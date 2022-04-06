@@ -1,0 +1,6 @@
+[submodule "dorado/3rdparty/koi"]
+	path = dorado/3rdparty/koi
+	url = ../koi.git
+[submodule "dorado/3rdparty/HighFive"]
+	path = dorado/3rdparty/HighFive
+	url = https://github.com/BlueBrain/HighFive.git

@@ -1,0 +1,9 @@
+*~
+build
+.vscode
+dorado/3rdparty/cuda11.3
+dorado/3rdparty/torch-*
+dorado/3rdparty/vbz_plugin
+cmake-build*
+.idea/
+.DS_Store
