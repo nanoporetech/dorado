@@ -1,0 +1,111 @@
+stages:
+  - build
+  - test
+
+variables:
+  BUILD_DIR: build
+  GIT_SUBMODULE_STRATEGY: recursive
+
+
+# Build stage components
+
+.macos_runner: &macos_runner
+  tags:
+    - macos
+    - m1
+
+.linux_runner: &linux_runner
+  tags:
+    - nvidia-docker
+
+.linux_dependencies: &linux_dependencies
+  before_script:
+    - echo Dorado dependency stage
+    # Fetch CUDA 11.3 (currently disabled as docker image already contains it)
+    #- wget -nv https://developer.download.nvidia.com/compute/cuda/11.3.0/local_installers/cuda_11.3.0_465.19.01_linux.run
+    #- sh cuda_11.3.0_465.19.01_linux.run --silent --toolkit
+    #- rm cuda_11.3.0_465.19.01_linux.run
+    # Install HDF 5
+    - apt-get update && apt-get install -y --no-install-recommends libhdf5-dev
+
+.build_dorado: &build_dorado
+  stage: build
+  script:
+    - echo Dorado build stage
+    - cmake ${BUILD_OPTIONS} -S . -B ${BUILD_DIR}
+    - cmake --build ${BUILD_DIR} --config Release -- -j 8
+  # We probably want to limit the amount of stuff in the artifacts by selecting out just the built EXEs
+  artifacts:
+    paths:
+      - build
+    expire_in: 1 day
+
+
+# Build stages themselves
+
+build:linux:x86:focal:install_deps:
+  image: ${DORADO_NO_DEPS}
+  <<: *linux_dependencies
+  <<: *linux_runner
+  <<: *build_dorado
+  when: manual
+
+build:linux:x86:focal:
+  image: ${DORADO_DEPS}
+  variables:
+    BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/libtorch"
+  <<: *linux_runner
+  <<: *build_dorado
+
+#build:macos:m1:
+#  <<: *macos_runner
+#  <<: *build_dorado
+
+# Test stage components
+
+.unit_test: &unit_test
+  stage: test
+  script:
+    - echo Dorado unit test stage
+    - ./${BUILD_DIR}/unit_test/dorado_tests
+
+.test_dorado: &test_dorado
+  stage: test
+  script:
+    - echo Dorado app test stage
+    - ./${BUILD_DIR}/bin/dorado ${TEST_MODEL_DIR}/dna_r9.4.1_e8_hac@v3.3 ./unit_test/data/
+
+# Manually building before testing until archiving is sorted
+# TODO: remove this by sorting out build artefacts from build stage
+.test_rebuild: &test_rebuild
+  before_script:
+    - echo Dorado build stage
+    - cmake ${BUILD_OPTIONS} -S . -B ${BUILD_DIR}
+    - cmake --build ${BUILD_DIR} --config Release -- -j 8
+
+# Test stages
+
+unit_test:linux:x86:focal:
+  image: ${DORADO_DEPS}
+  <<: *linux_runner
+  <<: *unit_test
+  needs:
+    - build:linux:x86:focal
+
+#unit_test:macos:m1:
+#  <<: *macos_runner
+#  <<: *test_rebuild
+#  <<: *unit_test
+
+# Dorado app tests disabled until a Box model is available
+# test:linux:x86:focal:
+#   image: ${DORADO_DEPS}
+#   <<: *linux_runner
+#   <<: *test_dorado
+#   needs:
+#     - build:linux:x86:focal
+
+# test:macos:m1:
+#   <<: *macos_runner
+#   <<: *test_rebuild
+#   <<: *test_dorado
