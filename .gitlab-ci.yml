@@ -57,9 +57,9 @@ build:linux:x86:focal:
   <<: *linux_runner
   <<: *build_dorado
 
-#build:macos:m1:
-#  <<: *macos_runner
-#  <<: *build_dorado
+build:macos:m1:
+  <<: *macos_runner
+  <<: *build_dorado
 
 # Test stage components
 
@@ -92,10 +92,10 @@ unit_test:linux:x86:focal:
   needs:
     - build:linux:x86:focal
 
-#unit_test:macos:m1:
-#  <<: *macos_runner
-#  <<: *test_rebuild
-#  <<: *unit_test
+unit_test:macos:m1:
+  <<: *macos_runner
+  <<: *test_rebuild
+  <<: *unit_test
 
 # Dorado app tests disabled until a Box model is available
 # test:linux:x86:focal:
