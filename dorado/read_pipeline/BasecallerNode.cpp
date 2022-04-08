@@ -12,7 +12,12 @@ void BasecallerNode::input_worker_thread() {
         // Wait until we are provided with a read
         std::unique_lock<std::mutex> lock(m_cv_mutex);
 
-        m_cv.wait_for(lock, 10ms, [this] {return !m_reads.empty();});
+        // Allow 5 batches per model runner on the chunks_in queue
+        size_t max_chunks_in = m_batch_size * m_num_active_model_runners * 5;
+
+        m_cv.wait_for(lock, 10ms, [this, &max_chunks_in] {
+            return (!m_reads.empty() and (m_chunks_in.size() < max_chunks_in));
+        });
 
         if (m_reads.empty()) {
             if (m_terminate) {
@@ -23,6 +28,10 @@ void BasecallerNode::input_worker_thread() {
             else {
                 continue;
             }
+        }
+
+        if (m_chunks_in.size() > max_chunks_in){
+            continue;
         }
 
         std::shared_ptr<Read> read = m_reads.front();
@@ -67,7 +76,8 @@ void BasecallerNode::basecall_current_batch(int worker_id) {
     // We need to assign each chunk back to the read it came from
     // MV TODO need a mutex on each source read - this is unsanfe.
     for (auto& complete_chunk : m_batched_chunks[worker_id]) {
-        complete_chunk->source_read->called_chunks.push_back(complete_chunk);
+        std::shared_ptr<Read> source_read = complete_chunk->source_read.lock();
+        source_read->called_chunks.push_back(complete_chunk);
     }
     m_batched_chunks[worker_id].clear();
 
@@ -128,8 +138,10 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
             std::shared_ptr<Chunk> chunk = m_chunks_in.front();
             m_chunks_in.pop_front();
             chunks_lock.unlock();
+
             // Copy the chunk into the input tensor
-            auto input_slice = chunk->source_read->raw_data.index({ Slice(chunk->input_offset, chunk->input_offset + m_chunk_size ) });
+            std::shared_ptr<Read> source_read = chunk->source_read.lock();
+            auto input_slice = source_read->raw_data.index({ Slice(chunk->input_offset, chunk->input_offset + m_chunk_size ) });
             size_t slice_size = input_slice.size(0);
 
             // Zero-pad any non-full chunks

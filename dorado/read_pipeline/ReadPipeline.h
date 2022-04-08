@@ -14,7 +14,7 @@ struct Chunk {
         idx_in_read(chunk_in_read_idx),
         raw_chunk_size(chunk_size){};
 
-    std::shared_ptr<Read> source_read;
+    std::weak_ptr<Read> source_read;
     size_t input_offset; // Where does this chunk start in the input raw read data
     size_t idx_in_read; // Just for tracking that the chunks don't go out of order
     size_t raw_chunk_size; // Just for knowing the original chunk size
