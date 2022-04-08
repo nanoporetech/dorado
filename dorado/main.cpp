@@ -10,18 +10,19 @@
 #include "read_pipeline/WriterNode.h"
 
 
-void setup(std::string model, std::string data, std::string device, size_t chunk_size, size_t overlap, size_t batch_size, size_t num_runners) {
+void setup(const std::string& model_path, const std::string& data_path, const std::string& device,
+        size_t chunk_size, size_t overlap, size_t batch_size, size_t num_runners) {
 
     auto decode_options = DecoderOptions();
     std::vector<std::shared_ptr<ModelRunner>> runners;
 
     if (device == "cpu") {
         for (int i = 0; i < num_runners; i++) {
-            runners.push_back(std::make_shared<ModelRunnerCPU>(model, device, chunk_size, batch_size, decode_options));
+            runners.push_back(std::make_shared<ModelRunnerCPU>(model_path, device, chunk_size, batch_size, decode_options));
         }
     } else {
         for (int i = 0; i < num_runners; i++) {
-            runners.push_back(std::make_shared<ModelRunnerGPU>(model, device, chunk_size, batch_size, decode_options));
+            runners.push_back(std::make_shared<ModelRunnerGPU>(model_path, device, chunk_size, batch_size, decode_options));
         }
     }
 
@@ -29,7 +30,7 @@ void setup(std::string model, std::string data, std::string device, size_t chunk
     BasecallerNode basecaller_node(writer_node, runners, batch_size, chunk_size, overlap);
     ScalerNode scaler_node(basecaller_node);
     Fast5DataLoader loader(scaler_node, "cpu");
-    loader.load_reads(data);
+    loader.load_reads(data_path);
 }
 
 

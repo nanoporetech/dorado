@@ -24,7 +24,7 @@ void fixed_string_reader(HighFive::Attribute& attribute, std::string& target_str
     };
 }
 
-void Fast5DataLoader::load_reads(std::string path) {
+void Fast5DataLoader::load_reads(const std::string& path) {
     for (const auto & entry : std::filesystem::directory_iterator(path)) {
         load_reads_from_file(entry.path());
     }
@@ -32,7 +32,7 @@ void Fast5DataLoader::load_reads(std::string path) {
     std::cerr << "> Loaded " << m_loaded_read_count << " reads" << std::endl;
 }
 
-void Fast5DataLoader::load_reads_from_file(std::string path) {
+void Fast5DataLoader::load_reads_from_file(const std::string& path) {
 
     // Read the file into a vector of torch tensors
     H5Easy::File file(path, H5Easy::File::ReadOnly);
@@ -76,7 +76,7 @@ void Fast5DataLoader::load_reads_from_file(std::string path) {
     }
 }
 
-Fast5DataLoader::Fast5DataLoader(ReadSink& read_sink, std::string device) :
+Fast5DataLoader::Fast5DataLoader(ReadSink& read_sink, const std::string& device) :
     m_read_sink(read_sink),
     m_device(device){
 }
