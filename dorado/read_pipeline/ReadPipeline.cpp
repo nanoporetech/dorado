@@ -9,4 +9,3 @@ void ReadSink::push_read(std::shared_ptr<Read>& read){
     m_reads.push_back(read);
     m_cv.notify_one();
 }
-

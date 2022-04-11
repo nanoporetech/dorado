@@ -29,38 +29,42 @@ void BasecallerNode::input_worker_thread() {
             }
         }
 
-        std::unique_lock<std::mutex> chunk_lock(m_chunks_in_mutex);
-        m_cv.wait_for(chunk_lock, 10ms, [this, &max_chunks_in] {
-            return (m_chunks_in.size() < max_chunks_in);
-        });
-
-        if (m_chunks_in.size() > max_chunks_in){
-            chunk_lock.unlock();
-            continue;
-        }
-
         std::shared_ptr<Read> read = m_reads.front();
         m_reads.pop_front();
         reads_lock.unlock();
 
-        // Here, we chunk up the read and put the chunks into the pending chunk list.
-        size_t raw_size = read->raw_data.size(0);
-        size_t offset = 0;
-        size_t chunk_in_read_idx = 0;
-        size_t signal_chunk_step = m_chunk_size - m_overlap;
-        m_chunks_in.push_back(std::make_shared<Chunk>(read, offset, chunk_in_read_idx++, m_chunk_size));
-        read->num_chunks = 1;
-        while (offset + m_chunk_size < raw_size) {
-            offset += signal_chunk_step;
-            m_chunks_in.push_back(std::make_shared<Chunk>(read, offset, chunk_in_read_idx++, m_chunk_size));
-            read->num_chunks++;
-        }
-        chunk_lock.unlock();
+        // Now that we have acquired a read and released the reads mutex, wait until we can push to chunks_in
+        while (true){
+            std::unique_lock<std::mutex> chunk_lock(m_chunks_in_mutex);
+            m_cv.wait_for(chunk_lock, 10ms, [this, &max_chunks_in] {
+                return (m_chunks_in.size() < max_chunks_in);
+            });
 
-        // Put the read in the working list
-        std::unique_lock<std::mutex> working_reads_lock(m_working_reads_mutex);
-        m_working_reads.push_back(read);
-        working_reads_lock.unlock();
+            if (m_chunks_in.size() > max_chunks_in){
+                continue;
+            }
+
+            // Here, we chunk up the read and put the chunks into the pending chunk list.
+            size_t raw_size = read->raw_data.size(0);
+            size_t offset = 0;
+            size_t chunk_in_read_idx = 0;
+            size_t signal_chunk_step = m_chunk_size - m_overlap;
+            m_chunks_in.push_back(std::make_shared<Chunk>(read, offset, chunk_in_read_idx++, m_chunk_size));
+            read->num_chunks = 1;
+            while (offset + m_chunk_size < raw_size) {
+                offset += signal_chunk_step;
+                m_chunks_in.push_back(std::make_shared<Chunk>(read, offset, chunk_in_read_idx++, m_chunk_size));
+                read->num_chunks++;
+            }
+            chunk_lock.unlock();
+
+            // Put the read in the working list
+            std::unique_lock<std::mutex> working_reads_lock(m_working_reads_mutex);
+            m_working_reads.push_back(read);
+            working_reads_lock.unlock();
+            break; // Go back to watching the input reads
+        }
+
     }
 }
 
