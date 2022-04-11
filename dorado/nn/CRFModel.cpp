@@ -146,7 +146,7 @@ struct CRFModelImpl : Module {
 TORCH_MODULE(CRFModel);
 
 
-ModuleHolder<AnyModule> load_crf_model(std::string path, int batch_size, int chunk_size, torch::TensorOptions options) {
+ModuleHolder<AnyModule> load_crf_model(const std::string& path, int batch_size, int chunk_size, torch::TensorOptions options) {
 
     auto state_dict = load_weights(path);
     auto lw = state_dict[state_dict.size() - 2];

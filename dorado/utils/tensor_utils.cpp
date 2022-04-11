@@ -2,14 +2,14 @@
 #include <torch/csrc/jit/serialization/pickle.h>
 #include "torch/torch.h"
 
-void serialise_tensor(torch::Tensor t, std::string path) {
+void serialise_tensor(torch::Tensor t, const std::string& path) {
     auto bytes = torch::jit::pickle_save(t);
     std::ofstream fout(path);
     fout.write(bytes.data(), bytes.size());
     fout.close();
 }
 
-std::vector<torch::Tensor> load_weights(std::string dir) {
+std::vector<torch::Tensor> load_weights(const std::string& dir) {
 
     auto weights = std::vector<torch::Tensor>();
     auto tensors = std::vector{
