@@ -9,14 +9,13 @@ using namespace torch::indexing;
 
 void BasecallerNode::input_worker_thread() {
     while (true) {
-        // Wait until we are provided with a read
-        std::unique_lock<std::mutex> lock(m_cv_mutex);
-
         // Allow 5 batches per model runner on the chunks_in queue
         size_t max_chunks_in = m_batch_size * m_num_active_model_runners * 5;
 
-        m_cv.wait_for(lock, 10ms, [this, &max_chunks_in] {
-            return (!m_reads.empty() and (m_chunks_in.size() < max_chunks_in));
+        // Wait until we are provided with a read
+        std::unique_lock<std::mutex> reads_lock(m_cv_mutex);
+        m_cv.wait_for(reads_lock, 10ms, [this] {
+            return (!m_reads.empty());
         });
 
         if (m_reads.empty()) {
@@ -30,20 +29,25 @@ void BasecallerNode::input_worker_thread() {
             }
         }
 
+        std::unique_lock<std::mutex> chunk_lock(m_chunks_in_mutex);
+        m_cv.wait_for(chunk_lock, 10ms, [this, &max_chunks_in] {
+            return (m_chunks_in.size() < max_chunks_in);
+        });
+
         if (m_chunks_in.size() > max_chunks_in){
+            chunk_lock.unlock();
             continue;
         }
 
         std::shared_ptr<Read> read = m_reads.front();
         m_reads.pop_front();
-        lock.unlock();
+        reads_lock.unlock();
 
         // Here, we chunk up the read and put the chunks into the pending chunk list.
         size_t raw_size = read->raw_data.size(0);
         size_t offset = 0;
         size_t chunk_in_read_idx = 0;
         size_t signal_chunk_step = m_chunk_size - m_overlap;
-        std::unique_lock<std::mutex> chunk_lock(m_chunks_in_mutex);
         m_chunks_in.push_back(std::make_shared<Chunk>(read, offset, chunk_in_read_idx++, m_chunk_size));
         read->num_chunks = 1;
         while (offset + m_chunk_size < raw_size) {
