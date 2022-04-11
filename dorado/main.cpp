@@ -1,9 +1,9 @@
 #include <iostream>
 #include <argparse.hpp>
 
-#include "decode/Decoder.h"
-#include "nn/ModelRunnerCPU.h"
-#include "nn/ModelRunnerGPU.h"
+#include "nn/ModelRunner.h"
+#include "decode/CPUDecoder.h"
+#include "decode/GPUDecoder.h"
 #include "data_loader/Fast5DataLoader.h"
 #include "read_pipeline/ScalerNode.h"
 #include "read_pipeline/BasecallerNode.h"
@@ -12,16 +12,16 @@
 
 void setup(std::string model, std::string data, std::string device, size_t chunk_size, size_t overlap, size_t batch_size, size_t num_runners) {
 
+    std::vector<Runner> runners;
     auto decode_options = DecoderOptions();
-    std::vector<std::shared_ptr<ModelRunner>> runners;
 
     if (device == "cpu") {
         for (int i = 0; i < num_runners; i++) {
-            runners.push_back(std::make_shared<ModelRunnerCPU>(model, device, chunk_size, batch_size, decode_options));
+            runners.push_back(std::make_shared<ModelRunner<CPUDecoder>>(model, device, chunk_size, batch_size, decode_options));
         }
     } else {
         for (int i = 0; i < num_runners; i++) {
-            runners.push_back(std::make_shared<ModelRunnerGPU>(model, device, chunk_size, batch_size, decode_options));
+            runners.push_back(std::make_shared<ModelRunner<GPUDecoder>>(model, device, chunk_size, batch_size, decode_options));
         }
     }
 
