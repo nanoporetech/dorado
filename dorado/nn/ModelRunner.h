@@ -30,7 +30,7 @@ template<typename T> class ModelRunner : public ModelRunnerBase {
 template<typename T> ModelRunner<T>::ModelRunner(const std::string &model, const std::string &device, int chunk_size, int batch_size, DecoderOptions d_options) {
     m_decoder_options = d_options;
     m_decoder = std::make_unique<T>();
-    m_options = torch::TensorOptions().dtype(m_decoder->dtype).device(device);
+    m_options = torch::TensorOptions().dtype(T::dtype).device(device);
     m_input = torch::zeros({batch_size, 1, chunk_size}, m_options);
     m_module = load_crf_model(model, batch_size, chunk_size, m_options);
 }

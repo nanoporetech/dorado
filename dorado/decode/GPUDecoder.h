@@ -7,7 +7,7 @@ class GPUDecoder : Decoder {
 
     public:
         std::vector<DecodedChunk> beam_search(torch::Tensor scores, int num_chunks, DecoderOptions options) final;
-        torch::ScalarType dtype = torch::kF16;
+        constexpr static torch::ScalarType dtype = torch::kF16;
 
     private:
         torch::Tensor chunks;

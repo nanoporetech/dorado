@@ -21,5 +21,4 @@ struct DecoderOptions {
 class Decoder {
     public:
         virtual std::vector<DecodedChunk> beam_search(torch::Tensor scores, int num_chunks, DecoderOptions options) = 0;
-        torch::ScalarType dtype = torch::kF32;
 };
