@@ -117,11 +117,6 @@ set(LIB_SOURCE_FILES
         dorado/nn/CRFModel.h
         dorado/nn/CRFModel.cpp
         dorado/nn/ModelRunner.h
-        dorado/nn/ModelRunnerCPU.h
-        dorado/nn/ModelRunnerCPU.cpp
-        dorado/nn/ModelRunnerCPU.h
-        dorado/nn/ModelRunnerGPU.cpp
-        dorado/nn/ModelRunnerGPU.h
         dorado/read_pipeline/ReadPipeline.cpp
         dorado/read_pipeline/ReadPipeline.h
         dorado/read_pipeline/ScalerNode.cpp

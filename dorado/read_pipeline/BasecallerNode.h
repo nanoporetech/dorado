@@ -5,7 +5,7 @@
 class BasecallerNode : public ReadSink {
 public:
     // Chunk size and overlap are in raw samples
-    BasecallerNode(ReadSink &sink, std::vector<std::shared_ptr<ModelRunner>> &model_runners, size_t batch_size,
+    BasecallerNode(ReadSink &sink, std::vector<Runner> &model_runners, size_t batch_size,
                    size_t chunk_size, size_t overlap, size_t max_reads=1000);
     ~BasecallerNode();
 
@@ -18,7 +18,7 @@ private:
     std::unique_ptr<std::thread> m_input_worker; // Chunks up incoming reads and sticks them in the pending list
     std::vector<std::unique_ptr<std::thread>> m_basecall_workers; // Basecalls chunks from the queue and puts read on the sink.
     std::string m_model_path;
-    std::vector<std::shared_ptr<ModelRunner>> m_model_runners;
+    std::vector<Runner> m_model_runners;
     size_t m_batch_size;
     size_t m_chunk_size;
     size_t m_overlap;
