@@ -52,7 +52,7 @@ void BasecallerNode::input_worker_thread() {
             m_chunks_in.push_back(std::make_shared<Chunk>(read, offset, chunk_in_read_idx++, m_chunk_size));
             read->num_chunks = 1;
             while (offset + m_chunk_size < raw_size) {
-                offset += signal_chunk_step;
+                offset = std::min(offset + signal_chunk_step, raw_size - signal_chunk_step);
                 m_chunks_in.push_back(std::make_shared<Chunk>(read, offset, chunk_in_read_idx++, m_chunk_size));
                 read->num_chunks++;
             }
