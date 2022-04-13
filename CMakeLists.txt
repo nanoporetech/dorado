@@ -59,6 +59,14 @@ function(get_hdf_vbz_plugin)
     endif()
 endfunction()
 
+function(copy_hdf_vbz_plugin)
+    if(LINUX)
+        file(COPY ${3RD_PARTY}/vbz_plugin/libvbz_hdf_plugin.so DESTINATION "${CMAKE_BINARY_DIR}/lib")
+    elseif(APPLE)
+        file(COPY ${3RD_PARTY}/vbz_plugin/libvbz_hdf_plugin.dylib DESTINATION "${CMAKE_BINARY_DIR}/lib")
+    endif()
+endfunction()
+
 
 if(UNIX AND NOT APPLE)
     set(LINUX TRUE)
@@ -83,6 +91,7 @@ elseif(APPLE)
 endif()
 
 get_hdf_vbz_plugin()
+copy_hdf_vbz_plugin()
 
 if(DEFINED DORADO_LIBTORCH_DIR)
     # Use the existing libtorch we have been pointed at
