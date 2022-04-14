@@ -26,7 +26,11 @@ void fixed_string_reader(HighFive::Attribute& attribute, std::string& target_str
 
 void Fast5DataLoader::load_reads(const std::string& path) {
     for (const auto & entry : std::filesystem::directory_iterator(path)) {
-        load_reads_from_file(entry.path());
+        std::string ext = std::filesystem::path(entry).extension().string();
+        std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c){ return std::tolower(c); });
+        if(ext == ".fast5") {
+            load_reads_from_file(entry.path());
+        }
     }
     m_read_sink.terminate();
     std::cerr << "> Loaded " << m_loaded_read_count << " reads" << std::endl;
@@ -80,5 +84,3 @@ Fast5DataLoader::Fast5DataLoader(ReadSink& read_sink, const std::string& device)
     m_read_sink(read_sink),
     m_device(device){
 }
-
-
