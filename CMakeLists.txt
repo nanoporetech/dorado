@@ -201,14 +201,14 @@ if(LINUX)
     # WON'T be archived into koi_lib, but will be added as a dep to anything that depends on koi_lib
 
     #sparse_logZ
-    add_library(koi_spase_logz_max dorado/3rdparty/koi/koi/lib/sparse_logZ.cu)
-    target_compile_options(koi_spase_logz_max PRIVATE ${KOI_FLAGS} -DFLOAT=float -DZERO=-1e38 -DSUM=max_
+    add_library(koi_sparse_logz_max dorado/3rdparty/koi/koi/lib/sparse_logZ.cu)
+    target_compile_options(koi_sparse_logz_max PRIVATE ${KOI_FLAGS} -DFLOAT=float -DZERO=-1e38 -DSUM=max_
             -DLOGZ_FWD_HOST_FN_NAME=logZ_fwd_host_max -DLOGZ_FWD_KERNEL_NAME=logz_fwd_max -DNZ=5 -DK=1 -DMUL=add -DSUFFIX=_max)
-    target_link_libraries(koi_lib koi_spase_logz_max)
-    add_library(koi_spase_logz_log dorado/3rdparty/koi/koi/lib/sparse_logZ.cu)
-    target_compile_options(koi_spase_logz_log PRIVATE ${KOI_FLAGS} -DFLOAT=float -DZERO=-1e38 -DSUM=logsumexp
+    target_link_libraries(koi_lib koi_sparse_logz_max)
+    add_library(koi_sparse_logz_log dorado/3rdparty/koi/koi/lib/sparse_logZ.cu)
+    target_compile_options(koi_sparse_logz_log PRIVATE ${KOI_FLAGS} -DFLOAT=float -DZERO=-1e38 -DSUM=logsumexp
             -DLOGZ_FWD_HOST_FN_NAME=logZ_fwd_host_log -DLOGZ_FWD_KERNEL_NAME=logz_fwd_log -DNZ=5 -DK=1 -DMUL=add -DSUFFIX=_log)
-    target_link_libraries(koi_lib koi_spase_logz_log)
+    target_link_libraries(koi_lib koi_sparse_logz_log)
 
     #lstm
     add_library(koi_lstm_fwd dorado/3rdparty/koi/koi/lib/lstm.cu)
