@@ -31,14 +31,13 @@ template<typename T> ModelRunner<T>::ModelRunner(const std::string &model, const
     m_decoder_options = d_options;
     m_decoder = std::make_unique<T>();
     m_options = torch::TensorOptions().dtype(T::dtype).device(device);
-    m_input = torch::zeros({batch_size, 1, chunk_size}, m_options);
+    m_input = torch::zeros({batch_size, 1, chunk_size}, torch::TensorOptions().dtype(T::dtype).device(torch::kCPU));
     m_module = load_crf_model(model, batch_size, chunk_size, m_options);
 }
 
 template<typename T> std::vector<DecodedChunk> ModelRunner<T>::call_chunks(int num_chunks) {
     torch::InferenceMode guard;
-    m_input = m_input.to(m_options.device_opt().value());
-    auto scores = m_module->forward(m_input);
+    auto scores = m_module->forward(m_input.to(m_options.device_opt().value()));
     return m_decoder->beam_search(scores, num_chunks, m_decoder_options);
 }
 
