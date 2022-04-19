@@ -18,5 +18,5 @@ class GPUDecoder : Decoder {
         torch::Tensor sequence;
         torch::Tensor qstring;
         bool initialized{false};
-
+        int get_cuda_device_id_from_device(const c10::Device& device);
 };
