@@ -51,7 +51,7 @@ void Fast5DataLoader::load_reads_from_file(const std::string& path) {
         float digitisation;
         digitisation_attr.read(digitisation);
         float range;
-        digitisation_attr.read(range);
+        range_attr.read(range);
         float offset;
         offset_attr.read(offset);
 
