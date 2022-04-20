@@ -6,6 +6,7 @@
 extern "C" {
     #include "3rdparty/koi/koi/lib/lib.h"
 }
+#include <cuda_runtime.h>
 #endif
 
 
@@ -53,7 +54,10 @@ std::vector<DecodedChunk> GPUDecoder::beam_search(torch::Tensor scores, int num_
     qstring.index({torch::indexing::Slice()})  = 0.0;
 
 #ifndef __APPLE__
-
+    int cuda_device_id = get_cuda_device_id_from_device(scores.device());
+    if(cudaSetDevice(cuda_device_id) != cudaSuccess){
+        throw std::runtime_error("Unable to set cuda device!");
+    }
     host_back_guide_step(chunks.data_ptr(),
                           chunk_results.data_ptr(),
                           N,
@@ -142,4 +146,15 @@ std::vector<DecodedChunk> GPUDecoder::beam_search(torch::Tensor scores, int num_
 
     return called_chunks;
 
+}
+
+
+int GPUDecoder::get_cuda_device_id_from_device(const c10::Device& device) {
+    if(!device.is_cuda() || !device.has_index()) {
+        std::stringstream ss;
+        ss << "Unable to extract CUDA device ID from device " << device;
+        throw std::runtime_error(ss.str());
+    }
+
+    return device.index();
 }
