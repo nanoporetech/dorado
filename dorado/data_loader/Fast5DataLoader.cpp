@@ -25,6 +25,17 @@ void fixed_string_reader(HighFive::Attribute& attribute, std::string& target_str
 }
 
 void Fast5DataLoader::load_reads(const std::string& path) {
+    if(!std::filesystem::exists(path)) {
+        std::cerr << "Requested input path " << path << " does not exist!" << std::endl;
+        m_read_sink.terminate();
+        return;
+    }
+    if(!std::filesystem::is_directory(path)) {
+        std::cerr << "Requested input path " << path << " is not a directory!" << std::endl;
+        m_read_sink.terminate();
+        return;
+    }
+
     for (const auto & entry : std::filesystem::directory_iterator(path)) {
         std::string ext = std::filesystem::path(entry).extension().string();
         std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c){ return std::tolower(c); });
