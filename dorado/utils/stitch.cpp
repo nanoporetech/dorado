@@ -35,9 +35,9 @@ void stitch_chunks(std::shared_ptr<Read> read) {
 
         int current_chunk_seq_len = current_chunk->seq.size();
         int end_pos = current_chunk_seq_len - current_chunk_bases_to_trim;
-
-        sequences.push_back(current_chunk->seq.substr(start_pos, end_pos));
-        qstrings.push_back(current_chunk->qstring.substr(start_pos, end_pos));
+        int trimmed_len = end_pos - start_pos;
+        sequences.push_back(current_chunk->seq.substr(start_pos, trimmed_len));
+        qstrings.push_back(current_chunk->qstring.substr(start_pos, trimmed_len));
 
         start_pos = 0;
         for (int i=0; i < mid_point; i++){
