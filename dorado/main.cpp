@@ -77,10 +77,6 @@ int main(int argc, char *argv[]) {
         std::exit(1);
     }
 
-    std::filesystem::path exe_path{argv[0]};
-    auto libdir = exe_path.parent_path() /  ".." / "lib";
-    setenv("HDF5_PLUGIN_PATH", libdir.c_str(), 0);
-
     std::cerr << "> Creating basecall pipeline" << std::endl;
     try {
         setup(
