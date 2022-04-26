@@ -4,3 +4,6 @@
 [submodule "dorado/3rdparty/HighFive"]
 	path = dorado/3rdparty/HighFive
 	url = https://github.com/BlueBrain/HighFive.git
+[submodule "dorado/3rdparty/toml11"]
+	path = dorado/3rdparty/toml11
+	url = https://github.com/ToruNiina/toml11.git

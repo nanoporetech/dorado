@@ -118,6 +118,7 @@ include_directories(${HDF5_INCLUDE_DIRS}
 		    dorado/3rdparty/HDF5/apple/1.12.1/include
 		    dorado/3rdparty/catch2
 		    dorado/3rdparty/argparse
+		    dorado/3rdparty/toml11
 		    dorado)
 
 set(LIB_SOURCE_FILES
