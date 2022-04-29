@@ -5,6 +5,12 @@ set(TORCH_VERSION 1.10.2)
 set(CMAKE_CXX_STANDARD 20)
 option(DYNAMIC_HDF "Link HDF as dynamic libs" OFF)
 
+if(WIN32)
+    message(STATUS "toolset: " ${CMAKE_GENERATOR_TOOLSET})
+    message(STATUS "platform: " ${CMAKE_GENERATOR_PLATFORM})
+    message(STATUS "vs platform: " ${CMAKE_VS_PLATFORM_NAME})
+endif()
+
 find_package(Git QUIET)
 if(GIT_FOUND AND EXISTS "${PROJECT_SOURCE_DIR}/.git")
 # Update submodules as needed
@@ -43,7 +49,17 @@ function(add_hdf_vbz_plugin)
     set(ENABLE_PYTHON OFF)
     set(ENABLE_PACKAGING OFF)
     set(BUILD_SHARED_LIBS OFF)
-
+    if(WIN32)
+        # On windows we need to build a static lib for zstd as there's no prebuilt distro
+        execute_process(COMMAND cmake -S dorado/3rdparty/zstd/build/cmake -B dorado/3rdparty/zstd/build/cmake/cmake-build -A x64)
+        execute_process(COMMAND cmake --build dorado/3rdparty/zstd/build/cmake/cmake-build --config Release)
+        # On windows we need to tell hdf_plugins where we put the built zstd lib
+        set(CONAN_INCLUDE_DIRS_RELEASE ${CMAKE_SOURCE_DIR}/dorado/3rdparty/zstd/lib)
+        set(CONAN_INCLUDE_DIRS_DEBUG ${CMAKE_SOURCE_DIR}/dorado/3rdparty/zstd/lib)
+        set(CONAN_LIB_DIRS_RELEASE ${CMAKE_SOURCE_DIR}/dorado/3rdparty/zstd/build/cmake/cmake-build/lib/Release)
+        set(CONAN_LIB_DIRS_DEBUG ${CMAKE_SOURCE_DIR}/dorado/3rdparty/zstd/build/cmake/cmake-build/lib/Debug)
+    endif()
+   
     add_subdirectory(dorado/3rdparty/hdf_plugins)
 endfunction()
 
@@ -68,18 +84,29 @@ if(LINUX)
 elseif(APPLE)
     set(TORCH_URL https://files.pythonhosted.org/packages/7b/91/89bbe2316b93671b6bccec094df6bc66109cf6d21a364cd2f1becd11ba3c/torch-${TORCH_VERSION}-cp39-none-macosx_11_0_arm64.whl)
     set(TORCH_LIB "${CMAKE_SOURCE_DIR}/dorado/3rdparty/torch-${TORCH_VERSION}-${CMAKE_SYSTEM_NAME}/torch")
+elseif(WIN32)
+    enable_language(CUDA)
+    set(TORCH_URL https://download.pytorch.org/libtorch/cu113/libtorch-win-shared-with-deps-${TORCH_VERSION}%2Bcu113.zip)
+    set(TORCH_LIB "${CMAKE_SOURCE_DIR}/dorado/3rdparty/torch-${TORCH_VERSION}-${CMAKE_SYSTEM_NAME}/libtorch")
+    
+    # On windows, we need to build HDF5
+    download_and_extract(https://gamma.hdfgroup.org/ftp/pub/outgoing/hdf5/snapshots/v112/OLD/hdf5-1.12.1-3.tar.gz
+        hdf-1.12.1)
+    #execute_process(COMMAND cmake -S dorado/3rdparty/hdf-1.12.1/hdf5-1.12.1-3 -B dorado/3rdparty/hdf-1.12.1/hdf5-1.12.1-3/cmake-build -A x64)
+    #execute_process(COMMAND cmake --build dorado/3rdparty/hdf-1.12.1/hdf5-1.12.1-3/cmake-build --config Release)
+    list(APPEND CMAKE_PREFIX_PATH "C:/Program Files/HDF_Group/HDF5/1.12.1/")
 endif()
 
 add_hdf_vbz_plugin()
 
 if(DEFINED DORADO_LIBTORCH_DIR)
     # Use the existing libtorch we have been pointed at
-    set(CMAKE_PREFIX_PATH ${DORADO_LIBTORCH_DIR})
+    list(APPEND CMAKE_PREFIX_PATH ${DORADO_LIBTORCH_DIR})
     message(STATUS "Using existing libtorch at ${DORADO_LIBTORCH_DIR}")
 else()
     # Get libtorch (if we don't already have it)
     download_and_extract(${TORCH_URL} torch-${TORCH_VERSION}-${CMAKE_SYSTEM_NAME})
-    set(CMAKE_PREFIX_PATH "${TORCH_LIB}")
+    list(APPEND CMAKE_PREFIX_PATH "${TORCH_LIB}")
 endif()
 find_package(Torch REQUIRED)
 
@@ -89,8 +116,15 @@ if(DYNAMIC_HDF)
 else()
     set (HDF5_USE_STATIC_LIBRARIES On)
 endif()
+
 find_package(HDF5 COMPONENTS C CXX HL)
 
+if(WIN32)
+    add_compile_options(
+        # Note we need to use the generator expression to avoid setting this for CUDA.
+        $<$<COMPILE_LANGUAGE:CXX>:/wd4624> # from libtorch: destructor was implicitly defined as deleted 
+    )
+endif()
 
 include_directories(${HDF5_INCLUDE_DIRS}
 		    dorado/3rdparty/HighFive/include
@@ -150,7 +184,7 @@ add_subdirectory(unit_test)
 # making an exe called 'dorado' right into the root here, which causes conflicts with cmake naming.
 # TODO: sort out cmake structure and put dorado sources into a lib, then move the dorado exe into a subfolder and add install target for it.
 
-if(LINUX)
+if(LINUX OR WIN32)
     # Note that any source file which gets compiled multiple times with differing flags won't get added here. See below.
     set(KOI_SOURCE_FILES dorado/3rdparty/koi/koi/lib/ctc_simple.cu
             dorado/3rdparty/koi/koi/lib/cuda_beam_search_constants.h
@@ -161,7 +195,6 @@ if(LINUX)
     set(KOI_FLAGS -c
             --ptxas-options=-v
             -Xcompiler
-            '-fPIC'
             --use_fast_math
             --restrict
             )
@@ -172,6 +205,12 @@ if(LINUX)
             PRIVATE
             ${KOI_FLAGS}
             )
+if(LINUX)
+    target_compile_options(koi_lib
+            PRIVATE
+            '-fPIC'
+            )
+endif()
 
     set_source_files_properties(dorado/3rdparty/koi/koi/lib/ctc_simple.cu PROPERTIES COMPILE_FLAGS "-DFLOAT=float -DZERO=-1e38 -DSUM=logsumexp2 -DMUL=add")
     set_source_files_properties(dorado/3rdparty/koi/koi/lib/decoder_lib.cu PROPERTIES COMPILE_FLAGS "-D REMOVE_FIXED_BEAM_STAYS=1")
@@ -214,4 +253,4 @@ if(LINUX)
 
     # Finally add a dependency on koi_lib to the dorado project
     target_link_libraries(dorado_lib koi_lib)
-endif() # LINUX
+endif() # LINUX OR WIN32

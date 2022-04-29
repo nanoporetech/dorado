@@ -94,7 +94,7 @@ int ScalerNode::trim(torch::Tensor signal, int window_size, float threshold_fact
         auto elements = window > threshold;
 
 
-        if ((elements.sum().item<int>() > min_elements) or seen_peak) {
+        if ((elements.sum().item<int>() > min_elements) || seen_peak) {
             seen_peak = true;
             if (window[-1].item<float>() > threshold) {
                 continue;

@@ -1,5 +1,6 @@
 #include "Fast5DataLoader.h"
 #include <filesystem>
+#include <cctype>
 #include "vbz_plugin_user_utils.h"
 
 namespace {
@@ -41,7 +42,7 @@ void Fast5DataLoader::load_reads(const std::string& path) {
         std::string ext = std::filesystem::path(entry).extension().string();
         std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c){ return std::tolower(c); });
         if(ext == ".fast5") {
-            load_reads_from_file(entry.path());
+            load_reads_from_file(entry.path().string());
         }
     }
     m_read_sink.terminate();

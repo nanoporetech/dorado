@@ -27,7 +27,7 @@
 
 // Compression function for Merkle-Damgard construction.
 // This function is generated using the framework provided.
-uint64_t mix(uint64_t h) {
+static uint64_t mix(uint64_t h) {
     h ^= h >> 23;
     h *= 0x2127599bf4325c37ULL;
     h ^= h >> 47;
