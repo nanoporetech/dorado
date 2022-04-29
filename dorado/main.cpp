@@ -12,7 +12,7 @@
 
 
 void setup(const std::string& model_path, const std::string& data_path, const std::string& device,
-        size_t chunk_size, size_t overlap, size_t batch_size, size_t num_runners) {
+        size_t chunk_size, size_t overlap, size_t batch_size, size_t num_runners, bool emit_sam) {
 
     std::vector<Runner> runners;
     auto decode_options = DecoderOptions();
@@ -68,6 +68,10 @@ int main(int argc, char *argv[]) {
             .default_value(1)
             .scan<'i', int>();
 
+    parser.add_argument("--emit-sam")
+            .default_value(false)
+            .implicit_value(true);
+
     try {
         parser.parse_args(argc, argv);
     }
@@ -90,7 +94,8 @@ int main(int argc, char *argv[]) {
             parser.get<int>("-c"),
             parser.get<int>("-o"),
             parser.get<int>("-b"),
-            parser.get<int>("-r")
+            parser.get<int>("-r"),
+            parser.get<bool>("--emit-sam")
         );
     }
     catch (const std::exception& e) {
