@@ -47,6 +47,7 @@ public:
 // Base class for an object which consumes reads
 class ReadSink {
 public:
+    ReadSink(size_t max_reads);
     void push_read(std::shared_ptr<Read>& read);
     void terminate() { m_terminate = true; }
 protected:

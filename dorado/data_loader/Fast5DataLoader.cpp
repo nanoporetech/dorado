@@ -1,4 +1,7 @@
 #include "Fast5DataLoader.h"
+#include "../read_pipeline/ReadPipeline.h"
+#include <highfive/H5File.hpp>
+#include <highfive/H5Easy.hpp>
 #include <filesystem>
 
 namespace {

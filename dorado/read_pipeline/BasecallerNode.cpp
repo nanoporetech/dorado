@@ -176,18 +176,16 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
 
 BasecallerNode::BasecallerNode(ReadSink &sink, std::vector<Runner> &model_runners,
                                size_t batch_size,
-                               size_t chunk_size, size_t overlap, size_t max_reads) :
-    m_sink(sink),
-    m_model_runners(model_runners),
-    m_batch_size(batch_size),
-    m_chunk_size(chunk_size),
-    m_overlap(overlap),
-    m_terminate_basecaller(false)
+                               size_t chunk_size, size_t overlap, size_t max_reads)
+    : ReadSink(max_reads)
+    , m_sink(sink)
+    , m_model_runners(model_runners)
+    , m_batch_size(batch_size)
+    , m_chunk_size(chunk_size)
+    , m_overlap(overlap)
+    , m_terminate_basecaller(false)
+    , m_input_worker(new std::thread(&BasecallerNode::input_worker_thread, this))
 {
-    m_input_worker.reset(new std::thread(&BasecallerNode::input_worker_thread, this));
-
-    m_max_reads = max_reads;
-
     //Spin up the model runners:
     int num_model_runners = m_model_runners.size();
     for(int i=0; i<num_model_runners; i++) {
@@ -205,6 +203,8 @@ BasecallerNode::BasecallerNode(ReadSink &sink, std::vector<Runner> &model_runner
 
 BasecallerNode::~BasecallerNode()
 {
+    terminate();
+    m_cv.notify_one();    
     m_input_worker->join();
     for (auto &t: m_basecall_workers){
         t->join();

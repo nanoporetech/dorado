@@ -55,15 +55,17 @@ void ScalerNode::worker_thread(){
     }
 }
 
-ScalerNode::ScalerNode(ReadSink& sink, size_t max_reads) :
-    m_sink(sink)
+ScalerNode::ScalerNode(ReadSink& sink, size_t max_reads) 
+    : ReadSink(max_reads)
+    , m_sink(sink)
+    , m_worker(new std::thread(&ScalerNode::worker_thread, this))
 {
-    m_worker.reset(new std::thread(&ScalerNode::worker_thread, this));
-    m_max_reads = max_reads;
 }
 
 ScalerNode::~ScalerNode()
 {
+    terminate();
+    m_cv.notify_one();
     m_worker->join();
 }
 

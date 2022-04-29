@@ -27,7 +27,7 @@ void setup(const std::string& model_path, const std::string& data_path, const st
         }
     }
 
-    WriterNode writer_node;
+    WriterNode writer_node(emit_sam);
     BasecallerNode basecaller_node(writer_node, runners, batch_size, chunk_size, overlap);
     ScalerNode scaler_node(basecaller_node);
     Fast5DataLoader loader(scaler_node, "cpu");
