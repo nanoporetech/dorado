@@ -1,31 +1,48 @@
 #include "Fast5DataLoader.h"
 #include "../read_pipeline/ReadPipeline.h"
+
 #include <highfive/H5File.hpp>
 #include <highfive/H5Easy.hpp>
+
+#include <ctime>
 #include <filesystem>
 
 namespace {
 void fixed_string_reader(HighFive::Attribute& attribute, std::string& target_str) {
-        // Create landing buffer and H5 datatype
-        size_t size = attribute.getDataType().getSize();
-        std::vector<char> target_array(size);
-        hid_t dtype = H5Tcopy(H5T_C_S1);
-        H5Tset_size(dtype, size);
+    // Create landing buffer and H5 datatype
+    size_t size = attribute.getDataType().getSize();
+    std::vector<char> target_array(size);
+    hid_t dtype = H5Tcopy(H5T_C_S1);
+    H5Tset_size(dtype, size);
 
-        // Copy to landing buffer
-        if (H5Aread(attribute.getId(), dtype, target_array.data()) < 0) {
-            throw std::runtime_error("Error during H5Aread of fixed length string");
-        }
+    // Copy to landing buffer
+    if (H5Aread(attribute.getId(), dtype, target_array.data()) < 0) {
+        throw std::runtime_error("Error during H5Aread of fixed length string");
+    }
 
-        // Extract to string
-        target_str = std::string(target_array.data(), size);
-        // It's possible the null terminator appears before the end of the string
-        size_t eol_pos = target_str.find(char(0));
-        if (eol_pos < target_str.size()) {
-            target_str.resize(eol_pos);
-        } 
-    };
+    // Extract to string
+    target_str = std::string(target_array.data(), size);
+    // It's possible the null terminator appears before the end of the string
+    size_t eol_pos = target_str.find(char(0));
+    if (eol_pos < target_str.size()) {
+        target_str.resize(eol_pos);
+    } 
+};
+
+std::string adjust_time(const std::string& time_stamp, uint32_t offset) {
+    // Expects the time to be encoded like "2017-09-12T9:50:12Z".
+    // Adds the offset (in seconds) to the timeStamp.
+    std::tm base_time = {};
+    strptime(time_stamp.c_str(), "%Y-%m-%dT%H:%M:%SZ", &base_time);
+    time_t timeObj = mktime(&base_time);
+    timeObj += offset;
+    std::tm* new_time = gmtime(&timeObj);
+    char buff[32];
+    strftime(buff, 32, "%FT%TZ", new_time);
+    return std::string(buff);
 }
+} /* anonymous namespace */
+
 
 void Fast5DataLoader::load_reads(const std::string& path) {
     if(!std::filesystem::exists(path)) {
@@ -66,16 +83,27 @@ void Fast5DataLoader::load_reads_from_file(const std::string& path) {
         HighFive::Attribute digitisation_attr = channel_id_group.getAttribute("digitisation");
         HighFive::Attribute range_attr = channel_id_group.getAttribute("range");
         HighFive::Attribute offset_attr = channel_id_group.getAttribute("offset");
-        // TODO: need to check type and if read as string then convert to int32_t
-        // Reading as string currently not functioning
-        // HighFive::Attribute channel_number_attr = channel_id_group.getAttribute("channel_number");
-        // int32_t channel_number;
+        HighFive::Attribute sampling_rate_attr = channel_id_group.getAttribute("sampling_rate");
+        HighFive::Attribute channel_number_attr = channel_id_group.getAttribute("channel_number"); 
+
+        int32_t channel_number;
+        if (channel_number_attr.getDataType().string().starts_with("String")) {
+            std::string channel_number_string;
+            fixed_string_reader(channel_number_attr, channel_number_string);
+            std::istringstream channel_stream(channel_number_string);
+            channel_stream >> channel_number;
+        } else {
+            channel_number_attr.read(channel_number);
+        }
+
         float digitisation;
         digitisation_attr.read(digitisation);
         float range;
         range_attr.read(range);
         float offset;
         offset_attr.read(offset);
+        float sampling_rate;
+        sampling_rate_attr.read(sampling_rate);
 
         HighFive::Group raw = read.getGroup("Raw");
         auto ds = raw.getDataSet("Signal");
@@ -87,14 +115,22 @@ void Fast5DataLoader::load_reads_from_file(const std::string& path) {
 
         HighFive::Attribute mux_attr = raw.getAttribute("start_mux");
         HighFive::Attribute read_number_attr = raw.getAttribute("read_number");
-        // TODO: Reading as string currently not functioning
-        // HighFive::Attribute start_time_attr = raw.getAttribute("start_time");
-        // std::string start_time;
+        HighFive::Attribute start_time_attr = raw.getAttribute("start_time");
         uint32_t mux;
         uint32_t read_number;
+        uint64_t start_time;
         mux_attr.read(mux);
         read_number_attr.read(read_number);
+        start_time_attr.read(start_time);
+
         std::string fast5_filename = std::filesystem::path(path).filename().string();
+
+        HighFive::Group tracking_id_group = read.getGroup("tracking_id");
+        HighFive::Attribute exp_start_time_attr = tracking_id_group.getAttribute("exp_start_time");
+        std::string exp_start_time;
+        fixed_string_reader(exp_start_time_attr, exp_start_time);
+
+        auto start_time_str = adjust_time(exp_start_time, static_cast<uint32_t>(start_time / sampling_rate));
 
         auto options = torch::TensorOptions().dtype(torch::kFloat32);
         auto new_read = std::make_shared<Read>( 
@@ -104,11 +140,13 @@ void Fast5DataLoader::load_reads_from_file(const std::string& path) {
                 .range = range,
                 .offset = offset,
                 .read_id = read_id,
+                .num_samples = floatTmp.size(),
+                .num_trimmed_samples = floatTmp.size(), // same value until we actually trim
                 .attributes = Read::Attributes {
                     .mux = mux,
                     .read_number = read_number,
-                    // .channel_number = channel_number,
-                    // .start_time = start_time;
+                    .channel_number = channel_number,
+                    .start_time = start_time_str,
                     .fast5_filename = fast5_filename
                 }
             }

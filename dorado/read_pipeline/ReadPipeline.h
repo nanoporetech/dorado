@@ -52,6 +52,9 @@ public:
     std::string seq;
     std::string qstring;
 
+    uint64_t num_samples;
+    uint64_t num_trimmed_samples;
+
     Attributes attributes;
 };
 
