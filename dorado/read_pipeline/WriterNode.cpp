@@ -26,11 +26,16 @@ void WriterNode::worker_thread() {
         m_num_samples_processed += read->raw_data.size(0);
         m_num_reads_processed += 1;
 
-	    std::cout << "@" << read->read_id << "\n"
-                  << read->seq << "\n"
-                  << "+\n"
-                  << read->qstring << "\n";
-
+        if (m_emit_sam) {
+            for (const auto& sam_line : read->extract_sam_lines()) {
+                std::cout << sam_line << "\n";
+            }
+        } else {
+	        std::cout << "@" << read->read_id << "\n"
+                      << read->seq << "\n"
+                      << "+\n"
+                      << read->qstring << "\n";
+        }
     }
 }
 
