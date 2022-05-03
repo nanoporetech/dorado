@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
+set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 project(dorado)
 set(TORCH_VERSION 1.10.2)
 set(CMAKE_CXX_STANDARD 20)
@@ -36,35 +37,14 @@ function(download_and_extract url name)
     endif()
 endfunction()
 
-function(get_hdf_vbz_plugin)
-    if(LINUX)
-        download_and_extract(
-            https://github.com/nanoporetech/vbz_compression/releases/download/v1.0.1/ont-vbz-hdf-plugin-1.0.1-Linux-x86_64.tar.gz
-            vbz_plugin)
-        # Move the file first time we download
-        set(VBZ_ARCHIVE_PATH ${3RD_PARTY}/vbz_plugin/ont-vbz-hdf-plugin-1.0.1-Linux/usr/local/hdf5/lib/plugin/libvbz_hdf_plugin.so)
-        if(EXISTS ${VBZ_ARCHIVE_PATH})
-            file(RENAME ${VBZ_ARCHIVE_PATH} ${3RD_PARTY}/vbz_plugin/libvbz_hdf_plugin.so)
-            file(REMOVE_RECURSE ${3RD_PARTY}/vbz_plugin/ont-vbz-hdf-plugin-1.0.1-Linux)
-        endif()
-    elseif(APPLE)
-        download_and_extract(
-            https://github.com/nanoporetech/vbz_compression/releases/download/v1.0.1/ont-vbz-hdf-plugin-1.0.1-Darwin-arm64.tar.gz
-            vbz_plugin)
-        set(VBZ_ARCHIVE_PATH ${3RD_PARTY}/vbz_plugin/ont-vbz-hdf-plugin-1.0.1-Darwin/bin/libvbz_hdf_plugin.dylib)
-        if(EXISTS ${VBZ_ARCHIVE_PATH})
-            file(RENAME ${VBZ_ARCHIVE_PATH} ${3RD_PARTY}/vbz_plugin/libvbz_hdf_plugin.dylib)
-            file(REMOVE_RECURSE ${3RD_PARTY}/vbz_plugin/ont-vbz-hdf-plugin-1.0.1-Darwin/)
-        endif()
-    endif()
-endfunction()
+function(add_hdf_vbz_plugin)
+    set(ENABLE_CONAN OFF)
+    set(ENABLE_PERF_TESTING OFF)
+    set(ENABLE_PYTHON OFF)
+    set(ENABLE_PACKAGING OFF)
+    set(BUILD_SHARED_LIBS OFF)
 
-function(copy_hdf_vbz_plugin)
-    if(LINUX)
-        file(COPY ${3RD_PARTY}/vbz_plugin/libvbz_hdf_plugin.so DESTINATION "${CMAKE_BINARY_DIR}/lib")
-    elseif(APPLE)
-        file(COPY ${3RD_PARTY}/vbz_plugin/libvbz_hdf_plugin.dylib DESTINATION "${CMAKE_BINARY_DIR}/lib")
-    endif()
+    add_subdirectory(dorado/3rdparty/hdf_plugins)
 endfunction()
 
 
@@ -90,8 +70,7 @@ elseif(APPLE)
     set(TORCH_LIB "${CMAKE_SOURCE_DIR}/dorado/3rdparty/torch-${TORCH_VERSION}-${CMAKE_SYSTEM_NAME}/torch")
 endif()
 
-get_hdf_vbz_plugin()
-copy_hdf_vbz_plugin()
+add_hdf_vbz_plugin()
 
 if(DEFINED DORADO_LIBTORCH_DIR)
     # Use the existing libtorch we have been pointed at
@@ -118,6 +97,7 @@ include_directories(${HDF5_INCLUDE_DIRS}
 		    dorado/3rdparty/HDF5/apple/1.12.1/include
 		    dorado/3rdparty/catch2
 		    dorado/3rdparty/argparse
+            dorado/3rdparty/hdf_plugins/vbz_plugin
 		    dorado)
 
 set(LIB_SOURCE_FILES
@@ -153,7 +133,7 @@ set_target_properties(dorado_lib
     LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
     ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
 )
-target_link_libraries(dorado_lib ${HDF5_C_LIBRARIES} ${TORCH_LIBRARIES})
+target_link_libraries(dorado_lib ${HDF5_C_LIBRARIES} ${TORCH_LIBRARIES} vbz_hdf_plugin)
 
 add_executable(dorado
     dorado/main.cpp)
