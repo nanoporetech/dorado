@@ -1,3 +1,5 @@
+#include <math.h>
+#include <toml.hpp>
 #include <torch/torch.h>
 #include "CRFModel.h"
 #include "../utils/tensor_utils.h"
@@ -47,7 +49,7 @@ struct LinearCRFImpl : Module {
             int C = scores.size(2);
             scores = F::pad(
                 scores.view({T, N, C / 4, 4}),
-		F::PadFuncOptions({1, 0, 0, 0, 0, 0, 0, 0}).value(blank_score)
+                F::PadFuncOptions({1, 0, 0, 0, 0, 0, 0, 0}).value(blank_score)
             ).view({T, N, -1});
         }
 
@@ -111,11 +113,11 @@ TORCH_MODULE(Convolution);
 
 struct CRFModelImpl : Module {
 
-    CRFModelImpl(int size, int outsize, bool expand_blanks) {
+    CRFModelImpl(int size, int outsize, int stride, bool expand_blanks) {
 
         conv1 = register_module("conv1", Convolution(1, 4, 5, 1));
         conv2 = register_module("conv2", Convolution(4, 16, 5, 1));
-        conv3 = register_module("conv3", Convolution(16, size, 19, 5));
+        conv3 = register_module("conv3", Convolution(16, size, 19, stride));
         permute = register_module("permute", Permute());
         rnns = register_module("rnns", LSTMStack(size));
         linear = register_module("linear", LinearCRF(size, outsize));
@@ -148,13 +150,19 @@ TORCH_MODULE(CRFModel);
 
 ModuleHolder<AnyModule> load_crf_model(const std::string& path, int batch_size, int chunk_size, torch::TensorOptions options) {
 
-    auto state_dict = load_weights(path);
-    auto lw = state_dict[state_dict.size() - 2];
-    int insize = lw.size(1);
-    int outsize = lw.size(0);
+    auto config = toml::parse(path + "/config.toml");
+
+    const auto& encoder = toml::find(config, "encoder");
+    const auto stride  = toml::find<int>(encoder, "stride");
+    const auto insize  = toml::find<int>(encoder, "features");
+
+    const auto& global_norm = toml::find(config, "global_norm");
+    const auto state_len = toml::find<int>(global_norm, "state_len");
+    int outsize = pow(4, state_len) * 4;
     bool expand = options.device_opt().value() == torch::kCPU;
 
-    auto model = CRFModel(insize, outsize, expand);
+    auto state_dict = load_weights(path);
+    auto model = CRFModel(insize, outsize, stride, expand);
     model->load_state_dict(state_dict);
     model->to(options.dtype_opt().value().toScalarType());
     model->to(options.device_opt().value());
