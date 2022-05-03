@@ -42,6 +42,7 @@ void ScalerNode::worker_thread(){
         int trim_start = trim(read->raw_data.index({torch::indexing::Slice(torch::indexing::None, 8000)})); //TODO use non default params
 
         read->raw_data = read->raw_data.index({torch::indexing::Slice(trim_start, torch::indexing::None)});
+        read->num_trimmed_samples = read->raw_data.size(0);
 
         auto med_mad = calculate_med_mad(read->raw_data);
         read->med = med_mad.first;
