@@ -37,6 +37,10 @@ public:
         std::string fast5_filename{};
     };
 
+    struct Mapping {
+        // Dummy struct for future use to represent alignments
+    };
+
     torch::Tensor raw_data; // Loaded from source file
     float digitisation; // Loaded from source file
     float range; // Loaded from source file
@@ -56,6 +60,10 @@ public:
     uint64_t num_trimmed_samples;
 
     Attributes attributes;
+    std::vector<Mapping> mappings;
+
+    std::vector<std::string> generate_read_tags() const;
+    std::vector<std::string> extract_sam_lines() const;
 };
 
 

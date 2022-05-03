@@ -143,6 +143,8 @@ set(LIB_SOURCE_FILES
         dorado/decode/CPUDecoder.h
         dorado/decode/GPUDecoder.cpp
         dorado/decode/GPUDecoder.h
+        dorado/utils/sequence_utils.cpp
+        dorado/utils/sequence_utils.h
         dorado/utils/stitch.cpp
         dorado/utils/stitch.h
         dorado/utils/tensor_utils.cpp
