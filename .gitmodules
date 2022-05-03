@@ -7,3 +7,6 @@
 [submodule "dorado/3rdparty/toml11"]
 	path = dorado/3rdparty/toml11
 	url = https://github.com/ToruNiina/toml11.git
+[submodule "dorado/3rdparty/hdf_plugins"]
+	path = dorado/3rdparty/hdf_plugins
+	url = https://github.com/nanoporetech/vbz_compression.git
