@@ -66,14 +66,16 @@ void Fast5DataLoader::load_reads_from_file(const std::string& path) {
         HighFive::Attribute digitisation_attr = channel_id_group.getAttribute("digitisation");
         HighFive::Attribute range_attr = channel_id_group.getAttribute("range");
         HighFive::Attribute offset_attr = channel_id_group.getAttribute("offset");
+        // TODO: need to check type and if read as string then convert to int32_t
+        // Reading as string currently not functioning
+        // HighFive::Attribute channel_number_attr = channel_id_group.getAttribute("channel_number");
+        // int32_t channel_number;
         float digitisation;
         digitisation_attr.read(digitisation);
         float range;
         range_attr.read(range);
         float offset;
         offset_attr.read(offset);
-
-        auto new_read = std::make_shared<Read>();
 
         HighFive::Group raw = read.getGroup("Raw");
         auto ds = raw.getDataSet("Signal");
@@ -83,12 +85,35 @@ void Fast5DataLoader::load_reads_from_file(const std::string& path) {
         ds.read(tmp);
         std::vector<float> floatTmp(tmp.begin(), tmp.end());
 
+        HighFive::Attribute mux_attr = raw.getAttribute("start_mux");
+        HighFive::Attribute read_number_attr = raw.getAttribute("read_number");
+        // TODO: Reading as string currently not functioning
+        // HighFive::Attribute start_time_attr = raw.getAttribute("start_time");
+        // std::string start_time;
+        uint32_t mux;
+        uint32_t read_number;
+        mux_attr.read(mux);
+        read_number_attr.read(read_number);
+        std::string fast5_filename = std::filesystem::path(path).filename().string();
+
         auto options = torch::TensorOptions().dtype(torch::kFloat32);
-        new_read->raw_data = torch::from_blob(floatTmp.data(), floatTmp.size(), options).clone().to(m_device);
-        new_read->digitisation = digitisation;
-        new_read->range = range;
-        new_read->offset = offset;
-        new_read->read_id = read_id;
+        auto new_read = std::make_shared<Read>( 
+            Read {
+                .raw_data = torch::from_blob(floatTmp.data(), floatTmp.size(), options).clone().to(m_device),
+                .digitisation = digitisation,
+                .range = range,
+                .offset = offset,
+                .read_id = read_id,
+                .attributes = Read::Attributes {
+                    .mux = mux,
+                    .read_number = read_number,
+                    // .channel_number = channel_number,
+                    // .start_time = start_time;
+                    .fast5_filename = fast5_filename
+                }
+            }
+        );
+
         m_read_sink.push_read(new_read);
         m_loaded_read_count++;
     }
