@@ -6,4 +6,4 @@
 	url = https://github.com/BlueBrain/HighFive.git
 [submodule "dorado/3rdparty/hdf_plugins"]
 	path = dorado/3rdparty/hdf_plugins
-	url = ../../informatics/hdf_plugins.git
+	url = https://github.com/nanoporetech/vbz_compression.git
