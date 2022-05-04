@@ -70,6 +70,10 @@ if(LINUX)
     set(TORCH_URL https://download.pytorch.org/libtorch/cu113/libtorch-shared-with-deps-${TORCH_VERSION}%2Bcu113.zip)
     set(TORCH_LIB "${CMAKE_SOURCE_DIR}/dorado/3rdparty/torch-${TORCH_VERSION}-${CMAKE_SYSTEM_NAME}/libtorch")
 elseif(APPLE)
+    download_and_extract(https://developer.apple.com/metal/cpp/files/metal-cpp_macOS12_iOS15.zip metal-cpp)
+    find_library(APPLE_FWK_FOUNDATION Foundation REQUIRED)
+    find_library(APPLE_FWK_QUARTZ_CORE QuartzCore REQUIRED)
+    find_library(APPLE_FWK_METAL Metal REQUIRED)
     set(TORCH_URL https://files.pythonhosted.org/packages/7b/91/89bbe2316b93671b6bccec094df6bc66109cf6d21a364cd2f1becd11ba3c/torch-${TORCH_VERSION}-cp39-none-macosx_11_0_arm64.whl)
     set(TORCH_LIB "${CMAKE_SOURCE_DIR}/dorado/3rdparty/torch-${TORCH_VERSION}-${CMAKE_SYSTEM_NAME}/torch")
 endif()
@@ -97,13 +101,14 @@ find_package(HDF5 COMPONENTS C CXX HL)
 
 
 include_directories(${HDF5_INCLUDE_DIRS}
-		    dorado/3rdparty/HighFive/include
-		    dorado/3rdparty/HDF5/apple/1.12.1/include
-		    dorado/3rdparty/catch2
-		    dorado/3rdparty/argparse
-		    dorado/3rdparty/toml11
-            dorado/3rdparty/hdf_plugins/vbz_plugin
-		    dorado)
+                    dorado/3rdparty/HighFive/include
+                    dorado/3rdparty/HDF5/apple/1.12.1/include
+                    dorado/3rdparty/catch2
+                    dorado/3rdparty/argparse
+                    dorado/3rdparty/toml11
+                    dorado/3rdparty/hdf_plugins/vbz_plugin
+                    dorado/3rdparty/metal-cpp/metal-cpp
+                    dorado)
 
 set(LIB_SOURCE_FILES
         dorado/data_loader/Fast5DataLoader.cpp
@@ -138,8 +143,14 @@ set_target_properties(dorado_lib
     LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
     ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
 )
-target_link_libraries(dorado_lib ${HDF5_C_LIBRARIES} ${TORCH_LIBRARIES} vbz_hdf_plugin)
-
+target_link_libraries(dorado_lib
+    ${APPLE_FWK_FOUNDATION}
+    ${APPLE_FWK_QUARTZ_CORE}
+    ${APPLE_FWK_METAL}
+    ${HDF5_C_LIBRARIES}
+    ${TORCH_LIBRARIES}
+    vbz_hdf_plugin
+)
 add_executable(dorado
     dorado/main.cpp)
 set_target_properties(dorado
