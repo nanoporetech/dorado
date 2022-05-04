@@ -8,7 +8,7 @@ using namespace std::chrono_literals;
 std::vector<std::string> Read::generate_read_tags() const {
     // GCC doesn't support <format> yet...
     std::vector<std::string> tags = {
-        "qs:i:" + std::to_string(std::round(utils::mean_qscore_from_qstring(qstring))),
+        "qs:i:" + std::to_string(static_cast<int>(std::round(utils::mean_qscore_from_qstring(qstring)))),
         "ns:i:" + std::to_string(num_samples),
         "ts:i:" + std::to_string(num_trimmed_samples),
         "mx:i:" + std::to_string(attributes.mux),
