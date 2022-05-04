@@ -162,6 +162,7 @@ set(LIB_SOURCE_FILES
 if(APPLE)
     list(APPEND LIB_SOURCE_FILES
             dorado/nn/metal/nn.h
+            dorado/nn/MetalCRFModel.h
             dorado/nn/MetalCRFModel.cpp
             dorado/utils/metal_utils.cpp
             dorado/utils/metal_utils.h)

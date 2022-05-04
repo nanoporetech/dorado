@@ -1,7 +1,15 @@
-#include "../utils/metal_utils.h"
+#define NS_PRIVATE_IMPLEMENTATION
+#define MTL_PRIVATE_IMPLEMENTATION
+
+#include <math.h>
+#include <toml.hpp>
 #include <torch/torch.h>
+#include "MetalCRFModel.h"
+#include "../utils/metal_utils.h"
+#include "../utils/tensor_utils.h"
 
 using namespace torch::nn;
+namespace F = torch::nn::functional;
 
 typedef uint16_t ftype;
 //typedef float ftype;
@@ -317,3 +325,49 @@ struct MetalModelImpl : Module {
 };
 
 TORCH_MODULE(MetalModel);
+
+
+ModuleHolder<AnyModule> load_crf_mtl_model(const std::string& path, int batch_size, int chunk_size, torch::TensorOptions options) {
+
+    auto device = MTL::CreateSystemDefaultDevice();
+    set_torch_mtl_allocator(device);
+
+    auto config = toml::parse(path + "/config.toml");
+
+    const auto& encoder = toml::find(config, "encoder");
+    const auto scale = toml::find<int>(encoder, "scale");
+    const auto stride = toml::find<int>(encoder, "stride");
+    const auto insize = toml::find<int>(encoder, "features");
+    const auto blank_score = toml::find<int>(encoder, "blank_score");
+
+    const auto& global_norm = toml::find(config, "global_norm");
+    const auto state_len = toml::find<int>(global_norm, "state_len");
+
+    int o = pow(4, state_len);
+    int outsize = pow(4, state_len) * 5;
+    auto state_dict = load_weights(path);
+
+    auto lw = state_dict[state_dict.size() - 1];
+    auto lb = state_dict[state_dict.size() - 2];
+
+    state_dict[state_dict.size() - 1] = F::pad(
+	lw.view({o,  4, -1}),
+        F::PadFuncOptions({0, 0, 1, 0}).value(0.0)
+    ).view({outsize, -1});
+
+    state_dict[state_dict.size() - 2] = F::pad(
+	lw.view({o,  4}),
+        F::PadFuncOptions({1, 0}).value(atanh(blank_score / scale))
+    ).view({-1});
+
+    auto model = MetalModel(insize, outsize, chunk_size, batch_size, device);
+    model->load_state_dict(state_dict);
+    model->to(options.dtype_opt().value().toScalarType());
+    model->to(options.device_opt().value());
+    model->eval();
+
+    auto module = AnyModule(model);
+    auto holder = ModuleHolder<AnyModule>(module);
+
+    return holder;
+}
