@@ -70,13 +70,14 @@ if(LINUX)
     set(TORCH_URL https://download.pytorch.org/libtorch/cu113/libtorch-shared-with-deps-${TORCH_VERSION}%2Bcu113.zip)
     set(TORCH_LIB "${CMAKE_SOURCE_DIR}/dorado/3rdparty/torch-${TORCH_VERSION}-${CMAKE_SYSTEM_NAME}/libtorch")
 elseif(APPLE)
-    download_and_extract(https://developer.apple.com/metal/cpp/files/metal-cpp_macOS12_iOS15.zip metal-cpp)
-    find_library(APPLE_FWK_FOUNDATION Foundation REQUIRED)
-    find_library(APPLE_FWK_QUARTZ_CORE QuartzCore REQUIRED)
-    find_library(APPLE_FWK_METAL Metal REQUIRED)
     set(TORCH_URL https://files.pythonhosted.org/packages/7b/91/89bbe2316b93671b6bccec094df6bc66109cf6d21a364cd2f1becd11ba3c/torch-${TORCH_VERSION}-cp39-none-macosx_11_0_arm64.whl)
     set(TORCH_LIB "${CMAKE_SOURCE_DIR}/dorado/3rdparty/torch-${TORCH_VERSION}-${CMAKE_SYSTEM_NAME}/torch")
 endif()
+
+download_and_extract(https://developer.apple.com/metal/cpp/files/metal-cpp_macOS12_iOS15.zip metal-cpp)
+find_library(APPLE_FWK_FOUNDATION Foundation REQUIRED)
+find_library(APPLE_FWK_QUARTZ_CORE QuartzCore REQUIRED)
+find_library(APPLE_FWK_METAL Metal REQUIRED)
 
 add_hdf_vbz_plugin()
 
