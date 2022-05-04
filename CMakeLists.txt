@@ -90,11 +90,16 @@ elseif(WIN32)
     set(TORCH_LIB "${CMAKE_SOURCE_DIR}/dorado/3rdparty/torch-${TORCH_VERSION}-${CMAKE_SYSTEM_NAME}/libtorch")
     
     # On windows, we need to build HDF5
-    download_and_extract(https://gamma.hdfgroup.org/ftp/pub/outgoing/hdf5/snapshots/v112/OLD/hdf5-1.12.1-3.tar.gz
-        hdf-1.12.1)
-    #execute_process(COMMAND cmake -S dorado/3rdparty/hdf-1.12.1/hdf5-1.12.1-3 -B dorado/3rdparty/hdf-1.12.1/hdf5-1.12.1-3/cmake-build -A x64)
-    #execute_process(COMMAND cmake --build dorado/3rdparty/hdf-1.12.1/hdf5-1.12.1-3/cmake-build --config Release)
-    list(APPEND CMAKE_PREFIX_PATH "C:/Program Files/HDF_Group/HDF5/1.12.1/")
+    set(HDF_VER hdf5-1.12.1-3)
+    if(EXISTS ${3RD_PARTY}/${HDF_VER})
+        message("-- Found ${HDF_VER}")
+    else()
+        download_and_extract(https://gamma.hdfgroup.org/ftp/pub/outgoing/hdf5/snapshots/v112/OLD/${HDF_VER}.tar.gz ${HDF_VER})
+        execute_process(COMMAND cmake -S ${3RD_PARTY}/${HDF_VER}/${HDF_VER} -B ${3RD_PARTY}/${HDF_VER}/${HDF_VER}/cmake-build -A x64 -DCMAKE_INSTALL_PREFIX=${3RD_PARTY}/${HDF_VER}/install)
+        execute_process(COMMAND cmake --build ${3RD_PARTY}/${HDF_VER}/${HDF_VER}/cmake-build --config Release --target install)
+    endif()
+    list(APPEND CMAKE_PREFIX_PATH ${3RD_PARTY}/${HDF_VER}/install)
+    message("Prefix path is ${CMAKE_PREFIX_PATH}")
 endif()
 
 add_hdf_vbz_plugin()
