@@ -116,13 +116,14 @@ void Fast5DataLoader::load_reads_from_file(const std::string& path) {
         HighFive::Attribute mux_attr = raw.getAttribute("start_mux");
         HighFive::Attribute read_number_attr = raw.getAttribute("read_number");
         HighFive::Attribute start_time_attr = raw.getAttribute("start_time");
+        HighFive::Attribute read_id_attr = raw.getAttribute("read_id");
         uint32_t mux;
         uint32_t read_number;
         uint64_t start_time;
         mux_attr.read(mux);
         read_number_attr.read(read_number);
         start_time_attr.read(start_time);
-
+        fixed_string_reader(read_id_attr, read_id);
         std::string fast5_filename = std::filesystem::path(path).filename().string();
 
         HighFive::Group tracking_id_group = read.getGroup("tracking_id");
