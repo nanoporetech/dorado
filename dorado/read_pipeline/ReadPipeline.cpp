@@ -22,6 +22,16 @@ std::vector<std::string> Read::generate_read_tags() const {
 }
 
 std::vector<std::string> Read::extract_sam_lines() const {
+    if (read_id.empty()) {
+        throw std::runtime_error("Empty read_name string provided");
+    }
+    if (seq.size() != qstring.size()) {
+        throw std::runtime_error("Sequence and qscore do not match size for read id " + read_id);
+    }
+    if (seq.empty()) {
+        throw std::runtime_error("Empty sequence and qstring provided for read id " + read_id);
+    }
+
     std::ostringstream read_tags_stream;
     auto read_tags = generate_read_tags();
     for (const auto& tag : read_tags) {

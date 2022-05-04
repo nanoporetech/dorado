@@ -27,8 +27,13 @@ void WriterNode::worker_thread() {
         m_num_reads_processed += 1;
 
         if (m_emit_sam) {
-            for (const auto& sam_line : read->extract_sam_lines()) {
-                std::cout << sam_line << "\n";
+            try {
+                for (const auto& sam_line : read->extract_sam_lines()) {
+                    std::cout << sam_line << "\n";
+                }
+            }
+            catch (const std::exception& ex) {
+                std::cerr << ex.what() << "\n";
             }
         } else {
 	        std::cout << "@" << read->read_id << "\n"
