@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 project(dorado)
+set(DORADO_VERSION "0.0.1a0")
+
 set(TORCH_VERSION 1.10.2)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -115,6 +117,9 @@ else()
 endif()
 find_package(HDF5 COMPONENTS C CXX HL)
 
+
+configure_file(dorado/Version.h.in dorado/Version.h)
+include_directories(${CMAKE_CURRENT_BINARY_DIR}/dorado)
 
 include_directories(${HDF5_INCLUDE_DIRS}
 		    dorado/3rdparty/HighFive/include

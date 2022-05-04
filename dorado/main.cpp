@@ -9,10 +9,12 @@
 #include "read_pipeline/ScalerNode.h"
 #include "read_pipeline/BasecallerNode.h"
 #include "read_pipeline/WriterNode.h"
+#include "Version.h"
 
 
-void setup(const std::string& model_path, const std::string& data_path, const std::string& device,
-        size_t chunk_size, size_t overlap, size_t batch_size, size_t num_runners, bool emit_sam) {
+void setup(std::vector<std::string> args, const std::string& model_path, const std::string& data_path,
+        const std::string& device, size_t chunk_size, size_t overlap, size_t batch_size, size_t num_runners, 
+        bool emit_sam) {
 
     std::vector<Runner> runners;
     auto decode_options = DecoderOptions();
@@ -27,7 +29,7 @@ void setup(const std::string& model_path, const std::string& data_path, const st
         }
     }
 
-    WriterNode writer_node(emit_sam);
+    WriterNode writer_node(std::move(args), emit_sam);
     BasecallerNode basecaller_node(writer_node, runners, batch_size, chunk_size, overlap);
     ScalerNode scaler_node(basecaller_node);
     Fast5DataLoader loader(scaler_node, "cpu");
@@ -37,7 +39,7 @@ void setup(const std::string& model_path, const std::string& data_path, const st
 
 int main(int argc, char *argv[]) {
 
-    argparse::ArgumentParser parser("dorado", "0.0.1a0");
+    argparse::ArgumentParser parser("dorado", DORADO_VERSION);
 
     parser.add_argument("model")
             .help("the basecaller model to run.");
@@ -81,6 +83,8 @@ int main(int argc, char *argv[]) {
         std::exit(1);
     }
 
+    std::vector<std::string> args(argv, argv + argc);
+
     std::filesystem::path exe_path{argv[0]};
     auto libdir = exe_path.parent_path() /  ".." / "lib";
     setenv("HDF5_PLUGIN_PATH", libdir.c_str(), 0);
@@ -88,6 +92,7 @@ int main(int argc, char *argv[]) {
     std::cerr << "> Creating basecall pipeline" << std::endl;
     try {
         setup(
+            args,
             parser.get<std::string>("model"),
             parser.get<std::string>("data"),
             parser.get<std::string>("-x"),

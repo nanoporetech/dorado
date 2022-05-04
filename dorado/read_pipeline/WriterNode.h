@@ -1,13 +1,19 @@
 #pragma once
+
+#include <string>
+#include <vector>
+
 #include "ReadPipeline.h"
 
 class WriterNode : public ReadSink {
 public:
-    WriterNode(bool emit_same = false, size_t max_reads=1000); // Writer has no sink - reads go to output
+    // Writer has no sink - reads go to output
+    WriterNode(std::vector<std::string> args, bool emit_sam = false, size_t max_reads=1000);
     ~WriterNode();
 private:
     void worker_thread();
 
+    std::vector<std::string> m_args;
     bool m_emit_sam;
     int m_num_samples_processed;
     int m_num_reads_processed;

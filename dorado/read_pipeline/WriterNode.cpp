@@ -1,10 +1,20 @@
 #include <chrono>
 #include <iostream>
 #include "WriterNode.h"
+#include "Version.h"
 
 using namespace std::chrono_literals;
 
 void WriterNode::worker_thread() {
+
+    if (m_emit_sam) {
+        std::cout << "@HD\tVN:1.5\tSO:unknown\n"
+                    << "@PG\tID:basecaller\tPN:dorado\tVN:" << DORADO_VERSION << "\tCL:dorado";
+        for (const auto& arg : m_args) {
+            std::cout << " " << arg;
+        }
+        std::cout << "\n";
+    }
 
     while (true) {
         // Wait until we are provided with a read
@@ -44,8 +54,9 @@ void WriterNode::worker_thread() {
     }
 }
 
-WriterNode::WriterNode(bool emit_sam, size_t max_reads) 
+WriterNode::WriterNode(std::vector<std::string> args, bool emit_sam, size_t max_reads) 
     : ReadSink(max_reads)
+    , m_args(std::move(args))
     , m_emit_sam(emit_sam)
     , m_num_samples_processed(0)
     , m_num_reads_processed(0)
