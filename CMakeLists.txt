@@ -115,6 +115,7 @@ set(LIB_SOURCE_FILES
         dorado/data_loader/Fast5DataLoader.h
         dorado/nn/CRFModel.h
         dorado/nn/CRFModel.cpp
+        dorado/nn/MetalCRFModel.cpp
         dorado/nn/ModelRunner.h
         dorado/read_pipeline/ReadPipeline.cpp
         dorado/read_pipeline/ReadPipeline.h
@@ -134,6 +135,8 @@ set(LIB_SOURCE_FILES
         dorado/decode/GPUDecoder.h
         dorado/utils/stitch.cpp
         dorado/utils/stitch.h
+        dorado/utils/metal_utils.cpp
+        dorado/utils/metal_utils.h
         dorado/utils/tensor_utils.cpp
         dorado/utils/tensor_utils.h)
 
