@@ -2,7 +2,6 @@
 #include <torch/torch.h>
 #include <Metal/Metal.hpp>
 
-#define BUILD_DIR "."
 
 using namespace std;
 using namespace MTL;
@@ -17,7 +16,7 @@ ComputePipelineState *make_cps(Device *device, const std::string name) {
     auto default_library = device->newDefaultLibrary();
 
     if (!default_library) {
-        auto lib_path = NS::String::string(BUILD_DIR"/default.metallib", NS::ASCIIStringEncoding);
+        auto lib_path = NS::String::string("../lib/default.metallib", NS::ASCIIStringEncoding);
         default_library = device->newLibrary(lib_path, &error);
         if (!default_library) {
             throw std::runtime_error("Failed to load default library.");

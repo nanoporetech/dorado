@@ -76,6 +76,28 @@ elseif(APPLE)
     find_library(APPLE_FWK_METAL Metal REQUIRED)
     set(TORCH_URL https://files.pythonhosted.org/packages/7b/91/89bbe2316b93671b6bccec094df6bc66109cf6d21a364cd2f1becd11ba3c/torch-${TORCH_VERSION}-cp39-none-macosx_11_0_arm64.whl)
     set(TORCH_LIB "${CMAKE_SOURCE_DIR}/dorado/3rdparty/torch-${TORCH_VERSION}-${CMAKE_SYSTEM_NAME}/torch")
+
+    set(AIR_FILES)
+    set(METAL_SOURCES dorado/nn/metal/nn.metal)
+
+    foreach(source ${METAL_SOURCES})
+        get_filename_component(basename "${source}" NAME_WE)
+        set(air_path "${CMAKE_BINARY_DIR}/${basename}.air")
+        add_custom_command(
+            OUTPUT "${air_path}"
+            COMMAND xcrun -sdk macosx metal -ffast-math -c "${CMAKE_CURRENT_SOURCE_DIR}/${source}" -o "${air_path}"
+            DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/${source}"
+            COMMENT "Compiling metal kernels"
+        )
+        list(APPEND AIR_FILES "${air_path}")
+    endforeach()
+
+    add_custom_command(
+        OUTPUT default.metallib
+        COMMAND xcrun -sdk macosx metallib ${AIR_FILES} -o ${CMAKE_BINARY_DIR}/lib/default.metallib
+        DEPENDS ${AIR_FILES}
+        COMMENT "Creating metallib"
+    )
 endif()
 
 add_hdf_vbz_plugin()
@@ -139,6 +161,7 @@ set(LIB_SOURCE_FILES
 
 if(APPLE)
     list(APPEND LIB_SOURCE_FILES
+            dorado/nn/metal/nn.h
             dorado/nn/MetalCRFModel.cpp
             dorado/utils/metal_utils.cpp
             dorado/utils/metal_utils.h)
@@ -158,6 +181,11 @@ target_link_libraries(dorado_lib
     ${TORCH_LIBRARIES}
     vbz_hdf_plugin
 )
+if(APPLE)
+    add_custom_target(metal-lib DEPENDS default.metallib)
+    add_dependencies(dorado_lib metal-lib)
+endif()
+
 add_executable(dorado
     dorado/main.cpp)
 set_target_properties(dorado
