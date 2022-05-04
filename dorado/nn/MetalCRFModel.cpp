@@ -335,30 +335,31 @@ ModuleHolder<AnyModule> load_crf_mtl_model(const std::string& path, int batch_si
     auto config = toml::parse(path + "/config.toml");
 
     const auto& encoder = toml::find(config, "encoder");
-    const auto scale = toml::find<int>(encoder, "scale");
+    const auto scale = toml::find<float>(encoder, "scale");
     const auto stride = toml::find<int>(encoder, "stride");
     const auto insize = toml::find<int>(encoder, "features");
-    const auto blank_score = toml::find<int>(encoder, "blank_score");
+    const auto blank_score = toml::find<float>(encoder, "blank_score");
 
     const auto& global_norm = toml::find(config, "global_norm");
     const auto state_len = toml::find<int>(global_norm, "state_len");
 
-    int o = pow(4, state_len);
-    int outsize = pow(4, state_len) * 5;
+    int states = pow(4, state_len);
+    int outsize = states * 5;
+
     auto state_dict = load_weights(path);
 
-    auto lw = state_dict[state_dict.size() - 1];
-    auto lb = state_dict[state_dict.size() - 2];
-
-    state_dict[state_dict.size() - 1] = F::pad(
-	lw.view({o,  4, -1}),
-        F::PadFuncOptions({0, 0, 1, 0}).value(0.0)
-    ).view({outsize, -1});
+    auto lw = state_dict[state_dict.size() - 2];
+    auto lb = state_dict[state_dict.size() - 1];
 
     state_dict[state_dict.size() - 2] = F::pad(
-	lw.view({o,  4}),
+	lw.view({states, 4, 384}),
+        F::PadFuncOptions({0, 0, 1, 0}).value(0.0)
+    ).view({outsize, insize});
+
+    state_dict[state_dict.size() - 1] = F::pad(
+	lb.view({states, 4}),
         F::PadFuncOptions({1, 0}).value(atanh(blank_score / scale))
-    ).view({-1});
+    ).view({outsize});
 
     auto model = MetalModel(insize, outsize, chunk_size, batch_size, device);
     model->load_state_dict(state_dict);
