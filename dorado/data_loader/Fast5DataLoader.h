@@ -1,9 +1,7 @@
 #pragma once
 #include <string>
-#include <highfive/H5File.hpp>
-#include <highfive/H5Easy.hpp>
-#include "../read_pipeline/ReadPipeline.h"
 
+class ReadSink;
 
 class Fast5DataLoader {
 public:

@@ -1,9 +1,14 @@
 cmake_minimum_required(VERSION 3.20)
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 project(dorado)
+set(DORADO_VERSION "0.0.1a0")
+
 set(TORCH_VERSION 1.10.2)
 set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_EXTENSIONS OFF)
 option(DYNAMIC_HDF "Link HDF as dynamic libs" OFF)
+
+enable_testing()
 
 find_package(Git QUIET)
 if(GIT_FOUND AND EXISTS "${PROJECT_SOURCE_DIR}/.git")
@@ -96,6 +101,9 @@ endif()
 find_package(HDF5 COMPONENTS C CXX HL)
 
 
+configure_file(dorado/Version.h.in dorado/Version.h)
+include_directories(${CMAKE_CURRENT_BINARY_DIR}/dorado)
+
 include_directories(${HDF5_INCLUDE_DIRS}
 		    dorado/3rdparty/HighFive/include
 		    dorado/3rdparty/HDF5/apple/1.12.1/include
@@ -127,6 +135,8 @@ set(LIB_SOURCE_FILES
         dorado/decode/CPUDecoder.h
         dorado/decode/GPUDecoder.cpp
         dorado/decode/GPUDecoder.h
+        dorado/utils/sequence_utils.cpp
+        dorado/utils/sequence_utils.h
         dorado/utils/stitch.cpp
         dorado/utils/stitch.h
         dorado/utils/tensor_utils.cpp

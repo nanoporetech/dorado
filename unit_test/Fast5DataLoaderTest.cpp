@@ -1,12 +1,14 @@
 #include <catch2/catch.hpp>
 
 #include "data_loader/Fast5DataLoader.h"
+#include "read_pipeline/ReadPipeline.h"
 #include "TestUtils.h"
 
 #define TEST_GROUP "Fast5DataLoaderTest: "
 
 class MockSink : public ReadSink {
 public:
+    MockSink() : ReadSink(1000) {}
     size_t get_read_count() { return m_reads.size(); }
 };
 

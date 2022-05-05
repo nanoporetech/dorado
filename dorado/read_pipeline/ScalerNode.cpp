@@ -42,6 +42,7 @@ void ScalerNode::worker_thread(){
         int trim_start = trim(read->raw_data.index({torch::indexing::Slice(torch::indexing::None, 8000)})); //TODO use non default params
 
         read->raw_data = read->raw_data.index({torch::indexing::Slice(trim_start, torch::indexing::None)});
+        read->num_trimmed_samples = trim_start;
 
         auto med_mad = calculate_med_mad(read->raw_data);
         read->med = med_mad.first;
@@ -55,15 +56,17 @@ void ScalerNode::worker_thread(){
     }
 }
 
-ScalerNode::ScalerNode(ReadSink& sink, size_t max_reads) :
-    m_sink(sink)
+ScalerNode::ScalerNode(ReadSink& sink, size_t max_reads) 
+    : ReadSink(max_reads)
+    , m_sink(sink)
+    , m_worker(new std::thread(&ScalerNode::worker_thread, this))
 {
-    m_worker.reset(new std::thread(&ScalerNode::worker_thread, this));
-    m_max_reads = max_reads;
 }
 
 ScalerNode::~ScalerNode()
 {
+    terminate();
+    m_cv.notify_one();
     m_worker->join();
 }
 

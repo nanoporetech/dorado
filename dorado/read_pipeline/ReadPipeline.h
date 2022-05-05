@@ -1,6 +1,8 @@
 #pragma once
-#include <string>
+#include <cstdint>
+#include <limits>
 #include <memory>
+#include <string>
 #include <vector>
 
 #include <torch/torch.h>
@@ -27,6 +29,18 @@ struct Chunk {
 // Object representing a simplex read
 class Read {
 public:
+    struct Attributes {
+        uint32_t mux{std::numeric_limits<uint32_t>::max()};
+        uint32_t read_number{std::numeric_limits<uint32_t>::max()};
+        int32_t channel_number{-1};
+        std::string start_time{};
+        std::string fast5_filename{};
+    };
+
+    struct Mapping {
+        // Dummy struct for future use to represent alignments
+    };
+
     torch::Tensor raw_data; // Loaded from source file
     float digitisation; // Loaded from source file
     float range; // Loaded from source file
@@ -41,12 +55,22 @@ public:
     std::string read_id;
     std::string seq;
     std::string qstring;
+
+    uint64_t num_samples;
+    uint64_t num_trimmed_samples;
+
+    Attributes attributes;
+    std::vector<Mapping> mappings;
+
+    std::vector<std::string> generate_read_tags() const;
+    std::vector<std::string> extract_sam_lines() const;
 };
 
 
 // Base class for an object which consumes reads
 class ReadSink {
 public:
+    ReadSink(size_t max_reads);
     void push_read(std::shared_ptr<Read>& read);
     void terminate() { m_terminate = true; }
 protected:

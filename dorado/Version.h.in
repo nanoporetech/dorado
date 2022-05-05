@@ -1,0 +1,3 @@
+#pragma once
+
+#cmakedefine DORADO_VERSION "@DORADO_VERSION@"
