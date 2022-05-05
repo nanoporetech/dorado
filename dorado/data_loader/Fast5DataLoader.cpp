@@ -6,6 +6,7 @@
 
 #include <ctime>
 #include <filesystem>
+#include "vbz_plugin_user_utils.h"
 
 namespace {
 void fixed_string_reader(HighFive::Attribute& attribute, std::string& target_str) {
@@ -161,4 +162,6 @@ void Fast5DataLoader::load_reads_from_file(const std::string& path) {
 Fast5DataLoader::Fast5DataLoader(ReadSink& read_sink, const std::string& device) :
     m_read_sink(read_sink),
     m_device(device){
+    static std::once_flag vbz_init_flag;
+    std::call_once(vbz_init_flag, vbz_register);
 }
