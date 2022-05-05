@@ -60,8 +60,7 @@ std::vector<std::string> Read::extract_sam_lines() const {
                  << (next_pos + 1) << "\t"      // PNEXT
                  << (template_length) << "\t"   // TLEN
                  << seq << "\t"                 // SEQ
-                 << qstring << "\t"             // QUAL
-                 << "NM:i:0";
+                 << qstring;                    // QUAL
         
         sam_line << read_tags_stream.str();
         sam_lines.push_back(sam_line.str());
