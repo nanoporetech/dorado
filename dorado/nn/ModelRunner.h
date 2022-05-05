@@ -33,13 +33,13 @@ template<typename T> ModelRunner<T>::ModelRunner(const std::string &model, const
     m_decoder = std::make_unique<T>();
     m_input = torch::zeros({batch_size, 1, chunk_size}, torch::TensorOptions().dtype(T::dtype).device(torch::kCPU));
 
-    if (device == "metal") {
-        m_options = torch::TensorOptions().dtype(T::dtype).device("cpu");
-        m_module = load_crf_mtl_model(model, batch_size, chunk_size, m_options);
-    } else {
-        m_options = torch::TensorOptions().dtype(T::dtype).device(device);
-        m_module = load_crf_model(model, batch_size, chunk_size, m_options);
-    }
+#ifdef __APPLE__
+    m_options = torch::TensorOptions().dtype(T::dtype).device("cpu");
+    m_module = load_crf_mtl_model(model, batch_size, chunk_size, m_options);
+#else
+    m_options = torch::TensorOptions().dtype(T::dtype).device(device);
+    m_module = load_crf_model(model, batch_size, chunk_size, m_options);
+#endif
 
 }
 
