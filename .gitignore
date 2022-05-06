@@ -6,5 +6,6 @@ dorado/3rdparty/hdf5-1.12.*
 dorado/3rdparty/torch-*
 dorado/3rdparty/vbz_plugin
 cmake-build*
+cmake.lock
 .idea/
 .DS_Store
