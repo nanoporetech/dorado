@@ -50,7 +50,7 @@ variables:
 build:linux:x86:focal:install_deps:
   image: ${DORADO_NO_DEPS}
   variables:
-    BUILD_THREADS:'-- -j 8'
+    BUILD_THREADS: "-- -j 8"
   <<: *linux_dependencies
   <<: *linux_runner
   <<: *build_dorado
@@ -60,7 +60,7 @@ build:linux:x86:focal:
   image: ${DORADO_DEPS}
   variables:
     BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/libtorch"
-    BUILD_THREADS:'-- -j 8'
+    BUILD_THREADS: "-- -j 8"
   <<: *linux_runner
   <<: *build_dorado
 
@@ -73,7 +73,7 @@ build:windows:
 
 build:macos:m1:
   variables:
-    BUILD_THREADS:'-- -j 8'
+    BUILD_THREADS: "-- -j 8"
   <<: *macos_runner
   <<: *build_dorado
 
