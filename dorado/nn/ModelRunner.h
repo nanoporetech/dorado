@@ -31,16 +31,21 @@ template<typename T> class ModelRunner : public ModelRunnerBase {
 template<typename T> ModelRunner<T>::ModelRunner(const std::string &model, const std::string &device, int chunk_size, int batch_size, DecoderOptions d_options) {
     m_decoder_options = d_options;
     m_decoder = std::make_unique<T>();
-    m_input = torch::zeros({batch_size, 1, chunk_size}, torch::TensorOptions().dtype(T::dtype).device(torch::kCPU));
 
 #ifdef __APPLE__
-    m_options = torch::TensorOptions().dtype(T::dtype).device("cpu");
-    m_module = load_crf_mtl_model(model, batch_size, chunk_size, m_options);
+    if (device == "metal") {
+        m_options = torch::TensorOptions().dtype(T::dtype).device("cpu");
+        m_module = load_crf_mtl_model(model, batch_size, chunk_size, m_options);
+    } else {
+        m_options = torch::TensorOptions().dtype(T::dtype).device(device);
+        m_module = load_crf_model(model, batch_size, chunk_size, m_options);
+    }
 #else
     m_options = torch::TensorOptions().dtype(T::dtype).device(device);
     m_module = load_crf_model(model, batch_size, chunk_size, m_options);
 #endif
 
+    m_input = torch::zeros({batch_size, 1, chunk_size}, torch::TensorOptions().dtype(T::dtype).device(torch::kCPU));
 }
 
 template<typename T> std::vector<DecodedChunk> ModelRunner<T>::call_chunks(int num_chunks) {

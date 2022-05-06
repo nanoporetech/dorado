@@ -1,5 +1,4 @@
 #include <iostream>
-#include <filesystem>
 #include <argparse.hpp>
 
 #include "nn/ModelRunner.h"
@@ -21,6 +20,10 @@ void setup(const std::string& model_path, const std::string& data_path, const st
         for (int i = 0; i < num_runners; i++) {
             runners.push_back(std::make_shared<ModelRunner<CPUDecoder>>(model_path, device, chunk_size, batch_size, decode_options));
         }
+    } else if (device == "metal") {
+        for (int i = 0; i < num_runners; i++) {
+            runners.push_back(std::make_shared<ModelRunner<CPUDecoder>>(model_path, device, chunk_size, batch_size, decode_options));
+	    }
     } else {
         for (int i = 0; i < num_runners; i++) {
             runners.push_back(std::make_shared<ModelRunner<GPUDecoder>>(model_path, device, chunk_size, batch_size, decode_options));
