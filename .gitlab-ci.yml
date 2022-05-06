@@ -18,6 +18,10 @@ variables:
   tags:
     - nvidia-docker
 
+.windows_runner: &windows_runner
+  tags:
+    - win10-gpu
+
 .linux_dependencies: &linux_dependencies
   before_script:
     - echo Dorado dependency stage
@@ -55,6 +59,12 @@ build:linux:x86:focal:
   variables:
     BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/libtorch"
   <<: *linux_runner
+  <<: *build_dorado
+
+build:windows:
+  variables:
+    BUILD_OPTIONS: "-A x64"
+  <<: *windows_runner
   <<: *build_dorado
 
 build:macos:m1:
