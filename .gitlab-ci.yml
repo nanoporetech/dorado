@@ -66,6 +66,7 @@ build:windows:
     BUILD_OPTIONS: "-A x64"
   <<: *windows_runner
   <<: *build_dorado
+  when: manual
 
 build:macos:m1:
   <<: *macos_runner
