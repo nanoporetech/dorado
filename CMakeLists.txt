@@ -204,7 +204,6 @@ if(LINUX OR WIN32)
 
     set(KOI_FLAGS -c
             --ptxas-options=-v
-            -Xcompiler
             --use_fast_math
             --restrict
             )
@@ -218,6 +217,7 @@ if(LINUX OR WIN32)
 if(LINUX)
     target_compile_options(koi_lib
             PRIVATE
+            -Xcompiler
             '-fPIC'
             )
 endif()
