@@ -1,14 +1,36 @@
 #include "metal_utils.h"
+#include <filesystem>
 #include <torch/torch.h>
+#include <mach-o/dyld.h>
+#include <sys/syslimits.h>
 #include <Metal/Metal.hpp>
 
 
 using namespace std;
 using namespace MTL;
 
+namespace fs = std::filesystem;
+
+
+NS::String* get_library_location() {
+
+    char ns_path[PATH_MAX+1];
+    uint32_t size = sizeof(ns_path);
+    _NSGetExecutablePath(ns_path, &size);
+
+    fs::path exepth {ns_path};
+    fs::path mtllib {"../lib/default.metallib"};
+    fs::path fspath = exepth.parent_path() / mtllib;
+
+    return NS::String::string(fspath.c_str(), NS::ASCIIStringEncoding);
+
+}
+
+
 MTL::Buffer* create_buffer(MTL::Device *device, size_t length) {
     return device->newBuffer(length, MTL::ResourceStorageModeShared);
 }
+
 
 ComputePipelineState *make_cps(Device *device, const std::string name) {
 
@@ -16,10 +38,10 @@ ComputePipelineState *make_cps(Device *device, const std::string name) {
     auto default_library = device->newDefaultLibrary();
 
     if (!default_library) {
-        auto lib_path = NS::String::string("../lib/default.metallib", NS::ASCIIStringEncoding);
+        auto lib_path = get_library_location();
         default_library = device->newLibrary(lib_path, &error);
         if (!default_library) {
-            throw std::runtime_error("Failed to load default library.");
+            throw std::runtime_error("Failed to load metallib library.");
         }
     }
 
