@@ -277,9 +277,6 @@ struct MetalBlockImpl : Module {
         MTL::CommandBuffer* command_buffer;
         std::tie(command_buffer, x) = forward_async(x);
         command_buffer->waitUntilCompleted();
-        auto end_t = command_buffer->GPUEndTime();
-        auto start_t = command_buffer->GPUStartTime();
-        std::cout << "MetalBlock GPU time " << (end_t - start_t) << "s" << std::endl;
         return x;
     }
 
