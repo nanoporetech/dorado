@@ -15,6 +15,8 @@ void setup(std::vector<std::string> args, const std::string& model_path, const s
         const std::string& device, size_t chunk_size, size_t overlap, size_t batch_size, size_t num_runners, 
         bool emit_sam) {
 
+    torch::set_num_threads(1);
+
     std::vector<Runner> runners;
     auto decode_options = DecoderOptions();
 
