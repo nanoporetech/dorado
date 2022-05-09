@@ -1,11 +1,13 @@
 #include "Fast5DataLoader.h"
 #include "../read_pipeline/ReadPipeline.h"
+#include "utils/compat_utils.h"
 
 #include <highfive/H5File.hpp>
 #include <highfive/H5Easy.hpp>
 
 #include <ctime>
 #include <filesystem>
+#include <cctype>
 #include "vbz_plugin_user_utils.h"
 
 namespace {
@@ -61,7 +63,7 @@ void Fast5DataLoader::load_reads(const std::string& path) {
         std::string ext = std::filesystem::path(entry).extension().string();
         std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c){ return std::tolower(c); });
         if(ext == ".fast5") {
-            load_reads_from_file(entry.path());
+            load_reads_from_file(entry.path().string());
         }
     }
     m_read_sink.terminate();
@@ -88,7 +90,7 @@ void Fast5DataLoader::load_reads_from_file(const std::string& path) {
         HighFive::Attribute channel_number_attr = channel_id_group.getAttribute("channel_number"); 
 
         int32_t channel_number;
-        if (channel_number_attr.getDataType().string().starts_with("String")) {
+        if (channel_number_attr.getDataType().string().substr(0, 6) == "String") {
             std::string channel_number_string;
             fixed_string_reader(channel_number_attr, channel_number_string);
             std::istringstream channel_stream(channel_number_string);
@@ -135,24 +137,19 @@ void Fast5DataLoader::load_reads_from_file(const std::string& path) {
         auto start_time_str = adjust_time(exp_start_time, static_cast<uint32_t>(start_time / sampling_rate));
 
         auto options = torch::TensorOptions().dtype(torch::kFloat32);
-        auto new_read = std::make_shared<Read>( 
-            Read {
-                .raw_data = torch::from_blob(floatTmp.data(), floatTmp.size(), options).clone().to(m_device),
-                .digitisation = digitisation,
-                .range = range,
-                .offset = offset,
-                .read_id = read_id,
-                .num_samples = floatTmp.size(),
-                .num_trimmed_samples = floatTmp.size(), // same value until we actually trim
-                .attributes = Read::Attributes {
-                    .mux = mux,
-                    .read_number = read_number,
-                    .channel_number = channel_number,
-                    .start_time = start_time_str,
-                    .fast5_filename = fast5_filename
-                }
-            }
-        );
+        auto new_read = std::make_shared<Read>();
+        new_read->raw_data = torch::from_blob(floatTmp.data(), floatTmp.size(), options).clone().to(m_device);
+        new_read->digitisation = digitisation;
+        new_read->range = range;
+        new_read->offset = offset;
+        new_read->read_id = read_id;
+        new_read->num_samples = floatTmp.size();
+        new_read->num_trimmed_samples = floatTmp.size(); // same value until we actually trim
+        new_read->attributes.mux = mux;
+        new_read->attributes.read_number = read_number;
+        new_read->attributes.channel_number = channel_number;
+        new_read->attributes.start_time = start_time_str;
+        new_read->attributes.fast5_filename = fast5_filename;
 
         m_read_sink.push_read(new_read);
         m_loaded_read_count++;

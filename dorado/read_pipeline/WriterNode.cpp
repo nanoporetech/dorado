@@ -70,7 +70,8 @@ WriterNode::~WriterNode() {
     m_cv.notify_one();
     m_worker->join();
     auto end_time = std::chrono::system_clock::now();
-    auto duration = duration_cast<std::chrono::milliseconds>(end_time - m_initialization_time).count();
+
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - m_initialization_time).count();
     std::cerr << "> Reads basecalled: " << m_num_reads_processed << std::endl;
     std::cerr << "> Samples/s: " << std::scientific << m_num_samples_processed / (duration / 1000.0) << std::endl;
 }

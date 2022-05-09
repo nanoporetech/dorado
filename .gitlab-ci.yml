@@ -18,6 +18,10 @@ variables:
   tags:
     - nvidia-docker
 
+.windows_runner: &windows_runner
+  tags:
+    - win10-gpu
+
 .linux_dependencies: &linux_dependencies
   before_script:
     - echo Dorado dependency stage
@@ -33,7 +37,7 @@ variables:
   script:
     - echo Dorado build stage
     - cmake ${BUILD_OPTIONS} -S . -B ${BUILD_DIR}
-    - cmake --build ${BUILD_DIR} --config Release -- -j 8
+    - cmake --build ${BUILD_DIR} --config Release ${BUILD_THREADS}
   # We probably want to limit the amount of stuff in the artifacts by selecting out just the built EXEs
   artifacts:
     paths:
@@ -45,6 +49,8 @@ variables:
 
 build:linux:x86:focal:install_deps:
   image: ${DORADO_NO_DEPS}
+  variables:
+    BUILD_THREADS: "-- -j 8"
   <<: *linux_dependencies
   <<: *linux_runner
   <<: *build_dorado
@@ -54,10 +60,20 @@ build:linux:x86:focal:
   image: ${DORADO_DEPS}
   variables:
     BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/libtorch"
+    BUILD_THREADS: "-- -j 8"
   <<: *linux_runner
   <<: *build_dorado
 
+build:windows:
+  variables:
+    BUILD_OPTIONS: "-A x64"
+  <<: *windows_runner
+  <<: *build_dorado
+  when: manual
+
 build:macos:m1:
+  variables:
+    BUILD_THREADS: "-- -j 8"
   <<: *macos_runner
   <<: *build_dorado
 

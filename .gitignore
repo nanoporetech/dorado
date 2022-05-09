@@ -2,9 +2,11 @@
 build
 .vscode
 dorado/3rdparty/cuda11.3
+dorado/3rdparty/hdf5-1.12.*
 dorado/3rdparty/torch-*
 dorado/3rdparty/vbz_plugin
 dorado/3rdparty/metal-cpp
 cmake-build*
+cmake.lock
 .idea/
 .DS_Store
