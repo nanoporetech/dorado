@@ -42,24 +42,18 @@ TORCH_MODULE(MetalLinearTanh);
 
 struct MetalConv1dImpl : Module {
     
-    MetalConv1dImpl(int layer, int outsize_, int chunk_size, int batch_size, MTL::Device *device)
-    : outsize(outsize_) {
+  MetalConv1dImpl(int layer, int insize_, int outsize_, int k_, int stride, int chunk_size, int batch_size, MTL::Device *device)
+    : insize(insize_), outsize(outsize_), k(k_) {
 
-        int stride = 1;
-        k = 5;
         assert(layer >= 1 && layer <= 3);
+
         if (layer == 1) {
-            insize = 1;
             assert(outsize == 4);
             mat_weights = create_buffer(device, 49 * 8 * sizeof(ftype));
         } else if (layer == 2) {
-            insize = 4;
             assert(outsize == 16);
             mat_weights = create_buffer(device, 29 * 16 * sizeof(ftype));
         } else {
-            insize = 16;
-            k = 19;
-            stride = 5;
             mat_weights = create_buffer(device, (k * insize + 1) * outsize * sizeof(ftype));
         }
         int32_t args_[] = {insize, k, outsize, stride, k / 2, chunk_size, batch_size};
@@ -131,14 +125,13 @@ TORCH_MODULE(MetalLSTM);
 
 struct MetalBlockImpl : Module {
 
-    MetalBlockImpl(int chunk_size_, int batch_size_, int layer_size_, int out_size_, MTL::Device *device_)
-    : device(device_), in_chunk_size(chunk_size_), batch_size(batch_size_), layer_size(layer_size_), out_size(out_size_) {
+    MetalBlockImpl(int chunk_size_, int batch_size_, int stride_, int layer_size_, int out_size_, MTL::Device *device_)
+      : device(device_), in_chunk_size(chunk_size_), stride(stride_), batch_size(batch_size_), layer_size(layer_size_), out_size(out_size_) {
 
         command_queue = device->newCommandQueue();
 
         constexpr int tile_size = 8;
 
-        constexpr int stride = 5;
         lstm_chunk_size = in_chunk_size / stride;
 
         // args for forward
@@ -190,9 +183,9 @@ struct MetalBlockImpl : Module {
         mat_state = create_buffer(device, batch_size * layer_size * sizeof(ftype));
         mat_temp_result = create_buffer(device, batch_size * layer_size * 4 * sizeof(ftype));
 
-        conv1 = register_module("conv1", MetalConv1d(1, 4, in_chunk_size, batch_size, device));
-        conv2 = register_module("conv2", MetalConv1d(2, 16, in_chunk_size, batch_size, device));
-        conv3 = register_module("conv3", MetalConv1d(3, layer_size, in_chunk_size, batch_size, device));
+        conv1 = register_module("conv1", MetalConv1d(1, 1, 4, 5, 1, in_chunk_size, batch_size, device));
+        conv2 = register_module("conv2", MetalConv1d(2, 4, 16, 5, 1, in_chunk_size, batch_size, device));
+        conv3 = register_module("conv3", MetalConv1d(3, 16, layer_size, 19, stride, in_chunk_size, batch_size, device));
         rnn1 = register_module("rnn_1", MetalLSTM(layer_size, true, device));
         rnn2 = register_module("rnn_2", MetalLSTM(layer_size, false, device));
         rnn3 = register_module("rnn_3", MetalLSTM(layer_size, true, device));
@@ -285,7 +278,7 @@ struct MetalBlockImpl : Module {
     std::string fn[2];
     MTL::ComputePipelineState *reorder_weights_cps, *reorder_input_cps, *reorder_output_cps, *lstm_cps[2], *to_half_cps, *linear_tanh_cps;
     MTL::Buffer *mat_transfer, *mat_transfer_ftype, *args[3], *mat_working_mem, *mat_state, *mat_temp_result, *mat_linear_weights;
-    int in_chunk_size, lstm_chunk_size, batch_size, layer_size, out_size, kernel_thread_groups, kernel_simd_groups;
+    int in_chunk_size, lstm_chunk_size, stride, batch_size, layer_size, out_size, kernel_thread_groups, kernel_simd_groups;
     MetalLSTM rnn1{nullptr}, rnn2{nullptr}, rnn3{nullptr}, rnn4{nullptr}, rnn5{nullptr};
     MetalConv1d conv1{nullptr}, conv2{nullptr}, conv3{nullptr};
     MetalLinearTanh linear{nullptr};
@@ -295,13 +288,11 @@ TORCH_MODULE(MetalBlock);
 
 struct MetalModelImpl : Module {
 
-    MetalModelImpl(int size, int outsize, int chunk_size, int batch_size, MTL::Device* device) {
-
-        mtl_block = register_module("mtl_block", MetalBlock(chunk_size, batch_size, size, outsize, device));
+    MetalModelImpl(int size, int outsize, int stride, int chunk_size, int batch_size, MTL::Device* device) {
+        mtl_block = register_module("mtl_block", MetalBlock(chunk_size, batch_size, stride, size, outsize, device));
     }
 
     void load_state_dict(std::vector<torch::Tensor> weights) {
-
         assert (weights.size() == parameters().size());
         for (size_t idx = 0; idx < weights.size(); idx++) {
             parameters()[idx].data() = weights[idx].data();
@@ -349,7 +340,7 @@ ModuleHolder<AnyModule> load_crf_mtl_model(const std::string& path, int batch_si
     auto lb = state_dict[state_dict.size() - 1];
 
     state_dict[state_dict.size() - 2] = F::pad(
-	lw.view({states, 4, 384}),
+	lw.view({states, 4, insize}),
         F::PadFuncOptions({0, 0, 1, 0}).value(0.0)
     ).view({outsize, insize});
 
@@ -358,7 +349,7 @@ ModuleHolder<AnyModule> load_crf_mtl_model(const std::string& path, int batch_si
         F::PadFuncOptions({1, 0}).value(atanh(blank_score / scale))
     ).view({outsize});
 
-    auto model = MetalModel(insize, outsize, chunk_size, batch_size, device);
+    auto model = MetalModel(insize, outsize, stride, chunk_size, batch_size, device);
     model->load_state_dict(state_dict);
     model->eval();
 
