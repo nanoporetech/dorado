@@ -17,17 +17,14 @@ TEST_CASE( TEST_GROUP ": Test tag generation", TEST_GROUP ) {
         "f5:Z:batch_0.fast5"
     };
 
-    Read test_read {
-        .num_samples = 121131,
-        .num_trimmed_samples = 2130,
-        .attributes = Read::Attributes {
-            .mux = 2,
-            .read_number = 18501,
-            .channel_number = 5,
-            .start_time = "2017-04-29T09:10:04Z",
-            .fast5_filename = "batch_0.fast5"
-        }
-    };
+    Read test_read;
+    test_read.num_samples = 121131;
+    test_read.num_trimmed_samples = 2130;
+    test_read.attributes.mux = 2;
+    test_read.attributes.read_number = 18501;
+    test_read.attributes.channel_number = 5;
+    test_read.attributes.start_time = "2017-04-29T09:10:04Z";
+    test_read.attributes.fast5_filename = "batch_0.fast5";
 
     REQUIRE(test_read.generate_read_tags() == expected_tags);
 }
@@ -64,15 +61,14 @@ TEST_CASE( TEST_GROUP ": Test sam line generation", TEST_GROUP ) {
         test_read.read_id = "test_read";
         test_read.seq = "ACGTACGT";
         test_read.qstring = "********";
-        test_read.num_samples = 121131,
-        test_read.num_trimmed_samples = 2130,
-        test_read.attributes = Read::Attributes {
-            .mux = 2,
-            .read_number = 18501,
-            .channel_number = 5,
-            .start_time = "2017-04-29T09:10:04Z",
-            .fast5_filename = "batch_0.fast5"
-        };
+        test_read.num_samples = 121131;
+        test_read.num_trimmed_samples = 2130;
+        test_read.attributes.mux = 2;
+        test_read.attributes.read_number = 18501;
+        test_read.attributes.channel_number = 5;
+        test_read.attributes.start_time = "2017-04-29T09:10:04Z";
+        test_read.attributes.fast5_filename = "batch_0.fast5";
+
         REQUIRE(test_read.extract_sam_lines() == expected_sam_lines);
     }
 }

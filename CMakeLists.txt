@@ -143,13 +143,13 @@ configure_file(dorado/Version.h.in dorado/Version.h)
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/dorado)
 
 include_directories(${HDF5_INCLUDE_DIRS}
-		    dorado/3rdparty/HighFive/include
-		    dorado/3rdparty/HDF5/apple/1.12.1/include
-		    dorado/3rdparty/catch2
-		    dorado/3rdparty/argparse
-		    dorado/3rdparty/toml11
-            dorado/3rdparty/hdf_plugins/vbz_plugin
-		    dorado)
+        dorado/3rdparty/HighFive/include
+        dorado/3rdparty/HDF5/apple/1.12.1/include
+        dorado/3rdparty/catch2
+        dorado/3rdparty/argparse
+        dorado/3rdparty/toml11
+        dorado/3rdparty/hdf_plugins/vbz_plugin
+        dorado)
 
 set(LIB_SOURCE_FILES
         dorado/data_loader/Fast5DataLoader.cpp
@@ -173,6 +173,8 @@ set(LIB_SOURCE_FILES
         dorado/decode/CPUDecoder.h
         dorado/decode/GPUDecoder.cpp
         dorado/decode/GPUDecoder.h
+        dorado/utils/compat_utils.cpp
+        dorado/utils/compat_utils.h
         dorado/utils/sequence_utils.cpp
         dorado/utils/sequence_utils.h
         dorado/utils/stitch.cpp
