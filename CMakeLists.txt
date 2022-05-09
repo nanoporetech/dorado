@@ -75,8 +75,34 @@ if(LINUX)
     set(TORCH_URL https://download.pytorch.org/libtorch/cu113/libtorch-shared-with-deps-${TORCH_VERSION}%2Bcu113.zip)
     set(TORCH_LIB "${CMAKE_SOURCE_DIR}/dorado/3rdparty/torch-${TORCH_VERSION}-${CMAKE_SYSTEM_NAME}/libtorch")
 elseif(APPLE)
+    download_and_extract(https://developer.apple.com/metal/cpp/files/metal-cpp_macOS12_iOS15.zip metal-cpp)
+    find_library(APPLE_FWK_FOUNDATION Foundation REQUIRED)
+    find_library(APPLE_FWK_QUARTZ_CORE QuartzCore REQUIRED)
+    find_library(APPLE_FWK_METAL Metal REQUIRED)
     set(TORCH_URL https://files.pythonhosted.org/packages/7b/91/89bbe2316b93671b6bccec094df6bc66109cf6d21a364cd2f1becd11ba3c/torch-${TORCH_VERSION}-cp39-none-macosx_11_0_arm64.whl)
     set(TORCH_LIB "${CMAKE_SOURCE_DIR}/dorado/3rdparty/torch-${TORCH_VERSION}-${CMAKE_SYSTEM_NAME}/torch")
+
+    set(AIR_FILES)
+    set(METAL_SOURCES dorado/nn/metal/nn.metal)
+
+    foreach(source ${METAL_SOURCES})
+        get_filename_component(basename "${source}" NAME_WE)
+        set(air_path "${CMAKE_BINARY_DIR}/${basename}.air")
+        add_custom_command(
+            OUTPUT "${air_path}"
+            COMMAND xcrun -sdk macosx metal -ffast-math -c "${CMAKE_CURRENT_SOURCE_DIR}/${source}" -o "${air_path}"
+            DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/${source}"
+            COMMENT "Compiling metal kernels"
+        )
+        list(APPEND AIR_FILES "${air_path}")
+    endforeach()
+
+    add_custom_command(
+        OUTPUT default.metallib
+        COMMAND xcrun -sdk macosx metallib ${AIR_FILES} -o ${CMAKE_BINARY_DIR}/lib/default.metallib
+        DEPENDS ${AIR_FILES}
+        COMMENT "Creating metallib"
+    )
 endif()
 
 add_hdf_vbz_plugin()
@@ -105,13 +131,14 @@ configure_file(dorado/Version.h.in dorado/Version.h)
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/dorado)
 
 include_directories(${HDF5_INCLUDE_DIRS}
-		    dorado/3rdparty/HighFive/include
-		    dorado/3rdparty/HDF5/apple/1.12.1/include
-		    dorado/3rdparty/catch2
-		    dorado/3rdparty/argparse
-		    dorado/3rdparty/toml11
-            dorado/3rdparty/hdf_plugins/vbz_plugin
-		    dorado)
+                    dorado/3rdparty/HighFive/include
+                    dorado/3rdparty/HDF5/apple/1.12.1/include
+                    dorado/3rdparty/catch2
+                    dorado/3rdparty/argparse
+                    dorado/3rdparty/toml11
+                    dorado/3rdparty/hdf_plugins/vbz_plugin
+                    dorado/3rdparty/metal-cpp/metal-cpp
+                    dorado)
 
 set(LIB_SOURCE_FILES
         dorado/data_loader/Fast5DataLoader.cpp
@@ -142,13 +169,33 @@ set(LIB_SOURCE_FILES
         dorado/utils/tensor_utils.cpp
         dorado/utils/tensor_utils.h)
 
+if(APPLE)
+    list(APPEND LIB_SOURCE_FILES
+            dorado/nn/metal/nn.h
+            dorado/nn/MetalCRFModel.h
+            dorado/nn/MetalCRFModel.cpp
+            dorado/utils/metal_utils.cpp
+            dorado/utils/metal_utils.h)
+endif()
+
 add_library(dorado_lib ${LIB_SOURCE_FILES})
 set_target_properties(dorado_lib
     PROPERTIES
     LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
     ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
 )
-target_link_libraries(dorado_lib ${HDF5_C_LIBRARIES} ${TORCH_LIBRARIES} vbz_hdf_plugin)
+target_link_libraries(dorado_lib
+    ${APPLE_FWK_FOUNDATION}
+    ${APPLE_FWK_QUARTZ_CORE}
+    ${APPLE_FWK_METAL}
+    ${HDF5_C_LIBRARIES}
+    ${TORCH_LIBRARIES}
+    vbz_hdf_plugin
+)
+if(APPLE)
+    add_custom_target(metal-lib DEPENDS default.metallib)
+    add_dependencies(dorado_lib metal-lib)
+endif()
 
 add_executable(dorado
     dorado/main.cpp)
