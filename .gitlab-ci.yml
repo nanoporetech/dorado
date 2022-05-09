@@ -48,7 +48,6 @@ build:linux:x86:focal:install_deps:
   <<: *linux_dependencies
   <<: *linux_runner
   <<: *build_dorado
-  <<: *unit_test  
   when: manual
 
 build:linux:x86:focal:
@@ -58,14 +57,12 @@ build:linux:x86:focal:
     BUILD_THREADS: "-- -j 8"
   <<: *linux_runner
   <<: *build_dorado
-  <<: *unit_test
   
 build:windows:
   variables:
     BUILD_OPTIONS: "-A x64"
   <<: *windows_runner
   <<: *build_dorado
-  <<: *unit_test
   when: manual
 
 build:macos:m1:
@@ -73,7 +70,6 @@ build:macos:m1:
     BUILD_THREADS: "-- -j 8"
   <<: *macos_runner
   <<: *build_dorado
-  <<: *unit_test
   
 # Test stage components
 
