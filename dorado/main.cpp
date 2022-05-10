@@ -1,112 +1,60 @@
+#include <map>
+#include <vector>
+#include <string>
+#include <sstream>
 #include <iostream>
-#include <argparse.hpp>
+#include <iterator>
+#include <functional>
 
-#include "nn/ModelRunner.h"
-#include "decode/CPUDecoder.h"
-#include "decode/GPUDecoder.h"
-#include "data_loader/Fast5DataLoader.h"
-#include "read_pipeline/ScalerNode.h"
-#include "read_pipeline/BasecallerNode.h"
-#include "read_pipeline/WriterNode.h"
 #include "Version.h"
+#include "cli/cli.h"
 
 
-void setup(std::vector<std::string> args, const std::string& model_path, const std::string& data_path,
-        const std::string& device, size_t chunk_size, size_t overlap, size_t batch_size, size_t num_runners, 
-        bool emit_sam) {
+using entry_ptr = std::function<int(int, char**)>;
 
-    std::vector<Runner> runners;
-    auto decode_options = DecoderOptions();
 
-    if (device == "cpu") {
-        for (int i = 0; i < num_runners; i++) {
-            runners.push_back(std::make_shared<ModelRunner<CPUDecoder>>(model_path, device, chunk_size, batch_size, decode_options));
-        }
-    } else if (device == "metal") {
-        for (int i = 0; i < num_runners; i++) {
-            runners.push_back(std::make_shared<ModelRunner<CPUDecoder>>(model_path, device, chunk_size, batch_size, decode_options));
-	    }
-    } else {
-        for (int i = 0; i < num_runners; i++) {
-            runners.push_back(std::make_shared<ModelRunner<GPUDecoder>>(model_path, device, chunk_size, batch_size, decode_options));
-        }
-    }
+int usage(std::vector<std::string> commands) {
 
-    WriterNode writer_node(std::move(args), emit_sam);
-    BasecallerNode basecaller_node(writer_node, runners, batch_size, chunk_size, overlap);
-    ScalerNode scaler_node(basecaller_node);
-    Fast5DataLoader loader(scaler_node, "cpu");
-    loader.load_reads(data_path);
+    std::ostringstream ss;
+    const char* const delim = ", ";
+    std::copy(commands.begin(), commands.end(), std::ostream_iterator<std::string>(ss, delim));
+
+    std::cout << "usage: dorado [-h] [-v] {" << ss.str() << "} ...\n\n"
+              << "optional arguments:\n"
+              << "  -h, --help            show this help message and exit\n"
+              << "  -v, --version         show program's version number and exit\n\n"
+              << "subcommands:\n"
+              << "  valid commands\n\n"
+              << "  {" << ss.str() << "}" << std::endl;
+     return 0;
 }
 
 
 int main(int argc, char *argv[]) {
 
-    argparse::ArgumentParser parser("dorado", DORADO_VERSION);
+    std::map<std::string, entry_ptr> subcommands = {
+        {"basecaller", &basecaller},
+    };
 
-    parser.add_argument("model")
-            .help("the basecaller model to run.");
+    std::vector<std::string> arguments(argv + 1, argv + argc);
+    std::vector<std::string> keys;
 
-    parser.add_argument("data")
-            .help("the data directory.");
-
-    parser.add_argument("-x", "--device")
-#ifdef __APPLE__
-            .default_value(std::string{"metal"});
-#else
-            .default_value(std::string{"cuda:0"});
-#endif
-
-    parser.add_argument("-b", "--batchsize")
-            .default_value(1024)
-            .scan<'i', int>();
-
-    parser.add_argument("-c", "--chunksize")
-            .default_value(8000)
-            .scan<'i', int>();
-
-    parser.add_argument("-o", "--overlap")
-            .default_value(150)
-            .scan<'i', int>();
-
-    parser.add_argument("-r", "--num_runners")
-            .default_value(1)
-            .scan<'i', int>();
-
-    parser.add_argument("--emit-sam")
-            .default_value(false)
-            .implicit_value(true);
-
-    try {
-        parser.parse_args(argc, argv);
-    }
-    catch (const std::exception &e) {
-        std::cerr << e.what() << std::endl;
-        std::cerr << parser;
-        std::exit(1);
+    for (const auto& [key, _] : subcommands) {
+         keys.push_back(key);
     }
 
-    std::vector<std::string> args(argv, argv + argc);
-
-    std::cerr << "> Creating basecall pipeline" << std::endl;
-    try {
-        setup(
-            args,
-            parser.get<std::string>("model"),
-            parser.get<std::string>("data"),
-            parser.get<std::string>("-x"),
-            parser.get<int>("-c"),
-            parser.get<int>("-o"),
-            parser.get<int>("-b"),
-            parser.get<int>("-r"),
-            parser.get<bool>("--emit-sam")
-        );
-    }
-    catch (const std::exception& e) {
-        std::cerr << e.what() << std::endl;
-        std::exit(1);
+    if (arguments.size() == 0) {
+        return usage(keys);
     }
 
-    std::cerr << "> Finished" << std::endl;
+    auto subcommand = arguments[0];
+
+    if (subcommand == "-v" || subcommand == "--version") {
+        std::cout << DORADO_VERSION << std::endl;
+    } else if (subcommands.contains(subcommand)) {
+        return subcommands.at(subcommand)(--argc, ++argv);
+    } else {
+        return usage(keys);
+    }
 
 }
