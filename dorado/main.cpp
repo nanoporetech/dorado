@@ -13,14 +13,14 @@ using entry_ptr = std::function<int(int, char**)>;
 
 void usage(const std::vector<std::string> commands) {
 
-    std::cout << "Usage: dorado [options] subcommand\n\n"
+    std::cerr << "Usage: dorado [options] subcommand\n\n"
               << "Positional arguments:" << std::endl;
 
     for (const auto command : commands) {
-        std::cout << command << std::endl;
+        std::cerr << command << std::endl;
     }
 
-    std::cout << "\nOptional arguments:\n"
+    std::cerr << "\nOptional arguments:\n"
               << "-h --help               shows help message and exits\n"
               << "-v --version            prints version information and exits"
               << std::endl;
@@ -49,7 +49,7 @@ int main(int argc, char *argv[]) {
     const auto subcommand = arguments[0];
 
     if (subcommand == "-v" || subcommand == "--version") {
-        std::cout << DORADO_VERSION << std::endl;
+        std::cerr << DORADO_VERSION << std::endl;
     } else if (subcommands.contains(subcommand)) {
         return subcommands.at(subcommand)(--argc, ++argv);
     } else {
