@@ -1,9 +1,7 @@
 #include <map>
 #include <vector>
 #include <string>
-#include <sstream>
 #include <iostream>
-#include <iterator>
 #include <functional>
 
 #include "Version.h"
@@ -13,20 +11,20 @@
 using entry_ptr = std::function<int(int, char**)>;
 
 
-int usage(std::vector<std::string> commands) {
+void usage(std::vector<std::string> commands) {
 
-    std::ostringstream ss;
-    const char* const delim = ", ";
-    std::copy(commands.begin(), commands.end(), std::ostream_iterator<std::string>(ss, delim));
+    std::cout << "Usage: dorado [options] subcommand\n\n"
+              << "Positional arguments:" << std::endl;
 
-    std::cout << "usage: dorado [-h] [-v] {" << ss.str() << "} ...\n\n"
-              << "optional arguments:\n"
-              << "  -h, --help            show this help message and exit\n"
-              << "  -v, --version         show program's version number and exit\n\n"
-              << "subcommands:\n"
-              << "  valid commands\n\n"
-              << "  {" << ss.str() << "}" << std::endl;
-     return 0;
+    for (auto command : commands) {
+        std::cout << command << std::endl;
+    }
+
+    std::cout << "\nOptional arguments:\n"
+              << "-h --help               shows help message and exits\n"
+              << "-v --version            prints version information and exits"
+              << std::endl;
+
 }
 
 
@@ -44,7 +42,8 @@ int main(int argc, char *argv[]) {
     }
 
     if (arguments.size() == 0) {
-        return usage(keys);
+        usage(keys);
+        return 0;
     }
 
     auto subcommand = arguments[0];
@@ -54,7 +53,10 @@ int main(int argc, char *argv[]) {
     } else if (subcommands.contains(subcommand)) {
         return subcommands.at(subcommand)(--argc, ++argv);
     } else {
-        return usage(keys);
+        usage(keys);
+        return 1;
     }
+
+    return 0;
 
 }
