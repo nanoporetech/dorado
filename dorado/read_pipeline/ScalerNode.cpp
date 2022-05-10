@@ -13,7 +13,6 @@ std::pair<float, float> calculate_med_mad(torch::Tensor &x, float factor=1.4826)
 }
 
 void ScalerNode::worker_thread(){
-    torch::set_num_threads(1);
 
     while (true) {
         // Wait until we are provided with a read

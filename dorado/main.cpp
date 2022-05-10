@@ -2,7 +2,6 @@
 #include <vector>
 #include <string>
 #include <iostream>
-#include <functional>
 
 #include "Version.h"
 #include "cli/cli.h"
