@@ -176,7 +176,11 @@ include_directories(${HDF5_INCLUDE_DIRS}
         dorado/3rdparty/toml11
         dorado/3rdparty/hdf_plugins/vbz_plugin
         dorado/3rdparty/metal-cpp/metal-cpp
+        dorado/3rdparty/mkr/c++
+        ${CMAKE_BINARY_DIR}/dorado/3rdparty/mkr/c++
         dorado)
+
+add_subdirectory(dorado/3rdparty/mkr)
 
 set(LIB_SOURCE_FILES
         dorado/data_loader/Fast5DataLoader.cpp
@@ -231,6 +235,7 @@ target_link_libraries(dorado_lib
     ${HDF5_C_LIBRARIES}
     ${TORCH_LIBRARIES}
     vbz_hdf_plugin
+    mkr_format
 )
 if(APPLE)
     add_custom_target(metal-lib DEPENDS default.metallib)
@@ -320,5 +325,5 @@ endif()
     target_link_libraries(koi_lib koi_lstm_quantized_rev_128)
 
     # Finally add a dependency on koi_lib to the dorado project
-    target_link_libraries(dorado_lib koi_lib)
+    target_link_libraries(dorado_lib koi_lib mkr_format)
 endif() # LINUX OR WIN32

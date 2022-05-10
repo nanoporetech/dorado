@@ -34,9 +34,13 @@ void ScalerNode::worker_thread(){
         m_reads.pop_front();
         lock.unlock();
 
-        float scaling = (float) read->range / (float) read->digitisation;
+        float scaling;
+        if (!read->scale_set){
+            read->scale = (float) read->range / (float) read->digitisation;
+            read->scale_set = true;
+        }
 
-        read->raw_data = scaling * (read->raw_data + read->offset);
+        read->raw_data = read->scale * (read->raw_data + read->offset);
 
         int trim_start = trim(read->raw_data.index({torch::indexing::Slice(torch::indexing::None, 8000)})); //TODO use non default params
 

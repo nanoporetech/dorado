@@ -49,6 +49,9 @@ public:
     float med; // To be set by scaler
     float mad; // To be set by scaler
 
+    bool scale_set = false;
+    float scale;
+
     size_t num_chunks;
     std::vector<std::shared_ptr<Chunk>> called_chunks;
 

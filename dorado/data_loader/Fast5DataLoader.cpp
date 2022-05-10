@@ -9,6 +9,8 @@
 #include <filesystem>
 #include <cctype>
 #include "vbz_plugin_user_utils.h"
+#include "mkr_format/c_api.h"
+
 
 namespace {
 void fixed_string_reader(HighFive::Attribute& attribute, std::string& target_str) {
@@ -63,14 +65,159 @@ void Fast5DataLoader::load_reads(const std::string& path) {
         std::string ext = std::filesystem::path(entry).extension().string();
         std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c){ return std::tolower(c); });
         if(ext == ".fast5") {
-            load_reads_from_file(entry.path().string());
+            load_fast5_reads_from_file(entry.path().string());
+        }
+        else if(ext == ".mkr") {
+            load_mkr_reads_from_file(entry.path().string());
         }
     }
     m_read_sink.terminate();
     std::cerr << "> Loaded " << m_loaded_read_count << " reads" << std::endl;
 }
 
-void Fast5DataLoader::load_reads_from_file(const std::string& path) {
+void Fast5DataLoader::load_mkr_reads_from_file(const std::string& path) {
+    std::cout << "Path is " << path << std::endl;
+
+    mkr_init();
+
+    // Open the file ready for walking:
+    MkrFileReader_t* file = mkr_open_combined_file(path.c_str());
+
+    if (!file) {
+        std::cerr << "Failed to open file " << path.c_str() << ": " << mkr_get_error_string() << "\n";
+        //return EXIT_FAILURE;
+    }
+
+    std::size_t batch_count = 0;
+    if (mkr_get_read_batch_count(&batch_count, file) != MKR_OK) {
+        std::cerr << "Failed to query batch count: " << mkr_get_error_string() << "\n";
+    }
+
+
+    size_t read_count = 0;
+    std::size_t samples_read = 0;
+
+    for (std::size_t batch_index = 0; batch_index < batch_count; ++batch_index) {
+        std::cout << "Batch index: " << batch_index << std::endl;
+        MkrReadRecordBatch_t* batch = nullptr;
+        if (mkr_get_read_batch(&batch, file, batch_index) != MKR_OK) {
+            std::cerr << "Failed to get batch: " << mkr_get_error_string() << "\n";
+            //return EXIT_FAILURE;
+        }
+
+        std::size_t batch_row_count = 0;
+        if (mkr_get_read_batch_row_count(&batch_row_count, batch) != MKR_OK) {
+            std::cerr << "Failed to get batch row count\n";
+            //return EXIT_FAILURE;
+        }
+
+        for (std::size_t row = 0; row < batch_row_count; ++row) {
+            std::cout << "row index: " << row << std::endl;
+
+            uint8_t read_id[16];
+            int16_t pore = 0;
+            int16_t calibration_idx = 0;
+            uint32_t read_number = 0;
+            uint64_t start_sample = 0;
+            float median_before = 0.0f;
+            int16_t end_reason = 0;
+            int16_t run_info = 0;
+            int64_t signal_row_count = 0;
+            if (mkr_get_read_batch_row_info(batch, row, read_id, &pore, &calibration_idx,
+                                            &read_number, &start_sample, &median_before,
+                                            &end_reason, &run_info, &signal_row_count) != MKR_OK) {
+                std::cerr << "Failed to get read " << row << "\n";
+                //return EXIT_FAILURE;
+            }
+            //std::cout << "read_id: " << read_id << std::endl;
+            //std::cout << "read_number: " << read_number << std::endl;
+            //output_stream << boost::uuids::to_string(read_id) << "\n";
+            read_count += 1;
+
+            char read_id_tmp[37];
+            mkr_error_t err = mkr_format_read_id(read_id, read_id_tmp);
+            std::string read_id_str(read_id_tmp);
+
+            // Now read out the calibration params:
+            CalibrationDictData_t *calib_data = nullptr;
+            if (mkr_get_calibration(batch, calibration_idx, &calib_data) != MKR_OK) {
+                std::cerr << "Failed to get read " << row
+                          << " calibration_idx data: " << mkr_get_error_string() << "\n";
+                //return EXIT_FAILURE;
+            }
+
+            // Find the absolute indices of the signal rows in the signal table
+            std::vector<std::uint64_t> signal_rows_indices(signal_row_count);
+            if (mkr_get_signal_row_indices(batch, row, signal_row_count,
+                                           signal_rows_indices.data()) != MKR_OK) {
+                std::cerr << "Failed to get read " << row
+                          << " signal row indices: " << mkr_get_error_string() << "\n";
+                //return EXIT_FAILURE;
+            }
+
+            // Find the locations of each row in signal batches:
+            std::vector<SignalRowInfo_t *> signal_rows(signal_row_count);
+            if (mkr_get_signal_row_info(file, signal_row_count, signal_rows_indices.data(),
+                                        signal_rows.data()) != MKR_OK) {
+                std::cerr << "Failed to get read " << row
+                          << " signal row locations: " << mkr_get_error_string() << "\n";
+            }
+
+            std::size_t total_sample_count = 0;
+            for (std::size_t i = 0; i < signal_row_count; ++i) {
+                total_sample_count += signal_rows[i]->stored_sample_count;
+            }
+
+            std::vector<std::int16_t> samples(total_sample_count);
+            std::size_t samples_read_so_far = 0;
+            for (std::size_t i = 0; i < signal_row_count; ++i) {
+                if (mkr_get_signal(file, signal_rows[i], signal_rows[i]->stored_sample_count,
+                                   samples.data() + samples_read_so_far) != MKR_OK) {
+                    std::cerr << "Failed to get read " << row
+                              << " signal: " << mkr_get_error_string() << "\n";
+                }
+
+                samples_read_so_far += signal_rows[i]->stored_sample_count;
+            }
+
+            std::vector<float> floatTmp(samples.begin(), samples.end());
+
+
+            samples_read += samples.size();
+
+            auto new_read = std::make_shared<Read>();
+
+            auto options = torch::TensorOptions().dtype(torch::kFloat32);
+            new_read->raw_data = torch::from_blob(floatTmp.data(), floatTmp.size(), options).clone().to(m_device);
+            float scale = calib_data->scale;
+            float offset = calib_data->offset;
+
+            new_read->scale = calib_data->scale;
+            new_read->scale_set = true;
+            new_read->offset = calib_data->offset;
+            new_read->read_id = read_id_str;
+
+            m_read_sink.push_read(new_read);
+            m_loaded_read_count++;
+
+            mkr_release_calibration(calib_data);
+            mkr_free_signal_row_info(signal_row_count, signal_rows.data());
+
+        }
+
+        if (mkr_free_read_batch(batch) != MKR_OK) {
+            std::cerr << "Failed to release batch\n";
+            //return EXIT_FAILURE;
+        }
+    }
+
+
+
+}
+
+
+
+void Fast5DataLoader::load_fast5_reads_from_file(const std::string& path) {
 
     // Read the file into a vector of torch tensors
     H5Easy::File file(path, H5Easy::File::ReadOnly);
