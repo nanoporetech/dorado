@@ -13,3 +13,6 @@
 [submodule "dorado/3rdparty/zstd"]
 	path = dorado/3rdparty/zstd
 	url = https://github.com/facebook/zstd.git
+[submodule "dorado/3rdparty/mkr"]
+	path = dorado/3rdparty/mkr
+	url = https://git.oxfordnanolabs.local/minknow/mkr-file-format.git
