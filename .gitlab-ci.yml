@@ -30,7 +30,7 @@ variables:
     #- sh cuda_11.3.0_465.19.01_linux.run --silent --toolkit
     #- rm cuda_11.3.0_465.19.01_linux.run
     # Install HDF 5
-    - apt-get update && apt-get install -y --no-install-recommends libhdf5-dev libssl-dev
+    - apt-get update && apt-get install -y --no-install-recommends libhdf5-dev libssl-dev libzstd-dev
 
 .build_dorado: &build_dorado
   stage: build
