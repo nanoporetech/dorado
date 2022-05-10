@@ -32,7 +32,7 @@ variables:
     - echo Dorado build stage
     - cmake ${BUILD_OPTIONS} -S . -B ${BUILD_DIR}
     - cmake --build ${BUILD_DIR} --config Release ${BUILD_THREADS}
-    - ctest --test-dir ${BUILD_DIR}
+    - ctest --config Release --test-dir ${BUILD_DIR}
   # We probably want to limit the amount of stuff in the artifacts by selecting out just the built EXEs
   artifacts:
     paths:
