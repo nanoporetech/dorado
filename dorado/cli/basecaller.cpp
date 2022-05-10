@@ -106,9 +106,10 @@ int basecaller(int argc, char *argv[]) {
     }
     catch (const std::exception& e) {
         std::cerr << e.what() << std::endl;
-        std::exit(1);
+        return 1;
     }
 
     std::cerr << "> Finished" << std::endl;
+    return 0;
 
 }

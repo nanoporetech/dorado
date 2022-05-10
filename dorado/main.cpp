@@ -2,6 +2,7 @@
 #include <vector>
 #include <string>
 #include <iostream>
+#include <functional>
 
 #include "Version.h"
 #include "cli/cli.h"
@@ -10,12 +11,12 @@
 using entry_ptr = std::function<int(int, char**)>;
 
 
-void usage(std::vector<std::string> commands) {
+void usage(const std::vector<std::string> commands) {
 
     std::cout << "Usage: dorado [options] subcommand\n\n"
               << "Positional arguments:" << std::endl;
 
-    for (auto command : commands) {
+    for (const auto command : commands) {
         std::cout << command << std::endl;
     }
 
@@ -29,7 +30,7 @@ void usage(std::vector<std::string> commands) {
 
 int main(int argc, char *argv[]) {
 
-    std::map<std::string, entry_ptr> subcommands = {
+    const std::map<std::string, entry_ptr> subcommands = {
         {"basecaller", &basecaller},
     };
 
@@ -45,7 +46,7 @@ int main(int argc, char *argv[]) {
         return 0;
     }
 
-    auto subcommand = arguments[0];
+    const auto subcommand = arguments[0];
 
     if (subcommand == "-v" || subcommand == "--version") {
         std::cout << DORADO_VERSION << std::endl;
