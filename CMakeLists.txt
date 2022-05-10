@@ -158,6 +158,10 @@ endif()
 
 find_package(HDF5 COMPONENTS C CXX HL)
 
+if(APPLE AND NOT DEFINED OPENSSL_ROOT_DIR)
+    set(OPENSSL_ROOT_DIR "/opt/homebrew/opt/openssl@3")
+endif()
+
 set(OPENSSL_USE_STATIC_LIBS TRUE)
 find_package(OpenSSL REQUIRED)
 
