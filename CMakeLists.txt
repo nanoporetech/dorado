@@ -158,6 +158,9 @@ endif()
 
 find_package(HDF5 COMPONENTS C CXX HL)
 
+set(OPENSSL_USE_STATIC_LIBS TRUE)
+find_package(OpenSSL REQUIRED)
+
 if(WIN32)
     add_compile_options(
         # Note we need to use the generator expression to avoid setting this for CUDA.
@@ -174,13 +177,16 @@ include_directories(${HDF5_INCLUDE_DIRS}
         dorado/3rdparty/catch2
         dorado/3rdparty/argparse
         dorado/3rdparty/toml11
+        dorado/3rdparty/cpp-httplib
         dorado/3rdparty/hdf_plugins/vbz_plugin
         dorado/3rdparty/metal-cpp/metal-cpp
         dorado)
 
 set(LIB_SOURCE_FILES
         dorado/cli/basecaller.cpp
+        dorado/cli/download.cpp
         dorado/cli/cli.h
+        dorado/models.h
         dorado/nn/CRFModel.h
         dorado/nn/CRFModel.cpp
         dorado/nn/ModelRunner.h
@@ -233,6 +239,7 @@ target_link_libraries(dorado_lib
     ${HDF5_C_LIBRARIES}
     ${TORCH_LIBRARIES}
     vbz_hdf_plugin
+    OpenSSL::SSL
 )
 if(APPLE)
     add_custom_target(metal-lib DEPENDS default.metallib)
