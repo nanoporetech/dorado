@@ -85,7 +85,6 @@ void Fast5DataLoader::load_mkr_reads_from_file(const std::string& path) {
 
     if (!file) {
         std::cerr << "Failed to open file " << path.c_str() << ": " << mkr_get_error_string() << "\n";
-        //return EXIT_FAILURE;
     }
 
     std::size_t batch_count = 0;
@@ -102,18 +101,14 @@ void Fast5DataLoader::load_mkr_reads_from_file(const std::string& path) {
         MkrReadRecordBatch_t* batch = nullptr;
         if (mkr_get_read_batch(&batch, file, batch_index) != MKR_OK) {
             std::cerr << "Failed to get batch: " << mkr_get_error_string() << "\n";
-            //return EXIT_FAILURE;
         }
 
         std::size_t batch_row_count = 0;
         if (mkr_get_read_batch_row_count(&batch_row_count, batch) != MKR_OK) {
             std::cerr << "Failed to get batch row count\n";
-            //return EXIT_FAILURE;
         }
 
         for (std::size_t row = 0; row < batch_row_count; ++row) {
-            std::cout << "row index: " << row << std::endl;
-
             uint8_t read_id[16];
             int16_t pore = 0;
             int16_t calibration_idx = 0;
@@ -127,11 +122,7 @@ void Fast5DataLoader::load_mkr_reads_from_file(const std::string& path) {
                                             &read_number, &start_sample, &median_before,
                                             &end_reason, &run_info, &signal_row_count) != MKR_OK) {
                 std::cerr << "Failed to get read " << row << "\n";
-                //return EXIT_FAILURE;
             }
-            //std::cout << "read_id: " << read_id << std::endl;
-            //std::cout << "read_number: " << read_number << std::endl;
-            //output_stream << boost::uuids::to_string(read_id) << "\n";
             read_count += 1;
 
             char read_id_tmp[37];
@@ -143,7 +134,6 @@ void Fast5DataLoader::load_mkr_reads_from_file(const std::string& path) {
             if (mkr_get_calibration(batch, calibration_idx, &calib_data) != MKR_OK) {
                 std::cerr << "Failed to get read " << row
                           << " calibration_idx data: " << mkr_get_error_string() << "\n";
-                //return EXIT_FAILURE;
             }
 
             // Find the absolute indices of the signal rows in the signal table
@@ -152,7 +142,6 @@ void Fast5DataLoader::load_mkr_reads_from_file(const std::string& path) {
                                            signal_rows_indices.data()) != MKR_OK) {
                 std::cerr << "Failed to get read " << row
                           << " signal row indices: " << mkr_get_error_string() << "\n";
-                //return EXIT_FAILURE;
             }
 
             // Find the locations of each row in signal batches:
@@ -207,7 +196,6 @@ void Fast5DataLoader::load_mkr_reads_from_file(const std::string& path) {
 
         if (mkr_free_read_batch(batch) != MKR_OK) {
             std::cerr << "Failed to release batch\n";
-            //return EXIT_FAILURE;
         }
     }
 
