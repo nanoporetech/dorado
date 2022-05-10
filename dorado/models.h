@@ -12,7 +12,7 @@ namespace basecaller {
     {"dna_r9.4.1_e8_hac@v3.3", "/shared/static/g6rbgd12xfunw5plgec3zlyy35692vy3.zip"},
     {"dna_r9.4.1_e8_sup@v3.3", "/shared/static/ezdt941r757a4tldam46l6sjcpgjflj2.zip"},
 
-    {"dna_r9.4.1_e8.1_fast@v3.4","buvtwoh7wg73yext2wphq5mkqkqltgzz.zip"},
+    {"dna_r9.4.1_e8.1_fast@v3.4","/shared/static/buvtwoh7wg73yext2wphq5mkqkqltgzz.zip"},
     {"dna_r9.4.1_e8.1_hac@v3.3", "/shared/static/i2rjjq0t3tlaktkipjjl8ef14p29eiss.zip"},
     {"dna_r9.4.1_e8.1_sup@v3.3", "/shared/static/xmpfpcq9eplsr2yoxha9pzmpurcerfey.zip"},
     

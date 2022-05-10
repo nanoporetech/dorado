@@ -2,10 +2,14 @@
 
 #include <iostream>
 #include <argparse.hpp>
+#include <filesystem>
+
+#include "models.h"
+#include "Version.h"
 
 #include "httplib.h"
-#include "Version.h"
-#include "../models.h"
+#include "elzip/elzip.hpp"
+
 
 int download(int argc, char *argv[]) {
 
@@ -44,6 +48,13 @@ int download(int argc, char *argv[]) {
       std::cerr << " - downloading " << model << " " << path;
       auto res = http.Get(path.c_str());
       std::cout << " [" << res->status << "]" << std::endl;
+
+      std::ofstream file(model + ".zip");
+      file << res->body;
+      file.close();
+
+      elz::extractZip(model + ".zip", model);
+
       return 0;
 
     }
@@ -51,5 +62,3 @@ int download(int argc, char *argv[]) {
     return 0;
 
 }
-
-

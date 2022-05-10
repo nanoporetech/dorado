@@ -186,6 +186,8 @@ include_directories(${HDF5_INCLUDE_DIRS}
         dorado/3rdparty/metal-cpp/metal-cpp
         dorado)
 
+add_subdirectory(dorado/3rdparty/11Zip)
+
 set(LIB_SOURCE_FILES
         dorado/cli/basecaller.cpp
         dorado/cli/download.cpp
@@ -236,6 +238,7 @@ set_target_properties(dorado_lib
     LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
     ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
 )
+
 target_link_libraries(dorado_lib
     ${APPLE_FWK_FOUNDATION}
     ${APPLE_FWK_QUARTZ_CORE}
@@ -244,6 +247,7 @@ target_link_libraries(dorado_lib
     ${TORCH_LIBRARIES}
     vbz_hdf_plugin
     OpenSSL::SSL
+    elzip
 )
 if(APPLE)
     add_custom_target(metal-lib DEPENDS default.metallib)
