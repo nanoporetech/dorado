@@ -122,14 +122,25 @@ elseif(WIN32)
     enable_language(CUDA)
     set(TORCH_URL https://download.pytorch.org/libtorch/cu113/libtorch-win-shared-with-deps-${TORCH_VERSION}%2Bcu113.zip)
     set(TORCH_LIB "${CMAKE_SOURCE_DIR}/dorado/3rdparty/torch-${TORCH_VERSION}-${CMAKE_SYSTEM_NAME}/libtorch")
-    
+
     # On windows, we need to build HDF5
     set(HDF_VER hdf5-1.12.1-3)
     if(EXISTS ${3RD_PARTY}/${HDF_VER})
         message("-- Found ${HDF_VER}")
     else()
+        # Need a zlib build for HDF to use
+        set(ZLIB_VER zlib-1.2.12)
+        download_and_extract(https://zlib.net/${ZLIB_VER}.tar.gz ${ZLIB_VER})
+        execute_process(COMMAND cmake -S ${3RD_PARTY}/${ZLIB_VER}/${ZLIB_VER} -B ${3RD_PARTY}/${ZLIB_VER}/${ZLIB_VER}/cmake-build -A x64
+            -DCMAKE_INSTALL_PREFIX=${3RD_PARTY}/${ZLIB_VER}/install)
+        execute_process(COMMAND cmake --build ${3RD_PARTY}/${ZLIB_VER}/${ZLIB_VER}/cmake-build --config Release --target install)
+        list(APPEND CMAKE_PREFIX_PATH ${3RD_PARTY}/${ZLIB_VER}/install)
+
+        # HDF5 itself
         download_and_extract(https://gamma.hdfgroup.org/ftp/pub/outgoing/hdf5/snapshots/v112/OLD/${HDF_VER}.tar.gz ${HDF_VER})
-        execute_process(COMMAND cmake -S ${3RD_PARTY}/${HDF_VER}/${HDF_VER} -B ${3RD_PARTY}/${HDF_VER}/${HDF_VER}/cmake-build -A x64 -DCMAKE_INSTALL_PREFIX=${3RD_PARTY}/${HDF_VER}/install)
+        execute_process(COMMAND cmake -S ${3RD_PARTY}/${HDF_VER}/${HDF_VER} -B ${3RD_PARTY}/${HDF_VER}/${HDF_VER}/cmake-build -A x64
+            -DHDF5_ENABLE_Z_LIB_SUPPORT=1 -DCMAKE_PREFIX_PATH=${3RD_PARTY}/${ZLIB_VER}/install
+            -DCMAKE_INSTALL_PREFIX=${3RD_PARTY}/${HDF_VER}/install)
         execute_process(COMMAND cmake --build ${3RD_PARTY}/${HDF_VER}/${HDF_VER}/cmake-build --config Release --target install)
     endif()
     list(APPEND CMAKE_PREFIX_PATH ${3RD_PARTY}/${HDF_VER}/install)
@@ -263,11 +274,10 @@ set_target_properties(dorado
 
 target_link_libraries(dorado dorado_lib)
 
-add_subdirectory(unit_test)
+add_subdirectory(tests)
 
 # Note that we can't cuurently do add_subdirectory(dorado) (or any subfolder thereof) as we're
 # making an exe called 'dorado' right into the root here, which causes conflicts with cmake naming.
-# TODO: sort out cmake structure and put dorado sources into a lib, then move the dorado exe into a subfolder and add install target for it.
 
 if(LINUX OR WIN32)
     # Note that any source file which gets compiled multiple times with differing flags won't get added here. See below.
