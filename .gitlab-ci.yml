@@ -79,7 +79,7 @@ build:macos:m1:
     - echo Dorado app test stage
     - curl -sSL https://nanoporetech.box.com/shared/static/g6rbgd12xfunw5plgec3zlyy35692vy3.zip -o model.zip
     - unzip model.zip
-    - ./${BUILD_DIR}/bin/dorado basecaller dna_r9.4.1_e8_hac@v3.3 ./unit_test/data/ -r 1 -b 384 > calls.fastq
+    - ./${BUILD_DIR}/bin/dorado basecaller dna_r9.4.1_e8_hac@v3.3 ./tests/data/ -r 1 -b 384 > calls.fastq
 
 # Test stages
 

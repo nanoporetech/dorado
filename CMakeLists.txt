@@ -259,7 +259,7 @@ set_target_properties(dorado
 
 target_link_libraries(dorado dorado_lib)
 
-add_subdirectory(unit_test)
+add_subdirectory(tests)
 
 # Note that we can't cuurently do add_subdirectory(dorado) (or any subfolder thereof) as we're
 # making an exe called 'dorado' right into the root here, which causes conflicts with cmake naming.
