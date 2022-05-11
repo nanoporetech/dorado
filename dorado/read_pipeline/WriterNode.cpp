@@ -7,7 +7,7 @@ using namespace std::chrono_literals;
 
 void WriterNode::worker_thread() {
 
-    if (m_emit_sam) {
+    if (!m_emit_fastq) {
         std::cout << "@HD\tVN:1.5\tSO:unknown\n"
                     << "@PG\tID:basecaller\tPN:dorado\tVN:" << DORADO_VERSION << "\tCL:dorado";
         for (const auto& arg : m_args) {
@@ -36,7 +36,12 @@ void WriterNode::worker_thread() {
         m_num_samples_processed += read->raw_data.size(0);
         m_num_reads_processed += 1;
 
-        if (m_emit_sam) {
+        if (m_emit_fastq) {
+	    std::cout << "@" << read->read_id << "\n"
+                      << read->seq << "\n"
+                      << "+\n"
+                      << read->qstring << "\n";
+        } else {
             try {
                 for (const auto& sam_line : read->extract_sam_lines()) {
                     std::cout << sam_line << "\n";
@@ -45,19 +50,15 @@ void WriterNode::worker_thread() {
             catch (const std::exception& ex) {
                 std::cerr << ex.what() << "\n";
             }
-        } else {
-	        std::cout << "@" << read->read_id << "\n"
-                      << read->seq << "\n"
-                      << "+\n"
-                      << read->qstring << "\n";
+
         }
     }
 }
 
-WriterNode::WriterNode(std::vector<std::string> args, bool emit_sam, size_t max_reads) 
+WriterNode::WriterNode(std::vector<std::string> args, bool emit_fastq, size_t max_reads)
     : ReadSink(max_reads)
     , m_args(std::move(args))
-    , m_emit_sam(emit_sam)
+    , m_emit_fastq(emit_fastq)
     , m_num_samples_processed(0)
     , m_num_reads_processed(0)
     , m_initialization_time(std::chrono::system_clock::now())

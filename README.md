@@ -15,5 +15,5 @@ $ ctest --test-dir cmake-build
 ## Running
 
 ```
-./dorado basecaller dna_r9.4.1_e8_hac@v3.3 fast5_pass/ > calls.fastq
+./dorado basecaller dna_r9.4.1_e8_hac@v3.3 fast5_pass/ > calls.sam
 ```
