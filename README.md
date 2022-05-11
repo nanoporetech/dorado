@@ -1,5 +1,7 @@
 # Dorado
 
+A LibTorch Basecaller for Oxford Nanopore Reads.
+
 ## Quickstart
 
 ```
