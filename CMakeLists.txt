@@ -190,8 +190,8 @@ include_directories(${HDF5_INCLUDE_DIRS}
         dorado)
 
 set(LIB_SOURCE_FILES
-        dorado/data_loader/Fast5DataLoader.cpp
-        dorado/data_loader/Fast5DataLoader.h
+        dorado/cli/basecaller.cpp
+        dorado/cli/cli.h
         dorado/nn/CRFModel.h
         dorado/nn/CRFModel.cpp
         dorado/nn/ModelRunner.h
@@ -203,6 +203,8 @@ set(LIB_SOURCE_FILES
         dorado/read_pipeline/BasecallerNode.h
         dorado/read_pipeline/WriterNode.cpp
         dorado/read_pipeline/WriterNode.h
+        dorado/data_loader/Fast5DataLoader.cpp
+        dorado/data_loader/Fast5DataLoader.h
         dorado/decode/beam_search.cpp
         dorado/decode/fast_hash.cpp
         dorado/decode/fast_hash.h
