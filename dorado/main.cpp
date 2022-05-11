@@ -50,7 +50,7 @@ int main(int argc, char *argv[]) {
 
     if (subcommand == "-v" || subcommand == "--version") {
         std::cerr << DORADO_VERSION << std::endl;
-    } else if (subcommands.contains(subcommand)) {
+    } else if (subcommands.find(subcommand) != subcommands.end()) {
         return subcommands.at(subcommand)(--argc, ++argv);
     } else {
         usage(keys);
