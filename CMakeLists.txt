@@ -197,7 +197,7 @@ include_directories(${HDF5_INCLUDE_DIRS}
         dorado/3rdparty/metal-cpp/metal-cpp
         dorado)
 
-add_subdirectory(dorado/3rdparty/11Zip)
+add_subdirectory(dorado/3rdparty/elzip)
 
 set(LIB_SOURCE_FILES
         dorado/cli/basecaller.cpp
