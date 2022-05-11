@@ -1,6 +1,6 @@
 #include <catch2/catch.hpp>
 
-#include "data_loader/Fast5DataLoader.h"
+#include "data_loader/DataLoader.h"
 #include "read_pipeline/ReadPipeline.h"
 #include "TestUtils.h"
 
@@ -18,7 +18,7 @@ TEST_CASE( TEST_GROUP "Test loading single-read Fast5 files" ) {
     MockSink mock_sink;
 
     std::string data_path(get_data_dir());
-    Fast5DataLoader loader(mock_sink, "cpu");
+    DataLoader loader(mock_sink, "cpu");
     loader.load_reads(data_path);
 
     REQUIRE(mock_sink.get_read_count() == 1);

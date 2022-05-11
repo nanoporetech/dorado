@@ -1,4 +1,4 @@
-#include "Fast5DataLoader.h"
+#include "DataLoader.h"
 #include "../read_pipeline/ReadPipeline.h"
 #include "utils/compat_utils.h"
 
@@ -49,7 +49,7 @@ std::string adjust_time(const std::string& time_stamp, uint32_t offset) {
 } /* anonymous namespace */
 
 
-void Fast5DataLoader::load_reads(const std::string& path) {
+void DataLoader::load_reads(const std::string& path) {
     if(!std::filesystem::exists(path)) {
         std::cerr << "Requested input path " << path << " does not exist!" << std::endl;
         m_read_sink.terminate();
@@ -75,7 +75,7 @@ void Fast5DataLoader::load_reads(const std::string& path) {
     std::cerr << "> Loaded " << m_loaded_read_count << " reads" << std::endl;
 }
 
-void Fast5DataLoader::load_mkr_reads_from_file(const std::string& path) {
+void DataLoader::load_mkr_reads_from_file(const std::string& path) {
     mkr_init();
 
     // Open the file ready for walking:
@@ -202,7 +202,7 @@ void Fast5DataLoader::load_mkr_reads_from_file(const std::string& path) {
 
 
 
-void Fast5DataLoader::load_fast5_reads_from_file(const std::string& path) {
+void DataLoader::load_fast5_reads_from_file(const std::string& path) {
 
     // Read the file into a vector of torch tensors
     H5Easy::File file(path, H5Easy::File::ReadOnly);
@@ -288,7 +288,7 @@ void Fast5DataLoader::load_fast5_reads_from_file(const std::string& path) {
     }
 }
 
-Fast5DataLoader::Fast5DataLoader(ReadSink& read_sink, const std::string& device) :
+DataLoader::DataLoader(ReadSink& read_sink, const std::string& device) :
     m_read_sink(read_sink),
     m_device(device){
     static std::once_flag vbz_init_flag;

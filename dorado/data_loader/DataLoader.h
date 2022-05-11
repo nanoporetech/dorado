@@ -3,9 +3,9 @@
 
 class ReadSink;
 
-class Fast5DataLoader {
+class DataLoader {
 public:
-    Fast5DataLoader(ReadSink& read_sink, const std::string& device);
+    DataLoader(ReadSink& read_sink, const std::string& device);
     void load_reads(const std::string& path);
 
 private:
@@ -15,4 +15,3 @@ private:
     size_t m_loaded_read_count{0};
     std::string m_device;
 };
-

@@ -183,8 +183,8 @@ include_directories(${HDF5_INCLUDE_DIRS}
 add_subdirectory(dorado/3rdparty/mkr)
 
 set(LIB_SOURCE_FILES
-        dorado/data_loader/Fast5DataLoader.cpp
-        dorado/data_loader/Fast5DataLoader.h
+        dorado/data_loader/DataLoader.cpp
+        dorado/data_loader/DataLoader.h
         dorado/nn/CRFModel.h
         dorado/nn/CRFModel.cpp
         dorado/nn/ModelRunner.h
