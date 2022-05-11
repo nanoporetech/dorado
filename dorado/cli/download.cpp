@@ -66,7 +66,7 @@ int download(int argc, char *argv[]) {
             std::ofstream ofs(archive.string());
             ofs << res->body;
             ofs.close();
-            elz::extractZip(archive.string(), directory.string());
+            elz::extractZip(archive, directory);
             fs::remove(archive);
       }
 
