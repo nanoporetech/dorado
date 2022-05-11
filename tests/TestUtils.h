@@ -2,7 +2,7 @@
 #include <filesystem>
 
 static std::string get_data_dir() {
-    const std::string data_path = "./unit_test/data";
+    const std::string data_path = "./tests/data";
 
     if(!std::filesystem::exists(data_path)) {
         std::cerr << "Datapath " << data_path << " does not exist, exiting.\n"
