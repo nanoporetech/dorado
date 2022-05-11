@@ -76,8 +76,6 @@ void Fast5DataLoader::load_reads(const std::string& path) {
 }
 
 void Fast5DataLoader::load_mkr_reads_from_file(const std::string& path) {
-    std::cout << "Path is " << path << std::endl;
-
     mkr_init();
 
     // Open the file ready for walking:
@@ -97,7 +95,6 @@ void Fast5DataLoader::load_mkr_reads_from_file(const std::string& path) {
     std::size_t samples_read = 0;
 
     for (std::size_t batch_index = 0; batch_index < batch_count; ++batch_index) {
-        std::cout << "Batch index: " << batch_index << std::endl;
         MkrReadRecordBatch_t* batch = nullptr;
         if (mkr_get_read_batch(&batch, file, batch_index) != MKR_OK) {
             std::cerr << "Failed to get batch: " << mkr_get_error_string() << "\n";
