@@ -13,7 +13,7 @@
 
 void setup(std::vector<std::string> args, const std::string& model_path, const std::string& data_path,
         const std::string& device, size_t chunk_size, size_t overlap, size_t batch_size, size_t num_runners, 
-        bool emit_sam) {
+        bool emit_fastq) {
 
     torch::set_num_threads(1);
     std::vector<Runner> runners;
@@ -28,7 +28,7 @@ void setup(std::vector<std::string> args, const std::string& model_path, const s
         }
     }
 
-    WriterNode writer_node(std::move(args), emit_sam);
+    WriterNode writer_node(std::move(args), emit_fastq);
     BasecallerNode basecaller_node(writer_node, runners, batch_size, chunk_size, overlap);
     ScalerNode scaler_node(basecaller_node);
     Fast5DataLoader loader(scaler_node, "cpu");
@@ -69,7 +69,7 @@ int basecaller(int argc, char *argv[]) {
             .default_value(1)
             .scan<'i', int>();
 
-    parser.add_argument("--emit-sam")
+    parser.add_argument("--emit-fastq")
             .default_value(false)
             .implicit_value(true);
 
@@ -95,7 +95,7 @@ int basecaller(int argc, char *argv[]) {
             parser.get<int>("-o"),
             parser.get<int>("-b"),
             parser.get<int>("-r"),
-            parser.get<bool>("--emit-sam")
+            parser.get<bool>("--emit-fastq")
         );
     }
     catch (const std::exception& e) {
