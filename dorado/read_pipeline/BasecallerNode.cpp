@@ -84,7 +84,6 @@ void BasecallerNode::basecall_current_batch(int worker_id) {
     }
 
     // We need to assign each chunk back to the read it came from
-    // MV TODO need a mutex on each source read - this is unsanfe.
     for (auto& complete_chunk : m_batched_chunks[worker_id]) {
         std::shared_ptr<Read> source_read = complete_chunk->source_read.lock();
         source_read->called_chunks[complete_chunk->idx_in_read] = complete_chunk;
