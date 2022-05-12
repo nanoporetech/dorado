@@ -17,7 +17,8 @@ int download(int argc, char *argv[]) {
 
     argparse::ArgumentParser parser("dorado", DORADO_VERSION);
 
-    parser.add_argument("model")
+    parser.add_argument("--model")
+            .default_value(std::string("all"))
             .help("the model to download");
 
     parser.add_argument("--directory")
@@ -38,6 +39,7 @@ int download(int argc, char *argv[]) {
     }
 
     auto list = parser.get<bool>("--list");
+    auto selected_model = parser.get<std::string>("--model");
     auto directory = fs::path(parser.get<std::string>("--directory"));
 
     if (list) {
@@ -45,20 +47,23 @@ int download(int argc, char *argv[]) {
         for (const auto& [model, _] : basecaller::models) {
             std::cerr << " - " << model << std::endl;
         }
-
         return 0;
+    }
+
+    if (selected_model != "all" && basecaller::models.find(selected_model) == basecaller::models.end()) {
+        std::cerr << "> error: '" << selected_model << "' is not a valid model" << std::endl;
+        std::cerr << "> basecaller models" << std::endl;
+        for (const auto& [model, _] : basecaller::models) {
+            std::cerr << " - " << model << std::endl;
+        }
+        return 1;
     }
 
     httplib::Client http(basecaller::URL_ROOT);
     http.set_follow_location(true);
 
-    std::cerr << "> basecaller models" << std::endl;
-
     for (const auto& [model, url] : basecaller::models) {
-
-        if (list) {
-            std::cerr << " - " << model << std::endl;
-        } else {
+        if (selected_model == "all" || selected_model == model) {
             std::cerr << " - downloading " << model;
             auto res = http.Get(url.c_str());
             std::cout << " [" << res->status << "]" << std::endl;
@@ -68,8 +73,7 @@ int download(int argc, char *argv[]) {
             ofs.close();
             elz::extractZip(archive, directory);
             fs::remove(archive);
-      }
-
+        }
     }
 
     return 0;
