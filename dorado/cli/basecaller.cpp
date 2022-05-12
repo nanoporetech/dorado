@@ -16,21 +16,15 @@ void setup(std::vector<std::string> args, const std::string& model_path, const s
         bool emit_sam) {
 
     torch::set_num_threads(1);
-
     std::vector<Runner> runners;
-    auto decode_options = DecoderOptions();
 
-    if (device == "cpu") {
+    if (device == "cpu" || device == "metal") {
         for (int i = 0; i < num_runners; i++) {
-            runners.push_back(std::make_shared<ModelRunner<CPUDecoder>>(model_path, device, chunk_size, batch_size, decode_options));
-        }
-    } else if (device == "metal") {
-        for (int i = 0; i < num_runners; i++) {
-            runners.push_back(std::make_shared<ModelRunner<CPUDecoder>>(model_path, device, chunk_size, batch_size, decode_options));
-	    }
+            runners.push_back(std::make_shared<ModelRunner<CPUDecoder>>(model_path, device, chunk_size, batch_size));
+	}
     } else {
         for (int i = 0; i < num_runners; i++) {
-            runners.push_back(std::make_shared<ModelRunner<GPUDecoder>>(model_path, device, chunk_size, batch_size, decode_options));
+            runners.push_back(std::make_shared<ModelRunner<GPUDecoder>>(model_path, device, chunk_size, batch_size));
         }
     }
 
