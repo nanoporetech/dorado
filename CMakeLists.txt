@@ -3,6 +3,8 @@ set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 project(dorado)
 set(DORADO_VERSION "0.0.1a0")
 
+#set(CMAKE_VERBOSE_MAKEFILE ON)
+
 set(TORCH_VERSION 1.10.2)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -197,6 +199,10 @@ include_directories(${HDF5_INCLUDE_DIRS}
         dorado/3rdparty/metal-cpp/metal-cpp
         dorado)
 
+add_compile_options(
+        -D_GLIBCXX_USE_CXX11_ABI=0
+)
+        
 add_subdirectory(dorado/3rdparty/elzip)
 
 set(LIB_SOURCE_FILES
@@ -273,6 +279,7 @@ set_target_properties(dorado
 )
 
 target_link_libraries(dorado dorado_lib)
+target_link_libraries(dorado elzip)
 
 add_subdirectory(tests)
 
