@@ -51,6 +51,7 @@ public:
 
     size_t num_chunks;
     std::vector<std::shared_ptr<Chunk>> called_chunks;
+    std::atomic_size_t num_chunks_called;
 
     std::string read_id;
     std::string seq;
