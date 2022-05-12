@@ -77,7 +77,7 @@ build:macos:m1:
   stage: test
   script:
     - echo Dorado app test stage
-    - ./${BUILD_DIR}/bin/dorado basecaller download --model dna_r9.4.1_e8_hac@v3.3
+    - ./${BUILD_DIR}/bin/dorado download --model dna_r9.4.1_e8_hac@v3.3
     - ./${BUILD_DIR}/bin/dorado basecaller dna_r9.4.1_e8_hac@v3.3 ./tests/data/ -r 1 -b 384 > calls.sam
 
 # Test stages
