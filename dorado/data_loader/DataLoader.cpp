@@ -195,9 +195,6 @@ void DataLoader::load_mkr_reads_from_file(const std::string& path) {
             std::cerr << "Failed to release batch\n";
         }
     }
-
-
-
 }
 
 
