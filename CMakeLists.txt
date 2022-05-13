@@ -82,11 +82,15 @@ if(UNIX AND NOT APPLE)
 endif()
 
 
+set(MKR_DIR mkr-0.0.11-${CMAKE_SYSTEM_NAME})
+set(MKR_LIBRARIES mkr_format boost_filesystem arrow)
+
 set(CUDNN_LIBRARY_PATH ${CMAKE_SOURCE_DIR}/dorado/3rdparty/fake_cudnn)
 set(CUDNN_INCLUDE_PATH ${CMAKE_SOURCE_DIR}/dorado/3rdparty/fake_cudnn)
 
 if(LINUX)
     set(MKR_URL https://nanoporetech.box.com/shared/static/v589ievqqmq39dnbfuk14drq33xyomov.gz)
+    link_directories(${3RD_PARTY}/${MKR_DIR}/lib64)
 
     # Note: We can set CUDA_TOOLKIT_ROOT_DIR externally, if it's not installed to the default location as
     #  per the readme instructions
@@ -98,6 +102,7 @@ if(LINUX)
     set(TORCH_LIB "${CMAKE_SOURCE_DIR}/dorado/3rdparty/torch-${TORCH_VERSION}-${CMAKE_SYSTEM_NAME}/libtorch")
 elseif(APPLE)
     set(MKR_URL https://nanoporetech.box.com/shared/static/t5w6jl1tqazjlpoekbpi7r145qspw8xo.gz)
+    link_directories(${3RD_PARTY}/${MKR_DIR}/lib)
 
     download_and_extract(https://developer.apple.com/metal/cpp/files/metal-cpp_macOS12_iOS15.zip metal-cpp)
     find_library(APPLE_FWK_FOUNDATION Foundation REQUIRED)
@@ -129,6 +134,7 @@ elseif(APPLE)
     )
 elseif(WIN32)
     set(MKR_URL https://nanoporetech.box.com/shared/static/wu75lj0f69lrs24fjvlnkpohkcch85c7.gz)
+    link_directories(${3RD_PARTY}/${MKR_DIR}/lib)
 
     enable_language(CUDA)
     set(TORCH_URL https://download.pytorch.org/libtorch/cu113/libtorch-win-shared-with-deps-${TORCH_VERSION}%2Bcu113.zip)
@@ -158,11 +164,7 @@ elseif(WIN32)
     message("Prefix path is ${CMAKE_PREFIX_PATH}")
 endif()
 
-set(MKR_DIR mkr-0.0.11-${CMAKE_SYSTEM_NAME})
-set(MKR_LIBRARIES mkr_format boost_filesystem arrow)
 download_and_extract(${MKR_URL} ${MKR_DIR})
-link_directories(${3RD_PARTY}/${MKR_DIR}/lib64)
-
 add_hdf_vbz_plugin()
 
 if(DEFINED DORADO_LIBTORCH_DIR)
