@@ -81,6 +81,11 @@ set(CUDNN_LIBRARY_PATH ${CMAKE_SOURCE_DIR}/dorado/3rdparty/fake_cudnn)
 set(CUDNN_INCLUDE_PATH ${CMAKE_SOURCE_DIR}/dorado/3rdparty/fake_cudnn)
 
 if(LINUX)
+    set(MKR_URL http://shadow-moses0:1565/mkr-file-format-0.0.5-linux-x64.tar)
+    set(MKR_VER mkr-0.0.5-linux)
+    set(MKR_LIB ${3RD_PARTY}/${MKR_VER}/lib64)
+    link_directories(${MKR_LIB})
+
     # Note: We can set CUDA_TOOLKIT_ROOT_DIR externally, if it's not installed to the default location as
     #  per the readme instructions
     if(DEFINED CUDA_TOOLKIT_ROOT_DIR)
@@ -90,6 +95,11 @@ if(LINUX)
     set(TORCH_URL https://download.pytorch.org/libtorch/cu113/libtorch-shared-with-deps-${TORCH_VERSION}%2Bcu113.zip)
     set(TORCH_LIB "${CMAKE_SOURCE_DIR}/dorado/3rdparty/torch-${TORCH_VERSION}-${CMAKE_SYSTEM_NAME}/libtorch")
 elseif(APPLE)
+    set(MKR_URL http://shadow-moses0:1565/mkr-file-format-0.0.5-osx-arm64.tar)
+    set(MKR_VER mkr-0.0.5-apple)
+    set(MKR_LIB ${3RD_PARTY}/${MKR_VER}/lib)
+    link_directories(${MKR_LIB})
+
     download_and_extract(https://developer.apple.com/metal/cpp/files/metal-cpp_macOS12_iOS15.zip metal-cpp)
     find_library(APPLE_FWK_FOUNDATION Foundation REQUIRED)
     find_library(APPLE_FWK_QUARTZ_CORE QuartzCore REQUIRED)
@@ -119,6 +129,11 @@ elseif(APPLE)
         COMMENT "Creating metallib"
     )
 elseif(WIN32)
+    set(MKR_URL http://shadow-moses0:1565/mkr-file-format-0.0.5-win-x64.tar)
+    set(MKR_VER mkr-0.0.5-win)
+    set(MKR_LIB ${3RD_PARTY}/${MKR_VER}/lib)
+    link_directories(${MKR_LIB})
+
     enable_language(CUDA)
     set(TORCH_URL https://download.pytorch.org/libtorch/cu113/libtorch-win-shared-with-deps-${TORCH_VERSION}%2Bcu113.zip)
     set(TORCH_LIB "${CMAKE_SOURCE_DIR}/dorado/3rdparty/torch-${TORCH_VERSION}-${CMAKE_SYSTEM_NAME}/libtorch")
@@ -135,6 +150,8 @@ elseif(WIN32)
     list(APPEND CMAKE_PREFIX_PATH ${3RD_PARTY}/${HDF_VER}/install)
     message("Prefix path is ${CMAKE_PREFIX_PATH}")
 endif()
+
+download_and_extract(${MKR_URL} ${MKR_VER})
 
 add_hdf_vbz_plugin()
 
@@ -176,11 +193,8 @@ include_directories(${HDF5_INCLUDE_DIRS}
         dorado/3rdparty/toml11
         dorado/3rdparty/hdf_plugins/vbz_plugin
         dorado/3rdparty/metal-cpp/metal-cpp
-        dorado/3rdparty/mkr/c++
-        ${CMAKE_BINARY_DIR}/dorado/3rdparty/mkr/c++
+        dorado/3rdparty/${MKR_VER}/include
         dorado)
-
-add_subdirectory(dorado/3rdparty/mkr)
 
 set(LIB_SOURCE_FILES
         dorado/data_loader/DataLoader.cpp
@@ -325,5 +339,5 @@ endif()
     target_link_libraries(koi_lib koi_lstm_quantized_rev_128)
 
     # Finally add a dependency on koi_lib to the dorado project
-    target_link_libraries(dorado_lib koi_lib mkr_format)
+    target_link_libraries(dorado_lib koi_lib)
 endif() # LINUX OR WIN32
