@@ -86,10 +86,8 @@ set(CUDNN_LIBRARY_PATH ${CMAKE_SOURCE_DIR}/dorado/3rdparty/fake_cudnn)
 set(CUDNN_INCLUDE_PATH ${CMAKE_SOURCE_DIR}/dorado/3rdparty/fake_cudnn)
 
 if(LINUX)
-    set(MKR_URL http://shadow-moses0:1565/mkr-file-format-0.0.5-linux-x64.tar)
-    set(MKR_VER mkr-0.0.5-linux)
-    set(MKR_LIB ${3RD_PARTY}/${MKR_VER}/lib64)
-    link_directories(${MKR_LIB})
+    set(MKR_URL http://shadow-moses0:1565/mkr-file-format-0.0.11-linux-x64.tar)
+    set(MKR_VER mkr-0.0.11-linux)
 
     # Note: We can set CUDA_TOOLKIT_ROOT_DIR externally, if it's not installed to the default location as
     #  per the readme instructions
@@ -100,10 +98,8 @@ if(LINUX)
     set(TORCH_URL https://download.pytorch.org/libtorch/cu113/libtorch-shared-with-deps-${TORCH_VERSION}%2Bcu113.zip)
     set(TORCH_LIB "${CMAKE_SOURCE_DIR}/dorado/3rdparty/torch-${TORCH_VERSION}-${CMAKE_SYSTEM_NAME}/libtorch")
 elseif(APPLE)
-    set(MKR_URL http://shadow-moses0:1565/mkr-file-format-0.0.5-osx-arm64.tar)
-    set(MKR_VER mkr-0.0.5-apple)
-    set(MKR_LIB ${3RD_PARTY}/${MKR_VER}/lib)
-    link_directories(${MKR_LIB})
+    set(MKR_URL http://shadow-moses0:1565/mkr-file-format-0.0.11-osx-arm64.tar)
+    set(MKR_VER mkr-0.0.11-apple)
 
     download_and_extract(https://developer.apple.com/metal/cpp/files/metal-cpp_macOS12_iOS15.zip metal-cpp)
     find_library(APPLE_FWK_FOUNDATION Foundation REQUIRED)
@@ -134,10 +130,8 @@ elseif(APPLE)
         COMMENT "Creating metallib"
     )
 elseif(WIN32)
-    set(MKR_URL http://shadow-moses0:1565/mkr-file-format-0.0.5-win-x64.tar)
-    set(MKR_VER mkr-0.0.5-win)
-    set(MKR_LIB ${3RD_PARTY}/${MKR_VER}/lib)
-    link_directories(${MKR_LIB})
+    set(MKR_URL http://shadow-moses0:1565/mkr-file-format-0.0.11-win-x64.tar)
+    set(MKR_VER mkr-0.0.11-win)
 
     enable_language(CUDA)
     set(TORCH_URL https://download.pytorch.org/libtorch/cu113/libtorch-win-shared-with-deps-${TORCH_VERSION}%2Bcu113.zip)
@@ -157,6 +151,9 @@ elseif(WIN32)
 endif()
 
 download_and_extract(${MKR_URL} ${MKR_VER})
+
+set(MKR_LIB ${3RD_PARTY}/${MKR_VER}/lib)
+link_directories(${MKR_LIB})
 
 add_hdf_vbz_plugin()
 
