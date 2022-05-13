@@ -59,6 +59,16 @@ int download(int argc, char *argv[]) {
         return 1;
     }
 
+    if (!fs::exists(directory)) {
+        try {
+            fs::create_directories(directory);
+        }
+         catch (const std::exception &e) {
+             std::cerr << e.what() << std::endl;
+             return 1;
+        }
+    }
+
     httplib::Client http(basecaller::URL_ROOT);
     http.set_follow_location(true);
 
