@@ -38,6 +38,8 @@ endif()
 # Helper function to extract the specified URL to the given 3rd party folder if it doesn't already exist
 set(3RD_PARTY ${CMAKE_SOURCE_DIR}/dorado/3rdparty)
 function(download_and_extract url name)
+    file(LOCK ${CMAKE_SOURCE_DIR} DIRECTORY)
+
     if(EXISTS ${3RD_PARTY}/${name})
         message("-- Found ${name}")
     else()
@@ -48,7 +50,10 @@ function(download_and_extract url name)
         file(ARCHIVE_EXTRACT INPUT ${3RD_PARTY}/${name}.zip DESTINATION ${3RD_PARTY}/${name})
         file(REMOVE ${3RD_PARTY}/${name}.zip)
         message("-- Extracting ${name} - done")
+
     endif()
+
+    file(LOCK ${CMAKE_SOURCE_DIR} DIRECTORY RELEASE)
 endfunction()
 
 function(add_hdf_vbz_plugin)
