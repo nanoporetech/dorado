@@ -144,6 +144,7 @@ elseif(WIN32)
       ${3RD_PARTY}/${MKR_DIR}/lib/mkr_format.lib
       ${3RD_PARTY}/${MKR_DIR}/lib/libboost_filesystem.lib
       ${3RD_PARTY}/${MKR_DIR}/lib/arrow_static.lib
+      bcrypt.lib
     )
     enable_language(CUDA)
     set(TORCH_URL https://download.pytorch.org/libtorch/cu113/libtorch-win-shared-with-deps-${TORCH_VERSION}%2Bcu113.zip)
