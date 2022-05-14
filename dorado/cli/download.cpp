@@ -42,6 +42,7 @@ int download(int argc, char *argv[]) {
     auto list = parser.get<bool>("--list");
     auto selected_model = parser.get<std::string>("--model");
     auto directory = fs::path(parser.get<std::string>("--directory"));
+    auto permissions = fs::status(directory).permissions();
 
     auto print_models = [] {
         std::cerr << "> basecaller models" << std::endl;
@@ -65,10 +66,19 @@ int download(int argc, char *argv[]) {
         try {
             fs::create_directories(directory);
         }
-         catch (const std::exception &e) {
-             std::cerr << e.what() << std::endl;
-             return 1;
+        catch(std::filesystem::filesystem_error const& e) {
+            std::cerr << "> error: " << e.code().message() << std::endl;
+            return 1;
         }
+    }
+
+    std::ofstream tmp(directory / "tmp");
+    tmp << "test";
+    tmp.close();
+
+    if (tmp.fail()) {
+        std::cerr << "> error: insufficient permissions to download models into " << directory << std::endl;
+        return 1;
     }
 
     httplib::Client http(basecaller::URL_ROOT);
