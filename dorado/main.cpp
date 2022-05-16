@@ -39,7 +39,7 @@ int main(int argc, char *argv[]) {
     std::vector<std::string> keys;
 
     for (const auto& [key, _] : subcommands) {
-         keys.push_back(key);
+        keys.push_back(key);
     }
 
     if (arguments.size() == 0) {

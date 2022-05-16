@@ -4,7 +4,7 @@
 #include "nn/ModelRunner.h"
 #include "decode/CPUDecoder.h"
 #include "decode/GPUDecoder.h"
-#include "data_loader/Fast5DataLoader.h"
+#include "data_loader/DataLoader.h"
 #include "read_pipeline/ScalerNode.h"
 #include "read_pipeline/BasecallerNode.h"
 #include "read_pipeline/WriterNode.h"
@@ -31,7 +31,7 @@ void setup(std::vector<std::string> args, const std::string& model_path, const s
     WriterNode writer_node(std::move(args), emit_fastq);
     BasecallerNode basecaller_node(writer_node, runners, batch_size, chunk_size, overlap);
     ScalerNode scaler_node(basecaller_node);
-    Fast5DataLoader loader(scaler_node, "cpu");
+    DataLoader loader(scaler_node, "cpu");
     loader.load_reads(data_path);
 }
 

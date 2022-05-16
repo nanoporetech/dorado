@@ -66,7 +66,7 @@ build:windows:
   when: manual
   # Temp solution for Windows unit tests: add paths to required DLLs
   before_script:
-    - export PATH=${PATH}:${PWD}/dorado/3rdparty/torch-1.10.2-Windows/libtorch/lib:${PWD}/dorado/3rdparty/cmake-build-zstd/lib/Release:${PWD}/dorado/3rdparty/zlib-1.2.12/install/bin
+    - export PATH=${PATH}:${PWD}/dorado/3rdparty/torch-1.10.2-Windows/libtorch/lib:${PWD}/dorado/3rdparty/cmake-build-zstd/lib/Release:${PWD}/dorado/3rdparty/zlib-1.2.12/install/bin:${PWD}/dorado/3rdparty/mkr-0.0.11-Windows/lib
 
 build:macos:m1:
   variables:
