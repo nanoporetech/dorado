@@ -1,7 +1,7 @@
 #! /usr/bin/env bash
 
 rm -rf koi_lib
-KOI_REV=$(git submodule status | grep koi | awk {'print substr($1,1,8)'})
+KOI_REV=$(git submodule status | awk '/koi/{print substr($1,1,8)}')
 echo "Koi revision is ${KOI_REV}"
 mkdir koi_lib
 mkdir koi_lib/lib
