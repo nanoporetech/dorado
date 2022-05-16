@@ -146,8 +146,12 @@ elseif(WIN32)
         execute_process(COMMAND cmake --build ${3RD_PARTY}/${HDF_VER}/${HDF_VER}/cmake-build --config Release --target install)
     endif()
     list(APPEND CMAKE_PREFIX_PATH ${3RD_PARTY}/${HDF_VER}/install)
-    message("Prefix path is ${CMAKE_PREFIX_PATH}")
-endif()
+
+    # Get prebuilt OpenSSL
+    #download_and_extract(https://nanoporetech.box.com/shared/static/iow91rd925cbocxhxbss50wr9e2vahv4.gz openssl-win)
+    
+    set (OPENSSL_ROOT_DIR ${3RD_PARTY}/openssl-win)
+endif() # WIN32
 
 add_hdf_vbz_plugin()
 
@@ -290,8 +294,8 @@ add_subdirectory(tests)
 # making an exe called 'dorado' right into the root here, which causes conflicts with cmake naming.
 
 if(LINUX OR WIN32)
-    #set(BUILD_KOI_FROM_SOURCE ON)
     if(BUILD_KOI_FROM_SOURCE)
+        message("Building Koi from source")
         # Note that any source file which gets compiled multiple times with differing flags won't get added here. See below.
         set(KOI_SOURCE_FILES dorado/3rdparty/koi/koi/lib/ctc_simple.cu
                 dorado/3rdparty/koi/koi/lib/cuda_beam_search_constants.h
@@ -365,11 +369,11 @@ if(LINUX OR WIN32)
         if(LINUX)
             download_and_extract(https://nanoporetech.box.com/shared/static/iow91rd925cbocxhxbss50wr9e2vahv4.gz koi_lib)
         elseif(WIN32)
-            message(ERROR "No prebuilt koi libs available for Windows")
+            #message(ERROR "No prebuilt koi libs available for Windows")
         endif()
         # Build koi from prebuilt libs
 
-        message ("Building from ${3RD_PARTY}/koi_lib")
+        message ("Building Koi from prebuilt ${3RD_PARTY}/koi_lib")
         target_include_directories(dorado_lib PUBLIC
             ${3RD_PARTY}/koi_lib/koi_lib/include
         )

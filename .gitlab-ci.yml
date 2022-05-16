@@ -53,12 +53,27 @@ build:linux:x86:focal:install_deps:
 build:linux:x86:focal:
   image: ${DORADO_DEPS}
   variables:
+    BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/libtorch -DBUILD_KOI_FROM_SOURCE"
+    BUILD_THREADS: "-- -j 8"
+  <<: *linux_runner
+  <<: *build_dorado
+
+build:linux:x86:focal_koi_download:
+  image: ${DORADO_DEPS}
+  variables:
     BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/libtorch"
     BUILD_THREADS: "-- -j 8"
   <<: *linux_runner
   <<: *build_dorado
   
 build:windows:
+  variables:
+    BUILD_OPTIONS: "-A x64 -DBUILD_KOI_FROM_SOURCE"
+  <<: *windows_runner
+  <<: *build_dorado
+  when: manual
+
+build:windows_koi_download:
   variables:
     BUILD_OPTIONS: "-A x64"
   <<: *windows_runner
