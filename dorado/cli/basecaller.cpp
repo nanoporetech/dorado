@@ -4,7 +4,7 @@
 #include "nn/ModelRunner.h"
 #include "decode/CPUDecoder.h"
 #include "decode/GPUDecoder.h"
-#include "data_loader/Fast5DataLoader.h"
+#include "data_loader/DataLoader.h"
 #include "read_pipeline/ScalerNode.h"
 #include "read_pipeline/BasecallerNode.h"
 #include "read_pipeline/WriterNode.h"
@@ -13,31 +13,25 @@
 
 void setup(std::vector<std::string> args, const std::string& model_path, const std::string& data_path,
         const std::string& device, size_t chunk_size, size_t overlap, size_t batch_size, size_t num_runners, 
-        bool emit_sam) {
+        bool emit_fastq) {
 
     torch::set_num_threads(1);
-
     std::vector<Runner> runners;
-    auto decode_options = DecoderOptions();
 
-    if (device == "cpu") {
+    if (device == "cpu" || device == "metal") {
         for (int i = 0; i < num_runners; i++) {
-            runners.push_back(std::make_shared<ModelRunner<CPUDecoder>>(model_path, device, chunk_size, batch_size, decode_options));
-        }
-    } else if (device == "metal") {
-        for (int i = 0; i < num_runners; i++) {
-            runners.push_back(std::make_shared<ModelRunner<CPUDecoder>>(model_path, device, chunk_size, batch_size, decode_options));
-	    }
+            runners.push_back(std::make_shared<ModelRunner<CPUDecoder>>(model_path, device, chunk_size, batch_size));
+	}
     } else {
         for (int i = 0; i < num_runners; i++) {
-            runners.push_back(std::make_shared<ModelRunner<GPUDecoder>>(model_path, device, chunk_size, batch_size, decode_options));
+            runners.push_back(std::make_shared<ModelRunner<GPUDecoder>>(model_path, device, chunk_size, batch_size));
         }
     }
 
-    WriterNode writer_node(std::move(args), emit_sam);
+    WriterNode writer_node(std::move(args), emit_fastq);
     BasecallerNode basecaller_node(writer_node, runners, batch_size, chunk_size, overlap);
     ScalerNode scaler_node(basecaller_node);
-    Fast5DataLoader loader(scaler_node, "cpu");
+    DataLoader loader(scaler_node, "cpu");
     loader.load_reads(data_path);
 }
 
@@ -75,7 +69,7 @@ int basecaller(int argc, char *argv[]) {
             .default_value(1)
             .scan<'i', int>();
 
-    parser.add_argument("--emit-sam")
+    parser.add_argument("--emit-fastq")
             .default_value(false)
             .implicit_value(true);
 
@@ -101,7 +95,7 @@ int basecaller(int argc, char *argv[]) {
             parser.get<int>("-o"),
             parser.get<int>("-b"),
             parser.get<int>("-r"),
-            parser.get<bool>("--emit-sam")
+            parser.get<bool>("--emit-fastq")
         );
     }
     catch (const std::exception& e) {

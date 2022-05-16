@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <toml.hpp>
 #include <torch/torch.h>
 #include "../decode/Decoder.h"
 #include "CRFModel.h"
@@ -16,7 +17,7 @@ using Runner = std::shared_ptr<ModelRunnerBase>;
 
 template<typename T> class ModelRunner : public ModelRunnerBase {
     public:
-        ModelRunner(const std::string &model, const std::string &device, int chunk_size, int batch_size, DecoderOptions d_options);
+        ModelRunner(const std::string &model, const std::string &device, int chunk_size, int batch_size);
         void accept_chunk(int chunk_idx, at::Tensor slice) final;
         std::vector<DecodedChunk> call_chunks(int num_chunks) final;
     private:
@@ -28,8 +29,16 @@ template<typename T> class ModelRunner : public ModelRunnerBase {
         torch::nn::ModuleHolder<torch::nn::AnyModule> m_module{nullptr};
 };
 
-template<typename T> ModelRunner<T>::ModelRunner(const std::string &model, const std::string &device, int chunk_size, int batch_size, DecoderOptions d_options) {
-    m_decoder_options = d_options;
+template<typename T> ModelRunner<T>::ModelRunner(const std::string &model, const std::string &device, int chunk_size, int batch_size) {
+
+    auto config = toml::parse(model + "/config.toml");
+    const auto& qscore = toml::find(config, "qscore");
+    const auto qbias = toml::find<float>(qscore, "bias");
+    const auto qscale = toml::find<float>(qscore, "scale");
+
+    m_decoder_options = DecoderOptions();
+    m_decoder_options.q_shift = qbias;
+    m_decoder_options.q_scale = qscale;
     m_decoder = std::make_unique<T>();
 
 #ifdef __APPLE__

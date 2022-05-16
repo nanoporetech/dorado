@@ -56,6 +56,8 @@ void BasecallerNode::input_worker_thread() {
                 m_chunks_in.push_back(std::make_shared<Chunk>(read, offset, chunk_in_read_idx++, m_chunk_size));
                 read->num_chunks++;
             }
+            read->called_chunks.resize(read->num_chunks);
+            read->num_chunks_called.store(0);
             chunk_lock.unlock();
 
             // Put the read in the working list
@@ -82,10 +84,10 @@ void BasecallerNode::basecall_current_batch(int worker_id) {
     }
 
     // We need to assign each chunk back to the read it came from
-    // MV TODO need a mutex on each source read - this is unsanfe.
     for (auto& complete_chunk : m_batched_chunks[worker_id]) {
         std::shared_ptr<Read> source_read = complete_chunk->source_read.lock();
-        source_read->called_chunks.push_back(complete_chunk);
+        source_read->called_chunks[complete_chunk->idx_in_read] = complete_chunk;
+        source_read->num_chunks_called += 1;
     }
     m_batched_chunks[worker_id].clear();
 
@@ -93,7 +95,7 @@ void BasecallerNode::basecall_current_batch(int worker_id) {
     //TODO have a separate thread which does this?
     std::unique_lock<std::mutex> working_reads_lock(m_working_reads_mutex);
     for (auto read_iter = m_working_reads.begin(); read_iter != m_working_reads.end();) {
-        if ((*read_iter)->called_chunks.size() == (*read_iter)->num_chunks) {
+        if ((*read_iter)->num_chunks_called.load() == (*read_iter)->num_chunks) {
             stitch_chunks(*read_iter);
             m_sink.push_read(*read_iter);
             read_iter = m_working_reads.erase(read_iter);

@@ -79,6 +79,9 @@ build:windows_koi_download:
   <<: *windows_runner
   <<: *build_dorado
   when: manual
+  # Temp solution for Windows unit tests: add paths to required DLLs
+  before_script:
+    - export PATH=${PATH}:${PWD}/dorado/3rdparty/torch-1.10.2-Windows/libtorch/lib:${PWD}/dorado/3rdparty/cmake-build-zstd/lib/Release:${PWD}/dorado/3rdparty/zlib-1.2.12/install/bin:${PWD}/dorado/3rdparty/mkr-0.0.11-Windows/lib
 
 build:macos:m1:
   variables:
@@ -92,9 +95,8 @@ build:macos:m1:
   stage: test
   script:
     - echo Dorado app test stage
-    - curl -sSL https://nanoporetech.box.com/shared/static/g6rbgd12xfunw5plgec3zlyy35692vy3.zip -o model.zip
-    - unzip model.zip
-    - ./${BUILD_DIR}/bin/dorado basecaller dna_r9.4.1_e8_hac@v3.3 ./tests/data/ -r 1 -b 384 > calls.fastq
+    - ./${BUILD_DIR}/bin/dorado download --model dna_r9.4.1_e8_hac@v3.3
+    - ./${BUILD_DIR}/bin/dorado basecaller dna_r9.4.1_e8_hac@v3.3 ./tests/data/ -r 1 -b 384 > calls.sam
 
 # Test stages
 
