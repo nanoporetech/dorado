@@ -53,12 +53,30 @@ build:linux:x86:focal:install_deps:
 build:linux:x86:focal:
   image: ${DORADO_DEPS}
   variables:
+    BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/libtorch -DBUILD_KOI_FROM_SOURCE=ON"
+    BUILD_THREADS: "-- -j 8"
+  <<: *linux_runner
+  <<: *build_dorado
+
+build:linux:x86:focal_koi_download:
+  image: ${DORADO_DEPS}
+  variables:
     BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/libtorch"
     BUILD_THREADS: "-- -j 8"
   <<: *linux_runner
   <<: *build_dorado
   
 build:windows:
+  variables:
+    BUILD_OPTIONS: "-A x64 -DBUILD_KOI_FROM_SOURCE=ON"
+  <<: *windows_runner
+  <<: *build_dorado
+  when: manual
+  # Temp solution for Windows unit tests: add paths to required DLLs
+  before_script:
+    - export PATH=${PATH}:${PWD}/dorado/3rdparty/torch-1.10.2-Windows/libtorch/lib:${PWD}/dorado/3rdparty/cmake-build-zstd/lib/Release:${PWD}/dorado/3rdparty/zlib-1.2.12/install/bin:${PWD}/dorado/3rdparty/mkr-0.0.11-Windows/lib
+
+build:windows_koi_download:
   variables:
     BUILD_OPTIONS: "-A x64"
   <<: *windows_runner

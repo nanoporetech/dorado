@@ -171,8 +171,11 @@ elseif(WIN32)
         execute_process(COMMAND cmake --build ${3RD_PARTY}/${HDF_VER}/${HDF_VER}/cmake-build --config Release --target install)
     endif()
     list(APPEND CMAKE_PREFIX_PATH ${3RD_PARTY}/${HDF_VER}/install)
-    message("Prefix path is ${CMAKE_PREFIX_PATH}")
-endif()
+
+    # Get prebuilt OpenSSL
+    download_and_extract(https://nanoporetech.box.com/shared/static/paqqcwfpdjo3eqaghu2denk9vgnis2ph.zip openssl-win)
+    set (OPENSSL_ROOT_DIR ${3RD_PARTY}/openssl-win)
+endif() # WIN32
 
 download_and_extract(${MKR_URL} ${MKR_DIR})
 add_hdf_vbz_plugin()
@@ -318,72 +321,107 @@ add_subdirectory(tests)
 # making an exe called 'dorado' right into the root here, which causes conflicts with cmake naming.
 
 if(LINUX OR WIN32)
-    # Note that any source file which gets compiled multiple times with differing flags won't get added here. See below.
-    set(KOI_SOURCE_FILES dorado/3rdparty/koi/koi/lib/ctc_simple.cu
-            dorado/3rdparty/koi/koi/lib/cuda_beam_search_constants.h
-            dorado/3rdparty/koi/koi/lib/decoder_lib.cu
-            dorado/3rdparty/koi/koi/lib/lib.h
-            )
+    if(BUILD_KOI_FROM_SOURCE)
+        message("Building Koi from source")
+        # Note that any source file which gets compiled multiple times with differing flags won't get added here. See below.
+        set(KOI_SOURCE_FILES dorado/3rdparty/koi/koi/lib/ctc_simple.cu
+                dorado/3rdparty/koi/koi/lib/cuda_beam_search_constants.h
+                dorado/3rdparty/koi/koi/lib/decoder_lib.cu
+                dorado/3rdparty/koi/koi/lib/lib.h
+                )
 
-    set(KOI_FLAGS -c
-            --ptxas-options=-v
-            --use_fast_math
-            --restrict
-            )
+        set(KOI_FLAGS -c
+                --ptxas-options=-v
+                --use_fast_math
+                --restrict
+                )
 
-    set(CMAKE_CUDA_ARCHITECTURES 70)
-    add_library(koi_lib ${KOI_SOURCE_FILES})
-    target_compile_options(koi_lib
-            PRIVATE
-            ${KOI_FLAGS}
-            )
-if(LINUX)
-    target_compile_options(koi_lib
-            PRIVATE
-            -Xcompiler
-            '-fPIC'
-            )
-endif()
+        set(CMAKE_CUDA_ARCHITECTURES 70)
+        add_library(koi_lib ${KOI_SOURCE_FILES})
+        target_compile_options(koi_lib
+                PRIVATE
+                ${KOI_FLAGS}
+                )
+        if(LINUX)
+            target_compile_options(koi_lib
+                    PRIVATE
+                    -Xcompiler
+                    '-fPIC'
+                    )
+        endif()
 
-    set_source_files_properties(dorado/3rdparty/koi/koi/lib/ctc_simple.cu PROPERTIES COMPILE_FLAGS "-DFLOAT=float -DZERO=-1e38 -DSUM=logsumexp2 -DMUL=add")
-    set_source_files_properties(dorado/3rdparty/koi/koi/lib/decoder_lib.cu PROPERTIES COMPILE_FLAGS "-D REMOVE_FIXED_BEAM_STAYS=1")
+        set_source_files_properties(dorado/3rdparty/koi/koi/lib/ctc_simple.cu PROPERTIES COMPILE_FLAGS "-DFLOAT=float -DZERO=-1e38 -DSUM=logsumexp2 -DMUL=add")
+        set_source_files_properties(dorado/3rdparty/koi/koi/lib/decoder_lib.cu PROPERTIES COMPILE_FLAGS "-D REMOVE_FIXED_BEAM_STAYS=1")
 
-    # Here we need to compile the same source file more than once with different flags, so we're going to make a target for
-    # each version of the source file we want to compile, then add that target to the koi lib as a dep. Note that the subtarget
-    # WON'T be archived into koi_lib, but will be added as a dep to anything that depends on koi_lib
+        # Here we need to compile the same source file more than once with different flags, so we're going to make a target for
+        # each version of the source file we want to compile, then add that target to the koi lib as a dep. Note that the subtarget
+        # WON'T be archived into koi_lib, but will be added as a dep to anything that depends on koi_lib
 
-    #sparse_logZ
-    add_library(koi_sparse_logz_max dorado/3rdparty/koi/koi/lib/sparse_logZ.cu)
-    target_compile_options(koi_sparse_logz_max PRIVATE ${KOI_FLAGS} -DFLOAT=float -DZERO=-1e38 -DSUM=max_
-            -DLOGZ_FWD_HOST_FN_NAME=logZ_fwd_host_max -DLOGZ_FWD_KERNEL_NAME=logz_fwd_max -DNZ=5 -DK=1 -DMUL=add -DSUFFIX=_max)
-    target_link_libraries(koi_lib koi_sparse_logz_max)
-    add_library(koi_sparse_logz_log dorado/3rdparty/koi/koi/lib/sparse_logZ.cu)
-    target_compile_options(koi_sparse_logz_log PRIVATE ${KOI_FLAGS} -DFLOAT=float -DZERO=-1e38 -DSUM=logsumexp
-            -DLOGZ_FWD_HOST_FN_NAME=logZ_fwd_host_log -DLOGZ_FWD_KERNEL_NAME=logz_fwd_log -DNZ=5 -DK=1 -DMUL=add -DSUFFIX=_log)
-    target_link_libraries(koi_lib koi_sparse_logz_log)
+        #sparse_logZ
+        add_library(koi_sparse_logz_max dorado/3rdparty/koi/koi/lib/sparse_logZ.cu)
+        target_compile_options(koi_sparse_logz_max PRIVATE ${KOI_FLAGS} -DFLOAT=float -DZERO=-1e38 -DSUM=max_
+                -DLOGZ_FWD_HOST_FN_NAME=logZ_fwd_host_max -DLOGZ_FWD_KERNEL_NAME=logz_fwd_max -DNZ=5 -DK=1 -DMUL=add -DSUFFIX=_max)
+        target_link_libraries(koi_lib koi_sparse_logz_max)
+        add_library(koi_sparse_logz_log dorado/3rdparty/koi/koi/lib/sparse_logZ.cu)
+        target_compile_options(koi_sparse_logz_log PRIVATE ${KOI_FLAGS} -DFLOAT=float -DZERO=-1e38 -DSUM=logsumexp
+                -DLOGZ_FWD_HOST_FN_NAME=logZ_fwd_host_log -DLOGZ_FWD_KERNEL_NAME=logz_fwd_log -DNZ=5 -DK=1 -DMUL=add -DSUFFIX=_log)
+        target_link_libraries(koi_lib koi_sparse_logz_log)
 
-    #lstm
-    add_library(koi_lstm_fwd dorado/3rdparty/koi/koi/lib/lstm.cu)
-    target_compile_options(koi_lstm_fwd PRIVATE ${KOI_FLAGS} -DREVERSE=0)
-    target_link_libraries(koi_lib koi_lstm_fwd)
-    add_library(koi_lstm_rev dorado/3rdparty/koi/koi/lib/lstm.cu)
-    target_compile_options(koi_lstm_rev PRIVATE ${KOI_FLAGS} -DREVERSE=1)
-    target_link_libraries(koi_lib koi_lstm_rev)
+        #lstm
+        add_library(koi_lstm_fwd dorado/3rdparty/koi/koi/lib/lstm.cu)
+        target_compile_options(koi_lstm_fwd PRIVATE ${KOI_FLAGS} -DREVERSE=0)
+        target_link_libraries(koi_lib koi_lstm_fwd)
+        add_library(koi_lstm_rev dorado/3rdparty/koi/koi/lib/lstm.cu)
+        target_compile_options(koi_lstm_rev PRIVATE ${KOI_FLAGS} -DREVERSE=1)
+        target_link_libraries(koi_lib koi_lstm_rev)
 
-    #lstm_quantized
-    add_library(koi_lstm_quantized_fwd_96 dorado/3rdparty/koi/koi/lib/lstm_quantized.cu)
-    target_compile_options(koi_lstm_quantized_fwd_96 PRIVATE ${KOI_FLAGS} -DREVERSE=0 -DLAYER_OUT_SIZE=96)
-    target_link_libraries(koi_lib koi_lstm_quantized_fwd_96)
-    add_library(koi_lstm_quantized_rev_96 dorado/3rdparty/koi/koi/lib/lstm_quantized.cu)
-    target_compile_options(koi_lstm_quantized_rev_96 PRIVATE ${KOI_FLAGS} -DREVERSE=1 -DLAYER_OUT_SIZE=96)
-    target_link_libraries(koi_lib koi_lstm_quantized_rev_96)
-    add_library(koi_lstm_quantized_fwd_128 dorado/3rdparty/koi/koi/lib/lstm_quantized.cu)
-    target_compile_options(koi_lstm_quantized_fwd_128 PRIVATE ${KOI_FLAGS} -DREVERSE=0 -DLAYER_OUT_SIZE=128)
-    target_link_libraries(koi_lib koi_lstm_quantized_fwd_128)
-    add_library(koi_lstm_quantized_rev_128 dorado/3rdparty/koi/koi/lib/lstm_quantized.cu)
-    target_compile_options(koi_lstm_quantized_rev_128 PRIVATE ${KOI_FLAGS} -DREVERSE=1 -DLAYER_OUT_SIZE=128)
-    target_link_libraries(koi_lib koi_lstm_quantized_rev_128)
+        #lstm_quantized
+        add_library(koi_lstm_quantized_fwd_96 dorado/3rdparty/koi/koi/lib/lstm_quantized.cu)
+        target_compile_options(koi_lstm_quantized_fwd_96 PRIVATE ${KOI_FLAGS} -DREVERSE=0 -DLAYER_OUT_SIZE=96)
+        target_link_libraries(koi_lib koi_lstm_quantized_fwd_96)
+        add_library(koi_lstm_quantized_rev_96 dorado/3rdparty/koi/koi/lib/lstm_quantized.cu)
+        target_compile_options(koi_lstm_quantized_rev_96 PRIVATE ${KOI_FLAGS} -DREVERSE=1 -DLAYER_OUT_SIZE=96)
+        target_link_libraries(koi_lib koi_lstm_quantized_rev_96)
+        add_library(koi_lstm_quantized_fwd_128 dorado/3rdparty/koi/koi/lib/lstm_quantized.cu)
+        target_compile_options(koi_lstm_quantized_fwd_128 PRIVATE ${KOI_FLAGS} -DREVERSE=0 -DLAYER_OUT_SIZE=128)
+        target_link_libraries(koi_lib koi_lstm_quantized_fwd_128)
+        add_library(koi_lstm_quantized_rev_128 dorado/3rdparty/koi/koi/lib/lstm_quantized.cu)
+        target_compile_options(koi_lstm_quantized_rev_128 PRIVATE ${KOI_FLAGS} -DREVERSE=1 -DLAYER_OUT_SIZE=128)
+        target_link_libraries(koi_lib koi_lstm_quantized_rev_128)
 
-    # Finally add a dependency on koi_lib to the dorado project
-    target_link_libraries(dorado_lib koi_lib)
+        # Finally add a dependency on koi_lib to the dorado project
+        target_link_libraries(dorado_lib koi_lib)
+
+    else() # end BUILD_KOI_FROM_SOURCE
+        if(LINUX)
+            download_and_extract(https://nanoporetech.box.com/shared/static/iow91rd925cbocxhxbss50wr9e2vahv4.gz koi_lib)
+        elseif(WIN32)
+            download_and_extract(https://nanoporetech.box.com/shared/static/psfgwpjfr0mxu3xc95lk1h3c1vj6wb6m.gz koi_lib)
+        endif()
+        # Build koi from prebuilt libs
+
+        message ("Building Koi from prebuilt ${3RD_PARTY}/koi_lib")
+        target_include_directories(dorado_lib PUBLIC
+            ${3RD_PARTY}/koi_lib/koi_lib/include
+        )
+        target_link_directories(dorado_lib PUBLIC
+            ${3RD_PARTY}/koi_lib/koi_lib/lib
+        )
+
+        #sparse_logZ
+        target_link_libraries(dorado_lib koi_sparse_logz_max)
+        target_link_libraries(dorado_lib koi_sparse_logz_log)
+        #lstm
+        target_link_libraries(dorado_lib koi_lstm_fwd)
+        target_link_libraries(dorado_lib koi_lstm_rev)
+        #lstm_quantized
+        target_link_libraries(dorado_lib koi_lstm_quantized_fwd_96)
+        target_link_libraries(dorado_lib koi_lstm_quantized_rev_96)
+        target_link_libraries(dorado_lib koi_lstm_quantized_fwd_128)
+        target_link_libraries(dorado_lib koi_lstm_quantized_rev_128)
+        # koi_lib
+        target_link_libraries(dorado_lib koi_lib)
+
+    endif()
 endif() # LINUX OR WIN32
+
