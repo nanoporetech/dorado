@@ -31,7 +31,8 @@ void usage(const std::vector<std::string> commands) {
 int main(int argc, char *argv[]) {
 
     const std::map<std::string, entry_ptr> subcommands = {
-            {"basecaller", &basecaller},
+        {"basecaller", &basecaller},
+        {"download", &download},
     };
 
     std::vector<std::string> arguments(argv + 1, argv + argc);

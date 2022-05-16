@@ -13,3 +13,9 @@
 [submodule "dorado/3rdparty/zstd"]
 	path = dorado/3rdparty/zstd
 	url = https://github.com/facebook/zstd.git
+[submodule "dorado/3rdparty/cpp-httplib"]
+	path = dorado/3rdparty/cpp-httplib
+	url = https://github.com/yhirose/cpp-httplib.git
+[submodule "dorado/3rdparty/11Zip"]
+	path = dorado/3rdparty/elzip
+	url = https://github.com/Sygmei/11Zip.git
