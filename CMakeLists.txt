@@ -173,8 +173,7 @@ elseif(WIN32)
     list(APPEND CMAKE_PREFIX_PATH ${3RD_PARTY}/${HDF_VER}/install)
 
     # Get prebuilt OpenSSL
-    #download_and_extract(https://nanoporetech.box.com/shared/static/iow91rd925cbocxhxbss50wr9e2vahv4.gz openssl-win)
-    
+    download_and_extract(https://nanoporetech.box.com/shared/static/paqqcwfpdjo3eqaghu2denk9vgnis2ph.zip openssl-win)
     set (OPENSSL_ROOT_DIR ${3RD_PARTY}/openssl-win)
 endif() # WIN32
 
@@ -397,7 +396,7 @@ if(LINUX OR WIN32)
         if(LINUX)
             download_and_extract(https://nanoporetech.box.com/shared/static/iow91rd925cbocxhxbss50wr9e2vahv4.gz koi_lib)
         elseif(WIN32)
-            #message(ERROR "No prebuilt koi libs available for Windows")
+            download_and_extract(https://nanoporetech.box.com/shared/static/psfgwpjfr0mxu3xc95lk1h3c1vj6wb6m.gz koi_lib)
         endif()
         # Build koi from prebuilt libs
 
