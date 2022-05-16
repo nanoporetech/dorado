@@ -3,6 +3,8 @@ set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 project(dorado)
 set(DORADO_VERSION "0.0.1a0")
 
+#set(CMAKE_VERBOSE_MAKEFILE ON)
+
 set(TORCH_VERSION 1.10.2)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -169,6 +171,13 @@ endif()
 
 find_package(HDF5 COMPONENTS C CXX HL)
 
+if(APPLE AND NOT DEFINED OPENSSL_ROOT_DIR)
+    set(OPENSSL_ROOT_DIR "/opt/homebrew/opt/openssl@3")
+endif()
+
+set(OPENSSL_USE_STATIC_LIBS TRUE)
+find_package(OpenSSL REQUIRED)
+
 if(WIN32)
     add_compile_options(
         # Note we need to use the generator expression to avoid setting this for CUDA.
@@ -185,13 +194,25 @@ include_directories(${HDF5_INCLUDE_DIRS}
         dorado/3rdparty/catch2
         dorado/3rdparty/argparse
         dorado/3rdparty/toml11
+        dorado/3rdparty/cpp-httplib
         dorado/3rdparty/hdf_plugins/vbz_plugin
         dorado/3rdparty/metal-cpp/metal-cpp
         dorado)
 
+# We need to force the use of the old ABI here as otherwise elzip builds with the libc++11 ABI
+# and we can't link against it.  We're on the old ABI right now due to the version of pytorch 
+# we are using.
+add_compile_options(
+        -D_GLIBCXX_USE_CXX11_ABI=0
+)
+        
+add_subdirectory(dorado/3rdparty/elzip)
+
 set(LIB_SOURCE_FILES
         dorado/cli/basecaller.cpp
+        dorado/cli/download.cpp
         dorado/cli/cli.h
+        dorado/models.h
         dorado/nn/CRFModel.h
         dorado/nn/CRFModel.cpp
         dorado/nn/ModelRunner.h
@@ -237,6 +258,7 @@ set_target_properties(dorado_lib
     LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
     ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
 )
+
 target_link_libraries(dorado_lib
     ${APPLE_FWK_FOUNDATION}
     ${APPLE_FWK_QUARTZ_CORE}
@@ -244,6 +266,8 @@ target_link_libraries(dorado_lib
     ${HDF5_C_LIBRARIES}
     ${TORCH_LIBRARIES}
     vbz_hdf_plugin
+    OpenSSL::SSL
+    elzip
 )
 if(APPLE)
     add_custom_target(metal-lib DEPENDS default.metallib)
@@ -258,6 +282,7 @@ set_target_properties(dorado
 )
 
 target_link_libraries(dorado dorado_lib)
+target_link_libraries(dorado elzip)
 
 add_subdirectory(tests)
 
