@@ -140,6 +140,7 @@ elseif(APPLE)
         DEPENDS ${AIR_FILES}
         COMMENT "Creating metallib"
     )
+    install(FILES ${CMAKE_BINARY_DIR}/lib/default.metallib DESTINATION lib)
 elseif(WIN32)
     set(MKR_URL https://nanoporetech.box.com/shared/static/wu75lj0f69lrs24fjvlnkpohkcch85c7.gz)
     set(MKR_LIBRARIES
