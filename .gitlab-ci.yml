@@ -30,7 +30,6 @@ variables:
   stage: build
   script:
     - echo Dorado build stage
-    - git config --global url."https://gitlab-ci-token:${CI_JOB_TOKEN}@git.oxfordnanolabs.local/".insteadOf "git@git.oxfordnanolabs.local:"
     - cmake ${BUILD_OPTIONS} -S . -B ${BUILD_DIR}
     - cmake --build ${BUILD_DIR} --config Release --target install ${BUILD_THREADS}
     - ctest -C Release --test-dir ${BUILD_DIR}
@@ -55,7 +54,7 @@ build:linux:x86:focal:install_deps:
 build:linux:x86:focal:
   image: ${DORADO_DEPS}
   variables:
-    BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/libtorch -DBUILD_KOI_FROM_SOURCE=ON"
+    BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/libtorch -DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN}"
     BUILD_THREADS: "-- -j 8"
   <<: *linux_runner
   <<: *build_dorado
@@ -70,7 +69,7 @@ build:linux:x86:focal_koi_download:
   
 build:windows:
   variables:
-    BUILD_OPTIONS: "-A x64 -DBUILD_KOI_FROM_SOURCE=ON"
+    BUILD_OPTIONS: "-A x64 -DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN}"
   <<: *windows_runner
   <<: *build_dorado
   when: manual
@@ -93,7 +92,8 @@ build:macos:m1:
     BUILD_THREADS: "-- -j 8"
   <<: *macos_runner
   <<: *build_dorado
-  
+
+
 # Test stage components
 
 .test_dorado: &test_dorado
