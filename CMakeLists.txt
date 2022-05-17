@@ -319,13 +319,25 @@ add_subdirectory(tests)
 if(LINUX OR WIN32)
     if(BUILD_KOI_FROM_SOURCE)
         message("Building Koi from source")
+
+        if(NOT EXISTS ${3RD_PARTY}/koi)
+            if(DEFINED GITLAB_CI_TOKEN)
+                message("Cloning Koi using CI token")
+                execute_process(COMMAND git clone https://gitlab-ci-token:${GITLAB_CI_TOKEN}@git.oxfordnanolabs.local/machine-learning/koi.git ${3RD_PARTY}/koi)
+            else()
+                message("Cloning Koi using ssh")
+                execute_process(COMMAND git clone git@git.oxfordnanolabs.local:machine-learning/koi.git ${3RD_PARTY}/koi)
+            endif()
+        endif()
+        execute_process(COMMAND git checkout b5c81ed15819b0dc02172a7467b70ad30454df76 WORKING_DIRECTORY ${3RD_PARTY}/koi)
+
         # Note that any source file which gets compiled multiple times with differing flags won't get added here. See below.
         set(KOI_SOURCE_FILES dorado/3rdparty/koi/koi/lib/ctc_simple.cu
                 dorado/3rdparty/koi/koi/lib/cuda_beam_search_constants.h
                 dorado/3rdparty/koi/koi/lib/decoder_lib.cu
                 dorado/3rdparty/koi/koi/lib/lib.h
                 )
-
+        
         set(KOI_FLAGS -c
                 --ptxas-options=-v
                 --use_fast_math
@@ -387,6 +399,9 @@ if(LINUX OR WIN32)
 
         # Finally add a dependency on koi_lib to the dorado project
         target_link_libraries(dorado_lib koi_lib)
+        target_include_directories(dorado_lib PUBLIC
+                ${3RD_PARTY}/koi/koi/lib
+        )
 
     else() # end BUILD_KOI_FROM_SOURCE
         if(LINUX)
