@@ -31,12 +31,13 @@ variables:
   script:
     - echo Dorado build stage
     - cmake ${BUILD_OPTIONS} -S . -B ${BUILD_DIR}
-    - cmake --build ${BUILD_DIR} --config Release ${BUILD_THREADS}
+    - cmake --build ${BUILD_DIR} --config Release --target install ${BUILD_THREADS}
     - ctest -C Release --test-dir ${BUILD_DIR}
   # We probably want to limit the amount of stuff in the artifacts by selecting out just the built EXEs
   artifacts:
     paths:
-      - build
+      - bin
+      - lib
     expire_in: 1 day
 
 # Build stages
@@ -99,8 +100,8 @@ build:macos:m1:
   stage: test
   script:
     - echo Dorado app test stage
-    - ./${BUILD_DIR}/bin/dorado download --model dna_r9.4.1_e8_hac@v3.3
-    - ./${BUILD_DIR}/bin/dorado basecaller dna_r9.4.1_e8_hac@v3.3 ./tests/data/ -r 1 -b 384 > calls.sam
+    - ./bin/dorado download --model dna_r9.4.1_e8_hac@v3.3
+    - ./bin/dorado basecaller dna_r9.4.1_e8_hac@v3.3 ./tests/data/ -r 1 -b 384 > calls.sam
 
 # Test stages
 
