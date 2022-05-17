@@ -323,6 +323,12 @@ add_subdirectory(tests)
 if(LINUX OR WIN32)
     if(BUILD_KOI_FROM_SOURCE)
         message("Building Koi from source")
+
+        if(NOT EXISTS ${3RD_PARTY}/koi)
+            execute_process(COMMAND git clone https://git.oxfordnanolabs.local/machine-learning/koi.git ${3RD_PARTY}/koi)
+        endif()
+        execute_process(COMMAND git checkout b5c81ed15819b0dc02172a7467b70ad30454df76 WORKING_DIRECTORY ${3RD_PARTY}/koi)
+
         # Note that any source file which gets compiled multiple times with differing flags won't get added here. See below.
         set(KOI_SOURCE_FILES dorado/3rdparty/koi/koi/lib/ctc_simple.cu
                 dorado/3rdparty/koi/koi/lib/cuda_beam_search_constants.h
