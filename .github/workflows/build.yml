@@ -12,9 +12,14 @@ jobs:
       uses: jwlawson/actions-setup-cmake@v1.12
       with:
         cmake-version: '3.21.x'
+    - uses: Jimver/cuda-toolkit@v0.2.7
+      id: cuda-toolkit
+      with:
+        cuda: '11.3.0'
+    - name: dependencies
+      run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libhdf5-dev libssl-dev libzstd-dev
     - name: build
       run: |
-        sudo apt-get update && sudo apt-get install -y --no-install-recommends libhdf5-dev libssl-dev libzstd-dev
         cmake -S . -B cmake-build
         cmake --build cmake-build --config Release --target install -- -j 4
         ctest -C Release --test-dir cmake-build
