@@ -30,6 +30,7 @@ variables:
   stage: build
   script:
     - echo Dorado build stage
+    - git config --global url."https://gitlab-ci-token:${CI_JOB_TOKEN}@git.oxfordnanolabs.local/".insteadOf "git@git.oxfordnanolabs.local:"
     - cmake ${BUILD_OPTIONS} -S . -B ${BUILD_DIR}
     - cmake --build ${BUILD_DIR} --config Release ${BUILD_THREADS}
     - ctest -C Release --test-dir ${BUILD_DIR}
