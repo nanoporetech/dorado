@@ -73,10 +73,7 @@ function(add_hdf_vbz_plugin)
         set(CONAN_LIB_DIRS_RELEASE ${CMAKE_SOURCE_DIR}/dorado/3rdparty/cmake-build-zstd/lib/Release)
         set(CONAN_LIB_DIRS_DEBUG ${CMAKE_SOURCE_DIR}/dorado/3rdparty/cmake-build-zstd/lib/Debug)
 
-        install(FILES
-            ${3RD_PARTY}/cmake-build-zstd/lib/Release/zstd.dll
-            DESTINATION bin
-        )
+        install(FILES ${3RD_PARTY}/cmake-build-zstd/lib/Release/zstd.dll DESTINATION bin)
     endif()
    
     add_subdirectory(dorado/3rdparty/hdf_plugins)
@@ -157,11 +154,12 @@ elseif(WIN32)
 
     # On windows, we need to build HDF5
     set(HDF_VER hdf5-1.12.1-3)
+    set(ZLIB_VER zlib-1.2.12)
+
     if(EXISTS ${3RD_PARTY}/${HDF_VER})
         message("-- Found ${HDF_VER}")
     else()
         # Need a zlib build for HDF to use
-        set(ZLIB_VER zlib-1.2.12)
         download_and_extract(https://zlib.net/${ZLIB_VER}.tar.gz ${ZLIB_VER})
         execute_process(COMMAND cmake -S ${3RD_PARTY}/${ZLIB_VER}/${ZLIB_VER} -B ${3RD_PARTY}/${ZLIB_VER}/${ZLIB_VER}/cmake-build -A x64
             -DCMAKE_INSTALL_PREFIX=${3RD_PARTY}/${ZLIB_VER}/install)
@@ -175,6 +173,8 @@ elseif(WIN32)
             -DCMAKE_INSTALL_PREFIX=${3RD_PARTY}/${HDF_VER}/install)
         execute_process(COMMAND cmake --build ${3RD_PARTY}/${HDF_VER}/${HDF_VER}/cmake-build --config Release --target install)
     endif()
+
+    install(FILES ${3RD_PARTY}/${ZLIB_VER}/install/bin/zlib.dll DESTINATION bin)
     list(APPEND CMAKE_PREFIX_PATH ${3RD_PARTY}/${HDF_VER}/install)
 
     # Get prebuilt OpenSSL
@@ -333,8 +333,15 @@ set_target_properties(dorado
 
 set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/../)
 install(TARGETS dorado RUNTIME)
-file(GLOB TORCH_DLLS "${TORCH_LIB}/lib/*.so*")
-install(FILES ${TORCH_DLLS} DESTINATION bin)
+if(LINUX)
+    file(GLOB TORCH_DLLS "${TORCH_LIB}/lib/*.so*")
+    install(FILES ${TORCH_DLLS} DESTINATION lib)
+elseif(WIN32)
+    file(GLOB TORCH_DLLS "${TORCH_LIB}/lib/*.dll")
+    install(FILES ${TORCH_DLLS} DESTINATION bin)
+elseif(APPLE)
+    # TODO: Add torch dylibs here
+endif()
 
 target_link_libraries(dorado dorado_lib)
 target_link_libraries(dorado elzip)

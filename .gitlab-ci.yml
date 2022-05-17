@@ -38,6 +38,7 @@ variables:
   artifacts:
     paths:
       - bin
+      - lib
     expire_in: 1 day
 
 # Build stages
