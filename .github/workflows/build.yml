@@ -7,15 +7,14 @@ jobs:
   build-linux:
     runs-on: ubuntu-latest
     steps:
-    - name: Setup cmake
+    - uses: actions/checkout@v1
+    - name: cmake
       uses: jwlawson/actions-setup-cmake@v1.12
       with:
         cmake-version: '3.21.x'
     - name: build
       run: |
         sudo apt-get update && sudo apt-get install -y --no-install-recommends libhdf5-dev libssl-dev libzstd-dev
-        echo $PWD
-        ls -la
         cmake -S . -B cmake-build
         cmake --build cmake-build --config Release --target install -- -j 4
         ctest -C Release --test-dir cmake-build
