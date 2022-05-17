@@ -53,7 +53,7 @@ build:linux:x86:focal:install_deps:
 build:linux:x86:focal:
   image: ${DORADO_DEPS}
   variables:
-    BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/libtorch -DBUILD_KOI_FROM_SOURCE=ON"
+    BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/libtorch -DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN}"
     BUILD_THREADS: "-- -j 8"
   <<: *linux_runner
   <<: *build_dorado
@@ -91,20 +91,6 @@ build:macos:m1:
     BUILD_THREADS: "-- -j 8"
   <<: *macos_runner
   <<: *build_dorado
-  
-
-#build:windows:koitest:
-#  variables:
-#    BUILD_OPTIONS: "-A x64 -DBUILD_KOI_FROM_SOURCE=ON"
-#  <<: *windows_runner
-#  stage: build
-#  script:
-#    # this worked
-#    #- git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@git.oxfordnanolabs.local/machine-learning/koi.git
-#    # This did not work, and also leaves a random key in the ofan_tester git config file
-#    # - git config --local credential.helper ''
-#    # - git config --global url."https://gitlab-ci-token:${CI_JOB_TOKEN}@git.oxfordnanolabs.local/".insteadOf "git@git.oxfordnanolabs.local:"
-#    # - git clone git@git.oxfordnanolabs.local:machine-learning/koi.git
 
 
 # Test stage components
