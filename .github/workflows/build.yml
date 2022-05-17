@@ -1,0 +1,19 @@
+name: build-dorado
+
+on: [push]
+
+jobs:
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Setup cmake
+      uses: jwlawson/actions-setup-cmake@v1.12
+      with:
+        cmake-version: '3.21.x'
+    - name: build
+      run: |
+      apt-get update && apt-get install -y --no-install-recommends libhdf5-dev libssl-dev libzstd-dev
+      cmake -S . -B cmake-build
+      cmake --build cmake-build --config Release --target install -- -j 4
+      ctest -C Release --test-dir cmake-build
