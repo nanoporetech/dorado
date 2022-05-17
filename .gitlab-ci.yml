@@ -95,11 +95,11 @@ build:macos:m1:
   <<: *build_dorado
   
 
-build:windows:koitest
+build:windows:koitest:
   variables:
     BUILD_OPTIONS: "-A x64 -DBUILD_KOI_FROM_SOURCE=ON"
   <<: *windows_runner
- stage: build
+  stage: build
   script:
     - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@git.oxfordnanolabs.local/machine-learning/dorado.git
     #- git config --local credential.helper ''
