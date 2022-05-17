@@ -340,7 +340,7 @@ if(LINUX OR WIN32)
                 dorado/3rdparty/koi/koi/lib/decoder_lib.cu
                 dorado/3rdparty/koi/koi/lib/lib.h
                 )
-
+        
         set(KOI_FLAGS -c
                 --ptxas-options=-v
                 --use_fast_math
@@ -402,6 +402,9 @@ if(LINUX OR WIN32)
 
         # Finally add a dependency on koi_lib to the dorado project
         target_link_libraries(dorado_lib koi_lib)
+        target_include_directories(dorado_lib PUBLIC
+                ${3RD_PARTY}/koi/koi/lib
+        )
 
     else() # end BUILD_KOI_FROM_SOURCE
         if(LINUX)
