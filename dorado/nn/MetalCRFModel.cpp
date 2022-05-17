@@ -317,8 +317,7 @@ TORCH_MODULE(MetalModel);
 
 ModuleHolder<AnyModule> load_crf_mtl_model(const std::string& path, int batch_size, int chunk_size, torch::TensorOptions options) {
 
-    static auto device = MTL::CreateSystemDefaultDevice();
-    set_torch_mtl_allocator(device);
+    auto device = get_mtl_device();
 
     auto config = toml::parse(path + "/config.toml");
 

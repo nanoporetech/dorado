@@ -4,6 +4,7 @@
 #include "nn/ModelRunner.h"
 #include "decode/CPUDecoder.h"
 #include "decode/GPUDecoder.h"
+#include "decode/MTLDecoder.h"
 #include "data_loader/DataLoader.h"
 #include "read_pipeline/ScalerNode.h"
 #include "read_pipeline/BasecallerNode.h"
@@ -18,10 +19,16 @@ void setup(std::vector<std::string> args, const std::string& model_path, const s
     torch::set_num_threads(1);
     std::vector<Runner> runners;
 
-    if (device == "cpu" || device == "metal") {
+    if (device == "cpu") {
         for (int i = 0; i < num_runners; i++) {
             runners.push_back(std::make_shared<ModelRunner<CPUDecoder>>(model_path, device, chunk_size, batch_size));
-	}
+        }
+#ifdef __APPLE__
+	} else if (device == "metal") {
+        for (int i = 0; i < num_runners; i++) {
+            runners.push_back(std::make_shared<ModelRunner<MTLDecoder>>(model_path, device, chunk_size, batch_size));
+        }
+#endif // __APPLE__
     } else {
         for (int i = 0; i < num_runners; i++) {
             runners.push_back(std::make_shared<ModelRunner<GPUDecoder>>(model_path, device, chunk_size, batch_size));

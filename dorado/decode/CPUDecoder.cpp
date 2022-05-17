@@ -83,6 +83,8 @@ std::vector<DecodedChunk> CPUDecoder::beam_search(torch::Tensor scores, int num_
 
     std::vector<DecodedChunk> chunk_results(num_chunks);
 
+    std::cerr << "Scores props " << torch::mean(scores) << torch::max(scores) << torch::min(scores) << std::endl;
+
     std::vector<std::unique_ptr<std::thread>> threads;
     threads.reserve(num_threads);
     for (int i = 0; i < num_threads; ++i) {
