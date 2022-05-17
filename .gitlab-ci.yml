@@ -30,8 +30,6 @@ variables:
   stage: build
   script:
     - echo Dorado build stage
-    - git config --local credential.helper ''
-    - git config --global url."https://gitlab-ci-token:${CI_JOB_TOKEN}@git.oxfordnanolabs.local/".insteadOf "git@git.oxfordnanolabs.local:"
     - cmake ${BUILD_OPTIONS} -S . -B ${BUILD_DIR}
     - cmake --build ${BUILD_DIR} --config Release ${BUILD_THREADS}
     - ctest -C Release --test-dir ${BUILD_DIR}
@@ -70,7 +68,7 @@ build:linux:x86:focal_koi_download:
   
 build:windows:
   variables:
-    BUILD_OPTIONS: "-A x64 -DBUILD_KOI_FROM_SOURCE=ON"
+    BUILD_OPTIONS: "-A x64 -DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN}"
   <<: *windows_runner
   <<: *build_dorado
   when: manual
@@ -95,17 +93,18 @@ build:macos:m1:
   <<: *build_dorado
   
 
-build:windows:koitest:
-  variables:
-    BUILD_OPTIONS: "-A x64 -DBUILD_KOI_FROM_SOURCE=ON"
-  <<: *windows_runner
-  stage: build
-  script:
-    # this worked
-    #- git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@git.oxfordnanolabs.local/machine-learning/koi.git
-    #- git config --local credential.helper ''
-    - git config --global url."https://gitlab-ci-token:${CI_JOB_TOKEN}@git.oxfordnanolabs.local/".insteadOf "git@git.oxfordnanolabs.local:"
-    - git clone git@git.oxfordnanolabs.local:machine-learning/koi.git
+#build:windows:koitest:
+#  variables:
+#    BUILD_OPTIONS: "-A x64 -DBUILD_KOI_FROM_SOURCE=ON"
+#  <<: *windows_runner
+#  stage: build
+#  script:
+#    # this worked
+#    #- git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@git.oxfordnanolabs.local/machine-learning/koi.git
+#    # This did not work, and also leaves a random key in the ofan_tester git config file
+#    # - git config --local credential.helper ''
+#    # - git config --global url."https://gitlab-ci-token:${CI_JOB_TOKEN}@git.oxfordnanolabs.local/".insteadOf "git@git.oxfordnanolabs.local:"
+#    # - git clone git@git.oxfordnanolabs.local:machine-learning/koi.git
 
 
 # Test stage components
