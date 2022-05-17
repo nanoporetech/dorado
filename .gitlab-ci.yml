@@ -101,7 +101,7 @@ build:windows:koitest:
   <<: *windows_runner
   stage: build
   script:
-    - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@git.oxfordnanolabs.local/machine-learning/dorado.git
+    - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@git.oxfordnanolabs.local/machine-learning/koi.git
     #- git config --local credential.helper ''
     #- git config --global url."https://gitlab-ci-token:${CI_JOB_TOKEN}@git.oxfordnanolabs.local/".insteadOf "git@git.oxfordnanolabs.local:"
 
