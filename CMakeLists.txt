@@ -325,7 +325,12 @@ if(LINUX OR WIN32)
         message("Building Koi from source")
 
         if(NOT EXISTS ${3RD_PARTY}/koi)
-            execute_process(COMMAND git clone https://git.oxfordnanolabs.local/machine-learning/koi.git ${3RD_PARTY}/koi)
+            #if(DEFINED GITUSER)
+            #    execute_process(COMMAND git clone https://${GITUSER}@git.oxfordnanolabs.local/machine-learning/koi.git ${3RD_PARTY}/koi)
+            #else()
+            #    execute_process(COMMAND git clone https://git.oxfordnanolabs.local/machine-learning/koi.git ${3RD_PARTY}/koi)
+            #endif()
+            execute_process(COMMAND git clone git@git.oxfordnanolabs.local:machine-learning/koi.git ${3RD_PARTY}/koi)
         endif()
         execute_process(COMMAND git checkout b5c81ed15819b0dc02172a7467b70ad30454df76 WORKING_DIRECTORY ${3RD_PARTY}/koi)
 
