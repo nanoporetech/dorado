@@ -72,6 +72,11 @@ function(add_hdf_vbz_plugin)
         set(CONAN_INCLUDE_DIRS_DEBUG ${CMAKE_SOURCE_DIR}/dorado/3rdparty/zstd/lib)
         set(CONAN_LIB_DIRS_RELEASE ${CMAKE_SOURCE_DIR}/dorado/3rdparty/cmake-build-zstd/lib/Release)
         set(CONAN_LIB_DIRS_DEBUG ${CMAKE_SOURCE_DIR}/dorado/3rdparty/cmake-build-zstd/lib/Debug)
+
+        install(FILES
+            ${3RD_PARTY}/cmake-build-zstd/lib/Release/zstd.dll
+            DESTINATION bin
+        )
     endif()
    
     add_subdirectory(dorado/3rdparty/hdf_plugins)
@@ -305,12 +310,31 @@ if(APPLE)
     add_dependencies(dorado_lib metal-lib)
 endif()
 
+
+if(NOT WIN32)
+    # Set up RPATHs so we can find dependencies
+    set(CMAKE_SKIP_RPATH FALSE)
+    # Note: we don't need the relative lib dir if everything is in 
+    if(APPLE)
+        set(CMAKE_INSTALL_RPATH "@executable_path/;@executable_path/../lib")
+    else()
+        set(CMAKE_INSTALL_RPATH "$ORIGIN/../lib/;$ORIGIN")
+    endif()
+    set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
+endif()
+
+
 add_executable(dorado
     dorado/main.cpp)
 set_target_properties(dorado
     PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
 )
+
+set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/../)
+install(TARGETS dorado RUNTIME)
+file(GLOB TORCH_DLLS "${TORCH_LIB}/lib/*.so*")
+install(FILES ${TORCH_DLLS} DESTINATION bin)
 
 target_link_libraries(dorado dorado_lib)
 target_link_libraries(dorado elzip)
@@ -325,11 +349,6 @@ if(LINUX OR WIN32)
         message("Building Koi from source")
 
         if(NOT EXISTS ${3RD_PARTY}/koi)
-            #if(DEFINED GITUSER)
-            #    execute_process(COMMAND git clone https://${GITUSER}@git.oxfordnanolabs.local/machine-learning/koi.git ${3RD_PARTY}/koi)
-            #else()
-            #    execute_process(COMMAND git clone https://git.oxfordnanolabs.local/machine-learning/koi.git ${3RD_PARTY}/koi)
-            #endif()
             execute_process(COMMAND git clone git@git.oxfordnanolabs.local:machine-learning/koi.git ${3RD_PARTY}/koi)
         endif()
         execute_process(COMMAND git checkout b5c81ed15819b0dc02172a7467b70ad30454df76 WORKING_DIRECTORY ${3RD_PARTY}/koi)
