@@ -15,7 +15,7 @@ jobs:
       run: |
         sudo apt-get update && sudo apt-get install -y --no-install-recommends libhdf5-dev libssl-dev libzstd-dev
         echo $PWD
-	ls -la
+        ls -la
         cmake -S . -B cmake-build
         cmake --build cmake-build --config Release --target install -- -j 4
         ctest -C Release --test-dir cmake-build
