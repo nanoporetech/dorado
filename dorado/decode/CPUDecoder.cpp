@@ -5,7 +5,7 @@
 #include "beam_search.h"
 
 at::Tensor scan(at::Tensor Ms, at::Tensor idx, at::Tensor v0){
-    int T =  Ms.size(0);
+    int T = Ms.size(0);
     int N = Ms.size(1);
     int C = Ms.size(2);
 
@@ -78,32 +78,52 @@ torch::Tensor CPUDecoder::backward_scores(torch::Tensor scores){
 std::vector<DecodedChunk> CPUDecoder::beam_search(torch::Tensor scores, int num_chunks, DecoderOptions options) {
 
     scores = scores.to("cpu");
+    constexpr int num_threads = 4;
+    int chunks_per_thread = (num_chunks + num_threads - 1) / num_threads;
 
-    torch::Tensor fwd = forward_scores(scores);
-    torch::Tensor bwd = backward_scores(scores);
+    std::vector<DecodedChunk> chunk_results(num_chunks);
 
-    torch::Tensor posts = torch::softmax(fwd + bwd, -1);
+    std::vector<std::unique_ptr<std::thread>> threads;
+    threads.reserve(num_threads);
+    for (int i = 0; i < num_threads; ++i) {
+        threads.emplace_back(
+            new std::thread(
+                [&] (int i) {
+                    int t_first_chunk = i * chunks_per_thread;
+                    int t_num_chunks = std::min(num_chunks - t_first_chunk, chunks_per_thread);
+                    using Slice = torch::indexing::Slice;
+                    auto t_scores = scores.index({Slice(), Slice(t_first_chunk, t_first_chunk + t_num_chunks)});
 
-    scores = scores.transpose(0, 1).contiguous();
-    bwd = bwd.transpose(0, 1).contiguous();
-    posts = posts.transpose(0, 1).contiguous();
+                    torch::Tensor fwd = forward_scores(t_scores);
+                    torch::Tensor bwd = backward_scores(t_scores);
 
-    std::vector<DecodedChunk> chunk_results;
+                    torch::Tensor posts = torch::softmax(fwd + bwd, -1);
 
-    for (int i = 0; i < num_chunks; i++) {
-        auto decode_result = beam_search_decode(scores[i],
-						bwd[i],
-						posts[i],
-						options.beam_cut,
-						options.blank_score,
-						options.q_shift,
-						options.q_scale,
-						options.temperature);
-        chunk_results.push_back(DecodedChunk{
-	    std::get<0>(decode_result),
-	    std::get<1>(decode_result),
-	    std::get<2>(decode_result),
-	});
+                    t_scores = t_scores.transpose(0, 1).contiguous();
+                    bwd = bwd.transpose(0, 1).contiguous();
+                    posts = posts.transpose(0, 1).contiguous();
+
+                    for (int i = 0; i < t_num_chunks; i++) {
+                        auto decode_result = beam_search_decode(t_scores[i],
+                                                                bwd[i],
+                                                                posts[i],
+                                                                options.beam_cut,
+                                                                options.blank_score,
+                                                                options.q_shift,
+                                                                options.q_scale,
+                                                                options.temperature);
+                        chunk_results[t_first_chunk + i] = DecodedChunk{
+                                std::get<0>(decode_result),
+                                std::get<1>(decode_result),
+                                std::get<2>(decode_result),
+                        };
+                    }
+                }
+            , i));
+    }
+
+    for (auto& thread : threads) {
+        thread->join();
     }
 
     return chunk_results;
