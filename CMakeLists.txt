@@ -164,13 +164,9 @@ elseif(WIN32)
         list(APPEND CMAKE_PREFIX_PATH ${3RD_PARTY}/${ZLIB_VER}/install)
 
         # HDF5 itself
-        download_and_extract(https://gamma.hdfgroup.org/ftp/pub/outgoing/hdf5/snapshots/v112/OLD/${HDF_VER}.tar.gz ${HDF_VER})
-        execute_process(COMMAND cmake -S ${3RD_PARTY}/${HDF_VER}/${HDF_VER} -B ${3RD_PARTY}/${HDF_VER}/${HDF_VER}/cmake-build -A x64
-            -DHDF5_ENABLE_Z_LIB_SUPPORT=1 -DCMAKE_PREFIX_PATH=${3RD_PARTY}/${ZLIB_VER}/install
-            -DCMAKE_INSTALL_PREFIX=${3RD_PARTY}/${HDF_VER}/install)
-        execute_process(COMMAND cmake --build ${3RD_PARTY}/${HDF_VER}/${HDF_VER}/cmake-build --config Release --target install)
+        download_and_extract(https://nanoporetech.box.com/shared/static/h5u267duw3sa4l814yirmxamx3hgouwp.zip ${HDF_VER})
     endif()
-    list(APPEND CMAKE_PREFIX_PATH ${3RD_PARTY}/${HDF_VER}/install)
+    list(APPEND CMAKE_PREFIX_PATH ${3RD_PARTY}/${HDF_VER}/${HDF_VER})
 
     # Get prebuilt OpenSSL
     download_and_extract(https://nanoporetech.box.com/shared/static/paqqcwfpdjo3eqaghu2denk9vgnis2ph.zip openssl-win)
