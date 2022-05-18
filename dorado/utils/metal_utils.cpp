@@ -108,6 +108,23 @@ struct MTLAllocator : torch::Allocator {
 };
 static MTLAllocator mtl_allocator;
 
+
+static std::mutex mtl_device_mutex;
+static thread_local std::unique_ptr<std::unique_lock<std::mutex>> mtl_device_lock;
+
+void lock_mtl_device() {
+    if (!mtl_device_lock) {
+        mtl_device_lock = std::make_unique<std::unique_lock<std::mutex>>(mtl_device_mutex);
+    } else {
+        mtl_device_lock->lock();
+    }
+}
+
+void unlock_mtl_device() {
+    mtl_device_lock->unlock();
+}
+
+
 MTL::Device *get_mtl_device() {
     if (mtl_device == nullptr) {
         mtl_device = MTL::CreateSystemDefaultDevice();

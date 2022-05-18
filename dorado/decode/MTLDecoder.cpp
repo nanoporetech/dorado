@@ -47,6 +47,8 @@ std::vector<DecodedChunk> MTLDecoder::beam_search(torch::Tensor scores, int num_
     launch_kernel_no_wait(scan_cps, command_buffer, {args_bwd, mtl_for_tensor(scores), mtl_for_tensor(bwd), mtl_for_tensor(scan_idx[1][0]), mtl_for_tensor(scan_idx[1][1])}, num_chunks, Cs);
     command_buffer->commit();
     command_buffer->waitUntilCompleted();
+    // Relies on lock_mtl_device() having been called by MetalBlockImpl::forward on the same thread
+    unlock_mtl_device();
 
     constexpr int num_threads = 4;
     int chunks_per_thread = (num_chunks + num_threads - 1) / num_threads;

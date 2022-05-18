@@ -14,6 +14,9 @@ ComputePipelineState *make_cps(MTL::Device *device, std::string name);
 void launch_kernel(ComputePipelineState *cps, CommandQueue *cq, std::vector<Buffer *> buffers, long threadgroups, long threads_per_threadroup);
 void launch_kernel_no_wait(ComputePipelineState *cps, CommandBuffer *cb, std::vector<Buffer *> buffers, long threadgroups, long threads_per_threadgroup);
 
+void lock_mtl_device();
+void unlock_mtl_device();
+
 MTL::Device *get_mtl_device();
 MTL::Buffer *mtl_for_tensor(const torch::Tensor &t);
 MTL::Buffer *extract_mtl_from_tensor(torch::Tensor &t);
