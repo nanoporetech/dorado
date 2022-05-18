@@ -53,34 +53,31 @@ kernel void scan(
     int C = args->C;
     int ts_states = C * NUM_TRANSITIONS;
     int dir = args->dir;
+    int chunk = gid;
 
-    for (int chunk = gid; chunk < N; chunk += threadgroups) {
-        device const ftype_in *chunk_in = in + chunk * ts_states;
-        device ftype_in *chunk_out = out + chunk * (T+1) * C;
-        device ftype_in *alpha_init = chunk_out + ((dir == -1) ? C * T : 0);
-        for (int c = tid; c < C; ++c) {
-            alpha_init[c] = 0;
+    device const ftype_in *chunk_in = in + chunk * ts_states;
+    device ftype_in *chunk_out = out + chunk * (T+1) * C;
+    device ftype_in *alpha_init = chunk_out + ((dir == -1) ? C * T : 0);
+    for (int c = tid; c < C; ++c) {
+        alpha_init[c] = 0;
+    }
+    for (int ts = 0; ts < T; ++ts) {
+        threadgroup_barrier(mem_flags::mem_device);
+        device const ftype_in *ts_in = chunk_in + N * ts_states * ((dir == -1) ? T - ts - 1 : ts);
+        device ftype_in *ts_alpha_in = alpha_init + C * dir * ts;
+        device ftype_in *ts_alpha_out = ts_alpha_in + C * dir;
+        float max_val = -1e38f;
+        float vals[NUM_TRANSITIONS];
+        for (int i = 0; i < NUM_TRANSITIONS; ++i) {
+            int state = tid * NUM_TRANSITIONS + i;
+            vals[i] = ts_in[idx1[state]] + ts_alpha_in[idx2[state]];
+            max_val = max(max_val, vals[i]);
         }
-        for (int ts = 0; ts < T; ++ts) {
-            threadgroup_barrier(mem_flags::mem_device);
-            device const ftype_in *ts_in = chunk_in + N * ts_states * ((dir == -1) ? T - ts - 1 : ts);
-            device ftype_in *ts_alpha_in = alpha_init + C * dir * ts;
-            device ftype_in *ts_alpha_out = ts_alpha_in + C * dir;
-            for (int c = tid; c < C; ++c) {
-                float max_val = -1e38f;
-                float vals[NUM_TRANSITIONS];
-                for (int i = 0; i < NUM_TRANSITIONS; ++i) {
-                    int state = c * NUM_TRANSITIONS + i;
-                    vals[i] = ts_in[idx1[state]] + ts_alpha_in[idx2[state]];
-                    max_val = max(max_val, vals[i]);
-                }
-                float sum = 0.f;
-                for (int i = 0; i < NUM_TRANSITIONS; ++i) {
-                    sum += exp(vals[i] - max_val);
-                }
-                ts_alpha_out[c] = max_val + log(sum);
-            }
+        float sum = 0.f;
+        for (int i = 0; i < NUM_TRANSITIONS; ++i) {
+            sum += exp(vals[i] - max_val);
         }
+        ts_alpha_out[tid] = max_val + log(sum);
     }
 }
 

@@ -43,8 +43,8 @@ std::vector<DecodedChunk> MTLDecoder::beam_search(torch::Tensor scores, int num_
     auto args_bwd = create_buffer(device, scan_args_, 4);
 
     auto command_buffer = command_queue->commandBuffer();
-    launch_kernel_no_wait(scan_cps, command_buffer, {args_fwd, mtl_for_tensor(scores), mtl_for_tensor(fwd), mtl_for_tensor(scan_idx[0][0]), mtl_for_tensor(scan_idx[0][1])}, N, Cs);
-    launch_kernel_no_wait(scan_cps, command_buffer, {args_bwd, mtl_for_tensor(scores), mtl_for_tensor(bwd), mtl_for_tensor(scan_idx[1][0]), mtl_for_tensor(scan_idx[1][1])}, N, Cs);
+    launch_kernel_no_wait(scan_cps, command_buffer, {args_fwd, mtl_for_tensor(scores), mtl_for_tensor(fwd), mtl_for_tensor(scan_idx[0][0]), mtl_for_tensor(scan_idx[0][1])}, num_chunks, Cs);
+    launch_kernel_no_wait(scan_cps, command_buffer, {args_bwd, mtl_for_tensor(scores), mtl_for_tensor(bwd), mtl_for_tensor(scan_idx[1][0]), mtl_for_tensor(scan_idx[1][1])}, num_chunks, Cs);
     command_buffer->commit();
     command_buffer->waitUntilCompleted();
 
