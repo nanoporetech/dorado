@@ -267,8 +267,6 @@ set(LIB_SOURCE_FILES
         dorado/decode/CPUDecoder.h
         dorado/decode/GPUDecoder.cpp
         dorado/decode/GPUDecoder.h
-        dorado/decode/MTLDecoder.cpp
-        dorado/decode/MTLDecoder.h
         dorado/utils/compat_utils.cpp
         dorado/utils/compat_utils.h
         dorado/utils/sequence_utils.cpp
@@ -283,6 +281,8 @@ if(APPLE)
             dorado/nn/metal/nn.h
             dorado/nn/MetalCRFModel.h
             dorado/nn/MetalCRFModel.cpp
+            dorado/decode/MTLDecoder.cpp
+            dorado/decode/MTLDecoder.h
             dorado/utils/metal_utils.cpp
             dorado/utils/metal_utils.h)
 endif()
