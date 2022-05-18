@@ -4,7 +4,7 @@
 
 #ifndef __APPLE__
 extern "C" {
-    #include "3rdparty/koi/koi/lib/lib.h"
+    #include "lib.h"
 }
 #include <cuda_runtime.h>
 #endif

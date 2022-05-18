@@ -72,6 +72,8 @@ function(add_hdf_vbz_plugin)
         set(CONAN_INCLUDE_DIRS_DEBUG ${CMAKE_SOURCE_DIR}/dorado/3rdparty/zstd/lib)
         set(CONAN_LIB_DIRS_RELEASE ${CMAKE_SOURCE_DIR}/dorado/3rdparty/cmake-build-zstd/lib/Release)
         set(CONAN_LIB_DIRS_DEBUG ${CMAKE_SOURCE_DIR}/dorado/3rdparty/cmake-build-zstd/lib/Debug)
+
+        install(FILES ${3RD_PARTY}/cmake-build-zstd/lib/Release/zstd.dll DESTINATION bin)
     endif()
    
     add_subdirectory(dorado/3rdparty/hdf_plugins)
@@ -138,6 +140,7 @@ elseif(APPLE)
         DEPENDS ${AIR_FILES}
         COMMENT "Creating metallib"
     )
+    install(FILES ${CMAKE_BINARY_DIR}/lib/default.metallib DESTINATION lib)
 elseif(WIN32)
     set(MKR_URL https://nanoporetech.box.com/shared/static/wu75lj0f69lrs24fjvlnkpohkcch85c7.gz)
     set(MKR_LIBRARIES
@@ -152,11 +155,12 @@ elseif(WIN32)
 
     # On windows, we need to build HDF5
     set(HDF_VER hdf5-1.12.1-3)
+    set(ZLIB_VER zlib-1.2.12)
+
     if(EXISTS ${3RD_PARTY}/${HDF_VER})
         message("-- Found ${HDF_VER}")
     else()
         # Need a zlib build for HDF to use
-        set(ZLIB_VER zlib-1.2.12)
         download_and_extract(https://zlib.net/${ZLIB_VER}.tar.gz ${ZLIB_VER})
         execute_process(COMMAND cmake -S ${3RD_PARTY}/${ZLIB_VER}/${ZLIB_VER} -B ${3RD_PARTY}/${ZLIB_VER}/${ZLIB_VER}/cmake-build -A x64
             -DCMAKE_INSTALL_PREFIX=${3RD_PARTY}/${ZLIB_VER}/install)
@@ -164,13 +168,11 @@ elseif(WIN32)
         list(APPEND CMAKE_PREFIX_PATH ${3RD_PARTY}/${ZLIB_VER}/install)
 
         # HDF5 itself
-        download_and_extract(https://gamma.hdfgroup.org/ftp/pub/outgoing/hdf5/snapshots/v112/OLD/${HDF_VER}.tar.gz ${HDF_VER})
-        execute_process(COMMAND cmake -S ${3RD_PARTY}/${HDF_VER}/${HDF_VER} -B ${3RD_PARTY}/${HDF_VER}/${HDF_VER}/cmake-build -A x64
-            -DHDF5_ENABLE_Z_LIB_SUPPORT=1 -DCMAKE_PREFIX_PATH=${3RD_PARTY}/${ZLIB_VER}/install
-            -DCMAKE_INSTALL_PREFIX=${3RD_PARTY}/${HDF_VER}/install)
-        execute_process(COMMAND cmake --build ${3RD_PARTY}/${HDF_VER}/${HDF_VER}/cmake-build --config Release --target install)
+        download_and_extract(https://nanoporetech.box.com/shared/static/h5u267duw3sa4l814yirmxamx3hgouwp.zip ${HDF_VER})
     endif()
-    list(APPEND CMAKE_PREFIX_PATH ${3RD_PARTY}/${HDF_VER}/install)
+
+    install(FILES ${3RD_PARTY}/${ZLIB_VER}/install/bin/zlib.dll DESTINATION bin)
+    list(APPEND CMAKE_PREFIX_PATH ${3RD_PARTY}/${HDF_VER}/${HDF_VER})
 
     # Get prebuilt OpenSSL
     download_and_extract(https://nanoporetech.box.com/shared/static/paqqcwfpdjo3eqaghu2denk9vgnis2ph.zip openssl-win)
@@ -184,6 +186,7 @@ if(DEFINED DORADO_LIBTORCH_DIR)
     # Use the existing libtorch we have been pointed at
     list(APPEND CMAKE_PREFIX_PATH ${DORADO_LIBTORCH_DIR})
     message(STATUS "Using existing libtorch at ${DORADO_LIBTORCH_DIR}")
+    set(TORCH_LIB ${DORADO_LIBTORCH_DIR})
 else()
     # Get libtorch (if we don't already have it)
     download_and_extract(${TORCH_URL} torch-${TORCH_VERSION}-${CMAKE_SYSTEM_NAME})
@@ -307,12 +310,39 @@ if(APPLE)
     add_dependencies(dorado_lib metal-lib)
 endif()
 
+
+if(NOT WIN32)
+    # Set up RPATHs so we can find dependencies
+    set(CMAKE_SKIP_RPATH FALSE)
+    # Note: we don't need the relative lib dir if everything is in 
+    if(APPLE)
+        set(CMAKE_INSTALL_RPATH "@executable_path/;@executable_path/../lib")
+    else()
+        set(CMAKE_INSTALL_RPATH "$ORIGIN/../lib/;$ORIGIN")
+    endif()
+    set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
+endif()
+
+
 add_executable(dorado
     dorado/main.cpp)
 set_target_properties(dorado
     PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
 )
+
+set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/../)
+install(TARGETS dorado RUNTIME)
+if(LINUX)
+    file(GLOB TORCH_DLLS "${TORCH_LIB}/lib/*.so*")
+    install(FILES ${TORCH_DLLS} DESTINATION lib)
+elseif(WIN32)
+    file(GLOB TORCH_DLLS "${TORCH_LIB}/lib/*.dll")
+    install(FILES ${TORCH_DLLS} DESTINATION bin)
+elseif(APPLE)
+    file(GLOB TORCH_DLLS "${TORCH_LIB}/lib/*.dylib")
+    install(FILES ${TORCH_DLLS} DESTINATION lib)
+endif()
 
 target_link_libraries(dorado dorado_lib)
 target_link_libraries(dorado elzip)
@@ -325,13 +355,25 @@ add_subdirectory(tests)
 if(LINUX OR WIN32)
     if(BUILD_KOI_FROM_SOURCE)
         message("Building Koi from source")
+
+        if(NOT EXISTS ${3RD_PARTY}/koi)
+            if(DEFINED GITLAB_CI_TOKEN)
+                message("Cloning Koi using CI token")
+                execute_process(COMMAND git clone https://gitlab-ci-token:${GITLAB_CI_TOKEN}@git.oxfordnanolabs.local/machine-learning/koi.git ${3RD_PARTY}/koi)
+            else()
+                message("Cloning Koi using ssh")
+                execute_process(COMMAND git clone git@git.oxfordnanolabs.local:machine-learning/koi.git ${3RD_PARTY}/koi)
+            endif()
+        endif()
+        execute_process(COMMAND git checkout b5c81ed15819b0dc02172a7467b70ad30454df76 WORKING_DIRECTORY ${3RD_PARTY}/koi)
+
         # Note that any source file which gets compiled multiple times with differing flags won't get added here. See below.
         set(KOI_SOURCE_FILES dorado/3rdparty/koi/koi/lib/ctc_simple.cu
                 dorado/3rdparty/koi/koi/lib/cuda_beam_search_constants.h
                 dorado/3rdparty/koi/koi/lib/decoder_lib.cu
                 dorado/3rdparty/koi/koi/lib/lib.h
                 )
-
+        
         set(KOI_FLAGS -c
                 --ptxas-options=-v
                 --use_fast_math
@@ -393,6 +435,9 @@ if(LINUX OR WIN32)
 
         # Finally add a dependency on koi_lib to the dorado project
         target_link_libraries(dorado_lib koi_lib)
+        target_include_directories(dorado_lib PUBLIC
+                ${3RD_PARTY}/koi/koi/lib
+        )
 
     else() # end BUILD_KOI_FROM_SOURCE
         if(LINUX)
