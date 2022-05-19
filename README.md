@@ -1,6 +1,6 @@
 # Dorado
 
-A Libtorch basecaller for Oxford Nanopore Reads.
+A Libtorch (C++) basecaller for Oxford Nanopore Reads.
 
 This is a *preview version* of Dorado, a Libtorch Basecaller for Oxford Nanopore Reads. This software is alpha preview version being released for early evaluation. It should subject to change and should not be used for critical applications. If you encounter any problems building or running Dorado  [report an issue](https://github.com/nanoporetech/dorado/).
 
@@ -35,6 +35,6 @@ Other Platforms may work, if you encounter problems with running on your system 
 
 ## Known limitations
 
-* Multi-GPU currently does not work.
-* GPU memory utilisation is high (compared to [Bonito](https://github.com/nanoporetech/bonito)). This is being resolved.
+* Multi-GPU support is limited and likely to work.
+* GPU memory utilisation on Nvidia devices is high (compared to [Bonito](https://github.com/nanoporetech/bonito)). This issue is currently being investigated and resolved.
 * Support for M1 GPUs is should be considered experimental.
