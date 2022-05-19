@@ -12,7 +12,6 @@ using namespace torch::nn;
 namespace F = torch::nn::functional;
 
 typedef uint16_t ftype;
-//typedef float ftype;
 
 static int get_gpu_core_count(MTL::Device *device) {
     std::string name = device->name()->utf8String();

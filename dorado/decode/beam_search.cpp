@@ -1,11 +1,3 @@
-/*
- * beam_search.h
- *
- *  Created on: October 28, 2020
- *  Proprietary and confidential information of Oxford Nanopore Technologies, Limited
- *  All rights reserved; (c)2020: Oxford Nanopore Technologies, Limited
- */
-
 #include "beam_search.h"
 #include "fast_hash.h"
 
