@@ -14,9 +14,14 @@ private:
     void worker_thread();
 
     std::vector<std::string> m_args;
+    //Emit FastQ if true
     bool m_emit_fastq;
+    //Total number of raw samples from the read WriterNode has processed. Used for performance benchmarking and debugging.
     int m_num_samples_processed;
+    //Total number of reads WriterNode has processed
     int m_num_reads_processed;
+    //Time when Node is initialised.
     std::chrono::time_point<std::chrono::system_clock> m_initialization_time;
+    //Async worker for writing.
     std::unique_ptr<std::thread> m_worker;
 };
