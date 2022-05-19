@@ -78,12 +78,11 @@ torch::Tensor CPUDecoder::backward_scores(torch::Tensor scores){
 std::vector<DecodedChunk> CPUDecoder::beam_search(torch::Tensor scores, int num_chunks, DecoderOptions options) {
 
     scores = scores.to("cpu");
-    int num_threads = std::min((num_chunks + 4 - 1) / 4, 4);
-    int chunks_per_thread = (num_chunks + num_threads - 1) / num_threads;
+    int num_threads = std::min(num_chunks, 4);
+    int chunks_per_thread = num_chunks / num_threads;
+    int num_threads_with_one_more_chunk = num_chunks % num_threads;
 
     std::vector<DecodedChunk> chunk_results(num_chunks);
-
-    std::cerr << "Scores props " << torch::mean(scores) << torch::max(scores) << torch::min(scores) << std::endl;
 
     std::vector<std::unique_ptr<std::thread>> threads;
     threads.reserve(num_threads);
@@ -91,8 +90,9 @@ std::vector<DecodedChunk> CPUDecoder::beam_search(torch::Tensor scores, int num_
         threads.emplace_back(
             new std::thread(
                 [&] (int i) {
-                    int t_first_chunk = i * chunks_per_thread;
-                    int t_num_chunks = std::min(num_chunks - t_first_chunk, chunks_per_thread);
+                    int t_first_chunk = i * chunks_per_thread + std::min(i, num_threads_with_one_more_chunk);
+                    int t_num_chunks = chunks_per_thread + int(i < num_threads_with_one_more_chunk);
+
                     using Slice = torch::indexing::Slice;
                     auto t_scores = scores.index({Slice(), Slice(t_first_chunk, t_first_chunk + t_num_chunks)});
 
@@ -101,7 +101,7 @@ std::vector<DecodedChunk> CPUDecoder::beam_search(torch::Tensor scores, int num_
 
                     torch::Tensor posts = torch::softmax(fwd + bwd, -1);
 
-                    t_scores = t_scores.transpose(0, 1).contiguous();
+                    t_scores = t_scores.transpose(0, 1);
                     bwd = bwd.transpose(0, 1).contiguous();
                     posts = posts.transpose(0, 1).contiguous();
 

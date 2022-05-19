@@ -241,7 +241,7 @@ struct MetalBlockImpl : Module {
         }
     }
 
-    std::pair<MTL::CommandBuffer*, torch::Tensor> forward_async(torch::Tensor x) {
+    std::pair<MTL::CommandBuffer*, torch::Tensor> forward_async(torch::Tensor x, bool lock_gpu) {
 
         auto command_buffer = command_queue->commandBuffer();
 
@@ -262,25 +262,25 @@ struct MetalBlockImpl : Module {
         x = torch::empty({lstm_chunk_size, batch_size, out_size});
         launch_kernel_no_wait(linear_tanh_cps, command_buffer, {args[0], mat_working_mem, mat_linear_weights, mtl_for_tensor(x)}, kernel_thread_groups, kernel_simd_groups * 32);
 
+        // TODO: Find a better way of dealing with long-running kernels.
+        // This is a hacky way of avoiding Metal kernel launch timeouts. We only let one runner thread
+        // access the GPU. Unlock happens in MTLDecoder::beam_search. We want one thread to finish work on the GPU
+        // and start CPU decoding before another thread starts GPU work.
+        if (lock_gpu) { lock_mtl_device(); }
         command_buffer->commit();
         return std::make_pair(command_buffer, x);
     }
 
     torch::Tensor forward(torch::Tensor x) {
         torch::Tensor out;
-        // TODO: Find a better way of dealing with long-running kernels.
-        // This is a hacky way of avoiding Metal kernel launch timeouts. We only let one runner thread
-        // access the GPU. Unlock happens in MTLDecoder::beam_search. We want one thread to finish work on the GPU
-        // and start CPU decoding before another thread starts GPU work.
-        lock_mtl_device();
         // TODO: find a more robust way of dealing with Metal kernel launch issues
         for (int retry = 0; retry < 5; ++retry) {
             MTL::CommandBuffer* command_buffer;
-            std::tie(command_buffer, out) = forward_async(x);
+            std::tie(command_buffer, out) = forward_async(x, retry == 0);
             command_buffer->waitUntilCompleted();
             if (command_buffer->status() == MTL::CommandBufferStatusCompleted) { break; }
             using namespace std::chrono_literals;
-            std::this_thread::sleep_for(100ms);
+            std::this_thread::sleep_for(20ms);
         }
         return out;
     }

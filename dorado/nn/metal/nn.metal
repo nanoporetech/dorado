@@ -81,6 +81,40 @@ kernel void scan(
     }
 }
 
+kernel void add_softmax(
+    device const ScanArgs* args,
+    device ftype_in *fwd_post,
+    device const ftype_in *bwd,
+    device ftype_in *post,
+    KERNEL_INDEX_INPUTS)
+{
+    int T = args->T + 1;
+    int C = args->C;
+    int chunk = gid;
+    int simd_lane = tid & 31;
+
+    for (int ts = sid; ts < T; ts += simdgroups) {
+        int ts_idx = (chunk * T + ts) * C;
+        float max_val = -1e38;
+        for (int i = simd_lane; i < C; i += 32) {
+            float val = fwd_post[ts_idx + i] + bwd[ts_idx + i];
+            max_val = max(max_val, val);
+            fwd_post[ts_idx + i] = val;
+        }
+        max_val = simd_max(max_val);
+        float sum = 0;
+        for (int i = simd_lane; i < C; i += 32) {
+            float val = exp(fwd_post[ts_idx + i] - max_val);
+            sum += val;
+            fwd_post[ts_idx + i] = val;
+        }
+        sum = simd_sum(sum);
+        float rcp_sum = 1.f / sum;
+        for (int i = simd_lane; i < C; i += 32) {
+            fwd_post[ts_idx + i] *= rcp_sum;
+        }
+    }
+}
 
 struct LstmArgs {
     int layer_size;

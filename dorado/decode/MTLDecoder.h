@@ -15,7 +15,7 @@ public:
 private:
     MTL::Device* device;
     MTL::CommandQueue* command_queue;
-    MTL::ComputePipelineState *scan_cps;
+    MTL::ComputePipelineState *scan_cps, *add_softmax_cps;
     torch::Tensor scan_idx[2][2];
 };
 
