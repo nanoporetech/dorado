@@ -34,7 +34,7 @@ torch::Tensor CPUDecoder::forward_scores(at::Tensor scores) {
 
     int y = pow(n_base,state_len);
 
-    auto v0 = Ms.new_full({{N, y}}, 0.0); // TODO double check all of this.
+    auto v0 = Ms.new_full({{N, y}}, 0.0);
 
     auto t1 = torch::arange(y).index({torch::indexing::Slice(), torch::indexing::None});
     auto t2 = torch::arange(y).repeat_interleave(n_base).reshape({n_base, -1});
@@ -59,7 +59,6 @@ torch::Tensor CPUDecoder::backward_scores(torch::Tensor scores){
 
     torch::Tensor vT = scores.new_full({N, y}, 0.0);
 
-    //TODO this should probably be at model level
     auto t1 = torch::arange(y).index({torch::indexing::Slice(), torch::indexing::None});
     auto t2 = torch::arange(y).repeat_interleave(n_base).reshape({n_base, -1}).t().contiguous();
     auto idx =  torch::cat({t1, t2}, 1).to(torch::kInt32);

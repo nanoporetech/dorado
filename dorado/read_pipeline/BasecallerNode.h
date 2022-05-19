@@ -28,7 +28,6 @@ private:
     std::chrono::time_point<std::chrono::system_clock> initialization_time;
     std::chrono::time_point<std::chrono::system_clock> termination_time;
     // Global chunk input list
-    // TODO: change this to a deque of shared_ptr<Chunk> to avoid copies? (not a perf issue until the chunk contains more data)
     std::mutex m_chunks_in_mutex;
     std::deque<std::shared_ptr<Chunk>> m_chunks_in; // Gets filled with chunks from the input reads
 
