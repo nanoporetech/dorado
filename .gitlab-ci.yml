@@ -33,12 +33,23 @@ variables:
     - cmake ${BUILD_OPTIONS} -S . -B ${BUILD_DIR}
     - cmake --build ${BUILD_DIR} --config Release --target install ${BUILD_THREADS}
     - ctest -C Release --test-dir ${BUILD_DIR}
-  # We probably want to limit the amount of stuff in the artifacts by selecting out just the built EXEs
   artifacts:
     paths:
       - bin
       - lib
     expire_in: 1 day
+
+.build_dorado_archive: &build_dorado_archive
+  stage: build
+  script:
+    - cmake ${BUILD_OPTIONS} -S . -B ${BUILD_DIR}
+    - cmake --build ${BUILD_DIR} --config Release ${BUILD_THREADS}
+    - cpack --config ${BUILD_DIR}/CPackConfig.cmake
+  artifacts:
+    paths:
+      - archive
+    expire_in: 1 day
+
 
 # Build stages
 
@@ -92,6 +103,29 @@ build:macos:m1:
     BUILD_THREADS: "-- -j 8"
   <<: *macos_runner
   <<: *build_dorado
+
+build_archive:linux:x86:focal:
+  image: ${DORADO_DEPS}
+  variables:
+    BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/libtorch -DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN}"
+    BUILD_THREADS: "-- -j 8"
+  <<: *linux_runner
+  <<: *build_dorado_archive
+  when: manual
+
+build_archive:windows:
+  variables:
+    BUILD_OPTIONS: "-A x64 -DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN}"
+  <<: *windows_runner
+  <<: *build_dorado_archive
+  when: manual
+
+build_archive:macos:m1:
+  variables:
+    BUILD_THREADS: "-- -j 8"
+  <<: *macos_runner
+  <<: *build_dorado_archive
+  when: manual
 
 
 # Test stage components

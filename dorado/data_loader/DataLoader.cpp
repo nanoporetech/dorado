@@ -13,7 +13,15 @@
 
 
 namespace {
-void fixed_string_reader(HighFive::Attribute& attribute, std::string& target_str) {
+void string_reader(HighFive::Attribute& attribute, std::string& target_str) {
+
+    // Load as a variable string if possible
+    if(attribute.getDataType().isVariableStr()) {
+        attribute.read(target_str);
+        return;
+    }
+
+    // Process as a fixed length string
     // Create landing buffer and H5 datatype
     size_t size = attribute.getDataType().getSize();
     std::vector<char> target_array(size);
@@ -221,7 +229,7 @@ void DataLoader::load_fast5_reads_from_file(const std::string& path) {
         int32_t channel_number;
         if (channel_number_attr.getDataType().string().substr(0, 6) == "String") {
             std::string channel_number_string;
-            fixed_string_reader(channel_number_attr, channel_number_string);
+            string_reader(channel_number_attr, channel_number_string);
             std::istringstream channel_stream(channel_number_string);
             channel_stream >> channel_number;
         } else {
@@ -255,13 +263,14 @@ void DataLoader::load_fast5_reads_from_file(const std::string& path) {
         mux_attr.read(mux);
         read_number_attr.read(read_number);
         start_time_attr.read(start_time);
-        fixed_string_reader(read_id_attr, read_id);
+        string_reader(read_id_attr, read_id);
+
         std::string fast5_filename = std::filesystem::path(path).filename().string();
 
         HighFive::Group tracking_id_group = read.getGroup("tracking_id");
         HighFive::Attribute exp_start_time_attr = tracking_id_group.getAttribute("exp_start_time");
         std::string exp_start_time;
-        fixed_string_reader(exp_start_time_attr, exp_start_time);
+        string_reader(exp_start_time_attr, exp_start_time);
 
         auto start_time_str = adjust_time(exp_start_time, static_cast<uint32_t>(start_time / sampling_rate));
 
