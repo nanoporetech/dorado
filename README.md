@@ -2,7 +2,7 @@
 
 A Libtorch basecaller for Oxford Nanopore Reads.
 
-This is a *preview version* of Dorado, a Libtorch Basecaller for Oxford Nanopore Reads. This software is alpha preview version being released for early evaluation. It should subject to change and should not be used for critical applications. If you encounter any problems building or running Dorado  [report an issue](https://github.com/nanoporetech/dorado/)issues).
+This is a *preview version* of Dorado, a Libtorch Basecaller for Oxford Nanopore Reads. This software is alpha preview version being released for early evaluation. It should subject to change and should not be used for critical applications. If you encounter any problems building or running Dorado  [report an issue](https://github.com/nanoporetech/dorado/).
 
 ## Developer quickstart
 
