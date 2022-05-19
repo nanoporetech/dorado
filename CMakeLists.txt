@@ -3,7 +3,7 @@ set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 project(dorado)
 set(DORADO_VERSION "0.0.1a0")
 
-set(MKR_VERSION 0.0.11)
+set(POD5_VERSION 0.0.14)
 set(TORCH_VERSION 1.10.2)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -85,17 +85,17 @@ if(UNIX AND NOT APPLE)
 endif()
 
 
-set(MKR_DIR mkr-${MKR_VERSION}-${CMAKE_SYSTEM_NAME})
+set(POD5_DIR pod5-${POD5_VERSION}-${CMAKE_SYSTEM_NAME})
 
 set(CUDNN_LIBRARY_PATH ${CMAKE_SOURCE_DIR}/dorado/3rdparty/fake_cudnn)
 set(CUDNN_INCLUDE_PATH ${CMAKE_SOURCE_DIR}/dorado/3rdparty/fake_cudnn)
 
 if(LINUX)
-    set(MKR_URL https://nanoporetech.box.com/shared/static/v589ievqqmq39dnbfuk14drq33xyomov.gz)
-    set(MKR_LIBRARIES
-      ${3RD_PARTY}/${MKR_DIR}/lib64/libmkr_format.a
-      ${3RD_PARTY}/${MKR_DIR}/lib64/libboost_filesystem.a
-      ${3RD_PARTY}/${MKR_DIR}/lib64/libarrow.a
+    set(POD5_URL https://nanoporetech.box.com/shared/static/s07gstemgltszzoecnxsnpx0jaq2e1m1.gz)
+    set(POD5_LIBRARIES
+      ${3RD_PARTY}/${POD5_DIR}/lib64/libpod5_format.a
+      ${3RD_PARTY}/${POD5_DIR}/lib64/libboost_filesystem.a
+      ${3RD_PARTY}/${POD5_DIR}/lib64/libarrow.a
     )
     # Note: We can set CUDA_TOOLKIT_ROOT_DIR externally, if it's not installed to the default location as
     #  per the readme instructions
@@ -106,11 +106,11 @@ if(LINUX)
     set(TORCH_URL https://download.pytorch.org/libtorch/cu113/libtorch-shared-with-deps-${TORCH_VERSION}%2Bcu113.zip)
     set(TORCH_LIB "${CMAKE_SOURCE_DIR}/dorado/3rdparty/torch-${TORCH_VERSION}-${CMAKE_SYSTEM_NAME}/libtorch")
 elseif(APPLE)
-    set(MKR_URL https://nanoporetech.box.com/shared/static/t5w6jl1tqazjlpoekbpi7r145qspw8xo.gz)
-    set(MKR_LIBRARIES
-      ${3RD_PARTY}/${MKR_DIR}/lib/libmkr_format.a
-      ${3RD_PARTY}/${MKR_DIR}/lib/libboost_filesystem.a
-      ${3RD_PARTY}/${MKR_DIR}/lib/libarrow.a
+    set(POD5_URL https://nanoporetech.box.com/shared/static/e657wyg0202xejx7ll7ulij0gec5kcnh.gz)
+    set(POD5_LIBRARIES
+      ${3RD_PARTY}/${POD5_DIR}/lib/libpod5_format.a
+      ${3RD_PARTY}/${POD5_DIR}/lib/libboost_filesystem.a
+      ${3RD_PARTY}/${POD5_DIR}/lib/libarrow.a
     )
     download_and_extract(https://developer.apple.com/metal/cpp/files/metal-cpp_macOS12_iOS15.zip metal-cpp)
     find_library(APPLE_FWK_FOUNDATION Foundation REQUIRED)
@@ -142,11 +142,11 @@ elseif(APPLE)
     )
     install(FILES ${CMAKE_BINARY_DIR}/lib/default.metallib DESTINATION lib)
 elseif(WIN32)
-    set(MKR_URL https://nanoporetech.box.com/shared/static/wu75lj0f69lrs24fjvlnkpohkcch85c7.gz)
-    set(MKR_LIBRARIES
-      ${3RD_PARTY}/${MKR_DIR}/lib/mkr_format.lib
-      ${3RD_PARTY}/${MKR_DIR}/lib/libboost_filesystem.lib
-      ${3RD_PARTY}/${MKR_DIR}/lib/arrow_static.lib
+    set(POD5_URL https://nanoporetech.box.com/shared/static/1o0ouhcyg9hqs1pae12uyrrbkmiimw84.gz)
+    set(POD5_LIBRARIES
+      ${3RD_PARTY}/${POD5_DIR}/lib/pod5_format.lib
+      ${3RD_PARTY}/${POD5_DIR}/lib/libboost_filesystem.lib
+      ${3RD_PARTY}/${POD5_DIR}/lib/arrow_static.lib
       bcrypt.lib
     )
     enable_language(CUDA)
@@ -179,7 +179,7 @@ elseif(WIN32)
     set (OPENSSL_ROOT_DIR ${3RD_PARTY}/openssl-win)
 endif() # WIN32
 
-download_and_extract(${MKR_URL} ${MKR_DIR})
+download_and_extract(${POD5_URL} ${POD5_DIR})
 add_hdf_vbz_plugin()
 
 if(DEFINED DORADO_LIBTORCH_DIR)
@@ -229,7 +229,7 @@ include_directories(${HDF5_INCLUDE_DIRS}
         dorado/3rdparty/cpp-httplib
         dorado/3rdparty/hdf_plugins/vbz_plugin
         dorado/3rdparty/metal-cpp/metal-cpp
-        dorado/3rdparty/${MKR_DIR}/include
+        dorado/3rdparty/${POD5_DIR}/include
         dorado)
 
 # We need to force the use of the old ABI here as otherwise elzip builds with the libc++11 ABI
@@ -300,7 +300,7 @@ target_link_libraries(dorado_lib
     ${APPLE_FWK_METAL}
     ${HDF5_C_LIBRARIES}
     ${TORCH_LIBRARIES}
-    ${MKR_LIBRARIES}
+    ${POD5_LIBRARIES}
     vbz_hdf_plugin
     OpenSSL::SSL
     elzip

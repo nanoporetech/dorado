@@ -11,7 +11,7 @@ dorado/3rdparty/hdf5-1.12.*
 dorado/3rdparty/koi
 dorado/3rdparty/koi_lib
 dorado/3rdparty/metal-cpp
-dorado/3rdparty/mkr-*
+dorado/3rdparty/pod5-*
 dorado/3rdparty/openssl-win
 dorado/3rdparty/torch-*
 dorado/3rdparty/vbz_plugin

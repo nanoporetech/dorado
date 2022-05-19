@@ -76,7 +76,6 @@ void BasecallerNode::basecall_current_batch(int worker_id) {
 
    auto decode_results = model_runner->call_chunks(m_batched_chunks[worker_id].size());
 
-    // MV TODO call chunks should do this - m_batched_chunks should be a property of a ModelRunner.
     for (int i = 0; i < m_batched_chunks[worker_id].size(); i++){
         m_batched_chunks[worker_id][i]->seq = decode_results[i].sequence;
         m_batched_chunks[worker_id][i]->qstring = decode_results[i].qstring;
@@ -92,7 +91,6 @@ void BasecallerNode::basecall_current_batch(int worker_id) {
     m_batched_chunks[worker_id].clear();
 
     // Now move any completed reads to the output queue
-    //TODO have a separate thread which does this?
     std::unique_lock<std::mutex> working_reads_lock(m_working_reads_mutex);
     for (auto read_iter = m_working_reads.begin(); read_iter != m_working_reads.end();) {
         if ((*read_iter)->num_chunks_called.load() == (*read_iter)->num_chunks) {
@@ -136,7 +134,6 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
             }
             else {
                 // There's no chunks available to call at the moment, sleep and try again
-                // TODO: if it's been a while since we saw a new chunk, we should force-dispatch the half full tensor here
                 chunks_lock.unlock();
                 std::this_thread::sleep_for(100ms);
                 continue;
@@ -160,7 +157,6 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
             }
 
             // Insert the chunk in the input tensor
-            // MV todo When this is a property of the modelrunner needs a function to accept chunks.
             m_model_runners[worker_id]->accept_chunk(int(m_batched_chunks[worker_id].size()), input_slice);
 
             m_batched_chunks[worker_id].push_back(chunk);

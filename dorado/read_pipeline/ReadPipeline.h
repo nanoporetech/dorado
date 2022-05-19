@@ -26,14 +26,14 @@ struct Chunk {
     std::vector<uint8_t> moves; // For stitching.
 };
 
-// Object representing a simplex read
+// Class representing a read, including raw data
 class Read {
 public:
     struct Attributes {
-        uint32_t mux{std::numeric_limits<uint32_t>::max()};
-        uint32_t read_number{std::numeric_limits<uint32_t>::max()};
-        int32_t channel_number{-1};
-        std::string start_time{};
+        uint32_t mux{std::numeric_limits<uint32_t>::max()}; // Channel mux
+        uint32_t read_number{std::numeric_limits<uint32_t>::max()}; // Per-channel number of each read as it was acquired by minknow
+        int32_t channel_number{-1}; //Channel ID
+        std::string start_time{}; //Read acquisition start time
         std::string fast5_filename{};
     };
 
@@ -49,19 +49,19 @@ public:
     float med; // To be set by scaler
     float mad; // To be set by scaler
 
-    bool scale_set = false;
-    float scale;
+    bool scale_set = false; //Set to True if scale has been applied to raw data
+    float scale; // Scale factor applied to convert raw integers from sequencer into pore current values
 
-    size_t num_chunks;
-    std::vector<std::shared_ptr<Chunk>> called_chunks;
-    std::atomic_size_t num_chunks_called;
+    size_t num_chunks; //Number of chunks in the read. Reads raw data is split into chunks for efficient basecalling.
+    std::vector<std::shared_ptr<Chunk>> called_chunks; // Vector of basecalled chunks.
+    std::atomic_size_t num_chunks_called; // Number of chunks which have been basecalled
 
-    std::string read_id;
-    std::string seq;
-    std::string qstring;
+    std::string read_id; //Unique read ID (UUID4)
+    std::string seq; //Read basecall
+    std::string qstring; //Read Qstring
 
-    uint64_t num_samples;
-    uint64_t num_trimmed_samples;
+    uint64_t num_samples; //Number of raw samples in read
+    uint64_t num_trimmed_samples; //Number of samples which have been trimmed from the raw read.
 
     Attributes attributes;
     std::vector<Mapping> mappings;
@@ -71,20 +71,21 @@ public:
 };
 
 
-// Base class for an object which consumes reads
+// Base class for an object which consumes reads.
+// ReadSink is a node within a pipeline.
 class ReadSink {
 public:
     ReadSink(size_t max_reads);
-    void push_read(std::shared_ptr<Read>& read);
-    void terminate() { m_terminate = true; }
+    void push_read(std::shared_ptr<Read>& read); //Push a read into readsink. This can block if receiving ReadSink is full.
+    void terminate() { m_terminate = true; } // Notify sinks and terminate.
 protected:
     std::condition_variable m_cv;
     std::mutex m_cv_mutex;
     std::condition_variable m_push_read_cv;
     std::mutex m_push_read_cv_mutex;
 
-    size_t m_max_reads = 1000;
-    bool m_terminate = false;
+    size_t m_max_reads = 1000; //ReadSink will block on accepting reads if it contains m_max_reads reads
+    bool m_terminate = false; // When set to true, ReadSink will notify it's sinks and terminate.
 
     // The queue of reads itself
     std::deque<std::shared_ptr<Read>> m_reads;

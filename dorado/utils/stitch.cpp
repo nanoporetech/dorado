@@ -5,7 +5,6 @@ int div_round_closest(const int n, const int d)
     return ((n < 0) ^ (d < 0)) ? ((n - d/2)/d) : ((n + d/2)/d);
 }
 
-//TODO test needed here to make sure there are no off-by-one errors in stitching
 void stitch_chunks(std::shared_ptr<Read> read) {
     //Calculate the chunk down sampling, round to closest int.
     int down_sampling = div_round_closest(read->called_chunks[0]->raw_chunk_size, read->called_chunks[0]->moves.size());

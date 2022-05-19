@@ -21,7 +21,6 @@ void ScalerNode::worker_thread(){
         if (m_reads.empty()) {
             if (m_terminate) {
                 // Notify our sink and then kill the worker if we're done
-                //std::cout << "ScalerNode terminating \n";
                 m_sink.terminate();
                 return;
             }
@@ -34,7 +33,6 @@ void ScalerNode::worker_thread(){
         m_reads.pop_front();
         lock.unlock();
 
-        float scaling;
         if (!read->scale_set){
             read->scale = (float) read->range / (float) read->digitisation;
             read->scale_set = true;
@@ -42,7 +40,8 @@ void ScalerNode::worker_thread(){
 
         read->raw_data = read->scale * (read->raw_data + read->offset);
 
-        int trim_start = trim(read->raw_data.index({torch::indexing::Slice(torch::indexing::None, 8000)})); //TODO use non default params
+        //8000 value may be changed in future. Currently this is found to work well.
+        int trim_start = trim(read->raw_data.index({torch::indexing::Slice(torch::indexing::None, 8000)}));
 
         read->raw_data = read->raw_data.index({torch::indexing::Slice(trim_start, torch::indexing::None)});
         read->num_trimmed_samples = trim_start;
@@ -51,7 +50,6 @@ void ScalerNode::worker_thread(){
         read->med = med_mad.first;
         read->mad = med_mad.second;
 
-        //TODO add the short read scaling (by noisiest section) as it is done in Bonito
         read->raw_data = (read->raw_data - read->med) / std::max(1.0f, read->mad);
 
         // Pass the read to the next node
@@ -78,12 +76,12 @@ ScalerNode::~ScalerNode()
 int ScalerNode::trim(torch::Tensor signal, int window_size, float threshold_factor, int min_elements) {
 
     int min_trim = 10;
-    signal = signal.index({torch::indexing::Slice(min_trim, torch::indexing::None)}); //OK
+    signal = signal.index({torch::indexing::Slice(min_trim, torch::indexing::None)});
 
-    auto a = -(window_size * 100);
+    auto trim_start = -(window_size * 100);
 
-    auto trimmed = signal.index({torch::indexing::Slice(a, torch::indexing::None)});
-    auto med_mad = calculate_med_mad(trimmed); //OK
+    auto trimmed = signal.index({torch::indexing::Slice(trim_start, torch::indexing::None)});
+    auto med_mad = calculate_med_mad(trimmed);
 
     auto threshold = med_mad.first + med_mad.second * threshold_factor;
 
@@ -96,7 +94,7 @@ int ScalerNode::trim(torch::Tensor signal, int window_size, float threshold_fact
         int start = pos * window_size;
         int end = start + window_size;
 
-        auto window = signal.index({torch::indexing::Slice(start, end)}); //OK
+        auto window = signal.index({torch::indexing::Slice(start, end)});
         auto elements = window > threshold;
 
 
