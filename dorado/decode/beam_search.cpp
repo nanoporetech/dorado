@@ -112,7 +112,7 @@ namespace {
 } // anonymous namespace
 
 template <typename T>
-float beam_search(const T* scores, const T* back_guide, const float* posts,
+float beam_search(const T* scores, size_t scores_block_stride, const T* back_guide, const float* posts,
                   size_t num_states, size_t num_blocks, size_t max_beam_width, float beam_cut, float fixed_stay_score,
                   std::vector<int32_t>& states, std::vector<uint8_t>& moves, std::vector<float>& qual_data, float temperature) {
 
@@ -173,7 +173,7 @@ float beam_search(const T* scores, const T* back_guide, const float* posts,
 
     // Iterate through blocks, extending beam
     for (size_t block_idx = 0; block_idx < num_blocks; block_idx++) {
-        const T * block_scores = scores + (block_idx * num_transitions);
+        const T * block_scores = scores + (block_idx * scores_block_stride);
         const T * block_back_scores = back_guide + ((block_idx + 1) * num_states);
 #ifdef REMOVE_FIXED_BEAM_STAYS
         /*  kmer transitions order:
@@ -454,24 +454,30 @@ std::tuple<std::string , std::string, std::vector<uint8_t>> beam_search_decode(
         throw std::runtime_error("beam_search_decode: mismatched tensor types provided for posts, scores and guides");
     }
 
+    // back guides and posts should be contiguous
+    auto back_guides_contig = back_guides_t.expect_contiguous();
+    auto posts_contig = posts_t.expect_contiguous();
+    // scores_t may come from a tensor with chunks interleaved, but make sure the last dimension is contiguous
+    auto scores_block_contig = (scores_t.stride(1) == 1) ? scores_t : scores_t.contiguous();
+    size_t scores_block_stride = scores_block_contig.stride(0);
     if (type_str == "float") {
-        const auto scores = scores_t.data_ptr<float>();
-        const auto back_guides = back_guides_t.data_ptr<float>();
-        const auto posts = posts_t.data_ptr<float>();
+        const auto scores = scores_block_contig.data_ptr<float>();
+        const auto back_guides = back_guides_contig->data_ptr<float>();
+        const auto posts = posts_contig->data_ptr<float>();
 
         beam_search<float>(
-                scores, back_guides, posts, num_states, num_blocks,
+                scores, scores_block_stride, back_guides, posts, num_states, num_blocks,
                 beam_width, beam_cut, fixed_stay_score, states, moves, qual_data, temperature
         );
 
     } else if (type_str == "signed char") {
-        const auto scores = scores_t.data_ptr<int8_t>();
-        const auto back_guides = back_guides_t.data_ptr<int8_t>();
-        const auto fposts = ((posts_t.to(torch::kFloat32) + 128.0f) / 255.0f);
+        const auto scores = scores_block_contig.data_ptr<int8_t>();
+        const auto back_guides = back_guides_contig->data_ptr<int8_t>();
+        const auto fposts = ((posts_contig->to(torch::kFloat32) + 128.0f) / 255.0f);
         const auto posts = fposts.data_ptr<float>();
 
         beam_search<int8_t>(
-                scores, back_guides, posts, num_states, num_blocks,
+                scores, scores_block_stride, back_guides, posts, num_states, num_blocks,
                 beam_width, beam_cut, fixed_stay_score, states, moves, qual_data, temperature
         );
 

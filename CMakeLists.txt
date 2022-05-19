@@ -281,6 +281,8 @@ if(APPLE)
             dorado/nn/metal/nn.h
             dorado/nn/MetalCRFModel.h
             dorado/nn/MetalCRFModel.cpp
+            dorado/decode/MTLDecoder.cpp
+            dorado/decode/MTLDecoder.h
             dorado/utils/metal_utils.cpp
             dorado/utils/metal_utils.h)
 endif()

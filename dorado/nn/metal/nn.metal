@@ -31,6 +31,91 @@ typedef metal::simdgroup_half8x8 simdgroup_ftype8x8;
     uint threads [[threads_per_threadgroup]]
 
 
+struct ScanArgs {
+    int T;
+    int N;
+    int C;
+    int dir;
+};
+
+constant int NUM_TRANSITIONS = 5;
+
+kernel void scan(
+    device const ScanArgs* args,
+    device const ftype_in *in,
+    device ftype_in *out,
+    device const int *idx1,
+    device const int *idx2,
+    KERNEL_INDEX_INPUTS)
+{
+    int T = args->T;
+    int N = args->N;
+    int C = args->C;
+    int ts_states = C * NUM_TRANSITIONS;
+    int dir = args->dir;
+    int chunk = gid;
+
+    device const ftype_in *chunk_in = in + chunk * ts_states;
+    device ftype_in *chunk_out = out + chunk * (T+1) * C;
+    device ftype_in *alpha_init = chunk_out + ((dir == -1) ? C * T : 0);
+    for (int c = tid; c < C; ++c) {
+        alpha_init[c] = 0;
+    }
+    for (int ts = 0; ts < T; ++ts) {
+        threadgroup_barrier(mem_flags::mem_device);
+        device const ftype_in *ts_in = chunk_in + N * ts_states * ((dir == -1) ? T - ts - 1 : ts);
+        device ftype_in *ts_alpha_in = alpha_init + C * dir * ts;
+        device ftype_in *ts_alpha_out = ts_alpha_in + C * dir;
+        float max_val = -1e38f;
+        float vals[NUM_TRANSITIONS];
+        for (int i = 0; i < NUM_TRANSITIONS; ++i) {
+            int state = tid * NUM_TRANSITIONS + i;
+            vals[i] = ts_in[idx1[state]] + ts_alpha_in[idx2[state]];
+            max_val = max(max_val, vals[i]);
+        }
+        float sum = 0.f;
+        for (int i = 0; i < NUM_TRANSITIONS; ++i) {
+            sum += exp(vals[i] - max_val);
+        }
+        ts_alpha_out[tid] = max_val + log(sum);
+    }
+}
+
+kernel void add_softmax(
+    device const ScanArgs* args,
+    device ftype_in *fwd_post,
+    device const ftype_in *bwd,
+    device ftype_in *post,
+    KERNEL_INDEX_INPUTS)
+{
+    int T = args->T + 1;
+    int C = args->C;
+    int chunk = gid;
+    int simd_lane = tid & 31;
+
+    for (int ts = sid; ts < T; ts += simdgroups) {
+        int ts_idx = (chunk * T + ts) * C;
+        float max_val = -1e38;
+        for (int i = simd_lane; i < C; i += 32) {
+            float val = fwd_post[ts_idx + i] + bwd[ts_idx + i];
+            max_val = max(max_val, val);
+            fwd_post[ts_idx + i] = val;
+        }
+        max_val = simd_max(max_val);
+        float sum = 0;
+        for (int i = simd_lane; i < C; i += 32) {
+            float val = exp(fwd_post[ts_idx + i] - max_val);
+            sum += val;
+            fwd_post[ts_idx + i] = val;
+        }
+        sum = simd_sum(sum);
+        float rcp_sum = 1.f / sum;
+        for (int i = simd_lane; i < C; i += 32) {
+            fwd_post[ts_idx + i] *= rcp_sum;
+        }
+    }
+}
+
 struct LstmArgs {
     int layer_size;
     int reverse;

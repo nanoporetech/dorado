@@ -87,7 +87,7 @@ void launch_kernel_no_wait(ComputePipelineState *pipeline, CommandBuffer *comman
 
 }
 
-static MTL::Device *mtl_allocator_device{nullptr};
+static MTL::Device *mtl_device{nullptr};
 
 struct MTLAllocator : torch::Allocator {
     virtual ~MTLAllocator() = default;
@@ -98,7 +98,7 @@ struct MTLAllocator : torch::Allocator {
         } else if (n >= (size_t(1) << 32)) {
             return torch::DataPtr(new char[n], torch::DeviceType::CPU);
         }
-        auto buffer = mtl_allocator_device->newBuffer(n, MTL::ResourceStorageModeShared);
+        auto buffer = mtl_device->newBuffer(n, MTL::ResourceStorageModeShared);
         return torch::DataPtr(buffer->contents(), buffer, &deleter, torch::DeviceType::CPU);
     }
 
@@ -108,9 +108,29 @@ struct MTLAllocator : torch::Allocator {
 };
 static MTLAllocator mtl_allocator;
 
-void set_torch_mtl_allocator(MTL::Device *device) {
-    mtl_allocator_device = device;
-    torch::SetAllocator(torch::DeviceType::CPU, &mtl_allocator);
+
+static std::mutex mtl_device_mutex;
+static thread_local std::unique_ptr<std::unique_lock<std::mutex>> mtl_device_lock;
+
+void lock_mtl_device() {
+    if (!mtl_device_lock) {
+        mtl_device_lock = std::make_unique<std::unique_lock<std::mutex>>(mtl_device_mutex);
+    } else {
+        mtl_device_lock->lock();
+    }
+}
+
+void unlock_mtl_device() {
+    mtl_device_lock->unlock();
+}
+
+
+MTL::Device *get_mtl_device() {
+    if (mtl_device == nullptr) {
+        mtl_device = MTL::CreateSystemDefaultDevice();
+        torch::SetAllocator(torch::DeviceType::CPU, &mtl_allocator);
+    }
+    return mtl_device;
 }
 
 MTL::Buffer *mtl_for_tensor(const torch::Tensor &x) {

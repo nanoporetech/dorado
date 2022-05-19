@@ -240,7 +240,7 @@ struct MetalBlockImpl : Module {
         }
     }
 
-    std::pair<MTL::CommandBuffer*, torch::Tensor> forward_async(torch::Tensor x) {
+    std::pair<MTL::CommandBuffer*, torch::Tensor> forward_async(torch::Tensor x, bool lock_gpu) {
 
         auto command_buffer = command_queue->commandBuffer();
 
@@ -261,15 +261,27 @@ struct MetalBlockImpl : Module {
         x = torch::empty({lstm_chunk_size, batch_size, out_size});
         launch_kernel_no_wait(linear_tanh_cps, command_buffer, {args[0], mat_working_mem, mat_linear_weights, mtl_for_tensor(x)}, kernel_thread_groups, kernel_simd_groups * 32);
 
+        // TODO: Find a better way of dealing with long-running kernels.
+        // This is a hacky way of avoiding Metal kernel launch timeouts. We only let one runner thread
+        // access the GPU. Unlock happens in MTLDecoder::beam_search. We want one thread to finish work on the GPU
+        // and start CPU decoding before another thread starts GPU work.
+        if (lock_gpu) { lock_mtl_device(); }
         command_buffer->commit();
         return std::make_pair(command_buffer, x);
     }
 
     torch::Tensor forward(torch::Tensor x) {
-        MTL::CommandBuffer* command_buffer;
-        std::tie(command_buffer, x) = forward_async(x);
-        command_buffer->waitUntilCompleted();
-        return x;
+        torch::Tensor out;
+        // TODO: find a more robust way of dealing with Metal kernel launch issues
+        for (int retry = 0; retry < 5; ++retry) {
+            MTL::CommandBuffer* command_buffer;
+            std::tie(command_buffer, out) = forward_async(x, retry == 0);
+            command_buffer->waitUntilCompleted();
+            if (command_buffer->status() == MTL::CommandBufferStatusCompleted) { break; }
+            using namespace std::chrono_literals;
+            std::this_thread::sleep_for(20ms);
+        }
+        return out;
     }
 
     MTL::Device* device;
@@ -304,10 +316,6 @@ struct MetalModelImpl : Module {
         return mtl_block->forward(x);
     }
 
-    std::pair<MTL::CommandBuffer*, torch::Tensor> forward_async(torch::Tensor x) {
-        return mtl_block->forward_async(x);
-    }
-
     MetalBlock mtl_block{nullptr};
 };
 
@@ -316,8 +324,7 @@ TORCH_MODULE(MetalModel);
 
 ModuleHolder<AnyModule> load_crf_mtl_model(const std::string& path, int batch_size, int chunk_size, torch::TensorOptions options) {
 
-    static auto device = MTL::CreateSystemDefaultDevice();
-    set_torch_mtl_allocator(device);
+    auto device = get_mtl_device();
 
     auto config = toml::parse(path + "/config.toml");
 
