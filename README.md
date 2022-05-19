@@ -15,7 +15,7 @@ $ dorado basecaller dna_r9.4.1_e8_hac@v3.3 fast5_pass/ > calls.sam
 ## Developer quickstart
 
 ```
-$ git clone git@git.oxfordnanolabs.local:machine-learning/dorado.git
+$ git clone git@github.com:nanoporetech/dorado.git
 $ cd dorado
 $ cmake -S . -B cmake-build
 $ cmake --build cmake-build --config Release -- -j
