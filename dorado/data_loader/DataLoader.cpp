@@ -9,7 +9,7 @@
 #include <filesystem>
 #include <cctype>
 #include "vbz_plugin_user_utils.h"
-#include "mkr_format/c_api.h"
+#include "pod5_format/c_api.h"
 
 
 namespace {
@@ -75,27 +75,27 @@ void DataLoader::load_reads(const std::string& path) {
         if(ext == ".fast5") {
             load_fast5_reads_from_file(entry.path().string());
         }
-        else if(ext == ".mkr") {
-            load_mkr_reads_from_file(entry.path().string());
+        else if(ext == ".pod5") {
+            load_pod5_reads_from_file(entry.path().string());
         }
     }
     m_read_sink.terminate();
     std::cerr << "> Loaded " << m_loaded_read_count << " reads" << std::endl;
 }
 
-void DataLoader::load_mkr_reads_from_file(const std::string& path) {
-    mkr_init();
+void DataLoader::load_pod5_reads_from_file(const std::string& path) {
+    pod5_init();
 
     // Open the file ready for walking:
-    MkrFileReader_t* file = mkr_open_combined_file(path.c_str());
+    Pod5FileReader_t* file = pod5_open_combined_file(path.c_str());
 
     if (!file) {
-        std::cerr << "Failed to open file " << path.c_str() << ": " << mkr_get_error_string() << "\n";
+        std::cerr << "Failed to open file " << path.c_str() << ": " << pod5_get_error_string() << "\n";
     }
 
     std::size_t batch_count = 0;
-    if (mkr_get_read_batch_count(&batch_count, file) != MKR_OK) {
-        std::cerr << "Failed to query batch count: " << mkr_get_error_string() << "\n";
+    if (pod5_get_read_batch_count(&batch_count, file) != POD5_OK) {
+        std::cerr << "Failed to query batch count: " << pod5_get_error_string() << "\n";
     }
 
 
@@ -103,13 +103,13 @@ void DataLoader::load_mkr_reads_from_file(const std::string& path) {
     std::size_t samples_read = 0;
 
     for (std::size_t batch_index = 0; batch_index < batch_count; ++batch_index) {
-        MkrReadRecordBatch_t* batch = nullptr;
-        if (mkr_get_read_batch(&batch, file, batch_index) != MKR_OK) {
-            std::cerr << "Failed to get batch: " << mkr_get_error_string() << "\n";
+        Pod5ReadRecordBatch_t* batch = nullptr;
+        if (pod5_get_read_batch(&batch, file, batch_index) != POD5_OK) {
+            std::cerr << "Failed to get batch: " << pod5_get_error_string() << "\n";
         }
 
         std::size_t batch_row_count = 0;
-        if (mkr_get_read_batch_row_count(&batch_row_count, batch) != MKR_OK) {
+        if (pod5_get_read_batch_row_count(&batch_row_count, batch) != POD5_OK) {
             std::cerr << "Failed to get batch row count\n";
         }
 
@@ -123,38 +123,38 @@ void DataLoader::load_mkr_reads_from_file(const std::string& path) {
             int16_t end_reason = 0;
             int16_t run_info = 0;
             int64_t signal_row_count = 0;
-            if (mkr_get_read_batch_row_info(batch, row, read_id, &pore, &calibration_idx,
+            if (pod5_get_read_batch_row_info(batch, row, read_id, &pore, &calibration_idx,
                                             &read_number, &start_sample, &median_before,
-                                            &end_reason, &run_info, &signal_row_count) != MKR_OK) {
+                                            &end_reason, &run_info, &signal_row_count) != POD5_OK) {
                 std::cerr << "Failed to get read " << row << "\n";
             }
             read_count += 1;
 
             char read_id_tmp[37];
-            mkr_error_t err = mkr_format_read_id(read_id, read_id_tmp);
+            pod5_error_t err = pod5_format_read_id(read_id, read_id_tmp);
             std::string read_id_str(read_id_tmp);
 
             // Now read out the calibration params:
             CalibrationDictData_t *calib_data = nullptr;
-            if (mkr_get_calibration(batch, calibration_idx, &calib_data) != MKR_OK) {
+            if (pod5_get_calibration(batch, calibration_idx, &calib_data) != POD5_OK) {
                 std::cerr << "Failed to get read " << row
-                          << " calibration_idx data: " << mkr_get_error_string() << "\n";
+                          << " calibration_idx data: " << pod5_get_error_string() << "\n";
             }
 
             // Find the absolute indices of the signal rows in the signal table
             std::vector<std::uint64_t> signal_rows_indices(signal_row_count);
-            if (mkr_get_signal_row_indices(batch, row, signal_row_count,
-                                           signal_rows_indices.data()) != MKR_OK) {
+            if (pod5_get_signal_row_indices(batch, row, signal_row_count,
+                                           signal_rows_indices.data()) != POD5_OK) {
                 std::cerr << "Failed to get read " << row
-                          << " signal row indices: " << mkr_get_error_string() << "\n";
+                          << " signal row indices: " << pod5_get_error_string() << "\n";
             }
 
             // Find the locations of each row in signal batches:
             std::vector<SignalRowInfo_t *> signal_rows(signal_row_count);
-            if (mkr_get_signal_row_info(file, signal_row_count, signal_rows_indices.data(),
-                                        signal_rows.data()) != MKR_OK) {
+            if (pod5_get_signal_row_info(file, signal_row_count, signal_rows_indices.data(),
+                                        signal_rows.data()) != POD5_OK) {
                 std::cerr << "Failed to get read " << row
-                          << " signal row locations: " << mkr_get_error_string() << "\n";
+                          << " signal row locations: " << pod5_get_error_string() << "\n";
             }
 
             std::size_t total_sample_count = 0;
@@ -165,10 +165,10 @@ void DataLoader::load_mkr_reads_from_file(const std::string& path) {
             std::vector<std::int16_t> samples(total_sample_count);
             std::size_t samples_read_so_far = 0;
             for (std::size_t i = 0; i < signal_row_count; ++i) {
-                if (mkr_get_signal(file, signal_rows[i], signal_rows[i]->stored_sample_count,
-                                   samples.data() + samples_read_so_far) != MKR_OK) {
+                if (pod5_get_signal(file, signal_rows[i], signal_rows[i]->stored_sample_count,
+                                   samples.data() + samples_read_so_far) != POD5_OK) {
                     std::cerr << "Failed to get read " << row
-                              << " signal: " << mkr_get_error_string() << "\n";
+                              << " signal: " << pod5_get_error_string() << "\n";
                 }
 
                 samples_read_so_far += signal_rows[i]->stored_sample_count;
@@ -194,12 +194,12 @@ void DataLoader::load_mkr_reads_from_file(const std::string& path) {
             m_read_sink.push_read(new_read);
             m_loaded_read_count++;
 
-            mkr_release_calibration(calib_data);
-            mkr_free_signal_row_info(signal_row_count, signal_rows.data());
+            pod5_release_calibration(calib_data);
+            pod5_free_signal_row_info(signal_row_count, signal_rows.data());
 
         }
 
-        if (mkr_free_read_batch(batch) != MKR_OK) {
+        if (pod5_free_read_batch(batch) != POD5_OK) {
             std::cerr << "Failed to release batch\n";
         }
     }
