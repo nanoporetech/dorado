@@ -14,7 +14,7 @@ $ dorado basecaller dna_r9.4.1_e8_hac@v3.3 fast5_pass/ > calls.sam
 
 ## Developer quickstart
 
-### Build Linux dependencies
+### Get Linux dependencies
 
 ```
 apt-get update && apt-get install -y --no-install-recommends libhdf5-dev libssl-dev libzstd-dev
