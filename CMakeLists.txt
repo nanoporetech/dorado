@@ -366,9 +366,9 @@ if(LINUX OR WIN32)
                 execute_process(COMMAND git clone git@git.oxfordnanolabs.local:machine-learning/koi.git ${KOI_DIR})
             endif()
         endif()
-        execute_process(COMMAND git checkout 2d01b43f0f05f9f343dcc2ddf5e68d8b94943cd3 WORKING_DIRECTORY ${KOI_DIR})
-        include(${KOI_DIR}/CMakeLists.txt)
-        target_include_directories(dorado_lib PUBLIC ${3RD_PARTY}/koi/koi/lib)
+        execute_process(COMMAND git checkout dbb8369ddbc5710d5f3b47d48f2aff098e33a6a9 WORKING_DIRECTORY ${KOI_DIR})
+        include(${KOI_DIR}/koi/lib/CMakeLists.txt)
+        target_include_directories(dorado_lib PUBLIC ${KOI_DIR}/koi/lib)
         target_link_libraries(dorado_lib koi)
 
     else() # end BUILD_KOI_FROM_SOURCE
