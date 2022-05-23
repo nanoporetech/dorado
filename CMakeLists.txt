@@ -367,7 +367,7 @@ if(LINUX OR WIN32)
             endif()
         endif()
         execute_process(COMMAND git checkout dbb8369ddbc5710d5f3b47d48f2aff098e33a6a9 WORKING_DIRECTORY ${KOI_DIR})
-        include(${KOI_DIR}/koi/lib/CMakeLists.txt)
+        add_subdirectory(${KOI_DIR}/koi/lib)
         target_include_directories(dorado_lib PUBLIC ${KOI_DIR}/koi/lib)
         target_link_libraries(dorado_lib koi)
 
