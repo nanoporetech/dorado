@@ -151,8 +151,3 @@ test:macos:m1:
   <<: *test_dorado
   needs:
     - build:macos:m1
-  # tmp - remove after archive builds sorted
-  before_script:
-    - mkdir -p dorado/3rdparty/torch-1.10.2-Darwin/
-    - curl -sL "https://files.pythonhosted.org/packages/7b/91/89bbe2316b93671b6bccec094df6bc66109cf6d21a364cd2f1becd11ba3c/torch-1.10.2-cp39-none-macosx_11_0_arm64.whl" --output dorado/3rdparty/torch-1.10.2-Darwin/torch.whl
-    - unzip -q dorado/3rdparty/torch-1.10.2-Darwin/torch.whl -d dorado/3rdparty/torch-1.10.2-Darwin
