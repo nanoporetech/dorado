@@ -16,6 +16,8 @@ if(WIN32)
 endif()
 enable_testing()
 
+include(cmake/format.cmake)
+
 find_package(Git QUIET)
 if(GIT_FOUND AND EXISTS "${PROJECT_SOURCE_DIR}/.git")
 # Update submodules as needed
@@ -348,6 +350,12 @@ target_link_libraries(dorado dorado_lib)
 target_link_libraries(dorado elzip)
 
 add_subdirectory(tests)
+
+# Formatting of all source files
+dorado_format_all_targets()
+add_dependencies(dorado format)
+# add_dependencies(format dorado_lib)
+# add_dependencies(format dorado_tests)
 
 # Note that we can't cuurently do add_subdirectory(dorado) (or any subfolder thereof) as we're
 # making an exe called 'dorado' right into the root here, which causes conflicts with cmake naming.

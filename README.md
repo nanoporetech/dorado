@@ -43,6 +43,15 @@ Other Platforms may work, if you encounter problems with running on your system 
 
 ## Known limitations
 
-* Multi-GPU support is limited and likely to work.
+* Multi-GPU support is limited and likely not to work.
 * GPU memory utilisation on Nvidia devices is high (compared to [Bonito](https://github.com/nanoporetech/bonito)). This issue is currently being investigated and resolved.
 * Support for M1 GPUs is should be considered experimental.
+
+## Code formatting
+Dorado uses `clang-format` for automatic code formatting in the build process. We use the `llvm` style configuration specified in the `.clang-format` file. 
+Run the following commands to manually apply the code formatting to all source files in `dorado/`
+```
+$ cmake -S . -B cmake-build
+$ cd cmake-build/
+$ make format
+```

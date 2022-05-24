@@ -203,6 +203,7 @@ void DataLoader::load_pod5_reads_from_file(const std::string& path) {
             std::cerr << "Failed to release batch\n";
         }
     }
+    pod5_close_and_free_reader(file);
 }
 
 
