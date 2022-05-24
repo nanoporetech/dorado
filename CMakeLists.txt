@@ -102,7 +102,6 @@ if(LINUX)
     if(DEFINED CUDA_TOOLKIT_ROOT_DIR)
         message(STATUS "CUDA toolkit dir is ${CUDA_TOOLKIT_ROOT_DIR}")
     endif()
-    enable_language(CUDA)
     set(TORCH_URL https://download.pytorch.org/libtorch/cu113/libtorch-shared-with-deps-${TORCH_VERSION}%2Bcu113.zip)
     set(TORCH_LIB "${CMAKE_SOURCE_DIR}/dorado/3rdparty/torch-${TORCH_VERSION}-${CMAKE_SYSTEM_NAME}/libtorch")
 elseif(APPLE)
@@ -149,7 +148,6 @@ elseif(WIN32)
       ${3RD_PARTY}/${POD5_DIR}/lib/arrow_static.lib
       bcrypt.lib
     )
-    enable_language(CUDA)
     set(TORCH_URL https://download.pytorch.org/libtorch/cu113/libtorch-win-shared-with-deps-${TORCH_VERSION}%2Bcu113.zip)
     set(TORCH_LIB "${CMAKE_SOURCE_DIR}/dorado/3rdparty/torch-${TORCH_VERSION}-${CMAKE_SYSTEM_NAME}/libtorch")
 
