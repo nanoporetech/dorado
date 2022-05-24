@@ -375,7 +375,7 @@ if(LINUX OR WIN32)
         if(LINUX)
             download_and_extract(https://nanoporetech.box.com/shared/static/qbasibmplodr2ixztz97v53vmkttxia1.gz koi_lib)
         elseif(WIN32)
-            download_and_extract(https://nanoporetech.box.com/shared/static/i8v4z1cdkfy3n6id1urhqqcynv1j3jma.zip koi_lib)
+            download_and_extract(https://nanoporetech.box.com/shared/static/wth54wdx8ls5w3m3wvb9c2s6ng65ahj2.zip koi_lib)
         endif()
 
         file(GLOB KOI_DIR "${3RD_PARTY}/koi_lib/*")
