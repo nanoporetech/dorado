@@ -91,7 +91,7 @@ set(CUDNN_LIBRARY_PATH ${CMAKE_SOURCE_DIR}/dorado/3rdparty/fake_cudnn)
 set(CUDNN_INCLUDE_PATH ${CMAKE_SOURCE_DIR}/dorado/3rdparty/fake_cudnn)
 
 if(LINUX)
-    set(POD5_URL https://nanoporetech.box.com/shared/static/s07gstemgltszzoecnxsnpx0jaq2e1m1.gz)
+    set(POD5_URL https://github.com/nanoporetech/pod5-file-format/releases/download/${POD5_VERSION}/pod5-file-format-${POD5_VERSION}-linux-x64.tar.gz)
     set(POD5_LIBRARIES
       ${3RD_PARTY}/${POD5_DIR}/lib64/libpod5_format.a
       ${3RD_PARTY}/${POD5_DIR}/lib64/libboost_filesystem.a
@@ -105,7 +105,7 @@ if(LINUX)
     set(TORCH_URL https://download.pytorch.org/libtorch/cu113/libtorch-shared-with-deps-${TORCH_VERSION}%2Bcu113.zip)
     set(TORCH_LIB "${CMAKE_SOURCE_DIR}/dorado/3rdparty/torch-${TORCH_VERSION}-${CMAKE_SYSTEM_NAME}/libtorch")
 elseif(APPLE)
-    set(POD5_URL https://nanoporetech.box.com/shared/static/e657wyg0202xejx7ll7ulij0gec5kcnh.gz)
+    set(POD5_URL https://github.com/nanoporetech/pod5-file-format/releases/download/${POD5_VERSION}/pod5-file-format-${POD5_VERSION}-osx-arm64.tar.gz)
     set(POD5_LIBRARIES
       ${3RD_PARTY}/${POD5_DIR}/lib/libpod5_format.a
       ${3RD_PARTY}/${POD5_DIR}/lib/libboost_filesystem.a
@@ -141,7 +141,7 @@ elseif(APPLE)
     )
     install(FILES ${CMAKE_BINARY_DIR}/lib/default.metallib DESTINATION lib)
 elseif(WIN32)
-    set(POD5_URL https://nanoporetech.box.com/shared/static/1o0ouhcyg9hqs1pae12uyrrbkmiimw84.gz)
+    set(POD5_URL https://github.com/nanoporetech/pod5-file-format/releases/download/${POD5_VERSION}/pod5-file-format-${POD5_VERSION}-win-x64.tar.gz)
     set(POD5_LIBRARIES
       ${3RD_PARTY}/${POD5_DIR}/lib/pod5_format.lib
       ${3RD_PARTY}/${POD5_DIR}/lib/libboost_filesystem.lib
