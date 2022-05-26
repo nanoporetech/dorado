@@ -1,0 +1,42 @@
+# See https://pre-commit.com for more information
+# See https://pre-commit.com/hooks.html for more hooks
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.0.1
+    hooks:
+      - id: check-case-conflict
+      - id: check-merge-conflict
+
+      # TODO: consider enabling these in the future (will want to rewrite a lot of files right now)
+      #- id: end-of-file-fixer
+      #- id: mixed-line-ending
+      #- id: trailing-whitespace
+
+      # TODO: consider this (will need to change dev_tools/release/helpers.py to skip hooks):
+      #- id: no-commit-to-branch
+      #  args:
+      #    - '--branch=develop'
+      #    - '--pattern=release/.*'
+      #  stages:
+      #    - commit
+  - repo: https://github.com/psf/black
+    rev: 22.3.0
+    hooks:
+      - id: black
+        args:
+          - '--target-version=py37'
+  - repo: https://github.com/pre-commit/mirrors-clang-format
+    rev: 'v13.0.1'
+    hooks:
+      - id: clang-format
+
+# NB: by default, pre-commit only installs the pre-commit hook ("commit" stage),
+# but you can tell `pre-commit install` to install other hooks.
+# This set of default stages ensures we don't slow down or break other git operations
+# even if you install hooks for them.
+default_stages:
+  - commit
+  - merge-commit
+  - manual
+
+# vi:et:sw=2:sts=2:
