@@ -26,8 +26,11 @@ jobs:
       if: matrix.os == 'ubuntu-20.04'
       run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libhdf5-dev libssl-dev libzstd-dev
     - name: Set up Windows path
+      uses: myci-actions/export-env-var-powershell@1
       if: matrix.os == 'windows-2016'
-      run: export PATH=${PATH}:${PWD}/dorado/3rdparty/torch-1.10.2-Windows/libtorch/lib:${PWD}/dorado/3rdparty/cmake-build-zstd/lib/Release:${PWD}/dorado/3rdparty/zlib-1.2.12/install/bin:${PWD}/dorado/3rdparty/pod5-0.0.14-Windows/lib
+      with:
+        name: PATH
+        value: $env:PATH;d:\a\dorado\dorado\bin
     - name: Build dorado
       run: |
         cmake -S . -B cmake-build ${{ matrix.arch }}
