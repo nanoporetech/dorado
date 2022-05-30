@@ -54,7 +54,7 @@ variables:
 # Pre-flight stages
 
 pre-commit:
-  image: ${DORADO_DEPS}
+  image: python:3.9
   stage: pre-flight
   script:
    - pip install pre-commit
