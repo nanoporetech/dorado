@@ -7,7 +7,7 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-20.04, windows-2019]
     runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v1
@@ -20,13 +20,12 @@ jobs:
       with:
         cuda: '11.3.0'
     - name: Install dependencies from apt
-      if: matrix.os == 'ubuntu-latest'
+      if: matrix.os == 'ubuntu-20.04'
       run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libhdf5-dev libssl-dev libzstd-dev
     - name: Set up msbuild
-      if: matrix.os == 'windows-latest'
+      if: matrix.os == 'windows-2019'
       uses: microsoft/setup-msbuild@v1.1
       with:
-        vs-version: 15.0
         msbuild-architecture: x64
     - name: Build dorado
       run: |
