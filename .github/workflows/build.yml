@@ -8,6 +8,9 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-20.04, windows-2016]
+        include:
+          - os: windows-2016
+            arch: "-A x64"
     runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v1
@@ -22,13 +25,8 @@ jobs:
     - name: Install dependencies from apt
       if: matrix.os == 'ubuntu-20.04'
       run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libhdf5-dev libssl-dev libzstd-dev
-    - name: Set up msbuild
-      if: matrix.os == 'windows-2016'
-      uses: microsoft/setup-msbuild@v1.1
-      with:
-        msbuild-architecture: x64
     - name: Build dorado
       run: |
-        cmake -S . -B cmake-build
+        cmake -S . -B cmake-build ${{ matrix.arch }}
         cmake --build cmake-build --config Release --target install -j 4
         ctest -C Release --test-dir cmake-build
