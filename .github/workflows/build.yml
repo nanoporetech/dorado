@@ -25,5 +25,5 @@ jobs:
     - name: Build dorado
       run: |
         cmake -S . -B cmake-build
-        cmake --build cmake-build --config Release --target install -- -j 4
+        cmake --build cmake-build --config Release --target install -j 4
         ctest -C Release --test-dir cmake-build
