@@ -12,7 +12,8 @@ jobs:
           - os: windows-2016
             arch: "-A x64"
           - os: macos-12
-            args: "-D OPENSSL_ROOT_DIR=/usr/local/opt/openssl@3 -D CMAKE_OSX_ARCHITECTURES=arm64"
+	    env: "arch -arm64"
+            args: "-D OPENSSL_ROOT_DIR=/usr/local/opt/openssl@3"
     runs-on: ${{ matrix.os }}
     steps:
     - name: Checkout repo
@@ -41,6 +42,6 @@ jobs:
         value: d:\a\dorado\dorado\bin;$env:PATH
     - name: Build dorado
       run: |
-        cmake -S . -B cmake-build ${{ matrix.arch }} ${{ matrix.args }}
-        cmake --build cmake-build --config Release --target install -j 4
-        ctest -C Release --test-dir cmake-build
+        ${{ matrix.env }} cmake -S . -B cmake-build ${{ matrix.arch }} ${{ matrix.args }}
+        ${{ matrix.env }} cmake --build cmake-build --config Release --target install -j 4
+        ${{ matrix.env }} ctest -C Release --test-dir cmake-build
