@@ -13,17 +13,14 @@
 #define LSTM_MAX_LAYER_SIZE LSTM_LAYER_SIZE
 #endif
 
-
-[[max_total_threads_per_threadgroup(LSTM_SIMD_GROUPS * 32)]]
-kernel void CONCAT(lstm_simd, LSTM_KERNEL_SUFFIX)
-(
-    device const LstmArgs* args,
-    device ftype* in_out,
-    device const ftype* weights_buf,
-    device ftype* state_buf,
-    device ftype* temp_result_buf,
-    KERNEL_INDEX_INPUTS
-) {
+[[max_total_threads_per_threadgroup(LSTM_SIMD_GROUPS * 32)]] kernel void CONCAT(lstm_simd,
+                                                                                LSTM_KERNEL_SUFFIX)(
+        device const LstmArgs* args,
+        device ftype* in_out,
+        device const ftype* weights_buf,
+        device ftype* state_buf,
+        device ftype* temp_result_buf,
+        KERNEL_INDEX_INPUTS) {
     int chunk_size = args->chunk_size;
     int chunk_tiles = args->chunk_tiles;
     int m_blks = chunk_tiles / SIMD_TILES_M;
@@ -44,7 +41,8 @@ kernel void CONCAT(lstm_simd, LSTM_KERNEL_SUFFIX)
     for (int m_blk = gid; m_blk < m_blks; m_blk += threadgroups) {
         for (int chunk = tid; chunk < SIMD_TILES_M * TILE_SIZE; chunk += threads) {
             for (int i = 0; i < LSTM_LAYER_SIZE; ++i) {
-                state_buf[i * chunk_tiles * TILE_SIZE + m_blk * SIMD_TILES_M * TILE_SIZE + chunk] = 0;
+                state_buf[i * chunk_tiles * TILE_SIZE + m_blk * SIMD_TILES_M * TILE_SIZE + chunk] =
+                        0;
             }
         }
     }
@@ -59,27 +57,51 @@ kernel void CONCAT(lstm_simd, LSTM_KERNEL_SUFFIX)
             for (int n_blk = sid; n_blk < n_blks; n_blk += simdgroups) {
                 for (int i = 0; i < SIMD_TILES_N; ++i) {
                     for (int j = 0; j < SIMD_TILES_M; ++j) {
-                        simdgroup_load(C[j * SIMD_TILES_N + i], b + (n_blk * SIMD_TILES_N + i) * TILE_SIZE, 0);
+                        simdgroup_load(C[j * SIMD_TILES_N + i],
+                                       b + (n_blk * SIMD_TILES_N + i) * TILE_SIZE, 0);
                     }
                 }
                 for (int k_blk = 0; k_blk < k_blks; ++k_blk) {
                     for (int i = 0; i < SIMD_TILES_N; ++i) {
-                        simdgroup_load(B[i], weights_buf, W_stride, ulong2((n_blk * SIMD_TILES_N + i) * TILE_SIZE, k_blk * TILE_SIZE));
+                        simdgroup_load(
+                                B[i], weights_buf, W_stride,
+                                ulong2((n_blk * SIMD_TILES_N + i) * TILE_SIZE, k_blk * TILE_SIZE));
                     }
-#define LOAD_A(x) simdgroup_load(A[x], in, inout_stride, ulong2((m_blk * SIMD_TILES_M + x) * TILE_SIZE, k_blk * TILE_SIZE))
-#define SMAC(x,y) simdgroup_multiply_accumulate(C[x * SIMD_TILES_N + y], A[x], B[y], C[x * SIMD_TILES_N + y]);
+#define LOAD_A(x)                          \
+    simdgroup_load(A[x], in, inout_stride, \
+                   ulong2((m_blk * SIMD_TILES_M + x) * TILE_SIZE, k_blk * TILE_SIZE))
+#define SMAC(x, y) \
+    simdgroup_multiply_accumulate(C[x * SIMD_TILES_N + y], A[x], B[y], C[x * SIMD_TILES_N + y]);
                     LOAD_A(0);
                     LOAD_A(1);
-                    SMAC(0,0); SMAC(0,1); SMAC(0,2); SMAC(0,3);
+                    SMAC(0, 0);
+                    SMAC(0, 1);
+                    SMAC(0, 2);
+                    SMAC(0, 3);
                     LOAD_A(2);
-                    SMAC(1,0); SMAC(1,1); SMAC(1,2); SMAC(1,3);
+                    SMAC(1, 0);
+                    SMAC(1, 1);
+                    SMAC(1, 2);
+                    SMAC(1, 3);
                     LOAD_A(3);
-                    SMAC(2,0); SMAC(2,1); SMAC(2,2); SMAC(2,3);
+                    SMAC(2, 0);
+                    SMAC(2, 1);
+                    SMAC(2, 2);
+                    SMAC(2, 3);
                     LOAD_A(4);
-                    SMAC(3,0); SMAC(3,1); SMAC(3,2); SMAC(3,3);
+                    SMAC(3, 0);
+                    SMAC(3, 1);
+                    SMAC(3, 2);
+                    SMAC(3, 3);
                     LOAD_A(5);
-                    SMAC(4,0); SMAC(4,1); SMAC(4,2); SMAC(4,3);
-                    SMAC(5,0); SMAC(5,1); SMAC(5,2); SMAC(5,3);
+                    SMAC(4, 0);
+                    SMAC(4, 1);
+                    SMAC(4, 2);
+                    SMAC(4, 3);
+                    SMAC(5, 0);
+                    SMAC(5, 1);
+                    SMAC(5, 2);
+                    SMAC(5, 3);
 #undef LOAD_A
 #undef SMAC
                 }
@@ -87,8 +109,10 @@ kernel void CONCAT(lstm_simd, LSTM_KERNEL_SUFFIX)
                     uint out_chunk_base = (m_blk * SIMD_TILES_M + i) * TILE_SIZE;
                     uint chunk_idx = out_chunk_base + row;
                     for (int j = 0; j < SIMD_TILES_N; j += 2) {
-                        simdgroup_store(C[i * SIMD_TILES_N + j + 0], simd_res_buf[sid], 2 * TILE_SIZE);
-                        simdgroup_store(C[i * SIMD_TILES_N + j + 1], simd_res_buf[sid] + TILE_SIZE, 2 * TILE_SIZE);
+                        simdgroup_store(C[i * SIMD_TILES_N + j + 0], simd_res_buf[sid],
+                                        2 * TILE_SIZE);
+                        simdgroup_store(C[i * SIMD_TILES_N + j + 1], simd_res_buf[sid] + TILE_SIZE,
+                                        2 * TILE_SIZE);
                         threadgroup_barrier(mem_flags::mem_threadgroup);
                         uint col = j * 2 + col_bits;
                         uint out_col = n_blk * SIMD_TILES_N * 2 + col;
@@ -104,7 +128,9 @@ kernel void CONCAT(lstm_simd, LSTM_KERNEL_SUFFIX)
                     }
                     threadgroup_barrier(mem_flags::mem_threadgroup);
                     simdgroup_load(A[0], simd_out_buf[sid], TILE_SIZE);
-                    simdgroup_store(A[0], (n_blk < n_blks - int(simdgroups)) ? temp_result_buf : out, inout_stride, ulong2(out_chunk_base, n_blk * TILE_SIZE));
+                    simdgroup_store(A[0],
+                                    (n_blk < n_blks - int(simdgroups)) ? temp_result_buf : out,
+                                    inout_stride, ulong2(out_chunk_base, n_blk * TILE_SIZE));
                 }
             }
         }
@@ -113,25 +139,24 @@ kernel void CONCAT(lstm_simd, LSTM_KERNEL_SUFFIX)
             for (int n_blk = sid; n_blk < n_blks - int(simdgroups); n_blk += simdgroups) {
                 for (int i = 0; i < SIMD_TILES_M; ++i) {
                     uint out_chunk_base = (m_blk * SIMD_TILES_M + i) * TILE_SIZE;
-                    simdgroup_load(A[0], temp_result_buf, inout_stride, ulong2(out_chunk_base, n_blk * TILE_SIZE));
-                    simdgroup_store(A[0], out, inout_stride, ulong2(out_chunk_base, n_blk * TILE_SIZE));
+                    simdgroup_load(A[0], temp_result_buf, inout_stride,
+                                   ulong2(out_chunk_base, n_blk * TILE_SIZE));
+                    simdgroup_store(A[0], out, inout_stride,
+                                    ulong2(out_chunk_base, n_blk * TILE_SIZE));
                 }
             }
         }
     }
 }
 
-
 #if LSTM_REVERSE == 0
-[[max_total_threads_per_threadgroup(LSTM_SIMD_GROUPS * 32)]]
-kernel void CONCAT(linear_tanh_simd, LSTM_KERNEL_SUFFIX)
-(
-    device const LstmArgs* args,
-    device ftype* in_buf,
-    device const ftype* weights_buf,
-    device ftype_in* out_buf,
-    KERNEL_INDEX_INPUTS
-) {
+[[max_total_threads_per_threadgroup(LSTM_SIMD_GROUPS * 32)]] kernel void CONCAT(linear_tanh_simd,
+                                                                                LSTM_KERNEL_SUFFIX)(
+        device const LstmArgs* args,
+        device ftype* in_buf,
+        device const ftype* weights_buf,
+        device ftype_in* out_buf,
+        KERNEL_INDEX_INPUTS) {
     int chunk_size = args->chunk_size;
     int chunk_tiles = args->chunk_tiles;
     int linear_layer_size = args->linear_layer_size;
@@ -154,27 +179,51 @@ kernel void CONCAT(linear_tanh_simd, LSTM_KERNEL_SUFFIX)
             for (int n_blk = sid; n_blk < n_blks; n_blk += simdgroups) {
                 for (int i = 0; i < SIMD_TILES_N; ++i) {
                     for (int j = 0; j < SIMD_TILES_M; ++j) {
-                        simdgroup_load(C[j * SIMD_TILES_N + i], b + (n_blk * SIMD_TILES_N + i) * TILE_SIZE, 0);
+                        simdgroup_load(C[j * SIMD_TILES_N + i],
+                                       b + (n_blk * SIMD_TILES_N + i) * TILE_SIZE, 0);
                     }
                 }
                 for (int k_blk = 0; k_blk < k_blks; ++k_blk) {
                     for (int i = 0; i < SIMD_TILES_N; ++i) {
-                        simdgroup_load(B[i], weights_buf, W_stride, ulong2((n_blk * SIMD_TILES_N + i) * TILE_SIZE, k_blk * TILE_SIZE));
+                        simdgroup_load(
+                                B[i], weights_buf, W_stride,
+                                ulong2((n_blk * SIMD_TILES_N + i) * TILE_SIZE, k_blk * TILE_SIZE));
                     }
-#define LOAD_A(x) simdgroup_load(A[x], in, in_stride, ulong2((m_blk * SIMD_TILES_M + x) * TILE_SIZE, k_blk * TILE_SIZE))
-#define SMAC(x,y) simdgroup_multiply_accumulate(C[x * SIMD_TILES_N + y], A[x], B[y], C[x * SIMD_TILES_N + y]);
+#define LOAD_A(x)                       \
+    simdgroup_load(A[x], in, in_stride, \
+                   ulong2((m_blk * SIMD_TILES_M + x) * TILE_SIZE, k_blk * TILE_SIZE))
+#define SMAC(x, y) \
+    simdgroup_multiply_accumulate(C[x * SIMD_TILES_N + y], A[x], B[y], C[x * SIMD_TILES_N + y]);
                     LOAD_A(0);
                     LOAD_A(1);
-                    SMAC(0,0); SMAC(0,1); SMAC(0,2); SMAC(0,3);
+                    SMAC(0, 0);
+                    SMAC(0, 1);
+                    SMAC(0, 2);
+                    SMAC(0, 3);
                     LOAD_A(2);
-                    SMAC(1,0); SMAC(1,1); SMAC(1,2); SMAC(1,3);
+                    SMAC(1, 0);
+                    SMAC(1, 1);
+                    SMAC(1, 2);
+                    SMAC(1, 3);
                     LOAD_A(3);
-                    SMAC(2,0); SMAC(2,1); SMAC(2,2); SMAC(2,3);
+                    SMAC(2, 0);
+                    SMAC(2, 1);
+                    SMAC(2, 2);
+                    SMAC(2, 3);
                     LOAD_A(4);
-                    SMAC(3,0); SMAC(3,1); SMAC(3,2); SMAC(3,3);
+                    SMAC(3, 0);
+                    SMAC(3, 1);
+                    SMAC(3, 2);
+                    SMAC(3, 3);
                     LOAD_A(5);
-                    SMAC(4,0); SMAC(4,1); SMAC(4,2); SMAC(4,3);
-                    SMAC(5,0); SMAC(5,1); SMAC(5,2); SMAC(5,3);
+                    SMAC(4, 0);
+                    SMAC(4, 1);
+                    SMAC(4, 2);
+                    SMAC(4, 3);
+                    SMAC(5, 0);
+                    SMAC(5, 1);
+                    SMAC(5, 2);
+                    SMAC(5, 3);
 #undef LOAD_A
 #undef SMAC
                 }
@@ -185,15 +234,16 @@ kernel void CONCAT(linear_tanh_simd, LSTM_KERNEL_SUFFIX)
                             simd_out_buf_f32[sid][elem] = 5.f * tanh_fast(simd_out_buf[sid][elem]);
                         }
                         simdgroup_load(out_tile, simd_out_buf_f32[sid], TILE_SIZE);
-                        simdgroup_store(out_tile, out, out_stride, ulong2((n_blk * SIMD_TILES_N + j) * TILE_SIZE, (m_blk * SIMD_TILES_M + i) * TILE_SIZE));
+                        simdgroup_store(out_tile, out, out_stride,
+                                        ulong2((n_blk * SIMD_TILES_N + j) * TILE_SIZE,
+                                               (m_blk * SIMD_TILES_M + i) * TILE_SIZE));
                     }
                 }
             }
         }
     }
 }
-#endif // LSTM_REVERSE == 0
-
+#endif  // LSTM_REVERSE == 0
 
 #undef LSTM_KERNEL_SUFFIX
 #undef LSTM_LAYER_SIZE

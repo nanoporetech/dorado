@@ -49,25 +49,31 @@ uint64_t fasthash64(const void *buf, size_t len, uint64_t seed) {
         h *= m;
     }
 
-    pos2 = (const unsigned char*)pos;
+    pos2 = (const unsigned char *)pos;
     v = 0;
 
     switch (len & 7) {
-        case 7: v ^= (uint64_t)pos2[6] << 48;
-        case 6: v ^= (uint64_t)pos2[5] << 40;
-        case 5: v ^= (uint64_t)pos2[4] << 32;
-        case 4: v ^= (uint64_t)pos2[3] << 24;
-        case 3: v ^= (uint64_t)pos2[2] << 16;
-        case 2: v ^= (uint64_t)pos2[1] << 8;
-        case 1: v ^= (uint64_t)pos2[0];
-            v = mix(v);
-            h ^= v;
-            h *= m;
+    case 7:
+        v ^= (uint64_t)pos2[6] << 48;
+    case 6:
+        v ^= (uint64_t)pos2[5] << 40;
+    case 5:
+        v ^= (uint64_t)pos2[4] << 32;
+    case 4:
+        v ^= (uint64_t)pos2[3] << 24;
+    case 3:
+        v ^= (uint64_t)pos2[2] << 16;
+    case 2:
+        v ^= (uint64_t)pos2[1] << 8;
+    case 1:
+        v ^= (uint64_t)pos2[0];
+        v = mix(v);
+        h ^= v;
+        h *= m;
     }
     h = mix(h);
     return h;
 }
-
 
 uint32_t fasthash32(const void *buf, size_t len, uint32_t seed) {
     // the following trick converts the 64-bit hashcode to Fermat
@@ -76,7 +82,6 @@ uint32_t fasthash32(const void *buf, size_t len, uint32_t seed) {
     uint64_t h = fasthash64(buf, len, seed);
     return uint32_t(h - (h >> 32));
 }
-
 
 /**  Chain a new value to hash
  *

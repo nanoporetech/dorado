@@ -4,4 +4,4 @@
 
 char* strptime(const char* s, const char* f, struct tm* tm);
 
-#endif // _WIN32
+#endif  // _WIN32

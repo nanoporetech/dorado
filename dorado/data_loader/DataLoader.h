@@ -11,7 +11,7 @@ public:
 private:
     void load_fast5_reads_from_file(const std::string& path);
     void load_pod5_reads_from_file(const std::string& path);
-    ReadSink& m_read_sink; // Where should the loaded reads go?
+    ReadSink& m_read_sink;  // Where should the loaded reads go?
     size_t m_loaded_read_count{0};
     std::string m_device;
 };

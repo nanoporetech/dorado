@@ -1,12 +1,16 @@
 #pragma once
-#include "ReadPipeline.h"
 #include "../nn/ModelRunner.h"
+#include "ReadPipeline.h"
 
 class BasecallerNode : public ReadSink {
 public:
     // Chunk size and overlap are in raw samples
-    BasecallerNode(ReadSink &sink, std::vector<Runner> &model_runners, size_t batch_size,
-                   size_t chunk_size, size_t overlap, size_t max_reads=1000);
+    BasecallerNode(ReadSink &sink,
+                   std::vector<Runner> &model_runners,
+                   size_t batch_size,
+                   size_t chunk_size,
+                   size_t overlap,
+                   size_t max_reads = 1000);
     ~BasecallerNode();
 
 private:
@@ -17,9 +21,11 @@ private:
     // Basecall batch of chunks
     void basecall_current_batch(int worker_id);
 
-    ReadSink& m_sink;
-    std::unique_ptr<std::thread> m_input_worker; // Chunks up incoming reads and sticks them in the pending list
-    std::vector<std::unique_ptr<std::thread>> m_basecall_workers; // Basecalls chunks from the queue and puts read on the sink.
+    ReadSink &m_sink;
+    std::unique_ptr<std::thread>
+            m_input_worker;  // Chunks up incoming reads and sticks them in the pending list
+    std::vector<std::unique_ptr<std::thread>>
+            m_basecall_workers;  // Basecalls chunks from the queue and puts read on the sink.
     std::string m_model_path;
     // Vector of model runners (each with their own GPU access etc)
     std::vector<Runner> m_model_runners;

@@ -1,39 +1,32 @@
 #define CPPHTTPLIB_OPENSSL_SUPPORT
 
-#include <iostream>
-#include <argparse.hpp>
-#include <filesystem>
-
-#include "models.h"
 #include "Version.h"
-
-#include "httplib.h"
 #include "elzip/elzip.hpp"
+#include "httplib.h"
+#include "models.h"
+
+#include <argparse.hpp>
+
+#include <filesystem>
+#include <iostream>
 
 namespace fs = std::filesystem;
 
-
-int download(int argc, char *argv[]) {
-
+int download(int argc, char* argv[]) {
     argparse::ArgumentParser parser("dorado", DORADO_VERSION);
 
-    parser.add_argument("--model")
-            .default_value(std::string("all"))
-            .help("the model to download");
+    parser.add_argument("--model").default_value(std::string("all")).help("the model to download");
 
     parser.add_argument("--directory")
-           .default_value(std::string("."))
-           .help("the directory to download the models into");
+            .default_value(std::string("."))
+            .help("the directory to download the models into");
 
-    parser.add_argument("--list")
-            .default_value(false)
-            .implicit_value(true)
-            .help("list the available models for download");
+    parser.add_argument("--list").default_value(false).implicit_value(true).help(
+            "list the available models for download");
 
     try {
         parser.parse_args(argc, argv);
-    }
-    catch (const std::exception &e) {
+    } catch (const std::exception& e) {
         std::cerr << e.what() << std::endl;
         std::cerr << parser;
         std::exit(1);
@@ -56,7 +49,8 @@ int download(int argc, char *argv[]) {
         return 0;
     }
 
-    if (selected_model != "all" && basecaller::models.find(selected_model) == basecaller::models.end()) {
+    if (selected_model != "all" &&
+        basecaller::models.find(selected_model) == basecaller::models.end()) {
         std::cerr << "> error: '" << selected_model << "' is not a valid model" << std::endl;
         print_models();
         return 1;
@@ -65,8 +59,7 @@ int download(int argc, char *argv[]) {
     if (!fs::exists(directory)) {
         try {
             fs::create_directories(directory);
-        }
-        catch(std::filesystem::filesystem_error const& e) {
+        } catch (std::filesystem::filesystem_error const& e) {
             std::cerr << "> error: " << e.code().message() << std::endl;
             return 1;
         }
@@ -77,7 +70,8 @@ int download(int argc, char *argv[]) {
     tmp.close();
 
     if (tmp.fail()) {
-        std::cerr << "> error: insufficient permissions to download models into " << directory << std::endl;
+        std::cerr << "> error: insufficient permissions to download models into " << directory
+                  << std::endl;
         return 1;
     }
 
@@ -99,5 +93,4 @@ int download(int argc, char *argv[]) {
     }
 
     return 0;
-
 }

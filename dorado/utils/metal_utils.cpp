@@ -1,39 +1,34 @@
 #include "metal_utils.h"
-#include <filesystem>
-#include <torch/torch.h>
+
+#include <Metal/Metal.hpp>
 #include <mach-o/dyld.h>
 #include <sys/syslimits.h>
-#include <Metal/Metal.hpp>
+#include <torch/torch.h>
 
+#include <filesystem>
 
 using namespace std;
 using namespace MTL;
 
 namespace fs = std::filesystem;
 
-
-NS::String* get_library_location() {
-
-    char ns_path[PATH_MAX+1];
+NS::String *get_library_location() {
+    char ns_path[PATH_MAX + 1];
     uint32_t size = sizeof(ns_path);
     _NSGetExecutablePath(ns_path, &size);
 
-    fs::path exepth {ns_path};
-    fs::path mtllib {"../lib/default.metallib"};
+    fs::path exepth{ns_path};
+    fs::path mtllib{"../lib/default.metallib"};
     fs::path fspath = exepth.parent_path() / mtllib;
 
     return NS::String::string(fspath.c_str(), NS::ASCIIStringEncoding);
-
 }
 
-
-MTL::Buffer* create_buffer(MTL::Device *device, size_t length) {
+MTL::Buffer *create_buffer(MTL::Device *device, size_t length) {
     return device->newBuffer(length, MTL::ResourceStorageModeShared);
 }
 
-
 ComputePipelineState *make_cps(Device *device, const std::string name) {
-
     NS::Error *error;
     auto default_library = device->newDefaultLibrary();
 
@@ -56,14 +51,18 @@ ComputePipelineState *make_cps(Device *device, const std::string name) {
     if (cps == NULL) {
         auto e_code = to_string(((int)error->code()));
         auto e_str = error->domain()->cString(NS::ASCIIStringEncoding);
-        throw std::runtime_error("failed to build compute pipeline for " + name + " - " + e_str + ": error " + e_code);
+        throw std::runtime_error("failed to build compute pipeline for " + name + " - " + e_str +
+                                 ": error " + e_code);
     }
 
     return cps;
 }
 
-void launch_kernel(ComputePipelineState *pipeline, CommandQueue *command_queue, vector<Buffer *> buffers, long threadgroups, long threads_per_threadgroup) {
-
+void launch_kernel(ComputePipelineState *pipeline,
+                   CommandQueue *command_queue,
+                   vector<Buffer *> buffers,
+                   long threadgroups,
+                   long threads_per_threadgroup) {
     auto command_buffer = command_queue->commandBuffer();
     launch_kernel_no_wait(pipeline, command_buffer, buffers, threadgroups, threads_per_threadgroup);
 
@@ -71,20 +70,22 @@ void launch_kernel(ComputePipelineState *pipeline, CommandQueue *command_queue, 
     command_buffer->waitUntilCompleted();
 }
 
-
-void launch_kernel_no_wait(ComputePipelineState *pipeline, CommandBuffer *command_buffer, vector<Buffer *> buffers, long threadgroups, long threads_per_threadgroup) {
-
+void launch_kernel_no_wait(ComputePipelineState *pipeline,
+                           CommandBuffer *command_buffer,
+                           vector<Buffer *> buffers,
+                           long threadgroups,
+                           long threads_per_threadgroup) {
     auto compute_encoder = command_buffer->computeCommandEncoder();
     compute_encoder->setComputePipelineState(pipeline);
 
-    for (auto i = 0; i < (int) buffers.size(); i++) {
+    for (auto i = 0; i < (int)buffers.size(); i++) {
         compute_encoder->setBuffer(buffers[i], 0, i);
     }
 
-    compute_encoder->dispatchThreadgroups(MTL::Size(threadgroups, 1, 1), MTL::Size(threads_per_threadgroup, 1, 1));
+    compute_encoder->dispatchThreadgroups(MTL::Size(threadgroups, 1, 1),
+                                          MTL::Size(threads_per_threadgroup, 1, 1));
     compute_encoder->memoryBarrier(BarrierScopeBuffers);
     compute_encoder->endEncoding();
-
 }
 
 static MTL::Device *mtl_device{nullptr};
@@ -102,12 +103,9 @@ struct MTLAllocator : torch::Allocator {
         return torch::DataPtr(buffer->contents(), buffer, &deleter, torch::DeviceType::CPU);
     }
 
-    static void deleter(void *ptr) {
-        ((MTL::Buffer *)ptr)->release();
-    }
+    static void deleter(void *ptr) { ((MTL::Buffer *)ptr)->release(); }
 };
 static MTLAllocator mtl_allocator;
-
 
 static std::mutex mtl_device_mutex;
 static thread_local std::unique_ptr<std::unique_lock<std::mutex>> mtl_device_lock;
@@ -120,10 +118,7 @@ void lock_mtl_device() {
     }
 }
 
-void unlock_mtl_device() {
-    mtl_device_lock->unlock();
-}
-
+void unlock_mtl_device() { mtl_device_lock->unlock(); }
 
 MTL::Device *get_mtl_device() {
     if (mtl_device == nullptr) {
@@ -134,7 +129,7 @@ MTL::Device *get_mtl_device() {
 }
 
 MTL::Buffer *mtl_for_tensor(const torch::Tensor &x) {
-    auto ptr = (MTL::Buffer*)(x.storage().data_ptr().get_context());
+    auto ptr = (MTL::Buffer *)(x.storage().data_ptr().get_context());
     assert(ptr != nullptr);
     return ptr;
 }

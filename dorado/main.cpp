@@ -1,18 +1,15 @@
-#include <map>
-#include <vector>
-#include <string>
-#include <iostream>
-#include <functional>
-
 #include "Version.h"
 #include "cli/cli.h"
 
+#include <functional>
+#include <iostream>
+#include <map>
+#include <string>
+#include <vector>
 
 using entry_ptr = std::function<int(int, char**)>;
 
-
 void usage(const std::vector<std::string> commands) {
-
     std::cerr << "Usage: dorado [options] subcommand\n\n"
               << "Positional arguments:" << std::endl;
 
@@ -22,17 +19,13 @@ void usage(const std::vector<std::string> commands) {
 
     std::cerr << "\nOptional arguments:\n"
               << "-h --help               shows help message and exits\n"
-              << "-v --version            prints version information and exits"
-              << std::endl;
-
+              << "-v --version            prints version information and exits" << std::endl;
 }
 
-
-int main(int argc, char *argv[]) {
-
+int main(int argc, char* argv[]) {
     const std::map<std::string, entry_ptr> subcommands = {
-        {"basecaller", &basecaller},
-        {"download", &download},
+            {"basecaller", &basecaller},
+            {"download", &download},
     };
 
     std::vector<std::string> arguments(argv + 1, argv + argc);
@@ -59,5 +52,4 @@ int main(int argc, char *argv[]) {
     }
 
     return 0;
-
 }

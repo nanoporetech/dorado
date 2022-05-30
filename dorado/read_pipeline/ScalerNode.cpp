@@ -1,10 +1,11 @@
 #include "ScalerNode.h"
+
 #include <chrono>
 #define EPS 1e-9f
 
 using namespace std::chrono_literals;
 
-std::pair<float, float> calculate_med_mad(torch::Tensor &x, float factor=1.4826){
+std::pair<float, float> calculate_med_mad(torch::Tensor& x, float factor = 1.4826) {
     //Calculate signal median and median absolute deviation
     auto med = x.median();
     auto mad = torch::median(torch::abs(x - med)) * factor + EPS;
@@ -12,19 +13,17 @@ std::pair<float, float> calculate_med_mad(torch::Tensor &x, float factor=1.4826)
     return {med.item<float>(), mad.item<float>()};
 }
 
-void ScalerNode::worker_thread(){
-
+void ScalerNode::worker_thread() {
     while (true) {
         // Wait until we are provided with a read
         std::unique_lock<std::mutex> lock(m_cv_mutex);
-        m_cv.wait_for(lock, 100ms, [this] {return !m_reads.empty();});
+        m_cv.wait_for(lock, 100ms, [this] { return !m_reads.empty(); });
         if (m_reads.empty()) {
             if (m_terminate) {
                 // Notify our sink and then kill the worker if we're done
                 m_sink.terminate();
                 return;
-            }
-            else {
+            } else {
                 continue;
             }
         }
@@ -33,17 +32,19 @@ void ScalerNode::worker_thread(){
         m_reads.pop_front();
         lock.unlock();
 
-        if (!read->scale_set){
-            read->scale = (float) read->range / (float) read->digitisation;
+        if (!read->scale_set) {
+            read->scale = (float)read->range / (float)read->digitisation;
             read->scale_set = true;
         }
 
         read->raw_data = read->scale * (read->raw_data + read->offset);
 
         //8000 value may be changed in future. Currently this is found to work well.
-        int trim_start = trim(read->raw_data.index({torch::indexing::Slice(torch::indexing::None, 8000)}));
+        int trim_start =
+                trim(read->raw_data.index({torch::indexing::Slice(torch::indexing::None, 8000)}));
 
-        read->raw_data = read->raw_data.index({torch::indexing::Slice(trim_start, torch::indexing::None)});
+        read->raw_data =
+                read->raw_data.index({torch::indexing::Slice(trim_start, torch::indexing::None)});
         read->num_trimmed_samples = trim_start;
 
         auto med_mad = calculate_med_mad(read->raw_data);
@@ -57,24 +58,21 @@ void ScalerNode::worker_thread(){
     }
 }
 
-ScalerNode::ScalerNode(ReadSink& sink, size_t max_reads) 
-    : ReadSink(max_reads)
-    , m_sink(sink)
-    , m_worker(new std::thread(&ScalerNode::worker_thread, this))
-{
-}
+ScalerNode::ScalerNode(ReadSink& sink, size_t max_reads)
+        : ReadSink(max_reads),
+          m_sink(sink),
+          m_worker(new std::thread(&ScalerNode::worker_thread, this)) {}
 
-ScalerNode::~ScalerNode()
-{
+ScalerNode::~ScalerNode() {
     terminate();
     m_cv.notify_one();
     m_worker->join();
 }
 
-
-
-int ScalerNode::trim(torch::Tensor signal, int window_size, float threshold_factor, int min_elements) {
-
+int ScalerNode::trim(torch::Tensor signal,
+                     int window_size,
+                     float threshold_factor,
+                     int min_elements) {
     int min_trim = 10;
     signal = signal.index({torch::indexing::Slice(min_trim, torch::indexing::None)});
 
@@ -97,13 +95,12 @@ int ScalerNode::trim(torch::Tensor signal, int window_size, float threshold_fact
         auto window = signal.index({torch::indexing::Slice(start, end)});
         auto elements = window > threshold;
 
-
         if ((elements.sum().item<int>() > min_elements) || seen_peak) {
             seen_peak = true;
             if (window[-1].item<float>() > threshold) {
                 continue;
             }
-            return std::min(end + min_trim, (int) signal.size(0));
+            return std::min(end + min_trim, (int)signal.size(0));
         }
     }
 

@@ -1,15 +1,17 @@
 #ifdef __APPLE__
 #pragma once
 
-#include <torch/torch.h>
-#include "Decoder.h"
 #include "../utils/metal_utils.h"
+#include "Decoder.h"
+
+#include <torch/torch.h>
 
 class MTLDecoder : Decoder {
-
 public:
     MTLDecoder();
-    std::vector<DecodedChunk> beam_search(torch::Tensor scores, int num_chunks, DecoderOptions options) final;
+    std::vector<DecodedChunk> beam_search(torch::Tensor scores,
+                                          int num_chunks,
+                                          DecoderOptions options) final;
     constexpr static torch::ScalarType dtype = torch::kF32;
 
 private:
@@ -19,4 +21,4 @@ private:
     torch::Tensor scan_idx[2][2];
 };
 
-#endif // __APPLE__
+#endif  // __APPLE__

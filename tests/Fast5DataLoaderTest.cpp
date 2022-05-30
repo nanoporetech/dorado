@@ -1,8 +1,8 @@
-#include <catch2/catch.hpp>
-
+#include "TestUtils.h"
 #include "data_loader/DataLoader.h"
 #include "read_pipeline/ReadPipeline.h"
-#include "TestUtils.h"
+
+#include <catch2/catch.hpp>
 
 #define TEST_GROUP "Fast5DataLoaderTest: "
 
@@ -12,8 +12,7 @@ public:
     size_t get_read_count() { return m_reads.size(); }
 };
 
-
-TEST_CASE( TEST_GROUP "Test loading single-read Fast5 files" ) {
+TEST_CASE(TEST_GROUP "Test loading single-read Fast5 files") {
     // Create a mock sink for testing output of reads
     MockSink mock_sink;
 

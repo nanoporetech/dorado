@@ -2,4 +2,7 @@
 
 #include <torch/torch.h>
 
-torch::nn::ModuleHolder<torch::nn::AnyModule> load_crf_model(const std::string& path, int batch_size, int chunk_size, torch::TensorOptions options);
+torch::nn::ModuleHolder<torch::nn::AnyModule> load_crf_model(const std::string& path,
+                                                             int batch_size,
+                                                             int chunk_size,
+                                                             torch::TensorOptions options);
