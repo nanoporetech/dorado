@@ -30,7 +30,7 @@ jobs:
       if: matrix.os == 'windows-2016'
       with:
         name: PATH
-        value: $env:PATH;d:\a\dorado\dorado\bin
+        value: d:\a\dorado\dorado\bin;$env:PATH
     - name: Build dorado
       run: |
         cmake -S . -B cmake-build ${{ matrix.arch }}
