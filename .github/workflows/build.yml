@@ -22,11 +22,6 @@ jobs:
     - name: Install dependencies from apt
       if: matrix.os == 'ubuntu-20.04'
       run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libhdf5-dev libssl-dev libzstd-dev
-    - name: Set up msbuild
-      if: matrix.os == 'windows-2019'
-      uses: microsoft/setup-msbuild@v1.1
-      with:
-        msbuild-architecture: x64
     - name: Build dorado
       run: |
         cmake -S . -B cmake-build
