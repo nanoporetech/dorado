@@ -1,4 +1,5 @@
 stages:
+  - pre-flight
   - build
   - test
 
@@ -50,6 +51,15 @@ variables:
       - archive
     expire_in: 1 day
 
+# Pre-flight stages
+
+pre-commit:
+  image: ${DORADO_DEPS}
+  stage: pre-flight
+  script:
+   - pip install pre-commit
+   - pre-commit run --all-files
+  <<: *linux_runner
 
 # Build stages
 
