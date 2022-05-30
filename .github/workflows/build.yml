@@ -7,18 +7,21 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [ubuntu-20.04, windows-2016]
+        os: [ubuntu-20.04, windows-2016, macos-12]
         include:
           - os: windows-2016
             arch: "-A x64"
     runs-on: ${{ matrix.os }}
     steps:
-    - uses: actions/checkout@v1
+    - name: Checkout repo
+      uses: actions/checkout@v1
     - name: Set up cmake
       uses: jwlawson/actions-setup-cmake@v1.12
       with:
         cmake-version: '3.21.x'
-    - uses: Jimver/cuda-toolkit@v0.2.7
+    - name: Install Cuda
+      uses: Jimver/cuda-toolkit@v0.2.7
+      if: matrix.os != 'macos-12'
       id: cuda-toolkit
       with:
         cuda: '11.3.0'
