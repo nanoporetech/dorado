@@ -33,6 +33,9 @@ void WriterNode::worker_thread() {
         m_reads.pop_front();
         lock.unlock();
 
+        if (m_num_samples_processed > std::numeric_limits<std::int64_t>::max() - read->raw_data.size(0)) {
+            EXIT_FAILURE;
+        }
         m_num_samples_processed += read->raw_data.size(0);
         m_num_reads_processed += 1;
 
