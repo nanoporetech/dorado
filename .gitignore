@@ -2,10 +2,12 @@
 .DS_Store
 .idea/
 .vscode
-bin
+dist
 build
+archive
 cmake-build*
 cmake.lock
+_CPack_Packages
 dorado/3rdparty/cuda11.3
 dorado/3rdparty/hdf5-1.12.*
 dorado/3rdparty/koi

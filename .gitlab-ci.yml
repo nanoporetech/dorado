@@ -36,8 +36,7 @@ variables:
     - ctest -C Release --test-dir ${BUILD_DIR}
   artifacts:
     paths:
-      - bin
-      - lib
+      - dist
     expire_in: 1 day
 
 .build_dorado_archive: &build_dorado_archive
@@ -91,7 +90,7 @@ build:windows:
   <<: *build_dorado
   when: manual
   before_script:
-    - export PATH=${PATH}:${PWD}/bin
+    - export PATH=${PATH}:${PWD}/dist/bin
 
 build:windows_koi_download:
   variables:
@@ -100,7 +99,7 @@ build:windows_koi_download:
   <<: *build_dorado
   when: manual
   before_script:
-    - export PATH=${PATH}:${PWD}/bin
+    - export PATH=${PATH}:${PWD}/dist/bin
 
 build:macos:m1:
   variables:
@@ -134,8 +133,8 @@ build_archive:macos:m1:
   stage: test
   script:
     - echo Dorado app test stage
-    - ./bin/dorado download --model dna_r9.4.1_e8_hac@v3.3
-    - ./bin/dorado basecaller dna_r9.4.1_e8_hac@v3.3 ./tests/data/ -r 1 -b 384 > calls.sam
+    - ./dist/bin/dorado download --model dna_r9.4.1_e8_hac@v3.3
+    - ./dist/bin/dorado basecaller dna_r9.4.1_e8_hac@v3.3 ./tests/data/ -r 1 -b 384 > calls.sam
 
 # Test stages
 
