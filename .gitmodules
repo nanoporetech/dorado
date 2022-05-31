@@ -16,3 +16,6 @@
 [submodule "dorado/3rdparty/11Zip"]
 	path = dorado/3rdparty/elzip
 	url = https://github.com/Sygmei/11Zip.git
+[submodule "dorado/3rdparty/slow5lib"]
+	path = dorado/3rdparty/slow5lib
+	url = https://github.com/hasindu2008/slow5lib.git
