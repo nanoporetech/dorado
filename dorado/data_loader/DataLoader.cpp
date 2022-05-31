@@ -12,6 +12,10 @@
 #include <ctime>
 #include <filesystem>
 
+#include "slow5/slow5.h"
+#include "slow5_extra.h"
+#include "slow5_thread.h"
+
 namespace {
 void string_reader(HighFive::Attribute& attribute, std::string& target_str) {
     // Load as a variable string if possible
@@ -61,20 +65,31 @@ void DataLoader::load_reads(const std::string& path) {
         m_read_sink.terminate();
         return;
     }
-    if (!std::filesystem::is_directory(path)) {
-        std::cerr << "Requested input path " << path << " is not a directory!" << std::endl;
-        m_read_sink.terminate();
-        return;
-    }
-
-    for (const auto& entry : std::filesystem::directory_iterator(path)) {
-        std::string ext = std::filesystem::path(entry).extension().string();
-        std::transform(ext.begin(), ext.end(), ext.begin(),
-                       [](unsigned char c) { return std::tolower(c); });
-        if (ext == ".fast5") {
-            load_fast5_reads_from_file(entry.path().string());
-        } else if (ext == ".pod5") {
-            load_pod5_reads_from_file(entry.path().string());
+    if(!std::filesystem::is_directory(path)) {
+        std::string ext = std::filesystem::path(path).extension().string();
+        std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c){ return std::tolower(c); });
+        if(ext == ".fast5") {
+            load_fast5_reads_from_file(path);
+        }
+        else if(ext == ".pod5") {
+            load_pod5_reads_from_file(path);
+        }
+        else if(ext == ".slow5" || ext == ".blow5") {
+            load_slow5_reads_from_file(path);
+        }
+    }else{
+        for (const auto & entry : std::filesystem::directory_iterator(path)) {
+            std::string ext = std::filesystem::path(entry).extension().string();
+            std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c){ return std::tolower(c); });
+            if(ext == ".fast5") {
+                load_fast5_reads_from_file(entry.path().string());
+            }
+            else if(ext == ".pod5") {
+                load_pod5_reads_from_file(entry.path().string());
+            }
+            else if(ext == ".slow5" || ext == ".blow5") {
+                load_slow5_reads_from_file(entry.path().string());
+            }
         }
     }
     m_read_sink.terminate();
@@ -290,6 +305,130 @@ void DataLoader::load_fast5_reads_from_file(const std::string& path) {
 
         m_read_sink.push_read(new_read);
         m_loaded_read_count++;
+    }
+}
+
+void create_read_data(core_t *core, db_t *db, int32_t i) {
+    //
+    struct slow5_rec *rec = NULL;
+    if (slow5_rec_depress_parse(&db->mem_records[i], &db->mem_bytes[i], NULL, &rec, core->fp) != 0) {
+        exit(EXIT_FAILURE);
+    } else {
+        free(db->mem_records[i]);
+    }
+    auto new_read = std::make_shared<Read>();
+
+    //
+    std::vector<int16_t> tmp(rec->raw_signal,rec->raw_signal+rec->len_raw_signal);
+    std::vector<float> floatTmp(tmp.begin(), tmp.end());
+
+    int ret = 0;
+    uint64_t start_time = slow5_aux_get_uint64(rec, "start_time", &ret);
+    if(ret!=0){
+        throw std::runtime_error("Error in getting auxiliary attribute 'start_time' from the file.");
+    }
+    ret = 0;
+    uint32_t mux = slow5_aux_get_uint8(rec, "start_mux", &ret);
+    if(ret!=0){
+        throw std::runtime_error("Error in getting auxiliary attribute 'start_mux' from the file.");
+    }
+    ret = 0;
+    int32_t read_number = slow5_aux_get_int32(rec, "read_number", &ret);
+    if(ret!=0){
+        throw std::runtime_error("Error in getting auxiliary attribute 'read_number' from the file.");
+    }
+    ret = 0;
+    uint64_t len;
+    std::string channel_number_str = slow5_aux_get_string(rec, "channel_number", &len, &ret);
+    if(ret!=0){
+        throw std::runtime_error("Error in getting auxiliary attribute 'channel_number' from the file.");
+    }
+    int32_t channel_number = static_cast<int32_t>(std::stol(channel_number_str));
+    char* exp_start_time = slow5_hdr_get("exp_start_time", rec->read_group, core->fp->header);
+    if(!exp_start_time){
+        throw std::runtime_error("exp_start_time is missing");
+    }
+
+    auto start_time_str = adjust_time(exp_start_time, static_cast<uint32_t>(start_time / rec->sampling_rate));
+
+    auto options = torch::TensorOptions().dtype(torch::kFloat32);
+    new_read->raw_data = torch::from_blob(floatTmp.data(), floatTmp.size(), options).clone().to(core->m_device_);
+    new_read->digitisation = rec->digitisation;
+    new_read->range = rec->range;
+    new_read->offset = rec->offset;
+    new_read->read_id = rec->read_id;
+    new_read->num_samples = floatTmp.size();
+    new_read->num_trimmed_samples = floatTmp.size(); // same value until we actually trim
+    new_read->attributes.mux = mux;
+    new_read->attributes.read_number = read_number;
+    new_read->attributes.channel_number = channel_number;
+    new_read->attributes.start_time = start_time_str;
+    new_read->attributes.fast5_filename = core->fp->meta.pathname;
+    //
+    db->read_data_ptrs[i] = new_read;
+    slow5_rec_free(rec);
+}
+
+void DataLoader::load_slow5_reads_from_file(const std::string& path){
+    slow5_file_t *sp = slow5_open(path.c_str(),"r");
+    if(sp==NULL){
+        fprintf(stderr,"Error in opening file\n");
+        exit(EXIT_FAILURE);
+    }
+    int64_t batch_size = slow5_batch;
+    int32_t num_threads = slow5_threads;
+
+    while(1){
+        int flag_EOF = 0;
+        db_t db = { 0 };
+        db.mem_records = (char **) malloc(batch_size * sizeof *db.read_id);
+        db.mem_bytes = (size_t *) malloc(batch_size * sizeof *db.read_id);
+
+        int64_t record_count = 0;
+        size_t bytes;
+        char *mem;
+
+        while (record_count < batch_size) {
+            if (!(mem = (char *) slow5_get_next_mem(&bytes, sp))) {
+                if (slow5_errno != SLOW5_ERR_EOF) {
+                    throw std::runtime_error("Error in slow5_get_next_mem.");
+                } else { //EOF file reached
+                    flag_EOF = 1;
+                    break;
+                }
+            } else {
+                db.mem_records[record_count] = mem;
+                db.mem_bytes[record_count] = bytes;
+                record_count++;
+            }
+        }
+
+        // Setup multithreading structures
+        core_t core;
+        core.num_thread = (num_threads > record_count) ? record_count : num_threads;
+        if(record_count == 0){
+            core.num_thread = 1;
+        }
+        core.fp = sp;
+        core.m_device_ = m_device;
+
+        db.n_batch = record_count;
+        db.read_data_ptrs = std::vector<std::shared_ptr<Read>> (record_count);
+
+        work_db(&core,&db,create_read_data);
+
+        for (int64_t i = 0; i < record_count; i++) {
+            m_read_sink.push_read(db.read_data_ptrs[i]);
+            m_loaded_read_count++;
+        }
+
+        // Free everything
+        free(db.mem_bytes);
+        free(db.mem_records);
+
+        if(flag_EOF == 1){
+            break;
+        }
     }
 }
 

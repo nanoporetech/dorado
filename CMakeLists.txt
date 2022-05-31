@@ -79,6 +79,11 @@ function(add_hdf_vbz_plugin)
     add_subdirectory(dorado/3rdparty/hdf_plugins)
 endfunction()
 
+function(add_slow5lib)
+    include_directories(dorado/3rdparty/slow5lib/include)
+    include_directories(dorado/3rdparty/slow5lib/src)
+    add_subdirectory(dorado/3rdparty/slow5lib)
+endfunction()
 
 if(UNIX AND NOT APPLE)
     set(LINUX TRUE)
@@ -179,6 +184,7 @@ endif() # WIN32
 
 download_and_extract(${POD5_URL} ${POD5_DIR})
 add_hdf_vbz_plugin()
+add_slow5lib()
 
 if(DEFINED DORADO_LIBTORCH_DIR)
     # Use the existing libtorch we have been pointed at
@@ -272,7 +278,9 @@ set(LIB_SOURCE_FILES
         dorado/utils/stitch.cpp
         dorado/utils/stitch.h
         dorado/utils/tensor_utils.cpp
-        dorado/utils/tensor_utils.h)
+        dorado/utils/tensor_utils.h
+        dorado/data_loader/slow5_thread.h
+        dorado/data_loader/slow5_thread.cpp)
 
 if(APPLE)
     list(APPEND LIB_SOURCE_FILES
@@ -379,6 +387,7 @@ if(LINUX OR WIN32)
         target_include_directories(dorado_lib PUBLIC ${KOI_DIR}/include)
         target_link_directories(dorado_lib PUBLIC ${KOI_DIR}/lib)
         target_link_libraries(dorado_lib koi)
+        target_link_libraries(dorado_lib slow5)
 
     endif()
 endif() # LINUX OR WIN32
