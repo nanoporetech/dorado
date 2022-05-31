@@ -32,7 +32,7 @@ variables:
   script:
     - echo Dorado build stage
     - cmake ${BUILD_OPTIONS} -S . -B ${BUILD_DIR}
-    - cmake --build ${BUILD_DIR} --config Release --target install ${BUILD_THREADS}
+    - cmake --build ${BUILD_DIR} --config Release --target install -j 8
     - ctest -C Release --test-dir ${BUILD_DIR}
   artifacts:
     paths:
@@ -44,7 +44,7 @@ variables:
   stage: build
   script:
     - cmake ${BUILD_OPTIONS} -S . -B ${BUILD_DIR}
-    - cmake --build ${BUILD_DIR} --config Release ${BUILD_THREADS}
+    - cmake --build ${BUILD_DIR} --config Release -j 8
     - cpack --config ${BUILD_DIR}/CPackConfig.cmake
   artifacts:
     paths:
@@ -65,8 +65,6 @@ pre-commit:
 
 build:linux:x86:focal:install_deps:
   image: ${DORADO_NO_DEPS}
-  variables:
-    BUILD_THREADS: "-- -j 8"
   <<: *linux_dependencies
   <<: *linux_runner
   <<: *build_dorado
@@ -76,7 +74,6 @@ build:linux:x86:focal:
   image: ${DORADO_DEPS}
   variables:
     BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/libtorch -DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN}"
-    BUILD_THREADS: "-- -j 8"
   <<: *linux_runner
   <<: *build_dorado
 
@@ -84,7 +81,6 @@ build:linux:x86:focal_koi_download:
   image: ${DORADO_DEPS}
   variables:
     BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/libtorch"
-    BUILD_THREADS: "-- -j 8"
   <<: *linux_runner
   <<: *build_dorado
   
@@ -94,9 +90,8 @@ build:windows:
   <<: *windows_runner
   <<: *build_dorado
   when: manual
-  # Temp solution for Windows unit tests: add paths to required DLLs
   before_script:
-    - export PATH=${PATH}:${PWD}/dorado/3rdparty/torch-1.10.2-Windows/libtorch/lib:${PWD}/dorado/3rdparty/cmake-build-zstd/lib/Release:${PWD}/dorado/3rdparty/zlib-1.2.12/install/bin:${PWD}/dorado/3rdparty/pod5-0.0.14-Windows/lib
+    - export PATH=${PATH}:${PWD}/bin
 
 build:windows_koi_download:
   variables:
@@ -104,13 +99,11 @@ build:windows_koi_download:
   <<: *windows_runner
   <<: *build_dorado
   when: manual
-  # Temp solution for Windows unit tests: add paths to required DLLs
   before_script:
-    - export PATH=${PATH}:${PWD}/dorado/3rdparty/torch-1.10.2-Windows/libtorch/lib:${PWD}/dorado/3rdparty/cmake-build-zstd/lib/Release:${PWD}/dorado/3rdparty/zlib-1.2.12/install/bin:${PWD}/dorado/3rdparty/pod5-0.0.14-Windows/lib
+    - export PATH=${PATH}:${PWD}/bin
 
 build:macos:m1:
   variables:
-    BUILD_THREADS: "-- -j 8"
   <<: *macos_runner
   <<: *build_dorado
 
@@ -118,7 +111,6 @@ build_archive:linux:x86:focal:
   image: ${DORADO_DEPS}
   variables:
     BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/libtorch -DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN}"
-    BUILD_THREADS: "-- -j 8"
   <<: *linux_runner
   <<: *build_dorado_archive
   when: manual
@@ -132,11 +124,9 @@ build_archive:windows:
 
 build_archive:macos:m1:
   variables:
-    BUILD_THREADS: "-- -j 8"
   <<: *macos_runner
   <<: *build_dorado_archive
   when: manual
-
 
 # Test stage components
 

@@ -25,7 +25,7 @@ apt-get update && apt-get install -y --no-install-recommends libhdf5-dev libssl-
 $ git clone git@github.com:nanoporetech/dorado.git
 $ cd dorado
 $ cmake -S . -B cmake-build
-$ cmake --build cmake-build --config Release -- -j
+$ cmake --build cmake-build --config Release -j
 $ ctest --test-dir cmake-build
 ```
 
