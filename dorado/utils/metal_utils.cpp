@@ -107,7 +107,6 @@ struct MTLAllocator : torch::Allocator {
 };
 static MTLAllocator mtl_allocator;
 
-
 MTL::Device *get_mtl_device() {
     if (mtl_device == nullptr) {
         mtl_device = MTL::CreateSystemDefaultDevice();

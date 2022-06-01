@@ -30,8 +30,8 @@ void setup(std::vector<std::string> args,
                                                                         chunk_size, batch_size));
         }
 #ifdef __APPLE__
-	} else if (device == "metal") {
-	    auto caller = create_metal_caller(model_path, chunk_size, batch_size);
+    } else if (device == "metal") {
+        auto caller = create_metal_caller(model_path, chunk_size, batch_size);
         for (int i = 0; i < num_runners; i++) {
             runners.push_back(std::make_shared<MetalModelRunner>(caller, chunk_size, batch_size));
         }

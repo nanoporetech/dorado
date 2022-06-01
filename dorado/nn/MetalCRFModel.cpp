@@ -257,7 +257,7 @@ struct MetalBlockImpl : Module {
         }
     }
 
-    MTL::CommandBuffer* forward_async(torch::Tensor &in, torch::Tensor &out) {
+    MTL::CommandBuffer *forward_async(torch::Tensor &in, torch::Tensor &out) {
         auto command_buffer = command_queue->commandBuffer();
 
         if (sizeof(ftype) == 2) {
@@ -339,7 +339,7 @@ struct MetalModelImpl : Module {
 
     torch::Tensor forward(torch::Tensor x) { return mtl_block->forward(x); }
 
-    MTL::CommandBuffer* forward_async(torch::Tensor &in, torch::Tensor &out) {
+    MTL::CommandBuffer *forward_async(torch::Tensor &in, torch::Tensor &out) {
         return mtl_block->forward_async(in, out);
     }
 
@@ -348,13 +348,11 @@ struct MetalModelImpl : Module {
 
 TORCH_MODULE(MetalModel);
 
-
 class MetalCaller {
 public:
-    MetalCaller(const std::string& model_path, int chunk_size, int batch_size) {
-
+    MetalCaller(const std::string &model_path, int chunk_size, int batch_size) {
         auto config = toml::parse(model_path + "/config.toml");
-        const auto& qscore = toml::find(config, "qscore");
+        const auto &qscore = toml::find(config, "qscore");
         const auto qbias = toml::find<float>(qscore, "bias");
         const auto qscale = toml::find<float>(qscore, "scale");
 
@@ -417,20 +415,25 @@ public:
         int C = outsize;
         int Cs = m_states;
 
-        int y = pow(n_base,state_len);
+        int y = pow(n_base, state_len);
 
         m_scan_idx[0][0] = torch::arange(C, torch::kInt32).contiguous();
         auto t1 = torch::arange(y).index({torch::indexing::Slice(), torch::indexing::None});
         auto t2 = torch::arange(y).repeat_interleave(n_base).reshape({n_base, -1}).t();
-        m_scan_idx[0][1] = torch::cat({t1,t2}, 1).to(torch::kInt32).contiguous();
+        m_scan_idx[0][1] = torch::cat({t1, t2}, 1).to(torch::kInt32).contiguous();
 
         auto idx_sizes = m_scan_idx[0][1].sizes();
-        m_scan_idx[1][0] = m_scan_idx[0][1].flatten().argsort().reshape(idx_sizes).to(torch::kInt32).contiguous();
+        m_scan_idx[1][0] = m_scan_idx[0][1]
+                                   .flatten()
+                                   .argsort()
+                                   .reshape(idx_sizes)
+                                   .to(torch::kInt32)
+                                   .contiguous();
         m_scan_idx[1][1] = torch::div(m_scan_idx[1][0], num_transitions, "floor");
 
         m_scores = torch::empty({T, N, C});
-        m_posts = torch::empty({N, T+1, Cs});
-        m_bwd = torch::empty({N, T+1, Cs});
+        m_posts = torch::empty({N, T + 1, Cs});
+        m_bwd = torch::empty({N, T + 1, Cs});
     }
 
     ~MetalCaller() {
@@ -441,14 +444,14 @@ public:
         m_decode_cv.notify_all();
 
         m_metal_thread->join();
-        for (auto& thr : m_decode_threads) {
+        for (auto &thr : m_decode_threads) {
             thr->join();
         }
     }
 
     struct NNTask {
         NNTask(torch::Tensor *input_, int num_chunks_, std::vector<DecodedChunk> *out_chunks_)
-        : input(input_), out_chunks(out_chunks_), num_chunks(num_chunks_) {
+                : input(input_), out_chunks(out_chunks_), num_chunks(num_chunks_) {
             static int run = 0;
             run_id = run++;
         }
@@ -465,7 +468,9 @@ public:
     };
 
     void call_chunks(torch::Tensor &input, int num_chunks, std::vector<DecodedChunk> &out_chunks) {
-        if (num_chunks == 0) { return; }
+        if (num_chunks == 0) {
+            return;
+        }
 
         NNTask task(&input, num_chunks, &out_chunks);
         {
@@ -475,15 +480,21 @@ public:
         m_input_cv.notify_one();
 
         std::unique_lock lock(task.mut);
-        while (task.decode_chunks_finished != num_chunks) { task.cv.wait(lock); }
+        while (task.decode_chunks_finished != num_chunks) {
+            task.cv.wait(lock);
+        }
     }
 
     void metal_thread_fn() {
         while (true) {
             std::unique_lock<std::mutex> input_lock(m_input_lock);
-            while (m_input_queue.empty() && !m_terminate) { m_input_cv.wait_for(input_lock, 100ms); }
+            while (m_input_queue.empty() && !m_terminate) {
+                m_input_cv.wait_for(input_lock, 100ms);
+            }
             // TODO: finish work before terminating?
-            if (m_terminate) { return; }
+            if (m_terminate) {
+                return;
+            }
 
             NNTask *task = m_input_queue.back();
             m_input_queue.pop_back();
@@ -491,33 +502,41 @@ public:
 
             // TODO: find a more robust way of dealing with Metal kernel launch issues
             for (int try_count = 0; try_count < 5; ++try_count) {
-                MTL::CommandBuffer* cb = m_model->forward_async(*task->input, m_scores);
+                MTL::CommandBuffer *cb = m_model->forward_async(*task->input, m_scores);
                 if (task->run_id != 0) {
                     cb->encodeWait(m_mtl_event, task->run_id - 1);
                 }
 
-                auto& fwd = m_posts; // Reusing memory
-                int32_t scan_args_[] = {m_out_chunk_size, m_batch_size, m_states, 1}; // T, N, C, dir
+                auto &fwd = m_posts;  // Reusing memory
+                int32_t scan_args_[] = {m_out_chunk_size, m_batch_size, m_states,
+                                        1};  // T, N, C, dir
                 auto args_fwd = create_buffer(m_device, scan_args_, 4);
                 scan_args_[3] = -1;
                 auto args_bwd = create_buffer(m_device, scan_args_, 4);
 
                 // TODO: optimise grid size
-                launch_kernel_no_wait(m_scan_cps, cb,
-                    {args_fwd, mtl_for_tensor(m_scores), mtl_for_tensor(fwd), mtl_for_tensor(m_scan_idx[0][0]), mtl_for_tensor(m_scan_idx[0][1])},
-                    task->num_chunks, m_states);
-                launch_kernel_no_wait(m_scan_cps, cb,
-                    {args_bwd, mtl_for_tensor(m_scores), mtl_for_tensor(m_bwd), mtl_for_tensor(m_scan_idx[1][0]), mtl_for_tensor(m_scan_idx[1][1])},
-                    task->num_chunks, m_states);
+                launch_kernel_no_wait(
+                        m_scan_cps, cb,
+                        {args_fwd, mtl_for_tensor(m_scores), mtl_for_tensor(fwd),
+                         mtl_for_tensor(m_scan_idx[0][0]), mtl_for_tensor(m_scan_idx[0][1])},
+                        task->num_chunks, m_states);
+                launch_kernel_no_wait(
+                        m_scan_cps, cb,
+                        {args_bwd, mtl_for_tensor(m_scores), mtl_for_tensor(m_bwd),
+                         mtl_for_tensor(m_scan_idx[1][0]), mtl_for_tensor(m_scan_idx[1][1])},
+                        task->num_chunks, m_states);
                 launch_kernel_no_wait(m_add_softmax_cps, cb,
-                    {args_fwd, mtl_for_tensor(fwd), mtl_for_tensor(m_bwd)},
-                    task->num_chunks, m_states);
+                                      {args_fwd, mtl_for_tensor(fwd), mtl_for_tensor(m_bwd)},
+                                      task->num_chunks, m_states);
 
                 cb->commit();
                 cb->waitUntilCompleted();
                 auto status = cb->status();
-                if (status == MTL::CommandBufferStatusCompleted) { break; }
-                std::cerr << "Metal command buffer execution failed: " << status << ", try #" << try_count << std::endl;
+                if (status == MTL::CommandBufferStatusCompleted) {
+                    break;
+                }
+                std::cerr << "Metal command buffer execution failed: " << status << ", try #"
+                          << try_count << std::endl;
                 using namespace std::chrono_literals;
                 std::this_thread::sleep_for(20ms);
             }
@@ -533,9 +552,13 @@ public:
     void decode_thread_fn(int thread_id) {
         while (true) {
             std::unique_lock<std::mutex> decode_lock(m_decode_lock);
-            while (m_decode_queue.empty() && !m_terminate) { m_decode_cv.wait_for(decode_lock, 100ms); }
+            while (m_decode_queue.empty() && !m_terminate) {
+                m_decode_cv.wait_for(decode_lock, 100ms);
+            }
             // TODO: finish work before terminating?
-            if (m_terminate) { return; }
+            if (m_terminate) {
+                return;
+            }
             NNTask *task = m_decode_queue.back();
             int chunk_idx = task->decode_chunks_started++;
             // If all chunks have been picked up for decoding, remove task from queue
@@ -544,14 +567,11 @@ public:
             }
             decode_lock.unlock();
 
-            auto decode_result = beam_search_decode(m_scores.index({Slice(), chunk_idx}),
-                                                    m_bwd[chunk_idx],
-                                                    m_posts[chunk_idx],
-                                                    m_decoder_options.beam_cut,
-                                                    m_decoder_options.blank_score,
-                                                    m_decoder_options.q_shift,
-                                                    m_decoder_options.q_scale,
-                                                    m_decoder_options.temperature);
+            auto decode_result =
+                    beam_search_decode(m_scores.index({Slice(), chunk_idx}), m_bwd[chunk_idx],
+                                       m_posts[chunk_idx], m_decoder_options.beam_cut,
+                                       m_decoder_options.blank_score, m_decoder_options.q_shift,
+                                       m_decoder_options.q_scale, m_decoder_options.temperature);
             (*task->out_chunks)[chunk_idx] = DecodedChunk{
                     std::get<0>(decode_result),
                     std::get<1>(decode_result),
@@ -580,8 +600,8 @@ public:
     std::vector<std::unique_ptr<std::thread>> m_decode_threads;
     DecoderOptions m_decoder_options;
     MetalModel m_model{nullptr};
-    MTL::Device* m_device;
-    MTL::CommandQueue* m_command_queue;
+    MTL::Device *m_device;
+    MTL::CommandQueue *m_command_queue;
     MTL::ComputePipelineState *m_scan_cps, *m_add_softmax_cps;
     MTL::SharedEvent *m_mtl_event;
     torch::Tensor m_scan_idx[2][2];
@@ -589,14 +609,18 @@ public:
     int m_out_chunk_size, m_batch_size, m_states;
 };
 
-
-std::shared_ptr<MetalCaller> create_metal_caller(const std::string& model_path, int chunk_size, int batch_size) {
+std::shared_ptr<MetalCaller> create_metal_caller(const std::string &model_path,
+                                                 int chunk_size,
+                                                 int batch_size) {
     return std::make_shared<MetalCaller>(model_path, chunk_size, batch_size);
 }
 
-MetalModelRunner::MetalModelRunner(std::shared_ptr<MetalCaller> caller, int chunk_size, int batch_size)
-: m_caller(caller) {
-    m_input = torch::empty({batch_size, 1, chunk_size}, torch::TensorOptions().dtype(torch::kF32).device(torch::kCPU));
+MetalModelRunner::MetalModelRunner(std::shared_ptr<MetalCaller> caller,
+                                   int chunk_size,
+                                   int batch_size)
+        : m_caller(caller) {
+    m_input = torch::empty({batch_size, 1, chunk_size},
+                           torch::TensorOptions().dtype(torch::kF32).device(torch::kCPU));
 }
 
 void MetalModelRunner::accept_chunk(int chunk_idx, at::Tensor slice) {
