@@ -3,7 +3,7 @@ OPTION(BUILD_KOI_FROM_SOURCE OFF)
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32)
 
     if(BUILD_KOI_FROM_SOURCE)
-        message("-- Building Koi from source")
+        message(STATUS "Building Koi from source")
 
         set(KOI_DIR "${DORADO_3RD_PARTY}/koi")
 	
@@ -22,7 +22,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32)
 	set(KOI_INCLUDE ${KOI_DIR}/koi/lib)
 	set(KOI_LIBRARIES koi)
     else()
-        message("-- Using prebuilt Koi from ${KOI_DIR}")
+        message(STATUS "Using prebuilt Koi from ${KOI_DIR}")
 	if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
             download_and_extract(https://nanoporetech.box.com/shared/static/qbasibmplodr2ixztz97v53vmkttxia1.gz koi_lib)
             file(GLOB KOI_DIR "${DORADO_3RD_PARTY}/koi_lib/*")

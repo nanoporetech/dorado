@@ -8,7 +8,7 @@ option(DYNAMIC_HDF "Link HDF as dynamic libs" OFF)
 if(WIN32)
 
     if(EXISTS ${DORADO_3RD_PARTY}/${HDF_VER})
-        message("-- Found ${HDF_VER}")
+        message(STATUS "Found ${HDF_VER}")
     else()
         # Need a zlib build for HDF to use
         download_and_extract(https://zlib.net/${ZLIB_VER}.tar.gz ${ZLIB_VER})
