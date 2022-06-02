@@ -21,3 +21,5 @@ function(git_submodule_update)
 
     endif()
 endfunction()
+
+git_submodule_update()

@@ -25,7 +25,6 @@ add_compile_options(-D_GLIBCXX_USE_CXX11_ABI=0)
 add_subdirectory(dorado/3rdparty/elzip)
 
 enable_testing()
-git_submodule_update()
 add_hdf_vbz_plugin()
 configure_file(dorado/Version.h.in dorado/Version.h)
 
