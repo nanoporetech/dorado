@@ -83,6 +83,7 @@ if(APPLE)
         dorado/nn/MetalCRFModel.cpp
         dorado/utils/metal_utils.cpp
         dorado/utils/metal_utils.h
+    )
 endif()
 
 add_library(dorado_lib ${LIB_SOURCE_FILES})
