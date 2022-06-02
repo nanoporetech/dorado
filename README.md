@@ -12,23 +12,6 @@ $ dorado download --model dna_r9.4.1_e8_hac@v3.3
 $ dorado basecaller dna_r9.4.1_e8_hac@v3.3 fast5_pass/ > calls.sam
 ```
 
-## Developer quickstart
-
-### Get Linux dependencies
-
-```
-apt-get update && apt-get install -y --no-install-recommends libhdf5-dev libssl-dev libzstd-dev
-```
-
-### Clone and build
-```
-$ git clone git@github.com:nanoporetech/dorado.git
-$ cd dorado
-$ cmake -S . -B cmake-build
-$ cmake --build cmake-build --config Release -j
-$ ctest --test-dir cmake-build
-```
-
 ## Platforms
 
 Dorado has been tested on the following systems:
@@ -47,15 +30,29 @@ Other Platforms may work, if you encounter problems with running on your system 
 * GPU memory utilisation on Nvidia devices is high (compared to [Bonito](https://github.com/nanoporetech/bonito)). This issue is currently being investigated and resolved.
 * Support for M1 GPUs is should be considered experimental.
 
+## Developer quickstart
+
+### Get Linux dependencies
+
+```
+apt-get update && apt-get install -y --no-install-recommends libhdf5-dev libssl-dev libzstd-dev
+```
+
+### Clone and build
+
+```
+$ git clone git@github.com:nanoporetech/dorado.git
+$ cd dorado
+$ cmake -S . -B cmake-build
+$ cmake --build cmake-build --config Release -j
+$ ctest --test-dir cmake-build
+```
+
 ### Pre commit
 
 The project uses pre-commit to ensure code is consistently formatted, you can set this up using pip:
 
 ```bash
-> pip install pre-commit
-# Install pre-commit hooks in your dorado repo:
-> cd dorado
-> pre-commit install
-# Run hooks on all files:
-> pre-commit run --all-files
+$ pip install pre-commit
+$ pre-commit install
 ```

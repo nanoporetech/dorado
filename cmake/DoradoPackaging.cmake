@@ -1,0 +1,17 @@
+if(APPLE)
+    set(CPACK_GENERATOR "TGZ")
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    set(CPACK_GENERATOR "TGZ")
+elseif (WIN32)
+    set(CPACK_GENERATOR "ZIP")
+else()
+    message(FATAL_ERROR "Unexpected archive build platform: expected OSX, UNIX, or WIN32")
+endif()
+
+set(CPACK_OUTPUT_FILE_PREFIX "${CMAKE_SOURCE_DIR}/archive")
+set(CPACK_PACKAGE_VENDOR "Oxford Nanopore Technologies Plc")
+set(CPACK_PACKAGE_VERSION "${DORADO_VERSION}")
+set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_SOURCE_DIR}/LICENCE.txt")
+set(CPACK_RESOURCE_FILE_README "${CMAKE_SOURCE_DIR}/README.md")
+
+include(CPack)
