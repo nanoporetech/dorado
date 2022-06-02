@@ -387,10 +387,10 @@ if(LINUX OR WIN32)
         target_include_directories(dorado_lib PUBLIC ${KOI_DIR}/include)
         target_link_directories(dorado_lib PUBLIC ${KOI_DIR}/lib)
         target_link_libraries(dorado_lib koi)
-        target_link_libraries(dorado_lib slow5)
-
     endif()
 endif() # LINUX OR WIN32
+
+target_link_libraries(dorado_lib slow5)
 
 if (APPLE)
     set(CPACK_GENERATOR "TGZ")
