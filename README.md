@@ -10,6 +10,8 @@ We will be publishing pre-built releases in the next few days.
 ```
 $ dorado download --model dna_r9.4.1_e8_hac@v3.3
 $ dorado basecaller dna_r9.4.1_e8_hac@v3.3 fast5_pass/ > calls.sam
+or
+$ dorado basecaller dna_r9.4.1_e8_hac@v3.3 [FILE|DIR] > calls.sam # FILE can be [.fast5|.pod5|.blow5|.slow5] or the DIR containing FILEs.
 ```
 
 ## Developer quickstart
