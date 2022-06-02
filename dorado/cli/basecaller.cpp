@@ -2,7 +2,7 @@
 #include "data_loader/DataLoader.h"
 #include "decode/CPUDecoder.h"
 #include "decode/GPUDecoder.h"
-#include "decode/MTLDecoder.h"
+#include "nn/MetalCRFModel.h"
 #include "nn/ModelRunner.h"
 #include "read_pipeline/BasecallerNode.h"
 #include "read_pipeline/ScalerNode.h"
@@ -31,9 +31,9 @@ void setup(std::vector<std::string> args,
         }
 #ifdef __APPLE__
     } else if (device == "metal") {
+        auto caller = create_metal_caller(model_path, chunk_size, batch_size);
         for (int i = 0; i < num_runners; i++) {
-            runners.push_back(std::make_shared<ModelRunner<MTLDecoder>>(model_path, device,
-                                                                        chunk_size, batch_size));
+            runners.push_back(std::make_shared<MetalModelRunner>(caller, chunk_size, batch_size));
         }
 #endif  // __APPLE__
     } else {

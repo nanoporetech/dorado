@@ -107,25 +107,44 @@ struct MTLAllocator : torch::Allocator {
 };
 static MTLAllocator mtl_allocator;
 
-static std::mutex mtl_device_mutex;
-static thread_local std::unique_ptr<std::unique_lock<std::mutex>> mtl_device_lock;
-
-void lock_mtl_device() {
-    if (!mtl_device_lock) {
-        mtl_device_lock = std::make_unique<std::unique_lock<std::mutex>>(mtl_device_mutex);
-    } else {
-        mtl_device_lock->lock();
-    }
-}
-
-void unlock_mtl_device() { mtl_device_lock->unlock(); }
-
 MTL::Device *get_mtl_device() {
     if (mtl_device == nullptr) {
         mtl_device = MTL::CreateSystemDefaultDevice();
         torch::SetAllocator(torch::DeviceType::CPU, &mtl_allocator);
     }
     return mtl_device;
+}
+
+int get_mtl_device_core_count() {
+    std::string name = get_mtl_device()->name()->utf8String();
+    // TODO: These numbers aren't always correct, lower-spec versions with 7, 14, 24 cores also exist.
+    //  And 8 might not be a good fallback. How do we determine the actual core count?
+    if (name == "Apple M1") {
+        return 8;
+    } else if (name == "Apple M1 Pro") {
+        return 16;
+    } else if (name == "Apple M1 Max") {
+        return 32;
+    } else if (name == "Apple M1 Ultra") {
+        return 64;
+    }
+    return 8;
+}
+
+int get_apple_cpu_perf_core_count() {
+    std::string name = get_mtl_device()->name()->utf8String();
+    // TODO: These numbers aren't always correct, lower-spec M1 Pro versions with 6 cores also exist.
+    //  And 4 might not be a good fallback. How do we determine the actual core count?
+    if (name == "Apple M1") {
+        return 4;
+    } else if (name == "Apple M1 Pro") {
+        return 8;
+    } else if (name == "Apple M1 Max") {
+        return 8;
+    } else if (name == "Apple M1 Ultra") {
+        return 16;
+    }
+    return 4;
 }
 
 MTL::Buffer *mtl_for_tensor(const torch::Tensor &x) {
