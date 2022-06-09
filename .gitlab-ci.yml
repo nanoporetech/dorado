@@ -167,6 +167,7 @@ test:sre-test:
               "git_checkout":"'${CI_COMMIT_SHA}'",
               "sre_output":"'${SRE_OUTPUT_ROOT}'/'${CI_COMMIT_SHA}'",
               "models":["dna_r10.4_e8.1_fast@v3.4","dna_r10.4_e8.1_hac@v3.4","dna_r10.4_e8.1_sup@v3.4"],
+              "val_set":"'${SRE_VALIDATION_SET}'",
               "basecaller_args":[["chunk_12k","-o 600 -c 12000 -b 64"]]
           }
       }' \
