@@ -159,7 +159,7 @@ test:sre-test:
   image: ${TRIGGER_IMAGE}
   dependencies: []
   variables:
-    GIT_STRATEGY: clone
+    GIT_STRATEGY: none
   script:
     - |
       curl -i --header "Content-Type: application/json" \
