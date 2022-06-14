@@ -1,5 +1,6 @@
 #include "sequence_utils.h"
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <numeric>
