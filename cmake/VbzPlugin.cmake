@@ -7,8 +7,8 @@ function(add_hdf_vbz_plugin)
 
     if(WIN32)
         # On windows we need to build a static lib for zstd as there's no prebuilt distro
-        execute_process(COMMAND cmake -S dorado/3rdparty/zstd/build/cmake -B dorado/3rdparty/cmake-build-zstd -A x64)
-        execute_process(COMMAND cmake --build dorado/3rdparty/cmake-build-zstd --config Release)
+        execute_process(COMMAND cmake -S ${DORADO_3RD_PARTY}/zstd/build/cmake -B ${DORADO_3RD_PARTY}/cmake-build-zstd -A x64)
+        execute_process(COMMAND cmake --build ${DORADO_3RD_PARTY}/cmake-build-zstd --config Release)
 
         # On windows we need to tell hdf_plugins where we put the built zstd lib
         set(CONAN_INCLUDE_DIRS_RELEASE ${CMAKE_SOURCE_DIR}/dorado/3rdparty/zstd/lib)
