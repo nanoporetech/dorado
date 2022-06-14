@@ -157,6 +157,9 @@ test:sre-test:
   stage: test
   when: manual
   image: ${TRIGGER_IMAGE}
+  dependencies: []
+  variables:
+    GIT_STRATEGY: clone
   script:
     - |
       curl -i --header "Content-Type: application/json" \
