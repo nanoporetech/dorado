@@ -47,6 +47,8 @@ private:
     std::mutex m_chunks_in_mutex;
     // Gets filled with chunks from the input reads
     std::deque<std::shared_ptr<Chunk>> m_chunks_in;
+    // Condition variable for the m_chunks_in size changes
+    std::condition_variable m_cv_chunks_in;
 
     std::mutex m_working_reads_mutex;
     // Reads removed from input queue and being basecalled.

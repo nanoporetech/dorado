@@ -33,39 +33,33 @@ void BasecallerNode::input_worker_thread() {
         reads_lock.unlock();
 
         // Now that we have acquired a read and released the reads mutex, wait until we can push to chunks_in
-        while (true) {
-            std::unique_lock<std::mutex> chunk_lock(m_chunks_in_mutex);
-            m_cv.wait_for(chunk_lock, 10ms,
-                          [this, &max_chunks_in] { return (m_chunks_in.size() < max_chunks_in); });
+        std::unique_lock<std::mutex> chunk_lock(m_chunks_in_mutex);
+        m_cv_chunks_in.wait(chunk_lock, [this, &max_chunks_in] {
+            return (m_chunks_in.size() < max_chunks_in);
+        });
 
-            if (m_chunks_in.size() > max_chunks_in) {
-                continue;
-            }
-
-            // Here, we chunk up the read and put the chunks into the pending chunk list.
-            size_t raw_size = read->raw_data.size(0);
-            size_t offset = 0;
-            size_t chunk_in_read_idx = 0;
-            size_t signal_chunk_step = m_chunk_size - m_overlap;
+        // Here, we chunk up the read and put the chunks into the pending chunk list.
+        size_t raw_size = read->raw_data.size(0);
+        size_t offset = 0;
+        size_t chunk_in_read_idx = 0;
+        size_t signal_chunk_step = m_chunk_size - m_overlap;
+        m_chunks_in.push_back(
+                std::make_shared<Chunk>(read, offset, chunk_in_read_idx++, m_chunk_size));
+        read->num_chunks = 1;
+        while (offset + m_chunk_size < raw_size) {
+            offset = std::min(offset + signal_chunk_step, raw_size - m_chunk_size);
             m_chunks_in.push_back(
                     std::make_shared<Chunk>(read, offset, chunk_in_read_idx++, m_chunk_size));
-            read->num_chunks = 1;
-            while (offset + m_chunk_size < raw_size) {
-                offset = std::min(offset + signal_chunk_step, raw_size - m_chunk_size);
-                m_chunks_in.push_back(
-                        std::make_shared<Chunk>(read, offset, chunk_in_read_idx++, m_chunk_size));
-                read->num_chunks++;
-            }
-            read->called_chunks.resize(read->num_chunks);
-            read->num_chunks_called.store(0);
-            chunk_lock.unlock();
-
-            // Put the read in the working list
-            std::unique_lock<std::mutex> working_reads_lock(m_working_reads_mutex);
-            m_working_reads.push_back(read);
-            working_reads_lock.unlock();
-            break;  // Go back to watching the input reads
+            read->num_chunks++;
         }
+        read->called_chunks.resize(read->num_chunks);
+        read->num_chunks_called.store(0);
+        chunk_lock.unlock();
+
+        // Put the read in the working list
+        std::unique_lock<std::mutex> working_reads_lock(m_working_reads_mutex);
+        m_working_reads.push_back(read);
+        working_reads_lock.unlock();
     }
 }
 
@@ -161,6 +155,7 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
         }
 
         chunks_lock.unlock();
+        m_cv_chunks_in.notify_one();
 
         if (m_batched_chunks[worker_id].size() == m_batch_size) {
             // Input tensor is full, let's get_scores.
