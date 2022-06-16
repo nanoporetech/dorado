@@ -52,6 +52,8 @@ set(LIB_SOURCE_FILES
     dorado/read_pipeline/ScalerNode.h
     dorado/read_pipeline/BasecallerNode.cpp
     dorado/read_pipeline/BasecallerNode.h
+    dorado/read_pipeline/ModBaseCallerNode.cpp
+    dorado/read_pipeline/ModBaseCallerNode.h
     dorado/read_pipeline/WriterNode.cpp
     dorado/read_pipeline/WriterNode.h
     dorado/data_loader/DataLoader.cpp
