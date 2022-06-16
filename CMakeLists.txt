@@ -46,6 +46,8 @@ set(LIB_SOURCE_FILES
     dorado/nn/CRFModel.h
     dorado/nn/CRFModel.cpp
     dorado/nn/ModelRunner.h
+    dorado/nn/RemoraModel.cpp
+    dorado/nn/RemoraModel.h
     dorado/read_pipeline/ReadPipeline.cpp
     dorado/read_pipeline/ReadPipeline.h
     dorado/read_pipeline/ScalerNode.cpp
