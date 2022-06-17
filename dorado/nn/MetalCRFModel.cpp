@@ -5,6 +5,7 @@
 
 #include "../decode/beam_search.h"
 #include "../utils/metal_utils.h"
+#include "../utils/module_utils.h"
 #include "../utils/tensor_utils.h"
 
 #include <math.h>
@@ -328,12 +329,8 @@ struct MetalModelImpl : Module {
                 "mtl_block", MetalBlock(chunk_size, batch_size, stride, size, outsize, device));
     }
 
-    void load_state_dict(std::vector<torch::Tensor> weights) {
-        assert(weights.size() == parameters().size());
-        for (size_t idx = 0; idx < weights.size(); idx++) {
-            parameters()[idx].data() = weights[idx].data();
-        }
-
+    void load_state_dict(const std::vector<torch::Tensor> &weights) {
+        ::utils::load_state_dict(*this, weights);
         mtl_block->load_weights();
     }
 

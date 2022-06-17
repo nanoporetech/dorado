@@ -1,5 +1,7 @@
 #include "RemoraModel.h"
 
+#include "../utils/module_utils.h"
+
 #include <torch/torch.h>
 
 using namespace torch::nn;
@@ -41,6 +43,10 @@ struct RemoraConvModelImpl : Module {
         merge_conv4 = register_module("merge_conv4", ConvBatchNorm(size, size, 3, 2, size));
 
         linear = register_module("linear", Linear(size * 3, num_out));
+    }
+
+    void load_state_dict(const std::vector<torch::Tensor>& weights) {
+        ::utils::load_state_dict(*this, weights);
     }
 
     torch::Tensor forward(torch::Tensor sigs, torch::Tensor seqs) {
@@ -97,6 +103,10 @@ struct RemoraConvLSTMModelImpl : Module {
         linear = register_module("linear", Linear(size, num_out));
 
         activation = register_module("activation", SiLU());
+    }
+
+    void load_state_dict(std::vector<torch::Tensor> weights) {
+        ::utils::load_state_dict(*this, weights);
     }
 
     torch::Tensor forward(torch::Tensor sigs, torch::Tensor seqs) {

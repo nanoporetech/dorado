@@ -1,5 +1,6 @@
 #include "CRFModel.h"
 
+#include "../utils/module_utils.h"
 #include "../utils/tensor_utils.h"
 
 #include <math.h>
@@ -110,11 +111,8 @@ struct CRFModelImpl : Module {
         encoder = Sequential(conv1, conv2, conv3, permute, rnns, linear);
     }
 
-    void load_state_dict(std::vector<torch::Tensor> weights) {
-        assert(weights.size() == parameters().size());
-        for (size_t idx = 0; idx < weights.size(); idx++) {
-            parameters()[idx].data() = weights[idx].data();
-        }
+    void load_state_dict(const std::vector<torch::Tensor>& weights) {
+        ::utils::load_state_dict(*this, weights);
     }
 
     torch::Tensor forward(torch::Tensor x) { return encoder->forward(x); }

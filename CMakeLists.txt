@@ -70,6 +70,7 @@ set(LIB_SOURCE_FILES
     dorado/decode/GPUDecoder.h
     dorado/utils/compat_utils.cpp
     dorado/utils/compat_utils.h
+    dorado/utils/module_utils.h
     dorado/utils/sequence_utils.cpp
     dorado/utils/sequence_utils.h
     dorado/utils/stitch.cpp
