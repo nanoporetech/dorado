@@ -77,7 +77,39 @@ struct RemoraConvModelImpl : Module {
 
     std::vector<torch::Tensor> load_weights(const std::string& dir) {
         auto weights = std::vector<torch::Tensor>();
-        auto tensors = std::vector<std::string>{};  // TODO!
+        auto tensors = std::vector<std::string>{
+                "sig_conv1.weight.tensor",   "sig_conv1.bias.tensor",
+                "sig_bn1.weight.tensor",     "sig_bn1.bias.tensor",
+
+                "sig_conv2.weight.tensor",   "sig_conv2.bias.tensor",
+                "sig_bn2.weight.tensor",     "sig_bn2.bias.tensor",
+
+                "sig_conv3.weight.tensor",   "sig_conv3.bias.tensor",
+                "sig_bn3.weight.tensor",     "sig_bn3.bias.tensor",
+
+                "seq_conv1.weight.tensor",   "seq_conv1.bias.tensor",
+                "seq_bn1.weight.tensor",     "seq_bn1.bias.tensor",
+
+                "seq_conv2.weight.tensor",   "seq_conv2.bias.tensor",
+                "seq_bn2.weight.tensor",     "seq_bn2.bias.tensor",
+
+                "seq_conv3.weight.tensor",   "seq_conv3.bias.tensor",
+                "seq_bn3.weight.tensor",     "seq_bn3.bias.tensor",
+
+                "merge_conv1.weight.tensor", "merge_conv1.bias.tensor",
+                "merge_bn1.weight.tensor",   "merge_bn1.bias.tensor",
+
+                "merge_conv2.weight.tensor", "merge_conv2.bias.tensor",
+                "merge_bn2.weight.tensor",   "merge_bn2.bias.tensor",
+
+                "merge_conv3.weight.tensor", "merge_conv3.bias.tensor",
+                "merge_bn3.weight.tensor",   "merge_bn3.bias.tensor",
+
+                "merge_conv4.weight.tensor", "merge_conv4.bias.tensor",
+                "merge_bn4.weight.tensor",   "merge_bn4.bias.tensor",
+
+                "fc.weight.tensor",          "fc.bias.tensor",
+        };
 
         return ::utils::load_weights(dir, tensors);
     }
@@ -206,7 +238,7 @@ ModuleHolder<AnyModule> load_remora_model(const std::string& path, torch::Tensor
     auto model = RemoraConvLSTMModel(size, kmer_len, num_out);
     auto state_dict = model->load_weights(path);
     model->load_state_dict(state_dict);
-    // model->to(options.dtype_opt().value().toScalarType()); // ?
+    model->to(options.dtype_opt().value().toScalarType());
     model->to(options.device_opt().value());
     model->eval();
 
@@ -217,6 +249,7 @@ ModuleHolder<AnyModule> load_remora_model(const std::string& path, torch::Tensor
 }
 
 RemoraCaller::RemoraCaller(const std::string& model, std::string device) {
+    // no metal implementation yet, force to cpu
     m_options = torch::TensorOptions().dtype(dtype).device(device == "metal" ? "cpu" : device);
     m_module = load_remora_model(model, m_options);
 
@@ -245,7 +278,6 @@ RemoraCaller::RemoraCaller(const std::string& model, std::string device) {
 }
 
 RemoraRunner::RemoraRunner(const std::vector<std::string>& model_paths, std::string device) {
-    // no metal implementation yet, force to cpu
     for (const auto& model : model_paths) {
         m_callers.push_back(std::make_shared<RemoraCaller>(model, device));
     }
