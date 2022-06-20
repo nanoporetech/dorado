@@ -146,72 +146,33 @@ struct RemoraConvLSTMModelImpl : Module {
 
     std::vector<torch::Tensor> load_weights(const std::string& dir) {
         auto weights = std::vector<torch::Tensor>();
-        auto tensors = std::vector<std::string>{"sig_conv1.weight.tensor",
-                                                "sig_conv1.bias.tensor",
+        auto tensors = std::vector<std::string>{
+                "sig_conv1.weight.tensor",   "sig_conv1.bias.tensor",
+                "sig_bn1.weight.tensor",     "sig_bn1.bias.tensor",
 
-                                                "sig_conv2.weight.tensor",
-                                                "sig_conv2.bias.tensor",
+                "sig_conv2.weight.tensor",   "sig_conv2.bias.tensor",
+                "sig_bn2.weight.tensor",     "sig_bn2.bias.tensor",
 
-                                                "sig_conv3.weight.tensor",
-                                                "sig_conv3.bias.tensor",
+                "sig_conv3.weight.tensor",   "sig_conv3.bias.tensor",
+                "sig_bn3.weight.tensor",     "sig_bn3.bias.tensor",
 
-                                                "seq_conv1.weight.tensor",
-                                                "seq_conv1.bias.tensor",
+                "seq_conv1.weight.tensor",   "seq_conv1.bias.tensor",
+                "seq_bn1.weight.tensor",     "seq_bn1.bias.tensor",
 
-                                                "seq_conv2.weight.tensor",
-                                                "seq_conv2.bias.tensor",
+                "seq_conv2.weight.tensor",   "seq_conv2.bias.tensor",
+                "seq_bn2.weight.tensor",     "seq_bn2.bias.tensor",
 
-                                                "merge_conv1.weight.tensor",
-                                                "merge_conv1.bias.tensor",
+                "merge_conv1.weight.tensor", "merge_conv1.bias.tensor",
+                "merge_bn.weight.tensor",    "merge_bn.bias.tensor",
 
-                                                "lstm1.weight_ih_l0.tensor",
-                                                "lstm1.weight_hh_l0.tensor",
-                                                "lstm1.bias_ih_l0.tensor",
-                                                "lstm1.bias_hh_l0.tensor",
+                "lstm1.weight_ih_l0.tensor", "lstm1.weight_hh_l0.tensor",
+                "lstm1.bias_ih_l0.tensor",   "lstm1.bias_hh_l0.tensor",
 
-                                                "lstm2.weight_ih_l0.tensor",
-                                                "lstm2.weight_hh_l0.tensor",
-                                                "lstm2.bias_ih_l0.tensor",
-                                                "lstm2.bias_hh_l0.tensor",
+                "lstm2.weight_ih_l0.tensor", "lstm2.weight_hh_l0.tensor",
+                "lstm2.bias_ih_l0.tensor",   "lstm2.bias_hh_l0.tensor",
 
-                                                "fc.weight.tensor",
-                                                "fc.bias.tensor",
-
-                                                "sig_bn1.weight.tensor",
-                                                "sig_bn1.bias.tensor",
-                                                "sig_bn1.running_mean.tensor",
-                                                "sig_bn1.running_var.tensor",
-                                                "sig_bn1.num_batches_tracked.tensor",
-
-                                                "sig_bn2.weight.tensor",
-                                                "sig_bn2.bias.tensor",
-                                                "sig_bn2.running_mean.tensor",
-                                                "sig_bn2.running_var.tensor",
-                                                "sig_bn2.num_batches_tracked.tensor",
-
-                                                "sig_bn3.weight.tensor",
-                                                "sig_bn3.bias.tensor",
-                                                "sig_bn3.running_mean.tensor",
-                                                "sig_bn3.running_var.tensor",
-                                                "sig_bn3.num_batches_tracked.tensor",
-
-                                                "seq_bn1.weight.tensor",
-                                                "seq_bn1.bias.tensor",
-                                                "seq_bn1.running_mean.tensor",
-                                                "seq_bn1.running_var.tensor",
-                                                "seq_bn1.num_batches_tracked.tensor",
-
-                                                "seq_bn2.weight.tensor",
-                                                "seq_bn2.bias.tensor",
-                                                "seq_bn2.running_mean.tensor",
-                                                "seq_bn2.running_var.tensor",
-                                                "seq_bn2.num_batches_tracked.tensor",
-
-                                                "merge_bn.weight.tensor",
-                                                "merge_bn.bias.tensor",
-                                                "merge_bn.running_mean.tensor",
-                                                "merge_bn.running_var.tensor",
-                                                "merge_bn.num_batches_tracked.tensor"};
+                "fc.weight.tensor",          "fc.bias.tensor",
+        };
 
         return ::utils::load_weights(dir, tensors);
     }
@@ -241,6 +202,7 @@ ModuleHolder<AnyModule> load_remora_model(const std::string& path, torch::Tensor
     const auto kmer_len = toml::find<int>(model_params, "kmer_len");
     const auto num_out = toml::find<int>(model_params, "num_out");
 
+    // TODO: detect the correct model!
     auto model = RemoraConvLSTMModel(size, kmer_len, num_out);
     auto state_dict = model->load_weights(path);
     model->load_state_dict(state_dict);
@@ -252,4 +214,39 @@ ModuleHolder<AnyModule> load_remora_model(const std::string& path, torch::Tensor
     auto holder = ModuleHolder<AnyModule>(module);
 
     return holder;
+}
+
+RemoraCaller::RemoraCaller(const std::string& model, std::string device) {
+    m_options = torch::TensorOptions().dtype(dtype).device(device == "metal" ? "cpu" : device);
+    m_module = load_remora_model(model, m_options);
+
+    auto config = toml::parse(model + "/config.toml");
+    const auto& params = toml::find(config, "modbases");
+    const auto num_motifs = toml::find<int>(params, "num_motifs");
+    std::vector<std::string> mod_long_names;
+    std::vector<std::string> motifs;
+    std::vector<int> motif_offsets;
+    for (auto i = 0; i < num_motifs; ++i) {
+        auto counter_string = std::to_string(i);
+        mod_long_names.push_back(
+                toml::find<std::string>(params, "mod_long_names_" + counter_string));
+        motifs.push_back(toml::find<std::string>(params, "motif_" + counter_string));
+        motif_offsets.push_back(toml::find<int>(params, "motif_offset_" + counter_string));
+    }
+
+    std::pair<int, int> chunk_contexts{toml::find<int>(params, "chunk_context_0"),
+                                       toml::find<int>(params, "chunk_context_1")};
+
+    std::pair<int, int> kmer_context_bases{toml::find<int>(params, "kmer_context_bases_0"),
+                                           toml::find<int>(params, "kmer_context_bases_1")};
+
+    const auto offset = toml::find<int>(params, "offset");
+    const auto mod_bases = toml::find<std::string>(params, "mod_bases");
+}
+
+RemoraRunner::RemoraRunner(const std::vector<std::string>& model_paths, std::string device) {
+    // no metal implementation yet, force to cpu
+    for (const auto& model : model_paths) {
+        m_callers.push_back(std::make_shared<RemoraCaller>(model, device));
+    }
 }

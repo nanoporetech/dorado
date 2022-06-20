@@ -4,6 +4,7 @@
 #include "decode/GPUDecoder.h"
 #include "nn/MetalCRFModel.h"
 #include "nn/ModelRunner.h"
+#include "nn/RemoraModel.h"
 #include "read_pipeline/BasecallerNode.h"
 #include "read_pipeline/ModBaseCallerNode.h"
 #include "read_pipeline/ScalerNode.h"
@@ -53,6 +54,11 @@ void setup(std::vector<std::string> args,
         remora_model_list.push_back(model);
     }
 
+    std::vector<std::shared_ptr<RemoraRunner>> mod_base_runners;
+    for (int i = 0; i < num_runners; i++) {
+        mod_base_runners.push_back(std::make_shared<RemoraRunner>(remora_model_list, device));
+    }
+
     WriterNode writer_node(std::move(args), emit_fastq);
 
     std::unique_ptr<ModBaseCallerNode> mod_base_caller_node;
@@ -61,7 +67,7 @@ void setup(std::vector<std::string> args,
     if (!remora_model_list.empty()) {
         // generate model callers
 
-        mod_base_caller_node.reset(new ModBaseCallerNode(writer_node));
+        mod_base_caller_node.reset(new ModBaseCallerNode(writer_node, mod_base_runners));
         basecaller_node = std::make_unique<BasecallerNode>(*mod_base_caller_node, runners,
                                                            batch_size, chunk_size, overlap);
     } else {

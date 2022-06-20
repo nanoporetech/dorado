@@ -3,7 +3,9 @@
 #include <chrono>
 using namespace std::chrono_literals;
 
-ModBaseCallerNode::ModBaseCallerNode(ReadSink& sink, size_t max_reads)
+ModBaseCallerNode::ModBaseCallerNode(ReadSink& sink,
+                                     std::vector<std::shared_ptr<RemoraRunner>>& model_runners,
+                                     size_t max_reads)
         : ReadSink(max_reads),
           m_sink(sink),
           m_worker(new std::thread(&ModBaseCallerNode::worker_thread, this)) {}

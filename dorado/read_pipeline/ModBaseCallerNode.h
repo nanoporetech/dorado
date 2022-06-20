@@ -1,9 +1,15 @@
 #pragma once
 #include "ReadPipeline.h"
 
+#include <memory>
+
+class RemoraRunner;
+
 class ModBaseCallerNode : public ReadSink {
 public:
-    ModBaseCallerNode(ReadSink& sink, size_t max_reads = 1000);
+    ModBaseCallerNode(ReadSink& sink,
+                      std::vector<std::shared_ptr<RemoraRunner>>& model_runners,
+                      size_t max_reads = 1000);
     ~ModBaseCallerNode();
 
 private:
