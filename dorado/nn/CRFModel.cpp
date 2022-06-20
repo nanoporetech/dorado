@@ -117,6 +117,35 @@ struct CRFModelImpl : Module {
 
     torch::Tensor forward(torch::Tensor x) { return encoder->forward(x); }
 
+    std::vector<torch::Tensor> load_weights(const std::string& dir) {
+        auto tensors = std::vector<std::string>{
+
+                "0.conv.weight.tensor",      "0.conv.bias.tensor",
+
+                "1.conv.weight.tensor",      "1.conv.bias.tensor",
+
+                "2.conv.weight.tensor",      "2.conv.bias.tensor",
+
+                "4.rnn.weight_ih_l0.tensor", "4.rnn.weight_hh_l0.tensor",
+                "4.rnn.bias_ih_l0.tensor",   "4.rnn.bias_hh_l0.tensor",
+
+                "5.rnn.weight_ih_l0.tensor", "5.rnn.weight_hh_l0.tensor",
+                "5.rnn.bias_ih_l0.tensor",   "5.rnn.bias_hh_l0.tensor",
+
+                "6.rnn.weight_ih_l0.tensor", "6.rnn.weight_hh_l0.tensor",
+                "6.rnn.bias_ih_l0.tensor",   "6.rnn.bias_hh_l0.tensor",
+
+                "7.rnn.weight_ih_l0.tensor", "7.rnn.weight_hh_l0.tensor",
+                "7.rnn.bias_ih_l0.tensor",   "7.rnn.bias_hh_l0.tensor",
+
+                "8.rnn.weight_ih_l0.tensor", "8.rnn.weight_hh_l0.tensor",
+                "8.rnn.bias_ih_l0.tensor",   "8.rnn.bias_hh_l0.tensor",
+
+                "9.linear.weight.tensor",    "9.linear.bias.tensor"};
+
+        return ::utils::load_weights(dir, tensors);
+    }
+
     Permute permute{nullptr};
     LSTMStack rnns{nullptr};
     LinearCRF linear{nullptr};
@@ -141,8 +170,8 @@ ModuleHolder<AnyModule> load_crf_model(const std::string& path,
     int outsize = pow(4, state_len) * 4;
     bool expand = options.device_opt().value() == torch::kCPU;
 
-    auto state_dict = load_weights(path);
     auto model = CRFModel(insize, outsize, stride, expand);
+    auto state_dict = model->load_weights(path);
     model->load_state_dict(state_dict);
     model->to(options.dtype_opt().value().toScalarType());
     model->to(options.device_opt().value());
