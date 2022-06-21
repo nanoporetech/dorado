@@ -375,7 +375,7 @@ public:
         m_batch_size = batch_size;
         int outsize = m_states * num_transitions;
 
-        auto state_dict = ::utils::load_weights(model_path);
+        auto state_dict = load_weights(model_path);
 
         auto lw = state_dict[state_dict.size() - 2];
         auto lb = state_dict[state_dict.size() - 1];
@@ -444,6 +444,35 @@ public:
         for (auto &thr : m_decode_threads) {
             thr->join();
         }
+    }
+
+    std::vector<torch::Tensor> load_weights(const std::string &dir) {
+        auto tensors = std::vector<std::string>{
+
+                "0.conv.weight.tensor",      "0.conv.bias.tensor",
+
+                "1.conv.weight.tensor",      "1.conv.bias.tensor",
+
+                "2.conv.weight.tensor",      "2.conv.bias.tensor",
+
+                "4.rnn.weight_ih_l0.tensor", "4.rnn.weight_hh_l0.tensor",
+                "4.rnn.bias_ih_l0.tensor",   "4.rnn.bias_hh_l0.tensor",
+
+                "5.rnn.weight_ih_l0.tensor", "5.rnn.weight_hh_l0.tensor",
+                "5.rnn.bias_ih_l0.tensor",   "5.rnn.bias_hh_l0.tensor",
+
+                "6.rnn.weight_ih_l0.tensor", "6.rnn.weight_hh_l0.tensor",
+                "6.rnn.bias_ih_l0.tensor",   "6.rnn.bias_hh_l0.tensor",
+
+                "7.rnn.weight_ih_l0.tensor", "7.rnn.weight_hh_l0.tensor",
+                "7.rnn.bias_ih_l0.tensor",   "7.rnn.bias_hh_l0.tensor",
+
+                "8.rnn.weight_ih_l0.tensor", "8.rnn.weight_hh_l0.tensor",
+                "8.rnn.bias_ih_l0.tensor",   "8.rnn.bias_hh_l0.tensor",
+
+                "9.linear.weight.tensor",    "9.linear.bias.tensor"};
+
+        return ::utils::load_weights(dir, tensors);
     }
 
     struct NNTask {
