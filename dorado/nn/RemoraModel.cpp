@@ -1,10 +1,13 @@
 #include "RemoraModel.h"
 
+#include "../utils/base64_utils.h"
 #include "../utils/module_utils.h"
 #include "../utils/tensor_utils.h"
 
 #include <toml.hpp>
 #include <torch/torch.h>
+
+#include <stdexcept>
 
 using namespace torch::nn;
 
@@ -275,6 +278,24 @@ RemoraCaller::RemoraCaller(const std::string& model, std::string device) {
 
     const auto offset = toml::find<int>(params, "offset");
     const auto mod_bases = toml::find<std::string>(params, "mod_bases");
+
+    try {
+        // these may not exist if we convert older models
+        const auto& refinement_params = toml::find(config, "refinement");
+        const auto refine_do_rough_rescale =
+                toml::find<int>(refinement_params, "refine_do_rough_rescale");
+        if (refine_do_rough_rescale != 0) {
+            const auto refine_kmer_center_idx =
+                    toml::find<int>(refinement_params, "refine_kmer_center_idx");
+            const auto refine_kmer_levels_base64 =
+                    toml::find<std::string>(refinement_params, "refine_kmer_levels_binary");
+            std::vector<float> refine_kmer_levels;
+            ::utils::decode_base64(refine_kmer_levels_base64, refine_kmer_levels);
+        }
+
+    } catch (const std::out_of_range& ex) {
+        // no refinement parameters, nothing to do
+    }
 }
 
 RemoraRunner::RemoraRunner(const std::vector<std::string>& model_paths, std::string device) {
