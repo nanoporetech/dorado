@@ -375,7 +375,7 @@ public:
         m_batch_size = batch_size;
         int outsize = m_states * num_transitions;
 
-        auto state_dict = load_weights(model_path);
+        auto state_dict = ::utils::load_weights(model_path);
 
         auto lw = state_dict[state_dict.size() - 2];
         auto lb = state_dict[state_dict.size() - 1];
