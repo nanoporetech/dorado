@@ -5,9 +5,11 @@
 #include <math.h>
 #include <toml.hpp>
 #include <torch/torch.h>
+#include <ATen/cuda/CUDAContext.h>
 
 using namespace torch::nn;
 namespace F = torch::nn::functional;
+using Slice = torch::indexing::Slice;
 
 struct PermuteImpl : Module {
     torch::Tensor forward(torch::Tensor x) { return x.permute({2, 0, 1}); }
@@ -54,6 +56,141 @@ struct LinearCRFImpl : Module {
     Tanh activation{nullptr};
 };
 
+
+#define USE_CUSPARSE 1
+#if USE_CUSPARSE
+extern "C" {
+#include "koi.h"
+}
+#include <cuda_runtime.h>
+#include <cublas_v2.h>
+
+#define CUDA_CHECK(X) { cudaError_t error = X; if (error != cudaSuccess) { \
+  printf("CUDA returned error %s (code %d), line(%d)\n", cudaGetErrorString(error), error, __LINE__); \
+  exit(EXIT_FAILURE); \
+}}
+#define CUBLAS_CHECK(X) { cublasStatus_t res = X; if (res != CUBLAS_STATUS_SUCCESS) { \
+  printf("CuBLAS returned error code %d, line(%d)\n", int(res), __LINE__); \
+  exit(EXIT_FAILURE); \
+}}
+#define CUSPARSE_CHECK(X) { cusparseStatus_t res = X; if (res != CUSPARSE_STATUS_SUCCESS) { \
+  printf("CuSPARSELt returned error code %d, line(%d)\n", int(res), __LINE__); \
+  exit(EXIT_FAILURE); \
+}}
+
+static int get_cuda_device_id_from_device(const c10::Device& device) {
+    if (!device.is_cuda() || !device.has_index()) {
+        std::stringstream ss;
+        ss << "Unable to extract CUDA device ID from device " << device;
+        throw std::runtime_error(ss.str());
+    }
+
+    return device.index();
+}
+
+struct CusparseLSTMImpl : Module {
+    CusparseLSTMImpl(int layer_size, bool reverse_) : reverse(reverse_) {
+        // TODO: do we need to specify .device("gpu")?
+        auto options = torch::TensorOptions().dtype(torch::kFloat16);
+        weights = torch::empty({layer_size * 4, layer_size * 2}, options).contiguous();
+        auto weight_ih = weights.slice(1, 0, layer_size);
+        auto weight_hh = weights.slice(1, layer_size, 2 * layer_size);
+        if (reverse) {
+            std::swap(weight_ih, weight_hh);
+        }
+        bias = torch::empty({layer_size * 4}, options).contiguous();
+        auto bias_hh = torch::empty({layer_size * 4}, options).contiguous();
+
+        register_parameter("weight_ih", weight_ih, false);
+        register_parameter("weight_hh", weight_hh, false);
+        register_parameter("bias_ih", bias, false);
+        register_parameter("bias_hh", bias_hh, false);
+    }
+
+    torch::Tensor weights, bias;
+    bool reverse;
+};
+
+TORCH_MODULE(CusparseLSTM);
+
+struct LSTMStackImpl : Module {
+    LSTMStackImpl(int layer_size_) : layer_size(layer_size_) {
+        rnn1 = register_module("rnn_1", CusparseLSTM(layer_size, true));
+        rnn2 = register_module("rnn_2", CusparseLSTM(layer_size, false));
+        rnn3 = register_module("rnn_3", CusparseLSTM(layer_size, true));
+        rnn4 = register_module("rnn_4", CusparseLSTM(layer_size, false));
+        rnn5 = register_module("rnn_5", CusparseLSTM(layer_size, true));
+
+        CUBLAS_CHECK(cublasCreate(&cublas_handle));
+        CUBLAS_CHECK(cublasSetStream(cublas_handle, 0));
+    }
+
+    torch::Tensor forward(torch::Tensor in) {
+//        int cuda_device_id = get_cuda_device_id_from_device(in.device());
+//        if (cudaSetDevice(cuda_device_id) != cudaSuccess) {
+//            throw std::runtime_error("Unable to set cuda device!");
+//        }
+
+        auto tensor_options = torch::TensorOptions()
+                                    .dtype(torch::kFloat16)
+                                    .device(in.device())
+                                    .requires_grad(false);
+        int chunk_size = in.size(0);
+        int batch_size = in.size(1);
+        int gate_size = layer_size * 4;
+        // copy contents of `in` into larger working memory matrix (holding both
+        // input and output interleaved, as well as padding zeroes)
+        auto mat_working_mem = torch::zeros({chunk_size + 1, batch_size, 2, in.size(2)}, tensor_options).contiguous();
+        mat_working_mem.slice(0, 1, chunk_size + 1).select(2, 1) = in;
+        size_t timestep_buf_size = size_t(batch_size) * 2 * layer_size;
+        int16_t *working_mem_ptr = (int16_t *)mat_working_mem.data_ptr();
+        torch::Tensor gate_buf = torch::empty({batch_size * gate_size}, tensor_options);
+        torch::Tensor state_buf = torch::empty({batch_size * layer_size}, tensor_options);
+
+        auto stream = at::cuda::getCurrentCUDAStream().stream();
+
+        for (auto &rnn : {rnn1, rnn2, rnn3, rnn4, rnn5}) {
+            cudaMemsetAsync(state_buf.data_ptr(), 0, size_t(batch_size) * layer_size * sizeof(int16_t), stream);
+            // TODO: cache per-device weights and bias
+            auto weights_cpu = rnn->weights.t().contiguous();
+            auto weights = weights_cpu.to(in.device());
+            auto bias = rnn->bias.to(in.device());
+            for (int ts = 0; ts < chunk_size; ++ts) {
+                void *timestep_in = working_mem_ptr + timestep_buf_size * ts;
+                void *timestep_out = working_mem_ptr + timestep_buf_size * (ts + 1) + layer_size;
+                if (rnn->reverse) {
+                    timestep_out = working_mem_ptr + timestep_buf_size * (chunk_size - ts - 1);
+                    timestep_in = working_mem_ptr + timestep_buf_size * (chunk_size - ts);
+                }
+
+                // timestep matrix mulitplication
+                static constexpr uint16_t HALF_ZERO = 0;     // 0.0 in half precision floating point format
+                static constexpr uint16_t HALF_ONE = 0x3C00; // 1.0 in half precision floating point format
+                CUBLAS_CHECK(cublasGemmEx(at::cuda::getCurrentCUDABlasHandle(), CUBLAS_OP_N, CUBLAS_OP_N,
+                        gate_size, batch_size, 2 * layer_size, &HALF_ONE,
+                        (const void *) weights.data_ptr(), CUDA_R_16F, gate_size,
+                        (const void *) timestep_in, CUDA_R_16F, 2 * layer_size,
+                        &HALF_ZERO, (void *) gate_buf.data_ptr(), CUDA_R_16F, gate_size,
+                        CUDA_R_16F, CUBLAS_GEMM_DEFAULT_TENSOR_OP));
+                host_lstm_step_f16(stream, batch_size, layer_size, bias.data_ptr(),
+                    gate_buf.data_ptr(), state_buf.data_ptr(), timestep_out);
+            }
+        }
+        CUDA_CHECK(cudaDeviceSynchronize());
+
+        // TODO: can we modify and return `in` here, or define a `forward_inplace()` method?
+        torch::Tensor out = torch::empty_like(in);
+        out.slice(0, 0, chunk_size) = mat_working_mem.index({Slice(0, chunk_size), Slice(), 0});
+        return out;
+    }
+
+    int layer_size;
+    CusparseLSTM rnn1{nullptr}, rnn2{nullptr}, rnn3{nullptr}, rnn4{nullptr}, rnn5{nullptr};
+    cublasHandle_t cublas_handle;
+};
+
+#else // if USE_CUSPARSE
+
 struct LSTMStackImpl : Module {
     LSTMStackImpl(int size) {
         rnn1 = register_module("rnn1", LSTM(LSTMOptions(size, size)));
@@ -93,128 +230,13 @@ struct LSTMStackImpl : Module {
     LSTM rnn1{nullptr}, rnn2{nullptr}, rnn3{nullptr}, rnn4{nullptr}, rnn5{nullptr};
 };
 
+#endif // if USE_CUSPARSE else
+
 TORCH_MODULE(Permute);
 TORCH_MODULE(LSTMStack);
 TORCH_MODULE(LinearCRF);
 TORCH_MODULE(Convolution);
 
-#if USE_CUSPARSE
-
-#define CUSPARSE_CHECK(X) { cusparseStatus_t res = X; if (res != CUSPARSE_STATUS_SUCCESS) { \
-  printf("CuSPARSELt returned error code %d, line(%d)\n", int(res), __LINE__); \
-  exit(EXIT_FAILURE); \
-}}
-
-struct CusparseLSTMImpl : Module {
-    CusparseLSTMImpl(int layer_size, bool reverse_) : reverse(reverse_) {
-        // TODO: do we need to specify .device("gpu")?
-        auto options = torch::TensorOptions().dtype(torch::kFloat16);
-        weight = torch::empty({layer_size * 4, layer_size * 2}, options).contiguous();
-        auto weight_ih = weight.index({Slice(), Slice(0, layer_size));
-        auto weight_hh = weight.index({Slice(), Slice(layer_size, 2 * layer_size));
-        if (reverse) {
-            std::swap(weight_ih, weight_hh);
-        }
-        bias = torch::empty({layer_size * 4}, options).contiguous();
-
-        register_parameter("weight_ih", weight_ih, false);
-        register_parameter("weight_hh", weight_hh, false);
-        register_parameter("bias_ih", bias, false);
-        // TODO: do we need to register "bias_hh"?
-    }
-
-    torch::Tensor weight, bias;
-    bool reverse;
-};
-
-TORCH_MODULE(CusparseLSTM);
-
-struct CusparseLSTMBlockImpl : Module {
-    CusparseLSTMBlockImpl(int chunk_size_,
-                   int batch_size_,
-                   int stride_,
-                   int layer_size_,
-                   int out_size_)
-            : in_chunk_size(chunk_size_),
-              stride(stride_),
-              batch_size(batch_size_),
-              layer_size(layer_size_),
-              out_size(out_size_) {
-        lstm_chunk_size = in_chunk_size / stride;
-
-//        reorder_input_cps = make_cps(device, "reorder_input");
-//        reorder_output_cps = make_cps(device, "reorder_output");
-//        reorder_weights_cps = make_cps(device, "reorder_weights");
-
-        // TODO: we can reuse some of these matrices
-        mat_working_mem = create_buffer(
-                device, size_t(lstm_chunk_size + 2) * batch_size * layer_size * sizeof(ftype));
-        mat_state = create_buffer(device, batch_size * layer_size * sizeof(ftype));
-        mat_temp_result = create_buffer(device, batch_size * layer_size * 4 * sizeof(ftype));
-
-        rnn1 = register_module("rnn_1", CusparseLSTM(layer_size, true, device));
-        rnn2 = register_module("rnn_2", CusparseLSTM(layer_size, false, device));
-        rnn3 = register_module("rnn_3", CusparseLSTM(layer_size, true, device));
-        rnn4 = register_module("rnn_4", CusparseLSTM(layer_size, false, device));
-        rnn5 = register_module("rnn_5", CusparseLSTM(layer_size, true, device));
-    }
-
-    void load_weights() {
-        for (auto &rnn : {rnn1, rnn2, rnn3, rnn4, rnn5}) {
-            auto params = rnn->named_parameters();
-
-            auto t_w = *params.find("weight_ih");
-            auto t_u = *params.find("weight_hh");
-            auto t_b = *params.find("bias_ih");
-
-            // reorder from IFGO to GIFO (2, 0, 1, 3)
-            t_w = t_w.reshape({4, layer_size, layer_size}).transpose(1, 2);
-            t_w = torch::concat({t_w[2], t_w[0], t_w[1], t_w[3]}, 1);
-
-            t_u = t_u.reshape({4, layer_size, layer_size}).transpose(1, 2);
-            t_u = torch::concat({t_u[2], t_u[0], t_u[1], t_u[3]}, 1);
-
-            t_b = t_b.reshape({4, layer_size});
-            t_b = torch::concat({t_b[2], t_b[0], t_b[1], t_b[3]});
-
-            t_w = t_w.flatten(0, -1).contiguous();
-            t_u = t_u.flatten(0, -1).contiguous();
-            t_b = t_b.flatten(0, -1).contiguous();
-
-            std::vector<MTL::Buffer *> buffers{args[rnn->reverse], mtl_for_tensor(t_w),
-                                               mtl_for_tensor(t_u), mtl_for_tensor(t_b),
-                                               rnn->mat_weights};
-            launch_kernel(reorder_weights_cps, command_queue, buffers, kernel_thread_groups, 256);
-        }
-    }
-
-    torch::Tensor forward(torch::Tensor in) {
-        auto options = torch::TensorOptions().dtype(torch::kFloat16);
-        auto mat_working_mem = torch::zeros({in.size(0) + 1, in.size(1), in.size(2) * 2}, options).contiguous();
-        if (rnn1.reverse) {
-            mat_working_mem.slice({Slice(0, in.size(0)), Slice(), Slice(0, in.size(2))}) = in;
-        } else {
-            mat_working_mem.slice({Slice(1, in.size(0)), Slice(), Slice(in.size(2), 2 * in.size(2))}) = in;
-        }
-
-        torch::Tensor out = torch::empty({lstm_chunk_size, batch_size, out_size});
-        for (auto &rnn : {rnn1, rnn2, rnn3, rnn4, rnn5}) {
-            std::vector<MTL::Buffer *> buffers{args[rnn->reverse], mat_working_mem,
-                                               rnn->mat_weights, mat_state, mat_temp_result};
-            launch_kernel_no_wait(lstm_cps[rnn->reverse], command_buffer, buffers,
-                                  kernel_thread_groups, kernel_simd_groups * 32);
-        }
-        return out;
-    }
-
-    int in_chunk_size, lstm_chunk_size, stride, batch_size, layer_size, out_size,
-            kernel_thread_groups, kernel_simd_groups;
-    CusparseLSTM rnn1{nullptr}, rnn2{nullptr}, rnn3{nullptr}, rnn4{nullptr}, rnn5{nullptr};
-};
-
-TORCH_MODULE(CusparseLSTMBlock);
-
-#endif // USE_CUSPARSE
 
 struct CRFModelImpl : Module {
     CRFModelImpl(int size, int outsize, int stride, bool expand_blanks) {
