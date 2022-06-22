@@ -1,6 +1,7 @@
 #include "RemoraModel.h"
 
 #include "../utils/base64_utils.h"
+#include "../utils/math_utils.h"
 #include "../utils/module_utils.h"
 #include "../utils/tensor_utils.h"
 
@@ -251,55 +252,64 @@ ModuleHolder<AnyModule> load_remora_model(const std::string& path, torch::Tensor
     return holder;
 }
 
-RemoraCaller::RemoraCaller(const std::string& model, std::string device) {
+RemoraCaller::RemoraCaller(const std::string& model, const std::string& device) {
     // no metal implementation yet, force to cpu
     m_options = torch::TensorOptions().dtype(dtype).device(device == "metal" ? "cpu" : device);
     m_module = load_remora_model(model, m_options);
 
     auto config = toml::parse(model + "/config.toml");
     const auto& params = toml::find(config, "modbases");
-    const auto num_motifs = toml::find<int>(params, "num_motifs");
-    std::vector<std::string> mod_long_names;
-    std::vector<std::string> motifs;
-    std::vector<int> motif_offsets;
-    for (auto i = 0; i < num_motifs; ++i) {
+    m_params.num_motifs = toml::find<int>(params, "num_motifs");
+    for (auto i = 0; i < m_params.num_motifs; ++i) {
         auto counter_string = std::to_string(i);
-        mod_long_names.push_back(
+        m_params.mod_long_names.push_back(
                 toml::find<std::string>(params, "mod_long_names_" + counter_string));
-        motifs.push_back(toml::find<std::string>(params, "motif_" + counter_string));
-        motif_offsets.push_back(toml::find<int>(params, "motif_offset_" + counter_string));
+        m_params.motifs.push_back(toml::find<std::string>(params, "motif_" + counter_string));
+        m_params.motif_offsets.push_back(toml::find<int>(params, "motif_offset_" + counter_string));
     }
 
-    std::pair<int, int> chunk_contexts{toml::find<int>(params, "chunk_context_0"),
-                                       toml::find<int>(params, "chunk_context_1")};
+    m_params.context_block_before = toml::find<int>(params, "chunk_context_0");
+    m_params.context_block_after = toml::find<int>(params, "chunk_context_1");
+    m_params.bases_before = toml::find<int>(params, "kmer_context_bases_0");
+    m_params.bases_after = toml::find<int>(params, "kmer_context_bases_1");
 
-    std::pair<int, int> kmer_context_bases{toml::find<int>(params, "kmer_context_bases_0"),
-                                           toml::find<int>(params, "kmer_context_bases_1")};
-
-    const auto offset = toml::find<int>(params, "offset");
-    const auto mod_bases = toml::find<std::string>(params, "mod_bases");
+    m_params.offset = toml::find<int>(params, "offset");
+    m_params.mod_bases = toml::find<std::string>(params, "mod_bases");
 
     try {
         // these may not exist if we convert older models
         const auto& refinement_params = toml::find(config, "refinement");
-        const auto refine_do_rough_rescale =
-                toml::find<int>(refinement_params, "refine_do_rough_rescale");
-        if (refine_do_rough_rescale != 0) {
-            const auto refine_kmer_center_idx =
+        m_params.refine_do_rough_rescale =
+                (toml::find<int>(refinement_params, "refine_do_rough_rescale") == 1);
+        if (m_params.refine_do_rough_rescale) {
+            m_params.refine_kmer_center_idx =
                     toml::find<int>(refinement_params, "refine_kmer_center_idx");
             const auto refine_kmer_levels_base64 =
                     toml::find<std::string>(refinement_params, "refine_kmer_levels_binary");
-            std::vector<float> refine_kmer_levels;
-            ::utils::decode_base64(refine_kmer_levels_base64, refine_kmer_levels);
+            ::utils::decode_base64(refine_kmer_levels_base64, m_params.refine_kmer_levels);
         }
 
     } catch (const std::out_of_range& ex) {
-        // no refinement parameters, nothing to do
+        // no refinement parameters
+        m_params.refine_do_rough_rescale = false;
     }
 }
 
-RemoraRunner::RemoraRunner(const std::vector<std::string>& model_paths, std::string device) {
+void RemoraCaller::call(torch::Tensor signal,
+                        const std::string& seq,
+                        const std::vector<uint8_t>& moves) {}
+
+RemoraRunner::RemoraRunner(const std::vector<std::string>& model_paths, const std::string& device) {
     for (const auto& model : model_paths) {
         m_callers.push_back(std::make_shared<RemoraCaller>(model, device));
+    }
+}
+
+void RemoraRunner::run(torch::Tensor signal,
+                       const std::string& seq,
+                       const std::vector<uint8_t>& moves) {
+    // each caller will have different parameters
+    for (auto& caller : m_callers) {
+        caller->call(signal, seq, moves);
     }
 }
