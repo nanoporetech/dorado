@@ -2,6 +2,7 @@ set(SOURCE_FILES
     main.cpp
     Fast5DataLoaderTest.cpp
     ReadTest.cpp
+    RemoraEncoderTest.cpp
     StitchTest.cpp
     )
 

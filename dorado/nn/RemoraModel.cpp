@@ -11,6 +11,11 @@
 #include <stdexcept>
 
 using namespace torch::nn;
+using namespace torch::indexing;
+
+namespace {
+constexpr int NUM_BASES = 4;
+}
 
 struct ConvBatchNormImpl : Module {
     ConvBatchNormImpl(int size = 1,
@@ -252,7 +257,8 @@ ModuleHolder<AnyModule> load_remora_model(const std::string& path, torch::Tensor
     return holder;
 }
 
-RemoraCaller::RemoraCaller(const std::string& model, const std::string& device) {
+RemoraCaller::RemoraCaller(const std::string& model, const std::string& device, int batch_size)
+        : m_batch_size(batch_size) {
     // no metal implementation yet, force to cpu
     m_options = torch::TensorOptions().dtype(dtype).device(device == "metal" ? "cpu" : device);
     m_module = load_remora_model(model, m_options);
@@ -268,8 +274,8 @@ RemoraCaller::RemoraCaller(const std::string& model, const std::string& device) 
         m_params.motif_offsets.push_back(toml::find<int>(params, "motif_offset_" + counter_string));
     }
 
-    m_params.context_block_before = toml::find<int>(params, "chunk_context_0");
-    m_params.context_block_after = toml::find<int>(params, "chunk_context_1");
+    m_params.context_before = toml::find<int>(params, "chunk_context_0");
+    m_params.context_after = toml::find<int>(params, "chunk_context_1");
     m_params.bases_before = toml::find<int>(params, "kmer_context_bases_0");
     m_params.bases_after = toml::find<int>(params, "kmer_context_bases_1");
 
@@ -293,11 +299,78 @@ RemoraCaller::RemoraCaller(const std::string& model, const std::string& device) 
         // no refinement parameters
         m_params.refine_do_rough_rescale = false;
     }
+
+    auto sig_len = static_cast<int64_t>(m_params.context_before + m_params.context_after);
+    auto kmer_len = m_params.bases_after + m_params.bases_before + 1;
+
+    m_input_sigs = torch::zeros({batch_size, 1, sig_len},
+                                torch::TensorOptions().dtype(dtype).device(torch::kCPU));
+    m_input_seqs = torch::zeros({batch_size, NUM_BASES * kmer_len, sig_len},
+                                torch::TensorOptions().dtype(dtype).device(torch::kCPU));
+}
+
+std::vector<size_t> RemoraCaller::get_motif_hits(const std::string& seq) const {
+    std::vector<size_t> context_hits;
+    for (int i = 0; i < m_params.num_motifs; ++i) {
+        const auto& motif = m_params.motifs[i];
+        const auto motif_offset = m_params.motif_offsets[i];
+        size_t kmer_len = motif.size();
+        size_t search_pos = 0;
+        while (search_pos < seq.size() - kmer_len + 1) {
+            search_pos = seq.find(motif, search_pos);
+            if (search_pos != std::string::npos) {
+                context_hits.push_back(search_pos + motif_offset);
+                ++search_pos;
+            }
+        }
+    }
+    return context_hits;
 }
 
 void RemoraCaller::call(torch::Tensor signal,
                         const std::string& seq,
-                        const std::vector<uint8_t>& moves) {}
+                        const std::vector<uint8_t>& moves) {
+    auto block_stride = ::utils::div_round_closest(signal.size(0), moves.size());
+    RemoraEncoder encoder(block_stride,
+                          (m_params.context_before + m_params.context_after) / block_stride,
+                          m_params.bases_before, m_params.bases_after);
+    encoder.encode_remora_data(moves, seq);
+    auto context_hits = get_motif_hits(seq);
+    auto options = torch::TensorOptions().dtype(torch::kFloat32);
+    auto kmer_len = m_params.bases_after + m_params.bases_before + 1;
+    auto sig_len = static_cast<int64_t>(m_params.context_before + m_params.context_after);
+
+    auto counter = 0;
+    for (auto context_hit : context_hits) {
+        auto slice = encoder.get_context(context_hit);
+        size_t first_sample_source = slice.first_sample;
+        size_t last_sample_source = first_sample_source + slice.num_samples;
+        size_t first_sample_dest = slice.lead_samples_needed;
+        size_t last_sample_dest = first_sample_dest + slice.num_samples;
+        size_t total_samples =
+                slice.lead_samples_needed + slice.num_samples + slice.tail_samples_needed;
+        auto input_signal = signal.index({Slice(first_sample_source, last_sample_source)});
+        m_input_sigs.index_put_({counter, 0, Slice(first_sample_dest, last_sample_dest)},
+                                input_signal);
+
+        auto options = torch::TensorOptions().dtype(torch::kFloat32).device(torch::kCPU);
+        torch::Tensor encoded_kmers = torch::empty({4 * kmer_len, sig_len}, options);
+        std::copy_n(slice.data, slice.size, encoded_kmers.contiguous().data_ptr<float>());
+        m_input_seqs.index_put_({counter}, encoded_kmers);
+        if (++counter == m_batch_size) {
+            counter = 0;
+            auto scores = m_module->forward(m_input_sigs.to(m_options.device_opt().value()),
+                                            m_input_seqs.to(m_options.device_opt().value()));
+        }
+    }
+
+    if (counter != 0) {
+        auto scores = m_module->forward(m_input_sigs.index({Slice(0, counter), Slice(), Slice()})
+                                                .to(m_options.device_opt().value()),
+                                        m_input_seqs.index({Slice(0, counter), Slice(), Slice()})
+                                                .to(m_options.device_opt().value()));
+    }
+}
 
 RemoraRunner::RemoraRunner(const std::vector<std::string>& model_paths, const std::string& device) {
     for (const auto& model : model_paths) {
@@ -312,4 +385,135 @@ void RemoraRunner::run(torch::Tensor signal,
     for (auto& caller : m_callers) {
         caller->call(signal, seq, moves);
     }
+}
+
+RemoraEncoder::RemoraEncoder(size_t block_stride,
+                             size_t context_blocks,
+                             int bases_before,
+                             int bases_after)
+        : m_base_mapping(255, -1),
+          m_bases_before(bases_before),
+          m_kmer_len(bases_before + bases_after + 1),
+          m_block_stride(int(block_stride)),
+          m_context_blocks(int(context_blocks)),
+          m_seq_len(0),
+          m_signal_len(0) {
+    m_padding = m_context_blocks / 2;
+    int padding_for_bases_before = (m_kmer_len - 1 - bases_before) * int(block_stride);
+    int padding_for_bases_after = (m_kmer_len - 1 - bases_after) * int(block_stride);
+    int padding_for_bases = std::max(padding_for_bases_before, padding_for_bases_after);
+    m_padding = std::max(padding_for_bases, m_padding);
+    m_base_mapping['A'] = 0;
+    m_base_mapping['C'] = 1;
+    m_base_mapping['G'] = 2;
+    m_base_mapping['T'] = 3;
+}
+
+void RemoraEncoder::encode_remora_data(const std::vector<uint8_t>& moves,
+                                       const std::string& sequence) {
+    // This code assumes that the first move value will always be 1. It also assumes that moves is only ever 0 or 1.
+    m_seq_len = int(sequence.size());
+    m_signal_len = int(moves.size()) * m_block_stride;
+    int padded_signal_len = m_signal_len + m_block_stride * m_padding * 2;
+    int encoded_data_size = padded_signal_len * m_kmer_len * NUM_BASES;
+    m_sample_offsets.clear();
+    m_sample_offsets.reserve(moves.size());
+    m_encoded_data.resize(encoded_data_size);
+
+    // Note that upon initialization, encoded_data is all zeros, which corresponds to "N" characters.
+
+    // First we need to find out which sample each base corresponds to, and make sure the moves vector is consistent
+    // with the sequence length.
+    int base_count = 0;
+    for (int i = 0; i < int(moves.size()); ++i) {
+        if (i == 0 || moves[i] == 1) {
+            m_sample_offsets.push_back(i * m_block_stride);
+            ++base_count;
+        }
+    }
+    if (base_count > m_seq_len) {
+        throw std::runtime_error("Movement table indicates more bases than provided in sequence (" +
+                                 std::to_string(base_count) + " > " + std::to_string(m_seq_len) +
+                                 ").");
+    }
+    if (base_count < m_seq_len) {
+        std::cerr << sequence << std::endl;
+        throw std::runtime_error("Movement table indicates fewer bases than provided in sequence(" +
+                                 std::to_string(base_count) + " < " + std::to_string(m_seq_len) +
+                                 ").");
+    }
+
+    // Now we can go through each base and fill in where the 1s belong.
+    std::vector<float> buffer(m_kmer_len * NUM_BASES);
+    for (int seq_pos = -m_kmer_len + 1; seq_pos < m_seq_len; ++seq_pos) {
+        // Fill buffer with the values corresponding to the kmer that begins with the current base.
+        std::fill(buffer.begin(), buffer.end(), 0.0f);
+        for (int kmer_pos = 0; kmer_pos < m_kmer_len; ++kmer_pos) {
+            int this_base_pos = seq_pos + kmer_pos;
+            int base_offset = -1;
+            if (this_base_pos >= 0 && this_base_pos < m_seq_len)
+                base_offset = m_base_mapping[sequence[this_base_pos]];
+            if (base_offset == -1)
+                continue;
+            buffer[kmer_pos * NUM_BASES + base_offset] = 1.0f;
+        }
+
+        // Now we need to copy buffer into the encoded_data vector a number of times equal to the number of samples of
+        // raw data corresponding to the kmer.
+        int base_sample_pos = compute_sample_pos(seq_pos + m_bases_before);
+        int next_base_sample_pos = compute_sample_pos(seq_pos + m_bases_before + 1);
+        int num_repeats = next_base_sample_pos - base_sample_pos;
+
+        // This is the position in the encoded data of the first sample corresponding to the kmer that begins with the
+        // current base.
+        int data_pos = base_sample_pos + m_padding * m_block_stride;
+        if (data_pos + num_repeats > padded_signal_len) {
+            throw std::runtime_error("Insufficient padding error.");
+        }
+        for (int i = 0; i < num_repeats; ++i, ++data_pos) {
+            std::copy(buffer.begin(), buffer.end(),
+                      m_encoded_data.data() + (data_pos * m_kmer_len * NUM_BASES));
+        }
+    }
+}
+
+RemoraEncoder::Context RemoraEncoder::get_context(size_t seq_pos) const {
+    if (seq_pos >= size_t(m_seq_len)) {
+        throw std::out_of_range("Sequence position out of range.");
+    }
+    Context context{};
+    context.size = m_context_blocks * m_block_stride * m_kmer_len * NUM_BASES;
+    int base_sample_pos =
+            (compute_sample_pos(int(seq_pos)) + compute_sample_pos(int(seq_pos) + 1)) / 2;
+    int samples_before = (m_context_blocks / 2) * m_block_stride;
+    int first_sample = base_sample_pos - samples_before;
+    if (first_sample >= 0) {
+        context.first_sample = size_t(first_sample);
+        context.lead_samples_needed = 0;
+    } else {
+        context.first_sample = 0;
+        context.lead_samples_needed = size_t(-first_sample);
+    }
+    int last_sample = first_sample + m_context_blocks * m_block_stride;
+    if (last_sample > m_signal_len) {
+        context.num_samples = size_t(m_signal_len) - context.first_sample;
+        context.tail_samples_needed = last_sample - m_signal_len;
+    } else {
+        context.num_samples = size_t(last_sample) - context.first_sample;
+        context.tail_samples_needed = 0;
+    }
+    context.data = m_encoded_data.data() +
+                   (m_padding * m_block_stride + first_sample) * m_kmer_len * NUM_BASES;
+    return context;
+}
+
+int RemoraEncoder::compute_sample_pos(int base_pos) const {
+    int base_offset = base_pos;
+    if (base_offset < 0) {
+        return m_block_stride * (base_offset);
+    }
+    if (base_offset >= m_seq_len) {
+        return m_signal_len + m_block_stride * (base_offset - m_seq_len);
+    }
+    return m_sample_offsets[base_offset];
 }
