@@ -193,7 +193,6 @@ struct LSTMStackImpl : Module {
                                    gate_buf.data_ptr(), state_buf.data_ptr(), timestep_out);
             }
         }
-        CUDA_CHECK(cudaDeviceSynchronize());
 
         // TODO: can we modify and return `in` here, or define a `forward_inplace()` method?
         torch::Tensor out = torch::empty_like(in);
