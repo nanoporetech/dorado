@@ -8,6 +8,7 @@
 #include <toml.hpp>
 #include <torch/torch.h>
 
+#include <array>
 #include <stdexcept>
 
 using namespace torch::nn;
@@ -267,20 +268,23 @@ RemoraCaller::RemoraCaller(const std::string& model, const std::string& device, 
     const auto& params = toml::find(config, "modbases");
     m_params.num_motifs = toml::find<int>(params, "num_motifs");
     for (auto i = 0; i < m_params.num_motifs; ++i) {
-        auto counter_string = std::to_string(i);
-        m_params.mod_long_names.push_back(
-                toml::find<std::string>(params, "mod_long_names_" + counter_string));
-        m_params.motifs.push_back(toml::find<std::string>(params, "motif_" + counter_string));
-        m_params.motif_offsets.push_back(toml::find<int>(params, "motif_offset_" + counter_string));
+        m_params.motifs.push_back(toml::find<std::string>(params, "motif_" + std::to_string(i)));
+        m_params.motif_offsets.push_back(
+                toml::find<int>(params, "motif_offset_" + std::to_string(i)));
     }
+
+    m_params.mod_bases = toml::find<std::string>(params, "mod_bases");
+    for (size_t i = 0; i < m_params.mod_bases.size(); ++i) {
+        m_params.mod_long_names.push_back(
+                toml::find<std::string>(params, "mod_long_names_" + std::to_string(i)));
+    }
+    m_params.base_mod_counts = m_params.mod_long_names.size();
 
     m_params.context_before = toml::find<int>(params, "chunk_context_0");
     m_params.context_after = toml::find<int>(params, "chunk_context_1");
     m_params.bases_before = toml::find<int>(params, "kmer_context_bases_0");
     m_params.bases_after = toml::find<int>(params, "kmer_context_bases_1");
-
     m_params.offset = toml::find<int>(params, "offset");
-    m_params.mod_bases = toml::find<std::string>(params, "mod_bases");
 
     try {
         // these may not exist if we convert older models
@@ -336,11 +340,15 @@ void RemoraCaller::call(torch::Tensor signal,
                           m_params.bases_before, m_params.bases_after);
     encoder.encode_remora_data(moves, seq);
     auto context_hits = get_motif_hits(seq);
-    auto options = torch::TensorOptions().dtype(torch::kFloat32);
+    auto options = torch::TensorOptions().dtype(torch::kFloat32).device(torch::kCPU);
     auto kmer_len = m_params.bases_after + m_params.bases_before + 1;
     auto sig_len = static_cast<int64_t>(m_params.context_before + m_params.context_after);
 
     auto counter = 0;
+    auto index = 0;
+    auto scores = torch::empty({static_cast<int64_t>(context_hits.size()),
+                                static_cast<int64_t>(m_params.base_mod_counts + 1)});
+
     for (auto context_hit : context_hits) {
         auto slice = encoder.get_context(context_hit);
         size_t first_sample_source = slice.first_sample;
@@ -359,16 +367,21 @@ void RemoraCaller::call(torch::Tensor signal,
         m_input_seqs.index_put_({counter}, encoded_kmers);
         if (++counter == m_batch_size) {
             counter = 0;
-            auto scores = m_module->forward(m_input_sigs.to(m_options.device_opt().value()),
+            auto output = m_module->forward(m_input_sigs.to(m_options.device_opt().value()),
                                             m_input_seqs.to(m_options.device_opt().value()));
+            scores.index_put_({Slice(index, index + m_batch_size), Slice(0, output.size(1))},
+                              output.to(torch::kCPU));
+            index += m_batch_size;
         }
     }
 
     if (counter != 0) {
-        auto scores = m_module->forward(m_input_sigs.index({Slice(0, counter), Slice(), Slice()})
+        auto output = m_module->forward(m_input_sigs.index({Slice(0, counter), Slice(), Slice()})
                                                 .to(m_options.device_opt().value()),
                                         m_input_seqs.index({Slice(0, counter), Slice(), Slice()})
                                                 .to(m_options.device_opt().value()));
+        scores.index_put_({Slice(index, index + counter), Slice(0, output.size(1))},
+                          output.to(torch::kCPU));
     }
 }
 

@@ -8,31 +8,36 @@
 torch::nn::ModuleHolder<torch::nn::AnyModule> load_remora_model(const std::string& path,
                                                                 torch::TensorOptions options);
 
+/// Helper struct for storing base modification results.
+struct BaseModStats {
+    size_t num_states;                  ///< The number of potential states per sequence postion.
+    std::vector<float> base_mod_probs;  ///< The modified base likelihoods.
+};
+
+struct BaseModParams {
+    int num_motifs;
+    std::vector<std::string> mod_long_names;  ///< The long names of the modified bases.
+    std::vector<std::string> motifs;          ///< The motifs to look for modified bases within.
+    size_t base_mod_counts;                   ///< The number of modifications for the base.
+    std::vector<size_t> motif_offsets;  ///< The position of the canonical base within the motif.
+    size_t context_before;  ///< The number of context samples in the signal the network looks at around a candidate base.
+    size_t context_after;  ///< The number of context samples in the signal the network looks at around a candidate base.
+    int bases_before;  ///< The number of bases before the primary base of a kmer.
+    int bases_after;   ///< The number of bases after the primary base of a kmer.
+    int offset;
+    std::string mod_bases;
+    std::vector<float> refine_kmer_levels;  ///< Expected kmer levels for rough rescaling
+    size_t refine_kmer_len;                 ///< Length of the kmers for the specified kmer_levels
+    size_t refine_kmer_center_idx;  ///< The position in the kmer at which to check the levels
+    bool refine_do_rough_rescale;   ///< Whether to perform rough rescaling
+};
+
 class RemoraCaller {
     constexpr static torch::ScalarType dtype = torch::kF32;
     torch::nn::ModuleHolder<torch::nn::AnyModule> m_module{nullptr};
     torch::TensorOptions m_options;
     torch::Tensor m_input_sigs;
     torch::Tensor m_input_seqs;
-
-    struct BaseModParams {
-        int num_motifs;
-        std::vector<std::string> mod_long_names;  ///< The motifs to look for modified bases within.
-        std::vector<std::string> motifs;          ///< The motifs to look for modified bases within.
-        std::vector<size_t> base_mod_counts;      ///< The number of modifications for the base.
-        std::vector<size_t>
-                motif_offsets;  ///< The position of the canonical base within the motif.
-        size_t context_before;  ///< The number of context samples in the signal the network looks at around a candidate base.
-        size_t context_after;  ///< The number of context samples in the signal the network looks at around a candidate base.
-        int bases_before;  ///< The number of bases before the primary base of a kmer.
-        int bases_after;   ///< The number of bases after the primary base of a kmer.
-        int offset;
-        std::string mod_bases;
-        std::vector<float> refine_kmer_levels;  ///< Expected kmer levels for rough rescaling
-        size_t refine_kmer_len;         ///< Length of the kmers for the specified kmer_levels
-        size_t refine_kmer_center_idx;  ///< The position in the kmer at which to check the levels
-        bool refine_do_rough_rescale;   ///< Whether to perform rough rescaling
-    };
 
     BaseModParams m_params;
     const int m_batch_size;
