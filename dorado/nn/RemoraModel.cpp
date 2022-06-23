@@ -368,11 +368,17 @@ std::pair<torch::Tensor, std::vector<size_t>> RemoraCaller::call(
         size_t last_sample_source = first_sample_source + slice.num_samples;
         size_t first_sample_dest = slice.lead_samples_needed;
         size_t last_sample_dest = first_sample_dest + slice.num_samples;
-        size_t total_samples =
-                slice.lead_samples_needed + slice.num_samples + slice.tail_samples_needed;
+
         auto input_signal = signal.index({Slice(first_sample_source, last_sample_source)});
         m_input_sigs.index_put_({counter, 0, Slice(first_sample_dest, last_sample_dest)},
                                 input_signal);
+
+        if (slice.lead_samples_needed > 0) {
+            m_input_sigs.index_put_({counter, 0, Slice(None, first_sample_dest)}, 0);
+        }
+        if (slice.tail_samples_needed > 0) {
+            m_input_sigs.index_put_({counter, 0, Slice(last_sample_dest, None)}, 0);
+        }
 
         auto options = torch::TensorOptions().dtype(torch::kFloat32).device(torch::kCPU);
         torch::Tensor encoded_kmers = torch::empty({4 * kmer_len, sig_len}, options);
