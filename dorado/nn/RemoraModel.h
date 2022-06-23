@@ -60,7 +60,9 @@ class RemoraRunner {
 
 public:
     RemoraRunner(const std::vector<std::string>& model_paths, const std::string& device);
-    void run(torch::Tensor signal, const std::string& seq, const std::vector<uint8_t>& moves);
+    BaseModStats run(torch::Tensor signal,
+                     const std::string& seq,
+                     const std::vector<uint8_t>& moves);
 };
 
 class RemoraEncoder {

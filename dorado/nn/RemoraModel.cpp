@@ -403,6 +403,7 @@ RemoraRunner::RemoraRunner(const std::vector<std::string>& model_paths, const st
           m_num_states(4)  // The 4 canonical bases.
 {
     std::array<size_t, 4> base_counts = {1, 1, 1, 1};
+    std::array<bool, 4> base_used = {false, false, false, false};
     for (const auto& model : model_paths) {
         auto caller = std::make_shared<RemoraCaller>(model, device);
         auto& params = caller->params();
@@ -412,9 +413,14 @@ RemoraRunner::RemoraRunner(const std::vector<std::string>& model_paths, const st
             if (base != base_0) {
                 throw std::runtime_error(
                         "Remora models with modifications to multiple canonical bases are not "
-                        "supported");
+                        "supported.");
             }
         }
+        int base_id = BASE_IDS[base_0];
+        if (base_used[base_id]) {
+            throw std::runtime_error("Only one model per canonical base permitted.");
+        }
+        base_used[base_id] = true;
         base_counts[BASE_IDS[base_0]] = params.base_mod_count + 1;
         m_num_states += params.base_mod_count;
         m_callers.push_back(caller);
@@ -426,9 +432,9 @@ RemoraRunner::RemoraRunner(const std::vector<std::string>& model_paths, const st
     m_base_prob_offsets[3] = base_counts[0] + base_counts[1] + base_counts[2];
 }
 
-void RemoraRunner::run(torch::Tensor signal,
-                       const std::string& seq,
-                       const std::vector<uint8_t>& moves) {
+BaseModStats RemoraRunner::run(torch::Tensor signal,
+                               const std::string& seq,
+                               const std::vector<uint8_t>& moves) {
     BaseModStats modified_base_data;
     modified_base_data.num_states = m_num_states;
     auto options = torch::TensorOptions().dtype(torch::kFloat32).device(torch::kCPU);
@@ -457,6 +463,8 @@ void RemoraRunner::run(torch::Tensor signal,
                     {result_pos, Slice(offset, offset + scores.size(1))}, scores[i]);
         }
     }
+
+    return modified_base_data;
 }
 
 RemoraEncoder::RemoraEncoder(size_t block_stride,
