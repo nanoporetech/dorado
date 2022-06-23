@@ -10,15 +10,15 @@ torch::nn::ModuleHolder<torch::nn::AnyModule> load_remora_model(const std::strin
 
 /// Helper struct for storing base modification results.
 struct BaseModStats {
-    size_t num_states;                  ///< The number of potential states per sequence postion.
-    std::vector<float> base_mod_probs;  ///< The modified base likelihoods.
+    size_t num_states;             ///< The number of potential states per sequence postion.
+    torch::Tensor base_mod_probs;  ///< The modified base likelihoods.
 };
 
 struct BaseModParams {
     int num_motifs;
     std::vector<std::string> mod_long_names;  ///< The long names of the modified bases.
     std::vector<std::string> motifs;          ///< The motifs to look for modified bases within.
-    size_t base_mod_counts;                   ///< The number of modifications for the base.
+    size_t base_mod_count;                    ///< The number of modifications for the base.
     std::vector<size_t> motif_offsets;  ///< The position of the canonical base within the motif.
     size_t context_before;  ///< The number of context samples in the signal the network looks at around a candidate base.
     size_t context_after;  ///< The number of context samples in the signal the network looks at around a candidate base.
@@ -33,7 +33,7 @@ struct BaseModParams {
 };
 
 class RemoraCaller {
-    constexpr static torch::ScalarType dtype = torch::kF32;
+    constexpr static torch::ScalarType dtype = torch::kFloat32;
     torch::nn::ModuleHolder<torch::nn::AnyModule> m_module{nullptr};
     torch::TensorOptions m_options;
     torch::Tensor m_input_sigs;
@@ -46,12 +46,17 @@ class RemoraCaller {
 
 public:
     RemoraCaller(const std::string& model, const std::string& device, int batch_size = 1000);
-    void call(torch::Tensor signal, const std::string& seq, const std::vector<uint8_t>& moves);
+    std::pair<torch::Tensor, std::vector<size_t>> call(torch::Tensor signal,
+                                                       const std::string& seq,
+                                                       const std::vector<uint8_t>& moves);
+    const BaseModParams& params() const { return m_params; }
 };
 
 class RemoraRunner {
     // one caller per model
     std::vector<std::shared_ptr<RemoraCaller>> m_callers;
+    std::vector<size_t> m_base_prob_offsets;
+    size_t m_num_states;
 
 public:
     RemoraRunner(const std::vector<std::string>& model_paths, const std::string& device);
@@ -62,7 +67,6 @@ class RemoraEncoder {
 private:
     std::vector<float> m_encoded_data;
     std::vector<int> m_sample_offsets;
-    std::vector<int> m_base_mapping;
     int m_bases_before;
     int m_kmer_len;
     int m_padding;

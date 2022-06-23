@@ -16,7 +16,17 @@ using namespace torch::indexing;
 
 namespace {
 constexpr int NUM_BASES = 4;
-}
+
+const std::vector<int> BASE_IDS = []() {
+    std::vector<int> base_ids(256, -1);
+    base_ids['A'] = 0;
+    base_ids['C'] = 1;
+    base_ids['G'] = 2;
+    base_ids['T'] = 3;
+    return base_ids;
+}();
+
+}  // namespace
 
 struct ConvBatchNormImpl : Module {
     ConvBatchNormImpl(int size = 1,
@@ -278,7 +288,7 @@ RemoraCaller::RemoraCaller(const std::string& model, const std::string& device, 
         m_params.mod_long_names.push_back(
                 toml::find<std::string>(params, "mod_long_names_" + std::to_string(i)));
     }
-    m_params.base_mod_counts = m_params.mod_long_names.size();
+    m_params.base_mod_count = m_params.mod_long_names.size();
 
     m_params.context_before = toml::find<int>(params, "chunk_context_0");
     m_params.context_after = toml::find<int>(params, "chunk_context_1");
@@ -331,9 +341,10 @@ std::vector<size_t> RemoraCaller::get_motif_hits(const std::string& seq) const {
     return context_hits;
 }
 
-void RemoraCaller::call(torch::Tensor signal,
-                        const std::string& seq,
-                        const std::vector<uint8_t>& moves) {
+std::pair<torch::Tensor, std::vector<size_t>> RemoraCaller::call(
+        torch::Tensor signal,
+        const std::string& seq,
+        const std::vector<uint8_t>& moves) {
     auto block_stride = ::utils::div_round_closest(signal.size(0), moves.size());
     RemoraEncoder encoder(block_stride,
                           (m_params.context_before + m_params.context_after) / block_stride,
@@ -347,7 +358,7 @@ void RemoraCaller::call(torch::Tensor signal,
     auto counter = 0;
     auto index = 0;
     auto scores = torch::empty({static_cast<int64_t>(context_hits.size()),
-                                static_cast<int64_t>(m_params.base_mod_counts + 1)});
+                                static_cast<int64_t>(m_params.base_mod_count + 1)});
 
     for (auto context_hit : context_hits) {
         auto slice = encoder.get_context(context_hit);
@@ -383,20 +394,68 @@ void RemoraCaller::call(torch::Tensor signal,
         scores.index_put_({Slice(index, index + counter), Slice(0, output.size(1))},
                           output.to(torch::kCPU));
     }
+
+    return {scores, context_hits};
 }
 
-RemoraRunner::RemoraRunner(const std::vector<std::string>& model_paths, const std::string& device) {
+RemoraRunner::RemoraRunner(const std::vector<std::string>& model_paths, const std::string& device)
+        : m_base_prob_offsets(4),
+          m_num_states(4)  // The 4 canonical bases.
+{
+    std::array<size_t, 4> base_counts = {1, 1, 1, 1};
     for (const auto& model : model_paths) {
-        m_callers.push_back(std::make_shared<RemoraCaller>(model, device));
+        auto caller = std::make_shared<RemoraCaller>(model, device);
+        auto& params = caller->params();
+        char base_0 = params.motifs[0][params.motif_offsets[0]];
+        for (int i = 0; i < params.num_motifs; ++i) {
+            char base = params.motifs[i][params.motif_offsets[i]];
+            if (base != base_0) {
+                throw std::runtime_error(
+                        "Remora models with modifications to multiple canonical bases are not "
+                        "supported");
+            }
+        }
+        base_counts[BASE_IDS[base_0]] = params.base_mod_count + 1;
+        m_num_states += params.base_mod_count;
+        m_callers.push_back(caller);
     }
+
+    m_base_prob_offsets[0] = 0;
+    m_base_prob_offsets[1] = base_counts[0];
+    m_base_prob_offsets[2] = base_counts[0] + base_counts[1];
+    m_base_prob_offsets[3] = base_counts[0] + base_counts[1] + base_counts[2];
 }
 
 void RemoraRunner::run(torch::Tensor signal,
                        const std::string& seq,
                        const std::vector<uint8_t>& moves) {
+    BaseModStats modified_base_data;
+    modified_base_data.num_states = m_num_states;
+    auto options = torch::TensorOptions().dtype(torch::kFloat32).device(torch::kCPU);
+
+    modified_base_data.base_mod_probs = torch::zeros(
+            {static_cast<int64_t>(seq.size()), static_cast<int64_t>(m_num_states)}, options);
+
+    for (size_t i = 0; i < seq.size(); ++i) {
+        // Initialize for what corresponds to 100% canonical base for each position.
+        int base_id = BASE_IDS[seq[i]];
+        if (base_id < 0) {
+            throw std::runtime_error("Invalid character in sequence.");
+        }
+        modified_base_data.base_mod_probs[i][m_base_prob_offsets[base_id]] = 1.0f;
+    }
+
     // each caller will have different parameters
     for (auto& caller : m_callers) {
-        caller->call(signal, seq, moves);
+        // The scores from the RNN should be a MxN tensor,
+        // where M is the number of context hits and N is the number of modifications + 1.
+        auto [scores, context_hits] = caller->call(signal, seq, moves);
+        for (size_t i = 0; i < context_hits.size(); ++i) {
+            int64_t result_pos = context_hits[i];
+            int64_t offset = m_base_prob_offsets[BASE_IDS[seq[context_hits[i]]]];
+            modified_base_data.base_mod_probs.index_put_(
+                    {result_pos, Slice(offset, offset + scores.size(1))}, scores[i]);
+        }
     }
 }
 
@@ -404,8 +463,7 @@ RemoraEncoder::RemoraEncoder(size_t block_stride,
                              size_t context_blocks,
                              int bases_before,
                              int bases_after)
-        : m_base_mapping(255, -1),
-          m_bases_before(bases_before),
+        : m_bases_before(bases_before),
           m_kmer_len(bases_before + bases_after + 1),
           m_block_stride(int(block_stride)),
           m_context_blocks(int(context_blocks)),
@@ -416,10 +474,6 @@ RemoraEncoder::RemoraEncoder(size_t block_stride,
     int padding_for_bases_after = (m_kmer_len - 1 - bases_after) * int(block_stride);
     int padding_for_bases = std::max(padding_for_bases_before, padding_for_bases_after);
     m_padding = std::max(padding_for_bases, m_padding);
-    m_base_mapping['A'] = 0;
-    m_base_mapping['C'] = 1;
-    m_base_mapping['G'] = 2;
-    m_base_mapping['T'] = 3;
 }
 
 void RemoraEncoder::encode_remora_data(const std::vector<uint8_t>& moves,
@@ -465,7 +519,7 @@ void RemoraEncoder::encode_remora_data(const std::vector<uint8_t>& moves,
             int this_base_pos = seq_pos + kmer_pos;
             int base_offset = -1;
             if (this_base_pos >= 0 && this_base_pos < m_seq_len)
-                base_offset = m_base_mapping[sequence[this_base_pos]];
+                base_offset = BASE_IDS[sequence[this_base_pos]];
             if (base_offset == -1)
                 continue;
             buffer[kmer_pos * NUM_BASES + base_offset] = 1.0f;
