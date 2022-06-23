@@ -2,10 +2,10 @@
 
 #include "../utils/tensor_utils.h"
 
+#include <ATen/cuda/CUDAContext.h>
 #include <math.h>
 #include <toml.hpp>
 #include <torch/torch.h>
-#include <ATen/cuda/CUDAContext.h>
 
 using namespace torch::nn;
 namespace F = torch::nn::functional;
@@ -56,29 +56,41 @@ struct LinearCRFImpl : Module {
     Tanh activation{nullptr};
 };
 
-
 #define USE_CUSPARSE 1
 #if USE_CUSPARSE
 extern "C" {
 #include "koi.h"
 }
-#include <cuda_runtime.h>
 #include <cublas_v2.h>
+#include <cuda_runtime.h>
 
-#define CUDA_CHECK(X) { cudaError_t error = X; if (error != cudaSuccess) { \
-  printf("CUDA returned error %s (code %d), line(%d)\n", cudaGetErrorString(error), error, __LINE__); \
-  exit(EXIT_FAILURE); \
-}}
-#define CUBLAS_CHECK(X) { cublasStatus_t res = X; if (res != CUBLAS_STATUS_SUCCESS) { \
-  printf("CuBLAS returned error code %d, line(%d)\n", int(res), __LINE__); \
-  exit(EXIT_FAILURE); \
-}}
-#define CUSPARSE_CHECK(X) { cusparseStatus_t res = X; if (res != CUSPARSE_STATUS_SUCCESS) { \
-  printf("CuSPARSELt returned error code %d, line(%d)\n", int(res), __LINE__); \
-  exit(EXIT_FAILURE); \
-}}
+#define CUDA_CHECK(X)                                                                         \
+    {                                                                                         \
+        cudaError_t error = X;                                                                \
+        if (error != cudaSuccess) {                                                           \
+            printf("CUDA returned error %s (code %d), line(%d)\n", cudaGetErrorString(error), \
+                   error, __LINE__);                                                          \
+            exit(EXIT_FAILURE);                                                               \
+        }                                                                                     \
+    }
+#define CUBLAS_CHECK(X)                                                              \
+    {                                                                                \
+        cublasStatus_t res = X;                                                      \
+        if (res != CUBLAS_STATUS_SUCCESS) {                                          \
+            printf("CuBLAS returned error code %d, line(%d)\n", int(res), __LINE__); \
+            exit(EXIT_FAILURE);                                                      \
+        }                                                                            \
+    }
+#define CUSPARSE_CHECK(X)                                                                \
+    {                                                                                    \
+        cusparseStatus_t res = X;                                                        \
+        if (res != CUSPARSE_STATUS_SUCCESS) {                                            \
+            printf("CuSPARSELt returned error code %d, line(%d)\n", int(res), __LINE__); \
+            exit(EXIT_FAILURE);                                                          \
+        }                                                                                \
+    }
 
-static int get_cuda_device_id_from_device(const c10::Device& device) {
+static int get_cuda_device_id_from_device(const c10::Device &device) {
     if (!device.is_cuda() || !device.has_index()) {
         std::stringstream ss;
         ss << "Unable to extract CUDA device ID from device " << device;
@@ -126,21 +138,23 @@ struct LSTMStackImpl : Module {
     }
 
     torch::Tensor forward(torch::Tensor in) {
-//        int cuda_device_id = get_cuda_device_id_from_device(in.device());
-//        if (cudaSetDevice(cuda_device_id) != cudaSuccess) {
-//            throw std::runtime_error("Unable to set cuda device!");
-//        }
+        //        int cuda_device_id = get_cuda_device_id_from_device(in.device());
+        //        if (cudaSetDevice(cuda_device_id) != cudaSuccess) {
+        //            throw std::runtime_error("Unable to set cuda device!");
+        //        }
 
         auto tensor_options = torch::TensorOptions()
-                                    .dtype(torch::kFloat16)
-                                    .device(in.device())
-                                    .requires_grad(false);
+                                      .dtype(torch::kFloat16)
+                                      .device(in.device())
+                                      .requires_grad(false);
         int chunk_size = in.size(0);
         int batch_size = in.size(1);
         int gate_size = layer_size * 4;
         // copy contents of `in` into larger working memory matrix (holding both
         // input and output interleaved, as well as padding zeroes)
-        auto mat_working_mem = torch::zeros({chunk_size + 1, batch_size, 2, in.size(2)}, tensor_options).contiguous();
+        auto mat_working_mem =
+                torch::zeros({chunk_size + 1, batch_size, 2, in.size(2)}, tensor_options)
+                        .contiguous();
         mat_working_mem.slice(0, 1, chunk_size + 1).select(2, 1) = in;
         size_t timestep_buf_size = size_t(batch_size) * 2 * layer_size;
         int16_t *working_mem_ptr = (int16_t *)mat_working_mem.data_ptr();
@@ -150,7 +164,8 @@ struct LSTMStackImpl : Module {
         auto stream = at::cuda::getCurrentCUDAStream().stream();
 
         for (auto &rnn : {rnn1, rnn2, rnn3, rnn4, rnn5}) {
-            cudaMemsetAsync(state_buf.data_ptr(), 0, size_t(batch_size) * layer_size * sizeof(int16_t), stream);
+            cudaMemsetAsync(state_buf.data_ptr(), 0,
+                            size_t(batch_size) * layer_size * sizeof(int16_t), stream);
             // TODO: cache per-device weights and bias
             auto weights_cpu = rnn->weights.t().contiguous();
             auto weights = weights_cpu.to(in.device());
@@ -164,16 +179,18 @@ struct LSTMStackImpl : Module {
                 }
 
                 // timestep matrix mulitplication
-                static constexpr uint16_t HALF_ZERO = 0;     // 0.0 in half precision floating point format
-                static constexpr uint16_t HALF_ONE = 0x3C00; // 1.0 in half precision floating point format
-                CUBLAS_CHECK(cublasGemmEx(at::cuda::getCurrentCUDABlasHandle(), CUBLAS_OP_N, CUBLAS_OP_N,
-                        gate_size, batch_size, 2 * layer_size, &HALF_ONE,
-                        (const void *) weights.data_ptr(), CUDA_R_16F, gate_size,
-                        (const void *) timestep_in, CUDA_R_16F, 2 * layer_size,
-                        &HALF_ZERO, (void *) gate_buf.data_ptr(), CUDA_R_16F, gate_size,
-                        CUDA_R_16F, CUBLAS_GEMM_DEFAULT_TENSOR_OP));
+                static constexpr uint16_t HALF_ZERO =
+                        0;  // 0.0 in half precision floating point format
+                static constexpr uint16_t HALF_ONE =
+                        0x3C00;  // 1.0 in half precision floating point format
+                CUBLAS_CHECK(cublasGemmEx(
+                        at::cuda::getCurrentCUDABlasHandle(), CUBLAS_OP_N, CUBLAS_OP_N, gate_size,
+                        batch_size, 2 * layer_size, &HALF_ONE, (const void *)weights.data_ptr(),
+                        CUDA_R_16F, gate_size, (const void *)timestep_in, CUDA_R_16F,
+                        2 * layer_size, &HALF_ZERO, (void *)gate_buf.data_ptr(), CUDA_R_16F,
+                        gate_size, CUDA_R_16F, CUBLAS_GEMM_DEFAULT_TENSOR_OP));
                 host_lstm_step_f16(stream, batch_size, layer_size, bias.data_ptr(),
-                    gate_buf.data_ptr(), state_buf.data_ptr(), timestep_out);
+                                   gate_buf.data_ptr(), state_buf.data_ptr(), timestep_out);
             }
         }
         CUDA_CHECK(cudaDeviceSynchronize());
@@ -189,7 +206,7 @@ struct LSTMStackImpl : Module {
     cublasHandle_t cublas_handle;
 };
 
-#else // if USE_CUSPARSE
+#else  // if USE_CUSPARSE
 
 struct LSTMStackImpl : Module {
     LSTMStackImpl(int size) {
@@ -230,13 +247,12 @@ struct LSTMStackImpl : Module {
     LSTM rnn1{nullptr}, rnn2{nullptr}, rnn3{nullptr}, rnn4{nullptr}, rnn5{nullptr};
 };
 
-#endif // if USE_CUSPARSE else
+#endif  // if USE_CUSPARSE else
 
 TORCH_MODULE(Permute);
 TORCH_MODULE(LSTMStack);
 TORCH_MODULE(LinearCRF);
 TORCH_MODULE(Convolution);
-
 
 struct CRFModelImpl : Module {
     CRFModelImpl(int size, int outsize, int stride, bool expand_blanks) {
@@ -268,17 +284,17 @@ struct CRFModelImpl : Module {
 
 TORCH_MODULE(CRFModel);
 
-ModuleHolder<AnyModule> load_crf_model(const std::string& path,
+ModuleHolder<AnyModule> load_crf_model(const std::string &path,
                                        int batch_size,
                                        int chunk_size,
                                        torch::TensorOptions options) {
     auto config = toml::parse(path + "/config.toml");
 
-    const auto& encoder = toml::find(config, "encoder");
+    const auto &encoder = toml::find(config, "encoder");
     const auto stride = toml::find<int>(encoder, "stride");
     const auto insize = toml::find<int>(encoder, "features");
 
-    const auto& global_norm = toml::find(config, "global_norm");
+    const auto &global_norm = toml::find(config, "global_norm");
     const auto state_len = toml::find<int>(global_norm, "state_len");
     int outsize = pow(4, state_len) * 4;
     bool expand = options.device_opt().value() == torch::kCPU;
