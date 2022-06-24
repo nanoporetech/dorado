@@ -276,12 +276,8 @@ RemoraCaller::RemoraCaller(const std::string& model, const std::string& device, 
 
     auto config = toml::parse(model + "/config.toml");
     const auto& params = toml::find(config, "modbases");
-    m_params.num_motifs = toml::find<int>(params, "num_motifs");
-    for (auto i = 0; i < m_params.num_motifs; ++i) {
-        m_params.motifs.push_back(toml::find<std::string>(params, "motif_" + std::to_string(i)));
-        m_params.motif_offsets.push_back(
-                toml::find<int>(params, "motif_offset_" + std::to_string(i)));
-    }
+    m_params.motif = toml::find<std::string>(params, "motif");
+    m_params.motif_offset = toml::find<int>(params, "motif_offset");
 
     m_params.mod_bases = toml::find<std::string>(params, "mod_bases");
     for (size_t i = 0; i < m_params.mod_bases.size(); ++i) {
@@ -327,17 +323,15 @@ RemoraCaller::RemoraCaller(const std::string& model, const std::string& device, 
 
 std::vector<size_t> RemoraCaller::get_motif_hits(const std::string& seq) const {
     std::vector<size_t> context_hits;
-    for (int i = 0; i < m_params.num_motifs; ++i) {
-        const auto& motif = m_params.motifs[i];
-        const auto motif_offset = m_params.motif_offsets[i];
-        size_t kmer_len = motif.size();
-        size_t search_pos = 0;
-        while (search_pos < seq.size() - kmer_len + 1) {
-            search_pos = seq.find(motif, search_pos);
-            if (search_pos != std::string::npos) {
-                context_hits.push_back(search_pos + motif_offset);
-                ++search_pos;
-            }
+    const auto& motif = m_params.motif;
+    const auto motif_offset = m_params.motif_offset;
+    size_t kmer_len = motif.size();
+    size_t search_pos = 0;
+    while (search_pos < seq.size() - kmer_len + 1) {
+        search_pos = seq.find(motif, search_pos);
+        if (search_pos != std::string::npos) {
+            context_hits.push_back(search_pos + motif_offset);
+            ++search_pos;
         }
     }
     return context_hits;
@@ -415,21 +409,8 @@ RemoraRunner::RemoraRunner(const std::vector<std::string>& model_paths, const st
     for (const auto& model : model_paths) {
         auto caller = std::make_shared<RemoraCaller>(model, device);
         auto& params = caller->params();
-        char base_0 = params.motifs[0][params.motif_offsets[0]];
-        for (int i = 0; i < params.num_motifs; ++i) {
-            char base = params.motifs[i][params.motif_offsets[i]];
-            if (base != base_0) {
-                throw std::runtime_error(
-                        "Remora models with modifications to multiple canonical bases are not "
-                        "supported.");
-            }
-        }
-        int base_id = BASE_IDS[base_0];
-        if (base_used[base_id]) {
-            throw std::runtime_error("Only one model per canonical base permitted.");
-        }
-        base_used[base_id] = true;
-        base_counts[BASE_IDS[base_0]] = params.base_mod_count + 1;
+        char base = params.motif[params.motif_offset];
+        base_counts[BASE_IDS[base]] = params.base_mod_count + 1;
         m_num_states += params.base_mod_count;
         m_callers.push_back(caller);
     }
