@@ -57,10 +57,11 @@ public:
     std::vector<std::shared_ptr<Chunk>> called_chunks;  // Vector of basecalled chunks.
     std::atomic_size_t num_chunks_called;  // Number of chunks which have been basecalled
 
-    std::string read_id;         // Unique read ID (UUID4)
-    std::string seq;             // Read basecall
-    std::string qstring;         // Read Qstring
-    std::vector<uint8_t> moves;  // Move table
+    std::string read_id;                  // Unique read ID (UUID4)
+    std::string seq;                      // Read basecall
+    std::string qstring;                  // Read Qstring
+    std::vector<uint8_t> moves;           // Move table
+    std::vector<uint8_t> base_mod_probs;  // Modified base probabilities
 
     uint64_t num_samples;          //Number of raw samples in read
     uint64_t num_trimmed_samples;  //Number of samples which have been trimmed from the raw read.
