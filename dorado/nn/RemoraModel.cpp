@@ -1,12 +1,13 @@
 #include "RemoraModel.h"
 
-#include "../modbase/remora_encoder.h"
-#include "../modbase/remora_scaler.h"
-#include "../utils/base64_utils.h"
-#include "../utils/base_mod_utils.h"
-#include "../utils/math_utils.h"
-#include "../utils/module_utils.h"
-#include "../utils/tensor_utils.h"
+#include "modbase/remora_encoder.h"
+#include "modbase/remora_scaler.h"
+#include "modbase/remora_utils.h"
+#include "utils/base64_utils.h"
+#include "utils/base_mod_utils.h"
+#include "utils/math_utils.h"
+#include "utils/module_utils.h"
+#include "utils/tensor_utils.h"
 
 #include <toml.hpp>
 #include <torch/torch.h>
@@ -16,20 +17,6 @@
 
 using namespace torch::nn;
 using namespace torch::indexing;
-
-namespace {
-constexpr int NUM_BASES = 4;
-
-const std::vector<int> BASE_IDS = []() {
-    std::vector<int> base_ids(256, -1);
-    base_ids['A'] = 0;
-    base_ids['C'] = 1;
-    base_ids['G'] = 2;
-    base_ids['T'] = 3;
-    return base_ids;
-}();
-
-}  // namespace
 
 struct ConvBatchNormImpl : Module {
     ConvBatchNormImpl(int size = 1,
@@ -320,7 +307,7 @@ RemoraCaller::RemoraCaller(const std::string& model, const std::string& device, 
 
     m_input_sigs = torch::zeros({batch_size, 1, sig_len},
                                 torch::TensorOptions().dtype(dtype).device(torch::kCPU));
-    m_input_seqs = torch::zeros({batch_size, NUM_BASES * kmer_len, sig_len},
+    m_input_seqs = torch::zeros({batch_size, RemoraUtils::NUM_BASES * kmer_len, sig_len},
                                 torch::TensorOptions().dtype(dtype).device(torch::kCPU));
 }
 
@@ -436,7 +423,7 @@ RemoraRunner::RemoraRunner(const std::vector<std::string>& model_paths, const st
         map_entry.motif = params.motif;
         map_entry.motif_offset = params.motif_offset;
 
-        base_counts[BASE_IDS[base]] = params.base_mod_count + 1;
+        base_counts[RemoraUtils::BASE_IDS[base]] = params.base_mod_count + 1;
         m_num_states += params.base_mod_count;
         m_callers.push_back(caller);
     }
@@ -474,7 +461,7 @@ torch::Tensor RemoraRunner::run(torch::Tensor signal,
 
     for (size_t i = 0; i < seq.size(); ++i) {
         // Initialize for what corresponds to 100% canonical base for each position.
-        int base_id = BASE_IDS[seq[i]];
+        int base_id = RemoraUtils::BASE_IDS[seq[i]];
         if (base_id < 0) {
             throw std::runtime_error("Invalid character in sequence.");
         }
@@ -504,7 +491,7 @@ torch::Tensor RemoraRunner::run(torch::Tensor signal,
         auto [scores, context_hits] = caller->call(scaled_signal, seq, moves);
         for (size_t i = 0; i < context_hits.size(); ++i) {
             int64_t result_pos = context_hits[i];
-            int64_t offset = m_base_prob_offsets[BASE_IDS[seq[context_hits[i]]]];
+            int64_t offset = m_base_prob_offsets[RemoraUtils::BASE_IDS[seq[context_hits[i]]]];
             base_mod_probs.index_put_({result_pos, Slice(offset, offset + scores.size(1))},
                                       scores[i]);
         }

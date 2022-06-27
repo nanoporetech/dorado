@@ -1,4 +1,4 @@
-#include "../dorado/modbase/remora_scaler.h"
+#include "modbase/remora_scaler.h"
 
 #include <catch2/catch.hpp>
 

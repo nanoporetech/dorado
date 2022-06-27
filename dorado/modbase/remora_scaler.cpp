@@ -1,7 +1,7 @@
 #include "remora_scaler.h"
 
-#include "../utils/math_utils.h"
 #include "remora_utils.h"
+#include "utils/math_utils.h"
 
 #include <algorithm>
 #include <iterator>

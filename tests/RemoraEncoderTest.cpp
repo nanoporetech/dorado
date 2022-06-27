@@ -1,4 +1,4 @@
-#include "../dorado/modbase/remora_encoder.h"
+#include "modbase/remora_encoder.h"
 
 #include <catch2/catch.hpp>
 

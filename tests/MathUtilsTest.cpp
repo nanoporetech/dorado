@@ -1,4 +1,4 @@
-#include "../dorado/utils/math_utils.h"
+#include "utils/math_utils.h"
 
 #include <catch2/catch.hpp>
 
