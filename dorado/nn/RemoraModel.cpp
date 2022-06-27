@@ -1,6 +1,7 @@
 #include "RemoraModel.h"
 
 #include "../utils/base64_utils.h"
+#include "../utils/base_mod_utils.h"
 #include "../utils/math_utils.h"
 #include "../utils/module_utils.h"
 #include "../utils/tensor_utils.h"
@@ -404,16 +405,55 @@ RemoraRunner::RemoraRunner(const std::vector<std::string>& model_paths, const st
         : m_base_prob_offsets(4),
           m_num_states(4)  // The 4 canonical bases.
 {
+    struct Info {
+        std::vector<std::string> long_names;
+        std::string alphabet;
+        std::string motif;
+        int motif_offset;
+    };
+    std::map<char, int> base_map{{'A', 0}, {'C', 1}, {'G', 2}, {'T', 3}};
+    std::string allowed_bases = "ACGT";
+    Info model_info[4];
+    for (int b = 0; b < 4; ++b) {
+        model_info[b].alphabet = allowed_bases[b];
+    }
+
     std::array<size_t, 4> base_counts = {1, 1, 1, 1};
     std::array<bool, 4> base_used = {false, false, false, false};
     for (const auto& model : model_paths) {
         auto caller = std::make_shared<RemoraCaller>(model, device);
         auto& params = caller->params();
-        char base = params.motif[params.motif_offset];
+
+        auto base = params.motif[params.motif_offset];
+        if (allowed_bases.find(base) == std::string::npos) {
+            throw std::runtime_error("Invalid base in remora model metadata.");
+        }
+        auto& map_entry = model_info[base_map.at(base)];
+        map_entry.long_names = params.mod_long_names;
+        map_entry.alphabet += params.mod_bases;
+        map_entry.motif = params.motif;
+        map_entry.motif_offset = params.motif_offset;
+
         base_counts[BASE_IDS[base]] = params.base_mod_count + 1;
         m_num_states += params.base_mod_count;
         m_callers.push_back(caller);
     }
+
+    std::string long_names, alphabet;
+    ::utils::BaseModContext context_handler;
+    for (const auto& info : model_info) {
+        for (const auto& name : info.long_names) {
+            if (!long_names.empty())
+                long_names += ' ';
+            long_names += name;
+        }
+        alphabet += info.alphabet;
+        if (!info.motif.empty()) {
+            context_handler.set_context(info.motif, size_t(info.motif_offset));
+        }
+    }
+
+    m_base_mod_info = std::make_shared<BaseModInfo>(alphabet, long_names, context_handler.encode());
 
     m_base_prob_offsets[0] = 0;
     m_base_prob_offsets[1] = base_counts[0];

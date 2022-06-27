@@ -68,6 +68,8 @@ set(LIB_SOURCE_FILES
     dorado/decode/CPUDecoder.h
     dorado/decode/GPUDecoder.cpp
     dorado/decode/GPUDecoder.h
+    dorado/utils/base_mod_utils.cpp
+    dorado/utils/base_mod_utils.h
     dorado/utils/base64_utils.h
     dorado/utils/compat_utils.cpp
     dorado/utils/compat_utils.h

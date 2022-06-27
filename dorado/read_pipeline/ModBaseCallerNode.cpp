@@ -48,6 +48,9 @@ void ModBaseCallerNode::worker_thread() {
             read->base_mod_probs[i] =
                     uint8_t(std::min(std::floor(results_view[i].item().toFloat() * 256), 255.0f));
         }
+
+        read->base_mod_info = m_model_runner->base_mod_info();
+
         // Pass the read to the next node
         m_sink.push_read(read);
     }

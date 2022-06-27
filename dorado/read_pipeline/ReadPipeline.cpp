@@ -1,10 +1,43 @@
 #include "ReadPipeline.h"
 
+#include "utils/base_mod_utils.h"
 #include "utils/sequence_utils.h"
 
 #include <chrono>
 
 using namespace std::chrono_literals;
+
+namespace {
+bool get_modbase_channel_name(std::string& channel_name, const std::string& mod_abbreviation) {
+    static const std::map<std::string, std::string> modbase_name_map = {// A
+                                                                        {"6mA", "a"},
+                                                                        // C
+                                                                        {"5mC", "m"},
+                                                                        {"5hmC", "h"},
+                                                                        {"5fc", "f"},
+                                                                        {"5caC", "c"},
+                                                                        // G
+                                                                        {"8oxoG", "o"},
+                                                                        // T
+                                                                        {"5hmU", "g"},
+                                                                        {"5fU", "e"},
+                                                                        {"5caU", "b"}};
+
+    if (modbase_name_map.find(mod_abbreviation) != modbase_name_map.end()) {
+        channel_name = modbase_name_map.at(mod_abbreviation);
+        return true;
+    }
+
+    // Check the supplied mod abbreviation is a simple integer and if so, assume it's a CHEBI code.
+    if (mod_abbreviation.find_first_not_of("0123456789") == std::string::npos) {
+        channel_name = mod_abbreviation;
+        return true;
+    }
+
+    std::cerr << "Unknown modified base abbreviation: " << mod_abbreviation;
+    return false;
+}
+}  // namespace
 
 std::vector<std::string> Read::generate_read_tags() const {
     // GCC doesn't support <format> yet...
@@ -70,7 +103,92 @@ std::vector<std::string> Read::extract_sam_lines() const {
         throw std::runtime_error("Mapped alignments not yet implemented");
     }
 
+    auto mod_base_string = generate_modbase_string();
+    if (!mod_base_string.empty()) {
+        sam_lines.front() += "\t";
+        sam_lines.front() += mod_base_string;
+    }
     return sam_lines;
+}
+
+std::string Read::generate_modbase_string(uint8_t threshold) const {
+    if (!base_mod_info) {
+        return {};
+    }
+
+    const size_t num_channels = base_mod_info->alphabet.size();
+    const std::string cardinal_bases = "ACGT";
+    char current_cardinal = 0;
+    if (seq.length() * num_channels != base_mod_probs.size()) {
+        throw std::runtime_error(
+                "Mismatch between base_mod_probs size and sequence length * num channels in "
+                "modbase_alphabet!");
+    }
+
+    std::istringstream mod_name_stream(base_mod_info->long_names);
+    std::string modbase_string = "MM:Z:";
+    std::string modbase_prob_string = "ML:B:C";
+
+    // Create a mask indicating which bases are modified.
+    std::map<char, bool> base_has_context = {
+            {'A', false}, {'C', false}, {'G', false}, {'T', false}};
+    ::utils::BaseModContext context_handler;
+    if (!base_mod_info->context.empty()) {
+        if (!context_handler.decode(base_mod_info->context)) {
+            throw std::runtime_error("Invalid base modification context string.");
+        }
+        for (auto base : cardinal_bases) {
+            if (context_handler.motif(base).size() > 1) {
+                // If the context is just the single base, then this is equivalent to no context.
+                base_has_context[base] = true;
+            }
+        }
+    }
+    auto modbase_mask = context_handler.get_sequence_mask(seq);
+    context_handler.update_mask(modbase_mask, seq, base_mod_info->alphabet, base_mod_probs,
+                                threshold);
+
+    // Iterate over the provided alphabet and find all the channels we need to write out
+    for (size_t channel_idx = 0; channel_idx < num_channels; channel_idx++) {
+        if (cardinal_bases.find(base_mod_info->alphabet[channel_idx]) != std::string::npos) {
+            // A cardinal base
+            current_cardinal = base_mod_info->alphabet[channel_idx];
+        } else {
+            // A modification on the previous cardinal base
+            std::string modbase_name;
+            mod_name_stream >> modbase_name;
+            std::string bam_name;
+            if (!get_modbase_channel_name(bam_name, modbase_name)) {
+                return {};
+            }
+
+            // Write out the results we found
+            modbase_string += std::string(1, current_cardinal) + "+" + bam_name;
+            if (base_has_context[current_cardinal]) {
+                modbase_string += "?";
+            }
+            int skipped_bases = 0;
+            for (size_t base_idx = 0; base_idx < seq.size(); base_idx++) {
+                if (seq[base_idx] == current_cardinal) {
+                    if (modbase_mask[base_idx] == 1) {
+                        modbase_string += "," + std::to_string(skipped_bases);
+                        skipped_bases = 0;
+                        modbase_prob_string +=
+                                "," +
+                                std::to_string(
+                                        base_mod_probs[base_idx * num_channels + channel_idx]);
+                    } else {
+                        // Skip this base
+                        skipped_bases++;
+                    }
+                }
+            }
+            modbase_string += ";";
+        }
+    }
+
+    modbase_string += "\t" + modbase_prob_string;
+    return modbase_string;
 }
 
 void ReadSink::push_read(std::shared_ptr<Read>& read) {

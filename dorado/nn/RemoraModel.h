@@ -5,6 +5,10 @@
 #include <string>
 #include <vector>
 
+namespace utils {
+struct BaseModInfo;
+}
+
 torch::nn::ModuleHolder<torch::nn::AnyModule> load_remora_model(const std::string& path,
                                                                 torch::TensorOptions options);
 
@@ -52,16 +56,24 @@ public:
 };
 
 class RemoraRunner {
+    using BaseModInfo = ::utils::BaseModInfo;
+
     // one caller per model
     std::vector<std::shared_ptr<RemoraCaller>> m_callers;
     std::vector<size_t> m_base_prob_offsets;
     size_t m_num_states;
+
+    std::shared_ptr<BaseModInfo> m_base_mod_info;
 
 public:
     RemoraRunner(const std::vector<std::string>& model_paths, const std::string& device);
     BaseModStats run(torch::Tensor signal,
                      const std::string& seq,
                      const std::vector<uint8_t>& moves);
+
+    std::shared_ptr<const BaseModInfo> base_mod_info() const {
+        return std::const_pointer_cast<const BaseModInfo>(m_base_mod_info);
+    }
 };
 
 class RemoraEncoder {

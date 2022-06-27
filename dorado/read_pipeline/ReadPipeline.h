@@ -7,6 +7,10 @@
 #include <string>
 #include <vector>
 
+namespace utils {
+struct BaseModInfo;
+}
+
 class Read;
 
 struct Chunk {
@@ -29,6 +33,8 @@ struct Chunk {
 // Class representing a read, including raw data
 class Read {
 public:
+    using BaseModInfo = ::utils::BaseModInfo;
+
     struct Attributes {
         uint32_t mux{std::numeric_limits<uint32_t>::max()};  // Channel mux
         uint32_t read_number{std::numeric_limits<
@@ -50,10 +56,10 @@ public:
     float med;  // To be set by scaler
     float mad;  // To be set by scaler
 
-    bool scale_set = false;  //Set to True if scale has been applied to raw data
+    bool scale_set = false;  // Set to True if scale has been applied to raw data
     float scale;  // Scale factor applied to convert raw integers from sequencer into pore current values
 
-    size_t num_chunks;  //Number of chunks in the read. Reads raw data is split into chunks for efficient basecalling.
+    size_t num_chunks;  // Number of chunks in the read. Reads raw data is split into chunks for efficient basecalling.
     std::vector<std::shared_ptr<Chunk>> called_chunks;  // Vector of basecalled chunks.
     std::atomic_size_t num_chunks_called;  // Number of chunks which have been basecalled
 
@@ -63,14 +69,18 @@ public:
     std::vector<uint8_t> moves;           // Move table
     std::vector<uint8_t> base_mod_probs;  // Modified base probabilities
 
-    uint64_t num_samples;          //Number of raw samples in read
-    uint64_t num_trimmed_samples;  //Number of samples which have been trimmed from the raw read.
+    std::shared_ptr<const BaseModInfo>
+            base_mod_info;  // Modified base settings of the models that ran on this read
+
+    uint64_t num_samples;          // Number of raw samples in read
+    uint64_t num_trimmed_samples;  // Number of samples which have been trimmed from the raw read.
 
     Attributes attributes;
     std::vector<Mapping> mappings;
 
     std::vector<std::string> generate_read_tags() const;
     std::vector<std::string> extract_sam_lines() const;
+    std::string generate_modbase_string(uint8_t threshold = 0) const;
 };
 
 // Base class for an object which consumes reads.
