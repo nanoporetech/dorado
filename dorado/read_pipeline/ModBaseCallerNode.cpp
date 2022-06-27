@@ -39,11 +39,10 @@ void ModBaseCallerNode::worker_thread() {
         lock.unlock();
 
         // TODO: better read queuing, multiple runners
-        auto results = m_model_runner->run(read->raw_data, read->seq, read->moves);
-        read->base_mod_probs.resize(results.base_mod_probs.size(0) *
-                                    results.base_mod_probs.size(1));
+        auto base_mod_probs = m_model_runner->run(read->raw_data, read->seq, read->moves);
+        read->base_mod_probs.resize(base_mod_probs.size(0) * base_mod_probs.size(1));
         auto results_view =
-                results.base_mod_probs.view({static_cast<int64_t>(read->base_mod_probs.size())});
+                base_mod_probs.view({static_cast<int64_t>(read->base_mod_probs.size())});
         for (auto i = 0ul; i < read->base_mod_probs.size(); ++i) {
             read->base_mod_probs[i] =
                     uint8_t(std::min(std::floor(results_view[i].item().toFloat() * 256), 255.0f));

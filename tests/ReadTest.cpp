@@ -1,4 +1,5 @@
 #include "read_pipeline/ReadPipeline.h"
+#include "utils/base_mod_utils.h"
 
 #include <catch2/catch.hpp>
 
@@ -62,5 +63,86 @@ TEST_CASE(TEST_GROUP ": Test sam line generation", TEST_GROUP) {
         test_read.attributes.fast5_filename = "batch_0.fast5";
 
         REQUIRE(test_read.extract_sam_lines() == expected_sam_lines);
+    }
+}
+
+TEST_CASE(TEST_GROUP ": Methylation tag generation", TEST_GROUP) {
+    std::string modbase_alphabet = "AXCYGT";
+    std::string modbase_long_names = "6mA 5mC";
+    std::vector<uint8_t> modbase_probs = {
+            235, 20,  0,   0,   0,   0,    // A 6ma (weak call)
+            0,   0,   255, 0,   0,   0,    // C
+            255, 0,   0,   0,   0,   0,    // A
+            0,   0,   0,   0,   255, 0,    // G
+            0,   0,   0,   0,   0,   255,  // T
+            0,   0,   0,   0,   255, 0,    // G
+            1,   254, 0,   0,   0,   0,    // A 6ma
+            0,   0,   3,   252, 0,   0,    // C 5ma
+            0,   0,   0,   0,   0,   255,  // T
+            255, 0,   0,   0,   0,   0,    // A
+            255, 0,   0,   0,   0,   0,    // A
+            255, 0,   0,   0,   0,   0,    // A
+            0,   0,   3,   252, 0,   0,    // C 6ma
+            0,   0,   0,   0,   0,   255,  // T
+            0,   0,   255, 0,   0,   0,    // C
+    };
+
+    Read read;
+    read.seq = "ACAGTGACTAAACTC";
+    read.base_mod_probs = modbase_probs;
+
+    std::string methylation_tag;
+    SECTION("Methylation threshold is correctly applied") {
+        std::string expected_methylation_tag_10_score =
+                "MM:Z:A+a,0,1;C+m,1,0;\tML:B:C,20,254,252,252";
+        std::string expected_methylation_tag_50_score = "MM:Z:A+a,2;C+m,1,0;\tML:B:C,254,252,252";
+        std::string expected_methylation_tag_255_score = "MM:Z:A+a;C+m;\tML:B:C";
+
+        read.base_mod_info =
+                std::make_shared<::utils::BaseModInfo>(modbase_alphabet, modbase_long_names, "");
+
+        // Test generation
+        methylation_tag = read.generate_modbase_string(10);
+        REQUIRE(methylation_tag == expected_methylation_tag_10_score);
+
+        // Test generation at higher rate excludes the correct mods.
+        methylation_tag = read.generate_modbase_string(50);
+        REQUIRE(methylation_tag == expected_methylation_tag_50_score);
+
+        // Test generation at max threshold rate excludes everything
+        methylation_tag = read.generate_modbase_string(255);
+        REQUIRE(methylation_tag == expected_methylation_tag_255_score);
+    }
+
+    SECTION("Test generation using CHEBI codes") {
+        std::string modbase_long_names_CHEBI = "55555 12345";
+        std::string expected_methylation_tag_CHEBI =
+                "MM:Z:A+55555,2;C+12345,1,0;\tML:B:C,254,252,252";
+
+        read.base_mod_info = std::make_shared<::utils::BaseModInfo>(modbase_alphabet,
+                                                                    modbase_long_names_CHEBI, "");
+        methylation_tag = read.generate_modbase_string(50);
+        REQUIRE(methylation_tag == expected_methylation_tag_CHEBI);
+    }
+
+    SECTION("Test generation using AC context for A methylation") {
+        std::string context = "XC:_:_:_";
+        std::string expected_methylation_tag_with_context =
+                "MM:Z:A+a?,0,1,2;C+m,1,0;\tML:B:C,20,254,0,252,252";
+
+        read.base_mod_info = std::make_shared<::utils::BaseModInfo>(modbase_alphabet,
+                                                                    modbase_long_names, context);
+
+        methylation_tag = read.generate_modbase_string(10);
+        REQUIRE(methylation_tag == expected_methylation_tag_with_context);
+    }
+
+    SECTION("Test handling of incorrect base names") {
+        std::string modbase_long_names_unknown = "12mA 5mq";
+
+        read.base_mod_info = std::make_shared<::utils::BaseModInfo>(modbase_alphabet,
+                                                                    modbase_long_names_unknown, "");
+        methylation_tag = read.generate_modbase_string(50);
+        REQUIRE(methylation_tag.empty());
     }
 }

@@ -68,6 +68,12 @@ set(LIB_SOURCE_FILES
     dorado/decode/CPUDecoder.h
     dorado/decode/GPUDecoder.cpp
     dorado/decode/GPUDecoder.h
+    dorado/modbase/remora_encoder.cpp
+    dorado/modbase/remora_encoder.h
+    dorado/modbase/remora_scaler.cpp
+    dorado/modbase/remora_scaler.h
+    dorado/modbase/remora_utils.cpp
+    dorado/modbase/remora_utils.h
     dorado/utils/base_mod_utils.cpp
     dorado/utils/base_mod_utils.h
     dorado/utils/base64_utils.h

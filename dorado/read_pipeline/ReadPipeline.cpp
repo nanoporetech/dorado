@@ -34,7 +34,7 @@ bool get_modbase_channel_name(std::string& channel_name, const std::string& mod_
         return true;
     }
 
-    std::cerr << "Unknown modified base abbreviation: " << mod_abbreviation;
+    std::cerr << "Unknown modified base abbreviation: " << mod_abbreviation << "\n";
     return false;
 }
 }  // namespace

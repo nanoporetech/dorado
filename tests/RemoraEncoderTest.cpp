@@ -1,8 +1,8 @@
-#include "../dorado/nn/RemoraModel.h"
+#include "../dorado/modbase/remora_encoder.h"
 
 #include <catch2/catch.hpp>
 
-#define TEST_GROUP "[remora_tools]"
+#define TEST_GROUP "[remora_encoder]"
 
 TEST_CASE("Encode sequence for modified basecalling", TEST_GROUP) {
     const size_t BLOCK_STRIDE = 2;

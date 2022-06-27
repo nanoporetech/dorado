@@ -1,5 +1,7 @@
 #include "RemoraModel.h"
 
+#include "../modbase/remora_encoder.h"
+#include "../modbase/remora_scaler.h"
 #include "../utils/base64_utils.h"
 #include "../utils/base_mod_utils.h"
 #include "../utils/math_utils.h"
@@ -461,14 +463,13 @@ RemoraRunner::RemoraRunner(const std::vector<std::string>& model_paths, const st
     m_base_prob_offsets[3] = base_counts[0] + base_counts[1] + base_counts[2];
 }
 
-BaseModStats RemoraRunner::run(torch::Tensor signal,
-                               const std::string& seq,
-                               const std::vector<uint8_t>& moves) {
-    BaseModStats modified_base_data;
-    modified_base_data.num_states = m_num_states;
+torch::Tensor RemoraRunner::run(torch::Tensor signal,
+                                const std::string& seq,
+                                const std::vector<uint8_t>& moves) {
+    torch::Tensor base_mod_probs;
     auto options = torch::TensorOptions().dtype(torch::kFloat32).device(torch::kCPU);
 
-    modified_base_data.base_mod_probs = torch::zeros(
+    base_mod_probs = torch::zeros(
             {static_cast<int64_t>(seq.size()), static_cast<int64_t>(m_num_states)}, options);
 
     for (size_t i = 0; i < seq.size(); ++i) {
@@ -477,7 +478,7 @@ BaseModStats RemoraRunner::run(torch::Tensor signal,
         if (base_id < 0) {
             throw std::runtime_error("Invalid character in sequence.");
         }
-        modified_base_data.base_mod_probs[i][m_base_prob_offsets[base_id]] = 1.0f;
+        base_mod_probs[i][m_base_prob_offsets[base_id]] = 1.0f;
     }
 
     auto block_stride = ::utils::div_round_closest(signal.size(0), moves.size());
@@ -504,235 +505,10 @@ BaseModStats RemoraRunner::run(torch::Tensor signal,
         for (size_t i = 0; i < context_hits.size(); ++i) {
             int64_t result_pos = context_hits[i];
             int64_t offset = m_base_prob_offsets[BASE_IDS[seq[context_hits[i]]]];
-            modified_base_data.base_mod_probs.index_put_(
-                    {result_pos, Slice(offset, offset + scores.size(1))}, scores[i]);
+            base_mod_probs.index_put_({result_pos, Slice(offset, offset + scores.size(1))},
+                                      scores[i]);
         }
     }
 
-    return modified_base_data;
-}
-
-RemoraEncoder::RemoraEncoder(size_t block_stride,
-                             size_t context_blocks,
-                             int bases_before,
-                             int bases_after)
-        : m_bases_before(bases_before),
-          m_kmer_len(bases_before + bases_after + 1),
-          m_block_stride(int(block_stride)),
-          m_context_blocks(int(context_blocks)),
-          m_seq_len(0),
-          m_signal_len(0) {
-    m_padding = m_context_blocks / 2;
-    int padding_for_bases_before = (m_kmer_len - 1 - bases_before) * int(block_stride);
-    int padding_for_bases_after = (m_kmer_len - 1 - bases_after) * int(block_stride);
-    int padding_for_bases = std::max(padding_for_bases_before, padding_for_bases_after);
-    m_padding = std::max(padding_for_bases, m_padding);
-}
-
-void RemoraEncoder::encode_remora_data(const std::vector<uint8_t>& moves,
-                                       const std::string& sequence) {
-    // This code assumes that the first move value will always be 1. It also assumes that moves is only ever 0 or 1.
-    m_seq_len = int(sequence.size());
-    m_signal_len = int(moves.size()) * m_block_stride;
-    int padded_signal_len = m_signal_len + m_block_stride * m_padding * 2;
-    int encoded_data_size = padded_signal_len * m_kmer_len * NUM_BASES;
-    m_sample_offsets.clear();
-    m_sample_offsets.reserve(moves.size());
-    m_encoded_data.resize(encoded_data_size);
-
-    // Note that upon initialization, encoded_data is all zeros, which corresponds to "N" characters.
-
-    // First we need to find out which sample each base corresponds to, and make sure the moves vector is consistent
-    // with the sequence length.
-    int base_count = 0;
-    for (int i = 0; i < int(moves.size()); ++i) {
-        if (i == 0 || moves[i] == 1) {
-            m_sample_offsets.push_back(i * m_block_stride);
-            ++base_count;
-        }
-    }
-    if (base_count > m_seq_len) {
-        throw std::runtime_error("Movement table indicates more bases than provided in sequence (" +
-                                 std::to_string(base_count) + " > " + std::to_string(m_seq_len) +
-                                 ").");
-    }
-    if (base_count < m_seq_len) {
-        std::cerr << sequence << std::endl;
-        throw std::runtime_error("Movement table indicates fewer bases than provided in sequence(" +
-                                 std::to_string(base_count) + " < " + std::to_string(m_seq_len) +
-                                 ").");
-    }
-
-    // Now we can go through each base and fill in where the 1s belong.
-    std::vector<float> buffer(m_kmer_len * NUM_BASES);
-    for (int seq_pos = -m_kmer_len + 1; seq_pos < m_seq_len; ++seq_pos) {
-        // Fill buffer with the values corresponding to the kmer that begins with the current base.
-        std::fill(buffer.begin(), buffer.end(), 0.0f);
-        for (int kmer_pos = 0; kmer_pos < m_kmer_len; ++kmer_pos) {
-            int this_base_pos = seq_pos + kmer_pos;
-            int base_offset = -1;
-            if (this_base_pos >= 0 && this_base_pos < m_seq_len)
-                base_offset = BASE_IDS[sequence[this_base_pos]];
-            if (base_offset == -1)
-                continue;
-            buffer[kmer_pos * NUM_BASES + base_offset] = 1.0f;
-        }
-
-        // Now we need to copy buffer into the encoded_data vector a number of times equal to the number of samples of
-        // raw data corresponding to the kmer.
-        int base_sample_pos = compute_sample_pos(seq_pos + m_bases_before);
-        int next_base_sample_pos = compute_sample_pos(seq_pos + m_bases_before + 1);
-        int num_repeats = next_base_sample_pos - base_sample_pos;
-
-        // This is the position in the encoded data of the first sample corresponding to the kmer that begins with the
-        // current base.
-        int data_pos = base_sample_pos + m_padding * m_block_stride;
-        if (data_pos + num_repeats > padded_signal_len) {
-            throw std::runtime_error("Insufficient padding error.");
-        }
-        for (int i = 0; i < num_repeats; ++i, ++data_pos) {
-            std::copy(buffer.begin(), buffer.end(),
-                      m_encoded_data.data() + (data_pos * m_kmer_len * NUM_BASES));
-        }
-    }
-}
-
-RemoraEncoder::Context RemoraEncoder::get_context(size_t seq_pos) const {
-    if (seq_pos >= size_t(m_seq_len)) {
-        throw std::out_of_range("Sequence position out of range.");
-    }
-    Context context{};
-    context.size = m_context_blocks * m_block_stride * m_kmer_len * NUM_BASES;
-    int base_sample_pos =
-            (compute_sample_pos(int(seq_pos)) + compute_sample_pos(int(seq_pos) + 1)) / 2;
-    int samples_before = (m_context_blocks / 2) * m_block_stride;
-    int first_sample = base_sample_pos - samples_before;
-    if (first_sample >= 0) {
-        context.first_sample = size_t(first_sample);
-        context.lead_samples_needed = 0;
-    } else {
-        context.first_sample = 0;
-        context.lead_samples_needed = size_t(-first_sample);
-    }
-    int last_sample = first_sample + m_context_blocks * m_block_stride;
-    if (last_sample > m_signal_len) {
-        context.num_samples = size_t(m_signal_len) - context.first_sample;
-        context.tail_samples_needed = last_sample - m_signal_len;
-    } else {
-        context.num_samples = size_t(last_sample) - context.first_sample;
-        context.tail_samples_needed = 0;
-    }
-    context.data = m_encoded_data.data() +
-                   (m_padding * m_block_stride + first_sample) * m_kmer_len * NUM_BASES;
-    return context;
-}
-
-int RemoraEncoder::compute_sample_pos(int base_pos) const {
-    int base_offset = base_pos;
-    if (base_offset < 0) {
-        return m_block_stride * (base_offset);
-    }
-    if (base_offset >= m_seq_len) {
-        return m_signal_len + m_block_stride * (base_offset - m_seq_len);
-    }
-    return m_sample_offsets[base_offset];
-}
-
-RemoraScaler::RemoraScaler(const std::vector<float>& kmer_levels,
-                           size_t kmer_len,
-                           size_t centre_index)
-        : m_kmer_levels(kmer_levels), m_kmer_len(kmer_len), m_centre_index(centre_index) {
-    // ensure that the levels were the length we expected
-    assert(m_kmer_levels.size() == static_cast<size_t>(1 << (2 * m_kmer_len)));
-}
-
-size_t RemoraScaler::index_from_int_kmer(const int* int_kmer_start, size_t kmer_len) {
-    size_t index = 0;
-    for (int kmer_pos = 0; kmer_pos < static_cast<int>(kmer_len); ++kmer_pos) {
-        index += *(int_kmer_start + kmer_len - kmer_pos - 1) * (1 << (2 * kmer_pos));
-    }
-    return index;
-}
-
-std::vector<float> RemoraScaler::extract_levels(const std::vector<int>& int_seq) const {
-    std::vector<float> levels(int_seq.size(), 0.f);
-    if (int_seq.size() < m_kmer_len) {
-        return levels;
-    }
-
-    auto int_kmer_start = int_seq.data();
-    for (size_t pos = 0; pos < int_seq.size() - m_kmer_len; ++pos) {
-        levels[pos + m_centre_index] =
-                m_kmer_levels[index_from_int_kmer(int_kmer_start + pos, m_kmer_len)];
-    }
-    return levels;
-}
-
-std::pair<float, float> RemoraScaler::rescale(const torch::Tensor samples,
-                                              const std::vector<uint64_t>& seq_to_sig_map,
-                                              const std::vector<float>& levels,
-                                              size_t clip_bases) const {
-    if (m_kmer_levels.empty()) {
-        return {0.f, 1.f};
-    }
-
-    // do calc and scaling
-
-    std::vector<float> optim_dacs;
-    std::vector<float> new_levels;
-    // get the mid-point of the base
-    std::transform(std::next(std::begin(seq_to_sig_map)), std::end(seq_to_sig_map),
-                   std::begin(seq_to_sig_map), std::back_inserter(optim_dacs),
-                   [&samples](auto first_pos, auto second_pos) {
-                       return samples[(first_pos + second_pos) / 2].item().toFloat();
-                   });
-
-    if (clip_bases > 0 && levels.size() > clip_bases * 2) {
-        new_levels =
-                std::vector<float>(std::begin(levels) + clip_bases, std::end(levels) - clip_bases);
-        optim_dacs = std::vector<float>(std::begin(optim_dacs) + clip_bases,
-                                        std::end(optim_dacs) - clip_bases);
-    } else {
-        new_levels = levels;
-    }
-
-    std::vector<float> quants(19);
-    std::generate(std::begin(quants), std::end(quants), [n = 0.f]() mutable { return n += 0.05f; });
-    new_levels = ::utils::quantiles(new_levels, quants);
-    optim_dacs = ::utils::quantiles(optim_dacs, quants);
-
-    float new_scale, new_offset;
-    if (!::utils::linreg(optim_dacs, new_levels, new_scale, new_offset)) {
-        return {0.f, 1.f};
-    }
-
-    return {new_offset, new_scale};
-}
-
-std::vector<int> RemoraScaler::seq_to_ints(const std::string& sequence) {
-    std::vector<int> sequence_ints;
-    sequence_ints.reserve(sequence.size());
-    std::transform(std::begin(sequence), std::end(sequence), std::back_inserter(sequence_ints),
-                   [](const auto& c) {
-                       if (BASE_IDS[c] != -1) {
-                           return BASE_IDS[c];
-                       } else {
-                           throw std::invalid_argument(std::string("Unexpected character \"") + c +
-                                                       "\" in sequence");
-                       }
-                   });
-    return sequence_ints;
-}
-
-std::vector<uint64_t> RemoraScaler::moves_to_map(const std::vector<uint8_t>& moves,
-                                                 size_t block_stride,
-                                                 size_t signal_len) {
-    std::vector<uint64_t> seq_to_sig_map;
-    for (size_t i = 0; i < moves.size(); ++i) {
-        if (moves[i] == 1) {
-            seq_to_sig_map.push_back(i * block_stride);
-        }
-    }
-    seq_to_sig_map.push_back(signal_len);
-    return seq_to_sig_map;
+    return base_mod_probs;
 }
