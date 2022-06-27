@@ -47,6 +47,10 @@ void setup(std::vector<std::string> args,
         }
     }
 
+    if (!remora_models.empty() && emit_fastq) {
+        throw std::runtime_error("Modified base models cannot be used with FASTQ output");
+    }
+
     std::vector<std::string> remora_model_list;
     std::istringstream stream{remora_models};
     std::string model;
