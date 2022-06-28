@@ -45,7 +45,8 @@ public:
     RemoraCaller(const std::string& model, const std::string& device, int batch_size = 1000);
     std::pair<torch::Tensor, std::vector<size_t>> call(torch::Tensor signal,
                                                        const std::string& seq,
-                                                       const std::vector<uint8_t>& moves);
+                                                       const std::vector<uint8_t>& moves,
+                                                       size_t block_stride);
     const BaseModParams& params() const { return m_params; }
 };
 
@@ -63,7 +64,8 @@ public:
     RemoraRunner(const std::vector<std::string>& model_paths, const std::string& device);
     torch::Tensor run(torch::Tensor signal,
                       const std::string& seq,
-                      const std::vector<uint8_t>& moves);
+                      const std::vector<uint8_t>& moves,
+                      size_t block_stride);
 
     std::shared_ptr<const BaseModInfo> base_mod_info() const {
         return std::const_pointer_cast<const BaseModInfo>(m_base_mod_info);

@@ -52,7 +52,12 @@ std::pair<float, float> RemoraScaler::rescale(const torch::Tensor samples,
     std::transform(std::next(std::begin(seq_to_sig_map)), std::end(seq_to_sig_map),
                    std::begin(seq_to_sig_map), std::back_inserter(optim_dacs),
                    [&samples](auto first_pos, auto second_pos) {
-                       return samples[(first_pos + second_pos) / 2].item().toFloat();
+                       auto pos = (first_pos + second_pos) / 2;
+                       if (pos < samples.size(0)) {
+                           return samples[pos].item().toFloat();
+                       } else {
+                           return 0.f;
+                       }
                    });
 
     if (clip_bases > 0 && levels.size() > clip_bases * 2) {

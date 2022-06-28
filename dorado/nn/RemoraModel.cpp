@@ -5,7 +5,6 @@
 #include "modbase/remora_utils.h"
 #include "utils/base64_utils.h"
 #include "utils/base_mod_utils.h"
-#include "utils/math_utils.h"
 #include "utils/module_utils.h"
 #include "utils/tensor_utils.h"
 
@@ -327,14 +326,13 @@ std::vector<size_t> RemoraCaller::get_motif_hits(const std::string& seq) const {
     return context_hits;
 }
 
-std::pair<torch::Tensor, std::vector<size_t>> RemoraCaller::call(
-        torch::Tensor signal,
-        const std::string& seq,
-        const std::vector<uint8_t>& moves) {
-    auto block_stride = ::utils::div_round_closest(signal.size(0), moves.size());
-    RemoraEncoder encoder(block_stride,
-                          (m_params.context_before + m_params.context_after) / block_stride,
-                          m_params.bases_before, m_params.bases_after);
+std::pair<torch::Tensor, std::vector<size_t>> RemoraCaller::call(torch::Tensor signal,
+                                                                 const std::string& seq,
+                                                                 const std::vector<uint8_t>& moves,
+                                                                 size_t block_stride) {
+    auto context_blocks = (m_params.context_before + m_params.context_after) / block_stride;
+    RemoraEncoder encoder(block_stride, context_blocks, m_params.bases_before,
+                          m_params.bases_after);
     encoder.encode_remora_data(moves, seq);
     auto context_hits = get_motif_hits(seq);
     auto options = torch::TensorOptions().dtype(torch::kFloat32).device(torch::kCPU);
@@ -352,6 +350,13 @@ std::pair<torch::Tensor, std::vector<size_t>> RemoraCaller::call(
         size_t last_sample_source = first_sample_source + slice.num_samples;
         size_t first_sample_dest = slice.lead_samples_needed;
         size_t last_sample_dest = first_sample_dest + slice.num_samples;
+        size_t tail_samples_needed = slice.tail_samples_needed;
+        if (last_sample_source > signal.size(0)) {
+            size_t overrun = last_sample_source - signal.size(0);
+            tail_samples_needed += overrun;
+            last_sample_dest -= overrun;
+            last_sample_source -= overrun;
+        }
 
         auto input_signal = signal.index({Slice(first_sample_source, last_sample_source)});
         m_input_sigs.index_put_({counter, 0, Slice(first_sample_dest, last_sample_dest)},
@@ -360,7 +365,7 @@ std::pair<torch::Tensor, std::vector<size_t>> RemoraCaller::call(
         if (slice.lead_samples_needed > 0) {
             m_input_sigs.index_put_({counter, 0, Slice(None, first_sample_dest)}, 0);
         }
-        if (slice.tail_samples_needed > 0) {
+        if (tail_samples_needed > 0) {
             m_input_sigs.index_put_({counter, 0, Slice(last_sample_dest, None)}, 0);
         }
 
@@ -449,7 +454,8 @@ RemoraRunner::RemoraRunner(const std::vector<std::string>& model_paths, const st
 
 torch::Tensor RemoraRunner::run(torch::Tensor signal,
                                 const std::string& seq,
-                                const std::vector<uint8_t>& moves) {
+                                const std::vector<uint8_t>& moves,
+                                size_t block_stride) {
     torch::Tensor base_mod_probs;
     auto options = torch::TensorOptions().dtype(torch::kFloat32).device(torch::kCPU);
 
@@ -465,7 +471,6 @@ torch::Tensor RemoraRunner::run(torch::Tensor signal,
         base_mod_probs[i][m_base_prob_offsets[base_id]] = 1.0f;
     }
 
-    auto block_stride = ::utils::div_round_closest(signal.size(0), moves.size());
     std::vector<int> sequence_ints = RemoraScaler::seq_to_ints(seq);
     std::vector<uint64_t> seq_to_sig_map =
             RemoraScaler::moves_to_map(moves, block_stride, signal.size(0));
@@ -485,7 +490,7 @@ torch::Tensor RemoraRunner::run(torch::Tensor signal,
         // The scores from the RNN should be a MxN tensor,
         // where M is the number of context hits and N is the number of modifications + 1.
         auto scaled_signal = signal * scale + offset;
-        auto [scores, context_hits] = caller->call(scaled_signal, seq, moves);
+        auto [scores, context_hits] = caller->call(scaled_signal, seq, moves, block_stride);
         for (size_t i = 0; i < context_hits.size(); ++i) {
             int64_t result_pos = context_hits[i];
             int64_t offset = m_base_prob_offsets[RemoraUtils::BASE_IDS[seq[context_hits[i]]]];
