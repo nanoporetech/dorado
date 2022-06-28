@@ -1,11 +1,13 @@
 #pragma once
 
+#include <torch/torch.h>
+
 #include <string>
 #include <vector>
 
 class RemoraEncoder {
 private:
-    std::vector<float> m_encoded_data;
+    torch::Tensor m_encoded_data;
     std::vector<int> m_sample_offsets;
     int m_bases_before;
     int m_kmer_len;
@@ -56,14 +58,14 @@ public:
     void encode_remora_data(const std::vector<uint8_t>& moves, const std::string& sequence);
 
     /// Get the full encoded data vector.
-    const std::vector<float>& get_encoded_data() const { return m_encoded_data; }
+    torch::Tensor get_encoded_data() const { return m_encoded_data; }
 
     /// Get the sample offsets for the sequence.
     const std::vector<int>& get_sample_offsets() const { return m_sample_offsets; }
 
     /// Helper structure for specifying the context and returning the corresponding encoded data.
     struct Context {
-        const float* data;    ///< Pointer to encoded data slice.
+        torch::Tensor data;   ///< Encoded data slice
         size_t size;          ///< Size of encoded data slice.
         size_t first_sample;  ///< Index of first raw data sample for the slice.
         size_t num_samples;   ///< Number of samples of raw data in the slice.

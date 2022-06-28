@@ -364,10 +364,7 @@ std::pair<torch::Tensor, std::vector<size_t>> RemoraCaller::call(
             m_input_sigs.index_put_({counter, 0, Slice(last_sample_dest, None)}, 0);
         }
 
-        auto options = torch::TensorOptions().dtype(torch::kFloat32).device(torch::kCPU);
-        torch::Tensor encoded_kmers = torch::empty({4 * kmer_len, sig_len}, options);
-        std::copy_n(slice.data, slice.size, encoded_kmers.contiguous().data_ptr<float>());
-        m_input_seqs.index_put_({counter}, encoded_kmers);
+        m_input_seqs.index_put_({counter}, torch::transpose(slice.data, 0, 1));
         if (++counter == m_batch_size) {
             counter = 0;
             auto output = m_module->forward(m_input_sigs.to(m_options.device_opt().value()),

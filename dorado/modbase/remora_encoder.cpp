@@ -31,7 +31,10 @@ void RemoraEncoder::encode_remora_data(const std::vector<uint8_t>& moves,
     int encoded_data_size = padded_signal_len * m_kmer_len * RemoraUtils::NUM_BASES;
     m_sample_offsets.clear();
     m_sample_offsets.reserve(moves.size());
-    m_encoded_data.resize(encoded_data_size);
+
+    auto options = torch::TensorOptions().dtype(torch::kFloat32).device(torch::kCPU);
+    m_encoded_data =
+            torch::zeros({padded_signal_len, m_kmer_len * RemoraUtils::NUM_BASES}, options);
 
     // Note that upon initialization, encoded_data is all zeros, which corresponds to "N" characters.
 
@@ -56,10 +59,10 @@ void RemoraEncoder::encode_remora_data(const std::vector<uint8_t>& moves,
     }
 
     // Now we can go through each base and fill in where the 1s belong.
-    std::vector<float> buffer(m_kmer_len * RemoraUtils::NUM_BASES);
     for (int seq_pos = -m_kmer_len + 1; seq_pos < m_seq_len; ++seq_pos) {
         // Fill buffer with the values corresponding to the kmer that begins with the current base.
-        std::fill(buffer.begin(), buffer.end(), 0.0f);
+        auto buffer = torch::zeros({m_kmer_len * RemoraUtils::NUM_BASES});
+        // std::fill(buffer.begin(), buffer.end(), 0.0f);
         for (int kmer_pos = 0; kmer_pos < m_kmer_len; ++kmer_pos) {
             int this_base_pos = seq_pos + kmer_pos;
             int base_offset = -1;
@@ -83,8 +86,7 @@ void RemoraEncoder::encode_remora_data(const std::vector<uint8_t>& moves,
             throw std::runtime_error("Insufficient padding error.");
         }
         for (int i = 0; i < num_repeats; ++i, ++data_pos) {
-            std::copy(buffer.begin(), buffer.end(),
-                      m_encoded_data.data() + (data_pos * m_kmer_len * RemoraUtils::NUM_BASES));
+            m_encoded_data.index_put_({data_pos}, buffer);
         }
     }
 }
@@ -114,8 +116,10 @@ RemoraEncoder::Context RemoraEncoder::get_context(size_t seq_pos) const {
         context.num_samples = size_t(last_sample) - context.first_sample;
         context.tail_samples_needed = 0;
     }
-    context.data = m_encoded_data.data() + (m_padding * m_block_stride + first_sample) *
-                                                   m_kmer_len * RemoraUtils::NUM_BASES;
+    auto start_pos = m_padding * m_block_stride + first_sample;
+    auto end_pos = start_pos + m_context_blocks * m_block_stride;
+    context.data = m_encoded_data.index(
+            {torch::indexing::Slice(start_pos, end_pos), torch::indexing::Slice()});
     return context;
 }
 
