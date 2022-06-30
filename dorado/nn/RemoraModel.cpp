@@ -181,6 +181,7 @@ struct RemoraConvLSTMModelImpl : Module {
 
         z = z2.index({-1});
         z = linear(z);
+        z = z.softmax(1);
 
         return z;
     }
@@ -230,7 +231,6 @@ struct RemoraConvLSTMModelImpl : Module {
 
     Linear linear{nullptr};
     SiLU activation{nullptr};
-    Softmax softmax{nullptr};
 };
 TORCH_MODULE(RemoraConvModel);
 TORCH_MODULE(RemoraConvLSTMModel);
