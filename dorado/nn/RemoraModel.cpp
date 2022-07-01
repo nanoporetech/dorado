@@ -179,7 +179,7 @@ struct RemoraConvLSTMModelImpl : Module {
         z2 = activation(z2);
         z2 = z2.flip(0);
 
-        z = z2.index({-1});
+        z = z2.index({-1}).permute({0, 1});
         z = linear(z);
         z = z.softmax(1);
 
