@@ -132,17 +132,10 @@ struct LSTMStackImpl : Module {
         rnn3 = register_module("rnn_3", CusparseLSTM(layer_size, true));
         rnn4 = register_module("rnn_4", CusparseLSTM(layer_size, false));
         rnn5 = register_module("rnn_5", CusparseLSTM(layer_size, true));
-
-        CUBLAS_CHECK(cublasCreate(&cublas_handle));
-        CUBLAS_CHECK(cublasSetStream(cublas_handle, 0));
     }
 
     torch::Tensor forward(torch::Tensor in) {
-        //        int cuda_device_id = get_cuda_device_id_from_device(in.device());
-        //        if (cudaSetDevice(cuda_device_id) != cudaSuccess) {
-        //            throw std::runtime_error("Unable to set cuda device!");
-        //        }
-
+        auto stream = at::cuda::getCurrentCUDAStream().stream();
         auto tensor_options = torch::TensorOptions()
                                       .dtype(torch::kFloat16)
                                       .device(in.device())
@@ -150,18 +143,38 @@ struct LSTMStackImpl : Module {
         int chunk_size = in.size(0);
         int batch_size = in.size(1);
         int gate_size = layer_size * 4;
-        // copy contents of `in` into larger working memory matrix (holding both
-        // input and output interleaved, as well as padding zeroes)
-        auto mat_working_mem =
-                torch::zeros({chunk_size + 1, batch_size, 2, in.size(2)}, tensor_options)
-                        .contiguous();
-        mat_working_mem.slice(0, 1, chunk_size + 1).select(2, 1) = in;
+
+        // We need some extra working memory to run the LSTM layers. By making it `thread_local`
+        // this will work with multiple runners (i.e. multiple threads).
+        thread_local torch::Tensor mat_working_mem, gate_buf, state_buf;
+        thread_local int max_batch_size = 0;
+        // TODO: even when not having to resize we need to make sure working mem buffers are on the right device
+        if (batch_size > max_batch_size) {
+            max_batch_size = batch_size;
+            mat_working_mem =
+                    torch::zeros({chunk_size + 1, batch_size, 2, layer_size}, tensor_options)
+                            .contiguous()
+                            .to(in.device());
+            gate_buf = torch::empty({batch_size * gate_size}, tensor_options)
+                               .contiguous()
+                               .to(in.device());
+            state_buf = torch::empty({batch_size * layer_size}, tensor_options)
+                                .contiguous()
+                                .to(in.device());
+        }
+
         size_t timestep_buf_size = size_t(batch_size) * 2 * layer_size;
         int16_t *working_mem_ptr = (int16_t *)mat_working_mem.data_ptr();
-        torch::Tensor gate_buf = torch::empty({batch_size * gate_size}, tensor_options);
-        torch::Tensor state_buf = torch::empty({batch_size * layer_size}, tensor_options);
 
-        auto stream = at::cuda::getCurrentCUDAStream().stream();
+        // copy contents of `in` into larger working memory matrix (holding both
+        // input and output interleaved, as well as padding zeroes)
+
+        // NOTE: `host_transpose_f16' does exactly what the commented out assignment
+        // below would do, only ~5x faster (on A100)
+        // mat_working_mem.slice(0, 1, chunk_size + 1).select(2, 1) = in;
+        host_transpose_f16(stream, in.data_ptr(), in.size(0), in.size(1), in.size(2), in.stride(0),
+                           in.stride(1), in.stride(2), batch_size * 2 * layer_size, 2 * layer_size,
+                           1, working_mem_ptr + 2 * batch_size * layer_size + layer_size);
 
         for (auto &rnn : {rnn1, rnn2, rnn3, rnn4, rnn5}) {
             cudaMemsetAsync(state_buf.data_ptr(), 0,
@@ -179,10 +192,8 @@ struct LSTMStackImpl : Module {
                 }
 
                 // timestep matrix mulitplication
-                static constexpr uint16_t HALF_ZERO =
-                        0;  // 0.0 in half precision floating point format
-                static constexpr uint16_t HALF_ONE =
-                        0x3C00;  // 1.0 in half precision floating point format
+                constexpr uint16_t HALF_ZERO = 0;      // 0.0 in __half format
+                constexpr uint16_t HALF_ONE = 0x3C00;  // 1.0 in __half format
                 CUBLAS_CHECK(cublasGemmEx(
                         at::cuda::getCurrentCUDABlasHandle(), CUBLAS_OP_N, CUBLAS_OP_N, gate_size,
                         batch_size, 2 * layer_size, &HALF_ONE, (const void *)weights.data_ptr(),
@@ -195,14 +206,14 @@ struct LSTMStackImpl : Module {
         }
 
         // TODO: can we modify and return `in` here, or define a `forward_inplace()` method?
-        torch::Tensor out = torch::empty_like(in);
+        torch::Tensor out =
+                torch::empty({in.size(1), in.size(0), in.size(2)}, tensor_options).transpose(0, 1);
         out.slice(0, 0, chunk_size) = mat_working_mem.index({Slice(0, chunk_size), Slice(), 0});
         return out;
     }
 
     int layer_size;
     CusparseLSTM rnn1{nullptr}, rnn2{nullptr}, rnn3{nullptr}, rnn4{nullptr}, rnn5{nullptr};
-    cublasHandle_t cublas_handle;
 };
 
 #else  // if USE_CUSPARSE
