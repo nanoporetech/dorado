@@ -56,8 +56,8 @@ struct LinearCRFImpl : Module {
     Tanh activation{nullptr};
 };
 
-#define USE_CUSPARSE 1
-#if USE_CUSPARSE
+#define USE_CUDA_LSTM 1
+#if USE_CUDA_LSTM
 extern "C" {
 #include "koi.h"
 }
@@ -81,14 +81,6 @@ extern "C" {
             exit(EXIT_FAILURE);                                                      \
         }                                                                            \
     }
-#define CUSPARSE_CHECK(X)                                                                \
-    {                                                                                    \
-        cusparseStatus_t res = X;                                                        \
-        if (res != CUSPARSE_STATUS_SUCCESS) {                                            \
-            printf("CuSPARSELt returned error code %d, line(%d)\n", int(res), __LINE__); \
-            exit(EXIT_FAILURE);                                                          \
-        }                                                                                \
-    }
 
 static int get_cuda_device_id_from_device(const c10::Device &device) {
     if (!device.is_cuda() || !device.has_index()) {
@@ -96,12 +88,11 @@ static int get_cuda_device_id_from_device(const c10::Device &device) {
         ss << "Unable to extract CUDA device ID from device " << device;
         throw std::runtime_error(ss.str());
     }
-
     return device.index();
 }
 
-struct CusparseLSTMImpl : Module {
-    CusparseLSTMImpl(int layer_size, bool reverse_) : reverse(reverse_) {
+struct CudaLSTMImpl : Module {
+    CudaLSTMImpl(int layer_size, bool reverse_) : reverse(reverse_) {
         // TODO: do we need to specify .device("gpu")?
         auto options = torch::TensorOptions().dtype(torch::kFloat16);
         weights = torch::empty({layer_size * 4, layer_size * 2}, options).contiguous();
@@ -123,15 +114,15 @@ struct CusparseLSTMImpl : Module {
     bool reverse;
 };
 
-TORCH_MODULE(CusparseLSTM);
+TORCH_MODULE(CudaLSTM);
 
 struct LSTMStackImpl : Module {
     LSTMStackImpl(int layer_size_) : layer_size(layer_size_) {
-        rnn1 = register_module("rnn_1", CusparseLSTM(layer_size, true));
-        rnn2 = register_module("rnn_2", CusparseLSTM(layer_size, false));
-        rnn3 = register_module("rnn_3", CusparseLSTM(layer_size, true));
-        rnn4 = register_module("rnn_4", CusparseLSTM(layer_size, false));
-        rnn5 = register_module("rnn_5", CusparseLSTM(layer_size, true));
+        rnn1 = register_module("rnn_1", CudaLSTM(layer_size, true));
+        rnn2 = register_module("rnn_2", CudaLSTM(layer_size, false));
+        rnn3 = register_module("rnn_3", CudaLSTM(layer_size, true));
+        rnn4 = register_module("rnn_4", CudaLSTM(layer_size, false));
+        rnn5 = register_module("rnn_5", CudaLSTM(layer_size, true));
     }
 
     torch::Tensor forward(torch::Tensor in) {
@@ -213,10 +204,10 @@ struct LSTMStackImpl : Module {
     }
 
     int layer_size;
-    CusparseLSTM rnn1{nullptr}, rnn2{nullptr}, rnn3{nullptr}, rnn4{nullptr}, rnn5{nullptr};
+    CudaLSTM rnn1{nullptr}, rnn2{nullptr}, rnn3{nullptr}, rnn4{nullptr}, rnn5{nullptr};
 };
 
-#else  // if USE_CUSPARSE
+#else  // if USE_CUDA_LSTM
 
 struct LSTMStackImpl : Module {
     LSTMStackImpl(int size) {
@@ -257,7 +248,7 @@ struct LSTMStackImpl : Module {
     LSTM rnn1{nullptr}, rnn2{nullptr}, rnn3{nullptr}, rnn4{nullptr}, rnn5{nullptr};
 };
 
-#endif  // if USE_CUSPARSE else
+#endif  // if USE_CUDA_LSTM else
 
 TORCH_MODULE(Permute);
 TORCH_MODULE(LSTMStack);
