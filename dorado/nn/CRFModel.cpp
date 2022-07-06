@@ -4,6 +4,9 @@
 
 #ifndef __APPLE__
 #include <ATen/cuda/CUDAContext.h>
+#define USE_CUDA_LSTM 1
+#else
+#define USE_CUDA_LSTM 0
 #endif
 
 #include <math.h>
@@ -59,10 +62,8 @@ struct LinearCRFImpl : Module {
     Tanh activation{nullptr};
 };
 
-#define USE_CUDA_LSTM 1
 #if USE_CUDA_LSTM
 
-#ifndef __APPLE__
 extern "C" {
 #include "koi.h"
 }
@@ -212,7 +213,6 @@ struct LSTMStackImpl : Module {
     CudaLSTM rnn1{nullptr}, rnn2{nullptr}, rnn3{nullptr}, rnn4{nullptr}, rnn5{nullptr};
 };
 
-#endif  // if not apple
 #else   // if USE_CUDA_LSTM
 
 struct LSTMStackImpl : Module {
