@@ -2,7 +2,10 @@
 
 #include "../utils/tensor_utils.h"
 
+#ifndef __APPLE__
 #include <ATen/cuda/CUDAContext.h>
+#endif
+
 #include <math.h>
 #include <toml.hpp>
 #include <torch/torch.h>
