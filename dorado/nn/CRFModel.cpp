@@ -61,6 +61,8 @@ struct LinearCRFImpl : Module {
 
 #define USE_CUDA_LSTM 1
 #if USE_CUDA_LSTM
+
+#ifndef __APPLE__
 extern "C" {
 #include "koi.h"
 }
@@ -210,6 +212,7 @@ struct LSTMStackImpl : Module {
     CudaLSTM rnn1{nullptr}, rnn2{nullptr}, rnn3{nullptr}, rnn4{nullptr}, rnn5{nullptr};
 };
 
+#endif // if not apple
 #else  // if USE_CUDA_LSTM
 
 struct LSTMStackImpl : Module {
