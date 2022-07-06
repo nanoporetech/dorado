@@ -212,8 +212,8 @@ struct LSTMStackImpl : Module {
     CudaLSTM rnn1{nullptr}, rnn2{nullptr}, rnn3{nullptr}, rnn4{nullptr}, rnn5{nullptr};
 };
 
-#endif // if not apple
-#else  // if USE_CUDA_LSTM
+#endif  // if not apple
+#else   // if USE_CUDA_LSTM
 
 struct LSTMStackImpl : Module {
     LSTMStackImpl(int size) {
