@@ -4,6 +4,7 @@
 
 #ifndef __APPLE__
 #include <ATen/cuda/CUDAContext.h>
+#include <c10/cuda/CUDAGuard.h>
 #define USE_CUDA_LSTM 1
 #else
 #define USE_CUDA_LSTM 0
@@ -132,6 +133,7 @@ struct LSTMStackImpl : Module {
     }
 
     torch::Tensor forward(torch::Tensor in) {
+        c10::cuda::CUDAGuard device_guard(in.device());
         auto stream = at::cuda::getCurrentCUDAStream().stream();
         auto tensor_options = torch::TensorOptions()
                                       .dtype(torch::kFloat16)
@@ -144,21 +146,22 @@ struct LSTMStackImpl : Module {
         // We need some extra working memory to run the LSTM layers. By making it `thread_local`
         // this will work with multiple runners (i.e. multiple threads).
         thread_local torch::Tensor mat_working_mem, gate_buf, state_buf;
-        thread_local int max_batch_size = 0;
-        // TODO: even when not having to resize we need to make sure working mem buffers are on the right device
-        if (batch_size > max_batch_size) {
-            max_batch_size = batch_size;
+        thread_local size_t max_working_mem_size = 0;
+        thread_local size_t max_state_buf_size = 0;
+        if (max_working_mem_size < size_t(chunk_size + 1) * batch_size) {
+            max_working_mem_size = size_t(chunk_size + 1) * batch_size;
             mat_working_mem =
                     torch::zeros({chunk_size + 1, batch_size, 2, layer_size}, tensor_options)
-                            .contiguous()
-                            .to(in.device());
-            gate_buf = torch::empty({batch_size * gate_size}, tensor_options)
-                               .contiguous()
-                               .to(in.device());
-            state_buf = torch::empty({batch_size * layer_size}, tensor_options)
-                                .contiguous()
-                                .to(in.device());
+                            .contiguous();
         }
+        if (max_state_buf_size < batch_size * layer_size) {
+            max_state_buf_size = size_t(batch_size) * layer_size;
+            gate_buf = torch::empty({batch_size * gate_size}, tensor_options).contiguous();
+            state_buf = torch::empty({batch_size * layer_size}, tensor_options).contiguous();
+        }
+        mat_working_mem.to(in.device());
+        gate_buf.to(in.device());
+        state_buf.to(in.device());
 
         size_t timestep_buf_size = size_t(batch_size) * 2 * layer_size;
         int16_t *working_mem_ptr = (int16_t *)mat_working_mem.data_ptr();
