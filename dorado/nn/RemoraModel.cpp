@@ -330,8 +330,8 @@ std::pair<torch::Tensor, std::vector<size_t>> RemoraCaller::call(torch::Tensor s
                                                                  const std::string& seq,
                                                                  const std::vector<uint8_t>& moves,
                                                                  size_t block_stride) {
-    auto context_blocks = (m_params.context_before + m_params.context_after) / block_stride;
-    RemoraEncoder encoder(block_stride, context_blocks, m_params.bases_before,
+    auto context_samples = (m_params.context_before + m_params.context_after);
+    RemoraEncoder encoder(block_stride, context_samples, m_params.bases_before,
                           m_params.bases_after);
     encoder.encode_remora_data(moves, seq);
     auto context_hits = get_motif_hits(seq);

@@ -13,7 +13,7 @@ private:
     int m_kmer_len;
     int m_padding;
     int m_block_stride;
-    int m_context_blocks;
+    int m_context_samples;
     int m_seq_len;
     int m_signal_len;
 
@@ -22,11 +22,11 @@ private:
 public:
     /** Encoder for Remora-style modified base detection.
      *  @param block_stride The number of samples corresponding to a single entry in the movement vector.
-     *  @param context_blocks The number of blocks corresponding to a slice of encoded data.
+     *  @param context_samples The number of samples corresponding to a slice of encoded data.
      *  @param bases_before The number of bases before the primary base of each kmer.
      *  @param bases_after The number of bases after the primary base of each kmer.
      */
-    RemoraEncoder(size_t block_stride, size_t context_blocks, int bases_before, int bases_after);
+    RemoraEncoder(size_t block_stride, size_t context_samples, int bases_before, int bases_after);
 
     /** Encode sequence data for input to modified base detection network.
      *  @param moves The movement vector from the basecall.

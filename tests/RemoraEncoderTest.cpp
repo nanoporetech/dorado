@@ -13,7 +13,7 @@ TEST_CASE("Encode sequence for modified basecalling", TEST_GROUP) {
     //                         T  A     T        T  C     A     G        T     A  C
     std::vector<uint8_t> moves{1, 1, 0, 1, 0, 0, 1, 1, 0, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 0};
 
-    RemoraEncoder encoder(BLOCK_STRIDE, SLICE_BLOCKS, 1, 1);
+    RemoraEncoder encoder(BLOCK_STRIDE, SLICE_BLOCKS * BLOCK_STRIDE, 1, 1);
     encoder.encode_remora_data(moves, sequence);
     const auto& sample_offsets = encoder.get_sample_offsets();
     const auto& encoded_data = encoder.get_encoded_data();
