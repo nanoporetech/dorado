@@ -9,7 +9,7 @@ using namespace std::chrono_literals;
 
 void WriterNode::worker_thread() {
     if (!m_emit_fastq) {
-        std::cout << "@HD\tVN:1.5\tSO:unknown\n"
+        std::cout << "@HD\tVN:1.6\tSO:unknown\n"
                   << "@PG\tID:basecaller\tPN:dorado\tVN:" << DORADO_VERSION << "\tCL:dorado";
         for (const auto& arg : m_args) {
             std::cout << " " << arg;
