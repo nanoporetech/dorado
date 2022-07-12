@@ -155,10 +155,10 @@ struct CRFModelImpl : Module {
 
 TORCH_MODULE(CRFModel);
 
-ModuleHolder<AnyModule> load_crf_model(const std::string& path,
-                                       int batch_size,
-                                       int chunk_size,
-                                       torch::TensorOptions options) {
+std::tuple<ModuleHolder<AnyModule>, size_t> load_crf_model(const std::string& path,
+                                                           int batch_size,
+                                                           int chunk_size,
+                                                           torch::TensorOptions options) {
     auto config = toml::parse(path + "/config.toml");
 
     const auto& encoder = toml::find(config, "encoder");
@@ -180,5 +180,5 @@ ModuleHolder<AnyModule> load_crf_model(const std::string& path,
     auto module = AnyModule(model);
     auto holder = ModuleHolder<AnyModule>(module);
 
-    return holder;
+    return {holder, static_cast<size_t>(stride)};
 }

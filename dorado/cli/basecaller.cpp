@@ -47,6 +47,10 @@ void setup(std::vector<std::string> args,
         }
     }
 
+    auto stride = runners.front()->stride();
+    assert(std::all_of(runners.begin(), runners.end(),
+                       [stride](auto runner) { return runner->stride() == stride; }));
+
     if (!remora_models.empty() && emit_fastq) {
         throw std::runtime_error("Modified base models cannot be used with FASTQ output");
     }
@@ -70,11 +74,11 @@ void setup(std::vector<std::string> args,
 
     if (!remora_model_list.empty()) {
         mod_base_caller_node.reset(new ModBaseCallerNode(writer_node, mod_base_runner));
-        basecaller_node = std::make_unique<BasecallerNode>(*mod_base_caller_node, runners,
-                                                           batch_size, chunk_size, overlap);
+        basecaller_node = std::make_unique<BasecallerNode>(
+                *mod_base_caller_node, std::move(runners), batch_size, chunk_size, overlap, stride);
     } else {
-        basecaller_node = std::make_unique<BasecallerNode>(writer_node, runners, batch_size,
-                                                           chunk_size, overlap);
+        basecaller_node = std::make_unique<BasecallerNode>(writer_node, std::move(runners),
+                                                           batch_size, chunk_size, overlap, stride);
     }
     ScalerNode scaler_node(*basecaller_node);
     DataLoader loader(scaler_node, "cpu");

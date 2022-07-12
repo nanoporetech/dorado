@@ -16,6 +16,7 @@ void stitch_chunks(std::shared_ptr<Read> read) {
         auto next_chunk = read->called_chunks[i + 1];
         int overlap_size = (current_chunk->raw_chunk_size + current_chunk->input_offset) -
                            (next_chunk->input_offset);
+        assert(overlap_size % down_sampling == 0);
         int overlap_down_sampled = overlap_size / down_sampling;
         int mid_point_rear = overlap_down_sampled / 2;
 

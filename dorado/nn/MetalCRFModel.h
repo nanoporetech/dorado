@@ -15,6 +15,7 @@ public:
     MetalModelRunner(std::shared_ptr<MetalCaller> caller, int chunk_size, int batch_size);
     void accept_chunk(int chunk_idx, at::Tensor slice) final;
     std::vector<DecodedChunk> call_chunks(int num_chunks) final;
+    size_t stride() const final;
 
 private:
     std::shared_ptr<MetalCaller> m_caller;

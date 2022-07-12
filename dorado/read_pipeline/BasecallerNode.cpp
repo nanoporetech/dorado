@@ -50,8 +50,14 @@ void BasecallerNode::input_worker_thread() {
             m_chunks_in.push_back(
                     std::make_shared<Chunk>(read, offset, chunk_in_read_idx++, m_chunk_size));
             read->num_chunks = 1;
+            auto last_chunk_offset = raw_size - m_chunk_size;
+            auto misalignment = last_chunk_offset % m_stride;
+            if (misalignment != 0) {
+                // move last chunk start to the next stride boundary. we'll zero pad any excess samples required.
+                last_chunk_offset += m_stride - misalignment;
+            }
             while (offset + m_chunk_size < raw_size) {
-                offset = std::min(offset + signal_chunk_step, raw_size - m_chunk_size);
+                offset = std::min(offset + signal_chunk_step, last_chunk_offset);
                 m_chunks_in.push_back(
                         std::make_shared<Chunk>(read, offset, chunk_in_read_idx++, m_chunk_size));
                 read->num_chunks++;
@@ -170,17 +176,19 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
 }
 
 BasecallerNode::BasecallerNode(ReadSink &sink,
-                               std::vector<Runner> &model_runners,
+                               std::vector<Runner> model_runners,
                                size_t batch_size,
                                size_t chunk_size,
                                size_t overlap,
+                               size_t stride,
                                size_t max_reads)
         : ReadSink(max_reads),
           m_sink(sink),
-          m_model_runners(model_runners),
+          m_model_runners(std::move(model_runners)),
           m_batch_size(batch_size),
           m_chunk_size(chunk_size),
           m_overlap(overlap),
+          m_stride(stride),
           m_terminate_basecaller(false),
           m_input_worker(new std::thread(&BasecallerNode::input_worker_thread, this)) {
     //Spin up the model runners:
@@ -193,6 +201,10 @@ BasecallerNode::BasecallerNode(ReadSink &sink,
         std::deque<std::shared_ptr<Chunk>> chunk_queue;
         m_batched_chunks.push_back(chunk_queue);
     }
+    // adjust chunk size to be a multiple of the stride
+    m_chunk_size /= stride;
+    m_chunk_size *= stride;
+
     initialization_time = std::chrono::system_clock::now();
 }
 
