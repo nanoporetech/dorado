@@ -162,8 +162,9 @@ set_target_properties(dorado
 target_link_libraries(dorado elzip)
 target_link_libraries(dorado dorado_lib)
 
-
-set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/../dist)
+if (NOT DEFINED CMAKE_INSTALL_PREFIX)
+    set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/../dist)
+endif()
 
 install(TARGETS dorado RUNTIME)
 
