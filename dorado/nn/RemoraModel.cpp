@@ -23,8 +23,7 @@ struct ConvBatchNormImpl : Module {
                       int k = 1,
                       int stride = 1,
                       int num_features = 1) {
-        conv = register_module(
-                "conv", Conv1d(Conv1dOptions(size, outsize, k).stride(stride).padding(k / 2)));
+        conv = register_module("conv", Conv1d(Conv1dOptions(size, outsize, k).stride(stride)));
         batch_norm = register_module("batch_norm", BatchNorm1d(num_features));
         activation = register_module("activation", SiLU());
     }
