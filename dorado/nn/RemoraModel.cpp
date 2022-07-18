@@ -419,10 +419,6 @@ std::pair<torch::Tensor, std::vector<size_t>> RemoraCaller::call(torch::Tensor s
                           m_params.bases_after);
     encoder.encode_remora_data(moves, seq);
     auto context_hits = get_motif_hits(seq);
-    auto options = torch::TensorOptions().dtype(torch::kFloat32).device(torch::kCPU);
-    auto kmer_len = m_params.bases_after + m_params.bases_before + 1;
-    auto sig_len = static_cast<int64_t>(m_params.context_before + m_params.context_after);
-
     auto counter = 0;
     auto index = 0;
     auto scores = torch::empty({static_cast<int64_t>(context_hits.size()),
