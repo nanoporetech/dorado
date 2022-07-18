@@ -9,6 +9,7 @@ class ModBaseCallerNode : public ReadSink {
 public:
     ModBaseCallerNode(ReadSink& sink,
                       std::shared_ptr<RemoraRunner> model_runner,
+                      size_t model_stride,
                       size_t max_reads = 1000);
     ~ModBaseCallerNode();
 

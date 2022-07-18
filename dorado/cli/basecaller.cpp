@@ -74,7 +74,8 @@ void setup(std::vector<std::string> args,
     std::unique_ptr<BasecallerNode> basecaller_node;
 
     if (!remora_model_list.empty()) {
-        mod_base_caller_node.reset(new ModBaseCallerNode(writer_node, mod_base_runner));
+        mod_base_caller_node.reset(
+                new ModBaseCallerNode(writer_node, mod_base_runner, model_stride));
         basecaller_node =
                 std::make_unique<BasecallerNode>(*mod_base_caller_node, std::move(runners),
                                                  batch_size, chunk_size, overlap, model_stride);
