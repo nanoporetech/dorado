@@ -49,8 +49,9 @@ void setup(std::vector<std::string> args,
 
     // verify that all runners are using the same stride, in case we allow multiple models in future
     auto model_stride = runners.front()->model_stride();
-    assert(std::all_of(runners.begin(), runners.end(),
-                       [stride](auto runner) { return runner->model_stride() == model_stride; }));
+    assert(std::all_of(runners.begin(), runners.end(), [model_stride](auto runner) {
+        return runner->model_stride() == model_stride;
+    }));
 
     if (!remora_models.empty() && emit_fastq) {
         throw std::runtime_error("Modified base models cannot be used with FASTQ output");
