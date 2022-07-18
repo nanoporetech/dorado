@@ -8,10 +8,12 @@ using namespace std::chrono_literals;
 
 ModBaseCallerNode::ModBaseCallerNode(ReadSink& sink,
                                      std::shared_ptr<RemoraRunner> model_runner,
+                                     size_t model_stride,
                                      size_t max_reads)
         : ReadSink(max_reads),
           m_sink(sink),
           m_model_runner(model_runner),
+          m_model_stride(model_stride),
           m_worker(new std::thread(&ModBaseCallerNode::worker_thread, this)) {}
 
 ModBaseCallerNode::~ModBaseCallerNode() {
@@ -39,11 +41,9 @@ void ModBaseCallerNode::worker_thread() {
         m_reads.pop_front();
         lock.unlock();
 
-        auto block_stride = ::utils::div_round_closest(read->called_chunks[0]->raw_chunk_size,
-                                                       read->called_chunks[0]->moves.size());
         // TODO: better read queuing, multiple runners
         auto base_mod_probs =
-                m_model_runner->run(read->raw_data, read->seq, read->moves, block_stride);
+                m_model_runner->run(read->raw_data, read->seq, read->moves, m_model_stride);
         read->base_mod_probs.resize(base_mod_probs.size(0) * base_mod_probs.size(1));
         auto results_view =
                 base_mod_probs.view({static_cast<int64_t>(read->base_mod_probs.size())});

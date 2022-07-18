@@ -17,5 +17,6 @@ private:
 
     ReadSink& m_sink;
     std::shared_ptr<RemoraRunner> m_model_runner;
+    size_t m_model_stride;  // stride of the basecall model that was used to process the read
     std::unique_ptr<std::thread> m_worker;
 };

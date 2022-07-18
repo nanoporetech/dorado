@@ -375,10 +375,9 @@ public:
         m_batch_size = batch_size;
         int outsize = m_states * num_transitions;
 
-        m_stride = static_cast<size_t>(stride);
+        m_model_stride = static_cast<size_t>(stride);
         // adjust chunk size to a multiple of the stride
-        chunk_size /= stride;
-        chunk_size *= stride;
+        chunk_size -= chunk_size % stride;
 
         auto state_dict = load_weights(model_path);
 
@@ -637,7 +636,7 @@ public:
     MTL::SharedEvent *m_mtl_event;
     torch::Tensor m_scan_idx[2][2];
     torch::Tensor m_scores, m_posts, m_bwd;
-    int m_out_chunk_size, m_batch_size, m_states, m_stride;
+    int m_out_chunk_size, m_batch_size, m_states, m_model_stride;
 };
 
 std::shared_ptr<MetalCaller> create_metal_caller(const std::string &model_path,
@@ -664,4 +663,4 @@ std::vector<DecodedChunk> MetalModelRunner::call_chunks(int num_chunks) {
     return out_chunks;
 }
 
-size_t MetalModelRunner::stride() const { return m_caller->m_stride; }
+size_t MetalModelRunner::model_stride() const { return m_caller->m_model_stride; }

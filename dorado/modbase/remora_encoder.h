@@ -45,7 +45,7 @@ public:
      *  [ 1, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0 ]
      *
      *  This would be repeated for each sample corresponding to that kmer. So if the basecall stayed on that kmer through
-     *  3 blocks, with a block-strike of 2, it would be repeated 6 times. The number of times the basecall stayed on the
+     *  3 blocks, with a block-stride of 2, it would be repeated 6 times. The number of times the basecall stayed on the
      *  primary base of the kmer determines the number of repeats. So if, in the above example, the middle base is the
      *  primary one (bases_before = bases_after = 1), and the move vector indicates that the basecall stayed twice after
      *  emitting the T, then with a block_stride of 2 that would mean the kmer would be repeated 6 times.

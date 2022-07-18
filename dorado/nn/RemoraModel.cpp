@@ -13,6 +13,7 @@
 
 #include <array>
 #include <stdexcept>
+#include <unordered_map>
 
 using namespace torch::nn;
 using namespace torch::indexing;
@@ -485,7 +486,7 @@ RemoraRunner::RemoraRunner(const std::vector<std::string>& model_paths, const st
         std::string motif;
         int motif_offset;
     };
-    std::map<char, int> base_map{{'A', 0}, {'C', 1}, {'G', 2}, {'T', 3}};
+    std::unordered_map<char, int> base_map{{'A', 0}, {'C', 1}, {'G', 2}, {'T', 3}};
     std::string allowed_bases = "ACGT";
     Info model_info[4];
     for (int b = 0; b < 4; ++b) {

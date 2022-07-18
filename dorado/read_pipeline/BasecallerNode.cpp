@@ -51,10 +51,10 @@ void BasecallerNode::input_worker_thread() {
                     std::make_shared<Chunk>(read, offset, chunk_in_read_idx++, m_chunk_size));
             read->num_chunks = 1;
             auto last_chunk_offset = raw_size - m_chunk_size;
-            auto misalignment = last_chunk_offset % m_stride;
+            auto misalignment = last_chunk_offset % m_model_stride;
             if (misalignment != 0) {
                 // move last chunk start to the next stride boundary. we'll zero pad any excess samples required.
-                last_chunk_offset += m_stride - misalignment;
+                last_chunk_offset += m_model_stride - misalignment;
             }
             while (offset + m_chunk_size < raw_size) {
                 offset = std::min(offset + signal_chunk_step, last_chunk_offset);
@@ -180,7 +180,7 @@ BasecallerNode::BasecallerNode(ReadSink &sink,
                                size_t batch_size,
                                size_t chunk_size,
                                size_t overlap,
-                               size_t stride,
+                               size_t model_stride,
                                size_t max_reads)
         : ReadSink(max_reads),
           m_sink(sink),
@@ -188,7 +188,7 @@ BasecallerNode::BasecallerNode(ReadSink &sink,
           m_batch_size(batch_size),
           m_chunk_size(chunk_size),
           m_overlap(overlap),
-          m_stride(stride),
+          m_model_stride(model_stride),
           m_terminate_basecaller(false),
           m_input_worker(new std::thread(&BasecallerNode::input_worker_thread, this)) {
     //Spin up the model runners:
@@ -202,8 +202,7 @@ BasecallerNode::BasecallerNode(ReadSink &sink,
         m_batched_chunks.push_back(chunk_queue);
     }
     // adjust chunk size to be a multiple of the stride
-    m_chunk_size /= stride;
-    m_chunk_size *= stride;
+    m_chunk_size -= chunk_size % model_stride;
 
     initialization_time = std::chrono::system_clock::now();
 }
