@@ -5,6 +5,31 @@
 #ifndef __APPLE__
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAGuard.h>
+
+extern "C" {
+#include "koi.h"
+}
+#include <cublas_v2.h>
+#include <cuda_runtime.h>
+
+#define CUDA_CHECK(X)                                                                         \
+    {                                                                                         \
+        cudaError_t error = X;                                                                \
+        if (error != cudaSuccess) {                                                           \
+            printf("CUDA returned error %s (code %d), line(%d)\n", cudaGetErrorString(error), \
+                   error, __LINE__);                                                          \
+            exit(EXIT_FAILURE);                                                               \
+        }                                                                                     \
+    }
+#define CUBLAS_CHECK(X)                                                              \
+    {                                                                                \
+        cublasStatus_t res = X;                                                      \
+        if (res != CUBLAS_STATUS_SUCCESS) {                                          \
+            printf("CuBLAS returned error code %d, line(%d)\n", int(res), __LINE__); \
+            exit(EXIT_FAILURE);                                                      \
+        }                                                                            \
+    }
+
 #define USE_CUDA_LSTM 1
 #else
 #define USE_CUDA_LSTM 0
@@ -42,11 +67,30 @@ struct LinearCRFImpl : Module {
     };
 
     torch::Tensor forward(torch::Tensor x) {
-        auto scores = activation(linear(x)) * scale;
+        c10::cuda::CUDAGuard device_guard(x.device());
+        auto stream = at::cuda::getCurrentCUDAStream().stream();
+        auto T = x.size(0);
+        auto N = x.size(1);
+
+        // The following lines (until the blank line) replace this operation, faster:
+        // auto scores = activation(linear(x)) * scale;
+        auto scores = torch::empty({N * T, linear->weight.size(0)}, x.options()).contiguous();
+        x = x.transpose(0, 1).contiguous().reshape(
+                {T * N, -1});                  // make sure input is NTC in memory
+        constexpr uint16_t HALF_ZERO = 0;      // 0.0 in __half format
+        constexpr uint16_t HALF_ONE = 0x3C00;  // 1.0 in __half format
+        CUBLAS_CHECK(cublasGemmEx(at::cuda::getCurrentCUDABlasHandle(), CUBLAS_OP_T, CUBLAS_OP_N,
+                                  scores.size(1), x.size(0), x.size(1), &HALF_ONE,
+                                  (const void *)linear->weight.data_ptr(), CUDA_R_16F, x.size(1),
+                                  (const void *)x.data_ptr(), CUDA_R_16F, x.stride(0), &HALF_ZERO,
+                                  (void *)scores.data_ptr(), CUDA_R_16F, scores.size(1), CUDA_R_16F,
+                                  CUBLAS_GEMM_DEFAULT_TENSOR_OP));
+        host_bias_tanh_scale_f16(stream, N * T, scores.size(1), scale, scores.data_ptr(),
+                                 linear->bias.data_ptr());
+        scores = scores.view({N, T, -1}).transpose(0, 1);  // logical order TNC, memory order NTC
 
         if (expand_blanks == true) {
-            int T = scores.size(0);
-            int N = scores.size(1);
+            scores = scores.contiguous();
             int C = scores.size(2);
             scores = F::pad(scores.view({T, N, C / 4, 4}),
                             F::PadFuncOptions({1, 0, 0, 0, 0, 0, 0, 0}).value(blank_score))
@@ -64,30 +108,6 @@ struct LinearCRFImpl : Module {
 };
 
 #if USE_CUDA_LSTM
-
-extern "C" {
-#include "koi.h"
-}
-#include <cublas_v2.h>
-#include <cuda_runtime.h>
-
-#define CUDA_CHECK(X)                                                                         \
-    {                                                                                         \
-        cudaError_t error = X;                                                                \
-        if (error != cudaSuccess) {                                                           \
-            printf("CUDA returned error %s (code %d), line(%d)\n", cudaGetErrorString(error), \
-                   error, __LINE__);                                                          \
-            exit(EXIT_FAILURE);                                                               \
-        }                                                                                     \
-    }
-#define CUBLAS_CHECK(X)                                                              \
-    {                                                                                \
-        cublasStatus_t res = X;                                                      \
-        if (res != CUBLAS_STATUS_SUCCESS) {                                          \
-            printf("CuBLAS returned error code %d, line(%d)\n", int(res), __LINE__); \
-            exit(EXIT_FAILURE);                                                      \
-        }                                                                            \
-    }
 
 static int get_cuda_device_id_from_device(const c10::Device &device) {
     if (!device.is_cuda() || !device.has_index()) {
@@ -135,12 +155,9 @@ struct LSTMStackImpl : Module {
     torch::Tensor forward(torch::Tensor in) {
         c10::cuda::CUDAGuard device_guard(in.device());
         auto stream = at::cuda::getCurrentCUDAStream().stream();
-        auto tensor_options = torch::TensorOptions()
-                                      .dtype(torch::kFloat16)
-                                      .device(in.device())
-                                      .requires_grad(false);
         int chunk_size = in.size(0);
         int batch_size = in.size(1);
+        assert(layer_size == in.size(2));
         int gate_size = layer_size * 4;
 
         // We need some extra working memory to run the LSTM layers. By making it `thread_local`
@@ -151,13 +168,13 @@ struct LSTMStackImpl : Module {
         if (max_working_mem_size < size_t(chunk_size + 1) * batch_size) {
             max_working_mem_size = size_t(chunk_size + 1) * batch_size;
             mat_working_mem =
-                    torch::zeros({chunk_size + 1, batch_size, 2, layer_size}, tensor_options)
+                    torch::zeros({chunk_size + 1, batch_size, 2, layer_size}, in.options())
                             .contiguous();
         }
         if (max_state_buf_size < batch_size * layer_size) {
             max_state_buf_size = size_t(batch_size) * layer_size;
-            gate_buf = torch::empty({batch_size * gate_size}, tensor_options).contiguous();
-            state_buf = torch::empty({batch_size * layer_size}, tensor_options).contiguous();
+            gate_buf = torch::empty({batch_size * gate_size}, in.options()).contiguous();
+            state_buf = torch::empty({batch_size * layer_size}, in.options()).contiguous();
         }
         mat_working_mem.to(in.device());
         gate_buf.to(in.device());
@@ -205,11 +222,11 @@ struct LSTMStackImpl : Module {
             }
         }
 
-        // TODO: can we modify and return `in` here, or define a `forward_inplace()` method?
-        torch::Tensor out =
-                torch::empty({in.size(1), in.size(0), in.size(2)}, tensor_options).transpose(0, 1);
-        out.slice(0, 0, chunk_size) = mat_working_mem.index({Slice(0, chunk_size), Slice(), 0});
-        return out;
+        // NOTE: we return a view to a thread_local tensor here, meaning we could get weird
+        // results if we called this method again on the same thread before consuming the
+        // tensor contents. For that to happen we'd have to have two consecutive LSTMStacks,
+        // which doesn't make much sense. So this should be safe in practice.
+        return mat_working_mem.index({Slice(0, chunk_size), Slice(), 0});
     }
 
     int layer_size;
