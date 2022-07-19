@@ -14,11 +14,11 @@ void serialise_tensor(torch::Tensor t, const std::string& path) {
     fout.close();
 }
 
-std::vector<torch::Tensor> load_weights(const std::string& dir,
+std::vector<torch::Tensor> load_tensors(const std::string& dir,
                                         const std::vector<std::string>& tensors) {
     auto weights = std::vector<torch::Tensor>();
-    for (auto weight : tensors) {
-        auto path = std::filesystem::path(dir) / weight;
+    for (auto tensor : tensors) {
+        auto path = std::filesystem::path(dir) / tensor;
         torch::load(weights, path.string());
     }
 

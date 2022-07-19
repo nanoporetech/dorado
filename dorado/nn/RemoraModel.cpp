@@ -3,7 +3,6 @@
 #include "modbase/remora_encoder.h"
 #include "modbase/remora_scaler.h"
 #include "modbase/remora_utils.h"
-#include "utils/base64_utils.h"
 #include "utils/base_mod_utils.h"
 #include "utils/module_utils.h"
 #include "utils/tensor_utils.h"
@@ -86,11 +85,11 @@ struct RemoraConvModelImpl : Module {
     }
 
     std::vector<torch::Tensor> load_weights(const std::string& dir) {
-        return ::utils::load_weights(dir, weight_tensors);
+        return ::utils::load_tensors(dir, weight_tensors);
     }
 
     std::vector<torch::Tensor> load_buffers(const std::string& dir) {
-        return ::utils::load_weights(dir, buffer_tensors);
+        return ::utils::load_tensors(dir, buffer_tensors);
     }
 
     static const std::vector<std::string> weight_tensors;
@@ -225,11 +224,11 @@ struct RemoraConvLSTMModelImpl : Module {
     }
 
     std::vector<torch::Tensor> load_weights(const std::string& dir) {
-        return ::utils::load_weights(dir, weight_tensors);
+        return ::utils::load_tensors(dir, weight_tensors);
     }
 
     std::vector<torch::Tensor> load_buffers(const std::string& dir) {
-        return ::utils::load_weights(dir, buffer_tensors);
+        return ::utils::load_tensors(dir, buffer_tensors);
     }
 
     static const std::vector<std::string> weight_tensors;
@@ -373,9 +372,12 @@ RemoraCaller::RemoraCaller(const std::string& model, const std::string& device, 
         if (m_params.refine_do_rough_rescale) {
             m_params.refine_kmer_center_idx =
                     toml::find<int>(refinement_params, "refine_kmer_center_idx");
-            const auto refine_kmer_levels_base64 =
-                    toml::find<std::string>(refinement_params, "refine_kmer_levels_binary");
-            ::utils::decode_base64(refine_kmer_levels_base64, m_params.refine_kmer_levels);
+
+            auto kmer_levels_tensor =
+                    ::utils::load_tensors(model, {"refine_kmer_levels.tensor"})[0].contiguous();
+            std::copy(kmer_levels_tensor.data_ptr<float>(),
+                      kmer_levels_tensor.data_ptr<float>() + kmer_levels_tensor.numel(),
+                      std::back_inserter(m_params.refine_kmer_levels));
             m_params.refine_kmer_len = static_cast<size_t>(
                     std::round(std::log(m_params.refine_kmer_levels.size()) / std::log(4)));
         }

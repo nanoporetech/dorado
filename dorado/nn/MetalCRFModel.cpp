@@ -476,7 +476,7 @@ public:
 
                 "9.linear.weight.tensor",    "9.linear.bias.tensor"};
 
-        return ::utils::load_weights(dir, tensors);
+        return ::utils::load_tensors(dir, tensors);
     }
 
     struct NNTask {

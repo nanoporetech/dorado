@@ -76,7 +76,6 @@ set(LIB_SOURCE_FILES
     dorado/modbase/remora_utils.h
     dorado/utils/base_mod_utils.cpp
     dorado/utils/base_mod_utils.h
-    dorado/utils/base64_utils.h
     dorado/utils/compat_utils.cpp
     dorado/utils/compat_utils.h
     dorado/utils/math_utils.h
