@@ -42,7 +42,7 @@ class RemoraCaller {
     std::vector<size_t> get_motif_hits(const std::string& seq) const;
 
 public:
-    RemoraCaller(const std::string& model, const std::string& device, int batch_size = 1000);
+    RemoraCaller(const std::string& model, const std::string& device, int batch_size);
     std::pair<torch::Tensor, std::vector<size_t>> call(torch::Tensor signal,
                                                        const std::string& seq,
                                                        const std::vector<uint8_t>& moves,
@@ -61,7 +61,9 @@ class RemoraRunner {
     std::shared_ptr<BaseModInfo> m_base_mod_info;
 
 public:
-    RemoraRunner(const std::vector<std::string>& model_paths, const std::string& device);
+    RemoraRunner(const std::vector<std::string>& model_paths,
+                 const std::string& device,
+                 int batch_size = 1000);
     torch::Tensor run(torch::Tensor signal,
                       const std::string& seq,
                       const std::vector<uint8_t>& moves,

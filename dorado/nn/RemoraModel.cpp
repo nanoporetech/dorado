@@ -474,7 +474,9 @@ std::pair<torch::Tensor, std::vector<size_t>> RemoraCaller::call(torch::Tensor s
     return {scores, context_hits};
 }
 
-RemoraRunner::RemoraRunner(const std::vector<std::string>& model_paths, const std::string& device)
+RemoraRunner::RemoraRunner(const std::vector<std::string>& model_paths,
+                           const std::string& device,
+                           int batch_size)
         : m_base_prob_offsets(4),
           m_num_states(4)  // The 4 canonical bases.
 {
@@ -494,7 +496,7 @@ RemoraRunner::RemoraRunner(const std::vector<std::string>& model_paths, const st
     std::array<size_t, 4> base_counts = {1, 1, 1, 1};
     std::array<bool, 4> base_used = {false, false, false, false};
     for (const auto& model : model_paths) {
-        auto caller = std::make_shared<RemoraCaller>(model, device);
+        auto caller = std::make_shared<RemoraCaller>(model, device, batch_size);
         auto& params = caller->params();
 
         auto base = params.motif[params.motif_offset];
