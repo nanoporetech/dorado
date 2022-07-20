@@ -453,6 +453,7 @@ std::pair<torch::Tensor, std::vector<size_t>> RemoraCaller::call(torch::Tensor s
 
         m_input_seqs.index_put_({counter}, torch::transpose(slice.data, 0, 1));
         if (++counter == m_batch_size) {
+            torch::InferenceMode guard;
             counter = 0;
             auto output = m_module->forward(m_input_sigs.to(m_options.device_opt().value()),
                                             m_input_seqs.to(m_options.device_opt().value()));
@@ -463,6 +464,7 @@ std::pair<torch::Tensor, std::vector<size_t>> RemoraCaller::call(torch::Tensor s
     }
 
     if (counter != 0) {
+        torch::InferenceMode guard;
         auto output = m_module->forward(m_input_sigs.index({Slice(0, counter), Slice(), Slice()})
                                                 .to(m_options.device_opt().value()),
                                         m_input_seqs.index({Slice(0, counter), Slice(), Slice()})
