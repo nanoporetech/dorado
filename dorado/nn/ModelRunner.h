@@ -20,7 +20,7 @@ using Runner = std::shared_ptr<ModelRunnerBase>;
 template <typename T>
 class ModelRunner : public ModelRunnerBase {
 public:
-    ModelRunner(const std::string &model,
+    ModelRunner(const std::filesystem::path &model,
                 const std::string &device,
                 int chunk_size,
                 int batch_size);
@@ -39,11 +39,11 @@ private:
 };
 
 template <typename T>
-ModelRunner<T>::ModelRunner(const std::string &model,
+ModelRunner<T>::ModelRunner(const std::filesystem::path &model_path,
                             const std::string &device,
                             int chunk_size,
                             int batch_size) {
-    auto config = toml::parse(model + "/config.toml");
+    auto config = toml::parse(model_path / "config.toml");
     const auto &qscore = toml::find(config, "qscore");
     const auto qbias = toml::find<float>(qscore, "bias");
     const auto qscale = toml::find<float>(qscore, "scale");
@@ -54,7 +54,7 @@ ModelRunner<T>::ModelRunner(const std::string &model,
     m_decoder = std::make_unique<T>();
 
     m_options = torch::TensorOptions().dtype(T::dtype).device(device);
-    auto [crf_module, stride] = load_crf_model(model, batch_size, chunk_size, m_options);
+    auto [crf_module, stride] = load_crf_model(model_path, batch_size, chunk_size, m_options);
     m_module = crf_module;
     m_model_stride = stride;
 

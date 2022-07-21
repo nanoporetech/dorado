@@ -12,11 +12,12 @@
 
 #include <argparse.hpp>
 
+#include <filesystem>
 #include <iostream>
 #include <sstream>
 
 void setup(std::vector<std::string> args,
-           const std::string& model_path,
+           const std::filesystem::path& model_path,
            const std::string& data_path,
            const std::string& remora_models,
            const std::string& device,
@@ -57,7 +58,7 @@ void setup(std::vector<std::string> args,
         throw std::runtime_error("Modified base models cannot be used with FASTQ output");
     }
 
-    std::vector<std::string> remora_model_list;
+    std::vector<std::filesystem::path> remora_model_list;
     std::istringstream stream{remora_models};
     std::string model;
     while (std::getline(stream, model, ',')) {

@@ -7,6 +7,8 @@
 #include <toml.hpp>
 #include <torch/torch.h>
 
+#include <string>
+
 using namespace torch::nn;
 namespace F = torch::nn::functional;
 
@@ -117,7 +119,7 @@ struct CRFModelImpl : Module {
 
     torch::Tensor forward(torch::Tensor x) { return encoder->forward(x); }
 
-    std::vector<torch::Tensor> load_weights(const std::string& dir) {
+    std::vector<torch::Tensor> load_weights(const std::filesystem::path& dir) {
         auto tensors = std::vector<std::string>{
 
                 "0.conv.weight.tensor",      "0.conv.bias.tensor",
@@ -155,11 +157,11 @@ struct CRFModelImpl : Module {
 
 TORCH_MODULE(CRFModel);
 
-std::tuple<ModuleHolder<AnyModule>, size_t> load_crf_model(const std::string& path,
+std::tuple<ModuleHolder<AnyModule>, size_t> load_crf_model(const std::filesystem::path& path,
                                                            int batch_size,
                                                            int chunk_size,
                                                            torch::TensorOptions options) {
-    auto config = toml::parse(path + "/config.toml");
+    auto config = toml::parse(path / "config.toml");
 
     const auto& encoder = toml::find(config, "encoder");
     const auto stride = toml::find<int>(encoder, "stride");

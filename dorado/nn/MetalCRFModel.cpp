@@ -347,8 +347,8 @@ TORCH_MODULE(MetalModel);
 
 class MetalCaller {
 public:
-    MetalCaller(const std::string &model_path, int chunk_size, int batch_size) {
-        auto config = toml::parse(model_path + "/config.toml");
+    MetalCaller(const std::filesystem::path &model_path, int chunk_size, int batch_size) {
+        auto config = toml::parse(model_path / "config.toml");
         const auto &qscore = toml::find(config, "qscore");
         const auto qbias = toml::find<float>(qscore, "bias");
         const auto qscale = toml::find<float>(qscore, "scale");
@@ -450,7 +450,7 @@ public:
         }
     }
 
-    std::vector<torch::Tensor> load_weights(const std::string &dir) {
+    std::vector<torch::Tensor> load_weights(const std::filesystem::path &dir) {
         auto tensors = std::vector<std::string>{
 
                 "0.conv.weight.tensor",      "0.conv.bias.tensor",
@@ -639,7 +639,7 @@ public:
     int m_out_chunk_size, m_batch_size, m_states, m_model_stride;
 };
 
-std::shared_ptr<MetalCaller> create_metal_caller(const std::string &model_path,
+std::shared_ptr<MetalCaller> create_metal_caller(const std::filesystem::path &model_path,
                                                  int chunk_size,
                                                  int batch_size) {
     return std::make_shared<MetalCaller>(model_path, chunk_size, batch_size);

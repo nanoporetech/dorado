@@ -85,11 +85,11 @@ struct RemoraConvModelImpl : Module {
         ::utils::load_state_dict(*this, weights, buffers);
     }
 
-    std::vector<torch::Tensor> load_weights(const std::string& dir) {
+    std::vector<torch::Tensor> load_weights(const std::filesystem::path& dir) {
         return ::utils::load_tensors(dir, weight_tensors);
     }
 
-    std::vector<torch::Tensor> load_buffers(const std::string& dir) {
+    std::vector<torch::Tensor> load_buffers(const std::filesystem::path& dir) {
         return ::utils::load_tensors(dir, buffer_tensors);
     }
 
@@ -224,11 +224,11 @@ struct RemoraConvLSTMModelImpl : Module {
         ::utils::load_state_dict(*this, weights, buffers);
     }
 
-    std::vector<torch::Tensor> load_weights(const std::string& dir) {
+    std::vector<torch::Tensor> load_weights(const std::filesystem::path& dir) {
         return ::utils::load_tensors(dir, weight_tensors);
     }
 
-    std::vector<torch::Tensor> load_buffers(const std::string& dir) {
+    std::vector<torch::Tensor> load_buffers(const std::filesystem::path& dir) {
         return ::utils::load_tensors(dir, buffer_tensors);
     }
 
@@ -302,7 +302,7 @@ TORCH_MODULE(RemoraConvLSTMModel);
 namespace {
 template <class Model>
 ModuleHolder<AnyModule> populate_model(Model&& model,
-                                       const std::string& path,
+                                       const std::filesystem::path& path,
                                        torch::TensorOptions options) {
     auto state_dict = model->load_weights(path);
     auto state_buffers = model->load_buffers(path);
@@ -317,8 +317,9 @@ ModuleHolder<AnyModule> populate_model(Model&& model,
 }
 }  // namespace
 
-ModuleHolder<AnyModule> load_remora_model(const std::string& path, torch::TensorOptions options) {
-    auto config = toml::parse(path + "/config.toml");
+ModuleHolder<AnyModule> load_remora_model(const std::filesystem::path& model_path,
+                                          torch::TensorOptions options) {
+    auto config = toml::parse(model_path / "config.toml");
 
     const auto& general_params = toml::find(config, "general");
     const auto model_type = toml::find<std::string>(general_params, "model");
@@ -330,24 +331,26 @@ ModuleHolder<AnyModule> load_remora_model(const std::string& path, torch::Tensor
 
     if (model_type == "conv_lstm") {
         auto model = RemoraConvLSTMModel(size, kmer_len, num_out);
-        return populate_model(model, path, options);
+        return populate_model(model, model_path, options);
     }
 
     if (model_type == "conv_only") {
         auto model = RemoraConvModel(size, kmer_len, num_out);
-        return populate_model(model, path, options);
+        return populate_model(model, model_path, options);
     }
 
     throw std::runtime_error("Unknown model type in config file.");
 }
 
-RemoraCaller::RemoraCaller(const std::string& model, const std::string& device, int batch_size)
+RemoraCaller::RemoraCaller(const std::filesystem::path& model_path,
+                           const std::string& device,
+                           int batch_size)
         : m_batch_size(batch_size) {
     // no metal implementation yet, force to cpu
     m_options = torch::TensorOptions().dtype(dtype).device(device == "metal" ? "cpu" : device);
-    m_module = load_remora_model(model, m_options);
+    m_module = load_remora_model(model_path, m_options);
 
-    auto config = toml::parse(model + "/config.toml");
+    auto config = toml::parse(model_path / "config.toml");
     const auto& params = toml::find(config, "modbases");
     m_params.motif = toml::find<std::string>(params, "motif");
     m_params.motif_offset = toml::find<int>(params, "motif_offset");
@@ -375,7 +378,8 @@ RemoraCaller::RemoraCaller(const std::string& model, const std::string& device, 
                     toml::find<int>(refinement_params, "refine_kmer_center_idx");
 
             auto kmer_levels_tensor =
-                    ::utils::load_tensors(model, {"refine_kmer_levels.tensor"})[0].contiguous();
+                    ::utils::load_tensors(model_path, {"refine_kmer_levels.tensor"})[0]
+                            .contiguous();
             std::copy(kmer_levels_tensor.data_ptr<float>(),
                       kmer_levels_tensor.data_ptr<float>() + kmer_levels_tensor.numel(),
                       std::back_inserter(m_params.refine_kmer_levels));
@@ -418,12 +422,18 @@ std::pair<torch::Tensor, std::vector<size_t>> RemoraCaller::call(torch::Tensor s
                                                                  const std::vector<uint8_t>& moves,
                                                                  size_t block_stride) {
     auto context_samples = (m_params.context_before + m_params.context_after);
+
+    // One-hot encode the kmer at each signal step for input into the network
     RemoraEncoder encoder(block_stride, context_samples, m_params.bases_before,
                           m_params.bases_after);
+
+    // TODO: could just do this on the candidates instead of the entire read
     encoder.encode_remora_data(moves, seq);
     auto context_hits = get_motif_hits(seq);
     auto counter = 0;
     auto index = 0;
+
+    // Network outputs
     auto scores = torch::empty({static_cast<int64_t>(context_hits.size()),
                                 static_cast<int64_t>(m_params.base_mod_count + 1)});
 
@@ -473,11 +483,10 @@ std::pair<torch::Tensor, std::vector<size_t>> RemoraCaller::call(torch::Tensor s
         scores.index_put_({Slice(index, index + counter), Slice(0, output.size(1))},
                           output.to(torch::kCPU));
     }
-
     return {scores, context_hits};
 }
 
-RemoraRunner::RemoraRunner(const std::vector<std::string>& model_paths,
+RemoraRunner::RemoraRunner(const std::vector<std::filesystem::path>& model_paths,
                            const std::string& device,
                            int batch_size)
         : m_base_prob_offsets(4),
@@ -542,10 +551,12 @@ RemoraRunner::RemoraRunner(const std::vector<std::string>& model_paths,
 torch::Tensor RemoraRunner::run(torch::Tensor signal,
                                 const std::string& seq,
                                 const std::vector<uint8_t>& moves,
-                                size_t block_stride) {
+                                size_t block_stride) {  // block_stride == model_stride
     torch::Tensor base_mod_probs;
     auto options = torch::TensorOptions().dtype(torch::kFloat32).device(torch::kCPU);
 
+    // TODO: this is probably quite expensive
+    // encode the modbase alphabet probabilities at each base
     base_mod_probs = torch::zeros(
             {static_cast<int64_t>(seq.size()), static_cast<int64_t>(m_num_states)}, options);
 
@@ -559,6 +570,8 @@ torch::Tensor RemoraRunner::run(torch::Tensor signal,
     }
 
     std::vector<int> sequence_ints = ::utils::sequence_to_ints(seq);
+
+    // Convert the move table to a series of indicies in the signal corresponding to the position of the 1s in the move table
     std::vector<uint64_t> seq_to_sig_map =
             ::utils::moves_to_map(moves, block_stride, signal.size(0));
 
@@ -571,6 +584,9 @@ torch::Tensor RemoraRunner::run(torch::Tensor signal,
             RemoraScaler scaler(params.refine_kmer_levels, params.refine_kmer_len,
                                 params.refine_kmer_center_idx);
             auto levels = scaler.extract_levels(sequence_ints);
+
+            // generate the signal values at the centre of each base, create the nx5% quantiles (sorted)
+            // and perform a linear regression against the expected kmer levels to generate a new shift and scale
             std::tie(offset, scale) = scaler.rescale(signal, seq_to_sig_map, levels);
         }
 

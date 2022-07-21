@@ -4,9 +4,13 @@
 
 #include <torch/torch.h>
 
+#include <filesystem>
+#include <memory>
+#include <vector>
+
 class MetalCaller;
 
-std::shared_ptr<MetalCaller> create_metal_caller(const std::string& model_path,
+std::shared_ptr<MetalCaller> create_metal_caller(const std::filesystem::path& model_path,
                                                  int chunk_size,
                                                  int batch_size);
 

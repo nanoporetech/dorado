@@ -2,6 +2,7 @@
 
 #include <torch/torch.h>
 
+#include <filesystem>
 #include <string>
 #include <vector>
 
@@ -9,8 +10,9 @@ namespace utils {
 struct BaseModInfo;
 }
 
-torch::nn::ModuleHolder<torch::nn::AnyModule> load_remora_model(const std::string& path,
-                                                                torch::TensorOptions options);
+torch::nn::ModuleHolder<torch::nn::AnyModule> load_remora_model(
+        const std::filesystem::path& model_path,
+        torch::TensorOptions options);
 
 struct BaseModParams {
     std::vector<std::string> mod_long_names;  ///< The long names of the modified bases.
@@ -42,7 +44,9 @@ class RemoraCaller {
     std::vector<size_t> get_motif_hits(const std::string& seq) const;
 
 public:
-    RemoraCaller(const std::string& model, const std::string& device, int batch_size);
+    RemoraCaller(const std::filesystem::path& model_path,
+                 const std::string& device,
+                 int batch_size);
     std::pair<torch::Tensor, std::vector<size_t>> call(torch::Tensor signal,
                                                        const std::string& seq,
                                                        const std::vector<uint8_t>& moves,
@@ -61,7 +65,7 @@ class RemoraRunner {
     std::shared_ptr<BaseModInfo> m_base_mod_info;
 
 public:
-    RemoraRunner(const std::vector<std::string>& model_paths,
+    RemoraRunner(const std::vector<std::filesystem::path>& model_paths,
                  const std::string& device,
                  int batch_size = 1000);
     torch::Tensor run(torch::Tensor signal,

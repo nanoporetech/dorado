@@ -47,6 +47,7 @@ void ModBaseCallerNode::worker_thread() {
         read->base_mod_probs.resize(base_mod_probs.size(0) * base_mod_probs.size(1));
         auto results_view =
                 base_mod_probs.view({static_cast<int64_t>(read->base_mod_probs.size())});
+        // Rescale network outputs (0-1) to SAM format (0-255)
         for (auto i = 0ul; i < read->base_mod_probs.size(); ++i) {
             read->base_mod_probs[i] =
                     uint8_t(std::min(std::floor(results_view[i].item().toFloat() * 256), 255.0f));
