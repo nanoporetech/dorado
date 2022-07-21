@@ -2,6 +2,7 @@
 
 #include <torch/torch.h>
 
+#include <array>
 #include <filesystem>
 #include <string>
 #include <vector>
@@ -59,7 +60,8 @@ class RemoraRunner {
 
     // one caller per model
     std::vector<std::shared_ptr<RemoraCaller>> m_callers;
-    std::vector<size_t> m_base_prob_offsets;
+    // The offsets to the canonical bases in the modbase alphabet
+    std::array<size_t, 4> m_base_prob_offsets;
     size_t m_num_states;
 
     std::shared_ptr<BaseModInfo> m_base_mod_info;

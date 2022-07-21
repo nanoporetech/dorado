@@ -489,8 +489,7 @@ std::pair<torch::Tensor, std::vector<size_t>> RemoraCaller::call(torch::Tensor s
 RemoraRunner::RemoraRunner(const std::vector<std::filesystem::path>& model_paths,
                            const std::string& device,
                            int batch_size)
-        : m_base_prob_offsets(4),
-          m_num_states(4)  // The 4 canonical bases.
+        : m_num_states(4)  // The 4 canonical bases.
 {
     struct Info {
         std::vector<std::string> long_names;
@@ -500,7 +499,7 @@ RemoraRunner::RemoraRunner(const std::vector<std::filesystem::path>& model_paths
     };
 
     std::string allowed_bases = "ACGT";
-    Info model_info[4];
+    std::array<Info, 4> model_info;
     for (int b = 0; b < 4; ++b) {
         model_info[b].alphabet = allowed_bases[b];
     }
@@ -515,7 +514,7 @@ RemoraRunner::RemoraRunner(const std::vector<std::filesystem::path>& model_paths
         if (allowed_bases.find(base) == std::string::npos) {
             throw std::runtime_error("Invalid base in remora model metadata.");
         }
-        auto& map_entry = model_info[::utils::base_to_int(base)];
+        auto& map_entry = model_info[RemoraUtils::BASE_IDS[base]];
         map_entry.long_names = params.mod_long_names;
         map_entry.alphabet += params.mod_bases;
         map_entry.motif = params.motif;
