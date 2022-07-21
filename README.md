@@ -16,11 +16,11 @@ $ dorado basecaller dna_r9.4.1_e8_hac@v3.3 fast5_pass/ > calls.sam
 
 Dorado has been tested on the following systems:
 
-| Platform | GPU/CPU |
-| ------ | ------ |
-| Windows | x86 |
-| Apple  | M1, M1 Max |
-| Linux | A100 40GB PCIe|
+| Platform | GPU/CPU              |
+| -------- | -------------------- |
+| Windows  | x86                  |
+| Apple    | M1, M1 Max, M1 Ultra |
+| Linux    | A100 40GB PCIe       |
 
 Other Platforms may work, if you encounter problems with running on your system please [report an issue](https://github.com/nanoporetech/dorado/issues)
 

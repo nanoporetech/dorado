@@ -194,8 +194,8 @@ BasecallerNode::BasecallerNode(ReadSink &sink,
     //Spin up the model runners:
     int num_model_runners = m_model_runners.size();
     for (int i = 0; i < num_model_runners; i++) {
-        std::unique_ptr<std::thread> t;
-        t.reset(new std::thread(&BasecallerNode::basecall_worker_thread, this, i));
+        std::unique_ptr<std::thread> t =
+                std::make_unique<std::thread>(&BasecallerNode::basecall_worker_thread, this, i);
         m_basecall_workers.push_back(std::move(t));
         m_num_active_model_runners++;
         std::deque<std::shared_ptr<Chunk>> chunk_queue;
