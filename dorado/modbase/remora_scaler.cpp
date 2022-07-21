@@ -74,10 +74,6 @@ std::pair<float, float> RemoraScaler::rescale(const torch::Tensor samples,
     new_levels = ::utils::quantiles(new_levels, quants);
     optim_dacs = ::utils::quantiles(optim_dacs, quants);
 
-    float new_scale, new_offset;
-    if (!::utils::linreg(optim_dacs, new_levels, new_scale, new_offset)) {
-        return {0.f, 1.f};
-    }
-
+    auto [new_scale, new_offset, rcoeff] = ::utils::linear_regression(optim_dacs, new_levels);
     return {new_offset, new_scale};
 }

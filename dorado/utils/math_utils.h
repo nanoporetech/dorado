@@ -47,10 +47,10 @@ inline std::vector<T> quantiles(const std::vector<T>& in_data, const std::vector
 }
 
 // Perform a least-squares linear regression of the form y = mx + b, solving for m and b.
-// Optionally return the correlation coefficient r
+// Returns a tuple {m, b, r} where r is the regression correlation coefficient
 // Adapted from https://stackoverflow.com/questions/5083465/fast-efficient-least-squares-fit-algorithm-in-c
 template <typename T, typename = typename std::enable_if<std::is_floating_point<T>::value, T>::type>
-bool linreg(const std::vector<T>& x, const std::vector<T>& y, T& m, T& b, T* r = nullptr) {
+std::tuple<T, T, T> linear_regression(const std::vector<T>& x, const std::vector<T>& y) {
     assert(x.size() == y.size());
     auto sum_square = [](auto s2, auto q) { return s2 + q * q; };
 
@@ -67,24 +67,17 @@ bool linreg(const std::vector<T>& x, const std::vector<T>& y, T& m, T& b, T* r =
 
     T denom = (n * sumx2 - (sumx * sumx));
     if (denom == 0) {
-        // singular matrix. can't solve the problem.
-        m = 0;
-        b = 0;
-        if (r) {
-            *r = 0;
-        }
-        return false;
+        // singular matrix. can't solve the problem, return identity transform
+        return {T(1), T(0), T(0)};
     }
 
-    m = (n * sumxy - sumx * sumy) / denom;
-    b = (sumy * sumx2 - sumx * sumxy) / denom;
-    if (r) {
-        // compute correlation coeff
-        *r = (sumxy - sumx * sumy / n) /
-             std::sqrt((sumx2 - (sumx * sumx) / n) * (sumy2 - (sumy * sumy) / n));
-    }
+    T m = (n * sumxy - sumx * sumy) / denom;
+    T b = (sumy * sumx2 - sumx * sumxy) / denom;
+    // compute correlation coeff
+    T r = (sumxy - sumx * sumy / n) /
+          std::sqrt((sumx2 - (sumx * sumx) / n) * (sumy2 - (sumy * sumy) / n));
 
-    return true;
+    return {m, b, r};
 }
 
 }  // namespace utils
