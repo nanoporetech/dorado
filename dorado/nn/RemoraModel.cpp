@@ -498,7 +498,7 @@ RemoraRunner::RemoraRunner(const std::vector<std::filesystem::path>& model_paths
         std::string motif;
         int motif_offset;
     };
-    std::unordered_map<char, int> base_map{{'A', 0}, {'C', 1}, {'G', 2}, {'T', 3}};
+
     std::string allowed_bases = "ACGT";
     Info model_info[4];
     for (int b = 0; b < 4; ++b) {
@@ -515,7 +515,7 @@ RemoraRunner::RemoraRunner(const std::vector<std::filesystem::path>& model_paths
         if (allowed_bases.find(base) == std::string::npos) {
             throw std::runtime_error("Invalid base in remora model metadata.");
         }
-        auto& map_entry = model_info[base_map.at(base)];
+        auto& map_entry = model_info[::utils::base_to_int(base)];
         map_entry.long_names = params.mod_long_names;
         map_entry.alphabet += params.mod_bases;
         map_entry.motif = params.motif;
