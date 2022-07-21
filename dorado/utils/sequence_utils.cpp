@@ -26,4 +26,27 @@ float mean_qscore_from_qstring(const std::string& qstring) {
     return mean_qscore;
 }
 
+int base_to_int(char c) { return 0b11 & ((c >> 2) ^ (c >> 1)); }
+
+std::vector<int> sequence_to_ints(const std::string& sequence) {
+    std::vector<int> sequence_ints;
+    sequence_ints.reserve(sequence.size());
+    std::transform(std::begin(sequence), std::end(sequence), std::back_inserter(sequence_ints),
+                   &base_to_int);
+    return sequence_ints;
+}
+
+std::vector<uint64_t> moves_to_map(const std::vector<uint8_t>& moves,
+                                   size_t block_stride,
+                                   size_t signal_len) {
+    std::vector<uint64_t> seq_to_sig_map;
+    for (size_t i = 0; i < moves.size(); ++i) {
+        if (moves[i] == 1) {
+            seq_to_sig_map.push_back(i * block_stride);
+        }
+    }
+    seq_to_sig_map.push_back(signal_len);
+    return seq_to_sig_map;
+}
+
 }  // namespace utils

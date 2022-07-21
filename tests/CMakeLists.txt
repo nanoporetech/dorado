@@ -4,7 +4,7 @@ set(SOURCE_FILES
     MathUtilsTest.cpp
     ReadTest.cpp
     RemoraEncoderTest.cpp
-    RemoraScalerTest.cpp
+    SequenceUtilsTest.cpp
     StitchTest.cpp
     )
 

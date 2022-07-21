@@ -81,31 +81,3 @@ std::pair<float, float> RemoraScaler::rescale(const torch::Tensor samples,
 
     return {new_offset, new_scale};
 }
-
-std::vector<int> RemoraScaler::seq_to_ints(const std::string& sequence) {
-    std::vector<int> sequence_ints;
-    sequence_ints.reserve(sequence.size());
-    std::transform(std::begin(sequence), std::end(sequence), std::back_inserter(sequence_ints),
-                   [](const auto& c) {
-                       if (RemoraUtils::BASE_IDS[c] != -1) {
-                           return RemoraUtils::BASE_IDS[c];
-                       } else {
-                           throw std::invalid_argument(std::string("Unexpected character \"") + c +
-                                                       "\" in sequence");
-                       }
-                   });
-    return sequence_ints;
-}
-
-std::vector<uint64_t> RemoraScaler::moves_to_map(const std::vector<uint8_t>& moves,
-                                                 size_t block_stride,
-                                                 size_t signal_len) {
-    std::vector<uint64_t> seq_to_sig_map;
-    for (size_t i = 0; i < moves.size(); ++i) {
-        if (moves[i] == 1) {
-            seq_to_sig_map.push_back(i * block_stride);
-        }
-    }
-    seq_to_sig_map.push_back(signal_len);
-    return seq_to_sig_map;
-}

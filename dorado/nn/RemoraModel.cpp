@@ -5,6 +5,7 @@
 #include "modbase/remora_utils.h"
 #include "utils/base_mod_utils.h"
 #include "utils/module_utils.h"
+#include "utils/sequence_utils.h"
 #include "utils/tensor_utils.h"
 
 #include <toml.hpp>
@@ -557,9 +558,9 @@ torch::Tensor RemoraRunner::run(torch::Tensor signal,
         base_mod_probs[i][m_base_prob_offsets[base_id]] = 1.0f;
     }
 
-    std::vector<int> sequence_ints = RemoraScaler::seq_to_ints(seq);
+    std::vector<int> sequence_ints = ::utils::sequence_to_ints(seq);
     std::vector<uint64_t> seq_to_sig_map =
-            RemoraScaler::moves_to_map(moves, block_stride, signal.size(0));
+            ::utils::moves_to_map(moves, block_stride, signal.size(0));
 
     // each caller will have different parameters
     for (auto& caller : m_callers) {

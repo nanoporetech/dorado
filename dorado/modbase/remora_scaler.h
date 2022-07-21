@@ -22,14 +22,6 @@ private:
     static inline size_t index_from_int_kmer(const int* int_kmer_start, size_t kmer_len);
 
 public:
-    /// Convert sequence to ints
-    static std::vector<int> seq_to_ints(const std::string& sequence);
-
-    /// Convert move table to vector of indices
-    static std::vector<uint64_t> moves_to_map(const std::vector<uint8_t>& moves,
-                                              size_t block_stride,
-                                              size_t signal_len);
-
     /** Get the expected normalized daq levels for in the input basecall sequence.
      *  @param int_seq The basecall sequence, encoded as integers with A=0, C=1, G=2, T=3
      *  @return A vector of the expected normalized daq level for each base
