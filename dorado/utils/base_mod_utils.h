@@ -92,7 +92,6 @@ public:
                      uint8_t threshold) const;
 
 private:
-    std::map<char, size_t> m_base_mapping;
     std::array<std::string, 4> m_motifs;
     std::array<size_t, 4> m_offsets = {0, 0, 0, 0};
 };
