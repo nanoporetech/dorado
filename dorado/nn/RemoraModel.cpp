@@ -432,6 +432,7 @@ std::pair<torch::Tensor, std::vector<size_t>> RemoraCaller::call(torch::Tensor s
     auto context_hits = get_motif_hits(seq);
     auto counter = 0;
     auto index = 0;
+    auto kmer_len = m_params.bases_before + m_params.bases_after + 1;
 
     // Network outputs
     auto scores = torch::empty({static_cast<int64_t>(context_hits.size()),
@@ -462,7 +463,10 @@ std::pair<torch::Tensor, std::vector<size_t>> RemoraCaller::call(torch::Tensor s
             m_input_sigs.index_put_({counter, 0, Slice(last_sample_dest, None)}, 0);
         }
 
-        m_input_seqs.index_put_({counter}, torch::transpose(slice.data, 0, 1));
+        m_input_seqs.index_put_(
+                {counter}, torch::from_blob(slice.data.data(), {(int64_t)context_samples,
+                                                                kmer_len * RemoraUtils::NUM_BASES})
+                                   .transpose(0, 1));
         if (++counter == m_batch_size) {
             torch::InferenceMode guard;
             counter = 0;

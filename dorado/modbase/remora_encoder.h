@@ -7,7 +7,7 @@
 
 class RemoraEncoder {
 private:
-    torch::Tensor m_encoded_data;
+    std::vector<float> m_encoded_data;
     std::vector<int> m_sample_offsets;
     int m_bases_before;
     int m_kmer_len;
@@ -16,6 +16,8 @@ private:
     int m_context_samples;
     int m_seq_len;
     int m_signal_len;
+
+    std::vector<float> m_buffer;
 
     int compute_sample_pos(int base_pos) const;
 
@@ -58,17 +60,17 @@ public:
     void encode_remora_data(const std::vector<uint8_t>& moves, const std::string& sequence);
 
     /// Get the full encoded data vector.
-    torch::Tensor get_encoded_data() const { return m_encoded_data; }
+    const std::vector<float>& get_encoded_data() const { return m_encoded_data; }
 
     /// Get the sample offsets for the sequence.
     const std::vector<int>& get_sample_offsets() const { return m_sample_offsets; }
 
     /// Helper structure for specifying the context and returning the corresponding encoded data.
     struct Context {
-        torch::Tensor data;   ///< Encoded data slice
-        size_t size;          ///< Size of encoded data slice.
-        size_t first_sample;  ///< Index of first raw data sample for the slice.
-        size_t num_samples;   ///< Number of samples of raw data in the slice.
+        std::vector<float> data;  ///< Encoded data slice
+        size_t size;              ///< Size of encoded data slice.
+        size_t first_sample;      ///< Index of first raw data sample for the slice.
+        size_t num_samples;       ///< Number of samples of raw data in the slice.
         size_t lead_samples_needed;  ///< Number of samples, if any, to pad the beginning of the raw data slice with.
         size_t tail_samples_needed;  ///< Number of samples, if any, to pad the end of the raw data slice with.
     };

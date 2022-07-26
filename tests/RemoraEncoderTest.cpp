@@ -20,16 +20,12 @@ TEST_CASE("Encode sequence for modified basecalling", TEST_GROUP) {
 
     CHECK(sequence.size() == sample_offsets.size());
     size_t EXPECTED_ENCODING_LEN = (2 * PADDING + moves.size()) * BLOCK_STRIDE * KMER_LEN * 4;
-    size_t encoded_data_size = 1;
-    for (auto size : encoded_data.sizes()) {
-        encoded_data_size *= size;
-    }
-    CHECK(EXPECTED_ENCODING_LEN == encoded_data_size);
+    CHECK(EXPECTED_ENCODING_LEN == encoded_data.size());
 
     std::vector<int> expected_sample_offsets{0, 2, 6, 12, 14, 18, 22, 28, 32, 34};
     CHECK(expected_sample_offsets == sample_offsets);
 
-    std::vector<float> expected_encoding_data{
+    std::vector<float> expected_encoding{
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // NNN
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // NNN
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // NNN
@@ -83,8 +79,7 @@ TEST_CASE("Encode sequence for modified basecalling", TEST_GROUP) {
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // NNN
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // NNN
     };
-    torch::Tensor expected_encoding = torch::from_blob(expected_encoding_data.data(), {52, 12});
-    CHECK(torch::all(expected_encoding == encoded_data).item().toBool());
+    CHECK(expected_encoding == encoded_data);
 
     auto slice0 = encoder.get_context(0);  // The T in the NTA 3mer.
     CHECK(slice0.size == SLICE_BLOCKS * BLOCK_STRIDE * KMER_LEN * 4);
@@ -92,7 +87,7 @@ TEST_CASE("Encode sequence for modified basecalling", TEST_GROUP) {
     CHECK(slice0.num_samples == 7);
     CHECK(slice0.lead_samples_needed == 5);
     CHECK(slice0.tail_samples_needed == 0);
-    std::vector<float> expected_slice0_data = {
+    std::vector<float> expected_slice0 = {
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // NNN
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // NNN
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // NNN
@@ -106,8 +101,7 @@ TEST_CASE("Encode sequence for modified basecalling", TEST_GROUP) {
             0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1,  // TAT
             1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1,  // ATT
     };
-    torch::Tensor expected_slice0 = torch::from_blob(expected_slice0_data.data(), {12, 12});
-    CHECK(torch::all(expected_slice0 == slice0.data).item().toBool());
+    CHECK(expected_slice0 == slice0.data);
 
     auto slice1 = encoder.get_context(4);  // The C in the TCA 3mer.
     CHECK(slice1.size == SLICE_BLOCKS * BLOCK_STRIDE * KMER_LEN * 4);
@@ -115,7 +109,7 @@ TEST_CASE("Encode sequence for modified basecalling", TEST_GROUP) {
     CHECK(slice1.num_samples == 12);
     CHECK(slice1.lead_samples_needed == 0);
     CHECK(slice1.tail_samples_needed == 0);
-    std::vector<float> expected_slice1_data = {
+    std::vector<float> expected_slice1 = {
             1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1,  // ATT
             1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1,  // ATT
             0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0,  // TTC
@@ -129,8 +123,7 @@ TEST_CASE("Encode sequence for modified basecalling", TEST_GROUP) {
             0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0,  // CAG
             0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0,  // CAG
     };
-    torch::Tensor expected_slice1 = torch::from_blob(expected_slice1_data.data(), {12, 12});
-    CHECK(torch::all(expected_slice1 == slice1.data).item().toBool());
+    CHECK(expected_slice1 == slice1.data);
 
     auto slice2 = encoder.get_context(9);  // The C in the ACN 3mer.
     CHECK(slice2.size == SLICE_BLOCKS * BLOCK_STRIDE * KMER_LEN * 4);
@@ -138,7 +131,7 @@ TEST_CASE("Encode sequence for modified basecalling", TEST_GROUP) {
     CHECK(slice2.num_samples == 9);
     CHECK(slice2.lead_samples_needed == 0);
     CHECK(slice2.tail_samples_needed == 3);
-    std::vector<float> expected_slice2_data = {
+    std::vector<float> expected_slice2 = {
             0, 0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0,  // GTA
             0, 0, 0, 1, 1, 0, 0, 0, 0, 1, 0, 0,  // TAC
             0, 0, 0, 1, 1, 0, 0, 0, 0, 1, 0, 0,  // TAC
@@ -152,6 +145,5 @@ TEST_CASE("Encode sequence for modified basecalling", TEST_GROUP) {
             0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // CNN
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // NNN
     };
-    torch::Tensor expected_slice2 = torch::from_blob(expected_slice2_data.data(), {12, 12});
-    CHECK(torch::all(expected_slice2 == slice2.data).item().toBool());
+    CHECK(expected_slice2 == slice2.data);
 }

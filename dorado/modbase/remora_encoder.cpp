@@ -14,7 +14,8 @@ RemoraEncoder::RemoraEncoder(size_t block_stride,
           m_block_stride(int(block_stride)),
           m_context_samples(int(context_samples)),
           m_seq_len(0),
-          m_signal_len(0) {
+          m_signal_len(0),
+          m_buffer(m_kmer_len * RemoraUtils::NUM_BASES) {
     m_padding = m_context_samples / 2;
     int padding_for_bases_before = (m_kmer_len - 1 - bases_before) * int(block_stride);
     int padding_for_bases_after = (m_kmer_len - 1 - bases_after) * int(block_stride);
@@ -32,11 +33,8 @@ void RemoraEncoder::encode_remora_data(const std::vector<uint8_t>& moves,
     m_sample_offsets.clear();
     m_sample_offsets.reserve(moves.size());
 
-    auto options = torch::TensorOptions().dtype(torch::kFloat32).device(torch::kCPU);
-    m_encoded_data =
-            torch::zeros({padded_signal_len, m_kmer_len * RemoraUtils::NUM_BASES}, options);
-
     // Note that upon initialization, encoded_data is all zeros, which corresponds to "N" characters.
+    m_encoded_data.resize(padded_signal_len * m_kmer_len * RemoraUtils::NUM_BASES);
 
     // First we need to find out which sample each base corresponds to, and make sure the moves vector is consistent
     // with the sequence length.
@@ -61,8 +59,7 @@ void RemoraEncoder::encode_remora_data(const std::vector<uint8_t>& moves,
     // Now we can go through each base and fill in where the 1s belong.
     for (int seq_pos = -m_kmer_len + 1; seq_pos < m_seq_len; ++seq_pos) {
         // Fill buffer with the values corresponding to the kmer that begins with the current base.
-        auto buffer = torch::zeros({m_kmer_len * RemoraUtils::NUM_BASES});
-        // std::fill(buffer.begin(), buffer.end(), 0.0f);
+        std::fill(m_buffer.begin(), m_buffer.end(), 0.0f);
         for (int kmer_pos = 0; kmer_pos < m_kmer_len; ++kmer_pos) {
             int this_base_pos = seq_pos + kmer_pos;
             int base_offset = -1;
@@ -70,7 +67,7 @@ void RemoraEncoder::encode_remora_data(const std::vector<uint8_t>& moves,
                 base_offset = RemoraUtils::BASE_IDS[sequence[this_base_pos]];
             if (base_offset == -1)
                 continue;
-            buffer[kmer_pos * RemoraUtils::NUM_BASES + base_offset] = 1.0f;
+            m_buffer[kmer_pos * RemoraUtils::NUM_BASES + base_offset] = 1.0f;
         }
 
         // Now we need to copy buffer into the encoded_data vector a number of times equal to the number of samples of
@@ -86,7 +83,8 @@ void RemoraEncoder::encode_remora_data(const std::vector<uint8_t>& moves,
             throw std::runtime_error("Insufficient padding error.");
         }
         for (int i = 0; i < num_repeats; ++i, ++data_pos) {
-            m_encoded_data.index_put_({data_pos}, buffer);
+            std::copy(m_buffer.begin(), m_buffer.end(),
+                      m_encoded_data.begin() + data_pos * m_buffer.size());
         }
     }
 }
@@ -118,8 +116,10 @@ RemoraEncoder::Context RemoraEncoder::get_context(size_t seq_pos) const {
     }
     auto start_pos = m_padding + first_sample;
     auto end_pos = start_pos + m_context_samples;
-    context.data = m_encoded_data.index(
-            {torch::indexing::Slice(start_pos, end_pos), torch::indexing::Slice()});
+
+    std::copy(m_encoded_data.begin() + start_pos * m_kmer_len * RemoraUtils::NUM_BASES,
+              m_encoded_data.begin() + end_pos * m_kmer_len * RemoraUtils::NUM_BASES,
+              std::back_inserter(context.data));
     return context;
 }
 
