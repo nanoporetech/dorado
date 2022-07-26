@@ -70,10 +70,10 @@ public:
     RemoraRunner(const std::vector<std::filesystem::path>& model_paths,
                  const std::string& device,
                  int batch_size = 1000);
-    torch::Tensor run(torch::Tensor signal,
-                      const std::string& seq,
-                      const std::vector<uint8_t>& moves,
-                      size_t block_stride);
+    std::vector<uint8_t> run(torch::Tensor signal,
+                             const std::string& seq,
+                             const std::vector<uint8_t>& moves,
+                             size_t block_stride);
 
     std::shared_ptr<const BaseModInfo> base_mod_info() const {
         return std::const_pointer_cast<const BaseModInfo>(m_base_mod_info);

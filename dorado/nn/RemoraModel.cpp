@@ -551,17 +551,15 @@ RemoraRunner::RemoraRunner(const std::vector<std::filesystem::path>& model_paths
     m_base_prob_offsets[3] = base_counts[0] + base_counts[1] + base_counts[2];
 }
 
-torch::Tensor RemoraRunner::run(torch::Tensor signal,
-                                const std::string& seq,
-                                const std::vector<uint8_t>& moves,
-                                size_t block_stride) {  // block_stride == model_stride
-    torch::Tensor base_mod_probs;
-    auto options = torch::TensorOptions().dtype(torch::kFloat32).device(torch::kCPU);
+std::vector<uint8_t> RemoraRunner::run(torch::Tensor signal,
+                                       const std::string& seq,
+                                       const std::vector<uint8_t>& moves,
+                                       size_t block_stride) {  // block_stride == model_stride
 
     // TODO: this is probably quite expensive
     // encode the modbase alphabet probabilities at each base
-    base_mod_probs = torch::zeros(
-            {static_cast<int64_t>(seq.size()), static_cast<int64_t>(m_num_states)}, options);
+
+    std::vector<uint8_t> base_mod_probs(seq.size() * m_num_states, 0);
 
     for (size_t i = 0; i < seq.size(); ++i) {
         // Initialize for what corresponds to 100% canonical base for each position.
@@ -569,7 +567,7 @@ torch::Tensor RemoraRunner::run(torch::Tensor signal,
         if (base_id < 0) {
             throw std::runtime_error("Invalid character in sequence.");
         }
-        base_mod_probs[i][m_base_prob_offsets[base_id]] = 1.0f;
+        base_mod_probs[i * m_num_states + m_base_prob_offsets[base_id]] = 1.0f;
     }
 
     std::vector<int> sequence_ints = ::utils::sequence_to_ints(seq);
@@ -600,8 +598,10 @@ torch::Tensor RemoraRunner::run(torch::Tensor signal,
         for (size_t i = 0; i < context_hits.size(); ++i) {
             int64_t result_pos = context_hits[i];
             int64_t offset = m_base_prob_offsets[RemoraUtils::BASE_IDS[seq[context_hits[i]]]];
-            base_mod_probs.index_put_({result_pos, Slice(offset, offset + scores.size(1))},
-                                      scores[i]);
+            for (int j = 0; j < scores.size(1); ++j) {
+                base_mod_probs[m_num_states * result_pos + offset + j] = uint8_t(std::min(
+                        std::floor(scores.index({(int64_t)i, j}).item().toFloat() * 256), 255.0f));
+            }
         }
     }
 
