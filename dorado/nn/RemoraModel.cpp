@@ -469,10 +469,10 @@ std::pair<torch::Tensor, std::vector<size_t>> RemoraCaller::call(
         }
 
         auto context_samples = (m_params.context_before + m_params.context_after);
-        m_input_seqs.index_put_(
-                {counter}, torch::from_blob(slice.data.data(), {(int64_t)context_samples,
-                                                                kmer_len * RemoraUtils::NUM_BASES})
-                                   .transpose(0, 1));
+        m_input_seqs.index_put_({counter}, torch::from_blob(const_cast<float*>(slice.data),
+                                                            {(int64_t)context_samples,
+                                                             kmer_len * RemoraUtils::NUM_BASES})
+                                                   .transpose(0, 1));
         if (++counter == m_batch_size) {
             torch::InferenceMode guard;
             counter = 0;

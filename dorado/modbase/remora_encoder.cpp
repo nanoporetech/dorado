@@ -117,12 +117,8 @@ RemoraEncoder::Context RemoraEncoder::get_context(size_t seq_pos) const {
         context.tail_samples_needed = 0;
     }
     auto start_pos = m_padding + first_sample;
-    auto end_pos = start_pos + m_context_samples;
+    context.data = m_encoded_data.data() + start_pos * encoded_kmer_len;
 
-    context.data.reserve(context.size);
-    std::copy(std::next(std::begin(m_encoded_data), start_pos * encoded_kmer_len),
-              std::next(std::begin(m_encoded_data), end_pos * encoded_kmer_len),
-              std::back_inserter(context.data));
     return context;
 }
 

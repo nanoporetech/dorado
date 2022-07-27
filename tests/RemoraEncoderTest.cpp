@@ -101,7 +101,7 @@ TEST_CASE("Encode sequence for modified basecalling", TEST_GROUP) {
             0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1,  // TAT
             1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1,  // ATT
     };
-    CHECK(expected_slice0 == slice0.data);
+    CHECK(expected_slice0 == std::vector<float>(slice0.data, slice0.data + slice0.size));
 
     auto slice1 = encoder.get_context(4);  // The C in the TCA 3mer.
     CHECK(slice1.size == SLICE_BLOCKS * BLOCK_STRIDE * KMER_LEN * 4);
@@ -123,7 +123,7 @@ TEST_CASE("Encode sequence for modified basecalling", TEST_GROUP) {
             0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0,  // CAG
             0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0,  // CAG
     };
-    CHECK(expected_slice1 == slice1.data);
+    CHECK(expected_slice1 == std::vector<float>(slice1.data, slice1.data + slice1.size));
 
     auto slice2 = encoder.get_context(9);  // The C in the ACN 3mer.
     CHECK(slice2.size == SLICE_BLOCKS * BLOCK_STRIDE * KMER_LEN * 4);
@@ -145,5 +145,5 @@ TEST_CASE("Encode sequence for modified basecalling", TEST_GROUP) {
             0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // CNN
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // NNN
     };
-    CHECK(expected_slice2 == slice2.data);
+    CHECK(expected_slice2 == std::vector<float>(slice2.data, slice2.data + slice2.size));
 }
