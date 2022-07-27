@@ -12,6 +12,7 @@ class ModelRunnerBase {
 public:
     virtual void accept_chunk(int chunk_idx, at::Tensor slice) = 0;
     virtual std::vector<DecodedChunk> call_chunks(int num_chunks) = 0;
+    virtual size_t model_stride() const = 0;
 };
 
 using Runner = std::shared_ptr<ModelRunnerBase>;
@@ -19,12 +20,13 @@ using Runner = std::shared_ptr<ModelRunnerBase>;
 template <typename T>
 class ModelRunner : public ModelRunnerBase {
 public:
-    ModelRunner(const std::string &model,
+    ModelRunner(const std::filesystem::path &model,
                 const std::string &device,
                 int chunk_size,
                 int batch_size);
     void accept_chunk(int chunk_idx, at::Tensor slice) final;
     std::vector<DecodedChunk> call_chunks(int num_chunks) final;
+    size_t model_stride() const final { return m_model_stride; }
 
 private:
     std::string m_device;
@@ -33,14 +35,15 @@ private:
     std::unique_ptr<T> m_decoder;
     DecoderOptions m_decoder_options;
     torch::nn::ModuleHolder<torch::nn::AnyModule> m_module{nullptr};
+    size_t m_model_stride;
 };
 
 template <typename T>
-ModelRunner<T>::ModelRunner(const std::string &model,
+ModelRunner<T>::ModelRunner(const std::filesystem::path &model_path,
                             const std::string &device,
                             int chunk_size,
                             int batch_size) {
-    auto config = toml::parse(model + "/config.toml");
+    auto config = toml::parse(model_path / "config.toml");
     const auto &qscore = toml::find(config, "qscore");
     const auto qbias = toml::find<float>(qscore, "bias");
     const auto qscale = toml::find<float>(qscore, "scale");
@@ -51,7 +54,12 @@ ModelRunner<T>::ModelRunner(const std::string &model,
     m_decoder = std::make_unique<T>();
 
     m_options = torch::TensorOptions().dtype(T::dtype).device(device);
-    m_module = load_crf_model(model, batch_size, chunk_size, m_options);
+    auto [crf_module, stride] = load_crf_model(model_path, batch_size, chunk_size, m_options);
+    m_module = crf_module;
+    m_model_stride = stride;
+
+    // adjust chunk size to be a multiple of the stride
+    chunk_size -= chunk_size % stride;
 
     m_input = torch::zeros({batch_size, 1, chunk_size},
                            torch::TensorOptions().dtype(T::dtype).device(torch::kCPU));

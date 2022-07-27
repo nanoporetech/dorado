@@ -6,10 +6,11 @@ class BasecallerNode : public ReadSink {
 public:
     // Chunk size and overlap are in raw samples
     BasecallerNode(ReadSink &sink,
-                   std::vector<Runner> &model_runners,
+                   std::vector<Runner> model_runners,
                    size_t batch_size,
                    size_t chunk_size,
                    size_t overlap,
+                   size_t model_stride,
                    size_t max_reads = 1000);
     ~BasecallerNode();
 
@@ -35,6 +36,8 @@ private:
     size_t m_chunk_size;
     // Minimum overlap between two adjacent chunks in a read. Overlap is used to reduce edge effects and improve accuracy.
     size_t m_overlap;
+    // Stride of the model in the runners
+    size_t m_model_stride;
 
     // Model runners which have not terminated.
     std::atomic<int> m_num_active_model_runners = 0;
