@@ -61,10 +61,8 @@ std::pair<float, float> RemoraScaler::rescale(const torch::Tensor samples,
                    });
 
     if (clip_bases > 0 && levels.size() > clip_bases * 2) {
-        new_levels =
-                std::vector<float>(std::begin(levels) + clip_bases, std::end(levels) - clip_bases);
-        optim_dacs = std::vector<float>(std::begin(optim_dacs) + clip_bases,
-                                        std::end(optim_dacs) - clip_bases);
+        new_levels = {std::begin(levels) + clip_bases, std::end(levels) - clip_bases};
+        optim_dacs = {std::begin(optim_dacs) + clip_bases, std::end(optim_dacs) - clip_bases};
     } else {
         new_levels = levels;
     }
