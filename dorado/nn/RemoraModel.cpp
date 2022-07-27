@@ -344,7 +344,8 @@ ModuleHolder<AnyModule> load_remora_model(const std::filesystem::path& model_pat
 
 RemoraCaller::RemoraCaller(const std::filesystem::path& model_path,
                            const std::string& device,
-                           int batch_size)
+                           int batch_size,
+                           size_t block_stride)
         : m_batch_size(batch_size) {
     // no metal implementation yet, force to cpu
     m_options = torch::TensorOptions().dtype(dtype).device(device == "metal" ? "cpu" : device);
@@ -399,6 +400,16 @@ RemoraCaller::RemoraCaller(const std::filesystem::path& model_path,
                                 torch::TensorOptions().dtype(dtype).device(torch::kCPU));
     m_input_seqs = torch::zeros({batch_size, RemoraUtils::NUM_BASES * kmer_len, sig_len},
                                 torch::TensorOptions().dtype(dtype).device(torch::kCPU));
+
+    auto context_samples = (m_params.context_before + m_params.context_after);
+    // One-hot encodes the kmer at each signal step for input into the network
+    m_encoder = std::make_unique<RemoraEncoder>(block_stride, context_samples,
+                                                m_params.bases_before, m_params.bases_after);
+    if (m_params.refine_do_rough_rescale) {
+        m_scaler = std::make_unique<RemoraScaler>(m_params.refine_kmer_levels,
+                                                  m_params.refine_kmer_len,
+                                                  m_params.refine_kmer_center_idx);
+    }
 }
 
 std::vector<size_t> RemoraCaller::get_motif_hits(const std::string& seq) const {
@@ -417,18 +428,12 @@ std::vector<size_t> RemoraCaller::get_motif_hits(const std::string& seq) const {
     return context_hits;
 }
 
-std::pair<torch::Tensor, std::vector<size_t>> RemoraCaller::call(torch::Tensor signal,
-                                                                 const std::string& seq,
-                                                                 const std::vector<uint8_t>& moves,
-                                                                 size_t block_stride) {
-    auto context_samples = (m_params.context_before + m_params.context_after);
-
-    // One-hot encode the kmer at each signal step for input into the network
-    RemoraEncoder encoder(block_stride, context_samples, m_params.bases_before,
-                          m_params.bases_after);
-
+std::pair<torch::Tensor, std::vector<size_t>> RemoraCaller::call(
+        torch::Tensor signal,
+        const std::string& seq,
+        const std::vector<uint8_t>& moves) {
     // TODO: could just do this on the candidates instead of the entire read
-    encoder.encode_remora_data(moves, seq);
+    m_encoder->encode_remora_data(moves, seq);
     auto context_hits = get_motif_hits(seq);
     auto counter = 0;
     auto index = 0;
@@ -439,7 +444,7 @@ std::pair<torch::Tensor, std::vector<size_t>> RemoraCaller::call(torch::Tensor s
                                 static_cast<int64_t>(m_params.base_mod_count + 1)});
 
     for (auto context_hit : context_hits) {
-        auto slice = encoder.get_context(context_hit);
+        auto slice = m_encoder->get_context(context_hit);
         size_t first_sample_source = slice.first_sample;
         size_t last_sample_source = first_sample_source + slice.num_samples;
         size_t first_sample_dest = slice.lead_samples_needed;
@@ -463,6 +468,7 @@ std::pair<torch::Tensor, std::vector<size_t>> RemoraCaller::call(torch::Tensor s
             m_input_sigs.index_put_({counter, 0, Slice(last_sample_dest, None)}, 0);
         }
 
+        auto context_samples = (m_params.context_before + m_params.context_after);
         m_input_seqs.index_put_(
                 {counter}, torch::from_blob(slice.data.data(), {(int64_t)context_samples,
                                                                 kmer_len * RemoraUtils::NUM_BASES})
@@ -490,10 +496,28 @@ std::pair<torch::Tensor, std::vector<size_t>> RemoraCaller::call(torch::Tensor s
     return {scores, context_hits};
 }
 
+torch::Tensor RemoraCaller::scale_signal(torch::Tensor signal,
+                                         const std::vector<int>& seq_ints,
+                                         const std::vector<uint64_t>& seq_to_sig_map) const {
+    if (!m_scaler) {
+        return signal;
+    }
+
+    auto levels = m_scaler->extract_levels(seq_ints);
+
+    // generate the signal values at the centre of each base, create the nx5% quantiles (sorted)
+    // and perform a linear regression against the expected kmer levels to generate a new shift and scale
+    auto [offset, scale] = m_scaler->rescale(signal, seq_to_sig_map, levels);
+    auto scaled_signal = signal * scale + offset;
+    return scaled_signal;
+}
+
 RemoraRunner::RemoraRunner(const std::vector<std::filesystem::path>& model_paths,
                            const std::string& device,
+                           size_t block_stride,
                            int batch_size)
-        : m_num_states(4)  // The 4 canonical bases.
+        : m_num_states(4),              // The 4 canonical bases.
+          m_block_stride(block_stride)  // The stride of the associated basecall model
 {
     struct Info {
         std::vector<std::string> long_names;
@@ -511,7 +535,7 @@ RemoraRunner::RemoraRunner(const std::vector<std::filesystem::path>& model_paths
     std::array<size_t, 4> base_counts = {1, 1, 1, 1};
     std::array<bool, 4> base_used = {false, false, false, false};
     for (const auto& model : model_paths) {
-        auto caller = std::make_shared<RemoraCaller>(model, device, batch_size);
+        auto caller = std::make_shared<RemoraCaller>(model, device, batch_size, block_stride);
         auto& params = caller->params();
 
         auto base = params.motif[params.motif_offset];
@@ -553,12 +577,9 @@ RemoraRunner::RemoraRunner(const std::vector<std::filesystem::path>& model_paths
 
 std::vector<uint8_t> RemoraRunner::run(torch::Tensor signal,
                                        const std::string& seq,
-                                       const std::vector<uint8_t>& moves,
-                                       size_t block_stride) {  // block_stride == model_stride
-
+                                       const std::vector<uint8_t>& moves) {
     // TODO: this is probably quite expensive
     // encode the modbase alphabet probabilities at each base
-
     std::vector<uint8_t> base_mod_probs(seq.size() * m_num_states, 0);
 
     for (size_t i = 0; i < seq.size(); ++i) {
@@ -574,27 +595,14 @@ std::vector<uint8_t> RemoraRunner::run(torch::Tensor signal,
 
     // Convert the move table to a series of indicies in the signal corresponding to the position of the 1s in the move table
     std::vector<uint64_t> seq_to_sig_map =
-            ::utils::moves_to_map(moves, block_stride, signal.size(0));
+            ::utils::moves_to_map(moves, m_block_stride, signal.size(0));
 
     // each caller will have different parameters
     for (auto& caller : m_callers) {
-        auto& params = caller->params();
-        float offset = 0;
-        float scale = 1;
-        if (params.refine_do_rough_rescale) {
-            RemoraScaler scaler(params.refine_kmer_levels, params.refine_kmer_len,
-                                params.refine_kmer_center_idx);
-            auto levels = scaler.extract_levels(sequence_ints);
-
-            // generate the signal values at the centre of each base, create the nx5% quantiles (sorted)
-            // and perform a linear regression against the expected kmer levels to generate a new shift and scale
-            std::tie(offset, scale) = scaler.rescale(signal, seq_to_sig_map, levels);
-        }
-
+        auto scaled_signal = caller->scale_signal(signal, sequence_ints, seq_to_sig_map);
         // The scores from the RNN should be a MxN tensor,
         // where M is the number of context hits and N is the number of modifications + 1.
-        auto scaled_signal = signal * scale + offset;
-        auto [scores, context_hits] = caller->call(scaled_signal, seq, moves, block_stride);
+        auto [scores, context_hits] = caller->call(scaled_signal, seq, moves);
         for (size_t i = 0; i < context_hits.size(); ++i) {
             int64_t result_pos = context_hits[i];
             int64_t offset = m_base_prob_offsets[RemoraUtils::BASE_IDS[seq[context_hits[i]]]];

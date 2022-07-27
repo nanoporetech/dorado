@@ -34,7 +34,7 @@ void RemoraEncoder::encode_remora_data(const std::vector<uint8_t>& moves,
     m_sample_offsets.reserve(moves.size());
 
     // Note that upon initialization, encoded_data is all zeros, which corresponds to "N" characters.
-    m_encoded_data.resize(padded_signal_len * m_kmer_len * RemoraUtils::NUM_BASES);
+    m_encoded_data.resize(encoded_data_size);
 
     // First we need to find out which sample each base corresponds to, and make sure the moves vector is consistent
     // with the sequence length.
@@ -93,8 +93,10 @@ RemoraEncoder::Context RemoraEncoder::get_context(size_t seq_pos) const {
     if (seq_pos >= size_t(m_seq_len)) {
         throw std::out_of_range("Sequence position out of range.");
     }
+
+    auto encoded_kmer_len = m_kmer_len * RemoraUtils::NUM_BASES;
     Context context{};
-    context.size = m_context_samples * m_kmer_len * RemoraUtils::NUM_BASES;
+    context.size = m_context_samples * encoded_kmer_len;
     int base_sample_pos =
             (compute_sample_pos(int(seq_pos)) + compute_sample_pos(int(seq_pos) + 1)) / 2;
     int samples_before = (m_context_samples / 2);
@@ -117,8 +119,9 @@ RemoraEncoder::Context RemoraEncoder::get_context(size_t seq_pos) const {
     auto start_pos = m_padding + first_sample;
     auto end_pos = start_pos + m_context_samples;
 
-    std::copy(m_encoded_data.begin() + start_pos * m_kmer_len * RemoraUtils::NUM_BASES,
-              m_encoded_data.begin() + end_pos * m_kmer_len * RemoraUtils::NUM_BASES,
+    context.data.reserve(context.size);
+    std::copy(std::next(std::begin(m_encoded_data), start_pos * encoded_kmer_len),
+              std::next(std::begin(m_encoded_data), end_pos * encoded_kmer_len),
               std::back_inserter(context.data));
     return context;
 }
