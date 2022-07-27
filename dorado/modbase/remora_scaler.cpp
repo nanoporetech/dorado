@@ -47,9 +47,7 @@ std::pair<float, float> RemoraScaler::rescale(const torch::Tensor samples,
     // do calc and scaling
 
     std::vector<float> optim_dacs;
-    optim_dacs.reserve(seq_to_sig_map.size() - 1);
     std::vector<float> new_levels;
-
     // get the mid-point of the base
     std::transform(std::next(std::begin(seq_to_sig_map)), std::end(seq_to_sig_map),
                    std::begin(seq_to_sig_map), std::back_inserter(optim_dacs),
@@ -63,16 +61,18 @@ std::pair<float, float> RemoraScaler::rescale(const torch::Tensor samples,
                    });
 
     if (clip_bases > 0 && levels.size() > clip_bases * 2) {
-        new_levels = {std::begin(levels) + clip_bases, std::end(levels) - clip_bases};
-        optim_dacs = {std::begin(optim_dacs) + clip_bases, std::end(optim_dacs) - clip_bases};
+        new_levels =
+                std::vector<float>(std::begin(levels) + clip_bases, std::end(levels) - clip_bases);
+        optim_dacs = std::vector<float>(std::begin(optim_dacs) + clip_bases,
+                                        std::end(optim_dacs) - clip_bases);
     } else {
         new_levels = levels;
     }
 
     std::vector<float> quants(19);
     std::generate(std::begin(quants), std::end(quants), [n = 0.f]() mutable { return n += 0.05f; });
-    new_levels = ::utils::quantiles(std::move(new_levels), quants);
-    optim_dacs = ::utils::quantiles(std::move(optim_dacs), quants);
+    new_levels = ::utils::quantiles(new_levels, quants);
+    optim_dacs = ::utils::quantiles(optim_dacs, quants);
 
     auto [new_scale, new_offset, rcoeff] = ::utils::linear_regression(optim_dacs, new_levels);
     return {new_offset, new_scale};

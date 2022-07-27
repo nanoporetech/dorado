@@ -16,38 +16,28 @@ inline int div_round_closest(const int n, const int d) {
 
 // Adapted from https://stackoverflow.com/questions/11964552/finding-quartiles
 template <typename T, typename = typename std::enable_if<std::is_floating_point<T>::value, T>::type>
-inline std::vector<T> quantiles(std::vector<T> data, const std::vector<T>& quants) {
-    if (data.empty()) {
+inline std::vector<T> quantiles(const std::vector<T>& in_data, const std::vector<T>& quants) {
+    if (in_data.empty()) {
         return {};
     }
 
-    if (data.size() == 1) {
-        return {data.front()};
+    if (in_data.size() == 1) {
+        return {in_data.front()};
     }
 
+    auto data = in_data;
+    std::sort(std::begin(data), std::end(data));
     std::vector<T> quantiles;
+
     auto linear_interp = [](T v0, T v1, T t) { return (1 - t) * v0 + t * v1; };
 
-    // Track the rightmost point we've sorted at as nth_element ensures everything left of that is
-    // less than the nth_element, so we can reduce our range each time
-    auto start_it = std::begin(data);
     for (size_t i = 0; i < quants.size(); ++i) {
         T pos = linear_interp(0, T(data.size() - 1), quants[i]);
 
         int64_t left = std::max(int64_t(std::floor(pos)), int64_t(0));
         int64_t right = std::min(int64_t(std::ceil(pos)), int64_t(data.size() - 1));
-
-        // Two `nth_element` calls per quantile at O(N) is better than
-        // sorting `data` at O(NlogN) for data.size >> quants.size(),
-        // which is almost always going to be true
-        auto nth_it = std::next(std::begin(data), left);
-        std::nth_element(start_it, nth_it, std::end(data));
-        T data_left = *nth_it;
-
-        nth_it = std::next(std::begin(data), right);
-        std::nth_element(start_it, nth_it, std::end(data));
-        T data_right = *nth_it;
-        start_it = std::next(nth_it);
+        T data_left = data.at(left);
+        T data_right = data.at(right);
 
         T quantile = linear_interp(data_left, data_right, pos - left);
         quantiles.push_back(quantile);
