@@ -1,5 +1,6 @@
 #include "CRFModel.h"
 
+#include "../utils/module_utils.h"
 #include "../utils/tensor_utils.h"
 
 #ifndef __APPLE__
@@ -38,6 +39,8 @@ extern "C" {
 #include <math.h>
 #include <toml.hpp>
 #include <torch/torch.h>
+
+#include <string>
 
 using namespace torch::nn;
 namespace F = torch::nn::functional;
@@ -293,14 +296,40 @@ struct CRFModelImpl : Module {
         encoder = Sequential(conv1, conv2, conv3, permute, rnns, linear);
     }
 
-    void load_state_dict(std::vector<torch::Tensor> weights) {
-        assert(weights.size() == parameters().size());
-        for (size_t idx = 0; idx < weights.size(); idx++) {
-            parameters()[idx].data() = weights[idx].data();
-        }
+    void load_state_dict(const std::vector<torch::Tensor> &weights) {
+        ::utils::load_state_dict(*this, weights);
     }
 
     torch::Tensor forward(torch::Tensor x) { return encoder->forward(x); }
+
+    std::vector<torch::Tensor> load_weights(const std::filesystem::path &dir) {
+        auto tensors = std::vector<std::string>{
+
+                "0.conv.weight.tensor",      "0.conv.bias.tensor",
+
+                "1.conv.weight.tensor",      "1.conv.bias.tensor",
+
+                "2.conv.weight.tensor",      "2.conv.bias.tensor",
+
+                "4.rnn.weight_ih_l0.tensor", "4.rnn.weight_hh_l0.tensor",
+                "4.rnn.bias_ih_l0.tensor",   "4.rnn.bias_hh_l0.tensor",
+
+                "5.rnn.weight_ih_l0.tensor", "5.rnn.weight_hh_l0.tensor",
+                "5.rnn.bias_ih_l0.tensor",   "5.rnn.bias_hh_l0.tensor",
+
+                "6.rnn.weight_ih_l0.tensor", "6.rnn.weight_hh_l0.tensor",
+                "6.rnn.bias_ih_l0.tensor",   "6.rnn.bias_hh_l0.tensor",
+
+                "7.rnn.weight_ih_l0.tensor", "7.rnn.weight_hh_l0.tensor",
+                "7.rnn.bias_ih_l0.tensor",   "7.rnn.bias_hh_l0.tensor",
+
+                "8.rnn.weight_ih_l0.tensor", "8.rnn.weight_hh_l0.tensor",
+                "8.rnn.bias_ih_l0.tensor",   "8.rnn.bias_hh_l0.tensor",
+
+                "9.linear.weight.tensor",    "9.linear.bias.tensor"};
+
+        return ::utils::load_tensors(dir, tensors);
+    }
 
     Permute permute{nullptr};
     LSTMStack rnns{nullptr};
@@ -311,11 +340,11 @@ struct CRFModelImpl : Module {
 
 TORCH_MODULE(CRFModel);
 
-ModuleHolder<AnyModule> load_crf_model(const std::string &path,
-                                       int batch_size,
-                                       int chunk_size,
-                                       torch::TensorOptions options) {
-    auto config = toml::parse(path + "/config.toml");
+std::tuple<ModuleHolder<AnyModule>, size_t> load_crf_model(const std::filesystem::path &path,
+                                                           int batch_size,
+                                                           int chunk_size,
+                                                           torch::TensorOptions options) {
+    auto config = toml::parse(path / "config.toml");
 
     const auto &encoder = toml::find(config, "encoder");
     const auto stride = toml::find<int>(encoder, "stride");
@@ -326,8 +355,8 @@ ModuleHolder<AnyModule> load_crf_model(const std::string &path,
     int outsize = pow(4, state_len) * 4;
     bool expand = options.device_opt().value() == torch::kCPU;
 
-    auto state_dict = load_weights(path);
     auto model = CRFModel(insize, outsize, stride, expand);
+    auto state_dict = model->load_weights(path);
     model->load_state_dict(state_dict);
     model->to(options.dtype_opt().value().toScalarType());
     model->to(options.device_opt().value());
@@ -336,5 +365,5 @@ ModuleHolder<AnyModule> load_crf_model(const std::string &path,
     auto module = AnyModule(model);
     auto holder = ModuleHolder<AnyModule>(module);
 
-    return holder;
+    return {holder, static_cast<size_t>(stride)};
 }

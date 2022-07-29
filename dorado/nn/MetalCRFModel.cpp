@@ -5,6 +5,7 @@
 
 #include "../decode/beam_search.h"
 #include "../utils/metal_utils.h"
+#include "../utils/module_utils.h"
 #include "../utils/tensor_utils.h"
 
 #include <math.h>
@@ -328,12 +329,8 @@ struct MetalModelImpl : Module {
                 "mtl_block", MetalBlock(chunk_size, batch_size, stride, size, outsize, device));
     }
 
-    void load_state_dict(std::vector<torch::Tensor> weights) {
-        assert(weights.size() == parameters().size());
-        for (size_t idx = 0; idx < weights.size(); idx++) {
-            parameters()[idx].data() = weights[idx].data();
-        }
-
+    void load_state_dict(const std::vector<torch::Tensor> &weights) {
+        ::utils::load_state_dict(*this, weights);
         mtl_block->load_weights();
     }
 
@@ -350,8 +347,8 @@ TORCH_MODULE(MetalModel);
 
 class MetalCaller {
 public:
-    MetalCaller(const std::string &model_path, int chunk_size, int batch_size) {
-        auto config = toml::parse(model_path + "/config.toml");
+    MetalCaller(const std::filesystem::path &model_path, int chunk_size, int batch_size) {
+        auto config = toml::parse(model_path / "config.toml");
         const auto &qscore = toml::find(config, "qscore");
         const auto qbias = toml::find<float>(qscore, "bias");
         const auto qscale = toml::find<float>(qscore, "scale");
@@ -377,6 +374,10 @@ public:
         m_states = pow(n_base, state_len);
         m_batch_size = batch_size;
         int outsize = m_states * num_transitions;
+
+        m_model_stride = static_cast<size_t>(stride);
+        // adjust chunk size to a multiple of the stride
+        chunk_size -= chunk_size % stride;
 
         auto state_dict = load_weights(model_path);
 
@@ -447,6 +448,35 @@ public:
         for (auto &thr : m_decode_threads) {
             thr->join();
         }
+    }
+
+    std::vector<torch::Tensor> load_weights(const std::filesystem::path &dir) {
+        auto tensors = std::vector<std::string>{
+
+                "0.conv.weight.tensor",      "0.conv.bias.tensor",
+
+                "1.conv.weight.tensor",      "1.conv.bias.tensor",
+
+                "2.conv.weight.tensor",      "2.conv.bias.tensor",
+
+                "4.rnn.weight_ih_l0.tensor", "4.rnn.weight_hh_l0.tensor",
+                "4.rnn.bias_ih_l0.tensor",   "4.rnn.bias_hh_l0.tensor",
+
+                "5.rnn.weight_ih_l0.tensor", "5.rnn.weight_hh_l0.tensor",
+                "5.rnn.bias_ih_l0.tensor",   "5.rnn.bias_hh_l0.tensor",
+
+                "6.rnn.weight_ih_l0.tensor", "6.rnn.weight_hh_l0.tensor",
+                "6.rnn.bias_ih_l0.tensor",   "6.rnn.bias_hh_l0.tensor",
+
+                "7.rnn.weight_ih_l0.tensor", "7.rnn.weight_hh_l0.tensor",
+                "7.rnn.bias_ih_l0.tensor",   "7.rnn.bias_hh_l0.tensor",
+
+                "8.rnn.weight_ih_l0.tensor", "8.rnn.weight_hh_l0.tensor",
+                "8.rnn.bias_ih_l0.tensor",   "8.rnn.bias_hh_l0.tensor",
+
+                "9.linear.weight.tensor",    "9.linear.bias.tensor"};
+
+        return ::utils::load_tensors(dir, tensors);
     }
 
     struct NNTask {
@@ -606,10 +636,10 @@ public:
     MTL::SharedEvent *m_mtl_event;
     torch::Tensor m_scan_idx[2][2];
     torch::Tensor m_scores, m_posts, m_bwd;
-    int m_out_chunk_size, m_batch_size, m_states;
+    int m_out_chunk_size, m_batch_size, m_states, m_model_stride;
 };
 
-std::shared_ptr<MetalCaller> create_metal_caller(const std::string &model_path,
+std::shared_ptr<MetalCaller> create_metal_caller(const std::filesystem::path &model_path,
                                                  int chunk_size,
                                                  int batch_size) {
     return std::make_shared<MetalCaller>(model_path, chunk_size, batch_size);
@@ -632,3 +662,5 @@ std::vector<DecodedChunk> MetalModelRunner::call_chunks(int num_chunks) {
     m_caller->call_chunks(m_input, num_chunks, out_chunks);
     return out_chunks;
 }
+
+size_t MetalModelRunner::model_stride() const { return m_caller->m_model_stride; }

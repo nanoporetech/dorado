@@ -46,12 +46,16 @@ set(LIB_SOURCE_FILES
     dorado/nn/CRFModel.h
     dorado/nn/CRFModel.cpp
     dorado/nn/ModelRunner.h
+    dorado/nn/RemoraModel.cpp
+    dorado/nn/RemoraModel.h
     dorado/read_pipeline/ReadPipeline.cpp
     dorado/read_pipeline/ReadPipeline.h
     dorado/read_pipeline/ScalerNode.cpp
     dorado/read_pipeline/ScalerNode.h
     dorado/read_pipeline/BasecallerNode.cpp
     dorado/read_pipeline/BasecallerNode.h
+    dorado/read_pipeline/ModBaseCallerNode.cpp
+    dorado/read_pipeline/ModBaseCallerNode.h
     dorado/read_pipeline/WriterNode.cpp
     dorado/read_pipeline/WriterNode.h
     dorado/data_loader/DataLoader.cpp
@@ -64,8 +68,18 @@ set(LIB_SOURCE_FILES
     dorado/decode/CPUDecoder.h
     dorado/decode/GPUDecoder.cpp
     dorado/decode/GPUDecoder.h
+    dorado/modbase/remora_encoder.cpp
+    dorado/modbase/remora_encoder.h
+    dorado/modbase/remora_scaler.cpp
+    dorado/modbase/remora_scaler.h
+    dorado/modbase/remora_utils.cpp
+    dorado/modbase/remora_utils.h
+    dorado/utils/base_mod_utils.cpp
+    dorado/utils/base_mod_utils.h
     dorado/utils/compat_utils.cpp
     dorado/utils/compat_utils.h
+    dorado/utils/math_utils.h
+    dorado/utils/module_utils.h
     dorado/utils/sequence_utils.cpp
     dorado/utils/sequence_utils.h
     dorado/utils/stitch.cpp
@@ -147,8 +161,11 @@ set_target_properties(dorado
 target_link_libraries(dorado elzip)
 target_link_libraries(dorado dorado_lib)
 
-
-set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/../dist)
+if (DEFINED DORADO_INSTALL_PATH)
+    set(CMAKE_INSTALL_PREFIX ${DORADO_INSTALL_PATH})
+else()
+    set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/../dist)
+endif()
 
 install(TARGETS dorado RUNTIME)
 

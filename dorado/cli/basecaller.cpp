@@ -4,17 +4,22 @@
 #include "decode/GPUDecoder.h"
 #include "nn/MetalCRFModel.h"
 #include "nn/ModelRunner.h"
+#include "nn/RemoraModel.h"
 #include "read_pipeline/BasecallerNode.h"
+#include "read_pipeline/ModBaseCallerNode.h"
 #include "read_pipeline/ScalerNode.h"
 #include "read_pipeline/WriterNode.h"
 
 #include <argparse.hpp>
 
+#include <filesystem>
 #include <iostream>
+#include <sstream>
 
 void setup(std::vector<std::string> args,
-           const std::string& model_path,
+           const std::filesystem::path& model_path,
            const std::string& data_path,
+           const std::string& remora_models,
            const std::string& device,
            size_t chunk_size,
            size_t overlap,
@@ -43,9 +48,44 @@ void setup(std::vector<std::string> args,
         }
     }
 
+    // verify that all runners are using the same stride, in case we allow multiple models in future
+    auto model_stride = runners.front()->model_stride();
+    assert(std::all_of(runners.begin(), runners.end(), [model_stride](auto runner) {
+        return runner->model_stride() == model_stride;
+    }));
+
+    if (!remora_models.empty() && emit_fastq) {
+        throw std::runtime_error("Modified base models cannot be used with FASTQ output");
+    }
+
+    std::vector<std::filesystem::path> remora_model_list;
+    std::istringstream stream{remora_models};
+    std::string model;
+    while (std::getline(stream, model, ',')) {
+        remora_model_list.push_back(model);
+    }
+
+    // generate model callers before nodes or it affects the speed calculations
+    std::shared_ptr<RemoraRunner> mod_base_runner =
+            remora_model_list.empty() ? std::shared_ptr<RemoraRunner>{}
+                                      : std::make_shared<RemoraRunner>(remora_model_list, device);
+
     WriterNode writer_node(std::move(args), emit_fastq);
-    BasecallerNode basecaller_node(writer_node, runners, batch_size, chunk_size, overlap);
-    ScalerNode scaler_node(basecaller_node);
+
+    std::unique_ptr<ModBaseCallerNode> mod_base_caller_node;
+    std::unique_ptr<BasecallerNode> basecaller_node;
+
+    if (!remora_model_list.empty()) {
+        mod_base_caller_node.reset(
+                new ModBaseCallerNode(writer_node, mod_base_runner, model_stride));
+        basecaller_node =
+                std::make_unique<BasecallerNode>(*mod_base_caller_node, std::move(runners),
+                                                 batch_size, chunk_size, overlap, model_stride);
+    } else {
+        basecaller_node = std::make_unique<BasecallerNode>(
+                writer_node, std::move(runners), batch_size, chunk_size, overlap, model_stride);
+    }
+    ScalerNode scaler_node(*basecaller_node);
     DataLoader loader(scaler_node, "cpu");
     loader.load_reads(data_path);
 }
@@ -74,6 +114,10 @@ int basecaller(int argc, char* argv[]) {
 
     parser.add_argument("--emit-fastq").default_value(false).implicit_value(true);
 
+    parser.add_argument("--remora_models")
+            .default_value(std::string())
+            .help("a comma separated list of remora models");
+
     try {
         parser.parse_args(argc, argv);
     } catch (const std::exception& e) {
@@ -87,8 +131,9 @@ int basecaller(int argc, char* argv[]) {
     std::cerr << "> Creating basecall pipeline" << std::endl;
     try {
         setup(args, parser.get<std::string>("model"), parser.get<std::string>("data"),
-              parser.get<std::string>("-x"), parser.get<int>("-c"), parser.get<int>("-o"),
-              parser.get<int>("-b"), parser.get<int>("-r"), parser.get<bool>("--emit-fastq"));
+              parser.get<std::string>("--remora_models"), parser.get<std::string>("-x"),
+              parser.get<int>("-c"), parser.get<int>("-o"), parser.get<int>("-b"),
+              parser.get<int>("-r"), parser.get<bool>("--emit-fastq"));
     } catch (const std::exception& e) {
         std::cerr << e.what() << std::endl;
         return 1;
