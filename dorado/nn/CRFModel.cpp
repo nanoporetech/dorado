@@ -70,13 +70,13 @@ struct LinearCRFImpl : Module {
     };
 
     torch::Tensor forward(torch::Tensor x) {
-        c10::cuda::CUDAGuard device_guard(x.device());
-        auto stream = at::cuda::getCurrentCUDAStream().stream();
         auto T = x.size(0);
         auto N = x.size(1);
+#if USE_CUDA_LSTM
+        // Optimised version of the #else branch for CUDA devices
+        c10::cuda::CUDAGuard device_guard(x.device());
+        auto stream = at::cuda::getCurrentCUDAStream().stream();
 
-        // The following lines (until the blank line) replace this operation, faster:
-        // auto scores = activation(linear(x)) * scale;
         auto scores = torch::empty({N * T, linear->weight.size(0)}, x.options()).contiguous();
         x = x.transpose(0, 1).contiguous().reshape(
                 {T * N, -1});                  // make sure input is NTC in memory
@@ -91,6 +91,10 @@ struct LinearCRFImpl : Module {
         host_bias_tanh_scale_f16(stream, N * T, scores.size(1), scale, scores.data_ptr(),
                                  linear->bias.data_ptr());
         scores = scores.view({N, T, -1}).transpose(0, 1);  // logical order TNC, memory order NTC
+
+#else  // if USE_CUDA_LSTM
+        auto scores = activation(linear(x)) * scale;
+#endif
 
         if (expand_blanks == true) {
             scores = scores.contiguous();
