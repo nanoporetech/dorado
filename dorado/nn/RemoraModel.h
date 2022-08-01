@@ -57,7 +57,8 @@ public:
                  size_t block_stride);
     std::pair<torch::Tensor, std::vector<size_t>> call(torch::Tensor signal,
                                                        const std::string& seq,
-                                                       const std::vector<uint8_t>& moves);
+                                                       const std::vector<int>& seq_ints,
+                                                       const std::vector<size_t>& moves);
     const BaseModParams& params() const { return m_params; }
 
     torch::Tensor scale_signal(torch::Tensor signal,

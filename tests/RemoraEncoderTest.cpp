@@ -1,4 +1,5 @@
 #include "modbase/remora_encoder.h"
+#include "utils/sequence_utils.h"
 
 #include <catch2/catch.hpp>
 
@@ -10,17 +11,13 @@ TEST_CASE("Encode sequence for modified basecalling", TEST_GROUP) {
     const size_t SLICE_BLOCKS = 6;
     const size_t PADDING = SLICE_BLOCKS / 2;
     std::string sequence{"TATTCAGTAC"};
+    auto seq_ints = ::utils::sequence_to_ints(sequence);
     //                         T  A     T        T  C     A     G        T     A  C
     std::vector<uint8_t> moves{1, 1, 0, 1, 0, 0, 1, 1, 0, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 0};
+    auto seq_to_sig_map = ::utils::moves_to_map(moves, BLOCK_STRIDE, moves.size() * BLOCK_STRIDE);
 
     RemoraEncoder encoder(BLOCK_STRIDE, SLICE_BLOCKS * BLOCK_STRIDE, 1, 1);
-    encoder.encode_remora_data(moves, sequence);
-    const auto& sample_offsets = encoder.get_sample_offsets();
-
-    CHECK(sequence.size() == sample_offsets.size());
-
-    std::vector<int> expected_sample_offsets{0, 2, 6, 12, 14, 18, 22, 28, 32, 34};
-    CHECK(expected_sample_offsets == sample_offsets);
+    encoder.init(seq_ints, seq_to_sig_map);
 
     auto slice0 = encoder.get_context(0);  // The T in the NTA 3mer.
     CHECK(slice0.size == SLICE_BLOCKS * BLOCK_STRIDE * KMER_LEN * 4);

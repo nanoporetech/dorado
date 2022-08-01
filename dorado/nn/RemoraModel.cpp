@@ -431,9 +431,9 @@ std::vector<size_t> RemoraCaller::get_motif_hits(const std::string& seq) const {
 std::pair<torch::Tensor, std::vector<size_t>> RemoraCaller::call(
         torch::Tensor signal,
         const std::string& seq,
-        const std::vector<uint8_t>& moves) {
-    // TODO: could just do this on the candidates instead of the entire read
-    m_encoder->encode_remora_data(moves, seq);
+        const std::vector<int>& seq_ints,
+        const std::vector<size_t>& seq_to_sig_map) {
+    m_encoder->init(seq_ints, seq_to_sig_map);
     auto context_hits = get_motif_hits(seq);
     auto counter = 0;
     auto index = 0;
@@ -602,7 +602,8 @@ std::vector<uint8_t> RemoraRunner::run(torch::Tensor signal,
         auto scaled_signal = caller->scale_signal(signal, sequence_ints, seq_to_sig_map);
         // The scores from the RNN should be a MxN tensor,
         // where M is the number of context hits and N is the number of modifications + 1.
-        auto [scores, context_hits] = caller->call(scaled_signal, seq, moves);
+        auto [scores, context_hits] =
+                caller->call(scaled_signal, seq, sequence_ints, seq_to_sig_map);
         for (size_t i = 0; i < context_hits.size(); ++i) {
             int64_t result_pos = context_hits[i];
             int64_t offset = m_base_prob_offsets[RemoraUtils::BASE_IDS[seq[context_hits[i]]]];

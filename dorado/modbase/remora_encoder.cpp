@@ -6,35 +6,6 @@
 #include <algorithm>
 #include <stdexcept>
 
-namespace {
-std::vector<float> encode_kmer(int before_context_bases,
-                               int after_context_bases,
-                               int sig_len,
-                               const std::vector<int>& seq,
-                               const std::vector<int>& seq_mappings) {
-    int seq_len = seq.size() - before_context_bases - after_context_bases;
-    auto kmer_len = before_context_bases + after_context_bases + 1;
-    std::vector<float> output(kmer_len * RemoraUtils::NUM_BASES * sig_len);
-
-    for (size_t kmer_pos = 0; kmer_pos < kmer_len; ++kmer_pos) {
-        auto enc_offset = RemoraUtils::NUM_BASES * kmer_pos;
-        for (size_t seq_pos = 0; seq_pos < seq_len; ++seq_pos) {
-            auto base = seq[seq_pos + kmer_pos];
-            if (base == -1) {
-                continue;
-            }
-            auto base_st = seq_mappings[seq_pos];
-            auto base_en = seq_mappings[seq_pos + 1];
-            for (size_t sig_pos = base_st; sig_pos < base_en; ++sig_pos) {
-                output[sig_len * (enc_offset + base) + sig_pos] = 1;
-                // output[enc_offset + base + sig_pos * kmer_len * RemoraUtils::NUM_BASES] = 1;
-            }
-        }
-    }
-    return output;
-}
-}  // namespace
-
 RemoraEncoder::RemoraEncoder(size_t block_stride,
                              size_t context_samples,
                              int bases_before,
@@ -45,37 +16,22 @@ RemoraEncoder::RemoraEncoder(size_t block_stride,
           m_block_stride(int(block_stride)),
           m_context_samples(int(context_samples)),
           m_seq_len(0),
-          m_signal_len(0),
-          m_buffer(m_kmer_len * RemoraUtils::NUM_BASES) {}
+          m_signal_len(0) {}
 
-void RemoraEncoder::encode_remora_data(const std::vector<uint8_t>& moves,
-                                       const std::string& sequence) {
-    // This code assumes that the first move value will always be 1. It also assumes that moves is only ever 0 or 1.
-    m_seq_len = int(sequence.size());
-    m_signal_len = int(moves.size()) * m_block_stride;
-    m_sequence_ints = ::utils::sequence_to_ints(sequence);
+void RemoraEncoder::init(const std::vector<int>& sequence_ints,
+                         const std::vector<size_t>& seq_to_sig_map) {
+    // gcc9 doesn't support <ranges>, which would be useful here
+    m_sequence_ints = sequence_ints;
 
-    m_sample_offsets.clear();
-    m_sample_offsets.reserve(moves.size());
+    // remove the final entry, we're only interested in where the bases start
+    m_sample_offsets = {std::begin(seq_to_sig_map), std::prev(std::end(seq_to_sig_map), 1)};
 
-    // First we need to find out which sample each base corresponds to, and make sure the moves vector is consistent
-    // with the sequence length.
-    int base_count = 0;
-    for (int i = 0; i < int(moves.size()); ++i) {
-        if (i == 0 || moves[i] == 1) {
-            m_sample_offsets.push_back(i * m_block_stride);
-            ++base_count;
-        }
-    }
-    if (base_count > m_seq_len) {
-        throw std::runtime_error("Movement table indicates more bases than provided in sequence (" +
-                                 std::to_string(base_count) + " > " + std::to_string(m_seq_len) +
-                                 ").");
-    }
-    if (base_count < m_seq_len) {
-        throw std::runtime_error("Movement table indicates fewer bases than provided in sequence(" +
-                                 std::to_string(base_count) + " < " + std::to_string(m_seq_len) +
-                                 ").");
+    m_seq_len = int(sequence_ints.size());
+
+    // round the signal length up to the next block
+    m_signal_len = seq_to_sig_map.back();
+    if (m_signal_len % m_block_stride != 0) {
+        m_signal_len += m_block_stride - m_signal_len % m_block_stride;
     }
 }
 
@@ -146,8 +102,7 @@ RemoraEncoder::Context RemoraEncoder::get_context(size_t seq_pos) const {
     chunk_seq_to_sig.front() = 0;
     chunk_seq_to_sig.back() = m_context_samples;
 
-    context.data = encode_kmer(m_bases_before, m_bases_after, m_context_samples, seq_ints,
-                               chunk_seq_to_sig);
+    context.data = encode_kmer(seq_ints, chunk_seq_to_sig);
 
     return context;
 }
@@ -161,4 +116,26 @@ int RemoraEncoder::compute_sample_pos(int base_pos) const {
         return m_signal_len + m_block_stride * (base_offset - m_seq_len);
     }
     return m_sample_offsets[base_offset];
+}
+
+std::vector<float> RemoraEncoder::encode_kmer(const std::vector<int>& seq,
+                                              const std::vector<int>& seq_mappings) const {
+    int seq_len = seq.size() - m_bases_before - m_bases_after;
+    std::vector<float> output(m_kmer_len * RemoraUtils::NUM_BASES * m_context_samples);
+
+    for (size_t kmer_pos = 0; kmer_pos < m_kmer_len; ++kmer_pos) {
+        auto enc_offset = RemoraUtils::NUM_BASES * kmer_pos;
+        for (size_t seq_pos = 0; seq_pos < seq_len; ++seq_pos) {
+            auto base = seq[seq_pos + kmer_pos];
+            if (base == -1) {
+                continue;
+            }
+            auto base_st = seq_mappings[seq_pos];
+            auto base_en = seq_mappings[seq_pos + 1];
+            for (size_t sig_pos = base_st; sig_pos < base_en; ++sig_pos) {
+                output[m_context_samples * (enc_offset + base) + sig_pos] = 1;
+            }
+        }
+    }
+    return output;
 }
