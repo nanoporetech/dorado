@@ -432,7 +432,7 @@ std::pair<torch::Tensor, std::vector<size_t>> RemoraCaller::call(
         torch::Tensor signal,
         const std::string& seq,
         const std::vector<int>& seq_ints,
-        const std::vector<size_t>& seq_to_sig_map) {
+        const std::vector<uint64_t>& seq_to_sig_map) {
     m_encoder->init(seq_ints, seq_to_sig_map);
     auto context_hits = get_motif_hits(seq);
     auto counter = 0;

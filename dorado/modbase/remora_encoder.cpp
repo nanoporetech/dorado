@@ -19,7 +19,7 @@ RemoraEncoder::RemoraEncoder(size_t block_stride,
           m_signal_len(0) {}
 
 void RemoraEncoder::init(const std::vector<int>& sequence_ints,
-                         const std::vector<size_t>& seq_to_sig_map) {
+                         const std::vector<uint64_t>& seq_to_sig_map) {
     // gcc9 doesn't support <ranges>, which would be useful here
     m_sequence_ints = sequence_ints;
 

@@ -37,7 +37,7 @@ public:
      *  @param seq_to_sig_map An array indicating the position in the signal at which the corresponding base begins/the 
      *  previous base ends. The final value in the array should be the length of the signal. @see ::utils::moves_to_map
      */
-    void init(const std::vector<int>& sequence_ints, const std::vector<size_t>& seq_to_sig_map);
+    void init(const std::vector<int>& sequence_ints, const std::vector<uint64_t>& seq_to_sig_map);
 
     /// Helper structure for specifying the context and returning the corresponding encoded data.
     struct Context {
