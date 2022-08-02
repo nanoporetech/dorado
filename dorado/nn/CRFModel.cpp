@@ -13,24 +13,6 @@ extern "C" {
 #include <cublas_v2.h>
 #include <cuda_runtime.h>
 
-#define CUDA_CHECK(X)                                                                         \
-    {                                                                                         \
-        cudaError_t error = X;                                                                \
-        if (error != cudaSuccess) {                                                           \
-            printf("CUDA returned error %s (code %d), line(%d)\n", cudaGetErrorString(error), \
-                   error, __LINE__);                                                          \
-            exit(EXIT_FAILURE);                                                               \
-        }                                                                                     \
-    }
-#define CUBLAS_CHECK(X)                                                              \
-    {                                                                                \
-        cublasStatus_t res = X;                                                      \
-        if (res != CUBLAS_STATUS_SUCCESS) {                                          \
-            printf("CuBLAS returned error code %d, line(%d)\n", int(res), __LINE__); \
-            exit(EXIT_FAILURE);                                                      \
-        }                                                                            \
-    }
-
 #define USE_CUDA_LSTM 1
 #else
 #define USE_CUDA_LSTM 0
@@ -77,17 +59,9 @@ struct LinearCRFImpl : Module {
         c10::cuda::CUDAGuard device_guard(x.device());
         auto stream = at::cuda::getCurrentCUDAStream().stream();
 
-        auto scores = torch::empty({N * T, linear->weight.size(0)}, x.options()).contiguous();
-        x = x.transpose(0, 1).contiguous().reshape(
-                {T * N, -1});                  // make sure input is NTC in memory
-        constexpr uint16_t HALF_ZERO = 0;      // 0.0 in __half format
-        constexpr uint16_t HALF_ONE = 0x3C00;  // 1.0 in __half format
-        CUBLAS_CHECK(cublasGemmEx(at::cuda::getCurrentCUDABlasHandle(), CUBLAS_OP_T, CUBLAS_OP_N,
-                                  scores.size(1), x.size(0), x.size(1), &HALF_ONE,
-                                  (const void *)linear->weight.data_ptr(), CUDA_R_16F, x.size(1),
-                                  (const void *)x.data_ptr(), CUDA_R_16F, x.stride(0), &HALF_ZERO,
-                                  (void *)scores.data_ptr(), CUDA_R_16F, scores.size(1), CUDA_R_16F,
-                                  CUBLAS_GEMM_DEFAULT_TENSOR_OP));
+        // make sure input is NTC in memory
+        x = x.transpose(0, 1).contiguous().reshape({T * N, -1});
+        auto scores = torch::matmul(x, linear->weight.t());
         host_bias_tanh_scale_f16(stream, N * T, scores.size(1), scale, scores.data_ptr(),
                                  linear->bias.data_ptr());
         scores = scores.view({N, T, -1}).transpose(0, 1);  // logical order TNC, memory order NTC
@@ -115,15 +89,6 @@ struct LinearCRFImpl : Module {
 };
 
 #if USE_CUDA_LSTM
-
-static int get_cuda_device_id_from_device(const c10::Device &device) {
-    if (!device.is_cuda() || !device.has_index()) {
-        std::stringstream ss;
-        ss << "Unable to extract CUDA device ID from device " << device;
-        throw std::runtime_error(ss.str());
-    }
-    return device.index();
-}
 
 struct CudaLSTMImpl : Module {
     CudaLSTMImpl(int layer_size, bool reverse_) : reverse(reverse_) {
@@ -169,63 +134,72 @@ struct LSTMStackImpl : Module {
 
         // We need some extra working memory to run the LSTM layers. By making it `thread_local`
         // this will work with multiple runners (i.e. multiple threads).
-        thread_local torch::Tensor mat_working_mem, gate_buf, state_buf;
-        thread_local size_t max_working_mem_size = 0;
-        thread_local size_t max_state_buf_size = 0;
-        if (max_working_mem_size < size_t(chunk_size + 1) * batch_size) {
-            max_working_mem_size = size_t(chunk_size + 1) * batch_size;
+        thread_local torch::Tensor mat_working_mem, gate_buf;
+        thread_local int working_mem_chunk_size = 0;
+        thread_local int max_batch_size = 0;
+        if (working_mem_chunk_size != chunk_size || max_batch_size < batch_size) {
+            if (max_batch_size < batch_size) {
+                gate_buf = torch::empty({batch_size, gate_size}, in.options()).contiguous();
+                max_batch_size = batch_size;
+            }
+            working_mem_chunk_size = chunk_size;
             mat_working_mem =
                     torch::zeros({chunk_size + 1, batch_size, 2, layer_size}, in.options())
                             .contiguous();
         }
-        if (max_state_buf_size < batch_size * layer_size) {
-            max_state_buf_size = size_t(batch_size) * layer_size;
-            gate_buf = torch::empty({batch_size * gate_size}, in.options()).contiguous();
-            state_buf = torch::empty({batch_size * layer_size}, in.options()).contiguous();
-        }
         mat_working_mem.to(in.device());
         gate_buf.to(in.device());
-        state_buf.to(in.device());
 
-        size_t timestep_buf_size = size_t(batch_size) * 2 * layer_size;
-        int16_t *working_mem_ptr = (int16_t *)mat_working_mem.data_ptr();
+        // Working memory is laid out as [T+1][N][2][C] in memory, where the 2 serves to
+        // interleave input and output for each LSTM layer in a specific way. The reverse LSTM
+        // layers (rnn1, rnn3, rnn5) use right as input and left as output, whereas the forward
+        // LSTM layers (rnn2, rnn4) use left as input and right as output.
+        //
+        // The interleaving means that x(t) and h(t-1), i.e. the input for the current timestep
+        // and the output of the previous timestep, appear concatenated in memory and we can
+        // perform a single matmul with the concatenated WU matrix
+        // Note that both working_mem[chunk_size][:][0][:] and working_mem[0][:][1][0] remain
+        // all zeroes, representing the initial LSTM state h(-1) in either direction.
 
-        // copy contents of `in` into larger working memory matrix (holding both
-        // input and output interleaved, as well as padding zeroes)
+        auto working_mem_all = mat_working_mem.view({chunk_size + 1, batch_size, -1});
+        auto working_mem_left = mat_working_mem.slice(0, 0, chunk_size).select(2, 0);
+        auto working_mem_right = mat_working_mem.slice(0, 1, chunk_size + 1).select(2, 1);
 
         // NOTE: `host_transpose_f16' does exactly what the commented out assignment
         // below would do, only ~5x faster (on A100)
-        // mat_working_mem.slice(0, 1, chunk_size + 1).select(2, 1) = in;
+        // working_mem_right = in;
         host_transpose_f16(stream, in.data_ptr(), in.size(0), in.size(1), in.size(2), in.stride(0),
-                           in.stride(1), in.stride(2), batch_size * 2 * layer_size, 2 * layer_size,
-                           1, working_mem_ptr + 2 * batch_size * layer_size + layer_size);
+                           in.stride(1), in.stride(2), working_mem_right.stride(0),
+                           working_mem_right.stride(1), 1, working_mem_right.data_ptr());
 
         for (auto &rnn : {rnn1, rnn2, rnn3, rnn4, rnn5}) {
-            cudaMemsetAsync(state_buf.data_ptr(), 0,
-                            size_t(batch_size) * layer_size * sizeof(int16_t), stream);
-            // TODO: cache per-device weights and bias
+            auto state_buf = torch::zeros({batch_size, layer_size}, in.options()).contiguous();
             auto weights_cpu = rnn->weights.t().contiguous();
             auto weights = weights_cpu.to(in.device());
             auto bias = rnn->bias.to(in.device());
             for (int ts = 0; ts < chunk_size; ++ts) {
-                void *timestep_in = working_mem_ptr + timestep_buf_size * ts;
-                void *timestep_out = working_mem_ptr + timestep_buf_size * (ts + 1) + layer_size;
-                if (rnn->reverse) {
-                    timestep_out = working_mem_ptr + timestep_buf_size * (chunk_size - ts - 1);
-                    timestep_in = working_mem_ptr + timestep_buf_size * (chunk_size - ts);
-                }
+                auto timestep_in = working_mem_all[rnn->reverse ? (chunk_size - ts) : ts];
+                auto timestep_out = rnn->reverse ? working_mem_left[chunk_size - ts - 1]
+                                                 : working_mem_right[ts];
 
-                // timestep matrix mulitplication
+                // Timestep matrix mulitplication (using cublasGemmEx, as using torch::matmul
+                // as below is a bit slower on A100 for some reason)
+                // gate_buf = torch::matmul(timestep_in, weights);
                 constexpr uint16_t HALF_ZERO = 0;      // 0.0 in __half format
                 constexpr uint16_t HALF_ONE = 0x3C00;  // 1.0 in __half format
-                CUBLAS_CHECK(cublasGemmEx(
+                auto res = cublasGemmEx(
                         at::cuda::getCurrentCUDABlasHandle(), CUBLAS_OP_N, CUBLAS_OP_N, gate_size,
                         batch_size, 2 * layer_size, &HALF_ONE, (const void *)weights.data_ptr(),
-                        CUDA_R_16F, gate_size, (const void *)timestep_in, CUDA_R_16F,
+                        CUDA_R_16F, gate_size, (const void *)timestep_in.data_ptr(), CUDA_R_16F,
                         2 * layer_size, &HALF_ZERO, (void *)gate_buf.data_ptr(), CUDA_R_16F,
-                        gate_size, CUDA_R_16F, CUBLAS_GEMM_DEFAULT_TENSOR_OP));
+                        gate_size, CUDA_R_16F, CUBLAS_GEMM_DEFAULT_TENSOR_OP);
+                if (res != CUBLAS_STATUS_SUCCESS) {
+                    std::cerr << "CuBLAS error " << int(res) << std::endl;
+                    exit(EXIT_FAILURE);
+                }
                 host_lstm_step_f16(stream, batch_size, layer_size, bias.data_ptr(),
-                                   gate_buf.data_ptr(), state_buf.data_ptr(), timestep_out);
+                                   gate_buf.data_ptr(), state_buf.data_ptr(),
+                                   timestep_out.data_ptr());
             }
         }
 
