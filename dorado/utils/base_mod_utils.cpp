@@ -1,23 +1,19 @@
 #include "base_mod_utils.h"
 
+#include "sequence_utils.h"
+
 #include <sstream>
 
 namespace utils {
-BaseModContext::BaseModContext() { m_base_mapping = {{'A', 0}, {'C', 1}, {'G', 2}, {'T', 3}}; }
+BaseModContext::BaseModContext() {}
 
-const std::string& BaseModContext::motif(char base) const {
-    return m_motifs[m_base_mapping.at(base)];
-}
+const std::string& BaseModContext::motif(char base) const { return m_motifs[base_to_int(base)]; }
 
-size_t BaseModContext::motif_offset(char base) const { return m_offsets[m_base_mapping.at(base)]; }
+size_t BaseModContext::motif_offset(char base) const { return m_offsets[base_to_int(base)]; }
 
 void BaseModContext::set_context(std::string motif, size_t offset) {
     char base = motif.at(offset);
-    auto iter = m_base_mapping.find(base);
-    if (iter == m_base_mapping.end()) {
-        throw std::runtime_error("Invalid motif string '" + motif + "'.");
-    }
-    auto index = iter->second;
+    auto index = base_to_int(base);
     m_motifs[index] = std::move(motif);
     m_offsets[index] = offset;
 }
@@ -69,7 +65,7 @@ std::string BaseModContext::encode() const {
 std::vector<int> BaseModContext::get_sequence_mask(const std::string& sequence) const {
     std::vector<int> mask(sequence.size(), 0);
     for (size_t p = 0; p < sequence.size(); ++p) {
-        auto idx = m_base_mapping.at(sequence[p]);
+        auto idx = base_to_int(sequence[p]);
         if (!m_motifs[idx].empty() && p >= m_offsets[idx] &&
             p + m_motifs[idx].size() - m_offsets[idx] < sequence.size()) {
             size_t a = p - m_offsets[idx];
@@ -95,7 +91,7 @@ void BaseModContext::update_mask(std::vector<int>& mask,
             // A cardinal base.
             current_cardinal = modbase_alphabet[channel_idx];
         } else {
-            if (!m_motifs[m_base_mapping.at(current_cardinal)].empty()) {
+            if (!m_motifs[base_to_int(current_cardinal)].empty()) {
                 // This cardinal base has a context associated with modifications, so the mask should
                 // not be updated, regardless of the threshold.
                 continue;

@@ -67,8 +67,9 @@ void setup(std::vector<std::string> args,
 
     // generate model callers before nodes or it affects the speed calculations
     std::shared_ptr<RemoraRunner> mod_base_runner =
-            remora_model_list.empty() ? std::shared_ptr<RemoraRunner>{}
-                                      : std::make_shared<RemoraRunner>(remora_model_list, device);
+            remora_model_list.empty()
+                    ? std::shared_ptr<RemoraRunner>{}
+                    : std::make_shared<RemoraRunner>(remora_model_list, device, model_stride);
 
     WriterNode writer_node(std::move(args), emit_fastq);
 
@@ -76,8 +77,7 @@ void setup(std::vector<std::string> args,
     std::unique_ptr<BasecallerNode> basecaller_node;
 
     if (!remora_model_list.empty()) {
-        mod_base_caller_node.reset(
-                new ModBaseCallerNode(writer_node, mod_base_runner, model_stride));
+        mod_base_caller_node.reset(new ModBaseCallerNode(writer_node, mod_base_runner));
         basecaller_node =
                 std::make_unique<BasecallerNode>(*mod_base_caller_node, std::move(runners),
                                                  batch_size, chunk_size, overlap, model_stride);

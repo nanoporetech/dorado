@@ -8,12 +8,10 @@ using namespace std::chrono_literals;
 
 ModBaseCallerNode::ModBaseCallerNode(ReadSink& sink,
                                      std::shared_ptr<RemoraRunner> model_runner,
-                                     size_t model_stride,
                                      size_t max_reads)
         : ReadSink(max_reads),
           m_sink(sink),
           m_model_runner(model_runner),
-          m_model_stride(model_stride),
           m_worker(new std::thread(&ModBaseCallerNode::worker_thread, this)) {}
 
 ModBaseCallerNode::~ModBaseCallerNode() {
@@ -42,17 +40,7 @@ void ModBaseCallerNode::worker_thread() {
         lock.unlock();
 
         // TODO: better read queuing, multiple runners
-        auto base_mod_probs =
-                m_model_runner->run(read->raw_data, read->seq, read->moves, m_model_stride);
-        read->base_mod_probs.resize(base_mod_probs.size(0) * base_mod_probs.size(1));
-        auto results_view =
-                base_mod_probs.view({static_cast<int64_t>(read->base_mod_probs.size())});
-        // Rescale network outputs (0-1) to SAM format (0-255)
-        for (auto i = 0ul; i < read->base_mod_probs.size(); ++i) {
-            read->base_mod_probs[i] =
-                    uint8_t(std::min(std::floor(results_view[i].item().toFloat() * 256), 255.0f));
-        }
-
+        read->base_mod_probs = m_model_runner->run(read->raw_data, read->seq, read->moves);
         read->base_mod_info = m_model_runner->base_mod_info();
 
         // Pass the read to the next node
