@@ -20,7 +20,6 @@ TEST_CASE("Encode sequence for modified basecalling", TEST_GROUP) {
     encoder.init(seq_ints, seq_to_sig_map);
 
     auto slice0 = encoder.get_context(0);  // The T in the NTA 3mer.
-    CHECK(slice0.size == SLICE_BLOCKS * BLOCK_STRIDE * KMER_LEN * 4);
     CHECK(slice0.first_sample == 0);
     CHECK(slice0.num_samples == 7);
     CHECK(slice0.lead_samples_needed == 5);
@@ -46,7 +45,6 @@ TEST_CASE("Encode sequence for modified basecalling", TEST_GROUP) {
     CHECK(expected_slice0 == slice0.data);
 
     auto slice1 = encoder.get_context(4);  // The C in the TCA 3mer.
-    CHECK(slice1.size == SLICE_BLOCKS * BLOCK_STRIDE * KMER_LEN * 4);
     CHECK(slice1.first_sample == 10);
     CHECK(slice1.num_samples == 12);
     CHECK(slice1.lead_samples_needed == 0);
@@ -72,7 +70,6 @@ TEST_CASE("Encode sequence for modified basecalling", TEST_GROUP) {
     CHECK(expected_slice1 == slice1.data);
 
     auto slice2 = encoder.get_context(9);  // The C in the ACN 3mer.
-    CHECK(slice2.size == SLICE_BLOCKS * BLOCK_STRIDE * KMER_LEN * 4);
     CHECK(slice2.first_sample == 31);
     CHECK(slice2.num_samples == 9);
     CHECK(slice2.lead_samples_needed == 0);

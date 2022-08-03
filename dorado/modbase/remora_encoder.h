@@ -42,7 +42,6 @@ public:
     /// Helper structure for specifying the context and returning the corresponding encoded data.
     struct Context {
         std::vector<float> data;  ///< Encoded data slice
-        size_t size;              ///< Size of encoded data slice.
         size_t first_sample;      ///< Index of first raw data sample for the slice.
         size_t num_samples;       ///< Number of samples of raw data in the slice.
         size_t lead_samples_needed;  ///< Number of samples, if any, to pad the beginning of the raw data slice with.

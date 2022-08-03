@@ -42,7 +42,6 @@ RemoraEncoder::Context RemoraEncoder::get_context(size_t seq_pos) const {
 
     auto encoded_kmer_len = m_kmer_len * RemoraUtils::NUM_BASES;
     Context context{};
-    context.size = m_context_samples * encoded_kmer_len;
     int base_sample_pos =
             (compute_sample_pos(int(seq_pos)) + compute_sample_pos(int(seq_pos) + 1)) / 2;
     int samples_before = (m_context_samples / 2);
