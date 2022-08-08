@@ -593,7 +593,7 @@ std::vector<uint8_t> RemoraRunner::run(torch::Tensor signal,
 
     std::vector<int> sequence_ints = ::utils::sequence_to_ints(seq);
 
-    // Convert the move table to a series of indicies in the signal corresponding to the position of the 1s in the move table
+    // Convert the move table to a series of indices in the signal corresponding to the position of the 1s in the move table
     std::vector<uint64_t> seq_to_sig_map =
             ::utils::moves_to_map(moves, m_block_stride, signal.size(0));
 
