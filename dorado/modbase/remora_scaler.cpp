@@ -28,10 +28,11 @@ std::vector<float> RemoraScaler::extract_levels(const std::vector<int>& int_seq)
         return levels;
     }
 
-    auto int_kmer_start = int_seq.data();
-    for (size_t pos = 0; pos < int_seq.size() - m_kmer_len; ++pos) {
-        levels[pos + m_centre_index] =
-                m_kmer_levels[index_from_int_kmer(int_kmer_start + pos, m_kmer_len)];
+    auto int_kmer_start_ptr = int_seq.data();
+    auto levels_ptr = levels.data() + m_centre_index;
+    for (size_t pos = 0; pos < int_seq.size() - m_kmer_len;
+         ++pos, ++int_kmer_start_ptr, ++levels_ptr) {
+        *(levels_ptr) = m_kmer_levels[index_from_int_kmer(int_kmer_start_ptr, m_kmer_len)];
     }
     return levels;
 }
