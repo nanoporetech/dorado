@@ -396,15 +396,11 @@ RemoraCaller::RemoraCaller(const std::filesystem::path& model_path,
     auto sig_len = static_cast<int64_t>(m_params.context_before + m_params.context_after);
     auto kmer_len = m_params.bases_after + m_params.bases_before + 1;
 
-    m_input_sigs = torch::zeros({batch_size, 1, sig_len},
+    m_input_sigs = torch::empty({batch_size, 1, sig_len},
                                 torch::TensorOptions().dtype(dtype).device(torch::kCPU));
-    m_input_seqs = torch::zeros({batch_size, RemoraUtils::NUM_BASES * kmer_len, sig_len},
+    m_input_seqs = torch::empty({batch_size, RemoraUtils::NUM_BASES * kmer_len, sig_len},
                                 torch::TensorOptions().dtype(dtype).device(torch::kCPU));
 
-    auto context_samples = (m_params.context_before + m_params.context_after);
-    // One-hot encodes the kmer at each signal step for input into the network
-    m_encoder = std::make_unique<RemoraEncoder>(block_stride, context_samples,
-                                                m_params.bases_before, m_params.bases_after);
     if (m_params.refine_do_rough_rescale) {
         m_scaler = std::make_unique<RemoraScaler>(m_params.refine_kmer_levels,
                                                   m_params.refine_kmer_len,
@@ -428,74 +424,6 @@ std::vector<size_t> RemoraCaller::get_motif_hits(const std::string& seq) const {
     return context_hits;
 }
 
-std::pair<torch::Tensor, std::vector<size_t>> RemoraCaller::call(
-        torch::Tensor signal,
-        const std::string& seq,
-        const std::vector<int>& seq_ints,
-        const std::vector<uint64_t>& seq_to_sig_map) {
-    m_encoder->init(seq_ints, seq_to_sig_map);
-    auto context_hits = get_motif_hits(seq);
-    auto counter = 0;
-    auto index = 0;
-    auto kmer_len = m_params.bases_before + m_params.bases_after + 1;
-
-    // Network outputs
-    auto scores = torch::empty({static_cast<int64_t>(context_hits.size()),
-                                static_cast<int64_t>(m_params.base_mod_count + 1)});
-
-    for (auto context_hit : context_hits) {
-        auto slice = m_encoder->get_context(context_hit);
-        size_t first_sample_source = slice.first_sample;
-        size_t last_sample_source = first_sample_source + slice.num_samples;
-        size_t first_sample_dest = slice.lead_samples_needed;
-        size_t last_sample_dest = first_sample_dest + slice.num_samples;
-        size_t tail_samples_needed = slice.tail_samples_needed;
-        if (last_sample_source > signal.size(0)) {
-            size_t overrun = last_sample_source - signal.size(0);
-            tail_samples_needed += overrun;
-            last_sample_dest -= overrun;
-            last_sample_source -= overrun;
-        }
-
-        auto input_signal = signal.index({Slice(first_sample_source, last_sample_source)});
-        m_input_sigs.index_put_({counter, 0, Slice(first_sample_dest, last_sample_dest)},
-                                input_signal);
-
-        if (slice.lead_samples_needed > 0) {
-            m_input_sigs.index_put_({counter, 0, Slice(None, first_sample_dest)}, 0);
-        }
-        if (tail_samples_needed > 0) {
-            m_input_sigs.index_put_({counter, 0, Slice(last_sample_dest, None)}, 0);
-        }
-
-        auto context_samples = (m_params.context_before + m_params.context_after);
-        m_input_seqs.index_put_(
-                {counter}, torch::from_blob(slice.data.data(), {kmer_len * RemoraUtils::NUM_BASES,
-                                                                (int64_t)context_samples}));
-        //    .transpose(0, 1));
-        if (++counter == m_batch_size) {
-            torch::InferenceMode guard;
-            counter = 0;
-            auto output = m_module->forward(m_input_sigs.to(m_options.device_opt().value()),
-                                            m_input_seqs.to(m_options.device_opt().value()));
-            scores.index_put_({Slice(index, index + m_batch_size), Slice(0, output.size(1))},
-                              output.to(torch::kCPU));
-            index += m_batch_size;
-        }
-    }
-
-    if (counter != 0) {
-        torch::InferenceMode guard;
-        auto output = m_module->forward(m_input_sigs.index({Slice(0, counter), Slice(), Slice()})
-                                                .to(m_options.device_opt().value()),
-                                        m_input_seqs.index({Slice(0, counter), Slice(), Slice()})
-                                                .to(m_options.device_opt().value()));
-        scores.index_put_({Slice(index, index + counter), Slice(0, output.size(1))},
-                          output.to(torch::kCPU));
-    }
-    return {scores, context_hits};
-}
-
 torch::Tensor RemoraCaller::scale_signal(torch::Tensor signal,
                                          const std::vector<int>& seq_ints,
                                          const std::vector<uint64_t>& seq_to_sig_map) const {
@@ -512,107 +440,21 @@ torch::Tensor RemoraCaller::scale_signal(torch::Tensor signal,
     return scaled_signal;
 }
 
-RemoraRunner::RemoraRunner(const std::vector<std::filesystem::path>& model_paths,
-                           const std::string& device,
-                           size_t block_stride,
-                           int batch_size)
-        : m_num_states(4),              // The 4 canonical bases.
-          m_block_stride(block_stride)  // The stride of the associated basecall model
-{
-    struct Info {
-        std::vector<std::string> long_names;
-        std::string alphabet;
-        std::string motif;
-        int motif_offset;
-    };
+void RemoraCaller::accept_chunk(int num_chunks,
+                                at::Tensor signal,
+                                const std::vector<float>& kmers) {
+    m_input_sigs.index_put_({num_chunks, 0}, signal);
 
-    std::string allowed_bases = "ACGT";
-    std::array<Info, 4> model_info;
-    for (int b = 0; b < 4; ++b) {
-        model_info[b].alphabet = allowed_bases[b];
-    }
-
-    std::array<size_t, 4> base_counts = {1, 1, 1, 1};
-    std::array<bool, 4> base_used = {false, false, false, false};
-    for (const auto& model : model_paths) {
-        auto caller = std::make_shared<RemoraCaller>(model, device, batch_size, block_stride);
-        auto& params = caller->params();
-
-        auto base = params.motif[params.motif_offset];
-        if (allowed_bases.find(base) == std::string::npos) {
-            throw std::runtime_error("Invalid base in remora model metadata.");
-        }
-        auto& map_entry = model_info[RemoraUtils::BASE_IDS[base]];
-        map_entry.long_names = params.mod_long_names;
-        map_entry.alphabet += params.mod_bases;
-        map_entry.motif = params.motif;
-        map_entry.motif_offset = params.motif_offset;
-
-        base_counts[RemoraUtils::BASE_IDS[base]] = params.base_mod_count + 1;
-        m_num_states += params.base_mod_count;
-        m_callers.push_back(caller);
-    }
-
-    std::string long_names, alphabet;
-    ::utils::BaseModContext context_handler;
-    for (const auto& info : model_info) {
-        for (const auto& name : info.long_names) {
-            if (!long_names.empty())
-                long_names += ' ';
-            long_names += name;
-        }
-        alphabet += info.alphabet;
-        if (!info.motif.empty()) {
-            context_handler.set_context(info.motif, size_t(info.motif_offset));
-        }
-    }
-
-    m_base_mod_info = std::make_shared<BaseModInfo>(alphabet, long_names, context_handler.encode());
-
-    m_base_prob_offsets[0] = 0;
-    m_base_prob_offsets[1] = base_counts[0];
-    m_base_prob_offsets[2] = base_counts[0] + base_counts[1];
-    m_base_prob_offsets[3] = base_counts[0] + base_counts[1] + base_counts[2];
+    auto sig_len = static_cast<int64_t>(m_params.context_before + m_params.context_after);
+    auto kmer_len = m_params.bases_after + m_params.bases_before + 1;
+    auto slice = torch::from_blob(const_cast<float*>(kmers.data()),
+                                  {kmer_len * RemoraUtils::NUM_BASES, sig_len});
+    m_input_seqs.index_put_({num_chunks}, slice);
 }
 
-std::vector<uint8_t> RemoraRunner::run(torch::Tensor signal,
-                                       const std::string& seq,
-                                       const std::vector<uint8_t>& moves) {
-    // TODO: this is probably quite expensive
-    // encode the modbase alphabet probabilities at each base
-    std::vector<uint8_t> base_mod_probs(seq.size() * m_num_states, 0);
-
-    for (size_t i = 0; i < seq.size(); ++i) {
-        // Initialize for what corresponds to 100% canonical base for each position.
-        int base_id = RemoraUtils::BASE_IDS[seq[i]];
-        if (base_id < 0) {
-            throw std::runtime_error("Invalid character in sequence.");
-        }
-        base_mod_probs[i * m_num_states + m_base_prob_offsets[base_id]] = 1.0f;
-    }
-
-    std::vector<int> sequence_ints = ::utils::sequence_to_ints(seq);
-
-    // Convert the move table to a series of indices in the signal corresponding to the position of the 1s in the move table
-    std::vector<uint64_t> seq_to_sig_map =
-            ::utils::moves_to_map(moves, m_block_stride, signal.size(0), seq.size() + 1);
-
-    // each caller will have different parameters
-    for (auto& caller : m_callers) {
-        auto scaled_signal = caller->scale_signal(signal, sequence_ints, seq_to_sig_map);
-        // The scores from the RNN should be a MxN tensor,
-        // where M is the number of context hits and N is the number of modifications + 1.
-        auto [scores, context_hits] =
-                caller->call(scaled_signal, seq, sequence_ints, seq_to_sig_map);
-        for (size_t i = 0; i < context_hits.size(); ++i) {
-            int64_t result_pos = context_hits[i];
-            int64_t offset = m_base_prob_offsets[RemoraUtils::BASE_IDS[seq[context_hits[i]]]];
-            for (int j = 0; j < scores.size(1); ++j) {
-                base_mod_probs[m_num_states * result_pos + offset + j] = uint8_t(std::min(
-                        std::floor(scores.index({(int64_t)i, j}).item().toFloat() * 256), 255.0f));
-            }
-        }
-    }
-
-    return base_mod_probs;
+torch::Tensor RemoraCaller::call_chunks(int num_chunks) {
+    torch::InferenceMode guard;
+    auto scores = m_module->forward(m_input_sigs.to(m_options.device_opt().value()),
+                                    m_input_seqs.to(m_options.device_opt().value()));
+    return scores.to(torch::kCPU);
 }
