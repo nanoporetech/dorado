@@ -147,6 +147,18 @@ void ModBaseCallerNode::runner_worker_thread(int runner_id) {
             }
             chunk_lock.unlock();
 
+            // initialize base_mod_probs _before_ we start handing out chunks
+            read->base_mod_probs.resize(read->seq.size() * m_num_states, 0);
+            for (size_t i = 0; i < read->seq.size(); ++i) {
+                // Initialize for what corresponds to 100% canonical base for each position.
+                int base_id = RemoraUtils::BASE_IDS[read->seq[i]];
+                if (base_id < 0) {
+                    throw std::runtime_error("Invalid character in sequence.");
+                }
+                read->base_mod_probs[i * m_num_states + m_base_prob_offsets[base_id]] = 1.0f;
+            }
+            read->base_mod_info = m_base_mod_info;
+
             std::vector<int> sequence_ints = ::utils::sequence_to_ints(read->seq);
             std::vector<uint64_t> seq_to_sig_map = ::utils::moves_to_map(
                     read->moves, m_block_stride, read->raw_data.size(0), read->seq.size() + 1);
@@ -199,17 +211,6 @@ void ModBaseCallerNode::runner_worker_thread(int runner_id) {
                     ++read->num_modbase_chunks;
                 }
             }
-
-            read->base_mod_probs.resize(read->seq.size() * m_num_states, 0);
-            for (size_t i = 0; i < read->seq.size(); ++i) {
-                // Initialize for what corresponds to 100% canonical base for each position.
-                int base_id = RemoraUtils::BASE_IDS[read->seq[i]];
-                if (base_id < 0) {
-                    throw std::runtime_error("Invalid character in sequence.");
-                }
-                read->base_mod_probs[i * m_num_states + m_base_prob_offsets[base_id]] = 1.0f;
-            }
-            read->base_mod_info = m_base_mod_info;
 
             // Put the read in the working list
             std::unique_lock<std::mutex> working_reads_lock(m_working_reads_mutex);
