@@ -185,13 +185,10 @@ void ModBaseCallerNode::runner_worker_thread(int runner_id) {
                     auto slice = encoder.get_context(context_hit);
                     size_t first_sample_source = slice.first_sample;
                     size_t last_sample_source = first_sample_source + slice.num_samples;
-                    size_t first_sample_dest = slice.lead_samples_needed;
-                    size_t last_sample_dest = first_sample_dest + slice.num_samples;
                     size_t tail_samples_needed = slice.tail_samples_needed;
                     if (last_sample_source > scaled_signal.size(0)) {
                         size_t overrun = last_sample_source - scaled_signal.size(0);
                         tail_samples_needed += overrun;
-                        last_sample_dest -= overrun;
                         last_sample_source -= overrun;
                     }
 
