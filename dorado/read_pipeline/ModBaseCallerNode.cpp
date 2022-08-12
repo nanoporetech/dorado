@@ -183,21 +183,12 @@ void ModBaseCallerNode::runner_worker_thread(int runner_id) {
                 auto context_hits = caller->get_motif_hits(read->seq);
                 for (auto context_hit : context_hits) {
                     auto slice = encoder.get_context(context_hit);
-                    size_t first_sample_source = slice.first_sample;
-                    size_t last_sample_source = first_sample_source + slice.num_samples;
-                    size_t tail_samples_needed = slice.tail_samples_needed;
-                    if (last_sample_source > scaled_signal.size(0)) {
-                        size_t overrun = last_sample_source - scaled_signal.size(0);
-                        tail_samples_needed += overrun;
-                        last_sample_source -= overrun;
-                    }
-
-                    auto input_signal = scaled_signal.index(
-                            {torch::indexing::Slice(first_sample_source, last_sample_source)});
-                    if (slice.lead_samples_needed != 0 || tail_samples_needed != 0) {
-                        input_signal = torch::constant_pad_nd(
-                                input_signal,
-                                {(int64_t)slice.lead_samples_needed, (int64_t)tail_samples_needed});
+                    auto input_signal = scaled_signal.index({torch::indexing::Slice(
+                            slice.first_sample, slice.first_sample + slice.num_samples)});
+                    if (slice.lead_samples_needed != 0 || slice.tail_samples_needed != 0) {
+                        input_signal = torch::constant_pad_nd(input_signal,
+                                                              {(int64_t)slice.lead_samples_needed,
+                                                               (int64_t)slice.tail_samples_needed});
                     }
 
                     chunk_lock.lock();
