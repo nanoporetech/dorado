@@ -1,8 +1,11 @@
 #include "Version.h"
 #include "data_loader/DataLoader.h"
 #include "decode/CPUDecoder.h"
-#include "decode/GPUDecoder.h"
+#ifdef __APPLE__
 #include "nn/MetalCRFModel.h"
+#else
+#include "nn/CudaCRFModel.h"
+#endif
 #include "nn/ModelRunner.h"
 #include "nn/RemoraModel.h"
 #include "read_pipeline/BasecallerNode.h"
@@ -40,13 +43,17 @@ void setup(std::vector<std::string> args,
         for (int i = 0; i < num_runners; i++) {
             runners.push_back(std::make_shared<MetalModelRunner>(caller, chunk_size, batch_size));
         }
-#endif  // __APPLE__
     } else {
+        throw std::runtime_error(std::string("Unsupported device: ") + device);
+    }
+#else   // ifdef __APPLE__
+    } else {
+        auto caller = create_cuda_caller(model_path, chunk_size, batch_size, device);
         for (int i = 0; i < num_runners; i++) {
-            runners.push_back(std::make_shared<ModelRunner<GPUDecoder>>(model_path, device,
-                                                                        chunk_size, batch_size));
+            runners.push_back(std::make_shared<CudaModelRunner>(caller, chunk_size, batch_size));
         }
     }
+#endif  // __APPLE__
 
     // verify that all runners are using the same stride, in case we allow multiple models in future
     auto model_stride = runners.front()->model_stride();
