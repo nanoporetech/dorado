@@ -20,14 +20,18 @@ public:
     ~ModBaseCallerNode();
 
 private:
+    // Determine the modbase alphabet from all callers and calculate offset positions for the results
     void init_modbase_info();
 
-    void input_worker_thread();   // Worker thread distributes reads to the runners.
-    void output_worker_thread();  // Worker thread processes results into the reads.
+    // Worker thread, processes chunk results back into the reads
+    void output_worker_thread();
 
+    // Worker threads, scales and chunks reads for callers and enqueues them
     void runner_worker_thread(int runner_id);
+    // Worker thread per caller, performs the GPU calls to the remora models
     void caller_worker_thread(int caller_id);
 
+    // Called by caller_worker_thread, calls the model and enqueues the results
     void call_current_batch(int caller_id);
 
     ReadSink& m_sink;
