@@ -1,8 +1,8 @@
 #include "metal_utils.h"
 
-#include <Metal/Metal.hpp>
 #include <CoreFoundation/CoreFoundation.h>
 #include <IOKit/IOKitLib.h>
+#include <Metal/Metal.hpp>
 #include <mach-o/dyld.h>
 #include <sys/syslimits.h>
 #include <torch/torch.h>
@@ -123,8 +123,8 @@ std::string cfstringref_to_string(const CFStringRef cfstringref) {
     // failing on an arbitrary basis, and did fail empirically.
     const auto utf16_len = CFStringGetLength(cfstringref);
     // We must leave room the for zero terminator, or CFStringGetCString will fail.
-    const auto max_ascii_len = CFStringGetMaximumSizeForEncoding(utf16_len,
-                                                            kCFStringEncodingASCII) + 1;
+    const auto max_ascii_len =
+            CFStringGetMaximumSizeForEncoding(utf16_len, kCFStringEncodingASCII) + 1;
     // CFStringGetCString wants to supply its own zero terminator, so write to an intermediate
     // buffer used for constructing the final std::string.
     std::vector<char> buffer(max_ascii_len);
@@ -138,9 +138,9 @@ std::string cfstringref_to_string(const CFStringRef cfstringref) {
 
 // Retrieves a dictionary of int64_t properties associated with a given service/property.
 // Returns true on success.
-bool retrieve_ioreg_props(const std::string& service_name,
-                               const std::string& property_name,
-                               std::unordered_map<std::string, int64_t>& props) {
+bool retrieve_ioreg_props(const std::string &service_name,
+                          const std::string &property_name,
+                          std::unordered_map<std::string, int64_t> &props) {
     // Look for a service matching the supplied class name.
     CFMutableDictionaryRef matching_dict = IOServiceNameMatching(service_name.c_str());
     if (!matching_dict) {
@@ -158,9 +158,10 @@ bool retrieve_ioreg_props(const std::string& service_name,
     }
 
     // Create a CF representation of the registry property of interest.
-    const auto cfs_property_name = CFStringCreateWithCString(kCFAllocatorDefault, property_name.c_str(), kCFStringEncodingUTF8);
-    CFTypeRef property = IORegistryEntryCreateCFProperty(service,
-      cfs_property_name, kCFAllocatorDefault, 0);
+    const auto cfs_property_name = CFStringCreateWithCString(
+            kCFAllocatorDefault, property_name.c_str(), kCFStringEncodingUTF8);
+    CFTypeRef property =
+            IORegistryEntryCreateCFProperty(service, cfs_property_name, kCFAllocatorDefault, 0);
     IOObjectRelease(service);
     CFRelease(cfs_property_name);
     if (!property) {
@@ -172,13 +173,13 @@ bool retrieve_ioreg_props(const std::string& service_name,
         CFRelease(property);
         return false;
     }
-    
+
     // Retrieve entries with integer keys from the CFDictionary we constructed.
-    
+
     // No implicit conversion from lambda to function pointer if it captures, so
     // just use the context parameter to point to the unordered_map being populated.
     const auto process_kvs = [](CFTypeRef key_ref, CFTypeRef value_ref, void *ctx) {
-        auto props_ptr = static_cast<std::unordered_map<std::string, int64_t>*>(ctx);
+        auto props_ptr = static_cast<std::unordered_map<std::string, int64_t> *>(ctx);
         // Presumably keys are always strings -- ignore anything that isn't.
         // Also ignore non-integer values, of which there are examples that are not
         // currently relevant.
@@ -193,7 +194,7 @@ bool retrieve_ioreg_props(const std::string& service_name,
         }
         props_ptr->insert({key, value});
     };
-    
+
     CFDictionaryApplyFunction(static_cast<CFDictionaryRef>(property), process_kvs, &props);
     CFRelease(property);
     return true;
@@ -207,7 +208,7 @@ int get_mtl_device_core_count() {
         if (auto gpu_cores_it = gpu_specs.find("num_cores"); gpu_cores_it != gpu_specs.cend())
             return gpu_cores_it->second;
     }
-    
+
     // If querying failed, fall back to 8, which implies a close to minimum spec. M1.
     std::cerr << "Failed to retrieve GPU specs\n";
     return 8;
