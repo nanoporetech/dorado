@@ -63,6 +63,10 @@ public:
     std::vector<std::shared_ptr<Chunk>> called_chunks;  // Vector of basecalled chunks.
     std::atomic_size_t num_chunks_called;  // Number of chunks which have been basecalled
 
+    size_t num_modbase_chunks;
+    std::atomic_size_t
+            num_modbase_chunks_called;  // Number of modbase chunks which have been scored
+
     std::string read_id;                  // Unique read ID (UUID4)
     std::string seq;                      // Read basecall
     std::string qstring;                  // Read Qstring
