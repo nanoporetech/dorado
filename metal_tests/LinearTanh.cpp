@@ -67,9 +67,6 @@ TEST_CASE(TEST_GROUP "LinearTanh") {
     // Ensure we get the same random values for each run.
     torch::manual_seed(42);
 
-    // For convenient slicing.
-    using namespace torch::indexing;
-
     // We want the fake weights to be symmetrically distributed, or the output will be saturated.
     const torch::Tensor weights_f32 = torch::rand({layer_size, out_size}, torch::kFloat32) - 0.5f;
     const torch::Tensor biases_f32 = torch::rand({out_size}, torch::kFloat32) - 0.5f;
@@ -123,4 +120,10 @@ TEST_CASE(TEST_GROUP "LinearTanh") {
     constexpr float kRelTolerance = 0.1f;
     constexpr float kAbsTolerance = 0.3f;
     REQUIRE(torch::allclose(out_cpu_f32, out_gpu_f32, kRelTolerance, kAbsTolerance));
+    constexpr int kNormOrder = 1;  // Sum of absolute differences
+    const float mean_sad =
+            torch::linalg::vector_norm(out_cpu_f32 - out_gpu_f32, kNormOrder, {}, {}, {})
+                    .item<float>() /
+            out_cpu_f32.numel();
+    REQUIRE(mean_sad < 0.005f);
 }
