@@ -53,11 +53,11 @@ public:
     float range;             // Loaded from source file
     float offset;            // Loaded from source file
 
-    float med;  // To be set by scaler
-    float mad;  // To be set by scaler
+    float shift;  // To be set by scaler
+    float scale;  // To be set by scaler
 
     bool scale_set = false;  // Set to True if scale has been applied to raw data
-    float scale;  // Scale factor applied to convert raw integers from sequencer into pore current values
+    float scaling;  // Scale factor applied to convert raw integers from sequencer into pore current values
 
     size_t num_chunks;  // Number of chunks in the read. Reads raw data is split into chunks for efficient basecalling.
     std::vector<std::shared_ptr<Chunk>> called_chunks;  // Vector of basecalled chunks.
