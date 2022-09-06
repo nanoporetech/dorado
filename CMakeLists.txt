@@ -186,6 +186,8 @@ elseif(APPLE)
 endif()
 
 add_subdirectory(tests)
-add_subdirectory(metal_tests)
+if(APPLE)
+    add_subdirectory(metal_tests)
+endif()
 
 include(cmake/DoradoPackaging.cmake)
