@@ -1,5 +1,7 @@
 #pragma once
 
+#include "modbase/remora_scaler.h"
+
 #include <torch/torch.h>
 
 #include <array>
@@ -42,53 +44,23 @@ class RemoraCaller {
     torch::TensorOptions m_options;
     torch::Tensor m_input_sigs;
     torch::Tensor m_input_seqs;
-    std::unique_ptr<RemoraEncoder> m_encoder;
     std::unique_ptr<RemoraScaler> m_scaler;
 
     BaseModParams m_params;
     const int m_batch_size;
-
-    std::vector<size_t> get_motif_hits(const std::string& seq) const;
 
 public:
     RemoraCaller(const std::filesystem::path& model_path,
                  const std::string& device,
                  int batch_size,
                  size_t block_stride);
-    std::pair<torch::Tensor, std::vector<size_t>> call(torch::Tensor signal,
-                                                       const std::string& seq,
-                                                       const std::vector<int>& seq_ints,
-                                                       const std::vector<uint64_t>& seq_to_sig_map);
     const BaseModParams& params() const { return m_params; }
 
     torch::Tensor scale_signal(torch::Tensor signal,
                                const std::vector<int>& seq_ints,
                                const std::vector<uint64_t>& seq_to_sig_map) const;
-};
+    std::vector<size_t> get_motif_hits(const std::string& seq) const;
 
-class RemoraRunner {
-    using BaseModInfo = ::utils::BaseModInfo;
-
-    // one caller per model
-    std::vector<std::shared_ptr<RemoraCaller>> m_callers;
-    // The offsets to the canonical bases in the modbase alphabet
-    std::array<size_t, 4> m_base_prob_offsets;
-    size_t m_num_states;
-    size_t m_block_stride;
-
-    std::shared_ptr<BaseModInfo> m_base_mod_info;
-
-public:
-    RemoraRunner(const std::vector<std::filesystem::path>& model_paths,
-                 const std::string& device,
-                 size_t block_stride,
-                 int batch_size = 1000);
-
-    std::vector<uint8_t> run(torch::Tensor signal,
-                             const std::string& seq,
-                             const std::vector<uint8_t>& moves);
-
-    std::shared_ptr<const BaseModInfo> base_mod_info() const {
-        return std::const_pointer_cast<const BaseModInfo>(m_base_mod_info);
-    }
+    void accept_chunk(int num_chunks, at::Tensor signal, const std::vector<float>& kmers);
+    torch::Tensor call_chunks(int num_chunks);
 };

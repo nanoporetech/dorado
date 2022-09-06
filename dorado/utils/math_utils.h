@@ -28,6 +28,7 @@ inline std::vector<T> quantiles(const std::vector<T>& in_data, const std::vector
     auto data = in_data;
     std::sort(std::begin(data), std::end(data));
     std::vector<T> quantiles;
+    quantiles.reserve(quants.size());
 
     auto linear_interp = [](T v0, T v1, T t) { return (1 - t) * v0 + t * v1; };
 
