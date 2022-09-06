@@ -8,8 +8,8 @@ We will be publishing pre-built releases in the next few days.
 ## Running
 
 ```
-$ dorado download --model dna_r10.4.1_e8.2_260_bps_hac@v3.5.2
-$ dorado basecaller dna_r10.4.1_e8.2_260_bps_hac@v3.5.2 fast5_pass/ > calls.sam
+$ dorado download --model dna_r10.4.1_e8.2_260bps_hac@v3.5.2
+$ dorado basecaller dna_r10.4.1_e8.2_260bps_hac@v3.5.2 fast5_pass/ > calls.sam
 ```
 
 ## Platforms
