@@ -49,10 +49,12 @@ void ScalerNode::worker_thread() {
         read->scale = scale;
         read->raw_data = (read->raw_data - read->shift) / read->scale;
 
+        float threshold = shift + scale * 2.4;
+
         //8000 value may be changed in future. Currently this is found to work well.
         int trim_start =
                 trim(read->raw_data.index({torch::indexing::Slice(torch::indexing::None, 8000)}),
-                     read->shift, read->scale);
+                     threshold);
 
         read->raw_data =
                 read->raw_data.index({torch::indexing::Slice(trim_start, torch::indexing::None)});
@@ -74,16 +76,10 @@ ScalerNode::~ScalerNode() {
     m_worker->join();
 }
 
-int ScalerNode::trim(torch::Tensor signal,
-                     float shift,
-                     float scale,
-                     int window_size,
-                     float threshold_factor,
-                     int min_elements) {
+int ScalerNode::trim(torch::Tensor signal, int window_size, float threshold, int min_elements) {
     int min_trim = 10;
     signal = signal.index({torch::indexing::Slice(min_trim, torch::indexing::None)});
 
-    auto threshold = shift + scale * threshold_factor;
     auto signal_len = signal.size(0);
     int num_windows = signal_len / window_size;
 
