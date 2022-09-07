@@ -157,7 +157,7 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
             if (slice_size != m_chunk_size) {
                 auto [n, overhang] = std::div((int)m_chunk_size, (int)slice_size);
                 input_slice =
-                        torch::concat({torch::repeat_interleave(input_slice, n),
+                        torch::concat({input_slice.repeat(n),
                                        input_slice.index({torch::indexing::Slice(0, overhang)})});
             }
 
