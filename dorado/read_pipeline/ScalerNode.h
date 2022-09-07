@@ -8,7 +8,7 @@ public:
     // Read Trimming method (removes some initial part of the raw read).
     int trim(torch::Tensor signal,
              int window_size = 40,
-             float threshold_factor = 2.4,
+             float threshold = 2.4,
              int min_elements = 3);
 
 private:
