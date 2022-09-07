@@ -185,7 +185,7 @@ void DataLoader::load_pod5_reads_from_file(const std::string& path) {
             float scale = calib_data->scale;
             float offset = calib_data->offset;
 
-            new_read->scale = calib_data->scale;
+            new_read->scaling = calib_data->scale;
             new_read->scale_set = true;
             new_read->offset = calib_data->offset;
             new_read->read_id = read_id_str;
