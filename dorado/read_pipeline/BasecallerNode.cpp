@@ -4,6 +4,7 @@
 #include "../utils/stitch.h"
 
 #include <chrono>
+#include <cstdlib>
 #include <memory>
 
 using namespace std::chrono_literals;
@@ -152,10 +153,12 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
                     {Slice(chunk->input_offset, chunk->input_offset + m_chunk_size)});
             size_t slice_size = input_slice.size(0);
 
-            // Zero-pad any non-full chunks
+            // repeat-pad any non-full chunks
             if (slice_size != m_chunk_size) {
-                input_slice = torch::constant_pad_nd(
-                        input_slice, c10::IntArrayRef{0, int(m_chunk_size - slice_size)}, 0);
+                auto [n, overhang] = std::div((int)m_chunk_size, (int)slice_size);
+                input_slice =
+                        torch::concat({torch::repeat_interleave(input_slice, n),
+                                       input_slice.index({torch::indexing::Slice(0, overhang)})});
             }
 
             // Insert the chunk in the input tensor
