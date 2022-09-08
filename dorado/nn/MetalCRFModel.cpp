@@ -137,7 +137,7 @@ struct MetalBlockImpl : Module {
         constexpr int tile_size = 8;
 
         lstm_chunk_size = in_chunk_size / stride;
-                  
+
         // args for forward LSTM
         int32_t args_lstm_[] = {layer_size, 0, batch_size / tile_size, lstm_chunk_size, out_size};
         args_lstm[0] = create_buffer(device, args_lstm_, 5);
@@ -150,10 +150,10 @@ struct MetalBlockImpl : Module {
         args_to_half = create_buffer(device, args_to_half_, 1);
 
         // args for linear layer
-        int32_t args_linear_[] = {batch_size / tile_size, 0 / tile_size, batch_size / tile_size, lstm_chunk_size, out_size};
+        int32_t args_linear_[] = {batch_size / tile_size, 0 / tile_size, batch_size / tile_size,
+                                  lstm_chunk_size, out_size};
         args_linear = create_buffer(device, args_linear_, 5);
 
-                  
         switch (layer_size) {
         case 128:
             kernel_simd_groups = 16;
@@ -285,9 +285,10 @@ struct MetalBlockImpl : Module {
                                   kernel_thread_groups, kernel_simd_groups * 32);
         }
 
-        launch_kernel_no_wait(linear_tanh_cps, command_buffer,
-                              {args_linear, mat_working_mem, mat_linear_weights, mtl_for_tensor(out)},
-                              kernel_thread_groups, kernel_simd_groups * 32);
+        launch_kernel_no_wait(
+                linear_tanh_cps, command_buffer,
+                {args_linear, mat_working_mem, mat_linear_weights, mtl_for_tensor(out)},
+                kernel_thread_groups, kernel_simd_groups * 32);
 
         return command_buffer;
     }
@@ -313,8 +314,8 @@ struct MetalBlockImpl : Module {
     std::string fn[2];
     MTL::ComputePipelineState *reorder_weights_cps, *reorder_input_cps, *reorder_output_cps,
             *lstm_cps[2], *to_half_cps, *linear_tanh_cps;
-    MTL::Buffer *mat_transfer, *mat_transfer_ftype, *mat_working_mem, *mat_state,
-    *mat_temp_result, *mat_linear_weights, *args_lstm[2], *args_to_half, *args_linear;
+    MTL::Buffer *mat_transfer, *mat_transfer_ftype, *mat_working_mem, *mat_state, *mat_temp_result,
+            *mat_linear_weights, *args_lstm[2], *args_to_half, *args_linear;
     int in_chunk_size, lstm_chunk_size, stride, batch_size, layer_size, out_size,
             kernel_thread_groups, kernel_simd_groups;
     MetalLSTM rnn1{nullptr}, rnn2{nullptr}, rnn3{nullptr}, rnn4{nullptr}, rnn5{nullptr};
