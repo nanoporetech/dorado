@@ -137,17 +137,23 @@ struct MetalBlockImpl : Module {
         constexpr int tile_size = 8;
 
         lstm_chunk_size = in_chunk_size / stride;
+                  
+        // args for forward LSTM
+        int32_t args_lstm_[] = {layer_size, 0, batch_size / tile_size, lstm_chunk_size, out_size};
+        args_lstm[0] = create_buffer(device, args_lstm_, 5);
+        // args for reverse LSTM
+        args_lstm_[1] = 1;
+        args_lstm[1] = create_buffer(device, args_lstm_, 5);
 
-        // args for forward
-        int32_t args_[] = {layer_size, 0, batch_size / tile_size, lstm_chunk_size, out_size};
-        args[0] = create_buffer(device, args_, 5);
-        // args for reverse
-        args_[1] = 1;
-        args[1] = create_buffer(device, args_, 5);
-        // args for conversion to half
-        args_[0] = in_chunk_size * batch_size;
-        args[2] = create_buffer(device, args_, 1);
+        // args for for conversion to half
+        int32_t args_to_half_[] = {in_chunk_size * batch_size};
+        args_to_half = create_buffer(device, args_to_half_, 1);
 
+        // args for linear layer
+        int32_t args_linear_[] = {batch_size / tile_size, 0 / tile_size, batch_size / tile_size, lstm_chunk_size, out_size};
+        args_linear = create_buffer(device, args_linear_, 5);
+
+                  
         switch (layer_size) {
         case 128:
             kernel_simd_groups = 16;
@@ -235,7 +241,7 @@ struct MetalBlockImpl : Module {
             t_u = t_u.flatten(0, -1).contiguous();
             t_b = t_b.flatten(0, -1).contiguous();
 
-            std::vector<MTL::Buffer *> buffers{args[rnn->reverse], mtl_for_tensor(t_w),
+            std::vector<MTL::Buffer *> buffers{args_lstm[rnn->reverse], mtl_for_tensor(t_w),
                                                mtl_for_tensor(t_u), mtl_for_tensor(t_b),
                                                rnn->mat_weights};
             launch_kernel(reorder_weights_cps, command_queue, buffers, kernel_thread_groups, 256);
@@ -263,7 +269,7 @@ struct MetalBlockImpl : Module {
 
         if (sizeof(ftype) == 2) {
             launch_kernel_no_wait(to_half_cps, command_buffer,
-                                  {args[2], mtl_for_tensor(in), mat_transfer_ftype},
+                                  {args_to_half, mtl_for_tensor(in), mat_transfer_ftype},
                                   kernel_thread_groups, 256);
             conv1->run(command_buffer, mat_transfer_ftype, mat_working_mem);
         } else {
@@ -273,14 +279,14 @@ struct MetalBlockImpl : Module {
         conv3->run(command_buffer, mat_transfer, mat_working_mem);
 
         for (auto &rnn : {rnn1, rnn2, rnn3, rnn4, rnn5}) {
-            std::vector<MTL::Buffer *> buffers{args[rnn->reverse], mat_working_mem,
+            std::vector<MTL::Buffer *> buffers{args_lstm[rnn->reverse], mat_working_mem,
                                                rnn->mat_weights, mat_state, mat_temp_result};
             launch_kernel_no_wait(lstm_cps[rnn->reverse], command_buffer, buffers,
                                   kernel_thread_groups, kernel_simd_groups * 32);
         }
 
         launch_kernel_no_wait(linear_tanh_cps, command_buffer,
-                              {args[0], mat_working_mem, mat_linear_weights, mtl_for_tensor(out)},
+                              {args_linear, mat_working_mem, mat_linear_weights, mtl_for_tensor(out)},
                               kernel_thread_groups, kernel_simd_groups * 32);
 
         return command_buffer;
@@ -307,8 +313,8 @@ struct MetalBlockImpl : Module {
     std::string fn[2];
     MTL::ComputePipelineState *reorder_weights_cps, *reorder_input_cps, *reorder_output_cps,
             *lstm_cps[2], *to_half_cps, *linear_tanh_cps;
-    MTL::Buffer *mat_transfer, *mat_transfer_ftype, *args[3], *mat_working_mem, *mat_state,
-            *mat_temp_result, *mat_linear_weights;
+    MTL::Buffer *mat_transfer, *mat_transfer_ftype, *mat_working_mem, *mat_state,
+    *mat_temp_result, *mat_linear_weights, *args_lstm[2], *args_to_half, *args_linear;
     int in_chunk_size, lstm_chunk_size, stride, batch_size, layer_size, out_size,
             kernel_thread_groups, kernel_simd_groups;
     MetalLSTM rnn1{nullptr}, rnn2{nullptr}, rnn3{nullptr}, rnn4{nullptr}, rnn5{nullptr};

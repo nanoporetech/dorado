@@ -152,18 +152,20 @@
 #if LSTM_REVERSE == 0
 [[max_total_threads_per_threadgroup(LSTM_SIMD_GROUPS * 32)]] kernel void CONCAT(linear_tanh_simd,
                                                                                 LSTM_KERNEL_SUFFIX)(
-        device const LstmArgs* args,
+        device const LinearArgs* args,
         device ftype* in_buf,
         device const ftype* weights_buf,
         device ftype_in* out_buf,
         KERNEL_INDEX_INPUTS) {
     int chunk_size = args->chunk_size;
-    int chunk_tiles = args->chunk_tiles;
+    int in_batch_tiles = args->in_batch_tiles;
+    int in_batch_tile_offset = args->in_batch_tile_offset;
+    int out_batch_tiles = args->out_batch_tiles;
     int linear_layer_size = args->linear_layer_size;
-    int m_blks = chunk_tiles / SIMD_TILES_M;
+    int m_blks = out_batch_tiles / SIMD_TILES_M;
     int n_blks = linear_layer_size / (TILE_SIZE * SIMD_TILES_N);
     int k_blks = LSTM_LAYER_SIZE / TILE_SIZE;
-    int in_stride = chunk_tiles * TILE_SIZE;
+    int in_stride = in_batch_tiles * TILE_SIZE;
     int W_stride = linear_layer_size;
     int out_stride = linear_layer_size;
     threadgroup ftype simd_out_buf[LSTM_SIMD_GROUPS][TILE_SIZE * TILE_SIZE];
@@ -173,8 +175,9 @@
     device const ftype* b = weights_buf + LSTM_LAYER_SIZE * W_stride;
 
     for (int ts = gid; ts < chunk_size; ts += threadgroups) {
-        auto in = in_buf + (ts + 1) * chunk_tiles * TILE_SIZE * LSTM_LAYER_SIZE;
-        auto out = out_buf + ts * linear_layer_size * chunk_tiles * TILE_SIZE;
+        auto in = in_buf + in_batch_tile_offset * TILE_SIZE +
+            (ts + 1) * in_batch_tiles * TILE_SIZE * LSTM_LAYER_SIZE;
+        auto out = out_buf + ts * linear_layer_size * out_batch_tiles * TILE_SIZE;
         for (int m_blk = 0; m_blk < m_blks; ++m_blk) {
             for (int n_blk = sid; n_blk < n_blks; n_blk += simdgroups) {
                 for (int i = 0; i < SIMD_TILES_N; ++i) {

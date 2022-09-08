@@ -124,6 +124,13 @@ struct LstmArgs {
     int linear_layer_size;
 };
 
+struct LinearArgs {
+    int in_batch_tiles;
+    int in_batch_tile_offset;
+    int out_batch_tiles;
+    int chunk_size;
+    int linear_layer_size;
+};
 
 kernel void reorder_weights(
     device const LstmArgs* lstm,
