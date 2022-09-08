@@ -176,7 +176,7 @@
 
     for (int ts = gid; ts < chunk_size; ts += threadgroups) {
         auto in = in_buf + in_batch_tile_offset * TILE_SIZE +
-            (ts + 1) * in_batch_tiles * TILE_SIZE * LSTM_LAYER_SIZE;
+                  (ts + 1) * in_batch_tiles * TILE_SIZE * LSTM_LAYER_SIZE;
         auto out = out_buf + ts * linear_layer_size * out_batch_tiles * TILE_SIZE;
         for (int m_blk = 0; m_blk < m_blks; ++m_blk) {
             for (int n_blk = sid; n_blk < n_blks; n_blk += simdgroups) {
