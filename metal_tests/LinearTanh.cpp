@@ -8,10 +8,9 @@
 
 #define TEST_GROUP "Metal: "
 
-float MeanSAD(const torch::Tensor &a, const torch::Tensor &b) {
+float MeanAbsDiff(const torch::Tensor &a, const torch::Tensor &b) {
     REQUIRE(a.numel() == b.numel());
-    constexpr int kNormOrder = 1;  // Sum of absolute differences
-    return torch::linalg::vector_norm(a - b, kNormOrder, {}, {}, {}).item<float>() / a.numel();
+    return torch::sum(torch::abs(a - b)).item<float>() / a.numel();
 }
 
 TEST_CASE(TEST_GROUP "LinearTanh") {
@@ -120,7 +119,7 @@ TEST_CASE(TEST_GROUP "LinearTanh") {
     // (The CPU calculation can be done in float16, but is too slow.)
     constexpr float kRelTolerance = 0.1f;
     constexpr float kAbsTolerance = 0.3f;
-    constexpr float kMeanSADTolerance = 0.006f;
+    constexpr float kMeanAbsDiffTolerance = 0.006f;
 
     // A single kernel launch calculates the entire result.
     SECTION("Complete batch") {
@@ -146,7 +145,7 @@ TEST_CASE(TEST_GROUP "LinearTanh") {
                       kernel_thread_groups, threads_per_thread_group);
 
         REQUIRE(torch::allclose(out_cpu_f32, out_gpu_f32, kRelTolerance, kAbsTolerance));
-        REQUIRE(MeanSAD(out_cpu_f32, out_gpu_f32) < kMeanSADTolerance);
+        REQUIRE(MeanAbsDiff(out_cpu_f32, out_gpu_f32) < kMeanAbsDiffTolerance);
     }
 
     // Two kernel launches each calculate half the batch elements.
@@ -186,6 +185,6 @@ TEST_CASE(TEST_GROUP "LinearTanh") {
             }
         }
         REQUIRE(torch::allclose(out_cpu_f32, out_gpu_complete_f32, kRelTolerance, kAbsTolerance));
-        REQUIRE(MeanSAD(out_cpu_f32, out_gpu_complete_f32) < kMeanSADTolerance);
+        REQUIRE(MeanAbsDiff(out_cpu_f32, out_gpu_complete_f32) < kMeanAbsDiffTolerance);
     }
 }
