@@ -4,7 +4,6 @@
 #include <torch/torch.h>
 
 #include <cstdint>
-#include <cstring>
 
 // For convenient Slice syntax.
 using namespace torch::indexing;
