@@ -145,7 +145,7 @@ struct MetalBlockImpl : Module {
         args_lstm_[1] = 1;
         args_lstm[1] = create_buffer(device, args_lstm_, 5);
 
-        // args for for conversion to half
+        // args for conversion to half
         int32_t args_to_half_[] = {in_chunk_size * batch_size};
         args_to_half = create_buffer(device, args_to_half_, 1);
 
@@ -264,7 +264,11 @@ struct MetalBlockImpl : Module {
         }
     }
 
-    MTL::CommandBuffer *forward_async(torch::Tensor &in, torch::Tensor &out) {
+    // Executes the model, with the linear layer held off by linear_hold_off, if non-NULL.
+    MTL::CommandBuffer *forward_async(torch::Tensor &in,
+                                      MTL::SharedEvent *const linear_hold_off_event,
+                                      int linear_hold_off_id,
+                                      torch::Tensor &out) {
         auto command_buffer = command_queue->commandBuffer();
 
         if (sizeof(ftype) == 2) {
@@ -285,6 +289,14 @@ struct MetalBlockImpl : Module {
                                   kernel_thread_groups, kernel_simd_groups * 32);
         }
 
+        // The output buffers of conv/LSTM layers are not used by the decoding, so
+        // can be overwritten by subsequent batches as soon as they have been consumed by
+        // the linear layer.  The output of the linear layer must be protected until
+        // it has been decoded.
+        if (linear_hold_off_event != nullptr) {
+            command_buffer->encodeWait(linear_hold_off_event, linear_hold_off_id);
+        }
+
         launch_kernel_no_wait(
                 linear_tanh_cps, command_buffer,
                 {args_linear, mat_working_mem, mat_linear_weights, mtl_for_tensor(out)},
@@ -297,7 +309,7 @@ struct MetalBlockImpl : Module {
         torch::Tensor out = torch::empty({lstm_chunk_size, batch_size, out_size});
         // TODO: find a more robust way of dealing with Metal kernel launch issues
         for (int try_count = 0; try_count < 5; ++try_count) {
-            MTL::CommandBuffer *command_buffer = forward_async(in, out);
+            MTL::CommandBuffer *command_buffer = forward_async(in, nullptr, 0, out);
             command_buffer->commit();
             command_buffer->waitUntilCompleted();
             if (command_buffer->status() == MTL::CommandBufferStatusCompleted) {
@@ -343,8 +355,11 @@ struct MetalModelImpl : Module {
 
     torch::Tensor forward(torch::Tensor x) { return mtl_block->forward(x); }
 
-    MTL::CommandBuffer *forward_async(torch::Tensor &in, torch::Tensor &out) {
-        return mtl_block->forward_async(in, out);
+    MTL::CommandBuffer *forward_async(torch::Tensor &in,
+                                      MTL::SharedEvent *const linear_hold_off_event,
+                                      int linear_hold_off_id,
+                                      torch::Tensor &out) {
+        return mtl_block->forward_async(in, linear_hold_off_event, linear_hold_off_id, out);
     }
 
     MetalBlock mtl_block{nullptr};
@@ -539,12 +554,16 @@ public:
 
             // TODO: find a more robust way of dealing with Metal kernel launch issues
             for (int try_count = 0; try_count < 5; ++try_count) {
-                MTL::CommandBuffer *cb = m_model->forward_async(*task->input, m_scores);
-                if (task->run_id != 0) {
-                    cb->encodeWait(m_mtl_event, task->run_id - 1);
-                }
+                // The linear layer should not execute until the previous batch has been decoded,
+                // since the same buffers are used for successive batches' scores, fwd/bwd scans.
+                MTL::SharedEvent *const linear_hold_off =
+                        (task->run_id != 0) ? m_mtl_event : nullptr;
+                MTL::CommandBuffer *const cb = m_model->forward_async(*task->input, linear_hold_off,
+                                                                      task->run_id - 1, m_scores);
 
-                auto &fwd = m_posts;  // Reusing memory
+                // The same buffer is used for the forward scan results and the output of
+                // m_add_softmax_cps.
+                auto &fwd = m_posts;
                 int32_t scan_args_[] = {m_out_chunk_size, m_batch_size, m_states,
                                         1};  // T, N, C, dir
                 auto args_fwd = create_buffer(m_device, scan_args_, 4);
