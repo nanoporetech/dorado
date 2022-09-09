@@ -6,6 +6,9 @@
 #include <cstdint>
 #include <cstring>
 
+// For convenient Slice syntax.
+using namespace torch::indexing;
+
 #define TEST_GROUP "Metal: "
 
 float MeanAbsDiff(const torch::Tensor &a, const torch::Tensor &b) {
@@ -156,7 +159,7 @@ TEST_CASE(TEST_GROUP "LinearTanh") {
         // Perform the LinearTanh computation via multiple runs, each on a subset of batch elements.
         // The results are rearranged into a single tensor that should match the single run.
         torch::Tensor out_gpu_complete_f32 =
-                torch::zeros({lstm_chunk_size * in_batch_size, out_size}, torch::kFloat32);
+                torch::zeros({lstm_chunk_size, in_batch_size, out_size}, torch::kFloat32);
 
         const int kCompleteBatchTiles = in_batch_size / tile_size;
         for (int in_batch_tile_offset = 0; in_batch_tile_offset < kCompleteBatchTiles;
@@ -167,7 +170,7 @@ TEST_CASE(TEST_GROUP "LinearTanh") {
             REQUIRE(args_linear != nullptr);
 
             torch::Tensor out_gpu_partial_f32 =
-                    torch::zeros({lstm_chunk_size * out_batch_size, out_size}, torch::kFloat32);
+                    torch::zeros({lstm_chunk_size, out_batch_size, out_size}, torch::kFloat32);
 
             launch_kernel(linear_tanh_cps, command_queue,
                           {args_linear, mtl_for_tensor(in_f16_reordered),
@@ -175,16 +178,17 @@ TEST_CASE(TEST_GROUP "LinearTanh") {
                           kernel_thread_groups, threads_per_thread_group);
 
             // Incorporate this set of batch elements in the overall output.
-            float *complete_ptr = out_gpu_complete_f32.data_ptr<float>() +
-                                  in_batch_tile_offset * tile_size * out_size;
-            const float *partial_ptr = out_gpu_partial_f32.data_ptr<float>();
             for (int ts = 0; ts < lstm_chunk_size; ++ts) {
-                std::memcpy(complete_ptr, partial_ptr, out_batch_size * out_size * sizeof(float));
-                complete_ptr += in_batch_size * out_size;
-                partial_ptr += out_batch_size * out_size;
+                const auto in_batch_offset = in_batch_tile_offset * tile_size;
+                out_gpu_complete_f32.index_put_(
+                        {ts, Slice(in_batch_offset, in_batch_offset + out_batch_size)},
+                        out_gpu_partial_f32.index({ts, Slice(), Slice()}));
             }
         }
-        REQUIRE(torch::allclose(out_cpu_f32, out_gpu_complete_f32, kRelTolerance, kAbsTolerance));
-        REQUIRE(MeanAbsDiff(out_cpu_f32, out_gpu_complete_f32) < kMeanAbsDiffTolerance);
+        const auto out_gpu_complete_2d_f32 =
+                out_gpu_complete_f32.view({lstm_chunk_size * in_batch_size, out_size});
+        REQUIRE(torch::allclose(out_cpu_f32, out_gpu_complete_2d_f32, kRelTolerance,
+                                kAbsTolerance));
+        REQUIRE(MeanAbsDiff(out_cpu_f32, out_gpu_complete_2d_f32) < kMeanAbsDiffTolerance);
     }
 }
