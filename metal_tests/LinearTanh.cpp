@@ -178,9 +178,9 @@ TEST_CASE(TEST_GROUP "LinearTanh") {
 
             // Incorporate this set of batch elements in the overall output.
             const auto in_batch_offset = in_batch_tile_offset * tile_size;
-            out_gpu_complete_f32.index_put_(
-                    {Slice(), Slice(in_batch_offset, in_batch_offset + out_batch_size)},
-                    out_gpu_partial_f32);
+            out_gpu_complete_f32.index(
+                    {Slice(), Slice(in_batch_offset, in_batch_offset + out_batch_size)}) =
+                    out_gpu_partial_f32;
         }
         const auto out_gpu_complete_2d_f32 =
                 out_gpu_complete_f32.view({lstm_chunk_size * in_batch_size, out_size});
