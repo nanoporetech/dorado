@@ -2,7 +2,7 @@
 #include "math_utils.h"
 
 void stitch_chunks(std::shared_ptr<Read> read) {
-    //Calculate the chunk down sampling, round to closest int.
+    //Calculate the chunk down sampling, round to closest int. This is our model stride.
     int down_sampling = ::utils::div_round_closest(read->called_chunks[0]->raw_chunk_size,
                                                    read->called_chunks[0]->moves.size());
 
@@ -11,6 +11,7 @@ void stitch_chunks(std::shared_ptr<Read> read) {
     std::vector<uint8_t> moves;
     std::vector<std::string> sequences;
     std::vector<std::string> qstrings;
+
     for (int i = 0; i < read->num_chunks - 1; i++) {
         auto current_chunk = read->called_chunks[i];
         auto next_chunk = read->called_chunks[i + 1];
@@ -42,10 +43,26 @@ void stitch_chunks(std::shared_ptr<Read> read) {
 
     //append the final chunk
     auto& last_chunk = read->called_chunks[read->num_chunks - 1];
-    sequences.push_back(last_chunk->seq.substr(start_pos));
-    qstrings.push_back(last_chunk->qstring.substr(start_pos));
+
+    // Here we need to shorten sequence, qstrings, moves for situations where read->num_chunks == 1
     moves.insert(moves.end(), std::next(last_chunk->moves.begin(), mid_point_front),
                  last_chunk->moves.end());
+
+    if (read->num_chunks == 1) {
+        //TODO read->num_samples = 0. This is wrong and needs to be corrected.
+            int last_index_in_moves_to_keep =
+                    (read->raw_data.size(0) - read->num_trimmed_samples) / down_sampling;
+            int end = 0;
+            for (int s=0;s<last_index_in_moves_to_keep;s++){
+                end += moves[s];
+            }
+            sequences.push_back(last_chunk->seq.substr(start_pos, end));
+            qstrings.push_back(last_chunk->qstring.substr(start_pos, end));
+            moves = std::vector<uint8_t>(moves.begin(), moves.begin() + last_index_in_moves_to_keep);
+        } else {
+            sequences.push_back(last_chunk->seq.substr(start_pos));
+            qstrings.push_back(last_chunk->qstring.substr(start_pos));
+        }
 
     // Set the read seq and qstring
     read->seq = std::accumulate(sequences.begin(), sequences.end(), std::string(""));
