@@ -121,7 +121,7 @@ int basecaller(int argc, char* argv[]) {
 
     parser.add_argument("-c", "--chunksize").default_value(8000).scan<'i', int>();
 
-    parser.add_argument("-o", "--overlap").default_value(150).scan<'i', int>();
+    parser.add_argument("-o", "--overlap").default_value(500).scan<'i', int>();
 
     parser.add_argument("-r", "--num_runners").default_value(1).scan<'i', int>();
 
