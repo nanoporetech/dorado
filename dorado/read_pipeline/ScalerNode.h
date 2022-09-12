@@ -9,7 +9,9 @@ public:
     int trim(torch::Tensor signal,
              int window_size = 40,
              float threshold = 2.4,
-             int min_elements = 3);
+             int min_elements = 3,
+             int max_samples = 8000,
+             float max_trim = 0.3);
 
 private:
     void worker_thread();  // Worker thread performs scaling and trimming asynchronously.
