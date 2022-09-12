@@ -138,15 +138,21 @@ struct MetalBlockImpl : Module {
 
         lstm_chunk_size = in_chunk_size / stride;
 
-        // args for forward
-        int32_t args_[] = {layer_size, 0, batch_size / tile_size, lstm_chunk_size, out_size};
-        args[0] = create_buffer(device, args_, 5);
-        // args for reverse
-        args_[1] = 1;
-        args[1] = create_buffer(device, args_, 5);
+        // args for forward LSTM
+        int32_t args_lstm_[] = {layer_size, 0, batch_size / tile_size, lstm_chunk_size, out_size};
+        args_lstm[0] = create_buffer(device, args_lstm_, 5);
+        // args for reverse LSTM
+        args_lstm_[1] = 1;
+        args_lstm[1] = create_buffer(device, args_lstm_, 5);
+
         // args for conversion to half
-        args_[0] = in_chunk_size * batch_size;
-        args[2] = create_buffer(device, args_, 1);
+        int32_t args_to_half_[] = {in_chunk_size * batch_size};
+        args_to_half = create_buffer(device, args_to_half_, 1);
+
+        // args for linear layer
+        int32_t args_linear_[] = {batch_size / tile_size, 0 / tile_size, batch_size / tile_size,
+                                  lstm_chunk_size, out_size};
+        args_linear = create_buffer(device, args_linear_, 5);
 
         switch (layer_size) {
         case 128:
@@ -235,7 +241,7 @@ struct MetalBlockImpl : Module {
             t_u = t_u.flatten(0, -1).contiguous();
             t_b = t_b.flatten(0, -1).contiguous();
 
-            std::vector<MTL::Buffer *> buffers{args[rnn->reverse], mtl_for_tensor(t_w),
+            std::vector<MTL::Buffer *> buffers{args_lstm[rnn->reverse], mtl_for_tensor(t_w),
                                                mtl_for_tensor(t_u), mtl_for_tensor(t_b),
                                                rnn->mat_weights};
             launch_kernel(reorder_weights_cps, command_queue, buffers, kernel_thread_groups, 256);
@@ -258,12 +264,16 @@ struct MetalBlockImpl : Module {
         }
     }
 
-    MTL::CommandBuffer *forward_async(torch::Tensor &in, torch::Tensor &out) {
+    // Executes the model, with the linear layer held off by linear_hold_off, if non-NULL.
+    MTL::CommandBuffer *forward_async(torch::Tensor &in,
+                                      MTL::SharedEvent *const linear_hold_off_event,
+                                      int linear_hold_off_id,
+                                      torch::Tensor &out) {
         auto command_buffer = command_queue->commandBuffer();
 
         if (sizeof(ftype) == 2) {
             launch_kernel_no_wait(to_half_cps, command_buffer,
-                                  {args[2], mtl_for_tensor(in), mat_transfer_ftype},
+                                  {args_to_half, mtl_for_tensor(in), mat_transfer_ftype},
                                   kernel_thread_groups, 256);
             conv1->run(command_buffer, mat_transfer_ftype, mat_working_mem);
         } else {
@@ -273,15 +283,24 @@ struct MetalBlockImpl : Module {
         conv3->run(command_buffer, mat_transfer, mat_working_mem);
 
         for (auto &rnn : {rnn1, rnn2, rnn3, rnn4, rnn5}) {
-            std::vector<MTL::Buffer *> buffers{args[rnn->reverse], mat_working_mem,
+            std::vector<MTL::Buffer *> buffers{args_lstm[rnn->reverse], mat_working_mem,
                                                rnn->mat_weights, mat_state, mat_temp_result};
             launch_kernel_no_wait(lstm_cps[rnn->reverse], command_buffer, buffers,
                                   kernel_thread_groups, kernel_simd_groups * 32);
         }
 
-        launch_kernel_no_wait(linear_tanh_cps, command_buffer,
-                              {args[0], mat_working_mem, mat_linear_weights, mtl_for_tensor(out)},
-                              kernel_thread_groups, kernel_simd_groups * 32);
+        // The output buffers of conv/LSTM layers are not used by the decoding, so
+        // can be overwritten by subsequent batches as soon as they have been consumed by
+        // the linear layer.  The output of the linear layer must be protected until
+        // it has been decoded.
+        if (linear_hold_off_event != nullptr) {
+            command_buffer->encodeWait(linear_hold_off_event, linear_hold_off_id);
+        }
+
+        launch_kernel_no_wait(
+                linear_tanh_cps, command_buffer,
+                {args_linear, mat_working_mem, mat_linear_weights, mtl_for_tensor(out)},
+                kernel_thread_groups, kernel_simd_groups * 32);
 
         return command_buffer;
     }
@@ -290,7 +309,7 @@ struct MetalBlockImpl : Module {
         torch::Tensor out = torch::empty({lstm_chunk_size, batch_size, out_size});
         // TODO: find a more robust way of dealing with Metal kernel launch issues
         for (int try_count = 0; try_count < 5; ++try_count) {
-            MTL::CommandBuffer *command_buffer = forward_async(in, out);
+            MTL::CommandBuffer *command_buffer = forward_async(in, nullptr, 0, out);
             command_buffer->commit();
             command_buffer->waitUntilCompleted();
             if (command_buffer->status() == MTL::CommandBufferStatusCompleted) {
@@ -307,8 +326,8 @@ struct MetalBlockImpl : Module {
     std::string fn[2];
     MTL::ComputePipelineState *reorder_weights_cps, *reorder_input_cps, *reorder_output_cps,
             *lstm_cps[2], *to_half_cps, *linear_tanh_cps;
-    MTL::Buffer *mat_transfer, *mat_transfer_ftype, *args[3], *mat_working_mem, *mat_state,
-            *mat_temp_result, *mat_linear_weights;
+    MTL::Buffer *mat_transfer, *mat_transfer_ftype, *mat_working_mem, *mat_state, *mat_temp_result,
+            *mat_linear_weights, *args_lstm[2], *args_to_half, *args_linear;
     int in_chunk_size, lstm_chunk_size, stride, batch_size, layer_size, out_size,
             kernel_thread_groups, kernel_simd_groups;
     MetalLSTM rnn1{nullptr}, rnn2{nullptr}, rnn3{nullptr}, rnn4{nullptr}, rnn5{nullptr};
@@ -336,8 +355,11 @@ struct MetalModelImpl : Module {
 
     torch::Tensor forward(torch::Tensor x) { return mtl_block->forward(x); }
 
-    MTL::CommandBuffer *forward_async(torch::Tensor &in, torch::Tensor &out) {
-        return mtl_block->forward_async(in, out);
+    MTL::CommandBuffer *forward_async(torch::Tensor &in,
+                                      MTL::SharedEvent *const linear_hold_off_event,
+                                      int linear_hold_off_id,
+                                      torch::Tensor &out) {
+        return mtl_block->forward_async(in, linear_hold_off_event, linear_hold_off_id, out);
     }
 
     MetalBlock mtl_block{nullptr};
@@ -532,12 +554,16 @@ public:
 
             // TODO: find a more robust way of dealing with Metal kernel launch issues
             for (int try_count = 0; try_count < 5; ++try_count) {
-                MTL::CommandBuffer *cb = m_model->forward_async(*task->input, m_scores);
-                if (task->run_id != 0) {
-                    cb->encodeWait(m_mtl_event, task->run_id - 1);
-                }
+                // The linear layer should not execute until the previous batch has been decoded,
+                // since the same buffers are used for successive batches' scores, fwd/bwd scans.
+                MTL::SharedEvent *const linear_hold_off =
+                        (task->run_id != 0) ? m_mtl_event : nullptr;
+                MTL::CommandBuffer *const cb = m_model->forward_async(*task->input, linear_hold_off,
+                                                                      task->run_id - 1, m_scores);
 
-                auto &fwd = m_posts;  // Reusing memory
+                // The same buffer is used for the forward scan results and the output of
+                // m_add_softmax_cps.
+                auto &fwd = m_posts;
                 int32_t scan_args_[] = {m_out_chunk_size, m_batch_size, m_states,
                                         1};  // T, N, C, dir
                 auto args_fwd = create_buffer(m_device, scan_args_, 4);
