@@ -119,7 +119,7 @@ int basecaller(int argc, char* argv[]) {
 
     parser.add_argument("-b", "--batchsize").default_value(1024).scan<'i', int>();
 
-    parser.add_argument("-c", "--chunksize").default_value(8000).scan<'i', int>();
+    parser.add_argument("-c", "--chunksize").default_value(10000).scan<'i', int>();
 
     parser.add_argument("-o", "--overlap").default_value(500).scan<'i', int>();
 
