@@ -76,17 +76,19 @@ ScalerNode::~ScalerNode() {
     m_worker->join();
 }
 
-int ScalerNode::trim(torch::Tensor signal, int window_size, float threshold, int min_elements) {
+int ScalerNode::trim(torch::Tensor signal,
+                     int window_size,
+                     float threshold,
+                     int min_elements,
+                     int max_samples,
+                     float max_trim) {
     int min_trim = 10;
-    signal = signal.index({torch::indexing::Slice(min_trim, torch::indexing::None)});
-
-    auto signal_len = signal.size(0);
-    int num_windows = signal_len / window_size;
-
     bool seen_peak = false;
+    int num_samples = std::min(max_samples, (int)signal.size(0));
+    int num_windows = num_samples / window_size;
 
     for (int pos = 0; pos < num_windows; pos++) {
-        int start = pos * window_size;
+        int start = pos * window_size + min_trim;
         int end = start + window_size;
 
         auto window = signal.index({torch::indexing::Slice(start, end)});
@@ -97,7 +99,11 @@ int ScalerNode::trim(torch::Tensor signal, int window_size, float threshold, int
             if (window[-1].item<float>() > threshold) {
                 continue;
             }
-            return std::min(end + min_trim, (int)signal.size(0));
+            if (end >= num_samples || end / (int)signal.size(0) > max_trim) {
+                return min_trim;
+            } else {
+                return end;
+            }
         }
     }
 

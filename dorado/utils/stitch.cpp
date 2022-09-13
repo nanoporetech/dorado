@@ -2,7 +2,7 @@
 #include "math_utils.h"
 
 void stitch_chunks(std::shared_ptr<Read> read) {
-    //Calculate the chunk down sampling, round to closest int.
+    // Calculate the chunk down sampling, round to closest int. This is our model stride.
     int down_sampling = ::utils::div_round_closest(read->called_chunks[0]->raw_chunk_size,
                                                    read->called_chunks[0]->moves.size());
 
@@ -11,6 +11,7 @@ void stitch_chunks(std::shared_ptr<Read> read) {
     std::vector<uint8_t> moves;
     std::vector<std::string> sequences;
     std::vector<std::string> qstrings;
+
     for (int i = 0; i < read->num_chunks - 1; i++) {
         auto current_chunk = read->called_chunks[i];
         auto next_chunk = read->called_chunks[i + 1];
@@ -40,12 +41,23 @@ void stitch_chunks(std::shared_ptr<Read> read) {
         }
     }
 
-    //append the final chunk
+    // Append the final chunk
     auto& last_chunk = read->called_chunks[read->num_chunks - 1];
-    sequences.push_back(last_chunk->seq.substr(start_pos));
-    qstrings.push_back(last_chunk->qstring.substr(start_pos));
     moves.insert(moves.end(), std::next(last_chunk->moves.begin(), mid_point_front),
                  last_chunk->moves.end());
+
+    if (read->num_chunks == 1) {
+        // shorten the sequence, qstring & moves where the read is shorter than chunksize
+        int last_index_in_moves_to_keep = read->num_samples / down_sampling;
+        moves = std::vector<uint8_t>(moves.begin(), moves.begin() + last_index_in_moves_to_keep);
+        int end = std::accumulate(moves.begin(), moves.end(), 0);
+        sequences.push_back(last_chunk->seq.substr(start_pos, end));
+        qstrings.push_back(last_chunk->qstring.substr(start_pos, end));
+
+    } else {
+        sequences.push_back(last_chunk->seq.substr(start_pos));
+        qstrings.push_back(last_chunk->qstring.substr(start_pos));
+    }
 
     // Set the read seq and qstring
     read->seq = std::accumulate(sequences.begin(), sequences.end(), std::string(""));
