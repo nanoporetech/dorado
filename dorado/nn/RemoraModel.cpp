@@ -18,40 +18,34 @@
 using namespace torch::nn;
 using namespace torch::indexing;
 
-struct ConvBatchNormImpl : Module {
-    ConvBatchNormImpl(int size = 1,
-                      int outsize = 1,
-                      int k = 1,
-                      int stride = 1,
-                      int num_features = 1) {
+struct UnpaddedConvolutionImpl : Module {
+    UnpaddedConvolutionImpl(int size = 1, int outsize = 1, int k = 1, int stride = 1) {
         conv = register_module("conv", Conv1d(Conv1dOptions(size, outsize, k).stride(stride)));
-        batch_norm = register_module("batch_norm", BatchNorm1d(num_features));
         activation = register_module("activation", SiLU());
     }
 
-    torch::Tensor forward(torch::Tensor x) { return activation(batch_norm(conv(x))); }
+    torch::Tensor forward(torch::Tensor x) { return activation(conv(x)); }
 
     Conv1d conv{nullptr};
-    BatchNorm1d batch_norm{nullptr};
     SiLU activation{nullptr};
 };
 
-TORCH_MODULE(ConvBatchNorm);
+TORCH_MODULE(UnpaddedConvolution);
 
 struct RemoraConvModelImpl : Module {
     RemoraConvModelImpl(int size, int kmer_len, int num_out) {
-        sig_conv1 = register_module("sig_conv1", ConvBatchNorm(1, 4, 11, 1, 4));
-        sig_conv2 = register_module("sig_conv2", ConvBatchNorm(4, 16, 11, 1, 16));
-        sig_conv3 = register_module("sig_conv3", ConvBatchNorm(16, size, 9, 3, size));
+        sig_conv1 = register_module("sig_conv1", UnpaddedConvolution(1, 4, 11, 1));
+        sig_conv2 = register_module("sig_conv2", UnpaddedConvolution(4, 16, 11, 1));
+        sig_conv3 = register_module("sig_conv3", UnpaddedConvolution(16, size, 9, 3));
 
-        seq_conv1 = register_module("seq_conv1", ConvBatchNorm(kmer_len * 4, 16, 11, 1, 16));
-        seq_conv2 = register_module("seq_conv2", ConvBatchNorm(16, 32, 11, 1, 32));
-        seq_conv3 = register_module("seq_conv3", ConvBatchNorm(32, size, 9, 3, size));
+        seq_conv1 = register_module("seq_conv1", UnpaddedConvolution(kmer_len * 4, 16, 11, 1));
+        seq_conv2 = register_module("seq_conv2", UnpaddedConvolution(16, 32, 11, 1));
+        seq_conv3 = register_module("seq_conv3", UnpaddedConvolution(32, size, 9, 3));
 
-        merge_conv1 = register_module("merge_conv1", ConvBatchNorm(size * 2, size, 5, 1, size));
-        merge_conv2 = register_module("merge_conv2", ConvBatchNorm(size, size, 5, 1, size));
-        merge_conv3 = register_module("merge_conv3", ConvBatchNorm(size, size, 3, 2, size));
-        merge_conv4 = register_module("merge_conv4", ConvBatchNorm(size, size, 3, 2, size));
+        merge_conv1 = register_module("merge_conv1", UnpaddedConvolution(size * 2, size, 5, 1));
+        merge_conv2 = register_module("merge_conv2", UnpaddedConvolution(size, size, 5, 1));
+        merge_conv3 = register_module("merge_conv3", UnpaddedConvolution(size, size, 3, 2));
+        merge_conv4 = register_module("merge_conv4", UnpaddedConvolution(size, size, 3, 2));
 
         linear = register_module("linear", Linear(size * 3, num_out));
     }
@@ -80,110 +74,56 @@ struct RemoraConvModelImpl : Module {
         return z;
     }
 
-    void load_state_dict(const std::vector<torch::Tensor>& weights,
-                         const std::vector<torch::Tensor>& buffers) {
-        ::utils::load_state_dict(*this, weights, buffers);
+    void load_state_dict(const std::vector<torch::Tensor>& weights) {
+        ::utils::load_state_dict(*this, weights);
     }
 
     std::vector<torch::Tensor> load_weights(const std::filesystem::path& dir) {
         return ::utils::load_tensors(dir, weight_tensors);
     }
 
-    std::vector<torch::Tensor> load_buffers(const std::filesystem::path& dir) {
-        return ::utils::load_tensors(dir, buffer_tensors);
-    }
-
     static const std::vector<std::string> weight_tensors;
-    static const std::vector<std::string> buffer_tensors;
 
-    ConvBatchNorm sig_conv1{nullptr};
-    ConvBatchNorm sig_conv2{nullptr};
-    ConvBatchNorm sig_conv3{nullptr};
-    ConvBatchNorm seq_conv1{nullptr};
-    ConvBatchNorm seq_conv2{nullptr};
-    ConvBatchNorm seq_conv3{nullptr};
-    ConvBatchNorm merge_conv1{nullptr};
-    ConvBatchNorm merge_conv2{nullptr};
-    ConvBatchNorm merge_conv3{nullptr};
-    ConvBatchNorm merge_conv4{nullptr};
+    UnpaddedConvolution sig_conv1{nullptr};
+    UnpaddedConvolution sig_conv2{nullptr};
+    UnpaddedConvolution sig_conv3{nullptr};
+    UnpaddedConvolution seq_conv1{nullptr};
+    UnpaddedConvolution seq_conv2{nullptr};
+    UnpaddedConvolution seq_conv3{nullptr};
+    UnpaddedConvolution merge_conv1{nullptr};
+    UnpaddedConvolution merge_conv2{nullptr};
+    UnpaddedConvolution merge_conv3{nullptr};
+    UnpaddedConvolution merge_conv4{nullptr};
     Linear linear{nullptr};
 };
 
 const std::vector<std::string> RemoraConvModelImpl::weight_tensors{
         "sig_conv1.weight.tensor",   "sig_conv1.bias.tensor",
-        "sig_bn1.weight.tensor",     "sig_bn1.bias.tensor",
-
         "sig_conv2.weight.tensor",   "sig_conv2.bias.tensor",
-        "sig_bn2.weight.tensor",     "sig_bn2.bias.tensor",
-
         "sig_conv3.weight.tensor",   "sig_conv3.bias.tensor",
-        "sig_bn3.weight.tensor",     "sig_bn3.bias.tensor",
 
         "seq_conv1.weight.tensor",   "seq_conv1.bias.tensor",
-        "seq_bn1.weight.tensor",     "seq_bn1.bias.tensor",
-
         "seq_conv2.weight.tensor",   "seq_conv2.bias.tensor",
-        "seq_bn2.weight.tensor",     "seq_bn2.bias.tensor",
-
         "seq_conv3.weight.tensor",   "seq_conv3.bias.tensor",
-        "seq_bn3.weight.tensor",     "seq_bn3.bias.tensor",
 
         "merge_conv1.weight.tensor", "merge_conv1.bias.tensor",
-        "merge_bn1.weight.tensor",   "merge_bn1.bias.tensor",
-
         "merge_conv2.weight.tensor", "merge_conv2.bias.tensor",
-        "merge_bn2.weight.tensor",   "merge_bn2.bias.tensor",
-
         "merge_conv3.weight.tensor", "merge_conv3.bias.tensor",
-        "merge_bn3.weight.tensor",   "merge_bn3.bias.tensor",
-
         "merge_conv4.weight.tensor", "merge_conv4.bias.tensor",
-        "merge_bn4.weight.tensor",   "merge_bn4.bias.tensor",
 
         "fc.weight.tensor",          "fc.bias.tensor",
 };
 
-const std::vector<std::string> RemoraConvModelImpl::buffer_tensors{
-        "sig_bn1.running_mean.tensor",          "sig_bn1.running_var.tensor",
-        "sig_bn1.num_batches_tracked.tensor",
-
-        "sig_bn2.running_mean.tensor",          "sig_bn2.running_var.tensor",
-        "sig_bn2.num_batches_tracked.tensor",
-
-        "sig_bn3.running_mean.tensor",          "sig_bn3.running_var.tensor",
-        "sig_bn3.num_batches_tracked.tensor",
-
-        "seq_bn1.running_mean.tensor",          "seq_bn1.running_var.tensor",
-        "seq_bn1.num_batches_tracked.tensor",
-
-        "seq_bn2.running_mean.tensor",          "seq_bn2.running_var.tensor",
-        "seq_bn2.num_batches_tracked.tensor",
-
-        "seq_bn3.running_mean.tensor",          "seq_bn3.running_var.tensor",
-        "seq_bn3.num_batches_tracked.tensor",
-
-        "merge_bn1.running_mean.tensor",        "merge_bn1.running_var.tensor",
-        "merge_bn1.num_batches_tracked.tensor",
-
-        "merge_bn2.running_mean.tensor",        "merge_bn2.running_var.tensor",
-        "merge_bn2.num_batches_tracked.tensor",
-
-        "merge_bn3.running_mean.tensor",        "merge_bn3.running_var.tensor",
-        "merge_bn3.num_batches_tracked.tensor",
-
-        "merge_bn4.running_mean.tensor",        "merge_bn4.running_var.tensor",
-        "merge_bn4.num_batches_tracked.tensor"};
-
 struct RemoraConvLSTMModelImpl : Module {
     RemoraConvLSTMModelImpl(int size, int kmer_len, int num_out) {
-        sig_conv1 = register_module("sig_conv1", ConvBatchNorm(1, 4, 5, 1, 4));
-        sig_conv2 = register_module("sig_conv2", ConvBatchNorm(4, 16, 5, 1, 16));
-        sig_conv3 = register_module("sig_conv3", ConvBatchNorm(16, size, 9, 3, size));
+        sig_conv1 = register_module("sig_conv1", UnpaddedConvolution(1, 4, 5, 1));
+        sig_conv2 = register_module("sig_conv2", UnpaddedConvolution(4, 16, 5, 1));
+        sig_conv3 = register_module("sig_conv3", UnpaddedConvolution(16, size, 9, 3));
 
-        seq_conv1 = register_module("seq_conv1", ConvBatchNorm(kmer_len * 4, 16, 5, 1, 16));
-        seq_conv2 = register_module("seq_conv2", ConvBatchNorm(16, size, 13, 3, size));
+        seq_conv1 = register_module("seq_conv1", UnpaddedConvolution(kmer_len * 4, 16, 5, 1));
+        seq_conv2 = register_module("seq_conv2", UnpaddedConvolution(16, size, 13, 3));
 
-        merge_conv1 = register_module("merge_conv1", ConvBatchNorm(size * 2, size, 5, 1, size));
+        merge_conv1 = register_module("merge_conv1", UnpaddedConvolution(size * 2, size, 5, 1));
 
         lstm1 = register_module("lstm1", LSTM(LSTMOptions(size, size)));
         lstm2 = register_module("lstm2", LSTM(LSTMOptions(size, size)));
@@ -220,27 +160,22 @@ struct RemoraConvLSTMModelImpl : Module {
         return z;
     }
 
-    void load_state_dict(std::vector<torch::Tensor> weights, std::vector<torch::Tensor> buffers) {
-        ::utils::load_state_dict(*this, weights, buffers);
+    void load_state_dict(std::vector<torch::Tensor> weights) {
+        ::utils::load_state_dict(*this, weights);
     }
 
     std::vector<torch::Tensor> load_weights(const std::filesystem::path& dir) {
         return ::utils::load_tensors(dir, weight_tensors);
     }
 
-    std::vector<torch::Tensor> load_buffers(const std::filesystem::path& dir) {
-        return ::utils::load_tensors(dir, buffer_tensors);
-    }
-
     static const std::vector<std::string> weight_tensors;
-    static const std::vector<std::string> buffer_tensors;
 
-    ConvBatchNorm sig_conv1{nullptr};
-    ConvBatchNorm sig_conv2{nullptr};
-    ConvBatchNorm sig_conv3{nullptr};
-    ConvBatchNorm seq_conv1{nullptr};
-    ConvBatchNorm seq_conv2{nullptr};
-    ConvBatchNorm merge_conv1{nullptr};
+    UnpaddedConvolution sig_conv1{nullptr};
+    UnpaddedConvolution sig_conv2{nullptr};
+    UnpaddedConvolution sig_conv3{nullptr};
+    UnpaddedConvolution seq_conv1{nullptr};
+    UnpaddedConvolution seq_conv2{nullptr};
+    UnpaddedConvolution merge_conv1{nullptr};
 
     LSTM lstm1{nullptr};
     LSTM lstm2{nullptr};
@@ -251,22 +186,13 @@ struct RemoraConvLSTMModelImpl : Module {
 
 const std::vector<std::string> RemoraConvLSTMModelImpl::weight_tensors{
         "sig_conv1.weight.tensor",   "sig_conv1.bias.tensor",
-        "sig_bn1.weight.tensor",     "sig_bn1.bias.tensor",
-
         "sig_conv2.weight.tensor",   "sig_conv2.bias.tensor",
-        "sig_bn2.weight.tensor",     "sig_bn2.bias.tensor",
-
         "sig_conv3.weight.tensor",   "sig_conv3.bias.tensor",
-        "sig_bn3.weight.tensor",     "sig_bn3.bias.tensor",
 
         "seq_conv1.weight.tensor",   "seq_conv1.bias.tensor",
-        "seq_bn1.weight.tensor",     "seq_bn1.bias.tensor",
-
         "seq_conv2.weight.tensor",   "seq_conv2.bias.tensor",
-        "seq_bn2.weight.tensor",     "seq_bn2.bias.tensor",
 
         "merge_conv1.weight.tensor", "merge_conv1.bias.tensor",
-        "merge_bn.weight.tensor",    "merge_bn.bias.tensor",
 
         "lstm1.weight_ih_l0.tensor", "lstm1.weight_hh_l0.tensor",
         "lstm1.bias_ih_l0.tensor",   "lstm1.bias_hh_l0.tensor",
@@ -277,25 +203,6 @@ const std::vector<std::string> RemoraConvLSTMModelImpl::weight_tensors{
         "fc.weight.tensor",          "fc.bias.tensor",
 };
 
-const std::vector<std::string> RemoraConvLSTMModelImpl::buffer_tensors{
-        "sig_bn1.running_mean.tensor",        "sig_bn1.running_var.tensor",
-        "sig_bn1.num_batches_tracked.tensor",
-
-        "sig_bn2.running_mean.tensor",        "sig_bn2.running_var.tensor",
-        "sig_bn2.num_batches_tracked.tensor",
-
-        "sig_bn3.running_mean.tensor",        "sig_bn3.running_var.tensor",
-        "sig_bn3.num_batches_tracked.tensor",
-
-        "seq_bn1.running_mean.tensor",        "seq_bn1.running_var.tensor",
-        "seq_bn1.num_batches_tracked.tensor",
-
-        "seq_bn2.running_mean.tensor",        "seq_bn2.running_var.tensor",
-        "seq_bn2.num_batches_tracked.tensor",
-
-        "merge_bn.running_mean.tensor",       "merge_bn.running_var.tensor",
-        "merge_bn.num_batches_tracked.tensor"};
-
 TORCH_MODULE(RemoraConvModel);
 TORCH_MODULE(RemoraConvLSTMModel);
 
@@ -305,8 +212,7 @@ ModuleHolder<AnyModule> populate_model(Model&& model,
                                        const std::filesystem::path& path,
                                        torch::TensorOptions options) {
     auto state_dict = model->load_weights(path);
-    auto state_buffers = model->load_buffers(path);
-    model->load_state_dict(state_dict, state_buffers);
+    model->load_state_dict(state_dict);
     model->to(options.dtype_opt().value().toScalarType());
     model->to(options.device_opt().value());
     model->eval();
