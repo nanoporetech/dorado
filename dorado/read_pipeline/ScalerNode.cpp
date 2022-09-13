@@ -7,7 +7,8 @@ using namespace std::chrono_literals;
 
 std::pair<float, float> normalisation(torch::Tensor& x) {
     //Calculate shift and scale factors for normalisation.
-    auto quantiles = torch::quantile(x, torch::tensor({0.2, 0.9}, {torch::kFloat}));
+    auto quantiles = torch::quantile(x.index({torch::indexing::Slice(0, 8000)}),
+                                     torch::tensor({0.2, 0.9}, {torch::kFloat}));
 
     float q20 = quantiles[0].item<float>();
     float q90 = quantiles[1].item<float>();
