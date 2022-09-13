@@ -85,7 +85,6 @@ kernel void add_softmax(
     device const ScanArgs* args,
     device ftype_in *fwd_post,
     device const ftype_in *bwd,
-    device ftype_in *post,
     KERNEL_INDEX_INPUTS)
 {
     int T = args->T + 1;
