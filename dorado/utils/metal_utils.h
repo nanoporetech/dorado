@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-// Returns an uninitiased MTL::Buffer of length bytes.
+// Returns an uninitialised MTL::Buffer of length bytes.
 MTL::Buffer *create_buffer(MTL::Device *device, size_t length);
 
 // Returns a MTL::Buffer holding the content of the supplied std::vector.
