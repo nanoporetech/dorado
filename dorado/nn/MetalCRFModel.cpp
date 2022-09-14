@@ -310,8 +310,8 @@ struct MetalBlockImpl : Module {
         // The output of the linear layer is split into multiple buffers, each generated
         // by a separate kernel launch.
         for (int i = 0; i < out.size(); ++i) {
-            Buffer *const args_buffer = args_linear.at(i);
-            Buffer *const out_buffer = mtl_for_tensor(out.at(i));
+            MTL::Buffer *const args_buffer = args_linear.at(i);
+            MTL::Buffer *const out_buffer = mtl_for_tensor(out.at(i));
             launch_kernel_no_wait(linear_tanh_cps, command_buffer,
                                   {args_buffer, mat_working_mem, mat_linear_weights, out_buffer},
                                   kernel_thread_groups, kernel_simd_groups * 32);

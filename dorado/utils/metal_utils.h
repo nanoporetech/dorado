@@ -2,24 +2,25 @@
 #include <Metal/Metal.hpp>
 #include <torch/torch.h>
 
-using namespace MTL;
+#include <string>
+#include <vector>
 
-Buffer *create_buffer(MTL::Device *device, size_t length);
+MTL::Buffer *create_buffer(MTL::Device *device, size_t length);
 
 template <typename T>
 MTL::Buffer *create_buffer(MTL::Device *device, T *ptr, size_t length) {
     return device->newBuffer(ptr, length * sizeof(T), MTL::ResourceStorageModeShared);
 }
 
-ComputePipelineState *make_cps(MTL::Device *device, std::string name);
-void launch_kernel(ComputePipelineState *cps,
-                   CommandQueue *cq,
-                   std::vector<Buffer *> buffers,
+MTL::ComputePipelineState *make_cps(MTL::Device *device, std::string name);
+void launch_kernel(MTL::ComputePipelineState *cps,
+                   MTL::CommandQueue *cq,
+                   std::vector<MTL::Buffer *> buffers,
                    long threadgroups,
                    long threads_per_threadroup);
-void launch_kernel_no_wait(ComputePipelineState *cps,
-                           CommandBuffer *cb,
-                           std::vector<Buffer *> buffers,
+void launch_kernel_no_wait(MTL::ComputePipelineState *cps,
+                           MTL::CommandBuffer *cb,
+                           std::vector<MTL::Buffer *> buffers,
                            long threadgroups,
                            long threads_per_threadgroup);
 
