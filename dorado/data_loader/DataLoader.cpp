@@ -182,13 +182,19 @@ void DataLoader::load_pod5_reads_from_file(const std::string& path) {
             new_read->raw_data = torch::from_blob(floatTmp.data(), floatTmp.size(), options)
                                          .clone()
                                          .to(m_device);
-            float scale = calib_data->scale;
-            float offset = calib_data->offset;
 
             new_read->scaling = calib_data->scale;
-            new_read->scale_set = true;
             new_read->offset = calib_data->offset;
+            new_read->scale_set = true;
             new_read->read_id = read_id_str;
+            new_read->num_trimmed_samples = 0;
+            new_read->attributes.read_number = read_number;
+            new_read->attributes.fast5_filename =
+                    std::filesystem::path(path.c_str()).filename().string();
+            //todo: fill these in
+            new_read->attributes.mux = 0;
+            new_read->attributes.channel_number = 0;
+            new_read->attributes.start_time = "?";
 
             m_read_sink.push_read(new_read);
             m_loaded_read_count++;
@@ -280,8 +286,7 @@ void DataLoader::load_fast5_reads_from_file(const std::string& path) {
         new_read->range = range;
         new_read->offset = offset;
         new_read->read_id = read_id;
-        new_read->num_samples = floatTmp.size();
-        new_read->num_trimmed_samples = floatTmp.size();  // same value until we actually trim
+        new_read->num_trimmed_samples = 0;
         new_read->attributes.mux = mux;
         new_read->attributes.read_number = read_number;
         new_read->attributes.channel_number = channel_number;

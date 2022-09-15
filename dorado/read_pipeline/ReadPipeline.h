@@ -76,7 +76,6 @@ public:
     std::shared_ptr<const BaseModInfo>
             base_mod_info;  // Modified base settings of the models that ran on this read
 
-    uint64_t num_samples;          // Number of raw samples in read
     uint64_t num_trimmed_samples;  // Number of samples which have been trimmed from the raw read.
 
     Attributes attributes;
