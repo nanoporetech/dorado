@@ -2,7 +2,6 @@
 #include <Metal/Metal.hpp>
 #include <torch/torch.h>
 
-#include <array>
 #include <string>
 #include <vector>
 
