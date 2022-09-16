@@ -181,6 +181,9 @@ struct MetalBlockImpl : Module {
         case 512:
             kernel_simd_groups = 32;
             break;
+        case 768:
+            kernel_simd_groups = 32;
+            break;
         default:
             kernel_simd_groups = 16;
         }

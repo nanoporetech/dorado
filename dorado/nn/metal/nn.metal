@@ -644,3 +644,17 @@ kernel void conv3_simd
 #define LSTM_REVERSE 1
 #define LSTM_KERNEL_SUFFIX _512_rev_32
 #include "nn.h"
+
+// FIXME -- Tune LSTM_SIMD_GROUPS for this layer size
+
+#define LSTM_LAYER_SIZE 768
+#define LSTM_SIMD_GROUPS 32
+#define LSTM_REVERSE 0
+#define LSTM_KERNEL_SUFFIX _768_fwd_32
+#include "nn.h"
+
+#define LSTM_LAYER_SIZE 768
+#define LSTM_SIMD_GROUPS 32
+#define LSTM_REVERSE 1
+#define LSTM_KERNEL_SUFFIX _768_rev_32
+#include "nn.h"
