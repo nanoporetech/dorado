@@ -5,11 +5,13 @@
 #include <string>
 #include <vector>
 
+// Returns an uninitialised MTL::Buffer of length bytes.
 MTL::Buffer *create_buffer(MTL::Device *device, size_t length);
 
+// Returns a MTL::Buffer holding the content of the supplied std::vector.
 template <typename T>
-MTL::Buffer *create_buffer(MTL::Device *device, T *ptr, size_t length) {
-    return device->newBuffer(ptr, length * sizeof(T), MTL::ResourceStorageModeShared);
+MTL::Buffer *create_vec_buffer(MTL::Device *const device, const std::vector<T> &vec) {
+    return device->newBuffer(vec.data(), vec.size() * sizeof(T), MTL::ResourceStorageModeShared);
 }
 
 MTL::ComputePipelineState *make_cps(MTL::Device *device, std::string name);

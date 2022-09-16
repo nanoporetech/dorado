@@ -53,8 +53,8 @@ struct MetalConv1dImpl : Module {
         } else {
             mat_weights = create_buffer(device, (k * insize + 1) * outsize * sizeof(ftype));
         }
-        int32_t args_[] = {insize, k, outsize, stride, k / 2, chunk_size, batch_size};
-        args = create_buffer(device, args_, 7);
+        const std::vector<int32_t> args_{insize, k, outsize, stride, k / 2, chunk_size, batch_size};
+        args = create_vec_buffer(device, args_);
 
         auto weight = torch::empty({outsize, insize, k});
         auto bias = torch::empty({outsize});
@@ -142,15 +142,16 @@ struct MetalBlockImpl : Module {
         lstm_chunk_size = in_chunk_size / stride;
 
         // args for forward LSTM
-        int32_t args_lstm_[] = {layer_size, 0, batch_size / tile_size, lstm_chunk_size, out_size};
-        args_lstm[0] = create_buffer(device, args_lstm_, 5);
+        std::vector<int32_t> args_lstm_{layer_size, 0, batch_size / tile_size, lstm_chunk_size,
+                                        out_size};
+        args_lstm[0] = create_vec_buffer(device, args_lstm_);
         // args for reverse LSTM
         args_lstm_[1] = 1;
-        args_lstm[1] = create_buffer(device, args_lstm_, 5);
+        args_lstm[1] = create_vec_buffer(device, args_lstm_);
 
         // args for conversion to half
-        int32_t args_to_half_[] = {in_chunk_size * batch_size};
-        args_to_half = create_buffer(device, args_to_half_, 1);
+        const std::vector<int32_t> args_to_half_{in_chunk_size * batch_size};
+        args_to_half = create_vec_buffer(device, args_to_half_);
 
         // args for linear layer
         // Each output buffer requires a distinct input offset, so we must have a separate args buffer.
@@ -159,9 +160,9 @@ struct MetalBlockImpl : Module {
             const int32_t in_batch_tiles = batch_size / tile_size;
             const int32_t out_batch_tiles = (batch_size / out_split_) / tile_size;
             const int32_t in_batch_tile_offset = out_batch_tiles * i;
-            int32_t args_linear_[] = {in_batch_tiles, in_batch_tile_offset, out_batch_tiles,
-                                      lstm_chunk_size, out_size};
-            args_linear.at(i) = create_buffer(device, args_linear_, 5);
+            std::vector<int32_t> args_linear_ = {in_batch_tiles, in_batch_tile_offset,
+                                                 out_batch_tiles, lstm_chunk_size, out_size};
+            args_linear.at(i) = create_vec_buffer(device, args_linear_);
         }
 
         switch (layer_size) {
@@ -263,8 +264,8 @@ struct MetalBlockImpl : Module {
         t_w = torch::concat({t_w.transpose(1, 0).contiguous().flatten(0, -1), t_b}).contiguous();
 
         if (sizeof(ftype) != sizeof(float)) {
-            int numel = int(t_w.numel());
-            MTL::Buffer *args = create_buffer(device, &numel, 1);
+            const auto numel = static_cast<int32_t>(t_w.numel());
+            MTL::Buffer *const args = create_vec_buffer(device, std::vector<int32_t>({numel}));
             mat_linear_weights = create_buffer(device, numel * sizeof(ftype));
             launch_kernel(to_half_cps, command_queue,
                           {args, mtl_for_tensor(t_w), mat_linear_weights}, kernel_thread_groups,
@@ -621,11 +622,11 @@ public:
                 auto &fwd = m_posts;
                 // This stage is operating on the split outputs of the linear layer, so
                 // the effective batch size is m_out_batch_size.
-                int32_t scan_args_[] = {m_out_chunk_size, m_out_batch_size, m_states,
-                                        1};  // T, N, C, dir
-                auto args_fwd = create_buffer(m_device, scan_args_, 4);
+                std::vector<int32_t> scan_args_{m_out_chunk_size, m_out_batch_size, m_states,
+                                                1};  // T, N, C, dir
+                auto args_fwd = create_vec_buffer(m_device, scan_args_);
                 scan_args_[3] = -1;
-                auto args_bwd = create_buffer(m_device, scan_args_, 4);
+                auto args_bwd = create_vec_buffer(m_device, scan_args_);
 
                 for (int i = 0; i < m_out_split; ++i) {
                     // TODO: optimise grid size
