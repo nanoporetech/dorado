@@ -220,7 +220,6 @@ void DataLoader::load_pod5_reads_from_file(const std::string& path) {
             new_read->attributes.read_number = read_number;
             new_read->attributes.fast5_filename =
                     std::filesystem::path(path.c_str()).filename().string();
-            //todo: fill these in
             new_read->attributes.mux = well;
             new_read->attributes.channel_number = channel;
             new_read->attributes.start_time = start_time;
