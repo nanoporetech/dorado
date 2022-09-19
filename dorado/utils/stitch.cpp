@@ -48,7 +48,7 @@ void stitch_chunks(std::shared_ptr<Read> read) {
 
     if (read->num_chunks == 1) {
         // shorten the sequence, qstring & moves where the read is shorter than chunksize
-        int last_index_in_moves_to_keep = read->num_samples / down_sampling;
+        int last_index_in_moves_to_keep = read->raw_data.size(0) / down_sampling;
         moves = std::vector<uint8_t>(moves.begin(), moves.begin() + last_index_in_moves_to_keep);
         int end = std::accumulate(moves.begin(), moves.end(), 0);
         sequences.push_back(last_chunk->seq.substr(start_pos, end));
