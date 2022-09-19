@@ -1,30 +1,17 @@
 #include "ScalerNode.h"
 
+#include "utils/tensor_utils.h"
+
 #include <algorithm>
 #include <chrono>
 
 using namespace std::chrono_literals;
 
-std::pair<float, float> quantile(const torch::Tensor t) {
-    // fast q20 and q90 using nth_element
-    auto tmp = t.clone();
-    auto start = tmp.data_ptr<float>();
-    auto end = tmp.data_ptr<float>() + tmp.size(0);
-
-    auto t1 = tmp.data_ptr<float>() + int(tmp.size(0) * 0.2);
-    std::nth_element(start, t1, end);
-    auto v1 = tmp[int(tmp.size(0) * 0.2)].item<float>();
-
-    auto t2 = tmp.data_ptr<float>() + int(tmp.size(0) * 0.9);
-    std::nth_element(start, t2, end);
-    auto v2 = tmp[int(tmp.size(0) * 0.9)].item<float>();
-
-    return std::make_pair(v1, v2);
-}
-
 std::pair<float, float> normalisation(torch::Tensor& x) {
     //Calculate shift and scale factors for normalisation.
-    auto [q20, q90] = quantile(x);
+    auto quantiles = utils::quantile(x, torch::tensor({0.2, 0.9}));
+    float q20 = quantiles[0].item<float>();
+    float q90 = quantiles[1].item<float>();
     float shift = std::max(10.0f, 0.51f * (q20 + q90));
     float scale = std::max(1.0f, 0.53f * (q90 - q20));
     return std::make_pair(shift, scale);

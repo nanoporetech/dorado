@@ -26,4 +26,23 @@ std::vector<torch::Tensor> load_tensors(const std::filesystem::path& dir,
     return weights;
 }
 
+torch::Tensor quantile(const torch::Tensor t, const torch::Tensor q) {
+    assert(t.dtype().name() == "float");
+    assert(q.dtype().name() == "float");
+
+    auto tmp = t.clone();
+    auto res = torch::empty_like(q);
+
+    auto start = tmp.data_ptr<float>();
+    auto end = tmp.data_ptr<float>() + tmp.size(0);
+
+    for (int i = 0; i < q.size(0); i++) {
+        auto m = start + static_cast<size_t>((tmp.size(0) - 1) * q[i].item<float>());
+        std::nth_element(start, m, end);
+        res[i] = *m;
+    }
+
+    return res;
+}
+
 }  // namespace utils
