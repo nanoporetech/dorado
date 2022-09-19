@@ -4,6 +4,7 @@
 #include <torch/torch.h>
 
 #include <cstdint>
+#include <vector>
 
 // For convenient Slice syntax.
 using namespace torch::indexing;
@@ -66,10 +67,9 @@ TEST_CASE(TEST_GROUP "LinearTanh") {
     // chunk_tiles
     // chunk_size
     // linear_layer_size
-    const int kNumReorderArgs = 5;
-    const int32_t args_reorder_[] = {layer_size, 0, in_batch_size / tile_size, lstm_chunk_size,
-                                     out_size};
-    MTL::Buffer *const args_reorder = create_buffer(device, args_reorder_, kNumReorderArgs);
+    const std::vector<int32_t> args_reorder_{layer_size, 0, in_batch_size / tile_size,
+                                             lstm_chunk_size, out_size};
+    MTL::Buffer *const args_reorder = create_vec_buffer(device, args_reorder_);
     REQUIRE(args_reorder != nullptr);
 
     // Ensure we get the same random values for each run.
@@ -113,7 +113,6 @@ TEST_CASE(TEST_GROUP "LinearTanh") {
     const torch::Tensor out_cpu_f32 =
             5.0f * torch::tanh(torch::addmm(biases_f32, in_f32, weights_f32));
 
-    const int kNumLinearArgs = 5;
     const int32_t in_batch_tiles = in_batch_size / tile_size;
 
     // These tolerances are somewhat arbitary, but we must account for GPU calculations in float16
@@ -133,9 +132,9 @@ TEST_CASE(TEST_GROUP "LinearTanh") {
         // chunk_size
         // linear_layer_size
         const int32_t out_batch_tiles = out_batch_size / tile_size;
-        const int32_t args_linear_[] = {in_batch_tiles, in_batch_tile_offset, out_batch_tiles,
-                                        lstm_chunk_size, out_size};
-        MTL::Buffer *const args_linear = create_buffer(device, args_linear_, kNumLinearArgs);
+        const std::vector<int32_t> args_linear_{in_batch_tiles, in_batch_tile_offset,
+                                                out_batch_tiles, lstm_chunk_size, out_size};
+        MTL::Buffer *const args_linear = create_vec_buffer(device, args_linear_);
         REQUIRE(args_linear != nullptr);
 
         // Perform the LinearTanh computation.
@@ -163,9 +162,9 @@ TEST_CASE(TEST_GROUP "LinearTanh") {
         const int kCompleteBatchTiles = in_batch_size / tile_size;
         for (int in_batch_tile_offset = 0; in_batch_tile_offset < kCompleteBatchTiles;
              in_batch_tile_offset += out_batch_tiles) {
-            const int32_t args_linear_[] = {in_batch_tiles, in_batch_tile_offset, out_batch_tiles,
-                                            lstm_chunk_size, out_size};
-            MTL::Buffer *const args_linear = create_buffer(device, args_linear_, kNumLinearArgs);
+            const std::vector<int32_t> args_linear_{in_batch_tiles, in_batch_tile_offset,
+                                                    out_batch_tiles, lstm_chunk_size, out_size};
+            MTL::Buffer *const args_linear = create_vec_buffer(device, args_linear_);
             REQUIRE(args_linear != nullptr);
 
             torch::Tensor out_gpu_partial_f32 =
