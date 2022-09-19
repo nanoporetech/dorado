@@ -123,7 +123,7 @@ int basecaller(int argc, char* argv[]) {
 
     parser.add_argument("-o", "--overlap").default_value(500).scan<'i', int>();
 
-    parser.add_argument("-r", "--num_runners").default_value(1).scan<'i', int>();
+    parser.add_argument("-r", "--num_runners").default_value(2).scan<'i', int>();
 
     parser.add_argument("--emit-fastq").default_value(false).implicit_value(true);
 
