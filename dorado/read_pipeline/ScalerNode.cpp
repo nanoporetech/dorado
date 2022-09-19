@@ -24,17 +24,9 @@ std::pair<float, float> quantile(const torch::Tensor t) {
 
 std::pair<float, float> normalisation(torch::Tensor& x) {
     //Calculate shift and scale factors for normalisation.
-    //auto quantiles = torch::quantile(x.index({torch::indexing::Slice(0, 8000)}),
-    //                                 torch::tensor({0.2, 0.9}, {torch::kFloat}));
-
-    //float q20 = quantiles[0].item<float>();
-    //float q90 = quantiles[1].item<float>();
-
     auto [q20, q90] = quantile(x);
-
     float shift = std::max(10.0f, 0.51f * (q20 + q90));
     float scale = std::max(1.0f, 0.53f * (q90 - q20));
-
     return std::make_pair(shift, scale);
 }
 
