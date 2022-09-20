@@ -387,7 +387,7 @@ struct LSTMStackImpl : Module {
 #else  // if USE_CUDA_LSTM
 
 struct LSTMStackImpl : Module {
-    LSTMStackImpl(int size) {
+    LSTMStackImpl(int size, int batchsize, int chunksize) {
         rnn1 = register_module("rnn1", LSTM(LSTMOptions(size, size)));
         rnn2 = register_module("rnn2", LSTM(LSTMOptions(size, size)));
         rnn3 = register_module("rnn3", LSTM(LSTMOptions(size, size)));
