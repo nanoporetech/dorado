@@ -41,12 +41,12 @@ void string_reader(HighFive::Attribute& attribute, std::string& target_str) {
     }
 };
 
-std::string get_time_from_timestamp(time_t time_stamp) {
+std::string get_string_timestamp_from_unix_time(time_t time_stamp) {
     //Convert a time_t (seconds from UNIX epoch) to a timestamp in %Y-%m-%dT%H:%M:%SZ format
     char buf[32];
     struct tm ts;
     ts = *gmtime(&time_stamp);
-    strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%SZ", &ts);
+    strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%S+00:00", &ts);
     return std::string(buf);
 }
 
@@ -211,7 +211,7 @@ void DataLoader::load_pod5_reads_from_file(const std::string& path) {
             auto start_time_ms =
                     run_acquisition_start_time_ms + (start_sample / run_sample_rate) * 1000;
             time_t start_time_s = start_time_ms / 1000;
-            auto start_time = get_time_from_timestamp(start_time_s);
+            auto start_time = get_string_timestamp_from_unix_time(start_time_s);
             new_read->scaling = calib_data->scale;
             new_read->offset = calib_data->offset;
             new_read->scale_set = true;
