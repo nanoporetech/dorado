@@ -41,6 +41,15 @@ void string_reader(HighFive::Attribute& attribute, std::string& target_str) {
     }
 };
 
+std::string get_time_from_timestamp(time_t time_stamp) {
+    //Convert a time_t (seconds from UNIX epoch) to a timestamp in %Y-%m-%dT%H:%M:%SZ format
+    char buf[32];
+    struct tm ts;
+    ts = *gmtime(&time_stamp);
+    strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%SZ", &ts);
+    return std::string(buf);
+}
+
 std::string adjust_time(const std::string& time_stamp, uint32_t offset) {
     // Expects the time to be encoded like "2017-09-12T9:50:12Z".
     // Adds the offset (in seconds) to the timeStamp.
@@ -128,6 +137,22 @@ void DataLoader::load_pod5_reads_from_file(const std::string& path) {
             }
             read_count += 1;
 
+            //Retrieve global information for the run
+            RunInfoDictData_t* run_info_data;
+            if (pod5_get_run_info(batch, run_info, &run_info_data) != POD5_OK) {
+                std::cerr << "Failed to get Run Info " << row << pod5_get_error_string() << "\n";
+            }
+            auto run_acquisition_start_time_ms = run_info_data->acquisition_start_time_ms;
+            auto run_sample_rate = run_info_data->sample_rate;
+
+            //Retrieve Pore information (Pore type, channel, mux etc)
+            PoreDictData_t* pore_data = nullptr;
+            if (pod5_get_pore(batch, pore, &pore_data) != POD5_OK) {
+                std::cerr << "Failed to pore data " << row << pod5_get_error_string() << "\n";
+            }
+            int channel = pore_data->channel;
+            int well = pore_data->well;
+
             char read_id_tmp[37];
             pod5_error_t err = pod5_format_read_id(read_id, read_id_tmp);
             std::string read_id_str(read_id_tmp);
@@ -182,13 +207,22 @@ void DataLoader::load_pod5_reads_from_file(const std::string& path) {
             new_read->raw_data = torch::from_blob(floatTmp.data(), floatTmp.size(), options)
                                          .clone()
                                          .to(m_device);
-            float scale = calib_data->scale;
-            float offset = calib_data->offset;
 
+            auto start_time_ms =
+                    run_acquisition_start_time_ms + (start_sample / run_sample_rate) * 1000;
+            time_t start_time_s = start_time_ms / 1000;
+            auto start_time = get_time_from_timestamp(start_time_s);
             new_read->scaling = calib_data->scale;
-            new_read->scale_set = true;
             new_read->offset = calib_data->offset;
+            new_read->scale_set = true;
             new_read->read_id = read_id_str;
+            new_read->num_trimmed_samples = 0;
+            new_read->attributes.read_number = read_number;
+            new_read->attributes.fast5_filename =
+                    std::filesystem::path(path.c_str()).filename().string();
+            new_read->attributes.mux = well;
+            new_read->attributes.channel_number = channel;
+            new_read->attributes.start_time = start_time;
 
             m_read_sink.push_read(new_read);
             m_loaded_read_count++;
@@ -280,8 +314,7 @@ void DataLoader::load_fast5_reads_from_file(const std::string& path) {
         new_read->range = range;
         new_read->offset = offset;
         new_read->read_id = read_id;
-        new_read->num_samples = floatTmp.size();
-        new_read->num_trimmed_samples = floatTmp.size();  // same value until we actually trim
+        new_read->num_trimmed_samples = 0;
         new_read->attributes.mux = mux;
         new_read->attributes.read_number = read_number;
         new_read->attributes.channel_number = channel_number;
