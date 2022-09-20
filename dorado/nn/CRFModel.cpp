@@ -137,10 +137,7 @@ struct LSTMStackImpl : Module {
         m_quantize = (layer_size == 128);
 
         if (m_quantize) {
-            // Create some working buffers which we are going to need
-
-            // TODO don't hardocde
-
+            // Create some working buffers which are needed for quantized kernels
             _buffer1 = torch::empty({batch_size, chunk_size / 5, layer_size}).to(_tensor_options);
             _buffer2 = torch::empty({batch_size, chunk_size / 5, layer_size}).to(_tensor_options);
 
@@ -323,12 +320,11 @@ struct LSTMStackImpl : Module {
         if (m_quantize && !_weights_rearranged) {
             rearrange_weights();
             quantize_weights();
-            //_buffer1.cuda();
-            //_buffer2.cuda();
+            // TODO: For multi-GPU this will need to be smarter
             _buffer1 = _buffer1.to(c10::kCUDA);
             _buffer2 = _buffer2.to(c10::kCUDA);
             _chunks = _chunks.to(c10::kCUDA);
-            //_chunks = _chunks.cuda();
+            git push-- set - upstream origin quantized - fast - kernels
         }
 
         x = x.permute({1, 0, 2}).contiguous();  // data needs to be in NTC format.
@@ -337,15 +333,9 @@ struct LSTMStackImpl : Module {
         auto outvw = torch::matmul(x, ih);
 
         host_run_lstm_reverse_quantized128(
-                _chunks.data_ptr(),                // Check - is this I32?
-                outvw.data_ptr(),                  // Check - is this fp16
-                _quantized_buffers[0].data_ptr(),  // check - is this char?
-                _rnns[0]->named_parameters()["bias_ih"]
-                        .data_ptr(),  // Check - FP16?, is this on the correct device?
-                _quantization_scale_factors[0].data_ptr(),  // Check - FP32
-                _buffer2.data_ptr(),                        // Check - FP16, correct size?
-                m_batch_size                                // Check - 256?
-        );
+                _chunks.data_ptr(), outvw.data_ptr(), _quantized_buffers[0].data_ptr(),
+                _rnns[0]->named_parameters()["bias_ih"].data_ptr(),
+                _quantization_scale_factors[0].data_ptr(), _buffer2.data_ptr(), m_batch_size);
 
         ih = _rnns[1]->named_parameters()["weight_ih"].transpose(0, 1).contiguous();
         outvw = torch::matmul(_buffer2, ih);
@@ -379,11 +369,10 @@ struct LSTMStackImpl : Module {
                 _rnns[4]->named_parameters()["bias_ih"].data_ptr(),
                 _quantization_scale_factors[4].data_ptr(), _buffer2.data_ptr(), m_batch_size);
 
-        //_buffer2 = _buffer2.permute();
-        //_buffer2 = _buffer2.contiguous(); // Dorado GPU decoder expects TNC, so need to map back at this point.
         return _buffer2.permute({1, 0, 2}).contiguous();
     }
 
+    // Dispatch to different forward method depending on whether we use quantized LSTMs or not
     torch::Tensor forward(torch::Tensor x) {
         if (m_quantize) {
             return forward_quantized(x);
