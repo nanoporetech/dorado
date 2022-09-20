@@ -324,7 +324,6 @@ struct LSTMStackImpl : Module {
             _buffer1 = _buffer1.to(c10::kCUDA);
             _buffer2 = _buffer2.to(c10::kCUDA);
             _chunks = _chunks.to(c10::kCUDA);
-            git push-- set - upstream origin quantized - fast - kernels
         }
 
         x = x.permute({1, 0, 2}).contiguous();  // data needs to be in NTC format.
