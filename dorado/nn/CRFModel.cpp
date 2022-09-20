@@ -94,14 +94,14 @@ struct CudaLSTMImpl : Module {
     CudaLSTMImpl(int layer_size, bool reverse_) : reverse(reverse_) {
         // TODO: do we need to specify .device("gpu")?
         auto options = torch::TensorOptions().dtype(torch::kFloat16);
-        weights = torch::empty({layer_size * 4, layer_size * 2}, options).contiguous().cuda();
-        auto weight_ih = weights.slice(1, 0, layer_size).cuda();
-        auto weight_hh = weights.slice(1, layer_size, 2 * layer_size).cuda();
+        weights = torch::empty({layer_size * 4, layer_size * 2}, options).contiguous();
+        auto weight_ih = weights.slice(1, 0, layer_size);
+        auto weight_hh = weights.slice(1, layer_size, 2 * layer_size);
         if (reverse) {
             std::swap(weight_ih, weight_hh);
         }
-        bias = torch::empty({layer_size * 4}, options).contiguous().cuda();
-        auto bias_hh = torch::empty({layer_size * 4}, options).contiguous().cuda();
+        bias = torch::empty({layer_size * 4}, options).contiguous();
+        auto bias_hh = torch::empty({layer_size * 4}, options).contiguous();
 
         register_parameter("weight_ih", weight_ih, false);
         register_parameter("weight_hh", weight_hh, false);
@@ -120,7 +120,7 @@ torch::TensorOptions get_tensor_options(CudaLSTM lstm) {
 };
 
 struct LSTMStackImpl : Module {
-    LSTMStackImpl(int layer_size_) : layer_size(layer_size_) {
+    LSTMStackImpl(int layer_size_, int batch_size, int chunk_size) : layer_size(layer_size_) {
         rnn1 = register_module("rnn_1", CudaLSTM(layer_size, true));
         _rnns.push_back(rnn1);
         rnn2 = register_module("rnn_2", CudaLSTM(layer_size, false));
@@ -133,18 +133,16 @@ struct LSTMStackImpl : Module {
         _rnns.push_back(rnn5);
         _tensor_options = get_tensor_options(rnn1);
 
+        m_batch_size = batch_size;
+        m_quantize = (layer_size == 128);
+
         if (m_quantize) {
             // Create some working buffers which we are going to need
 
             // TODO don't hardocde
-            int chunk_size = 4000;
-            int batch_size = 256;
-            int rnn_layer_size = 128;
 
-            _buffer1 =
-                    torch::empty({batch_size, chunk_size / 5, rnn_layer_size}).to(_tensor_options);
-            _buffer2 =
-                    torch::empty({batch_size, chunk_size / 5, rnn_layer_size}).to(_tensor_options);
+            _buffer1 = torch::empty({batch_size, chunk_size / 5, layer_size}).to(_tensor_options);
+            _buffer2 = torch::empty({batch_size, chunk_size / 5, layer_size}).to(_tensor_options);
 
             int cs = chunk_size / 5;
 
@@ -156,9 +154,9 @@ struct LSTMStackImpl : Module {
         }
     }
 
-    bool m_quantize = true;
     bool _weights_rearranged = false;
-
+    bool m_quantize;
+    int m_batch_size;
     std::vector<CudaLSTM> _rnns;
     std::vector<torch::Tensor> _quantized_buffers;
     std::vector<torch::Tensor> _quantization_scale_factors;
@@ -166,10 +164,6 @@ struct LSTMStackImpl : Module {
     torch::Tensor _buffer2;
     torch::Tensor _chunks;
     torch::TensorOptions _tensor_options;
-
-    // TODO - don't hardcode these.
-    int m_batch_size = 256;
-    int m_chunk_size = 4000;
 
     torch::Tensor forward_cublas(torch::Tensor in) {
         c10::cuda::CUDAGuard device_guard(in.device());
@@ -451,12 +445,17 @@ TORCH_MODULE(LinearCRF);
 TORCH_MODULE(Convolution);
 
 struct CRFModelImpl : Module {
-    CRFModelImpl(int size, int outsize, int stride, bool expand_blanks) {
+    CRFModelImpl(int size,
+                 int outsize,
+                 int stride,
+                 bool expand_blanks,
+                 int batch_size,
+                 int chunk_size) {
         conv1 = register_module("conv1", Convolution(1, 4, 5, 1));
         conv2 = register_module("conv2", Convolution(4, 16, 5, 1));
         conv3 = register_module("conv3", Convolution(16, size, 19, stride));
         permute = register_module("permute", Permute());
-        rnns = register_module("rnns", LSTMStack(size));
+        rnns = register_module("rnns", LSTMStack(size, batch_size, chunk_size));
         linear = register_module("linear", LinearCRF(size, outsize));
         linear->expand_blanks = expand_blanks;
         encoder = Sequential(conv1, conv2, conv3, permute, rnns, linear);
@@ -521,7 +520,7 @@ std::tuple<ModuleHolder<AnyModule>, size_t> load_crf_model(const std::filesystem
     int outsize = pow(4, state_len) * 4;
     bool expand = options.device_opt().value() == torch::kCPU;
 
-    auto model = CRFModel(insize, outsize, stride, expand);
+    auto model = CRFModel(insize, outsize, stride, expand, batch_size, chunk_size);
     auto state_dict = model->load_weights(path);
     model->load_state_dict(state_dict);
     model->to(options.dtype_opt().value().toScalarType());
