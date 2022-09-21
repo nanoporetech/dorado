@@ -134,7 +134,7 @@ struct LSTMStackImpl : Module {
         _tensor_options = get_tensor_options(rnn1);
 
         m_batch_size = batch_size;
-        m_quantize = (layer_size == 128);
+        m_quantize = ((layer_size == 128) || (layer_size == 96));
 
         if (m_quantize) {
             // Create some working buffers which are needed for quantized kernels
@@ -331,7 +331,20 @@ struct LSTMStackImpl : Module {
         auto ih = _rnns[0]->named_parameters()["weight_ih"].transpose(0, 1).contiguous();
         auto outvw = torch::matmul(x, ih);
 
-        host_run_lstm_reverse_quantized128(
+        std::function<int(void*, void*, void*, void*, void*, void*, int)> host_run_lstm_reverse_quantized;
+        std::function<int(void*, void*, void*, void*, void*, void*, int)> host_run_lstm_fwd_quantized;
+
+        if (layer_size == 128) {
+            host_run_lstm_reverse_quantized = host_run_lstm_reverse_quantized128;
+            host_run_lstm_fwd_quantized = host_run_lstm_fwd_quantized128;
+
+         } else if (layer_size == 96){
+             host_run_lstm_reverse_quantized = host_run_lstm_reverse_quantized96;
+             host_run_lstm_fwd_quantized = host_run_lstm_fwd_quantized96;
+         }
+
+
+         host_run_lstm_reverse_quantized(
                 _chunks.data_ptr(), outvw.data_ptr(), _quantized_buffers[0].data_ptr(),
                 _rnns[0]->named_parameters()["bias_ih"].data_ptr(),
                 _quantization_scale_factors[0].data_ptr(), _buffer2.data_ptr(), m_batch_size);
@@ -339,7 +352,7 @@ struct LSTMStackImpl : Module {
         ih = _rnns[1]->named_parameters()["weight_ih"].transpose(0, 1).contiguous();
         outvw = torch::matmul(_buffer2, ih);
 
-        host_run_lstm_fwd_quantized128(
+        host_run_lstm_fwd_quantized(
                 _chunks.data_ptr(), outvw.data_ptr(), _quantized_buffers[1].data_ptr(),
                 _rnns[1]->named_parameters()["bias_ih"].data_ptr(),
                 _quantization_scale_factors[1].data_ptr(), _buffer1.data_ptr(), m_batch_size);
@@ -347,7 +360,7 @@ struct LSTMStackImpl : Module {
         outvw = torch::matmul(
                 _buffer1, _rnns[2]->named_parameters()["weight_ih"].transpose(0, 1).contiguous());
 
-        host_run_lstm_reverse_quantized128(
+        host_run_lstm_reverse_quantized(
                 _chunks.data_ptr(), outvw.data_ptr(), _quantized_buffers[2].data_ptr(),
                 _rnns[2]->named_parameters()["bias_ih"].data_ptr(),
                 _quantization_scale_factors[2].data_ptr(), _buffer2.data_ptr(), m_batch_size);
@@ -355,7 +368,7 @@ struct LSTMStackImpl : Module {
         outvw = torch::matmul(
                 _buffer2, _rnns[3]->named_parameters()["weight_ih"].transpose(0, 1).contiguous());
 
-        host_run_lstm_fwd_quantized128(
+        host_run_lstm_fwd_quantized(
                 _chunks.data_ptr(), outvw.data_ptr(), _quantized_buffers[3].data_ptr(),
                 _rnns[3]->named_parameters()["bias_ih"].data_ptr(),
                 _quantization_scale_factors[3].data_ptr(), _buffer1.data_ptr(), m_batch_size);
@@ -363,7 +376,7 @@ struct LSTMStackImpl : Module {
         outvw = torch::matmul(
                 _buffer1, _rnns[4]->named_parameters()["weight_ih"].transpose(0, 1).contiguous());
 
-        host_run_lstm_reverse_quantized128(
+        host_run_lstm_reverse_quantized(
                 _chunks.data_ptr(), outvw.data_ptr(), _quantized_buffers[4].data_ptr(),
                 _rnns[4]->named_parameters()["bias_ih"].data_ptr(),
                 _quantization_scale_factors[4].data_ptr(), _buffer2.data_ptr(), m_batch_size);
