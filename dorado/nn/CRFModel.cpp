@@ -27,6 +27,7 @@ extern "C" {
 using namespace torch::nn;
 namespace F = torch::nn::functional;
 using Slice = torch::indexing::Slice;
+using quantized_lstm = std::function<int(void *, void *, void *, void *, void *, void *, int)>;
 
 struct PermuteImpl : Module {
     torch::Tensor forward(torch::Tensor x) { return x.permute({2, 0, 1}); }
@@ -134,20 +135,31 @@ struct LSTMStackImpl : Module {
         _tensor_options = get_tensor_options(rnn1);
 
         m_batch_size = batch_size;
-        m_quantize = ((layer_size == 128) || (layer_size == 96));
+        m_quantize = ((layer_size == 96) || (layer_size == 128));
 
         if (m_quantize) {
-            // Create some working buffers which are needed for quantized kernels
-            _buffer1 = torch::empty({batch_size, chunk_size / 5, layer_size}).to(_tensor_options);
-            _buffer2 = torch::empty({batch_size, chunk_size / 5, layer_size}).to(_tensor_options);
+            // TODO: fix this hardcoded 5 with stride
+            int block_size = chunk_size / 5;
 
-            int cs = chunk_size / 5;
+            // Create some working buffers which are needed for quantized kernels
+            _buffer1 = torch::empty({batch_size, block_size, layer_size}).to(_tensor_options);
+            _buffer2 = torch::empty({batch_size, block_size, layer_size}).to(_tensor_options);
 
             _chunks = torch::empty({batch_size, 4}).to(_tensor_options).to(torch::kI32);
-            _chunks.index({torch::indexing::Slice(), 0}) = torch::arange(0, cs * batch_size, cs);
-            _chunks.index({torch::indexing::Slice(), 2}) = torch::arange(0, cs * batch_size, cs);
-            _chunks.index({torch::indexing::Slice(), 1}) = cs;
+            _chunks.index({torch::indexing::Slice(), 0}) =
+                    torch::arange(0, block_size * batch_size, block_size);
+            _chunks.index({torch::indexing::Slice(), 2}) =
+                    torch::arange(0, block_size * batch_size, block_size);
+            _chunks.index({torch::indexing::Slice(), 1}) = block_size;
             _chunks.index({torch::indexing::Slice(), 2}) = 0;
+        }
+
+        if (layer_size == 96) {
+            _host_run_lstm_fwd_quantized = host_run_lstm_fwd_quantized96;
+            _host_run_lstm_rev_quantized = host_run_lstm_reverse_quantized96;
+        } else if (layer_size == 128) {
+            _host_run_lstm_fwd_quantized = host_run_lstm_fwd_quantized128;
+            _host_run_lstm_rev_quantized = host_run_lstm_reverse_quantized128;
         }
     }
 
@@ -155,12 +167,14 @@ struct LSTMStackImpl : Module {
     bool m_quantize;
     int m_batch_size;
     std::vector<CudaLSTM> _rnns;
+    std::vector<torch::Tensor> _r_wih;
     std::vector<torch::Tensor> _quantized_buffers;
     std::vector<torch::Tensor> _quantization_scale_factors;
     torch::Tensor _buffer1;
     torch::Tensor _buffer2;
     torch::Tensor _chunks;
     torch::TensorOptions _tensor_options;
+    quantized_lstm _host_run_lstm_fwd_quantized, _host_run_lstm_rev_quantized;
 
     torch::Tensor forward_cublas(torch::Tensor in) {
         c10::cuda::CUDAGuard device_guard(in.device());
@@ -271,7 +285,7 @@ struct LSTMStackImpl : Module {
         for (auto rnn : _rnns) {
             rearrange_individual_weights(rnn->named_parameters()["weight_hh"]);
             rearrange_individual_weights(rnn->named_parameters()["weight_ih"]);
-
+            _r_wih.push_back(rnn->named_parameters()["weight_ih"].transpose(0, 1).contiguous());
             rearrange_individual_weights(rnn->named_parameters()["bias_hh"]);
             rearrange_individual_weights(rnn->named_parameters()["bias_ih"]);
         }
@@ -321,64 +335,45 @@ struct LSTMStackImpl : Module {
             rearrange_weights();
             quantize_weights();
             // TODO: For multi-GPU this will need to be smarter
-            _buffer1 = _buffer1.to(c10::kCUDA);
-            _buffer2 = _buffer2.to(c10::kCUDA);
-            _chunks = _chunks.to(c10::kCUDA);
+            _buffer1 = _buffer1.to(x.device());
+            _buffer2 = _buffer2.to(x.device());
+            _chunks = _chunks.to(x.device());
         }
 
         x = x.permute({1, 0, 2}).contiguous();  // data needs to be in NTC format.
 
-        auto ih = _rnns[0]->named_parameters()["weight_ih"].transpose(0, 1).contiguous();
-        auto outvw = torch::matmul(x, ih);
+        _buffer1 = torch::matmul(x, _r_wih[0]);
 
-        std::function<int(void *, void *, void *, void *, void *, void *, int)>
-                host_run_lstm_reverse_quantized;
-        std::function<int(void *, void *, void *, void *, void *, void *, int)>
-                host_run_lstm_fwd_quantized;
-
-        if (layer_size == 128) {
-            host_run_lstm_reverse_quantized = host_run_lstm_reverse_quantized128;
-            host_run_lstm_fwd_quantized = host_run_lstm_fwd_quantized128;
-
-        } else if (layer_size == 96) {
-            host_run_lstm_reverse_quantized = host_run_lstm_reverse_quantized96;
-            host_run_lstm_fwd_quantized = host_run_lstm_fwd_quantized96;
-        }
-
-        host_run_lstm_reverse_quantized(
-                _chunks.data_ptr(), outvw.data_ptr(), _quantized_buffers[0].data_ptr(),
+        _host_run_lstm_rev_quantized(
+                _chunks.data_ptr(), _buffer1.data_ptr(), _quantized_buffers[0].data_ptr(),
                 _rnns[0]->named_parameters()["bias_ih"].data_ptr(),
                 _quantization_scale_factors[0].data_ptr(), _buffer2.data_ptr(), m_batch_size);
 
-        ih = _rnns[1]->named_parameters()["weight_ih"].transpose(0, 1).contiguous();
-        outvw = torch::matmul(_buffer2, ih);
+        _buffer1 = torch::matmul(_buffer2, _r_wih[1]);
 
-        host_run_lstm_fwd_quantized(
-                _chunks.data_ptr(), outvw.data_ptr(), _quantized_buffers[1].data_ptr(),
+        _host_run_lstm_fwd_quantized(
+                _chunks.data_ptr(), _buffer1.data_ptr(), _quantized_buffers[1].data_ptr(),
                 _rnns[1]->named_parameters()["bias_ih"].data_ptr(),
-                _quantization_scale_factors[1].data_ptr(), _buffer1.data_ptr(), m_batch_size);
+                _quantization_scale_factors[1].data_ptr(), _buffer2.data_ptr(), m_batch_size);
 
-        outvw = torch::matmul(
-                _buffer1, _rnns[2]->named_parameters()["weight_ih"].transpose(0, 1).contiguous());
+        _buffer1 = torch::matmul(_buffer2, _r_wih[2]);
 
-        host_run_lstm_reverse_quantized(
-                _chunks.data_ptr(), outvw.data_ptr(), _quantized_buffers[2].data_ptr(),
+        _host_run_lstm_rev_quantized(
+                _chunks.data_ptr(), _buffer1.data_ptr(), _quantized_buffers[2].data_ptr(),
                 _rnns[2]->named_parameters()["bias_ih"].data_ptr(),
                 _quantization_scale_factors[2].data_ptr(), _buffer2.data_ptr(), m_batch_size);
 
-        outvw = torch::matmul(
-                _buffer2, _rnns[3]->named_parameters()["weight_ih"].transpose(0, 1).contiguous());
+        _buffer1 = torch::matmul(_buffer2, _r_wih[3]);
 
-        host_run_lstm_fwd_quantized(
-                _chunks.data_ptr(), outvw.data_ptr(), _quantized_buffers[3].data_ptr(),
+        _host_run_lstm_fwd_quantized(
+                _chunks.data_ptr(), _buffer1.data_ptr(), _quantized_buffers[3].data_ptr(),
                 _rnns[3]->named_parameters()["bias_ih"].data_ptr(),
-                _quantization_scale_factors[3].data_ptr(), _buffer1.data_ptr(), m_batch_size);
+                _quantization_scale_factors[3].data_ptr(), _buffer2.data_ptr(), m_batch_size);
 
-        outvw = torch::matmul(
-                _buffer1, _rnns[4]->named_parameters()["weight_ih"].transpose(0, 1).contiguous());
+        _buffer1 = torch::matmul(_buffer2, _r_wih[4]);
 
-        host_run_lstm_reverse_quantized(
-                _chunks.data_ptr(), outvw.data_ptr(), _quantized_buffers[4].data_ptr(),
+        _host_run_lstm_rev_quantized(
+                _chunks.data_ptr(), _buffer1.data_ptr(), _quantized_buffers[4].data_ptr(),
                 _rnns[4]->named_parameters()["bias_ih"].data_ptr(),
                 _quantization_scale_factors[4].data_ptr(), _buffer2.data_ptr(), m_batch_size);
 
