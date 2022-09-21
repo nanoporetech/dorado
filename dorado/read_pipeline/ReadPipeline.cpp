@@ -50,7 +50,10 @@ std::vector<std::string> Read::generate_read_tags() const {
             "ch:i:" + std::to_string(attributes.channel_number),
             "st:Z:" + attributes.start_time,
             "rn:i:" + std::to_string(attributes.read_number),
-            "f5:Z:" + attributes.fast5_filename};
+            "f5:Z:" + attributes.fast5_filename,
+            "sm:f:" + std::to_string(shift),
+            "sd:f:" + std::to_string(scale),
+            "sv:Z:quantile"};
 
     return tags;
 }
