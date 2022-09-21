@@ -138,19 +138,16 @@ struct LSTMStackImpl : Module {
         m_quantize = ((layer_size == 96) || (layer_size == 128));
 
         if (m_quantize) {
-            // TODO: fix this hardcoded 5 with stride
-            int block_size = chunk_size / 5;
-
             // Create some working buffers which are needed for quantized kernels
-            _buffer1 = torch::empty({batch_size, block_size, layer_size}).to(_tensor_options);
-            _buffer2 = torch::empty({batch_size, block_size, layer_size}).to(_tensor_options);
+            _buffer1 = torch::empty({batch_size, chunk_size, layer_size}).to(_tensor_options);
+            _buffer2 = torch::empty({batch_size, chunk_size, layer_size}).to(_tensor_options);
 
             _chunks = torch::empty({batch_size, 4}).to(_tensor_options).to(torch::kI32);
             _chunks.index({torch::indexing::Slice(), 0}) =
-                    torch::arange(0, block_size * batch_size, block_size);
+                    torch::arange(0, chunk_size * batch_size, chunk_size);
             _chunks.index({torch::indexing::Slice(), 2}) =
-                    torch::arange(0, block_size * batch_size, block_size);
-            _chunks.index({torch::indexing::Slice(), 1}) = block_size;
+                    torch::arange(0, chunk_size * batch_size, chunk_size);
+            _chunks.index({torch::indexing::Slice(), 1}) = chunk_size;
             _chunks.index({torch::indexing::Slice(), 2}) = 0;
         }
 
@@ -452,7 +449,7 @@ struct CRFModelImpl : Module {
         conv2 = register_module("conv2", Convolution(4, 16, 5, 1));
         conv3 = register_module("conv3", Convolution(16, size, 19, stride));
         permute = register_module("permute", Permute());
-        rnns = register_module("rnns", LSTMStack(size, batch_size, chunk_size));
+        rnns = register_module("rnns", LSTMStack(size, batch_size, chunk_size / stride));
         linear = register_module("linear", LinearCRF(size, outsize));
         linear->expand_blanks = expand_blanks;
         encoder = Sequential(conv1, conv2, conv3, permute, rnns, linear);
