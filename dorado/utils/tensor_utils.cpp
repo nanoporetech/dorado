@@ -29,21 +29,19 @@ std::vector<torch::Tensor> load_tensors(const std::filesystem::path& dir,
 torch::Tensor quantile(const torch::Tensor t, const torch::Tensor q) {
     assert(t.dtype().name() == "float");
     assert(q.dtype().name() == "float");
-    if (!torch::equal(q, std::get<0>(q.sort()))) {
-        throw std::runtime_error("quantiles q are not sorted");
-    }
 
     auto tmp = t.clone();
+    auto [qval, qidx] = q.sort();
     auto res = torch::empty_like(q);
 
     auto start = tmp.data_ptr<float>();
     auto end = tmp.data_ptr<float>() + tmp.size(0);
 
     for (int i = 0; i < q.size(0); i++) {
-        auto m =
-                tmp.data_ptr<float>() + static_cast<size_t>((tmp.size(0) - 1) * q[i].item<float>());
+        auto m = tmp.data_ptr<float>() +
+                 static_cast<size_t>((tmp.size(0) - 1) * qval[i].item<float>());
         std::nth_element(start, m, end);
-        res[i] = *m;
+        res[qidx[i]] = *m;
         start = m;
     }
 
