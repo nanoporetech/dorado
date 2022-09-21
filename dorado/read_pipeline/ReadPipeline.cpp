@@ -4,6 +4,8 @@
 #include "utils/sequence_utils.h"
 
 #include <chrono>
+#include <iomanip>
+#include <sstream>
 
 using namespace std::chrono_literals;
 
@@ -41,6 +43,15 @@ bool get_modbase_channel_name(std::string& channel_name, const std::string& mod_
 
 std::vector<std::string> Read::generate_read_tags() const {
     // GCC doesn't support <format> yet...
+
+    std::stringstream stream;
+    stream << std::fixed << std::setprecision(3) << shift;
+    std::string shift_str = stream.str();
+
+    stream = std::stringstream();
+    stream << std::fixed << std::setprecision(3) << scale;
+    std::string scale_str = stream.str();
+
     std::vector<std::string> tags = {
             "qs:i:" + std::to_string(static_cast<int>(
                               std::round(utils::mean_qscore_from_qstring(qstring)))),
@@ -51,8 +62,8 @@ std::vector<std::string> Read::generate_read_tags() const {
             "st:Z:" + attributes.start_time,
             "rn:i:" + std::to_string(attributes.read_number),
             "f5:Z:" + attributes.fast5_filename,
-            "sm:f:" + std::to_string(shift),
-            "sd:f:" + std::to_string(scale),
+            "sm:f:" + shift_str,
+            "sd:f:" + scale_str,
             "sv:Z:quantile"};
 
     return tags;
