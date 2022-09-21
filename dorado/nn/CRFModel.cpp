@@ -331,20 +331,21 @@ struct LSTMStackImpl : Module {
         auto ih = _rnns[0]->named_parameters()["weight_ih"].transpose(0, 1).contiguous();
         auto outvw = torch::matmul(x, ih);
 
-        std::function<int(void*, void*, void*, void*, void*, void*, int)> host_run_lstm_reverse_quantized;
-        std::function<int(void*, void*, void*, void*, void*, void*, int)> host_run_lstm_fwd_quantized;
+        std::function<int(void *, void *, void *, void *, void *, void *, int)>
+                host_run_lstm_reverse_quantized;
+        std::function<int(void *, void *, void *, void *, void *, void *, int)>
+                host_run_lstm_fwd_quantized;
 
         if (layer_size == 128) {
             host_run_lstm_reverse_quantized = host_run_lstm_reverse_quantized128;
             host_run_lstm_fwd_quantized = host_run_lstm_fwd_quantized128;
 
-         } else if (layer_size == 96){
-             host_run_lstm_reverse_quantized = host_run_lstm_reverse_quantized96;
-             host_run_lstm_fwd_quantized = host_run_lstm_fwd_quantized96;
-         }
+        } else if (layer_size == 96) {
+            host_run_lstm_reverse_quantized = host_run_lstm_reverse_quantized96;
+            host_run_lstm_fwd_quantized = host_run_lstm_fwd_quantized96;
+        }
 
-
-         host_run_lstm_reverse_quantized(
+        host_run_lstm_reverse_quantized(
                 _chunks.data_ptr(), outvw.data_ptr(), _quantized_buffers[0].data_ptr(),
                 _rnns[0]->named_parameters()["bias_ih"].data_ptr(),
                 _quantization_scale_factors[0].data_ptr(), _buffer2.data_ptr(), m_batch_size);
