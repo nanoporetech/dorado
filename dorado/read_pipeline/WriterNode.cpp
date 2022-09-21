@@ -22,7 +22,8 @@ void WriterNode::worker_thread() {
         std::unique_lock<std::mutex> lock(m_cv_mutex);
         m_cv.wait_for(lock, 100ms, [this] { return !m_reads.empty(); });
         if (m_reads.empty()) {
-            if (m_terminate) {  // Kill the worker if we're done
+            if (m_terminate) {
+                // Termination flag is set and read input queue is empty, so terminate the worker
                 return;
             } else {
                 continue;

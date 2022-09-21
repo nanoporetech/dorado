@@ -17,5 +17,6 @@ private:
     void worker_thread();  // Worker thread performs scaling and trimming asynchronously.
     ReadSink&
             m_sink;  // ReadSink to consume scaled reads. Typically this will be a Basecaller Node.
-    std::unique_ptr<std::thread> m_worker;
+    std::vector<std::unique_ptr<std::thread>> worker_threads;
+    int m_num_worker_threads = 5;
 };
