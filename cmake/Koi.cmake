@@ -15,7 +15,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32)
                 message("Cloning Koi using ssh")
                 execute_process(COMMAND git clone git@git.oxfordnanolabs.local:machine-learning/koi.git ${KOI_DIR})
             endif()
-            execute_process(COMMAND git checkout d4418e42334492d9b13f9c33d40ede136021c430 WORKING_DIRECTORY ${KOI_DIR})
+            execute_process(COMMAND git checkout 6f3a5b827434e275f38791a8f2e5244a2f2ff2ff WORKING_DIRECTORY ${KOI_DIR})
         endif()
         add_subdirectory(${KOI_DIR}/koi/lib)
 
