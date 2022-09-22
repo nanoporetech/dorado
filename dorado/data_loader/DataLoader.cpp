@@ -41,13 +41,18 @@ void string_reader(HighFive::Attribute& attribute, std::string& target_str) {
     }
 };
 
-std::string get_string_timestamp_from_unix_time(time_t time_stamp) {
+std::string get_string_timestamp_from_unix_time(time_t time_stamp_ms) {
     //Convert a time_t (seconds from UNIX epoch) to a timestamp in %Y-%m-%dT%H:%M:%SZ format
+    auto time_stamp_s = time_stamp_ms / 1000;
+    int num_ms = time_stamp_ms % 1000;
     char buf[32];
     struct tm ts;
-    ts = *gmtime(&time_stamp);
-    strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%S+00:00", &ts);
-    return std::string(buf);
+    ts = *gmtime(&time_stamp_s);
+    strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%S.", &ts);
+    std::string time_stamp_str = std::string(buf);
+    time_stamp_str += std::to_string(num_ms);  // add ms
+    time_stamp_str += "+00:00";                //add zero timezone
+    return time_stamp_str;
 }
 
 std::string adjust_time(const std::string& time_stamp, uint32_t offset) {
@@ -210,8 +215,7 @@ void DataLoader::load_pod5_reads_from_file(const std::string& path) {
 
             auto start_time_ms =
                     run_acquisition_start_time_ms + (start_sample / run_sample_rate) * 1000;
-            time_t start_time_s = start_time_ms / 1000;
-            auto start_time = get_string_timestamp_from_unix_time(start_time_s);
+            auto start_time = get_string_timestamp_from_unix_time(start_time_ms);
             new_read->scaling = calib_data->scale;
             new_read->offset = calib_data->offset;
             new_read->scale_set = true;
