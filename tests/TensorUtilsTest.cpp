@@ -18,7 +18,11 @@ TEST_CASE(CUT_TAG ": test quartiles", CUT_TAG) {
 TEST_CASE(CUT_TAG ": test quartiles reversed", CUT_TAG) {
     auto in = torch::rand(1000, {torch::kFloat});
     auto q = torch::tensor({0.75, 0.5, 0.25}, {torch::kFloat});
-    REQUIRE_THROWS_WITH(::utils::quantile(in, q), Catch::Matchers::Contains("not sorted"));
+
+    auto expected = torch::quantile(in, q, 0, false, c10::string_view("lower"));
+    auto computed = ::utils::quantile(in, q);
+
+    REQUIRE(torch::equal(computed, expected));
 }
 
 TEST_CASE(CUT_TAG ": test quantiles", CUT_TAG) {
