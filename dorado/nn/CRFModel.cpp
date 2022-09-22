@@ -142,7 +142,8 @@ struct LSTMStackImpl : Module {
             _buffer1 = torch::empty({batch_size, chunk_size, layer_size}).to(_tensor_options);
             _buffer2 = torch::empty({batch_size, chunk_size, layer_size}).to(_tensor_options);
 
-            _chunks = torch::empty({batch_size, 4}).to(_tensor_options).to(torch::kI32);
+            _chunks = torch::empty({batch_size, 4}).to(_tensor_options).to(torch::kInt32);
+            // chunk_size * batch_size can not be > 2**31 (2147483648). For practical purposes this is currently always the case.
             _chunks.index({torch::indexing::Slice(), 0}) =
                     torch::arange(0, chunk_size * batch_size, chunk_size);
             _chunks.index({torch::indexing::Slice(), 2}) =
