@@ -214,7 +214,7 @@ void DataLoader::load_pod5_reads_from_file(const std::string& path) {
                                          .to(m_device);
 
             auto start_time_ms =
-                    run_acquisition_start_time_ms + (start_sample / run_sample_rate) * 1000;
+                    run_acquisition_start_time_ms + ((start_sample * 1000) / run_sample_rate);
             auto start_time = get_string_timestamp_from_unix_time(start_time_ms);
             new_read->scaling = calib_data->scale;
             new_read->offset = calib_data->offset;
