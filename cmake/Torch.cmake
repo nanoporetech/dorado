@@ -3,7 +3,7 @@ set(CUDNN_LIBRARY_PATH ${CMAKE_SOURCE_DIR}/dorado/3rdparty/fake_cudnn)
 set(CUDNN_INCLUDE_PATH ${CMAKE_SOURCE_DIR}/dorado/3rdparty/fake_cudnn)
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    set(TORCH_URL https://download.pytorch.org/libtorch/cu113/libtorch-cxx11-abi--shared-with-deps-${TORCH_VERSION}%2Bcu113.zip)
+    set(TORCH_URL https://download.pytorch.org/libtorch/cu113/libtorch-cxx11-abi-shared-with-deps-${TORCH_VERSION}%2Bcu113.zip)
     set(TORCH_LIB "${CMAKE_SOURCE_DIR}/dorado/3rdparty/torch-${TORCH_VERSION}-${CMAKE_SYSTEM_NAME}/libtorch")
 elseif(APPLE)
     set(TORCH_URL https://files.pythonhosted.org/packages/c8/74/fd7d90bb7c589a695417e6922149dc3eb29fe0c9a97b6fb28ae851f1c19f/torch-${TORCH_VERSION}-cp39-none-macosx_11_0_arm64.whl)
