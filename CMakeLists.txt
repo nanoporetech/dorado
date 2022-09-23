@@ -18,10 +18,6 @@ include(cmake/Pod5.cmake)
 include(cmake/Torch.cmake)
 include(cmake/OpenSSL.cmake)
 
-# We need to force the use of the old ABI here as otherwise elzip builds with the libc++11 ABI
-# and we can't link against it.  We're on the old ABI right now due to the version of pytorch 
-# we are using.
-add_compile_options(-D_GLIBCXX_USE_CXX11_ABI=0)
 add_subdirectory(dorado/3rdparty/elzip)
 
 enable_testing()
