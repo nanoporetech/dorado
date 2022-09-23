@@ -116,10 +116,6 @@ struct CudaLSTMImpl : Module {
 
 TORCH_MODULE(CudaLSTM);
 
-torch::TensorOptions get_tensor_options(CudaLSTM lstm) {
-    return lstm->named_parameters()["weight_hh"].options();
-};
-
 struct LSTMStackImpl : Module {
     LSTMStackImpl(int layer_size_, int batch_size, int chunk_size) : layer_size(layer_size_) {
         rnn1 = register_module("rnn_1", CudaLSTM(layer_size, true));
@@ -132,18 +128,18 @@ struct LSTMStackImpl : Module {
         _rnns.push_back(rnn4);
         rnn5 = register_module("rnn_5", CudaLSTM(layer_size, true));
         _rnns.push_back(rnn5);
-        _tensor_options = get_tensor_options(rnn1);
 
         m_batch_size = batch_size;
         m_quantize = ((layer_size == 96) || (layer_size == 128));
 
         if (m_quantize) {
+            auto opts = torch::TensorOptions().dtype(torch::kFloat16);
             // Create some working buffers which are needed for quantized kernels
-            _buffer1 = torch::empty({batch_size, chunk_size, layer_size}).to(_tensor_options);
-            _buffer2 = torch::empty({batch_size, chunk_size, layer_size}).to(_tensor_options);
-
-            _chunks = torch::empty({batch_size, 4}).to(_tensor_options).to(torch::kInt32);
-            // chunk_size * batch_size can not be > 2**31 (2147483648). For practical purposes this is currently always the case.
+            _buffer1 = torch::empty({batch_size, chunk_size, layer_size}, opts);
+            _buffer2 = torch::empty({batch_size, chunk_size, layer_size}, opts);
+            // chunk_size * batch_size can not be > 2**31 (2147483648).
+            // For practical purposes this is currently always the case.
+            _chunks = torch::empty({batch_size, 4}).to(torch::kInt32);
             _chunks.index({torch::indexing::Slice(), 0}) =
                     torch::arange(0, chunk_size * batch_size, chunk_size);
             _chunks.index({torch::indexing::Slice(), 2}) =
@@ -171,7 +167,6 @@ struct LSTMStackImpl : Module {
     torch::Tensor _buffer1;
     torch::Tensor _buffer2;
     torch::Tensor _chunks;
-    torch::TensorOptions _tensor_options;
     quantized_lstm _host_run_lstm_fwd_quantized, _host_run_lstm_rev_quantized;
 
     torch::Tensor forward_cublas(torch::Tensor in) {
@@ -332,7 +327,6 @@ struct LSTMStackImpl : Module {
         if (m_quantize && !_weights_rearranged) {
             rearrange_weights();
             quantize_weights();
-            // TODO: For multi-GPU this will need to be smarter
             _buffer1 = _buffer1.to(x.device());
             _buffer2 = _buffer2.to(x.device());
             _chunks = _chunks.to(x.device());
