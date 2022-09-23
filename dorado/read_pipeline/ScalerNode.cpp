@@ -98,7 +98,7 @@ int ScalerNode::trim(torch::Tensor signal,
             if (window[-1].item<float>() > threshold) {
                 continue;
             }
-            if (end >= num_samples || end / (int)signal.size(0) > max_trim) {
+            if (end >= num_samples || (end / (float)signal.size(0)) > max_trim) {
                 return min_trim;
             } else {
                 return end;
