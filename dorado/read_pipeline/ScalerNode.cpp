@@ -24,8 +24,7 @@ void ScalerNode::worker_thread() {
         m_cv.wait_for(lock, 100ms, [this] { return !m_reads.empty(); });
         if (m_reads.empty()) {
             if (m_terminate) {
-                // Notify our sink and then kill the worker if we're done
-                m_sink.terminate();
+                // Termination flag is set and read input queue is empty, so terminate the worker
                 return;
             } else {
                 continue;
@@ -64,15 +63,25 @@ void ScalerNode::worker_thread() {
     }
 }
 
-ScalerNode::ScalerNode(ReadSink& sink, size_t max_reads)
-        : ReadSink(max_reads),
-          m_sink(sink),
-          m_worker(new std::thread(&ScalerNode::worker_thread, this)) {}
+ScalerNode::ScalerNode(ReadSink& sink, size_t max_reads) : ReadSink(max_reads), m_sink(sink) {
+    for (int i = 0; i < m_num_worker_threads; i++) {
+        std::unique_ptr<std::thread> scaler_worker_thread =
+                std::make_unique<std::thread>(&ScalerNode::worker_thread, this);
+        worker_threads.push_back(std::move(scaler_worker_thread));
+    }
+}
 
 ScalerNode::~ScalerNode() {
     terminate();
     m_cv.notify_one();
-    m_worker->join();
+
+    // Wait for all the Scaler Node's worker threads to terminate
+    for (auto& t : worker_threads) {
+        t->join();
+    }
+
+    //Notify the sink that the Scaler Node has terminated
+    m_sink.terminate();
 }
 
 int ScalerNode::trim(torch::Tensor signal,
