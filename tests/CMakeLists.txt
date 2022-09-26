@@ -1,6 +1,8 @@
+
 set(SOURCE_FILES 
     main.cpp
     Fast5DataLoaderTest.cpp
+    TensorUtilsTest.cpp
     MathUtilsTest.cpp
     ReadTest.cpp
     RemoraEncoderTest.cpp

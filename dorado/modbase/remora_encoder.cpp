@@ -26,13 +26,11 @@ void RemoraEncoder::init(const std::vector<int>& sequence_ints,
     // remove the final entry, we're only interested in where the bases start
     m_sample_offsets = {std::begin(seq_to_sig_map), std::prev(std::end(seq_to_sig_map), 1)};
 
-    m_seq_len = int(sequence_ints.size());
-
-    // round the signal length up to the next block
+    // last entry is the signal length
     m_signal_len = seq_to_sig_map.back();
-    if (m_signal_len % m_block_stride != 0) {
-        m_signal_len += m_block_stride - m_signal_len % m_block_stride;
-    }
+
+    // cache sequence length
+    m_seq_len = int(sequence_ints.size());
 }
 
 RemoraEncoder::Context RemoraEncoder::get_context(size_t seq_pos) const {
@@ -112,7 +110,11 @@ int RemoraEncoder::compute_sample_pos(int base_pos) const {
         return m_block_stride * (base_offset);
     }
     if (base_offset >= m_seq_len) {
-        return m_signal_len + m_block_stride * (base_offset - m_seq_len);
+        auto sig_len = m_signal_len;
+        if (sig_len % m_block_stride != 0) {
+            sig_len += m_block_stride - m_signal_len % m_block_stride;
+        }
+        return sig_len + m_block_stride * (base_offset - m_seq_len);
     }
     return m_sample_offsets[base_offset];
 }

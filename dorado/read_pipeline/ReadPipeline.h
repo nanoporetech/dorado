@@ -53,15 +53,19 @@ public:
     float range;             // Loaded from source file
     float offset;            // Loaded from source file
 
-    float med;  // To be set by scaler
-    float mad;  // To be set by scaler
+    float shift;  // To be set by scaler
+    float scale;  // To be set by scaler
 
     bool scale_set = false;  // Set to True if scale has been applied to raw data
-    float scale;  // Scale factor applied to convert raw integers from sequencer into pore current values
+    float scaling;  // Scale factor applied to convert raw integers from sequencer into pore current values
 
     size_t num_chunks;  // Number of chunks in the read. Reads raw data is split into chunks for efficient basecalling.
     std::vector<std::shared_ptr<Chunk>> called_chunks;  // Vector of basecalled chunks.
     std::atomic_size_t num_chunks_called;  // Number of chunks which have been basecalled
+
+    size_t num_modbase_chunks;
+    std::atomic_size_t
+            num_modbase_chunks_called;  // Number of modbase chunks which have been scored
 
     std::string read_id;                  // Unique read ID (UUID4)
     std::string seq;                      // Read basecall
@@ -72,7 +76,6 @@ public:
     std::shared_ptr<const BaseModInfo>
             base_mod_info;  // Modified base settings of the models that ran on this read
 
-    uint64_t num_samples;          // Number of raw samples in read
     uint64_t num_trimmed_samples;  // Number of samples which have been trimmed from the raw read.
 
     Attributes attributes;

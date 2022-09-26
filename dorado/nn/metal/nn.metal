@@ -85,7 +85,6 @@ kernel void add_softmax(
     device const ScanArgs* args,
     device ftype_in *fwd_post,
     device const ftype_in *bwd,
-    device ftype_in *post,
     KERNEL_INDEX_INPUTS)
 {
     int T = args->T + 1;
@@ -124,6 +123,13 @@ struct LstmArgs {
     int linear_layer_size;
 };
 
+struct LinearArgs {
+    int in_batch_tiles;
+    int in_batch_tile_offset;
+    int out_batch_tiles;
+    int chunk_size;
+    int linear_layer_size;
+};
 
 kernel void reorder_weights(
     device const LstmArgs* lstm,
@@ -637,4 +643,28 @@ kernel void conv3_simd
 #define LSTM_SIMD_GROUPS 32
 #define LSTM_REVERSE 1
 #define LSTM_KERNEL_SUFFIX _512_rev_32
+#include "nn.h"
+
+#define LSTM_LAYER_SIZE 768
+#define LSTM_SIMD_GROUPS 32
+#define LSTM_REVERSE 0
+#define LSTM_KERNEL_SUFFIX _768_fwd_32
+#include "nn.h"
+
+#define LSTM_LAYER_SIZE 768
+#define LSTM_SIMD_GROUPS 32
+#define LSTM_REVERSE 1
+#define LSTM_KERNEL_SUFFIX _768_rev_32
+#include "nn.h"
+
+#define LSTM_LAYER_SIZE 1024
+#define LSTM_SIMD_GROUPS 32
+#define LSTM_REVERSE 0
+#define LSTM_KERNEL_SUFFIX _1024_fwd_32
+#include "nn.h"
+
+#define LSTM_LAYER_SIZE 1024
+#define LSTM_SIMD_GROUPS 32
+#define LSTM_REVERSE 1
+#define LSTM_KERNEL_SUFFIX _1024_rev_32
 #include "nn.h"

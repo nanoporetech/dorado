@@ -1,8 +1,11 @@
 #include "Version.h"
 #include "data_loader/DataLoader.h"
 #include "decode/CPUDecoder.h"
-#include "decode/GPUDecoder.h"
+#ifdef __APPLE__
 #include "nn/MetalCRFModel.h"
+#else
+#include "nn/CudaCRFModel.h"
+#endif
 #include "nn/ModelRunner.h"
 #include "nn/RemoraModel.h"
 #include "read_pipeline/BasecallerNode.h"
@@ -25,6 +28,8 @@ void setup(std::vector<std::string> args,
            size_t overlap,
            size_t batch_size,
            size_t num_runners,
+           size_t remora_batch_size,
+           size_t num_remora_threads,
            bool emit_fastq) {
     torch::set_num_threads(1);
     std::vector<Runner> runners;
@@ -40,13 +45,17 @@ void setup(std::vector<std::string> args,
         for (int i = 0; i < num_runners; i++) {
             runners.push_back(std::make_shared<MetalModelRunner>(caller, chunk_size, batch_size));
         }
-#endif  // __APPLE__
     } else {
+        throw std::runtime_error(std::string("Unsupported device: ") + device);
+    }
+#else   // ifdef __APPLE__
+    } else {
+        auto caller = create_cuda_caller(model_path, chunk_size, batch_size, device);
         for (int i = 0; i < num_runners; i++) {
-            runners.push_back(std::make_shared<ModelRunner<GPUDecoder>>(model_path, device,
-                                                                        chunk_size, batch_size));
+            runners.push_back(std::make_shared<CudaModelRunner>(caller, chunk_size, batch_size));
         }
     }
+#endif  // __APPLE__
 
     // verify that all runners are using the same stride, in case we allow multiple models in future
     auto model_stride = runners.front()->model_stride();
@@ -66,10 +75,12 @@ void setup(std::vector<std::string> args,
     }
 
     // generate model callers before nodes or it affects the speed calculations
-    std::shared_ptr<RemoraRunner> mod_base_runner =
-            remora_model_list.empty()
-                    ? std::shared_ptr<RemoraRunner>{}
-                    : std::make_shared<RemoraRunner>(remora_model_list, device, model_stride);
+    std::vector<std::shared_ptr<RemoraCaller>> remora_callers;
+    for (const auto& remora_model : remora_model_list) {
+        auto caller = std::make_shared<RemoraCaller>(remora_model, device, remora_batch_size,
+                                                     model_stride);
+        remora_callers.push_back(caller);
+    }
 
     WriterNode writer_node(std::move(args), emit_fastq);
 
@@ -77,7 +88,9 @@ void setup(std::vector<std::string> args,
     std::unique_ptr<BasecallerNode> basecaller_node;
 
     if (!remora_model_list.empty()) {
-        mod_base_caller_node.reset(new ModBaseCallerNode(writer_node, mod_base_runner));
+        mod_base_caller_node.reset(new ModBaseCallerNode(writer_node, std::move(remora_callers),
+                                                         num_remora_threads, model_stride,
+                                                         remora_batch_size));
         basecaller_node =
                 std::make_unique<BasecallerNode>(*mod_base_caller_node, std::move(runners),
                                                  batch_size, chunk_size, overlap, model_stride);
@@ -106,13 +119,17 @@ int basecaller(int argc, char* argv[]) {
 
     parser.add_argument("-b", "--batchsize").default_value(1024).scan<'i', int>();
 
-    parser.add_argument("-c", "--chunksize").default_value(8000).scan<'i', int>();
+    parser.add_argument("-c", "--chunksize").default_value(10000).scan<'i', int>();
 
-    parser.add_argument("-o", "--overlap").default_value(150).scan<'i', int>();
+    parser.add_argument("-o", "--overlap").default_value(500).scan<'i', int>();
 
-    parser.add_argument("-r", "--num_runners").default_value(1).scan<'i', int>();
+    parser.add_argument("-r", "--num_runners").default_value(2).scan<'i', int>();
 
     parser.add_argument("--emit-fastq").default_value(false).implicit_value(true);
+
+    parser.add_argument("--remora-batchsize").default_value(1000).scan<'i', int>();
+
+    parser.add_argument("--remora-threads").default_value(1).scan<'i', int>();
 
     parser.add_argument("--remora_models")
             .default_value(std::string())
@@ -133,7 +150,8 @@ int basecaller(int argc, char* argv[]) {
         setup(args, parser.get<std::string>("model"), parser.get<std::string>("data"),
               parser.get<std::string>("--remora_models"), parser.get<std::string>("-x"),
               parser.get<int>("-c"), parser.get<int>("-o"), parser.get<int>("-b"),
-              parser.get<int>("-r"), parser.get<bool>("--emit-fastq"));
+              parser.get<int>("-r"), parser.get<int>("--remora-batchsize"),
+              parser.get<int>("--remora-threads"), parser.get<bool>("--emit-fastq"));
     } catch (const std::exception& e) {
         std::cerr << e.what() << std::endl;
         return 1;

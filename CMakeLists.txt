@@ -66,8 +66,6 @@ set(LIB_SOURCE_FILES
     dorado/decode/beam_search.h
     dorado/decode/CPUDecoder.cpp
     dorado/decode/CPUDecoder.h
-    dorado/decode/GPUDecoder.cpp
-    dorado/decode/GPUDecoder.h
     dorado/modbase/remora_encoder.cpp
     dorado/modbase/remora_encoder.h
     dorado/modbase/remora_scaler.cpp
@@ -96,6 +94,13 @@ if(APPLE)
         dorado/nn/MetalCRFModel.cpp
         dorado/utils/metal_utils.cpp
         dorado/utils/metal_utils.h
+    )
+else ()
+    list(APPEND LIB_SOURCE_FILES
+        dorado/decode/GPUDecoder.cpp
+        dorado/decode/GPUDecoder.h
+        dorado/nn/CudaCRFModel.h
+        dorado/nn/CudaCRFModel.cpp
     )
 endif()
 
@@ -182,5 +187,8 @@ elseif(APPLE)
 endif()
 
 add_subdirectory(tests)
+if(APPLE)
+    add_subdirectory(metal_tests)
+endif()
 
 include(cmake/DoradoPackaging.cmake)

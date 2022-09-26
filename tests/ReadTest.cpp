@@ -6,14 +6,24 @@
 #define TEST_GROUP "ReadTest"
 
 TEST_CASE(TEST_GROUP ": Test tag generation", TEST_GROUP) {
-    const std::vector<std::string> expected_tags{
-            "qs:i:0",  // empty qstring
-            "ns:i:121131", "ts:i:2130",         "mx:i:2", "ch:i:5", "st:Z:2017-04-29T09:10:04Z",
-            "rn:i:18501",  "f5:Z:batch_0.fast5"};
+    const std::vector<std::string> expected_tags{"qs:i:0",  // empty qstring
+                                                 "ns:i:4132",
+                                                 "ts:i:132",
+                                                 "mx:i:2",
+                                                 "ch:i:5",
+                                                 "st:Z:2017-04-29T09:10:04Z",
+                                                 "rn:i:18501",
+                                                 "f5:Z:batch_0.fast5",
+                                                 "sm:f:128.384",
+                                                 "sd:f:8.258",
+                                                 "sv:Z:quantile"};
 
     Read test_read;
-    test_read.num_samples = 121131;
-    test_read.num_trimmed_samples = 2130;
+
+    test_read.raw_data = torch::empty(4000);
+    test_read.shift = 128.3842f;
+    test_read.scale = 8.258f;
+    test_read.num_trimmed_samples = 132;
     test_read.attributes.mux = 2;
     test_read.attributes.read_number = 18501;
     test_read.attributes.channel_number = 5;
@@ -48,14 +58,16 @@ TEST_CASE(TEST_GROUP ": Test sam line generation", TEST_GROUP) {
     SECTION("Generated sam line for unaligned read is correct") {
         std::vector<std::string> expected_sam_lines{
                 "test_read\t4\t*\t0\t0\t*\t*\t0\t8\tACGTACGT\t********\t"
-                "qs:i:9\tns:i:121131\tts:i:2130\tmx:i:2\tch:i:5\tst:Z:2017-04-29T09:10:04Z\trn:i:"
-                "18501\tf5:Z:batch_0.fast5"};
+                "qs:i:9\tns:i:4132\tts:i:132\tmx:i:2\tch:i:5\tst:Z:2017-04-29T09:10:04Z\trn:i:"
+                "18501\tf5:Z:batch_0.fast5\tsm:f:128.384\tsd:f:8.258\tsv:Z:quantile"};
 
+        test_read.raw_data = torch::empty(4000);
+        test_read.shift = 128.3842f;
+        test_read.scale = 8.258f;
         test_read.read_id = "test_read";
         test_read.seq = "ACGTACGT";
         test_read.qstring = "********";
-        test_read.num_samples = 121131;
-        test_read.num_trimmed_samples = 2130;
+        test_read.num_trimmed_samples = 132;
         test_read.attributes.mux = 2;
         test_read.attributes.read_number = 18501;
         test_read.attributes.channel_number = 5;

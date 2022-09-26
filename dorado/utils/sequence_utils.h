@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -19,6 +20,7 @@ std::vector<int> sequence_to_ints(const std::string& sequence);
 // Convert move table to vector of indices
 std::vector<uint64_t> moves_to_map(const std::vector<uint8_t>& moves,
                                    size_t block_stride,
-                                   size_t signal_len);
+                                   size_t signal_len,
+                                   std::optional<size_t> reserve_size = std::nullopt);
 
 }  // namespace utils

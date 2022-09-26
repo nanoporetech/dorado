@@ -36,10 +36,16 @@ std::vector<int> sequence_to_ints(const std::string& sequence) {
     return sequence_ints;
 }
 
+// Convert a move table to an array of the indices of the start/end of each base in the signal
 std::vector<uint64_t> moves_to_map(const std::vector<uint8_t>& moves,
                                    size_t block_stride,
-                                   size_t signal_len) {
+                                   size_t signal_len,
+                                   std::optional<size_t> reserve_size) {
     std::vector<uint64_t> seq_to_sig_map;
+    if (reserve_size) {
+        seq_to_sig_map.reserve(*reserve_size);
+    }
+
     for (size_t i = 0; i < moves.size(); ++i) {
         if (moves[i] == 1) {
             seq_to_sig_map.push_back(i * block_stride);

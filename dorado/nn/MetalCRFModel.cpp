@@ -12,6 +12,8 @@
 #include <toml.hpp>
 #include <torch/torch.h>
 
+#include <vector>
+
 using namespace std::chrono_literals;
 using namespace torch::nn;
 namespace F = torch::nn::functional;
@@ -51,8 +53,8 @@ struct MetalConv1dImpl : Module {
         } else {
             mat_weights = create_buffer(device, (k * insize + 1) * outsize * sizeof(ftype));
         }
-        int32_t args_[] = {insize, k, outsize, stride, k / 2, chunk_size, batch_size};
-        args = create_buffer(device, args_, 7);
+        const std::vector<int32_t> args_{insize, k, outsize, stride, k / 2, chunk_size, batch_size};
+        args = create_vec_buffer(device, args_);
 
         auto weight = torch::empty({outsize, insize, k});
         auto bias = torch::empty({outsize});
@@ -125,6 +127,7 @@ struct MetalBlockImpl : Module {
                    int stride_,
                    int layer_size_,
                    int out_size_,
+                   int out_split_,
                    MTL::Device *device_)
             : device(device_),
               in_chunk_size(chunk_size_),
@@ -138,15 +141,29 @@ struct MetalBlockImpl : Module {
 
         lstm_chunk_size = in_chunk_size / stride;
 
-        // args for forward
-        int32_t args_[] = {layer_size, 0, batch_size / tile_size, lstm_chunk_size, out_size};
-        args[0] = create_buffer(device, args_, 5);
-        // args for reverse
-        args_[1] = 1;
-        args[1] = create_buffer(device, args_, 5);
+        // args for forward LSTM
+        std::vector<int32_t> args_lstm_{layer_size, 0, batch_size / tile_size, lstm_chunk_size,
+                                        out_size};
+        args_lstm[0] = create_vec_buffer(device, args_lstm_);
+        // args for reverse LSTM
+        args_lstm_[1] = 1;
+        args_lstm[1] = create_vec_buffer(device, args_lstm_);
+
         // args for conversion to half
-        args_[0] = in_chunk_size * batch_size;
-        args[2] = create_buffer(device, args_, 1);
+        const std::vector<int32_t> args_to_half_{in_chunk_size * batch_size};
+        args_to_half = create_vec_buffer(device, args_to_half_);
+
+        // args for linear layer
+        // Each output buffer requires a distinct input offset, so we must have a separate args buffer.
+        args_linear.resize(out_split_);
+        for (int i = 0; i < out_split_; ++i) {
+            const int32_t in_batch_tiles = batch_size / tile_size;
+            const int32_t out_batch_tiles = (batch_size / out_split_) / tile_size;
+            const int32_t in_batch_tile_offset = out_batch_tiles * i;
+            std::vector<int32_t> args_linear_ = {in_batch_tiles, in_batch_tile_offset,
+                                                 out_batch_tiles, lstm_chunk_size, out_size};
+            args_linear.at(i) = create_vec_buffer(device, args_linear_);
+        }
 
         switch (layer_size) {
         case 128:
@@ -162,6 +179,12 @@ struct MetalBlockImpl : Module {
             kernel_simd_groups = 24;
             break;
         case 512:
+            kernel_simd_groups = 32;
+            break;
+        case 768:
+            kernel_simd_groups = 32;
+            break;
+        case 1024:
             kernel_simd_groups = 32;
             break;
         default:
@@ -235,7 +258,7 @@ struct MetalBlockImpl : Module {
             t_u = t_u.flatten(0, -1).contiguous();
             t_b = t_b.flatten(0, -1).contiguous();
 
-            std::vector<MTL::Buffer *> buffers{args[rnn->reverse], mtl_for_tensor(t_w),
+            std::vector<MTL::Buffer *> buffers{args_lstm[rnn->reverse], mtl_for_tensor(t_w),
                                                mtl_for_tensor(t_u), mtl_for_tensor(t_b),
                                                rnn->mat_weights};
             launch_kernel(reorder_weights_cps, command_queue, buffers, kernel_thread_groups, 256);
@@ -247,8 +270,8 @@ struct MetalBlockImpl : Module {
         t_w = torch::concat({t_w.transpose(1, 0).contiguous().flatten(0, -1), t_b}).contiguous();
 
         if (sizeof(ftype) != sizeof(float)) {
-            int numel = int(t_w.numel());
-            MTL::Buffer *args = create_buffer(device, &numel, 1);
+            const auto numel = static_cast<int32_t>(t_w.numel());
+            MTL::Buffer *const args = create_vec_buffer(device, std::vector<int32_t>({numel}));
             mat_linear_weights = create_buffer(device, numel * sizeof(ftype));
             launch_kernel(to_half_cps, command_queue,
                           {args, mtl_for_tensor(t_w), mat_linear_weights}, kernel_thread_groups,
@@ -258,12 +281,16 @@ struct MetalBlockImpl : Module {
         }
     }
 
-    MTL::CommandBuffer *forward_async(torch::Tensor &in, torch::Tensor &out) {
+    // Executes the model, with the linear layer held off by linear_hold_off, if non-NULL.
+    MTL::CommandBuffer *forward_async(torch::Tensor &in,
+                                      MTL::SharedEvent *const linear_hold_off_event,
+                                      int linear_hold_off_id,
+                                      std::vector<torch::Tensor> &out) {
         auto command_buffer = command_queue->commandBuffer();
 
         if (sizeof(ftype) == 2) {
             launch_kernel_no_wait(to_half_cps, command_buffer,
-                                  {args[2], mtl_for_tensor(in), mat_transfer_ftype},
+                                  {args_to_half, mtl_for_tensor(in), mat_transfer_ftype},
                                   kernel_thread_groups, 256);
             conv1->run(command_buffer, mat_transfer_ftype, mat_working_mem);
         } else {
@@ -273,24 +300,37 @@ struct MetalBlockImpl : Module {
         conv3->run(command_buffer, mat_transfer, mat_working_mem);
 
         for (auto &rnn : {rnn1, rnn2, rnn3, rnn4, rnn5}) {
-            std::vector<MTL::Buffer *> buffers{args[rnn->reverse], mat_working_mem,
+            std::vector<MTL::Buffer *> buffers{args_lstm[rnn->reverse], mat_working_mem,
                                                rnn->mat_weights, mat_state, mat_temp_result};
             launch_kernel_no_wait(lstm_cps[rnn->reverse], command_buffer, buffers,
                                   kernel_thread_groups, kernel_simd_groups * 32);
         }
 
-        launch_kernel_no_wait(linear_tanh_cps, command_buffer,
-                              {args[0], mat_working_mem, mat_linear_weights, mtl_for_tensor(out)},
-                              kernel_thread_groups, kernel_simd_groups * 32);
+        // The output buffers of conv/LSTM layers are not used by the decoding, so
+        // can be overwritten by subsequent batches as soon as they have been consumed by
+        // the linear layer.  The output of the linear layer must be protected until
+        // it has been decoded.
+        if (linear_hold_off_event != nullptr) {
+            command_buffer->encodeWait(linear_hold_off_event, linear_hold_off_id);
+        }
 
+        // The output of the linear layer is split into multiple buffers, each generated
+        // by a separate kernel launch.
+        for (int i = 0; i < out.size(); ++i) {
+            MTL::Buffer *const args_buffer = args_linear.at(i);
+            MTL::Buffer *const out_buffer = mtl_for_tensor(out.at(i));
+            launch_kernel_no_wait(linear_tanh_cps, command_buffer,
+                                  {args_buffer, mat_working_mem, mat_linear_weights, out_buffer},
+                                  kernel_thread_groups, kernel_simd_groups * 32);
+        }
         return command_buffer;
     }
 
     torch::Tensor forward(torch::Tensor in) {
-        torch::Tensor out = torch::empty({lstm_chunk_size, batch_size, out_size});
+        std::vector<torch::Tensor> out{torch::empty({lstm_chunk_size, batch_size, out_size})};
         // TODO: find a more robust way of dealing with Metal kernel launch issues
         for (int try_count = 0; try_count < 5; ++try_count) {
-            MTL::CommandBuffer *command_buffer = forward_async(in, out);
+            MTL::CommandBuffer *command_buffer = forward_async(in, nullptr, 0, out);
             command_buffer->commit();
             command_buffer->waitUntilCompleted();
             if (command_buffer->status() == MTL::CommandBufferStatusCompleted) {
@@ -299,7 +339,7 @@ struct MetalBlockImpl : Module {
             using namespace std::chrono_literals;
             std::this_thread::sleep_for(20ms);
         }
-        return out;
+        return out.at(0);
     }
 
     MTL::Device *device;
@@ -307,8 +347,9 @@ struct MetalBlockImpl : Module {
     std::string fn[2];
     MTL::ComputePipelineState *reorder_weights_cps, *reorder_input_cps, *reorder_output_cps,
             *lstm_cps[2], *to_half_cps, *linear_tanh_cps;
-    MTL::Buffer *mat_transfer, *mat_transfer_ftype, *args[3], *mat_working_mem, *mat_state,
-            *mat_temp_result, *mat_linear_weights;
+    MTL::Buffer *mat_transfer, *mat_transfer_ftype, *mat_working_mem, *mat_state, *mat_temp_result,
+            *mat_linear_weights, *args_lstm[2], *args_to_half;
+    std::vector<MTL::Buffer *> args_linear;
     int in_chunk_size, lstm_chunk_size, stride, batch_size, layer_size, out_size,
             kernel_thread_groups, kernel_simd_groups;
     MetalLSTM rnn1{nullptr}, rnn2{nullptr}, rnn3{nullptr}, rnn4{nullptr}, rnn5{nullptr};
@@ -324,9 +365,10 @@ struct MetalModelImpl : Module {
                    int stride,
                    int chunk_size,
                    int batch_size,
+                   int out_split,
                    MTL::Device *device) {
-        mtl_block = register_module(
-                "mtl_block", MetalBlock(chunk_size, batch_size, stride, size, outsize, device));
+        mtl_block = register_module("mtl_block", MetalBlock(chunk_size, batch_size, stride, size,
+                                                            outsize, out_split, device));
     }
 
     void load_state_dict(const std::vector<torch::Tensor> &weights) {
@@ -336,8 +378,11 @@ struct MetalModelImpl : Module {
 
     torch::Tensor forward(torch::Tensor x) { return mtl_block->forward(x); }
 
-    MTL::CommandBuffer *forward_async(torch::Tensor &in, torch::Tensor &out) {
-        return mtl_block->forward_async(in, out);
+    MTL::CommandBuffer *forward_async(torch::Tensor &in,
+                                      MTL::SharedEvent *const linear_hold_off_event,
+                                      int linear_hold_off_id,
+                                      std::vector<torch::Tensor> &out) {
+        return mtl_block->forward_async(in, linear_hold_off_event, linear_hold_off_id, out);
     }
 
     MetalBlock mtl_block{nullptr};
@@ -348,6 +393,9 @@ TORCH_MODULE(MetalModel);
 class MetalCaller {
 public:
     MetalCaller(const std::filesystem::path &model_path, int chunk_size, int batch_size) {
+        // LSTM kernels, which run with the full supplied batch size, require that the batch size
+        // be an integral multiple of 48.
+        assert(batch_size % 48 == 0);
         auto config = toml::parse(model_path / "config.toml");
         const auto &qscore = toml::find(config, "qscore");
         const auto qbias = toml::find<float>(qscore, "bias");
@@ -379,6 +427,9 @@ public:
         // adjust chunk size to a multiple of the stride
         chunk_size -= chunk_size % stride;
 
+        // Chunk size after decimation via convolution stride.
+        m_out_chunk_size = chunk_size / stride;
+
         auto state_dict = load_weights(model_path);
 
         auto lw = state_dict[state_dict.size() - 2];
@@ -393,7 +444,40 @@ public:
                        F::PadFuncOptions({1, 0}).value(atanh(blank_score / scale)))
                         .view({outsize});
 
-        m_model = MetalModel(insize, outsize, stride, chunk_size, batch_size, m_device);
+        // Buffers visible to the CPU and GPU have a 4GB size limit, and the linear layer
+        // output buffer hits this limit with batch sizes larger than 384 with typical
+        // chunk sizes.  At the same time, the LSTM layer performance benefits from large batch sizes.
+        // We therefore run the linear layer via 1 or more kernel runs, each with an output buffer
+        // with a size <= 4GB, with a reduced batch size.
+        // The linear layer kernel requires a batch size that is an integral multiple of 48.
+        // As things stand, we need an exactly even split of batch elements in the linear
+        // layer output buffers (this could be relaxed).
+        // We therefore need the smallest divisor of batch_size that results in
+        // linear layer output buffers < 4GB, and a linear layer batch size that is an
+        // integral multiple of 48.  Since the LSTM batch size is already constrained to be an integral multiple of
+        // 48, this means the batch splitting factor must be an exact divisor of
+        // the batch_size / 48.
+        constexpr auto kMaxBufferSize = static_cast<int64_t>(1) << 32;
+        const auto complete_linear_out_size = static_cast<int64_t>(m_out_chunk_size) *
+                                              static_cast<int64_t>(batch_size) *
+                                              static_cast<int64_t>(outsize) * sizeof(float);
+        const int num_batch_pieces = batch_size / 48;
+        for (m_out_split = 1; m_out_split < num_batch_pieces; ++m_out_split) {
+            if (num_batch_pieces % m_out_split == 0 &&
+                complete_linear_out_size / m_out_split < kMaxBufferSize)
+                break;
+        }
+        // If we exited the loop above without breaking, then m_out_split = num_batch_pieces,
+        // which satisfies the divisor criterion, and should mean small enough linear layer
+        // output buffers, given other reasonable parameters.
+        assert(num_batch_pieces % m_out_split == 0);
+        assert(complete_linear_out_size / m_out_split < kMaxBufferSize);
+        assert(batch_size % m_out_split == 0);
+        m_out_batch_size = batch_size / m_out_split;
+        assert(m_out_batch_size % 48 == 0);
+
+        m_model =
+                MetalModel(insize, outsize, stride, chunk_size, batch_size, m_out_split, m_device);
         m_model->load_state_dict(state_dict);
         m_model->eval();
 
@@ -410,9 +494,7 @@ public:
             m_decode_threads.emplace_back(new std::thread(&MetalCaller::decode_thread_fn, this, i));
         }
 
-        m_out_chunk_size = chunk_size / stride;
         int T = m_out_chunk_size;
-        int N = batch_size;
         int C = outsize;
         int Cs = m_states;
 
@@ -432,9 +514,11 @@ public:
                                    .contiguous();
         m_scan_idx[1][1] = torch::div(m_scan_idx[1][0], num_transitions, "floor");
 
-        m_scores = torch::empty({T, N, C});
-        m_posts = torch::empty({N, T + 1, Cs});
-        m_bwd = torch::empty({N, T + 1, Cs});
+        for (int i = 0; i < m_out_split; ++i) {
+            m_scores.push_back(torch::empty({T, m_out_batch_size, C}));
+            m_posts.push_back(torch::empty({m_out_batch_size, T + 1, Cs}));
+            m_bwd.push_back(torch::empty({m_out_batch_size, T + 1, Cs}));
+        }
     }
 
     ~MetalCaller() {
@@ -532,35 +616,45 @@ public:
 
             // TODO: find a more robust way of dealing with Metal kernel launch issues
             for (int try_count = 0; try_count < 5; ++try_count) {
-                MTL::CommandBuffer *cb = m_model->forward_async(*task->input, m_scores);
-                if (task->run_id != 0) {
-                    cb->encodeWait(m_mtl_event, task->run_id - 1);
-                }
+                // The linear layer should not execute until the previous batch has been decoded,
+                // since the same buffers are used for successive batches' scores, fwd/bwd scans.
+                MTL::SharedEvent *const linear_hold_off =
+                        (task->run_id != 0) ? m_mtl_event : nullptr;
+                MTL::CommandBuffer *const cb = m_model->forward_async(*task->input, linear_hold_off,
+                                                                      task->run_id - 1, m_scores);
 
-                auto &fwd = m_posts;  // Reusing memory
-                int32_t scan_args_[] = {m_out_chunk_size, m_batch_size, m_states,
-                                        1};  // T, N, C, dir
-                auto args_fwd = create_buffer(m_device, scan_args_, 4);
+                // The same buffer is used for the forward scan results and the output of
+                // m_add_softmax_cps.
+                auto &fwd = m_posts;
+                // This stage is operating on the split outputs of the linear layer, so
+                // the effective batch size is m_out_batch_size.
+                std::vector<int32_t> scan_args_{m_out_chunk_size, m_out_batch_size, m_states,
+                                                1};  // T, N, C, dir
+                auto args_fwd = create_vec_buffer(m_device, scan_args_);
                 scan_args_[3] = -1;
-                auto args_bwd = create_buffer(m_device, scan_args_, 4);
+                auto args_bwd = create_vec_buffer(m_device, scan_args_);
 
-                // TODO: optimise grid size
-                launch_kernel_no_wait(
-                        m_scan_cps, cb,
-                        {args_fwd, mtl_for_tensor(m_scores), mtl_for_tensor(fwd),
-                         mtl_for_tensor(m_scan_idx[0][0]), mtl_for_tensor(m_scan_idx[0][1])},
-                        task->num_chunks, m_states);
-                launch_kernel_no_wait(
-                        m_scan_cps, cb,
-                        {args_bwd, mtl_for_tensor(m_scores), mtl_for_tensor(m_bwd),
-                         mtl_for_tensor(m_scan_idx[1][0]), mtl_for_tensor(m_scan_idx[1][1])},
-                        task->num_chunks, m_states);
-                launch_kernel_no_wait(m_add_softmax_cps, cb,
-                                      {args_fwd, mtl_for_tensor(fwd), mtl_for_tensor(m_bwd)},
-                                      task->num_chunks, m_states);
+                for (int i = 0; i < m_out_split; ++i) {
+                    // TODO: optimise grid size
+                    launch_kernel_no_wait(
+                            m_scan_cps, cb,
+                            {args_fwd, mtl_for_tensor(m_scores.at(i)), mtl_for_tensor(fwd.at(i)),
+                             mtl_for_tensor(m_scan_idx[0][0]), mtl_for_tensor(m_scan_idx[0][1])},
+                            m_out_batch_size, m_states);
+                    launch_kernel_no_wait(
+                            m_scan_cps, cb,
+                            {args_bwd, mtl_for_tensor(m_scores.at(i)), mtl_for_tensor(m_bwd.at(i)),
+                             mtl_for_tensor(m_scan_idx[1][0]), mtl_for_tensor(m_scan_idx[1][1])},
+                            m_out_batch_size, m_states);
+                    launch_kernel_no_wait(
+                            m_add_softmax_cps, cb,
+                            {args_fwd, mtl_for_tensor(fwd.at(i)), mtl_for_tensor(m_bwd.at(i))},
+                            m_out_batch_size, m_states);
+                }
 
                 cb->commit();
                 cb->waitUntilCompleted();
+
                 auto status = cb->status();
                 if (status == MTL::CommandBufferStatusCompleted) {
                     break;
@@ -597,11 +691,19 @@ public:
             }
             decode_lock.unlock();
 
-            auto decode_result =
-                    beam_search_decode(m_scores.index({Slice(), chunk_idx}), m_bwd[chunk_idx],
-                                       m_posts[chunk_idx], m_decoder_options.beam_cut,
-                                       m_decoder_options.blank_score, m_decoder_options.q_shift,
-                                       m_decoder_options.q_scale, m_decoder_options.temperature);
+            // Model outputs are split across m_out_split buffers.
+            assert(m_scores.size() == m_out_split);
+            assert(m_bwd.size() == m_out_split);
+            assert(m_posts.size() == m_out_split);
+            const int out_buf_idx = chunk_idx / m_out_batch_size;
+            const int buf_chunk_idx = chunk_idx % m_out_batch_size;
+
+            auto decode_result = beam_search_decode(
+                    m_scores.at(out_buf_idx).index({Slice(), buf_chunk_idx}),
+                    m_bwd.at(out_buf_idx)[buf_chunk_idx], m_posts.at(out_buf_idx)[buf_chunk_idx],
+                    m_decoder_options.beam_cut, m_decoder_options.blank_score,
+                    m_decoder_options.q_shift, m_decoder_options.q_scale,
+                    m_decoder_options.temperature);
             (*task->out_chunks)[chunk_idx] = DecodedChunk{
                     std::get<0>(decode_result),
                     std::get<1>(decode_result),
@@ -635,8 +737,12 @@ public:
     MTL::ComputePipelineState *m_scan_cps, *m_add_softmax_cps;
     MTL::SharedEvent *m_mtl_event;
     torch::Tensor m_scan_idx[2][2];
-    torch::Tensor m_scores, m_posts, m_bwd;
+    std::vector<torch::Tensor> m_scores, m_posts, m_bwd;
     int m_out_chunk_size, m_batch_size, m_states, m_model_stride;
+    // Number of pieces the linear output is split into, for reasons of
+    // buffer size constraints.
+    int m_out_split;
+    int m_out_batch_size;
 };
 
 std::shared_ptr<MetalCaller> create_metal_caller(const std::filesystem::path &model_path,
