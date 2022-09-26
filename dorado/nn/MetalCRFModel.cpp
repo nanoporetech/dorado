@@ -207,13 +207,9 @@ struct MetalBlockImpl : Module {
         reorder_weights_cps = make_cps(device, "reorder_weights");
 
         // TODO: we can reuse some of these matrices
-        // If processing is in float16 precision, inputs are converted to float16,
-        // with the result in mat_in_ftype; otherwise this is not used.
-        mat_in_ftype =
-                (typeid(ftype) == typeid(float))
-                        ? nullptr
-                        : create_buffer(device, (size_t)batch_size * in_chunk_size * sizeof(ftype));
-        // The output of the second conv layer resides in this buffer.
+        // This buffer is sized to accommodate the output of the second conv layer.
+        // It is also used for the (smaller) input to the first conv layer in the case
+        // where float16 processing is done, and we need to convert from float32 inputs.
         constexpr int kConv2OutChannels = 16;
         mat_transfer = create_buffer(
                 device, batch_size * kConv2OutChannels * in_chunk_size * sizeof(ftype));
@@ -294,11 +290,11 @@ struct MetalBlockImpl : Module {
         auto command_buffer = command_queue->commandBuffer();
 
         if (sizeof(ftype) == 2) {
-            // Convert input activations to ftype.
+            // Convert input activations from float32 to float16.
             launch_kernel_no_wait(to_half_cps, command_buffer,
-                                  {args_to_half, mtl_for_tensor(in), mat_in_ftype},
+                                  {args_to_half, mtl_for_tensor(in), mat_transfer},
                                   kernel_thread_groups, 256);
-            conv1->run(command_buffer, mat_in_ftype, mat_working_mem);
+            conv1->run(command_buffer, mat_transfer, mat_working_mem);
         } else {
             conv1->run(command_buffer, mtl_for_tensor(in), mat_working_mem);
         }
@@ -353,8 +349,8 @@ struct MetalBlockImpl : Module {
     std::string fn[2];
     MTL::ComputePipelineState *reorder_weights_cps, *reorder_input_cps, *reorder_output_cps,
             *lstm_cps[2], *to_half_cps, *linear_tanh_cps;
-    MTL::Buffer *mat_transfer, *mat_in_ftype, *mat_working_mem, *mat_state, *mat_temp_result,
-            *mat_linear_weights, *args_lstm[2], *args_to_half;
+    MTL::Buffer *mat_transfer, *mat_working_mem, *mat_state, *mat_temp_result, *mat_linear_weights,
+            *args_lstm[2], *args_to_half;
     std::vector<MTL::Buffer *> args_linear;
     int in_chunk_size, lstm_chunk_size, stride, batch_size, layer_size, out_size,
             kernel_thread_groups, kernel_simd_groups;
