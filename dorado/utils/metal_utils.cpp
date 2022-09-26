@@ -132,7 +132,6 @@ std::string cfstringref_to_string(const CFStringRef cfstringref) {
         return std::string(buffer.data());
     }
 
-    std::cerr << "CFStringRef conversion failed\n";
     return std::string("");
 }
 
@@ -144,7 +143,6 @@ bool retrieve_ioreg_props(const std::string &service_name,
     // Look for a service matching the supplied class name.
     CFMutableDictionaryRef matching_dict = IOServiceNameMatching(service_name.c_str());
     if (!matching_dict) {
-        std::cerr << "Failed to create dictionary\n";
         return false;
     }
     // Note: kIOMainPortDefault was introduced on MacOS 12.  If support for earlier versions
@@ -153,7 +151,6 @@ bool retrieve_ioreg_props(const std::string &service_name,
     // to release it ourselves.
     io_service_t service = IOServiceGetMatchingService(kIOMainPortDefault, matching_dict);
     if (!service) {
-        std::cerr << "Failed to find service\n";
         return false;
     }
 
@@ -165,11 +162,9 @@ bool retrieve_ioreg_props(const std::string &service_name,
     IOObjectRelease(service);
     CFRelease(cfs_property_name);
     if (!property) {
-        std::cerr << "Failed to obtain property\n";
         return false;
     }
     if (CFGetTypeID(property) != CFDictionaryGetTypeID()) {
-        std::cout << "Property had an unexpected type\n";
         CFRelease(property);
         return false;
     }
@@ -189,7 +184,6 @@ bool retrieve_ioreg_props(const std::string &service_name,
         const std::string key = cfstringref_to_string(static_cast<CFStringRef>(key_ref));
         int64_t value = -1;
         if (!CFNumberGetValue(static_cast<CFNumberRef>(value_ref), kCFNumberSInt64Type, &value)) {
-            std::cerr << "Failed to convert number\n";
             return;
         }
         props_ptr->insert({key, value});
@@ -201,17 +195,35 @@ bool retrieve_ioreg_props(const std::string &service_name,
 }
 
 int get_mtl_device_core_count() {
-    // The G13 accelerator is what is present in M1.
+    // We cache the count once it has been obtained.
+    static int gpu_core_count = -1;
+    if (gpu_core_count != -1)
+        return gpu_core_count;
+
+    // Attempt to directly query the GPU core count.
+    // The G13 accelerator is what is present in M1-type chips.
     // TODO -- Is this service present on later chips?
     std::unordered_map<std::string, int64_t> gpu_specs;
     if (retrieve_ioreg_props("AGXAcceleratorG13X", "GPUConfigurationVariable", gpu_specs)) {
-        if (auto gpu_cores_it = gpu_specs.find("num_cores"); gpu_cores_it != gpu_specs.cend())
-            return gpu_cores_it->second;
+        if (auto gpu_cores_it = gpu_specs.find("num_cores"); gpu_cores_it != gpu_specs.cend()) {
+            gpu_core_count = gpu_cores_it->second;
+            return gpu_core_count;
+        }
     }
 
-    // If querying failed, fall back to 8, which implies a close to minimum spec. M1.
-    std::cerr << "Failed to retrieve GPU specs\n";
-    return 8;
+    // If querying failed, estimate the count based on the Metal device name,
+    // with a fallback of 8 (a complete base spec. M1) if it is not recognised.
+    gpu_core_count = 8;
+    const std::string name = get_mtl_device()->name()->utf8String();
+    if (name == "Apple M1 Pro") {
+        gpu_core_count = 16;
+    } else if (name == "Apple M1 Max") {
+        gpu_core_count = 32;
+    } else if (name == "Apple M1 Ultra") {
+        gpu_core_count = 64;
+    }
+
+    return gpu_core_count;
 }
 
 int get_apple_cpu_perf_core_count() {
