@@ -1,6 +1,7 @@
 set(TORCH_VERSION 1.12.1)
 set(CUDNN_LIBRARY_PATH ${CMAKE_SOURCE_DIR}/dorado/3rdparty/fake_cudnn)
 set(CUDNN_INCLUDE_PATH ${CMAKE_SOURCE_DIR}/dorado/3rdparty/fake_cudnn)
+set(CMAKE_CUDA_ARCHITECTURES 70 72 75 80 86)
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     set(TORCH_URL https://download.pytorch.org/libtorch/cu113/libtorch-cxx11-abi-shared-with-deps-${TORCH_VERSION}%2Bcu113.zip)
