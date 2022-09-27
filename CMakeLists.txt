@@ -18,6 +18,12 @@ include(cmake/Pod5.cmake)
 include(cmake/Torch.cmake)
 include(cmake/OpenSSL.cmake)
 
+if(DEFINED USING_OLD_CPP_ABI)
+  # We need to force the use of the old ABI here, if we are building in an old ABI context, as otherwise elzip builds
+  # with the libc++11 ABI and we can't link against it.
+  add_compile_options(-D_GLIBCXX_USE_CXX11_ABI=0)
+endif()
+
 add_subdirectory(dorado/3rdparty/elzip)
 
 enable_testing()
