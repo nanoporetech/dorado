@@ -117,7 +117,7 @@ build_archive:linux:x86:focal:
 build_archive:linux:x86:centos7:
   image: ${DORADO_DOCKER_ROOT}/dorado-deps-centos7:1.0
   variables:
-    BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/libtorch -DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN} -DOPENSSL_ROOT_DIR=/usr/lib64/openssl11/ -DOPENSSL_INCLUDE_DIR=/usr/include/openssl11 -DUSING_OLD_CPP_ABI"
+    BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/libtorch -DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN} -DOPENSSL_ROOT_DIR=/usr/lib64/openssl11/ -DOPENSSL_INCLUDE_DIR=/usr/include/openssl11 -DDORADO_USING_OLD_CPP_ABI=ON"
   <<: *linux_runner
   <<: *build_dorado_archive
   when: manual
