@@ -1,5 +1,7 @@
 #include "metal_utils.h"
 
+#include <CoreFoundation/CoreFoundation.h>
+#include <IOKit/IOKitLib.h>
 #include <Metal/Metal.hpp>
 #include <mach-o/dyld.h>
 #include <sys/syslimits.h>
@@ -115,20 +117,113 @@ MTL::Device *get_mtl_device() {
     return mtl_device;
 }
 
-int get_mtl_device_core_count() {
-    std::string name = get_mtl_device()->name()->utf8String();
-    // TODO: These numbers aren't always correct, lower-spec versions with 7, 14, 24 cores also exist.
-    //  And 8 might not be a good fallback. How do we determine the actual core count?
-    if (name == "Apple M1") {
-        return 8;
-    } else if (name == "Apple M1 Pro") {
-        return 16;
-    } else if (name == "Apple M1 Max") {
-        return 32;
-    } else if (name == "Apple M1 Ultra") {
-        return 64;
+// Returns an ASCII std::string associated with the given CFStringRef.
+std::string cfstringref_to_string(const CFStringRef cfstringref) {
+    // There does exist an API to directly return a char* pointer, but this is documented as
+    // failing on an arbitrary basis, and did fail empirically.
+    const auto utf16_len = CFStringGetLength(cfstringref);
+    // We must leave room the for zero terminator, or CFStringGetCString will fail.
+    const auto max_ascii_len =
+            CFStringGetMaximumSizeForEncoding(utf16_len, kCFStringEncodingASCII) + 1;
+    // CFStringGetCString wants to supply its own zero terminator, so write to an intermediate
+    // buffer used for constructing the final std::string.
+    std::vector<char> buffer(max_ascii_len);
+    if (CFStringGetCString(cfstringref, &buffer[0], buffer.size(), kCFStringEncodingASCII)) {
+        return std::string(buffer.data());
     }
-    return 8;
+
+    return std::string("");
+}
+
+// Retrieves a dictionary of int64_t properties associated with a given service/property.
+// Returns true on success.
+bool retrieve_ioreg_props(const std::string &service_name,
+                          const std::string &property_name,
+                          std::unordered_map<std::string, int64_t> &props) {
+    // Look for a service matching the supplied class name.
+    CFMutableDictionaryRef matching_dict = IOServiceNameMatching(service_name.c_str());
+    if (!matching_dict) {
+        return false;
+    }
+    // Note: kIOMainPortDefault was introduced on MacOS 12.  If support for earlier versions
+    // is needed an alternate constant will be needed.
+    // IOServiceGetMatchingService consumes a reference to matching_dict, so we don't need
+    // to release it ourselves.
+    io_service_t service = IOServiceGetMatchingService(kIOMainPortDefault, matching_dict);
+    if (!service) {
+        return false;
+    }
+
+    // Create a CF representation of the registry property of interest.
+    const auto cfs_property_name = CFStringCreateWithCString(
+            kCFAllocatorDefault, property_name.c_str(), kCFStringEncodingUTF8);
+    CFTypeRef property =
+            IORegistryEntryCreateCFProperty(service, cfs_property_name, kCFAllocatorDefault, 0);
+    IOObjectRelease(service);
+    CFRelease(cfs_property_name);
+    if (!property) {
+        return false;
+    }
+    if (CFGetTypeID(property) != CFDictionaryGetTypeID()) {
+        CFRelease(property);
+        return false;
+    }
+
+    // Retrieve entries with integer keys from the CFDictionary we constructed.
+
+    // No implicit conversion from lambda to function pointer if it captures, so
+    // just use the context parameter to point to the unordered_map being populated.
+    const auto process_kvs = [](CFTypeRef key_ref, CFTypeRef value_ref, void *ctx) {
+        auto props_ptr = static_cast<std::unordered_map<std::string, int64_t> *>(ctx);
+        // Presumably keys are always strings -- ignore anything that isn't.
+        // Also ignore non-integer values, of which there are examples that are not
+        // currently relevant.
+        if (CFGetTypeID(key_ref) != CFStringGetTypeID() ||
+            CFGetTypeID(value_ref) != CFNumberGetTypeID())
+            return;
+        const std::string key = cfstringref_to_string(static_cast<CFStringRef>(key_ref));
+        int64_t value = -1;
+        if (!CFNumberGetValue(static_cast<CFNumberRef>(value_ref), kCFNumberSInt64Type, &value)) {
+            return;
+        }
+        props_ptr->insert({key, value});
+    };
+
+    CFDictionaryApplyFunction(static_cast<CFDictionaryRef>(property), process_kvs, &props);
+    CFRelease(property);
+    return true;
+}
+
+int get_mtl_device_core_count() {
+    // We cache the count once it has been obtained.
+    static int gpu_core_count = -1;
+    if (gpu_core_count != -1)
+        return gpu_core_count;
+
+    // Attempt to directly query the GPU core count.
+    // The G13 accelerator is what is present in M1-type chips.
+    // TODO -- Is this service present on later chips?
+    std::unordered_map<std::string, int64_t> gpu_specs;
+    if (retrieve_ioreg_props("AGXAcceleratorG13X", "GPUConfigurationVariable", gpu_specs)) {
+        if (auto gpu_cores_it = gpu_specs.find("num_cores"); gpu_cores_it != gpu_specs.cend()) {
+            gpu_core_count = gpu_cores_it->second;
+            return gpu_core_count;
+        }
+    }
+
+    // If querying failed, estimate the count based on the Metal device name,
+    // with a fallback of 8 (a complete base spec. M1) if it is not recognised.
+    gpu_core_count = 8;
+    const std::string name = get_mtl_device()->name()->utf8String();
+    if (name == "Apple M1 Pro") {
+        gpu_core_count = 16;
+    } else if (name == "Apple M1 Max") {
+        gpu_core_count = 32;
+    } else if (name == "Apple M1 Ultra") {
+        gpu_core_count = 64;
+    }
+
+    return gpu_core_count;
 }
 
 int get_apple_cpu_perf_core_count() {

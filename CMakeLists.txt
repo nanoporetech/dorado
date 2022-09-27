@@ -130,6 +130,7 @@ target_link_libraries(dorado_lib
     ${APPLE_FWK_FOUNDATION}
     ${APPLE_FWK_QUARTZ_CORE}
     ${APPLE_FWK_METAL}
+    ${IOKIT}
     ${HDF5_C_LIBRARIES}
     ${TORCH_LIBRARIES}
     ${POD5_LIBRARIES}
