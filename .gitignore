@@ -4,6 +4,7 @@
 .vscode
 dist
 build
+build-Release
 archive
 cmake-build*
 cmake.lock
