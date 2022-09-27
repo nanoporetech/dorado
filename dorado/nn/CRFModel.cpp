@@ -127,7 +127,6 @@ struct LSTMStackImpl : Module {
         m_quantize = ((layer_size == 96) || (layer_size == 128));
 
         if (m_quantize) {
-            auto opts = torch::TensorOptions().dtype(torch::kFloat16);
             // chunk_size * batch_size can not be > 2**31 (2147483648).
             // For practical purposes this is currently always the case.
             _chunks = torch::empty({batch_size, 4}).to(torch::kInt32);
@@ -310,6 +309,8 @@ struct LSTMStackImpl : Module {
     }
 
     torch::Tensor forward_quantized(torch::Tensor x) {
+        c10::cuda::CUDAGuard device_guard(x.device());
+
         //If this is the fist time the forward method is being applied, do some startup
         if (m_quantize && !_weights_rearranged) {
             rearrange_weights();
