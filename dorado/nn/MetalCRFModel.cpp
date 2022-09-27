@@ -207,12 +207,13 @@ struct MetalBlockImpl : Module {
         reorder_weights_cps = make_cps(device, "reorder_weights");
 
         // TODO: we can reuse some of these matrices
+        // This buffer is sized to accommodate the output of the second conv layer.
+        // It is also used for the (smaller) input to the first conv layer in the case
+        // where float16 processing is done, and we need to convert from float32 inputs.
+        constexpr int kConv2OutChannels = 16;
         mat_transfer = create_buffer(
-                device, (size_t)batch_size * lstm_chunk_size * out_size * sizeof(float));
-        mat_transfer_ftype =
-                (sizeof(ftype) == 4)
-                        ? mat_transfer
-                        : create_buffer(device, (size_t)batch_size * in_chunk_size * sizeof(ftype));
+                device, batch_size * kConv2OutChannels * in_chunk_size * sizeof(ftype));
+        // This buffer is used for several layers of the model.
         mat_working_mem = create_buffer(
                 device, size_t(lstm_chunk_size + 2) * batch_size * layer_size * sizeof(ftype));
         mat_state = create_buffer(device, batch_size * layer_size * sizeof(ftype));
@@ -289,10 +290,11 @@ struct MetalBlockImpl : Module {
         auto command_buffer = command_queue->commandBuffer();
 
         if (sizeof(ftype) == 2) {
+            // Convert input activations from float32 to float16.
             launch_kernel_no_wait(to_half_cps, command_buffer,
-                                  {args_to_half, mtl_for_tensor(in), mat_transfer_ftype},
+                                  {args_to_half, mtl_for_tensor(in), mat_transfer},
                                   kernel_thread_groups, 256);
-            conv1->run(command_buffer, mat_transfer_ftype, mat_working_mem);
+            conv1->run(command_buffer, mat_transfer, mat_working_mem);
         } else {
             conv1->run(command_buffer, mtl_for_tensor(in), mat_working_mem);
         }
@@ -347,8 +349,8 @@ struct MetalBlockImpl : Module {
     std::string fn[2];
     MTL::ComputePipelineState *reorder_weights_cps, *reorder_input_cps, *reorder_output_cps,
             *lstm_cps[2], *to_half_cps, *linear_tanh_cps;
-    MTL::Buffer *mat_transfer, *mat_transfer_ftype, *mat_working_mem, *mat_state, *mat_temp_result,
-            *mat_linear_weights, *args_lstm[2], *args_to_half;
+    MTL::Buffer *mat_transfer, *mat_working_mem, *mat_state, *mat_temp_result, *mat_linear_weights,
+            *args_lstm[2], *args_to_half;
     std::vector<MTL::Buffer *> args_linear;
     int in_chunk_size, lstm_chunk_size, stride, batch_size, layer_size, out_size,
             kernel_thread_groups, kernel_simd_groups;
@@ -444,19 +446,21 @@ public:
                        F::PadFuncOptions({1, 0}).value(atanh(blank_score / scale)))
                         .view({outsize});
 
-        // Buffers visible to the CPU and GPU have a 4GB size limit, and the linear layer
-        // output buffer hits this limit with batch sizes larger than 384 with typical
-        // chunk sizes.  At the same time, the LSTM layer performance benefits from large batch sizes.
-        // We therefore run the linear layer via 1 or more kernel runs, each with an output buffer
-        // with a size <= 4GB, with a reduced batch size.
-        // The linear layer kernel requires a batch size that is an integral multiple of 48.
-        // As things stand, we need an exactly even split of batch elements in the linear
-        // layer output buffers (this could be relaxed).
+        // Allocations beyond 4GB can fail, and the linear layer output buffer
+        // hits this limit with batch sizes larger than 384 with typical
+        // chunk sizes.  At the same time, the LSTM layer performance benefits
+        // from large batch sizes.
+        // We therefore run the linear layer via 1 or more kernel runs, each
+        // with an output buffer with a size <= 4GB, with a reduced batch size.
+        // The linear layer kernel requires a batch size that is an integral
+        // multiple of 48.
+        // As things stand, we need an exactly even split of batch elements in
+        // the linear layer output buffers (this could be relaxed).
         // We therefore need the smallest divisor of batch_size that results in
-        // linear layer output buffers < 4GB, and a linear layer batch size that is an
-        // integral multiple of 48.  Since the LSTM batch size is already constrained to be an integral multiple of
-        // 48, this means the batch splitting factor must be an exact divisor of
-        // the batch_size / 48.
+        // linear layer output buffers < 4GB, and a linear layer batch size
+        // that is an integral multiple of 48.  Since the LSTM batch size is
+        // already constrained to be an integral multiple of 48, this means the
+        // batch splitting factor must be an exact divisor of the batch_size / 48.
         constexpr auto kMaxBufferSize = static_cast<int64_t>(1) << 32;
         const auto complete_linear_out_size = static_cast<int64_t>(m_out_chunk_size) *
                                               static_cast<int64_t>(batch_size) *
