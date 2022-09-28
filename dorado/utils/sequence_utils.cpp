@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <iterator>
 #include <numeric>
 #include <vector>
 
@@ -15,8 +16,8 @@ float mean_qscore_from_qstring(const std::string& qstring) {
 
     std::vector<float> scores;
     scores.reserve(qstring.length());
-    std::transform(qstring.begin(), qstring.end(), std::back_inserter(scores),
-                   [](const char& qchar) {
+    std::transform(qstring.begin(), qstring.end(),
+                   std::back_insert_iterator<std::vector<float>>(scores), [](const char& qchar) {
                        float qscore = static_cast<float>(qchar - 33);
                        return std::pow(10.f, -qscore / 10.f);
                    });
@@ -31,8 +32,8 @@ int base_to_int(char c) { return 0b11 & ((c >> 2) ^ (c >> 1)); }
 std::vector<int> sequence_to_ints(const std::string& sequence) {
     std::vector<int> sequence_ints;
     sequence_ints.reserve(sequence.size());
-    std::transform(std::begin(sequence), std::end(sequence), std::back_inserter(sequence_ints),
-                   &base_to_int);
+    std::transform(std::begin(sequence), std::end(sequence),
+                   std::back_insert_iterator<std::vector<int>>(sequence_ints), &base_to_int);
     return sequence_ints;
 }
 
