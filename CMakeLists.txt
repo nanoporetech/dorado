@@ -3,7 +3,7 @@ set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 
 project(dorado)
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(DORADO_3RD_PARTY ${CMAKE_SOURCE_DIR}/dorado/3rdparty)
 
@@ -18,10 +18,12 @@ include(cmake/Pod5.cmake)
 include(cmake/Torch.cmake)
 include(cmake/OpenSSL.cmake)
 
-# We need to force the use of the old ABI here as otherwise elzip builds with the libc++11 ABI
-# and we can't link against it.  We're on the old ABI right now due to the version of pytorch 
-# we are using.
-add_compile_options(-D_GLIBCXX_USE_CXX11_ABI=0)
+if(DORADO_USING_OLD_CPP_ABI)
+  # We need to force the use of the old ABI here, if we are building in an old ABI context, as otherwise elzip builds
+  # with the libc++11 ABI and we can't link against it.
+  add_compile_options(-D_GLIBCXX_USE_CXX11_ABI=0)
+endif()
+
 add_subdirectory(dorado/3rdparty/elzip)
 
 enable_testing()
@@ -178,6 +180,10 @@ install(TARGETS dorado RUNTIME)
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     file(GLOB TORCH_DLLS "${TORCH_LIB}/lib/*.so*")
     install(FILES ${TORCH_DLLS} DESTINATION lib)
+    if(DYNAMIC_HDF)
+        file(GLOB HDF_DLLS "${HDF5_CXX_LIBRARY_DIRS}/*hdf5*.so*")
+        install(FILES ${HDF_DLLS} DESTINATION lib)
+    endif()
 elseif(WIN32)
     file(GLOB TORCH_DLLS "${TORCH_LIB}/lib/*.dll")
     install(FILES ${TORCH_DLLS} DESTINATION bin)
