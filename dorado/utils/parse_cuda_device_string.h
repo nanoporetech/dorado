@@ -1,0 +1,8 @@
+//
+// Created by mike on 28/09/22.
+//
+
+#ifndef DORADO_PARSE_CUDA_DEVICE_STRING_H
+#define DORADO_PARSE_CUDA_DEVICE_STRING_H
+
+#endif  //DORADO_PARSE_CUDA_DEVICE_STRING_H
