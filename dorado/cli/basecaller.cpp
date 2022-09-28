@@ -12,6 +12,7 @@
 #include "read_pipeline/ModBaseCallerNode.h"
 #include "read_pipeline/ScalerNode.h"
 #include "read_pipeline/WriterNode.h"
+#include "utils/parse_cuda_device_string.h"
 
 #include <argparse.hpp>
 
@@ -34,6 +35,8 @@ void setup(std::vector<std::string> args,
     torch::set_num_threads(1);
     std::vector<Runner> runners;
 
+    int num_devices = 1;
+
     if (device == "cpu") {
         for (int i = 0; i < num_runners; i++) {
             runners.push_back(std::make_shared<ModelRunner<CPUDecoder>>(model_path, device,
@@ -50,9 +53,14 @@ void setup(std::vector<std::string> args,
     }
 #else   // ifdef __APPLE__
     } else {
-        auto caller = create_cuda_caller(model_path, chunk_size, batch_size, device);
-        for (int i = 0; i < num_runners; i++) {
-            runners.push_back(std::make_shared<CudaModelRunner>(caller, chunk_size, batch_size));
+        auto devices = parse_cuda_device_string(device);
+        num_devices = devices.size();
+        for (auto device_string : devices) {
+            auto caller = create_cuda_caller(model_path, chunk_size, batch_size, device_string);
+            for (int i = 0; i < num_runners; i++) {
+                runners.push_back(
+                        std::make_shared<CudaModelRunner>(caller, chunk_size, batch_size));
+            }
         }
     }
 #endif  // __APPLE__
@@ -98,7 +106,7 @@ void setup(std::vector<std::string> args,
         basecaller_node = std::make_unique<BasecallerNode>(
                 writer_node, std::move(runners), batch_size, chunk_size, overlap, model_stride);
     }
-    ScalerNode scaler_node(*basecaller_node);
+    ScalerNode scaler_node(*basecaller_node, num_devices * 5);
     DataLoader loader(scaler_node, "cpu");
     loader.load_reads(data_path);
 }
@@ -111,10 +119,11 @@ int basecaller(int argc, char* argv[]) {
     parser.add_argument("data").help("the data directory.");
 
     parser.add_argument("-x", "--device")
+            .help("device string in format \"cuda:0,...,N\", \"cuda:all\", \"metal\" etc..")
 #ifdef __APPLE__
             .default_value(std::string{"metal"});
 #else
-            .default_value(std::string{"cuda:0"});
+            .default_value(std::string{"cuda:all"});
 #endif
 
     parser.add_argument("-b", "--batchsize").default_value(1024).scan<'i', int>();
