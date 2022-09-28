@@ -54,7 +54,7 @@ void setup(std::vector<std::string> args,
 #else   // ifdef __APPLE__
     } else {
         auto devices = parse_cuda_device_string(device);
-        int num_devices = devices.size();
+        num_devices = devices.size();
         for (auto device_string : devices) {
             auto caller = create_cuda_caller(model_path, chunk_size, batch_size, device_string);
             for (int i = 0; i < num_runners; i++) {
