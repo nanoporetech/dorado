@@ -63,7 +63,8 @@ void ScalerNode::worker_thread() {
     }
 }
 
-ScalerNode::ScalerNode(ReadSink& sink, size_t max_reads) : ReadSink(max_reads), m_sink(sink) {
+ScalerNode::ScalerNode(ReadSink& sink, int num_worker_threads, size_t max_reads)
+        : ReadSink(max_reads), m_sink(sink), m_num_worker_threads(num_worker_threads) {
     for (int i = 0; i < m_num_worker_threads; i++) {
         std::unique_ptr<std::thread> scaler_worker_thread =
                 std::make_unique<std::thread>(&ScalerNode::worker_thread, this);

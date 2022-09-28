@@ -1,8 +1,8 @@
-//
-// Created by mike on 28/09/22.
-//
+#pragma once
 
-#ifndef DORADO_PARSE_CUDA_DEVICE_STRING_H
-#define DORADO_PARSE_CUDA_DEVICE_STRING_H
+#include <string>
+#include <vector>
 
-#endif  //DORADO_PARSE_CUDA_DEVICE_STRING_H
+// Given a string representing cuda devices (e.g "cuda:0,1,3") returns a vector of strings, one for
+// each device (e.g ["cuda:0", "cuda:2", ..., "cuda:7"]
+std::vector<std::string> parse_cuda_device_string(std::string device_string);

@@ -3,7 +3,7 @@
 
 class ScalerNode : public ReadSink {
 public:
-    ScalerNode(ReadSink& sink, size_t max_reads = 1000);
+    ScalerNode(ReadSink& sink, int num_worker_threads = 5, size_t max_reads = 1000);
     ~ScalerNode();
     // Read Trimming method (removes some initial part of the raw read).
     int trim(torch::Tensor signal,
@@ -18,5 +18,5 @@ private:
     ReadSink&
             m_sink;  // ReadSink to consume scaled reads. Typically this will be a Basecaller Node.
     std::vector<std::unique_ptr<std::thread>> worker_threads;
-    int m_num_worker_threads = 5;
+    int m_num_worker_threads;
 };
