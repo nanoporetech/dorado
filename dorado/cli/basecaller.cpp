@@ -119,6 +119,7 @@ int basecaller(int argc, char* argv[]) {
     parser.add_argument("data").help("the data directory.");
 
     parser.add_argument("-x", "--device")
+            .help("device string in format \"cuda:0,...,N\", \"cuda:all\", \"metal\" etc..")
 #ifdef __APPLE__
             .default_value(std::string{"metal"});
 #else
