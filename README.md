@@ -1,15 +1,16 @@
 # Dorado
 
-This is a *preview version* of Dorado, a Libtorch Basecaller for Oxford Nanopore Reads. This software is in alpha preview stage and being released for early evaluation. It is subject to change. If you encounter any problems building or running Dorado please [report an issue](https://github.com/nanoporetech/dorado/).
+This is a *preview version* of Dorado, a Libtorch Basecaller for Oxford Nanopore Reads. This software is in alpha preview stage and being released for early evaluation. It is subject to change. If you encounter any problems building or running Dorado please [report an issue](https://github.com/nanoporetech/dorado/issues).
 
 ## Downloading Dorado
+
 We will be publishing pre-built releases in the next few days.
 
 ## Running
 
 ```
 $ dorado download --model dna_r10.4.1_e8.2_260bps_hac@v3.5.2
-$ dorado basecaller dna_r10.4.1_e8.2_260bps_hac@v3.5.2 fast5_pass/ > calls.sam
+$ dorado basecaller dna_r10.4.1_e8.2_260bps_hac@v3.5.2 pod5/ > calls.sam
 ```
 
 ## Platforms
