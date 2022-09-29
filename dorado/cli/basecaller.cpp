@@ -5,6 +5,8 @@
 #include "nn/MetalCRFModel.h"
 #else
 #include "nn/CudaCRFModel.h"
+#include "utils/parse_cuda_device_string.h"
+
 #endif
 #include "nn/ModelRunner.h"
 #include "nn/RemoraModel.h"
@@ -12,7 +14,6 @@
 #include "read_pipeline/ModBaseCallerNode.h"
 #include "read_pipeline/ScalerNode.h"
 #include "read_pipeline/WriterNode.h"
-#include "utils/parse_cuda_device_string.h"
 
 #include <argparse.hpp>
 
@@ -20,21 +21,6 @@
 #include <iostream>
 #include <sstream>
 #include <thread>
-
-int auto_gpu_batch_size(std::string model_path) {
-    if (model_path.find("_fast@v") != std::string::npos) {
-        return 2048;  // 128 * 16 - 15GB
-    } else if (model_path.find("_hac@v") != std::string::npos) {
-        return 2224;  // 140 * 16
-                      //return 1024; // 64 * 16 - 15GB
-    } else if (model_path.find("_sup@v") != std::string::npos) {
-        return 720;  // 45 * 16 - 30. GB
-                     //return 768; // 48 * 16 - 32.196 GB
-                     //return 320; // 20 * 16 - 15GB
-    }
-
-    return 320;
-}
 
 void setup(std::vector<std::string> args,
            const std::filesystem::path& model_path,
@@ -73,7 +59,8 @@ void setup(std::vector<std::string> args,
     } else {
         auto devices = parse_cuda_device_string(device);
         num_devices = devices.size();
-        batch_size = batch_size == 0 ? auto_gpu_batch_size(model_path.string()) : batch_size;
+        batch_size =
+                batch_size == 0 ? auto_gpu_batch_size(model_path.string(), devices) : batch_size;
         for (auto device_string : devices) {
             auto caller = create_cuda_caller(model_path, chunk_size, batch_size, device_string);
             for (int i = 0; i < num_runners; i++) {
