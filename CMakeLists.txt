@@ -86,8 +86,8 @@ set(LIB_SOURCE_FILES
     dorado/utils/stitch.h
     dorado/utils/tensor_utils.cpp
     dorado/utils/tensor_utils.h
-    dorado/utils/parse_cuda_device_string.cpp
-    dorado/utils/parse_cuda_device_string.h)
+    dorado/utils/cuda_utils.cpp
+    dorado/utils/cuda_utils.h)
 
 if(APPLE)
     include(cmake/Metal.cmake)

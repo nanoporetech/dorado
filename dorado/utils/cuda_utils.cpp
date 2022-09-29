@@ -1,4 +1,4 @@
-#include "parse_cuda_device_string.h"
+#include "cuda_utils.h"
 
 #include "torch/torch.h"
 

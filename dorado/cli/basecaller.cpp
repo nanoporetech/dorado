@@ -5,8 +5,7 @@
 #include "nn/MetalCRFModel.h"
 #else
 #include "nn/CudaCRFModel.h"
-#include "utils/parse_cuda_device_string.h"
-
+#include "utils/cuda_utils.h"
 #endif
 #include "nn/ModelRunner.h"
 #include "nn/RemoraModel.h"
