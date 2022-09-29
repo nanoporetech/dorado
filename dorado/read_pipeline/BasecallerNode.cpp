@@ -36,8 +36,9 @@ void BasecallerNode::input_worker_thread() {
         // Now that we have acquired a read and released the reads mutex, wait until we can push to chunks_in
         while (true) {
             std::unique_lock<std::mutex> chunk_lock(m_chunks_in_mutex);
-            m_cv.wait_for(chunk_lock, 10ms,
-                          [this, &max_chunks_in] { return (m_chunks_in.size() < max_chunks_in); });
+            m_chunks_in_has_space_cv.wait_for(chunk_lock, 10ms, [this, &max_chunks_in] {
+                return (m_chunks_in.size() < max_chunks_in);
+            });
 
             if (m_chunks_in.size() > max_chunks_in) {
                 continue;
@@ -146,6 +147,7 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
             std::shared_ptr<Chunk> chunk = m_chunks_in.front();
             m_chunks_in.pop_front();
             chunks_lock.unlock();
+            m_chunks_in_has_space_cv.notify_one();
 
             // Copy the chunk into the input tensor
             std::shared_ptr<Read> source_read = chunk->source_read.lock();

@@ -46,6 +46,8 @@ private:
     std::chrono::time_point<std::chrono::system_clock> initialization_time;
     // Time when Basecaller Node terminates. Used for benchmarking and debugging
     std::chrono::time_point<std::chrono::system_clock> termination_time;
+    // Signalled when there is space in m_chunks_in
+    std::condition_variable m_chunks_in_has_space_cv;
     // Global chunk input list
     std::mutex m_chunks_in_mutex;
     // Gets filled with chunks from the input reads
