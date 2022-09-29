@@ -7,7 +7,7 @@
 
 using namespace std::chrono_literals;
 
-void WriterNode::worker_thread() {
+void WriterNode::print_header() {
     if (!m_emit_fastq) {
         std::cout << "@HD\tVN:1.6\tSO:unknown\n"
                   << "@PG\tID:basecaller\tPN:dorado\tVN:" << DORADO_VERSION << "\tCL:dorado";
@@ -16,7 +16,9 @@ void WriterNode::worker_thread() {
         }
         std::cout << "\n";
     }
+}
 
+void WriterNode::worker_thread() {
     while (true) {
         // Wait until we are provided with a read
         std::unique_lock<std::mutex> lock(m_cv_mutex);
@@ -38,25 +40,35 @@ void WriterNode::worker_thread() {
             std::numeric_limits<std::int64_t>::max() - read->raw_data.size(0)) {
             EXIT_FAILURE;
         }
+
         m_num_samples_processed += read->raw_data.size(0);
         m_num_reads_processed += 1;
 
         if (m_num_reads_processed % 100 == 0) {
+            m_cerr_mutex.lock();
             std::cerr << "\r> Reads basecalled: " << m_num_reads_processed;
+            m_cerr_mutex.unlock();
         }
 
         if (m_emit_fastq) {
+            m_cout_mutex.lock();
             std::cout << "@" << read->read_id << "\n"
                       << read->seq << "\n"
                       << "+\n"
                       << read->qstring << "\n";
+            m_cout_mutex.unlock();
+
         } else {
             try {
                 for (const auto& sam_line : read->extract_sam_lines()) {
+                    m_cout_mutex.lock();
                     std::cout << sam_line << "\n";
+                    m_cout_mutex.unlock();
                 }
             } catch (const std::exception& ex) {
+                m_cerr_mutex.lock();
                 std::cerr << ex.what() << "\n";
+                m_cerr_mutex.unlock();
             }
         }
     }
@@ -68,13 +80,20 @@ WriterNode::WriterNode(std::vector<std::string> args, bool emit_fastq, size_t ma
           m_emit_fastq(emit_fastq),
           m_num_samples_processed(0),
           m_num_reads_processed(0),
-          m_initialization_time(std::chrono::system_clock::now()),
-          m_worker(new std::thread(&WriterNode::worker_thread, this)) {}
+          m_initialization_time(std::chrono::system_clock::now()) {
+    print_header();
+    for (int i = 0; i < 4; i++) {
+        m_workers.push_back(
+                std::make_unique<std::thread>(std::thread(&WriterNode::worker_thread, this)));
+    }
+}
 
 WriterNode::~WriterNode() {
     terminate();
     m_cv.notify_one();
-    m_worker->join();
+    for (auto& m : m_workers) {
+        m->join();
+    }
     auto end_time = std::chrono::system_clock::now();
 
     auto duration =
