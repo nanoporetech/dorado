@@ -3,6 +3,7 @@
 #include "decode/CPUDecoder.h"
 #ifdef __APPLE__
 #include "nn/MetalCRFModel.h"
+#include "utils/metal_utils.h"
 #else
 #include "nn/CudaCRFModel.h"
 #include "utils/cuda_utils.h"
@@ -46,7 +47,7 @@ void setup(std::vector<std::string> args,
         }
 #ifdef __APPLE__
     } else if (device == "metal") {
-        batch_size = batch_size == 0 ? 384 : batch_size;
+        batch_size = batch_size == 0 ? auto_gpu_batch_size(model_path.string()) : batch_size;
         auto caller = create_metal_caller(model_path, chunk_size, batch_size);
         for (int i = 0; i < num_runners; i++) {
             runners.push_back(std::make_shared<MetalModelRunner>(caller, chunk_size, batch_size));
