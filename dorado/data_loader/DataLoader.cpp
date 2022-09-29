@@ -92,7 +92,6 @@ void DataLoader::load_reads(const std::string& path) {
         }
     }
     m_read_sink.terminate();
-    std::cerr << "> Loaded " << m_loaded_read_count << " reads" << std::endl;
 }
 
 void DataLoader::load_pod5_reads_from_file(const std::string& path) {
