@@ -41,6 +41,8 @@ void WriterNode::worker_thread() {
         m_num_samples_processed += read->raw_data.size(0);
         m_num_reads_processed += 1;
 
+        std::cerr << "\r> Reads basecalled: " << m_num_reads_processed;
+
         if (m_emit_fastq) {
             std::cout << "@" << read->read_id << "\n"
                       << read->seq << "\n"
@@ -76,7 +78,7 @@ WriterNode::~WriterNode() {
     auto duration =
             std::chrono::duration_cast<std::chrono::milliseconds>(end_time - m_initialization_time)
                     .count();
-    std::cerr << "> Reads basecalled: " << m_num_reads_processed << std::endl;
+    std::cerr << "\r> Reads basecalled: " << m_num_reads_processed << std::endl;
     std::cerr << "> Samples/s: " << std::scientific << m_num_samples_processed / (duration / 1000.0)
               << std::endl;
 }
