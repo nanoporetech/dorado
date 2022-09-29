@@ -41,7 +41,9 @@ void WriterNode::worker_thread() {
         m_num_samples_processed += read->raw_data.size(0);
         m_num_reads_processed += 1;
 
-        std::cerr << "\r> Reads basecalled: " << m_num_reads_processed;
+        if (m_num_reads_processed % 100 == 0) {
+            std::cerr << "\r> Reads basecalled: " << m_num_reads_processed;
+        }
 
         if (m_emit_fastq) {
             std::cout << "@" << read->read_id << "\n"
