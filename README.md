@@ -21,15 +21,9 @@ Dorado has been tested on the following systems:
 | -------- | -------------------- |
 | Windows  | x86                  |
 | Apple    | M1, M1 Max, M1 Ultra |
-| Linux    | A100 40GB PCIe       |
+| Linux    | (G)V100, A100        |
 
 Other Platforms may work, if you encounter problems with running on your system please [report an issue](https://github.com/nanoporetech/dorado/issues)
-
-## Known limitations
-
-* Multi-GPU support is limited and likely not to work.
-* GPU memory utilisation on Nvidia devices is high (compared to [Bonito](https://github.com/nanoporetech/bonito)). This issue is currently being investigated and resolved.
-* Support for M1 GPUs is should be considered experimental.
 
 ## Developer quickstart
 
