@@ -132,8 +132,10 @@ int basecaller(int argc, char* argv[]) {
             .default_value(std::string{"cuda:all"});
 #endif
 
-    parser.add_argument("-b", "--batchsize").default_value(0).scan<'i', int>();
-    .help("if 0 an optimal batchsize will be selected");
+    parser.add_argument("-b", "--batchsize")
+            .default_value(0)
+            .scan<'i', int>()
+            .help("if 0 an optimal batchsize will be selected");
 
     parser.add_argument("-c", "--chunksize").default_value(10000).scan<'i', int>();
 
