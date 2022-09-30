@@ -107,7 +107,7 @@ void setup(std::vector<std::string> args,
                 writer_node, std::move(runners), batch_size, chunk_size, overlap, model_stride);
     }
     ScalerNode scaler_node(*basecaller_node, num_devices * 5);
-    DataLoader loader(scaler_node, "cpu", num_devices * 4);
+    DataLoader loader(scaler_node, "cpu", num_devices);
     loader.load_reads(data_path);
 }
 
