@@ -5,7 +5,7 @@ class ReadSink;
 
 class DataLoader {
 public:
-    DataLoader(ReadSink& read_sink, const std::string& device, size_t num_worker_threads = 1);
+    DataLoader(ReadSink& read_sink, const std::string& device, size_t num_worker_threads);
     void load_reads(const std::string& path);
 
 private:
@@ -14,5 +14,5 @@ private:
     ReadSink& m_read_sink;  // Where should the loaded reads go?
     size_t m_loaded_read_count{0};
     std::string m_device;
-    size_t m_num_worker_threads = 4;
+    size_t m_num_worker_threads{1};
 };

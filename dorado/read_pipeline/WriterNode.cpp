@@ -45,30 +45,25 @@ void WriterNode::worker_thread() {
         m_num_reads_processed += 1;
 
         if (m_num_reads_processed % 100 == 0) {
-            std::unique_lock<std::mutex> lock(m_cerr_mutex);
+            std::scoped_lock<std::mutex> lock(m_cerr_mutex);
             std::cerr << "\r> Reads basecalled: " << m_num_reads_processed;
-            lock.unlock();
         }
 
         if (m_emit_fastq) {
-            std::unique_lock<std::mutex> lock(m_cout_mutex);
+            std::scoped_lock<std::mutex> lock(m_cout_mutex);
             std::cout << "@" << read->read_id << "\n"
                       << read->seq << "\n"
                       << "+\n"
                       << read->qstring << "\n";
-            lock.unlock();
-
         } else {
             try {
                 for (const auto& sam_line : read->extract_sam_lines()) {
-                    std::unique_lock<std::mutex> lock(m_cout_mutex);
+                    std::scoped_lock<std::mutex> lock(m_cout_mutex);
                     std::cout << sam_line << "\n";
-                    lock.unlock();
                 }
             } catch (const std::exception& ex) {
-                std::unique_lock<std::mutex> lock(m_cerr_mutex);
+                std::scoped_lock<std::mutex> lock(m_cerr_mutex);
                 std::cerr << ex.what() << "\n";
-                lock.unlock();
             }
         }
     }

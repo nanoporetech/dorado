@@ -42,6 +42,8 @@ void string_reader(HighFive::Attribute& attribute, std::string& target_str) {
 };
 
 std::string get_string_timestamp_from_unix_time(time_t time_stamp_ms) {
+    static std::mutex timestamp_mtx;
+    std::unique_lock lock(timestamp_mtx);
     //Convert a time_t (seconds from UNIX epoch) to a timestamp in %Y-%m-%dT%H:%M:%SZ format
     auto time_stamp_s = time_stamp_ms / 1000;
     int num_ms = time_stamp_ms % 1000;
@@ -98,8 +100,7 @@ std::shared_ptr<Read> process_pod5_read(size_t row,
                                         Pod5ReadRecordBatch* batch,
                                         Pod5FileReader* file,
                                         const std::string path,
-                                        std::string device,
-                                        std::mutex& timestamp_mtx) {
+                                        std::string device) {
     uint8_t read_id[16];
     int16_t pore = 0;
     int16_t calibration_idx = 0;
@@ -184,10 +185,7 @@ std::shared_ptr<Read> process_pod5_read(size_t row,
             torch::from_blob(floatTmp.data(), floatTmp.size(), options).clone().to(device);
 
     auto start_time_ms = run_acquisition_start_time_ms + ((start_sample * 1000) / run_sample_rate);
-    std::unique_lock lock(timestamp_mtx);
-    //not a threadsafe function
     auto start_time = get_string_timestamp_from_unix_time(start_time_ms);
-    lock.unlock();
     new_read->scaling = calib_data->scale;
     new_read->offset = calib_data->offset;
     new_read->scale_set = true;
@@ -235,10 +233,8 @@ void DataLoader::load_pod5_reads_from_file(const std::string& path) {
 
         std::vector<std::future<std::shared_ptr<Read>>> futures;
 
-        std::mutex timestamp_mtx;
         for (std::size_t row = 0; row < batch_row_count; ++row) {
-            futures.push_back(pool.push(process_pod5_read, row, batch, file, path, m_device,
-                                        std::ref(timestamp_mtx)));
+            futures.push_back(pool.push(process_pod5_read, row, batch, file, path, m_device));
         }
 
         for (auto& v : futures) {

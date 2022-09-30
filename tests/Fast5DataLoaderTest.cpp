@@ -17,7 +17,7 @@ TEST_CASE(TEST_GROUP "Test loading single-read Fast5 files") {
     MockSink mock_sink;
 
     std::string data_path(get_data_dir());
-    DataLoader loader(mock_sink, "cpu");
+    DataLoader loader(mock_sink, "cpu", 1);
     loader.load_reads(data_path);
 
     REQUIRE(mock_sink.get_read_count() == 1);
