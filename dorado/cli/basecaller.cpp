@@ -96,7 +96,7 @@ void setup(std::vector<std::string> args,
         remora_callers.push_back(caller);
     }
 
-    WriterNode writer_node(std::move(args), emit_fastq);
+    WriterNode writer_node(std::move(args), emit_fastq, num_devices);
 
     std::unique_ptr<ModBaseCallerNode> mod_base_caller_node;
     std::unique_ptr<BasecallerNode> basecaller_node;
@@ -113,7 +113,7 @@ void setup(std::vector<std::string> args,
                 writer_node, std::move(runners), batch_size, chunk_size, overlap, model_stride);
     }
     ScalerNode scaler_node(*basecaller_node, num_devices * 5);
-    DataLoader loader(scaler_node, "cpu");
+    DataLoader loader(scaler_node, "cpu", num_devices);
     loader.load_reads(data_path);
 }
 

@@ -1,8 +1,8 @@
 #include "DataLoader.h"
 
 #include "../read_pipeline/ReadPipeline.h"
+#include "cxxpool.h"
 #include "pod5_format/c_api.h"
-#include "utils/compat_utils.h"
 #include "vbz_plugin_user_utils.h"
 
 #include <highfive/H5Easy.hpp>
@@ -42,6 +42,8 @@ void string_reader(HighFive::Attribute& attribute, std::string& target_str) {
 };
 
 std::string get_string_timestamp_from_unix_time(time_t time_stamp_ms) {
+    static std::mutex timestamp_mtx;
+    std::unique_lock lock(timestamp_mtx);
     //Convert a time_t (seconds from UNIX epoch) to a timestamp in %Y-%m-%dT%H:%M:%SZ format
     auto time_stamp_s = time_stamp_ms / 1000;
     int num_ms = time_stamp_ms % 1000;
@@ -94,6 +96,122 @@ void DataLoader::load_reads(const std::string& path) {
     m_read_sink.terminate();
 }
 
+std::shared_ptr<Read> process_pod5_read(size_t row,
+                                        Pod5ReadRecordBatch* batch,
+                                        Pod5FileReader* file,
+                                        const std::string path,
+                                        std::string device) {
+    uint8_t read_id[16];
+    int16_t pore = 0;
+    int16_t calibration_idx = 0;
+    uint32_t read_number = 0;
+    uint64_t start_sample = 0;
+    float median_before = 0.0f;
+    int16_t end_reason = 0;
+    int16_t run_info = 0;
+    int64_t signal_row_count = 0;
+
+    static std::mutex cerr_mtx;
+
+    if (pod5_get_read_batch_row_info(batch, row, read_id, &pore, &calibration_idx, &read_number,
+                                     &start_sample, &median_before, &end_reason, &run_info,
+                                     &signal_row_count) != POD5_OK) {
+        std::scoped_lock lock(cerr_mtx);
+        std::cerr << "Failed to get read " << row << "\n";
+    }
+
+    //Retrieve global information for the run
+    RunInfoDictData_t* run_info_data;
+    if (pod5_get_run_info(batch, run_info, &run_info_data) != POD5_OK) {
+        std::scoped_lock lock(cerr_mtx);
+        std::cerr << "Failed to get Run Info " << row << pod5_get_error_string() << "\n";
+    }
+    auto run_acquisition_start_time_ms = run_info_data->acquisition_start_time_ms;
+    auto run_sample_rate = run_info_data->sample_rate;
+
+    //Retrieve Pore information (Pore type, channel, mux etc)
+    PoreDictData_t* pore_data = nullptr;
+    if (pod5_get_pore(batch, pore, &pore_data) != POD5_OK) {
+        std::scoped_lock lock(cerr_mtx);
+        std::cerr << "Failed to pore data " << row << pod5_get_error_string() << "\n";
+    }
+    int channel = pore_data->channel;
+    int well = pore_data->well;
+
+    char read_id_tmp[37];
+    pod5_error_t err = pod5_format_read_id(read_id, read_id_tmp);
+    std::string read_id_str(read_id_tmp);
+
+    // Now read out the calibration params:
+    CalibrationDictData_t* calib_data = nullptr;
+    if (pod5_get_calibration(batch, calibration_idx, &calib_data) != POD5_OK) {
+        std::scoped_lock lock(cerr_mtx);
+        std::cerr << "Failed to get read " << row
+                  << " calibration_idx data: " << pod5_get_error_string() << "\n";
+    }
+
+    // Find the absolute indices of the signal rows in the signal table
+    std::vector<std::uint64_t> signal_rows_indices(signal_row_count);
+    if (pod5_get_signal_row_indices(batch, row, signal_row_count, signal_rows_indices.data()) !=
+        POD5_OK) {
+        std::scoped_lock lock(cerr_mtx);
+        std::cerr << "Failed to get read " << row
+                  << " signal row indices: " << pod5_get_error_string() << "\n";
+    }
+
+    // Find the locations of each row in signal batches:
+    std::vector<SignalRowInfo_t*> signal_rows(signal_row_count);
+    if (pod5_get_signal_row_info(file, signal_row_count, signal_rows_indices.data(),
+                                 signal_rows.data()) != POD5_OK) {
+        std::scoped_lock lock(cerr_mtx);
+        std::cerr << "Failed to get read " << row
+                  << " signal row locations: " << pod5_get_error_string() << "\n";
+    }
+
+    std::size_t total_sample_count = 0;
+    for (std::size_t i = 0; i < signal_row_count; ++i) {
+        total_sample_count += signal_rows[i]->stored_sample_count;
+    }
+
+    std::vector<std::int16_t> samples(total_sample_count);
+    std::size_t samples_read_so_far = 0;
+    for (std::size_t i = 0; i < signal_row_count; ++i) {
+        if (pod5_get_signal(file, signal_rows[i], signal_rows[i]->stored_sample_count,
+                            samples.data() + samples_read_so_far) != POD5_OK) {
+            std::scoped_lock lock(cerr_mtx);
+            std::cerr << "Failed to get read " << row << " signal: " << pod5_get_error_string()
+                      << "\n";
+        }
+
+        samples_read_so_far += signal_rows[i]->stored_sample_count;
+    }
+
+    std::vector<float> floatTmp(samples.begin(), samples.end());
+
+    auto new_read = std::make_shared<Read>();
+
+    auto options = torch::TensorOptions().dtype(torch::kFloat32);
+    new_read->raw_data =
+            torch::from_blob(floatTmp.data(), floatTmp.size(), options).clone().to(device);
+
+    auto start_time_ms = run_acquisition_start_time_ms + ((start_sample * 1000) / run_sample_rate);
+    auto start_time = get_string_timestamp_from_unix_time(start_time_ms);
+    new_read->scaling = calib_data->scale;
+    new_read->offset = calib_data->offset;
+    new_read->scale_set = true;
+    new_read->read_id = read_id_str;
+    new_read->num_trimmed_samples = 0;
+    new_read->attributes.read_number = read_number;
+    new_read->attributes.fast5_filename = std::filesystem::path(path.c_str()).filename().string();
+    new_read->attributes.mux = well;
+    new_read->attributes.channel_number = channel;
+    new_read->attributes.start_time = start_time;
+
+    pod5_release_calibration(calib_data);
+    pod5_free_signal_row_info(signal_row_count, signal_rows.data());
+    return new_read;
+}
+
 void DataLoader::load_pod5_reads_from_file(const std::string& path) {
     pod5_init();
 
@@ -110,8 +228,7 @@ void DataLoader::load_pod5_reads_from_file(const std::string& path) {
         std::cerr << "Failed to query batch count: " << pod5_get_error_string() << "\n";
     }
 
-    size_t read_count = 0;
-    std::size_t samples_read = 0;
+    cxxpool::thread_pool pool{m_num_worker_threads};
 
     for (std::size_t batch_index = 0; batch_index < batch_count; ++batch_index) {
         Pod5ReadRecordBatch_t* batch = nullptr;
@@ -124,114 +241,16 @@ void DataLoader::load_pod5_reads_from_file(const std::string& path) {
             std::cerr << "Failed to get batch row count\n";
         }
 
+        std::vector<std::future<std::shared_ptr<Read>>> futures;
+
         for (std::size_t row = 0; row < batch_row_count; ++row) {
-            uint8_t read_id[16];
-            int16_t pore = 0;
-            int16_t calibration_idx = 0;
-            uint32_t read_number = 0;
-            uint64_t start_sample = 0;
-            float median_before = 0.0f;
-            int16_t end_reason = 0;
-            int16_t run_info = 0;
-            int64_t signal_row_count = 0;
-            if (pod5_get_read_batch_row_info(
-                        batch, row, read_id, &pore, &calibration_idx, &read_number, &start_sample,
-                        &median_before, &end_reason, &run_info, &signal_row_count) != POD5_OK) {
-                std::cerr << "Failed to get read " << row << "\n";
-            }
-            read_count += 1;
+            futures.push_back(pool.push(process_pod5_read, row, batch, file, path, m_device));
+        }
 
-            //Retrieve global information for the run
-            RunInfoDictData_t* run_info_data;
-            if (pod5_get_run_info(batch, run_info, &run_info_data) != POD5_OK) {
-                std::cerr << "Failed to get Run Info " << row << pod5_get_error_string() << "\n";
-            }
-            auto run_acquisition_start_time_ms = run_info_data->acquisition_start_time_ms;
-            auto run_sample_rate = run_info_data->sample_rate;
-
-            //Retrieve Pore information (Pore type, channel, mux etc)
-            PoreDictData_t* pore_data = nullptr;
-            if (pod5_get_pore(batch, pore, &pore_data) != POD5_OK) {
-                std::cerr << "Failed to pore data " << row << pod5_get_error_string() << "\n";
-            }
-            int channel = pore_data->channel;
-            int well = pore_data->well;
-
-            char read_id_tmp[37];
-            pod5_error_t err = pod5_format_read_id(read_id, read_id_tmp);
-            std::string read_id_str(read_id_tmp);
-
-            // Now read out the calibration params:
-            CalibrationDictData_t* calib_data = nullptr;
-            if (pod5_get_calibration(batch, calibration_idx, &calib_data) != POD5_OK) {
-                std::cerr << "Failed to get read " << row
-                          << " calibration_idx data: " << pod5_get_error_string() << "\n";
-            }
-
-            // Find the absolute indices of the signal rows in the signal table
-            std::vector<std::uint64_t> signal_rows_indices(signal_row_count);
-            if (pod5_get_signal_row_indices(batch, row, signal_row_count,
-                                            signal_rows_indices.data()) != POD5_OK) {
-                std::cerr << "Failed to get read " << row
-                          << " signal row indices: " << pod5_get_error_string() << "\n";
-            }
-
-            // Find the locations of each row in signal batches:
-            std::vector<SignalRowInfo_t*> signal_rows(signal_row_count);
-            if (pod5_get_signal_row_info(file, signal_row_count, signal_rows_indices.data(),
-                                         signal_rows.data()) != POD5_OK) {
-                std::cerr << "Failed to get read " << row
-                          << " signal row locations: " << pod5_get_error_string() << "\n";
-            }
-
-            std::size_t total_sample_count = 0;
-            for (std::size_t i = 0; i < signal_row_count; ++i) {
-                total_sample_count += signal_rows[i]->stored_sample_count;
-            }
-
-            std::vector<std::int16_t> samples(total_sample_count);
-            std::size_t samples_read_so_far = 0;
-            for (std::size_t i = 0; i < signal_row_count; ++i) {
-                if (pod5_get_signal(file, signal_rows[i], signal_rows[i]->stored_sample_count,
-                                    samples.data() + samples_read_so_far) != POD5_OK) {
-                    std::cerr << "Failed to get read " << row
-                              << " signal: " << pod5_get_error_string() << "\n";
-                }
-
-                samples_read_so_far += signal_rows[i]->stored_sample_count;
-            }
-
-            std::vector<float> floatTmp(samples.begin(), samples.end());
-
-            samples_read += samples.size();
-
-            auto new_read = std::make_shared<Read>();
-
-            auto options = torch::TensorOptions().dtype(torch::kFloat32);
-            new_read->raw_data = torch::from_blob(floatTmp.data(), floatTmp.size(), options)
-                                         .clone()
-                                         .to(m_device);
-
-            auto start_time_ms =
-                    run_acquisition_start_time_ms + ((start_sample * 1000) / run_sample_rate);
-            auto start_time = get_string_timestamp_from_unix_time(start_time_ms);
-            new_read->scaling = calib_data->scale;
-            new_read->offset = calib_data->offset;
-            new_read->scale_set = true;
-            new_read->read_id = read_id_str;
-            new_read->num_trimmed_samples = 0;
-            new_read->attributes.read_number = read_number;
-            new_read->attributes.fast5_filename =
-                    std::filesystem::path(path.c_str()).filename().string();
-            new_read->attributes.mux = well;
-            new_read->attributes.channel_number = channel;
-            new_read->attributes.start_time = start_time;
-
-            m_read_sink.push_read(new_read);
+        for (auto& v : futures) {
+            auto read = v.get();
+            m_read_sink.push_read(read);
             m_loaded_read_count++;
-
-            pod5_release_calibration(calib_data);
-            pod5_free_signal_row_info(signal_row_count, signal_rows.data());
         }
 
         if (pod5_free_read_batch(batch) != POD5_OK) {
@@ -329,8 +348,8 @@ void DataLoader::load_fast5_reads_from_file(const std::string& path) {
     }
 }
 
-DataLoader::DataLoader(ReadSink& read_sink, const std::string& device)
-        : m_read_sink(read_sink), m_device(device) {
+DataLoader::DataLoader(ReadSink& read_sink, const std::string& device, size_t num_worker_threads)
+        : m_read_sink(read_sink), m_device(device), m_num_worker_threads(num_worker_threads) {
     static std::once_flag vbz_init_flag;
     std::call_once(vbz_init_flag, vbz_register);
 }
