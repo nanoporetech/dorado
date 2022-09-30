@@ -110,15 +110,20 @@ std::shared_ptr<Read> process_pod5_read(size_t row,
     int16_t end_reason = 0;
     int16_t run_info = 0;
     int64_t signal_row_count = 0;
+
+    static std::mutex cerr_mtx;
+
     if (pod5_get_read_batch_row_info(batch, row, read_id, &pore, &calibration_idx, &read_number,
                                      &start_sample, &median_before, &end_reason, &run_info,
                                      &signal_row_count) != POD5_OK) {
+        std::scoped_lock lock(cerr_mtx);
         std::cerr << "Failed to get read " << row << "\n";
     }
 
     //Retrieve global information for the run
     RunInfoDictData_t* run_info_data;
     if (pod5_get_run_info(batch, run_info, &run_info_data) != POD5_OK) {
+        std::scoped_lock lock(cerr_mtx);
         std::cerr << "Failed to get Run Info " << row << pod5_get_error_string() << "\n";
     }
     auto run_acquisition_start_time_ms = run_info_data->acquisition_start_time_ms;
@@ -127,6 +132,7 @@ std::shared_ptr<Read> process_pod5_read(size_t row,
     //Retrieve Pore information (Pore type, channel, mux etc)
     PoreDictData_t* pore_data = nullptr;
     if (pod5_get_pore(batch, pore, &pore_data) != POD5_OK) {
+        std::scoped_lock lock(cerr_mtx);
         std::cerr << "Failed to pore data " << row << pod5_get_error_string() << "\n";
     }
     int channel = pore_data->channel;
@@ -139,6 +145,7 @@ std::shared_ptr<Read> process_pod5_read(size_t row,
     // Now read out the calibration params:
     CalibrationDictData_t* calib_data = nullptr;
     if (pod5_get_calibration(batch, calibration_idx, &calib_data) != POD5_OK) {
+        std::scoped_lock lock(cerr_mtx);
         std::cerr << "Failed to get read " << row
                   << " calibration_idx data: " << pod5_get_error_string() << "\n";
     }
@@ -147,6 +154,7 @@ std::shared_ptr<Read> process_pod5_read(size_t row,
     std::vector<std::uint64_t> signal_rows_indices(signal_row_count);
     if (pod5_get_signal_row_indices(batch, row, signal_row_count, signal_rows_indices.data()) !=
         POD5_OK) {
+        std::scoped_lock lock(cerr_mtx);
         std::cerr << "Failed to get read " << row
                   << " signal row indices: " << pod5_get_error_string() << "\n";
     }
@@ -155,6 +163,7 @@ std::shared_ptr<Read> process_pod5_read(size_t row,
     std::vector<SignalRowInfo_t*> signal_rows(signal_row_count);
     if (pod5_get_signal_row_info(file, signal_row_count, signal_rows_indices.data(),
                                  signal_rows.data()) != POD5_OK) {
+        std::scoped_lock lock(cerr_mtx);
         std::cerr << "Failed to get read " << row
                   << " signal row locations: " << pod5_get_error_string() << "\n";
     }
@@ -169,6 +178,7 @@ std::shared_ptr<Read> process_pod5_read(size_t row,
     for (std::size_t i = 0; i < signal_row_count; ++i) {
         if (pod5_get_signal(file, signal_rows[i], signal_rows[i]->stored_sample_count,
                             samples.data() + samples_read_so_far) != POD5_OK) {
+            std::scoped_lock lock(cerr_mtx);
             std::cerr << "Failed to get read " << row << " signal: " << pod5_get_error_string()
                       << "\n";
         }
