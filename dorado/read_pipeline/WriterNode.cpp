@@ -74,7 +74,10 @@ void WriterNode::worker_thread() {
     }
 }
 
-WriterNode::WriterNode(std::vector<std::string> args, bool emit_fastq, size_t max_reads)
+WriterNode::WriterNode(std::vector<std::string> args,
+                       bool emit_fastq,
+                       size_t num_worker_threads,
+                       size_t max_reads)
         : ReadSink(max_reads),
           m_args(std::move(args)),
           m_emit_fastq(emit_fastq),
@@ -82,7 +85,7 @@ WriterNode::WriterNode(std::vector<std::string> args, bool emit_fastq, size_t ma
           m_num_reads_processed(0),
           m_initialization_time(std::chrono::system_clock::now()) {
     print_header();
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < num_worker_threads; i++) {
         m_workers.push_back(
                 std::make_unique<std::thread>(std::thread(&WriterNode::worker_thread, this)));
     }

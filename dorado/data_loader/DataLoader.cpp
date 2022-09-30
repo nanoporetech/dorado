@@ -220,8 +220,7 @@ void DataLoader::load_pod5_reads_from_file(const std::string& path) {
         std::cerr << "Failed to query batch count: " << pod5_get_error_string() << "\n";
     }
 
-    int max_reads_batch = 100;
-    cxxpool::thread_pool pool{32};
+    cxxpool::thread_pool pool{m_num_worker_threads};
 
     for (std::size_t batch_index = 0; batch_index < batch_count; ++batch_index) {
         Pod5ReadRecordBatch_t* batch = nullptr;
@@ -343,8 +342,8 @@ void DataLoader::load_fast5_reads_from_file(const std::string& path) {
     }
 }
 
-DataLoader::DataLoader(ReadSink& read_sink, const std::string& device)
-        : m_read_sink(read_sink), m_device(device) {
+DataLoader::DataLoader(ReadSink& read_sink, const std::string& device, size_t num_worker_threads)
+        : m_read_sink(read_sink), m_device(device), m_num_worker_threads(num_worker_threads) {
     static std::once_flag vbz_init_flag;
     std::call_once(vbz_init_flag, vbz_register);
 }
