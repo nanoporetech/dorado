@@ -254,3 +254,13 @@ MTL::Buffer *extract_mtl_from_tensor(torch::Tensor &x) {
     x.reset();
     return bfr;
 }
+
+int auto_gpu_batch_size(std::string model_path) {
+    if (model_path.find("_fast@v") != std::string::npos) {
+        return 1536;
+    } else if (model_path.find("_hac@v") != std::string::npos) {
+        return 768;
+    } else if (model_path.find("_sup@v") != std::string::npos) {
+        return 384;
+    }
+}

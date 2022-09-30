@@ -3,8 +3,10 @@
 #include "decode/CPUDecoder.h"
 #ifdef __APPLE__
 #include "nn/MetalCRFModel.h"
+#include "utils/metal_utils.h"
 #else
 #include "nn/CudaCRFModel.h"
+#include "utils/cuda_utils.h"
 #endif
 #include "nn/ModelRunner.h"
 #include "nn/RemoraModel.h"
@@ -12,13 +14,13 @@
 #include "read_pipeline/ModBaseCallerNode.h"
 #include "read_pipeline/ScalerNode.h"
 #include "read_pipeline/WriterNode.h"
-#include "utils/parse_cuda_device_string.h"
 
 #include <argparse.hpp>
 
 #include <filesystem>
 #include <iostream>
 #include <sstream>
+#include <thread>
 
 void setup(std::vector<std::string> args,
            const std::filesystem::path& model_path,
@@ -38,12 +40,14 @@ void setup(std::vector<std::string> args,
     int num_devices = 1;
 
     if (device == "cpu") {
+        batch_size = batch_size == 0 ? std::thread::hardware_concurrency() : batch_size;
         for (int i = 0; i < num_runners; i++) {
             runners.push_back(std::make_shared<ModelRunner<CPUDecoder>>(model_path, device,
                                                                         chunk_size, batch_size));
         }
 #ifdef __APPLE__
     } else if (device == "metal") {
+        batch_size = batch_size == 0 ? auto_gpu_batch_size(model_path.string()) : batch_size;
         auto caller = create_metal_caller(model_path, chunk_size, batch_size);
         for (int i = 0; i < num_runners; i++) {
             runners.push_back(std::make_shared<MetalModelRunner>(caller, chunk_size, batch_size));
@@ -55,6 +59,8 @@ void setup(std::vector<std::string> args,
     } else {
         auto devices = parse_cuda_device_string(device);
         num_devices = devices.size();
+        batch_size =
+                batch_size == 0 ? auto_gpu_batch_size(model_path.string(), devices) : batch_size;
         for (auto device_string : devices) {
             auto caller = create_cuda_caller(model_path, chunk_size, batch_size, device_string);
             for (int i = 0; i < num_runners; i++) {
@@ -126,7 +132,10 @@ int basecaller(int argc, char* argv[]) {
             .default_value(std::string{"cuda:all"});
 #endif
 
-    parser.add_argument("-b", "--batchsize").default_value(1024).scan<'i', int>();
+    parser.add_argument("-b", "--batchsize")
+            .default_value(0)
+            .scan<'i', int>()
+            .help("if 0 an optimal batchsize will be selected");
 
     parser.add_argument("-c", "--chunksize").default_value(10000).scan<'i', int>();
 
