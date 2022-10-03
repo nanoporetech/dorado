@@ -186,19 +186,14 @@ std::shared_ptr<Read> process_pod5_read(size_t row,
         samples_read_so_far += signal_rows[i]->stored_sample_count;
     }
 
-    std::vector<float> floatTmp(samples.begin(), samples.end());
-
+    std::vector<int32_t> tmp(samples.begin(), samples.end());
     auto new_read = std::make_shared<Read>();
-
-    auto options = torch::TensorOptions().dtype(torch::kFloat32);
-    new_read->raw_data =
-            torch::from_blob(floatTmp.data(), floatTmp.size(), options).clone().to(device);
-
+    auto options = torch::TensorOptions().dtype(torch::kInt32);
+    new_read->raw_data = torch::from_blob(tmp.data(), tmp.size(), options).clone();
     auto start_time_ms = run_acquisition_start_time_ms + ((start_sample * 1000) / run_sample_rate);
     auto start_time = get_string_timestamp_from_unix_time(start_time_ms);
     new_read->scaling = calib_data->scale;
     new_read->offset = calib_data->offset;
-    new_read->scale_set = true;
     new_read->read_id = read_id_str;
     new_read->num_trimmed_samples = 0;
     new_read->attributes.read_number = read_number;
@@ -302,9 +297,9 @@ void DataLoader::load_fast5_reads_from_file(const std::string& path) {
         if (ds.getDataType().string() != "Integer16")
             throw std::runtime_error("Invalid FAST5 Signal data type of " +
                                      ds.getDataType().string());
-        std::vector<int16_t> tmp;
-        ds.read(tmp);
-        std::vector<float> floatTmp(tmp.begin(), tmp.end());
+        std::vector<int16_t> samples;
+        ds.read(samples);
+        std::vector<float> tmp(samples.begin(), samples.end());
 
         HighFive::Attribute mux_attr = raw.getAttribute("start_mux");
         HighFive::Attribute read_number_attr = raw.getAttribute("read_number");
@@ -330,11 +325,11 @@ void DataLoader::load_fast5_reads_from_file(const std::string& path) {
 
         auto options = torch::TensorOptions().dtype(torch::kFloat32);
         auto new_read = std::make_shared<Read>();
-        new_read->raw_data =
-                torch::from_blob(floatTmp.data(), floatTmp.size(), options).clone().to(m_device);
+        new_read->raw_data = torch::from_blob(tmp.data(), tmp.size(), options).clone();
         new_read->digitisation = digitisation;
         new_read->range = range;
         new_read->offset = offset;
+        new_read->scaling = range / digitisation;
         new_read->read_id = read_id;
         new_read->num_trimmed_samples = 0;
         new_read->attributes.mux = mux;

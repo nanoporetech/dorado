@@ -56,7 +56,6 @@ public:
     float shift;  // To be set by scaler
     float scale;  // To be set by scaler
 
-    bool scale_set = false;  // Set to True if scale has been applied to raw data
     float scaling;  // Scale factor applied to convert raw integers from sequencer into pore current values
 
     size_t num_chunks;  // Number of chunks in the read. Reads raw data is split into chunks for efficient basecalling.

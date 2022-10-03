@@ -4,7 +4,6 @@
 
 #include <torch/csrc/jit/serialization/pickle.h>
 
-#include <array>
 #include <fstream>
 #include <vector>
 
@@ -29,7 +28,7 @@ std::vector<torch::Tensor> load_tensors(const std::filesystem::path& dir,
 }
 
 torch::Tensor quantile(const torch::Tensor t, const torch::Tensor q) {
-    assert(q.dtype().name() == "float");
+    assert(q.dtype() == torch::kF32);
 
     auto tmp = t.clone();
     auto [qval, qidx] = q.sort();
@@ -49,14 +48,13 @@ torch::Tensor quantile(const torch::Tensor t, const torch::Tensor q) {
     return res;
 }
 
-torch::Tensor quantile_counting(const torch::Tensor t,
-                                int range_min,
-                                int range_max,
-                                const torch::Tensor q) {
+torch::Tensor quantile_counting(const torch::Tensor t, const torch::Tensor q) {
     assert(q.dtype() == torch::kF32);
-    assert(range_min < range_max);
 
     auto p = t.data_ptr<int>();
+    auto range_min = t.min().item<int>();
+    auto range_max = t.max().item<int>();
+
     int size = t.size(0);
 
     std::vector<int> counts(range_max - range_min + 1);

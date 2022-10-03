@@ -9,7 +9,7 @@ using namespace std::chrono_literals;
 
 std::pair<float, float> normalisation(torch::Tensor& x) {
     //Calculate shift and scale factors for normalisation.
-    auto quantiles = utils::quantile(x, torch::tensor({0.2, 0.9}));
+    auto quantiles = utils::quantile_counting(x, torch::tensor({0.2, 0.9}));
     float q20 = quantiles[0].item<float>();
     float q90 = quantiles[1].item<float>();
     float shift = std::max(10.0f, 0.51f * (q20 + q90));
@@ -35,24 +35,14 @@ void ScalerNode::worker_thread() {
         m_reads.pop_front();
         lock.unlock();
 
-        if (!read->scale_set) {
-            read->scaling = (float)read->range / (float)read->digitisation;
-            read->scale_set = true;
-        }
-
-        read->raw_data = read->scaling * (read->raw_data + read->offset);
-
         auto [shift, scale] = normalisation(read->raw_data);
-        read->shift = shift;
-        read->scale = scale;
-        read->raw_data = (read->raw_data - read->shift) / read->scale;
+        read->shift = read->scaling * (shift + read->offset);
+        read->scale = read->scaling * (scale + read->offset);
+        read->raw_data = (read->raw_data.to(torch::kFloat32) - read->shift) / read->scale;
 
-        float threshold = shift + scale * 2.4;
-
-        //8000 value may be changed in future. Currently this is found to work well.
+        // 8000 value may be changed in future. Currently this is found to work well.
         int trim_start =
-                trim(read->raw_data.index({torch::indexing::Slice(torch::indexing::None, 8000)}),
-                     threshold);
+                trim(read->raw_data.index({torch::indexing::Slice(torch::indexing::None, 8000)}));
 
         read->raw_data =
                 read->raw_data.index({torch::indexing::Slice(trim_start, torch::indexing::None)});
@@ -93,7 +83,7 @@ int ScalerNode::trim(torch::Tensor signal,
                      float max_trim) {
     int min_trim = 10;
     bool seen_peak = false;
-    int num_samples = std::min(max_samples, (int)signal.size(0));
+    int num_samples = std::min(max_samples, static_cast<int>(signal.size(0)));
     int num_windows = num_samples / window_size;
 
     for (int pos = 0; pos < num_windows; pos++) {

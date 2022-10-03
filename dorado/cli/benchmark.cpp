@@ -41,7 +41,7 @@ int benchmark(int argc, char* argv[]) {
 
         // radix sort
         start = std::chrono::system_clock::now();
-        res = ::utils::quantile_counting(x, 0, 2047, q);
+        res = ::utils::quantile_counting(x, q);
         end = std::chrono::system_clock::now();
         duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 
