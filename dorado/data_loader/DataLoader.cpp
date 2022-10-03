@@ -299,7 +299,7 @@ void DataLoader::load_fast5_reads_from_file(const std::string& path) {
                                      ds.getDataType().string());
         std::vector<int16_t> samples;
         ds.read(samples);
-        std::vector<float> tmp(samples.begin(), samples.end());
+        std::vector<int32_t> tmp(samples.begin(), samples.end());
 
         HighFive::Attribute mux_attr = raw.getAttribute("start_mux");
         HighFive::Attribute read_number_attr = raw.getAttribute("read_number");
@@ -323,7 +323,7 @@ void DataLoader::load_fast5_reads_from_file(const std::string& path) {
         auto start_time_str =
                 adjust_time(exp_start_time, static_cast<uint32_t>(start_time / sampling_rate));
 
-        auto options = torch::TensorOptions().dtype(torch::kFloat32);
+        auto options = torch::TensorOptions().dtype(torch::kInt32);
         auto new_read = std::make_shared<Read>();
         new_read->raw_data = torch::from_blob(tmp.data(), tmp.size(), options).clone();
         new_read->digitisation = digitisation;
