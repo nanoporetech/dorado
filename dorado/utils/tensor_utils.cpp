@@ -49,43 +49,32 @@ torch::Tensor quantile(const torch::Tensor t, const torch::Tensor q) {
     return res;
 }
 
-torch::Tensor quantile_radix(const torch::Tensor t, const torch::Tensor q) {
-    assert(q.dtype().name() == "float");
+torch::Tensor quantile_counting(const torch::Tensor t,
+                                int range_min,
+                                int range_max,
+                                const torch::Tensor q) {
+    assert(q.dtype() == torch::kF32);
+    assert(range_min < range_max);
 
     auto p = t.data_ptr<int>();
-    std::vector<int> tmp{p, p + t.size(0)};
+    int size = t.size(0);
+
+    std::vector<int> counts(range_max - range_min + 1);
+    for (int i = 0; i < size; ++i) {
+        counts[p[i] - range_min] += 1;
+    }
+    std::partial_sum(counts.begin(), counts.end(), counts.begin());
 
     auto res = torch::empty_like(q);
 
-    int radix = 1;
-
-    // Largest element in unsorted array
-    int max = *(std::max_element(tmp.begin(), tmp.end()));
-
-    while (max / radix) {
-        std::array<std::vector<int>, 10> buckets;
-
-        for (const auto& num : tmp) {
-            int digit = num / radix % 10;
-            buckets[digit].push_back(num);
-        }
-
-        size_t k = 0;
-
-        // Take the elements out of buckets into the array
-        for (size_t i = 0; i < 10; i++) {
-            for (size_t j = 0; j < buckets[i].size(); j++) {
-                tmp[k] = buckets[i][j];
-                k++;
+    for (size_t idx = 0; idx < q.numel(); idx++) {
+        int threshold = q[idx].item<float>() * size;
+        for (int i = 0; i <= counts.size(); ++i) {
+            if (counts[i] >= threshold) {
+                res[idx] = i + range_min;
+                break;
             }
         }
-
-        // Change the place of digit used for sorting
-        radix *= 10;
-    }
-
-    for (size_t idx = 0; idx < q.numel(); idx++) {
-        res[idx] = tmp[static_cast<size_t>(q[idx].item<float>() * tmp.size())];
     }
 
     return res;
