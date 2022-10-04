@@ -75,6 +75,13 @@ int download(int argc, char* argv[]) {
         return 1;
     }
 
+    try {
+        fs::remove(directory / "tmp");
+    } catch (std::filesystem::filesystem_error const& e) {
+        std::cerr << "> error: " << e.code().message() << std::endl;
+        return 1;
+    }
+
     httplib::Client http(basecaller::URL_ROOT);
     http.enable_server_certificate_verification(false);
     http.set_follow_location(true);
