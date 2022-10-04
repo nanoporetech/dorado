@@ -5,6 +5,10 @@
 #include <chrono>
 #include <iostream>
 
+#ifndef _WIN32
+#include <unistd.h>
+#endif
+
 using namespace std::chrono_literals;
 
 void WriterNode::print_header() {
@@ -44,7 +48,7 @@ void WriterNode::worker_thread() {
         m_num_samples_processed += read->raw_data.size(0);
         m_num_reads_processed += 1;
 
-        if (m_num_reads_processed % 100 == 0) {
+        if (m_num_reads_processed % 100 == 0 && m_isatty) {
             std::scoped_lock<std::mutex> lock(m_cerr_mutex);
             std::cerr << "\r> Reads basecalled: " << m_num_reads_processed;
         }
@@ -79,6 +83,12 @@ WriterNode::WriterNode(std::vector<std::string> args,
           m_num_samples_processed(0),
           m_num_reads_processed(0),
           m_initialization_time(std::chrono::system_clock::now()) {
+#ifdef _WIN32
+    m_isatty = true;
+#else
+    m_isatty = isatty(fileno(stderr));
+#endif
+
     print_header();
     for (int i = 0; i < num_worker_threads; i++) {
         m_workers.push_back(
@@ -97,7 +107,11 @@ WriterNode::~WriterNode() {
     auto duration =
             std::chrono::duration_cast<std::chrono::milliseconds>(end_time - m_initialization_time)
                     .count();
-    std::cerr << "\r> Reads basecalled: " << m_num_reads_processed << std::endl;
+
+    if (m_isatty) {
+        std::cerr << "\r";
+    }
+    std::cerr << "> Reads basecalled: " << m_num_reads_processed << std::endl;
     std::cerr << "> Samples/s: " << std::scientific << m_num_samples_processed / (duration / 1000.0)
               << std::endl;
 }

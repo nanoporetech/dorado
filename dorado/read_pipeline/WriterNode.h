@@ -22,7 +22,7 @@ private:
 
     std::vector<std::string> m_args;
     // Emit Fastq if true
-    bool m_emit_fastq;
+    bool m_emit_fastq, m_isatty;
     // Total number of raw samples from the read WriterNode has processed. Used for performance benchmarking and debugging.
     std::atomic<int64_t> m_num_samples_processed;
     //Total number of reads WriterNode has processed
