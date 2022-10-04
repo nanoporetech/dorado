@@ -18,35 +18,49 @@ int benchmark(int argc, char* argv[]) {
         std::exit(1);
     }
 
-    std::cerr << "benchmarker.." << std::endl;
-
     std::vector<size_t> sizes{1000, 1000, 2000, 3000, 4000, 10000, 100000, 1000000, 10000000};
 
     for (auto n : sizes) {
+        std::cerr << "samples : " << n << std::endl;
+
         // generate some input
-        auto x = torch::randint(0, 2048, n);
+        auto x = torch::randint(0, 2047, n);
         auto q = torch::tensor({0.2, 0.9}, {torch::kFloat32});
 
-        // nth_element
+        // torch::quantile
         auto start = std::chrono::system_clock::now();
-        auto res = ::utils::quantile(x, q);
+        auto res = torch::quantile(x, q);
         auto end = std::chrono::system_clock::now();
 
         auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 
-        std::cerr << "nth_element n=" << n << " " << duration << "us q20=";
-        std::cerr << res[0].item<int>() << " q90=" << res[1].item<int>() << std::endl;
+        std::cerr << "torch:quant  "
+                  << " q20=" << res[0].item<int>() << " q90=" << res[1].item<int>() << " "
+                  << duration << "us" << std::endl;
 
-        x = x.to(torch::kInt);
+        // nth_element
+        start = std::chrono::system_clock::now();
+        res = ::utils::quantile(x, q);
+        end = std::chrono::system_clock::now();
 
-        // radix sort
+        duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+
+        std::cerr << "nth_element  "
+                  << " q20=" << res[0].item<int>() << " q90=" << res[1].item<int>() << " "
+                  << duration << "us" << std::endl;
+
+        x = x.to(torch::kInt16);
+
+        // counting
         start = std::chrono::system_clock::now();
         res = ::utils::quantile_counting(x, q);
         end = std::chrono::system_clock::now();
         duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 
-        std::cerr << "counting    n=" << n << " " << duration << "us q20=";
-        std::cerr << res[0].item<int>() << " q90=" << res[1].item<int>() << std::endl;
+        std::cerr << "counting     "
+                  << " q20=" << res[0].item<int>() << " q90=" << res[1].item<int>() << " "
+                  << duration << "us" << std::endl
+                  << std::endl;
     }
 
     return 0;
