@@ -51,9 +51,9 @@ torch::Tensor quantile(const torch::Tensor t, const torch::Tensor q) {
 torch::Tensor quantile_counting(const torch::Tensor t, const torch::Tensor q) {
     assert(q.dtype() == torch::kF32);
 
-    auto p = t.data_ptr<int>();
-    auto range_min = t.min().item<int>();
-    auto range_max = t.max().item<int>();
+    auto p = t.data_ptr<int16_t>();
+    auto range_min = t.min().item<int16_t>();
+    auto range_max = t.max().item<int16_t>();
 
     int size = t.size(0);
 

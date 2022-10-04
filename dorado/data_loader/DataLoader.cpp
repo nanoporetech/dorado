@@ -174,11 +174,13 @@ std::shared_ptr<Read> process_pod5_read(size_t row,
         total_sample_count += signal_rows[i]->stored_sample_count;
     }
 
-    std::vector<std::int16_t> samples(total_sample_count);
+    auto options = torch::TensorOptions().dtype(torch::kInt16);
+    auto samples = torch::empty(total_sample_count, options);
+
     std::size_t samples_read_so_far = 0;
     for (std::size_t i = 0; i < signal_row_count; ++i) {
         if (pod5_get_signal(file, signal_rows[i], signal_rows[i]->stored_sample_count,
-                            samples.data() + samples_read_so_far) != POD5_OK) {
+                            samples.data_ptr<int16_t>() + samples_read_so_far) != POD5_OK) {
             std::scoped_lock lock(cerr_mtx);
             std::cerr << "Failed to get read " << row << " signal: " << pod5_get_error_string()
                       << "\n";
@@ -187,10 +189,8 @@ std::shared_ptr<Read> process_pod5_read(size_t row,
         samples_read_so_far += signal_rows[i]->stored_sample_count;
     }
 
-    std::vector<int32_t> tmp(samples.begin(), samples.end());
     auto new_read = std::make_shared<Read>();
-    auto options = torch::TensorOptions().dtype(torch::kInt32);
-    new_read->raw_data = torch::from_blob(tmp.data(), tmp.size(), options).clone();
+    new_read->raw_data = samples;
     auto start_time_ms = run_acquisition_start_time_ms + ((start_sample * 1000) / run_sample_rate);
     auto start_time = get_string_timestamp_from_unix_time(start_time_ms);
     new_read->scaling = calib_data->scale;
@@ -298,9 +298,10 @@ void DataLoader::load_fast5_reads_from_file(const std::string& path) {
         if (ds.getDataType().string() != "Integer16")
             throw std::runtime_error("Invalid FAST5 Signal data type of " +
                                      ds.getDataType().string());
-        std::vector<int16_t> samples;
-        ds.read(samples);
-        std::vector<int32_t> tmp(samples.begin(), samples.end());
+
+        auto options = torch::TensorOptions().dtype(torch::kInt16);
+        auto samples = torch::empty(ds.getStorageSize(), options);
+        ds.read(samples.data_ptr<int16_t>());
 
         HighFive::Attribute mux_attr = raw.getAttribute("start_mux");
         HighFive::Attribute read_number_attr = raw.getAttribute("read_number");
@@ -324,9 +325,8 @@ void DataLoader::load_fast5_reads_from_file(const std::string& path) {
         auto start_time_str =
                 adjust_time(exp_start_time, static_cast<uint32_t>(start_time / sampling_rate));
 
-        auto options = torch::TensorOptions().dtype(torch::kInt32);
         auto new_read = std::make_shared<Read>();
-        new_read->raw_data = torch::from_blob(tmp.data(), tmp.size(), options).clone();
+        new_read->raw_data = samples;
         new_read->digitisation = digitisation;
         new_read->range = range;
         new_read->offset = offset;
