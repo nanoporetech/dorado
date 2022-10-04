@@ -36,14 +36,11 @@ void ScalerNode::worker_thread() {
         lock.unlock();
 
         auto [shift, scale] = normalisation(read->raw_data);
+        read->raw_data = (read->raw_data - shift) / scale;
 
-        // shift to pA
-        read->raw_data = read->scaling * (read->raw_data + read->offset);
-
-        // normalise
+        // move the shift and scale into pA.
         read->scale = read->scaling * scale;
         read->shift = read->scaling * (shift + read->offset);
-        read->raw_data = (read->raw_data - read->shift) / read->scale;
 
         float threshold = read->shift + read->scale * 2.4;
 
