@@ -300,7 +300,7 @@ void DataLoader::load_fast5_reads_from_file(const std::string& path) {
                                      ds.getDataType().string());
 
         auto options = torch::TensorOptions().dtype(torch::kInt16);
-        auto samples = torch::empty(ds.getStorageSize(), options);
+        auto samples = torch::empty(ds.getElementCount(), options);
         ds.read(samples.data_ptr<int16_t>());
 
         HighFive::Attribute mux_attr = raw.getAttribute("start_mux");
