@@ -4,6 +4,7 @@
 #include "elzip/elzip.hpp"
 #include "httplib.h"
 #include "models.h"
+#include "utils/log_utils.h"
 
 #include <argparse.hpp>
 
@@ -13,6 +14,8 @@
 namespace fs = std::filesystem;
 
 int download(int argc, char* argv[]) {
+    InitLogging();
+
     argparse::ArgumentParser parser("dorado", DORADO_VERSION);
 
     parser.add_argument("--model").default_value(std::string("all")).help("the model to download");
