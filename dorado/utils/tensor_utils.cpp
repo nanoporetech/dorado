@@ -57,18 +57,18 @@ torch::Tensor quantile_counting(const torch::Tensor t, const torch::Tensor q) {
 
     int size = t.size(0);
 
-    std::vector<int> counts(range_max - range_min + 1);
+    std::vector<int> counts(range_max - range_min + 1, 0);
     for (int i = 0; i < size; ++i) {
-        counts[p[i] - range_min] += 1;
+        counts[p[i] - range_min]++;
     }
     std::partial_sum(counts.begin(), counts.end(), counts.begin());
 
     auto res = torch::empty_like(q);
 
     for (size_t idx = 0; idx < q.numel(); idx++) {
-        int threshold = q[idx].item<float>() * size;
+        int threshold = q[idx].item<float>() * (size - 1);
         for (int i = 0; i <= counts.size(); ++i) {
-            if (counts[i] >= threshold) {
+            if (counts[i] > threshold) {
                 res[idx] = i + range_min;
                 break;
             }
