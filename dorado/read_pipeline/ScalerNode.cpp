@@ -36,9 +36,14 @@ void ScalerNode::worker_thread() {
         lock.unlock();
 
         auto [shift, scale] = normalisation(read->raw_data);
+
+        // shift to pA
+        read->raw_data = read->scaling * (read->raw_data + read->offset);
+
+        // normalise
+        read->scale = read->scaling * scale;
         read->shift = read->scaling * (shift + read->offset);
-        read->scale = read->scaling * (scale + read->offset);
-        read->raw_data = (read->raw_data.to(torch::kFloat32) - read->shift) / read->scale;
+        read->raw_data = (read->raw_data - read->shift) / read->scale;
 
         // 8000 value may be changed in future. Currently this is found to work well.
         int trim_start =
