@@ -43,6 +43,7 @@ endif()
 set(LIB_SOURCE_FILES
     dorado/cli/basecaller.cpp
     dorado/cli/download.cpp
+    dorado/cli/benchmark.cpp
     dorado/cli/cli.h
     dorado/models.h
     dorado/nn/CRFModel.h
