@@ -21,7 +21,7 @@ void ScalerNode::worker_thread() {
     while (true) {
         // Wait until we are provided with a read
         std::unique_lock<std::mutex> lock(m_cv_mutex);
-        m_cv.wait_for(lock, 100ms, [this] { return !m_reads.empty(); });
+        m_cv.wait_for(lock, 1ms, [this] { return !m_reads.empty(); });
         if (m_reads.empty()) {
             if (m_terminate) {
                 // Termination flag is set and read input queue is empty, so terminate the worker
@@ -45,9 +45,12 @@ void ScalerNode::worker_thread() {
         read->shift = read->scaling * (shift + read->offset);
         read->raw_data = (read->raw_data - read->shift) / read->scale;
 
+        float threshold = read->shift + read->scale * 2.4;
+
         // 8000 value may be changed in future. Currently this is found to work well.
         int trim_start =
-                trim(read->raw_data.index({torch::indexing::Slice(torch::indexing::None, 8000)}));
+                trim(read->raw_data.index({torch::indexing::Slice(torch::indexing::None, 8000)}),
+                     threshold);
 
         read->raw_data =
                 read->raw_data.index({torch::indexing::Slice(trim_start, torch::indexing::None)});
