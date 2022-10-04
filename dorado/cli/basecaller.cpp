@@ -14,6 +14,7 @@
 #include "read_pipeline/ModBaseCallerNode.h"
 #include "read_pipeline/ScalerNode.h"
 #include "read_pipeline/WriterNode.h"
+#include "utils/log_utils.h"
 
 #include <argparse.hpp>
 
@@ -118,6 +119,8 @@ void setup(std::vector<std::string> args,
 }
 
 int basecaller(int argc, char* argv[]) {
+    InitLogging();
+
     argparse::ArgumentParser parser("dorado", DORADO_VERSION);
 
     parser.add_argument("model").help("the basecaller model to run.");
