@@ -131,6 +131,13 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR}/dorado
     dorado
 )
 
+file(GLOB_RECURSE pod5_children LIST_DIRECTORIES true "${POD5_INCLUDE}/**")
+message("pod5 dir ${POD5_INCLUDE} contents:")
+foreach(item ${pod5_children})
+    message(" - ${item}")
+endforeach()
+message("children end")
+
 target_link_libraries(dorado_lib
     ${APPLE_FWK_FOUNDATION}
     ${APPLE_FWK_QUARTZ_CORE}
