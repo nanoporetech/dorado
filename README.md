@@ -16,9 +16,9 @@ This is an alpha of Dorado . This software is being released for evaluation. If 
 
 ## Installation
 
- - [dorado-0.0.1-linux-x64](https://nanoporetech.box.com/shared/static/q39qjh0tacym6b467u4gh1p6q3xpyc5l.gz)
- - [dorado-0.0.1-osx-arm64](https://nanoporetech.box.com/shared/static/skouz5lp9tpcejdz20s4b5avvrw36cvj.gz)
- - [dorado-0.0.1-windows-x64](https://nanoporetech.box.com/shared/static/s0401b23uxca2srtz7s88gsv1puf4chi.zip)
+ - [dorado-0.0.1-linux-x64](https://nanoporetech.box.com/shared/static/h8eqc9htxk938jzpl4fch2rqlm48yeb0.gz)
+ - [dorado-0.0.1-osx-arm64](https://nanoporetech.box.com/shared/static/e33yelum810yv09mao5mr7tgh8gj2e5f.gz)
+ - [dorado-0.0.1-windows-x64](https://nanoporetech.box.com/shared/static/vb2zxg30e5jl9dbit4eqtlvkb5p377te.zip)
 
 ## Running
 
