@@ -40,11 +40,11 @@ $ dorado basecaller dna_r10.4.1_e8.2_260bps_hac@v3.5.2 pod5s/ | samtools view -S
 
 Dorado has been tested on the following systems:
 
-| Platform | GPU/CPU              |
-| -------- | -------------------- |
-| Windows  | (G)V100, A100        |
-| Apple    | M1, M1 Max, M1 Ultra |
-| Linux    | (G)V100, A100        |
+| Platform | GPU/CPU                      |
+| -------- | ---------------------------- |
+| Windows  | (G)V100, A100                |
+| Apple    | M1, M1 Pro, M1 Max, M1 Ultra |
+| Linux    | (G)V100, A100                |
 
 Systems not listed above but which have Nvidia GPUs with >=8GB VRAM and architecture from Volta onwards have not been widely tested but are expected to work. If you encounter problems with running on your system please [report an issue](https://github.com/nanoporetech/dorado/issues)
 
