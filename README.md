@@ -33,7 +33,6 @@ For unaligned BAM output, dorado output can be piped to BAM using samtoools:
 
 ```
 $ dorado basecaller dna_r10.4.1_e8.2_260bps_hac@v3.5.2 pod5s/ | samtools view -Sh > calls.bam
-
 ```
 
 ## Platforms
