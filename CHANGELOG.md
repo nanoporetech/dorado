@@ -16,7 +16,7 @@ We are excited to announce the first binary release of Dorado. This Dorado relea
 * 9955d0de71d36e279b44e46545f5dfb6c742f224 - Added fast int8-quantization optimisation for LSTM networks with layer size of 96 or 128
 * f2e993d3961a52072cf43b0f327dbc21029c3aad - New cuBLAS-based implementation for LSTMs leading to state-of-the-art performance.
 * 6ec50dc5cecc65f0ff940420c0de152ba561f85c - Major rearchitecture of CUDA model runners for  higher basecalling speed and lower GPU memory utilisation.
-* a0a197f4950d390221b6ffc82ccd8ce012c3c765 - Accuracy improvements to handling of short reads (<1Kb) with an upgraded padding strategy.
+* a0a197f4950d390221b6ffc82ccd8ce012c3c765 - Accuracy improvements to handling of short reads (<1KB) with an upgraded padding strategy.
 * d01bf04f7dd84b14753790fae83ba20b7776f498 - Ability to download basecalling models from Dorado.
 * 7c7e59c6d65464f0eee40bf3d9f6885aae27839b - Support for SAM output
 
