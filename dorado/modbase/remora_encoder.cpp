@@ -71,7 +71,8 @@ RemoraEncoder::Context RemoraEncoder::get_context(size_t seq_pos) const {
 
     std::vector<int> seq_ints;
 
-    if (seq_start >= m_bases_before && seq_end + m_bases_after < static_cast<int>(m_sequence_ints.size())) {
+    if (seq_start >= m_bases_before &&
+        seq_end + m_bases_after < static_cast<int>(m_sequence_ints.size())) {
         seq_ints = {m_sequence_ints.begin() + seq_start - m_bases_before,
                     m_sequence_ints.begin() + seq_end + m_bases_after};
     } else {

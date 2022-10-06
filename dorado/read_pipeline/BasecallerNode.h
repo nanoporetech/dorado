@@ -38,7 +38,7 @@ private:
     std::atomic<int> m_num_active_model_runners{0};
 
     bool m_terminate_basecaller{false};
-    
+
     std::unique_ptr<std::thread>
             m_input_worker;  // Chunks up incoming reads and sticks them in the pending list
     std::vector<std::unique_ptr<std::thread>>
