@@ -5,7 +5,7 @@ project(dorado)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_EXTENSIONS OFF)
-set(DORADO_3RD_PARTY ${CMAKE_SOURCE_DIR}/dorado/3rdparty)
+set(DORADO_3RD_PARTY ${CMAKE_CURRENT_SOURCE_DIR}/dorado/3rdparty)
 
 include(cmake/DoradoVersion.cmake)
 include(cmake/UpdateSubmodules.cmake)
@@ -19,15 +19,17 @@ include(cmake/Torch.cmake)
 include(cmake/OpenSSL.cmake)
 
 if(DORADO_USING_OLD_CPP_ABI)
+  message(status "Setting old ABI in dorado")
   # We need to force the use of the old ABI here, if we are building in an old ABI context, as otherwise elzip builds
   # with the libc++11 ABI and we can't link against it.
   add_compile_options(-D_GLIBCXX_USE_CXX11_ABI=0)
 endif()
 
+add_compile_options(-Wno-shadow -Wno-sign-compare)
 add_subdirectory(dorado/3rdparty/elzip)
+set_property(TARGET minizip APPEND PROPERTY COMPILE_OPTIONS -Wno-unused-function)
 
-enable_testing()
-add_hdf_vbz_plugin()
+
 configure_file(dorado/Version.h.in dorado/Version.h)
 
 if(WIN32)
@@ -41,11 +43,6 @@ if(DEFINED CUDA_TOOLKIT_ROOT_DIR)
 endif()
 
 set(LIB_SOURCE_FILES
-    dorado/cli/basecaller.cpp
-    dorado/cli/download.cpp
-    dorado/cli/benchmark.cpp
-    dorado/cli/cli.h
-    dorado/models.h
     dorado/nn/CRFModel.h
     dorado/nn/CRFModel.cpp
     dorado/nn/ModelRunner.h
@@ -131,6 +128,12 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR}/dorado
     dorado
 )
 
+enable_testing()
+
+if(NOT DORADO_IN_CORE)
+  add_hdf_vbz_plugin()
+endif()
+
 target_link_libraries(dorado_lib
     ${APPLE_FWK_FOUNDATION}
     ${APPLE_FWK_QUARTZ_CORE}
@@ -142,7 +145,6 @@ target_link_libraries(dorado_lib
     ${KOI_LIBRARIES}
     vbz_hdf_plugin
     OpenSSL::SSL
-    elzip
 )
 
 if(APPLE)
@@ -150,35 +152,44 @@ if(APPLE)
     add_dependencies(dorado_lib metal-lib)
 endif()
 
-if(NOT WIN32)
-    # Set up RPATHs so we can find dependencies
-    set(CMAKE_SKIP_RPATH FALSE)
-    # Note: we don't need the relative lib dir if everything is in 
-    if(APPLE)
-        set(CMAKE_INSTALL_RPATH "@executable_path/;@executable_path/../lib")
-    else()
-        set(CMAKE_INSTALL_RPATH "$ORIGIN/../lib/;$ORIGIN")
+if(NOT DORADO_IN_CORE)
+    if(NOT WIN32)
+        # Set up RPATHs so we can find dependencies
+        set(CMAKE_SKIP_RPATH FALSE)
+        # Note: we don't need the relative lib dir if everything is in 
+        if(APPLE)
+            set(CMAKE_INSTALL_RPATH "@executable_path/;@executable_path/../lib")
+        else()
+            set(CMAKE_INSTALL_RPATH "$ORIGIN/../lib/;$ORIGIN")
+        endif()
+        set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
     endif()
-    set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
+
+    add_executable(dorado 
+        dorado/main.cpp
+        dorado/cli/basecaller.cpp
+        dorado/cli/benchmark.cpp        
+        dorado/cli/download.cpp
+        dorado/cli/cli.h
+        dorado/models.h
+    )
+
+    set_target_properties(dorado
+        PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+    )
+
+    target_link_libraries(dorado elzip)
+    target_link_libraries(dorado dorado_lib)
+
+    if (DEFINED DORADO_INSTALL_PATH)
+        set(CMAKE_INSTALL_PREFIX ${DORADO_INSTALL_PATH})
+    else()
+        set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/../dist)
+    endif()
+
+    install(TARGETS dorado RUNTIME)
 endif()
-
-add_executable(dorado dorado/main.cpp)
-
-set_target_properties(dorado
-    PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
-)
-
-target_link_libraries(dorado elzip)
-target_link_libraries(dorado dorado_lib)
-
-if (DEFINED DORADO_INSTALL_PATH)
-    set(CMAKE_INSTALL_PREFIX ${DORADO_INSTALL_PATH})
-else()
-    set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/../dist)
-endif()
-
-install(TARGETS dorado RUNTIME)
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     file(GLOB TORCH_DLLS "${TORCH_LIB}/lib/*.so*")
@@ -200,4 +211,6 @@ if(APPLE)
     add_subdirectory(metal_tests)
 endif()
 
-include(cmake/DoradoPackaging.cmake)
+if(NOT DORADO_IN_CORE)
+    include(cmake/DoradoPackaging.cmake)
+endif()

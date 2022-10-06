@@ -25,8 +25,8 @@ void WriterNode::print_header() {
 void WriterNode::worker_thread() {
     while (true) {
         // Wait until we are provided with a read
-        std::unique_lock<std::mutex> lock(m_cv_mutex);
-        m_cv.wait_for(lock, 100ms, [this] { return !m_reads.empty(); });
+        std::unique_lock<std::mutex> read_lock(m_cv_mutex);
+        m_cv.wait_for(read_lock, 100ms, [this] { return !m_reads.empty(); });
         if (m_reads.empty()) {
             if (m_terminate) {
                 // Termination flag is set and read input queue is empty, so terminate the worker
@@ -38,7 +38,7 @@ void WriterNode::worker_thread() {
 
         std::shared_ptr<Read> read = m_reads.front();
         m_reads.pop_front();
-        lock.unlock();
+        read_lock.unlock();
 
         if (m_num_samples_processed >
             std::numeric_limits<std::int64_t>::max() - read->raw_data.size(0)) {
@@ -90,7 +90,7 @@ WriterNode::WriterNode(std::vector<std::string> args,
 #endif
 
     print_header();
-    for (int i = 0; i < num_worker_threads; i++) {
+    for (size_t i = 0; i < num_worker_threads; i++) {
         m_workers.push_back(
                 std::make_unique<std::thread>(std::thread(&WriterNode::worker_thread, this)));
     }

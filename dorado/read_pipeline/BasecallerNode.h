@@ -23,11 +23,6 @@ private:
     void basecall_current_batch(int worker_id);
 
     ReadSink &m_sink;
-    std::unique_ptr<std::thread>
-            m_input_worker;  // Chunks up incoming reads and sticks them in the pending list
-    std::vector<std::unique_ptr<std::thread>>
-            m_basecall_workers;  // Basecalls chunks from the queue and puts read on the sink.
-    std::string m_model_path;
     // Vector of model runners (each with their own GPU access etc)
     std::vector<Runner> m_model_runners;
     // Number of chunks in a batch
@@ -40,7 +35,14 @@ private:
     size_t m_model_stride;
 
     // Model runners which have not terminated.
-    std::atomic<int> m_num_active_model_runners = 0;
+    std::atomic<int> m_num_active_model_runners{0};
+
+    bool m_terminate_basecaller{false};
+    
+    std::unique_ptr<std::thread>
+            m_input_worker;  // Chunks up incoming reads and sticks them in the pending list
+    std::vector<std::unique_ptr<std::thread>>
+            m_basecall_workers;  // Basecalls chunks from the queue and puts read on the sink.
 
     // Time when Basecaller Node is initialised. Used for benchmarking and debugging
     std::chrono::time_point<std::chrono::system_clock> initialization_time;
@@ -59,6 +61,4 @@ private:
 
     // If we go multi-threaded, there will be one of these batches per thread
     std::vector<std::deque<std::shared_ptr<Chunk>>> m_batched_chunks;
-
-    bool m_terminate_basecaller;
 };

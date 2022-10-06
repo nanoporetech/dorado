@@ -2,7 +2,7 @@
 
 function(download_and_extract url name)
 
-    file(LOCK ${CMAKE_SOURCE_DIR} DIRECTORY)
+    file(LOCK ${CMAKE_CURRENT_SOURCE_DIR} DIRECTORY)
 
     if(EXISTS ${DORADO_3RD_PARTY}/${name})
         message(STATUS "Found ${name}")
@@ -16,6 +16,6 @@ function(download_and_extract url name)
         message(STATUS "Extracting ${name} - done")
     endif()
 
-    file(LOCK ${CMAKE_SOURCE_DIR} DIRECTORY RELEASE)
+    file(LOCK ${CMAKE_CURRENT_SOURCE_DIR} DIRECTORY RELEASE)
 
 endfunction()

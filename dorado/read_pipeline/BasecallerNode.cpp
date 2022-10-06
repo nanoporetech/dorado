@@ -82,7 +82,7 @@ void BasecallerNode::basecall_current_batch(int worker_id) {
 
     auto decode_results = model_runner->call_chunks(m_batched_chunks[worker_id].size());
 
-    for (int i = 0; i < m_batched_chunks[worker_id].size(); i++) {
+    for (size_t i = 0; i < m_batched_chunks[worker_id].size(); i++) {
         m_batched_chunks[worker_id][i]->seq = decode_results[i].sequence;
         m_batched_chunks[worker_id][i]->qstring = decode_results[i].qstring;
         m_batched_chunks[worker_id][i]->moves = decode_results[i].moves;
@@ -194,7 +194,6 @@ BasecallerNode::BasecallerNode(ReadSink &sink,
           m_chunk_size(chunk_size),
           m_overlap(overlap),
           m_model_stride(model_stride),
-          m_terminate_basecaller(false),
           m_input_worker(new std::thread(&BasecallerNode::input_worker_thread, this)) {
     // Spin up the model runners:
     int num_model_runners = m_model_runners.size();

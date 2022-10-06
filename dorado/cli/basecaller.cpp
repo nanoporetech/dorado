@@ -41,7 +41,7 @@ void setup(std::vector<std::string> args,
 
     if (device == "cpu") {
         batch_size = batch_size == 0 ? std::thread::hardware_concurrency() : batch_size;
-        for (int i = 0; i < num_runners; i++) {
+        for (size_t i = 0; i < num_runners; i++) {
             runners.push_back(std::make_shared<ModelRunner<CPUDecoder>>(model_path, device,
                                                                         chunk_size, batch_size));
         }
@@ -63,7 +63,7 @@ void setup(std::vector<std::string> args,
                 batch_size == 0 ? auto_gpu_batch_size(model_path.string(), devices) : batch_size;
         for (auto device_string : devices) {
             auto caller = create_cuda_caller(model_path, chunk_size, batch_size, device_string);
-            for (int i = 0; i < num_runners; i++) {
+            for (size_t i = 0; i < num_runners; i++) {
                 runners.push_back(
                         std::make_shared<CudaModelRunner>(caller, chunk_size, batch_size));
             }
