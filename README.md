@@ -22,7 +22,7 @@ This is an alpha of Dorado . This software is being released for evaluation. If 
 
 ### Note on wget
 
-If downloading builds via wget, it is necessary to untar the files for example:
+If downloading builds via wget, it is necessary to untar the files, for example:
 
 ```
 wget https://nanoporetech.box.com/shared/static/h8eqc9htxk938jzpl4fch2rqlm48yeb0.gz
