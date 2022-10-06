@@ -20,6 +20,15 @@ This is an alpha of Dorado . This software is being released for evaluation. If 
  - [dorado-0.0.1-osx-arm64](https://nanoporetech.box.com/shared/static/e33yelum810yv09mao5mr7tgh8gj2e5f.gz)
  - [dorado-0.0.1-windows-x64](https://nanoporetech.box.com/shared/static/vb2zxg30e5jl9dbit4eqtlvkb5p377te.zip)
 
+### Note on wget
+
+If downloading builds via wget, it is necessary to untar the files for example:
+
+```
+wget https://nanoporetech.box.com/shared/static/h8eqc9htxk938jzpl4fch2rqlm48yeb0.gz
+tar -xvf h8eqc9htxk938jzpl4fch2rqlm48yeb0.gz
+```
+
 ## Running
 
 To run Dorado, download a model and point it to POD5 files. Fast5 files are supported but will not be as performant.
@@ -95,7 +104,7 @@ apt-get update && apt-get install -y --no-install-recommends libhdf5-dev libssl-
 ```
 $ git clone git@github.com:nanoporetech/dorado.git
 $ cd dorado
-$ cmake -S . -B cmake-build
+$ cmake -S . -B cmake-build -DCMAKE_CUDA_COMPILER=<NVCC_DIR>/nvcc
 $ cmake --build cmake-build --config Release -j
 $ ctest --test-dir cmake-build
 ```
