@@ -13,21 +13,11 @@ Dorado is a high-performance, easy-to-use, open source basecaller for Oxford Nan
 
 This is an alpha of Dorado . This software is being released for evaluation. If you encounter any problems building or running Dorado please [report an issue](https://github.com/nanoporetech/dorado/issues).
 
-
 ## Installation
 
  - [dorado-0.0.1-linux-x64](https://nanoporetech.box.com/shared/static/h8eqc9htxk938jzpl4fch2rqlm48yeb0.gz)
  - [dorado-0.0.1-osx-arm64](https://nanoporetech.box.com/shared/static/e33yelum810yv09mao5mr7tgh8gj2e5f.gz)
  - [dorado-0.0.1-windows-x64](https://nanoporetech.box.com/shared/static/vb2zxg30e5jl9dbit4eqtlvkb5p377te.zip)
-
-### Note on wget
-
-If downloading builds via wget, it is necessary to untar the files, for example:
-
-```
-wget https://nanoporetech.box.com/shared/static/h8eqc9htxk938jzpl4fch2rqlm48yeb0.gz
-tar -xvf h8eqc9htxk938jzpl4fch2rqlm48yeb0.gz
-```
 
 ## Running
 
