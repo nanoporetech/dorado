@@ -10,8 +10,6 @@ extern "C" {
 }
 
 torch::Tensor GPUDecoder::gpu_part(torch::Tensor scores, int num_chunks, DecoderOptions options) {
-    scores = scores.transpose(1, 0).contiguous();
-
     long int N = scores.sizes()[0];
     long int T = scores.sizes()[1];
     long int C = scores.sizes()[2];

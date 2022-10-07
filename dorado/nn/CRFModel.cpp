@@ -29,10 +29,6 @@ namespace F = torch::nn::functional;
 using Slice = torch::indexing::Slice;
 using quantized_lstm = std::function<int(void *, void *, void *, void *, void *, void *, int)>;
 
-struct PermuteImpl : Module {
-    torch::Tensor forward(torch::Tensor x) { return x.permute({2, 0, 1}); }
-};
-
 struct ConvolutionImpl : Module {
     ConvolutionImpl(int size = 1, int outsize = 1, int k = 1, int stride = 1) {
         conv = register_module(
@@ -53,19 +49,18 @@ struct LinearCRFImpl : Module {
     };
 
     torch::Tensor forward(torch::Tensor x) {
-        auto T = x.size(0);
-        auto N = x.size(1);
+        auto N = x.size(0);
+        auto T = x.size(1);
 #if USE_CUDA_LSTM
         // Optimised version of the #else branch for CUDA devices
         c10::cuda::CUDAGuard device_guard(x.device());
         auto stream = at::cuda::getCurrentCUDAStream().stream();
 
-        // make sure input is NTC in memory
-        x = x.transpose(0, 1).contiguous().reshape({T * N, -1});
+        x = x.reshape({N * T, -1});
         auto scores = torch::matmul(x, linear->weight.t());
         host_bias_tanh_scale_f16(stream, N * T, scores.size(1), scale, scores.data_ptr(),
                                  linear->bias.data_ptr());
-        scores = scores.view({N, T, -1}).transpose(0, 1);  // logical order TNC, memory order NTC
+        scores = scores.view({N, T, -1});
 
 #else  // if USE_CUDA_LSTM
         auto scores = activation(linear(x)) * scale;
@@ -318,7 +313,7 @@ struct LSTMStackImpl : Module {
             _chunks = _chunks.to(x.device());
         }
 
-        x = x.permute({1, 0, 2}).contiguous();  // data needs to be in NTC format.
+        x = x.permute({0, 2, 1}).contiguous();  // data needs to be in NTC format.
 
         auto buffer = torch::matmul(x, _r_wih[0]);
 
@@ -357,7 +352,7 @@ struct LSTMStackImpl : Module {
 
         torch::cuda::synchronize();
 
-        return x.permute({1, 0, 2}).contiguous();
+        return x;
     }
 
     // Dispatch to different forward method depending on whether we use quantized LSTMs or not
@@ -416,7 +411,6 @@ struct LSTMStackImpl : Module {
 
 #endif  // if USE_CUDA_LSTM else
 
-TORCH_MODULE(Permute);
 TORCH_MODULE(LSTMStack);
 TORCH_MODULE(LinearCRF);
 TORCH_MODULE(Convolution);
@@ -431,11 +425,10 @@ struct CRFModelImpl : Module {
         conv1 = register_module("conv1", Convolution(1, 4, 5, 1));
         conv2 = register_module("conv2", Convolution(4, 16, 5, 1));
         conv3 = register_module("conv3", Convolution(16, size, 19, stride));
-        permute = register_module("permute", Permute());
         rnns = register_module("rnns", LSTMStack(size, batch_size, chunk_size / stride));
         linear = register_module("linear", LinearCRF(size, outsize));
         linear->expand_blanks = expand_blanks;
-        encoder = Sequential(conv1, conv2, conv3, permute, rnns, linear);
+        encoder = Sequential(conv1, conv2, conv3, rnns, linear);
     }
 
     void load_state_dict(const std::vector<torch::Tensor> &weights) {
@@ -473,7 +466,6 @@ struct CRFModelImpl : Module {
         return ::utils::load_tensors(dir, tensors);
     }
 
-    Permute permute{nullptr};
     LSTMStack rnns{nullptr};
     LinearCRF linear{nullptr};
     Sequential encoder{nullptr};
