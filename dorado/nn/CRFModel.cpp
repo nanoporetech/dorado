@@ -374,7 +374,7 @@ struct LSTMStackImpl : Module {
     };
 
     torch::Tensor forward(torch::Tensor x) {
-        x = x.permute({2, 0, 1}));
+        x = x.permute({2, 0, 1});
 
         // rnn1
         x = x.flip(0);
