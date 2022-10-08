@@ -312,9 +312,6 @@ struct LSTMStackImpl : Module {
             quantize_weights();
             _chunks = _chunks.to(x.device());
         }
-
-        x = x.permute({0, 2, 1}).contiguous();  // data needs to be in NTC format.
-
         auto buffer = torch::matmul(x, _r_wih[0]);
 
         _host_run_lstm_rev_quantized(
@@ -358,9 +355,11 @@ struct LSTMStackImpl : Module {
     // Dispatch to different forward method depending on whether we use quantized LSTMs or not
     torch::Tensor forward(torch::Tensor x) {
         if (m_quantize) {
+            x = x.permute({0, 2, 1}).contiguous();  // NCT -> NTC
             return forward_quantized(x);
         } else {
-            return forward_cublas(x);
+            x = x.permute({2, 0, 1}).contiguous();                  // NCT -> TNC
+            return forward_cublas(x).transpose(1, 0).contiguous();  // NTC out
         }
     }
 
