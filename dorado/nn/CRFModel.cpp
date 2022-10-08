@@ -166,16 +166,13 @@ struct LSTMStackImpl : Module {
         thread_local int max_batch_size = 0;
         if (working_mem_chunk_size != chunk_size || max_batch_size < batch_size) {
             if (max_batch_size < batch_size) {
-                gate_buf = torch::empty({batch_size, gate_size}, in.options()).contiguous();
+                gate_buf = torch::empty({batch_size, gate_size}, in.options());
                 max_batch_size = batch_size;
             }
             working_mem_chunk_size = chunk_size;
             mat_working_mem =
-                    torch::zeros({chunk_size + 1, batch_size, 2, layer_size}, in.options())
-                            .contiguous();
+                    torch::zeros({chunk_size + 1, batch_size, 2, layer_size}, in.options());
         }
-        mat_working_mem.to(in.device());
-        gate_buf.to(in.device());
 
         // Working memory is laid out as [T+1][N][2][C] in memory, where the 2 serves to
         // interleave input and output for each LSTM layer in a specific way. The reverse LSTM
