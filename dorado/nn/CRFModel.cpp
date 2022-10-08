@@ -352,11 +352,9 @@ struct LSTMStackImpl : Module {
     // Dispatch to different forward method depending on whether we use quantized LSTMs or not
     torch::Tensor forward(torch::Tensor x) {
         if (m_quantize) {
-            x = x.permute({0, 2, 1}).contiguous();  // NCT -> NTC
-            return forward_quantized(x);
+            return forward_quantized(x.permute({0, 2, 1}).contiguous());
         } else {
-            x = x.permute({2, 0, 1}).contiguous();                  // NCT -> TNC
-            return forward_cublas(x).transpose(1, 0).contiguous();  // NTC out
+            return forward_cublas(x.permute({2, 0, 1})).transpose(1, 0);
         }
     }
 
