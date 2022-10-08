@@ -69,9 +69,9 @@ struct LinearCRFImpl : Module {
         if (expand_blanks == true) {
             scores = scores.contiguous();
             int C = scores.size(2);
-            scores = F::pad(scores.view({T, N, C / 4, 4}),
+            scores = F::pad(scores.view({N, T, C / 4, 4}),
                             F::PadFuncOptions({1, 0, 0, 0, 0, 0, 0, 0}).value(blank_score))
-                             .view({T, N, -1});
+                             .view({N, T, -1});
         }
 
         return scores;
@@ -374,6 +374,8 @@ struct LSTMStackImpl : Module {
     };
 
     torch::Tensor forward(torch::Tensor x) {
+        x = x.permute({2, 0, 1}));
+
         // rnn1
         x = x.flip(0);
         auto [y1, h1] = rnn1(x);
