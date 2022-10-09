@@ -344,8 +344,6 @@ struct LSTMStackImpl : Module {
                 rnn5->named_parameters()["bias_ih"].data_ptr(),
                 _quantization_scale_factors[4].data_ptr(), x.data_ptr(), _chunks.size(0));
 
-        torch::cuda::synchronize();
-
         return x;
     }
 

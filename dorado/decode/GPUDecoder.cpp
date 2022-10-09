@@ -68,10 +68,11 @@ torch::Tensor GPUDecoder::gpu_part(torch::Tensor scores, int num_chunks, Decoder
                     qstring.data_ptr(), options.q_scale, options.q_shift, options.beam_width,
                     options.beam_cut, options.blank_score, options.move_pad);
 
-    return moves_sequence_qstring.reshape({3, N, -1}).to(torch::kCPU);
+    return moves_sequence_qstring.reshape({3, N, -1});
 }
 
 std::vector<DecodedChunk> GPUDecoder::cpu_part(torch::Tensor moves_sequence_qstring_cpu) {
+    assert(moves_sequence_qstring_cpu.device() == torch::kCPU);
     auto moves_cpu = moves_sequence_qstring_cpu[0];
     auto sequence_cpu = moves_sequence_qstring_cpu[1];
     auto qstring_cpu = moves_sequence_qstring_cpu[2];
