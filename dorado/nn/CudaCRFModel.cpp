@@ -52,6 +52,7 @@ public:
     };
 
     std::vector<DecodedChunk> call_chunks(torch::Tensor &input,
+                                          torch::Tensor &output,
                                           int num_chunks,
                                           c10::cuda::CUDAStream stream) {
         c10::cuda::CUDAStreamGuard stream_guard(stream);
@@ -71,7 +72,8 @@ public:
             task.cv.wait(lock);
         }
 
-        return m_decoder->cpu_part(task.out.to(torch::kCPU));
+        output.copy_(task.out);
+        return m_decoder->cpu_part(output);
     }
 
     void cuda_thread_fn() {
@@ -129,6 +131,11 @@ CudaModelRunner::CudaModelRunner(std::shared_ptr<CudaCaller> caller, int chunk_s
                                                                 .dtype(m_caller->m_options.dtype())
                                                                 .device(torch::kCPU)
                                                                 .pinned_memory(true));
+
+    long int block_size = chunk_size / model_stride();
+    m_output = torch::empty(
+            {3, batch_size, block_size},
+            torch::TensorOptions().dtype(torch::kInt8).device(torch::kCPU).pinned_memory(true));
     // warm up
     call_chunks(batch_size);
 }
@@ -138,7 +145,7 @@ void CudaModelRunner::accept_chunk(int chunk_idx, at::Tensor slice) {
 }
 
 std::vector<DecodedChunk> CudaModelRunner::call_chunks(int num_chunks) {
-    return m_caller->call_chunks(m_input, num_chunks, m_stream);
+    return m_caller->call_chunks(m_input, m_output, num_chunks, m_stream);
 }
 
 size_t CudaModelRunner::model_stride() const { return m_caller->m_model_stride; }
