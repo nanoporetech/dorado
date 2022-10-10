@@ -42,9 +42,8 @@ public:
     }
 
     struct NNTask {
-        NNTask(torch::Tensor *input_, int num_chunks_) : input(input_), num_chunks(num_chunks_) {}
-
-        torch::Tensor *input;
+        NNTask(torch::Tensor input_, int num_chunks_) : input(input_), num_chunks(num_chunks_) {}
+        torch::Tensor input;
         std::mutex mut;
         std::condition_variable cv;
         torch::Tensor out;
@@ -55,11 +54,12 @@ public:
     std::vector<DecodedChunk> call_chunks(torch::Tensor &input,
                                           int num_chunks,
                                           c10::cuda::CUDAStream stream) {
+        c10::cuda::CUDAStreamGuard stream_guard(stream);
+
         if (num_chunks == 0) {
             return std::vector<DecodedChunk>();
         }
-
-        NNTask task(&input, num_chunks);
+        NNTask task(input.to(m_options.device_opt().value()).to(GPUDecoder::dtype), num_chunks);
         {
             std::lock_guard<std::mutex> lock(m_input_lock);
             m_input_queue.push_front(&task);
@@ -70,10 +70,7 @@ public:
         while (!task.done) {
             task.cv.wait(lock);
         }
-        {
-            c10::cuda::CUDAStreamGuard stream_guard(stream);
-            return m_decoder->cpu_part(task.out.to(torch::kCPU));
-        }
+        return m_decoder->cpu_part(task.out.to(torch::kCPU));
     }
 
     void cuda_thread_fn() {
@@ -95,8 +92,7 @@ public:
             input_lock.unlock();
 
             std::unique_lock<std::mutex> task_lock(task->mut);
-            auto scores = m_module->forward(
-                    task->input->to(m_options.device_opt().value()).to(GPUDecoder::dtype));
+            auto scores = m_module->forward(task->input);
             task->out = m_decoder->gpu_part(scores, task->num_chunks, m_decoder_options);
             torch::cuda::synchronize();
             task->done = true;
