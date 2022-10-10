@@ -59,7 +59,7 @@ public:
         if (num_chunks == 0) {
             return std::vector<DecodedChunk>();
         }
-        NNTask task(input.to(m_options.device_opt().value()).to(GPUDecoder::dtype), num_chunks);
+        NNTask task(input.to(m_options.device()), num_chunks);
         {
             std::lock_guard<std::mutex> lock(m_input_lock);
             m_input_queue.push_front(&task);
@@ -70,6 +70,7 @@ public:
         while (!task.done) {
             task.cv.wait(lock);
         }
+
         return m_decoder->cpu_part(task.out.to(torch::kCPU));
     }
 
@@ -124,9 +125,10 @@ std::shared_ptr<CudaCaller> create_cuda_caller(const std::filesystem::path &mode
 CudaModelRunner::CudaModelRunner(std::shared_ptr<CudaCaller> caller, int chunk_size, int batch_size)
         : m_caller(caller),
           m_stream(c10::cuda::getStreamFromPool(false, m_caller->m_options.device().index())) {
-    m_input = torch::empty(
-            {batch_size, 1, chunk_size},
-            torch::TensorOptions().dtype(torch::kF32).device(torch::kCPU).pinned_memory(true));
+    m_input = torch::empty({batch_size, 1, chunk_size}, torch::TensorOptions()
+                                                                .dtype(m_caller->m_options.dtype())
+                                                                .device(torch::kCPU)
+                                                                .pinned_memory(true));
     // warm up
     call_chunks(batch_size);
 }
