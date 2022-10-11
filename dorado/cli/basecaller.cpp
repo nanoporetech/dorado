@@ -96,7 +96,7 @@ void setup(std::vector<std::string> args,
         remora_callers.push_back(caller);
     }
 
-    WriterNode writer_node(std::move(args), emit_fastq, num_devices);
+    WriterNode writer_node(std::move(args), emit_fastq, num_devices * 2);
 
     std::unique_ptr<ModBaseCallerNode> mod_base_caller_node;
     std::unique_ptr<BasecallerNode> basecaller_node;

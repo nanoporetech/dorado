@@ -98,7 +98,7 @@ void BasecallerNode::basecall_current_batch(int worker_id) {
 }
 
 void BasecallerNode::working_reads_manager() {
-    cxxpool::thread_pool pool{m_num_active_model_runners * 2};
+    cxxpool::thread_pool pool{m_num_active_model_runners};
 
     while (!m_terminate || !m_working_reads.empty()) {
         std::deque<std::shared_ptr<Read>> completed_reads;
