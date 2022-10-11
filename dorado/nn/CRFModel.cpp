@@ -19,6 +19,7 @@ extern "C" {
 #endif
 
 #include <math.h>
+#include <spdlog/spdlog.h>
 #include <toml.hpp>
 #include <torch/torch.h>
 
@@ -226,7 +227,7 @@ struct LSTMStackImpl : Module {
                         2 * layer_size, &HALF_ZERO, (void *)gate_buf.data_ptr(), CUDA_R_16F,
                         gate_size, CUDA_R_16F, CUBLAS_GEMM_DEFAULT_TENSOR_OP);
                 if (res != CUBLAS_STATUS_SUCCESS) {
-                    std::cerr << "CuBLAS error " << int(res) << std::endl;
+                    spdlog::error("CuBLAS error {}", int(res));
                     exit(EXIT_FAILURE);
                 }
                 host_lstm_step_f16(stream, batch_size, layer_size, bias.data_ptr(),

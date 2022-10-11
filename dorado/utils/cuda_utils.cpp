@@ -3,6 +3,7 @@
 #include "torch/torch.h"
 
 #include <cuda_runtime_api.h>
+#include <spdlog/spdlog.h>
 
 #include <regex>
 #include <string>
@@ -73,6 +74,6 @@ int auto_gpu_batch_size(std::string model_path, std::vector<std::string> devices
         return presets[2];
     }
 
-    std::cerr << "> warning: auto batchsize detection failed" << std::endl;
+    spdlog::error("> warning: auto batchsize detection failed");
     return 128;
 }
