@@ -5,6 +5,7 @@
 #include <torch/csrc/jit/serialization/pickle.h>
 
 #include <fstream>
+#include <vector>
 
 namespace utils {
 
@@ -27,8 +28,7 @@ std::vector<torch::Tensor> load_tensors(const std::filesystem::path& dir,
 }
 
 torch::Tensor quantile(const torch::Tensor t, const torch::Tensor q) {
-    assert(t.dtype().name() == "float");
-    assert(q.dtype().name() == "float");
+    assert(q.dtype() == torch::kF32);
 
     auto tmp = t.clone();
     auto [qval, qidx] = q.sort();
@@ -43,6 +43,36 @@ torch::Tensor quantile(const torch::Tensor t, const torch::Tensor q) {
         std::nth_element(start, m, end);
         res[qidx[i]] = *m;
         start = m;
+    }
+
+    return res;
+}
+
+torch::Tensor quantile_counting(const torch::Tensor t, const torch::Tensor q) {
+    assert(q.dtype() == torch::kF32);
+
+    auto p = t.data_ptr<int16_t>();
+    auto range_min = t.min().item<int16_t>();
+    auto range_max = t.max().item<int16_t>();
+
+    int size = t.size(0);
+
+    std::vector<int> counts(range_max - range_min + 1, 0);
+    for (int i = 0; i < size; ++i) {
+        counts[p[i] - range_min]++;
+    }
+    std::partial_sum(counts.begin(), counts.end(), counts.begin());
+
+    auto res = torch::empty_like(q);
+
+    for (size_t idx = 0; idx < q.numel(); idx++) {
+        int threshold = q[idx].item<float>() * (size - 1);
+        for (int i = 0; i <= counts.size(); ++i) {
+            if (counts[i] > threshold) {
+                res[idx] = i + range_min;
+                break;
+            }
+        }
     }
 
     return res;

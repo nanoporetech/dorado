@@ -81,20 +81,32 @@ int download(int argc, char* argv[]) {
         return 1;
     }
 
+    try {
+        fs::remove(directory / "tmp");
+    } catch (std::filesystem::filesystem_error const& e) {
+        std::cerr << "> error: " << e.code().message() << std::endl;
+        return 1;
+    }
+
     httplib::Client http(basecaller::URL_ROOT);
+    http.enable_server_certificate_verification(false);
     http.set_follow_location(true);
 
     for (const auto& [model, url] : basecaller::models) {
         if (selected_model == "all" || selected_model == model) {
             spdlog::info(" - downloading {}", model);
             auto res = http.Get(url.c_str());
-            spdlog::info(" [{}]", res->status);
-            fs::path archive(directory / (model + ".zip"));
-            std::ofstream ofs(archive.string());
-            ofs << res->body;
-            ofs.close();
-            elz::extractZip(archive, directory);
-            fs::remove(archive);
+            if (res != nullptr) {
+                spdlog::info(" [{}]", res->status);
+                fs::path archive(directory / (model + ".zip"));
+                std::ofstream ofs(archive.string());
+                ofs << res->body;
+                ofs.close();
+                elz::extractZip(archive, directory);
+                fs::remove(archive);
+            } else {
+                spdlog::error("Failed to download {}", model);
+            }
         }
     }
 
