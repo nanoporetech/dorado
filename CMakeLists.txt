@@ -19,7 +19,6 @@ include(cmake/Torch.cmake)
 include(cmake/OpenSSL.cmake)
 
 if(DORADO_USING_OLD_CPP_ABI)
-  message(status "Setting old ABI in dorado")
   # We need to force the use of the old ABI here, if we are building in an old ABI context, as otherwise elzip builds
   # with the libc++11 ABI and we can't link against it.
   add_compile_options(-D_GLIBCXX_USE_CXX11_ABI=0)
