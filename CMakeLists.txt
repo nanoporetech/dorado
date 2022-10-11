@@ -128,6 +128,7 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR}/dorado
     dorado/3rdparty/metal-cpp/metal-cpp
     dorado/3rdparty/hdf_plugins/vbz_plugin
     dorado/3rdparty/cxxpool/src
+    dorado/3rdparty/NVTX/c/include
     dorado
 )
 
