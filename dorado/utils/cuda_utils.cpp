@@ -74,6 +74,6 @@ int auto_gpu_batch_size(std::string model_path, std::vector<std::string> devices
         return presets[2];
     }
 
-    spdlog::error("> warning: auto batchsize detection failed");
+    spdlog::warn("> warning: auto batchsize detection failed");
     return 128;
 }

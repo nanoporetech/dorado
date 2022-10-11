@@ -664,7 +664,7 @@ public:
                 if (status == MTL::CommandBufferStatusCompleted) {
                     break;
                 }
-                spdlog::warn("Metal command buffer execution failed: {}, try # {}", status,
+                spdlog::warn("Metal command buffer execution failed: {}, try #{}", status,
                              try_count);
                 using namespace std::chrono_literals;
                 std::this_thread::sleep_for(20ms);
