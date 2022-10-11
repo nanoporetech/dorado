@@ -172,7 +172,7 @@ std::shared_ptr<Read> process_pod5_read(size_t row,
     std::size_t samples_read_so_far = 0;
     for (std::size_t i = 0; i < signal_row_count; ++i) {
         if (pod5_get_signal(file, signal_rows[i], signal_rows[i]->stored_sample_count,
-                            samples.data() + samples_read_so_far) != POD5_OK) {
+                            samples.data_ptr<int16_t>() + samples_read_so_far) != POD5_OK) {
             spdlog::error("Failed to get read {} signal: {}", row, pod5_get_error_string());
         }
 
