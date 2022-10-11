@@ -45,7 +45,7 @@ std::vector<size_t> available_memory(std::vector<std::string> devices) {
     cxxpool::thread_pool pool{devices.size()};
     std::vector<std::future<size_t>> futures;
     for (auto device : devices) {
-        futures.push_back(pool.push([&] { return available_memory(device); }));
+        futures.push_back(pool.push([=] { return available_memory(device); }));
     }
     for (auto& v : futures) {
         vec.push_back(v.get());
