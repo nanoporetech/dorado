@@ -21,12 +21,17 @@ private:
     void basecall_worker_thread(int worker_id);
     // Basecall batch of chunks
     void basecall_current_batch(int worker_id);
+    // Construct complete reads
+    void working_reads_manager();
 
     ReadSink &m_sink;
     std::unique_ptr<std::thread>
             m_input_worker;  // Chunks up incoming reads and sticks them in the pending list
     std::vector<std::unique_ptr<std::thread>>
             m_basecall_workers;  // Basecalls chunks from the queue and puts read on the sink.
+
+    std::unique_ptr<std::thread> m_working_reads_manager;
+
     std::string m_model_path;
     // Vector of model runners (each with their own GPU access etc)
     std::vector<Runner> m_model_runners;

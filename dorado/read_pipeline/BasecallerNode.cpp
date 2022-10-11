@@ -79,7 +79,6 @@ void BasecallerNode::input_worker_thread() {
 
 void BasecallerNode::basecall_current_batch(int worker_id) {
     auto model_runner = m_model_runners[worker_id];
-
     auto decode_results = model_runner->call_chunks(m_batched_chunks[worker_id].size());
 
     for (int i = 0; i < m_batched_chunks[worker_id].size(); i++) {
@@ -95,19 +94,33 @@ void BasecallerNode::basecall_current_batch(int worker_id) {
         source_read->num_chunks_called += 1;
     }
     m_batched_chunks[worker_id].clear();
+}
 
-    // Now move any completed reads to the output queue
-    std::unique_lock<std::mutex> working_reads_lock(m_working_reads_mutex);
-    for (auto read_iter = m_working_reads.begin(); read_iter != m_working_reads.end();) {
-        if ((*read_iter)->num_chunks_called.load() == (*read_iter)->num_chunks) {
-            stitch_chunks(*read_iter);
-            m_sink.push_read(*read_iter);
-            read_iter = m_working_reads.erase(read_iter);
-        } else {
-            read_iter++;
+void BasecallerNode::working_reads_manager() {
+    while (!m_terminate || !m_working_reads.empty()) {
+        std::unique_lock<std::mutex> working_reads_lock(m_working_reads_mutex);
+        std::deque<std::shared_ptr<Read>> completed_reads;
+
+        for (auto read_iter = m_working_reads.begin(); read_iter != m_working_reads.end();) {
+            if ((*read_iter)->num_chunks_called.load() == (*read_iter)->num_chunks) {
+                completed_reads.push_back(*read_iter);
+                read_iter = m_working_reads.erase(read_iter);
+            } else {
+                read_iter++;
+            }
+        }
+
+        working_reads_lock.unlock();
+
+        if (completed_reads.empty()) {
+            std::this_thread::sleep_for(10ms);
+        }
+
+        for (auto &read : completed_reads) {
+            stitch_chunks(read);
+            m_sink.push_read(read);
         }
     }
-    working_reads_lock.unlock();
 }
 
 void BasecallerNode::basecall_worker_thread(int worker_id) {
@@ -121,18 +134,6 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
                 if (!m_batched_chunks[worker_id].empty()) {
                     basecall_current_batch(worker_id);
                 }
-
-                // The input thread has completed, we should shut down.
-                std::unique_lock<std::mutex> working_reads_lock(m_working_reads_mutex);
-                if (!m_working_reads.empty()) {
-                }
-
-                //Reduce the count of active model runners, if this was the last active model runner also send termination signal to sink
-                int num_remaining_runners = --m_num_active_model_runners;
-                if (num_remaining_runners == 0) {
-                    m_sink.terminate();
-                }
-
                 return;
             } else {
                 // There's no chunks available to call at the moment, sleep and try again
@@ -195,14 +196,15 @@ BasecallerNode::BasecallerNode(ReadSink &sink,
           m_overlap(overlap),
           m_model_stride(model_stride),
           m_terminate_basecaller(false),
+          m_working_reads_manager(new std::thread(&BasecallerNode::working_reads_manager, this)),
           m_input_worker(new std::thread(&BasecallerNode::input_worker_thread, this)) {
     // Spin up the model runners:
     int num_model_runners = m_model_runners.size();
+
     for (int i = 0; i < num_model_runners; i++) {
         std::unique_ptr<std::thread> t =
                 std::make_unique<std::thread>(&BasecallerNode::basecall_worker_thread, this, i);
         m_basecall_workers.push_back(std::move(t));
-        m_num_active_model_runners++;
         std::deque<std::shared_ptr<Chunk>> chunk_queue;
         m_batched_chunks.push_back(chunk_queue);
     }
@@ -216,8 +218,10 @@ BasecallerNode::~BasecallerNode() {
     terminate();
     m_cv.notify_one();
     m_input_worker->join();
+    m_working_reads_manager->join();
     for (auto &t : m_basecall_workers) {
         t->join();
     }
+    m_sink.terminate();
     termination_time = std::chrono::system_clock::now();
 }
