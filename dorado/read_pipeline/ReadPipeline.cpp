@@ -3,6 +3,8 @@
 #include "utils/base_mod_utils.h"
 #include "utils/sequence_utils.h"
 
+#include <spdlog/spdlog.h>
+
 #include <chrono>
 #include <iomanip>
 #include <sstream>
@@ -36,7 +38,7 @@ bool get_modbase_channel_name(std::string& channel_name, const std::string& mod_
         return true;
     }
 
-    std::cerr << "Unknown modified base abbreviation: " << mod_abbreviation << "\n";
+    spdlog::error("Unknown modified base abbreviation: {}", mod_abbreviation);
     return false;
 }
 }  // namespace
