@@ -199,9 +199,8 @@ BasecallerNode::BasecallerNode(ReadSink &sink,
           m_working_reads_manager(new std::thread(&BasecallerNode::working_reads_manager, this)),
           m_input_worker(new std::thread(&BasecallerNode::input_worker_thread, this)) {
     // Spin up the model runners:
-    int num_model_runners = m_model_runners.size();
-
-    for (int i = 0; i < num_model_runners; i++) {
+    m_num_active_model_runners = m_model_runners.size();
+    for (int i = 0; i < m_num_active_model_runners; i++) {
         std::unique_ptr<std::thread> t =
                 std::make_unique<std::thread>(&BasecallerNode::basecall_worker_thread, this, i);
         m_basecall_workers.push_back(std::move(t));
