@@ -1,5 +1,6 @@
 #include "cuda_utils.h"
 
+#include "cxxpool.h"
 #include "torch/torch.h"
 
 #include <cuda_runtime_api.h>
@@ -32,17 +33,24 @@ std::vector<std::string> parse_cuda_device_string(std::string device_string) {
     return devices;
 }
 
-size_t available_memory(std::vector<std::string> devices) {
+size_t available_memory(std::string device) {
     size_t free, total;
+    cudaSetDevice(std::stoi(device.substr(5)));
+    cudaMemGetInfo(&free, &total);
+    return free;
+}
+
+std::vector<size_t> available_memory(std::vector<std::string> devices) {
     std::vector<size_t> vec;
-
+    cxxpool::thread_pool pool{devices.size()};
+    std::vector<std::future<size_t>> futures;
     for (auto device : devices) {
-        cudaSetDevice(std::stoi(device.substr(5)));
-        cudaMemGetInfo(&free, &total);
-        vec.push_back(free);
+        futures.push_back(pool.push([&] { return available_memory(device); }));
     }
-
-    return *std::min_element(vec.begin(), vec.end());
+    for (auto& v : futures) {
+        vec.push_back(v.get());
+    }
+    return vec;
 }
 
 int auto_gpu_batch_size(std::string model_path, std::vector<std::string> devices) {
@@ -60,8 +68,10 @@ int auto_gpu_batch_size(std::string model_path, std::vector<std::string> devices
     assert(breakpoints.size() == batch_sizes.size());
 
     // compute how much free gpu memory and pick the closest breakpoint
-    int available = available_memory(devices) / 1e+9;
-    int idx = std::lower_bound(breakpoints.begin(), breakpoints.end(), available) -
+    auto available = available_memory(devices);
+    auto min_available = *std::min_element(available.begin(), available.end()) / 1e+9;
+
+    int idx = std::lower_bound(breakpoints.begin(), breakpoints.end(), min_available) -
               breakpoints.begin();
     auto presets = batch_sizes[std::min(idx, static_cast<int>(breakpoints.size() - 1))];
 
