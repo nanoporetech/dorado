@@ -25,9 +25,7 @@ if(DORADO_USING_OLD_CPP_ABI)
   add_compile_options(-D_GLIBCXX_USE_CXX11_ABI=0)
 endif()
 
-add_compile_options(-Wno-shadow -Wno-sign-compare)
 add_subdirectory(dorado/3rdparty/elzip)
-set_property(TARGET minizip APPEND PROPERTY COMPILE_OPTIONS -Wno-unused-function)
 
 configure_file(dorado/Version.h.in dorado/Version.h)
 
