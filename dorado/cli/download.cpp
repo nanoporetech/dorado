@@ -94,10 +94,10 @@ int download(int argc, char* argv[]) {
 
     for (const auto& [model, url] : basecaller::models) {
         if (selected_model == "all" || selected_model == model) {
-            std::cerr << " - downloading " << model;
+            spdlog::info(" - downloading {}", model);
             auto res = http.Get(url.c_str());
             if (res != nullptr) {
-                std::cerr << " [" << res->status << "]" << std::endl;
+                spdlog::info(" [{}]", res->status);
                 fs::path archive(directory / (model + ".zip"));
                 std::ofstream ofs(archive.string());
                 ofs << res->body;
