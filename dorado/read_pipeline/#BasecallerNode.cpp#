@@ -1,8 +1,8 @@
 #include "BasecallerNode.h"
 
+#include "cxxpool.h"
 #include "../decode/CPUDecoder.h"
 #include "../utils/stitch.h"
-#include "cxxpool.h"
 
 #include <chrono>
 #include <cstdlib>
@@ -98,11 +98,13 @@ void BasecallerNode::basecall_current_batch(int worker_id) {
 }
 
 void BasecallerNode::working_reads_manager() {
+
     cxxpool::thread_pool pool{m_num_active_model_runners * 2};
 
     while (!m_terminate || !m_working_reads.empty()) {
+
         std::deque<std::shared_ptr<Read>> completed_reads;
-        std::vector<std::future<std::shared_ptr<Read>>> futures;
+	std::vector<std::future<std::shared_ptr<Read>>> futures;
         std::unique_lock<std::mutex> working_reads_lock(m_working_reads_mutex);
 
         for (auto read_iter = m_working_reads.begin(); read_iter != m_working_reads.end();) {
@@ -118,16 +120,17 @@ void BasecallerNode::working_reads_manager() {
 
         if (completed_reads.empty()) {
             std::this_thread::sleep_for(10ms);
-        }
+
+o        }
 
         for (auto &read : completed_reads) {
-            futures.push_back(pool.push(stitch_chunks, read));
+	    futures.push_back(pool.push(stitch_chunks, read));
         }
 
-        for (auto &res : futures) {
-            auto read = res.get();
-            m_sink.push_read(read);
-        }
+	for (auto &res : futures) {
+	     auto read = res.get();
+             m_sink.push_read(read);
+	}
     }
 }
 
