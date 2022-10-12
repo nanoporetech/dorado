@@ -3,6 +3,7 @@
 #include "Decoder.h"
 
 #include <c10/cuda/CUDAGuard.h>
+#include <nvtx3/nvtx3.hpp>
 #include <torch/torch.h>
 
 extern "C" {
@@ -10,6 +11,7 @@ extern "C" {
 }
 
 torch::Tensor GPUDecoder::gpu_part(torch::Tensor scores, int num_chunks, DecoderOptions options) {
+    NVTX3_FUNC_RANGE();
     long int N = scores.sizes()[0];
     long int T = scores.sizes()[1];
     long int C = scores.sizes()[2];
@@ -72,6 +74,7 @@ torch::Tensor GPUDecoder::gpu_part(torch::Tensor scores, int num_chunks, Decoder
 }
 
 std::vector<DecodedChunk> GPUDecoder::cpu_part(torch::Tensor moves_sequence_qstring_cpu) {
+    NVTX3_FUNC_RANGE();
     assert(moves_sequence_qstring_cpu.device() == torch::kCPU);
     auto moves_cpu = moves_sequence_qstring_cpu[0];
     auto sequence_cpu = moves_sequence_qstring_cpu[1];

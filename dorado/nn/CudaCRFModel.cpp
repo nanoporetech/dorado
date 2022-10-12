@@ -4,6 +4,7 @@
 
 #include <c10/cuda/CUDAGuard.h>
 #include <c10/cuda/CUDAStream.h>
+#include <nvtx3/nvtx3.hpp>
 #include <toml.hpp>
 #include <torch/torch.h>
 
@@ -55,6 +56,7 @@ public:
                                           torch::Tensor &output,
                                           int num_chunks,
                                           c10::cuda::CUDAStream stream) {
+        NVTX3_FUNC_RANGE();
         c10::cuda::CUDAStreamGuard stream_guard(stream);
 
         if (num_chunks == 0) {
@@ -77,6 +79,7 @@ public:
     }
 
     void cuda_thread_fn() {
+        NVTX3_FUNC_RANGE();
         torch::InferenceMode guard;
         c10::cuda::CUDAGuard device_guard(m_options.device_opt().value());
 

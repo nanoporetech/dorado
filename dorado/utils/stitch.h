@@ -4,4 +4,4 @@
 
 // Given a read with unstitched chunks, stitch the chunks (accounting for overlap) and assign basecalled read and
 // qstring to Read
-std::shared_ptr<Read> stitch_chunks(std::shared_ptr<Read> read);
+void stitch_chunks(std::shared_ptr<Read> read);

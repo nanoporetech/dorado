@@ -2,7 +2,8 @@
 
 #include "../decode/CPUDecoder.h"
 #include "../utils/stitch.h"
-#include "cxxpool.h"
+
+#include <nvtx3/nvtx3.hpp>
 
 #include <chrono>
 #include <cstdlib>
@@ -79,6 +80,7 @@ void BasecallerNode::input_worker_thread() {
 }
 
 void BasecallerNode::basecall_current_batch(int worker_id) {
+    NVTX3_FUNC_RANGE();
     auto model_runner = m_model_runners[worker_id];
     auto decode_results = model_runner->call_chunks(m_batched_chunks[worker_id].size());
 
@@ -98,11 +100,9 @@ void BasecallerNode::basecall_current_batch(int worker_id) {
 }
 
 void BasecallerNode::working_reads_manager() {
-    cxxpool::thread_pool pool{m_num_active_model_runners};
-
     while (!m_terminate || !m_working_reads.empty()) {
+        nvtx3::scoped_range loop{"working_reads_manager"};
         std::deque<std::shared_ptr<Read>> completed_reads;
-        std::vector<std::future<std::shared_ptr<Read>>> futures;
         std::unique_lock<std::mutex> working_reads_lock(m_working_reads_mutex);
 
         for (auto read_iter = m_working_reads.begin(); read_iter != m_working_reads.end();) {
@@ -121,11 +121,7 @@ void BasecallerNode::working_reads_manager() {
         }
 
         for (auto &read : completed_reads) {
-            futures.push_back(pool.push(stitch_chunks, read));
-        }
-
-        for (auto &res : futures) {
-            auto read = res.get();
+            stitch_chunks(read);
             m_sink.push_read(read);
         }
     }

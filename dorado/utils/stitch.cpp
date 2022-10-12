@@ -1,7 +1,7 @@
 #include "../read_pipeline/ReadPipeline.h"
 #include "math_utils.h"
 
-std::shared_ptr<Read> stitch_chunks(std::shared_ptr<Read> read) {
+void stitch_chunks(std::shared_ptr<Read> read) {
     // Calculate the chunk down sampling, round to closest int. This is our model stride.
     int down_sampling = ::utils::div_round_closest(read->called_chunks[0]->raw_chunk_size,
                                                    read->called_chunks[0]->moves.size());
@@ -63,6 +63,4 @@ std::shared_ptr<Read> stitch_chunks(std::shared_ptr<Read> read) {
     read->seq = std::accumulate(sequences.begin(), sequences.end(), std::string(""));
     read->qstring = std::accumulate(qstrings.begin(), qstrings.end(), std::string(""));
     read->moves = std::move(moves);
-
-    return read;
 }
