@@ -45,7 +45,7 @@ private:
     size_t m_model_stride;
 
     // Model runners which have not terminated.
-    size_t m_num_active_model_runners = 0;
+    std::atomic<size_t> m_num_active_model_runners = 0;
 
     // Time when Basecaller Node is initialised. Used for benchmarking and debugging
     std::chrono::time_point<std::chrono::system_clock> initialization_time;

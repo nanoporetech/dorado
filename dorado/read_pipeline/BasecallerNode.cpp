@@ -138,7 +138,19 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
                 if (!m_batched_chunks[worker_id].empty()) {
                     basecall_current_batch(worker_id);
                 }
+
+                if (!m_working_reads.empty()) {
+                    continue;
+                }
+
+                m_num_active_model_runners--;
+
+                if (!m_num_active_model_runners) {
+                    m_sink.terminate();
+                }
+
                 return;
+
             } else {
                 // There's no chunks available to call at the moment, sleep and try again
                 chunks_lock.unlock();
@@ -223,10 +235,9 @@ BasecallerNode::~BasecallerNode() {
     terminate();
     m_cv.notify_one();
     m_input_worker->join();
-    m_working_reads_manager->join();
     for (auto &t : m_basecall_workers) {
         t->join();
     }
-    m_sink.terminate();
+    m_working_reads_manager->join();
     termination_time = std::chrono::system_clock::now();
 }
