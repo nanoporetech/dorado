@@ -81,7 +81,8 @@ public:
     void cuda_thread_fn() {
         NVTX3_FUNC_RANGE();
         torch::InferenceMode guard;
-        c10::cuda::CUDAGuard device_guard(m_options.device_opt().value());
+        c10::cuda::CUDAGuard device_guard(m_options.device());
+        auto stream = c10::cuda::getCurrentCUDAStream(m_options.device().index());
 
         while (true) {
             std::unique_lock<std::mutex> input_lock(m_input_lock);
@@ -100,7 +101,7 @@ public:
             std::unique_lock<std::mutex> task_lock(task->mut);
             auto scores = m_module->forward(task->input);
             task->out = m_decoder->gpu_part(scores, task->num_chunks, m_decoder_options);
-            torch::cuda::synchronize();
+            stream.synchronize();
             task->done = true;
             task_lock.unlock();
             task->cv.notify_one();
