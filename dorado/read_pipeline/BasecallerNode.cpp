@@ -200,8 +200,10 @@ BasecallerNode::BasecallerNode(ReadSink &sink,
           m_overlap(overlap),
           m_model_stride(model_stride),
           m_terminate_basecaller(false),
-          m_working_reads_manager(new std::thread(&BasecallerNode::working_reads_manager, this)),
-          m_input_worker(new std::thread(&BasecallerNode::input_worker_thread, this)) {
+          m_working_reads_manager(
+                  std::make_unique<std::thread>(&BasecallerNode::working_reads_manager, this)),
+          m_input_worker(
+                  std::make_unique<std::thread>(&BasecallerNode::input_worker_thread, this)) {
     // Spin up the model runners:
     m_num_active_model_runners = m_model_runners.size();
     for (int i = 0; i < m_num_active_model_runners; i++) {
