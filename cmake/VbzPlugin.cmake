@@ -11,10 +11,10 @@ function(add_hdf_vbz_plugin)
         execute_process(COMMAND cmake --build ${DORADO_3RD_PARTY}/cmake-build-zstd --config Release)
 
         # On windows we need to tell hdf_plugins where we put the built zstd lib
-        set(CONAN_INCLUDE_DIRS_RELEASE ${CMAKE_SOURCE_DIR}/dorado/3rdparty/zstd/lib)
-        set(CONAN_INCLUDE_DIRS_DEBUG ${CMAKE_SOURCE_DIR}/dorado/3rdparty/zstd/lib)
-        set(CONAN_LIB_DIRS_RELEASE ${CMAKE_SOURCE_DIR}/dorado/3rdparty/cmake-build-zstd/lib/Release)
-        set(CONAN_LIB_DIRS_DEBUG ${CMAKE_SOURCE_DIR}/dorado/3rdparty/cmake-build-zstd/lib/Debug)
+        set(CONAN_INCLUDE_DIRS_RELEASE ${DORADO_3RD_PARTY}/zstd/lib)
+        set(CONAN_INCLUDE_DIRS_DEBUG ${DORADO_3RD_PARTY}/zstd/lib)
+        set(CONAN_LIB_DIRS_RELEASE${DORADO_3RD_PARTY}/cmake-build-zstd/lib/Release)
+        set(CONAN_LIB_DIRS_DEBUG ${DORADO_3RD_PARTY}/cmake-build-zstd/lib/Debug)
 
         install(FILES ${DORADO_3RD_PARTY}/cmake-build-zstd/lib/Release/zstd.dll DESTINATION bin)
     endif()

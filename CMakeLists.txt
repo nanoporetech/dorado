@@ -126,7 +126,8 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR}/dorado
 
 enable_testing()
 
-if(NOT DORADO_IN_CORE)
+if(DORADO_LIB_ONLY AND NOT SKIP_HDF_PLUGINS)
+  # Can skip this if we're consuming the lib from a parent project that already has hdf_plugins
   add_hdf_vbz_plugin()
 endif()
 
@@ -148,7 +149,7 @@ if(APPLE)
     add_dependencies(dorado_lib metal-lib)
 endif()
 
-if(NOT DORADO_IN_CORE)
+if(NOT DORADO_LIB_ONLY)
     if(NOT WIN32)
         # Set up RPATHs so we can find dependencies
         set(CMAKE_SKIP_RPATH FALSE)
@@ -207,6 +208,6 @@ if(APPLE)
     add_subdirectory(metal_tests)
 endif()
 
-if(NOT DORADO_IN_CORE)
+if(NOT DORADO_LIB_ONLY)
     include(cmake/DoradoPackaging.cmake)
 endif()
