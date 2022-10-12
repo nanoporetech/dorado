@@ -11,7 +11,7 @@ extern "C" {
 }
 
 torch::Tensor GPUDecoder::gpu_part(torch::Tensor scores, int num_chunks, DecoderOptions options) {
-    NVTX3_FUNC_RANGE();
+    nvtx3::scoped_range loop{"gpu_decode"};
     long int N = scores.sizes()[0];
     long int T = scores.sizes()[1];
     long int C = scores.sizes()[2];
@@ -74,7 +74,7 @@ torch::Tensor GPUDecoder::gpu_part(torch::Tensor scores, int num_chunks, Decoder
 }
 
 std::vector<DecodedChunk> GPUDecoder::cpu_part(torch::Tensor moves_sequence_qstring_cpu) {
-    NVTX3_FUNC_RANGE();
+    nvtx3::scoped_range loop{"cpu_decode"};
     assert(moves_sequence_qstring_cpu.device() == torch::kCPU);
     auto moves_cpu = moves_sequence_qstring_cpu[0];
     auto sequence_cpu = moves_sequence_qstring_cpu[1];

@@ -19,6 +19,7 @@ extern "C" {
 #endif
 
 #include <math.h>
+#include <nvtx3/nvtx3.hpp>
 #include <toml.hpp>
 #include <torch/torch.h>
 
@@ -429,7 +430,10 @@ struct CRFModelImpl : Module {
         ::utils::load_state_dict(*this, weights);
     }
 
-    torch::Tensor forward(torch::Tensor x) { return encoder->forward(x); }
+    torch::Tensor forward(torch::Tensor x) {
+        nvtx3::scoped_range loop{"nn_forward"};
+        return encoder->forward(x);
+    }
 
     std::vector<torch::Tensor> load_weights(const std::filesystem::path &dir) {
         auto tensors = std::vector<std::string>{
