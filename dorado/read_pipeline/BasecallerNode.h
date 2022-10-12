@@ -65,5 +65,6 @@ private:
     // If we go multi-threaded, there will be one of these batches per thread
     std::vector<std::deque<std::shared_ptr<Chunk>>> m_batched_chunks;
 
-    bool m_terminate_basecaller;
+    bool m_terminate_basecaller{false};
+    bool m_terminate_manager{false};
 };

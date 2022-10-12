@@ -100,7 +100,7 @@ void BasecallerNode::basecall_current_batch(int worker_id) {
 }
 
 void BasecallerNode::working_reads_manager() {
-    while (!m_terminate || !m_working_reads.empty()) {
+    while (!m_terminate_manager || !m_working_reads.empty()) {
         nvtx3::scoped_range loop{"working_reads_manager"};
         std::deque<std::shared_ptr<Read>> completed_reads;
         std::unique_lock<std::mutex> working_reads_lock(m_working_reads_mutex);
@@ -125,6 +125,8 @@ void BasecallerNode::working_reads_manager() {
             m_sink.push_read(read);
         }
     }
+
+    m_sink.terminate();
 }
 
 void BasecallerNode::basecall_worker_thread(int worker_id) {
@@ -143,10 +145,10 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
                     continue;
                 }
 
-                m_num_active_model_runners--;
+                size_t num_remaining_runners = --m_num_active_model_runners;
 
-                if (!m_num_active_model_runners) {
-                    m_sink.terminate();
+                if (num_remaining_runners == 0) {
+                    m_terminate_manager = true;
                 }
 
                 return;
