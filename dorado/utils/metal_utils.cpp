@@ -262,5 +262,7 @@ int auto_gpu_batch_size(std::string model_path) {
         return 768;
     } else if (model_path.find("_sup@v") != std::string::npos) {
         return 384;
+    } else {
+        throw std::runtime_error(std::string("Unsupported model: ") + model_path);
     }
 }
