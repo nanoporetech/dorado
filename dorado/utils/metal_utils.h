@@ -3,6 +3,8 @@
 #include <torch/torch.h>
 
 #include <string>
+#include <tuple>
+#include <variant>
 #include <vector>
 
 // Returns an uninitialised MTL::Buffer of length bytes.
@@ -14,15 +16,27 @@ MTL::Buffer *create_vec_buffer(MTL::Device *const device, const std::vector<T> &
     return device->newBuffer(vec.data(), vec.size() * sizeof(T), MTL::ResourceStorageModeShared);
 }
 
-MTL::ComputePipelineState *make_cps(MTL::Device *device, std::string name);
+using MetalConstant = std::variant<int, bool>;
+
+// Returns a ComputePipelineState object created from the named kernel and
+// given constants.  If max_total_threads_per_tg != -1, the value overrides
+// the default (and the shader should not itself specify the value).
+MTL::ComputePipelineState *make_cps(
+        MTL::Device *device,
+        const std::string &name,
+        const std::vector<std::tuple<std::string, MetalConstant>> &named_constants,
+        const int max_total_threads_per_tg = -1);
+
 void launch_kernel(MTL::ComputePipelineState *cps,
                    MTL::CommandQueue *cq,
-                   std::vector<MTL::Buffer *> buffers,
+                   const std::vector<MTL::Buffer *> &buffers,
+                   const std::vector<int> &tg_buffer_lens,
                    long threadgroups,
                    long threads_per_threadroup);
 void launch_kernel_no_wait(MTL::ComputePipelineState *cps,
                            MTL::CommandBuffer *cb,
-                           std::vector<MTL::Buffer *> buffers,
+                           const std::vector<MTL::Buffer *> &buffers,
+                           const std::vector<int> &tg_buffer_lens,
                            long threadgroups,
                            long threads_per_threadgroup);
 

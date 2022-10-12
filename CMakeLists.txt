@@ -91,7 +91,6 @@ set(LIB_SOURCE_FILES
 if(APPLE)
     include(cmake/Metal.cmake)
     list(APPEND LIB_SOURCE_FILES
-        dorado/nn/metal/nn.h
         dorado/nn/MetalCRFModel.h
         dorado/nn/MetalCRFModel.cpp
         dorado/utils/metal_utils.cpp
