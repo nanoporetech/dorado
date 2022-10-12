@@ -126,7 +126,7 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR}/dorado
 
 enable_testing()
 
-if(DORADO_LIB_ONLY AND NOT SKIP_HDF_PLUGINS)
+if(NOT SKIP_HDF_PLUGINS)
   # Can skip this if we're consuming the lib from a parent project that already has hdf_plugins
   add_hdf_vbz_plugin()
 endif()
