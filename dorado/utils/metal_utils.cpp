@@ -15,6 +15,14 @@ using namespace MTL;
 
 namespace fs = std::filesystem;
 
+// Allows less ugliness in use of std::visit.
+template <class... Ts>
+struct overloaded : Ts... {
+    using Ts::operator()...;
+};
+template <class... Ts>
+overloaded(Ts...) -> overloaded<Ts...>;
+
 NS::String *get_library_location() {
     char ns_path[PATH_MAX + 1];
     uint32_t size = sizeof(ns_path);
@@ -31,7 +39,11 @@ MTL::Buffer *create_buffer(MTL::Device *device, size_t length) {
     return device->newBuffer(length, MTL::ResourceStorageModeShared);
 }
 
-ComputePipelineState *make_cps(Device *device, const std::string name) {
+MTL::ComputePipelineState *make_cps(
+        MTL::Device *const device,
+        const std::string &name,
+        const std::vector<std::tuple<std::string, MetalConstant>> &named_constants,
+        const int max_total_threads_per_tg) {
     NS::Error *error;
     auto default_library = device->newDefaultLibrary();
 
@@ -43,15 +55,35 @@ ComputePipelineState *make_cps(Device *device, const std::string name) {
         }
     }
 
-    auto kernel_name = NS::String::string(name.c_str(), NS::ASCIIStringEncoding);
-    auto kernel = default_library->newFunction(kernel_name);
+    auto constant_vals = FunctionConstantValues::alloc();
+    constant_vals->init();
+    for (auto &[name, constant] : named_constants) {
+        const auto ns_name = NS::String::string(name.c_str(), NS::ASCIIStringEncoding);
+        std::visit(overloaded{[&](int val) {
+                                  constant_vals->setConstantValue(&val, DataTypeInt, ns_name);
+                              },
+                              [&](bool val) {
+                                  constant_vals->setConstantValue(&val, DataTypeBool, ns_name);
+                              }},
+                   constant);
+    }
 
+    auto kernel_name = NS::String::string(name.c_str(), NS::ASCIIStringEncoding);
+    auto kernel = default_library->newFunction(kernel_name, constant_vals, &error);
+    CFRelease(constant_vals);
     if (!kernel) {
         throw std::runtime_error("Failed to find the kernel: " + name);
     }
-    auto cps = device->newComputePipelineState(kernel, &error);
 
-    if (cps == NULL) {
+    auto cp_descriptor = MTL::ComputePipelineDescriptor::alloc();
+    cp_descriptor->setComputeFunction(kernel);
+    if (max_total_threads_per_tg != -1)
+        cp_descriptor->setMaxTotalThreadsPerThreadgroup(max_total_threads_per_tg);
+
+    auto cps = device->newComputePipelineState(cp_descriptor, MTL::PipelineOptionNone, nullptr,
+                                               &error);
+    CFRelease(cp_descriptor);
+    if (cps == nullptr) {
         auto e_code = to_string(((int)error->code()));
         auto e_str = error->domain()->cString(NS::ASCIIStringEncoding);
         throw std::runtime_error("failed to build compute pipeline for " + name + " - " + e_str +
@@ -61,28 +93,37 @@ ComputePipelineState *make_cps(Device *device, const std::string name) {
     return cps;
 }
 
-void launch_kernel(ComputePipelineState *pipeline,
-                   CommandQueue *command_queue,
-                   vector<Buffer *> buffers,
+void launch_kernel(ComputePipelineState *const pipeline,
+                   CommandQueue *const command_queue,
+                   const vector<Buffer *> &buffers,
+                   const vector<int> &tg_buffer_lens,
                    long threadgroups,
                    long threads_per_threadgroup) {
     auto command_buffer = command_queue->commandBuffer();
-    launch_kernel_no_wait(pipeline, command_buffer, buffers, threadgroups, threads_per_threadgroup);
+    launch_kernel_no_wait(pipeline, command_buffer, buffers, tg_buffer_lens, threadgroups,
+                          threads_per_threadgroup);
 
     command_buffer->commit();
     command_buffer->waitUntilCompleted();
 }
 
-void launch_kernel_no_wait(ComputePipelineState *pipeline,
-                           CommandBuffer *command_buffer,
-                           vector<Buffer *> buffers,
+void launch_kernel_no_wait(ComputePipelineState *const pipeline,
+                           CommandBuffer *const command_buffer,
+                           const vector<Buffer *> &buffers,
+                           const vector<int> &tg_buffer_lens,
                            long threadgroups,
                            long threads_per_threadgroup) {
     auto compute_encoder = command_buffer->computeCommandEncoder();
     compute_encoder->setComputePipelineState(pipeline);
 
+    // Set up device memory buffers.
     for (auto i = 0; i < (int)buffers.size(); i++) {
         compute_encoder->setBuffer(buffers[i], 0, i);
+    }
+
+    // Set lengths of threadgroup memory buffers.
+    for (int i = 0; i < tg_buffer_lens.size(); ++i) {
+        compute_encoder->setThreadgroupMemoryLength(tg_buffer_lens.at(i), i);
     }
 
     compute_encoder->dispatchThreadgroups(MTL::Size(threadgroups, 1, 1),
