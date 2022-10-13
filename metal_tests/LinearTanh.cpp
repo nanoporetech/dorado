@@ -47,28 +47,33 @@ TEST_CASE(TEST_GROUP "LinearTanh") {
     // doesn't necessarily use the maximum possible.
     const int kernel_simd_groups = 24;
 
+    // Threadgroup memory size calculation.
+    constexpr int kTileSize = 8;
+    typedef uint16_t ftype;
+    const int kOutBufSize = sizeof(ftype) * kernel_simd_groups * kTileSize * kTileSize;
+    const int kOutBufF32Size = sizeof(float) * kernel_simd_groups * kTileSize * kTileSize;
+    const std::vector<int> tg_buffer_lens{kOutBufSize, kOutBufF32Size};
+
     // 32 threads/SIMD group on Apple GPUs.  The kernels have this hardwired.
     constexpr int kSimdGroupSize = 32;
     const int threads_per_thread_group = kernel_simd_groups * kSimdGroupSize;
 
     // Create a ComputePipelineState for the LinearTanh kernel.
-    const std::string linear_fn = "linear_tanh_simd_" + std::to_string(layer_size) + "_fwd_" +
-                                  std::to_string(kernel_simd_groups);
-    MTL::ComputePipelineState *const linear_tanh_cps = make_cps(device, linear_fn);
+
+    MTL::ComputePipelineState *const linear_tanh_cps = make_cps(
+            device, "linear_tanh", {{"kLstmLayerSize", layer_size}, {"kLinearLayerSize", out_size}},
+            threads_per_thread_group);
     REQUIRE(linear_tanh_cps != nullptr);
 
     // Create a ComputePipelineState for the input reordering kernel.
-    MTL::ComputePipelineState *const reorder_input_cps = make_cps(device, "reorder_input");
+    MTL::ComputePipelineState *const reorder_input_cps =
+            make_cps(device, "reorder_input", {{"kLstmLayerSize", layer_size}});
     REQUIRE(reorder_input_cps != nullptr);
 
     // Order in LstmArgs struct (which is also used by reorder_input):
-    // layer_size
-    // reverse
-    // chunk_tiles
+    // batch_tiles
     // chunk_size
-    // linear_layer_size
-    const std::vector<int32_t> args_reorder_{layer_size, 0, in_batch_size / tile_size,
-                                             lstm_chunk_size, out_size};
+    const std::vector<int32_t> args_reorder_{in_batch_size / tile_size, lstm_chunk_size};
     MTL::Buffer *const args_reorder = create_vec_buffer(device, args_reorder_);
     REQUIRE(args_reorder != nullptr);
 
@@ -106,7 +111,7 @@ TEST_CASE(TEST_GROUP "LinearTanh") {
     torch::Tensor in_f16_reordered =
             torch::zeros({(2 + lstm_chunk_size) * in_batch_size, layer_size}, torch::kFloat16);
     launch_kernel(reorder_input_cps, command_queue,
-                  {args_reorder, mtl_for_tensor(in_f32), mtl_for_tensor(in_f16_reordered)},
+                  {args_reorder, mtl_for_tensor(in_f32), mtl_for_tensor(in_f16_reordered)}, {},
                   kernel_thread_groups, threads_per_thread_group);
 
     // CPU comparison calculation (in float32 precision).
@@ -143,7 +148,7 @@ TEST_CASE(TEST_GROUP "LinearTanh") {
         launch_kernel(linear_tanh_cps, command_queue,
                       {args_linear, mtl_for_tensor(in_f16_reordered),
                        mtl_for_tensor(weights_biases_f16), mtl_for_tensor(out_gpu_f32)},
-                      kernel_thread_groups, threads_per_thread_group);
+                      tg_buffer_lens, kernel_thread_groups, threads_per_thread_group);
 
         REQUIRE(torch::allclose(out_cpu_f32, out_gpu_f32, kRelTolerance, kAbsTolerance));
         REQUIRE(MeanAbsDiff(out_cpu_f32, out_gpu_f32) < kMeanAbsDiffTolerance);
@@ -173,7 +178,7 @@ TEST_CASE(TEST_GROUP "LinearTanh") {
             launch_kernel(linear_tanh_cps, command_queue,
                           {args_linear, mtl_for_tensor(in_f16_reordered),
                            mtl_for_tensor(weights_biases_f16), mtl_for_tensor(out_gpu_partial_f32)},
-                          kernel_thread_groups, threads_per_thread_group);
+                          tg_buffer_lens, kernel_thread_groups, threads_per_thread_group);
 
             // Incorporate this set of batch elements in the overall output.
             const auto in_batch_offset = in_batch_tile_offset * tile_size;

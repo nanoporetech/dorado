@@ -84,7 +84,7 @@ void BasecallerNode::basecall_current_batch(int worker_id) {
     auto model_runner = m_model_runners[worker_id];
     auto decode_results = model_runner->call_chunks(m_batched_chunks[worker_id].size());
 
-    for (int i = 0; i < m_batched_chunks[worker_id].size(); i++) {
+    for (size_t i = 0; i < m_batched_chunks[worker_id].size(); i++) {
         m_batched_chunks[worker_id][i]->seq = decode_results[i].sequence;
         m_batched_chunks[worker_id][i]->qstring = decode_results[i].qstring;
         m_batched_chunks[worker_id][i]->moves = decode_results[i].moves;
