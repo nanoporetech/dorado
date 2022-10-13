@@ -138,11 +138,11 @@ std::string cfstringref_to_string(const CFStringRef cfstringref) {
 
 // Retrieves a dictionary of int64_t properties associated with a given service/property.
 // Returns true on success.
-bool retrieve_ioreg_props(const std::string &service_name,
+bool retrieve_ioreg_props(const std::string &service_class,
                           const std::string &property_name,
                           std::unordered_map<std::string, int64_t> &props) {
     // Look for a service matching the supplied class name.
-    CFMutableDictionaryRef matching_dict = IOServiceNameMatching(service_name.c_str());
+    CFMutableDictionaryRef matching_dict = IOServiceMatching(service_class.c_str());
     if (!matching_dict) {
         return false;
     }
@@ -205,7 +205,7 @@ int get_mtl_device_core_count() {
     // The G13 accelerator is what is present in M1-type chips.
     // TODO -- Is this service present on later chips?
     std::unordered_map<std::string, int64_t> gpu_specs;
-    if (retrieve_ioreg_props("AGXAcceleratorG13X", "GPUConfigurationVariable", gpu_specs)) {
+    if (retrieve_ioreg_props("AGXAccelerator", "GPUConfigurationVariable", gpu_specs)) {
         if (auto gpu_cores_it = gpu_specs.find("num_cores"); gpu_cores_it != gpu_specs.cend()) {
             gpu_core_count = gpu_cores_it->second;
             spdlog::info("Retrieved GPU core count of {} from IO Registry", gpu_core_count);
