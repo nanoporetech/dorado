@@ -231,7 +231,8 @@ float beam_search(const T* scores,
         auto generate_stay_index = [](state_t state, size_t num_bases) {
             return state_t(state * (num_bases + 1));
         };
-#endif  // REMOVE_FIXED_BEAM_STAYS \
+#endif  // REMOVE_FIXED_BEAM_STAYS
+
         // Generate list of candidate elements for this timestep (block)
         size_t new_elem_count = 0;
         for (size_t prev_elem_idx = 0; prev_elem_idx < current_beam_width; prev_elem_idx++) {

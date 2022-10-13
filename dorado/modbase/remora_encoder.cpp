@@ -71,7 +71,8 @@ RemoraEncoder::Context RemoraEncoder::get_context(size_t seq_pos) const {
 
     std::vector<int> seq_ints;
 
-    if (seq_start >= m_bases_before && seq_end + m_bases_after < m_sequence_ints.size()) {
+    if (seq_start >= m_bases_before &&
+        seq_end + m_bases_after < static_cast<int>(m_sequence_ints.size())) {
         seq_ints = {m_sequence_ints.begin() + seq_start - m_bases_before,
                     m_sequence_ints.begin() + seq_end + m_bases_after};
     } else {
@@ -83,7 +84,7 @@ RemoraEncoder::Context RemoraEncoder::get_context(size_t seq_pos) const {
             fill_st = m_bases_before - seq_start;
             chunk_seq_st = 0;
         }
-        if (seq_end + m_bases_after > m_sequence_ints.size()) {
+        if (seq_end + m_bases_after > static_cast<int>(m_sequence_ints.size())) {
             chunk_seq_en = m_sequence_ints.size();
         }
         std::copy(m_sequence_ints.begin() + chunk_seq_st, m_sequence_ints.begin() + chunk_seq_en,

@@ -26,7 +26,7 @@ ModBaseCallerNode::ModBaseCallerNode(ReadSink& sink,
     m_output_worker = std::make_unique<std::thread>(&ModBaseCallerNode::output_worker_thread, this);
 
     // Spin up the caller threads
-    int num_model_callers = m_callers.size();
+    size_t num_model_callers = m_callers.size();
     for (size_t i = 0; i < num_model_callers; ++i) {
         m_chunk_queues.emplace_back();
         m_batched_chunks.emplace_back();
@@ -111,7 +111,7 @@ void ModBaseCallerNode::init_modbase_info() {
     m_base_prob_offsets[3] = base_counts[0] + base_counts[1] + base_counts[2];
 }
 
-void ModBaseCallerNode::runner_worker_thread(int runner_id) {
+void ModBaseCallerNode::runner_worker_thread(size_t runner_id) {
     while (true) {
         // Wait until we are provided with a read
         std::unique_lock<std::mutex> lock(m_cv_mutex);
@@ -209,7 +209,7 @@ void ModBaseCallerNode::runner_worker_thread(int runner_id) {
     }
 }
 
-void ModBaseCallerNode::caller_worker_thread(int caller_id) {
+void ModBaseCallerNode::caller_worker_thread(size_t caller_id) {
     auto& caller = m_callers[caller_id];
     auto& chunk_queue = m_chunk_queues[caller_id];
     auto& batched_chunks = m_batched_chunks[caller_id];
@@ -256,7 +256,7 @@ void ModBaseCallerNode::caller_worker_thread(int caller_id) {
     }
 }
 
-void ModBaseCallerNode::call_current_batch(int caller_id) {
+void ModBaseCallerNode::call_current_batch(size_t caller_id) {
     auto& caller = m_callers[caller_id];
     auto results = caller->call_chunks(m_batched_chunks[caller_id].size());
 
@@ -301,7 +301,7 @@ void ModBaseCallerNode::output_worker_thread() {
             int64_t result_pos = chunk->context_hit;
             int64_t offset =
                     m_base_prob_offsets[RemoraUtils::BASE_IDS[source_read->seq[result_pos]]];
-            for (int i = 0; i < chunk->scores.size(); ++i) {
+            for (size_t i = 0; i < chunk->scores.size(); ++i) {
                 source_read->base_mod_probs[m_num_states * result_pos + offset + i] =
                         uint8_t(std::min(std::floor(chunk->scores[i] * 256), 255.0f));
             }
