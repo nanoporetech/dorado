@@ -4,15 +4,20 @@
 #include "elzip/elzip.hpp"
 #include "httplib.h"
 #include "models.h"
+#include "utils/log_utils.h"
 
 #include <argparse.hpp>
+#include <spdlog/spdlog.h>
 
 #include <filesystem>
 #include <iostream>
+#include <sstream>
 
 namespace fs = std::filesystem;
 
 int download(int argc, char* argv[]) {
+    InitLogging();
+
     argparse::ArgumentParser parser("dorado", DORADO_VERSION);
 
     parser.add_argument("--model").default_value(std::string("all")).help("the model to download");
@@ -27,8 +32,9 @@ int download(int argc, char* argv[]) {
     try {
         parser.parse_args(argc, argv);
     } catch (const std::exception& e) {
-        std::cerr << e.what() << std::endl;
-        std::cerr << parser;
+        std::ostringstream parser_stream;
+        parser_stream << parser;
+        spdlog::error("{}\n{}", e.what(), parser_stream.str());
         std::exit(1);
     }
 
@@ -38,9 +44,9 @@ int download(int argc, char* argv[]) {
     auto permissions = fs::status(directory).permissions();
 
     auto print_models = [] {
-        std::cerr << "> basecaller models" << std::endl;
+        spdlog::info("> basecaller models");
         for (const auto& [model, _] : basecaller::models) {
-            std::cerr << " - " << model << std::endl;
+            spdlog::info(" - {}", model);
         }
     };
 
@@ -51,7 +57,7 @@ int download(int argc, char* argv[]) {
 
     if (selected_model != "all" &&
         basecaller::models.find(selected_model) == basecaller::models.end()) {
-        std::cerr << "> error: '" << selected_model << "' is not a valid model" << std::endl;
+        spdlog::error("> error: '{}' is not a valid model", selected_model);
         print_models();
         return 1;
     }
@@ -60,7 +66,7 @@ int download(int argc, char* argv[]) {
         try {
             fs::create_directories(directory);
         } catch (std::filesystem::filesystem_error const& e) {
-            std::cerr << "> error: " << e.code().message() << std::endl;
+            spdlog::error("> error: {}", e.code().message());
             return 1;
         }
     }
@@ -70,8 +76,8 @@ int download(int argc, char* argv[]) {
     tmp.close();
 
     if (tmp.fail()) {
-        std::cerr << "> error: insufficient permissions to download models into " << directory
-                  << std::endl;
+        spdlog::error("> error: insufficient permissions to download models into {}",
+                      std::string(directory));
         return 1;
     }
 
@@ -88,10 +94,10 @@ int download(int argc, char* argv[]) {
 
     for (const auto& [model, url] : basecaller::models) {
         if (selected_model == "all" || selected_model == model) {
-            std::cerr << " - downloading " << model;
+            spdlog::info(" - downloading {}", model);
             auto res = http.Get(url.c_str());
             if (res != nullptr) {
-                std::cerr << " [" << res->status << "]" << std::endl;
+                spdlog::info(" [{}]", res->status);
                 fs::path archive(directory / (model + ".zip"));
                 std::ofstream ofs(archive.string());
                 ofs << res->body;
@@ -99,7 +105,7 @@ int download(int argc, char* argv[]) {
                 elz::extractZip(archive, directory);
                 fs::remove(archive);
             } else {
-                std::cerr << "Failed to download " << model << std::endl;
+                spdlog::error("Failed to download {}", model);
             }
         }
     }

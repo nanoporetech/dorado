@@ -14,8 +14,10 @@
 #include "read_pipeline/ModBaseCallerNode.h"
 #include "read_pipeline/ScalerNode.h"
 #include "read_pipeline/WriterNode.h"
+#include "utils/log_utils.h"
 
 #include <argparse.hpp>
+#include <spdlog/spdlog.h>
 
 #include <filesystem>
 #include <iostream>
@@ -118,6 +120,8 @@ void setup(std::vector<std::string> args,
 }
 
 int basecaller(int argc, char* argv[]) {
+    InitLogging();
+
     argparse::ArgumentParser parser("dorado", DORADO_VERSION);
 
     parser.add_argument("model").help("the basecaller model to run.");
@@ -156,14 +160,15 @@ int basecaller(int argc, char* argv[]) {
     try {
         parser.parse_args(argc, argv);
     } catch (const std::exception& e) {
-        std::cerr << e.what() << std::endl;
-        std::cerr << parser;
+        std::ostringstream parser_stream;
+        parser_stream << parser;
+        spdlog::error("{}\n{}", e.what(), parser_stream.str());
         std::exit(1);
     }
 
     std::vector<std::string> args(argv, argv + argc);
 
-    std::cerr << "> Creating basecall pipeline" << std::endl;
+    spdlog::info("> Creating basecall pipeline");
     try {
         setup(args, parser.get<std::string>("model"), parser.get<std::string>("data"),
               parser.get<std::string>("--remora_models"), parser.get<std::string>("-x"),
@@ -171,10 +176,10 @@ int basecaller(int argc, char* argv[]) {
               parser.get<int>("-r"), parser.get<int>("--remora-batchsize"),
               parser.get<int>("--remora-threads"), parser.get<bool>("--emit-fastq"));
     } catch (const std::exception& e) {
-        std::cerr << e.what() << std::endl;
+        spdlog::error("{}", e.what());
         return 1;
     }
 
-    std::cerr << "> Finished" << std::endl;
+    spdlog::info("> Finished");
     return 0;
 }

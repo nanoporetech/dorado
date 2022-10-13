@@ -9,6 +9,7 @@
 #include "../utils/tensor_utils.h"
 
 #include <math.h>
+#include <spdlog/spdlog.h>
 #include <toml.hpp>
 #include <torch/torch.h>
 
@@ -663,8 +664,8 @@ public:
                 if (status == MTL::CommandBufferStatusCompleted) {
                     break;
                 }
-                std::cerr << "Metal command buffer execution failed: " << status << ", try #"
-                          << try_count << std::endl;
+                spdlog::warn("Metal command buffer execution failed: {}, try #{}", status,
+                             try_count);
                 using namespace std::chrono_literals;
                 std::this_thread::sleep_for(20ms);
             }

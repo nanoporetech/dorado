@@ -4,6 +4,7 @@
 #include <IOKit/IOKitLib.h>
 #include <Metal/Metal.hpp>
 #include <mach-o/dyld.h>
+#include <spdlog/spdlog.h>
 #include <sys/syslimits.h>
 #include <torch/torch.h>
 
@@ -207,6 +208,7 @@ int get_mtl_device_core_count() {
     if (retrieve_ioreg_props("AGXAcceleratorG13X", "GPUConfigurationVariable", gpu_specs)) {
         if (auto gpu_cores_it = gpu_specs.find("num_cores"); gpu_cores_it != gpu_specs.cend()) {
             gpu_core_count = gpu_cores_it->second;
+            spdlog::info("Retrieved GPU core count of {} from IO Registry", gpu_core_count);
             return gpu_core_count;
         }
     }
@@ -223,6 +225,8 @@ int get_mtl_device_core_count() {
         gpu_core_count = 64;
     }
 
+    spdlog::warn("Failed to retrieve GPU core count from IO Registry: using value of {}",
+                 gpu_core_count);
     return gpu_core_count;
 }
 
@@ -263,4 +267,7 @@ int auto_gpu_batch_size(std::string model_path) {
     } else if (model_path.find("_sup@v") != std::string::npos) {
         return 384;
     }
+    constexpr int kDefaultBatchSize = 384;
+    spdlog::warn("Unrecognised model suffix: defaulting to batch size {}", kDefaultBatchSize);
+    return kDefaultBatchSize;
 }
