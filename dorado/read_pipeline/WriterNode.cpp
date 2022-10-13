@@ -2,8 +2,11 @@
 
 #include "Version.h"
 
+#include <spdlog/spdlog.h>
+
 #include <chrono>
 #include <iostream>
+#include <sstream>
 
 #ifndef _WIN32
 #include <unistd.h>
@@ -67,7 +70,7 @@ void WriterNode::worker_thread() {
                 }
             } catch (const std::exception& ex) {
                 std::scoped_lock<std::mutex> lock(m_cerr_mutex);
-                std::cerr << ex.what() << "\n";
+                spdlog::error("{}", ex.what());
             }
         }
     }
@@ -111,7 +114,8 @@ WriterNode::~WriterNode() {
     if (m_isatty) {
         std::cerr << "\r";
     }
-    std::cerr << "> Reads basecalled: " << m_num_reads_processed << std::endl;
-    std::cerr << "> Samples/s: " << std::scientific << m_num_samples_processed / (duration / 1000.0)
-              << std::endl;
+    spdlog::info("> Reads basecalled: {}", m_num_reads_processed);
+    std::ostringstream samples_sec;
+    samples_sec << std::scientific << m_num_samples_processed / (duration / 1000.0);
+    spdlog::info("> Samples/s: {}", samples_sec.str());
 }

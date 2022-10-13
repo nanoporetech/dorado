@@ -79,6 +79,8 @@ set(LIB_SOURCE_FILES
     dorado/utils/base_mod_utils.h
     dorado/utils/compat_utils.cpp
     dorado/utils/compat_utils.h
+    dorado/utils/log_utils.h
+    dorado/utils/log_utils.cpp
     dorado/utils/math_utils.h
     dorado/utils/module_utils.h
     dorado/utils/sequence_utils.cpp
@@ -130,6 +132,7 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR}/dorado
     dorado/3rdparty/cxxpool/src
     dorado/3rdparty/NVTX/c/include
     dorado
+    dorado/3rdparty/spdlog/include
 )
 
 target_link_libraries(dorado_lib
