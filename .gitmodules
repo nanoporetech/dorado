@@ -19,6 +19,9 @@
 [submodule "dorado/3rdparty/cxxpool"]
 	path = dorado/3rdparty/cxxpool
 	url = https://github.com/bloomen/cxxpool.git
+[submodule "dorado/3rdparty/NVTX"]
+	path = dorado/3rdparty/NVTX
+	url = https://github.com/NVIDIA/NVTX.git
 [submodule "dorado/3rdparty/spdlog"]
 	path = dorado/3rdparty/spdlog
 	url = https://github.com/gabime/spdlog

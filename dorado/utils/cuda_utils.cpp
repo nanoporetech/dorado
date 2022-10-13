@@ -70,8 +70,8 @@ int auto_gpu_batch_size(std::string model_path, std::vector<std::string> devices
 
     // compute how much free gpu memory and pick the closest breakpoint
     auto available = available_memory(devices);
-    auto min_available = *std::min_element(available.begin(), available.end()) / 1e+9;
 
+    int min_available = *std::min_element(available.begin(), available.end()) / 1e+9;
     int idx = std::lower_bound(breakpoints.begin(), breakpoints.end(), min_available) -
               breakpoints.begin();
     auto presets = batch_sizes[std::min(idx, static_cast<int>(breakpoints.size() - 1))];

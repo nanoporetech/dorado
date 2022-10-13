@@ -19,6 +19,7 @@ extern "C" {
 #endif
 
 #include <math.h>
+#include <nvtx3/nvtx3.hpp>
 #include <spdlog/spdlog.h>
 #include <toml.hpp>
 #include <torch/torch.h>
@@ -29,10 +30,6 @@ using namespace torch::nn;
 namespace F = torch::nn::functional;
 using Slice = torch::indexing::Slice;
 using quantized_lstm = std::function<int(void *, void *, void *, void *, void *, void *, int)>;
-
-struct PermuteImpl : Module {
-    torch::Tensor forward(torch::Tensor x) { return x.permute({2, 0, 1}); }
-};
 
 struct ConvolutionImpl : Module {
     ConvolutionImpl(int size = 1, int outsize = 1, int k = 1, int stride = 1) {
@@ -54,19 +51,18 @@ struct LinearCRFImpl : Module {
     };
 
     torch::Tensor forward(torch::Tensor x) {
-        auto T = x.size(0);
-        auto N = x.size(1);
+        auto N = x.size(0);
+        auto T = x.size(1);
 #if USE_CUDA_LSTM
         // Optimised version of the #else branch for CUDA devices
         c10::cuda::CUDAGuard device_guard(x.device());
         auto stream = at::cuda::getCurrentCUDAStream().stream();
 
-        // make sure input is NTC in memory
-        x = x.transpose(0, 1).contiguous().reshape({T * N, -1});
+        x = x.reshape({N * T, -1});
         auto scores = torch::matmul(x, linear->weight.t());
         host_bias_tanh_scale_f16(stream, N * T, scores.size(1), scale, scores.data_ptr(),
                                  linear->bias.data_ptr());
-        scores = scores.view({N, T, -1}).transpose(0, 1);  // logical order TNC, memory order NTC
+        scores = scores.view({N, T, -1});
 
 #else  // if USE_CUDA_LSTM
         auto scores = activation(linear(x)) * scale;
@@ -75,9 +71,9 @@ struct LinearCRFImpl : Module {
         if (expand_blanks == true) {
             scores = scores.contiguous();
             int C = scores.size(2);
-            scores = F::pad(scores.view({T, N, C / 4, 4}),
+            scores = F::pad(scores.view({N, T, C / 4, 4}),
                             F::PadFuncOptions({1, 0, 0, 0, 0, 0, 0, 0}).value(blank_score))
-                             .view({T, N, -1});
+                             .view({N, T, -1});
         }
 
         return scores;
@@ -172,16 +168,13 @@ struct LSTMStackImpl : Module {
         thread_local int max_batch_size = 0;
         if (working_mem_chunk_size != chunk_size || max_batch_size < batch_size) {
             if (max_batch_size < batch_size) {
-                gate_buf = torch::empty({batch_size, gate_size}, in.options()).contiguous();
+                gate_buf = torch::empty({batch_size, gate_size}, in.options());
                 max_batch_size = batch_size;
             }
             working_mem_chunk_size = chunk_size;
             mat_working_mem =
-                    torch::zeros({chunk_size + 1, batch_size, 2, layer_size}, in.options())
-                            .contiguous();
+                    torch::zeros({chunk_size + 1, batch_size, 2, layer_size}, in.options());
         }
-        mat_working_mem.to(in.device());
-        gate_buf.to(in.device());
 
         // Working memory is laid out as [T+1][N][2][C] in memory, where the 2 serves to
         // interleave input and output for each LSTM layer in a specific way. The reverse LSTM
@@ -318,9 +311,6 @@ struct LSTMStackImpl : Module {
             quantize_weights();
             _chunks = _chunks.to(x.device());
         }
-
-        x = x.permute({1, 0, 2}).contiguous();  // data needs to be in NTC format.
-
         auto buffer = torch::matmul(x, _r_wih[0]);
 
         _host_run_lstm_rev_quantized(
@@ -356,17 +346,15 @@ struct LSTMStackImpl : Module {
                 rnn5->named_parameters()["bias_ih"].data_ptr(),
                 _quantization_scale_factors[4].data_ptr(), x.data_ptr(), _chunks.size(0));
 
-        torch::cuda::synchronize();
-
-        return x.permute({1, 0, 2}).contiguous();
+        return x;
     }
 
     // Dispatch to different forward method depending on whether we use quantized LSTMs or not
     torch::Tensor forward(torch::Tensor x) {
         if (m_quantize) {
-            return forward_quantized(x);
+            return forward_quantized(x.permute({0, 2, 1}).contiguous());
         } else {
-            return forward_cublas(x);
+            return forward_cublas(x.permute({2, 0, 1})).transpose(1, 0);
         }
     }
 
@@ -386,6 +374,8 @@ struct LSTMStackImpl : Module {
     };
 
     torch::Tensor forward(torch::Tensor x) {
+        x = x.permute({2, 0, 1});
+
         // rnn1
         x = x.flip(0);
         auto [y1, h1] = rnn1(x);
@@ -417,7 +407,6 @@ struct LSTMStackImpl : Module {
 
 #endif  // if USE_CUDA_LSTM else
 
-TORCH_MODULE(Permute);
 TORCH_MODULE(LSTMStack);
 TORCH_MODULE(LinearCRF);
 TORCH_MODULE(Convolution);
@@ -432,18 +421,20 @@ struct CRFModelImpl : Module {
         conv1 = register_module("conv1", Convolution(1, 4, 5, 1));
         conv2 = register_module("conv2", Convolution(4, 16, 5, 1));
         conv3 = register_module("conv3", Convolution(16, size, 19, stride));
-        permute = register_module("permute", Permute());
         rnns = register_module("rnns", LSTMStack(size, batch_size, chunk_size / stride));
         linear = register_module("linear", LinearCRF(size, outsize));
         linear->expand_blanks = expand_blanks;
-        encoder = Sequential(conv1, conv2, conv3, permute, rnns, linear);
+        encoder = Sequential(conv1, conv2, conv3, rnns, linear);
     }
 
     void load_state_dict(const std::vector<torch::Tensor> &weights) {
         ::utils::load_state_dict(*this, weights);
     }
 
-    torch::Tensor forward(torch::Tensor x) { return encoder->forward(x); }
+    torch::Tensor forward(torch::Tensor x) {
+        nvtx3::scoped_range loop{"nn_forward"};
+        return encoder->forward(x);
+    }
 
     std::vector<torch::Tensor> load_weights(const std::filesystem::path &dir) {
         auto tensors = std::vector<std::string>{
@@ -474,7 +465,6 @@ struct CRFModelImpl : Module {
         return ::utils::load_tensors(dir, tensors);
     }
 
-    Permute permute{nullptr};
     LSTMStack rnns{nullptr};
     LinearCRF linear{nullptr};
     Sequential encoder{nullptr};
