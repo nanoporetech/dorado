@@ -77,7 +77,7 @@ int download(int argc, char* argv[]) {
 
     if (tmp.fail()) {
         spdlog::error("> error: insufficient permissions to download models into {}",
-                      std::string(directory));
+                      std::string(directory.u8string()));
         return 1;
     }
 
