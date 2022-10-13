@@ -17,6 +17,8 @@ include(cmake/Koi.cmake)
 include(cmake/Pod5.cmake)
 include(cmake/Torch.cmake)
 include(cmake/OpenSSL.cmake)
+include(cmake/Htslib.cmake)
+
 
 if(DORADO_USING_OLD_CPP_ABI)
   # We need to force the use of the old ABI here, if we are building in an old ABI context, as otherwise elzip builds
@@ -42,6 +44,7 @@ endif()
 
 set(LIB_SOURCE_FILES
     dorado/cli/basecaller.cpp
+    dorado/cli/duplex.cpp
     dorado/cli/download.cpp
     dorado/cli/benchmark.cpp
     dorado/cli/cli.h
@@ -126,9 +129,11 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR}/dorado
     dorado/3rdparty/toml11
     dorado/3rdparty/cpp-httplib
     dorado/3rdparty/metal-cpp/metal-cpp
+    dorado/3rdparty/metal-cpp/metal-cpp
     dorado/3rdparty/hdf_plugins/vbz_plugin
-    dorado/3rdparty/cxxpool/src
     dorado
+    dorado/3rdparty/cxxpool/src
+    dorado/3rdparty/htslib
 )
 
 target_link_libraries(dorado_lib
@@ -140,6 +145,7 @@ target_link_libraries(dorado_lib
     ${TORCH_LIBRARIES}
     ${POD5_LIBRARIES}
     ${KOI_LIBRARIES}
+    htslib
     vbz_hdf_plugin
     OpenSSL::SSL
     elzip

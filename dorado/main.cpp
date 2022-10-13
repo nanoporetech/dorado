@@ -25,6 +25,7 @@ void usage(const std::vector<std::string> commands) {
 int main(int argc, char* argv[]) {
     const std::map<std::string, entry_ptr> subcommands = {
             {"basecaller", &basecaller},
+            {"duplex", &duplex},
             {"download", &download},
     };
 
