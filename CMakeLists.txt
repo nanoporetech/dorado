@@ -28,6 +28,8 @@ endif()
 
 add_subdirectory(dorado/3rdparty/elzip)
 
+add_subdirectory(dorado/3rdparty/edlib EXCLUDE_FROM_ALL)
+
 enable_testing()
 add_hdf_vbz_plugin()
 configure_file(dorado/Version.h.in dorado/Version.h)
@@ -149,6 +151,7 @@ target_link_libraries(dorado_lib
     vbz_hdf_plugin
     OpenSSL::SSL
     elzip
+    edlib
 )
 
 if(APPLE)

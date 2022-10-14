@@ -19,3 +19,6 @@
 [submodule "dorado/3rdparty/cxxpool"]
 	path = dorado/3rdparty/cxxpool
 	url = https://github.com/bloomen/cxxpool.git
+[submodule "dorado/3rdparty/edlib"]
+	path = dorado/3rdparty/edlib
+	url = https://github.com/martinsos/edlib

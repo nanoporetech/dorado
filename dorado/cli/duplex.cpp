@@ -19,14 +19,22 @@
 
 #include <filesystem>
 #include <iostream>
+#include <fstream>
 #include <sstream>
 #include <thread>
+#include "3rdparty/edlib/edlib/include/edlib.h"
 
-//TODO: Move these to some utils handler
-#define bam1_seq(b) ((b)->data + (b)->core.n_cigar*4 + (b)->core.l_qname)
-#define bam1_seqi(s, i) (bam_seqi((s), (i)))
 
-#define bam1_qua(b) ((b)->data + ((b)->core.n_cigar<<2) + (b)->core.l_qname + (((b)->core.l_qseq + 1)>>1))
+struct read {
+    std::string read_id;
+    std::vector<char> sequence;
+    std::vector<uint8_t> scores;
+};
+
+struct read_pair {
+    read* temp;
+    read* comp;
+};
 
 void setup_duplex(std::vector<std::string> args,
            const std::filesystem::path& model_path,
@@ -159,19 +167,6 @@ int duplex(int argc, char* argv[]) {
             .default_value(std::string())
             .help("a comma separated list of remora models");
 
-/*    try {
-        parser.parse_args(argc, argv);	samFile *fp_in = hts_open(argv[1],"r"); //open bam file
-	bam_hdr_t *bamHdr = sam_hdr_read(fp_in); //read header
-	bam1_t *aln = bam_init1(); //initialize an alignment
-
-    } catch (const std::exception& e) {
-        std::cerr << e.what() << std::endl;
-        std::cerr << parser;
-        std::exit(1);
-    }
-/home/OXFORDNANOLABS/mvella
-    std::vector<std::string> args(argv, argv + argc);*/
-
     std::cerr << "Loading BAM" << std::endl;
 
     samFile *fp_in = hts_open("/home/OXFORDNANOLABS/mvella/calls.bam","r"); //open bam file
@@ -180,76 +175,69 @@ int duplex(int argc, char* argv[]) {
     std::cerr << "Header:\n " <<  bamHdr->text  << std::endl;
 
     auto a = sam_read1(fp_in,bamHdr,aln);
-   while(sam_read1(fp_in,bamHdr,aln) >= 0){
-        int32_t pos = aln->core.pos +1; //left most position of alignment in zero based coordianate (+1)
-        //char *chr = bamHdr->target_name[aln->core.tid] ; //contig name (chromosome)
-        uint32_t len = aln->core.l_qseq; //length of the read.
+    std::vector<read> reads;
+   while(sam_read1(fp_in,bamHdr,aln) >= 0) {
+       //int32_t pos = aln->core.pos +1; //left most position of alignment in zero based coordianate (+1)
+       //char *chr = bamHdr->target_name[aln->core.tid] ; //contig name (chromosome)
+       uint32_t len = aln->core.l_qseq;  //length of the read.
 
+       std::string read_id = bam_get_qname(aln);
 
-/*
-        for(int i=0; i< len ; i++){
-            int ibase = bam1_seqi(bam1_seq(aln),i);
-            char base = seq_nt16_str[ibase];
-            std::cerr << base;
-        }
-        std::cerr << std::endl;*/
+       uint8_t* q = bam_get_qual(aln);  //quality string
+       uint8_t* s = bam_get_seq(aln);  //sequence string
 
+       std::vector<uint8_t> qualities(len);
+       std::vector<char> nucleotides(len);
 
-
-        uint8_t *q = bam_get_qual(aln); //quality string
-        //uint32_t q2 = aln->core.qual ; //mapping quality
-
-        //std::cerr << q << std::endl;
-
-        //char *qseq = (char *)malloc(len);
-
-/*
-        for(int i=0; i< len ; i++){
-            qseq[i] = seq_nt16_str[bam_seqi(q,i)]; //gets nucleotide id and converts them into IUPAC id.
-        }
-*/
-
-
-        for(int i=0; i< len ; i++){
-            //q[i] += 33;
-            std::cerr << int(q[i]) << std::endl;
-        }
-
+       // Todo - there is a better way to do this.
+       for (int i = 0; i < len; i++) {
+           qualities[i] = q[i];
+           nucleotides[i] = seq_nt16_str[bam_seqi(s, i)];
+       }
+       reads.push_back({read_id, nucleotides, qualities});
+   }
         std::cerr << std::endl;
-        //printf("%d\t%d\t%s\t%s\t%d\n",pos,len,qseq,q,q2);
-
-
-/*        for(int i=0; i< len ; i++){
-            qseq[i] = seq_nt16_str[bam_seqi(q,i)]; //gets nucleotide id and converts them into IUPAC id.
-        }*/
-
-        //std::cerr << qseq << std::endl;
-
-        //printf("%s\t%d\t%d\t%s\t%s\t%d\n",chr,pos,len,qseq,q,q2);*/
-
-        }
     std::cerr << "Exit While" << std::endl;
 
-
-
-    std::cerr << "Closing BAM" << std::endl;
     bam_destroy1(aln);
     sam_close(fp_in);
     std::cerr << "Closing BAM - DONE" << std::endl;
 
+   // Let's also load a pairs.txt
 
-/*    std::cerr << "> Creating basecall pipeline" << std::endl;
-    try {
-        setup_duplex(args, parser.get<std::string>("model"), parser.get<std::string>("data"),
-              parser.get<std::string>("--remora_models"), parser.get<std::string>("-x"),
-              parser.get<int>("-c"), parser.get<int>("-o"), parser.get<int>("-b"),
-              parser.get<int>("-r"), parser.get<int>("--remora-batchsize"),
-              parser.get<int>("--remora-threads"), parser.get<bool>("--emit-fastq"));
-    } catch (const std::exception& e) {
-        std::cerr << e.what() << std::endl;
-        return 1;
+    std::string pairs_file = "/media/groups/machine_learning/active/klawrence/stereo_duplex_investigation/duplex_realdata/data/human_kit14_260bps/pair_id_files/20220411_1706_3C_PAM62277_dfe6b6d7/pair_ids_filtered.txt";
+
+    std::ifstream dataFile;
+    dataFile.open (pairs_file);
+
+    std::vector<std::string>   resultr;
+    //std::string                line;
+    //std::getline(dataFile,line);
+
+    //std::stringstream          lineStream(line);
+
+    std::string                cell;
+    int line = 0;
+
+    std::getline(dataFile,cell);
+    while(!dataFile.eof())
+    {
+        char delim = ' ';
+        auto delim_pos = cell.find(delim);
+        resultr.push_back(cell.substr(0, delim_pos));
+        resultr.push_back(cell.substr(delim_pos, delim_pos * 2 -1));
+        line++;
+        std::getline(dataFile,cell);
     }
 
-    std::cerr << "> Finished" << std::endl;*/
+    EdlibAlignResult result = edlibAlign("hello", 5, "world!", 6, edlibDefaultAlignConfig());
+    if (result.status == EDLIB_STATUS_OK) {
+        printf("edit_distance('hello', 'world!') = %d\n", result.editDistance);
+    }
+    edlibFreeAlignResult(result);
+
+
+
+
     return 0;
 }
