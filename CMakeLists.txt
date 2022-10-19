@@ -208,8 +208,8 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
 
     # CUDA system DLLs we depend on:
     file(GLOB CUDART_DLLS "${CUDAToolkit_ROOT}/targets/x86_64-linux/lib/*cudart.so*")
-    file(GLOB CUBLAS_DLLS "${CUDAToolkit_ROOT}/targets/x86_64-linux/lib/cublas*.so*")
-    file(GLOB NVTOOLS_DLLS "${CUDAToolkit_ROOT}/targets/x86_64-linux/lib/nvToolsExt.so*")
+    file(GLOB CUBLAS_DLLS "${CUDAToolkit_ROOT}/targets/x86_64-linux/lib/*cublas*.so*")
+    file(GLOB NVTOOLS_DLLS "${CUDAToolkit_ROOT}/targets/x86_64-linux/lib/*nvToolsExt.so*")
     install(FILES ${CUDART_DLLS} DESTINATION lib)
     install(FILES ${CUBLAS_DLLS} DESTINATION lib)
     install(FILES ${NVTOOLS_DLLS} DESTINATION lib)
