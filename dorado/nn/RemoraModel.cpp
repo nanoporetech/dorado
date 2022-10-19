@@ -8,8 +8,10 @@
 #include "utils/sequence_utils.h"
 #include "utils/tensor_utils.h"
 
+#ifndef __APPLE__
 #include <c10/cuda/CUDAGuard.h>
 #include <c10/cuda/CUDAStream.h>
+#endif
 #include <nvtx3/nvtx3.hpp>
 #include <toml.hpp>
 #include <torch/torch.h>
@@ -255,7 +257,11 @@ RemoraCaller::RemoraCaller(const std::filesystem::path& model_path,
                            const std::string& device,
                            int batch_size,
                            size_t block_stride)
+#ifdef __APPLE__
+        : m_batch_size(batch_size) {
+#else
         : m_batch_size(batch_size), m_stream(c10::cuda::getStreamFromPool()) {
+#endif
     // no metal implementation yet, force to cpu
     m_options = torch::TensorOptions().dtype(dtype).device(device == "metal" ? "cpu" : device);
     m_module = load_remora_model(model_path, m_options);
@@ -367,8 +373,10 @@ torch::Tensor RemoraCaller::call_chunks(int num_chunks) {
     nvtx3::scoped_range loop{"remora_nn"};
 
     torch::InferenceMode guard;
-    c10::cuda::CUDAStreamGuard stream_guard(m_stream);
 
+#ifndef __APPLE__
+    c10::cuda::CUDAStreamGuard stream_guard(m_stream);
+#endif
     auto scores = m_module->forward(m_input_sigs.to(m_options.device()),
                                     m_input_seqs.to(m_options.device()));
 

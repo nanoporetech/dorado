@@ -2,7 +2,9 @@
 
 #include "modbase/remora_scaler.h"
 
+#ifndef __APPLE__
 #include <c10/cuda/CUDAStream.h>
+#endif
 #include <torch/torch.h>
 
 #include <array>
@@ -45,7 +47,9 @@ class RemoraCaller {
     torch::TensorOptions m_options;
     torch::Tensor m_input_sigs;
     torch::Tensor m_input_seqs;
+#ifndef __APPLE__
     c10::cuda::CUDAStream m_stream;
+#endif
     std::unique_ptr<RemoraScaler> m_scaler;
 
     BaseModParams m_params;
