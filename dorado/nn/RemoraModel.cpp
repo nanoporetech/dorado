@@ -8,6 +8,9 @@
 #include "utils/sequence_utils.h"
 #include "utils/tensor_utils.h"
 
+#include <c10/cuda/CUDAGuard.h>
+#include <c10/cuda/CUDAStream.h>
+#include <nvtx3/nvtx3.hpp>
 #include <toml.hpp>
 #include <torch/torch.h>
 
@@ -252,7 +255,7 @@ RemoraCaller::RemoraCaller(const std::filesystem::path& model_path,
                            const std::string& device,
                            int batch_size,
                            size_t block_stride)
-        : m_batch_size(batch_size) {
+        : m_batch_size(batch_size), m_stream(c10::cuda::getStreamFromPool()) {
     // no metal implementation yet, force to cpu
     m_options = torch::TensorOptions().dtype(dtype).device(device == "metal" ? "cpu" : device);
     m_module = load_remora_model(model_path, m_options);
@@ -302,10 +305,12 @@ RemoraCaller::RemoraCaller(const std::filesystem::path& model_path,
     auto sig_len = static_cast<int64_t>(m_params.context_before + m_params.context_after);
     auto kmer_len = m_params.bases_after + m_params.bases_before + 1;
 
-    m_input_sigs = torch::empty({batch_size, 1, sig_len},
-                                torch::TensorOptions().dtype(dtype).device(torch::kCPU));
-    m_input_seqs = torch::empty({batch_size, RemoraUtils::NUM_BASES * kmer_len, sig_len},
-                                torch::TensorOptions().dtype(dtype).device(torch::kCPU));
+    m_input_sigs = torch::empty(
+            {batch_size, 1, sig_len},
+            torch::TensorOptions().dtype(dtype).device(torch::kCPU).pinned_memory(true));
+    m_input_seqs = torch::empty(
+            {batch_size, RemoraUtils::NUM_BASES * kmer_len, sig_len},
+            torch::TensorOptions().dtype(dtype).device(torch::kCPU).pinned_memory(true));
 
     if (m_params.refine_do_rough_rescale) {
         m_scaler = std::make_unique<RemoraScaler>(m_params.refine_kmer_levels,
@@ -359,8 +364,13 @@ void RemoraCaller::accept_chunk(int num_chunks,
 }
 
 torch::Tensor RemoraCaller::call_chunks(int num_chunks) {
+    nvtx3::scoped_range loop{"remora_nn"};
+
     torch::InferenceMode guard;
-    auto scores = m_module->forward(m_input_sigs.to(m_options.device_opt().value()),
-                                    m_input_seqs.to(m_options.device_opt().value()));
+    c10::cuda::CUDAStreamGuard stream_guard(m_stream);
+
+    auto scores = m_module->forward(m_input_sigs.to(m_options.device()),
+                                    m_input_seqs.to(m_options.device()));
+
     return scores.to(torch::kCPU);
 }

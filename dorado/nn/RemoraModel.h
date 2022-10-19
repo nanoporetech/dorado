@@ -2,6 +2,7 @@
 
 #include "modbase/remora_scaler.h"
 
+#include <c10/cuda/CUDAStream.h>
 #include <torch/torch.h>
 
 #include <array>
@@ -39,11 +40,12 @@ struct BaseModParams {
 };
 
 class RemoraCaller {
-    constexpr static torch::ScalarType dtype = torch::kFloat32;
+    constexpr static torch::ScalarType dtype = torch::kFloat16;
     torch::nn::ModuleHolder<torch::nn::AnyModule> m_module{nullptr};
     torch::TensorOptions m_options;
     torch::Tensor m_input_sigs;
     torch::Tensor m_input_seqs;
+    c10::cuda::CUDAStream m_stream;
     std::unique_ptr<RemoraScaler> m_scaler;
 
     BaseModParams m_params;
