@@ -62,29 +62,15 @@ std::pair<float, float> RemoraScaler::rescale(const torch::Tensor samples,
         for (size_t i = 0; i < n; i++) {
             int pos = (seq_to_sig_map[i] + seq_to_sig_map[i + 1]) / 2;
             optim_dacs[i] = samples[pos].item<float>();
+            new_levels[i] = levels[i];
         }
     }
 
     if (clip_bases > 0 && levels.size() > clip_bases * 2) {
-        new_levels = {std::begin(levels) + clip_bases, std::end(levels) - clip_bases};
+        new_levels = {std::begin(new_levels) + clip_bases, std::end(new_levels) - clip_bases};
         optim_dacs = {std::begin(optim_dacs) + clip_bases, std::end(optim_dacs) - clip_bases};
-    } else {
-        new_levels = levels;
     }
 
-    {
-        nvtx3::scoped_range loop{"quatiles"};
-        std::vector<float> quants(19);
-        std::generate(std::begin(quants), std::end(quants),
-                      [n = 0.f]() mutable { return n += 0.05f; });
-
-        new_levels = ::utils::quantiles(new_levels, quants);
-        optim_dacs = ::utils::quantiles(optim_dacs, quants);
-    }
-
-    {
-        nvtx3::scoped_range loop{"linear regression"};
-        auto [new_scale, new_offset, rcoeff] = ::utils::linear_regression(optim_dacs, new_levels);
-        return {new_offset, new_scale};
-    }
+    auto [new_scale, new_offset, rcoeff] = ::utils::linear_regression(optim_dacs, new_levels);
+    return {new_offset, new_scale};
 }

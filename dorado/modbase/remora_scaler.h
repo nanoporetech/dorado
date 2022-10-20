@@ -41,7 +41,7 @@ public:
                                     const std::vector<uint64_t>& seq_to_sig_map,
                                     const std::vector<float>& levels,
                                     size_t clip_bases = 10,
-                                    size_t max_bases = 500) const;
+                                    size_t max_bases = 1000) const;
 
     /** Scale calculator for v1 Remora-style modified base detection.
      *  @param kmer_levels A vector of expected signal levels per kmer.
