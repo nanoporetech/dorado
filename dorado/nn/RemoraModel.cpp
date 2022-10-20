@@ -260,10 +260,11 @@ RemoraCaller::RemoraCaller(const std::filesystem::path& model_path,
 #ifdef __APPLE__
         : m_batch_size(batch_size) {
 #else
-        : m_batch_size(batch_size), m_stream(c10::cuda::getStreamFromPool()) {
+        : m_batch_size(batch_size), m_stream(c10::cuda::getDefaultCUDAStream()) {
 #endif
     // no metal implementation yet, force to cpu
     m_options = torch::TensorOptions().dtype(dtype).device(device == "metal" ? "cpu" : device);
+    m_stream = c10::cuda::getStreamFromPool(false, m_options.device().index());
     m_module = load_remora_model(model_path, m_options);
 
     auto config = toml::parse(model_path / "config.toml");
@@ -375,6 +376,7 @@ torch::Tensor RemoraCaller::call_chunks(int num_chunks) {
     torch::InferenceMode guard;
 
 #ifndef __APPLE__
+    c10::cuda::CUDAGuard device_guard(m_options.device());
     c10::cuda::CUDAStreamGuard stream_guard(m_stream);
 #endif
     auto scores = m_module->forward(m_input_sigs.to(m_options.device()),

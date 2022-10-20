@@ -92,10 +92,17 @@ void setup(std::vector<std::string> args,
 
     // generate model callers before nodes or it affects the speed calculations
     std::vector<std::shared_ptr<RemoraCaller>> remora_callers;
-    for (const auto& remora_model : remora_model_list) {
-        auto caller = std::make_shared<RemoraCaller>(remora_model, device, remora_batch_size,
-                                                     model_stride);
-        remora_callers.push_back(caller);
+
+    auto devices = parse_cuda_device_string(device);
+    num_devices = devices.size();
+
+    for (auto device_string : devices) {
+        spdlog::info("devices {}", device_string);
+        for (const auto& remora_model : remora_model_list) {
+            auto caller = std::make_shared<RemoraCaller>(remora_model, device_string,
+                                                         remora_batch_size, model_stride);
+            remora_callers.push_back(caller);
+        }
     }
 
     WriterNode writer_node(std::move(args), emit_fastq, num_devices * 2);
@@ -104,9 +111,9 @@ void setup(std::vector<std::string> args,
     std::unique_ptr<BasecallerNode> basecaller_node;
 
     if (!remora_model_list.empty()) {
-        mod_base_caller_node.reset(new ModBaseCallerNode(writer_node, std::move(remora_callers),
-                                                         num_remora_threads, model_stride,
-                                                         remora_batch_size));
+        mod_base_caller_node = std::make_unique<ModBaseCallerNode>(
+                writer_node, std::move(remora_callers), num_remora_threads * num_devices,
+                model_stride, remora_batch_size);
         basecaller_node =
                 std::make_unique<BasecallerNode>(*mod_base_caller_node, std::move(runners),
                                                  batch_size, chunk_size, overlap, model_stride);
