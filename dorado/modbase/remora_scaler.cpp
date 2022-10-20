@@ -3,6 +3,8 @@
 #include "remora_utils.h"
 #include "utils/math_utils.h"
 
+#include <nvtx3/nvtx3.hpp>
+
 #include <algorithm>
 #include <iterator>
 
@@ -40,26 +42,28 @@ std::vector<float> RemoraScaler::extract_levels(const std::vector<int>& int_seq)
 std::pair<float, float> RemoraScaler::rescale(const torch::Tensor samples,
                                               const std::vector<uint64_t>& seq_to_sig_map,
                                               const std::vector<float>& levels,
-                                              size_t clip_bases) const {
+                                              size_t clip_bases,
+                                              size_t max_bases) const {
+    NVTX3_FUNC_RANGE();
+
     if (m_kmer_levels.empty()) {
         return {0.f, 1.f};
     }
 
-    // do calc and scaling
+    auto n = std::min({seq_to_sig_map.size() - 1, max_bases});
 
-    std::vector<float> optim_dacs;
-    std::vector<float> new_levels;
-    // get the mid-point of the base
-    std::transform(std::next(std::begin(seq_to_sig_map)), std::end(seq_to_sig_map),
-                   std::begin(seq_to_sig_map), std::back_inserter(optim_dacs),
-                   [&samples](auto first_pos, auto second_pos) {
-                       auto pos = (first_pos + second_pos) / 2;
-                       if (pos < samples.size(0)) {
-                           return samples[pos].item().toFloat();
-                       } else {
-                           return 0.f;
-                       }
-                   });
+    std::vector<float> optim_dacs(n, 0.f);
+    std::vector<float> new_levels(n, 0.f);
+
+    {
+        nvtx3::scoped_range loop{"midpoint"};
+
+        // get the mid-point of the base
+        for (size_t i = 0; i < n; i++) {
+            int pos = (seq_to_sig_map[i] + seq_to_sig_map[i + 1]) / 2;
+            optim_dacs[i] = samples[pos].item<float>();
+        }
+    }
 
     if (clip_bases > 0 && levels.size() > clip_bases * 2) {
         new_levels = {std::begin(levels) + clip_bases, std::end(levels) - clip_bases};
@@ -68,11 +72,19 @@ std::pair<float, float> RemoraScaler::rescale(const torch::Tensor samples,
         new_levels = levels;
     }
 
-    std::vector<float> quants(19);
-    std::generate(std::begin(quants), std::end(quants), [n = 0.f]() mutable { return n += 0.05f; });
-    new_levels = ::utils::quantiles(new_levels, quants);
-    optim_dacs = ::utils::quantiles(optim_dacs, quants);
+    {
+        nvtx3::scoped_range loop{"quatiles"};
+        std::vector<float> quants(19);
+        std::generate(std::begin(quants), std::end(quants),
+                      [n = 0.f]() mutable { return n += 0.05f; });
 
-    auto [new_scale, new_offset, rcoeff] = ::utils::linear_regression(optim_dacs, new_levels);
-    return {new_offset, new_scale};
+        new_levels = ::utils::quantiles(new_levels, quants);
+        optim_dacs = ::utils::quantiles(optim_dacs, quants);
+    }
+
+    {
+        nvtx3::scoped_range loop{"linear regression"};
+        auto [new_scale, new_offset, rcoeff] = ::utils::linear_regression(optim_dacs, new_levels);
+        return {new_offset, new_scale};
+    }
 }
