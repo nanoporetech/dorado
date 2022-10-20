@@ -798,4 +798,4 @@ std::vector<DecodedChunk> MetalModelRunner::call_chunks(int num_chunks) {
 }
 
 size_t MetalModelRunner::model_stride() const { return m_caller->m_model_stride; }
-size_t CudaModelRunner::chunk_size() const { return m_input.size(2); }
+size_t MetalModelRunner::chunk_size() const { return m_input.size(2); }
