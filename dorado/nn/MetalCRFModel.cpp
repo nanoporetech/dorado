@@ -780,6 +780,9 @@ MetalModelRunner::MetalModelRunner(std::shared_ptr<MetalCaller> caller,
                                    int chunk_size,
                                    int batch_size)
         : m_caller(caller) {
+    // adjust chunk size to be a multiple of the stride
+    chunk_size -= chunk_size % model_stride();
+
     m_input = torch::empty({batch_size, 1, chunk_size},
                            torch::TensorOptions().dtype(torch::kF32).device(torch::kCPU));
 }
@@ -795,3 +798,4 @@ std::vector<DecodedChunk> MetalModelRunner::call_chunks(int num_chunks) {
 }
 
 size_t MetalModelRunner::model_stride() const { return m_caller->m_model_stride; }
+size_t CudaModelRunner::chunk_size() const { return m_input.size(2); }

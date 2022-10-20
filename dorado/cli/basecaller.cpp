@@ -75,9 +75,22 @@ void setup(std::vector<std::string> args,
 
     // verify that all runners are using the same stride, in case we allow multiple models in future
     auto model_stride = runners.front()->model_stride();
-    assert(std::all_of(runners.begin(), runners.end(), [model_stride](auto runner) {
-        return runner->model_stride() == model_stride;
+    auto adjusted_chunk_size = runners.front()->chunk_size();
+    assert(std::all_of(runners.begin(), runners.end(), [&](auto runner) {
+        return runner->model_stride() == model_stride &&
+               runner->chunk_size() == adjusted_chunk_size;
     }));
+
+    if (chunk_size != adjusted_chunk_size) {
+        spdlog::info("Adjusted chunk size to match model stride: {} -> {}", chunk_size,
+                     adjusted_chunk_size);
+        chunk_size = adjusted_chunk_size;
+    }
+    auto adjusted_overlap = (overlap / model_stride) * model_stride;
+    if (overlap != adjusted_overlap) {
+        spdlog::info("Adjusted overlap to match model stride: {} -> {}", overlap, adjusted_overlap);
+        overlap = adjusted_overlap;
+    }
 
     if (!remora_models.empty() && emit_fastq) {
         throw std::runtime_error("Modified base models cannot be used with FASTQ output");
