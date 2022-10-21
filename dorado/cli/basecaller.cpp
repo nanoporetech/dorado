@@ -135,12 +135,13 @@ void setup(std::vector<std::string> args,
 
 int basecaller(int argc, char* argv[]) {
     InitLogging();
-
     argparse::ArgumentParser parser("dorado", DORADO_VERSION);
 
     parser.add_argument("model").help("the basecaller model to run.");
 
     parser.add_argument("data").help("the data directory.");
+
+    parser.add_argument("-v", "--verbose").default_value(false).implicit_value(true);
 
     parser.add_argument("-x", "--device")
             .help("device string in format \"cuda:0,...,N\", \"cuda:all\", \"metal\" etc..")
@@ -181,6 +182,10 @@ int basecaller(int argc, char* argv[]) {
     }
 
     std::vector<std::string> args(argv, argv + argc);
+
+    if (parser.get<bool>("--verbose")) {
+        spdlog::set_level(spdlog::level::debug);
+    }
 
     spdlog::info("> Creating basecall pipeline");
     try {

@@ -249,7 +249,7 @@ int get_mtl_device_core_count() {
     if (retrieve_ioreg_props("AGXAccelerator", "GPUConfigurationVariable", gpu_specs)) {
         if (auto gpu_cores_it = gpu_specs.find("num_cores"); gpu_cores_it != gpu_specs.cend()) {
             gpu_core_count = gpu_cores_it->second;
-            spdlog::info("Retrieved GPU core count of {} from IO Registry", gpu_core_count);
+            spdlog::debug("Retrieved GPU core count of {} from IO Registry", gpu_core_count);
             return gpu_core_count;
         }
     }
