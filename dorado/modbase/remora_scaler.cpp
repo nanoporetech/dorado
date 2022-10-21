@@ -71,6 +71,16 @@ std::pair<float, float> RemoraScaler::rescale(const torch::Tensor samples,
         optim_dacs = {std::begin(optim_dacs) + clip_bases, std::end(optim_dacs) - clip_bases};
     }
 
+    {
+        nvtx3::scoped_range loop{"quatiles"};
+        std::vector<float> quants(19);
+        std::generate(std::begin(quants), std::end(quants),
+                      [n = 0.f]() mutable { return n += 0.05f; });
+
+        new_levels = ::utils::quantiles(new_levels, quants);
+        optim_dacs = ::utils::quantiles(optim_dacs, quants);
+    }
+
     auto [new_scale, new_offset, rcoeff] = ::utils::linear_regression(optim_dacs, new_levels);
     return {new_offset, new_scale};
 }
