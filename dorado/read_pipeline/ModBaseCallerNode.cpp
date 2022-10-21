@@ -25,11 +25,14 @@ ModBaseCallerNode::ModBaseCallerNode(ReadSink& sink,
 
     m_output_worker = std::make_unique<std::thread>(&ModBaseCallerNode::output_worker_thread, this);
 
-    // Spin up the caller threads
     size_t num_model_callers = m_callers.size();
+
     for (size_t i = 0; i < num_model_callers; ++i) {
         m_chunk_queues.emplace_back();
         m_batched_chunks.emplace_back();
+    }
+
+    for (size_t i = 0; i < num_model_callers; i++) {
         std::unique_ptr<std::thread> t =
                 std::make_unique<std::thread>(&ModBaseCallerNode::caller_worker_thread, this, i);
         m_caller_workers.push_back(std::move(t));
