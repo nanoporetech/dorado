@@ -82,13 +82,14 @@ void setup(std::vector<std::string> args,
     }));
 
     if (chunk_size != adjusted_chunk_size) {
-        spdlog::info("Adjusted chunk size to match model stride: {} -> {}", chunk_size,
-                     adjusted_chunk_size);
+        spdlog::debug("Adjusted chunk size to match model stride: {} -> {}", chunk_size,
+                      adjusted_chunk_size);
         chunk_size = adjusted_chunk_size;
     }
     auto adjusted_overlap = (overlap / model_stride) * model_stride;
     if (overlap != adjusted_overlap) {
-        spdlog::info("Adjusted overlap to match model stride: {} -> {}", overlap, adjusted_overlap);
+        spdlog::debug("Adjusted overlap to match model stride: {} -> {}", overlap,
+                      adjusted_overlap);
         overlap = adjusted_overlap;
     }
 
