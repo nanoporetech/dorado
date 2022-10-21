@@ -106,7 +106,7 @@ void setup(std::vector<std::string> args,
     }
 #else
     for (const auto& remora_model : remora_model_list) {
-        auto caller = std::make_shared<RemoraCaller>(remora_model, device_string, remora_batch_size,
+        auto caller = std::make_shared<RemoraCaller>(remora_model, device, remora_batch_size,
                                                      model_stride);
         remora_callers.push_back(caller);
     }
