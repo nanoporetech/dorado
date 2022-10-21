@@ -264,7 +264,9 @@ RemoraCaller::RemoraCaller(const std::filesystem::path& model_path,
 #endif
     // no metal implementation yet, force to cpu
     m_options = torch::TensorOptions().dtype(dtype).device(device == "metal" ? "cpu" : device);
+#ifndef __APPLE__
     m_stream = c10::cuda::getStreamFromPool(false, m_options.device().index());
+#endif
     m_module = load_remora_model(model_path, m_options);
 
     auto config = toml::parse(model_path / "config.toml");
