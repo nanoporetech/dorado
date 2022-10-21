@@ -32,8 +32,8 @@ struct read {
 };
 
 struct read_pair {
-    read* temp;
-    read* comp;
+    std::string temp;
+    std::string comp;
 };
 
 void setup_duplex(std::vector<std::string> args,
@@ -175,7 +175,7 @@ int duplex(int argc, char* argv[]) {
     std::cerr << "Header:\n " <<  bamHdr->text  << std::endl;
 
     auto a = sam_read1(fp_in,bamHdr,aln);
-    std::vector<read> reads;
+    std::map<std::string, read> reads;
    while(sam_read1(fp_in,bamHdr,aln) >= 0) {
        //int32_t pos = aln->core.pos +1; //left most position of alignment in zero based coordianate (+1)
        //char *chr = bamHdr->target_name[aln->core.tid] ; //contig name (chromosome)
@@ -194,7 +194,7 @@ int duplex(int argc, char* argv[]) {
            qualities[i] = q[i];
            nucleotides[i] = seq_nt16_str[bam_seqi(s, i)];
        }
-       reads.push_back({read_id, nucleotides, qualities});
+       reads[read_id] = {read_id, nucleotides, qualities};
    }
         std::cerr << std::endl;
     std::cerr << "Exit While" << std::endl;
@@ -211,30 +211,72 @@ int duplex(int argc, char* argv[]) {
     dataFile.open (pairs_file);
 
     std::vector<std::string>   resultr;
-    //std::string                line;
-    //std::getline(dataFile,line);
-
-    //std::stringstream          lineStream(line);
 
     std::string                cell;
     int line = 0;
+
+    std::map<std::string, std::string > t_c_map;
+    std::map<std::string, std::string > c_t_map;
 
     std::getline(dataFile,cell);
     while(!dataFile.eof())
     {
         char delim = ' ';
         auto delim_pos = cell.find(delim);
-        resultr.push_back(cell.substr(0, delim_pos));
-        resultr.push_back(cell.substr(delim_pos, delim_pos * 2 -1));
+
+        std::string t = cell.substr(0, delim_pos);
+        std::string c = cell.substr(delim_pos, delim_pos * 2 -1);
+        t_c_map[t] = c;
+        c_t_map[c] = t;
+
         line++;
         std::getline(dataFile,cell);
     }
 
-    EdlibAlignResult result = edlibAlign("hello", 5, "world!", 6, edlibDefaultAlignConfig());
-    if (result.status == EDLIB_STATUS_OK) {
-        printf("edit_distance('hello', 'world!') = %d\n", result.editDistance);
+    // Let's now perform alignmnet on all pairs:
+    EdlibAlignConfig align_config = edlibDefaultAlignConfig();
+    align_config.task = EDLIB_TASK_PATH;
+
+    for(auto key: reads){
+        std::cerr << key.first << std::endl;
     }
-    edlibFreeAlignResult(result);
+
+    for(auto key: t_c_map){
+        std::string temp = key.first;
+        std::string comp = key.second;
+
+        std::vector<char> temp_str;
+        std::vector<char> comp_str;
+
+        std::cerr << "Looking for: " << temp << std::endl;
+        if (reads.find(temp) == reads.end()) {
+        } else {
+            temp_str = reads.at(temp).sequence;
+            std::cerr << "found one!" << std::endl;
+        }
+
+       // auto comp_str = reads.at(comp).sequence;
+
+
+        EdlibAlignResult result = edlibAlign(temp_str.data(), temp_str.size(), comp_str.data(), comp_str.size(), align_config);
+        edlibFreeAlignResult(result);
+    }
+
+
+
+
+/*
+    std::cerr<< result.alignmentLength <<std::endl;
+    std::cerr<< *result.startLocations <<std::endl;
+    std::cerr<< *result.endLocations <<std::endl;
+
+    for (size_t i=0; i<result.alignmentLength; i++) {
+        std::cerr << int(result.alignment[i]) << std::endl;
+    }
+*/
+
+
+
 
 
 
