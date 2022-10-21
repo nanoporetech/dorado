@@ -93,6 +93,7 @@ void setup(std::vector<std::string> args,
     // generate model callers before nodes or it affects the speed calculations
     std::vector<std::shared_ptr<RemoraCaller>> remora_callers;
 
+#ifdef __APPLE__
     auto devices = parse_cuda_device_string(device);
     num_devices = devices.size();
 
@@ -103,6 +104,13 @@ void setup(std::vector<std::string> args,
             remora_callers.push_back(caller);
         }
     }
+#else
+    for (const auto& remora_model : remora_model_list) {
+        auto caller = std::make_shared<RemoraCaller>(remora_model, device_string, remora_batch_size,
+                                                     model_stride);
+        remora_callers.push_back(caller);
+    }
+#endif  // __APPLE__
 
     WriterNode writer_node(std::move(args), emit_fastq, num_devices * 2);
 
