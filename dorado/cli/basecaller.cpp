@@ -97,7 +97,6 @@ void setup(std::vector<std::string> args,
     num_devices = devices.size();
 
     for (auto device_string : devices) {
-        spdlog::info("devices {}", device_string);
         for (const auto& remora_model : remora_model_list) {
             auto caller = std::make_shared<RemoraCaller>(remora_model, device_string,
                                                          remora_batch_size, model_stride);
