@@ -93,7 +93,7 @@ void setup(std::vector<std::string> args,
     // generate model callers before nodes or it affects the speed calculations
     std::vector<std::shared_ptr<RemoraCaller>> remora_callers;
 
-#ifdef __APPLE__
+#ifndef __APPLE__
     auto devices = parse_cuda_device_string(device);
     num_devices = devices.size();
 
