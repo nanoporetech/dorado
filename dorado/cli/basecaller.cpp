@@ -163,11 +163,11 @@ int basecaller(int argc, char* argv[]) {
 
     parser.add_argument("--emit-fastq").default_value(false).implicit_value(true);
 
-    parser.add_argument("--remora-batchsize").default_value(1000).scan<'i', int>();
+    parser.add_argument("--remora-batchsize").default_value(1024).scan<'i', int>();
 
-    parser.add_argument("--remora-threads").default_value(1).scan<'i', int>();
+    parser.add_argument("--remora-threads").default_value(2).scan<'i', int>();
 
-    parser.add_argument("--remora_models")
+    parser.add_argument("--remora-models")
             .default_value(std::string())
             .help("a comma separated list of remora models");
 
@@ -185,7 +185,7 @@ int basecaller(int argc, char* argv[]) {
     spdlog::info("> Creating basecall pipeline");
     try {
         setup(args, parser.get<std::string>("model"), parser.get<std::string>("data"),
-              parser.get<std::string>("--remora_models"), parser.get<std::string>("-x"),
+              parser.get<std::string>("--remora-models"), parser.get<std::string>("-x"),
               parser.get<int>("-c"), parser.get<int>("-o"), parser.get<int>("-b"),
               parser.get<int>("-r"), parser.get<int>("--remora-batchsize"),
               parser.get<int>("--remora-threads"), parser.get<bool>("--emit-fastq"));
