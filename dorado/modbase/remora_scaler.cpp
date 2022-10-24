@@ -72,7 +72,7 @@ std::pair<float, float> RemoraScaler::rescale(const torch::Tensor samples,
     }
 
     {
-        nvtx3::scoped_range loop{"quatiles"};
+        nvtx3::scoped_range loop{"quantiles"};
         std::vector<float> quants(19);
         std::generate(std::begin(quants), std::end(quants),
                       [n = 0.f]() mutable { return n += 0.05f; });
