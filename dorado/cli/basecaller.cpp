@@ -119,7 +119,7 @@ void setup(std::vector<std::string> args,
 
     if (!remora_model_list.empty()) {
         mod_base_caller_node = std::make_unique<ModBaseCallerNode>(
-                writer_node, std::move(remora_callers), num_remora_threads * num_devices,
+                writer_node, std::move(remora_callers), num_remora_threads, num_devices,
                 model_stride, remora_batch_size);
         basecaller_node =
                 std::make_unique<BasecallerNode>(*mod_base_caller_node, std::move(runners),
