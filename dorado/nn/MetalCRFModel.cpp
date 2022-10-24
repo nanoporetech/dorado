@@ -645,8 +645,8 @@ public:
                 // since the same buffers are used for successive batches' scores, fwd/bwd scans.
                 MTL::SharedEvent *const linear_hold_off =
                         (task->run_id != 0) ? m_mtl_event : nullptr;
-                MTL::CommandBuffer *const cb = m_model->forward_async(*task->input, linear_hold_off,
-                                                                      task->run_id - 1, m_scores_int8);
+                MTL::CommandBuffer *const cb = m_model->forward_async(
+                        *task->input, linear_hold_off, task->run_id - 1, m_scores_int8);
 
                 // The same buffer is used for the forward scan results and the output of
                 // m_add_softmax_cps.
@@ -659,20 +659,19 @@ public:
                 scan_args_[3] = -1;
                 auto args_bwd = create_vec_buffer(m_device, scan_args_);
 
-
                 for (int i = 0; i < m_out_split; ++i) {
                     // TODO: optimise grid size
                     launch_kernel_no_wait(
                             m_scan_cps, cb,
                             {args_fwd, mtl_for_tensor(m_scores_int8.at(i)),
-                                mtl_for_tensor(fwd.at(i)),
-                             mtl_for_tensor(m_scan_idx[0][0]), mtl_for_tensor(m_scan_idx[0][1])},
+                             mtl_for_tensor(fwd.at(i)), mtl_for_tensor(m_scan_idx[0][0]),
+                             mtl_for_tensor(m_scan_idx[0][1])},
                             {}, m_out_batch_size, m_states);
                     launch_kernel_no_wait(
                             m_scan_cps, cb,
                             {args_bwd, mtl_for_tensor(m_scores_int8.at(i)),
-                                mtl_for_tensor(m_bwd.at(i)),
-                             mtl_for_tensor(m_scan_idx[1][0]), mtl_for_tensor(m_scan_idx[1][1])},
+                             mtl_for_tensor(m_bwd.at(i)), mtl_for_tensor(m_scan_idx[1][0]),
+                             mtl_for_tensor(m_scan_idx[1][1])},
                             {}, m_out_batch_size, m_states);
 
                     launch_kernel_no_wait(
@@ -691,7 +690,7 @@ public:
                 spdlog::warn("Metal command buffer execution failed: {}, try #{}", status,
                              try_count);
                 if (status == MTL::CommandBufferStatusError) {
-                    const auto* const error_ptr = cb->error();
+                    const auto *const error_ptr = cb->error();
                     if (error_ptr)
                         spdlog::warn("Command buffer error code: {}", error_ptr->code());
                 }
@@ -739,9 +738,7 @@ public:
                     m_decoder_options.q_shift, m_decoder_options.q_scale,
                     m_decoder_options.temperature);
 
-            (*task->out_chunks)[chunk_idx] = DecodedChunk{
-                    sequence, qstring, moves
-            };
+            (*task->out_chunks)[chunk_idx] = DecodedChunk{sequence, qstring, moves};
 
             // Wake the waiting thread which called `call_chunks()` if we're done decoding
             std::unique_lock<std::mutex> task_lock(task->mut);

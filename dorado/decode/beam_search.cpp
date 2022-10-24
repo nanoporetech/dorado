@@ -3,6 +3,7 @@
 #include "fast_hash.h"
 
 #include <math.h>
+#include <spdlog/spdlog.h>
 #include <torch/torch.h>
 
 #include <algorithm>
@@ -10,8 +11,6 @@
 #include <iostream>
 #include <limits>
 #include <numeric>
-
-#include <spdlog/spdlog.h>
 
 namespace {
 
@@ -189,7 +188,9 @@ float beam_search(const T* const scores,
     for (size_t block_idx = 0; block_idx < num_blocks; block_idx++) {
         const T* const block_scores = scores + (block_idx * scores_block_stride);
         // Retrieves the given score as a float, multiplied by score_scale.
-        const auto fetch_block_score = [block_scores, score_scale](size_t idx) { return static_cast<float>(block_scores[idx]) * score_scale; };
+        const auto fetch_block_score = [block_scores, score_scale](size_t idx) {
+            return static_cast<float>(block_scores[idx]) * score_scale;
+        };
         const float* const block_back_scores = back_guide + ((block_idx + 1) * num_states);
 #ifdef REMOVE_FIXED_BEAM_STAYS
         /*  kmer transitions order:
@@ -249,8 +250,7 @@ float beam_search(const T* const scores,
                         state_t((previous_element.state * num_bases) % num_states + new_base);
                 const state_t move_idx = generate_move_index(previous_element.state, new_state,
                                                              num_bases, num_states);
-                float new_score = previous_element.score +
-                                  fetch_block_score(move_idx) +
+                float new_score = previous_element.score + fetch_block_score(move_idx) +
                                   static_cast<float>(block_back_scores[new_state]);
                 uint64_t new_hash = chainfasthash64(previous_element.hash, new_state);
 
@@ -455,7 +455,7 @@ float beam_search(const T* const scores,
             block_prob += float(timestep_posts[r_shift_idx + shift_base]);
         }
         block_prob = std::clamp(block_prob, 0.0f, 1.0f);
-        block_prob = powf(block_prob, 0.4f);                      // Power fudge factor
+        block_prob = powf(block_prob, 0.4f);  // Power fudge factor
 
         // Calculate a placeholder qscore for the "wrong" bases
         float wrong_base_prob = (1.0f - block_prob) / 3.0f;
@@ -501,26 +501,26 @@ std::tuple<std::string, std::string, std::vector<uint8_t>> beam_search_decode(
     auto scores_block_contig = (scores_t.stride(1) == 1) ? scores_t : scores_t.contiguous();
     const size_t scores_block_stride = scores_block_contig.stride(0);
     if (scores_t.dtype() == torch::kFloat32) {
-            const auto scores = scores_block_contig.data_ptr<float>();
-            const auto back_guides = back_guides_contig->data_ptr<float>();
-            const auto posts = posts_contig->data_ptr<float>();
+        const auto scores = scores_block_contig.data_ptr<float>();
+        const auto back_guides = back_guides_contig->data_ptr<float>();
+        const auto posts = posts_contig->data_ptr<float>();
 
-            beam_search<float>(scores, scores_block_stride, back_guides, posts, num_states, num_blocks,
-                               beam_width, beam_cut, fixed_stay_score, states, moves, qual_data,
-                               temperature, 1.0f);
+        beam_search<float>(scores, scores_block_stride, back_guides, posts, num_states, num_blocks,
+                           beam_width, beam_cut, fixed_stay_score, states, moves, qual_data,
+                           temperature, 1.0f);
     } else if (scores_t.dtype() == torch::kInt8) {
-            const auto scores = scores_block_contig.data_ptr<int8_t>();
-            const auto back_guides = back_guides_contig->data_ptr<float>();
-            const auto posts = posts_contig->data_ptr<float>();
+        const auto scores = scores_block_contig.data_ptr<int8_t>();
+        const auto back_guides = back_guides_contig->data_ptr<float>();
+        const auto posts = posts_contig->data_ptr<float>();
 
-            // Scores must be rescaled from [-127, 127] to [-5.0, 5.0].
-            const auto kScoreScale = static_cast<float>(5.0 / 127.0);
-            beam_search<int8_t>(scores, scores_block_stride, back_guides, posts, num_states, num_blocks,
-                                beam_width, beam_cut, fixed_stay_score, states, moves, qual_data,
-                                temperature, kScoreScale);
+        // Scores must be rescaled from [-127, 127] to [-5.0, 5.0].
+        const auto kScoreScale = static_cast<float>(5.0 / 127.0);
+        beam_search<int8_t>(scores, scores_block_stride, back_guides, posts, num_states, num_blocks,
+                            beam_width, beam_cut, fixed_stay_score, states, moves, qual_data,
+                            temperature, kScoreScale);
     } else {
-       throw std::runtime_error(std::string("beam_search_decode: unsupported tensor type ") +
-                                std::string(scores_t.dtype().name()));
+        throw std::runtime_error(std::string("beam_search_decode: unsupported tensor type ") +
+                                 std::string(scores_t.dtype().name()));
     }
 
     std::tie(sequence, qstring) = generate_sequence(moves, states, qual_data, q_shift, q_scale);
