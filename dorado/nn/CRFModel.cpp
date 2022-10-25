@@ -457,10 +457,10 @@ struct LSTMStackImpl : Module {
     LSTMStackImpl(int size, int batchsize, int chunksize) {
         // torch::nn::LSTM expects/produces [N, T, C] with batch_first == true
         rnn1 = register_module("rnn1", LSTM(LSTMOptions(size, size).batch_first(true)));
-        rnn2 = register_module("rnn2", LSTM(LSTMOptions(size, size).batch_first(true))));
-        rnn3 = register_module("rnn3", LSTM(LSTMOptions(size, size).batch_first(true))));
-        rnn4 = register_module("rnn4", LSTM(LSTMOptions(size, size).batch_first(true))));
-        rnn5 = register_module("rnn5", LSTM(LSTMOptions(size, size).batch_first(true))));
+        rnn2 = register_module("rnn2", LSTM(LSTMOptions(size, size).batch_first(true)));
+        rnn3 = register_module("rnn3", LSTM(LSTMOptions(size, size).batch_first(true)));
+        rnn4 = register_module("rnn4", LSTM(LSTMOptions(size, size).batch_first(true)));
+        rnn5 = register_module("rnn5", LSTM(LSTMOptions(size, size).batch_first(true)));
     };
 
     torch::Tensor forward(torch::Tensor x) {
