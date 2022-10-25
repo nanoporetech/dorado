@@ -20,6 +20,8 @@ int download(int argc, char* argv[]) {
 
     argparse::ArgumentParser parser("dorado", DORADO_VERSION);
 
+    parser.add_argument("-v", "--verbose").default_value(false).implicit_value(true);
+
     parser.add_argument("--model").default_value(std::string("all")).help("the model to download");
 
     parser.add_argument("--directory")
@@ -36,6 +38,10 @@ int download(int argc, char* argv[]) {
         parser_stream << parser;
         spdlog::error("{}\n{}", e.what(), parser_stream.str());
         std::exit(1);
+    }
+
+    if (parser.get<bool>("--verbose")) {
+        spdlog::set_level(spdlog::level::debug);
     }
 
     auto list = parser.get<bool>("--list");
