@@ -3,8 +3,6 @@
 #include "remora_utils.h"
 #include "utils/math_utils.h"
 
-#include <nvtx3/nvtx3.hpp>
-
 #include <algorithm>
 #include <iterator>
 
@@ -44,8 +42,6 @@ std::pair<float, float> RemoraScaler::rescale(const torch::Tensor samples,
                                               const std::vector<float>& levels,
                                               size_t clip_bases,
                                               size_t max_bases) const {
-    NVTX3_FUNC_RANGE();
-
     if (m_kmer_levels.empty()) {
         return {0.f, 1.f};
     }
@@ -55,15 +51,11 @@ std::pair<float, float> RemoraScaler::rescale(const torch::Tensor samples,
     std::vector<float> optim_dacs(n, 0.f);
     std::vector<float> new_levels(n, 0.f);
 
-    {
-        nvtx3::scoped_range loop{"midpoint"};
-
-        // get the mid-point of the base
-        for (size_t i = 0; i < n; i++) {
-            int pos = (seq_to_sig_map[i] + seq_to_sig_map[i + 1]) / 2;
-            optim_dacs[i] = samples[pos].item<float>();
-            new_levels[i] = levels[i];
-        }
+    // get the mid-point of the base
+    for (size_t i = 0; i < n; i++) {
+        int pos = (seq_to_sig_map[i] + seq_to_sig_map[i + 1]) / 2;
+        optim_dacs[i] = samples[pos].item<float>();
+        new_levels[i] = levels[i];
     }
 
     if (clip_bases > 0 && levels.size() > clip_bases * 2) {
@@ -71,15 +63,11 @@ std::pair<float, float> RemoraScaler::rescale(const torch::Tensor samples,
         optim_dacs = {std::begin(optim_dacs) + clip_bases, std::end(optim_dacs) - clip_bases};
     }
 
-    {
-        nvtx3::scoped_range loop{"quantiles"};
-        std::vector<float> quants(19);
-        std::generate(std::begin(quants), std::end(quants),
-                      [n = 0.f]() mutable { return n += 0.05f; });
+    std::vector<float> quants(19);
+    std::generate(std::begin(quants), std::end(quants), [n = 0.f]() mutable { return n += 0.05f; });
 
-        new_levels = ::utils::quantiles(new_levels, quants);
-        optim_dacs = ::utils::quantiles(optim_dacs, quants);
-    }
+    new_levels = ::utils::quantiles(new_levels, quants);
+    optim_dacs = ::utils::quantiles(optim_dacs, quants);
 
     auto [new_scale, new_offset, rcoeff] = ::utils::linear_regression(optim_dacs, new_levels);
     return {new_offset, new_scale};
