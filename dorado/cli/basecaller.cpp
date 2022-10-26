@@ -35,7 +35,8 @@ void setup(std::vector<std::string> args,
            size_t num_runners,
            size_t remora_batch_size,
            size_t num_remora_threads,
-           bool emit_fastq) {
+           bool emit_fastq,
+           bool emit_moves) {
     torch::set_num_threads(1);
     std::vector<Runner> runners;
 
@@ -126,7 +127,7 @@ void setup(std::vector<std::string> args,
     }
 #endif  // __APPLE__
 
-    WriterNode writer_node(std::move(args), emit_fastq, num_devices * 2);
+    WriterNode writer_node(std::move(args), emit_fastq, emit_moves, num_devices * 2);
 
     std::unique_ptr<ModBaseCallerNode> mod_base_caller_node;
     std::unique_ptr<BasecallerNode> basecaller_node;
@@ -178,6 +179,8 @@ int basecaller(int argc, char* argv[]) {
 
     parser.add_argument("--emit-fastq").default_value(false).implicit_value(true);
 
+    parser.add_argument("--emit-moves").default_value(false).implicit_value(true);
+
     parser.add_argument("--remora-batchsize").default_value(1024).scan<'i', int>();
 
     parser.add_argument("--remora-threads").default_value(2).scan<'i', int>();
@@ -207,7 +210,8 @@ int basecaller(int argc, char* argv[]) {
               parser.get<std::string>("--remora-models"), parser.get<std::string>("-x"),
               parser.get<int>("-c"), parser.get<int>("-o"), parser.get<int>("-b"),
               parser.get<int>("-r"), parser.get<int>("--remora-batchsize"),
-              parser.get<int>("--remora-threads"), parser.get<bool>("--emit-fastq"));
+              parser.get<int>("--remora-threads"), parser.get<bool>("--emit-fastq"),
+              parser.get<bool>("--emit-moves"));
     } catch (const std::exception& e) {
         spdlog::error("{}", e.what());
         return 1;

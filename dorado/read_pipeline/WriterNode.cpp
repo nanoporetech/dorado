@@ -78,11 +78,13 @@ void WriterNode::worker_thread() {
 
 WriterNode::WriterNode(std::vector<std::string> args,
                        bool emit_fastq,
+                       bool emit_moves,
                        size_t num_worker_threads,
                        size_t max_reads)
         : ReadSink(max_reads),
           m_args(std::move(args)),
           m_emit_fastq(emit_fastq),
+          m_emit_moves(emit_moves),
           m_num_samples_processed(0),
           m_num_reads_processed(0),
           m_initialization_time(std::chrono::system_clock::now()) {
