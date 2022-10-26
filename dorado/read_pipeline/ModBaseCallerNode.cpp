@@ -10,7 +10,7 @@
 #include <chrono>
 using namespace std::chrono_literals;
 
-namespace { 
+namespace {
 constexpr auto FORCE_TIMEOUT = 100ms;
 }
 
@@ -245,7 +245,8 @@ void ModBaseCallerNode::caller_worker_thread(size_t caller_id) {
                 chunks_lock.unlock();
 
                 auto current_time = std::chrono::system_clock::now();
-                auto delta = std::chrono::duration_cast<std::chrono::milliseconds>(current_time - last_chunk_reserve_time);
+                auto delta = std::chrono::duration_cast<std::chrono::milliseconds>(
+                        current_time - last_chunk_reserve_time);
                 if (delta > FORCE_TIMEOUT && !batched_chunks.empty()) {
                     call_current_batch(caller_id);
                 } else {

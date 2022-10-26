@@ -12,7 +12,7 @@
 using namespace std::chrono_literals;
 using namespace torch::indexing;
 
-namespace { 
+namespace {
 constexpr auto FORCE_TIMEOUT = 100ms;
 }
 
@@ -134,7 +134,6 @@ void BasecallerNode::working_reads_manager() {
 }
 
 void BasecallerNode::basecall_worker_thread(int worker_id) {
-
     auto last_chunk_reserve_time = std::chrono::system_clock::now();
     while (true) {
         std::unique_lock<std::mutex> chunks_lock(m_chunks_in_mutex);
@@ -164,7 +163,8 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
                 chunks_lock.unlock();
 
                 auto current_time = std::chrono::system_clock::now();
-                auto delta = std::chrono::duration_cast<std::chrono::milliseconds>(current_time - last_chunk_reserve_time);
+                auto delta = std::chrono::duration_cast<std::chrono::milliseconds>(
+                        current_time - last_chunk_reserve_time);
                 if (delta > FORCE_TIMEOUT && !m_batched_chunks[worker_id].empty()) {
                     basecall_current_batch(worker_id);
                 } else {
