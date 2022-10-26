@@ -106,11 +106,25 @@ void setup(std::vector<std::string> args,
 
     // generate model callers before nodes or it affects the speed calculations
     std::vector<std::shared_ptr<RemoraCaller>> remora_callers;
+
+#ifndef __APPLE__
+    auto devices = parse_cuda_device_string(device);
+    num_devices = devices.size();
+
+    for (auto device_string : devices) {
+        for (const auto& remora_model : remora_model_list) {
+            auto caller = std::make_shared<RemoraCaller>(remora_model, device_string,
+                                                         remora_batch_size, model_stride);
+            remora_callers.push_back(caller);
+        }
+    }
+#else
     for (const auto& remora_model : remora_model_list) {
         auto caller = std::make_shared<RemoraCaller>(remora_model, device, remora_batch_size,
                                                      model_stride);
         remora_callers.push_back(caller);
     }
+#endif  // __APPLE__
 
     WriterNode writer_node(std::move(args), emit_fastq, num_devices * 2);
 
@@ -118,9 +132,9 @@ void setup(std::vector<std::string> args,
     std::unique_ptr<BasecallerNode> basecaller_node;
 
     if (!remora_model_list.empty()) {
-        mod_base_caller_node.reset(new ModBaseCallerNode(writer_node, std::move(remora_callers),
-                                                         num_remora_threads, model_stride,
-                                                         remora_batch_size));
+        mod_base_caller_node = std::make_unique<ModBaseCallerNode>(
+                writer_node, std::move(remora_callers), num_remora_threads, num_devices,
+                model_stride, remora_batch_size);
         basecaller_node =
                 std::make_unique<BasecallerNode>(*mod_base_caller_node, std::move(runners),
                                                  batch_size, chunk_size, overlap, model_stride);
@@ -164,11 +178,11 @@ int basecaller(int argc, char* argv[]) {
 
     parser.add_argument("--emit-fastq").default_value(false).implicit_value(true);
 
-    parser.add_argument("--remora-batchsize").default_value(1000).scan<'i', int>();
+    parser.add_argument("--remora-batchsize").default_value(1024).scan<'i', int>();
 
-    parser.add_argument("--remora-threads").default_value(1).scan<'i', int>();
+    parser.add_argument("--remora-threads").default_value(2).scan<'i', int>();
 
-    parser.add_argument("--remora_models")
+    parser.add_argument("--remora-models")
             .default_value(std::string())
             .help("a comma separated list of remora models");
 
@@ -190,7 +204,7 @@ int basecaller(int argc, char* argv[]) {
     spdlog::info("> Creating basecall pipeline");
     try {
         setup(args, parser.get<std::string>("model"), parser.get<std::string>("data"),
-              parser.get<std::string>("--remora_models"), parser.get<std::string>("-x"),
+              parser.get<std::string>("--remora-models"), parser.get<std::string>("-x"),
               parser.get<int>("-c"), parser.get<int>("-o"), parser.get<int>("-b"),
               parser.get<int>("-r"), parser.get<int>("--remora-batchsize"),
               parser.get<int>("--remora-threads"), parser.get<bool>("--emit-fastq"));
