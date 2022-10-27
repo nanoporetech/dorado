@@ -8,22 +8,22 @@
 #include "nn/CudaCRFModel.h"
 #include "utils/cuda_utils.h"
 #endif
+#include "3rdparty/edlib/edlib/include/edlib.h"
+#include "htslib/sam.h"
 #include "nn/ModelRunner.h"
 #include "nn/RemoraModel.h"
 #include "read_pipeline/BasecallerNode.h"
 #include "read_pipeline/ModBaseCallerNode.h"
 #include "read_pipeline/ScalerNode.h"
 #include "read_pipeline/WriterNode.h"
-#include "htslib/sam.h"
+
 #include <argparse.hpp>
 
 #include <filesystem>
-#include <iostream>
 #include <fstream>
+#include <iostream>
 #include <sstream>
 #include <thread>
-#include "3rdparty/edlib/edlib/include/edlib.h"
-
 
 struct read {
     std::string read_id;
@@ -37,17 +37,17 @@ struct read_pair {
 };
 
 void setup_duplex(std::vector<std::string> args,
-           const std::filesystem::path& model_path,
-           const std::string& data_path,
-           const std::string& remora_models,
-           const std::string& device,
-           size_t chunk_size,
-           size_t overlap,
-           size_t batch_size,
-           size_t num_runners,
-           size_t remora_batch_size,
-           size_t num_remora_threads,
-           bool emit_fastq) {
+                  const std::filesystem::path& model_path,
+                  const std::string& data_path,
+                  const std::string& remora_models,
+                  const std::string& device,
+                  size_t chunk_size,
+                  size_t overlap,
+                  size_t batch_size,
+                  size_t num_runners,
+                  size_t remora_batch_size,
+                  size_t num_remora_threads,
+                  bool emit_fastq) {
     torch::set_num_threads(1);
     std::vector<Runner> runners;
 
@@ -169,103 +169,112 @@ int duplex(int argc, char* argv[]) {
 
     std::cerr << "Loading BAM" << std::endl;
 
-    samFile *fp_in = hts_open("/home/OXFORDNANOLABS/mvella/calls.bam","r"); //open bam file
-    bam_hdr_t *bamHdr = sam_hdr_read(fp_in); //read header
-    bam1_t *aln = bam_init1(); //initialize an alignment
-    std::cerr << "Header:\n " <<  bamHdr->text  << std::endl;
+    samFile* fp_in = hts_open(
+            "/media/groups/machine_learning/active/mvella/duplex_data/kit14_260bps_duplex_test_set/"
+            "calls.bam",
+            "r");                             //open bam file
+    bam_hdr_t* bamHdr = sam_hdr_read(fp_in);  //read header
+    bam1_t* aln = bam_init1();                //initialize an alignment
+    std::cerr << "Header:\n " << bamHdr->text << std::endl;
 
-    auto a = sam_read1(fp_in,bamHdr,aln);
+    auto a = sam_read1(fp_in, bamHdr, aln);
     std::map<std::string, read> reads;
-   while(sam_read1(fp_in,bamHdr,aln) >= 0) {
-       //int32_t pos = aln->core.pos +1; //left most position of alignment in zero based coordianate (+1)
-       //char *chr = bamHdr->target_name[aln->core.tid] ; //contig name (chromosome)
-       uint32_t len = aln->core.l_qseq;  //length of the read.
+    while (sam_read1(fp_in, bamHdr, aln) >= 0) {
+        //int32_t pos = aln->core.pos +1; //left most position of alignment in zero based coordianate (+1)
+        //char *chr = bamHdr->target_name[aln->core.tid] ; //contig name (chromosome)
+        uint32_t len = aln->core.l_qseq;  //length of the read.
 
-       std::string read_id = bam_get_qname(aln);
+        std::string read_id = bam_get_qname(aln);
 
-       uint8_t* q = bam_get_qual(aln);  //quality string
-       uint8_t* s = bam_get_seq(aln);  //sequence string
+        uint8_t* q = bam_get_qual(aln);  //quality string
+        uint8_t* s = bam_get_seq(aln);   //sequence string
 
-       std::vector<uint8_t> qualities(len);
-       std::vector<char> nucleotides(len);
+        std::vector<uint8_t> qualities(len);
+        std::vector<char> nucleotides(len);
 
-       // Todo - there is a better way to do this.
-       for (int i = 0; i < len; i++) {
-           qualities[i] = q[i];
-           nucleotides[i] = seq_nt16_str[bam_seqi(s, i)];
-       }
-       reads[read_id] = {read_id, nucleotides, qualities};
-   }
-        std::cerr << std::endl;
+        // Todo - there is a better way to do this.
+        for (int i = 0; i < len; i++) {
+            qualities[i] = q[i];
+            nucleotides[i] = seq_nt16_str[bam_seqi(s, i)];
+        }
+        reads[read_id] = {read_id, nucleotides, qualities};
+    }
+    std::cerr << std::endl;
     std::cerr << "Exit While" << std::endl;
 
     bam_destroy1(aln);
     sam_close(fp_in);
     std::cerr << "Closing BAM - DONE" << std::endl;
 
-   // Let's also load a pairs.txt
+    // Let's also load a pairs.txt
 
-    std::string pairs_file = "/media/groups/machine_learning/active/klawrence/stereo_duplex_investigation/duplex_realdata/data/human_kit14_260bps/pair_id_files/20220411_1706_3C_PAM62277_dfe6b6d7/pair_ids_filtered.txt";
+    std::string pairs_file =
+            "/media/groups/machine_learning/active/mvella/duplex_data/kit14_260bps_duplex_test_set/"
+            "pair_ids_filtered.txt";
 
     std::ifstream dataFile;
-    dataFile.open (pairs_file);
+    dataFile.open(pairs_file);
 
-    std::vector<std::string>   resultr;
+    std::vector<std::string> resultr;
 
-    std::string                cell;
+    std::string cell;
     int line = 0;
 
-    std::map<std::string, std::string > t_c_map;
-    std::map<std::string, std::string > c_t_map;
+    std::map<std::string, std::string> t_c_map;
+    std::map<std::string, std::string> c_t_map;
 
-    std::getline(dataFile,cell);
-    while(!dataFile.eof())
-    {
+    std::getline(dataFile, cell);
+    while (!dataFile.eof()) {
         char delim = ' ';
         auto delim_pos = cell.find(delim);
 
         std::string t = cell.substr(0, delim_pos);
-        std::string c = cell.substr(delim_pos, delim_pos * 2 -1);
+        std::string c = cell.substr(delim_pos + 1, delim_pos * 2 - 1);
         t_c_map[t] = c;
         c_t_map[c] = t;
 
         line++;
-        std::getline(dataFile,cell);
+        std::getline(dataFile, cell);
     }
 
     // Let's now perform alignmnet on all pairs:
     EdlibAlignConfig align_config = edlibDefaultAlignConfig();
     align_config.task = EDLIB_TASK_PATH;
 
-    for(auto key: reads){
-        std::cerr << key.first << std::endl;
-    }
-
-    for(auto key: t_c_map){
-        std::string temp = key.first;
-        std::string comp = key.second;
+    int i = 0;
+    for (auto key : t_c_map) {
+        std::string temp_id = key.first;
+        std::string comp_id = key.second;
 
         std::vector<char> temp_str;
         std::vector<char> comp_str;
 
-        std::cerr << "Looking for: " << temp << std::endl;
-        if (reads.find(temp) == reads.end()) {
+        if (reads.find(temp_id) == reads.end()) {
         } else {
-            temp_str = reads.at(temp).sequence;
+            temp_str = reads.at(temp_id).sequence;
             std::cerr << "found one!" << std::endl;
         }
 
-       // auto comp_str = reads.at(comp).sequence;
+        if (reads.find(comp_id) == reads.end()) {
+            std::cerr << "missing complement" << std::endl;
+        } else {
+            comp_str = reads.at(comp_id).sequence;
+            EdlibAlignResult result = edlibAlign(temp_str.data(), temp_str.size(), temp_str.data(),
+                                                 temp_str.size(), align_config);
 
+            edlibFreeAlignResult(result);
+        }
 
-        EdlibAlignResult result = edlibAlign(temp_str.data(), temp_str.size(), comp_str.data(), comp_str.size(), align_config);
-        edlibFreeAlignResult(result);
+        if (i > 10000) {
+            break;
+        }
+
+        i++;
+
+        std::cerr << i << std::endl;
     }
 
-
-
-
-/*
+    /*
     std::cerr<< result.alignmentLength <<std::endl;
     std::cerr<< *result.startLocations <<std::endl;
     std::cerr<< *result.endLocations <<std::endl;
@@ -274,12 +283,6 @@ int duplex(int argc, char* argv[]) {
         std::cerr << int(result.alignment[i]) << std::endl;
     }
 */
-
-
-
-
-
-
 
     return 0;
 }
