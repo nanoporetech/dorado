@@ -11,8 +11,10 @@ static float tanh_fast(float x) {
     return 2.f * sigmoid(2.f * x) - 1.f;
 }
 
+// Precision of input activations and weights (before conversion).
 typedef float ftype_in;
-typedef metal::simdgroup_float8x8 simdgroup_ftype_in8x8;
+
+// Precision of layer processing.
 #if 0
 typedef float ftype;
 typedef metal::simdgroup_float8x8 simdgroup_ftype8x8;
@@ -20,6 +22,10 @@ typedef metal::simdgroup_float8x8 simdgroup_ftype8x8;
 typedef half ftype;
 typedef metal::simdgroup_half8x8 simdgroup_ftype8x8;
 #endif
+
+// Precision of back guides and posterior probabilities.
+// (Scores are int8_t.)
+typedef float ftype_out;
 
 #define MAX_LAYER_SIZE 512
 #define KERNEL_INDEX_INPUTS \
@@ -38,39 +44,44 @@ struct ScanArgs {
     int dir;
 };
 
-constant int NUM_TRANSITIONS = 5;
-
 kernel void scan(
-    device const ScanArgs* args,
-    device const ftype_in *in,
-    device ftype_in *out,
-    device const int *idx1,
-    device const int *idx2,
+    device const ScanArgs* const args,
+    // Scores are supplied in int8 form, in the range [-127, 127], and must be mapped to [-5, 5] before use.
+    device const int8_t* const scores_in,
+    device ftype_out* const out,
+    device const int* const idx1,
+    device const int* const idx2,
     KERNEL_INDEX_INPUTS)
 {
-    int T = args->T;
-    int N = args->N;
-    int C = args->C;
-    int ts_states = C * NUM_TRANSITIONS;
-    int dir = args->dir;
-    int chunk = gid;
+    constexpr int NUM_TRANSITIONS = 5;
 
-    device const ftype_in *chunk_in = in + chunk * ts_states;
-    device ftype_in *chunk_out = out + chunk * (T+1) * C;
-    device ftype_in *alpha_init = chunk_out + ((dir == -1) ? C * T : 0);
+    const int T = args->T;
+    const int N = args->N;
+    const int C = args->C;
+    const int ts_states = C * NUM_TRANSITIONS;
+    const int dir = args->dir;
+    const int chunk = gid;
+
+    device const int8_t* const chunk_in = scores_in + chunk * ts_states;
+    device ftype_out* const chunk_out = out + chunk * (T+1) * C;
+    device ftype_out* const alpha_init = chunk_out + ((dir == -1) ? C * T : 0);
     for (int c = tid; c < C; ++c) {
-        alpha_init[c] = 0;
+        alpha_init[c] = 0.0f;
     }
     for (int ts = 0; ts < T; ++ts) {
         threadgroup_barrier(mem_flags::mem_device);
-        device const ftype_in *ts_in = chunk_in + N * ts_states * ((dir == -1) ? T - ts - 1 : ts);
-        device ftype_in *ts_alpha_in = alpha_init + C * dir * ts;
-        device ftype_in *ts_alpha_out = ts_alpha_in + C * dir;
+        device const auto* const ts_in = chunk_in + N * ts_states * ((dir == -1) ? T - ts - 1 : ts);
+        device ftype_out* const ts_alpha_in = alpha_init + C * dir * ts;
+        device ftype_out* const ts_alpha_out = ts_alpha_in + C * dir;
+
         float max_val = -1e38f;
         float vals[NUM_TRANSITIONS];
         for (int i = 0; i < NUM_TRANSITIONS; ++i) {
-            int state = tid * NUM_TRANSITIONS + i;
-            vals[i] = ts_in[idx1[state]] + ts_alpha_in[idx2[state]];
+            const int state = tid * NUM_TRANSITIONS + i;
+            // Rescale the score from int8 to a float in the range [-5.0, 5.0].
+            const auto kScoreScale = static_cast<float>(5.0 / 127.0);
+            const auto score = static_cast<float>(ts_in[idx1[state]]) * kScoreScale;
+            vals[i] = score + ts_alpha_in[idx2[state]];
             max_val = max(max_val, vals[i]);
         }
         float sum = 0.f;
@@ -82,9 +93,9 @@ kernel void scan(
 }
 
 kernel void add_softmax(
-    device const ScanArgs* args,
-    device ftype_in *fwd_post,
-    device const ftype_in *bwd,
+    device const ScanArgs* const args,
+    device ftype_out* const fwd_post,
+    device const ftype_out* const bwd,
     KERNEL_INDEX_INPUTS)
 {
     int T = args->T + 1;
@@ -127,10 +138,10 @@ struct ConvArgs {
 
 /*
 kernel void conv(
-    device const ConvArgs* args,
-    device const ftype* in,
-    device const ftype* weights,
-    device ftype* out,
+    device const ConvArgs* const args,
+    device const ftype* const in,
+    device const ftype* const weights,
+    device ftype* const out,
     KERNEL_INDEX_INPUTS)
 {
     const int in_size = args->in_size;
@@ -163,9 +174,9 @@ kernel void conv(
 
 kernel void conv1_simd_reorder_weights
 (
-    device const ConvArgs* args,
-    device const ftype_in* weights_in,
-    device ftype* weights_out
+    device const ConvArgs* const args,
+    device const ftype_in* const weights_in,
+    device ftype* const weights_out
 ) {
     const int win_size = 5;
     const int out_size = 4;
@@ -183,9 +194,9 @@ kernel void conv1_simd_reorder_weights
 
 kernel void conv2_simd_reorder_weights
 (
-    device const ConvArgs* args,
-    device const ftype_in* weights_in,
-    device ftype* weights_out
+    device const ConvArgs* const args,
+    device const ftype_in* const weights_in,
+    device ftype* const weights_out
 ) {
     for (int col = 0; col < 16; ++col) {
         for (int row = 0; row < 29; ++row) {
@@ -200,9 +211,9 @@ kernel void conv2_simd_reorder_weights
 // Just type conversion
 kernel void conv3_simd_reorder_weights
 (
-    device const ConvArgs* args,
-    device const ftype_in* weights_in,
-    device ftype* weights_out
+    device const ConvArgs* const args,
+    device const ftype_in* const weights_in,
+    device ftype* const weights_out
 ) {
     const int cols = args->out_size;
     const int rows = args->in_size * args->win_size + 1;
@@ -216,9 +227,9 @@ kernel void conv3_simd_reorder_weights
 // Just type conversion
 kernel void float_to_half
 (
-    device const int* num_elems,
-    device const ftype_in* in,
-    device ftype* out,
+    device const int* const num_elems,
+    device const float* const in,
+    device half* const out,
     KERNEL_INDEX_INPUTS
 ) {
     for (int elem = gid * threads + tid; elem < *num_elems; elem += threadgroups * threads) {
@@ -232,10 +243,10 @@ kernel void float_to_half
 [[max_total_threads_per_threadgroup(CONV1_SIMD_GROUPS * 32)]]
 kernel void conv1_simd
 (
-    device const ConvArgs* args,
-    device const ftype* in_buf,
-    device const ftype* weights_buf,
-    device ftype* out_buf,
+    device const ConvArgs* const args,
+    device const ftype* const in_buf,
+    device const ftype* const weights_buf,
+    device ftype* const out_buf,
     KERNEL_INDEX_INPUTS
 ) {
 //    const int in_size = 1;
@@ -309,9 +320,9 @@ kernel void conv1_simd
 kernel void conv2_simd
 (
     device const ConvArgs* args,
-    device const ftype* in_buf,
-    device const ftype* weights_buf,
-    device ftype* out_buf,
+    device const ftype* const in_buf,
+    device const ftype* const weights_buf,
+    device ftype* const out_buf,
     KERNEL_INDEX_INPUTS
 ) {
     const int in_size = 4;
@@ -364,10 +375,10 @@ kernel void conv2_simd
 [[max_total_threads_per_threadgroup(CONV3_SIMD_GROUPS * 32)]]
 kernel void conv3_simd
 (
-    device const ConvArgs* args,
-    device const ftype* in_buf,
-    device const ftype* weights_buf,
-    device ftype* out_buf,
+    device const ConvArgs* const args,
+    device const ftype* const in_buf,
+    device const ftype* const weights_buf,
+    device ftype* const out_buf,
     KERNEL_INDEX_INPUTS
 ) {
     const int in_size = args->in_size;
@@ -526,9 +537,9 @@ kernel void reorder_input(
 }
 
 kernel void reorder_output(
-    device const LstmArgs* args,
-    device const ftype* in,
-    device ftype_in* const out,
+    device const LstmArgs* const args,
+    device const ftype* const in,
+    device ftype_out* const out,
     KERNEL_INDEX_INPUTS)
 {
     threadgroup ftype bfr[MAX_LAYER_SIZE * TILE_SIZE];
@@ -547,7 +558,7 @@ kernel void reorder_output(
             for (int chunk = 0; chunk < TILE_SIZE; ++chunk) {
                 for (int col = tid; col < kLstmLayerSize; col += threads) {
                     const int idx = (timestep * batch_tiles * TILE_SIZE + (batch_tile * TILE_SIZE + chunk)) * kLstmLayerSize + col;
-                    out[idx] = ftype_in(bfr[chunk * MAX_LAYER_SIZE + col]);
+                    out[idx] = ftype_out(bfr[chunk * MAX_LAYER_SIZE + col]);
                 }
             }
         }
@@ -705,11 +716,10 @@ kernel void linear_tanh(
         device const LinearArgs* const args,
         device ftype* const in_buf,
         device const ftype* const weights_buf,
-        device ftype_in* const out_buf,
-        // The sizes of these buffers are set via MTL::ComputeCommandEncoder.
-        // They depend on the SIMD group count.
+        device int8_t* const out_buf,
+        // The size of this buffer is set via MTL::ComputeCommandEncoder.
+        // It depends on the SIMD group count.
         threadgroup ftype (* const simd_out_buf)[TILE_SIZE * TILE_SIZE],
-        threadgroup float (* const simd_out_buf_f32)[TILE_SIZE * TILE_SIZE],
         KERNEL_INDEX_INPUTS) {
     const int chunk_size = args->chunk_size;
     const int in_batch_tiles = args->in_batch_tiles;
@@ -722,7 +732,7 @@ kernel void linear_tanh(
     const int W_stride = kLinearLayerSize;
     const int out_stride = kLinearLayerSize;
     simdgroup_ftype8x8 A[SIMD_TILES_M], B[SIMD_TILES_N], C[SIMD_TILES_M * SIMD_TILES_N];
-    simdgroup_float8x8 out_tile;
+
     device const ftype* const b = weights_buf + kLstmLayerSize * W_stride;
 
     for (int ts = gid; ts < chunk_size; ts += threadgroups) {
@@ -783,14 +793,21 @@ kernel void linear_tanh(
                 }
                 for (int i = 0; i < SIMD_TILES_M; ++i) {
                     for (int j = 0; j < SIMD_TILES_N; ++j) {
+                        // Store this 8x8 tile to threadgroup memory as ftype.
                         simdgroup_store(C[i * SIMD_TILES_N + j], simd_out_buf[sid], TILE_SIZE);
+                        
+                        const uint tile_i = (m_blk * SIMD_TILES_M + i) * TILE_SIZE;
+                        const uint tile_j = (n_blk * SIMD_TILES_N + j) * TILE_SIZE;
+
+                        // Apply tanh activation, scale to byte range, and store to the output
+                        // buffer.
                         for (int elem = tid & 31; elem < TILE_SIZE * TILE_SIZE; elem += 32) {
-                            simd_out_buf_f32[sid][elem] = 5.f * tanh_fast(simd_out_buf[sid][elem]);
+                            const int in_tile_i = elem / TILE_SIZE;
+                            const int in_tile_j = elem % TILE_SIZE;
+                            out[(tile_i + in_tile_i) * out_stride + tile_j + in_tile_j] =
+                                static_cast<int8_t>(tanh_fast(simd_out_buf[sid][elem]) * 127.0f);
+
                         }
-                        simdgroup_load(out_tile, simd_out_buf_f32[sid], TILE_SIZE);
-                        simdgroup_store(out_tile, out, out_stride,
-                                        ulong2((n_blk * SIMD_TILES_N + j) * TILE_SIZE,
-                                               (m_blk * SIMD_TILES_M + i) * TILE_SIZE));
                     }
                 }
             }
