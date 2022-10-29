@@ -57,6 +57,7 @@ std::vector<std::string> Read::generate_read_tags() const {
     std::vector<std::string> tags = {
             "qs:i:" + std::to_string(static_cast<int>(
                               std::round(utils::mean_qscore_from_qstring(qstring)))),
+            "du:f:" + std::to_string((raw_data.size(0) + num_trimmed_samples) / 4000.0),
             "ns:i:" + std::to_string(raw_data.size(0) + num_trimmed_samples),
             "ts:i:" + std::to_string(num_trimmed_samples),
             "mx:i:" + std::to_string(attributes.mux),
