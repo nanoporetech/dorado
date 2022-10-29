@@ -64,7 +64,7 @@ void WriterNode::worker_thread() {
                       << read->qstring << "\n";
         } else {
             try {
-                for (const auto& sam_line : read->extract_sam_lines()) {
+                for (const auto& sam_line : read->extract_sam_lines(m_emit_moves)) {
                     std::scoped_lock<std::mutex> lock(m_cout_mutex);
                     std::cout << sam_line << "\n";
                 }
