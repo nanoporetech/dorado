@@ -170,8 +170,7 @@ int duplex(int argc, char* argv[]) {
     std::cerr << "Loading BAM" << std::endl;
 
     samFile* fp_in = hts_open(
-            "/media/groups/machine_learning/active/mvella/duplex_data/kit14_260bps_duplex_test_set/"
-            "calls.bam",
+            "/data/duplex_data/calls.bam",
             "r");                             //open bam file
     bam_hdr_t* bamHdr = sam_hdr_read(fp_in);  //read header
     bam1_t* aln = bam_init1();                //initialize an alignment
@@ -206,11 +205,9 @@ int duplex(int argc, char* argv[]) {
     sam_close(fp_in);
     std::cerr << "Closing BAM - DONE" << std::endl;
 
-    // Let's also load a pairs.txt
-
+    // Let's also load a pairs file
     std::string pairs_file =
-            "/media/groups/machine_learning/active/mvella/duplex_data/kit14_260bps_duplex_test_set/"
-            "pair_ids_filtered.txt";
+            "/data/duplex_data/pair_ids_filtered.txt";
 
     std::ifstream dataFile;
     dataFile.open(pairs_file);
@@ -241,6 +238,13 @@ int duplex(int argc, char* argv[]) {
     EdlibAlignConfig align_config = edlibDefaultAlignConfig();
     align_config.task = EDLIB_TASK_PATH;
 
+    std::map<char,char> complementary_nucleotides;
+
+    complementary_nucleotides['A'] = 'T';
+    complementary_nucleotides['C'] = 'G';
+    complementary_nucleotides['G'] = 'C';
+    complementary_nucleotides['T'] = 'A';
+
     int i = 0;
     for (auto key : t_c_map) {
         std::string temp_id = key.first;
@@ -248,20 +252,64 @@ int duplex(int argc, char* argv[]) {
 
         std::vector<char> temp_str;
         std::vector<char> comp_str;
-
+        std::vector<uint8_t> temp_q_string;
         if (reads.find(temp_id) == reads.end()) {
         } else {
-            temp_str = reads.at(temp_id).sequence;
-            std::cerr << "found one!" << std::endl;
+            auto read = reads.at(temp_id);
+            temp_str = read.sequence;
+            temp_q_string = read.scores;
+            std::cerr << "found a template!" << std::endl;
         }
 
-        if (reads.find(comp_id) == reads.end()) {
-            std::cerr << "missing complement" << std::endl;
-        } else {
-            comp_str = reads.at(comp_id).sequence;
-            EdlibAlignResult result = edlibAlign(temp_str.data(), temp_str.size(), temp_str.data(),
-                                                 temp_str.size(), align_config);
+/*        auto opts = torch::TensorOptions().dtype(torch::kInt8);
+        torch::Tensor t = torch::from_blob(temp_q_string.data(), {(int) temp_q_string.size()});
+        t = -torch::max_pool1d(-t,
+                          3,
+                          1);*/
 
+        if (reads.find(comp_id) == reads.end()) {
+            std::cerr << "Corresponding complement is missing" << std::endl;
+        } else if (temp_str.size() != 0) {// We can do the alignment
+            auto complement_read = reads.at(comp_id);
+            comp_str = complement_read.sequence;
+            auto comp_q_scores_reverse = complement_read.scores;
+            std::reverse(comp_q_scores_reverse.begin(), comp_q_scores_reverse.end());
+
+            std::vector<char> comp_str_rc = comp_str;
+            //compute the RC
+            std::reverse(comp_str_rc.begin(), comp_str_rc.end());
+            std::for_each(comp_str_rc.begin(), comp_str_rc.end(), [&complementary_nucleotides](char &c){ c=complementary_nucleotides[c]; });
+
+            EdlibAlignResult result = edlibAlign(temp_str.data(), temp_str.size(), comp_str_rc.data(),
+                                                 comp_str_rc.size(), align_config);
+
+            //Now - we have to do the actual basespace alignment itself
+
+            std::vector<char> consensus;
+            int query_cursor = 0;
+            int target_cursor = result.startLocations[0];
+            for (int i=0; i<result.alignmentLength; i++){
+                if (temp_q_string[target_cursor] >= comp_q_scores_reverse[query_cursor]){
+                    consensus.push_back(temp_str[target_cursor]);
+                } else{
+                    consensus.push_back(comp_str_rc[query_cursor]);
+                }
+
+                //Anything but a query insertion and target advances
+                if (result.alignment[i] != 2) {
+                    target_cursor++;
+                }
+
+                //Anything but a target insertion and target advances
+                if (result.alignment[i] != 1) {
+                    query_cursor++;
+                }
+            }
+            std::cerr<< std::endl;
+            for (auto &c: consensus){
+                std::cerr << c;
+            }
+            std::cerr<< std::endl;
             edlibFreeAlignResult(result);
         }
 
@@ -270,19 +318,7 @@ int duplex(int argc, char* argv[]) {
         }
 
         i++;
-
-        std::cerr << i << std::endl;
     }
-
-    /*
-    std::cerr<< result.alignmentLength <<std::endl;
-    std::cerr<< *result.startLocations <<std::endl;
-    std::cerr<< *result.endLocations <<std::endl;
-
-    for (size_t i=0; i<result.alignmentLength; i++) {
-        std::cerr << int(result.alignment[i]) << std::endl;
-    }
-*/
 
     return 0;
 }
