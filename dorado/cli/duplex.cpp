@@ -170,7 +170,7 @@ int duplex(int argc, char* argv[]) {
     std::cerr << "Loading BAM" << std::endl;
 
     samFile* fp_in = hts_open(
-            "/data/duplex_data/calls.bam",
+            "/media/groups/machine_learning/active/mvella/duplex_data/kit14_260bps_duplex_test_set/calls.bam",
             "r");                             //open bam file
     bam_hdr_t* bamHdr = sam_hdr_read(fp_in);  //read header
     bam1_t* aln = bam_init1();                //initialize an alignment
@@ -207,7 +207,7 @@ int duplex(int argc, char* argv[]) {
 
     // Let's also load a pairs file
     std::string pairs_file =
-            "/data/duplex_data/pair_ids_filtered.txt";
+            "/media/groups/machine_learning/active/mvella/duplex_data/kit14_260bps_duplex_test_set/pair_ids_filtered.txt";
 
     std::ifstream dataFile;
     dataFile.open(pairs_file);
@@ -261,11 +261,17 @@ int duplex(int argc, char* argv[]) {
             std::cerr << "found a template!" << std::endl;
         }
 
-/*        auto opts = torch::TensorOptions().dtype(torch::kInt8);
-        torch::Tensor t = torch::from_blob(temp_q_string.data(), {(int) temp_q_string.size()});
-        t = -torch::max_pool1d(-t,
-                          3,
-                          1);*/
+        auto opts = torch::TensorOptions().dtype(torch::kInt8);
+        torch::Tensor t = torch::from_blob(temp_q_string.data(),
+                                           {1, (int) temp_q_string.size()}, opts);
+        auto t_float = t.to(torch::kFloat32);
+        int pool_window = 5;
+        t.index({torch::indexing::Slice()}) = -torch::max_pool1d(-t_float,
+                                     pool_window,
+                                     1,
+                                     pool_window / 2);
+
+        //t.index({0, torch::indexing::Slice()}) = t_float.index({0, torch::indexing::Slice()});
 
         if (reads.find(comp_id) == reads.end()) {
             std::cerr << "Corresponding complement is missing" << std::endl;
