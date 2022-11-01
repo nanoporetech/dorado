@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-namespace utils {
+namespace dorado::utils {
 
 // Serialise Torch tensor to disk.
 void serialise_tensor(torch::Tensor t, const std::string& path);
@@ -24,4 +24,4 @@ torch::Tensor quantile(const torch::Tensor t, const torch::Tensor q);
 // Only `interpolation='lower'` is currently implemented.
 torch::Tensor quantile_counting(const torch::Tensor t, const torch::Tensor q);
 
-}  // namespace utils
+}  // namespace dorado::utils

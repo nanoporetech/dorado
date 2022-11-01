@@ -11,10 +11,11 @@ TEST_CASE("Encode sequence for modified basecalling", TEST_GROUP) {
     const size_t SLICE_BLOCKS = 6;
     const size_t PADDING = SLICE_BLOCKS / 2;
     std::string sequence{"TATTCAGTAC"};
-    auto seq_ints = ::utils::sequence_to_ints(sequence);
+    auto seq_ints = dorado::utils::sequence_to_ints(sequence);
     //                         T  A     T        T  C     A     G        T     A  C
     std::vector<uint8_t> moves{1, 1, 0, 1, 0, 0, 1, 1, 0, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 0};
-    auto seq_to_sig_map = ::utils::moves_to_map(moves, BLOCK_STRIDE, moves.size() * BLOCK_STRIDE);
+    auto seq_to_sig_map =
+            dorado::utils::moves_to_map(moves, BLOCK_STRIDE, moves.size() * BLOCK_STRIDE);
 
     RemoraEncoder encoder(BLOCK_STRIDE, SLICE_BLOCKS * BLOCK_STRIDE, 1, 1);
     encoder.init(seq_ints, seq_to_sig_map);

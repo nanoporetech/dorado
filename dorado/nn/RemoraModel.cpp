@@ -80,11 +80,11 @@ struct RemoraConvModelImpl : Module {
     }
 
     void load_state_dict(const std::vector<torch::Tensor>& weights) {
-        ::utils::load_state_dict(*this, weights);
+        dorado::utils::load_state_dict(*this, weights);
     }
 
     std::vector<torch::Tensor> load_weights(const std::filesystem::path& dir) {
-        return ::utils::load_tensors(dir, weight_tensors);
+        return dorado::utils::load_tensors(dir, weight_tensors);
     }
 
     static const std::vector<std::string> weight_tensors;
@@ -166,11 +166,11 @@ struct RemoraConvLSTMModelImpl : Module {
     }
 
     void load_state_dict(std::vector<torch::Tensor> weights) {
-        ::utils::load_state_dict(*this, weights);
+        dorado::utils::load_state_dict(*this, weights);
     }
 
     std::vector<torch::Tensor> load_weights(const std::filesystem::path& dir) {
-        return ::utils::load_tensors(dir, weight_tensors);
+        return dorado::utils::load_tensors(dir, weight_tensors);
     }
 
     static const std::vector<std::string> weight_tensors;
@@ -297,7 +297,7 @@ RemoraCaller::RemoraCaller(const std::filesystem::path& model_path,
                     toml::find<int>(refinement_params, "refine_kmer_center_idx");
 
             auto kmer_levels_tensor =
-                    ::utils::load_tensors(model_path, {"refine_kmer_levels.tensor"})[0]
+                    dorado::utils::load_tensors(model_path, {"refine_kmer_levels.tensor"})[0]
                             .contiguous();
             std::copy(kmer_levels_tensor.data_ptr<float>(),
                       kmer_levels_tensor.data_ptr<float>() + kmer_levels_tensor.numel(),

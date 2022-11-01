@@ -49,7 +49,8 @@ void setup(std::vector<std::string> args,
         }
 #ifdef __APPLE__
     } else if (device == "metal") {
-        batch_size = batch_size == 0 ? auto_gpu_batch_size(model_path.string()) : batch_size;
+        batch_size = batch_size == 0 ? dorado::utils::auto_gpu_batch_size(model_path.string())
+                                     : batch_size;
         auto caller = create_metal_caller(model_path, chunk_size, batch_size);
         for (int i = 0; i < num_runners; i++) {
             runners.push_back(std::make_shared<MetalModelRunner>(caller, chunk_size, batch_size));
@@ -59,10 +60,11 @@ void setup(std::vector<std::string> args,
     }
 #else   // ifdef __APPLE__
     } else {
-        auto devices = parse_cuda_device_string(device);
+        auto devices = dorado::utils::parse_cuda_device_string(device);
         num_devices = devices.size();
-        batch_size =
-                batch_size == 0 ? auto_gpu_batch_size(model_path.string(), devices) : batch_size;
+        batch_size = batch_size == 0
+                             ? dorado::utils::auto_gpu_batch_size(model_path.string(), devices)
+                             : batch_size;
         for (auto device_string : devices) {
             auto caller = create_cuda_caller(model_path, chunk_size, batch_size, device_string);
             for (size_t i = 0; i < num_runners; i++) {
@@ -108,7 +110,7 @@ void setup(std::vector<std::string> args,
     std::vector<std::shared_ptr<RemoraCaller>> remora_callers;
 
 #ifndef __APPLE__
-    auto devices = parse_cuda_device_string(device);
+    auto devices = dorado::utils::parse_cuda_device_string(device);
     num_devices = devices.size();
 
     for (auto device_string : devices) {
@@ -148,7 +150,7 @@ void setup(std::vector<std::string> args,
 }
 
 int basecaller(int argc, char* argv[]) {
-    InitLogging();
+    dorado::utils::InitLogging();
     argparse::ArgumentParser parser("dorado", DORADO_VERSION);
 
     parser.add_argument("model").help("the basecaller model to run.");

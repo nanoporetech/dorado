@@ -66,7 +66,7 @@ private:
     bool m_terminate_callers{false};
     bool m_terminate_output{false};
 
-    using BaseModInfo = ::utils::BaseModInfo;
+    using BaseModInfo = dorado::utils::BaseModInfo;
     std::shared_ptr<const BaseModInfo> m_base_mod_info;
     // The offsets to the canonical bases in the modbase alphabet
     std::array<size_t, 4> m_base_prob_offsets;

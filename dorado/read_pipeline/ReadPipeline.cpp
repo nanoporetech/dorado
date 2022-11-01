@@ -56,7 +56,7 @@ std::vector<std::string> Read::generate_read_tags() const {
 
     std::vector<std::string> tags = {
             "qs:i:" + std::to_string(static_cast<int>(
-                              std::round(utils::mean_qscore_from_qstring(qstring)))),
+                              std::round(dorado::utils::mean_qscore_from_qstring(qstring)))),
             "ns:i:" + std::to_string(raw_data.size(0) + num_trimmed_samples),
             "ts:i:" + std::to_string(num_trimmed_samples),
             "mx:i:" + std::to_string(attributes.mux),
@@ -149,7 +149,7 @@ std::string Read::generate_modbase_string(uint8_t threshold) const {
     // Create a mask indicating which bases are modified.
     std::map<char, bool> base_has_context = {
             {'A', false}, {'C', false}, {'G', false}, {'T', false}};
-    ::utils::BaseModContext context_handler;
+    dorado::utils::BaseModContext context_handler;
     if (!base_mod_info->context.empty()) {
         if (!context_handler.decode(base_mod_info->context)) {
             throw std::runtime_error("Invalid base modification context string.");

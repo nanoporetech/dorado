@@ -93,7 +93,7 @@ void ModBaseCallerNode::init_modbase_info() {
     }
 
     std::string long_names, alphabet;
-    ::utils::BaseModContext context_handler;
+    dorado::utils::BaseModContext context_handler;
     for (const auto& info : model_info) {
         for (const auto& name : info.long_names) {
             if (!long_names.empty())
@@ -162,8 +162,8 @@ void ModBaseCallerNode::runner_worker_thread(size_t runner_id) {
             }
             read->base_mod_info = m_base_mod_info;
 
-            std::vector<int> sequence_ints = ::utils::sequence_to_ints(read->seq);
-            std::vector<uint64_t> seq_to_sig_map = ::utils::moves_to_map(
+            std::vector<int> sequence_ints = dorado::utils::sequence_to_ints(read->seq);
+            std::vector<uint64_t> seq_to_sig_map = dorado::utils::moves_to_map(
                     read->moves, m_block_stride, read->raw_data.size(0), read->seq.size() + 1);
 
             read->num_modbase_chunks = 0;

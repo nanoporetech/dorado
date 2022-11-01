@@ -4,7 +4,8 @@
 
 #include <sstream>
 
-namespace utils {
+namespace dorado::utils {
+
 BaseModContext::BaseModContext() {}
 
 const std::string& BaseModContext::motif(char base) const { return m_motifs[base_to_int(base)]; }
@@ -107,4 +108,4 @@ void BaseModContext::update_mask(std::vector<int>& mask,
     }
 }
 
-}  // namespace utils
+}  // namespace dorado::utils

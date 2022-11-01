@@ -64,7 +64,7 @@ TEST_CASE("Test stitch_chunks", TEST_GROUP) {
         read->num_chunks++;
     }
 
-    REQUIRE_NOTHROW(stitch_chunks(read));
+    REQUIRE_NOTHROW(dorado::utils::stitch_chunks(read));
 
     const std::string expected_sequence = "ACGTCGCGTCGTCGTCCGT";
     const std::string expected_qstring = "!&.-&.&.-&.-&.-&&.-";

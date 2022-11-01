@@ -502,7 +502,7 @@ struct CRFModelImpl : Module {
     }
 
     void load_state_dict(const std::vector<torch::Tensor> &weights) {
-        ::utils::load_state_dict(*this, weights);
+        dorado::utils::load_state_dict(*this, weights);
     }
 
     torch::Tensor forward(torch::Tensor x) {
@@ -536,7 +536,7 @@ struct CRFModelImpl : Module {
 
                 "9.linear.weight.tensor",    "9.linear.bias.tensor"};
 
-        return ::utils::load_tensors(dir, tensors);
+        return dorado::utils::load_tensors(dir, tensors);
     }
 
     LSTMStack rnns{nullptr};

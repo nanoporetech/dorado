@@ -121,7 +121,7 @@ void BasecallerNode::working_reads_manager() {
         }
 
         for (auto &read : completed_reads) {
-            stitch_chunks(read);
+            dorado::utils::stitch_chunks(read);
             m_sink.push_read(read);
         }
     }

@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-namespace utils {
+namespace dorado::utils {
 struct BaseModInfo;
 }
 
@@ -33,7 +33,7 @@ struct Chunk {
 // Class representing a read, including raw data
 class Read {
 public:
-    using BaseModInfo = ::utils::BaseModInfo;
+    using BaseModInfo = dorado::utils::BaseModInfo;
 
     struct Attributes {
         uint32_t mux{std::numeric_limits<uint32_t>::max()};  // Channel mux

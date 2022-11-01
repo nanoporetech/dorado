@@ -13,7 +13,7 @@
 #include <string>
 #include <vector>
 
-namespace utils {
+namespace dorado::utils {
 struct BaseModInfo;
 }
 

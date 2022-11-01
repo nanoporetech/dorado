@@ -9,7 +9,7 @@ using namespace std::chrono_literals;
 
 std::pair<float, float> normalisation(torch::Tensor& x) {
     //Calculate shift and scale factors for normalisation.
-    auto quantiles = utils::quantile_counting(x, torch::tensor({0.2, 0.9}));
+    auto quantiles = dorado::utils::quantile_counting(x, torch::tensor({0.2, 0.9}));
     float q20 = quantiles[0].item<float>();
     float q90 = quantiles[1].item<float>();
     float shift = std::max(10.0f, 0.51f * (q20 + q90));

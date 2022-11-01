@@ -10,11 +10,11 @@
 
 #include <filesystem>
 
-using namespace std;
 using namespace MTL;
 
 namespace fs = std::filesystem;
 
+namespace {
 // Allows less ugliness in use of std::visit.
 template <class... Ts>
 struct overloaded : Ts... {
@@ -34,6 +34,69 @@ NS::String *get_library_location() {
 
     return NS::String::string(fspath.c_str(), NS::ASCIIStringEncoding);
 }
+
+// Retrieves a dictionary of int64_t properties associated with a given service/property.
+// Returns true on success.
+bool retrieve_ioreg_props(const std::string &service_class,
+                          const std::string &property_name,
+                          std::unordered_map<std::string, int64_t> &props) {
+    // Look for a service matching the supplied class name.
+    CFMutableDictionaryRef matching_dict = IOServiceMatching(service_class.c_str());
+    if (!matching_dict) {
+        return false;
+    }
+    // Note: kIOMainPortDefault was introduced on MacOS 12.  If support for earlier versions
+    // is needed an alternate constant will be needed.
+    // IOServiceGetMatchingService consumes a reference to matching_dict, so we don't need
+    // to release it ourselves.
+    io_service_t service = IOServiceGetMatchingService(kIOMainPortDefault, matching_dict);
+    if (!service) {
+        return false;
+    }
+
+    // Create a CF representation of the registry property of interest.
+    const auto cfs_property_name = CFStringCreateWithCString(
+            kCFAllocatorDefault, property_name.c_str(), kCFStringEncodingUTF8);
+    CFTypeRef property =
+            IORegistryEntryCreateCFProperty(service, cfs_property_name, kCFAllocatorDefault, 0);
+    IOObjectRelease(service);
+    CFRelease(cfs_property_name);
+    if (!property) {
+        return false;
+    }
+    if (CFGetTypeID(property) != CFDictionaryGetTypeID()) {
+        CFRelease(property);
+        return false;
+    }
+
+    // Retrieve entries with integer keys from the CFDictionary we constructed.
+
+    // No implicit conversion from lambda to function pointer if it captures, so
+    // just use the context parameter to point to the unordered_map being populated.
+    const auto process_kvs = [](CFTypeRef key_ref, CFTypeRef value_ref, void *ctx) {
+        auto props_ptr = static_cast<std::unordered_map<std::string, int64_t> *>(ctx);
+        // Presumably keys are always strings -- ignore anything that isn't.
+        // Also ignore non-integer values, of which there are examples that are not
+        // currently relevant.
+        if (CFGetTypeID(key_ref) != CFStringGetTypeID() ||
+            CFGetTypeID(value_ref) != CFNumberGetTypeID())
+            return;
+        const std::string key = cfstringref_to_string(static_cast<CFStringRef>(key_ref));
+        int64_t value = -1;
+        if (!CFNumberGetValue(static_cast<CFNumberRef>(value_ref), kCFNumberSInt64Type, &value)) {
+            return;
+        }
+        props_ptr->insert({key, value});
+    };
+
+    CFDictionaryApplyFunction(static_cast<CFDictionaryRef>(property), process_kvs, &props);
+    CFRelease(property);
+    return true;
+}
+
+}  // namespace
+
+namespace dorado::utils {
 
 MTL::Buffer *create_buffer(MTL::Device *device, size_t length) {
     return device->newBuffer(length, MTL::ResourceStorageModeShared);
@@ -177,65 +240,6 @@ std::string cfstringref_to_string(const CFStringRef cfstringref) {
     return std::string("");
 }
 
-// Retrieves a dictionary of int64_t properties associated with a given service/property.
-// Returns true on success.
-bool retrieve_ioreg_props(const std::string &service_class,
-                          const std::string &property_name,
-                          std::unordered_map<std::string, int64_t> &props) {
-    // Look for a service matching the supplied class name.
-    CFMutableDictionaryRef matching_dict = IOServiceMatching(service_class.c_str());
-    if (!matching_dict) {
-        return false;
-    }
-    // Note: kIOMainPortDefault was introduced on MacOS 12.  If support for earlier versions
-    // is needed an alternate constant will be needed.
-    // IOServiceGetMatchingService consumes a reference to matching_dict, so we don't need
-    // to release it ourselves.
-    io_service_t service = IOServiceGetMatchingService(kIOMainPortDefault, matching_dict);
-    if (!service) {
-        return false;
-    }
-
-    // Create a CF representation of the registry property of interest.
-    const auto cfs_property_name = CFStringCreateWithCString(
-            kCFAllocatorDefault, property_name.c_str(), kCFStringEncodingUTF8);
-    CFTypeRef property =
-            IORegistryEntryCreateCFProperty(service, cfs_property_name, kCFAllocatorDefault, 0);
-    IOObjectRelease(service);
-    CFRelease(cfs_property_name);
-    if (!property) {
-        return false;
-    }
-    if (CFGetTypeID(property) != CFDictionaryGetTypeID()) {
-        CFRelease(property);
-        return false;
-    }
-
-    // Retrieve entries with integer keys from the CFDictionary we constructed.
-
-    // No implicit conversion from lambda to function pointer if it captures, so
-    // just use the context parameter to point to the unordered_map being populated.
-    const auto process_kvs = [](CFTypeRef key_ref, CFTypeRef value_ref, void *ctx) {
-        auto props_ptr = static_cast<std::unordered_map<std::string, int64_t> *>(ctx);
-        // Presumably keys are always strings -- ignore anything that isn't.
-        // Also ignore non-integer values, of which there are examples that are not
-        // currently relevant.
-        if (CFGetTypeID(key_ref) != CFStringGetTypeID() ||
-            CFGetTypeID(value_ref) != CFNumberGetTypeID())
-            return;
-        const std::string key = cfstringref_to_string(static_cast<CFStringRef>(key_ref));
-        int64_t value = -1;
-        if (!CFNumberGetValue(static_cast<CFNumberRef>(value_ref), kCFNumberSInt64Type, &value)) {
-            return;
-        }
-        props_ptr->insert({key, value});
-    };
-
-    CFDictionaryApplyFunction(static_cast<CFDictionaryRef>(property), process_kvs, &props);
-    CFRelease(property);
-    return true;
-}
-
 int get_mtl_device_core_count() {
     // We cache the count once it has been obtained.
     static int gpu_core_count = -1;
@@ -314,3 +318,5 @@ int auto_gpu_batch_size(std::string model_path) {
     spdlog::warn("Unrecognised model suffix: defaulting to batch size {}", kDefaultBatchSize);
     return kDefaultBatchSize;
 }
+
+}  // namespace dorado::utils
