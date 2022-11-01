@@ -21,12 +21,12 @@ public:
         const auto qbias = toml::find<float>(qscore, "bias");
         const auto qscale = toml::find<float>(qscore, "scale");
 
-        m_decoder_options = DecoderOptions();
+        m_decoder_options = dorado::DecoderOptions();
         m_decoder_options.q_shift = qbias;
         m_decoder_options.q_scale = qscale;
-        m_decoder = std::make_unique<GPUDecoder>();
+        m_decoder = std::make_unique<dorado::GPUDecoder>();
 
-        m_options = torch::TensorOptions().dtype(GPUDecoder::dtype).device(device);
+        m_options = torch::TensorOptions().dtype(dorado::GPUDecoder::dtype).device(device);
         auto [crf_module, stride] = load_crf_model(model_path, batch_size, chunk_size, m_options);
         m_module = crf_module;
         m_model_stride = stride;
@@ -52,15 +52,15 @@ public:
         int num_chunks;
     };
 
-    std::vector<DecodedChunk> call_chunks(torch::Tensor &input,
-                                          torch::Tensor &output,
-                                          int num_chunks,
-                                          c10::cuda::CUDAStream stream) {
+    std::vector<dorado::DecodedChunk> call_chunks(torch::Tensor &input,
+                                                  torch::Tensor &output,
+                                                  int num_chunks,
+                                                  c10::cuda::CUDAStream stream) {
         NVTX3_FUNC_RANGE();
         c10::cuda::CUDAStreamGuard stream_guard(stream);
 
         if (num_chunks == 0) {
-            return std::vector<DecodedChunk>();
+            return std::vector<dorado::DecodedChunk>();
         }
         NNTask task(input.to(m_options.device()), num_chunks);
         {
@@ -110,8 +110,8 @@ public:
 
     std::string m_device;
     torch::TensorOptions m_options;
-    std::unique_ptr<GPUDecoder> m_decoder;
-    DecoderOptions m_decoder_options;
+    std::unique_ptr<dorado::GPUDecoder> m_decoder;
+    dorado::DecoderOptions m_decoder_options;
     torch::nn::ModuleHolder<torch::nn::AnyModule> m_module{nullptr};
     size_t m_model_stride;
     bool m_terminate{false};
@@ -151,7 +151,7 @@ void CudaModelRunner::accept_chunk(int chunk_idx, at::Tensor slice) {
     m_input.index_put_({chunk_idx, 0}, slice);
 }
 
-std::vector<DecodedChunk> CudaModelRunner::call_chunks(int num_chunks) {
+std::vector<dorado::DecodedChunk> CudaModelRunner::call_chunks(int num_chunks) {
     return m_caller->call_chunks(m_input, m_output, num_chunks, m_stream);
 }
 
