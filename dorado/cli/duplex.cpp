@@ -258,7 +258,6 @@ int duplex(int argc, char* argv[]) {
             auto read = reads.at(temp_id);
             temp_str = read.sequence;
             temp_q_string = read.scores;
-            std::cerr << "found a template!" << std::endl;
         }
 
         auto opts = torch::TensorOptions().dtype(torch::kInt8);
@@ -271,55 +270,126 @@ int duplex(int argc, char* argv[]) {
                                      1,
                                      pool_window / 2);
 
+
+
         //t.index({0, torch::indexing::Slice()}) = t_float.index({0, torch::indexing::Slice()});
 
         if (reads.find(comp_id) == reads.end()) {
-            std::cerr << "Corresponding complement is missing" << std::endl;
-        } else if (temp_str.size() != 0) {// We can do the alignment
+            //std::cerr << "Corresponding complement is missing" << std::endl;
+        } else if (temp_str.size() != 0) {  // We can do the alignment
             auto complement_read = reads.at(comp_id);
             comp_str = complement_read.sequence;
             auto comp_q_scores_reverse = complement_read.scores;
+
+            auto opts = torch::TensorOptions().dtype(torch::kInt8);
+            torch::Tensor t = torch::from_blob(comp_q_scores_reverse.data(),
+                                               {1, (int)comp_q_scores_reverse.size()}, opts);
+            auto t_float = t.to(torch::kFloat32);
+            int pool_window = 5;
+            t.index({torch::indexing::Slice()}) =
+                    -torch::max_pool1d(-t_float, pool_window, 1, pool_window / 2);
+
             std::reverse(comp_q_scores_reverse.begin(), comp_q_scores_reverse.end());
 
             std::vector<char> comp_str_rc = comp_str;
             //compute the RC
             std::reverse(comp_str_rc.begin(), comp_str_rc.end());
-            std::for_each(comp_str_rc.begin(), comp_str_rc.end(), [&complementary_nucleotides](char &c){ c=complementary_nucleotides[c]; });
+            std::for_each(
+                    comp_str_rc.begin(), comp_str_rc.end(),
+                    [&complementary_nucleotides](char& c) { c = complementary_nucleotides[c]; });
 
-            EdlibAlignResult result = edlibAlign(temp_str.data(), temp_str.size(), comp_str_rc.data(),
-                                                 comp_str_rc.size(), align_config);
+            EdlibAlignResult result =
+                    edlibAlign(temp_str.data(), temp_str.size(), comp_str_rc.data(),
+                               comp_str_rc.size(), align_config);
 
             //Now - we have to do the actual basespace alignment itself
 
             std::vector<char> consensus;
             int query_cursor = 0;
             int target_cursor = result.startLocations[0];
-            for (int i=0; i<result.alignmentLength; i++){
-                if (temp_q_string[target_cursor] >= comp_q_scores_reverse[query_cursor]){
-                    consensus.push_back(temp_str[target_cursor]);
-                } else{
-                    consensus.push_back(comp_str_rc[query_cursor]);
-                }
 
-                //Anything but a query insertion and target advances
-                if (result.alignment[i] != 2) {
+            //Let's do the start trim
+            int num_consecutive = 0;
+            int num_consecutive_wanted = 11;
+            int alignment_position = 0;
+            bool alignment_possible = true;
+
+            // Find forward trim.
+            while (num_consecutive < num_consecutive_wanted) {
+                if (result.alignment[alignment_position] != 2) {
                     target_cursor++;
                 }
 
-                //Anything but a target insertion and target advances
-                if (result.alignment[i] != 1) {
+                if (result.alignment[alignment_position] != 1) {
                     query_cursor++;
                 }
+
+                if (result.alignment[alignment_position] == 0) {
+                    num_consecutive++;
+                } else {
+                    num_consecutive = 0;  //reset counter
+                }
+
+                alignment_position++;
+
+                if (alignment_position >= result.alignmentLength) {
+                    alignment_possible = false;
+                    break;
+                }
             }
-            std::cerr<< std::endl;
-            for (auto &c: consensus){
-                std::cerr << c;
+
+            target_cursor -= num_consecutive_wanted;
+            query_cursor -= num_consecutive_wanted;
+
+            // Find reverse trim
+
+            int end_alignment_position = result.endLocations[0];
+            num_consecutive = 0;
+            while(num_consecutive < num_consecutive_wanted){
+                if (result.alignment[end_alignment_position] == 0){
+                    num_consecutive++;
+                } else {
+                    num_consecutive = 0;
+                }
+
+                end_alignment_position--;
+
+                if (end_alignment_position < alignment_position){
+                    alignment_possible = false;
+                    break;
+                }
+
             }
-            std::cerr<< std::endl;
-            edlibFreeAlignResult(result);
+
+            if (alignment_possible) {
+                for (int i = alignment_position; i < end_alignment_position; i++) {
+                    if (temp_q_string.at(target_cursor) >= comp_q_scores_reverse.at(query_cursor)) {
+                        consensus.push_back(temp_str.at(target_cursor));
+                    } else {
+                        consensus.push_back(comp_str_rc.at(query_cursor));
+                    }
+
+                    //Anything but a query insertion and target advances
+                    if (result.alignment[i] != 2) {
+                        target_cursor++;
+                    }
+
+                    //Anything but a target insertion and query advances
+                    if (result.alignment[i] != 1) {
+                        query_cursor++;
+                    }
+                }
+
+                std::cerr << ">Read " << std::to_string(i) << std::endl;
+                for (auto& c : consensus) {
+                    std::cerr << c;
+                }
+                std::cerr << std::endl;
+                edlibFreeAlignResult(result);
+            }
         }
 
-        if (i > 10000) {
+        if (i > 1000) {
             break;
         }
 
