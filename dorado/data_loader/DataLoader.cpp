@@ -71,32 +71,6 @@ std::string adjust_time(const std::string& time_stamp, uint32_t offset) {
     strftime(buff, 32, "%FT%TZ", new_time);
     return std::string(buff);
 }
-} /* anonymous namespace */
-
-void DataLoader::load_reads(const std::string& path) {
-    if (!std::filesystem::exists(path)) {
-        spdlog::error("Requested input path {} does not exist!", path);
-        m_read_sink.terminate();
-        return;
-    }
-    if (!std::filesystem::is_directory(path)) {
-        spdlog::error("Requested input path {} is not a directory!", path);
-        m_read_sink.terminate();
-        return;
-    }
-
-    for (const auto& entry : std::filesystem::directory_iterator(path)) {
-        std::string ext = std::filesystem::path(entry).extension().string();
-        std::transform(ext.begin(), ext.end(), ext.begin(),
-                       [](unsigned char c) { return std::tolower(c); });
-        if (ext == ".fast5") {
-            load_fast5_reads_from_file(entry.path().string());
-        } else if (ext == ".pod5") {
-            load_pod5_reads_from_file(entry.path().string());
-        }
-    }
-    m_read_sink.terminate();
-}
 
 std::shared_ptr<Read> process_pod5_read(size_t row,
                                         Pod5ReadRecordBatch* batch,
@@ -196,6 +170,35 @@ std::shared_ptr<Read> process_pod5_read(size_t row,
     pod5_release_calibration(calib_data);
     pod5_free_signal_row_info(signal_row_count, signal_rows.data());
     return new_read;
+}
+
+} /* anonymous namespace */
+
+namespace dorado {
+
+void DataLoader::load_reads(const std::string& path) {
+    if (!std::filesystem::exists(path)) {
+        spdlog::error("Requested input path {} does not exist!", path);
+        m_read_sink.terminate();
+        return;
+    }
+    if (!std::filesystem::is_directory(path)) {
+        spdlog::error("Requested input path {} is not a directory!", path);
+        m_read_sink.terminate();
+        return;
+    }
+
+    for (const auto& entry : std::filesystem::directory_iterator(path)) {
+        std::string ext = std::filesystem::path(entry).extension().string();
+        std::transform(ext.begin(), ext.end(), ext.begin(),
+                       [](unsigned char c) { return std::tolower(c); });
+        if (ext == ".fast5") {
+            load_fast5_reads_from_file(entry.path().string());
+        } else if (ext == ".pod5") {
+            load_pod5_reads_from_file(entry.path().string());
+        }
+    }
+    m_read_sink.terminate();
 }
 
 void DataLoader::load_pod5_reads_from_file(const std::string& path) {
@@ -338,3 +341,5 @@ DataLoader::DataLoader(ReadSink& read_sink, const std::string& device, size_t nu
     static std::once_flag vbz_init_flag;
     std::call_once(vbz_init_flag, vbz_register);
 }
+
+}  // namespace dorado

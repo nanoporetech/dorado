@@ -3,6 +3,8 @@
 
 class ReadSink;
 
+namespace dorado {
+
 class DataLoader {
 public:
     DataLoader(ReadSink& read_sink, const std::string& device, size_t num_worker_threads);
@@ -16,3 +18,5 @@ private:
     std::string m_device;
     size_t m_num_worker_threads{1};
 };
+
+}  // namespace dorado
