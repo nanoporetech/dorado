@@ -35,6 +35,24 @@ NS::String *get_library_location() {
     return NS::String::string(fspath.c_str(), NS::ASCIIStringEncoding);
 }
 
+// Returns an ASCII std::string associated with the given CFStringRef.
+std::string cfstringref_to_string(const CFStringRef cfstringref) {
+    // There does exist an API to directly return a char* pointer, but this is documented as
+    // failing on an arbitrary basis, and did fail empirically.
+    const auto utf16_len = CFStringGetLength(cfstringref);
+    // We must leave room the for zero terminator, or CFStringGetCString will fail.
+    const auto max_ascii_len =
+            CFStringGetMaximumSizeForEncoding(utf16_len, kCFStringEncodingASCII) + 1;
+    // CFStringGetCString wants to supply its own zero terminator, so write to an intermediate
+    // buffer used for constructing the final std::string.
+    std::vector<char> buffer(max_ascii_len);
+    if (CFStringGetCString(cfstringref, &buffer[0], buffer.size(), kCFStringEncodingASCII)) {
+        return std::string(buffer.data());
+    }
+
+    return std::string("");
+}
+
 // Retrieves a dictionary of int64_t properties associated with a given service/property.
 // Returns true on success.
 bool retrieve_ioreg_props(const std::string &service_class,
@@ -147,7 +165,7 @@ MTL::ComputePipelineState *make_cps(
                                                &error);
     CFRelease(cp_descriptor);
     if (cps == nullptr) {
-        auto e_code = to_string(((int)error->code()));
+        auto e_code = std::to_string(((int)error->code()));
         auto e_str = error->domain()->cString(NS::ASCIIStringEncoding);
         throw std::runtime_error("failed to build compute pipeline for " + name + " - " + e_str +
                                  ": error " + e_code);
@@ -158,8 +176,8 @@ MTL::ComputePipelineState *make_cps(
 
 void launch_kernel(ComputePipelineState *const pipeline,
                    CommandQueue *const command_queue,
-                   const vector<Buffer *> &buffers,
-                   const vector<int> &tg_buffer_lens,
+                   const std::vector<Buffer *> &buffers,
+                   const std::vector<int> &tg_buffer_lens,
                    long threadgroups,
                    long threads_per_threadgroup) {
     auto command_buffer = command_queue->commandBuffer();
@@ -172,8 +190,8 @@ void launch_kernel(ComputePipelineState *const pipeline,
 
 void launch_kernel_no_wait(ComputePipelineState *const pipeline,
                            CommandBuffer *const command_buffer,
-                           const vector<Buffer *> &buffers,
-                           const vector<int> &tg_buffer_lens,
+                           const std::vector<Buffer *> &buffers,
+                           const std::vector<int> &tg_buffer_lens,
                            long threadgroups,
                            long threads_per_threadgroup) {
     auto compute_encoder = command_buffer->computeCommandEncoder();
@@ -220,24 +238,6 @@ MTL::Device *get_mtl_device() {
         torch::SetAllocator(torch::DeviceType::CPU, &mtl_allocator);
     }
     return mtl_device;
-}
-
-// Returns an ASCII std::string associated with the given CFStringRef.
-std::string cfstringref_to_string(const CFStringRef cfstringref) {
-    // There does exist an API to directly return a char* pointer, but this is documented as
-    // failing on an arbitrary basis, and did fail empirically.
-    const auto utf16_len = CFStringGetLength(cfstringref);
-    // We must leave room the for zero terminator, or CFStringGetCString will fail.
-    const auto max_ascii_len =
-            CFStringGetMaximumSizeForEncoding(utf16_len, kCFStringEncodingASCII) + 1;
-    // CFStringGetCString wants to supply its own zero terminator, so write to an intermediate
-    // buffer used for constructing the final std::string.
-    std::vector<char> buffer(max_ascii_len);
-    if (CFStringGetCString(cfstringref, &buffer[0], buffer.size(), kCFStringEncodingASCII)) {
-        return std::string(buffer.data());
-    }
-
-    return std::string("");
 }
 
 int get_mtl_device_core_count() {
