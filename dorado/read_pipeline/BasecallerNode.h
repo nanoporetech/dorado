@@ -6,7 +6,7 @@ class BasecallerNode : public ReadSink {
 public:
     // Chunk size and overlap are in raw samples
     BasecallerNode(ReadSink &sink,
-                   std::vector<Runner> model_runners,
+                   std::vector<dorado::Runner> model_runners,
                    size_t batch_size,
                    size_t chunk_size,
                    size_t overlap,
@@ -26,7 +26,7 @@ private:
 
     ReadSink &m_sink;
     // Vector of model runners (each with their own GPU access etc)
-    std::vector<Runner> m_model_runners;
+    std::vector<dorado::Runner> m_model_runners;
     // Number of chunks in a batch
     size_t m_batch_size;
     // Chunk length

@@ -7,12 +7,14 @@
 #include <vector>
 
 class RemoraChunk;
+namespace dorado {
 class RemoraCaller;
+}
 
 class ModBaseCallerNode : public ReadSink {
 public:
     ModBaseCallerNode(ReadSink& sink,
-                      std::vector<std::shared_ptr<RemoraCaller>> model_callers,
+                      std::vector<std::shared_ptr<dorado::RemoraCaller>> model_callers,
                       size_t remora_threads,
                       size_t num_devices,
                       size_t block_stride,
@@ -40,7 +42,7 @@ private:
     size_t m_batch_size;
     size_t m_block_stride;
 
-    std::vector<std::shared_ptr<RemoraCaller>> m_callers;
+    std::vector<std::shared_ptr<dorado::RemoraCaller>> m_callers;
 
     std::unique_ptr<std::thread> m_output_worker;
     std::vector<std::unique_ptr<std::thread>> m_caller_workers;

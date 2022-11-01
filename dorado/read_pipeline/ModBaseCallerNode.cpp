@@ -10,13 +10,14 @@
 #include <chrono>
 using namespace std::chrono_literals;
 
-ModBaseCallerNode::ModBaseCallerNode(ReadSink& sink,
-                                     std::vector<std::shared_ptr<RemoraCaller>> model_callers,
-                                     size_t remora_threads,
-                                     size_t num_devices,
-                                     size_t block_stride,
-                                     size_t batch_size,
-                                     size_t max_reads)
+ModBaseCallerNode::ModBaseCallerNode(
+        ReadSink& sink,
+        std::vector<std::shared_ptr<dorado::RemoraCaller>> model_callers,
+        size_t remora_threads,
+        size_t num_devices,
+        size_t block_stride,
+        size_t batch_size,
+        size_t max_reads)
         : ReadSink(max_reads),
           m_sink(sink),
           m_num_devices(num_devices),

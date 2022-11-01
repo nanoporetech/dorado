@@ -23,6 +23,27 @@
 using namespace torch::nn;
 using namespace torch::indexing;
 
+namespace {
+template <class Model>
+ModuleHolder<AnyModule> populate_model(Model&& model,
+                                       const std::filesystem::path& path,
+                                       torch::TensorOptions options) {
+    auto state_dict = model->load_weights(path);
+    model->load_state_dict(state_dict);
+    model->to(options.dtype_opt().value().toScalarType());
+    model->to(options.device_opt().value());
+    model->eval();
+
+    auto module = AnyModule(model);
+    auto holder = ModuleHolder<AnyModule>(module);
+    return holder;
+}
+}  // namespace
+
+namespace dorado {
+
+namespace nn {
+
 struct UnpaddedConvolutionImpl : Module {
     UnpaddedConvolutionImpl(int size = 1, int outsize = 1, int k = 1, int stride = 1) {
         conv = register_module("conv", Conv1d(Conv1dOptions(size, outsize, k).stride(stride)));
@@ -211,22 +232,7 @@ const std::vector<std::string> RemoraConvLSTMModelImpl::weight_tensors{
 TORCH_MODULE(RemoraConvModel);
 TORCH_MODULE(RemoraConvLSTMModel);
 
-namespace {
-template <class Model>
-ModuleHolder<AnyModule> populate_model(Model&& model,
-                                       const std::filesystem::path& path,
-                                       torch::TensorOptions options) {
-    auto state_dict = model->load_weights(path);
-    model->load_state_dict(state_dict);
-    model->to(options.dtype_opt().value().toScalarType());
-    model->to(options.device_opt().value());
-    model->eval();
-
-    auto module = AnyModule(model);
-    auto holder = ModuleHolder<AnyModule>(module);
-    return holder;
-}
-}  // namespace
+}  // namespace nn
 
 ModuleHolder<AnyModule> load_remora_model(const std::filesystem::path& model_path,
                                           torch::TensorOptions options) {
@@ -241,12 +247,12 @@ ModuleHolder<AnyModule> load_remora_model(const std::filesystem::path& model_pat
     const auto num_out = toml::find<int>(model_params, "num_out");
 
     if (model_type == "conv_lstm") {
-        auto model = RemoraConvLSTMModel(size, kmer_len, num_out);
+        auto model = nn::RemoraConvLSTMModel(size, kmer_len, num_out);
         return populate_model(model, model_path, options);
     }
 
     if (model_type == "conv_only") {
-        auto model = RemoraConvModel(size, kmer_len, num_out);
+        auto model = nn::RemoraConvModel(size, kmer_len, num_out);
         return populate_model(model, model_path, options);
     }
 
@@ -386,3 +392,5 @@ torch::Tensor RemoraCaller::call_chunks(int num_chunks) {
 
     return scores.to(torch::kCPU);
 }
+
+}  // namespace dorado

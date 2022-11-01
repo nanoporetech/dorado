@@ -200,7 +200,7 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
 }
 
 BasecallerNode::BasecallerNode(ReadSink &sink,
-                               std::vector<Runner> model_runners,
+                               std::vector<dorado::Runner> model_runners,
                                size_t batch_size,
                                size_t chunk_size,
                                size_t overlap,

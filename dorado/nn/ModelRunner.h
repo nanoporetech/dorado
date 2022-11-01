@@ -8,6 +8,8 @@
 
 #include <string>
 
+namespace dorado {
+
 class ModelRunnerBase {
 public:
     virtual void accept_chunk(int chunk_idx, at::Tensor slice) = 0;
@@ -56,7 +58,8 @@ ModelRunner<T>::ModelRunner(const std::filesystem::path &model_path,
     m_decoder = std::make_unique<T>();
 
     m_options = torch::TensorOptions().dtype(T::dtype).device(device);
-    auto [crf_module, stride] = load_crf_model(model_path, batch_size, chunk_size, m_options);
+    auto [crf_module, stride] =
+            dorado::load_crf_model(model_path, batch_size, chunk_size, m_options);
     m_module = crf_module;
     m_model_stride = stride;
 
@@ -78,3 +81,5 @@ template <typename T>
 void ModelRunner<T>::accept_chunk(int num_chunks, at::Tensor slice) {
     m_input.index_put_({num_chunks, 0}, slice);
 }
+
+}  // namespace dorado

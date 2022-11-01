@@ -13,12 +13,14 @@
 #include <string>
 #include <vector>
 
-namespace dorado::utils {
-struct BaseModInfo;
-}
-
 class RemoraEncoder;
 class RemoraScaler;
+
+namespace dorado {
+
+namespace utils {
+struct BaseModInfo;
+}
 
 torch::nn::ModuleHolder<torch::nn::AnyModule> load_remora_model(
         const std::filesystem::path& model_path,
@@ -70,3 +72,5 @@ public:
     void accept_chunk(int num_chunks, at::Tensor signal, const std::vector<float>& kmers);
     torch::Tensor call_chunks(int num_chunks);
 };
+
+}  // namespace dorado
