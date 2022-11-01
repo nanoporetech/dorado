@@ -427,7 +427,7 @@ public:
 
         m_device = get_mtl_device();
 
-        m_decoder_options = DecoderOptions();
+        m_decoder_options = dorado::DecoderOptions();
         m_decoder_options.q_shift = qbias;
         m_decoder_options.q_scale = qscale;
 
@@ -590,7 +590,9 @@ public:
     }
 
     struct NNTask {
-        NNTask(torch::Tensor *input_, int num_chunks_, std::vector<DecodedChunk> *out_chunks_)
+        NNTask(torch::Tensor *input_,
+               int num_chunks_,
+               std::vector<dorado::DecodedChunk> *out_chunks_)
                 : input(input_), out_chunks(out_chunks_), num_chunks(num_chunks_) {
             static int run = 0;
             run_id = run++;
@@ -600,14 +602,16 @@ public:
         std::mutex mut;
         std::condition_variable cv;
         bool ready{false};
-        std::vector<DecodedChunk> *out_chunks;
+        std::vector<dorado::DecodedChunk> *out_chunks;
         int num_chunks;
         int decode_chunks_started{0};
         int decode_chunks_finished{0};
         int run_id;
     };
 
-    void call_chunks(torch::Tensor &input, int num_chunks, std::vector<DecodedChunk> &out_chunks) {
+    void call_chunks(torch::Tensor &input,
+                     int num_chunks,
+                     std::vector<dorado::DecodedChunk> &out_chunks) {
         if (num_chunks == 0) {
             return;
         }
@@ -739,7 +743,7 @@ public:
                     m_decoder_options.q_shift, m_decoder_options.q_scale,
                     m_decoder_options.temperature);
 
-            (*task->out_chunks)[chunk_idx] = DecodedChunk{sequence, qstring, moves};
+            (*task->out_chunks)[chunk_idx] = dorado::DecodedChunk{sequence, qstring, moves};
 
             // Wake the waiting thread which called `call_chunks()` if we're done decoding
             std::unique_lock<std::mutex> task_lock(task->mut);
@@ -761,7 +765,7 @@ public:
     std::mutex m_decode_lock;
     std::condition_variable m_decode_cv;
     std::vector<std::unique_ptr<std::thread>> m_decode_threads;
-    DecoderOptions m_decoder_options;
+    dorado::DecoderOptions m_decoder_options;
     MetalModel m_model{nullptr};
     MTL::Device *m_device;
     MTL::CommandQueue *m_command_queue;
@@ -797,8 +801,8 @@ void MetalModelRunner::accept_chunk(int chunk_idx, at::Tensor slice) {
     m_input.index_put_({chunk_idx, 0}, slice);
 }
 
-std::vector<DecodedChunk> MetalModelRunner::call_chunks(int num_chunks) {
-    std::vector<DecodedChunk> out_chunks(num_chunks);
+std::vector<dorado::DecodedChunk> MetalModelRunner::call_chunks(int num_chunks) {
+    std::vector<dorado::DecodedChunk> out_chunks(num_chunks);
     m_caller->call_chunks(m_input, num_chunks, out_chunks);
     return out_chunks;
 }
