@@ -7,6 +7,8 @@
 #include <chrono>
 #include <iostream>
 
+namespace dorado {
+
 int benchmark(int argc, char* argv[]) {
     argparse::ArgumentParser parser("dorado", DORADO_VERSION);
 
@@ -65,3 +67,5 @@ int benchmark(int argc, char* argv[]) {
 
     return 0;
 }
+
+}  // namespace dorado
