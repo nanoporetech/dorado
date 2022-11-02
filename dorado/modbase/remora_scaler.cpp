@@ -6,6 +6,8 @@
 #include <algorithm>
 #include <iterator>
 
+namespace dorado {
+
 RemoraScaler::RemoraScaler(const std::vector<float>& kmer_levels,
                            size_t kmer_len,
                            size_t centre_index)
@@ -72,3 +74,5 @@ std::pair<float, float> RemoraScaler::rescale(const torch::Tensor samples,
     auto [new_scale, new_offset, rcoeff] = dorado::utils::linear_regression(optim_dacs, new_levels);
     return {new_offset, new_scale};
 }
+
+}  // namespace dorado

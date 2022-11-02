@@ -17,7 +17,7 @@ TEST_CASE("Encode sequence for modified basecalling", TEST_GROUP) {
     auto seq_to_sig_map =
             dorado::utils::moves_to_map(moves, BLOCK_STRIDE, moves.size() * BLOCK_STRIDE);
 
-    RemoraEncoder encoder(BLOCK_STRIDE, SLICE_BLOCKS * BLOCK_STRIDE, 1, 1);
+    dorado::RemoraEncoder encoder(BLOCK_STRIDE, SLICE_BLOCKS * BLOCK_STRIDE, 1, 1);
     encoder.init(seq_ints, seq_to_sig_map);
 
     auto slice0 = encoder.get_context(0);  // The T in the NTA 3mer.

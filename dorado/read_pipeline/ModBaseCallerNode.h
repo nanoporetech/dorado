@@ -6,11 +6,10 @@
 #include <memory>
 #include <vector>
 
-class RemoraChunk;
-
 namespace dorado {
 
 class RemoraCaller;
+class RemoraChunk;
 
 class ModBaseCallerNode : public ReadSink {
 public:
@@ -32,6 +31,7 @@ private:
 
     // Worker threads, scales and chunks reads for callers and enqueues them
     void runner_worker_thread(size_t runner_id);
+
     // Worker thread per caller, performs the GPU calls to the remora models
     void caller_worker_thread(size_t caller_id);
 
@@ -43,7 +43,7 @@ private:
     size_t m_batch_size;
     size_t m_block_stride;
 
-    std::vector<std::shared_ptr<dorado::RemoraCaller>> m_callers;
+    std::vector<std::shared_ptr<RemoraCaller>> m_callers;
 
     std::unique_ptr<std::thread> m_output_worker;
     std::vector<std::unique_ptr<std::thread>> m_caller_workers;

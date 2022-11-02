@@ -13,14 +13,14 @@
 #include <string>
 #include <vector>
 
-class RemoraEncoder;
-class RemoraScaler;
-
 namespace dorado {
 
 namespace utils {
 struct BaseModInfo;
 }
+
+class RemoraEncoder;
+class RemoraScaler;
 
 torch::nn::ModuleHolder<torch::nn::AnyModule> load_remora_model(
         const std::filesystem::path& model_path,

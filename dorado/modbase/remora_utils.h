@@ -6,8 +6,8 @@
 #include <vector>
 
 namespace dorado {
+
 class Read;
-}
 
 class RemoraUtils {
 public:
@@ -31,3 +31,5 @@ struct RemoraChunk {
     size_t context_hit;
     std::vector<float> scores;
 };
+
+}  // namespace dorado
