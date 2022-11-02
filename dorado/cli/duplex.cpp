@@ -300,7 +300,6 @@ int duplex(int argc, char* argv[]) {
 
             //Now - we have to do the actual basespace alignment itself
 
-            std::vector<char> consensus;
             int query_cursor = 0;
             int target_cursor = result.startLocations[0];
 
@@ -358,18 +357,21 @@ int duplex(int argc, char* argv[]) {
             }
 
             end_alignment_position += num_consecutive_wanted;
-
+            std::vector<char> consensus;
+            std::vector<char> q_string;
             if (alignment_possible) {
                 for (int i = alignment_position; i < end_alignment_position; i++) {
-                    if (temp_q_string.at(target_cursor) >= comp_q_scores_reverse.at(query_cursor)) { // Target is higher Q
-                        // If there is *not* an insertion to the query, add the string from the target curson
+                    if (temp_q_string.at(target_cursor) > comp_q_scores_reverse.at(query_cursor)) { // Target is higher Q
+                        // If there is *not* an insertion to the query, add the nucleotide from the target cursor
                         if (result.alignment[i] != 2) {
                             consensus.push_back(temp_str.at(target_cursor));
+                            q_string.push_back(temp_q_string.at(target_cursor));
                         }
                     } else {
-                        // If there is *not* an insertion to the target, push back the query cursor
+                        // If there is *not* an insertion to the target, add the nucleotide from the query cursor
                         if (result.alignment[i] != 1) {
                             consensus.push_back(comp_str_rc.at(query_cursor));
+                            q_string.push_back(comp_q_scores_reverse.at(query_cursor));
                         }
                     }
 
@@ -384,20 +386,26 @@ int duplex(int argc, char* argv[]) {
                     }
                 }
 
-                std::cout << ">Read " << std::to_string(i) << std::endl;
+                std::cout << ">" << temp_id << std::endl;
                 for (auto& c : consensus) {
                     std::cout << c;
                 }
                 std::cout << std::endl;
+/*
+                for (auto& q : q_string) {
+                    std::cout << char(q + 33);
+                }
+                std::cout << std::endl;
+*/
                 edlibFreeAlignResult(result);
             }
         }
 
-/*
-        if (i > 50000) {
+
+        if (i > 75) {
             break;
         }
-*/
+
 
         i++;
     }
