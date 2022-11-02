@@ -402,7 +402,7 @@ struct MetalModelImpl : Module {
     }
 
     void load_state_dict(const std::vector<torch::Tensor> &weights) {
-        dorado::utils::load_state_dict(*this, weights);
+        utils::load_state_dict(*this, weights);
         mtl_block->load_weights();
     }
 
@@ -594,7 +594,7 @@ public:
 
                 "9.linear.weight.tensor",    "9.linear.bias.tensor"};
 
-        return dorado::utils::load_tensors(dir, tensors);
+        return utils::load_tensors(dir, tensors);
     }
 
     struct NNTask {
@@ -608,7 +608,7 @@ public:
         std::mutex mut;
         std::condition_variable cv;
         bool ready{false};
-        std::vector<dorado::DecodedChunk> *out_chunks;
+        std::vector<DecodedChunk> *out_chunks;
         int num_chunks;
         int decode_chunks_started{0};
         int decode_chunks_finished{0};

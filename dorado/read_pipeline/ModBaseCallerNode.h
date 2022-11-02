@@ -14,7 +14,7 @@ class RemoraChunk;
 class ModBaseCallerNode : public ReadSink {
 public:
     ModBaseCallerNode(ReadSink& sink,
-                      std::vector<std::shared_ptr<dorado::RemoraCaller>> model_callers,
+                      std::vector<std::shared_ptr<RemoraCaller>> model_callers,
                       size_t remora_threads,
                       size_t num_devices,
                       size_t block_stride,

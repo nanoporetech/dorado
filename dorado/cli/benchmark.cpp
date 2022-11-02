@@ -42,7 +42,7 @@ int benchmark(int argc, char* argv[]) {
 
         // nth_element
         start = std::chrono::system_clock::now();
-        res = dorado::utils::quantile(x, q);
+        res = utils::quantile(x, q);
         end = std::chrono::system_clock::now();
 
         duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
@@ -55,7 +55,7 @@ int benchmark(int argc, char* argv[]) {
 
         // counting
         start = std::chrono::system_clock::now();
-        res = dorado::utils::quantile_counting(x, q);
+        res = utils::quantile_counting(x, q);
         end = std::chrono::system_clock::now();
         duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 

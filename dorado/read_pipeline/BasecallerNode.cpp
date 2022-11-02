@@ -123,7 +123,7 @@ void BasecallerNode::working_reads_manager() {
         }
 
         for (auto &read : completed_reads) {
-            dorado::utils::stitch_chunks(read);
+            utils::stitch_chunks(read);
             m_sink.push_read(read);
         }
     }
@@ -202,7 +202,7 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
 }
 
 BasecallerNode::BasecallerNode(ReadSink &sink,
-                               std::vector<dorado::Runner> model_runners,
+                               std::vector<Runner> model_runners,
                                size_t batch_size,
                                size_t chunk_size,
                                size_t overlap,

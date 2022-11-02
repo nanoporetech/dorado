@@ -13,7 +13,7 @@ namespace dorado {
 class ModelRunnerBase {
 public:
     virtual void accept_chunk(int chunk_idx, at::Tensor slice) = 0;
-    virtual std::vector<dorado::DecodedChunk> call_chunks(int num_chunks) = 0;
+    virtual std::vector<DecodedChunk> call_chunks(int num_chunks) = 0;
     virtual size_t model_stride() const = 0;
     virtual size_t chunk_size() const = 0;
 };
@@ -28,7 +28,7 @@ public:
                 int chunk_size,
                 int batch_size);
     void accept_chunk(int chunk_idx, at::Tensor slice) final;
-    std::vector<dorado::DecodedChunk> call_chunks(int num_chunks) final;
+    std::vector<DecodedChunk> call_chunks(int num_chunks) final;
     size_t model_stride() const final { return m_model_stride; }
     size_t chunk_size() const final { return m_input.size(2); }
 
@@ -37,7 +37,7 @@ private:
     torch::Tensor m_input;
     torch::TensorOptions m_options;
     std::unique_ptr<T> m_decoder;
-    dorado::DecoderOptions m_decoder_options;
+    DecoderOptions m_decoder_options;
     torch::nn::ModuleHolder<torch::nn::AnyModule> m_module{nullptr};
     size_t m_model_stride;
 };
@@ -52,14 +52,13 @@ ModelRunner<T>::ModelRunner(const std::filesystem::path &model_path,
     const auto qbias = toml::find<float>(qscore, "bias");
     const auto qscale = toml::find<float>(qscore, "scale");
 
-    m_decoder_options = dorado::DecoderOptions();
+    m_decoder_options = DecoderOptions();
     m_decoder_options.q_shift = qbias;
     m_decoder_options.q_scale = qscale;
     m_decoder = std::make_unique<T>();
 
     m_options = torch::TensorOptions().dtype(T::dtype).device(device);
-    auto [crf_module, stride] =
-            dorado::load_crf_model(model_path, batch_size, chunk_size, m_options);
+    auto [crf_module, stride] = load_crf_model(model_path, batch_size, chunk_size, m_options);
     m_module = crf_module;
     m_model_stride = stride;
 
@@ -71,7 +70,7 @@ ModelRunner<T>::ModelRunner(const std::filesystem::path &model_path,
 }
 
 template <typename T>
-std::vector<dorado::DecodedChunk> ModelRunner<T>::call_chunks(int num_chunks) {
+std::vector<DecodedChunk> ModelRunner<T>::call_chunks(int num_chunks) {
     torch::InferenceMode guard;
     auto scores = m_module->forward(m_input.to(m_options.device_opt().value()));
     return m_decoder->beam_search(scores, num_chunks, m_decoder_options);

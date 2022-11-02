@@ -229,7 +229,7 @@ void DataLoader::load_pod5_reads_from_file(const std::string& path) {
             spdlog::error("Failed to get batch row count");
         }
 
-        std::vector<std::future<std::shared_ptr<dorado::Read>>> futures;
+        std::vector<std::future<std::shared_ptr<Read>>> futures;
 
         for (std::size_t row = 0; row < batch_row_count; ++row) {
             futures.push_back(pool.push(process_pod5_read, row, batch, file, path, m_device));
