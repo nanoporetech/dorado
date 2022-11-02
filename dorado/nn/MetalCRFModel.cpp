@@ -510,8 +510,8 @@ public:
         m_out_batch_size = batch_size / m_out_split;
         assert(m_out_batch_size % 48 == 0);
 
-        m_model =
-                MetalModel(insize, outsize, stride, chunk_size, batch_size, m_out_split, m_device);
+        m_model = nn::MetalModel(insize, outsize, stride, chunk_size, batch_size, m_out_split,
+                                 m_device);
         m_model->load_state_dict(state_dict);
         m_model->eval();
 
@@ -770,7 +770,7 @@ public:
     std::condition_variable m_decode_cv;
     std::vector<std::unique_ptr<std::thread>> m_decode_threads;
     DecoderOptions m_decoder_options;
-    MetalModel m_model{nullptr};
+    nn::MetalModel m_model{nullptr};
     MTL::Device *m_device;
     MTL::CommandQueue *m_command_queue;
     MTL::ComputePipelineState *m_scan_cps, *m_add_softmax_cps;
