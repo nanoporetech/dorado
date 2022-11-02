@@ -270,10 +270,6 @@ int duplex(int argc, char* argv[]) {
                                      1,
                                      pool_window / 2);
 
-
-
-        //t.index({0, torch::indexing::Slice()}) = t_float.index({0, torch::indexing::Slice()});
-
         if (reads.find(comp_id) == reads.end()) {
             //std::cerr << "Corresponding complement is missing" << std::endl;
         } else if (temp_str.size() != 0) {  // We can do the alignment
@@ -363,10 +359,16 @@ int duplex(int argc, char* argv[]) {
 
             if (alignment_possible) {
                 for (int i = alignment_position; i < end_alignment_position; i++) {
-                    if (temp_q_string.at(target_cursor) >= comp_q_scores_reverse.at(query_cursor)) {
-                        consensus.push_back(temp_str.at(target_cursor));
+                    if (temp_q_string.at(target_cursor) >= comp_q_scores_reverse.at(query_cursor)) { // Target is higher Q
+                        // If there is *not* an insertion to the query, add the string from the target curson
+                        if (result.alignment[i] != 2) {
+                            consensus.push_back(temp_str.at(target_cursor));
+                        }
                     } else {
-                        consensus.push_back(comp_str_rc.at(query_cursor));
+                        // If there is *not* an insertion to the target, push back the query cursor
+                        if (result.alignment[i] != 1) {
+                            consensus.push_back(comp_str_rc.at(query_cursor));
+                        }
                     }
 
                     //Anything but a query insertion and target advances
@@ -389,7 +391,7 @@ int duplex(int argc, char* argv[]) {
             }
         }
 
-        if (i > 1000) {
+        if (i > 75) {
             break;
         }
 
