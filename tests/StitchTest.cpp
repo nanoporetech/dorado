@@ -42,13 +42,13 @@ TEST_CASE("Test stitch_chunks", TEST_GROUP) {
     constexpr size_t CHUNK_SIZE = 10;
     constexpr size_t OVERLAP = 3;
 
-    auto read = std::make_shared<Read>();
+    auto read = std::make_shared<dorado::Read>();
     read->num_chunks = 0;
 
     size_t offset = 0;
     size_t chunk_in_read_idx = 0;
     size_t signal_chunk_step = CHUNK_SIZE - OVERLAP;
-    auto chunk = std::make_shared<Chunk>(read, offset, chunk_in_read_idx++, CHUNK_SIZE);
+    auto chunk = std::make_shared<dorado::Chunk>(read, offset, chunk_in_read_idx++, CHUNK_SIZE);
     chunk->qstring = QSTR[read->num_chunks];
     chunk->seq = SEQS[read->num_chunks];
     chunk->moves = MOVES[read->num_chunks];
@@ -56,7 +56,7 @@ TEST_CASE("Test stitch_chunks", TEST_GROUP) {
     read->num_chunks++;
     while (offset + CHUNK_SIZE < RAW_SIGNAL_SIZE) {
         offset = std::min(offset + signal_chunk_step, RAW_SIGNAL_SIZE - CHUNK_SIZE);
-        chunk = std::make_shared<Chunk>(read, offset, chunk_in_read_idx++, CHUNK_SIZE);
+        chunk = std::make_shared<dorado::Chunk>(read, offset, chunk_in_read_idx++, CHUNK_SIZE);
         chunk->qstring = QSTR[read->num_chunks];
         chunk->seq = SEQS[read->num_chunks];
         chunk->moves = MOVES[read->num_chunks];

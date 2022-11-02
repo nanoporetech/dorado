@@ -5,7 +5,9 @@
 #include <memory>
 #include <vector>
 
+namespace dorado {
 class Read;
+}
 
 class RemoraUtils {
 public:
@@ -14,7 +16,7 @@ public:
 };
 
 struct RemoraChunk {
-    RemoraChunk(std::shared_ptr<Read> read,
+    RemoraChunk(std::shared_ptr<dorado::Read> read,
                 torch::Tensor input_signal,
                 std::vector<float> kmer_data,
                 size_t position)
@@ -23,7 +25,7 @@ struct RemoraChunk {
               encoded_kmers(std::move(kmer_data)),
               context_hit(position) {}
 
-    std::weak_ptr<Read> source_read;
+    std::weak_ptr<dorado::Read> source_read;
     torch::Tensor signal;
     std::vector<float> encoded_kmers;
     size_t context_hit;

@@ -6,7 +6,7 @@
 
 #define TEST_GROUP "Fast5DataLoaderTest: "
 
-class MockSink : public ReadSink {
+class MockSink : public dorado::ReadSink {
 public:
     MockSink() : ReadSink(1000) {}
     size_t get_read_count() { return m_reads.size(); }

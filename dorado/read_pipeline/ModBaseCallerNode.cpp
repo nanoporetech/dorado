@@ -10,6 +10,8 @@
 #include <chrono>
 using namespace std::chrono_literals;
 
+namespace dorado {
+
 ModBaseCallerNode::ModBaseCallerNode(
         ReadSink& sink,
         std::vector<std::shared_ptr<dorado::RemoraCaller>> model_callers,
@@ -107,7 +109,8 @@ void ModBaseCallerNode::init_modbase_info() {
         }
     }
 
-    m_base_mod_info = std::make_shared<BaseModInfo>(alphabet, long_names, context_handler.encode());
+    m_base_mod_info =
+            std::make_shared<utils::BaseModInfo>(alphabet, long_names, context_handler.encode());
 
     m_base_prob_offsets[0] = 0;
     m_base_prob_offsets[1] = base_counts[0];
@@ -331,3 +334,5 @@ void ModBaseCallerNode::output_worker_thread() {
         working_reads_lock.unlock();
     }
 }
+
+}  // namespace dorado

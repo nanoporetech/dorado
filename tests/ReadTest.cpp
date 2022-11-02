@@ -18,7 +18,7 @@ TEST_CASE(TEST_GROUP ": Test tag generation", TEST_GROUP) {
                                                  "sd:f:8.258",
                                                  "sv:Z:quantile"};
 
-    Read test_read;
+    dorado::Read test_read;
 
     test_read.raw_data = torch::empty(4000);
     test_read.shift = 128.3842f;
@@ -34,7 +34,7 @@ TEST_CASE(TEST_GROUP ": Test tag generation", TEST_GROUP) {
 }
 
 TEST_CASE(TEST_GROUP ": Test sam line generation", TEST_GROUP) {
-    Read test_read{};
+    dorado::Read test_read{};
     SECTION("Generating sam line for empty read throws") {
         REQUIRE_THROWS(test_read.extract_sam_lines());
     }
@@ -99,7 +99,7 @@ TEST_CASE(TEST_GROUP ": Methylation tag generation", TEST_GROUP) {
             0,   0,   255, 0,   0,   0,    // C
     };
 
-    Read read;
+    dorado::Read read;
     read.seq = "ACAGTGACTAAACTC";
     read.base_mod_probs = modbase_probs;
 

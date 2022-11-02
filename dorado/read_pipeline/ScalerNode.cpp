@@ -7,6 +7,8 @@
 
 using namespace std::chrono_literals;
 
+namespace {
+
 std::pair<float, float> normalisation(torch::Tensor& x) {
     //Calculate shift and scale factors for normalisation.
     auto quantiles = dorado::utils::quantile_counting(x, torch::tensor({0.2, 0.9}));
@@ -16,6 +18,10 @@ std::pair<float, float> normalisation(torch::Tensor& x) {
     float scale = std::max(1.0f, 0.53f * (q90 - q20));
     return std::make_pair(shift, scale);
 }
+
+}  // namespace
+
+namespace dorado {
 
 void ScalerNode::worker_thread() {
     while (true) {
@@ -113,3 +119,5 @@ int ScalerNode::trim(torch::Tensor signal,
 
     return min_trim;
 }
+
+}  // namespace dorado

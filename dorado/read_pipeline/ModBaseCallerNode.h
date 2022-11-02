@@ -7,9 +7,10 @@
 #include <vector>
 
 class RemoraChunk;
+
 namespace dorado {
+
 class RemoraCaller;
-}
 
 class ModBaseCallerNode : public ReadSink {
 public:
@@ -68,9 +69,10 @@ private:
     bool m_terminate_callers{false};
     bool m_terminate_output{false};
 
-    using BaseModInfo = dorado::utils::BaseModInfo;
-    std::shared_ptr<const BaseModInfo> m_base_mod_info;
+    std::shared_ptr<const utils::BaseModInfo> m_base_mod_info;
     // The offsets to the canonical bases in the modbase alphabet
     std::array<size_t, 4> m_base_prob_offsets;
     size_t m_num_states{4};
 };
+
+}  // namespace dorado

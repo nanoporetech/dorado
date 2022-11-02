@@ -12,6 +12,8 @@
 using namespace std::chrono_literals;
 using namespace torch::indexing;
 
+namespace dorado {
+
 void BasecallerNode::input_worker_thread() {
     while (true) {
         // Allow 5 batches per model runner on the chunks_in queue
@@ -243,3 +245,5 @@ BasecallerNode::~BasecallerNode() {
     m_working_reads_manager->join();
     termination_time = std::chrono::system_clock::now();
 }
+
+}  // namespace dorado

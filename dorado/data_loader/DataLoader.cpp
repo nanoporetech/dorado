@@ -72,11 +72,11 @@ std::string adjust_time(const std::string& time_stamp, uint32_t offset) {
     return std::string(buff);
 }
 
-std::shared_ptr<Read> process_pod5_read(size_t row,
-                                        Pod5ReadRecordBatch* batch,
-                                        Pod5FileReader* file,
-                                        const std::string path,
-                                        std::string device) {
+std::shared_ptr<dorado::Read> process_pod5_read(size_t row,
+                                                Pod5ReadRecordBatch* batch,
+                                                Pod5FileReader* file,
+                                                const std::string path,
+                                                std::string device) {
     uint8_t read_id[16];
     int16_t pore = 0;
     int16_t calibration_idx = 0;
@@ -153,7 +153,7 @@ std::shared_ptr<Read> process_pod5_read(size_t row,
         samples_read_so_far += signal_rows[i]->stored_sample_count;
     }
 
-    auto new_read = std::make_shared<Read>();
+    auto new_read = std::make_shared<dorado::Read>();
     new_read->raw_data = samples;
     auto start_time_ms = run_acquisition_start_time_ms + ((start_sample * 1000) / run_sample_rate);
     auto start_time = get_string_timestamp_from_unix_time(start_time_ms);
@@ -229,7 +229,7 @@ void DataLoader::load_pod5_reads_from_file(const std::string& path) {
             spdlog::error("Failed to get batch row count");
         }
 
-        std::vector<std::future<std::shared_ptr<Read>>> futures;
+        std::vector<std::future<std::shared_ptr<dorado::Read>>> futures;
 
         for (std::size_t row = 0; row < batch_row_count; ++row) {
             futures.push_back(pool.push(process_pod5_read, row, batch, file, path, m_device));

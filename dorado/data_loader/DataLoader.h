@@ -1,9 +1,9 @@
 #pragma once
 #include <string>
 
-class ReadSink;
-
 namespace dorado {
+
+class ReadSink;
 
 class DataLoader {
 public:
