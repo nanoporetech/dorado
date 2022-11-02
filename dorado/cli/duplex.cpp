@@ -170,7 +170,7 @@ int duplex(int argc, char* argv[]) {
     std::cerr << "Loading BAM" << std::endl;
 
     samFile* fp_in = hts_open(
-            "/media/groups/machine_learning/active/mvella/duplex_data/kit14_260bps_duplex_test_set/calls.bam",
+            "/data/scratch/mvella/duplex/calls.bam",
             "r");                             //open bam file
     bam_hdr_t* bamHdr = sam_hdr_read(fp_in);  //read header
     bam1_t* aln = bam_init1();                //initialize an alignment
@@ -357,6 +357,8 @@ int duplex(int argc, char* argv[]) {
 
             }
 
+            end_alignment_position += num_consecutive_wanted;
+
             if (alignment_possible) {
                 for (int i = alignment_position; i < end_alignment_position; i++) {
                     if (temp_q_string.at(target_cursor) >= comp_q_scores_reverse.at(query_cursor)) { // Target is higher Q
@@ -382,18 +384,20 @@ int duplex(int argc, char* argv[]) {
                     }
                 }
 
-                std::cerr << ">Read " << std::to_string(i) << std::endl;
+                std::cout << ">Read " << std::to_string(i) << std::endl;
                 for (auto& c : consensus) {
-                    std::cerr << c;
+                    std::cout << c;
                 }
-                std::cerr << std::endl;
+                std::cout << std::endl;
                 edlibFreeAlignResult(result);
             }
         }
 
-        if (i > 75) {
+/*
+        if (i > 50000) {
             break;
         }
+*/
 
         i++;
     }
