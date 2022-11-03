@@ -170,7 +170,7 @@ int duplex(int argc, char* argv[]) {
     std::cerr << "Loading BAM" << std::endl;
 
     samFile* fp_in = hts_open(
-            "/data/scratch/mvella/duplex/calls.bam",
+            "/data/duplex_data/calls.bam",
             "r");                             //open bam file
     bam_hdr_t* bamHdr = sam_hdr_read(fp_in);  //read header
     bam1_t* aln = bam_init1();                //initialize an alignment
@@ -207,7 +207,7 @@ int duplex(int argc, char* argv[]) {
 
     // Let's also load a pairs file
     std::string pairs_file =
-            "/media/groups/machine_learning/active/mvella/duplex_data/kit14_260bps_duplex_test_set/pair_ids_filtered.txt";
+            "/data/duplex_data/pair_ids_filtered.txt";
 
     std::ifstream dataFile;
     dataFile.open(pairs_file);
@@ -237,6 +237,7 @@ int duplex(int argc, char* argv[]) {
     // Let's now perform alignmnet on all pairs:
     EdlibAlignConfig align_config = edlibDefaultAlignConfig();
     align_config.task = EDLIB_TASK_PATH;
+    //align_config.mode = EDLIB_MODE_HW;
 
     std::map<char,char> complementary_nucleotides;
 
@@ -356,10 +357,36 @@ int duplex(int argc, char* argv[]) {
 
             }
 
+            alignment_position -= num_consecutive_wanted;
+
             end_alignment_position += num_consecutive_wanted;
             std::vector<char> consensus;
             std::vector<char> q_string;
+            bool debug = false;
+
+            if (temp_id == "00011c8f-3b76-49a0-a9cc-6026e6e1a8f3"){
+                debug = false;
+
+                std::cerr<< "Template sequence" << std::endl;
+                for (size_t i=0;i<temp_str.size(); i++){
+                    std::cerr<<temp_str[i];
+                }
+                std::cerr<< std::endl;
+                std::cerr<< "Complement sequence" << std::endl;
+                for (size_t i=0;i<comp_str_rc.size(); i++){
+                    std::cerr<<comp_str_rc[i];
+                }
+                std::cerr<<std::endl;
+
+            }
+
+
             if (alignment_possible) {
+                if(debug) {
+                    std::cerr << edlibAlignmentToCigar(result.alignment, result.alignmentLength,
+                                                       EDLIB_CIGAR_EXTENDED);
+                    std::cerr << std::endl;
+                }
                 for (int i = alignment_position; i < end_alignment_position; i++) {
                     if (temp_q_string.at(target_cursor) > comp_q_scores_reverse.at(query_cursor)) { // Target is higher Q
                         // If there is *not* an insertion to the query, add the nucleotide from the target cursor
@@ -375,6 +402,54 @@ int duplex(int argc, char* argv[]) {
                         }
                     }
 
+
+
+                    if (debug){
+                        //Template
+
+                        char tmp_char;
+
+                        if(result.alignment[i] == 2){  // Insertion to query
+                            tmp_char = '-';
+                        }else{
+                            tmp_char = temp_str[target_cursor];
+                        }
+
+                        std::cerr << tmp_char;
+
+                        // Complement
+                        std::cerr << " ";
+
+                        char comp_char;
+
+                        if(result.alignment[i] == 1){ // Insertion to target
+                            comp_char = '-';
+                        }else{
+                             comp_char = comp_str_rc[query_cursor];
+                        }
+#
+                        std::cerr<< comp_char;
+
+                        std::cerr << " ";
+
+                        std::cerr << int(result.alignment[i]);
+
+                        std::cerr << " ";
+                        //Consensus
+                        char cons_char = consensus.back();
+                        std::cerr << cons_char;
+
+                        if (!(cons_char == comp_char && comp_char == tmp_char)){
+                            std::cerr << "*";
+                        }
+
+                        std::cerr << std::endl;
+
+
+
+                    }
+
+
                     //Anything but a query insertion and target advances
                     if (result.alignment[i] != 2) {
                         target_cursor++;
@@ -386,11 +461,13 @@ int duplex(int argc, char* argv[]) {
                     }
                 }
 
-                std::cout << ">" << temp_id << std::endl;
-                for (auto& c : consensus) {
-                    std::cout << c;
+                if (true) {
+                    std::cout << ">" << temp_id << std::endl;
+                    for (auto& c : consensus) {
+                        std::cout << c;
+                    }
+                    std::cout << std::endl;
                 }
-                std::cout << std::endl;
 /*
                 for (auto& q : q_string) {
                     std::cout << char(q + 33);
@@ -402,9 +479,9 @@ int duplex(int argc, char* argv[]) {
         }
 
 
-        if (i > 75) {
+/*        if (i > 75) {
             break;
-        }
+        }*/
 
 
         i++;
