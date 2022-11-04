@@ -91,7 +91,8 @@ set(LIB_SOURCE_FILES
     dorado/utils/stitch.cpp
     dorado/utils/stitch.h
     dorado/utils/tensor_utils.cpp
-    dorado/utils/tensor_utils.h)
+    dorado/utils/tensor_utils.h
+    dorado/utils/bam_utils.cpp)
 
 if(APPLE)
     include(cmake/Metal.cmake)

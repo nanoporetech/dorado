@@ -1,28 +1,12 @@
 #include "Version.h"
-#include "data_loader/DataLoader.h"
-#include "decode/CPUDecoder.h"
-#ifdef __APPLE__
-#include "nn/MetalCRFModel.h"
-#include "utils/metal_utils.h"
-#else
-#include "nn/CudaCRFModel.h"
-#include "utils/cuda_utils.h"
-#endif
+
 #include "3rdparty/edlib/edlib/include/edlib.h"
 #include "htslib/sam.h"
-#include "nn/ModelRunner.h"
-#include "nn/RemoraModel.h"
-#include "read_pipeline/BasecallerNode.h"
-#include "read_pipeline/ModBaseCallerNode.h"
-#include "read_pipeline/ScalerNode.h"
 #include "read_pipeline/WriterNode.h"
 
 #include <argparse.hpp>
 
-#include <filesystem>
-#include <fstream>
 #include <iostream>
-#include <sstream>
 #include <thread>
 
 struct read {
@@ -31,152 +15,31 @@ struct read {
     std::vector<uint8_t> scores;
 };
 
-struct read_pair {
-    std::string temp;
-    std::string comp;
-};
-
-void setup_duplex(std::vector<std::string> args,
-                  const std::filesystem::path& model_path,
-                  const std::string& data_path,
-                  const std::string& remora_models,
-                  const std::string& device,
-                  size_t chunk_size,
-                  size_t overlap,
-                  size_t batch_size,
-                  size_t num_runners,
-                  size_t remora_batch_size,
-                  size_t num_remora_threads,
-                  bool emit_fastq) {
-    torch::set_num_threads(1);
-    std::vector<Runner> runners;
-
-    int num_devices = 1;
-
-    if (device == "cpu") {
-        batch_size = batch_size == 0 ? std::thread::hardware_concurrency() : batch_size;
-        for (int i = 0; i < num_runners; i++) {
-            runners.push_back(std::make_shared<ModelRunner<CPUDecoder>>(model_path, device,
-                                                                        chunk_size, batch_size));
-        }
-#ifdef __APPLE__
-    } else if (device == "metal") {
-        batch_size = batch_size == 0 ? auto_gpu_batch_size(model_path.string()) : batch_size;
-        auto caller = create_metal_caller(model_path, chunk_size, batch_size);
-        for (int i = 0; i < num_runners; i++) {
-            runners.push_back(std::make_shared<MetalModelRunner>(caller, chunk_size, batch_size));
-        }
-    } else {
-        throw std::runtime_error(std::string("Unsupported device: ") + device);
-    }
-#else   // ifdef __APPLE__
-    } else {
-        auto devices = parse_cuda_device_string(device);
-        num_devices = devices.size();
-        batch_size =
-                batch_size == 0 ? auto_gpu_batch_size(model_path.string(), devices) : batch_size;
-        for (auto device_string : devices) {
-            auto caller = create_cuda_caller(model_path, chunk_size, batch_size, device_string);
-            for (int i = 0; i < num_runners; i++) {
-                runners.push_back(
-                        std::make_shared<CudaModelRunner>(caller, chunk_size, batch_size));
-            }
-        }
-    }
-#endif  // __APPLE__
-
-    // verify that all runners are using the same stride, in case we allow multiple models in future
-    auto model_stride = runners.front()->model_stride();
-    assert(std::all_of(runners.begin(), runners.end(), [model_stride](auto runner) {
-        return runner->model_stride() == model_stride;
-    }));
-
-    if (!remora_models.empty() && emit_fastq) {
-        throw std::runtime_error("Modified base models cannot be used with FASTQ output");
-    }
-
-    std::vector<std::filesystem::path> remora_model_list;
-    std::istringstream stream{remora_models};
-    std::string model;
-    while (std::getline(stream, model, ',')) {
-        remora_model_list.push_back(model);
-    }
-
-    // generate model callers before nodes or it affects the speed calculations
-    std::vector<std::shared_ptr<RemoraCaller>> remora_callers;
-    for (const auto& remora_model : remora_model_list) {
-        auto caller = std::make_shared<RemoraCaller>(remora_model, device, remora_batch_size,
-                                                     model_stride);
-        remora_callers.push_back(caller);
-    }
-
-    WriterNode writer_node(std::move(args), emit_fastq, num_devices);
-
-    std::unique_ptr<ModBaseCallerNode> mod_base_caller_node;
-    std::unique_ptr<BasecallerNode> basecaller_node;
-
-    if (!remora_model_list.empty()) {
-        mod_base_caller_node.reset(new ModBaseCallerNode(writer_node, std::move(remora_callers),
-                                                         num_remora_threads, model_stride,
-                                                         remora_batch_size));
-        basecaller_node =
-                std::make_unique<BasecallerNode>(*mod_base_caller_node, std::move(runners),
-                                                 batch_size, chunk_size, overlap, model_stride);
-    } else {
-        basecaller_node = std::make_unique<BasecallerNode>(
-                writer_node, std::move(runners), batch_size, chunk_size, overlap, model_stride);
-    }
-    ScalerNode scaler_node(*basecaller_node, num_devices * 2);
-    DataLoader loader(scaler_node, "cpu", num_devices);
-    loader.load_reads(data_path);
-}
 
 int duplex(int argc, char* argv[]) {
     argparse::ArgumentParser parser("dorado", DORADO_VERSION);
-
-    parser.add_argument("model").help("the basecaller model to run.");
-
-    parser.add_argument("data").help("the data directory.");
-
-    parser.add_argument("-x", "--device")
-            .help("device string in format \"cuda:0,...,N\", \"cuda:all\", \"metal\" etc..")
-#ifdef __APPLE__
-            .default_value(std::string{"metal"});
-#else
-            .default_value(std::string{"cuda:all"});
-#endif
-
-    parser.add_argument("-b", "--batchsize")
-            .default_value(0)
-            .scan<'i', int>()
-            .help("if 0 an optimal batchsize will be selected");
-
-    parser.add_argument("-c", "--chunksize").default_value(10000).scan<'i', int>();
-
-    parser.add_argument("-o", "--overlap").default_value(500).scan<'i', int>();
-
-    parser.add_argument("-r", "--num_runners").default_value(2).scan<'i', int>();
-
-    parser.add_argument("--emit-fastq").default_value(false).implicit_value(true);
-
-    parser.add_argument("--remora-batchsize").default_value(1000).scan<'i', int>();
-
-    parser.add_argument("--remora-threads").default_value(1).scan<'i', int>();
-
-    parser.add_argument("--remora_models")
-            .default_value(std::string())
-            .help("a comma separated list of remora models");
+    parser.add_argument("reads_file").help("Basecalled reads.");
+    parser.add_argument("pairs_file").help("Space-delimited csv containing read ID pairs.");
 
     std::cerr << "Loading BAM" << std::endl;
 
-    samFile* fp_in = hts_open(
-            "/data/duplex_data/calls.bam",
-            "r");                             //open bam file
+    try {
+        parser.parse_args(argc, argv);
+    } catch (const std::exception& e) {
+        std::cerr << e.what() << std::endl;
+        std::cerr << parser;
+        std::exit(1);
+    }
+
+    std::string reads_file = parser.get<std::string>("reads_file");
+    std::string pairs_file = parser.get<std::string>("pairs_file");
+
+    samFile* fp_in = hts_open(reads_file.c_str(), "r");
+
     bam_hdr_t* bamHdr = sam_hdr_read(fp_in);  //read header
     bam1_t* aln = bam_init1();                //initialize an alignment
     std::cerr << "Header:\n " << bamHdr->text << std::endl;
 
-    auto a = sam_read1(fp_in, bamHdr, aln);
     std::map<std::string, read> reads;
     while (sam_read1(fp_in, bamHdr, aln) >= 0) {
         //int32_t pos = aln->core.pos +1; //left most position of alignment in zero based coordianate (+1)
@@ -206,9 +69,6 @@ int duplex(int argc, char* argv[]) {
     std::cerr << "Closing BAM - DONE" << std::endl;
 
     // Let's also load a pairs file
-    std::string pairs_file =
-            "/data/duplex_data/pair_ids_filtered.txt";
-
     std::ifstream dataFile;
     dataFile.open(pairs_file);
 
@@ -237,7 +97,6 @@ int duplex(int argc, char* argv[]) {
     // Let's now perform alignmnet on all pairs:
     EdlibAlignConfig align_config = edlibDefaultAlignConfig();
     align_config.task = EDLIB_TASK_PATH;
-    //align_config.mode = EDLIB_MODE_HW;
 
     std::map<char,char> complementary_nucleotides;
 
@@ -246,7 +105,6 @@ int duplex(int argc, char* argv[]) {
     complementary_nucleotides['G'] = 'C';
     complementary_nucleotides['T'] = 'A';
 
-    int i = 0;
     for (auto key : t_c_map) {
         std::string temp_id = key.first;
         std::string comp_id = key.second;
@@ -300,7 +158,6 @@ int duplex(int argc, char* argv[]) {
                                comp_str_rc.size(), align_config);
 
             //Now - we have to do the actual basespace alignment itself
-
             int query_cursor = 0;
             int target_cursor = result.startLocations[0];
 
@@ -338,7 +195,6 @@ int duplex(int argc, char* argv[]) {
             query_cursor -= num_consecutive_wanted;
 
             // Find reverse trim
-
             int end_alignment_position = result.endLocations[0];
             num_consecutive = 0;
             while(num_consecutive < num_consecutive_wanted){
@@ -354,41 +210,17 @@ int duplex(int argc, char* argv[]) {
                     alignment_possible = false;
                     break;
                 }
-
             }
 
             alignment_position -= num_consecutive_wanted;
-
             end_alignment_position += num_consecutive_wanted;
+
             std::vector<char> consensus;
             std::vector<char> q_string;
-            bool debug = false;
-
-            if (temp_id == "00011c8f-3b76-49a0-a9cc-6026e6e1a8f3"){
-                debug = false;
-
-                std::cerr<< "Template sequence" << std::endl;
-                for (size_t i=0;i<temp_str.size(); i++){
-                    std::cerr<<temp_str[i];
-                }
-                std::cerr<< std::endl;
-                std::cerr<< "Complement sequence" << std::endl;
-                for (size_t i=0;i<comp_str_rc.size(); i++){
-                    std::cerr<<comp_str_rc[i];
-                }
-                std::cerr<<std::endl;
-
-            }
-
 
             if (alignment_possible) {
-                if(debug) {
-                    std::cerr << edlibAlignmentToCigar(result.alignment, result.alignmentLength,
-                                                       EDLIB_CIGAR_EXTENDED);
-                    std::cerr << std::endl;
-                }
                 for (int i = alignment_position; i < end_alignment_position; i++) {
-                    if (temp_q_string.at(target_cursor) > comp_q_scores_reverse.at(query_cursor)) { // Target is higher Q
+                    if (temp_q_string.at(target_cursor) >= comp_q_scores_reverse.at(query_cursor)) { // Target is higher Q
                         // If there is *not* an insertion to the query, add the nucleotide from the target cursor
                         if (result.alignment[i] != 2) {
                             consensus.push_back(temp_str.at(target_cursor));
@@ -402,54 +234,6 @@ int duplex(int argc, char* argv[]) {
                         }
                     }
 
-
-
-                    if (debug){
-                        //Template
-
-                        char tmp_char;
-
-                        if(result.alignment[i] == 2){  // Insertion to query
-                            tmp_char = '-';
-                        }else{
-                            tmp_char = temp_str[target_cursor];
-                        }
-
-                        std::cerr << tmp_char;
-
-                        // Complement
-                        std::cerr << " ";
-
-                        char comp_char;
-
-                        if(result.alignment[i] == 1){ // Insertion to target
-                            comp_char = '-';
-                        }else{
-                             comp_char = comp_str_rc[query_cursor];
-                        }
-#
-                        std::cerr<< comp_char;
-
-                        std::cerr << " ";
-
-                        std::cerr << int(result.alignment[i]);
-
-                        std::cerr << " ";
-                        //Consensus
-                        char cons_char = consensus.back();
-                        std::cerr << cons_char;
-
-                        if (!(cons_char == comp_char && comp_char == tmp_char)){
-                            std::cerr << "*";
-                        }
-
-                        std::cerr << std::endl;
-
-
-
-                    }
-
-
                     //Anything but a query insertion and target advances
                     if (result.alignment[i] != 2) {
                         target_cursor++;
@@ -460,32 +244,20 @@ int duplex(int argc, char* argv[]) {
                         query_cursor++;
                     }
                 }
+                edlibFreeAlignResult(result);
 
-                if (true) {
-                    std::cout << ">" << temp_id << std::endl;
-                    for (auto& c : consensus) {
-                        std::cout << c;
-                    }
-                    std::cout << std::endl;
+                std::cout << ">" << temp_id << std::endl;
+                for (auto& c : consensus) {
+                    std::cout << c;
                 }
-/*
+                std::cout << std::endl;
+
                 for (auto& q : q_string) {
                     std::cout << char(q + 33);
                 }
                 std::cout << std::endl;
-*/
-                edlibFreeAlignResult(result);
             }
         }
-
-
-/*        if (i > 75) {
-            break;
-        }*/
-
-
-        i++;
     }
-
     return 0;
 }
