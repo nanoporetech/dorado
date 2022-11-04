@@ -8,9 +8,6 @@
 
 #include <iostream>
 #include <thread>
-/*
-#include "3rdparty/edlib/edlib/include/edlib.h"
-*/
 
 int duplex(int argc, char* argv[]) {
     argparse::ArgumentParser parser("dorado", DORADO_VERSION);
