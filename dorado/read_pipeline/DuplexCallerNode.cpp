@@ -1,12 +1,12 @@
+#include "DuplexCallerNode.h"
+
 #include "3rdparty/edlib/edlib/include/edlib.h"
 
-#include "DuplexCallerNode.h"
 #include <chrono>
 
 using namespace std::chrono_literals;
 
 void DuplexCallerNode::worker_thread() {
-
     EdlibAlignConfig align_config = edlibDefaultAlignConfig();
     align_config.task = EDLIB_TASK_PATH;
 
@@ -26,14 +26,12 @@ void DuplexCallerNode::worker_thread() {
         }
 
         auto opts = torch::TensorOptions().dtype(torch::kInt8);
-        torch::Tensor t = torch::from_blob(temp_q_string.data(),
-                                           {1, (int) temp_q_string.size()}, opts);
+        torch::Tensor t =
+                torch::from_blob(temp_q_string.data(), {1, (int)temp_q_string.size()}, opts);
         auto t_float = t.to(torch::kFloat32);
         int pool_window = 5;
-        t.index({torch::indexing::Slice()}) = -torch::max_pool1d(-t_float,
-                                                                 pool_window,
-                                                                 1,
-                                                                 pool_window / 2);
+        t.index({torch::indexing::Slice()}) =
+                -torch::max_pool1d(-t_float, pool_window, 1, pool_window / 2);
 
         if (m_reads.find(comp_id) == m_reads.end()) {
             //std::cerr << "Corresponding complement is missing" << std::endl;
@@ -56,10 +54,8 @@ void DuplexCallerNode::worker_thread() {
             //compute the RC
             std::reverse(comp_str_rc.begin(), comp_str_rc.end());
 
-            std::map<char,char> complementary_nucleotides = { {'A', 'T'},
-                                                              {'C', 'G'},
-                                                              {'G', 'C'},
-                                                              {'T', 'A'}};
+            std::map<char, char> complementary_nucleotides = {
+                    {'A', 'T'}, {'C', 'G'}, {'G', 'C'}, {'T', 'A'}};
             std::for_each(
                     comp_str_rc.begin(), comp_str_rc.end(),
                     [&complementary_nucleotides](char& c) { c = complementary_nucleotides[c]; });
@@ -108,8 +104,8 @@ void DuplexCallerNode::worker_thread() {
             // Find reverse trim
             int end_alignment_position = result.endLocations[0];
             num_consecutive = 0;
-            while(num_consecutive < num_consecutive_wanted){
-                if (result.alignment[end_alignment_position] == 0){
+            while (num_consecutive < num_consecutive_wanted) {
+                if (result.alignment[end_alignment_position] == 0) {
                     num_consecutive++;
                 } else {
                     num_consecutive = 0;
@@ -117,7 +113,7 @@ void DuplexCallerNode::worker_thread() {
 
                 end_alignment_position--;
 
-                if (end_alignment_position < alignment_position){
+                if (end_alignment_position < alignment_position) {
                     alignment_possible = false;
                     break;
                 }
@@ -131,7 +127,8 @@ void DuplexCallerNode::worker_thread() {
 
             if (alignment_possible) {
                 for (int i = alignment_position; i < end_alignment_position; i++) {
-                    if (temp_q_string.at(target_cursor) >= comp_q_scores_reverse.at(query_cursor)) { // Target is higher Q
+                    if (temp_q_string.at(target_cursor) >=
+                        comp_q_scores_reverse.at(query_cursor)) {  // Target is higher Q
                         // If there is *not* an insertion to the query, add the nucleotide from the target cursor
                         if (result.alignment[i] != 2) {
                             consensus.push_back(temp_str.at(target_cursor));
@@ -174,11 +171,11 @@ void DuplexCallerNode::worker_thread() {
 DuplexCallerNode::DuplexCallerNode(ReadSink& sink,
                                    std::map<std::string, std::string> template_complement_map,
                                    std::map<std::string, std::shared_ptr<Read>> reads)
-        : ReadSink(1000), m_sink(sink),
+        : ReadSink(1000),
+          m_sink(sink),
           m_template_complement_map(template_complement_map),
-          m_reads(reads)
-{
-    for (int i = 0; i < 1; i++) { //TODO fix this its silly
+          m_reads(reads) {
+    for (int i = 0; i < 1; i++) {  //TODO fix this its silly
         std::unique_ptr<std::thread> worker_thread =
                 std::make_unique<std::thread>(&DuplexCallerNode::worker_thread, this);
         worker_threads.push_back(std::move(worker_thread));

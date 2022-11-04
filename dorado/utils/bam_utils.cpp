@@ -1,11 +1,12 @@
-#include "htslib/sam.h"
+#include "bam_utils.h"
 
+#include "htslib/sam.h"
 #include "read_pipeline/ReadPipeline.h"
+
 #include <iostream>
 #include <map>
 #include <string>
 #include <vector>
-#include "bam_utils.h"
 
 std::map<std::string, std::shared_ptr<Read>> read_bam(std::string reads_file) {
     samFile* fp_in = hts_open(reads_file.c_str(), "r");

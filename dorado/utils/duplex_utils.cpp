@@ -1,8 +1,8 @@
-#include <fstream>
-
 #include "duplex_utils.h"
 
-std::map<std::string, std::string> load_pairs_file(std::string pairs_file){
+#include <fstream>
+
+std::map<std::string, std::string> load_pairs_file(std::string pairs_file) {
     std::ifstream dataFile;
     dataFile.open(pairs_file);
 

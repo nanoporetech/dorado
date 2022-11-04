@@ -1,12 +1,13 @@
-#include <argparse.hpp>
-#include <iostream>
-#include <thread>
-
 #include "Version.h"
-#include "read_pipeline/WriterNode.h"
 #include "read_pipeline/DuplexCallerNode.h"
+#include "read_pipeline/WriterNode.h"
 #include "utils/bam_utils.h"
 #include "utils/duplex_utils.h"
+
+#include <argparse.hpp>
+
+#include <iostream>
+#include <thread>
 /*
 #include "3rdparty/edlib/edlib/include/edlib.h"
 */
@@ -42,7 +43,7 @@ int duplex(int argc, char* argv[]) {
     WriterNode writer_node(std::move(args), emit_fastq, 1);
     DuplexCallerNode duplex_caller_node(writer_node, template_complement_map, reads);
 
-/*    // Let's now perform alignment on all pairs:
+    /*    // Let's now perform alignment on all pairs:
     EdlibAlignConfig align_config = edlibDefaultAlignConfig();
     align_config.task = EDLIB_TASK_PATH;
 
