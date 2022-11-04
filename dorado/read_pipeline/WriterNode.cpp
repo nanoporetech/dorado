@@ -64,7 +64,7 @@ void WriterNode::worker_thread() {
                       << read->qstring << "\n";
         } else {
             try {
-                for (const auto& sam_line : read->extract_sam_lines()) {
+                for (const auto& sam_line : read->extract_sam_lines(m_emit_moves)) {
                     std::scoped_lock<std::mutex> lock(m_cout_mutex);
                     std::cout << sam_line << "\n";
                 }
@@ -78,11 +78,13 @@ void WriterNode::worker_thread() {
 
 WriterNode::WriterNode(std::vector<std::string> args,
                        bool emit_fastq,
+                       bool emit_moves,
                        size_t num_worker_threads,
                        size_t max_reads)
         : ReadSink(max_reads),
           m_args(std::move(args)),
           m_emit_fastq(emit_fastq),
+          m_emit_moves(emit_moves),
           m_num_samples_processed(0),
           m_num_reads_processed(0),
           m_initialization_time(std::chrono::system_clock::now()) {
