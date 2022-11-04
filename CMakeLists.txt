@@ -92,7 +92,12 @@ set(LIB_SOURCE_FILES
     dorado/utils/stitch.h
     dorado/utils/tensor_utils.cpp
     dorado/utils/tensor_utils.h
-    dorado/utils/bam_utils.cpp)
+    dorado/utils/bam_utils.cpp
+    dorado/read_pipeline/DuplexCallerNode.cpp
+    dorado/read_pipeline/DuplexCallerNode.h
+    dorado/utils/bam_utils.h
+    dorado/utils/duplex_utils.h
+    dorado/utils/duplex_utils.cpp)
 
 if(APPLE)
     include(cmake/Metal.cmake)

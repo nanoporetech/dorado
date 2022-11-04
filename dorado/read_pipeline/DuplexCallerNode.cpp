@@ -1,63 +1,28 @@
-#include <argparse.hpp>
-#include <iostream>
-#include <thread>
-
-#include "Version.h"
-#include "read_pipeline/WriterNode.h"
-#include "read_pipeline/DuplexCallerNode.h"
-#include "utils/bam_utils.h"
-#include "utils/duplex_utils.h"
-/*
 #include "3rdparty/edlib/edlib/include/edlib.h"
-*/
 
-int duplex(int argc, char* argv[]) {
-    argparse::ArgumentParser parser("dorado", DORADO_VERSION);
-    parser.add_argument("reads_file").help("Basecalled reads.");
-    parser.add_argument("pairs_file").help("Space-delimited csv containing read ID pairs.");
-    parser.add_argument("--emit-fastq").default_value(false).implicit_value(true);
+#include "DuplexCallerNode.h"
+#include <chrono>
 
-    std::cerr << "Loading BAM" << std::endl;
+using namespace std::chrono_literals;
 
-    try {
-        parser.parse_args(argc, argv);
-    } catch (const std::exception& e) {
-        std::cerr << e.what() << std::endl;
-        std::cerr << parser;
-        std::exit(1);
-    }
+void DuplexCallerNode::worker_thread() {
 
-    std::string reads_file = parser.get<std::string>("reads_file");
-    std::string pairs_file = parser.get<std::string>("pairs_file");
-
-    // Load the pairs file
-    std::map<std::string, std::string> template_complement_map = load_pairs_file(pairs_file);
-
-    // Load basecalls
-    std::map<std::string, std::shared_ptr<Read>> reads = read_bam(reads_file);
-
-    std::vector<std::string> args(argv, argv + argc);
-    bool emit_fastq = parser.get<bool>("--emit-fastq");
-
-    WriterNode writer_node(std::move(args), emit_fastq, 1);
-    DuplexCallerNode duplex_caller_node(writer_node, template_complement_map, reads);
-
-/*    // Let's now perform alignment on all pairs:
     EdlibAlignConfig align_config = edlibDefaultAlignConfig();
     align_config.task = EDLIB_TASK_PATH;
 
-    for (auto key : template_complement_map) {
+    for (auto key : m_template_complement_map) {
         std::string temp_id = key.first;
         std::string comp_id = key.second;
 
         std::vector<char> temp_str;
         std::vector<char> comp_str;
         std::vector<uint8_t> temp_q_string;
-        if (reads.find(temp_id) == reads.end()) {
+        std::shared_ptr<Read> template_read;
+        if (m_reads.find(temp_id) == m_reads.end()) {
         } else {
-            auto read = reads.at(temp_id);
-            temp_str = read->sequence;
-            temp_q_string = read->scores;
+            template_read = m_reads.at(temp_id);
+            temp_str = template_read->sequence;
+            temp_q_string = template_read->scores;
         }
 
         auto opts = torch::TensorOptions().dtype(torch::kInt8);
@@ -66,14 +31,14 @@ int duplex(int argc, char* argv[]) {
         auto t_float = t.to(torch::kFloat32);
         int pool_window = 5;
         t.index({torch::indexing::Slice()}) = -torch::max_pool1d(-t_float,
-                                     pool_window,
-                                     1,
-                                     pool_window / 2);
+                                                                 pool_window,
+                                                                 1,
+                                                                 pool_window / 2);
 
-        if (reads.find(comp_id) == reads.end()) {
+        if (m_reads.find(comp_id) == m_reads.end()) {
             //std::cerr << "Corresponding complement is missing" << std::endl;
         } else if (temp_str.size() != 0) {  // We can do the alignment
-            auto complement_read = reads.at(comp_id);
+            auto complement_read = m_reads.at(comp_id);
             comp_str = complement_read->sequence;
             auto comp_q_scores_reverse = complement_read->scores;
 
@@ -190,20 +155,45 @@ int duplex(int argc, char* argv[]) {
                         query_cursor++;
                     }
                 }
-                edlibFreeAlignResult(result);
 
-                std::cout << ">" << temp_id << std::endl;
-                for (auto& c : consensus) {
-                    std::cout << c;
-                }
-                std::cout << std::endl;
+                template_read->seq = std::string(consensus.begin(), consensus.end());
 
                 for (auto& q : q_string) {
-                    std::cout << char(q + 33);
+                    q += 33;
                 }
-                std::cout << std::endl;
+
+                template_read->qstring = std::string(q_string.begin(), q_string.end());
+
+                m_sink.push_read(template_read);
             }
+            edlibFreeAlignResult(result);
         }
-    }*/
-    return 0;
+    }
+}
+
+DuplexCallerNode::DuplexCallerNode(ReadSink& sink,
+                                   std::map<std::string, std::string> template_complement_map,
+                                   std::map<std::string, std::shared_ptr<Read>> reads)
+        : ReadSink(1000), m_sink(sink),
+          m_template_complement_map(template_complement_map),
+          m_reads(reads)
+{
+    for (int i = 0; i < 1; i++) { //TODO fix this its silly
+        std::unique_ptr<std::thread> worker_thread =
+                std::make_unique<std::thread>(&DuplexCallerNode::worker_thread, this);
+        worker_threads.push_back(std::move(worker_thread));
+    }
+}
+
+DuplexCallerNode::~DuplexCallerNode() {
+    terminate();
+    m_cv.notify_one();
+
+    // Wait for all the Node's worker threads to terminate
+    for (auto& t : worker_threads) {
+        t->join();
+    }
+
+    //Notify the sink that the Node has terminated
+    m_sink.terminate();
 }

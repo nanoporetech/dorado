@@ -83,6 +83,9 @@ public:
     std::vector<std::string> generate_read_tags() const;
     std::vector<std::string> extract_sam_lines() const;
     std::string generate_modbase_string(uint8_t threshold = 0) const;
+
+    std::vector<char> sequence;
+    std::vector<uint8_t> scores;
 };
 
 // Base class for an object which consumes reads.

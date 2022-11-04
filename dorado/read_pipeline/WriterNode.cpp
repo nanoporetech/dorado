@@ -50,7 +50,7 @@ void WriterNode::worker_thread() {
 
         if (m_num_reads_processed % 100 == 0 && m_isatty) {
             std::scoped_lock<std::mutex> lock(m_cerr_mutex);
-            std::cerr << "\r> Reads basecalled: " << m_num_reads_processed;
+            std::cerr << "\r> Reads processed: " << m_num_reads_processed;
         }
 
         if (m_emit_fastq) {
