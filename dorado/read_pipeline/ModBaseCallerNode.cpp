@@ -10,6 +10,10 @@
 #include <chrono>
 using namespace std::chrono_literals;
 
+namespace {
+constexpr auto FORCE_TIMEOUT = 100ms;
+}
+
 ModBaseCallerNode::ModBaseCallerNode(ReadSink& sink,
                                      std::vector<std::shared_ptr<RemoraCaller>> model_callers,
                                      size_t remora_threads,
@@ -218,6 +222,8 @@ void ModBaseCallerNode::caller_worker_thread(size_t caller_id) {
     auto num_models = m_callers.size() / m_num_devices;
     auto& chunk_queue = m_chunk_queues[caller_id % num_models];
     auto& batched_chunks = m_batched_chunks[caller_id];
+    auto last_chunk_reserve_time = std::chrono::system_clock::now();
+
     while (true) {
         std::unique_lock<std::mutex> chunks_lock(m_chunk_queues_mutex);
         if (chunk_queue.empty()) {
@@ -237,7 +243,15 @@ void ModBaseCallerNode::caller_worker_thread(size_t caller_id) {
             } else {
                 // There's no chunks available to call at the moment, sleep and try again
                 chunks_lock.unlock();
-                std::this_thread::sleep_for(100ms);
+
+                auto current_time = std::chrono::system_clock::now();
+                auto delta = std::chrono::duration_cast<std::chrono::milliseconds>(
+                        current_time - last_chunk_reserve_time);
+                if (delta > FORCE_TIMEOUT && !batched_chunks.empty()) {
+                    call_current_batch(caller_id);
+                } else {
+                    std::this_thread::sleep_for(100ms);
+                }
                 continue;
             }
         }
@@ -250,6 +264,8 @@ void ModBaseCallerNode::caller_worker_thread(size_t caller_id) {
             caller->accept_chunk(batched_chunks.size(), chunk->signal, chunk->encoded_kmers);
             batched_chunks.push_back(chunk);
             chunks_lock.lock();
+
+            last_chunk_reserve_time = std::chrono::system_clock::now();
         }
 
         chunks_lock.unlock();

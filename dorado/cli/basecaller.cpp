@@ -15,6 +15,7 @@
 #include "read_pipeline/ScalerNode.h"
 #include "read_pipeline/WriterNode.h"
 #include "utils/log_utils.h"
+#include "utils/parameters.h"
 
 #include <argparse.hpp>
 #include <spdlog/spdlog.h>
@@ -149,6 +150,8 @@ void setup(std::vector<std::string> args,
 }
 
 int basecaller(int argc, char* argv[]) {
+    using dorado::utils::default_parameters;
+
     InitLogging();
     argparse::ArgumentParser parser("dorado", DORADO_VERSION);
 
@@ -160,30 +163,36 @@ int basecaller(int argc, char* argv[]) {
 
     parser.add_argument("-x", "--device")
             .help("device string in format \"cuda:0,...,N\", \"cuda:all\", \"metal\" etc..")
-#ifdef __APPLE__
-            .default_value(std::string{"metal"});
-#else
-            .default_value(std::string{"cuda:all"});
-#endif
+            .default_value(default_parameters.device);
 
     parser.add_argument("-b", "--batchsize")
-            .default_value(0)
+            .default_value(default_parameters.batchsize)
             .scan<'i', int>()
             .help("if 0 an optimal batchsize will be selected");
 
-    parser.add_argument("-c", "--chunksize").default_value(10000).scan<'i', int>();
+    parser.add_argument("-c", "--chunksize")
+            .default_value(default_parameters.chunksize)
+            .scan<'i', int>();
 
-    parser.add_argument("-o", "--overlap").default_value(500).scan<'i', int>();
+    parser.add_argument("-o", "--overlap")
+            .default_value(default_parameters.overlap)
+            .scan<'i', int>();
 
-    parser.add_argument("-r", "--num_runners").default_value(2).scan<'i', int>();
+    parser.add_argument("-r", "--num_runners")
+            .default_value(default_parameters.num_runners)
+            .scan<'i', int>();
 
     parser.add_argument("--emit-fastq").default_value(false).implicit_value(true);
 
     parser.add_argument("--emit-moves").default_value(false).implicit_value(true);
 
-    parser.add_argument("--remora-batchsize").default_value(1024).scan<'i', int>();
+    parser.add_argument("--remora-batchsize")
+            .default_value(default_parameters.remora_batchsize)
+            .scan<'i', int>();
 
-    parser.add_argument("--remora-threads").default_value(2).scan<'i', int>();
+    parser.add_argument("--remora-threads")
+            .default_value(default_parameters.remora_threads)
+            .scan<'i', int>();
 
     parser.add_argument("--remora-models")
             .default_value(std::string())

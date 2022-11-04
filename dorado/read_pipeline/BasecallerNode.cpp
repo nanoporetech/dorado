@@ -12,6 +12,10 @@
 using namespace std::chrono_literals;
 using namespace torch::indexing;
 
+namespace {
+constexpr auto FORCE_TIMEOUT = 100ms;
+}
+
 void BasecallerNode::input_worker_thread() {
     while (true) {
         // Allow 5 batches per model runner on the chunks_in queue
@@ -130,6 +134,7 @@ void BasecallerNode::working_reads_manager() {
 }
 
 void BasecallerNode::basecall_worker_thread(int worker_id) {
+    auto last_chunk_reserve_time = std::chrono::system_clock::now();
     while (true) {
         std::unique_lock<std::mutex> chunks_lock(m_chunks_in_mutex);
 
@@ -156,7 +161,15 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
             } else {
                 // There's no chunks available to call at the moment, sleep and try again
                 chunks_lock.unlock();
-                std::this_thread::sleep_for(100ms);
+
+                auto current_time = std::chrono::system_clock::now();
+                auto delta = std::chrono::duration_cast<std::chrono::milliseconds>(
+                        current_time - last_chunk_reserve_time);
+                if (delta > FORCE_TIMEOUT && !m_batched_chunks[worker_id].empty()) {
+                    basecall_current_batch(worker_id);
+                } else {
+                    std::this_thread::sleep_for(100ms);
+                }
                 continue;
             }
         }
@@ -188,6 +201,8 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
 
             m_batched_chunks[worker_id].push_back(chunk);
             chunks_lock.lock();
+
+            last_chunk_reserve_time = std::chrono::system_clock::now();
         }
 
         chunks_lock.unlock();
