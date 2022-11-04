@@ -15,6 +15,7 @@
 #include "read_pipeline/ScalerNode.h"
 #include "read_pipeline/WriterNode.h"
 #include "utils/log_utils.h"
+#include "utils/parameters.h"
 
 #include <argparse.hpp>
 #include <spdlog/spdlog.h>
@@ -37,7 +38,8 @@ void setup(std::vector<std::string> args,
            size_t num_runners,
            size_t remora_batch_size,
            size_t num_remora_threads,
-           bool emit_fastq) {
+           bool emit_fastq,
+           bool emit_moves) {
     torch::set_num_threads(1);
     std::vector<Runner> runners;
 
@@ -128,7 +130,7 @@ void setup(std::vector<std::string> args,
     }
 #endif  // __APPLE__
 
-    WriterNode writer_node(std::move(args), emit_fastq, num_devices * 2);
+    WriterNode writer_node(std::move(args), emit_fastq, emit_moves, num_devices * 2);
 
     std::unique_ptr<ModBaseCallerNode> mod_base_caller_node;
     std::unique_ptr<BasecallerNode> basecaller_node;
@@ -150,7 +152,10 @@ void setup(std::vector<std::string> args,
 }
 
 int basecaller(int argc, char* argv[]) {
-    utils::InitLogging();
+    using dorado::utils::default_parameters;
+
+    InitLogging();
+
     argparse::ArgumentParser parser("dorado", DORADO_VERSION);
 
     parser.add_argument("model").help("the basecaller model to run.");
@@ -161,28 +166,36 @@ int basecaller(int argc, char* argv[]) {
 
     parser.add_argument("-x", "--device")
             .help("device string in format \"cuda:0,...,N\", \"cuda:all\", \"metal\" etc..")
-#ifdef __APPLE__
-            .default_value(std::string{"metal"});
-#else
-            .default_value(std::string{"cuda:all"});
-#endif
+            .default_value(default_parameters.device);
 
     parser.add_argument("-b", "--batchsize")
-            .default_value(0)
+            .default_value(default_parameters.batchsize)
             .scan<'i', int>()
             .help("if 0 an optimal batchsize will be selected");
 
-    parser.add_argument("-c", "--chunksize").default_value(10000).scan<'i', int>();
+    parser.add_argument("-c", "--chunksize")
+            .default_value(default_parameters.chunksize)
+            .scan<'i', int>();
 
-    parser.add_argument("-o", "--overlap").default_value(500).scan<'i', int>();
+    parser.add_argument("-o", "--overlap")
+            .default_value(default_parameters.overlap)
+            .scan<'i', int>();
 
-    parser.add_argument("-r", "--num_runners").default_value(2).scan<'i', int>();
+    parser.add_argument("-r", "--num_runners")
+            .default_value(default_parameters.num_runners)
+            .scan<'i', int>();
 
     parser.add_argument("--emit-fastq").default_value(false).implicit_value(true);
 
-    parser.add_argument("--remora-batchsize").default_value(1024).scan<'i', int>();
+    parser.add_argument("--emit-moves").default_value(false).implicit_value(true);
 
-    parser.add_argument("--remora-threads").default_value(2).scan<'i', int>();
+    parser.add_argument("--remora-batchsize")
+            .default_value(default_parameters.remora_batchsize)
+            .scan<'i', int>();
+
+    parser.add_argument("--remora-threads")
+            .default_value(default_parameters.remora_threads)
+            .scan<'i', int>();
 
     parser.add_argument("--remora-models")
             .default_value(std::string())
@@ -209,7 +222,8 @@ int basecaller(int argc, char* argv[]) {
               parser.get<std::string>("--remora-models"), parser.get<std::string>("-x"),
               parser.get<int>("-c"), parser.get<int>("-o"), parser.get<int>("-b"),
               parser.get<int>("-r"), parser.get<int>("--remora-batchsize"),
-              parser.get<int>("--remora-threads"), parser.get<bool>("--emit-fastq"));
+              parser.get<int>("--remora-threads"), parser.get<bool>("--emit-fastq"),
+              parser.get<bool>("--emit-moves"));
     } catch (const std::exception& e) {
         spdlog::error("{}", e.what());
         return 1;

@@ -45,7 +45,7 @@ bool get_modbase_channel_name(std::string& channel_name, const std::string& mod_
 
 namespace dorado {
 
-std::vector<std::string> Read::generate_read_tags() const {
+std::vector<std::string> Read::generate_read_tags(bool emit_moves) const {
     // GCC doesn't support <format> yet...
 
     std::stringstream stream;
@@ -59,6 +59,7 @@ std::vector<std::string> Read::generate_read_tags() const {
     std::vector<std::string> tags = {
             "qs:i:" + std::to_string(static_cast<int>(
                               std::round(utils::mean_qscore_from_qstring(qstring)))),
+            "du:f:" + std::to_string((raw_data.size(0) + num_trimmed_samples) / sample_rate),
             "ns:i:" + std::to_string(raw_data.size(0) + num_trimmed_samples),
             "ts:i:" + std::to_string(num_trimmed_samples),
             "mx:i:" + std::to_string(attributes.mux),
@@ -70,10 +71,25 @@ std::vector<std::string> Read::generate_read_tags() const {
             "sd:f:" + scale_str,
             "sv:Z:quantile"};
 
+    if (emit_moves) {
+        const std::string tag{"mv:B:c," + std::to_string(model_stride)};
+        std::string movess(moves.size() * 2 + tag.size(), ',');
+
+        for (size_t idx = 0; idx < tag.size(); idx++) {
+            movess[idx] = tag[idx];
+        }
+
+        for (size_t idx = 0; idx < moves.size(); idx++) {
+            movess[idx * 2 + tag.size() + 1] = static_cast<char>(moves[idx] + 48);
+        }
+
+        tags.push_back(movess);
+    }
+
     return tags;
 }
 
-std::vector<std::string> Read::extract_sam_lines() const {
+std::vector<std::string> Read::extract_sam_lines(bool emit_moves) const {
     if (read_id.empty()) {
         throw std::runtime_error("Empty read_name string provided");
     }
@@ -85,7 +101,7 @@ std::vector<std::string> Read::extract_sam_lines() const {
     }
 
     std::ostringstream read_tags_stream;
-    auto read_tags = generate_read_tags();
+    auto read_tags = generate_read_tags(emit_moves);
     for (const auto& tag : read_tags) {
         read_tags_stream << "\t" << tag;
     }
