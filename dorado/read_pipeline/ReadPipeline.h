@@ -52,6 +52,7 @@ public:
     float digitisation;      // Loaded from source file
     float range;             // Loaded from source file
     float offset;            // Loaded from source file
+    float sample_rate;       // Loaded from source file
 
     float shift;  // To be set by scaler
     float scale;  // To be set by scaler
