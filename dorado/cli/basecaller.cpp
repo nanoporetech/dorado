@@ -63,6 +63,9 @@ void setup(std::vector<std::string> args,
     } else {
         auto devices = parse_cuda_device_string(device);
         num_devices = devices.size();
+        if (num_devices == 0) {
+            throw std::runtime_error("CUDA device requested but no devices found.");
+        }
         batch_size =
                 batch_size == 0 ? auto_gpu_batch_size(model_path.string(), devices) : batch_size;
         for (auto device_string : devices) {
@@ -110,23 +113,26 @@ void setup(std::vector<std::string> args,
     std::vector<std::shared_ptr<RemoraCaller>> remora_callers;
 
 #ifndef __APPLE__
-    auto devices = parse_cuda_device_string(device);
-    num_devices = devices.size();
+    if (device != "cpu") {
+        auto devices = parse_cuda_device_string(device);
+        num_devices = devices.size();
 
-    for (auto device_string : devices) {
+        for (auto device_string : devices) {
+            for (const auto& remora_model : remora_model_list) {
+                auto caller = std::make_shared<RemoraCaller>(remora_model, device_string,
+                                                             remora_batch_size, model_stride);
+                remora_callers.push_back(caller);
+            }
+        }
+    } else
+#endif
+    {
         for (const auto& remora_model : remora_model_list) {
-            auto caller = std::make_shared<RemoraCaller>(remora_model, device_string,
-                                                         remora_batch_size, model_stride);
+            auto caller = std::make_shared<RemoraCaller>(remora_model, device, remora_batch_size,
+                                                         model_stride);
             remora_callers.push_back(caller);
         }
     }
-#else
-    for (const auto& remora_model : remora_model_list) {
-        auto caller = std::make_shared<RemoraCaller>(remora_model, device, remora_batch_size,
-                                                     model_stride);
-        remora_callers.push_back(caller);
-    }
-#endif  // __APPLE__
 
     WriterNode writer_node(std::move(args), emit_fastq, emit_moves, num_devices * 2);
 
