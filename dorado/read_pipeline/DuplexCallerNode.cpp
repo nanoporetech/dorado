@@ -2,67 +2,76 @@
 
 #include "3rdparty/edlib/edlib/include/edlib.h"
 
+#include <spdlog/spdlog.h>
+
 #include <chrono>
 
 using namespace std::chrono_literals;
+
+void preprocess_quality_scores(std::vector<uint8_t>& quality_scores, int pool_window = 5) {
+    // Apply a min-pool window to the quality scores
+    auto opts = torch::TensorOptions().dtype(torch::kInt8);
+    torch::Tensor t =
+            torch::from_blob(quality_scores.data(), {1, (int)quality_scores.size()}, opts);
+    auto t_float = t.to(torch::kFloat32);
+    t.index({torch::indexing::Slice()}) =
+            -torch::max_pool1d(-t_float, pool_window, 1, pool_window / 2);
+}
+
+void reverse_complement(std::vector<char>& sequence) {
+    std::reverse(sequence.begin(), sequence.end());
+    std::map<char, char> complementary_nucleotides = {
+            {'A', 'T'}, {'C', 'G'}, {'G', 'C'}, {'T', 'A'}};
+    std::for_each(sequence.begin(), sequence.end(),
+                  [&complementary_nucleotides](char& c) { c = complementary_nucleotides[c]; });
+}
+
+void compute_basespace_consensus() {}
 
 void DuplexCallerNode::worker_thread() {
     EdlibAlignConfig align_config = edlibDefaultAlignConfig();
     align_config.task = EDLIB_TASK_PATH;
 
+    // Loop over every template-complement pair, performing duplex calling on-the-fly
     for (auto key : m_template_complement_map) {
-        std::string temp_id = key.first;
-        std::string comp_id = key.second;
+        std::string template_read_id = key.first;
+        std::string complement_read_id = key.second;
 
-        std::vector<char> temp_str;
-        std::vector<char> comp_str;
-        std::vector<uint8_t> temp_q_string;
+        std::vector<char> template_sequence;
         std::shared_ptr<Read> template_read;
-        if (m_reads.find(temp_id) == m_reads.end()) {
+        std::vector<uint8_t> template_quality_scores;
+        if (m_reads.find(template_read_id) == m_reads.end()) {
+            spdlog::error("Template Read ID=", template_read_id,
+                          "is present in pairs file but read was not found");
         } else {
-            template_read = m_reads.at(temp_id);
-            temp_str = template_read->sequence;
-            temp_q_string = template_read->scores;
+            template_read = m_reads.at(template_read_id);
+            template_sequence = template_read->sequence;
+            template_quality_scores = template_read->scores;
         }
 
-        auto opts = torch::TensorOptions().dtype(torch::kInt8);
-        torch::Tensor t =
-                torch::from_blob(temp_q_string.data(), {1, (int)temp_q_string.size()}, opts);
-        auto t_float = t.to(torch::kFloat32);
-        int pool_window = 5;
-        t.index({torch::indexing::Slice()}) =
-                -torch::max_pool1d(-t_float, pool_window, 1, pool_window / 2);
+        preprocess_quality_scores(template_quality_scores);
 
-        if (m_reads.find(comp_id) == m_reads.end()) {
-            //std::cerr << "Corresponding complement is missing" << std::endl;
-        } else if (temp_str.size() != 0) {  // We can do the alignment
-            auto complement_read = m_reads.at(comp_id);
-            comp_str = complement_read->sequence;
-            auto comp_q_scores_reverse = complement_read->scores;
+        if (m_reads.find(complement_read_id) == m_reads.end()) {
+            spdlog::debug("Complement ID=", complement_read_id,
+                          "paired with Template ID=", template_read_id, " is missing");
+        } else if (template_sequence.size() !=
+                   0) {  // We have both sequences and can perform the consensus
+            auto complement_read = m_reads.at(complement_read_id);
+            std::vector<char> complement_str = complement_read->sequence;
+            auto complement_quality_scores_reverse = complement_read->scores;
+            std::reverse(complement_quality_scores_reverse.begin(),
+                         complement_quality_scores_reverse.end());
 
-            auto opts = torch::TensorOptions().dtype(torch::kInt8);
-            torch::Tensor t = torch::from_blob(comp_q_scores_reverse.data(),
-                                               {1, (int)comp_q_scores_reverse.size()}, opts);
-            auto t_float = t.to(torch::kFloat32);
-            int pool_window = 5;
-            t.index({torch::indexing::Slice()}) =
-                    -torch::max_pool1d(-t_float, pool_window, 1, pool_window / 2);
+            preprocess_quality_scores(complement_quality_scores_reverse);
 
-            std::reverse(comp_q_scores_reverse.begin(), comp_q_scores_reverse.end());
-
-            std::vector<char> comp_str_rc = comp_str;
+            std::vector<char> complement_sequence_reverse_complement = complement_str;
             //compute the RC
-            std::reverse(comp_str_rc.begin(), comp_str_rc.end());
-
-            std::map<char, char> complementary_nucleotides = {
-                    {'A', 'T'}, {'C', 'G'}, {'G', 'C'}, {'T', 'A'}};
-            std::for_each(
-                    comp_str_rc.begin(), comp_str_rc.end(),
-                    [&complementary_nucleotides](char& c) { c = complementary_nucleotides[c]; });
+            reverse_complement(complement_sequence_reverse_complement);
 
             EdlibAlignResult result =
-                    edlibAlign(temp_str.data(), temp_str.size(), comp_str_rc.data(),
-                               comp_str_rc.size(), align_config);
+                    edlibAlign(template_sequence.data(), template_sequence.size(),
+                               complement_sequence_reverse_complement.data(),
+                               complement_sequence_reverse_complement.size(), align_config);
 
             //Now - we have to do the actual basespace alignment itself
             int query_cursor = 0;
@@ -127,18 +136,19 @@ void DuplexCallerNode::worker_thread() {
 
             if (alignment_possible) {
                 for (int i = alignment_position; i < end_alignment_position; i++) {
-                    if (temp_q_string.at(target_cursor) >=
-                        comp_q_scores_reverse.at(query_cursor)) {  // Target is higher Q
+                    if (template_quality_scores.at(target_cursor) >=
+                        complement_quality_scores_reverse.at(query_cursor)) {  // Target is higher Q
                         // If there is *not* an insertion to the query, add the nucleotide from the target cursor
                         if (result.alignment[i] != 2) {
-                            consensus.push_back(temp_str.at(target_cursor));
-                            q_string.push_back(temp_q_string.at(target_cursor));
+                            consensus.push_back(template_sequence.at(target_cursor));
+                            q_string.push_back(template_quality_scores.at(target_cursor));
                         }
                     } else {
                         // If there is *not* an insertion to the target, add the nucleotide from the query cursor
                         if (result.alignment[i] != 1) {
-                            consensus.push_back(comp_str_rc.at(query_cursor));
-                            q_string.push_back(comp_q_scores_reverse.at(query_cursor));
+                            consensus.push_back(
+                                    complement_sequence_reverse_complement.at(query_cursor));
+                            q_string.push_back(complement_quality_scores_reverse.at(query_cursor));
                         }
                     }
 
@@ -153,15 +163,16 @@ void DuplexCallerNode::worker_thread() {
                     }
                 }
 
-                template_read->seq = std::string(consensus.begin(), consensus.end());
-
+                auto duplex_read = std::make_shared<Read>();
+                duplex_read->seq = std::string(consensus.begin(), consensus.end());
                 for (auto& q : q_string) {
                     q += 33;
                 }
+                duplex_read->qstring = std::string(q_string.begin(), q_string.end());
 
-                template_read->qstring = std::string(q_string.begin(), q_string.end());
+                duplex_read->read_id = template_read->read_id + ";" + complement_read->read_id;
 
-                m_sink.push_read(template_read);
+                m_sink.push_read(duplex_read);
             }
             edlibFreeAlignResult(result);
         }
