@@ -16,7 +16,7 @@ int duplex(int argc, char* argv[]) {
     utils::InitLogging();
 
     argparse::ArgumentParser parser("dorado", DORADO_VERSION);
-    parser.add_argument("reads_file").help("Basecalled reads.");
+    parser.add_argument("reads_file").help("Basecalled reads in BAM/SAM/CRAM format.");
     parser.add_argument("pairs_file").help("Space-delimited csv containing read ID pairs.");
     parser.add_argument("--emit-fastq").default_value(false).implicit_value(true);
 
@@ -42,7 +42,7 @@ int duplex(int argc, char* argv[]) {
     std::vector<std::string> args(argv, argv + argc);
     bool emit_fastq = parser.get<bool>("--emit-fastq");
 
-    WriterNode writer_node(std::move(args), emit_fastq, 1);
+    WriterNode writer_node(std::move(args), emit_fastq, false, 4);
     DuplexCallerNode duplex_caller_node(writer_node, template_complement_map, reads);
 
     return 0;
