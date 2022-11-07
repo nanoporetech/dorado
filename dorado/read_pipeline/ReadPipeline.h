@@ -52,6 +52,7 @@ public:
     float digitisation;      // Loaded from source file
     float range;             // Loaded from source file
     float offset;            // Loaded from source file
+    float sample_rate;       // Loaded from source file
 
     float shift;  // To be set by scaler
     float scale;  // To be set by scaler
@@ -65,6 +66,8 @@ public:
     size_t num_modbase_chunks;
     std::atomic_size_t
             num_modbase_chunks_called;  // Number of modbase chunks which have been scored
+
+    int model_stride;  // The down sampling factor of the model
 
     std::string read_id;                  // Unique read ID (UUID4)
     std::string seq;                      // Read basecall
@@ -80,8 +83,8 @@ public:
     Attributes attributes;
     std::vector<Mapping> mappings;
 
-    std::vector<std::string> generate_read_tags() const;
-    std::vector<std::string> extract_sam_lines() const;
+    std::vector<std::string> generate_read_tags(bool emit_moves) const;
+    std::vector<std::string> extract_sam_lines(bool emit_moves) const;
     std::string generate_modbase_string(uint8_t threshold = 0) const;
 
     std::vector<char> sequence;

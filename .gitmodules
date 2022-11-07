@@ -25,3 +25,9 @@
 [submodule "dorado/3rdparty/htslib"]
 	path = dorado/3rdparty/htslib
 	url = https://github.com/samtools/htslib.git
+[submodule "dorado/3rdparty/NVTX"]
+	path = dorado/3rdparty/NVTX
+	url = https://github.com/NVIDIA/NVTX.git
+[submodule "dorado/3rdparty/spdlog"]
+	path = dorado/3rdparty/spdlog
+	url = https://github.com/gabime/spdlog

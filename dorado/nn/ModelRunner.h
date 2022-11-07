@@ -13,6 +13,7 @@ public:
     virtual void accept_chunk(int chunk_idx, at::Tensor slice) = 0;
     virtual std::vector<DecodedChunk> call_chunks(int num_chunks) = 0;
     virtual size_t model_stride() const = 0;
+    virtual size_t chunk_size() const = 0;
 };
 
 using Runner = std::shared_ptr<ModelRunnerBase>;
@@ -27,6 +28,7 @@ public:
     void accept_chunk(int chunk_idx, at::Tensor slice) final;
     std::vector<DecodedChunk> call_chunks(int num_chunks) final;
     size_t model_stride() const final { return m_model_stride; }
+    size_t chunk_size() const final { return m_input.size(2); }
 
 private:
     std::string m_device;

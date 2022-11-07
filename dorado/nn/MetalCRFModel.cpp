@@ -9,6 +9,7 @@
 #include "../utils/tensor_utils.h"
 
 #include <math.h>
+#include <spdlog/spdlog.h>
 #include <toml.hpp>
 #include <torch/torch.h>
 
@@ -18,6 +19,9 @@ using namespace std::chrono_literals;
 using namespace torch::nn;
 namespace F = torch::nn::functional;
 using Slice = torch::indexing::Slice;
+
+// SIMD tile size dictated by the metal spec.
+const int kTileSize = 8;
 
 typedef uint16_t ftype;
 
@@ -62,22 +66,24 @@ struct MetalConv1dImpl : Module {
         register_parameter("weight", weight, false);
         register_parameter("bias", bias, false);
 
-        conv_cps = make_cps(device, "conv" + std::to_string(layer) + "_simd");
-        weights_cps = make_cps(device, "conv" + std::to_string(layer) + "_simd_reorder_weights");
-
         kernel_simd_groups = layer == 3 ? 4 : 16;
         kernel_thread_groups = get_mtl_device_core_count() * 4;
+
+        const int kernel_threads = 32 * kernel_simd_groups;
+        conv_cps = make_cps(device, "conv" + std::to_string(layer) + "_simd", {}, kernel_threads);
+        weights_cps =
+                make_cps(device, "conv" + std::to_string(layer) + "_simd_reorder_weights", {});
     }
 
     void run(MTL::CommandQueue *command_queue, MTL::Buffer *mat_in, MTL::Buffer *mat_out) {
         std::vector<MTL::Buffer *> buffers{args, mat_in, mat_weights, mat_out};
-        launch_kernel(conv_cps, command_queue, buffers, kernel_thread_groups,
+        launch_kernel(conv_cps, command_queue, buffers, {}, kernel_thread_groups,
                       kernel_simd_groups * 32);
     }
 
     void run(MTL::CommandBuffer *command_buffer, MTL::Buffer *mat_in, MTL::Buffer *mat_out) {
         std::vector<MTL::Buffer *> buffers{args, mat_in, mat_weights, mat_out};
-        launch_kernel_no_wait(conv_cps, command_buffer, buffers, kernel_thread_groups,
+        launch_kernel_no_wait(conv_cps, command_buffer, buffers, {}, kernel_thread_groups,
                               kernel_simd_groups * 32);
     }
 
@@ -88,7 +94,8 @@ struct MetalConv1dImpl : Module {
         t_w = t_w.permute({2, 1, 0}).contiguous();
         t_w = t_w.reshape({insize * k, outsize});
         t_w = torch::concat({t_w.flatten(0, -1), t_b}).contiguous();
-        launch_kernel(weights_cps, command_queue, {args, mtl_for_tensor(t_w), mat_weights}, 1, 1);
+        launch_kernel(weights_cps, command_queue, {args, mtl_for_tensor(t_w), mat_weights}, {}, 1,
+                      1);
     }
 
     MTL::Buffer *args, *mat_weights;
@@ -141,13 +148,9 @@ struct MetalBlockImpl : Module {
 
         lstm_chunk_size = in_chunk_size / stride;
 
-        // args for forward LSTM
-        std::vector<int32_t> args_lstm_{layer_size, 0, batch_size / tile_size, lstm_chunk_size,
-                                        out_size};
-        args_lstm[0] = create_vec_buffer(device, args_lstm_);
-        // args for reverse LSTM
-        args_lstm_[1] = 1;
-        args_lstm[1] = create_vec_buffer(device, args_lstm_);
+        // args for LSTM kernel
+        std::vector<int32_t> args_lstm_{batch_size / tile_size, lstm_chunk_size};
+        args_lstm = create_vec_buffer(device, args_lstm_);
 
         // args for conversion to half
         const std::vector<int32_t> args_to_half_{in_chunk_size * batch_size};
@@ -161,7 +164,7 @@ struct MetalBlockImpl : Module {
             const int32_t out_batch_tiles = (batch_size / out_split_) / tile_size;
             const int32_t in_batch_tile_offset = out_batch_tiles * i;
             std::vector<int32_t> args_linear_ = {in_batch_tiles, in_batch_tile_offset,
-                                                 out_batch_tiles, lstm_chunk_size, out_size};
+                                                 out_batch_tiles, lstm_chunk_size};
             args_linear.at(i) = create_vec_buffer(device, args_linear_);
         }
 
@@ -191,20 +194,22 @@ struct MetalBlockImpl : Module {
             kernel_simd_groups = 16;
         }
         kernel_thread_groups = get_mtl_device_core_count();
-
-        fn[0] = "lstm_simd_" + std::to_string(layer_size) + "_fwd_" +
-                std::to_string(kernel_simd_groups);
-        fn[1] = "lstm_simd_" + std::to_string(layer_size) + "_rev_" +
-                std::to_string(kernel_simd_groups);
-        std::string linear_fn = "linear_tanh_simd_" + std::to_string(layer_size) + "_fwd_" +
-                                std::to_string(kernel_simd_groups);
-        lstm_cps[0] = make_cps(device, fn[0]);
-        lstm_cps[1] = make_cps(device, fn[1]);
-        linear_tanh_cps = make_cps(device, linear_fn);
-        to_half_cps = make_cps(device, "float_to_half");
-        reorder_input_cps = make_cps(device, "reorder_input");
-        reorder_output_cps = make_cps(device, "reorder_output");
-        reorder_weights_cps = make_cps(device, "reorder_weights");
+        const int lstm_threads = kernel_simd_groups * 32;
+        lstm_cps[0] = make_cps(device, "lstm",
+                               {{"kLstmLayerSize", layer_size}, {"kLstmReversedInTime", false}},
+                               lstm_threads);
+        lstm_cps[1] = make_cps(device, "lstm",
+                               {{"kLstmLayerSize", layer_size}, {"kLstmReversedInTime", true}},
+                               lstm_threads);
+        const int linear_threads = kernel_simd_groups * 32;
+        linear_tanh_cps = make_cps(device, "linear_tanh",
+                                   {{"kLstmLayerSize", layer_size}, {"kLinearLayerSize", out_size}},
+                                   linear_threads);
+        to_half_cps = make_cps(device, "float_to_half", {});
+        reorder_input_cps = make_cps(device, "reorder_input", {{"kLstmLayerSize", layer_size}});
+        reorder_output_cps = make_cps(device, "reorder_output", {{"kLstmLayerSize", layer_size}});
+        reorder_lstm_weights_cps =
+                make_cps(device, "reorder_lstm_weights", {{"kLstmLayerSize", layer_size}});
 
         // TODO: we can reuse some of these matrices
         // This buffer is sized to accommodate the output of the second conv layer.
@@ -259,10 +264,18 @@ struct MetalBlockImpl : Module {
             t_u = t_u.flatten(0, -1).contiguous();
             t_b = t_b.flatten(0, -1).contiguous();
 
-            std::vector<MTL::Buffer *> buffers{args_lstm[rnn->reverse], mtl_for_tensor(t_w),
-                                               mtl_for_tensor(t_u), mtl_for_tensor(t_b),
-                                               rnn->mat_weights};
-            launch_kernel(reorder_weights_cps, command_queue, buffers, kernel_thread_groups, 256);
+            // The effect of time reversal is accommodated by swapping buffer order.
+            if (rnn->reverse) {
+                launch_kernel(reorder_lstm_weights_cps, command_queue,
+                              {mtl_for_tensor(t_u), mtl_for_tensor(t_w), mtl_for_tensor(t_b),
+                               rnn->mat_weights},
+                              {}, kernel_thread_groups, 256);
+            } else {
+                launch_kernel(reorder_lstm_weights_cps, command_queue,
+                              {mtl_for_tensor(t_w), mtl_for_tensor(t_u), mtl_for_tensor(t_b),
+                               rnn->mat_weights},
+                              {}, kernel_thread_groups, 256);
+            }
         }
 
         auto params = linear->named_parameters();
@@ -275,7 +288,7 @@ struct MetalBlockImpl : Module {
             MTL::Buffer *const args = create_vec_buffer(device, std::vector<int32_t>({numel}));
             mat_linear_weights = create_buffer(device, numel * sizeof(ftype));
             launch_kernel(to_half_cps, command_queue,
-                          {args, mtl_for_tensor(t_w), mat_linear_weights}, kernel_thread_groups,
+                          {args, mtl_for_tensor(t_w), mat_linear_weights}, {}, kernel_thread_groups,
                           256);
         } else {
             mat_linear_weights = extract_mtl_from_tensor(t_w);
@@ -292,7 +305,7 @@ struct MetalBlockImpl : Module {
         if (sizeof(ftype) == 2) {
             // Convert input activations from float32 to float16.
             launch_kernel_no_wait(to_half_cps, command_buffer,
-                                  {args_to_half, mtl_for_tensor(in), mat_transfer},
+                                  {args_to_half, mtl_for_tensor(in), mat_transfer}, {},
                                   kernel_thread_groups, 256);
             conv1->run(command_buffer, mat_transfer, mat_working_mem);
         } else {
@@ -302,9 +315,12 @@ struct MetalBlockImpl : Module {
         conv3->run(command_buffer, mat_transfer, mat_working_mem);
 
         for (auto &rnn : {rnn1, rnn2, rnn3, rnn4, rnn5}) {
-            std::vector<MTL::Buffer *> buffers{args_lstm[rnn->reverse], mat_working_mem,
-                                               rnn->mat_weights, mat_state, mat_temp_result};
-            launch_kernel_no_wait(lstm_cps[rnn->reverse], command_buffer, buffers,
+            const std::vector<MTL::Buffer *> buffers{args_lstm, mat_working_mem, rnn->mat_weights,
+                                                     mat_state, mat_temp_result};
+            const int kResBufSize = sizeof(ftype) * kernel_simd_groups * 2 * kTileSize * kTileSize;
+            const int kOutBufSize = sizeof(ftype) * kernel_simd_groups * kTileSize * kTileSize;
+            const std::vector<int> tg_buffer_lens{kResBufSize, kOutBufSize};
+            launch_kernel_no_wait(lstm_cps[rnn->reverse], command_buffer, buffers, tg_buffer_lens,
                                   kernel_thread_groups, kernel_simd_groups * 32);
         }
 
@@ -321,9 +337,14 @@ struct MetalBlockImpl : Module {
         for (int i = 0; i < out.size(); ++i) {
             MTL::Buffer *const args_buffer = args_linear.at(i);
             MTL::Buffer *const out_buffer = mtl_for_tensor(out.at(i));
+
+            const int kOutBufSize = sizeof(ftype) * kernel_simd_groups * kTileSize * kTileSize;
+            const int kOutBufF32Size = sizeof(float) * kernel_simd_groups * kTileSize * kTileSize;
+            const std::vector<int> tg_buffer_lens{kOutBufSize};
+
             launch_kernel_no_wait(linear_tanh_cps, command_buffer,
                                   {args_buffer, mat_working_mem, mat_linear_weights, out_buffer},
-                                  kernel_thread_groups, kernel_simd_groups * 32);
+                                  tg_buffer_lens, kernel_thread_groups, kernel_simd_groups * 32);
         }
         return command_buffer;
     }
@@ -347,10 +368,10 @@ struct MetalBlockImpl : Module {
     MTL::Device *device;
     MTL::CommandQueue *command_queue;
     std::string fn[2];
-    MTL::ComputePipelineState *reorder_weights_cps, *reorder_input_cps, *reorder_output_cps,
+    MTL::ComputePipelineState *reorder_lstm_weights_cps, *reorder_input_cps, *reorder_output_cps,
             *lstm_cps[2], *to_half_cps, *linear_tanh_cps;
     MTL::Buffer *mat_transfer, *mat_working_mem, *mat_state, *mat_temp_result, *mat_linear_weights,
-            *args_lstm[2], *args_to_half;
+            *args_lstm, *args_to_half;
     std::vector<MTL::Buffer *> args_linear;
     int in_chunk_size, lstm_chunk_size, stride, batch_size, layer_size, out_size,
             kernel_thread_groups, kernel_simd_groups;
@@ -487,8 +508,8 @@ public:
 
         m_command_queue = m_device->newCommandQueue();
         m_mtl_event = m_device->newSharedEvent();
-        m_scan_cps = make_cps(m_device, "scan");
-        m_add_softmax_cps = make_cps(m_device, "add_softmax");
+        m_scan_cps = make_cps(m_device, "scan", {});
+        m_add_softmax_cps = make_cps(m_device, "add_softmax", {});
 
         m_metal_thread.reset(new std::thread(&MetalCaller::metal_thread_fn, this));
 
@@ -519,7 +540,7 @@ public:
         m_scan_idx[1][1] = torch::div(m_scan_idx[1][0], num_transitions, "floor");
 
         for (int i = 0; i < m_out_split; ++i) {
-            m_scores.push_back(torch::empty({T, m_out_batch_size, C}));
+            m_scores_int8.push_back(torch::empty({T, m_out_batch_size, C}, torch::kInt8));
             m_posts.push_back(torch::empty({m_out_batch_size, T + 1, Cs}));
             m_bwd.push_back(torch::empty({m_out_batch_size, T + 1, Cs}));
         }
@@ -624,8 +645,8 @@ public:
                 // since the same buffers are used for successive batches' scores, fwd/bwd scans.
                 MTL::SharedEvent *const linear_hold_off =
                         (task->run_id != 0) ? m_mtl_event : nullptr;
-                MTL::CommandBuffer *const cb = m_model->forward_async(*task->input, linear_hold_off,
-                                                                      task->run_id - 1, m_scores);
+                MTL::CommandBuffer *const cb = m_model->forward_async(
+                        *task->input, linear_hold_off, task->run_id - 1, m_scores_int8);
 
                 // The same buffer is used for the forward scan results and the output of
                 // m_add_softmax_cps.
@@ -642,17 +663,20 @@ public:
                     // TODO: optimise grid size
                     launch_kernel_no_wait(
                             m_scan_cps, cb,
-                            {args_fwd, mtl_for_tensor(m_scores.at(i)), mtl_for_tensor(fwd.at(i)),
-                             mtl_for_tensor(m_scan_idx[0][0]), mtl_for_tensor(m_scan_idx[0][1])},
-                            m_out_batch_size, m_states);
+                            {args_fwd, mtl_for_tensor(m_scores_int8.at(i)),
+                             mtl_for_tensor(fwd.at(i)), mtl_for_tensor(m_scan_idx[0][0]),
+                             mtl_for_tensor(m_scan_idx[0][1])},
+                            {}, m_out_batch_size, m_states);
                     launch_kernel_no_wait(
                             m_scan_cps, cb,
-                            {args_bwd, mtl_for_tensor(m_scores.at(i)), mtl_for_tensor(m_bwd.at(i)),
-                             mtl_for_tensor(m_scan_idx[1][0]), mtl_for_tensor(m_scan_idx[1][1])},
-                            m_out_batch_size, m_states);
+                            {args_bwd, mtl_for_tensor(m_scores_int8.at(i)),
+                             mtl_for_tensor(m_bwd.at(i)), mtl_for_tensor(m_scan_idx[1][0]),
+                             mtl_for_tensor(m_scan_idx[1][1])},
+                            {}, m_out_batch_size, m_states);
+
                     launch_kernel_no_wait(
                             m_add_softmax_cps, cb,
-                            {args_fwd, mtl_for_tensor(fwd.at(i)), mtl_for_tensor(m_bwd.at(i))},
+                            {args_fwd, mtl_for_tensor(fwd.at(i)), mtl_for_tensor(m_bwd.at(i))}, {},
                             m_out_batch_size, m_states);
                 }
 
@@ -663,8 +687,13 @@ public:
                 if (status == MTL::CommandBufferStatusCompleted) {
                     break;
                 }
-                std::cerr << "Metal command buffer execution failed: " << status << ", try #"
-                          << try_count << std::endl;
+                spdlog::warn("Metal command buffer execution failed: {}, try #{}", status,
+                             try_count);
+                if (status == MTL::CommandBufferStatusError) {
+                    const auto *const error_ptr = cb->error();
+                    if (error_ptr)
+                        spdlog::warn("Command buffer error code: {}", error_ptr->code());
+                }
                 using namespace std::chrono_literals;
                 std::this_thread::sleep_for(20ms);
             }
@@ -696,23 +725,20 @@ public:
             decode_lock.unlock();
 
             // Model outputs are split across m_out_split buffers.
-            assert(m_scores.size() == m_out_split);
+            assert(m_scores_int8.size() == m_out_split);
             assert(m_bwd.size() == m_out_split);
             assert(m_posts.size() == m_out_split);
             const int out_buf_idx = chunk_idx / m_out_batch_size;
             const int buf_chunk_idx = chunk_idx % m_out_batch_size;
 
-            auto decode_result = beam_search_decode(
-                    m_scores.at(out_buf_idx).index({Slice(), buf_chunk_idx}),
+            auto [sequence, qstring, moves] = beam_search_decode(
+                    m_scores_int8.at(out_buf_idx).index({Slice(), buf_chunk_idx}),
                     m_bwd.at(out_buf_idx)[buf_chunk_idx], m_posts.at(out_buf_idx)[buf_chunk_idx],
                     m_decoder_options.beam_cut, m_decoder_options.blank_score,
                     m_decoder_options.q_shift, m_decoder_options.q_scale,
                     m_decoder_options.temperature);
-            (*task->out_chunks)[chunk_idx] = DecodedChunk{
-                    std::get<0>(decode_result),
-                    std::get<1>(decode_result),
-                    std::get<2>(decode_result),
-            };
+
+            (*task->out_chunks)[chunk_idx] = DecodedChunk{sequence, qstring, moves};
 
             // Wake the waiting thread which called `call_chunks()` if we're done decoding
             std::unique_lock<std::mutex> task_lock(task->mut);
@@ -741,7 +767,7 @@ public:
     MTL::ComputePipelineState *m_scan_cps, *m_add_softmax_cps;
     MTL::SharedEvent *m_mtl_event;
     torch::Tensor m_scan_idx[2][2];
-    std::vector<torch::Tensor> m_scores, m_posts, m_bwd;
+    std::vector<torch::Tensor> m_scores_int8, m_posts, m_bwd;
     int m_out_chunk_size, m_batch_size, m_states, m_model_stride;
     // Number of pieces the linear output is split into, for reasons of
     // buffer size constraints.
@@ -759,6 +785,9 @@ MetalModelRunner::MetalModelRunner(std::shared_ptr<MetalCaller> caller,
                                    int chunk_size,
                                    int batch_size)
         : m_caller(caller) {
+    // adjust chunk size to be a multiple of the stride
+    chunk_size -= chunk_size % model_stride();
+
     m_input = torch::empty({batch_size, 1, chunk_size},
                            torch::TensorOptions().dtype(torch::kF32).device(torch::kCPU));
 }
@@ -774,3 +803,4 @@ std::vector<DecodedChunk> MetalModelRunner::call_chunks(int num_chunks) {
 }
 
 size_t MetalModelRunner::model_stride() const { return m_caller->m_model_stride; }
+size_t MetalModelRunner::chunk_size() const { return m_input.size(2); }

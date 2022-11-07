@@ -14,8 +14,11 @@
 #include "read_pipeline/ModBaseCallerNode.h"
 #include "read_pipeline/ScalerNode.h"
 #include "read_pipeline/WriterNode.h"
+#include "utils/log_utils.h"
+#include "utils/parameters.h"
 
 #include <argparse.hpp>
+#include <spdlog/spdlog.h>
 
 #include <filesystem>
 #include <iostream>
@@ -33,7 +36,8 @@ void setup(std::vector<std::string> args,
            size_t num_runners,
            size_t remora_batch_size,
            size_t num_remora_threads,
-           bool emit_fastq) {
+           bool emit_fastq,
+           bool emit_moves) {
     torch::set_num_threads(1);
     std::vector<Runner> runners;
 
@@ -41,7 +45,7 @@ void setup(std::vector<std::string> args,
 
     if (device == "cpu") {
         batch_size = batch_size == 0 ? std::thread::hardware_concurrency() : batch_size;
-        for (int i = 0; i < num_runners; i++) {
+        for (size_t i = 0; i < num_runners; i++) {
             runners.push_back(std::make_shared<ModelRunner<CPUDecoder>>(model_path, device,
                                                                         chunk_size, batch_size));
         }
@@ -63,7 +67,7 @@ void setup(std::vector<std::string> args,
                 batch_size == 0 ? auto_gpu_batch_size(model_path.string(), devices) : batch_size;
         for (auto device_string : devices) {
             auto caller = create_cuda_caller(model_path, chunk_size, batch_size, device_string);
-            for (int i = 0; i < num_runners; i++) {
+            for (size_t i = 0; i < num_runners; i++) {
                 runners.push_back(
                         std::make_shared<CudaModelRunner>(caller, chunk_size, batch_size));
             }
@@ -73,9 +77,23 @@ void setup(std::vector<std::string> args,
 
     // verify that all runners are using the same stride, in case we allow multiple models in future
     auto model_stride = runners.front()->model_stride();
-    assert(std::all_of(runners.begin(), runners.end(), [model_stride](auto runner) {
-        return runner->model_stride() == model_stride;
+    auto adjusted_chunk_size = runners.front()->chunk_size();
+    assert(std::all_of(runners.begin(), runners.end(), [&](auto runner) {
+        return runner->model_stride() == model_stride &&
+               runner->chunk_size() == adjusted_chunk_size;
     }));
+
+    if (chunk_size != adjusted_chunk_size) {
+        spdlog::debug("Adjusted chunk size to match model stride: {} -> {}", chunk_size,
+                      adjusted_chunk_size);
+        chunk_size = adjusted_chunk_size;
+    }
+    auto adjusted_overlap = (overlap / model_stride) * model_stride;
+    if (overlap != adjusted_overlap) {
+        spdlog::debug("Adjusted overlap to match model stride: {} -> {}", overlap,
+                      adjusted_overlap);
+        overlap = adjusted_overlap;
+    }
 
     if (!remora_models.empty() && emit_fastq) {
         throw std::runtime_error("Modified base models cannot be used with FASTQ output");
@@ -90,21 +108,35 @@ void setup(std::vector<std::string> args,
 
     // generate model callers before nodes or it affects the speed calculations
     std::vector<std::shared_ptr<RemoraCaller>> remora_callers;
+
+#ifndef __APPLE__
+    auto devices = parse_cuda_device_string(device);
+    num_devices = devices.size();
+
+    for (auto device_string : devices) {
+        for (const auto& remora_model : remora_model_list) {
+            auto caller = std::make_shared<RemoraCaller>(remora_model, device_string,
+                                                         remora_batch_size, model_stride);
+            remora_callers.push_back(caller);
+        }
+    }
+#else
     for (const auto& remora_model : remora_model_list) {
         auto caller = std::make_shared<RemoraCaller>(remora_model, device, remora_batch_size,
                                                      model_stride);
         remora_callers.push_back(caller);
     }
+#endif  // __APPLE__
 
-    WriterNode writer_node(std::move(args), emit_fastq, num_devices);
+    WriterNode writer_node(std::move(args), emit_fastq, emit_moves, num_devices * 2);
 
     std::unique_ptr<ModBaseCallerNode> mod_base_caller_node;
     std::unique_ptr<BasecallerNode> basecaller_node;
 
     if (!remora_model_list.empty()) {
-        mod_base_caller_node.reset(new ModBaseCallerNode(writer_node, std::move(remora_callers),
-                                                         num_remora_threads, model_stride,
-                                                         remora_batch_size));
+        mod_base_caller_node = std::make_unique<ModBaseCallerNode>(
+                writer_node, std::move(remora_callers), num_remora_threads, num_devices,
+                model_stride, remora_batch_size);
         basecaller_node =
                 std::make_unique<BasecallerNode>(*mod_base_caller_node, std::move(runners),
                                                  batch_size, chunk_size, overlap, model_stride);
@@ -118,63 +150,82 @@ void setup(std::vector<std::string> args,
 }
 
 int basecaller(int argc, char* argv[]) {
+    using dorado::utils::default_parameters;
+
+    InitLogging();
     argparse::ArgumentParser parser("dorado", DORADO_VERSION);
 
     parser.add_argument("model").help("the basecaller model to run.");
 
     parser.add_argument("data").help("the data directory.");
 
+    parser.add_argument("-v", "--verbose").default_value(false).implicit_value(true);
+
     parser.add_argument("-x", "--device")
             .help("device string in format \"cuda:0,...,N\", \"cuda:all\", \"metal\" etc..")
-#ifdef __APPLE__
-            .default_value(std::string{"metal"});
-#else
-            .default_value(std::string{"cuda:all"});
-#endif
+            .default_value(default_parameters.device);
 
     parser.add_argument("-b", "--batchsize")
-            .default_value(0)
+            .default_value(default_parameters.batchsize)
             .scan<'i', int>()
             .help("if 0 an optimal batchsize will be selected");
 
-    parser.add_argument("-c", "--chunksize").default_value(10000).scan<'i', int>();
+    parser.add_argument("-c", "--chunksize")
+            .default_value(default_parameters.chunksize)
+            .scan<'i', int>();
 
-    parser.add_argument("-o", "--overlap").default_value(500).scan<'i', int>();
+    parser.add_argument("-o", "--overlap")
+            .default_value(default_parameters.overlap)
+            .scan<'i', int>();
 
-    parser.add_argument("-r", "--num_runners").default_value(2).scan<'i', int>();
+    parser.add_argument("-r", "--num_runners")
+            .default_value(default_parameters.num_runners)
+            .scan<'i', int>();
 
     parser.add_argument("--emit-fastq").default_value(false).implicit_value(true);
 
-    parser.add_argument("--remora-batchsize").default_value(1000).scan<'i', int>();
+    parser.add_argument("--emit-moves").default_value(false).implicit_value(true);
 
-    parser.add_argument("--remora-threads").default_value(1).scan<'i', int>();
+    parser.add_argument("--remora-batchsize")
+            .default_value(default_parameters.remora_batchsize)
+            .scan<'i', int>();
 
-    parser.add_argument("--remora_models")
+    parser.add_argument("--remora-threads")
+            .default_value(default_parameters.remora_threads)
+            .scan<'i', int>();
+
+    parser.add_argument("--remora-models")
             .default_value(std::string())
             .help("a comma separated list of remora models");
 
     try {
         parser.parse_args(argc, argv);
     } catch (const std::exception& e) {
-        std::cerr << e.what() << std::endl;
-        std::cerr << parser;
+        std::ostringstream parser_stream;
+        parser_stream << parser;
+        spdlog::error("{}\n{}", e.what(), parser_stream.str());
         std::exit(1);
     }
 
     std::vector<std::string> args(argv, argv + argc);
 
-    std::cerr << "> Creating basecall pipeline" << std::endl;
+    if (parser.get<bool>("--verbose")) {
+        spdlog::set_level(spdlog::level::debug);
+    }
+
+    spdlog::info("> Creating basecall pipeline");
     try {
         setup(args, parser.get<std::string>("model"), parser.get<std::string>("data"),
-              parser.get<std::string>("--remora_models"), parser.get<std::string>("-x"),
+              parser.get<std::string>("--remora-models"), parser.get<std::string>("-x"),
               parser.get<int>("-c"), parser.get<int>("-o"), parser.get<int>("-b"),
               parser.get<int>("-r"), parser.get<int>("--remora-batchsize"),
-              parser.get<int>("--remora-threads"), parser.get<bool>("--emit-fastq"));
+              parser.get<int>("--remora-threads"), parser.get<bool>("--emit-fastq"),
+              parser.get<bool>("--emit-moves"));
     } catch (const std::exception& e) {
-        std::cerr << e.what() << std::endl;
+        spdlog::error("{}", e.what());
         return 1;
     }
 
-    std::cerr << "> Finished" << std::endl;
+    spdlog::info("> Finished");
     return 0;
 }

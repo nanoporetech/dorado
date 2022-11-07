@@ -13,7 +13,6 @@ Dorado is a high-performance, easy-to-use, open source basecaller for Oxford Nan
 
 This is an alpha of Dorado . This software is being released for evaluation. If you encounter any problems building or running Dorado please [report an issue](https://github.com/nanoporetech/dorado/issues).
 
-
 ## Installation
 
  - [dorado-0.0.1-linux-x64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.0.1-linux-x64.tar.gz)
@@ -95,7 +94,7 @@ apt-get update && apt-get install -y --no-install-recommends libhdf5-dev libssl-
 ```
 $ git clone git@github.com:nanoporetech/dorado.git
 $ cd dorado
-$ cmake -S . -B cmake-build
+$ cmake -S . -B cmake-build -DCMAKE_CUDA_COMPILER=<NVCC_DIR>/nvcc
 $ cmake --build cmake-build --config Release -j
 $ ctest --test-dir cmake-build
 ```

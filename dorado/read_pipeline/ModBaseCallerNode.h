@@ -14,6 +14,7 @@ public:
     ModBaseCallerNode(ReadSink& sink,
                       std::vector<std::shared_ptr<RemoraCaller>> model_callers,
                       size_t remora_threads,
+                      size_t num_devices,
                       size_t block_stride,
                       size_t batch_size,
                       size_t max_reads = 1000);
@@ -27,14 +28,15 @@ private:
     void output_worker_thread();
 
     // Worker threads, scales and chunks reads for callers and enqueues them
-    void runner_worker_thread(int runner_id);
+    void runner_worker_thread(size_t runner_id);
     // Worker thread per caller, performs the GPU calls to the remora models
-    void caller_worker_thread(int caller_id);
+    void caller_worker_thread(size_t caller_id);
 
     // Called by caller_worker_thread, calls the model and enqueues the results
-    void call_current_batch(int caller_id);
+    void call_current_batch(size_t caller_id);
 
     ReadSink& m_sink;
+    size_t m_num_devices;
     size_t m_batch_size;
     size_t m_block_stride;
 

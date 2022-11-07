@@ -3,6 +3,8 @@
 #include "decode/GPUDecoder.h"
 
 #include <c10/cuda/CUDAGuard.h>
+#include <c10/cuda/CUDAStream.h>
+#include <nvtx3/nvtx3.hpp>
 #include <toml.hpp>
 #include <torch/torch.h>
 
@@ -41,9 +43,8 @@ public:
     }
 
     struct NNTask {
-        NNTask(torch::Tensor *input_, int num_chunks_) : input(input_), num_chunks(num_chunks_) {}
-
-        torch::Tensor *input;
+        NNTask(torch::Tensor input_, int num_chunks_) : input(input_), num_chunks(num_chunks_) {}
+        torch::Tensor input;
         std::mutex mut;
         std::condition_variable cv;
         torch::Tensor out;
@@ -51,12 +52,17 @@ public:
         int num_chunks;
     };
 
-    std::vector<DecodedChunk> call_chunks(torch::Tensor &input, int num_chunks) {
+    std::vector<DecodedChunk> call_chunks(torch::Tensor &input,
+                                          torch::Tensor &output,
+                                          int num_chunks,
+                                          c10::cuda::CUDAStream stream) {
+        NVTX3_FUNC_RANGE();
+        c10::cuda::CUDAStreamGuard stream_guard(stream);
+
         if (num_chunks == 0) {
             return std::vector<DecodedChunk>();
         }
-
-        NNTask task(&input, num_chunks);
+        NNTask task(input.to(m_options.device()), num_chunks);
         {
             std::lock_guard<std::mutex> lock(m_input_lock);
             m_input_queue.push_front(&task);
@@ -67,12 +73,16 @@ public:
         while (!task.done) {
             task.cv.wait(lock);
         }
-        return m_decoder->cpu_part(task.out);
+
+        output.copy_(task.out);
+        return m_decoder->cpu_part(output);
     }
 
     void cuda_thread_fn() {
+        NVTX3_FUNC_RANGE();
         torch::InferenceMode guard;
-        c10::cuda::CUDAGuard device_guard(m_options.device_opt().value());
+        c10::cuda::CUDAGuard device_guard(m_options.device());
+        auto stream = c10::cuda::getCurrentCUDAStream(m_options.device().index());
 
         while (true) {
             std::unique_lock<std::mutex> input_lock(m_input_lock);
@@ -88,10 +98,10 @@ public:
             m_input_queue.pop_back();
             input_lock.unlock();
 
-            auto scores = m_module->forward(
-                    task->input->to(m_options.device_opt().value()).to(GPUDecoder::dtype));
             std::unique_lock<std::mutex> task_lock(task->mut);
+            auto scores = m_module->forward(task->input);
             task->out = m_decoder->gpu_part(scores, task->num_chunks, m_decoder_options);
+            stream.synchronize();
             task->done = true;
             task_lock.unlock();
             task->cv.notify_one();
@@ -119,10 +129,20 @@ std::shared_ptr<CudaCaller> create_cuda_caller(const std::filesystem::path &mode
 }
 
 CudaModelRunner::CudaModelRunner(std::shared_ptr<CudaCaller> caller, int chunk_size, int batch_size)
-        : m_caller(caller) {
-    m_input = torch::empty(
-            {batch_size, 1, chunk_size},
-            torch::TensorOptions().dtype(torch::kF32).device(torch::kCPU).pinned_memory(true));
+        : m_caller(caller),
+          m_stream(c10::cuda::getStreamFromPool(false, m_caller->m_options.device().index())) {
+    // adjust chunk size to be a multiple of the stride
+    chunk_size -= chunk_size % model_stride();
+
+    m_input = torch::empty({batch_size, 1, chunk_size}, torch::TensorOptions()
+                                                                .dtype(m_caller->m_options.dtype())
+                                                                .device(torch::kCPU)
+                                                                .pinned_memory(true));
+
+    long int block_size = chunk_size / model_stride();
+    m_output = torch::empty(
+            {3, batch_size, block_size},
+            torch::TensorOptions().dtype(torch::kInt8).device(torch::kCPU).pinned_memory(true));
     // warm up
     call_chunks(batch_size);
 }
@@ -132,7 +152,8 @@ void CudaModelRunner::accept_chunk(int chunk_idx, at::Tensor slice) {
 }
 
 std::vector<DecodedChunk> CudaModelRunner::call_chunks(int num_chunks) {
-    return m_caller->call_chunks(m_input, num_chunks);
+    return m_caller->call_chunks(m_input, m_output, num_chunks, m_stream);
 }
 
 size_t CudaModelRunner::model_stride() const { return m_caller->m_model_stride; }
+size_t CudaModelRunner::chunk_size() const { return m_input.size(2); }

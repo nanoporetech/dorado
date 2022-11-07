@@ -5,7 +5,7 @@ project(dorado)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_EXTENSIONS OFF)
-set(DORADO_3RD_PARTY ${CMAKE_SOURCE_DIR}/dorado/3rdparty)
+set(DORADO_3RD_PARTY ${CMAKE_CURRENT_SOURCE_DIR}/dorado/3rdparty)
 
 include(cmake/DoradoVersion.cmake)
 include(cmake/UpdateSubmodules.cmake)
@@ -31,7 +31,7 @@ add_subdirectory(dorado/3rdparty/elzip)
 add_subdirectory(dorado/3rdparty/edlib EXCLUDE_FROM_ALL)
 
 enable_testing()
-add_hdf_vbz_plugin()
+
 configure_file(dorado/Version.h.in dorado/Version.h)
 
 if(WIN32)
@@ -84,8 +84,11 @@ set(LIB_SOURCE_FILES
     dorado/utils/base_mod_utils.h
     dorado/utils/compat_utils.cpp
     dorado/utils/compat_utils.h
+    dorado/utils/log_utils.h
+    dorado/utils/log_utils.cpp
     dorado/utils/math_utils.h
     dorado/utils/module_utils.h
+    dorado/utils/parameters.h
     dorado/utils/sequence_utils.cpp
     dorado/utils/sequence_utils.h
     dorado/utils/stitch.cpp
@@ -102,7 +105,6 @@ set(LIB_SOURCE_FILES
 if(APPLE)
     include(cmake/Metal.cmake)
     list(APPEND LIB_SOURCE_FILES
-        dorado/nn/metal/nn.h
         dorado/nn/MetalCRFModel.h
         dorado/nn/MetalCRFModel.cpp
         dorado/utils/metal_utils.cpp
@@ -139,10 +141,19 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR}/dorado
     dorado/3rdparty/metal-cpp/metal-cpp
     dorado/3rdparty/metal-cpp/metal-cpp
     dorado/3rdparty/hdf_plugins/vbz_plugin
-    dorado
-    dorado/3rdparty/cxxpool/src
     dorado/3rdparty/htslib
+    dorado/3rdparty/cxxpool/src
+    dorado/3rdparty/NVTX/c/include
+    dorado
+    dorado/3rdparty/spdlog/include
 )
+
+enable_testing()
+
+if(NOT SKIP_HDF_PLUGINS)
+  # Can skip this if we're consuming the lib from a parent project that already has hdf_plugins
+  add_hdf_vbz_plugin()
+endif()
 
 target_link_libraries(dorado_lib
     ${APPLE_FWK_FOUNDATION}
@@ -165,35 +176,44 @@ if(APPLE)
     add_dependencies(dorado_lib metal-lib)
 endif()
 
-if(NOT WIN32)
-    # Set up RPATHs so we can find dependencies
-    set(CMAKE_SKIP_RPATH FALSE)
-    # Note: we don't need the relative lib dir if everything is in 
-    if(APPLE)
-        set(CMAKE_INSTALL_RPATH "@executable_path/;@executable_path/../lib")
-    else()
-        set(CMAKE_INSTALL_RPATH "$ORIGIN/../lib/;$ORIGIN")
+if(NOT DORADO_LIB_ONLY)
+    if(NOT WIN32)
+        # Set up RPATHs so we can find dependencies
+        set(CMAKE_SKIP_RPATH FALSE)
+        # Note: we don't need the relative lib dir if everything is in 
+        if(APPLE)
+            set(CMAKE_INSTALL_RPATH "@executable_path/;@executable_path/../lib")
+        else()
+            set(CMAKE_INSTALL_RPATH "$ORIGIN/../lib/;$ORIGIN")
+        endif()
+        set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
     endif()
-    set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
+
+    add_executable(dorado 
+        dorado/main.cpp
+        dorado/cli/basecaller.cpp
+        dorado/cli/benchmark.cpp        
+        dorado/cli/download.cpp
+        dorado/cli/cli.h
+        dorado/models.h
+    )
+
+    set_target_properties(dorado
+        PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+    )
+
+    target_link_libraries(dorado elzip)
+    target_link_libraries(dorado dorado_lib)
+
+    if (DEFINED DORADO_INSTALL_PATH)
+        set(CMAKE_INSTALL_PREFIX ${DORADO_INSTALL_PATH})
+    else()
+        set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/../dist)
+    endif()
+
+    install(TARGETS dorado RUNTIME)
 endif()
-
-add_executable(dorado dorado/main.cpp)
-
-set_target_properties(dorado
-    PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
-)
-
-target_link_libraries(dorado elzip)
-target_link_libraries(dorado dorado_lib)
-
-if (DEFINED DORADO_INSTALL_PATH)
-    set(CMAKE_INSTALL_PREFIX ${DORADO_INSTALL_PATH})
-else()
-    set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/../dist)
-endif()
-
-install(TARGETS dorado RUNTIME)
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     file(GLOB TORCH_DLLS "${TORCH_LIB}/lib/*.so*")
@@ -202,6 +222,22 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         file(GLOB HDF_DLLS "${HDF5_CXX_LIBRARY_DIRS}/*hdf5*.so*")
         install(FILES ${HDF_DLLS} DESTINATION lib)
     endif()
+    file(GLOB SZ_DLLS "${HDF5_CXX_LIBRARY_DIRS}/libsz.so*")
+    install(FILES ${SZ_DLLS} DESTINATION lib)
+    file(GLOB AEC_DLLS "${HDF5_CXX_LIBRARY_DIRS}/libaec.so*")
+    list(LENGTH AEC_DLLS AEC_DLL_LIST_LEN)
+    if(AEC_DLL_LIST_LEN)
+        install(FILES ${AEC_DLLS} DESTINATION lib)
+    endif()
+
+    # CUDA system DLLs we depend on:
+    file(GLOB CUDART_DLLS "${CUDAToolkit_ROOT}/targets/x86_64-linux/lib/*cudart.so*")
+    file(GLOB CUBLAS_DLLS "${CUDAToolkit_ROOT}/targets/x86_64-linux/lib/*cublas*.so*")
+    file(GLOB NVTOOLS_DLLS "${CUDAToolkit_ROOT}/targets/x86_64-linux/lib/*nvToolsExt.so*")
+    install(FILES ${CUDART_DLLS} DESTINATION lib)
+    install(FILES ${CUBLAS_DLLS} DESTINATION lib)
+    install(FILES ${NVTOOLS_DLLS} DESTINATION lib)
+
 elseif(WIN32)
     file(GLOB TORCH_DLLS "${TORCH_LIB}/lib/*.dll")
     install(FILES ${TORCH_DLLS} DESTINATION bin)
@@ -215,4 +251,6 @@ if(APPLE)
     add_subdirectory(metal_tests)
 endif()
 
-include(cmake/DoradoPackaging.cmake)
+if(NOT DORADO_LIB_ONLY)
+    include(cmake/DoradoPackaging.cmake)
+endif()

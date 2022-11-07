@@ -45,6 +45,9 @@ int main(int argc, char* argv[]) {
 
     if (subcommand == "-v" || subcommand == "--version") {
         std::cerr << DORADO_VERSION << std::endl;
+    } else if (subcommand == "-h" || subcommand == "--help") {
+        usage(keys);
+        return 0;
     } else if (subcommands.find(subcommand) != subcommands.end()) {
         return subcommands.at(subcommand)(--argc, ++argv);
     } else {

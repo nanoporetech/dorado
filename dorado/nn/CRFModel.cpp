@@ -19,6 +19,8 @@ extern "C" {
 #endif
 
 #include <math.h>
+#include <nvtx3/nvtx3.hpp>
+#include <spdlog/spdlog.h>
 #include <toml.hpp>
 #include <torch/torch.h>
 
@@ -29,21 +31,107 @@ namespace F = torch::nn::functional;
 using Slice = torch::indexing::Slice;
 using quantized_lstm = std::function<int(void *, void *, void *, void *, void *, void *, int)>;
 
-struct PermuteImpl : Module {
-    torch::Tensor forward(torch::Tensor x) { return x.permute({2, 0, 1}); }
-};
+#if USE_CUDA_LSTM
+static void cublas_matmul_f16(torch::Tensor const &A, torch::Tensor const &B, torch::Tensor &C) {
+    constexpr uint16_t HALF_ZERO = 0;      // 0.0 in __half format
+    constexpr uint16_t HALF_ONE = 0x3C00;  // 1.0 in __half format
+    assert(A.dtype() == torch::kF16 && B.dtype() == torch::kF16 && C.dtype() == torch::kF16);
+    assert(A.stride(1) == 1 && B.stride(1) == 1 && C.stride(1) == 1);
+    assert(A.size(0) == C.size(0));  // M
+    assert(B.size(1) == C.size(1));  // N
+    assert(A.size(1) == B.size(0));  // K
+    auto res =
+            cublasGemmEx(at::cuda::getCurrentCUDABlasHandle(), CUBLAS_OP_N, CUBLAS_OP_N, B.size(1),
+                         A.size(0), A.size(1), &HALF_ONE, B.data_ptr(), CUDA_R_16F, B.stride(0),
+                         A.data_ptr(), CUDA_R_16F, A.stride(0), &HALF_ZERO, C.data_ptr(),
+                         CUDA_R_16F, C.stride(0), CUDA_R_16F, CUBLAS_GEMM_DEFAULT_TENSOR_OP);
+    if (res != CUBLAS_STATUS_SUCCESS) {
+        spdlog::error("CuBLAS error {}", int(res));
+        exit(EXIT_FAILURE);
+    }
+}
+
+static bool cuda_lstm_is_quantized(int layer_size) {
+    return ((layer_size == 96) || (layer_size == 128));
+}
+#endif  // if USE_CUDA_LSTM
 
 struct ConvolutionImpl : Module {
-    ConvolutionImpl(int size = 1, int outsize = 1, int k = 1, int stride = 1) {
+    ConvolutionImpl(int size, int outsize, int k, int stride_, bool to_lstm_ = false)
+            : in_size(size), out_size(outsize), window_size(k), stride(stride_), to_lstm(to_lstm_) {
         conv = register_module(
                 "conv", Conv1d(Conv1dOptions(size, outsize, k).stride(stride).padding(k / 2)));
         activation = register_module("activation", SiLU());
     }
 
-    torch::Tensor forward(torch::Tensor x) { return activation(conv(x)); }
+    torch::Tensor forward(torch::Tensor x) {
+        // Input x is [N, C_in, T_in], contiguity optional
+        if (to_lstm) {
+#if USE_CUDA_LSTM
+            c10::cuda::CUDAGuard device_guard(x.device());
+            auto stream = at::cuda::getCurrentCUDAStream().stream();
+
+            int batch_size = x.size(0);
+            int chunk_size_in = x.size(2);
+            int chunk_size_out = chunk_size_in / stride;
+            auto w_device = conv->weight.view({out_size, in_size * window_size})
+                                    .t()
+                                    .to(x.options())
+                                    .contiguous();
+            auto b_device = conv->bias.to(x.options());
+            if (cuda_lstm_is_quantized(out_size)) {
+                torch::Tensor res =
+                        torch::empty({batch_size, chunk_size_out, out_size}, x.options());
+                auto res_2D = res.view({-1, out_size});
+                auto ntcw_mat = torch::empty({batch_size, chunk_size_out, in_size, window_size},
+                                             x.options());
+                host_window_ntcw_f16(stream, x.stride(0), x.stride(2), x.stride(1), batch_size,
+                                     chunk_size_in, in_size, window_size, stride,
+                                     ntcw_mat.stride(0), ntcw_mat.stride(1), ntcw_mat.stride(2),
+                                     ntcw_mat.stride(3), x.data_ptr(), ntcw_mat.data_ptr());
+                cublas_matmul_f16(ntcw_mat.view({-1, in_size * window_size}), w_device, res_2D);
+                host_bias_swish_f16(stream, res_2D.size(0), res_2D.size(1), res_2D.stride(0),
+                                    res_2D.data_ptr(), b_device.data_ptr());
+
+                // Output is [N, T_out, C_out], contiguous
+                return res;
+            } else {
+                auto res = torch::empty({chunk_size_out + 1, batch_size, 2, out_size}, x.options());
+                res.index({0, Slice(), 1, Slice()}) = 0;
+                res.index({chunk_size_out, Slice(), 0, Slice()}) = 0;
+                auto res_TNC = res.slice(0, 1, chunk_size_out + 1).select(2, 1);
+                auto res_2D = res_TNC.view({-1, out_size});
+
+                auto tncw_mat = torch::empty({chunk_size_out, batch_size, in_size, window_size},
+                                             x.options());
+                host_window_ntcw_f16(stream, x.stride(0), x.stride(2), x.stride(1), batch_size,
+                                     chunk_size_in, in_size, window_size, stride,
+                                     tncw_mat.stride(1), tncw_mat.stride(0), tncw_mat.stride(2),
+                                     tncw_mat.stride(3), x.data_ptr(), tncw_mat.data_ptr());
+                cublas_matmul_f16(tncw_mat.view({-1, in_size * window_size}), w_device, res_2D);
+                host_bias_swish_f16(stream, res_2D.size(0), res_2D.size(1), res_2D.stride(0),
+                                    res_2D.data_ptr(), b_device.data_ptr());
+
+                // Output is [T_out + 1, N, 2, C_out], contiguous, which serves as
+                // working memory for CuBLAS LSTM
+                return res;
+            }
+#else
+            // Output is [N, T_out, C_out], non-contiguous
+            return activation(conv(x)).transpose(1, 2);
+#endif
+        }
+        // Output is [N, C_out, T_out], contiguous
+        return activation(conv(x));
+    }
 
     Conv1d conv{nullptr};
     SiLU activation{nullptr};
+    int in_size;
+    int out_size;
+    int window_size;
+    int stride;
+    bool to_lstm;
 };
 
 struct LinearCRFImpl : Module {
@@ -53,19 +141,19 @@ struct LinearCRFImpl : Module {
     };
 
     torch::Tensor forward(torch::Tensor x) {
-        auto T = x.size(0);
-        auto N = x.size(1);
+        // Input x is [N, T, C], contiguity optional
+        auto N = x.size(0);
+        auto T = x.size(1);
 #if USE_CUDA_LSTM
         // Optimised version of the #else branch for CUDA devices
         c10::cuda::CUDAGuard device_guard(x.device());
         auto stream = at::cuda::getCurrentCUDAStream().stream();
 
-        // make sure input is NTC in memory
-        x = x.transpose(0, 1).contiguous().reshape({T * N, -1});
+        x = x.contiguous().reshape({N * T, -1});
         auto scores = torch::matmul(x, linear->weight.t());
         host_bias_tanh_scale_f16(stream, N * T, scores.size(1), scale, scores.data_ptr(),
                                  linear->bias.data_ptr());
-        scores = scores.view({N, T, -1}).transpose(0, 1);  // logical order TNC, memory order NTC
+        scores = scores.view({N, T, -1});
 
 #else  // if USE_CUDA_LSTM
         auto scores = activation(linear(x)) * scale;
@@ -74,11 +162,12 @@ struct LinearCRFImpl : Module {
         if (expand_blanks == true) {
             scores = scores.contiguous();
             int C = scores.size(2);
-            scores = F::pad(scores.view({T, N, C / 4, 4}),
+            scores = F::pad(scores.view({N, T, C / 4, 4}),
                             F::PadFuncOptions({1, 0, 0, 0, 0, 0, 0, 0}).value(blank_score))
-                             .view({T, N, -1});
+                             .view({N, T, -1});
         }
 
+        // Output is [N, T, C], contiguous
         return scores;
     }
 
@@ -124,7 +213,7 @@ struct LSTMStackImpl : Module {
         rnn4 = register_module("rnn_4", CudaLSTM(layer_size, false));
         rnn5 = register_module("rnn_5", CudaLSTM(layer_size, true));
 
-        m_quantize = ((layer_size == 96) || (layer_size == 128));
+        m_quantize = cuda_lstm_is_quantized(layer_size);
 
         if (m_quantize) {
             // chunk_size * batch_size can not be > 2**31 (2147483648).
@@ -157,30 +246,28 @@ struct LSTMStackImpl : Module {
     quantized_lstm _host_run_lstm_rev_quantized{nullptr};
 
     torch::Tensor forward_cublas(torch::Tensor in) {
+        // input in is ([N, T, C], contiguity optional) or ([T+1, N, 2, C], contiguous) (see below)
         c10::cuda::CUDAGuard device_guard(in.device());
         auto stream = at::cuda::getCurrentCUDAStream().stream();
-        int chunk_size = in.size(0);
-        int batch_size = in.size(1);
-        assert(layer_size == in.size(2));
-        int gate_size = layer_size * 4;
-
-        // We need some extra working memory to run the LSTM layers. By making it `thread_local`
-        // this will work with multiple runners (i.e. multiple threads).
-        thread_local torch::Tensor mat_working_mem, gate_buf;
-        thread_local int working_mem_chunk_size = 0;
-        thread_local int max_batch_size = 0;
-        if (working_mem_chunk_size != chunk_size || max_batch_size < batch_size) {
-            if (max_batch_size < batch_size) {
-                gate_buf = torch::empty({batch_size, gate_size}, in.options()).contiguous();
-                max_batch_size = batch_size;
-            }
-            working_mem_chunk_size = chunk_size;
+        int chunk_size, batch_size;
+        torch::Tensor mat_working_mem;
+        bool input_is_working_mem = (in.dim() == 4 && in.size(2) == 2);
+        if (input_is_working_mem) {
+            mat_working_mem = in;
+            chunk_size = in.size(0) - 1;
+            batch_size = in.size(1);
+            assert(layer_size == in.size(3));
+            assert(in.is_contiguous());
+        } else {
+            batch_size = in.size(0);
+            chunk_size = in.size(1);
+            assert(layer_size == in.size(2));
             mat_working_mem =
-                    torch::zeros({chunk_size + 1, batch_size, 2, layer_size}, in.options())
-                            .contiguous();
+                    torch::zeros({chunk_size + 1, batch_size, 2, layer_size}, in.options());
         }
-        mat_working_mem.to(in.device());
-        gate_buf.to(in.device());
+
+        int gate_size = layer_size * 4;
+        auto gate_buf = torch::empty({batch_size, gate_size}, in.options());
 
         // Working memory is laid out as [T+1][N][2][C] in memory, where the 2 serves to
         // interleave input and output for each LSTM layer in a specific way. The reverse LSTM
@@ -190,22 +277,25 @@ struct LSTMStackImpl : Module {
         // The interleaving means that x(t) and h(t-1), i.e. the input for the current timestep
         // and the output of the previous timestep, appear concatenated in memory and we can
         // perform a single matmul with the concatenated WU matrix
-        // Note that both working_mem[chunk_size][:][0][:] and working_mem[0][:][1][0] remain
+        // Note that both working_mem[chunk_size][:][0][:] and working_mem[0][:][1][:] remain
         // all zeroes, representing the initial LSTM state h(-1) in either direction.
 
         auto working_mem_all = mat_working_mem.view({chunk_size + 1, batch_size, -1});
         auto working_mem_left = mat_working_mem.slice(0, 0, chunk_size).select(2, 0);
         auto working_mem_right = mat_working_mem.slice(0, 1, chunk_size + 1).select(2, 1);
 
-        // NOTE: `host_transpose_f16' does exactly what the commented out assignment
-        // below would do, only ~5x faster (on A100)
-        // working_mem_right = in;
-        host_transpose_f16(stream, in.data_ptr(), in.size(0), in.size(1), in.size(2), in.stride(0),
-                           in.stride(1), in.stride(2), working_mem_right.stride(0),
-                           working_mem_right.stride(1), 1, working_mem_right.data_ptr());
+        if (!input_is_working_mem) {
+            // NOTE: `host_transpose_f16' does exactly what the commented out assignment
+            // below would do, only ~5x faster (on A100)
+            // working_mem_right = in.transpose(1, 0);
+            host_transpose_f16(stream, in.data_ptr(), in.size(1), in.size(0), in.size(2),
+                               in.stride(1), in.stride(0), in.stride(2),
+                               working_mem_right.stride(0), working_mem_right.stride(1),
+                               working_mem_right.stride(2), working_mem_right.data_ptr());
+        }
 
         for (auto &rnn : {rnn1, rnn2, rnn3, rnn4, rnn5}) {
-            auto state_buf = torch::zeros({batch_size, layer_size}, in.options()).contiguous();
+            auto state_buf = torch::zeros({batch_size, layer_size}, in.options());
             auto weights_cpu = rnn->weights.t().contiguous();
             auto weights = weights_cpu.to(in.device());
             auto bias = rnn->bias.to(in.device());
@@ -217,29 +307,15 @@ struct LSTMStackImpl : Module {
                 // Timestep matrix mulitplication (using cublasGemmEx, as using torch::matmul
                 // as below is a bit slower on A100 for some reason)
                 // gate_buf = torch::matmul(timestep_in, weights);
-                constexpr uint16_t HALF_ZERO = 0;      // 0.0 in __half format
-                constexpr uint16_t HALF_ONE = 0x3C00;  // 1.0 in __half format
-                auto res = cublasGemmEx(
-                        at::cuda::getCurrentCUDABlasHandle(), CUBLAS_OP_N, CUBLAS_OP_N, gate_size,
-                        batch_size, 2 * layer_size, &HALF_ONE, (const void *)weights.data_ptr(),
-                        CUDA_R_16F, gate_size, (const void *)timestep_in.data_ptr(), CUDA_R_16F,
-                        2 * layer_size, &HALF_ZERO, (void *)gate_buf.data_ptr(), CUDA_R_16F,
-                        gate_size, CUDA_R_16F, CUBLAS_GEMM_DEFAULT_TENSOR_OP);
-                if (res != CUBLAS_STATUS_SUCCESS) {
-                    std::cerr << "CuBLAS error " << int(res) << std::endl;
-                    exit(EXIT_FAILURE);
-                }
+                cublas_matmul_f16(timestep_in, weights, gate_buf);
                 host_lstm_step_f16(stream, batch_size, layer_size, bias.data_ptr(),
                                    gate_buf.data_ptr(), state_buf.data_ptr(),
                                    timestep_out.data_ptr());
             }
         }
 
-        // NOTE: we return a view to a thread_local tensor here, meaning we could get weird
-        // results if we called this method again on the same thread before consuming the
-        // tensor contents. For that to happen we'd have to have two consecutive LSTMStacks,
-        // which doesn't make much sense. So this should be safe in practice.
-        return mat_working_mem.index({Slice(0, chunk_size), Slice(), 0});
+        // Output is [N, T, C], non-contiguous
+        return working_mem_left.transpose(1, 0);
     }
 
     void rearrange_individual_weights(torch::Tensor buffer) {
@@ -309,7 +385,10 @@ struct LSTMStackImpl : Module {
     }
 
     torch::Tensor forward_quantized(torch::Tensor x) {
+        // Input x is [N, T, C], contiguity optional
         c10::cuda::CUDAGuard device_guard(x.device());
+
+        x = x.contiguous();
 
         //If this is the fist time the forward method is being applied, do some startup
         if (m_quantize && !_weights_rearranged) {
@@ -317,9 +396,6 @@ struct LSTMStackImpl : Module {
             quantize_weights();
             _chunks = _chunks.to(x.device());
         }
-
-        x = x.permute({1, 0, 2}).contiguous();  // data needs to be in NTC format.
-
         auto buffer = torch::matmul(x, _r_wih[0]);
 
         _host_run_lstm_rev_quantized(
@@ -355,16 +431,18 @@ struct LSTMStackImpl : Module {
                 rnn5->named_parameters()["bias_ih"].data_ptr(),
                 _quantization_scale_factors[4].data_ptr(), x.data_ptr(), _chunks.size(0));
 
-        torch::cuda::synchronize();
-
-        return x.permute({1, 0, 2}).contiguous();
+        // Output is [N, T, C], contiguous
+        return x;
     }
 
     // Dispatch to different forward method depending on whether we use quantized LSTMs or not
     torch::Tensor forward(torch::Tensor x) {
+        // Input x is [N, T, C], contiguity optional
         if (m_quantize) {
+            // Output is [N, T, C], contiguous
             return forward_quantized(x);
         } else {
+            // Output is [N, T, C], non-contiguous
             return forward_cublas(x);
         }
     }
@@ -377,38 +455,25 @@ struct LSTMStackImpl : Module {
 
 struct LSTMStackImpl : Module {
     LSTMStackImpl(int size, int batchsize, int chunksize) {
-        rnn1 = register_module("rnn1", LSTM(LSTMOptions(size, size)));
-        rnn2 = register_module("rnn2", LSTM(LSTMOptions(size, size)));
-        rnn3 = register_module("rnn3", LSTM(LSTMOptions(size, size)));
-        rnn4 = register_module("rnn4", LSTM(LSTMOptions(size, size)));
-        rnn5 = register_module("rnn5", LSTM(LSTMOptions(size, size)));
+        // torch::nn::LSTM expects/produces [N, T, C] with batch_first == true
+        rnn1 = register_module("rnn1", LSTM(LSTMOptions(size, size).batch_first(true)));
+        rnn2 = register_module("rnn2", LSTM(LSTMOptions(size, size).batch_first(true)));
+        rnn3 = register_module("rnn3", LSTM(LSTMOptions(size, size).batch_first(true)));
+        rnn4 = register_module("rnn4", LSTM(LSTMOptions(size, size).batch_first(true)));
+        rnn5 = register_module("rnn5", LSTM(LSTMOptions(size, size).batch_first(true)));
     };
 
     torch::Tensor forward(torch::Tensor x) {
-        // rnn1
-        x = x.flip(0);
-        auto [y1, h1] = rnn1(x);
-        x = y1.flip(0);
+        // Input is [N, T, C], contiguity optional
 
-        // rnn2
-        auto [y2, h2] = rnn2(x);
-        x = y2;
+        auto [y1, h1] = rnn1(x.flip(1));
+        auto [y2, h2] = rnn2(y1.flip(1));
+        auto [y3, h3] = rnn3(y2.flip(1));
+        auto [y4, h4] = rnn4(y3.flip(1));
+        auto [y5, h5] = rnn5(y4.flip(1));
 
-        // rnn3
-        x = x.flip(0);
-        auto [y3, h3] = rnn3(x);
-        x = y3.flip(0);
-
-        // rnn4
-        auto [y4, h4] = rnn4(x);
-        x = y4;
-
-        // rnn5
-        x = x.flip(0);
-        auto [y5, h5] = rnn5(x);
-        x = y5.flip(0);
-
-        return x;
+        // Output is [N, T, C], non-contiguous
+        return y5.flip(1);
     }
 
     LSTM rnn1{nullptr}, rnn2{nullptr}, rnn3{nullptr}, rnn4{nullptr}, rnn5{nullptr};
@@ -416,7 +481,6 @@ struct LSTMStackImpl : Module {
 
 #endif  // if USE_CUDA_LSTM else
 
-TORCH_MODULE(Permute);
 TORCH_MODULE(LSTMStack);
 TORCH_MODULE(LinearCRF);
 TORCH_MODULE(Convolution);
@@ -430,19 +494,21 @@ struct CRFModelImpl : Module {
                  int chunk_size) {
         conv1 = register_module("conv1", Convolution(1, 4, 5, 1));
         conv2 = register_module("conv2", Convolution(4, 16, 5, 1));
-        conv3 = register_module("conv3", Convolution(16, size, 19, stride));
-        permute = register_module("permute", Permute());
+        conv3 = register_module("conv3", Convolution(16, size, 19, stride, true));
         rnns = register_module("rnns", LSTMStack(size, batch_size, chunk_size / stride));
         linear = register_module("linear", LinearCRF(size, outsize));
         linear->expand_blanks = expand_blanks;
-        encoder = Sequential(conv1, conv2, conv3, permute, rnns, linear);
+        encoder = Sequential(conv1, conv2, conv3, rnns, linear);
     }
 
     void load_state_dict(const std::vector<torch::Tensor> &weights) {
         ::utils::load_state_dict(*this, weights);
     }
 
-    torch::Tensor forward(torch::Tensor x) { return encoder->forward(x); }
+    torch::Tensor forward(torch::Tensor x) {
+        nvtx3::scoped_range loop{"nn_forward"};
+        return encoder->forward(x);
+    }
 
     std::vector<torch::Tensor> load_weights(const std::filesystem::path &dir) {
         auto tensors = std::vector<std::string>{
@@ -473,7 +539,6 @@ struct CRFModelImpl : Module {
         return ::utils::load_tensors(dir, tensors);
     }
 
-    Permute permute{nullptr};
     LSTMStack rnns{nullptr};
     LinearCRF linear{nullptr};
     Sequential encoder{nullptr};

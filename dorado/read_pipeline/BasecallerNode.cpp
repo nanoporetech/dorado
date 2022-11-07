@@ -3,12 +3,18 @@
 #include "../decode/CPUDecoder.h"
 #include "../utils/stitch.h"
 
+#include <nvtx3/nvtx3.hpp>
+
 #include <chrono>
 #include <cstdlib>
 #include <memory>
 
 using namespace std::chrono_literals;
 using namespace torch::indexing;
+
+namespace {
+constexpr auto FORCE_TIMEOUT = 100ms;
+}
 
 void BasecallerNode::input_worker_thread() {
     while (true) {
@@ -78,11 +84,11 @@ void BasecallerNode::input_worker_thread() {
 }
 
 void BasecallerNode::basecall_current_batch(int worker_id) {
+    NVTX3_FUNC_RANGE();
     auto model_runner = m_model_runners[worker_id];
-
     auto decode_results = model_runner->call_chunks(m_batched_chunks[worker_id].size());
 
-    for (int i = 0; i < m_batched_chunks[worker_id].size(); i++) {
+    for (size_t i = 0; i < m_batched_chunks[worker_id].size(); i++) {
         m_batched_chunks[worker_id][i]->seq = decode_results[i].sequence;
         m_batched_chunks[worker_id][i]->qstring = decode_results[i].qstring;
         m_batched_chunks[worker_id][i]->moves = decode_results[i].moves;
@@ -95,22 +101,40 @@ void BasecallerNode::basecall_current_batch(int worker_id) {
         source_read->num_chunks_called += 1;
     }
     m_batched_chunks[worker_id].clear();
+}
 
-    // Now move any completed reads to the output queue
-    std::unique_lock<std::mutex> working_reads_lock(m_working_reads_mutex);
-    for (auto read_iter = m_working_reads.begin(); read_iter != m_working_reads.end();) {
-        if ((*read_iter)->num_chunks_called.load() == (*read_iter)->num_chunks) {
-            stitch_chunks(*read_iter);
-            m_sink.push_read(*read_iter);
-            read_iter = m_working_reads.erase(read_iter);
-        } else {
-            read_iter++;
+void BasecallerNode::working_reads_manager() {
+    while (!m_terminate_manager || !m_working_reads.empty()) {
+        nvtx3::scoped_range loop{"working_reads_manager"};
+        std::deque<std::shared_ptr<Read>> completed_reads;
+        std::unique_lock<std::mutex> working_reads_lock(m_working_reads_mutex);
+
+        for (auto read_iter = m_working_reads.begin(); read_iter != m_working_reads.end();) {
+            if ((*read_iter)->num_chunks_called.load() == (*read_iter)->num_chunks) {
+                completed_reads.push_back(*read_iter);
+                read_iter = m_working_reads.erase(read_iter);
+            } else {
+                read_iter++;
+            }
+        }
+
+        working_reads_lock.unlock();
+
+        if (completed_reads.empty()) {
+            std::this_thread::sleep_for(10ms);
+        }
+
+        for (auto &read : completed_reads) {
+            stitch_chunks(read);
+            m_sink.push_read(read);
         }
     }
-    working_reads_lock.unlock();
+
+    m_sink.terminate();
 }
 
 void BasecallerNode::basecall_worker_thread(int worker_id) {
+    auto last_chunk_reserve_time = std::chrono::system_clock::now();
     while (true) {
         std::unique_lock<std::mutex> chunks_lock(m_chunks_in_mutex);
 
@@ -122,22 +146,30 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
                     basecall_current_batch(worker_id);
                 }
 
-                // The input thread has completed, we should shut down.
-                std::unique_lock<std::mutex> working_reads_lock(m_working_reads_mutex);
                 if (!m_working_reads.empty()) {
+                    continue;
                 }
 
-                //Reduce the count of active model runners, if this was the last active model runner also send termination signal to sink
-                int num_remaining_runners = --m_num_active_model_runners;
+                size_t num_remaining_runners = --m_num_active_model_runners;
+
                 if (num_remaining_runners == 0) {
-                    m_sink.terminate();
+                    m_terminate_manager = true;
                 }
 
                 return;
+
             } else {
                 // There's no chunks available to call at the moment, sleep and try again
                 chunks_lock.unlock();
-                std::this_thread::sleep_for(100ms);
+
+                auto current_time = std::chrono::system_clock::now();
+                auto delta = std::chrono::duration_cast<std::chrono::milliseconds>(
+                        current_time - last_chunk_reserve_time);
+                if (delta > FORCE_TIMEOUT && !m_batched_chunks[worker_id].empty()) {
+                    basecall_current_batch(worker_id);
+                } else {
+                    std::this_thread::sleep_for(100ms);
+                }
                 continue;
             }
         }
@@ -169,6 +201,8 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
 
             m_batched_chunks[worker_id].push_back(chunk);
             chunks_lock.lock();
+
+            last_chunk_reserve_time = std::chrono::system_clock::now();
         }
 
         chunks_lock.unlock();
@@ -195,14 +229,16 @@ BasecallerNode::BasecallerNode(ReadSink &sink,
           m_overlap(overlap),
           m_model_stride(model_stride),
           m_terminate_basecaller(false),
-          m_input_worker(new std::thread(&BasecallerNode::input_worker_thread, this)) {
+          m_working_reads_manager(
+                  std::make_unique<std::thread>(&BasecallerNode::working_reads_manager, this)),
+          m_input_worker(
+                  std::make_unique<std::thread>(&BasecallerNode::input_worker_thread, this)) {
     // Spin up the model runners:
-    int num_model_runners = m_model_runners.size();
-    for (int i = 0; i < num_model_runners; i++) {
+    m_num_active_model_runners = m_model_runners.size();
+    for (int i = 0; i < m_num_active_model_runners; i++) {
         std::unique_ptr<std::thread> t =
                 std::make_unique<std::thread>(&BasecallerNode::basecall_worker_thread, this, i);
         m_basecall_workers.push_back(std::move(t));
-        m_num_active_model_runners++;
         std::deque<std::shared_ptr<Chunk>> chunk_queue;
         m_batched_chunks.push_back(chunk_queue);
     }
@@ -219,5 +255,6 @@ BasecallerNode::~BasecallerNode() {
     for (auto &t : m_basecall_workers) {
         t->join();
     }
+    m_working_reads_manager->join();
     termination_time = std::chrono::system_clock::now();
 }
