@@ -14,6 +14,7 @@ public:
     ModBaseCallerNode(ReadSink& sink,
                       std::vector<std::shared_ptr<RemoraCaller>> model_callers,
                       size_t remora_threads,
+                      size_t num_devices,
                       size_t block_stride,
                       size_t batch_size,
                       size_t max_reads = 1000);
@@ -35,6 +36,7 @@ private:
     void call_current_batch(size_t caller_id);
 
     ReadSink& m_sink;
+    size_t m_num_devices;
     size_t m_batch_size;
     size_t m_block_stride;
 

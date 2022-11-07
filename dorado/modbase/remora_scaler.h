@@ -33,13 +33,15 @@ public:
      *  @param seq_to_sig_map The indices of the samples corresponding to moves in the move table
      *  @param levels The expected levels for each kmer in the basecalled sequence
      *  @param clip_bases The number of bases to trim from the start and end of the sequence
-     * 
+     *  @param max_bases is number of bases to calculate the rescaling from
+     *
      *  @return The new offset and scale values
      */
     std::pair<float, float> rescale(const torch::Tensor samples,
                                     const std::vector<uint64_t>& seq_to_sig_map,
                                     const std::vector<float>& levels,
-                                    size_t clip_bases = 10) const;
+                                    size_t clip_bases = 10,
+                                    size_t max_bases = 1000) const;
 
     /** Scale calculator for v1 Remora-style modified base detection.
      *  @param kmer_levels A vector of expected signal levels per kmer.

@@ -10,14 +10,20 @@
 #include <chrono>
 using namespace std::chrono_literals;
 
+namespace {
+constexpr auto FORCE_TIMEOUT = 100ms;
+}
+
 ModBaseCallerNode::ModBaseCallerNode(ReadSink& sink,
                                      std::vector<std::shared_ptr<RemoraCaller>> model_callers,
                                      size_t remora_threads,
+                                     size_t num_devices,
                                      size_t block_stride,
                                      size_t batch_size,
                                      size_t max_reads)
         : ReadSink(max_reads),
           m_sink(sink),
+          m_num_devices(num_devices),
           m_batch_size(batch_size),
           m_block_stride(block_stride),
           m_callers(std::move(model_callers)) {
@@ -25,11 +31,12 @@ ModBaseCallerNode::ModBaseCallerNode(ReadSink& sink,
 
     m_output_worker = std::make_unique<std::thread>(&ModBaseCallerNode::output_worker_thread, this);
 
-    // Spin up the caller threads
     size_t num_model_callers = m_callers.size();
-    for (size_t i = 0; i < num_model_callers; ++i) {
-        m_chunk_queues.emplace_back();
-        m_batched_chunks.emplace_back();
+
+    m_chunk_queues.resize(num_model_callers / num_devices);
+    m_batched_chunks.resize(num_model_callers);
+
+    for (size_t i = 0; i < num_model_callers; i++) {
         std::unique_ptr<std::thread> t =
                 std::make_unique<std::thread>(&ModBaseCallerNode::caller_worker_thread, this, i);
         m_caller_workers.push_back(std::move(t));
@@ -37,7 +44,7 @@ ModBaseCallerNode::ModBaseCallerNode(ReadSink& sink,
     }
 
     // Spin up the proessing threads:
-    for (size_t i = 0; i < remora_threads; ++i) {
+    for (size_t i = 0; i < remora_threads * num_devices; ++i) {
         std::unique_ptr<std::thread> t =
                 std::make_unique<std::thread>(&ModBaseCallerNode::runner_worker_thread, this, i);
         m_runner_workers.push_back(std::move(t));
@@ -72,8 +79,8 @@ void ModBaseCallerNode::init_modbase_info() {
     }
 
     std::array<size_t, 4> base_counts = {1, 1, 1, 1};
-    for (const auto& caller : m_callers) {
-        auto& params = caller->params();
+    for (size_t id = 0; id < m_callers.size() / m_num_devices; ++id) {
+        const auto& params = m_callers[id]->params();
 
         auto base = params.motif[params.motif_offset];
         if (allowed_bases.find(base) == std::string::npos) {
@@ -165,7 +172,7 @@ void ModBaseCallerNode::runner_worker_thread(size_t runner_id) {
 
             read->num_modbase_chunks = 0;
             read->num_modbase_chunks_called = 0;
-            for (size_t caller_id = 0; caller_id < m_callers.size(); ++caller_id) {
+            for (size_t caller_id = 0; caller_id < m_callers.size() / m_num_devices; ++caller_id) {
                 const auto& caller = m_callers[caller_id];
                 auto& chunk_queue = m_chunk_queues[caller_id];
 
@@ -211,8 +218,12 @@ void ModBaseCallerNode::runner_worker_thread(size_t runner_id) {
 
 void ModBaseCallerNode::caller_worker_thread(size_t caller_id) {
     auto& caller = m_callers[caller_id];
-    auto& chunk_queue = m_chunk_queues[caller_id];
+
+    auto num_models = m_callers.size() / m_num_devices;
+    auto& chunk_queue = m_chunk_queues[caller_id % num_models];
     auto& batched_chunks = m_batched_chunks[caller_id];
+    auto last_chunk_reserve_time = std::chrono::system_clock::now();
+
     while (true) {
         std::unique_lock<std::mutex> chunks_lock(m_chunk_queues_mutex);
         if (chunk_queue.empty()) {
@@ -232,7 +243,15 @@ void ModBaseCallerNode::caller_worker_thread(size_t caller_id) {
             } else {
                 // There's no chunks available to call at the moment, sleep and try again
                 chunks_lock.unlock();
-                std::this_thread::sleep_for(100ms);
+
+                auto current_time = std::chrono::system_clock::now();
+                auto delta = std::chrono::duration_cast<std::chrono::milliseconds>(
+                        current_time - last_chunk_reserve_time);
+                if (delta > FORCE_TIMEOUT && !batched_chunks.empty()) {
+                    call_current_batch(caller_id);
+                } else {
+                    std::this_thread::sleep_for(100ms);
+                }
                 continue;
             }
         }
@@ -245,6 +264,8 @@ void ModBaseCallerNode::caller_worker_thread(size_t caller_id) {
             caller->accept_chunk(batched_chunks.size(), chunk->signal, chunk->encoded_kmers);
             batched_chunks.push_back(chunk);
             chunks_lock.lock();
+
+            last_chunk_reserve_time = std::chrono::system_clock::now();
         }
 
         chunks_lock.unlock();

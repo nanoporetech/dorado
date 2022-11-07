@@ -340,7 +340,7 @@ struct MetalBlockImpl : Module {
 
             const int kOutBufSize = sizeof(ftype) * kernel_simd_groups * kTileSize * kTileSize;
             const int kOutBufF32Size = sizeof(float) * kernel_simd_groups * kTileSize * kTileSize;
-            const std::vector<int> tg_buffer_lens{kOutBufSize, kOutBufF32Size};
+            const std::vector<int> tg_buffer_lens{kOutBufSize};
 
             launch_kernel_no_wait(linear_tanh_cps, command_buffer,
                                   {args_buffer, mat_working_mem, mat_linear_weights, out_buffer},
@@ -540,7 +540,7 @@ public:
         m_scan_idx[1][1] = torch::div(m_scan_idx[1][0], num_transitions, "floor");
 
         for (int i = 0; i < m_out_split; ++i) {
-            m_scores.push_back(torch::empty({T, m_out_batch_size, C}));
+            m_scores_int8.push_back(torch::empty({T, m_out_batch_size, C}, torch::kInt8));
             m_posts.push_back(torch::empty({m_out_batch_size, T + 1, Cs}));
             m_bwd.push_back(torch::empty({m_out_batch_size, T + 1, Cs}));
         }
@@ -645,8 +645,8 @@ public:
                 // since the same buffers are used for successive batches' scores, fwd/bwd scans.
                 MTL::SharedEvent *const linear_hold_off =
                         (task->run_id != 0) ? m_mtl_event : nullptr;
-                MTL::CommandBuffer *const cb = m_model->forward_async(*task->input, linear_hold_off,
-                                                                      task->run_id - 1, m_scores);
+                MTL::CommandBuffer *const cb = m_model->forward_async(
+                        *task->input, linear_hold_off, task->run_id - 1, m_scores_int8);
 
                 // The same buffer is used for the forward scan results and the output of
                 // m_add_softmax_cps.
@@ -663,14 +663,17 @@ public:
                     // TODO: optimise grid size
                     launch_kernel_no_wait(
                             m_scan_cps, cb,
-                            {args_fwd, mtl_for_tensor(m_scores.at(i)), mtl_for_tensor(fwd.at(i)),
-                             mtl_for_tensor(m_scan_idx[0][0]), mtl_for_tensor(m_scan_idx[0][1])},
+                            {args_fwd, mtl_for_tensor(m_scores_int8.at(i)),
+                             mtl_for_tensor(fwd.at(i)), mtl_for_tensor(m_scan_idx[0][0]),
+                             mtl_for_tensor(m_scan_idx[0][1])},
                             {}, m_out_batch_size, m_states);
                     launch_kernel_no_wait(
                             m_scan_cps, cb,
-                            {args_bwd, mtl_for_tensor(m_scores.at(i)), mtl_for_tensor(m_bwd.at(i)),
-                             mtl_for_tensor(m_scan_idx[1][0]), mtl_for_tensor(m_scan_idx[1][1])},
+                            {args_bwd, mtl_for_tensor(m_scores_int8.at(i)),
+                             mtl_for_tensor(m_bwd.at(i)), mtl_for_tensor(m_scan_idx[1][0]),
+                             mtl_for_tensor(m_scan_idx[1][1])},
                             {}, m_out_batch_size, m_states);
+
                     launch_kernel_no_wait(
                             m_add_softmax_cps, cb,
                             {args_fwd, mtl_for_tensor(fwd.at(i)), mtl_for_tensor(m_bwd.at(i))}, {},
@@ -686,6 +689,11 @@ public:
                 }
                 spdlog::warn("Metal command buffer execution failed: {}, try #{}", status,
                              try_count);
+                if (status == MTL::CommandBufferStatusError) {
+                    const auto *const error_ptr = cb->error();
+                    if (error_ptr)
+                        spdlog::warn("Command buffer error code: {}", error_ptr->code());
+                }
                 using namespace std::chrono_literals;
                 std::this_thread::sleep_for(20ms);
             }
@@ -717,23 +725,20 @@ public:
             decode_lock.unlock();
 
             // Model outputs are split across m_out_split buffers.
-            assert(m_scores.size() == m_out_split);
+            assert(m_scores_int8.size() == m_out_split);
             assert(m_bwd.size() == m_out_split);
             assert(m_posts.size() == m_out_split);
             const int out_buf_idx = chunk_idx / m_out_batch_size;
             const int buf_chunk_idx = chunk_idx % m_out_batch_size;
 
-            auto decode_result = beam_search_decode(
-                    m_scores.at(out_buf_idx).index({Slice(), buf_chunk_idx}),
+            auto [sequence, qstring, moves] = beam_search_decode(
+                    m_scores_int8.at(out_buf_idx).index({Slice(), buf_chunk_idx}),
                     m_bwd.at(out_buf_idx)[buf_chunk_idx], m_posts.at(out_buf_idx)[buf_chunk_idx],
                     m_decoder_options.beam_cut, m_decoder_options.blank_score,
                     m_decoder_options.q_shift, m_decoder_options.q_scale,
                     m_decoder_options.temperature);
-            (*task->out_chunks)[chunk_idx] = DecodedChunk{
-                    std::get<0>(decode_result),
-                    std::get<1>(decode_result),
-                    std::get<2>(decode_result),
-            };
+
+            (*task->out_chunks)[chunk_idx] = DecodedChunk{sequence, qstring, moves};
 
             // Wake the waiting thread which called `call_chunks()` if we're done decoding
             std::unique_lock<std::mutex> task_lock(task->mut);
@@ -762,7 +767,7 @@ public:
     MTL::ComputePipelineState *m_scan_cps, *m_add_softmax_cps;
     MTL::SharedEvent *m_mtl_event;
     torch::Tensor m_scan_idx[2][2];
-    std::vector<torch::Tensor> m_scores, m_posts, m_bwd;
+    std::vector<torch::Tensor> m_scores_int8, m_posts, m_bwd;
     int m_out_chunk_size, m_batch_size, m_states, m_model_stride;
     // Number of pieces the linear output is split into, for reasons of
     // buffer size constraints.
@@ -780,6 +785,9 @@ MetalModelRunner::MetalModelRunner(std::shared_ptr<MetalCaller> caller,
                                    int chunk_size,
                                    int batch_size)
         : m_caller(caller) {
+    // adjust chunk size to be a multiple of the stride
+    chunk_size -= chunk_size % model_stride();
+
     m_input = torch::empty({batch_size, 1, chunk_size},
                            torch::TensorOptions().dtype(torch::kF32).device(torch::kCPU));
 }
@@ -795,3 +803,4 @@ std::vector<DecodedChunk> MetalModelRunner::call_chunks(int num_chunks) {
 }
 
 size_t MetalModelRunner::model_stride() const { return m_caller->m_model_stride; }
+size_t MetalModelRunner::chunk_size() const { return m_input.size(2); }

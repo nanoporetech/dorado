@@ -131,6 +131,9 @@ std::shared_ptr<CudaCaller> create_cuda_caller(const std::filesystem::path &mode
 CudaModelRunner::CudaModelRunner(std::shared_ptr<CudaCaller> caller, int chunk_size, int batch_size)
         : m_caller(caller),
           m_stream(c10::cuda::getStreamFromPool(false, m_caller->m_options.device().index())) {
+    // adjust chunk size to be a multiple of the stride
+    chunk_size -= chunk_size % model_stride();
+
     m_input = torch::empty({batch_size, 1, chunk_size}, torch::TensorOptions()
                                                                 .dtype(m_caller->m_options.dtype())
                                                                 .device(torch::kCPU)
@@ -153,3 +156,4 @@ std::vector<DecodedChunk> CudaModelRunner::call_chunks(int num_chunks) {
 }
 
 size_t CudaModelRunner::model_stride() const { return m_caller->m_model_stride; }
+size_t CudaModelRunner::chunk_size() const { return m_input.size(2); }

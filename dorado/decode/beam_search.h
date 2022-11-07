@@ -58,9 +58,9 @@ void merge_sort(T* data,
 }
 
 std::tuple<std::string, std::string, std::vector<uint8_t>> beam_search_decode(
-        const torch::Tensor scores_t,
-        const torch::Tensor back_guides_t,
-        const torch::Tensor posts_t,
+        const torch::Tensor& scores_t,
+        const torch::Tensor& back_guides_t,
+        const torch::Tensor& posts_t,
         size_t beam_width = 5,
         float beam_cut = 100.0,
         float fixed_stay_score = 2.0,

@@ -42,13 +42,6 @@ private:
     bool m_terminate_basecaller{false};
     bool m_terminate_manager{false};
 
-    std::unique_ptr<std::thread>
-            m_input_worker;  // Chunks up incoming reads and sticks them in the pending list.
-    std::vector<std::unique_ptr<std::thread>>
-            m_basecall_workers;  // Basecalls chunks from the queue and puts read on the sink.
-    std::unique_ptr<std::thread>
-            m_working_reads_manager;  // Stitches working reads into complete reads.
-
     // Time when Basecaller Node is initialised. Used for benchmarking and debugging
     std::chrono::time_point<std::chrono::system_clock> initialization_time;
     // Time when Basecaller Node terminates. Used for benchmarking and debugging
@@ -66,4 +59,15 @@ private:
 
     // If we go multi-threaded, there will be one of these batches per thread
     std::vector<std::deque<std::shared_ptr<Chunk>>> m_batched_chunks;
+
+    // Class members are initialised in declaration order regardless of initialiser list order.
+    // Class data members whose construction launches threads must therefore have their
+    // declarations follow those of the state on which they rely, e.g. mutexes, if their
+    // initialisation is via initialiser lists.
+    std::unique_ptr<std::thread>
+            m_input_worker;  // Chunks up incoming reads and sticks them in the pending list.
+    std::vector<std::unique_ptr<std::thread>>
+            m_basecall_workers;  // Basecalls chunks from the queue and puts read on the sink.
+    std::unique_ptr<std::thread>
+            m_working_reads_manager;  // Stitches working reads into complete reads.
 };
