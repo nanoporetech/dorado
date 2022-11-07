@@ -170,26 +170,23 @@ struct LinearCRFImpl : Module {
         auto N = x.size(0);
         auto T = x.size(1);
 
-        auto scores = [&]() {
-            torch::Tensor scores;
+        torch::Tensor scores;
 #if USE_CUDA_LSTM
-            if (x.device() != torch::kCPU) {
-                // Optimised version of the else branch for CUDA devices
-                c10::cuda::CUDAGuard device_guard(x.device());
-                auto stream = at::cuda::getCurrentCUDAStream().stream();
+        if (x.device() != torch::kCPU) {
+            // Optimised version of the else branch for CUDA devices
+            c10::cuda::CUDAGuard device_guard(x.device());
+            auto stream = at::cuda::getCurrentCUDAStream().stream();
 
-                x = x.contiguous().reshape({N * T, -1});
-                scores = torch::matmul(x, linear->weight.t());
-                host_bias_tanh_scale_f16(stream, N * T, scores.size(1), scale, scores.data_ptr(),
-                                         linear->bias.data_ptr());
-                scores = scores.view({N, T, -1});
-            } else
+            x = x.contiguous().reshape({N * T, -1});
+            scores = torch::matmul(x, linear->weight.t());
+            host_bias_tanh_scale_f16(stream, N * T, scores.size(1), scale, scores.data_ptr(),
+                                     linear->bias.data_ptr());
+            scores = scores.view({N, T, -1});
+        } else
 #endif  // if USE_CUDA_LSTM
-            {
-                scores = activation(linear(x)) * scale;
-            }
-            return scores;
-        }();
+        {
+            scores = activation(linear(x)) * scale;
+        }
 
         if (expand_blanks == true) {
             scores = scores.contiguous();
