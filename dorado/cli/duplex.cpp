@@ -8,31 +8,35 @@
 
 #include <iostream>
 #include <thread>
-
+#include <spdlog/spdlog.h>
+#include "utils/log_utils.h"
 int duplex(int argc, char* argv[]) {
+    InitLogging();
+
     argparse::ArgumentParser parser("dorado", DORADO_VERSION);
     parser.add_argument("reads_file").help("Basecalled reads.");
     parser.add_argument("pairs_file").help("Space-delimited csv containing read ID pairs.");
     parser.add_argument("--emit-fastq").default_value(false).implicit_value(true);
 
-    std::cerr << "Loading BAM" << std::endl;
-
     try {
         parser.parse_args(argc, argv);
     } catch (const std::exception& e) {
-        std::cerr << e.what() << std::endl;
-        std::cerr << parser;
+        spdlog::error(e.what());
         std::exit(1);
     }
 
     std::string reads_file = parser.get<std::string>("reads_file");
+
+
     std::string pairs_file = parser.get<std::string>("pairs_file");
 
-    // Load the pairs file
+    spdlog::info("Loading pairs file: " + pairs_file);
     std::map<std::string, std::string> template_complement_map = load_pairs_file(pairs_file);
+    spdlog::info("Pairs file loaded");
 
-    // Load basecalls
+    spdlog::info("Loading reads: " + reads_file);
     std::map<std::string, std::shared_ptr<Read>> reads = read_bam(reads_file);
+    spdlog::info("Reads loaded");
 
     std::vector<std::string> args(argv, argv + argc);
     bool emit_fastq = parser.get<bool>("--emit-fastq");

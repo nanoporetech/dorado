@@ -13,7 +13,6 @@ std::map<std::string, std::shared_ptr<Read>> read_bam(std::string reads_file) {
 
     bam_hdr_t* bamHdr = sam_hdr_read(fp_in);  //read header
     bam1_t* aln = bam_init1();                //initialize an alignment
-    std::cerr << "Header:\n " << bamHdr->text << std::endl;
 
     std::map<std::string, std::shared_ptr<Read>> reads;
 
