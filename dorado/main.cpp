@@ -9,6 +9,8 @@
 
 using entry_ptr = std::function<int(int, char**)>;
 
+namespace {
+
 void usage(const std::vector<std::string> commands) {
     std::cerr << "Usage: dorado [options] subcommand\n\n"
               << "Positional arguments:" << std::endl;
@@ -22,11 +24,13 @@ void usage(const std::vector<std::string> commands) {
               << "-v --version            prints version information and exits" << std::endl;
 }
 
+}  // namespace
+
 int main(int argc, char* argv[]) {
     const std::map<std::string, entry_ptr> subcommands = {
-            {"basecaller", &basecaller},
-            {"duplex", &duplex},
-            {"download", &download},
+            {"basecaller", &dorado::basecaller},
+            {"duplex", &dorado::duplex},
+            {"download", &dorado::download},
     };
 
     std::vector<std::string> arguments(argv + 1, argv + argc);

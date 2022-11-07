@@ -8,6 +8,7 @@
 
 using namespace std::chrono_literals;
 
+namespace dorado {
 // Applies a min pool filter to q scores
 void preprocess_quality_scores(std::vector<uint8_t>& quality_scores, int pool_window = 5) {
     // Apply a min-pool window to the quality scores
@@ -29,15 +30,16 @@ void reverse_complement(std::vector<char>& sequence) {
 }
 
 // Given two sequences, their quality scores, and alignments, computes a consensus sequence
-std::pair<std::vector<char>, std::vector<char>> compute_basespace_consensus(int alignment_start_position,
-                                                                             int alignment_end_position,
-                                                                             std::vector<uint8_t> target_quality_scores,
-                                                                             int target_cursor,
-                                                                             std::vector<uint8_t> query_quality_scores,
-                                                                             int query_cursor,
-                                                                             std::vector<char> target_sequence,
-                                                                             std::vector<char> query_sequence,
-                                                                             unsigned char* alignment) {
+std::pair<std::vector<char>, std::vector<char>> compute_basespace_consensus(
+        int alignment_start_position,
+        int alignment_end_position,
+        std::vector<uint8_t> target_quality_scores,
+        int target_cursor,
+        std::vector<uint8_t> query_quality_scores,
+        int query_cursor,
+        std::vector<char> target_sequence,
+        std::vector<char> query_sequence,
+        unsigned char* alignment) {
     std::vector<char> consensus;
     std::vector<char> quality_scores_phred;
 
@@ -52,8 +54,7 @@ std::pair<std::vector<char>, std::vector<char>> compute_basespace_consensus(int 
         } else {
             // If there is *not* an insertion to the target, add the nucleotide from the query cursor
             if (alignment[i] != 1) {
-                consensus.push_back(
-                        query_sequence.at(query_cursor));
+                consensus.push_back(query_sequence.at(query_cursor));
                 quality_scores_phred.push_back(query_quality_scores.at(query_cursor) + 33);
             }
         }
@@ -72,13 +73,14 @@ std::pair<std::vector<char>, std::vector<char>> compute_basespace_consensus(int 
 }
 
 // Returns subset of alignment for which start and end start with  `num_consecutive_wanted` consecutive nucleotides.
-std::pair<std::pair<int, int>, std::pair<int, int>> get_trimmed_alignment(int num_consecutive_wanted,
-                                                                          unsigned char* alignment,
-                                                                          int alignment_length,
-                                                                          int target_cursor,
-                                                                          int query_cursor,
-                                                                          int start_alignment_position,
-                                                                          int end_alignment_position){
+std::pair<std::pair<int, int>, std::pair<int, int>> get_trimmed_alignment(
+        int num_consecutive_wanted,
+        unsigned char* alignment,
+        int alignment_length,
+        int target_cursor,
+        int query_cursor,
+        int start_alignment_position,
+        int end_alignment_position) {
     int num_consecutive = 0;
 
     // Find forward trim.
@@ -102,7 +104,6 @@ std::pair<std::pair<int, int>, std::pair<int, int>> get_trimmed_alignment(int nu
         if (start_alignment_position >= alignment_length) {
             break;
         }
-
     }
 
     target_cursor -= num_consecutive_wanted;
@@ -131,7 +132,6 @@ std::pair<std::pair<int, int>, std::pair<int, int>> get_trimmed_alignment(int nu
     auto query_target_cursors = std::make_pair(query_cursor, target_cursor);
 
     return std::make_pair(alignment_start_end, query_target_cursors);
-
 }
 
 void DuplexCallerNode::worker_thread() {
@@ -183,13 +183,9 @@ void DuplexCallerNode::worker_thread() {
             int query_cursor = 0;
             int target_cursor = result.startLocations[0];
 
-            auto [alignment_start_end, cursors] = get_trimmed_alignment(11,
-                                                                        result.alignment,
-                                                                        result.alignmentLength,
-                                                                        target_cursor,
-                                                                        query_cursor,
-                                                                        0,
-                                                                        result.endLocations[0]);
+            auto [alignment_start_end, cursors] =
+                    get_trimmed_alignment(11, result.alignment, result.alignmentLength,
+                                          target_cursor, query_cursor, 0, result.endLocations[0]);
 
             query_cursor = cursors.first;
             target_cursor = cursors.second;
@@ -197,18 +193,15 @@ void DuplexCallerNode::worker_thread() {
             int end_alignment_position = alignment_start_end.second;
 
             if (start_alignment_position < end_alignment_position) {
-                auto [consensus, quality_scores_phred] = compute_basespace_consensus(start_alignment_position,
-                                                                                     end_alignment_position,
-                                                                                     template_quality_scores,
-                                                                                     target_cursor,
-                                                                                     complement_quality_scores_reverse,
-                                                                                     query_cursor,
-                                                                                     template_sequence,
-                                                                                     complement_sequence_reverse_complement,
-                                                                                     result.alignment);
+                auto [consensus, quality_scores_phred] = compute_basespace_consensus(
+                        start_alignment_position, end_alignment_position, template_quality_scores,
+                        target_cursor, complement_quality_scores_reverse, query_cursor,
+                        template_sequence, complement_sequence_reverse_complement,
+                        result.alignment);
                 auto duplex_read = std::make_shared<Read>();
-                duplex_read->seq = std::string( consensus.begin(), consensus.end());
-                duplex_read->qstring = std::string(quality_scores_phred.begin(), quality_scores_phred.end());
+                duplex_read->seq = std::string(consensus.begin(), consensus.end());
+                duplex_read->qstring =
+                        std::string(quality_scores_phred.begin(), quality_scores_phred.end());
                 duplex_read->read_id = template_read->read_id + ";" + complement_read->read_id;
 
                 m_sink.push_read(duplex_read);
@@ -244,4 +237,6 @@ DuplexCallerNode::~DuplexCallerNode() {
 
     //Notify the sink that the Node has terminated
     m_sink.terminate();
+}
+
 }

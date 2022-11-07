@@ -7,7 +7,7 @@
 #include <map>
 #include <string>
 #include <vector>
-
+namespace dorado::utils {
 std::map<std::string, std::shared_ptr<Read>> read_bam(std::string reads_file) {
     samFile* fp_in = hts_open(reads_file.c_str(), "r");
 
@@ -42,4 +42,5 @@ std::map<std::string, std::shared_ptr<Read>> read_bam(std::string reads_file) {
     bam_destroy1(aln);
     sam_close(fp_in);
     return reads;
+}
 }

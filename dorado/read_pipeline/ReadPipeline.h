@@ -7,6 +7,8 @@
 #include <string>
 #include <vector>
 
+namespace dorado {
+
 namespace utils {
 struct BaseModInfo;
 }
@@ -33,8 +35,6 @@ struct Chunk {
 // Class representing a read, including raw data
 class Read {
 public:
-    using BaseModInfo = ::utils::BaseModInfo;
-
     struct Attributes {
         uint32_t mux{std::numeric_limits<uint32_t>::max()};  // Channel mux
         uint32_t read_number{std::numeric_limits<
@@ -75,7 +75,7 @@ public:
     std::vector<uint8_t> moves;           // Move table
     std::vector<uint8_t> base_mod_probs;  // Modified base probabilities
 
-    std::shared_ptr<const BaseModInfo>
+    std::shared_ptr<const utils::BaseModInfo>
             base_mod_info;  // Modified base settings of the models that ran on this read
 
     uint64_t num_trimmed_samples;  // Number of samples which have been trimmed from the raw read.
@@ -113,3 +113,5 @@ protected:
     // The queue of reads itself
     std::deque<std::shared_ptr<Read>> m_reads;
 };
+
+}  // namespace dorado

@@ -14,6 +14,8 @@
 
 using namespace std::chrono_literals;
 
+namespace dorado {
+
 void WriterNode::print_header() {
     if (!m_emit_fastq) {
         std::cout << "@HD\tVN:1.6\tSO:unknown\n"
@@ -121,3 +123,5 @@ WriterNode::~WriterNode() {
     samples_sec << std::scientific << m_num_samples_processed / (duration / 1000.0);
     spdlog::info("> Samples/s: {}", samples_sec.str());
 }
+
+}  // namespace dorado

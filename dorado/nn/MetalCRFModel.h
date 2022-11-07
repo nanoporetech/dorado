@@ -8,6 +8,8 @@
 #include <memory>
 #include <vector>
 
+namespace dorado {
+
 class MetalCaller;
 
 std::shared_ptr<MetalCaller> create_metal_caller(const std::filesystem::path& model_path,
@@ -26,3 +28,5 @@ private:
     std::shared_ptr<MetalCaller> m_caller;
     torch::Tensor m_input;
 };
+
+}  // namespace dorado

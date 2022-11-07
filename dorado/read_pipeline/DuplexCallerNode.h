@@ -2,6 +2,7 @@
 #include "ReadPipeline.h"
 #include "utils/bam_utils.h"
 
+namespace dorado {
 class DuplexCallerNode : public ReadSink {
 public:
     DuplexCallerNode(ReadSink& sink,
@@ -17,3 +18,4 @@ private:
     std::map<std::string, std::string> m_template_complement_map;
     std::map<std::string, std::shared_ptr<Read>> m_reads;
 };
+}

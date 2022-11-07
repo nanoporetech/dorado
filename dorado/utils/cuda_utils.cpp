@@ -10,6 +10,8 @@
 #include <string>
 #include <vector>
 
+namespace dorado::utils {
+
 std::vector<std::string> parse_cuda_device_string(std::string device_string) {
     std::vector<std::string> devices;
     std::regex e("[0-9]+");
@@ -87,3 +89,5 @@ int auto_gpu_batch_size(std::string model_path, std::vector<std::string> devices
     spdlog::warn("> warning: auto batchsize detection failed");
     return 128;
 }
+
+}  // namespace dorado::utils

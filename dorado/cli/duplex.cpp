@@ -6,12 +6,14 @@
 
 #include <argparse.hpp>
 
-#include <iostream>
 #include <thread>
 #include <spdlog/spdlog.h>
 #include "utils/log_utils.h"
+
+namespace dorado {
+
 int duplex(int argc, char* argv[]) {
-    InitLogging();
+    utils::InitLogging();
 
     argparse::ArgumentParser parser("dorado", DORADO_VERSION);
     parser.add_argument("reads_file").help("Basecalled reads.");
@@ -27,7 +29,6 @@ int duplex(int argc, char* argv[]) {
 
     std::string reads_file = parser.get<std::string>("reads_file");
 
-
     std::string pairs_file = parser.get<std::string>("pairs_file");
 
     spdlog::info("Loading pairs file: " + pairs_file);
@@ -35,7 +36,7 @@ int duplex(int argc, char* argv[]) {
     spdlog::info("Pairs file loaded");
 
     spdlog::info("Loading reads: " + reads_file);
-    std::map<std::string, std::shared_ptr<Read>> reads = read_bam(reads_file);
+    std::map<std::string, std::shared_ptr<Read>> reads = utils::read_bam(reads_file);
     spdlog::info("Reads loaded");
 
     std::vector<std::string> args(argv, argv + argc);
@@ -45,4 +46,5 @@ int duplex(int argc, char* argv[]) {
     DuplexCallerNode duplex_caller_node(writer_node, template_complement_map, reads);
 
     return 0;
+}
 }

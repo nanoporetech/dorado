@@ -4,6 +4,8 @@
 
 #include <torch/torch.h>
 
+namespace dorado {
+
 class GPUDecoder : Decoder {
 public:
     std::vector<DecodedChunk> beam_search(torch::Tensor scores,
@@ -25,3 +27,5 @@ private:
     torch::Tensor moves_sequence_qstring;
     bool initialized{false};
 };
+
+}  // namespace dorado
