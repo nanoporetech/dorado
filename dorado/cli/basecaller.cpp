@@ -160,7 +160,7 @@ void setup(std::vector<std::string> args,
 int basecaller(int argc, char* argv[]) {
     using dorado::utils::default_parameters;
 
-    dorado::utils::InitLogging();
+    utils::InitLogging();
 
     argparse::ArgumentParser parser("dorado", DORADO_VERSION);
 
