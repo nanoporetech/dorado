@@ -10,6 +10,8 @@ extern "C" {
 #include "koi.h"
 }
 
+namespace dorado {
+
 torch::Tensor GPUDecoder::gpu_part(torch::Tensor scores, int num_chunks, DecoderOptions options) {
     nvtx3::scoped_range loop{"gpu_decode"};
     long int N = scores.sizes()[0];
@@ -104,3 +106,5 @@ std::vector<DecodedChunk> GPUDecoder::beam_search(torch::Tensor scores,
                                                   DecoderOptions options) {
     return cpu_part(gpu_part(scores, num_chunks, options));
 }
+
+}  // namespace dorado

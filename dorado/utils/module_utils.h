@@ -4,7 +4,7 @@
 
 #include <vector>
 
-namespace utils {
+namespace dorado::utils {
 
 inline void load_state_dict(torch::nn::Module& module,
                             const std::vector<torch::Tensor>& weights,
@@ -20,4 +20,4 @@ inline void load_state_dict(torch::nn::Module& module,
     }
 }
 
-}  // namespace utils
+}  // namespace dorado::utils

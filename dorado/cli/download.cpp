@@ -15,8 +15,10 @@
 
 namespace fs = std::filesystem;
 
+namespace dorado {
+
 int download(int argc, char* argv[]) {
-    InitLogging();
+    dorado::utils::InitLogging();
 
     argparse::ArgumentParser parser("dorado", DORADO_VERSION);
 
@@ -118,3 +120,5 @@ int download(int argc, char* argv[]) {
 
     return 0;
 }
+
+}  // namespace dorado
