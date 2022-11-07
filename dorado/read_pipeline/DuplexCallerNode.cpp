@@ -9,7 +9,7 @@
 using namespace std::chrono_literals;
 
 namespace dorado {
-// Applies a min pool filter to q scores
+// Applies a min pool filter to q scores for basespace-duplex algorithm
 void preprocess_quality_scores(std::vector<uint8_t>& quality_scores, int pool_window = 5) {
     // Apply a min-pool window to the quality scores
     auto opts = torch::TensorOptions().dtype(torch::kInt8);
@@ -44,18 +44,19 @@ std::pair<std::vector<char>, std::vector<char>> compute_basespace_consensus(
     std::vector<char> quality_scores_phred;
 
     for (int i = alignment_start_position; i < alignment_end_position; i++) {
+        //Comparison between q-scores is done in Phred space which is offset by 33
         if (target_quality_scores.at(target_cursor) >=
             query_quality_scores.at(query_cursor)) {  // Target has a higher quality score
             // If there is *not* an insertion to the query, add the nucleotide from the target cursor
             if (alignment[i] != 2) {
                 consensus.push_back(target_sequence.at(target_cursor));
-                quality_scores_phred.push_back(target_quality_scores.at(target_cursor) + 33);
+                quality_scores_phred.push_back(target_quality_scores.at(target_cursor));
             }
         } else {
             // If there is *not* an insertion to the target, add the nucleotide from the query cursor
             if (alignment[i] != 1) {
                 consensus.push_back(query_sequence.at(query_cursor));
-                quality_scores_phred.push_back(query_quality_scores.at(query_cursor) + 33);
+                quality_scores_phred.push_back(query_quality_scores.at(query_cursor));
             }
         }
 
@@ -151,8 +152,10 @@ void DuplexCallerNode::worker_thread() {
                           "is present in pairs file but read was not found");
         } else {
             template_read = m_reads.at(template_read_id);
-            template_sequence = template_read->sequence;
-            template_quality_scores = template_read->scores;
+            template_sequence =
+                    std::vector<char>(template_read->seq.begin(), template_read->seq.end());
+            template_quality_scores = std::vector<uint8_t>(template_read->qstring.begin(),
+                                                           template_read->qstring.end());
         }
 
         preprocess_quality_scores(template_quality_scores);
@@ -163,8 +166,10 @@ void DuplexCallerNode::worker_thread() {
         } else if (template_sequence.size() !=
                    0) {  // We have both sequences and can perform the consensus
             auto complement_read = m_reads.at(complement_read_id);
-            std::vector<char> complement_str = complement_read->sequence;
-            auto complement_quality_scores_reverse = complement_read->scores;
+            std::vector<char> complement_str =
+                    std::vector<char>(complement_read->seq.begin(), complement_read->seq.end());
+            auto complement_quality_scores_reverse = std::vector<uint8_t>(
+                    complement_read->qstring.begin(), complement_read->qstring.end());
             std::reverse(complement_quality_scores_reverse.begin(),
                          complement_quality_scores_reverse.end());
 
@@ -239,4 +244,4 @@ DuplexCallerNode::~DuplexCallerNode() {
     m_sink.terminate();
 }
 
-}
+}  // namespace dorado

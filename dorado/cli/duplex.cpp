@@ -3,12 +3,12 @@
 #include "read_pipeline/WriterNode.h"
 #include "utils/bam_utils.h"
 #include "utils/duplex_utils.h"
+#include "utils/log_utils.h"
 
 #include <argparse.hpp>
+#include <spdlog/spdlog.h>
 
 #include <thread>
-#include <spdlog/spdlog.h>
-#include "utils/log_utils.h"
 
 namespace dorado {
 
@@ -47,4 +47,4 @@ int duplex(int argc, char* argv[]) {
 
     return 0;
 }
-}
+}  // namespace dorado
