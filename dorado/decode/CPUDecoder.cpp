@@ -81,7 +81,6 @@ std::vector<DecodedChunk> CPUDecoder::beam_search(torch::Tensor scores,
                                                   int num_chunks,
                                                   DecoderOptions options) {
     scores = scores.to(torch::kCPU);
-    // scores = scores.to(torch::kCPU).transpose(0, 1); // seems to be required, but is probably better to do in the actual model?
     int num_threads = std::min(num_chunks, 4);
     int chunks_per_thread = num_chunks / num_threads;
     int num_threads_with_one_more_chunk = num_chunks % num_threads;
