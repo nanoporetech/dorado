@@ -7,6 +7,8 @@
 #include <utility>
 #include <vector>
 
+namespace dorado {
+
 /// Calculates new scaling values for improved modified base detection
 class RemoraScaler {
 private:
@@ -50,3 +52,5 @@ public:
      */
     RemoraScaler(const std::vector<float>& kmer_levels, size_t kmer_len, size_t centre_index);
 };
+
+}  // namespace dorado

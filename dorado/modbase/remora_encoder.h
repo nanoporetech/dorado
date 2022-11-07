@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 
+namespace dorado {
+
 class RemoraEncoder {
 private:
     int m_bases_before;
@@ -59,3 +61,5 @@ public:
      */
     Context get_context(size_t seq_pos) const;
 };
+
+}  // namespace dorado

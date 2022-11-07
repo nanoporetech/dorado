@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-namespace utils {
+namespace dorado::utils {
 
 // Calculate a mean qscore from a per-base Q string.
 float mean_qscore_from_qstring(const std::string& qstring);
@@ -23,4 +23,4 @@ std::vector<uint64_t> moves_to_map(const std::vector<uint8_t>& moves,
                                    size_t signal_len,
                                    std::optional<size_t> reserve_size = std::nullopt);
 
-}  // namespace utils
+}  // namespace dorado::utils

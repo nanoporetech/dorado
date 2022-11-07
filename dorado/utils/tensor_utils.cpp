@@ -7,7 +7,7 @@
 #include <fstream>
 #include <vector>
 
-namespace utils {
+namespace dorado::utils {
 
 void serialise_tensor(torch::Tensor t, const std::string& path) {
     auto bytes = torch::jit::pickle_save(t);
@@ -78,4 +78,4 @@ torch::Tensor quantile_counting(const torch::Tensor t, const torch::Tensor q) {
     return res;
 }
 
-}  // namespace utils
+}  // namespace dorado::utils

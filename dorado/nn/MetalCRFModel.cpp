@@ -15,15 +15,22 @@
 
 #include <vector>
 
+using namespace dorado::utils;
 using namespace std::chrono_literals;
 using namespace torch::nn;
 namespace F = torch::nn::functional;
 using Slice = torch::indexing::Slice;
 
+using ftype = uint16_t;
+
+namespace {
 // SIMD tile size dictated by the metal spec.
 const int kTileSize = 8;
+}  // namespace
 
-typedef uint16_t ftype;
+namespace dorado {
+
+namespace nn {
 
 struct MetalLinearTanhImpl : Module {
     MetalLinearTanhImpl(int insize, int outsize) {
@@ -395,7 +402,7 @@ struct MetalModelImpl : Module {
     }
 
     void load_state_dict(const std::vector<torch::Tensor> &weights) {
-        ::utils::load_state_dict(*this, weights);
+        utils::load_state_dict(*this, weights);
         mtl_block->load_weights();
     }
 
@@ -412,6 +419,8 @@ struct MetalModelImpl : Module {
 };
 
 TORCH_MODULE(MetalModel);
+
+}  // namespace nn
 
 class MetalCaller {
 public:
@@ -501,8 +510,8 @@ public:
         m_out_batch_size = batch_size / m_out_split;
         assert(m_out_batch_size % 48 == 0);
 
-        m_model =
-                MetalModel(insize, outsize, stride, chunk_size, batch_size, m_out_split, m_device);
+        m_model = nn::MetalModel(insize, outsize, stride, chunk_size, batch_size, m_out_split,
+                                 m_device);
         m_model->load_state_dict(state_dict);
         m_model->eval();
 
@@ -585,7 +594,7 @@ public:
 
                 "9.linear.weight.tensor",    "9.linear.bias.tensor"};
 
-        return ::utils::load_tensors(dir, tensors);
+        return utils::load_tensors(dir, tensors);
     }
 
     struct NNTask {
@@ -761,7 +770,7 @@ public:
     std::condition_variable m_decode_cv;
     std::vector<std::unique_ptr<std::thread>> m_decode_threads;
     DecoderOptions m_decoder_options;
-    MetalModel m_model{nullptr};
+    nn::MetalModel m_model{nullptr};
     MTL::Device *m_device;
     MTL::CommandQueue *m_command_queue;
     MTL::ComputePipelineState *m_scan_cps, *m_add_softmax_cps;
@@ -804,3 +813,5 @@ std::vector<DecodedChunk> MetalModelRunner::call_chunks(int num_chunks) {
 
 size_t MetalModelRunner::model_stride() const { return m_caller->m_model_stride; }
 size_t MetalModelRunner::chunk_size() const { return m_input.size(2); }
+
+}  // namespace dorado

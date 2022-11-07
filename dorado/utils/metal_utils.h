@@ -7,6 +7,8 @@
 #include <variant>
 #include <vector>
 
+namespace dorado::utils {
+
 // Returns an uninitialised MTL::Buffer of length bytes.
 MTL::Buffer *create_buffer(MTL::Device *device, size_t length);
 
@@ -33,6 +35,7 @@ void launch_kernel(MTL::ComputePipelineState *cps,
                    const std::vector<int> &tg_buffer_lens,
                    long threadgroups,
                    long threads_per_threadroup);
+
 void launch_kernel_no_wait(MTL::ComputePipelineState *cps,
                            MTL::CommandBuffer *cb,
                            const std::vector<MTL::Buffer *> &buffers,
@@ -46,3 +49,5 @@ int get_apple_cpu_perf_core_count();
 MTL::Buffer *mtl_for_tensor(const torch::Tensor &t);
 MTL::Buffer *extract_mtl_from_tensor(torch::Tensor &t);
 int auto_gpu_batch_size(std::string model_path);
+
+}  // namespace dorado::utils

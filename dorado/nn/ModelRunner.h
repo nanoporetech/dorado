@@ -8,6 +8,8 @@
 
 #include <string>
 
+namespace dorado {
+
 class ModelRunnerBase {
 public:
     virtual void accept_chunk(int chunk_idx, at::Tensor slice) = 0;
@@ -78,3 +80,5 @@ template <typename T>
 void ModelRunner<T>::accept_chunk(int num_chunks, at::Tensor slice) {
     m_input.index_put_({num_chunks, 0}, slice);
 }
+
+}  // namespace dorado

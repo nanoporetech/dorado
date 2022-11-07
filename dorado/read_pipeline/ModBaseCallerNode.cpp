@@ -10,9 +10,9 @@
 #include <chrono>
 using namespace std::chrono_literals;
 
-namespace {
+namespace dorado {
+
 constexpr auto FORCE_TIMEOUT = 100ms;
-}
 
 ModBaseCallerNode::ModBaseCallerNode(ReadSink& sink,
                                      std::vector<std::shared_ptr<RemoraCaller>> model_callers,
@@ -97,7 +97,7 @@ void ModBaseCallerNode::init_modbase_info() {
     }
 
     std::string long_names, alphabet;
-    ::utils::BaseModContext context_handler;
+    utils::BaseModContext context_handler;
     for (const auto& info : model_info) {
         for (const auto& name : info.long_names) {
             if (!long_names.empty())
@@ -110,7 +110,8 @@ void ModBaseCallerNode::init_modbase_info() {
         }
     }
 
-    m_base_mod_info = std::make_shared<BaseModInfo>(alphabet, long_names, context_handler.encode());
+    m_base_mod_info =
+            std::make_shared<utils::BaseModInfo>(alphabet, long_names, context_handler.encode());
 
     m_base_prob_offsets[0] = 0;
     m_base_prob_offsets[1] = base_counts[0];
@@ -166,8 +167,8 @@ void ModBaseCallerNode::runner_worker_thread(size_t runner_id) {
             }
             read->base_mod_info = m_base_mod_info;
 
-            std::vector<int> sequence_ints = ::utils::sequence_to_ints(read->seq);
-            std::vector<uint64_t> seq_to_sig_map = ::utils::moves_to_map(
+            std::vector<int> sequence_ints = utils::sequence_to_ints(read->seq);
+            std::vector<uint64_t> seq_to_sig_map = utils::moves_to_map(
                     read->moves, m_block_stride, read->raw_data.size(0), read->seq.size() + 1);
 
             read->num_modbase_chunks = 0;
@@ -346,3 +347,5 @@ void ModBaseCallerNode::output_worker_thread() {
         working_reads_lock.unlock();
     }
 }
+
+}  // namespace dorado

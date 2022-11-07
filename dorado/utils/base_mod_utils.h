@@ -22,7 +22,7 @@
  *  be "CXT:XG:_:_". 
  */
 
-namespace utils {
+namespace dorado::utils {
 
 struct BaseModInfo {
     BaseModInfo(const std::string& alphabet_,
@@ -96,4 +96,4 @@ private:
     std::array<size_t, 4> m_offsets = {0, 0, 0, 0};
 };
 
-}  // namespace utils
+}  // namespace dorado::utils

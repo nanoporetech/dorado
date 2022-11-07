@@ -9,6 +9,8 @@
 #include <memory>
 #include <vector>
 
+namespace dorado {
+
 class CudaCaller;
 
 std::shared_ptr<CudaCaller> create_cuda_caller(const std::filesystem::path& model_path,
@@ -30,3 +32,5 @@ private:
     torch::Tensor m_input;
     torch::Tensor m_output;
 };
+
+}  // namespace dorado
