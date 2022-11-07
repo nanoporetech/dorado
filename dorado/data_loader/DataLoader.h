@@ -1,6 +1,8 @@
 #pragma once
 #include <string>
 
+namespace dorado {
+
 class ReadSink;
 
 class DataLoader {
@@ -16,3 +18,5 @@ private:
     std::string m_device;
     size_t m_num_worker_threads{1};
 };
+
+}  // namespace dorado

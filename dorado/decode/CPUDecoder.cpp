@@ -7,6 +7,7 @@
 
 #include <vector>
 
+namespace {
 at::Tensor scan(at::Tensor Ms, at::Tensor idx, at::Tensor v0) {
     int T = Ms.size(0);
     int N = Ms.size(1);
@@ -22,6 +23,10 @@ at::Tensor scan(at::Tensor Ms, at::Tensor idx, at::Tensor v0) {
 
     return alpha;
 }
+
+}  // namespace
+
+namespace dorado {
 
 torch::Tensor CPUDecoder::forward_scores(at::Tensor scores) {
     int T = scores.size(0);  // Signal len
@@ -130,3 +135,5 @@ std::vector<DecodedChunk> CPUDecoder::beam_search(torch::Tensor scores,
 
     return chunk_results;
 }
+
+}  // namespace dorado

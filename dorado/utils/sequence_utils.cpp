@@ -7,7 +7,7 @@
 #include <numeric>
 #include <vector>
 
-namespace utils {
+namespace dorado::utils {
 
 float mean_qscore_from_qstring(const std::string& qstring) {
     if (qstring.empty()) {
@@ -56,4 +56,4 @@ std::vector<uint64_t> moves_to_map(const std::vector<uint8_t>& moves,
     return seq_to_sig_map;
 }
 
-}  // namespace utils
+}  // namespace dorado::utils

@@ -4,6 +4,8 @@
 
 #include <torch/torch.h>
 
+namespace dorado {
+
 class CPUDecoder : Decoder {
 public:
     std::vector<DecodedChunk> beam_search(torch::Tensor scores,
@@ -15,3 +17,5 @@ private:
     torch::Tensor forward_scores(torch::Tensor scores);
     torch::Tensor backward_scores(torch::Tensor scores);
 };
+
+}  // namespace dorado

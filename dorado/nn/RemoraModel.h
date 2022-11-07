@@ -13,6 +13,8 @@
 #include <string>
 #include <vector>
 
+namespace dorado {
+
 namespace utils {
 struct BaseModInfo;
 }
@@ -70,3 +72,5 @@ public:
     void accept_chunk(int num_chunks, at::Tensor signal, const std::vector<float>& kmers);
     torch::Tensor call_chunks(int num_chunks);
 };
+
+}  // namespace dorado

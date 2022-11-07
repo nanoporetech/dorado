@@ -2,7 +2,8 @@
 #include <string>
 #include <vector>
 
-namespace basecaller {
+namespace dorado::basecaller {
+
 // Root URL for Models
 static const std::string URL_ROOT = "https://nanoporetech.box.com";
 
@@ -29,4 +30,4 @@ static const std::map<std::string, std::string> models = {
 
 };
 
-}  // namespace basecaller
+}  // namespace dorado::basecaller

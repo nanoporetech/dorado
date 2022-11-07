@@ -1,10 +1,12 @@
 #include "../read_pipeline/ReadPipeline.h"
 #include "math_utils.h"
 
+namespace dorado::utils {
+
 void stitch_chunks(std::shared_ptr<Read> read) {
-    // Calculate the chunk down sampling, round to closest int. This is our model stride.
-    read->model_stride = ::utils::div_round_closest(read->called_chunks[0]->raw_chunk_size,
-                                                    read->called_chunks[0]->moves.size());
+    // Calculate the chunk down sampling, round to closest int.
+    read->model_stride = dorado::utils::div_round_closest(read->called_chunks[0]->raw_chunk_size,
+                                                          read->called_chunks[0]->moves.size());
 
     int start_pos = 0;
     int mid_point_front = 0;
@@ -64,3 +66,5 @@ void stitch_chunks(std::shared_ptr<Read> read) {
     read->qstring = std::accumulate(qstrings.begin(), qstrings.end(), std::string(""));
     read->moves = std::move(moves);
 }
+
+}  // namespace dorado::utils

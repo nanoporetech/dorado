@@ -56,6 +56,27 @@ static bool cuda_lstm_is_quantized(int layer_size) {
 }
 #endif  // if USE_CUDA_LSTM
 
+namespace {
+template <class Model>
+ModuleHolder<AnyModule> populate_model(Model &&model,
+                                       const std::filesystem::path &path,
+                                       torch::TensorOptions options) {
+    auto state_dict = model->load_weights(path);
+    model->load_state_dict(state_dict);
+    model->to(options.dtype_opt().value().toScalarType());
+    model->to(options.device_opt().value());
+    model->eval();
+
+    auto module = AnyModule(model);
+    auto holder = ModuleHolder<AnyModule>(module);
+    return holder;
+}
+}  // namespace
+
+namespace dorado {
+
+namespace nn {
+
 struct ConvolutionImpl : Module {
     ConvolutionImpl(int size, int outsize, int k, int stride_, bool to_lstm_ = false)
             : in_size(size), out_size(outsize), window_size(k), stride(stride_), to_lstm(to_lstm_) {
@@ -519,7 +540,7 @@ struct CRFModelImpl : Module {
     }
 
     void load_state_dict(const std::vector<torch::Tensor> &weights) {
-        ::utils::load_state_dict(*this, weights);
+        utils::load_state_dict(*this, weights);
     }
 
     torch::Tensor forward(torch::Tensor x) {
@@ -553,7 +574,7 @@ struct CRFModelImpl : Module {
 
                 "9.linear.weight.tensor",    "9.linear.bias.tensor"};
 
-        return ::utils::load_tensors(dir, tensors);
+        return utils::load_tensors(dir, tensors);
     }
 
     LSTMStackType rnns{nullptr};
@@ -570,22 +591,7 @@ TORCH_MODULE(CudaCRFModel);
 using CpuCRFModelImpl = CRFModelImpl<LSTMStack>;
 TORCH_MODULE(CpuCRFModel);
 
-namespace {
-template <class Model>
-ModuleHolder<AnyModule> populate_model(Model &&model,
-                                       const std::filesystem::path &path,
-                                       torch::TensorOptions options) {
-    auto state_dict = model->load_weights(path);
-    model->load_state_dict(state_dict);
-    model->to(options.dtype_opt().value().toScalarType());
-    model->to(options.device_opt().value());
-    model->eval();
-
-    auto module = AnyModule(model);
-    auto holder = ModuleHolder<AnyModule>(module);
-    return holder;
-}
-}  // namespace
+}  // namespace nn
 
 std::tuple<ModuleHolder<AnyModule>, size_t> load_crf_model(const std::filesystem::path &path,
                                                            int batch_size,
@@ -604,15 +610,17 @@ std::tuple<ModuleHolder<AnyModule>, size_t> load_crf_model(const std::filesystem
 #if USE_CUDA_LSTM
     if (options.device() != torch::kCPU) {
         bool expand = false;
-        auto model = CudaCRFModel(insize, outsize, stride, expand, batch_size, chunk_size);
+        auto model = nn::CudaCRFModel(insize, outsize, stride, expand, batch_size, chunk_size);
         auto holder = populate_model(model, path, options);
         return {holder, static_cast<size_t>(stride)};
     } else
 #endif
     {
         bool expand = true;
-        auto model = CpuCRFModel(insize, outsize, stride, expand, batch_size, chunk_size);
+        auto model = nn::CpuCRFModel(insize, outsize, stride, expand, batch_size, chunk_size);
         auto holder = populate_model(model, path, options);
         return {holder, static_cast<size_t>(stride)};
     }
 }
+
+}  // namespace dorado

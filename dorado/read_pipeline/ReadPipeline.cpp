@@ -43,6 +43,8 @@ bool get_modbase_channel_name(std::string& channel_name, const std::string& mod_
 }
 }  // namespace
 
+namespace dorado {
+
 std::vector<std::string> Read::generate_read_tags(bool emit_moves) const {
     // GCC doesn't support <format> yet...
 
@@ -165,7 +167,7 @@ std::string Read::generate_modbase_string(uint8_t threshold) const {
     // Create a mask indicating which bases are modified.
     std::map<char, bool> base_has_context = {
             {'A', false}, {'C', false}, {'G', false}, {'T', false}};
-    ::utils::BaseModContext context_handler;
+    utils::BaseModContext context_handler;
     if (!base_mod_info->context.empty()) {
         if (!context_handler.decode(base_mod_info->context)) {
             throw std::runtime_error("Invalid base modification context string.");
@@ -237,3 +239,5 @@ void ReadSink::push_read(std::shared_ptr<Read>& read) {
 }
 
 ReadSink::ReadSink(size_t max_reads) : m_max_reads(max_reads) {}
+
+}  // namespace dorado

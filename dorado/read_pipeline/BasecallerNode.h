@@ -2,6 +2,8 @@
 #include "../nn/ModelRunner.h"
 #include "ReadPipeline.h"
 
+namespace dorado {
+
 class BasecallerNode : public ReadSink {
 public:
     // Chunk size and overlap are in raw samples
@@ -71,3 +73,5 @@ private:
     std::unique_ptr<std::thread>
             m_working_reads_manager;  // Stitches working reads into complete reads.
 };
+
+}  // namespace dorado
