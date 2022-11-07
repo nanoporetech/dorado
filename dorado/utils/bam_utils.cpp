@@ -29,13 +29,14 @@ std::map<std::string, std::shared_ptr<Read>> read_bam(std::string reads_file) {
 
         // Todo - there is a better way to do this.
         for (int i = 0; i < len; i++) {
-            qualities[i] = q[i];
+            qualities[i] = q[i] + 33;
             nucleotides[i] = seq_nt16_str[bam_seqi(s, i)];
         }
         auto tmp_read = std::make_shared<Read>();
         tmp_read->read_id = read_id;
-        tmp_read->sequence = nucleotides;
-        tmp_read->scores = qualities;
+        tmp_read->seq = std::string(nucleotides.begin(), nucleotides.end());
+        ;
+        tmp_read->qstring = std::string(qualities.begin(), qualities.end());
         reads[read_id] = tmp_read;
     }
 
@@ -43,4 +44,4 @@ std::map<std::string, std::shared_ptr<Read>> read_bam(std::string reads_file) {
     sam_close(fp_in);
     return reads;
 }
-}
+}  // namespace dorado::utils
