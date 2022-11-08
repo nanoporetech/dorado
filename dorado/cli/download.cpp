@@ -107,7 +107,7 @@ int download(int argc, char* argv[]) {
             if (res != nullptr) {
                 spdlog::info(" [{}]", res->status);
                 fs::path archive(directory / (model + ".zip"));
-                std::ofstream ofs(archive.string());
+                std::ofstream ofs(archive.string(), std::ofstream::binary);
                 ofs << res->body;
                 ofs.close();
                 elz::extractZip(archive, directory);
