@@ -198,7 +198,11 @@ void DuplexCallerNode::worker_thread() {
             int start_alignment_position = alignment_start_end.first;
             int end_alignment_position = alignment_start_end.second;
 
-            if (start_alignment_position < end_alignment_position) {
+            int min_trimmed_alignment_length = 200;
+            bool consensus_possible = (start_alignment_position < end_alignment_position)  &&
+                                      ((end_alignment_position - start_alignment_position) > min_trimmed_alignment_length);
+
+            if (consensus_possible) {
                 auto [consensus, quality_scores_phred] = compute_basespace_consensus(
                         start_alignment_position, end_alignment_position, template_quality_scores,
                         target_cursor, complement_quality_scores_reverse, query_cursor,
