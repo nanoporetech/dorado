@@ -4,7 +4,7 @@
 
 #define TEST_GROUP "[utils]"
 
-using namespace utils;
+using namespace dorado::utils;
 
 TEST_CASE(TEST_GROUP ": Test base_to_int") {
     CHECK(base_to_int('A') == 0);

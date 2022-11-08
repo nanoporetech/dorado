@@ -56,6 +56,10 @@ static bool cuda_lstm_is_quantized(int layer_size) {
 }
 #endif  // if USE_CUDA_LSTM
 
+namespace dorado {
+
+namespace nn {
+
 struct ConvolutionImpl : Module {
     ConvolutionImpl(int size, int outsize, int k, int stride_, bool to_lstm_ = false)
             : in_size(size), out_size(outsize), window_size(k), stride(stride_), to_lstm(to_lstm_) {
@@ -514,7 +518,7 @@ struct CRFModelImpl : Module {
     }
 
     void load_state_dict(const std::vector<torch::Tensor> &weights) {
-        ::utils::load_state_dict(*this, weights);
+        utils::load_state_dict(*this, weights);
     }
 
     torch::Tensor forward(torch::Tensor x) {
@@ -558,7 +562,7 @@ struct CRFModelImpl : Module {
             tensors.push_back("10.linear.weight.tensor");
         }
 
-        return ::utils::load_tensors(dir, tensors);
+        return utils::load_tensors(dir, tensors);
     }
 
     LSTMStack rnns{nullptr};
@@ -569,6 +573,8 @@ struct CRFModelImpl : Module {
 };
 
 TORCH_MODULE(CRFModel);
+
+}  // namespace nn
 
 std::tuple<ModuleHolder<AnyModule>, size_t> load_crf_model(const std::filesystem::path &path,
                                                            int batch_size,
@@ -607,8 +613,8 @@ std::tuple<ModuleHolder<AnyModule>, size_t> load_crf_model(const std::filesystem
     int outsize = pow(4, state_len) * 4;
     bool expand = options.device_opt().value() == torch::kCPU;
 
-    auto model =
-            CRFModel(conv, insize, outsize, stride, decomposition, expand, batch_size, chunk_size);
+    auto model = nn::CRFModel(conv, insize, outsize, stride, decomposition, expand, batch_size,
+                              chunk_size);
     auto state_dict = model->load_weights(path, static_cast<bool>(decomposition), bias);
     model->load_state_dict(state_dict);
     model->to(options.dtype_opt().value().toScalarType());
@@ -620,3 +626,5 @@ std::tuple<ModuleHolder<AnyModule>, size_t> load_crf_model(const std::filesystem
 
     return {holder, static_cast<size_t>(stride)};
 }
+
+}  // namespace dorado

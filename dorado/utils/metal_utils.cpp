@@ -10,11 +10,11 @@
 
 #include <filesystem>
 
-using namespace std;
 using namespace MTL;
 
 namespace fs = std::filesystem;
 
+namespace {
 // Allows less ugliness in use of std::visit.
 template <class... Ts>
 struct overloaded : Ts... {
@@ -33,130 +33,6 @@ NS::String *get_library_location() {
     fs::path fspath = exepth.parent_path() / mtllib;
 
     return NS::String::string(fspath.c_str(), NS::ASCIIStringEncoding);
-}
-
-MTL::Buffer *create_buffer(MTL::Device *device, size_t length) {
-    return device->newBuffer(length, MTL::ResourceStorageModeShared);
-}
-
-MTL::ComputePipelineState *make_cps(
-        MTL::Device *const device,
-        const std::string &name,
-        const std::vector<std::tuple<std::string, MetalConstant>> &named_constants,
-        const int max_total_threads_per_tg) {
-    NS::Error *error;
-    auto default_library = device->newDefaultLibrary();
-
-    if (!default_library) {
-        auto lib_path = get_library_location();
-        default_library = device->newLibrary(lib_path, &error);
-        if (!default_library) {
-            throw std::runtime_error("Failed to load metallib library.");
-        }
-    }
-
-    auto constant_vals = FunctionConstantValues::alloc();
-    constant_vals->init();
-    for (auto &[name, constant] : named_constants) {
-        const auto ns_name = NS::String::string(name.c_str(), NS::ASCIIStringEncoding);
-        std::visit(overloaded{[&](int val) {
-                                  constant_vals->setConstantValue(&val, DataTypeInt, ns_name);
-                              },
-                              [&](bool val) {
-                                  constant_vals->setConstantValue(&val, DataTypeBool, ns_name);
-                              }},
-                   constant);
-    }
-
-    auto kernel_name = NS::String::string(name.c_str(), NS::ASCIIStringEncoding);
-    auto kernel = default_library->newFunction(kernel_name, constant_vals, &error);
-    CFRelease(constant_vals);
-    if (!kernel) {
-        throw std::runtime_error("Failed to find the kernel: " + name);
-    }
-
-    auto cp_descriptor = MTL::ComputePipelineDescriptor::alloc();
-    cp_descriptor->setComputeFunction(kernel);
-    if (max_total_threads_per_tg != -1)
-        cp_descriptor->setMaxTotalThreadsPerThreadgroup(max_total_threads_per_tg);
-
-    auto cps = device->newComputePipelineState(cp_descriptor, MTL::PipelineOptionNone, nullptr,
-                                               &error);
-    CFRelease(cp_descriptor);
-    if (cps == nullptr) {
-        auto e_code = to_string(((int)error->code()));
-        auto e_str = error->domain()->cString(NS::ASCIIStringEncoding);
-        throw std::runtime_error("failed to build compute pipeline for " + name + " - " + e_str +
-                                 ": error " + e_code);
-    }
-
-    return cps;
-}
-
-void launch_kernel(ComputePipelineState *const pipeline,
-                   CommandQueue *const command_queue,
-                   const vector<Buffer *> &buffers,
-                   const vector<int> &tg_buffer_lens,
-                   long threadgroups,
-                   long threads_per_threadgroup) {
-    auto command_buffer = command_queue->commandBuffer();
-    launch_kernel_no_wait(pipeline, command_buffer, buffers, tg_buffer_lens, threadgroups,
-                          threads_per_threadgroup);
-
-    command_buffer->commit();
-    command_buffer->waitUntilCompleted();
-}
-
-void launch_kernel_no_wait(ComputePipelineState *const pipeline,
-                           CommandBuffer *const command_buffer,
-                           const vector<Buffer *> &buffers,
-                           const vector<int> &tg_buffer_lens,
-                           long threadgroups,
-                           long threads_per_threadgroup) {
-    auto compute_encoder = command_buffer->computeCommandEncoder();
-    compute_encoder->setComputePipelineState(pipeline);
-
-    // Set up device memory buffers.
-    for (auto i = 0; i < (int)buffers.size(); i++) {
-        compute_encoder->setBuffer(buffers[i], 0, i);
-    }
-
-    // Set lengths of threadgroup memory buffers.
-    for (int i = 0; i < tg_buffer_lens.size(); ++i) {
-        compute_encoder->setThreadgroupMemoryLength(tg_buffer_lens.at(i), i);
-    }
-
-    compute_encoder->dispatchThreadgroups(MTL::Size(threadgroups, 1, 1),
-                                          MTL::Size(threads_per_threadgroup, 1, 1));
-    compute_encoder->memoryBarrier(BarrierScopeBuffers);
-    compute_encoder->endEncoding();
-}
-
-static MTL::Device *mtl_device{nullptr};
-
-struct MTLAllocator : torch::Allocator {
-    virtual ~MTLAllocator() = default;
-
-    virtual torch::DataPtr allocate(size_t n) const {
-        if (n == 0) {
-            return torch::DataPtr(nullptr, torch::DeviceType::CPU);
-        } else if (n >= (size_t(1) << 32)) {
-            return torch::DataPtr(new char[n], torch::DeviceType::CPU);
-        }
-        auto buffer = mtl_device->newBuffer(n, MTL::ResourceStorageModeShared);
-        return torch::DataPtr(buffer->contents(), buffer, &deleter, torch::DeviceType::CPU);
-    }
-
-    static void deleter(void *ptr) { ((MTL::Buffer *)ptr)->release(); }
-};
-static MTLAllocator mtl_allocator;
-
-MTL::Device *get_mtl_device() {
-    if (mtl_device == nullptr) {
-        mtl_device = MTL::CreateSystemDefaultDevice();
-        torch::SetAllocator(torch::DeviceType::CPU, &mtl_allocator);
-    }
-    return mtl_device;
 }
 
 // Returns an ASCII std::string associated with the given CFStringRef.
@@ -234,6 +110,134 @@ bool retrieve_ioreg_props(const std::string &service_class,
     CFDictionaryApplyFunction(static_cast<CFDictionaryRef>(property), process_kvs, &props);
     CFRelease(property);
     return true;
+}
+
+}  // namespace
+
+namespace dorado::utils {
+
+MTL::Buffer *create_buffer(MTL::Device *device, size_t length) {
+    return device->newBuffer(length, MTL::ResourceStorageModeShared);
+}
+
+MTL::ComputePipelineState *make_cps(
+        MTL::Device *const device,
+        const std::string &name,
+        const std::vector<std::tuple<std::string, MetalConstant>> &named_constants,
+        const int max_total_threads_per_tg) {
+    NS::Error *error;
+    auto default_library = device->newDefaultLibrary();
+
+    if (!default_library) {
+        auto lib_path = get_library_location();
+        default_library = device->newLibrary(lib_path, &error);
+        if (!default_library) {
+            throw std::runtime_error("Failed to load metallib library.");
+        }
+    }
+
+    auto constant_vals = FunctionConstantValues::alloc();
+    constant_vals->init();
+    for (auto &[name, constant] : named_constants) {
+        const auto ns_name = NS::String::string(name.c_str(), NS::ASCIIStringEncoding);
+        std::visit(overloaded{[&](int val) {
+                                  constant_vals->setConstantValue(&val, DataTypeInt, ns_name);
+                              },
+                              [&](bool val) {
+                                  constant_vals->setConstantValue(&val, DataTypeBool, ns_name);
+                              }},
+                   constant);
+    }
+
+    auto kernel_name = NS::String::string(name.c_str(), NS::ASCIIStringEncoding);
+    auto kernel = default_library->newFunction(kernel_name, constant_vals, &error);
+    CFRelease(constant_vals);
+    if (!kernel) {
+        throw std::runtime_error("Failed to find the kernel: " + name);
+    }
+
+    auto cp_descriptor = MTL::ComputePipelineDescriptor::alloc();
+    cp_descriptor->setComputeFunction(kernel);
+    if (max_total_threads_per_tg != -1)
+        cp_descriptor->setMaxTotalThreadsPerThreadgroup(max_total_threads_per_tg);
+
+    auto cps = device->newComputePipelineState(cp_descriptor, MTL::PipelineOptionNone, nullptr,
+                                               &error);
+    CFRelease(cp_descriptor);
+    if (cps == nullptr) {
+        auto e_code = std::to_string(((int)error->code()));
+        auto e_str = error->domain()->cString(NS::ASCIIStringEncoding);
+        throw std::runtime_error("failed to build compute pipeline for " + name + " - " + e_str +
+                                 ": error " + e_code);
+    }
+
+    return cps;
+}
+
+void launch_kernel(ComputePipelineState *const pipeline,
+                   CommandQueue *const command_queue,
+                   const std::vector<Buffer *> &buffers,
+                   const std::vector<int> &tg_buffer_lens,
+                   long threadgroups,
+                   long threads_per_threadgroup) {
+    auto command_buffer = command_queue->commandBuffer();
+    launch_kernel_no_wait(pipeline, command_buffer, buffers, tg_buffer_lens, threadgroups,
+                          threads_per_threadgroup);
+
+    command_buffer->commit();
+    command_buffer->waitUntilCompleted();
+}
+
+void launch_kernel_no_wait(ComputePipelineState *const pipeline,
+                           CommandBuffer *const command_buffer,
+                           const std::vector<Buffer *> &buffers,
+                           const std::vector<int> &tg_buffer_lens,
+                           long threadgroups,
+                           long threads_per_threadgroup) {
+    auto compute_encoder = command_buffer->computeCommandEncoder();
+    compute_encoder->setComputePipelineState(pipeline);
+
+    // Set up device memory buffers.
+    for (auto i = 0; i < (int)buffers.size(); i++) {
+        compute_encoder->setBuffer(buffers[i], 0, i);
+    }
+
+    // Set lengths of threadgroup memory buffers.
+    for (int i = 0; i < tg_buffer_lens.size(); ++i) {
+        compute_encoder->setThreadgroupMemoryLength(tg_buffer_lens.at(i), i);
+    }
+
+    compute_encoder->dispatchThreadgroups(MTL::Size(threadgroups, 1, 1),
+                                          MTL::Size(threads_per_threadgroup, 1, 1));
+    compute_encoder->memoryBarrier(BarrierScopeBuffers);
+    compute_encoder->endEncoding();
+}
+
+static MTL::Device *mtl_device{nullptr};
+
+struct MTLAllocator : torch::Allocator {
+    virtual ~MTLAllocator() = default;
+
+    virtual torch::DataPtr allocate(size_t n) const {
+        if (n == 0) {
+            return torch::DataPtr(nullptr, torch::DeviceType::CPU);
+        } else if (n >= (size_t(1) << 32)) {
+            return torch::DataPtr(new char[n], torch::DeviceType::CPU);
+        }
+        auto buffer = mtl_device->newBuffer(n, MTL::ResourceStorageModeShared);
+        return torch::DataPtr(buffer->contents(), buffer, &deleter, torch::DeviceType::CPU);
+    }
+
+    static void deleter(void *ptr) { ((MTL::Buffer *)ptr)->release(); }
+};
+static MTLAllocator mtl_allocator;
+
+MTL::Device *get_mtl_device() {
+    if (mtl_device == nullptr) {
+        mtl_device = MTL::CreateSystemDefaultDevice();
+        torch::SetAllocator(torch::DeviceType::CPU, &mtl_allocator);
+    }
+    return mtl_device;
 }
 
 int get_mtl_device_core_count() {
@@ -314,3 +318,5 @@ int auto_gpu_batch_size(std::string model_path) {
     spdlog::warn("Unrecognised model suffix: defaulting to batch size {}", kDefaultBatchSize);
     return kDefaultBatchSize;
 }
+
+}  // namespace dorado::utils

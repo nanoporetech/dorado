@@ -10,6 +10,8 @@
 
 using namespace std::chrono_literals;
 
+namespace dorado {
+
 class CudaCaller {
 public:
     CudaCaller(const std::filesystem::path &model_path,
@@ -165,3 +167,5 @@ std::vector<DecodedChunk> CudaModelRunner::call_chunks(int num_chunks) {
 
 size_t CudaModelRunner::model_stride() const { return m_caller->m_model_stride; }
 size_t CudaModelRunner::chunk_size() const { return m_input.size(2); }
+
+}  // namespace dorado

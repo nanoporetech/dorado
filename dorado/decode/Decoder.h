@@ -2,6 +2,11 @@
 
 #include <torch/torch.h>
 
+#include <string>
+#include <vector>
+
+namespace dorado {
+
 struct DecodedChunk {
     std::string sequence;
     std::string qstring;
@@ -24,3 +29,5 @@ public:
                                                   int num_chunks,
                                                   DecoderOptions options) = 0;
 };
+
+}  // namespace dorado

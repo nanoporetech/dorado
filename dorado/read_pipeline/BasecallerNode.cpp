@@ -12,9 +12,9 @@
 using namespace std::chrono_literals;
 using namespace torch::indexing;
 
-namespace {
+namespace dorado {
+
 constexpr auto FORCE_TIMEOUT = 100ms;
-}
 
 void BasecallerNode::input_worker_thread() {
     while (true) {
@@ -125,7 +125,7 @@ void BasecallerNode::working_reads_manager() {
         }
 
         for (auto &read : completed_reads) {
-            stitch_chunks(read);
+            utils::stitch_chunks(read);
             m_sink.push_read(read);
         }
     }
@@ -258,3 +258,5 @@ BasecallerNode::~BasecallerNode() {
     m_working_reads_manager->join();
     termination_time = std::chrono::system_clock::now();
 }
+
+}  // namespace dorado

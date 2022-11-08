@@ -6,6 +6,8 @@
 #include <algorithm>
 #include <stdexcept>
 
+namespace dorado {
+
 RemoraEncoder::RemoraEncoder(size_t block_stride,
                              size_t context_samples,
                              int bases_before,
@@ -141,3 +143,5 @@ std::vector<float> RemoraEncoder::encode_kmer(const std::vector<int>& seq,
     }
     return output;
 }
+
+}  // namespace dorado

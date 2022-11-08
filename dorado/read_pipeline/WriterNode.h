@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 
+namespace dorado {
+
 class WriterNode : public ReadSink {
 public:
     // Writer has no sink - reads go to output
@@ -36,3 +38,5 @@ private:
     std::mutex m_cout_mutex;
     std::mutex m_cerr_mutex;
 };
+
+}  // namespace dorado

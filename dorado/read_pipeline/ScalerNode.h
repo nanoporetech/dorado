@@ -1,6 +1,8 @@
 #pragma once
 #include "ReadPipeline.h"
 
+namespace dorado {
+
 class ScalerNode : public ReadSink {
 public:
     ScalerNode(ReadSink& sink, int num_worker_threads = 5, size_t max_reads = 1000);
@@ -20,3 +22,5 @@ private:
     std::vector<std::unique_ptr<std::thread>> worker_threads;
     int m_num_worker_threads;
 };
+
+}  // namespace dorado
