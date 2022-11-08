@@ -43,6 +43,7 @@ std::pair<std::vector<char>, std::vector<char>> compute_basespace_consensus(
     std::vector<char> consensus;
     std::vector<char> quality_scores_phred;
 
+    // Loop over each alignment position, within given alignment boundaries
     for (int i = alignment_start_position; i < alignment_end_position; i++) {
         //Comparison between q-scores is done in Phred space which is offset by 33
         if (target_quality_scores.at(target_cursor) >=
@@ -60,7 +61,7 @@ std::pair<std::vector<char>, std::vector<char>> compute_basespace_consensus(
             }
         }
 
-        //Anything but a query insertion and target advances
+        //Anything excluding a query insertion causes the target cursor to advance
         if (alignment[i] != 2) {
             target_cursor++;
         }
