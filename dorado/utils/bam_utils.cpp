@@ -12,7 +12,7 @@
 // seq_nt16_str is referred to in the hts-3.lib stub on windows, but has not been declared dllimport for
 //  client code, so it comes up as an undefined reference when linking the stub.
 const char seq_nt16_str[] = "=ACMGRSVTWYHKDBN";
-#endif // _WIN32
+#endif  // _WIN32
 
 namespace dorado::utils {
 std::map<std::string, std::shared_ptr<Read>> read_bam(std::string reads_file) {
