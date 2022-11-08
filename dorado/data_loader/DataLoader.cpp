@@ -290,6 +290,7 @@ void DataLoader::load_fast5_reads_from_file(const std::string& path) {
 
 DataLoader::DataLoader(ReadSink& read_sink, const std::string& device, size_t num_worker_threads)
         : m_read_sink(read_sink), m_device(device), m_num_worker_threads(num_worker_threads) {
+    assert(m_num_worker_threads > 0);
     static std::once_flag vbz_init_flag;
     std::call_once(vbz_init_flag, vbz_register);
 }
