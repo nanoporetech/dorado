@@ -28,6 +28,11 @@ static const std::map<std::string, std::string> models = {
         {"dna_r10.4.1_e8.2_400bps_sup@v3.5.2",
          "/shared/static/2qnx2lsc0bhfjgwydgvon8zxv9c9bu9j.zip"},
 
+        {"dna_r10.4.1_e8.2_400bps_fast@v4a0",
+         "/shared/static/9x2dhlmi1xlzb1u46wqdz5fui3pewdiw.zip"},
+        {"dna_r10.4.1_e8.2_400bps_hac@v4a0", "/shared/static/a9dsdkl9vfoii4vux6337v8tl77ckjnz.zip"},
+        {"dna_r10.4.1_e8.2_400bps_sup@v4a0", "/shared/static/btxh650hgj3rxf3cyts4mosknm8mft4h.zip"},
+
 };
 
 }  // namespace dorado::basecaller
