@@ -144,7 +144,6 @@ build_archive:macos:m1:
     - ./dist/bin/dorado download --model dna_r9.4.1_e8_hac@v3.3
     - ./dist/bin/dorado basecaller dna_r9.4.1_e8_hac@v3.3 ./tests/data/ -r 1 -b 384 > calls.sam
 
-
 .test_archive: &test_archive
   stage: test
   script:
@@ -184,7 +183,6 @@ test_archive:linux:x86:20.04:
   needs:
     - build_archive:linux:x86:centos7
 
-
 # Single read eval
 
 test:sre-test:
@@ -205,7 +203,7 @@ test:sre-test:
               "git_checkout":"'${CI_COMMIT_SHA}'",
               "branch_name":"'${CI_COMMIT_REF_NAME}'",
               "sre_output":"'${SRE_OUTPUT_ROOT}'/'${CI_COMMIT_SHA}'/",
-              "models":["dna_r10.4.1_e8.2_400bps_hac@v4a0", "dna_r10.4.1_e8.2_400bps_hac@v4a0", "dna_r10.4.1_e8.2_400bps_sup@v4a0"]
+              "models":["dna_r10.4.1_e8.2_400bps_fast@v4a0", "dna_r10.4.1_e8.2_400bps_hac@v4a0", "dna_r10.4.1_e8.2_400bps_sup@v4a0"]
           }
       }' \
       ${MLHUB_TRIGGER_URL}
