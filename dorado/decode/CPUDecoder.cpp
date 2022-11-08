@@ -85,7 +85,7 @@ torch::Tensor CPUDecoder::backward_scores(torch::Tensor scores) {
 std::vector<DecodedChunk> CPUDecoder::beam_search(torch::Tensor scores,
                                                   int num_chunks,
                                                   DecoderOptions options) {
-    scores = scores.to("cpu");
+    scores = scores.to(torch::kCPU);
     int num_threads = std::min(num_chunks, 4);
     int chunks_per_thread = num_chunks / num_threads;
     int num_threads_with_one_more_chunk = num_chunks % num_threads;
