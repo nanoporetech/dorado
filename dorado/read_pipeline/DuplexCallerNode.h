@@ -6,7 +6,7 @@ namespace dorado {
 class DuplexCallerNode : public ReadSink {
 public:
     DuplexCallerNode(ReadSink& sink,
-                     std::map<std::string, std::string>,
+                     std::map<std::string, std::string> template_complement_map,
                      std::map<std::string, std::shared_ptr<Read>> reads);
     ~DuplexCallerNode();
 
