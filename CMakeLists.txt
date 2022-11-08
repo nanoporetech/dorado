@@ -141,7 +141,7 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR}/dorado
     dorado/3rdparty/metal-cpp/metal-cpp
     dorado/3rdparty/metal-cpp/metal-cpp
     dorado/3rdparty/hdf_plugins/vbz_plugin
-    dorado/3rdparty/htslib
+    ${HTSLIB_DIR}
     dorado/3rdparty/cxxpool/src
     dorado/3rdparty/NVTX/c/include
     dorado
@@ -164,7 +164,7 @@ target_link_libraries(dorado_lib
     ${TORCH_LIBRARIES}
     ${POD5_LIBRARIES}
     ${KOI_LIBRARIES}
-    htslib
+    ${HTSLIB_LIBRARIES}
     vbz_hdf_plugin
     OpenSSL::SSL
     elzip
@@ -241,6 +241,8 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
 elseif(WIN32)
     file(GLOB TORCH_DLLS "${TORCH_LIB}/lib/*.dll")
     install(FILES ${TORCH_DLLS} DESTINATION bin)
+    file(GLOB HTSLIB_DLLS "${HTSLIB_DIR}/*.dll")
+    install(FILES ${HTSLIB_DLLS} DESTINATION bin)
 elseif(APPLE)
     file(GLOB TORCH_DLLS "${TORCH_LIB}/lib/*.dylib")
     install(FILES ${TORCH_DLLS} DESTINATION lib)
