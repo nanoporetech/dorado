@@ -17,9 +17,17 @@ public:
                int batch_size,
                const std::string &device) {
         auto config = toml::parse(model_path / "config.toml");
-        const auto &qscore = toml::find(config, "qscore");
-        const auto qbias = toml::find<float>(qscore, "bias");
-        const auto qscale = toml::find<float>(qscore, "scale");
+
+        float qscale = 1.0;
+        float qbias = 0.0;
+
+        if (config.contains("qscore")) {
+            const auto &qscore = toml::find(config, "qscore");
+            qbias = toml::find<float>(qscore, "bias");
+            qscale = toml::find<float>(qscore, "scale");
+        } else {
+            spdlog::debug("> no qscore calibration found");
+        }
 
         m_decoder_options = DecoderOptions();
         m_decoder_options.q_shift = qbias;

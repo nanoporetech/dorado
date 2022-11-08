@@ -486,19 +486,31 @@ TORCH_MODULE(LinearCRF);
 TORCH_MODULE(Convolution);
 
 struct CRFModelImpl : Module {
-    CRFModelImpl(int size,
+    CRFModelImpl(int conv,
+                 int size,
                  int outsize,
                  int stride,
+                 int decomposition,
                  bool expand_blanks,
                  int batch_size,
                  int chunk_size) {
-        conv1 = register_module("conv1", Convolution(1, 4, 5, 1));
-        conv2 = register_module("conv2", Convolution(4, 16, 5, 1));
+        conv1 = register_module("conv1", Convolution(1, conv, 5, 1));
+        conv2 = register_module("conv2", Convolution(conv, 16, 5, 1));
         conv3 = register_module("conv3", Convolution(16, size, 19, stride, true));
         rnns = register_module("rnns", LSTMStack(size, batch_size, chunk_size / stride));
-        linear = register_module("linear", LinearCRF(size, outsize));
-        linear->expand_blanks = expand_blanks;
-        encoder = Sequential(conv1, conv2, conv3, rnns, linear);
+
+        if (decomposition) {
+            linear1 = register_module("linear1", Linear(size, decomposition));
+            linear2 = register_module("linear2",
+                                      Linear(LinearOptions(decomposition, outsize).bias(false)));
+            encoder = Sequential(conv1, conv2, conv3, rnns, linear1, linear2);
+        } else if (conv == 16) {
+            linear1 = register_module("linear1", Linear(LinearOptions(size, outsize).bias(false)));
+            encoder = Sequential(conv1, conv2, conv3, rnns, linear1);
+        } else {
+            linear = register_module("linear1", LinearCRF(size, outsize));
+            encoder = Sequential(conv1, conv2, conv3, rnns, linear);
+        }
     }
 
     void load_state_dict(const std::vector<torch::Tensor> &weights) {
@@ -510,7 +522,9 @@ struct CRFModelImpl : Module {
         return encoder->forward(x);
     }
 
-    std::vector<torch::Tensor> load_weights(const std::filesystem::path &dir) {
+    std::vector<torch::Tensor> load_weights(const std::filesystem::path &dir,
+                                            bool decomposition,
+                                            bool bias) {
         auto tensors = std::vector<std::string>{
 
                 "0.conv.weight.tensor",      "0.conv.bias.tensor",
@@ -534,13 +548,22 @@ struct CRFModelImpl : Module {
                 "8.rnn.weight_ih_l0.tensor", "8.rnn.weight_hh_l0.tensor",
                 "8.rnn.bias_ih_l0.tensor",   "8.rnn.bias_hh_l0.tensor",
 
-                "9.linear.weight.tensor",    "9.linear.bias.tensor"};
+                "9.linear.weight.tensor"};
+
+        if (bias) {
+            tensors.push_back("9.linear.bias.tensor");
+        }
+
+        if (decomposition) {
+            tensors.push_back("10.linear.weight.tensor");
+        }
 
         return ::utils::load_tensors(dir, tensors);
     }
 
     LSTMStack rnns{nullptr};
     LinearCRF linear{nullptr};
+    Linear linear1{nullptr}, linear2{nullptr};
     Sequential encoder{nullptr};
     Convolution conv1{nullptr}, conv2{nullptr}, conv3{nullptr};
 };
@@ -554,16 +577,39 @@ std::tuple<ModuleHolder<AnyModule>, size_t> load_crf_model(const std::filesystem
     auto config = toml::parse(path / "config.toml");
 
     const auto &encoder = toml::find(config, "encoder");
-    const auto stride = toml::find<int>(encoder, "stride");
-    const auto insize = toml::find<int>(encoder, "features");
-
     const auto &global_norm = toml::find(config, "global_norm");
     const auto state_len = toml::find<int>(global_norm, "state_len");
+
+    int conv = 4;
+    int insize = 0;
+    int stride = 1;
+    bool bias = true;
+    int decomposition = 0;
+
+    if (encoder.contains("type")) {
+        for (const auto &segment : toml::find(config, "encoder", "sublayers").as_array()) {
+            const auto type = toml::find<std::string>(segment, "type");
+            if (type.compare("convolution") == 0) {
+                stride *= toml::find<int>(segment, "stride");
+            } else if (type.compare("lstm") == 0) {
+                insize = toml::find<int>(segment, "size");
+            } else if (type.compare("linear") == 0) {
+                decomposition = toml::find<int>(segment, "out_features");
+            }
+        }
+        conv = 16;
+        bias = static_cast<bool>(insize > 128);
+    } else {
+        stride = toml::find<int>(encoder, "stride");
+        insize = toml::find<int>(encoder, "features");
+    }
+
     int outsize = pow(4, state_len) * 4;
     bool expand = options.device_opt().value() == torch::kCPU;
 
-    auto model = CRFModel(insize, outsize, stride, expand, batch_size, chunk_size);
-    auto state_dict = model->load_weights(path);
+    auto model =
+            CRFModel(conv, insize, outsize, stride, decomposition, expand, batch_size, chunk_size);
+    auto state_dict = model->load_weights(path, static_cast<bool>(decomposition), bias);
     model->load_state_dict(state_dict);
     model->to(options.dtype_opt().value().toScalarType());
     model->to(options.device_opt().value());
