@@ -52,8 +52,12 @@ int download(int argc, char* argv[]) {
     auto permissions = fs::status(directory).permissions();
 
     auto print_models = [] {
-        spdlog::info("> basecaller models");
-        for (const auto& [model, _] : basecaller::models) {
+        spdlog::info("> simplex models");
+        for (const auto& [model, _] : simplex::models) {
+            spdlog::info(" - {}", model);
+        }
+        spdlog::info("> modification models");
+        for (const auto& [model, _] : modified::models) {
             spdlog::info(" - {}", model);
         }
     };
@@ -63,8 +67,7 @@ int download(int argc, char* argv[]) {
         return 0;
     }
 
-    if (selected_model != "all" &&
-        basecaller::models.find(selected_model) == basecaller::models.end()) {
+    if (selected_model != "all" && simplex::models.find(selected_model) == simplex::models.end()) {
         spdlog::error("> error: '{}' is not a valid model", selected_model);
         print_models();
         return 1;
@@ -96,27 +99,31 @@ int download(int argc, char* argv[]) {
         return 1;
     }
 
-    httplib::Client http(basecaller::URL_ROOT);
+    httplib::Client http(simplex::URL_ROOT);
     http.enable_server_certificate_verification(false);
     http.set_follow_location(true);
 
-    for (const auto& [model, url] : basecaller::models) {
-        if (selected_model == "all" || selected_model == model) {
-            spdlog::info(" - downloading {}", model);
-            auto res = http.Get(url.c_str());
-            if (res != nullptr) {
-                spdlog::info(" [{}]", res->status);
-                fs::path archive(directory / (model + ".zip"));
-                std::ofstream ofs(archive.string(), std::ofstream::binary);
-                ofs << res->body;
-                ofs.close();
-                elz::extractZip(archive, directory);
-                fs::remove(archive);
-            } else {
-                spdlog::error("Failed to download {}", model);
+    auto download_models = [&](std::map<std::string, std::string> models) {
+        for (const auto& [model, url] : models) {
+            if (selected_model == "all" || selected_model == model) {
+                spdlog::info(" - downloading {}", model);
+                auto res = http.Get(url.c_str());
+                if (res != nullptr) {
+                    fs::path archive(directory / (model + ".zip"));
+                    std::ofstream ofs(archive.string(), std::ofstream::binary);
+                    ofs << res->body;
+                    ofs.close();
+                    elz::extractZip(archive, directory);
+                    fs::remove(archive);
+                } else {
+                    spdlog::error("Failed to download {}", model);
+                }
             }
         }
-    }
+    };
+
+    download_models(simplex::models);
+    download_models(modified::models);
 
     return 0;
 }
