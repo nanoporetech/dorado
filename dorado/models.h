@@ -2,12 +2,13 @@
 #include <string>
 #include <vector>
 
-namespace dorado::simplex {
+namespace dorado::urls {
 
-// Root URL for Models
 static const std::string URL_ROOT = "https://nanoporetech.box.com";
 
 // Serialised, released models
+namespace simplex {
+
 static const std::map<std::string, std::string> models = {
 
         {"dna_r9.4.1_e8_fast@v3.4", "/shared/static/vrfk86xjtot5jndy8175w4mus1zcojy4.zip"},
@@ -30,9 +31,9 @@ static const std::map<std::string, std::string> models = {
 
 };
 
-}  // namespace dorado::simplex
+}  // namespace simplex
 
-namespace dorado::modified {
+namespace modified {
 
 static const std::map<std::string, std::string> models = {
 
@@ -56,4 +57,6 @@ static const std::map<std::string, std::string> models = {
 
 };
 
-}  // namespace dorado::modified
+}  // namespace modified
+
+}  // namespace dorado::urls
