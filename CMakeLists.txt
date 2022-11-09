@@ -28,7 +28,9 @@ endif()
 
 add_subdirectory(dorado/3rdparty/elzip)
 
+set(BUILD_TESTING OFF)
 add_subdirectory(dorado/3rdparty/edlib EXCLUDE_FROM_ALL)
+set(BUILD_TESTING ON)
 
 enable_testing()
 
