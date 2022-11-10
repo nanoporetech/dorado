@@ -14,6 +14,7 @@ Release of version 0.0.2 is a minor release which introduces several performance
 * f5371d16cfd7eef71995edbfeeb86df7f4201440 - Add signal move tables to SAM output.
 * 621cc4d7624d8c99569a6cad5bd1bb7842e45be9 - Fix CPU basecalling
 * 9c4bf7172024a5d8fc7719890ff62f7d701f6248 - Add `dorado` namespace
+* acbca36edb1459d493df7aa445069e9f2e725f9f - Improvements to Dorado portability - Dorado archive now bundles more dependencies.
 
 ## Minor changes
 
