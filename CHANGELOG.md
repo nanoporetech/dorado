@@ -2,6 +2,33 @@
 
 All notable changes to Dorado will be documented in this file.
 
+# [0.0.2] (10 Nov 2022)
+
+Release of version 0.0.2 is a minor release which introduces several performance and usability improvements to Dorado. In particular, we are happy to announce the inclusion of multi-GPU base modification calling and 5mC models.
+
+## Major changes
+
+* 163615381a3ba7b3c247d001df348535a7a112fd - Major upgrade to modified base calling speed.
+* fea918116182fe8f6809cf332900209a13a57bf5 61a7bc0181f0bf3e2e46727ccdf0717b0ee015e2 - Improve convolutional layer performance for increase in basecalling speed.
+* fb7cb242779c0cf3c6da73cbc7b57d892e97a5f8 - Reduction in memory requirement for M1 basecalling, allows running on larger number of M1 devices.
+* f5371d16cfd7eef71995edbfeeb86df7f4201440 - Add signal move tables to SAM output.
+* 621cc4d7624d8c99569a6cad5bd1bb7842e45be9 - Fix CPU basecalling
+* 9c4bf7172024a5d8fc7719890ff62f7d701f6248 - Add `dorado` namespace
+
+## Minor changes
+
+* 16cb5cb6f15ad6e04cb806ee03c5bebe2a7d45ae - Fix downloading models in Windows
+* 3202db8ff153dbad7d62d7efbddcbdeef70c3e9d - Basecaller node timeout, enables computation of non-full batches after timeout elapses.
+* 1a40836f2d8e1054232f05563298d6905955782e - Add duration tag to SAM.
+* 0b3a3367d7e44eb2470913a16806f2bd6d146860 - Add verbose flag to Dorado.
+* d75303d6e4d3bd97e4363e00210e1fef96db6d49 - Solve segfault-causing race condition
+* ac0a4d5a7946ad9b1036ab90ab54f27c9913bb0e - Adjust overlap and chunk size to be a multiple of the model stride
+* 626137a2fae13b8ac641fc7c032bb0ae150cbfad - Improve the way we look up GPU core count on Apple
+* b2864dbf198b0a3974828387cc89d43c06b3fa97 - Added [spdlog](https://github.com/gabime/spdlog) logging framework
+* e9c78665ed8cf4d76de5a0fb57cd19fdd03c5a44 - Reduced Startup cost on multi-GPU systems
+* fe71021aa24ffdb6ac110d5ce4f9a47933c03a53 - Migrate archive distributions from Box to CDN
+* 4b67720fd1037dc002264badf11f743d372dba3a - Resolved issue with SSL verification for model downloads.
+
 # [0.0.1] (05 Oct 2022)
 
 We are excited to announce the first binary release of Dorado. This Dorado release introduces important new features such as support for modified base calling, and significant improvements to basecalling performance and usability, taking it to the state of the art for speed and accuracy.
