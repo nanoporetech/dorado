@@ -65,7 +65,9 @@ TEST_CASE(CUT_TAG ": quantile_counting guppy comparison", CUT_TAG) {
     auto between = [&rng](auto min, auto max) {
         return min + (max - min) * float(rng()) / rng.max();
     };
-    std::vector<int16_t> input_data(314159);  // intentionally larger than int16_t::max()
+    // Use an input size greater than that of the datatype we're testing with (int16_t) in
+    // order to flush out any bugs where it might be misused as an index
+    std::vector<int16_t> input_data(314159);
     std::generate(input_data.begin(), input_data.end(),
                   [&] { return static_cast<int16_t>(between(-123, 456)); });
     std::vector<float> quantiles(std::size(expected));
@@ -74,8 +76,7 @@ TEST_CASE(CUT_TAG ": quantile_counting guppy comparison", CUT_TAG) {
     // Run the test
     auto input_tensor = torch::tensor(at::makeArrayRef(input_data), {torch::kI16});
     auto quantiles_tensor = torch::tensor(at::makeArrayRef(quantiles), {torch::kFloat});
-    auto computed =
-            dorado::utils::quantile_counting(input_tensor.to(torch::kI16), quantiles_tensor);
+    auto computed = dorado::utils::quantile_counting(input_tensor, quantiles_tensor);
 
     // Check the output matches
     for (size_t i = 0; i < std::size(expected); i++) {
