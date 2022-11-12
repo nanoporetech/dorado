@@ -25,4 +25,4 @@ std::map<std::string, std::string> load_pairs_file(std::string pairs_file) {
     }
     return template_complement_map;
 }
-}
+}  // namespace dorado::utils
