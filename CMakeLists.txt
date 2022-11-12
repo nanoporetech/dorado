@@ -47,11 +47,6 @@ if(DEFINED CUDA_TOOLKIT_ROOT_DIR)
 endif()
 
 set(LIB_SOURCE_FILES
-    dorado/cli/basecaller.cpp
-    dorado/cli/duplex.cpp
-    dorado/cli/download.cpp
-    dorado/cli/benchmark.cpp
-    dorado/cli/cli.h
     dorado/models.h
     dorado/nn/CRFModel.h
     dorado/nn/CRFModel.cpp
@@ -68,6 +63,8 @@ set(LIB_SOURCE_FILES
     dorado/read_pipeline/ModBaseCallerNode.h
     dorado/read_pipeline/WriterNode.cpp
     dorado/read_pipeline/WriterNode.h
+    dorado/read_pipeline/DuplexCallerNode.cpp
+    dorado/read_pipeline/DuplexCallerNode.h
     dorado/data_loader/DataLoader.cpp
     dorado/data_loader/DataLoader.h
     dorado/decode/beam_search.cpp
@@ -98,8 +95,6 @@ set(LIB_SOURCE_FILES
     dorado/utils/tensor_utils.cpp
     dorado/utils/tensor_utils.h
     dorado/utils/bam_utils.cpp
-    dorado/read_pipeline/DuplexCallerNode.cpp
-    dorado/read_pipeline/DuplexCallerNode.h
     dorado/utils/bam_utils.h
     dorado/utils/duplex_utils.h
     dorado/utils/duplex_utils.cpp)
@@ -141,7 +136,6 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR}/dorado
     dorado/3rdparty/toml11
     dorado/3rdparty/cpp-httplib
     dorado/3rdparty/metal-cpp/metal-cpp
-    dorado/3rdparty/metal-cpp/metal-cpp
     dorado/3rdparty/hdf_plugins/vbz_plugin
     ${HTSLIB_DIR}
     dorado/3rdparty/cxxpool/src
@@ -169,7 +163,6 @@ target_link_libraries(dorado_lib
     ${HTSLIB_LIBRARIES}
     vbz_hdf_plugin
     OpenSSL::SSL
-    elzip
     edlib
 )
 
@@ -193,6 +186,7 @@ if(NOT DORADO_LIB_ONLY)
 
     add_executable(dorado 
         dorado/main.cpp
+        dorado/cli/duplex.cpp
         dorado/cli/basecaller.cpp
         dorado/cli/benchmark.cpp        
         dorado/cli/download.cpp

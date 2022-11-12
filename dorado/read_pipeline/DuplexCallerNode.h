@@ -14,7 +14,7 @@ public:
     ~DuplexCallerNode();
 
 private:
-    void worker_thread();  // Worker thread performs scaling and trimming asynchronously.
+    void worker_thread();
     ReadSink&
             m_sink;  // ReadSink to consume Duplex Called Reads. This will typically be a writer node
     std::vector<std::unique_ptr<std::thread>> worker_threads;

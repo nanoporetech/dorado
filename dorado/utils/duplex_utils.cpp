@@ -2,6 +2,7 @@
 
 #include <fstream>
 
+namespace dorado::utils {
 std::map<std::string, std::string> load_pairs_file(std::string pairs_file) {
     std::ifstream dataFile;
     dataFile.open(pairs_file);
@@ -23,4 +24,5 @@ std::map<std::string, std::string> load_pairs_file(std::string pairs_file) {
         std::getline(dataFile, cell);
     }
     return template_complement_map;
+}
 }

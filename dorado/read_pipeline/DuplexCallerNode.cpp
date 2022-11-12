@@ -7,8 +7,7 @@
 #include <chrono>
 
 using namespace std::chrono_literals;
-
-namespace dorado {
+namespace {
 // Applies a min pool filter to q scores for basespace-duplex algorithm
 void preprocess_quality_scores(std::vector<uint8_t>& quality_scores, int pool_window = 5) {
     // Apply a min-pool window to the quality scores
@@ -19,7 +18,6 @@ void preprocess_quality_scores(std::vector<uint8_t>& quality_scores, int pool_wi
     t.index({torch::indexing::Slice()}) =
             -torch::max_pool1d(-t_float, pool_window, 1, pool_window / 2);
 }
-
 // Returns reverse complement of a nucleotide sequence
 void reverse_complement(std::vector<char>& sequence) {
     std::reverse(sequence.begin(), sequence.end());
@@ -135,6 +133,9 @@ std::pair<std::pair<int, int>, std::pair<int, int>> get_trimmed_alignment(
 
     return std::make_pair(alignment_start_end, query_target_cursors);
 }
+}  // namespace
+
+namespace dorado {
 
 void DuplexCallerNode::worker_thread() {
     EdlibAlignConfig align_config = edlibDefaultAlignConfig();
@@ -149,8 +150,8 @@ void DuplexCallerNode::worker_thread() {
         std::shared_ptr<Read> template_read;
         std::vector<uint8_t> template_quality_scores;
         if (m_reads.find(template_read_id) == m_reads.end()) {
-            spdlog::debug("Template Read ID=" + template_read_id +
-                          "is present in pairs file but read was not found");
+            spdlog::debug("Template Read ID={} is present in pairs file but read was not found",
+                          template_read_id);
         } else {
             template_read = m_reads.at(template_read_id);
             template_sequence =
@@ -162,8 +163,8 @@ void DuplexCallerNode::worker_thread() {
         preprocess_quality_scores(template_quality_scores);
 
         if (m_reads.find(complement_read_id) == m_reads.end()) {
-            spdlog::debug("Complement ID=" + complement_read_id,
-                          "paired with Template ID=" + template_read_id + " was not found");
+            spdlog::debug("Complement ID={} paired with Template ID={} was not found",
+                          complement_read_id, template_read_id);
         } else if (template_sequence.size() !=
                    0) {  // We have both sequences and can perform the consensus
             auto complement_read = m_reads.at(complement_read_id);
@@ -227,8 +228,8 @@ DuplexCallerNode::DuplexCallerNode(ReadSink& sink,
                                    std::map<std::string, std::shared_ptr<Read>> reads)
         : ReadSink(1000),
           m_sink(sink),
-          m_template_complement_map(template_complement_map),
-          m_reads(reads) {
+          m_template_complement_map(std::move(template_complement_map)),
+          m_reads(std::move(reads)) {
     // Only one worker at present
     for (int i = 0; i < 1; i++) {
         std::unique_ptr<std::thread> worker_thread =

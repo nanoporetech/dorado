@@ -24,25 +24,24 @@ std::map<std::string, std::shared_ptr<Read>> read_bam(std::string reads_file) {
     std::map<std::string, std::shared_ptr<Read>> reads;
 
     while (sam_read1(fp_in, bamHdr, aln) >= 0) {
-        uint32_t len = aln->core.l_qseq;  //length of the read.
+        uint32_t seqlen = aln->core.l_qseq;
 
         std::string read_id = bam_get_qname(aln);
 
-        uint8_t* q = bam_get_qual(aln);  //quality string
-        uint8_t* s = bam_get_seq(aln);   //sequence string
+        uint8_t* qstring = bam_get_qual(aln);
+        uint8_t* sequence = bam_get_seq(aln);
 
-        std::vector<uint8_t> qualities(len);
-        std::vector<char> nucleotides(len);
+        std::vector<uint8_t> qualities(seqlen);
+        std::vector<char> nucleotides(seqlen);
 
         // Todo - there is a better way to do this.
-        for (int i = 0; i < len; i++) {
-            qualities[i] = q[i] + 33;
-            nucleotides[i] = seq_nt16_str[bam_seqi(s, i)];
+        for (int i = 0; i < seqlen; i++) {
+            qualities[i] = qstring[i] + 33;
+            nucleotides[i] = seq_nt16_str[bam_seqi(sequence, i)];
         }
         auto tmp_read = std::make_shared<Read>();
         tmp_read->read_id = read_id;
         tmp_read->seq = std::string(nucleotides.begin(), nucleotides.end());
-        ;
         tmp_read->qstring = std::string(qualities.begin(), qualities.end());
         reads[read_id] = tmp_read;
     }

@@ -16,7 +16,7 @@ int duplex(int argc, char* argv[]) {
     utils::InitLogging();
 
     argparse::ArgumentParser parser("dorado", DORADO_VERSION);
-    parser.add_argument("reads_file").help("Basecalled reads in BAM/SAM/CRAM format.");
+    parser.add_argument("bam_file").help("Basecalled reads in BAM/SAM format.");
     parser.add_argument("pairs_file").help("Space-delimited csv containing read ID pairs.");
     parser.add_argument("--emit-fastq").default_value(false).implicit_value(true);
 
@@ -27,16 +27,17 @@ int duplex(int argc, char* argv[]) {
         std::exit(1);
     }
 
-    std::string reads_file = parser.get<std::string>("reads_file");
+    std::string bam_file = parser.get<std::string>("bam_file");
 
     std::string pairs_file = parser.get<std::string>("pairs_file");
 
-    spdlog::info("Loading pairs file: " + pairs_file);
-    std::map<std::string, std::string> template_complement_map = load_pairs_file(pairs_file);
+    spdlog::info("Loading pairs file: {}", pairs_file);
+    std::map<std::string, std::string> template_complement_map =
+            dorado::utils::load_pairs_file(pairs_file);
     spdlog::info("Pairs file loaded");
 
-    spdlog::info("Loading reads: " + reads_file);
-    std::map<std::string, std::shared_ptr<Read>> reads = utils::read_bam(reads_file);
+    spdlog::info("Loading reads: {}", bam_file);
+    std::map<std::string, std::shared_ptr<Read>> reads = utils::read_bam(bam_file);
     spdlog::info("Reads loaded");
 
     std::vector<std::string> args(argv, argv + argc);
