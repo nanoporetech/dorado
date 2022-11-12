@@ -2,6 +2,12 @@
 
 All notable changes to Dorado will be documented in this file.
 
+# [0.0.3] (12 Nov 2022)
+
+Upgrade to Pod5 v0.0.41
+
+47be749be07b3f0de05206308103da58dd8cca4b - Support new pod5 version (0.0.41)
+
 # [0.0.2] (10 Nov 2022)
 
 Release of version 0.0.2 is a minor release which introduces several performance and usability improvements to Dorado. In particular, we are happy to announce the inclusion of multi-GPU base modification calling and 5mC models.
