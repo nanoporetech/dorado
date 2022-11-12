@@ -20,3 +20,14 @@ If libtorch is already downloaded on the host system and you do not wish the bui
 ```
 cmake -DDORADO_LIBTORCH_DIR=/usr/local/libtorch -S -DCMAKE_CUDA_COMPILER=<NVCC_DIR>/nvcc . -B cmake-build 
 ```
+
+### OSX
+Building on OSX has been tested with the Ninja Generator.
+
+On OSX, version 2.69 of autoconf is required.
+
+```bash
+brew uninstall autoconf # not necessary if autoconf is not already installed
+brew install autoconf@2.69
+brew link autoconf@2.69
+```
