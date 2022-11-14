@@ -165,6 +165,10 @@ target_link_libraries(dorado_lib
     edlib
 )
 
+if(NOT WIN32)
+    add_dependencies(dorado_lib htslib_project)
+endif()
+
 if(APPLE)
     add_custom_target(metal-lib DEPENDS default.metallib)
     add_dependencies(dorado_lib metal-lib)
