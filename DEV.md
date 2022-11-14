@@ -22,9 +22,7 @@ cmake -DDORADO_LIBTORCH_DIR=/usr/local/libtorch -S -DCMAKE_CUDA_COMPILER=<NVCC_D
 ```
 
 ### OSX
-Building on OSX has been tested with the Ninja Generator.
-
-On OSX, version 2.69 of autoconf is required.
+On OSX, version 2.69 of autoconf is required:
 
 ```bash
 brew uninstall autoconf # not necessary if autoconf is not already installed
