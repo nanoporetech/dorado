@@ -47,7 +47,6 @@ if(DEFINED CUDA_TOOLKIT_ROOT_DIR)
 endif()
 
 set(LIB_SOURCE_FILES
-    dorado/models.h
     dorado/nn/CRFModel.h
     dorado/nn/CRFModel.cpp
     dorado/nn/ModelRunner.h
