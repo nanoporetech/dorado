@@ -56,6 +56,23 @@ static bool cuda_lstm_is_quantized(int layer_size) {
 }
 #endif  // if USE_CUDA_LSTM
 
+namespace {
+template <class Model>
+ModuleHolder<AnyModule> populate_model(Model &&model,
+                                       const std::filesystem::path &path,
+                                       torch::TensorOptions options) {
+    auto state_dict = model->load_weights(path);
+    model->load_state_dict(state_dict);
+    model->to(options.dtype_opt().value().toScalarType());
+    model->to(options.device_opt().value());
+    model->eval();
+
+    auto module = AnyModule(model);
+    auto holder = ModuleHolder<AnyModule>(module);
+    return holder;
+}
+}  // namespace
+
 namespace dorado {
 
 namespace nn {
@@ -72,58 +89,62 @@ struct ConvolutionImpl : Module {
         // Input x is [N, C_in, T_in], contiguity optional
         if (to_lstm) {
 #if USE_CUDA_LSTM
-            c10::cuda::CUDAGuard device_guard(x.device());
-            auto stream = at::cuda::getCurrentCUDAStream().stream();
+            if (x.device() != torch::kCPU) {
+                c10::cuda::CUDAGuard device_guard(x.device());
+                auto stream = at::cuda::getCurrentCUDAStream().stream();
 
-            int batch_size = x.size(0);
-            int chunk_size_in = x.size(2);
-            int chunk_size_out = chunk_size_in / stride;
-            auto w_device = conv->weight.view({out_size, in_size * window_size})
-                                    .t()
-                                    .to(x.options())
-                                    .contiguous();
-            auto b_device = conv->bias.to(x.options());
-            if (cuda_lstm_is_quantized(out_size)) {
-                torch::Tensor res =
-                        torch::empty({batch_size, chunk_size_out, out_size}, x.options());
-                auto res_2D = res.view({-1, out_size});
-                auto ntcw_mat = torch::empty({batch_size, chunk_size_out, in_size, window_size},
-                                             x.options());
-                host_window_ntcw_f16(stream, x.stride(0), x.stride(2), x.stride(1), batch_size,
-                                     chunk_size_in, in_size, window_size, stride,
-                                     ntcw_mat.stride(0), ntcw_mat.stride(1), ntcw_mat.stride(2),
-                                     ntcw_mat.stride(3), x.data_ptr(), ntcw_mat.data_ptr());
-                cublas_matmul_f16(ntcw_mat.view({-1, in_size * window_size}), w_device, res_2D);
-                host_bias_swish_f16(stream, res_2D.size(0), res_2D.size(1), res_2D.stride(0),
-                                    res_2D.data_ptr(), b_device.data_ptr());
+                int batch_size = x.size(0);
+                int chunk_size_in = x.size(2);
+                int chunk_size_out = chunk_size_in / stride;
+                auto w_device = conv->weight.view({out_size, in_size * window_size})
+                                        .t()
+                                        .to(x.options())
+                                        .contiguous();
+                auto b_device = conv->bias.to(x.options());
+                if (cuda_lstm_is_quantized(out_size)) {
+                    torch::Tensor res =
+                            torch::empty({batch_size, chunk_size_out, out_size}, x.options());
+                    auto res_2D = res.view({-1, out_size});
+                    auto ntcw_mat = torch::empty({batch_size, chunk_size_out, in_size, window_size},
+                                                 x.options());
+                    host_window_ntcw_f16(stream, x.stride(0), x.stride(2), x.stride(1), batch_size,
+                                         chunk_size_in, in_size, window_size, stride,
+                                         ntcw_mat.stride(0), ntcw_mat.stride(1), ntcw_mat.stride(2),
+                                         ntcw_mat.stride(3), x.data_ptr(), ntcw_mat.data_ptr());
+                    cublas_matmul_f16(ntcw_mat.view({-1, in_size * window_size}), w_device, res_2D);
+                    host_bias_swish_f16(stream, res_2D.size(0), res_2D.size(1), res_2D.stride(0),
+                                        res_2D.data_ptr(), b_device.data_ptr());
 
-                // Output is [N, T_out, C_out], contiguous
-                return res;
-            } else {
-                auto res = torch::empty({chunk_size_out + 1, batch_size, 2, out_size}, x.options());
-                res.index({0, Slice(), 1, Slice()}) = 0;
-                res.index({chunk_size_out, Slice(), 0, Slice()}) = 0;
-                auto res_TNC = res.slice(0, 1, chunk_size_out + 1).select(2, 1);
-                auto res_2D = res_TNC.view({-1, out_size});
+                    // Output is [N, T_out, C_out], contiguous
+                    return res;
+                } else {
+                    auto res = torch::empty({chunk_size_out + 1, batch_size, 2, out_size},
+                                            x.options());
+                    res.index({0, Slice(), 1, Slice()}) = 0;
+                    res.index({chunk_size_out, Slice(), 0, Slice()}) = 0;
+                    auto res_TNC = res.slice(0, 1, chunk_size_out + 1).select(2, 1);
+                    auto res_2D = res_TNC.view({-1, out_size});
 
-                auto tncw_mat = torch::empty({chunk_size_out, batch_size, in_size, window_size},
-                                             x.options());
-                host_window_ntcw_f16(stream, x.stride(0), x.stride(2), x.stride(1), batch_size,
-                                     chunk_size_in, in_size, window_size, stride,
-                                     tncw_mat.stride(1), tncw_mat.stride(0), tncw_mat.stride(2),
-                                     tncw_mat.stride(3), x.data_ptr(), tncw_mat.data_ptr());
-                cublas_matmul_f16(tncw_mat.view({-1, in_size * window_size}), w_device, res_2D);
-                host_bias_swish_f16(stream, res_2D.size(0), res_2D.size(1), res_2D.stride(0),
-                                    res_2D.data_ptr(), b_device.data_ptr());
+                    auto tncw_mat = torch::empty({chunk_size_out, batch_size, in_size, window_size},
+                                                 x.options());
+                    host_window_ntcw_f16(stream, x.stride(0), x.stride(2), x.stride(1), batch_size,
+                                         chunk_size_in, in_size, window_size, stride,
+                                         tncw_mat.stride(1), tncw_mat.stride(0), tncw_mat.stride(2),
+                                         tncw_mat.stride(3), x.data_ptr(), tncw_mat.data_ptr());
+                    cublas_matmul_f16(tncw_mat.view({-1, in_size * window_size}), w_device, res_2D);
+                    host_bias_swish_f16(stream, res_2D.size(0), res_2D.size(1), res_2D.stride(0),
+                                        res_2D.data_ptr(), b_device.data_ptr());
 
-                // Output is [T_out + 1, N, 2, C_out], contiguous, which serves as
-                // working memory for CuBLAS LSTM
-                return res;
-            }
-#else
-            // Output is [N, T_out, C_out], non-contiguous
-            return activation(conv(x)).transpose(1, 2);
+                    // Output is [T_out + 1, N, 2, C_out], contiguous, which serves as
+                    // working memory for CuBLAS LSTM
+                    return res;
+                }
+            } else
 #endif
+            {
+                // Output is [N, T_out, C_out], non-contiguous
+                return activation(conv(x)).transpose(1, 2);
+            }
         }
         // Output is [N, C_out, T_out], contiguous
         return activation(conv(x));
@@ -135,7 +156,7 @@ struct ConvolutionImpl : Module {
     int out_size;
     int window_size;
     int stride;
-    bool to_lstm;
+    const bool to_lstm;
 };
 
 struct LinearCRFImpl : Module {
@@ -148,20 +169,24 @@ struct LinearCRFImpl : Module {
         // Input x is [N, T, C], contiguity optional
         auto N = x.size(0);
         auto T = x.size(1);
+
+        torch::Tensor scores;
 #if USE_CUDA_LSTM
-        // Optimised version of the #else branch for CUDA devices
-        c10::cuda::CUDAGuard device_guard(x.device());
-        auto stream = at::cuda::getCurrentCUDAStream().stream();
+        if (x.device() != torch::kCPU) {
+            // Optimised version of the else branch for CUDA devices
+            c10::cuda::CUDAGuard device_guard(x.device());
+            auto stream = at::cuda::getCurrentCUDAStream().stream();
 
-        x = x.contiguous().reshape({N * T, -1});
-        auto scores = torch::matmul(x, linear->weight.t());
-        host_bias_tanh_scale_f16(stream, N * T, scores.size(1), scale, scores.data_ptr(),
-                                 linear->bias.data_ptr());
-        scores = scores.view({N, T, -1});
-
-#else  // if USE_CUDA_LSTM
-        auto scores = activation(linear(x)) * scale;
-#endif
+            x = x.contiguous().reshape({N * T, -1});
+            scores = torch::matmul(x, linear->weight.t());
+            host_bias_tanh_scale_f16(stream, N * T, scores.size(1), scale, scores.data_ptr(),
+                                     linear->bias.data_ptr());
+            scores = scores.view({N, T, -1});
+        } else
+#endif  // if USE_CUDA_LSTM
+        {
+            scores = activation(linear(x)) * scale;
+        }
 
         if (expand_blanks == true) {
             scores = scores.contiguous();
@@ -169,6 +194,11 @@ struct LinearCRFImpl : Module {
             scores = F::pad(scores.view({N, T, C / 4, 4}),
                             F::PadFuncOptions({1, 0, 0, 0, 0, 0, 0, 0}).value(blank_score))
                              .view({N, T, -1});
+        }
+
+        if (x.device() == torch::kCPU) {
+            // Output is [T, N, C]
+            return scores.transpose(0, 1);
         }
 
         // Output is [N, T, C], contiguous
@@ -209,8 +239,8 @@ struct CudaLSTMImpl : Module {
 
 TORCH_MODULE(CudaLSTM);
 
-struct LSTMStackImpl : Module {
-    LSTMStackImpl(int layer_size_, int batch_size, int chunk_size) : layer_size(layer_size_) {
+struct CudaLSTMStackImpl : Module {
+    CudaLSTMStackImpl(int layer_size_, int batch_size, int chunk_size) : layer_size(layer_size_) {
         rnn1 = register_module("rnn_1", CudaLSTM(layer_size, true));
         rnn2 = register_module("rnn_2", CudaLSTM(layer_size, false));
         rnn3 = register_module("rnn_3", CudaLSTM(layer_size, true));
@@ -455,7 +485,9 @@ struct LSTMStackImpl : Module {
     CudaLSTM rnn1{nullptr}, rnn2{nullptr}, rnn3{nullptr}, rnn4{nullptr}, rnn5{nullptr};
 };
 
-#else  // if USE_CUDA_LSTM
+TORCH_MODULE(CudaLSTMStack);
+
+#endif  // if USE_CUDA_LSTM
 
 struct LSTMStackImpl : Module {
     LSTMStackImpl(int size, int batchsize, int chunksize) {
@@ -483,12 +515,11 @@ struct LSTMStackImpl : Module {
     LSTM rnn1{nullptr}, rnn2{nullptr}, rnn3{nullptr}, rnn4{nullptr}, rnn5{nullptr};
 };
 
-#endif  // if USE_CUDA_LSTM else
-
 TORCH_MODULE(LSTMStack);
 TORCH_MODULE(LinearCRF);
 TORCH_MODULE(Convolution);
 
+template <class LSTMStackType>
 struct CRFModelImpl : Module {
     CRFModelImpl(int size,
                  int outsize,
@@ -499,7 +530,7 @@ struct CRFModelImpl : Module {
         conv1 = register_module("conv1", Convolution(1, 4, 5, 1));
         conv2 = register_module("conv2", Convolution(4, 16, 5, 1));
         conv3 = register_module("conv3", Convolution(16, size, 19, stride, true));
-        rnns = register_module("rnns", LSTMStack(size, batch_size, chunk_size / stride));
+        rnns = register_module("rnns", LSTMStackType(size, batch_size, chunk_size / stride));
         linear = register_module("linear", LinearCRF(size, outsize));
         linear->expand_blanks = expand_blanks;
         encoder = Sequential(conv1, conv2, conv3, rnns, linear);
@@ -543,13 +574,19 @@ struct CRFModelImpl : Module {
         return utils::load_tensors(dir, tensors);
     }
 
-    LSTMStack rnns{nullptr};
+    LSTMStackType rnns{nullptr};
     LinearCRF linear{nullptr};
     Sequential encoder{nullptr};
     Convolution conv1{nullptr}, conv2{nullptr}, conv3{nullptr};
 };
 
-TORCH_MODULE(CRFModel);
+#if USE_CUDA_LSTM
+using CudaCRFModelImpl = CRFModelImpl<CudaLSTMStack>;
+TORCH_MODULE(CudaCRFModel);
+#endif
+
+using CpuCRFModelImpl = CRFModelImpl<LSTMStack>;
+TORCH_MODULE(CpuCRFModel);
 
 }  // namespace nn
 
@@ -566,19 +603,21 @@ std::tuple<ModuleHolder<AnyModule>, size_t> load_crf_model(const std::filesystem
     const auto &global_norm = toml::find(config, "global_norm");
     const auto state_len = toml::find<int>(global_norm, "state_len");
     int outsize = pow(4, state_len) * 4;
-    bool expand = options.device_opt().value() == torch::kCPU;
 
-    auto model = nn::CRFModel(insize, outsize, stride, expand, batch_size, chunk_size);
-    auto state_dict = model->load_weights(path);
-    model->load_state_dict(state_dict);
-    model->to(options.dtype_opt().value().toScalarType());
-    model->to(options.device_opt().value());
-    model->eval();
-
-    auto module = AnyModule(model);
-    auto holder = ModuleHolder<AnyModule>(module);
-
-    return {holder, static_cast<size_t>(stride)};
+#if USE_CUDA_LSTM
+    if (options.device() != torch::kCPU) {
+        bool expand = false;
+        auto model = nn::CudaCRFModel(insize, outsize, stride, expand, batch_size, chunk_size);
+        auto holder = populate_model(model, path, options);
+        return {holder, static_cast<size_t>(stride)};
+    } else
+#endif
+    {
+        bool expand = true;
+        auto model = nn::CpuCRFModel(insize, outsize, stride, expand, batch_size, chunk_size);
+        auto holder = populate_model(model, path, options);
+        return {holder, static_cast<size_t>(stride)};
+    }
 }
 
 }  // namespace dorado

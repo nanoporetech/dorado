@@ -237,6 +237,11 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     install(FILES ${CUBLAS_DLLS} DESTINATION lib)
     install(FILES ${NVTOOLS_DLLS} DESTINATION lib)
 
+    # If zstd has been dynamically linked, add the .so to the package
+    get_filename_component(ZSTD_LIBRARY_PATH ${ZSTD_LIBRARY_RELEASE} DIRECTORY)
+    file(GLOB ZSTD_DLLS "${ZSTD_LIBRARY_PATH}/*zstd.so*")
+    install(FILES ${ZSTD_DLLS} DESTINATION lib)
+
 elseif(WIN32)
     file(GLOB TORCH_DLLS "${TORCH_LIB}/lib/*.dll")
     install(FILES ${TORCH_DLLS} DESTINATION bin)
