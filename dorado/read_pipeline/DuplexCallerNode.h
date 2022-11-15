@@ -10,13 +10,16 @@ class DuplexCallerNode : public ReadSink {
 public:
     DuplexCallerNode(ReadSink& sink,
                      std::map<std::string, std::string> template_complement_map,
-                     std::map<std::string, std::shared_ptr<Read>> reads);
+                     std::map<std::string, std::shared_ptr<Read>> reads,
+                     size_t threads);
     ~DuplexCallerNode();
 
 private:
     void worker_thread();
+    void basespace(std::string template_read_id, std::string complement_read_id);
     ReadSink&
             m_sink;  // ReadSink to consume Duplex Called Reads. This will typically be a writer node
+    size_t m_num_worker_threads{1};
     std::vector<std::unique_ptr<std::thread>> worker_threads;
     std::map<std::string, std::string> m_template_complement_map;
     std::map<std::string, std::shared_ptr<Read>> m_reads;

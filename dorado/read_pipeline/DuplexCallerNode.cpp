@@ -1,6 +1,7 @@
 #include "DuplexCallerNode.h"
 
 #include "3rdparty/edlib/edlib/include/edlib.h"
+#include "cxxpool.h"
 
 #include <spdlog/spdlog.h>
 
@@ -138,104 +139,108 @@ std::pair<std::pair<int, int>, std::pair<int, int>> get_trimmed_alignment(
 namespace dorado {
 
 void DuplexCallerNode::worker_thread() {
+    cxxpool::thread_pool pool{m_num_worker_threads};
+    std::vector<std::future<void>> futures;
+
+    for (auto [template_read_id, complement_read_id] : m_template_complement_map) {
+        futures.push_back(pool.push([template_read_id, complement_read_id, this] {
+            return basespace(template_read_id, complement_read_id);
+        }));
+    }
+    for (auto& v : futures) {
+        v.get();
+    }
+}
+
+void DuplexCallerNode::basespace(std::string template_read_id, std::string complement_read_id) {
     EdlibAlignConfig align_config = edlibDefaultAlignConfig();
     align_config.task = EDLIB_TASK_PATH;
 
-    // Loop over every template-complement pair, performing duplex calling on-the-fly
-    for (auto key : m_template_complement_map) {
-        std::string template_read_id = key.first;
-        std::string complement_read_id = key.second;
+    std::vector<char> template_sequence;
+    std::shared_ptr<Read> template_read;
+    std::vector<uint8_t> template_quality_scores;
+    if (m_reads.find(template_read_id) == m_reads.end()) {
+        spdlog::debug("Template Read ID={} is present in pairs file but read was not found",
+                      template_read_id);
+    } else {
+        template_read = m_reads.at(template_read_id);
+        template_sequence = std::vector<char>(template_read->seq.begin(), template_read->seq.end());
+        template_quality_scores =
+                std::vector<uint8_t>(template_read->qstring.begin(), template_read->qstring.end());
+    }
 
-        std::vector<char> template_sequence;
-        std::shared_ptr<Read> template_read;
-        std::vector<uint8_t> template_quality_scores;
-        if (m_reads.find(template_read_id) == m_reads.end()) {
-            spdlog::debug("Template Read ID={} is present in pairs file but read was not found",
-                          template_read_id);
-        } else {
-            template_read = m_reads.at(template_read_id);
-            template_sequence =
-                    std::vector<char>(template_read->seq.begin(), template_read->seq.end());
-            template_quality_scores = std::vector<uint8_t>(template_read->qstring.begin(),
-                                                           template_read->qstring.end());
+    preprocess_quality_scores(template_quality_scores);
+
+    if (m_reads.find(complement_read_id) == m_reads.end()) {
+        spdlog::debug("Complement ID={} paired with Template ID={} was not found",
+                      complement_read_id, template_read_id);
+    } else if (template_sequence.size() != 0) {
+        // We have both sequences and can perform the consensus
+        auto complement_read = m_reads.at(complement_read_id);
+        std::vector<char> complement_str =
+                std::vector<char>(complement_read->seq.begin(), complement_read->seq.end());
+        auto complement_quality_scores_reverse = std::vector<uint8_t>(
+                complement_read->qstring.begin(), complement_read->qstring.end());
+        std::reverse(complement_quality_scores_reverse.begin(),
+                     complement_quality_scores_reverse.end());
+
+        preprocess_quality_scores(complement_quality_scores_reverse);
+
+        std::vector<char> complement_sequence_reverse_complement = complement_str;
+        // Compute the RC
+        reverse_complement(complement_sequence_reverse_complement);
+
+        EdlibAlignResult result =
+                edlibAlign(template_sequence.data(), template_sequence.size(),
+                           complement_sequence_reverse_complement.data(),
+                           complement_sequence_reverse_complement.size(), align_config);
+
+        // Now - we have to do the actual basespace alignment itself
+        int query_cursor = 0;
+        int target_cursor = result.startLocations[0];
+
+        auto [alignment_start_end, cursors] =
+                get_trimmed_alignment(11, result.alignment, result.alignmentLength, target_cursor,
+                                      query_cursor, 0, result.endLocations[0]);
+
+        query_cursor = cursors.first;
+        target_cursor = cursors.second;
+        int start_alignment_position = alignment_start_end.first;
+        int end_alignment_position = alignment_start_end.second;
+
+        int min_trimmed_alignment_length = 200;
+        bool consensus_possible = (start_alignment_position < end_alignment_position) &&
+                                  ((end_alignment_position - start_alignment_position) >
+                                   min_trimmed_alignment_length);
+
+        if (consensus_possible) {
+            auto [consensus, quality_scores_phred] = compute_basespace_consensus(
+                    start_alignment_position, end_alignment_position, template_quality_scores,
+                    target_cursor, complement_quality_scores_reverse, query_cursor,
+                    template_sequence, complement_sequence_reverse_complement, result.alignment);
+
+            auto duplex_read = std::make_shared<Read>();
+            duplex_read->seq = std::string(consensus.begin(), consensus.end());
+            duplex_read->qstring =
+                    std::string(quality_scores_phred.begin(), quality_scores_phred.end());
+
+            duplex_read->read_id = template_read->read_id + ";" + complement_read->read_id;
+            m_sink.push_read(duplex_read);
         }
-
-        preprocess_quality_scores(template_quality_scores);
-
-        if (m_reads.find(complement_read_id) == m_reads.end()) {
-            spdlog::debug("Complement ID={} paired with Template ID={} was not found",
-                          complement_read_id, template_read_id);
-        } else if (template_sequence.size() !=
-                   0) {  // We have both sequences and can perform the consensus
-            auto complement_read = m_reads.at(complement_read_id);
-            std::vector<char> complement_str =
-                    std::vector<char>(complement_read->seq.begin(), complement_read->seq.end());
-            auto complement_quality_scores_reverse = std::vector<uint8_t>(
-                    complement_read->qstring.begin(), complement_read->qstring.end());
-            std::reverse(complement_quality_scores_reverse.begin(),
-                         complement_quality_scores_reverse.end());
-
-            preprocess_quality_scores(complement_quality_scores_reverse);
-
-            std::vector<char> complement_sequence_reverse_complement = complement_str;
-            //compute the RC
-            reverse_complement(complement_sequence_reverse_complement);
-
-            EdlibAlignResult result =
-                    edlibAlign(template_sequence.data(), template_sequence.size(),
-                               complement_sequence_reverse_complement.data(),
-                               complement_sequence_reverse_complement.size(), align_config);
-
-            //Now - we have to do the actual basespace alignment itself
-            int query_cursor = 0;
-            int target_cursor = result.startLocations[0];
-
-            auto [alignment_start_end, cursors] =
-                    get_trimmed_alignment(11, result.alignment, result.alignmentLength,
-                                          target_cursor, query_cursor, 0, result.endLocations[0]);
-
-            query_cursor = cursors.first;
-            target_cursor = cursors.second;
-            int start_alignment_position = alignment_start_end.first;
-            int end_alignment_position = alignment_start_end.second;
-
-            int min_trimmed_alignment_length = 200;
-            bool consensus_possible = (start_alignment_position < end_alignment_position) &&
-                                      ((end_alignment_position - start_alignment_position) >
-                                       min_trimmed_alignment_length);
-
-            if (consensus_possible) {
-                auto [consensus, quality_scores_phred] = compute_basespace_consensus(
-                        start_alignment_position, end_alignment_position, template_quality_scores,
-                        target_cursor, complement_quality_scores_reverse, query_cursor,
-                        template_sequence, complement_sequence_reverse_complement,
-                        result.alignment);
-                auto duplex_read = std::make_shared<Read>();
-                duplex_read->seq = std::string(consensus.begin(), consensus.end());
-                duplex_read->qstring =
-                        std::string(quality_scores_phred.begin(), quality_scores_phred.end());
-                duplex_read->read_id = template_read->read_id + ";" + complement_read->read_id;
-
-                m_sink.push_read(duplex_read);
-            }
-            edlibFreeAlignResult(result);
-        }
+        edlibFreeAlignResult(result);
     }
 }
 
 DuplexCallerNode::DuplexCallerNode(ReadSink& sink,
                                    std::map<std::string, std::string> template_complement_map,
-                                   std::map<std::string, std::shared_ptr<Read>> reads)
+                                   std::map<std::string, std::shared_ptr<Read>> reads,
+                                   size_t threads)
         : ReadSink(1000),
           m_sink(sink),
           m_template_complement_map(std::move(template_complement_map)),
-          m_reads(std::move(reads)) {
-    // Only one worker at present
-    for (int i = 0; i < 1; i++) {
-        std::unique_ptr<std::thread> worker_thread =
-                std::make_unique<std::thread>(&DuplexCallerNode::worker_thread, this);
-        worker_threads.push_back(std::move(worker_thread));
-    }
+          m_reads(std::move(reads)),
+          m_num_worker_threads(threads) {
+    worker_threads.push_back(std::make_unique<std::thread>(&DuplexCallerNode::worker_thread, this));
 }
 
 DuplexCallerNode::~DuplexCallerNode() {
