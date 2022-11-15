@@ -17,6 +17,8 @@ include(cmake/Koi.cmake)
 include(cmake/Pod5.cmake)
 include(cmake/Torch.cmake)
 include(cmake/OpenSSL.cmake)
+include(cmake/Htslib.cmake)
+
 
 if(DORADO_USING_OLD_CPP_ABI)
   # We need to force the use of the old ABI here, if we are building in an old ABI context, as otherwise elzip builds
@@ -25,6 +27,12 @@ if(DORADO_USING_OLD_CPP_ABI)
 endif()
 
 add_subdirectory(dorado/3rdparty/elzip)
+
+set(BUILD_TESTING OFF)
+add_subdirectory(dorado/3rdparty/edlib EXCLUDE_FROM_ALL)
+set(BUILD_TESTING ON)
+
+enable_testing()
 
 configure_file(dorado/Version.h.in dorado/Version.h)
 
@@ -54,6 +62,8 @@ set(LIB_SOURCE_FILES
     dorado/read_pipeline/ModBaseCallerNode.h
     dorado/read_pipeline/WriterNode.cpp
     dorado/read_pipeline/WriterNode.h
+    dorado/read_pipeline/DuplexCallerNode.cpp
+    dorado/read_pipeline/DuplexCallerNode.h
     dorado/data_loader/DataLoader.cpp
     dorado/data_loader/DataLoader.h
     dorado/decode/beam_search.cpp
@@ -82,7 +92,11 @@ set(LIB_SOURCE_FILES
     dorado/utils/stitch.cpp
     dorado/utils/stitch.h
     dorado/utils/tensor_utils.cpp
-    dorado/utils/tensor_utils.h)
+    dorado/utils/tensor_utils.h
+    dorado/utils/bam_utils.cpp
+    dorado/utils/bam_utils.h
+    dorado/utils/duplex_utils.h
+    dorado/utils/duplex_utils.cpp)
 
 if(APPLE)
     include(cmake/Metal.cmake)
@@ -122,6 +136,7 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR}/dorado
     dorado/3rdparty/cpp-httplib
     dorado/3rdparty/metal-cpp/metal-cpp
     dorado/3rdparty/hdf_plugins/vbz_plugin
+    ${HTSLIB_DIR}
     dorado/3rdparty/cxxpool/src
     dorado/3rdparty/NVTX/c/include
     dorado
@@ -144,9 +159,15 @@ target_link_libraries(dorado_lib
     ${TORCH_LIBRARIES}
     ${POD5_LIBRARIES}
     ${KOI_LIBRARIES}
+    ${HTSLIB_LIBRARIES}
     vbz_hdf_plugin
     OpenSSL::SSL
+    edlib
 )
+
+if(NOT WIN32)
+    add_dependencies(dorado_lib htslib_project)
+endif()
 
 if(APPLE)
     add_custom_target(metal-lib DEPENDS default.metallib)
@@ -168,6 +189,7 @@ if(NOT DORADO_LIB_ONLY)
 
     add_executable(dorado 
         dorado/main.cpp
+        dorado/cli/duplex.cpp
         dorado/cli/basecaller.cpp
         dorado/cli/benchmark.cpp        
         dorado/cli/download.cpp
@@ -223,6 +245,8 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
 elseif(WIN32)
     file(GLOB TORCH_DLLS "${TORCH_LIB}/lib/*.dll")
     install(FILES ${TORCH_DLLS} DESTINATION bin)
+    file(GLOB HTSLIB_DLLS "${HTSLIB_DIR}/*.dll")
+    install(FILES ${HTSLIB_DLLS} DESTINATION bin)
 elseif(APPLE)
     file(GLOB TORCH_DLLS "${TORCH_LIB}/lib/*.dylib")
     install(FILES ${TORCH_DLLS} DESTINATION lib)

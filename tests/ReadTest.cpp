@@ -33,24 +33,24 @@ TEST_CASE(TEST_GROUP ": Test tag generation", TEST_GROUP) {
 TEST_CASE(TEST_GROUP ": Test sam line generation", TEST_GROUP) {
     dorado::Read test_read{};
     SECTION("Generating sam line for empty read throws") {
-        REQUIRE_THROWS(test_read.extract_sam_lines(false));
+        REQUIRE_THROWS(test_read.extract_sam_lines(false, false));
     }
     SECTION("Generating sam line for empty seq and qstring throws") {
         test_read.read_id = "test_read";
-        REQUIRE_THROWS(test_read.extract_sam_lines(false));
+        REQUIRE_THROWS(test_read.extract_sam_lines(false, false));
     }
     SECTION("Generating sam line for mismatched seq and qstring throws") {
         test_read.read_id = "test_read";
         test_read.seq = "ACGTACGT";
         test_read.qstring = "!!!!";
-        REQUIRE_THROWS(test_read.extract_sam_lines(false));
+        REQUIRE_THROWS(test_read.extract_sam_lines(false, false));
     }
     SECTION("Generating sam line for read with non-empty mappings throws") {
         test_read.read_id = "test_read";
         test_read.seq = "ACGTACGT";
         test_read.qstring = "!!!!!!!!";
         test_read.mappings.resize(1);
-        REQUIRE_THROWS(test_read.extract_sam_lines(false));
+        REQUIRE_THROWS(test_read.extract_sam_lines(false, false));
     }
     SECTION("Generated sam line for unaligned read is correct") {
         std::vector<std::string> expected_sam_lines{
@@ -73,7 +73,7 @@ TEST_CASE(TEST_GROUP ": Test sam line generation", TEST_GROUP) {
         test_read.attributes.start_time = "2017-04-29T09:10:04Z";
         test_read.attributes.fast5_filename = "batch_0.fast5";
 
-        REQUIRE(test_read.extract_sam_lines(false) == expected_sam_lines);
+        REQUIRE(test_read.extract_sam_lines(false, false) == expected_sam_lines);
     }
 }
 
