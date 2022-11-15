@@ -121,7 +121,6 @@ TEST_CASE(TEST_GROUP "LinearTanh") {
             (127.0f * torch::tanh(torch::addmm(biases_f32, in_f32, weights_f32))).to(torch::kInt8);
     const auto out_cpu_f32 = out_cpu_i8.to(torch::kFloat32);
 
-
     const int32_t in_batch_tiles = in_batch_size / tile_size;
 
     // These tolerances are somewhat arbitary, but we must account for GPU calculations in float16
