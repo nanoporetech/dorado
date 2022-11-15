@@ -136,7 +136,7 @@ void setup(std::vector<std::string> args,
         }
     }
 
-    WriterNode writer_node(std::move(args), emit_fastq, emit_moves, num_devices * 2);
+    WriterNode writer_node(std::move(args), emit_fastq, emit_moves, false, num_devices * 2);
 
     std::unique_ptr<ModBaseCallerNode> mod_base_caller_node;
     std::unique_ptr<BasecallerNode> basecaller_node;

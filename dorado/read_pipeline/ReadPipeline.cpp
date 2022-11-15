@@ -89,7 +89,13 @@ std::vector<std::string> Read::generate_read_tags(bool emit_moves) const {
     return tags;
 }
 
-std::vector<std::string> Read::extract_sam_lines(bool emit_moves) const {
+std::vector<std::string> Read::generate_duplex_read_tags() const {
+    std::vector<std::string> tags = {"qs:i:" + std::to_string(static_cast<int>(std::round(
+                                                       utils::mean_qscore_from_qstring(qstring))))};
+    return tags;
+}
+
+std::vector<std::string> Read::extract_sam_lines(bool emit_moves, bool duplex) const {
     if (read_id.empty()) {
         throw std::runtime_error("Empty read_name string provided");
     }
@@ -101,7 +107,14 @@ std::vector<std::string> Read::extract_sam_lines(bool emit_moves) const {
     }
 
     std::ostringstream read_tags_stream;
-    auto read_tags = generate_read_tags(emit_moves);
+    std::vector<std::string> read_tags;
+
+    if (duplex) {
+        read_tags = generate_duplex_read_tags();
+    } else {
+        read_tags = generate_read_tags(emit_moves);
+    }
+
     for (const auto& tag : read_tags) {
         read_tags_stream << "\t" << tag;
     }

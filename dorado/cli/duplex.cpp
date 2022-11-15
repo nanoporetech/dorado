@@ -43,7 +43,7 @@ int duplex(int argc, char* argv[]) {
     torch::set_num_threads(1);
     threads = threads == 0 ? std::thread::hardware_concurrency() : threads;
 
-    WriterNode writer_node(std::move(args), emit_fastq, false, 4);
+    WriterNode writer_node(std::move(args), emit_fastq, false, true, 4);
     DuplexCallerNode duplex_caller_node(writer_node, template_complement_map, reads, threads);
 
     return 0;
