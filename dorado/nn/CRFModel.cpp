@@ -14,6 +14,7 @@ extern "C" {
 #include <cuda_runtime.h>
 
 #define USE_CUDA_LSTM 1
+#define CUDA_PROFILE_TO_CERR 0
 #else
 #define USE_CUDA_LSTM 0
 #endif
@@ -32,6 +33,16 @@ using Slice = torch::indexing::Slice;
 using quantized_lstm = std::function<int(void *, void *, void *, void *, void *, void *, int)>;
 
 #if USE_CUDA_LSTM
+#define CUDA_CHECK(X)                                                                         \
+    {                                                                                         \
+        cudaError_t error = X;                                                                \
+        if (error != cudaSuccess) {                                                           \
+            printf("CUDA returned error %s (code %d), line(%d)\n", cudaGetErrorString(error), \
+                   error, __LINE__);                                                          \
+            exit(EXIT_FAILURE);                                                               \
+        }                                                                                     \
+    }
+
 static void cublas_matmul_f16(torch::Tensor const &A, torch::Tensor const &B, torch::Tensor &C) {
     constexpr uint16_t HALF_ZERO = 0;      // 0.0 in __half format
     constexpr uint16_t HALF_ONE = 0x3C00;  // 1.0 in __half format
@@ -55,6 +66,45 @@ static bool cuda_lstm_is_quantized(int layer_size) {
     return ((layer_size == 96) || (layer_size == 128));
 }
 #endif  // if USE_CUDA_LSTM
+
+#if CUDA_PROFILE_TO_CERR
+class ScopedProfileRange {
+public:
+    explicit ScopedProfileRange(const char *label) : m_nvtx_range(label), m_label(label) {
+        m_stream = at::cuda::getCurrentCUDAStream().stream();
+        CUDA_CHECK(cudaEventCreate(&m_start));
+        CUDA_CHECK(cudaEventRecord(m_start, m_stream));
+        m_active = true;
+    }
+
+    ~ScopedProfileRange() { finish(); }
+
+private:
+    void finish() {
+        if (!m_active) {
+            return;
+        }
+        cudaEvent_t stop;
+        CUDA_CHECK(cudaEventCreate(&stop));
+        CUDA_CHECK(cudaEventRecord(stop, m_stream));
+        CUDA_CHECK(cudaEventSynchronize(stop));
+        float timeMs = 0.0f;
+        CUDA_CHECK(cudaEventElapsedTime(&timeMs, m_start, stop));
+        CUDA_CHECK(cudaEventDestroy(m_start));
+        CUDA_CHECK(cudaEventDestroy(stop));
+        std::cerr << "[" << m_label << " " << timeMs << " ms]" << std::endl;
+        m_active = false;
+    }
+
+    nvtx3::scoped_range m_nvtx_range;
+    const char *m_label;
+    cudaStream_t m_stream;
+    cudaEvent_t m_start;
+    bool m_active;
+};
+#else  // if CUDA_PROFILE_TO_CERR
+using ScopedProfileRange = nvtx3::scoped_range;
+#endif
 
 namespace {
 template <class Model>
@@ -273,6 +323,9 @@ struct CudaLSTMStackImpl : Module {
     bool _weights_rearranged = false;
     bool m_quantize;
     torch::Tensor _chunks;
+    std::vector<torch::Tensor> device_weights;
+    std::vector<torch::Tensor> device_bias;
+    std::vector<torch::Tensor> device_scale;
     std::vector<torch::Tensor> _r_wih;
     std::vector<torch::Tensor> _quantized_buffers;
     std::vector<torch::Tensor> _quantization_scale_factors;
@@ -281,8 +334,13 @@ struct CudaLSTMStackImpl : Module {
 
     torch::Tensor forward_cublas(torch::Tensor in) {
         // input in is ([N, T, C], contiguity optional) or ([T+1, N, 2, C], contiguous) (see below)
-        c10::cuda::CUDAGuard device_guard(in.device());
         auto stream = at::cuda::getCurrentCUDAStream().stream();
+
+        // Cutlass kernel currently requires SM8.0 (A100) or later
+        cudaDeviceProp *prop = at::cuda::getCurrentDeviceProperties();
+        const bool use_cutlass = prop->major >= 8;
+        const bool use_int8 = use_cutlass;
+
         int chunk_size, batch_size;
         torch::Tensor mat_working_mem;
         bool input_is_working_mem = (in.dim() == 4 && in.size(2) == 2);
@@ -318,37 +376,112 @@ struct CudaLSTMStackImpl : Module {
         auto working_mem_left = mat_working_mem.slice(0, 0, chunk_size).select(2, 0);
         auto working_mem_right = mat_working_mem.slice(0, 1, chunk_size + 1).select(2, 1);
 
-        if (!input_is_working_mem) {
-            // NOTE: `host_transpose_f16' does exactly what the commented out assignment
-            // below would do, only ~5x faster (on A100)
-            // working_mem_right = in.transpose(1, 0);
-            host_transpose_f16(stream, in.data_ptr(), in.size(1), in.size(0), in.size(2),
-                               in.stride(1), in.stride(0), in.stride(2),
-                               working_mem_right.stride(0), working_mem_right.stride(1),
-                               working_mem_right.stride(2), working_mem_right.data_ptr());
+        torch::Tensor working_mem_i8, working_mem_left_i8;
+        if (use_int8) {
+            working_mem_i8 = torch::empty(
+                    mat_working_mem.sizes(),
+                    torch::TensorOptions(mat_working_mem.options()).dtype(torch::kInt8));
+            working_mem_i8.index({chunk_size, Slice(), 0, Slice()}) = 0;
+            working_mem_i8.index({0, Slice(), 1, Slice()}) = 0;
+            working_mem_left_i8 = working_mem_i8.slice(0, 0, chunk_size).select(2, 0);
         }
 
-        for (auto &rnn : {rnn1, rnn2, rnn3, rnn4, rnn5}) {
-            auto state_buf = torch::zeros({batch_size, layer_size}, in.options());
-            auto weights_cpu = rnn->weights.t().contiguous();
-            auto weights = weights_cpu.to(in.device());
-            auto bias = rnn->bias.to(in.device());
-            for (int ts = 0; ts < chunk_size; ++ts) {
-                auto timestep_in = working_mem_all[rnn->reverse ? (chunk_size - ts) : ts];
-                auto timestep_out = rnn->reverse ? working_mem_left[chunk_size - ts - 1]
-                                                 : working_mem_right[ts];
-
-                // Timestep matrix mulitplication (using cublasGemmEx, as using torch::matmul
-                // as below is a bit slower on A100 for some reason)
-                // gate_buf = torch::matmul(timestep_in, weights);
-                cublas_matmul_f16(timestep_in, weights, gate_buf);
-                host_lstm_step_f16(stream, batch_size, layer_size, bias.data_ptr(),
-                                   gate_buf.data_ptr(), state_buf.data_ptr(),
-                                   timestep_out.data_ptr());
+        if (!input_is_working_mem) {
+            // TODO: drop custom solution
+            if (in.dtype() == torch::kF16) {
+                // NOTE: `host_transpose_f16' does exactly what the assignment in the else path
+                // below would do, only ~5x faster (on A100)
+                host_transpose_f16(stream, in.data_ptr(), in.size(1), in.size(0), in.size(2),
+                                   in.stride(1), in.stride(0), in.stride(2),
+                                   working_mem_right.stride(0), working_mem_right.stride(1),
+                                   working_mem_right.stride(2), working_mem_right.data_ptr());
+            } else {
+                working_mem_right = in.transpose(1, 0);
             }
         }
 
+        int layer_idx = 0;
+        for (auto &rnn : {rnn1, rnn2, rnn3, rnn4, rnn5}) {
+            ScopedProfileRange spr_lstm("lstm_layer");
+            auto state_buf =
+                    torch::zeros({batch_size, layer_size},
+                                 torch::TensorOptions().dtype(torch::kF16).device(in.device()));
+            auto weights_cpu = rnn->weights;
+            if (use_cutlass) {
+                if (int(device_weights.size()) == layer_idx) {
+                    device_bias.push_back(rnn->bias.to(in.device()));
+                    if (use_int8 && layer_idx > 0) {
+                        auto [factors, quantized] =
+                                quantize_tensor(weights_cpu.t().to(torch::kF32));
+                        weights_cpu = quantized.t();
+                        device_scale.push_back(
+                                factors.contiguous().to(in.device()).to(torch::kF16));
+                    } else {
+                        device_scale.push_back(torch::ones_like(device_bias.back()));
+                    }
+                    // Cutlass kernel expects weights reordered as <igigigigfofofofo>
+                    auto weights_cpu_cutlass = torch::empty_like(weights_cpu);
+                    for (int i = 0; i < layer_size; ++i) {
+                        int i0 = i / 4;
+                        int i1 = i % 4;
+                        weights_cpu_cutlass[i0 * 16 + i1 * 2 + 0] = weights_cpu[i + 0 * layer_size];
+                        weights_cpu_cutlass[i0 * 16 + i1 * 2 + 1] = weights_cpu[i + 1 * layer_size];
+                        weights_cpu_cutlass[i0 * 16 + i1 * 2 + 8] = weights_cpu[i + 2 * layer_size];
+                        weights_cpu_cutlass[i0 * 16 + i1 * 2 + 9] = weights_cpu[i + 3 * layer_size];
+                    }
+                    device_weights.push_back(weights_cpu_cutlass.contiguous().to(in.device()));
+                }
+                if (use_int8 && layer_idx > 0) {
+                    host_cutlass_lstm_i8(stream, layer_idx, batch_size, layer_size, chunk_size,
+                                         rnn->reverse ? -1 : 1, working_mem_i8.data_ptr(),
+                                         device_weights[layer_idx].data_ptr(),
+                                         device_bias[layer_idx].data_ptr(),
+                                         device_scale[layer_idx].data_ptr(), state_buf.data_ptr());
+                } else {
+                    host_cutlass_lstm_f16(stream, layer_idx, batch_size, layer_size, chunk_size,
+                                          rnn->reverse ? -1 : 1, working_mem_all.data_ptr(),
+                                          device_weights[layer_idx].data_ptr(),
+                                          device_bias[layer_idx].data_ptr(),
+                                          device_scale[layer_idx].data_ptr(), state_buf.data_ptr());
+                }
+                if (use_int8 && layer_idx == 0) {
+                    ScopedProfileRange spr_convert("f16_to_int8");
+                    host_f16_to_i8(stream, working_mem_left.data_ptr(),
+                                   working_mem_left_i8.data_ptr(),
+                                   working_mem_left.size(0) * working_mem_left.size(1),
+                                   working_mem_left.size(2), working_mem_left.stride(1),
+                                   working_mem_left_i8.stride(1));
+                }
+            } else {
+                if (int(device_weights.size()) == layer_idx) {
+                    device_bias.push_back(rnn->bias.to(in.device()));
+                    device_weights.push_back(rnn->weights.t().contiguous().to(in.device()));
+                }
+                for (int ts = 0; ts < chunk_size; ++ts) {
+                    auto timestep_in = working_mem_all[rnn->reverse ? (chunk_size - ts) : ts];
+                    auto timestep_out = rnn->reverse ? working_mem_left[chunk_size - ts - 1]
+                                                     : working_mem_right[ts];
+
+                    // Timestep matrix mulitplication (using cublasGemmEx, as using torch::matmul
+                    // as below is a bit slower on A100 for some reason)
+                    // gate_buf = torch::matmul(timestep_in, weights);
+                    cublas_matmul_f16(timestep_in, device_weights[layer_idx], gate_buf);
+                    host_lstm_step_f16(stream, batch_size, layer_size,
+                                       device_bias[layer_idx].data_ptr(), gate_buf.data_ptr(),
+                                       state_buf.data_ptr(), timestep_out.data_ptr());
+                }
+            }
+            ++layer_idx;
+        }
+
         // Output is [N, T, C], non-contiguous
+        if (use_int8) {
+            ScopedProfileRange spr_convert("int8_to_f16");
+            host_i8_to_f16(stream, working_mem_left_i8.data_ptr(), working_mem_left.data_ptr(),
+                           working_mem_left_i8.size(0) * working_mem_left_i8.size(1),
+                           working_mem_left_i8.size(2), working_mem_left_i8.stride(1),
+                           working_mem_left.stride(1));
+        }
         return working_mem_left.transpose(1, 0);
     }
 
@@ -386,7 +519,6 @@ struct CudaLSTMStackImpl : Module {
                                                             int levels = 256) {
         //Qauntize a tensor to int8, returning per-channel scales and the quantized tensor
         //if weights have not been quantized we get some scaling
-        tensor = tensor.transpose(0, 1).contiguous();
         auto fp_max = torch::abs(std::get<0>(torch::max(tensor, 0)));
         auto fp_min = torch::abs(std::get<0>(torch::min(tensor, 0)));
 
@@ -412,16 +544,14 @@ struct CudaLSTMStackImpl : Module {
 
     void quantize_weights() {
         for (auto &rnn : {rnn1, rnn2, rnn3, rnn4, rnn5}) {
-            auto [factors, quantized] = quantize_tensor(rnn->named_parameters()["weight_hh"]);
-            _quantization_scale_factors.push_back(factors);
-            _quantized_buffers.push_back(quantized);
+            auto [factors, quantized] = quantize_tensor(rnn->named_parameters()["weight_hh"].t());
+            _quantization_scale_factors.push_back(factors.contiguous());
+            _quantized_buffers.push_back(quantized.contiguous());
         }
     }
 
     torch::Tensor forward_quantized(torch::Tensor x) {
         // Input x is [N, T, C], contiguity optional
-        c10::cuda::CUDAGuard device_guard(x.device());
-
         x = x.contiguous();
 
         //If this is the fist time the forward method is being applied, do some startup
@@ -472,6 +602,9 @@ struct CudaLSTMStackImpl : Module {
     // Dispatch to different forward method depending on whether we use quantized LSTMs or not
     torch::Tensor forward(torch::Tensor x) {
         // Input x is [N, T, C], contiguity optional
+        c10::cuda::CUDAGuard device_guard(x.device());
+        ScopedProfileRange spr("lstm_stack");
+
         if (m_quantize) {
             // Output is [N, T, C], contiguous
             return forward_quantized(x);
@@ -541,7 +674,7 @@ struct CRFModelImpl : Module {
     }
 
     torch::Tensor forward(torch::Tensor x) {
-        nvtx3::scoped_range loop{"nn_forward"};
+        ScopedProfileRange spr("nn_forward");
         return encoder->forward(x);
     }
 
