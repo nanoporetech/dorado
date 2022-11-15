@@ -142,10 +142,8 @@ void DuplexCallerNode::worker_thread() {
     cxxpool::thread_pool pool{m_num_worker_threads};
     std::vector<std::future<void>> futures;
 
-    for (auto [template_read_id, complement_read_id] : m_template_complement_map) {
-        futures.push_back(pool.push([template_read_id, complement_read_id, this] {
-            return basespace(template_read_id, complement_read_id);
-        }));
+    for (auto key : m_template_complement_map) {
+        futures.push_back(pool.push([key, this] { return basespace(key.first, key.second); }));
     }
     for (auto& v : futures) {
         v.get();
