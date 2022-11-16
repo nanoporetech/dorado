@@ -116,9 +116,10 @@ TEST_CASE(TEST_GROUP "LinearTanh") {
                   {args_reorder, mtl_for_tensor(in_f32), mtl_for_tensor(in_f16_reordered)}, {},
                   kernel_thread_groups, threads_per_thread_group);
 
-    // CPU comparison calculation (in float32 precision).
-    const torch::Tensor out_cpu_f32 =
-            5.0f * torch::tanh(torch::addmm(biases_f32, in_f32, weights_f32));
+    // CPU comparison calculation (scaled to int8 range).
+    const torch::Tensor out_cpu_i8 =
+            (127.0f * torch::tanh(torch::addmm(biases_f32, in_f32, weights_f32))).to(torch::kInt8);
+    const auto out_cpu_f32 = out_cpu_i8.to(torch::kFloat32);
 
     const int32_t in_batch_tiles = in_batch_size / tile_size;
 
@@ -126,8 +127,8 @@ TEST_CASE(TEST_GROUP "LinearTanh") {
     // versus CPU calculations in float32.
     // (The CPU calculation can be done in float16, but is too slow.)
     constexpr float kRelTolerance = 0.1f;
-    constexpr float kAbsTolerance = 0.3f;
-    constexpr float kMeanAbsDiffTolerance = 0.006f;
+    constexpr float kAbsTolerance = 8.0f;
+    constexpr float kMeanAbsDiffTolerance = 0.14f;
 
     // A single kernel launch calculates the entire result.
     SECTION("Complete batch") {
@@ -145,13 +146,16 @@ TEST_CASE(TEST_GROUP "LinearTanh") {
         REQUIRE(args_linear != nullptr);
 
         // Perform the LinearTanh computation.
-        torch::Tensor out_gpu_f32 =
-                torch::zeros({lstm_chunk_size * out_batch_size, out_size}, torch::kFloat32);
+        // float16 input -> int8 output
+        torch::Tensor out_gpu_i8 =
+                torch::zeros({lstm_chunk_size * out_batch_size, out_size}, torch::kInt8);
         launch_kernel(linear_tanh_cps, command_queue,
                       {args_linear, mtl_for_tensor(in_f16_reordered),
-                       mtl_for_tensor(weights_biases_f16), mtl_for_tensor(out_gpu_f32)},
+                       mtl_for_tensor(weights_biases_f16), mtl_for_tensor(out_gpu_i8)},
                       tg_buffer_lens, kernel_thread_groups, threads_per_thread_group);
 
+        // Compare as floats.
+        const auto out_gpu_f32 = out_gpu_i8.to(torch::kFloat32);
         REQUIRE(torch::allclose(out_cpu_f32, out_gpu_f32, kRelTolerance, kAbsTolerance));
         REQUIRE(MeanAbsDiff(out_cpu_f32, out_gpu_f32) < kMeanAbsDiffTolerance);
     }
@@ -163,8 +167,8 @@ TEST_CASE(TEST_GROUP "LinearTanh") {
 
         // Perform the LinearTanh computation via multiple runs, each on a subset of batch elements.
         // The results are rearranged into a single tensor that should match the single run.
-        torch::Tensor out_gpu_complete_f32 =
-                torch::zeros({lstm_chunk_size, in_batch_size, out_size}, torch::kFloat32);
+        torch::Tensor out_gpu_complete_i8 =
+                torch::zeros({lstm_chunk_size, in_batch_size, out_size}, torch::kInt8);
 
         const int kCompleteBatchTiles = in_batch_size / tile_size;
         for (int in_batch_tile_offset = 0; in_batch_tile_offset < kCompleteBatchTiles;
@@ -174,20 +178,21 @@ TEST_CASE(TEST_GROUP "LinearTanh") {
             MTL::Buffer *const args_linear = create_vec_buffer(device, args_linear_);
             REQUIRE(args_linear != nullptr);
 
-            torch::Tensor out_gpu_partial_f32 =
-                    torch::zeros({lstm_chunk_size, out_batch_size, out_size}, torch::kFloat32);
+            torch::Tensor out_gpu_partial_i8 =
+                    torch::zeros({lstm_chunk_size, out_batch_size, out_size}, torch::kInt8);
 
             launch_kernel(linear_tanh_cps, command_queue,
                           {args_linear, mtl_for_tensor(in_f16_reordered),
-                           mtl_for_tensor(weights_biases_f16), mtl_for_tensor(out_gpu_partial_f32)},
+                           mtl_for_tensor(weights_biases_f16), mtl_for_tensor(out_gpu_partial_i8)},
                           tg_buffer_lens, kernel_thread_groups, threads_per_thread_group);
 
             // Incorporate this set of batch elements in the overall output.
             const auto in_batch_offset = in_batch_tile_offset * tile_size;
-            out_gpu_complete_f32.index(
+            out_gpu_complete_i8.index(
                     {Slice(), Slice(in_batch_offset, in_batch_offset + out_batch_size)}) =
-                    out_gpu_partial_f32;
+                    out_gpu_partial_i8;
         }
+        const auto out_gpu_complete_f32 = out_gpu_complete_i8.to(torch::kFloat32);
         const auto out_gpu_complete_2d_f32 =
                 out_gpu_complete_f32.view({lstm_chunk_size * in_batch_size, out_size});
         REQUIRE(torch::allclose(out_cpu_f32, out_gpu_complete_2d_f32, kRelTolerance,
