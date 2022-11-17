@@ -76,12 +76,12 @@ build:linux:x86:focal:
   <<: *linux_runner
   <<: *build_dorado
 
-build:linux:x86:focal_koi_download:
-  image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04:1.0
-  variables:
-    BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/libtorch"
-  <<: *linux_runner
-  <<: *build_dorado
+#build:linux:x86:focal_koi_download:
+#  image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04:1.0
+#  variables:
+#    BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/libtorch"
+#  <<: *linux_runner
+#  <<: *build_dorado
 
 build:windows:
   variables:
@@ -92,14 +92,14 @@ build:windows:
   before_script:
     - export PATH=${PATH}:${PWD}/dist/bin
 
-build:windows_koi_download:
-  variables:
-    BUILD_OPTIONS: "-A x64"
-  <<: *windows_runner
-  <<: *build_dorado
-  when: manual
-  before_script:
-    - export PATH=${PATH}:${PWD}/dist/bin
+#build:windows_koi_download:
+#  variables:
+#    BUILD_OPTIONS: "-A x64"
+#  <<: *windows_runner
+#  <<: *build_dorado
+#  when: manual
+#  before_script:
+#    - export PATH=${PATH}:${PWD}/dist/bin
 
 build:macos:m1:
   variables:
@@ -171,14 +171,6 @@ test:macos:m1:
 # Test that you can run dorado in a clean cuda 20.04 environment
 test_archive:linux:x86:20.04_nvidia:
   image: nvidia/cuda:11.3.0-devel-ubuntu20.04
-  <<: *linux_runner
-  <<: *test_archive
-  needs:
-    - build_archive:linux:x86:centos7
-
-# Test that you can run dorado in a clean cpu 18.04 environment
-test_archive:linux:x86:18.04:
-  image: ubuntu:18.04
   <<: *linux_runner
   <<: *test_archive
   needs:
