@@ -1,0 +1,27 @@
+#pragma once
+#include "../nn/ModelRunner.h"
+#include "ReadPipeline.h"
+
+namespace dorado {
+
+class StereoDuplexEncoderNode : public ReadSink {
+public:
+    // Chunk size and overlap are in raw samples
+    StereoDuplexEncoderNode(ReadSink &sink);
+    ~StereoDuplexEncoderNode();
+
+private:
+    // Consume reads from input queue
+    void worker_thread();
+    ReadSink &m_sink;
+
+    std::vector<std::unique_ptr<std::thread>> worker_threads;
+
+    // Time when Basecaller Node is initialised. Used for benchmarking and debugging
+    std::chrono::time_point<std::chrono::system_clock> initialization_time;
+
+    // Time when Basecaller Node terminates. Used for benchmarking and debugging
+    std::chrono::time_point<std::chrono::system_clock> termination_time;
+};
+
+}  // namespace dorado

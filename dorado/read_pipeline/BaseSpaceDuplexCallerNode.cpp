@@ -1,4 +1,4 @@
-#include "DuplexCallerNode.h"
+#include "BaseSpaceDuplexCallerNode.h"
 
 #include "3rdparty/edlib/edlib/include/edlib.h"
 #include "cxxpool.h"
@@ -138,7 +138,7 @@ std::pair<std::pair<int, int>, std::pair<int, int>> get_trimmed_alignment(
 
 namespace dorado {
 
-void DuplexCallerNode::worker_thread() {
+void BaseSpaceDuplexCallerNode::worker_thread() {
     cxxpool::thread_pool pool{m_num_worker_threads};
     std::vector<std::future<void>> futures;
 
@@ -150,7 +150,7 @@ void DuplexCallerNode::worker_thread() {
     }
 }
 
-void DuplexCallerNode::basespace(std::string template_read_id, std::string complement_read_id) {
+void BaseSpaceDuplexCallerNode::basespace(std::string template_read_id, std::string complement_read_id) {
     EdlibAlignConfig align_config = edlibDefaultAlignConfig();
     align_config.task = EDLIB_TASK_PATH;
 
@@ -229,7 +229,7 @@ void DuplexCallerNode::basespace(std::string template_read_id, std::string compl
     }
 }
 
-DuplexCallerNode::DuplexCallerNode(ReadSink& sink,
+BaseSpaceDuplexCallerNode::BaseSpaceDuplexCallerNode(ReadSink& sink,
                                    std::map<std::string, std::string> template_complement_map,
                                    std::map<std::string, std::shared_ptr<Read>> reads,
                                    size_t threads)
@@ -238,10 +238,10 @@ DuplexCallerNode::DuplexCallerNode(ReadSink& sink,
           m_template_complement_map(std::move(template_complement_map)),
           m_reads(std::move(reads)),
           m_num_worker_threads(threads) {
-    worker_threads.push_back(std::make_unique<std::thread>(&DuplexCallerNode::worker_thread, this));
+    worker_threads.push_back(std::make_unique<std::thread>(&BaseSpaceDuplexCallerNode::worker_thread, this));
 }
 
-DuplexCallerNode::~DuplexCallerNode() {
+BaseSpaceDuplexCallerNode::~BaseSpaceDuplexCallerNode() {
     terminate();
     m_cv.notify_one();
 
