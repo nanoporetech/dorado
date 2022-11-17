@@ -1,13 +1,13 @@
 if(WIN32)
     message(STATUS "Fetching htslib from Box")
     download_and_extract(https://nanoporetech.box.com/shared/static/9dnctbjw86d20qq8l8tw3dk93hu1nrul.gz htslib-win)
-    set(HTSLIB_DIR ${PROJECT_SOURCE_DIR}/dorado/3rdparty/htslib-win CACHE STRING
+    set(HTSLIB_DIR ${DORADO_3RD_PARTY}/htslib-win CACHE STRING
                 "Path to htslib repo")
     set(HTSLIB_LIBRARIES hts-3)
     link_directories(${HTSLIB_DIR})
 else()
     message(STATUS "Building htslib")
-    set(HTSLIB_DIR ${PROJECT_SOURCE_DIR}/dorado/3rdparty/htslib CACHE STRING
+    set(HTSLIB_DIR ${DORADO_3RD_PARTY}/htslib CACHE STRING
                 "Path to htslib repo")
     set(MAKE_COMMAND make)
     set(HTSLIB_INSTALL ${MAKE_COMMAND} install prefix=${CMAKE_BINARY_DIR}/3rdparty/htslib)
