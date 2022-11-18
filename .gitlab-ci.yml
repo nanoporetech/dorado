@@ -175,6 +175,14 @@ test_archive:linux:x86:20.04_nvidia:
   needs:
     - build_archive:linux:x86:centos7
 
+# Test that you can run dorado in a clean cpu 18.04 environment
+test_archive:linux:x86:18.04:
+  image: ubuntu:18.04
+  <<: *linux_runner
+  <<: *test_archive
+  needs:
+    - build_archive:linux:x86:centos7
+
 # Test that you can run dorado in a clean cpu 20.04 environment
 test_archive:linux:x86:20.04:
   image: ubuntu:20.04

@@ -71,7 +71,7 @@ public:
 
     std::string read_id;                  // Unique read ID (UUID4)
     std::string seq;                      // Read basecall
-    std::string qstring;                  // Read Qstring
+    std::string qstring;                  // Read Qstring (Phred)
     std::vector<uint8_t> moves;           // Move table
     std::vector<uint8_t> base_mod_probs;  // Modified base probabilities
 
@@ -82,9 +82,9 @@ public:
 
     Attributes attributes;
     std::vector<Mapping> mappings;
-
+    std::vector<std::string> generate_duplex_read_tags() const;
     std::vector<std::string> generate_read_tags(bool emit_moves) const;
-    std::vector<std::string> extract_sam_lines(bool emit_moves) const;
+    std::vector<std::string> extract_sam_lines(bool emit_moves, bool duplex) const;
     std::string generate_modbase_string(uint8_t threshold = 0) const;
 };
 

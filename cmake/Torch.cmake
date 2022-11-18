@@ -39,3 +39,7 @@ else()
 endif()
 
 find_package(Torch REQUIRED)
+
+if(WIN32 AND DEFINED MKL_ROOT)
+    link_directories(${MKL_ROOT}/lib/intel64)
+endif()
