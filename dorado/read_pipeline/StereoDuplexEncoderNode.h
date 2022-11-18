@@ -7,7 +7,8 @@ namespace dorado {
 class StereoDuplexEncoderNode : public ReadSink {
 public:
     // Chunk size and overlap are in raw samples
-    StereoDuplexEncoderNode(ReadSink &sink);
+    StereoDuplexEncoderNode(ReadSink &sink,
+                            std::map<std::string, std::string> template_complement_map);
     ~StereoDuplexEncoderNode();
 
 private:
@@ -22,6 +23,10 @@ private:
 
     // Time when Basecaller Node terminates. Used for benchmarking and debugging
     std::chrono::time_point<std::chrono::system_clock> termination_time;
+
+    std::map<std::string, std::string> m_template_complement_map;
+    std::map<std::string, std::string> m_complement_template_map;
+    std::map<std::string, std::shared_ptr<Read>> reads;
 };
 
 }  // namespace dorado
