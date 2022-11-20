@@ -26,7 +26,7 @@ private:
 
     std::map<std::string, std::string> m_template_complement_map;
     std::map<std::string, std::string> m_complement_template_map;
-    std::map<std::string, std::shared_ptr<Read>> reads;
+    std::map<std::string, std::shared_ptr<Read>> read_cache;
 };
 
 }  // namespace dorado

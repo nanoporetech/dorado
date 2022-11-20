@@ -1,6 +1,7 @@
 #include "duplex_utils.h"
 
 #include <fstream>
+#include <vector>
 
 namespace dorado::utils {
 std::map<std::string, std::string> load_pairs_file(std::string pairs_file) {
@@ -24,5 +25,13 @@ std::map<std::string, std::string> load_pairs_file(std::string pairs_file) {
         std::getline(dataFile, cell);
     }
     return template_complement_map;
+}
+
+void reverse_complement(std::vector<char>& sequence) {
+    std::reverse(sequence.begin(), sequence.end());
+    std::map<char, char> complementary_nucleotides = {
+            {'A', 'T'}, {'C', 'G'}, {'G', 'C'}, {'T', 'A'}};
+    std::for_each(sequence.begin(), sequence.end(),
+                  [&complementary_nucleotides](char& c) { c = complementary_nucleotides[c]; });
 }
 }  // namespace dorado::utils

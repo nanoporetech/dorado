@@ -2,6 +2,7 @@
 
 #include "3rdparty/edlib/edlib/include/edlib.h"
 #include "cxxpool.h"
+#include "utils/duplex_utils.h"
 
 #include <spdlog/spdlog.h>
 
@@ -18,14 +19,6 @@ void preprocess_quality_scores(std::vector<uint8_t>& quality_scores, int pool_wi
     auto t_float = t.to(torch::kFloat32);
     t.index({torch::indexing::Slice()}) =
             -torch::max_pool1d(-t_float, pool_window, 1, pool_window / 2);
-}
-// Returns reverse complement of a nucleotide sequence
-void reverse_complement(std::vector<char>& sequence) {
-    std::reverse(sequence.begin(), sequence.end());
-    std::map<char, char> complementary_nucleotides = {
-            {'A', 'T'}, {'C', 'G'}, {'G', 'C'}, {'T', 'A'}};
-    std::for_each(sequence.begin(), sequence.end(),
-                  [&complementary_nucleotides](char& c) { c = complementary_nucleotides[c]; });
 }
 
 // Given two sequences, their quality scores, and alignments, computes a consensus sequence
@@ -150,7 +143,8 @@ void BaseSpaceDuplexCallerNode::worker_thread() {
     }
 }
 
-void BaseSpaceDuplexCallerNode::basespace(std::string template_read_id, std::string complement_read_id) {
+void BaseSpaceDuplexCallerNode::basespace(std::string template_read_id,
+                                          std::string complement_read_id) {
     EdlibAlignConfig align_config = edlibDefaultAlignConfig();
     align_config.task = EDLIB_TASK_PATH;
 
@@ -186,7 +180,7 @@ void BaseSpaceDuplexCallerNode::basespace(std::string template_read_id, std::str
 
         std::vector<char> complement_sequence_reverse_complement = complement_str;
         // Compute the RC
-        reverse_complement(complement_sequence_reverse_complement);
+        dorado::utils::reverse_complement(complement_sequence_reverse_complement);
 
         EdlibAlignResult result =
                 edlibAlign(template_sequence.data(), template_sequence.size(),
@@ -229,16 +223,18 @@ void BaseSpaceDuplexCallerNode::basespace(std::string template_read_id, std::str
     }
 }
 
-BaseSpaceDuplexCallerNode::BaseSpaceDuplexCallerNode(ReadSink& sink,
-                                   std::map<std::string, std::string> template_complement_map,
-                                   std::map<std::string, std::shared_ptr<Read>> reads,
-                                   size_t threads)
+BaseSpaceDuplexCallerNode::BaseSpaceDuplexCallerNode(
+        ReadSink& sink,
+        std::map<std::string, std::string> template_complement_map,
+        std::map<std::string, std::shared_ptr<Read>> reads,
+        size_t threads)
         : ReadSink(1000),
           m_sink(sink),
           m_template_complement_map(std::move(template_complement_map)),
           m_reads(std::move(reads)),
           m_num_worker_threads(threads) {
-    worker_threads.push_back(std::make_unique<std::thread>(&BaseSpaceDuplexCallerNode::worker_thread, this));
+    worker_threads.push_back(
+            std::make_unique<std::thread>(&BaseSpaceDuplexCallerNode::worker_thread, this));
 }
 
 BaseSpaceDuplexCallerNode::~BaseSpaceDuplexCallerNode() {
