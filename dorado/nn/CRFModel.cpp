@@ -518,11 +518,7 @@ struct LSTMStackImpl : Module {
 };
 
 struct ClampImpl : Module {
-    ClampImpl(float min, float max, bool active) {
-        min = min;
-        max = max;
-        active = active;
-    };
+    ClampImpl(float _min, float _max, bool _active) : min(_min), max(_max), active(_active){};
 
     torch::Tensor forward(torch::Tensor x) {
         if (active) {
@@ -671,7 +667,7 @@ std::tuple<ModuleHolder<AnyModule>, size_t> load_crf_model(const std::filesystem
                 insize = toml::find<int>(segment, "size");
             } else if (type.compare("linear") == 0) {
                 decomposition = toml::find<int>(segment, "out_features");
-            } else if (type.compare("clamp")) {
+            } else if (type.compare("clamp") == 0) {
                 clamp = true;
             }
         }
