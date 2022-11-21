@@ -9,4 +9,14 @@ std::map<std::string, std::string> load_pairs_file(std::string pairs_file);
 
 // Compute reverse complement of a nucleotide sequence
 void reverse_complement(std::vector<char>& sequence);
+
+// Returns subset of alignment for which start and end start with  `num_consecutive_wanted` consecutive nucleotides.
+std::pair<std::pair<int, int>, std::pair<int, int>> get_trimmed_alignment(
+        int num_consecutive_wanted,
+        unsigned char* alignment,
+        int alignment_length,
+        int target_cursor,
+        int query_cursor,
+        int start_alignment_position,
+        int end_alignment_position);
 }  // namespace dorado::utils

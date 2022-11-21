@@ -11,7 +11,6 @@ using namespace torch::indexing;
 namespace {
 std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> template_read,
                                             std::shared_ptr<dorado::Read> complement_read) {
-    // As a first step, let's return basespace calls, just as a sanity test and code-cleanup opportunity
     EdlibAlignConfig align_config = edlibDefaultAlignConfig();
     align_config.task = EDLIB_TASK_PATH;
 
@@ -19,24 +18,91 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
                                                              complement_read->seq.end());
     dorado::utils::reverse_complement(complement_sequence_reverse_complement);
 
-    // Step 1 - let's align the two reads to one another and print out the score.
+    std::vector<char> complemnet_q_scores_reversed(complement_read->seq.begin(),
+                                                   complement_read->seq.end());
+    std::reverse(complemnet_q_scores_reversed.begin(),
+                 complemnet_q_scores_reversed.end());  // -33 ?
+
+    std::vector<char> template_sequence(template_read->seq.begin(), template_read->seq.end());
+    std::vector<char> template_q_scores(template_read->qstring.begin(),
+                                        template_read->qstring.end());
+
+    // Align the two reads to one another and print out the score.
     EdlibAlignResult result =
             edlibAlign(template_read->seq.data(), template_read->seq.size(),
                        complement_sequence_reverse_complement.data(),
                        complement_sequence_reverse_complement.size(), align_config);
 
     std::cerr << result.editDistance << std::endl;
-    // Step 2 - Prepare the encoding tensor
 
-    int max_size = complement_sequence_reverse_complement.size() + template_read->seq.size();
-    auto opts = torch::TensorOptions().dtype(torch::kFloat16).device(torch::kCPU);
-    int num_features = 13;
-    auto tmp = torch::empty({num_features, max_size}, opts);
+    int query_cursor = 0;
+    int target_cursor = result.startLocations[0];
 
-    // Step 3 - Move along the alignment, filling out the encodoing tensor
+    auto [alignment_start_end, cursors] = dorado::utils::get_trimmed_alignment(
+            11, result.alignment, result.alignmentLength, target_cursor, query_cursor, 0,
+            result.endLocations[0]);
 
-    // Step 4 - Assign the data to a new read,
-    return template_read;
+    query_cursor = cursors.first;
+    target_cursor = cursors.second;
+    int start_alignment_position = alignment_start_end.first;
+    int end_alignment_position = alignment_start_end.second;
+
+    // TODO: perhaps its overkill having this function make this decision...
+    int min_trimmed_alignment_length = 200;
+    bool consensus_possible =
+            (start_alignment_position < end_alignment_position) &&
+            ((end_alignment_position - start_alignment_position) > min_trimmed_alignment_length);
+
+    std::shared_ptr<dorado::Read> read = std::make_shared<dorado::Read>();
+    if (consensus_possible) {
+        // Step 3 - Move along the alignment, filling out the stereo-encoded tensor
+        // Prepare the encoding tensor
+        int max_size = complement_sequence_reverse_complement.size() + template_read->seq.size();
+        auto opts = torch::TensorOptions().dtype(torch::kFloat16).device(torch::kCPU);
+        int num_features = 13;
+        auto tmp = torch::zeros({num_features, max_size}, opts);
+
+        std::vector<char> consensus;
+        std::vector<char> quality_scores_phred;
+
+        // Loop over each alignment position, within given alignment boundaries
+        for (int i = start_alignment_position; i < end_alignment_position; i++) {
+            //Comparison between q-scores is done in Phred space which is offset by 33
+            if (template_q_scores.at(target_cursor) >=
+                complemnet_q_scores_reversed.at(
+                        query_cursor)) {  // Target has a higher quality score
+                // If there is *not* an insertion to the query, add the nucleotide from the target cursor
+                if (result.alignment[i] != 2) {
+                    consensus.push_back(template_sequence.at(target_cursor));
+                    quality_scores_phred.push_back(template_q_scores.at(target_cursor));
+                }
+            } else {
+                // If there is *not* an insertion to the target, add the nucleotide from the query cursor
+                if (result.alignment[i] != 1) {
+                    consensus.push_back(complement_sequence_reverse_complement.at(query_cursor));
+                    quality_scores_phred.push_back(complemnet_q_scores_reversed.at(query_cursor));
+                }
+            }
+
+            //Anything excluding a query insertion causes the target cursor to advance
+            if (result.alignment[i] != 2) {
+                target_cursor++;
+            }
+
+            //Anything but a target insertion and query advances
+            if (result.alignment[i] != 1) {
+                query_cursor++;
+            }
+        }
+        // Step 4 - Assign the data to a new read,
+        read->seq = std::string(consensus.begin(), consensus.end());
+        read->qstring = std::string(quality_scores_phred.begin(), quality_scores_phred.end());
+        read->read_id = std::string("Test");
+        return read;
+    }
+    read->seq = std::string("test");
+    read->qstring = std::string("test");
+    return read;
 }
 }  // namespace
 
@@ -65,7 +131,6 @@ void StereoDuplexEncoderNode::worker_thread() {
         lock.unlock();
 
         bool read_is_template = false;
-        bool read_is_complement = false;
         bool partner_found = false;
         std::string partner_id;
 
@@ -74,13 +139,10 @@ void StereoDuplexEncoderNode::worker_thread() {
             read_is_template = true;
             partner_id = m_template_complement_map[read->read_id];
             partner_found = true;
-            //std::cerr<< "Read is template" << std::endl;
         } else {
             if (m_complement_template_map.find(read->read_id) != m_complement_template_map.end()) {
-                read_is_complement = true;
                 partner_id = m_complement_template_map[read->read_id];
                 partner_found = true;
-                //std::cerr<< "Read is complement" << std::endl;
             }
         }
 
@@ -111,7 +173,7 @@ void StereoDuplexEncoderNode::worker_thread() {
 
                 std::shared_ptr<Read> stereo_encoded_read =
                         stereo_encode(template_read, complement_read);
-                if (stereo_encoded_read->raw_data.numel() > 0) {
+                if (stereo_encoded_read->seq.size() > 100) {
                     m_sink.push_read(stereo_encoded_read);  // Found a partner, so process it.
                 }
             }

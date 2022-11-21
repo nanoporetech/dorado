@@ -65,68 +65,6 @@ std::pair<std::vector<char>, std::vector<char>> compute_basespace_consensus(
     }
     return std::make_pair(consensus, quality_scores_phred);
 }
-
-// Returns subset of alignment for which start and end start with  `num_consecutive_wanted` consecutive nucleotides.
-std::pair<std::pair<int, int>, std::pair<int, int>> get_trimmed_alignment(
-        int num_consecutive_wanted,
-        unsigned char* alignment,
-        int alignment_length,
-        int target_cursor,
-        int query_cursor,
-        int start_alignment_position,
-        int end_alignment_position) {
-    int num_consecutive = 0;
-
-    // Find forward trim.
-    while (num_consecutive < num_consecutive_wanted) {
-        if (alignment[start_alignment_position] != 2) {
-            target_cursor++;
-        }
-
-        if (alignment[start_alignment_position] != 1) {
-            query_cursor++;
-        }
-
-        if (alignment[start_alignment_position] == 0) {
-            num_consecutive++;
-        } else {
-            num_consecutive = 0;  //reset counter
-        }
-
-        start_alignment_position++;
-
-        if (start_alignment_position >= alignment_length) {
-            break;
-        }
-    }
-
-    target_cursor -= num_consecutive_wanted;
-    query_cursor -= num_consecutive_wanted;
-
-    // Find reverse trim
-    num_consecutive = 0;
-    while (num_consecutive < num_consecutive_wanted) {
-        if (alignment[end_alignment_position] == 0) {
-            num_consecutive++;
-        } else {
-            num_consecutive = 0;
-        }
-
-        end_alignment_position--;
-
-        if (end_alignment_position < start_alignment_position) {
-            break;
-        }
-    }
-
-    start_alignment_position -= num_consecutive_wanted;
-    end_alignment_position += num_consecutive_wanted;
-
-    auto alignment_start_end = std::make_pair(start_alignment_position, end_alignment_position);
-    auto query_target_cursors = std::make_pair(query_cursor, target_cursor);
-
-    return std::make_pair(alignment_start_end, query_target_cursors);
-}
 }  // namespace
 
 namespace dorado {
@@ -161,6 +99,7 @@ void BaseSpaceDuplexCallerNode::basespace(std::string template_read_id,
                 std::vector<uint8_t>(template_read->qstring.begin(), template_read->qstring.end());
     }
 
+    // For basespace, a q score filter is run over the quality scores.
     preprocess_quality_scores(template_quality_scores);
 
     if (m_reads.find(complement_read_id) == m_reads.end()) {
@@ -176,6 +115,7 @@ void BaseSpaceDuplexCallerNode::basespace(std::string template_read_id,
         std::reverse(complement_quality_scores_reverse.begin(),
                      complement_quality_scores_reverse.end());
 
+        // For basespace, a q score filter is run over the quality scores.
         preprocess_quality_scores(complement_quality_scores_reverse);
 
         std::vector<char> complement_sequence_reverse_complement = complement_str;
@@ -191,9 +131,9 @@ void BaseSpaceDuplexCallerNode::basespace(std::string template_read_id,
         int query_cursor = 0;
         int target_cursor = result.startLocations[0];
 
-        auto [alignment_start_end, cursors] =
-                get_trimmed_alignment(11, result.alignment, result.alignmentLength, target_cursor,
-                                      query_cursor, 0, result.endLocations[0]);
+        auto [alignment_start_end, cursors] = utils::get_trimmed_alignment(
+                11, result.alignment, result.alignmentLength, target_cursor, query_cursor, 0,
+                result.endLocations[0]);
 
         query_cursor = cursors.first;
         target_cursor = cursors.second;
