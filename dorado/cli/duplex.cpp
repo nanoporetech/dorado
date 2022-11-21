@@ -1,6 +1,7 @@
 #include "Version.h"
 #include "data_loader/DataLoader.h"
 #include "decode/CPUDecoder.h"
+#include "nn/CudaCRFModel.h"
 #include "nn/MetalCRFModel.h"
 #include "read_pipeline/BaseSpaceDuplexCallerNode.h"
 #include "read_pipeline/BasecallerNode.h"
@@ -8,13 +9,16 @@
 #include "read_pipeline/StereoDuplexEncoderNode.h"
 #include "read_pipeline/WriterNode.h"
 #include "utils/bam_utils.h"
+#include "utils/cuda_utils.h"
 #include "utils/duplex_utils.h"
 #include "utils/log_utils.h"
+#ifdef __APPLE__
 #include "utils/metal_utils.h"
+#endif
 
 #include <argparse.hpp>
 #include <spdlog/spdlog.h>
-
+#include "utils/parameters.h"
 #include <thread>
 
 namespace dorado {
@@ -28,13 +32,17 @@ int duplex(int argc, char* argv[]) {
     parser.add_argument("--pairs").help("Space-delimited csv containing read ID pairs.");
     parser.add_argument("--emit-fastq").default_value(false).implicit_value(true);
     parser.add_argument("-t", "--threads").default_value(0).scan<'i', int>();
-
+    parser.add_argument("-x", "--device")
+            .help("device string in format \"cuda:0,...,N\", \"cuda:all\", \"metal\" etc..")
+            .default_value(utils::default_parameters.device);
     try {
         parser.parse_args(argc, argv);
     } catch (const std::exception& e) {
         spdlog::error(e.what());
         std::exit(1);
     }
+
+    std::string device = parser.get<std::string>("-x");
 
     std::string model = parser.get<std::string>("model");
     std::string reads = parser.get<std::string>("reads");
@@ -68,7 +76,6 @@ int duplex(int argc, char* argv[]) {
         size_t overlap = 100;      // TODO: Set in CLI
         size_t num_runners = 1;
 
-        std::string device("metal");
 
         if (device == "cpu") {
             batch_size = batch_size == 0 ? std::thread::hardware_concurrency() : batch_size;
@@ -95,10 +102,10 @@ int duplex(int argc, char* argv[]) {
             if (num_devices == 0) {
                 throw std::runtime_error("CUDA device requested but no devices found.");
             }
-            batch_size = batch_size == 0 ? utils::auto_gpu_batch_size(model_path.string(), devices)
+            batch_size = batch_size == 0 ? utils::auto_gpu_batch_size(model, devices)
                                          : batch_size;
             for (auto device_string : devices) {
-                auto caller = create_cuda_caller(model_path, chunk_size, batch_size, device_string);
+                auto caller = create_cuda_caller(model, chunk_size, batch_size, device_string);
                 for (size_t i = 0; i < num_runners; i++) {
                     runners.push_back(
                             std::make_shared<CudaModelRunner>(caller, chunk_size, batch_size));

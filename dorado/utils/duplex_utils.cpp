@@ -1,5 +1,6 @@
 #include "duplex_utils.h"
 
+#include <algorithm>
 #include <fstream>
 #include <vector>
 
