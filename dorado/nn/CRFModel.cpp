@@ -517,9 +517,29 @@ struct LSTMStackImpl : Module {
     LSTM rnn1{nullptr}, rnn2{nullptr}, rnn3{nullptr}, rnn4{nullptr}, rnn5{nullptr};
 };
 
+struct ClampImpl : Module {
+    ClampImpl(float min, float max, bool active) {
+        min = min;
+        max = max;
+        active = active;
+    };
+
+    torch::Tensor forward(torch::Tensor x) {
+        if (active) {
+            return x.clamp(min, max);
+        } else {
+            return x;
+        }
+    }
+
+    bool active;
+    float min, max;
+};
+
 TORCH_MODULE(LSTMStack);
 TORCH_MODULE(LinearCRF);
 TORCH_MODULE(Convolution);
+TORCH_MODULE(Clamp);
 
 template <class LSTMStackType>
 struct CRFModelImpl : Module {
@@ -528,12 +548,16 @@ struct CRFModelImpl : Module {
                  int outsize,
                  int stride,
                  int decomposition,
+                 bool clamp,
                  bool expand_blanks,
                  int batch_size,
                  int chunk_size) {
         conv1 = register_module("conv1", Convolution(1, conv, 5, 1));
+        clamp1 = Clamp(-0.5, 3.5, clamp);
         conv2 = register_module("conv2", Convolution(conv, 16, 5, 1));
+        clamp2 = Clamp(-0.5, 3.5, clamp);
         conv3 = register_module("conv3", Convolution(16, size, 19, stride, true));
+        clamp3 = Clamp(-0.5, 3.5, clamp);
 
         rnns = register_module("rnns", LSTMStackType(size, batch_size, chunk_size / stride));
 
@@ -541,10 +565,14 @@ struct CRFModelImpl : Module {
             linear1 = register_module("linear1", Linear(size, decomposition));
             linear2 = register_module("linear2",
                                       Linear(LinearOptions(decomposition, outsize).bias(false)));
-            encoder = Sequential(conv1, conv2, conv3, rnns, linear1, linear2);
+            clamp4 = Clamp(-4.0, 4.0, clamp);
+            encoder = Sequential(conv1, clamp1, conv2, clamp2, conv3, clamp3, rnns, linear1,
+                                 linear2, clamp4);
         } else if (conv == 16) {
             linear1 = register_module("linear1", Linear(LinearOptions(size, outsize).bias(false)));
-            encoder = Sequential(conv1, conv2, conv3, rnns, linear1);
+            clamp4 = Clamp(-4.0, 4.0, clamp);
+            encoder =
+                    Sequential(conv1, clamp1, conv2, clamp2, conv3, clamp3, rnns, linear1, clamp4);
         } else {
             linear = register_module("linear1", LinearCRF(size, outsize));
             encoder = Sequential(conv1, conv2, conv3, rnns, linear);
@@ -604,6 +632,7 @@ struct CRFModelImpl : Module {
     Linear linear1{nullptr}, linear2{nullptr};
     Sequential encoder{nullptr};
     Convolution conv1{nullptr}, conv2{nullptr}, conv3{nullptr};
+    Clamp clamp1{nullptr}, clamp2{nullptr}, clamp3{nullptr}, clamp4{nullptr};
 };
 
 #if USE_CUDA_LSTM
@@ -630,6 +659,7 @@ std::tuple<ModuleHolder<AnyModule>, size_t> load_crf_model(const std::filesystem
     int insize = 0;
     int stride = 1;
     bool bias = true;
+    bool clamp = false;
     int decomposition = 0;
 
     if (encoder.contains("type")) {
@@ -641,6 +671,8 @@ std::tuple<ModuleHolder<AnyModule>, size_t> load_crf_model(const std::filesystem
                 insize = toml::find<int>(segment, "size");
             } else if (type.compare("linear") == 0) {
                 decomposition = toml::find<int>(segment, "out_features");
+            } else if (type.compare("clamp")) {
+                clamp = true;
             }
         }
         conv = 16;
@@ -655,7 +687,7 @@ std::tuple<ModuleHolder<AnyModule>, size_t> load_crf_model(const std::filesystem
 #if USE_CUDA_LSTM
     if (options.device() != torch::kCPU) {
         bool expand = false;
-        auto model = nn::CudaCRFModel(conv, insize, outsize, stride, decomposition, expand,
+        auto model = nn::CudaCRFModel(conv, insize, outsize, stride, decomposition, clamp, expand,
                                       batch_size, chunk_size);
         auto holder = populate_model(model, path, options, static_cast<bool>(decomposition), bias);
         return {holder, static_cast<size_t>(stride)};
@@ -663,7 +695,7 @@ std::tuple<ModuleHolder<AnyModule>, size_t> load_crf_model(const std::filesystem
 #endif
     {
         bool expand = true;
-        auto model = nn::CpuCRFModel(conv, insize, outsize, stride, decomposition, expand,
+        auto model = nn::CpuCRFModel(conv, insize, outsize, stride, decomposition, clamp, expand,
                                      batch_size, chunk_size);
         auto holder = populate_model(model, path, options, static_cast<bool>(decomposition), bias);
         return {holder, static_cast<size_t>(stride)};
