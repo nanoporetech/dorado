@@ -10,17 +10,6 @@
 
 using namespace std::chrono_literals;
 namespace {
-// Applies a min pool filter to q scores for basespace-duplex algorithm
-void preprocess_quality_scores(std::vector<uint8_t>& quality_scores, int pool_window = 5) {
-    // Apply a min-pool window to the quality scores
-    auto opts = torch::TensorOptions().dtype(torch::kInt8);
-    torch::Tensor t =
-            torch::from_blob(quality_scores.data(), {1, (int)quality_scores.size()}, opts);
-    auto t_float = t.to(torch::kFloat32);
-    t.index({torch::indexing::Slice()}) =
-            -torch::max_pool1d(-t_float, pool_window, 1, pool_window / 2);
-}
-
 // Given two sequences, their quality scores, and alignments, computes a consensus sequence
 std::pair<std::vector<char>, std::vector<char>> compute_basespace_consensus(
         int alignment_start_position,
@@ -100,7 +89,7 @@ void BaseSpaceDuplexCallerNode::basespace(std::string template_read_id,
     }
 
     // For basespace, a q score filter is run over the quality scores.
-    preprocess_quality_scores(template_quality_scores);
+    utils::preprocess_quality_scores(template_quality_scores);
 
     if (m_reads.find(complement_read_id) == m_reads.end()) {
         spdlog::debug("Complement ID={} paired with Template ID={} was not found",
@@ -116,20 +105,22 @@ void BaseSpaceDuplexCallerNode::basespace(std::string template_read_id,
                      complement_quality_scores_reverse.end());
 
         // For basespace, a q score filter is run over the quality scores.
-        preprocess_quality_scores(complement_quality_scores_reverse);
+        utils::preprocess_quality_scores(complement_quality_scores_reverse);
 
         std::vector<char> complement_sequence_reverse_complement = complement_str;
         // Compute the RC
         dorado::utils::reverse_complement(complement_sequence_reverse_complement);
 
         EdlibAlignResult result =
-                edlibAlign(template_sequence.data(), template_sequence.size(),
+                edlibAlign(template_sequence.data(),
+                           template_sequence.size(),
                            complement_sequence_reverse_complement.data(),
-                           complement_sequence_reverse_complement.size(), align_config);
+                           complement_sequence_reverse_complement.size(),
+                           align_config);
 
         // Now - we have to do the actual basespace alignment itself
         int query_cursor = 0;
-        int target_cursor = result.startLocations[0];
+        int target_cursor = result.startLocations[0]; // 0-based position in the *target* where alignment starts.
 
         auto [alignment_start_end, cursors] = utils::get_trimmed_alignment(
                 11, result.alignment, result.alignmentLength, target_cursor, query_cursor, 0,
@@ -147,9 +138,15 @@ void BaseSpaceDuplexCallerNode::basespace(std::string template_read_id,
 
         if (consensus_possible) {
             auto [consensus, quality_scores_phred] = compute_basespace_consensus(
-                    start_alignment_position, end_alignment_position, template_quality_scores,
-                    target_cursor, complement_quality_scores_reverse, query_cursor,
-                    template_sequence, complement_sequence_reverse_complement, result.alignment);
+                    start_alignment_position,
+                    end_alignment_position,
+                    template_quality_scores,
+                    target_cursor,
+                    complement_quality_scores_reverse,
+                    query_cursor,
+                    template_sequence,
+                    complement_sequence_reverse_complement,
+                    result.alignment);
 
             auto duplex_read = std::make_shared<Read>();
             duplex_read->seq = std::string(consensus.begin(), consensus.end());

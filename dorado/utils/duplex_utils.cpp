@@ -4,6 +4,8 @@
 #include <fstream>
 #include <vector>
 
+#include "torch/torch.h"
+
 namespace dorado::utils {
 std::map<std::string, std::string> load_pairs_file(std::string pairs_file) {
     std::ifstream dataFile;
@@ -96,4 +98,16 @@ std::pair<std::pair<int, int>, std::pair<int, int>> get_trimmed_alignment(
 
     return std::make_pair(alignment_start_end, query_target_cursors);
 }
+
+// Applies a min pool filter to q scores for basespace-duplex algorithm
+void preprocess_quality_scores(std::vector<uint8_t>& quality_scores, int pool_window) {
+    // Apply a min-pool window to the quality scores
+    auto opts = torch::TensorOptions().dtype(torch::kInt8);
+    torch::Tensor t =
+            torch::from_blob(quality_scores.data(), {1, (int)quality_scores.size()}, opts);
+    auto t_float = t.to(torch::kFloat32);
+    t.index({torch::indexing::Slice()}) =
+            -torch::max_pool1d(-t_float, pool_window, 1, pool_window / 2);
+}
+
 }  // namespace dorado::utils

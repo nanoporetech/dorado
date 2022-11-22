@@ -70,7 +70,7 @@ int duplex(int argc, char* argv[]) {
         torch::set_num_threads(1);
         std::vector<Runner> runners;
         int num_devices = 1;
-        size_t batch_size = 48;
+        size_t batch_size;
         size_t model_stride = 5;   // TODO: Set in CLI
         size_t chunk_size = 5000;  // TODO: Set in CLI
         size_t overlap = 100;      // TODO: Set in CLI

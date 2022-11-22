@@ -18,13 +18,13 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
                                                              complement_read->seq.end());
     dorado::utils::reverse_complement(complement_sequence_reverse_complement);
 
-    std::vector<char> complemnet_q_scores_reversed(complement_read->seq.begin(),
+    std::vector<uint8_t> complemnet_q_scores_reversed(complement_read->seq.begin(),
                                                    complement_read->seq.end());
     std::reverse(complemnet_q_scores_reversed.begin(),
                  complemnet_q_scores_reversed.end());  // -33 ?
 
     std::vector<char> template_sequence(template_read->seq.begin(), template_read->seq.end());
-    std::vector<char> template_q_scores(template_read->qstring.begin(),
+    std::vector<uint8_t> template_q_scores(template_read->qstring.begin(),
                                         template_read->qstring.end());
 
     // Align the two reads to one another and print out the score.
@@ -55,6 +55,10 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
 
     std::shared_ptr<dorado::Read> read = std::make_shared<dorado::Read>();
     if (consensus_possible) {
+
+        dorado::utils::preprocess_quality_scores(template_q_scores);
+        dorado::utils::preprocess_quality_scores(complemnet_q_scores_reversed);
+
         // Step 3 - Move along the alignment, filling out the stereo-encoded tensor
         // Prepare the encoding tensor
         int max_size = complement_sequence_reverse_complement.size() + template_read->seq.size();
@@ -97,11 +101,9 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
         // Step 4 - Assign the data to a new read,
         read->seq = std::string(consensus.begin(), consensus.end());
         read->qstring = std::string(quality_scores_phred.begin(), quality_scores_phred.end());
-        read->read_id = std::string("Test");
+        read->read_id = std::string(template_read->read_id + ";" + complement_read->read_id);
         return read;
     }
-    read->seq = std::string("test");
-    read->qstring = std::string("test");
     return read;
 }
 }  // namespace

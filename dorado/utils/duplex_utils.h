@@ -19,4 +19,7 @@ std::pair<std::pair<int, int>, std::pair<int, int>> get_trimmed_alignment(
         int query_cursor,
         int start_alignment_position,
         int end_alignment_position);
+
+// Applies a min pool filter to q scores for basespace-duplex algorithm
+void preprocess_quality_scores(std::vector<uint8_t>& quality_scores, int pool_window = 5);
 }  // namespace dorado::utils
