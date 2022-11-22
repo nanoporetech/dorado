@@ -110,8 +110,10 @@ namespace {
 template <class Model>
 ModuleHolder<AnyModule> populate_model(Model &&model,
                                        const std::filesystem::path &path,
-                                       torch::TensorOptions options) {
-    auto state_dict = model->load_weights(path);
+                                       torch::TensorOptions options,
+                                       bool decomposition,
+                                       bool bias) {
+    auto state_dict = model->load_weights(path, decomposition, bias);
     model->load_state_dict(state_dict);
     model->to(options.dtype_opt().value().toScalarType());
     model->to(options.device_opt().value());
@@ -648,25 +650,62 @@ struct LSTMStackImpl : Module {
     LSTM rnn1{nullptr}, rnn2{nullptr}, rnn3{nullptr}, rnn4{nullptr}, rnn5{nullptr};
 };
 
+struct ClampImpl : Module {
+    ClampImpl(float _min, float _max, bool _active) : min(_min), max(_max), active(_active){};
+
+    torch::Tensor forward(torch::Tensor x) {
+        if (active) {
+            return x.clamp(min, max);
+        } else {
+            return x;
+        }
+    }
+
+    bool active;
+    float min, max;
+};
+
 TORCH_MODULE(LSTMStack);
 TORCH_MODULE(LinearCRF);
 TORCH_MODULE(Convolution);
+TORCH_MODULE(Clamp);
 
 template <class LSTMStackType>
 struct CRFModelImpl : Module {
-    CRFModelImpl(int size,
+    CRFModelImpl(int conv,
+                 int size,
                  int outsize,
                  int stride,
+                 int decomposition,
+                 bool clamp,
                  bool expand_blanks,
                  int batch_size,
                  int chunk_size) {
-        conv1 = register_module("conv1", Convolution(1, 4, 5, 1));
-        conv2 = register_module("conv2", Convolution(4, 16, 5, 1));
+        conv1 = register_module("conv1", Convolution(1, conv, 5, 1));
+        clamp1 = Clamp(-0.5, 3.5, clamp);
+        conv2 = register_module("conv2", Convolution(conv, 16, 5, 1));
+        clamp2 = Clamp(-0.5, 3.5, clamp);
         conv3 = register_module("conv3", Convolution(16, size, 19, stride, true));
+        clamp3 = Clamp(-0.5, 3.5, clamp);
+
         rnns = register_module("rnns", LSTMStackType(size, batch_size, chunk_size / stride));
-        linear = register_module("linear", LinearCRF(size, outsize));
-        linear->expand_blanks = expand_blanks;
-        encoder = Sequential(conv1, conv2, conv3, rnns, linear);
+
+        if (decomposition) {
+            linear1 = register_module("linear1", Linear(size, decomposition));
+            linear2 = register_module("linear2",
+                                      Linear(LinearOptions(decomposition, outsize).bias(false)));
+            clamp4 = Clamp(-4.0, 4.0, clamp);
+            encoder = Sequential(conv1, clamp1, conv2, clamp2, conv3, clamp3, rnns, linear1,
+                                 linear2, clamp4);
+        } else if (conv == 16) {
+            linear1 = register_module("linear1", Linear(LinearOptions(size, outsize).bias(false)));
+            clamp4 = Clamp(-4.0, 4.0, clamp);
+            encoder =
+                    Sequential(conv1, clamp1, conv2, clamp2, conv3, clamp3, rnns, linear1, clamp4);
+        } else {
+            linear = register_module("linear1", LinearCRF(size, outsize));
+            encoder = Sequential(conv1, conv2, conv3, rnns, linear);
+        }
     }
 
     void load_state_dict(const std::vector<torch::Tensor> &weights) {
@@ -678,7 +717,9 @@ struct CRFModelImpl : Module {
         return encoder->forward(x);
     }
 
-    std::vector<torch::Tensor> load_weights(const std::filesystem::path &dir) {
+    std::vector<torch::Tensor> load_weights(const std::filesystem::path &dir,
+                                            bool decomposition,
+                                            bool bias) {
         auto tensors = std::vector<std::string>{
 
                 "0.conv.weight.tensor",      "0.conv.bias.tensor",
@@ -702,15 +743,25 @@ struct CRFModelImpl : Module {
                 "8.rnn.weight_ih_l0.tensor", "8.rnn.weight_hh_l0.tensor",
                 "8.rnn.bias_ih_l0.tensor",   "8.rnn.bias_hh_l0.tensor",
 
-                "9.linear.weight.tensor",    "9.linear.bias.tensor"};
+                "9.linear.weight.tensor"};
+
+        if (bias) {
+            tensors.push_back("9.linear.bias.tensor");
+        }
+
+        if (decomposition) {
+            tensors.push_back("10.linear.weight.tensor");
+        }
 
         return utils::load_tensors(dir, tensors);
     }
 
     LSTMStackType rnns{nullptr};
     LinearCRF linear{nullptr};
+    Linear linear1{nullptr}, linear2{nullptr};
     Sequential encoder{nullptr};
     Convolution conv1{nullptr}, conv2{nullptr}, conv3{nullptr};
+    Clamp clamp1{nullptr}, clamp2{nullptr}, clamp3{nullptr}, clamp4{nullptr};
 };
 
 #if USE_CUDA_LSTM
@@ -730,25 +781,52 @@ std::tuple<ModuleHolder<AnyModule>, size_t> load_crf_model(const std::filesystem
     auto config = toml::parse(path / "config.toml");
 
     const auto &encoder = toml::find(config, "encoder");
-    const auto stride = toml::find<int>(encoder, "stride");
-    const auto insize = toml::find<int>(encoder, "features");
-
     const auto &global_norm = toml::find(config, "global_norm");
     const auto state_len = toml::find<int>(global_norm, "state_len");
+
+    int conv = 4;
+    int insize = 0;
+    int stride = 1;
+    bool bias = true;
+    bool clamp = false;
+    int decomposition = 0;
+
+    if (encoder.contains("type")) {
+        for (const auto &segment : toml::find(config, "encoder", "sublayers").as_array()) {
+            const auto type = toml::find<std::string>(segment, "type");
+            if (type.compare("convolution") == 0) {
+                stride *= toml::find<int>(segment, "stride");
+            } else if (type.compare("lstm") == 0) {
+                insize = toml::find<int>(segment, "size");
+            } else if (type.compare("linear") == 0) {
+                decomposition = toml::find<int>(segment, "out_features");
+            } else if (type.compare("clamp") == 0) {
+                clamp = true;
+            }
+        }
+        conv = 16;
+        bias = static_cast<bool>(insize > 128);
+    } else {
+        stride = toml::find<int>(encoder, "stride");
+        insize = toml::find<int>(encoder, "features");
+    }
+
     int outsize = pow(4, state_len) * 4;
 
 #if USE_CUDA_LSTM
     if (options.device() != torch::kCPU) {
         bool expand = false;
-        auto model = nn::CudaCRFModel(insize, outsize, stride, expand, batch_size, chunk_size);
-        auto holder = populate_model(model, path, options);
+        auto model = nn::CudaCRFModel(conv, insize, outsize, stride, decomposition, clamp, expand,
+                                      batch_size, chunk_size);
+        auto holder = populate_model(model, path, options, static_cast<bool>(decomposition), bias);
         return {holder, static_cast<size_t>(stride)};
     } else
 #endif
     {
         bool expand = true;
-        auto model = nn::CpuCRFModel(insize, outsize, stride, expand, batch_size, chunk_size);
-        auto holder = populate_model(model, path, options);
+        auto model = nn::CpuCRFModel(conv, insize, outsize, stride, decomposition, clamp, expand,
+                                     batch_size, chunk_size);
+        auto holder = populate_model(model, path, options, static_cast<bool>(decomposition), bias);
         return {holder, static_cast<size_t>(stride)};
     }
 }

@@ -50,12 +50,13 @@ void WriterNode::worker_thread() {
             EXIT_FAILURE;
         }
 
+        m_num_bases_processed += read->seq.length();
         m_num_samples_processed += read->raw_data.size(0);
         m_num_reads_processed += 1;
 
         if (m_num_reads_processed % 100 == 0 && m_isatty) {
             std::scoped_lock<std::mutex> lock(m_cerr_mutex);
-            std::cerr << "\r> Reads basecalled: " << m_num_reads_processed;
+            std::cerr << "\r> Reads processed: " << m_num_reads_processed;
         }
 
         if (m_emit_fastq) {
@@ -66,7 +67,7 @@ void WriterNode::worker_thread() {
                       << read->qstring << "\n";
         } else {
             try {
-                for (const auto& sam_line : read->extract_sam_lines(m_emit_moves)) {
+                for (const auto& sam_line : read->extract_sam_lines(m_emit_moves, m_duplex)) {
                     std::scoped_lock<std::mutex> lock(m_cout_mutex);
                     std::cout << sam_line << "\n";
                 }
@@ -81,12 +82,15 @@ void WriterNode::worker_thread() {
 WriterNode::WriterNode(std::vector<std::string> args,
                        bool emit_fastq,
                        bool emit_moves,
+                       bool duplex,
                        size_t num_worker_threads,
                        size_t max_reads)
         : ReadSink(max_reads),
           m_args(std::move(args)),
           m_emit_fastq(emit_fastq),
           m_emit_moves(emit_moves),
+          m_duplex(duplex),
+          m_num_bases_processed(0),
           m_num_samples_processed(0),
           m_num_reads_processed(0),
           m_initialization_time(std::chrono::system_clock::now()) {
@@ -120,7 +124,11 @@ WriterNode::~WriterNode() {
     }
     spdlog::info("> Reads basecalled: {}", m_num_reads_processed);
     std::ostringstream samples_sec;
-    samples_sec << std::scientific << m_num_samples_processed / (duration / 1000.0);
+    if (m_duplex) {
+        samples_sec << std::scientific << m_num_bases_processed / (duration / 1000.0);
+    } else {
+        samples_sec << std::scientific << m_num_samples_processed / (duration / 1000.0);
+    }
     spdlog::info("> Samples/s: {}", samples_sec.str());
 }
 

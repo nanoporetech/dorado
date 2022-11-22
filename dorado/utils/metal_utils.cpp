@@ -157,6 +157,7 @@ MTL::ComputePipelineState *make_cps(
     }
 
     auto cp_descriptor = MTL::ComputePipelineDescriptor::alloc();
+    cp_descriptor->init();
     cp_descriptor->setComputeFunction(kernel);
     if (max_total_threads_per_tg != -1)
         cp_descriptor->setMaxTotalThreadsPerThreadgroup(max_total_threads_per_tg);

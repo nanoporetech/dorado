@@ -2,6 +2,12 @@
 
 All notable changes to Dorado will be documented in this file.
 
+# [0.0.4] (21 Nov 2022)
+
+ * ae353913ff86af943f5c7569e0692e0d6662c3b1 - Basespace duplex
+ * 0e1541b206a6cd3a17ca845da3a780f635ff55b4 - Simplex v4 model support
+ * 6855fc1a4a4a76609f9232d7a692a7bb231bc5bb - Basecalling performance improvements
+
 # [0.0.3] (12 Nov 2022)
 
 Upgrade to Pod5 v0.0.41
