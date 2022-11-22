@@ -19,13 +19,13 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
     dorado::utils::reverse_complement(complement_sequence_reverse_complement);
 
     std::vector<uint8_t> complemnet_q_scores_reversed(complement_read->seq.begin(),
-                                                   complement_read->seq.end());
+                                                      complement_read->seq.end());
     std::reverse(complemnet_q_scores_reversed.begin(),
                  complemnet_q_scores_reversed.end());  // -33 ?
 
     std::vector<char> template_sequence(template_read->seq.begin(), template_read->seq.end());
     std::vector<uint8_t> template_q_scores(template_read->qstring.begin(),
-                                        template_read->qstring.end());
+                                           template_read->qstring.end());
 
     // Align the two reads to one another and print out the score.
     EdlibAlignResult result =
@@ -33,7 +33,11 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
                        complement_sequence_reverse_complement.data(),
                        complement_sequence_reverse_complement.size(), align_config);
 
-    std::cerr << result.editDistance << std::endl;
+    if (template_read->read_id == "025c2ee5-6775-43b8-85cb-0397fef88d5b") {
+        std::cerr << "Edit distance is " << result.editDistance << std::endl;
+        std::cerr << "Template sequence is " << template_read->seq << std::endl;
+        std::cerr << "Complement sequence is " << complement_read->seq << std::endl;
+    }
 
     int query_cursor = 0;
     int target_cursor = result.startLocations[0];
@@ -55,7 +59,6 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
 
     std::shared_ptr<dorado::Read> read = std::make_shared<dorado::Read>();
     if (consensus_possible) {
-
         dorado::utils::preprocess_quality_scores(template_q_scores);
         dorado::utils::preprocess_quality_scores(complemnet_q_scores_reversed);
 
@@ -98,10 +101,20 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
                 query_cursor++;
             }
         }
+
+        if (template_read->read_id == "025c2ee5-6775-43b8-85cb-0397fef88d5b") {
+            std::cerr << "Consensus is " << std::string(consensus.begin(), consensus.end())
+                      << std::endl;
+        }
+
         // Step 4 - Assign the data to a new read,
         read->seq = std::string(consensus.begin(), consensus.end());
         read->qstring = std::string(quality_scores_phred.begin(), quality_scores_phred.end());
         read->read_id = std::string(template_read->read_id + ";" + complement_read->read_id);
+
+        std::cerr << template_read->seq << std::endl;
+        std::cerr << complement_read->seq << std::endl;
+
         return read;
     }
     return read;
@@ -176,7 +189,7 @@ void StereoDuplexEncoderNode::worker_thread() {
                 std::shared_ptr<Read> stereo_encoded_read =
                         stereo_encode(template_read, complement_read);
                 if (stereo_encoded_read->seq.size() > 100) {
-                    m_sink.push_read(stereo_encoded_read);  // Found a partner, so process it.
+                    //m_sink.push_read(stereo_encoded_read);  // Found a partner, so process it.
                 }
             }
         }

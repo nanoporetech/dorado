@@ -16,9 +16,11 @@
 #include "utils/metal_utils.h"
 #endif
 
+#include "utils/parameters.h"
+
 #include <argparse.hpp>
 #include <spdlog/spdlog.h>
-#include "utils/parameters.h"
+
 #include <thread>
 
 namespace dorado {
@@ -71,11 +73,10 @@ int duplex(int argc, char* argv[]) {
         std::vector<Runner> runners;
         int num_devices = 1;
         size_t batch_size;
-        size_t model_stride = 5;   // TODO: Set in CLI
-        size_t chunk_size = 5000;  // TODO: Set in CLI
-        size_t overlap = 100;      // TODO: Set in CLI
+        size_t model_stride = 5;    // TODO: Set in CLI
+        size_t chunk_size = 10000;  // TODO: Set in CLI
+        size_t overlap = 500;       // TODO: Set in CLI
         size_t num_runners = 1;
-
 
         if (device == "cpu") {
             batch_size = batch_size == 0 ? std::thread::hardware_concurrency() : batch_size;
@@ -102,8 +103,7 @@ int duplex(int argc, char* argv[]) {
             if (num_devices == 0) {
                 throw std::runtime_error("CUDA device requested but no devices found.");
             }
-            batch_size = batch_size == 0 ? utils::auto_gpu_batch_size(model, devices)
-                                         : batch_size;
+            batch_size = batch_size == 0 ? utils::auto_gpu_batch_size(model, devices) : batch_size;
             for (auto device_string : devices) {
                 auto caller = create_cuda_caller(model, chunk_size, batch_size, device_string);
                 for (size_t i = 0; i < num_runners; i++) {

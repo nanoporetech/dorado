@@ -112,15 +112,21 @@ void BaseSpaceDuplexCallerNode::basespace(std::string template_read_id,
         dorado::utils::reverse_complement(complement_sequence_reverse_complement);
 
         EdlibAlignResult result =
-                edlibAlign(template_sequence.data(),
-                           template_sequence.size(),
+                edlibAlign(template_sequence.data(), template_sequence.size(),
                            complement_sequence_reverse_complement.data(),
-                           complement_sequence_reverse_complement.size(),
-                           align_config);
+                           complement_sequence_reverse_complement.size(), align_config);
+
+        if (template_read->read_id == "025c2ee5-6775-43b8-85cb-0397fef88d5b") {
+            std::cerr << "Edit distance is " << result.editDistance << std::endl;
+            std::cerr << "Template sequence is " << template_read->seq << std::endl;
+            std::cerr << "Complement sequence is " << complement_read->seq << std::endl;
+        }
 
         // Now - we have to do the actual basespace alignment itself
         int query_cursor = 0;
-        int target_cursor = result.startLocations[0]; // 0-based position in the *target* where alignment starts.
+        int target_cursor =
+                result.startLocations
+                        [0];  // 0-based position in the *target* where alignment starts.
 
         auto [alignment_start_end, cursors] = utils::get_trimmed_alignment(
                 11, result.alignment, result.alignmentLength, target_cursor, query_cursor, 0,
@@ -138,23 +144,21 @@ void BaseSpaceDuplexCallerNode::basespace(std::string template_read_id,
 
         if (consensus_possible) {
             auto [consensus, quality_scores_phred] = compute_basespace_consensus(
-                    start_alignment_position,
-                    end_alignment_position,
-                    template_quality_scores,
-                    target_cursor,
-                    complement_quality_scores_reverse,
-                    query_cursor,
-                    template_sequence,
-                    complement_sequence_reverse_complement,
-                    result.alignment);
+                    start_alignment_position, end_alignment_position, template_quality_scores,
+                    target_cursor, complement_quality_scores_reverse, query_cursor,
+                    template_sequence, complement_sequence_reverse_complement, result.alignment);
 
+            if (template_read->read_id == "025c2ee5-6775-43b8-85cb-0397fef88d5b") {
+                std::cerr << "Consensus is " << std::string(consensus.begin(), consensus.end())
+                          << std::endl;
+            }
             auto duplex_read = std::make_shared<Read>();
             duplex_read->seq = std::string(consensus.begin(), consensus.end());
             duplex_read->qstring =
                     std::string(quality_scores_phred.begin(), quality_scores_phred.end());
 
             duplex_read->read_id = template_read->read_id + ";" + complement_read->read_id;
-            m_sink.push_read(duplex_read);
+            //m_sink.push_read(duplex_read);
         }
         edlibFreeAlignResult(result);
     }
