@@ -18,28 +18,16 @@ public:
                int chunk_size,
                int batch_size,
                const std::string &device) {
-        auto config = toml::parse(model_path / "config.toml");
-
-        float qscale = 1.0;
-        float qbias = 0.0;
-
-        if (config.contains("qscore")) {
-            const auto &qscore = toml::find(config, "qscore");
-            qbias = toml::find<float>(qscore, "bias");
-            qscale = toml::find<float>(qscore, "scale");
-        } else {
-            spdlog::debug("> no qscore calibration found");
-        }
+        const auto model_config = load_crf_model_config(model_path);
+        m_model_stride = static_cast<size_t>(model_config.stride);
 
         m_decoder_options = DecoderOptions();
-        m_decoder_options.q_shift = qbias;
-        m_decoder_options.q_scale = qscale;
+        m_decoder_options.q_shift = model_config.qbias;
+        m_decoder_options.q_scale = model_config.qscale;
         m_decoder = std::make_unique<GPUDecoder>();
 
         m_options = torch::TensorOptions().dtype(GPUDecoder::dtype).device(device);
-        auto [crf_module, stride] = load_crf_model(model_path, batch_size, chunk_size, m_options);
-        m_module = crf_module;
-        m_model_stride = stride;
+        m_module = load_crf_model(model_path, model_config, batch_size, chunk_size, m_options);
 
         m_cuda_thread.reset(new std::thread(&CudaCaller::cuda_thread_fn, this));
     }

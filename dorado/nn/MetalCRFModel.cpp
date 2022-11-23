@@ -390,15 +390,14 @@ struct MetalBlockImpl : Module {
 TORCH_MODULE(MetalBlock);
 
 struct MetalModelImpl : Module {
-    MetalModelImpl(int size,
-                   int outsize,
-                   int stride,
+    MetalModelImpl(const CRFModelConfig &config,
                    int chunk_size,
                    int batch_size,
                    int out_split,
-                   MTL::Device *device) {
-        mtl_block = register_module("mtl_block", MetalBlock(chunk_size, batch_size, stride, size,
-                                                            outsize, out_split, device));
+                   MTL::Device *const device) {
+        mtl_block = register_module("mtl_block",
+                                    MetalBlock(chunk_size, batch_size, config.stride, config.insize,
+                                               config.outsize, out_split, device));
     }
 
     void load_state_dict(const std::vector<torch::Tensor> &weights) {
@@ -428,10 +427,39 @@ public:
         // LSTM kernels, which run with the full supplied batch size, require that the batch size
         // be an integral multiple of 48.
         assert(batch_size % 48 == 0);
+
+        const auto model_config = load_crf_model_config(model_path);
+        m_model_stride = static_cast<size_t>(model_config.stride);
+
+        m_device = get_mtl_device();
+
+        m_decoder_options = DecoderOptions();
+        m_decoder_options.q_shift = model_config.qbias;
+        m_decoder_options.q_scale = model_config.qscale;
+
+        // adjust chunk size to a multiple of the stride
+        chunk_size -= chunk_size % model_config.stride;
+
+        // FIXME -- we don't honour the config n_base
+        constexpr int n_base = 4;
+        constexpr int num_transitions = 5;
+        m_states = pow(n_base, model_config.state_len);
+
+        m_batch_size = batch_size;
+        const int outsize = m_states * num_transitions;
+        spdlog::info("MetalCaller outsize {} ", outsize);
+
+        /*// FIXME -- this duplicates what is in ModelRunner
         auto config = toml::parse(model_path / "config.toml");
-        const auto &qscore = toml::find(config, "qscore");
-        const auto qbias = toml::find<float>(qscore, "bias");
-        const auto qscale = toml::find<float>(qscore, "scale");
+        float qscale = 1.0f;
+        float qbias = 0.0f;
+        if (config.contains("qscore")) {
+            const auto &qscore = toml::find(config, "qscore");
+            qbias = toml::find<float>(qscore, "bias");
+            qscale = toml::find<float>(qscore, "scale");
+        } else {
+            spdlog::debug("> no qscore calibration found");
+        }
 
         m_device = get_mtl_device();
 
@@ -440,7 +468,10 @@ public:
         m_decoder_options.q_scale = qscale;
 
         const auto &encoder = toml::find(config, "encoder");
-        const auto scale = toml::find<float>(encoder, "scale");
+        // SCBA HACK
+        spdlog::warn("Using hardwired encoder scale of 5");
+        const float scale = 5.0f;
+        //const auto scale = toml::find<float>(encoder, "scale");
         const auto stride = toml::find<int>(encoder, "stride");
         const auto insize = toml::find<int>(encoder, "features");
         const auto blank_score = toml::find<float>(encoder, "blank_score");
@@ -457,23 +488,24 @@ public:
 
         m_model_stride = static_cast<size_t>(stride);
         // adjust chunk size to a multiple of the stride
-        chunk_size -= chunk_size % stride;
+        chunk_size -= chunk_size % stride;*/
 
         // Chunk size after decimation via convolution stride.
-        m_out_chunk_size = chunk_size / stride;
+        m_out_chunk_size = chunk_size / model_config.stride;
 
         auto state_dict = load_weights(model_path);
 
         auto lw = state_dict[state_dict.size() - 2];
         auto lb = state_dict[state_dict.size() - 1];
 
-        state_dict[state_dict.size() - 2] =
-                F::pad(lw.view({m_states, 4, insize}), F::PadFuncOptions({0, 0, 1, 0}).value(0.0))
-                        .view({outsize, insize});
+        state_dict[state_dict.size() - 2] = F::pad(lw.view({m_states, 4, model_config.insize}),
+                                                   F::PadFuncOptions({0, 0, 1, 0}).value(0.0))
+                                                    .view({outsize, model_config.insize});
 
         state_dict[state_dict.size() - 1] =
                 F::pad(lb.view({m_states, 4}),
-                       F::PadFuncOptions({1, 0}).value(atanh(blank_score / scale)))
+                       F::PadFuncOptions({1, 0}).value(
+                               atanh(model_config.blank_score / model_config.scale)))
                         .view({outsize});
 
         // Allocations beyond 4GB can fail, and the linear layer output buffer
@@ -510,8 +542,7 @@ public:
         m_out_batch_size = batch_size / m_out_split;
         assert(m_out_batch_size % 48 == 0);
 
-        m_model = nn::MetalModel(insize, outsize, stride, chunk_size, batch_size, m_out_split,
-                                 m_device);
+        m_model = nn::MetalModel(model_config, chunk_size, batch_size, m_out_split, m_device);
         m_model->load_state_dict(state_dict);
         m_model->eval();
 
@@ -532,7 +563,7 @@ public:
         int C = outsize;
         int Cs = m_states;
 
-        int y = pow(n_base, state_len);
+        int y = pow(n_base, model_config.state_len);
 
         m_scan_idx[0][0] = torch::arange(C, torch::kInt32).contiguous();
         auto t1 = torch::arange(y).index({torch::indexing::Slice(), torch::indexing::None});
