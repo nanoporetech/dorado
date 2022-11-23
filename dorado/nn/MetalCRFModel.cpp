@@ -440,55 +440,13 @@ public:
         // adjust chunk size to a multiple of the stride
         chunk_size -= chunk_size % model_config.stride;
 
-        // FIXME -- we don't honour the config n_base
+        // TODO -- we don't honour the config n_base
         constexpr int n_base = 4;
         constexpr int num_transitions = 5;
         m_states = pow(n_base, model_config.state_len);
 
         m_batch_size = batch_size;
         const int outsize = m_states * num_transitions;
-        spdlog::info("MetalCaller outsize {} ", outsize);
-
-        /*// FIXME -- this duplicates what is in ModelRunner
-        auto config = toml::parse(model_path / "config.toml");
-        float qscale = 1.0f;
-        float qbias = 0.0f;
-        if (config.contains("qscore")) {
-            const auto &qscore = toml::find(config, "qscore");
-            qbias = toml::find<float>(qscore, "bias");
-            qscale = toml::find<float>(qscore, "scale");
-        } else {
-            spdlog::debug("> no qscore calibration found");
-        }
-
-        m_device = get_mtl_device();
-
-        m_decoder_options = DecoderOptions();
-        m_decoder_options.q_shift = qbias;
-        m_decoder_options.q_scale = qscale;
-
-        const auto &encoder = toml::find(config, "encoder");
-        // SCBA HACK
-        spdlog::warn("Using hardwired encoder scale of 5");
-        const float scale = 5.0f;
-        //const auto scale = toml::find<float>(encoder, "scale");
-        const auto stride = toml::find<int>(encoder, "stride");
-        const auto insize = toml::find<int>(encoder, "features");
-        const auto blank_score = toml::find<float>(encoder, "blank_score");
-
-        const auto &global_norm = toml::find(config, "global_norm");
-        const auto state_len = toml::find<int>(global_norm, "state_len");
-
-        constexpr int n_base = 4;
-        constexpr int num_transitions = 5;
-
-        m_states = pow(n_base, state_len);
-        m_batch_size = batch_size;
-        int outsize = m_states * num_transitions;
-
-        m_model_stride = static_cast<size_t>(stride);
-        // adjust chunk size to a multiple of the stride
-        chunk_size -= chunk_size % stride;*/
 
         // Chunk size after decimation via convolution stride.
         m_out_chunk_size = chunk_size / model_config.stride;
