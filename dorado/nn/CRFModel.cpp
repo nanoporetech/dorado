@@ -561,12 +561,12 @@ struct CRFModelImpl : Module {
             linear1 = register_module("linear1", Linear(size, decomposition));
             linear2 = register_module("linear2",
                                       Linear(LinearOptions(decomposition, outsize).bias(false)));
-            clamp4 = Clamp(-4.0, 4.0, clamp);
+            clamp4 = Clamp(-5.0, 5.0, clamp);
             encoder = Sequential(conv1, clamp1, conv2, clamp2, conv3, clamp3, rnns, linear1,
                                  linear2, clamp4);
         } else if (conv == 16) {
             linear1 = register_module("linear1", Linear(LinearOptions(size, outsize).bias(false)));
-            clamp4 = Clamp(-4.0, 4.0, clamp);
+            clamp4 = Clamp(-5.0, 5.0, clamp);
             encoder =
                     Sequential(conv1, clamp1, conv2, clamp2, conv3, clamp3, rnns, linear1, clamp4);
         } else {
