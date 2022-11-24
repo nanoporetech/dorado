@@ -7,7 +7,10 @@ class ReadSink;
 
 class DataLoader {
 public:
-    DataLoader(ReadSink& read_sink, const std::string& device, size_t num_worker_threads);
+    DataLoader(ReadSink& read_sink,
+               const std::string& device,
+               size_t num_worker_threads,
+               size_t max_reads = 0);
     void load_reads(const std::string& path);
 
 private:
@@ -17,6 +20,7 @@ private:
     size_t m_loaded_read_count{0};
     std::string m_device;
     size_t m_num_worker_threads{1};
+    size_t m_max_reads{0};
 };
 
 }  // namespace dorado
