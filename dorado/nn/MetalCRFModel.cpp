@@ -446,7 +446,6 @@ public:
         m_states = pow(n_base, model_config.state_len);
 
         m_batch_size = batch_size;
-        const int outsize = m_states * num_transitions;
 
         // Chunk size after decimation via convolution stride.
         m_out_chunk_size = chunk_size / model_config.stride;
@@ -456,15 +455,16 @@ public:
         auto lw = state_dict[state_dict.size() - 2];
         auto lb = state_dict[state_dict.size() - 1];
 
-        state_dict[state_dict.size() - 2] = F::pad(lw.view({m_states, 4, model_config.insize}),
-                                                   F::PadFuncOptions({0, 0, 1, 0}).value(0.0))
-                                                    .view({outsize, model_config.insize});
+        state_dict[state_dict.size() - 2] =
+                F::pad(lw.view({m_states, 4, model_config.insize}),
+                       F::PadFuncOptions({0, 0, 1, 0}).value(0.0))
+                        .view({model_config.outsize, model_config.insize});
 
         state_dict[state_dict.size() - 1] =
                 F::pad(lb.view({m_states, 4}),
                        F::PadFuncOptions({1, 0}).value(
                                atanh(model_config.blank_score / model_config.scale)))
-                        .view({outsize});
+                        .view({model_config.outsize});
 
         // Allocations beyond 4GB can fail, and the linear layer output buffer
         // hits this limit with batch sizes larger than 384 with typical
@@ -482,9 +482,9 @@ public:
         // already constrained to be an integral multiple of 48, this means the
         // batch splitting factor must be an exact divisor of the batch_size / 48.
         constexpr auto kMaxBufferSize = static_cast<int64_t>(1) << 32;
-        const auto complete_linear_out_size = static_cast<int64_t>(m_out_chunk_size) *
-                                              static_cast<int64_t>(batch_size) *
-                                              static_cast<int64_t>(outsize) * sizeof(float);
+        const auto complete_linear_out_size =
+                static_cast<int64_t>(m_out_chunk_size) * static_cast<int64_t>(batch_size) *
+                static_cast<int64_t>(model_config.outsize) * sizeof(float);
         const int num_batch_pieces = batch_size / 48;
         for (m_out_split = 1; m_out_split < num_batch_pieces; ++m_out_split) {
             if (num_batch_pieces % m_out_split == 0 &&
@@ -518,7 +518,7 @@ public:
         }
 
         int T = m_out_chunk_size;
-        int C = outsize;
+        int C = model_config.outsize;
         int Cs = m_states;
 
         int y = pow(n_base, model_config.state_len);
