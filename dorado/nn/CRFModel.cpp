@@ -551,8 +551,8 @@ struct CRFModelImpl : Module {
                 "rnns", LSTMStackType(config.insize, batch_size, chunk_size / config.stride));
 
         if (config.out_features.has_value()) {
-            const int decomposition = config.out_features.value();
             // The linear layer is decomposed into 2 matmuls.
+            const int decomposition = config.out_features.value();
             linear1 = register_module("linear1", Linear(config.insize, decomposition));
             linear2 = register_module(
                     "linear2", Linear(LinearOptions(decomposition, config.outsize).bias(false)));
