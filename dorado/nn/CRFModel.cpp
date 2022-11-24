@@ -25,6 +25,7 @@ extern "C" {
 #include <toml.hpp>
 #include <torch/torch.h>
 
+#include <limits>
 #include <string>
 
 using namespace torch::nn;
@@ -129,9 +130,24 @@ namespace dorado {
 
 namespace nn {
 
+static constexpr float SWISH_LOWER_BOUND = -0.278464543f;  // global minimum of `x * sigmoid(x)`
+static constexpr float I8_RANGE = 127.f;
+
 struct ConvolutionImpl : Module {
-    ConvolutionImpl(int size, int outsize, int k, int stride_, bool to_lstm_ = false)
-            : in_size(size), out_size(outsize), window_size(k), stride(stride_), to_lstm(to_lstm_) {
+    ConvolutionImpl(int size,
+                    int outsize,
+                    int k,
+                    int stride_,
+                    bool clamp_,
+                    float max_value_,
+                    bool to_lstm_)
+            : in_size(size),
+              out_size(outsize),
+              window_size(k),
+              stride(stride_),
+              clamp(clamp_),
+              max_value(clamp_ ? max_value_ : std::numeric_limits<float>::max()),
+              to_lstm(to_lstm_) {
         conv = register_module(
                 "conv", Conv1d(Conv1dOptions(size, outsize, k).stride(stride).padding(k / 2)));
         activation = register_module("activation", SiLU());
@@ -139,67 +155,91 @@ struct ConvolutionImpl : Module {
 
     torch::Tensor forward(torch::Tensor x) {
         // Input x is [N, C_in, T_in], contiguity optional
-        if (to_lstm) {
 #if USE_CUDA_LSTM
-            if (x.device() != torch::kCPU) {
-                c10::cuda::CUDAGuard device_guard(x.device());
-                auto stream = at::cuda::getCurrentCUDAStream().stream();
+        if (to_lstm && x.device() != torch::kCPU) {
+            c10::cuda::CUDAGuard device_guard(x.device());
+            auto stream = at::cuda::getCurrentCUDAStream().stream();
 
-                int batch_size = x.size(0);
-                int chunk_size_in = x.size(2);
-                int chunk_size_out = chunk_size_in / stride;
-                auto w_device = conv->weight.view({out_size, in_size * window_size})
-                                        .t()
-                                        .to(x.options())
-                                        .contiguous();
-                auto b_device = conv->bias.to(x.options());
-                if (cuda_lstm_is_quantized(out_size)) {
-                    torch::Tensor res =
-                            torch::empty({batch_size, chunk_size_out, out_size}, x.options());
-                    auto res_2D = res.view({-1, out_size});
-                    auto ntcw_mat = torch::empty({batch_size, chunk_size_out, in_size, window_size},
-                                                 x.options());
-                    host_window_ntcw_f16(stream, x.stride(0), x.stride(2), x.stride(1), batch_size,
-                                         chunk_size_in, in_size, window_size, stride,
-                                         ntcw_mat.stride(0), ntcw_mat.stride(1), ntcw_mat.stride(2),
-                                         ntcw_mat.stride(3), x.data_ptr(), ntcw_mat.data_ptr());
-                    cublas_matmul_f16(ntcw_mat.view({-1, in_size * window_size}), w_device, res_2D);
-                    host_bias_swish_f16(stream, res_2D.size(0), res_2D.size(1), res_2D.stride(0),
-                                        res_2D.data_ptr(), b_device.data_ptr());
+            int batch_size = x.size(0);
+            int chunk_size_in = x.size(2);
+            int chunk_size_out = chunk_size_in / stride;
+            auto w_device = conv->weight.view({out_size, in_size * window_size})
+                                    .t()
+                                    .to(x.options())
+                                    .contiguous();
+            auto b_device = conv->bias.to(x.options());
 
-                    // Output is [N, T_out, C_out], contiguous
-                    return res;
+            cudaDeviceProp *prop = at::cuda::getCurrentDeviceProperties();
+            const bool output_NTC = cuda_lstm_is_quantized(out_size);
+            // TODO: reinstate output as int8
+            //            const bool output_int8 = !output_NTC && clamp && prop->major >= 8;
+            const bool output_int8 = false;
+
+            if (output_NTC) {
+                auto res = torch::empty({batch_size, chunk_size_out, out_size}, x.options());
+                auto res_2D = res.view({-1, out_size});
+                auto ntcw_mat = torch::empty({batch_size, chunk_size_out, in_size, window_size},
+                                             x.options());
+                host_window_ntcw_f16(stream, x.stride(0), x.stride(2), x.stride(1), batch_size,
+                                     chunk_size_in, in_size, window_size, stride,
+                                     ntcw_mat.stride(0), ntcw_mat.stride(1), ntcw_mat.stride(2),
+                                     ntcw_mat.stride(3), x.data_ptr(), ntcw_mat.data_ptr());
+                cublas_matmul_f16(ntcw_mat.view({-1, in_size * window_size}), w_device, res_2D);
+                host_bias_swish_f16_clamp(stream, res_2D.size(0), res_2D.size(1), res_2D.stride(0),
+                                          res_2D.data_ptr(), b_device.data_ptr(), max_value);
+                // Output is [N, T_out, C_out], contiguous
+                return res;
+            } else {
+                torch::Tensor res, mm_out;
+                if (output_int8) {
+                    res = torch::empty({chunk_size_out + 1, batch_size, 2, out_size},
+                                       x.options().dtype(torch::kInt8));
+                    mm_out = res.slice(0, 1, chunk_size_out + 1)
+                                     .view({-1, 2 * out_size})
+                                     .view(torch::kF16);
                 } else {
-                    auto res = torch::empty({chunk_size_out + 1, batch_size, 2, out_size},
-                                            x.options());
-                    res.index({0, Slice(), 1, Slice()}) = 0;
-                    res.index({chunk_size_out, Slice(), 0, Slice()}) = 0;
+                    res = torch::empty({chunk_size_out + 1, batch_size, 2, out_size}, x.options());
                     auto res_TNC = res.slice(0, 1, chunk_size_out + 1).select(2, 1);
-                    auto res_2D = res_TNC.view({-1, out_size});
-
-                    auto tncw_mat = torch::empty({chunk_size_out, batch_size, in_size, window_size},
-                                                 x.options());
-                    host_window_ntcw_f16(stream, x.stride(0), x.stride(2), x.stride(1), batch_size,
-                                         chunk_size_in, in_size, window_size, stride,
-                                         tncw_mat.stride(1), tncw_mat.stride(0), tncw_mat.stride(2),
-                                         tncw_mat.stride(3), x.data_ptr(), tncw_mat.data_ptr());
-                    cublas_matmul_f16(tncw_mat.view({-1, in_size * window_size}), w_device, res_2D);
-                    host_bias_swish_f16(stream, res_2D.size(0), res_2D.size(1), res_2D.stride(0),
-                                        res_2D.data_ptr(), b_device.data_ptr());
-
-                    // Output is [T_out + 1, N, 2, C_out], contiguous, which serves as
-                    // working memory for CuBLAS LSTM
-                    return res;
+                    mm_out = res_TNC.view({-1, out_size});
                 }
-            } else
-#endif
-            {
-                // Output is [N, T_out, C_out], non-contiguous
-                return activation(conv(x)).transpose(1, 2);
+
+                auto tncw_mat = torch::empty({chunk_size_out, batch_size, in_size, window_size},
+                                             x.options());
+                host_window_ntcw_f16(stream, x.stride(0), x.stride(2), x.stride(1), batch_size,
+                                     chunk_size_in, in_size, window_size, stride,
+                                     tncw_mat.stride(1), tncw_mat.stride(0), tncw_mat.stride(2),
+                                     tncw_mat.stride(3), x.data_ptr(), tncw_mat.data_ptr());
+                cublas_matmul_f16(tncw_mat.view({-1, in_size * window_size}), w_device, mm_out);
+                if (output_int8) {
+                    float scale = 2 * I8_RANGE / (max_value - SWISH_LOWER_BOUND);
+                    float zero_offset = scale * max_value - I8_RANGE;
+                    host_bias_swish_f16_i8_inplace(stream, mm_out.size(0), mm_out.size(1), out_size,
+                                                   mm_out.data_ptr(), b_device.data_ptr(), scale,
+                                                   zero_offset);
+                } else {
+                    host_bias_swish_f16_clamp(stream, mm_out.size(0), mm_out.size(1),
+                                              mm_out.stride(0), mm_out.data_ptr(),
+                                              b_device.data_ptr(), max_value);
+                }
+                // Output is [T_out + 1, N, 2, C_out], contiguous, which serves as
+                // working memory for CuBLAS LSTM
+                res.index({0, Slice(), 1}) = 0;
+                res.index({chunk_size_out, Slice(), 0}) = 0;
+                return res;
             }
         }
-        // Output is [N, C_out, T_out], contiguous
-        return activation(conv(x));
+#endif
+        x = activation(conv(x));
+        if (clamp) {
+            x = x.clamp(c10::nullopt, max_value);
+        }
+        if (to_lstm) {
+            // Output is [N, T_out, C_out], non-contiguous
+            return x.transpose(1, 2);
+        } else {
+            // Output is [N, C_out, T_out], contiguous
+            return x;
+        }
     }
 
     Conv1d conv{nullptr};
@@ -208,6 +248,8 @@ struct ConvolutionImpl : Module {
     int out_size;
     int window_size;
     int stride;
+    const bool clamp;
+    const float max_value;
     const bool to_lstm;
 };
 
@@ -268,7 +310,6 @@ struct LinearCRFImpl : Module {
 
 struct CudaLSTMImpl : Module {
     CudaLSTMImpl(int layer_size, bool reverse_) : reverse(reverse_) {
-        // TODO: do we need to specify .device("gpu")?
         auto options = torch::TensorOptions().dtype(torch::kFloat16);
         weights = torch::empty({layer_size * 4, layer_size * 2}, options).contiguous();
         auto weight_ih = weights.slice(1, 0, layer_size);
@@ -292,7 +333,12 @@ struct CudaLSTMImpl : Module {
 TORCH_MODULE(CudaLSTM);
 
 struct CudaLSTMStackImpl : Module {
-    CudaLSTMStackImpl(int layer_size_, int batch_size, int chunk_size) : layer_size(layer_size_) {
+    CudaLSTMStackImpl(int layer_size_,
+                      int batch_size,
+                      int chunk_size,
+                      float scale_i8_,
+                      float zero_offset_i8_)
+            : layer_size(layer_size_), scale_i8(scale_i8_), zero_offset_i8(zero_offset_i8_) {
         rnn1 = register_module("rnn_1", CudaLSTM(layer_size, true));
         rnn2 = register_module("rnn_2", CudaLSTM(layer_size, false));
         rnn3 = register_module("rnn_3", CudaLSTM(layer_size, true));
@@ -335,7 +381,7 @@ struct CudaLSTMStackImpl : Module {
     quantized_lstm _host_run_lstm_rev_quantized{nullptr};
 
     torch::Tensor forward_cublas(torch::Tensor in) {
-        // input in is ([N, T, C], contiguity optional) or ([T+1, N, 2, C], contiguous) (see below)
+        // input is ([T+1, N, 2, C], contiguous) (see below)
         auto stream = at::cuda::getCurrentCUDAStream().stream();
 
         // Cutlass kernel currently requires SM8.0 (A100) or later
@@ -343,25 +389,15 @@ struct CudaLSTMStackImpl : Module {
         const bool use_cutlass = prop->major >= 8;
         const bool use_int8 = use_cutlass;
 
-        int chunk_size, batch_size;
-        torch::Tensor mat_working_mem;
-        bool input_is_working_mem = (in.dim() == 4 && in.size(2) == 2);
-        if (input_is_working_mem) {
-            mat_working_mem = in;
-            chunk_size = in.size(0) - 1;
-            batch_size = in.size(1);
-            assert(layer_size == in.size(3));
-            assert(in.is_contiguous());
-        } else {
-            batch_size = in.size(0);
-            chunk_size = in.size(1);
-            assert(layer_size == in.size(2));
-            mat_working_mem =
-                    torch::zeros({chunk_size + 1, batch_size, 2, layer_size}, in.options());
-        }
-
-        int gate_size = layer_size * 4;
-        auto gate_buf = torch::empty({batch_size, gate_size}, in.options());
+        torch::Tensor mat_working_mem = in;
+        const int chunk_size = in.size(0) - 1;
+        const int batch_size = in.size(1);
+        assert(layer_size == in.size(3));
+        assert(in.dim() == 4 && in.size(2) == 2);
+        assert(in.dtype() == torch::kF16 || (use_int8 && in.dtype() == torch::kInt8));
+        assert(in.is_contiguous());
+        auto opts_f16 = in.options().dtype(torch::kF16);
+        const int gate_size = layer_size * 4;
 
         // Working memory is laid out as [T+1][N][2][C] in memory, where the 2 serves to
         // interleave input and output for each LSTM layer in a specific way. The reverse LSTM
@@ -374,53 +410,53 @@ struct CudaLSTMStackImpl : Module {
         // Note that both working_mem[chunk_size][:][0][:] and working_mem[0][:][1][:] remain
         // all zeroes, representing the initial LSTM state h(-1) in either direction.
 
-        auto working_mem_all = mat_working_mem.view({chunk_size + 1, batch_size, -1});
-        auto working_mem_left = mat_working_mem.slice(0, 0, chunk_size).select(2, 0);
-        auto working_mem_right = mat_working_mem.slice(0, 1, chunk_size + 1).select(2, 1);
-
-        torch::Tensor working_mem_i8, working_mem_left_i8;
-        if (use_int8) {
-            working_mem_i8 = torch::empty(
-                    mat_working_mem.sizes(),
-                    torch::TensorOptions(mat_working_mem.options()).dtype(torch::kInt8));
-            working_mem_i8.index({chunk_size, Slice(), 0, Slice()}) = 0;
-            working_mem_i8.index({0, Slice(), 1, Slice()}) = 0;
-            working_mem_left_i8 = working_mem_i8.slice(0, 0, chunk_size).select(2, 0);
+        torch::Tensor inout_all_f16, inout_left_f16, inout_right_f16;
+        torch::Tensor inout_all_i8, inout_left_i8, inout_right_i8, gate_buf;
+        // F16 and Int8 tensors share the same memory. We can convert in-place,
+        // doubling stride(-2) for the Int8 tensor.
+        int convert_to_int8_layer_idx = -1;
+        if (in.dtype() == torch::kF16) {
+            inout_all_f16 = in.view({chunk_size + 1, batch_size, -1});
+            inout_left_f16 = in.slice(0, 0, chunk_size).select(2, 0);
+            inout_right_f16 = in.slice(0, 1, chunk_size + 1).select(2, 1);
+            inout_all_i8 = in.select(2, 0).view(torch::kInt8);
+            inout_left_i8 = inout_all_i8.slice(0, 0, chunk_size).slice(2, 0, layer_size);
+            inout_right_i8 =
+                    inout_all_i8.slice(0, 1, chunk_size + 1).slice(2, layer_size, 2 * layer_size);
+            convert_to_int8_layer_idx = use_int8 ? 0 : 6;  // convert after first layer, or never
+        } else if (in.dtype() == torch::kInt8) {
+            inout_all_i8 = in.view({chunk_size + 1, batch_size, -1});
+            inout_left_i8 = in.slice(0, 0, chunk_size).select(2, 0);
+            inout_right_i8 = in.slice(0, 1, chunk_size + 1).select(2, 1);
+            inout_left_f16 = inout_all_i8.slice(0, 0, chunk_size).view(torch::kF16);
         }
-
-        if (!input_is_working_mem) {
-            // TODO: drop custom solution
-            if (in.dtype() == torch::kF16) {
-                // NOTE: `host_transpose_f16' does exactly what the assignment in the else path
-                // below would do, only ~5x faster (on A100)
-                host_transpose_f16(stream, in.data_ptr(), in.size(1), in.size(0), in.size(2),
-                                   in.stride(1), in.stride(0), in.stride(2),
-                                   working_mem_right.stride(0), working_mem_right.stride(1),
-                                   working_mem_right.stride(2), working_mem_right.data_ptr());
-            } else {
-                working_mem_right = in.transpose(1, 0);
-            }
+        if (!use_cutlass) {
+            gate_buf = torch::empty({batch_size, gate_size}, in.options());
         }
 
         int layer_idx = 0;
         for (auto &rnn : {rnn1, rnn2, rnn3, rnn4, rnn5}) {
             ScopedProfileRange spr_lstm("lstm_layer");
-            auto state_buf =
-                    torch::zeros({batch_size, layer_size},
-                                 torch::TensorOptions().dtype(torch::kF16).device(in.device()));
+            auto state_buf = torch::zeros({batch_size, layer_size}, opts_f16);
             auto weights_cpu = rnn->weights;
             if (use_cutlass) {
+                auto type_id = (layer_idx > convert_to_int8_layer_idx) ? KOI_I8 : KOI_F16;
                 if (int(device_weights.size()) == layer_idx) {
-                    device_bias.push_back(rnn->bias.to(in.device()));
-                    if (use_int8 && layer_idx > 0) {
-                        auto [factors, quantized] =
-                                quantize_tensor(weights_cpu.t().to(torch::kF32));
+                    auto layer_device_bias = rnn->bias.to(in.device());
+                    if (type_id == KOI_I8) {
+                        auto weights_f32 = weights_cpu.t().to(torch::kF32);
+                        auto [scale, quantized] = quantize_tensor(weights_f32);
                         weights_cpu = quantized.t();
-                        device_scale.push_back(
-                                factors.contiguous().to(in.device()).to(torch::kF16));
+                        if (layer_idx == 0) {
+                            scale *= scale_i8 / I8_RANGE;
+                            layer_device_bias = layer_device_bias +
+                                                weights_f32.sum(1) * (zero_offset_i8 / scale_i8);
+                        }
+                        device_scale.push_back(scale.contiguous().to(in.device()).to(torch::kF16));
                     } else {
-                        device_scale.push_back(torch::ones_like(device_bias.back()));
+                        device_scale.push_back(torch::ones_like(layer_device_bias));
                     }
+                    device_bias.push_back(layer_device_bias);
                     // Cutlass kernel expects weights reordered as <igigigigfofofofo>
                     auto weights_cpu_cutlass = torch::empty_like(weights_cpu);
                     for (int i = 0; i < layer_size; ++i) {
@@ -433,26 +469,21 @@ struct CudaLSTMStackImpl : Module {
                     }
                     device_weights.push_back(weights_cpu_cutlass.contiguous().to(in.device()));
                 }
-                if (use_int8 && layer_idx > 0) {
-                    host_cutlass_lstm_i8(stream, layer_idx, batch_size, layer_size, chunk_size,
-                                         rnn->reverse ? -1 : 1, working_mem_i8.data_ptr(),
-                                         device_weights[layer_idx].data_ptr(),
-                                         device_bias[layer_idx].data_ptr(),
-                                         device_scale[layer_idx].data_ptr(), state_buf.data_ptr());
-                } else {
-                    host_cutlass_lstm_f16(stream, layer_idx, batch_size, layer_size, chunk_size,
-                                          rnn->reverse ? -1 : 1, working_mem_all.data_ptr(),
-                                          device_weights[layer_idx].data_ptr(),
-                                          device_bias[layer_idx].data_ptr(),
-                                          device_scale[layer_idx].data_ptr(), state_buf.data_ptr());
-                }
-                if (use_int8 && layer_idx == 0) {
+
+                auto in = (type_id == KOI_I8) ? inout_all_i8 : inout_all_f16;
+                host_cutlass_lstm(stream, type_id, layer_idx, batch_size, layer_size, chunk_size,
+                                  rnn->reverse ? -1 : 1, in.stride(1), in.data_ptr(),
+                                  device_weights[layer_idx].data_ptr(),
+                                  device_bias[layer_idx].data_ptr(),
+                                  device_scale[layer_idx].data_ptr(), state_buf.data_ptr());
+
+                if (layer_idx == convert_to_int8_layer_idx) {
                     ScopedProfileRange spr_convert("f16_to_int8");
-                    host_f16_to_i8(stream, working_mem_left.data_ptr(),
-                                   working_mem_left_i8.data_ptr(),
-                                   working_mem_left.size(0) * working_mem_left.size(1),
-                                   working_mem_left.size(2), working_mem_left.stride(1),
-                                   working_mem_left_i8.stride(1));
+                    host_f16_to_i8_inplace(stream, inout_left_f16.data_ptr(),
+                                           inout_left_f16.size(0) * inout_left_f16.size(1),
+                                           inout_left_f16.size(2), inout_left_f16.stride(1), 0);
+                    inout_all_i8.index({chunk_size, Slice(), 0}) = 0;
+                    inout_all_i8.index({0, Slice(), 1}) = 0;
                 }
             } else {
                 if (int(device_weights.size()) == layer_idx) {
@@ -460,9 +491,9 @@ struct CudaLSTMStackImpl : Module {
                     device_weights.push_back(rnn->weights.t().contiguous().to(in.device()));
                 }
                 for (int ts = 0; ts < chunk_size; ++ts) {
-                    auto timestep_in = working_mem_all[rnn->reverse ? (chunk_size - ts) : ts];
-                    auto timestep_out = rnn->reverse ? working_mem_left[chunk_size - ts - 1]
-                                                     : working_mem_right[ts];
+                    auto timestep_in = inout_all_f16[rnn->reverse ? (chunk_size - ts) : ts];
+                    auto timestep_out = rnn->reverse ? inout_left_f16[chunk_size - ts - 1]
+                                                     : inout_right_f16[ts];
 
                     // Timestep matrix mulitplication (using cublasGemmEx, as using torch::matmul
                     // as below is a bit slower on A100 for some reason)
@@ -476,15 +507,15 @@ struct CudaLSTMStackImpl : Module {
             ++layer_idx;
         }
 
-        // Output is [N, T, C], non-contiguous
         if (use_int8) {
             ScopedProfileRange spr_convert("int8_to_f16");
-            host_i8_to_f16(stream, working_mem_left_i8.data_ptr(), working_mem_left.data_ptr(),
-                           working_mem_left_i8.size(0) * working_mem_left_i8.size(1),
-                           working_mem_left_i8.size(2), working_mem_left_i8.stride(1),
-                           working_mem_left.stride(1));
+            // inout_left_i8 shares storage with inout_left_f16[:][:][0:layer_size/2]
+            host_i8_to_f16_inplace(stream, inout_left_f16.data_ptr(),
+                                   inout_left_f16.size(0) * inout_left_f16.size(1),
+                                   inout_left_f16.size(2), inout_left_f16.stride(1), 0);
         }
-        return working_mem_left.transpose(1, 0);
+        // Output is [N, T, C], non-contiguous
+        return inout_left_f16.transpose(1, 0);
     }
 
     void rearrange_individual_weights(torch::Tensor buffer) {
@@ -617,6 +648,8 @@ struct CudaLSTMStackImpl : Module {
     }
 
     int layer_size;
+    float scale_i8;
+    float zero_offset_i8;
     CudaLSTM rnn1{nullptr}, rnn2{nullptr}, rnn3{nullptr}, rnn4{nullptr}, rnn5{nullptr};
 };
 
@@ -625,7 +658,7 @@ TORCH_MODULE(CudaLSTMStack);
 #endif  // if USE_CUDA_LSTM
 
 struct LSTMStackImpl : Module {
-    LSTMStackImpl(int size, int batchsize, int chunksize) {
+    LSTMStackImpl(int size, int batchsize, int chunksize, float, float) {
         // torch::nn::LSTM expects/produces [N, T, C] with batch_first == true
         rnn1 = register_module("rnn1", LSTM(LSTMOptions(size, size).batch_first(true)));
         rnn2 = register_module("rnn2", LSTM(LSTMOptions(size, size).batch_first(true)));
@@ -681,27 +714,27 @@ struct CRFModelImpl : Module {
                  bool expand_blanks,
                  int batch_size,
                  int chunk_size) {
-        conv1 = register_module("conv1", Convolution(1, conv, 5, 1));
-        clamp1 = Clamp(-0.5, 3.5, clamp);
-        conv2 = register_module("conv2", Convolution(conv, 16, 5, 1));
-        clamp2 = Clamp(-0.5, 3.5, clamp);
-        conv3 = register_module("conv3", Convolution(16, size, 19, stride, true));
-        clamp3 = Clamp(-0.5, 3.5, clamp);
+        constexpr float conv3_max_value = 3.5f;
+        conv1 = register_module("conv1", Convolution(1, conv, 5, 1, clamp, 3.5f, false));
+        conv2 = register_module("conv2", Convolution(conv, 16, 5, 1, clamp, 3.5f, false));
+        conv3 = register_module("conv3",
+                                Convolution(16, size, 19, stride, clamp, conv3_max_value, true));
 
-        rnns = register_module("rnns", LSTMStackType(size, batch_size, chunk_size / stride));
+        float scale = 2 * I8_RANGE / (conv3_max_value - SWISH_LOWER_BOUND);
+        float zero_offset = scale * conv3_max_value - I8_RANGE;
+        rnns = register_module(
+                "rnns", LSTMStackType(size, batch_size, chunk_size / stride, scale, zero_offset));
 
         if (decomposition) {
             linear1 = register_module("linear1", Linear(size, decomposition));
             linear2 = register_module("linear2",
                                       Linear(LinearOptions(decomposition, outsize).bias(false)));
-            clamp4 = Clamp(-4.0, 4.0, clamp);
-            encoder = Sequential(conv1, clamp1, conv2, clamp2, conv3, clamp3, rnns, linear1,
-                                 linear2, clamp4);
+            clamp1 = Clamp(-4.0, 4.0, clamp);
+            encoder = Sequential(conv1, conv2, conv3, rnns, linear1, linear2, clamp1);
         } else if (conv == 16) {
             linear1 = register_module("linear1", Linear(LinearOptions(size, outsize).bias(false)));
-            clamp4 = Clamp(-4.0, 4.0, clamp);
-            encoder =
-                    Sequential(conv1, clamp1, conv2, clamp2, conv3, clamp3, rnns, linear1, clamp4);
+            clamp1 = Clamp(-4.0, 4.0, clamp);
+            encoder = Sequential(conv1, conv2, conv3, rnns, linear1, clamp1);
         } else {
             linear = register_module("linear1", LinearCRF(size, outsize));
             encoder = Sequential(conv1, conv2, conv3, rnns, linear);
@@ -761,7 +794,7 @@ struct CRFModelImpl : Module {
     Linear linear1{nullptr}, linear2{nullptr};
     Sequential encoder{nullptr};
     Convolution conv1{nullptr}, conv2{nullptr}, conv3{nullptr};
-    Clamp clamp1{nullptr}, clamp2{nullptr}, clamp3{nullptr}, clamp4{nullptr};
+    Clamp clamp1{nullptr};
 };
 
 #if USE_CUDA_LSTM
