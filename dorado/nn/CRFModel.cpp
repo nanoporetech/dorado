@@ -676,7 +676,7 @@ CRFModelConfig load_crf_model_config(const std::filesystem::path &path) {
                 // Specifying out_features implies a decomposition of the linear layer matrix
                 // multiply with a bottleneck before the final feature size.
                 config.out_features = toml::find<int>(segment, "out_features");
-            } else if (type.compare("clamp")) {
+            } else if (type.compare("clamp") == 0) {
                 config.clamp = true;
             } else if (type.compare("linearcrfencoder") == 0) {
                 config.blank_score = toml::find<float>(segment, "blank_score");
