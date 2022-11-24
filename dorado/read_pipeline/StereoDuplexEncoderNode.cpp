@@ -18,8 +18,8 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
                                                              complement_read->seq.end());
     dorado::utils::reverse_complement(complement_sequence_reverse_complement);
 
-    std::vector<uint8_t> complemnet_q_scores_reversed(complement_read->seq.begin(),
-                                                      complement_read->seq.end());
+    std::vector<uint8_t> complemnet_q_scores_reversed(complement_read->qstring.begin(),
+                                                      complement_read->qstring.end());
     std::reverse(complemnet_q_scores_reversed.begin(),
                  complemnet_q_scores_reversed.end());  // -33 ?
 
@@ -51,6 +51,13 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
     int start_alignment_position = alignment_start_end.first;
     int end_alignment_position = alignment_start_end.second;
 
+    if (template_read->read_id == "025c2ee5-6775-43b8-85cb-0397fef88d5b") {
+        std::cerr << "start_alignment_position " << start_alignment_position << std::endl;
+        std::cerr << "end_alignment_position " << end_alignment_position << std::endl;
+        std::cerr << "Target cursor " << target_cursor << std::endl;
+        std::cerr << "Query cursor " << query_cursor << std::endl;
+    }
+
     // TODO: perhaps its overkill having this function make this decision...
     int min_trimmed_alignment_length = 200;
     bool consensus_possible =
@@ -68,6 +75,89 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
         auto opts = torch::TensorOptions().dtype(torch::kFloat16).device(torch::kCPU);
         int num_features = 13;
         auto tmp = torch::zeros({num_features, max_size}, opts);
+
+        // Diagnostics one: Is sum of move vector the same length as the sequence
+        int num_moves = 0;
+        for(int i=0; i< template_read->moves.size(); i++){
+            num_moves += template_read->moves[i];
+        }
+        std::cerr<< "number of moves is: " << num_moves << std::endl;
+        std::cerr<< "sequence length is: " << template_read->seq.size() << std::endl;
+
+        float pad_value = -100; // Just  a fixed value for now
+
+        auto tmp2 = torch::zeros({3, 5}, opts);
+
+        //test - can we write a value directly? yes!
+        tmp2[0][0] = 0.4;
+        tmp2[1][0] = 0.5;
+        tmp2[0][1] = 0.6;
+
+        // Step one - we need three cursors (besides the sequence ones)
+        // 1. TSignal cursor
+        // 2. CSignal Cursor
+        // 3. Encoding cursor
+
+        // Step 1 - let's get the tsignal cursor.
+        // We have the target_query, let's loop over the move table until we have got our index into the signal.
+
+        int template_signal_cursor = 0;
+        int complement_signal_cursor = 0;
+
+        int template_moves_seen = template_read->moves[template_signal_cursor];
+        while(template_moves_seen < target_cursor + 1){
+            template_signal_cursor++;
+            template_moves_seen += template_read->moves[template_signal_cursor];
+        }
+
+        int target_moves_seen = template_read->moves[template_signal_cursor];
+        while(target_moves_seen < query_cursor + 1){
+            complement_signal_cursor++;
+            target_moves_seen += complement_read->moves[complement_signal_cursor];
+        }
+
+
+        int stereo_global_cursor = 0;
+        for (int i = start_alignment_position; i < end_alignment_position; i++) {
+        // We move along every alignment position. For every position we need to add signal and padding.
+            bool t_end = false; // have we reached the end of this move for the template?
+            bool q_end = false; // have we reached the end of this move for the complement?
+
+            //Let us add the respective nucleotides and q-scores
+
+            // If there is *not* an insertion to the query, add the nucleotide from the target cursor
+            if (result.alignment[i] != 2) {
+                char nucleotide = template_sequence.at(target_cursor);
+                tmp[2 + (0b11 & (nucleotide >> 2 ^ nucleotide >> 1))][stereo_global_cursor] = 1;
+                tmp[11][stereo_global_cursor] = template_q_scores.at(target_cursor); // To-do some kind of normalisation is needed here
+            }
+
+            if (result.alignment[i] != 1) {
+                char nucleotide = complement_sequence_reverse_complement.at(query_cursor); // Question - are
+                tmp[6 + (0b11 & (nucleotide >> 2 ^ nucleotide >> 1))][stereo_global_cursor] = 1;
+                tmp[12][stereo_global_cursor] = complemnet_q_scores_reversed.at(target_cursor); // To-do some kind of normalisation is needed here
+            }
+
+            // Now let's add the remaining signal - main confusion is how do we deal with the reverse signal (from the complement)
+
+
+            // Update query and target cursors
+            //Anything excluding a query insertion causes the target cursor to advance
+            if (result.alignment[i] != 2) {
+                target_cursor++;
+            }
+
+            //Anything but a target insertion and query advances
+            if (result.alignment[i] != 1) {
+                query_cursor++;
+            }
+            stereo_global_cursor++;
+        }
+
+        tmp = tmp.index({torch::indexing::Slice(None),
+                         torch::indexing::Slice(None, stereo_global_cursor)});
+
+        std::cerr << tmp << std::endl;
 
         std::vector<char> consensus;
         std::vector<char> quality_scores_phred;
