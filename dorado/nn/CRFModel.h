@@ -4,7 +4,6 @@
 
 #include <filesystem>
 #include <optional>
-#include <tuple>
 
 namespace dorado {
 
