@@ -550,11 +550,12 @@ struct CRFModelImpl : Module {
         rnns = register_module(
                 "rnns", LSTMStackType(config.insize, batch_size, chunk_size / config.stride));
 
-        const bool decomposition = config.out_features.has_value();
-        if (decomposition) {
-            linear1 = register_module("linear1", Linear(config.insize, decomposition));
+        if (config.out_features.has_value()) {
+            // The linear layer is decomposed into 2 matmuls.
+            linear1 = register_module("linear1", Linear(config.insize, config.out_features));
             linear2 = register_module(
-                    "linear2", Linear(LinearOptions(decomposition, config.outsize).bias(false)));
+                    "linear2",
+                    Linear(LinearOptions(config.out_features, config.outsize).bias(false)));
             clamp4 = Clamp(-4.0, 4.0, config.clamp);
             encoder = Sequential(conv1, clamp1, conv2, clamp2, conv3, clamp3, rnns, linear1,
                                  linear2, clamp4);
