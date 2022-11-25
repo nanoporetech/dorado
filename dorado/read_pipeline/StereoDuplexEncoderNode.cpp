@@ -122,7 +122,7 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
             for (int j = 0; j < stride - 1; j++) {
                 complement_moves_expanded.push_back(0);
             }
-        }  // TODO add the last elements
+        }
 
         extra_moves = complement_moves_expanded.size() - complement_read->raw_data.size(0);
         for (int i = 0; i < extra_moves; i++) {
