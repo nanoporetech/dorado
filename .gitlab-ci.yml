@@ -53,7 +53,7 @@ variables:
 # Pre-flight stages
 
 pre-commit:
-  image: python:3.9
+  image: external-docker.artifactory.oxfordnanolabs.local/python:3.9
   stage: pre-flight
   script:
     - pip install pre-commit
