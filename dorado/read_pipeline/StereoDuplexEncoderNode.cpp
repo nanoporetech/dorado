@@ -235,9 +235,17 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
             }
         }
 
-        tmp = tmp.index({torch::indexing::Slice(None), torch::indexing::Slice(None, 200)});
+        std::cerr << template_read->read_id << std::endl;
+        std::cerr << complement_read->read_id << std::endl;
 
-        std::cerr << tmp << std::endl;
+        tmp = tmp.index(
+                {torch::indexing::Slice(None),
+                 torch::indexing::Slice(
+                         None,
+                         stereo_global_cursor)});  // TODO check if stereo_global_cursor is the correct limit here
+        torch::save(tmp, "/home/OXFORDNANOLABS/mvella/stereo_tensor3.pt");
+
+        //std::cerr << tmp << std::endl;
 
         return read;
     }
