@@ -66,12 +66,12 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
 
     std::shared_ptr<dorado::Read> read = std::make_shared<dorado::Read>();
     if (consensus_possible) {
-        dorado::utils::preprocess_quality_scores(template_q_scores);
-        dorado::utils::preprocess_quality_scores(complemnet_q_scores_reversed);
+        //dorado::utils::preprocess_quality_scores(template_q_scores);
+        //dorado::utils::preprocess_quality_scores(complemnet_q_scores_reversed);
 
         // Step 3 - Move along the alignment, filling out the stereo-encoded tensor
         // Prepare the encoding tensor
-        int max_size = complement_sequence_reverse_complement.size() + template_read->seq.size();
+        int max_size = template_read->raw_data.size(0) + template_read->raw_data.size(0);
         auto opts = torch::TensorOptions().dtype(torch::kFloat16).device(torch::kCPU);
         int num_features = 13;
         auto tmp = torch::zeros({num_features, max_size}, opts);
@@ -84,14 +84,7 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
         std::cerr<< "number of moves is: " << num_moves << std::endl;
         std::cerr<< "sequence length is: " << template_read->seq.size() << std::endl;
 
-        float pad_value = -100; // Just  a fixed value for now
 
-        auto tmp2 = torch::zeros({3, 5}, opts);
-
-        //test - can we write a value directly? yes!
-        tmp2[0][0] = 0.4;
-        tmp2[1][0] = 0.5;
-        tmp2[0][1] = 0.6;
 
         // Step one - we need three cursors (besides the sequence ones)
         // 1. TSignal cursor
@@ -110,37 +103,81 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
             template_moves_seen += template_read->moves[template_signal_cursor];
         }
 
-        int target_moves_seen = template_read->moves[template_signal_cursor];
-        while(target_moves_seen < query_cursor + 1){
+
+        auto complement_moves = complement_read->moves;
+        complement_moves.push_back(1);
+        std::reverse(complement_moves.begin(), complement_moves.end());
+        complement_moves.pop_back();
+
+        auto complement_signal = complement_read->raw_data;
+        complement_signal = torch::flip(complement_read->raw_data, 0);
+
+        int complement_moves_seen = complement_read->moves[complement_signal_cursor];
+        while(complement_moves_seen < query_cursor + 1){
             complement_signal_cursor++;
-            target_moves_seen += complement_read->moves[complement_signal_cursor];
+            complement_moves_seen += complement_moves[complement_signal_cursor];
         }
 
+        std::cerr << complement_moves << std::endl;
 
-        int stereo_global_cursor = 0;
+        float pad_value = -100; // TODO use a correct pad value
+
+        tmp.index({torch::indexing::Slice(None, 2)}) = pad_value;
+
+
+
+        int stereo_global_cursor = 0; // Index into the stereo-encoded signal
         for (int i = start_alignment_position; i < end_alignment_position; i++) {
         // We move along every alignment position. For every position we need to add signal and padding.
-            bool t_end = false; // have we reached the end of this move for the template?
-            bool q_end = false; // have we reached the end of this move for the complement?
-
             //Let us add the respective nucleotides and q-scores
+
+            int template_segment_length = 0; // index into this segment in signal-space
+            int complement_segment_length = 0; // index into this segment in signal-space
 
             // If there is *not* an insertion to the query, add the nucleotide from the target cursor
             if (result.alignment[i] != 2) {
                 char nucleotide = template_sequence.at(target_cursor);
-                tmp[2 + (0b11 & (nucleotide >> 2 ^ nucleotide >> 1))][stereo_global_cursor] = 1;
-                tmp[11][stereo_global_cursor] = template_q_scores.at(target_cursor); // To-do some kind of normalisation is needed here
+                //need to initialise
+                tmp[0][template_segment_length + stereo_global_cursor] = template_read->raw_data[template_signal_cursor];
+                tmp[2 + (0b11 & (nucleotide >> 2 ^ nucleotide >> 1))][stereo_global_cursor + template_segment_length] = 1;
+                tmp[11][stereo_global_cursor + template_segment_length] = template_q_scores.at(target_cursor); // TODO some kind of normalisation is needed here
+
+                template_segment_length++;
+                template_signal_cursor++;
+                auto max_signal_length = template_read->moves.size();
+                while(template_read->moves[template_signal_cursor] == 0 && (template_signal_cursor < max_signal_length)){
+                    auto val = template_read->raw_data[template_signal_cursor];
+                    tmp[0][stereo_global_cursor + template_segment_length] = val;
+                    tmp[2 + (0b11 & (nucleotide >> 2 ^ nucleotide >> 1))][stereo_global_cursor + template_segment_length] = 1;
+                    tmp[11][stereo_global_cursor + template_segment_length] = template_q_scores.at(target_cursor); // TODO some kind of normalisation is needed here
+                    template_signal_cursor++;
+                    template_segment_length++;
+                }
             }
 
+            // If there is *not* an insertion to the target, add the nucleotide from the query cursor
             if (result.alignment[i] != 1) {
-                char nucleotide = complement_sequence_reverse_complement.at(query_cursor); // Question - are
-                tmp[6 + (0b11 & (nucleotide >> 2 ^ nucleotide >> 1))][stereo_global_cursor] = 1;
-                tmp[12][stereo_global_cursor] = complemnet_q_scores_reversed.at(target_cursor); // To-do some kind of normalisation is needed here
+                char nucleotide = complement_sequence_reverse_complement.at(query_cursor);
+                //need to initialise
+                tmp[1][complement_segment_length + stereo_global_cursor] = complement_signal[complement_signal_cursor];
+                tmp[6 + (0b11 & (nucleotide >> 2 ^ nucleotide >> 1))][stereo_global_cursor + complement_segment_length] = 1;
+                tmp[12][stereo_global_cursor + complement_segment_length] = complemnet_q_scores_reversed.at(query_cursor); // TODO some kind of normalisation is needed here
+
+                complement_segment_length++;
+                complement_signal_cursor++;
+                auto max_signal_length = complement_read->moves.size();
+                while(complement_read->moves[complement_signal_cursor] == 0 && (complement_signal_cursor < max_signal_length)){
+                    auto val = template_read->raw_data[complement_signal_cursor];
+                    tmp[1][stereo_global_cursor + complement_segment_length] = val;
+                    tmp[6 + (0b11 & (nucleotide >> 2 ^ nucleotide >> 1))][stereo_global_cursor + complement_segment_length] = 1;
+                    tmp[12][stereo_global_cursor + complement_segment_length] = complemnet_q_scores_reversed.at(target_cursor); // TODO some kind of normalisation is needed here
+                    complement_signal_cursor++;
+                    complement_segment_length++;
+                }
             }
 
-            // Now let's add the remaining signal - main confusion is how do we deal with the reverse signal (from the complement)
-
-
+            tmp[10][stereo_global_cursor] = 1; //set the move table TODO is this the correct way to do it
+            stereo_global_cursor += std::max(template_segment_length, complement_segment_length);
             // Update query and target cursors
             //Anything excluding a query insertion causes the target cursor to advance
             if (result.alignment[i] != 2) {
@@ -151,59 +188,13 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
             if (result.alignment[i] != 1) {
                 query_cursor++;
             }
-            stereo_global_cursor++;
         }
 
         tmp = tmp.index({torch::indexing::Slice(None),
-                         torch::indexing::Slice(None, stereo_global_cursor)});
+                         torch::indexing::Slice(None, 200)});
 
         std::cerr << tmp << std::endl;
 
-        std::vector<char> consensus;
-        std::vector<char> quality_scores_phred;
-
-        // Loop over each alignment position, within given alignment boundaries
-        for (int i = start_alignment_position; i < end_alignment_position; i++) {
-            //Comparison between q-scores is done in Phred space which is offset by 33
-            if (template_q_scores.at(target_cursor) >=
-                complemnet_q_scores_reversed.at(
-                        query_cursor)) {  // Target has a higher quality score
-                // If there is *not* an insertion to the query, add the nucleotide from the target cursor
-                if (result.alignment[i] != 2) {
-                    consensus.push_back(template_sequence.at(target_cursor));
-                    quality_scores_phred.push_back(template_q_scores.at(target_cursor));
-                }
-            } else {
-                // If there is *not* an insertion to the target, add the nucleotide from the query cursor
-                if (result.alignment[i] != 1) {
-                    consensus.push_back(complement_sequence_reverse_complement.at(query_cursor));
-                    quality_scores_phred.push_back(complemnet_q_scores_reversed.at(query_cursor));
-                }
-            }
-
-            //Anything excluding a query insertion causes the target cursor to advance
-            if (result.alignment[i] != 2) {
-                target_cursor++;
-            }
-
-            //Anything but a target insertion and query advances
-            if (result.alignment[i] != 1) {
-                query_cursor++;
-            }
-        }
-
-        if (template_read->read_id == "025c2ee5-6775-43b8-85cb-0397fef88d5b") {
-            std::cerr << "Consensus is " << std::string(consensus.begin(), consensus.end())
-                      << std::endl;
-        }
-
-        // Step 4 - Assign the data to a new read,
-        read->seq = std::string(consensus.begin(), consensus.end());
-        read->qstring = std::string(quality_scores_phred.begin(), quality_scores_phred.end());
-        read->read_id = std::string(template_read->read_id + ";" + complement_read->read_id);
-
-        std::cerr << template_read->seq << std::endl;
-        std::cerr << complement_read->seq << std::endl;
 
         return read;
     }
