@@ -63,7 +63,7 @@ ModuleHolder<AnyModule> populate_model(Model &&model,
                                        const torch::TensorOptions &options,
                                        bool decomposition,
                                        bool bias) {
-    auto state_dict = dorado::load_crf_weights(path, decomposition, bias);
+    auto state_dict = dorado::load_crf_model_weights(path, decomposition, bias);
     model->load_state_dict(state_dict);
     model->to(options.dtype_opt().value().toScalarType());
     model->to(options.device_opt().value());
@@ -670,9 +670,9 @@ CRFModelConfig load_crf_model_config(const std::filesystem::path &path) {
     return config;
 }
 
-std::vector<torch::Tensor> load_crf_weights(const std::filesystem::path &dir,
-                                            bool decomposition,
-                                            bool bias) {
+std::vector<torch::Tensor> load_crf_model_weights(const std::filesystem::path &dir,
+                                                  bool decomposition,
+                                                  bool bias) {
     auto tensors = std::vector<std::string>{
 
             "0.conv.weight.tensor",      "0.conv.bias.tensor",
