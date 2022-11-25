@@ -63,7 +63,7 @@ ModuleHolder<AnyModule> populate_model(Model &&model,
                                        const torch::TensorOptions &options,
                                        bool decomposition,
                                        bool bias) {
-    auto state_dict = model->load_weights(path, decomposition, bias);
+    auto state_dict = dorado::load_crf_weights(path, decomposition, bias);
     model->load_state_dict(state_dict);
     model->to(options.dtype_opt().value().toScalarType());
     model->to(options.device_opt().value());
@@ -580,45 +580,6 @@ struct CRFModelImpl : Module {
         return encoder->forward(x);
     }
 
-    std::vector<torch::Tensor> load_weights(const std::filesystem::path &dir,
-                                            bool decomposition,
-                                            bool bias) {
-        auto tensors = std::vector<std::string>{
-
-                "0.conv.weight.tensor",      "0.conv.bias.tensor",
-
-                "1.conv.weight.tensor",      "1.conv.bias.tensor",
-
-                "2.conv.weight.tensor",      "2.conv.bias.tensor",
-
-                "4.rnn.weight_ih_l0.tensor", "4.rnn.weight_hh_l0.tensor",
-                "4.rnn.bias_ih_l0.tensor",   "4.rnn.bias_hh_l0.tensor",
-
-                "5.rnn.weight_ih_l0.tensor", "5.rnn.weight_hh_l0.tensor",
-                "5.rnn.bias_ih_l0.tensor",   "5.rnn.bias_hh_l0.tensor",
-
-                "6.rnn.weight_ih_l0.tensor", "6.rnn.weight_hh_l0.tensor",
-                "6.rnn.bias_ih_l0.tensor",   "6.rnn.bias_hh_l0.tensor",
-
-                "7.rnn.weight_ih_l0.tensor", "7.rnn.weight_hh_l0.tensor",
-                "7.rnn.bias_ih_l0.tensor",   "7.rnn.bias_hh_l0.tensor",
-
-                "8.rnn.weight_ih_l0.tensor", "8.rnn.weight_hh_l0.tensor",
-                "8.rnn.bias_ih_l0.tensor",   "8.rnn.bias_hh_l0.tensor",
-
-                "9.linear.weight.tensor"};
-
-        if (bias) {
-            tensors.push_back("9.linear.bias.tensor");
-        }
-
-        if (decomposition) {
-            tensors.push_back("10.linear.weight.tensor");
-        }
-
-        return utils::load_tensors(dir, tensors);
-    }
-
     LSTMStackType rnns{nullptr};
     LinearCRF linear{nullptr};
     Linear linear1{nullptr}, linear2{nullptr};
@@ -707,6 +668,45 @@ CRFModelConfig load_crf_model_config(const std::filesystem::path &path) {
 #endif
 
     return config;
+}
+
+std::vector<torch::Tensor> load_crf_weights(const std::filesystem::path &dir,
+                                            bool decomposition,
+                                            bool bias) {
+    auto tensors = std::vector<std::string>{
+
+            "0.conv.weight.tensor",      "0.conv.bias.tensor",
+
+            "1.conv.weight.tensor",      "1.conv.bias.tensor",
+
+            "2.conv.weight.tensor",      "2.conv.bias.tensor",
+
+            "4.rnn.weight_ih_l0.tensor", "4.rnn.weight_hh_l0.tensor",
+            "4.rnn.bias_ih_l0.tensor",   "4.rnn.bias_hh_l0.tensor",
+
+            "5.rnn.weight_ih_l0.tensor", "5.rnn.weight_hh_l0.tensor",
+            "5.rnn.bias_ih_l0.tensor",   "5.rnn.bias_hh_l0.tensor",
+
+            "6.rnn.weight_ih_l0.tensor", "6.rnn.weight_hh_l0.tensor",
+            "6.rnn.bias_ih_l0.tensor",   "6.rnn.bias_hh_l0.tensor",
+
+            "7.rnn.weight_ih_l0.tensor", "7.rnn.weight_hh_l0.tensor",
+            "7.rnn.bias_ih_l0.tensor",   "7.rnn.bias_hh_l0.tensor",
+
+            "8.rnn.weight_ih_l0.tensor", "8.rnn.weight_hh_l0.tensor",
+            "8.rnn.bias_ih_l0.tensor",   "8.rnn.bias_hh_l0.tensor",
+
+            "9.linear.weight.tensor"};
+
+    if (bias) {
+        tensors.push_back("9.linear.bias.tensor");
+    }
+
+    if (decomposition) {
+        tensors.push_back("10.linear.weight.tensor");
+    }
+
+    return utils::load_tensors(dir, tensors);
 }
 
 ModuleHolder<AnyModule> load_crf_model(const std::filesystem::path &path,

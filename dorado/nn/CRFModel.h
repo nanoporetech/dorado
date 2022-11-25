@@ -4,6 +4,7 @@
 
 #include <filesystem>
 #include <optional>
+#include <vector>
 
 namespace dorado {
 
@@ -27,6 +28,10 @@ struct CRFModelConfig {
 };
 
 CRFModelConfig load_crf_model_config(const std::filesystem::path& path);
+
+std::vector<torch::Tensor> load_crf_weights(const std::filesystem::path& dir,
+                                            bool decomposition,
+                                            bool bias);
 
 torch::nn::ModuleHolder<torch::nn::AnyModule> load_crf_model(const std::filesystem::path& path,
                                                              const CRFModelConfig& model_config,
