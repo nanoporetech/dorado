@@ -20,8 +20,7 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
 
     std::vector<uint8_t> complemnet_q_scores_reversed(complement_read->qstring.begin(),
                                                       complement_read->qstring.end());
-    std::reverse(complemnet_q_scores_reversed.begin(),
-                 complemnet_q_scores_reversed.end());  // -33 ?
+    std::reverse(complemnet_q_scores_reversed.begin(), complemnet_q_scores_reversed.end());
 
     std::vector<char> template_sequence(template_read->seq.begin(), template_read->seq.end());
     std::vector<uint8_t> template_q_scores(template_read->qstring.begin(),
@@ -64,6 +63,7 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
             (start_alignment_position < end_alignment_position) &&
             ((end_alignment_position - start_alignment_position) > min_trimmed_alignment_length);
 
+    int stride = 5;  // TODO this needs to be passed in as a parameter
     std::shared_ptr<dorado::Read> read = std::make_shared<dorado::Read>();
     if (consensus_possible) {
         //dorado::utils::preprocess_quality_scores(template_q_scores);
@@ -78,13 +78,11 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
 
         // Diagnostics one: Is sum of move vector the same length as the sequence
         int num_moves = 0;
-        for(int i=0; i< template_read->moves.size(); i++){
+        for (int i = 0; i < template_read->moves.size(); i++) {
             num_moves += template_read->moves[i];
         }
-        std::cerr<< "number of moves is: " << num_moves << std::endl;
-        std::cerr<< "sequence length is: " << template_read->seq.size() << std::endl;
-
-
+        std::cerr << "number of moves is: " << num_moves << std::endl;
+        std::cerr << "sequence length is: " << template_read->seq.size() << std::endl;
 
         // Step one - we need three cursors (besides the sequence ones)
         // 1. TSignal cursor
@@ -97,59 +95,82 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
         int template_signal_cursor = 0;
         int complement_signal_cursor = 0;
 
-        int template_moves_seen = template_read->moves[template_signal_cursor];
-        while(template_moves_seen < target_cursor + 1){
-            template_signal_cursor++;
-            template_moves_seen += template_read->moves[template_signal_cursor];
+        std::vector<uint8_t> template_moves_expanded;
+        for (int i = 0; i < template_read->moves.size(); i++) {
+            template_moves_expanded.push_back(template_read->moves[i]);
+            for (int j = 0; j < stride - 1; j++) {
+                template_moves_expanded.push_back(0);
+            }
+        }  // TODO add the last elements
+        int extra_moves = template_moves_expanded.size() - template_read->raw_data.size(0);
+        for (int i = 0; i < extra_moves; i++) {
+            template_moves_expanded.pop_back();
         }
 
+        std::cerr << "Raw data size: " << template_read->raw_data.size(0) << std::endl;
+        std::cerr << "Expanded move table size: " << template_moves_expanded.size() << std::endl;
 
-        auto complement_moves = complement_read->moves;
-        complement_moves.push_back(1);
-        std::reverse(complement_moves.begin(), complement_moves.end());
-        complement_moves.pop_back();
+        int template_moves_seen = template_moves_expanded[template_signal_cursor];
+        while (template_moves_seen < target_cursor + 1) {  // TODO: is this +1 correct?
+            template_signal_cursor++;
+            template_moves_seen += template_moves_expanded[template_signal_cursor];
+        }
+
+        std::vector<uint8_t> complement_moves_expanded;
+        for (int i = 0; i < complement_read->moves.size(); i++) {
+            complement_moves_expanded.push_back(complement_read->moves[i]);
+            for (int j = 0; j < stride - 1; j++) {
+                complement_moves_expanded.push_back(0);
+            }
+        }  // TODO add the last elements
+
+        extra_moves = complement_moves_expanded.size() - complement_read->raw_data.size(0);
+        for (int i = 0; i < extra_moves; i++) {
+            complement_moves_expanded.pop_back();
+        }
+        std::cerr << "Raw data size: " << complement_read->raw_data.size(0) << std::endl;
+        std::cerr << "Expanded move table size: " << complement_moves_expanded.size() << std::endl;
+
+        complement_moves_expanded.push_back(1);
+        std::reverse(complement_moves_expanded.begin(), complement_moves_expanded.end());
+        complement_moves_expanded.pop_back();
 
         auto complement_signal = complement_read->raw_data;
         complement_signal = torch::flip(complement_read->raw_data, 0);
 
         int complement_moves_seen = complement_read->moves[complement_signal_cursor];
-        while(complement_moves_seen < query_cursor + 1){
+        while (complement_moves_seen < query_cursor + 1) {
             complement_signal_cursor++;
-            complement_moves_seen += complement_moves[complement_signal_cursor];
+            complement_moves_seen += complement_moves_expanded[complement_signal_cursor];
         }
 
-        std::cerr << complement_moves << std::endl;
+        std::cerr << complement_moves_expanded << std::endl;
 
-        float pad_value = -100; // TODO use a correct pad value
+        float pad_value = 0.8 * std::min(torch::min(complement_signal).item<float>(),
+                                         torch::min(template_read->raw_data).item<float>());
 
         tmp.index({torch::indexing::Slice(None, 2)}) = pad_value;
 
-
-
-        int stereo_global_cursor = 0; // Index into the stereo-encoded signal
+        int stereo_global_cursor = 0;  // Index into the stereo-encoded signal
         for (int i = start_alignment_position; i < end_alignment_position; i++) {
-        // We move along every alignment position. For every position we need to add signal and padding.
+            // We move along every alignment position. For every position we need to add signal and padding.
             //Let us add the respective nucleotides and q-scores
 
-            int template_segment_length = 0; // index into this segment in signal-space
-            int complement_segment_length = 0; // index into this segment in signal-space
+            int template_segment_length = 0;    // index into this segment in signal-space
+            int complement_segment_length = 0;  // index into this segment in signal-space
 
             // If there is *not* an insertion to the query, add the nucleotide from the target cursor
             if (result.alignment[i] != 2) {
-                char nucleotide = template_sequence.at(target_cursor);
                 //need to initialise
-                tmp[0][template_segment_length + stereo_global_cursor] = template_read->raw_data[template_signal_cursor];
-                tmp[2 + (0b11 & (nucleotide >> 2 ^ nucleotide >> 1))][stereo_global_cursor + template_segment_length] = 1;
-                tmp[11][stereo_global_cursor + template_segment_length] = template_q_scores.at(target_cursor); // TODO some kind of normalisation is needed here
-
+                tmp[0][template_segment_length + stereo_global_cursor] =
+                        template_read->raw_data[template_signal_cursor];
                 template_segment_length++;
                 template_signal_cursor++;
-                auto max_signal_length = template_read->moves.size();
-                while(template_read->moves[template_signal_cursor] == 0 && (template_signal_cursor < max_signal_length)){
-                    auto val = template_read->raw_data[template_signal_cursor];
-                    tmp[0][stereo_global_cursor + template_segment_length] = val;
-                    tmp[2 + (0b11 & (nucleotide >> 2 ^ nucleotide >> 1))][stereo_global_cursor + template_segment_length] = 1;
-                    tmp[11][stereo_global_cursor + template_segment_length] = template_q_scores.at(target_cursor); // TODO some kind of normalisation is needed here
+                auto max_signal_length = template_moves_expanded.size();
+                while (template_moves_expanded[template_signal_cursor] == 0 &&
+                       (template_signal_cursor < max_signal_length)) {
+                    tmp[0][stereo_global_cursor + template_segment_length] =
+                            template_read->raw_data[template_signal_cursor];
                     template_signal_cursor++;
                     template_segment_length++;
                 }
@@ -159,25 +180,49 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
             if (result.alignment[i] != 1) {
                 char nucleotide = complement_sequence_reverse_complement.at(query_cursor);
                 //need to initialise
-                tmp[1][complement_segment_length + stereo_global_cursor] = complement_signal[complement_signal_cursor];
-                tmp[6 + (0b11 & (nucleotide >> 2 ^ nucleotide >> 1))][stereo_global_cursor + complement_segment_length] = 1;
-                tmp[12][stereo_global_cursor + complement_segment_length] = complemnet_q_scores_reversed.at(query_cursor); // TODO some kind of normalisation is needed here
+                tmp[1][complement_segment_length + stereo_global_cursor] =
+                        complement_signal[complement_signal_cursor];
 
                 complement_segment_length++;
                 complement_signal_cursor++;
-                auto max_signal_length = complement_read->moves.size();
-                while(complement_read->moves[complement_signal_cursor] == 0 && (complement_signal_cursor < max_signal_length)){
-                    auto val = template_read->raw_data[complement_signal_cursor];
-                    tmp[1][stereo_global_cursor + complement_segment_length] = val;
-                    tmp[6 + (0b11 & (nucleotide >> 2 ^ nucleotide >> 1))][stereo_global_cursor + complement_segment_length] = 1;
-                    tmp[12][stereo_global_cursor + complement_segment_length] = complemnet_q_scores_reversed.at(target_cursor); // TODO some kind of normalisation is needed here
+                auto max_signal_length = complement_moves_expanded.size();
+                while (complement_moves_expanded[complement_signal_cursor] == 0 &&
+                       (complement_signal_cursor < max_signal_length)) {
+                    tmp[1][stereo_global_cursor + complement_segment_length] =
+                            complement_signal[complement_signal_cursor];
                     complement_signal_cursor++;
                     complement_segment_length++;
                 }
             }
 
-            tmp[10][stereo_global_cursor] = 1; //set the move table TODO is this the correct way to do it
-            stereo_global_cursor += std::max(template_segment_length, complement_segment_length);
+            int total_segment_length = std::max(template_segment_length, complement_segment_length);
+
+            // Now, add the nucleotides and q scores
+            if (result.alignment[i] != 2) {
+                char nucleotide = template_sequence.at(target_cursor);
+                for (int i = 0; i < total_segment_length; i++) {
+                    tmp[2 + (0b11 & (nucleotide >> 2 ^ nucleotide >> 1))]
+                       [stereo_global_cursor + i] = 1;
+                    tmp[11][stereo_global_cursor + i] =
+                            float(template_q_scores.at(target_cursor) - 33) / 90;
+                }
+            }
+
+            // Now, add the nucleotides and q scores
+            if (result.alignment[i] != 1) {
+                char nucleotide = complement_sequence_reverse_complement.at(query_cursor);
+                for (int i = 0; i < total_segment_length; i++) {
+                    tmp[6 + (0b11 & (nucleotide >> 2 ^ nucleotide >> 1))]
+                       [stereo_global_cursor + i] = 1;
+                    tmp[12][stereo_global_cursor + i] =
+                            float(complemnet_q_scores_reversed.at(query_cursor) - 33) / 90;
+                }
+            }
+
+            tmp[10][stereo_global_cursor] = 1;  //set the move table
+
+            //update the global cursor
+            stereo_global_cursor += total_segment_length;
             // Update query and target cursors
             //Anything excluding a query insertion causes the target cursor to advance
             if (result.alignment[i] != 2) {
@@ -190,11 +235,9 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
             }
         }
 
-        tmp = tmp.index({torch::indexing::Slice(None),
-                         torch::indexing::Slice(None, 200)});
+        tmp = tmp.index({torch::indexing::Slice(None), torch::indexing::Slice(None, 200)});
 
         std::cerr << tmp << std::endl;
-
 
         return read;
     }
