@@ -390,15 +390,14 @@ struct MetalBlockImpl : Module {
 TORCH_MODULE(MetalBlock);
 
 struct MetalModelImpl : Module {
-    MetalModelImpl(int size,
-                   int outsize,
-                   int stride,
+    MetalModelImpl(const CRFModelConfig &config,
                    int chunk_size,
                    int batch_size,
                    int out_split,
-                   MTL::Device *device) {
-        mtl_block = register_module("mtl_block", MetalBlock(chunk_size, batch_size, stride, size,
-                                                            outsize, out_split, device));
+                   MTL::Device *const device) {
+        mtl_block = register_module("mtl_block",
+                                    MetalBlock(chunk_size, batch_size, config.stride, config.insize,
+                                               config.outsize, out_split, device));
     }
 
     void load_state_dict(const std::vector<torch::Tensor> &weights) {
@@ -428,39 +427,28 @@ public:
         // LSTM kernels, which run with the full supplied batch size, require that the batch size
         // be an integral multiple of 48.
         assert(batch_size % 48 == 0);
-        auto config = toml::parse(model_path / "config.toml");
-        const auto &qscore = toml::find(config, "qscore");
-        const auto qbias = toml::find<float>(qscore, "bias");
-        const auto qscale = toml::find<float>(qscore, "scale");
+
+        const auto model_config = load_crf_model_config(model_path);
+        m_model_stride = static_cast<size_t>(model_config.stride);
 
         m_device = get_mtl_device();
 
         m_decoder_options = DecoderOptions();
-        m_decoder_options.q_shift = qbias;
-        m_decoder_options.q_scale = qscale;
+        m_decoder_options.q_shift = model_config.qbias;
+        m_decoder_options.q_scale = model_config.qscale;
 
-        const auto &encoder = toml::find(config, "encoder");
-        const auto scale = toml::find<float>(encoder, "scale");
-        const auto stride = toml::find<int>(encoder, "stride");
-        const auto insize = toml::find<int>(encoder, "features");
-        const auto blank_score = toml::find<float>(encoder, "blank_score");
+        // adjust chunk size to a multiple of the stride
+        chunk_size -= chunk_size % model_config.stride;
 
-        const auto &global_norm = toml::find(config, "global_norm");
-        const auto state_len = toml::find<int>(global_norm, "state_len");
-
+        // TODO -- we don't honour the config n_base
         constexpr int n_base = 4;
         constexpr int num_transitions = 5;
+        m_states = pow(n_base, model_config.state_len);
 
-        m_states = pow(n_base, state_len);
         m_batch_size = batch_size;
-        int outsize = m_states * num_transitions;
-
-        m_model_stride = static_cast<size_t>(stride);
-        // adjust chunk size to a multiple of the stride
-        chunk_size -= chunk_size % stride;
 
         // Chunk size after decimation via convolution stride.
-        m_out_chunk_size = chunk_size / stride;
+        m_out_chunk_size = chunk_size / model_config.stride;
 
         auto state_dict = load_weights(model_path);
 
@@ -468,13 +456,15 @@ public:
         auto lb = state_dict[state_dict.size() - 1];
 
         state_dict[state_dict.size() - 2] =
-                F::pad(lw.view({m_states, 4, insize}), F::PadFuncOptions({0, 0, 1, 0}).value(0.0))
-                        .view({outsize, insize});
+                F::pad(lw.view({m_states, 4, model_config.insize}),
+                       F::PadFuncOptions({0, 0, 1, 0}).value(0.0))
+                        .view({model_config.outsize, model_config.insize});
 
         state_dict[state_dict.size() - 1] =
                 F::pad(lb.view({m_states, 4}),
-                       F::PadFuncOptions({1, 0}).value(atanh(blank_score / scale)))
-                        .view({outsize});
+                       F::PadFuncOptions({1, 0}).value(
+                               atanh(model_config.blank_score / model_config.scale)))
+                        .view({model_config.outsize});
 
         // Allocations beyond 4GB can fail, and the linear layer output buffer
         // hits this limit with batch sizes larger than 384 with typical
@@ -492,9 +482,9 @@ public:
         // already constrained to be an integral multiple of 48, this means the
         // batch splitting factor must be an exact divisor of the batch_size / 48.
         constexpr auto kMaxBufferSize = static_cast<int64_t>(1) << 32;
-        const auto complete_linear_out_size = static_cast<int64_t>(m_out_chunk_size) *
-                                              static_cast<int64_t>(batch_size) *
-                                              static_cast<int64_t>(outsize) * sizeof(float);
+        const auto complete_linear_out_size =
+                static_cast<int64_t>(m_out_chunk_size) * static_cast<int64_t>(batch_size) *
+                static_cast<int64_t>(model_config.outsize) * sizeof(float);
         const int num_batch_pieces = batch_size / 48;
         for (m_out_split = 1; m_out_split < num_batch_pieces; ++m_out_split) {
             if (num_batch_pieces % m_out_split == 0 &&
@@ -510,8 +500,7 @@ public:
         m_out_batch_size = batch_size / m_out_split;
         assert(m_out_batch_size % 48 == 0);
 
-        m_model = nn::MetalModel(insize, outsize, stride, chunk_size, batch_size, m_out_split,
-                                 m_device);
+        m_model = nn::MetalModel(model_config, chunk_size, batch_size, m_out_split, m_device);
         m_model->load_state_dict(state_dict);
         m_model->eval();
 
@@ -529,10 +518,10 @@ public:
         }
 
         int T = m_out_chunk_size;
-        int C = outsize;
+        int C = model_config.outsize;
         int Cs = m_states;
 
-        int y = pow(n_base, state_len);
+        int y = pow(n_base, model_config.state_len);
 
         m_scan_idx[0][0] = torch::arange(C, torch::kInt32).contiguous();
         auto t1 = torch::arange(y).index({torch::indexing::Slice(), torch::indexing::None});
