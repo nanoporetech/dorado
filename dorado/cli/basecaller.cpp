@@ -39,7 +39,8 @@ void setup(std::vector<std::string> args,
            size_t remora_batch_size,
            size_t num_remora_threads,
            bool emit_fastq,
-           bool emit_moves) {
+           bool emit_moves,
+           size_t max_reads) {
     torch::set_num_threads(1);
     std::vector<Runner> runners;
 
@@ -153,7 +154,7 @@ void setup(std::vector<std::string> args,
                 writer_node, std::move(runners), batch_size, chunk_size, overlap, model_stride);
     }
     ScalerNode scaler_node(*basecaller_node, num_devices * 2);
-    DataLoader loader(scaler_node, "cpu", num_devices);
+    DataLoader loader(scaler_node, "cpu", num_devices, max_reads);
     loader.load_reads(data_path);
 }
 
@@ -207,6 +208,8 @@ int basecaller(int argc, char* argv[]) {
             .default_value(std::string())
             .help("a comma separated list of remora models");
 
+    parser.add_argument("--max-reads").default_value(0).scan<'i', int>();
+
     try {
         parser.parse_args(argc, argv);
     } catch (const std::exception& e) {
@@ -229,7 +232,7 @@ int basecaller(int argc, char* argv[]) {
               parser.get<int>("-c"), parser.get<int>("-o"), parser.get<int>("-b"),
               parser.get<int>("-r"), parser.get<int>("--remora-batchsize"),
               parser.get<int>("--remora-threads"), parser.get<bool>("--emit-fastq"),
-              parser.get<bool>("--emit-moves"));
+              parser.get<bool>("--emit-moves"), parser.get<int>("--max-reads"));
     } catch (const std::exception& e) {
         spdlog::error("{}", e.what());
         return 1;
