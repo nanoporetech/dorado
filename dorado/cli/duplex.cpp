@@ -113,11 +113,30 @@ int duplex(int argc, char* argv[]) {
             }
         }
 #endif  // __APPLE__
+        std::vector<Runner> stereo_runners;
+        auto devices = utils::parse_cuda_device_string(device);
+        std::string stereo_model("/data/duplex_data/stereo_models/dna_r10.4.1_e8.2_4khz_400bps_duplex@v4.0.alpha");
+        for (auto device_string : devices) {
+            auto caller = create_cuda_caller(stereo_model, chunk_size, batch_size, device_string);
+            for (size_t i = 0; i < num_runners; i++) {
+                stereo_runners.push_back(
+                        std::make_shared<CudaModelRunner>(caller, 9995, batch_size));
+            }
+        }
+
+        // TO DO:
+        // 1. Pass correct model
+        // 2. Set up cleanly (so apple is also OK or just doesn't run)
+
+        std::unique_ptr<BasecallerNode> stereo_basecaller_node;
+        // STEREO FAST MODEL RUNNER AND CALLER START HERE
+        stereo_basecaller_node = std::make_unique<BasecallerNode>(
+                writer_node, std::move(stereo_runners), 256, 9995, overlap, model_stride);
 
         StereoDuplexEncoderNode stereo_node = StereoDuplexEncoderNode(
-                writer_node,
+                *stereo_basecaller_node,
                 std::move(
-                        template_complement_map));  //Currently the StereoDuplexEncoderNode just outputs the read it receives into the writer node
+                        template_complement_map));  //TODO: try bypass stereo encoding and just forward the read for re-bascalling (send back template read)
 
         std::unique_ptr<BasecallerNode> basecaller_node;
         basecaller_node = std::make_unique<BasecallerNode>(

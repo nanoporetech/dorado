@@ -64,7 +64,9 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
             ((end_alignment_position - start_alignment_position) > min_trimmed_alignment_length);
 
     int stride = 5;  // TODO this needs to be passed in as a parameter
+
     std::shared_ptr<dorado::Read> read = std::make_shared<dorado::Read>();
+
     if (consensus_possible) {
         //dorado::utils::preprocess_quality_scores(template_q_scores);
         //dorado::utils::preprocess_quality_scores(complemnet_q_scores_reversed);
@@ -243,10 +245,12 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
                  torch::indexing::Slice(
                          None,
                          stereo_global_cursor)});  // TODO check if stereo_global_cursor is the correct limit here
-        torch::save(tmp, "/home/OXFORDNANOLABS/mvella/stereo_tensor3.pt");
+        //torch::save(tmp, "/home/OXFORDNANOLABS/mvella/stereo_tensor3.pt");
 
         //std::cerr << tmp << std::endl;
 
+        read->read_id = template_read->read_id + ";" + complement_read->read_id;
+        read->raw_data = tmp; // use the encoded signal
         return read;
     }
     return read;
@@ -320,8 +324,12 @@ void StereoDuplexEncoderNode::worker_thread() {
 
                 std::shared_ptr<Read> stereo_encoded_read =
                         stereo_encode(template_read, complement_read);
-                if (stereo_encoded_read->seq.size() > 100) {
+                std::cerr << "ndims : " << stereo_encoded_read->raw_data.ndimension() << std::endl;
+
+                if (stereo_encoded_read->raw_data.ndimension() == 2) { // 2 dims for stereo encoding, 1 for simpex
                     //m_sink.push_read(stereo_encoded_read);  // Found a partner, so process it.
+                    std::cerr << "sizes is: " << stereo_encoded_read->raw_data.sizes() << std::endl;
+                    m_sink.push_read(stereo_encoded_read);  // Found a partner, so process it.
                 }
             }
         }

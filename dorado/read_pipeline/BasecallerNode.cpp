@@ -50,8 +50,15 @@ void BasecallerNode::input_worker_thread() {
                 continue;
             }
 
+            // TODO this needs to work for stereo.
             // Here, we chunk up the read and put the chunks into the pending chunk list.
-            size_t raw_size = read->raw_data.size(0);
+            size_t raw_size;
+            // TODO ensure following logic is correct
+            if(read->raw_data.ndimension() == 1){
+                raw_size = read->raw_data.size(0);
+            } else{
+                raw_size = read->raw_data.sizes()[1]; // Triggered for Stereo
+            }
             size_t offset = 0;
             size_t chunk_in_read_idx = 0;
             size_t signal_chunk_step = m_chunk_size - m_overlap;
@@ -183,9 +190,16 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
 
             // Copy the chunk into the input tensor
             std::shared_ptr<Read> source_read = chunk->source_read.lock();
+
             auto input_slice = source_read->raw_data.index(
-                    {Slice(chunk->input_offset, chunk->input_offset + m_chunk_size)});
-            size_t slice_size = input_slice.size(0);
+                    {"...", Slice(chunk->input_offset, chunk->input_offset + m_chunk_size)});
+            size_t slice_size;
+            if (input_slice.ndimension() == 1) {
+                slice_size = input_slice.size(0);
+            } else{
+                slice_size = input_slice.sizes()[1];
+            }
+
 
             // repeat-pad any non-full chunks
             if (slice_size != m_chunk_size) {

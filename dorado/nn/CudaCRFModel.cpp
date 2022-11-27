@@ -102,6 +102,7 @@ public:
 
             std::unique_lock<std::mutex> task_lock(task->mut);
             auto scores = m_module->forward(task->input);
+            torch::cuda::synchronize();
             task->out = m_decoder->gpu_part(scores, task->num_chunks, m_decoder_options);
             stream.synchronize();
             task->done = true;
@@ -136,21 +137,34 @@ CudaModelRunner::CudaModelRunner(std::shared_ptr<CudaCaller> caller, int chunk_s
     // adjust chunk size to be a multiple of the stride
     chunk_size -= chunk_size % model_stride();
 
-    m_input = torch::empty({batch_size, 1, chunk_size}, torch::TensorOptions()
-                                                                .dtype(m_caller->m_options.dtype())
-                                                                .device(torch::kCPU)
-                                                                .pinned_memory(true));
+    if (chunk_size == 9995) { // TODO - nasty hack
+        m_input = torch::empty({batch_size, 13, chunk_size},
+                               torch::TensorOptions()
+                                       .dtype(m_caller->m_options.dtype())
+                                       .device(torch::kCPU)
+                                       .pinned_memory(true));
+    } else {
+        m_input = torch::empty({batch_size, 1, chunk_size},
+                               torch::TensorOptions()
+                                       .dtype(m_caller->m_options.dtype())
+                                       .device(torch::kCPU)
+                                       .pinned_memory(true));
+    }
 
     long int block_size = chunk_size / model_stride();
     m_output = torch::empty(
             {3, batch_size, block_size},
             torch::TensorOptions().dtype(torch::kInt8).device(torch::kCPU).pinned_memory(true));
     // warm up
-    call_chunks(batch_size);
+    //call_chunks(batch_size); // TODO - undisable warmup
 }
 
 void CudaModelRunner::accept_chunk(int chunk_idx, at::Tensor slice) {
-    m_input.index_put_({chunk_idx, 0}, slice);
+    m_input.index_put_({chunk_idx, "..."}, slice); // TODO is this ellipses correct? worth checking this one out with pytorch
+    if (slice.ndimension() == 2){
+/*        std::cerr << m_input << std::endl;
+        std::cerr << "NDIM 2! " << std::endl;*/
+    }
 }
 
 std::vector<DecodedChunk> CudaModelRunner::call_chunks(int num_chunks) {

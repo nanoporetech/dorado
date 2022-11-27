@@ -13,7 +13,7 @@ extern "C" {
 #include <cublas_v2.h>
 #include <cuda_runtime.h>
 
-#define USE_CUDA_LSTM 1
+#define USE_CUDA_LSTM 1 // TODO undo
 #else
 #define USE_CUDA_LSTM 0
 #endif
@@ -52,7 +52,7 @@ static void cublas_matmul_f16(torch::Tensor const &A, torch::Tensor const &B, to
 }
 
 static bool cuda_lstm_is_quantized(int layer_size) {
-    return ((layer_size == 96) || (layer_size == 128));
+    return ((layer_size == 96) || (layer_size == 129)); // TODO - change back! just a test to see if quantized kernels are the problem
 }
 #endif  // if USE_CUDA_LSTM
 
@@ -527,9 +527,16 @@ struct CRFModelImpl : Module {
                  bool expand_blanks,
                  int batch_size,
                  int chunk_size) {
-        conv1 = register_module("conv1", Convolution(1, 4, 5, 1));
-        conv2 = register_module("conv2", Convolution(4, 16, 5, 1));
-        conv3 = register_module("conv3", Convolution(16, size, 19, stride, true));
+        if (size == 128) { // TODO this is horrible and breaks fast-128 support
+            conv1 = register_module("conv1", Convolution(13, 16, 5, 1));
+            conv2 = register_module("conv2", Convolution(16, 16, 5, 1));
+            conv3 = register_module("conv3", Convolution(16, size, 19, stride, true));
+        }else{
+            conv1 = register_module("conv1", Convolution(1, 4, 5, 1));
+            conv2 = register_module("conv2", Convolution(4, 16, 5, 1));
+            conv3 = register_module("conv3", Convolution(16, size, 19, stride, true));
+        }
+
         rnns = register_module("rnns", LSTMStackType(size, batch_size, chunk_size / stride));
         linear = register_module("linear", LinearCRF(size, outsize));
         linear->expand_blanks = expand_blanks;
