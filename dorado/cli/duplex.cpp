@@ -26,6 +26,7 @@
 namespace dorado {
 
 int duplex(int argc, char* argv[]) {
+    using dorado::utils::default_parameters;
     utils::InitLogging();
 
     argparse::ArgumentParser parser("dorado", DORADO_VERSION);
@@ -34,9 +35,27 @@ int duplex(int argc, char* argv[]) {
     parser.add_argument("--pairs").help("Space-delimited csv containing read ID pairs.");
     parser.add_argument("--emit-fastq").default_value(false).implicit_value(true);
     parser.add_argument("-t", "--threads").default_value(0).scan<'i', int>();
+
     parser.add_argument("-x", "--device")
             .help("device string in format \"cuda:0,...,N\", \"cuda:all\", \"metal\" etc..")
             .default_value(utils::default_parameters.device);
+
+    parser.add_argument("-b", "--batchsize")
+            .default_value(default_parameters.batchsize)
+            .scan<'i', int>()
+            .help("if 0 an optimal batchsize will be selected");
+
+    parser.add_argument("-c", "--chunksize")
+            .default_value(default_parameters.chunksize)
+            .scan<'i', int>();
+
+    parser.add_argument("-o", "--overlap")
+            .default_value(default_parameters.overlap)
+            .scan<'i', int>();
+
+    parser.add_argument("-r", "--num_runners")
+            .default_value(default_parameters.num_runners)
+            .scan<'i', int>();
     try {
         parser.parse_args(argc, argv);
     } catch (const std::exception& e) {
@@ -44,38 +63,38 @@ int duplex(int argc, char* argv[]) {
         std::exit(1);
     }
 
-    std::string device = parser.get<std::string>("-x");
-
-    std::string model = parser.get<std::string>("model");
-    std::string reads = parser.get<std::string>("reads");
-    std::string pairs_file = parser.get<std::string>("--pairs");
-    size_t threads = static_cast<size_t>(parser.get<int>("--threads"));
+    auto device(parser.get<std::string>("-x"));
+    auto model(parser.get<std::string>("model"));
+    auto reads(parser.get<std::string>("reads"));
+    auto pairs_file(parser.get<std::string>("--pairs"));
+    auto threads = static_cast<size_t>(parser.get<int>("--threads"));
     bool emit_fastq = parser.get<bool>("--emit-fastq");
     std::vector<std::string> args(argv, argv + argc);
 
     spdlog::info("> Loading pairs file");
     std::map<std::string, std::string> template_complement_map = utils::load_pairs_file(pairs_file);
+    spdlog::info("> Pairs file loaded");
 
     WriterNode writer_node(std::move(args), emit_fastq, false, true, 4);
     torch::set_num_threads(1);
 
-    if (model.compare("basespace") == 0) {
+    if (model.compare("basespace") == 0) { // Execute a Basespace duplex pipeline.
         spdlog::info("> Loading reads");
         std::map<std::string, std::shared_ptr<Read>> read_map = utils::read_bam(reads);
+        spdlog::info("> Starting Basespace Duplex Pipeline");
 
         threads = threads == 0 ? std::thread::hardware_concurrency() : threads;
         BaseSpaceDuplexCallerNode duplex_caller_node(writer_node, template_complement_map, read_map,
                                                      threads);
-    } else {  // Execute a Stereo Basecall pipeline.
-
-        // ***** STEREO STARTS HERE *** //
+    } else {  // Execute a Stereo Duplex pipeline.
         torch::set_num_threads(1);
         std::vector<Runner> runners;
-        int num_devices = 1;
-        size_t batch_size = 0;
-        size_t model_stride = 5;    // TODO: Set in CLI
-        size_t chunk_size = 10000;  // TODO: Set in CLI
-        size_t overlap = 500;       // TODO: Set in CLI
+        std::vector<Runner> stereo_runners;
+
+        int num_devices;
+        int batch_size(parser.get<int>("-b"));
+        int chunk_size(parser.get<int>("-c"));
+        int overlap(parser.get<int>("-o"));
         size_t num_runners = 1;
 
         if (device == "cpu") {
@@ -84,17 +103,9 @@ int duplex(int argc, char* argv[]) {
                 runners.push_back(std::make_shared<ModelRunner<CPUDecoder>>(
                         model, device, chunk_size, batch_size));
             }
-
 #ifdef __APPLE__
-        } else if (device == "metal") {
-            batch_size = batch_size == 0 ? utils::auto_gpu_batch_size(model) : batch_size;
-            auto caller = create_metal_caller(model, chunk_size, batch_size);
-            for (int i = 0; i < num_runners; i++) {
-                runners.push_back(
-                        std::make_shared<MetalModelRunner>(caller, chunk_size, batch_size));
-            }
         } else {
-            throw std::runtime_error(std::string("Unsupported device: ") + device);
+            throw std::runtime_error(std::string("Stereo Duplex currently unspported on Metal"));
         }
 #else   // ifdef __APPLE__
         } else {
@@ -111,37 +122,36 @@ int duplex(int argc, char* argv[]) {
                             std::make_shared<CudaModelRunner>(caller, chunk_size, batch_size));
                 }
             }
-        }
-#endif  // __APPLE__
-        std::vector<Runner> stereo_runners;
-        auto devices = utils::parse_cuda_device_string(device);
-        std::string stereo_model("/data/duplex_data/stereo_models/dna_r10.4.1_e8.2_4khz_400bps_duplex@v4.0.alpha");
-        for (auto device_string : devices) {
-            auto caller = create_cuda_caller(stereo_model, chunk_size, batch_size, device_string);
-            for (size_t i = 0; i < num_runners; i++) {
-                stereo_runners.push_back(
-                        std::make_shared<CudaModelRunner>(caller, 9995, batch_size));
+
+            size_t stereo_batch_size = 256;
+            std::string stereo_model("dna_r10.4.1_e8.2_4khz_mixedspeed_duplex@v4.0.beta");
+            for (auto device_string : devices) {
+                auto caller = create_cuda_caller(stereo_model, 9995, stereo_batch_size, device_string);
+                for (size_t i = 0; i < num_runners; i++) {
+                    stereo_runners.push_back(
+                            std::make_shared<CudaModelRunner>(caller, 9995, batch_size));
+                }
             }
         }
-
-        // TO DO:
-        // 1. Pass correct model
-        // 2. Set up cleanly (so apple is also OK or just doesn't run)
+#endif  // __APPLE__
+        spdlog::info("> Starting Stereo Duplex pipeline");
 
         std::unique_ptr<BasecallerNode> stereo_basecaller_node;
-        // STEREO FAST MODEL RUNNER AND CALLER START HERE
+
+        auto stereo_model_stride = stereo_runners.front()->model_stride();
         stereo_basecaller_node = std::make_unique<BasecallerNode>(
-                writer_node, std::move(stereo_runners), 256, 9995, overlap, model_stride);
+                writer_node, std::move(stereo_runners), 256, 9995, overlap, stereo_model_stride);
 
         StereoDuplexEncoderNode stereo_node = StereoDuplexEncoderNode(
                 *stereo_basecaller_node,
-                std::move(
-                        template_complement_map));  //TODO: try bypass stereo encoding and just forward the read for re-bascalling (send back template read)
+                std::move(template_complement_map));
 
         std::unique_ptr<BasecallerNode> basecaller_node;
+        auto simplex_model_stride = runners.front()->model_stride();
         basecaller_node = std::make_unique<BasecallerNode>(
-                stereo_node, std::move(runners), batch_size, chunk_size, overlap, model_stride);
+                stereo_node, std::move(runners), batch_size, chunk_size, overlap, simplex_model_stride);
         ScalerNode scaler_node(*basecaller_node, num_devices * 2);
+
         DataLoader loader(scaler_node, "cpu", num_devices);
         loader.load_reads(reads);
     }
