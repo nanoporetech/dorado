@@ -60,10 +60,10 @@ namespace {
 template <class Model>
 ModuleHolder<AnyModule> populate_model(Model &&model,
                                        const std::filesystem::path &path,
-                                       torch::TensorOptions options,
+                                       const torch::TensorOptions &options,
                                        bool decomposition,
                                        bool bias) {
-    auto state_dict = model->load_weights(path, decomposition, bias);
+    auto state_dict = dorado::load_crf_model_weights(path, decomposition, bias);
     model->load_state_dict(state_dict);
     model->to(options.dtype_opt().value().toScalarType());
     model->to(options.device_opt().value());
@@ -539,38 +539,34 @@ TORCH_MODULE(Clamp);
 
 template <class LSTMStackType>
 struct CRFModelImpl : Module {
-    CRFModelImpl(int conv,
-                 int size,
-                 int outsize,
-                 int stride,
-                 int decomposition,
-                 bool clamp,
-                 bool expand_blanks,
-                 int batch_size,
-                 int chunk_size) {
-        conv1 = register_module("conv1", Convolution(1, conv, 5, 1));
-        clamp1 = Clamp(-0.5, 3.5, clamp);
-        conv2 = register_module("conv2", Convolution(conv, 16, 5, 1));
-        clamp2 = Clamp(-0.5, 3.5, clamp);
-        conv3 = register_module("conv3", Convolution(16, size, 19, stride, true));
-        clamp3 = Clamp(-0.5, 3.5, clamp);
+    CRFModelImpl(const CRFModelConfig &config, bool expand_blanks, int batch_size, int chunk_size) {
+        conv1 = register_module("conv1", Convolution(1, config.conv, 5, 1));
+        clamp1 = Clamp(-0.5, 3.5, config.clamp);
+        conv2 = register_module("conv2", Convolution(config.conv, 16, 5, 1));
+        clamp2 = Clamp(-0.5, 3.5, config.clamp);
+        conv3 = register_module("conv3", Convolution(16, config.insize, 19, config.stride, true));
+        clamp3 = Clamp(-0.5, 3.5, config.clamp);
 
-        rnns = register_module("rnns", LSTMStackType(size, batch_size, chunk_size / stride));
+        rnns = register_module(
+                "rnns", LSTMStackType(config.insize, batch_size, chunk_size / config.stride));
 
-        if (decomposition) {
-            linear1 = register_module("linear1", Linear(size, decomposition));
-            linear2 = register_module("linear2",
-                                      Linear(LinearOptions(decomposition, outsize).bias(false)));
-            clamp4 = Clamp(-5.0, 5.0, clamp);
+        if (config.out_features.has_value()) {
+            // The linear layer is decomposed into 2 matmuls.
+            const int decomposition = config.out_features.value();
+            linear1 = register_module("linear1", Linear(config.insize, decomposition));
+            linear2 = register_module(
+                    "linear2", Linear(LinearOptions(decomposition, config.outsize).bias(false)));
+            clamp4 = Clamp(-5.0, 5.0, config.clamp);
             encoder = Sequential(conv1, clamp1, conv2, clamp2, conv3, clamp3, rnns, linear1,
                                  linear2, clamp4);
-        } else if (conv == 16) {
-            linear1 = register_module("linear1", Linear(LinearOptions(size, outsize).bias(false)));
-            clamp4 = Clamp(-5.0, 5.0, clamp);
+        } else if (config.conv == 16) {
+            linear1 = register_module(
+                    "linear1", Linear(LinearOptions(config.insize, config.outsize).bias(false)));
+            clamp4 = Clamp(-5.0, 5.0, config.clamp);
             encoder =
                     Sequential(conv1, clamp1, conv2, clamp2, conv3, clamp3, rnns, linear1, clamp4);
         } else {
-            linear = register_module("linear1", LinearCRF(size, outsize));
+            linear = register_module("linear1", LinearCRF(config.insize, config.outsize));
             encoder = Sequential(conv1, conv2, conv3, rnns, linear);
         }
     }
@@ -582,45 +578,6 @@ struct CRFModelImpl : Module {
     torch::Tensor forward(torch::Tensor x) {
         nvtx3::scoped_range loop{"nn_forward"};
         return encoder->forward(x);
-    }
-
-    std::vector<torch::Tensor> load_weights(const std::filesystem::path &dir,
-                                            bool decomposition,
-                                            bool bias) {
-        auto tensors = std::vector<std::string>{
-
-                "0.conv.weight.tensor",      "0.conv.bias.tensor",
-
-                "1.conv.weight.tensor",      "1.conv.bias.tensor",
-
-                "2.conv.weight.tensor",      "2.conv.bias.tensor",
-
-                "4.rnn.weight_ih_l0.tensor", "4.rnn.weight_hh_l0.tensor",
-                "4.rnn.bias_ih_l0.tensor",   "4.rnn.bias_hh_l0.tensor",
-
-                "5.rnn.weight_ih_l0.tensor", "5.rnn.weight_hh_l0.tensor",
-                "5.rnn.bias_ih_l0.tensor",   "5.rnn.bias_hh_l0.tensor",
-
-                "6.rnn.weight_ih_l0.tensor", "6.rnn.weight_hh_l0.tensor",
-                "6.rnn.bias_ih_l0.tensor",   "6.rnn.bias_hh_l0.tensor",
-
-                "7.rnn.weight_ih_l0.tensor", "7.rnn.weight_hh_l0.tensor",
-                "7.rnn.bias_ih_l0.tensor",   "7.rnn.bias_hh_l0.tensor",
-
-                "8.rnn.weight_ih_l0.tensor", "8.rnn.weight_hh_l0.tensor",
-                "8.rnn.bias_ih_l0.tensor",   "8.rnn.bias_hh_l0.tensor",
-
-                "9.linear.weight.tensor"};
-
-        if (bias) {
-            tensors.push_back("9.linear.bias.tensor");
-        }
-
-        if (decomposition) {
-            tensors.push_back("10.linear.weight.tensor");
-        }
-
-        return utils::load_tensors(dir, tensors);
     }
 
     LSTMStackType rnns{nullptr};
@@ -641,60 +598,135 @@ TORCH_MODULE(CpuCRFModel);
 
 }  // namespace nn
 
-std::tuple<ModuleHolder<AnyModule>, size_t> load_crf_model(const std::filesystem::path &path,
-                                                           int batch_size,
-                                                           int chunk_size,
-                                                           torch::TensorOptions options) {
-    auto config = toml::parse(path / "config.toml");
+CRFModelConfig load_crf_model_config(const std::filesystem::path &path) {
+    const auto config_toml = toml::parse(path / "config.toml");
 
-    const auto &encoder = toml::find(config, "encoder");
-    const auto &global_norm = toml::find(config, "global_norm");
-    const auto state_len = toml::find<int>(global_norm, "state_len");
+    CRFModelConfig config;
+    config.qscale = 1.0f;
+    config.qbias = 0.0f;
 
-    int conv = 4;
-    int insize = 0;
-    int stride = 1;
-    bool bias = true;
-    bool clamp = false;
-    int decomposition = 0;
-
-    if (encoder.contains("type")) {
-        for (const auto &segment : toml::find(config, "encoder", "sublayers").as_array()) {
-            const auto type = toml::find<std::string>(segment, "type");
-            if (type.compare("convolution") == 0) {
-                stride *= toml::find<int>(segment, "stride");
-            } else if (type.compare("lstm") == 0) {
-                insize = toml::find<int>(segment, "size");
-            } else if (type.compare("linear") == 0) {
-                decomposition = toml::find<int>(segment, "out_features");
-            } else if (type.compare("clamp") == 0) {
-                clamp = true;
-            }
-        }
-        conv = 16;
-        bias = static_cast<bool>(insize > 128);
+    if (config_toml.contains("qscore")) {
+        const auto &qscore = toml::find(config_toml, "qscore");
+        config.qbias = toml::find<float>(qscore, "bias");
+        config.qscale = toml::find<float>(qscore, "scale");
     } else {
-        stride = toml::find<int>(encoder, "stride");
-        insize = toml::find<int>(encoder, "features");
+        spdlog::debug("> no qscore calibration found");
     }
 
-    int outsize = pow(4, state_len) * 4;
+    config.conv = 4;
+    config.insize = 0;
+    config.stride = 1;
+    config.bias = true;
+    config.clamp = false;
 
+    // The encoder scale only appears in pre-v4 models.  In v4 models
+    // the value of 1 is used.
+    config.scale = 1.0f;
+
+    const auto &encoder = toml::find(config_toml, "encoder");
+    if (encoder.contains("type")) {
+        // v4-type model
+        for (const auto &segment : toml::find(config_toml, "encoder", "sublayers").as_array()) {
+            const auto type = toml::find<std::string>(segment, "type");
+            if (type.compare("convolution") == 0) {
+                // Overall stride is the product of all conv layers' strides.
+                config.stride *= toml::find<int>(segment, "stride");
+            } else if (type.compare("lstm") == 0) {
+                config.insize = toml::find<int>(segment, "size");
+            } else if (type.compare("linear") == 0) {
+                // Specifying out_features implies a decomposition of the linear layer matrix
+                // multiply with a bottleneck before the final feature size.
+                config.out_features = toml::find<int>(segment, "out_features");
+            } else if (type.compare("clamp") == 0) {
+                config.clamp = true;
+            } else if (type.compare("linearcrfencoder") == 0) {
+                config.blank_score = toml::find<float>(segment, "blank_score");
+            }
+        }
+        config.conv = 16;
+        config.bias = config.insize > 128;
+    } else {
+        // pre-v4 model
+        config.stride = toml::find<int>(encoder, "stride");
+        config.insize = toml::find<int>(encoder, "features");
+        config.blank_score = toml::find<float>(encoder, "blank_score");
+        config.scale = toml::find<float>(encoder, "scale");
+    }
+
+    const auto &global_norm = toml::find(config_toml, "global_norm");
+    // Note that in v4 files state_len appears twice: under global_norm and under
+    // linearcrfencoder.  We are ignoring the latter.
+    config.state_len = toml::find<int>(global_norm, "state_len");
+
+#ifdef __APPLE__
+    // The Metal path outputs explicit stay scores from the NN.
+    // TODO -- remove explicit stay score output from the Metal path.
+    config.outsize = pow(4, config.state_len) * 5;
+#else
+    // CUDA and CPU paths do not output explicit stay scores from the NN.
+    config.outsize = pow(4, config.state_len) * 4;
+#endif
+
+    return config;
+}
+
+std::vector<torch::Tensor> load_crf_model_weights(const std::filesystem::path &dir,
+                                                  bool decomposition,
+                                                  bool bias) {
+    auto tensors = std::vector<std::string>{
+
+            "0.conv.weight.tensor",      "0.conv.bias.tensor",
+
+            "1.conv.weight.tensor",      "1.conv.bias.tensor",
+
+            "2.conv.weight.tensor",      "2.conv.bias.tensor",
+
+            "4.rnn.weight_ih_l0.tensor", "4.rnn.weight_hh_l0.tensor",
+            "4.rnn.bias_ih_l0.tensor",   "4.rnn.bias_hh_l0.tensor",
+
+            "5.rnn.weight_ih_l0.tensor", "5.rnn.weight_hh_l0.tensor",
+            "5.rnn.bias_ih_l0.tensor",   "5.rnn.bias_hh_l0.tensor",
+
+            "6.rnn.weight_ih_l0.tensor", "6.rnn.weight_hh_l0.tensor",
+            "6.rnn.bias_ih_l0.tensor",   "6.rnn.bias_hh_l0.tensor",
+
+            "7.rnn.weight_ih_l0.tensor", "7.rnn.weight_hh_l0.tensor",
+            "7.rnn.bias_ih_l0.tensor",   "7.rnn.bias_hh_l0.tensor",
+
+            "8.rnn.weight_ih_l0.tensor", "8.rnn.weight_hh_l0.tensor",
+            "8.rnn.bias_ih_l0.tensor",   "8.rnn.bias_hh_l0.tensor",
+
+            "9.linear.weight.tensor"};
+
+    if (bias) {
+        tensors.push_back("9.linear.bias.tensor");
+    }
+
+    if (decomposition) {
+        tensors.push_back("10.linear.weight.tensor");
+    }
+
+    return utils::load_tensors(dir, tensors);
+}
+
+ModuleHolder<AnyModule> load_crf_model(const std::filesystem::path &path,
+                                       const CRFModelConfig &model_config,
+                                       const int batch_size,
+                                       const int chunk_size,
+                                       const torch::TensorOptions &options) {
 #if USE_CUDA_LSTM
     if (options.device() != torch::kCPU) {
-        bool expand = false;
-        auto model = nn::CudaCRFModel(conv, insize, outsize, stride, decomposition, clamp, expand,
-                                      batch_size, chunk_size);
-        auto holder = populate_model(model, path, options, static_cast<bool>(decomposition), bias);
-        return {holder, static_cast<size_t>(stride)};
+        const bool expand_blanks = false;
+        auto model = nn::CudaCRFModel(model_config, expand_blanks, batch_size, chunk_size);
+        return populate_model(model, path, options, model_config.out_features.has_value(),
+                              model_config.bias);
     } else
 #endif
     {
-        bool expand = true;
-        auto model = nn::CpuCRFModel(conv, insize, outsize, stride, decomposition, clamp, expand,
-                                     batch_size, chunk_size);
-        auto holder = populate_model(model, path, options, static_cast<bool>(decomposition), bias);
-        return {holder, static_cast<size_t>(stride)};
+        const bool expand_blanks = true;
+        auto model = nn::CpuCRFModel(model_config, expand_blanks, batch_size, chunk_size);
+        return populate_model(model, path, options, model_config.out_features.has_value(),
+                              model_config.bias);
     }
 }
 
