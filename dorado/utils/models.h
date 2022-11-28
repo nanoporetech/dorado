@@ -63,7 +63,8 @@ static const std::map<std::string, std::string> models = {
 
 namespace utils {
 
-void download_models(std::string target_directory, std::string selected_model);
+bool is_valid_model(const std::string& selected_model);
+void download_models(const std::string& target_directory, const std::string& selected_model);
 
 }  // namespace utils
 

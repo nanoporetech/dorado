@@ -64,9 +64,7 @@ int download(int argc, char* argv[]) {
         return 0;
     }
 
-    if (selected_model != "all" &&
-        urls::simplex::models.find(selected_model) == urls::simplex::models.end() &&
-        urls::modified::models.find(selected_model) == urls::modified::models.end()) {
+    if (!utils::is_valid_model(selected_model)) {
         spdlog::error("> error: '{}' is not a valid model", selected_model);
         print_models();
         return 1;

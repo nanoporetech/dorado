@@ -11,7 +11,13 @@ namespace fs = std::filesystem;
 
 namespace dorado::utils {
 
-void download_models(std::string target_directory, std::string selected_model) {
+bool is_valid_model(const std::string& selected_model) {
+    return selected_model == "all" ||
+           urls::simplex::models.find(selected_model) != urls::simplex::models.end() ||
+           urls::modified::models.find(selected_model) != urls::modified::models.end();
+}
+
+void download_models(const std::string& target_directory, const std::string& selected_model) {
     fs::path directory(target_directory);
 
     httplib::Client http(urls::URL_ROOT);
