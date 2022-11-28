@@ -18,7 +18,7 @@ float MeanAbsDiff(const torch::Tensor &a, const torch::Tensor &b) {
     return torch::sum(torch::abs(a - b)).item<float>() / a.numel();
 }
 
-TEST_CASE(TEST_GROUP "LinearTanh") {
+TEST_CASE(TEST_GROUP "Linear") {
     // Basic device setup.
     // get_mtl_device sets up an allocator that provides GPU/CPU shared memory
     // launch_kernel will create a MTL::CommandBuffer for us.
@@ -60,12 +60,12 @@ TEST_CASE(TEST_GROUP "LinearTanh") {
     constexpr int kSimdGroupSize = 32;
     const int threads_per_thread_group = kernel_simd_groups * kSimdGroupSize;
 
-    // Create a ComputePipelineState for the LinearTanh kernel.
+    // Create a ComputePipelineState for the Linear kernel.
 
-    MTL::ComputePipelineState *const linear_tanh_cps = make_cps(
-            device, "linear_tanh", {{"kLstmLayerSize", layer_size}, {"kLinearLayerSize", out_size}},
+    MTL::ComputePipelineState *const linear_cps = make_cps(
+            device, "linear", {{"kLstmLayerSize", layer_size}, {"kLinearLayerSize", out_size}},
             threads_per_thread_group);
-    REQUIRE(linear_tanh_cps != nullptr);
+    REQUIRE(linear_cps != nullptr);
 
     // Create a ComputePipelineState for the input reordering kernel.
     MTL::ComputePipelineState *const reorder_input_cps =
@@ -105,7 +105,7 @@ TEST_CASE(TEST_GROUP "LinearTanh") {
     const torch::Tensor weights_biases_f16 =
             torch::cat({weights_f16, torch::unsqueeze(biases_f16, 0)}, 0);
 
-    // Prepare the input buffer for the LinearTanh kernel.
+    // Prepare the input buffer for the Linear kernel.
     // reorder_inputs transforms the input in 3 ways:
     // 1) Rearranges input tiles in a fairly complex manner.
     // 2) Adds one time step of padding before and after the chunk time extents.
@@ -145,11 +145,11 @@ TEST_CASE(TEST_GROUP "LinearTanh") {
         MTL::Buffer *const args_linear = create_vec_buffer(device, args_linear_);
         REQUIRE(args_linear != nullptr);
 
-        // Perform the LinearTanh computation.
+        // Perform the Linear computation.
         // float16 input -> int8 output
         torch::Tensor out_gpu_i8 =
                 torch::zeros({lstm_chunk_size * out_batch_size, out_size}, torch::kInt8);
-        launch_kernel(linear_tanh_cps, command_queue,
+        launch_kernel(linear_cps, command_queue,
                       {args_linear, mtl_for_tensor(in_f16_reordered),
                        mtl_for_tensor(weights_biases_f16), mtl_for_tensor(out_gpu_i8)},
                       tg_buffer_lens, kernel_thread_groups, threads_per_thread_group);
@@ -165,7 +165,7 @@ TEST_CASE(TEST_GROUP "LinearTanh") {
         const int out_batch_size = 48;
         const int32_t out_batch_tiles = out_batch_size / tile_size;
 
-        // Perform the LinearTanh computation via multiple runs, each on a subset of batch elements.
+        // Perform the Linear computation via multiple runs, each on a subset of batch elements.
         // The results are rearranged into a single tensor that should match the single run.
         torch::Tensor out_gpu_complete_i8 =
                 torch::zeros({lstm_chunk_size, in_batch_size, out_size}, torch::kInt8);
@@ -181,7 +181,7 @@ TEST_CASE(TEST_GROUP "LinearTanh") {
             torch::Tensor out_gpu_partial_i8 =
                     torch::zeros({lstm_chunk_size, out_batch_size, out_size}, torch::kInt8);
 
-            launch_kernel(linear_tanh_cps, command_queue,
+            launch_kernel(linear_cps, command_queue,
                           {args_linear, mtl_for_tensor(in_f16_reordered),
                            mtl_for_tensor(weights_biases_f16), mtl_for_tensor(out_gpu_partial_i8)},
                           tg_buffer_lens, kernel_thread_groups, threads_per_thread_group);
