@@ -57,7 +57,7 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
     if (consensus_possible) {
         // Step 3 - Move along the alignment, filling out the stereo-encoded tensor
         // Prepare the encoding tensor
-        int max_size = template_read->raw_data.size(0) + template_read->raw_data.size(0);
+        int max_size = template_read->raw_data.size(0) + complement_read->raw_data.size(0);
         auto opts = torch::TensorOptions().dtype(torch::kFloat16).device(torch::kCPU);
         int num_features = 13;
         auto tmp = torch::zeros({num_features, max_size}, opts);
