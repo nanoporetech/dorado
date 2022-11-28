@@ -1,15 +1,12 @@
-#define CPPHTTPLIB_OPENSSL_SUPPORT
-
 #include "Version.h"
-#include "elzip/elzip.hpp"
-#include "httplib.h"
-#include "models.h"
 #include "utils/log_utils.h"
+#include "utils/models.h"
 
 #include <argparse.hpp>
 #include <spdlog/spdlog.h>
 
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <sstream>
 
@@ -68,7 +65,8 @@ int download(int argc, char* argv[]) {
     }
 
     if (selected_model != "all" &&
-        urls::simplex::models.find(selected_model) == urls::simplex::models.end()) {
+        urls::simplex::models.find(selected_model) == urls::simplex::models.end() &&
+        urls::modified::models.find(selected_model) == urls::modified::models.end()) {
         spdlog::error("> error: '{}' is not a valid model", selected_model);
         print_models();
         return 1;
@@ -100,31 +98,7 @@ int download(int argc, char* argv[]) {
         return 1;
     }
 
-    httplib::Client http(urls::URL_ROOT);
-    http.enable_server_certificate_verification(false);
-    http.set_follow_location(true);
-
-    auto download_models = [&](std::map<std::string, std::string> models) {
-        for (const auto& [model, url] : models) {
-            if (selected_model == "all" || selected_model == model) {
-                spdlog::info(" - downloading {}", model);
-                auto res = http.Get(url.c_str());
-                if (res != nullptr) {
-                    fs::path archive(directory / (model + ".zip"));
-                    std::ofstream ofs(archive.string(), std::ofstream::binary);
-                    ofs << res->body;
-                    ofs.close();
-                    elz::extractZip(archive, directory);
-                    fs::remove(archive);
-                } else {
-                    spdlog::error("Failed to download {}", model);
-                }
-            }
-        }
-    };
-
-    download_models(urls::simplex::models);
-    download_models(urls::modified::models);
+    utils::download_models(directory.string(), selected_model);
 
     return 0;
 }

@@ -2,7 +2,8 @@
 #include <string>
 #include <vector>
 
-namespace dorado::urls {
+namespace dorado {
+namespace urls {
 
 static const std::string URL_ROOT = "https://nanoporetech.box.com";
 
@@ -58,5 +59,12 @@ static const std::map<std::string, std::string> models = {
 };
 
 }  // namespace modified
+}  // namespace urls
 
-}  // namespace dorado::urls
+namespace utils {
+
+void download_models(std::string target_directory, std::string selected_model);
+
+}  // namespace utils
+
+}  // namespace dorado
