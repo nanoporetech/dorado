@@ -10,7 +10,7 @@ struct DefaultParameters {
 #endif
     int batchsize{0};
     int chunksize{10000};
-    int overlap{200};
+    int overlap{500};
     int num_runners{2};
     int remora_batchsize{1024};
     int remora_threads{2};
