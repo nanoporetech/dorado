@@ -7,8 +7,13 @@ constant int TILE_SIZE = 8;
 // creation time.
 constant int kLstmLayerSize [[function_constant(0)]];
 constant bool kLstmReversedInTime [[function_constant(1)]];
-constant int kLinearLayerSize [[function_constant(2)]];
-constant bool kClampConvOutput [[function_constant(3)]];
+constant int kLinearContractDim [[function_constant(2)]];
+constant int kLinearInnerDim [[function_constant(3)]];
+constant bool kClampConvOutput [[function_constant(4)]];
+constant float kLinearOutputScale [[function_constant(5)]];
+constant bool kLinearOutputClamp [[function_constant(6)]];
+constant bool kLinearOutputTanh [[function_constant(7)]];
+constant bool kLinearOutputAsByte [[function_constant(8)]];
 
 namespace {
 
@@ -216,7 +221,7 @@ kernel void conv1_out4_simd_reorder_weights
     }
 }
 
-// Rearranges/replicates weights for v4-type conv1, where output feature size is 4.
+// Rearranges/replicates weights for v4-type conv1, where output feature size is 16.
 // Currently just type conversion
 kernel void conv1_out16_simd_reorder_weights
 (
@@ -836,17 +841,14 @@ struct LinearArgs {
     int in_batch_tiles;
     int in_batch_tile_offset;
     int out_batch_tiles;
-    int chunk_size;
+    int chunk_size;  // FIXME -- rename, since it could be decomposition feature size
 };
 
-// TODO:
-// 1) Make tanh optional.
-// 2) Make output type switchable.
 kernel void linear(
         device const LinearArgs* const args,
         device ftype* const in_buf,
         device const ftype* const weights_buf,
-        device int8_t* const out_buf,
+        device void* const out_buf,
         // The size of this buffer is set via MTL::ComputeCommandEncoder.
         // It depends on the SIMD group count.
         threadgroup ftype (* const simd_out_buf)[TILE_SIZE * TILE_SIZE],
@@ -856,19 +858,22 @@ kernel void linear(
     const int in_batch_tile_offset = args->in_batch_tile_offset;
     const int out_batch_tiles = args->out_batch_tiles;
     const int m_blks = out_batch_tiles / SIMD_TILES_M;
-    const int n_blks = kLinearLayerSize / (TILE_SIZE * SIMD_TILES_N);
-    const int k_blks = kLstmLayerSize / TILE_SIZE;
+    const int n_blks = kLinearInnerDim / (TILE_SIZE * SIMD_TILES_N);
+    const int k_blks = kLinearContractDim / TILE_SIZE;
     const int in_stride = in_batch_tiles * TILE_SIZE;
-    const int W_stride = kLinearLayerSize;
-    const int out_stride = kLinearLayerSize;
+    const int W_stride = kLinearInnerDim;
+    const int out_stride = kLinearInnerDim;
     simdgroup_ftype8x8 A[SIMD_TILES_M], B[SIMD_TILES_N], C[SIMD_TILES_M * SIMD_TILES_N];
 
-    device const ftype* const b = weights_buf + kLstmLayerSize * W_stride;
+    device const ftype* const b = weights_buf + kLinearContractDim * W_stride;
 
     for (int ts = gid; ts < chunk_size; ts += threadgroups) {
         auto in = in_buf + in_batch_tile_offset * TILE_SIZE +
-                  (ts + 1) * in_batch_tiles * TILE_SIZE * kLstmLayerSize;
-        auto out = out_buf + ts * kLinearLayerSize * out_batch_tiles * TILE_SIZE;
+                  (ts + 1) * in_batch_tiles * TILE_SIZE * kLinearContractDim;
+        const auto out_buf_offset = ts * kLinearInnerDim * out_batch_tiles * TILE_SIZE;
+        device auto* const out_int8 = (device int8_t*)out_buf + out_buf_offset;
+        device auto* const out_ftype = (device ftype*)out_buf + out_buf_offset;
+
         for (int m_blk = 0; m_blk < m_blks; ++m_blk) {
             for (int n_blk = sid; n_blk < n_blks; n_blk += simdgroups) {
                 for (int i = 0; i < SIMD_TILES_N; ++i) {
@@ -929,14 +934,23 @@ kernel void linear(
                         const uint tile_i = (m_blk * SIMD_TILES_M + i) * TILE_SIZE;
                         const uint tile_j = (n_blk * SIMD_TILES_N + j) * TILE_SIZE;
 
-                        // Apply tanh activation, scale to byte range, and store to the output
-                        // buffer.
+                        // Apply tanh activation or clamping, scaling, and type conversion.
+                        // Store to the output buffer.
                         for (int elem = tid & 31; elem < TILE_SIZE * TILE_SIZE; elem += 32) {
+                            const ftype matmul_output = simd_out_buf[sid][elem];
+                            const auto with_clamp = kLinearOutputClamp ? clamp(ftype(-4.0f), ftype(4.0f), matmul_output) : matmul_output;
+                            const auto with_tanh = kLinearOutputTanh ? tanh_fast(with_clamp) : with_clamp;
+                            const auto with_scale = with_tanh * kLinearOutputScale;
+
                             const int in_tile_i = elem / TILE_SIZE;
                             const int in_tile_j = elem % TILE_SIZE;
-                            out[(tile_i + in_tile_i) * out_stride + tile_j + in_tile_j] =
-                                static_cast<int8_t>(tanh_fast(simd_out_buf[sid][elem]) * 127.0f);
-
+                            if (kLinearOutputAsByte) {
+                                out_int8[(tile_i + in_tile_i) * out_stride + tile_j + in_tile_j] =
+                                    static_cast<int8_t>(with_scale);
+                            } else {
+                                out_ftype[(tile_i + in_tile_i) * out_stride + tile_j + in_tile_j] =
+                                    static_cast<ftype>(with_scale);
+                            }
                         }
                     }
                 }

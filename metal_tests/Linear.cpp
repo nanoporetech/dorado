@@ -61,10 +61,14 @@ TEST_CASE(TEST_GROUP "Linear") {
     const int threads_per_thread_group = kernel_simd_groups * kSimdGroupSize;
 
     // Create a ComputePipelineState for the Linear kernel.
-
-    MTL::ComputePipelineState *const linear_cps = make_cps(
-            device, "linear", {{"kLstmLayerSize", layer_size}, {"kLinearLayerSize", out_size}},
-            threads_per_thread_group);
+    MTL::ComputePipelineState *const linear_cps = make_cps(device, "linear",
+                                                           {{"kLinearContractDim", layer_size},
+                                                            {"kLinearInnerDim", out_size},
+                                                            {"kLinearOutputScale", 127.0f},
+                                                            {"kLinearOuputClamp", false},
+                                                            {"kLinearOutputTanh", true},
+                                                            {"kLinearOutputAsByte", true}},
+                                                           threads_per_thread_group);
     REQUIRE(linear_cps != nullptr);
 
     // Create a ComputePipelineState for the input reordering kernel.
