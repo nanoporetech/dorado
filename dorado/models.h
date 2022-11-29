@@ -11,10 +11,12 @@ namespace simplex {
 
 static const std::map<std::string, std::string> models = {
 
+        // v3.{3,4}
         {"dna_r9.4.1_e8_fast@v3.4", "/shared/static/vrfk86xjtot5jndy8175w4mus1zcojy4.zip"},
         {"dna_r9.4.1_e8_hac@v3.3", "/shared/static/g6rbgd12xfunw5plgec3zlyy35692vy3.zip"},
         {"dna_r9.4.1_e8_sup@v3.3", "/shared/static/ezdt941r757a4tldam46l6sjcpgjflj2.zip"},
 
+        // v3.5.2
         {"dna_r10.4.1_e8.2_260bps_fast@v3.5.2",
          "/shared/static/uegadbtxw3j76ommk092a9711tk6unli.zip"},
         {"dna_r10.4.1_e8.2_260bps_hac@v3.5.2",
@@ -29,6 +31,21 @@ static const std::map<std::string, std::string> models = {
         {"dna_r10.4.1_e8.2_400bps_sup@v3.5.2",
          "/shared/static/2qnx2lsc0bhfjgwydgvon8zxv9c9bu9j.zip"},
 
+        // v4.0.0
+        {"dna_r10.4.1_e8.2_260bps_fast@v4.0.0",
+         "/shared/static/ky2mrrmdwep5qgi8ht6b5hfvy5b2ojy9.zip"},
+        {"dna_r10.4.1_e8.2_260bps_hac@v4.0.0",
+         "/shared/static/nhxea41t11dg30hc70fg18bafj0yju8q.zip"},
+        {"dna_r10.4.1_e8.2_260bps_sup@v4.0.0",
+         "/shared/static/exzd2ezi6q708ynltkm6ckv361xgmam4.zip"},
+
+        {"dna_r10.4.1_e8.2_400bps_fast@v4.0.0",
+         "/shared/static/6xmmoltxeo8budtsxlak4qi0130m3opx.zip"},
+        {"dna_r10.4.1_e8.2_400bps_hac@v4.0.0",
+         "/shared/static/2ed0ab3r6b8tptjq582f98r17nyojvpk.zip"},
+        {"dna_r10.4.1_e8.2_400bps_sup@v4.0.0",
+         "/shared/static/i1f2unj1s6dplzpebl2bx4ytk8iqj0de.zip"},
+
 };
 
 }  // namespace simplex
@@ -37,10 +54,12 @@ namespace modified {
 
 static const std::map<std::string, std::string> models = {
 
+        // v3.{3,4}
         {"dna_r9.4.1_e8_fast@v3.4_5mCG@v0", "/shared/static/340iw6qus57wfvqseeqbcn6k7m4ifmfl.zip"},
         {"dna_r9.4.1_e8_hac@v3.4_5mCG@v0", "/shared/static/umgvspqcpwb3lv0ps956amjnvnko8ly6.zip"},
         {"dna_r9.4.1_e8_sup@v3.4_5mCG@v0", "/shared/static/dmgvhghorlpa12y4s782x1fx0fqdqgxl.zip"},
 
+        // v3.5.2
         {"dna_r10.4.1_e8.2_260bps_fast@v3.5.2_5mCG@v2",
          "/shared/static/4fj87s3b03eiewmz3uzeoa29yecr5l80.zip"},
         {"dna_r10.4.1_e8.2_260bps_hac@v3.5.2_5mCG@v2",
