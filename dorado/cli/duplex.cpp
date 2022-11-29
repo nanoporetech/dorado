@@ -97,6 +97,8 @@ int duplex(int argc, char* argv[]) {
         int overlap(parser.get<int>("-o"));
         size_t num_runners = 1;
 
+        size_t stereo_batch_size;
+
         if (device == "cpu") {
             batch_size = batch_size == 0 ? std::thread::hardware_concurrency() : batch_size;
             for (size_t i = 0; i < num_runners; i++) {
@@ -123,14 +125,14 @@ int duplex(int argc, char* argv[]) {
                 }
             }
 
-            size_t stereo_batch_size = 256;
+            stereo_batch_size = 256;
             std::string stereo_model("dna_r10.4.1_e8.2_4khz_mixedspeed_duplex@v4.0.beta");
             for (auto device_string : devices) {
                 auto caller =
                         create_cuda_caller(stereo_model, 9995, stereo_batch_size, device_string);
                 for (size_t i = 0; i < num_runners; i++) {
                     stereo_runners.push_back(
-                            std::make_shared<CudaModelRunner>(caller, 9995, batch_size));
+                            std::make_shared<CudaModelRunner>(caller, 9995, stereo_batch_size));
                 }
             }
         }
@@ -141,7 +143,8 @@ int duplex(int argc, char* argv[]) {
 
         auto stereo_model_stride = stereo_runners.front()->model_stride();
         stereo_basecaller_node = std::make_unique<BasecallerNode>(
-                writer_node, std::move(stereo_runners), 256, 9995, overlap, stereo_model_stride);
+                writer_node, std::move(stereo_runners), stereo_batch_size, 9995, overlap,
+                stereo_model_stride);
 
         StereoDuplexEncoderNode stereo_node = StereoDuplexEncoderNode(
                 *stereo_basecaller_node, std::move(template_complement_map));
