@@ -71,6 +71,9 @@ void setup(std::vector<std::string> args,
         }
         batch_size = batch_size == 0 ? utils::auto_gpu_batch_size(model_path.string(), devices)
                                      : batch_size;
+
+        spdlog::debug("- selected batchsize {}", batch_size);
+
         for (auto device_string : devices) {
             auto caller = create_cuda_caller(model_path, chunk_size, batch_size, device_string);
             for (size_t i = 0; i < num_runners; i++) {
@@ -90,13 +93,13 @@ void setup(std::vector<std::string> args,
     }));
 
     if (chunk_size != adjusted_chunk_size) {
-        spdlog::debug("Adjusted chunk size to match model stride: {} -> {}", chunk_size,
+        spdlog::debug("- adjusted chunk size to match model stride: {} -> {}", chunk_size,
                       adjusted_chunk_size);
         chunk_size = adjusted_chunk_size;
     }
     auto adjusted_overlap = (overlap / model_stride) * model_stride;
     if (overlap != adjusted_overlap) {
-        spdlog::debug("Adjusted overlap to match model stride: {} -> {}", overlap,
+        spdlog::debug("- adjusted overlap to match model stride: {} -> {}", overlap,
                       adjusted_overlap);
         overlap = adjusted_overlap;
     }
