@@ -148,18 +148,11 @@ void BaseSpaceDuplexCallerNode::basespace(std::string template_read_id,
             std::cerr << "Query cursor " << query_cursor << std::endl;
         }
 
-
         if (consensus_possible) {
             auto [consensus, quality_scores_phred] = compute_basespace_consensus(
-                    start_alignment_position,
-                    end_alignment_position,
-                    template_quality_scores,
-                    target_cursor,
-                    complement_quality_scores_reverse,
-                    query_cursor,
-                    template_sequence,
-                    complement_sequence_reverse_complement,
-                    result.alignment);
+                    start_alignment_position, end_alignment_position, template_quality_scores,
+                    target_cursor, complement_quality_scores_reverse, query_cursor,
+                    template_sequence, complement_sequence_reverse_complement, result.alignment);
 
             if (template_read->read_id == "025c2ee5-6775-43b8-85cb-0397fef88d5b") {
                 std::cerr << "Consensus is " << std::string(consensus.begin(), consensus.end())

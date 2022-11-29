@@ -54,10 +54,10 @@ void BasecallerNode::input_worker_thread() {
             // Here, we chunk up the read and put the chunks into the pending chunk list.
             size_t raw_size;
             // TODO ensure following logic is correct
-            if(read->raw_data.ndimension() == 1){
+            if (read->raw_data.ndimension() == 1) {
                 raw_size = read->raw_data.size(0);
-            } else{
-                raw_size = read->raw_data.sizes()[1]; // Triggered for Stereo
+            } else {
+                raw_size = read->raw_data.sizes()[1];  // Triggered for Stereo
             }
             size_t offset = 0;
             size_t chunk_in_read_idx = 0;
@@ -196,17 +196,25 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
             size_t slice_size;
             if (input_slice.ndimension() == 1) {
                 slice_size = input_slice.size(0);
-            } else{
+            } else {
                 slice_size = input_slice.sizes()[1];
             }
 
-
             // repeat-pad any non-full chunks
+
             if (slice_size != m_chunk_size) {
-                auto [n, overhang] = std::div((int)m_chunk_size, (int)slice_size);
-                input_slice =
-                        torch::concat({input_slice.repeat(n),
-                                       input_slice.index({torch::indexing::Slice(0, overhang)})});
+                if (input_slice.ndimension() == 1) {
+                    auto [n, overhang] = std::div((int)m_chunk_size, (int)slice_size);
+                    input_slice = torch::concat(
+                            {input_slice.repeat({n}),
+                             input_slice.index({"...", torch::indexing::Slice(0, overhang)})});
+                } else if (input_slice.ndimension() == 2) {
+                    auto [n, overhang] = std::div((int)m_chunk_size, (int)slice_size);
+                    input_slice = torch::concat(
+                            {input_slice.repeat({1, n}),
+                             input_slice.index({"...", torch::indexing::Slice(0, overhang)})},
+                            1);
+                }
             }
 
             // Insert the chunk in the input tensor

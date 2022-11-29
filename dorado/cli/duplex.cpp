@@ -78,7 +78,7 @@ int duplex(int argc, char* argv[]) {
     WriterNode writer_node(std::move(args), emit_fastq, false, true, 4);
     torch::set_num_threads(1);
 
-    if (model.compare("basespace") == 0) { // Execute a Basespace duplex pipeline.
+    if (model.compare("basespace") == 0) {  // Execute a Basespace duplex pipeline.
         spdlog::info("> Loading reads");
         std::map<std::string, std::shared_ptr<Read>> read_map = utils::read_bam(reads);
         spdlog::info("> Starting Basespace Duplex Pipeline");
@@ -126,7 +126,8 @@ int duplex(int argc, char* argv[]) {
             size_t stereo_batch_size = 256;
             std::string stereo_model("dna_r10.4.1_e8.2_4khz_mixedspeed_duplex@v4.0.beta");
             for (auto device_string : devices) {
-                auto caller = create_cuda_caller(stereo_model, 9995, stereo_batch_size, device_string);
+                auto caller =
+                        create_cuda_caller(stereo_model, 9995, stereo_batch_size, device_string);
                 for (size_t i = 0; i < num_runners; i++) {
                     stereo_runners.push_back(
                             std::make_shared<CudaModelRunner>(caller, 9995, batch_size));
@@ -143,13 +144,13 @@ int duplex(int argc, char* argv[]) {
                 writer_node, std::move(stereo_runners), 256, 9995, overlap, stereo_model_stride);
 
         StereoDuplexEncoderNode stereo_node = StereoDuplexEncoderNode(
-                *stereo_basecaller_node,
-                std::move(template_complement_map));
+                *stereo_basecaller_node, std::move(template_complement_map));
 
         std::unique_ptr<BasecallerNode> basecaller_node;
         auto simplex_model_stride = runners.front()->model_stride();
-        basecaller_node = std::make_unique<BasecallerNode>(
-                stereo_node, std::move(runners), batch_size, chunk_size, overlap, simplex_model_stride);
+        basecaller_node =
+                std::make_unique<BasecallerNode>(stereo_node, std::move(runners), batch_size,
+                                                 chunk_size, overlap, simplex_model_stride);
         ScalerNode scaler_node(*basecaller_node, num_devices * 2);
 
         DataLoader loader(scaler_node, "cpu", num_devices);

@@ -1,10 +1,10 @@
 #include "duplex_utils.h"
 
+#include "torch/torch.h"
+
 #include <algorithm>
 #include <fstream>
 #include <vector>
-
-#include "torch/torch.h"
 
 namespace dorado::utils {
 std::map<std::string, std::string> load_pairs_file(std::string pairs_file) {

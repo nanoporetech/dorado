@@ -9,9 +9,9 @@ namespace dorado {
 class BaseSpaceDuplexCallerNode : public ReadSink {
 public:
     BaseSpaceDuplexCallerNode(ReadSink& sink,
-                     std::map<std::string, std::string> template_complement_map,
-                     std::map<std::string, std::shared_ptr<Read>> reads,
-                     size_t threads);
+                              std::map<std::string, std::string> template_complement_map,
+                              std::map<std::string, std::shared_ptr<Read>> reads,
+                              size_t threads);
     ~BaseSpaceDuplexCallerNode();
 
 private:

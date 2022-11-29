@@ -211,7 +211,7 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
         //torch::save(tmp, "/home/OXFORDNANOLABS/mvella/stereo_tensor3.pt");
 
         read->read_id = template_read->read_id + ";" + complement_read->read_id;
-        read->raw_data = tmp; // use the encoded signal
+        read->raw_data = tmp;  // use the encoded signal
         return read;
     }
     return read;
@@ -281,7 +281,8 @@ void StereoDuplexEncoderNode::worker_thread() {
                 std::shared_ptr<Read> stereo_encoded_read =
                         stereo_encode(template_read, complement_read);
 
-                if (stereo_encoded_read->raw_data.ndimension() == 2) { // 2 dims for stereo encoding, 1 for simpex
+                if (stereo_encoded_read->raw_data.ndimension() ==
+                    2) {  // 2 dims for stereo encoding, 1 for simpex
                     m_sink.push_read(stereo_encoded_read);  // Found a partner, so process it.
                 }
             }
