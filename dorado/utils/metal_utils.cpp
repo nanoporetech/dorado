@@ -21,7 +21,7 @@ struct overloaded : Ts... {
     using Ts::operator()...;
 };
 template <class... Ts>
-overloaded(Ts...)->overloaded<Ts...>;
+overloaded(Ts...) -> overloaded<Ts...>;
 
 NS::String *get_library_location() {
     char ns_path[PATH_MAX + 1];
@@ -157,6 +157,7 @@ MTL::ComputePipelineState *make_cps(
     }
 
     auto cp_descriptor = MTL::ComputePipelineDescriptor::alloc();
+    cp_descriptor->init();
     cp_descriptor->setComputeFunction(kernel);
     if (max_total_threads_per_tg != -1)
         cp_descriptor->setMaxTotalThreadsPerThreadgroup(max_total_threads_per_tg);

@@ -11,11 +11,15 @@ std::map<std::string, std::string> load_pairs_file(std::string pairs_file) {
     std::ifstream dataFile;
     dataFile.open(pairs_file);
 
+    std::map<std::string, std::string> template_complement_map;
+
+    if (!dataFile.is_open()) {
+        throw std::runtime_error("Pairs file does not exist.");
+    }
     std::string cell;
     int line = 0;
 
     std::getline(dataFile, cell);
-    std::map<std::string, std::string> template_complement_map;
     while (!dataFile.eof()) {
         char delim = ' ';
         auto delim_pos = cell.find(delim);
