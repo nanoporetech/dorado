@@ -247,6 +247,7 @@ void StereoDuplexEncoderNode::worker_thread() {
         std::string partner_id;
 
         // Check if read is a template with corresponding complement
+        lock.lock();
         if (m_template_complement_map.find(read->read_id) != m_template_complement_map.end()) {
             read_is_template = true;
             partner_id = m_template_complement_map[read->read_id];
@@ -257,8 +258,10 @@ void StereoDuplexEncoderNode::worker_thread() {
                 partner_found = true;
             }
         }
+        lock.unlock();
 
         if (partner_found) {
+            lock.lock();
             if (read_cache.find(partner_id) == read_cache.end()) {
                 // Partner is not in the read cache
                 read_cache[read->read_id] = read;
@@ -269,6 +272,7 @@ void StereoDuplexEncoderNode::worker_thread() {
                 auto partner_read_itr = read_cache.find(partner_id);
                 auto partner_read = partner_read_itr->second;
                 read_cache.erase(partner_read_itr);
+                lock.unlock();
 
                 if (read_is_template) {
                     template_read = read;
@@ -300,9 +304,12 @@ StereoDuplexEncoderNode::StereoDuplexEncoderNode(
         m_complement_template_map[key.second] = key.first;
     }
 
-    std::unique_ptr<std::thread> stereo_encoder_worker_thread =
-            std::make_unique<std::thread>(&StereoDuplexEncoderNode::worker_thread, this);
-    worker_threads.push_back(std::move(stereo_encoder_worker_thread));
+    int num_worker_threads = std::thread::hardware_concurrency();
+    for (int i = 0; i < num_worker_threads; i++) {
+        std::unique_ptr<std::thread> stereo_encoder_worker_thread =
+                std::make_unique<std::thread>(&StereoDuplexEncoderNode::worker_thread, this);
+        worker_threads.push_back(std::move(stereo_encoder_worker_thread));
+    }
 }
 
 StereoDuplexEncoderNode::~StereoDuplexEncoderNode() {

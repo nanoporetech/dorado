@@ -126,7 +126,7 @@ int duplex(int argc, char* argv[]) {
                 }
             }
 
-            stereo_batch_size = 256;
+            stereo_batch_size = 1024;
             std::string stereo_model(
                     "/media/groups/machine_learning/active/klawrence/stereo-duplex/"
                     "202211_ncm_model_training/4khz_mixedspeed/20221115_beta_training/"
