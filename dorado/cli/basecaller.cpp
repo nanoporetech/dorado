@@ -243,8 +243,13 @@ int basecaller(int argc, char* argv[]) {
                 "only one of --modified-bases or --modified-bases-models should be specified.");
         std::exit(EXIT_FAILURE);
     } else if (mod_bases.size()) {
-        // TODO: iterate all mods
-        utils::get_modification_model(model, mod_bases[0]);
+        std::vector<std::string> m;
+        std::transform(mod_bases.begin(), mod_bases.end(), std::back_inserter(m),
+                       [&model](std::string m) { return utils::get_modification_model(model, m); });
+
+        mod_bases_models =
+                std::accumulate(std::next(m.begin()), m.end(), m[0],
+                                [](std::string a, std::string b) { return a + "," + b; });
     }
 
     spdlog::info("> Creating basecall pipeline");

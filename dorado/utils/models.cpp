@@ -77,13 +77,14 @@ std::string get_modification_model(const std::string& simplex_model,
                                  simplex_name.u8string()};
     }
 
-    spdlog::debug(" - matching modification model found: {}", modification_model);
+    spdlog::debug("- matching modification model found: {}", modification_model);
 
-    if (!fs::exists(model_dir / fs::path{modification_model})) {
+    auto modification_path = model_dir / fs::path{modification_model};
+    if (!fs::exists(modification_path)) {
         download_models(model_dir.u8string(), modification_model);
     }
 
-    return modification_model;
+    return modification_path.u8string();
 }
 
 }  // namespace dorado::utils
