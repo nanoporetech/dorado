@@ -61,6 +61,12 @@ void stitch_chunks(std::shared_ptr<Read> read) {
         qstrings.push_back(last_chunk->qstring.substr(start_pos));
     }
 
+    // remove move table overhang
+    if (moves.size() > static_cast<int>(read->raw_data.size(0) / read->model_stride)) {
+        assert(moves.back() == 0);
+        moves.pop_back();
+    }
+
     // Set the read seq and qstring
     read->seq = std::accumulate(sequences.begin(), sequences.end(), std::string(""));
     read->qstring = std::accumulate(qstrings.begin(), qstrings.end(), std::string(""));
