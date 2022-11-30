@@ -234,6 +234,7 @@ int basecaller(int argc, char* argv[]) {
         spdlog::set_level(spdlog::level::debug);
     }
 
+    auto model = parser.get<std::string>("model");
     auto mod_bases = parser.get<std::vector<std::string>>("--modified-bases");
     auto mod_bases_models = parser.get<std::string>("--modified-bases-models");
 
@@ -241,17 +242,19 @@ int basecaller(int argc, char* argv[]) {
         spdlog::error(
                 "only one of --modified-bases or --modified-bases-models should be specified.");
         std::exit(EXIT_FAILURE);
+    } else if (mod_bases.size()) {
+        // TODO: iterate all mods
+        utils::get_modification_model(model, mod_bases[0]);
     }
 
     spdlog::info("> Creating basecall pipeline");
 
     try {
-        setup(args, parser.get<std::string>("model"), parser.get<std::string>("data"),
-              mod_bases_models, parser.get<std::string>("-x"), parser.get<int>("-c"),
-              parser.get<int>("-o"), parser.get<int>("-b"), parser.get<int>("-r"),
-              default_parameters.remora_batchsize, default_parameters.remora_threads,
-              parser.get<bool>("--emit-fastq"), parser.get<bool>("--emit-moves"),
-              parser.get<int>("--max-reads"));
+        setup(args, model, parser.get<std::string>("data"), mod_bases_models,
+              parser.get<std::string>("-x"), parser.get<int>("-c"), parser.get<int>("-o"),
+              parser.get<int>("-b"), parser.get<int>("-r"), default_parameters.remora_batchsize,
+              default_parameters.remora_threads, parser.get<bool>("--emit-fastq"),
+              parser.get<bool>("--emit-moves"), parser.get<int>("--max-reads"));
     } catch (const std::exception& e) {
         spdlog::error("{}", e.what());
         return 1;

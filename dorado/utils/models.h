@@ -88,6 +88,8 @@ namespace utils {
 
 bool is_valid_model(const std::string& selected_model);
 void download_models(const std::string& target_directory, const std::string& selected_model);
+std::string get_modification_model(const std::string& simplex_model,
+                                   const std::string& modification);
 
 }  // namespace utils
 
