@@ -11,6 +11,17 @@ using namespace torch::indexing;
 namespace {
 std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> template_read,
                                             std::shared_ptr<dorado::Read> complement_read) {
+
+    std::shared_ptr<dorado::Read> read = std::make_shared<dorado::Read>(); // Return read
+
+    float template_len = template_read->seq.size();
+    float complement_len = template_read->seq.size();
+
+    float delta = std::max(template_len, complement_len) - std::min(template_len, complement_len);
+    if ((delta / std::max(template_len, complement_len)) < 0.95){
+        return read;
+    }
+
     EdlibAlignConfig align_config = edlibDefaultAlignConfig();
     align_config.task = EDLIB_TASK_PATH;
 
@@ -52,7 +63,6 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
 
     int stride = 5;  // TODO this needs to be passed in as a parameter
 
-    std::shared_ptr<dorado::Read> read = std::make_shared<dorado::Read>();
 
     if (consensus_possible) {
         // Move along the alignment, filling out the stereo-encoded tensor
@@ -247,21 +257,24 @@ void StereoDuplexEncoderNode::worker_thread() {
         std::string partner_id;
 
         // Check if read is a template with corresponding complement
-        lock.lock();
+        std::unique_lock<std::mutex> tc_lock(m_tc_map_mutex);
+
         if (m_template_complement_map.find(read->read_id) != m_template_complement_map.end()) {
             read_is_template = true;
             partner_id = m_template_complement_map[read->read_id];
+            tc_lock.unlock();
             partner_found = true;
         } else {
+            std::unique_lock<std::mutex> ct_lock(m_ct_map_mutex);
             if (m_complement_template_map.find(read->read_id) != m_complement_template_map.end()) {
                 partner_id = m_complement_template_map[read->read_id];
+                ct_lock.unlock();
                 partner_found = true;
             }
         }
-        lock.unlock();
 
         if (partner_found) {
-            lock.lock();
+            std::unique_lock<std::mutex> read_cache_lock(m_read_cache_mutex);
             if (read_cache.find(partner_id) == read_cache.end()) {
                 // Partner is not in the read cache
                 read_cache[read->read_id] = read;
@@ -272,7 +285,7 @@ void StereoDuplexEncoderNode::worker_thread() {
                 auto partner_read_itr = read_cache.find(partner_id);
                 auto partner_read = partner_read_itr->second;
                 read_cache.erase(partner_read_itr);
-                lock.unlock();
+                read_cache_lock.unlock();
 
                 if (read_is_template) {
                     template_read = read;

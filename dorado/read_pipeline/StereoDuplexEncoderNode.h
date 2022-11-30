@@ -16,6 +16,10 @@ private:
     void worker_thread();
     ReadSink &m_sink;
 
+    std::mutex m_tc_map_mutex;
+    std::mutex m_ct_map_mutex;
+    std::mutex m_read_cache_mutex;
+
     std::vector<std::unique_ptr<std::thread>> worker_threads;
 
     // Time when Basecaller Node is initialised. Used for benchmarking and debugging
