@@ -117,6 +117,7 @@ int duplex(int argc, char* argv[]) {
                 throw std::runtime_error("CUDA device requested but no devices found.");
             }
             batch_size = batch_size == 0 ? utils::auto_gpu_batch_size(model, devices) : batch_size;
+            batch_size = batch_size / 2;  //Needed to support Stereo and Simplex in parallel
             for (auto device_string : devices) {
                 auto caller = create_cuda_caller(model, chunk_size, batch_size, device_string);
                 for (size_t i = 0; i < num_runners; i++) {
@@ -126,7 +127,10 @@ int duplex(int argc, char* argv[]) {
             }
 
             stereo_batch_size = 256;
-            std::string stereo_model("dna_r10.4.1_e8.2_4khz_mixedspeed_duplex@v4.0.beta");
+            std::string stereo_model(
+                    "/media/groups/machine_learning/active/klawrence/stereo-duplex/"
+                    "202211_ncm_model_training/4khz_mixedspeed/20221115_beta_training/"
+                    "dna_r10.4.1_e8.2_4khz_mixedspeed_duplex@v4.0.beta");
             for (auto device_string : devices) {
                 auto caller =
                         create_cuda_caller(stereo_model, 9995, stereo_batch_size, device_string);

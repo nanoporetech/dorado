@@ -25,6 +25,7 @@ struct CRFModelConfig {
     int outsize;
     float blank_score;
     float scale;
+    int num_features;
 };
 
 CRFModelConfig load_crf_model_config(const std::filesystem::path& path);
