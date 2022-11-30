@@ -1,7 +1,7 @@
 #include "Version.h"
 #include "data_loader/DataLoader.h"
 #include "decode/CPUDecoder.h"
-#include "models.h"
+#include "utils/models.h"
 #ifdef __APPLE__
 #include "nn/MetalCRFModel.h"
 #include "utils/metal_utils.h"
