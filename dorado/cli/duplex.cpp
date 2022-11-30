@@ -132,11 +132,11 @@ int duplex(int argc, char* argv[]) {
                     "202211_ncm_model_training/4khz_mixedspeed/20221115_beta_training/"
                     "dna_r10.4.1_e8.2_4khz_mixedspeed_duplex@v4.0.beta");
             for (auto device_string : devices) {
-                auto caller =
-                        create_cuda_caller(stereo_model, 9995, stereo_batch_size, device_string);
+                auto caller = create_cuda_caller(stereo_model, chunk_size, stereo_batch_size,
+                                                 device_string);
                 for (size_t i = 0; i < num_runners; i++) {
-                    stereo_runners.push_back(
-                            std::make_shared<CudaModelRunner>(caller, 9995, stereo_batch_size));
+                    stereo_runners.push_back(std::make_shared<CudaModelRunner>(caller, chunk_size,
+                                                                               stereo_batch_size));
                 }
             }
         }
@@ -147,7 +147,7 @@ int duplex(int argc, char* argv[]) {
 
         auto stereo_model_stride = stereo_runners.front()->model_stride();
         stereo_basecaller_node = std::make_unique<BasecallerNode>(
-                writer_node, std::move(stereo_runners), stereo_batch_size, 9995, overlap,
+                writer_node, std::move(stereo_runners), stereo_batch_size, chunk_size, overlap,
                 stereo_model_stride);
 
         StereoDuplexEncoderNode stereo_node = StereoDuplexEncoderNode(
