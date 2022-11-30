@@ -9,7 +9,7 @@ constant int kLstmLayerSize [[function_constant(0)]];
 constant bool kLstmReversedInTime [[function_constant(1)]];
 constant int kLinearContractDim [[function_constant(2)]];
 constant int kLinearInnerDim [[function_constant(3)]];
-constant bool kClampConvOutput [[function_constant(4)]];
+constant bool kConvOutputClamp [[function_constant(4)]];
 constant float kLinearOutputScale [[function_constant(5)]];
 constant bool kLinearOutputClamp [[function_constant(6)]];
 constant bool kLinearOutputTanh [[function_constant(7)]];
@@ -28,8 +28,9 @@ inline float tanh_fast(float x) {
 inline float conv_activation(float x) {
     // SiLU / swish activation.
     const float y = x * sigmoid(x);
-    if (kClampConvOutput) {
+    if (kConvOutputClamp) {
         // Note: the lower bound is inoperative, since SiLU(x) has a min. of ~-0.28.
+        // Needs to updated anyway, once clamp range is nailed down.
         return clamp(y, -0.5f, 3.5f);
     }
     return y;
@@ -158,7 +159,7 @@ struct ConvArgs {
     int stride;
     int pad;
     int chunk_size_in; // NOTE: multiple of stride!
-    int num_chunks;
+    int num_chunks; // Actually batch size
 };
 
 /*
@@ -302,6 +303,7 @@ kernel void float_to_half
 }
 
 // Specialised conv1 implementation for v3-type models, where output feature size is 4.
+// Outputs (batch * time span, out feature) with padded rows as described below.
 #define CONV1_SIMD_GROUPS 16
 [[max_total_threads_per_threadgroup(CONV1_SIMD_GROUPS * 32)]]
 kernel void conv1_out4_simd
@@ -331,11 +333,15 @@ kernel void conv1_out4_simd
         for (int pass = sid; pass < 2; ++pass) {
             simdgroup_load(I[0], in_buf, chunk_size, ulong2(pass * (chunk_size - 8), tile_row * TILE_SIZE));
             if (pass == 0) {
+                // Start of time span / output feature row.
+                // Padded with 1 tile = 8 entries.
                 A[0] = simdgroup_ftype8x8(0);
                 simdgroup_multiply_accumulate(A[1], I[0], W[1], B);
                 simdgroup_multiply_accumulate(A[2], I[0], W[2], B);
                 simdgroup_multiply_accumulate(A[3], I[0], W[3], B);
             } else {
+                // End of time span / output feature row.
+                // Padded with 3 tiles = 8 entries.
                 simdgroup_multiply_accumulate(A[0], I[0], W[4], B);
                 A[1] = simdgroup_ftype8x8(0);
                 A[2] = simdgroup_ftype8x8(0);
@@ -938,7 +944,7 @@ kernel void linear(
                         // Store to the output buffer.
                         for (int elem = tid & 31; elem < TILE_SIZE * TILE_SIZE; elem += 32) {
                             const ftype matmul_output = simd_out_buf[sid][elem];
-                            const auto with_clamp = kLinearOutputClamp ? clamp(ftype(-4.0f), ftype(4.0f), matmul_output) : matmul_output;
+                            const auto with_clamp = kLinearOutputClamp ? clamp(matmul_output, ftype(-4.0f), ftype(4.0f)) : matmul_output;
                             const auto with_tanh = kLinearOutputTanh ? tanh_fast(with_clamp) : with_clamp;
                             const auto with_scale = with_tanh * kLinearOutputScale;
 
