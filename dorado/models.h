@@ -52,6 +52,10 @@ static const std::map<std::string, std::string> models = {
 
 namespace modified {
 
+static const std::vector<std::string> mods = {
+        "5mCG",
+};
+
 static const std::map<std::string, std::string> models = {
 
         // v3.{3,4}
