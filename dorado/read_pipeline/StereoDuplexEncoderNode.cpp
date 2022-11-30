@@ -55,8 +55,7 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
     std::shared_ptr<dorado::Read> read = std::make_shared<dorado::Read>();
 
     if (consensus_possible) {
-        // Step 3 - Move along the alignment, filling out the stereo-encoded tensor
-        // Prepare the encoding tensor
+        // Move along the alignment, filling out the stereo-encoded tensor
         int max_size = template_read->raw_data.size(0) + complement_read->raw_data.size(0);
         auto opts = torch::TensorOptions().dtype(torch::kFloat16).device(torch::kCPU);
         int num_features = 13;
@@ -84,7 +83,7 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
         }
 
         int template_moves_seen = template_moves_expanded[template_signal_cursor];
-        while (template_moves_seen < target_cursor + 1) {  // TODO: is this +1 correct?
+        while (template_moves_seen < target_cursor + 1) {
             template_signal_cursor++;
             template_moves_seen += template_moves_expanded[template_signal_cursor];
         }
@@ -207,13 +206,14 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
                 {torch::indexing::Slice(None),
                  torch::indexing::Slice(
                          None,
-                         stereo_global_cursor)});  // TODO check if stereo_global_cursor is the correct limit here
-        //torch::save(tmp, "/home/OXFORDNANOLABS/mvella/stereo_tensor3.pt");
+                         stereo_global_cursor)});
 
         read->read_id = template_read->read_id + ";" + complement_read->read_id;
         read->raw_data = tmp;  // use the encoded signal
-        return read;
     }
+
+    edlibFreeAlignResult(result);
+
     return read;
 }
 }  // namespace
@@ -286,8 +286,8 @@ void StereoDuplexEncoderNode::worker_thread() {
                         stereo_encode(template_read, complement_read);
 
                 if (stereo_encoded_read->raw_data.ndimension() ==
-                    2) {  // 2 dims for stereo encoding, 1 for simpex
-                    m_sink.push_read(stereo_encoded_read);  // Found a partner, so process it.
+                    2) {  // 2 dims for stereo encoding, 1 for simplex
+                    m_sink.push_read(stereo_encoded_read);  // Strereo-encoded read created, send it to sink
                 }
             }
         }
