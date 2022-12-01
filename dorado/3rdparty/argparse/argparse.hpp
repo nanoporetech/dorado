@@ -1166,8 +1166,8 @@ public:
   void parse_args(const std::vector<std::string> &arguments) {
     parse_args_internal(arguments);
     // Check if all arguments are parsed
-    for ([[maybe_unused]] const auto &[unused, argument] : m_argument_map) {
-      argument->validate();
+    for (const auto &entry : m_argument_map) {
+        entry.second->validate();
     }
   }
 
@@ -1180,8 +1180,8 @@ public:
   parse_known_args(const std::vector<std::string> &arguments) {
     auto unknown_arguments = parse_known_args_internal(arguments);
     // Check if all arguments are parsed
-    for ([[maybe_unused]] const auto &[unused, argument] : m_argument_map) {
-      argument->validate();
+    for (const auto &entry : m_argument_map) {
+        entry.second->validate();
     }
     return unknown_arguments;
   }
