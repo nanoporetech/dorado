@@ -14,7 +14,7 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
     std::shared_ptr<dorado::Read> read = std::make_shared<dorado::Read>();  // Return read
 
     float template_len = template_read->seq.size();
-    float complement_len = template_read->seq.size();
+    float complement_len = complement_len->seq.size();
 
     float delta = std::max(template_len, complement_len) - std::min(template_len, complement_len);
     if ((delta / std::max(template_len, complement_len)) > 0.05) {
