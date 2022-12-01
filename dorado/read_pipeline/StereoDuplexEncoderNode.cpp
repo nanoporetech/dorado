@@ -11,15 +11,14 @@ using namespace torch::indexing;
 namespace {
 std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> template_read,
                                             std::shared_ptr<dorado::Read> complement_read) {
-
-    std::shared_ptr<dorado::Read> read = std::make_shared<dorado::Read>(); // Return read
+    std::shared_ptr<dorado::Read> read = std::make_shared<dorado::Read>();  // Return read
 
     float template_len = template_read->seq.size();
     float complement_len = template_read->seq.size();
 
     float delta = std::max(template_len, complement_len) - std::min(template_len, complement_len);
-    if ((delta / std::max(template_len, complement_len)) > 0.05){
-        std:: cerr << "pair rejected" << std::endl;
+    if ((delta / std::max(template_len, complement_len)) > 0.05) {
+        std::cerr << "pair rejected" << std::endl;
         return read;
     }
 
@@ -63,7 +62,6 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
             ((end_alignment_position - start_alignment_position) > min_trimmed_alignment_length);
 
     int stride = 5;  // TODO this needs to be passed in as a parameter
-
 
     if (consensus_possible) {
         // Move along the alignment, filling out the stereo-encoded tensor
@@ -214,10 +212,7 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
         }
 
         tmp = tmp.index(
-                {torch::indexing::Slice(None),
-                 torch::indexing::Slice(
-                         None,
-                         stereo_global_cursor)});
+                {torch::indexing::Slice(None), torch::indexing::Slice(None, stereo_global_cursor)});
 
         read->read_id = template_read->read_id + ";" + complement_read->read_id;
         read->raw_data = tmp;  // use the encoded signal
@@ -261,17 +256,18 @@ void StereoDuplexEncoderNode::worker_thread() {
         std::unique_lock<std::mutex> tc_lock(m_tc_map_mutex);
 
         if (m_template_complement_map.find(read->read_id) != m_template_complement_map.end()) {
-            read_is_template = true;
             partner_id = m_template_complement_map[read->read_id];
             tc_lock.unlock();
+            read_is_template = true;
             partner_found = true;
         } else {
+            tc_lock.unlock();
             std::unique_lock<std::mutex> ct_lock(m_ct_map_mutex);
             if (m_complement_template_map.find(read->read_id) != m_complement_template_map.end()) {
                 partner_id = m_complement_template_map[read->read_id];
-                ct_lock.unlock();
                 partner_found = true;
             }
+            ct_lock.unlock();
         }
 
         if (partner_found) {
@@ -279,14 +275,15 @@ void StereoDuplexEncoderNode::worker_thread() {
             if (read_cache.find(partner_id) == read_cache.end()) {
                 // Partner is not in the read cache
                 read_cache[read->read_id] = read;
+                read_cache_lock.unlock();
             } else {
-                std::shared_ptr<Read> template_read;
-                std::shared_ptr<Read> complement_read;
-
                 auto partner_read_itr = read_cache.find(partner_id);
                 auto partner_read = partner_read_itr->second;
                 read_cache.erase(partner_read_itr);
                 read_cache_lock.unlock();
+
+                std::shared_ptr<Read> template_read;
+                std::shared_ptr<Read> complement_read;
 
                 if (read_is_template) {
                     template_read = read;
@@ -301,7 +298,8 @@ void StereoDuplexEncoderNode::worker_thread() {
 
                 if (stereo_encoded_read->raw_data.ndimension() ==
                     2) {  // 2 dims for stereo encoding, 1 for simplex
-                    m_sink.push_read(stereo_encoded_read);  // Strereo-encoded read created, send it to sink
+                    m_sink.push_read(
+                            stereo_encoded_read);  // Strereo-encoded read created, send it to sink
                 }
             }
         }
