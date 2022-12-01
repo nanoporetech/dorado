@@ -47,4 +47,44 @@ void download_models(const std::string& target_directory, const std::string& sel
     download_model_set(urls::modified::models);
 }
 
+std::string get_modification_model(const std::string& simplex_model,
+                                   const std::string& modification) {
+    std::string modification_model{""};
+    auto simplex_path = fs::path(simplex_model);
+
+    if (!fs::exists(simplex_path)) {
+        throw std::runtime_error{"unknown simplex model " + simplex_model};
+    }
+
+    simplex_path = fs::canonical(simplex_path);
+    auto model_dir = simplex_path.parent_path();
+    auto simplex_name = simplex_path.filename();
+
+    if (is_valid_model(simplex_name.u8string())) {
+        std::string mods_prefix = simplex_name.u8string() + "_" + modification;
+        for (const auto& [model, _] : urls::modified::models) {
+            if (mods_prefix.compare(0, mods_prefix.size(), model) > 0) {
+                modification_model = model;
+                break;
+            }
+        }
+    } else {
+        throw std::runtime_error{"unknown simplex model " + simplex_name.u8string()};
+    }
+
+    if (modification_model.empty()) {
+        throw std::runtime_error{"could not find matching modification model for " +
+                                 simplex_name.u8string()};
+    }
+
+    spdlog::debug("- matching modification model found: {}", modification_model);
+
+    auto modification_path = model_dir / fs::path{modification_model};
+    if (!fs::exists(modification_path)) {
+        download_models(model_dir.u8string(), modification_model);
+    }
+
+    return modification_path.u8string();
+}
+
 }  // namespace dorado::utils
