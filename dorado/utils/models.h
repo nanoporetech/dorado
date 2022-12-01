@@ -88,6 +88,10 @@ namespace utils {
 
 bool is_valid_model(const std::string& selected_model);
 void download_models(const std::string& target_directory, const std::string& selected_model);
+
+// finds the matching modification model for a given modification i.e. 5mCG and a simplex model
+// is the matching modification model is not found in the same model directory as the simplex
+// model then it is downloaded.
 std::string get_modification_model(const std::string& simplex_model,
                                    const std::string& modification);
 
