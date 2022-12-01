@@ -60,7 +60,7 @@ std::string get_modification_model(const std::string& simplex_model,
     auto model_dir = simplex_path.parent_path();
     auto simplex_name = simplex_path.filename();
 
-    if (is_valid_model(simplex_name.c_str())) {
+    if (is_valid_model(simplex_name.u8string())) {
         std::string mods_prefix = simplex_name.u8string() + "_" + modification;
         for (const auto& [model, _] : urls::modified::models) {
             if (mods_prefix.compare(0, mods_prefix.size(), model) > 0) {
