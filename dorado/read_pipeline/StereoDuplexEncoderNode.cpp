@@ -18,7 +18,6 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
 
     float delta = std::max(template_len, complement_len) - std::min(template_len, complement_len);
     if ((delta / std::max(template_len, complement_len)) > 0.05) {
-        std::cerr << "pair rejected" << std::endl;
         return read;
     }
 
