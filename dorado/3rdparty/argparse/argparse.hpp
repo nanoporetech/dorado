@@ -1614,11 +1614,11 @@ private:
       return 0;
     }
     std::size_t max_size = 0;
-    for ([[maybe_unused]] const auto &[unused, argument] : m_argument_map) {
-      max_size = std::max(max_size, argument->get_arguments_length());
+    for (const auto &entry : m_argument_map) {
+        max_size = std::max(max_size, entry.second->get_arguments_length());
     }
-    for ([[maybe_unused]] const auto &[command, unused] : m_subparser_map) {
-      max_size = std::max(max_size, command.size());
+    for (const auto &entry : m_subparser_map) {
+      max_size = std::max(max_size, entry.first.size());
     }
     return max_size;
   }
