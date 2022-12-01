@@ -73,7 +73,7 @@ void stitch_chunks(std::shared_ptr<Read> read) {
             read->qstring.pop_back();
         }
         read->moves.pop_back();
-        assert(std::reduce(read->moves.begin(), read->moves.end()) == read->seq.size());
+        assert(std::accumulate(read->moves.begin(), read->moves.end(), 0) == read->seq.size());
     }
 }
 
