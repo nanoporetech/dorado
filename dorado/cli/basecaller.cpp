@@ -201,7 +201,7 @@ int basecaller(int argc, char* argv[]) {
                 if (std::find(urls::modified::mods.begin(), urls::modified::mods.end(), value) ==
                     urls::modified::mods.end()) {
                     spdlog::error(
-                            "'{}' is not a support modification please select from {}", value,
+                            "'{}' is not a supported modification please select from {}", value,
                             std::accumulate(
                                     std::next(urls::modified::mods.begin()),
                                     urls::modified::mods.end(), urls::modified::mods[0],
