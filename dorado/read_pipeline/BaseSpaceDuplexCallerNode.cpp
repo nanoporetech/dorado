@@ -116,12 +116,6 @@ void BaseSpaceDuplexCallerNode::basespace(std::string template_read_id,
                            complement_sequence_reverse_complement.data(),
                            complement_sequence_reverse_complement.size(), align_config);
 
-        if (template_read->read_id == "025c2ee5-6775-43b8-85cb-0397fef88d5b") {
-            std::cerr << "Edit distance is " << result.editDistance << std::endl;
-            std::cerr << "Template sequence is " << template_read->seq << std::endl;
-            std::cerr << "Complement sequence is " << complement_read->seq << std::endl;
-        }
-
         // Now - we have to do the actual basespace alignment itself
         int query_cursor = 0;
         int target_cursor =
@@ -141,12 +135,6 @@ void BaseSpaceDuplexCallerNode::basespace(std::string template_read_id,
         bool consensus_possible = (start_alignment_position < end_alignment_position) &&
                                   ((end_alignment_position - start_alignment_position) >
                                    min_trimmed_alignment_length);
-        if (template_read->read_id == "025c2ee5-6775-43b8-85cb-0397fef88d5b") {
-            std::cerr << "start_alignment_position " << start_alignment_position << std::endl;
-            std::cerr << "end_alignment_position " << end_alignment_position << std::endl;
-            std::cerr << "Target cursor " << target_cursor << std::endl;
-            std::cerr << "Query cursor " << query_cursor << std::endl;
-        }
 
         if (consensus_possible) {
             auto [consensus, quality_scores_phred] = compute_basespace_consensus(
@@ -154,10 +142,6 @@ void BaseSpaceDuplexCallerNode::basespace(std::string template_read_id,
                     target_cursor, complement_quality_scores_reverse, query_cursor,
                     template_sequence, complement_sequence_reverse_complement, result.alignment);
 
-            if (template_read->read_id == "025c2ee5-6775-43b8-85cb-0397fef88d5b") {
-                std::cerr << "Consensus is " << std::string(consensus.begin(), consensus.end())
-                          << std::endl;
-            }
             auto duplex_read = std::make_shared<Read>();
             duplex_read->seq = std::string(consensus.begin(), consensus.end());
             duplex_read->qstring =

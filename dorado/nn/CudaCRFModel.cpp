@@ -146,7 +146,7 @@ CudaModelRunner::CudaModelRunner(std::shared_ptr<CudaCaller> caller, int chunk_s
             {3, batch_size, block_size},
             torch::TensorOptions().dtype(torch::kInt8).device(torch::kCPU).pinned_memory(true));
     // warm up
-    call_chunks(batch_size);  // TODO - undisable warmup
+    call_chunks(batch_size);
 }
 
 void CudaModelRunner::accept_chunk(int chunk_idx, at::Tensor slice) {
