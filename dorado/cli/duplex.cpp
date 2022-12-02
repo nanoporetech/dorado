@@ -1,19 +1,20 @@
 #include "Version.h"
 #include "data_loader/DataLoader.h"
 #include "decode/CPUDecoder.h"
-#include "nn/CudaCRFModel.h"
-#include "nn/MetalCRFModel.h"
 #include "read_pipeline/BaseSpaceDuplexCallerNode.h"
 #include "read_pipeline/BasecallerNode.h"
 #include "read_pipeline/ScalerNode.h"
 #include "read_pipeline/StereoDuplexEncoderNode.h"
 #include "read_pipeline/WriterNode.h"
 #include "utils/bam_utils.h"
-#include "utils/cuda_utils.h"
 #include "utils/duplex_utils.h"
 #include "utils/log_utils.h"
 #ifdef __APPLE__
+#include "nn/MetalCRFModel.h"
 #include "utils/metal_utils.h"
+#else
+#include "nn/CudaCRFModel.h"
+#include "utils/cuda_utils.h"
 #endif
 
 #include "utils/parameters.h"
