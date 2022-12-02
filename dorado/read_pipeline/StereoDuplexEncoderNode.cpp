@@ -224,8 +224,6 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
 }  // namespace
 
 namespace dorado {
-// Let's make a stub which just consumes reads from its input queue and passes it to its output queue.
-// Next step
 
 void StereoDuplexEncoderNode::worker_thread() {
     int i = 0;
