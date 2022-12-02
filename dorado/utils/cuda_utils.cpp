@@ -133,11 +133,11 @@ int auto_gpu_batch_size(std::string model_path, std::vector<std::string> devices
     // {fast, hac, sup}
     const std::vector<std::vector<int>> batch_sizes = {
             {960, 448, 128},     // 8GB
-            {1536, 768, 240},    // 12GB
-            {2048, 1024, 320},   // 16GB
+            {1536, 640, 192},    // 12GB
+            {2048, 1024, 256},   // 16GB
             {2048, 1536, 512},   // 24GB
             {2560, 2560, 640},   // 32GB
-            {4096, 4096, 1024},  // 40GB
+            {4096, 2560, 1024},  // 40GB
     };
 
     assert(breakpoints.size() == batch_sizes.size());
