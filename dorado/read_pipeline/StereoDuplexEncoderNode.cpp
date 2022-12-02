@@ -309,8 +309,7 @@ StereoDuplexEncoderNode::StereoDuplexEncoderNode(
         ReadSink &sink,
         std::map<std::string, std::string> template_complement_map)
         : ReadSink(1000), m_sink(sink), m_template_complement_map(template_complement_map) {
-    // Set up teh complement_template_map
-
+    // Set up the complement-template_map
     for (auto key : template_complement_map) {
         m_complement_template_map[key.second] = key.first;
     }

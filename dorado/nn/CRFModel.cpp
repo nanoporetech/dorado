@@ -13,7 +13,7 @@ extern "C" {
 #include <cublas_v2.h>
 #include <cuda_runtime.h>
 
-#define USE_CUDA_LSTM 1  // TODO undo
+#define USE_CUDA_LSTM 1
 #else
 #define USE_CUDA_LSTM 0
 #endif
@@ -54,7 +54,7 @@ static void cublas_matmul_f16(torch::Tensor const &A, torch::Tensor const &B, to
 static bool cuda_lstm_is_quantized(int layer_size) {
     return ((layer_size == 96) ||
             (layer_size ==
-             129));  // TODO - change back! just a test to see if quantized kernels are the problem
+             128));  // TODO - change back! just a test to see if quantized kernels are the problem
 }
 #endif  // if USE_CUDA_LSTM
 
@@ -542,7 +542,7 @@ TORCH_MODULE(Clamp);
 template <class LSTMStackType>
 struct CRFModelImpl : Module {
     CRFModelImpl(const CRFModelConfig &config, bool expand_blanks, int batch_size, int chunk_size) {
-        if (config.insize == 128) {  // TODO - this is wrong! need to fix it for stereo
+        if (config.insize == 128) {
             conv1 = register_module("conv1", Convolution(config.num_features, 16, 5, 1));
             clamp1 = Clamp(-0.5, 3.5, config.clamp);
             conv2 = register_module("conv2", Convolution(16, 16, 5, 1));
