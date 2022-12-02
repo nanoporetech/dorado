@@ -68,7 +68,8 @@ int duplex(int argc, char* argv[]) {
         std::vector<std::string> args(argv, argv + argc);
 
         spdlog::info("> Loading pairs file");
-        std::map<std::string, std::string> template_complement_map = utils::load_pairs_file(pairs_file);
+        std::map<std::string, std::string> template_complement_map =
+                utils::load_pairs_file(pairs_file);
         spdlog::info("> Pairs file loaded");
 
         WriterNode writer_node(std::move(args), emit_fastq, false, true, 4);
@@ -80,8 +81,8 @@ int duplex(int argc, char* argv[]) {
             spdlog::info("> Starting Basespace Duplex Pipeline");
 
             threads = threads == 0 ? std::thread::hardware_concurrency() : threads;
-            BaseSpaceDuplexCallerNode duplex_caller_node(writer_node, template_complement_map, read_map,
-                                                         threads);
+            BaseSpaceDuplexCallerNode duplex_caller_node(writer_node, template_complement_map,
+                                                         read_map, threads);
         } else {  // Execute a Stereo Duplex pipeline.
             torch::set_num_threads(1);
             std::vector<Runner> runners;
@@ -101,18 +102,20 @@ int duplex(int argc, char* argv[]) {
                     runners.push_back(std::make_shared<ModelRunner<CPUDecoder>>(
                             model, device, chunk_size, batch_size));
                 }
-    #ifdef __APPLE__
+#ifdef __APPLE__
             } else {
-                throw std::runtime_error(std::string("Stereo Duplex currently unspported on Metal"));
+                throw std::runtime_error(
+                        std::string("Stereo Duplex currently unspported on Metal"));
             }
-    #else   // ifdef __APPLE__
+#else   // ifdef __APPLE__
             } else {
                 auto devices = utils::parse_cuda_device_string(device);
                 num_devices = devices.size();
                 if (num_devices == 0) {
                     throw std::runtime_error("CUDA device requested but no devices found.");
                 }
-                batch_size = batch_size == 0 ? utils::auto_gpu_batch_size(model, devices) : batch_size;
+                batch_size =
+                        batch_size == 0 ? utils::auto_gpu_batch_size(model, devices) : batch_size;
                 batch_size = batch_size / 2;  //Needed to support Stereo and Simplex in parallel
                 for (auto device_string : devices) {
                     auto caller = create_cuda_caller(model, chunk_size, batch_size, device_string);
@@ -135,12 +138,12 @@ int duplex(int argc, char* argv[]) {
                     auto caller = create_cuda_caller(stereo_model, chunk_size, stereo_batch_size,
                                                      device_string);
                     for (size_t i = 0; i < num_runners; i++) {
-                        stereo_runners.push_back(std::make_shared<CudaModelRunner>(caller, chunk_size,
-                                                                                   stereo_batch_size));
+                        stereo_runners.push_back(std::make_shared<CudaModelRunner>(
+                                caller, chunk_size, stereo_batch_size));
                     }
                 }
             }
-    #endif  // __APPLE__
+#endif  // __APPLE__
             spdlog::info("> Starting Stereo Duplex pipeline");
 
             std::unique_ptr<BasecallerNode> stereo_basecaller_node;
