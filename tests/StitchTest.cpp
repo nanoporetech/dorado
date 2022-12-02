@@ -35,7 +35,7 @@ A        C        G     T
                                                                                                                         1, 0, 0, 1, 0, 0, 1, 0, 1, 0
 =
 A        C        G     T     C           G        C     G  T           C        G     T     C        G     T              C     C        G     T
-1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0, 1, 1, 0, 0, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0 
+1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0, 1, 1, 0, 0, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0
 */
 // clang-format on
 TEST_CASE("Test stitch_chunks", TEST_GROUP) {
@@ -70,7 +70,7 @@ TEST_CASE("Test stitch_chunks", TEST_GROUP) {
     const std::string expected_qstring = "!&.-&.&.-&.-&.-&&.-";
     const std::vector<uint8_t> expected_moves = {1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0,
                                                  1, 0, 1, 1, 0, 0, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0, 0,
-                                                 1, 0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0};
+                                                 1, 0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1, 0, 1};
 
     REQUIRE(read->seq == expected_sequence);
     REQUIRE(read->qstring == expected_qstring);
