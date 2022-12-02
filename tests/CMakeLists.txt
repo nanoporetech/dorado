@@ -12,7 +12,7 @@ set(SOURCE_FILES
 
 add_executable(dorado_tests ${SOURCE_FILES})
 
-target_link_libraries(dorado_tests dorado_lib elzip)
+target_link_libraries(dorado_tests dorado_lib)
 
 add_test(
     NAME dorado_tests

@@ -87,6 +87,8 @@ set(LIB_SOURCE_FILES
     dorado/utils/log_utils.h
     dorado/utils/log_utils.cpp
     dorado/utils/math_utils.h
+    dorado/utils/models.cpp
+    dorado/utils/models.h
     dorado/utils/module_utils.h
     dorado/utils/parameters.h
     dorado/utils/sequence_utils.cpp
@@ -165,6 +167,7 @@ target_link_libraries(dorado_lib
     vbz_hdf_plugin
     OpenSSL::SSL
     edlib
+    elzip
 )
 
 if(NOT WIN32)
@@ -196,7 +199,6 @@ if(NOT DORADO_LIB_ONLY)
         dorado/cli/benchmark.cpp        
         dorado/cli/download.cpp
         dorado/cli/cli.h
-        dorado/models.h
     )
 
     set_target_properties(dorado
@@ -204,7 +206,6 @@ if(NOT DORADO_LIB_ONLY)
         RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
     )
 
-    target_link_libraries(dorado elzip)
     target_link_libraries(dorado dorado_lib)
 
     if (DEFINED DORADO_INSTALL_PATH)

@@ -65,6 +65,16 @@ void stitch_chunks(std::shared_ptr<Read> read) {
     read->seq = std::accumulate(sequences.begin(), sequences.end(), std::string(""));
     read->qstring = std::accumulate(qstrings.begin(), qstrings.end(), std::string(""));
     read->moves = std::move(moves);
+
+    // remove partial stride overhang
+    if (read->moves.size() > static_cast<int>(read->raw_data.size(0) / read->model_stride)) {
+        if (read->moves.back() == 1) {
+            read->seq.pop_back();
+            read->qstring.pop_back();
+        }
+        read->moves.pop_back();
+        assert(std::accumulate(read->moves.begin(), read->moves.end(), 0) == read->seq.size());
+    }
 }
 
 }  // namespace dorado::utils
