@@ -21,7 +21,7 @@ struct overloaded : Ts... {
     using Ts::operator()...;
 };
 template <class... Ts>
-overloaded(Ts...) -> overloaded<Ts...>;
+overloaded(Ts...)->overloaded<Ts...>;
 
 NS::String *get_library_location() {
     char ns_path[PATH_MAX + 1];

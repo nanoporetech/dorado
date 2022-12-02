@@ -127,10 +127,13 @@ int duplex(int argc, char* argv[]) {
             }
 
             stereo_batch_size = 1024;
-            std::string stereo_model(
-                    "/media/groups/machine_learning/active/klawrence/stereo-duplex/"
-                    "202211_ncm_model_training/4khz_mixedspeed/20221115_beta_training/"
-                    "dna_r10.4.1_e8.2_4khz_mixedspeed_duplex@v4.0.beta");
+
+            std::string stereo_model_name("dna_r10.4.1_e8.2_4khz_mixedspeed_duplex@v4.0.beta");
+            auto model_path = std::filesystem::path(model);
+            auto stereo_model_path =
+                    model_path.parent_path() / std::filesystem::path(stereo_model_name);
+
+            std::string stereo_model(stereo_model_path);
             for (auto device_string : devices) {
                 auto caller = create_cuda_caller(stereo_model, chunk_size, stereo_batch_size,
                                                  device_string);
