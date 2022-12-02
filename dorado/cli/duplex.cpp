@@ -58,112 +58,118 @@ int duplex(int argc, char* argv[]) {
             .scan<'i', int>();
     try {
         parser.parse_args(argc, argv);
+
+        auto device(parser.get<std::string>("-x"));
+        auto model(parser.get<std::string>("model"));
+        auto reads(parser.get<std::string>("reads"));
+        auto pairs_file(parser.get<std::string>("--pairs"));
+        auto threads = static_cast<size_t>(parser.get<int>("--threads"));
+        bool emit_fastq = parser.get<bool>("--emit-fastq");
+        std::vector<std::string> args(argv, argv + argc);
+
+        spdlog::info("> Loading pairs file");
+        std::map<std::string, std::string> template_complement_map = utils::load_pairs_file(pairs_file);
+        spdlog::info("> Pairs file loaded");
+
+        WriterNode writer_node(std::move(args), emit_fastq, false, true, 4);
+        torch::set_num_threads(1);
+
+        if (model.compare("basespace") == 0) {  // Execute a Basespace duplex pipeline.
+            spdlog::info("> Loading reads");
+            std::map<std::string, std::shared_ptr<Read>> read_map = utils::read_bam(reads);
+            spdlog::info("> Starting Basespace Duplex Pipeline");
+
+            threads = threads == 0 ? std::thread::hardware_concurrency() : threads;
+            BaseSpaceDuplexCallerNode duplex_caller_node(writer_node, template_complement_map, read_map,
+                                                         threads);
+        } else {  // Execute a Stereo Duplex pipeline.
+            torch::set_num_threads(1);
+            std::vector<Runner> runners;
+            std::vector<Runner> stereo_runners;
+
+            int num_devices;
+            int batch_size(parser.get<int>("-b"));
+            int chunk_size(parser.get<int>("-c"));
+            int overlap(parser.get<int>("-o"));
+            size_t num_runners = 1;
+
+            size_t stereo_batch_size;
+
+            if (device == "cpu") {
+                batch_size = batch_size == 0 ? std::thread::hardware_concurrency() : batch_size;
+                for (size_t i = 0; i < num_runners; i++) {
+                    runners.push_back(std::make_shared<ModelRunner<CPUDecoder>>(
+                            model, device, chunk_size, batch_size));
+                }
+    #ifdef __APPLE__
+            } else {
+                throw std::runtime_error(std::string("Stereo Duplex currently unspported on Metal"));
+            }
+    #else   // ifdef __APPLE__
+            } else {
+                auto devices = utils::parse_cuda_device_string(device);
+                num_devices = devices.size();
+                if (num_devices == 0) {
+                    throw std::runtime_error("CUDA device requested but no devices found.");
+                }
+                batch_size = batch_size == 0 ? utils::auto_gpu_batch_size(model, devices) : batch_size;
+                batch_size = batch_size / 2;  //Needed to support Stereo and Simplex in parallel
+                for (auto device_string : devices) {
+                    auto caller = create_cuda_caller(model, chunk_size, batch_size, device_string);
+                    for (size_t i = 0; i < num_runners; i++) {
+                        runners.push_back(
+                                std::make_shared<CudaModelRunner>(caller, chunk_size, batch_size));
+                    }
+                }
+
+                stereo_batch_size = 1024;
+#ifdef WIN32
+                std::string stereo_model(
+                        "U:\\Groups\\machine_learning\\active\\klawrence\\stereo-duplex\\"
+                        "202211_ncm_model_training\\4khz_mixedspeed\\20221115_beta_training\\"
+                        "dna_r10.4.1_e8.2_4khz_mixedspeed_duplex@v4.0.beta");
+#else
+                std::string stereo_model(
+                        "/media/groups/machine_learning/active/klawrence/stereo-duplex/"
+                        "202211_ncm_model_training/4khz_mixedspeed/20221115_beta_training/"
+                        "dna_r10.4.1_e8.2_4khz_mixedspeed_duplex@v4.0.beta");
+#endif
+                for (auto device_string : devices) {
+                    auto caller = create_cuda_caller(stereo_model, chunk_size, stereo_batch_size,
+                                                     device_string);
+                    for (size_t i = 0; i < num_runners; i++) {
+                        stereo_runners.push_back(std::make_shared<CudaModelRunner>(caller, chunk_size,
+                                                                                   stereo_batch_size));
+                    }
+                }
+            }
+    #endif  // __APPLE__
+            spdlog::info("> Starting Stereo Duplex pipeline");
+
+            std::unique_ptr<BasecallerNode> stereo_basecaller_node;
+
+            auto stereo_model_stride = stereo_runners.front()->model_stride();
+            stereo_basecaller_node = std::make_unique<BasecallerNode>(
+                    writer_node, std::move(stereo_runners), stereo_batch_size, chunk_size, overlap,
+                    stereo_model_stride);
+
+            StereoDuplexEncoderNode stereo_node = StereoDuplexEncoderNode(
+                    *stereo_basecaller_node, std::move(template_complement_map));
+
+            std::unique_ptr<BasecallerNode> basecaller_node;
+            auto simplex_model_stride = runners.front()->model_stride();
+            basecaller_node =
+                    std::make_unique<BasecallerNode>(stereo_node, std::move(runners), batch_size,
+                                                     chunk_size, overlap, simplex_model_stride);
+            ScalerNode scaler_node(*basecaller_node, num_devices * 2);
+
+            DataLoader loader(scaler_node, "cpu", num_devices);
+            loader.load_reads(reads);
+        }
     } catch (const std::exception& e) {
         spdlog::error(e.what());
         std::exit(1);
     }
-
-    auto device(parser.get<std::string>("-x"));
-    auto model(parser.get<std::string>("model"));
-    auto reads(parser.get<std::string>("reads"));
-    auto pairs_file(parser.get<std::string>("--pairs"));
-    auto threads = static_cast<size_t>(parser.get<int>("--threads"));
-    bool emit_fastq = parser.get<bool>("--emit-fastq");
-    std::vector<std::string> args(argv, argv + argc);
-
-    spdlog::info("> Loading pairs file");
-    std::map<std::string, std::string> template_complement_map = utils::load_pairs_file(pairs_file);
-    spdlog::info("> Pairs file loaded");
-
-    WriterNode writer_node(std::move(args), emit_fastq, false, true, 4);
-    torch::set_num_threads(1);
-
-    if (model.compare("basespace") == 0) {  // Execute a Basespace duplex pipeline.
-        spdlog::info("> Loading reads");
-        std::map<std::string, std::shared_ptr<Read>> read_map = utils::read_bam(reads);
-        spdlog::info("> Starting Basespace Duplex Pipeline");
-
-        threads = threads == 0 ? std::thread::hardware_concurrency() : threads;
-        BaseSpaceDuplexCallerNode duplex_caller_node(writer_node, template_complement_map, read_map,
-                                                     threads);
-    } else {  // Execute a Stereo Duplex pipeline.
-        torch::set_num_threads(1);
-        std::vector<Runner> runners;
-        std::vector<Runner> stereo_runners;
-
-        int num_devices;
-        int batch_size(parser.get<int>("-b"));
-        int chunk_size(parser.get<int>("-c"));
-        int overlap(parser.get<int>("-o"));
-        size_t num_runners = 1;
-
-        size_t stereo_batch_size;
-
-        if (device == "cpu") {
-            batch_size = batch_size == 0 ? std::thread::hardware_concurrency() : batch_size;
-            for (size_t i = 0; i < num_runners; i++) {
-                runners.push_back(std::make_shared<ModelRunner<CPUDecoder>>(
-                        model, device, chunk_size, batch_size));
-            }
-#ifdef __APPLE__
-        } else {
-            throw std::runtime_error(std::string("Stereo Duplex currently unspported on Metal"));
-        }
-#else   // ifdef __APPLE__
-        } else {
-            auto devices = utils::parse_cuda_device_string(device);
-            num_devices = devices.size();
-            if (num_devices == 0) {
-                throw std::runtime_error("CUDA device requested but no devices found.");
-            }
-            batch_size = batch_size == 0 ? utils::auto_gpu_batch_size(model, devices) : batch_size;
-            batch_size = batch_size / 2;  //Needed to support Stereo and Simplex in parallel
-            for (auto device_string : devices) {
-                auto caller = create_cuda_caller(model, chunk_size, batch_size, device_string);
-                for (size_t i = 0; i < num_runners; i++) {
-                    runners.push_back(
-                            std::make_shared<CudaModelRunner>(caller, chunk_size, batch_size));
-                }
-            }
-
-            stereo_batch_size = 1024;
-            std::string stereo_model(
-                    "/media/groups/machine_learning/active/klawrence/stereo-duplex/"
-                    "202211_ncm_model_training/4khz_mixedspeed/20221115_beta_training/"
-                    "dna_r10.4.1_e8.2_4khz_mixedspeed_duplex@v4.0.beta");
-            for (auto device_string : devices) {
-                auto caller = create_cuda_caller(stereo_model, chunk_size, stereo_batch_size,
-                                                 device_string);
-                for (size_t i = 0; i < num_runners; i++) {
-                    stereo_runners.push_back(std::make_shared<CudaModelRunner>(caller, chunk_size,
-                                                                               stereo_batch_size));
-                }
-            }
-        }
-#endif  // __APPLE__
-        spdlog::info("> Starting Stereo Duplex pipeline");
-
-        std::unique_ptr<BasecallerNode> stereo_basecaller_node;
-
-        auto stereo_model_stride = stereo_runners.front()->model_stride();
-        stereo_basecaller_node = std::make_unique<BasecallerNode>(
-                writer_node, std::move(stereo_runners), stereo_batch_size, chunk_size, overlap,
-                stereo_model_stride);
-
-        StereoDuplexEncoderNode stereo_node = StereoDuplexEncoderNode(
-                *stereo_basecaller_node, std::move(template_complement_map));
-
-        std::unique_ptr<BasecallerNode> basecaller_node;
-        auto simplex_model_stride = runners.front()->model_stride();
-        basecaller_node =
-                std::make_unique<BasecallerNode>(stereo_node, std::move(runners), batch_size,
-                                                 chunk_size, overlap, simplex_model_stride);
-        ScalerNode scaler_node(*basecaller_node, num_devices * 2);
-
-        DataLoader loader(scaler_node, "cpu", num_devices);
-        loader.load_reads(reads);
-    }
-
     return 0;
 }
 }  // namespace dorado

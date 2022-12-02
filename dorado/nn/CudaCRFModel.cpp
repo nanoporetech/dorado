@@ -103,8 +103,8 @@ public:
             task->out = m_decoder->gpu_part(scores, task->num_chunks, m_decoder_options);
             stream.synchronize();
             task->done = true;
-            task_lock.unlock();
             task->cv.notify_one();
+            task_lock.unlock();
         }
     }
 
