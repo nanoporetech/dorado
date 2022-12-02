@@ -129,7 +129,7 @@ int duplex(int argc, char* argv[]) {
                 auto stereo_model_path =
                         model_path.parent_path() / std::filesystem::path(stereo_model_name);
 
-                std::string stereo_model(stereo_model_path);
+                std::string stereo_model(stereo_model_path.string());
 
                 for (auto device_string : devices) {
                     auto caller = create_cuda_caller(stereo_model, chunk_size, stereo_batch_size,
