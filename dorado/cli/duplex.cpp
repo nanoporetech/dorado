@@ -128,7 +128,7 @@ int duplex(int argc, char* argv[]) {
 
                 stereo_batch_size = 1024;
 
-                std::string stereo_model_name("dna_r10.4.1_e8.2_4khz_mixedspeed_duplex@v4.0.beta");
+                std::string stereo_model_name("dna_r10.4.2_e8.2_4khz_stereo@v1.0");
                 auto model_path = std::filesystem::path(model);
                 auto stereo_model_path =
                         model_path.parent_path() / std::filesystem::path(stereo_model_name);
