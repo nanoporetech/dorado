@@ -1,6 +1,7 @@
 #include "Version.h"
 #include "data_loader/DataLoader.h"
 #include "decode/CPUDecoder.h"
+#include "utils/models.h"
 #ifdef __APPLE__
 #include "nn/MetalCRFModel.h"
 #include "utils/metal_utils.h"
@@ -178,6 +179,8 @@ int basecaller(int argc, char* argv[]) {
             .help("device string in format \"cuda:0,...,N\", \"cuda:all\", \"metal\" etc..")
             .default_value(default_parameters.device);
 
+    parser.add_argument("-n", "--max-reads").default_value(0).scan<'i', int>();
+
     parser.add_argument("-b", "--batchsize")
             .default_value(default_parameters.batchsize)
             .scan<'i', int>()
@@ -195,23 +198,29 @@ int basecaller(int argc, char* argv[]) {
             .default_value(default_parameters.num_runners)
             .scan<'i', int>();
 
+    parser.add_argument("--modified-bases")
+            .nargs(argparse::nargs_pattern::at_least_one)
+            .action([](const std::string& value) {
+                if (std::find(urls::modified::mods.begin(), urls::modified::mods.end(), value) ==
+                    urls::modified::mods.end()) {
+                    spdlog::error(
+                            "'{}' is not a supported modification please select from {}", value,
+                            std::accumulate(
+                                    std::next(urls::modified::mods.begin()),
+                                    urls::modified::mods.end(), urls::modified::mods[0],
+                                    [](std::string a, std::string b) { return a + ", " + b; }));
+                    std::exit(EXIT_FAILURE);
+                }
+                return value;
+            });
+
+    parser.add_argument("--modified-bases-models")
+            .default_value(std::string())
+            .help("a comma separated list of modified base models");
+
     parser.add_argument("--emit-fastq").default_value(false).implicit_value(true);
 
     parser.add_argument("--emit-moves").default_value(false).implicit_value(true);
-
-    parser.add_argument("--remora-batchsize")
-            .default_value(default_parameters.remora_batchsize)
-            .scan<'i', int>();
-
-    parser.add_argument("--remora-threads")
-            .default_value(default_parameters.remora_threads)
-            .scan<'i', int>();
-
-    parser.add_argument("--remora-models")
-            .default_value(std::string())
-            .help("a comma separated list of remora models");
-
-    parser.add_argument("--max-reads").default_value(0).scan<'i', int>();
 
     try {
         parser.parse_args(argc, argv);
@@ -228,13 +237,31 @@ int basecaller(int argc, char* argv[]) {
         spdlog::set_level(spdlog::level::debug);
     }
 
+    auto model = parser.get<std::string>("model");
+    auto mod_bases = parser.get<std::vector<std::string>>("--modified-bases");
+    auto mod_bases_models = parser.get<std::string>("--modified-bases-models");
+
+    if (mod_bases.size() && !mod_bases_models.empty()) {
+        spdlog::error(
+                "only one of --modified-bases or --modified-bases-models should be specified.");
+        std::exit(EXIT_FAILURE);
+    } else if (mod_bases.size()) {
+        std::vector<std::string> m;
+        std::transform(mod_bases.begin(), mod_bases.end(), std::back_inserter(m),
+                       [&model](std::string m) { return utils::get_modification_model(model, m); });
+
+        mod_bases_models =
+                std::accumulate(std::next(m.begin()), m.end(), m[0],
+                                [](std::string a, std::string b) { return a + "," + b; });
+    }
+
     spdlog::info("> Creating basecall pipeline");
+
     try {
-        setup(args, parser.get<std::string>("model"), parser.get<std::string>("data"),
-              parser.get<std::string>("--remora-models"), parser.get<std::string>("-x"),
-              parser.get<int>("-c"), parser.get<int>("-o"), parser.get<int>("-b"),
-              parser.get<int>("-r"), parser.get<int>("--remora-batchsize"),
-              parser.get<int>("--remora-threads"), parser.get<bool>("--emit-fastq"),
+        setup(args, model, parser.get<std::string>("data"), mod_bases_models,
+              parser.get<std::string>("-x"), parser.get<int>("-c"), parser.get<int>("-o"),
+              parser.get<int>("-b"), parser.get<int>("-r"), default_parameters.remora_batchsize,
+              default_parameters.remora_threads, parser.get<bool>("--emit-fastq"),
               parser.get<bool>("--emit-moves"), parser.get<int>("--max-reads"));
     } catch (const std::exception& e) {
         spdlog::error("{}", e.what());
