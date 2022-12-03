@@ -51,6 +51,15 @@ static const std::map<std::string, std::string> models = {
 
 }  // namespace simplex
 
+namespace stereo {
+
+static const std::map<std::string, std::string> models = {
+        {"dna_r10.4.2_e8.2_4khz_stereo@v1.0",
+         "/shared/static/45zmew48ktyq6zbw05hq3t40qyrhuuya.zip"},
+};
+
+}
+
 namespace modified {
 
 static const std::vector<std::string> mods = {

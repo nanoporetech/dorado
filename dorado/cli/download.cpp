@@ -53,6 +53,10 @@ int download(int argc, char* argv[]) {
         for (const auto& [model, _] : urls::simplex::models) {
             spdlog::info(" - {}", model);
         }
+        spdlog::info("> stereo models");
+        for (const auto& [model, _] : urls::stereo::models) {
+            spdlog::info(" - {}", model);
+        }
         spdlog::info("> modification models");
         for (const auto& [model, _] : urls::modified::models) {
             spdlog::info(" - {}", model);
