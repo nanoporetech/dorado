@@ -14,6 +14,7 @@ namespace dorado::utils {
 bool is_valid_model(const std::string& selected_model) {
     return selected_model == "all" ||
            urls::simplex::models.find(selected_model) != urls::simplex::models.end() ||
+           urls::stereo::models.find(selected_model) != urls::stereo::models.end() ||
            urls::modified::models.find(selected_model) != urls::modified::models.end();
 }
 
@@ -44,6 +45,7 @@ void download_models(const std::string& target_directory, const std::string& sel
     };
 
     download_model_set(urls::simplex::models);
+    download_model_set(urls::stereo::models);
     download_model_set(urls::modified::models);
 }
 
