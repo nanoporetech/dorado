@@ -11,12 +11,17 @@ using namespace dorado::utils;
 // For convenient Slice syntax.
 using namespace torch::indexing;
 
+namespace F = torch::nn::functional;
+
 #define TEST_GROUP "Metal: "
 
 float MeanAbsDiff(const torch::Tensor &a, const torch::Tensor &b) {
     REQUIRE(a.numel() == b.numel());
     return torch::sum(torch::abs(a - b)).item<float>() / a.numel();
 }
+
+// 32 threads/SIMD group on Apple GPUs.  The kernels have this hardwired.
+constexpr int kSimdGroupSize = 32;
 
 TEST_CASE(TEST_GROUP "Linear") {
     // Basic device setup.
@@ -49,6 +54,8 @@ TEST_CASE(TEST_GROUP "Linear") {
     // doesn't necessarily use the maximum possible.
     const int kernel_simd_groups = 24;
 
+    const int threads_per_thread_group = kernel_simd_groups * kSimdGroupSize;
+
     // Threadgroup memory size calculation.
     constexpr int kTileSize = 8;
     typedef uint16_t ftype;
@@ -56,20 +63,36 @@ TEST_CASE(TEST_GROUP "Linear") {
     const int kOutBufF32Size = sizeof(float) * kernel_simd_groups * kTileSize * kTileSize;
     const std::vector<int> tg_buffer_lens{kOutBufSize, kOutBufF32Size};
 
-    // 32 threads/SIMD group on Apple GPUs.  The kernels have this hardwired.
-    constexpr int kSimdGroupSize = 32;
-    const int threads_per_thread_group = kernel_simd_groups * kSimdGroupSize;
 
-    // Create a ComputePipelineState for the Linear kernel.
-    MTL::ComputePipelineState *const linear_cps = make_cps(device, "linear",
+    MTL::ComputePipelineState *const linear_cps_tanh_byte = make_cps(device, "linear",
                                                            {{"kLinearContractDim", layer_size},
                                                             {"kLinearInnerDim", out_size},
                                                             {"kLinearOutputScale", 127.0f},
-                                                            {"kLinearOuputClamp", false},
+                                                            {"kLinearOutputClamp", false},
                                                             {"kLinearOutputTanh", true},
                                                             {"kLinearOutputAsByte", true}},
                                                            threads_per_thread_group);
-    REQUIRE(linear_cps != nullptr);
+    REQUIRE(linear_cps_tanh_byte != nullptr);
+
+    MTL::ComputePipelineState *const linear_cps_clamp_byte = make_cps(device, "linear",
+                                                           {{"kLinearContractDim", layer_size},
+                                                            {"kLinearInnerDim", out_size},
+                                                            {"kLinearOutputScale", static_cast<float>(127.0 / 4.0)},
+                                                            {"kLinearOutputClamp", true},
+                                                            {"kLinearOutputTanh", false},
+                                                            {"kLinearOutputAsByte", true}},
+                                                           threads_per_thread_group);
+    REQUIRE(linear_cps_clamp_byte != nullptr);
+
+    MTL::ComputePipelineState *const linear_cps_f16 = make_cps(device, "linear",
+                                                           {{"kLinearContractDim", layer_size},
+                                                            {"kLinearInnerDim", out_size},
+                                                            {"kLinearOutputScale", 1.0f},
+                                                            {"kLinearOutputClamp", false},
+                                                            {"kLinearOutputTanh", false},
+                                                            {"kLinearOutputAsByte", false}},
+                                                           threads_per_thread_group);
+    REQUIRE(linear_cps_f16 != nullptr);
 
     // Create a ComputePipelineState for the input reordering kernel.
     MTL::ComputePipelineState *const reorder_input_cps =
@@ -120,10 +143,15 @@ TEST_CASE(TEST_GROUP "Linear") {
                   {args_reorder, mtl_for_tensor(in_f32), mtl_for_tensor(in_f16_reordered)}, {},
                   kernel_thread_groups, threads_per_thread_group);
 
-    // CPU comparison calculation (scaled to int8 range).
-    const torch::Tensor out_cpu_i8 =
-            (127.0f * torch::tanh(torch::addmm(biases_f32, in_f32, weights_f32))).to(torch::kInt8);
-    const auto out_cpu_f32 = out_cpu_i8.to(torch::kFloat32);
+    // CPU comparison calculation.
+    const torch::Tensor out_cpu_f32 = torch::addmm(biases_f32, in_f32, weights_f32);
+    const torch::Tensor out_cpu_tanh_i8 =
+            (127.0f * torch::tanh(out_cpu_f32)).to(torch::kInt8);
+    const torch::Tensor out_cpu_clamp_i8 =
+            (static_cast<float>(127.0 / 4.0) * torch::clamp(out_cpu_f32, -4.0f, 4.0f)).to(torch::kInt8);
+
+    const auto out_cpu_tanh_i8_as_f32 = out_cpu_tanh_i8.to(torch::kFloat32);
+    const auto out_cpu_clamp_i8_as_f32 = out_cpu_clamp_i8.to(torch::kFloat32);
 
     const int32_t in_batch_tiles = in_batch_size / tile_size;
 
@@ -135,37 +163,80 @@ TEST_CASE(TEST_GROUP "Linear") {
     constexpr float kMeanAbsDiffTolerance = 0.14f;
 
     // A single kernel launch calculates the entire result.
-    SECTION("Complete batch") {
+    SECTION("Complete batch tanh byte") {
         const int in_batch_tile_offset = 0;
         const int out_batch_size = 96;
 
-        // Order in LinearArgs struct:
-        // batch_tiles
-        // chunk_size
-        // linear_layer_size
         const int32_t out_batch_tiles = out_batch_size / tile_size;
         const std::vector<int32_t> args_linear_{in_batch_tiles, in_batch_tile_offset,
                                                 out_batch_tiles, lstm_chunk_size, out_size};
         MTL::Buffer *const args_linear = create_vec_buffer(device, args_linear_);
         REQUIRE(args_linear != nullptr);
 
-        // Perform the Linear computation.
         // float16 input -> int8 output
         torch::Tensor out_gpu_i8 =
                 torch::zeros({lstm_chunk_size * out_batch_size, out_size}, torch::kInt8);
-        launch_kernel(linear_cps, command_queue,
+        launch_kernel(linear_cps_tanh_byte, command_queue,
                       {args_linear, mtl_for_tensor(in_f16_reordered),
                        mtl_for_tensor(weights_biases_f16), mtl_for_tensor(out_gpu_i8)},
                       tg_buffer_lens, kernel_thread_groups, threads_per_thread_group);
 
         // Compare as floats.
         const auto out_gpu_f32 = out_gpu_i8.to(torch::kFloat32);
+        REQUIRE(torch::allclose(out_cpu_tanh_i8_as_f32, out_gpu_f32, kRelTolerance, kAbsTolerance));
+        REQUIRE(MeanAbsDiff(out_cpu_tanh_i8_as_f32, out_gpu_f32) < kMeanAbsDiffTolerance);
+    }
+
+    SECTION("Complete batch float16") {
+        const int in_batch_tile_offset = 0;
+        const int out_batch_size = 96;
+
+        const int32_t out_batch_tiles = out_batch_size / tile_size;
+        const std::vector<int32_t> args_linear_{in_batch_tiles, in_batch_tile_offset,
+                                                out_batch_tiles, lstm_chunk_size, out_size};
+        MTL::Buffer *const args_linear = create_vec_buffer(device, args_linear_);
+        REQUIRE(args_linear != nullptr);
+
+        // float16 input -> float16 output
+        torch::Tensor out_gpu_f16 =
+                torch::zeros({lstm_chunk_size * out_batch_size, out_size}, torch::kFloat16);
+        launch_kernel(linear_cps_f16, command_queue,
+                      {args_linear, mtl_for_tensor(in_f16_reordered),
+                       mtl_for_tensor(weights_biases_f16), mtl_for_tensor(out_gpu_f16)},
+                      tg_buffer_lens, kernel_thread_groups, threads_per_thread_group);
+
+        // Compare as floats.
+        const auto out_gpu_f32 = out_gpu_f16.to(torch::kFloat32);
         REQUIRE(torch::allclose(out_cpu_f32, out_gpu_f32, kRelTolerance, kAbsTolerance));
         REQUIRE(MeanAbsDiff(out_cpu_f32, out_gpu_f32) < kMeanAbsDiffTolerance);
     }
 
+    SECTION("Complete batch clamp byte") {
+        const int in_batch_tile_offset = 0;
+        const int out_batch_size = 96;
+
+        const int32_t out_batch_tiles = out_batch_size / tile_size;
+        const std::vector<int32_t> args_linear_{in_batch_tiles, in_batch_tile_offset,
+                                                out_batch_tiles, lstm_chunk_size, out_size};
+        MTL::Buffer *const args_linear = create_vec_buffer(device, args_linear_);
+        REQUIRE(args_linear != nullptr);
+
+        // float16 input -> int8 output
+        torch::Tensor out_gpu_i8 =
+                torch::zeros({lstm_chunk_size * out_batch_size, out_size}, torch::kInt8);
+        launch_kernel(linear_cps_clamp_byte, command_queue,
+                      {args_linear, mtl_for_tensor(in_f16_reordered),
+                       mtl_for_tensor(weights_biases_f16), mtl_for_tensor(out_gpu_i8)},
+                      tg_buffer_lens, kernel_thread_groups, threads_per_thread_group);
+
+        // Compare as floats.
+        const auto out_gpu_f32 = out_gpu_i8.to(torch::kFloat32);
+        REQUIRE(torch::allclose(out_cpu_clamp_i8_as_f32, out_gpu_f32, kRelTolerance, kAbsTolerance));
+        REQUIRE(MeanAbsDiff(out_cpu_clamp_i8_as_f32, out_gpu_f32) < kMeanAbsDiffTolerance);
+    }
+
     // Two kernel launches each calculate half the batch elements.
-    SECTION("Split batch") {
+    SECTION("Split batch tanh byte") {
         const int out_batch_size = 48;
         const int32_t out_batch_tiles = out_batch_size / tile_size;
 
@@ -185,7 +256,7 @@ TEST_CASE(TEST_GROUP "Linear") {
             torch::Tensor out_gpu_partial_i8 =
                     torch::zeros({lstm_chunk_size, out_batch_size, out_size}, torch::kInt8);
 
-            launch_kernel(linear_cps, command_queue,
+            launch_kernel(linear_cps_tanh_byte, command_queue,
                           {args_linear, mtl_for_tensor(in_f16_reordered),
                            mtl_for_tensor(weights_biases_f16), mtl_for_tensor(out_gpu_partial_i8)},
                           tg_buffer_lens, kernel_thread_groups, threads_per_thread_group);
@@ -199,8 +270,8 @@ TEST_CASE(TEST_GROUP "Linear") {
         const auto out_gpu_complete_f32 = out_gpu_complete_i8.to(torch::kFloat32);
         const auto out_gpu_complete_2d_f32 =
                 out_gpu_complete_f32.view({lstm_chunk_size * in_batch_size, out_size});
-        REQUIRE(torch::allclose(out_cpu_f32, out_gpu_complete_2d_f32, kRelTolerance,
+        REQUIRE(torch::allclose(out_cpu_tanh_i8_as_f32, out_gpu_complete_2d_f32, kRelTolerance,
                                 kAbsTolerance));
-        REQUIRE(MeanAbsDiff(out_cpu_f32, out_gpu_complete_2d_f32) < kMeanAbsDiffTolerance);
+        REQUIRE(MeanAbsDiff(out_cpu_tanh_i8_as_f32, out_gpu_complete_2d_f32) < kMeanAbsDiffTolerance);
     }
 }

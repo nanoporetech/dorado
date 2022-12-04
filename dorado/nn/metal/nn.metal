@@ -847,7 +847,7 @@ struct LinearArgs {
     int in_batch_tiles;
     int in_batch_tile_offset;
     int out_batch_tiles;
-    int chunk_size;  // FIXME -- rename, since it could be decomposition feature size
+    int chunk_size;
 };
 
 kernel void linear(
