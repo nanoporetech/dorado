@@ -63,35 +63,36 @@ TEST_CASE(TEST_GROUP "Linear") {
     const int kOutBufF32Size = sizeof(float) * kernel_simd_groups * kTileSize * kTileSize;
     const std::vector<int> tg_buffer_lens{kOutBufSize, kOutBufF32Size};
 
-
-    MTL::ComputePipelineState *const linear_cps_tanh_byte = make_cps(device, "linear",
-                                                           {{"kLinearContractDim", layer_size},
-                                                            {"kLinearInnerDim", out_size},
-                                                            {"kLinearOutputScale", 127.0f},
-                                                            {"kLinearOutputClamp", false},
-                                                            {"kLinearOutputTanh", true},
-                                                            {"kLinearOutputAsByte", true}},
-                                                           threads_per_thread_group);
+    MTL::ComputePipelineState *const linear_cps_tanh_byte =
+            make_cps(device, "linear",
+                     {{"kLinearContractDim", layer_size},
+                      {"kLinearInnerDim", out_size},
+                      {"kLinearOutputScale", 127.0f},
+                      {"kLinearOutputClamp", false},
+                      {"kLinearOutputTanh", true},
+                      {"kLinearOutputAsByte", true}},
+                     threads_per_thread_group);
     REQUIRE(linear_cps_tanh_byte != nullptr);
 
-    MTL::ComputePipelineState *const linear_cps_clamp_byte = make_cps(device, "linear",
-                                                           {{"kLinearContractDim", layer_size},
-                                                            {"kLinearInnerDim", out_size},
-                                                            {"kLinearOutputScale", static_cast<float>(127.0 / 4.0)},
-                                                            {"kLinearOutputClamp", true},
-                                                            {"kLinearOutputTanh", false},
-                                                            {"kLinearOutputAsByte", true}},
-                                                           threads_per_thread_group);
+    MTL::ComputePipelineState *const linear_cps_clamp_byte =
+            make_cps(device, "linear",
+                     {{"kLinearContractDim", layer_size},
+                      {"kLinearInnerDim", out_size},
+                      {"kLinearOutputScale", static_cast<float>(127.0 / 4.0)},
+                      {"kLinearOutputClamp", true},
+                      {"kLinearOutputTanh", false},
+                      {"kLinearOutputAsByte", true}},
+                     threads_per_thread_group);
     REQUIRE(linear_cps_clamp_byte != nullptr);
 
     MTL::ComputePipelineState *const linear_cps_f16 = make_cps(device, "linear",
-                                                           {{"kLinearContractDim", layer_size},
-                                                            {"kLinearInnerDim", out_size},
-                                                            {"kLinearOutputScale", 1.0f},
-                                                            {"kLinearOutputClamp", false},
-                                                            {"kLinearOutputTanh", false},
-                                                            {"kLinearOutputAsByte", false}},
-                                                           threads_per_thread_group);
+                                                               {{"kLinearContractDim", layer_size},
+                                                                {"kLinearInnerDim", out_size},
+                                                                {"kLinearOutputScale", 1.0f},
+                                                                {"kLinearOutputClamp", false},
+                                                                {"kLinearOutputTanh", false},
+                                                                {"kLinearOutputAsByte", false}},
+                                                               threads_per_thread_group);
     REQUIRE(linear_cps_f16 != nullptr);
 
     // Create a ComputePipelineState for the input reordering kernel.
@@ -145,10 +146,10 @@ TEST_CASE(TEST_GROUP "Linear") {
 
     // CPU comparison calculation.
     const torch::Tensor out_cpu_f32 = torch::addmm(biases_f32, in_f32, weights_f32);
-    const torch::Tensor out_cpu_tanh_i8 =
-            (127.0f * torch::tanh(out_cpu_f32)).to(torch::kInt8);
+    const torch::Tensor out_cpu_tanh_i8 = (127.0f * torch::tanh(out_cpu_f32)).to(torch::kInt8);
     const torch::Tensor out_cpu_clamp_i8 =
-            (static_cast<float>(127.0 / 4.0) * torch::clamp(out_cpu_f32, -4.0f, 4.0f)).to(torch::kInt8);
+            (static_cast<float>(127.0 / 4.0) * torch::clamp(out_cpu_f32, -4.0f, 4.0f))
+                    .to(torch::kInt8);
 
     const auto out_cpu_tanh_i8_as_f32 = out_cpu_tanh_i8.to(torch::kFloat32);
     const auto out_cpu_clamp_i8_as_f32 = out_cpu_clamp_i8.to(torch::kFloat32);
@@ -231,7 +232,8 @@ TEST_CASE(TEST_GROUP "Linear") {
 
         // Compare as floats.
         const auto out_gpu_f32 = out_gpu_i8.to(torch::kFloat32);
-        REQUIRE(torch::allclose(out_cpu_clamp_i8_as_f32, out_gpu_f32, kRelTolerance, kAbsTolerance));
+        REQUIRE(torch::allclose(out_cpu_clamp_i8_as_f32, out_gpu_f32, kRelTolerance,
+                                kAbsTolerance));
         REQUIRE(MeanAbsDiff(out_cpu_clamp_i8_as_f32, out_gpu_f32) < kMeanAbsDiffTolerance);
     }
 
@@ -272,6 +274,7 @@ TEST_CASE(TEST_GROUP "Linear") {
                 out_gpu_complete_f32.view({lstm_chunk_size * in_batch_size, out_size});
         REQUIRE(torch::allclose(out_cpu_tanh_i8_as_f32, out_gpu_complete_2d_f32, kRelTolerance,
                                 kAbsTolerance));
-        REQUIRE(MeanAbsDiff(out_cpu_tanh_i8_as_f32, out_gpu_complete_2d_f32) < kMeanAbsDiffTolerance);
+        REQUIRE(MeanAbsDiff(out_cpu_tanh_i8_as_f32, out_gpu_complete_2d_f32) <
+                kMeanAbsDiffTolerance);
     }
 }
