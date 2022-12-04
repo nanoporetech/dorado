@@ -232,22 +232,24 @@ struct MetalBlockImpl : Module {
                                lstm_threads);
 
         const int linear_threads = kernel_simd_groups * 32;
-        const auto linear_constants = config.out_features.has_value() ? 
-                std::vector<std::tuple<std::string, MetalConstant>>({{"kLinearContractDim", layer_size},
-                {"kLinearInnerDim", out_size},
-                // Rescale from clamped [-4.0, 4.0] range to byte range.
-                {"kLinearOutputScale", static_cast<float>(127.0f / 4.0f)},
-                {"kLinearOutputClamp", true},
-                {"kLinearOutputTanh", false},
-                {"kLinearOutputAsByte", true}})
-                :
-                std::vector<std::tuple<std::string, MetalConstant>>({{"kLinearContractDim", layer_size},
-                {"kLinearInnerDim", out_size},
-                // Rescale from tanh [-1, 1] range to byte range.
-                {"kLinearOutputScale", 127.0f},
-                {"kLinearOutputClamp", false},
-                {"kLinearOutputTanh", true},
-                {"kLinearOutputAsByte", true}});
+        const auto linear_constants =
+                config.out_features.has_value()
+                        ? std::vector<std::tuple<std::string, MetalConstant>>(
+                                  {{"kLinearContractDim", layer_size},
+                                   {"kLinearInnerDim", out_size},
+                                   // Rescale from clamped [-4.0, 4.0] range to byte range.
+                                   {"kLinearOutputScale", static_cast<float>(127.0f / 4.0f)},
+                                   {"kLinearOutputClamp", true},
+                                   {"kLinearOutputTanh", false},
+                                   {"kLinearOutputAsByte", true}})
+                        : std::vector<std::tuple<std::string, MetalConstant>>(
+                                  {{"kLinearContractDim", layer_size},
+                                   {"kLinearInnerDim", out_size},
+                                   // Rescale from tanh [-1, 1] range to byte range.
+                                   {"kLinearOutputScale", 127.0f},
+                                   {"kLinearOutputClamp", false},
+                                   {"kLinearOutputTanh", true},
+                                   {"kLinearOutputAsByte", true}});
         linear_cps = make_cps(device, "linear", linear_constants, linear_threads);
 
         to_half_cps = make_cps(device, "float_to_half", {});
@@ -337,8 +339,8 @@ struct MetalBlockImpl : Module {
         }
 
         // Linear weights and bias are stored in the same buffer.
-        linear_weights =
-                create_buffer(device, static_cast<size_t>(layer_size + 1) * out_size * sizeof(ftype));
+        linear_weights = create_buffer(
+                device, static_cast<size_t>(layer_size + 1) * out_size * sizeof(ftype));
 
         // Load and prepare linear layer weights.
         torch::Tensor linear_w, linear_b;
@@ -362,9 +364,11 @@ struct MetalBlockImpl : Module {
             // the stay score for the zero entries corresponding to stays in the
             // transformed bias vector.
             const auto num_states = linear_b.sizes().at(0);
-            auto linear_b_no_zeros = linear_b.view({num_states / 5, 5}).index({Slice(0, num_states / 5), Slice(1, 5)});
-            linear_b = F::pad(linear_b_no_zeros, F::PadFuncOptions({1, 0}).value(
-                                                   stay_score)).flatten().contiguous();
+            auto linear_b_no_zeros = linear_b.view({num_states / 5, 5})
+                                             .index({Slice(0, num_states / 5), Slice(1, 5)});
+            linear_b = F::pad(linear_b_no_zeros, F::PadFuncOptions({1, 0}).value(stay_score))
+                               .flatten()
+                               .contiguous();
         } else {
             // v3 style: single matrix with bias.
             auto params = linear1->named_parameters();
@@ -374,8 +378,9 @@ struct MetalBlockImpl : Module {
 
         // Create a single tensor containing the weights and bias, since this is what
         // the kernel expects.
-        auto linear_wb = torch::concat({linear_w.transpose(1, 0).contiguous().flatten(0, -1), linear_b})
-                          .contiguous();
+        auto linear_wb =
+                torch::concat({linear_w.transpose(1, 0).contiguous().flatten(0, -1), linear_b})
+                        .contiguous();
 
         if (sizeof(ftype) != sizeof(float)) {
             // Convert weights from float32 to float16.
@@ -437,10 +442,10 @@ struct MetalBlockImpl : Module {
         for (int i = 0; i < out.size(); ++i) {
             MTL::Buffer *const args_buffer = args_linear.at(i);
             MTL::Buffer *const out_buffer = mtl_for_tensor(out.at(i));
-            launch_kernel_no_wait(
-                    linear_cps, command_buffer,
-                    {args_buffer, mat_working_mem, linear_weights, out_buffer},
-                    linear_tg_buffer_lens, kernel_thread_groups, kernel_simd_groups * 32);
+            launch_kernel_no_wait(linear_cps, command_buffer,
+                                  {args_buffer, mat_working_mem, linear_weights, out_buffer},
+                                  linear_tg_buffer_lens, kernel_thread_groups,
+                                  kernel_simd_groups * 32);
         }
         return command_buffer;
     }
@@ -466,8 +471,8 @@ struct MetalBlockImpl : Module {
     std::string fn[2];
     MTL::ComputePipelineState *reorder_lstm_weights_cps, *reorder_input_cps, *reorder_output_cps,
             *lstm_cps[2], *to_half_cps, *linear_cps;
-    MTL::Buffer *mat_transfer, *mat_working_mem, *mat_state, *mat_temp_result,
-            *args_lstm, *args_to_half, *linear_weights;
+    MTL::Buffer *mat_transfer, *mat_working_mem, *mat_state, *mat_temp_result, *args_lstm,
+            *args_to_half, *linear_weights;
     std::vector<MTL::Buffer *> args_linear;
     int in_chunk_size, lstm_chunk_size, stride, batch_size, layer_size, out_size, conv,
             kernel_thread_groups, kernel_simd_groups;
@@ -817,10 +822,9 @@ public:
             auto [sequence, qstring, moves] = beam_search_decode(
                     m_scores_int8.at(out_buf_idx).index({Slice(), buf_chunk_idx}),
                     m_bwd.at(out_buf_idx)[buf_chunk_idx], m_posts.at(out_buf_idx)[buf_chunk_idx],
-                    m_decoder_options.beam_width,
-                    m_decoder_options.beam_cut, m_decoder_options.blank_score,
-                    m_decoder_options.q_shift, m_decoder_options.q_scale,
-                    m_decoder_options.temperature, score_scale);
+                    m_decoder_options.beam_width, m_decoder_options.beam_cut,
+                    m_decoder_options.blank_score, m_decoder_options.q_shift,
+                    m_decoder_options.q_scale, m_decoder_options.temperature, score_scale);
 
             (*task->out_chunks)[chunk_idx] = DecodedChunk{sequence, qstring, moves};
 
@@ -858,7 +862,7 @@ public:
     int m_out_split;
     int m_out_batch_size;
     // v3 and v4 models have different score scaling requirements.
-    float score_scale { 0.0f };
+    float score_scale{0.0f};
 };
 
 std::shared_ptr<MetalCaller> create_metal_caller(const std::filesystem::path &model_path,
