@@ -85,6 +85,8 @@ set(LIB_SOURCE_FILES
     dorado/utils/log_utils.h
     dorado/utils/log_utils.cpp
     dorado/utils/math_utils.h
+    dorado/utils/models.cpp
+    dorado/utils/models.h
     dorado/utils/module_utils.h
     dorado/utils/parameters.h
     dorado/utils/sequence_utils.cpp
@@ -163,6 +165,7 @@ target_link_libraries(dorado_lib
     vbz_hdf_plugin
     OpenSSL::SSL
     edlib
+    elzip
 )
 
 if(NOT WIN32)
@@ -194,7 +197,6 @@ if(NOT DORADO_LIB_ONLY)
         dorado/cli/benchmark.cpp        
         dorado/cli/download.cpp
         dorado/cli/cli.h
-        dorado/models.h
     )
 
     set_target_properties(dorado
@@ -202,7 +204,6 @@ if(NOT DORADO_LIB_ONLY)
         RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
     )
 
-    target_link_libraries(dorado elzip)
     target_link_libraries(dorado dorado_lib)
 
     if (DEFINED DORADO_INSTALL_PATH)
@@ -216,40 +217,40 @@ endif()
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     file(GLOB TORCH_DLLS "${TORCH_LIB}/lib/*.so*")
-    install(FILES ${TORCH_DLLS} DESTINATION lib)
+    install(FILES ${TORCH_DLLS} DESTINATION lib COMPONENT redist_libs)
     if(DYNAMIC_HDF)
         file(GLOB HDF_DLLS "${HDF5_CXX_LIBRARY_DIRS}/*hdf5*.so*")
-        install(FILES ${HDF_DLLS} DESTINATION lib)
+        install(FILES ${HDF_DLLS} DESTINATION lib COMPONENT redist_libs)
     endif()
     file(GLOB SZ_DLLS "${HDF5_CXX_LIBRARY_DIRS}/libsz.so*")
-    install(FILES ${SZ_DLLS} DESTINATION lib)
+    install(FILES ${SZ_DLLS} DESTINATION lib COMPONENT redist_libs)
     file(GLOB AEC_DLLS "${HDF5_CXX_LIBRARY_DIRS}/libaec.so*")
     list(LENGTH AEC_DLLS AEC_DLL_LIST_LEN)
     if(AEC_DLL_LIST_LEN)
-        install(FILES ${AEC_DLLS} DESTINATION lib)
+        install(FILES ${AEC_DLLS} DESTINATION lib COMPONENT redist_libs)
     endif()
 
     # CUDA system DLLs we depend on:
     file(GLOB CUDART_DLLS "${CUDAToolkit_ROOT}/targets/x86_64-linux/lib/*cudart.so*")
     file(GLOB CUBLAS_DLLS "${CUDAToolkit_ROOT}/targets/x86_64-linux/lib/*cublas*.so*")
     file(GLOB NVTOOLS_DLLS "${CUDAToolkit_ROOT}/targets/x86_64-linux/lib/*nvToolsExt.so*")
-    install(FILES ${CUDART_DLLS} DESTINATION lib)
-    install(FILES ${CUBLAS_DLLS} DESTINATION lib)
-    install(FILES ${NVTOOLS_DLLS} DESTINATION lib)
+    install(FILES ${CUDART_DLLS} DESTINATION lib COMPONENT redist_libs)
+    install(FILES ${CUBLAS_DLLS} DESTINATION lib COMPONENT redist_libs)
+    install(FILES ${NVTOOLS_DLLS} DESTINATION lib COMPONENT redist_libs)
 
     # If zstd has been dynamically linked, add the .so to the package
     get_filename_component(ZSTD_LIBRARY_PATH ${ZSTD_LIBRARY_RELEASE} DIRECTORY)
     file(GLOB ZSTD_DLLS "${ZSTD_LIBRARY_PATH}/*zstd.so*")
-    install(FILES ${ZSTD_DLLS} DESTINATION lib)
+    install(FILES ${ZSTD_DLLS} DESTINATION lib COMPONENT redist_libs)
 
 elseif(WIN32)
     file(GLOB TORCH_DLLS "${TORCH_LIB}/lib/*.dll")
-    install(FILES ${TORCH_DLLS} DESTINATION bin)
+    install(FILES ${TORCH_DLLS} DESTINATION bin COMPONENT redist_libs)
     file(GLOB HTSLIB_DLLS "${HTSLIB_DIR}/*.dll")
-    install(FILES ${HTSLIB_DLLS} DESTINATION bin)
+    install(FILES ${HTSLIB_DLLS} DESTINATION bin COMPONENT redist_libs)
 elseif(APPLE)
     file(GLOB TORCH_DLLS "${TORCH_LIB}/lib/*.dylib")
-    install(FILES ${TORCH_DLLS} DESTINATION lib)
+    install(FILES ${TORCH_DLLS} DESTINATION lib COMPONENT redist_libs)
 endif()
 
 add_subdirectory(tests)

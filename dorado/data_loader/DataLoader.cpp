@@ -140,6 +140,9 @@ void DataLoader::load_reads(const std::string& path) {
     }
 
     for (const auto& entry : std::filesystem::directory_iterator(path)) {
+        if (m_loaded_read_count == m_max_reads) {
+            break;
+        }
         std::string ext = std::filesystem::path(entry).extension().string();
         std::transform(ext.begin(), ext.end(), ext.begin(),
                        [](unsigned char c) { return std::tolower(c); });
@@ -170,6 +173,9 @@ void DataLoader::load_pod5_reads_from_file(const std::string& path) {
     cxxpool::thread_pool pool{m_num_worker_threads};
 
     for (std::size_t batch_index = 0; batch_index < batch_count; ++batch_index) {
+        if (m_loaded_read_count == m_max_reads) {
+            break;
+        }
         Pod5ReadRecordBatch_t* batch = nullptr;
         if (pod5_get_read_batch(&batch, file, batch_index) != POD5_OK) {
             spdlog::error("Failed to get batch: {}", pod5_get_error_string());
@@ -179,6 +185,7 @@ void DataLoader::load_pod5_reads_from_file(const std::string& path) {
         if (pod5_get_read_batch_row_count(&batch_row_count, batch) != POD5_OK) {
             spdlog::error("Failed to get batch row count");
         }
+        batch_row_count = std::min(batch_row_count, m_max_reads - m_loaded_read_count);
 
         std::vector<std::future<std::shared_ptr<Read>>> futures;
 
@@ -205,7 +212,7 @@ void DataLoader::load_fast5_reads_from_file(const std::string& path) {
     HighFive::Group reads = file.getGroup("/");
     int num_reads = reads.getNumberObjects();
 
-    for (int i = 0; i < num_reads; i++) {
+    for (int i = 0; i < num_reads && m_loaded_read_count < m_max_reads; i++) {
         auto read_id = reads.getObjectName(i);
         HighFive::Group read = reads.getGroup(read_id);
 
@@ -288,8 +295,12 @@ void DataLoader::load_fast5_reads_from_file(const std::string& path) {
     }
 }
 
-DataLoader::DataLoader(ReadSink& read_sink, const std::string& device, size_t num_worker_threads)
+DataLoader::DataLoader(ReadSink& read_sink,
+                       const std::string& device,
+                       size_t num_worker_threads,
+                       size_t max_reads)
         : m_read_sink(read_sink), m_device(device), m_num_worker_threads(num_worker_threads) {
+    m_max_reads = max_reads == 0 ? std::numeric_limits<decltype(m_max_reads)>::max() : max_reads;
     assert(m_num_worker_threads > 0);
     static std::once_flag vbz_init_flag;
     std::call_once(vbz_init_flag, vbz_register);

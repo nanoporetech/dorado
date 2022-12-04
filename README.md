@@ -24,14 +24,14 @@ This is an alpha of Dorado . This software is being released for evaluation. If 
 To run Dorado, download a model and point it to POD5 files. Fast5 files are supported but will not be as performant.
 
 ```
-$ dorado download --model dna_r10.4.1_e8.2_260bps_hac@v3.5.2
-$ dorado basecaller dna_r10.4.1_e8.2_260bps_hac@v3.5.2 pod5s/ > calls.sam
+$ dorado download --model dna_r10.4.1_e8.2_260bps_hac@v4.0.0
+$ dorado basecaller dna_r10.4.1_e8.2_260bps_hac@v4.0.0 pod5s/ > calls.sam
 ```
 
 For unaligned BAM output, dorado output can be piped to BAM using samtoools:
 
 ```
-$ dorado basecaller dna_r10.4.1_e8.2_260bps_hac@v3.5.2 pod5s/ | samtools view -Sh > calls.bam
+$ dorado basecaller dna_r10.4.1_e8.2_260bps_hac@v4.0.0 pod5s/ | samtools view -Sh > calls.bam
 ```
 
 ## Platforms
@@ -71,6 +71,12 @@ $ dorado download --model all
 
 The following models are currently available:
 
+* dna_r10.4.1_e8.2_260bps_fast@v4.0.0
+* dna_r10.4.1_e8.2_260bps_hac@v4.0.0
+* dna_r10.4.1_e8.2_260bps_sup@v4.0.0
+* dna_r10.4.1_e8.2_400bps_fast@v4.0.0
+* dna_r10.4.1_e8.2_400bps_hac@v4.0.0
+* dna_r10.4.1_e8.2_400bps_sup@v4.0.0
 * dna_r10.4.1_e8.2_260bps_fast@v3.5.2
 * dna_r10.4.1_e8.2_260bps_hac@v3.5.2
 * dna_r10.4.1_e8.2_260bps_sup@v3.5.2

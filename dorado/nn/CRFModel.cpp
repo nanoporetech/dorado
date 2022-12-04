@@ -4,14 +4,14 @@
 #include "../utils/tensor_utils.h"
 
 #ifndef __APPLE__
+#include "../utils/cuda_utils.h"
+
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAGuard.h>
 
 extern "C" {
 #include "koi.h"
 }
-#include <cublas_v2.h>
-#include <cuda_runtime.h>
 
 #define USE_CUDA_LSTM 1
 #else
@@ -32,24 +32,6 @@ using Slice = torch::indexing::Slice;
 using quantized_lstm = std::function<int(void *, void *, void *, void *, void *, void *, int)>;
 
 #if USE_CUDA_LSTM
-static void cublas_matmul_f16(torch::Tensor const &A, torch::Tensor const &B, torch::Tensor &C) {
-    constexpr uint16_t HALF_ZERO = 0;      // 0.0 in __half format
-    constexpr uint16_t HALF_ONE = 0x3C00;  // 1.0 in __half format
-    assert(A.dtype() == torch::kF16 && B.dtype() == torch::kF16 && C.dtype() == torch::kF16);
-    assert(A.stride(1) == 1 && B.stride(1) == 1 && C.stride(1) == 1);
-    assert(A.size(0) == C.size(0));  // M
-    assert(B.size(1) == C.size(1));  // N
-    assert(A.size(1) == B.size(0));  // K
-    auto res =
-            cublasGemmEx(at::cuda::getCurrentCUDABlasHandle(), CUBLAS_OP_N, CUBLAS_OP_N, B.size(1),
-                         A.size(0), A.size(1), &HALF_ONE, B.data_ptr(), CUDA_R_16F, B.stride(0),
-                         A.data_ptr(), CUDA_R_16F, A.stride(0), &HALF_ZERO, C.data_ptr(),
-                         CUDA_R_16F, C.stride(0), CUDA_R_16F, CUBLAS_GEMM_DEFAULT_TENSOR_OP);
-    if (res != CUBLAS_STATUS_SUCCESS) {
-        spdlog::error("CuBLAS error {}", int(res));
-        exit(EXIT_FAILURE);
-    }
-}
 
 static bool cuda_lstm_is_quantized(int layer_size) {
     return ((layer_size == 96) || (layer_size == 128));
@@ -113,7 +95,8 @@ struct ConvolutionImpl : Module {
                                          chunk_size_in, in_size, window_size, stride,
                                          ntcw_mat.stride(0), ntcw_mat.stride(1), ntcw_mat.stride(2),
                                          ntcw_mat.stride(3), x.data_ptr(), ntcw_mat.data_ptr());
-                    cublas_matmul_f16(ntcw_mat.view({-1, in_size * window_size}), w_device, res_2D);
+                    dorado::utils::cublas_matmul_f16(ntcw_mat.view({-1, in_size * window_size}),
+                                                     w_device, res_2D);
                     host_bias_swish_f16(stream, res_2D.size(0), res_2D.size(1), res_2D.stride(0),
                                         res_2D.data_ptr(), b_device.data_ptr());
 
@@ -133,7 +116,8 @@ struct ConvolutionImpl : Module {
                                          chunk_size_in, in_size, window_size, stride,
                                          tncw_mat.stride(1), tncw_mat.stride(0), tncw_mat.stride(2),
                                          tncw_mat.stride(3), x.data_ptr(), tncw_mat.data_ptr());
-                    cublas_matmul_f16(tncw_mat.view({-1, in_size * window_size}), w_device, res_2D);
+                    dorado::utils::cublas_matmul_f16(tncw_mat.view({-1, in_size * window_size}),
+                                                     w_device, res_2D);
                     host_bias_swish_f16(stream, res_2D.size(0), res_2D.size(1), res_2D.stride(0),
                                         res_2D.data_ptr(), b_device.data_ptr());
 
@@ -343,7 +327,7 @@ struct CudaLSTMStackImpl : Module {
                 // Timestep matrix mulitplication (using cublasGemmEx, as using torch::matmul
                 // as below is a bit slower on A100 for some reason)
                 // gate_buf = torch::matmul(timestep_in, weights);
-                cublas_matmul_f16(timestep_in, weights, gate_buf);
+                dorado::utils::cublas_matmul_f16(timestep_in, weights, gate_buf);
                 host_lstm_step_f16(stream, batch_size, layer_size, bias.data_ptr(),
                                    gate_buf.data_ptr(), state_buf.data_ptr(),
                                    timestep_out.data_ptr());
@@ -556,13 +540,13 @@ struct CRFModelImpl : Module {
             linear1 = register_module("linear1", Linear(config.insize, decomposition));
             linear2 = register_module(
                     "linear2", Linear(LinearOptions(decomposition, config.outsize).bias(false)));
-            clamp4 = Clamp(-4.0, 4.0, config.clamp);
+            clamp4 = Clamp(-5.0, 5.0, config.clamp);
             encoder = Sequential(conv1, clamp1, conv2, clamp2, conv3, clamp3, rnns, linear1,
                                  linear2, clamp4);
         } else if (config.conv == 16) {
             linear1 = register_module(
                     "linear1", Linear(LinearOptions(config.insize, config.outsize).bias(false)));
-            clamp4 = Clamp(-4.0, 4.0, config.clamp);
+            clamp4 = Clamp(-5.0, 5.0, config.clamp);
             encoder =
                     Sequential(conv1, clamp1, conv2, clamp2, conv3, clamp3, rnns, linear1, clamp4);
         } else {
