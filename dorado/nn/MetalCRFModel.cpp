@@ -32,16 +32,17 @@ namespace dorado {
 
 namespace nn {
 
-struct MetalLinearTanhImpl : Module {
-    MetalLinearTanhImpl(int insize, int outsize) {
+struct MetalLinearImpl : Module {
+    MetalLinearImpl(int insize, int outsize, bool has_bias, MTL::Device *const device) {
         auto weight = torch::empty({outsize, insize});
         auto bias = torch::empty({outsize});
         register_parameter("weight", weight, false);
-        register_parameter("bias", bias, false);
+        if (has_bias)
+            register_parameter("bias", bias, false);
     }
 };
 
-TORCH_MODULE(MetalLinearTanh);
+TORCH_MODULE(MetalLinear);
 
 struct MetalConv1dImpl : Module {
     MetalConv1dImpl(int layer,
@@ -49,21 +50,30 @@ struct MetalConv1dImpl : Module {
                     int outsize_,
                     int k_,
                     int stride,
+                    bool clamp,
                     int chunk_size,
                     int batch_size,
-                    MTL::Device *device)
+                    MTL::Device *const device)
             : insize(insize_), outsize(outsize_), k(k_) {
         assert(layer >= 1 && layer <= 3);
 
+        // For layers 1 and 2 we only have kernels for particular in/out feature sizes.
         if (layer == 1) {
-            assert(outsize == 4);
-            mat_weights = create_buffer(device, 49 * 8 * sizeof(ftype));
+            assert(outsize == 4 || outsize == 16);
         } else if (layer == 2) {
+            assert(insize == 4 || insize == 16);
             assert(outsize == 16);
-            mat_weights = create_buffer(device, 29 * 16 * sizeof(ftype));
-        } else {
-            mat_weights = create_buffer(device, (k * insize + 1) * outsize * sizeof(ftype));
         }
+
+        // Some convolution kernels blow up weights size because they need replicated weights.
+        // Others just need the conventional weight count.  This size is intended to be at least
+        // as large as either.  In the former case, this should be manually verified against the
+        // weight arrangement used in the kernel.
+        const int min_weights_size = (k * insize + 1) * outsize;
+        constexpr int kMaxWeightsSize = 1 << 20;
+        assert(kMaxWeightsSize >= min_weights_size);
+        mat_weights = create_buffer(device, kMaxWeightsSize * sizeof(ftype));
+
         const std::vector<int32_t> args_{insize, k, outsize, stride, k / 2, chunk_size, batch_size};
         args = create_vec_buffer(device, args_);
 
@@ -76,10 +86,17 @@ struct MetalConv1dImpl : Module {
         kernel_simd_groups = layer == 3 ? 4 : 16;
         kernel_thread_groups = get_mtl_device_core_count() * 4;
 
+        std::vector<std::tuple<std::string, MetalConstant>> metal_constants = {
+                {"kConvOutputClamp", clamp}};
         const int kernel_threads = 32 * kernel_simd_groups;
-        conv_cps = make_cps(device, "conv" + std::to_string(layer) + "_simd", {}, kernel_threads);
-        weights_cps =
-                make_cps(device, "conv" + std::to_string(layer) + "_simd_reorder_weights", {});
+        std::string kernel_name = "conv" + std::to_string(layer);
+        // Layers 1 and 2 have variants with a different intermediate feature size.
+        if (layer == 1)
+            kernel_name += "_out" + std::to_string(outsize);
+        else if (layer == 2)
+            kernel_name += "_in" + std::to_string(insize);
+        conv_cps = make_cps(device, kernel_name + "_simd", metal_constants, kernel_threads);
+        weights_cps = make_cps(device, kernel_name + "_simd_reorder_weights", metal_constants);
     }
 
     void run(MTL::CommandQueue *command_queue, MTL::Buffer *mat_in, MTL::Buffer *mat_out) {
@@ -138,17 +155,18 @@ TORCH_MODULE(MetalLSTM);
 struct MetalBlockImpl : Module {
     MetalBlockImpl(int chunk_size_,
                    int batch_size_,
-                   int stride_,
-                   int layer_size_,
-                   int out_size_,
+                   const CRFModelConfig &config,
                    int out_split_,
-                   MTL::Device *device_)
+                   MTL::Device *const device_)
             : device(device_),
               in_chunk_size(chunk_size_),
-              stride(stride_),
+              stride(config.stride),
               batch_size(batch_size_),
-              layer_size(layer_size_),
-              out_size(out_size_) {
+              layer_size(config.insize),
+              out_size(config.outsize),
+              conv(config.conv),
+              out_features(config.out_features),
+              stay_score(config.blank_score) {
         command_queue = device->newCommandQueue();
 
         constexpr int tile_size = 8;
@@ -156,14 +174,18 @@ struct MetalBlockImpl : Module {
         lstm_chunk_size = in_chunk_size / stride;
 
         // args for LSTM kernel
-        std::vector<int32_t> args_lstm_{batch_size / tile_size, lstm_chunk_size};
-        args_lstm = create_vec_buffer(device, args_lstm_);
+        {
+            std::vector<int32_t> args_lstm_{batch_size / tile_size, lstm_chunk_size};
+            args_lstm = create_vec_buffer(device, args_lstm_);
+        }
 
         // args for conversion to half
-        const std::vector<int32_t> args_to_half_{in_chunk_size * batch_size};
-        args_to_half = create_vec_buffer(device, args_to_half_);
+        {
+            const std::vector<int32_t> args_to_half_{in_chunk_size * batch_size};
+            args_to_half = create_vec_buffer(device, args_to_half_);
+        }
 
-        // args for linear layer
+        // args for final (possibly only) linear layer kernel.
         // Each output buffer requires a distinct input offset, so we must have a separate args buffer.
         args_linear.resize(out_split_);
         for (int i = 0; i < out_split_; ++i) {
@@ -208,10 +230,32 @@ struct MetalBlockImpl : Module {
         lstm_cps[1] = make_cps(device, "lstm",
                                {{"kLstmLayerSize", layer_size}, {"kLstmReversedInTime", true}},
                                lstm_threads);
+
         const int linear_threads = kernel_simd_groups * 32;
-        linear_tanh_cps = make_cps(device, "linear_tanh",
-                                   {{"kLstmLayerSize", layer_size}, {"kLinearLayerSize", out_size}},
-                                   linear_threads);
+        // If the intermediate feature size between conv1 and conv2 is 16, then this is a v4
+        // type model, where the linear layer output is clamped rather than run through tanh.
+        // Otherwise the intermediate feature size is 4.
+        assert(config.conv == 4 || config.conv == 16);
+        const auto linear_constants =
+                config.conv == 16
+                        ? std::vector<std::tuple<std::string, MetalConstant>>(
+                                  {{"kLinearContractDim", layer_size},
+                                   {"kLinearInnerDim", out_size},
+                                   // Rescale from clamped [-5.0, 5.0] range to byte range.
+                                   {"kLinearOutputScale", static_cast<float>(127.0f / 5.0f)},
+                                   {"kLinearOutputClamp", true},
+                                   {"kLinearOutputTanh", false},
+                                   {"kLinearOutputAsByte", true}})
+                        : std::vector<std::tuple<std::string, MetalConstant>>(
+                                  {{"kLinearContractDim", layer_size},
+                                   {"kLinearInnerDim", out_size},
+                                   // Rescale from tanh [-1, 1] range to byte range.
+                                   {"kLinearOutputScale", 127.0f},
+                                   {"kLinearOutputClamp", false},
+                                   {"kLinearOutputTanh", true},
+                                   {"kLinearOutputAsByte", true}});
+        linear_cps = make_cps(device, "linear", linear_constants, linear_threads);
+
         to_half_cps = make_cps(device, "float_to_half", {});
         reorder_input_cps = make_cps(device, "reorder_input", {{"kLstmLayerSize", layer_size}});
         reorder_output_cps = make_cps(device, "reorder_output", {{"kLstmLayerSize", layer_size}});
@@ -222,27 +266,40 @@ struct MetalBlockImpl : Module {
         // This buffer is sized to accommodate the output of the second conv layer.
         // It is also used for the (smaller) input to the first conv layer in the case
         // where float16 processing is done, and we need to convert from float32 inputs.
-        constexpr int kConv2OutChannels = 16;
+        constexpr int kMaxConv2OutChannels = 16;
         mat_transfer = create_buffer(
-                device, batch_size * kConv2OutChannels * in_chunk_size * sizeof(ftype));
+                device, batch_size * kMaxConv2OutChannels * in_chunk_size * sizeof(ftype));
         // This buffer is used for several layers of the model.
         mat_working_mem = create_buffer(
                 device, size_t(lstm_chunk_size + 2) * batch_size * layer_size * sizeof(ftype));
         mat_state = create_buffer(device, batch_size * layer_size * sizeof(ftype));
         mat_temp_result = create_buffer(device, batch_size * layer_size * 4 * sizeof(ftype));
 
-        conv1 = register_module("conv1",
-                                MetalConv1d(1, 1, 4, 5, 1, in_chunk_size, batch_size, device));
-        conv2 = register_module("conv2",
-                                MetalConv1d(2, 4, 16, 5, 1, in_chunk_size, batch_size, device));
-        conv3 = register_module("conv3", MetalConv1d(3, 16, layer_size, 19, stride, in_chunk_size,
+        conv1 = register_module("conv1", MetalConv1d(1, 1, conv, 5, 1, config.clamp, in_chunk_size,
                                                      batch_size, device));
+        conv2 = register_module("conv2", MetalConv1d(2, conv, 16, 5, 1, config.clamp, in_chunk_size,
+                                                     batch_size, device));
+        conv3 = register_module("conv3", MetalConv1d(3, 16, layer_size, 19, stride, config.clamp,
+                                                     in_chunk_size, batch_size, device));
         rnn1 = register_module("rnn_1", MetalLSTM(layer_size, true, device));
         rnn2 = register_module("rnn_2", MetalLSTM(layer_size, false, device));
         rnn3 = register_module("rnn_3", MetalLSTM(layer_size, true, device));
         rnn4 = register_module("rnn_4", MetalLSTM(layer_size, false, device));
         rnn5 = register_module("rnn_5", MetalLSTM(layer_size, true, device));
-        linear = register_module("linear", MetalLinearTanh(layer_size, out_size));
+
+        if (config.out_features.has_value()) {
+            // The linear layer is decomposed into 2 matmuls.
+            const int decomposition = config.out_features.value();
+            linear1 = register_module("linear1",
+                                      MetalLinear(layer_size, decomposition, config.bias, device));
+            const bool kSecondLayerBias = false;
+            linear2 = register_module(
+                    "linear2", MetalLinear(decomposition, out_size, kSecondLayerBias, device));
+        } else {
+            // Single matmul that may or may not have a bias.
+            linear1 = register_module("linear1",
+                                      MetalLinear(layer_size, out_size, config.bias, device));
+        }
     }
 
     void load_weights() {
@@ -285,20 +342,70 @@ struct MetalBlockImpl : Module {
             }
         }
 
-        auto params = linear->named_parameters();
-        auto t_w = *params.find("weight");
-        auto t_b = *params.find("bias");
-        t_w = torch::concat({t_w.transpose(1, 0).contiguous().flatten(0, -1), t_b}).contiguous();
+        // Linear weights and bias are stored in the same buffer.
+        linear_weights = create_buffer(
+                device, static_cast<size_t>(layer_size + 1) * out_size * sizeof(ftype));
+
+        // Load and prepare linear layer weights.
+        // TODO - if explicit stay scores remain, unify this and the other padding code.
+        torch::Tensor linear_w, linear_b;
+        if (out_features.has_value()) {
+            // v4 with 2 matrices that we premultiply at weight loading time.
+            // We expect a bias for the first matrix but not the second.
+            auto linear1_params = linear1->named_parameters();
+            auto t_w1 = *linear1_params.find("weight");
+            auto t_b1 = *linear1_params.find("bias");
+
+            auto linear2_params = linear2->named_parameters();
+            auto t_w2 = *linear2_params.find("weight");
+            assert(!linear2_params.find("bias"));
+
+            // Premultiply weights, and bias vector.
+            linear_w = torch::matmul(t_w2, t_w1);
+            linear_b = torch::matmul(t_w2, t_b1);
+
+            // We use the bias vector to impose stay scores, so we have to substitute
+            // the stay score for the zero entries corresponding to stays in the
+            // transformed bias vector.
+            const auto num_states = linear_b.sizes().at(0);
+            auto linear_b_no_zeros = linear_b.view({num_states / 5, 5})
+                                             .index({Slice(0, num_states / 5), Slice(1, 5)});
+            linear_b = F::pad(linear_b_no_zeros, F::PadFuncOptions({1, 0}).value(stay_score))
+                               .flatten()
+                               .contiguous();
+        } else if (conv == 16) {
+            // v4 with single matrix and no bias.
+            auto params = linear1->named_parameters();
+            linear_w = *params.find("weight");
+            // We supply a bias vector of zeros and stay scores.
+            const auto num_states = linear_w.sizes().at(0);
+            linear_b = F::pad(torch::zeros({num_states / 5, 4}),
+                              F::PadFuncOptions({1, 0}).value(stay_score))
+                               .flatten()
+                               .contiguous();
+
+        } else {
+            // v3 single matrix with bias
+            auto params = linear1->named_parameters();
+            linear_w = *params.find("weight");
+            linear_b = *params.find("bias");
+        }
+
+        // Create a single tensor containing the weights and bias, since this is what
+        // the kernel expects.
+        auto linear_wb =
+                torch::concat({linear_w.transpose(1, 0).contiguous().flatten(0, -1), linear_b})
+                        .contiguous();
 
         if (sizeof(ftype) != sizeof(float)) {
-            const auto numel = static_cast<int32_t>(t_w.numel());
+            // Convert weights from float32 to float16.
+            const auto numel = static_cast<int32_t>(linear_wb.numel());
             MTL::Buffer *const args = create_vec_buffer(device, std::vector<int32_t>({numel}));
-            mat_linear_weights = create_buffer(device, numel * sizeof(ftype));
             launch_kernel(to_half_cps, command_queue,
-                          {args, mtl_for_tensor(t_w), mat_linear_weights}, {}, kernel_thread_groups,
-                          256);
+                          {args, mtl_for_tensor(linear_wb), linear_weights}, {},
+                          kernel_thread_groups, 256);
         } else {
-            mat_linear_weights = extract_mtl_from_tensor(t_w);
+            linear_weights = extract_mtl_from_tensor(linear_wb);
         }
     }
 
@@ -339,19 +446,21 @@ struct MetalBlockImpl : Module {
             command_buffer->encodeWait(linear_hold_off_event, linear_hold_off_id);
         }
 
+        // For now the same SIMD group count, and therefore threadgroup memory buffer size, is
+        // used for all linear layer kernel invocations.
+        const int kLinearTGOutBufSize =
+                static_cast<int>(sizeof(ftype) * kernel_simd_groups * kTileSize * kTileSize);
+        const std::vector<int> linear_tg_buffer_lens{kLinearTGOutBufSize};
+
         // The output of the linear layer is split into multiple buffers, each generated
         // by a separate kernel launch.
         for (int i = 0; i < out.size(); ++i) {
             MTL::Buffer *const args_buffer = args_linear.at(i);
             MTL::Buffer *const out_buffer = mtl_for_tensor(out.at(i));
-
-            const int kOutBufSize = sizeof(ftype) * kernel_simd_groups * kTileSize * kTileSize;
-            const int kOutBufF32Size = sizeof(float) * kernel_simd_groups * kTileSize * kTileSize;
-            const std::vector<int> tg_buffer_lens{kOutBufSize};
-
-            launch_kernel_no_wait(linear_tanh_cps, command_buffer,
-                                  {args_buffer, mat_working_mem, mat_linear_weights, out_buffer},
-                                  tg_buffer_lens, kernel_thread_groups, kernel_simd_groups * 32);
+            launch_kernel_no_wait(linear_cps, command_buffer,
+                                  {args_buffer, mat_working_mem, linear_weights, out_buffer},
+                                  linear_tg_buffer_lens, kernel_thread_groups,
+                                  kernel_simd_groups * 32);
         }
         return command_buffer;
     }
@@ -376,15 +485,17 @@ struct MetalBlockImpl : Module {
     MTL::CommandQueue *command_queue;
     std::string fn[2];
     MTL::ComputePipelineState *reorder_lstm_weights_cps, *reorder_input_cps, *reorder_output_cps,
-            *lstm_cps[2], *to_half_cps, *linear_tanh_cps;
-    MTL::Buffer *mat_transfer, *mat_working_mem, *mat_state, *mat_temp_result, *mat_linear_weights,
-            *args_lstm, *args_to_half;
+            *lstm_cps[2], *to_half_cps, *linear_cps;
+    MTL::Buffer *mat_transfer, *mat_working_mem, *mat_state, *mat_temp_result, *args_lstm,
+            *args_to_half, *linear_weights;
     std::vector<MTL::Buffer *> args_linear;
-    int in_chunk_size, lstm_chunk_size, stride, batch_size, layer_size, out_size,
+    int in_chunk_size, lstm_chunk_size, stride, batch_size, layer_size, out_size, conv,
             kernel_thread_groups, kernel_simd_groups;
+    std::optional<int> out_features;
+    float stay_score;
     MetalLSTM rnn1{nullptr}, rnn2{nullptr}, rnn3{nullptr}, rnn4{nullptr}, rnn5{nullptr};
     MetalConv1d conv1{nullptr}, conv2{nullptr}, conv3{nullptr};
-    MetalLinearTanh linear{nullptr};
+    MetalLinear linear1{nullptr}, linear2{nullptr};
 };
 
 TORCH_MODULE(MetalBlock);
@@ -396,8 +507,7 @@ struct MetalModelImpl : Module {
                    int out_split,
                    MTL::Device *const device) {
         mtl_block = register_module("mtl_block",
-                                    MetalBlock(chunk_size, batch_size, config.stride, config.insize,
-                                               config.outsize, out_split, device));
+                                    MetalBlock(chunk_size, batch_size, config, out_split, device));
     }
 
     void load_state_dict(const std::vector<torch::Tensor> &weights) {
@@ -450,21 +560,39 @@ public:
         // Chunk size after decimation via convolution stride.
         m_out_chunk_size = chunk_size / model_config.stride;
 
-        auto state_dict = load_weights(model_path);
+        auto state_dict = load_crf_model_weights(model_path, model_config.out_features.has_value(),
+                                                 model_config.bias);
 
-        auto lw = state_dict[state_dict.size() - 2];
-        auto lb = state_dict[state_dict.size() - 1];
+        // Linear layer weights/bias do not have entries for stay scores, but the linear layer
+        // kernel expects them, so pad the weights with zeros and the bias (if present) with
+        // the blank score to accommodate this.
+        const bool decomposition = model_config.out_features.has_value();
+        const bool last_tensor_is_w = (decomposition == model_config.bias);
+        const int lw_idx = state_dict.size() - 2 + static_cast<int>(last_tensor_is_w);
+        auto lw = state_dict.at(lw_idx);
+        const int lw_inner_dim = lw.sizes().at(1);
+        state_dict.at(lw_idx) = F::pad(lw.view({m_states, 4, lw_inner_dim}),
+                                       F::PadFuncOptions({0, 0, 1, 0}).value(0.0f))
+                                        .view({model_config.outsize, lw_inner_dim});
 
-        state_dict[state_dict.size() - 2] =
-                F::pad(lw.view({m_states, 4, model_config.insize}),
-                       F::PadFuncOptions({0, 0, 1, 0}).value(0.0))
-                        .view({model_config.outsize, model_config.insize});
-
-        state_dict[state_dict.size() - 1] =
-                F::pad(lb.view({m_states, 4}),
-                       F::PadFuncOptions({1, 0}).value(
-                               atanh(model_config.blank_score / model_config.scale)))
-                        .view({model_config.outsize});
+        // We need to pad the bias tensor if:
+        // a) There is a bias tensor.
+        // b) There is no decomposition, since in the case of decomposition the bias
+        //    vector is sized according to the bottleneck dimension, not the state space size.
+        // In this case the bias tensor must be the last entry.
+        if (model_config.bias && !decomposition) {
+            const int lb_idx = state_dict.size() - 1;
+            const auto lb = state_dict.at(lb_idx);
+            const int lb_dim = lb.sizes().at(0);
+            // Note: We are assuming that in the absence of linear layer decomposition
+            // there is a tanh activation.
+            // The padding value below will produce model_config.blank_score once
+            // run through the tanh activation and scaled to the [-5, 5] range.
+            state_dict.at(lb_idx) = F::pad(lb.view({m_states, 4}),
+                                           F::PadFuncOptions({1, 0}).value(atanh(
+                                                   model_config.blank_score / model_config.scale)))
+                                            .view({model_config.outsize});
+        }
 
         // Allocations beyond 4GB can fail, and the linear layer output buffer
         // hits this limit with batch sizes larger than 384 with typical
@@ -542,6 +670,14 @@ public:
             m_posts.push_back(torch::empty({m_out_batch_size, T + 1, Cs}));
             m_bwd.push_back(torch::empty({m_out_batch_size, T + 1, Cs}));
         }
+
+        // v3 scores come from a tanh activation whose [-1, 1] range is packed into bytes.
+        // The linear kernel scales to [-127, 127] byte range, after which beam search
+        // rescales to the expected [-5, 5].
+        // v4 scores come from a clamped [-5, 5] range that is rescaled by the kernel to
+        // fit into bytes.
+        // In both cases beam search applies the same 5/127 factor to scores.
+        score_scale = static_cast<float>(5.0 / 127.0);
     }
 
     ~MetalCaller() {
@@ -555,35 +691,6 @@ public:
         for (auto &thr : m_decode_threads) {
             thr->join();
         }
-    }
-
-    std::vector<torch::Tensor> load_weights(const std::filesystem::path &dir) {
-        auto tensors = std::vector<std::string>{
-
-                "0.conv.weight.tensor",      "0.conv.bias.tensor",
-
-                "1.conv.weight.tensor",      "1.conv.bias.tensor",
-
-                "2.conv.weight.tensor",      "2.conv.bias.tensor",
-
-                "4.rnn.weight_ih_l0.tensor", "4.rnn.weight_hh_l0.tensor",
-                "4.rnn.bias_ih_l0.tensor",   "4.rnn.bias_hh_l0.tensor",
-
-                "5.rnn.weight_ih_l0.tensor", "5.rnn.weight_hh_l0.tensor",
-                "5.rnn.bias_ih_l0.tensor",   "5.rnn.bias_hh_l0.tensor",
-
-                "6.rnn.weight_ih_l0.tensor", "6.rnn.weight_hh_l0.tensor",
-                "6.rnn.bias_ih_l0.tensor",   "6.rnn.bias_hh_l0.tensor",
-
-                "7.rnn.weight_ih_l0.tensor", "7.rnn.weight_hh_l0.tensor",
-                "7.rnn.bias_ih_l0.tensor",   "7.rnn.bias_hh_l0.tensor",
-
-                "8.rnn.weight_ih_l0.tensor", "8.rnn.weight_hh_l0.tensor",
-                "8.rnn.bias_ih_l0.tensor",   "8.rnn.bias_hh_l0.tensor",
-
-                "9.linear.weight.tensor",    "9.linear.bias.tensor"};
-
-        return utils::load_tensors(dir, tensors);
     }
 
     struct NNTask {
@@ -734,7 +841,7 @@ public:
                     m_bwd.at(out_buf_idx)[buf_chunk_idx], m_posts.at(out_buf_idx)[buf_chunk_idx],
                     m_decoder_options.beam_width, m_decoder_options.beam_cut,
                     m_decoder_options.blank_score, m_decoder_options.q_shift,
-                    m_decoder_options.q_scale, m_decoder_options.temperature);
+                    m_decoder_options.q_scale, m_decoder_options.temperature, score_scale);
 
             (*task->out_chunks)[chunk_idx] = DecodedChunk{sequence, qstring, moves};
 
@@ -771,6 +878,8 @@ public:
     // buffer size constraints.
     int m_out_split;
     int m_out_batch_size;
+    // v3 and v4 models have different score scaling requirements.
+    float score_scale{0.0f};
 };
 
 std::shared_ptr<MetalCaller> create_metal_caller(const std::filesystem::path &model_path,
