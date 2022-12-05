@@ -70,7 +70,7 @@ struct MetalConv1dImpl : Module {
         // as large as either.  In the former case, this should be manually verified against the
         // weight arrangement used in the kernel.
         const int min_weights_size = (k * insize + 1) * outsize;
-        constexpr int kMaxWeightsSize = 262144;
+        constexpr int kMaxWeightsSize = 1 << 20;
         assert(kMaxWeightsSize >= min_weights_size);
         mat_weights = create_buffer(device, kMaxWeightsSize * sizeof(ftype));
 
