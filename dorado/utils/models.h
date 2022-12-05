@@ -67,6 +67,7 @@ namespace modified {
 
 static const std::vector<std::string> mods = {
         "5mCG",
+        "5mCG_5hmCG",
 };
 
 static const std::map<std::string, std::string> models = {
