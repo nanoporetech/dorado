@@ -34,7 +34,9 @@ using quantized_lstm = std::function<int(void *, void *, void *, void *, void *,
 #if USE_CUDA_LSTM
 
 static bool cuda_lstm_is_quantized(int layer_size) {
-    return ((layer_size == 96) || (layer_size == 128));
+    return ((layer_size == 96) ||
+            (layer_size ==
+             128));  // TODO - change back! just a test to see if quantized kernels are the problem
 }
 #endif  // if USE_CUDA_LSTM
 
@@ -524,12 +526,23 @@ TORCH_MODULE(Clamp);
 template <class LSTMStackType>
 struct CRFModelImpl : Module {
     CRFModelImpl(const CRFModelConfig &config, bool expand_blanks, int batch_size, int chunk_size) {
-        conv1 = register_module("conv1", Convolution(1, config.conv, 5, 1));
-        clamp1 = Clamp(-0.5, 3.5, config.clamp);
-        conv2 = register_module("conv2", Convolution(config.conv, 16, 5, 1));
-        clamp2 = Clamp(-0.5, 3.5, config.clamp);
-        conv3 = register_module("conv3", Convolution(16, config.insize, 19, config.stride, true));
-        clamp3 = Clamp(-0.5, 3.5, config.clamp);
+        if (config.insize == 128) {
+            conv1 = register_module("conv1", Convolution(config.num_features, 16, 5, 1));
+            clamp1 = Clamp(-0.5, 3.5, config.clamp);
+            conv2 = register_module("conv2", Convolution(16, 16, 5, 1));
+            clamp2 = Clamp(-0.5, 3.5, config.clamp);
+            conv3 = register_module("conv3",
+                                    Convolution(16, config.insize, 19, config.stride, true));
+            clamp3 = Clamp(-0.5, 3.5, config.clamp);
+        } else {
+            conv1 = register_module("conv1", Convolution(config.num_features, config.conv, 5, 1));
+            clamp1 = Clamp(-0.5, 3.5, config.clamp);
+            conv2 = register_module("conv2", Convolution(config.conv, 16, 5, 1));
+            clamp2 = Clamp(-0.5, 3.5, config.clamp);
+            conv3 = register_module("conv3",
+                                    Convolution(16, config.insize, 19, config.stride, true));
+            clamp3 = Clamp(-0.5, 3.5, config.clamp);
+        }
 
         rnns = register_module(
                 "rnns", LSTMStackType(config.insize, batch_size, chunk_size / config.stride));
@@ -543,7 +556,7 @@ struct CRFModelImpl : Module {
             clamp4 = Clamp(-5.0, 5.0, config.clamp);
             encoder = Sequential(conv1, clamp1, conv2, clamp2, conv3, clamp3, rnns, linear1,
                                  linear2, clamp4);
-        } else if (config.conv == 16) {
+        } else if ((config.conv == 16) && (config.num_features == 1)) {
             linear1 = register_module(
                     "linear1", Linear(LinearOptions(config.insize, config.outsize).bias(false)));
             clamp4 = Clamp(-5.0, 5.0, config.clamp);
@@ -607,6 +620,9 @@ CRFModelConfig load_crf_model_config(const std::filesystem::path &path) {
     // the value of 1 is used.
     config.scale = 1.0f;
 
+    const auto &input = toml::find(config_toml, "input");
+    config.num_features = toml::find<int>(input, "features");
+
     const auto &encoder = toml::find(config_toml, "encoder");
     if (encoder.contains("type")) {
         // v4-type model
@@ -635,6 +651,10 @@ CRFModelConfig load_crf_model_config(const std::filesystem::path &path) {
         config.insize = toml::find<int>(encoder, "features");
         config.blank_score = toml::find<float>(encoder, "blank_score");
         config.scale = toml::find<float>(encoder, "scale");
+
+        if (encoder.contains("first_conv_size")) {
+            config.conv = toml::find<int>(encoder, "first_conv_size");
+        }
     }
 
     const auto &global_norm = toml::find(config_toml, "global_norm");
