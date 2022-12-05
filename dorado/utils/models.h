@@ -1,3 +1,4 @@
+#include <filesystem>
 #include <map>
 #include <string>
 #include <vector>
@@ -47,6 +48,8 @@ static const std::map<std::string, std::string> models = {
         {"dna_r10.4.1_e8.2_400bps_sup@v4.0.0",
          "/shared/static/i1f2unj1s6dplzpebl2bx4ytk8iqj0de.zip"},
 
+        // RNA003
+        {"rna003_120bps_sup@v3", "/shared/static/na0q0nooudrpe5yxgzkn58zlxfmlyuyo.zip"},
 };
 
 }  // namespace simplex
@@ -95,6 +98,7 @@ static const std::map<std::string, std::string> models = {
 
 namespace utils {
 
+bool is_rna_model(const std::filesystem::path& model);
 bool is_valid_model(const std::string& selected_model);
 void download_models(const std::string& target_directory, const std::string& selected_model);
 

@@ -14,6 +14,7 @@ public:
     WriterNode(std::vector<std::string> args,
                bool emit_fastq,
                bool emit_moves,
+               bool rna,
                bool duplex,
                size_t num_worker_threads = 1,
                size_t max_reads = 1000);
@@ -26,7 +27,7 @@ private:
 
     std::vector<std::string> m_args;
     // Emit Fastq if true
-    bool m_emit_fastq, m_emit_moves, m_isatty, m_duplex;
+    bool m_emit_fastq, m_emit_moves, m_isatty, m_duplex, m_rna;
     // Total number of raw samples from the read WriterNode has processed. Used for performance benchmarking and debugging.
     std::atomic<int64_t> m_num_bases_processed;
     std::atomic<int64_t> m_num_samples_processed;
