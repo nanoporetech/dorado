@@ -5,13 +5,14 @@ Dorado is a high-performance, easy-to-use, open source basecaller for Oxford Nan
 ## Features
 
 * One executable with sensible defaults, automatic hardware detection and configuration.
-* Runs on Apple silicon (M1-family) and Nvidia GPUs including multi-GPU with linear scaling.
+* Runs on Apple silicon (M1/2 family) and Nvidia GPUs including multi-GPU with linear scaling.
 * Modified basecalling (Remora models).
+* Duplex basecalling.
 * [POD5](https://github.com/nanoporetech/pod5-file-format) support for highest basecalling performance.
 * Based on libtorch, the C++ API for pytorch.
 * Multiple custom optimisations in CUDA and Metal for maximising inference performance.
 
-This is an alpha of Dorado . This software is being released for evaluation. If you encounter any problems building or running Dorado please [report an issue](https://github.com/nanoporetech/dorado/issues).
+If you encounter any problems building or running Dorado please [report an issue](https://github.com/nanoporetech/dorado/issues).
 
 ## Installation
 
@@ -21,7 +22,7 @@ This is an alpha of Dorado . This software is being released for evaluation. If 
 
 ## Running
 
-To run Dorado, download a model and point it to POD5 files. Fast5 files are supported but will not be as performant.
+To run Dorado, download a model and point it to POD5 files _(Fast5 files are supported but will not be as performant)_.
 
 ```
 $ dorado download --model dna_r10.4.1_e8.2_260bps_hac@v4.0.0
@@ -38,6 +39,12 @@ For unaligned BAM output, dorado output can be piped to BAM using samtoools:
 
 ```
 $ dorado basecaller dna_r10.4.1_e8.2_260bps_hac@v4.0.0 pod5s/ | samtools view -Sh > calls.bam
+```
+
+Stereo Duplex Calling:
+
+```
+$ dorado duplex dna_r10.4.1_e8.2_260bps_sup@v4.0.0 pod5s/ --pairs pairs.txt > duplex.sam
 ```
 
 ## Platforms
@@ -57,15 +64,14 @@ Systems not listed above but which have Nvidia GPUs with >=8GB VRAM and architec
 Dorado is still in alpha stage and not feature-complete, the following features form the core of our roadmap:
 
 1. DNA Barcode multiplexing
-2. Duplex basecalling
-3. Alignmnet (output aligned BAMs)
-4. Python API
+2. Alignment *(output aligned BAMs)*.
+3. Python API
 
 ## Performance tips
 
 1. For optimal performance Dorado requires POD5 file input. Please [convert your Fast5 files](https://github.com/nanoporetech/pod5-file-format) before basecalling.
-1. Dorado will automatically detect your GPUs' free memory and select an appropriate batch size. If you know what you're doing, you can use the     `--batch` parameter to tune batch size.
-2. Dorado will automatically run in multi-GPU (`'cuda:all'`) mode. If you have a hetrogenous collection of GPUs select the faster GPUs using the `--device` flag (e.g `--device "cuda:0,2`). Not doing this will have a detrimental impact on performance.
+2. Dorado will automatically detect your GPUs' free memory and select an appropriate batch size.
+3. Dorado will automatically run in multi-GPU (`'cuda:all'`) mode. If you have a hetrogenous collection of GPUs select the faster GPUs using the `--device` flag (e.g `--device "cuda:0,2`). Not doing this will have a detrimental impact on performance.
 
 ## Available basecalling models
 
@@ -95,7 +101,7 @@ The following models are currently available:
 
 ## Developer quickstart
 
-### Get Linux dependencies
+### Linux dependencies
 
 ```
 apt-get update && apt-get install -y --no-install-recommends libhdf5-dev libssl-dev libzstd-dev
