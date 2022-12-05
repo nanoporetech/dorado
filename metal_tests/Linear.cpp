@@ -78,7 +78,7 @@ TEST_CASE(TEST_GROUP "Linear") {
             make_cps(device, "linear",
                      {{"kLinearContractDim", layer_size},
                       {"kLinearInnerDim", out_size},
-                      {"kLinearOutputScale", static_cast<float>(127.0 / 4.0)},
+                      {"kLinearOutputScale", static_cast<float>(127.0 / 5.0)},
                       {"kLinearOutputClamp", true},
                       {"kLinearOutputTanh", false},
                       {"kLinearOutputAsByte", true}},
@@ -148,7 +148,7 @@ TEST_CASE(TEST_GROUP "Linear") {
     const torch::Tensor out_cpu_f32 = torch::addmm(biases_f32, in_f32, weights_f32);
     const torch::Tensor out_cpu_tanh_i8 = (127.0f * torch::tanh(out_cpu_f32)).to(torch::kInt8);
     const torch::Tensor out_cpu_clamp_i8 =
-            (static_cast<float>(127.0 / 4.0) * torch::clamp(out_cpu_f32, -4.0f, 4.0f))
+            (static_cast<float>(127.0 / 5.0) * torch::clamp(out_cpu_f32, -5.0f, 5.0f))
                     .to(torch::kInt8);
 
     const auto out_cpu_tanh_i8_as_f32 = out_cpu_tanh_i8.to(torch::kFloat32);

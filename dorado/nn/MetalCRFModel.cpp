@@ -237,8 +237,8 @@ struct MetalBlockImpl : Module {
                         ? std::vector<std::tuple<std::string, MetalConstant>>(
                                   {{"kLinearContractDim", layer_size},
                                    {"kLinearInnerDim", out_size},
-                                   // Rescale from clamped [-4.0, 4.0] range to byte range.
-                                   {"kLinearOutputScale", static_cast<float>(127.0f / 4.0f)},
+                                   // Rescale from clamped [-5.0, 5.0] range to byte range.
+                                   {"kLinearOutputScale", static_cast<float>(127.0f / 5.0f)},
                                    {"kLinearOutputClamp", true},
                                    {"kLinearOutputTanh", false},
                                    {"kLinearOutputAsByte", true}})
@@ -654,13 +654,9 @@ public:
             m_bwd.push_back(torch::empty({m_out_batch_size, T + 1, Cs}));
         }
 
-        if (decomposition) {
-            // v4 models have clamped [-4.0, 4.0] output scaled to byte range.
-            score_scale = static_cast<float>(4.0 / 127.0);
-        } else {
-            // v3 models have a 5*tanh, so [-5.0, 5.0], output scaled to byte range.
-            score_scale = static_cast<float>(5.0 / 127.0);
-        }
+        // v3 and v3 models both output scores in the [-5.0, 5.0] range before they are
+        // packed into bytes.  This recovers that range at beam search time.
+        score_scale = static_cast<float>(5.0 / 127.0);
     }
 
     ~MetalCaller() {

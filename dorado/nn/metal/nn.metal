@@ -982,7 +982,7 @@ kernel void linear(
                         // Store to the output buffer.
                         for (int elem = tid & 31; elem < TILE_SIZE * TILE_SIZE; elem += 32) {
                             const ftype matmul_output = simd_out_buf[sid][elem];
-                            const auto with_clamp = kLinearOutputClamp ? clamp(matmul_output, ftype(-4.0f), ftype(4.0f)) : matmul_output;
+                            const auto with_clamp = kLinearOutputClamp ? clamp(matmul_output, ftype(-5.0f), ftype(5.0f)) : matmul_output;
                             const auto with_tanh = kLinearOutputTanh ? tanh_fast(with_clamp) : with_clamp;
                             const auto with_scale = with_tanh * kLinearOutputScale;
 
