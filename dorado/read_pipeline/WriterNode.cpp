@@ -126,10 +126,11 @@ WriterNode::~WriterNode() {
     std::ostringstream samples_sec;
     if (m_duplex) {
         samples_sec << std::scientific << m_num_bases_processed / (duration / 1000.0);
+        spdlog::info("> Bases/s: {}", samples_sec.str());
     } else {
         samples_sec << std::scientific << m_num_samples_processed / (duration / 1000.0);
+        spdlog::info("> Samples/s: {}", samples_sec.str());
     }
-    spdlog::info("> Samples/s: {}", samples_sec.str());
 }
 
 }  // namespace dorado
