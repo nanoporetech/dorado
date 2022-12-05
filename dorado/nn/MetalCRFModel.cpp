@@ -232,8 +232,12 @@ struct MetalBlockImpl : Module {
                                lstm_threads);
 
         const int linear_threads = kernel_simd_groups * 32;
+        // If the intermediate feature size between conv1 and conv2 is 16, then this is a v4
+        // type model, where the linear layer output is clamped rather than run through tanh.
+        // Otherwise the intermediate feature size is 4.
+        assert(config.conv == 4 || config.conv == 16);
         const auto linear_constants =
-                config.out_features.has_value()
+                config.conv == 16
                         ? std::vector<std::tuple<std::string, MetalConstant>>(
                                   {{"kLinearContractDim", layer_size},
                                    {"kLinearInnerDim", out_size},
@@ -343,11 +347,11 @@ struct MetalBlockImpl : Module {
                 device, static_cast<size_t>(layer_size + 1) * out_size * sizeof(ftype));
 
         // Load and prepare linear layer weights.
+        // TODO - if explicit stay scores remain, unify this and the other padding code.
         torch::Tensor linear_w, linear_b;
         if (out_features.has_value()) {
-            // v4 style: 2 matrices that we premultiply at weight loading time.
+            // v4 with 2 matrices that we premultiply at weight loading time.
             // We expect a bias for the first matrix but not the second.
-            // TODO - if explicit stay scores remain, unify this and the other padding code.
             auto linear1_params = linear1->named_parameters();
             auto t_w1 = *linear1_params.find("weight");
             auto t_b1 = *linear1_params.find("bias");
@@ -369,8 +373,19 @@ struct MetalBlockImpl : Module {
             linear_b = F::pad(linear_b_no_zeros, F::PadFuncOptions({1, 0}).value(stay_score))
                                .flatten()
                                .contiguous();
+        } else if (conv == 16) {
+            // v4 with single matrix and no bias.
+            auto params = linear1->named_parameters();
+            linear_w = *params.find("weight");
+            // We supply a bias vector of zeros and stay scores.
+            const auto num_states = linear_w.sizes().at(0);
+            linear_b = F::pad(torch::zeros({num_states / 5, 4}),
+                              F::PadFuncOptions({1, 0}).value(stay_score))
+                               .flatten()
+                               .contiguous();
+
         } else {
-            // v3 style: single matrix with bias.
+            // v3 single matrix with bias
             auto params = linear1->named_parameters();
             linear_w = *params.find("weight");
             linear_b = *params.find("bias");
@@ -571,6 +586,8 @@ public:
             const int lb_dim = lb.sizes().at(0);
             // Note: We are assuming that in the absence of linear layer decomposition
             // there is a tanh activation.
+            // The padding value below will produce model_config.blank_score once
+            // run through the tanh activation and scaled to the [-5, 5] range.
             state_dict.at(lb_idx) = F::pad(lb.view({m_states, 4}),
                                            F::PadFuncOptions({1, 0}).value(atanh(
                                                    model_config.blank_score / model_config.scale)))
@@ -654,8 +671,12 @@ public:
             m_bwd.push_back(torch::empty({m_out_batch_size, T + 1, Cs}));
         }
 
-        // v3 and v3 models both output scores in the [-5.0, 5.0] range before they are
-        // packed into bytes.  This recovers that range at beam search time.
+        // v3 scores come from a tanh activation whose [-1, 1] range is packed into bytes.
+        // The linear kernel scales to [-127, 127] byte range, after which beam search
+        // rescales to the expected [-5, 5].
+        // v4 scores come from a clamped [-5, 5] range that is rescaled by the kernel to
+        // fit into bytes.
+        // In both cases beam search applies the same 5/127 factor to scores.
         score_scale = static_cast<float>(5.0 / 127.0);
     }
 
