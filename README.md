@@ -28,6 +28,12 @@ $ dorado download --model dna_r10.4.1_e8.2_260bps_hac@v4.0.0
 $ dorado basecaller dna_r10.4.1_e8.2_260bps_hac@v4.0.0 pod5s/ > calls.sam
 ```
 
+To call modifications simply add `--modified-bases`.
+
+```
+$ dorado basecaller --modified-bases 5mCG_5hmCG dna_r10.4.1_e8.2_260bps_hac@v4.0.0 pod5s/ > calls.sam
+```
+
 For unaligned BAM output, dorado output can be piped to BAM using samtoools:
 
 ```
