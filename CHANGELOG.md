@@ -4,13 +4,13 @@ All notable changes to Dorado will be documented in this file.
 
 # [0.1.0] (05 Dec 2022)
 
- * 0ff3e59b3e6bf1231e7e4b5d4521de0f6c371278 - new steroe duplex calling introduced
- * fe42f660d962782213b351fb057929fcd88cb67b - new v4.0.0 simplex models for kit 14
+ * 0ff3e59b3e6bf1231e7e4b5d4521de0f6c371278 - Introducing stereo duplex calling introduced
+ * fe42f660d962782213b351fb057929fcd88cb67b - New v4.0.0 simplex models for kit 14
  * 9e9fae377b2ec95f6fa80bb8234fe38cf05f50ea - v4.0.0 400bps simplex 5mCG_5hmGC modification models
- * 59aef4968cdacb671ecf1d707a35951c08829e5b - simplified modification calling interface `--modified-bases 5mCG_5hmGC`
- * c8d4f39eb37986548b7703cac4e3d66af4f8ff0c - initial RNA calling support
- * 9747efde97887d06721aa357023faa8b3836681f - remove move table overhang
- * eb4854a280e1dcdd7af19c7194c8ae8a40c2f459 - improved simplex calling performance by selecting the optimal batchsize at startup
+ * 59aef4968cdacb671ecf1d707a35951c08829e5b - Simplified modification calling interface `--modified-bases 5mCG_5hmGC`
+ * c8d4f39eb37986548b7703cac4e3d66af4f8ff0c - Initial RNA calling support
+ * 9747efde97887d06721aa357023faa8b3836681f - Remove move table overhang
+ * eb4854a280e1dcdd7af19c7194c8ae8a40c2f459 - Improved simplex calling performance by selecting the optimal batchsize at startup
 
 # [0.0.4] (21 Nov 2022)
 
