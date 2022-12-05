@@ -9,6 +9,7 @@ extern "C" {
 }
 
 #include <ATen/cuda/CUDAContext.h>
+#include <c10/cuda/CUDAGuard.h>
 #include <cublas_v2.h>
 #include <cuda_runtime.h>
 #include <cuda_runtime_api.h>
@@ -91,6 +92,7 @@ int select_batchsize(int layer_size, int min_batchsize, int max_batchsize, std::
     int best_batchsize = max_batchsize;
     float best_time = std::numeric_limits<float>::max();
 
+    c10::cuda::CUDAGuard device_guard(device);
     auto stream = at::cuda::getCurrentCUDAStream().stream();
     auto options = torch::TensorOptions().dtype(torch::kFloat16).device(device);
     auto a = torch::empty({max_batchsize, layer_size * 2}, options);
