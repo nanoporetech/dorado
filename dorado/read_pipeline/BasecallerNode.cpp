@@ -50,8 +50,10 @@ void BasecallerNode::input_worker_thread() {
                 continue;
             }
 
-            // Here, we chunk up the read and put the chunks into the pending chunk list.
-            size_t raw_size = read->raw_data.size(0);
+            // Chunk up the read and put the chunks into the pending chunk list.
+            size_t raw_size =
+                    read->raw_data.sizes()[read->raw_data.sizes().size() - 1];  // Time dimension.
+
             size_t offset = 0;
             size_t chunk_in_read_idx = 0;
             size_t signal_chunk_step = m_chunk_size - m_overlap;
@@ -183,16 +185,31 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
 
             // Copy the chunk into the input tensor
             std::shared_ptr<Read> source_read = chunk->source_read.lock();
+
             auto input_slice = source_read->raw_data.index(
-                    {Slice(chunk->input_offset, chunk->input_offset + m_chunk_size)});
-            size_t slice_size = input_slice.size(0);
+                    {Ellipsis, Slice(chunk->input_offset, chunk->input_offset + m_chunk_size)});
+            size_t slice_size;
+            if (input_slice.ndimension() == 1) {
+                slice_size = input_slice.size(0);
+            } else {
+                slice_size = input_slice.sizes()[1];
+            }
 
             // repeat-pad any non-full chunks
+            // Stereo and Simplex encoding need to be treated differently
             if (slice_size != m_chunk_size) {
-                auto [n, overhang] = std::div((int)m_chunk_size, (int)slice_size);
-                input_slice =
-                        torch::concat({input_slice.repeat(n),
-                                       input_slice.index({torch::indexing::Slice(0, overhang)})});
+                if (input_slice.ndimension() == 1) {
+                    auto [n, overhang] = std::div((int)m_chunk_size, (int)slice_size);
+                    input_slice = torch::concat(
+                            {input_slice.repeat({n}),
+                             input_slice.index({Ellipsis, torch::indexing::Slice(0, overhang)})});
+                } else if (input_slice.ndimension() == 2) {
+                    auto [n, overhang] = std::div((int)m_chunk_size, (int)slice_size);
+                    input_slice = torch::concat(
+                            {input_slice.repeat({1, n}),
+                             input_slice.index({Ellipsis, torch::indexing::Slice(0, overhang)})},
+                            1);
+                }
             }
 
             // Insert the chunk in the input tensor

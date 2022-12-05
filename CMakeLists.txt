@@ -56,14 +56,16 @@ set(LIB_SOURCE_FILES
     dorado/read_pipeline/ReadPipeline.h
     dorado/read_pipeline/ScalerNode.cpp
     dorado/read_pipeline/ScalerNode.h
+    dorado/read_pipeline/StereoDuplexEncoderNode.cpp
+    dorado/read_pipeline/StereoDuplexEncoderNode.h
     dorado/read_pipeline/BasecallerNode.cpp
     dorado/read_pipeline/BasecallerNode.h
     dorado/read_pipeline/ModBaseCallerNode.cpp
     dorado/read_pipeline/ModBaseCallerNode.h
     dorado/read_pipeline/WriterNode.cpp
     dorado/read_pipeline/WriterNode.h
-    dorado/read_pipeline/DuplexCallerNode.cpp
-    dorado/read_pipeline/DuplexCallerNode.h
+    dorado/read_pipeline/BaseSpaceDuplexCallerNode.cpp
+    dorado/read_pipeline/BaseSpaceDuplexCallerNode.h
     dorado/data_loader/DataLoader.cpp
     dorado/data_loader/DataLoader.h
     dorado/decode/beam_search.cpp
