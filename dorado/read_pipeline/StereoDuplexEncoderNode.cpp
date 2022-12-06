@@ -3,8 +3,8 @@
 #include "3rdparty/edlib/edlib/include/edlib.h"
 #include "utils/duplex_utils.h"
 
-#include <cstring>
 #include <chrono>
+#include <cstring>
 
 using namespace std::chrono_literals;
 using namespace torch::indexing;
@@ -147,20 +147,21 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
                 template_signal_cursor++;
                 auto max_signal_length = template_moves_expanded.size();
 
-		// We are relying on strings of 0s ended in a 1.  It would be more efficient
-		// in any case to store run length data above.
-		// We're also assuming uint8_t is an alias for char (not guaranteed in principle).
-		const auto* const start_ptr = &template_moves_expanded[template_signal_cursor];
-		auto* const next_move_ptr =
-			static_cast<const uint8_t *>(std::memchr(start_ptr, 1, max_signal_length));
-		const size_t sample_count = next_move_ptr ? (next_move_ptr - start_ptr) : max_signal_length;
+                // We are relying on strings of 0s ended in a 1.  It would be more efficient
+                // in any case to store run length data above.
+                // We're also assuming uint8_t is an alias for char (not guaranteed in principle).
+                const auto* const start_ptr = &template_moves_expanded[template_signal_cursor];
+                auto* const next_move_ptr =
+                        static_cast<const uint8_t*>(std::memchr(start_ptr, 1, max_signal_length));
+                const size_t sample_count =
+                        next_move_ptr ? (next_move_ptr - start_ptr) : max_signal_length;
 
-                float* const tmp_ptr = static_cast<float *>(tmp[0].data_ptr());
-		const float* const raw_data_ptr = static_cast<float *>(template_read->raw_data.data_ptr());
-		// Assumes contiguity of successive elements.
-		std::memcpy(&tmp_ptr[stereo_global_cursor + template_segment_length],
-			    &raw_data_ptr[template_signal_cursor],
-		            sample_count * sizeof(float));
+                float* const tmp_ptr = static_cast<float*>(tmp[0].data_ptr());
+                const float* const raw_data_ptr =
+                        static_cast<float*>(template_read->raw_data.data_ptr());
+                // Assumes contiguity of successive elements.
+                std::memcpy(&tmp_ptr[stereo_global_cursor + template_segment_length],
+                            &raw_data_ptr[template_signal_cursor], sample_count * sizeof(float));
 
                 template_signal_cursor += sample_count;
                 template_segment_length += sample_count;
@@ -177,17 +178,17 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
                 complement_signal_cursor++;
                 auto max_signal_length = complement_moves_expanded.size();
 
-		// See comments above.
-		const auto* const start_ptr = &complement_moves_expanded[complement_signal_cursor];
-		auto* const next_move_ptr =
-			static_cast<const uint8_t *>(std::memchr(start_ptr, 1, max_signal_length));
-		const size_t sample_count = next_move_ptr ? (next_move_ptr - start_ptr) : max_signal_length;
+                // See comments above.
+                const auto* const start_ptr = &complement_moves_expanded[complement_signal_cursor];
+                auto* const next_move_ptr =
+                        static_cast<const uint8_t*>(std::memchr(start_ptr, 1, max_signal_length));
+                const size_t sample_count =
+                        next_move_ptr ? (next_move_ptr - start_ptr) : max_signal_length;
 
-                float* const tmp_ptr = static_cast<float *>(tmp[1].data_ptr());
-		const float* const raw_data_ptr = static_cast<float *>(complement_signal.data_ptr());
-		std::memcpy(&tmp_ptr[stereo_global_cursor + complement_segment_length],
-			    &raw_data_ptr[complement_signal_cursor],
-		            sample_count * sizeof(float));
+                float* const tmp_ptr = static_cast<float*>(tmp[1].data_ptr());
+                const float* const raw_data_ptr = static_cast<float*>(complement_signal.data_ptr());
+                std::memcpy(&tmp_ptr[stereo_global_cursor + complement_segment_length],
+                            &raw_data_ptr[complement_signal_cursor], sample_count * sizeof(float));
 
                 complement_signal_cursor += sample_count;
                 complement_segment_length += sample_count;
@@ -327,7 +328,7 @@ void StereoDuplexEncoderNode::worker_thread() {
 }
 
 StereoDuplexEncoderNode::StereoDuplexEncoderNode(
-        ReadSink &sink,
+        ReadSink& sink,
         std::map<std::string, std::string> template_complement_map)
         : ReadSink(1000), m_sink(sink), m_template_complement_map(template_complement_map) {
     // Set up the complement-template_map
@@ -346,7 +347,7 @@ StereoDuplexEncoderNode::StereoDuplexEncoderNode(
 StereoDuplexEncoderNode::~StereoDuplexEncoderNode() {
     terminate();
     m_cv.notify_one();
-    for (auto &t : worker_threads) {
+    for (auto& t : worker_threads) {
         t->join();
     }
 }
