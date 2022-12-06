@@ -208,21 +208,14 @@ kernel void conv(
 // Rearranges/replicates weights for v3-type conv1, where output feature size is 4.
 // `weights_in` is expected to be a contiguous tensor of shape [`win_size` + 1, `out_size`],
 // i.e. [6, 4], where `weights_in[win_size]` is the bias vector.
-// `weights_out` is a contiguous tensor of shape [6 * TILE_SIZE + 1, TILE_SIZE], i.e. [49, 8],
-// which is 6 8x8 simdgroup tiles plus an 8-wide vector which is the bias vector repeated twice.
+// `weights_out` is a contiguous tensor of shape [19, 8]
 //
-// If the input consists of 6 4-wide vectors
-//     [ A ] [ B ] [ C ] [ D ] [ E ] [ F ]
-// then the output is arranged in 6 tiles (plus one 8-wide vector) as follows:
-//     tile 0   tile 1   tile 2   tile 3   tile 4   tile 5   bias
-//     [ E D ]  [ C B ]  [ A 0 ]  [ 0 0 ]  [ 0 0 ]  [ 0 0 ]  [ F F ]
-//     [ 0 E ]  [ D C ]  [ B A ]  [ 0 0 ]  [ 0 0 ]  [ 0 0 ]
-//     [ 0 0 ]  [ E D ]  [ C B ]  [ A 0 ]  [ 0 0 ]  [ 0 0 ]
-//     [ 0 0 ]  [ 0 E ]  [ D C ]  [ B A ]  [ 0 0 ]  [ 0 0 ]
-//     [ 0 0 ]  [ 0 0 ]  [ E D ]  [ C B ]  [ A 0 ]  [ 0 0 ]
-//     [ 0 0 ]  [ 0 0 ]  [ 0 E ]  [ D C ]  [ B A ]  [ 0 0 ]
-//     [ 0 0 ]  [ 0 0 ]  [ 0 0 ]  [ E D ]  [ C B ]  [ A 0 ]
-//     [ 0 0 ]  [ 0 0 ]  [ 0 0 ]  [ 0 E ]  [ D C ]  [ B A ]
+//   auto in = torch::empty({6, 4}, torch::kF32); // ... populated with weights/bias
+//   auto out = torch::zeros({19, 8}, torch::kF16);
+//   out.index({Slice(6, 11), Slice(0, 4)}) = in.slice(0, 0, 5);
+//   out.index({Slice(7, 12), Slice(4, 8)}) = in.slice(0, 0, 5);
+//   out.index({18, Slice(0, 4)}) = in[5];
+//   out.index({18, Slice(4, 8)}) = in[5];
 //
 kernel void conv1_out4_simd_reorder_weights(
     device const ConvArgs* const args,
@@ -231,43 +224,50 @@ kernel void conv1_out4_simd_reorder_weights(
 {
     const int win_size = 5;
     const int out_size = 4;
-    for (int col = 0; col < TILE_SIZE; ++col) {
-        int in_col = col % out_size;
-        for (int tile = 0; tile < 6; ++tile) {
-            for (int row = 0; row < TILE_SIZE; ++row) {
-                int in_row = row + 4 - (col / 4) - (tile * 2);
-                weights_out[(tile * TILE_SIZE + row) * TILE_SIZE + col] = (in_row >= 0 && in_row < win_size) ? weights_in[in_row * out_size + in_col] : ftype(0);
+    for (int vec4_col = 0; vec4_col < 2; ++vec4_col) {
+        for (int in_col = 0; in_col < out_size; ++in_col) {
+            for (int row = 0; row < 19; ++row) {
+                int in_row = (row >= 11 + vec4_col) ? ((row == 18) ? win_size : -1) : row - 6 - vec4_col;
+                weights_out[row * TILE_SIZE + vec4_col * 4 + in_col] =
+                    (in_row >= 0) ? weights_in[in_row * out_size + in_col] : ftype(0);
             }
         }
-        weights_out[6 * TILE_SIZE * TILE_SIZE + col] = weights_in[win_size * out_size + in_col];
     }
 }
 
-// Rearranges/replicates weights for v4-type conv1, where output feature size is 16.
-// Currently just type conversion
+// Rearranges/replicates weights for a conv1 where output feature size is a multiple of TILE_SIZE.
+// `weights_in` is expected to be a contiguous tensor of shape [`win_size` + 1, `out_size`],
+// where `weights_in[win_size]` is the bias vector.
+// `weights_out` is a contiguous tensor of shape [`win_size` + 2 * TILE_SIZE - 1, `out_size`]
+//
+//   auto in = torch::empty({win_size + 1, out_size}, torch::kF32); // ... populated with weights/bias
+//   auto out = torch::zeros({win_size + 2 * TILE_SIZE - 1, out_size}, torch::kF16);
+//   out.slice(0, TILE_SIZE - 1, TILE_SIZE + win_size - 1) = in.slice(0, 0, win_size);
+//   out[win_size + 2 * TILE_SIZE - 2] = in[win_size];
+//
 kernel void conv1_out16_simd_reorder_weights(
     device const ConvArgs* const args,
     device const ftype_in* const weights_in,
     device ftype* const weights_out)
 {
-    const int cols = args->out_size;
-    const int rows = args->in_size * args->win_size + 1;
-    for (int row = 0; row < rows; ++row) {
-        for (int col = 0; col < cols; ++col) {
-            weights_out[row * cols + col] = weights_in[row * cols + col];
+    const int win_size = args->win_size;
+    const int out_size = args->out_size;
+    const int rows = win_size + 2 * TILE_SIZE - 1;
+    for (int col = 0; col < out_size; ++col) {
+        for (int row = 0; row < rows; ++row) {
+            int in_row = (row >= TILE_SIZE + win_size - 1) ? ((row == rows - 1) ? win_size : -1) : row - TILE_SIZE + 1;
+            weights_out[row * out_size + col] = (in_row >= 0) ? weights_in[in_row * out_size + col] : ftype(0);
         }
     }
 }
 
 // Rearranges/replicates weights for v3-type conv2, where input feature size is 4.
-// Given
-//     weights_in = torch::empty({21, 16}); // then populated with weight data
-//     weights_out = torch::empty({29, 16});
-// this will fill weights_out like this:
-//     weights_out.slice(0, 0, 4) = 0;
-//     weights_out.slice(0, 4, 24) = weights_in.slice(0, 0, 20);
-//     weights_out.slice(0, 24, 28) = 0;
-//     weights_out[28] = weights_in[20];
+//
+//   auto in = torch::empty({21, 16}, torch::kF32); // ... populated with weights/bias
+//   auto out = torch::zeros({29, 16}, torch::kF16);
+//   out.slice(0, 4, 24) = in.slice(0, 0, 20);
+//   out[28] = in[20];
+//
 kernel void conv2_in4_simd_reorder_weights(
     device const ConvArgs* const args,
     device const ftype_in* const weights_in,
@@ -275,16 +275,14 @@ kernel void conv2_in4_simd_reorder_weights(
 {
     for (int col = 0; col < 16; ++col) {
         for (int row = 0; row < 29; ++row) {
-            int in_row = row - 4;
-            if (in_row >= 20) { in_row = -1; }
-            if (row == 28) { in_row = 20; }
+            int in_row = (row >= 24) ? ((row == 28) ? 20 : -1) : row - 4;
             weights_out[row * 16 + col] = (in_row >= 0) ? weights_in[in_row * 16 + col] : ftype(0);
         }
     }
 }
 
-// Rearranges/replicates weights for v4-type conv2, where input feature size is 16.
-// Currently just type conversion
+// Rearranges/replicates weights for v4-type conv2, where input feature size is a multiple of TILE_SIZE.
+// Just type conversion
 kernel void conv2_in16_simd_reorder_weights(
     device const ConvArgs* const args,
     device const ftype_in* const weights_in,
@@ -328,8 +326,8 @@ kernel void float_to_half(
 
 // Specialised conv1 implementation for v3-type models, where output feature size is 4.
 // Given a contiguous input tensor of shape [batch_size, chunk_size, 1] this will fill
-// a contiguous output tensor of shape [batch_size, chunk_size + 4, 4], where the actual output
-// is located at output.slice(1, 1, chunk_size + 1) and values before and after that slice are
+// a contiguous output tensor of shape [batch_size, chunk_size + 8, 4], where the actual output
+// is located at output.slice(1, 2, chunk_size + 2) and values before and after that slice are
 // set to zero (this padding is used by the second layer in order to avoid special handling
 // of the edges).
 #define CONV1_SIMD_GROUPS 16
@@ -350,16 +348,17 @@ kernel void conv1_out4_simd(
     simdgroup_ftype8x8 W[6], B, I[2], A[4];
 
     for (int i = 0; i < 6; ++i) {
-        simdgroup_load(W[i], weights_buf, TILE_SIZE, ulong2(0, i * TILE_SIZE));
+        simdgroup_load(W[i], weights_buf, TILE_SIZE, ulong2(0, 10 - 2 * i));
     }
-    simdgroup_load(B, weights_buf + 6 * TILE_SIZE * TILE_SIZE, 0);
-    int num_iters = (chunk_size / 8) - 1;
+    simdgroup_load(B, weights_buf + 18 * TILE_SIZE, 0);
+    int num_iters = (chunk_size / TILE_SIZE) - 1;
 
     // Deal with the chunk edges first
     for (int tile_row = gid; tile_row < chunk_tiles; tile_row += threadgroups) {
-        for (int pass = sid; pass < 2; ++pass) {
-            simdgroup_load(I[0], in_buf, chunk_size, ulong2(pass * (chunk_size - 8), tile_row * TILE_SIZE));
-            if (pass == 0) {
+        if (sid < 2) {
+            int is_last = sid;
+            simdgroup_load(I[0], in_buf, chunk_size, ulong2(is_last * (chunk_size - 8), tile_row * TILE_SIZE));
+            if (!is_last) {
                 // Start of time span / output feature row.
                 // Padded with 1 tile = 8 entries.
                 A[0] = simdgroup_ftype8x8(0);
@@ -381,7 +380,7 @@ kernel void conv1_out4_simd(
                     simd_out_buf[sid][i][elem] = conv_activation(val);
                 }
                 simdgroup_load(A[i], simd_out_buf[sid][i], TILE_SIZE);
-                simdgroup_store(A[i], out_buf, out_stride, ulong2((pass * (num_iters + 1) * 4 + i) * TILE_SIZE, tile_row * TILE_SIZE));
+                simdgroup_store(A[i], out_buf, out_stride, ulong2((is_last * (num_iters + 1) * 4 + i) * TILE_SIZE, tile_row * TILE_SIZE));
             }
         }
     }
@@ -413,42 +412,91 @@ kernel void conv1_out4_simd(
 
 // Conv1 implementation for v4-type models, where output feature size is 16.
 // Currently this is just a copy of the generic implementation.
-kernel void conv1_out16_simd
-(
+#define CONV1_SIMD_GROUPS 16
+[[max_total_threads_per_threadgroup(CONV1_SIMD_GROUPS * 32)]]
+kernel void conv1_out16_simd(
     device const ConvArgs* const args,
-    device const ftype* const in,
-    device const ftype* const weights,
-    device ftype* const out,
-    KERNEL_INDEX_INPUTS
-) {
-    const int in_size = args->in_size;
-    const int win_size = args->win_size;
-    const int dp_size = in_size * win_size;
-    const int out_size = args->out_size;
-    const int stride = args->stride;
-    const int pad = args->pad;
-    const int chunk_size_in = args->chunk_size_in;
-    const int chunk_size_out = chunk_size_in / stride;
-    const int num_chunks = args->num_chunks;
+    device const ftype* const in_buf,
+    device const ftype* const weights_buf,
+    device ftype* const out_buf,
+    KERNEL_INDEX_INPUTS)
+{
+//    const int in_size = 1;
+    const int out_size = 16;
+    const int chunk_size = args->chunk_size_in; // must be multiple of 8
+    const int chunk_tiles = args->num_chunks / TILE_SIZE; // num_chunks must be multiple of TILE_SIZE
+    const int out_stride = chunk_size * out_size;
+    threadgroup ftype simd_out_buf[CONV1_SIMD_GROUPS][8][TILE_SIZE * TILE_SIZE];
+    simdgroup_ftype8x8 W[2][12], B[2], I[2], A[8];
 
-    for (int chunk = gid * threads + tid; chunk < num_chunks; chunk += threadgroups * threads) {
-        for (int ts = 0; ts < chunk_size_out; ++ts) {
-            int in_pos_start = (ts * stride - pad) * in_size;
-            for (int output_idx = 0; output_idx < out_size; ++output_idx) {
-                ftype sum = weights[dp_size * out_size + output_idx]; // bias
-                for (int dp_pos = 0; dp_pos < dp_size; ++dp_pos) {
-                    int in_pos = in_pos_start + dp_pos;
-                    if (in_pos >= 0 && in_pos < chunk_size_in * in_size) {
-                        sum += in[chunk * chunk_size_in * in_size + in_pos] * weights[dp_pos * out_size + output_idx];
-                    }
+    for (int tile_col = 0; tile_col < 2; ++tile_col) {
+        for (int tile_row = 0; tile_row < 12; ++tile_row) {
+            simdgroup_load(W[tile_col][tile_row], weights_buf, 2 * TILE_SIZE, ulong2(tile_col * TILE_SIZE, tile_row));
+        }
+        simdgroup_load(B[tile_col], weights_buf + 19 * out_size + tile_col * TILE_SIZE, 0);
+    }
+    int num_iters = (chunk_size / TILE_SIZE) - 1;
+
+    // Deal with the chunk edges first
+    for (int tile_row = gid; tile_row < chunk_tiles; tile_row += threadgroups) {
+        if (sid < 2) {
+            simdgroup_load(I[0], in_buf, chunk_size, ulong2(0, tile_row * TILE_SIZE));
+            simdgroup_load(I[1], in_buf, chunk_size, ulong2(chunk_size - TILE_SIZE, tile_row * TILE_SIZE));
+            simdgroup_multiply_accumulate(A[0], I[0], W[sid][9], B[sid]);
+            simdgroup_multiply_accumulate(A[1], I[0], W[sid][8], B[sid]);
+            simdgroup_multiply_accumulate(A[2], I[0], W[sid][7], B[sid]);
+            simdgroup_multiply_accumulate(A[3], I[0], W[sid][6], B[sid]);
+            simdgroup_multiply_accumulate(A[4], I[0], W[sid][5], B[sid]);
+            simdgroup_multiply_accumulate(A[5], I[0], W[sid][4], B[sid]);
+            simdgroup_multiply_accumulate(A[6], I[1], W[sid][3], B[sid]);
+            simdgroup_multiply_accumulate(A[7], I[1], W[sid][2], B[sid]);
+            for (int i = 0; i < 8; ++i) {
+                simdgroup_store(A[i], simd_out_buf[sid][i], TILE_SIZE);
+                for (int elem = tid & 31; elem < TILE_SIZE * TILE_SIZE; elem += 32) {
+                    ftype val = simd_out_buf[sid][i][elem];
+                    simd_out_buf[sid][i][elem] = conv_activation(val);
                 }
-                out[chunk * chunk_size_out * out_size + ts * out_size + output_idx] = conv_activation(sum);
+                simdgroup_load(A[i], simd_out_buf[sid][i], TILE_SIZE);
+                simdgroup_store(A[i], out_buf, out_stride,
+                    ulong2((int(i > 5) * (chunk_size - 8) + i) * out_size + sid * TILE_SIZE, tile_row * TILE_SIZE));
+            }
+        }
+    }
+
+    for (int tile_row = gid; tile_row < chunk_tiles; tile_row += threadgroups) {
+        for (int iter = sid; iter < num_iters; iter += simdgroups) {
+            simdgroup_load(I[0], in_buf, chunk_size, ulong2(iter * TILE_SIZE, tile_row * TILE_SIZE));
+            simdgroup_load(I[1], in_buf, chunk_size, ulong2((iter + 1) * TILE_SIZE, tile_row * TILE_SIZE));
+            for (int i = 0; i < 2; ++i) {
+                simdgroup_multiply_accumulate(A[0], I[0], W[i][3], B[i]);
+                simdgroup_multiply_accumulate(A[1], I[0], W[i][2], B[i]);
+                simdgroup_multiply_accumulate(A[2], I[0], W[i][1], B[i]);
+                simdgroup_multiply_accumulate(A[3], I[0], W[i][0], B[i]);
+                simdgroup_multiply_accumulate(A[4], I[1], W[i][7], B[i]);
+                simdgroup_multiply_accumulate(A[5], I[1], W[i][6], B[i]);
+                simdgroup_multiply_accumulate(A[6], I[1], W[i][5], B[i]);
+                simdgroup_multiply_accumulate(A[7], I[1], W[i][4], B[i]);
+                simdgroup_multiply_accumulate(A[0], I[1], W[i][11], A[0]);
+                simdgroup_multiply_accumulate(A[1], I[1], W[i][10], A[1]);
+                simdgroup_multiply_accumulate(A[2], I[1], W[i][9], A[2]);
+                simdgroup_multiply_accumulate(A[3], I[1], W[i][8], A[3]);
+                for (int j = 0; j < 8; ++j) {
+                    simdgroup_store(A[j], simd_out_buf[sid][j], TILE_SIZE);
+                    for (int elem = tid & 31; elem < TILE_SIZE * TILE_SIZE; elem += 32) {
+                        ftype val = simd_out_buf[sid][j][elem];
+                        simd_out_buf[sid][j][elem] = conv_activation(val);
+                    }
+                    simdgroup_load(A[j], simd_out_buf[sid][j], TILE_SIZE);
+                    simdgroup_store(A[j], out_buf, out_stride,
+                        ulong2((iter * 8 + 6 + j) * out_size + i * TILE_SIZE, tile_row * TILE_SIZE));
+                }
             }
         }
     }
 }
+#undef CONV1_SIMD_GROUPS
 
-// Specialised conv1 implementation for v3-type models, where input feature size is 4.
+// Specialised conv2 implementation for v3-type models, where input feature size is 4.
 #define CONV2_SIMD_GROUPS 16
 [[max_total_threads_per_threadgroup(CONV2_SIMD_GROUPS * 32)]]
 kernel void conv2_in4_simd
@@ -502,42 +550,59 @@ kernel void conv2_in4_simd
 }
 #undef CONV2_SIMD_GROUPS
 
-// Conv2 implementation for v4-type models, where input feature size is 16.
-// Currently this is just a copy of the generic implementation.
+// Specialised conv2 implementation for v3-type models, where input feature size is 16.
+#define CONV2_SIMD_GROUPS 16
+[[max_total_threads_per_threadgroup(CONV2_SIMD_GROUPS * 32)]]
 kernel void conv2_in16_simd
 (
     device const ConvArgs* const args,
-    device const ftype* const in,
-    device const ftype* const weights,
-    device ftype* const out,
+    device const ftype* const in_buf,
+    device const ftype* const weights_buf,
+    device ftype* const out_buf,
     KERNEL_INDEX_INPUTS
 ) {
-    const int in_size = args->in_size;
-    const int win_size = args->win_size;
-    const int dp_size = in_size * win_size;
-    const int out_size = args->out_size;
-    const int stride = args->stride;
-    const int pad = args->pad;
-    const int chunk_size_in = args->chunk_size_in;
-    const int chunk_size_out = chunk_size_in / stride;
-    const int num_chunks = args->num_chunks;
+    const int in_size = 16;
+    const int out_size = 16;
+    const int win_size = 5;
+    const int chunk_size = args->chunk_size_in; // must be multiple of 2
+    const int chunk_tiles = args->num_chunks / TILE_SIZE; // num_chunks must be multiple of TILE_SIZE
+    const int in_stride = chunk_size * in_size;
+    const int out_stride = chunk_size * out_size;
+    threadgroup ftype simd_out_buf[CONV2_SIMD_GROUPS][2][TILE_SIZE * TILE_SIZE];
+    simdgroup_ftype8x8 W[10][2], B[2], I, A[2];
+    device const ftype* b = weights_buf + win_size * in_size * out_size;
 
-    for (int chunk = gid * threads + tid; chunk < num_chunks; chunk += threadgroups * threads) {
-        for (int ts = 0; ts < chunk_size_out; ++ts) {
-            int in_pos_start = (ts * stride - pad) * in_size;
-            for (int output_idx = 0; output_idx < out_size; ++output_idx) {
-                ftype sum = weights[dp_size * out_size + output_idx]; // bias
-                for (int dp_pos = 0; dp_pos < dp_size; ++dp_pos) {
-                    int in_pos = in_pos_start + dp_pos;
-                    if (in_pos >= 0 && in_pos < chunk_size_in * in_size) {
-                        sum += in[chunk * chunk_size_in * in_size + in_pos] * weights[dp_pos * out_size + output_idx];
-                    }
+    simdgroup_load(B[0], b, 0);
+    simdgroup_load(B[1], b + TILE_SIZE, 0);
+    for (int i = 0; i < 10; ++i) {
+        simdgroup_load(W[i][0], weights_buf, out_size, ulong2(0 * TILE_SIZE, i * TILE_SIZE));
+        simdgroup_load(W[i][1], weights_buf, out_size, ulong2(1 * TILE_SIZE, i * TILE_SIZE));
+    }
+
+    for (int tile_row = gid; tile_row < chunk_tiles; tile_row += threadgroups) {
+        for (int ts = sid; ts < chunk_size; ts += simdgroups) {
+            int start_pad_tiles = max(0, 2 - ts) * 2;
+            int end_pad_tiles = max(0, ts - chunk_size + 3) * 2;
+            A[0] = B[0];
+            A[1] = B[1];
+            for (int i = start_pad_tiles; i < 10 - end_pad_tiles; ++i) {
+                simdgroup_load(I, in_buf, in_stride, ulong2((ts - 2) * out_size + i * TILE_SIZE, tile_row * TILE_SIZE));
+                simdgroup_multiply_accumulate(A[0], I, W[i][0], A[0]);
+                simdgroup_multiply_accumulate(A[1], I, W[i][1], A[1]);
+            }
+            for (int i = 0; i < 2; ++i) {
+                simdgroup_store(A[i], simd_out_buf[sid][i], TILE_SIZE);
+                for (int elem = tid & 31; elem < TILE_SIZE * TILE_SIZE; elem += 32) {
+                    ftype val = simd_out_buf[sid][i][elem];
+                    simd_out_buf[sid][i][elem] = conv_activation(val);
                 }
-                out[chunk * chunk_size_out * out_size + ts * out_size + output_idx] = conv_activation(sum);
+                simdgroup_load(A[i], simd_out_buf[sid][i], TILE_SIZE);
+                simdgroup_store(A[i], out_buf, out_stride, ulong2(ts * out_size + i * TILE_SIZE, tile_row * TILE_SIZE));
             }
         }
     }
 }
+#undef CONV2_SIMD_GROUPS
 
 #define SIMD_TILES_M 6
 #define SIMD_TILES_N 4
@@ -671,8 +736,8 @@ struct LstmArgs {
 };
 
 // This takes a contiguous input tensor of shape [T, N, C], and contiguous output tensor
-// of shape [T+2, C/8, N, 8], and performs these assignments:
-//     output.slice(0, 1, T+1) = input.view({T, N, C/8, 8}.transpose(1, 2);
+// of shape [T+2, C/8, 8, N/8, 8], and performs these assignments:
+//     output.slice(0, 1, T+1) = input.view({T, N/8, 8, C/8, 8}.transpose(1, 3);
 //     output[0] = 0;
 //     output[T+1] = 0;
 kernel void reorder_input(
@@ -706,9 +771,9 @@ kernel void reorder_input(
     }
 }
 
-// This takes a contiguous input tensor of shape [T+2, C/8, N, 8], and contiguous output tensor
+// This takes a contiguous input tensor of shape [T+2, C/8, 8, N/8, 8], and contiguous output tensor
 // of shape [T, N, C], and performs this copy:
-//     output.view({T, N, C/8, 8}) = input.slice(0, 1, T + 1).transpose(1, 2);
+//     output.view({T, N/8, 8, C/8, 8}) = input.slice(0, 1, T+1).transpose(1, 3);
 // Note that it ignores input[0,:,:,:] and input[T+1,:,:,:]
 kernel void reorder_output(
     device const LstmArgs* const args,
