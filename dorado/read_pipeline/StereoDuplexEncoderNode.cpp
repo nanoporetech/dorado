@@ -3,6 +3,7 @@
 #include "3rdparty/edlib/edlib/include/edlib.h"
 #include "utils/duplex_utils.h"
 
+#include <cstring>
 #include <chrono>
 
 using namespace std::chrono_literals;
@@ -11,6 +12,10 @@ using namespace torch::indexing;
 namespace {
 std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> template_read,
                                             std::shared_ptr<dorado::Read> complement_read) {
+    // We rely on the incoming read raw data being of type float32 to allow dumb copying.
+    assert(template_read->raw_data.dtype() == torch::kFloat32);
+    assert(complement_read->raw_data.dtype() == torch::kFloat32);
+
     std::shared_ptr<dorado::Read> read = std::make_shared<dorado::Read>();  // Return read
 
     float template_len = template_read->seq.size();
@@ -65,7 +70,7 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
     if (consensus_possible) {
         // Move along the alignment, filling out the stereo-encoded tensor
         int max_size = template_read->raw_data.size(0) + complement_read->raw_data.size(0);
-        auto opts = torch::TensorOptions().dtype(torch::kFloat16).device(torch::kCPU);
+        auto opts = torch::TensorOptions().dtype(torch::kFloat32).device(torch::kCPU);
         int num_features = 13;
         auto tmp = torch::zeros({num_features, max_size}, opts);
 
@@ -125,7 +130,6 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
                                          torch::min(template_read->raw_data).item<float>());
 
         tmp.index({torch::indexing::Slice(None, 2)}) = pad_value;
-
         int stereo_global_cursor = 0;  // Index into the stereo-encoded signal
         for (int i = start_alignment_position; i < end_alignment_position; i++) {
             // We move along every alignment position. For every position we need to add signal and padding.
@@ -142,13 +146,24 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
                 template_segment_length++;
                 template_signal_cursor++;
                 auto max_signal_length = template_moves_expanded.size();
-                while (template_moves_expanded[template_signal_cursor] == 0 &&
-                       (template_signal_cursor < max_signal_length)) {
-                    tmp[0][stereo_global_cursor + template_segment_length] =
-                            template_read->raw_data[template_signal_cursor];
-                    template_signal_cursor++;
-                    template_segment_length++;
-                }
+
+		// We are relying on strings of 0s ended in a 1.  It would be more efficient
+		// in any case to store run length data above.
+		// We're also assuming uint8_t is an alias for char (not guaranteed in principle).
+		const auto* const start_ptr = &template_moves_expanded[template_signal_cursor];
+		auto* const next_move_ptr =
+			static_cast<const uint8_t *>(std::memchr(start_ptr, 1, max_signal_length));
+		const size_t sample_count = next_move_ptr ? (next_move_ptr - start_ptr) : max_signal_length;
+
+                float* const tmp_ptr = static_cast<float *>(tmp[0].data_ptr());
+		const float* const raw_data_ptr = static_cast<float *>(template_read->raw_data.data_ptr());
+		// Assumes contiguity of successive elements.
+		std::memcpy(&tmp_ptr[stereo_global_cursor + template_segment_length],
+			    &raw_data_ptr[template_signal_cursor],
+		            sample_count * sizeof(float));
+
+                template_signal_cursor += sample_count;
+                template_segment_length += sample_count;
             }
 
             // If there is *not* an insertion to the target, add the nucleotide from the query cursor
@@ -161,13 +176,21 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
                 complement_segment_length++;
                 complement_signal_cursor++;
                 auto max_signal_length = complement_moves_expanded.size();
-                while (complement_moves_expanded[complement_signal_cursor] == 0 &&
-                       (complement_signal_cursor < max_signal_length)) {
-                    tmp[1][stereo_global_cursor + complement_segment_length] =
-                            complement_signal[complement_signal_cursor];
-                    complement_signal_cursor++;
-                    complement_segment_length++;
-                }
+
+		// See comments above.
+		const auto* const start_ptr = &complement_moves_expanded[complement_signal_cursor];
+		auto* const next_move_ptr =
+			static_cast<const uint8_t *>(std::memchr(start_ptr, 1, max_signal_length));
+		const size_t sample_count = next_move_ptr ? (next_move_ptr - start_ptr) : max_signal_length;
+
+                float* const tmp_ptr = static_cast<float *>(tmp[1].data_ptr());
+		const float* const raw_data_ptr = static_cast<float *>(complement_signal.data_ptr());
+		std::memcpy(&tmp_ptr[stereo_global_cursor + complement_segment_length],
+			    &raw_data_ptr[complement_signal_cursor],
+		            sample_count * sizeof(float));
+
+                complement_signal_cursor += sample_count;
+                complement_segment_length += sample_count;
             }
 
             int total_segment_length = std::max(template_segment_length, complement_segment_length);
@@ -214,7 +237,7 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
                 {torch::indexing::Slice(None), torch::indexing::Slice(None, stereo_global_cursor)});
 
         read->read_id = template_read->read_id + ";" + complement_read->read_id;
-        read->raw_data = tmp;  // use the encoded signal
+        read->raw_data = tmp.to(torch::kFloat16);  // use the encoded signal
     }
 
     edlibFreeAlignResult(result);
