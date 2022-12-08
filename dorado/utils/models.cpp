@@ -66,23 +66,22 @@ std::string get_modification_model(const std::string& simplex_model,
 
     simplex_path = fs::canonical(simplex_path);
     auto model_dir = simplex_path.parent_path();
-    auto simplex_name = simplex_path.filename();
+    auto simplex_name = simplex_path.filename().u8string();
 
-    if (is_valid_model(simplex_name.u8string())) {
-        std::string mods_prefix = simplex_name.u8string() + "_" + modification;
+    if (is_valid_model(simplex_name)) {
+        std::string mods_prefix = simplex_name + "_" + modification + "@v";
         for (const auto& [model, _] : urls::modified::models) {
-            if (mods_prefix.compare(0, mods_prefix.size(), model) > 0) {
+            if (model.compare(0, mods_prefix.size(), mods_prefix) == 0) {
                 modification_model = model;
                 break;
             }
         }
     } else {
-        throw std::runtime_error{"unknown simplex model " + simplex_name.u8string()};
+        throw std::runtime_error{"unknown simplex model " + simplex_name};
     }
 
     if (modification_model.empty()) {
-        throw std::runtime_error{"could not find matching modification model for " +
-                                 simplex_name.u8string()};
+        throw std::runtime_error{"could not find matching modification model for " + simplex_name};
     }
 
     spdlog::debug("- matching modification model found: {}", modification_model);
