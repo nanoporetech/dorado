@@ -33,9 +33,9 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
                                                              complement_read->seq.end());
     dorado::utils::reverse_complement(complement_sequence_reverse_complement);
 
-    std::vector<uint8_t> complemnet_q_scores_reversed(complement_read->qstring.begin(),
+    std::vector<uint8_t> complement_q_scores_reversed(complement_read->qstring.begin(),
                                                       complement_read->qstring.end());
-    std::reverse(complemnet_q_scores_reversed.begin(), complemnet_q_scores_reversed.end());
+    std::reverse(complement_q_scores_reversed.begin(), complement_q_scores_reversed.end());
 
     std::vector<char> template_sequence(template_read->seq.begin(), template_read->seq.end());
     std::vector<uint8_t> template_q_scores(template_read->qstring.begin(),
@@ -194,28 +194,24 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
                 complement_segment_length += sample_count;
             }
 
-            int total_segment_length = std::max(template_segment_length, complement_segment_length);
+            const int total_segment_length = std::max(template_segment_length, complement_segment_length);
+            const int start_ts = stereo_global_cursor;
+            const int end_ts = start_ts + total_segment_length;
 
             // Now, add the nucleotides and q scores
             if (result.alignment[i] != 2) {
-                char nucleotide = template_sequence.at(target_cursor);
-                for (int i = 0; i < total_segment_length; i++) {
-                    tmp[2 + (0b11 & (nucleotide >> 2 ^ nucleotide >> 1))]
-                       [stereo_global_cursor + i] = 1;
-                    tmp[11][stereo_global_cursor + i] =
-                            float(template_q_scores.at(target_cursor) - 33) / 90;
-                }
+                const char nucleotide = template_sequence.at(target_cursor);
+                const auto feature_idx = 2 + (0b11 & (nucleotide >> 2 ^ nucleotide >> 1));
+                tmp.index_put_({feature_idx, Slice(start_ts, end_ts)}, 1.0f);
+                tmp.index_put_({11, Slice(start_ts, end_ts)}, float(template_q_scores.at(target_cursor) - 33) / 90);
             }
 
             // Now, add the nucleotides and q scores
             if (result.alignment[i] != 1) {
-                char nucleotide = complement_sequence_reverse_complement.at(query_cursor);
-                for (int i = 0; i < total_segment_length; i++) {
-                    tmp[6 + (0b11 & (nucleotide >> 2 ^ nucleotide >> 1))]
-                       [stereo_global_cursor + i] = 1;
-                    tmp[12][stereo_global_cursor + i] =
-                            float(complemnet_q_scores_reversed.at(query_cursor) - 33) / 90;
-                }
+                const char nucleotide = complement_sequence_reverse_complement.at(query_cursor);
+                const auto feature_idx = 6 + (0b11 & (nucleotide >> 2 ^ nucleotide >> 1));
+                tmp.index_put_({feature_idx, Slice(start_ts, end_ts)}, 1.0f);
+                tmp.index_put_({12, Slice(start_ts, end_ts)}, float(complement_q_scores_reversed.at(query_cursor) - 33) / 90);
             }
 
             tmp[10][stereo_global_cursor] = 1;  //set the move table
