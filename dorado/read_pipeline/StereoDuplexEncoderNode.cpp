@@ -194,7 +194,8 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
                 complement_segment_length += sample_count;
             }
 
-            const int total_segment_length = std::max(template_segment_length, complement_segment_length);
+            const int total_segment_length =
+                    std::max(template_segment_length, complement_segment_length);
             const int start_ts = stereo_global_cursor;
             const int end_ts = start_ts + total_segment_length;
 
@@ -203,7 +204,8 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
                 const char nucleotide = template_sequence.at(target_cursor);
                 const auto feature_idx = 2 + (0b11 & (nucleotide >> 2 ^ nucleotide >> 1));
                 tmp.index_put_({feature_idx, Slice(start_ts, end_ts)}, 1.0f);
-                tmp.index_put_({11, Slice(start_ts, end_ts)}, float(template_q_scores.at(target_cursor) - 33) / 90);
+                tmp.index_put_({11, Slice(start_ts, end_ts)},
+                               float(template_q_scores.at(target_cursor) - 33) / 90);
             }
 
             // Now, add the nucleotides and q scores
@@ -211,7 +213,8 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
                 const char nucleotide = complement_sequence_reverse_complement.at(query_cursor);
                 const auto feature_idx = 6 + (0b11 & (nucleotide >> 2 ^ nucleotide >> 1));
                 tmp.index_put_({feature_idx, Slice(start_ts, end_ts)}, 1.0f);
-                tmp.index_put_({12, Slice(start_ts, end_ts)}, float(complement_q_scores_reversed.at(query_cursor) - 33) / 90);
+                tmp.index_put_({12, Slice(start_ts, end_ts)},
+                               float(complement_q_scores_reversed.at(query_cursor) - 33) / 90);
             }
 
             tmp[10][stereo_global_cursor] = 1;  //set the move table
