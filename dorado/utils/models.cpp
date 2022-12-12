@@ -49,6 +49,12 @@ void download_models(const std::string& target_directory, const std::string& sel
     download_model_set(urls::modified::models);
 }
 
+bool is_rna_model(const std::filesystem::path& model) {
+    auto path = fs::canonical(model);
+    auto filename = path.filename();
+    return filename.u8string().rfind("rna", 0) == 0;
+}
+
 std::string get_modification_model(const std::string& simplex_model,
                                    const std::string& modification) {
     std::string modification_model{""};

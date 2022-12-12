@@ -1,3 +1,4 @@
+#include <filesystem>
 #include <map>
 #include <string>
 #include <vector>
@@ -47,6 +48,8 @@ static const std::map<std::string, std::string> models = {
         {"dna_r10.4.1_e8.2_400bps_sup@v4.0.0",
          "/shared/static/i1f2unj1s6dplzpebl2bx4ytk8iqj0de.zip"},
 
+        // RNA003
+        {"rna003_120bps_sup@v3", "/shared/static/na0q0nooudrpe5yxgzkn58zlxfmlyuyo.zip"},
 };
 
 }  // namespace simplex
@@ -64,6 +67,7 @@ namespace modified {
 
 static const std::vector<std::string> mods = {
         "5mCG",
+        "5mCG_5hmCG",
 };
 
 static const std::map<std::string, std::string> models = {
@@ -88,6 +92,14 @@ static const std::map<std::string, std::string> models = {
         {"dna_r10.4.1_e8.2_400bps_sup@v3.5.2_5mCG@v2",
          "/shared/static/8emosrp9i3vfqg3e4ehsifnecr9dpiot.zip"},
 
+        // v4.0.0
+        {"dna_r10.4.1_e8.2_400bps_fast@v4.0.0_5mCG_5hmCG@v2",
+         "/shared/static/3hhvl90kfkdwch6uuglsa0ggk78nmcqa.zip"},
+        {"dna_r10.4.1_e8.2_400bps_hac@v4.0.0_5mCG_5hmCG@v2",
+         "/shared/static/kijrf268zwurcpotq1v4sjj757ftc51l.zip"},
+        {"dna_r10.4.1_e8.2_400bps_sup@v4.0.0_5mCG_5hmCG@v2",
+         "/shared/static/1pv196twy5m3ob0gfyufvjm1zogzh8vu.zip"},
+
 };
 
 }  // namespace modified
@@ -95,6 +107,7 @@ static const std::map<std::string, std::string> models = {
 
 namespace utils {
 
+bool is_rna_model(const std::filesystem::path& model);
 bool is_valid_model(const std::string& selected_model);
 void download_models(const std::string& target_directory, const std::string& selected_model);
 
