@@ -73,7 +73,9 @@ int duplex(int argc, char* argv[]) {
                 utils::load_pairs_file(pairs_file);
         spdlog::info("> Pairs file loaded");
 
-        WriterNode writer_node(std::move(args), emit_fastq, false, true, 4);
+        bool emit_moves = false, rna = false, duplex = true;
+        WriterNode writer_node(std::move(args), emit_fastq, emit_moves, rna, duplex, 4);
+
         torch::set_num_threads(1);
 
         if (model.compare("basespace") == 0) {  // Execute a Basespace duplex pipeline.
