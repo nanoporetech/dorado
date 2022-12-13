@@ -18,7 +18,7 @@ if(NOT DEFINED HTSLIB_LIBRARIES) # lazy include guard
                 PREFIX ${htslib_PREFIX}
                 SOURCE_DIR ${HTSLIB_DIR}
                 BUILD_IN_SOURCE 1
-                CONFIGURE_COMMAND autoheader && autoconf && ${HTSLIB_DIR}/configure --disable-bz2 --disable-lzma --disable-libcurl --disable-s3 --disable-gcs
+                CONFIGURE_COMMAND bash -c "autoheader && autoreconf --install && ${HTSLIB_DIR}/configure --disable-bz2 --disable-lzma --disable-libcurl --disable-s3 --disable-gcs"
                 BUILD_COMMAND "${HTSLIB_INSTALL}"
                 INSTALL_COMMAND ""
                 BUILD_BYPRODUCTS ${htslib_PREFIX}/lib/libhts.a
