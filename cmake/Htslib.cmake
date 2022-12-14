@@ -13,12 +13,13 @@ if(NOT DEFINED HTSLIB_LIBRARIES) # lazy include guard
         set(MAKE_COMMAND make)
         set(HTSLIB_INSTALL ${MAKE_COMMAND} install prefix=${CMAKE_BINARY_DIR}/3rdparty/htslib)
         set(htslib_PREFIX ${CMAKE_BINARY_DIR}/3rdparty/htslib)
+
         include(ExternalProject)
         ExternalProject_Add(htslib_project
                 PREFIX ${htslib_PREFIX}
                 SOURCE_DIR ${HTSLIB_DIR}
                 BUILD_IN_SOURCE 1
-                CONFIGURE_COMMAND bash -c "autoheader && autoreconf --install && ${HTSLIB_DIR}/configure --disable-bz2 --disable-lzma --disable-libcurl --disable-s3 --disable-gcs"
+                CONFIGURE_COMMAND bash -c "autoheader && autoconf || autoreconf --install && ./configure --disable-bz2 --disable-lzma --disable-libcurl --disable-s3 --disable-gcs"
                 BUILD_COMMAND "${HTSLIB_INSTALL}"
                 INSTALL_COMMAND ""
                 BUILD_BYPRODUCTS ${htslib_PREFIX}/lib/libhts.a
