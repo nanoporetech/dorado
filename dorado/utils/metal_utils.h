@@ -18,7 +18,7 @@ MTL::Buffer *create_vec_buffer(MTL::Device *const device, const std::vector<T> &
     return device->newBuffer(vec.data(), vec.size() * sizeof(T), MTL::ResourceStorageModeShared);
 }
 
-using MetalConstant = std::variant<int, bool>;
+using MetalConstant = std::variant<int, bool, float>;
 
 // Returns a ComputePipelineState object created from the named kernel and
 // given constants.  If max_total_threads_per_tg != -1, the value overrides

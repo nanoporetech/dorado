@@ -1,6 +1,7 @@
 #include "Version.h"
 #include "data_loader/DataLoader.h"
 #include "decode/CPUDecoder.h"
+#include "utils/models.h"
 #ifdef __APPLE__
 #include "nn/MetalCRFModel.h"
 #include "utils/metal_utils.h"
@@ -39,7 +40,8 @@ void setup(std::vector<std::string> args,
            size_t remora_batch_size,
            size_t num_remora_threads,
            bool emit_fastq,
-           bool emit_moves) {
+           bool emit_moves,
+           size_t max_reads) {
     torch::set_num_threads(1);
     std::vector<Runner> runners;
 
@@ -70,6 +72,9 @@ void setup(std::vector<std::string> args,
         }
         batch_size = batch_size == 0 ? utils::auto_gpu_batch_size(model_path.string(), devices)
                                      : batch_size;
+
+        spdlog::debug("- selected batchsize {}", batch_size);
+
         for (auto device_string : devices) {
             auto caller = create_cuda_caller(model_path, chunk_size, batch_size, device_string);
             for (size_t i = 0; i < num_runners; i++) {
@@ -89,13 +94,13 @@ void setup(std::vector<std::string> args,
     }));
 
     if (chunk_size != adjusted_chunk_size) {
-        spdlog::debug("Adjusted chunk size to match model stride: {} -> {}", chunk_size,
+        spdlog::debug("- adjusted chunk size to match model stride: {} -> {}", chunk_size,
                       adjusted_chunk_size);
         chunk_size = adjusted_chunk_size;
     }
     auto adjusted_overlap = (overlap / model_stride) * model_stride;
     if (overlap != adjusted_overlap) {
-        spdlog::debug("Adjusted overlap to match model stride: {} -> {}", overlap,
+        spdlog::debug("- adjusted overlap to match model stride: {} -> {}", overlap,
                       adjusted_overlap);
         overlap = adjusted_overlap;
     }
@@ -136,7 +141,8 @@ void setup(std::vector<std::string> args,
         }
     }
 
-    WriterNode writer_node(std::move(args), emit_fastq, emit_moves, false, num_devices * 2);
+    bool rna = utils::is_rna_model(model_path), duplex = false;
+    WriterNode writer_node(std::move(args), emit_fastq, emit_moves, rna, duplex, num_devices * 2);
 
     std::unique_ptr<ModBaseCallerNode> mod_base_caller_node;
     std::unique_ptr<BasecallerNode> basecaller_node;
@@ -153,7 +159,7 @@ void setup(std::vector<std::string> args,
                 writer_node, std::move(runners), batch_size, chunk_size, overlap, model_stride);
     }
     ScalerNode scaler_node(*basecaller_node, num_devices * 2);
-    DataLoader loader(scaler_node, "cpu", num_devices);
+    DataLoader loader(scaler_node, "cpu", num_devices, max_reads);
     loader.load_reads(data_path);
 }
 
@@ -174,6 +180,8 @@ int basecaller(int argc, char* argv[]) {
             .help("device string in format \"cuda:0,...,N\", \"cuda:all\", \"metal\" etc..")
             .default_value(default_parameters.device);
 
+    parser.add_argument("-n", "--max-reads").default_value(0).scan<'i', int>();
+
     parser.add_argument("-b", "--batchsize")
             .default_value(default_parameters.batchsize)
             .scan<'i', int>()
@@ -191,21 +199,29 @@ int basecaller(int argc, char* argv[]) {
             .default_value(default_parameters.num_runners)
             .scan<'i', int>();
 
+    parser.add_argument("--modified-bases")
+            .nargs(argparse::nargs_pattern::at_least_one)
+            .action([](const std::string& value) {
+                if (std::find(urls::modified::mods.begin(), urls::modified::mods.end(), value) ==
+                    urls::modified::mods.end()) {
+                    spdlog::error(
+                            "'{}' is not a supported modification please select from {}", value,
+                            std::accumulate(
+                                    std::next(urls::modified::mods.begin()),
+                                    urls::modified::mods.end(), urls::modified::mods[0],
+                                    [](std::string a, std::string b) { return a + ", " + b; }));
+                    std::exit(EXIT_FAILURE);
+                }
+                return value;
+            });
+
+    parser.add_argument("--modified-bases-models")
+            .default_value(std::string())
+            .help("a comma separated list of modified base models");
+
     parser.add_argument("--emit-fastq").default_value(false).implicit_value(true);
 
     parser.add_argument("--emit-moves").default_value(false).implicit_value(true);
-
-    parser.add_argument("--remora-batchsize")
-            .default_value(default_parameters.remora_batchsize)
-            .scan<'i', int>();
-
-    parser.add_argument("--remora-threads")
-            .default_value(default_parameters.remora_threads)
-            .scan<'i', int>();
-
-    parser.add_argument("--remora-models")
-            .default_value(std::string())
-            .help("a comma separated list of remora models");
 
     try {
         parser.parse_args(argc, argv);
@@ -222,14 +238,32 @@ int basecaller(int argc, char* argv[]) {
         spdlog::set_level(spdlog::level::debug);
     }
 
+    auto model = parser.get<std::string>("model");
+    auto mod_bases = parser.get<std::vector<std::string>>("--modified-bases");
+    auto mod_bases_models = parser.get<std::string>("--modified-bases-models");
+
+    if (mod_bases.size() && !mod_bases_models.empty()) {
+        spdlog::error(
+                "only one of --modified-bases or --modified-bases-models should be specified.");
+        std::exit(EXIT_FAILURE);
+    } else if (mod_bases.size()) {
+        std::vector<std::string> m;
+        std::transform(mod_bases.begin(), mod_bases.end(), std::back_inserter(m),
+                       [&model](std::string m) { return utils::get_modification_model(model, m); });
+
+        mod_bases_models =
+                std::accumulate(std::next(m.begin()), m.end(), m[0],
+                                [](std::string a, std::string b) { return a + "," + b; });
+    }
+
     spdlog::info("> Creating basecall pipeline");
+
     try {
-        setup(args, parser.get<std::string>("model"), parser.get<std::string>("data"),
-              parser.get<std::string>("--remora-models"), parser.get<std::string>("-x"),
-              parser.get<int>("-c"), parser.get<int>("-o"), parser.get<int>("-b"),
-              parser.get<int>("-r"), parser.get<int>("--remora-batchsize"),
-              parser.get<int>("--remora-threads"), parser.get<bool>("--emit-fastq"),
-              parser.get<bool>("--emit-moves"));
+        setup(args, model, parser.get<std::string>("data"), mod_bases_models,
+              parser.get<std::string>("-x"), parser.get<int>("-c"), parser.get<int>("-o"),
+              parser.get<int>("-b"), parser.get<int>("-r"), default_parameters.remora_batchsize,
+              default_parameters.remora_threads, parser.get<bool>("--emit-fastq"),
+              parser.get<bool>("--emit-moves"), parser.get<int>("--max-reads"));
     } catch (const std::exception& e) {
         spdlog::error("{}", e.what());
         return 1;

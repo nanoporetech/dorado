@@ -4,9 +4,11 @@
 
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
 #include <chrono>
 #include <iostream>
 #include <sstream>
+#include <string>
 
 #ifndef _WIN32
 #include <unistd.h>
@@ -54,6 +56,11 @@ void WriterNode::worker_thread() {
         m_num_samples_processed += read->raw_data.size(0);
         m_num_reads_processed += 1;
 
+        if (m_rna) {
+            std::reverse(read->seq.begin(), read->seq.end());
+            std::reverse(read->qstring.begin(), read->qstring.end());
+        }
+
         if (m_num_reads_processed % 100 == 0 && m_isatty) {
             std::scoped_lock<std::mutex> lock(m_cerr_mutex);
             std::cerr << "\r> Reads processed: " << m_num_reads_processed;
@@ -82,6 +89,7 @@ void WriterNode::worker_thread() {
 WriterNode::WriterNode(std::vector<std::string> args,
                        bool emit_fastq,
                        bool emit_moves,
+                       bool rna,
                        bool duplex,
                        size_t num_worker_threads,
                        size_t max_reads)
@@ -89,6 +97,7 @@ WriterNode::WriterNode(std::vector<std::string> args,
           m_args(std::move(args)),
           m_emit_fastq(emit_fastq),
           m_emit_moves(emit_moves),
+          m_rna(rna),
           m_duplex(duplex),
           m_num_bases_processed(0),
           m_num_samples_processed(0),
@@ -126,10 +135,11 @@ WriterNode::~WriterNode() {
     std::ostringstream samples_sec;
     if (m_duplex) {
         samples_sec << std::scientific << m_num_bases_processed / (duration / 1000.0);
+        spdlog::info("> Bases/s: {}", samples_sec.str());
     } else {
         samples_sec << std::scientific << m_num_samples_processed / (duration / 1000.0);
+        spdlog::info("> Samples/s: {}", samples_sec.str());
     }
-    spdlog::info("> Samples/s: {}", samples_sec.str());
 }
 
 }  // namespace dorado

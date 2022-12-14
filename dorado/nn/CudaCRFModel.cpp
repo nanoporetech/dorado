@@ -18,28 +18,17 @@ public:
                int chunk_size,
                int batch_size,
                const std::string &device) {
-        auto config = toml::parse(model_path / "config.toml");
-
-        float qscale = 1.0;
-        float qbias = 0.0;
-
-        if (config.contains("qscore")) {
-            const auto &qscore = toml::find(config, "qscore");
-            qbias = toml::find<float>(qscore, "bias");
-            qscale = toml::find<float>(qscore, "scale");
-        } else {
-            spdlog::debug("> no qscore calibration found");
-        }
+        const auto model_config = load_crf_model_config(model_path);
+        m_model_stride = static_cast<size_t>(model_config.stride);
 
         m_decoder_options = DecoderOptions();
-        m_decoder_options.q_shift = qbias;
-        m_decoder_options.q_scale = qscale;
+        m_decoder_options.q_shift = model_config.qbias;
+        m_decoder_options.q_scale = model_config.qscale;
         m_decoder = std::make_unique<GPUDecoder>();
+        m_num_input_features = model_config.num_features;
 
         m_options = torch::TensorOptions().dtype(GPUDecoder::dtype).device(device);
-        auto [crf_module, stride] = load_crf_model(model_path, batch_size, chunk_size, m_options);
-        m_module = crf_module;
-        m_model_stride = stride;
+        m_module = load_crf_model(model_path, model_config, batch_size, chunk_size, m_options);
 
         m_cuda_thread.reset(new std::thread(&CudaCaller::cuda_thread_fn, this));
     }
@@ -110,11 +99,12 @@ public:
 
             std::unique_lock<std::mutex> task_lock(task->mut);
             auto scores = m_module->forward(task->input);
+            torch::cuda::synchronize();
             task->out = m_decoder->gpu_part(scores, task->num_chunks, m_decoder_options);
             stream.synchronize();
             task->done = true;
-            task_lock.unlock();
             task->cv.notify_one();
+            task_lock.unlock();
         }
     }
 
@@ -129,6 +119,7 @@ public:
     std::mutex m_input_lock;
     std::condition_variable m_input_cv;
     std::unique_ptr<std::thread> m_cuda_thread;
+    int m_num_input_features;
 };
 
 std::shared_ptr<CudaCaller> create_cuda_caller(const std::filesystem::path &model_path,
@@ -144,10 +135,11 @@ CudaModelRunner::CudaModelRunner(std::shared_ptr<CudaCaller> caller, int chunk_s
     // adjust chunk size to be a multiple of the stride
     chunk_size -= chunk_size % model_stride();
 
-    m_input = torch::empty({batch_size, 1, chunk_size}, torch::TensorOptions()
-                                                                .dtype(m_caller->m_options.dtype())
-                                                                .device(torch::kCPU)
-                                                                .pinned_memory(true));
+    m_input = torch::empty({batch_size, caller->m_num_input_features, chunk_size},
+                           torch::TensorOptions()
+                                   .dtype(m_caller->m_options.dtype())
+                                   .device(torch::kCPU)
+                                   .pinned_memory(true));
 
     long int block_size = chunk_size / model_stride();
     m_output = torch::empty(
@@ -158,7 +150,7 @@ CudaModelRunner::CudaModelRunner(std::shared_ptr<CudaCaller> caller, int chunk_s
 }
 
 void CudaModelRunner::accept_chunk(int chunk_idx, at::Tensor slice) {
-    m_input.index_put_({chunk_idx, 0}, slice);
+    m_input.index_put_({chunk_idx, torch::indexing::Ellipsis}, slice);
 }
 
 std::vector<DecodedChunk> CudaModelRunner::call_chunks(int num_chunks) {

@@ -478,7 +478,8 @@ std::tuple<std::string, std::string, std::vector<uint8_t>> beam_search_decode(
         float fixed_stay_score,
         float q_shift,
         float q_scale,
-        float temperature) {
+        float temperature,
+        float byte_score_scale) {
     const int num_blocks = int(scores_t.size(0));
     const int num_states = get_num_states(scores_t.size(1));
 
@@ -513,11 +514,9 @@ std::tuple<std::string, std::string, std::vector<uint8_t>> beam_search_decode(
         const auto back_guides = back_guides_contig->data_ptr<float>();
         const auto posts = posts_contig->data_ptr<float>();
 
-        // Scores must be rescaled from [-127, 127] to [-5.0, 5.0].
-        const auto kScoreScale = static_cast<float>(5.0 / 127.0);
         beam_search<int8_t>(scores, scores_block_stride, back_guides, posts, num_states, num_blocks,
                             beam_width, beam_cut, fixed_stay_score, states, moves, qual_data,
-                            temperature, kScoreScale);
+                            temperature, byte_score_scale);
     } else {
         throw std::runtime_error(std::string("beam_search_decode: unsupported tensor type ") +
                                  std::string(scores_t.dtype().name()));

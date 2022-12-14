@@ -145,6 +145,9 @@ MTL::ComputePipelineState *make_cps(
                               },
                               [&](bool val) {
                                   constant_vals->setConstantValue(&val, DataTypeBool, ns_name);
+                              },
+                              [&](float val) {
+                                  constant_vals->setConstantValue(&val, DataTypeFloat, ns_name);
                               }},
                    constant);
     }

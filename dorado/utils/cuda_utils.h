@@ -1,5 +1,7 @@
 #pragma once
 
+#include <torch/torch.h>
+
 #include <string>
 #include <vector>
 
@@ -15,5 +17,7 @@ size_t available_memory(std::string device);
 // will report the amount of available memory (in bytes) for all devices.
 std::vector<size_t> available_memory(std::vector<std::string> devices);
 int auto_gpu_batch_size(std::string model_path, std::vector<std::string> devices);
+
+void cublas_matmul_f16(torch::Tensor const &A, torch::Tensor const &B, torch::Tensor &C);
 
 }  // namespace dorado::utils
