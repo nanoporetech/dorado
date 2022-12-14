@@ -14,7 +14,6 @@ add_executable(dorado_tests ${SOURCE_FILES})
 
 target_link_libraries(dorado_tests
     dorado_lib
-    elzip
     ${ZLIB_LIBRARIES}
 )
 
