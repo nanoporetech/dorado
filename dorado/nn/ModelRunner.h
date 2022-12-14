@@ -22,7 +22,7 @@ public:
 using Runner = std::shared_ptr<ModelRunnerBase>;
 
 template <typename T>
-class ModelRunner : public ModelRunnerBase {
+class ModelRunner final : public ModelRunnerBase {
 public:
     ModelRunner(const std::filesystem::path &model,
                 const std::string &device,

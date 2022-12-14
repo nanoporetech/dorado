@@ -6,7 +6,7 @@
 
 namespace dorado {
 
-class CPUDecoder : Decoder {
+class CPUDecoder final : Decoder {
 public:
     std::vector<DecodedChunk> beam_search(torch::Tensor scores,
                                           int num_chunks,
