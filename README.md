@@ -16,9 +16,9 @@ If you encounter any problems building or running Dorado please [report an issue
 
 ## Installation
 
- - [dorado-0.1.0-linux-x64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.1.0-linux-x64.tar.gz)
- - [dorado-0.1.0-osx-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.1.0-osx-arm64.tar.gz)
- - [dorado-0.1.0-win64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.1.0-win64.zip)
+ - [dorado-0.1.1-linux-x64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.1.1-linux-x64.tar.gz)
+ - [dorado-0.1.1-osx-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.1.1-osx-arm64.tar.gz)
+ - [dorado-0.1.1-win64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.1.1-win64.zip)
 
 ## Running
 
@@ -32,7 +32,7 @@ $ dorado basecaller dna_r10.4.1_e8.2_260bps_hac@v4.0.0 pod5s/ > calls.sam
 To call modifications simply add `--modified-bases`.
 
 ```
-$ dorado basecaller --modified-bases 5mCG_5hmCG dna_r10.4.1_e8.2_260bps_hac@v4.0.0 pod5s/ > calls.sam
+$ dorado basecaller dna_r10.4.1_e8.2_260bps_hac@v4.0.0 pod5s/ --modified-bases 5mCG_5hmCG > calls.sam
 ```
 
 For unaligned BAM output, dorado output can be piped to BAM using samtoools:
