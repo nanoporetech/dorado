@@ -324,14 +324,71 @@ kernel void float_to_half(
     }
 }
 
+
+template <int SIMD_TILES_M, int SIMD_TILES_N, int transpose_A> struct MatMul {
+    static_assert(SIMD_TILES_M <= 6, "SIMD_TILES_M must be <= 6");
+    simdgroup_ftype8x8 A, B[SIMD_TILES_N], accum[SIMD_TILES_M][SIMD_TILES_N];
+
+    void mm_bias(
+            int k_tiles_begin, int k_tiles_end,
+            device ftype const *a_ptr, int a_stride, int a_col, int a_row,
+            device ftype const *b_ptr, int b_stride, int b_col, int b_row,
+            device ftype const *bias)
+    {
+        a_ptr += a_row * a_stride + a_col;
+        b_ptr += b_row * b_stride + b_col;
+        for (int i = 0; i < SIMD_TILES_N; ++i) {
+            for (int j = 0; j < SIMD_TILES_M; ++j) {
+                simdgroup_load(accum[j][i], bias + b_col + i * TILE_SIZE, 0);
+            }
+        }
+        for (int k_tile = k_tiles_begin; k_tile < k_tiles_end; ++k_tile) {
+            for (int i = 0; i < SIMD_TILES_N; ++i) {
+                simdgroup_load(B[i], b_ptr, b_stride,
+                               ulong2(i * TILE_SIZE, k_tile * TILE_SIZE));
+            }
+#define SMAC_ROW(m_tile)\
+    if (m_tile < SIMD_TILES_M) {\
+        simdgroup_load(A, a_ptr, a_stride, transpose_A ? ulong2(m_tile * TILE_SIZE, k_tile * TILE_SIZE) : ulong2(k_tile * TILE_SIZE, m_tile * TILE_SIZE)); \
+        for (int n_tile = 0; n_tile < SIMD_TILES_N; ++n_tile) {\
+            simdgroup_multiply_accumulate(accum[m_tile][n_tile], A, B[n_tile], accum[m_tile][n_tile]);\
+        }\
+    }
+            SMAC_ROW(0);
+            SMAC_ROW(1);
+            SMAC_ROW(2);
+            SMAC_ROW(3);
+            SMAC_ROW(4);
+            SMAC_ROW(5);
+#undef SMAC_ROW
+        }
+    }
+};
+
+
+// Apply conv_activation to a simdgroup matrix tile (using threadgroup memory) then store the tile in device memory.
+void conv_activation_and_store(simdgroup_ftype8x8 A, threadgroup ftype *simd_local_buf, int tid,
+    device ftype* const out_buf, int out_stride, int tile_col, int tile_row)
+{
+    simdgroup_store(A, simd_local_buf, TILE_SIZE);
+    for (int elem = tid & 31; elem < TILE_SIZE * TILE_SIZE; elem += 32) {
+        ftype val = simd_local_buf[elem];
+        simd_local_buf[elem] = conv_activation(val);
+    }
+    simdgroup_load(A, simd_local_buf, TILE_SIZE);
+    simdgroup_store(A, out_buf, out_stride, ulong2(tile_col * TILE_SIZE, tile_row * TILE_SIZE));
+
+}
+
+
 // Specialised conv1 implementation for v3-type models, where output feature size is 4.
 // Given a contiguous input tensor of shape [batch_size, chunk_size, 1] this will fill
 // a contiguous output tensor of shape [batch_size, chunk_size + 8, 4], where the actual output
 // is located at output.slice(1, 2, chunk_size + 2) and values before and after that slice are
 // set to zero (this padding is used by the second layer in order to avoid special handling
 // of the edges).
-#define CONV1_SIMD_GROUPS 16
-[[max_total_threads_per_threadgroup(CONV1_SIMD_GROUPS * 32)]]
+#define SIMD_GROUPS 16
+[[max_total_threads_per_threadgroup(SIMD_GROUPS * 32)]]
 kernel void conv1_out4_simd(
     device const ConvArgs* const args,
     device const ftype* const in_buf,
@@ -344,7 +401,7 @@ kernel void conv1_out4_simd(
     const int chunk_size = args->chunk_size_in; // must be multiple of 8
     const int chunk_tiles = args->num_chunks / TILE_SIZE; // num_chunks must be multiple of TILE_SIZE
     const int out_stride = (chunk_size + 8) * out_size;
-    threadgroup ftype simd_out_buf[CONV1_SIMD_GROUPS][4][TILE_SIZE * TILE_SIZE];
+    threadgroup ftype simd_out_buf[SIMD_GROUPS][TILE_SIZE * TILE_SIZE];
     simdgroup_ftype8x8 W[6], B, I[2], A[4];
 
     for (int i = 0; i < 6; ++i) {
@@ -374,13 +431,7 @@ kernel void conv1_out4_simd(
                 A[3] = simdgroup_ftype8x8(0);
             }
             for (int i = 0; i < 4; ++i) {
-                simdgroup_store(A[i], simd_out_buf[sid][i], TILE_SIZE);
-                for (int elem = tid & 31; elem < TILE_SIZE * TILE_SIZE; elem += 32) {
-                    ftype val = simd_out_buf[sid][i][elem];
-                    simd_out_buf[sid][i][elem] = conv_activation(val);
-                }
-                simdgroup_load(A[i], simd_out_buf[sid][i], TILE_SIZE);
-                simdgroup_store(A[i], out_buf, out_stride, ulong2((is_last * (num_iters + 1) * 4 + i) * TILE_SIZE, tile_row * TILE_SIZE));
+                conv_activation_and_store(A[i], simd_out_buf[sid], tid, out_buf, out_stride, is_last * (num_iters + 1) * 4 + i, tile_row);
             }
         }
     }
@@ -396,24 +447,17 @@ kernel void conv1_out4_simd(
             simdgroup_multiply_accumulate(A[0], I[1], W[0], A[0]);
             simdgroup_multiply_accumulate(A[1], I[1], W[1], A[1]);
             for (int i = 0; i < 4; ++i) {
-                simdgroup_store(A[i], simd_out_buf[sid][i], TILE_SIZE);
-                for (int elem = tid & 31; elem < TILE_SIZE * TILE_SIZE; elem += 32) {
-                    ftype val = simd_out_buf[sid][i][elem];
-                    simd_out_buf[sid][i][elem] = conv_activation(val);
-                }
-                simdgroup_load(A[i], simd_out_buf[sid][i], TILE_SIZE);
-                simdgroup_store(A[i], out_buf, out_stride, ulong2(((iter + 1) * 4 + i) * TILE_SIZE, tile_row * TILE_SIZE));
+                conv_activation_and_store(A[i], simd_out_buf[sid], tid, out_buf, out_stride, (iter + 1) * 4 + i, tile_row);
             }
         }
     }
 }
 
-#undef CONV1_SIMD_GROUPS
+#undef SIMD_GROUPS
 
 // Conv1 implementation for v4-type models, where output feature size is 16.
-// Currently this is just a copy of the generic implementation.
-#define CONV1_SIMD_GROUPS 16
-[[max_total_threads_per_threadgroup(CONV1_SIMD_GROUPS * 32)]]
+#define SIMD_GROUPS 16
+[[max_total_threads_per_threadgroup(SIMD_GROUPS * 32)]]
 kernel void conv1_out16_simd(
     device const ConvArgs* const args,
     device const ftype* const in_buf,
@@ -426,7 +470,7 @@ kernel void conv1_out16_simd(
     const int chunk_size = args->chunk_size_in; // must be multiple of 8
     const int chunk_tiles = args->num_chunks / TILE_SIZE; // num_chunks must be multiple of TILE_SIZE
     const int out_stride = chunk_size * out_size;
-    threadgroup ftype simd_out_buf[CONV1_SIMD_GROUPS][8][TILE_SIZE * TILE_SIZE];
+    threadgroup ftype simd_out_buf[SIMD_GROUPS][TILE_SIZE * TILE_SIZE];
     simdgroup_ftype8x8 W[2][12], B[2], I[2], A[8];
 
     for (int tile_col = 0; tile_col < 2; ++tile_col) {
@@ -451,14 +495,8 @@ kernel void conv1_out16_simd(
             simdgroup_multiply_accumulate(A[6], I[1], W[sid][3], B[sid]);
             simdgroup_multiply_accumulate(A[7], I[1], W[sid][2], B[sid]);
             for (int i = 0; i < 8; ++i) {
-                simdgroup_store(A[i], simd_out_buf[sid][i], TILE_SIZE);
-                for (int elem = tid & 31; elem < TILE_SIZE * TILE_SIZE; elem += 32) {
-                    ftype val = simd_out_buf[sid][i][elem];
-                    simd_out_buf[sid][i][elem] = conv_activation(val);
-                }
-                simdgroup_load(A[i], simd_out_buf[sid][i], TILE_SIZE);
-                simdgroup_store(A[i], out_buf, out_stride,
-                    ulong2((int(i > 5) * (chunk_size - 8) + i) * out_size + sid * TILE_SIZE, tile_row * TILE_SIZE));
+                int tile_col = (int(i > 5) * (chunk_size - 8) + i) * (out_size / TILE_SIZE) + sid;
+                conv_activation_and_store(A[i], simd_out_buf[sid], tid, out_buf, out_stride, tile_col, tile_row);
             }
         }
     }
@@ -468,37 +506,31 @@ kernel void conv1_out16_simd(
             simdgroup_load(I[0], in_buf, chunk_size, ulong2(iter * TILE_SIZE, tile_row * TILE_SIZE));
             simdgroup_load(I[1], in_buf, chunk_size, ulong2((iter + 1) * TILE_SIZE, tile_row * TILE_SIZE));
             for (int i = 0; i < 2; ++i) {
-                simdgroup_multiply_accumulate(A[0], I[0], W[i][3], B[i]);
-                simdgroup_multiply_accumulate(A[1], I[0], W[i][2], B[i]);
-                simdgroup_multiply_accumulate(A[2], I[0], W[i][1], B[i]);
-                simdgroup_multiply_accumulate(A[3], I[0], W[i][0], B[i]);
+                simdgroup_multiply_accumulate(A[0], I[1], W[i][11], B[i]);
+                simdgroup_multiply_accumulate(A[1], I[1], W[i][10], B[i]);
+                simdgroup_multiply_accumulate(A[2], I[1], W[i][9], B[i]);
+                simdgroup_multiply_accumulate(A[3], I[1], W[i][8], B[i]);
                 simdgroup_multiply_accumulate(A[4], I[1], W[i][7], B[i]);
                 simdgroup_multiply_accumulate(A[5], I[1], W[i][6], B[i]);
                 simdgroup_multiply_accumulate(A[6], I[1], W[i][5], B[i]);
                 simdgroup_multiply_accumulate(A[7], I[1], W[i][4], B[i]);
-                simdgroup_multiply_accumulate(A[0], I[1], W[i][11], A[0]);
-                simdgroup_multiply_accumulate(A[1], I[1], W[i][10], A[1]);
-                simdgroup_multiply_accumulate(A[2], I[1], W[i][9], A[2]);
-                simdgroup_multiply_accumulate(A[3], I[1], W[i][8], A[3]);
+                simdgroup_multiply_accumulate(A[0], I[0], W[i][3], A[0]);
+                simdgroup_multiply_accumulate(A[1], I[0], W[i][2], A[1]);
+                simdgroup_multiply_accumulate(A[2], I[0], W[i][1], A[2]);
+                simdgroup_multiply_accumulate(A[3], I[0], W[i][0], A[3]);
                 for (int j = 0; j < 8; ++j) {
-                    simdgroup_store(A[j], simd_out_buf[sid][j], TILE_SIZE);
-                    for (int elem = tid & 31; elem < TILE_SIZE * TILE_SIZE; elem += 32) {
-                        ftype val = simd_out_buf[sid][j][elem];
-                        simd_out_buf[sid][j][elem] = conv_activation(val);
-                    }
-                    simdgroup_load(A[j], simd_out_buf[sid][j], TILE_SIZE);
-                    simdgroup_store(A[j], out_buf, out_stride,
-                        ulong2((iter * 8 + 6 + j) * out_size + i * TILE_SIZE, tile_row * TILE_SIZE));
+                    int tile_col = (iter * 8 + 6 + j) * (out_size / TILE_SIZE) + i;
+                    conv_activation_and_store(A[j], simd_out_buf[sid], tid, out_buf, out_stride, tile_col, tile_row);
                 }
             }
         }
     }
 }
-#undef CONV1_SIMD_GROUPS
+#undef SIMD_GROUPS
 
 // Specialised conv2 implementation for v3-type models, where input feature size is 4.
-#define CONV2_SIMD_GROUPS 16
-[[max_total_threads_per_threadgroup(CONV2_SIMD_GROUPS * 32)]]
+#define SIMD_GROUPS 16
+[[max_total_threads_per_threadgroup(SIMD_GROUPS * 32)]]
 kernel void conv2_in4_simd
 (
     device const ConvArgs* const args,
@@ -513,7 +545,7 @@ kernel void conv2_in4_simd
     const int chunk_tiles = args->num_chunks / TILE_SIZE; // num_chunks must be multiple of TILE_SIZE
     const int in_stride = (chunk_size + 8) * in_size;
     const int out_stride = chunk_size * out_size;
-    threadgroup ftype simd_out_buf[CONV2_SIMD_GROUPS][4][TILE_SIZE * TILE_SIZE];
+    threadgroup ftype simd_out_buf[SIMD_GROUPS][TILE_SIZE * TILE_SIZE];
     simdgroup_ftype8x8 W[3][4], B[2], I[3], A[4];
     device const ftype* b = weights_buf + 28 * 16;
 
@@ -537,22 +569,18 @@ kernel void conv2_in4_simd
                 simdgroup_multiply_accumulate(A[i], I[2], W[2][i], A[i]);
             }
             for (int i = 0; i < 4; ++i) {
-                simdgroup_store(A[i], simd_out_buf[sid][i], TILE_SIZE);
-                for (int elem = tid & 31; elem < TILE_SIZE * TILE_SIZE; elem += 32) {
-                    ftype val = simd_out_buf[sid][i][elem];
-                    simd_out_buf[sid][i][elem] = conv_activation(val);
-                }
-                simdgroup_load(A[i], simd_out_buf[sid][i], TILE_SIZE);
-                simdgroup_store(A[i], out_buf, out_stride, ulong2((iter * 4 + i) * TILE_SIZE, tile_row * TILE_SIZE));
+                conv_activation_and_store(A[i], simd_out_buf[sid], tid, out_buf, out_stride, iter * 4 + i, tile_row);
             }
         }
     }
 }
-#undef CONV2_SIMD_GROUPS
+#undef SIMD_GROUPS
 
-// Specialised conv2 implementation for v3-type models, where input feature size is 16.
-#define CONV2_SIMD_GROUPS 16
-[[max_total_threads_per_threadgroup(CONV2_SIMD_GROUPS * 32)]]
+#define SIMD_TILES_M 6
+#define SIMD_TILES_N 2
+#define SIMD_GROUPS 4
+
+[[max_total_threads_per_threadgroup(SIMD_GROUPS * 32)]]
 kernel void conv2_in16_simd
 (
     device const ConvArgs* const args,
@@ -561,54 +589,73 @@ kernel void conv2_in16_simd
     device ftype* const out_buf,
     KERNEL_INDEX_INPUTS
 ) {
-    const int in_size = 16;
-    const int out_size = 16;
-    const int win_size = 5;
-    const int chunk_size = args->chunk_size_in; // must be multiple of 2
-    const int chunk_tiles = args->num_chunks / TILE_SIZE; // num_chunks must be multiple of TILE_SIZE
-    const int in_stride = chunk_size * in_size;
-    const int out_stride = chunk_size * out_size;
-    threadgroup ftype simd_out_buf[CONV2_SIMD_GROUPS][2][TILE_SIZE * TILE_SIZE];
-    simdgroup_ftype8x8 W[10][2], B[2], I, A[2];
-    device const ftype* b = weights_buf + win_size * in_size * out_size;
+    const int in_size = args->in_size;
+    const int win_size = args->win_size;
+    const int dp_size = in_size * win_size;
+    const int out_size = 16; // required! //args->out_size;
+    const int stride = args->stride;
+    const int pad = args->pad;
+    const int w_pad_rows = 0;
+    const int chunk_size_in = args->chunk_size_in;
+    const int chunk_size_out = chunk_size_in / stride;
+    const int num_chunks = args->num_chunks;
+    const int m_blks = num_chunks / (TILE_SIZE * SIMD_TILES_M);
+    const int k_tiles = (dp_size + TILE_SIZE - 1) / TILE_SIZE;
+    threadgroup ftype simd_out_buf[SIMD_GROUPS][SIMD_TILES_N * SIMD_TILES_M][TILE_SIZE * TILE_SIZE];
+    device const ftype* bias = weights_buf + (dp_size + 2 * w_pad_rows) * out_size;
+    const int in_buf_stride = chunk_size_in * in_size;
+    const int out_buf_stride = chunk_size_out * out_size;
+    MatMul<SIMD_TILES_M, SIMD_TILES_N, 0> mm;
 
-    simdgroup_load(B[0], b, 0);
-    simdgroup_load(B[1], b + TILE_SIZE, 0);
-    for (int i = 0; i < 10; ++i) {
-        simdgroup_load(W[i][0], weights_buf, out_size, ulong2(0 * TILE_SIZE, i * TILE_SIZE));
-        simdgroup_load(W[i][1], weights_buf, out_size, ulong2(1 * TILE_SIZE, i * TILE_SIZE));
-    }
-
-    for (int tile_row = gid; tile_row < chunk_tiles; tile_row += threadgroups) {
-        for (int ts = sid; ts < chunk_size; ts += simdgroups) {
-            int start_pad_tiles = max(0, 2 - ts) * 2;
-            int end_pad_tiles = max(0, ts - chunk_size + 3) * 2;
-            A[0] = B[0];
-            A[1] = B[1];
-            for (int i = start_pad_tiles; i < 10 - end_pad_tiles; ++i) {
-                simdgroup_load(I, in_buf, in_stride, ulong2((ts - 2) * out_size + i * TILE_SIZE, tile_row * TILE_SIZE));
-                simdgroup_multiply_accumulate(A[0], I, W[i][0], A[0]);
-                simdgroup_multiply_accumulate(A[1], I, W[i][1], A[1]);
-            }
-            for (int i = 0; i < 2; ++i) {
-                simdgroup_store(A[i], simd_out_buf[sid][i], TILE_SIZE);
-                for (int elem = tid & 31; elem < TILE_SIZE * TILE_SIZE; elem += 32) {
-                    ftype val = simd_out_buf[sid][i][elem];
-                    simd_out_buf[sid][i][elem] = conv_activation(val);
+    for (int m_blk = gid; m_blk < m_blks; m_blk += threadgroups) {
+        for (int ts = sid; ts < chunk_size_in / stride; ts += simdgroups) {
+            int start_pos = (ts * stride - pad) * in_size;
+            int end_pos = start_pos + dp_size;
+            int clamped_start_pos = max(0, start_pos);
+            int clamped_end_pos = min(chunk_size_in * in_size, end_pos);
+            int start_pad = clamped_start_pos - start_pos;
+            int end_pad = end_pos - clamped_end_pos;
+            int start_pad_tiles = start_pad / TILE_SIZE;
+            start_pad -= start_pad_tiles * TILE_SIZE;
+            int w_row_offset = w_pad_rows - start_pad;
+            int end_pad_tiles = end_pad / TILE_SIZE;
+            int pad_tiles = start_pad_tiles + end_pad_tiles;
+            mm.mm_bias(0, k_tiles - pad_tiles,
+                in_buf, in_buf_stride, clamped_start_pos, m_blk * SIMD_TILES_M * TILE_SIZE,
+                weights_buf, out_size, 0, w_row_offset, bias);
+            for (int i = 0; i < SIMD_TILES_M; ++i) {
+                for (int j = 0; j < SIMD_TILES_N; ++j) {
+                    simdgroup_store(mm.accum[i][j], simd_out_buf[sid][i * SIMD_TILES_N + j], TILE_SIZE);
                 }
-                simdgroup_load(A[i], simd_out_buf[sid][i], TILE_SIZE);
-                simdgroup_store(A[i], out_buf, out_stride, ulong2(ts * out_size + i * TILE_SIZE, tile_row * TILE_SIZE));
+            }
+            simdgroup_barrier(mem_flags::mem_threadgroup);
+            for (uint elem = tid & 31; elem < SIMD_TILES_N * SIMD_TILES_M * TILE_SIZE * TILE_SIZE; elem += 32) {
+                // swish activation
+                ftype val = simd_out_buf[sid][0][elem];
+                simd_out_buf[sid][0][elem] = conv_activation(val);
+            }
+            simdgroup_barrier(mem_flags::mem_threadgroup);
+            for (int i = 0; i < SIMD_TILES_M; ++i) {
+                int out_row = (m_blk * SIMD_TILES_M + i) * TILE_SIZE;
+                for (int j = 0; j < SIMD_TILES_N; ++j) {
+                    int tile_idx = i * SIMD_TILES_N + j;
+                    int out_col = ts * out_size + j * TILE_SIZE;
+                    simdgroup_load(mm.A, simd_out_buf[sid][tile_idx], TILE_SIZE);
+                    simdgroup_store(mm.A, out_buf, out_buf_stride, ulong2(out_col, out_row));
+                }
             }
         }
     }
 }
-#undef CONV2_SIMD_GROUPS
+#undef SIMD_GROUPS
+#undef SIMD_TILES_M
+#undef SIMD_TILES_N
 
 #define SIMD_TILES_M 6
 #define SIMD_TILES_N 4
-#define CONV3_SIMD_GROUPS 4
+#define SIMD_GROUPS 4
 
-[[max_total_threads_per_threadgroup(CONV3_SIMD_GROUPS * 32)]]
+[[max_total_threads_per_threadgroup(SIMD_GROUPS * 32)]]
 kernel void conv3_simd
 (
     device const ConvArgs* const args,
@@ -630,10 +677,10 @@ kernel void conv3_simd
     const int m_blks = num_chunks / (TILE_SIZE * SIMD_TILES_M);
     const int n_blks = out_size / (TILE_SIZE * SIMD_TILES_N);
     const int k_blks = dp_size / TILE_SIZE;
-    threadgroup ftype simd_out_buf[CONV3_SIMD_GROUPS][SIMD_TILES_N * SIMD_TILES_M][TILE_SIZE * TILE_SIZE];
-    simdgroup_ftype8x8 A[SIMD_TILES_M], B[SIMD_TILES_N], C[SIMD_TILES_M * SIMD_TILES_N];
-    device const ftype* b = weights_buf + dp_size * out_size;
+    threadgroup ftype simd_out_buf[SIMD_GROUPS][SIMD_TILES_N * SIMD_TILES_M][TILE_SIZE * TILE_SIZE];
+    device const ftype* bias = weights_buf + dp_size * out_size;
     const int in_buf_stride = chunk_size_in * in_size;
+    MatMul<SIMD_TILES_M, SIMD_TILES_N, 0> mm;
 
     for (int m_blk = gid; m_blk < m_blks; m_blk += threadgroups) {
         for (int chunk = tid; chunk < SIMD_TILES_M * TILE_SIZE; chunk += threads) {
@@ -652,38 +699,12 @@ kernel void conv3_simd
             int end_pad_tiles = max(0, start_pos + win_size - chunk_size_in) * in_size_tiles;
             device ftype* out = out_buf + (ts + 1) * num_chunks * out_size; // One timestep of padding as required by LSTM
             for (int n_blk = sid; n_blk < n_blks; n_blk += simdgroups) {
-                for (int i = 0; i < SIMD_TILES_N; ++i) {
-                    for (int j = 0; j < SIMD_TILES_M; ++j) {
-                        // load bias into all accumulator tiles
-                        simdgroup_load(C[j * SIMD_TILES_N + i], b + (n_blk * SIMD_TILES_N + i) * TILE_SIZE, 0);
-                    }
-                }
-                for (int k_blk = start_pad_tiles; k_blk < k_blks - end_pad_tiles; ++k_blk) {
-                    for (int i = 0; i < SIMD_TILES_N; ++i) {
-                        simdgroup_load(B[i], weights_buf, out_size, ulong2((n_blk * SIMD_TILES_N + i) * TILE_SIZE, k_blk * TILE_SIZE));
-                    }
-#define LOAD_A(x) simdgroup_load(A[x], in_buf, in_buf_stride, ulong2((start_pos * in_size_tiles + k_blk) * TILE_SIZE, (m_blk * SIMD_TILES_M + x) * TILE_SIZE))
-#define SMAC(x,y) simdgroup_multiply_accumulate(C[x * SIMD_TILES_N + y], A[x], B[y], C[x * SIMD_TILES_N + y])
-                    LOAD_A(0);
-                    LOAD_A(1);
-                    SMAC(0,0); SMAC(0,1); SMAC(0,2); SMAC(0,3);
-                    LOAD_A(2);
-                    SMAC(1,0); SMAC(1,1); SMAC(1,2); SMAC(1,3);
-                    LOAD_A(3);
-                    SMAC(2,0); SMAC(2,1); SMAC(2,2); SMAC(2,3);
-                    LOAD_A(4);
-                    SMAC(3,0); SMAC(3,1); SMAC(3,2); SMAC(3,3);
-                    LOAD_A(5);
-                    SMAC(4,0); SMAC(4,1); SMAC(4,2); SMAC(4,3);
-                    SMAC(5,0); SMAC(5,1); SMAC(5,2); SMAC(5,3);
-#undef LOAD_A
-#undef SMAC
-                }
-
+                mm.mm_bias(start_pad_tiles, k_blks - end_pad_tiles,
+                    in_buf, in_buf_stride, start_pos * in_size_tiles * TILE_SIZE, m_blk * SIMD_TILES_M * TILE_SIZE,
+                    weights_buf, out_size, n_blk * SIMD_TILES_N * TILE_SIZE, 0, bias);
                 for (int i = 0; i < SIMD_TILES_M; ++i) {
                     for (int j = 0; j < SIMD_TILES_N; ++j) {
-                        int tile_idx = i * SIMD_TILES_N + j;
-                        simdgroup_store(C[tile_idx], simd_out_buf[sid][tile_idx], TILE_SIZE);
+                        simdgroup_store(mm.accum[i][j], simd_out_buf[sid][i * SIMD_TILES_N + j], TILE_SIZE);
                     }
                 }
                 simdgroup_barrier(mem_flags::mem_threadgroup);
@@ -698,16 +719,27 @@ kernel void conv3_simd
                     for (int j = 0; j < SIMD_TILES_N; ++j) {
                         int tile_idx = i * SIMD_TILES_N + j;
                         uint out_row = (n_blk * SIMD_TILES_N + j) * TILE_SIZE;
-                        simdgroup_load(A[0], simd_out_buf[sid][tile_idx], TILE_SIZE);
-                        simdgroup_store(A[0], out, num_chunks, ulong2(out_col, out_row));
+                        simdgroup_load(mm.A, simd_out_buf[sid][tile_idx], TILE_SIZE);
+                        simdgroup_store(mm.A, out, num_chunks, ulong2(out_col, out_row));
                     }
                 }
             }
         }
     }
 }
-#undef CONV3_SIMD_GROUPS
+#undef SIMD_GROUPS
 
+
+
+// auto W = torch::empty({layer_size, 4, layer_size}, torch::kF32);  // {in_size, gate, out_size}, gate order: GIFO
+// auto U = torch::empty({layer_size, 4, layer_size}, torch::kF32);  // as above
+// auto b = torch::empty({4, layer_size}, torch::kF32);              // {gate, out_size}
+// [ ... fill W, U, and b ... ]
+// auto weights_buf = torch::empty{2 * layer_size + 1, layer_size, 4}, torch::kF16);
+// weights_buf.slice(0, 0, layer_size) = U.transpose(1, 2);
+// weights_buf.slice(0, layer_size, 2 * layer_size) = W.transpose(1, 2);
+// weights_buf[2 * layer_size] = b.transpose(0, 1);
+//
 kernel void reorder_lstm_weights(
     device const ftype_in* const W,
     device const ftype_in* const U,
@@ -823,11 +855,11 @@ kernel void lstm(
     const int batch_tiles = args->batch_tiles;
     const int m_blks = batch_tiles / SIMD_TILES_M;
     const int n_blks = kLstmLayerSize * 4 / (TILE_SIZE * SIMD_TILES_N);
-    const int k_blks = kLstmLayerSize * 2 / TILE_SIZE;
+    const int k_tiles = kLstmLayerSize * 2 / TILE_SIZE;
     const int inout_stride = batch_tiles * TILE_SIZE;
-    const int W_stride = kLstmLayerSize * 4;
-    simdgroup_ftype8x8 A[SIMD_TILES_M], B[SIMD_TILES_N], C[SIMD_TILES_M * SIMD_TILES_N];
-    device const ftype* const b = weights_buf + 2 * kLstmLayerSize * W_stride;
+    const int w_stride = kLstmLayerSize * 4;
+    MatMul<SIMD_TILES_M, SIMD_TILES_N, 1> mm;
+    device const ftype* const bias = weights_buf + 2 * kLstmLayerSize * w_stride;
 
     const uint t_idx = tid & 31;
     const uint col_bits = t_idx & 3;
@@ -837,8 +869,7 @@ kernel void lstm(
     for (int m_blk = gid; m_blk < m_blks; m_blk += threadgroups) {
         for (int chunk = tid; chunk < SIMD_TILES_M * TILE_SIZE; chunk += threads) {
             for (int i = 0; i < kLstmLayerSize; ++i) {
-                state_buf[i * batch_tiles * TILE_SIZE + m_blk * SIMD_TILES_M * TILE_SIZE + chunk] =
-                        0;
+                state_buf[i * batch_tiles * TILE_SIZE + m_blk * SIMD_TILES_M * TILE_SIZE + chunk] = 0;
             }
         }
     }
@@ -851,63 +882,15 @@ kernel void lstm(
         device ftype* const out = in_out + timestep_out * inout_stride * kLstmLayerSize;
         for (int m_blk = gid; m_blk < m_blks; m_blk += threadgroups) {
             for (int n_blk = sid; n_blk < n_blks; n_blk += simdgroups) {
-                for (int i = 0; i < SIMD_TILES_N; ++i) {
-                    for (int j = 0; j < SIMD_TILES_M; ++j) {
-                        simdgroup_load(C[j * SIMD_TILES_N + i],
-                                       b + (n_blk * SIMD_TILES_N + i) * TILE_SIZE, 0);
-                    }
-                }
-                for (int k_blk = 0; k_blk < k_blks; ++k_blk) {
-                    for (int i = 0; i < SIMD_TILES_N; ++i) {
-                        simdgroup_load(
-                                B[i], weights_buf, W_stride,
-                                ulong2((n_blk * SIMD_TILES_N + i) * TILE_SIZE, k_blk * TILE_SIZE));
-                    }
-#define LOAD_A(x)                          \
-    simdgroup_load(A[x], in, inout_stride, \
-                   ulong2((m_blk * SIMD_TILES_M + x) * TILE_SIZE, k_blk * TILE_SIZE))
-#define SMAC(x, y) \
-    simdgroup_multiply_accumulate(C[x * SIMD_TILES_N + y], A[x], B[y], C[x * SIMD_TILES_N + y]);
-                    LOAD_A(0);
-                    LOAD_A(1);
-                    SMAC(0, 0);
-                    SMAC(0, 1);
-                    SMAC(0, 2);
-                    SMAC(0, 3);
-                    LOAD_A(2);
-                    SMAC(1, 0);
-                    SMAC(1, 1);
-                    SMAC(1, 2);
-                    SMAC(1, 3);
-                    LOAD_A(3);
-                    SMAC(2, 0);
-                    SMAC(2, 1);
-                    SMAC(2, 2);
-                    SMAC(2, 3);
-                    LOAD_A(4);
-                    SMAC(3, 0);
-                    SMAC(3, 1);
-                    SMAC(3, 2);
-                    SMAC(3, 3);
-                    LOAD_A(5);
-                    SMAC(4, 0);
-                    SMAC(4, 1);
-                    SMAC(4, 2);
-                    SMAC(4, 3);
-                    SMAC(5, 0);
-                    SMAC(5, 1);
-                    SMAC(5, 2);
-                    SMAC(5, 3);
-#undef LOAD_A
-#undef SMAC
-                }
+                mm.mm_bias(0, k_tiles, in, inout_stride, m_blk * SIMD_TILES_M * TILE_SIZE, 0,
+                           weights_buf, w_stride, n_blk * SIMD_TILES_N * TILE_SIZE, 0, bias);
                 for (int i = 0; i < SIMD_TILES_M; ++i) {
                     const uint out_chunk_base = (m_blk * SIMD_TILES_M + i) * TILE_SIZE;
                     const uint chunk_idx = out_chunk_base + row;
                     for (int j = 0; j < SIMD_TILES_N; j += 2) {
-                        simdgroup_store(C[i * SIMD_TILES_N + j + 0], simd_res_buf[sid],
+                        simdgroup_store(mm.accum[i][j + 0], simd_res_buf[sid],
                                         2 * TILE_SIZE);
-                        simdgroup_store(C[i * SIMD_TILES_N + j + 1], simd_res_buf[sid] + TILE_SIZE,
+                        simdgroup_store(mm.accum[i][j + 1], simd_res_buf[sid] + TILE_SIZE,
                                         2 * TILE_SIZE);
                         threadgroup_barrier(mem_flags::mem_threadgroup);
                         const uint col = j * 2 + col_bits;
@@ -923,8 +906,8 @@ kernel void lstm(
                         simd_out_buf[sid][row * TILE_SIZE + col] = h;
                     }
                     threadgroup_barrier(mem_flags::mem_threadgroup);
-                    simdgroup_load(A[0], simd_out_buf[sid], TILE_SIZE);
-                    simdgroup_store(A[0],
+                    simdgroup_load(mm.A, simd_out_buf[sid], TILE_SIZE);
+                    simdgroup_store(mm.A,
                                     (n_blk < n_blks - int(simdgroups)) ? temp_result_buf : out,
                                     inout_stride, ulong2(out_chunk_base, n_blk * TILE_SIZE));
                 }
@@ -935,9 +918,9 @@ kernel void lstm(
             for (int n_blk = sid; n_blk < n_blks - int(simdgroups); n_blk += simdgroups) {
                 for (int i = 0; i < SIMD_TILES_M; ++i) {
                     uint out_chunk_base = (m_blk * SIMD_TILES_M + i) * TILE_SIZE;
-                    simdgroup_load(A[0], temp_result_buf, inout_stride,
+                    simdgroup_load(mm.A, temp_result_buf, inout_stride,
                                    ulong2(out_chunk_base, n_blk * TILE_SIZE));
-                    simdgroup_store(A[0], out, inout_stride,
+                    simdgroup_store(mm.A, out, inout_stride,
                                     ulong2(out_chunk_base, n_blk * TILE_SIZE));
                 }
             }
@@ -968,13 +951,12 @@ kernel void linear(
     const int out_batch_tiles = args->out_batch_tiles;
     const int m_blks = out_batch_tiles / SIMD_TILES_M;
     const int n_blks = kLinearInnerDim / (TILE_SIZE * SIMD_TILES_N);
-    const int k_blks = kLinearContractDim / TILE_SIZE;
+    const int k_tiles = kLinearContractDim / TILE_SIZE;
     const int in_stride = in_batch_tiles * TILE_SIZE;
-    const int W_stride = kLinearInnerDim;
+    const int w_stride = kLinearInnerDim;
     const int out_stride = kLinearInnerDim;
-    simdgroup_ftype8x8 A[SIMD_TILES_M], B[SIMD_TILES_N], C[SIMD_TILES_M * SIMD_TILES_N];
-
-    device const ftype* const b = weights_buf + kLinearContractDim * W_stride;
+    device const ftype* const bias = weights_buf + kLinearContractDim * w_stride;
+    MatMul<SIMD_TILES_M, SIMD_TILES_N, 1> mm;
 
     for (int ts = gid; ts < chunk_size; ts += threadgroups) {
         auto in = in_buf + in_batch_tile_offset * TILE_SIZE +
@@ -985,60 +967,12 @@ kernel void linear(
 
         for (int m_blk = 0; m_blk < m_blks; ++m_blk) {
             for (int n_blk = sid; n_blk < n_blks; n_blk += simdgroups) {
-                for (int i = 0; i < SIMD_TILES_N; ++i) {
-                    for (int j = 0; j < SIMD_TILES_M; ++j) {
-                        simdgroup_load(C[j * SIMD_TILES_N + i],
-                                       b + (n_blk * SIMD_TILES_N + i) * TILE_SIZE, 0);
-                    }
-                }
-                for (int k_blk = 0; k_blk < k_blks; ++k_blk) {
-                    for (int i = 0; i < SIMD_TILES_N; ++i) {
-                        simdgroup_load(
-                                B[i], weights_buf, W_stride,
-                                ulong2((n_blk * SIMD_TILES_N + i) * TILE_SIZE, k_blk * TILE_SIZE));
-                    }
-#define LOAD_A(x)                       \
-    simdgroup_load(A[x], in, in_stride, \
-                   ulong2((m_blk * SIMD_TILES_M + x) * TILE_SIZE, k_blk * TILE_SIZE))
-#define SMAC(x, y) \
-    simdgroup_multiply_accumulate(C[x * SIMD_TILES_N + y], A[x], B[y], C[x * SIMD_TILES_N + y]);
-                    LOAD_A(0);
-                    LOAD_A(1);
-                    SMAC(0, 0);
-                    SMAC(0, 1);
-                    SMAC(0, 2);
-                    SMAC(0, 3);
-                    LOAD_A(2);
-                    SMAC(1, 0);
-                    SMAC(1, 1);
-                    SMAC(1, 2);
-                    SMAC(1, 3);
-                    LOAD_A(3);
-                    SMAC(2, 0);
-                    SMAC(2, 1);
-                    SMAC(2, 2);
-                    SMAC(2, 3);
-                    LOAD_A(4);
-                    SMAC(3, 0);
-                    SMAC(3, 1);
-                    SMAC(3, 2);
-                    SMAC(3, 3);
-                    LOAD_A(5);
-                    SMAC(4, 0);
-                    SMAC(4, 1);
-                    SMAC(4, 2);
-                    SMAC(4, 3);
-                    SMAC(5, 0);
-                    SMAC(5, 1);
-                    SMAC(5, 2);
-                    SMAC(5, 3);
-#undef LOAD_A
-#undef SMAC
-                }
+                mm.mm_bias(0, k_tiles, in, in_stride, m_blk * SIMD_TILES_M * TILE_SIZE, 0,
+                           weights_buf, w_stride, n_blk * SIMD_TILES_N * TILE_SIZE, 0, bias);
                 for (int i = 0; i < SIMD_TILES_M; ++i) {
                     for (int j = 0; j < SIMD_TILES_N; ++j) {
                         // Store this 8x8 tile to threadgroup memory as ftype.
-                        simdgroup_store(C[i * SIMD_TILES_N + j], simd_out_buf[sid], TILE_SIZE);
+                        simdgroup_store(mm.accum[i][j], simd_out_buf[sid], TILE_SIZE);
                         
                         const uint tile_i = (m_blk * SIMD_TILES_M + i) * TILE_SIZE;
                         const uint tile_j = (n_blk * SIMD_TILES_N + j) * TILE_SIZE;
