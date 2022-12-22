@@ -238,10 +238,6 @@ struct MetalBlockImpl : Module {
         // Otherwise the intermediate feature size is 4.
         assert(config.conv == 4 || config.conv == 16);
 
-        /*std::cerr << "layer_size = " << layer_size << "\n";
-        std::cerr << "out_size = " << out_size << "\n";
-        exit(0);*/
-
         const auto linear_constants =
                 config.conv == 16
                         ? std::vector<std::tuple<std::string, MetalConstant>>(
@@ -608,14 +604,12 @@ public:
 
         int T = m_out_chunk_size;
         int C = model_config.outsize;
-        spdlog::info("C {}", C);
         int Cs = m_states;
 
         int y = pow(n_base, model_config.state_len);
 
         for (int i = 0; i < m_out_split; ++i) {
             m_scores_int8.push_back(torch::empty({T, m_out_batch_size, C}, torch::kInt8));
-            //m_scores_int8_no_stays.push_back(torch::empty({T, m_out_batch_size, 4 * (C / 5)}, torch::kInt8));
             m_posts.push_back(torch::empty({m_out_batch_size, T + 1, Cs}));
             m_bwd.push_back(torch::empty({m_out_batch_size, T + 1, Cs}));
         }
