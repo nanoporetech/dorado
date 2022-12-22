@@ -34,6 +34,7 @@ namespace nn {
 
 struct MetalLinearImpl : Module {
     MetalLinearImpl(int insize, int outsize, bool has_bias, MTL::Device *const device) {
+        spdlog::info("MetalLinearImpl outsize {}", outsize);
         auto weight = torch::empty({outsize, insize});
         auto bias = torch::empty({outsize});
         register_parameter("weight", weight, false);
@@ -236,6 +237,11 @@ struct MetalBlockImpl : Module {
         // type model, where the linear layer output is clamped rather than run through tanh.
         // Otherwise the intermediate feature size is 4.
         assert(config.conv == 4 || config.conv == 16);
+
+        /*std::cerr << "layer_size = " << layer_size << "\n";
+        std::cerr << "out_size = " << out_size << "\n";
+        exit(0);*/
+
         const auto linear_constants =
                 config.conv == 16
                         ? std::vector<std::tuple<std::string, MetalConstant>>(
@@ -347,7 +353,6 @@ struct MetalBlockImpl : Module {
                 device, static_cast<size_t>(layer_size + 1) * out_size * sizeof(ftype));
 
         // Load and prepare linear layer weights.
-        // TODO - if explicit stay scores remain, unify this and the other padding code.
         torch::Tensor linear_w, linear_b;
         if (out_features.has_value()) {
             // v4 with 2 matrices that we premultiply at weight loading time.
@@ -363,27 +368,13 @@ struct MetalBlockImpl : Module {
             // Premultiply weights, and bias vector.
             linear_w = torch::matmul(t_w2, t_w1);
             linear_b = torch::matmul(t_w2, t_b1);
-
-            // We use the bias vector to impose stay scores, so we have to substitute
-            // the stay score for the zero entries corresponding to stays in the
-            // transformed bias vector.
-            const auto num_states = linear_b.sizes().at(0);
-            auto linear_b_no_zeros = linear_b.view({num_states / 5, 5})
-                                             .index({Slice(0, num_states / 5), Slice(1, 5)});
-            linear_b = F::pad(linear_b_no_zeros, F::PadFuncOptions({1, 0}).value(stay_score))
-                               .flatten()
-                               .contiguous();
         } else if (conv == 16) {
             // v4 with single matrix and no bias.
             auto params = linear1->named_parameters();
             linear_w = *params.find("weight");
-            // We supply a bias vector of zeros and stay scores.
+            // We supply a bias vector of zeros.
             const auto num_states = linear_w.sizes().at(0);
-            linear_b = F::pad(torch::zeros({num_states / 5, 4}),
-                              F::PadFuncOptions({1, 0}).value(stay_score))
-                               .flatten()
-                               .contiguous();
-
+            linear_b = torch::zeros({num_states});
         } else {
             // v3 single matrix with bias
             auto params = linear1->named_parameters();
@@ -563,37 +554,6 @@ public:
         auto state_dict = load_crf_model_weights(model_path, model_config.out_features.has_value(),
                                                  model_config.bias);
 
-        // Linear layer weights/bias do not have entries for stay scores, but the linear layer
-        // kernel expects them, so pad the weights with zeros and the bias (if present) with
-        // the blank score to accommodate this.
-        const bool decomposition = model_config.out_features.has_value();
-        const bool last_tensor_is_w = (decomposition == model_config.bias);
-        const int lw_idx = state_dict.size() - 2 + static_cast<int>(last_tensor_is_w);
-        auto lw = state_dict.at(lw_idx);
-        const int lw_inner_dim = lw.sizes().at(1);
-        state_dict.at(lw_idx) = F::pad(lw.view({m_states, 4, lw_inner_dim}),
-                                       F::PadFuncOptions({0, 0, 1, 0}).value(0.0f))
-                                        .view({model_config.outsize, lw_inner_dim});
-
-        // We need to pad the bias tensor if:
-        // a) There is a bias tensor.
-        // b) There is no decomposition, since in the case of decomposition the bias
-        //    vector is sized according to the bottleneck dimension, not the state space size.
-        // In this case the bias tensor must be the last entry.
-        if (model_config.bias && !decomposition) {
-            const int lb_idx = state_dict.size() - 1;
-            const auto lb = state_dict.at(lb_idx);
-            const int lb_dim = lb.sizes().at(0);
-            // Note: We are assuming that in the absence of linear layer decomposition
-            // there is a tanh activation.
-            // The padding value below will produce model_config.blank_score once
-            // run through the tanh activation and scaled to the [-5, 5] range.
-            state_dict.at(lb_idx) = F::pad(lb.view({m_states, 4}),
-                                           F::PadFuncOptions({1, 0}).value(atanh(
-                                                   model_config.blank_score / model_config.scale)))
-                                            .view({model_config.outsize});
-        }
-
         // Allocations beyond 4GB can fail, and the linear layer output buffer
         // hits this limit with batch sizes larger than 384 with typical
         // chunk sizes.  At the same time, the LSTM layer performance benefits
@@ -634,7 +594,8 @@ public:
 
         m_command_queue = m_device->newCommandQueue();
         m_mtl_event = m_device->newSharedEvent();
-        m_scan_cps = make_cps(m_device, "scan", {});
+        m_bwd_scan_cps = make_cps(m_device, "backward_scan", {});
+        m_fwd_scan_cps = make_cps(m_device, "forward_scan", {});
         m_add_softmax_cps = make_cps(m_device, "add_softmax", {});
 
         m_metal_thread.reset(new std::thread(&MetalCaller::metal_thread_fn, this));
@@ -647,26 +608,14 @@ public:
 
         int T = m_out_chunk_size;
         int C = model_config.outsize;
+        spdlog::info("C {}", C);
         int Cs = m_states;
 
         int y = pow(n_base, model_config.state_len);
 
-        m_scan_idx[0][0] = torch::arange(C, torch::kInt32).contiguous();
-        auto t1 = torch::arange(y).index({torch::indexing::Slice(), torch::indexing::None});
-        auto t2 = torch::arange(y).repeat_interleave(n_base).reshape({n_base, -1}).t();
-        m_scan_idx[0][1] = torch::cat({t1, t2}, 1).to(torch::kInt32).contiguous();
-
-        auto idx_sizes = m_scan_idx[0][1].sizes();
-        m_scan_idx[1][0] = m_scan_idx[0][1]
-                                   .flatten()
-                                   .argsort()
-                                   .reshape(idx_sizes)
-                                   .to(torch::kInt32)
-                                   .contiguous();
-        m_scan_idx[1][1] = torch::div(m_scan_idx[1][0], num_transitions, "floor");
-
         for (int i = 0; i < m_out_split; ++i) {
             m_scores_int8.push_back(torch::empty({T, m_out_batch_size, C}, torch::kInt8));
+            //m_scores_int8_no_stays.push_back(torch::empty({T, m_out_batch_size, 4 * (C / 5)}, torch::kInt8));
             m_posts.push_back(torch::empty({m_out_batch_size, T + 1, Cs}));
             m_bwd.push_back(torch::empty({m_out_batch_size, T + 1, Cs}));
         }
@@ -750,38 +699,32 @@ public:
                 // since the same buffers are used for successive batches' scores, fwd/bwd scans.
                 MTL::SharedEvent *const linear_hold_off =
                         (task->run_id != 0) ? m_mtl_event : nullptr;
-                MTL::CommandBuffer *const cb = m_model->forward_async(
-                        *task->input, linear_hold_off, task->run_id - 1, m_scores_int8);
+                MTL::CommandBuffer *cb = m_model->forward_async(*task->input, linear_hold_off,
+                                                                task->run_id - 1, m_scores_int8);
 
                 // The same buffer is used for the forward scan results and the output of
                 // m_add_softmax_cps.
                 auto &fwd = m_posts;
                 // This stage is operating on the split outputs of the linear layer, so
                 // the effective batch size is m_out_batch_size.
-                std::vector<int32_t> scan_args_{m_out_chunk_size, m_out_batch_size, m_states,
-                                                1};  // T, N, C, dir
-                auto args_fwd = create_vec_buffer(m_device, scan_args_);
-                scan_args_[3] = -1;
-                auto args_bwd = create_vec_buffer(m_device, scan_args_);
+                std::vector<int32_t> scan_args_{m_out_chunk_size, m_out_batch_size, m_states};
+                auto scan_args = create_vec_buffer(m_device, scan_args_);
 
                 for (int i = 0; i < m_out_split; ++i) {
                     // TODO: optimise grid size
-                    launch_kernel_no_wait(
-                            m_scan_cps, cb,
-                            {args_fwd, mtl_for_tensor(m_scores_int8.at(i)),
-                             mtl_for_tensor(fwd.at(i)), mtl_for_tensor(m_scan_idx[0][0]),
-                             mtl_for_tensor(m_scan_idx[0][1])},
-                            {}, m_out_batch_size, m_states);
-                    launch_kernel_no_wait(
-                            m_scan_cps, cb,
-                            {args_bwd, mtl_for_tensor(m_scores_int8.at(i)),
-                             mtl_for_tensor(m_bwd.at(i)), mtl_for_tensor(m_scan_idx[1][0]),
-                             mtl_for_tensor(m_scan_idx[1][1])},
-                            {}, m_out_batch_size, m_states);
+                    launch_kernel_no_wait(m_fwd_scan_cps, cb,
+                                          {scan_args, mtl_for_tensor(m_scores_int8.at(i)),
+                                           mtl_for_tensor(fwd.at(i))},
+                                          {}, m_out_batch_size, m_states);
+
+                    launch_kernel_no_wait(m_bwd_scan_cps, cb,
+                                          {scan_args, mtl_for_tensor(m_scores_int8.at(i)),
+                                           mtl_for_tensor(m_bwd.at(i))},
+                                          {}, m_out_batch_size, m_states);
 
                     launch_kernel_no_wait(
                             m_add_softmax_cps, cb,
-                            {args_fwd, mtl_for_tensor(fwd.at(i)), mtl_for_tensor(m_bwd.at(i))}, {},
+                            {scan_args, mtl_for_tensor(fwd.at(i)), mtl_for_tensor(m_bwd.at(i))}, {},
                             m_out_batch_size, m_states);
                 }
 
@@ -869,9 +812,8 @@ public:
     nn::MetalModel m_model{nullptr};
     MTL::Device *m_device;
     MTL::CommandQueue *m_command_queue;
-    MTL::ComputePipelineState *m_scan_cps, *m_add_softmax_cps;
+    MTL::ComputePipelineState *m_bwd_scan_cps, *m_fwd_scan_cps, *m_add_softmax_cps;
     MTL::SharedEvent *m_mtl_event;
-    torch::Tensor m_scan_idx[2][2];
     std::vector<torch::Tensor> m_scores_int8, m_posts, m_bwd;
     int m_out_chunk_size, m_batch_size, m_states, m_model_stride;
     // Number of pieces the linear output is split into, for reasons of
