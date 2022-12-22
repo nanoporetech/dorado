@@ -34,7 +34,6 @@ namespace nn {
 
 struct MetalLinearImpl : Module {
     MetalLinearImpl(int insize, int outsize, bool has_bias, MTL::Device *const device) {
-        spdlog::info("MetalLinearImpl outsize {}", outsize);
         auto weight = torch::empty({outsize, insize});
         auto bias = torch::empty({outsize});
         register_parameter("weight", weight, false);
@@ -237,7 +236,6 @@ struct MetalBlockImpl : Module {
         // type model, where the linear layer output is clamped rather than run through tanh.
         // Otherwise the intermediate feature size is 4.
         assert(config.conv == 4 || config.conv == 16);
-
         const auto linear_constants =
                 config.conv == 16
                         ? std::vector<std::tuple<std::string, MetalConstant>>(
