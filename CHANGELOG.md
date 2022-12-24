@@ -2,6 +2,12 @@
 
 All notable changes to Dorado will be documented in this file.
 
+# [0.1.1] (12 Dec 2022)
+
+ * 38b953f3863d44067593adb49d9496dd704fef69 - Improved stereo duplex calling performance
+ * 0de73feeeab9cd21f4b5c72685f7008fe143f846 - Fixed reverse calls in stereo
+ * 1f62d8d71dc3393e78b4bb572576ba057d2f155b - Fixed modification model matching
+
 # [0.1.0] (05 Dec 2022)
 
  * 0ff3e59b3e6bf1231e7e4b5d4521de0f6c371278 - Introducing stereo duplex calling introduced

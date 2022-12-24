@@ -26,6 +26,27 @@ using ftype = uint16_t;
 namespace {
 // SIMD tile size dictated by the metal spec.
 const int kTileSize = 8;
+
+bool finishCommandBuffer(const char *label, MTL::CommandBuffer *cb, int try_count) {
+    cb->commit();
+    cb->waitUntilCompleted();
+
+    auto status = cb->status();
+    bool success = (status == MTL::CommandBufferStatusCompleted);
+    if (success) {
+        spdlog::debug("Metal command buffer {}: {} ms", label,
+                      1000.f * float(cb->GPUEndTime() - cb->GPUStartTime()));
+    } else {
+        spdlog::warn("Metal command buffer {} failed: {}, try #{}", label, status, try_count);
+        if (status == MTL::CommandBufferStatusError) {
+            const auto *const error_ptr = cb->error();
+            if (error_ptr)
+                spdlog::warn("Command buffer error code: {}", error_ptr->code());
+        }
+    }
+    return success;
+}
+
 }  // namespace
 
 namespace dorado {
@@ -83,7 +104,7 @@ struct MetalConv1dImpl : Module {
         register_parameter("weight", weight, false);
         register_parameter("bias", bias, false);
 
-        kernel_simd_groups = layer == 3 ? 4 : 16;
+        kernel_simd_groups = (layer == 3 || (layer == 2 && insize == 16)) ? 4 : 16;
         kernel_thread_groups = get_mtl_device_core_count() * 4;
 
         std::vector<std::tuple<std::string, MetalConstant>> metal_constants = {
@@ -175,7 +196,7 @@ struct MetalBlockImpl : Module {
 
         // args for LSTM kernel
         {
-            std::vector<int32_t> args_lstm_{batch_size / tile_size, lstm_chunk_size};
+            std::vector<int32_t> args_lstm_{batch_size / kTileSize, lstm_chunk_size};
             args_lstm = create_vec_buffer(device, args_lstm_);
         }
 
@@ -189,8 +210,8 @@ struct MetalBlockImpl : Module {
         // Each output buffer requires a distinct input offset, so we must have a separate args buffer.
         args_linear.resize(out_split_);
         for (int i = 0; i < out_split_; ++i) {
-            const int32_t in_batch_tiles = batch_size / tile_size;
-            const int32_t out_batch_tiles = (batch_size / out_split_) / tile_size;
+            const int32_t in_batch_tiles = batch_size / kTileSize;
+            const int32_t out_batch_tiles = (batch_size / out_split_) / kTileSize;
             const int32_t in_batch_tile_offset = out_batch_tiles * i;
             std::vector<int32_t> args_linear_ = {in_batch_tiles, in_batch_tile_offset,
                                                  out_batch_tiles, lstm_chunk_size};
@@ -410,8 +431,14 @@ struct MetalBlockImpl : Module {
         } else {
             conv1->run(command_buffer, mtl_for_tensor(in), mat_working_mem);
         }
+        finishCommandBuffer("conv1", command_buffer, 0);
+        command_buffer = command_queue->commandBuffer();
         conv2->run(command_buffer, mat_working_mem, mat_transfer);
+        finishCommandBuffer("conv2", command_buffer, 0);
+        command_buffer = command_queue->commandBuffer();
         conv3->run(command_buffer, mat_transfer, mat_working_mem);
+        finishCommandBuffer("conv3", command_buffer, 0);
+        command_buffer = command_queue->commandBuffer();
 
         for (auto &rnn : {rnn1, rnn2, rnn3, rnn4, rnn5}) {
             const std::vector<MTL::Buffer *> buffers{args_lstm, mat_working_mem, rnn->mat_weights,
@@ -422,6 +449,8 @@ struct MetalBlockImpl : Module {
             launch_kernel_no_wait(lstm_cps[rnn->reverse], command_buffer, buffers, tg_buffer_lens,
                                   kernel_thread_groups, kernel_simd_groups * 32);
         }
+        finishCommandBuffer("lstm", command_buffer, 0);
+        command_buffer = command_queue->commandBuffer();
 
         // The output buffers of conv/LSTM layers are not used by the decoding, so
         // can be overwritten by subsequent batches as soon as they have been consumed by
@@ -719,22 +748,9 @@ public:
                             {scan_args, mtl_for_tensor(fwd.at(i)), mtl_for_tensor(m_bwd.at(i))}, {},
                             m_out_batch_size, m_states);
                 }
-
-                cb->commit();
-                cb->waitUntilCompleted();
-
-                auto status = cb->status();
-                if (status == MTL::CommandBufferStatusCompleted) {
+                if (finishCommandBuffer("linear/scan/softmax", cb, try_count)) {
                     break;
                 }
-                spdlog::warn("Metal command buffer execution failed: {}, try #{}", status,
-                             try_count);
-                if (status == MTL::CommandBufferStatusError) {
-                    const auto *const error_ptr = cb->error();
-                    if (error_ptr)
-                        spdlog::warn("Command buffer error code: {}", error_ptr->code());
-                }
-                using namespace std::chrono_literals;
                 std::this_thread::sleep_for(20ms);
             }
 
