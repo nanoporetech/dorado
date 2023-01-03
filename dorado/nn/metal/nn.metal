@@ -67,51 +67,107 @@ struct ScanArgs {
     int T;
     int N;
     int C;
-    int dir;
 };
 
-kernel void scan(
+// Scores must be rescaled from byte range to [-5.0, 5.0] before use in
+// forward / backward scans.
+float ScaleByteScore(int8_t byte_score) {
+    constexpr auto kScoreScale = static_cast<float>(5.0 / 127.0);
+    return kScoreScale * static_cast<float>(byte_score);
+}
+
+kernel void backward_scan(
     device const ScanArgs* const args,
-    // Scores are supplied in int8 form, in the range [-127, 127], and must be mapped to [-5, 5] before use.
     device const int8_t* const scores_in,
     device ftype_out* const out,
-    device const int* const idx1,
-    device const int* const idx2,
     KERNEL_INDEX_INPUTS)
 {
-    constexpr int NUM_TRANSITIONS = 5;
+    constexpr int kNumBases = 4;
+    constexpr int kNumTransitions = kNumBases + 1;
+    constexpr float kFixedStayScore = 2.0f;
 
     const int T = args->T;
     const int N = args->N;
-    const int C = args->C;
-    const int ts_states = C * NUM_TRANSITIONS;
-    const int dir = args->dir;
+    const int num_states = args->C;
+    const int ts_states = num_states * kNumBases;
     const int chunk = gid;
 
     device const int8_t* const chunk_in = scores_in + chunk * ts_states;
-    device ftype_out* const chunk_out = out + chunk * (T+1) * C;
-    device ftype_out* const alpha_init = chunk_out + ((dir == -1) ? C * T : 0);
-    for (int c = tid; c < C; ++c) {
+    device ftype_out* const chunk_out = out + chunk * (T+1) * num_states;
+    device ftype_out* const alpha_init = chunk_out + num_states * T;
+    for (int c = tid; c < num_states; c += threads) {
         alpha_init[c] = 0.0f;
     }
     for (int ts = 0; ts < T; ++ts) {
         threadgroup_barrier(mem_flags::mem_device);
-        device const auto* const ts_in = chunk_in + N * ts_states * ((dir == -1) ? T - ts - 1 : ts);
-        device ftype_out* const ts_alpha_in = alpha_init + C * dir * ts;
-        device ftype_out* const ts_alpha_out = ts_alpha_in + C * dir;
+        device const auto* const ts_in = chunk_in + N * ts_states * (T - ts - 1);
+        device ftype_out* const ts_alpha_in = alpha_init - num_states * ts;
+        device ftype_out* const ts_alpha_out = ts_alpha_in - num_states;
 
-        float max_val = -1e38f;
-        float vals[NUM_TRANSITIONS];
-        for (int i = 0; i < NUM_TRANSITIONS; ++i) {
-            const int state = tid * NUM_TRANSITIONS + i;
-            // Rescale the score from int8 to a float in the range [-5.0, 5.0].
-            const auto kScoreScale = static_cast<float>(5.0 / 127.0);
-            const auto score = static_cast<float>(ts_in[idx1[state]]) * kScoreScale;
-            vals[i] = score + ts_alpha_in[idx2[state]];
-            max_val = max(max_val, vals[i]);
+        const int state = tid;
+        const int stay_state_idx = state;
+        const int step_state_idx_a = (state * kNumBases) % num_states;
+        const int step_trans_idx_a = step_state_idx_a * kNumBases +
+            ((state * kNumBases) / num_states);
+
+        float vals[kNumTransitions];
+        float max_val = vals[0] = ts_alpha_in[stay_state_idx] + kFixedStayScore;
+        for (int base = 0; base < kNumBases; ++base) {
+            vals[base + 1] = ts_alpha_in[step_state_idx_a + base] +
+                ScaleByteScore(ts_in[step_trans_idx_a + base * kNumBases]);
+            max_val = max(max_val, vals[base + 1]);
         }
-        float sum = 0.f;
-        for (int i = 0; i < NUM_TRANSITIONS; ++i) {
+        float sum = 0.0f;
+        for (int i = 0; i < kNumTransitions; ++i) {
+            sum += exp(vals[i] - max_val);
+        }
+        ts_alpha_out[tid] = max_val + log(sum);
+    }
+}
+
+kernel void forward_scan(
+    device const ScanArgs* const args,
+    device const int8_t* const scores_in,
+    device ftype_out* const out,
+    KERNEL_INDEX_INPUTS)
+{
+    constexpr int kNumBases = 4;
+    constexpr int kNumTransitions = kNumBases + 1;
+    constexpr float kFixedStayScore = 2.0f;
+
+    const int T = args->T;
+    const int N = args->N;
+    const int num_states = args->C;
+    const int ts_states = num_states * kNumBases;
+    const int kMsb = num_states / kNumBases;
+    const int chunk = gid;
+
+    device const int8_t* const chunk_in = scores_in + chunk * ts_states;
+    device ftype_out* const chunk_out = out + chunk * (T+1) * num_states;
+    device ftype_out* const alpha_init = chunk_out;
+    for (int c = tid; c < num_states; c += threads) {
+        alpha_init[c] = 0.0f;
+    }
+    for (int ts = 0; ts < T; ++ts) {
+        threadgroup_barrier(mem_flags::mem_device);
+        device const auto* const ts_in = chunk_in + N * ts_states * ts;
+        device ftype_out* const ts_alpha_in = alpha_init + num_states * ts;
+        device ftype_out* const ts_alpha_out = ts_alpha_in + num_states;
+
+        const int state = tid;
+        const int stay_state_idx = state;
+        const int step_state_idx_a = state / kNumBases;
+        const int step_trans_idx_a = state * kNumBases;
+
+        float vals[kNumTransitions];
+        float max_val = vals[0] = ts_alpha_in[stay_state_idx] + kFixedStayScore;
+        for (int base = 0; base < kNumBases; ++base) {
+            vals[base + 1] = ts_alpha_in[step_state_idx_a + base * kMsb] +
+                ScaleByteScore(ts_in[step_trans_idx_a + base]);
+            max_val = max(max_val, vals[base + 1]);
+        }
+        float sum = 0.0f;
+        for (int i = 0; i < kNumTransitions; ++i) {
             sum += exp(vals[i] - max_val);
         }
         ts_alpha_out[tid] = max_val + log(sum);

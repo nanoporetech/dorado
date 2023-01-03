@@ -7,10 +7,13 @@
 #include <torch/torch.h>
 
 #include <algorithm>
+#include <array>
 #include <cstring>
 #include <iostream>
 #include <limits>
 #include <numeric>
+
+#define REMOVE_FIXED_BEAM_STAYS
 
 namespace {
 
@@ -68,7 +71,7 @@ std::tuple<std::string, std::string> generate_sequence(const std::vector<uint8_t
 
     std::string sequence(seqLen, 'N');
     std::string qstring(seqLen, '!');
-    std::vector<char> alphabet = {'A', 'C', 'G', 'T'};
+    std::array<char, 4> alphabet = {'A', 'C', 'G', 'T'};
     std::vector<float> baseProbs(seqLen), totalProbs(seqLen);
 
     for (size_t blk = 0; blk < num_blocks; ++blk) {
@@ -130,11 +133,6 @@ float beam_search(const T* const scores,
     }
 
     // Some values we need
-#ifdef REMOVE_FIXED_BEAM_STAYS
-    size_t num_transitions = num_states * num_bases;
-#else
-    size_t num_transitions = num_states * (num_bases + 1);
-#endif
     constexpr uint64_t hash_seed = 0x880355f21e6d1965ULL;
     const float log_beam_cut =
             (beam_cut > 0.0f) ? (temperature * logf(beam_cut)) : std::numeric_limits<float>::max();
