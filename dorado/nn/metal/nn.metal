@@ -95,7 +95,7 @@ kernel void backward_scan(
     device const int8_t* const chunk_in = scores_in + chunk * ts_states;
     device ftype_out* const chunk_out = out + chunk * (T+1) * num_states;
     device ftype_out* const alpha_init = chunk_out + num_states * T;
-    for (int c = tid; c < num_states; ++c) {
+    for (int c = tid; c < num_states; c += threads) {
         alpha_init[c] = 0.0f;
     }
     for (int ts = 0; ts < T; ++ts) {
@@ -145,7 +145,7 @@ kernel void forward_scan(
     device const int8_t* const chunk_in = scores_in + chunk * ts_states;
     device ftype_out* const chunk_out = out + chunk * (T+1) * num_states;
     device ftype_out* const alpha_init = chunk_out;
-    for (int c = tid; c < num_states; ++c) {
+    for (int c = tid; c < num_states; c += threads) {
         alpha_init[c] = 0.0f;
     }
     for (int ts = 0; ts < T; ++ts) {
