@@ -662,14 +662,10 @@ CRFModelConfig load_crf_model_config(const std::filesystem::path &path) {
     // linearcrfencoder.  We are ignoring the latter.
     config.state_len = toml::find<int>(global_norm, "state_len");
 
-#ifdef __APPLE__
-    // The Metal path outputs explicit stay scores from the NN.
-    // TODO -- remove explicit stay score output from the Metal path.
-    config.outsize = pow(4, config.state_len) * 5;
-#else
-    // CUDA and CPU paths do not output explicit stay scores from the NN.
-    config.outsize = pow(4, config.state_len) * 4;
-#endif
+    // All of the paths avoid outputting explicit stay scores from the NN,
+    // so we have 4^bases * 4 transitions.
+    const auto PowerOf4 = [](int x) { return 1 << (x << 1); };
+    config.outsize = PowerOf4(config.state_len + 1);
 
     return config;
 }
