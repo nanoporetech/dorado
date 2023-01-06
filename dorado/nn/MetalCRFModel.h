@@ -16,7 +16,7 @@ std::shared_ptr<MetalCaller> create_metal_caller(const std::filesystem::path& mo
                                                  int chunk_size,
                                                  int batch_size);
 
-class MetalModelRunner : public ModelRunnerBase {
+class MetalModelRunner final : public ModelRunnerBase {
 public:
     MetalModelRunner(std::shared_ptr<MetalCaller> caller, int chunk_size, int batch_size);
     void accept_chunk(int chunk_idx, at::Tensor slice) final;
