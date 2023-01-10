@@ -30,7 +30,7 @@ endif()
 if(DYNAMIC_HDF)
     add_link_options(-ldl)
 else()
-    set(ZLIB_USE_STATIC_LIBS ON)
+#    set(ZLIB_USE_STATIC_LIBS ON)
     set(HDF5_USE_STATIC_LIBRARIES ON)
 endif()
 
