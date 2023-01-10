@@ -41,7 +41,8 @@ void setup(std::vector<std::string> args,
            size_t num_remora_threads,
            bool emit_fastq,
            bool emit_moves,
-           size_t max_reads) {
+           size_t max_reads,
+           size_t min_qscore) {
     torch::set_num_threads(1);
     std::vector<Runner> runners;
 
@@ -142,7 +143,8 @@ void setup(std::vector<std::string> args,
     }
 
     bool rna = utils::is_rna_model(model_path), duplex = false;
-    WriterNode writer_node(std::move(args), emit_fastq, emit_moves, rna, duplex, num_devices * 2);
+    WriterNode writer_node(std::move(args), emit_fastq, emit_moves, rna, duplex, min_qscore,
+                           num_devices * 2);
 
     std::unique_ptr<ModBaseCallerNode> mod_base_caller_node;
     std::unique_ptr<BasecallerNode> basecaller_node;
@@ -181,6 +183,8 @@ int basecaller(int argc, char* argv[]) {
             .default_value(default_parameters.device);
 
     parser.add_argument("-n", "--max-reads").default_value(0).scan<'i', int>();
+
+    parser.add_argument("--min-qscore").default_value(0).scan<'i', int>();
 
     parser.add_argument("-b", "--batchsize")
             .default_value(default_parameters.batchsize)
@@ -263,7 +267,8 @@ int basecaller(int argc, char* argv[]) {
               parser.get<std::string>("-x"), parser.get<int>("-c"), parser.get<int>("-o"),
               parser.get<int>("-b"), parser.get<int>("-r"), default_parameters.remora_batchsize,
               default_parameters.remora_threads, parser.get<bool>("--emit-fastq"),
-              parser.get<bool>("--emit-moves"), parser.get<int>("--max-reads"));
+              parser.get<bool>("--emit-moves"), parser.get<int>("--max-reads"),
+              parser.get<int>("--min-qscore"));
     } catch (const std::exception& e) {
         spdlog::error("{}", e.what());
         return 1;

@@ -57,6 +57,9 @@ int duplex(int argc, char* argv[]) {
     parser.add_argument("-r", "--num_runners")
             .default_value(default_parameters.num_runners)
             .scan<'i', int>();
+
+    parser.add_argument("--min-qscore").default_value(0).scan<'i', int>();
+
     try {
         parser.parse_args(argc, argv);
 
@@ -66,6 +69,7 @@ int duplex(int argc, char* argv[]) {
         auto pairs_file(parser.get<std::string>("--pairs"));
         auto threads = static_cast<size_t>(parser.get<int>("--threads"));
         bool emit_fastq = parser.get<bool>("--emit-fastq");
+        auto min_qscore(parser.get<int>("--min-qscore"));
         std::vector<std::string> args(argv, argv + argc);
 
         spdlog::info("> Loading pairs file");
@@ -74,7 +78,7 @@ int duplex(int argc, char* argv[]) {
         spdlog::info("> Pairs file loaded");
 
         bool emit_moves = false, rna = false, duplex = true;
-        WriterNode writer_node(std::move(args), emit_fastq, emit_moves, rna, duplex, 4);
+        WriterNode writer_node(std::move(args), emit_fastq, emit_moves, rna, duplex, min_qscore, 4);
 
         torch::set_num_threads(1);
 
