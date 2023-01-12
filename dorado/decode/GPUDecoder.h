@@ -8,9 +8,9 @@ namespace dorado {
 
 class GPUDecoder : Decoder {
 public:
-    std::vector<DecodedChunk> beam_search(torch::Tensor scores,
+    std::vector<DecodedChunk> beam_search(const torch::Tensor& scores,
                                           int num_chunks,
-                                          DecoderOptions options) final;
+                                          const DecoderOptions& options) final;
     constexpr static torch::ScalarType dtype = torch::kF16;
 
     // We split beam_search into two parts, the first one running on the GPU and the second
