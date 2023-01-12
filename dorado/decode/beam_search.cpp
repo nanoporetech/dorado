@@ -194,7 +194,7 @@ float beam_search(const T* const scores,
         /*  kmer transitions order:
 	 *  N^K , N array
 	 *  Elements stored as resulting kmer and modifying action (stays have a fixed score and are not computed).
-	 *  Kmer index is lexographic with most recent base in the fastest index
+	 *  Kmer index is lexicographic with most recent base in the fastest index
 	 *
 	 *  E.g.  AGT has index (4^2, 4, 1) . (0, 2, 3) == 11
 	 *  The modifying action is
@@ -213,7 +213,7 @@ float beam_search(const T* const scores,
         /*  kmer transitions order:
          *  N^K , (N + 1) array
          *  Elements stored as resulting kmer and modifying action (0 == stay).
-         *  Kmer index is lexographic with most recent base in the fastest index
+         *  Kmer index is lexicographic with most recent base in the fastest index
          *
          *  E.g.  AGT has index (4^2, 4, 1) . (0, 2, 3) == 11
          *  The modifying action is
