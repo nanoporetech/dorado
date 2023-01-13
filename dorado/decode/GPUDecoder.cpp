@@ -101,9 +101,9 @@ std::vector<DecodedChunk> GPUDecoder::cpu_part(torch::Tensor moves_sequence_qstr
     return called_chunks;
 }
 
-std::vector<DecodedChunk> GPUDecoder::beam_search(torch::Tensor scores,
+std::vector<DecodedChunk> GPUDecoder::beam_search(const torch::Tensor &scores,
                                                   int num_chunks,
-                                                  DecoderOptions options) {
+                                                  const DecoderOptions &options) {
     return cpu_part(gpu_part(scores, num_chunks, options));
 }
 
