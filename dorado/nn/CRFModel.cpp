@@ -526,23 +526,12 @@ TORCH_MODULE(Clamp);
 template <class LSTMStackType>
 struct CRFModelImpl : Module {
     CRFModelImpl(const CRFModelConfig &config, bool expand_blanks, int batch_size, int chunk_size) {
-        if (config.insize == 128) {
-            conv1 = register_module("conv1", Convolution(config.num_features, 16, 5, 1));
-            clamp1 = Clamp(-0.5, 3.5, config.clamp);
-            conv2 = register_module("conv2", Convolution(16, 16, 5, 1));
-            clamp2 = Clamp(-0.5, 3.5, config.clamp);
-            conv3 = register_module("conv3",
-                                    Convolution(16, config.insize, 19, config.stride, true));
-            clamp3 = Clamp(-0.5, 3.5, config.clamp);
-        } else {
-            conv1 = register_module("conv1", Convolution(config.num_features, config.conv, 5, 1));
-            clamp1 = Clamp(-0.5, 3.5, config.clamp);
-            conv2 = register_module("conv2", Convolution(config.conv, 16, 5, 1));
-            clamp2 = Clamp(-0.5, 3.5, config.clamp);
-            conv3 = register_module("conv3",
-                                    Convolution(16, config.insize, 19, config.stride, true));
-            clamp3 = Clamp(-0.5, 3.5, config.clamp);
-        }
+        conv1 = register_module("conv1", Convolution(config.num_features, config.conv, 5, 1));
+        clamp1 = Clamp(-0.5, 3.5, config.clamp);
+        conv2 = register_module("conv2", Convolution(config.conv, 16, 5, 1));
+        clamp2 = Clamp(-0.5, 3.5, config.clamp);
+        conv3 = register_module("conv3", Convolution(16, config.insize, 19, config.stride, true));
+        clamp3 = Clamp(-0.5, 3.5, config.clamp);
 
         rnns = register_module(
                 "rnns", LSTMStackType(config.insize, batch_size, chunk_size / config.stride));
