@@ -288,7 +288,8 @@ template <int SIMD_TILES_M, int SIMD_TILES_N, int TRANSPOSE_A> struct MatMul {
             device ftype const *b_ptr, int b_stride, int b_col, int b_row,
             device ftype const *bias, bool transpose_A_)
     {
-        a_ptr += a_row * a_stride + a_col;
+        bool transpose_A = (TRANSPOSE_A == 2) ? transpose_A_ : TRANSPOSE_A;
+        a_ptr += transpose_A ? (a_col * a_stride + a_row) : (a_row * a_stride + a_col);
         b_ptr += b_row * b_stride + b_col;
         for (int i = 0; i < SIMD_TILES_N; ++i) {
             for (int j = 0; j < SIMD_TILES_M; ++j) {
@@ -300,7 +301,6 @@ template <int SIMD_TILES_M, int SIMD_TILES_N, int TRANSPOSE_A> struct MatMul {
                 simdgroup_load(B[i], b_ptr, b_stride,
                                ulong2(i * TILE_SIZE, k_tile * TILE_SIZE));
             }
-            bool transpose_A = (TRANSPOSE_A == 2) ? transpose_A_ : TRANSPOSE_A;
 #define SMAC_ROW(m_tile)\
     if (m_tile < SIMD_TILES_M) {\
         int col_tile = transpose_A ? m_tile : k_tile; \
@@ -785,7 +785,7 @@ kernel void lstm(
         device ftype* const out = in_out + timestep_out * inout_stride * kLstmLayerSize;
         for (int m_blk = gid; m_blk < m_blks; m_blk += threadgroups) {
             for (int n_blk = sid; n_blk < n_blks; n_blk += simdgroups) {
-                mm.mm_bias(0, k_tiles, in, inout_stride, m_blk * SIMD_TILES_M * TILE_SIZE, 0,
+                mm.mm_bias(0, k_tiles, in, inout_stride, 0, m_blk * SIMD_TILES_M * TILE_SIZE,
                            weights_buf, w_stride, n_blk * SIMD_TILES_N * TILE_SIZE, 0, bias, true);
                 for (int i = 0; i < SIMD_TILES_M; ++i) {
                     const uint out_chunk_base = (m_blk * SIMD_TILES_M + i) * TILE_SIZE;
@@ -874,7 +874,7 @@ kernel void linear(
 
         for (int m_blk = 0; m_blk < m_blks; ++m_blk) {
             for (int n_blk = sid; n_blk < n_blks; n_blk += simdgroups) {
-                mm.mm_bias(0, k_tiles, in, in_stride, m_blk * SIMD_TILES_M * TILE_SIZE, 0,
+                mm.mm_bias(0, k_tiles, in, in_stride, 0, m_blk * SIMD_TILES_M * TILE_SIZE,
                            weights_buf, w_stride, n_blk * SIMD_TILES_N * TILE_SIZE, 0, bias, kLinearInputFromLstm);
                 for (int i = 0; i < SIMD_TILES_M; ++i) {
                     for (int j = 0; j < SIMD_TILES_N; ++j) {
