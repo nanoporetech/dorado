@@ -14,7 +14,6 @@ constant float kLinearOutputScale [[function_constant(5)]];
 constant bool kLinearOutputClamp [[function_constant(6)]];
 constant bool kLinearOutputTanh [[function_constant(7)]];
 constant bool kLinearOutputAsByte [[function_constant(8)]];
-constant bool kLinearInputFromLstm [[function_constant(9)]];
 
 namespace {
 
@@ -275,10 +274,8 @@ kernel void float_to_half(
     }
 }
 
-// TRANSPOSE_A == 0 means never transpose A
-// TRANSPOSE_A == 1 means always transpose A
-// TRANSPOSE_A == 2 means whether to transpose is based on last parameter to MatMul::mm_bias()
-template <int SIMD_TILES_M, int SIMD_TILES_N, int TRANSPOSE_A> struct MatMul {
+enum class InputLayout : int {LINEAR = 0, LSTM};
+template <int SIMD_TILES_M, int SIMD_TILES_N, InputLayout INPUT_LAYOUT> struct MatMul {
     static_assert(SIMD_TILES_M <= 6, "SIMD_TILES_M must be <= 6");
     simdgroup_ftype8x8 A, B[SIMD_TILES_N], accum[SIMD_TILES_M][SIMD_TILES_N];
 
@@ -286,9 +283,9 @@ template <int SIMD_TILES_M, int SIMD_TILES_N, int TRANSPOSE_A> struct MatMul {
             int k_tiles_begin, int k_tiles_end,
             device ftype const *a_ptr, int a_stride, int a_col, int a_row,
             device ftype const *b_ptr, int b_stride, int b_col, int b_row,
-            device ftype const *bias, bool transpose_A_)
+            device ftype const *bias)
     {
-        bool transpose_A = (TRANSPOSE_A == 2) ? transpose_A_ : TRANSPOSE_A;
+        bool transpose_A = (INPUT_LAYOUT == InputLayout::LSTM);
         a_ptr += transpose_A ? (a_col * a_stride + a_row) : (a_row * a_stride + a_col);
         b_ptr += b_row * b_stride + b_col;
         for (int i = 0; i < SIMD_TILES_N; ++i) {
@@ -540,7 +537,7 @@ kernel void conv2_in16_simd
     device const ftype* bias = weights_buf + (dp_size + 2 * w_pad_rows) * out_size;
     const int in_buf_stride = chunk_size_in * in_size;
     const int out_buf_stride = chunk_size_out * out_size;
-    MatMul<SIMD_TILES_M, SIMD_TILES_N, 0> mm;
+    MatMul<SIMD_TILES_M, SIMD_TILES_N, InputLayout::LINEAR> mm;
 
     for (int m_blk = gid; m_blk < m_blks; m_blk += threadgroups) {
         for (int ts = sid; ts < chunk_size_in / stride; ts += simdgroups) {
@@ -557,7 +554,7 @@ kernel void conv2_in16_simd
             int pad_tiles = start_pad_tiles + end_pad_tiles;
             mm.mm_bias(0, k_tiles - pad_tiles,
                 in_buf, in_buf_stride, clamped_start_pos, m_blk * SIMD_TILES_M * TILE_SIZE,
-                weights_buf, out_size, 0, w_row_offset, bias, false);
+                weights_buf, out_size, 0, w_row_offset, bias);
             for (int i = 0; i < SIMD_TILES_M; ++i) {
                 for (int j = 0; j < SIMD_TILES_N; ++j) {
                     simdgroup_store(mm.accum[i][j], simd_out_buf[sid][i * SIMD_TILES_N + j], TILE_SIZE);
@@ -615,7 +612,7 @@ kernel void conv3_simd
     threadgroup ftype simd_out_buf[SIMD_GROUPS][SIMD_TILES_N * SIMD_TILES_M][TILE_SIZE * TILE_SIZE];
     device const ftype* bias = weights_buf + dp_size * out_size;
     const int in_buf_stride = chunk_size_in * in_size;
-    MatMul<SIMD_TILES_M, SIMD_TILES_N, 0> mm;
+    MatMul<SIMD_TILES_M, SIMD_TILES_N, InputLayout::LINEAR> mm;
 
     for (int m_blk = gid; m_blk < m_blks; m_blk += threadgroups) {
         for (int chunk = tid; chunk < SIMD_TILES_M * TILE_SIZE; chunk += threads) {
@@ -636,7 +633,7 @@ kernel void conv3_simd
             for (int n_blk = sid; n_blk < n_blks; n_blk += simdgroups) {
                 mm.mm_bias(start_pad_tiles, k_blks - end_pad_tiles,
                     in_buf, in_buf_stride, start_pos * in_size_tiles * TILE_SIZE, m_blk * SIMD_TILES_M * TILE_SIZE,
-                    weights_buf, out_size, n_blk * SIMD_TILES_N * TILE_SIZE, 0, bias, false);
+                    weights_buf, out_size, n_blk * SIMD_TILES_N * TILE_SIZE, 0, bias);
                 for (int i = 0; i < SIMD_TILES_M; ++i) {
                     for (int j = 0; j < SIMD_TILES_N; ++j) {
                         simdgroup_store(mm.accum[i][j], simd_out_buf[sid][i * SIMD_TILES_N + j], TILE_SIZE);
@@ -761,7 +758,7 @@ kernel void lstm(
     const int k_tiles = kLstmLayerSize * 2 / TILE_SIZE;
     const int inout_stride = batch_tiles * TILE_SIZE;
     const int w_stride = kLstmLayerSize * 4;
-    MatMul<SIMD_TILES_M, SIMD_TILES_N, 1> mm;
+    MatMul<SIMD_TILES_M, SIMD_TILES_N, InputLayout::LSTM> mm;
     device const ftype* const bias = weights_buf + 2 * kLstmLayerSize * w_stride;
 
     const uint t_idx = tid & 31;
@@ -786,7 +783,7 @@ kernel void lstm(
         for (int m_blk = gid; m_blk < m_blks; m_blk += threadgroups) {
             for (int n_blk = sid; n_blk < n_blks; n_blk += simdgroups) {
                 mm.mm_bias(0, k_tiles, in, inout_stride, 0, m_blk * SIMD_TILES_M * TILE_SIZE,
-                           weights_buf, w_stride, n_blk * SIMD_TILES_N * TILE_SIZE, 0, bias, true);
+                           weights_buf, w_stride, n_blk * SIMD_TILES_N * TILE_SIZE, 0, bias);
                 for (int i = 0; i < SIMD_TILES_M; ++i) {
                     const uint out_chunk_base = (m_blk * SIMD_TILES_M + i) * TILE_SIZE;
                     const uint chunk_idx = out_chunk_base + row;
@@ -838,7 +835,7 @@ struct LinearArgs {
     int chunk_size;
 };
 
-kernel void linear(
+template<InputLayout INPUT_LAYOUT> kernel void linear(
         device const LinearArgs* const args,
         device ftype* const in_buf,
         device const ftype* const weights_buf,
@@ -855,15 +852,15 @@ kernel void linear(
     const int m_blks = out_batch_tiles / SIMD_TILES_M;
     const int n_blks = kLinearOutSize / (TILE_SIZE * SIMD_TILES_N);
     const int k_tiles = kLinearInSize / TILE_SIZE;
-    const int in_stride = kLinearInputFromLstm ? in_batch_tiles * TILE_SIZE : kLinearInSize;
+    const int in_stride = (INPUT_LAYOUT == InputLayout::LSTM) ? in_batch_tiles * TILE_SIZE : kLinearInSize;
     const int w_stride = kLinearOutSize;
     const int out_stride = kLinearOutSize;
     device const ftype* const bias = weights_buf + kLinearInSize * w_stride;
-    MatMul<SIMD_TILES_M, SIMD_TILES_N, 2> mm;
+    MatMul<SIMD_TILES_M, SIMD_TILES_N, INPUT_LAYOUT> mm;
 
     for (int ts = gid; ts < chunk_size; ts += threadgroups) {
         auto in = in_buf;
-        if (kLinearInputFromLstm) {
+        if (INPUT_LAYOUT == InputLayout::LSTM) {
             in += in_batch_tile_offset * TILE_SIZE + (ts + 1) * in_batch_tiles * TILE_SIZE * kLinearInSize;
         } else {
             in += (ts * in_batch_tiles + in_batch_tile_offset) * TILE_SIZE * kLinearInSize;
@@ -875,7 +872,7 @@ kernel void linear(
         for (int m_blk = 0; m_blk < m_blks; ++m_blk) {
             for (int n_blk = sid; n_blk < n_blks; n_blk += simdgroups) {
                 mm.mm_bias(0, k_tiles, in, in_stride, 0, m_blk * SIMD_TILES_M * TILE_SIZE,
-                           weights_buf, w_stride, n_blk * SIMD_TILES_N * TILE_SIZE, 0, bias, kLinearInputFromLstm);
+                           weights_buf, w_stride, n_blk * SIMD_TILES_N * TILE_SIZE, 0, bias);
                 for (int i = 0; i < SIMD_TILES_M; ++i) {
                     for (int j = 0; j < SIMD_TILES_N; ++j) {
                         // Store this 8x8 tile to threadgroup memory as ftype.
@@ -908,3 +905,19 @@ kernel void linear(
         }
     }
 }
+
+template [[ host_name("linear") ]] kernel void linear<InputLayout::LINEAR>(
+        device const LinearArgs*,
+        device ftype*,
+        device const ftype*,
+        device void* const,
+        threadgroup ftype (* const simd_out_buf)[TILE_SIZE * TILE_SIZE],
+        KERNEL_INDEX_INPUTS);
+
+template [[ host_name("linear_from_lstm") ]] kernel void linear<InputLayout::LSTM>(
+        device const LinearArgs*,
+        device ftype*,
+        device const ftype*,
+        device void* const,
+        threadgroup ftype (* const simd_out_buf)[TILE_SIZE * TILE_SIZE],
+        KERNEL_INDEX_INPUTS);

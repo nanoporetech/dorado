@@ -32,9 +32,6 @@ TEST_CASE(TEST_GROUP "Linear") {
     MTL::CommandQueue *const command_queue = device->newCommandQueue();
     REQUIRE(command_queue != nullptr);
 
-    // Note: Parameters below, e.g. layer_size, must correspond to a compiled shader.
-    // If they don't, make_cps will fail.
-
     // Example values for HAC model run.
     const int layer_size = 384;       // Typical LSTM layer size for HAC model.
     const int in_batch_size = 768;    // Runtime-specified: number of chunks handled simultaneously.
@@ -132,14 +129,13 @@ TEST_CASE(TEST_GROUP "Linear") {
                     DYNAMIC_SECTION("Metal linear layer " << output_clamp << output_tanh
                                                           << output_as_byte << input_from_lstm) {
                         MTL::ComputePipelineState *const linear_cps =
-                                make_cps(device, "linear",
+                                make_cps(device, input_from_lstm ? "linear_from_lstm" : "linear",
                                          {{"kLinearInSize", layer_size},
                                           {"kLinearOutSize", out_size},
                                           {"kLinearOutputScale", output_scale},
                                           {"kLinearOutputClamp", output_clamp},
                                           {"kLinearOutputTanh", output_tanh},
-                                          {"kLinearOutputAsByte", output_as_byte},
-                                          {"kLinearInputFromLstm", input_from_lstm}},
+                                          {"kLinearOutputAsByte", output_as_byte}},
                                          threads_per_thread_group);
                         REQUIRE(linear_cps != nullptr);
 
