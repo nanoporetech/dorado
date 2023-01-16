@@ -30,7 +30,10 @@ endif()
 if(DYNAMIC_HDF)
     add_link_options(-ldl)
 else()
-    set(ZLIB_USE_STATIC_LIBS ON)
+    # We cannot rely on static zlib being available on OS X or Windows.
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        set(ZLIB_USE_STATIC_LIBS ON)
+    endif()
     set(HDF5_USE_STATIC_LIBRARIES ON)
 endif()
 
