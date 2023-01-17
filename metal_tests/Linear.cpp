@@ -32,15 +32,13 @@ TEST_CASE(TEST_GROUP "Linear") {
     MTL::CommandQueue *const command_queue = device->newCommandQueue();
     REQUIRE(command_queue != nullptr);
 
-    // Note: Parameters below, e.g. layer_size, must correspond to a compiled shader.
-    // If they don't, make_cps will fail.
-
     // Example values for HAC model run.
-    const int layer_size = 384;    // LSTM layer size.  Set by the model architecture.
-    const int in_batch_size = 96;  // Runtime-specified: number of chunks handled simultaneously.
-    const int tile_size = 8;       // Size of simdgroup_* tiles.  Dictated by Metal itself.
-    const int lstm_chunk_size = 1600;  // Number of samples in a chunk
-    const int out_size = 1280;         // 4-mer -> 5-mer transition matrix => 4**4 * 5
+    const int layer_size = 384;       // Typical LSTM layer size for HAC model.
+    const int in_batch_size = 768;    // Runtime-specified: number of chunks handled simultaneously.
+    const int tile_size = 8;          // Size of simdgroup_* tiles.  Dictated by Metal itself.
+    const int lstm_chunk_size = 200;  // Number of samples in a chunk divided by model stride
+    const int out_size = 1024;  // 4-mer transition matrix without fixed stay scores => 4**4 * 4
+    const int batch_split = 2;
 
     // Hardwired block size of 32x48 in the kernel imposes the constraint that the batch size be an
     // integral multiple of 48.
@@ -63,38 +61,6 @@ TEST_CASE(TEST_GROUP "Linear") {
     const int kOutBufF32Size = sizeof(float) * kernel_simd_groups * kTileSize * kTileSize;
     const std::vector<int> tg_buffer_lens{kOutBufSize, kOutBufF32Size};
 
-    MTL::ComputePipelineState *const linear_cps_tanh_byte =
-            make_cps(device, "linear",
-                     {{"kLinearContractDim", layer_size},
-                      {"kLinearInnerDim", out_size},
-                      {"kLinearOutputScale", 127.0f},
-                      {"kLinearOutputClamp", false},
-                      {"kLinearOutputTanh", true},
-                      {"kLinearOutputAsByte", true}},
-                     threads_per_thread_group);
-    REQUIRE(linear_cps_tanh_byte != nullptr);
-
-    MTL::ComputePipelineState *const linear_cps_clamp_byte =
-            make_cps(device, "linear",
-                     {{"kLinearContractDim", layer_size},
-                      {"kLinearInnerDim", out_size},
-                      {"kLinearOutputScale", static_cast<float>(127.0 / 5.0)},
-                      {"kLinearOutputClamp", true},
-                      {"kLinearOutputTanh", false},
-                      {"kLinearOutputAsByte", true}},
-                     threads_per_thread_group);
-    REQUIRE(linear_cps_clamp_byte != nullptr);
-
-    MTL::ComputePipelineState *const linear_cps_f16 = make_cps(device, "linear",
-                                                               {{"kLinearContractDim", layer_size},
-                                                                {"kLinearInnerDim", out_size},
-                                                                {"kLinearOutputScale", 1.0f},
-                                                                {"kLinearOutputClamp", false},
-                                                                {"kLinearOutputTanh", false},
-                                                                {"kLinearOutputAsByte", false}},
-                                                               threads_per_thread_group);
-    REQUIRE(linear_cps_f16 != nullptr);
-
     // Create a ComputePipelineState for the input reordering kernel.
     MTL::ComputePipelineState *const reorder_input_cps =
             make_cps(device, "reorder_input", {{"kLstmLayerSize", layer_size}});
@@ -110,28 +76,20 @@ TEST_CASE(TEST_GROUP "Linear") {
     // Ensure we get the same random values for each run.
     torch::manual_seed(42);
 
+    // The kernel takes weights and biases in a single tensor,
     // We want the fake weights to be symmetrically distributed, or the output will be saturated.
-    const torch::Tensor weights_f32 = torch::rand({layer_size, out_size}, torch::kFloat32) - 0.5f;
-    const torch::Tensor biases_f32 = torch::rand({out_size}, torch::kFloat32) - 0.5f;
+    const torch::Tensor weights_biases_f32 =
+            torch::rand({layer_size + 1, out_size}, torch::kFloat32) - 0.5f;
+    const torch::Tensor weights_f32 = weights_biases_f32.slice(0, 0, layer_size);
+    const torch::Tensor biases_f32 = weights_biases_f32[-1];
 
-    // We combine the batch and chunk size dimensions into the leading dimension,
-    // for input into the reorder_input kernel.
+    // We combine the batch and chunk size dimensions into the leading dimension for input into torch::addmm.
     const torch::Tensor in_f32 =
             torch::rand({lstm_chunk_size * in_batch_size, layer_size}, torch::kFloat32);
 
     // The kernel takes float16 weights, and works generally in float16.
-    const torch::Tensor weights_f16 = weights_f32.to(torch::kFloat16);
-    const torch::Tensor biases_f16 = biases_f32.to(torch::kFloat16);
+    const torch::Tensor weights_biases_f16 = weights_biases_f32.to(torch::kFloat16);
     const torch::Tensor in_f16 = in_f32.to(torch::kFloat16);
-
-    // Prepare weights/biases buffer for the kernel.
-    // The weights are a layer_size * out_size matrix, and come first in memory.
-    // The biases are out_size entries, and immediately follow the weights
-    // in memory.
-    // If the weights matrix is viewed as layer_size rows each of size out_size,
-    // then the biases form an additional row at the bottom.
-    const torch::Tensor weights_biases_f16 =
-            torch::cat({weights_f16, torch::unsqueeze(biases_f16, 0)}, 0);
 
     // Prepare the input buffer for the Linear kernel.
     // reorder_inputs transforms the input in 3 ways:
@@ -139,142 +97,95 @@ TEST_CASE(TEST_GROUP "Linear") {
     // 2) Adds one time step of padding before and after the chunk time extents.
     // 3) Converts from float32 to float16.
     torch::Tensor in_f16_reordered =
-            torch::zeros({(2 + lstm_chunk_size) * in_batch_size, layer_size}, torch::kFloat16);
+            torch::zeros({lstm_chunk_size + 2, in_batch_size, layer_size}, torch::kFloat16);
     launch_kernel(reorder_input_cps, command_queue,
                   {args_reorder, mtl_for_tensor(in_f32), mtl_for_tensor(in_f16_reordered)}, {},
                   kernel_thread_groups, threads_per_thread_group);
 
     // CPU comparison calculation.
     const torch::Tensor out_cpu_f32 = torch::addmm(biases_f32, in_f32, weights_f32);
-    const torch::Tensor out_cpu_tanh_i8 = (127.0f * torch::tanh(out_cpu_f32)).to(torch::kInt8);
-    const torch::Tensor out_cpu_clamp_i8 =
-            (static_cast<float>(127.0 / 5.0) * torch::clamp(out_cpu_f32, -5.0f, 5.0f))
-                    .to(torch::kInt8);
-
-    const auto out_cpu_tanh_i8_as_f32 = out_cpu_tanh_i8.to(torch::kFloat32);
-    const auto out_cpu_clamp_i8_as_f32 = out_cpu_clamp_i8.to(torch::kFloat32);
 
     const int32_t in_batch_tiles = in_batch_size / tile_size;
 
-    // These tolerances are somewhat arbitary, but we must account for GPU calculations in float16
-    // versus CPU calculations in float32.
-    // (The CPU calculation can be done in float16, but is too slow.)
-    constexpr float kRelTolerance = 0.1f;
-    constexpr float kAbsTolerance = 8.0f;
-    constexpr float kMeanAbsDiffTolerance = 0.14f;
+    for (bool output_clamp : {false, true}) {
+        const auto out_cpu_clamp_f32 = output_clamp ? out_cpu_f32.clamp(-5.f, 5.f) : out_cpu_f32;
+        for (bool output_tanh : {false, true}) {
+            const auto out_cpu_tanh_f32 =
+                    output_tanh ? out_cpu_clamp_f32.tanh() : out_cpu_clamp_f32;
+            for (bool output_as_byte : {false, true}) {
+                // Byte output is only supported if at least one of [tanh, clamp] is enabled
+                if (output_as_byte && !(output_tanh || output_clamp)) {
+                    continue;
+                }
+                float output_scale =
+                        (output_as_byte ? ((output_clamp && !output_tanh) ? (127.f / 5.f) : 127.f)
+                                        : 1.f);
+                const auto out_cpu =
+                        output_as_byte
+                                ? (output_scale * out_cpu_tanh_f32).to(torch::kI8).to(torch::kF32)
+                                : out_cpu_tanh_f32;
 
-    // A single kernel launch calculates the entire result.
-    SECTION("Complete batch tanh byte") {
-        const int in_batch_tile_offset = 0;
-        const int out_batch_size = 96;
+                for (bool input_from_lstm : {false, true}) {
+                    DYNAMIC_SECTION("Metal linear layer " << output_clamp << output_tanh
+                                                          << output_as_byte << input_from_lstm) {
+                        MTL::ComputePipelineState *const linear_cps =
+                                make_cps(device, input_from_lstm ? "linear_from_lstm" : "linear",
+                                         {{"kLinearInSize", layer_size},
+                                          {"kLinearOutSize", out_size},
+                                          {"kLinearOutputScale", output_scale},
+                                          {"kLinearOutputClamp", output_clamp},
+                                          {"kLinearOutputTanh", output_tanh},
+                                          {"kLinearOutputAsByte", output_as_byte}},
+                                         threads_per_thread_group);
+                        REQUIRE(linear_cps != nullptr);
 
-        const int32_t out_batch_tiles = out_batch_size / tile_size;
-        const std::vector<int32_t> args_linear_{in_batch_tiles, in_batch_tile_offset,
-                                                out_batch_tiles, lstm_chunk_size, out_size};
-        MTL::Buffer *const args_linear = create_vec_buffer(device, args_linear_);
-        REQUIRE(args_linear != nullptr);
+                        auto out_gpu_f32 = torch::zeros({lstm_chunk_size, in_batch_size, out_size},
+                                                        torch::kF32);
 
-        // float16 input -> int8 output
-        torch::Tensor out_gpu_i8 =
-                torch::zeros({lstm_chunk_size * out_batch_size, out_size}, torch::kInt8);
-        launch_kernel(linear_cps_tanh_byte, command_queue,
-                      {args_linear, mtl_for_tensor(in_f16_reordered),
-                       mtl_for_tensor(weights_biases_f16), mtl_for_tensor(out_gpu_i8)},
-                      tg_buffer_lens, kernel_thread_groups, threads_per_thread_group);
+                        const int out_batch_size = in_batch_size / batch_split;
+                        const int32_t out_batch_tiles = out_batch_size / tile_size;
 
-        // Compare as floats.
-        const auto out_gpu_f32 = out_gpu_i8.to(torch::kFloat32);
-        REQUIRE(torch::allclose(out_cpu_tanh_i8_as_f32, out_gpu_f32, kRelTolerance, kAbsTolerance));
-        REQUIRE(MeanAbsDiff(out_cpu_tanh_i8_as_f32, out_gpu_f32) < kMeanAbsDiffTolerance);
-    }
+                        const int in_batch_tiles = in_batch_size / tile_size;
+                        for (int in_batch_tile_offset = 0; in_batch_tile_offset < in_batch_tiles;
+                             in_batch_tile_offset += out_batch_tiles) {
+                            const std::vector<int32_t> args_linear_{
+                                    in_batch_tiles, in_batch_tile_offset, out_batch_tiles,
+                                    lstm_chunk_size};
+                            MTL::Buffer *const args_linear =
+                                    create_vec_buffer(device, args_linear_);
+                            REQUIRE(args_linear != nullptr);
 
-    SECTION("Complete batch float16") {
-        const int in_batch_tile_offset = 0;
-        const int out_batch_size = 96;
+                            auto out_dtype = output_as_byte ? torch::kI8 : torch::kF16;
+                            auto out_gpu_partial = torch::zeros(
+                                    {lstm_chunk_size, out_batch_size, out_size}, out_dtype);
 
-        const int32_t out_batch_tiles = out_batch_size / tile_size;
-        const std::vector<int32_t> args_linear_{in_batch_tiles, in_batch_tile_offset,
-                                                out_batch_tiles, lstm_chunk_size, out_size};
-        MTL::Buffer *const args_linear = create_vec_buffer(device, args_linear_);
-        REQUIRE(args_linear != nullptr);
+                            launch_kernel(
+                                    linear_cps, command_queue,
+                                    {args_linear,
+                                     mtl_for_tensor(input_from_lstm ? in_f16_reordered : in_f16),
+                                     mtl_for_tensor(weights_biases_f16),
+                                     mtl_for_tensor(out_gpu_partial)},
+                                    tg_buffer_lens, kernel_thread_groups, threads_per_thread_group);
 
-        // float16 input -> float16 output
-        torch::Tensor out_gpu_f16 =
-                torch::zeros({lstm_chunk_size * out_batch_size, out_size}, torch::kFloat16);
-        launch_kernel(linear_cps_f16, command_queue,
-                      {args_linear, mtl_for_tensor(in_f16_reordered),
-                       mtl_for_tensor(weights_biases_f16), mtl_for_tensor(out_gpu_f16)},
-                      tg_buffer_lens, kernel_thread_groups, threads_per_thread_group);
+                            int in_batch_offset = in_batch_tile_offset * tile_size;
+                            out_gpu_f32.slice(1, in_batch_offset,
+                                              in_batch_offset + out_batch_size) = out_gpu_partial;
+                        }
 
-        // Compare as floats.
-        const auto out_gpu_f32 = out_gpu_f16.to(torch::kFloat32);
-        REQUIRE(torch::allclose(out_cpu_f32, out_gpu_f32, kRelTolerance, kAbsTolerance));
-        REQUIRE(MeanAbsDiff(out_cpu_f32, out_gpu_f32) < kMeanAbsDiffTolerance);
-    }
+                        // These tolerances are somewhat arbitary, but we must account for GPU calculations in float16
+                        // versus CPU calculations in float32.
+                        // (The CPU calculation can be done in float16, but is too slow.)
+                        const float kRelTolerance = 0.1f;
+                        const float kAbsTolerance =
+                                output_as_byte ? (output_tanh ? 7.f : 2.f) : 0.08;
+                        const float kMeanAbsDiffTolerance = output_as_byte ? 0.15f : 0.008f;
 
-    SECTION("Complete batch clamp byte") {
-        const int in_batch_tile_offset = 0;
-        const int out_batch_size = 96;
-
-        const int32_t out_batch_tiles = out_batch_size / tile_size;
-        const std::vector<int32_t> args_linear_{in_batch_tiles, in_batch_tile_offset,
-                                                out_batch_tiles, lstm_chunk_size, out_size};
-        MTL::Buffer *const args_linear = create_vec_buffer(device, args_linear_);
-        REQUIRE(args_linear != nullptr);
-
-        // float16 input -> int8 output
-        torch::Tensor out_gpu_i8 =
-                torch::zeros({lstm_chunk_size * out_batch_size, out_size}, torch::kInt8);
-        launch_kernel(linear_cps_clamp_byte, command_queue,
-                      {args_linear, mtl_for_tensor(in_f16_reordered),
-                       mtl_for_tensor(weights_biases_f16), mtl_for_tensor(out_gpu_i8)},
-                      tg_buffer_lens, kernel_thread_groups, threads_per_thread_group);
-
-        // Compare as floats.
-        const auto out_gpu_f32 = out_gpu_i8.to(torch::kFloat32);
-        REQUIRE(torch::allclose(out_cpu_clamp_i8_as_f32, out_gpu_f32, kRelTolerance,
-                                kAbsTolerance));
-        REQUIRE(MeanAbsDiff(out_cpu_clamp_i8_as_f32, out_gpu_f32) < kMeanAbsDiffTolerance);
-    }
-
-    // Two kernel launches each calculate half the batch elements.
-    SECTION("Split batch tanh byte") {
-        const int out_batch_size = 48;
-        const int32_t out_batch_tiles = out_batch_size / tile_size;
-
-        // Perform the Linear computation via multiple runs, each on a subset of batch elements.
-        // The results are rearranged into a single tensor that should match the single run.
-        torch::Tensor out_gpu_complete_i8 =
-                torch::zeros({lstm_chunk_size, in_batch_size, out_size}, torch::kInt8);
-
-        const int kCompleteBatchTiles = in_batch_size / tile_size;
-        for (int in_batch_tile_offset = 0; in_batch_tile_offset < kCompleteBatchTiles;
-             in_batch_tile_offset += out_batch_tiles) {
-            const std::vector<int32_t> args_linear_{in_batch_tiles, in_batch_tile_offset,
-                                                    out_batch_tiles, lstm_chunk_size, out_size};
-            MTL::Buffer *const args_linear = create_vec_buffer(device, args_linear_);
-            REQUIRE(args_linear != nullptr);
-
-            torch::Tensor out_gpu_partial_i8 =
-                    torch::zeros({lstm_chunk_size, out_batch_size, out_size}, torch::kInt8);
-
-            launch_kernel(linear_cps_tanh_byte, command_queue,
-                          {args_linear, mtl_for_tensor(in_f16_reordered),
-                           mtl_for_tensor(weights_biases_f16), mtl_for_tensor(out_gpu_partial_i8)},
-                          tg_buffer_lens, kernel_thread_groups, threads_per_thread_group);
-
-            // Incorporate this set of batch elements in the overall output.
-            const auto in_batch_offset = in_batch_tile_offset * tile_size;
-            out_gpu_complete_i8.index(
-                    {Slice(), Slice(in_batch_offset, in_batch_offset + out_batch_size)}) =
-                    out_gpu_partial_i8;
+                        auto out_gpu_2d = out_gpu_f32.view({-1, out_size});
+                        REQUIRE(torch::allclose(out_cpu, out_gpu_2d, kRelTolerance, kAbsTolerance));
+                        REQUIRE(MeanAbsDiff(out_cpu, out_gpu_2d) < kMeanAbsDiffTolerance);
+                    }
+                }
+            }
         }
-        const auto out_gpu_complete_f32 = out_gpu_complete_i8.to(torch::kFloat32);
-        const auto out_gpu_complete_2d_f32 =
-                out_gpu_complete_f32.view({lstm_chunk_size * in_batch_size, out_size});
-        REQUIRE(torch::allclose(out_cpu_tanh_i8_as_f32, out_gpu_complete_2d_f32, kRelTolerance,
-                                kAbsTolerance));
-        REQUIRE(MeanAbsDiff(out_cpu_tanh_i8_as_f32, out_gpu_complete_2d_f32) <
-                kMeanAbsDiffTolerance);
     }
 }
