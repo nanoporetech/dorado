@@ -1,7 +1,8 @@
-#include "DuplexCallerNode.h"
+#include "BaseSpaceDuplexCallerNode.h"
 
 #include "3rdparty/edlib/edlib/include/edlib.h"
 #include "cxxpool.h"
+#include "utils/duplex_utils.h"
 
 #include <spdlog/spdlog.h>
 
@@ -9,25 +10,6 @@
 
 using namespace std::chrono_literals;
 namespace {
-// Applies a min pool filter to q scores for basespace-duplex algorithm
-void preprocess_quality_scores(std::vector<uint8_t>& quality_scores, int pool_window = 5) {
-    // Apply a min-pool window to the quality scores
-    auto opts = torch::TensorOptions().dtype(torch::kInt8);
-    torch::Tensor t =
-            torch::from_blob(quality_scores.data(), {1, (int)quality_scores.size()}, opts);
-    auto t_float = t.to(torch::kFloat32);
-    t.index({torch::indexing::Slice()}) =
-            -torch::max_pool1d(-t_float, pool_window, 1, pool_window / 2);
-}
-// Returns reverse complement of a nucleotide sequence
-void reverse_complement(std::vector<char>& sequence) {
-    std::reverse(sequence.begin(), sequence.end());
-    std::map<char, char> complementary_nucleotides = {
-            {'A', 'T'}, {'C', 'G'}, {'G', 'C'}, {'T', 'A'}};
-    std::for_each(sequence.begin(), sequence.end(),
-                  [&complementary_nucleotides](char& c) { c = complementary_nucleotides[c]; });
-}
-
 // Given two sequences, their quality scores, and alignments, computes a consensus sequence
 std::pair<std::vector<char>, std::vector<char>> compute_basespace_consensus(
         int alignment_start_position,
@@ -72,73 +54,11 @@ std::pair<std::vector<char>, std::vector<char>> compute_basespace_consensus(
     }
     return std::make_pair(consensus, quality_scores_phred);
 }
-
-// Returns subset of alignment for which start and end start with  `num_consecutive_wanted` consecutive nucleotides.
-std::pair<std::pair<int, int>, std::pair<int, int>> get_trimmed_alignment(
-        int num_consecutive_wanted,
-        unsigned char* alignment,
-        int alignment_length,
-        int target_cursor,
-        int query_cursor,
-        int start_alignment_position,
-        int end_alignment_position) {
-    int num_consecutive = 0;
-
-    // Find forward trim.
-    while (num_consecutive < num_consecutive_wanted) {
-        if (alignment[start_alignment_position] != 2) {
-            target_cursor++;
-        }
-
-        if (alignment[start_alignment_position] != 1) {
-            query_cursor++;
-        }
-
-        if (alignment[start_alignment_position] == 0) {
-            num_consecutive++;
-        } else {
-            num_consecutive = 0;  //reset counter
-        }
-
-        start_alignment_position++;
-
-        if (start_alignment_position >= alignment_length) {
-            break;
-        }
-    }
-
-    target_cursor -= num_consecutive_wanted;
-    query_cursor -= num_consecutive_wanted;
-
-    // Find reverse trim
-    num_consecutive = 0;
-    while (num_consecutive < num_consecutive_wanted) {
-        if (alignment[end_alignment_position] == 0) {
-            num_consecutive++;
-        } else {
-            num_consecutive = 0;
-        }
-
-        end_alignment_position--;
-
-        if (end_alignment_position < start_alignment_position) {
-            break;
-        }
-    }
-
-    start_alignment_position -= num_consecutive_wanted;
-    end_alignment_position += num_consecutive_wanted;
-
-    auto alignment_start_end = std::make_pair(start_alignment_position, end_alignment_position);
-    auto query_target_cursors = std::make_pair(query_cursor, target_cursor);
-
-    return std::make_pair(alignment_start_end, query_target_cursors);
-}
 }  // namespace
 
 namespace dorado {
 
-void DuplexCallerNode::worker_thread() {
+void BaseSpaceDuplexCallerNode::worker_thread() {
     cxxpool::thread_pool pool{m_num_worker_threads};
     std::vector<std::future<void>> futures;
 
@@ -150,7 +70,8 @@ void DuplexCallerNode::worker_thread() {
     }
 }
 
-void DuplexCallerNode::basespace(std::string template_read_id, std::string complement_read_id) {
+void BaseSpaceDuplexCallerNode::basespace(std::string template_read_id,
+                                          std::string complement_read_id) {
     EdlibAlignConfig align_config = edlibDefaultAlignConfig();
     align_config.task = EDLIB_TASK_PATH;
 
@@ -167,7 +88,8 @@ void DuplexCallerNode::basespace(std::string template_read_id, std::string compl
                 std::vector<uint8_t>(template_read->qstring.begin(), template_read->qstring.end());
     }
 
-    preprocess_quality_scores(template_quality_scores);
+    // For basespace, a q score filter is run over the quality scores.
+    utils::preprocess_quality_scores(template_quality_scores);
 
     if (m_reads.find(complement_read_id) == m_reads.end()) {
         spdlog::debug("Complement ID={} paired with Template ID={} was not found",
@@ -182,11 +104,12 @@ void DuplexCallerNode::basespace(std::string template_read_id, std::string compl
         std::reverse(complement_quality_scores_reverse.begin(),
                      complement_quality_scores_reverse.end());
 
-        preprocess_quality_scores(complement_quality_scores_reverse);
+        // For basespace, a q score filter is run over the quality scores.
+        utils::preprocess_quality_scores(complement_quality_scores_reverse);
 
         std::vector<char> complement_sequence_reverse_complement = complement_str;
         // Compute the RC
-        reverse_complement(complement_sequence_reverse_complement);
+        dorado::utils::reverse_complement(complement_sequence_reverse_complement);
 
         EdlibAlignResult result =
                 edlibAlign(template_sequence.data(), template_sequence.size(),
@@ -195,11 +118,13 @@ void DuplexCallerNode::basespace(std::string template_read_id, std::string compl
 
         // Now - we have to do the actual basespace alignment itself
         int query_cursor = 0;
-        int target_cursor = result.startLocations[0];
+        int target_cursor =
+                result.startLocations
+                        [0];  // 0-based position in the *target* where alignment starts.
 
-        auto [alignment_start_end, cursors] =
-                get_trimmed_alignment(11, result.alignment, result.alignmentLength, target_cursor,
-                                      query_cursor, 0, result.endLocations[0]);
+        auto [alignment_start_end, cursors] = utils::get_trimmed_alignment(
+                11, result.alignment, result.alignmentLength, target_cursor, query_cursor, 0,
+                result.endLocations[0]);
 
         query_cursor = cursors.first;
         target_cursor = cursors.second;
@@ -229,19 +154,21 @@ void DuplexCallerNode::basespace(std::string template_read_id, std::string compl
     }
 }
 
-DuplexCallerNode::DuplexCallerNode(ReadSink& sink,
-                                   std::map<std::string, std::string> template_complement_map,
-                                   std::map<std::string, std::shared_ptr<Read>> reads,
-                                   size_t threads)
+BaseSpaceDuplexCallerNode::BaseSpaceDuplexCallerNode(
+        ReadSink& sink,
+        std::map<std::string, std::string> template_complement_map,
+        std::map<std::string, std::shared_ptr<Read>> reads,
+        size_t threads)
         : ReadSink(1000),
           m_sink(sink),
           m_template_complement_map(std::move(template_complement_map)),
           m_reads(std::move(reads)),
           m_num_worker_threads(threads) {
-    worker_threads.push_back(std::make_unique<std::thread>(&DuplexCallerNode::worker_thread, this));
+    worker_threads.push_back(
+            std::make_unique<std::thread>(&BaseSpaceDuplexCallerNode::worker_thread, this));
 }
 
-DuplexCallerNode::~DuplexCallerNode() {
+BaseSpaceDuplexCallerNode::~BaseSpaceDuplexCallerNode() {
     terminate();
     m_cv.notify_one();
 

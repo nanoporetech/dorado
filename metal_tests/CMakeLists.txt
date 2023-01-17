@@ -1,6 +1,6 @@
 set(SOURCE_FILES 
     main.cpp
-    LinearTanh.cpp
+    Linear.cpp
     )
 
 add_executable(dorado_metal_tests ${SOURCE_FILES})

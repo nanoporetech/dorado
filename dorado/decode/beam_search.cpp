@@ -7,10 +7,13 @@
 #include <torch/torch.h>
 
 #include <algorithm>
+#include <array>
 #include <cstring>
 #include <iostream>
 #include <limits>
 #include <numeric>
+
+#define REMOVE_FIXED_BEAM_STAYS
 
 namespace {
 
@@ -68,7 +71,7 @@ std::tuple<std::string, std::string> generate_sequence(const std::vector<uint8_t
 
     std::string sequence(seqLen, 'N');
     std::string qstring(seqLen, '!');
-    std::vector<char> alphabet = {'A', 'C', 'G', 'T'};
+    std::array<char, 4> alphabet = {'A', 'C', 'G', 'T'};
     std::vector<float> baseProbs(seqLen), totalProbs(seqLen);
 
     for (size_t blk = 0; blk < num_blocks; ++blk) {
@@ -130,11 +133,6 @@ float beam_search(const T* const scores,
     }
 
     // Some values we need
-#ifdef REMOVE_FIXED_BEAM_STAYS
-    size_t num_transitions = num_states * num_bases;
-#else
-    size_t num_transitions = num_states * (num_bases + 1);
-#endif
     constexpr uint64_t hash_seed = 0x880355f21e6d1965ULL;
     const float log_beam_cut =
             (beam_cut > 0.0f) ? (temperature * logf(beam_cut)) : std::numeric_limits<float>::max();
@@ -196,7 +194,7 @@ float beam_search(const T* const scores,
         /*  kmer transitions order:
 	 *  N^K , N array
 	 *  Elements stored as resulting kmer and modifying action (stays have a fixed score and are not computed).
-	 *  Kmer index is lexographic with most recent base in the fastest index
+	 *  Kmer index is lexicographic with most recent base in the fastest index
 	 *
 	 *  E.g.  AGT has index (4^2, 4, 1) . (0, 2, 3) == 11
 	 *  The modifying action is
@@ -215,7 +213,7 @@ float beam_search(const T* const scores,
         /*  kmer transitions order:
          *  N^K , (N + 1) array
          *  Elements stored as resulting kmer and modifying action (0 == stay).
-         *  Kmer index is lexographic with most recent base in the fastest index
+         *  Kmer index is lexicographic with most recent base in the fastest index
          *
          *  E.g.  AGT has index (4^2, 4, 1) . (0, 2, 3) == 11
          *  The modifying action is
@@ -478,7 +476,8 @@ std::tuple<std::string, std::string, std::vector<uint8_t>> beam_search_decode(
         float fixed_stay_score,
         float q_shift,
         float q_scale,
-        float temperature) {
+        float temperature,
+        float byte_score_scale) {
     const int num_blocks = int(scores_t.size(0));
     const int num_states = get_num_states(scores_t.size(1));
 
@@ -513,11 +512,9 @@ std::tuple<std::string, std::string, std::vector<uint8_t>> beam_search_decode(
         const auto back_guides = back_guides_contig->data_ptr<float>();
         const auto posts = posts_contig->data_ptr<float>();
 
-        // Scores must be rescaled from [-127, 127] to [-5.0, 5.0].
-        const auto kScoreScale = static_cast<float>(5.0 / 127.0);
         beam_search<int8_t>(scores, scores_block_stride, back_guides, posts, num_states, num_blocks,
                             beam_width, beam_cut, fixed_stay_score, states, moves, qual_data,
-                            temperature, kScoreScale);
+                            temperature, byte_score_scale);
     } else {
         throw std::runtime_error(std::string("beam_search_decode: unsupported tensor type ") +
                                  std::string(scores_t.dtype().name()));

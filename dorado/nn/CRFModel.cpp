@@ -4,14 +4,14 @@
 #include "../utils/tensor_utils.h"
 
 #ifndef __APPLE__
+#include "../utils/cuda_utils.h"
+
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAGuard.h>
 
 extern "C" {
 #include "koi.h"
 }
-#include <cublas_v2.h>
-#include <cuda_runtime.h>
 
 #define USE_CUDA_LSTM 1
 #define CUDA_PROFILE_TO_CERR 0
@@ -64,7 +64,9 @@ static void cublas_matmul_f16(torch::Tensor const &A, torch::Tensor const &B, to
 }
 
 static bool cuda_lstm_is_quantized(int layer_size) {
-    return ((layer_size == 96) || (layer_size == 128));
+    return ((layer_size == 96) ||
+            (layer_size ==
+             128));  // TODO - change back! just a test to see if quantized kernels are the problem
 }
 #endif  // if USE_CUDA_LSTM
 
@@ -706,16 +708,16 @@ TORCH_MODULE(Clamp);
 template <class LSTMStackType>
 struct CRFModelImpl : Module {
     CRFModelImpl(const CRFModelConfig &config, bool expand_blanks, int batch_size, int chunk_size) {
-        constexpr float conv3_max_value = 3.5f;
-        conv1 = register_module("conv1",
-                                Convolution(1, config.conv, 5, 1, config.clamp, 3.5f, false));
-        conv2 = register_module("conv2",
-                                Convolution(config.conv, 16, 5, 1, config.clamp, 3.5f, false));
+        constexpr float conv_max_value = 3.5f;
+        conv1 = register_module("conv1", Convolution(config.num_features, config.conv, 5, 1,
+                                                     config.clamp, conv_max_value, false));
+        conv2 = register_module(
+                "conv2", Convolution(config.conv, 16, 5, 1, config.clamp, conv_max_value, false));
         conv3 = register_module("conv3", Convolution(16, config.insize, 19, config.stride,
-                                                     config.clamp, conv3_max_value, true));
+                                                     config.clamp, conv_max_value, true));
 
-        float scale = 2 * I8_RANGE / (conv3_max_value - SWISH_LOWER_BOUND);
-        float zero_offset = scale * conv3_max_value - I8_RANGE;
+        float scale = 2 * I8_RANGE / (conv_max_value - SWISH_LOWER_BOUND);
+        float zero_offset = scale * conv_max_value - I8_RANGE;
         rnns = register_module(
                 "rnns", LSTMStackType(config.insize, batch_size, chunk_size / config.stride, scale,
                                       zero_offset));
@@ -726,12 +728,12 @@ struct CRFModelImpl : Module {
             linear1 = register_module("linear1", Linear(config.insize, decomposition));
             linear2 = register_module(
                     "linear2", Linear(LinearOptions(decomposition, config.outsize).bias(false)));
-            clamp1 = Clamp(-4.0, 4.0, config.clamp);
+            clamp1 = Clamp(-5.0, 5.0, config.clamp);
             encoder = Sequential(conv1, conv2, conv3, rnns, linear1, linear2, clamp1);
         } else if (config.conv == 16) {
             linear1 = register_module(
                     "linear1", Linear(LinearOptions(config.insize, config.outsize).bias(false)));
-            clamp1 = Clamp(-4.0, 4.0, config.clamp);
+            clamp1 = Clamp(-5.0, 5.0, config.clamp);
             encoder = Sequential(conv1, conv2, conv3, rnns, linear1, clamp1);
         } else {
             linear = register_module("linear1", LinearCRF(config.insize, config.outsize));
@@ -791,6 +793,9 @@ CRFModelConfig load_crf_model_config(const std::filesystem::path &path) {
     // the value of 1 is used.
     config.scale = 1.0f;
 
+    const auto &input = toml::find(config_toml, "input");
+    config.num_features = toml::find<int>(input, "features");
+
     const auto &encoder = toml::find(config_toml, "encoder");
     if (encoder.contains("type")) {
         // v4-type model
@@ -819,6 +824,10 @@ CRFModelConfig load_crf_model_config(const std::filesystem::path &path) {
         config.insize = toml::find<int>(encoder, "features");
         config.blank_score = toml::find<float>(encoder, "blank_score");
         config.scale = toml::find<float>(encoder, "scale");
+
+        if (encoder.contains("first_conv_size")) {
+            config.conv = toml::find<int>(encoder, "first_conv_size");
+        }
     }
 
     const auto &global_norm = toml::find(config_toml, "global_norm");
@@ -826,14 +835,10 @@ CRFModelConfig load_crf_model_config(const std::filesystem::path &path) {
     // linearcrfencoder.  We are ignoring the latter.
     config.state_len = toml::find<int>(global_norm, "state_len");
 
-#ifdef __APPLE__
-    // The Metal path outputs explicit stay scores from the NN.
-    // TODO -- remove explicit stay score output from the Metal path.
-    config.outsize = pow(4, config.state_len) * 5;
-#else
-    // CUDA and CPU paths do not output explicit stay scores from the NN.
-    config.outsize = pow(4, config.state_len) * 4;
-#endif
+    // All of the paths avoid outputting explicit stay scores from the NN,
+    // so we have 4^bases * 4 transitions.
+    const auto PowerOf4 = [](int x) { return 1 << (x << 1); };
+    config.outsize = PowerOf4(config.state_len + 1);
 
     return config;
 }

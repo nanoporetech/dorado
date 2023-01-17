@@ -1,12 +1,15 @@
 #include "WriterNode.h"
 
 #include "Version.h"
+#include "utils/sequence_utils.h"
 
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
 #include <chrono>
 #include <iostream>
 #include <sstream>
+#include <string>
 
 #ifndef _WIN32
 #include <unistd.h>
@@ -54,9 +57,19 @@ void WriterNode::worker_thread() {
         m_num_samples_processed += read->raw_data.size(0);
         m_num_reads_processed += 1;
 
+        if (m_rna) {
+            std::reverse(read->seq.begin(), read->seq.end());
+            std::reverse(read->qstring.begin(), read->qstring.end());
+        }
+
         if (m_num_reads_processed % 100 == 0 && m_isatty) {
             std::scoped_lock<std::mutex> lock(m_cerr_mutex);
             std::cerr << "\r> Reads processed: " << m_num_reads_processed;
+        }
+
+        if (utils::mean_qscore_from_qstring(read->qstring) < m_min_qscore) {
+            m_num_reads_failed += 1;
+            continue;
         }
 
         if (m_emit_fastq) {
@@ -82,17 +95,22 @@ void WriterNode::worker_thread() {
 WriterNode::WriterNode(std::vector<std::string> args,
                        bool emit_fastq,
                        bool emit_moves,
+                       bool rna,
                        bool duplex,
+                       size_t min_qscore,
                        size_t num_worker_threads,
                        size_t max_reads)
         : ReadSink(max_reads),
           m_args(std::move(args)),
           m_emit_fastq(emit_fastq),
           m_emit_moves(emit_moves),
+          m_rna(rna),
           m_duplex(duplex),
+          m_min_qscore(min_qscore),
           m_num_bases_processed(0),
           m_num_samples_processed(0),
           m_num_reads_processed(0),
+          m_num_reads_failed(0),
           m_initialization_time(std::chrono::system_clock::now()) {
 #ifdef _WIN32
     m_isatty = true;
@@ -123,13 +141,17 @@ WriterNode::~WriterNode() {
         std::cerr << "\r";
     }
     spdlog::info("> Reads basecalled: {}", m_num_reads_processed);
+    if (m_min_qscore > 0) {
+        spdlog::info("> Reads skipped (qscore < {}): {}", m_min_qscore, m_num_reads_failed);
+    }
     std::ostringstream samples_sec;
     if (m_duplex) {
         samples_sec << std::scientific << m_num_bases_processed / (duration / 1000.0);
+        spdlog::info("> Bases/s: {}", samples_sec.str());
     } else {
         samples_sec << std::scientific << m_num_samples_processed / (duration / 1000.0);
+        spdlog::info("> Samples/s: {}", samples_sec.str());
     }
-    spdlog::info("> Samples/s: {}", samples_sec.str());
 }
 
 }  // namespace dorado
