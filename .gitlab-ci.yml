@@ -88,18 +88,16 @@ build:windows:
     BUILD_OPTIONS: "-A x64 -DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN}"
   <<: *windows_runner
   <<: *build_dorado
-  when: manual
-  before_script:
-    - export PATH=${PATH}:${PWD}/dist/bin
+#  before_script:
+#    - export PATH=${PATH}:${PWD}/dist/bin
 
 build:windows_koi_download:
   variables:
     BUILD_OPTIONS: "-A x64"
   <<: *windows_runner
   <<: *build_dorado
-  when: manual
-  before_script:
-    - export PATH=${PATH}:${PWD}/dist/bin
+#  before_script:
+#    - export PATH=${PATH}:${PWD}/dist/bin
 
 build:macos:m1:
   variables:
