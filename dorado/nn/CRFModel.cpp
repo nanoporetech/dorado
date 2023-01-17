@@ -292,11 +292,6 @@ struct LinearCRFImpl : Module {
                              .view({N, T, -1});
         }
 
-        if (x.device() == torch::kCPU) {
-            // Output is [T, N, C]
-            return scores.transpose(0, 1);
-        }
-
         // Output is [N, T, C], contiguous
         return scores;
     }
@@ -747,6 +742,11 @@ struct CRFModelImpl : Module {
 
     torch::Tensor forward(torch::Tensor x) {
         ScopedProfileRange spr("nn_forward");
+        if (x.device() == torch::kCPU) {
+            // Output is [T, N, C], which CPU decoding requires.
+            return encoder->forward(x).transpose(0, 1);
+        }
+        // Output is [N, T, C]
         return encoder->forward(x);
     }
 
