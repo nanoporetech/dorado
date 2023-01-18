@@ -10,6 +10,12 @@ set(SOURCE_FILES
     StitchTest.cpp
 )
 
+if(APPLE)
+    list(APPEND SOURCE_FILES
+        MetalLinearTest.cpp
+    )
+endif()
+
 add_executable(dorado_tests ${SOURCE_FILES})
 
 target_link_libraries(dorado_tests

@@ -256,9 +256,6 @@ elseif(APPLE)
 endif()
 
 add_subdirectory(tests)
-if(APPLE)
-    add_subdirectory(metal_tests)
-endif()
 
 if(NOT DORADO_LIB_ONLY)
     include(cmake/DoradoPackaging.cmake)
