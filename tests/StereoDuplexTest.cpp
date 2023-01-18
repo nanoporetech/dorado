@@ -47,16 +47,16 @@ TEST_CASE(TEST_GROUP "Encoder") {
     template_read->seq = ReadFileIntoString(DataPath("template_seq"));
     template_read->qstring = ReadFileIntoString(DataPath("template_qstring"));
     template_read->moves = ReadFileIntoVector(DataPath("template_moves"));
-    torch::load(template_read->raw_data, DataPath("template_raw_data.tensor"));
+    torch::load(template_read->raw_data, DataPath("template_raw_data.tensor").string());
 
     const auto complement_read = std::make_shared<dorado::Read>();
     complement_read->seq = ReadFileIntoString(DataPath("complement_seq"));
     complement_read->qstring = ReadFileIntoString(DataPath("complement_qstring"));
     complement_read->moves = ReadFileIntoVector(DataPath("complement_moves"));
-    torch::load(complement_read->raw_data, DataPath("complement_raw_data.tensor"));
+    torch::load(complement_read->raw_data, DataPath("complement_raw_data.tensor").string());
 
     torch::Tensor stereo_raw_data;
-    torch::load(stereo_raw_data, DataPath("tereo_raw_data.tensor"));
+    torch::load(stereo_raw_data, DataPath("stereo_raw_data.tensor").string());
 
     const auto stereo_read = stereo_internal::stereo_encode(template_read, complement_read);
     REQUIRE(torch::equal(stereo_raw_data, stereo_read->raw_data));
