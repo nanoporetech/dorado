@@ -16,6 +16,7 @@ variables:
 
 .linux_runner: &linux_runner
   tags:
+    - linux
     - nvidia-docker
 
 .windows_runner: &windows_runner
