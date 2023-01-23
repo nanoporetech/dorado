@@ -1,6 +1,7 @@
 #include "Version.h"
 #include "data_loader/DataLoader.h"
 #include "decode/CPUDecoder.h"
+#include "utils/basecaller_utils.h"
 #include "utils/models.h"
 #ifdef __APPLE__
 #include "nn/MetalCRFModel.h"
@@ -42,7 +43,8 @@ void setup(std::vector<std::string> args,
            bool emit_fastq,
            bool emit_moves,
            size_t max_reads,
-           size_t min_qscore) {
+           size_t min_qscore,
+           const std::string read_list_file) {
     torch::set_num_threads(1);
     std::vector<Runner> runners;
 
@@ -161,7 +163,9 @@ void setup(std::vector<std::string> args,
                 writer_node, std::move(runners), batch_size, chunk_size, overlap, model_stride);
     }
     ScalerNode scaler_node(*basecaller_node, num_devices * 2);
-    DataLoader loader(scaler_node, "cpu", num_devices, max_reads);
+    DataLoader loader(scaler_node, "cpu", num_devices, max_reads,
+                      utils::load_read_list(read_list_file));
+
     loader.load_reads(data_path);
 }
 
@@ -181,6 +185,11 @@ int basecaller(int argc, char* argv[]) {
     parser.add_argument("-x", "--device")
             .help("device string in format \"cuda:0,...,N\", \"cuda:all\", \"metal\" etc..")
             .default_value(default_parameters.device);
+
+    parser.add_argument("-l", "--read_list")
+            .help("A file with a newline-delimited list of reads to basecall. If not provided, all "
+                  "reads will be basecalled")
+            .default_value(std::string(""));
 
     parser.add_argument("-n", "--max-reads").default_value(0).scan<'i', int>();
 
@@ -268,7 +277,7 @@ int basecaller(int argc, char* argv[]) {
               parser.get<int>("-b"), parser.get<int>("-r"), default_parameters.remora_batchsize,
               default_parameters.remora_threads, parser.get<bool>("--emit-fastq"),
               parser.get<bool>("--emit-moves"), parser.get<int>("--max-reads"),
-              parser.get<int>("--min-qscore"));
+              parser.get<int>("--min-qscore"), parser.get<std::string>("--read_list"));
     } catch (const std::exception& e) {
         spdlog::error("{}", e.what());
         return 1;

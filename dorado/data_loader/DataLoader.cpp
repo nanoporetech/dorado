@@ -195,8 +195,11 @@ void DataLoader::load_pod5_reads_from_file(const std::string& path) {
 
         for (auto& v : futures) {
             auto read = v.get();
-            m_read_sink.push_read(read);
-            m_loaded_read_count++;
+            if (m_allowed_read_ids.size() == 0 ||
+                (m_allowed_read_ids.find(read->read_id) != m_allowed_read_ids.end())) {
+                m_read_sink.push_read(read);
+                m_loaded_read_count++;
+            }
         }
 
         if (pod5_free_read_batch(batch) != POD5_OK) {
@@ -290,16 +293,23 @@ void DataLoader::load_fast5_reads_from_file(const std::string& path) {
         new_read->attributes.start_time = start_time_str;
         new_read->attributes.fast5_filename = fast5_filename;
 
-        m_read_sink.push_read(new_read);
-        m_loaded_read_count++;
+        if (m_allowed_read_ids.size() == 0 ||
+            (m_allowed_read_ids.find(new_read->read_id) != m_allowed_read_ids.end())) {
+            m_read_sink.push_read(new_read);
+            m_loaded_read_count++;
+        }
     }
 }
 
 DataLoader::DataLoader(ReadSink& read_sink,
                        const std::string& device,
                        size_t num_worker_threads,
-                       size_t max_reads)
-        : m_read_sink(read_sink), m_device(device), m_num_worker_threads(num_worker_threads) {
+                       size_t max_reads,
+                       std::set<std::string> read_list)
+        : m_read_sink(read_sink),
+          m_device(device),
+          m_num_worker_threads(num_worker_threads),
+          m_allowed_read_ids(read_list) {
     m_max_reads = max_reads == 0 ? std::numeric_limits<decltype(m_max_reads)>::max() : max_reads;
     assert(m_num_worker_threads > 0);
     static std::once_flag vbz_init_flag;

@@ -100,7 +100,9 @@ set(LIB_SOURCE_FILES
     dorado/utils/bam_utils.cpp
     dorado/utils/bam_utils.h
     dorado/utils/duplex_utils.h
-    dorado/utils/duplex_utils.cpp)
+    dorado/utils/duplex_utils.cpp
+    dorado/utils/basecaller_utils.h
+    dorado/utils/basecaller_utils.cpp)
 
 if(APPLE)
     include(cmake/Metal.cmake)

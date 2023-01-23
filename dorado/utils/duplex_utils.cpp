@@ -34,6 +34,16 @@ std::map<std::string, std::string> load_pairs_file(std::string pairs_file) {
     return template_complement_map;
 }
 
+std::set<std::string> get_read_list_from_pairs(
+        std::map<std::string, std::string> template_complement_map) {
+    std::set<std::string> read_list;
+    for (auto const& x : template_complement_map) {
+        read_list.insert(x.first);
+        read_list.insert(x.second);
+    }
+    return read_list;
+}
+
 void reverse_complement(std::vector<char>& sequence) {
     std::reverse(sequence.begin(), sequence.end());
     std::map<char, char> complementary_nucleotides = {
