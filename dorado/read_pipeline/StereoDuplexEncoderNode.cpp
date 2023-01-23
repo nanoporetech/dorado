@@ -9,7 +9,7 @@
 using namespace std::chrono_literals;
 using namespace torch::indexing;
 
-namespace {
+namespace stereo_internal {
 std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> template_read,
                                             std::shared_ptr<dorado::Read> complement_read) {
     // We rely on the incoming read raw data being of type float32 to allow dumb copying.
@@ -244,7 +244,7 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
 
     return read;
 }
-}  // namespace
+}  // namespace stereo_internal
 
 namespace dorado {
 
@@ -314,7 +314,7 @@ void StereoDuplexEncoderNode::worker_thread() {
                 }
 
                 std::shared_ptr<Read> stereo_encoded_read =
-                        stereo_encode(template_read, complement_read);
+                        stereo_internal::stereo_encode(template_read, complement_read);
 
                 if (stereo_encoded_read->raw_data.ndimension() ==
                     2) {  // 2 dims for stereo encoding, 1 for simplex

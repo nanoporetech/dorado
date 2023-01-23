@@ -8,6 +8,7 @@ set(SOURCE_FILES
     RemoraEncoderTest.cpp
     SequenceUtilsTest.cpp
     StitchTest.cpp
+    StereoDuplexTest.cpp
 )
 
 if(APPLE)
