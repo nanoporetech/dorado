@@ -1,5 +1,6 @@
 #include "Version.h"
 #include "cli/cli.h"
+#include "spdlog/cfg/env.h"
 
 #include <functional>
 #include <iostream>
@@ -27,6 +28,9 @@ void usage(const std::vector<std::string> commands) {
 }  // namespace
 
 int main(int argc, char* argv[]) {
+    // Load logging settings from environment/command-line.
+    spdlog::cfg::load_env_levels();
+
     const std::map<std::string, entry_ptr> subcommands = {
             {"basecaller", &dorado::basecaller},
             {"duplex", &dorado::duplex},
