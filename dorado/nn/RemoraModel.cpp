@@ -265,21 +265,15 @@ RemoraCaller::RemoraCaller(const std::filesystem::path& model_path,
                            size_t block_stride)
         : m_batch_size(batch_size) {
     // no metal implementation yet, force to cpu
-    if (device == "metal") {
-        m_options = m_options.device(torch::kCPU);
-    } else {
-        m_options = m_options.device(device);
-    }
-
-    if (m_options.device() == torch::kCPU) {
+    if (device == "metal" || device == "cpu") {
         // no slow_conv2d_cpu for type Half, need to use float32
-        m_options = m_options.dtype(torch::kFloat32);
+        m_options = torch::TensorOptions().device(torch::kCPU).dtype(torch::kFloat32);
     } else {
-        m_options = m_options.dtype(torch::kFloat16);
+        m_options = torch::TensorOptions().device(device).dtype(torch::kFloat16);
     }
 
 #ifndef __APPLE__
-    if (m_options.device() != torch::kCPU) {
+    if (m_options.device().is_cuda()) {
         m_stream = c10::cuda::getStreamFromPool(false, m_options.device().index());
     }
 #endif
@@ -330,9 +324,7 @@ RemoraCaller::RemoraCaller(const std::filesystem::path& model_path,
     auto kmer_len = m_params.bases_after + m_params.bases_before + 1;
 
     auto input_options = torch::TensorOptions()
-#ifndef __APPLE__
-                                 .pinned_memory(true)
-#endif
+                                 .pinned_memory(m_options.device().is_cuda())
                                  .dtype(m_options.dtype())
                                  .device(torch::kCPU);
 
