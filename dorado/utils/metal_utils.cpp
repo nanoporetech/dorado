@@ -5,6 +5,7 @@
 #include <Metal/Metal.hpp>
 #include <mach-o/dyld.h>
 #include <spdlog/spdlog.h>
+#include <sys/sysctl.h>
 #include <sys/syslimits.h>
 #include <torch/torch.h>
 
@@ -280,19 +281,29 @@ int get_mtl_device_core_count() {
 }
 
 int get_apple_cpu_perf_core_count() {
-    std::string name = get_mtl_device()->name()->utf8String();
-    // TODO: These numbers aren't always correct, lower-spec M1 Pro versions with 6 cores also exist.
-    //  And 4 might not be a good fallback. How do we determine the actual core count?
-    if (name == "Apple M1") {
-        return 4;
-    } else if (name == "Apple M1 Pro") {
-        return 8;
-    } else if (name == "Apple M1 Max") {
-        return 8;
-    } else if (name == "Apple M1 Ultra") {
-        return 16;
+    // We cache the count once it has been obtained.
+    static int cpu_perf_core_count = -1;
+    if (cpu_perf_core_count != -1)
+        return cpu_perf_core_count;
+
+    size_t size = sizeof(cpu_perf_core_count);
+    if (sysctlbyname("hw.perflevel0.physicalcpu", &cpu_perf_core_count, &size, nullptr, 0) == -1) {
+        std::string name = get_mtl_device()->name()->utf8String();
+        cpu_perf_core_count = 4;  // Used for M1, M2, and as fallback
+        // Lower-spec M1/M2 Pro versions with 6 cores also exist.
+        if (name == "Apple M1 Pro" || name == "Apple M1 Max" || name == "Apple M2 Pro" ||
+            name == "Apple M2 Max") {
+            cpu_perf_core_count = 8;
+        } else if (name == "Apple M1 Ultra") {
+            cpu_perf_core_count = 16;
+        }
+        spdlog::warn("Failed to retrieve CPU performance core count from sysctl: using value of {}",
+                     cpu_perf_core_count);
+    } else {
+        spdlog::debug("Retrieved CPU performance core count of {} from sysctl",
+                      cpu_perf_core_count);
     }
-    return 4;
+    return cpu_perf_core_count;
 }
 
 MTL::Buffer *mtl_for_tensor(const torch::Tensor &x) {
@@ -308,19 +319,6 @@ MTL::Buffer *extract_mtl_from_tensor(torch::Tensor &x) {
     return bfr;
 }
 
-int auto_gpu_batch_size(std::string model_path) {
-    if (model_path.find("_fast@v") != std::string::npos) {
-        return 1536;
-    } else if (model_path.find("_hac@v") != std::string::npos) {
-        return 768;
-    } else if (model_path.find("_sup@v") != std::string::npos) {
-        return 384;
-    } else {
-        throw std::runtime_error(std::string("Unsupported model: ") + model_path);
-    }
-    constexpr int kDefaultBatchSize = 384;
-    spdlog::warn("Unrecognised model suffix: defaulting to batch size {}", kDefaultBatchSize);
-    return kDefaultBatchSize;
-}
+int auto_gpu_batch_size() { return 48 * get_mtl_device_core_count(); }
 
 }  // namespace dorado::utils
