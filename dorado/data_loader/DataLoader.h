@@ -12,8 +12,8 @@ public:
                const std::string& device,
                size_t num_worker_threads,
                size_t max_reads = 0,
-               std::set<std::string> read_list = std::set<std::string>());
-    void load_reads(const std::string& path);
+               std::set<std::string> pairs_file_path = std::set<std::string>());
+    void load_reads(const std::string& pairs_file_path);
 
 private:
     void load_fast5_reads_from_file(const std::string& path);

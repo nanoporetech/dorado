@@ -44,7 +44,7 @@ void setup(std::vector<std::string> args,
            bool emit_moves,
            size_t max_reads,
            size_t min_qscore,
-           const std::string read_list_file) {
+           const std::string read_list_file_path) {
     torch::set_num_threads(1);
     std::vector<Runner> runners;
 
@@ -164,7 +164,7 @@ void setup(std::vector<std::string> args,
     }
     ScalerNode scaler_node(*basecaller_node, num_devices * 2);
     DataLoader loader(scaler_node, "cpu", num_devices, max_reads,
-                      utils::load_read_list(read_list_file));
+                      utils::load_read_list(read_list_file_path));
 
     loader.load_reads(data_path);
 }

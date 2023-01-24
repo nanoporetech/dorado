@@ -7,9 +7,9 @@
 #include <vector>
 
 namespace dorado::utils {
-std::map<std::string, std::string> load_pairs_file(std::string pairs_file) {
+std::map<std::string, std::string> load_pairs_file(std::string pairs_file_path) {
     std::ifstream dataFile;
-    dataFile.open(pairs_file);
+    dataFile.open(pairs_file_path);
 
     std::map<std::string, std::string> template_complement_map;
 
