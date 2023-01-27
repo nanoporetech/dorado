@@ -187,7 +187,7 @@ struct MetalLSTMImpl : Module {
         register_parameter("bias_ih", bias_ih, false);
         register_parameter("bias_hh", bias_hh, false);
 
-        t_weights_bias = torch::empty({layer_size * 2 + 1, layer_size, kLstmGates}, torch_dtype);
+        t_weights_bias = torch::empty({layer_size * 3 + 1, layer_size, kLstmGates}, torch_dtype);
     }
 
     torch::Tensor t_weights_bias;
@@ -350,7 +350,7 @@ struct MetalBlockImpl : Module {
 
         // This buffer is used for several layers of the model.
         mat_working_mem = create_buffer(
-                device, size_t(lstm_chunk_size + 2) * batch_size * layer_size * dtype_bytes);
+                device, size_t(lstm_chunk_size + 3) * batch_size * layer_size * dtype_bytes);
         mat_state = create_buffer(device, batch_size * layer_size * dtype_bytes);
         mat_temp = create_buffer(device, mat_temp_elems * dtype_bytes);
     }
@@ -376,7 +376,7 @@ struct MetalBlockImpl : Module {
             t_w = t_w.reshape({kLstmGates, layer_size, layer_size}).transpose(1, 2);
             t_u = t_u.reshape({kLstmGates, layer_size, layer_size}).transpose(1, 2);
             t_b = t_b.reshape({kLstmGates, 1, layer_size});
-            t_w = torch::concat({t_u, t_w, t_b}, 1);
+            t_w = torch::concat({t_u, t_w, t_w, t_b}, 1);
 
             // reorder from IFGO to GIFO (2, 0, 1, 3), and transpose to gate last
             t_w = torch::stack({t_w[2], t_w[0], t_w[1], t_w[3]}, 2);
