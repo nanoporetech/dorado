@@ -102,9 +102,21 @@ The following models are currently available:
 ## Developer quickstart
 
 ### Linux dependencies
-
+The following packages are necessary to build dorado in a barebones environment (e.g. the official ubuntu:jammy docker image)
 ```
-apt-get update && apt-get install -y --no-install-recommends libhdf5-dev libssl-dev libzstd-dev
+apt-get update && \
+    apt-get install -y --no-install-recommends \
+        curl \
+        git \
+        ca-certificates \
+        build-essential \
+        nvidia-cuda-toolkit \
+        libhdf5-dev \
+        libssl-dev \
+        libzstd-dev \
+        cmake \
+        autoconf \
+        automake
 ```
 
 ### Clone and build
