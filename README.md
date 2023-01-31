@@ -104,7 +104,7 @@ The following models are currently available:
 ### Linux dependencies
 
 ```
-apt-get update && apt-get install -y --no-install-recommends libhdf5-dev libssl-dev libzstd-dev
+apt-get update && apt-get install -y --no-install-recommends autoconf libhdf5-dev libssl-dev libzstd-dev
 ```
 
 ### Clone and build
