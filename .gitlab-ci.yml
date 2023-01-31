@@ -155,7 +155,7 @@ build_archive:macos:m1:
 # Test stages
 
 test:linux:x86:focal:
-  image: ${DORADO_DEPS}
+  image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04:1.1
   <<: *linux_runner
   <<: *test_dorado
   needs:
