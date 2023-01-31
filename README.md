@@ -120,13 +120,19 @@ apt-get update && \
 ```
 
 ### Clone and build
+The commands below will build dorado and install it in `/opt`.
+ `NUM_THREADS` controls the number of threads that cmake uses to compile dorado. It can be set to a value higher than "1", but using too many threads can use all available RAM and cause compilation to fail. Peak memory usage seems to be 1-2GB per thread.
 
 ```
-$ git clone git@github.com:nanoporetech/dorado.git
-$ cd dorado
-$ cmake -S . -B cmake-build -DCMAKE_CUDA_COMPILER=<NVCC_DIR>/nvcc
-$ cmake --build cmake-build --config Release -j
-$ ctest --test-dir cmake-build
+export NUM_THREADS=1
+git clone https://github.com/nanoporetech/dorado.git /dorado
+cd /dorado
+cmake -S . -B cmake-build -DCMAKE_CUDA_COMPILER=nvcc
+cmake --build cmake-build --config Release --parallel $NUM_THREADS
+ctest --test-dir cmake-build
+cmake --install cmake-build --prefix /opt
+rm -rf /dorado
+cd /
 ```
 
 ### Pre commit
