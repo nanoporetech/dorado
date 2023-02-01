@@ -305,7 +305,7 @@ DataLoader::DataLoader(ReadSink& read_sink,
                        const std::string& device,
                        size_t num_worker_threads,
                        size_t max_reads,
-                       std::set<std::string> read_list)
+                       std::unordered_set<std::string> read_list)
         : m_read_sink(read_sink),
           m_device(device),
           m_num_worker_threads(num_worker_threads),

@@ -160,7 +160,7 @@ int duplex(int argc, char* argv[]) {
                     writer_node, std::move(stereo_runners), stereo_batch_size, chunk_size, overlap,
                     stereo_model_stride);
 
-            std::set<std::string> read_list =
+            std::unordered_set<std::string> read_list =
                     utils::get_read_list_from_pairs(template_complement_map);
 
             StereoDuplexEncoderNode stereo_node = StereoDuplexEncoderNode(

@@ -1,6 +1,6 @@
 #include <map>
-#include <set>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 namespace dorado::utils {
@@ -24,6 +24,6 @@ std::pair<std::pair<int, int>, std::pair<int, int>> get_trimmed_alignment(
 // Applies a min pool filter to q scores for basespace-duplex algorithm
 void preprocess_quality_scores(std::vector<uint8_t>& quality_scores, int pool_window = 5);
 
-std::set<std::string> get_read_list_from_pairs(
+std::unordered_set<std::string> get_read_list_from_pairs(
         std::map<std::string, std::string> template_complement_map);
 }  // namespace dorado::utils

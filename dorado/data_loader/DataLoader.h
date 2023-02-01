@@ -1,6 +1,6 @@
 #pragma once
-#include <set>
 #include <string>
+#include <unordered_set>
 
 namespace dorado {
 
@@ -12,7 +12,7 @@ public:
                const std::string& device,
                size_t num_worker_threads,
                size_t max_reads = 0,
-               std::set<std::string> pairs_file_path = std::set<std::string>());
+               std::unordered_set<std::string> pairs_file_path = std::unordered_set<std::string>());
     void load_reads(const std::string& pairs_file_path);
 
 private:
@@ -23,7 +23,7 @@ private:
     std::string m_device;
     size_t m_num_worker_threads{1};
     size_t m_max_reads{0};
-    std::set<std::string> m_allowed_read_ids;
+    std::unordered_set<std::string> m_allowed_read_ids;
 };
 
 }  // namespace dorado
