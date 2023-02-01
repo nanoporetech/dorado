@@ -44,7 +44,7 @@ void setup(std::vector<std::string> args,
            bool emit_moves,
            size_t max_reads,
            size_t min_qscore,
-           const std::string read_list_file_path) {
+           std::string read_list_file_path) {
     torch::set_num_threads(1);
     std::vector<Runner> runners;
 

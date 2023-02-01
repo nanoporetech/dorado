@@ -173,7 +173,7 @@ int duplex(int argc, char* argv[]) {
                                                      chunk_size, overlap, simplex_model_stride);
             ScalerNode scaler_node(*basecaller_node, num_devices * 2);
 
-            DataLoader loader(scaler_node, "cpu", num_devices, 0, read_list);
+            DataLoader loader(scaler_node, "cpu", num_devices, 0, std::move(read_list));
             loader.load_reads(reads);
         }
     } catch (const std::exception& e) {

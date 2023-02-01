@@ -321,7 +321,7 @@ DataLoader::DataLoader(ReadSink& read_sink,
         : m_read_sink(read_sink),
           m_device(device),
           m_num_worker_threads(num_worker_threads),
-          m_allowed_read_ids(read_list) {
+          m_allowed_read_ids(std::move(read_list)) {
     m_max_reads = max_reads == 0 ? std::numeric_limits<decltype(m_max_reads)>::max() : max_reads;
     assert(m_num_worker_threads > 0);
     static std::once_flag vbz_init_flag;
