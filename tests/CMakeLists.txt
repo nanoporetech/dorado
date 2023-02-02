@@ -1,6 +1,7 @@
 
 set(SOURCE_FILES
     main.cpp
+    AsyncQueueTest.cpp
     Fast5DataLoaderTest.cpp
     TensorUtilsTest.cpp
     MathUtilsTest.cpp
@@ -13,7 +14,7 @@ set(SOURCE_FILES
 
 if(APPLE)
     list(APPEND SOURCE_FILES
-        MetalLinearTest.cpp
+        #MetalLinearTest.cpp
     )
 endif()
 
