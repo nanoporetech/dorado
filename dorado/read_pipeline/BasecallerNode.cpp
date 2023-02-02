@@ -17,29 +17,12 @@ namespace dorado {
 constexpr auto FORCE_TIMEOUT = 100ms;
 
 void BasecallerNode::input_worker_thread() {
-    while (true) {
+    std::shared_ptr<Read> read;
+    while (m_work_queue.try_pop(read)) {
         // Allow 5 batches per model runner on the chunks_in queue
-        size_t max_chunks_in = m_batch_size * m_num_active_model_runners * 5;
+        const size_t max_chunks_in = m_batch_size * m_num_active_model_runners * 5;
 
-        // Wait until we are provided with a read
-        std::unique_lock<std::mutex> reads_lock(m_cv_mutex);
-        m_cv.wait_for(reads_lock, 10ms, [this] { return (!m_reads.empty()); });
-
-        if (m_reads.empty()) {
-            if (m_terminate) {
-                // Notify the basecaller threads that it is safe to gracefully terminate the basecaller
-                m_terminate_basecaller = true;
-                return;
-            } else {
-                continue;
-            }
-        }
-
-        std::shared_ptr<Read> read = m_reads.front();
-        m_reads.pop_front();
-        reads_lock.unlock();
-
-        // Now that we have acquired a read and released the reads mutex, wait until we can push to chunks_in
+        // Now that we have acquired a read, wait until we can push to chunks_in
         while (true) {
             std::unique_lock<std::mutex> chunk_lock(m_chunks_in_mutex);
             m_chunks_in_has_space_cv.wait_for(chunk_lock, 10ms, [this, &max_chunks_in] {
@@ -83,6 +66,9 @@ void BasecallerNode::input_worker_thread() {
             break;  // Go back to watching the input reads
         }
     }
+
+    // Notify the basecaller threads that it is safe to gracefully terminate the basecaller
+    m_terminate_basecaller = true;
 }
 
 void BasecallerNode::basecall_current_batch(int worker_id) {
@@ -267,7 +253,6 @@ BasecallerNode::BasecallerNode(ReadSink &sink,
 
 BasecallerNode::~BasecallerNode() {
     terminate();
-    m_cv.notify_one();
     m_input_worker->join();
     for (auto &t : m_basecall_workers) {
         t->join();

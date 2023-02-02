@@ -240,17 +240,12 @@ std::string Read::generate_modbase_string(uint8_t threshold) const {
 }
 
 void ReadSink::push_read(std::shared_ptr<Read>& read) {
-    std::unique_lock<std::mutex> push_read_cv_lock(m_push_read_cv_mutex);
-    while (!m_push_read_cv.wait_for(push_read_cv_lock, 100ms,
-                                    [this] { return m_reads.size() < m_max_reads; })) {
-    }
-    {
-        std::unique_lock<std::mutex> lock(m_cv_mutex);
-        m_reads.push_back(read);
-    }
-    m_cv.notify_one();
+    const bool success = m_work_queue.try_push(std::move(read));
+    // try_push will fail if the sink has been told to terminate.
+    // We do not expect to be pushign reads from this source if that is the case.
+    assert(success);
 }
 
-ReadSink::ReadSink(size_t max_reads) : m_max_reads(max_reads) {}
+ReadSink::ReadSink(size_t max_reads) : m_work_queue(max_reads) {}
 
 }  // namespace dorado

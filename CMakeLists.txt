@@ -80,6 +80,7 @@ set(LIB_SOURCE_FILES
     dorado/modbase/remora_scaler.h
     dorado/modbase/remora_utils.cpp
     dorado/modbase/remora_utils.h
+    dorado/utils/AsyncQueue.h
     dorado/utils/base_mod_utils.cpp
     dorado/utils/base_mod_utils.h
     dorado/utils/compat_utils.cpp
