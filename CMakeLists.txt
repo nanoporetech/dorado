@@ -7,6 +7,8 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(DORADO_3RD_PARTY ${CMAKE_CURRENT_SOURCE_DIR}/dorado/3rdparty)
 
+find_package(CUDAToolkit QUIET)
+
 include(cmake/DoradoVersion.cmake)
 include(cmake/UpdateSubmodules.cmake)
 include(cmake/DownloadAndExtract.cmake)
@@ -234,7 +236,6 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     endif()
 
     # CUDA system DLLs we depend on:
-    find_package(CUDAToolkit QUIET)
     set(PATTERNS
         "*cudart.so*"
         "*cublas*.so*"
