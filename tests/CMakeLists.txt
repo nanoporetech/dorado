@@ -14,7 +14,7 @@ set(SOURCE_FILES
 
 if(APPLE)
     list(APPEND SOURCE_FILES
-        #MetalLinearTest.cpp
+        MetalLinearTest.cpp
     )
 endif()
 
