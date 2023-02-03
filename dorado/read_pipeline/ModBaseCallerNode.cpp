@@ -61,7 +61,6 @@ ModBaseCallerNode::~ModBaseCallerNode() {
         t->join();
     }
     m_output_worker->join();
-    m_sink.terminate();
 }
 
 void ModBaseCallerNode::init_modbase_info() {

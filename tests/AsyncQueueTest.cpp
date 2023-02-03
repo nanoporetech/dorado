@@ -2,7 +2,7 @@
 
 #include <catch2/catch.hpp>
 
-#define TEST_GROUP "AsyncQueue: "
+#define TEST_GROUP "AsyncQueue "
 
 #include <iostream>
 #include <thread>
