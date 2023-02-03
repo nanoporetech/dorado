@@ -188,26 +188,6 @@ if(NOT DORADO_LIB_ONLY)
         set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
     endif()
 
-    add_library(dorado_io_lib
-        dorado/data_loader/DataLoader.cpp
-        dorado/data_loader/DataLoader.h
-        dorado/utils/models.cpp
-        dorado/utils/models.h
-    )
-
-    target_link_libraries(dorado_io_lib
-       OpenSSL::SSL
-       elzip
-       ${POD5_LIBRARIES}
-       ${HDF5_C_LIBRARIES}
-    )
-
-    set_target_properties(dorado_io_lib
-        PROPERTIES
-        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
-        ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
-    )
-
     add_executable(dorado 
         dorado/main.cpp
         dorado/cli/duplex.cpp
@@ -275,6 +255,26 @@ elseif(APPLE)
 endif()
 
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    add_library(dorado_io_lib
+        dorado/data_loader/DataLoader.cpp
+        dorado/data_loader/DataLoader.h
+        dorado/utils/models.cpp
+        dorado/utils/models.h
+    )
+
+    target_link_libraries(dorado_io_lib
+       OpenSSL::SSL
+       elzip
+       ${POD5_LIBRARIES}
+       ${HDF5_C_LIBRARIES}
+    )
+
+    set_target_properties(dorado_io_lib
+        PROPERTIES
+        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
+        ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
+    )
+
     add_subdirectory(tests)
 endif()
 
