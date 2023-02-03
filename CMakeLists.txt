@@ -44,6 +44,7 @@ endif()
 
 if(DEFINED CUDA_TOOLKIT_ROOT_DIR)
   message(STATUS "CUDA toolkit dir is ${CUDA_TOOLKIT_ROOT_DIR}")
+  set(CUDAToolkit_ROOT ${CUDA_TOOLKIT_ROOT_DIR})
 endif()
 
 set(LIB_SOURCE_FILES
@@ -233,12 +234,26 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     endif()
 
     # CUDA system DLLs we depend on:
-    file(GLOB CUDART_DLLS "${CUDAToolkit_ROOT}/targets/x86_64-linux/lib/*cudart.so*")
-    file(GLOB CUBLAS_DLLS "${CUDAToolkit_ROOT}/targets/x86_64-linux/lib/*cublas*.so*")
-    file(GLOB NVTOOLS_DLLS "${CUDAToolkit_ROOT}/targets/x86_64-linux/lib/*nvToolsExt.so*")
-    install(FILES ${CUDART_DLLS} DESTINATION lib COMPONENT redist_libs)
-    install(FILES ${CUBLAS_DLLS} DESTINATION lib COMPONENT redist_libs)
-    install(FILES ${NVTOOLS_DLLS} DESTINATION lib COMPONENT redist_libs)
+    find_package(CUDAToolkit QUIET)
+    set(PATTERNS
+        "*cudart.so*"
+        "*cublas*.so*"
+        "*nvToolsExt.so*"
+    )
+
+    if(${CMAKE_SYSTEM_PROCESSOR} STREQUAL "aarch64")
+        list(APPEND PATTERNS
+            "*cusparse*"
+            "*curand.so*"
+            "*cusolver*"
+            "*cufft.so*"
+        )
+    endif()
+    
+    foreach(PATTERN ${PATTERNS})
+        file(GLOB DEP_DLLS "${CUDAToolkit_ROOT}/targets/${CMAKE_SYSTEM_PROCESSOR}-linux/lib/${PATTERN}")
+        install(FILES ${DEP_DLLS} DESTINATION lib COMPONENT redist_libs)
+    endforeach()
 
     # If zstd has been dynamically linked, add the .so to the package
     get_filename_component(ZSTD_LIBRARY_PATH ${ZSTD_LIBRARY_RELEASE} DIRECTORY)
