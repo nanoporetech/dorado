@@ -19,6 +19,11 @@ if(NOT DEFINED HTSLIB_LIBRARIES) # lazy include guard
         endif()
         set(htslib_PREFIX ${CMAKE_BINARY_DIR}/3rdparty/htslib)
 
+        # We need cross-compilation mode for iOS builds.
+        if (CMAKE_SYSTEM_NAME STREQUAL "iOS")
+            set(CONFIGURE_FLAGS "--host=aarch64-apple-darwin")
+        endif()
+
         include(ExternalProject)
         ExternalProject_Add(htslib_project
                 PREFIX ${htslib_PREFIX}
@@ -26,7 +31,7 @@ if(NOT DEFINED HTSLIB_LIBRARIES) # lazy include guard
                 BUILD_IN_SOURCE 1
                 CONFIGURE_COMMAND autoheader
                 COMMAND ${AUTOCONF_COMMAND}
-                COMMAND ./configure --disable-bz2 --disable-lzma --disable-libcurl --disable-s3 --disable-gcs
+                COMMAND ./configure --disable-bz2 --disable-lzma --disable-libcurl --disable-s3 --disable-gcs ${CONFIGURE_FLAGS}
                 BUILD_COMMAND ${MAKE_COMMAND} install prefix=${htslib_PREFIX}
                 INSTALL_COMMAND ""
                 BUILD_BYPRODUCTS ${htslib_PREFIX}/lib/libhts.a
