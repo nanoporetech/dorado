@@ -52,6 +52,8 @@ set(LIB_SOURCE_FILES
     dorado/nn/ModelRunner.h
     dorado/nn/RemoraModel.cpp
     dorado/nn/RemoraModel.h
+    dorado/read_pipeline/FakeDataLoader.cpp
+    dorado/read_pipeline/FakeDataLoader.h
     dorado/read_pipeline/ReadPipeline.cpp
     dorado/read_pipeline/ReadPipeline.h
     dorado/read_pipeline/ScalerNode.cpp
@@ -66,8 +68,6 @@ set(LIB_SOURCE_FILES
     dorado/read_pipeline/WriterNode.h
     dorado/read_pipeline/BaseSpaceDuplexCallerNode.cpp
     dorado/read_pipeline/BaseSpaceDuplexCallerNode.h
-    dorado/data_loader/DataLoader.cpp
-    dorado/data_loader/DataLoader.h
     dorado/decode/beam_search.cpp
     dorado/decode/fast_hash.cpp
     dorado/decode/fast_hash.h
@@ -87,8 +87,6 @@ set(LIB_SOURCE_FILES
     dorado/utils/log_utils.h
     dorado/utils/log_utils.cpp
     dorado/utils/math_utils.h
-    dorado/utils/models.cpp
-    dorado/utils/models.h
     dorado/utils/module_utils.h
     dorado/utils/parameters.h
     dorado/utils/sequence_utils.cpp
@@ -130,6 +128,7 @@ set_target_properties(dorado_lib
 )
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/dorado
+    ${TORCH_INCLUDE_DIRS}
     ${HDF5_INCLUDE_DIRS}
     ${KOI_INCLUDE}
     ${POD5_INCLUDE}
@@ -159,15 +158,12 @@ target_link_libraries(dorado_lib
     ${APPLE_FWK_QUARTZ_CORE}
     ${APPLE_FWK_METAL}
     ${IOKIT}
-    ${HDF5_C_LIBRARIES}
     ${TORCH_LIBRARIES}
-    ${POD5_LIBRARIES}
     ${KOI_LIBRARIES}
     ${HTSLIB_LIBRARIES}
     vbz_hdf_plugin
     OpenSSL::SSL
     edlib
-    elzip
 )
 
 if(NOT WIN32)
@@ -206,7 +202,10 @@ if(NOT DORADO_LIB_ONLY)
         RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
     )
 
-    target_link_libraries(dorado dorado_lib)
+    target_link_libraries(dorado
+        dorado_lib
+        dorado_io_lib
+    )
 
     if (DEFINED DORADO_INSTALL_PATH)
         set(CMAKE_INSTALL_PREFIX ${DORADO_INSTALL_PATH})
@@ -255,7 +254,29 @@ elseif(APPLE)
     install(FILES ${TORCH_DLLS} DESTINATION lib COMPONENT redist_libs)
 endif()
 
-add_subdirectory(tests)
+if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    add_library(dorado_io_lib
+        dorado/data_loader/DataLoader.cpp
+        dorado/data_loader/DataLoader.h
+        dorado/utils/models.cpp
+        dorado/utils/models.h
+    )
+
+    target_link_libraries(dorado_io_lib
+       OpenSSL::SSL
+       elzip
+       ${POD5_LIBRARIES}
+       ${HDF5_C_LIBRARIES}
+    )
+
+    set_target_properties(dorado_io_lib
+        PROPERTIES
+        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
+        ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
+    )
+
+    add_subdirectory(tests)
+endif()
 
 if(NOT DORADO_LIB_ONLY)
     include(cmake/DoradoPackaging.cmake)
