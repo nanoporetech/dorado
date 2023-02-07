@@ -131,6 +131,8 @@ int select_batchsize(int layer_size, int min_batchsize, int max_batchsize, std::
 
 int auto_gpu_batch_size(std::string model_path, std::vector<std::string> devices) {
     // memory breakpoints in GB
+    int result;
+
     const std::vector<int> breakpoints{8, 12, 16, 24, 32, 40};
     // {fast, hac, sup}
     const std::vector<std::vector<int>> batch_sizes = {
@@ -149,7 +151,11 @@ int auto_gpu_batch_size(std::string model_path, std::vector<std::string> devices
     int min_available = *std::min_element(available.begin(), available.end()) / 1e+9;
     spdlog::debug("- available GPU memory {}GB", min_available);
     int idx = std::lower_bound(breakpoints.begin(), breakpoints.end(), min_available) -
-              breakpoints.begin();
+              breakpoints.begin() - 1;
+    if (idx < 0) {
+        spdlog::warn("> warning: auto batchsize detection failed. Insufficient memory, required 8GB, available {}GB", min_available);
+        return 128;
+    }
     auto presets = batch_sizes[std::min(idx, static_cast<int>(breakpoints.size() - 1))];
 
     if (model_path.find("_fast@v") != std::string::npos) {
