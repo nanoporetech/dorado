@@ -186,7 +186,7 @@ int basecaller(int argc, char* argv[]) {
             .help("device string in format \"cuda:0,...,N\", \"cuda:all\", \"metal\" etc..")
             .default_value(default_parameters.device);
 
-    parser.add_argument("-l", "--read-list")
+    parser.add_argument("-l", "--read-ids")
             .help("A file with a newline-delimited list of reads to basecall. If not provided, all "
                   "reads will be basecalled")
             .default_value(std::string(""));
