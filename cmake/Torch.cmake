@@ -6,7 +6,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32)
     # so we need to make CUDA_TOOLKIT_ROOT_DIR is set correctly as per [1] we also
     # 1. https://cmake.org/cmake/help/latest/module/FindCUDAToolkit.html
     # 2. https://github.com/pytorch/pytorch/blob/5fa71207222620b4efb78989849525d4ee6032e8/cmake/public/cuda.cmake#L40
-    if(DEFINED ${CUDAToolkit_ROOT})
+    if(DEFINED CUDAToolkit_ROOT)
       set(CUDA_TOOLKIT_ROOT_DIR ${CUDAToolkit_ROOT})
     endif()
     if(NOT DEFINED CMAKE_CUDA_COMPILER)
