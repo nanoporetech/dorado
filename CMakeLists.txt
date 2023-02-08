@@ -157,7 +157,6 @@ target_link_libraries(dorado_lib
     ${APPLE_FWK_FOUNDATION}
     ${APPLE_FWK_QUARTZ_CORE}
     ${APPLE_FWK_METAL}
-    ${IOKIT}
     ${TORCH_LIBRARIES}
     ${KOI_LIBRARIES}
     ${HTSLIB_LIBRARIES}
@@ -165,6 +164,10 @@ target_link_libraries(dorado_lib
     OpenSSL::SSL
     edlib
 )
+
+if(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    target_link_libraries(dorado_lib ${IOKIT})
+endif()
 
 if(NOT WIN32)
     add_dependencies(dorado_lib htslib_project)
