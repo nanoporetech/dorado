@@ -102,19 +102,37 @@ The following models are currently available:
 ## Developer quickstart
 
 ### Linux dependencies
-
+The following packages are necessary to build dorado in a barebones environment (e.g. the official ubuntu:jammy docker image)
 ```
-apt-get update && apt-get install -y --no-install-recommends libhdf5-dev libssl-dev libzstd-dev
+apt-get update && \
+    apt-get install -y --no-install-recommends \
+        curl \
+        git \
+        ca-certificates \
+        build-essential \
+        nvidia-cuda-toolkit \
+        libhdf5-dev \
+        libssl-dev \
+        libzstd-dev \
+        cmake \
+        autoconf \
+        automake
 ```
 
 ### Clone and build
+The commands below will build dorado and install it in `/opt`.
+ `NUM_THREADS` controls the number of threads that cmake uses to compile dorado. It can be set to a value higher than "1", but using too many threads can use all available RAM and cause compilation to fail. Peak memory usage seems to be 1-2GB per thread.
 
 ```
-$ git clone git@github.com:nanoporetech/dorado.git
-$ cd dorado
-$ cmake -S . -B cmake-build -DCMAKE_CUDA_COMPILER=<NVCC_DIR>/nvcc
-$ cmake --build cmake-build --config Release -j
-$ ctest --test-dir cmake-build
+export NUM_THREADS=1
+git clone https://github.com/nanoporetech/dorado.git /dorado
+cd /dorado
+cmake -S . -B cmake-build -DCMAKE_CUDA_COMPILER=nvcc
+cmake --build cmake-build --config Release --parallel $NUM_THREADS
+ctest --test-dir cmake-build
+cmake --install cmake-build --prefix /opt
+rm -rf /dorado
+cd /
 ```
 
 ### Pre commit
