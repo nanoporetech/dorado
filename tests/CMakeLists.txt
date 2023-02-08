@@ -1,7 +1,6 @@
 
 set(SOURCE_FILES
     main.cpp
-    cuda_utils_test.cpp
     Fast5DataLoaderTest.cpp
     Pod5DataLoaderTest.cpp
     TensorUtilsTest.cpp
@@ -16,6 +15,10 @@ set(SOURCE_FILES
 if(APPLE)
     list(APPEND SOURCE_FILES
         MetalLinearTest.cpp
+    )
+else()
+    list(APPEND SOURCE_FILES
+        cuda_utils_test.cpp
     )
 endif()
 
