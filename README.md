@@ -134,12 +134,12 @@ The `-j` flag will use all available threads to build dorado and usage is around
 by the amount of available memory on your system you can lower the number of threads i.e.` -j 4`.
 
 After building you can run dorado from the build directory `./cmake-build/bin/dorado` or install it somewhere else on your
-system i.e. `/opt` **(note: you will need the relevant permissions for the target installation directory)**.
+system i.e. `/opt` *(note: you will need the relevant permissions for the target installation directory)*.
 
 ```
 $ cmake --install cmake-build --prefix /opt
-``
-`
+```
+
 ### Pre commit
 
 The project uses pre-commit to ensure code is consistently formatted, you can set this up using pip:
