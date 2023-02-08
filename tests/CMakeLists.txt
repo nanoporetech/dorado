@@ -1,6 +1,7 @@
 
 set(SOURCE_FILES
     main.cpp
+    cuda_utils_test.cpp
     Fast5DataLoaderTest.cpp
     TensorUtilsTest.cpp
     MathUtilsTest.cpp

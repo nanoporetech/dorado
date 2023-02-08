@@ -15,8 +15,10 @@ extern "C" {
 #include <cuda_runtime_api.h>
 #include <spdlog/spdlog.h>
 
+#include <array>
 #include <chrono>
 #include <limits>
+#include <optional>
 #include <regex>
 #include <string>
 #include <vector>
@@ -133,7 +135,7 @@ int auto_gpu_batch_size(std::string model_path, std::vector<std::string> devices
     // memory breakpoints in GB
     const std::vector<int> breakpoints{8, 12, 16, 24, 32, 40};
     // {fast, hac, sup}
-    const std::vector<std::vector<int>> batch_sizes = {
+    const std::vector<std::array<int, 3>> batch_sizes = {
             {960, 448, 128},     // 8GB
             {1536, 640, 192},    // 12GB
             {2048, 1024, 256},   // 16GB
@@ -142,33 +144,43 @@ int auto_gpu_batch_size(std::string model_path, std::vector<std::string> devices
             {4096, 2560, 1024},  // 40GB
     };
 
-    assert(breakpoints.size() == batch_sizes.size());
-
     // compute how much free gpu memory and pick the closest breakpoint
     auto available = available_memory(devices);
     int min_available = *std::min_element(available.begin(), available.end()) / 1e+9;
-    spdlog::debug("- available GPU memory {}GB", min_available);
-    int idx = std::upper_bound(breakpoints.begin(), breakpoints.end(), min_available) -
-              breakpoints.begin() - 1;
-    if (idx < 0) {
+    auto presets = details::try_select_max_batch_sizes(breakpoints, batch_sizes, min_available);
+    if (!presets) {
         spdlog::warn(
-                "Auto batchsize detection failed. Insufficient memory, required 8GB, available "
-                "{}GB",
+                "Auto batchsize detection failed. Insufficient memory"
+                ", required 8GB, available {}GB",
                 min_available);
         return 128;
     }
-    auto presets = batch_sizes[idx];
 
     if (model_path.find("_fast@v") != std::string::npos) {
-        return select_batchsize(96, 64, presets[0], devices[0]);
+        return select_batchsize(96, 64, presets->at(0), devices[0]);
     } else if (model_path.find("_hac@v") != std::string::npos) {
-        return select_batchsize(384, 64, presets[1], devices[0]);
+        return select_batchsize(384, 64, presets->at(1), devices[0]);
     } else if (model_path.find("_sup@v") != std::string::npos) {
-        return select_batchsize(1024, 64, presets[2], devices[0]);
+        return select_batchsize(1024, 64, presets->at(2), devices[0]);
     }
 
     spdlog::warn("Auto batchsize detection failed");
     return 128;
 }
+
+namespace details {
+std::optional<std::array<int, 3>> try_select_max_batch_sizes(
+        std::vector<int> const &breakpoints,
+        std::vector<std::array<int, 3>> const &batch_sizes,
+        int available_memory_gb) {
+    assert(breakpoints.size() == batch_sizes.size());
+    int idx = std::upper_bound(breakpoints.begin(), breakpoints.end(), available_memory_gb) -
+              breakpoints.begin() - 1;
+    if (idx < 0) {
+        return std::nullopt;
+    }
+    return batch_sizes[idx];
+}
+}  // namespace details
 
 }  // namespace dorado::utils
