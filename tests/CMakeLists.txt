@@ -16,6 +16,10 @@ if(APPLE)
     list(APPEND SOURCE_FILES
         MetalLinearTest.cpp
     )
+else()
+    list(APPEND SOURCE_FILES
+        cuda_utils_test.cpp
+    )
 endif()
 
 add_executable(dorado_tests ${SOURCE_FILES})
