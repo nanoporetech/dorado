@@ -277,7 +277,7 @@ int basecaller(int argc, char* argv[]) {
               parser.get<int>("-b"), parser.get<int>("-r"), default_parameters.remora_batchsize,
               default_parameters.remora_threads, parser.get<bool>("--emit-fastq"),
               parser.get<bool>("--emit-moves"), parser.get<int>("--max-reads"),
-              parser.get<int>("--min-qscore"), parser.get<std::string>("--read_list"));
+              parser.get<int>("--min-qscore"), parser.get<std::string>("--read-ids"));
     } catch (const std::exception& e) {
         spdlog::error("{}", e.what());
         return 1;
