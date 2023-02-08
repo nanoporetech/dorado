@@ -3,6 +3,13 @@ set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 
 project(dorado)
 
+if (NOT EXISTS ${CMAKE_BINARY_DIR}/CMakeCache.txt)
+  if (NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE "Release" CACHE STRING "" FORCE)
+  endif()
+endif()
+message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(DORADO_3RD_PARTY ${CMAKE_CURRENT_SOURCE_DIR}/dorado/3rdparty)
@@ -98,7 +105,9 @@ set(LIB_SOURCE_FILES
     dorado/utils/bam_utils.cpp
     dorado/utils/bam_utils.h
     dorado/utils/duplex_utils.h
-    dorado/utils/duplex_utils.cpp)
+    dorado/utils/duplex_utils.cpp
+    dorado/utils/basecaller_utils.h
+    dorado/utils/basecaller_utils.cpp)
 
 if(APPLE)
     include(cmake/Metal.cmake)
