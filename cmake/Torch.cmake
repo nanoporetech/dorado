@@ -1,14 +1,16 @@
 set(TORCH_VERSION 1.13.1)
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32)
-    find_package(CUDAToolkit)
+    find_package(CUDAToolkit REQUIRED)
     # the torch cuda.cmake will set(CUDAToolkit_ROOT "${CUDA_TOOLKIT_ROOT_DIR}") [2]
     # so we need to make CUDA_TOOLKIT_ROOT_DIR is set correctly as per [1] we also
     # 1. https://cmake.org/cmake/help/latest/module/FindCUDAToolkit.html
     # 2. https://github.com/pytorch/pytorch/blob/5fa71207222620b4efb78989849525d4ee6032e8/cmake/public/cuda.cmake#L40
-    set(CUDA_TOOLKIT_ROOT_DIR ${CUDAToolkit_ROOT})
+    if(DEFINED ${CUDAToolkit_ROOT})
+      set(CUDA_TOOLKIT_ROOT_DIR ${CUDAToolkit_ROOT})
+    endif()
     if(NOT DEFINED CMAKE_CUDA_COMPILER)
-      set(CMAKE_CUDA_COMPILER ${CUDAToolkit_ROOT}/bin/nvcc)
+      set(CMAKE_CUDA_COMPILER ${CUDAToolkit_NVCC_EXECUTABLE})
     endif()
 
     set(CUDNN_LIBRARY_PATH ${DORADO_3RD_PARTY}/fake_cudnn)
