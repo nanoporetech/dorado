@@ -190,7 +190,22 @@ void DataLoader::load_pod5_reads_from_file(const std::string& path) {
         std::vector<std::future<std::shared_ptr<Read>>> futures;
 
         for (std::size_t row = 0; row < batch_row_count; ++row) {
-            futures.push_back(pool.push(process_pod5_read, row, batch, file, path, m_device));
+            // TODO - check the read ID here, for each one, only send the row if it is in the list of ones we care about
+
+            uint16_t read_table_version = 0;
+            ReadBatchRowInfo_t read_data;
+            if (pod5_get_read_batch_row_info_data(batch, row, READ_BATCH_ROW_INFO_VERSION,
+                                                  &read_data, &read_table_version) != POD5_OK) {
+                spdlog::error("Failed to get read {}", row);
+            }
+
+            char read_id_tmp[37];
+            pod5_error_t err = pod5_format_read_id(read_data.read_id, read_id_tmp);
+            std::string read_id_str(read_id_tmp);
+            if (m_allowed_read_ids.size() == 0 ||
+                (m_allowed_read_ids.find(read_id_str) != m_allowed_read_ids.end())) {
+                futures.push_back(pool.push(process_pod5_read, row, batch, file, path, m_device));
+            }
         }
 
         for (auto& v : futures) {
@@ -290,16 +305,23 @@ void DataLoader::load_fast5_reads_from_file(const std::string& path) {
         new_read->attributes.start_time = start_time_str;
         new_read->attributes.fast5_filename = fast5_filename;
 
-        m_read_sink.push_read(new_read);
-        m_loaded_read_count++;
+        if (m_allowed_read_ids.size() == 0 ||
+            (m_allowed_read_ids.find(new_read->read_id) != m_allowed_read_ids.end())) {
+            m_read_sink.push_read(new_read);
+            m_loaded_read_count++;
+        }
     }
 }
 
 DataLoader::DataLoader(ReadSink& read_sink,
                        const std::string& device,
                        size_t num_worker_threads,
-                       size_t max_reads)
-        : m_read_sink(read_sink), m_device(device), m_num_worker_threads(num_worker_threads) {
+                       size_t max_reads,
+                       std::unordered_set<std::string> read_list)
+        : m_read_sink(read_sink),
+          m_device(device),
+          m_num_worker_threads(num_worker_threads),
+          m_allowed_read_ids(std::move(read_list)) {
     m_max_reads = max_reads == 0 ? std::numeric_limits<decltype(m_max_reads)>::max() : max_reads;
     assert(m_num_worker_threads > 0);
     static std::once_flag vbz_init_flag;
