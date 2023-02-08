@@ -1,8 +1,8 @@
-find_package(CUDAToolkit REQUIRED)
-
 OPTION(BUILD_KOI_FROM_SOURCE OFF)
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32)
+
+    find_package(CUDAToolkit REQUIRED)
 
     if(BUILD_KOI_FROM_SOURCE)
         message(STATUS "Building Koi from source")

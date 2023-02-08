@@ -1,4 +1,4 @@
-find_package(CUDAToolkit REQUIRED)
+find_package(CUDAToolkit)
 
 set(TORCH_VERSION 1.13.1)
 set(CUDNN_LIBRARY_PATH ${DORADO_3RD_PARTY}/fake_cudnn)
