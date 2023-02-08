@@ -103,18 +103,41 @@ The following models are currently available:
 
 ### Linux dependencies
 
+The following packages are necessary to build dorado in a barebones environment (e.g. the official ubuntu:jammy docker image)
+
 ```
-apt-get update && apt-get install -y --no-install-recommends autoconf libhdf5-dev libssl-dev libzstd-dev
+$ apt-get update && apt-get install -y --no-install-recommends \
+        curl \
+        git \
+        ca-certificates \
+        build-essential \
+        nvidia-cuda-toolkit \
+        libhdf5-dev \
+        libssl-dev \
+        libzstd-dev \
+        cmake \
+        autoconf \
+        automake
 ```
 
 ### Clone and build
 
 ```
-$ git clone git@github.com:nanoporetech/dorado.git
+$ git clone https://github.com/nanoporetech/dorado.git dorado
 $ cd dorado
-$ cmake -S . -B cmake-build -DCMAKE_CUDA_COMPILER=<NVCC_DIR>/nvcc
+$ cmake -S . -B cmake-build -DCMAKE_CUDA_COMPILER=nvcc
 $ cmake --build cmake-build --config Release -j
 $ ctest --test-dir cmake-build
+```
+
+The `-j` flag will use all available threads to build dorado and usage is around 1-2GB per thread. If you are constrained
+by the amount of available memory on your system you can lower the number of threads i.e.` -j 4`.
+
+After building you can run dorado from the build directory `./cmake-build/bin/dorado` or install it somewhere else on your
+system i.e. `/opt` *(note: you will need the relevant permissions for the target installation directory)*.
+
+```
+$ cmake --install cmake-build --prefix /opt
 ```
 
 ### Pre commit
