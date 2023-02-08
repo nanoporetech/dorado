@@ -92,7 +92,7 @@ build:linux:x86:focal_koi_download:
 
 build:windows:
   variables:
-    BUILD_OPTIONS: "-A x64 -T cuda=11.7 -DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN}"
+    BUILD_OPTIONS: "-A x64 -T cuda=11.7 -DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN} -DCUDAToolkit_ROOT=$(cygpath -u "$CUDA_PATH_V11_7")"
   <<: *windows_runner
   <<: *build_dorado
   before_script:
@@ -100,7 +100,7 @@ build:windows:
 
 build:windows_koi_download:
   variables:
-    BUILD_OPTIONS: "-A x64 -T cuda=11.7"
+    BUILD_OPTIONS: "-A x64 -T cuda=11.7 -DCUDAToolkit_ROOT=$(cygpath -u "$CUDA_PATH_V11_7")"
   <<: *windows_runner
   <<: *build_dorado
   before_script:
@@ -135,7 +135,7 @@ build_archive:linux:x86:centos7:
 
 build_archive:windows:
   variables:
-    BUILD_OPTIONS: "-A x64 -T cuda=11.7 -DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN}"
+    BUILD_OPTIONS: "-A x64 -T cuda=11.7 -DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN} -D CUDAToolkit_ROOT=$(cygpath -u "$CUDA_PATH_V11_7")"
   <<: *windows_runner
   <<: *build_dorado_archive
   when: manual
