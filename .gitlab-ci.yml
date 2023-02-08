@@ -51,6 +51,12 @@ variables:
       - archive
     expire_in: 1 day
 
+.build_dorado_lib_only: &build_dorado_lib_only
+  stage: build
+  script:
+    - cmake ${BUILD_OPTIONS} -S . -B ${BUILD_DIR} -DDORADO_LIB_ONLY=1
+    - cmake --build ${BUILD_DIR} -j 8
+
 # Pre-flight stages
 
 pre-commit:
@@ -104,6 +110,12 @@ build:macos:m1:
   variables:
   <<: *macos_runner
   <<: *build_dorado
+
+build:ios:m1:
+  variables:
+    BUILD_OPTIONS: "-DCMAKE_TOOLCHAIN_FILE=cmake/ios-cmake/ios.toolchain.cmake -DPLATFORM=OS64 -DSKIP_HDF_PLUGINS=1 -DDEPLOYMENT_TARGET=16.0"
+  <<: *macos_runner
+  <<: *build_dorado_lib_only
 
 build_archive:linux:x86:focal:
   image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-11.7.0:1.0

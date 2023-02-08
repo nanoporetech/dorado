@@ -18,7 +18,7 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
 
 namespace {
 std::filesystem::path DataPath(std::string_view filename) {
-    return std::filesystem::path(get_data_dir()) / "stereo" / filename;
+    return std::filesystem::path(get_stereo_data_dir()) / filename;
 }
 
 // Reads into a string.

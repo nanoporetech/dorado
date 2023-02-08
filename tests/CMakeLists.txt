@@ -2,6 +2,7 @@
 set(SOURCE_FILES
     main.cpp
     Fast5DataLoaderTest.cpp
+    Pod5DataLoaderTest.cpp
     TensorUtilsTest.cpp
     MathUtilsTest.cpp
     ReadTest.cpp
@@ -15,12 +16,17 @@ if(APPLE)
     list(APPEND SOURCE_FILES
         MetalLinearTest.cpp
     )
+else()
+    list(APPEND SOURCE_FILES
+        cuda_utils_test.cpp
+    )
 endif()
 
 add_executable(dorado_tests ${SOURCE_FILES})
 
 target_link_libraries(dorado_tests
     dorado_lib
+    dorado_io_lib
     ${ZLIB_LIBRARIES}
 )
 
