@@ -228,20 +228,6 @@ if(NOT DORADO_LIB_ONLY)
 endif()
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    file(GLOB TORCH_DLLS "${TORCH_LIB}/lib/*.so*")
-    install(FILES ${TORCH_DLLS} DESTINATION lib COMPONENT redist_libs)
-    if(DYNAMIC_HDF)
-        file(GLOB HDF_DLLS "${HDF5_CXX_LIBRARY_DIRS}/*hdf5*.so*")
-        install(FILES ${HDF_DLLS} DESTINATION lib COMPONENT redist_libs)
-    endif()
-    file(GLOB SZ_DLLS "${HDF5_CXX_LIBRARY_DIRS}/libsz.so*")
-    install(FILES ${SZ_DLLS} DESTINATION lib COMPONENT redist_libs)
-    file(GLOB AEC_DLLS "${HDF5_CXX_LIBRARY_DIRS}/libaec.so*")
-    list(LENGTH AEC_DLLS AEC_DLL_LIST_LEN)
-    if(AEC_DLL_LIST_LEN)
-        install(FILES ${AEC_DLLS} DESTINATION lib COMPONENT redist_libs)
-    endif()
-
     # CUDA system DLLs we depend on:
     set(PATTERNS
         "*cudart.so*"
@@ -262,6 +248,18 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         file(GLOB DEP_DLLS "${CUDAToolkit_ROOT}/targets/${CMAKE_SYSTEM_PROCESSOR}-linux/lib/${PATTERN}")
         install(FILES ${DEP_DLLS} DESTINATION lib COMPONENT redist_libs)
     endforeach()
+
+    file(GLOB TORCH_DLLS "${TORCH_LIB}/lib/*.so*")
+    install(FILES ${TORCH_DLLS} DESTINATION lib COMPONENT redist_libs)
+
+    if(DYNAMIC_HDF)
+        find_library(HDF_DLLS hdf5 HINTS ${HDF5_CXX_LIBRARY_DIRS})
+        install(FILES ${HDF_DLLS} DESTINATION lib COMPONENT redist_libs)
+    endif()
+    find_library(SZ_DLLS sz REQUIRED)
+    install(FILES ${SZ_DLLS} DESTINATION lib COMPONENT redist_libs)
+    find_library(AEC_DLLS aec REQUIRED)
+    install(FILES ${AEC_DLLS} DESTINATION lib COMPONENT redist_libs)
 
     # If zstd has been dynamically linked, add the .so to the package
     get_filename_component(ZSTD_LIBRARY_PATH ${ZSTD_LIBRARY_RELEASE} DIRECTORY)
