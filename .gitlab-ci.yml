@@ -7,7 +7,7 @@ variables:
   BUILD_DIR: build
   GIT_SUBMODULE_STRATEGY: recursive
   CUDA: "11.7"
-  WIN_CUDA_TOOLKIT: "/c/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v${CUDA}"
+  WIN_CUDA_TOOLKIT: "\"/c/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v${CUDA}\""
 
 # Build stage components
 
