@@ -97,19 +97,18 @@ build:windows:
   <<: *build_dorado
   before_script:
     - export PATH=${PATH}:${PWD}/dist/bin
-    - echo WIN_CUDA_TOOLKIT from variable is $WIN_CUDA_TOOLKIT
-    - export WIN_CUDA_TOOLKIT=$(cygpath -d "$WIN_CUDA_TOOLKIT")
-    - echo WIN_CUDA_TOOLKIT from cygpath is $WIN_CUDA_TOOLKIT
-    - export BUILD_OPTIONS='-A x64 -T cuda=${CUDA} -DCUDAToolkit_ROOT=${WIN_CUDA_TOOLKIT} -DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN}'
+    - export CUDA_TOOLKIT=$(cygpath -u $(cygpath -d "${WIN_CUDA_TOOLKIT}"))
+    - export BUILD_OPTIONS="-A x64 -T cuda=${CUDA} -DCUDAToolkit_ROOT=${CUDA_TOOLKIT} -DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN}"
     - echo BUILD_OPTIONS is ${BUILD_OPTIONS}
 
 build:windows_koi_download:
-  variables:
-    BUILD_OPTIONS: '-A x64 -T cuda=${CUDA} -DCUDAToolkit_ROOT=${WIN_CUDA_TOOLKIT}'
   <<: *windows_runner
   <<: *build_dorado
   before_script:
     - export PATH=${PATH}:${PWD}/dist/bin
+    - export CUDA_TOOLKIT=$(cygpath -u $(cygpath -d "${WIN_CUDA_TOOLKIT}"))
+    - export BUILD_OPTIONS="-A x64 -T cuda=${CUDA} -DCUDAToolkit_ROOT=${CUDA_TOOLKIT}"
+    - echo BUILD_OPTIONS is ${BUILD_OPTIONS}
 
 build:macos:m1:
   variables:
@@ -139,8 +138,10 @@ build_archive:linux:x86:centos7:
   when: manual
 
 build_archive:windows:
-  variables:
-    BUILD_OPTIONS: '-A x64 -T cuda=${CUDA} -DCUDAToolkit_ROOT=${WIN_CUDA_TOOLKIT} -DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN}'
+  before_script:
+    - export CUDA_TOOLKIT=$(cygpath -u $(cygpath -d "${WIN_CUDA_TOOLKIT}"))
+    - export BUILD_OPTIONS="-A x64 -T cuda=${CUDA} -DCUDAToolkit_ROOT=${CUDA_TOOLKIT} -DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN}"
+    - echo BUILD_OPTIONS is ${BUILD_OPTIONS}
   <<: *windows_runner
   <<: *build_dorado_archive
   when: manual
