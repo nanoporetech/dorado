@@ -101,6 +101,9 @@ build:windows:
   <<: *build_dorado
   before_script:
     - export PATH=${PATH}:${PWD}/dist/bin
+    - echo WIN_CUDA_TOOLKIT from variable is $WIN_CUDA_TOOLKIT
+    - export WIN_CUDA_TOOLKIT="\"/c/Program\ Files/NVIDIA\ GPU\ Computing\ Toolkit/CUDA/v${CUDA}\""
+    - echo WIN_CUDA_TOOLKIT from export is $WIN_CUDA_TOOLKIT
 
 build:windows_koi_download:
   variables:
