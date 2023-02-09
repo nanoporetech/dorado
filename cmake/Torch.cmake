@@ -12,7 +12,11 @@ endif()
 # TODO: sort out download location for ARM cuda 10.2 build
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    if(DORADO_USING_OLD_CPP_ABI)
+    if(CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
+        set(TORCH_VERSION 1.10.0)
+        set(TORCH_URL https://cdn.oxfordnanoportal.com/software/analysis/torch-1.10-Linux-aarch64.zip)
+        set(TORCH_LIB "${DORADO_3RD_PARTY}/torch-${TORCH_VERSION}-${CMAKE_SYSTEM_NAME}/torch")
+    elseif(DORADO_USING_OLD_CPP_ABI)
         set(TORCH_URL https://download.pytorch.org/libtorch/cu113/libtorch-shared-with-deps-${TORCH_VERSION}%2Bcu113.zip)
         set(TORCH_LIB "${DORADO_3RD_PARTY}/torch-no-cxx11-abi-${TORCH_VERSION}-${CMAKE_SYSTEM_NAME}/libtorch")
     else()
