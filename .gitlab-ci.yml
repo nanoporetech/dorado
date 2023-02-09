@@ -24,6 +24,10 @@ variables:
     - linux_aarch64
     - docker-arm
 
+.linux_arm64_gpu_runner: &linux_arm64_gpu_runner
+  tags:
+    - nvidia-docker-tegra-gpu
+
 .windows_runner: &windows_runner
   tags:
     - win10-gpu
@@ -180,6 +184,13 @@ test:linux:x86:focal:
   <<: *test_dorado
   needs:
     - build:linux:x86:focal
+
+test:linux:aarch64:l4t-r32.7.1_koi_download:
+  image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r32.7.1-deps:1.0
+  <<: *linux_arm64_gpu_runner
+  <<: *test_dorado
+  needs:
+    - build:linux:aarch64:l4t-r32.7.1_koi_download
 
 test:macos:m1:
   <<: *macos_runner
