@@ -7,7 +7,7 @@ variables:
   BUILD_DIR: build
   GIT_SUBMODULE_STRATEGY: recursive
   CUDA: "11.7"
-  WIN_CUDA_TOOLKIT: "\"/c/Program\ Files/NVIDIA\ GPU\ Computing\ Toolkit/CUDA/v${CUDA}\""
+  WIN_CUDA_TOOLKIT: "/c/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v${CUDA}"
 
 # Build stage components
 
@@ -34,8 +34,6 @@ variables:
   stage: build
   script:
     - echo Dorado build stage
-    - echo WIN_CUDA_TOOLKIT is ${WIN_CUDA_TOOLKIT}
-    - echo BUILD_OPTIONS is ${BUILD_OPTIONS}
     - cmake ${BUILD_OPTIONS} -S . -B ${BUILD_DIR}
     - cmake --build ${BUILD_DIR} --config Release --target install -j 8
     - ctest -C Release --test-dir ${BUILD_DIR}
@@ -95,17 +93,15 @@ build:linux:x86:focal_koi_download:
   <<: *build_dorado
 
 build:windows:
-  variables:
-    BUILD_OPTIONS: '-A x64 -T cuda=${CUDA} -DCUDAToolkit_ROOT=${WIN_CUDA_TOOLKIT} -DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN}'
   <<: *windows_runner
   <<: *build_dorado
   before_script:
     - export PATH=${PATH}:${PWD}/dist/bin
     - echo WIN_CUDA_TOOLKIT from variable is $WIN_CUDA_TOOLKIT
-    - export WIN_CUDA_TOOLKIT="\"/c/Program\ Files/NVIDIA\ GPU\ Computing\ Toolkit/CUDA/v${CUDA}\""
-    - echo WIN_CUDA_TOOLKIT from export is $WIN_CUDA_TOOLKIT
     - export WIN_CUDA_TOOLKIT=$(cygpath -d "$WIN_CUDA_TOOLKIT")
     - echo WIN_CUDA_TOOLKIT from cygpath is $WIN_CUDA_TOOLKIT
+    - export BUILD_OPTIONS='-A x64 -T cuda=${CUDA} -DCUDAToolkit_ROOT=${WIN_CUDA_TOOLKIT} -DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN}'
+    - echo BUILD_OPTIONS is ${BUILD_OPTIONS}
 
 build:windows_koi_download:
   variables:
