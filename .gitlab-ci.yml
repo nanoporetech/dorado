@@ -34,6 +34,8 @@ variables:
   stage: build
   script:
     - echo Dorado build stage
+    - echo WIN_CUDA_TOOLKIT is ${WIN_CUDA_TOOLKIT}
+    - echo BUILD_OPTIONS is ${BUILD_OPTIONS}
     - cmake ${BUILD_OPTIONS} -S . -B ${BUILD_DIR}
     - cmake --build ${BUILD_DIR} --config Release --target install -j 8
     - ctest -C Release --test-dir ${BUILD_DIR}
