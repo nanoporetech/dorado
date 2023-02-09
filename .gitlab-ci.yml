@@ -223,6 +223,14 @@ test_archive:linux:x86:20.04:
   needs:
     - build_archive:linux:x86:centos7
 
+# Test that you can run dorado in a clean l4t environment
+test_archive:linux:aarch64:l4t-r32.7.1:
+  image: nvcr.io/nvidia/l4t-base:r32.7.1
+  <<: *linux_arm64_gpu_runner
+  <<: *test_archive
+  needs:
+    - build_archive:linux:aarch64:l4t-r32.7.1_koi_download
+
 # Single read eval
 
 test:sre-test:
