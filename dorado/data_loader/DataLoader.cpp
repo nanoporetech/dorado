@@ -3,7 +3,9 @@
 #include "../read_pipeline/ReadPipeline.h"
 #include "../utils/compat_utils.h"
 #include "cxxpool.h"
+#ifndef DISABLE_POD5
 #include "pod5_format/c_api.h"
+#endif
 #include "vbz_plugin_user_utils.h"
 
 #include <highfive/H5Easy.hpp>
@@ -72,6 +74,7 @@ std::string adjust_time(const std::string& time_stamp, uint32_t offset) {
     return std::string(buff);
 }
 
+#ifndef DISABLE_POD5
 std::shared_ptr<dorado::Read> process_pod5_read(size_t row,
                                                 Pod5ReadRecordBatch* batch,
                                                 Pod5FileReader* file,
@@ -122,7 +125,7 @@ std::shared_ptr<dorado::Read> process_pod5_read(size_t row,
 
     return new_read;
 }
-
+#endif
 } /* anonymous namespace */
 
 namespace dorado {
@@ -148,13 +151,17 @@ void DataLoader::load_reads(const std::string& path) {
                        [](unsigned char c) { return std::tolower(c); });
         if (ext == ".fast5") {
             load_fast5_reads_from_file(entry.path().string());
-        } else if (ext == ".pod5") {
+        }
+#ifndef DISABLE_POD5
+        else if (ext == ".pod5") {
             load_pod5_reads_from_file(entry.path().string());
         }
+#endif
     }
     m_read_sink.terminate();
 }
 
+#ifndef DISABLE_POD5
 void DataLoader::load_pod5_reads_from_file(const std::string& path) {
     pod5_init();
 
@@ -205,6 +212,7 @@ void DataLoader::load_pod5_reads_from_file(const std::string& path) {
     }
     pod5_close_and_free_reader(file);
 }
+#endif
 
 void DataLoader::load_fast5_reads_from_file(const std::string& path) {
     // Read the file into a vector of torch tensors
