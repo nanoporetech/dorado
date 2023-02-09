@@ -7,7 +7,7 @@ variables:
   BUILD_DIR: build
   GIT_SUBMODULE_STRATEGY: recursive
   CUDA: "11.7"
-  WIN_CUDA_TOOLKIT: "/c/Program\ Files/NVIDIA\ GPU\ Computing\ Toolkit/CUDA/v${CUDA}"
+  WIN_CUDA_TOOLKIT: "/c/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v${CUDA}"
 
 # Build stage components
 
@@ -94,7 +94,7 @@ build:linux:x86:focal_koi_download:
 
 build:windows:
   variables:
-    BUILD_OPTIONS: "-A x64 -T cuda=${CUDA} -DCUDAToolkit_ROOT=${WIN_CUDA_TOOLKIT} -DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN}"
+    BUILD_OPTIONS: "-A x64 -T cuda=${CUDA} -DCUDAToolkit_ROOT=\"${WIN_CUDA_TOOLKIT}\" -DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN}"
   <<: *windows_runner
   <<: *build_dorado
   before_script:
@@ -102,7 +102,7 @@ build:windows:
 
 build:windows_koi_download:
   variables:
-    BUILD_OPTIONS: "-A x64 -T cuda=${CUDA} -DCUDAToolkit_ROOT=${WIN_CUDA_TOOLKIT}"
+    BUILD_OPTIONS: "-A x64 -T cuda=${CUDA} -DCUDAToolkit_ROOT=\"${WIN_CUDA_TOOLKIT}\""
   <<: *windows_runner
   <<: *build_dorado
   before_script:
@@ -137,7 +137,7 @@ build_archive:linux:x86:centos7:
 
 build_archive:windows:
   variables:
-    BUILD_OPTIONS: "-A x64 -T cuda=${CUDA} -DCUDAToolkit_ROOT=${WIN_CUDA_TOOLKIT} -DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN}"
+    BUILD_OPTIONS: "-A x64 -T cuda=${CUDA} -DCUDAToolkit_ROOT=\"${WIN_CUDA_TOOLKIT}\" -DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN}"
   <<: *windows_runner
   <<: *build_dorado_archive
   when: manual
