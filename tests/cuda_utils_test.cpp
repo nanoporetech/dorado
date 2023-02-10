@@ -6,10 +6,11 @@
 #include <tuple>
 
 #define CUT_TAG "[cuda_utils]"
+#define DEFINE_TEST(name) TEST_CASE(CUT_TAG " " name, CUT_TAG)
 
 namespace {
 
-TEST_CASE(CUT_TAG ": try_select_max_batch_sizes valid params does not throw", CUT_TAG) {
+DEFINE_TEST("try_select_max_batch_sizes valid params does not throw") {
     std::vector<int> const breakpoints{1};
     std::vector<std::array<int, 3>> const batch_sizes{{1, 2, 3}};
 
@@ -17,7 +18,7 @@ TEST_CASE(CUT_TAG ": try_select_max_batch_sizes valid params does not throw", CU
             dorado::utils::details::try_select_max_batch_sizes(breakpoints, batch_sizes, 0));
 }
 
-TEST_CASE(CUT_TAG ": try_select_max_batch_sizes empty arrays returns no result", CUT_TAG) {
+DEFINE_TEST("try_select_max_batch_sizes empty arrays returns no result") {
     std::vector<int> const breakpoints{};
     std::vector<std::array<int, 3>> const batch_sizes{};
 
@@ -26,8 +27,7 @@ TEST_CASE(CUT_TAG ": try_select_max_batch_sizes empty arrays returns no result",
     REQUIRE_FALSE(result.has_value());
 }
 
-TEST_CASE(CUT_TAG ": try_select_max_batch_sizes single breakpoint with low value returns no result",
-          CUT_TAG) {
+DEFINE_TEST("try_select_max_batch_sizes single breakpoint with low value returns no result") {
     std::vector<int> const breakpoints{1};
     std::vector<std::array<int, 3>> const batch_sizes{{1, 2, 3}};
 
@@ -36,8 +36,7 @@ TEST_CASE(CUT_TAG ": try_select_max_batch_sizes single breakpoint with low value
     REQUIRE_FALSE(result.has_value());
 }
 
-TEST_CASE(CUT_TAG ": try_select_max_batch_sizes single breakpoint with high value returns result",
-          CUT_TAG) {
+DEFINE_TEST("try_select_max_batch_sizes single breakpoint with high value returns result") {
     std::vector<int> const breakpoints{1};
     std::array<int, 3> max_values{1, 2, 3};
     std::vector<std::array<int, 3>> const batch_sizes{
@@ -50,9 +49,7 @@ TEST_CASE(CUT_TAG ": try_select_max_batch_sizes single breakpoint with high valu
     REQUIRE(*result == max_values);
 }
 
-TEST_CASE(CUT_TAG
-          ": try_select_max_batch_sizes single breakpoint with breakpoint value returns result",
-          CUT_TAG) {
+DEFINE_TEST(": try_select_max_batch_sizes single breakpoint with breakpoint value returns result") {
     std::vector<int> const breakpoints{1};
     std::array<int, 3> max_values{1, 2, 3};
     std::vector<std::array<int, 3>> const batch_sizes{
@@ -74,7 +71,7 @@ const std::array<int, 3> batch_sizes_none{0, 0, 0};
 const std::vector<std::array<int, 3>> batch_sizes = {batch_sizes_low, batch_sizes_mid,
                                                      batch_sizes_high};
 
-TEST_CASE(CUT_TAG ": try_select_max_batch_sizes parameterised", CUT_TAG) {
+DEFINE_TEST("try_select_max_batch_sizes parameterised") {
     int available_memory;
     bool expected_success;
     std::array<int, 3> expected_result;
