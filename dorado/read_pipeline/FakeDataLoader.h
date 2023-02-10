@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstddef>
+
 namespace dorado {
 
 class ReadSink;
@@ -8,7 +10,7 @@ class ReadSink;
 class FakeDataLoader {
 public:
     FakeDataLoader(ReadSink& read_sink);
-    void load_reads(int num_reads);
+    void load_reads(std::size_t num_reads);
 
 private:
     ReadSink& m_read_sink;
