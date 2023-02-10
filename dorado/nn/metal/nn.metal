@@ -274,95 +274,184 @@ kernel void float_to_half(
     }
 }
 
+// 2D matrix layouts using 8x8 tiles
 // layout RrCc, where: R = row / 8; r = row % 8; C = col / 8; c = col % 8
+template<typename FTYPE = ftype>
 struct TileBlockRowMajor {
-    device const ftype *ptr;
+    using simdgroup_tile = simdgroup_matrix<FTYPE, TILE_SIZE, TILE_SIZE>;
+    device FTYPE *ptr;
     int stride;
-    TileBlockRowMajor(device const ftype *ptr_, int stride_, int r, int c) : ptr(ptr_ + r * stride_ + c), stride(stride_) {}
-    void load(thread simdgroup_ftype8x8 &tile, int row_tile, int col_tile) {
+    TileBlockRowMajor(device FTYPE *ptr_, int stride_, int r, int c) : ptr(ptr_ + r * stride_ + c), stride(stride_) {}
+    void load(thread simdgroup_tile &tile, int row_tile, int col_tile) {
         simdgroup_load(tile, ptr, stride, ulong2(col_tile * TILE_SIZE, row_tile * TILE_SIZE));
+    }
+    void store(thread simdgroup_tile const &tile, int row_tile, int col_tile) {
+        simdgroup_store(tile, ptr, stride, ulong2(col_tile * TILE_SIZE, row_tile * TILE_SIZE));
     }
 };
 // layout CrRc, where: R = row / 8; r = row % 8; C = col / 8; c = col % 8
+template<typename FTYPE = ftype>
 struct TileBlockColMajor {
-    device const ftype *ptr;
+    using simdgroup_tile = simdgroup_matrix<FTYPE, TILE_SIZE, TILE_SIZE>;
+    device ftype *ptr;
     int stride;
-    TileBlockColMajor(device const ftype *ptr_, int stride_, int r, int c) : ptr(ptr_ + c * stride_ + r), stride(stride_) {}
-    void load(thread simdgroup_ftype8x8 &tile, int row_tile, int col_tile) {
+    TileBlockColMajor(device FTYPE *ptr_, int stride_, int r, int c) : ptr(ptr_ + c * stride_ + r), stride(stride_) {}
+    void load(thread simdgroup_tile &tile, int row_tile, int col_tile) {
         simdgroup_load(tile, ptr, stride, ulong2(row_tile * TILE_SIZE, col_tile * TILE_SIZE));
     }
+    void store(thread simdgroup_tile const &tile, int row_tile, int col_tile) {
+        simdgroup_store(tile, ptr, stride, ulong2(row_tile * TILE_SIZE, col_tile * TILE_SIZE));
+    }
 };
 
-
+// TNC matrix layouts (i.e. time, batch, channel)
+template<int SIMD_TILES_N, int SIMD_TILES_C, typename FTYPE = ftype>
 struct MatLayoutRowMajor {
-    static TileBlockRowMajor tnc(device const ftype *ptr, int T, int N, int C, int t, int n, int c) {
-        return TileBlockRowMajor(ptr, C, t * N + n, c);
+    using TileBlock = TileBlockRowMajor<FTYPE>;
+    using ftype = FTYPE;
+    static TileBlock tnc_block(device FTYPE *ptr, int T, int N, int C, int t, int n_blk, int c_blk) {
+        return TileBlock(ptr, C, t * N + n_blk * SIMD_TILES_N * TILE_SIZE, c_blk * SIMD_TILES_C * TILE_SIZE);
     }
+    static void zero_initial_state(device FTYPE *, int, int, int, uint, uint, uint, uint) {}
 };
+
+// The memory layout of LSTM input/output matrices matches a contiguous tensor of sizes [T+3, C/8, 8, N/8, 8],
+// corresponding to [t+x, c/8, n%8, n/8, c%8] in TNC terms (time, batch, channel).
+// x is either 1 or 2, depending on whether the buffer is output from a forward or a reverse LSTM layer.
+// Thus a reverse layer shifts its output one forward, a forward layer shifts it one back.
+// This works as long as we alternate reverse and forward layers.
+// [0] and [T+2] are set to zero and act as the initial LSTM state.
+//
+//
+// To illustrate, the output of a conv3/forward LSTM layer with T=10 may look like this ('?' denotes
+// uninitialised/irrelevant data, A is data for t=0, J for t=9):
+//
+//    position:    0   1   2   3   4   5   6   7   8   9  10  11  12
+//        data:    0   A   B   C   D   E   F   G   H   I   J   ?   0
+//
+// The reverse LSTM layer, in its iteration 0, loads inputs J(10) and 0(12), and produces a new output J',
+// which it writes in the unused space between the two inputs (11). Iteration 1 loads inputs I(9) and the
+// just-generated J'(11) to produce output I'(10), etc.
+//
+//        t_in:        0   1   2   3   4   5   6   7   8   9
+// iteration 0:    0   A   B   C   D   E   F   G   H   I  [J]  ?  [0]
+//                                                           \   /
+//                 0   A   B   C   D   E   F   G   H   I   J  {J'} 0
+//
+// iteration 1:    0   A   B   C   D   E   F   G   H  [I]  J  [J'] 0
+//                                                       \   /
+//                 0   A   B   C   D   E   F   G   H   I  {I'} J'  0
+//
+//    [...]
+//
+// iteration 9:    0  [A]  B  [B'] C'  D'  E'  F'  G'  H'  I'  J'  0
+//                       \   /
+//                 0   A  {A'} B'  C'  D'  E'  F'  G'  H'  I'  J'  0
+//       t_out:            0   1   2   3   4   5   6   7   8   9
+//
+//
+// The forward LSTM layer then loads inputs 0(0) and A'(2) in its iteration 0, producing new output A",
+// overwriting A.
+//
+//        t_in:            0   1   2   3   4   5   6   7   8   9
+// iteration 0:   [0]  A  [A'] B'  C'  D'  E'  F'  G'  H'  I'  J'  0
+//                   \   /
+//                 0  {A"} A'  B'  C'  D'  E'  F'  G'  H'  I'  J'  0
+//
+// iteration 1:    0  [A"] A' [B'] C'  D'  E'  F'  G'  H'  I'  J'  0
+//                       \   /
+//                 0   A" {B"} B'  C'  D'  E'  F'  G'  H'  I'  J'  0
+//
+//    [...]
+//
+// iteration 9:    0   A"  B"  C"  D"  E"  F"  G"  H" [I"] I' [J'] 0
+//                                                       \   /
+//                 0   A"  B"  C"  D"  E"  F"  G"  H"  I" {J"} J'  0
+//       t_out:        0   1   2   3   4   5   6   7   8   9
+//
+//
+// With this method we can use the same buffer for both input and output instead of needing twice as
+// much memory for separate input and output buffers. Because the output of each LSTM iteration is
+// written between the two inputs, we don't overwrite any data that is currently being consumed.
+//
+// NO_OFFSET is used in the lstm kernel to access raw positions in the T dimension
+enum LstmOutputOffset {NO_OFFSET = 0, FORWARD_LSTM_OUTPUT = 1, REVERSE_LSTM_OUTPUT = 2};
+template<int SIMD_TILES_N, int SIMD_TILES_C, LstmOutputOffset T_OFFSET, typename FTYPE = ftype>
 struct MatLayoutLSTM {
-    static TileBlockColMajor tnc(device const ftype *ptr, int T, int N, int C, int t, int n, int c) {
-        return tnc_raw(ptr, T, N, C, t + 1, n, c); // Actual contents are shifted by one timestep
+    using TileBlock = TileBlockColMajor<FTYPE>;
+    using ftype = FTYPE;
+    static TileBlock tnc_block(device FTYPE *ptr, int T, int N, int C, int t, int n_blk, int c_blk) {
+        return TileBlock(ptr, N, n_blk * SIMD_TILES_N * TILE_SIZE, (t+T_OFFSET) * C + c_blk * SIMD_TILES_C * TILE_SIZE);
     }
-    static TileBlockColMajor tnc_raw(device const ftype *ptr, int T, int N, int C, int t, int n, int c) {
-        return TileBlockColMajor(ptr, N, n, t * C + c);
-    }
-};
 
-template <int SIMD_TILES_M, int SIMD_TILES_N> struct MatMul {
-    static_assert(SIMD_TILES_M <= 8, "SIMD_TILES_M must be <= 8");
-    static_assert(SIMD_TILES_N <= 8, "SIMD_TILES_N must be <= 8");
-    simdgroup_ftype8x8 A[SIMD_TILES_M], B[SIMD_TILES_N], accum[SIMD_TILES_M][SIMD_TILES_N];
-
-    // (N_INNER == true) means we compute accum[mn_tile][0:SIMD_TILES_N]
-    // (N_INNER == false) means we compute accum[0:SIMD_TILES_M][mn_tile]
-    template<bool N_INNER, typename LAYOUT_A, typename LAYOUT_B>
-    inline void mma_line(int mn_tile, int k_tile, thread LAYOUT_A &mat_a, thread LAYOUT_B &mat_b) {
-        if (N_INNER) {
-            const int m_tile = mn_tile;
-            if (m_tile < SIMD_TILES_M) {
-                mat_a.load(A[m_tile], m_tile, k_tile);
-                for (int n_tile = 0; n_tile < SIMD_TILES_N; ++n_tile) {
-                    if (m_tile == 0) { mat_b.load(B[n_tile], k_tile, n_tile); }
-                    simdgroup_multiply_accumulate(accum[m_tile][n_tile], A[m_tile], B[n_tile], accum[m_tile][n_tile]);
-                }
-            }
-        } else {
-            const int n_tile = mn_tile;
-            if (n_tile < SIMD_TILES_N) {
-                mat_b.load(B[n_tile], k_tile, n_tile);
-                for (int m_tile = 0; m_tile < SIMD_TILES_M; ++m_tile) {
-                    if (n_tile == 0) { mat_a.load(A[m_tile], m_tile, k_tile); }
-                    simdgroup_multiply_accumulate(accum[m_tile][n_tile], A[m_tile], B[n_tile], accum[m_tile][n_tile]);
-                }
+    // Zero-initialise the inital LSTM state at T-positions 0 (for forward) and T+2 (for reverse)
+    static void zero_initial_state(device FTYPE *ptr, int T, int N, int C,
+        uint gid, uint threadgroups, uint sid, uint simdgroups)
+    {
+        auto A = make_filled_simdgroup_matrix<FTYPE, TILE_SIZE, TILE_SIZE>(0);
+        int n_tiles = N / TILE_SIZE;
+        int c_tiles = C / TILE_SIZE;
+        TileBlock first(ptr, N, 0, 0);
+        TileBlock last(ptr, N, 0, (T + 2) * C);
+        for (int c_tile = gid; c_tile < c_tiles; c_tile += threadgroups) {
+            for (int n_tile = sid; n_tile < n_tiles; n_tile += simdgroups) {
+                first.store(A, n_tile, c_tile);
+                last.store(A, n_tile, c_tile);
             }
         }
     }
+};
 
+template <int SIMD_TILES_M, int SIMD_TILES_N> class MatMul {
+    static_assert(SIMD_TILES_M <= 8, "SIMD_TILES_M must be <= 8");
+    static_assert(SIMD_TILES_N <= 8, "SIMD_TILES_N must be <= 8");
+    simdgroup_ftype8x8 A, B, accum[SIMD_TILES_M][SIMD_TILES_N];
+
+public:
+    // Matrix multiply-accumulate.
+    // Performance note: loading the A and B matrix tiles every iteration is actually
+    // faster than trying to prefetch or keep the values in registers.
     template <typename LAYOUT_A, typename LAYOUT_B, bool N_INNER = true>
     void mma(int k_tiles_begin, int k_tiles_end, thread LAYOUT_A &mat_a, thread LAYOUT_B &mat_b)
     {
         for (int k_tile = k_tiles_begin; k_tile < k_tiles_end; ++k_tile) {
-            mma_line<N_INNER>(0, k_tile, mat_a, mat_b);
-            mma_line<N_INNER>(1, k_tile, mat_a, mat_b);
-            mma_line<N_INNER>(2, k_tile, mat_a, mat_b);
-            mma_line<N_INNER>(3, k_tile, mat_a, mat_b);
-            mma_line<N_INNER>(4, k_tile, mat_a, mat_b);
-            mma_line<N_INNER>(5, k_tile, mat_a, mat_b);
-            mma_line<N_INNER>(6, k_tile, mat_a, mat_b);
-            mma_line<N_INNER>(7, k_tile, mat_a, mat_b);
+#pragma unroll 8
+            for (int mn_tile = 0; mn_tile < 8; ++mn_tile) {
+                // (N_INNER == true) means we compute accum[mn_tile][0:SIMD_TILES_N] per mn_tile iteration
+                // (N_INNER == false) means we compute accum[0:SIMD_TILES_M][mn_tile] per mn_tile iteration
+                if (N_INNER) {
+                    const int m_tile = mn_tile;
+                    if (m_tile < SIMD_TILES_M) {
+                        mat_a.load(A, m_tile, k_tile);
+                        for (int n_tile = 0; n_tile < SIMD_TILES_N; ++n_tile) {
+                            mat_b.load(B, k_tile, n_tile);
+                            simdgroup_multiply_accumulate(acc(m_tile, n_tile), A, B, acc(m_tile, n_tile));
+                        }
+                    }
+                } else {
+                    const int n_tile = mn_tile;
+                    if (n_tile < SIMD_TILES_N) {
+                        mat_b.load(B, k_tile, n_tile);
+                        for (int m_tile = 0; m_tile < SIMD_TILES_M; ++m_tile) {
+                            mat_a.load(A, m_tile, k_tile);
+                            simdgroup_multiply_accumulate(acc(m_tile, n_tile), A, B, acc(m_tile, n_tile));
+                        }
+                    }
+                }
+            }
         }
     }
 
     void load_bias(device ftype const *bias, int col) {
         for (int i = 0; i < SIMD_TILES_N; ++i) {
             for (int j = 0; j < SIMD_TILES_M; ++j) {
-                simdgroup_load(accum[j][i], bias + col + i * TILE_SIZE, 0);
+                simdgroup_load(acc(j, i), bias + col + i * TILE_SIZE, 0);
             }
         }
     }
+
+    thread simdgroup_ftype8x8 &acc(int m_tile, int n_tile) { return accum[m_tile][n_tile]; }
 };
-
-
 
 
 // Apply conv_activation to a simdgroup matrix tile (using threadgroup memory) then store the tile in device memory.
@@ -562,8 +651,8 @@ kernel void conv2_in4_simd
 kernel void conv2_in16_simd
 (
     device const ConvArgs* const args,
-    device const ftype* const in_buf,
-    device const ftype* const weights_buf,
+    device ftype* const in_buf,
+    device ftype* const weights_buf,
     device ftype* const out_buf,
     KERNEL_INDEX_INPUTS
 ) {
@@ -599,12 +688,12 @@ kernel void conv2_in16_simd
             int end_pad_tiles = end_pad / TILE_SIZE;
             int pad_tiles = start_pad_tiles + end_pad_tiles;
             mm.load_bias(bias, 0);
-            TileBlockRowMajor mat_a(in_buf, in_buf_stride, m_blk * SIMD_TILES_M * TILE_SIZE, clamped_start_pos);
-            TileBlockRowMajor mat_b(weights_buf, out_size, w_row_offset, 0);
+            TileBlockRowMajor<> mat_a(in_buf, in_buf_stride, m_blk * SIMD_TILES_M * TILE_SIZE, clamped_start_pos);
+            TileBlockRowMajor<> mat_b(weights_buf, out_size, w_row_offset, 0);
             mm.mma(0, k_tiles - pad_tiles, mat_a, mat_b);
             for (int i = 0; i < SIMD_TILES_M; ++i) {
                 for (int j = 0; j < SIMD_TILES_N; ++j) {
-                    simdgroup_store(mm.accum[i][j], simd_out_buf[sid][i * SIMD_TILES_N + j], TILE_SIZE);
+                    simdgroup_store(mm.acc(i, j), simd_out_buf[sid][i * SIMD_TILES_N + j], TILE_SIZE);
                 }
             }
             simdgroup_barrier(mem_flags::mem_threadgroup);
@@ -639,8 +728,8 @@ kernel void conv2_in16_simd
 kernel void conv3_simd
 (
     device const ConvArgs* const args,
-    device const ftype* const in_buf,
-    device const ftype* const weights_buf,
+    device ftype* const in_buf,
+    device ftype* const weights_buf,
     device ftype* const out_buf,
     KERNEL_INDEX_INPUTS
 ) {
@@ -661,31 +750,23 @@ kernel void conv3_simd
     device const ftype* bias = weights_buf + dp_size * out_size;
     const int in_buf_stride = chunk_size_in * in_size;
     MatMul<SIMD_TILES_M, SIMD_TILES_N> mm;
+    using MatLayoutLSTM = MatLayoutLSTM<SIMD_TILES_M, SIMD_TILES_N, FORWARD_LSTM_OUTPUT>;
 
-    for (int m_blk = gid; m_blk < m_blks; m_blk += threadgroups) {
-        for (int chunk = tid; chunk < SIMD_TILES_M * TILE_SIZE; chunk += threads) {
-            for (int i = 0; i < out_size; ++i) {
-                int idx = i * num_chunks + m_blk * SIMD_TILES_M * TILE_SIZE + chunk;
-                out_buf[idx] = 0;
-                out_buf[idx + (chunk_size_out + 1) * out_size] = 0;
-            }
-        }
-    }
+    MatLayoutLSTM::zero_initial_state(out_buf, chunk_size_out, num_chunks, out_size, gid, threadgroups, sid, simdgroups);
 
     for (int m_blk = gid; m_blk < m_blks; m_blk += threadgroups) {
         for (int ts = 0; ts < chunk_size_out; ++ts) {
             int start_pos = ts * stride - pad;
             int start_pad_tiles = max(0, -start_pos) * in_size_tiles;
             int end_pad_tiles = max(0, start_pos + win_size - chunk_size_in) * in_size_tiles;
-            device ftype* out = out_buf + (ts + 1) * num_chunks * out_size; // One timestep of padding as required by LSTM
             for (int n_blk = sid; n_blk < n_blks; n_blk += simdgroups) {
                 mm.load_bias(bias, n_blk * SIMD_TILES_N * TILE_SIZE);
-                TileBlockRowMajor mat_a(in_buf, in_buf_stride, m_blk * SIMD_TILES_M * TILE_SIZE, start_pos * in_size_tiles * TILE_SIZE);
-                TileBlockRowMajor mat_b(weights_buf, out_size, 0, n_blk * SIMD_TILES_N * TILE_SIZE);
+                TileBlockRowMajor<> mat_a(in_buf, in_buf_stride, m_blk * SIMD_TILES_M * TILE_SIZE, start_pos * in_size_tiles * TILE_SIZE);
+                TileBlockRowMajor<> mat_b(weights_buf, out_size, 0, n_blk * SIMD_TILES_N * TILE_SIZE);
                 mm.mma(start_pad_tiles, k_blks - end_pad_tiles, mat_a, mat_b);
                 for (int i = 0; i < SIMD_TILES_M; ++i) {
                     for (int j = 0; j < SIMD_TILES_N; ++j) {
-                        simdgroup_store(mm.accum[i][j], simd_out_buf[sid][i * SIMD_TILES_N + j], TILE_SIZE);
+                        simdgroup_store(mm.acc(i, j), simd_out_buf[sid][i * SIMD_TILES_N + j], TILE_SIZE);
                     }
                 }
                 simdgroup_barrier(mem_flags::mem_threadgroup);
@@ -695,14 +776,12 @@ kernel void conv3_simd
                     simd_out_buf[sid][0][elem] = conv_activation(val);
                 }
                 simdgroup_barrier(mem_flags::mem_threadgroup);
+                auto out_tile_blk = MatLayoutLSTM::tnc_block(out_buf, chunk_size_out, num_chunks, out_size, ts, m_blk, n_blk);
                 for (int i = 0; i < SIMD_TILES_M; ++i) {
-                    uint out_col = (m_blk * SIMD_TILES_M + i) * TILE_SIZE;
                     for (int j = 0; j < SIMD_TILES_N; ++j) {
-                        int tile_idx = i * SIMD_TILES_N + j;
-                        uint out_row = (n_blk * SIMD_TILES_N + j) * TILE_SIZE;
                         simdgroup_ftype8x8 A;
-                        simdgroup_load(A, simd_out_buf[sid][tile_idx], TILE_SIZE);
-                        simdgroup_store(A, out, num_chunks, ulong2(out_col, out_row));
+                        simdgroup_load(A, simd_out_buf[sid][i * SIMD_TILES_N + j], TILE_SIZE);
+                        out_tile_blk.store(A, i, j);
                     }
                 }
             }
@@ -717,74 +796,63 @@ struct LstmArgs {
     int chunk_size;
 };
 
-// This takes a contiguous input tensor of shape [T, N, C], and contiguous output tensor
-// of shape [T+2, C/8, 8, N/8, 8], and performs these assignments:
-//     output.slice(0, 1, T+1) = input.view({T, N/8, 8, C/8, 8}.transpose(1, 3);
-//     output[0] = 0;
-//     output[T+1] = 0;
-kernel void reorder_input(
+template<typename InLayout, typename OutLayout>
+kernel void reorder(
     device const LstmArgs* const args,
-    device const ftype_in* const in,
-    device ftype* const out,
+    device typename InLayout::ftype* const in,
+    device typename OutLayout::ftype* const out,
     KERNEL_INDEX_INPUTS)
 {
-    threadgroup ftype bfr[MAX_LAYER_SIZE * TILE_SIZE];
-    const int layer_tiles = kLstmLayerSize / TILE_SIZE;
-    const int batch_tiles = args->batch_tiles;
+    threadgroup typename InLayout::ftype bfr_in[32][TILE_SIZE * TILE_SIZE];
+    threadgroup typename OutLayout::ftype bfr_out[32][TILE_SIZE * TILE_SIZE];
+    const int batch_size = args->batch_tiles * TILE_SIZE;
     const int chunk_size = args->chunk_size;
-    for (int batch_tile = gid; batch_tile < batch_tiles; batch_tile += threadgroups) {
-        // note: at timestep=-1 and timestep=chunk_size we do zero-padding in order to avoid having to deal with the edges differently
-        for (int timestep = -1; timestep <= chunk_size; ++timestep) {
-            threadgroup_barrier(mem_flags::mem_threadgroup);
-            for (int chunk = 0; chunk < TILE_SIZE; ++chunk) {
-                for (int col = tid; col < kLstmLayerSize; col += threads) {
-                    const int idx = (timestep * batch_tiles * TILE_SIZE + (batch_tile * TILE_SIZE + chunk)) * kLstmLayerSize + col;
-                    const ftype val = (timestep >= 0 && timestep < chunk_size) ? ftype(in[idx]) : ftype(0);
-                    bfr[chunk * MAX_LAYER_SIZE + col] = val;
+    const int m_blks = args->batch_tiles / SIMD_TILES_M;
+    const int n_blks = kLstmLayerSize / (SIMD_TILES_N * TILE_SIZE);
+    uint lane_id = tid & 31;
+
+    OutLayout::zero_initial_state(out, chunk_size, batch_size, kLstmLayerSize, gid, threadgroups, sid, simdgroups);
+    for (int ts = 0; ts < chunk_size; ++ts) {
+        for (int m_blk = gid; m_blk < m_blks; m_blk += threadgroups) {
+            for (int n_blk = sid; n_blk < n_blks; n_blk += simdgroups) {
+                auto in_blk = InLayout::tnc_block(in, chunk_size, batch_size, kLstmLayerSize, ts, m_blk, n_blk);
+                auto out_blk = OutLayout::tnc_block(out, chunk_size, batch_size, kLstmLayerSize, ts, m_blk, n_blk);
+                for (int m_tile = 0; m_tile < SIMD_TILES_M; ++m_tile) {
+                    for (int n_tile = 0; n_tile < SIMD_TILES_N; ++n_tile) {
+                        typename decltype(in_blk)::simdgroup_tile in_tile;
+                        typename decltype(out_blk)::simdgroup_tile out_tile;
+                        in_blk.load(in_tile, m_tile, n_tile);
+                        simdgroup_store(in_tile, bfr_in[sid], TILE_SIZE);
+                        simdgroup_barrier(mem_flags::mem_threadgroup);
+                        for (int i = lane_id; i < TILE_SIZE * TILE_SIZE; i += 32) {
+                            bfr_out[sid][i] = ftype(bfr_in[sid][i]);
+                        }
+                        simdgroup_load(out_tile, bfr_out[sid], TILE_SIZE);
+                        simdgroup_barrier(mem_flags::mem_threadgroup);
+                        out_blk.store(out_tile, m_tile, n_tile);
+                    }
                 }
-            }
-            threadgroup_barrier(mem_flags::mem_threadgroup);
-            for (int tile = sid; tile < layer_tiles; tile += simdgroups) {
-                simdgroup_ftype8x8 A;
-                simdgroup_load(A, bfr + tile * TILE_SIZE, MAX_LAYER_SIZE);
-                simdgroup_store(A, out, batch_tiles * TILE_SIZE, ulong2(batch_tile * TILE_SIZE, (timestep + 1) * kLstmLayerSize + tile * TILE_SIZE));
             }
         }
     }
 }
 
-// This takes a contiguous input tensor of shape [T+2, C/8, 8, N/8, 8], and contiguous output tensor
-// of shape [T, N, C], and performs this copy:
-//     output.view({T, N/8, 8, C/8, 8}) = input.slice(0, 1, T+1).transpose(1, 3);
-// Note that it ignores input[0,:,:,:] and input[T+1,:,:,:]
-kernel void reorder_output(
-    device const LstmArgs* const args,
-    device const ftype* const in,
-    device ftype_out* const out,
-    KERNEL_INDEX_INPUTS)
-{
-    threadgroup ftype bfr[MAX_LAYER_SIZE * TILE_SIZE];
-    const int layer_tiles = kLstmLayerSize / TILE_SIZE;
-    const int batch_tiles = args->batch_tiles;
-    const int chunk_size = args->chunk_size;
-    for (int batch_tile = gid; batch_tile < batch_tiles; batch_tile += threadgroups) {
-        for (int timestep = 0; timestep < chunk_size; ++timestep) {
-            threadgroup_barrier(mem_flags::mem_threadgroup);
-            for (int tile = sid; tile < layer_tiles; tile += simdgroups) {
-                simdgroup_ftype8x8 A;
-                simdgroup_load(A, in, batch_tiles * TILE_SIZE, ulong2(batch_tile * TILE_SIZE, (timestep + 1) * kLstmLayerSize + tile * TILE_SIZE));
-                simdgroup_store(A, bfr + tile * TILE_SIZE, MAX_LAYER_SIZE);
-            }
-            threadgroup_barrier(mem_flags::mem_threadgroup);
-            for (int chunk = 0; chunk < TILE_SIZE; ++chunk) {
-                for (int col = tid; col < kLstmLayerSize; col += threads) {
-                    const int idx = (timestep * batch_tiles * TILE_SIZE + (batch_tile * TILE_SIZE + chunk)) * kLstmLayerSize + col;
-                    out[idx] = ftype_out(bfr[chunk * MAX_LAYER_SIZE + col]);
-                }
-            }
-        }
-    }
-}
+template [[ host_name("reorder_input") ]] kernel void reorder<
+    MatLayoutRowMajor<SIMD_TILES_M, SIMD_TILES_N, ftype_in>,
+            MatLayoutLSTM<SIMD_TILES_M, SIMD_TILES_N, FORWARD_LSTM_OUTPUT, ftype>>(
+        device const LstmArgs*,
+        device ftype_in*,
+        device ftype*,
+        KERNEL_INDEX_INPUTS);
+
+template [[ host_name("reorder_output") ]] kernel void reorder<
+    MatLayoutLSTM<SIMD_TILES_M, SIMD_TILES_N, REVERSE_LSTM_OUTPUT, ftype>,
+            MatLayoutRowMajor<SIMD_TILES_M, SIMD_TILES_N, ftype_out>>(
+        device const LstmArgs*,
+        device ftype*,
+        device ftype_out*,
+        KERNEL_INDEX_INPUTS);
+
 
 // Note: max_total_threads_per_threadgroup is set via ComputePipelineDescriptor,
 // rather than an attribute here, since it depends on the SIMD group count,
@@ -792,7 +860,7 @@ kernel void reorder_output(
 kernel void lstm(
         device const LstmArgs* const args,
         device ftype* const in_out,
-        device const ftype* const weights_buf,
+        device ftype* const weights_buf,
         device ftype* const state_buf,
         device ftype* const temp_result_buf,
         // The sizes of these buffers are set via MTL::ComputeCommandEncoder.
@@ -806,9 +874,10 @@ kernel void lstm(
     const int m_blks = batch_tiles / SIMD_TILES_M;
     const int n_blks = kLstmLayerSize * 4 / (TILE_SIZE * SIMD_TILES_N);
     const int k_tiles = kLstmLayerSize / TILE_SIZE;
-    const int inout_stride = batch_tiles * TILE_SIZE;
+    const int batch_size = batch_tiles * TILE_SIZE;
     const int w_stride = kLstmLayerSize * 4;
     MatMul<SIMD_TILES_M, SIMD_TILES_N> mm;
+    using MatLayoutLSTM = MatLayoutLSTM<SIMD_TILES_M, SIMD_TILES_N, NO_OFFSET>;
     device const ftype* const bias = weights_buf + 3 * kLstmLayerSize * w_stride;
 
     const uint t_idx = tid & 31;
@@ -826,28 +895,29 @@ kernel void lstm(
 
     for (int iter = 0; iter < chunk_size; ++iter) {
         threadgroup_barrier(mem_flags::mem_device | mem_flags::mem_threadgroup);
-        const int timestep_out = kLstmReversedInTime ? chunk_size + 1 - iter : iter + 1;
-        const int timestep_in = timestep_out - 1;
-        device ftype* const out = in_out + timestep_out * inout_stride * kLstmLayerSize;
+        const int timestep_in = kLstmReversedInTime ? chunk_size - iter : iter;
         for (int m_blk = gid; m_blk < m_blks; m_blk += threadgroups) {
             for (int n_blk = sid; n_blk < n_blks; n_blk += simdgroups) {
                 mm.load_bias(bias, n_blk * SIMD_TILES_N * TILE_SIZE);
-                auto mat_a = MatLayoutLSTM::tnc_raw(in_out, 0, batch_tiles * TILE_SIZE, kLstmLayerSize, timestep_in, m_blk * SIMD_TILES_M * TILE_SIZE, 0);
-                TileBlockRowMajor mat_b(weights_buf, w_stride, 0, n_blk * SIMD_TILES_N * TILE_SIZE);
+                auto mat_a = MatLayoutLSTM::tnc_block(in_out, 0, batch_size, kLstmLayerSize, timestep_in, m_blk, 0);
+                TileBlockRowMajor<> mat_b(weights_buf, w_stride, 0, n_blk * SIMD_TILES_N * TILE_SIZE);
+                auto mat_c = MatLayoutLSTM::tnc_block(in_out, 0, batch_size, kLstmLayerSize, timestep_in + 1, m_blk, 0);
+                // Surprisingly, executing the second mma starting from 2*k_tiles is faster than
+                // doing `mat_a = MatLayoutLSTM::tnc_block(..., timestep_in+2, ...);` or adding
+                // an offset to `mat_a.ptr` and `mat_b.ptr`
+                // This is why `weights_buf` has `3*kLstmLayerSize` rows instead of `2*kLstmLayerSize` rows
                 mm.mma(0, k_tiles, mat_a, mat_b);
                 mm.mma(2 * k_tiles, 3 * k_tiles, mat_a, mat_b);
+
                 for (int i = 0; i < SIMD_TILES_M; ++i) {
-                    const uint out_chunk_base = (m_blk * SIMD_TILES_M + i) * TILE_SIZE;
-                    const uint chunk_idx = out_chunk_base + row;
+                    const uint chunk_idx = (m_blk * SIMD_TILES_M + i) * TILE_SIZE + row;
                     for (int j = 0; j < SIMD_TILES_N; j += 2) {
-                        simdgroup_store(mm.accum[i][j + 0], simd_res_buf[sid],
-                                        2 * TILE_SIZE);
-                        simdgroup_store(mm.accum[i][j + 1], simd_res_buf[sid] + TILE_SIZE,
-                                        2 * TILE_SIZE);
+                        simdgroup_store(mm.acc(i, j + 0), simd_res_buf[sid], 2 * TILE_SIZE);
+                        simdgroup_store(mm.acc(i, j + 1), simd_res_buf[sid] + TILE_SIZE, 2 * TILE_SIZE);
                         simdgroup_barrier(mem_flags::mem_threadgroup);
                         const uint col = j * 2 + col_bits;
                         const uint out_col = n_blk * SIMD_TILES_N * 2 + col;
-                        const uint out_idx = out_col * inout_stride + chunk_idx;
+                        const uint out_idx = out_col * batch_size + chunk_idx;
                         const float g = tanh_fast(simd_res_buf[sid][rb_idx + 0]);
                         const float i = sigmoid(simd_res_buf[sid][rb_idx + 1]);
                         const float f = sigmoid(simd_res_buf[sid][rb_idx + 2]);
@@ -861,7 +931,7 @@ kernel void lstm(
                     simdgroup_ftype8x8 A;
                     for (int j = 0; j < SIMD_TILES_N / 4; ++j) {
                         simdgroup_load(A, simd_out_buf[sid], SIMD_TILES_N * 2, ulong2(j * TILE_SIZE, 0));
-                        simdgroup_store(A, out, inout_stride, ulong2(out_chunk_base, n_blk * SIMD_TILES_N * 2 + j * TILE_SIZE));
+                        mat_c.store(A, i, n_blk * (SIMD_TILES_N / 4) + j);
                     }
                 }
             }
@@ -879,7 +949,7 @@ struct LinearArgs {
 template<typename InputMatLayout> kernel void linear(
         device const LinearArgs* const args,
         device ftype* const in_buf,
-        device const ftype* const weights_buf,
+        device ftype* const weights_buf,
         device void* const out_buf,
         // The size of this buffer is set via MTL::ComputeCommandEncoder.
         // It depends on the SIMD group count.
@@ -888,7 +958,7 @@ template<typename InputMatLayout> kernel void linear(
 {
     const int chunk_size = args->chunk_size;
     const int in_batch_size = args->in_batch_tiles * TILE_SIZE;
-    const int in_batch_offset = args->in_batch_tile_offset * TILE_SIZE;
+    const int in_batch_block_offset = args->in_batch_tile_offset / SIMD_TILES_M;
     const int out_batch_tiles = args->out_batch_tiles;
     const int m_blks = out_batch_tiles / SIMD_TILES_M;
     const int n_blks = kLinearOutSize / (TILE_SIZE * SIMD_TILES_N);
@@ -906,14 +976,14 @@ template<typename InputMatLayout> kernel void linear(
         for (int m_blk = 0; m_blk < m_blks; ++m_blk) {
             for (int n_blk = sid; n_blk < n_blks; n_blk += simdgroups) {
                 mm.load_bias(bias, n_blk * SIMD_TILES_N * TILE_SIZE);
-                auto mat_a = InputMatLayout::tnc(in_buf, chunk_size, in_batch_size, kLinearInSize,
-                    ts, m_blk * SIMD_TILES_M * TILE_SIZE + in_batch_offset, 0);
-                TileBlockRowMajor mat_b(weights_buf, w_stride, 0, n_blk * SIMD_TILES_N * TILE_SIZE);
+                auto mat_a = InputMatLayout::tnc_block(in_buf, chunk_size, in_batch_size, kLinearInSize,
+                    ts, m_blk + in_batch_block_offset, 0);
+                TileBlockRowMajor<> mat_b(weights_buf, w_stride, 0, n_blk * SIMD_TILES_N * TILE_SIZE);
                 mm.mma(0, k_tiles, mat_a, mat_b);
                 for (int i = 0; i < SIMD_TILES_M; ++i) {
                     for (int j = 0; j < SIMD_TILES_N; ++j) {
                         // Store this 8x8 tile to threadgroup memory as ftype.
-                        simdgroup_store(mm.accum[i][j], simd_out_buf[sid], TILE_SIZE);
+                        simdgroup_store(mm.acc(i, j), simd_out_buf[sid], TILE_SIZE);
                         
                         const uint tile_i = (m_blk * SIMD_TILES_M + i) * TILE_SIZE;
                         const uint tile_j = (n_blk * SIMD_TILES_N + j) * TILE_SIZE;
@@ -943,18 +1013,18 @@ template<typename InputMatLayout> kernel void linear(
     }
 }
 
-template [[ host_name("linear") ]] kernel void linear<MatLayoutRowMajor>(
+template [[ host_name("linear") ]] kernel void linear<MatLayoutRowMajor<SIMD_TILES_M, SIMD_TILES_N>>(
         device const LinearArgs*,
         device ftype*,
-        device const ftype*,
+        device ftype*,
         device void* const,
         threadgroup ftype (* const simd_out_buf)[TILE_SIZE * TILE_SIZE],
         KERNEL_INDEX_INPUTS);
 
-template [[ host_name("linear_from_lstm") ]] kernel void linear<MatLayoutLSTM>(
+template [[ host_name("linear_from_lstm") ]] kernel void linear<MatLayoutLSTM<SIMD_TILES_M, SIMD_TILES_N, REVERSE_LSTM_OUTPUT>>(
         device const LinearArgs*,
         device ftype*,
-        device const ftype*,
+        device ftype*,
         device void* const,
         threadgroup ftype (* const simd_out_buf)[TILE_SIZE * TILE_SIZE],
         KERNEL_INDEX_INPUTS);
