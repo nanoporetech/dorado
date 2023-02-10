@@ -167,8 +167,9 @@ int select_batchsize(int layer_size, int min_batchsize, int max_batchsize, std::
                            state_buf.data_ptr(), a.data_ptr());
     }
 
+    CUDATimer cuda_timer;
     for (int batchsize = min_batchsize; batchsize <= max_batchsize; batchsize += 16) {
-        steady_clock::time_point begin = steady_clock::now();
+        cuda_timer.start();
         for (int t = 0; t < timesteps; t++) {
             a = torch::empty({batchsize, layer_size * 2}, options);
             c = torch::empty({batchsize, layer_size * 4}, options);
@@ -176,8 +177,8 @@ int select_batchsize(int layer_size, int min_batchsize, int max_batchsize, std::
             host_lstm_step_f16(stream, batchsize, layer_size, bias.data_ptr(), c.data_ptr(),
                                state_buf.data_ptr(), a.data_ptr());
         }
-        steady_clock::time_point end = steady_clock::now();
-        float time = duration_cast<nanoseconds>(end - begin).count() / batchsize;
+        cuda_timer.stop();
+        float const time = cuda_timer.result_ms() / batchsize;
 
         if (time < best_time) {
             best_time = time;
