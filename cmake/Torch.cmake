@@ -3,7 +3,7 @@ set(TORCH_VERSION 1.13.1)
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32)
     find_package(CUDAToolkit REQUIRED)
     # the torch cuda.cmake will set(CUDAToolkit_ROOT "${CUDA_TOOLKIT_ROOT_DIR}") [2]
-    # so we need to make CUDA_TOOLKIT_ROOT_DIR is set correctly as per [1] we also
+    # so we need to make CUDA_TOOLKIT_ROOT_DIR is set correctly as per [1]
     # 1. https://cmake.org/cmake/help/latest/module/FindCUDAToolkit.html
     # 2. https://github.com/pytorch/pytorch/blob/5fa71207222620b4efb78989849525d4ee6032e8/cmake/public/cuda.cmake#L40
     if(DEFINED CUDAToolkit_ROOT)
@@ -70,6 +70,11 @@ else()
 endif()
 
 find_package(Torch REQUIRED)
+file(STRINGS "${TORCH_LIB}/build-version" TORCH_BUILD_VERSION)
+
+if (NOT TORCH_BUILD_VERSION EQUAL TORCH_VERSION)
+  message(WARNING "expected ${TORCH_VERSION} but found ${TORCH_BUILD_VERSION}")
+endif()
 
 if(WIN32 AND DEFINED MKL_ROOT)
     link_directories(${MKL_ROOT}/lib/intel64)
