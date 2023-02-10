@@ -3,13 +3,17 @@
 #include "fast_hash.h"
 
 #include <math.h>
+#include <spdlog/spdlog.h>
 #include <torch/torch.h>
 
 #include <algorithm>
+#include <array>
 #include <cstring>
 #include <iostream>
 #include <limits>
 #include <numeric>
+
+#define REMOVE_FIXED_BEAM_STAYS
 
 namespace {
 
@@ -67,7 +71,7 @@ std::tuple<std::string, std::string> generate_sequence(const std::vector<uint8_t
 
     std::string sequence(seqLen, 'N');
     std::string qstring(seqLen, '!');
-    std::vector<char> alphabet = {'A', 'C', 'G', 'T'};
+    std::array<char, 4> alphabet = {'A', 'C', 'G', 'T'};
     std::vector<float> baseProbs(seqLen), totalProbs(seqLen);
 
     for (size_t blk = 0; blk < num_blocks; ++blk) {
@@ -110,10 +114,10 @@ std::tuple<std::string, std::string> generate_sequence(const std::vector<uint8_t
 }  // anonymous namespace
 
 template <typename T>
-float beam_search(const T* scores,
+float beam_search(const T* const scores,
                   size_t scores_block_stride,
-                  const T* back_guide,
-                  const float* posts,
+                  const float* const back_guide,
+                  const float* const posts,
                   size_t num_states,
                   size_t num_blocks,
                   size_t max_beam_width,
@@ -122,17 +126,13 @@ float beam_search(const T* scores,
                   std::vector<int32_t>& states,
                   std::vector<uint8_t>& moves,
                   std::vector<float>& qual_data,
-                  float temperature) {
+                  float temperature,
+                  float score_scale) {
     if (max_beam_width > 256) {
         throw std::range_error("Beamsearch max_beam_width cannot be greater than 256.");
     }
 
     // Some values we need
-#ifdef REMOVE_FIXED_BEAM_STAYS
-    size_t num_transitions = num_states * num_bases;
-#else
-    size_t num_transitions = num_states * (num_bases + 1);
-#endif
     constexpr uint64_t hash_seed = 0x880355f21e6d1965ULL;
     const float log_beam_cut =
             (beam_cut > 0.0f) ? (temperature * logf(beam_cut)) : std::numeric_limits<float>::max();
@@ -184,13 +184,17 @@ float beam_search(const T* scores,
 
     // Iterate through blocks, extending beam
     for (size_t block_idx = 0; block_idx < num_blocks; block_idx++) {
-        const T* block_scores = scores + (block_idx * scores_block_stride);
-        const T* block_back_scores = back_guide + ((block_idx + 1) * num_states);
+        const T* const block_scores = scores + (block_idx * scores_block_stride);
+        // Retrieves the given score as a float, multiplied by score_scale.
+        const auto fetch_block_score = [block_scores, score_scale](size_t idx) {
+            return static_cast<float>(block_scores[idx]) * score_scale;
+        };
+        const float* const block_back_scores = back_guide + ((block_idx + 1) * num_states);
 #ifdef REMOVE_FIXED_BEAM_STAYS
         /*  kmer transitions order:
 	 *  N^K , N array
 	 *  Elements stored as resulting kmer and modifying action (stays have a fixed score and are not computed).
-	 *  Kmer index is lexographic with most recent base in the fastest index
+	 *  Kmer index is lexicographic with most recent base in the fastest index
 	 *
 	 *  E.g.  AGT has index (4^2, 4, 1) . (0, 2, 3) == 11
 	 *  The modifying action is
@@ -209,7 +213,7 @@ float beam_search(const T* scores,
         /*  kmer transitions order:
          *  N^K , (N + 1) array
          *  Elements stored as resulting kmer and modifying action (0 == stay).
-         *  Kmer index is lexographic with most recent base in the fastest index
+         *  Kmer index is lexicographic with most recent base in the fastest index
          *
          *  E.g.  AGT has index (4^2, 4, 1) . (0, 2, 3) == 11
          *  The modifying action is
@@ -231,7 +235,8 @@ float beam_search(const T* scores,
         auto generate_stay_index = [](state_t state, size_t num_bases) {
             return state_t(state * (num_bases + 1));
         };
-#endif  // REMOVE_FIXED_BEAM_STAYS \
+#endif  // REMOVE_FIXED_BEAM_STAYS
+
         // Generate list of candidate elements for this timestep (block)
         size_t new_elem_count = 0;
         for (size_t prev_elem_idx = 0; prev_elem_idx < current_beam_width; prev_elem_idx++) {
@@ -243,8 +248,8 @@ float beam_search(const T* scores,
                         state_t((previous_element.state * num_bases) % num_states + new_base);
                 const state_t move_idx = generate_move_index(previous_element.state, new_state,
                                                              num_bases, num_states);
-                float new_score = previous_element.score + float(block_scores[move_idx]) +
-                                  float(block_back_scores[new_state]);
+                float new_score = previous_element.score + fetch_block_score(move_idx) +
+                                  static_cast<float>(block_back_scores[new_state]);
                 uint64_t new_hash = chainfasthash64(previous_element.hash, new_state);
 
                 // Add new element to the candidate list
@@ -258,11 +263,11 @@ float beam_search(const T* scores,
             // Add the possible stay
 #ifdef REMOVE_FIXED_BEAM_STAYS
             const float stay_score = previous_element.score + fixed_stay_score +
-                                     float(block_back_scores[previous_element.state]);
+                                     static_cast<float>(block_back_scores[previous_element.state]);
 #else
             const state_t stay_idx = generate_stay_index(previous_element.state, num_bases);
-            const float stay_score = previous_element.score + block_scores[stay_idx] +
-                                     float(block_back_scores[previous_element.state]);
+            const float stay_score = previous_element.score + fetch_block_score(stay_idx) +
+                                     static_cast<float>(block_back_scores[previous_element.state]);
 #endif
             (*current_beam_front)[new_elem_count++] = {previous_element.hash, stay_score,
                                                        previous_element.state,
@@ -447,8 +452,8 @@ float beam_search(const T* scores,
         for (int shift_base = 0; shift_base < num_bases; shift_base++) {
             block_prob += float(timestep_posts[r_shift_idx + shift_base]);
         }
-        block_prob = std::min(std::max(block_prob, 0.0f), 1.0f);  // clamp prob between 0 and 1
-        block_prob = powf(block_prob, 0.4f);                      // Power fudge factor
+        block_prob = std::clamp(block_prob, 0.0f, 1.0f);
+        block_prob = powf(block_prob, 0.4f);  // Power fudge factor
 
         // Calculate a placeholder qscore for the "wrong" bases
         float wrong_base_prob = (1.0f - block_prob) / 3.0f;
@@ -463,15 +468,16 @@ float beam_search(const T* scores,
 }
 
 std::tuple<std::string, std::string, std::vector<uint8_t>> beam_search_decode(
-        const torch::Tensor scores_t,
-        const torch::Tensor back_guides_t,
-        const torch::Tensor posts_t,
+        const torch::Tensor& scores_t,
+        const torch::Tensor& back_guides_t,
+        const torch::Tensor& posts_t,
         size_t beam_width,
         float beam_cut,
         float fixed_stay_score,
         float q_shift,
         float q_scale,
-        float temperature) {
+        float temperature,
+        float byte_score_scale) {
     const int num_blocks = int(scores_t.size(0));
     const int num_states = get_num_states(scores_t.size(1));
 
@@ -480,13 +486,10 @@ std::tuple<std::string, std::string, std::vector<uint8_t>> beam_search_decode(
     std::vector<uint8_t> moves(num_blocks);
     std::vector<float> qual_data(num_blocks * num_bases);
 
-    std::string type_str(scores_t.dtype().name());
-    std::string post_type_str(posts_t.dtype().name());
-    std::string guides_type_str(back_guides_t.dtype().name());
-
-    if (post_type_str != type_str || guides_type_str != type_str) {
+    // Posterior probabilities and back guides must be floats regardless of scores type.
+    if (posts_t.dtype() != torch::kFloat32 || back_guides_t.dtype() != torch::kFloat32) {
         throw std::runtime_error(
-                "beam_search_decode: mismatched tensor types provided for posts, scores and "
+                "beam_search_decode: mismatched tensor types provided for posts and "
                 "guides");
     }
 
@@ -495,29 +498,26 @@ std::tuple<std::string, std::string, std::vector<uint8_t>> beam_search_decode(
     auto posts_contig = posts_t.expect_contiguous();
     // scores_t may come from a tensor with chunks interleaved, but make sure the last dimension is contiguous
     auto scores_block_contig = (scores_t.stride(1) == 1) ? scores_t : scores_t.contiguous();
-    size_t scores_block_stride = scores_block_contig.stride(0);
-    if (type_str == "float") {
+    const size_t scores_block_stride = scores_block_contig.stride(0);
+    if (scores_t.dtype() == torch::kFloat32) {
         const auto scores = scores_block_contig.data_ptr<float>();
         const auto back_guides = back_guides_contig->data_ptr<float>();
         const auto posts = posts_contig->data_ptr<float>();
 
         beam_search<float>(scores, scores_block_stride, back_guides, posts, num_states, num_blocks,
                            beam_width, beam_cut, fixed_stay_score, states, moves, qual_data,
-                           temperature);
-
-    } else if (type_str == "signed char") {
+                           temperature, 1.0f);
+    } else if (scores_t.dtype() == torch::kInt8) {
         const auto scores = scores_block_contig.data_ptr<int8_t>();
-        const auto back_guides = back_guides_contig->data_ptr<int8_t>();
-        const auto fposts = ((posts_contig->to(torch::kFloat32) + 128.0f) / 255.0f);
-        const auto posts = fposts.data_ptr<float>();
+        const auto back_guides = back_guides_contig->data_ptr<float>();
+        const auto posts = posts_contig->data_ptr<float>();
 
         beam_search<int8_t>(scores, scores_block_stride, back_guides, posts, num_states, num_blocks,
                             beam_width, beam_cut, fixed_stay_score, states, moves, qual_data,
-                            temperature);
-
+                            temperature, byte_score_scale);
     } else {
         throw std::runtime_error(std::string("beam_search_decode: unsupported tensor type ") +
-                                 type_str);
+                                 std::string(scores_t.dtype().name()));
     }
 
     std::tie(sequence, qstring) = generate_sequence(moves, states, qual_data, q_shift, q_scale);

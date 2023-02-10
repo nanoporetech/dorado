@@ -9,7 +9,8 @@
 #include <iomanip>
 #include <sstream>
 
-char* strptime(const char* s, const char* f, struct tm* tm) {
+namespace dorado::utils {
+char* strptime(const char* s, const char* f, tm* tm) {
     std::istringstream input(s);
     input.imbue(std::locale(setlocale(LC_ALL, nullptr)));
     input >> std::get_time(tm, f);
@@ -19,4 +20,5 @@ char* strptime(const char* s, const char* f, struct tm* tm) {
     return (char*)(s + input.tellg());
 }
 
+}  // namespace dorado::utils
 #endif  // _WIN32

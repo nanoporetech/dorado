@@ -2,20 +2,18 @@
 
 #include "Decoder.h"
 
+#include <c10/cuda/CUDAGuard.h>
+#include <nvtx3/nvtx3.hpp>
 #include <torch/torch.h>
 
-#ifndef __APPLE__
 extern "C" {
 #include "koi.h"
 }
-#include <cuda_runtime.h>
-#endif
 
-std::vector<DecodedChunk> GPUDecoder::beam_search(torch::Tensor scores,
-                                                  int num_chunks,
-                                                  DecoderOptions options) {
-    scores = scores.transpose(1, 0).contiguous();
+namespace dorado {
 
+torch::Tensor GPUDecoder::gpu_part(torch::Tensor scores, int num_chunks, DecoderOptions options) {
+    nvtx3::scoped_range loop{"gpu_decode"};
     long int N = scores.sizes()[0];
     long int T = scores.sizes()[1];
     long int C = scores.sizes()[2];
@@ -42,22 +40,17 @@ std::vector<DecodedChunk> GPUDecoder::beam_search(torch::Tensor scores,
         aux = torch::empty(N * (T + 1) * (C + 4 * options.beam_width), tensor_options_int8);
         path = torch::zeros(N * (T + 1), tensor_options_int32);
 
-        moves = torch::zeros(N * T, tensor_options_int8);
-        sequence = torch::zeros(N * T, tensor_options_int8);
-        qstring = torch::zeros(N * T, tensor_options_int8);
+        moves_sequence_qstring = torch::zeros({3, N * T}, tensor_options_int8);
 
         initialized = true;
     }
 
-    moves.index({torch::indexing::Slice()}) = 0.0;
-    sequence.index({torch::indexing::Slice()}) = 0.0;
-    qstring.index({torch::indexing::Slice()}) = 0.0;
+    moves_sequence_qstring.index({torch::indexing::Slice()}) = 0.0;
+    auto moves = moves_sequence_qstring[0];
+    auto sequence = moves_sequence_qstring[1];
+    auto qstring = moves_sequence_qstring[2];
 
-#ifndef __APPLE__
-    int cuda_device_id = get_cuda_device_id_from_device(scores.device());
-    if (cudaSetDevice(cuda_device_id) != cudaSuccess) {
-        throw std::runtime_error("Unable to set cuda device!");
-    }
+    c10::cuda::CUDAGuard device_guard(scores.device());
     host_back_guide_step(chunks.data_ptr(), chunk_results.data_ptr(), N, scores.data_ptr(), C,
                          aux.data_ptr(), path.data_ptr(), moves.data_ptr(), NULL,
                          sequence.data_ptr(), qstring.data_ptr(), options.q_scale, options.q_shift,
@@ -79,22 +72,28 @@ std::vector<DecodedChunk> GPUDecoder::beam_search(torch::Tensor scores,
                     qstring.data_ptr(), options.q_scale, options.q_shift, options.beam_width,
                     options.beam_cut, options.blank_score, options.move_pad);
 
-#endif
+    return moves_sequence_qstring.reshape({3, N, -1});
+}
 
-    auto sequence_cpu = sequence.reshape({N, -1}).to(torch::kCPU);
-    auto qstring_cpu = qstring.reshape({N, -1}).to(torch::kCPU);
-    auto moves_cpu = moves.reshape({N, -1}).to(torch::kCPU);
+std::vector<DecodedChunk> GPUDecoder::cpu_part(torch::Tensor moves_sequence_qstring_cpu) {
+    nvtx3::scoped_range loop{"cpu_decode"};
+    assert(moves_sequence_qstring_cpu.device() == torch::kCPU);
+    auto moves_cpu = moves_sequence_qstring_cpu[0];
+    auto sequence_cpu = moves_sequence_qstring_cpu[1];
+    auto qstring_cpu = moves_sequence_qstring_cpu[2];
+    int N = moves_cpu.size(0);
+    int T = moves_cpu.size(1);
 
     std::vector<DecodedChunk> called_chunks;
 
     for (int idx = 0; idx < N; idx++) {
-        std::vector<uint8_t> mov((uint8_t*)moves_cpu[idx].data_ptr(),
-                                 (uint8_t*)moves_cpu[idx].data_ptr() + T);
+        std::vector<uint8_t> mov((uint8_t *)moves_cpu[idx].data_ptr(),
+                                 (uint8_t *)moves_cpu[idx].data_ptr() + T);
         auto num_bases = moves_cpu[idx].sum().item<int>();
-        std::string seq((char*)sequence_cpu[idx].data_ptr(),
-                        (char*)sequence_cpu[idx].data_ptr() + num_bases);
-        std::string qstr((char*)qstring_cpu[idx].data_ptr(),
-                         (char*)qstring_cpu[idx].data_ptr() + num_bases);
+        std::string seq((char *)sequence_cpu[idx].data_ptr(),
+                        (char *)sequence_cpu[idx].data_ptr() + num_bases);
+        std::string qstr((char *)qstring_cpu[idx].data_ptr(),
+                         (char *)qstring_cpu[idx].data_ptr() + num_bases);
 
         called_chunks.emplace_back(DecodedChunk{std::move(seq), std::move(qstr), std::move(mov)});
     }
@@ -102,12 +101,10 @@ std::vector<DecodedChunk> GPUDecoder::beam_search(torch::Tensor scores,
     return called_chunks;
 }
 
-int GPUDecoder::get_cuda_device_id_from_device(const c10::Device& device) {
-    if (!device.is_cuda() || !device.has_index()) {
-        std::stringstream ss;
-        ss << "Unable to extract CUDA device ID from device " << device;
-        throw std::runtime_error(ss.str());
-    }
-
-    return device.index();
+std::vector<DecodedChunk> GPUDecoder::beam_search(const torch::Tensor &scores,
+                                                  int num_chunks,
+                                                  const DecoderOptions &options) {
+    return cpu_part(gpu_part(scores, num_chunks, options));
 }
+
+}  // namespace dorado

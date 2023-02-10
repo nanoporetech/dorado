@@ -16,6 +16,21 @@
 [submodule "dorado/3rdparty/11Zip"]
 	path = dorado/3rdparty/elzip
 	url = https://github.com/Sygmei/11Zip.git
+[submodule "dorado/3rdparty/cxxpool"]
+	path = dorado/3rdparty/cxxpool
+	url = https://github.com/bloomen/cxxpool.git
+[submodule "dorado/3rdparty/edlib"]
+	path = dorado/3rdparty/edlib
+	url = https://github.com/martinsos/edlib
+[submodule "dorado/3rdparty/htslib"]
+	path = dorado/3rdparty/htslib
+	url = https://github.com/samtools/htslib.git
+[submodule "dorado/3rdparty/NVTX"]
+	path = dorado/3rdparty/NVTX
+	url = https://github.com/NVIDIA/NVTX.git
+[submodule "dorado/3rdparty/spdlog"]
+	path = dorado/3rdparty/spdlog
+	url = https://github.com/gabime/spdlog
 [submodule "dorado/3rdparty/slow5lib"]
 	path = dorado/3rdparty/slow5lib
 	url = https://github.com/hasindu2008/slow5lib.git

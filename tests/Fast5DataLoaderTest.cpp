@@ -6,7 +6,7 @@
 
 #define TEST_GROUP "Fast5DataLoaderTest: "
 
-class MockSink : public ReadSink {
+class MockSink : public dorado::ReadSink {
 public:
     MockSink() : ReadSink(1000) {}
     size_t get_read_count() { return m_reads.size(); }
@@ -17,7 +17,7 @@ TEST_CASE(TEST_GROUP "Test loading single-read Fast5 files") {
     MockSink mock_sink;
 
     std::string data_path(get_data_dir());
-    DataLoader loader(mock_sink, "cpu");
+    dorado::DataLoader loader(mock_sink, "cpu", 1);
     loader.load_reads(data_path);
 
     REQUIRE(mock_sink.get_read_count() == 1);

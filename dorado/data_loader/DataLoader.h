@@ -1,11 +1,16 @@
 #pragma once
 #include <string>
 
+namespace dorado {
+
 class ReadSink;
 
 class DataLoader {
 public:
-    DataLoader(ReadSink& read_sink, const std::string& device);
+    DataLoader(ReadSink& read_sink,
+               const std::string& device,
+               size_t num_worker_threads,
+               size_t max_reads = 0);
     void load_reads(const std::string& path);
 
 private:
@@ -17,4 +22,8 @@ private:
     std::string m_device;
     int64_t slow5_batch = 4000;
     int32_t slow5_threads = 8;
+    size_t m_num_worker_threads{1};
+    size_t m_max_reads{0};
 };
+
+}  // namespace dorado

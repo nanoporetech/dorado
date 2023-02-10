@@ -1,5 +1,6 @@
 #include "Version.h"
 #include "cli/cli.h"
+#include "spdlog/cfg/env.h"
 
 #include <functional>
 #include <iostream>
@@ -8,6 +9,8 @@
 #include <vector>
 
 using entry_ptr = std::function<int(int, char**)>;
+
+namespace {
 
 void usage(const std::vector<std::string> commands) {
     std::cerr << "Usage: dorado [options] subcommand\n\n"
@@ -22,10 +25,16 @@ void usage(const std::vector<std::string> commands) {
               << "-v --version            prints version information and exits" << std::endl;
 }
 
+}  // namespace
+
 int main(int argc, char* argv[]) {
+    // Load logging settings from environment/command-line.
+    spdlog::cfg::load_env_levels();
+
     const std::map<std::string, entry_ptr> subcommands = {
-            {"basecaller", &basecaller},
-            {"download", &download},
+            {"basecaller", &dorado::basecaller},
+            {"duplex", &dorado::duplex},
+            {"download", &dorado::download},
     };
 
     std::vector<std::string> arguments(argv + 1, argv + argc);
@@ -44,6 +53,9 @@ int main(int argc, char* argv[]) {
 
     if (subcommand == "-v" || subcommand == "--version") {
         std::cerr << DORADO_VERSION << std::endl;
+    } else if (subcommand == "-h" || subcommand == "--help") {
+        usage(keys);
+        return 0;
     } else if (subcommands.find(subcommand) != subcommands.end()) {
         return subcommands.at(subcommand)(--argc, ++argv);
     } else {

@@ -2,12 +2,17 @@
 .DS_Store
 .idea/
 .vscode
-bin
+*.qdrep
+dist
 build
+build-Release
+archive
 cmake-build*
 cmake.lock
+_CPack_Packages
 dorado/3rdparty/cuda11.3
 dorado/3rdparty/hdf5-1.12.*
+dorado/3rdparty/htslib-win
 dorado/3rdparty/koi
 dorado/3rdparty/koi_lib
 dorado/3rdparty/metal-cpp
@@ -16,3 +21,4 @@ dorado/3rdparty/openssl-win
 dorado/3rdparty/torch-*
 dorado/3rdparty/vbz_plugin
 dorado/3rdparty/zlib-1.2.*
+

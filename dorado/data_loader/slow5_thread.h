@@ -75,7 +75,7 @@ typedef struct {
     std::vector<std::vector<size_t>> list;
     std::string output_dir;
     //
-    std::vector<std::shared_ptr<Read>> read_data_ptrs;
+    std::vector<std::shared_ptr<dorado::Read>> read_data_ptrs;
 } db_t;
 
 /* argument wrapper for the multithreaded framework used for data processing */

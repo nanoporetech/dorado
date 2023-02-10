@@ -2,6 +2,11 @@
 
 #include <torch/torch.h>
 
+#include <string>
+#include <vector>
+
+namespace dorado {
+
 struct DecodedChunk {
     std::string sequence;
     std::string qstring;
@@ -20,7 +25,9 @@ struct DecoderOptions {
 
 class Decoder {
 public:
-    virtual std::vector<DecodedChunk> beam_search(torch::Tensor scores,
+    virtual std::vector<DecodedChunk> beam_search(const torch::Tensor& scores,
                                                   int num_chunks,
-                                                  DecoderOptions options) = 0;
+                                                  const DecoderOptions& options) = 0;
 };
+
+}  // namespace dorado

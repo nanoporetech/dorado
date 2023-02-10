@@ -1,4 +1,4 @@
-Oxford Nanopore Technologies, Ltd. Public License Version 1.0
+Oxford Nanopore Technologies PLC. Public License Version 1.0
 =============================================================
 
 1. Definitions
@@ -287,7 +287,7 @@ shall not be used to construe this License against a Contributor.
 
 10.1. New Versions
 
-Oxford Nanopore Technologies, Ltd. is the license steward. Except as
+Oxford Nanopore Technologies PLC. is the license steward. Except as
 provided in Section 10.3, no one other than the license steward has the
 right to modify or publish new versions of this License. Each version
 will be given a distinguishing version number.
@@ -311,7 +311,7 @@ Exhibit A - Source Code Form License Notice
 -------------------------------------------
 
   This Source Code Form is subject to the terms of the Oxford Nanopore
-    Technologies, Ltd. Public License, v. 1.0.  Full licence can be found
+    Technologies PLC. Public License, v. 1.0.  Full licence can be found
       at
         https://github.com/nanoporetech/dorado/blob/master/LICENCE.txt
 

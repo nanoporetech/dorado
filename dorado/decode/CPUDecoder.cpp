@@ -3,84 +3,101 @@
 #include "beam_search.h"
 
 #include <math.h>
+#include <spdlog/spdlog.h>
 #include <torch/torch.h>
 
 #include <vector>
 
-at::Tensor scan(at::Tensor Ms, at::Tensor idx, at::Tensor v0) {
-    int T = Ms.size(0);
-    int N = Ms.size(1);
-    int C = Ms.size(2);
+namespace {
+
+at::Tensor scan(const torch::Tensor& Ms,
+                const float fixed_stay_score,
+                const torch::Tensor& idx,
+                const torch::Tensor& v0) {
+    const int T = Ms.size(0);
+    const int N = Ms.size(1);
+    const int C = Ms.size(2);
 
     torch::Tensor alpha = Ms.new_full({T + 1, N, C}, -1E38);
     alpha[0] = v0;
 
     for (int t = 0; t < T; t++) {
-        auto x = torch::add(Ms[t], alpha.index({t, torch::indexing::Slice(), idx}));
-        alpha[t + 1] = torch::logsumexp(x, -1);
+        auto scored_steps = torch::add(alpha.index({t, torch::indexing::Slice(), idx}), Ms[t]);
+        auto scored_stay = torch::add(alpha.index({t, torch::indexing::Slice()}), fixed_stay_score)
+                                   .unsqueeze(-1);
+        auto scored_transitions = torch::cat({scored_stay, scored_steps}, -1);
+
+        alpha[t + 1] = torch::logsumexp(scored_transitions, -1);
     }
 
     return alpha;
 }
 
-torch::Tensor CPUDecoder::forward_scores(at::Tensor scores) {
-    int T = scores.size(0);  // Signal len
-    int N = scores.size(1);  // Num batches
-    int C = scores.size(2);
+torch::Tensor forward_scores(const torch::Tensor& scores, const float fixed_stay_score) {
+    const int T = scores.size(0);  // Signal len
+    const int N = scores.size(1);  // Num batches
+    const int C = scores.size(2);  // 4^state_len * 4 = 4^(state_len + 1)
 
-    int n_base = 4;
-    int num_transitions = 5;
+    const int n_base = 4;
+    const int state_len = std::log(C) / std::log(n_base) - 1;
 
-    int state_len = log(C / num_transitions) / log(n_base);
+    // Transition scores reshaped so that the 4 scores for each predecessor state are arranged along the
+    // innermost dimension.
+    const torch::Tensor Ms = scores.reshape({T, N, -1, n_base});
 
-    torch::Tensor Ms = scores.reshape({T, N, -1, num_transitions});
+    // Number of states per timestep.
+    const int num_states = pow(n_base, state_len);
 
-    int y = pow(n_base, state_len);
+    // Guide values at first timestep.
+    const auto v0 = Ms.new_full({{N, num_states}}, 0.0f);
 
-    auto v0 = Ms.new_full({{N, y}}, 0.0);
+    // For each state, the indices of the 4 states that could precede it via a step transition.
+    const auto idx = torch::arange(num_states)
+                             .repeat_interleave(n_base)
+                             .reshape({n_base, -1})
+                             .t()
+                             .contiguous();
 
-    auto t1 = torch::arange(y).index({torch::indexing::Slice(), torch::indexing::None});
-    auto t2 = torch::arange(y).repeat_interleave(n_base).reshape({n_base, -1});
-    t2 = t2.t().contiguous();
-
-    auto idx = torch::cat({t1, t2}, 1).to(torch::kInt32);
-
-    auto result = scan(Ms, idx.to(torch::kInt64), v0);
-    return result;
+    return scan(Ms, fixed_stay_score, idx, v0);
 }
 
-torch::Tensor CPUDecoder::backward_scores(torch::Tensor scores) {
-    int N = scores.size(1);  // Num batches
-    int C = scores.size(2);  // Num batches
+torch::Tensor backward_scores(const torch::Tensor& scores, const float fixed_stay_score) {
+    const int N = scores.size(1);  // Num batches
+    const int C = scores.size(2);  // 4^state_len * 4 = 4^(state_len + 1)
 
-    int n_base = 4;
-    int num_transitions = 5;
+    const int n_base = 4;
 
-    int state_len = log(C / num_transitions) / log(n_base);
+    const int state_len = std::log(C) / std::log(n_base) - 1;
 
-    int y = pow(n_base, state_len);
+    // Number of states per timestep.
+    const int num_states = pow(n_base, state_len);
 
-    torch::Tensor vT = scores.new_full({N, y}, 0.0);
+    // Guide values at last timestep.
+    const torch::Tensor vT = scores.new_full({N, num_states}, 0.0f);
 
-    auto t1 = torch::arange(y).index({torch::indexing::Slice(), torch::indexing::None});
-    auto t2 = torch::arange(y).repeat_interleave(n_base).reshape({n_base, -1}).t().contiguous();
-    auto idx = torch::cat({t1, t2}, 1).to(torch::kInt32);
+    const auto idx = torch::arange(num_states)
+                             .repeat_interleave(n_base)
+                             .reshape({n_base, -1})
+                             .t()
+                             .contiguous();
+    auto idx_T = idx.flatten().argsort().reshape(idx.sizes());
 
-    auto idx_sizes = idx.sizes();
-    auto idx_T = idx.flatten().argsort().reshape(idx_sizes);
+    const auto Ms_T = scores.index({torch::indexing::Slice(), torch::indexing::Slice(), idx_T});
 
-    auto Ms_T = scores.index({torch::indexing::Slice(), torch::indexing::Slice(), idx_T});
+    // For each state, the indices of the 4 states that could succeed it via a step transition.
+    idx_T = torch::bitwise_right_shift(idx_T, 2);
 
-    idx_T = torch::div(idx_T, n_base + 1, "floor");
-
-    auto result = scan(Ms_T.flip(0), idx_T.to(torch::kInt64), vT).flip(0);
-    return result;
+    return scan(Ms_T.flip(0), fixed_stay_score, idx_T.to(torch::kInt64), vT).flip(0);
 }
 
-std::vector<DecodedChunk> CPUDecoder::beam_search(torch::Tensor scores,
-                                                  int num_chunks,
-                                                  DecoderOptions options) {
-    scores = scores.to("cpu");
+}  // namespace
+
+namespace dorado {
+
+std::vector<DecodedChunk> CPUDecoder::beam_search(const torch::Tensor& scores,
+                                                  const int num_chunks,
+                                                  const DecoderOptions& options) {
+    const auto scores_cpu = scores.to(torch::kCPU);
     int num_threads = std::min(num_chunks, 4);
     int chunks_per_thread = num_chunks / num_threads;
     int num_threads_with_one_more_chunk = num_chunks % num_threads;
@@ -97,11 +114,11 @@ std::vector<DecodedChunk> CPUDecoder::beam_search(torch::Tensor scores,
                     int t_num_chunks = chunks_per_thread + int(i < num_threads_with_one_more_chunk);
 
                     using Slice = torch::indexing::Slice;
-                    auto t_scores = scores.index(
+                    auto t_scores = scores_cpu.index(
                             {Slice(), Slice(t_first_chunk, t_first_chunk + t_num_chunks)});
 
-                    torch::Tensor fwd = forward_scores(t_scores);
-                    torch::Tensor bwd = backward_scores(t_scores);
+                    torch::Tensor fwd = forward_scores(t_scores, options.blank_score);
+                    torch::Tensor bwd = backward_scores(t_scores, options.blank_score);
 
                     torch::Tensor posts = torch::softmax(fwd + bwd, -1);
 
@@ -110,10 +127,10 @@ std::vector<DecodedChunk> CPUDecoder::beam_search(torch::Tensor scores,
                     posts = posts.transpose(0, 1).contiguous();
 
                     for (int i = 0; i < t_num_chunks; i++) {
-                        auto decode_result =
-                                beam_search_decode(t_scores[i], bwd[i], posts[i], options.beam_cut,
-                                                   options.blank_score, options.q_shift,
-                                                   options.q_scale, options.temperature);
+                        auto decode_result = beam_search_decode(
+                                t_scores[i], bwd[i], posts[i], options.beam_width, options.beam_cut,
+                                options.blank_score, options.q_shift, options.q_scale,
+                                options.temperature, 1.0f);
                         chunk_results[t_first_chunk + i] = DecodedChunk{
                                 std::get<0>(decode_result),
                                 std::get<1>(decode_result),
@@ -130,3 +147,5 @@ std::vector<DecodedChunk> CPUDecoder::beam_search(torch::Tensor scores,
 
     return chunk_results;
 }
+
+}  // namespace dorado
