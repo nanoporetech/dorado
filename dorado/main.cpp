@@ -54,7 +54,11 @@ int main(int argc, char* argv[]) {
     if (subcommand == "-v" || subcommand == "--version") {
         std::cerr << DORADO_VERSION << std::endl;
     } else if (subcommand == "-vv") {
+#ifdef __APPLE__
+        std::cerr << "dorado:   " << DORADO_VERSION << std::endl;
+#else
         std::cerr << "dorado:   " << DORADO_VERSION << "+cu" << CUDA_VERSION << std::endl;
+#endif
         std::cerr << "libtorch: " << TORCH_BUILD_VERSION << std::endl;
     } else if (subcommand == "-h" || subcommand == "--help") {
         usage(keys);

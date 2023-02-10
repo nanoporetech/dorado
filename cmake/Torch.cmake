@@ -72,7 +72,7 @@ endif()
 find_package(Torch REQUIRED)
 
 if(APPLE)
-  set(TORCH_BUILD_VERSION ${TORCH_BUILD_VERSION})
+  set(TORCH_BUILD_VERSION ${TORCH_VERSION})
 else()
   file(STRINGS "${TORCH_LIB}/build-version" TORCH_BUILD_VERSION)
 endif()
