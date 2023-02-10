@@ -70,7 +70,12 @@ else()
 endif()
 
 find_package(Torch REQUIRED)
-file(STRINGS "${TORCH_LIB}/build-version" TORCH_BUILD_VERSION)
+
+if(APPLE)
+  set(TORCH_BUILD_VERSION ${TORCH_BUILD_VERSION})
+else()
+  file(STRINGS "${TORCH_LIB}/build-version" TORCH_BUILD_VERSION)
+endif()
 
 if (NOT TORCH_BUILD_VERSION EQUAL TORCH_VERSION)
   message(WARNING "expected ${TORCH_VERSION} but found ${TORCH_BUILD_VERSION}")
