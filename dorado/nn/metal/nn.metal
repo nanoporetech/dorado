@@ -862,7 +862,6 @@ kernel void lstm(
         device ftype* const in_out,
         device ftype* const weights_buf,
         device ftype* const state_buf,
-        device ftype* const temp_result_buf,
         // The sizes of these buffers are set via MTL::ComputeCommandEncoder.
         // They depend on the SIMD group count.
         threadgroup ftype (* const simd_res_buf)[2 * TILE_SIZE * TILE_SIZE],

@@ -433,9 +433,8 @@ struct MetalBlockImpl : Module {
         command_buffer = command_queue->commandBuffer();
 
         for (auto &rnn : {rnn1, rnn2, rnn3, rnn4, rnn5}) {
-            const std::vector<MTL::Buffer *> buffers{args_lstm, mat_working_mem,
-                                                     mtl_for_tensor(rnn->t_weights_bias), mat_state,
-                                                     mat_temp};
+            const std::vector<MTL::Buffer *> buffers{
+                    args_lstm, mat_working_mem, mtl_for_tensor(rnn->t_weights_bias), mat_state};
             const int kResBufSize = dtype_bytes * kernel_simd_groups * 2 * kTileSize * kTileSize;
             const int kOutBufSize = dtype_bytes * kernel_simd_groups * kTileSize * kTileSize;
             const std::vector<int> tg_buffer_lens{kResBufSize, kOutBufSize};
