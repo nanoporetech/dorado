@@ -25,6 +25,63 @@ extern "C" {
 using namespace std::chrono;
 
 namespace dorado::utils {
+namespace {
+
+/**
+ * Wrapper around CUDA events to measure GPU timings.
+ */
+class CUDATimer {
+    cudaEvent_t m_start, m_stop;
+
+    CUDATimer(const CUDATimer &) = delete;
+    CUDATimer &operator=(const CUDATimer &) = delete;
+
+    static void check_cuda_result(cudaError_t err) {
+        if (err != cudaSuccess) {
+            spdlog::error("CUDA event error: {} - {}", cudaGetErrorName(err),
+                          cudaGetErrorString(err));
+            exit(EXIT_FAILURE);
+        }
+    }
+
+public:
+    /**
+     * Mark the beginning of a profiling section.
+     * The timer will start once all previously submitted CUDA work
+     * has completed on the active stream.
+     */
+    void start() { check_cuda_result(cudaEventRecord(m_start)); }
+
+    /**
+     * Mark the end of a profiling section.
+     * The timer will stop once all previously submitted CUDA work
+     * has completed on the active stream.
+     */
+    void stop() { check_cuda_result(cudaEventRecord(m_stop)); }
+
+    /**
+     * Get the time spent on the GPU between the begin and end markers.
+     * @note This will block the active stream until the end marker
+     * has been reached on the GPU.
+     */
+    float result_ms() {
+        check_cuda_result(cudaEventSynchronize(m_stop));
+        float ms = 0;
+        check_cuda_result(cudaEventElapsedTime(&ms, m_start, m_stop));
+        return ms;
+    }
+
+    CUDATimer() {
+        check_cuda_result(cudaEventCreate(&m_start));
+        check_cuda_result(cudaEventCreate(&m_stop));
+    }
+    ~CUDATimer() {
+        check_cuda_result(cudaEventDestroy(m_start));
+        check_cuda_result(cudaEventDestroy(m_stop));
+    }
+};
+
+}  // namespace
 
 void cublas_matmul_f16(torch::Tensor const &A, torch::Tensor const &B, torch::Tensor &C) {
     constexpr uint16_t HALF_ZERO = 0;      // 0.0 in __half format
