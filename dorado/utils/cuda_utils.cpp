@@ -81,9 +81,7 @@ public:
     }
 };
 
-}  // namespace
-
-void cublas_matmul_f16(torch::Tensor const &A, torch::Tensor const &B, torch::Tensor &C) {
+void matmul_f16_cublas(torch::Tensor const &A, torch::Tensor const &B, torch::Tensor &C) {
     constexpr uint16_t HALF_ZERO = 0;      // 0.0 in __half format
     constexpr uint16_t HALF_ONE = 0x3C00;  // 1.0 in __half format
     assert(A.dtype() == torch::kF16 && B.dtype() == torch::kF16 && C.dtype() == torch::kF16);
@@ -100,6 +98,40 @@ void cublas_matmul_f16(torch::Tensor const &A, torch::Tensor const &B, torch::Te
         spdlog::error("CuBLAS error {}", int(res));
         exit(EXIT_FAILURE);
     }
+}
+
+void matmul_f16_torch(torch::Tensor const &A, torch::Tensor const &B, torch::Tensor &C) {
+    C.copy_(torch::matmul(A, B));
+}
+
+}  // namespace
+
+void cublas_matmul_f16(torch::Tensor const &A, torch::Tensor const &B, torch::Tensor &C) {
+    // torch::matmul() is a bit slower than cublasGemmEx() on A100 and half the speed on V100,
+    // but an order of magnitude faster on our Windows CI machines (1080 Ti), so dynamically
+    // pick which one we should use on first invocation.
+    static auto const fastest_mat_mul = [&] {
+        CUDATimer cuda_timer;
+
+        auto run_N_times = [&](auto matmul_impl) {
+            const size_t N = 1000;
+            // Warmup then profile
+            for (size_t i = 0; i < N; i++) {
+                matmul_impl(A, B, C);
+            }
+            cuda_timer.start();
+            for (size_t i = 0; i < N; i++) {
+                matmul_impl(A, B, C);
+            }
+            cuda_timer.stop();
+            return cuda_timer.result_ms();
+        };
+
+        float const torch_time = run_N_times(matmul_f16_torch);
+        float const cublas_time = run_N_times(matmul_f16_cublas);
+        return cublas_time < torch_time ? matmul_f16_cublas : matmul_f16_torch;
+    }();
+    fastest_mat_mul(A, B, C);
 }
 
 std::vector<std::string> parse_cuda_device_string(std::string device_string) {

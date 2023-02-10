@@ -321,9 +321,7 @@ struct CudaLSTMStackImpl : Module {
                 auto timestep_out = rnn->reverse ? working_mem_left[chunk_size - ts - 1]
                                                  : working_mem_right[ts];
 
-                // Timestep matrix mulitplication (using cublasGemmEx, as using torch::matmul
-                // as below is a bit slower on A100 for some reason)
-                // gate_buf = torch::matmul(timestep_in, weights);
+                // Timestep matrix mulitplication
                 dorado::utils::cublas_matmul_f16(timestep_in, weights, gate_buf);
                 host_lstm_step_f16(stream, batch_size, layer_size, bias.data_ptr(),
                                    gate_buf.data_ptr(), state_buf.data_ptr(),
