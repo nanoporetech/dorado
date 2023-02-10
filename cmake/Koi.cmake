@@ -30,7 +30,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32)
 
         if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
             download_and_extract(${KOI_CDN_URL}/${KOI_DIR}.tar.gz ${KOI_DIR})
-            set(KOI_LIBRARIES ${DORADO_3RD_PARTY}/${KOI_DIR}/${KOI_DIR}lib/libkoi.a)
+            set(KOI_LIBRARIES ${DORADO_3RD_PARTY}/${KOI_DIR}/${KOI_DIR}/lib/libkoi.a)
         elseif(WIN32)
             download_and_extract(${KOI_CDN_URL}/${KOI_DIR}.zip ${KOI_DIR})
             set(KOI_LIBRARIES ${DORADO_3RD_PARTY}/${KOI_DIR}/${KOI_DIR}/lib/koi.lib)
