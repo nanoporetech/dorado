@@ -28,7 +28,6 @@ if(DORADO_USING_OLD_CPP_ABI)
     # with the libc++11 ABI and we can't link against it.
     add_compile_options(-D_GLIBCXX_USE_CXX11_ABI=0)
 endif()
-add_compile_options(-D_GLIBCXX_USE_CXX11_ABI=0)
 
 add_subdirectory(dorado/3rdparty/elzip)
 
