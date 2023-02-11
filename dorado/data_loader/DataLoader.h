@@ -14,7 +14,9 @@ public:
     void load_reads(const std::string& path);
 
 private:
+#ifdef USE_FAST5
     void load_fast5_reads_from_file(const std::string& path);
+#endif
 #ifdef USE_POD5
     void load_pod5_reads_from_file(const std::string& path);
 #endif

@@ -6,10 +6,12 @@
 #ifdef USE_POD5
 #include "pod5_format/c_api.h"
 #endif
+#ifdef USE_FAST5
 #include "vbz_plugin_user_utils.h"
-
 #include <highfive/H5Easy.hpp>
 #include <highfive/H5File.hpp>
+#endif
+
 #include <spdlog/spdlog.h>
 
 #include <cctype>
@@ -21,6 +23,7 @@
 #include "slow5_thread.h"
 
 namespace {
+#ifdef USE_FAST5
 void string_reader(HighFive::Attribute& attribute, std::string& target_str) {
     // Load as a variable string if possible
     if (attribute.getDataType().isVariableStr()) {
@@ -48,6 +51,7 @@ void string_reader(HighFive::Attribute& attribute, std::string& target_str) {
         target_str.resize(eol_pos);
     }
 };
+#endif
 
 std::string get_string_timestamp_from_unix_time(time_t time_stamp_ms) {
     static std::mutex timestamp_mtx;
@@ -144,30 +148,34 @@ void DataLoader::load_reads(const std::string& path) {
     if(!std::filesystem::is_directory(path)) {
         std::string ext = std::filesystem::path(path).extension().string();
         std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c){ return std::tolower(c); });
+#ifdef USE_FAST5
         if(ext == ".fast5") {
             load_fast5_reads_from_file(path);
         }
+#endif
 #ifdef USE_POD5
-        else if(ext == ".pod5") {
+        if(ext == ".pod5") {
             load_pod5_reads_from_file(path);
         }
 #endif
-        else if(ext == ".slow5" || ext == ".blow5") {
+        if(ext == ".slow5" || ext == ".blow5") {
             load_slow5_reads_from_file(path);
         }
     }else{
         for (const auto & entry : std::filesystem::directory_iterator(path)) {
             std::string ext = std::filesystem::path(entry).extension().string();
             std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c){ return std::tolower(c); });
+#ifdef USE_FAST5
             if(ext == ".fast5") {
                 load_fast5_reads_from_file(entry.path().string());
             }
+#endif
 #ifdef USE_POD5
-            else if(ext == ".pod5") {
+            if(ext == ".pod5") {
                 load_pod5_reads_from_file(entry.path().string());
             }
 #endif
-            else if(ext == ".slow5" || ext == ".blow5") {
+            if(ext == ".slow5" || ext == ".blow5") {
                 load_slow5_reads_from_file(entry.path().string());
             }
         }
@@ -227,7 +235,7 @@ void DataLoader::load_pod5_reads_from_file(const std::string& path) {
     pod5_close_and_free_reader(file);
 }
 #endif
-
+#ifdef USE_FAST5
 void DataLoader::load_fast5_reads_from_file(const std::string& path) {
     // Read the file into a vector of torch tensors
     H5Easy::File file(path, H5Easy::File::ReadOnly);
@@ -316,6 +324,7 @@ void DataLoader::load_fast5_reads_from_file(const std::string& path) {
         m_loaded_read_count++;
     }
 }
+#endif
 
 void create_read_data(core_t *core, db_t *db, int32_t i) {
     //
@@ -450,7 +459,9 @@ DataLoader::DataLoader(ReadSink& read_sink,
     m_max_reads = max_reads == 0 ? std::numeric_limits<decltype(m_max_reads)>::max() : max_reads;
     assert(m_num_worker_threads > 0);
     static std::once_flag vbz_init_flag;
+#ifdef USE_FAST5
     std::call_once(vbz_init_flag, vbz_register);
+#endif
 }
 
 }  // namespace dorado

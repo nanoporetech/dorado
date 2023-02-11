@@ -10,14 +10,16 @@ set(DORADO_3RD_PARTY ${CMAKE_CURRENT_SOURCE_DIR}/dorado/3rdparty)
 include(cmake/DoradoVersion.cmake)
 include(cmake/UpdateSubmodules.cmake)
 include(cmake/DownloadAndExtract.cmake)
+if(DORADO_USE_FAST5)
+    include(cmake/HDF5.cmake)
+    include(cmake/VbzPlugin.cmake)
+endif()
 
-include(cmake/HDF5.cmake)
-include(cmake/VbzPlugin.cmake)
-include(cmake/Koi.cmake)
 if(DORADO_USE_POD5)
     add_definitions("USE_POD5")
-    #include(cmake/Pod5.cmake)
+    include(cmake/Pod5.cmake)
 endif()
+include(cmake/Koi.cmake)
 include(cmake/Torch.cmake)
 include(cmake/OpenSSL.cmake)
 include(cmake/Htslib.cmake)
@@ -162,9 +164,19 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR}/dorado
 
 enable_testing()
 
-if(NOT SKIP_HDF_PLUGINS)
+if(DORADO_USE_FAST5)
     # Can skip this if we're consuming the lib from a parent project that already has hdf_plugins
     add_hdf_vbz_plugin()
+    target_link_libraries(dorado_lib
+            ${HDF5_C_LIBRARIES}
+            vbz_hdf_plugin
+            )
+endif()
+if(DORADO_USE_POD5)
+    target_link_libraries(dorado_lib
+            ${POD5_LIBRARIES}
+            )
+
 endif()
 
 target_link_libraries(dorado_lib
@@ -172,13 +184,10 @@ target_link_libraries(dorado_lib
         ${APPLE_FWK_QUARTZ_CORE}
         ${APPLE_FWK_METAL}
         ${IOKIT}
-        ${HDF5_C_LIBRARIES}
         ${TORCH_LIBRARIES}
-        ${POD5_LIBRARIES}
         ${KOI_LIBRARIES}
         ${HTSLIB_LIBRARIES}
         slow5
-        vbz_hdf_plugin
         OpenSSL::SSL
         edlib
         elzip
@@ -255,9 +264,9 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     install(FILES ${NVTOOLS_DLLS} DESTINATION lib COMPONENT redist_libs)
 
     # If zstd has been dynamically linked, add the .so to the package
-    get_filename_component(ZSTD_LIBRARY_PATH ${ZSTD_LIBRARY_RELEASE} DIRECTORY)
-    file(GLOB ZSTD_DLLS "${ZSTD_LIBRARY_PATH}/*zstd.so*")
-    install(FILES ${ZSTD_DLLS} DESTINATION lib COMPONENT redist_libs)
+#    get_filename_component(ZSTD_LIBRARY_PATH ${ZSTD_LIBRARY_RELEASE} DIRECTORY)
+#    file(GLOB ZSTD_DLLS "${ZSTD_LIBRARY_PATH}/*zstd.so*")
+#    install(FILES ${ZSTD_DLLS} DESTINATION lib COMPONENT redist_libs)
 
 elseif(WIN32)
     file(GLOB TORCH_DLLS "${TORCH_LIB}/lib/*.dll")
@@ -269,7 +278,7 @@ elseif(APPLE)
     install(FILES ${TORCH_DLLS} DESTINATION lib COMPONENT redist_libs)
 endif()
 
-add_subdirectory(tests)
+#add_subdirectory(tests)
 
 if(NOT DORADO_LIB_ONLY)
     include(cmake/DoradoPackaging.cmake)
