@@ -334,11 +334,11 @@ void create_read_data(core_t *core, db_t *db, int32_t i) {
     } else {
         free(db->mem_records[i]);
     }
-    auto new_read = std::make_shared<Read>();
+    auto new_read = std::make_shared<dorado::Read>();
 
     //
     std::vector<int16_t> tmp(rec->raw_signal,rec->raw_signal+rec->len_raw_signal);
-    std::vector<float> floatTmp(tmp.begin(), tmp.end());
+//    std::vector<float> floatTmp(tmp.begin(), tmp.end());
 
     int ret = 0;
     uint64_t start_time = slow5_aux_get_uint64(rec, "start_time", &ret);
@@ -369,11 +369,13 @@ void create_read_data(core_t *core, db_t *db, int32_t i) {
 
     auto start_time_str = adjust_time(exp_start_time, static_cast<uint32_t>(start_time / rec->sampling_rate));
 
-    auto options = torch::TensorOptions().dtype(torch::kFloat32);
+//    auto options = torch::TensorOptions().dtype(torch::kFloat32);
+    auto options = torch::TensorOptions().dtype(torch::kInt16);
     new_read->sample_rate = rec->sampling_rate;
-    new_read->raw_data = torch::from_blob(floatTmp.data(), floatTmp.size(), options).clone().to(core->m_device_);
+    new_read->raw_data = torch::from_blob(tmp.data(), tmp.size(), options).clone().to(core->m_device_);
     new_read->digitisation = rec->digitisation;
     new_read->range = rec->range;
+    new_read->scaling = rec->range / rec->digitisation;
     new_read->offset = rec->offset;
     new_read->read_id = rec->read_id;
     new_read->num_trimmed_samples = 0;
