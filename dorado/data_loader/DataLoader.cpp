@@ -395,7 +395,7 @@ void DataLoader::load_slow5_reads_from_file(const std::string& path){
         fprintf(stderr,"Error in opening file\n");
         exit(EXIT_FAILURE);
     }
-    int64_t batch_size = slow5_batch;
+    int64_t batch_size = slow5_batchsize;
     int32_t num_threads = slow5_threads;
 
     while(1){
@@ -456,8 +456,10 @@ void DataLoader::load_slow5_reads_from_file(const std::string& path){
 DataLoader::DataLoader(ReadSink& read_sink,
                        const std::string& device,
                        size_t num_worker_threads,
-                       size_t max_reads)
-        : m_read_sink(read_sink), m_device(device), m_num_worker_threads(num_worker_threads) {
+                       size_t max_reads,
+                       int32_t slow5_threads,
+                       int64_t slow5_batchsize)
+        : m_read_sink(read_sink), m_device(device), m_num_worker_threads(num_worker_threads), slow5_threads(slow5_threads), slow5_batchsize(slow5_batchsize) {
     m_max_reads = max_reads == 0 ? std::numeric_limits<decltype(m_max_reads)>::max() : max_reads;
     assert(m_num_worker_threads > 0);
     static std::once_flag vbz_init_flag;

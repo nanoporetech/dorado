@@ -10,7 +10,9 @@ public:
     DataLoader(ReadSink& read_sink,
                const std::string& device,
                size_t num_worker_threads,
-               size_t max_reads = 0);
+               size_t max_reads = 0,
+               int32_t slow5_threads = 8,
+               int64_t slow5_batchsize = 4000);
     void load_reads(const std::string& path);
 
 private:
@@ -24,8 +26,8 @@ private:
     ReadSink& m_read_sink;  // Where should the loaded reads go?
     size_t m_loaded_read_count{0};
     std::string m_device;
-    int64_t slow5_batch = 4000;
-    int32_t slow5_threads = 8;
+    int32_t slow5_threads{8};
+    int64_t slow5_batchsize{4000};
     size_t m_num_worker_threads{1};
     size_t m_max_reads{0};
 };

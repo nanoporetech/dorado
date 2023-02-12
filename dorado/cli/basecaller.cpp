@@ -42,7 +42,9 @@ void setup(std::vector<std::string> args,
            bool emit_fastq,
            bool emit_moves,
            size_t max_reads,
-           size_t min_qscore) {
+           size_t min_qscore,
+           int32_t slow5_threads,
+           int64_t slow5_batchsize) {
     torch::set_num_threads(1);
     std::vector<Runner> runners;
 
@@ -164,7 +166,7 @@ void setup(std::vector<std::string> args,
                 writer_node, std::move(runners), batch_size, chunk_size, overlap, model_stride);
     }
     ScalerNode scaler_node(*basecaller_node, num_devices * 2);
-    DataLoader loader(scaler_node, "cpu", num_devices, max_reads);
+    DataLoader loader(scaler_node, "cpu", num_devices, max_reads, slow5_threads, slow5_batchsize);
     loader.load_reads(data_path);
 }
 
@@ -205,6 +207,14 @@ int basecaller(int argc, char* argv[]) {
     parser.add_argument("-r", "--num_runners")
             .default_value(default_parameters.num_runners)
             .scan<'i', int>();
+
+    parser.add_argument("--slow5_threads")
+            .default_value(default_parameters.slow5_threads)
+            .scan<'i', int32_t>();
+
+    parser.add_argument("--slow5_batchsize")
+            .default_value(default_parameters.slow5_batchsize)
+            .scan<'i', int64_t>();
 
     parser.add_argument("--modified-bases")
             .nargs(argparse::nargs_pattern::at_least_one)
@@ -271,7 +281,7 @@ int basecaller(int argc, char* argv[]) {
               parser.get<int>("-b"), parser.get<int>("-r"), default_parameters.remora_batchsize,
               default_parameters.remora_threads, parser.get<bool>("--emit-fastq"),
               parser.get<bool>("--emit-moves"), parser.get<int>("--max-reads"),
-              parser.get<int>("--min-qscore"));
+              parser.get<int>("--min-qscore"), parser.get<int32_t>("--slow5_threads"), parser.get<int64_t>("--slow5_batchsize"));
     } catch (const std::exception& e) {
         spdlog::error("{}", e.what());
         return 1;
