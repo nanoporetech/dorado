@@ -33,7 +33,7 @@ variables:
 .linux_dependencies: &linux_dependencies
   before_script:
     - echo Dorado dependency stage
-    - apt-get update && apt-get install -y --no-install-recommends libhdf5-dev libssl-dev libzstd-dev
+    - apt-get update && apt-get install -y --no-install-recommends curl libhdf5-dev libssl-dev libzstd-dev libsz2
 
 .build_dorado: &build_dorado
   stage: build
@@ -94,8 +94,7 @@ build:linux:arm64:focal:
   image: nvcr.io/nvidia/l4t-pytorch:r35.1.0-pth1.13-py3
   variables:
     BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/lib/python3.8/dist-packages/torch -DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN}"
-  before_script:
-    - apt-get update && apt-get install -y --no-install-recommends curl ca-certificates libhdf5-dev libssl-dev libzstd-dev
+  <<: *linux_dependencies
   <<: *linux_arm64_runner
   <<: *build_dorado
 
@@ -147,8 +146,7 @@ build_archive:linux:arm64:focal:
   image: nvcr.io/nvidia/l4t-pytorch:r35.1.0-pth1.13-py3
   variables:
     BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/lib/python3.8/dist-packages/torch -DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN}"
-  before_script:
-    - apt-get update && apt-get install -y --no-install-recommends curl ca-certificates libhdf5-dev libssl-dev libzstd-dev
+  <<: *linux_dependencies
   <<: *linux_arm64_runner
   <<: *build_dorado_archive
   when: manual
