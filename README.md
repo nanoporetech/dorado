@@ -128,7 +128,7 @@ $ apt-get update && apt-get install -y --no-install-recommends \
 ```
 $ git clone https://github.com/nanoporetech/dorado.git dorado
 $ cd dorado
-$ cmake -S . -B cmake-build -DCMAKE_CUDA_COMPILER=nvcc
+$ cmake -S . -B cmake-build
 $ cmake --build cmake-build --config Release -j
 $ ctest --test-dir cmake-build
 ```

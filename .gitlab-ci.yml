@@ -6,6 +6,8 @@ stages:
 variables:
   BUILD_DIR: build
   GIT_SUBMODULE_STRATEGY: recursive
+  CUDA: "11.7"
+  WIN_CUDA_TOOLKIT: "/c/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v${CUDA}"
 
 # Build stage components
 
@@ -70,41 +72,43 @@ pre-commit:
 # Build stages
 
 build:linux:x86:focal:install_deps:
-  image: ${DORADO_DOCKER_ROOT}/dorado-no-deps-20.04:1.0
+  image: ${DORADO_DOCKER_ROOT}/dorado-no-deps-20.04-cuda-${CUDA}.0:1.0
   <<: *linux_dependencies
   <<: *linux_runner
   <<: *build_dorado
   when: manual
 
 build:linux:x86:focal:
-  image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04:1.0
+  image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.0
   variables:
     BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/libtorch -DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN}"
   <<: *linux_runner
   <<: *build_dorado
 
 build:linux:x86:focal_koi_download:
-  image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04:1.0
+  image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.0
   variables:
     BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/libtorch"
   <<: *linux_runner
   <<: *build_dorado
 
 build:windows:
-  variables:
-    BUILD_OPTIONS: "-A x64 -DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN}"
   <<: *windows_runner
   <<: *build_dorado
   before_script:
     - export PATH=${PATH}:${PWD}/dist/bin
+    - export CUDA_TOOLKIT=$(cygpath -u $(cygpath -d "${WIN_CUDA_TOOLKIT}"))
+    - export BUILD_OPTIONS="-A x64 -T cuda=${CUDA} -DCUDAToolkit_ROOT=${CUDA_TOOLKIT} -DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN}"
+    - echo BUILD_OPTIONS is ${BUILD_OPTIONS}
 
 build:windows_koi_download:
-  variables:
-    BUILD_OPTIONS: "-A x64"
   <<: *windows_runner
   <<: *build_dorado
   before_script:
     - export PATH=${PATH}:${PWD}/dist/bin
+    - export CUDA_TOOLKIT=$(cygpath -u $(cygpath -d "${WIN_CUDA_TOOLKIT}"))
+    - export BUILD_OPTIONS="-A x64 -T cuda=${CUDA} -DCUDAToolkit_ROOT=${CUDA_TOOLKIT}"
+    - echo BUILD_OPTIONS is ${BUILD_OPTIONS}
 
 build:macos:m1:
   variables:
@@ -118,7 +122,7 @@ build:ios:m1:
   <<: *build_dorado_lib_only
 
 build_archive:linux:x86:focal:
-  image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04:1.0
+  image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.0
   variables:
     BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/libtorch -DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN}"
   <<: *linux_runner
@@ -126,7 +130,7 @@ build_archive:linux:x86:focal:
   when: manual
 
 build_archive:linux:x86:centos7:
-  image: ${DORADO_DOCKER_ROOT}/dorado-deps-centos7:1.0
+  image: ${DORADO_DOCKER_ROOT}/dorado-deps-centos7-cuda-${CUDA}.0:1.0
   variables:
     BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/libtorch -DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN} -DOPENSSL_ROOT_DIR=/usr/lib64/openssl11/ -DOPENSSL_INCLUDE_DIR=/usr/include/openssl11 -DDORADO_USING_OLD_CPP_ABI=ON -DDYNAMIC_HDF=ON"
   <<: *linux_runner
@@ -134,8 +138,10 @@ build_archive:linux:x86:centos7:
   when: manual
 
 build_archive:windows:
-  variables:
-    BUILD_OPTIONS: "-A x64 -DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN}"
+  before_script:
+    - export CUDA_TOOLKIT=$(cygpath -u $(cygpath -d "${WIN_CUDA_TOOLKIT}"))
+    - export BUILD_OPTIONS="-A x64 -T cuda=${CUDA} -DCUDAToolkit_ROOT=${CUDA_TOOLKIT} -DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN}"
+    - echo BUILD_OPTIONS is ${BUILD_OPTIONS}
   <<: *windows_runner
   <<: *build_dorado_archive
   when: manual
@@ -161,13 +167,13 @@ build_archive:macos:m1:
   script:
     - tar -xzf archive/dorado-*.gz
     - ldd ./dorado-*/bin/dorado
-    # We just want to check that dorado will run here, so simply call the help command
-    - ./dorado-*/bin/dorado --help
+    # We just want to check that dorado will run here, so simply display the verbose version info
+    - ./dorado-*/bin/dorado -vv
 
 # Test stages
 
 test:linux:x86:focal:
-  image: ${DORADO_DEPS}
+  image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.0
   <<: *linux_runner
   <<: *test_dorado
   needs:
@@ -181,7 +187,7 @@ test:macos:m1:
 
 # Test that you can run dorado in a clean cuda 20.04 environment
 test_archive:linux:x86:20.04_nvidia:
-  image: nvidia/cuda:11.3.0-devel-ubuntu20.04
+  image: nvidia/cuda:${CUDA}.0-devel-ubuntu20.04
   <<: *linux_runner
   <<: *test_archive
   needs:
