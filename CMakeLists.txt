@@ -14,6 +14,7 @@ find_package(CUDAToolkit QUIET)
 include(cmake/DoradoVersion.cmake)
 include(cmake/UpdateSubmodules.cmake)
 include(cmake/DownloadAndExtract.cmake)
+include(cmake/SharedLibHelpers.cmake)
 
 include(cmake/HDF5.cmake)
 include(cmake/VbzPlugin.cmake)
@@ -253,21 +254,9 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     install(FILES ${TORCH_DLLS} DESTINATION lib COMPONENT redist_libs)
 
     if(DYNAMIC_HDF)
-        find_library(HDF_DLL hdf5 HINTS ${HDF5_CXX_LIBRARY_DIRS} REQUIRED)
-        get_filename_component(HDF_DLL_PATH ${HDF_DLL} DIRECTORY)
-        file(GLOB HDF_DLLS "${HDF_DLL_PATH}/*hdf5.so*")
-        install(FILES ${HDF_DLLS} DESTINATION lib COMPONENT redist_libs)
+        RESOLVE_SYMLINKS(${HDF5_C_LIBRARIES} NEW_HDF_LIBRARIES)
+        install(FILES ${NEW_HDF_LIBRARIES} DESTINATION lib COMPONENT redist_libs)
     endif()
-
-    find_library(SZ_DLL sz REQUIRED)
-    get_filename_component(SZ_DLL_PATH ${SZ_DLL} DIRECTORY)
-    file(GLOB SZ_DLLS "${SZ_DLL_PATH}/libsz.so*")
-    install(FILES ${SZ_DLLS} DESTINATION lib COMPONENT redist_libs)
-
-    find_library(AEC_DLL aec REQUIRED)
-    get_filename_component(AEC_DLL_PATH ${AEC_DLL} DIRECTORY)
-    file(GLOB AEC_DLLS "${AEC_DLL_PATH}/libaec.so*")
-    install(FILES ${AEC_DLLS} DESTINATION lib COMPONENT redist_libs)
 
     # If zstd has been dynamically linked, add the .so to the package
     get_filename_component(ZSTD_LIBRARY_PATH ${ZSTD_LIBRARY_RELEASE} DIRECTORY)
