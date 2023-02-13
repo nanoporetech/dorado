@@ -7,7 +7,7 @@ $ wget https://developer.download.nvidia.com/compute/cuda/11.7.0/local_installer
 $ sh cuda_11.7.0_465.19.01_linux.run --silent --toolkit --toolkitpath=${PWD}/cuda11.7
 ```
 
-In this case, cmake should be invoked with `CUDA_TOOLKIT_ROOT_DIR` in order to tell the build process where to find CUDA:
+In this case, cmake should be invoked with `CUDAToolkit_ROOT` in order to tell the build process where to find CUDA:
 
 ```
 $ cmake -DCUDAToolkit_ROOT=~/dorado_deps/cuda11.7 -S . -B cmake-build

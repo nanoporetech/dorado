@@ -22,7 +22,9 @@ void usage(const std::vector<std::string> commands) {
 
     std::cerr << "\nOptional arguments:\n"
               << "-h --help               shows help message and exits\n"
-              << "-v --version            prints version information and exits" << std::endl;
+              << "-v --version            prints version information and exits\n"
+              << "-vv                     prints verbose version information and exits"
+              << std::endl;
 }
 
 }  // namespace
