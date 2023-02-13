@@ -143,6 +143,16 @@ build_archive:linux:x86:focal:
   <<: *build_dorado_archive
   when: manual
 
+build_archive:linux:arm64:focal:
+  image: nvcr.io/nvidia/l4t-pytorch:r35.1.0-pth1.13-py3
+  variables:
+    CUDA: "11.4"
+  before_script:
+    - apt-get update && apt-get install -y --no-install-recommends curl ca-certificates libhdf5-dev libssl-dev libzstd-dev
+  <<: *linux_arm64_runner
+  <<: *build_dorado_archive
+  when: manual
+
 build_archive:linux:x86:centos7:
   image: ${DORADO_DOCKER_ROOT}/dorado-deps-centos7-cuda-${CUDA}.0:1.0
   variables:
@@ -193,6 +203,13 @@ test:linux:x86:focal:
   needs:
     - build:linux:x86:focal
 
+test:linux:arm64:focal:
+  image: nvcr.io/nvidia/l4t-pytorch:r35.1.0-pth1.13-py3
+  <<: *linux_arm64_runner
+  <<: *test_dorado
+  needs:
+    - build:linux:arm64:focal
+
 test:macos:m1:
   <<: *macos_runner
   <<: *test_dorado
@@ -222,6 +239,13 @@ test_archive:linux:x86:20.04:
   <<: *test_archive
   needs:
     - build_archive:linux:x86:centos7
+
+test_archive:linux:arm64:20.04:
+  image: nvcr.io/nvidia/l4t-pytorch:r35.1.0-pth1.13-py3
+  <<: *linux_arm64_runner
+  <<: *test_archive
+  needs:
+    - build_archive:linux:arm64:focal
 
 # Single read eval
 
