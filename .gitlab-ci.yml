@@ -203,6 +203,7 @@ test:linux:x86:focal:
 
 test:linux:arm64:focal:
   image: nvcr.io/nvidia/l4t-pytorch:r35.1.0-pth1.13-py3
+  <<: *linux_dependencies
   <<: *linux_arm64_runner
   <<: *test_dorado
   needs:
@@ -240,6 +241,7 @@ test_archive:linux:x86:20.04:
 
 test_archive:linux:arm64:20.04:
   image: nvcr.io/nvidia/l4t-pytorch:r35.1.0-pth1.13-py3
+  <<: *linux_dependencies
   <<: *linux_arm64_runner
   <<: *test_archive
   needs:
