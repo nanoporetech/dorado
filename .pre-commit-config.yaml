@@ -23,14 +23,14 @@ repos:
     rev: 22.3.0
     hooks:
       - id: black
-        exclude: 'dorado/3rdparty/'
+        exclude: 'dorado/
         args:
           - '--target-version=py37'
   - repo: https://github.com/pre-commit/mirrors-clang-format
     rev: 'v13.0.1'
     hooks:
       - id: clang-format
-        exclude: 'dorado/3rdparty/'
+        exclude: 'dorado/
 
 # NB: by default, pre-commit only installs the pre-commit hook ("commit" stage),
 # but you can tell `pre-commit install` to install other hooks.
