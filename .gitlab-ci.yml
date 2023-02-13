@@ -2,6 +2,7 @@ stages:
   - pre-flight
   - build
   - test
+  - deploy
 
 variables:
   BUILD_DIR: build
@@ -271,3 +272,14 @@ test:sre-test:
           }
       }' \
       ${MLHUB_TRIGGER_URL}
+
+# Deploy
+
+deploy:all:
+  stage: deploy
+  script:
+   - ls -la dist
+  artifacts:
+    paths:
+      - dist
+    expire_in: 1 day
