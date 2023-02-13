@@ -17,9 +17,14 @@ If you encounter any problems building or running sow5-dorado please [report an 
 
 ## Installation
 
- - [dorado-0.1.1-linux-x64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.1.1-linux-x64.tar.gz)
- - [dorado-0.1.1-osx-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.1.1-osx-arm64.tar.gz)
- - [dorado-0.1.1-win64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.1.1-win64.zip)
+Binaries are provided for Linux x64 under [Relases](https://github.com/hiruna72/slow5-dorado/releases/). 
+
+```
+wget <link> -O slow5-dorado.tar.gz
+tar xf slow5-dorado.tar.gz
+cd slow5-dorado/bin
+./slow5-dorado --version
+```
 
 ## Running
 
@@ -27,26 +32,27 @@ To run slow5-dorado, download a model and point it to S/BLOW5 files.
 
 ```
 
-$ dorado download --model dna_r10.4.1_e8.2_260bps_hac@v4.0.0
-$ dorado basecaller dna_r10.4.1_e8.2_260bps_hac@v4.0.0 BLOW5s/ > calls.sam
+$ slow5-dorado download --model dna_r10.4.1_e8.2_260bps_hac@v4.0.0
+$ slow5-dorado basecaller dna_r10.4.1_e8.2_260bps_hac@v4.0.0 BLOW5s/ > calls.sam # blow5 directory
+./slow5-dorado basecaller dna_r10.4.1_e8.2_260bps_hac@v4.0.0 merged.blow5 >calls.samq # a single BLOW5 file
 ```
 
 To call modifications simply add `--modified-bases`.
 
 ```
-$ dorado basecaller dna_r10.4.1_e8.2_260bps_hac@v4.0.0 BLOW5s/ --modified-bases 5mCG_5hmCG > calls.sam
+$ slow5-dorado basecaller dna_r10.4.1_e8.2_260bps_hac@v4.0.0 BLOW5s/ --modified-bases 5mCG_5hmCG > calls.sam
 ```
 
 For unaligned BAM output, dorado output can be piped to BAM using samtoools:
 
 ```
-$ dorado basecaller dna_r10.4.1_e8.2_260bps_hac@v4.0.0 BLOW5s/ | samtools view -Sh > calls.bam
+$ slow5-dorado basecaller dna_r10.4.1_e8.2_260bps_hac@v4.0.0 BLOW5s/ | samtools view -Sh > calls.bam
 ```
 
 Stereo Duplex Calling:
 
 ```
-$ dorado duplex dna_r10.4.1_e8.2_260bps_sup@v4.0.0 BLOW5s/ --pairs pairs.txt > duplex.sam
+$ slow5-dorado duplex dna_r10.4.1_e8.2_260bps_sup@v4.0.0 BLOW5s/ --pairs pairs.txt > duplex.sam
 ```
 
 ## Platforms
