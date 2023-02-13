@@ -114,18 +114,29 @@ void matmul_f16(torch::Tensor const &A, torch::Tensor const &B, torch::Tensor &C
     // torch::matmul() is a bit slower than cublasGemmEx() on A100 and half the speed on V100,
     // but an order of magnitude faster on our Windows CI machines (1080 Ti), so dynamically
     // pick which one we should use on first invocation.
-    static auto const fastest_mat_mul = [&] {
+    static auto const fastest_mat_mul = [] {
         CUDATimer cuda_timer;
+
+        // Arbitrary tensor lengths to benchmark against.
+        // Note: even with sizes this small it still takes ~2s to benchmark cuBLAS on a 1080 Ti.
+        const int L = 2048;
+        const int M = 192;
+        const int N = 384;
+
+        auto options = torch::TensorOptions().dtype(torch::kFloat16).device(c10::kCUDA);
+        auto a = torch::empty({L, M}, options);
+        auto b = torch::empty({M, N}, options);
+        auto c = torch::empty({L, N}, options);
 
         auto run_N_times = [&](auto matmul_impl) {
             const size_t N = 1000;
             // Warmup then profile
             for (size_t i = 0; i < N; i++) {
-                matmul_impl(A, B, C);
+                matmul_impl(a, b, c);
             }
             cuda_timer.start();
             for (size_t i = 0; i < N; i++) {
-                matmul_impl(A, B, C);
+                matmul_impl(a, b, c);
             }
             cuda_timer.stop();
             return cuda_timer.result_ms();
