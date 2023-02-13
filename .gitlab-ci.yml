@@ -167,8 +167,8 @@ build_archive:macos:m1:
   script:
     - tar -xzf archive/dorado-*.gz
     - ldd ./dorado-*/bin/dorado
-    # We just want to check that dorado will run here, so simply call the help command
-    - ./dorado-*/bin/dorado --help
+    # We just want to check that dorado will run here, so simply display the verbose version info
+    - ./dorado-*/bin/dorado -vv
 
 # Test stages
 
