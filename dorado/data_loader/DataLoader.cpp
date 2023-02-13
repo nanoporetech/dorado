@@ -119,7 +119,7 @@ std::shared_ptr<dorado::Read> process_pod5_read(size_t row,
     new_read->attributes.mux = read_data.well;
     new_read->attributes.channel_number = read_data.channel;
     new_read->attributes.start_time = start_time;
-
+    new_read->run_id = run_info_data->protocol_run_id;
     return new_read;
 }
 
@@ -155,16 +155,16 @@ void DataLoader::load_reads(const std::string& path) {
     m_read_sink.terminate();
 }
 
-int DataLoader::load_read_groups(std::string data_path) {
-    std::vector<std::string> read_groups;
+std::unordered_map<std::string, ReadGroup> DataLoader::load_read_groups(std::string data_path,
+                                                                        std::string model_path) {
+    std::unordered_map<std::string, ReadGroup>
+            read_groups;  // This needs to be a set and we need to write our own cmp, but for now it will do.
 
     for (const auto& entry : std::filesystem::directory_iterator(data_path)) {
         std::string ext = std::filesystem::path(entry).extension().string();
         std::transform(ext.begin(), ext.end(), ext.begin(),
                        [](unsigned char c) { return std::tolower(c); });
         if (ext == ".pod5") {
-            std::cerr << "POD5 found!" << std::endl;
-
             // Let's loop through every read and get the run ID shall we?
             pod5_init();
 
@@ -208,10 +208,23 @@ int DataLoader::load_read_groups(std::string data_path) {
                     }
                     auto run_acquisition_start_time_ms = run_info_data->acquisition_start_time_ms;
                     auto run_sample_rate = run_info_data->sample_rate;
-                    auto flowcell_id = run_info_data->flow_cell_id;
-                    auto run_id = run_info_data->protocol_run_id;
-                }
+                    std::string flowcell_id = run_info_data->flow_cell_id;
+                    std::string device_id =
+                            run_info_data
+                                    ->system_name;  // Is this device ID? TODO no its not needs to change
+                    std::string run_id = run_info_data->protocol_run_id;
+                    std::string sample_id = run_info_data->sample_id;
 
+                    // For now just use the flowcell_id id as a key, this will need to change
+                    std::string id = run_id + "_" + model_path;
+                    read_groups[id] = ReadGroup{
+                            run_id,
+                            model_path,
+                            flowcell_id,
+                            device_id,
+                            get_string_timestamp_from_unix_time(run_acquisition_start_time_ms),
+                            sample_id};
+                }
                 if (pod5_free_read_batch(batch) != POD5_OK) {
                     spdlog::error("Failed to release batch");
                 }
@@ -220,7 +233,7 @@ int DataLoader::load_read_groups(std::string data_path) {
             pod5_close_and_free_reader(file);
         }
     }
-    return 0;
+    return read_groups;
 }
 
 void DataLoader::load_pod5_reads_from_file(const std::string& path) {
