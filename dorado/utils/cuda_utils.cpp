@@ -81,6 +81,10 @@ public:
     }
 };
 
+}  // namespace
+
+namespace details {
+
 void matmul_f16_cublas(torch::Tensor const &A, torch::Tensor const &B, torch::Tensor &C) {
     constexpr uint16_t HALF_ZERO = 0;      // 0.0 in __half format
     constexpr uint16_t HALF_ONE = 0x3C00;  // 1.0 in __half format
@@ -104,7 +108,7 @@ void matmul_f16_torch(torch::Tensor const &A, torch::Tensor const &B, torch::Ten
     C.copy_(torch::matmul(A, B));
 }
 
-}  // namespace
+}  // namespace details
 
 void matmul_f16(torch::Tensor const &A, torch::Tensor const &B, torch::Tensor &C) {
     // torch::matmul() is a bit slower than cublasGemmEx() on A100 and half the speed on V100,
@@ -127,9 +131,9 @@ void matmul_f16(torch::Tensor const &A, torch::Tensor const &B, torch::Tensor &C
             return cuda_timer.result_ms();
         };
 
-        float const torch_time = run_N_times(matmul_f16_torch);
-        float const cublas_time = run_N_times(matmul_f16_cublas);
-        return cublas_time < torch_time ? matmul_f16_cublas : matmul_f16_torch;
+        float const torch_time = run_N_times(details::matmul_f16_torch);
+        float const cublas_time = run_N_times(details::matmul_f16_cublas);
+        return cublas_time < torch_time ? details::matmul_f16_cublas : details::matmul_f16_torch;
     }();
     fastest_mat_mul(A, B, C);
 }

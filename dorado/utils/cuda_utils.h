@@ -29,6 +29,9 @@ std::optional<std::array<int, 3>> try_select_max_batch_sizes(
         std::vector<std::array<int, 3>> const &batch_sizes,
         int available_memory_gb);
 
+void matmul_f16_cublas(torch::Tensor const &A, torch::Tensor const &B, torch::Tensor &C);
+void matmul_f16_torch(torch::Tensor const &A, torch::Tensor const &B, torch::Tensor &C);
+
 }  //  namespace details
 
 }  // namespace dorado::utils
