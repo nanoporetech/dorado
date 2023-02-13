@@ -42,6 +42,7 @@ macro(RESOLVE_SYMLINKS INPUT_LIST OUTPUT_LIST)
           # Append resolved path to symlink resolution list.
           list(APPEND ${OUTPUT_LIST} "${LIB}")
         endwhile()
+
         # We've now got a lib that isn't a symlink.
         # Check and see if it's a text file -- there are some Linux
         # libs (libpthread, libm) that are configured this way. We'll just
@@ -54,7 +55,7 @@ macro(RESOLVE_SYMLINKS INPUT_LIST OUTPUT_LIST)
                 OUTPUT_STRIP_TRAILING_WHITESPACE
             )
             if(${FILE_OUTPUT} MATCHES "ASCII")
-                message(STATUS "Shared library ${LIB} is a text file -- not adding to redist_libs target")
+#                message(STATUS "Shared library ${LIB} is a text file -- not adding to redist_libs target")
                 continue()
             endif()
         endif()

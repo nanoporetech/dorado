@@ -140,6 +140,7 @@ set_target_properties(dorado_lib
     ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
 )
 
+
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/dorado
     ${HDF5_INCLUDE_DIRS}
     ${KOI_INCLUDE}
@@ -254,9 +255,23 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     install(FILES ${TORCH_DLLS} DESTINATION lib COMPONENT redist_libs)
 
     if(DYNAMIC_HDF)
-        RESOLVE_SYMLINKS(${HDF5_C_LIBRARIES} NEW_HDF_LIBRARIES)
-        install(FILES ${NEW_HDF_LIBRARIES} DESTINATION lib COMPONENT redist_libs)
+        RESOLVE_SYMLINKS("${HDF5_C_LIBRARIES}" NEW_HDF_LIBRARIES)
+        foreach(HDF_LIB IN LISTS NEW_HDF_LIBRARIES)
+	    if(${HDF_LIB} MATCHES "hdf5_serial")
+                install(FILES ${HDF_LIB} DESTINATION lib COMPONENT redist_libs)
+            endif()
+        endforeach()
     endif()
+
+    find_library(SZ_DLL sz REQUIRED)
+    get_filename_component(SZ_DLL_PATH ${SZ_DLL} DIRECTORY)
+    file(GLOB SZ_DLLS "${SZ_DLL_PATH}/libsz.so*")
+    install(FILES ${SZ_DLLS} DESTINATION lib COMPONENT redist_libs)
+
+    find_library(AEC_DLL aec REQUIRED)
+    get_filename_component(AEC_DLL_PATH ${AEC_DLL} DIRECTORY)
+    file(GLOB AEC_DLLS "${AEC_DLL_PATH}/libaec.so*")
+    install(FILES ${AEC_DLLS} DESTINATION lib COMPONENT redist_libs)
 
     # If zstd has been dynamically linked, add the .so to the package
     get_filename_component(ZSTD_LIBRARY_PATH ${ZSTD_LIBRARY_RELEASE} DIRECTORY)
