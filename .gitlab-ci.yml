@@ -93,7 +93,7 @@ build:linux:x86:focal:
 build:linux:arm64:focal:
   image: nvcr.io/nvidia/l4t-pytorch:r35.1.0-pth1.13-py3
   variables:
-    CUDA: "11.4"
+    BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/lib/python3.8/dist-packages/torch -DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN}"
   before_script:
     - apt-get update && apt-get install -y --no-install-recommends curl ca-certificates libhdf5-dev libssl-dev libzstd-dev
   <<: *linux_arm64_runner
@@ -146,7 +146,7 @@ build_archive:linux:x86:focal:
 build_archive:linux:arm64:focal:
   image: nvcr.io/nvidia/l4t-pytorch:r35.1.0-pth1.13-py3
   variables:
-    CUDA: "11.4"
+    BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/lib/python3.8/dist-packages/torch -DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN}"
   before_script:
     - apt-get update && apt-get install -y --no-install-recommends curl ca-certificates libhdf5-dev libssl-dev libzstd-dev
   <<: *linux_arm64_runner
