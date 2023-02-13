@@ -21,6 +21,11 @@ variables:
     - linux
     - nvidia-docker
 
+.linux_arm64_runner: &linux_arm64_runner
+  tags:
+    - nvidia-docker
+    - linux-arm64-gpu
+
 .windows_runner: &windows_runner
   tags:
     - win10-gpu
@@ -83,6 +88,13 @@ build:linux:x86:focal:
   variables:
     BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/libtorch -DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN}"
   <<: *linux_runner
+  <<: *build_dorado
+
+build:linux:arm64:focal:
+  image: nvcr.io/nvidia/l4t-pytorch:r35.1.0-pth1.13-py3
+  variables:
+    CUDA: "11.4"
+  <<: *linux_arm64_runner
   <<: *build_dorado
 
 build:linux:x86:focal_koi_download:
