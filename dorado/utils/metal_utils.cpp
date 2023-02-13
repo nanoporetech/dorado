@@ -1,7 +1,7 @@
 #include "metal_utils.h"
 
 #include <CoreFoundation/CoreFoundation.h>
-#if !defined(TARGET_OS_IPHONE)
+#if !TARGET_OS_IPHONE
 #include <IOKit/IOKitLib.h>
 #endif
 #include <Metal/Metal.hpp>
@@ -56,7 +56,7 @@ std::string cfstringref_to_string(const CFStringRef cfstringref) {
     return std::string("");
 }
 
-#if !defined(TARGET_OS_IPHONE)
+#if !TARGET_OS_IPHONE
 
 // Retrieves a dictionary of int64_t properties associated with a given service/property.
 // Returns true on success.
@@ -118,7 +118,7 @@ bool retrieve_ioreg_props(const std::string &service_class,
     return true;
 }
 
-#endif
+#endif  // if !TARGET_OS_IPHONE
 
 }  // namespace
 
@@ -258,7 +258,7 @@ int get_mtl_device_core_count() {
     if (gpu_core_count != -1)
         return gpu_core_count;
 
-#if !defined(TARGET_OS_IPHONE)
+#if !TARGET_OS_IPHONE
     // Attempt to directly query the GPU core count.
     std::unordered_map<std::string, int64_t> gpu_specs;
     if (retrieve_ioreg_props("AGXAccelerator", "GPUConfigurationVariable", gpu_specs)) {
@@ -268,7 +268,7 @@ int get_mtl_device_core_count() {
             return gpu_core_count;
         }
     }
-#endif
+#endif  // if !TARGET_OS_IPHONE
 
     // If querying failed, estimate the count based on the Metal device name,
     // with a fallback of 8 (a complete base spec. M1) if it is not recognised.
