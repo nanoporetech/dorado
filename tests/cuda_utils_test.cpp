@@ -120,7 +120,11 @@ DEFINE_TEST("matmul_f16") {
     dorado::utils::details::matmul_f16_torch(A, B, C2);
 
     // Compare results
-    REQUIRE(torch::allclose(C1, C2));
+    // Note that half precision floating point only has enough mantissa for
+    // ~3 decimal digits, so we need to reduce the tolerances a bit.
+    const double rtol = 1e-3;
+    const double atol = 0;
+    REQUIRE(torch::allclose(C1, C2, rtol, atol));
 }
 
 }  // namespace
