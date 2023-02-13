@@ -78,7 +78,7 @@ endif()
 
 find_package(Torch REQUIRED)
 
-if(APPLE)
+if(APPLE OR CMAKE_SYSTEM_PROCESSOR MATCHES "^aarch64*|^arm*")
   set(TORCH_BUILD_VERSION ${TORCH_VERSION})
 else()
   file(STRINGS "${TORCH_LIB}/build-version" TORCH_BUILD_VERSION)
