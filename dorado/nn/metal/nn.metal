@@ -837,21 +837,20 @@ kernel void reorder(
     }
 }
 
-template [[ host_name("reorder_input") ]] kernel void reorder<
+template [[ host_name("reorder_input_to_fwd_lstm_output") ]] kernel void reorder<
     MatLayoutRowMajor<SIMD_TILES_M, SIMD_TILES_N, ftype_in>,
             MatLayoutLSTM<SIMD_TILES_M, SIMD_TILES_N, FORWARD_LSTM_OUTPUT, ftype>>(
-        device const LstmArgs*,
-        device ftype_in*,
-        device ftype*,
-        KERNEL_INDEX_INPUTS);
+        device const LstmArgs*, device ftype_in*, device ftype*, KERNEL_INDEX_INPUTS);
 
-template [[ host_name("reorder_output") ]] kernel void reorder<
+template [[ host_name("reorder_input_to_rev_lstm_output") ]] kernel void reorder<
+    MatLayoutRowMajor<SIMD_TILES_M, SIMD_TILES_N, ftype_in>,
+            MatLayoutLSTM<SIMD_TILES_M, SIMD_TILES_N, REVERSE_LSTM_OUTPUT, ftype>>(
+        device const LstmArgs*, device ftype_in*, device ftype*, KERNEL_INDEX_INPUTS);
+
+template [[ host_name("reorder_rev_lstm_output_to_linear") ]] kernel void reorder<
     MatLayoutLSTM<SIMD_TILES_M, SIMD_TILES_N, REVERSE_LSTM_OUTPUT, ftype>,
             MatLayoutRowMajor<SIMD_TILES_M, SIMD_TILES_N, ftype_out>>(
-        device const LstmArgs*,
-        device ftype*,
-        device ftype_out*,
-        KERNEL_INDEX_INPUTS);
+        device const LstmArgs*, device ftype*, device ftype_out*, KERNEL_INDEX_INPUTS);
 
 
 // Note: max_total_threads_per_threadgroup is set via ComputePipelineDescriptor,
@@ -1012,18 +1011,12 @@ template<typename InputMatLayout> kernel void linear(
     }
 }
 
-template [[ host_name("linear") ]] kernel void linear<MatLayoutRowMajor<SIMD_TILES_M, SIMD_TILES_N>>(
-        device const LinearArgs*,
-        device ftype*,
-        device ftype*,
-        device void* const,
-        threadgroup ftype (* const simd_out_buf)[TILE_SIZE * TILE_SIZE],
-        KERNEL_INDEX_INPUTS);
+template [[ host_name("linear") ]] kernel void linear<
+    MatLayoutRowMajor<SIMD_TILES_M, SIMD_TILES_N>>(
+        device const LinearArgs*, device ftype*, device ftype*, device void* const,
+        threadgroup ftype (* const simd_out_buf)[TILE_SIZE * TILE_SIZE], KERNEL_INDEX_INPUTS);
 
-template [[ host_name("linear_from_lstm") ]] kernel void linear<MatLayoutLSTM<SIMD_TILES_M, SIMD_TILES_N, REVERSE_LSTM_OUTPUT>>(
-        device const LinearArgs*,
-        device ftype*,
-        device ftype*,
-        device void* const,
-        threadgroup ftype (* const simd_out_buf)[TILE_SIZE * TILE_SIZE],
-        KERNEL_INDEX_INPUTS);
+template [[ host_name("linear_from_rev_lstm") ]] kernel void linear<
+    MatLayoutLSTM<SIMD_TILES_M, SIMD_TILES_N, REVERSE_LSTM_OUTPUT>>(
+        device const LinearArgs*, device ftype*, device ftype*, device void* const,
+        threadgroup ftype (* const simd_out_buf)[TILE_SIZE * TILE_SIZE], KERNEL_INDEX_INPUTS);
