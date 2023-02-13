@@ -320,7 +320,8 @@ struct MetalBlockImpl : Module {
                      {"kLinearOutputClamp", false},
                      {"kLinearOutputTanh", false},
                      {"kLinearOutputAsByte", false}});
-            linear_cps[0] = make_cps(device, "linear_from_lstm", linear_constants1, linear_threads);
+            linear_cps[0] =
+                    make_cps(device, "linear_from_rev_lstm", linear_constants1, linear_threads);
             const auto linear_constants2 = std::vector<std::tuple<std::string, MetalConstant>>(
                     {{"kLinearInSize", decomposition},
                      {"kLinearOutSize", out_size},
@@ -342,7 +343,8 @@ struct MetalBlockImpl : Module {
                      {"kLinearOutputClamp", !is_v3_model},
                      {"kLinearOutputTanh", is_v3_model},
                      {"kLinearOutputAsByte", true}});
-            linear_cps[0] = make_cps(device, "linear_from_lstm", linear_constants, linear_threads);
+            linear_cps[0] =
+                    make_cps(device, "linear_from_rev_lstm", linear_constants, linear_threads);
             // Single matmul that may or may not have a bias.
             if (!config.out_features.has_value()) {
                 linear1 =
