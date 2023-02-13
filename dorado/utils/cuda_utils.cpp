@@ -106,7 +106,7 @@ void matmul_f16_torch(torch::Tensor const &A, torch::Tensor const &B, torch::Ten
 
 }  // namespace
 
-void cublas_matmul_f16(torch::Tensor const &A, torch::Tensor const &B, torch::Tensor &C) {
+void matmul_f16(torch::Tensor const &A, torch::Tensor const &B, torch::Tensor &C) {
     // torch::matmul() is a bit slower than cublasGemmEx() on A100 and half the speed on V100,
     // but an order of magnitude faster on our Windows CI machines (1080 Ti), so dynamically
     // pick which one we should use on first invocation.
@@ -194,7 +194,7 @@ int select_batchsize(int layer_size, int min_batchsize, int max_batchsize, std::
 
     // warmup
     for (int t = 0; t < timesteps; t++) {
-        cublas_matmul_f16(a, b, c);
+        matmul_f16(a, b, c);
         host_lstm_step_f16(stream, max_batchsize, layer_size, bias.data_ptr(), c.data_ptr(),
                            state_buf.data_ptr(), a.data_ptr());
     }
@@ -205,7 +205,7 @@ int select_batchsize(int layer_size, int min_batchsize, int max_batchsize, std::
         for (int t = 0; t < timesteps; t++) {
             a = torch::empty({batchsize, layer_size * 2}, options);
             c = torch::empty({batchsize, layer_size * 4}, options);
-            cublas_matmul_f16(a, b, c);
+            matmul_f16(a, b, c);
             host_lstm_step_f16(stream, batchsize, layer_size, bias.data_ptr(), c.data_ptr(),
                                state_buf.data_ptr(), a.data_ptr());
         }
