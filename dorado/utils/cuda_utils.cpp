@@ -61,8 +61,8 @@ public:
 
     /**
      * Get the time spent on the GPU between the begin and end markers.
-     * @note This will block the active stream until the end marker
-     * has been reached on the GPU.
+     * @note This will block the current CPU thread until the end marker
+     * has been reached on the active stream.
      */
     float result_ms() {
         check_cuda_result(cudaEventSynchronize(m_stop));
@@ -131,7 +131,7 @@ void matmul_f16(torch::Tensor const &A, torch::Tensor const &B, torch::Tensor &C
         auto run_N_times = [&](auto matmul_impl) {
             const size_t N = 1000;
             // Warmup then profile
-            for (size_t i = 0; i < N; i++) {
+            for (size_t i = 0; i < 10; i++) {
                 matmul_impl(a, b, c);
             }
             cuda_timer.start();
@@ -208,7 +208,7 @@ int select_batchsize(int layer_size, int min_batchsize, int max_batchsize, std::
     auto state_buf = torch::empty({max_batchsize, layer_size}, options);
 
     // warmup
-    for (int t = 0; t < timesteps; t++) {
+    for (int t = 0; t < 10; t++) {
         matmul_f16(a, b, c);
         host_lstm_step_f16(stream, max_batchsize, layer_size, bias.data_ptr(), c.data_ptr(),
                            state_buf.data_ptr(), a.data_ptr());
