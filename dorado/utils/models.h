@@ -46,7 +46,7 @@ static const std::vector<std::string> models = {
 
 namespace stereo {
 
-static const std::vector<std::string> models = {"dna_r10.4.2_e8.2_4khz_stereo@v1.0"};
+static const std::vector<std::string> models = {"dna_r10.4.1_e8.2_4khz_stereo@v1.1"};
 
 }
 
