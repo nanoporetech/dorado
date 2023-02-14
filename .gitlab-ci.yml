@@ -93,10 +93,10 @@ build:linux:x86:focal_koi_download:
   <<: *linux_runner
   <<: *build_dorado
 
-build:linux:aarch64:l4t-r32.7.1_koi_download:
-  image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r32.7.1-deps:1.0
+build:linux:aarch64:bionic:
+  image: nvcr.io/nvidia/l4t-pytorch:r32.7.1-pth1.10-py3
   variables:
-    BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/torch-1.10-Linux-aarch64/torch/ -DDISABLE_POD5=ON"
+    BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/lib/python3.6/dist-packages/torch -DDISABLE_POD5=ON"
   <<: *linux_arm64_runner
   <<: *build_dorado
 
@@ -137,10 +137,11 @@ build_archive:linux:x86:centos7:
   <<: *build_dorado_archive
   when: manual
 
-build_archive:linux:aarch64:l4t-r32.7.1_koi_download:
-  image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r32.7.1-deps:1.0
+build_archive:linux:aarch64:bionic:
+  image: nvcr.io/nvidia/l4t-pytorch:r32.7.1-pth1.10-py3
   variables:
-    BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/torch-1.10-Linux-aarch64/torch/ -DDISABLE_POD5=ON"
+    BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/lib/python3.6/dist-packages/torch -DDISABLE_POD5=ON"
+  <<: *linux_dependencies
   <<: *linux_arm64_runner
   <<: *build_dorado_archive
   when: manual
@@ -185,12 +186,12 @@ test:linux:x86:focal:
   needs:
     - build:linux:x86:focal
 
-test:linux:aarch64:l4t-r32.7.1_koi_download:
-  image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r32.7.1-deps:1.0
+test:linux:aarch64:bionic:
+  image: nvcr.io/nvidia/l4t-base:r32.7.1
   <<: *linux_arm64_gpu_runner
   <<: *test_dorado
   needs:
-    - build:linux:aarch64:l4t-r32.7.1_koi_download
+    - build:linux:aarch64:bionic
 
 test:macos:m1:
   <<: *macos_runner
@@ -223,12 +224,12 @@ test_archive:linux:x86:20.04:
     - build_archive:linux:x86:centos7
 
 # Test that you can run dorado in a clean l4t environment
-test_archive:linux:aarch64:l4t-r32.7.1:
+test_archive:linux:aarch64:bionic:
   image: nvcr.io/nvidia/l4t-base:r32.7.1
   <<: *linux_arm64_gpu_runner
   <<: *test_archive
   needs:
-    - build_archive:linux:aarch64:l4t-r32.7.1_koi_download
+    - build_archive:linux:aarch64:bionic
 
 # Single read eval
 
