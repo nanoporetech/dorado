@@ -26,8 +26,7 @@ variables:
 
 .linux_arm64_gpu_runner: &linux_arm64_gpu_runner
   tags:
-    - linux-arm64-gpu
-    - nvidia-docker
+    - nvidia-docker-tegra-gpu
 
 .windows_runner: &windows_runner
   tags:
