@@ -36,6 +36,10 @@ variables:
     - echo Dorado dependency stage
     - apt-get update && apt-get install -y --no-install-recommends curl libhdf5-dev libssl-dev libzstd-dev libsz2
 
+.torch_build_version: &torch_build_version
+  before_script:
+    - python -c 'import torch; print("%s+cu%s" % (torch.__version__, torch.version.cuda.replace(".", "")))' > /usr/local/lib/python3.8/dist-packages/torch/build-version
+
 .build_dorado: &build_dorado
   stage: build
   script:
@@ -95,6 +99,7 @@ build:linux:arm64:focal:
   image: nvcr.io/nvidia/l4t-pytorch:r35.1.0-pth1.13-py3
   variables:
     BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/lib/python3.8/dist-packages/torch"
+  <<: *torch_build_version
   <<: *linux_dependencies
   <<: *linux_arm64_runner
   <<: *build_dorado
@@ -147,6 +152,7 @@ build_archive:linux:x86:cuda12:
   image: nvcr.io/nvidia/pytorch:23.01-py3
   variables:
     BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/lib/python3.8/dist-packages/torch"
+  <<: *torch_build_version
   <<: *linux_dependencies
   <<: *linux_runner
   <<: *build_dorado_archive
@@ -156,6 +162,7 @@ build_archive:linux:arm64:focal:
   image: nvcr.io/nvidia/l4t-pytorch:r35.1.0-pth1.13-py3
   variables:
     BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/lib/python3.8/dist-packages/torch"
+  <<: *torch_build_version
   <<: *linux_dependencies
   <<: *linux_arm64_runner
   <<: *build_dorado_archive
@@ -289,7 +296,7 @@ deploy:all:
   variables:
     GIT_STRATEGY: none
   script:
-   - ls -la archive
+   - ls -lh archive
   when: manual
   artifacts:
     paths:
