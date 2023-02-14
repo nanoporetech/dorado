@@ -277,6 +277,8 @@ test:sre-test:
 
 deploy:all:
   stage: deploy
+  variables:
+    GIT_STRATEGY: none
   script:
    - ls -la archive
   when: manual
