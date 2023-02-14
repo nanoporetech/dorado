@@ -7,8 +7,8 @@ if((CMAKE_SYSTEM_NAME STREQUAL "Linux") AND (CMAKE_SYSTEM_PROCESSOR STREQUAL "aa
     # download the pacakge for arm, we want to package this due to hdf5's dependencies
 
     set(DYNAMIC_HDF ON)
-    set(HDF_VER hdf5-1.10.0) # TODO: Check this!
-    # download_and_extract(<cdn_path_for_aarch64_hdf5_package>) # TODO: fix!
+    set(HDF_VER hdf5-1.10.0-aarch64)
+    download_and_extract(https://cdn.oxfordnanoportal.com/software/analysis/${HDF_VER}.zip)
     list(PREPEND CMAKE_PREFIX_PATH ${DORADO_3RD_PARTY}/${HDF_VER}/${HDF_VER})
 
 elseif(WIN32)
