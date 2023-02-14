@@ -21,6 +21,11 @@ variables:
     - linux
     - nvidia-docker
 
+.linux_arm64_runner: &linux_arm64_runner
+  tags:
+    - nvidia-docker
+    - linux-arm64-gpu
+
 .windows_runner: &windows_runner
   tags:
     - win10-gpu
@@ -28,7 +33,7 @@ variables:
 .linux_dependencies: &linux_dependencies
   before_script:
     - echo Dorado dependency stage
-    - apt-get update && apt-get install -y --no-install-recommends libhdf5-dev libssl-dev libzstd-dev
+    - apt-get update && apt-get install -y --no-install-recommends curl libhdf5-dev libssl-dev libzstd-dev libsz2
 
 .build_dorado: &build_dorado
   stage: build
@@ -85,6 +90,14 @@ build:linux:x86:focal:
   <<: *linux_runner
   <<: *build_dorado
 
+build:linux:arm64:focal:
+  image: nvcr.io/nvidia/l4t-pytorch:r35.1.0-pth1.13-py3
+  variables:
+    BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/lib/python3.8/dist-packages/torch"
+  <<: *linux_dependencies
+  <<: *linux_arm64_runner
+  <<: *build_dorado
+
 build:linux:x86:focal_koi_download:
   image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.0
   variables:
@@ -129,6 +142,15 @@ build_archive:linux:x86:focal:
   <<: *build_dorado_archive
   when: manual
 
+build_archive:linux:arm64:focal:
+  image: nvcr.io/nvidia/l4t-pytorch:r35.1.0-pth1.13-py3
+  variables:
+    BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/lib/python3.8/dist-packages/torch"
+  <<: *linux_dependencies
+  <<: *linux_arm64_runner
+  <<: *build_dorado_archive
+  when: manual
+
 build_archive:linux:x86:centos7:
   image: ${DORADO_DOCKER_ROOT}/dorado-deps-centos7-cuda-${CUDA}.0:1.0
   variables:
@@ -159,8 +181,8 @@ build_archive:macos:m1:
   script:
     - echo Dorado app test stage
     - ./dist/bin/dorado download --model dna_r9.4.1_e8_hac@v3.3
-    - ./dist/bin/dorado basecaller dna_r9.4.1_e8_hac@v3.3 ./tests/data/ -r 1 -b 384 > calls.sam
-    - ./dist/bin/dorado basecaller dna_r9.4.1_e8_hac@v3.3 ./tests/data/ -r 1 -x cpu > calls.sam
+    - ./dist/bin/dorado basecaller dna_r9.4.1_e8_hac@v3.3 ./tests/data/pod5 -r 1 -b 384 > calls.sam
+    - ./dist/bin/dorado basecaller dna_r9.4.1_e8_hac@v3.3 ./tests/data/pod5 -r 1 -x cpu > calls.sam
 
 .test_archive: &test_archive
   stage: test
@@ -178,6 +200,14 @@ test:linux:x86:focal:
   <<: *test_dorado
   needs:
     - build:linux:x86:focal
+
+test:linux:arm64:focal:
+  image: nvcr.io/nvidia/l4t-pytorch:r35.1.0-pth1.13-py3
+  <<: *linux_dependencies
+  <<: *linux_arm64_runner
+  <<: *test_dorado
+  needs:
+    - build:linux:arm64:focal
 
 test:macos:m1:
   <<: *macos_runner
@@ -208,6 +238,14 @@ test_archive:linux:x86:20.04:
   <<: *test_archive
   needs:
     - build_archive:linux:x86:centos7
+
+test_archive:linux:arm64:20.04:
+  image: nvcr.io/nvidia/l4t-pytorch:r35.1.0-pth1.13-py3
+  <<: *linux_dependencies
+  <<: *linux_arm64_runner
+  <<: *test_archive
+  needs:
+    - build_archive:linux:arm64:focal
 
 # Single read eval
 
