@@ -170,7 +170,7 @@ std::unordered_map<std::string, ReadGroup> DataLoader::load_read_groups(std::str
             Pod5FileReader_t* file = pod5_open_file(entry.path().string().c_str());
 
             if (!file) {
-                spdlog::error("Failed to open file {}: {}", entry.path().c_str(),
+                spdlog::error("Failed to open file {}: {}", entry.path().string().c_str(),
                               pod5_get_error_string());
             }
 
