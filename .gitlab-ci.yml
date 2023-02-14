@@ -144,7 +144,7 @@ build_archive:linux:x86:focal:
   when: manual
 
 build_archive:linux:x86:cuda12:
-  image: https://nvcr.io/nvidia/pytorch:23.01-py3
+  image: nvcr.io/nvidia/pytorch:23.01-py3
   variables:
     BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/lib/python3.8/dist-packages/torch"
   <<: *linux_dependencies
