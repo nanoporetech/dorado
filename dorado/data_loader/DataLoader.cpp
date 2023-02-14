@@ -157,15 +157,13 @@ void DataLoader::load_reads(const std::string& path) {
 
 std::unordered_map<std::string, ReadGroup> DataLoader::load_read_groups(std::string data_path,
                                                                         std::string model_path) {
-    std::unordered_map<std::string, ReadGroup>
-            read_groups;  // This needs to be a set and we need to write our own cmp, but for now it will do.
+    std::unordered_map<std::string, ReadGroup> read_groups;
 
     for (const auto& entry : std::filesystem::directory_iterator(data_path)) {
         std::string ext = std::filesystem::path(entry).extension().string();
         std::transform(ext.begin(), ext.end(), ext.begin(),
                        [](unsigned char c) { return std::tolower(c); });
         if (ext == ".pod5") {
-            // Let's loop through every read and get the run ID shall we?
             pod5_init();
 
             // Open the file ready for walking:
@@ -213,7 +211,7 @@ std::unordered_map<std::string, ReadGroup> DataLoader::load_read_groups(std::str
                     std::string run_id = run_info_data->protocol_run_id;
                     std::string sample_id = run_info_data->sample_id;
 
-                    // For now just use the flowcell_id id as a key, this will need to change
+                    // Construct the read group ID
                     std::string id = run_id + "_" + model_path;
                     read_groups[id] =
                             ReadGroup{run_id,
