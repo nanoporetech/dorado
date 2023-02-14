@@ -2,6 +2,7 @@ stages:
   - pre-flight
   - build
   - test
+  - deploy
 
 variables:
   BUILD_DIR: build
@@ -271,3 +272,22 @@ test:sre-test:
           }
       }' \
       ${MLHUB_TRIGGER_URL}
+
+# Deploy
+
+deploy:all:
+  stage: deploy
+  variables:
+    GIT_STRATEGY: none
+  script:
+   - ls -la archive
+  when: manual
+  artifacts:
+    paths:
+      - archive
+    expire_in: 1 day
+  needs:
+    - build_archive:linux:x86:centos7
+    - build_archive:linux:arm64:focal
+    - build_archive:macos:m1
+    - build_archive:windows
