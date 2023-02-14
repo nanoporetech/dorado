@@ -97,6 +97,7 @@ build:linux:aarch64:bionic:
   image: nvcr.io/nvidia/l4t-pytorch:r32.7.1-pth1.10-py3
   variables:
     BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/lib/python3.6/dist-packages/torch -DDISABLE_POD5=ON"
+  <<: *linux_dependencies
   <<: *linux_arm64_runner
   <<: *build_dorado
 
