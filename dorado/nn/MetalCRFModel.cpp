@@ -10,7 +10,6 @@
 
 #include <math.h>
 #include <spdlog/spdlog.h>
-#include <toml.hpp>
 #include <torch/torch.h>
 
 #include <vector>
@@ -570,7 +569,6 @@ public:
 
         // TODO -- we don't honour the config n_base
         constexpr int n_base = 4;
-        constexpr int num_transitions = 5;
         m_states = pow(n_base, model_config.state_len);
 
         m_batch_size = batch_size;

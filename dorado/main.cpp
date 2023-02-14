@@ -1,5 +1,6 @@
 #include "Version.h"
 #include "cli/cli.h"
+#include "spdlog/cfg/env.h"
 
 #include <functional>
 #include <iostream>
@@ -21,12 +22,17 @@ void usage(const std::vector<std::string> commands) {
 
     std::cerr << "\nOptional arguments:\n"
               << "-h --help               shows help message and exits\n"
-              << "-v --version            prints version information and exits" << std::endl;
+              << "-v --version            prints version information and exits\n"
+              << "-vv                     prints verbose version information and exits"
+              << std::endl;
 }
 
 }  // namespace
 
 int main(int argc, char* argv[]) {
+    // Load logging settings from environment/command-line.
+    spdlog::cfg::load_env_levels();
+
     const std::map<std::string, entry_ptr> subcommands = {
             {"basecaller", &dorado::basecaller},
             {"duplex", &dorado::duplex},
@@ -49,6 +55,13 @@ int main(int argc, char* argv[]) {
 
     if (subcommand == "-v" || subcommand == "--version") {
         std::cerr << DORADO_VERSION << std::endl;
+    } else if (subcommand == "-vv") {
+#ifdef __APPLE__
+        std::cerr << "dorado:   " << DORADO_VERSION << std::endl;
+#else
+        std::cerr << "dorado:   " << DORADO_VERSION << "+cu" << CUDA_VERSION << std::endl;
+#endif
+        std::cerr << "libtorch: " << TORCH_BUILD_VERSION << std::endl;
     } else if (subcommand == "-h" || subcommand == "--help") {
         usage(keys);
         return 0;

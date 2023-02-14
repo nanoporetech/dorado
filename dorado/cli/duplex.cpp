@@ -160,6 +160,9 @@ int duplex(int argc, char* argv[]) {
                     writer_node, std::move(stereo_runners), stereo_batch_size, chunk_size, overlap,
                     stereo_model_stride);
 
+            std::unordered_set<std::string> read_list =
+                    utils::get_read_list_from_pairs(template_complement_map);
+
             StereoDuplexEncoderNode stereo_node = StereoDuplexEncoderNode(
                     *stereo_basecaller_node, std::move(template_complement_map));
 
@@ -170,7 +173,7 @@ int duplex(int argc, char* argv[]) {
                                                      chunk_size, overlap, simplex_model_stride);
             ScalerNode scaler_node(*basecaller_node, num_devices * 2);
 
-            DataLoader loader(scaler_node, "cpu", num_devices);
+            DataLoader loader(scaler_node, "cpu", num_devices, 0, std::move(read_list));
             loader.load_reads(reads);
         }
     } catch (const std::exception& e) {

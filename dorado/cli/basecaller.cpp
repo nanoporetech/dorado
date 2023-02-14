@@ -1,6 +1,7 @@
 #include "Version.h"
 #include "data_loader/DataLoader.h"
 #include "decode/CPUDecoder.h"
+#include "utils/basecaller_utils.h"
 #include "utils/models.h"
 #ifdef __APPLE__
 #include "nn/MetalCRFModel.h"
@@ -42,7 +43,8 @@ void setup(std::vector<std::string> args,
            bool emit_fastq,
            bool emit_moves,
            size_t max_reads,
-           size_t min_qscore) {
+           size_t min_qscore,
+           std::string read_list_file_path) {
     torch::set_num_threads(1);
     std::vector<Runner> runners;
 
@@ -56,7 +58,10 @@ void setup(std::vector<std::string> args,
         }
 #ifdef __APPLE__
     } else if (device == "metal") {
-        batch_size = batch_size == 0 ? utils::auto_gpu_batch_size(model_path.string()) : batch_size;
+        if (batch_size == 0) {
+            batch_size = utils::auto_gpu_batch_size();
+            spdlog::debug("- selected batchsize {}", batch_size);
+        }
         auto caller = create_metal_caller(model_path, chunk_size, batch_size);
         for (int i = 0; i < num_runners; i++) {
             runners.push_back(std::make_shared<MetalModelRunner>(caller, chunk_size, batch_size));
@@ -161,7 +166,9 @@ void setup(std::vector<std::string> args,
                 writer_node, std::move(runners), batch_size, chunk_size, overlap, model_stride);
     }
     ScalerNode scaler_node(*basecaller_node, num_devices * 2);
-    DataLoader loader(scaler_node, "cpu", num_devices, max_reads);
+    DataLoader loader(scaler_node, "cpu", num_devices, max_reads,
+                      utils::load_read_list(read_list_file_path));
+
     loader.load_reads(data_path);
 }
 
@@ -181,6 +188,11 @@ int basecaller(int argc, char* argv[]) {
     parser.add_argument("-x", "--device")
             .help("device string in format \"cuda:0,...,N\", \"cuda:all\", \"metal\" etc..")
             .default_value(default_parameters.device);
+
+    parser.add_argument("-l", "--read-ids")
+            .help("A file with a newline-delimited list of reads to basecall. If not provided, all "
+                  "reads will be basecalled")
+            .default_value(std::string(""));
 
     parser.add_argument("-n", "--max-reads").default_value(0).scan<'i', int>();
 
@@ -206,14 +218,14 @@ int basecaller(int argc, char* argv[]) {
     parser.add_argument("--modified-bases")
             .nargs(argparse::nargs_pattern::at_least_one)
             .action([](const std::string& value) {
-                if (std::find(urls::modified::mods.begin(), urls::modified::mods.end(), value) ==
-                    urls::modified::mods.end()) {
+                if (std::find(modified::mods.begin(), modified::mods.end(), value) ==
+                    modified::mods.end()) {
                     spdlog::error(
                             "'{}' is not a supported modification please select from {}", value,
-                            std::accumulate(
-                                    std::next(urls::modified::mods.begin()),
-                                    urls::modified::mods.end(), urls::modified::mods[0],
-                                    [](std::string a, std::string b) { return a + ", " + b; }));
+                            std::accumulate(std::next(modified::mods.begin()), modified::mods.end(),
+                                            modified::mods[0], [](std::string a, std::string b) {
+                                                return a + ", " + b;
+                                            }));
                     std::exit(EXIT_FAILURE);
                 }
                 return value;
@@ -268,7 +280,7 @@ int basecaller(int argc, char* argv[]) {
               parser.get<int>("-b"), parser.get<int>("-r"), default_parameters.remora_batchsize,
               default_parameters.remora_threads, parser.get<bool>("--emit-fastq"),
               parser.get<bool>("--emit-moves"), parser.get<int>("--max-reads"),
-              parser.get<int>("--min-qscore"));
+              parser.get<int>("--min-qscore"), parser.get<std::string>("--read-ids"));
     } catch (const std::exception& e) {
         spdlog::error("{}", e.what());
         return 1;

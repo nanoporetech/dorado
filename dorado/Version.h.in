@@ -1,3 +1,5 @@
 #pragma once
 
 #cmakedefine DORADO_VERSION "@DORADO_VERSION@"
+#cmakedefine TORCH_BUILD_VERSION "@TORCH_BUILD_VERSION@"
+#cmakedefine CUDA_VERSION @CUDAToolkit_VERSION_MAJOR@@CUDAToolkit_VERSION_MINOR@

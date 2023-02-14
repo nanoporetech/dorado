@@ -44,13 +44,12 @@ struct BaseModParams {
 };
 
 class RemoraCaller {
-    constexpr static torch::ScalarType dtype = torch::kFloat16;
     torch::nn::ModuleHolder<torch::nn::AnyModule> m_module{nullptr};
     torch::TensorOptions m_options;
     torch::Tensor m_input_sigs;
     torch::Tensor m_input_seqs;
 #ifndef __APPLE__
-    c10::cuda::CUDAStream m_stream;
+    c10::optional<c10::Stream> m_stream;
 #endif
     std::unique_ptr<RemoraScaler> m_scaler;
 

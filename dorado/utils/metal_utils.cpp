@@ -1,10 +1,13 @@
 #include "metal_utils.h"
 
 #include <CoreFoundation/CoreFoundation.h>
+#if !TARGET_OS_IPHONE
 #include <IOKit/IOKitLib.h>
+#endif
 #include <Metal/Metal.hpp>
 #include <mach-o/dyld.h>
 #include <spdlog/spdlog.h>
+#include <sys/sysctl.h>
 #include <sys/syslimits.h>
 #include <torch/torch.h>
 
@@ -52,6 +55,8 @@ std::string cfstringref_to_string(const CFStringRef cfstringref) {
 
     return std::string("");
 }
+
+#if !TARGET_OS_IPHONE
 
 // Retrieves a dictionary of int64_t properties associated with a given service/property.
 // Returns true on success.
@@ -109,8 +114,11 @@ bool retrieve_ioreg_props(const std::string &service_class,
 
     CFDictionaryApplyFunction(static_cast<CFDictionaryRef>(property), process_kvs, &props);
     CFRelease(property);
+
     return true;
 }
+
+#endif  // if !TARGET_OS_IPHONE
 
 }  // namespace
 
@@ -250,9 +258,8 @@ int get_mtl_device_core_count() {
     if (gpu_core_count != -1)
         return gpu_core_count;
 
+#if !TARGET_OS_IPHONE
     // Attempt to directly query the GPU core count.
-    // The G13 accelerator is what is present in M1-type chips.
-    // TODO -- Is this service present on later chips?
     std::unordered_map<std::string, int64_t> gpu_specs;
     if (retrieve_ioreg_props("AGXAccelerator", "GPUConfigurationVariable", gpu_specs)) {
         if (auto gpu_cores_it = gpu_specs.find("num_cores"); gpu_cores_it != gpu_specs.cend()) {
@@ -261,17 +268,26 @@ int get_mtl_device_core_count() {
             return gpu_core_count;
         }
     }
+#endif  // if !TARGET_OS_IPHONE
 
     // If querying failed, estimate the count based on the Metal device name,
     // with a fallback of 8 (a complete base spec. M1) if it is not recognised.
     gpu_core_count = 8;
     const std::string name = get_mtl_device()->name()->utf8String();
+    spdlog::debug("Basing GPU core count on Metal device string {}", name);
     if (name == "Apple M1 Pro") {
         gpu_core_count = 16;
     } else if (name == "Apple M1 Max") {
         gpu_core_count = 32;
     } else if (name == "Apple M1 Ultra") {
         gpu_core_count = 64;
+    } else if (name == "Apple M2 GPU") {
+        // M2 configurations with < 10 cores exist in e.g. MacBook Air, but it's
+        // assumed that those configurations would be handled above via IORegistry
+        // querying.  The M2 iPad Pro always has 10 GPU cores.  Note also that
+        // iOS metal device names in any case appear to have a different form, with
+        // "GPU" at the end.
+        gpu_core_count = 10;
     }
 
     spdlog::warn("Failed to retrieve GPU core count from IO Registry: using value of {}",
@@ -280,19 +296,29 @@ int get_mtl_device_core_count() {
 }
 
 int get_apple_cpu_perf_core_count() {
-    std::string name = get_mtl_device()->name()->utf8String();
-    // TODO: These numbers aren't always correct, lower-spec M1 Pro versions with 6 cores also exist.
-    //  And 4 might not be a good fallback. How do we determine the actual core count?
-    if (name == "Apple M1") {
-        return 4;
-    } else if (name == "Apple M1 Pro") {
-        return 8;
-    } else if (name == "Apple M1 Max") {
-        return 8;
-    } else if (name == "Apple M1 Ultra") {
-        return 16;
+    // We cache the count once it has been obtained.
+    static int cpu_perf_core_count = -1;
+    if (cpu_perf_core_count != -1)
+        return cpu_perf_core_count;
+
+    size_t size = sizeof(cpu_perf_core_count);
+    if (sysctlbyname("hw.perflevel0.physicalcpu", &cpu_perf_core_count, &size, nullptr, 0) == -1) {
+        std::string name = get_mtl_device()->name()->utf8String();
+        cpu_perf_core_count = 4;  // Used for M1, M2, and as fallback
+        // Lower-spec M1/M2 Pro versions with 6 cores also exist.
+        if (name == "Apple M1 Pro" || name == "Apple M1 Max" || name == "Apple M2 Pro" ||
+            name == "Apple M2 Max") {
+            cpu_perf_core_count = 8;
+        } else if (name == "Apple M1 Ultra") {
+            cpu_perf_core_count = 16;
+        }
+        spdlog::warn("Failed to retrieve CPU performance core count from sysctl: using value of {}",
+                     cpu_perf_core_count);
+    } else {
+        spdlog::debug("Retrieved CPU performance core count of {} from sysctl",
+                      cpu_perf_core_count);
     }
-    return 4;
+    return cpu_perf_core_count;
 }
 
 MTL::Buffer *mtl_for_tensor(const torch::Tensor &x) {
@@ -308,19 +334,6 @@ MTL::Buffer *extract_mtl_from_tensor(torch::Tensor &x) {
     return bfr;
 }
 
-int auto_gpu_batch_size(std::string model_path) {
-    if (model_path.find("_fast@v") != std::string::npos) {
-        return 1536;
-    } else if (model_path.find("_hac@v") != std::string::npos) {
-        return 768;
-    } else if (model_path.find("_sup@v") != std::string::npos) {
-        return 384;
-    } else {
-        throw std::runtime_error(std::string("Unsupported model: ") + model_path);
-    }
-    constexpr int kDefaultBatchSize = 384;
-    spdlog::warn("Unrecognised model suffix: defaulting to batch size {}", kDefaultBatchSize);
-    return kDefaultBatchSize;
-}
+int auto_gpu_batch_size() { return 48 * get_mtl_device_core_count(); }
 
 }  // namespace dorado::utils
