@@ -148,8 +148,7 @@ void setup(std::vector<std::string> args,
     }
 
     std::string model_name = std::filesystem::canonical(model_path).filename();
-    auto read_groups = DataLoader::load_read_groups(data_path,
-                                                    model_name);  // TODO add model path afterwards.
+    auto read_groups = DataLoader::load_read_groups(data_path, model_name);
     bool rna = utils::is_rna_model(model_path), duplex = false;
     WriterNode writer_node(std::move(args), emit_fastq, emit_moves, rna, duplex, min_qscore,
                            num_devices * 2, read_groups);

@@ -206,24 +206,22 @@ std::unordered_map<std::string, ReadGroup> DataLoader::load_read_groups(std::str
                     if (pod5_get_run_info(batch, read_data.run_info, &run_info_data) != POD5_OK) {
                         spdlog::error("Failed to get Run Info {}{}", row, pod5_get_error_string());
                     }
-                    auto run_acquisition_start_time_ms = run_info_data->acquisition_start_time_ms;
+                    auto exp_start_time_ms = run_info_data->protocol_start_time_ms;
                     auto run_sample_rate = run_info_data->sample_rate;
                     std::string flowcell_id = run_info_data->flow_cell_id;
-                    std::string device_id =
-                            run_info_data
-                                    ->system_name;  // Is this device ID? TODO no its not needs to change
+                    std::string device_id = run_info_data->sequencer_position;
                     std::string run_id = run_info_data->protocol_run_id;
                     std::string sample_id = run_info_data->sample_id;
 
                     // For now just use the flowcell_id id as a key, this will need to change
                     std::string id = run_id + "_" + model_path;
-                    read_groups[id] = ReadGroup{
-                            run_id,
-                            model_path,
-                            flowcell_id,
-                            device_id,
-                            get_string_timestamp_from_unix_time(run_acquisition_start_time_ms),
-                            sample_id};
+                    read_groups[id] =
+                            ReadGroup{run_id,
+                                      model_path,
+                                      flowcell_id,
+                                      device_id,
+                                      get_string_timestamp_from_unix_time(exp_start_time_ms),
+                                      sample_id};
                 }
                 if (pod5_free_read_batch(batch) != POD5_OK) {
                     spdlog::error("Failed to release batch");
