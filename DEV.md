@@ -3,8 +3,8 @@
 Dorado requires CUDA 11.7 on linux platforms. If the system you are running on does not have CUDA 11.7 installed, and you do not have sudo privileges, you can install locally from a run file as follows:
 
 ```
-$ wget https://developer.download.nvidia.com/compute/cuda/11.7.0/local_installers/cuda_11.7.0_465.19.01_linux.run
-$ sh cuda_11.7.0_465.19.01_linux.run --silent --toolkit --toolkitpath=${PWD}/cuda11.7
+$ wget https://developer.download.nvidia.com/compute/cuda/11.7.0/local_installers/cuda_11.7.0_515.43.04_linux.run
+$ sh cuda_11.7.0_515.43.04_linux.run --silent --toolkit --toolkitpath=${PWD}/cuda11.7
 ```
 
 In this case, cmake should be invoked with `CUDAToolkit_ROOT` in order to tell the build process where to find CUDA:
