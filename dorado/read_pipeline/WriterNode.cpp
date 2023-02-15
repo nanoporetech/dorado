@@ -43,9 +43,8 @@ void WriterNode::print_header() {
                       << " runid=" << x.second.run_id << "\t";
             std::cout << "LB:" << x.second.sample_id << "\t";
             std::cout << "SM:" << x.second.sample_id << "\t";
+            std::cout << std::endl;
         }
-
-        std::cout << std::endl;
     }
 }
 
