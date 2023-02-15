@@ -207,7 +207,7 @@ std::unordered_map<std::string, ReadGroup> DataLoader::load_read_groups(std::str
                     auto exp_start_time_ms = run_info_data->protocol_start_time_ms;
                     auto run_sample_rate = run_info_data->sample_rate;
                     std::string flowcell_id = run_info_data->flow_cell_id;
-                    std::string device_id = run_info_data->sequencer_position;
+                    std::string device_id = run_info_data->system_name;
                     std::string run_id = run_info_data->protocol_run_id;
                     std::string sample_id = run_info_data->sample_id;
 
