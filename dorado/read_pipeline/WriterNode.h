@@ -19,8 +19,7 @@ public:
                bool duplex,
                size_t min_qscore,
                size_t num_worker_threads = 1,
-               std::unordered_map<std::string, ReadGroup> =
-                       std::unordered_map<std::string, ReadGroup>(),
+               std::unordered_map<std::string, ReadGroup> = {},
                size_t max_reads = 1000);
     ~WriterNode();
 

@@ -249,7 +249,7 @@ BasecallerNode::BasecallerNode(ReadSink &sink,
           m_overlap(overlap),
           m_model_stride(model_stride),
           m_terminate_basecaller(false),
-          m_model_name(model_name),
+          m_model_name(std::move(model_name)),
           m_working_reads_manager(
                   std::make_unique<std::thread>(&BasecallerNode::working_reads_manager, this)),
           m_input_worker(
