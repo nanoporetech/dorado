@@ -1,9 +1,16 @@
 OPTION(BUILD_KOI_FROM_SOURCE OFF)
 
-function(get_best_compatible_koi_version CUDA_VERSION KOI_CUDA)
-    # List of supported versions must be sorted descending
-    foreach(SUPPORTED_VERSION 12.0 11.8 11.7 11.3)
-        if (${CUDA_VERSION} VERSION_GREATER_EQUAL ${SUPPORTED_VERSION})
+function(get_best_compatible_koi_version KOI_CUDA)
+    if (${CMAKE_SYSTEM_PROCESSOR} STREQUAL "aarch64")
+        # Koi only provides binaries for 11.4 when targeting aarch64
+        set(SUPPORTED_VERSIONS 11.4)
+    else()
+        set(SUPPORTED_VERSIONS 12.0 11.8 11.7 11.3)
+    endif()
+
+    list(SORT SUPPORTED_VERSIONS COMPARE NATURAL ORDER DESCENDING)
+    foreach(SUPPORTED_VERSION IN LISTS SUPPORTED_VERSIONS)
+        if (${CUDAToolkit_VERSION} VERSION_GREATER_EQUAL ${SUPPORTED_VERSION})
             set(${KOI_CUDA} ${SUPPORTED_VERSION} PARENT_SCOPE)
             return()
         endif()
@@ -35,7 +42,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32)
 
         set(KOI_VERSION 0.2.1)
         find_package(CUDAToolkit REQUIRED)
-        get_best_compatible_koi_version(${CUDAToolkit_VERSION} KOI_CUDA)
+        get_best_compatible_koi_version(KOI_CUDA)
         set(KOI_DIR libkoi-${KOI_VERSION}-${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}-cuda-${KOI_CUDA})
         set(KOI_CDN_URL "https://cdn.oxfordnanoportal.com/software/analysis")
 
