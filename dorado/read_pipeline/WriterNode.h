@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ReadPipeline.h"
+#include "data_loader/DataLoader.h"
 
 #include <atomic>
 #include <string>
@@ -18,6 +19,7 @@ public:
                bool duplex,
                size_t min_qscore,
                size_t num_worker_threads = 1,
+               std::unordered_map<std::string, ReadGroup> = {},
                size_t max_reads = 1000);
     ~WriterNode();
 
@@ -28,6 +30,8 @@ private:
 
     std::vector<std::string> m_args;
     size_t m_min_qscore;
+    // Read Groups - print these in header.
+    std::unordered_map<std::string, ReadGroup> m_read_groups;
     // Emit Fastq if true
     bool m_emit_fastq, m_emit_moves, m_isatty, m_duplex, m_rna;
     // Total number of raw samples from the read WriterNode has processed. Used for performance benchmarking and debugging.
