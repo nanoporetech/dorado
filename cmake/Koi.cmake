@@ -15,7 +15,7 @@ function(get_best_compatible_koi_version KOI_CUDA)
             return()
         endif()
     endforeach()
-    message(FATAL_ERROR "Unsupported CUDA toolkit version: ${CUDA_VERSION}")
+    message(FATAL_ERROR "Unsupported CUDA toolkit version: ${CUDAToolkit_VERSION}")
 endfunction()
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32)
