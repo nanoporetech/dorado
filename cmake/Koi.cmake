@@ -1,5 +1,16 @@
 OPTION(BUILD_KOI_FROM_SOURCE OFF)
 
+function(get_best_compatible_koi_version CUDA_VERSION KOI_CUDA)
+    # List of supported versions must be sorted descending
+    foreach(SUPPORTED_VERSION 12.0 11.8 11.7 11.3)
+        if (${CUDA_VERSION} VERSION_GREATER_EQUAL ${SUPPORTED_VERSION})
+            set(${KOI_CUDA} ${SUPPORTED_VERSION} PARENT_SCOPE)
+            return()
+        endif()
+    endforeach()
+    message(FATAL_ERROR "Unsupported CUDA toolkit version: ${CUDA_VERSION}")
+endfunction()
+
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32)
 
     if(BUILD_KOI_FROM_SOURCE)
@@ -24,7 +35,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32)
 
         set(KOI_VERSION 0.2.1)
         find_package(CUDAToolkit REQUIRED)
-        set(KOI_CUDA ${CUDAToolkit_VERSION_MAJOR}.${CUDAToolkit_VERSION_MINOR})
+        get_best_compatible_koi_version(${CUDAToolkit_VERSION} KOI_CUDA)
         set(KOI_DIR libkoi-${KOI_VERSION}-${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}-cuda-${KOI_CUDA})
         set(KOI_CDN_URL "https://cdn.oxfordnanoportal.com/software/analysis")
 
