@@ -15,6 +15,7 @@ All notable changes to Dorado will be documented in this file.
  * e802181f401d7a2d283076f54e8d7da283e16f78 - Modbase CPU fixes
  * f0b96548651a9365712e0ca93483914a222a6bb4 - Better auto-batchsize detection on macos
  * 1a422db5b4008138927f12e1ad01410ef35a7139 - Switch to transparent model URLs
+ * c2e694e66e573f7d4f49e41ce5a48a0c643918a5 - 260bps v4.0.0 5mCG_5hmCG@v2 models
  * 6b9249f4cc64ecb43134239fba2fe5682c5deb72 - Initial CUDA 12.0 support
 
 # [0.1.1] (12 Dec 2022)
