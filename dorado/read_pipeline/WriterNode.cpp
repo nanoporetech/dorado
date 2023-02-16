@@ -42,7 +42,7 @@ void WriterNode::print_header() {
                       << "basecall_model=" << x.second.basecalling_model
                       << " runid=" << x.second.run_id << "\t";
             std::cout << "LB:" << x.second.sample_id << "\t";
-            std::cout << "SM:" << x.second.sample_id << "\t";
+            std::cout << "SM:" << x.second.sample_id;
             std::cout << std::endl;
         }
     }
