@@ -2,6 +2,10 @@
 
 All notable changes to Dorado will be documented in this file.
 
+# [0.2.1] (15 Feb 2023)
+
+ * 121dddf9a3a288ca2c01dd2b732017a8f02c19a2 - Fix malformed SAM header
+
 # [0.2.0] (15 Feb 2023)
 
  * 9b8ea1133b94e4071d7214000c8d7e10ed379540 - v4.1.0 with models higher accuracy basecalling in low-complexity genomic regions
