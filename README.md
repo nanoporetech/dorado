@@ -16,9 +16,36 @@ If you encounter any problems building or running Dorado please [report an issue
 
 ## Installation
 
- - [dorado-0.1.1-linux-x64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.1.1-linux-x64.tar.gz)
- - [dorado-0.1.1-osx-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.1.1-osx-arm64.tar.gz)
- - [dorado-0.1.1-win64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.1.1-win64.zip)
+ - [dorado-0.2.0-linux-x64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.2.0-linux-x64.tar.gz)
+ - [dorado-0.2.0-linux-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.2.0-linux-x64.tar.gz)
+ - [dorado-0.2.0-osx-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.2.0-osx-arm64.tar.gz)
+ - [dorado-0.2.0-win64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.2.0-win64.zip)
+
+## Platforms
+
+Dorado has been tested on the following systems:
+
+| Platform | GPU/CPU                      |
+| -------- | ---------------------------- |
+| Windows  | (G)V100, A100                |
+| Apple    | M1, M1 Pro, M1 Max, M1 Ultra |
+| Linux    | (G)V100, A100                |
+
+Systems not listed above but which have Nvidia GPUs with >=8GB VRAM and architecture from Volta onwards have not been widely tested but are expected to work. If you encounter problems with running on your system please [report an issue](https://github.com/nanoporetech/dorado/issues)
+
+## Roadmap
+
+Dorado is still in alpha stage and not feature-complete, the following features form the core of our roadmap:
+
+1. DNA Barcode multiplexing
+2. Alignment *(output aligned BAMs)*.
+3. Python API
+
+## Performance tips
+
+1. For optimal performance Dorado requires POD5 file input. Please [convert your Fast5 files](https://github.com/nanoporetech/pod5-file-format) before basecalling.
+2. Dorado will automatically detect your GPUs' free memory and select an appropriate batch size.
+3. Dorado will automatically run in multi-GPU (`'cuda:all'`) mode. If you have a hetrogenous collection of GPUs select the faster GPUs using the `--device` flag (e.g `--device "cuda:0,2`). Not doing this will have a detrimental impact on performance.
 
 ## Running
 
@@ -47,31 +74,7 @@ Stereo Duplex Calling:
 $ dorado duplex dna_r10.4.1_e8.2_260bps_sup@v4.1.0 pod5s/ --pairs pairs.txt > duplex.sam
 ```
 
-## Platforms
-
-Dorado has been tested on the following systems:
-
-| Platform | GPU/CPU                      |
-| -------- | ---------------------------- |
-| Windows  | (G)V100, A100                |
-| Apple    | M1, M1 Pro, M1 Max, M1 Ultra |
-| Linux    | (G)V100, A100                |
-
-Systems not listed above but which have Nvidia GPUs with >=8GB VRAM and architecture from Volta onwards have not been widely tested but are expected to work. If you encounter problems with running on your system please [report an issue](https://github.com/nanoporetech/dorado/issues)
-
-## Roadmap
-
-Dorado is still in alpha stage and not feature-complete, the following features form the core of our roadmap:
-
-1. DNA Barcode multiplexing
-2. Alignment *(output aligned BAMs)*.
-3. Python API
-
-## Performance tips
-
-1. For optimal performance Dorado requires POD5 file input. Please [convert your Fast5 files](https://github.com/nanoporetech/pod5-file-format) before basecalling.
-2. Dorado will automatically detect your GPUs' free memory and select an appropriate batch size.
-3. Dorado will automatically run in multi-GPU (`'cuda:all'`) mode. If you have a hetrogenous collection of GPUs select the faster GPUs using the `--device` flag (e.g `--device "cuda:0,2`). Not doing this will have a detrimental impact on performance.
+See [duplex-tools](https://github.com/nanoporetech/duplex-tools#usage-with-dorado-recommended) for creating a `pairs.txt`.
 
 ## Available basecalling models
 
@@ -81,14 +84,17 @@ To download all available dorado models run:
 $ dorado download --model all
 ```
 
-The following models are currently available:
+The latest simplex models are v4.1.0:
 
 * dna_r10.4.1_e8.2_260bps_fast@v4.1.0
-* dna_r10.4.1_e8.2_260ps_hac@v4.1.0
+* dna_r10.4.1_e8.2_260bps_hac@v4.1.0
 * dna_r10.4.1_e8.2_260bps_sup@v4.1.0
 * dna_r10.4.1_e8.2_400bps_fast@v4.1.0
 * dna_r10.4.1_e8.2_400bps_hac@v4.1.0
 * dna_r10.4.1_e8.2_400bps_sup@v4.1.0
+
+The following models are also available:
+
 * dna_r10.4.1_e8.2_260bps_fast@v4.0.0
 * dna_r10.4.1_e8.2_260bps_hac@v4.0.0
 * dna_r10.4.1_e8.2_260bps_sup@v4.0.0
