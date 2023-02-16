@@ -1,6 +1,7 @@
 #include "utils/cuda_utils.h"
 
 #include <catch2/catch.hpp>
+#include <spdlog/spdlog.h>
 
 #include <limits>
 #include <tuple>
@@ -109,6 +110,11 @@ DEFINE_TEST("matmul_f16") {
     const int N = 5;
 
     // Setup tensors
+    if (!torch::hasCUDA()) {
+        spdlog::warn("No Nvidia driver present - Test skipped");
+        return;
+    }
+
     auto options = torch::TensorOptions().dtype(torch::kFloat16).device(c10::kCUDA);
     auto A = torch::rand({L, M}, options);
     auto B = torch::rand({M, N}, options);
