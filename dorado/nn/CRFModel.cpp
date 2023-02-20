@@ -97,8 +97,8 @@ struct ConvolutionImpl : Module {
                                          chunk_size_in, in_size, window_size, stride,
                                          ntcw_mat.stride(0), ntcw_mat.stride(1), ntcw_mat.stride(2),
                                          ntcw_mat.stride(3), x.data_ptr(), ntcw_mat.data_ptr());
-                    dorado::utils::cublas_matmul_f16(ntcw_mat.view({-1, in_size * window_size}),
-                                                     w_device, res_2D);
+                    dorado::utils::matmul_f16(ntcw_mat.view({-1, in_size * window_size}), w_device,
+                                              res_2D);
                     host_bias_swish_f16(stream, res_2D.size(0), res_2D.size(1), res_2D.stride(0),
                                         res_2D.data_ptr(), b_device.data_ptr());
 
@@ -118,8 +118,8 @@ struct ConvolutionImpl : Module {
                                          chunk_size_in, in_size, window_size, stride,
                                          tncw_mat.stride(1), tncw_mat.stride(0), tncw_mat.stride(2),
                                          tncw_mat.stride(3), x.data_ptr(), tncw_mat.data_ptr());
-                    dorado::utils::cublas_matmul_f16(tncw_mat.view({-1, in_size * window_size}),
-                                                     w_device, res_2D);
+                    dorado::utils::matmul_f16(tncw_mat.view({-1, in_size * window_size}), w_device,
+                                              res_2D);
                     host_bias_swish_f16(stream, res_2D.size(0), res_2D.size(1), res_2D.stride(0),
                                         res_2D.data_ptr(), b_device.data_ptr());
 
@@ -321,10 +321,8 @@ struct CudaLSTMStackImpl : Module {
                 auto timestep_out = rnn->reverse ? working_mem_left[chunk_size - ts - 1]
                                                  : working_mem_right[ts];
 
-                // Timestep matrix mulitplication (using cublasGemmEx, as using torch::matmul
-                // as below is a bit slower on A100 for some reason)
-                // gate_buf = torch::matmul(timestep_in, weights);
-                dorado::utils::cublas_matmul_f16(timestep_in, weights, gate_buf);
+                // Timestep matrix mulitplication
+                dorado::utils::matmul_f16(timestep_in, weights, gate_buf);
                 host_lstm_step_f16(stream, batch_size, layer_size, bias.data_ptr(),
                                    gate_buf.data_ptr(), state_buf.data_ptr(),
                                    timestep_out.data_ptr());

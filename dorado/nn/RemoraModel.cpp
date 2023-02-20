@@ -263,15 +263,19 @@ RemoraCaller::RemoraCaller(const std::filesystem::path& model_path,
                            const std::string& device,
                            int batch_size,
                            size_t block_stride)
-#ifdef __APPLE__
         : m_batch_size(batch_size) {
-#else
-        : m_batch_size(batch_size), m_stream(c10::cuda::getDefaultCUDAStream()) {
-#endif
     // no metal implementation yet, force to cpu
-    m_options = torch::TensorOptions().dtype(dtype).device(device == "metal" ? "cpu" : device);
+    if (device == "metal" || device == "cpu") {
+        // no slow_conv2d_cpu for type Half, need to use float32
+        m_options = torch::TensorOptions().device(torch::kCPU).dtype(torch::kFloat32);
+    } else {
+        m_options = torch::TensorOptions().device(device).dtype(torch::kFloat16);
+    }
+
 #ifndef __APPLE__
-    m_stream = c10::cuda::getStreamFromPool(false, m_options.device().index());
+    if (m_options.device().is_cuda()) {
+        m_stream = c10::cuda::getStreamFromPool(false, m_options.device().index());
+    }
 #endif
     m_module = load_remora_model(model_path, m_options);
 
@@ -319,12 +323,14 @@ RemoraCaller::RemoraCaller(const std::filesystem::path& model_path,
     auto sig_len = static_cast<int64_t>(m_params.context_before + m_params.context_after);
     auto kmer_len = m_params.bases_after + m_params.bases_before + 1;
 
-    m_input_sigs = torch::empty(
-            {batch_size, 1, sig_len},
-            torch::TensorOptions().dtype(dtype).device(torch::kCPU).pinned_memory(true));
-    m_input_seqs = torch::empty(
-            {batch_size, RemoraUtils::NUM_BASES * kmer_len, sig_len},
-            torch::TensorOptions().dtype(dtype).device(torch::kCPU).pinned_memory(true));
+    auto input_options = torch::TensorOptions()
+                                 .pinned_memory(m_options.device().is_cuda())
+                                 .dtype(m_options.dtype())
+                                 .device(torch::kCPU);
+
+    m_input_sigs = torch::empty({batch_size, 1, sig_len}, input_options);
+    m_input_seqs =
+            torch::empty({batch_size, RemoraUtils::NUM_BASES * kmer_len, sig_len}, input_options);
 
     if (m_params.refine_do_rough_rescale) {
         m_scaler = std::make_unique<RemoraScaler>(m_params.refine_kmer_levels,
@@ -383,8 +389,9 @@ torch::Tensor RemoraCaller::call_chunks(int num_chunks) {
     torch::InferenceMode guard;
 
 #ifndef __APPLE__
-    c10::cuda::CUDAGuard device_guard(m_options.device());
-    c10::cuda::CUDAStreamGuard stream_guard(m_stream);
+    // If m_stream is set, sets the current stream to m_stream, and the current device to the device associated
+    // with the stream. Resets both to their prior state on destruction
+    c10::cuda::OptionalCUDAStreamGuard stream_guard(m_stream);
 #endif
     auto scores = m_module->forward(m_input_sigs.to(m_options.device()),
                                     m_input_seqs.to(m_options.device()));

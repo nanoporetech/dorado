@@ -2,6 +2,8 @@
 
 #include <torch/torch.h>
 
+#include <array>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -18,6 +20,18 @@ size_t available_memory(std::string device);
 std::vector<size_t> available_memory(std::vector<std::string> devices);
 int auto_gpu_batch_size(std::string model_path, std::vector<std::string> devices);
 
-void cublas_matmul_f16(torch::Tensor const &A, torch::Tensor const &B, torch::Tensor &C);
+void matmul_f16(torch::Tensor const &A, torch::Tensor const &B, torch::Tensor &C);
+
+namespace details {
+// Exposed in the header for testability
+std::optional<std::array<int, 3>> try_select_max_batch_sizes(
+        std::vector<int> const &breakpoints,
+        std::vector<std::array<int, 3>> const &batch_sizes,
+        int available_memory_gb);
+
+void matmul_f16_cublas(torch::Tensor const &A, torch::Tensor const &B, torch::Tensor &C);
+void matmul_f16_torch(torch::Tensor const &A, torch::Tensor const &B, torch::Tensor &C);
+
+}  //  namespace details
 
 }  // namespace dorado::utils

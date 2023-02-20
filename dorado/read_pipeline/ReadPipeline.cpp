@@ -71,6 +71,10 @@ std::vector<std::string> Read::generate_read_tags(bool emit_moves) const {
             "sd:f:" + scale_str,
             "sv:Z:quantile"};
 
+    if (run_id != "" && model_name != "") {
+        tags.push_back("RG:Z:" + run_id + "_" + model_name);
+    }
+
     if (emit_moves) {
         const std::string tag{"mv:B:c," + std::to_string(model_stride)};
         std::string movess(moves.size() * 2 + tag.size(), ',');

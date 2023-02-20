@@ -187,7 +187,9 @@ struct MetalLSTMImpl : Module {
         register_parameter("bias_ih", bias_ih, false);
         register_parameter("bias_hh", bias_hh, false);
 
-        t_weights_bias = torch::empty({layer_size * 2 + 1, layer_size, kLstmGates}, torch_dtype);
+        // For non-obvious reasons the LSTM kernel runs faster if the U (or _hh) and W (or _ih) matrices are
+        // spaced such that there is room for one more matrix between them. Thus a factor of 3 instead of 2.
+        t_weights_bias = torch::empty({layer_size * 3 + 1, layer_size, kLstmGates}, torch_dtype);
     }
 
     torch::Tensor t_weights_bias;
@@ -318,7 +320,8 @@ struct MetalBlockImpl : Module {
                      {"kLinearOutputClamp", false},
                      {"kLinearOutputTanh", false},
                      {"kLinearOutputAsByte", false}});
-            linear_cps[0] = make_cps(device, "linear_from_lstm", linear_constants1, linear_threads);
+            linear_cps[0] =
+                    make_cps(device, "linear_from_rev_lstm", linear_constants1, linear_threads);
             const auto linear_constants2 = std::vector<std::tuple<std::string, MetalConstant>>(
                     {{"kLinearInSize", decomposition},
                      {"kLinearOutSize", out_size},
@@ -340,7 +343,8 @@ struct MetalBlockImpl : Module {
                      {"kLinearOutputClamp", !is_v3_model},
                      {"kLinearOutputTanh", is_v3_model},
                      {"kLinearOutputAsByte", true}});
-            linear_cps[0] = make_cps(device, "linear_from_lstm", linear_constants, linear_threads);
+            linear_cps[0] =
+                    make_cps(device, "linear_from_rev_lstm", linear_constants, linear_threads);
             // Single matmul that may or may not have a bias.
             if (!config.out_features.has_value()) {
                 linear1 =
@@ -350,7 +354,7 @@ struct MetalBlockImpl : Module {
 
         // This buffer is used for several layers of the model.
         mat_working_mem = create_buffer(
-                device, size_t(lstm_chunk_size + 2) * batch_size * layer_size * dtype_bytes);
+                device, size_t(lstm_chunk_size + 3) * batch_size * layer_size * dtype_bytes);
         mat_state = create_buffer(device, batch_size * layer_size * dtype_bytes);
         mat_temp = create_buffer(device, mat_temp_elems * dtype_bytes);
     }
@@ -372,11 +376,13 @@ struct MetalBlockImpl : Module {
                 std::swap(t_w, t_u);
             }
 
-            // Reshape and combine matrices into one of size {kLstmGates, 2 * layer_size + 1, layer_size}
+            // Reshape and combine matrices into one of size {kLstmGates, 3 * layer_size + 1, layer_size}
             t_w = t_w.reshape({kLstmGates, layer_size, layer_size}).transpose(1, 2);
             t_u = t_u.reshape({kLstmGates, layer_size, layer_size}).transpose(1, 2);
             t_b = t_b.reshape({kLstmGates, 1, layer_size});
-            t_w = torch::concat({t_u, t_w, t_b}, 1);
+            // For non-obvious reasons the LSTM kernel runs faster if the U and W (or _ih) matrices are
+            // spaced such that there is room for one more matrix between them. t_w used twice does that.
+            t_w = torch::concat({t_u, t_w, t_w, t_b}, 1);
 
             // reorder from IFGO to GIFO (2, 0, 1, 3), and transpose to gate last
             t_w = torch::stack({t_w[2], t_w[0], t_w[1], t_w[3]}, 2);
@@ -423,19 +429,14 @@ struct MetalBlockImpl : Module {
         } else {
             conv1->run(command_buffer, mtl_for_tensor(in), mat_working_mem);
         }
-        finishCommandBuffer("conv1", command_buffer, 0);
-        command_buffer = command_queue->commandBuffer();
         conv2->run(command_buffer, mat_working_mem, mat_temp);
-        finishCommandBuffer("conv2", command_buffer, 0);
-        command_buffer = command_queue->commandBuffer();
         conv3->run(command_buffer, mat_temp, mat_working_mem);
-        finishCommandBuffer("conv3", command_buffer, 0);
+        finishCommandBuffer("convolutions", command_buffer, 0);
         command_buffer = command_queue->commandBuffer();
 
         for (auto &rnn : {rnn1, rnn2, rnn3, rnn4, rnn5}) {
-            const std::vector<MTL::Buffer *> buffers{args_lstm, mat_working_mem,
-                                                     mtl_for_tensor(rnn->t_weights_bias), mat_state,
-                                                     mat_temp};
+            const std::vector<MTL::Buffer *> buffers{
+                    args_lstm, mat_working_mem, mtl_for_tensor(rnn->t_weights_bias), mat_state};
             const int kResBufSize = dtype_bytes * kernel_simd_groups * 2 * kTileSize * kTileSize;
             const int kOutBufSize = dtype_bytes * kernel_simd_groups * kTileSize * kTileSize;
             const std::vector<int> tg_buffer_lens{kResBufSize, kOutBufSize};

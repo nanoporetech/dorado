@@ -41,7 +41,7 @@ TEST_CASE(CUT_TAG ": test quartiles_counting", CUT_TAG) {
     auto in = torch::randint(0, 2047, 1000);
     auto q = torch::tensor({0.25, 0.5, 0.75}, {torch::kFloat});
 
-    auto expected = torch::quantile(in, q, 0, false, c10::string_view("lower"));
+    auto expected = torch::quantile(in.to(torch::kFloat), q, 0, false, c10::string_view("lower"));
     auto computed = dorado::utils::quantile_counting(in.to(torch::kI16), q);
 
     REQUIRE(torch::equal(computed, expected));
@@ -51,7 +51,7 @@ TEST_CASE(CUT_TAG ": test quantiles_counting", CUT_TAG) {
     auto in = torch::randint(0, 2047, 1000);
     auto q = torch::tensor({0.2, 0.9}, {torch::kFloat});
 
-    auto expected = torch::quantile(in, q, 0, false, c10::string_view("lower"));
+    auto expected = torch::quantile(in.to(torch::kFloat), q, 0, false, c10::string_view("lower"));
     auto computed = dorado::utils::quantile_counting(in.to(torch::kI16), q);
 
     REQUIRE(torch::equal(computed, expected));

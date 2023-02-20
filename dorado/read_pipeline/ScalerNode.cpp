@@ -78,7 +78,7 @@ int ScalerNode::trim(torch::Tensor signal,
                      float max_trim) {
     int min_trim = 10;
     bool seen_peak = false;
-    int num_samples = std::min(max_samples, static_cast<int>(signal.size(0)));
+    int num_samples = std::min(max_samples, static_cast<int>(signal.size(0)) - min_trim);
     int num_windows = num_samples / window_size;
 
     for (int pos = 0; pos < num_windows; pos++) {

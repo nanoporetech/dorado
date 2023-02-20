@@ -4,69 +4,57 @@
 
 #include <catch2/catch.hpp>
 
-#include <memory>
-
-#define TEST_GROUP "Fast5DataLoaderTest: "
+#define TEST_GROUP "Pod5DataLoaderTest: "
 
 class MockSink : public dorado::ReadSink {
 public:
     MockSink() : ReadSink(1000) {}
-    size_t get_read_count();
+    size_t get_read_count() { return m_reads.size(); }
 };
 
-size_t MockSink::get_read_count() {
-    size_t read_count = 0;
-    std::shared_ptr<dorado::Read> read;
-    while (m_work_queue.try_pop(read))
-        ++read_count;
-    return read_count;
-}
-
-TEST_CASE(TEST_GROUP "Test loading single-read Fast5 files") {
+TEST_CASE(TEST_GROUP "Test loading single-read POD5 files") {
     // Create a mock sink for testing output of reads
     MockSink mock_sink;
 
-    std::string data_path(get_fast5_data_dir());
+    std::string data_path(get_pod5_data_dir());
     dorado::DataLoader loader(mock_sink, "cpu", 1);
-    // Note: Upon completion load_reads calls terminate on its sink, so the
-    // the loop in get_reads_count will finish as soon as the queue is empty.
     loader.load_reads(data_path);
 
     REQUIRE(mock_sink.get_read_count() == 1);
 }
 
-TEST_CASE(TEST_GROUP "Test loading single-read Fast5 file, empty read list") {
+TEST_CASE(TEST_GROUP "Test loading single-read POD5 file, empty read list") {
     // Create a mock sink for testing output of reads
     MockSink mock_sink;
 
     auto read_list = std::unordered_set<std::string>();
-    std::string data_path(get_fast5_data_dir());
+    std::string data_path(get_pod5_data_dir());
     dorado::DataLoader loader(mock_sink, "cpu", 1, 0, read_list);
     loader.load_reads(data_path);
 
     REQUIRE(mock_sink.get_read_count() == 1);
 }
 
-TEST_CASE(TEST_GROUP "Test loading single-read Fast5 file, mismatched read list") {
+TEST_CASE(TEST_GROUP "Test loading single-read POD5 file, mismatched read list") {
     // Create a mock sink for testing output of reads
     MockSink mock_sink;
 
     auto read_list = std::unordered_set<std::string>();
     read_list.insert("read_1");
-    std::string data_path(get_fast5_data_dir());
+    std::string data_path(get_pod5_data_dir());
     dorado::DataLoader loader(mock_sink, "cpu", 1, 0, read_list);
     loader.load_reads(data_path);
 
     REQUIRE(mock_sink.get_read_count() == 0);
 }
 
-TEST_CASE(TEST_GROUP "Test loading single-read Fast5 file, matched read list") {
+TEST_CASE(TEST_GROUP "Test loading single-read POD5 file, matched read list") {
     // Create a mock sink for testing output of reads
     MockSink mock_sink;
 
     auto read_list = std::unordered_set<std::string>();
-    read_list.insert("59097f00-0f1c-4fac-aea2-3c23d79b0a58");  // read present in Fast5 file
-    std::string data_path(get_fast5_data_dir());
+    read_list.insert("002bd127-db82-436f-b828-28567c3d505d");  // read present in POD5
+    std::string data_path(get_pod5_data_dir());
     dorado::DataLoader loader(mock_sink, "cpu", 1, 0, read_list);
     loader.load_reads(data_path);
 

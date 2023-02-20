@@ -1,6 +1,7 @@
 #include "Version.h"
 #include "data_loader/DataLoader.h"
 #include "decode/CPUDecoder.h"
+#include "utils/basecaller_utils.h"
 #include "utils/models.h"
 #ifdef __APPLE__
 #include "nn/MetalCRFModel.h"
@@ -42,7 +43,8 @@ void setup(std::vector<std::string> args,
            bool emit_fastq,
            bool emit_moves,
            size_t max_reads,
-           size_t min_qscore) {
+           size_t min_qscore,
+           std::string read_list_file_path) {
     torch::set_num_threads(1);
     std::vector<Runner> runners;
 
@@ -145,9 +147,11 @@ void setup(std::vector<std::string> args,
         }
     }
 
+    std::string model_name = std::filesystem::canonical(model_path).filename().string();
+    auto read_groups = DataLoader::load_read_groups(data_path, model_name);
     bool rna = utils::is_rna_model(model_path), duplex = false;
     WriterNode writer_node(std::move(args), emit_fastq, emit_moves, rna, duplex, min_qscore,
-                           num_devices * 2);
+                           num_devices * 2, std::move(read_groups));
 
     std::unique_ptr<ModBaseCallerNode> mod_base_caller_node;
     std::unique_ptr<BasecallerNode> basecaller_node;
@@ -156,15 +160,18 @@ void setup(std::vector<std::string> args,
         mod_base_caller_node = std::make_unique<ModBaseCallerNode>(
                 writer_node, std::move(remora_callers), num_remora_threads, num_devices,
                 model_stride, remora_batch_size);
-        basecaller_node =
-                std::make_unique<BasecallerNode>(*mod_base_caller_node, std::move(runners),
-                                                 batch_size, chunk_size, overlap, model_stride);
-    } else {
         basecaller_node = std::make_unique<BasecallerNode>(
-                writer_node, std::move(runners), batch_size, chunk_size, overlap, model_stride);
+                *mod_base_caller_node, std::move(runners), batch_size, chunk_size, overlap,
+                model_stride, model_name);
+    } else {
+        basecaller_node =
+                std::make_unique<BasecallerNode>(writer_node, std::move(runners), batch_size,
+                                                 chunk_size, overlap, model_stride, model_name);
     }
     ScalerNode scaler_node(*basecaller_node, num_devices * 2);
-    DataLoader loader(scaler_node, "cpu", num_devices, max_reads);
+    DataLoader loader(scaler_node, "cpu", num_devices, max_reads,
+                      utils::load_read_list(read_list_file_path));
+
     loader.load_reads(data_path);
 }
 
@@ -184,6 +191,11 @@ int basecaller(int argc, char* argv[]) {
     parser.add_argument("-x", "--device")
             .help("device string in format \"cuda:0,...,N\", \"cuda:all\", \"metal\" etc..")
             .default_value(default_parameters.device);
+
+    parser.add_argument("-l", "--read-ids")
+            .help("A file with a newline-delimited list of reads to basecall. If not provided, all "
+                  "reads will be basecalled")
+            .default_value(std::string(""));
 
     parser.add_argument("-n", "--max-reads").default_value(0).scan<'i', int>();
 
@@ -209,14 +221,14 @@ int basecaller(int argc, char* argv[]) {
     parser.add_argument("--modified-bases")
             .nargs(argparse::nargs_pattern::at_least_one)
             .action([](const std::string& value) {
-                if (std::find(urls::modified::mods.begin(), urls::modified::mods.end(), value) ==
-                    urls::modified::mods.end()) {
+                if (std::find(modified::mods.begin(), modified::mods.end(), value) ==
+                    modified::mods.end()) {
                     spdlog::error(
                             "'{}' is not a supported modification please select from {}", value,
-                            std::accumulate(
-                                    std::next(urls::modified::mods.begin()),
-                                    urls::modified::mods.end(), urls::modified::mods[0],
-                                    [](std::string a, std::string b) { return a + ", " + b; }));
+                            std::accumulate(std::next(modified::mods.begin()), modified::mods.end(),
+                                            modified::mods[0], [](std::string a, std::string b) {
+                                                return a + ", " + b;
+                                            }));
                     std::exit(EXIT_FAILURE);
                 }
                 return value;
@@ -271,7 +283,7 @@ int basecaller(int argc, char* argv[]) {
               parser.get<int>("-b"), parser.get<int>("-r"), default_parameters.remora_batchsize,
               default_parameters.remora_threads, parser.get<bool>("--emit-fastq"),
               parser.get<bool>("--emit-moves"), parser.get<int>("--max-reads"),
-              parser.get<int>("--min-qscore"));
+              parser.get<int>("--min-qscore"), parser.get<std::string>("--read-ids"));
     } catch (const std::exception& e) {
         spdlog::error("{}", e.what());
         return 1;
