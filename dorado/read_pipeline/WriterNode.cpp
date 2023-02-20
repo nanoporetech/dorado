@@ -27,6 +27,24 @@ void WriterNode::print_header() {
             std::cout << " " << arg;
         }
         std::cout << "\n";
+
+        // Add read groups
+        for (auto const& x : m_read_groups) {
+            std::cout << "@RG\t";
+            std::cout << "ID:" << x.first << "\t";
+            std::cout << "PU:" << x.second.flowcell_id << "\t";
+            std::cout << "PM:" << x.second.device_id << "\t";
+            std::cout << "DT:" << x.second.exp_start_time << "\t";
+            std::cout << "PL:"
+                      << "ONT"
+                      << "\t";
+            std::cout << "DS:"
+                      << "basecall_model=" << x.second.basecalling_model
+                      << " runid=" << x.second.run_id << "\t";
+            std::cout << "LB:" << x.second.sample_id << "\t";
+            std::cout << "SM:" << x.second.sample_id;
+            std::cout << std::endl;
+        }
     }
 }
 
@@ -99,6 +117,7 @@ WriterNode::WriterNode(std::vector<std::string> args,
                        bool duplex,
                        size_t min_qscore,
                        size_t num_worker_threads,
+                       std::unordered_map<std::string, ReadGroup> read_groups,
                        size_t max_reads)
         : ReadSink(max_reads),
           m_args(std::move(args)),
@@ -107,6 +126,7 @@ WriterNode::WriterNode(std::vector<std::string> args,
           m_rna(rna),
           m_duplex(duplex),
           m_min_qscore(min_qscore),
+          m_read_groups(std::move(read_groups)),
           m_num_bases_processed(0),
           m_num_samples_processed(0),
           m_num_reads_processed(0),

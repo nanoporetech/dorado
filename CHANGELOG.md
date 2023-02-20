@@ -2,6 +2,26 @@
 
 All notable changes to Dorado will be documented in this file.
 
+# [0.2.1] (15 Feb 2023)
+
+ * 121dddf9a3a288ca2c01dd2b732017a8f02c19a2 - Fix malformed SAM header
+
+# [0.2.0] (15 Feb 2023)
+
+ * 9b8ea1133b94e4071d7214000c8d7e10ed379540 - v4.1.0 with models higher accuracy basecalling in low-complexity genomic regions
+ * 1311cbe06fbfa1a09785d4f3171548f99e0f739e - Increased basecalling performance on macOS
+ * 74a04fc51765750e712289ecc7b7f9f162a96a54 - The stereo duplex model has been updated with calibrated qscores parameters
+ * 1170ef6d0e0c04729530851b33d79e03ec65df4a - SAM output now include read groups
+ * 63fb334a687876565c05e47707500142456a5ee4 - linux-arm64 builds
+ * 117be24d9db35417ed8c06414eaac1a0f9349013 - Added `--read-id` filter and only basecalling paired reads in duplex for higher basecalling speed
+ * a8ec89510b3f7208e43d41757bc3b025eb28e0b3 - Added `--min-qscore` filter
+ * c80bae6020e7d60c17da54d3a47cdc0f876fd199 - Set builds to default to Release
+ * e802181f401d7a2d283076f54e8d7da283e16f78 - Modbase CPU fixes
+ * f0b96548651a9365712e0ca93483914a222a6bb4 - Better auto-batchsize detection on macos
+ * 1a422db5b4008138927f12e1ad01410ef35a7139 - Switch to transparent model URLs
+ * c2e694e66e573f7d4f49e41ce5a48a0c643918a5 - 260bps v4.0.0 5mCG_5hmCG@v2 models
+ * 6b9249f4cc64ecb43134239fba2fe5682c5deb72 - Initial CUDA 12.0 support
+
 # [0.1.1] (12 Dec 2022)
 
  * 38b953f3863d44067593adb49d9496dd704fef69 - Improved stereo duplex calling performance

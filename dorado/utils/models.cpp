@@ -2,6 +2,7 @@
 
 #include <elzip/elzip.hpp>
 
+#include <algorithm>
 #include <filesystem>
 #define CPPHTTPLIB_OPENSSL_SUPPORT
 #include <httplib.h>
@@ -13,9 +14,12 @@ namespace dorado::utils {
 
 bool is_valid_model(const std::string& selected_model) {
     return selected_model == "all" ||
-           urls::simplex::models.find(selected_model) != urls::simplex::models.end() ||
-           urls::stereo::models.find(selected_model) != urls::stereo::models.end() ||
-           urls::modified::models.find(selected_model) != urls::modified::models.end();
+           std::find(simplex::models.begin(), simplex::models.end(), selected_model) !=
+                   simplex::models.end() ||
+           std::find(stereo::models.begin(), stereo::models.end(), selected_model) !=
+                   stereo::models.end() ||
+           std::find(modified::models.begin(), modified::models.end(), selected_model) !=
+                   modified::models.end();
 }
 
 void download_models(const std::string& target_directory, const std::string& selected_model) {
@@ -25,9 +29,10 @@ void download_models(const std::string& target_directory, const std::string& sel
     http.enable_server_certificate_verification(false);
     http.set_follow_location(true);
 
-    auto download_model_set = [&](std::map<std::string, std::string> models) {
-        for (const auto& [model, url] : models) {
+    auto download_model_set = [&](std::vector<std::string> models) {
+        for (const auto& model : models) {
             if (selected_model == "all" || selected_model == model) {
+                auto url = urls::URL_ROOT + urls::URL_PATH + model + ".zip";
                 spdlog::info(" - downloading {}", model);
                 auto res = http.Get(url.c_str());
                 if (res != nullptr) {
@@ -44,9 +49,9 @@ void download_models(const std::string& target_directory, const std::string& sel
         }
     };
 
-    download_model_set(urls::simplex::models);
-    download_model_set(urls::stereo::models);
-    download_model_set(urls::modified::models);
+    download_model_set(simplex::models);
+    download_model_set(stereo::models);
+    download_model_set(modified::models);
 }
 
 bool is_rna_model(const std::filesystem::path& model) {
@@ -70,7 +75,7 @@ std::string get_modification_model(const std::string& simplex_model,
 
     if (is_valid_model(simplex_name)) {
         std::string mods_prefix = simplex_name + "_" + modification + "@v";
-        for (const auto& [model, _] : urls::modified::models) {
+        for (const auto& model : modified::models) {
             if (model.compare(0, mods_prefix.size(), mods_prefix) == 0) {
                 modification_model = model;
                 break;

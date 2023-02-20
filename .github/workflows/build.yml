@@ -21,7 +21,7 @@ jobs:
     - uses: Jimver/cuda-toolkit@v0.2.7
       id: cuda-toolkit
       with:
-        cuda: '11.3.0'
+        cuda: '11.7.0'
     - name: Install dependencies from apt
       if: matrix.os == 'ubuntu-20.04'
       run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libhdf5-dev libssl-dev libzstd-dev autoconf
@@ -35,4 +35,4 @@ jobs:
       run: |
         cmake -S . -B cmake-build ${{ matrix.arch }}
         cmake --build cmake-build --config Release --target install -j 4
-        ctest -C Release --test-dir cmake-build
+        ctest -C Release --test-dir cmake-build  --output-on-failure

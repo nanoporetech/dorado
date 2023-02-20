@@ -63,7 +63,7 @@ TEST_CASE(TEST_GROUP "Linear") {
 
     // Create a ComputePipelineState for the input reordering kernel.
     MTL::ComputePipelineState *const reorder_input_cps =
-            make_cps(device, "reorder_input", {{"kLstmLayerSize", layer_size}});
+            make_cps(device, "reorder_input_to_rev_lstm_output", {{"kLstmLayerSize", layer_size}});
     REQUIRE(reorder_input_cps != nullptr);
 
     // Order in LstmArgs struct (which is also used by reorder_input):
@@ -97,7 +97,7 @@ TEST_CASE(TEST_GROUP "Linear") {
     // 2) Adds one time step of padding before and after the chunk time extents.
     // 3) Converts from float32 to float16.
     torch::Tensor in_f16_reordered =
-            torch::zeros({lstm_chunk_size + 2, in_batch_size, layer_size}, torch::kFloat16);
+            torch::zeros({lstm_chunk_size + 3, in_batch_size, layer_size}, torch::kFloat16);
     launch_kernel(reorder_input_cps, command_queue,
                   {args_reorder, mtl_for_tensor(in_f32), mtl_for_tensor(in_f16_reordered)}, {},
                   kernel_thread_groups, threads_per_thread_group);
@@ -128,15 +128,15 @@ TEST_CASE(TEST_GROUP "Linear") {
                 for (bool input_from_lstm : {false, true}) {
                     DYNAMIC_SECTION("Metal linear layer " << output_clamp << output_tanh
                                                           << output_as_byte << input_from_lstm) {
-                        MTL::ComputePipelineState *const linear_cps =
-                                make_cps(device, input_from_lstm ? "linear_from_lstm" : "linear",
-                                         {{"kLinearInSize", layer_size},
-                                          {"kLinearOutSize", out_size},
-                                          {"kLinearOutputScale", output_scale},
-                                          {"kLinearOutputClamp", output_clamp},
-                                          {"kLinearOutputTanh", output_tanh},
-                                          {"kLinearOutputAsByte", output_as_byte}},
-                                         threads_per_thread_group);
+                        MTL::ComputePipelineState *const linear_cps = make_cps(
+                                device, input_from_lstm ? "linear_from_rev_lstm" : "linear",
+                                {{"kLinearInSize", layer_size},
+                                 {"kLinearOutSize", out_size},
+                                 {"kLinearOutputScale", output_scale},
+                                 {"kLinearOutputClamp", output_clamp},
+                                 {"kLinearOutputTanh", output_tanh},
+                                 {"kLinearOutputAsByte", output_as_byte}},
+                                threads_per_thread_group);
                         REQUIRE(linear_cps != nullptr);
 
                         auto out_gpu_f32 = torch::zeros({lstm_chunk_size, in_batch_size, out_size},

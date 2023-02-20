@@ -13,6 +13,7 @@ public:
                    size_t chunk_size,
                    size_t overlap,
                    size_t model_stride,
+                   std::string model_name = "",
                    size_t max_reads = 1000);
     ~BasecallerNode();
 
@@ -37,6 +38,8 @@ private:
     size_t m_overlap;
     // Stride of the model in the runners
     size_t m_model_stride;
+    // model_name
+    std::string m_model_name;
 
     // Model runners which have not terminated.
     std::atomic<int> m_num_active_model_runners{0};

@@ -1,5 +1,16 @@
 #pragma once
 #include <string>
+#include <unordered_map>
+#include <unordered_set>
+
+struct ReadGroup {
+    std::string run_id;
+    std::string basecalling_model;
+    std::string flowcell_id;
+    std::string device_id;
+    std::string exp_start_time;
+    std::string sample_id;
+};
 
 namespace dorado {
 
@@ -10,8 +21,12 @@ public:
     DataLoader(ReadSink& read_sink,
                const std::string& device,
                size_t num_worker_threads,
-               size_t max_reads = 0);
+               size_t max_reads = 0,
+               std::unordered_set<std::string> read_list = std::unordered_set<std::string>());
     void load_reads(const std::string& path);
+
+    static std::unordered_map<std::string, ReadGroup> load_read_groups(std::string data_path,
+                                                                       std::string model_path);
 
 private:
     void load_fast5_reads_from_file(const std::string& path);
@@ -23,6 +38,7 @@ private:
     std::string m_device;
     size_t m_num_worker_threads{1};
     size_t m_max_reads{0};
+    std::unordered_set<std::string> m_allowed_read_ids;
 };
 
 }  // namespace dorado

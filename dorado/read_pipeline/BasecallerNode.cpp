@@ -113,6 +113,8 @@ void BasecallerNode::working_reads_manager() {
 
         for (auto read_iter = m_working_reads.begin(); read_iter != m_working_reads.end();) {
             if ((*read_iter)->num_chunks_called.load() == (*read_iter)->num_chunks) {
+                (*read_iter)->model_name =
+                        m_model_name;  // Before sending read to sink, assign its model name
                 completed_reads.push_back(*read_iter);
                 read_iter = m_working_reads.erase(read_iter);
             } else {
@@ -237,6 +239,7 @@ BasecallerNode::BasecallerNode(ReadSink &sink,
                                size_t chunk_size,
                                size_t overlap,
                                size_t model_stride,
+                               std::string model_name,
                                size_t max_reads)
         : ReadSink(max_reads),
           m_sink(sink),
@@ -246,6 +249,7 @@ BasecallerNode::BasecallerNode(ReadSink &sink,
           m_overlap(overlap),
           m_model_stride(model_stride),
           m_terminate_basecaller(false),
+          m_model_name(std::move(model_name)),
           m_working_reads_manager(
                   std::make_unique<std::thread>(&BasecallerNode::working_reads_manager, this)),
           m_input_worker(

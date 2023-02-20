@@ -74,6 +74,8 @@ public:
     std::string qstring;                  // Read Qstring (Phred)
     std::vector<uint8_t> moves;           // Move table
     std::vector<uint8_t> base_mod_probs;  // Modified base probabilities
+    std::string run_id;                   // Read group
+    std::string model_name;               // Read group
 
     std::shared_ptr<const utils::BaseModInfo>
             base_mod_info;  // Modified base settings of the models that ran on this read
