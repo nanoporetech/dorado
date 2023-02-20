@@ -35,7 +35,7 @@ endif()
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
 
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "^aarch64*|^arm*")
-        if(${CUDAToolkit_VERSION} VERSION_LESS_THAN 11.0)
+        if(${CUDAToolkit_VERSION} VERSION_LESS 11.0)
             set(TORCH_VERSION 1.10.0)
             set(TORCH_URL https://cdn.oxfordnanoportal.com/software/analysis/torch-1.10.0-Linux-aarch64.zip)
         else()
