@@ -147,9 +147,11 @@ void setup(std::vector<std::string> args,
         }
     }
 
+    std::string model_name = std::filesystem::canonical(model_path).filename().string();
+    auto read_groups = DataLoader::load_read_groups(data_path, model_name);
     bool rna = utils::is_rna_model(model_path), duplex = false;
     WriterNode writer_node(std::move(args), emit_fastq, emit_moves, rna, duplex, min_qscore,
-                           num_devices * 2);
+                           num_devices * 2, std::move(read_groups));
 
     std::unique_ptr<ModBaseCallerNode> mod_base_caller_node;
     std::unique_ptr<BasecallerNode> basecaller_node;
@@ -158,12 +160,13 @@ void setup(std::vector<std::string> args,
         mod_base_caller_node = std::make_unique<ModBaseCallerNode>(
                 writer_node, std::move(remora_callers), num_remora_threads, num_devices,
                 model_stride, remora_batch_size);
-        basecaller_node =
-                std::make_unique<BasecallerNode>(*mod_base_caller_node, std::move(runners),
-                                                 batch_size, chunk_size, overlap, model_stride);
-    } else {
         basecaller_node = std::make_unique<BasecallerNode>(
-                writer_node, std::move(runners), batch_size, chunk_size, overlap, model_stride);
+                *mod_base_caller_node, std::move(runners), batch_size, chunk_size, overlap,
+                model_stride, model_name);
+    } else {
+        basecaller_node =
+                std::make_unique<BasecallerNode>(writer_node, std::move(runners), batch_size,
+                                                 chunk_size, overlap, model_stride, model_name);
     }
     ScalerNode scaler_node(*basecaller_node, num_devices * 2);
     DataLoader loader(scaler_node, "cpu", num_devices, max_reads,
