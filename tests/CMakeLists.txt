@@ -12,6 +12,10 @@ set(SOURCE_FILES
     StereoDuplexTest.cpp
 )
 
+if(NOT DISABLE_POD5)
+    list(APPEND SOURCE_FILES Pod5DataLoaderTest.cpp)
+endif()
+
 if(APPLE)
     list(APPEND SOURCE_FILES
         MetalLinearTest.cpp
