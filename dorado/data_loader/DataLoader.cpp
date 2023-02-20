@@ -158,7 +158,7 @@ void DataLoader::load_reads(const std::string& path) {
 #else
             static std::once_flag pod5_disabled_log_flag;
             std::call_once(pod5_disabled_log_flag, []() {
-                spdlog::warning("pod5 loading is disabled, skipping .pod5 files.");
+                spdlog::warn("pod5 loading is disabled, skipping .pod5 files.");
             });
 #endif
         }
