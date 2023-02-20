@@ -15,6 +15,7 @@
 #include <cctype>
 #include <ctime>
 #include <filesystem>
+#include <mutex>
 
 namespace {
 void string_reader(HighFive::Attribute& attribute, std::string& target_str) {
@@ -151,12 +152,16 @@ void DataLoader::load_reads(const std::string& path) {
                        [](unsigned char c) { return std::tolower(c); });
         if (ext == ".fast5") {
             load_fast5_reads_from_file(entry.path().string());
-        }
+        } else if (ext == ".pod5") {
 #ifndef DISABLE_POD5
-        else if (ext == ".pod5") {
             load_pod5_reads_from_file(entry.path().string());
-        }
+#else
+            static std::once_flag pod5_disabled_log_flag;
+            std::call_once(pod5_disabled_log_flag, []() {
+                spdlog::warning("pod5 loading is disabled, skipping .pod5 files.");
+            });
 #endif
+        }
     }
     m_read_sink.terminate();
 }
