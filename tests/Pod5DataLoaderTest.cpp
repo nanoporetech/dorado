@@ -6,11 +6,23 @@
 
 #define TEST_GROUP "Pod5DataLoaderTest: "
 
+namespace {
+
 class MockSink : public dorado::ReadSink {
 public:
     MockSink() : ReadSink(1000) {}
-    size_t get_read_count() { return m_reads.size(); }
+    size_t get_read_count();
 };
+
+size_t MockSink::get_read_count() {
+    size_t read_count = 0;
+    std::shared_ptr<dorado::Read> read;
+    while (m_work_queue.try_pop(read))
+        ++read_count;
+    return read_count;
+}
+
+}  // namespace
 
 TEST_CASE(TEST_GROUP "Test loading single-read POD5 files") {
     // Create a mock sink for testing output of reads

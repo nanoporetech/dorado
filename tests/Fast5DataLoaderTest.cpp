@@ -8,6 +8,8 @@
 
 #define TEST_GROUP "Fast5DataLoaderTest: "
 
+namespace {
+
 class MockSink : public dorado::ReadSink {
 public:
     MockSink() : ReadSink(1000) {}
@@ -21,6 +23,8 @@ size_t MockSink::get_read_count() {
         ++read_count;
     return read_count;
 }
+
+}  // namespace
 
 TEST_CASE(TEST_GROUP "Test loading single-read Fast5 files") {
     // Create a mock sink for testing output of reads
