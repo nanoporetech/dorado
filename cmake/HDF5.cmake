@@ -8,8 +8,12 @@ if((CMAKE_SYSTEM_NAME STREQUAL "Linux") AND (CMAKE_SYSTEM_PROCESSOR STREQUAL "aa
 
     set(DYNAMIC_HDF ON)
     set(HDF_VER hdf5-1.10.0-aarch64)
-    download_and_extract(https://cdn.oxfordnanoportal.com/software/analysis/${HDF_VER}.zip ${HDF_VER})
-    list(PREPEND CMAKE_PREFIX_PATH ${DORADO_3RD_PARTY}/${HDF_VER}/${HDF_VER}/${HDF_VER}) # TODO: fix!
+    if(EXISTS ${DORADO_3RD_PARTY}/${HDF_VER})
+        message(STATUS "Found ${HDF_VER}")
+    else()    
+        download_and_extract(https://cdn.oxfordnanoportal.com/software/analysis/${HDF_VER}.zip ${HDF_VER})
+    endif()
+    list(PREPEND CMAKE_PREFIX_PATH ${DORADO_3RD_PARTY}/${HDF_VER}/${HDF_VER})
 
 elseif(WIN32)
     # On windows, we need to build HDF5
