@@ -2,7 +2,6 @@
 set(SOURCE_FILES
     main.cpp
     Fast5DataLoaderTest.cpp
-    Pod5DataLoaderTest.cpp
     TensorUtilsTest.cpp
     MathUtilsTest.cpp
     ReadTest.cpp
