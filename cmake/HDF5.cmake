@@ -3,9 +3,20 @@ set(ZLIB_VER 1.2.12)
 
 option(DYNAMIC_HDF "Link HDF as dynamic libs" OFF)
 
-# On windows, we need to build HDF5
+if((CMAKE_SYSTEM_NAME STREQUAL "Linux") AND (CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64"))
+    # download the pacakge for arm, we want to package this due to hdf5's dependencies
 
-if(WIN32)
+    set(DYNAMIC_HDF ON)
+    set(HDF_VER hdf5-1.10.0-aarch64)
+    if(EXISTS ${DORADO_3RD_PARTY}/${HDF_VER})
+        message(STATUS "Found ${HDF_VER}")
+    else()    
+        download_and_extract(https://cdn.oxfordnanoportal.com/software/analysis/${HDF_VER}.zip ${HDF_VER})
+    endif()
+    list(PREPEND CMAKE_PREFIX_PATH ${DORADO_3RD_PARTY}/${HDF_VER}/${HDF_VER})
+
+elseif(WIN32)
+    # On windows, we need to build HDF5
 
     if(EXISTS ${DORADO_3RD_PARTY}/${HDF_VER})
         message(STATUS "Found ${HDF_VER}")
@@ -26,7 +37,6 @@ if(WIN32)
 
 endif()
 
-
 if(DYNAMIC_HDF)
     add_link_options(-ldl)
 else()
@@ -38,4 +48,5 @@ else()
 endif()
 
 find_package(ZLIB)
-find_package(HDF5 COMPONENTS C CXX HL)
+find_package(HDF5 COMPONENTS C)
+

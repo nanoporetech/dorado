@@ -74,8 +74,8 @@ TEST_CASE(CUT_TAG ": quantile_counting guppy comparison", CUT_TAG) {
     std::generate(quantiles.begin(), quantiles.end(), [&] { return between(0.f, 1.f); });
 
     // Run the test
-    auto input_tensor = torch::tensor(at::makeArrayRef(input_data), {torch::kI16});
-    auto quantiles_tensor = torch::tensor(at::makeArrayRef(quantiles), {torch::kFloat});
+    auto input_tensor = torch::tensor(at::ArrayRef(input_data), {torch::kI16});
+    auto quantiles_tensor = torch::tensor(at::ArrayRef(quantiles), {torch::kFloat});
     auto computed = dorado::utils::quantile_counting(input_tensor, quantiles_tensor);
 
     // Check the output matches
