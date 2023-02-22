@@ -12,9 +12,11 @@ using namespace torch::indexing;
 namespace stereo_internal {
 std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> template_read,
                                             std::shared_ptr<dorado::Read> complement_read) {
-    // We rely on the incoming read raw data being of type float32 to allow dumb copying.
-    assert(template_read->raw_data.dtype() == torch::kFloat32);
-    assert(complement_read->raw_data.dtype() == torch::kFloat32);
+    // We rely on the incoming read raw data being of type float16 to allow direct memcpy
+    // of tensor elements.
+    assert(template_read->raw_data.dtype() == torch::kFloat16);
+    assert(complement_read->raw_data.dtype() == torch::kFloat16);
+    using SampleType = c10::Half;
 
     std::shared_ptr<dorado::Read> read = std::make_shared<dorado::Read>();  // Return read
 
@@ -70,7 +72,7 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
     if (consensus_possible) {
         // Move along the alignment, filling out the stereo-encoded tensor
         int max_size = template_read->raw_data.size(0) + complement_read->raw_data.size(0);
-        auto opts = torch::TensorOptions().dtype(torch::kFloat32).device(torch::kCPU);
+        auto opts = torch::TensorOptions().dtype(torch::kFloat16).device(torch::kCPU);
         int num_features = 13;
         auto tmp = torch::zeros({num_features, max_size}, opts);
 
@@ -156,12 +158,13 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
                 const size_t sample_count =
                         next_move_ptr ? (next_move_ptr - start_ptr) : max_signal_length;
 
-                float* const tmp_ptr = static_cast<float*>(tmp[0].data_ptr());
-                const float* const raw_data_ptr =
-                        static_cast<float*>(template_read->raw_data.data_ptr());
+                auto* const tmp_ptr = static_cast<SampleType*>(tmp[0].data_ptr());
+                const auto* const raw_data_ptr =
+                        static_cast<SampleType*>(template_read->raw_data.data_ptr());
                 // Assumes contiguity of successive elements.
                 std::memcpy(&tmp_ptr[stereo_global_cursor + template_segment_length],
-                            &raw_data_ptr[template_signal_cursor], sample_count * sizeof(float));
+                            &raw_data_ptr[template_signal_cursor],
+                            sample_count * sizeof(SampleType));
 
                 template_signal_cursor += sample_count;
                 template_segment_length += sample_count;
@@ -185,10 +188,12 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
                 const size_t sample_count =
                         next_move_ptr ? (next_move_ptr - start_ptr) : max_signal_length;
 
-                float* const tmp_ptr = static_cast<float*>(tmp[1].data_ptr());
-                const float* const raw_data_ptr = static_cast<float*>(complement_signal.data_ptr());
+                auto* const tmp_ptr = static_cast<SampleType*>(tmp[1].data_ptr());
+                const auto* const raw_data_ptr =
+                        static_cast<SampleType*>(complement_signal.data_ptr());
                 std::memcpy(&tmp_ptr[stereo_global_cursor + complement_segment_length],
-                            &raw_data_ptr[complement_signal_cursor], sample_count * sizeof(float));
+                            &raw_data_ptr[complement_signal_cursor],
+                            sample_count * sizeof(SampleType));
 
                 complement_signal_cursor += sample_count;
                 complement_segment_length += sample_count;
@@ -237,7 +242,7 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
                 {torch::indexing::Slice(None), torch::indexing::Slice(None, stereo_global_cursor)});
 
         read->read_id = template_read->read_id + ";" + complement_read->read_id;
-        read->raw_data = tmp.to(torch::kFloat16);  // use the encoded signal
+        read->raw_data = tmp;  // use the encoded signal
     }
 
     edlibFreeAlignResult(result);
