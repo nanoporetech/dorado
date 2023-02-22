@@ -214,6 +214,7 @@ build_archive:macos:m1:
   stage: test
   variables:
     TEST_DATA: pod5
+    GIT_STRATEGY: none    
   script:
     - echo Dorado app test stage
     - ./dist/bin/dorado download --model dna_r9.4.1_e8_hac@v3.3
@@ -221,6 +222,8 @@ build_archive:macos:m1:
     - ./dist/bin/dorado basecaller dna_r9.4.1_e8_hac@v3.3 ./tests/data/${TEST_DATA} -r 1 -x cpu > calls.sam
 
 .test_archive: &test_archive
+  variables:
+    GIT_STRATEGY: none
   stage: test
   script:
     - tar -xzf archive/dorado-*.gz
