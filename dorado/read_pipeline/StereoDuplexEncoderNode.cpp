@@ -163,7 +163,8 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
                         static_cast<SampleType*>(template_read->raw_data.data_ptr());
                 // Assumes contiguity of successive elements.
                 std::memcpy(&tmp_ptr[stereo_global_cursor + template_segment_length],
-                            &raw_data_ptr[template_signal_cursor], sample_count * sizeof(SampleType));
+                            &raw_data_ptr[template_signal_cursor],
+                            sample_count * sizeof(SampleType));
 
                 template_signal_cursor += sample_count;
                 template_segment_length += sample_count;
@@ -188,9 +189,11 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
                         next_move_ptr ? (next_move_ptr - start_ptr) : max_signal_length;
 
                 auto* const tmp_ptr = static_cast<SampleType*>(tmp[1].data_ptr());
-                const auto* const raw_data_ptr = static_cast<SampleType*>(complement_signal.data_ptr());
+                const auto* const raw_data_ptr =
+                        static_cast<SampleType*>(complement_signal.data_ptr());
                 std::memcpy(&tmp_ptr[stereo_global_cursor + complement_segment_length],
-                            &raw_data_ptr[complement_signal_cursor], sample_count * sizeof(SampleType));
+                            &raw_data_ptr[complement_signal_cursor],
+                            sample_count * sizeof(SampleType));
 
                 complement_signal_cursor += sample_count;
                 complement_segment_length += sample_count;
