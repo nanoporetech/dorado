@@ -180,7 +180,7 @@ int basecaller(int argc, char* argv[]) {
 
     utils::InitLogging();
 
-    argparse::ArgumentParser parser("dorado", DORADO_VERSION);
+    argparse::ArgumentParser parser("dorado", DORADO_VERSION, argparse::default_arguments::help);
 
     parser.add_argument("model").help("the basecaller model to run.");
 
