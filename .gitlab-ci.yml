@@ -217,8 +217,8 @@ build_archive:macos:m1:
   script:
     - echo Dorado app test stage
     - ./dist/bin/dorado download --model dna_r9.4.1_e8_hac@v3.3
-    - ./dist/bin/dorado basecaller dna_r9.4.1_e8_hac@v3.3 ./tests/data/${TEST_DATA} -r 1 -b 384 > calls.sam
-    - ./dist/bin/dorado basecaller dna_r9.4.1_e8_hac@v3.3 ./tests/data/${TEST_DATA} -r 1 -x cpu > calls.sam
+    - ./dist/bin/dorado basecaller dna_r9.4.1_e8_hac@v3.3 ./tests/data/${TEST_DATA} -r 1 -b 384 --modified-bases 5mCG > calls.sam
+    - ./dist/bin/dorado basecaller dna_r9.4.1_e8_hac@v3.3 ./tests/data/${TEST_DATA} -r 1 -x cpu --modified-bases 5mCG > calls.sam
 
 .test_archive: &test_archive
   stage: test
