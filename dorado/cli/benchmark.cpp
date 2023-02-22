@@ -10,7 +10,7 @@
 namespace dorado {
 
 int benchmark(int argc, char* argv[]) {
-    argparse::ArgumentParser parser("dorado", DORADO_VERSION);
+    argparse::ArgumentParser parser("dorado", DORADO_VERSION, argparse::default_arguments::help);
 
     try {
         parser.parse_args(argc, argv);
