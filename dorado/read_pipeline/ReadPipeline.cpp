@@ -179,7 +179,8 @@ std::string Read::generate_modbase_string(uint8_t threshold) const {
 
     std::istringstream mod_name_stream(base_mod_info->long_names);
     std::string modbase_string = "MM:Z:";
-    std::string modbase_prob_string = "ML:B:C";
+    std::string modbase_prob_string_prefix = "ML:B:C";
+    std::string modbase_prob_string;
 
     // Create a mask indicating which bases are modified.
     std::map<char, bool> base_has_context = {
@@ -239,7 +240,9 @@ std::string Read::generate_modbase_string(uint8_t threshold) const {
         }
     }
 
-    modbase_string += "\t" + modbase_prob_string;
+    if (!modbase_prob_string.empty()) {
+        modbase_string += "\t" + modbase_prob_string_prefix + modbase_prob_string;
+    }
     return modbase_string;
 }
 
