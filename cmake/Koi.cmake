@@ -2,8 +2,8 @@ OPTION(BUILD_KOI_FROM_SOURCE OFF)
 
 function(get_best_compatible_koi_version KOI_CUDA)
     if (${CMAKE_SYSTEM_PROCESSOR} STREQUAL "aarch64")
-        # Koi only provides binaries for 11.4 when targeting aarch64
-        set(SUPPORTED_VERSIONS 11.4)
+        # Koi only provides binaries for 11.4 and 10.2 when targeting aarch64
+        set(SUPPORTED_VERSIONS 11.4 10.2)
     else()
         set(SUPPORTED_VERSIONS 12.0 11.8 11.7 11.3)
     endif()

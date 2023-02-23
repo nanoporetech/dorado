@@ -17,7 +17,7 @@ namespace dorado {
 int download(int argc, char* argv[]) {
     utils::InitLogging();
 
-    argparse::ArgumentParser parser("dorado", DORADO_VERSION);
+    argparse::ArgumentParser parser("dorado", DORADO_VERSION, argparse::default_arguments::help);
 
     parser.add_argument("-v", "--verbose").default_value(false).implicit_value(true);
 
