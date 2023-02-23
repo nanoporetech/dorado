@@ -34,3 +34,6 @@
 [submodule "cmake/ios-cmake"]
 	path = cmake/ios-cmake
 	url = https://github.com/leetal/ios-cmake.git
+[submodule "dorado/3rdparty/indicators"]
+	path = dorado/3rdparty/indicators
+	url = https://github.com/p-ranav/indicators.git

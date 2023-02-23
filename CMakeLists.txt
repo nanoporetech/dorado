@@ -165,7 +165,7 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR}/dorado
     dorado/3rdparty/NVTX/c/include
     dorado
     dorado/3rdparty/spdlog/include
-)
+    dorado/3rdparty/indicators/include)
 
 enable_testing()
 

@@ -1,6 +1,7 @@
 #include "WriterNode.h"
 
 #include "Version.h"
+#include "indicators/progress_bar.hpp"
 #include "utils/sequence_utils.h"
 
 #include <spdlog/spdlog.h>
@@ -80,9 +81,10 @@ void WriterNode::worker_thread() {
             std::reverse(read->qstring.begin(), read->qstring.end());
         }
 
-        if (m_num_reads_processed % 100 == 0 && m_isatty) {
+        if (m_num_reads_processed % (m_num_reads_expected / 100) == 0 && m_isatty) {
             std::scoped_lock<std::mutex> lock(m_cerr_mutex);
-            std::cerr << "\r> Reads processed: " << m_num_reads_processed;
+            //std::cerr << "\r> Reads processed: " << m_num_reads_processed << "/" << m_num_reads_expected;
+            m_progress_bar.tick();
         }
 
         if (utils::mean_qscore_from_qstring(read->qstring) < m_min_qscore) {
@@ -100,7 +102,7 @@ void WriterNode::worker_thread() {
             try {
                 for (const auto& sam_line : read->extract_sam_lines(m_emit_moves, m_duplex)) {
                     std::scoped_lock<std::mutex> lock(m_cout_mutex);
-                    std::cout << sam_line << "\n";
+                    //std::cout << sam_line << "\n";
                 }
             } catch (const std::exception& ex) {
                 std::scoped_lock<std::mutex> lock(m_cerr_mutex);
@@ -118,6 +120,7 @@ WriterNode::WriterNode(std::vector<std::string> args,
                        size_t min_qscore,
                        size_t num_worker_threads,
                        std::unordered_map<std::string, ReadGroup> read_groups,
+                       int num_reads,
                        size_t max_reads)
         : ReadSink(max_reads),
           m_args(std::move(args)),
@@ -131,7 +134,8 @@ WriterNode::WriterNode(std::vector<std::string> args,
           m_num_samples_processed(0),
           m_num_reads_processed(0),
           m_num_reads_failed(0),
-          m_initialization_time(std::chrono::system_clock::now()) {
+          m_initialization_time(std::chrono::system_clock::now()),
+          m_num_reads_expected(num_reads) {
 #ifdef _WIN32
     m_isatty = true;
 #else
@@ -139,6 +143,7 @@ WriterNode::WriterNode(std::vector<std::string> args,
 #endif
 
     print_header();
+
     for (size_t i = 0; i < num_worker_threads; i++) {
         m_workers.push_back(
                 std::make_unique<std::thread>(std::thread(&WriterNode::worker_thread, this)));
