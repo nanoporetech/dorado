@@ -12,7 +12,11 @@ struct DefaultParameters {
     int chunksize{10000};
     int overlap{500};
     int num_runners{2};
+#if defined(__linux__) && defined(__aarch64__)
+    int remora_batchsize{128};
+#else
     int remora_batchsize{1024};
+#endif
     int remora_threads{2};
 };
 
