@@ -189,10 +189,15 @@ void ModBaseCallerNode::runner_worker_thread(size_t runner_id) {
                 }
             }
 
-            // Put the read in the working list
-            std::unique_lock<std::mutex> working_reads_lock(m_working_reads_mutex);
-            m_working_reads.push_back(read);
-            working_reads_lock.unlock();
+            if (read->num_modbase_chunks != 0) {
+                // Put the read in the working list
+                std::unique_lock<std::mutex> working_reads_lock(m_working_reads_mutex);
+                m_working_reads.push_back(read);
+                working_reads_lock.unlock();
+            } else {
+                // No modbases to call, pass directly to next node
+                m_sink.push_read(read);
+            }
             break;
         }
     }
