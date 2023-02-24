@@ -14,8 +14,6 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(DORADO_3RD_PARTY ${CMAKE_CURRENT_SOURCE_DIR}/dorado/3rdparty)
 
-option(DISABLE_POD5 "Disable use of pod5" OFF)
-
 find_package(CUDAToolkit QUIET)
 
 include(cmake/DoradoVersion.cmake)
@@ -26,12 +24,7 @@ include(cmake/SharedLibHelpers.cmake)
 include(cmake/HDF5.cmake)
 include(cmake/VbzPlugin.cmake)
 include(cmake/Koi.cmake)
-
-if(DISABLE_POD5)
-    add_compile_definitions(DISABLE_POD5)
-else()
-    include(cmake/Pod5.cmake)
-endif()
+include(cmake/Pod5.cmake)
 include(cmake/Torch.cmake)
 include(cmake/OpenSSL.cmake)
 include(cmake/Htslib.cmake)

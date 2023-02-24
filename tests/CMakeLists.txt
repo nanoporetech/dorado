@@ -2,6 +2,7 @@
 set(SOURCE_FILES
     main.cpp
     Fast5DataLoaderTest.cpp
+    Pod5DataLoaderTest.cpp
     TensorUtilsTest.cpp
     MathUtilsTest.cpp
     ReadTest.cpp
@@ -10,10 +11,6 @@ set(SOURCE_FILES
     StitchTest.cpp
     StereoDuplexTest.cpp
 )
-
-if(NOT DISABLE_POD5)
-    list(APPEND SOURCE_FILES Pod5DataLoaderTest.cpp)
-endif()
 
 if(APPLE)
     list(APPEND SOURCE_FILES
