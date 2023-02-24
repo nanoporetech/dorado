@@ -1,6 +1,7 @@
 
 set(SOURCE_FILES
     main.cpp
+    AsyncQueueTest.cpp
     Fast5DataLoaderTest.cpp
     TensorUtilsTest.cpp
     MathUtilsTest.cpp

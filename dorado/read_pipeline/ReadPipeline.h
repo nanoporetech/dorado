@@ -1,4 +1,6 @@
 #pragma once
+#include "utils/AsyncQueue.h"
+
 #include <torch/torch.h>
 
 #include <cstdint>
@@ -98,19 +100,11 @@ public:
     void push_read(
             std::shared_ptr<Read>&
                     read);  //Push a read into readsink. This can block if receiving ReadSink is full.
-    void terminate() { m_terminate = true; }  // Notify sinks and terminate.
+    void terminate() { m_work_queue.terminate(); }
+
 protected:
-    std::condition_variable m_cv;
-    std::mutex m_cv_mutex;
-    std::condition_variable m_push_read_cv;
-    std::mutex m_push_read_cv_mutex;
-
-    size_t m_max_reads =
-            1000;  //ReadSink will block on accepting reads if it contains m_max_reads reads
-    bool m_terminate = false;  // When set to true, ReadSink will notify it's sinks and terminate.
-
-    // The queue of reads itself
-    std::deque<std::shared_ptr<Read>> m_reads;
+    // Queue of work items for this node.
+    AsyncQueue<std::shared_ptr<Read>> m_work_queue;
 };
 
 }  // namespace dorado
