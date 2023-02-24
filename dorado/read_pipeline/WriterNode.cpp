@@ -4,12 +4,12 @@
 #include "indicators/progress_bar.hpp"
 #include "utils/sequence_utils.h"
 
+#include <indicators/cursor_control.hpp>
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <chrono>
 #include <iostream>
-#include <sstream>
 #include <string>
 
 #ifndef _WIN32
@@ -82,8 +82,6 @@ void WriterNode::worker_thread() {
         }
 
         if (m_num_reads_processed % (m_num_reads_expected / 100) == 0 && m_isatty) {
-            std::scoped_lock<std::mutex> lock(m_cerr_mutex);
-            //std::cerr << "\r> Reads processed: " << m_num_reads_processed << "/" << m_num_reads_expected;
             m_progress_bar.tick();
         }
 
@@ -102,7 +100,7 @@ void WriterNode::worker_thread() {
             try {
                 for (const auto& sam_line : read->extract_sam_lines(m_emit_moves, m_duplex)) {
                     std::scoped_lock<std::mutex> lock(m_cout_mutex);
-                    //std::cout << sam_line << "\n";
+                    std::cout << sam_line << "\n";
                 }
             } catch (const std::exception& ex) {
                 std::scoped_lock<std::mutex> lock(m_cerr_mutex);
@@ -161,7 +159,6 @@ WriterNode::~WriterNode() {
     auto duration =
             std::chrono::duration_cast<std::chrono::milliseconds>(end_time - m_initialization_time)
                     .count();
-
     if (m_isatty) {
         std::cerr << "\r";
     }

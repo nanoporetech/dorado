@@ -53,10 +53,9 @@ private:
     std::mutex m_cerr_mutex;
 
     indicators::ProgressBar m_progress_bar{
-            indicators::option::BarWidth{50}, indicators::option::Stream{std::cerr},
-            indicators::option::Start{"["},   indicators::option::Fill{"="},
-            indicators::option::Lead{">"},    indicators::option::Remainder{" "},
-            indicators::option::End{"]"},     indicators::option::PostfixText{"Reads basecalled"},
+            indicators::option::Stream{std::cerr},     indicators::option::BarWidth{30},
+            indicators::option::ShowElapsedTime{true}, indicators::option::ShowRemainingTime{true},
+            indicators::option::ShowPercentage{true},
     };
 };
 
