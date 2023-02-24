@@ -2,6 +2,7 @@
 
 #include "ReadPipeline.h"
 #include "data_loader/DataLoader.h"
+#include "indicators/indeterminate_progress_bar.hpp"
 #include "indicators/progress_bar.hpp"
 
 #include <atomic>
@@ -51,7 +52,9 @@ private:
     std::vector<std::unique_ptr<std::thread>> m_workers;
     std::mutex m_cout_mutex;
     std::mutex m_cerr_mutex;
+    int progress_bar_increment;
 
+    // Progress bar for showing basecalling progress
     indicators::ProgressBar m_progress_bar{
             indicators::option::Stream{std::cerr},     indicators::option::BarWidth{30},
             indicators::option::ShowElapsedTime{true}, indicators::option::ShowRemainingTime{true},

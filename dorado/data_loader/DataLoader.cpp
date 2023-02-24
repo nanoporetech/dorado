@@ -166,7 +166,7 @@ void DataLoader::load_reads(const std::string& path) {
     m_read_sink.terminate();
 }
 
-int DataLoader::get_num_reads(std::string data_path) {
+int DataLoader::get_num_reads(std::string data_path, std::unordered_set<std::string> read_list) {
     int num_reads = 0;
     for (const auto& entry : std::filesystem::directory_iterator(data_path)) {
         std::string ext = std::filesystem::path(entry).extension().string();
@@ -201,7 +201,21 @@ int DataLoader::get_num_reads(std::string data_path) {
                 }
 
                 for (std::size_t row = 0; row < batch_row_count; ++row) {
-                    num_reads++;
+                    uint16_t read_table_version = 0;
+                    ReadBatchRowInfo_t read_data;
+                    if (pod5_get_read_batch_row_info_data(batch, row, READ_BATCH_ROW_INFO_VERSION,
+                                                          &read_data,
+                                                          &read_table_version) != POD5_OK) {
+                        spdlog::error("Failed to get read {}", row);
+                    }
+
+                    char read_id_tmp[37];
+                    pod5_error_t err = pod5_format_read_id(read_data.read_id, read_id_tmp);
+                    std::string read_id_str(read_id_tmp);
+
+                    if (read_list.size() == 0 || (read_list.find(read_id_str) != read_list.end())) {
+                        num_reads++;
+                    }
                 }
                 if (pod5_free_read_batch(batch) != POD5_OK) {
                     spdlog::error("Failed to release batch");

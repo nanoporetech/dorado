@@ -81,8 +81,14 @@ void WriterNode::worker_thread() {
             std::reverse(read->qstring.begin(), read->qstring.end());
         }
 
-        if (m_num_reads_processed % (m_num_reads_expected / 100) == 0 && m_isatty) {
-            m_progress_bar.tick();
+        if (((m_num_reads_processed % progress_bar_increment) == 0) && m_isatty &&
+            ((m_num_reads_processed / progress_bar_increment) < 100)) {
+            if (m_num_reads_expected != 0) {
+                m_progress_bar.tick();
+            } else {
+                std::scoped_lock<std::mutex> lock(m_cerr_mutex);
+                std::cerr << "\r> Reads processed: " << m_num_reads_processed;
+            }
         }
 
         if (utils::mean_qscore_from_qstring(read->qstring) < m_min_qscore) {
@@ -140,7 +146,15 @@ WriterNode::WriterNode(std::vector<std::string> args,
     m_isatty = isatty(fileno(stderr));
 #endif
 
+    if (m_num_reads_expected == 0) {
+        progress_bar_increment = 100;
+    } else {
+        progress_bar_increment = m_num_reads_expected / 100;
+    }
+
     print_header();
+
+    indicators::show_console_cursor(false);
 
     for (size_t i = 0; i < num_worker_threads; i++) {
         m_workers.push_back(
@@ -149,6 +163,8 @@ WriterNode::WriterNode(std::vector<std::string> args,
 }
 
 WriterNode::~WriterNode() {
+    indicators::show_console_cursor(true);
+
     terminate();
     m_cv.notify_one();
     for (auto& m : m_workers) {
