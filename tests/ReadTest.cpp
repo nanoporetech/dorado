@@ -107,7 +107,7 @@ TEST_CASE(TEST_GROUP ": Methylation tag generation", TEST_GROUP) {
         std::string expected_methylation_tag_10_score =
                 "MM:Z:A+a,0,1;C+m,1,0;\tML:B:C,20,254,252,252";
         std::string expected_methylation_tag_50_score = "MM:Z:A+a,2;C+m,1,0;\tML:B:C,254,252,252";
-        std::string expected_methylation_tag_255_score = "MM:Z:A+a;C+m;";
+        std::string expected_methylation_tag_255_score = "MM:Z:A+a;C+m;\tML:B:C";
 
         read.base_mod_info = std::make_shared<dorado::utils::BaseModInfo>(modbase_alphabet,
                                                                           modbase_long_names, "");
