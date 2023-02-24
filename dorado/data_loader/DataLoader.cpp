@@ -3,9 +3,7 @@
 #include "../read_pipeline/ReadPipeline.h"
 #include "../utils/compat_utils.h"
 #include "cxxpool.h"
-#ifndef DISABLE_POD5
 #include "pod5_format/c_api.h"
-#endif
 #include "vbz_plugin_user_utils.h"
 
 #include <highfive/H5Easy.hpp>
@@ -75,7 +73,6 @@ std::string adjust_time(const std::string& time_stamp, uint32_t offset) {
     return std::string(buff);
 }
 
-#ifndef DISABLE_POD5
 std::shared_ptr<dorado::Read> process_pod5_read(size_t row,
                                                 Pod5ReadRecordBatch* batch,
                                                 Pod5FileReader* file,
@@ -126,7 +123,6 @@ std::shared_ptr<dorado::Read> process_pod5_read(size_t row,
     new_read->run_id = run_info_data->protocol_run_id;
     return new_read;
 }
-#endif
 } /* anonymous namespace */
 
 namespace dorado {
@@ -153,14 +149,7 @@ void DataLoader::load_reads(const std::string& path) {
         if (ext == ".fast5") {
             load_fast5_reads_from_file(entry.path().string());
         } else if (ext == ".pod5") {
-#ifndef DISABLE_POD5
             load_pod5_reads_from_file(entry.path().string());
-#else
-            static std::once_flag pod5_disabled_log_flag;
-            std::call_once(pod5_disabled_log_flag, []() {
-                spdlog::warn("pod5 loading is disabled, skipping .pod5 files.");
-            });
-#endif
         }
     }
     m_read_sink.terminate();
@@ -174,7 +163,6 @@ std::unordered_map<std::string, ReadGroup> DataLoader::load_read_groups(std::str
         std::string ext = std::filesystem::path(entry).extension().string();
         std::transform(ext.begin(), ext.end(), ext.begin(),
                        [](unsigned char c) { return std::tolower(c); });
-#ifndef DISABLE_POD5
         if (ext == ".pod5") {
             pod5_init();
 
@@ -240,12 +228,10 @@ std::unordered_map<std::string, ReadGroup> DataLoader::load_read_groups(std::str
 
             pod5_close_and_free_reader(file);
         }
-#endif  // DISABLE_POD5
     }
     return read_groups;
 }
 
-#ifndef DISABLE_POD5
 void DataLoader::load_pod5_reads_from_file(const std::string& path) {
     pod5_init();
 
@@ -311,7 +297,6 @@ void DataLoader::load_pod5_reads_from_file(const std::string& path) {
     }
     pod5_close_and_free_reader(file);
 }
-#endif
 
 void DataLoader::load_fast5_reads_from_file(const std::string& path) {
     // Read the file into a vector of torch tensors
