@@ -55,6 +55,7 @@ variables:
   artifacts:
     paths:
       - dist
+      - tests/data
     expire_in: 1 day
 
 .build_dorado_archive: &build_dorado_archive
