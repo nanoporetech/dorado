@@ -170,14 +170,13 @@ BaseSpaceDuplexCallerNode::BaseSpaceDuplexCallerNode(
 
 BaseSpaceDuplexCallerNode::~BaseSpaceDuplexCallerNode() {
     terminate();
-    m_cv.notify_one();
 
     // Wait for all the Node's worker threads to terminate
     for (auto& t : worker_threads) {
         t->join();
     }
 
-    //Notify the sink that the Node has terminated
+    // Notify the sink that the Node has terminated
     m_sink.terminate();
 }
 
