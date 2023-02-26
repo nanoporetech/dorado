@@ -133,9 +133,6 @@ WriterNode::WriterNode(std::vector<std::string> args,
     }
 
     print_header();
-
-    indicators::show_console_cursor(false);
-
     for (size_t i = 0; i < num_worker_threads; i++) {
         m_workers.push_back(
                 std::make_unique<std::thread>(std::thread(&WriterNode::worker_thread, this)));
@@ -143,8 +140,6 @@ WriterNode::WriterNode(std::vector<std::string> args,
 }
 
 WriterNode::~WriterNode() {
-    indicators::show_console_cursor(true);
-
     terminate();
     for (auto& m : m_workers) {
         m->join();
