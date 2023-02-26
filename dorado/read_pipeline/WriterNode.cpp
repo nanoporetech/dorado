@@ -126,7 +126,7 @@ WriterNode::WriterNode(std::vector<std::string> args,
     m_isatty = isatty(fileno(stderr));
 #endif
 
-    if (m_num_reads_expected == 0) {
+    if (m_num_reads_expected <= 100) {
         progress_bar_increment = 100;
     } else {
         progress_bar_increment = m_num_reads_expected / 100;
