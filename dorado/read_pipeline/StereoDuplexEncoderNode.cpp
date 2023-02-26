@@ -256,23 +256,8 @@ namespace dorado {
 void StereoDuplexEncoderNode::worker_thread() {
     int i = 0;
 
-    while (true) {
-        // Wait until we are provided with a read
-        std::unique_lock<std::mutex> lock(m_cv_mutex);
-        m_cv.wait_for(lock, 100ms, [this] { return !m_reads.empty(); });
-        if (m_reads.empty()) {
-            if (m_terminate) {
-                // Termination flag is set and read input queue is empty, so terminate the worker
-                return;
-            } else {
-                continue;
-            }
-        }
-
-        std::shared_ptr<Read> read = m_reads.front();
-        m_reads.pop_front();
-        lock.unlock();
-
+    std::shared_ptr<Read> read;
+    while (m_work_queue.try_pop(read)) {
         bool read_is_template = false;
         bool partner_found = false;
         std::string partner_id;
@@ -350,10 +335,11 @@ StereoDuplexEncoderNode::StereoDuplexEncoderNode(
 
 StereoDuplexEncoderNode::~StereoDuplexEncoderNode() {
     terminate();
-    m_cv.notify_one();
     for (auto& t : worker_threads) {
         t->join();
     }
+
+    m_sink.terminate();
 }
 
 }  // namespace dorado

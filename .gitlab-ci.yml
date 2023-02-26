@@ -55,6 +55,7 @@ variables:
   artifacts:
     paths:
       - dist
+      - tests/data
     expire_in: 1 day
 
 .build_dorado_archive: &build_dorado_archive
@@ -103,7 +104,7 @@ build:linux:x86:focal:
 build:linux:arm64:bionic:
   image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r32.4.3-deps:1.0
   variables:
-    BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/torch-1.10.0-Linux-aarch64/torch/ -DDISABLE_POD5=ON"
+    BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/torch-1.10.0-Linux-aarch64/torch/"
   <<: *linux_arm64_runner
   <<: *build_dorado
 
@@ -171,7 +172,7 @@ build_archive:linux:x86:cuda12:
 build_archive:linux:arm64:bionic:
   image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r32.4.3-deps:1.0
   variables:
-    BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/torch-1.10.0-Linux-aarch64/torch/ -DDISABLE_POD5=ON"
+    BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/torch-1.10.0-Linux-aarch64/torch/"
   <<: *linux_arm64_runner
   <<: *build_dorado_archive
   when: manual
@@ -213,13 +214,12 @@ build_archive:macos:m1:
 .test_dorado: &test_dorado
   stage: test
   variables:
-    TEST_DATA: pod5
     GIT_STRATEGY: none    
   script:
     - echo Dorado app test stage
     - ./dist/bin/dorado download --model dna_r9.4.1_e8_hac@v3.3
-    - ./dist/bin/dorado basecaller dna_r9.4.1_e8_hac@v3.3 ./tests/data/${TEST_DATA} -r 1 -b 384 --modified-bases 5mCG > calls.sam
-    - ./dist/bin/dorado basecaller dna_r9.4.1_e8_hac@v3.3 ./tests/data/${TEST_DATA} -r 1 -x cpu --modified-bases 5mCG > calls.sam
+    - ./dist/bin/dorado basecaller dna_r9.4.1_e8_hac@v3.3 ./tests/data/pod5 -r 1 -b 384 --modified-bases 5mCG > calls.sam
+    - ./dist/bin/dorado basecaller dna_r9.4.1_e8_hac@v3.3 ./tests/data/pod5 -r 1 -x cpu --modified-bases 5mCG > calls.sam
     - samtools quickcheck calls.sam || [[ $? -eq 8 ]]
     - samtools view -b calls.sam > calls.bam
 
@@ -248,8 +248,6 @@ test:linux:arm64:bionic:
   <<: *linux_dependencies
   <<: *linux_tegra_runner
   <<: *test_dorado
-  variables:
-    TEST_DATA: fast5 
   needs:
     - build:linux:arm64:bionic
 

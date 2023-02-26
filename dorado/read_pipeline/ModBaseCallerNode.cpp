@@ -54,7 +54,6 @@ ModBaseCallerNode::ModBaseCallerNode(ReadSink& sink,
 
 ModBaseCallerNode::~ModBaseCallerNode() {
     terminate();
-    m_cv.notify_all();
     for (auto& t : m_runner_workers) {
         t->join();
     }
@@ -120,27 +119,9 @@ void ModBaseCallerNode::init_modbase_info() {
 }
 
 void ModBaseCallerNode::runner_worker_thread(size_t runner_id) {
-    while (true) {
-        // Wait until we are provided with a read
-        std::unique_lock<std::mutex> lock(m_cv_mutex);
-        m_cv.wait_for(lock, 100ms, [this] { return !m_reads.empty(); });
-        if (m_reads.empty()) {
-            if (m_terminate) {
-                int num_remaining_runners = --m_num_active_model_runners;
-                if (num_remaining_runners == 0) {
-                    m_terminate_callers = true;
-                }
-                return;
-            } else {
-                continue;
-            }
-        }
-
-        std::shared_ptr<Read> read = m_reads.front();
-        m_reads.pop_front();
-        lock.unlock();
-
-        size_t max_chunks_in = m_batch_size * 5;  // size per queue: one queue per caller
+    std::shared_ptr<Read> read;
+    while (m_work_queue.try_pop(read)) {
+        const size_t max_chunks_in = m_batch_size * 5;  // size per queue: one queue per caller
         auto chunk_queues_available = [this, &max_chunks_in] {
             return std::all_of(
                     std::begin(m_chunk_queues), std::end(m_chunk_queues),
@@ -208,12 +189,22 @@ void ModBaseCallerNode::runner_worker_thread(size_t runner_id) {
                 }
             }
 
-            // Put the read in the working list
-            std::unique_lock<std::mutex> working_reads_lock(m_working_reads_mutex);
-            m_working_reads.push_back(read);
-            working_reads_lock.unlock();
+            if (read->num_modbase_chunks != 0) {
+                // Put the read in the working list
+                std::unique_lock<std::mutex> working_reads_lock(m_working_reads_mutex);
+                m_working_reads.push_back(read);
+                working_reads_lock.unlock();
+            } else {
+                // No modbases to call, pass directly to next node
+                m_sink.push_read(read);
+            }
             break;
         }
+    }
+
+    int num_remaining_runners = --m_num_active_model_runners;
+    if (num_remaining_runners == 0) {
+        m_terminate_callers = true;
     }
 }
 
