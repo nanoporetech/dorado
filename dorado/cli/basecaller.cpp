@@ -22,6 +22,7 @@
 #include <argparse.hpp>
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
 #include <filesystem>
 #include <iostream>
 #include <sstream>
@@ -152,7 +153,8 @@ void setup(std::vector<std::string> args,
 
     auto read_list = utils::load_read_list(read_list_file_path);
 
-    int num_reads = DataLoader::get_num_reads(data_path, read_list);
+    size_t num_reads = DataLoader::get_num_reads(data_path, read_list);
+    num_reads = max_reads == 0 ? num_reads : std::min(num_reads, max_reads);
 
     bool rna = utils::is_rna_model(model_path), duplex = false;
     WriterNode writer_node(std::move(args), emit_fastq, emit_moves, rna, duplex, min_qscore,
