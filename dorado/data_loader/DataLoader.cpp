@@ -161,7 +161,6 @@ int DataLoader::get_num_reads(std::string data_path, std::unordered_set<std::str
         std::string ext = std::filesystem::path(entry).extension().string();
         std::transform(ext.begin(), ext.end(), ext.begin(),
                        [](unsigned char c) { return std::tolower(c); });
-#ifndef DISABLE_POD5
         if (ext == ".pod5") {
             pod5_init();
 
@@ -212,7 +211,6 @@ int DataLoader::get_num_reads(std::string data_path, std::unordered_set<std::str
             }
             pod5_close_and_free_reader(file);
         }
-#endif  // DISABLE_POD5
     }
     return num_reads;
 }
