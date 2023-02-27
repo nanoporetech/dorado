@@ -92,19 +92,24 @@ public:
     std::string generate_modbase_string(uint8_t threshold = 0) const;
 };
 
-// Base class for an object which consumes reads.
-// ReadSink is a node within a pipeline.
-class ReadSink {
+// FIXME -- As things stand, these just encompass Reads.  The intention
+// is to allow for other types of data flow, the first step being
+// std::variant<...>
+using Message = std::shared_ptr<Read>;
+
+// Base class for an object which consumes messages.
+// MessageSink is a node within a pipeline.
+class MessageSink {
 public:
-    ReadSink(size_t max_reads);
-    void push_read(
-            std::shared_ptr<Read>&
-                    read);  //Push a read into readsink. This can block if receiving ReadSink is full.
+    MessageSink(size_t max_messages);
+    void push_message(
+            Message&
+                    message);  // Push a message into message sink.  This can block if it is full.
     void terminate() { m_work_queue.terminate(); }
 
 protected:
     // Queue of work items for this node.
-    AsyncQueue<std::shared_ptr<Read>> m_work_queue;
+    AsyncQueue<Message> m_work_queue;
 };
 
 }  // namespace dorado

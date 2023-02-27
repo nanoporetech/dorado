@@ -9,7 +9,7 @@
 
 namespace dorado {
 
-class WriterNode : public ReadSink {
+class WriterNode : public MessageSink {
 public:
     // Writer has no sink - reads go to output
     WriterNode(std::vector<std::string> args,

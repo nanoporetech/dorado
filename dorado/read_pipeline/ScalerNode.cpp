@@ -47,12 +47,12 @@ void ScalerNode::worker_thread() {
         read->num_trimmed_samples = trim_start;
 
         // Pass the read to the next node
-        m_sink.push_read(read);
+        m_sink.push_message(read);
     }
 }
 
-ScalerNode::ScalerNode(ReadSink& sink, int num_worker_threads, size_t max_reads)
-        : ReadSink(max_reads), m_sink(sink), m_num_worker_threads(num_worker_threads) {
+ScalerNode::ScalerNode(MessageSink& sink, int num_worker_threads, size_t max_reads)
+        : MessageSink(max_reads), m_sink(sink), m_num_worker_threads(num_worker_threads) {
     for (int i = 0; i < m_num_worker_threads; i++) {
         std::unique_ptr<std::thread> scaler_worker_thread =
                 std::make_unique<std::thread>(&ScalerNode::worker_thread, this);

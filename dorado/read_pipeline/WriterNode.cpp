@@ -99,7 +99,7 @@ WriterNode::WriterNode(std::vector<std::string> args,
                        size_t num_worker_threads,
                        std::unordered_map<std::string, ReadGroup> read_groups,
                        size_t max_reads)
-        : ReadSink(max_reads),
+        : MessageSink(max_reads),
           m_args(std::move(args)),
           m_emit_fastq(emit_fastq),
           m_emit_moves(emit_moves),

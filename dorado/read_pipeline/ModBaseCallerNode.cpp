@@ -14,14 +14,14 @@ namespace dorado {
 
 constexpr auto FORCE_TIMEOUT = 100ms;
 
-ModBaseCallerNode::ModBaseCallerNode(ReadSink& sink,
+ModBaseCallerNode::ModBaseCallerNode(MessageSink& sink,
                                      std::vector<std::shared_ptr<RemoraCaller>> model_callers,
                                      size_t remora_threads,
                                      size_t num_devices,
                                      size_t block_stride,
                                      size_t batch_size,
                                      size_t max_reads)
-        : ReadSink(max_reads),
+        : MessageSink(max_reads),
           m_sink(sink),
           m_num_devices(num_devices),
           m_batch_size(batch_size),
@@ -196,7 +196,7 @@ void ModBaseCallerNode::runner_worker_thread(size_t runner_id) {
                 working_reads_lock.unlock();
             } else {
                 // No modbases to call, pass directly to next node
-                m_sink.push_read(read);
+                m_sink.push_message(read);
             }
             break;
         }
@@ -329,7 +329,7 @@ void ModBaseCallerNode::output_worker_thread() {
         for (auto read_iter = m_working_reads.begin(); read_iter != m_working_reads.end();) {
             if ((*read_iter)->num_modbase_chunks_called.load() ==
                 (*read_iter)->num_modbase_chunks) {
-                m_sink.push_read(*read_iter);
+                m_sink.push_message(*read_iter);
                 read_iter = m_working_reads.erase(read_iter);
             } else {
                 ++read_iter;

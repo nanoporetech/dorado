@@ -308,7 +308,7 @@ void StereoDuplexEncoderNode::worker_thread() {
 
                 if (stereo_encoded_read->raw_data.ndimension() ==
                     2) {  // 2 dims for stereo encoding, 1 for simplex
-                    m_sink.push_read(
+                    m_sink.push_message(
                             stereo_encoded_read);  // Strereo-encoded read created, send it to sink
                 }
             }
@@ -317,9 +317,9 @@ void StereoDuplexEncoderNode::worker_thread() {
 }
 
 StereoDuplexEncoderNode::StereoDuplexEncoderNode(
-        ReadSink& sink,
+        MessageSink& sink,
         std::map<std::string, std::string> template_complement_map)
-        : ReadSink(1000), m_sink(sink), m_template_complement_map(template_complement_map) {
+        : MessageSink(1000), m_sink(sink), m_template_complement_map(template_complement_map) {
     // Set up the complement-template_map
     for (auto key : template_complement_map) {
         m_complement_template_map[key.second] = key.first;

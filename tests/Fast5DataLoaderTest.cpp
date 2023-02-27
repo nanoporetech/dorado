@@ -10,9 +10,9 @@
 
 namespace {
 
-class MockSink : public dorado::ReadSink {
+class MockSink : public dorado::MessageSink {
 public:
-    MockSink() : ReadSink(1000) {}
+    MockSink() : MessageSink(1000) {}
     size_t get_read_count();
 };
 
