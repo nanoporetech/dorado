@@ -29,7 +29,7 @@ extern "C" {
 #include <string>
 
 
-constexpr bool g_options_no_i8 = false;
+constexpr bool g_options_no_i8 = true;
 constexpr bool g_options_no_conv_i8 = false;
 constexpr float g_options_scale_i8 = 1.0f;
 constexpr float g_options_scale_i8_lstm = 1.0f;
