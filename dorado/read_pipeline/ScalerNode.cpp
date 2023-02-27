@@ -10,13 +10,13 @@ using namespace std::chrono_literals;
 namespace {
 
 std::pair<float, float> normalisation(torch::Tensor& x) {
-    //Calculate shift and scale factors for normalisation.
+    // Calculate shift and scale factors for normalisation.
     auto quantiles = dorado::utils::quantile_counting(x, torch::tensor({0.2, 0.9}));
     float q20 = quantiles[0].item<float>();
     float q90 = quantiles[1].item<float>();
     float shift = std::max(10.0f, 0.51f * (q20 + q90));
     float scale = std::max(1.0f, 0.53f * (q90 - q20));
-    return std::make_pair(shift, scale);
+    return {shift, scale};
 }
 
 }  // namespace
@@ -24,25 +24,12 @@ std::pair<float, float> normalisation(torch::Tensor& x) {
 namespace dorado {
 
 void ScalerNode::worker_thread() {
-    while (true) {
-        // Wait until we are provided with a read
-        std::unique_lock<std::mutex> lock(m_cv_mutex);
-        m_cv.wait_for(lock, 100ms, [this] { return !m_reads.empty(); });
-        if (m_reads.empty()) {
-            if (m_terminate) {
-                // Termination flag is set and read input queue is empty, so terminate the worker
-                return;
-            } else {
-                continue;
-            }
-        }
-
-        std::shared_ptr<Read> read = m_reads.front();
-        m_reads.pop_front();
-        lock.unlock();
-
-        auto [shift, scale] = normalisation(read->raw_data);
-        read->raw_data = (read->raw_data - shift) / scale;
+    std::shared_ptr<Read> read;
+    while (m_work_queue.try_pop(read)) {
+        const auto [shift, scale] = normalisation(read->raw_data);
+        // raw_data comes from DataLoader with dtype int16.  We send it on as float16 after
+        // shifting/scaling in float32 form.
+        read->raw_data = ((read->raw_data.to(torch::kFloat) - shift) / scale).to(torch::kFloat16);
 
         // move the shift and scale into pA.
         read->scale = read->scaling * scale;
@@ -75,14 +62,13 @@ ScalerNode::ScalerNode(ReadSink& sink, int num_worker_threads, size_t max_reads)
 
 ScalerNode::~ScalerNode() {
     terminate();
-    m_cv.notify_one();
 
     // Wait for all the Scaler Node's worker threads to terminate
     for (auto& t : worker_threads) {
         t->join();
     }
 
-    //Notify the sink that the Scaler Node has terminated
+    // Notify the sink that the Scaler Node has terminated
     m_sink.terminate();
 }
 

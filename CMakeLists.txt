@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
+set(CMAKE_POLICY_DEFAULT_CMP0063 NEW)
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 
 project(dorado)
@@ -14,9 +15,12 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(DORADO_3RD_PARTY ${CMAKE_CURRENT_SOURCE_DIR}/dorado/3rdparty)
 
+find_package(CUDAToolkit QUIET)
+
 include(cmake/DoradoVersion.cmake)
 include(cmake/UpdateSubmodules.cmake)
 include(cmake/DownloadAndExtract.cmake)
+include(cmake/SharedLibHelpers.cmake)
 
 include(cmake/HDF5.cmake)
 include(cmake/VbzPlugin.cmake)
@@ -36,7 +40,7 @@ endif()
 add_subdirectory(dorado/3rdparty/elzip)
 
 set(BUILD_TESTING OFF)
-add_subdirectory(dorado/3rdparty/edlib EXCLUDE_FROM_ALL)
+add_subdirectory(${DORADO_3RD_PARTY}/edlib EXCLUDE_FROM_ALL)
 set(BUILD_TESTING ON)
 
 enable_testing()
@@ -51,6 +55,7 @@ endif()
 
 if(DEFINED CUDA_TOOLKIT_ROOT_DIR)
   message(STATUS "CUDA toolkit dir is ${CUDA_TOOLKIT_ROOT_DIR}")
+  set(CUDAToolkit_ROOT ${CUDA_TOOLKIT_ROOT_DIR})
 endif()
 
 set(LIB_SOURCE_FILES
@@ -87,6 +92,7 @@ set(LIB_SOURCE_FILES
     dorado/modbase/remora_scaler.h
     dorado/modbase/remora_utils.cpp
     dorado/modbase/remora_utils.h
+    dorado/utils/AsyncQueue.h
     dorado/utils/base_mod_utils.cpp
     dorado/utils/base_mod_utils.h
     dorado/utils/compat_utils.cpp
@@ -136,23 +142,24 @@ set_target_properties(dorado_lib
     ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
 )
 
+
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/dorado
     ${TORCH_INCLUDE_DIRS}
     ${HDF5_INCLUDE_DIRS}
     ${KOI_INCLUDE}
     ${POD5_INCLUDE}
-    dorado/3rdparty/HighFive/include
-    dorado/3rdparty/catch2
-    dorado/3rdparty/argparse
-    dorado/3rdparty/toml11
-    dorado/3rdparty/cpp-httplib
-    dorado/3rdparty/metal-cpp/metal-cpp
-    dorado/3rdparty/hdf_plugins/vbz_plugin
     ${HTSLIB_DIR}
-    dorado/3rdparty/cxxpool/src
-    dorado/3rdparty/NVTX/c/include
+    ${DORADO_3RD_PARTY}/HighFive/include
+    ${DORADO_3RD_PARTY}/catch2
+    ${DORADO_3RD_PARTY}/argparse
+    ${DORADO_3RD_PARTY}/toml11
+    ${DORADO_3RD_PARTY}/cpp-httplib
+    ${DORADO_3RD_PARTY}/metal-cpp/metal-cpp
+    ${DORADO_3RD_PARTY}/hdf_plugins/vbz_plugin
+    ${DORADO_3RD_PARTY}/cxxpool/src
+    ${DORADO_3RD_PARTY}/NVTX/c/include
+    ${DORADO_3RD_PARTY}/spdlog/include
     dorado
-    dorado/3rdparty/spdlog/include
 )
 
 enable_testing()
@@ -229,27 +236,48 @@ if(NOT DORADO_LIB_ONLY)
 endif()
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    # CUDA system DLLs we depend on:
+    set(PATTERNS
+        "*cudart.so*"
+        "*cublas*.so*"
+        "*nvToolsExt.so*"
+    )
+
+    if(${CMAKE_SYSTEM_PROCESSOR} STREQUAL "aarch64")
+        list(APPEND PATTERNS
+            "*cusparse.so*"
+            "*curand.so*"
+            "*cusolver.so*"
+            "*cufft.so*"
+        )
+    endif()
+    
+    foreach(PATTERN ${PATTERNS})
+        file(GLOB DEP_DLLS "${CUDAToolkit_ROOT}/targets/${CMAKE_SYSTEM_PROCESSOR}-linux/lib/${PATTERN}")
+        install(FILES ${DEP_DLLS} DESTINATION lib COMPONENT redist_libs)
+    endforeach()
+
     file(GLOB TORCH_DLLS "${TORCH_LIB}/lib/*.so*")
     install(FILES ${TORCH_DLLS} DESTINATION lib COMPONENT redist_libs)
+
     if(DYNAMIC_HDF)
-        file(GLOB HDF_DLLS "${HDF5_CXX_LIBRARY_DIRS}/*hdf5*.so*")
-        install(FILES ${HDF_DLLS} DESTINATION lib COMPONENT redist_libs)
-    endif()
-    file(GLOB SZ_DLLS "${HDF5_CXX_LIBRARY_DIRS}/libsz.so*")
-    install(FILES ${SZ_DLLS} DESTINATION lib COMPONENT redist_libs)
-    file(GLOB AEC_DLLS "${HDF5_CXX_LIBRARY_DIRS}/libaec.so*")
-    list(LENGTH AEC_DLLS AEC_DLL_LIST_LEN)
-    if(AEC_DLL_LIST_LEN)
-        install(FILES ${AEC_DLLS} DESTINATION lib COMPONENT redist_libs)
+        RESOLVE_SYMLINKS("${HDF5_C_LIBRARIES}" NEW_HDF_LIBRARIES)
+        foreach(HDF_LIB IN LISTS NEW_HDF_LIBRARIES)
+	    if(${HDF_LIB} MATCHES "hdf5")
+                install(FILES ${HDF_LIB} DESTINATION lib COMPONENT redist_libs)
+            endif()
+        endforeach()
     endif()
 
-    # CUDA system DLLs we depend on:
-    file(GLOB CUDART_DLLS "${CUDAToolkit_ROOT}/targets/x86_64-linux/lib/*cudart.so*")
-    file(GLOB CUBLAS_DLLS "${CUDAToolkit_ROOT}/targets/x86_64-linux/lib/*cublas*.so*")
-    file(GLOB NVTOOLS_DLLS "${CUDAToolkit_ROOT}/targets/x86_64-linux/lib/*nvToolsExt.so*")
-    install(FILES ${CUDART_DLLS} DESTINATION lib COMPONENT redist_libs)
-    install(FILES ${CUBLAS_DLLS} DESTINATION lib COMPONENT redist_libs)
-    install(FILES ${NVTOOLS_DLLS} DESTINATION lib COMPONENT redist_libs)
+    find_library(SZ_DLL sz REQUIRED)
+    get_filename_component(SZ_DLL_PATH ${SZ_DLL} DIRECTORY)
+    file(GLOB SZ_DLLS "${SZ_DLL_PATH}/libsz.so*")
+    install(FILES ${SZ_DLLS} DESTINATION lib COMPONENT redist_libs)
+
+    find_library(AEC_DLL aec REQUIRED)
+    get_filename_component(AEC_DLL_PATH ${AEC_DLL} DIRECTORY)
+    file(GLOB AEC_DLLS "${AEC_DLL_PATH}/libaec.so*")
+    install(FILES ${AEC_DLLS} DESTINATION lib COMPONENT redist_libs)
 
     # If zstd has been dynamically linked, add the .so to the package
     get_filename_component(ZSTD_LIBRARY_PATH ${ZSTD_LIBRARY_RELEASE} DIRECTORY)

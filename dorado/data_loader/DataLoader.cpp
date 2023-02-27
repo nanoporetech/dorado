@@ -13,6 +13,7 @@
 #include <cctype>
 #include <ctime>
 #include <filesystem>
+#include <mutex>
 
 namespace {
 void string_reader(HighFive::Attribute& attribute, std::string& target_str) {
@@ -122,7 +123,6 @@ std::shared_ptr<dorado::Read> process_pod5_read(size_t row,
     new_read->run_id = run_info_data->protocol_run_id;
     return new_read;
 }
-
 } /* anonymous namespace */
 
 namespace dorado {

@@ -13,4 +13,4 @@ endif()
 
 set(CMAKE_PREFIX_PATH ${OPENSSL_ROOT_DIR} ${CMAKE_PREFIX_PATH}) # put the selected openssl path before any older imported one.
 
-find_package(OpenSSL REQUIRED)
+find_package(OpenSSL REQUIRED QUIET)
