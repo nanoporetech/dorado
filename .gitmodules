@@ -15,7 +15,7 @@
 	url = https://github.com/yhirose/cpp-httplib.git
 [submodule "dorado/3rdparty/11Zip"]
 	path = dorado/3rdparty/elzip
-	url = https://github.com/iiSeymour/11Zip.git
+	url = https://github.com/Sygmei/11Zip.git
 [submodule "dorado/3rdparty/cxxpool"]
 	path = dorado/3rdparty/cxxpool
 	url = https://github.com/bloomen/cxxpool.git
