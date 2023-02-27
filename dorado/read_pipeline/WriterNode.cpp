@@ -3,12 +3,12 @@
 #include "Version.h"
 #include "utils/sequence_utils.h"
 
+#include <indicators/progress_bar.hpp>
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <chrono>
 #include <iostream>
-#include <sstream>
 #include <string>
 
 #ifndef _WIN32
@@ -60,9 +60,14 @@ void WriterNode::worker_thread() {
             std::reverse(read->qstring.begin(), read->qstring.end());
         }
 
-        if (m_num_reads_processed % 100 == 0 && m_isatty) {
-            std::scoped_lock<std::mutex> lock(m_cerr_mutex);
-            std::cerr << "\r> Reads processed: " << m_num_reads_processed;
+        if (((m_num_reads_processed % m_progress_bar_increment) == 0) && m_isatty &&
+            ((m_num_reads_processed / m_progress_bar_increment) < 100)) {
+            if (m_num_reads_expected != 0) {
+                m_progress_bar.tick();
+            } else {
+                std::scoped_lock<std::mutex> lock(m_cerr_mutex);
+                std::cerr << "\r> Reads processed: " << m_num_reads_processed;
+            }
         }
 
         if (utils::mean_qscore_from_qstring(read->qstring) < m_min_qscore) {
@@ -98,6 +103,7 @@ WriterNode::WriterNode(std::vector<std::string> args,
                        size_t min_qscore,
                        size_t num_worker_threads,
                        std::unordered_map<std::string, ReadGroup> read_groups,
+                       int num_reads,
                        size_t max_reads)
         : ReadSink(max_reads),
           m_args(std::move(args)),
@@ -111,12 +117,19 @@ WriterNode::WriterNode(std::vector<std::string> args,
           m_num_samples_processed(0),
           m_num_reads_processed(0),
           m_num_reads_failed(0),
-          m_initialization_time(std::chrono::system_clock::now()) {
+          m_initialization_time(std::chrono::system_clock::now()),
+          m_num_reads_expected(num_reads) {
 #ifdef _WIN32
     m_isatty = true;
 #else
     m_isatty = isatty(fileno(stderr));
 #endif
+
+    if (m_num_reads_expected <= 100) {
+        m_progress_bar_increment = 100;
+    } else {
+        m_progress_bar_increment = m_num_reads_expected / 100;
+    }
 
     print_header();
     for (size_t i = 0; i < num_worker_threads; i++) {
@@ -135,7 +148,6 @@ WriterNode::~WriterNode() {
     auto duration =
             std::chrono::duration_cast<std::chrono::milliseconds>(end_time - m_initialization_time)
                     .count();
-
     if (m_isatty) {
         std::cerr << "\r";
     }
