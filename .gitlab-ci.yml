@@ -101,20 +101,20 @@ build:linux:x86:focal:
   <<: *linux_runner
   <<: *build_dorado
 
-build:linux:arm64:bionic:
-  image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r32.4.3-deps:1.0
-  variables:
-    BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/torch-1.10.0-Linux-aarch64/torch/"
-  <<: *linux_arm64_runner
-  <<: *build_dorado
+#build:linux:arm64:bionic:
+#  image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r32.4.3-deps:1.0
+#  variables:
+#    BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/torch-1.10.0-Linux-aarch64/torch/"
+#  <<: *linux_arm64_runner
+#  <<: *build_dorado
 
-build:linux:arm64:focal:
-  image: nvcr.io/nvidia/l4t-pytorch:r35.1.0-pth1.13-py3
-  variables:
-    BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/lib/python3.8/dist-packages/torch"
-  <<: *linux_dependencies
-  <<: *linux_arm64_runner
-  <<: *build_dorado
+#build:linux:arm64:focal:
+#  image: nvcr.io/nvidia/l4t-pytorch:r35.1.0-pth1.13-py3
+#  variables:
+#    BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/lib/python3.8/dist-packages/torch"
+#  <<: *linux_dependencies
+#  <<: *linux_arm64_runner
+#  <<: *build_dorado
 
 #build:linux:x86:focal_koi_download:
 #  image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.0
