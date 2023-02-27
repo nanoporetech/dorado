@@ -28,7 +28,6 @@ extern "C" {
 #include <limits>
 #include <string>
 
-
 constexpr bool g_options_no_i8 = false;
 constexpr bool g_options_no_conv_i8 = true;
 constexpr float g_options_scale_i8 = 1.0f;
@@ -51,9 +50,7 @@ using quantized_lstm = std::function<int(void *, void *, void *, void *, void *,
         }                                                                                     \
     }
 
-static bool cuda_lstm_is_quantized(int layer_size) {
-    return (layer_size == 96);
-}
+static bool cuda_lstm_is_quantized(int layer_size) { return (layer_size == 96); }
 #endif  // if USE_CUDA_LSTM
 
 #if CUDA_PROFILE_TO_CERR
@@ -159,8 +156,8 @@ struct ConvolutionImpl : Module {
 
             cudaDeviceProp *prop = at::cuda::getCurrentDeviceProperties();
             const bool output_NTC = cuda_lstm_is_quantized(out_size);
-            const bool output_int8 = !g_options_no_conv_i8 && !g_options_no_i8 &&
-                                     !output_NTC && clamp && prop->major >= 8;
+            const bool output_int8 = !g_options_no_conv_i8 && !g_options_no_i8 && !output_NTC &&
+                                     clamp && prop->major >= 8;
 
             if (output_NTC) {
                 auto res = torch::empty({batch_size, chunk_size_out, out_size}, x.options());
@@ -171,7 +168,8 @@ struct ConvolutionImpl : Module {
                                      chunk_size_in, in_size, window_size, stride,
                                      ntcw_mat.stride(0), ntcw_mat.stride(1), ntcw_mat.stride(2),
                                      ntcw_mat.stride(3), x.data_ptr(), ntcw_mat.data_ptr());
-                dorado::utils::matmul_f16(ntcw_mat.view({-1, in_size * window_size}), w_device, res_2D);
+                dorado::utils::matmul_f16(ntcw_mat.view({-1, in_size * window_size}), w_device,
+                                          res_2D);
                 host_bias_swish_f16_clamp(stream, res_2D.size(0), res_2D.size(1), res_2D.stride(0),
                                           res_2D.data_ptr(), b_device.data_ptr(), max_value);
                 // Output is [N, T_out, C_out], contiguous
@@ -196,7 +194,8 @@ struct ConvolutionImpl : Module {
                                      chunk_size_in, in_size, window_size, stride,
                                      tncw_mat.stride(1), tncw_mat.stride(0), tncw_mat.stride(2),
                                      tncw_mat.stride(3), x.data_ptr(), tncw_mat.data_ptr());
-                dorado::utils::matmul_f16(tncw_mat.view({-1, in_size * window_size}), w_device, mm_out);
+                dorado::utils::matmul_f16(tncw_mat.view({-1, in_size * window_size}), w_device,
+                                          mm_out);
                 if (output_int8) {
                     //                    float scale = 2 * I8_RANGE / (max_value - SWISH_LOWER_BOUND);
                     //                    float zero_offset = scale * max_value - I8_RANGE;
@@ -704,8 +703,7 @@ template <class LSTMStackType>
 struct CRFModelImpl : Module {
     CRFModelImpl(const CRFModelConfig &config, bool expand_blanks, int batch_size, int chunk_size) {
         constexpr float conv_max_value = 3.5f;
-        float conv3_max_value =
-                g_options_conv3_max ? g_options_conv3_max : conv_max_value;
+        float conv3_max_value = g_options_conv3_max ? g_options_conv3_max : conv_max_value;
         conv1 = register_module("conv1", Convolution(config.num_features, config.conv, 5, 1,
                                                      config.clamp, conv_max_value, false));
         conv2 = register_module(
