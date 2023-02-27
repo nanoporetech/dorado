@@ -148,18 +148,18 @@ void BaseSpaceDuplexCallerNode::basespace(std::string template_read_id,
                     std::string(quality_scores_phred.begin(), quality_scores_phred.end());
 
             duplex_read->read_id = template_read->read_id + ";" + complement_read->read_id;
-            m_sink.push_read(duplex_read);
+            m_sink.push_message(duplex_read);
         }
         edlibFreeAlignResult(result);
     }
 }
 
 BaseSpaceDuplexCallerNode::BaseSpaceDuplexCallerNode(
-        ReadSink& sink,
+        MessageSink& sink,
         std::map<std::string, std::string> template_complement_map,
         std::map<std::string, std::shared_ptr<Read>> reads,
         size_t threads)
-        : ReadSink(1000),
+        : MessageSink(1000),
           m_sink(sink),
           m_template_complement_map(std::move(template_complement_map)),
           m_reads(std::move(reads)),

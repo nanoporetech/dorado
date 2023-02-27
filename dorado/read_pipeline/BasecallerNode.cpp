@@ -17,8 +17,11 @@ namespace dorado {
 constexpr auto FORCE_TIMEOUT = 100ms;
 
 void BasecallerNode::input_worker_thread() {
-    std::shared_ptr<Read> read;
-    while (m_work_queue.try_pop(read)) {
+    Message message;
+    while (m_work_queue.try_pop(message)) {
+        // If this message isn't a read, we'll get a bad_variant_access exception.
+        auto read = std::get<std::shared_ptr<Read>>(message);
+
         // Allow 5 batches per model runner on the chunks_in queue
         const size_t max_chunks_in = m_batch_size * m_num_active_model_runners * 5;
 
@@ -116,7 +119,7 @@ void BasecallerNode::working_reads_manager() {
 
         for (auto &read : completed_reads) {
             utils::stitch_chunks(read);
-            m_sink.push_read(read);
+            m_sink.push_message(read);
         }
     }
 
@@ -219,7 +222,7 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
     }
 }
 
-BasecallerNode::BasecallerNode(ReadSink &sink,
+BasecallerNode::BasecallerNode(MessageSink &sink,
                                std::vector<Runner> model_runners,
                                size_t batch_size,
                                size_t chunk_size,
@@ -227,7 +230,7 @@ BasecallerNode::BasecallerNode(ReadSink &sink,
                                size_t model_stride,
                                std::string model_name,
                                size_t max_reads)
-        : ReadSink(max_reads),
+        : MessageSink(max_reads),
           m_sink(sink),
           m_model_runners(std::move(model_runners)),
           m_batch_size(batch_size),

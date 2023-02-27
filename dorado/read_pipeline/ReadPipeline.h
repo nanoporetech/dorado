@@ -7,6 +7,7 @@
 #include <limits>
 #include <memory>
 #include <string>
+#include <variant>
 #include <vector>
 
 namespace dorado {
@@ -92,19 +93,24 @@ public:
     std::string generate_modbase_string(uint8_t threshold = 0) const;
 };
 
-// Base class for an object which consumes reads.
-// ReadSink is a node within a pipeline.
-class ReadSink {
+// As things stand, the only Message variant is shared_ptr<Read>.  Other Message types
+// can be added here.
+using Message = std::variant<std::shared_ptr<Read>>;
+
+// Base class for an object which consumes messages.
+// MessageSink is a node within a pipeline.
+class MessageSink {
 public:
-    ReadSink(size_t max_reads);
-    void push_read(
-            std::shared_ptr<Read>&
-                    read);  //Push a read into readsink. This can block if receiving ReadSink is full.
+    MessageSink(size_t max_messages);
+    // Pushed messages must be rvalues: the sink takes ownership.
+    void push_message(
+            Message&&
+                    message);  // Push a message into message sink.  This can block if the sink's queue is full.
     void terminate() { m_work_queue.terminate(); }
 
 protected:
     // Queue of work items for this node.
-    AsyncQueue<std::shared_ptr<Read>> m_work_queue;
+    AsyncQueue<Message> m_work_queue;
 };
 
 }  // namespace dorado

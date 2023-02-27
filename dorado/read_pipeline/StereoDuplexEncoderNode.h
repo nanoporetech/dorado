@@ -4,17 +4,17 @@
 
 namespace dorado {
 
-class StereoDuplexEncoderNode : public ReadSink {
+class StereoDuplexEncoderNode : public MessageSink {
 public:
     // Chunk size and overlap are in raw samples
-    StereoDuplexEncoderNode(ReadSink &sink,
+    StereoDuplexEncoderNode(MessageSink &sink,
                             std::map<std::string, std::string> template_complement_map);
     ~StereoDuplexEncoderNode();
 
 private:
     // Consume reads from input queue
     void worker_thread();
-    ReadSink &m_sink;
+    MessageSink &m_sink;
 
     std::mutex m_tc_map_mutex;
     std::mutex m_ct_map_mutex;
