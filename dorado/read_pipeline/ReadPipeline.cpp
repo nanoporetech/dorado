@@ -243,13 +243,13 @@ std::string Read::generate_modbase_string(uint8_t threshold) const {
     return modbase_string;
 }
 
-void ReadSink::push_read(std::shared_ptr<Read>& read) {
-    const bool success = m_work_queue.try_push(std::move(read));
+void MessageSink::push_message(Message&& message) {
+    const bool success = m_work_queue.try_push(std::move(message));
     // try_push will fail if the sink has been told to terminate.
     // We do not expect to be pushing reads from this source if that is the case.
     assert(success);
 }
 
-ReadSink::ReadSink(size_t max_reads) : m_work_queue(max_reads) {}
+MessageSink::MessageSink(size_t max_messages) : m_work_queue(max_messages) {}
 
 }  // namespace dorado

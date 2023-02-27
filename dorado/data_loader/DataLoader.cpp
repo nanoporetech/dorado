@@ -347,7 +347,7 @@ void DataLoader::load_pod5_reads_from_file(const std::string& path) {
 
         for (auto& v : futures) {
             auto read = v.get();
-            m_read_sink.push_read(read);
+            m_read_sink.push_message(read);
             m_loaded_read_count++;
         }
 
@@ -444,13 +444,13 @@ void DataLoader::load_fast5_reads_from_file(const std::string& path) {
 
         if (m_allowed_read_ids.size() == 0 ||
             (m_allowed_read_ids.find(new_read->read_id) != m_allowed_read_ids.end())) {
-            m_read_sink.push_read(new_read);
+            m_read_sink.push_message(new_read);
             m_loaded_read_count++;
         }
     }
 }
 
-DataLoader::DataLoader(ReadSink& read_sink,
+DataLoader::DataLoader(MessageSink& read_sink,
                        const std::string& device,
                        size_t num_worker_threads,
                        size_t max_reads,
