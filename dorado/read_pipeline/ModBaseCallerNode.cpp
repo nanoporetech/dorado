@@ -119,8 +119,11 @@ void ModBaseCallerNode::init_modbase_info() {
 }
 
 void ModBaseCallerNode::runner_worker_thread(size_t runner_id) {
-    std::shared_ptr<Read> read;
-    while (m_work_queue.try_pop(read)) {
+    Message message;
+    while (m_work_queue.try_pop(message)) {
+        // If this message isn't a read, we'll get a bad_variant_access exception.
+        auto read = std::get<std::shared_ptr<Read>>(message);
+
         const size_t max_chunks_in = m_batch_size * 5;  // size per queue: one queue per caller
         auto chunk_queues_available = [this, &max_chunks_in] {
             return std::all_of(

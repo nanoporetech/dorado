@@ -243,9 +243,8 @@ std::string Read::generate_modbase_string(uint8_t threshold) const {
     return modbase_string;
 }
 
-void MessageSink::push_message(std::shared_ptr<Read>& read) {
-    // FIXME -- moving from ref!
-    const bool success = m_work_queue.try_push(std::move(read));
+void MessageSink::push_message(Message&& message) {
+    const bool success = m_work_queue.try_push(std::move(message));
     // try_push will fail if the sink has been told to terminate.
     // We do not expect to be pushing reads from this source if that is the case.
     assert(success);

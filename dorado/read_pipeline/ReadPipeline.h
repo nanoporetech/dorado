@@ -7,6 +7,7 @@
 #include <limits>
 #include <memory>
 #include <string>
+#include <variant>
 #include <vector>
 
 namespace dorado {
@@ -92,19 +93,19 @@ public:
     std::string generate_modbase_string(uint8_t threshold = 0) const;
 };
 
-// FIXME -- As things stand, these just encompass Reads.  The intention
-// is to allow for other types of data flow, the first step being
-// std::variant<...>
-using Message = std::shared_ptr<Read>;
+// As things stand, the only Message variant is shared_ptr<Read>.  Other Message types
+// can be added here.
+using Message = std::variant<std::shared_ptr<Read>>;
 
 // Base class for an object which consumes messages.
 // MessageSink is a node within a pipeline.
 class MessageSink {
 public:
     MessageSink(size_t max_messages);
+    // Pushed messages must be rvalues: the sink takes ownership.
     void push_message(
-            Message&
-                    message);  // Push a message into message sink.  This can block if it is full.
+            Message&&
+                    message);  // Push a message into message sink.  This can block if the sink's queue is full.
     void terminate() { m_work_queue.terminate(); }
 
 protected:

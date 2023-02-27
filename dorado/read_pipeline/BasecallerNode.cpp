@@ -17,8 +17,11 @@ namespace dorado {
 constexpr auto FORCE_TIMEOUT = 100ms;
 
 void BasecallerNode::input_worker_thread() {
-    std::shared_ptr<Read> read;
-    while (m_work_queue.try_pop(read)) {
+    Message message;
+    while (m_work_queue.try_pop(message)) {
+        // If this message isn't a read, we'll get a bad_variant_access exception.
+        auto read = std::get<std::shared_ptr<Read>>(message);
+
         // Allow 5 batches per model runner on the chunks_in queue
         const size_t max_chunks_in = m_batch_size * m_num_active_model_runners * 5;
 

@@ -254,10 +254,10 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
 namespace dorado {
 
 void StereoDuplexEncoderNode::worker_thread() {
-    int i = 0;
-
-    std::shared_ptr<Read> read;
-    while (m_work_queue.try_pop(read)) {
+    Message message;
+    while (m_work_queue.try_pop(message)) {
+        // If this message isn't a read, we'll get a bad_variant_access exception.
+        auto read = std::get<std::shared_ptr<Read>>(message);
         bool read_is_template = false;
         bool partner_found = false;
         std::string partner_id;

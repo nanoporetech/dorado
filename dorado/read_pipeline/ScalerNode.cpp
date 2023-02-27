@@ -24,8 +24,11 @@ std::pair<float, float> normalisation(torch::Tensor& x) {
 namespace dorado {
 
 void ScalerNode::worker_thread() {
-    std::shared_ptr<Read> read;
-    while (m_work_queue.try_pop(read)) {
+    Message message;
+    while (m_work_queue.try_pop(message)) {
+        // If this message isn't a read, we'll get a bad_variant_access exception.
+        auto read = std::get<std::shared_ptr<Read>>(message);
+
         const auto [shift, scale] = normalisation(read->raw_data);
         // raw_data comes from DataLoader with dtype int16.  We send it on as float16 after
         // shifting/scaling in float32 form.

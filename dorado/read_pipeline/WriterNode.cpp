@@ -49,8 +49,11 @@ void WriterNode::print_header() {
 }
 
 void WriterNode::worker_thread() {
-    std::shared_ptr<Read> read;
-    while (m_work_queue.try_pop(read)) {
+    Message message;
+    while (m_work_queue.try_pop(message)) {
+        // If this message isn't a read, we'll get a bad_variant_access exception.
+        auto read = std::get<std::shared_ptr<Read>>(message);
+
         m_num_bases_processed += read->seq.length();
         m_num_samples_processed += read->raw_data.size(0);
         ++m_num_reads_processed;
