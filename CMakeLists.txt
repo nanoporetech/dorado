@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
+set(CMAKE_POLICY_DEFAULT_CMP0063 NEW)
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 
 project(dorado)
@@ -39,7 +40,7 @@ endif()
 add_subdirectory(dorado/3rdparty/elzip)
 
 set(BUILD_TESTING OFF)
-add_subdirectory(dorado/3rdparty/edlib EXCLUDE_FROM_ALL)
+add_subdirectory(${DORADO_3RD_PARTY}/edlib EXCLUDE_FROM_ALL)
 set(BUILD_TESTING ON)
 
 enable_testing()
@@ -147,18 +148,18 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR}/dorado
     ${HDF5_INCLUDE_DIRS}
     ${KOI_INCLUDE}
     ${POD5_INCLUDE}
-    dorado/3rdparty/HighFive/include
-    dorado/3rdparty/catch2
-    dorado/3rdparty/argparse
-    dorado/3rdparty/toml11
-    dorado/3rdparty/cpp-httplib
-    dorado/3rdparty/metal-cpp/metal-cpp
-    dorado/3rdparty/hdf_plugins/vbz_plugin
     ${HTSLIB_DIR}
-    dorado/3rdparty/cxxpool/src
-    dorado/3rdparty/NVTX/c/include
+    ${DORADO_3RD_PARTY}/HighFive/include
+    ${DORADO_3RD_PARTY}/catch2
+    ${DORADO_3RD_PARTY}/argparse
+    ${DORADO_3RD_PARTY}/toml11
+    ${DORADO_3RD_PARTY}/cpp-httplib
+    ${DORADO_3RD_PARTY}/metal-cpp/metal-cpp
+    ${DORADO_3RD_PARTY}/hdf_plugins/vbz_plugin
+    ${DORADO_3RD_PARTY}/cxxpool/src
+    ${DORADO_3RD_PARTY}/NVTX/c/include
+    ${DORADO_3RD_PARTY}/spdlog/include
     dorado
-    dorado/3rdparty/spdlog/include
 )
 
 enable_testing()
