@@ -28,6 +28,10 @@ public:
     static std::unordered_map<std::string, ReadGroup> load_read_groups(std::string data_path,
                                                                        std::string model_path);
 
+    static int get_num_reads(
+            std::string data_path,
+            std::unordered_set<std::string> read_list = std::unordered_set<std::string>());
+
 private:
     void load_fast5_reads_from_file(const std::string& path);
     void load_pod5_reads_from_file(const std::string& path);
