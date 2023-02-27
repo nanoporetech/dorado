@@ -28,6 +28,13 @@ extern "C" {
 #include <limits>
 #include <string>
 
+
+constexpr bool g_options_no_i8 = false;
+constexpr bool g_options_no_conv_i8 = false;
+constexpr float g_options_scale_i8 = 1.0f;
+constexpr float g_options_scale_i8_lstm = 1.0f;
+constexpr float g_options_conv3_max = 3.5f;
+
 using namespace torch::nn;
 namespace F = torch::nn::functional;
 using Slice = torch::indexing::Slice;
@@ -44,29 +51,8 @@ using quantized_lstm = std::function<int(void *, void *, void *, void *, void *,
         }                                                                                     \
     }
 
-static void cublas_matmul_f16(torch::Tensor const &A, torch::Tensor const &B, torch::Tensor &C) {
-    constexpr uint16_t HALF_ZERO = 0;      // 0.0 in __half format
-    constexpr uint16_t HALF_ONE = 0x3C00;  // 1.0 in __half format
-    assert(A.dtype() == torch::kF16 && B.dtype() == torch::kF16 && C.dtype() == torch::kF16);
-    assert(A.stride(1) == 1 && B.stride(1) == 1 && C.stride(1) == 1);
-    assert(A.size(0) == C.size(0));  // M
-    assert(B.size(1) == C.size(1));  // N
-    assert(A.size(1) == B.size(0));  // K
-    auto res =
-            cublasGemmEx(at::cuda::getCurrentCUDABlasHandle(), CUBLAS_OP_N, CUBLAS_OP_N, B.size(1),
-                         A.size(0), A.size(1), &HALF_ONE, B.data_ptr(), CUDA_R_16F, B.stride(0),
-                         A.data_ptr(), CUDA_R_16F, A.stride(0), &HALF_ZERO, C.data_ptr(),
-                         CUDA_R_16F, C.stride(0), CUDA_R_16F, CUBLAS_GEMM_DEFAULT_TENSOR_OP);
-    if (res != CUBLAS_STATUS_SUCCESS) {
-        spdlog::error("CuBLAS error {}", int(res));
-        exit(EXIT_FAILURE);
-    }
-}
-
 static bool cuda_lstm_is_quantized(int layer_size) {
-    return ((layer_size == 96) ||
-            (layer_size ==
-             128));  // TODO - change back! just a test to see if quantized kernels are the problem
+    return (layer_size == 96);
 }
 #endif  // if USE_CUDA_LSTM
 
@@ -173,9 +159,8 @@ struct ConvolutionImpl : Module {
 
             cudaDeviceProp *prop = at::cuda::getCurrentDeviceProperties();
             const bool output_NTC = cuda_lstm_is_quantized(out_size);
-            // TODO: reinstate output as int8
-            //            const bool output_int8 = !output_NTC && clamp && prop->major >= 8;
-            const bool output_int8 = false;
+            const bool output_int8 = !g_options_no_conv_i8 && !g_options_no_i8 &&
+                                     !output_NTC && clamp && prop->major >= 8;
 
             if (output_NTC) {
                 auto res = torch::empty({batch_size, chunk_size_out, out_size}, x.options());
@@ -186,7 +171,7 @@ struct ConvolutionImpl : Module {
                                      chunk_size_in, in_size, window_size, stride,
                                      ntcw_mat.stride(0), ntcw_mat.stride(1), ntcw_mat.stride(2),
                                      ntcw_mat.stride(3), x.data_ptr(), ntcw_mat.data_ptr());
-                cublas_matmul_f16(ntcw_mat.view({-1, in_size * window_size}), w_device, res_2D);
+                dorado::utils::matmul_f16(ntcw_mat.view({-1, in_size * window_size}), w_device, res_2D);
                 host_bias_swish_f16_clamp(stream, res_2D.size(0), res_2D.size(1), res_2D.stride(0),
                                           res_2D.data_ptr(), b_device.data_ptr(), max_value);
                 // Output is [N, T_out, C_out], contiguous
@@ -211,13 +196,24 @@ struct ConvolutionImpl : Module {
                                      chunk_size_in, in_size, window_size, stride,
                                      tncw_mat.stride(1), tncw_mat.stride(0), tncw_mat.stride(2),
                                      tncw_mat.stride(3), x.data_ptr(), tncw_mat.data_ptr());
-                cublas_matmul_f16(tncw_mat.view({-1, in_size * window_size}), w_device, mm_out);
+                dorado::utils::matmul_f16(tncw_mat.view({-1, in_size * window_size}), w_device, mm_out);
                 if (output_int8) {
-                    float scale = 2 * I8_RANGE / (max_value - SWISH_LOWER_BOUND);
-                    float zero_offset = scale * max_value - I8_RANGE;
-                    host_bias_swish_f16_i8_inplace(stream, mm_out.size(0), mm_out.size(1), out_size,
-                                                   mm_out.data_ptr(), b_device.data_ptr(), scale,
-                                                   zero_offset);
+                    //                    float scale = 2 * I8_RANGE / (max_value - SWISH_LOWER_BOUND);
+                    //                    float zero_offset = scale * max_value - I8_RANGE;
+                    //                    float scale = 2.f * I8_RANGE;
+                    //                    float zero_offset = 0.f;
+                    host_bias_swish_f16_clamp(stream, mm_out.size(0), mm_out.size(1),
+                                              mm_out.stride(0), mm_out.data_ptr(),
+                                              b_device.data_ptr(), max_value);
+                    float scale_i8 = g_options_scale_i8;
+                    if (scale_i8) {
+                        mm_out /= scale_i8;
+                    }
+                    host_f16_to_i8_inplace(stream, mm_out.data_ptr(), mm_out.size(0),
+                                           mm_out.size(1), mm_out.stride(0), out_size);
+                    //                    host_bias_swish_f16_i8_inplace(stream, mm_out.size(0), mm_out.size(1), out_size,
+                    //                                                   mm_out.data_ptr(), b_device.data_ptr(), scale,
+                    //                                                   zero_offset);
                 } else {
                     host_bias_swish_f16_clamp(stream, mm_out.size(0), mm_out.size(1),
                                               mm_out.stride(0), mm_out.data_ptr(),
@@ -377,14 +373,14 @@ struct CudaLSTMStackImpl : Module {
     quantized_lstm _host_run_lstm_fwd_quantized{nullptr};
     quantized_lstm _host_run_lstm_rev_quantized{nullptr};
 
-    torch::Tensor forward_cublas(torch::Tensor in) {
+    torch::Tensor forward_cublas_or_cutlass(torch::Tensor in) {
         // input is ([T+1, N, 2, C], contiguous) (see below)
         auto stream = at::cuda::getCurrentCUDAStream().stream();
 
         // Cutlass kernel currently requires SM8.0 (A100) or later
         cudaDeviceProp *prop = at::cuda::getCurrentDeviceProperties();
         const bool use_cutlass = prop->major >= 8;
-        const bool use_int8 = use_cutlass;
+        const bool use_int8 = !g_options_no_i8 && use_cutlass;
 
         torch::Tensor mat_working_mem = in;
         const int chunk_size = in.size(0) - 1;
@@ -445,15 +441,21 @@ struct CudaLSTMStackImpl : Module {
                         auto [scale, quantized] = quantize_tensor(weights_f32);
                         weights_cpu = quantized.t();
                         if (layer_idx == 0) {
-                            scale *= scale_i8 / I8_RANGE;
-                            layer_device_bias = layer_device_bias +
-                                                weights_f32.sum(1) * (zero_offset_i8 / scale_i8);
+                            //                            scale /= scale_i8 / I8_RANGE;
+                            scale_i8 = g_options_scale_i8_lstm;
+                            if (scale_i8) {
+                                scale /= scale_i8;
+                            }
+                            //                            layer_device_bias = (rnn->bias.to(torch::kF32).to(torch::kCPU) +
+                            //                                    (weights_f32.sum(0).to(torch::kCPU) * (zero_offset_i8 / scale_i8)))
+                            //                                                .to(in.device()).to(torch::kF16).contiguous();
                         }
                         device_scale.push_back(scale.contiguous().to(in.device()).to(torch::kF16));
                     } else {
                         device_scale.push_back(torch::ones_like(layer_device_bias));
                     }
-                    device_bias.push_back(layer_device_bias);
+                    device_bias.push_back(
+                            layer_device_bias.to(in.device()).to(torch::kF16).contiguous());
                     // Cutlass kernel expects weights reordered as <igigigigfofofofo>
                     auto weights_cpu_cutlass = torch::empty_like(weights_cpu);
                     for (int i = 0; i < layer_size; ++i) {
@@ -638,7 +640,7 @@ struct CudaLSTMStackImpl : Module {
             return forward_quantized(x);
         } else {
             // Output is [N, T, C], non-contiguous
-            return forward_cublas(x);
+            return forward_cublas_or_cutlass(x);
         }
     }
 
@@ -702,15 +704,19 @@ template <class LSTMStackType>
 struct CRFModelImpl : Module {
     CRFModelImpl(const CRFModelConfig &config, bool expand_blanks, int batch_size, int chunk_size) {
         constexpr float conv_max_value = 3.5f;
+        float conv3_max_value =
+                g_options_conv3_max ? g_options_conv3_max : conv_max_value;
         conv1 = register_module("conv1", Convolution(config.num_features, config.conv, 5, 1,
                                                      config.clamp, conv_max_value, false));
         conv2 = register_module(
                 "conv2", Convolution(config.conv, 16, 5, 1, config.clamp, conv_max_value, false));
         conv3 = register_module("conv3", Convolution(16, config.insize, 19, config.stride,
-                                                     config.clamp, conv_max_value, true));
+                                                     config.clamp, conv3_max_value, true));
 
-        float scale = 2 * I8_RANGE / (conv_max_value - SWISH_LOWER_BOUND);
-        float zero_offset = scale * conv_max_value - I8_RANGE;
+        //        float scale = 2 * I8_RANGE / (conv3_max_value - SWISH_LOWER_BOUND);
+        //        float zero_offset = scale * conv3_max_value - I8_RANGE;
+        float scale = I8_RANGE;
+        float zero_offset = 0.f;
         rnns = register_module(
                 "rnns", LSTMStackType(config.insize, batch_size, chunk_size / config.stride, scale,
                                       zero_offset));
