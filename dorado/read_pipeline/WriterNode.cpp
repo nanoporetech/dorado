@@ -1,10 +1,9 @@
 #include "WriterNode.h"
 
 #include "Version.h"
-#include "indicators/progress_bar.hpp"
 #include "utils/sequence_utils.h"
 
-#include <indicators/cursor_control.hpp>
+#include <indicators/progress_bar.hpp>
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
@@ -61,8 +60,8 @@ void WriterNode::worker_thread() {
             std::reverse(read->qstring.begin(), read->qstring.end());
         }
 
-        if (((m_num_reads_processed % progress_bar_increment) == 0) && m_isatty &&
-            ((m_num_reads_processed / progress_bar_increment) < 100)) {
+        if (((m_num_reads_processed % m_progress_bar_increment) == 0) && m_isatty &&
+            ((m_num_reads_processed / m_progress_bar_increment) < 100)) {
             if (m_num_reads_expected != 0) {
                 m_progress_bar.tick();
             } else {
@@ -127,9 +126,9 @@ WriterNode::WriterNode(std::vector<std::string> args,
 #endif
 
     if (m_num_reads_expected <= 100) {
-        progress_bar_increment = 100;
+        m_progress_bar_increment = 100;
     } else {
-        progress_bar_increment = m_num_reads_expected / 100;
+        m_progress_bar_increment = m_num_reads_expected / 100;
     }
 
     print_header();
