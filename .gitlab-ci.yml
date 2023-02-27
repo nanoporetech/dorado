@@ -116,7 +116,7 @@ build:linux:arm64:focal:
   <<: *linux_arm64_runner
   <<: *build_dorado
 
-build:linux:x86:focal_koi_download:
+#build:linux:x86:focal_koi_download:
 #  image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.0
 #  variables:
 #    BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/libtorch"
@@ -132,7 +132,7 @@ build:windows:
     - export BUILD_OPTIONS="-A x64 -T cuda=${CUDA} -DCUDAToolkit_ROOT=${CUDA_TOOLKIT} -DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN}"
     - echo BUILD_OPTIONS is ${BUILD_OPTIONS}
 
-build:windows_koi_download:
+#build:windows_koi_download:
 #  <<: *windows_runner
 #  <<: *build_dorado
 #  before_script:
