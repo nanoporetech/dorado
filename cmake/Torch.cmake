@@ -17,7 +17,11 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32)
       endif()
     endif()
 
-    set(CUDNN_LIBRARY_PATH ${DORADO_3RD_PARTY}/fake_cudnn)
+    # use python3 to compute shorthash for libnvrtc.so
+    # https://github.com/pytorch/pytorch/blob/7289d22d6749465d3bae2cb5a6ce04729318f55b/cmake/public/cuda.cmake#L173
+    set(PYTHON_EXECUTABLE "python3")
+
+    set(CUDNN_LIBRARY_PATH ${DORADO_3RD_PARTY}/fake_cudnn/libcudnn.a)
     set(CUDNN_INCLUDE_PATH ${DORADO_3RD_PARTY}/fake_cudnn)
 
     set(CMAKE_CUDA_ARCHITECTURES 62 70 72 75)

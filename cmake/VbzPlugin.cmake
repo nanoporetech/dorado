@@ -4,6 +4,7 @@ function(add_hdf_vbz_plugin)
     set(ENABLE_PYTHON OFF)
     set(ENABLE_PACKAGING OFF)
     set(BUILD_SHARED_LIBS OFF)
+    set(BUILD_TESTING OFF)
 
     if(WIN32)
         # On windows we need to build a static lib for zstd as there's no prebuilt distro
@@ -19,5 +20,5 @@ function(add_hdf_vbz_plugin)
         install(FILES ${DORADO_3RD_PARTY}/cmake-build-zstd/lib/Release/zstd.dll DESTINATION bin)
     endif()
    
-    add_subdirectory(dorado/3rdparty/hdf_plugins)
+    add_subdirectory(dorado/3rdparty/hdf_plugins EXCLUDE_FROM_ALL)
 endfunction()
