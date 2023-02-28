@@ -37,7 +37,9 @@ if(DORADO_USING_OLD_CPP_ABI)
   add_compile_options(-D_GLIBCXX_USE_CXX11_ABI=0)
 endif()
 
-if((CMAKE_SYSTEM_PROCESSOR MATCHES "^aarch64*|^arm*") AND (${CUDAToolkit_VERSION} VERSION_LESS 11.0))
+if((CMAKE_SYSTEM_NAME STREQUAL "Linux") AND
+    (CMAKE_SYSTEM_PROCESSOR MATCHES "^aarch64*|^arm*") AND 
+    (${CUDAToolkit_VERSION} VERSION_LESS 11.0))
   add_compile_definitions(DORADO_TX2)
 endif()
 
