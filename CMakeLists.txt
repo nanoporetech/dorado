@@ -9,13 +9,25 @@ if (NOT EXISTS ${CMAKE_BINARY_DIR}/CMakeCache.txt)
     set(CMAKE_BUILD_TYPE "Release" CACHE STRING "" FORCE)
   endif()
 endif()
+
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
+
+if(WIN32)
+  message(STATUS "toolset: ${CMAKE_GENERATOR_TOOLSET}")
+  message(STATUS "platform: ${CMAKE_GENERATOR_PLATFORM}")
+  message(STATUS "vs platform: ${CMAKE_VS_PLATFORM_NAME}")
+endif()
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(DORADO_3RD_PARTY ${CMAKE_CURRENT_SOURCE_DIR}/dorado/3rdparty)
 
 find_package(CUDAToolkit QUIET)
+
+if(${CUDAToolkit_FOUND})
+  file(REAL_PATH ${CUDAToolkit_TARGET_DIR} CUDAToolkit_REAL_DIR)
+  message(STATUS "Found CUDA ${CUDAToolkit_VERSION} (${CUDAToolkit_TARGET_DIR} -> ${CUDAToolkit_REAL_DIR})")
+endif()
 
 include(cmake/DoradoVersion.cmake)
 include(cmake/UpdateSubmodules.cmake)
@@ -29,7 +41,6 @@ include(cmake/Pod5.cmake)
 include(cmake/Torch.cmake)
 include(cmake/OpenSSL.cmake)
 include(cmake/Htslib.cmake)
-
 
 if(DORADO_USING_OLD_CPP_ABI)
   # We need to force the use of the old ABI here, if we are building in an old ABI context, as otherwise elzip builds
@@ -52,17 +63,6 @@ set(BUILD_TESTING ON)
 enable_testing()
 
 configure_file(dorado/Version.h.in dorado/Version.h)
-
-if(WIN32)
-  message(STATUS "toolset: ${CMAKE_GENERATOR_TOOLSET}")
-  message(STATUS "platform: ${CMAKE_GENERATOR_PLATFORM}")
-  message(STATUS "vs platform: ${CMAKE_VS_PLATFORM_NAME}")
-endif()
-
-if(DEFINED CUDA_TOOLKIT_ROOT_DIR)
-  message(STATUS "CUDA toolkit dir is ${CUDA_TOOLKIT_ROOT_DIR}")
-  set(CUDAToolkit_ROOT ${CUDA_TOOLKIT_ROOT_DIR})
-endif()
 
 set(LIB_SOURCE_FILES
     dorado/nn/CRFModel.h
