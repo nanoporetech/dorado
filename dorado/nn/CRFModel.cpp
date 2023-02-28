@@ -34,10 +34,13 @@ using quantized_lstm = std::function<int(void *, void *, void *, void *, void *,
 #if USE_CUDA_LSTM
 
 static bool cuda_lstm_is_quantized(int layer_size) {
-    return ((layer_size == 96) ||
-            (layer_size ==
-             128));  // TODO - change back! just a test to see if quantized kernels are the problem
+#ifdef DORADO_TX2
+    return false;
+#else
+    return ((layer_size == 96) || (layer_size == 128));
+#endif
 }
+
 #endif  // if USE_CUDA_LSTM
 
 namespace {
@@ -365,7 +368,7 @@ struct CudaLSTMStackImpl : Module {
 
     std::pair<torch::Tensor, torch::Tensor> quantize_tensor(torch::Tensor tensor,
                                                             int levels = 256) {
-        //Qauntize a tensor to int8, returning per-channel scales and the quantized tensor
+        //Quantize a tensor to int8, returning per-channel scales and the quantized tensor
         //if weights have not been quantized we get some scaling
         tensor = tensor.transpose(0, 1).contiguous();
         auto fp_max = torch::abs(std::get<0>(torch::max(tensor, 0)));
