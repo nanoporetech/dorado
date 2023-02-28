@@ -143,7 +143,7 @@ std::vector<std::string> Read::extract_sam_lines(bool emit_moves, bool duplex) c
                  << cigar_string << "\t"        // CIGAR
                  << r_next << "\t"              // RNEXT
                  << (next_pos + 1) << "\t"      // PNEXT
-                 << (template_length) << "\t"   // TLEN
+                 << 0 << "\t"                   // TLEN
                  << seq << "\t"                 // SEQ
                  << qstring;                    // QUAL
 
