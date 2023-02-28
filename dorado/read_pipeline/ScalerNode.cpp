@@ -24,8 +24,11 @@ std::pair<float, float> normalisation(torch::Tensor& x) {
 namespace dorado {
 
 void ScalerNode::worker_thread() {
-    std::shared_ptr<Read> read;
-    while (m_work_queue.try_pop(read)) {
+    Message message;
+    while (m_work_queue.try_pop(message)) {
+        // If this message isn't a read, we'll get a bad_variant_access exception.
+        auto read = std::get<std::shared_ptr<Read>>(message);
+
         const auto [shift, scale] = normalisation(read->raw_data);
         // raw_data comes from DataLoader with dtype int16.  We send it on as float16 after
         // shifting/scaling in float32 form.
@@ -47,12 +50,12 @@ void ScalerNode::worker_thread() {
         read->num_trimmed_samples = trim_start;
 
         // Pass the read to the next node
-        m_sink.push_read(read);
+        m_sink.push_message(read);
     }
 }
 
-ScalerNode::ScalerNode(ReadSink& sink, int num_worker_threads, size_t max_reads)
-        : ReadSink(max_reads), m_sink(sink), m_num_worker_threads(num_worker_threads) {
+ScalerNode::ScalerNode(MessageSink& sink, int num_worker_threads, size_t max_reads)
+        : MessageSink(max_reads), m_sink(sink), m_num_worker_threads(num_worker_threads) {
     for (int i = 0; i < m_num_worker_threads; i++) {
         std::unique_ptr<std::thread> scaler_worker_thread =
                 std::make_unique<std::thread>(&ScalerNode::worker_thread, this);

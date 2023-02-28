@@ -37,6 +37,12 @@ if(DORADO_USING_OLD_CPP_ABI)
   add_compile_options(-D_GLIBCXX_USE_CXX11_ABI=0)
 endif()
 
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    if((CMAKE_SYSTEM_PROCESSOR MATCHES "^aarch64*|^arm*") AND (${CUDAToolkit_VERSION} VERSION_LESS 11.0))
+        add_compile_definitions(DORADO_TX2)
+    endif()
+endif()
+
 add_subdirectory(dorado/3rdparty/elzip)
 
 set(BUILD_TESTING OFF)
@@ -160,7 +166,8 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR}/dorado
     ${DORADO_3RD_PARTY}/NVTX/c/include
     ${DORADO_3RD_PARTY}/spdlog/include
     dorado
-)
+    dorado/3rdparty/spdlog/include
+    dorado/3rdparty/indicators/include)
 
 enable_testing()
 

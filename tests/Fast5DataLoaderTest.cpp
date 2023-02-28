@@ -10,15 +10,15 @@
 
 namespace {
 
-class MockSink : public dorado::ReadSink {
+class MockSink : public dorado::MessageSink {
 public:
-    MockSink() : ReadSink(1000) {}
+    MockSink() : MessageSink(1000) {}
     size_t get_read_count();
 };
 
 size_t MockSink::get_read_count() {
     size_t read_count = 0;
-    std::shared_ptr<dorado::Read> read;
+    dorado::Message read;
     while (m_work_queue.try_pop(read))
         ++read_count;
     return read_count;

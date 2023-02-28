@@ -11,9 +11,9 @@ namespace dorado {
 class RemoraCaller;
 class RemoraChunk;
 
-class ModBaseCallerNode : public ReadSink {
+class ModBaseCallerNode : public MessageSink {
 public:
-    ModBaseCallerNode(ReadSink& sink,
+    ModBaseCallerNode(MessageSink& sink,
                       std::vector<std::shared_ptr<RemoraCaller>> model_callers,
                       size_t remora_threads,
                       size_t num_devices,
@@ -38,7 +38,7 @@ private:
     // Called by caller_worker_thread, calls the model and enqueues the results
     void call_current_batch(size_t caller_id);
 
-    ReadSink& m_sink;
+    MessageSink& m_sink;
     size_t m_num_devices;
     size_t m_batch_size;
     size_t m_block_stride;
