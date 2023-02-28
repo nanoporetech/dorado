@@ -4,10 +4,10 @@
 
 namespace dorado {
 
-class BasecallerNode : public ReadSink {
+class BasecallerNode : public MessageSink {
 public:
     // Chunk size and overlap are in raw samples
-    BasecallerNode(ReadSink &sink,
+    BasecallerNode(MessageSink &sink,
                    std::vector<Runner> model_runners,
                    size_t batch_size,
                    size_t chunk_size,
@@ -27,7 +27,7 @@ private:
     // Construct complete reads
     void working_reads_manager();
 
-    ReadSink &m_sink;
+    MessageSink &m_sink;
     // Vector of model runners (each with their own GPU access etc)
     std::vector<Runner> m_model_runners;
     // Number of chunks in a batch

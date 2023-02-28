@@ -50,7 +50,11 @@ using quantized_lstm = std::function<int(void *, void *, void *, void *, void *,
         }                                                                                     \
     }
 
-static bool cuda_lstm_is_quantized(int layer_size) { return (layer_size == 96); }
+static bool cuda_lstm_is_quantized(int layer_size, cudaDeviceProp *prop) {
+    return !(prop->major == 6 && prop->minor == 2) &&
+           ((layer_size == 96) || (layer_size == 128 && prop->major < 8));
+}
+
 #endif  // if USE_CUDA_LSTM
 
 #if CUDA_PROFILE_TO_CERR
@@ -155,7 +159,7 @@ struct ConvolutionImpl : Module {
             auto b_device = conv->bias.to(x.options());
 
             cudaDeviceProp *prop = at::cuda::getCurrentDeviceProperties();
-            const bool output_NTC = cuda_lstm_is_quantized(out_size);
+            const bool output_NTC = cuda_lstm_is_quantized(out_size, prop);
             const bool output_int8 = !g_options_no_conv_i8 && !g_options_no_i8 && !output_NTC &&
                                      clamp && prop->major >= 8;
 
@@ -337,7 +341,7 @@ struct CudaLSTMStackImpl : Module {
         rnn4 = register_module("rnn_4", CudaLSTM(layer_size, false));
         rnn5 = register_module("rnn_5", CudaLSTM(layer_size, true));
 
-        m_quantize = cuda_lstm_is_quantized(layer_size);
+        m_quantize = cuda_lstm_is_quantized(layer_size, at::cuda::getCurrentDeviceProperties());
 
         if (m_quantize) {
             // chunk_size * batch_size can not be > 2**31 (2147483648).
@@ -546,7 +550,7 @@ struct CudaLSTMStackImpl : Module {
 
     std::pair<torch::Tensor, torch::Tensor> quantize_tensor(torch::Tensor tensor,
                                                             int levels = 256) {
-        //Qauntize a tensor to int8, returning per-channel scales and the quantized tensor
+        //Quantize a tensor to int8, returning per-channel scales and the quantized tensor
         //if weights have not been quantized we get some scaling
         auto fp_max = torch::abs(std::get<0>(torch::max(tensor, 0)));
         auto fp_min = torch::abs(std::get<0>(torch::min(tensor, 0)));

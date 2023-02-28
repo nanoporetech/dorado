@@ -2,7 +2,7 @@ set(OPENSSL_USE_STATIC_LIBS TRUE)
 
 if(APPLE)
     if(NOT DEFINED OPENSSL_ROOT_DIR)
-      set(OPENSSL_ROOT_DIR "/opt/homebrew/opt/openssl@3")
+      set(OPENSSL_ROOT_DIR "/opt/homebrew/opt/openssl@1.1")
     endif()
 elseif(WIN32)
     if(NOT DEFINED OPENSSL_ROOT_DIR)
