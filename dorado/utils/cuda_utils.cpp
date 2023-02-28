@@ -237,6 +237,9 @@ int select_batchsize(int layer_size, int min_batchsize, int max_batchsize, std::
 }
 
 int auto_gpu_batch_size(std::string model_path, std::vector<std::string> devices) {
+#if defined(__linux__) && defined(__aarch64__)
+    return 256;
+#else
     // memory breakpoints in GB
     const std::vector<int> breakpoints{8, 12, 16, 24, 32, 40};
     // {fast, hac, sup}
@@ -271,6 +274,7 @@ int auto_gpu_batch_size(std::string model_path, std::vector<std::string> devices
 
     spdlog::warn("Auto batchsize detection failed");
     return 128;
+#endif
 }
 
 namespace details {
