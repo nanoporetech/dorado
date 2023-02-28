@@ -34,7 +34,7 @@ using quantized_lstm = std::function<int(void *, void *, void *, void *, void *,
 #if USE_CUDA_LSTM
 
 static bool cuda_lstm_is_quantized(int layer_size) {
-#if defined(__linux__) && defined(__aarch64__)
+#ifdef DORADO_TX2
     return false;
 #else
     return ((layer_size == 96) || (layer_size == 128));

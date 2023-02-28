@@ -237,7 +237,7 @@ int select_batchsize(int layer_size, int min_batchsize, int max_batchsize, std::
 }
 
 int auto_gpu_batch_size(std::string model_path, std::vector<std::string> devices) {
-#if defined(__linux__) && defined(__aarch64__)
+#ifdef DORADO_TX2
     return 256;
 #else
     // memory breakpoints in GB
