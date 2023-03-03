@@ -420,7 +420,8 @@ struct MetalBlockImpl : Module {
                                       std::vector<torch::Tensor> &out) {
         auto command_buffer = command_queue->commandBuffer();
 
-        if (torch_dtype == torch::kF16) {
+        assert(in.dtype() == torch::kF16 || in.dtype() == torch::kF32);
+        if (in.dtype() == torch::kF32 && torch_dtype == torch::kF16) {
             // Convert input activations from float32 to float16.
             launch_kernel_no_wait(to_half_cps, command_buffer,
                                   {args_to_half, mtl_for_tensor(in), mat_temp}, {},
@@ -848,8 +849,7 @@ MetalModelRunner::MetalModelRunner(std::shared_ptr<MetalCaller> caller,
     // adjust chunk size to be a multiple of the stride
     chunk_size -= chunk_size % model_stride();
 
-    m_input = torch::empty({batch_size, 1, chunk_size},
-                           torch::TensorOptions().dtype(torch::kF32).device(torch::kCPU));
+    m_input = torch::empty({batch_size, 1, chunk_size}, torch::TensorOptions().dtype(torch::kF16));
 }
 
 void MetalModelRunner::accept_chunk(int chunk_idx, at::Tensor slice) {
