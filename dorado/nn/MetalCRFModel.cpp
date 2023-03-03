@@ -420,7 +420,7 @@ struct MetalBlockImpl : Module {
                                       std::vector<torch::Tensor> &out) {
         auto command_buffer = command_queue->commandBuffer();
 
-        assert(in.dtype() == torch::F16 || in.dtype() == torch::F32);
+        assert(in.dtype() == torch::kF16 || in.dtype() == torch::kF32);
         if (in.dtype() == torch::kF32 && torch_dtype == torch::kF16) {
             // Convert input activations from float32 to float16.
             launch_kernel_no_wait(to_half_cps, command_buffer,
