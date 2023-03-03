@@ -121,6 +121,7 @@ std::shared_ptr<dorado::Read> process_pod5_read(size_t row,
     new_read->attributes.channel_number = read_data.channel;
     new_read->attributes.start_time = start_time;
     new_read->run_id = run_info_data->protocol_run_id;
+    pod5_release_run_info(run_info_data);
     return new_read;
 }
 } /* anonymous namespace */
@@ -270,6 +271,8 @@ std::unordered_map<std::string, ReadGroup> DataLoader::load_read_groups(std::str
                     std::string device_id = run_info_data->system_name;
                     std::string run_id = run_info_data->protocol_run_id;
                     std::string sample_id = run_info_data->sample_id;
+
+                    pod5_release_run_info(run_info_data);
 
                     // Construct the read group ID
                     std::string id = run_id + "_" + model_path;
