@@ -39,3 +39,6 @@
 	url = https://github.com/p-ranav/indicators.git
 [submodule "dorado/3rdparty/elzip"]
 	url = https://github.com/iiSeymour/11Zip
+[submodule "dorado/3rdparty/ont_minimap2"]
+	path = dorado/3rdparty/ont_minimap2
+	url = https://github.com/nanoporetech/ont_minimap2
