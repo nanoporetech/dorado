@@ -210,6 +210,7 @@ if(NOT DORADO_LIB_ONLY)
 
     add_executable(dorado 
         dorado/main.cpp
+        dorado/cli/mm2.cpp
         dorado/cli/duplex.cpp
         dorado/cli/basecaller.cpp
         dorado/cli/benchmark.cpp        
