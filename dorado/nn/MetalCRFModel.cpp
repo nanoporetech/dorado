@@ -416,7 +416,7 @@ struct MetalBlockImpl : Module {
     // Executes the model, with the linear layer held off by linear_hold_off, if non-NULL.
     MTL::CommandBuffer *forward_async(torch::Tensor &in,
                                       MTL::SharedEvent *const linear_hold_off_event,
-                                      int linear_hold_off_id,
+                                      uint64_t linear_hold_off_id,
                                       std::vector<torch::Tensor> &out) {
         auto command_buffer = command_queue->commandBuffer();
 
@@ -451,9 +451,7 @@ struct MetalBlockImpl : Module {
         // can be overwritten by subsequent batches as soon as they have been consumed by
         // the linear layer.  The output of the linear layer must be protected until
         // it has been decoded.
-        if (linear_hold_off_event != nullptr) {
-            command_buffer->encodeWait(linear_hold_off_event, linear_hold_off_id);
-        }
+        command_buffer->encodeWait(linear_hold_off_event, linear_hold_off_id);
 
         // For now the same SIMD group count, and therefore threadgroup memory buffer size, is
         // used for all linear layer kernel invocations.
@@ -483,22 +481,6 @@ struct MetalBlockImpl : Module {
             }
         }
         return command_buffer;
-    }
-
-    torch::Tensor forward(torch::Tensor in) {
-        std::vector<torch::Tensor> out{torch::empty({lstm_chunk_size, batch_size, out_size})};
-        // TODO: find a more robust way of dealing with Metal kernel launch issues
-        for (int try_count = 0; try_count < 5; ++try_count) {
-            MTL::CommandBuffer *command_buffer = forward_async(in, nullptr, 0, out);
-            command_buffer->commit();
-            command_buffer->waitUntilCompleted();
-            if (command_buffer->status() == MTL::CommandBufferStatusCompleted) {
-                break;
-            }
-            using namespace std::chrono_literals;
-            std::this_thread::sleep_for(20ms);
-        }
-        return out.at(0);
     }
 
     MTL::Device *device;
@@ -534,11 +516,9 @@ struct MetalModelImpl : Module {
         mtl_block->load_weights();
     }
 
-    torch::Tensor forward(torch::Tensor x) { return mtl_block->forward(x); }
-
     MTL::CommandBuffer *forward_async(torch::Tensor &in,
                                       MTL::SharedEvent *const linear_hold_off_event,
-                                      int linear_hold_off_id,
+                                      uint64_t linear_hold_off_id,
                                       std::vector<torch::Tensor> &out) {
         return mtl_block->forward_async(in, linear_hold_off_event, linear_hold_off_id, out);
     }
@@ -620,7 +600,7 @@ public:
         m_model->eval();
 
         m_command_queue = m_device->newCommandQueue();
-        m_mtl_event = m_device->newSharedEvent();
+        m_decode_complete_event = m_device->newSharedEvent();
         m_bwd_scan_cps = make_cps(m_device, "backward_scan", {});
         m_fwd_scan_cps = make_cps(m_device, "forward_scan", {});
         m_add_softmax_cps = make_cps(m_device, "add_softmax", {});
@@ -669,10 +649,7 @@ public:
 
     struct NNTask {
         NNTask(torch::Tensor *input_, int num_chunks_, std::vector<DecodedChunk> *out_chunks_)
-                : input(input_), out_chunks(out_chunks_), num_chunks(num_chunks_) {
-            static int run = 0;
-            run_id = run++;
-        }
+                : input(input_), out_chunks(out_chunks_), num_chunks(num_chunks_) {}
 
         torch::Tensor *input;
         std::mutex mut;
@@ -682,7 +659,8 @@ public:
         int num_chunks;
         int decode_chunks_started{0};
         int decode_chunks_finished{0};
-        int run_id;
+        // Event ID to be signalled when decoding for this task is complete, set by metal_thread_fn.
+        uint64_t decode_complete_event_id = static_cast<uint64_t>(0);
     };
 
     void call_chunks(torch::Tensor &input, int num_chunks, std::vector<DecodedChunk> &out_chunks) {
@@ -704,6 +682,11 @@ public:
     }
 
     void metal_thread_fn() {
+        // Incrementing ID used to prevent the linear layer of run i+1 overwriting the scores of
+        // run i before the CPU has finished decoding all run i's chunks.
+        // Start at 1, since at event creation ID 0 is deemed to have been signalled.
+        auto next_decode_complete_event_id = static_cast<uint64_t>(1);
+
         while (true) {
             std::unique_lock<std::mutex> input_lock(m_input_lock);
             while (m_input_queue.empty() && !m_terminate) {
@@ -714,18 +697,22 @@ public:
                 return;
             }
 
-            NNTask *task = m_input_queue.back();
+            NNTask *const task = m_input_queue.back();
             m_input_queue.pop_back();
             input_lock.unlock();
+
+            // Assign this task a unique decode completion event ID.
+            // This ID will be signalled by the CPU once it has finished relevant decoding work,
+            // allowing the GPU to proceed.
+            task->decode_complete_event_id = next_decode_complete_event_id++;
 
             // TODO: find a more robust way of dealing with Metal kernel launch issues
             for (int try_count = 0; try_count < 5; ++try_count) {
                 // The linear layer should not execute until the previous batch has been decoded,
                 // since the same buffers are used for successive batches' scores, fwd/bwd scans.
-                MTL::SharedEvent *const linear_hold_off =
-                        (task->run_id != 0) ? m_mtl_event : nullptr;
-                MTL::CommandBuffer *cb = m_model->forward_async(*task->input, linear_hold_off,
-                                                                task->run_id - 1, m_scores_int8);
+                MTL::CommandBuffer *const cb =
+                        m_model->forward_async(*task->input, m_decode_complete_event,
+                                               task->decode_complete_event_id - 1, m_scores_int8);
 
                 // The same buffer is used for the forward scan results and the output of
                 // m_add_softmax_cps.
@@ -776,7 +763,7 @@ public:
             if (m_terminate) {
                 return;
             }
-            NNTask *task = m_decode_queue.back();
+            NNTask *const task = m_decode_queue.back();
             int chunk_idx = task->decode_chunks_started++;
             // If all chunks have been picked up for decoding, remove task from queue
             if (chunk_idx == task->num_chunks - 1) {
@@ -805,7 +792,10 @@ public:
             bool done = ++(task->decode_chunks_finished) == task->num_chunks;
             task_lock.unlock();
             if (done) {
-                m_mtl_event->setSignaledValue(task->run_id);
+                // Now that all chunks are decoded, signal that the GPU can overwrite the scores
+                // buffer with subsequent work.
+                assert(m_decode_complete_event != nullptr);
+                m_decode_complete_event->setSignaledValue(task->decode_complete_event_id);
                 task->cv.notify_one();
             }
         }
@@ -825,7 +815,8 @@ public:
     MTL::Device *m_device;
     MTL::CommandQueue *m_command_queue;
     MTL::ComputePipelineState *m_bwd_scan_cps, *m_fwd_scan_cps, *m_add_softmax_cps;
-    MTL::SharedEvent *m_mtl_event;
+    // Used to signal completion of an NNTask's decoding.
+    MTL::SharedEvent *m_decode_complete_event = nullptr;
     std::vector<torch::Tensor> m_scores_int8, m_posts, m_bwd;
     int m_out_chunk_size, m_batch_size, m_states, m_model_stride;
     // Number of pieces the linear output is split into, for reasons of
