@@ -337,7 +337,7 @@ mlhub:sre_lamba:
     .mlhub_sre
   variables:
     SRE_CONFIG_TRIGGER_KEY: ${MLHUB_TRIGGER_KEY_SRE_LAMBDA}
-    MODELS: '"dna_r10.4.1_e8.2_400bps_fast@v4.1.0","dna_r10.4.1_e8.2_400bps_hac@v4.1.0","dna_r10.4.1_e8.2_400bps_sup@v4.1.0"'
+    MODELS: '["dna_r10.4.1_e8.2_400bps_fast@v4.1.0","dna_r10.4.1_e8.2_400bps_hac@v4.1.0","dna_r10.4.1_e8.2_400bps_sup@v4.1.0"]'
 
 
 .mlhub_remora:
