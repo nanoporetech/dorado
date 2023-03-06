@@ -451,9 +451,7 @@ struct MetalBlockImpl : Module {
         // can be overwritten by subsequent batches as soon as they have been consumed by
         // the linear layer.  The output of the linear layer must be protected until
         // it has been decoded.
-        if (linear_hold_off_event != nullptr) {
-            command_buffer->encodeWait(linear_hold_off_event, linear_hold_off_id);
-        }
+        command_buffer->encodeWait(linear_hold_off_event, linear_hold_off_id);
 
         // For now the same SIMD group count, and therefore threadgroup memory buffer size, is
         // used for all linear layer kernel invocations.
@@ -483,22 +481,6 @@ struct MetalBlockImpl : Module {
             }
         }
         return command_buffer;
-    }
-
-    torch::Tensor forward(torch::Tensor in) {
-        std::vector<torch::Tensor> out{torch::empty({lstm_chunk_size, batch_size, out_size})};
-        // TODO: find a more robust way of dealing with Metal kernel launch issues
-        for (int try_count = 0; try_count < 5; ++try_count) {
-            MTL::CommandBuffer *command_buffer = forward_async(in, nullptr, 0, out);
-            command_buffer->commit();
-            command_buffer->waitUntilCompleted();
-            if (command_buffer->status() == MTL::CommandBufferStatusCompleted) {
-                break;
-            }
-            using namespace std::chrono_literals;
-            std::this_thread::sleep_for(20ms);
-        }
-        return out.at(0);
     }
 
     MTL::Device *device;
@@ -533,8 +515,6 @@ struct MetalModelImpl : Module {
         utils::load_state_dict(*this, weights);
         mtl_block->load_weights();
     }
-
-    torch::Tensor forward(torch::Tensor x) { return mtl_block->forward(x); }
 
     MTL::CommandBuffer *forward_async(torch::Tensor &in,
                                       MTL::SharedEvent *const linear_hold_off_event,
@@ -704,7 +684,8 @@ public:
     void metal_thread_fn() {
         // Incrementing ID used to prevent the linear layer of run i+1 overwriting the scores of
         // run i before the CPU has finished decoding all run i's chunks.
-        auto next_decode_complete_event_id = static_cast<uint64_t>(0);
+        // Start at 1, since at event creation ID 0 is deemed to have been signalled.
+        auto next_decode_complete_event_id = static_cast<uint64_t>(1);
 
         while (true) {
             std::unique_lock<std::mutex> input_lock(m_input_lock);
@@ -729,18 +710,9 @@ public:
             for (int try_count = 0; try_count < 5; ++try_count) {
                 // The linear layer should not execute until the previous batch has been decoded,
                 // since the same buffers are used for successive batches' scores, fwd/bwd scans.
-                MTL::CommandBuffer *cb = nullptr;
-                if (task->decode_complete_event_id) {
-                    // There was a preceding task whose decoding must be complete before
-                    // the linear layer of this task starts.
-                    cb = m_model->forward_async(*task->input, m_decode_complete_event,
-                                                task->decode_complete_event_id - 1, m_scores_int8);
-                } else {
-                    // There was no preceding task, and therefore the scores buffer is available for
-                    // immediate use.
-                    cb = m_model->forward_async(*task->input, nullptr, static_cast<uint64_t>(0),
-                                                m_scores_int8);
-                }
+                MTL::CommandBuffer *const cb =
+                        m_model->forward_async(*task->input, m_decode_complete_event,
+                                               task->decode_complete_event_id - 1, m_scores_int8);
 
                 // The same buffer is used for the forward scan results and the output of
                 // m_add_softmax_cps.
