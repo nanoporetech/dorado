@@ -318,6 +318,8 @@ test_archive:linux:arm64:20.04:
 .mlhub_sre:
   <<: *mlhub
   script:
+    - echo ${SRE_CONFIG_TRIGGER_KEY}
+    - echo ${MODELS}
     - |
       curl -i --header "Content-Type: application/json" \
       --request POST \
@@ -325,7 +327,7 @@ test_archive:linux:arm64:20.04:
           "key": "'${SRE_CONFIG_TRIGGER_KEY}'",
           "job_name": "Dorado SRE: '${CI_COMMIT_REF_NAME}' - '"$CI_COMMIT_TITLE"' ",
           "script_parameters": {
-              "models":$MODELS,
+              "models":"'${MODELS}'",
               "sre_output":"'${SRE_OUTPUT_ROOT}'/'${CI_COMMIT_SHA}'/",
               "dorado_branch":"'${CI_COMMIT_SHA}'",
               }
