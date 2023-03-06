@@ -329,7 +329,7 @@ test_archive:linux:arm64:20.04:
           "script_parameters": {
               "models":"'${MODELS}'",
               "sre_output":"'${SRE_OUTPUT_ROOT}'/'${CI_COMMIT_SHA}'/",
-              "dorado_branch":"'${CI_COMMIT_SHA}'",
+              "dorado_branch":"'${CI_COMMIT_SHA}'"
               }
       }' \
       ${MLHUB_TRIGGER_URL} \
