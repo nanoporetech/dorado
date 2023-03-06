@@ -319,7 +319,7 @@ test_archive:linux:arm64:20.04:
   <<: *mlhub
   script:
     - echo ${MODELS}
-    - >
+    - |
       curl -i --header "Content-Type: application/json" \
       --request POST \
       --data '{
