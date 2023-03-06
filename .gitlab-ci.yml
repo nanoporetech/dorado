@@ -331,7 +331,7 @@ test_archive:linux:arm64:20.04:
               "dorado_branch":"'${CI_COMMIT_SHA}'"
               }
       }' \
-      ${MLHUB_TRIGGER_URL} 
+      ${MLHUB_TRIGGER_URL}
 
 mlhub:sre_lamba:
   extends:
