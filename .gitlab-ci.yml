@@ -318,10 +318,9 @@ test_archive:linux:arm64:20.04:
 .mlhub_sre:
   <<: *mlhub
   script:
-    - echo ${SRE_CONFIG_TRIGGER_KEY}
     - echo ${MODELS}
     - |
-      curl -i --header "Content-Type: application/json" \
+      curl -i -v --header "Content-Type: application/json" \
       --request POST \
       --data '{
           "key": "'${SRE_CONFIG_TRIGGER_KEY}'",
@@ -332,7 +331,7 @@ test_archive:linux:arm64:20.04:
               "dorado_branch":"'${CI_COMMIT_SHA}'"
               }
       }' \
-      ${MLHUB_TRIGGER_URL} \
+      ${MLHUB_TRIGGER_URL} 
 
 mlhub:sre_lamba:
   extends:
