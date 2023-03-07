@@ -324,7 +324,7 @@ test_archive:linux:arm64:20.04:
       --request POST \
       --data '{
           "key": "'${SRE_CONFIG_TRIGGER_KEY}'",
-          "job_name": "Dorado SRE: '${CI_COMMIT_REF_NAME}' - '"$CI_COMMIT_TITLE"' ",
+          "job_name": "Dorado SRE: '${CONDITION}' '${CI_COMMIT_REF_NAME}' - '"$CI_COMMIT_TITLE"' ",
           "script_parameters": {
               "models":'${MODELS}',
               "sre_output":"'${SRE_OUTPUT_ROOT}'/'${CI_COMMIT_SHA}'/",
@@ -337,6 +337,7 @@ mlhub:sre_4k_260:
   extends:
     .mlhub_sre
   variables:
+    CONDITION: '4k_260bps'
     SRE_CONFIG_TRIGGER_KEY: ${MLHUB_TRIGGER_KEY_SRE_4k_260bps}
     MODELS: '["dna_r10.4.1_e8.2_260bps_fast@v4.1.0","dna_r10.4.1_e8.2_260bps_hac@v4.1.0","dna_r10.4.1_e8.2_260bps_sup@v4.1.0"]'
 
@@ -344,6 +345,7 @@ mlhub:sre_4k_400bps:
   extends:
     .mlhub_sre
   variables:
+    CONDITION: '4k_400bps'
     SRE_CONFIG_TRIGGER_KEY: ${MLHUB_TRIGGER_KEY_SRE_4k_400bps}
     MODELS: '["dna_r10.4.1_e8.2_400bps_fast@v4.1.0","dna_r10.4.1_e8.2_400bps_hac@v4.1.0","dna_r10.4.1_e8.2_400bps_sup@v4.1.0"]'
 
@@ -351,6 +353,7 @@ mlhub:sre_4k_400bps:
 #   extends:
 #     .mlhub_sre
 #   variables:
+#     CONDITION: '5k_400bps'
 #     SRE_CONFIG_TRIGGER_KEY: ${MLHUB_TRIGGER_KEY_SRE_5k_400bps}
 #     MODELS: '[5k models]'
 
