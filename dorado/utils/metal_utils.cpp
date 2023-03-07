@@ -322,6 +322,9 @@ int get_apple_cpu_perf_core_count() {
 }
 
 MTL::Buffer *mtl_for_tensor(const torch::Tensor &x) {
+    // Metal kernels assume contiguity.
+    if (!x.is_contiguous())
+        throw std::runtime_error("Tensor is not contiguous");
     auto ptr = (MTL::Buffer *)(x.storage().data_ptr().get_context());
     assert(ptr != nullptr);
     return ptr;

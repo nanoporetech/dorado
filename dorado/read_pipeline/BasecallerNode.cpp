@@ -204,8 +204,8 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
             }
 
             // Insert the chunk in the input tensor
-            m_model_runners[worker_id]->accept_chunk(int(m_batched_chunks[worker_id].size()),
-                                                     input_slice);
+            m_model_runners[worker_id]->accept_chunk(
+                    static_cast<int>(m_batched_chunks[worker_id].size()), input_slice);
 
             m_batched_chunks[worker_id].push_back(chunk);
             chunks_lock.lock();

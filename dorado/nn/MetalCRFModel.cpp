@@ -18,7 +18,8 @@ using namespace dorado::utils;
 using namespace std::chrono_literals;
 using namespace torch::nn;
 namespace F = torch::nn::functional;
-using Slice = torch::indexing::Slice;
+using torch::indexing::Ellipsis;
+using torch::indexing::Slice;
 
 static constexpr auto torch_dtype = torch::kF16;
 static const size_t dtype_bytes = torch::elementSize(torch_dtype);
@@ -225,7 +226,8 @@ struct MetalBlockImpl : Module {
 
         // args for conversion to half
         {
-            const std::vector<int32_t> args_to_half_{in_chunk_size * batch_size};
+            const std::vector<int32_t> args_to_half_{in_chunk_size * batch_size *
+                                                     config.num_features};
             args_to_half = create_vec_buffer(device, args_to_half_);
         }
 
@@ -288,8 +290,9 @@ struct MetalBlockImpl : Module {
         int mat_temp_elems =
                 batch_size * std::max(kMaxConv2OutChannels * in_chunk_size, layer_size);
 
-        conv1 = register_module("conv1", MetalConv1d(1, 1, conv, 5, 1, config.clamp, in_chunk_size,
-                                                     batch_size, device));
+        conv1 = register_module("conv1",
+                                MetalConv1d(1, config.num_features, conv, 5, 1, config.clamp,
+                                            in_chunk_size, batch_size, device));
         conv2 = register_module("conv2", MetalConv1d(2, conv, 16, 5, 1, config.clamp, in_chunk_size,
                                                      batch_size, device));
         conv3 = register_module("conv3", MetalConv1d(3, 16, layer_size, 19, stride, config.clamp,
@@ -334,7 +337,8 @@ struct MetalBlockImpl : Module {
             mat_temp_elems = std::max(mat_temp_elems,
                                       decomposition * (batch_size / out_split_) * lstm_chunk_size);
         } else {
-            bool is_v3_model = (config.conv == 4);
+            const bool is_v3_model = (config.num_features == 1 && config.conv == 4) ||
+                                     (config.num_features == 13 && config.conv == 16);
             const auto linear_constants = std::vector<std::tuple<std::string, MetalConstant>>(
                     {{"kLinearInSize", layer_size},
                      {"kLinearOutSize", out_size},
@@ -539,6 +543,7 @@ public:
 
         const auto model_config = load_crf_model_config(model_path);
         m_model_stride = static_cast<size_t>(model_config.stride);
+        m_num_input_features = model_config.num_features;
 
         m_device = get_mtl_device();
 
@@ -825,6 +830,8 @@ public:
     int m_out_batch_size;
     // v3 and v4 models have different score scaling requirements.
     float score_scale{0.0f};
+    // Chunk input channel count.
+    int m_num_input_features = -1;
 };
 
 std::shared_ptr<MetalCaller> create_metal_caller(const std::filesystem::path &model_path,
@@ -840,11 +847,25 @@ MetalModelRunner::MetalModelRunner(std::shared_ptr<MetalCaller> caller,
     // adjust chunk size to be a multiple of the stride
     chunk_size -= chunk_size % model_stride();
 
-    m_input = torch::empty({batch_size, 1, chunk_size}, torch::TensorOptions().dtype(torch::kF16));
+    // Metal convolution kernels operate with channel ordering (N, T, C).  If m_input
+    // is to be submitted directly then it must also have this arrangement.
+    // Note that this is not the same as other caller implementations, which
+    // have T innermost.
+    assert(m_caller->m_num_input_features > 0);
+    m_input = torch::empty({batch_size, chunk_size, caller->m_num_input_features}, torch::kF16);
 }
 
-void MetalModelRunner::accept_chunk(int chunk_idx, at::Tensor slice) {
-    m_input.index_put_({chunk_idx, 0}, slice);
+void MetalModelRunner::accept_chunk(int chunk_idx, const torch::Tensor &chunk) {
+    if (chunk.dim() == 1) {
+        // Input has single feature dimension.
+        assert(m_caller->m_num_input_features == 1);
+        m_input.index_put_({chunk_idx, Ellipsis, 0}, chunk);
+    } else {
+        // Chunks are passed with timestep the innermost dimension, whereas we need
+        // channels innermost.
+        assert(m_caller->m_num_input_features == chunk.size(0));
+        m_input.index_put_({chunk_idx, Ellipsis, Ellipsis}, chunk.transpose(0, 1));
+    }
 }
 
 std::vector<DecodedChunk> MetalModelRunner::call_chunks(int num_chunks) {
@@ -854,6 +875,6 @@ std::vector<DecodedChunk> MetalModelRunner::call_chunks(int num_chunks) {
 }
 
 size_t MetalModelRunner::model_stride() const { return m_caller->m_model_stride; }
-size_t MetalModelRunner::chunk_size() const { return m_input.size(2); }
+size_t MetalModelRunner::chunk_size() const { return m_input.size(1); }
 
 }  // namespace dorado

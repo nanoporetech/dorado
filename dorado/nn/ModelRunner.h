@@ -13,7 +13,7 @@ namespace dorado {
 
 class ModelRunnerBase {
 public:
-    virtual void accept_chunk(int chunk_idx, at::Tensor slice) = 0;
+    virtual void accept_chunk(int chunk_idx, const torch::Tensor &chunk) = 0;
     virtual std::vector<DecodedChunk> call_chunks(int num_chunks) = 0;
     virtual size_t model_stride() const = 0;
     virtual size_t chunk_size() const = 0;
@@ -28,7 +28,7 @@ public:
                 const std::string &device,
                 int chunk_size,
                 int batch_size);
-    void accept_chunk(int chunk_idx, at::Tensor slice) final;
+    void accept_chunk(int chunk_idx, const torch::Tensor &chunk) final;
     std::vector<DecodedChunk> call_chunks(int num_chunks) final;
     size_t model_stride() const final { return m_model_stride; }
     size_t chunk_size() const final { return m_input.size(2); }
@@ -74,8 +74,8 @@ std::vector<DecodedChunk> ModelRunner<T>::call_chunks(int num_chunks) {
 }
 
 template <typename T>
-void ModelRunner<T>::accept_chunk(int num_chunks, at::Tensor slice) {
-    m_input.index_put_({num_chunks, 0}, slice);
+void ModelRunner<T>::accept_chunk(int chunk_idx, const torch::Tensor &chunk) {
+    m_input.index_put_({chunk_idx, 0}, chunk);
 }
 
 }  // namespace dorado
