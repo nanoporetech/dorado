@@ -28,7 +28,7 @@ public:
                 const std::string &device,
                 int chunk_size,
                 int batch_size);
-    void accept_chunk(int chunk_idx, const torch::Tensor &slice) final;
+    void accept_chunk(int chunk_idx, const torch::Tensor &chunk) final;
     std::vector<DecodedChunk> call_chunks(int num_chunks) final;
     size_t model_stride() const final { return m_model_stride; }
     size_t chunk_size() const final { return m_input.size(2); }
