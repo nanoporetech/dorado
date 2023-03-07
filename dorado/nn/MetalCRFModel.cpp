@@ -86,6 +86,8 @@ struct MetalConv1dImpl : Module {
 
         // For layers 1 and 2 we only have kernels for particular in/out feature sizes.
         if (layer == 1) {
+            // Simplex in_size == 1.  Duplex in_size == 13.
+            assert(in_size == 1 || in_size == 13);
             assert(out_size == 4 || out_size == 16);
             assert(win_size = 5);
         } else if (layer == 2) {
@@ -130,11 +132,12 @@ struct MetalConv1dImpl : Module {
                 {"kConvOutputClamp", clamp}};
         const int kernel_threads = 32 * kernel_simd_groups;
         std::string kernel_name = "conv" + std::to_string(layer);
-        // Layers 1 and 2 have variants with a different intermediate feature size.
-        if (layer == 1)
-            kernel_name += "_out" + std::to_string(out_size);
-        else if (layer == 2)
-            kernel_name += "_in" + std::to_string(in_size);
+        // Layer 1 and 2 conv kernels are tailored to specific feature sizes.
+        if (layer == 1 || layer == 2) {
+            kernel_name += "_in" + std::to_string(in_size) +
+            "_out" + std::to_string(out_size);
+        }
+
         conv_cps = make_cps(device, kernel_name + "_simd", metal_constants, kernel_threads);
     }
 
