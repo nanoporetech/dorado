@@ -172,6 +172,8 @@ int duplex(int argc, char* argv[]) {
                 }
             }
 #endif  // __APPLE__
+            spdlog::info("> Starting Stereo Duplex pipeline");
+
             std::unique_ptr<BasecallerNode> stereo_basecaller_node;
 
             auto stereo_model_stride = stereo_runners.front()->model_stride();
