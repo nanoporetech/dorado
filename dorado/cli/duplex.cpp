@@ -77,6 +77,13 @@ int duplex(int argc, char* argv[]) {
                 utils::load_pairs_file(pairs_file);
         spdlog::info("> Pairs file loaded");
 
+        const auto model_path = std::filesystem::path(model);
+
+        // Currently the stereo model is hardcoded.
+        const std::string stereo_model_name("dna_r10.4.1_e8.2_4khz_stereo@v1.1");
+        const auto stereo_model_path =
+                model_path.parent_path() / std::filesystem::path(stereo_model_name);
+
         bool emit_moves = false, rna = false, duplex = true;
         WriterNode writer_node(std::move(args), emit_fastq, emit_moves, rna, duplex, min_qscore, 4);
 
@@ -95,7 +102,8 @@ int duplex(int argc, char* argv[]) {
             std::vector<Runner> runners;
             std::vector<Runner> stereo_runners;
 
-            int num_devices;
+            // Default is 1 device.  CUDA path may alter this.
+            int num_devices = 1;
             int batch_size(parser.get<int>("-b"));
             int chunk_size(parser.get<int>("-c"));
             int overlap(parser.get<int>("-o"));
@@ -107,12 +115,31 @@ int duplex(int argc, char* argv[]) {
                 batch_size = batch_size == 0 ? std::thread::hardware_concurrency() : batch_size;
                 for (size_t i = 0; i < num_runners; i++) {
                     runners.push_back(std::make_shared<ModelRunner<CPUDecoder>>(
-                            model, device, chunk_size, batch_size));
+                            model_path, device, chunk_size, batch_size));
                 }
 #ifdef __APPLE__
+            } else if (device == "metal") {
+                if (batch_size == 0) {
+                    batch_size = utils::auto_gpu_batch_size();
+                    spdlog::debug("- selected batchsize {}", batch_size);
+                }
+                auto simplex_caller = create_metal_caller(model_path, chunk_size, batch_size);
+                for (int i = 0; i < num_runners; i++) {
+                    runners.push_back(std::make_shared<MetalModelRunner>(simplex_caller, chunk_size,
+                                                                         batch_size));
+                }
+
+                // For now, the minimal batch size is used for the duplex model.
+                stereo_batch_size = 48;
+
+                auto duplex_caller =
+                        create_metal_caller(stereo_model_path, chunk_size, stereo_batch_size);
+                for (size_t i = 0; i < num_runners; i++) {
+                    stereo_runners.push_back(std::make_shared<MetalModelRunner>(
+                            duplex_caller, chunk_size, stereo_batch_size));
+                }
             } else {
-                throw std::runtime_error(
-                        std::string("Stereo Duplex currently unspported on Metal"));
+                throw std::runtime_error(std::string("Unsupported device: ") + device);
             }
 #else   // ifdef __APPLE__
             } else {
@@ -125,7 +152,8 @@ int duplex(int argc, char* argv[]) {
                         batch_size == 0 ? utils::auto_gpu_batch_size(model, devices) : batch_size;
                 batch_size = batch_size / 2;  //Needed to support Stereo and Simplex in parallel
                 for (auto device_string : devices) {
-                    auto caller = create_cuda_caller(model, chunk_size, batch_size, device_string);
+                    auto caller =
+                            create_cuda_caller(model_path, chunk_size, batch_size, device_string);
                     for (size_t i = 0; i < num_runners; i++) {
                         runners.push_back(
                                 std::make_shared<CudaModelRunner>(caller, chunk_size, batch_size));
@@ -134,16 +162,9 @@ int duplex(int argc, char* argv[]) {
 
                 stereo_batch_size = 1024;
 
-                std::string stereo_model_name("dna_r10.4.1_e8.2_4khz_stereo@v1.1");
-                auto model_path = std::filesystem::path(model);
-                auto stereo_model_path =
-                        model_path.parent_path() / std::filesystem::path(stereo_model_name);
-
-                std::string stereo_model(stereo_model_path.string());
-
                 for (auto device_string : devices) {
-                    auto caller = create_cuda_caller(stereo_model, chunk_size, stereo_batch_size,
-                                                     device_string);
+                    auto caller = create_cuda_caller(stereo_model_path, chunk_size,
+                                                     stereo_batch_size, device_string);
                     for (size_t i = 0; i < num_runners; i++) {
                         stereo_runners.push_back(std::make_shared<CudaModelRunner>(
                                 caller, chunk_size, stereo_batch_size));
@@ -151,8 +172,6 @@ int duplex(int argc, char* argv[]) {
                 }
             }
 #endif  // __APPLE__
-            spdlog::info("> Starting Stereo Duplex pipeline");
-
             std::unique_ptr<BasecallerNode> stereo_basecaller_node;
 
             auto stereo_model_stride = stereo_runners.front()->model_stride();
