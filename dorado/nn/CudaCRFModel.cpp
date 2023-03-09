@@ -149,8 +149,8 @@ CudaModelRunner::CudaModelRunner(std::shared_ptr<CudaCaller> caller, int chunk_s
     call_chunks(batch_size);
 }
 
-void CudaModelRunner::accept_chunk(int chunk_idx, at::Tensor slice) {
-    m_input.index_put_({chunk_idx, torch::indexing::Ellipsis}, slice);
+void CudaModelRunner::accept_chunk(int chunk_idx, const torch::Tensor &chunk) {
+    m_input.index_put_({chunk_idx, torch::indexing::Ellipsis}, chunk);
 }
 
 std::vector<DecodedChunk> CudaModelRunner::call_chunks(int num_chunks) {

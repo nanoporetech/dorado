@@ -472,7 +472,7 @@ void conv_activation_and_store(simdgroup_ftype8x8 A, threadgroup ftype *simd_loc
 }
 
 
-// Specialised conv1 implementation for v3-type models, where output feature size is 4.
+// Specialised conv1 implementation for v3-type simplex models, where output feature size is 4.
 // Given a contiguous input tensor of shape [batch_size, chunk_size, 1] this will fill
 // a contiguous output tensor of shape [batch_size, chunk_size + 8, 4], where the actual output
 // is located at output.slice(1, 2, chunk_size + 2) and values before and after that slice are
@@ -480,7 +480,7 @@ void conv_activation_and_store(simdgroup_ftype8x8 A, threadgroup ftype *simd_loc
 // of the edges).
 #define SIMD_GROUPS 16
 [[max_total_threads_per_threadgroup(SIMD_GROUPS * 32)]]
-kernel void conv1_out4_simd(
+kernel void conv1_in1_out4_simd(
     device const ConvArgs* const args,
     device const ftype* const in_buf,
     device const ftype* const weights_buf,
@@ -544,10 +544,10 @@ kernel void conv1_out4_simd(
 
 #undef SIMD_GROUPS
 
-// Conv1 implementation for v4-type models, where output feature size is 16.
+// Conv1 implementation for v4-type simplex models, where output feature size is 16.
 #define SIMD_GROUPS 16
 [[max_total_threads_per_threadgroup(SIMD_GROUPS * 32)]]
-kernel void conv1_out16_simd(
+kernel void conv1_in1_out16_simd(
     device const ConvArgs* const args,
     device const ftype* const in_buf,
     device const ftype* const weights_buf,
@@ -599,10 +599,48 @@ kernel void conv1_out16_simd(
 }
 #undef SIMD_GROUPS
 
+
+// Conv1 implementation for stereo duplex models, where input feature size is 13 and
+// output feature size is 16.
+// FIXME - replace this slow generic implementation.
+kernel void conv1_in13_out16_simd(
+    device const ConvArgs* const args,
+    device const ftype* const in,
+    device const ftype* const weights,
+    device ftype* const out,
+    KERNEL_INDEX_INPUTS)
+{
+    const int in_size = args->in_size;
+    const int win_size = args->win_size;
+    const int dp_size = in_size * win_size;
+    const int out_size = args->out_size;
+    const int stride = args->stride;
+    const int pad = args->pad;
+    const int chunk_size_in = args->chunk_size_in;
+    const int chunk_size_out = chunk_size_in / stride;
+    const int num_chunks = args->num_chunks;
+
+    for (int chunk = gid * threads + tid; chunk < num_chunks; chunk += threadgroups * threads) {
+        for (int ts = 0; ts < chunk_size_out; ++ts) {
+            int in_pos_start = (ts * stride - pad) * in_size;
+            for (int output_idx = 0; output_idx < out_size; ++output_idx) {
+                ftype sum = weights[dp_size * out_size + output_idx]; // bias
+                for (int dp_pos = 0; dp_pos < dp_size; ++dp_pos) {
+                    int in_pos = in_pos_start + dp_pos;
+                    if (in_pos >= 0 && in_pos < chunk_size_in * in_size) {
+                        sum += in[chunk * chunk_size_in * in_size + in_pos] * weights[dp_pos * out_size + output_idx];
+                    }
+                }
+                out[chunk * chunk_size_out * out_size + ts * out_size + output_idx] = conv_activation(sum);
+            }
+        }
+    }
+}
+
 // Specialised conv2 implementation for v3-type models, where input feature size is 4.
 #define SIMD_GROUPS 16
 [[max_total_threads_per_threadgroup(SIMD_GROUPS * 32)]]
-kernel void conv2_in4_simd
+kernel void conv2_in4_out16_simd
 (
     device const ConvArgs* const args,
     device const ftype* const in_buf,
@@ -652,7 +690,7 @@ kernel void conv2_in4_simd
 #define SIMD_GROUPS 4
 
 [[max_total_threads_per_threadgroup(SIMD_GROUPS * 32)]]
-kernel void conv2_in16_simd
+kernel void conv2_in16_out16_simd
 (
     device const ConvArgs* const args,
     device const ftype* const in_buf,
