@@ -393,6 +393,7 @@ struct CudaLSTMStackImpl : Module {
         assert(in.dtype() == torch::kF16 || (use_int8 && in.dtype() == torch::kInt8));
         assert(in.is_contiguous());
         auto opts_f16 = in.options().dtype(torch::kF16);
+        auto opts_i32 = in.options().dtype(torch::kI32);
         const int gate_size = layer_size * 4;
 
         // Working memory is laid out as [T+1][N][2][C] in memory, where the 2 serves to
@@ -434,6 +435,7 @@ struct CudaLSTMStackImpl : Module {
         for (auto &rnn : {rnn1, rnn2, rnn3, rnn4, rnn5}) {
             ScopedProfileRange spr_lstm("lstm_layer");
             auto state_buf = torch::zeros({batch_size, layer_size}, opts_f16);
+            auto sync_buf = torch::zeros({3}, opts_i32);
             auto weights_cpu = rnn->weights;
             if (use_cutlass) {
                 auto type_id = (layer_idx > convert_to_int8_layer_idx) ? KOI_I8 : KOI_F16;
@@ -477,7 +479,8 @@ struct CudaLSTMStackImpl : Module {
                                   rnn->reverse ? -1 : 1, in.stride(1), in.data_ptr(),
                                   device_weights[layer_idx].data_ptr(),
                                   device_bias[layer_idx].data_ptr(),
-                                  device_scale[layer_idx].data_ptr(), state_buf.data_ptr());
+                                  device_scale[layer_idx].data_ptr(), state_buf.data_ptr(),
+                                  sync_buf.data_ptr());
 
                 if (layer_idx == convert_to_int8_layer_idx) {
                     ScopedProfileRange spr_convert("f16_to_int8");
