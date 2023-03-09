@@ -89,7 +89,7 @@ void BasecallerNode::basecall_current_batch(int worker_id) {
     for (auto &complete_chunk : m_batched_chunks[worker_id]) {
         std::shared_ptr<Read> source_read = complete_chunk->source_read.lock();
         source_read->called_chunks[complete_chunk->idx_in_read] = complete_chunk;
-        source_read->num_chunks_called += 1;
+        ++source_read->num_chunks_called;
     }
     m_batched_chunks[worker_id].clear();
 }

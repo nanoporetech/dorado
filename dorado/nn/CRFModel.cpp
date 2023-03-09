@@ -102,8 +102,8 @@ ModuleHolder<AnyModule> populate_model(Model &&model,
                                        const std::filesystem::path &path,
                                        const torch::TensorOptions &options,
                                        bool decomposition,
-                                       bool bias) {
-    auto state_dict = dorado::load_crf_model_weights(path, decomposition, bias);
+                                       bool linear_layer_bias) {
+    auto state_dict = dorado::load_crf_model_weights(path, decomposition, linear_layer_bias);
     model->load_state_dict(state_dict);
     model->to(options.dtype_opt().value().toScalarType());
     model->to(options.device_opt().value());
@@ -590,7 +590,7 @@ struct CudaLSTMStackImpl : Module {
         // Input x is [N, T, C], contiguity optional
         x = x.contiguous();
 
-        //If this is the fist time the forward method is being applied, do some startup
+        // If this is the first time the forward method is being applied, do some startup
         if (m_quantize && !_weights_rearranged) {
             rearrange_weights();
             quantize_weights();
@@ -854,7 +854,7 @@ CRFModelConfig load_crf_model_config(const std::filesystem::path &path) {
 
 std::vector<torch::Tensor> load_crf_model_weights(const std::filesystem::path &dir,
                                                   bool decomposition,
-                                                  bool bias) {
+                                                  bool linear_layer_bias) {
     auto tensors = std::vector<std::string>{
 
             "0.conv.weight.tensor",      "0.conv.bias.tensor",
@@ -880,7 +880,7 @@ std::vector<torch::Tensor> load_crf_model_weights(const std::filesystem::path &d
 
             "9.linear.weight.tensor"};
 
-    if (bias) {
+    if (linear_layer_bias) {
         tensors.push_back("9.linear.bias.tensor");
     }
 
