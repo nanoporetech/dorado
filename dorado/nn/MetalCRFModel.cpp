@@ -211,7 +211,6 @@ struct MetalBlockImpl : Module {
               in_chunk_size(chunk_size_),
               batch_size(batch_size_),
               config(config_) {
-        spdlog::warn("device {}", (void *)device);
         command_queue = device->newCommandQueue();
 
         lstm_chunk_size = in_chunk_size / config.stride;
@@ -688,6 +687,11 @@ public:
         // Start at 1, since at event creation ID 0 is deemed to have been signalled.
         auto next_decode_complete_event_id = static_cast<uint64_t>(1);
 
+        // For unknown reasons, concurrent access to the GPU from multiple instances of this thread --
+        // i.e. with > 1 instance of MetalCaller -- results in errors, usually command buffer error code 1.
+        // Holding this mutex while executing models seemingly prevents these errors.
+        static std::mutex inter_caller_mutex;
+
         while (true) {
             std::unique_lock<std::mutex> input_lock(m_input_lock);
             while (m_input_queue.empty() && !m_terminate) {
@@ -709,6 +713,8 @@ public:
 
             // TODO: find a more robust way of dealing with Metal kernel launch issues
             for (int try_count = 0; try_count < 5; ++try_count) {
+                std::lock_guard<std::mutex> lock(inter_caller_mutex);
+
                 // The linear layer should not execute until the previous batch has been decoded,
                 // since the same buffers are used for successive batches' scores, fwd/bwd scans.
                 MTL::CommandBuffer *const cb =
