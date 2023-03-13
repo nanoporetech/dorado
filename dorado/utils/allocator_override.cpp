@@ -3,6 +3,7 @@
 #include <iostream>
 
 // These functions are linked into dorado and replace the default allocator with jemalloc.
+// Note: this is only supported on linux, likely need to override different functions on OSX
 
 extern "C" {
 
@@ -22,11 +23,9 @@ void je_sdallocx(void *ptr, size_t size, int flags);
 size_t je_nallocx(size_t size, int flags);
 
 size_t je_malloc_usable_size(void *ptr);
-//size_t je_malloc_size(const void *ptr);
 
 void *je_memalign(size_t alignment, size_t size);
 void *je_valloc(size_t size);
-//void *je_pvalloc(size_t size);
 
 void *malloc(size_t size) { return je_malloc(size); }
 void *calloc(size_t num, size_t size) { return je_calloc(num, size); }
@@ -48,13 +47,7 @@ void sdallocx(void *ptr, size_t size, int flags) { return je_sdallocx(ptr, size,
 size_t nallocx(size_t size, int flags) { return je_nallocx(size, flags); }
 
 size_t malloc_usable_size(void *ptr) { return je_malloc_usable_size(ptr); }
-/*size_t malloc_size(const void *ptr) {
-    return je_malloc_size(ptr);
-}*/
 
 void *memalign(size_t alignment, size_t size) { return je_memalign(alignment, size); }
 void *valloc(size_t size) { return je_valloc(size); }
-/*void *pvalloc(size_t size) {
-    return je_pvalloc(size);
-}*/
 }
