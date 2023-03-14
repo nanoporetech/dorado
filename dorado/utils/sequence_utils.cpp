@@ -23,7 +23,7 @@ float mean_qscore_from_qstring(const std::string& qstring) {
                    });
     float mean_error = std::accumulate(scores.begin(), scores.end(), 0.f) / scores.size();
     float mean_qscore = -10.0f * log10(mean_error);
-    mean_qscore = std::min(90.0f, std::max(1.0f, mean_qscore));
+    mean_qscore = std::min(50.0f, std::max(1.0f, mean_qscore));
     return mean_qscore;
 }
 
