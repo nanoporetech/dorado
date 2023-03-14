@@ -121,7 +121,9 @@ std::shared_ptr<dorado::Read> process_pod5_read(size_t row,
     new_read->attributes.channel_number = read_data.channel;
     new_read->attributes.start_time = start_time;
     new_read->run_id = run_info_data->protocol_run_id;
-    pod5_release_run_info(run_info_data);
+    if (pod5_free_run_info(run_info_data) != POD5_OK) {
+        spdlog::error("Failed to free run info");
+    }
     return new_read;
 }
 } /* anonymous namespace */
@@ -157,7 +159,7 @@ void DataLoader::load_reads(const std::string& path) {
 }
 
 int DataLoader::get_num_reads(std::string data_path, std::unordered_set<std::string> read_list) {
-    int num_reads = 0;
+    size_t num_reads = 0;
     for (const auto& entry : std::filesystem::directory_iterator(data_path)) {
         std::string ext = std::filesystem::path(entry).extension().string();
         std::transform(ext.begin(), ext.end(), ext.begin(),
@@ -168,49 +170,17 @@ int DataLoader::get_num_reads(std::string data_path, std::unordered_set<std::str
             // Open the file ready for walking:
             Pod5FileReader_t* file = pod5_open_file(entry.path().string().c_str());
 
+            size_t read_count;
+            pod5_get_read_count(file, &read_count);
             if (!file) {
                 spdlog::error("Failed to open file {}: {}", entry.path().string().c_str(),
                               pod5_get_error_string());
             }
 
-            std::size_t batch_count = 0;
-            if (pod5_get_read_batch_count(&batch_count, file) != POD5_OK) {
-                spdlog::error("Failed to query batch count: {}", pod5_get_error_string());
+            num_reads += read_count;
+            if (pod5_close_and_free_reader(file) != POD5_OK) {
+                spdlog::error("Failed to close and free POD5 reader");
             }
-
-            for (std::size_t batch_index = 0; batch_index < batch_count; ++batch_index) {
-                Pod5ReadRecordBatch_t* batch = nullptr;
-                if (pod5_get_read_batch(&batch, file, batch_index) != POD5_OK) {
-                    spdlog::error("Failed to get batch: {}", pod5_get_error_string());
-                }
-
-                std::size_t batch_row_count = 0;
-                if (pod5_get_read_batch_row_count(&batch_row_count, batch) != POD5_OK) {
-                    spdlog::error("Failed to get batch row count");
-                }
-
-                for (std::size_t row = 0; row < batch_row_count; ++row) {
-                    uint16_t read_table_version = 0;
-                    ReadBatchRowInfo_t read_data;
-                    if (pod5_get_read_batch_row_info_data(batch, row, READ_BATCH_ROW_INFO_VERSION,
-                                                          &read_data,
-                                                          &read_table_version) != POD5_OK) {
-                        spdlog::error("Failed to get read {}", row);
-                    }
-
-                    char read_id_tmp[37];
-                    pod5_error_t err = pod5_format_read_id(read_data.read_id, read_id_tmp);
-                    std::string read_id_str(read_id_tmp);
-
-                    if (read_list.size() == 0 || (read_list.find(read_id_str) != read_list.end())) {
-                        num_reads++;
-                    }
-                }
-                if (pod5_free_read_batch(batch) != POD5_OK) {
-                    spdlog::error("Failed to release batch");
-                }
-            }
-            pod5_close_and_free_reader(file);
         }
     }
     return num_reads;
@@ -235,61 +205,34 @@ std::unordered_map<std::string, ReadGroup> DataLoader::load_read_groups(std::str
                               pod5_get_error_string());
             }
 
-            std::size_t batch_count = 0;
-            if (pod5_get_read_batch_count(&batch_count, file) != POD5_OK) {
-                spdlog::error("Failed to query batch count: {}", pod5_get_error_string());
+            // First get the run info count
+            size_t run_info_count;
+            pod5_get_file_run_info_count(file, &run_info_count);
+            for (int16_t idx = 0; idx < run_info_count; idx++) {
+                RunInfoDictData_t* run_info_data;
+                pod5_get_file_run_info(file, idx, &run_info_data);
+
+                auto exp_start_time_ms = run_info_data->protocol_start_time_ms;
+                std::string flowcell_id = run_info_data->flow_cell_id;
+                std::string device_id = run_info_data->system_name;
+                std::string run_id = run_info_data->protocol_run_id;
+                std::string sample_id = run_info_data->sample_id;
+
+                if (pod5_free_run_info(run_info_data) != POD5_OK) {
+                    spdlog::error("Failed to free run info");
+                }
+
+                std::string id = run_id + "_" + model_path;
+                read_groups[id] = ReadGroup{run_id,
+                                            model_path,
+                                            flowcell_id,
+                                            device_id,
+                                            get_string_timestamp_from_unix_time(exp_start_time_ms),
+                                            sample_id};
             }
-
-            for (std::size_t batch_index = 0; batch_index < batch_count; ++batch_index) {
-                Pod5ReadRecordBatch_t* batch = nullptr;
-                if (pod5_get_read_batch(&batch, file, batch_index) != POD5_OK) {
-                    spdlog::error("Failed to get batch: {}", pod5_get_error_string());
-                }
-
-                std::size_t batch_row_count = 0;
-                if (pod5_get_read_batch_row_count(&batch_row_count, batch) != POD5_OK) {
-                    spdlog::error("Failed to get batch row count");
-                }
-
-                for (std::size_t row = 0; row < batch_row_count; ++row) {
-                    uint16_t read_table_version = 0;
-                    ReadBatchRowInfo_t read_data;
-                    if (pod5_get_read_batch_row_info_data(batch, row, READ_BATCH_ROW_INFO_VERSION,
-                                                          &read_data,
-                                                          &read_table_version) != POD5_OK) {
-                        spdlog::error("Failed to get read {}", row);
-                    }
-
-                    //Retrieve global information for the run
-                    RunInfoDictData_t* run_info_data;
-                    if (pod5_get_run_info(batch, read_data.run_info, &run_info_data) != POD5_OK) {
-                        spdlog::error("Failed to get Run Info {}{}", row, pod5_get_error_string());
-                    }
-                    auto exp_start_time_ms = run_info_data->protocol_start_time_ms;
-                    auto run_sample_rate = run_info_data->sample_rate;
-                    std::string flowcell_id = run_info_data->flow_cell_id;
-                    std::string device_id = run_info_data->system_name;
-                    std::string run_id = run_info_data->protocol_run_id;
-                    std::string sample_id = run_info_data->sample_id;
-
-                    pod5_release_run_info(run_info_data);
-
-                    // Construct the read group ID
-                    std::string id = run_id + "_" + model_path;
-                    read_groups[id] =
-                            ReadGroup{run_id,
-                                      model_path,
-                                      flowcell_id,
-                                      device_id,
-                                      get_string_timestamp_from_unix_time(exp_start_time_ms),
-                                      sample_id};
-                }
-                if (pod5_free_read_batch(batch) != POD5_OK) {
-                    spdlog::error("Failed to release batch");
-                }
+            if (pod5_close_and_free_reader(file) != POD5_OK) {
+                spdlog::error("Failed to close and free POD5 reader");
             }
-
-            pod5_close_and_free_reader(file);
         }
     }
     return read_groups;
@@ -358,7 +301,9 @@ void DataLoader::load_pod5_reads_from_file(const std::string& path) {
             spdlog::error("Failed to release batch");
         }
     }
-    pod5_close_and_free_reader(file);
+    if (pod5_close_and_free_reader(file) != POD5_OK) {
+        spdlog::error("Failed to close and free POD5 reader");
+    }
 }
 
 void DataLoader::load_fast5_reads_from_file(const std::string& path) {
