@@ -103,7 +103,7 @@ std::tuple<std::string, std::string> generate_sequence(const std::vector<uint8_t
         baseProbs[i] = 1.0f - (baseProbs[i] / totalProbs[i]);
         baseProbs[i] = -10.0f * log10f(baseProbs[i]);
         float qscore = baseProbs[i] * scale + shift;
-        qscore = std::min(90.0f, qscore);
+        qscore = std::min(50.0f, qscore);
         qscore = std::max(1.0f, qscore);
         qstring[i] = char(33.5f + qscore);
     }
