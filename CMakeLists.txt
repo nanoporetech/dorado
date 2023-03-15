@@ -309,6 +309,17 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
         dorado/utils/models.h
     )
 
+    if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
+        add_library(dorado_allocator_lib STATIC
+            dorado/utils/allocator_override.cpp
+        )
+        target_link_libraries(dorado_allocator_lib
+            ${POD5_LIBRARIES}
+        )
+
+        target_link_libraries(dorado_io_lib dorado_allocator_lib)
+    endif()
+
     target_link_libraries(dorado_io_lib
        OpenSSL::SSL
        ${POD5_LIBRARIES}
@@ -329,3 +340,4 @@ endif()
 if(NOT DORADO_LIB_ONLY)
     include(cmake/DoradoPackaging.cmake)
 endif()
+
