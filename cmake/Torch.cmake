@@ -95,6 +95,26 @@ else()
     list(APPEND CMAKE_PREFIX_PATH "${TORCH_LIB}")
 endif()
 
+if (APPLE AND CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
+    # For some reason the RPATHs of the dylibs are pointing to the libiomp5.dylib in functools rather
+    # than the one that's next to them, so correct that here before we import the package.
+    file(GLOB TORCH_DYLIBS "${TORCH_LIB}/lib/*.dylib")
+    foreach(TORCH_DYLIB IN LISTS TORCH_DYLIBS)
+        execute_process(
+            COMMAND
+                ${CMAKE_INSTALL_NAME_TOOL}
+                -change "@loader_path/../../functorch/.dylibs/libiomp5.dylib" "@loader_path/libiomp5.dylib"
+                ${TORCH_DYLIB}
+            RESULT_VARIABLE RETVAL
+            OUTPUT_VARIABLE OUTPUT
+            ERROR_VARIABLE ERRORS
+        )
+        if (NOT RETVAL EQUAL 0)
+            message(FATAL_ERROR "Error running ${CMAKE_INSTALL_NAME_TOOL}: ${RETVAL}\nOUTPUT=${OUTPUT}\nERRORS=${ERRORS}")
+        endif()
+    endforeach()
+endif()
+
 find_package(Torch REQUIRED)
 
 if(APPLE)
