@@ -258,7 +258,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
             "*cufft.so*"
         )
     endif()
-    
+
     foreach(PATTERN ${PATTERNS})
         file(GLOB DEP_DLLS "${CUDAToolkit_ROOT}/targets/${CMAKE_SYSTEM_PROCESSOR}-linux/lib/${PATTERN}")
         install(FILES ${DEP_DLLS} DESTINATION lib COMPONENT redist_libs)
@@ -268,10 +268,18 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     install(FILES ${TORCH_DLLS} DESTINATION lib COMPONENT redist_libs)
 
     if(DYNAMIC_HDF)
-        RESOLVE_SYMLINKS("${HDF5_C_LIBRARIES}" NEW_HDF_LIBRARIES)
-        foreach(HDF_LIB IN LISTS NEW_HDF_LIBRARIES)
+        FILTER_LIST("${HDF5_C_LIBRARIES}" DEBUG_LIBRARIES debug optimized so)
+        RESOLVE_SYMLINKS("${DEBUG_LIBRARIES}" NEW_HDF_DEBUG_LIBRARIES)
+        foreach(HDF_LIB IN LISTS NEW_HDF_DEBUG_LIBRARIES)
 	    if(${HDF_LIB} MATCHES "hdf5")
-                install(FILES ${HDF_LIB} DESTINATION lib COMPONENT redist_libs)
+                install(FILES ${HDF_LIB} DESTINATION lib COMPONENT redist_libs CONFIGURATIONS Debug)
+            endif()
+        endforeach()
+        FILTER_LIST("${HDF5_C_LIBRARIES}" RELEASE_LIBRARIES optimized debug so)
+        RESOLVE_SYMLINKS("${RELEASE_LIBRARIES}" NEW_HDF_RELEASE_LIBRARIES)
+        foreach(HDF_LIB IN LISTS NEW_HDF_RELEASE_LIBRARIES)
+	    if(${HDF_LIB} MATCHES "hdf5")
+                install(FILES ${HDF_LIB} DESTINATION lib COMPONENT redist_libs CONFIGURATIONS Release ReleaseWithDebInfo)
             endif()
         endforeach()
     endif()
@@ -324,7 +332,7 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
        OpenSSL::SSL
        ${POD5_LIBRARIES}
        ${HDF5_C_LIBRARIES}
-       ${CMAKE_DL_LIBS}       
+       ${CMAKE_DL_LIBS}
        elzip
     )
 
