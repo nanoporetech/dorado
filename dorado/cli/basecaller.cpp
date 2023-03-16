@@ -161,10 +161,10 @@ void setup(std::vector<std::string> args,
     WriterNode writer_node(std::move(args), emit_fastq, emit_moves, rna, duplex, min_qscore,
                            num_devices * 2, std::move(read_groups), num_reads);
 
+    DuplexSplitNode duplex_split_node(writer_node, DuplexSplitSettings(), /*num worker threads*/1);
+
     std::unique_ptr<ModBaseCallerNode> mod_base_caller_node;
     std::unique_ptr<BasecallerNode> basecaller_node;
-
-    DuplexSplitNode duplex_split_node(writer_node, DuplexSplitSettings(), /*num worker threads*/1);
 
     if (!remora_model_list.empty()) {
         //FIXME remove
@@ -179,6 +179,8 @@ void setup(std::vector<std::string> args,
         basecaller_node =
                 std::make_unique<BasecallerNode>(duplex_split_node, std::move(runners), batch_size,
                                                  chunk_size, overlap, model_stride, model_name);
+                // std::make_unique<BasecallerNode>(writer_node, std::move(runners), batch_size,
+                //                                  chunk_size, overlap, model_stride, model_name);
     }
     ScalerNode scaler_node(*basecaller_node, num_devices * 2);
     DataLoader loader(scaler_node, "cpu", num_devices, max_reads, read_list);

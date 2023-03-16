@@ -3,7 +3,11 @@
 
 /*
 To ask:
-move table spec?
+. does mod calling after splitting?
+. separate reads pairing
+. why do we keep trimmed?
+. where is end_reason internally? -- put in a PR (modify dataloader)
+
 To update:
 . end_reason
 . signal
@@ -44,9 +48,19 @@ II. Adapter-aware mode
 */
 struct DuplexSplitSettings {
     float pore_thr = 170.;
-    size_t pore_cl_dist = 10;
+    size_t pore_cl_dist = 1000;
     size_t flank_size = 1000;
+    //FIXME should probably be fractional
+    //currently has to account for the adapter
+    int flank_edist = 150;
     size_t adapter_length = 20;
+    uint8_t adapter_edist = 3; //TODO figure out good threshold
+    uint8_t pore_adapter_gap_thr = 30; //bp TODO figure out good threshold
+    uint64_t expect_adapter_prefix = 200;
+    //FIXME configure
+    //TAIL_ADAPTER = 'GCAATACGTAACTGAACGAAGT'
+    //HEAD_ADAPTER = 'AATGTACTTCGTTCAGTTACGTATTGCT'
+    std::string adapter = "AATGTACTTCGTTCAGTTACGTATTGCT";
 };
 
 // struct ReadRange {
@@ -72,6 +86,7 @@ public:
                     int num_worker_threads = 5, size_t max_reads = 1000);
     ~DuplexSplitNode();
 
+    std::vector<DuplexSplitNode::PosRange> possible_pore_regions(const Read& read);
     std::vector<PosRange> identify_splits(const Read& read);
     std::vector<Message> split(const Read& message, const std::vector<PosRange> &interspace_regions);
 
@@ -79,8 +94,8 @@ private:
     void worker_thread();  // Worker thread performs scaling and trimming asynchronously.
     MessageSink& m_sink;  // MessageSink to consume scaled reads.
 
-    DuplexSplitSettings m_settings;
-    int m_num_worker_threads;
+    const DuplexSplitSettings m_settings;
+    const int m_num_worker_threads;
     std::vector<std::unique_ptr<std::thread>> worker_threads;
 };
 
