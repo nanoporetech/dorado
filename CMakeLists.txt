@@ -48,6 +48,13 @@ if(DORADO_USING_OLD_CPP_ABI)
   add_compile_options(-D_GLIBCXX_USE_CXX11_ABI=0)
 endif()
 
+# We don't support GPU builds on macOS/x64
+if (APPLE AND CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
+    set(DORADO_GPU_BUILD FALSE)
+else()
+    set(DORADO_GPU_BUILD TRUE)
+endif()
+
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     if((CMAKE_SYSTEM_PROCESSOR MATCHES "^aarch64*|^arm*") AND (${CUDAToolkit_VERSION} VERSION_LESS 11.0))
         add_compile_definitions(DORADO_TX2)
@@ -121,23 +128,25 @@ set(LIB_SOURCE_FILES
     dorado/utils/basecaller_utils.h
     dorado/utils/basecaller_utils.cpp)
 
-if(APPLE)
-    include(cmake/Metal.cmake)
-    list(APPEND LIB_SOURCE_FILES
-        dorado/nn/MetalCRFModel.h
-        dorado/nn/MetalCRFModel.cpp
-        dorado/utils/metal_utils.cpp
-        dorado/utils/metal_utils.h
-    )
-else ()
-    list(APPEND LIB_SOURCE_FILES
-        dorado/decode/GPUDecoder.cpp
-        dorado/decode/GPUDecoder.h
-        dorado/nn/CudaCRFModel.h
-        dorado/nn/CudaCRFModel.cpp
-        dorado/utils/cuda_utils.cpp
-        dorado/utils/cuda_utils.h
-    )
+if (DORADO_GPU_BUILD)
+    if(APPLE)
+        include(cmake/Metal.cmake)
+        list(APPEND LIB_SOURCE_FILES
+            dorado/nn/MetalCRFModel.h
+            dorado/nn/MetalCRFModel.cpp
+            dorado/utils/metal_utils.cpp
+            dorado/utils/metal_utils.h
+        )
+    else()
+        list(APPEND LIB_SOURCE_FILES
+            dorado/decode/GPUDecoder.cpp
+            dorado/decode/GPUDecoder.h
+            dorado/nn/CudaCRFModel.h
+            dorado/nn/CudaCRFModel.cpp
+            dorado/utils/cuda_utils.cpp
+            dorado/utils/cuda_utils.h
+        )
+    endif()
 endif()
 
 add_library(dorado_lib ${LIB_SOURCE_FILES})
@@ -196,7 +205,7 @@ if(NOT WIN32)
     add_dependencies(dorado_lib htslib_project)
 endif()
 
-if(APPLE)
+if(APPLE AND DORADO_GPU_BUILD)
     add_custom_target(metal-lib DEPENDS default.metallib)
     add_dependencies(dorado_lib metal-lib)
 endif()
