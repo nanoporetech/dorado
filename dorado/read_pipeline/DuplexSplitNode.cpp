@@ -233,8 +233,6 @@ DuplexSplitNode::possible_pore_regions(const Read& read) {
 
     const auto move_sums = move_cum_sums(read.moves);
     assert(move_sums.back() == read.seq.length());
-    auto move_sz = move_sums.size();
-    auto stride_sz = read.raw_data.size(0) / read.model_stride;
 
     //pA formula before scaling:
     //pA = read->scaling * (raw + read->offset);
@@ -249,7 +247,7 @@ DuplexSplitNode::possible_pore_regions(const Read& read) {
         auto move_end = pore_signal_region.second / read.model_stride;
         assert(move_end >= move_start);
         //NB move_start can get to move_sums.size(), because of the stride rounding?
-        if (move_start >= move_sums.size() || move_sums.at(move_start) == 0) {
+        if (move_start >= move_sums.size() || move_end >= move_sums.size() || move_sums.at(move_start) == 0) {
             //either at very end of the signal or basecalls have not started yet
             continue;
         }
