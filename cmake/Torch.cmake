@@ -50,10 +50,12 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         endif()
     else()
         if(DORADO_USING_OLD_CPP_ABI)
-            set(TORCH_URL https://download.pytorch.org/libtorch/cu117/libtorch-shared-with-deps-${TORCH_VERSION}%2Bcu117.zip)
+            set(TORCH_URL https://download.pytorch.org/libtorch/cu118/libtorch-shared-with-deps-${TORCH_VERSION}%2Bcu118.zip)
+
             set(TORCH_LIB "${DORADO_3RD_PARTY}/torch-no-cxx11-abi-${TORCH_VERSION}-${CMAKE_SYSTEM_NAME}/libtorch")
         else()
-            set(TORCH_URL https://download.pytorch.org/libtorch/cu117/libtorch-cxx11-abi-shared-with-deps-${TORCH_VERSION}%2Bcu117.zip)
+            set(TORCH_URL https://download.pytorch.org/libtorch/cu118/libtorch-cxx11-abi-shared-with-deps-${TORCH_VERSION}%2Bcu118.zip)
+
             set(TORCH_LIB "${DORADO_3RD_PARTY}/torch-${TORCH_VERSION}-${CMAKE_SYSTEM_NAME}/libtorch")
         endif()
     endif()
@@ -67,7 +69,7 @@ elseif(APPLE)
         set(TORCH_LIB "${DORADO_3RD_PARTY}/torch-${TORCH_VERSION}-${CMAKE_SYSTEM_NAME}/torch")
     endif()
 elseif(WIN32)
-    set(TORCH_URL https://download.pytorch.org/libtorch/cu117/libtorch-win-shared-with-deps-${TORCH_VERSION}%2Bcu117.zip)
+    set(TORCH_URL https://download.pytorch.org/libtorch/cu118/libtorch-win-shared-with-deps-${TORCH_VERSION}%2Bcu118.zip)
     set(TORCH_LIB "${DORADO_3RD_PARTY}/torch-${TORCH_VERSION}-${CMAKE_SYSTEM_NAME}/libtorch")
     add_compile_options(
         # Note we need to use the generator expression to avoid setting this for CUDA.
