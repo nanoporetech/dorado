@@ -453,11 +453,9 @@ float beam_search(const T* const scores,
             // don't double-count this shifted state if it matches the current state
             bool count_state = (candidate_state != state);
             // or any other shifted state that we've seen so far
-            if (count_state) {
-                for (int _inner_state = 0; _inner_state < state_idx; ++_inner_state) {
-                    if (shifted_states[_inner_state] == candidate_state) {
-                        count_state = false;
-                    }
+            for (int _inner_state = 0; _inner_state < state_idx && count_state; ++_inner_state) {
+                if (shifted_states[_inner_state] == candidate_state) {
+                    count_state = false;
                 }
             }
             if (count_state) {
