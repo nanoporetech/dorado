@@ -1,4 +1,4 @@
-set(TORCH_VERSION 1.13.1)
+set(TORCH_VERSION 2.0.0)
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32)
     find_package(CUDAToolkit REQUIRED)
