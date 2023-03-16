@@ -6,6 +6,7 @@
 
 #include <spdlog/spdlog.h>
 #include <optional>
+#include <cmath>
 
 namespace {
 
@@ -57,28 +58,8 @@ std::vector<std::pair<size_t, size_t>> detect_pore_signal(torch::Tensor pa_signa
     if (end > 0) {
         ans.push_back(std::pair{start, end});
     }
+    assert(start < pore_a.size(0) && end <= start < pore_a.size(0));
     return ans;
-    //std::vector<std::pair<size_t, size_t>> ans;
-    // auto pore_positions = torch::nonzero(pa_signal > threshold);
-    // //FIXME what type to use here?
-    // auto pore_a = pore_positions.accessor<int32_t, 1>();
-    // size_t start = size_t(-1);
-    // size_t end = size_t(-1);
-
-    // int i = 0;
-    // for (; i < pore_a.size(0); i++) {
-    //     if (i == 0 || pore_a[i] > end + cluster_dist) {
-    //         if (i > 0) {
-    //             ans.push_back(std::pair{start, end});
-    //         }
-    //         start = pore_a[i];
-    //     }
-    //     end = pore_a[i] + 1;
-    // }
-    // if (i > 0) {
-    //     ans.push_back(std::pair{start, end});
-    // }
-    // return ans;
 }
 
 //[inc, excl)
@@ -112,7 +93,8 @@ find_best_adapter_match(const std::string& adapter,
         //only report for top call on the read
         if (span == seq.size() - 200 /*expect_adapter_prefix*/) {
             //FIXME remove
-            spdlog::info("Best adapter match edit distance: {}", edlib_result.editDistance);
+            spdlog::info("Best adapter match edit distance: {} ; is middle {}",
+                        edlib_result.editDistance, abs(int(span / 2) - edlib_result.startLocations[0]) < 1000);
         }
         if (edlib_result.editDistance <= dist_thr) {
             res = {edlib_result.startLocations[0] + shift, edlib_result.endLocations[0] + shift + 1};
@@ -251,11 +233,14 @@ DuplexSplitNode::possible_pore_regions(const Read& read) {
 
     const auto move_sums = move_cum_sums(read.moves);
     assert(move_sums.back() == read.seq.length());
+    auto move_sz = move_sums.size();
+    auto stride_sz = read.raw_data.size(0) / read.model_stride;
 
     //pA formula before scaling:
     //pA = read->scaling * (raw + read->offset);
     //pA formula after scaling:
     //pA = read->scale * raw + read->shift
+    spdlog::info("Analyzing signal in read {}", read.read_id);
     for (auto pore_signal_region : detect_pore_signal(
                                    read.raw_data.to(torch::kFloat) * read.scale + read.shift,
                                    m_settings.pore_thr,
@@ -263,8 +248,9 @@ DuplexSplitNode::possible_pore_regions(const Read& read) {
         auto move_start = pore_signal_region.first / read.model_stride;
         auto move_end = pore_signal_region.second / read.model_stride;
         assert(move_end >= move_start);
-        if (move_sums.at(move_start) == 0) {
-            //basecalls have not started yet
+        //NB move_start can get to move_sums.size(), because of the stride rounding?
+        if (move_start >= move_sums.size() || move_sums.at(move_start) == 0) {
+            //either at very end of the signal or basecalls have not started yet
             continue;
         }
         auto start_pos = move_sums.at(move_start) - 1;
@@ -284,6 +270,7 @@ DuplexSplitNode::identify_splits(const Read& read) {
     std::vector<PosRange> interspace_regions;
 
     auto pore_region_candidates = possible_pore_regions(read);
+    spdlog::info("DSN: Finding adapter matches in read {}", read.read_id);
     auto adapter_region_candidates = find_adapter_matches(m_settings.adapter, read.seq,
                                             m_settings.adapter_edist,
                                             m_settings.expect_adapter_prefix);
@@ -356,6 +343,9 @@ void DuplexSplitNode::worker_thread() {
         auto ranges = identify_splits(*read);
         std::ostringstream oss;
         std::copy(ranges.begin(), ranges.end(), std::ostream_iterator<PosRange>(oss, ";"));
+        for (auto r : ranges) {
+            spdlog::info("BED\t{}\t{}\t{}", read->read_id, r.first, r.second);
+        }
         //spdlog::info("DSN: identified {} splits in read {}: {}", ranges.size(), read->read_id, oss.str());
         //if (ranges.empty()) {
         //    m_sink.push_message(read);
@@ -364,6 +354,8 @@ void DuplexSplitNode::worker_thread() {
         //        m_sink.push_message(std::move(m));
         //    }
         //}
+        //FIXME Just passes the reads to get basecalls for now
+        //m_sink.push_message(std::move(message));
     }
 }
 

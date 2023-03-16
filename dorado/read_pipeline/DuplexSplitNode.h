@@ -47,20 +47,19 @@ II. Adapter-aware mode
     Maybe try finding remnants of an adapter here?
 */
 struct DuplexSplitSettings {
-    float pore_thr = 170.;
+    float pore_thr = 160.;
     size_t pore_cl_dist = 1000;
     size_t flank_size = 1000;
     //FIXME should probably be fractional
     //currently has to account for the adapter
     int flank_edist = 150;
-    size_t adapter_length = 20;
-    uint8_t adapter_edist = 3; //TODO figure out good threshold
+    uint8_t adapter_edist = 3; //TODO figure out good threshold. 3 seems ok for hac/sup, but can probably relax
     uint8_t pore_adapter_gap_thr = 30; //bp TODO figure out good threshold
     uint64_t expect_adapter_prefix = 200;
-    //FIXME configure
     //TAIL_ADAPTER = 'GCAATACGTAACTGAACGAAGT'
     //HEAD_ADAPTER = 'AATGTACTTCGTTCAGTTACGTATTGCT'
-    std::string adapter = "AATGTACTTCGTTCAGTTACGTATTGCT";
+    //clipped 4 letters from the beginningof head adapter! 24 left
+    std::string adapter = "TACTTCGTTCAGTTACGTATTGCT";
 };
 
 // struct ReadRange {

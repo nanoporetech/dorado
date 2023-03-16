@@ -350,7 +350,6 @@ void DataLoader::load_pod5_reads_from_file(const std::string& path) {
 
         for (auto& v : futures) {
             auto read = v.get();
-            spdlog::info("Pushing read {}", read->read_id);
             m_read_sink.push_message(read);
             m_loaded_read_count++;
         }
