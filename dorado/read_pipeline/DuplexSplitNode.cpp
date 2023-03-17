@@ -180,15 +180,18 @@ bool check_rc_match(const std::string& seq, PosRange templ_r, PosRange compl_r, 
     auto edlib_result = edlibAlign(c_seq + templ_r.first,
                             templ_r.second - templ_r.first,
                             rc_compl.data(), rc_compl.size(),
-                            edlibNewAlignConfig(dist_thr, EDLIB_MODE_SHW, EDLIB_TASK_DISTANCE, NULL, 0));
+                            edlibNewAlignConfig(-1, EDLIB_MODE_SHW, EDLIB_TASK_DISTANCE, NULL, 0));
     assert(edlib_result.status == EDLIB_STATUS_OK);
     std::optional<PosRange> res = std::nullopt;
     assert(edlib_result.status == EDLIB_STATUS_OK && edlib_result.editDistance <= dist_thr);
-    spdlog::debug("Checking ranges [{}, {}] vs [{}, {}]: edist={}",
+    spdlog::info("Checking ranges [{}, {}] vs [{}, {}]: edist={}",
                     templ_r.first, templ_r.second,
                     compl_r.first, compl_r.second,
                     edlib_result.editDistance);
-    bool match = (edlib_result.status == EDLIB_STATUS_OK) && (edlib_result.editDistance != -1);
+    //FIXME integrate dist_thr check right into align call after tweaking the settings
+    bool match = (edlib_result.status == EDLIB_STATUS_OK)
+                    && (edlib_result.editDistance != -1)
+                    && (edlib_result.editDistance <= dist_thr);
     edlibFreeAlignResult(edlib_result);
     return match;
 }
