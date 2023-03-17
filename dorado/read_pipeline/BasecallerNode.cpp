@@ -17,8 +17,11 @@ namespace dorado {
 constexpr auto FORCE_TIMEOUT = 100ms;
 
 void BasecallerNode::input_worker_thread() {
-    std::shared_ptr<Read> read;
-    while (m_work_queue.try_pop(read)) {
+    Message message;
+    while (m_work_queue.try_pop(message)) {
+        // If this message isn't a read, we'll get a bad_variant_access exception.
+        auto read = std::get<std::shared_ptr<Read>>(message);
+
         // Allow 5 batches per model runner on the chunks_in queue
         const size_t max_chunks_in = m_batch_size * m_num_active_model_runners * 5;
 
@@ -86,7 +89,7 @@ void BasecallerNode::basecall_current_batch(int worker_id) {
     for (auto &complete_chunk : m_batched_chunks[worker_id]) {
         std::shared_ptr<Read> source_read = complete_chunk->source_read.lock();
         source_read->called_chunks[complete_chunk->idx_in_read] = complete_chunk;
-        source_read->num_chunks_called += 1;
+        ++source_read->num_chunks_called;
     }
     m_batched_chunks[worker_id].clear();
 }
@@ -116,7 +119,7 @@ void BasecallerNode::working_reads_manager() {
 
         for (auto &read : completed_reads) {
             utils::stitch_chunks(read);
-            m_sink.push_read(read);
+            m_sink.push_message(read);
         }
     }
 
@@ -201,8 +204,8 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
             }
 
             // Insert the chunk in the input tensor
-            m_model_runners[worker_id]->accept_chunk(int(m_batched_chunks[worker_id].size()),
-                                                     input_slice);
+            m_model_runners[worker_id]->accept_chunk(
+                    static_cast<int>(m_batched_chunks[worker_id].size()), input_slice);
 
             m_batched_chunks[worker_id].push_back(chunk);
             chunks_lock.lock();
@@ -219,7 +222,7 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
     }
 }
 
-BasecallerNode::BasecallerNode(ReadSink &sink,
+BasecallerNode::BasecallerNode(MessageSink &sink,
                                std::vector<Runner> model_runners,
                                size_t batch_size,
                                size_t chunk_size,
@@ -227,7 +230,7 @@ BasecallerNode::BasecallerNode(ReadSink &sink,
                                size_t model_stride,
                                std::string model_name,
                                size_t max_reads)
-        : ReadSink(max_reads),
+        : MessageSink(max_reads),
           m_sink(sink),
           m_model_runners(std::move(model_runners)),
           m_batch_size(batch_size),

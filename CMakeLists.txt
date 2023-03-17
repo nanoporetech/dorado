@@ -9,13 +9,25 @@ if (NOT EXISTS ${CMAKE_BINARY_DIR}/CMakeCache.txt)
     set(CMAKE_BUILD_TYPE "Release" CACHE STRING "" FORCE)
   endif()
 endif()
+
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
+
+if(WIN32)
+  message(STATUS "toolset: ${CMAKE_GENERATOR_TOOLSET}")
+  message(STATUS "platform: ${CMAKE_GENERATOR_PLATFORM}")
+  message(STATUS "vs platform: ${CMAKE_VS_PLATFORM_NAME}")
+endif()
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(DORADO_3RD_PARTY ${CMAKE_CURRENT_SOURCE_DIR}/dorado/3rdparty)
 
 find_package(CUDAToolkit QUIET)
+
+if(${CUDAToolkit_FOUND})
+  file(REAL_PATH ${CUDAToolkit_TARGET_DIR} CUDAToolkit_REAL_DIR)
+  message(STATUS "Found CUDA ${CUDAToolkit_VERSION} (${CUDAToolkit_TARGET_DIR} -> ${CUDAToolkit_REAL_DIR})")
+endif()
 
 include(cmake/DoradoVersion.cmake)
 include(cmake/UpdateSubmodules.cmake)
@@ -30,11 +42,16 @@ include(cmake/Torch.cmake)
 include(cmake/OpenSSL.cmake)
 include(cmake/Htslib.cmake)
 
-
 if(DORADO_USING_OLD_CPP_ABI)
   # We need to force the use of the old ABI here, if we are building in an old ABI context, as otherwise elzip builds
   # with the libc++11 ABI and we can't link against it.
   add_compile_options(-D_GLIBCXX_USE_CXX11_ABI=0)
+endif()
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    if((CMAKE_SYSTEM_PROCESSOR MATCHES "^aarch64*|^arm*") AND (${CUDAToolkit_VERSION} VERSION_LESS 11.0))
+        add_compile_definitions(DORADO_TX2)
+    endif()
 endif()
 
 add_subdirectory(dorado/3rdparty/elzip)
@@ -46,17 +63,6 @@ set(BUILD_TESTING ON)
 enable_testing()
 
 configure_file(dorado/Version.h.in dorado/Version.h)
-
-if(WIN32)
-  message(STATUS "toolset: ${CMAKE_GENERATOR_TOOLSET}")
-  message(STATUS "platform: ${CMAKE_GENERATOR_PLATFORM}")
-  message(STATUS "vs platform: ${CMAKE_VS_PLATFORM_NAME}")
-endif()
-
-if(DEFINED CUDA_TOOLKIT_ROOT_DIR)
-  message(STATUS "CUDA toolkit dir is ${CUDA_TOOLKIT_ROOT_DIR}")
-  set(CUDAToolkit_ROOT ${CUDA_TOOLKIT_ROOT_DIR})
-endif()
 
 set(LIB_SOURCE_FILES
     dorado/nn/CRFModel.h
@@ -304,6 +310,17 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
         dorado/utils/models.h
     )
 
+    if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
+        add_library(dorado_allocator_lib STATIC
+            dorado/utils/allocator_override.cpp
+        )
+        target_link_libraries(dorado_allocator_lib
+            ${POD5_LIBRARIES}
+        )
+
+        target_link_libraries(dorado_io_lib dorado_allocator_lib)
+    endif()
+
     target_link_libraries(dorado_io_lib
        OpenSSL::SSL
        ${POD5_LIBRARIES}
@@ -324,3 +341,4 @@ endif()
 if(NOT DORADO_LIB_ONLY)
     include(cmake/DoradoPackaging.cmake)
 endif()
+

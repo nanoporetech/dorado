@@ -34,10 +34,13 @@ using quantized_lstm = std::function<int(void *, void *, void *, void *, void *,
 #if USE_CUDA_LSTM
 
 static bool cuda_lstm_is_quantized(int layer_size) {
-    return ((layer_size == 96) ||
-            (layer_size ==
-             128));  // TODO - change back! just a test to see if quantized kernels are the problem
+#ifdef DORADO_TX2
+    return false;
+#else
+    return ((layer_size == 96) || (layer_size == 128));
+#endif
 }
+
 #endif  // if USE_CUDA_LSTM
 
 namespace {
@@ -46,8 +49,8 @@ ModuleHolder<AnyModule> populate_model(Model &&model,
                                        const std::filesystem::path &path,
                                        const torch::TensorOptions &options,
                                        bool decomposition,
-                                       bool bias) {
-    auto state_dict = dorado::load_crf_model_weights(path, decomposition, bias);
+                                       bool linear_layer_bias) {
+    auto state_dict = dorado::load_crf_model_weights(path, decomposition, linear_layer_bias);
     model->load_state_dict(state_dict);
     model->to(options.dtype_opt().value().toScalarType());
     model->to(options.device_opt().value());
@@ -365,7 +368,7 @@ struct CudaLSTMStackImpl : Module {
 
     std::pair<torch::Tensor, torch::Tensor> quantize_tensor(torch::Tensor tensor,
                                                             int levels = 256) {
-        //Qauntize a tensor to int8, returning per-channel scales and the quantized tensor
+        //Quantize a tensor to int8, returning per-channel scales and the quantized tensor
         //if weights have not been quantized we get some scaling
         tensor = tensor.transpose(0, 1).contiguous();
         auto fp_max = torch::abs(std::get<0>(torch::max(tensor, 0)));
@@ -405,7 +408,7 @@ struct CudaLSTMStackImpl : Module {
 
         x = x.contiguous();
 
-        //If this is the fist time the forward method is being applied, do some startup
+        // If this is the first time the forward method is being applied, do some startup
         if (m_quantize && !_weights_rearranged) {
             rearrange_weights();
             quantize_weights();
@@ -659,7 +662,7 @@ CRFModelConfig load_crf_model_config(const std::filesystem::path &path) {
 
 std::vector<torch::Tensor> load_crf_model_weights(const std::filesystem::path &dir,
                                                   bool decomposition,
-                                                  bool bias) {
+                                                  bool linear_layer_bias) {
     auto tensors = std::vector<std::string>{
 
             "0.conv.weight.tensor",      "0.conv.bias.tensor",
@@ -685,7 +688,7 @@ std::vector<torch::Tensor> load_crf_model_weights(const std::filesystem::path &d
 
             "9.linear.weight.tensor"};
 
-    if (bias) {
+    if (linear_layer_bias) {
         tensors.push_back("9.linear.bias.tensor");
     }
 

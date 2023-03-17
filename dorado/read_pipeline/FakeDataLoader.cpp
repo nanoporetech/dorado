@@ -16,10 +16,10 @@ void FakeDataLoader::load_reads(const int num_reads) {
         fake_read->raw_data = torch::randint(0, 10000, {read_size}, torch::kInt16);
         fake_read->read_id = "Placeholder-read-id";
 
-        m_read_sink.push_read(fake_read);
+        m_read_sink.push_message(fake_read);
     }
 }
 
-FakeDataLoader::FakeDataLoader(ReadSink& read_sink) : m_read_sink(read_sink) {}
+FakeDataLoader::FakeDataLoader(MessageSink& read_sink) : m_read_sink(read_sink) {}
 
 }  // namespace dorado

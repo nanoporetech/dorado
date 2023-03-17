@@ -49,6 +49,7 @@ void setup(std::vector<std::string> args,
     torch::set_num_threads(1);
     std::vector<Runner> runners;
 
+    // Default is 1 device.  CUDA path may alter this.
     int num_devices = 1;
 
     if (device == "cpu") {

@@ -54,7 +54,7 @@ TEST_CASE(TEST_GROUP ": Test sam line generation", TEST_GROUP) {
     }
     SECTION("Generated sam line for unaligned read is correct") {
         std::vector<std::string> expected_sam_lines{
-                "test_read\t4\t*\t0\t0\t*\t*\t0\t8\tACGTACGT\t********\t"
+                "test_read\t4\t*\t0\t0\t*\t*\t0\t0\tACGTACGT\t********\t"
                 "qs:i:9\tdu:f:1.033000\tns:i:4132\tts:i:132\tmx:i:2\tch:i:5\tst:Z:2017-04-29T09:10:"
                 "04Z\trn:i:"
                 "18501\tf5:Z:batch_0.fast5\tsm:f:128.384\tsd:f:8.258\tsv:Z:quantile"};
