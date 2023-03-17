@@ -37,7 +37,7 @@ int main(int argc, char* argv[]) {
             {"basecaller", &dorado::basecaller},
             {"duplex", &dorado::duplex},
             {"download", &dorado::download},
-            {"mm2", &dorado::mm2},
+            {"aligner", &dorado::aligner},
     };
 
     std::vector<std::string> arguments(argv + 1, argv + argc);
