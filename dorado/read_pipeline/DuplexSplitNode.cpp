@@ -40,7 +40,7 @@ std::vector<std::pair<size_t, size_t>> detect_pore_signal(torch::Tensor pa_signa
     std::vector<std::pair<size_t, size_t>> ans;
     //FIXME what type to use here?
     auto pore_a = pa_signal.accessor<float, 1>();
-    size_t start = size_t(-1);
+    size_t start = 0;
     size_t end = 0;
 
     for (size_t i = 0; i < pore_a.size(0); i++) {
@@ -58,7 +58,7 @@ std::vector<std::pair<size_t, size_t>> detect_pore_signal(torch::Tensor pa_signa
     if (end > 0) {
         ans.push_back(std::pair{start, end});
     }
-    assert(start < pore_a.size(0) && end <= start < pore_a.size(0));
+    assert(start < pore_a.size(0) && end <= pore_a.size(0));
     return ans;
 }
 
@@ -172,6 +172,48 @@ merge_ranges(std::vector<PosRange>&& pore_regions) {
     return pore_regions;
 }
 
+std::string print_alignment(const char* query, const char* target, const EdlibAlignResult& result) {
+    std::stringstream ss;
+    int tpos = result.startLocations[0];
+
+    int qpos = 0;
+    for (int i = 0; i < result.alignmentLength; i++) {
+        if (result.alignment[i] == EDLIB_EDOP_INSERT) {
+            ss << "-";
+        } else {
+            ss << query[qpos];
+            qpos++;
+        }
+    }
+
+    ss << '\n';
+
+    for (int i = 0; i < result.alignmentLength; i++) {
+        if (result.alignment[i] == EDLIB_EDOP_MATCH) {
+            ss << "|";
+        } else if (result.alignment[i] == EDLIB_EDOP_INSERT) {
+            ss << " ";
+        } else if (result.alignment[i] == EDLIB_EDOP_DELETE) {
+            ss << " ";
+        } else if (result.alignment[i] == EDLIB_EDOP_MISMATCH) {
+            ss << "*";
+        }
+    }
+
+    ss << '\n';
+
+    for (int i = 0; i < result.alignmentLength; i++) {
+        if (result.alignment[i] == EDLIB_EDOP_DELETE) {
+            ss << "-";
+        } else {
+            ss << target[tpos];
+            tpos++;
+        }
+    }
+
+    return ss.str();
+}
+
 bool check_rc_match(const std::string& seq, PosRange templ_r, PosRange compl_r, int dist_thr) {
     assert(templ_r.second > templ_r.first && compl_r.second > compl_r.first);
     const char* c_seq = seq.c_str();
@@ -181,14 +223,17 @@ bool check_rc_match(const std::string& seq, PosRange templ_r, PosRange compl_r, 
     auto edlib_result = edlibAlign(c_seq + templ_r.first,
                             templ_r.second - templ_r.first,
                             rc_compl.data(), rc_compl.size(),
-                            edlibNewAlignConfig(-1, EDLIB_MODE_HW, EDLIB_TASK_DISTANCE, NULL, 0));
+                            //edlibNewAlignConfig(-1, EDLIB_MODE_HW, EDLIB_TASK_DISTANCE, NULL, 0));
+                            edlibNewAlignConfig(-1, EDLIB_MODE_HW, EDLIB_TASK_PATH, NULL, 0));
     assert(edlib_result.status == EDLIB_STATUS_OK);
     std::optional<PosRange> res = std::nullopt;
     assert(edlib_result.status == EDLIB_STATUS_OK && edlib_result.editDistance <= dist_thr);
-    spdlog::info("Checking ranges [{}, {}] vs [{}, {}]: edist={}",
+    spdlog::info("Checking ranges [{}, {}] vs [{}, {}]: edist={}\n{}",
                     templ_r.first, templ_r.second,
                     compl_r.first, compl_r.second,
-                    edlib_result.editDistance);
+                    edlib_result.editDistance,
+                    print_alignment(c_seq + templ_r.first, rc_compl.data(), edlib_result));
+
     //FIXME integrate dist_thr check right into align call after tweaking the settings
     bool match = (edlib_result.status == EDLIB_STATUS_OK)
                     && (edlib_result.editDistance != -1)
