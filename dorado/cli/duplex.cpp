@@ -86,7 +86,7 @@ int duplex(int argc, char* argv[]) {
                 model_path.parent_path() / std::filesystem::path(stereo_model_name);
 
         if (!std::filesystem::exists(stereo_model_path)) {
-            utils::download_models(model_path.parent_path(), stereo_model_name);
+            utils::download_models(model_path.parent_path().u8string(), stereo_model_name);
         }
 
         bool emit_moves = false, rna = false, duplex = true;
