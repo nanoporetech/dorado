@@ -49,7 +49,11 @@ II. Adapter-aware mode
 struct DuplexSplitSettings {
     float pore_thr = 160.;
     size_t pore_cl_dist = 1000;
-    size_t flank_size = 1000;
+    size_t templ_flank = 1100;
+    //trim potentially erroneous bases at end of template
+    size_t templ_trim = 100;
+    //adjusted to adapter presense and potential loss of bases on template, leading to 'shift'
+    size_t compl_flank = 1200;
     //FIXME should probably be fractional
     //currently has to account for the adapter
     int flank_edist = 150;

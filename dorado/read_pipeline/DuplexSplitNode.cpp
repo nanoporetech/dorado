@@ -173,6 +173,7 @@ merge_ranges(std::vector<PosRange>&& pore_regions) {
 }
 
 bool check_rc_match(const std::string& seq, PosRange templ_r, PosRange compl_r, int dist_thr) {
+    assert(templ_r.second > templ_r.first && compl_r.second > compl_r.first);
     const char* c_seq = seq.c_str();
     std::vector<char> rc_compl(c_seq + compl_r.first, c_seq + compl_r.second);
     dorado::utils::reverse_complement(rc_compl);
@@ -180,7 +181,7 @@ bool check_rc_match(const std::string& seq, PosRange templ_r, PosRange compl_r, 
     auto edlib_result = edlibAlign(c_seq + templ_r.first,
                             templ_r.second - templ_r.first,
                             rc_compl.data(), rc_compl.size(),
-                            edlibNewAlignConfig(-1, EDLIB_MODE_SHW, EDLIB_TASK_DISTANCE, NULL, 0));
+                            edlibNewAlignConfig(-1, EDLIB_MODE_HW, EDLIB_TASK_DISTANCE, NULL, 0));
     assert(edlib_result.status == EDLIB_STATUS_OK);
     std::optional<PosRange> res = std::nullopt;
     assert(edlib_result.status == EDLIB_STATUS_OK && edlib_result.editDistance <= dist_thr);
@@ -283,21 +284,19 @@ DuplexSplitNode::identify_splits(const Read& read) {
     auto matched_pore_adapter = definite_splits.size();
 
     //checking reverse-complement matching for uncertain regions
-    size_t templ_flank = m_settings.flank_size;
     //No need to 'cut' adapter region -- matching complement region
-    // won't be penalized for having extra prefix in edlib
-    size_t compl_flank = m_settings.flank_size + m_settings.adapter.size();
+    // won't be penalized for having extra prefix & suffix in edlib
     for (auto r : extra_regions) {
-        if (r.first < templ_flank ||
-            r.second + compl_flank > read.seq.length()) {
+        if (r.first < m_settings.templ_flank ||
+            r.second + m_settings.compl_flank > read.seq.length()) {
             //TODO maybe handle some of these cases too (extra min_avail_sequence parameter?)
             continue;
         }
         //FIXME any need to adjust for adapter
         //FIXME should we subtract a portion of tail adapter from the first region too?
         if (check_rc_match(read.seq,
-                        {r.first - templ_flank, r.first},
-                        {r.second, r.second + compl_flank},
+                        {r.first - m_settings.templ_flank, r.first - m_settings.templ_trim},
+                        {r.second, r.second + m_settings.compl_flank},
                         m_settings.flank_edist)) {
             //TODO might make sense to use actual adapter coordinates when it was found
             definite_splits.push_back(r);
