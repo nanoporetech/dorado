@@ -1,5 +1,6 @@
 #include "Version.h"
 #include "minimap.h"
+#include "utils/bam_utils.h"
 #include "utils/log_utils.h"
 
 #include <argparse.hpp>
@@ -18,6 +19,9 @@ int aligner(int argc, char* argv[]) {
 
     try {
         parser.parse_args(argc, argv);
+        auto reads(parser.get<std::string>("reads"));
+        std::map<std::string, std::shared_ptr<Read>> read_map = utils::read_bam(reads);
+
     } catch (const std::exception& e) {
         std::ostringstream parser_stream;
         parser_stream << parser;
@@ -30,8 +34,6 @@ int aligner(int argc, char* argv[]) {
     if (parser.get<bool>("--verbose")) {
         spdlog::set_level(spdlog::level::debug);
     }
-
-    spdlog::info("MM_MAX_SEG {}", MM_MAX_SEG);
 
     return 0;
 }
