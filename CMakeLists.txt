@@ -231,6 +231,7 @@ if(NOT DORADO_LIB_ONLY)
     target_link_libraries(dorado
         dorado_lib
         dorado_io_lib
+        dorado_models_lib
     )
 
     if (DEFINED DORADO_INSTALL_PATH)
@@ -310,12 +311,19 @@ elseif(APPLE)
     install(FILES ${TORCH_DLLS} DESTINATION lib COMPONENT redist_libs)
 endif()
 
+add_library(dorado_models_lib
+    dorado/utils/models.cpp
+    dorado/utils/models.h
+)
+
+target_link_libraries(dorado_models_lib
+    elzip
+)
+
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     add_library(dorado_io_lib
         dorado/data_loader/DataLoader.cpp
         dorado/data_loader/DataLoader.h
-        dorado/utils/models.cpp
-        dorado/utils/models.h
     )
 
     if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
@@ -334,7 +342,6 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
        ${POD5_LIBRARIES}
        ${HDF5_C_LIBRARIES}
        ${CMAKE_DL_LIBS}
-       elzip
     )
 
     set_target_properties(dorado_io_lib
@@ -349,4 +356,3 @@ endif()
 if(NOT DORADO_LIB_ONLY)
     include(cmake/DoradoPackaging.cmake)
 endif()
-
