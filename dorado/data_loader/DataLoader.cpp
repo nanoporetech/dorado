@@ -142,7 +142,7 @@ void DataLoader::load_reads(const std::string& path) {
         return;
     }
 
-    for (const auto& entry : std::filesystem::directory_iterator(path)) {
+    for (const auto& entry : std::filesystem::recursive_directory_iterator(path)) {
         if (m_loaded_read_count == m_max_reads) {
             break;
         }
@@ -160,7 +160,7 @@ void DataLoader::load_reads(const std::string& path) {
 
 int DataLoader::get_num_reads(std::string data_path, std::unordered_set<std::string> read_list) {
     size_t num_reads = 0;
-    for (const auto& entry : std::filesystem::directory_iterator(data_path)) {
+    for (const auto& entry : std::filesystem::recursive_directory_iterator(data_path)) {
         std::string ext = std::filesystem::path(entry).extension().string();
         std::transform(ext.begin(), ext.end(), ext.begin(),
                        [](unsigned char c) { return std::tolower(c); });
@@ -190,7 +190,7 @@ std::unordered_map<std::string, ReadGroup> DataLoader::load_read_groups(std::str
                                                                         std::string model_path) {
     std::unordered_map<std::string, ReadGroup> read_groups;
 
-    for (const auto& entry : std::filesystem::directory_iterator(data_path)) {
+    for (const auto& entry : std::filesystem::recursive_directory_iterator(data_path)) {
         std::string ext = std::filesystem::path(entry).extension().string();
         std::transform(ext.begin(), ext.end(), ext.begin(),
                        [](unsigned char c) { return std::tolower(c); });
