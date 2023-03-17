@@ -17,6 +17,7 @@
 #include "utils/cuda_utils.h"
 #endif
 
+#include "utils/models.h"
 #include "utils/parameters.h"
 
 #include <argparse.hpp>
@@ -77,12 +78,16 @@ int duplex(int argc, char* argv[]) {
                 utils::load_pairs_file(pairs_file);
         spdlog::info("> Pairs file loaded");
 
-        const auto model_path = std::filesystem::path(model);
+        const auto model_path = std::filesystem::canonical(std::filesystem::path(model));
 
         // Currently the stereo model is hardcoded.
         const std::string stereo_model_name("dna_r10.4.1_e8.2_4khz_stereo@v1.1");
         const auto stereo_model_path =
                 model_path.parent_path() / std::filesystem::path(stereo_model_name);
+
+        if (!std::filesystem::exists(stereo_model_path)) {
+            utils::download_models(model_path.parent_path().u8string(), stereo_model_name);
+        }
 
         bool emit_moves = false, rna = false, duplex = true;
         WriterNode writer_node(std::move(args), emit_fastq, emit_moves, rna, duplex, min_qscore, 4);
