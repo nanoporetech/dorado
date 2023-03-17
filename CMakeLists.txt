@@ -317,6 +317,7 @@ add_library(dorado_models_lib
 )
 
 target_link_libraries(dorado_models_lib
+    OpenSSL::SSL
     elzip
 )
 
@@ -338,7 +339,6 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     endif()
 
     target_link_libraries(dorado_io_lib
-       OpenSSL::SSL
        ${POD5_LIBRARIES}
        ${HDF5_C_LIBRARIES}
        ${CMAKE_DL_LIBS}
