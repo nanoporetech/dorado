@@ -178,7 +178,7 @@ std::string print_alignment(const char* query, const char* target, const EdlibAl
 
     int qpos = 0;
     for (int i = 0; i < result.alignmentLength; i++) {
-        if (result.alignment[i] == EDLIB_EDOP_INSERT) {
+        if (result.alignment[i] == EDLIB_EDOP_DELETE) {
             ss << "-";
         } else {
             ss << query[qpos];
@@ -203,7 +203,7 @@ std::string print_alignment(const char* query, const char* target, const EdlibAl
     ss << '\n';
 
     for (int i = 0; i < result.alignmentLength; i++) {
-        if (result.alignment[i] == EDLIB_EDOP_DELETE) {
+        if (result.alignment[i] == EDLIB_EDOP_INSERT) {
             ss << "-";
         } else {
             ss << target[tpos];
