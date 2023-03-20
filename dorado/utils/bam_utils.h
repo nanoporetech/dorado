@@ -3,6 +3,7 @@
 #include "read_pipeline/ReadPipeline.h"
 
 #include <map>
+#include <set>
 #include <string>
 namespace dorado::utils {
 
@@ -20,7 +21,8 @@ namespace dorado::utils {
  * @note The caller is responsible for managing the memory of the returned map.
  * @note The input BAM file must be properly formatted and readable.
  */
-std::map<std::string, std::shared_ptr<Read>> read_bam(const std::string& filename);
+std::map<std::string, std::shared_ptr<Read>> read_bam(const std::string& filename,
+                                                      const std::set<std::string>& read_ids);
 
 class BamReader {
 public:

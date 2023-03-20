@@ -5,6 +5,7 @@
 
 #include <iostream>
 #include <map>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -17,12 +18,17 @@ const char seq_nt16_str[] = "=ACMGRSVTWYHKDBN";
 
 namespace dorado::utils {
 
-std::map<std::string, std::shared_ptr<Read>> read_bam(const std::string& filename) {
+std::map<std::string, std::shared_ptr<Read>> read_bam(const std::string& filename,
+                                                      const std::set<std::string>& read_ids) {
     BamReader reader(filename);
     std::map<std::string, std::shared_ptr<Read>> reads;
 
     while (reader.next()) {
         std::string read_id = bam_get_qname(reader.m_record);
+
+        if (read_ids.find(read_id) == read_ids.end()) {
+            continue;
+        }
 
         uint8_t* qstring = bam_get_qual(reader.m_record);
         uint8_t* sequence = bam_get_seq(reader.m_record);

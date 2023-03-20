@@ -23,6 +23,7 @@
 #include <argparse.hpp>
 #include <spdlog/spdlog.h>
 
+#include <set>
 #include <thread>
 
 namespace dorado {
@@ -74,8 +75,7 @@ int duplex(int argc, char* argv[]) {
         std::vector<std::string> args(argv, argv + argc);
 
         spdlog::info("> Loading pairs file");
-        std::map<std::string, std::string> template_complement_map =
-                utils::load_pairs_file(pairs_file);
+        auto template_complement_map = utils::load_pairs_file(pairs_file);
         spdlog::info("> Pairs file loaded");
 
         bool emit_moves = false, rna = false, duplex = true;
@@ -84,8 +84,17 @@ int duplex(int argc, char* argv[]) {
         torch::set_num_threads(1);
 
         if (model.compare("basespace") == 0) {  // Execute a Basespace duplex pipeline.
+
+            // create a set of the read_ids
+            std::set<std::string> read_ids;
+            for (const auto& pair : template_complement_map) {
+                read_ids.insert(pair.first);
+                read_ids.insert(pair.second);
+            }
+
             spdlog::info("> Loading reads");
-            std::map<std::string, std::shared_ptr<Read>> read_map = utils::read_bam(reads);
+            std::map<std::string, std::shared_ptr<Read>> read_map =
+                    utils::read_bam(reads, read_ids);
             spdlog::info("> Starting Basespace Duplex Pipeline");
 
             threads = threads == 0 ? std::thread::hardware_concurrency() : threads;
