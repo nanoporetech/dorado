@@ -155,7 +155,7 @@ void setup(std::vector<std::string> args,
 
     auto read_list = utils::load_read_list(read_list_file_path);
 
-    size_t num_reads = DataLoader::get_num_reads(data_path, read_list);
+    size_t num_reads = DataLoader::get_num_reads(data_path, read_list, recurisve_file_loading);
     num_reads = max_reads == 0 ? num_reads : std::min(num_reads, max_reads);
 
     bool rna = utils::is_rna_model(model_path), duplex = false;

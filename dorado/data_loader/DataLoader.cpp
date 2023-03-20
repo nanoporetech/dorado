@@ -170,31 +170,46 @@ void DataLoader::load_reads(const std::string& path, bool recursive_file_loading
     m_read_sink.terminate();
 }
 
-int DataLoader::get_num_reads(std::string data_path, std::unordered_set<std::string> read_list) {
+int DataLoader::get_num_reads(std::string data_path,
+                              std::unordered_set<std::string> read_list,
+                              bool recursive_file_loading) {
     size_t num_reads = 0;
-    for (const auto& entry : std::filesystem::recursive_directory_iterator(data_path)) {
-        std::string ext = std::filesystem::path(entry).extension().string();
-        std::transform(ext.begin(), ext.end(), ext.begin(),
-                       [](unsigned char c) { return std::tolower(c); });
-        if (ext == ".pod5") {
-            pod5_init();
 
-            // Open the file ready for walking:
-            Pod5FileReader_t* file = pod5_open_file(entry.path().string().c_str());
+    auto iterate_directory = [&](const auto& iterator_fn) {
+        for (const auto& entry : iterator_fn(data_path)) {
+            std::string ext = std::filesystem::path(entry).extension().string();
+            std::transform(ext.begin(), ext.end(), ext.begin(),
+                           [](unsigned char c) { return std::tolower(c); });
+            if (ext == ".pod5") {
+                pod5_init();
 
-            size_t read_count;
-            pod5_get_read_count(file, &read_count);
-            if (!file) {
-                spdlog::error("Failed to open file {}: {}", entry.path().string().c_str(),
-                              pod5_get_error_string());
-            }
+                // Open the file ready for walking:
+                Pod5FileReader_t* file = pod5_open_file(entry.path().string().c_str());
 
-            num_reads += read_count;
-            if (pod5_close_and_free_reader(file) != POD5_OK) {
-                spdlog::error("Failed to close and free POD5 reader");
+                size_t read_count;
+                pod5_get_read_count(file, &read_count);
+                if (!file) {
+                    spdlog::error("Failed to open file {}: {}", entry.path().string().c_str(),
+                                  pod5_get_error_string());
+                }
+
+                num_reads += read_count;
+                if (pod5_close_and_free_reader(file) != POD5_OK) {
+                    spdlog::error("Failed to close and free POD5 reader");
+                }
             }
         }
+    };
+
+    if (recursive_file_loading) {
+        iterate_directory([](const auto& path) {
+            return std::filesystem::recursive_directory_iterator(path);
+        });
+    } else {
+        iterate_directory(
+                [](const auto& path) { return std::filesystem::directory_iterator(path); });
     }
+
     return num_reads;
 }
 
