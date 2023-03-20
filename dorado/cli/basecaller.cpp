@@ -45,7 +45,8 @@ void setup(std::vector<std::string> args,
            bool emit_moves,
            size_t max_reads,
            size_t min_qscore,
-           std::string read_list_file_path) {
+           std::string read_list_file_path,
+           bool recurisve_file_loading) {
     torch::set_num_threads(1);
     std::vector<Runner> runners;
 
@@ -150,7 +151,7 @@ void setup(std::vector<std::string> args,
     }
 
     std::string model_name = std::filesystem::canonical(model_path).filename().string();
-    auto read_groups = DataLoader::load_read_groups(data_path, model_name);
+    auto read_groups = DataLoader::load_read_groups(data_path, model_name, false);
 
     auto read_list = utils::load_read_list(read_list_file_path);
 
@@ -179,7 +180,7 @@ void setup(std::vector<std::string> args,
     ScalerNode scaler_node(*basecaller_node, num_devices * 2);
     DataLoader loader(scaler_node, "cpu", num_devices, max_reads, read_list);
 
-    loader.load_reads(data_path);
+    loader.load_reads(data_path, false);
 }
 
 int basecaller(int argc, char* argv[]) {
@@ -221,9 +222,10 @@ int basecaller(int argc, char* argv[]) {
             .default_value(default_parameters.overlap)
             .scan<'i', int>();
 
-    parser.add_argument("-r", "--num_runners")
-            .default_value(default_parameters.num_runners)
-            .scan<'i', int>();
+    parser.add_argument("-r", "--recursive")
+            .default_value(false)
+            .implicit_value(true)
+            .help("Recursively scan through directories to load FAST5 and POD5 files");
 
     parser.add_argument("--modified-bases")
             .nargs(argparse::nargs_pattern::at_least_one)
@@ -287,10 +289,11 @@ int basecaller(int argc, char* argv[]) {
     try {
         setup(args, model, parser.get<std::string>("data"), mod_bases_models,
               parser.get<std::string>("-x"), parser.get<int>("-c"), parser.get<int>("-o"),
-              parser.get<int>("-b"), parser.get<int>("-r"), default_parameters.remora_batchsize,
-              default_parameters.remora_threads, parser.get<bool>("--emit-fastq"),
-              parser.get<bool>("--emit-moves"), parser.get<int>("--max-reads"),
-              parser.get<int>("--min-qscore"), parser.get<std::string>("--read-ids"));
+              parser.get<int>("-b"), default_parameters.num_runners,
+              default_parameters.remora_batchsize, default_parameters.remora_threads,
+              parser.get<bool>("--emit-fastq"), parser.get<bool>("--emit-moves"),
+              parser.get<int>("--max-reads"), parser.get<int>("--min-qscore"),
+              parser.get<std::string>("--read-ids"), parser.get<bool>("--recursive"));
     } catch (const std::exception& e) {
         spdlog::error("{}", e.what());
         return 1;

@@ -200,7 +200,7 @@ int duplex(int argc, char* argv[]) {
             ScalerNode scaler_node(*basecaller_node, num_devices * 2);
 
             DataLoader loader(scaler_node, "cpu", num_devices, 0, std::move(read_list));
-            loader.load_reads(reads);
+            loader.load_reads(reads, false);
         }
     } catch (const std::exception& e) {
         spdlog::error(e.what());
