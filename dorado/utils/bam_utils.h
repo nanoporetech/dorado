@@ -8,14 +8,15 @@
 namespace dorado::utils {
 
 /**
- * @brief Reads a BAM file and returns a map of read IDs to Read objects.
+ * @brief Reads a SAM/BAM/CRAM file and returns a map of read IDs to Read objects.
  *
- * This function opens a BAM file specified by the input filename parameter,
+ * This function opens a SAM/BAM/CRAM file specified by the input filename parameter,
  * reads the alignments, and creates a map that associates read IDs with their
  * corresponding Read objects. The Read objects contain the read ID, sequence,
  * and quality string.
  *
  * @param filename The input BAM file path as a string.
+ * @param read_ids A set of read_ids to filter on.
  * @return A map with read IDs as keys and shared pointers to Read objects as values.
  *
  * @note The caller is responsible for managing the memory of the returned map.

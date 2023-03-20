@@ -93,10 +93,9 @@ int duplex(int argc, char* argv[]) {
             }
 
             spdlog::info("> Loading reads");
-            std::map<std::string, std::shared_ptr<Read>> read_map =
-                    utils::read_bam(reads, read_ids);
-            spdlog::info("> Starting Basespace Duplex Pipeline");
+            auto read_map = utils::read_bam(reads, read_ids);
 
+            spdlog::info("> Starting Basespace Duplex Pipeline");
             threads = threads == 0 ? std::thread::hardware_concurrency() : threads;
             BaseSpaceDuplexCallerNode duplex_caller_node(writer_node, template_complement_map,
                                                          read_map, threads);
