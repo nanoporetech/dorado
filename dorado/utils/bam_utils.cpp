@@ -5,6 +5,7 @@
 
 #include <iostream>
 #include <map>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -15,22 +16,18 @@ const char seq_nt16_str[] = "=ACMGRSVTWYHKDBN";
 #endif  // _WIN32
 
 namespace dorado::utils {
-std::map<std::string, std::shared_ptr<Read>> read_bam(std::string reads_file) {
-    samFile* fp_in = hts_open(reads_file.c_str(), "r");
 
-    bam_hdr_t* bamHdr = sam_hdr_read(fp_in);  //read header
-    bam1_t* aln = bam_init1();                //initialize an alignment
-
+std::map<std::string, std::shared_ptr<Read>> read_bam(const std::string& filename) {
+    BamReader reader(filename);
     std::map<std::string, std::shared_ptr<Read>> reads;
 
-    while (sam_read1(fp_in, bamHdr, aln) >= 0) {
-        uint32_t seqlen = aln->core.l_qseq;
+    while (reader.next()) {
+        std::string read_id = bam_get_qname(reader.m_record);
 
-        std::string read_id = bam_get_qname(aln);
+        uint8_t* qstring = bam_get_qual(reader.m_record);
+        uint8_t* sequence = bam_get_seq(reader.m_record);
 
-        uint8_t* qstring = bam_get_qual(aln);
-        uint8_t* sequence = bam_get_seq(aln);
-
+        uint32_t seqlen = reader.m_record->core.l_qseq;
         std::vector<uint8_t> qualities(seqlen);
         std::vector<char> nucleotides(seqlen);
 
@@ -39,6 +36,7 @@ std::map<std::string, std::shared_ptr<Read>> read_bam(std::string reads_file) {
             qualities[i] = qstring[i] + 33;
             nucleotides[i] = seq_nt16_str[bam_seqi(sequence, i)];
         }
+
         auto tmp_read = std::make_shared<Read>();
         tmp_read->read_id = read_id;
         tmp_read->seq = std::string(nucleotides.begin(), nucleotides.end());
@@ -46,8 +44,34 @@ std::map<std::string, std::shared_ptr<Read>> read_bam(std::string reads_file) {
         reads[read_id] = tmp_read;
     }
 
-    bam_destroy1(aln);
-    sam_close(fp_in);
     return reads;
 }
+
+BamReader::BamReader(const std::string& filename) {
+    m_file = hts_open(filename.c_str(), "r");
+    if (!m_file) {
+        throw std::runtime_error("Could not open file: " + filename);
+    }
+
+    m_header = sam_hdr_read(m_file);
+    if (!m_header) {
+        throw std::runtime_error("Could not read header from file: " + filename);
+    }
+    m_record = bam_init1();
+}
+
+BamReader::~BamReader() {
+    if (m_header) {
+        bam_hdr_destroy(m_header);
+    }
+    if (m_record) {
+        bam_destroy1(m_record);
+    }
+    if (m_file) {
+        sam_close(m_file);
+    }
+}
+
+bool BamReader::next() { return sam_read1(m_file, m_header, m_record) >= 0; }
+
 }  // namespace dorado::utils
