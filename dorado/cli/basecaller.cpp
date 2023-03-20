@@ -180,7 +180,7 @@ void setup(std::vector<std::string> args,
     ScalerNode scaler_node(*basecaller_node, num_devices * 2);
     DataLoader loader(scaler_node, "cpu", num_devices, max_reads, read_list);
 
-    loader.load_reads(data_path, false);
+    loader.load_reads(data_path, recurisve_file_loading);
 }
 
 int basecaller(int argc, char* argv[]) {
