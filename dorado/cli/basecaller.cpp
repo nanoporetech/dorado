@@ -151,7 +151,7 @@ void setup(std::vector<std::string> args,
     }
 
     std::string model_name = std::filesystem::canonical(model_path).filename().string();
-    auto read_groups = DataLoader::load_read_groups(data_path, model_name, false);
+    auto read_groups = DataLoader::load_read_groups(data_path, model_name, recurisve_file_loading);
 
     auto read_list = utils::load_read_list(read_list_file_path);
 
