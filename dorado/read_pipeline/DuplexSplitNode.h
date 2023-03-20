@@ -50,7 +50,7 @@ struct DuplexSplitSettings {
     float pore_thr = 160.;
     size_t pore_cl_dist = 1000;
     size_t templ_flank = 1100;
-    //trim potentially erroneous bases at end of template
+    //trim potentially erroneous (and/or PCR adapter) bases at end of template
     size_t templ_trim = 100;
     //adjusted to adapter presense and potential loss of bases on template, leading to 'shift'
     size_t compl_flank = 1200;
@@ -59,27 +59,13 @@ struct DuplexSplitSettings {
     int flank_edist = 150;
     uint8_t adapter_edist = 3; //TODO figure out good threshold. 3 seems ok for hac/sup, but can probably relax
     uint8_t pore_adapter_gap_thr = 30; //bp TODO figure out good threshold
+    //TODO don't need if we have more efficient adapter detection
     uint64_t expect_adapter_prefix = 200;
     //TAIL_ADAPTER = 'GCAATACGTAACTGAACGAAGT'
     //HEAD_ADAPTER = 'AATGTACTTCGTTCAGTTACGTATTGCT'
     //clipped 4 letters from the beginningof head adapter! 24 left
     std::string adapter = "TACTTCGTTCAGTTACGTATTGCT";
 };
-
-// struct ReadRange {
-//     size_t start_pos;
-//     size_t end_pos;
-//     size_t start_sample;
-//     size_t end_sample;
-
-//     ReadRange(size_t start_pos,
-//             size_t end_pos,
-//             size_t start_sample,
-//             size_t end_sample):
-//             start_pos(start_pos), end_pos(end_pos),
-//             start_sample(start_sample), end_sample(end_sample) {
-//     }
-// };
 
 class DuplexSplitNode : public MessageSink {
 public:

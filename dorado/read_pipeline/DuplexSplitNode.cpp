@@ -8,6 +8,13 @@
 #include <optional>
 #include <cmath>
 
+#include <iostream>
+#include <iomanip>
+#include <string>
+#include <sstream>
+#include <array>
+#include <openssl/sha.h>
+
 namespace {
 
 using namespace dorado;
@@ -17,6 +24,74 @@ typedef DuplexSplitNode::PosRange PosRange;
 std::ostream& operator<<(std::ostream& os, const PosRange& r)
 {
     return os << "[" << r.first << ", " << r.second << "]";
+}
+
+//FIXME ask if we can have some copy constructor?
+std::shared_ptr<Read> copy_read(const Read &read) {
+    auto copy = std::make_shared<Read>();
+    copy->raw_data = read.raw_data;
+    copy->digitisation = read.digitisation;
+    copy->range = read.range;
+    copy->offset = read.offset;
+    copy->sample_rate = read.sample_rate;
+
+    copy->shift = read.shift;
+    copy->scale = read.scale;
+
+    copy->scaling = read.scaling;
+
+    copy->num_chunks = read.num_chunks;
+    copy->num_modbase_chunks = read.num_modbase_chunks;
+
+    copy->model_stride = read.model_stride;
+
+    copy->read_id = read.read_id;
+    copy->seq = read.seq;
+    copy->qstring = read.qstring;
+    copy->moves = read.moves;
+    copy->base_mod_probs = read.base_mod_probs;
+    copy->run_id = read.run_id;
+    copy->model_name = read.model_name;
+
+    copy->base_mod_info = read.base_mod_info;
+
+    copy->num_trimmed_samples = read.num_trimmed_samples;
+
+    copy->attributes = read.attributes;
+    return copy;
+}
+
+//FIXME copied from DataLoader.cpp
+std::string get_string_timestamp_from_unix_time(time_t time_stamp_ms) {
+    static std::mutex timestamp_mtx;
+    std::unique_lock lock(timestamp_mtx);
+    //Convert a time_t (seconds from UNIX epoch) to a timestamp in %Y-%m-%dT%H:%M:%S format
+    auto time_stamp_s = time_stamp_ms / 1000;
+    int num_ms = time_stamp_ms % 1000;
+    char buf[32];
+    struct tm ts;
+    ts = *gmtime(&time_stamp_s);
+    strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%S.", &ts);
+    std::string time_stamp_str = std::string(buf);
+    time_stamp_str += std::to_string(num_ms);  // add ms
+    time_stamp_str += "+00:00";                //add zero timezone
+    return time_stamp_str;
+}
+
+// Expects the time to be encoded like "2017-09-12T9:50:12.456+00:00".
+time_t get_unix_time_from_string_timestamp(const std::string& time_stamp) {
+    static std::mutex timestamp_mtx;
+    std::unique_lock lock(timestamp_mtx);
+    std::tm base_time = {};
+    strptime(time_stamp.c_str(), "%Y-%m-%dT%H:%M:%S.", &base_time);
+    auto num_ms = std::stoi(time_stamp.substr(19, time_stamp.size()-25));
+    return mktime(&base_time) * 1000 + num_ms;
+}
+
+std::string adjust_time_ms(const std::string& time_stamp, uint64_t offset_ms) {
+    return get_string_timestamp_from_unix_time(
+                get_unix_time_from_string_timestamp(time_stamp)
+                + offset_ms);
 }
 
 //                           T  A     T        T  C     A     G        T     A  C
@@ -30,6 +105,37 @@ std::vector<uint64_t> move_cum_sums(const std::vector<uint8_t> moves) {
         ans[i] = ans[i-1] + moves[i];
     }
     return ans;
+}
+
+std::string derive_uuid(const std::string& input_uuid, const std::string& desc) {
+    // Hash the input UUID using SHA-256
+    unsigned char hash[SHA256_DIGEST_LENGTH];
+    SHA256_CTX sha256;
+    SHA256_Init(&sha256);
+    SHA256_Update(&sha256, input_uuid.c_str(), input_uuid.size());
+    SHA256_Update(&sha256, desc.c_str(), desc.size());
+    SHA256_Final(hash, &sha256);
+
+    // Truncate the hash to 16 bytes (128 bits) to match the size of a UUID
+    std::array<unsigned char, 16> truncated_hash;
+    std::copy(std::begin(hash), std::begin(hash) + 16, std::begin(truncated_hash));
+
+    // Set the UUID version to 4 (random)
+    truncated_hash[6] = (truncated_hash[6] & 0x0F) | 0x40;
+
+    // Set the UUID variant to the RFC 4122 specified value (10)
+    truncated_hash[8] = (truncated_hash[8] & 0x3F) | 0x80;
+
+    // Convert the truncated hash to a UUID string
+    std::stringstream ss;
+    for (size_t i = 0; i < truncated_hash.size(); ++i) {
+        ss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(truncated_hash[i]);
+        if (i == 3 || i == 5 || i == 7 || i == 9) {
+            ss << "-";
+        }
+    }
+
+    return ss.str();
 }
 
 std::vector<std::pair<size_t, size_t>> detect_pore_signal(torch::Tensor pa_signal,
@@ -242,34 +348,38 @@ bool check_rc_match(const std::string& seq, PosRange templ_r, PosRange compl_r, 
     return match;
 }
 
+//TODO end_reason access?
+//signal_range should already be 'adjusted' to stride (e.g. probably gotten from seq_range)
 std::shared_ptr<Read> subread(const Read& read, PosRange seq_range, PosRange signal_range) {
-    //FIXME TODO
-    //FIXME do we have end_reason access?
+    const int stride = read.model_stride;
+    assert(signal_range.first % stride == 0 && signal_range.second % stride == 1);
 
-    /*
-    new_read->raw_data = ...read->raw_data.index({torch::indexing::Slice(trim_start, torch::indexing::None)});
-    new_read->sample_rate = run_sample_rate;
-    auto start_time_ms =
-            run_acquisition_start_time_ms + ((read_data.start_sample * 1000) / run_sample_rate);
-    auto start_time = get_string_timestamp_from_unix_time(start_time_ms);
-    new_read->scaling = read_data.calibration_scale;
-    new_read->offset = read_data.calibration_offset;
-    new_read->read_id = std::move(read_id_str);
-    new_read->num_trimmed_samples = 0;
-    new_read->attributes.read_number = read_data.read_number;
-    new_read->attributes.fast5_filename = std::filesystem::path(path.c_str()).filename().string();
-    new_read->attributes.mux = read_data.well;
-    new_read->attributes.channel_number = read_data.channel;
-    new_read->attributes.start_time = start_time;
-    new_read->run_id = run_info_data->protocol_run_id;
-    new_read->scale = ...
-    new_read->shift = ...
-    new_read->seq = ...
-    new_read->qstring = ...
-    new_read->moves = ...
-    new_read->model_stride = ...
-    */
-    return std::make_shared<Read>();
+    assert(read.called_chunks.empty() && read.num_chunks_called == 0 && read.num_modbase_chunks_called == 0);
+    auto subread = copy_read(read);
+
+    //TODO is it ok, or do we want subread number here?
+    const auto subread_id = derive_uuid(read.read_id,
+                        std::to_string(seq_range.first) + "-" + std::to_string(seq_range.second));
+    subread->read_id = subread_id;
+    subread->raw_data = subread->raw_data.index({torch::indexing::Slice(signal_range.first, signal_range.second)});
+    subread->attributes.start_time = adjust_time_ms(subread->attributes.start_time,
+                                        (subread->num_trimmed_samples + signal_range.first)
+                                            * 1000. / subread->sample_rate);
+    //we adjust for it in new start time above
+    subread->num_trimmed_samples = 0;
+    //FIXME HOW TO UPDATE
+    //subread->attributes.read_number = ???;
+    ////fixme update?
+    //subread->range = ???;
+    ////fixme update?
+    //subread->offset = ???;
+
+    subread->seq = subread->seq.substr(seq_range.first, seq_range.second - seq_range.first);
+    subread->qstring = subread->qstring.substr(seq_range.first, seq_range.second - seq_range.first);
+    subread->moves = std::vector<uint8_t>(subread->moves.begin() + signal_range.first / stride,
+        subread->moves.begin() + signal_range.second / stride);
+    assert(subread->moves.size() * stride == subread->raw_data.size(0));
+    return subread;
 }
 
 }
@@ -374,6 +484,7 @@ std::vector<Message> DuplexSplitNode::split(const Read& read,
         start_pos = r.second;
         signal_start = seq_to_sig_map[r.second];
     }
+    assert(read.raw_data.size(0) % read.model_stride == 0);
     ans.push_back(subread(read, {start_pos, read.seq.size()}, {signal_start, read.raw_data.size(0)}));
     return ans;
 }
@@ -385,20 +496,21 @@ void DuplexSplitNode::worker_thread() {
         // If this message isn't a read, we'll get a bad_variant_access exception.
         auto read = std::get<std::shared_ptr<Read>>(message);
 
-        auto ranges = identify_splits(*read);
+        auto interspace_ranges = identify_splits(*read);
         std::ostringstream oss;
-        std::copy(ranges.begin(), ranges.end(), std::ostream_iterator<PosRange>(oss, ";"));
-        for (auto r : ranges) {
+        std::copy(interspace_ranges.begin(), interspace_ranges.end(), std::ostream_iterator<PosRange>(oss, ";"));
+        for (auto r : interspace_ranges) {
             spdlog::info("BED\t{}\t{}\t{}", read->read_id, r.first, r.second);
         }
-        //spdlog::info("DSN: identified {} splits in read {}: {}", ranges.size(), read->read_id, oss.str());
-        //if (ranges.empty()) {
-        //    m_sink.push_message(read);
-        //} else {
-        //    for (auto m : split(*read, ranges)) {
-        //        m_sink.push_message(std::move(m));
-        //    }
-        //}
+
+        spdlog::info("DSN: identified {} splits in read {}: {}", interspace_ranges.size(), read->read_id, oss.str());
+        if (interspace_ranges.empty()) {
+            m_sink.push_message(read);
+        } else {
+            for (auto m : split(*read, interspace_ranges)) {
+                m_sink.push_message(std::move(m));
+            }
+        }
         //FIXME Just passes the reads to get basecalls for now
         //m_sink.push_message(std::move(message));
     }
