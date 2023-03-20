@@ -35,7 +35,6 @@ public:
 
 private:
     htsFile* m_file;
-    hts_itr_t* m_iterator;
 };
 
 }  // namespace dorado::utils
