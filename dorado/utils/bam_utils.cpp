@@ -1,6 +1,7 @@
 #include "bam_utils.h"
 
 #include "htslib/sam.h"
+#include "minimap.h"
 #include "read_pipeline/ReadPipeline.h"
 
 #include <iostream>
@@ -90,6 +91,8 @@ BamWriter::BamWriter(const std::string& filename, const sam_hdr_t* header) {
         throw std::runtime_error("Could not open file: " + filename);
     }
     m_header = sam_hdr_dup(header);
+    write_hdr_pg();
+    write_hdr_sq();
     auto res = sam_hdr_write(m_file, m_header);
 }
 
@@ -103,5 +106,26 @@ BamWriter::~BamWriter() {
 }
 
 int BamWriter::write_record(bam1_t* record) { return sam_write1(m_file, m_header, record); }
+
+int BamWriter::write_record(bam1_t* record, int flag, int tid, int pos, int mapq) {
+    record->core.flag = flag;
+    record->core.tid = tid;
+    record->core.pos = pos;
+    record->core.qual = mapq;
+    //uint32_t cigar[] = {1000 << BAM_CIGAR_SHIFT | BAM_CMATCH};
+    //int n_cigar = 1;
+    //record->core.n_cigar = n_cigar;
+    //bam_set_cigar(record, cigar);
+    return sam_write1(m_file, m_header, record);
+}
+
+int BamWriter::write_hdr_pg() {
+    return sam_hdr_add_line(m_header, "PG", "ID", "aligner", "PN", "dorado", "VN", MM_VERSION, "DS",
+                            "minimap2", NULL);  // add CL Writer node
+}
+
+int BamWriter::write_hdr_sq() {
+    return sam_hdr_add_line(m_header, "SQ", "SN", "CHM1", "LN", "1000", NULL);
+}
 
 }  // namespace dorado::utils

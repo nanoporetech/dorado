@@ -39,7 +39,7 @@ int aligner(int argc, char* argv[]) {
     spdlog::info("> input fmt: {} aligned: {}", reader.m_format, reader.m_is_aligned);
 
     while (reader.next()) {
-        writer.write_record(reader.m_record);
+        writer.write_record(reader.m_record, 16, 0, 0, 50);
     }
 
     return 0;

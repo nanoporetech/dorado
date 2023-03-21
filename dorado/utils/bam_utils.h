@@ -43,7 +43,10 @@ class BamWriter {
 public:
     BamWriter(const std::string& filename, const sam_hdr_t* header);
     ~BamWriter();
+    int write_hdr_pg();
+    int write_hdr_sq();
     int write_record(bam1_t* record);
+    int write_record(bam1_t* record, int flag, int tid, int pos, int mapq);
     sam_hdr_t* m_header;
 
 private:
