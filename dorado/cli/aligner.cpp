@@ -15,13 +15,11 @@ int aligner(int argc, char* argv[]) {
     utils::InitLogging();
 
     argparse::ArgumentParser parser("dorado", DORADO_VERSION, argparse::default_arguments::help);
+    parser.add_argument("reads").help("Reads in BAM/SAM/CRAM format.");
     parser.add_argument("-v", "--verbose").default_value(false).implicit_value(true);
 
     try {
         parser.parse_args(argc, argv);
-        auto reads(parser.get<std::string>("reads"));
-        std::map<std::string, std::shared_ptr<Read>> read_map = utils::read_bam(reads);
-
     } catch (const std::exception& e) {
         std::ostringstream parser_stream;
         parser_stream << parser;
@@ -29,10 +27,17 @@ int aligner(int argc, char* argv[]) {
         std::exit(1);
     }
 
-    std::vector<std::string> args(argv, argv + argc);
-
     if (parser.get<bool>("--verbose")) {
         spdlog::set_level(spdlog::level::debug);
+    }
+
+    auto reads(parser.get<std::string>("reads"));
+
+    utils::BamReader reader(reads);
+    utils::BamWriter writer("-", reader.m_header);
+
+    while (reader.next()) {
+        writer.write_record(reader.m_record);
     }
 
     return 0;

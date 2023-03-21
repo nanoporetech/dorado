@@ -80,4 +80,24 @@ BamReader::~BamReader() {
 
 bool BamReader::next() { return sam_read1(m_file, m_header, m_record) >= 0; }
 
+BamWriter::BamWriter(const std::string& filename, const sam_hdr_t* header) {
+    m_file = hts_open(filename.c_str(), "wb");
+    if (!m_file) {
+        throw std::runtime_error("Could not open file: " + filename);
+    }
+    m_header = sam_hdr_dup(header);
+    auto res = sam_hdr_write(m_file, m_header);
+}
+
+BamWriter::~BamWriter() {
+    if (m_header) {
+        bam_hdr_destroy(m_header);
+    }
+    if (m_file) {
+        sam_close(m_file);
+    }
+}
+
+int BamWriter::write_record(bam1_t* record) { return sam_write1(m_file, m_header, record); }
+
 }  // namespace dorado::utils

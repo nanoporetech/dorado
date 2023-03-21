@@ -37,4 +37,15 @@ private:
     htsFile* m_file;
 };
 
+class BamWriter {
+public:
+    BamWriter(const std::string& filename, const sam_hdr_t* header);
+    ~BamWriter();
+    int write_record(bam1_t* record);
+    sam_hdr_t* m_header;
+
+private:
+    htsFile* m_file;
+};
+
 }  // namespace dorado::utils
