@@ -84,7 +84,7 @@ time_t get_unix_time_from_string_timestamp(const std::string& time_stamp) {
     std::unique_lock lock(timestamp_mtx);
     std::tm base_time = {};
     strptime(time_stamp.c_str(), "%Y-%m-%dT%H:%M:%S.", &base_time);
-    auto num_ms = std::stoi(time_stamp.substr(19, time_stamp.size()-25));
+    auto num_ms = std::stoi(time_stamp.substr(20, time_stamp.size()-26));
     return mktime(&base_time) * 1000 + num_ms;
 }
 
@@ -352,9 +352,10 @@ bool check_rc_match(const std::string& seq, PosRange templ_r, PosRange compl_r, 
 //signal_range should already be 'adjusted' to stride (e.g. probably gotten from seq_range)
 std::shared_ptr<Read> subread(const Read& read, PosRange seq_range, PosRange signal_range) {
     const int stride = read.model_stride;
-    assert(signal_range.first % stride == 0 && signal_range.second % stride == 1);
+    assert(signal_range.first % stride == 0);
+    assert(signal_range.second % stride == 0 || (signal_range.second == read.raw_data.size(0) && seq_range.second == read.seq.size()));
 
-    assert(read.called_chunks.empty() && read.num_chunks_called == 0 && read.num_modbase_chunks_called == 0);
+    //assert(read.called_chunks.empty() && read.num_chunks_called == 0 && read.num_modbase_chunks_called == 0);
     auto subread = copy_read(read);
 
     //TODO is it ok, or do we want subread number here?
@@ -378,7 +379,7 @@ std::shared_ptr<Read> subread(const Read& read, PosRange seq_range, PosRange sig
     subread->qstring = subread->qstring.substr(seq_range.first, seq_range.second - seq_range.first);
     subread->moves = std::vector<uint8_t>(subread->moves.begin() + signal_range.first / stride,
         subread->moves.begin() + signal_range.second / stride);
-    assert(subread->moves.size() * stride == subread->raw_data.size(0));
+    assert(signal_range.second == read.raw_data.size(0) || subread->moves.size() * stride == subread->raw_data.size(0));
     return subread;
 }
 
@@ -484,7 +485,7 @@ std::vector<Message> DuplexSplitNode::split(const Read& read,
         start_pos = r.second;
         signal_start = seq_to_sig_map[r.second];
     }
-    assert(read.raw_data.size(0) % read.model_stride == 0);
+    assert(read.raw_data.size(0) == seq_to_sig_map[read.seq.size()]);
     ans.push_back(subread(read, {start_pos, read.seq.size()}, {signal_start, read.raw_data.size(0)}));
     return ans;
 }
