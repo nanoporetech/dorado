@@ -63,6 +63,7 @@ BamReader::BamReader(const std::string& filename) {
     if (!m_header) {
         throw std::runtime_error("Could not read header from file: " + filename);
     }
+    m_is_aligned = m_header->n_targets > 0;
     m_record = bam_init1();
 }
 

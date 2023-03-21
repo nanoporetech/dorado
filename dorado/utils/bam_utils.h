@@ -31,6 +31,7 @@ public:
     ~BamReader();
     bool next();
     char* m_format;
+    bool m_is_aligned;
     bam1_t* m_record;
     sam_hdr_t* m_header;
 
