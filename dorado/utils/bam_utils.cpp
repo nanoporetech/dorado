@@ -58,7 +58,7 @@ BamReader::BamReader(const std::string& filename) {
     if (!m_file) {
         throw std::runtime_error("Could not open file: " + filename);
     }
-
+    m_format = hts_format_description(hts_get_format(m_file));
     m_header = sam_hdr_read(m_file);
     if (!m_header) {
         throw std::runtime_error("Could not read header from file: " + filename);
@@ -72,6 +72,9 @@ BamReader::~BamReader() {
     }
     if (m_record) {
         bam_destroy1(m_record);
+    }
+    if (m_format) {
+        free(m_format);
     }
     if (m_file) {
         sam_close(m_file);

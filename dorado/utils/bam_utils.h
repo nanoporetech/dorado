@@ -30,6 +30,7 @@ public:
     BamReader(const std::string& filename);
     ~BamReader();
     bool next();
+    char* m_format;
     bam1_t* m_record;
     sam_hdr_t* m_header;
 

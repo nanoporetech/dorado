@@ -36,6 +36,8 @@ int aligner(int argc, char* argv[]) {
     utils::BamReader reader(reads);
     utils::BamWriter writer("-", reader.m_header);
 
+    spdlog::info("> input fmt: {}", reader.m_format);
+
     while (reader.next()) {
         writer.write_record(reader.m_record);
     }
