@@ -28,6 +28,7 @@ add_executable(dorado_tests ${SOURCE_FILES})
 target_link_libraries(dorado_tests
     dorado_lib
     dorado_io_lib
+    dorado_models_lib
     ${ZLIB_LIBRARIES}
 )
 

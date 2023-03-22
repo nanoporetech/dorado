@@ -237,6 +237,7 @@ if(NOT DORADO_LIB_ONLY)
     target_link_libraries(dorado
         dorado_lib
         dorado_io_lib
+        dorado_models_lib
         minimap2
     )
 
@@ -265,7 +266,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
             "*cufft.so*"
         )
     endif()
-    
+
     foreach(PATTERN ${PATTERNS})
         file(GLOB DEP_DLLS "${CUDAToolkit_ROOT}/targets/${CMAKE_SYSTEM_PROCESSOR}-linux/lib/${PATTERN}")
         install(FILES ${DEP_DLLS} DESTINATION lib COMPONENT redist_libs)
@@ -275,10 +276,19 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     install(FILES ${TORCH_DLLS} DESTINATION lib COMPONENT redist_libs)
 
     if(DYNAMIC_HDF)
-        RESOLVE_SYMLINKS("${HDF5_C_LIBRARIES}" NEW_HDF_LIBRARIES)
-        foreach(HDF_LIB IN LISTS NEW_HDF_LIBRARIES)
+        string(REPLACE "."  "" SHARED_LIB_EXT "${CMAKE_SHARED_LIBRARY_SUFFIX}")
+        FILTER_LIST("${HDF5_C_LIBRARIES}" DEBUG_LIBRARIES debug optimized ${SHARED_LIB_EXT})
+        RESOLVE_SYMLINKS("${DEBUG_LIBRARIES}" NEW_HDF_DEBUG_LIBRARIES)
+        foreach(HDF_LIB IN LISTS NEW_HDF_DEBUG_LIBRARIES)
 	    if(${HDF_LIB} MATCHES "hdf5")
-                install(FILES ${HDF_LIB} DESTINATION lib COMPONENT redist_libs)
+                install(FILES ${HDF_LIB} DESTINATION lib COMPONENT redist_libs CONFIGURATIONS Debug)
+            endif()
+        endforeach()
+        FILTER_LIST("${HDF5_C_LIBRARIES}" RELEASE_LIBRARIES optimized debug ${SHARED_LIB_EXT})
+        RESOLVE_SYMLINKS("${RELEASE_LIBRARIES}" NEW_HDF_RELEASE_LIBRARIES)
+        foreach(HDF_LIB IN LISTS NEW_HDF_RELEASE_LIBRARIES)
+	    if(${HDF_LIB} MATCHES "hdf5")
+                install(FILES ${HDF_LIB} DESTINATION lib COMPONENT redist_libs CONFIGURATIONS Release ReleaseWithDebInfo)
             endif()
         endforeach()
     endif()
@@ -308,12 +318,20 @@ elseif(APPLE)
     install(FILES ${TORCH_DLLS} DESTINATION lib COMPONENT redist_libs)
 endif()
 
+add_library(dorado_models_lib
+    dorado/utils/models.cpp
+    dorado/utils/models.h
+)
+
+target_link_libraries(dorado_models_lib
+    OpenSSL::SSL
+    elzip
+)
+
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     add_library(dorado_io_lib
         dorado/data_loader/DataLoader.cpp
         dorado/data_loader/DataLoader.h
-        dorado/utils/models.cpp
-        dorado/utils/models.h
     )
 
     if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
@@ -328,11 +346,9 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     endif()
 
     target_link_libraries(dorado_io_lib
-       OpenSSL::SSL
        ${POD5_LIBRARIES}
        ${HDF5_C_LIBRARIES}
-       ${CMAKE_DL_LIBS}       
-       elzip
+       ${CMAKE_DL_LIBS}
     )
 
     set_target_properties(dorado_io_lib
@@ -347,4 +363,3 @@ endif()
 if(NOT DORADO_LIB_ONLY)
     include(cmake/DoradoPackaging.cmake)
 endif()
-
