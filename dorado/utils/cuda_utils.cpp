@@ -1,6 +1,5 @@
 #include "cuda_utils.h"
 
-#include "../nn/CRFModel.h"
 #include "cxxpool.h"
 #include "torch/torch.h"
 
