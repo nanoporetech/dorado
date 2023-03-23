@@ -41,6 +41,8 @@ struct BaseModParams {
     size_t refine_kmer_len;                 ///< Length of the kmers for the specified kmer_levels
     size_t refine_kmer_center_idx;  ///< The position in the kmer at which to check the levels
     bool refine_do_rough_rescale;   ///< Whether to perform rough rescaling
+
+    void parse(std::filesystem::path const & model_path, bool all=true);
 };
 
 class RemoraCaller {
@@ -61,6 +63,7 @@ public:
                  const std::string& device,
                  int batch_size,
                  size_t block_stride);
+
     const BaseModParams& params() const { return m_params; }
 
     torch::Tensor scale_signal(torch::Tensor signal,
