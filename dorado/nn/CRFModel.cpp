@@ -40,6 +40,15 @@ using Slice = torch::indexing::Slice;
 using quantized_lstm = std::function<int(void *, void *, void *, void *, void *, void *, int)>;
 
 #if USE_CUDA_LSTM
+
+static bool cuda_lstm_is_quantized(int layer_size, cudaDeviceProp *prop) {
+    return !(prop->major == 6 && prop->minor == 2) &&
+           ((layer_size == 96) || (layer_size == 128 && prop->major < 8));
+}
+
+#endif  // if USE_CUDA_LSTM
+
+#if CUDA_PROFILE_TO_CERR
 #define CUDA_CHECK(X)                                                                         \
     {                                                                                         \
         cudaError_t error = X;                                                                \
@@ -50,14 +59,6 @@ using quantized_lstm = std::function<int(void *, void *, void *, void *, void *,
         }                                                                                     \
     }
 
-static bool cuda_lstm_is_quantized(int layer_size, cudaDeviceProp *prop) {
-    return !(prop->major == 6 && prop->minor == 2) &&
-           ((layer_size == 96) || (layer_size == 128 && prop->major < 8));
-}
-
-#endif  // if USE_CUDA_LSTM
-
-#if CUDA_PROFILE_TO_CERR
 class ScopedProfileRange {
 public:
     explicit ScopedProfileRange(const char *label) : m_nvtx_range(label), m_label(label) {
@@ -201,10 +202,10 @@ struct ConvolutionImpl : Module {
                 dorado::utils::matmul_f16(tncw_mat.view({-1, in_size * window_size}), w_device,
                                           mm_out);
                 if (output_int8) {
-                    //                    float scale = 2 * I8_RANGE / (max_value - SWISH_LOWER_BOUND);
-                    //                    float zero_offset = scale * max_value - I8_RANGE;
-                    //                    float scale = 2.f * I8_RANGE;
-                    //                    float zero_offset = 0.f;
+                    // float scale = 2 * I8_RANGE / (max_value - SWISH_LOWER_BOUND);
+                    // float zero_offset = scale * max_value - I8_RANGE;
+                    // float scale = 2.f * I8_RANGE;
+                    // float zero_offset = 0.f;
                     host_bias_swish_f16_clamp(stream, mm_out.size(0), mm_out.size(1),
                                               mm_out.stride(0), mm_out.data_ptr(),
                                               b_device.data_ptr(), max_value);
@@ -212,11 +213,12 @@ struct ConvolutionImpl : Module {
                     if (scale_i8) {
                         mm_out /= scale_i8;
                     }
-                    host_f16_to_i8_inplace(stream, mm_out.data_ptr(), mm_out.size(0),
-                                           mm_out.size(1), mm_out.stride(0), out_size);
-                    //                    host_bias_swish_f16_i8_inplace(stream, mm_out.size(0), mm_out.size(1), out_size,
-                    //                                                   mm_out.data_ptr(), b_device.data_ptr(), scale,
-                    //                                                   zero_offset);
+                    host_convert_inplace(stream, mm_out.data_ptr(), KOI_F16, KOI_I8,
+                                         mm_out.stride(0), out_size, mm_out.size(0),
+                                         mm_out.size(1));
+                    // host_bias_swish_f16_i8_inplace(stream, mm_out.size(0), mm_out.size(1), out_size,
+                    //                                mm_out.data_ptr(), b_device.data_ptr(), scale,
+                    //                                zero_offset);
                 } else {
                     host_bias_swish_f16_clamp(stream, mm_out.size(0), mm_out.size(1),
                                               mm_out.stride(0), mm_out.data_ptr(),
@@ -439,28 +441,29 @@ struct CudaLSTMStackImpl : Module {
             auto weights_cpu = rnn->weights;
             if (use_cutlass) {
                 auto type_id = (layer_idx > convert_to_int8_layer_idx) ? KOI_I8 : KOI_F16;
+                bool use_brf_kernel = (layer_size == 384 && type_id == KOI_I8);
                 if (int(device_weights.size()) == layer_idx) {
-                    auto layer_device_bias = rnn->bias.to(in.device());
+                    auto layer_device_bias = rnn->bias.to(opts_f16).view({4, layer_size}).t();
                     if (type_id == KOI_I8) {
                         auto weights_f32 = weights_cpu.t().to(torch::kF32);
                         auto [scale, quantized] = quantize_tensor(weights_f32);
                         weights_cpu = quantized.t();
                         if (layer_idx == 0) {
-                            //                            scale /= scale_i8 / I8_RANGE;
+                            // scale /= scale_i8 / I8_RANGE;
                             scale_i8 = g_options_scale_i8_lstm;
                             if (scale_i8) {
                                 scale /= scale_i8;
                             }
-                            //                            layer_device_bias = (rnn->bias.to(torch::kF32).to(torch::kCPU) +
-                            //                                    (weights_f32.sum(0).to(torch::kCPU) * (zero_offset_i8 / scale_i8)))
-                            //                                                .to(in.device()).to(torch::kF16).contiguous();
+                            // layer_device_bias = (rnn->bias.to(torch::kF32).to(torch::kCPU) +
+                            //                      (weights_f32.sum(0).to(torch::kCPU) * (zero_offset_i8 / scale_i8)))
+                            //                      .to(in.device()).to(torch::kF16).contiguous();
                         }
-                        device_scale.push_back(scale.contiguous().to(in.device()).to(torch::kF16));
+                        scale = scale.view({4, layer_size}).t();
+                        device_scale.push_back(scale.to(opts_f16).contiguous());
                     } else {
                         device_scale.push_back(torch::ones_like(layer_device_bias));
                     }
-                    device_bias.push_back(
-                            layer_device_bias.to(in.device()).to(torch::kF16).contiguous());
+                    device_bias.push_back(layer_device_bias.contiguous());
                     // Cutlass kernel expects weights reordered as <igigigigfofofofo>
                     auto weights_cpu_cutlass = torch::empty_like(weights_cpu);
                     for (int i = 0; i < layer_size; ++i) {
@@ -475,18 +478,29 @@ struct CudaLSTMStackImpl : Module {
                 }
 
                 auto in = (type_id == KOI_I8) ? inout_all_i8 : inout_all_f16;
-                host_cutlass_lstm(stream, type_id, layer_idx, batch_size, layer_size, chunk_size,
-                                  rnn->reverse ? -1 : 1, in.stride(1), in.data_ptr(),
-                                  device_weights[layer_idx].data_ptr(),
-                                  device_bias[layer_idx].data_ptr(),
-                                  device_scale[layer_idx].data_ptr(), state_buf.data_ptr(),
-                                  sync_buf.data_ptr());
+
+                if (use_brf_kernel) {
+                    host_cutlass_lstm_brf(stream, type_id, layer_idx, batch_size, layer_size,
+                                          chunk_size, rnn->reverse ? -1 : 1, in.stride(1),
+                                          in.data_ptr(), device_weights[layer_idx].data_ptr(),
+                                          device_bias[layer_idx].data_ptr(),
+                                          device_scale[layer_idx].data_ptr(), state_buf.data_ptr(),
+                                          &m_koi_sync, false);
+                } else {
+                    host_cutlass_lstm(stream, type_id, layer_idx, batch_size, layer_size,
+                                      chunk_size, rnn->reverse ? -1 : 1, in.stride(1),
+                                      in.data_ptr(), device_weights[layer_idx].data_ptr(),
+                                      device_bias[layer_idx].data_ptr(),
+                                      device_scale[layer_idx].data_ptr(), state_buf.data_ptr(),
+                                      sync_buf.data_ptr());
+                }
 
                 if (layer_idx == convert_to_int8_layer_idx) {
                     ScopedProfileRange spr_convert("f16_to_int8");
-                    host_f16_to_i8_inplace(stream, inout_left_f16.data_ptr(),
-                                           inout_left_f16.size(0) * inout_left_f16.size(1),
-                                           inout_left_f16.size(2), inout_left_f16.stride(1), 0);
+                    host_convert_inplace(stream, inout_left_f16.data_ptr(), KOI_F16, KOI_I8,
+                                         inout_left_f16.stride(1), 0,
+                                         inout_left_f16.size(0) * inout_left_f16.size(1),
+                                         inout_left_f16.size(2));
                     inout_all_i8.index({chunk_size, Slice(), 0}) = 0;
                     inout_all_i8.index({0, Slice(), 1}) = 0;
                 }
@@ -513,9 +527,9 @@ struct CudaLSTMStackImpl : Module {
         if (use_int8) {
             ScopedProfileRange spr_convert("int8_to_f16");
             // inout_left_i8 shares storage with inout_left_f16[:][:][0:layer_size/2]
-            host_i8_to_f16_inplace(stream, inout_left_f16.data_ptr(),
-                                   inout_left_f16.size(0) * inout_left_f16.size(1),
-                                   inout_left_f16.size(2), inout_left_f16.stride(1), 0);
+            host_convert_inplace(
+                    stream, inout_left_f16.data_ptr(), KOI_I8, KOI_F16, inout_left_f16.stride(1), 0,
+                    inout_left_f16.size(0) * inout_left_f16.size(1), inout_left_f16.size(2));
         }
         // Output is [N, T, C], non-contiguous
         return inout_left_f16.transpose(1, 0);
@@ -654,6 +668,7 @@ struct CudaLSTMStackImpl : Module {
     float scale_i8;
     float zero_offset_i8;
     CudaLSTM rnn1{nullptr}, rnn2{nullptr}, rnn3{nullptr}, rnn4{nullptr}, rnn5{nullptr};
+    KoiSync m_koi_sync{nullptr};
 };
 
 TORCH_MODULE(CudaLSTMStack);
