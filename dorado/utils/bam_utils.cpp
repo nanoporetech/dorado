@@ -56,6 +56,8 @@ std::map<std::string, std::shared_ptr<Read>> read_bam(const std::string& filenam
 
 Aligner::Aligner(const std::string& filename) {
     mm_idxopt_t opt;
+    mm_mapopt_t mopt;
+
     opt.k = 19;
     opt.w = 19;
     opt.flag = 1;
@@ -63,14 +65,34 @@ Aligner::Aligner(const std::string& filename) {
     opt.batch_size = 4000000;
     opt.mini_batch_size = 50000000;
 
-    auto r = mm_idx_reader_open(filename.c_str(), &opt, NULL);
-    m_index = mm_idx_reader_read(r, 1);  //TODO: full read
-    mm_idx_reader_close(r);
+    mopt.flag |= MM_F_CIGAR;
 
-    get_idx_records();
+    m_idx_opt = &opt;
+    m_map_opt = &mopt;
+
+    mm_set_opt("map-ont", m_idx_opt, m_map_opt);
+
+    m_map_opt->flag |= MM_F_CIGAR;
+
+    auto r = mm_idx_reader_open(filename.c_str(), &opt, NULL);
+    m_index = mm_idx_reader_read(r, 1);    //TODO: full read - see example.c
+    mm_mapopt_update(m_map_opt, m_index);  // sets the maximum minimizer occurrence
+    m_tbuf = mm_tbuf_init();
+
+    mm_idx_reader_close(r);
 }
 
-Aligner::~Aligner() { mm_idx_destroy(m_index); }
+Aligner::~Aligner() {
+    mm_idx_destroy(m_index);
+    mm_tbuf_destroy(m_tbuf);
+}
+
+mm_reg1_t* Aligner::align(int length, const char* seq, const char* qname) {
+    int hits;
+    auto r = mm_map(m_index, length, seq, &hits, m_tbuf, m_map_opt, qname);
+    std::cerr << "DBG: HITS " << hits << std::endl;
+    return r;
+}
 
 std::vector<std::pair<char*, uint32_t>> Aligner::get_idx_records() {
     std::vector<std::pair<char*, uint32_t>> records;
@@ -138,19 +160,21 @@ BamWriter::~BamWriter() {
 
 int BamWriter::write_record(bam1_t* record) { return sam_write1(m_file, m_header, record); }
 
-int BamWriter::write_record(bam1_t* record,
-                            uint16_t flag,
-                            int32_t tid,
-                            hts_pos_t pos,
-                            uint8_t mapq) {
+int BamWriter::write_record(bam1_t* record, mm_reg1_t* a) {
+    uint16_t flag = 16;  // todo: calc flag
+
     int n_cigar = 1;
     uint32_t ssize = record->core.l_qseq;
     uint32_t cigar[] = {ssize << BAM_CIGAR_SHIFT | BAM_CMATCH};
 
+    // todo: set  a->p
+    // n_cigar = a->p->n_cigar;
+    // cigar = a->p->cigar;
+
     record->core.flag = flag;
-    record->core.tid = tid;
-    record->core.pos = pos;
-    record->core.qual = mapq;
+    record->core.tid = a->rid;
+    record->core.pos = a->rs;  //todo: is POS a-rs
+    record->core.qual = a->mapq;
     record->core.n_cigar = n_cigar;
 
     if (n_cigar != 0) {
@@ -168,6 +192,8 @@ int BamWriter::write_record(bam1_t* record,
         // Update the data length
         record->l_data += cigar_size;
     }
+
+    // todo: free a, a->p
 
     return sam_write1(m_file, m_header, record);
 }

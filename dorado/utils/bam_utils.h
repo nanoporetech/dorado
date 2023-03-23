@@ -31,8 +31,12 @@ public:
     Aligner(const std::string& filename);
     ~Aligner();
     std::vector<std::pair<char*, uint32_t>> get_idx_records();
+    mm_reg1_t* align(int size, const char* seq, const char* name);
 
 private:
+    mm_idxopt_t* m_idx_opt;
+    mm_mapopt_t* m_map_opt;
+    mm_tbuf_t* m_tbuf;
     mm_idx_t* m_index;
 };
 
@@ -57,7 +61,7 @@ public:
               std::vector<std::pair<char*, uint32_t>> seq);
     ~BamWriter();
     int write_record(bam1_t* record);
-    int write_record(bam1_t* record, uint16_t flag, int32_t tid, hts_pos_t pos, uint8_t mapq);
+    int write_record(bam1_t* record, mm_reg1_t* a);
     sam_hdr_t* m_header;
 
 private:

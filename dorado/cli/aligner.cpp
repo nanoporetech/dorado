@@ -42,7 +42,18 @@ int aligner(int argc, char* argv[]) {
     spdlog::info("> input fmt: {} aligned: {}", reader.m_format, reader.m_is_aligned);
 
     while (reader.next()) {
-        writer.write_record(reader.m_record, 16, 0, 0, 50);
+        // todo: move to reader
+        int length = reader.m_record->core.l_qseq;
+        auto useq = bam_get_seq(reader.m_record);
+        std::vector<char> nucleotides(length);
+        for (int i = 0; i < length; i++) {
+            nucleotides[i] = seq_nt16_str[bam_seqi(useq, i)];
+        }
+        auto qname = bam_get_qname(reader.m_record);
+
+        // todo: loop results
+        auto alignment = aligner.align(length, nucleotides.data(), qname);
+        writer.write_record(reader.m_record, alignment);
     }
 
     return 0;
