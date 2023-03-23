@@ -14,8 +14,6 @@ using namespace torch::indexing;
 
 namespace dorado {
 
-constexpr auto FORCE_TIMEOUT = 100ms;
-
 void BasecallerNode::input_worker_thread() {
     Message message;
     while (m_work_queue.try_pop(message)) {
@@ -158,7 +156,7 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
                 auto current_time = std::chrono::system_clock::now();
                 auto delta = std::chrono::duration_cast<std::chrono::milliseconds>(
                         current_time - last_chunk_reserve_time);
-                if (delta > FORCE_TIMEOUT && !m_batched_chunks[worker_id].empty()) {
+                if (delta.count() > m_batch_timeout_ms && !m_batched_chunks[worker_id].empty()) {
                     basecall_current_batch(worker_id);
                 } else {
                     std::this_thread::sleep_for(100ms);
@@ -228,6 +226,7 @@ BasecallerNode::BasecallerNode(MessageSink &sink,
                                size_t chunk_size,
                                size_t overlap,
                                size_t model_stride,
+                               int batch_timeout_ms,
                                std::string model_name,
                                size_t max_reads)
         : MessageSink(max_reads),
@@ -238,6 +237,7 @@ BasecallerNode::BasecallerNode(MessageSink &sink,
           m_overlap(overlap),
           m_model_stride(model_stride),
           m_terminate_basecaller(false),
+          m_batch_timeout_ms(batch_timeout_ms),
           m_model_name(std::move(model_name)),
           m_working_reads_manager(
                   std::make_unique<std::thread>(&BasecallerNode::working_reads_manager, this)),

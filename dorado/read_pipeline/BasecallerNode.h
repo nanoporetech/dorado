@@ -13,6 +13,7 @@ public:
                    size_t chunk_size,
                    size_t overlap,
                    size_t model_stride,
+                   int batch_timeout_ms,
                    std::string model_name = "",
                    size_t max_reads = 1000);
     ~BasecallerNode();
@@ -38,6 +39,8 @@ private:
     size_t m_overlap;
     // Stride of the model in the runners
     size_t m_model_stride;
+    // Time in milliseconds before partial batches are called.
+    int m_batch_timeout_ms;
     // model_name
     std::string m_model_name;
 

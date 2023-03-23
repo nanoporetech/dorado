@@ -120,7 +120,7 @@ int duplex(int argc, char* argv[]) {
             int batch_size(parser.get<int>("-b"));
             int chunk_size(parser.get<int>("-c"));
             int overlap(parser.get<int>("-o"));
-            size_t num_runners = 1;
+            const size_t num_runners = parser.get<int>("-r");
 
             size_t stereo_batch_size;
 
@@ -190,9 +190,10 @@ int duplex(int argc, char* argv[]) {
             std::unique_ptr<BasecallerNode> stereo_basecaller_node;
 
             auto stereo_model_stride = stereo_runners.front()->model_stride();
+            const int kStereoBatchTimeoutMS = 500;
             stereo_basecaller_node = std::make_unique<BasecallerNode>(
                     writer_node, std::move(stereo_runners), stereo_batch_size, chunk_size, overlap,
-                    stereo_model_stride);
+                    stereo_model_stride, kStereoBatchTimeoutMS);
 
             std::unordered_set<std::string> read_list =
                     utils::get_read_list_from_pairs(template_complement_map);
@@ -202,9 +203,11 @@ int duplex(int argc, char* argv[]) {
 
             std::unique_ptr<BasecallerNode> basecaller_node;
             auto simplex_model_stride = runners.front()->model_stride();
+            const int kSimplexBatchTimeoutMS = 100;
             basecaller_node =
                     std::make_unique<BasecallerNode>(stereo_node, std::move(runners), batch_size,
-                                                     chunk_size, overlap, simplex_model_stride);
+                                                     chunk_size, overlap, simplex_model_stride,
+                                                     kSimplexBatchTimeoutMS);
             ScalerNode scaler_node(*basecaller_node, num_devices * 2);
 
             DataLoader loader(scaler_node, "cpu", num_devices, 0, std::move(read_list));
