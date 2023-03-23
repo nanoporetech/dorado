@@ -1,6 +1,5 @@
 #include <cstddef>
 #include <cstdlib>
-#include <iostream>
 
 // These functions are linked into dorado and replace the default allocator with jemalloc.
 // Note: this is only supported on linux, likely need to override different functions on OSX
@@ -12,7 +11,7 @@ void *je_calloc(size_t num, size_t size);
 int je_posix_memalign(void **memptr, size_t alignment, size_t size);
 void *je_aligned_alloc(size_t alignment, size_t size);
 void *je_realloc(void *ptr, size_t size);
-void je_free(void *size);
+void je_free(void *ptr);
 
 void *je_mallocx(size_t size, int flags);
 void *je_rallocx(void *ptr, size_t size, int flags);
@@ -36,7 +35,7 @@ void *aligned_alloc(size_t alignment, size_t size) { return je_aligned_alloc(ali
 void *realloc(void *ptr, size_t size) { return je_realloc(ptr, size); }
 void free(void *ptr) { je_free(ptr); }
 
-void *jmallocx(size_t size, int flags) { return je_mallocx(size, flags); }
+void *mallocx(size_t size, int flags) { return je_mallocx(size, flags); }
 void *rallocx(void *ptr, size_t size, int flags) { return je_rallocx(ptr, size, flags); }
 size_t xallocx(void *ptr, size_t size, size_t extra, int flags) {
     return je_xallocx(ptr, size, extra, flags);
