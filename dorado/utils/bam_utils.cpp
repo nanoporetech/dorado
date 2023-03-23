@@ -107,15 +107,37 @@ BamWriter::~BamWriter() {
 
 int BamWriter::write_record(bam1_t* record) { return sam_write1(m_file, m_header, record); }
 
-int BamWriter::write_record(bam1_t* record, int flag, int tid, int pos, int mapq) {
+int BamWriter::write_record(bam1_t* record,
+                            uint16_t flag,
+                            int32_t tid,
+                            hts_pos_t pos,
+                            uint8_t mapq) {
+    int n_cigar = 1;
+    uint32_t ssize = record->core.l_qseq;
+    uint32_t cigar[] = {ssize << BAM_CIGAR_SHIFT | BAM_CMATCH};
+
     record->core.flag = flag;
     record->core.tid = tid;
     record->core.pos = pos;
     record->core.qual = mapq;
-    //uint32_t cigar[] = {1000 << BAM_CIGAR_SHIFT | BAM_CMATCH};
-    //int n_cigar = 1;
-    //record->core.n_cigar = n_cigar;
-    //bam_set_cigar(record, cigar);
+    record->core.n_cigar = n_cigar;
+
+    if (n_cigar != 0) {
+        int cigar_size = n_cigar * sizeof(uint32_t);
+        uint8_t* data = (uint8_t*)realloc(record->data, record->l_data + cigar_size);
+        record->data = data;
+
+        // Shift existing data to make room for the new cigar field
+        memmove(record->data + record->core.l_qname + cigar_size,
+                record->data + record->core.l_qname, record->l_data - record->core.l_qname);
+
+        // Copy the new cigar field into the bam1_t structure
+        memcpy(record->data + record->core.l_qname, cigar, cigar_size);
+
+        // Update the data length
+        record->l_data += cigar_size;
+    }
+
     return sam_write1(m_file, m_header, record);
 }
 

@@ -46,7 +46,7 @@ public:
     int write_hdr_pg();
     int write_hdr_sq();
     int write_record(bam1_t* record);
-    int write_record(bam1_t* record, int flag, int tid, int pos, int mapq);
+    int write_record(bam1_t* record, uint16_t flag, int32_t tid, hts_pos_t pos, uint8_t mapq);
     sam_hdr_t* m_header;
 
 private:
