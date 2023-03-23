@@ -63,9 +63,10 @@ ModBaseCallerNode::~ModBaseCallerNode() {
     m_output_worker->join();
 }
 
-
-[[maybe_unused]] std::pair<std::string, std::string> // long_names, alphabet
-ModBaseCallerNode::get_modbase_info(std::vector<std::reference_wrapper<BaseModParams const>> const & base_mod_params, ModBaseCallerNode * node) {
+[[maybe_unused]] std::pair<std::string, std::string>  // long_names, alphabet
+ModBaseCallerNode::get_modbase_info(
+        std::vector<std::reference_wrapper<BaseModParams const>> const& base_mod_params,
+        ModBaseCallerNode* node) {
     struct Info {
         std::vector<std::string> long_names;
         std::string alphabet;
@@ -80,7 +81,7 @@ ModBaseCallerNode::get_modbase_info(std::vector<std::reference_wrapper<BaseModPa
         model_info[b].alphabet = allowed_bases[b];
     }
 
-    for (const auto& params: base_mod_params) {
+    for (const auto& params : base_mod_params) {
         auto base = params.get().motif[params.get().motif_offset];
         if (allowed_bases.find(base) == std::string::npos) {
             throw std::runtime_error("Invalid base in remora model metadata.");
@@ -111,8 +112,8 @@ ModBaseCallerNode::get_modbase_info(std::vector<std::reference_wrapper<BaseModPa
     }
 
     if (node) {
-        node->m_base_mod_info =
-                std::make_shared<utils::BaseModInfo>(alphabet, long_names, context_handler.encode());
+        node->m_base_mod_info = std::make_shared<utils::BaseModInfo>(alphabet, long_names,
+                                                                     context_handler.encode());
 
         node->m_base_prob_offsets[0] = 0;
         node->m_base_prob_offsets[1] = model_info[0].base_counts;
@@ -123,7 +124,6 @@ ModBaseCallerNode::get_modbase_info(std::vector<std::reference_wrapper<BaseModPa
     return {long_names, alphabet};
 }
 
-
 void ModBaseCallerNode::init_modbase_info() {
     std::vector<std::reference_wrapper<BaseModParams const>> base_mod_params;
     for (size_t id = 0; id < m_callers.size() / m_num_devices; ++id) {
@@ -131,7 +131,6 @@ void ModBaseCallerNode::init_modbase_info() {
     }
     get_modbase_info(base_mod_params, this);
 }
-
 
 void ModBaseCallerNode::runner_worker_thread(size_t runner_id) {
     Message message;

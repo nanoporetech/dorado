@@ -259,7 +259,7 @@ ModuleHolder<AnyModule> load_remora_model(const std::filesystem::path& model_pat
     throw std::runtime_error("Unknown model type in config file.");
 }
 
-void BaseModParams::parse(std::filesystem::path const & model_path, bool all) {
+void BaseModParams::parse(std::filesystem::path const& model_path, bool all) {
     auto config = toml::parse(model_path / "config.toml");
     const auto& params = toml::find(config, "modbases");
     motif = toml::find<std::string>(params, "motif");
@@ -271,7 +271,8 @@ void BaseModParams::parse(std::filesystem::path const & model_path, bool all) {
                 toml::find<std::string>(params, "mod_long_names_" + std::to_string(i)));
     }
 
-    if (!all) return;
+    if (!all)
+        return;
 
     base_mod_count = mod_long_names.size();
 
@@ -287,8 +288,7 @@ void BaseModParams::parse(std::filesystem::path const & model_path, bool all) {
         refine_do_rough_rescale =
                 (toml::find<int>(refinement_params, "refine_do_rough_rescale") == 1);
         if (refine_do_rough_rescale) {
-            refine_kmer_center_idx =
-                    toml::find<int>(refinement_params, "refine_kmer_center_idx");
+            refine_kmer_center_idx = toml::find<int>(refinement_params, "refine_kmer_center_idx");
 
             auto kmer_levels_tensor =
                     utils::load_tensors(model_path, {"refine_kmer_levels.tensor"})[0].contiguous();

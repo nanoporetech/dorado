@@ -24,15 +24,18 @@ public:
     ~ModBaseCallerNode();
 
     // Wxpose long_names and alphabet computed by get_modbase_info
-    static std::pair<std::string, std::string> // long_names, alphabet
-    get_modbase_info(std::vector<std::reference_wrapper<BaseModParams const>> const & base_mod_params) {
+    static std::pair<std::string, std::string>  // long_names, alphabet
+    get_modbase_info(
+            std::vector<std::reference_wrapper<BaseModParams const>> const& base_mod_params) {
         return get_modbase_info(base_mod_params, nullptr);
     };
 
 private:
     // Determine the modbase alphabet from parameters and calculate offset positions for the results
-    [[maybe_unused]] static std::pair<std::string, std::string> // long_names, alphabet
-    get_modbase_info(std::vector<std::reference_wrapper<BaseModParams const>> const & base_mod_params, ModBaseCallerNode * node);
+    [[maybe_unused]] static std::pair<std::string, std::string>  // long_names, alphabet
+    get_modbase_info(
+            std::vector<std::reference_wrapper<BaseModParams const>> const& base_mod_params,
+            ModBaseCallerNode* node);
 
     // Determine the modbase alphabet from all callers and calculate offset positions for the results
     void init_modbase_info();
