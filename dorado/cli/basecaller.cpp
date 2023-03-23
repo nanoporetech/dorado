@@ -173,9 +173,9 @@ void setup(std::vector<std::string> args,
                 *mod_base_caller_node, std::move(runners), batch_size, chunk_size, overlap,
                 model_stride, kBatchTimeoutMS, model_name);
     } else {
-        basecaller_node =
-                std::make_unique<BasecallerNode>(writer_node, std::move(runners), batch_size,
-                                                 chunk_size, overlap, model_stride, kBatchTimeoutMS, model_name);
+        basecaller_node = std::make_unique<BasecallerNode>(
+                writer_node, std::move(runners), batch_size, chunk_size, overlap, model_stride,
+                kBatchTimeoutMS, model_name);
     }
     ScalerNode scaler_node(*basecaller_node, num_devices * 2);
     DataLoader loader(scaler_node, "cpu", num_devices, max_reads, read_list);

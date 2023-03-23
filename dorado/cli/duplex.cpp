@@ -204,10 +204,9 @@ int duplex(int argc, char* argv[]) {
             std::unique_ptr<BasecallerNode> basecaller_node;
             auto simplex_model_stride = runners.front()->model_stride();
             const int kSimplexBatchTimeoutMS = 100;
-            basecaller_node =
-                    std::make_unique<BasecallerNode>(stereo_node, std::move(runners), batch_size,
-                                                     chunk_size, overlap, simplex_model_stride,
-                                                     kSimplexBatchTimeoutMS);
+            basecaller_node = std::make_unique<BasecallerNode>(
+                    stereo_node, std::move(runners), batch_size, chunk_size, overlap,
+                    simplex_model_stride, kSimplexBatchTimeoutMS);
             ScalerNode scaler_node(*basecaller_node, num_devices * 2);
 
             DataLoader loader(scaler_node, "cpu", num_devices, 0, std::move(read_list));
