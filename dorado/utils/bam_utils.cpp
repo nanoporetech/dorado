@@ -54,6 +54,32 @@ std::map<std::string, std::shared_ptr<Read>> read_bam(const std::string& filenam
     return reads;
 }
 
+Aligner::Aligner(const std::string& filename) {
+    mm_idxopt_t opt;
+    opt.k = 19;
+    opt.w = 19;
+    opt.flag = 1;
+    opt.bucket_bits = 14;
+    opt.batch_size = 4000000;
+    opt.mini_batch_size = 50000000;
+
+    auto r = mm_idx_reader_open(filename.c_str(), &opt, NULL);
+    m_index = mm_idx_reader_read(r, 1);  //TODO: full read
+    mm_idx_reader_close(r);
+
+    get_idx_records();
+}
+
+Aligner::~Aligner() { mm_idx_destroy(m_index); }
+
+std::vector<std::pair<char*, uint32_t>> Aligner::get_idx_records() {
+    std::vector<std::pair<char*, uint32_t>> records;
+    for (int i = 0; i < m_index->n_seq; ++i) {
+        records.push_back(std::make_pair(m_index->seq[i].name, m_index->seq[i].len));
+    }
+    return records;
+}
+
 BamReader::BamReader(const std::string& filename) {
     m_file = hts_open(filename.c_str(), "r");
     if (!m_file) {
@@ -85,14 +111,19 @@ BamReader::~BamReader() {
 
 bool BamReader::next() { return sam_read1(m_file, m_header, m_record) >= 0; }
 
-BamWriter::BamWriter(const std::string& filename, const sam_hdr_t* header) {
+BamWriter::BamWriter(const std::string& filename,
+                     const sam_hdr_t* header,
+                     std::vector<std::pair<char*, uint32_t>> seq) {
     m_file = hts_open(filename.c_str(), "wb");
     if (!m_file) {
         throw std::runtime_error("Could not open file: " + filename);
     }
     m_header = sam_hdr_dup(header);
     write_hdr_pg();
-    write_hdr_sq();
+
+    for (auto pair : seq) {
+        write_hdr_sq(std::get<0>(pair), std::get<1>(pair));
+    }
     auto res = sam_hdr_write(m_file, m_header);
 }
 
@@ -146,8 +177,8 @@ int BamWriter::write_hdr_pg() {
                             "minimap2", NULL);  // add CL Writer node
 }
 
-int BamWriter::write_hdr_sq() {
-    return sam_hdr_add_line(m_header, "SQ", "SN", "CHM1", "LN", "1000", NULL);
+int BamWriter::write_hdr_sq(char* name, uint32_t length) {
+    return sam_hdr_add_line(m_header, "SQ", "SN", name, "LN", std::to_string(length).c_str(), NULL);
 }
 
 }  // namespace dorado::utils

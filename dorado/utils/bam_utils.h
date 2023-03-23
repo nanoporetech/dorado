@@ -1,5 +1,6 @@
 #pragma once
 #include "htslib/sam.h"
+#include "minimap.h"
 #include "read_pipeline/ReadPipeline.h"
 
 #include <map>
@@ -25,6 +26,16 @@ namespace dorado::utils {
 std::map<std::string, std::shared_ptr<Read>> read_bam(const std::string& filename,
                                                       const std::set<std::string>& read_ids);
 
+class Aligner {
+public:
+    Aligner(const std::string& filename);
+    ~Aligner();
+    std::vector<std::pair<char*, uint32_t>> get_idx_records();
+
+private:
+    mm_idx_t* m_index;
+};
+
 class BamReader {
 public:
     BamReader(const std::string& filename);
@@ -41,16 +52,18 @@ private:
 
 class BamWriter {
 public:
-    BamWriter(const std::string& filename, const sam_hdr_t* header);
+    BamWriter(const std::string& filename,
+              const sam_hdr_t* header,
+              std::vector<std::pair<char*, uint32_t>> seq);
     ~BamWriter();
-    int write_hdr_pg();
-    int write_hdr_sq();
     int write_record(bam1_t* record);
     int write_record(bam1_t* record, uint16_t flag, int32_t tid, hts_pos_t pos, uint8_t mapq);
     sam_hdr_t* m_header;
 
 private:
     htsFile* m_file;
+    int write_hdr_pg();
+    int write_hdr_sq(char* name, uint32_t length);
 };
 
 }  // namespace dorado::utils
