@@ -56,9 +56,10 @@ int duplex(int argc, char* argv[]) {
             .default_value(default_parameters.overlap)
             .scan<'i', int>();
 
-    parser.add_argument("-r", "--num_runners")
-            .default_value(default_parameters.num_runners)
-            .scan<'i', int>();
+    parser.add_argument("-r", "--recursive")
+            .default_value(false)
+            .implicit_value(true)
+            .help("Recursively scan through directories to load FAST5 and POD5 files");
 
     parser.add_argument("--min-qscore").default_value(0).scan<'i', int>();
 
@@ -120,7 +121,7 @@ int duplex(int argc, char* argv[]) {
             int batch_size(parser.get<int>("-b"));
             int chunk_size(parser.get<int>("-c"));
             int overlap(parser.get<int>("-o"));
-            const size_t num_runners = parser.get<int>("-r");
+            const size_t num_runners = default_parameters.num_runners;
 
             size_t stereo_batch_size;
 
@@ -210,7 +211,7 @@ int duplex(int argc, char* argv[]) {
             ScalerNode scaler_node(*basecaller_node, num_devices * 2);
 
             DataLoader loader(scaler_node, "cpu", num_devices, 0, std::move(read_list));
-            loader.load_reads(reads, false);
+            loader.load_reads(reads, parser.get<bool>("--recursive"));
         }
     } catch (const std::exception& e) {
         spdlog::error(e.what());
