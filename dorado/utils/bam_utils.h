@@ -31,7 +31,7 @@ public:
     Aligner(const std::string& filename);
     ~Aligner();
     std::vector<std::pair<char*, uint32_t>> get_idx_records();
-    mm_reg1_t* align(int size, const char* seq, const char* name);
+    std::pair<int, mm_reg1_t*> align(const std::vector<char> seq, const char* name);
 
 private:
     mm_idxopt_t* m_idx_opt;
@@ -44,6 +44,11 @@ class BamReader {
 public:
     BamReader(const std::string& filename);
     ~BamReader();
+
+    char* qname();
+    int seqlen();
+    std::vector<char> seq();
+
     bool next();
     char* m_format;
     bool m_is_aligned;

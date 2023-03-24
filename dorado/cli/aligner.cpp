@@ -32,28 +32,23 @@ int aligner(int argc, char* argv[]) {
         spdlog::set_level(spdlog::level::debug);
     }
 
+    const char* stdout = "-";
     auto index(parser.get<std::string>("index"));
     auto reads(parser.get<std::string>("reads"));
 
     utils::Aligner aligner(index);
     utils::BamReader reader(reads);
-    utils::BamWriter writer("-", reader.m_header, aligner.get_idx_records());
+    utils::BamWriter writer(stdout, reader.m_header, aligner.get_idx_records());
 
     spdlog::info("> input fmt: {} aligned: {}", reader.m_format, reader.m_is_aligned);
 
     while (reader.next()) {
-        // todo: move to reader
-        int length = reader.m_record->core.l_qseq;
-        auto useq = bam_get_seq(reader.m_record);
-        std::vector<char> nucleotides(length);
-        for (int i = 0; i < length; i++) {
-            nucleotides[i] = seq_nt16_str[bam_seqi(useq, i)];
-        }
-        auto qname = bam_get_qname(reader.m_record);
+        auto [hits, alignment] = aligner.align(reader.seq(), reader.qname());
+        spdlog::info("> HITS {}", hits);
 
-        // todo: loop results
-        auto alignment = aligner.align(length, nucleotides.data(), qname);
-        writer.write_record(reader.m_record, alignment);
+        for (int i = 0; i < hits; i++) {
+            writer.write_record(reader.m_record, &alignment[i]);
+        }
     }
 
     return 0;

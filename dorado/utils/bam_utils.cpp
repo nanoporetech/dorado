@@ -72,8 +72,6 @@ Aligner::Aligner(const std::string& filename) {
 
     mm_set_opt("map-ont", m_idx_opt, m_map_opt);
 
-    m_map_opt->flag |= MM_F_CIGAR;
-
     auto r = mm_idx_reader_open(filename.c_str(), &opt, NULL);
     m_index = mm_idx_reader_read(r, 1);    //TODO: full read - see example.c
     mm_mapopt_update(m_map_opt, m_index);  // sets the maximum minimizer occurrence
@@ -87,11 +85,10 @@ Aligner::~Aligner() {
     mm_tbuf_destroy(m_tbuf);
 }
 
-mm_reg1_t* Aligner::align(int length, const char* seq, const char* qname) {
+std::pair<int, mm_reg1_t*> Aligner::align(const std::vector<char> seq, const char* qname) {
     int hits;
-    auto r = mm_map(m_index, length, seq, &hits, m_tbuf, m_map_opt, qname);
-    std::cerr << "DBG: HITS " << hits << std::endl;
-    return r;
+    auto r = mm_map(m_index, seq.size(), seq.data(), &hits, m_tbuf, m_map_opt, qname);
+    return std::make_pair(hits, r);
 }
 
 std::vector<std::pair<char*, uint32_t>> Aligner::get_idx_records() {
@@ -131,7 +128,17 @@ BamReader::~BamReader() {
     }
 }
 
+char* BamReader::qname() { return bam_get_qname(m_record); }
+int BamReader::seqlen() { return m_record->core.l_qseq; }
 bool BamReader::next() { return sam_read1(m_file, m_header, m_record) >= 0; }
+std::vector<char> BamReader::seq() {
+    auto bseq = bam_get_seq(m_record);
+    std::vector<char> nucleotides(seqlen());
+    for (int i = 0; i < seqlen(); i++) {
+        nucleotides[i] = seq_nt16_str[bam_seqi(bseq, i)];
+    }
+    return nucleotides;
+}
 
 BamWriter::BamWriter(const std::string& filename,
                      const sam_hdr_t* header,
