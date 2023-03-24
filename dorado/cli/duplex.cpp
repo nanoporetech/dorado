@@ -23,6 +23,7 @@
 #include <argparse.hpp>
 #include <spdlog/spdlog.h>
 
+#include <set>
 #include <thread>
 
 namespace dorado {
@@ -74,20 +75,8 @@ int duplex(int argc, char* argv[]) {
         std::vector<std::string> args(argv, argv + argc);
 
         spdlog::info("> Loading pairs file");
-        std::map<std::string, std::string> template_complement_map =
-                utils::load_pairs_file(pairs_file);
+        auto template_complement_map = utils::load_pairs_file(pairs_file);
         spdlog::info("> Pairs file loaded");
-
-        const auto model_path = std::filesystem::canonical(std::filesystem::path(model));
-
-        // Currently the stereo model is hardcoded.
-        const std::string stereo_model_name("dna_r10.4.1_e8.2_4khz_stereo@v1.1");
-        const auto stereo_model_path =
-                model_path.parent_path() / std::filesystem::path(stereo_model_name);
-
-        if (!std::filesystem::exists(stereo_model_path)) {
-            utils::download_models(model_path.parent_path().u8string(), stereo_model_name);
-        }
 
         bool emit_moves = false, rna = false, duplex = true;
         WriterNode writer_node(std::move(args), emit_fastq, emit_moves, rna, duplex, min_qscore, 4);
@@ -95,15 +84,34 @@ int duplex(int argc, char* argv[]) {
         torch::set_num_threads(1);
 
         if (model.compare("basespace") == 0) {  // Execute a Basespace duplex pipeline.
-            spdlog::info("> Loading reads");
-            std::map<std::string, std::shared_ptr<Read>> read_map = utils::read_bam(reads);
-            spdlog::info("> Starting Basespace Duplex Pipeline");
 
+            // create a set of the read_ids
+            std::set<std::string> read_ids;
+            for (const auto& pair : template_complement_map) {
+                read_ids.insert(pair.first);
+                read_ids.insert(pair.second);
+            }
+
+            spdlog::info("> Loading reads");
+            auto read_map = utils::read_bam(reads, read_ids);
+
+            spdlog::info("> Starting Basespace Duplex Pipeline");
             threads = threads == 0 ? std::thread::hardware_concurrency() : threads;
             BaseSpaceDuplexCallerNode duplex_caller_node(writer_node, template_complement_map,
                                                          read_map, threads);
         } else {  // Execute a Stereo Duplex pipeline.
-            torch::set_num_threads(1);
+
+            const auto model_path = std::filesystem::canonical(std::filesystem::path(model));
+
+            // Currently the stereo model is hardcoded.
+            const std::string stereo_model_name("dna_r10.4.1_e8.2_4khz_stereo@v1.1");
+            const auto stereo_model_path =
+                    model_path.parent_path() / std::filesystem::path(stereo_model_name);
+
+            if (!std::filesystem::exists(stereo_model_path)) {
+                utils::download_models(model_path.parent_path().u8string(), stereo_model_name);
+            }
+
             std::vector<Runner> runners;
             std::vector<Runner> stereo_runners;
 
@@ -112,7 +120,7 @@ int duplex(int argc, char* argv[]) {
             int batch_size(parser.get<int>("-b"));
             int chunk_size(parser.get<int>("-c"));
             int overlap(parser.get<int>("-o"));
-            size_t num_runners = 1;
+            const size_t num_runners = parser.get<int>("-r");
 
             size_t stereo_batch_size;
 
@@ -182,9 +190,10 @@ int duplex(int argc, char* argv[]) {
             std::unique_ptr<BasecallerNode> stereo_basecaller_node;
 
             auto stereo_model_stride = stereo_runners.front()->model_stride();
+            const int kStereoBatchTimeoutMS = 500;
             stereo_basecaller_node = std::make_unique<BasecallerNode>(
                     writer_node, std::move(stereo_runners), stereo_batch_size, chunk_size, overlap,
-                    stereo_model_stride);
+                    stereo_model_stride, kStereoBatchTimeoutMS);
 
             std::unordered_set<std::string> read_list =
                     utils::get_read_list_from_pairs(template_complement_map);
@@ -194,9 +203,10 @@ int duplex(int argc, char* argv[]) {
 
             std::unique_ptr<BasecallerNode> basecaller_node;
             auto simplex_model_stride = runners.front()->model_stride();
-            basecaller_node =
-                    std::make_unique<BasecallerNode>(stereo_node, std::move(runners), batch_size,
-                                                     chunk_size, overlap, simplex_model_stride);
+            const int kSimplexBatchTimeoutMS = 100;
+            basecaller_node = std::make_unique<BasecallerNode>(
+                    stereo_node, std::move(runners), batch_size, chunk_size, overlap,
+                    simplex_model_stride, kSimplexBatchTimeoutMS);
             ScalerNode scaler_node(*basecaller_node, num_devices * 2);
 
             DataLoader loader(scaler_node, "cpu", num_devices, 0, std::move(read_list));

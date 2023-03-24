@@ -165,17 +165,18 @@ void setup(std::vector<std::string> args,
     std::unique_ptr<ModBaseCallerNode> mod_base_caller_node;
     std::unique_ptr<BasecallerNode> basecaller_node;
 
+    const int kBatchTimeoutMS = 100;
     if (!remora_model_list.empty()) {
         mod_base_caller_node = std::make_unique<ModBaseCallerNode>(
                 writer_node, std::move(remora_callers), num_remora_threads, num_devices,
                 model_stride, remora_batch_size);
         basecaller_node = std::make_unique<BasecallerNode>(
                 *mod_base_caller_node, std::move(runners), batch_size, chunk_size, overlap,
-                model_stride, model_name);
+                model_stride, kBatchTimeoutMS, model_name);
     } else {
-        basecaller_node =
-                std::make_unique<BasecallerNode>(writer_node, std::move(runners), batch_size,
-                                                 chunk_size, overlap, model_stride, model_name);
+        basecaller_node = std::make_unique<BasecallerNode>(
+                writer_node, std::move(runners), batch_size, chunk_size, overlap, model_stride,
+                kBatchTimeoutMS, model_name);
     }
     ScalerNode scaler_node(*basecaller_node, num_devices * 2);
     DataLoader loader(scaler_node, "cpu", num_devices, max_reads, read_list);

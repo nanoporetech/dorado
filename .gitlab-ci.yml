@@ -7,7 +7,7 @@ stages:
 variables:
   BUILD_DIR: build
   GIT_SUBMODULE_STRATEGY: recursive
-  CUDA: "11.7"
+  CUDA: "11.8"
   WIN_CUDA_TOOLKIT: "/c/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v${CUDA}"
 
 # Build stage components
@@ -83,7 +83,8 @@ pre-commit:
   script:
     - pip install pre-commit
     - pre-commit run --all-files
-  <<: *linux_runner
+  tags:
+    - linux
 
 # Build stages
 
