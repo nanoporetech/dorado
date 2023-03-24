@@ -22,6 +22,7 @@ jobs:
       id: cuda-toolkit
       with:
         cuda: '11.8.0'
+        method: 'network'
     - name: Install dependencies from apt
       if: matrix.os == 'ubuntu-20.04'
       run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libhdf5-dev libssl-dev libzstd-dev autoconf
