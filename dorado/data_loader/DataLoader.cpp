@@ -206,9 +206,9 @@ std::unordered_map<std::string, ReadGroup> DataLoader::load_read_groups(std::str
             }
 
             // First get the run info count
-            size_t run_info_count;
+            run_info_index_t run_info_count;
             pod5_get_file_run_info_count(file, &run_info_count);
-            for (int16_t idx = 0; idx < run_info_count; idx++) {
+            for (run_info_index_t idx = 0; idx < run_info_count; idx++) {
                 RunInfoDictData_t* run_info_data;
                 pod5_get_file_run_info(file, idx, &run_info_data);
 
