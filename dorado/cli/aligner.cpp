@@ -32,13 +32,12 @@ int aligner(int argc, char* argv[]) {
         spdlog::set_level(spdlog::level::debug);
     }
 
-    const char* stdout = "-";
     auto index(parser.get<std::string>("index"));
     auto reads(parser.get<std::string>("reads"));
 
     utils::Aligner aligner(index);
     utils::BamReader reader(reads);
-    utils::BamWriter writer(stdout, reader.m_header, aligner.get_idx_records());
+    utils::BamWriter writer("-", reader.m_header, aligner.get_idx_records());
 
     spdlog::info("> input fmt: {} aligned: {}", reader.m_format, reader.m_is_aligned);
 
