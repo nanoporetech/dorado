@@ -18,7 +18,7 @@ jobs:
       if: matrix.os == 'ubuntu-20.04'
       run: sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost "$AGENT_TOOLSDIRECTORY"
     - name: Set up cmake
-      uses: jwlawson/actions-setup-cmake@v1.12
+      uses: jwlawson/actions-setup-cmake@v1.13
       with:
         cmake-version: '3.21.x'
     - uses: Jimver/cuda-toolkit@v0.2.10
