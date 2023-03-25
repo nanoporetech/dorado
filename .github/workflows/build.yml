@@ -14,7 +14,6 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v3
-    - uses: easimon/maximize-build-space@v6
     - name: Set up cmake
       uses: jwlawson/actions-setup-cmake@v1.12
       with:
