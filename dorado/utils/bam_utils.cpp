@@ -55,40 +55,34 @@ std::map<std::string, std::shared_ptr<Read>> read_bam(const std::string& filenam
 }
 
 Aligner::Aligner(const std::string& filename) {
-    mm_idxopt_t opt;
-    mm_mapopt_t mopt;
+    mm_set_opt(0, &m_idx_opt, &m_map_opt);
 
-    opt.k = 19;
-    opt.w = 19;
-    opt.flag = 1;
-    opt.bucket_bits = 14;
-    opt.batch_size = 4000000;
-    opt.mini_batch_size = 50000000;
+    m_idx_opt.k = 19;
+    m_idx_opt.w = 19;
+    m_idx_opt.flag = 1;
+    m_idx_opt.bucket_bits = 14;
+    m_idx_opt.batch_size = 4000000;
+    m_idx_opt.mini_batch_size = 50000000;
 
-    mopt.flag |= MM_F_CIGAR;
+    m_map_opt.flag |= MM_F_CIGAR;
 
-    m_idx_opt = &opt;
-    m_map_opt = &mopt;
+    m_index_reader = mm_idx_reader_open(filename.c_str(), &m_idx_opt, 0);
+    m_index = mm_idx_reader_read(m_index_reader, m_threads);
+    mm_mapopt_update(&m_map_opt, m_index);
 
-    mm_set_opt("map-ont", m_idx_opt, m_map_opt);
-
-    auto r = mm_idx_reader_open(filename.c_str(), &opt, NULL);
-    m_index = mm_idx_reader_read(r, 1);    //TODO: full read - see example.c
-    mm_mapopt_update(m_map_opt, m_index);  // sets the maximum minimizer occurrence
     m_tbuf = mm_tbuf_init();
-
-    mm_idx_reader_close(r);
 }
 
 Aligner::~Aligner() {
     mm_idx_destroy(m_index);
     mm_tbuf_destroy(m_tbuf);
+    mm_idx_reader_close(m_index_reader);
 }
 
 std::pair<int, mm_reg1_t*> Aligner::align(const std::vector<char> seq, const char* qname) {
-    int hits;
-    auto r = mm_map(m_index, seq.size(), seq.data(), &hits, m_tbuf, m_map_opt, qname);
-    return std::make_pair(hits, r);
+    int hits = 0;
+    mm_reg1_t* reg = mm_map(m_index, seq.size(), seq.data(), &hits, m_tbuf, &m_map_opt, 0);
+    return std::make_pair(hits, reg);
 }
 
 std::vector<std::pair<char*, uint32_t>> Aligner::get_idx_records() {
@@ -168,24 +162,24 @@ BamWriter::~BamWriter() {
 int BamWriter::write_record(bam1_t* record) { return sam_write1(m_file, m_header, record); }
 
 int BamWriter::write_record(bam1_t* record, mm_reg1_t* a) {
-    uint16_t flag = 16;  // todo: calc flag
-
-    int n_cigar = 1;
-    uint32_t ssize = record->core.l_qseq;
-    uint32_t cigar[] = {ssize << BAM_CIGAR_SHIFT | BAM_CMATCH};
-
-    // todo: set  a->p
-    // n_cigar = a->p->n_cigar;
-    // cigar = a->p->cigar;
+    uint16_t flag = 0x0;
+    if (a->rev)
+        flag |= 0x10;
+    if (a->parent != a->id)
+        flag |= 0x100;
+    else if (!a->sam_pri)
+        flag |= 0x800;
 
     record->core.flag = flag;
     record->core.tid = a->rid;
-    record->core.pos = a->rs;  //todo: is POS a-rs
+    record->core.pos = a->rs;
     record->core.qual = a->mapq;
-    record->core.n_cigar = n_cigar;
+    record->core.n_cigar = a->p ? a->p->n_cigar : 0;
 
-    if (n_cigar != 0) {
-        int cigar_size = n_cigar * sizeof(uint32_t);
+    // todo: handle soft/hard clippings!
+    // https://github.com/lh3/minimap2/blob/1d3c3eef03216fde72f5e1a3850941b0193216d9/format.c#L36a4
+    if (record->core.n_cigar != 0) {
+        int cigar_size = a->p->n_cigar * sizeof(uint32_t);
         uint8_t* data = (uint8_t*)realloc(record->data, record->l_data + cigar_size);
         record->data = data;
 
@@ -194,14 +188,18 @@ int BamWriter::write_record(bam1_t* record, mm_reg1_t* a) {
                 record->data + record->core.l_qname, record->l_data - record->core.l_qname);
 
         // Copy the new cigar field into the bam1_t structure
-        memcpy(record->data + record->core.l_qname, cigar, cigar_size);
+        memcpy(record->data + record->core.l_qname, a->p->cigar, cigar_size);
 
         // Update the data length
         record->l_data += cigar_size;
     }
 
-    // todo: free a, a->p
+    if (a->p) {
+        free(a->p);
+    }
+    free(a);
 
+    //TODO: extra tags (NM)
     return sam_write1(m_file, m_header, record);
 }
 

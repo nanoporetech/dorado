@@ -34,10 +34,12 @@ public:
     std::pair<int, mm_reg1_t*> align(const std::vector<char> seq, const char* name);
 
 private:
-    mm_idxopt_t* m_idx_opt;
-    mm_mapopt_t* m_map_opt;
+    int m_threads = 1;
+    mm_idxopt_t m_idx_opt;
+    mm_mapopt_t m_map_opt;
     mm_tbuf_t* m_tbuf;
     mm_idx_t* m_index;
+    mm_idx_reader_t* m_index_reader;
 };
 
 class BamReader {

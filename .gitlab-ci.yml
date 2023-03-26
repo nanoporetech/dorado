@@ -215,7 +215,7 @@ build_archive:macos:m1:
 .test_dorado: &test_dorado
   stage: test
   variables:
-    GIT_STRATEGY: none    
+    GIT_STRATEGY: none
   script:
     - echo dorado basecaller test stage
     - ./dist/bin/dorado download --model dna_r9.4.1_e8_hac@v3.3
@@ -225,7 +225,8 @@ build_archive:macos:m1:
     - samtools quickcheck -u calls.sam
     - samtools view -b calls.sam > calls.bam
     - echo dorado aligner test stage
-    - ./dist/bin/dorado basecaller dna_r9.4.1_e8_hac@v3.3 ./tests/data/pod5 -r 1 -b 384 --modified-bases 5mCG | ./dist/bin/dorado aligner ref.fq - > calls.bam
+    - ./dist/bin/dorado aligner ref.fq calls.sam > calls.bam
+    - ./dist/bin/dorado basecaller dna_r9.4.1_e8_hac@v3.3 ./tests/data/pod5 -r 1 -b 384 --modified-bases 5mCG | ./dist/bin/dorado aligner ref.fq > calls.bam
     - samtools quickcheck -u calls.bam
     - samtools view -h calls.bam > calls.sam
 

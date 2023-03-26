@@ -16,7 +16,9 @@ int aligner(int argc, char* argv[]) {
 
     argparse::ArgumentParser parser("dorado", DORADO_VERSION, argparse::default_arguments::help);
     parser.add_argument("index").help("Index in fasta/mmi format.");
-    parser.add_argument("reads").help("Reads in BAM/SAM/CRAM format.");
+    parser.add_argument("reads")
+            .help("Reads in BAM/SAM/CRAM format.")
+            .nargs(argparse::nargs_pattern::any);
     parser.add_argument("-v", "--verbose").default_value(false).implicit_value(true);
 
     try {
@@ -33,20 +35,31 @@ int aligner(int argc, char* argv[]) {
     }
 
     auto index(parser.get<std::string>("index"));
-    auto reads(parser.get<std::string>("reads"));
+    auto reads(parser.get<std::vector<std::string>>("reads"));
+
+    if (reads.size() == 0) {
+        // todo: check stdin is a pipe and not empty
+        reads.push_back("-");
+    } else if (reads.size() > 1) {
+        spdlog::error("> multi file input not yet handled");
+        return 1;
+    }
 
     utils::Aligner aligner(index);
-    utils::BamReader reader(reads);
+    utils::BamReader reader(reads[0]);
     utils::BamWriter writer("-", reader.m_header, aligner.get_idx_records());
 
     spdlog::info("> input fmt: {} aligned: {}", reader.m_format, reader.m_is_aligned);
 
     while (reader.next()) {
         auto [hits, alignment] = aligner.align(reader.seq(), reader.qname());
-        spdlog::info("> HITS {}", hits);
 
+        spdlog::info("> HITS {}", hits);
         for (int i = 0; i < hits; i++) {
             writer.write_record(reader.m_record, &alignment[i]);
+        }
+        if (hits == 0) {
+            writer.write_record(reader.m_record);
         }
     }
 
