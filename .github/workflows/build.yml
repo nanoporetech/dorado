@@ -28,8 +28,16 @@ jobs:
     - name: Install dependencies from apt
       if: matrix.os == 'ubuntu-20.04'
       run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libhdf5-dev libssl-dev libzstd-dev autoconf
+    - name: Set up Windows path
+      uses: myci-actions/export-env-var-powershell@1
+      if: matrix.os == 'windows-2019'
+      with:
+        name: PATH
+        value: d:\a\dorado\dorado\dist\bin;$env:PATH
     - name: Build dorado
       run: |
         cmake -S . -B cmake-build ${{ matrix.arch }}
         cmake --build cmake-build --config Release -j 4
+        rm -rf dorado/3rdparty/torch*
+        cmake --build cmake-build --config Release --target install -j 4
         ctest -C Release --test-dir cmake-build --output-on-failure
