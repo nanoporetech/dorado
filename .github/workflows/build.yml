@@ -38,6 +38,11 @@ jobs:
       run: |
         cmake -S . -B cmake-build ${{ matrix.arch }}
         cmake --build cmake-build --config Release -j 4
-        rm -rf dorado/3rdparty/torch*
+    - name: Cleanup torch
+      uses: JesseTG/rm@v1.0.3
+      with:
+        path: dorado/3rdparty/torch-2.0.0-Linux
+    - name: Test dorado
+      run: |
         cmake --build cmake-build --config Release --target install -j 4
         ctest -C Release --test-dir cmake-build --output-on-failure
