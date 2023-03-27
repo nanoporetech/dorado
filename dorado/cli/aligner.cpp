@@ -61,7 +61,7 @@ int aligner(int argc, char* argv[]) {
     spdlog::info("> input fmt: {} aligned: {}", reader.m_format, reader.m_is_aligned);
 
     while (reader.next()) {
-        auto [hits, alignment] = aligner.align(reader.seq(), reader.qname());
+        auto [hits, alignment] = aligner.align(reader.seq());
 
         spdlog::info("> HITS {}", hits);
         for (int i = 0; i < hits; i++) {

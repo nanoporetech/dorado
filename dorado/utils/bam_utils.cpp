@@ -79,7 +79,7 @@ Aligner::~Aligner() {
     mm_idx_reader_close(m_index_reader);
 }
 
-std::pair<int, mm_reg1_t*> Aligner::align(const std::vector<char> seq, const char* qname) {
+std::pair<int, mm_reg1_t*> Aligner::align(const std::vector<char> seq) {
     int hits = 0;
     mm_reg1_t* reg = mm_map(m_index, seq.size(), seq.data(), &hits, m_tbuf, &m_map_opt, 0);
     return std::make_pair(hits, reg);
@@ -114,9 +114,7 @@ BamReader::~BamReader() {
     if (m_record) {
         bam_destroy1(m_record);
     }
-    if (m_format) {
-        free(m_format);
-    }
+    free(m_format);
     if (m_file) {
         sam_close(m_file);
     }
@@ -219,9 +217,7 @@ int BamWriter::write_record(bam1_t* record, mm_reg1_t* a) {
         record->l_data += cigar_size;
     }
 
-    if (a->p) {
-        free(a->p);
-    }
+    free(a->p);
     free(a);
 
     //TODO: extra tags (NM)

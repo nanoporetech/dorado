@@ -31,7 +31,7 @@ public:
     Aligner(const std::string& filename);
     ~Aligner();
     std::vector<std::pair<char*, uint32_t>> get_idx_records();
-    std::pair<int, mm_reg1_t*> align(const std::vector<char> seq, const char* name);
+    std::pair<int, mm_reg1_t*> align(const std::vector<char> seq);
 
 private:
     int m_threads = 1;
@@ -65,7 +65,7 @@ class BamWriter {
 public:
     BamWriter(const std::string& filename,
               const sam_hdr_t* header,
-              std::vector<std::pair<char*, uint32_t>> seq);
+              const std::vector<std::pair<char*, uint32_t>> seq);
     ~BamWriter();
     int write_record(bam1_t* record);
     int write_record(bam1_t* record, mm_reg1_t* a);
