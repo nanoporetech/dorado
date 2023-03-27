@@ -20,10 +20,8 @@ int aligner(int argc, char* argv[]) {
     utils::InitLogging();
 
     argparse::ArgumentParser parser("dorado", DORADO_VERSION, argparse::default_arguments::help);
-    parser.add_argument("index").help("Index in fasta/mmi format.");
-    parser.add_argument("reads")
-            .help("Reads in BAM/SAM/CRAM format.")
-            .nargs(argparse::nargs_pattern::any);
+    parser.add_argument("index").help("reference in (fastq/fasta/mmi).");
+    parser.add_argument("reads").help("any HTS format.").nargs(argparse::nargs_pattern::any);
     parser.add_argument("-t", "--threads").default_value(0).scan<'i', int>();
     parser.add_argument("-n", "--max-reads").default_value(1000).scan<'i', int>();
     parser.add_argument("-v", "--verbose").default_value(false).implicit_value(true);
@@ -70,33 +68,19 @@ int aligner(int argc, char* argv[]) {
     utils::BamReader reader(reads[0]);
     utils::BamWriter writer("-", reader.m_header, aligner.get_idx_records());
 
-    spdlog::info("> input fmt: {} aligned: {}", reader.m_format, reader.m_is_aligned);
+    spdlog::debug("> input fmt: {} aligned: {}", reader.m_format, reader.m_is_aligned);
 
-    int counter = 0;
-
-    spdlog::info("starting alignment");
-    while (reader.next()) {
-        auto [hits, alignment] = aligner.align(reader.seq());
-
-        counter++;
-        spdlog::info("> HITS {}", hits);
-
-        if (hits == 0) {
-            writer.write_record(reader.m_record);
-        } else {
-            for (int i = 0; i < hits; i++) {
-                writer.write_record(reader.m_record, &alignment[i]);
-            }
+    spdlog::info("> starting alignment");
+    int num_reads = 0;
+    while (reader.read()) {
+        auto records = aligner.align(reader.m_record);
+        for (auto record : records) {
+            writer.write(record);
         }
-
-        free(alignment);
-
-        if (counter > max_reads) {
+        if (num_reads++ >= max_reads)
             break;
-        }
     }
-
-    spdlog::info("finished alignment");
+    spdlog::info("> finished alignment");
 
     return 0;
 }

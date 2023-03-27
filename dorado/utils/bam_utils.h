@@ -6,6 +6,9 @@
 #include <map>
 #include <set>
 #include <string>
+
+using sq_t = std::vector<std::pair<char*, uint32_t>>;
+
 namespace dorado::utils {
 
 /**
@@ -30,7 +33,8 @@ class Aligner {
 public:
     Aligner(const std::string& filename, int threads);
     ~Aligner();
-    std::vector<std::pair<char*, uint32_t>> get_idx_records();
+    sq_t get_idx_records();
+    std::vector<bam1_t*> align(bam1_t* record);
     std::pair<int, mm_reg1_t*> align(const std::vector<char> seq);
 
 private:
@@ -46,12 +50,7 @@ class BamReader {
 public:
     BamReader(const std::string& filename);
     ~BamReader();
-
-    char* qname();
-    int seqlen();
-    std::vector<char> seq();
-
-    bool next();
+    bool read();
     char* m_format;
     bool m_is_aligned;
     bam1_t* m_record;
@@ -63,12 +62,9 @@ private:
 
 class BamWriter {
 public:
-    BamWriter(const std::string& filename,
-              const sam_hdr_t* header,
-              const std::vector<std::pair<char*, uint32_t>> seq);
+    BamWriter(const std::string& filename, const sam_hdr_t* header, const sq_t seqs);
     ~BamWriter();
-    int write_record(bam1_t* record);
-    int write_record(bam1_t* record, mm_reg1_t* a);
+    int write(bam1_t* record);
     sam_hdr_t* m_header;
 
 private:

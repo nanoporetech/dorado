@@ -1,5 +1,6 @@
 #include "bam_utils.h"
 
+#include "Version.h"
 #include "htslib/sam.h"
 #include "minimap.h"
 #include "read_pipeline/ReadPipeline.h"
@@ -24,7 +25,7 @@ std::map<std::string, std::shared_ptr<Read>> read_bam(const std::string& filenam
     BamReader reader(filename);
     std::map<std::string, std::shared_ptr<Read>> reads;
 
-    while (reader.next()) {
+    while (reader.read()) {
         std::string read_id = bam_get_qname(reader.m_record);
 
         if (read_ids.find(read_id) == read_ids.end()) {
@@ -64,8 +65,6 @@ Aligner::Aligner(const std::string& filename, const int threads) {
     m_idx_opt.flag = 1;
     m_idx_opt.bucket_bits = 14;
     m_idx_opt.batch_size = 16000000000;
-    // todo: we don't use minibatch
-    m_idx_opt.mini_batch_size = 50000000;
 
     m_map_opt.flag |= MM_F_CIGAR;
 
@@ -96,6 +95,103 @@ std::pair<int, mm_reg1_t*> Aligner::align(const std::vector<char> seq) {
     return std::make_pair(hits, reg);
 }
 
+std::vector<bam1_t*> Aligner::align(bam1_t* irecord) {
+    // some where for the hits
+    std::vector<bam1_t*> results;
+
+    // get the sequence to map from the record
+    auto seqlen = irecord->core.l_qseq;
+
+    auto bseq = bam_get_seq(irecord);
+    std::vector<char> nucleotides(seqlen);
+    for (int i = 0; i < seqlen; i++) {
+        nucleotides[i] = seq_nt16_str[bam_seqi(bseq, i)];
+    }
+
+    // do the mapping
+    int hits = 0;
+    mm_reg1_t* reg = mm_map(m_index, nucleotides.size(), nucleotides.data(), &hits, m_tbufs[0],
+                            &m_map_opt, 0);
+
+    // just return the input record
+    if (hits == 0) {
+        results.push_back(irecord);
+    }
+
+    for (int j = 0; j < hits; j++) {
+        // new output record
+        auto record = bam_dup1(irecord);
+
+        // mapping region
+        auto a = &reg[j];
+
+        uint16_t flag = 0x0;
+
+        if (a->rev)
+            flag |= 0x10;
+        if (a->parent != a->id)
+            flag |= 0x100;
+        else if (!a->sam_pri)
+            flag |= 0x800;
+
+        record->core.flag = flag;
+        record->core.tid = a->rid;
+        record->core.pos = a->rs;
+        record->core.qual = a->mapq;
+        record->core.n_cigar = a->p ? a->p->n_cigar : 0;
+
+        // todo: handle max_bam_cigar_op
+
+        if (record->core.n_cigar != 0) {
+            uint32_t clip_len[2] = {0};
+            clip_len[0] = a->rev ? record->core.l_qseq - a->qe : a->qs;
+            clip_len[1] = a->rev ? a->qs : record->core.l_qseq - a->qe;
+
+            if (clip_len[0]) {
+                record->core.n_cigar++;
+            }
+            if (clip_len[1]) {
+                record->core.n_cigar++;
+            }
+            int offset = clip_len[0] ? 1 : 0;
+            int cigar_size = record->core.n_cigar * sizeof(uint32_t);
+            uint8_t* data = (uint8_t*)realloc(record->data, record->l_data + cigar_size);
+
+            // Shift existing data to make room for the new cigar field
+            memmove(data + record->core.l_qname + cigar_size, data + record->core.l_qname,
+                    record->l_data - record->core.l_qname);
+
+            record->data = data;
+
+            // write the left softclip
+            if (clip_len[0]) {
+                auto clip = bam_cigar_gen(clip_len[0], BAM_CSOFT_CLIP);
+                memcpy(bam_get_cigar(record), &clip, sizeof(uint32_t));
+            }
+
+            // write the cigar
+            memcpy(bam_get_cigar(record) + offset, a->p->cigar, a->p->n_cigar * sizeof(uint32_t));
+
+            // write the right softclip
+            if (clip_len[1]) {
+                auto clip = bam_cigar_gen(clip_len[1], BAM_CSOFT_CLIP);
+                memcpy(bam_get_cigar(record) + offset + a->p->n_cigar, &clip, sizeof(uint32_t));
+            }
+
+            // Update the data length
+            record->l_data += cigar_size;
+
+            //TODO: m_data size
+            //TODO: extra tags (NM)
+        }
+        free(a->p);
+        results.push_back(record);
+    }
+
+    free(reg);
+    return results;
+}
+
 std::vector<std::pair<char*, uint32_t>> Aligner::get_idx_records() {
     std::vector<std::pair<char*, uint32_t>> records;
     for (int i = 0; i < m_index->n_seq; ++i) {
@@ -118,35 +214,16 @@ BamReader::BamReader(const std::string& filename) {
     m_record = bam_init1();
 }
 
+bool BamReader::read() { return sam_read1(m_file, m_header, m_record) >= 0; }
+
 BamReader::~BamReader() {
-    // todo: shoundn't need to check
-    if (m_header) {
-        bam_hdr_destroy(m_header);
-    }
-    if (m_record) {
-        bam_destroy1(m_record);
-    }
     free(m_format);
-    if (m_file) {
-        sam_close(m_file);
-    }
+    sam_hdr_destroy(m_header);
+    bam_destroy1(m_record);
+    hts_close(m_file);
 }
 
-char* BamReader::qname() { return bam_get_qname(m_record); }
-int BamReader::seqlen() { return m_record->core.l_qseq; }
-bool BamReader::next() { return sam_read1(m_file, m_header, m_record) >= 0; }
-std::vector<char> BamReader::seq() {
-    auto bseq = bam_get_seq(m_record);
-    std::vector<char> nucleotides(seqlen());
-    for (int i = 0; i < seqlen(); i++) {
-        nucleotides[i] = seq_nt16_str[bam_seqi(bseq, i)];
-    }
-    return nucleotides;
-}
-
-BamWriter::BamWriter(const std::string& filename,
-                     const sam_hdr_t* header,
-                     std::vector<std::pair<char*, uint32_t>> seq) {
+BamWriter::BamWriter(const std::string& filename, const sam_hdr_t* header, sq_t seqs) {
     m_file = hts_open(filename.c_str(), "wb");
     if (!m_file) {
         throw std::runtime_error("Could not open file: " + filename);
@@ -154,96 +231,23 @@ BamWriter::BamWriter(const std::string& filename,
     m_header = sam_hdr_dup(header);
     write_hdr_pg();
 
-    for (auto pair : seq) {
+    for (auto pair : seqs) {
         write_hdr_sq(std::get<0>(pair), std::get<1>(pair));
     }
     auto res = sam_hdr_write(m_file, m_header);
 }
 
 BamWriter::~BamWriter() {
-    if (m_header) {
-        bam_hdr_destroy(m_header);
-    }
-    if (m_file) {
-        sam_close(m_file);
-    }
+    sam_hdr_destroy(m_header);
+    hts_close(m_file);
 }
 
-int BamWriter::write_record(bam1_t* record) { return sam_write1(m_file, m_header, record); }
-
-int BamWriter::write_record(bam1_t* irecord, mm_reg1_t* a) {
-    auto record = bam_dup1(irecord);
-
-    uint16_t flag = 0x0;
-
-    if (a->rev)
-        flag |= 0x10;
-    if (a->parent != a->id)
-        flag |= 0x100;
-    else if (!a->sam_pri)
-        flag |= 0x800;
-
-    record->core.flag = flag;
-    record->core.tid = a->rid;
-    record->core.pos = a->rs;
-    record->core.qual = a->mapq;
-    record->core.n_cigar = a->p ? a->p->n_cigar : 0;
-
-    // todo: handle max_bam_cigar_op
-
-    if (record->core.n_cigar != 0) {
-        uint32_t clip_len[2] = {0};
-        clip_len[0] = a->rev ? record->core.l_qseq - a->qe : a->qs;
-        clip_len[1] = a->rev ? a->qs : record->core.l_qseq - a->qe;
-
-        if (clip_len[0]) {
-            record->core.n_cigar++;
-        }
-        if (clip_len[1]) {
-            record->core.n_cigar++;
-        }
-        int offset = clip_len[0] ? 1 : 0;
-
-        int cigar_size = record->core.n_cigar * sizeof(uint32_t);
-        uint8_t* data = (uint8_t*)realloc(record->data, record->l_data + cigar_size);
-
-        // Shift existing data to make room for the new cigar field
-        memmove(data + record->core.l_qname + cigar_size, data + record->core.l_qname,
-                record->l_data - record->core.l_qname);
-
-        record->data = data;
-
-        // write the left softclip
-        if (clip_len[0]) {
-            auto clip = bam_cigar_gen(clip_len[0], BAM_CSOFT_CLIP);
-            memcpy(bam_get_cigar(record), &clip, sizeof(uint32_t));
-        }
-
-        // write the cigar
-        memcpy(bam_get_cigar(record) + offset, a->p->cigar, a->p->n_cigar * sizeof(uint32_t));
-
-        // write the right softclip
-        if (clip_len[1]) {
-            auto clip = bam_cigar_gen(clip_len[1], BAM_CSOFT_CLIP);
-            memcpy(bam_get_cigar(record) + offset + a->p->n_cigar, &clip, sizeof(uint32_t));
-        }
-
-        // Update the data length
-        record->l_data += cigar_size;
-
-        //TODO: m_data size
-    }
-
-    //TODO: extra tags (NM)
-
-    auto res = sam_write1(m_file, m_header, record);
-    free(a->p);
-    return res;
-}
+int BamWriter::write(bam1_t* record) { return sam_write1(m_file, m_header, record); }
 
 int BamWriter::write_hdr_pg() {
-    return sam_hdr_add_line(m_header, "PG", "ID", "aligner", "PN", "dorado", "VN", MM_VERSION, "DS",
-                            "minimap2", NULL);  // add CL Writer node
+    //TODO: add CL Writer node
+    return sam_hdr_add_line(m_header, "PG", "ID", "aligner", "PN", "dorado", "VN", DORADO_VERSION,
+                            "DS", MM_VERSION, NULL);
 }
 
 int BamWriter::write_hdr_sq(char* name, uint32_t length) {
