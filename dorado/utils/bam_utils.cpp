@@ -176,19 +176,44 @@ int BamWriter::write_record(bam1_t* record, mm_reg1_t* a) {
     record->core.qual = a->mapq;
     record->core.n_cigar = a->p ? a->p->n_cigar : 0;
 
-    // todo: handle soft/hard clippings!
-    // https://github.com/lh3/minimap2/blob/1d3c3eef03216fde72f5e1a3850941b0193216d9/format.c#L36a4
+    // todo: handle max_bam_cigar_op
+
     if (record->core.n_cigar != 0) {
-        int cigar_size = a->p->n_cigar * sizeof(uint32_t);
+        uint32_t clip_len[2] = {0};
+        clip_len[0] = a->rev ? record->core.l_qseq - a->qe : a->qs;
+        clip_len[1] = a->rev ? a->qs : record->core.l_qseq - a->qe;
+
+        if (clip_len[0]) {
+            record->core.n_cigar++;
+        }
+        if (clip_len[1]) {
+            record->core.n_cigar++;
+        }
+        int offset = clip_len[0] ? 1 : 0;
+
+        int cigar_size = record->core.n_cigar * sizeof(uint32_t);
         uint8_t* data = (uint8_t*)realloc(record->data, record->l_data + cigar_size);
-        record->data = data;
 
         // Shift existing data to make room for the new cigar field
-        memmove(record->data + record->core.l_qname + cigar_size,
-                record->data + record->core.l_qname, record->l_data - record->core.l_qname);
+        memmove(data + record->core.l_qname + cigar_size, data + record->core.l_qname,
+                record->l_data - record->core.l_qname);
 
-        // Copy the new cigar field into the bam1_t structure
-        memcpy(record->data + record->core.l_qname, a->p->cigar, cigar_size);
+        record->data = data;
+
+        // write the left softclip
+        if (clip_len[0]) {
+            auto clip = bam_cigar_gen(clip_len[0], BAM_CSOFT_CLIP);
+            memcpy(bam_get_cigar(record), &clip, sizeof(uint32_t));
+        }
+
+        // write the cigar
+        memcpy(bam_get_cigar(record) + offset, a->p->cigar, a->p->n_cigar * sizeof(uint32_t));
+
+        // write the right softclip
+        if (clip_len[1]) {
+            auto clip = bam_cigar_gen(clip_len[1], BAM_CSOFT_CLIP);
+            memcpy(bam_get_cigar(record) + offset + a->p->n_cigar, &clip, sizeof(uint32_t));
+        }
 
         // Update the data length
         record->l_data += cigar_size;
