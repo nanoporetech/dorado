@@ -28,7 +28,7 @@ std::map<std::string, std::shared_ptr<Read>> read_bam(const std::string& filenam
 
 class Aligner {
 public:
-    Aligner(const std::string& filename);
+    Aligner(const std::string& filename, int threads);
     ~Aligner();
     std::vector<std::pair<char*, uint32_t>> get_idx_records();
     std::pair<int, mm_reg1_t*> align(const std::vector<char> seq);
@@ -37,9 +37,9 @@ private:
     int m_threads = 1;
     mm_idxopt_t m_idx_opt;
     mm_mapopt_t m_map_opt;
-    mm_tbuf_t* m_tbuf;
     mm_idx_t* m_index;
     mm_idx_reader_t* m_index_reader;
+    std::vector<mm_tbuf_t*> m_tbufs;
 };
 
 class BamReader {

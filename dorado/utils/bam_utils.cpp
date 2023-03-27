@@ -54,14 +54,17 @@ std::map<std::string, std::shared_ptr<Read>> read_bam(const std::string& filenam
     return reads;
 }
 
-Aligner::Aligner(const std::string& filename) {
+Aligner::Aligner(const std::string& filename, const int threads) {
+    m_threads = threads;
+
     mm_set_opt(0, &m_idx_opt, &m_map_opt);
 
     m_idx_opt.k = 19;
     m_idx_opt.w = 19;
     m_idx_opt.flag = 1;
     m_idx_opt.bucket_bits = 14;
-    m_idx_opt.batch_size = 4000000;
+    m_idx_opt.batch_size = 16000000000;
+    // todo: we don't use minibatch
     m_idx_opt.mini_batch_size = 50000000;
 
     m_map_opt.flag |= MM_F_CIGAR;
@@ -70,18 +73,26 @@ Aligner::Aligner(const std::string& filename) {
     m_index = mm_idx_reader_read(m_index_reader, m_threads);
     mm_mapopt_update(&m_map_opt, m_index);
 
-    m_tbuf = mm_tbuf_init();
+    if (mm_verbose >= 3) {
+        mm_idx_stat(m_index);
+    }
+
+    for (int i = 0; i < m_threads; i++) {
+        m_tbufs.push_back(mm_tbuf_init());
+    }
 }
 
 Aligner::~Aligner() {
     mm_idx_destroy(m_index);
-    mm_tbuf_destroy(m_tbuf);
+    for (int i = 0; i < m_threads; i++) {
+        mm_tbuf_destroy(m_tbufs[i]);
+    }
     mm_idx_reader_close(m_index_reader);
 }
 
 std::pair<int, mm_reg1_t*> Aligner::align(const std::vector<char> seq) {
     int hits = 0;
-    mm_reg1_t* reg = mm_map(m_index, seq.size(), seq.data(), &hits, m_tbuf, &m_map_opt, 0);
+    mm_reg1_t* reg = mm_map(m_index, seq.size(), seq.data(), &hits, m_tbufs[0], &m_map_opt, 0);
     return std::make_pair(hits, reg);
 }
 
@@ -108,6 +119,7 @@ BamReader::BamReader(const std::string& filename) {
 }
 
 BamReader::~BamReader() {
+    // todo: shoundn't need to check
     if (m_header) {
         bam_hdr_destroy(m_header);
     }
@@ -159,8 +171,11 @@ BamWriter::~BamWriter() {
 
 int BamWriter::write_record(bam1_t* record) { return sam_write1(m_file, m_header, record); }
 
-int BamWriter::write_record(bam1_t* record, mm_reg1_t* a) {
+int BamWriter::write_record(bam1_t* irecord, mm_reg1_t* a) {
+    auto record = bam_dup1(irecord);
+
     uint16_t flag = 0x0;
+
     if (a->rev)
         flag |= 0x10;
     if (a->parent != a->id)
@@ -215,13 +230,15 @@ int BamWriter::write_record(bam1_t* record, mm_reg1_t* a) {
 
         // Update the data length
         record->l_data += cigar_size;
+
+        //TODO: m_data size
     }
 
-    free(a->p);
-    free(a);
-
     //TODO: extra tags (NM)
-    return sam_write1(m_file, m_header, record);
+
+    auto res = sam_write1(m_file, m_header, record);
+    free(a->p);
+    return res;
 }
 
 int BamWriter::write_hdr_pg() {
