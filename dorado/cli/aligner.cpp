@@ -9,6 +9,10 @@
 #include <string>
 #include <vector>
 
+#ifndef _WIN32
+#include <unistd.h>
+#endif
+
 namespace dorado {
 
 int aligner(int argc, char* argv[]) {
@@ -38,7 +42,12 @@ int aligner(int argc, char* argv[]) {
     auto reads(parser.get<std::vector<std::string>>("reads"));
 
     if (reads.size() == 0) {
-        // todo: check stdin is a pipe and not empty
+#ifndef _WIN32
+        if (isatty(fileno(stdin))) {
+            std::cout << parser << std::endl;
+            return 1;
+        }
+#endif
         reads.push_back("-");
     } else if (reads.size() > 1) {
         spdlog::error("> multi file input not yet handled");
