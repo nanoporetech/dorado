@@ -13,15 +13,22 @@ jobs:
             arch: "-A x64"
     runs-on: ${{ matrix.os }}
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v3
+    - name: Clean up diskspace
+      if: matrix.os == 'ubuntu-20.04'
+      run: sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost "$AGENT_TOOLSDIRECTORY"
     - name: Set up cmake
-      uses: jwlawson/actions-setup-cmake@v1.12
+      uses: jwlawson/actions-setup-cmake@v1.13
       with:
         cmake-version: '3.21.x'
-    - uses: Jimver/cuda-toolkit@v0.2.7
+    - uses: Jimver/cuda-toolkit@v0.2.10
       id: cuda-toolkit
       with:
         cuda: '11.8.0'
+    - name: Cleanup CUDA cache
+      uses: JesseTG/rm@v1.0.3
+      with:
+        path: D:\a\dorado\dorado\cuda_installer-windows-10.0.17763-11.8.0
     - name: Install dependencies from apt
       if: matrix.os == 'ubuntu-20.04'
       run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libhdf5-dev libssl-dev libzstd-dev autoconf
@@ -30,9 +37,16 @@ jobs:
       if: matrix.os == 'windows-2019'
       with:
         name: PATH
-        value: d:\a\dorado\dorado\dist\bin;$env:PATH
+        value: D:\a\dorado\dorado\dist\bin;$env:PATH
     - name: Build dorado
       run: |
         cmake -S . -B cmake-build ${{ matrix.arch }}
+        cmake --build cmake-build --config Release -j 4
+    - name: Cleanup torch
+      uses: JesseTG/rm@v1.0.3
+      with:
+        path: D:\a\dorado\dorado\3rdparty
+    - name: Test dorado
+      run: |
         cmake --build cmake-build --config Release --target install -j 4
-        ctest -C Release --test-dir cmake-build  --output-on-failure
+        ctest -C Release --test-dir cmake-build --output-on-failure
