@@ -20,41 +20,6 @@ const char seq_nt16_str[] = "=ACMGRSVTWYHKDBN";
 
 namespace dorado::utils {
 
-std::map<std::string, std::shared_ptr<Read>> read_bam(const std::string& filename,
-                                                      const std::set<std::string>& read_ids) {
-    BamReader reader(filename);
-    std::map<std::string, std::shared_ptr<Read>> reads;
-
-    while (reader.read()) {
-        std::string read_id = bam_get_qname(reader.m_record);
-
-        if (read_ids.find(read_id) == read_ids.end()) {
-            continue;
-        }
-
-        uint8_t* qstring = bam_get_qual(reader.m_record);
-        uint8_t* sequence = bam_get_seq(reader.m_record);
-
-        uint32_t seqlen = reader.m_record->core.l_qseq;
-        std::vector<uint8_t> qualities(seqlen);
-        std::vector<char> nucleotides(seqlen);
-
-        // Todo - there is a better way to do this.
-        for (int i = 0; i < seqlen; i++) {
-            qualities[i] = qstring[i] + 33;
-            nucleotides[i] = seq_nt16_str[bam_seqi(sequence, i)];
-        }
-
-        auto tmp_read = std::make_shared<Read>();
-        tmp_read->read_id = read_id;
-        tmp_read->seq = std::string(nucleotides.begin(), nucleotides.end());
-        tmp_read->qstring = std::string(qualities.begin(), qualities.end());
-        reads[read_id] = tmp_read;
-    }
-
-    return reads;
-}
-
 Aligner::Aligner(const std::string& filename, const int threads) {
     m_threads = threads;
 
@@ -89,6 +54,14 @@ Aligner::~Aligner() {
     mm_idx_reader_close(m_index_reader);
 }
 
+std::vector<std::pair<char*, uint32_t>> Aligner::get_idx_records() {
+    std::vector<std::pair<char*, uint32_t>> records;
+    for (int i = 0; i < m_index->n_seq; ++i) {
+        records.push_back(std::make_pair(m_index->seq[i].name, m_index->seq[i].len));
+    }
+    return records;
+}
+
 std::pair<int, mm_reg1_t*> Aligner::align(const std::vector<char> seq) {
     int hits = 0;
     mm_reg1_t* reg = mm_map(m_index, seq.size(), seq.data(), &hits, m_tbufs[0], &m_map_opt, 0);
@@ -103,15 +76,14 @@ std::vector<bam1_t*> Aligner::align(bam1_t* irecord) {
     auto seqlen = irecord->core.l_qseq;
 
     auto bseq = bam_get_seq(irecord);
-    std::vector<char> nucleotides(seqlen);
+    std::vector<char> seq(seqlen);
     for (int i = 0; i < seqlen; i++) {
-        nucleotides[i] = seq_nt16_str[bam_seqi(bseq, i)];
+        seq[i] = seq_nt16_str[bam_seqi(bseq, i)];
     }
 
     // do the mapping
     int hits = 0;
-    mm_reg1_t* reg = mm_map(m_index, nucleotides.size(), nucleotides.data(), &hits, m_tbufs[0],
-                            &m_map_opt, 0);
+    mm_reg1_t* reg = mm_map(m_index, seq.size(), seq.data(), &hits, m_tbufs[0], &m_map_opt, 0);
 
     // just return the input record
     if (hits == 0) {
@@ -192,14 +164,6 @@ std::vector<bam1_t*> Aligner::align(bam1_t* irecord) {
     return results;
 }
 
-std::vector<std::pair<char*, uint32_t>> Aligner::get_idx_records() {
-    std::vector<std::pair<char*, uint32_t>> records;
-    for (int i = 0; i < m_index->n_seq; ++i) {
-        records.push_back(std::make_pair(m_index->seq[i].name, m_index->seq[i].len));
-    }
-    return records;
-}
-
 BamReader::BamReader(const std::string& filename) {
     m_file = hts_open(filename.c_str(), "r");
     if (!m_file) {
@@ -214,14 +178,14 @@ BamReader::BamReader(const std::string& filename) {
     m_record = bam_init1();
 }
 
-bool BamReader::read() { return sam_read1(m_file, m_header, m_record) >= 0; }
-
 BamReader::~BamReader() {
     free(m_format);
     sam_hdr_destroy(m_header);
     bam_destroy1(m_record);
     hts_close(m_file);
 }
+
+bool BamReader::read() { return sam_read1(m_file, m_header, m_record) >= 0; }
 
 BamWriter::BamWriter(const std::string& filename, const sam_hdr_t* header, sq_t seqs) {
     m_file = hts_open(filename.c_str(), "wb");
@@ -242,7 +206,20 @@ BamWriter::~BamWriter() {
     hts_close(m_file);
 }
 
-int BamWriter::write(bam1_t* record) { return sam_write1(m_file, m_header, record); }
+int BamWriter::write(bam1_t* record) {
+    // track stats
+    m_total++;
+    if (record->core.flag & BAM_FUNMAP)
+        m_unmapped++;
+    if (record->core.flag & BAM_FSECONDARY)
+        m_secondary++;
+    if (record->core.flag & BAM_FSUPPLEMENTARY)
+        m_supplementary++;
+    m_primary = m_total - m_secondary - m_supplementary - m_unmapped;
+
+    // todo: handle result
+    return sam_write1(m_file, m_header, record);
+}
 
 int BamWriter::write_hdr_pg() {
     //TODO: add CL Writer node
@@ -252,6 +229,40 @@ int BamWriter::write_hdr_pg() {
 
 int BamWriter::write_hdr_sq(char* name, uint32_t length) {
     return sam_hdr_add_line(m_header, "SQ", "SN", name, "LN", std::to_string(length).c_str(), NULL);
+}
+
+read_map read_bam(const std::string& filename, const std::set<std::string>& read_ids) {
+    BamReader reader(filename);
+    std::map<std::string, std::shared_ptr<Read>> reads;
+
+    while (reader.read()) {
+        std::string read_id = bam_get_qname(reader.m_record);
+
+        if (read_ids.find(read_id) == read_ids.end()) {
+            continue;
+        }
+
+        uint8_t* qstring = bam_get_qual(reader.m_record);
+        uint8_t* sequence = bam_get_seq(reader.m_record);
+
+        uint32_t seqlen = reader.m_record->core.l_qseq;
+        std::vector<uint8_t> qualities(seqlen);
+        std::vector<char> nucleotides(seqlen);
+
+        // Todo - there is a better way to do this.
+        for (int i = 0; i < seqlen; i++) {
+            qualities[i] = qstring[i] + 33;
+            nucleotides[i] = seq_nt16_str[bam_seqi(sequence, i)];
+        }
+
+        auto tmp_read = std::make_shared<Read>();
+        tmp_read->read_id = read_id;
+        tmp_read->seq = std::string(nucleotides.begin(), nucleotides.end());
+        tmp_read->qstring = std::string(qualities.begin(), qualities.end());
+        reads[read_id] = tmp_read;
+    }
+
+    return reads;
 }
 
 }  // namespace dorado::utils

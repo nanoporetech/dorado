@@ -63,7 +63,6 @@ int aligner(int argc, char* argv[]) {
 
     spdlog::info("> loading index {}", index);
     utils::Aligner aligner(index, threads);
-    spdlog::info("> loaded index {}", index);
 
     utils::BamReader reader(reads[0]);
     utils::BamWriter writer("-", reader.m_header, aligner.get_idx_records());
@@ -77,10 +76,12 @@ int aligner(int argc, char* argv[]) {
         for (auto record : records) {
             writer.write(record);
         }
-        if (num_reads++ >= max_reads)
+        if (num_reads++ > max_reads)
             break;
     }
     spdlog::info("> finished alignment");
+    spdlog::info("> total/primary/unmapped {}/{}/{}", writer.m_total, writer.m_primary,
+                 writer.m_unmapped);
 
     return 0;
 }
