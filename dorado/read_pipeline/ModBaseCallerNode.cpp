@@ -112,8 +112,8 @@ ModBaseCallerNode::~ModBaseCallerNode() {
     }
 
     if (node) {
-        node->m_base_mod_info = std::make_shared<utils::BaseModInfo>(result.alphabet, result.long_names,
-                                                                     context_handler.encode());
+        node->m_base_mod_info = std::make_shared<utils::BaseModInfo>(
+                result.alphabet, result.long_names, context_handler.encode());
 
         node->m_base_prob_offsets[0] = 0;
         node->m_base_prob_offsets[1] = model_info[0].base_counts;
