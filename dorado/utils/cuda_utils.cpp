@@ -172,29 +172,16 @@ std::vector<std::string> parse_cuda_device_string(std::string device_string) {
     return devices;
 }
 
-size_t available_memory(std::string device) {
+size_t available_memory(torch::Device device) {
     size_t free, total;
-    cudaSetDevice(std::stoi(device.substr(5)));
+    c10::cuda::CUDAGuard device_guard(device);
     cudaMemGetInfo(&free, &total);
     return free;
 }
 
-std::vector<size_t> available_memory(std::vector<std::string> devices) {
-    std::vector<size_t> vec;
-    cxxpool::thread_pool pool{devices.size()};
-    std::vector<std::future<size_t>> futures;
-    for (auto device : devices) {
-        futures.push_back(pool.push([=] { return available_memory(device); }));
-    }
-    for (auto &v : futures) {
-        vec.push_back(v.get());
-    }
-    return vec;
-}
-
-int select_batchsize(int layer_size, int min_batchsize, int max_batchsize, std::string device) {
+int select_batchsize(int layer_size, int granularity, int max_batchsize, torch::Device device) {
     int timesteps = 1000;
-    int best_batchsize = max_batchsize;
+    int best_batchsize = granularity;
     float best_time = std::numeric_limits<float>::max();
 
     c10::cuda::CUDAGuard device_guard(device);
@@ -214,7 +201,7 @@ int select_batchsize(int layer_size, int min_batchsize, int max_batchsize, std::
     }
 
     CUDATimer cuda_timer;
-    for (int batchsize = min_batchsize; batchsize <= max_batchsize; batchsize += 16) {
+    for (int batchsize = granularity; batchsize <= max_batchsize; batchsize += granularity) {
         cuda_timer.start();
         for (int t = 0; t < timesteps; t++) {
             a = torch::empty({batchsize, layer_size * 2}, options);
@@ -235,7 +222,10 @@ int select_batchsize(int layer_size, int min_batchsize, int max_batchsize, std::
     return best_batchsize;
 }
 
-int auto_gpu_batch_size(std::string model_path, std::vector<std::string> devices) {
+int auto_gpu_batch_size(std::string model_path,
+                        int batchsize_granularity,
+                        torch::Device device,
+                        float memory_limit_fraction) {
 #ifdef DORADO_TX2
     return 256;
 #else
@@ -252,23 +242,22 @@ int auto_gpu_batch_size(std::string model_path, std::vector<std::string> devices
     };
 
     // compute how much free gpu memory and pick the closest breakpoint
-    auto available = available_memory(devices);
-    int min_available = *std::min_element(available.begin(), available.end()) / 1e+9;
-    auto presets = details::try_select_max_batch_sizes(breakpoints, batch_sizes, min_available);
+    auto available = available_memory(device) * memory_limit_fraction / 1e+9;
+    auto presets = details::try_select_max_batch_sizes(breakpoints, batch_sizes, available);
     if (!presets) {
         spdlog::warn(
                 "Auto batchsize detection failed. Insufficient memory"
                 ", required 8GB, available {}GB",
-                min_available);
+                available);
         return 128;
     }
 
     if (model_path.find("_fast@v") != std::string::npos) {
-        return select_batchsize(96, 64, presets->at(0), devices[0]);
+        return select_batchsize(96, batchsize_granularity, presets->at(0), device);
     } else if (model_path.find("_hac@v") != std::string::npos) {
-        return select_batchsize(384, 64, presets->at(1), devices[0]);
+        return select_batchsize(384, batchsize_granularity, presets->at(1), device);
     } else if (model_path.find("_sup@v") != std::string::npos) {
-        return select_batchsize(1024, 64, presets->at(2), devices[0]);
+        return select_batchsize(1024, batchsize_granularity, presets->at(2), device);
     }
 
     spdlog::warn("Auto batchsize detection failed");
