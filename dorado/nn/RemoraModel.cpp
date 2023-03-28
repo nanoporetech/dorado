@@ -259,7 +259,7 @@ ModuleHolder<AnyModule> load_remora_model(const std::filesystem::path& model_pat
     throw std::runtime_error("Unknown model type in config file.");
 }
 
-void BaseModParams::parse(std::filesystem::path const& model_path, bool all) {
+void BaseModParams::parse(std::filesystem::path const& model_path, bool all_members) {
     auto config = toml::parse(model_path / "config.toml");
     const auto& params = toml::find(config, "modbases");
     motif = toml::find<std::string>(params, "motif");
@@ -271,7 +271,7 @@ void BaseModParams::parse(std::filesystem::path const& model_path, bool all) {
                 toml::find<std::string>(params, "mod_long_names_" + std::to_string(i)));
     }
 
-    if (!all)
+    if (!all_members)
         return;
 
     base_mod_count = mod_long_names.size();

@@ -3,6 +3,7 @@
 
 #include <atomic>
 #include <deque>
+#include <functional>
 #include <memory>
 #include <vector>
 
@@ -23,17 +24,21 @@ public:
                       size_t max_reads = 1000);
     ~ModBaseCallerNode();
 
-    // Wxpose long_names and alphabet computed by get_modbase_info
-    static std::pair<std::string, std::string>  // long_names, alphabet
-    get_modbase_info(
+    struct Info {
+        std::string long_names;
+        std::string alphabet;
+    };
+
+    // Expose long_names and alphabet computed by get_modbase_info
+    static Info get_modbase_info(
             std::vector<std::reference_wrapper<BaseModParams const>> const& base_mod_params) {
-        return get_modbase_info(base_mod_params, nullptr);
+        return get_modbase_info_and_maybe_init(base_mod_params, nullptr);
     };
 
 private:
     // Determine the modbase alphabet from parameters and calculate offset positions for the results
-    [[maybe_unused]] static std::pair<std::string, std::string>  // long_names, alphabet
-    get_modbase_info(
+    // if node is not null it will populate its members
+    [[maybe_unused]] static Info get_modbase_info_and_maybe_init(
             std::vector<std::reference_wrapper<BaseModParams const>> const& base_mod_params,
             ModBaseCallerNode* node);
 

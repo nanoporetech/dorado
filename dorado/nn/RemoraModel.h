@@ -42,7 +42,7 @@ struct BaseModParams {
     size_t refine_kmer_center_idx;  ///< The position in the kmer at which to check the levels
     bool refine_do_rough_rescale;   ///< Whether to perform rough rescaling
 
-    void parse(std::filesystem::path const& model_path, bool all = true);
+    void parse(std::filesystem::path const& model_path, bool all_members = true);
 };
 
 class RemoraCaller {
