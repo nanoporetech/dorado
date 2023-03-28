@@ -135,11 +135,11 @@ int duplex(int argc, char* argv[]) {
 #ifdef __APPLE__
             } else if (device == "metal") {
                 auto simplex_caller = create_metal_caller(model_path, chunk_size, batch_size);
-                if (simplex_caller->batch_size() != batch_size) {
-                    spdlog::debug("- set batch size to {}", simplex_caller->batch_size());
-                }
                 for (int i = 0; i < num_runners; i++) {
                     runners.push_back(std::make_shared<MetalModelRunner>(simplex_caller));
+                }
+                if (runners.back()->batch_size() != batch_size) {
+                    spdlog::debug("- set batch size to {}", runners.back()->batch_size());
                 }
 
                 // For now, the minimal batch size is used for the duplex model.

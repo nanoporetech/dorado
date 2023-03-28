@@ -63,11 +63,11 @@ void setup(std::vector<std::string> args,
 #ifdef __APPLE__
     } else if (device == "metal") {
         auto caller = create_metal_caller(model_path, chunk_size, batch_size);
-        if (caller->batch_size() != batch_size) {
-            spdlog::debug("- set batch size to {}", caller->batch_size());
-        }
         for (size_t i = 0; i < num_runners; i++) {
             runners.push_back(std::make_shared<MetalModelRunner>(caller));
+        }
+        if (runners.back()->batch_size() != batch_size) {
+            spdlog::debug("- set batch size to {}", runners.back()->batch_size());
         }
     } else {
         throw std::runtime_error(std::string("Unsupported device: ") + device);
