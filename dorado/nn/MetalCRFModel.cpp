@@ -4,6 +4,7 @@
 #include "MetalCRFModel.h"
 
 #include "../decode/beam_search.h"
+#include "../utils/math_utils.h"
 #include "../utils/metal_utils.h"
 #include "../utils/module_utils.h"
 #include "../utils/tensor_utils.h"
@@ -532,7 +533,7 @@ TORCH_MODULE(MetalModel);
 
 class MetalCaller {
 public:
-    MetalCaller(const std::filesystem::path &model_path, int chunk_size_, int batch_size_) {
+    MetalCaller(const std::filesystem::path &model_path, int chunk_size, int batch_size) {
         const auto model_config = load_crf_model_config(model_path);
         m_model_stride = static_cast<size_t>(model_config.stride);
         m_num_input_features = model_config.num_features;
@@ -548,8 +549,8 @@ public:
         m_states = pow(n_base, model_config.state_len);
 
         constexpr int MTL_CORE_BATCH_SIZE = 48;
-        m_batch_size = (batch_size_ == 0) ? MTL_CORE_BATCH_SIZE * get_mtl_device_core_count()
-                                          : utils::pad_to(batch_size_, MTL_CORE_BATCH_SIZE);
+        m_batch_size = (batch_size == 0) ? MTL_CORE_BATCH_SIZE * get_mtl_device_core_count()
+                                         : utils::pad_to(batch_size, MTL_CORE_BATCH_SIZE);
 
         // Chunk size after decimation via convolution stride.
         m_out_chunk_size = chunk_size / model_config.stride;
@@ -576,9 +577,9 @@ public:
         // batch splitting factor must be an exact divisor of the batch_size / 48.
         constexpr auto kMaxBufferSize = static_cast<int64_t>(1) << 32;
         const auto complete_linear_out_size =
-                static_cast<int64_t>(m_out_chunk_size) * static_cast<int64_t>(batch_size) *
+                static_cast<int64_t>(m_out_chunk_size) * static_cast<int64_t>(m_batch_size) *
                 static_cast<int64_t>(model_config.outsize) * sizeof(float);
-        const int num_batch_pieces = batch_size / MTL_CORE_BATCH_SIZE;
+        const int num_batch_pieces = m_batch_size / MTL_CORE_BATCH_SIZE;
         for (m_out_split = 1; m_out_split < num_batch_pieces; ++m_out_split) {
             if (num_batch_pieces % m_out_split == 0 &&
                 complete_linear_out_size / m_out_split < kMaxBufferSize)
@@ -589,11 +590,12 @@ public:
         // output buffers, given other reasonable parameters.
         assert(num_batch_pieces % m_out_split == 0);
         assert(complete_linear_out_size / m_out_split < kMaxBufferSize);
-        assert(batch_size % m_out_split == 0);
-        m_out_batch_size = batch_size / m_out_split;
+        assert(m_batch_size % m_out_split == 0);
+        m_out_batch_size = m_batch_size / m_out_split;
         assert(m_out_batch_size % MTL_CORE_BATCH_SIZE == 0);
 
-        m_model = nn::MetalModel(model_config, chunk_size, batch_size, m_out_split, m_device);
+        m_model =
+                nn::MetalModel(model_config, m_in_chunk_size, m_batch_size, m_out_split, m_device);
         m_model->load_state_dict(state_dict);
         m_model->eval();
 

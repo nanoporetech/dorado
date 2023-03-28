@@ -41,7 +41,7 @@ public:
         int batch_size_granularity = get_batch_size_granularity(model_config, m_options);
         m_batch_size = utils::pad_to(batch_size, batch_size_granularity);
         if (batch_size == 0) {
-            m_batch_size = utils::auto_gpu_batch_size(model_path, batch_size_granularity,
+            m_batch_size = utils::auto_gpu_batch_size(model_path.string(), batch_size_granularity,
                                                       m_options.device(), memory_limit_fraction);
         }
 
