@@ -48,6 +48,5 @@ int get_mtl_device_core_count();
 int get_apple_cpu_perf_core_count();
 MTL::Buffer *mtl_for_tensor(const torch::Tensor &t);
 MTL::Buffer *extract_mtl_from_tensor(torch::Tensor &t);
-int auto_gpu_batch_size();
 
 }  // namespace dorado::utils

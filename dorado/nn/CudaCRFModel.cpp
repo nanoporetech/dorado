@@ -1,6 +1,8 @@
 #include "CudaCRFModel.h"
 
 #include "decode/GPUDecoder.h"
+#include "utils/cuda_utils.h"
+#include "utils/math_utils.h"
 
 #include <c10/cuda/CUDAGuard.h>
 #include <c10/cuda/CUDAStream.h>
@@ -17,7 +19,8 @@ public:
     CudaCaller(const std::filesystem::path &model_path,
                int chunk_size,
                int batch_size,
-               const std::string &device) {
+               const std::string &device,
+               float memory_limit_fraction) {
         const auto model_config = load_crf_model_config(model_path);
         m_model_stride = static_cast<size_t>(model_config.stride);
 
@@ -26,9 +29,21 @@ public:
         m_decoder_options.q_scale = model_config.qscale;
         m_decoder = std::make_unique<GPUDecoder>();
         m_num_input_features = model_config.num_features;
+        // adjust chunk size to be a multiple of the stride
+        m_out_chunk_size = chunk_size / m_model_stride;
+        m_in_chunk_size = m_out_chunk_size * m_model_stride;
 
         m_options = torch::TensorOptions().dtype(GPUDecoder::dtype).device(device);
-        m_module = load_crf_model(model_path, model_config, batch_size, chunk_size, m_options);
+        assert(m_options.device.is_cuda());
+
+        m_module = load_crf_model(model_path, model_config, m_options);
+
+        int batch_size_granularity = get_batch_size_granularity(model_config, m_options);
+        m_batch_size = utils::pad_to(batch_size, batch_size_granularity);
+        if (batch_size == 0) {
+            m_batch_size = utils::auto_gpu_batch_size(model_path.string(), batch_size_granularity,
+                                                      m_options.device(), memory_limit_fraction);
+        }
 
         m_cuda_thread.reset(new std::thread(&CudaCaller::cuda_thread_fn, this));
     }
@@ -39,6 +54,12 @@ public:
         input_lock.unlock();
         m_input_cv.notify_one();
         m_cuda_thread->join();
+    }
+
+    static int get_batch_size_granularity(const CRFModelConfig &model_config,
+                                          const torch::TensorOptions &options) {
+        // TODO: we may want to use different numbers based on model type and GPU arch
+        return 64;
     }
 
     struct NNTask {
@@ -119,34 +140,30 @@ public:
     std::mutex m_input_lock;
     std::condition_variable m_input_cv;
     std::unique_ptr<std::thread> m_cuda_thread;
-    int m_num_input_features;
+    int m_num_input_features, m_batch_size, m_in_chunk_size, m_out_chunk_size;
 };
 
 std::shared_ptr<CudaCaller> create_cuda_caller(const std::filesystem::path &model_path,
                                                int chunk_size,
                                                int batch_size,
-                                               const std::string &device) {
-    return std::make_shared<CudaCaller>(model_path, chunk_size, batch_size, device);
+                                               const std::string &device,
+                                               float memory_limit_fraction) {
+    return std::make_shared<CudaCaller>(model_path, chunk_size, batch_size, device,
+                                        memory_limit_fraction);
 }
 
-CudaModelRunner::CudaModelRunner(std::shared_ptr<CudaCaller> caller, int chunk_size, int batch_size)
+CudaModelRunner::CudaModelRunner(std::shared_ptr<CudaCaller> caller)
         : m_caller(caller),
           m_stream(c10::cuda::getStreamFromPool(false, m_caller->m_options.device().index())) {
-    // adjust chunk size to be a multiple of the stride
-    chunk_size -= chunk_size % model_stride();
+    auto opts = torch::TensorOptions().device(torch::kCPU).pinned_memory(true);
+    m_input = torch::empty(
+            {caller->m_batch_size, caller->m_num_input_features, caller->m_in_chunk_size},
+            opts.dtype(m_caller->m_options.dtype()));
 
-    m_input = torch::empty({batch_size, caller->m_num_input_features, chunk_size},
-                           torch::TensorOptions()
-                                   .dtype(m_caller->m_options.dtype())
-                                   .device(torch::kCPU)
-                                   .pinned_memory(true));
-
-    long int block_size = chunk_size / model_stride();
-    m_output = torch::empty(
-            {3, batch_size, block_size},
-            torch::TensorOptions().dtype(torch::kInt8).device(torch::kCPU).pinned_memory(true));
+    m_output = torch::empty({3, caller->m_batch_size, caller->m_out_chunk_size},
+                            opts.dtype(torch::kInt8));
     // warm up
-    call_chunks(batch_size);
+    call_chunks(caller->m_batch_size);
 }
 
 void CudaModelRunner::accept_chunk(int chunk_idx, const torch::Tensor &chunk) {
@@ -159,5 +176,6 @@ std::vector<DecodedChunk> CudaModelRunner::call_chunks(int num_chunks) {
 
 size_t CudaModelRunner::model_stride() const { return m_caller->m_model_stride; }
 size_t CudaModelRunner::chunk_size() const { return m_input.size(2); }
+size_t CudaModelRunner::batch_size() const { return m_input.size(0); }
 
 }  // namespace dorado
