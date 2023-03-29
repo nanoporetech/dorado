@@ -9,6 +9,7 @@
 #include "utils/bam_utils.h"
 #include "utils/duplex_utils.h"
 #include "utils/log_utils.h"
+#if DORADO_GPU_BUILD
 #ifdef __APPLE__
 #include "nn/MetalCRFModel.h"
 #include "utils/metal_utils.h"
@@ -16,6 +17,7 @@
 #include "nn/CudaCRFModel.h"
 #include "utils/cuda_utils.h"
 #endif
+#endif  // DORADO_GPU_BUILD
 
 #include "utils/models.h"
 #include "utils/parameters.h"
@@ -130,8 +132,10 @@ int duplex(int argc, char* argv[]) {
                     runners.push_back(std::make_shared<ModelRunner<CPUDecoder>>(
                             model_path, device, chunk_size, batch_size));
                 }
+            }
+#if DORADO_GPU_BUILD
 #ifdef __APPLE__
-            } else if (device == "metal") {
+            else if (device == "metal") {
                 if (batch_size == 0) {
                     batch_size = utils::auto_gpu_batch_size();
                     spdlog::debug("- selected batchsize {}", batch_size);
@@ -155,7 +159,7 @@ int duplex(int argc, char* argv[]) {
                 throw std::runtime_error(std::string("Unsupported device: ") + device);
             }
 #else   // ifdef __APPLE__
-            } else {
+            else {
                 auto devices = utils::parse_cuda_device_string(device);
                 num_devices = devices.size();
                 if (num_devices == 0) {
@@ -185,6 +189,7 @@ int duplex(int argc, char* argv[]) {
                 }
             }
 #endif  // __APPLE__
+#endif  // DORADO_GPU_BUILD
             spdlog::info("> Starting Stereo Duplex pipeline");
 
             std::unique_ptr<BasecallerNode> stereo_basecaller_node;

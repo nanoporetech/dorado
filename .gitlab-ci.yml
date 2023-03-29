@@ -12,10 +12,18 @@ variables:
 
 # Build stage components
 
-.macos_runner: &macos_runner
+.macos_m1_runner: &macos_m1_runner
   tags:
     - macos
     - m1
+  variables:
+    MACOSX_DEPLOYMENT_TARGET: "12.0"
+
+.macos_x64_runner: &macos_x64_runner
+  tags:
+    - osx_x86
+  variables:
+    MACOSX_DEPLOYMENT_TARGET: "10.15"
 
 .linux_runner: &linux_runner
   tags:
@@ -144,13 +152,18 @@ build:windows_koi_download:
 
 build:macos:m1:
   variables:
-  <<: *macos_runner
+  <<: *macos_m1_runner
+  <<: *build_dorado
+
+build:macos:x64:
+  variables:
+  <<: *macos_x64_runner
   <<: *build_dorado
 
 build:ios:m1:
   variables:
     BUILD_OPTIONS: "-DCMAKE_TOOLCHAIN_FILE=cmake/ios-cmake/ios.toolchain.cmake -DPLATFORM=OS64 -DSKIP_HDF_PLUGINS=1 -DDEPLOYMENT_TARGET=16.0"
-  <<: *macos_runner
+  <<: *macos_m1_runner
   <<: *build_dorado_lib_only
 
 build_archive:linux:x86:focal:
@@ -206,7 +219,13 @@ build_archive:windows:
 
 build_archive:macos:m1:
   variables:
-  <<: *macos_runner
+  <<: *macos_m1_runner
+  <<: *build_dorado_archive
+  when: manual
+
+build_archive:macos:x64:
+  variables:
+  <<: *macos_x64_runner
   <<: *build_dorado_archive
   when: manual
 
@@ -261,10 +280,16 @@ test:linux:arm64:focal:
     - build:linux:arm64:focal
 
 test:macos:m1:
-  <<: *macos_runner
+  <<: *macos_m1_runner
   <<: *test_dorado
   needs:
     - build:macos:m1
+
+test:macos:x64:
+  <<: *macos_x64_runner
+  <<: *test_dorado
+  needs:
+    - build:macos:x64
 
 # Test that you can run dorado in a clean cuda 20.04 environment
 test_archive:linux:x86:20.04_nvidia:
@@ -404,4 +429,5 @@ deploy:all:
     - build_archive:linux:arm64:bionic
     - build_archive:linux:arm64:focal
     - build_archive:macos:m1
+    - build_archive:macos:x64
     - build_archive:windows
