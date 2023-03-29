@@ -46,7 +46,7 @@ void setup(std::vector<std::string> args,
            size_t max_reads,
            size_t min_qscore,
            std::string read_list_file_path,
-           bool recurisve_file_loading) {
+           bool recursive_file_loading) {
     torch::set_num_threads(1);
     std::vector<Runner> runners;
 
@@ -151,11 +151,11 @@ void setup(std::vector<std::string> args,
     }
 
     std::string model_name = std::filesystem::canonical(model_path).filename().string();
-    auto read_groups = DataLoader::load_read_groups(data_path, model_name, recurisve_file_loading);
+    auto read_groups = DataLoader::load_read_groups(data_path, model_name, recursive_file_loading);
 
     auto read_list = utils::load_read_list(read_list_file_path);
 
-    size_t num_reads = DataLoader::get_num_reads(data_path, read_list, recurisve_file_loading);
+    size_t num_reads = DataLoader::get_num_reads(data_path, read_list, recursive_file_loading);
     num_reads = max_reads == 0 ? num_reads : std::min(num_reads, max_reads);
 
     bool rna = utils::is_rna_model(model_path), duplex = false;
@@ -181,7 +181,7 @@ void setup(std::vector<std::string> args,
     ScalerNode scaler_node(*basecaller_node, num_devices * 2);
     DataLoader loader(scaler_node, "cpu", num_devices, max_reads, read_list);
 
-    loader.load_reads(data_path, recurisve_file_loading);
+    loader.load_reads(data_path, recursive_file_loading);
 }
 
 int basecaller(int argc, char* argv[]) {
