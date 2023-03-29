@@ -63,7 +63,7 @@ struct DuplexSplitSettings {
     uint64_t expect_adapter_prefix = 200;
     //TAIL_ADAPTER = 'GCAATACGTAACTGAACGAAGT'
     //HEAD_ADAPTER = 'AATGTACTTCGTTCAGTTACGTATTGCT'
-    //clipped 4 letters from the beginningof head adapter! 24 left
+    //clipped 4 letters from the beginning of head adapter! 24 left
     std::string adapter = "TACTTCGTTCAGTTACGTATTGCT";
 };
 
@@ -75,11 +75,14 @@ public:
                     int num_worker_threads = 5, size_t max_reads = 1000);
     ~DuplexSplitNode();
 
-    std::vector<DuplexSplitNode::PosRange> possible_pore_regions(const Read& read);
-    std::vector<PosRange> identify_splits(const Read& read);
-    std::vector<Message> split(const Read& message, const std::vector<PosRange> &interspace_regions);
-
 private:
+    std::vector<DuplexSplitNode::PosRange> possible_pore_regions(const Read& read, float pore_thr, size_t pore_cl_dist);
+    std::vector<PosRange> identify_splits(const Read& read);
+    std::vector<PosRange> identify_splits_check_all(const Read& read);
+    std::optional<DuplexSplitNode::PosRange>
+    identify_extra_middle_split(const Read& read);
+    std::vector<std::shared_ptr<Read>> split(const Read& message, const std::vector<PosRange> &interspace_regions);
+
     void worker_thread();  // Worker thread performs scaling and trimming asynchronously.
     MessageSink& m_sink;  // MessageSink to consume scaled reads.
 
