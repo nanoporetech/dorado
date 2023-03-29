@@ -16,10 +16,14 @@ variables:
   tags:
     - macos
     - m1
+  variables:
+    MACOSX_DEPLOYMENT_TARGET: "12.0"
 
 .macos_x64_runner: &macos_x64_runner
   tags:
     - osx_x86
+  variables:
+    MACOSX_DEPLOYMENT_TARGET: "10.15"
 
 .linux_runner: &linux_runner
   tags:
