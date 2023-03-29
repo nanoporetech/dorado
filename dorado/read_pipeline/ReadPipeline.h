@@ -1,4 +1,5 @@
 #pragma once
+#include "htslib/sam.h"
 #include "utils/AsyncQueue.h"
 
 #include <torch/torch.h>
@@ -95,7 +96,7 @@ public:
 
 // As things stand, the only Message variant is shared_ptr<Read>.  Other Message types
 // can be added here.
-using Message = std::variant<std::shared_ptr<Read>>;
+using Message = std::variant<std::shared_ptr<Read>, bam1_t*>;
 
 // Base class for an object which consumes messages.
 // MessageSink is a node within a pipeline.

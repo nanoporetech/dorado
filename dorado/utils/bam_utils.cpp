@@ -20,18 +20,19 @@ const char seq_nt16_str[] = "=ACMGRSVTWYHKDBN";
 
 namespace dorado::utils {
 
-Aligner::Aligner(const std::string& filename, const int threads) {
-    m_threads = threads;
-
+Aligner::Aligner(MessageSink& sink, const std::string& filename, const int threads)
+        : MessageSink(10000), m_sink(sink), m_threads(threads) {
     mm_set_opt(0, &m_idx_opt, &m_map_opt);
 
     m_idx_opt.k = 19;
     m_idx_opt.w = 19;
     m_idx_opt.flag = 1;
-    m_idx_opt.bucket_bits = 14;
-    m_idx_opt.batch_size = 16000000000;
+    m_idx_opt.batch_size = 4000000000;
+    m_idx_opt.mini_batch_size = 16000000000;
 
     m_map_opt.flag |= MM_F_CIGAR;
+
+    mm_check_opt(&m_idx_opt, &m_map_opt);
 
     m_index_reader = mm_idx_reader_open(filename.c_str(), &m_idx_opt, 0);
     m_index = mm_idx_reader_read(m_index_reader, m_threads);
@@ -44,17 +45,26 @@ Aligner::Aligner(const std::string& filename, const int threads) {
     for (int i = 0; i < m_threads; i++) {
         m_tbufs.push_back(mm_tbuf_init());
     }
+
+    for (size_t i = 0; i < m_threads; i++) {
+        m_workers.push_back(
+                std::make_unique<std::thread>(std::thread(&Aligner::worker_thread, this)));
+    }
 }
 
 Aligner::~Aligner() {
-    mm_idx_destroy(m_index);
+    terminate();
+    for (auto& m : m_workers) {
+        m->join();
+    }
     for (int i = 0; i < m_threads; i++) {
         mm_tbuf_destroy(m_tbufs[i]);
     }
     mm_idx_reader_close(m_index_reader);
+    mm_idx_destroy(m_index);
 }
 
-std::vector<std::pair<char*, uint32_t>> Aligner::get_idx_records() {
+std::vector<std::pair<char*, uint32_t>> Aligner::sq() {
     std::vector<std::pair<char*, uint32_t>> records;
     for (int i = 0; i < m_index->n_seq; ++i) {
         records.push_back(std::make_pair(m_index->seq[i].name, m_index->seq[i].len));
@@ -63,12 +73,26 @@ std::vector<std::pair<char*, uint32_t>> Aligner::get_idx_records() {
 }
 
 std::pair<int, mm_reg1_t*> Aligner::align(const std::vector<char> seq) {
+    m_total++;
     int hits = 0;
     mm_reg1_t* reg = mm_map(m_index, seq.size(), seq.data(), &hits, m_tbufs[0], &m_map_opt, 0);
     return std::make_pair(hits, reg);
 }
 
-std::vector<bam1_t*> Aligner::align(bam1_t* irecord) {
+void Aligner::worker_thread() {
+    Message message;
+    auto buf = m_tbufs[m_total++ % m_threads];
+
+    while (m_work_queue.try_pop(message)) {
+        auto records = align(std::get<bam1_t*>(message), buf);
+        for (auto& record : records) {
+            m_sink.push_message(std::move(record));
+        }
+    }
+    m_sink.terminate();
+}
+
+std::vector<bam1_t*> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
     // some where for the hits
     std::vector<bam1_t*> results;
 
@@ -83,7 +107,7 @@ std::vector<bam1_t*> Aligner::align(bam1_t* irecord) {
 
     // do the mapping
     int hits = 0;
-    mm_reg1_t* reg = mm_map(m_index, seq.size(), seq.data(), &hits, m_tbufs[0], &m_map_opt, 0);
+    mm_reg1_t* reg = mm_map(m_index, seq.size(), seq.data(), &hits, buf, &m_map_opt, 0);
 
     // just return the input record
     if (hits == 0) {
@@ -164,7 +188,7 @@ std::vector<bam1_t*> Aligner::align(bam1_t* irecord) {
     return results;
 }
 
-BamReader::BamReader(const std::string& filename) {
+BamReader::BamReader(MessageSink& sink, const std::string& filename) : m_sink(sink) {
     m_file = hts_open(filename.c_str(), "r");
     if (!m_file) {
         throw std::runtime_error("Could not open file: " + filename);
@@ -185,25 +209,43 @@ BamReader::~BamReader() {
     hts_close(m_file);
 }
 
-bool BamReader::read() { return sam_read1(m_file, m_header, m_record) >= 0; }
+void BamReader::read(int max_reads) {
+    int num_reads = 0;
+    while (sam_read1(m_file, m_header, m_record) >= 0) {
+        m_sink.push_message(std::move(bam_dup1(m_record)));
+        if (++num_reads >= max_reads) {
+            break;
+        }
+    }
+    m_sink.terminate();
+}
 
-BamWriter::BamWriter(const std::string& filename, const sam_hdr_t* header, sq_t seqs) {
+BamWriter::BamWriter(const std::string& filename) : MessageSink(1000) {
     m_file = hts_open(filename.c_str(), "wb");
     if (!m_file) {
         throw std::runtime_error("Could not open file: " + filename);
     }
-    m_header = sam_hdr_dup(header);
-    write_hdr_pg();
-
-    for (auto pair : seqs) {
-        write_hdr_sq(std::get<0>(pair), std::get<1>(pair));
-    }
-    auto res = sam_hdr_write(m_file, m_header);
+    m_worker = std::make_unique<std::thread>(std::thread(&BamWriter::worker_thread, this));
 }
 
 BamWriter::~BamWriter() {
+    terminate();
+    join();
     sam_hdr_destroy(m_header);
     hts_close(m_file);
+}
+
+void BamWriter::worker_thread() {
+    Message message;
+    while (m_work_queue.try_pop(message)) {
+        write(std::get<bam1_t*>(message));
+    }
+}
+
+void BamWriter::join() {
+    if (m_worker->joinable()) {
+        m_worker->join();
+    }
 }
 
 int BamWriter::write(bam1_t* record) {
@@ -221,6 +263,17 @@ int BamWriter::write(bam1_t* record) {
     return sam_write1(m_file, m_header, record);
 }
 
+int BamWriter::write_header(const sam_hdr_t* header, const sq_t seqs) {
+    m_header = sam_hdr_dup(header);
+    write_hdr_pg();
+
+    for (auto pair : seqs) {
+        write_hdr_sq(std::get<0>(pair), std::get<1>(pair));
+    }
+    auto res = sam_hdr_write(m_file, m_header);
+    return res;
+}
+
 int BamWriter::write_hdr_pg() {
     //TODO: add CL Writer node
     return sam_hdr_add_line(m_header, "PG", "ID", "aligner", "PN", "dorado", "VN", DORADO_VERSION,
@@ -231,8 +284,16 @@ int BamWriter::write_hdr_sq(char* name, uint32_t length) {
     return sam_hdr_add_line(m_header, "SQ", "SN", name, "LN", std::to_string(length).c_str(), NULL);
 }
 
+/*
 read_map read_bam(const std::string& filename, const std::set<std::string>& read_ids) {
-    BamReader reader(filename);
+
+    utils::sq_t seq;
+    sam_hdr_t* hdr;
+
+    utils::BamWriter writer("-", hdr, seq);
+
+    BamReader reader(writer, filename);
+
     std::map<std::string, std::shared_ptr<Read>> reads;
 
     while (reader.read()) {
@@ -264,5 +325,6 @@ read_map read_bam(const std::string& filename, const std::set<std::string>& read
 
     return reads;
 }
+*/
 
 }  // namespace dorado::utils

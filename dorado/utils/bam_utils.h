@@ -7,9 +7,72 @@
 #include <set>
 #include <string>
 
-using sq_t = std::vector<std::pair<char*, uint32_t>>;
-
 namespace dorado::utils {
+
+using sq_t = std::vector<std::pair<char*, uint32_t>>;
+using read_map = std::map<std::string, std::shared_ptr<Read>>;
+
+class Aligner : public MessageSink {
+public:
+    Aligner(MessageSink& read_sink, const std::string& filename, int threads);
+    ~Aligner();
+    sq_t sq();
+    std::vector<bam1_t*> align(bam1_t* record, mm_tbuf_t* buf);
+    std::pair<int, mm_reg1_t*> align(const std::vector<char> seq);
+
+private:
+    MessageSink& m_sink;
+    size_t m_threads{1};
+    std::atomic<size_t> m_total{0};
+    std::vector<mm_tbuf_t*> m_tbufs;
+    std::vector<std::unique_ptr<std::thread>> m_workers;
+    void worker_thread();
+
+    mm_idxopt_t m_idx_opt;
+    mm_mapopt_t m_map_opt;
+    mm_idx_t* m_index{nullptr};
+    mm_idx_reader_t* m_index_reader{nullptr};
+};
+
+class BamReader {
+public:
+    BamReader(const std::string& filename);
+    BamReader(MessageSink& read_sink, const std::string& filename);
+    ~BamReader();
+    void read(int max_reads);
+    char* m_format{nullptr};
+    bool m_is_aligned{false};
+    bam1_t* m_record{nullptr};
+    sam_hdr_t* m_header{nullptr};
+
+private:
+    htsFile* m_file{nullptr};
+    MessageSink& m_sink;
+};
+
+class BamWriter : public MessageSink {
+public:
+    BamWriter(const std::string& filename);
+    ~BamWriter();
+    int write_header(const sam_hdr_t* header, const sq_t seqs);
+    int write(bam1_t* record);
+    void join();
+
+    size_t m_total{0};
+    size_t m_primary{0};
+    size_t m_unmapped{0};
+    size_t m_secondary{0};
+    size_t m_supplementary{0};
+
+    sam_hdr_t* m_header{nullptr};
+
+private:
+    htsFile* m_file{nullptr};
+    std::unique_ptr<std::thread> m_worker;
+    void worker_thread();
+    int write_hdr_pg();
+    int write_hdr_sq(char* name, uint32_t length);
+};
 
 /**
  * @brief Reads a SAM/BAM/CRAM file and returns a map of read IDs to Read objects.
@@ -26,51 +89,6 @@ namespace dorado::utils {
  * @note The caller is responsible for managing the memory of the returned map.
  * @note The input BAM file must be properly formatted and readable.
  */
-std::map<std::string, std::shared_ptr<Read>> read_bam(const std::string& filename,
-                                                      const std::set<std::string>& read_ids);
-
-class Aligner {
-public:
-    Aligner(const std::string& filename, int threads);
-    ~Aligner();
-    sq_t get_idx_records();
-    std::vector<bam1_t*> align(bam1_t* record);
-    std::pair<int, mm_reg1_t*> align(const std::vector<char> seq);
-
-private:
-    int m_threads = 1;
-    mm_idxopt_t m_idx_opt;
-    mm_mapopt_t m_map_opt;
-    mm_idx_t* m_index;
-    mm_idx_reader_t* m_index_reader;
-    std::vector<mm_tbuf_t*> m_tbufs;
-};
-
-class BamReader {
-public:
-    BamReader(const std::string& filename);
-    ~BamReader();
-    bool read();
-    char* m_format;
-    bool m_is_aligned;
-    bam1_t* m_record;
-    sam_hdr_t* m_header;
-
-private:
-    htsFile* m_file;
-};
-
-class BamWriter {
-public:
-    BamWriter(const std::string& filename, const sam_hdr_t* header, const sq_t seqs);
-    ~BamWriter();
-    int write(bam1_t* record);
-    sam_hdr_t* m_header;
-
-private:
-    htsFile* m_file;
-    int write_hdr_pg();
-    int write_hdr_sq(char* name, uint32_t length);
-};
+read_map read_bam(const std::string& filename, const std::set<std::string>& read_ids);
 
 }  // namespace dorado::utils
