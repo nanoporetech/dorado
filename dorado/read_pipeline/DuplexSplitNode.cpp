@@ -424,7 +424,9 @@ DuplexSplitNode::possible_pore_regions(const Read& read,
         assert(end_pos > start_pos);
         pore_regions.push_back({start_pos, end_pos});
     }
-    spdlog::info("{} regions to check", pore_regions.size());
+    std::ostringstream oss;
+    std::copy(pore_regions.begin(), pore_regions.end(), std::ostream_iterator<PosRange>(oss, "; "));
+    spdlog::info("{} regions to check: {}", pore_regions.size(), oss.str());
     return pore_regions;
 }
 
@@ -500,6 +502,7 @@ std::vector<DuplexSplitNode::PosRange>
 DuplexSplitNode::identify_splits(const Read& read) {
     spdlog::info("DSN: Searching for splits in read {}", read.read_id);
     spdlog::info("Read length {}", read.seq.size());
+    spdlog::info("trimmed samples {}", read.num_trimmed_samples);
     std::vector<PosRange> interspace_regions;
 
     auto pore_region_candidates = possible_pore_regions(read,
