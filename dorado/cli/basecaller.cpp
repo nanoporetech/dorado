@@ -3,12 +3,14 @@
 #include "decode/CPUDecoder.h"
 #include "utils/basecaller_utils.h"
 #include "utils/models.h"
+#if DORADO_GPU_BUILD
 #ifdef __APPLE__
 #include "nn/MetalCRFModel.h"
 #else
 #include "nn/CudaCRFModel.h"
 #include "utils/cuda_utils.h"
 #endif
+#endif  // DORADO_GPU_BUILD
 #include "nn/ModelRunner.h"
 #include "nn/RemoraModel.h"
 #include "read_pipeline/BasecallerNode.h"
@@ -60,8 +62,10 @@ void setup(std::vector<std::string> args,
             runners.push_back(std::make_shared<ModelRunner<CPUDecoder>>(model_path, device,
                                                                         chunk_size, batch_size));
         }
+    }
+#if DORADO_GPU_BUILD
 #ifdef __APPLE__
-    } else if (device == "metal") {
+    else if (device == "metal") {
         auto caller = create_metal_caller(model_path, chunk_size, batch_size);
         for (size_t i = 0; i < num_runners; i++) {
             runners.push_back(std::make_shared<MetalModelRunner>(caller));
@@ -73,7 +77,7 @@ void setup(std::vector<std::string> args,
         throw std::runtime_error(std::string("Unsupported device: ") + device);
     }
 #else   // ifdef __APPLE__
-    } else {
+    else {
         auto devices = utils::parse_cuda_device_string(device);
         num_devices = devices.size();
         if (num_devices == 0) {
@@ -91,6 +95,7 @@ void setup(std::vector<std::string> args,
         }
     }
 #endif  // __APPLE__
+#endif  // DORADO_GPU_BUILD
 
     // verify that all runners are using the same stride, in case we allow multiple models in future
     auto model_stride = runners.front()->model_stride();
@@ -126,7 +131,7 @@ void setup(std::vector<std::string> args,
     // generate model callers before nodes or it affects the speed calculations
     std::vector<std::shared_ptr<RemoraCaller>> remora_callers;
 
-#ifndef __APPLE__
+#if DORADO_GPU_BUILD && !defined(__APPLE__)
     if (device != "cpu") {
         auto devices = utils::parse_cuda_device_string(device);
         num_devices = devices.size();

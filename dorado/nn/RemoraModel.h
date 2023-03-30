@@ -2,7 +2,7 @@
 
 #include "modbase/remora_scaler.h"
 
-#ifndef __APPLE__
+#if DORADO_GPU_BUILD && !defined(__APPLE__)
 #include <c10/cuda/CUDAStream.h>
 #endif
 #include <torch/torch.h>
@@ -50,7 +50,7 @@ class RemoraCaller {
     torch::TensorOptions m_options;
     torch::Tensor m_input_sigs;
     torch::Tensor m_input_seqs;
-#ifndef __APPLE__
+#if DORADO_GPU_BUILD && !defined(__APPLE__)
     c10::optional<c10::Stream> m_stream;
 #endif
     std::unique_ptr<RemoraScaler> m_scaler;

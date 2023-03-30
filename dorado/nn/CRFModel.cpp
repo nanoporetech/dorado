@@ -3,7 +3,7 @@
 #include "../utils/module_utils.h"
 #include "../utils/tensor_utils.h"
 
-#ifndef __APPLE__
+#if DORADO_GPU_BUILD && !defined(__APPLE__)
 #include "../utils/cuda_utils.h"
 
 #include <ATen/cuda/CUDAContext.h>
