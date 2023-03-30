@@ -372,8 +372,12 @@ private:
         auto stream = at::cuda::getCurrentCUDAStream().stream();
 
         // Cutlass kernel currently requires SM8.0 (A100) or later
+#ifdef DORADO_TX2
+        const bool use_cutlass = false;
+#else
         cudaDeviceProp *prop = at::cuda::getCurrentDeviceProperties();
         const bool use_cutlass = prop->major >= 8;
+#endif
         const bool use_int8 = !g_options_no_i8 && use_cutlass;
 
         torch::Tensor mat_working_mem = in;
@@ -428,9 +432,9 @@ private:
             auto state_buf = torch::zeros({batch_size, layer_size}, opts_f16);
             auto sync_buf = torch::zeros({3}, opts_i32);
             auto weights_cpu = rnn->weights;
+#ifndef DORADO_TX2  // Koi for TX2 does not have Cutlass kernels
             if (use_cutlass) {
                 auto type_id = (layer_idx > convert_to_int8_layer_idx) ? KOI_I8 : KOI_F16;
-                bool use_brf_kernel = (layer_size == 384 && type_id == KOI_I8);
                 if (int(device_weights.size()) == layer_idx) {
                     auto layer_device_bias = rnn->bias.to(opts_f16).view({4, layer_size}).t();
                     if (type_id == KOI_I8) {
@@ -468,13 +472,12 @@ private:
 
                 auto in = (type_id == KOI_I8) ? inout_all_i8 : inout_all_f16;
 
-                if (use_brf_kernel) {
-                    host_cutlass_lstm_brf(stream, type_id, layer_idx, batch_size, layer_size,
-                                          chunk_size, rnn->reverse ? -1 : 1, in.stride(1),
-                                          in.data_ptr(), device_weights[layer_idx].data_ptr(),
-                                          device_bias[layer_idx].data_ptr(),
-                                          device_scale[layer_idx].data_ptr(), state_buf.data_ptr(),
-                                          &m_koi_sync, false);
+                if (layer_size == 384 && type_id == KOI_I8) {
+                    host_cutlass_lstm_384_i8(
+                            stream, layer_idx, batch_size, chunk_size, rnn->reverse ? -1 : 1,
+                            in.stride(1), in.data_ptr(), device_weights[layer_idx].data_ptr(),
+                            device_bias[layer_idx].data_ptr(), device_scale[layer_idx].data_ptr(),
+                            state_buf.data_ptr(), &m_koi_sync, false);
                 } else {
                     host_cutlass_lstm(stream, type_id, layer_idx, batch_size, layer_size,
                                       chunk_size, rnn->reverse ? -1 : 1, in.stride(1),
@@ -493,7 +496,9 @@ private:
                     inout_all_i8.index({chunk_size, Slice(), 0}) = 0;
                     inout_all_i8.index({0, Slice(), 1}) = 0;
                 }
-            } else {
+            } else
+#endif  // ifndef DORADO_TX2
+            {
                 if (int(device_weights.size()) == layer_idx) {
                     device_bias.push_back(rnn->bias.to(in.device()));
                     device_weights.push_back(rnn->weights.t().contiguous().to(in.device()));
