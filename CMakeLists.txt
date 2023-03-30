@@ -54,12 +54,8 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     endif()
 endif()
 
-# This setting of MZ_OPENSSL stops minizip from adding OpenSSL as a target (Instead of OpenSSL::SSL, which is the
-#  static lib), preventing use of a dylib on osx.
-#set(MZ_OPENSSL OFF)
-#set(MZ_WZAES OFF)
-#set(MZ_PKCRYPT OFF)
-set(ELZIP_EXCLUDE_MINIZIP ON)
+# ELZIP_DECOMPRESS_ONLY stops minizip from adding OpenSSL as a target, preventing use of three dylibs on osx.
+set(ELZIP_DECOMPRESS_ONLY ON)
 add_subdirectory(dorado/3rdparty/elzip)
 
 set(BUILD_TESTING OFF)
