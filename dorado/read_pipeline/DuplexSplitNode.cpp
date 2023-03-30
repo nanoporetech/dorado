@@ -27,6 +27,13 @@ std::ostream& operator<<(std::ostream& os, const PosRange& r)
     return os << "[" << r.first << ", " << r.second << "]";
 }
 
+template<class FilterF>
+auto filter_ranges(const PosRanges& ranges, FilterF filter_f) {
+    PosRanges filtered;
+    std::copy_if(ranges.begin(), ranges.end(), std::back_inserter(filtered), filter_f);
+    return filtered;
+}
+
 //FIXME ask if we can have some copy constructor?
 std::shared_ptr<Read> copy_read(const Read &read) {
     auto copy = std::make_shared<Read>();
@@ -281,41 +288,41 @@ std::vector<PosRange> find_adapter_matches(const std::string& adapter,
     return answer;
 }
 
-//first -- pore regions matched with adapters
-//second -- remaining pore regions and 'empty' ranges before unmatched adapters
-std::pair<std::vector<PosRange>, std::vector<PosRange>>
-match_pore_adapter(const std::vector<PosRange>& pore_regions,
-                   const std::vector<PosRange>& adapter_regions,
-                   uint64_t max_dist) {
-    std::vector<PosRange> matched_pore_regions;
-    std::vector<PosRange> extra_potential_splits;
-    const size_t ar_size = adapter_regions.size();
-    size_t ar_idx = 0;
-    uint64_t ar_start;
-    for (auto pore_region : pore_regions) {
-        bool found_match = false;
-        while (ar_idx < ar_size
-            && (ar_start = adapter_regions[ar_idx].first) < pore_region.first) {
-            extra_potential_splits.push_back({ar_start, ar_start});
-            ar_idx++;
-        }
-        assert(ar_idx == ar_size || ar_start == adapter_regions[ar_idx].first);
-        if (ar_idx < ar_size && ar_start < pore_region.second + max_dist) {
-            //match!
-            matched_pore_regions.push_back(pore_region);
-            found_match = true;
-            ar_idx++;
-        }
-        if (!found_match) {
-            extra_potential_splits.push_back(pore_region);
-        }
-    }
-    for (; ar_idx < ar_size; ar_idx++) {
-        ar_start = adapter_regions[ar_idx].first;
-        extra_potential_splits.push_back({ar_start, ar_start});
-    }
-    return {matched_pore_regions, extra_potential_splits};
-}
+////first -- pore regions matched with adapters
+////second -- remaining pore regions and 'empty' ranges before unmatched adapters
+//std::pair<std::vector<PosRange>, std::vector<PosRange>>
+//match_pore_adapter(const std::vector<PosRange>& pore_regions,
+//                   const std::vector<PosRange>& adapter_regions,
+//                   uint64_t max_dist) {
+//    std::vector<PosRange> matched_pore_regions;
+//    std::vector<PosRange> extra_potential_splits;
+//    const size_t ar_size = adapter_regions.size();
+//    size_t ar_idx = 0;
+//    uint64_t ar_start;
+//    for (auto pore_region : pore_regions) {
+//        bool found_match = false;
+//        while (ar_idx < ar_size
+//            && (ar_start = adapter_regions[ar_idx].first) < pore_region.first) {
+//            extra_potential_splits.push_back({ar_start, ar_start});
+//            ar_idx++;
+//        }
+//        assert(ar_idx == ar_size || ar_start == adapter_regions[ar_idx].first);
+//        if (ar_idx < ar_size && ar_start < pore_region.second + max_dist) {
+//            //match!
+//            matched_pore_regions.push_back(pore_region);
+//            found_match = true;
+//            ar_idx++;
+//        }
+//        if (!found_match) {
+//            extra_potential_splits.push_back(pore_region);
+//        }
+//    }
+//    for (; ar_idx < ar_size; ar_idx++) {
+//        ar_start = adapter_regions[ar_idx].first;
+//        extra_potential_splits.push_back({ar_start, ar_start});
+//    }
+//    return {matched_pore_regions, extra_potential_splits};
+//}
 
 //we probably don't need merging actually, just assert if overlap for now
 std::vector<PosRange>
@@ -328,7 +335,7 @@ merge_ranges(std::vector<PosRange>&& pore_regions) {
 
 //semi-global alignment of "template region" to "complement region"
 bool check_rc_match(const std::string& seq, PosRange templ_r, PosRange compl_r, int dist_thr) {
-    assert(templ_r.second > templ_r.first && compl_r.second > compl_r.first);
+    assert(templ_r.second > templ_r.first && compl_r.second > compl_r.first && dist_thr >= 0);
     const char* c_seq = seq.c_str();
     std::vector<char> rc_compl(c_seq + compl_r.first, c_seq + compl_r.second);
     dorado::utils::reverse_complement(rc_compl);
@@ -429,65 +436,96 @@ possible_pore_regions(const Read& read, float pore_thr, size_t pore_cl_dist) {
 
 namespace dorado {
 
-//std::vector<ReadRange>
-std::vector<DuplexSplitNode::PosRange>
-DuplexSplitNode::identify_splits_check_all(const Read& read) {
-    spdlog::info("DSN: Searching for splits checking all (relaxed) conditions in read {}", read.read_id);
-    spdlog::info("Read length {}", read.seq.size());
-    std::vector<PosRange> splits;
+//negative flank_edits disables check
+PosRanges
+DuplexSplitNode::identify_splits_around_pore(const Read& read, float pore_thr,
+                                            int adapter_edist, int flank_edist) {
+    auto filter_f = [&](PosRange r) {
+        return find_best_adapter_match(m_settings.adapter,
+                    read.seq,
+                    /*FIXME relaxed thr*/6,
+                    PosRange{r.second, std::min(r.second + m_settings.pore_adapter_range, (uint64_t) read.seq.size())},
+                    true) && (flank_edist < 0 || check_flank_match(read, r, flank_edist));
+    };
 
-    for (const auto r: possible_pore_regions(read, /*FIXME relaxed thr*/140., 1000)) {
-        spdlog::info("Checking possible pore region [{}, {}]", r.first, r.second);
-        if (r.first >= m_settings.templ_flank
-                && r.second + m_settings.compl_flank <= read.seq.length()
-                && find_best_adapter_match(m_settings.adapter,
-                        read.seq,
-                        /*FIXME relaxed thr*/6,
-                        PosRange{r.second, std::min(r.second + /*FIXME thr*/100, (uint64_t) read.seq.size())},
-                        true)
-                && check_rc_match(read.seq,
-                        {r.first - m_settings.templ_flank, r.first - m_settings.templ_trim},
-                        {r.second, r.second + m_settings.compl_flank},
-                        300 /*FIXME m_settings.flank_edist*/)) {
-            splits.push_back(r);
-        }
-    }
-    return splits;
+    return filter_ranges(possible_pore_regions(read, pore_thr, m_settings.pore_cl_dist), filter_f);
 }
+
+PosRanges
+DuplexSplitNode::identify_splits_around_adapter(const Read& read) {
+    auto filter_f = [&](PosRange r) {
+        return check_flank_match(read, {r.first, r.first}, m_settings.flank_edist);
+    };
+
+    PosRanges filtered;
+
+    spdlog::info("DSN: Finding adapter matches in read {}", read.read_id);
+    return filter_ranges(find_adapter_matches(m_settings.adapter,
+                                                read.seq,
+                                                m_settings.adapter_edist,
+                                                PosRange{m_settings.expect_adapter_prefix, read.seq.size()}),
+                            filter_f);
+}
+
+//r is potential interspace region
+bool
+DuplexSplitNode::check_flank_match(const Read& read, PosRange r, int dist_thr) {
+    return r.first >= m_settings.query_flank
+            && r.second + m_settings.target_flank <= read.seq.length()
+            && check_rc_match(read.seq,
+                    {r.first - m_settings.query_flank, r.first - m_settings.query_trim},
+                    {r.second, r.second + m_settings.target_flank},
+                    dist_thr);
+}
+
+//PosRanges
+//DuplexSplitNode::identify_splits_check_all(const Read& read) {
+//    spdlog::info("DSN: Searching for splits checking all (relaxed) conditions in read {}", read.read_id);
+//    spdlog::info("Read length {}", read.seq.size());
+//    std::vector<PosRange> splits;
+//
+//    for (const auto r: possible_pore_regions(read, /*FIXME relaxed thr*/140., 1000)) {
+//        spdlog::info("Checking possible pore region [{}, {}]", r.first, r.second);
+//        if (r.first >= m_settings.templ_flank
+//                && r.second + m_settings.compl_flank <= read.seq.length()
+//                && find_best_adapter_match(m_settings.adapter,
+//                        read.seq,
+//                        /*FIXME relaxed thr*/6,
+//                        PosRange{r.second, std::min(r.second + /*FIXME thr*/100, (uint64_t) read.seq.size())},
+//                        true)
+//                && check_rc_match(read.seq,
+//                        {r.first - m_settings.templ_flank, r.first - m_settings.templ_trim},
+//                        {r.second, r.second + m_settings.compl_flank},
+//                        300 /*FIXME m_settings.flank_edist*/)) {
+//            splits.push_back(r);
+//        }
+//    }
+//    return splits;
+//}
 
 //std::vector<ReadRange>
 std::optional<DuplexSplitNode::PosRange>
 DuplexSplitNode::identify_extra_middle_split(const Read& read) {
-    spdlog::info("DSN: Searching for extra splits in the middle of read {}", read.read_id);
-    spdlog::info("Read length {}", read.seq.size());
-
-    //TODO parameterize
-    //flank size of region being aligned
-    const auto qflank = 1000;
-    //flank size of region to which we align
-    const auto rflank = 1500;
     const auto adapter_search_span = 1000;
-    const auto adapter_edist = 8;
-    const auto flank_edist = 250;
 
     const auto r_l = read.seq.size();
-    if (r_l < qflank + rflank) {
+    if (r_l < m_settings.query_flank + m_settings.target_flank) {
         return std::nullopt;
     }
 
     spdlog::info("Checking start/end match");
-    if (check_rc_match(read.seq, {r_l - qflank, r_l}, {0, rflank}, flank_edist)) {
+    if (check_rc_match(read.seq, {r_l - m_settings.query_flank, r_l},
+            {0, m_settings.target_flank}, m_settings.relaxed_flank_edist)) {
         spdlog::info("Searching for adapter match");
         if (auto adapter_match = find_best_adapter_match(m_settings.adapter, read.seq,
-                                adapter_edist,
+                                m_settings.relaxed_adapter_edist,
                                 PosRange{r_l / 2 - adapter_search_span / 2, r_l / 2 + adapter_search_span / 2},
                                 true)) {
             auto adapter_start = adapter_match->first;
             spdlog::info("Checking middle match");
-            if (check_rc_match(read.seq,
-                                {adapter_start - qflank, adapter_start},
-                                {adapter_start, adapter_start + rflank},
-                                flank_edist)) {
+            if (check_flank_match(read,
+                                {adapter_start, adapter_start},
+                                m_settings.relaxed_flank_edist)) {
                 return PosRange{adapter_start - 1, adapter_start};
             }
         }
@@ -495,54 +533,54 @@ DuplexSplitNode::identify_extra_middle_split(const Read& read) {
     return std::nullopt;
 }
 
-//empty return means that there is no need to split
-//std::vector<ReadRange>
-std::vector<DuplexSplitNode::PosRange>
-DuplexSplitNode::identify_splits(const Read& read) {
-    spdlog::info("DSN: Searching for splits in read {}", read.read_id);
-    spdlog::info("Read length {}", read.seq.size());
-    spdlog::info("trimmed samples {}", read.num_trimmed_samples);
-    std::vector<PosRange> interspace_regions;
-
-    auto pore_region_candidates = possible_pore_regions(read,
-                                   m_settings.pore_thr,
-                                   m_settings.pore_cl_dist);
-    spdlog::info("DSN: Finding adapter matches in read {}", read.read_id);
-    auto adapter_region_candidates = find_adapter_matches(m_settings.adapter, read.seq,
-                                            m_settings.adapter_edist,
-                                            PosRange{m_settings.expect_adapter_prefix, read.seq.size()});
-
-    auto [definite_splits, extra_regions] =
-                match_pore_adapter(pore_region_candidates,
-                                   adapter_region_candidates,
-                                   m_settings.pore_adapter_gap_thr);
-    auto matched_pore_adapter = definite_splits.size();
-
-    //checking reverse-complement matching for uncertain regions
-    //No need to 'cut' adapter region -- matching complement region
-    // won't be penalized for having extra prefix & suffix in edlib
-    for (auto r : extra_regions) {
-        //TODO maybe handle some of the cases when only short flanks are available (extra min_avail_sequence parameter?)
-        //FIXME any need to adjust for adapter
-        //FIXME should we subtract a portion of tail adapter from the first region too?
-        //TODO might make sense to use actual adapter coordinates when it was found
-        if (r.first >= m_settings.templ_flank
-            && r.second + m_settings.compl_flank <= read.seq.length()
-            && check_rc_match(read.seq,
-                    {r.first - m_settings.templ_flank, r.first - m_settings.templ_trim},
-                    {r.second, r.second + m_settings.compl_flank},
-                    m_settings.flank_edist)) {
-            definite_splits.push_back(r);
-        }
-    }
-    spdlog::info("DSN: Read {} ; pore regions {} ; adapter regions {} ; matched {} ; rc checked {} ; rc check pass {} ; final splits {}",
-                    read.read_id, pore_region_candidates.size(),
-                    adapter_region_candidates.size(), matched_pore_adapter,
-                    extra_regions.size(), definite_splits.size() - matched_pore_adapter,
-                    definite_splits.size());
-    std::sort(definite_splits.begin(), definite_splits.end());
-    return merge_ranges(std::move(definite_splits));
-}
+////empty return means that there is no need to split
+////std::vector<ReadRange>
+//std::vector<DuplexSplitNode::PosRange>
+//DuplexSplitNode::identify_splits(const Read& read) {
+//    spdlog::info("DSN: Searching for splits in read {}", read.read_id);
+//    spdlog::info("Read length {}", read.seq.size());
+//    spdlog::info("trimmed samples {}", read.num_trimmed_samples);
+//    std::vector<PosRange> interspace_regions;
+//
+//    auto pore_region_candidates = possible_pore_regions(read,
+//                                   m_settings.pore_thr,
+//                                   m_settings.pore_cl_dist);
+//    spdlog::info("DSN: Finding adapter matches in read {}", read.read_id);
+//    auto adapter_region_candidates = find_adapter_matches(m_settings.adapter, read.seq,
+//                                            m_settings.adapter_edist,
+//                                            PosRange{m_settings.expect_adapter_prefix, read.seq.size()});
+//
+//    auto [definite_splits, extra_regions] =
+//                match_pore_adapter(pore_region_candidates,
+//                                   adapter_region_candidates,
+//                                   m_settings.pore_adapter_gap_thr);
+//    auto matched_pore_adapter = definite_splits.size();
+//
+//    //checking reverse-complement matching for uncertain regions
+//    //No need to 'cut' adapter region -- matching complement region
+//    // won't be penalized for having extra prefix & suffix in edlib
+//    for (auto r : extra_regions) {
+//        //TODO maybe handle some of the cases when only short flanks are available (extra min_avail_sequence parameter?)
+//        //FIXME any need to adjust for adapter
+//        //FIXME should we subtract a portion of tail adapter from the first region too?
+//        //TODO might make sense to use actual adapter coordinates when it was found
+//        if (r.first >= m_settings.templ_flank
+//            && r.second + m_settings.compl_flank <= read.seq.length()
+//            && check_rc_match(read.seq,
+//                    {r.first - m_settings.templ_flank, r.first - m_settings.templ_trim},
+//                    {r.second, r.second + m_settings.compl_flank},
+//                    m_settings.flank_edist)) {
+//            definite_splits.push_back(r);
+//        }
+//    }
+//    spdlog::info("DSN: Read {} ; pore regions {} ; adapter regions {} ; matched {} ; rc checked {} ; rc check pass {} ; final splits {}",
+//                    read.read_id, pore_region_candidates.size(),
+//                    adapter_region_candidates.size(), matched_pore_adapter,
+//                    extra_regions.size(), definite_splits.size() - matched_pore_adapter,
+//                    definite_splits.size());
+//    std::sort(definite_splits.begin(), definite_splits.end());
+//    return merge_ranges(std::move(definite_splits));
+//}
 
 std::vector<std::shared_ptr<Read>> DuplexSplitNode::split(const Read& read,
                                             const std::vector<PosRange> &interspace_regions) {
@@ -574,30 +612,45 @@ void DuplexSplitNode::worker_thread() {
         // If this message isn't a read, we'll get a bad_variant_access exception.
         const auto& read = *std::get<std::shared_ptr<Read>>(message);
 
+        //FIXME actual recursive splitting
+        //pore-based -> adapter-match-based -> middle adapter based
         std::ostringstream oss;
-        auto interspace_ranges = identify_splits(read);
+        auto interspace_ranges = identify_splits_around_pore(read, m_settings.pore_thr, m_settings.adapter_edist);
         std::copy(interspace_ranges.begin(), interspace_ranges.end(), std::ostream_iterator<PosRange>(oss, "; "));
         for (auto r : interspace_ranges) {
             spdlog::info("BED\t{}\t{}\t{}", read.read_id, r.first, r.second);
         }
-        spdlog::info("DSN: BASE {} splits in read {}: {}", interspace_ranges.size(), read.read_id, oss.str());
+        spdlog::info("DSN: PORE_SIMPLEX {} splits in read {}: {}", interspace_ranges.size(), read.read_id, oss.str());
 
+        interspace_ranges = identify_splits_around_pore(read, m_settings.relaxed_pore_thr,
+                                                             m_settings.relaxed_adapter_edist, m_settings.relaxed_flank_edist);
         oss.str("");
-        auto more_interspace_ranges = identify_splits_check_all(read);
-        std::copy(more_interspace_ranges.begin(), more_interspace_ranges.end(), std::ostream_iterator<PosRange>(oss, "; "));
-        for (auto r : more_interspace_ranges) {
+        std::copy(interspace_ranges.begin(), interspace_ranges.end(), std::ostream_iterator<PosRange>(oss, "; "));
+        for (auto r : interspace_ranges) {
             spdlog::info("BED\t{}\t{}\t{}", read.read_id, r.first, r.second);
         }
-        spdlog::info("DSN: ALL_CHECKS {} splits in read {}: {}", more_interspace_ranges.size(), read.read_id, oss.str());
+        spdlog::info("DSN: PORE_DUPLEX {} splits in read {}: {}", interspace_ranges.size(), read.read_id, oss.str());
+
+        oss.str("");
+        interspace_ranges = identify_splits_around_adapter(read);
+        std::copy(interspace_ranges.begin(), interspace_ranges.end(), std::ostream_iterator<PosRange>(oss, "; "));
+        for (auto r : interspace_ranges) {
+            spdlog::info("BED\t{}\t{}\t{}", read.read_id, r.first, r.second);
+        }
+        spdlog::info("DSN: BASE_ADAPTER {} splits in read {}: {}", interspace_ranges.size(), read.read_id, oss.str());
 
         //FIXME do for subregions!
         oss.str("");
-        std::vector<PosRange> middle_interspace_ranges;
-        if (auto middle_split = identify_extra_middle_split(read)) {
-            middle_interspace_ranges.push_back(*middle_split);
+        interspace_ranges.clear();
+        if (auto split = identify_extra_middle_split(read)) {
+            interspace_ranges.push_back(*split);
         }
-        std::copy(middle_interspace_ranges.begin(), middle_interspace_ranges.end(), std::ostream_iterator<PosRange>(oss, "; "));
-        spdlog::info("DSN: MIDDLE {} splits in read {}: {}", middle_interspace_ranges.size(), read.read_id, oss.str());
+        std::copy(interspace_ranges.begin(), interspace_ranges.end(), std::ostream_iterator<PosRange>(oss, "; "));
+        for (auto r : interspace_ranges) {
+            spdlog::info("BED\t{}\t{}\t{}", read.read_id, r.first, r.second);
+        }
+        spdlog::info("DSN: MIDDLE_ADAPTER {} splits in read {}: {}", interspace_ranges.size(), read.read_id, oss.str());
+
         //if (interspace_ranges.empty()) {
         //    m_sink.push_message(message);
         //} else {

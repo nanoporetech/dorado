@@ -49,16 +49,23 @@ II. Adapter-aware mode
 struct DuplexSplitSettings {
     float pore_thr = 160.;
     size_t pore_cl_dist = 1000;
-    size_t templ_flank = 1100;
-    //trim potentially erroneous (and/or PCR adapter) bases at end of template
-    size_t templ_trim = 100;
-    //adjusted to adapter presense and potential loss of bases on template, leading to 'shift'
-    size_t compl_flank = 1200;
+    float relaxed_pore_thr = 140.;
+    //usually template read region to the left of potential interspace region
+    //FIXME rename to end_flank?!!
+    size_t query_flank = 1100;
+    //trim potentially erroneous (and/or PCR adapter) bases at end of query
+    size_t query_trim = 100;
+    //adjusted to adapter presense and potential loss of bases on query, leading to 'shift'
+    //FIXME rename to start_flank?!!
+    size_t target_flank = 1200;
     //FIXME should probably be fractional
     //currently has to account for the adapter
     int flank_edist = 150;
-    uint8_t adapter_edist = 3; //TODO figure out good threshold. 3 seems ok for hac/sup, but can probably relax
-    uint8_t pore_adapter_gap_thr = 30; //bp TODO figure out good threshold
+    //FIXME do we need both of them?
+    int relaxed_flank_edist = 250;
+    int adapter_edist = 3; //TODO figure out good threshold. 3 seems ok for hac/sup, but can probably relax
+    int relaxed_adapter_edist = 7;
+    uint64_t pore_adapter_range = 100; //bp TODO figure out good threshold
     //TODO don't need if we have more efficient adapter detection
     uint64_t expect_adapter_prefix = 200;
     //TAIL_ADAPTER = 'GCAATACGTAACTGAACGAAGT'
@@ -76,8 +83,9 @@ public:
     ~DuplexSplitNode();
 
 private:
-    std::vector<PosRange> identify_splits(const Read& read);
-    std::vector<PosRange> identify_splits_check_all(const Read& read);
+    bool check_flank_match(const Read& read, PosRange r, int dist_thr);
+    std::vector<PosRange> identify_splits_around_adapter(const Read& read);
+    std::vector<PosRange> identify_splits_around_pore(const Read& read, float pore_thr, int adapter_edist, int flank_edist = -1);
     std::optional<PosRange> identify_extra_middle_split(const Read& read);
     std::vector<std::shared_ptr<Read>> split(const Read& message, const std::vector<PosRange> &interspace_regions);
 
