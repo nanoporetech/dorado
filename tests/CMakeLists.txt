@@ -13,14 +13,16 @@ set(SOURCE_FILES
     StereoDuplexTest.cpp
 )
 
-if(APPLE)
-    list(APPEND SOURCE_FILES
-        MetalLinearTest.cpp
-    )
-else()
-    list(APPEND SOURCE_FILES
-        cuda_utils_test.cpp
-    )
+if (DORADO_GPU_BUILD)
+    if(APPLE)
+        list(APPEND SOURCE_FILES
+            MetalLinearTest.cpp
+        )
+    else()
+        list(APPEND SOURCE_FILES
+            cuda_utils_test.cpp
+        )
+    endif()
 endif()
 
 add_executable(dorado_tests ${SOURCE_FILES})
