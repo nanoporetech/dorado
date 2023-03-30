@@ -55,7 +55,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
 endif()
 
 # ELZIP_DECOMPRESS_ONLY stops minizip from adding OpenSSL as a target, preventing use of three dylibs on osx.
-#set(ELZIP_DECOMPRESS_ONLY ON)
+set(ELZIP_DECOMPRESS_ONLY ON)
 add_subdirectory(dorado/3rdparty/elzip)
 
 set(BUILD_TESTING OFF)
@@ -345,6 +345,12 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
        ${HDF5_C_LIBRARIES}
        ${CMAKE_DL_LIBS}
     )
+
+    if(WIN32)
+        target_link_libraries(dorado_io_lib
+           ${ZLIB_LIBRARIES}
+        )
+    endif()
 
     set_target_properties(dorado_io_lib
         PROPERTIES
