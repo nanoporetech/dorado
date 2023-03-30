@@ -55,7 +55,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
 endif()
 
 # ELZIP_DECOMPRESS_ONLY stops minizip from adding OpenSSL as a target, preventing use of three dylibs on osx.
-set(ELZIP_DECOMPRESS_ONLY ON)
+#set(ELZIP_DECOMPRESS_ONLY ON)
 add_subdirectory(dorado/3rdparty/elzip)
 
 set(BUILD_TESTING OFF)
