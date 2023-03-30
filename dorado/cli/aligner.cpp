@@ -6,9 +6,11 @@
 #include <argparse.hpp>
 #include <spdlog/spdlog.h>
 
+#include <chrono>
 #include <string>
 #include <thread>
 #include <vector>
+using namespace std::chrono_literals;
 
 #ifndef _WIN32
 #include <unistd.h>
@@ -72,7 +74,11 @@ int aligner(int argc, char* argv[]) {
 
     spdlog::info("> starting alignment");
     reader.read(max_reads);
-    writer.join();
+
+    //while (!writer.finished()) {
+    //   std::this_thread::sleep_for(100ms);
+    //}
+
     spdlog::info("> finished alignment");
     spdlog::info("> total/primary/unmapped {}/{}/{}", writer.m_total, writer.m_primary,
                  writer.m_unmapped);

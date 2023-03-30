@@ -57,6 +57,7 @@ Aligner::~Aligner() {
     for (auto& m : m_workers) {
         m->join();
     }
+    m_sink.terminate();
     for (int i = 0; i < m_threads; i++) {
         mm_tbuf_destroy(m_tbufs[i]);
     }
@@ -89,7 +90,6 @@ void Aligner::worker_thread() {
             m_sink.push_message(std::move(record));
         }
     }
-    m_sink.terminate();
 }
 
 std::vector<bam1_t*> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
@@ -153,7 +153,7 @@ std::vector<bam1_t*> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
             int cigar_size = record->core.n_cigar * sizeof(uint32_t);
             uint8_t* data = (uint8_t*)realloc(record->data, record->l_data + cigar_size);
 
-            // Shift existing data to make room for the new cigar field
+            // shift existing data to make room for the new cigar field
             memmove(data + record->core.l_qname + cigar_size, data + record->core.l_qname,
                     record->l_data - record->core.l_qname);
 
@@ -174,11 +174,11 @@ std::vector<bam1_t*> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
                 memcpy(bam_get_cigar(record) + offset + a->p->n_cigar, &clip, sizeof(uint32_t));
             }
 
-            // Update the data length
+            // update the data length
             record->l_data += cigar_size;
 
-            //TODO: m_data size
-            //TODO: extra tags (NM)
+            // todo: m_data size
+            // todo: extra tags (NM)
         }
         free(a->p);
         results.push_back(record);
@@ -203,6 +203,7 @@ BamReader::BamReader(MessageSink& sink, const std::string& filename) : m_sink(si
 }
 
 BamReader::~BamReader() {
+    m_sink.terminate();
     free(m_format);
     sam_hdr_destroy(m_header);
     bam_destroy1(m_record);
@@ -217,7 +218,6 @@ void BamReader::read(int max_reads) {
             break;
         }
     }
-    m_sink.terminate();
 }
 
 BamWriter::BamWriter(const std::string& filename) : MessageSink(1000) {
@@ -230,21 +230,18 @@ BamWriter::BamWriter(const std::string& filename) : MessageSink(1000) {
 
 BamWriter::~BamWriter() {
     terminate();
-    join();
+    m_worker->join();
     sam_hdr_destroy(m_header);
     hts_close(m_file);
+    std::cerr << m_primary << "/" << m_unmapped << std::endl;
 }
+
+bool BamWriter::finished() { return !m_worker->joinable(); }
 
 void BamWriter::worker_thread() {
     Message message;
     while (m_work_queue.try_pop(message)) {
         write(std::get<bam1_t*>(message));
-    }
-}
-
-void BamWriter::join() {
-    if (m_worker->joinable()) {
-        m_worker->join();
     }
 }
 
@@ -266,7 +263,6 @@ int BamWriter::write(bam1_t* record) {
 int BamWriter::write_header(const sam_hdr_t* header, const sq_t seqs) {
     m_header = sam_hdr_dup(header);
     write_hdr_pg();
-
     for (auto pair : seqs) {
         write_hdr_sq(std::get<0>(pair), std::get<1>(pair));
     }
@@ -275,7 +271,7 @@ int BamWriter::write_header(const sam_hdr_t* header, const sq_t seqs) {
 }
 
 int BamWriter::write_hdr_pg() {
-    //TODO: add CL Writer node
+    // todo: add CL Writer node
     return sam_hdr_add_line(m_header, "PG", "ID", "aligner", "PN", "dorado", "VN", DORADO_VERSION,
                             "DS", MM_VERSION, NULL);
 }

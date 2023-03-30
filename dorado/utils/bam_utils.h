@@ -56,7 +56,7 @@ public:
     ~BamWriter();
     int write_header(const sam_hdr_t* header, const sq_t seqs);
     int write(bam1_t* record);
-    void join();
+    bool finished();
 
     size_t m_total{0};
     size_t m_primary{0};
