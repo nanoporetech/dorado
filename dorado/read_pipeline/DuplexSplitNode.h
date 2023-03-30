@@ -76,11 +76,9 @@ public:
     ~DuplexSplitNode();
 
 private:
-    std::vector<DuplexSplitNode::PosRange> possible_pore_regions(const Read& read, float pore_thr, size_t pore_cl_dist);
     std::vector<PosRange> identify_splits(const Read& read);
     std::vector<PosRange> identify_splits_check_all(const Read& read);
-    std::optional<DuplexSplitNode::PosRange>
-    identify_extra_middle_split(const Read& read);
+    std::optional<PosRange> identify_extra_middle_split(const Read& read);
     std::vector<std::shared_ptr<Read>> split(const Read& message, const std::vector<PosRange> &interspace_regions);
 
     void worker_thread();  // Worker thread performs scaling and trimming asynchronously.

@@ -20,6 +20,7 @@ namespace {
 using namespace dorado;
 
 typedef DuplexSplitNode::PosRange PosRange;
+typedef std::vector<PosRange> PosRanges;
 
 std::ostream& operator<<(std::ostream& os, const PosRange& r)
 {
@@ -388,15 +389,9 @@ std::shared_ptr<Read> subread(const Read& read, PosRange seq_range, PosRange sig
     return subread;
 }
 
-}
-
-namespace dorado {
-
-std::vector<DuplexSplitNode::PosRange>
-DuplexSplitNode::possible_pore_regions(const Read& read,
-                                       float pore_thr,
-                                       size_t pore_cl_dist) {
-    std::vector<DuplexSplitNode::PosRange> pore_regions;
+PosRanges
+possible_pore_regions(const Read& read, float pore_thr, size_t pore_cl_dist) {
+    PosRanges pore_regions;
 
     const auto move_sums = move_cum_sums(read.moves);
     assert(move_sums.back() == read.seq.length());
@@ -429,6 +424,10 @@ DuplexSplitNode::possible_pore_regions(const Read& read,
     spdlog::info("{} regions to check: {}", pore_regions.size(), oss.str());
     return pore_regions;
 }
+
+}
+
+namespace dorado {
 
 //std::vector<ReadRange>
 std::vector<DuplexSplitNode::PosRange>
