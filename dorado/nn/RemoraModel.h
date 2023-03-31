@@ -2,7 +2,7 @@
 
 #include "modbase/remora_scaler.h"
 
-#ifndef __APPLE__
+#if DORADO_GPU_BUILD && !defined(__APPLE__)
 #include <c10/cuda/CUDAStream.h>
 #endif
 #include <torch/torch.h>
@@ -41,6 +41,8 @@ struct BaseModParams {
     size_t refine_kmer_len;                 ///< Length of the kmers for the specified kmer_levels
     size_t refine_kmer_center_idx;  ///< The position in the kmer at which to check the levels
     bool refine_do_rough_rescale;   ///< Whether to perform rough rescaling
+
+    void parse(std::filesystem::path const& model_path, bool all_members = true);
 };
 
 class RemoraCaller {
@@ -48,7 +50,7 @@ class RemoraCaller {
     torch::TensorOptions m_options;
     torch::Tensor m_input_sigs;
     torch::Tensor m_input_seqs;
-#ifndef __APPLE__
+#if DORADO_GPU_BUILD && !defined(__APPLE__)
     c10::optional<c10::Stream> m_stream;
 #endif
     std::unique_ptr<RemoraScaler> m_scaler;
@@ -61,6 +63,7 @@ public:
                  const std::string& device,
                  int batch_size,
                  size_t block_stride);
+
     const BaseModParams& params() const { return m_params; }
 
     torch::Tensor scale_signal(torch::Tensor signal,

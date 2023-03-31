@@ -259,6 +259,52 @@ ModuleHolder<AnyModule> load_remora_model(const std::filesystem::path& model_pat
     throw std::runtime_error("Unknown model type in config file.");
 }
 
+void BaseModParams::parse(std::filesystem::path const& model_path, bool all_members) {
+    auto config = toml::parse(model_path / "config.toml");
+    const auto& params = toml::find(config, "modbases");
+    motif = toml::find<std::string>(params, "motif");
+    motif_offset = toml::find<int>(params, "motif_offset");
+
+    mod_bases = toml::find<std::string>(params, "mod_bases");
+    for (size_t i = 0; i < mod_bases.size(); ++i) {
+        mod_long_names.push_back(
+                toml::find<std::string>(params, "mod_long_names_" + std::to_string(i)));
+    }
+
+    if (!all_members)
+        return;
+
+    base_mod_count = mod_long_names.size();
+
+    context_before = toml::find<int>(params, "chunk_context_0");
+    context_after = toml::find<int>(params, "chunk_context_1");
+    bases_before = toml::find<int>(params, "kmer_context_bases_0");
+    bases_after = toml::find<int>(params, "kmer_context_bases_1");
+    offset = toml::find<int>(params, "offset");
+
+    try {
+        // these may not exist if we convert older models
+        const auto& refinement_params = toml::find(config, "refinement");
+        refine_do_rough_rescale =
+                (toml::find<int>(refinement_params, "refine_do_rough_rescale") == 1);
+        if (refine_do_rough_rescale) {
+            refine_kmer_center_idx = toml::find<int>(refinement_params, "refine_kmer_center_idx");
+
+            auto kmer_levels_tensor =
+                    utils::load_tensors(model_path, {"refine_kmer_levels.tensor"})[0].contiguous();
+            std::copy(kmer_levels_tensor.data_ptr<float>(),
+                      kmer_levels_tensor.data_ptr<float>() + kmer_levels_tensor.numel(),
+                      std::back_inserter(refine_kmer_levels));
+            refine_kmer_len = static_cast<size_t>(
+                    std::round(std::log(refine_kmer_levels.size()) / std::log(4)));
+        }
+
+    } catch (const std::out_of_range& ex) {
+        // no refinement parameters
+        refine_do_rough_rescale = false;
+    }
+}
+
 RemoraCaller::RemoraCaller(const std::filesystem::path& model_path,
                            const std::string& device,
                            int batch_size,
@@ -278,47 +324,7 @@ RemoraCaller::RemoraCaller(const std::filesystem::path& model_path,
     }
 #endif
     m_module = load_remora_model(model_path, m_options);
-
-    auto config = toml::parse(model_path / "config.toml");
-    const auto& params = toml::find(config, "modbases");
-    m_params.motif = toml::find<std::string>(params, "motif");
-    m_params.motif_offset = toml::find<int>(params, "motif_offset");
-
-    m_params.mod_bases = toml::find<std::string>(params, "mod_bases");
-    for (size_t i = 0; i < m_params.mod_bases.size(); ++i) {
-        m_params.mod_long_names.push_back(
-                toml::find<std::string>(params, "mod_long_names_" + std::to_string(i)));
-    }
-    m_params.base_mod_count = m_params.mod_long_names.size();
-
-    m_params.context_before = toml::find<int>(params, "chunk_context_0");
-    m_params.context_after = toml::find<int>(params, "chunk_context_1");
-    m_params.bases_before = toml::find<int>(params, "kmer_context_bases_0");
-    m_params.bases_after = toml::find<int>(params, "kmer_context_bases_1");
-    m_params.offset = toml::find<int>(params, "offset");
-
-    try {
-        // these may not exist if we convert older models
-        const auto& refinement_params = toml::find(config, "refinement");
-        m_params.refine_do_rough_rescale =
-                (toml::find<int>(refinement_params, "refine_do_rough_rescale") == 1);
-        if (m_params.refine_do_rough_rescale) {
-            m_params.refine_kmer_center_idx =
-                    toml::find<int>(refinement_params, "refine_kmer_center_idx");
-
-            auto kmer_levels_tensor =
-                    utils::load_tensors(model_path, {"refine_kmer_levels.tensor"})[0].contiguous();
-            std::copy(kmer_levels_tensor.data_ptr<float>(),
-                      kmer_levels_tensor.data_ptr<float>() + kmer_levels_tensor.numel(),
-                      std::back_inserter(m_params.refine_kmer_levels));
-            m_params.refine_kmer_len = static_cast<size_t>(
-                    std::round(std::log(m_params.refine_kmer_levels.size()) / std::log(4)));
-        }
-
-    } catch (const std::out_of_range& ex) {
-        // no refinement parameters
-        m_params.refine_do_rough_rescale = false;
-    }
+    m_params.parse(model_path);
 
     auto sig_len = static_cast<int64_t>(m_params.context_before + m_params.context_after);
     auto kmer_len = m_params.bases_after + m_params.bases_before + 1;
