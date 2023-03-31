@@ -143,9 +143,10 @@ std::string derive_uuid(const std::string& input_uuid, const std::string& desc) 
 
 std::vector<std::pair<size_t, size_t>> detect_pore_signal(torch::Tensor pa_signal,
                                                           float threshold,
-                                                          size_t cluster_dist) {
-
-    spdlog::info("Max raw signal {} pA", pa_signal.index({torch::indexing::Slice(1000, torch::indexing::None)}).max().item<float>());
+                                                          size_t cluster_dist,
+                                                          size_t ignore_prefix) {
+    //FIXME remove
+    spdlog::info("Max raw signal {} pA", pa_signal.index({torch::indexing::Slice(ignore_prefix, torch::indexing::None)}).max().item<float>());
 
     std::vector<std::pair<size_t, size_t>> ans;
     //FIXME what type to use here?
@@ -153,7 +154,7 @@ std::vector<std::pair<size_t, size_t>> detect_pore_signal(torch::Tensor pa_signa
     size_t start = 0;
     size_t end = 0;
 
-    for (size_t i = 0; i < pore_a.size(0); i++) {
+    for (size_t i = ignore_prefix; i < pore_a.size(0); i++) {
         if (pore_a[i] > threshold) {
             if (end == 0 || i > end + cluster_dist) {
                 if (end > 0) {
@@ -391,8 +392,12 @@ std::shared_ptr<Read> subread(const Read& read, PosRange seq_range, PosRange sig
     return subread;
 }
 
+}
+
+namespace dorado {
+
 PosRanges
-possible_pore_regions(const Read& read, float pore_thr, size_t pore_cl_dist) {
+DuplexSplitNode::possible_pore_regions(const Read& read, float pore_thr) const {
     PosRanges pore_regions;
 
     const auto move_sums = move_cum_sums(read.moves);
@@ -406,7 +411,8 @@ possible_pore_regions(const Read& read, float pore_thr, size_t pore_cl_dist) {
     for (auto pore_signal_region : detect_pore_signal(
                                    read.raw_data.to(torch::kFloat) * read.scale + read.shift,
                                    pore_thr,
-                                   pore_cl_dist)) {
+                                   m_settings.pore_cl_dist,
+                                   m_settings.expect_pore_prefix)) {
         auto move_start = pore_signal_region.first / read.model_stride;
         auto move_end = pore_signal_region.second / read.model_stride;
         assert(move_end >= move_start);
@@ -427,44 +433,18 @@ possible_pore_regions(const Read& read, float pore_thr, size_t pore_cl_dist) {
     return pore_regions;
 }
 
-}
-
-namespace dorado {
-
-//negative flank_edits disables check
-PosRanges
-DuplexSplitNode::identify_splits_around_pore(const Read& read, float pore_thr,
-                                            int adapter_edist, int flank_edist) {
-    auto filter_f = [&](PosRange r) {
-        return find_best_adapter_match(m_settings.adapter,
-                    read.seq,
-                    adapter_edist,
-                    PosRange{r.second, std::min(r.second + m_settings.pore_adapter_range, (uint64_t) read.seq.size())},
-                    true) && (flank_edist < 0 || check_flank_match(read, r, flank_edist));
-    };
-
-    return filter_ranges(possible_pore_regions(read, pore_thr, m_settings.pore_cl_dist), filter_f);
-}
-
-PosRanges
-DuplexSplitNode::identify_splits_around_adapter(const Read& read) {
-    auto filter_f = [&](PosRange r) {
-        return check_flank_match(read, {r.first, r.first}, m_settings.flank_edist);
-    };
-
-    PosRanges filtered;
-
-    spdlog::info("DSN: Finding adapter matches in read {}", read.read_id);
-    return filter_ranges(find_adapter_matches(m_settings.adapter,
-                                                read.seq,
-                                                m_settings.adapter_edist,
-                                                PosRange{m_settings.expect_adapter_prefix, read.seq.size()}),
-                            filter_f);
+bool
+DuplexSplitNode::check_nearby_adapter(const Read& read, PosRange r, int adapter_edist) const {
+    return find_best_adapter_match(m_settings.adapter,
+                read.seq,
+                adapter_edist,
+                PosRange{r.second, std::min(r.second + m_settings.pore_adapter_range, (uint64_t) read.seq.size())},
+                true).has_value();
 }
 
 //r is potential interspace region
 bool
-DuplexSplitNode::check_flank_match(const Read& read, PosRange r, int dist_thr) {
+DuplexSplitNode::check_flank_match(const Read& read, PosRange r, int dist_thr) const {
     return r.first >= m_settings.query_flank
             && r.second + m_settings.target_flank <= read.seq.length()
             && check_rc_match(read.seq,
@@ -473,34 +453,10 @@ DuplexSplitNode::check_flank_match(const Read& read, PosRange r, int dist_thr) {
                     dist_thr);
 }
 
-//PosRanges
-//DuplexSplitNode::identify_splits_check_all(const Read& read) {
-//    spdlog::info("DSN: Searching for splits checking all (relaxed) conditions in read {}", read.read_id);
-//    spdlog::info("Read length {}", read.seq.size());
-//    std::vector<PosRange> splits;
-//
-//    for (const auto r: possible_pore_regions(read, /*FIXME relaxed thr*/140., 1000)) {
-//        spdlog::info("Checking possible pore region [{}, {}]", r.first, r.second);
-//        if (r.first >= m_settings.templ_flank
-//                && r.second + m_settings.compl_flank <= read.seq.length()
-//                && find_best_adapter_match(m_settings.adapter,
-//                        read.seq,
-//                        /*FIXME relaxed thr*/6,
-//                        PosRange{r.second, std::min(r.second + /*FIXME thr*/100, (uint64_t) read.seq.size())},
-//                        true)
-//                && check_rc_match(read.seq,
-//                        {r.first - m_settings.templ_flank, r.first - m_settings.templ_trim},
-//                        {r.second, r.second + m_settings.compl_flank},
-//                        300 /*FIXME m_settings.flank_edist*/)) {
-//            splits.push_back(r);
-//        }
-//    }
-//    return splits;
-//}
-
 //std::vector<ReadRange>
 std::optional<DuplexSplitNode::PosRange>
-DuplexSplitNode::identify_extra_middle_split(const Read& read) {
+DuplexSplitNode::identify_extra_middle_split(const Read& read) const {
+    //FIXME parameterize
     const auto adapter_search_span = 1000;
 
     const auto r_l = read.seq.size();
@@ -577,8 +533,8 @@ DuplexSplitNode::identify_extra_middle_split(const Read& read) {
 //    return merge_ranges(std::move(definite_splits));
 //}
 
-std::vector<std::shared_ptr<Read>> DuplexSplitNode::split(const Read& read,
-                                            const std::vector<PosRange> &interspace_regions) {
+std::vector<std::shared_ptr<Read>>
+DuplexSplitNode::split(const Read& read, const std::vector<PosRange> &interspace_regions) const {
     assert(!interspace_regions.empty());
     std::vector<std::shared_ptr<Read>> ans;
     ans.reserve(interspace_regions.size() + 1);
@@ -606,33 +562,65 @@ void DuplexSplitNode::worker_thread() {
     while (m_work_queue.try_pop(message)) {
         // If this message isn't a read, we'll get a bad_variant_access exception.
         const auto& read = *std::get<std::shared_ptr<Read>>(message);
+        spdlog::info("Processing read {}; length {}", read.read_id, read.seq.size());
 
         //FIXME actual recursive splitting
         //pore-based -> adapter-match-based -> middle adapter based
+        auto interspace_ranges = filter_ranges(
+            possible_pore_regions(read, m_settings.pore_thr),
+            [&](PosRange r) {
+                return check_nearby_adapter(read, r, m_settings.adapter_edist);
+            });
+
         std::ostringstream oss;
-        auto interspace_ranges = identify_splits_around_pore(read, m_settings.pore_thr, m_settings.adapter_edist);
         std::copy(interspace_ranges.begin(), interspace_ranges.end(), std::ostream_iterator<PosRange>(oss, "; "));
         for (auto r : interspace_ranges) {
             spdlog::info("BED\t{}\t{}\t{}", read.read_id, r.first, r.second);
         }
-        spdlog::info("DSN: PORE_SIMPLEX {} splits in read {}: {}", interspace_ranges.size(), read.read_id, oss.str());
+        spdlog::info("DSN: PORE_ADAPTER {} splits in read {}: {}", interspace_ranges.size(), read.read_id, oss.str());
 
-        interspace_ranges = identify_splits_around_pore(read, m_settings.relaxed_pore_thr,
-                                                             m_settings.relaxed_adapter_edist, m_settings.relaxed_flank_edist);
+        interspace_ranges = filter_ranges(
+            possible_pore_regions(read, m_settings.pore_thr),
+            [&](PosRange r) {
+                return check_flank_match(read, r, m_settings.flank_edist);
+            });
         oss.str("");
         std::copy(interspace_ranges.begin(), interspace_ranges.end(), std::ostream_iterator<PosRange>(oss, "; "));
         for (auto r : interspace_ranges) {
             spdlog::info("BED\t{}\t{}\t{}", read.read_id, r.first, r.second);
         }
-        spdlog::info("DSN: PORE_DUPLEX {} splits in read {}: {}", interspace_ranges.size(), read.read_id, oss.str());
+        spdlog::info("DSN: PORE_FLANK {} splits in read {}: {}", interspace_ranges.size(), read.read_id, oss.str());
+
+        interspace_ranges = filter_ranges(
+            possible_pore_regions(read, m_settings.relaxed_pore_thr),
+            [&](PosRange r) {
+                return check_nearby_adapter(read, r, m_settings.relaxed_adapter_edist)
+                        && check_flank_match(read, r, m_settings.relaxed_flank_edist);
+            });
 
         oss.str("");
-        interspace_ranges = identify_splits_around_adapter(read);
         std::copy(interspace_ranges.begin(), interspace_ranges.end(), std::ostream_iterator<PosRange>(oss, "; "));
         for (auto r : interspace_ranges) {
             spdlog::info("BED\t{}\t{}\t{}", read.read_id, r.first, r.second);
         }
-        spdlog::info("DSN: BASE_ADAPTER {} splits in read {}: {}", interspace_ranges.size(), read.read_id, oss.str());
+        spdlog::info("DSN: PORE_ALL {} splits in read {}: {}", interspace_ranges.size(), read.read_id, oss.str());
+
+        //spdlog::info("DSN: Finding adapter matches in read {}", read.read_id);
+        oss.str("");
+        interspace_ranges = filter_ranges(
+            find_adapter_matches(m_settings.adapter,
+                                read.seq,
+                                m_settings.adapter_edist,
+                                PosRange{m_settings.expect_adapter_prefix, read.seq.size()}),
+            [&](PosRange r) {
+                return check_flank_match(read, {r.first, r.first}, m_settings.flank_edist);
+            });
+
+        std::copy(interspace_ranges.begin(), interspace_ranges.end(), std::ostream_iterator<PosRange>(oss, "; "));
+        for (auto r : interspace_ranges) {
+            spdlog::info("BED\t{}\t{}\t{}", read.read_id, r.first, r.second);
+        }
+        spdlog::info("DSN: ADAPTER_FLANK {} splits in read {}: {}", interspace_ranges.size(), read.read_id, oss.str());
 
         //FIXME do for subregions!
         oss.str("");
@@ -644,7 +632,7 @@ void DuplexSplitNode::worker_thread() {
         for (auto r : interspace_ranges) {
             spdlog::info("BED\t{}\t{}\t{}", read.read_id, r.first, r.second);
         }
-        spdlog::info("DSN: MIDDLE_ADAPTER {} splits in read {}: {}", interspace_ranges.size(), read.read_id, oss.str());
+        spdlog::info("DSN: ADAPTER_MIDDLE {} splits in read {}: {}", interspace_ranges.size(), read.read_id, oss.str());
 
         //if (interspace_ranges.empty()) {
         //    m_sink.push_message(message);
