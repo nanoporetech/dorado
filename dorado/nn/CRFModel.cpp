@@ -411,7 +411,11 @@ private:
             inout_all_f16 = in.view({chunk_size + 1, batch_size, -1});
             inout_left_f16 = in.slice(0, 0, chunk_size).select(2, 0);
             inout_right_f16 = in.slice(0, 1, chunk_size + 1).select(2, 1);
+#if TORCH_VERSION_MAJOR < 2
+            inout_all_i8 = in.select(2, 0).to(torch::kInt8);
+#else
             inout_all_i8 = in.select(2, 0).view(torch::kInt8);
+#endif
             inout_left_i8 = inout_all_i8.slice(0, 0, chunk_size).slice(2, 0, layer_size);
             inout_right_i8 =
                     inout_all_i8.slice(0, 1, chunk_size + 1).slice(2, layer_size, 2 * layer_size);
