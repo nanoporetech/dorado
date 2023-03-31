@@ -38,6 +38,8 @@ public:
 
         m_module = load_crf_model(model_path, model_config, m_options);
 
+        // Batch size will be rounded up to a mutliple of batch_size_granularity, regardless of user choice, this prevents
+        // Execution of batch size which may not be compatible with a CUDA/Metal kernel.
         int batch_size_granularity = get_batch_size_granularity(model_config, m_options);
         m_batch_size = utils::pad_to(batch_size, batch_size_granularity);
         if (batch_size == 0) {

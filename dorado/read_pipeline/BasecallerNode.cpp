@@ -19,6 +19,7 @@ void BasecallerNode::input_worker_thread() {
 
     // Allow 5 batches per model runner on the chunks_in queue
     size_t max_chunks_in = 0;
+    // Allows optimal batch size to be used for every GPU
     for (auto &runner : m_model_runners) {
         max_chunks_in += runner->batch_size() * 5;
     }

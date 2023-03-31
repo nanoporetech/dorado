@@ -28,6 +28,7 @@ extern "C" {
 #include <limits>
 #include <string>
 
+// Different configurations for running Quantised LSTM
 constexpr bool g_options_no_i8 = false;
 constexpr bool g_options_no_conv_i8 = true;
 constexpr float g_options_scale_i8 = 1.0f;
@@ -59,6 +60,8 @@ static bool cuda_lstm_is_quantized(int layer_size, cudaDeviceProp *prop) {
         }                                                                                     \
     }
 
+// Times range and prints it to console so you don't have to generate a QDREP file to perform
+// basic profiling
 class ScopedProfileRange {
 public:
     explicit ScopedProfileRange(const char *label) : m_nvtx_range(label), m_label(label) {
@@ -202,10 +205,6 @@ struct ConvolutionImpl : Module {
                 dorado::utils::matmul_f16(tncw_mat.view({-1, in_size * window_size}), w_device,
                                           mm_out);
                 if (output_int8) {
-                    // float scale = 2 * I8_RANGE / (max_value - SWISH_LOWER_BOUND);
-                    // float zero_offset = scale * max_value - I8_RANGE;
-                    // float scale = 2.f * I8_RANGE;
-                    // float zero_offset = 0.f;
                     host_bias_swish_f16_clamp(stream, mm_out.size(0), mm_out.size(1),
                                               mm_out.stride(0), mm_out.data_ptr(),
                                               b_device.data_ptr(), max_value);
@@ -216,9 +215,6 @@ struct ConvolutionImpl : Module {
                     host_convert_inplace(stream, mm_out.data_ptr(), KOI_F16, KOI_I8,
                                          mm_out.stride(0), out_size, mm_out.size(0),
                                          mm_out.size(1));
-                    // host_bias_swish_f16_i8_inplace(stream, mm_out.size(0), mm_out.size(1), out_size,
-                    //                                mm_out.data_ptr(), b_device.data_ptr(), scale,
-                    //                                zero_offset);
                 } else {
                     host_bias_swish_f16_clamp(stream, mm_out.size(0), mm_out.size(1),
                                               mm_out.stride(0), mm_out.data_ptr(),
@@ -232,6 +228,7 @@ struct ConvolutionImpl : Module {
             }
         }
 #endif
+        // Alternative route - non CUDALSTM route.
         x = activation(conv(x));
         if (clamp) {
             x = x.clamp(c10::nullopt, max_value);
@@ -356,6 +353,8 @@ struct CudaLSTMStackImpl : Module {
         c10::cuda::CUDAGuard device_guard(x.device());
         ScopedProfileRange spr("lstm_stack");
 
+        // This is persistent block-based quantization, rather than cutlass-based inter-SM
+        // quantization.
         if (m_quantize) {
             // Output is [N, T, C], contiguous
             return forward_quantized(x);
@@ -449,14 +448,10 @@ private:
                         auto [scale, quantized] = quantize_tensor(weights_f32);
                         weights_cpu = quantized.t();
                         if (layer_idx == 0) {
-                            // scale /= scale_i8 / I8_RANGE;
                             scale_i8 = g_options_scale_i8_lstm;
                             if (scale_i8) {
                                 scale /= scale_i8;
                             }
-                            // layer_device_bias = (rnn->bias.to(torch::kF32).to(torch::kCPU) +
-                            //                      (weights_f32.sum(0).to(torch::kCPU) * (zero_offset_i8 / scale_i8)))
-                            //                      .to(in.device()).to(torch::kF16).contiguous();
                         }
                         scale = scale.view({4, layer_size}).t();
                         device_scale.push_back(scale.to(opts_f16).contiguous());
@@ -678,6 +673,7 @@ private:
     quantized_lstm _host_run_lstm_fwd_quantized{nullptr};
     quantized_lstm _host_run_lstm_rev_quantized{nullptr};
     CudaLSTM rnn1{nullptr}, rnn2{nullptr}, rnn3{nullptr}, rnn4{nullptr}, rnn5{nullptr};
+    // Buffer which contains buffers, used for the cutlass_brf kernel
     KoiSync m_koi_sync{nullptr};
 };
 
@@ -743,8 +739,6 @@ struct CRFModelImpl : Module {
         conv3 = register_module("conv3", Convolution(16, config.insize, 19, config.stride,
                                                      config.clamp, conv3_max_value, true));
 
-        //        float scale = 2 * I8_RANGE / (conv3_max_value - SWISH_LOWER_BOUND);
-        //        float zero_offset = scale * conv3_max_value - I8_RANGE;
         float scale = I8_RANGE;
         float zero_offset = 0.f;
         rnns = register_module("rnns", LSTMStackType(config.insize, scale, zero_offset));
