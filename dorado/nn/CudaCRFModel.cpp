@@ -34,7 +34,7 @@ public:
         m_in_chunk_size = m_out_chunk_size * m_model_stride;
 
         m_options = torch::TensorOptions().dtype(GPUDecoder::dtype).device(device);
-        assert(m_options.device.is_cuda());
+        assert(m_options.device().is_cuda());
 
         m_module = load_crf_model(model_path, model_config, m_options);
 
