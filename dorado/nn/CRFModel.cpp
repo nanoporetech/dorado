@@ -376,7 +376,10 @@ private:
         const bool use_cutlass = false;
 #else
         cudaDeviceProp *prop = at::cuda::getCurrentDeviceProperties();
-        const bool use_cutlass = prop->major >= 8;
+        // Limit Cutlass usage to A100 and H100 GPUs
+        const bool a100_gpu = (prop->major == 8) && (prop->minor == 0);
+        const bool h100_gpu = (prop->major == 9) && (prop->minor == 0);
+        const bool use_cutlass = a100_gpu || h100_gpu;
 #endif
         const bool use_int8 = !g_options_no_i8 && use_cutlass;
 
