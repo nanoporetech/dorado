@@ -438,7 +438,8 @@ DuplexSplitNode::check_nearby_adapter(const Read& read, PosRange r, int adapter_
     return find_best_adapter_match(m_settings.adapter,
                 read.seq,
                 adapter_edist,
-                PosRange{r.second, std::min(r.second + m_settings.pore_adapter_range, (uint64_t) read.seq.size())},
+                //including interspace region in search
+                PosRange{r.first, std::min(r.second + m_settings.pore_adapter_range, (uint64_t) read.seq.size())},
                 true).has_value();
 }
 
@@ -449,7 +450,8 @@ DuplexSplitNode::check_flank_match(const Read& read, PosRange r, int dist_thr) c
             && r.second + m_settings.target_flank <= read.seq.length()
             && check_rc_match(read.seq,
                     {r.first - m_settings.query_flank, r.first - m_settings.query_trim},
-                    {r.second, r.second + m_settings.target_flank},
+                    //including interspace region in search
+                    {r.first, r.second + m_settings.target_flank},
                     dist_thr);
 }
 
