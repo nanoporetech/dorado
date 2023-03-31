@@ -22,11 +22,6 @@ using namespace dorado;
 typedef DuplexSplitNode::PosRange PosRange;
 typedef std::vector<PosRange> PosRanges;
 
-std::ostream& operator<<(std::ostream& os, const PosRange& r)
-{
-    return os << "[" << r.first << ", " << r.second << "]";
-}
-
 template<class FilterF>
 auto filter_ranges(const PosRanges& ranges, FilterF filter_f) {
     PosRanges filtered;
@@ -254,7 +249,7 @@ find_best_adapter_match(const std::string& adapter,
         if (debug/*expect_adapter_prefix*/) {
             spdlog::info("Best adapter match edit distance: {} ; is middle {}",
                         edlib_result.editDistance, abs(int(span / 2) - edlib_result.startLocations[0]) < 1000);
-            spdlog::info("Match location: [{}, {}]", edlib_result.startLocations[0] + shift, edlib_result.endLocations[0] + shift + 1);
+            spdlog::info("Match location: ({}, {})", edlib_result.startLocations[0] + shift, edlib_result.endLocations[0] + shift + 1);
             spdlog::info("\n{}", print_alignment(adapter.c_str(), seq.c_str()+shift, edlib_result));
         }
         if (edlib_result.editDistance <= dist_thr) {
@@ -443,7 +438,7 @@ DuplexSplitNode::identify_splits_around_pore(const Read& read, float pore_thr,
     auto filter_f = [&](PosRange r) {
         return find_best_adapter_match(m_settings.adapter,
                     read.seq,
-                    /*FIXME relaxed thr*/6,
+                    adapter_edist,
                     PosRange{r.second, std::min(r.second + m_settings.pore_adapter_range, (uint64_t) read.seq.size())},
                     true) && (flank_edist < 0 || check_flank_match(read, r, flank_edist));
     };
