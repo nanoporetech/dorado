@@ -74,10 +74,7 @@ int aligner(int argc, char* argv[]) {
 
     spdlog::info("> starting alignment");
     reader.read(max_reads);
-
-    //while (!writer.finished()) {
-    //   std::this_thread::sleep_for(100ms);
-    //}
+    writer.join();
 
     spdlog::info("> finished alignment");
     spdlog::info("> total/primary/unmapped {}/{}/{}", writer.m_total, writer.m_primary,

@@ -53,11 +53,9 @@ Aligner::Aligner(MessageSink& sink, const std::string& filename, const int threa
 }
 
 Aligner::~Aligner() {
-    terminate();
     for (auto& m : m_workers) {
         m->join();
     }
-    m_sink.terminate();
     for (int i = 0; i < m_threads; i++) {
         mm_tbuf_destroy(m_tbufs[i]);
     }
@@ -74,7 +72,6 @@ std::vector<std::pair<char*, uint32_t>> Aligner::sq() {
 }
 
 std::pair<int, mm_reg1_t*> Aligner::align(const std::vector<char> seq) {
-    m_total++;
     int hits = 0;
     mm_reg1_t* reg = mm_map(m_index, seq.size(), seq.data(), &hits, m_tbufs[0], &m_map_opt, 0);
     return std::make_pair(hits, reg);
@@ -82,13 +79,16 @@ std::pair<int, mm_reg1_t*> Aligner::align(const std::vector<char> seq) {
 
 void Aligner::worker_thread() {
     Message message;
-    auto buf = m_tbufs[m_total++ % m_threads];
-
+    int tid = m_active++ % m_threads;
     while (m_work_queue.try_pop(message)) {
-        auto records = align(std::get<bam1_t*>(message), buf);
+        auto records = align(std::get<bam1_t*>(message), m_tbufs[tid]);
         for (auto& record : records) {
             m_sink.push_message(std::move(record));
         }
+    }
+    if (--m_active == 0) {
+        terminate();
+        m_sink.terminate();
     }
 }
 
@@ -203,7 +203,6 @@ BamReader::BamReader(MessageSink& sink, const std::string& filename) : m_sink(si
 }
 
 BamReader::~BamReader() {
-    m_sink.terminate();
     free(m_format);
     sam_hdr_destroy(m_header);
     bam_destroy1(m_record);
@@ -218,6 +217,7 @@ void BamReader::read(int max_reads) {
             break;
         }
     }
+    m_sink.terminate();
 }
 
 BamWriter::BamWriter(const std::string& filename) : MessageSink(1000) {
@@ -229,20 +229,18 @@ BamWriter::BamWriter(const std::string& filename) : MessageSink(1000) {
 }
 
 BamWriter::~BamWriter() {
-    terminate();
-    m_worker->join();
     sam_hdr_destroy(m_header);
     hts_close(m_file);
-    std::cerr << m_primary << "/" << m_unmapped << std::endl;
 }
 
-bool BamWriter::finished() { return !m_worker->joinable(); }
+void BamWriter::join() { m_worker->join(); }
 
 void BamWriter::worker_thread() {
     Message message;
     while (m_work_queue.try_pop(message)) {
         write(std::get<bam1_t*>(message));
     }
+    terminate();
 }
 
 int BamWriter::write(bam1_t* record) {

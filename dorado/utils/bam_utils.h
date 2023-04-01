@@ -23,7 +23,7 @@ public:
 private:
     MessageSink& m_sink;
     size_t m_threads{1};
-    std::atomic<size_t> m_total{0};
+    std::atomic<size_t> m_active{0};
     std::vector<mm_tbuf_t*> m_tbufs;
     std::vector<std::unique_ptr<std::thread>> m_workers;
     void worker_thread();
@@ -56,7 +56,7 @@ public:
     ~BamWriter();
     int write_header(const sam_hdr_t* header, const sq_t seqs);
     int write(bam1_t* record);
-    bool finished();
+    void join();
 
     size_t m_total{0};
     size_t m_primary{0};
