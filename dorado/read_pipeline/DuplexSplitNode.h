@@ -48,23 +48,23 @@ II. Adapter-aware mode
 */
 struct DuplexSplitSettings {
     float pore_thr = 160.;
-    size_t pore_cl_dist = 1000;
-    float relaxed_pore_thr = 140.;
+    size_t pore_cl_dist = 4000; // TODO maybe use frequency * 1sec here?
+    float relaxed_pore_thr = 150.;
     //usually template read region to the left of potential interspace region
     //FIXME rename to end_flank?!!
-    size_t query_flank = 1100;
+    size_t query_flank = 1200;
     //trim potentially erroneous (and/or PCR adapter) bases at end of query
-    size_t query_trim = 100;
+    size_t query_trim = 200;
     //adjusted to adapter presense and potential loss of bases on query, leading to 'shift'
     //FIXME rename to start_flank?!!
-    size_t target_flank = 1600;
+    size_t target_flank = 1700;
     //FIXME should probably be fractional
     //currently has to account for the adapter
     int flank_edist = 150;
     //FIXME do we need both of them?
     int relaxed_flank_edist = 250;
-    int adapter_edist = 3; //TODO figure out good threshold. 3 seems ok for hac/sup, but can probably relax
-    int relaxed_adapter_edist = 7;
+    int adapter_edist = 4;
+    int relaxed_adapter_edist = 6;
     uint64_t pore_adapter_range = 100; //bp TODO figure out good threshold
     //in bases
     uint64_t expect_adapter_prefix = 200;
