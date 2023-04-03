@@ -141,6 +141,20 @@ std::string derive_uuid(const std::string& input_uuid, const std::string& desc) 
     return ss.str();
 }
 
+//ranges supposed to be sorted by start coordinate
+PosRanges merge_ranges(const PosRanges& ranges, size_t merge_dist) {
+    PosRanges merged;
+    for (auto r : ranges) {
+        assert(merged.empty() || r.first >= merged.back().first);
+        if (merged.empty() || r.first > merged.back().second + merge_dist) {
+            merged.push_back(r);
+        } else {
+            merged.back().second = r.second;
+        }
+    }
+    return merged;
+}
+
 std::vector<std::pair<size_t, size_t>> detect_pore_signal(torch::Tensor pa_signal,
                                                           float threshold,
                                                           size_t cluster_dist,
@@ -320,14 +334,14 @@ std::vector<PosRange> find_adapter_matches(const std::string& adapter,
 //    return {matched_pore_regions, extra_potential_splits};
 //}
 
-//we probably don't need merging actually, just assert if overlap for now
-std::vector<PosRange>
-merge_ranges(std::vector<PosRange>&& pore_regions) {
-    for (size_t i = 1; i < pore_regions.size(); i++) {
-        assert(pore_regions[i-1].second < pore_regions[i].first);
-    }
-    return pore_regions;
-}
+////we probably don't need merging actually, just assert if overlap for now
+//std::vector<PosRange>
+//merge_ranges(std::vector<PosRange>&& pore_regions) {
+//    for (size_t i = 1; i < pore_regions.size(); i++) {
+//        assert(pore_regions[i-1].second < pore_regions[i].first);
+//    }
+//    return pore_regions;
+//}
 
 //semi-global alignment of "template region" to "complement region"
 bool check_rc_match(const std::string& seq, PosRange templ_r, PosRange compl_r, int dist_thr) {
@@ -581,11 +595,11 @@ void DuplexSplitNode::worker_thread() {
         }
         spdlog::info("DSN: PORE_ADAPTER {} splits in read {}: {}", interspace_ranges.size(), read.read_id, oss.str());
 
-        interspace_ranges = filter_ranges(
+        interspace_ranges = merge_ranges(filter_ranges(
             possible_pore_regions(read, m_settings.pore_thr),
             [&](PosRange r) {
                 return check_flank_match(read, r, m_settings.flank_edist);
-            });
+            }), m_settings.query_flank + m_settings.target_flank);
         oss.str("");
         std::copy(interspace_ranges.begin(), interspace_ranges.end(), std::ostream_iterator<PosRange>(oss, "; "));
         for (auto r : interspace_ranges) {
@@ -593,12 +607,12 @@ void DuplexSplitNode::worker_thread() {
         }
         spdlog::info("DSN: PORE_FLANK {} splits in read {}: {}", interspace_ranges.size(), read.read_id, oss.str());
 
-        interspace_ranges = filter_ranges(
+        interspace_ranges = merge_ranges(filter_ranges(
             possible_pore_regions(read, m_settings.relaxed_pore_thr),
             [&](PosRange r) {
                 return check_nearby_adapter(read, r, m_settings.relaxed_adapter_edist)
                         && check_flank_match(read, r, m_settings.relaxed_flank_edist);
-            });
+            }), m_settings.query_flank + m_settings.target_flank);
 
         oss.str("");
         std::copy(interspace_ranges.begin(), interspace_ranges.end(), std::ostream_iterator<PosRange>(oss, "; "));
