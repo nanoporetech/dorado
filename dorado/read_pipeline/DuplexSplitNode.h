@@ -50,7 +50,7 @@ struct DuplexSplitSettings {
     float pore_thr = 160.;
     size_t pore_cl_dist = 4000; // TODO maybe use frequency * 1sec here?
     float relaxed_pore_thr = 150.;
-    //usually template read region to the left of potential interspace region
+    //usually template read region to the left of potential spacer region
     //FIXME rename to end_flank?!!
     size_t query_flank = 1200;
     //trim potentially erroneous (and/or PCR adapter) bases at end of query
@@ -79,6 +79,8 @@ struct DuplexSplitSettings {
 class DuplexSplitNode : public MessageSink {
 public:
     typedef std::pair<uint64_t, uint64_t> PosRange;
+    typedef std::vector<PosRange> PosRanges;
+    typedef std::function<PosRanges (const Read&)> SplitFinderF;
 
     DuplexSplitNode(MessageSink& sink, DuplexSplitSettings settings,
                     int num_worker_threads = 5, size_t max_reads = 1000);
@@ -89,7 +91,12 @@ private:
     bool check_nearby_adapter(const Read& read, PosRange r, int adapter_edist) const;
     bool check_flank_match(const Read& read, PosRange r, int dist_thr) const;
     std::optional<PosRange> identify_extra_middle_split(const Read& read) const;
-    std::vector<std::shared_ptr<Read>> split(const Read& message, const std::vector<PosRange> &interspace_regions) const;
+
+    std::vector<std::shared_ptr<Read>>
+    split(std::shared_ptr<Read> read, const PosRanges& spacers) const;
+
+    std::vector<std::pair<std::string, SplitFinderF>>
+    build_split_finders() const;
 
     void worker_thread();  // Worker thread performs scaling and trimming asynchronously.
     MessageSink& m_sink;  // MessageSink to consume scaled reads.
