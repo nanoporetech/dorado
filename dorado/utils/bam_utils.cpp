@@ -177,8 +177,66 @@ std::vector<bam1_t*> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
             // update the data length
             record->l_data += cigar_size;
 
+            //----------- Add auxiliary tags------------//
+            // These are added to maintain parity with mm2.
+
+            // tp
+            char type;
+            if (a->id == a->parent)
+                type = a->inv ? 'I' : 'P';
+            else
+                type = a->inv ? 'i' : 'S';
+            bam_aux_append(record, "tp", 'A', sizeof(type), (uint8_t*)&type);
+
+            // cm
+            bam_aux_append(record, "cm", 'i', sizeof(a->cnt), (uint8_t*)&(a->cnt));
+
+            // s1
+            bam_aux_append(record, "s1", 'i', sizeof(a->score), (uint8_t*)&(a->score));
+
+            if (a->p) {
+                // NM
+                int32_t nm = a->blen - a->mlen + a->p->n_ambi;
+                bam_aux_append(record, "NM", 'i', sizeof(nm), (uint8_t*)&nm);
+
+                // ms
+                int32_t ms = a->p->dp_max;
+                bam_aux_append(record, "ms", 'i', sizeof(nm), (uint8_t*)&ms);
+
+                // AS
+                int32_t as = a->p->dp_score;
+                bam_aux_append(record, "AS", 'i', sizeof(nm), (uint8_t*)&as);
+
+                // nn
+                int32_t nn = a->p->n_ambi;
+                bam_aux_append(record, "nn", 'i', sizeof(nm), (uint8_t*)&nn);
+
+                if (a->p->trans_strand == 1 || a->p->trans_strand == 2)
+                    bam_aux_append(record, "ts", 'A', 2, (uint8_t*)&("?+-?"[a->p->trans_strand]));
+            }
+
+            // MD
+            char* md = NULL;
+            int max_len = 0;
+            int md_len = mm_gen_MD(NULL, &md, &max_len, m_index, a, seq.data());
+            if (md_len > 0)
+                bam_aux_append(record, "MD", 'Z', md_len + 1, (uint8_t*)md);
+
+            // s2
+            if (a->parent == a->id)
+                bam_aux_append(record, "s2", 'i', sizeof(a->subsc), (uint8_t*)&a->subsc);
+
+            // zd
+            if (a->split) {
+                uint32_t split = uint32_t(a->split);
+                bam_aux_append(record, "zd", 'i', sizeof(split), (uint8_t*)&split);
+            }
+
             // todo: m_data size
-            // todo: extra tags (NM)
+
+            // TODO: do we need the de and dv tags? They use an mm_event_identity function
+            // which is private in mm2, so we will have to duplicate that functionality if we need these
+            // tags.
         }
         free(a->p);
         results.push_back(record);
