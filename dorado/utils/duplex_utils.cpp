@@ -44,12 +44,14 @@ std::unordered_set<std::string> get_read_list_from_pairs(
     return read_list;
 }
 
-void reverse_complement(std::vector<char>& sequence) {
-    std::reverse(sequence.begin(), sequence.end());
+std::string reverse_complement(const std::string& sequence) {
+    auto reversed_sequence = sequence;
+    std::reverse(reversed_sequence.begin(), reversed_sequence.end());
     std::map<char, char> complementary_nucleotides = {
             {'A', 'T'}, {'C', 'G'}, {'G', 'C'}, {'T', 'A'}};
-    std::for_each(sequence.begin(), sequence.end(),
+    std::for_each(reversed_sequence.begin(), reversed_sequence.end(),
                   [&complementary_nucleotides](char& c) { c = complementary_nucleotides[c]; });
+    return reversed_sequence;
 }
 
 std::pair<std::pair<int, int>, std::pair<int, int>> get_trimmed_alignment(
