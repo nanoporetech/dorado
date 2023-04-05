@@ -68,6 +68,9 @@ void BaseSpaceDuplexCallerNode::worker_thread() {
     for (auto& v : futures) {
         v.get();
     }
+
+    // Notify the sink that the Node has terminated
+    m_sink.terminate();    
 }
 
 void BaseSpaceDuplexCallerNode::basespace(std::string template_read_id,
@@ -164,20 +167,14 @@ BaseSpaceDuplexCallerNode::BaseSpaceDuplexCallerNode(
           m_template_complement_map(std::move(template_complement_map)),
           m_reads(std::move(reads)),
           m_num_worker_threads(threads) {
-    worker_threads.push_back(
-            std::make_unique<std::thread>(&BaseSpaceDuplexCallerNode::worker_thread, this));
+    m_worker_thread = std::make_unique<std::thread>(&BaseSpaceDuplexCallerNode::worker_thread, this);
 }
 
 BaseSpaceDuplexCallerNode::~BaseSpaceDuplexCallerNode() {
     terminate();
-
-    // Wait for all the Node's worker threads to terminate
-    for (auto& t : worker_threads) {
-        t->join();
-    }
-
+    m_worker_thread->join();
     // Notify the sink that the Node has terminated
-    m_sink.terminate();
+    m_sink.terminate();    
 }
 
 }  // namespace dorado
