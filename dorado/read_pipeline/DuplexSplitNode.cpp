@@ -16,6 +16,9 @@
 #include <chrono>
 #include <openssl/sha.h>
 
+//TODO go via preprocessor?
+static const bool DEBUG = false;
+
 namespace {
 
 using namespace dorado;
@@ -156,14 +159,16 @@ PosRanges merge_ranges(const PosRanges& ranges, size_t merge_dist) {
     return merged;
 }
 
-std::vector<std::pair<size_t, size_t>> detect_pore_signal(torch::Tensor pa_signal,
+std::vector<std::pair<size_t, size_t>> detect_pore_signal(torch::Tensor signal,
                                                           float threshold,
                                                           size_t cluster_dist,
                                                           size_t ignore_prefix) {
-    spdlog::debug("Max raw signal {} pA", pa_signal.index({torch::indexing::Slice(ignore_prefix, torch::indexing::None)}).max().item<float>());
+    using namespace std::chrono;
+    auto start_ts = high_resolution_clock::now();
 
     std::vector<std::pair<size_t, size_t>> ans;
-    auto pore_a = pa_signal.accessor<float, 1>();
+    //auto pore_a = signal.accessor<torch::kFloat16, 1>();
+    auto pore_a = signal.accessor<float, 1>();
     size_t start = 0;
     size_t end = 0;
 
@@ -183,7 +188,31 @@ std::vector<std::pair<size_t, size_t>> detect_pore_signal(torch::Tensor pa_signa
         ans.push_back(std::pair{start, end});
     }
     assert(start < pore_a.size(0) && end <= pore_a.size(0));
+    auto stop_ts = high_resolution_clock::now();
+    spdlog::info("OPEN_PORE duration: {} microseconds", duration_cast<microseconds>(stop_ts - start_ts).count());
     return ans;
+    //FIXME optimize
+    //std::vector<std::pair<size_t, size_t>> ans;
+    // auto pore_positions = torch::nonzero(signal > threshold);
+    // //FIXME what type to use here?
+    // auto pore_a = pore_positions.accessor<int32_t, 1>();
+    // size_t start = size_t(-1);
+    // size_t end = size_t(-1);
+
+    // int i = 0;
+    // for (; i < pore_a.size(0); i++) {
+    //     if (i == 0 || pore_a[i] > end + cluster_dist) {
+    //         if (i > 0) {
+    //             ans.push_back(std::pair{start, end});
+    //         }
+    //         start = pore_a[i];
+    //     }
+    //     end = pore_a[i] + 1;
+    // }
+    // if (i > 0) {
+    //     ans.push_back(std::pair{start, end});
+    // }
+    // return ans;
 }
 
 std::string print_alignment(const char* query, const char* target, const EdlibAlignResult& result) {
@@ -245,19 +274,24 @@ find_best_adapter_match(const std::string& adapter,
     //might be unnecessary, depending on edlib's empty sequence handling
     if (span == 0) return std::nullopt;
 
+    auto edlib_cfg = /*debug*/DEBUG ? edlibNewAlignConfig(-1, EDLIB_MODE_HW, EDLIB_TASK_PATH, NULL, 0) :
+                                edlibNewAlignConfig(dist_thr, EDLIB_MODE_HW, EDLIB_TASK_LOC, NULL, 0);
+
     auto edlib_result = edlibAlign(adapter.c_str(), adapter.size(),
-                             seq.c_str() + shift, span,
-                             edlibNewAlignConfig(-1, EDLIB_MODE_HW, EDLIB_TASK_PATH, NULL, 0));
-                             //TODO edlibNewAlignConfig(-1, EDLIB_MODE_HW, EDLIB_TASK_LOC, NULL, 0));
+                             seq.c_str() + shift, span, edlib_cfg);
     assert(edlib_result.status == EDLIB_STATUS_OK);
     std::optional<PosRange> res = std::nullopt;
     if (edlib_result.status == EDLIB_STATUS_OK && edlib_result.editDistance != -1) {
-        //FIXME REMOVE and use dist_thr instead of -1
-        spdlog::debug("Best adapter match edit distance: {} ; is middle {}",
-                    edlib_result.editDistance, abs(int(span / 2) - edlib_result.startLocations[0]) < 1000);
-        spdlog::debug("Match location: ({}, {})", edlib_result.startLocations[0] + shift, edlib_result.endLocations[0] + shift + 1);
-        spdlog::debug("\n{}", print_alignment(adapter.c_str(), seq.c_str()+shift, edlib_result));
-        if (edlib_result.editDistance <= dist_thr) {
+        if (DEBUG) {
+            spdlog::debug("Best adapter match edit distance: {} ; is middle {}",
+                        edlib_result.editDistance, abs(int(span / 2) - edlib_result.startLocations[0]) < 1000);
+            spdlog::debug("Match location: ({}, {})", edlib_result.startLocations[0] + shift, edlib_result.endLocations[0] + shift + 1);
+            spdlog::debug("\n{}", print_alignment(adapter.c_str(), seq.c_str()+shift, edlib_result));
+            if (edlib_result.editDistance <= dist_thr) {
+                res = {edlib_result.startLocations[0] + shift, edlib_result.endLocations[0] + shift + 1};
+            }
+        } else {
+            assert(edlib_result.editDistance <= dist_thr);
             res = {edlib_result.startLocations[0] + shift, edlib_result.endLocations[0] + shift + 1};
         }
     }
@@ -288,23 +322,29 @@ bool check_rc_match(const std::string& seq, PosRange templ_r, PosRange compl_r, 
     std::vector<char> rc_compl(c_seq + compl_r.first, c_seq + compl_r.second);
     dorado::utils::reverse_complement(rc_compl);
 
+    auto edlib_cfg = DEBUG ? edlibNewAlignConfig(-1, EDLIB_MODE_HW, EDLIB_TASK_PATH, NULL, 0) :
+                            edlibNewAlignConfig(dist_thr, EDLIB_MODE_HW, EDLIB_TASK_DISTANCE, NULL, 0);
+
     auto edlib_result = edlibAlign(c_seq + templ_r.first,
                             templ_r.second - templ_r.first,
                             rc_compl.data(), rc_compl.size(),
-                            //edlibNewAlignConfig(dist_thr, EDLIB_MODE_HW, EDLIB_TASK_DISTANCE, NULL, 0));
-                            edlibNewAlignConfig(-1, EDLIB_MODE_HW, EDLIB_TASK_PATH, NULL, 0));
-    assert(edlib_result.status == EDLIB_STATUS_OK); //&& edlib_result.editDistance <= dist_thr);
+                            edlib_cfg);
+    assert(edlib_result.status == EDLIB_STATUS_OK);
     std::optional<PosRange> res = std::nullopt;
-    spdlog::debug("Checking ranges [{}, {}] vs [{}, {}]: edist={}\n{}",
-                    templ_r.first, templ_r.second,
-                    compl_r.first, compl_r.second,
-                    edlib_result.editDistance,
-                    print_alignment(c_seq + templ_r.first, rc_compl.data(), edlib_result));
 
-    //FIXME integrate dist_thr check right into align call after tweaking the settings
     bool match = (edlib_result.status == EDLIB_STATUS_OK)
-                    && (edlib_result.editDistance != -1)
-                    && (edlib_result.editDistance <= dist_thr);
+                    && (edlib_result.editDistance != -1);
+    if (DEBUG) {
+        spdlog::debug("Checking ranges [{}, {}] vs [{}, {}]: edist={}\n{}",
+                        templ_r.first, templ_r.second,
+                        compl_r.first, compl_r.second,
+                        edlib_result.editDistance,
+                        print_alignment(c_seq + templ_r.first, rc_compl.data(), edlib_result));
+        match = match && (edlib_result.editDistance <= dist_thr);
+    } else {
+        assert(!match || edlib_result.editDistance <= dist_thr);
+    }
+
     edlibFreeAlignResult(edlib_result);
     return match;
 }
@@ -350,8 +390,11 @@ namespace dorado {
 
 PosRanges
 DuplexSplitNode::possible_pore_regions(const Read& read, float pore_thr) const {
+    using namespace std::chrono;
+    auto start_ts = high_resolution_clock::now();
     PosRanges pore_regions;
 
+    //FIXME reasonably fast, but maybe optimize
     const auto move_sums = move_cum_sums(read.moves);
     assert(move_sums.back() == read.seq.length());
 
@@ -360,28 +403,43 @@ DuplexSplitNode::possible_pore_regions(const Read& read, float pore_thr) const {
     //pA formula after scaling:
     //pA = read->scale * raw + read->shift
     spdlog::debug("Analyzing signal in read {}", read.read_id);
+
+    //FIXME do we need to check DEBUG or spdlog::debug is lazy enough?
+    if (DEBUG) {
+        spdlog::debug("Max raw signal {} pA, threshold: {}",
+            (read.raw_data.to(torch::kFloat) * read.scale + read.shift)
+                .index({torch::indexing::Slice(m_settings.expect_pore_prefix, torch::indexing::None)}).max().item<float>(),
+            threshold);
+    }
+
     for (auto pore_signal_region : detect_pore_signal(
-                                   read.raw_data.to(torch::kFloat) * read.scale + read.shift,
-                                   pore_thr,
+                                   read.raw_data.to(torch::kFloat),
+                                   (pore_thr - read.shift) / read.scale,
                                    m_settings.pore_cl_dist,
                                    m_settings.expect_pore_prefix)) {
         auto move_start = pore_signal_region.first / read.model_stride;
         auto move_end = pore_signal_region.second / read.model_stride;
         assert(move_end >= move_start);
         //NB move_start can get to move_sums.size(), because of the stride rounding?
-        if (move_start >= move_sums.size() || move_end >= move_sums.size() || move_sums.at(move_start) == 0) {
+        if (move_start >= move_sums.size() || move_end >= move_sums.size() || move_sums[move_start] == 0) {
             //either at very end of the signal or basecalls have not started yet
             continue;
         }
-        auto start_pos = move_sums.at(move_start) - 1;
+        auto start_pos = move_sums[move_start] - 1;
         //NB. adding adapter length
-        auto end_pos = move_sums.at(move_end);
+        auto end_pos = move_sums[move_end];
         assert(end_pos > start_pos);
         pore_regions.push_back({start_pos, end_pos});
     }
-    std::ostringstream oss;
-    std::copy(pore_regions.begin(), pore_regions.end(), std::ostream_iterator<PosRange>(oss, "; "));
-    spdlog::debug("{} regions to check: {}", pore_regions.size(), oss.str());
+
+    if (DEBUG) {
+        std::ostringstream oss;
+        std::copy(pore_regions.begin(), pore_regions.end(), std::ostream_iterator<PosRange>(oss, "; "));
+        spdlog::debug("{} regions to check: {}", pore_regions.size(), oss.str());
+    }
+
+    auto stop_ts = high_resolution_clock::now();
+    spdlog::info("POSSIBLE_PORE duration: {} microseconds", duration_cast<microseconds>(stop_ts - start_ts).count());
     return pore_regions;
 }
 
@@ -451,7 +509,6 @@ DuplexSplitNode::split(std::shared_ptr<Read> read, const std::vector<PosRange> &
     uint64_t start_pos = 0;
     uint64_t signal_start = seq_to_sig_map[0];
     for (auto r: spacers) {
-        //FIXME Don't forget to correctly process end_reasons!
         subreads.push_back(subread(*read, {start_pos, r.first}, {signal_start, seq_to_sig_map[r.first]}));
         start_pos = r.second;
         signal_start = seq_to_sig_map[r.second];
@@ -548,14 +605,15 @@ void DuplexSplitNode::worker_thread() {
                 spdlog::info("Split duration: {} microseconds", duration_cast<microseconds>(stop - start).count());
 
                 //logging begin
-                //if (subreads.size() > 1) {
-                std::ostringstream id_oss;
-                std::transform(subreads.begin(), subreads.end(),
-                    std::ostream_iterator<std::string>(id_oss, "; "),
-                    [](std::shared_ptr<Read> sr) {return sr->read_id;});
-                spdlog::info("DSN: {} strategy {} splits in read {} (subread {}). Spacing regions (in subread coordinates): {}. New read ids: {}",
-                                description, spacers.size(), init_read->read_id, r->read_id, spacer_oss.str(), id_oss.str());
-                //}
+                if (DEBUG) {
+                    //if (subreads.size() > 1)
+                    std::ostringstream id_oss;
+                    std::transform(subreads.begin(), subreads.end(),
+                        std::ostream_iterator<std::string>(id_oss, "; "),
+                        [](std::shared_ptr<Read> sr) {return sr->read_id;});
+                    spdlog::info("DSN: {} strategy {} splits in read {} (subread {}). Spacing regions (in subread coordinates): {}. New read ids: {}",
+                                    description, spacers.size(), init_read->read_id, r->read_id, spacer_oss.str(), id_oss.str());
+                }
                 //logging end
 
                 split_round_result.insert(split_round_result.end(), subreads.begin(), subreads.end());
@@ -565,6 +623,7 @@ void DuplexSplitNode::worker_thread() {
         }
 
         for (auto subread : to_split) {
+            //TODO correctly process end_reason when we have them
             subread->parent_read_id = init_read->read_id;
             m_sink.push_message(std::move(subread));
             //FIXME add debug mode which would not do any splitting
