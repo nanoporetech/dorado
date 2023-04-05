@@ -102,6 +102,7 @@ private:
     MessageSink& m_sink;  // MessageSink to consume scaled reads.
 
     const DuplexSplitSettings m_settings;
+    std::vector<std::pair<std::string, SplitFinderF>> m_split_finders;
     const int m_num_worker_threads;
     std::vector<std::unique_ptr<std::thread>> worker_threads;
 };
