@@ -8,7 +8,9 @@ namespace dorado::utils {
 // returns a map of template_id to  complement_id
 std::map<std::string, std::string> load_pairs_file(std::string pairs_file);
 
-// Compute reverse complement of a nucleotide sequence
+// Compute reverse complement of a nucleotide sequence.
+// Bases are specified as capital letters.
+// Undefined output if characters other than A, C, G, T appear.
 std::string reverse_complement(const std::string& sequence);
 
 // Returns subset of alignment for which start and end start with  `num_consecutive_wanted` consecutive nucleotides.
