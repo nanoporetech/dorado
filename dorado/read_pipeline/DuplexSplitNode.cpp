@@ -673,13 +673,12 @@ void DuplexSplitNode::worker_thread() {
             spdlog::info("At the end of {} overall number of subreads: {}", description, to_split.size());
         }
 
-        //    for (auto subread : to_split)) {
-        //        subread->parent_read_id = init_read.read_id;
-        //        m_sink.push_message(std::move(subread));
-        //    }
+        for (auto subread : to_split) {
+            m_sink.push_message(std::move(subread));
+            //FIXME add debug mode which would not do any splitting
+            //m_sink.push_message(std::move(message));
+        }
 
-        //FIXME Just passes the reads to get basecalls for now
-        //m_sink.push_message(std::move(message));
     }
 }
 
