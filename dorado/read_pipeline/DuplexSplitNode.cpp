@@ -414,24 +414,22 @@ DuplexSplitNode::identify_extra_middle_split(const Read& read) const {
     const auto adapter_search_span = 1000;
 
     const auto r_l = read.seq.size();
-    if (r_l < m_settings.query_flank + m_settings.target_flank) {
+    if (r_l < m_settings.query_flank + m_settings.target_flank || r_l < adapter_search_span) {
         return std::nullopt;
     }
 
-    spdlog::debug("Checking start/end match");
-    if (check_rc_match(read.seq, {r_l - m_settings.query_flank, r_l},
-            {0, m_settings.target_flank}, m_settings.relaxed_flank_edist)) {
-        spdlog::debug("Searching for adapter match");
-        if (auto adapter_match = find_best_adapter_match(m_settings.adapter, read.seq,
-                                m_settings.relaxed_adapter_edist,
-                                PosRange{r_l / 2 - adapter_search_span / 2, r_l / 2 + adapter_search_span / 2})) {
-            auto adapter_start = adapter_match->first;
-            spdlog::debug("Checking middle match");
-            if (check_flank_match(read,
-                                {adapter_start, adapter_start},
-                                m_settings.relaxed_flank_edist)) {
-                return PosRange{adapter_start - 1, adapter_start};
-            }
+    spdlog::debug("Searching for adapter match");
+    if (auto adapter_match = find_best_adapter_match(m_settings.adapter, read.seq,
+                            m_settings.relaxed_adapter_edist,
+                            PosRange{r_l / 2 - adapter_search_span / 2, r_l / 2 + adapter_search_span / 2})) {
+        auto adapter_start = adapter_match->first;
+        spdlog::debug("Checking middle match & start/end match");
+        if (check_flank_match(read,
+                            {adapter_start, adapter_start},
+                            m_settings.relaxed_flank_edist)
+                && check_rc_match(read.seq, {r_l - m_settings.query_flank, r_l - m_settings.query_trim},
+                        {0, m_settings.target_flank}, m_settings.relaxed_flank_edist)) {
+            return PosRange{adapter_start - 1, adapter_start};
         }
     }
     return std::nullopt;
