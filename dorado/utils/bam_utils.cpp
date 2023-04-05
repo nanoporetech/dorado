@@ -1,6 +1,7 @@
 #include "bam_utils.h"
 
 #include "Version.h"
+#include "htslib/kroundup.h"
 #include "htslib/sam.h"
 #include "minimap.h"
 #include "read_pipeline/ReadPipeline.h"
@@ -92,6 +93,66 @@ void Aligner::worker_thread() {
     }
 }
 
+// Function to add auxiliary tags to the alignment record.
+// These are added to maintain parity with mm2.
+void Aligner::add_tags(bam1_t* record, const mm_reg1_t* aln, const std::vector<char>& seq) {
+    if (aln->p) {
+        // NM
+        int32_t nm = aln->blen - aln->mlen + aln->p->n_ambi;
+        bam_aux_append(record, "NM", 'i', sizeof(nm), (uint8_t*)&nm);
+
+        // ms
+        int32_t ms = aln->p->dp_max;
+        bam_aux_append(record, "ms", 'i', sizeof(nm), (uint8_t*)&ms);
+
+        // AS
+        int32_t as = aln->p->dp_score;
+        bam_aux_append(record, "AS", 'i', sizeof(nm), (uint8_t*)&as);
+
+        // nn
+        int32_t nn = aln->p->n_ambi;
+        bam_aux_append(record, "nn", 'i', sizeof(nm), (uint8_t*)&nn);
+
+        if (aln->p->trans_strand == 1 || aln->p->trans_strand == 2)
+            bam_aux_append(record, "ts", 'A', 2, (uint8_t*)&("?+-?"[aln->p->trans_strand]));
+    }
+
+    // tp
+    char type;
+    if (aln->id == aln->parent)
+        type = aln->inv ? 'I' : 'P';
+    else
+        type = aln->inv ? 'i' : 'S';
+    bam_aux_append(record, "tp", 'A', sizeof(type), (uint8_t*)&type);
+
+    // cm
+    bam_aux_append(record, "cm", 'i', sizeof(aln->cnt), (uint8_t*)&aln->cnt);
+
+    // s1
+    bam_aux_append(record, "s1", 'i', sizeof(aln->score), (uint8_t*)&aln->score);
+
+    // s2
+    if (aln->parent == aln->id)
+        bam_aux_append(record, "s2", 'i', sizeof(aln->subsc), (uint8_t*)&aln->subsc);
+
+    // MD
+    char* md = NULL;
+    int max_len = 0;
+    int md_len = mm_gen_MD(NULL, &md, &max_len, m_index, aln, seq.data());
+    if (md_len > 0)
+        bam_aux_append(record, "MD", 'Z', md_len + 1, (uint8_t*)md);
+
+    // zd
+    if (aln->split) {
+        uint32_t split = uint32_t(aln->split);
+        bam_aux_append(record, "zd", 'i', sizeof(split), (uint8_t*)&split);
+    }
+
+    // TODO: do we need the de and dv tags? They use an mm_event_identity function
+    // which is private in mm2, so we will have to duplicate that functionality if we need these
+    // tags.
+}
+
 std::vector<bam1_t*> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
     // some where for the hits
     std::vector<bam1_t*> results;
@@ -136,8 +197,10 @@ std::vector<bam1_t*> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
         record->core.qual = a->mapq;
         record->core.n_cigar = a->p ? a->p->n_cigar : 0;
 
-        // todo: handle max_bam_cigar_op
-
+        // Note: max_bam_cigar_op doesn't need to handled specially when
+        // using htslib since the sam_write1 method already takes care
+        // of moving the CIGAR string to the tags if the length
+        // exceeds 65535.
         if (record->core.n_cigar != 0) {
             uint32_t clip_len[2] = {0};
             clip_len[0] = a->rev ? record->core.l_qseq - a->qe : a->qs;
@@ -151,7 +214,9 @@ std::vector<bam1_t*> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
             }
             int offset = clip_len[0] ? 1 : 0;
             int cigar_size = record->core.n_cigar * sizeof(uint32_t);
-            uint8_t* data = (uint8_t*)realloc(record->data, record->l_data + cigar_size);
+            uint32_t new_m_data = record->l_data + cigar_size;
+            kroundup32(new_m_data);
+            uint8_t* data = (uint8_t*)realloc(record->data, new_m_data);
 
             // shift existing data to make room for the new cigar field
             memmove(data + record->core.l_qname + cigar_size, data + record->core.l_qname,
@@ -176,68 +241,11 @@ std::vector<bam1_t*> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
 
             // update the data length
             record->l_data += cigar_size;
-
-            //----------- Add auxiliary tags------------//
-            // These are added to maintain parity with mm2.
-
-            // tp
-            char type;
-            if (a->id == a->parent)
-                type = a->inv ? 'I' : 'P';
-            else
-                type = a->inv ? 'i' : 'S';
-            bam_aux_append(record, "tp", 'A', sizeof(type), (uint8_t*)&type);
-
-            // cm
-            bam_aux_append(record, "cm", 'i', sizeof(a->cnt), (uint8_t*)&(a->cnt));
-
-            // s1
-            bam_aux_append(record, "s1", 'i', sizeof(a->score), (uint8_t*)&(a->score));
-
-            if (a->p) {
-                // NM
-                int32_t nm = a->blen - a->mlen + a->p->n_ambi;
-                bam_aux_append(record, "NM", 'i', sizeof(nm), (uint8_t*)&nm);
-
-                // ms
-                int32_t ms = a->p->dp_max;
-                bam_aux_append(record, "ms", 'i', sizeof(nm), (uint8_t*)&ms);
-
-                // AS
-                int32_t as = a->p->dp_score;
-                bam_aux_append(record, "AS", 'i', sizeof(nm), (uint8_t*)&as);
-
-                // nn
-                int32_t nn = a->p->n_ambi;
-                bam_aux_append(record, "nn", 'i', sizeof(nm), (uint8_t*)&nn);
-
-                if (a->p->trans_strand == 1 || a->p->trans_strand == 2)
-                    bam_aux_append(record, "ts", 'A', 2, (uint8_t*)&("?+-?"[a->p->trans_strand]));
-            }
-
-            // MD
-            char* md = NULL;
-            int max_len = 0;
-            int md_len = mm_gen_MD(NULL, &md, &max_len, m_index, a, seq.data());
-            if (md_len > 0)
-                bam_aux_append(record, "MD", 'Z', md_len + 1, (uint8_t*)md);
-
-            // s2
-            if (a->parent == a->id)
-                bam_aux_append(record, "s2", 'i', sizeof(a->subsc), (uint8_t*)&a->subsc);
-
-            // zd
-            if (a->split) {
-                uint32_t split = uint32_t(a->split);
-                bam_aux_append(record, "zd", 'i', sizeof(split), (uint8_t*)&split);
-            }
-
-            // todo: m_data size
-
-            // TODO: do we need the de and dv tags? They use an mm_event_identity function
-            // which is private in mm2, so we will have to duplicate that functionality if we need these
-            // tags.
+            record->m_data = new_m_data;
         }
+
+        add_tags(record, a, seq);
+
         free(a->p);
         results.push_back(record);
     }
@@ -312,8 +320,11 @@ int BamWriter::write(bam1_t* record) {
         m_supplementary++;
     m_primary = m_total - m_secondary - m_supplementary - m_unmapped;
 
-    // todo: handle result
-    return sam_write1(m_file, m_header, record);
+    auto res = sam_write1(m_file, m_header, record);
+    if (res < 0) {
+        throw std::runtime_error("Failed to write SAM record, error code " + std::to_string(res));
+    }
+    return res;
 }
 
 int BamWriter::write_header(const sam_hdr_t* header, const sq_t seqs) {
