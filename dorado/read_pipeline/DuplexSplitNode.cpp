@@ -13,6 +13,7 @@
 #include <string>
 #include <sstream>
 #include <array>
+#include <chrono>
 #include <openssl/sha.h>
 
 namespace {
@@ -534,6 +535,7 @@ DuplexSplitNode::build_split_finders() const {
 }
 
 void DuplexSplitNode::worker_thread() {
+    using namespace std::chrono;
     spdlog::info("DSN: Hello from worker thread");
     Message message;
 
@@ -547,14 +549,20 @@ void DuplexSplitNode::worker_thread() {
             spdlog::info("Running {}", description);
             std::vector<std::shared_ptr<Read>> split_round_result;
             for (auto r : to_split) {
+                auto start = high_resolution_clock::now();
                 auto spacers = split_f(*r);
+                auto stop = high_resolution_clock::now();
+                spdlog::info("{} duration: {} microseconds", description, duration_cast<microseconds>(stop - start).count());
 
                 //logging begin
                 std::ostringstream spacer_oss;
                 std::copy(spacers.begin(), spacers.end(), std::ostream_iterator<PosRange>(spacer_oss, "; "));
                 //logging end
 
+                start = high_resolution_clock::now();
                 auto subreads = split(r, spacers);
+                stop = high_resolution_clock::now();
+                spdlog::info("Split duration: {} microseconds", duration_cast<microseconds>(stop - start).count());
 
                 //logging begin
                 //if (subreads.size() > 1) {
