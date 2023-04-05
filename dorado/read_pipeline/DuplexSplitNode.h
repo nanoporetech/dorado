@@ -2,50 +2,11 @@
 #include "ReadPipeline.h"
 
 /*
-To ask:
-. does mod calling after splitting?
-. separate reads pairing
-. why do we keep trimmed?
-. where is end_reason internally? -- put in a PR (modify dataloader)
-
-To update:
-. end_reason
-. signal
-. basecalls
-. trims
-. Chunks??? num_chunks_called
-. num_trimmed samples???
-. base mod info?
-. Attributes
-. shift/scale/scaling
+. put in a PR for end_reason (modify dataloader)
 . assert empty mappings
 */
 namespace dorado {
 
-/*
-Available:
- . signal spikes
- . adapter sequences
- . self-folding
-
-Q: is the signal scaled at this point?
-Should I scale it back to detect 170pAmp spikes?
-
-Plan:
-I. Adapter-less mode
-1. Detect spikes
-2. For each detected spike try complement matching (exclude adapter) and split at spike
-3. Try matching ends of the complete read (stepping away to account for adapter)
-4. If match -- split somewhere in the middle
-
-II. Adapter-aware mode
-1. Detect spikes and likely adapter injections
-2. If see both spike and adapter -- split (also handles non-duplex case)
-3. If see one -- try matching the flanking regions
-4. Try matching ends of the complete read (stepping away to account for adapter)
-5. If match -- split somewhere in the middle
-    Maybe try finding remnants of an adapter here?
-*/
 struct DuplexSplitSettings {
     bool simplex_mode;
     float pore_thr = 160.;

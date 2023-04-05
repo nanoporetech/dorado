@@ -30,7 +30,7 @@ auto filter_ranges(const PosRanges& ranges, FilterF filter_f) {
     return filtered;
 }
 
-//FIXME ask if we can have some copy constructor?
+//TODO add copy constructor?
 std::shared_ptr<Read> copy_read(const Read &read) {
     auto copy = std::make_shared<Read>();
     copy->raw_data = read.raw_data;
@@ -160,11 +160,9 @@ std::vector<std::pair<size_t, size_t>> detect_pore_signal(torch::Tensor pa_signa
                                                           float threshold,
                                                           size_t cluster_dist,
                                                           size_t ignore_prefix) {
-    //FIXME remove
-    spdlog::info("Max raw signal {} pA", pa_signal.index({torch::indexing::Slice(ignore_prefix, torch::indexing::None)}).max().item<float>());
+    spdlog::debug("Max raw signal {} pA", pa_signal.index({torch::indexing::Slice(ignore_prefix, torch::indexing::None)}).max().item<float>());
 
     std::vector<std::pair<size_t, size_t>> ans;
-    //FIXME what type to use here?
     auto pore_a = pa_signal.accessor<float, 1>();
     size_t start = 0;
     size_t end = 0;
@@ -230,14 +228,12 @@ std::string print_alignment(const char* query, const char* target, const EdlibAl
     return ss.str();
 }
 
-//[inc, excl)
-//FIXME remove debug
+//[start, end)
 std::optional<PosRange>
 find_best_adapter_match(const std::string& adapter,
                         const std::string& seq,
                         int dist_thr,
-                        std::optional<PosRange> subrange = std::nullopt,
-                        bool debug = false) {
+                        std::optional<PosRange> subrange = std::nullopt) {
     uint64_t shift = 0;
     uint64_t span = seq.size();
     assert(subrange);
@@ -257,12 +253,10 @@ find_best_adapter_match(const std::string& adapter,
     std::optional<PosRange> res = std::nullopt;
     if (edlib_result.status == EDLIB_STATUS_OK && edlib_result.editDistance != -1) {
         //FIXME REMOVE and use dist_thr instead of -1
-        if (debug/*expect_adapter_prefix*/) {
-            spdlog::info("Best adapter match edit distance: {} ; is middle {}",
-                        edlib_result.editDistance, abs(int(span / 2) - edlib_result.startLocations[0]) < 1000);
-            spdlog::info("Match location: ({}, {})", edlib_result.startLocations[0] + shift, edlib_result.endLocations[0] + shift + 1);
-            spdlog::info("\n{}", print_alignment(adapter.c_str(), seq.c_str()+shift, edlib_result));
-        }
+        spdlog::debug("Best adapter match edit distance: {} ; is middle {}",
+                    edlib_result.editDistance, abs(int(span / 2) - edlib_result.startLocations[0]) < 1000);
+        spdlog::debug("Match location: ({}, {})", edlib_result.startLocations[0] + shift, edlib_result.endLocations[0] + shift + 1);
+        spdlog::debug("\n{}", print_alignment(adapter.c_str(), seq.c_str()+shift, edlib_result));
         if (edlib_result.editDistance <= dist_thr) {
             res = {edlib_result.startLocations[0] + shift, edlib_result.endLocations[0] + shift + 1};
         }
@@ -271,6 +265,8 @@ find_best_adapter_match(const std::string& adapter,
     return res;
 }
 
+//currently just finds a single best match
+//TODO efficiently find more matches
 std::vector<PosRange> find_adapter_matches(const std::string& adapter,
                                            const std::string& seq,
                                            int dist_thr,
@@ -279,17 +275,8 @@ std::vector<PosRange> find_adapter_matches(const std::string& adapter,
     std::vector<PosRange> answer;
     assert(subrange.first <= subrange.second && subrange.second <= seq.size());
 
-    if (auto best_match = find_best_adapter_match(adapter, seq, dist_thr, subrange, true)) {
-        //Try to split again each side
-        if (auto left_match = find_best_adapter_match(adapter, seq, dist_thr,
-                                        PosRange{subrange.first, best_match->first})) {
-            answer.push_back(*left_match);
-        }
+    if (auto best_match = find_best_adapter_match(adapter, seq, dist_thr, subrange)) {
         answer.push_back(*best_match);
-        if (auto right_match = find_best_adapter_match(adapter, seq, dist_thr,
-                                        PosRange{best_match->second, subrange.second})) {
-            answer.push_back(*right_match);
-        }
     }
     return answer;
 }
@@ -308,7 +295,7 @@ bool check_rc_match(const std::string& seq, PosRange templ_r, PosRange compl_r, 
                             edlibNewAlignConfig(-1, EDLIB_MODE_HW, EDLIB_TASK_PATH, NULL, 0));
     assert(edlib_result.status == EDLIB_STATUS_OK); //&& edlib_result.editDistance <= dist_thr);
     std::optional<PosRange> res = std::nullopt;
-    spdlog::info("Checking ranges [{}, {}] vs [{}, {}]: edist={}\n{}",
+    spdlog::debug("Checking ranges [{}, {}] vs [{}, {}]: edist={}\n{}",
                     templ_r.first, templ_r.second,
                     compl_r.first, compl_r.second,
                     edlib_result.editDistance,
@@ -372,7 +359,7 @@ DuplexSplitNode::possible_pore_regions(const Read& read, float pore_thr) const {
     //pA = read->scaling * (raw + read->offset);
     //pA formula after scaling:
     //pA = read->scale * raw + read->shift
-    spdlog::info("Analyzing signal in read {}", read.read_id);
+    spdlog::debug("Analyzing signal in read {}", read.read_id);
     for (auto pore_signal_region : detect_pore_signal(
                                    read.raw_data.to(torch::kFloat) * read.scale + read.shift,
                                    pore_thr,
@@ -394,7 +381,7 @@ DuplexSplitNode::possible_pore_regions(const Read& read, float pore_thr) const {
     }
     std::ostringstream oss;
     std::copy(pore_regions.begin(), pore_regions.end(), std::ostream_iterator<PosRange>(oss, "; "));
-    spdlog::info("{} regions to check: {}", pore_regions.size(), oss.str());
+    spdlog::debug("{} regions to check: {}", pore_regions.size(), oss.str());
     return pore_regions;
 }
 
@@ -404,8 +391,8 @@ DuplexSplitNode::check_nearby_adapter(const Read& read, PosRange r, int adapter_
                 read.seq,
                 adapter_edist,
                 //including spacer region in search
-                PosRange{r.first, std::min(r.second + m_settings.pore_adapter_range, (uint64_t) read.seq.size())},
-                true).has_value();
+                PosRange{r.first, std::min(r.second + m_settings.pore_adapter_range, (uint64_t) read.seq.size())})
+                .has_value();
 }
 
 //r is potential spacer region
@@ -431,16 +418,15 @@ DuplexSplitNode::identify_extra_middle_split(const Read& read) const {
         return std::nullopt;
     }
 
-    spdlog::info("Checking start/end match");
+    spdlog::debug("Checking start/end match");
     if (check_rc_match(read.seq, {r_l - m_settings.query_flank, r_l},
             {0, m_settings.target_flank}, m_settings.relaxed_flank_edist)) {
-        spdlog::info("Searching for adapter match");
+        spdlog::debug("Searching for adapter match");
         if (auto adapter_match = find_best_adapter_match(m_settings.adapter, read.seq,
                                 m_settings.relaxed_adapter_edist,
-                                PosRange{r_l / 2 - adapter_search_span / 2, r_l / 2 + adapter_search_span / 2},
-                                true)) {
+                                PosRange{r_l / 2 - adapter_search_span / 2, r_l / 2 + adapter_search_span / 2})) {
             auto adapter_start = adapter_match->first;
-            spdlog::info("Checking middle match");
+            spdlog::debug("Checking middle match");
             if (check_flank_match(read,
                                 {adapter_start, adapter_start},
                                 m_settings.relaxed_flank_edist)) {
@@ -536,7 +522,6 @@ DuplexSplitNode::build_split_finders() const {
 
 void DuplexSplitNode::worker_thread() {
     using namespace std::chrono;
-    spdlog::info("DSN: Hello from worker thread");
     Message message;
 
     while (m_work_queue.try_pop(message)) {
