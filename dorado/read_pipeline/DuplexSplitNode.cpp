@@ -373,6 +373,7 @@ bool check_rc_match(const std::string& seq, PosRange templ_r, PosRange compl_r, 
 
 //TODO end_reason access?
 //signal_range should already be 'adjusted' to stride (e.g. probably gotten from seq_range)
+//NB: doesn't set parent_read_id
 std::shared_ptr<Read> subread(const Read& read, PosRange seq_range, PosRange signal_range) {
     const int stride = read.model_stride;
     assert(signal_range.first % stride == 0);
@@ -386,13 +387,12 @@ std::shared_ptr<Read> subread(const Read& read, PosRange seq_range, PosRange sig
                         std::to_string(seq_range.first) + "-" + std::to_string(seq_range.second));
     subread->read_id = subread_id;
     subread->raw_data = subread->raw_data.index({torch::indexing::Slice(signal_range.first, signal_range.second)});
+    subread->attributes.read_number = uint32_t(-1);
     subread->attributes.start_time = adjust_time_ms(subread->attributes.start_time,
                                         (subread->num_trimmed_samples + signal_range.first)
                                             * 1000. / subread->sample_rate);
     //we adjust for it in new start time above
     subread->num_trimmed_samples = 0;
-    //FIXME HOW TO UPDATE
-    //subread->attributes.read_number = ???;
     ////fixme update?
     //subread->range = ???;
     ////fixme update?
@@ -674,6 +674,7 @@ void DuplexSplitNode::worker_thread() {
         }
 
         for (auto subread : to_split) {
+            subread->parent_read_id = init_read->read_id;
             m_sink.push_message(std::move(subread));
             //FIXME add debug mode which would not do any splitting
             //m_sink.push_message(std::move(message));

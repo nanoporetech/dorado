@@ -80,6 +80,8 @@ public:
     std::string run_id;                   // Read group
     std::string model_name;               // Read group
 
+    std::string parent_read_id;           // Origin read ID for all its subreads
+
     std::shared_ptr<const utils::BaseModInfo>
             base_mod_info;  // Modified base settings of the models that ran on this read
 

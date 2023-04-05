@@ -65,11 +65,15 @@ std::vector<std::string> Read::generate_read_tags(bool emit_moves) const {
             "mx:i:" + std::to_string(attributes.mux),
             "ch:i:" + std::to_string(attributes.channel_number),
             "st:Z:" + attributes.start_time,
-            "rn:i:" + std::to_string(attributes.read_number),
+            "rn:i:" + (attributes.read_number == uint32_t(-1) ? "-1" : std::to_string(attributes.read_number)),
             "f5:Z:" + attributes.fast5_filename,
             "sm:f:" + shift_str,
             "sd:f:" + scale_str,
             "sv:Z:quantile"};
+
+    if (!parent_read_id.empty()) {
+        tags.push_back("pi:Z:" + parent_read_id);
+    }
 
     if (run_id != "" && model_name != "") {
         tags.push_back("RG:Z:" + run_id + "_" + model_name);
