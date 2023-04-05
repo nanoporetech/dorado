@@ -47,8 +47,10 @@ II. Adapter-aware mode
     Maybe try finding remnants of an adapter here?
 */
 struct DuplexSplitSettings {
+    bool simplex_mode;
     float pore_thr = 160.;
     size_t pore_cl_dist = 4000; // TODO maybe use frequency * 1sec here?
+    //FIXME see if it ever helps!
     float relaxed_pore_thr = 150.;
     //usually template read region to the left of potential spacer region
     //FIXME rename to end_flank?!!
@@ -74,6 +76,8 @@ struct DuplexSplitSettings {
     //HEAD_ADAPTER = 'AATGTACTTCGTTCAGTTACGTATTGCT'
     //clipped 4 letters from the beginning of head adapter! 24 left
     std::string adapter = "TACTTCGTTCAGTTACGTATTGCT";
+
+    explicit DuplexSplitSettings(bool simplex_mode = false) : simplex_mode(simplex_mode) {}
 };
 
 class DuplexSplitNode : public MessageSink {

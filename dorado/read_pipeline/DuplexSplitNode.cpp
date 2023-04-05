@@ -488,45 +488,47 @@ DuplexSplitNode::build_split_finders() const {
                     });
         }});
 
-    split_finders.push_back({"PORE_FLANK",
-        [&](const Read &read) {
-            return merge_ranges(filter_ranges(
-                possible_pore_regions(read, m_settings.pore_thr),
-                [&](PosRange r) {
-                    return check_flank_match(read, r, m_settings.flank_edist);
-                }), m_settings.query_flank + m_settings.target_flank);
-        }});
+    if (!m_settings.simplex_mode) {
+        split_finders.push_back({"PORE_FLANK",
+            [&](const Read &read) {
+                return merge_ranges(filter_ranges(
+                    possible_pore_regions(read, m_settings.pore_thr),
+                    [&](PosRange r) {
+                        return check_flank_match(read, r, m_settings.flank_edist);
+                    }), m_settings.query_flank + m_settings.target_flank);
+            }});
 
-    split_finders.push_back({"PORE_ALL",
-        [&](const Read &read) {
-            return merge_ranges(filter_ranges(
-                possible_pore_regions(read, m_settings.relaxed_pore_thr),
-                [&](PosRange r) {
-                    return check_nearby_adapter(read, r, m_settings.relaxed_adapter_edist)
-                            && check_flank_match(read, r, m_settings.relaxed_flank_edist);
-                }), m_settings.query_flank + m_settings.target_flank);
-        }});
+        split_finders.push_back({"PORE_ALL",
+            [&](const Read &read) {
+                return merge_ranges(filter_ranges(
+                    possible_pore_regions(read, m_settings.relaxed_pore_thr),
+                    [&](PosRange r) {
+                        return check_nearby_adapter(read, r, m_settings.relaxed_adapter_edist)
+                                && check_flank_match(read, r, m_settings.relaxed_flank_edist);
+                    }), m_settings.query_flank + m_settings.target_flank);
+            }});
 
-    split_finders.push_back({"ADAPTER_FLANK",
-        [&](const Read &read) {
-            return filter_ranges(
-                find_adapter_matches(m_settings.adapter,
-                                    read.seq,
-                                    m_settings.adapter_edist,
-                                    PosRange{m_settings.expect_adapter_prefix, read.seq.size()}),
-                [&](PosRange r) {
-                    return check_flank_match(read, {r.first, r.first}, m_settings.flank_edist);
-                });
-        }});
+        split_finders.push_back({"ADAPTER_FLANK",
+            [&](const Read &read) {
+                return filter_ranges(
+                    find_adapter_matches(m_settings.adapter,
+                                        read.seq,
+                                        m_settings.adapter_edist,
+                                        PosRange{m_settings.expect_adapter_prefix, read.seq.size()}),
+                    [&](PosRange r) {
+                        return check_flank_match(read, {r.first, r.first}, m_settings.flank_edist);
+                    });
+            }});
 
-    split_finders.push_back({"ADAPTER_MIDDLE",
-        [&](const Read &read) {
-            if (auto split = identify_extra_middle_split(read)) {
-                return PosRanges{*split};
-            } else {
-                return PosRanges();
-            }
-        }});
+        split_finders.push_back({"ADAPTER_MIDDLE",
+            [&](const Read &read) {
+                if (auto split = identify_extra_middle_split(read)) {
+                    return PosRanges{*split};
+                } else {
+                    return PosRanges();
+                }
+            }});
+    }
 
     return split_finders;
 }

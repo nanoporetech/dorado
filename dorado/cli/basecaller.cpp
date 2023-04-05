@@ -161,7 +161,7 @@ void setup(std::vector<std::string> args,
     WriterNode writer_node(std::move(args), emit_fastq, emit_moves, rna, duplex, min_qscore,
                            num_devices * 2, std::move(read_groups), num_reads);
 
-    DuplexSplitNode duplex_split_node(writer_node, DuplexSplitSettings(), /*num worker threads*/1);
+    DuplexSplitNode duplex_split_node(writer_node, DuplexSplitSettings(/*simplex_mode*/false), /*num_devices*/1);
 
     std::unique_ptr<ModBaseCallerNode> mod_base_caller_node;
     std::unique_ptr<BasecallerNode> basecaller_node;
