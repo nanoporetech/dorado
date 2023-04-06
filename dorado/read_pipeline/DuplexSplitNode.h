@@ -7,7 +7,7 @@ struct DuplexSplitSettings {
     bool enabled = true;
     bool simplex_mode;
     float pore_thr = 160.;
-    size_t pore_cl_dist = 4000; // TODO maybe use frequency * 1sec here?
+    size_t pore_cl_dist = 4000;  // TODO maybe use frequency * 1sec here?
     float relaxed_pore_thr = 150.;
     //usually template read region to the left of potential spacer region
     size_t end_flank = 1200;
@@ -19,7 +19,7 @@ struct DuplexSplitSettings {
     int relaxed_flank_edist = 250;
     int adapter_edist = 4;
     int relaxed_adapter_edist = 6;
-    uint64_t pore_adapter_range = 100; //bp
+    uint64_t pore_adapter_range = 100;  //bp
     //in bases
     uint64_t expect_adapter_prefix = 200;
     //in samples
@@ -48,26 +48,27 @@ public:
     typedef std::pair<uint64_t, uint64_t> PosRange;
     typedef std::vector<PosRange> PosRanges;
 
-    DuplexSplitNode(MessageSink& sink, DuplexSplitSettings settings,
-                    int num_worker_threads = 5, size_t max_reads = 1000);
+    DuplexSplitNode(MessageSink& sink,
+                    DuplexSplitSettings settings,
+                    int num_worker_threads = 5,
+                    size_t max_reads = 1000);
     ~DuplexSplitNode();
 
 private:
-    typedef std::function<PosRanges (const ExtRead&)> SplitFinderF;
+    typedef std::function<PosRanges(const ExtRead&)> SplitFinderF;
 
     std::vector<PosRange> possible_pore_regions(const ExtRead& read, float pore_thr) const;
     bool check_nearby_adapter(const Read& read, PosRange r, int adapter_edist) const;
     bool check_flank_match(const Read& read, PosRange r, int dist_thr) const;
     std::optional<PosRange> identify_extra_middle_split(const Read& read) const;
 
-    std::vector<std::shared_ptr<Read>>
-    split(std::shared_ptr<Read> read, const PosRanges& spacers) const;
+    std::vector<std::shared_ptr<Read>> split(std::shared_ptr<Read> read,
+                                             const PosRanges& spacers) const;
 
-    std::vector<std::pair<std::string, SplitFinderF>>
-    build_split_finders() const;
+    std::vector<std::pair<std::string, SplitFinderF>> build_split_finders() const;
 
     void worker_thread();  // Worker thread performs scaling and trimming asynchronously.
-    MessageSink& m_sink;  // MessageSink to consume scaled reads.
+    MessageSink& m_sink;   // MessageSink to consume scaled reads.
 
     const DuplexSplitSettings m_settings;
     std::vector<std::pair<std::string, SplitFinderF>> m_split_finders;

@@ -13,9 +13,9 @@
 #include "nn/ModelRunner.h"
 #include "nn/RemoraModel.h"
 #include "read_pipeline/BasecallerNode.h"
+#include "read_pipeline/DuplexSplitNode.h"
 #include "read_pipeline/ModBaseCallerNode.h"
 #include "read_pipeline/ScalerNode.h"
-#include "read_pipeline/DuplexSplitNode.h"
 #include "read_pipeline/WriterNode.h"
 #include "utils/log_utils.h"
 #include "utils/parameters.h"
@@ -161,8 +161,8 @@ void setup(std::vector<std::string> args,
     WriterNode writer_node(std::move(args), emit_fastq, emit_moves, rna, duplex, min_qscore,
                            num_devices * 2, std::move(read_groups), num_reads);
 
-    DuplexSplitNode splitter_node(
-            writer_node, DuplexSplitSettings(/*simplex_mode*/true), num_devices);
+    DuplexSplitNode splitter_node(writer_node, DuplexSplitSettings(/*simplex_mode*/ true),
+                                  num_devices);
 
     std::unique_ptr<ModBaseCallerNode> mod_base_caller_node;
     std::unique_ptr<BasecallerNode> basecaller_node;
