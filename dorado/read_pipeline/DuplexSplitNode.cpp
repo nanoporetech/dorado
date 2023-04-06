@@ -409,7 +409,7 @@ DuplexSplitNode::possible_pore_regions(const Read& read, float pore_thr) const {
         spdlog::debug("Max raw signal {} pA, threshold: {}",
             (read.raw_data.to(torch::kFloat) * read.scale + read.shift)
                 .index({torch::indexing::Slice(m_settings.expect_pore_prefix, torch::indexing::None)}).max().item<float>(),
-            threshold);
+            pore_thr);
     }
 
     for (auto pore_signal_region : detect_pore_signal(
