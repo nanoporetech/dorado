@@ -1,10 +1,6 @@
 #pragma once
 #include "ReadPipeline.h"
 
-/*
-. put in a PR for end_reason (modify dataloader)
-. assert empty mappings
-*/
 namespace dorado {
 
 struct DuplexSplitSettings {

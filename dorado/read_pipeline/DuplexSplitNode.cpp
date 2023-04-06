@@ -55,10 +55,10 @@ std::shared_ptr<Read> copy_read(const Read &read) {
     copy->seq = read.seq;
     copy->qstring = read.qstring;
     copy->moves = read.moves;
-    copy->base_mod_probs = read.base_mod_probs;
     copy->run_id = read.run_id;
     copy->model_name = read.model_name;
 
+    copy->base_mod_probs = read.base_mod_probs;
     copy->base_mod_info = read.base_mod_info;
 
     copy->num_trimmed_samples = read.num_trimmed_samples;
@@ -331,6 +331,9 @@ bool check_rc_match(const std::string& seq, PosRange templ_r, PosRange compl_r, 
 //signal_range should already be 'adjusted' to stride (e.g. probably gotten from seq_range)
 //NB: doesn't set parent_read_id
 std::shared_ptr<Read> subread(const Read& read, PosRange seq_range, PosRange signal_range) {
+    //TODO support mods
+    //NB: currently doesn't support mods
+    assert(read.base_mod_info == nullptr && read.base_mod_probs.empty());
     const int stride = read.model_stride;
     assert(signal_range.first % stride == 0);
     assert(signal_range.second % stride == 0 || (signal_range.second == read.raw_data.size(0) && seq_range.second == read.seq.size()));
@@ -349,9 +352,9 @@ std::shared_ptr<Read> subread(const Read& read, PosRange seq_range, PosRange sig
                                             * 1000. / subread->sample_rate);
     //we adjust for it in new start time above
     subread->num_trimmed_samples = 0;
-    ////fixme update?
+    ////FIXME update?
     //subread->range = ???;
-    ////fixme update?
+    ////FIXME update?
     //subread->offset = ???;
 
     subread->seq = subread->seq.substr(seq_range.first, seq_range.second - seq_range.first);
