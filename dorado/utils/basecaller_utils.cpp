@@ -17,13 +17,9 @@ std::unordered_set<std::string> load_read_list(std::string read_list) {
         throw std::runtime_error("Read list does not exist.");
     }
     std::string cell;
-    int line = 0;
 
-    std::getline(dataFile, cell);
-    while (!dataFile.eof()) {
+    while (std::getline(dataFile, cell)) {
         read_ids.insert(cell);
-        line++;
-        std::getline(dataFile, cell);
     }
     return read_ids;
 }
