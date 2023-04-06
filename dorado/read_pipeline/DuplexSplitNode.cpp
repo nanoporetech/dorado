@@ -188,31 +188,10 @@ std::vector<std::pair<size_t, size_t>> detect_pore_signal(torch::Tensor signal,
         ans.push_back(std::pair{start, end});
     }
     assert(start < pore_a.size(0) && end <= pore_a.size(0));
+
     auto stop_ts = high_resolution_clock::now();
     spdlog::info("OPEN_PORE duration: {} microseconds", duration_cast<microseconds>(stop_ts - start_ts).count());
     return ans;
-    //FIXME optimize
-    //std::vector<std::pair<size_t, size_t>> ans;
-    // auto pore_positions = torch::nonzero(signal > threshold);
-    // //FIXME what type to use here?
-    // auto pore_a = pore_positions.accessor<int32_t, 1>();
-    // size_t start = size_t(-1);
-    // size_t end = size_t(-1);
-
-    // int i = 0;
-    // for (; i < pore_a.size(0); i++) {
-    //     if (i == 0 || pore_a[i] > end + cluster_dist) {
-    //         if (i > 0) {
-    //             ans.push_back(std::pair{start, end});
-    //         }
-    //         start = pore_a[i];
-    //     }
-    //     end = pore_a[i] + 1;
-    // }
-    // if (i > 0) {
-    //     ans.push_back(std::pair{start, end});
-    // }
-    // return ans;
 }
 
 std::string print_alignment(const char* query, const char* target, const EdlibAlignResult& result) {
