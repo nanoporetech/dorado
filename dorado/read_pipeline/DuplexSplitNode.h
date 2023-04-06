@@ -38,26 +38,27 @@ struct DuplexSplitSettings {
     explicit DuplexSplitSettings(bool simplex_mode = false) : simplex_mode(simplex_mode) {}
 };
 
-//TODO consider precumputing and reusing ranges with high signal
-struct ExtRead {
-    std::shared_ptr<Read> read;
-    torch::Tensor data_as_float32;
-    std::vector<uint64_t> move_sums;
-
-    explicit ExtRead(std::shared_ptr<Read> r);
-};
-
 class DuplexSplitNode : public MessageSink {
 public:
+    //TODO consider precumputing and reusing ranges with high signal
+    struct ExtRead {
+        std::shared_ptr<Read> read;
+        torch::Tensor data_as_float32;
+        std::vector<uint64_t> move_sums;
+
+        explicit ExtRead(std::shared_ptr<Read> r);
+    };
+
     typedef std::pair<uint64_t, uint64_t> PosRange;
     typedef std::vector<PosRange> PosRanges;
-    typedef std::function<PosRanges (const ExtRead&)> SplitFinderF;
 
     DuplexSplitNode(MessageSink& sink, DuplexSplitSettings settings,
                     int num_worker_threads = 5, size_t max_reads = 1000);
     ~DuplexSplitNode();
 
 private:
+    typedef std::function<PosRanges (const ExtRead&)> SplitFinderF;
+
     std::vector<PosRange> possible_pore_regions(const ExtRead& read, float pore_thr) const;
     bool check_nearby_adapter(const Read& read, PosRange r, int adapter_edist) const;
     bool check_flank_match(const Read& read, PosRange r, int dist_thr) const;

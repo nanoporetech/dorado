@@ -366,7 +366,7 @@ std::shared_ptr<Read> subread(const Read& read, PosRange seq_range, PosRange sig
 
 namespace dorado {
 
-ExtRead::ExtRead(std::shared_ptr<Read> r) :
+DuplexSplitNode::ExtRead::ExtRead(std::shared_ptr<Read> r) :
     read(r),
     data_as_float32(read->raw_data.to(torch::kFloat)),
     move_sums(move_cum_sums(read->moves)) {
@@ -374,7 +374,7 @@ ExtRead::ExtRead(std::shared_ptr<Read> r) :
 }
 
 PosRanges
-DuplexSplitNode::possible_pore_regions(const ExtRead& read, float pore_thr) const {
+DuplexSplitNode::possible_pore_regions(const DuplexSplitNode::ExtRead& read, float pore_thr) const {
     PosRanges pore_regions;
 
     //pA formula before scaling:
@@ -603,7 +603,7 @@ void DuplexSplitNode::worker_thread() {
         spdlog::debug("Read {} split into {} subreads", init_read->read_id, to_split.size());
 
         auto stop_ts = high_resolution_clock::now();
-        spdlog::trace("READ duration: {} microseconds", duration_cast<microseconds>(stop_ts - start_ts).count());
+        spdlog::trace("READ duration: {} microseconds (ID: {})", duration_cast<microseconds>(stop_ts - start_ts).count(), init_read->read_id);
 
         for (auto subread : to_split) {
             //TODO correctly process end_reason when we have them
