@@ -12,24 +12,18 @@ struct DuplexSplitSettings {
     bool simplex_mode;
     float pore_thr = 160.;
     size_t pore_cl_dist = 4000; // TODO maybe use frequency * 1sec here?
-    //FIXME see if it ever helps!
     float relaxed_pore_thr = 150.;
     //usually template read region to the left of potential spacer region
-    //FIXME rename to end_flank?!!
-    size_t query_flank = 1200;
+    size_t end_flank = 1200;
     //trim potentially erroneous (and/or PCR adapter) bases at end of query
-    size_t query_trim = 200;
+    size_t end_trim = 200;
     //adjusted to adapter presense and potential loss of bases on query, leading to 'shift'
-    //FIXME rename to start_flank?!!
-    size_t target_flank = 1700;
-    //FIXME should probably be fractional
-    //currently has to account for the adapter
+    size_t start_flank = 1700;
     int flank_edist = 150;
-    //FIXME do we need both of them?
     int relaxed_flank_edist = 250;
     int adapter_edist = 4;
     int relaxed_adapter_edist = 6;
-    uint64_t pore_adapter_range = 100; //bp TODO figure out good threshold
+    uint64_t pore_adapter_range = 100; //bp
     //in bases
     uint64_t expect_adapter_prefix = 200;
     //in samples

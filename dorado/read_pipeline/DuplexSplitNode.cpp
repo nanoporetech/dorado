@@ -18,7 +18,6 @@
 
 //TODO go via preprocessor?
 static const bool DEBUG = false;
-
 namespace {
 
 using namespace dorado;
@@ -68,7 +67,7 @@ std::shared_ptr<Read> copy_read(const Read &read) {
     return copy;
 }
 
-//FIXME copied from DataLoader.cpp
+//TODO copied from DataLoader.cpp along with the num_ms bug
 std::string get_string_timestamp_from_unix_time(time_t time_stamp_ms) {
     static std::mutex timestamp_mtx;
     std::unique_lock lock(timestamp_mtx);
@@ -433,12 +432,12 @@ DuplexSplitNode::check_nearby_adapter(const Read& read, PosRange r, int adapter_
 //r is potential spacer region
 bool
 DuplexSplitNode::check_flank_match(const Read& read, PosRange r, int dist_thr) const {
-    return r.first >= m_settings.query_flank
-            && r.second + m_settings.target_flank <= read.seq.length()
+    return r.first >= m_settings.end_flank
+            && r.second + m_settings.start_flank <= read.seq.length()
             && check_rc_match(read.seq,
-                    {r.first - m_settings.query_flank, r.first - m_settings.query_trim},
+                    {r.first - m_settings.end_flank, r.first - m_settings.end_trim},
                     //including spacer region in search
-                    {r.first, r.second + m_settings.target_flank},
+                    {r.first, r.second + m_settings.start_flank},
                     dist_thr);
 }
 
@@ -446,22 +445,22 @@ DuplexSplitNode::check_flank_match(const Read& read, PosRange r, int dist_thr) c
 std::optional<DuplexSplitNode::PosRange>
 DuplexSplitNode::identify_extra_middle_split(const Read& read) const {
     const auto r_l = read.seq.size();
-    if (r_l < m_settings.query_flank + m_settings.target_flank || r_l < m_settings.middle_adapter_search_span) {
+    if (r_l < m_settings.end_flank + m_settings.start_flank || r_l < m_settings.middle_adapter_search_span) {
         return std::nullopt;
     }
 
-    spdlog::debug("Searching for adapter match");
+    spdlog::trace("Searching for adapter match");
     if (auto adapter_match = find_best_adapter_match(m_settings.adapter, read.seq,
                             m_settings.relaxed_adapter_edist,
                             PosRange{r_l / 2 - m_settings.middle_adapter_search_span / 2,
                                      r_l / 2 + m_settings.middle_adapter_search_span / 2})) {
         auto adapter_start = adapter_match->first;
-        spdlog::debug("Checking middle match & start/end match");
+        spdlog::trace("Checking middle match & start/end match");
         if (check_flank_match(read,
                             {adapter_start, adapter_start},
                             m_settings.relaxed_flank_edist)
-                && check_rc_match(read.seq, {r_l - m_settings.query_flank, r_l - m_settings.query_trim},
-                        {0, m_settings.target_flank}, m_settings.relaxed_flank_edist)) {
+                && check_rc_match(read.seq, {r_l - m_settings.end_flank, r_l - m_settings.end_trim},
+                        {0, m_settings.start_flank}, m_settings.relaxed_flank_edist)) {
             return PosRange{adapter_start - 1, adapter_start};
         }
     }
@@ -525,7 +524,7 @@ DuplexSplitNode::build_split_finders() const {
                     possible_pore_regions(read, m_settings.pore_thr),
                     [&](PosRange r) {
                         return check_flank_match(*read.read, r, m_settings.flank_edist);
-                    }), m_settings.query_flank + m_settings.target_flank);
+                    }), m_settings.end_flank + m_settings.start_flank);
             }});
 
         split_finders.push_back({"PORE_ALL",
@@ -535,7 +534,7 @@ DuplexSplitNode::build_split_finders() const {
                     [&](PosRange r) {
                         return check_nearby_adapter(*read.read, r, m_settings.relaxed_adapter_edist)
                                 && check_flank_match(*read.read, r, m_settings.relaxed_flank_edist);
-                    }), m_settings.query_flank + m_settings.target_flank);
+                    }), m_settings.end_flank + m_settings.start_flank);
             }});
 
         split_finders.push_back({"ADAPTER_FLANK",
@@ -580,7 +579,7 @@ void DuplexSplitNode::worker_thread() {
 
         std::vector<ExtRead> to_split{ExtRead(init_read)};
         for (const auto &[description, split_f] : m_split_finders) {
-            spdlog::debug("Running {}", description);
+            spdlog::trace("Running {}", description);
             std::vector<ExtRead> split_round_result;
             for (auto &r : to_split) {
                 //auto start = high_resolution_clock::now();
@@ -601,7 +600,7 @@ void DuplexSplitNode::worker_thread() {
             to_split = std::move(split_round_result);
         }
 
-        spdlog::debug("Read {} split into {} subreads: {}", init_read->read_id, to_split.size());
+        spdlog::debug("Read {} split into {} subreads", init_read->read_id, to_split.size());
 
         auto stop_ts = high_resolution_clock::now();
         spdlog::trace("READ duration: {} microseconds", duration_cast<microseconds>(stop_ts - start_ts).count());
