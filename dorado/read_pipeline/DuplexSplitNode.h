@@ -8,6 +8,7 @@
 namespace dorado {
 
 struct DuplexSplitSettings {
+    bool enabled = true;
     bool simplex_mode;
     float pore_thr = 160.;
     size_t pore_cl_dist = 4000; // TODO maybe use frequency * 1sec here?
@@ -33,26 +34,37 @@ struct DuplexSplitSettings {
     uint64_t expect_adapter_prefix = 200;
     //in samples
     uint64_t expect_pore_prefix = 5000;
+    int middle_adapter_search_span = 1000;
+
     //TAIL_ADAPTER = 'GCAATACGTAACTGAACGAAGT'
     //HEAD_ADAPTER = 'AATGTACTTCGTTCAGTTACGTATTGCT'
-    //clipped 4 letters from the beginning of head adapter! 24 left
+    //clipped 4 letters from the beginning of head adapter (24 left)
     std::string adapter = "TACTTCGTTCAGTTACGTATTGCT";
 
     explicit DuplexSplitSettings(bool simplex_mode = false) : simplex_mode(simplex_mode) {}
+};
+
+//TODO consider precumputing and reusing ranges with high signal
+struct ExtRead {
+    std::shared_ptr<Read> read;
+    torch::Tensor data_as_float32;
+    std::vector<uint64_t> move_sums;
+
+    explicit ExtRead(std::shared_ptr<Read> r);
 };
 
 class DuplexSplitNode : public MessageSink {
 public:
     typedef std::pair<uint64_t, uint64_t> PosRange;
     typedef std::vector<PosRange> PosRanges;
-    typedef std::function<PosRanges (const Read&)> SplitFinderF;
+    typedef std::function<PosRanges (const ExtRead&)> SplitFinderF;
 
     DuplexSplitNode(MessageSink& sink, DuplexSplitSettings settings,
                     int num_worker_threads = 5, size_t max_reads = 1000);
     ~DuplexSplitNode();
 
 private:
-    std::vector<PosRange> possible_pore_regions(const Read& read, float pore_thr) const;
+    std::vector<PosRange> possible_pore_regions(const ExtRead& read, float pore_thr) const;
     bool check_nearby_adapter(const Read& read, PosRange r, int adapter_edist) const;
     bool check_flank_match(const Read& read, PosRange r, int dist_thr) const;
     std::optional<PosRange> identify_extra_middle_split(const Read& read) const;

@@ -164,7 +164,7 @@ std::vector<std::pair<size_t, size_t>> detect_pore_signal(torch::Tensor signal,
                                                           size_t cluster_dist,
                                                           size_t ignore_prefix) {
     using namespace std::chrono;
-    auto start_ts = high_resolution_clock::now();
+    const auto start_ts = high_resolution_clock::now();
 
     std::vector<std::pair<size_t, size_t>> ans;
     //auto pore_a = signal.accessor<torch::kFloat16, 1>();
@@ -189,8 +189,8 @@ std::vector<std::pair<size_t, size_t>> detect_pore_signal(torch::Tensor signal,
     }
     assert(start < pore_a.size(0) && end <= pore_a.size(0));
 
-    auto stop_ts = high_resolution_clock::now();
-    spdlog::info("OPEN_PORE duration: {} microseconds", duration_cast<microseconds>(stop_ts - start_ts).count());
+    const auto stop_ts = high_resolution_clock::now();
+    spdlog::trace("OPEN_PORE duration: {} microseconds", duration_cast<microseconds>(stop_ts - start_ts).count());
     return ans;
 }
 
@@ -367,46 +367,46 @@ std::shared_ptr<Read> subread(const Read& read, PosRange seq_range, PosRange sig
 
 namespace dorado {
 
-PosRanges
-DuplexSplitNode::possible_pore_regions(const Read& read, float pore_thr) const {
-    using namespace std::chrono;
-    auto start_ts = high_resolution_clock::now();
-    PosRanges pore_regions;
+ExtRead::ExtRead(std::shared_ptr<Read> r) :
+    read(r),
+    data_as_float32(read->raw_data.to(torch::kFloat)),
+    move_sums(move_cum_sums(read->moves)) {
+    assert(move_sums.back() == read->seq.length());
+}
 
-    //FIXME reasonably fast, but maybe optimize
-    const auto move_sums = move_cum_sums(read.moves);
-    assert(move_sums.back() == read.seq.length());
+PosRanges
+DuplexSplitNode::possible_pore_regions(const ExtRead& read, float pore_thr) const {
+    PosRanges pore_regions;
 
     //pA formula before scaling:
     //pA = read->scaling * (raw + read->offset);
     //pA formula after scaling:
     //pA = read->scale * raw + read->shift
-    spdlog::debug("Analyzing signal in read {}", read.read_id);
+    spdlog::debug("Analyzing signal in read {}", read.read->read_id);
 
-    //FIXME do we need to check DEBUG or spdlog::debug is lazy enough?
     if (DEBUG) {
         spdlog::debug("Max raw signal {} pA, threshold: {}",
-            (read.raw_data.to(torch::kFloat) * read.scale + read.shift)
+            (read.data_as_float32 * read.read->scale + read.read->shift)
                 .index({torch::indexing::Slice(m_settings.expect_pore_prefix, torch::indexing::None)}).max().item<float>(),
             pore_thr);
     }
 
     for (auto pore_signal_region : detect_pore_signal(
-                                   read.raw_data.to(torch::kFloat),
-                                   (pore_thr - read.shift) / read.scale,
+                                   read.data_as_float32,
+                                   (pore_thr - read.read->shift) / read.read->scale,
                                    m_settings.pore_cl_dist,
                                    m_settings.expect_pore_prefix)) {
-        auto move_start = pore_signal_region.first / read.model_stride;
-        auto move_end = pore_signal_region.second / read.model_stride;
+        auto move_start = pore_signal_region.first / read.read->model_stride;
+        auto move_end = pore_signal_region.second / read.read->model_stride;
         assert(move_end >= move_start);
         //NB move_start can get to move_sums.size(), because of the stride rounding?
-        if (move_start >= move_sums.size() || move_end >= move_sums.size() || move_sums[move_start] == 0) {
+        if (move_start >= read.move_sums.size() || move_end >= read.move_sums.size() || read.move_sums[move_start] == 0) {
             //either at very end of the signal or basecalls have not started yet
             continue;
         }
-        auto start_pos = move_sums[move_start] - 1;
+        auto start_pos = read.move_sums[move_start] - 1;
         //NB. adding adapter length
-        auto end_pos = move_sums[move_end];
+        auto end_pos = read.move_sums[move_end];
         assert(end_pos > start_pos);
         pore_regions.push_back({start_pos, end_pos});
     }
@@ -417,8 +417,6 @@ DuplexSplitNode::possible_pore_regions(const Read& read, float pore_thr) const {
         spdlog::debug("{} regions to check: {}", pore_regions.size(), oss.str());
     }
 
-    auto stop_ts = high_resolution_clock::now();
-    spdlog::info("POSSIBLE_PORE duration: {} microseconds", duration_cast<microseconds>(stop_ts - start_ts).count());
     return pore_regions;
 }
 
@@ -447,18 +445,16 @@ DuplexSplitNode::check_flank_match(const Read& read, PosRange r, int dist_thr) c
 //std::vector<ReadRange>
 std::optional<DuplexSplitNode::PosRange>
 DuplexSplitNode::identify_extra_middle_split(const Read& read) const {
-    //FIXME parameterize
-    const auto adapter_search_span = 1000;
-
     const auto r_l = read.seq.size();
-    if (r_l < m_settings.query_flank + m_settings.target_flank || r_l < adapter_search_span) {
+    if (r_l < m_settings.query_flank + m_settings.target_flank || r_l < m_settings.middle_adapter_search_span) {
         return std::nullopt;
     }
 
     spdlog::debug("Searching for adapter match");
     if (auto adapter_match = find_best_adapter_match(m_settings.adapter, read.seq,
                             m_settings.relaxed_adapter_edist,
-                            PosRange{r_l / 2 - adapter_search_span / 2, r_l / 2 + adapter_search_span / 2})) {
+                            PosRange{r_l / 2 - m_settings.middle_adapter_search_span / 2,
+                                     r_l / 2 + m_settings.middle_adapter_search_span / 2})) {
         auto adapter_start = adapter_match->first;
         spdlog::debug("Checking middle match & start/end match");
         if (check_flank_match(read,
@@ -494,6 +490,19 @@ DuplexSplitNode::split(std::shared_ptr<Read> read, const std::vector<PosRange> &
     }
     assert(read->raw_data.size(0) == seq_to_sig_map[read->seq.size()]);
     subreads.push_back(subread(*read, {start_pos, read->seq.size()}, {signal_start, read->raw_data.size(0)}));
+
+    if (DEBUG) {
+        std::ostringstream spacer_oss;
+        std::copy(spacers.begin(), spacers.end(), std::ostream_iterator<PosRange>(spacer_oss, "; "));
+
+        std::ostringstream id_oss;
+        std::transform(subreads.begin(), subreads.end(),
+            std::ostream_iterator<std::string>(id_oss, "; "),
+            [](std::shared_ptr<Read> sr) {return sr->read_id;});
+        spdlog::debug("{} spacing regions in subread {}: {}. New read ids: {}",
+                    spacers.size(), read->read_id, spacer_oss.str(), id_oss.str());
+    }
+
     return subreads;
 }
 
@@ -501,49 +510,49 @@ std::vector<std::pair<std::string, DuplexSplitNode::SplitFinderF>>
 DuplexSplitNode::build_split_finders() const {
     std::vector<std::pair<std::string, SplitFinderF>> split_finders;
     split_finders.push_back({"PORE_ADAPTER",
-        [&](const Read &read) {
+        [&](const ExtRead &read) {
             return filter_ranges(
                     possible_pore_regions(read, m_settings.pore_thr),
                     [&](PosRange r) {
-                        return check_nearby_adapter(read, r, m_settings.adapter_edist);
+                        return check_nearby_adapter(*read.read, r, m_settings.adapter_edist);
                     });
         }});
 
     if (!m_settings.simplex_mode) {
         split_finders.push_back({"PORE_FLANK",
-            [&](const Read &read) {
+            [&](const ExtRead &read) {
                 return merge_ranges(filter_ranges(
                     possible_pore_regions(read, m_settings.pore_thr),
                     [&](PosRange r) {
-                        return check_flank_match(read, r, m_settings.flank_edist);
+                        return check_flank_match(*read.read, r, m_settings.flank_edist);
                     }), m_settings.query_flank + m_settings.target_flank);
             }});
 
         split_finders.push_back({"PORE_ALL",
-            [&](const Read &read) {
+            [&](const ExtRead &read) {
                 return merge_ranges(filter_ranges(
                     possible_pore_regions(read, m_settings.relaxed_pore_thr),
                     [&](PosRange r) {
-                        return check_nearby_adapter(read, r, m_settings.relaxed_adapter_edist)
-                                && check_flank_match(read, r, m_settings.relaxed_flank_edist);
+                        return check_nearby_adapter(*read.read, r, m_settings.relaxed_adapter_edist)
+                                && check_flank_match(*read.read, r, m_settings.relaxed_flank_edist);
                     }), m_settings.query_flank + m_settings.target_flank);
             }});
 
         split_finders.push_back({"ADAPTER_FLANK",
-            [&](const Read &read) {
+            [&](const ExtRead &read) {
                 return filter_ranges(
                     find_adapter_matches(m_settings.adapter,
-                                        read.seq,
+                                        read.read->seq,
                                         m_settings.adapter_edist,
-                                        PosRange{m_settings.expect_adapter_prefix, read.seq.size()}),
+                                        PosRange{m_settings.expect_adapter_prefix, read.read->seq.size()}),
                     [&](PosRange r) {
-                        return check_flank_match(read, {r.first, r.first}, m_settings.flank_edist);
+                        return check_flank_match(*read.read, {r.first, r.first}, m_settings.flank_edist);
                     });
             }});
 
         split_finders.push_back({"ADAPTER_MIDDLE",
-            [&](const Read &read) {
-                if (auto split = identify_extra_middle_split(read)) {
+            [&](const ExtRead &read) {
+                if (auto split = identify_extra_middle_split(*read.read)) {
                     return PosRanges{*split};
                 } else {
                     return PosRanges();
@@ -559,56 +568,49 @@ void DuplexSplitNode::worker_thread() {
     Message message;
 
     while (m_work_queue.try_pop(message)) {
+        if (!m_settings.enabled) {
+            m_sink.push_message(std::move(message));
+            continue;
+        }
+
+        auto start_ts = high_resolution_clock::now();
         // If this message isn't a read, we'll get a bad_variant_access exception.
         auto init_read = std::get<std::shared_ptr<Read>>(message);
-        spdlog::info("Processing read {}; length {}", init_read->read_id, init_read->seq.size());
+        spdlog::debug("Processing read {}; length {}", init_read->read_id, init_read->seq.size());
 
-        std::vector<std::shared_ptr<Read>> to_split{init_read};
+        std::vector<ExtRead> to_split{ExtRead(init_read)};
         for (const auto &[description, split_f] : m_split_finders) {
-            spdlog::info("Running {}", description);
-            std::vector<std::shared_ptr<Read>> split_round_result;
-            for (auto r : to_split) {
-                auto start = high_resolution_clock::now();
-                auto spacers = split_f(*r);
-                auto stop = high_resolution_clock::now();
-                spdlog::info("{} duration: {} microseconds", description, duration_cast<microseconds>(stop - start).count());
+            spdlog::debug("Running {}", description);
+            std::vector<ExtRead> split_round_result;
+            for (auto &r : to_split) {
+                //auto start = high_resolution_clock::now();
+                auto spacers = split_f(r);
+                //auto stop = high_resolution_clock::now();
+                //spdlog::trace("{} duration: {} microseconds", description, duration_cast<microseconds>(stop - start).count());
+                spdlog::debug("DSN: {} strategy {} splits in read {}", description, spacers.size(), init_read->read_id);
 
-                //logging begin
-                std::ostringstream spacer_oss;
-                std::copy(spacers.begin(), spacers.end(), std::ostream_iterator<PosRange>(spacer_oss, "; "));
-                //logging end
-
-                start = high_resolution_clock::now();
-                auto subreads = split(r, spacers);
-                stop = high_resolution_clock::now();
-                spdlog::info("Split duration: {} microseconds", duration_cast<microseconds>(stop - start).count());
-
-                //logging begin
-                if (DEBUG) {
-                    //if (subreads.size() > 1)
-                    std::ostringstream id_oss;
-                    std::transform(subreads.begin(), subreads.end(),
-                        std::ostream_iterator<std::string>(id_oss, "; "),
-                        [](std::shared_ptr<Read> sr) {return sr->read_id;});
-                    spdlog::info("DSN: {} strategy {} splits in read {} (subread {}). Spacing regions (in subread coordinates): {}. New read ids: {}",
-                                    description, spacers.size(), init_read->read_id, r->read_id, spacer_oss.str(), id_oss.str());
+                if (spacers.empty()) {
+                    split_round_result.push_back(std::move(r));
+                } else {
+                    for (auto sr : split(r.read, spacers)) {
+                        split_round_result.emplace_back(sr);
+                    }
                 }
-                //logging end
-
-                split_round_result.insert(split_round_result.end(), subreads.begin(), subreads.end());
             }
-            to_split = split_round_result;
-            spdlog::info("At the end of {} overall number of subreads: {}", description, to_split.size());
+            //std::swap(to_split, split_round_result);
+            to_split = std::move(split_round_result);
         }
+
+        spdlog::debug("Read {} split into {} subreads: {}", init_read->read_id, to_split.size());
+
+        auto stop_ts = high_resolution_clock::now();
+        spdlog::trace("READ duration: {} microseconds", duration_cast<microseconds>(stop_ts - start_ts).count());
 
         for (auto subread : to_split) {
             //TODO correctly process end_reason when we have them
-            subread->parent_read_id = init_read->read_id;
-            m_sink.push_message(std::move(subread));
-            //FIXME add debug mode which would not do any splitting
-            //m_sink.push_message(std::move(message));
+            subread.read->parent_read_id = init_read->read_id;
+            m_sink.push_message(std::move(subread.read));
         }
-
     }
 }
 
