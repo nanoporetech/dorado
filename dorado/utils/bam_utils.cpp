@@ -4,6 +4,7 @@
 #include "htslib/kroundup.h"
 #include "htslib/sam.h"
 #include "minimap.h"
+#include "mmpriv.h"  // todo: This is a private header from mm2. Ask lh3 to make some of these funcs publicly available?
 #include "read_pipeline/ReadPipeline.h"
 
 #include <iostream>
@@ -117,6 +118,28 @@ void Aligner::add_tags(bam1_t* record, const mm_reg1_t* aln, const std::vector<c
             bam_aux_append(record, "ts", 'A', 2, (uint8_t*)&("?+-?"[aln->p->trans_strand]));
     }
 
+    // de / dv
+    if (aln->p) {
+        char buf[16];
+        float div;
+        div = 1.0 - mm_event_identity(aln);
+        if (div == 0.0)
+            buf[0] = '0', buf[1] = 0;
+        else
+            snprintf(buf, 16, "%.4f", 1.0 - mm_event_identity(aln));
+        auto ret = bam_aux_append(record, "de", 'f', sizeof(div), (uint8_t*)&div);
+        if (ret < 0)
+            std::cerr << "issue adding tag" << std::endl;
+        ;
+    } else if (aln->div >= 0.0f && aln->div <= 1.0f) {
+        char buf[16];
+        if (aln->div == 0.0f)
+            buf[0] = '0', buf[1] = 0;
+        else
+            snprintf(buf, 16, "%.4f", aln->div);
+        bam_aux_append(record, "dv", 'f', sizeof(aln->div), (uint8_t*)&aln->div);
+    }
+
     // tp
     char type;
     if (aln->id == aln->parent)
@@ -147,10 +170,6 @@ void Aligner::add_tags(bam1_t* record, const mm_reg1_t* aln, const std::vector<c
         uint32_t split = uint32_t(aln->split);
         bam_aux_append(record, "zd", 'i', sizeof(split), (uint8_t*)&split);
     }
-
-    // TODO: do we need the de and dv tags? They use an mm_event_identity function
-    // which is private in mm2, so we will have to duplicate that functionality if we need these
-    // tags.
 }
 
 std::vector<bam1_t*> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
