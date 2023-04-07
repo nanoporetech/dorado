@@ -11,6 +11,7 @@ set(SOURCE_FILES
     SequenceUtilsTest.cpp
     StitchTest.cpp
     StereoDuplexTest.cpp
+    AlignerTest.cpp
 )
 
 if (DORADO_GPU_BUILD)
@@ -31,6 +32,7 @@ target_link_libraries(dorado_tests
     dorado_lib
     dorado_io_lib
     dorado_models_lib
+    minimap2
     ${ZLIB_LIBRARIES}
 )
 
