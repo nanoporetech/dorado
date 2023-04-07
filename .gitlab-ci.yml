@@ -59,7 +59,7 @@ variables:
     - echo Dorado build stage
     - cmake ${BUILD_OPTIONS} -S . -B ${BUILD_DIR}
     - cmake --build ${BUILD_DIR} --config Release --target install -j 8
-    - ctest -C Release --test-dir ${BUILD_DIR} --output-on-failure
+    - ctest -C Release --test-dir ${BUILD_DIR} --output-on-failure --verbose
   artifacts:
     paths:
       - dist

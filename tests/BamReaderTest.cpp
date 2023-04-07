@@ -11,11 +11,10 @@
 
 namespace fs = std::filesystem;
 
-TEST_CASE("BamReaderTest: Check reading to sink", TEST_GROUP) {
+TEST_CASE("BamReaderTest: Read fasta to sink", TEST_GROUP) {
     fs::path aligner_test_dir = fs::path(get_data_dir("bam_reader"));
     auto fasta = aligner_test_dir / "input.fa";
 
-    // Read FASTA.
     MessageSinkToVector<bam1_t*> sink(100);
     dorado::utils::BamReader reader(fasta.string());
     reader.read(sink, 100);
@@ -23,11 +22,10 @@ TEST_CASE("BamReaderTest: Check reading to sink", TEST_GROUP) {
     REQUIRE(bam_records.size() == 10);  // FASTA file has 10 reads.
 }
 
-TEST_CASE("BamReaderTest: Check synchronous read", TEST_GROUP) {
+TEST_CASE("BamReaderTest: Read fasta line by line", TEST_GROUP) {
     fs::path aligner_test_dir = fs::path(get_data_dir("bam_reader"));
     auto fasta = aligner_test_dir / "input.fa";
 
-    // Read FASTA.
     dorado::utils::BamReader reader(fasta.string());
     uint32_t read_count = 0;
     while (reader.read()) {
@@ -36,12 +34,44 @@ TEST_CASE("BamReaderTest: Check synchronous read", TEST_GROUP) {
     REQUIRE(read_count == 10);  // FASTA file has 10 reads.
 }
 
-TEST_CASE("BamReaderTest: read_bam API", TEST_GROUP) {
+TEST_CASE("BamReaderTest: read_bam API w/ fasta", TEST_GROUP) {
     fs::path aligner_test_dir = fs::path(get_data_dir("bam_reader"));
     auto fasta = aligner_test_dir / "input.fa";
     const std::set<std::string> read_ids = {"read_1", "read_2"};
 
-    // Read FASTA.
     auto read_map = dorado::utils::read_bam(fasta.string(), read_ids);
+    REQUIRE(read_map.size() == 2);  // read_id filter is only asking for 2 reads.
+}
+
+TEST_CASE("BamReaderTest: Read SAM to sink", TEST_GROUP) {
+    fs::path aligner_test_dir = fs::path(get_data_dir("bam_reader"));
+    auto sam = aligner_test_dir / "small.sam";
+
+    MessageSinkToVector<bam1_t*> sink(100);
+    dorado::utils::BamReader reader(sam.string());
+    reader.read(sink, 100);
+    auto bam_records = sink.get_messages();
+    REQUIRE(bam_records.size() == 11);  // SAM file has 11 reads.
+}
+
+TEST_CASE("BamReaderTest: Read SAM line by line", TEST_GROUP) {
+    fs::path aligner_test_dir = fs::path(get_data_dir("bam_reader"));
+    auto sam = aligner_test_dir / "small.sam";
+
+    dorado::utils::BamReader reader(sam.string());
+    uint32_t read_count = 0;
+    while (reader.read()) {
+        read_count++;
+    }
+    REQUIRE(read_count == 11);  // FASTA file has 11 reads.
+}
+
+TEST_CASE("BamReaderTest: read_bam API w/ SAM", TEST_GROUP) {
+    fs::path aligner_test_dir = fs::path(get_data_dir("bam_reader"));
+    auto sam = aligner_test_dir / "small.sam";
+    const std::set<std::string> read_ids = {"d7500028-dfcc-4404-b636-13edae804c55",
+                                            "60588a89-f191-414e-b444-ad0815b7d9c9"};
+
+    auto read_map = dorado::utils::read_bam(sam.string(), read_ids);
     REQUIRE(read_map.size() == 2);  // read_id filter is only asking for 2 reads.
 }

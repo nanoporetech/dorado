@@ -13,6 +13,7 @@ set(SOURCE_FILES
     StereoDuplexTest.cpp
     AlignerTest.cpp
     BamReaderTest.cpp
+    BamWriterTest.cpp
 )
 
 if (DORADO_GPU_BUILD)
@@ -39,6 +40,6 @@ target_link_libraries(dorado_tests
 
 add_test(
     NAME dorado_tests
-    COMMAND dorado_tests
+    COMMAND dorado_tests -s
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
