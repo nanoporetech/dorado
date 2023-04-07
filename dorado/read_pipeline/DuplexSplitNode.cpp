@@ -239,16 +239,11 @@ std::string print_alignment(const char* query, const char* target, const EdlibAl
 std::optional<PosRange> find_best_adapter_match(const std::string& adapter,
                                                 const std::string& seq,
                                                 int dist_thr,
-                                                std::optional<PosRange> subrange = std::nullopt) {
-    uint64_t shift = 0;
-    uint64_t span = seq.size();
-    assert(subrange);
-    if (subrange) {
-        assert(subrange->first <= subrange->second && subrange->second <= seq.size());
-        shift = subrange->first;
-        span = subrange->second - subrange->first;
-    }
-    //might be unnecessary, depending on edlib's empty sequence handling
+                                                PosRange subrange) {
+    assert(subrange.first <= subrange.second && subrange.second <= seq.size());
+    auto shift = subrange.first;
+    auto span = subrange.second - subrange.first;
+
     if (span == 0)
         return std::nullopt;
 
@@ -288,13 +283,13 @@ std::optional<PosRange> find_best_adapter_match(const std::string& adapter,
 std::vector<PosRange> find_adapter_matches(const std::string& adapter,
                                            const std::string& seq,
                                            int dist_thr,
-                                           std::optional<PosRange> opt_subrange = std::nullopt) {
-    PosRange subrange = opt_subrange ? *opt_subrange : PosRange{0, seq.size()};
+                                           uint64_t ignore_prefix) {
     std::vector<PosRange> answer;
-    assert(subrange.first <= subrange.second && subrange.second <= seq.size());
-
-    if (auto best_match = find_best_adapter_match(adapter, seq, dist_thr, subrange)) {
-        answer.push_back(*best_match);
+    if (ignore_prefix < seq.size()) {
+        if (auto best_match =
+                    find_best_adapter_match(adapter, seq, dist_thr, {ignore_prefix, seq.size()})) {
+            answer.push_back(*best_match);
+        }
     }
     return answer;
 }
@@ -431,11 +426,10 @@ PosRanges DuplexSplitNode::possible_pore_regions(const DuplexSplitNode::ExtRead&
 }
 
 bool DuplexSplitNode::check_nearby_adapter(const Read& read, PosRange r, int adapter_edist) const {
-    return find_best_adapter_match(
-                   m_settings.adapter, read.seq, adapter_edist,
-                   //including spacer region in search
-                   PosRange{r.first, std::min(r.second + m_settings.pore_adapter_range,
-                                              (uint64_t)read.seq.size())})
+    return find_best_adapter_match(m_settings.adapter, read.seq, adapter_edist,
+                                   //including spacer region in search
+                                   {r.first, std::min(r.second + m_settings.pore_adapter_range,
+                                                      (uint64_t)read.seq.size())})
             .has_value();
 }
 
@@ -460,8 +454,8 @@ std::optional<DuplexSplitNode::PosRange> DuplexSplitNode::identify_extra_middle_
     spdlog::trace("Searching for adapter match");
     if (auto adapter_match = find_best_adapter_match(
                 m_settings.adapter, read.seq, m_settings.relaxed_adapter_edist,
-                PosRange{r_l / 2 - m_settings.middle_adapter_search_span / 2,
-                         r_l / 2 + m_settings.middle_adapter_search_span / 2})) {
+                {r_l / 2 - m_settings.middle_adapter_search_span / 2,
+                 r_l / 2 + m_settings.middle_adapter_search_span / 2})) {
         auto adapter_start = adapter_match->first;
         spdlog::trace("Checking middle match & start/end match");
         if (check_flank_match(read, {adapter_start, adapter_start},
@@ -556,15 +550,14 @@ DuplexSplitNode::build_split_finders() const {
 
         split_finders.push_back(
                 {"ADAPTER_FLANK", [&](const ExtRead& read) {
-                     return filter_ranges(
-                             find_adapter_matches(m_settings.adapter, read.read->seq,
-                                                  m_settings.adapter_edist,
-                                                  PosRange{m_settings.expect_adapter_prefix,
-                                                           read.read->seq.size()}),
-                             [&](PosRange r) {
-                                 return check_flank_match(*read.read, {r.first, r.first},
-                                                          m_settings.flank_edist);
-                             });
+                     return filter_ranges(find_adapter_matches(m_settings.adapter, read.read->seq,
+                                                               m_settings.adapter_edist,
+                                                               m_settings.expect_adapter_prefix),
+                                          [&](PosRange r) {
+                                              return check_flank_match(*read.read,
+                                                                       {r.first, r.first},
+                                                                       m_settings.flank_edist);
+                                          });
                  }});
 
         split_finders.push_back({"ADAPTER_MIDDLE", [&](const ExtRead& read) {
