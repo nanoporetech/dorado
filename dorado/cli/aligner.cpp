@@ -67,13 +67,13 @@ int aligner(int argc, char* argv[]) {
 
     utils::BamWriter writer("-");
     utils::Aligner aligner(writer, index, threads);
-    utils::BamReader reader(aligner, reads[0]);
+    utils::BamReader reader(reads[0]);
 
     spdlog::debug("> input fmt: {} aligned: {}", reader.m_format, reader.m_is_aligned);
     writer.write_header(reader.m_header, aligner.sq());
 
     spdlog::info("> starting alignment");
-    reader.read(max_reads);
+    reader.read(aligner, max_reads);
     writer.join();
 
     spdlog::info("> finished alignment");

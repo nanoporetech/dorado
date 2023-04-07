@@ -16,7 +16,7 @@ static std::string get_data_dir(const char* sub_dir) {
                   << std::endl;
         exit(1);
     }
-    return data_path;
+    return data_path.string();
 }
 
 // Reads into a string.

@@ -12,6 +12,7 @@ set(SOURCE_FILES
     StitchTest.cpp
     StereoDuplexTest.cpp
     AlignerTest.cpp
+    BamReaderTest.cpp
 )
 
 if (DORADO_GPU_BUILD)

@@ -87,9 +87,6 @@ int duplex(int argc, char* argv[]) {
         torch::set_num_threads(1);
 
         if (model.compare("basespace") == 0) {  // Execute a Basespace duplex pipeline.
-            // todo: fix this
-            exit(1);
-            /**
             // create a set of the read_ids
             std::set<std::string> read_ids;
             for (const auto& pair : template_complement_map) {
@@ -104,7 +101,6 @@ int duplex(int argc, char* argv[]) {
             threads = threads == 0 ? std::thread::hardware_concurrency() : threads;
             BaseSpaceDuplexCallerNode duplex_caller_node(writer_node, template_complement_map,
                                                          read_map, threads);
-	    */
         } else {  // Execute a Stereo Duplex pipeline.
 
             const auto model_path = std::filesystem::canonical(std::filesystem::path(model));

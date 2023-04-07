@@ -1,3 +1,4 @@
+#include "MessageSinkUtils.h"
 #include "TestUtils.h"
 #include "htslib/sam.h"
 #include "utils/bam_utils.h"
@@ -10,23 +11,7 @@
 
 namespace fs = std::filesystem;
 
-template <typename T>
-class MessageSinkToVector : public dorado::MessageSink {
-public:
-    MessageSinkToVector(size_t max_messages) : MessageSink(max_messages) {}
-
-    std::vector<T> get_messages() {
-        std::vector<T> vec;
-        dorado::Message message;
-        while (m_work_queue.try_pop(message)) {
-            vec.push_back(std::get<T>(message));
-        }
-        terminate();
-        return vec;
-    }
-};
-
-TEST_CASE("check proper tag generation", TEST_GROUP) {
+TEST_CASE("AlignerTest: Check proper tag generation", TEST_GROUP) {
     using Catch::Matchers::Contains;
 
     fs::path aligner_test_dir = fs::path(get_aligner_data_dir());
@@ -34,10 +19,10 @@ TEST_CASE("check proper tag generation", TEST_GROUP) {
     auto query = aligner_test_dir / "target.fa";
 
     // Run alignment.
-    MessageSinkToVector<bam1_t*> sink(1);
+    MessageSinkToVector<bam1_t*> sink(100);
     dorado::utils::Aligner aligner(sink, ref.string(), 10);
-    dorado::utils::BamReader reader(aligner, query);
-    reader.read(100);
+    dorado::utils::BamReader reader(query);
+    reader.read(aligner, 100);
     auto bam_records = sink.get_messages();
     REQUIRE(bam_records.size() == 1);
 

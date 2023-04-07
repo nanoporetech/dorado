@@ -273,7 +273,7 @@ std::vector<bam1_t*> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
     return results;
 }
 
-BamReader::BamReader(MessageSink& sink, const std::string& filename) : m_sink(sink) {
+BamReader::BamReader(const std::string& filename) {
     m_file = hts_open(filename.c_str(), "r");
     if (!m_file) {
         throw std::runtime_error("Could not open file: " + filename);
@@ -294,15 +294,17 @@ BamReader::~BamReader() {
     hts_close(m_file);
 }
 
-void BamReader::read(int max_reads) {
+bool BamReader::read() { return sam_read1(m_file, m_header, m_record) >= 0; }
+
+void BamReader::read(MessageSink& read_sink, int max_reads) {
     int num_reads = 0;
-    while (sam_read1(m_file, m_header, m_record) >= 0) {
-        m_sink.push_message(std::move(bam_dup1(m_record)));
+    while (this->read()) {
+        read_sink.push_message(std::move(bam_dup1(m_record)));
         if (++num_reads >= max_reads) {
             break;
         }
     }
-    m_sink.terminate();
+    read_sink.terminate();
 }
 
 BamWriter::BamWriter(const std::string& filename) : MessageSink(1000) {
@@ -366,15 +368,8 @@ int BamWriter::write_hdr_sq(char* name, uint32_t length) {
     return sam_hdr_add_line(m_header, "SQ", "SN", name, "LN", std::to_string(length).c_str(), NULL);
 }
 
-/*
 read_map read_bam(const std::string& filename, const std::set<std::string>& read_ids) {
-
-    utils::sq_t seq;
-    sam_hdr_t* hdr;
-
-    utils::BamWriter writer("-", hdr, seq);
-
-    BamReader reader(writer, filename);
+    BamReader reader(filename);
 
     std::map<std::string, std::shared_ptr<Read>> reads;
 
@@ -407,6 +402,5 @@ read_map read_bam(const std::string& filename, const std::set<std::string>& read
 
     return reads;
 }
-*/
 
 }  // namespace dorado::utils

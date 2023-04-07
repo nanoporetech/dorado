@@ -40,7 +40,8 @@ public:
     BamReader(const std::string& filename);
     BamReader(MessageSink& read_sink, const std::string& filename);
     ~BamReader();
-    void read(int max_reads);
+    bool read();
+    void read(MessageSink& read_sink, int max_reads = -1);
     char* m_format{nullptr};
     bool m_is_aligned{false};
     bam1_t* m_record{nullptr};
@@ -48,7 +49,6 @@ public:
 
 private:
     htsFile* m_file{nullptr};
-    MessageSink& m_sink;
 };
 
 class BamWriter : public MessageSink {
