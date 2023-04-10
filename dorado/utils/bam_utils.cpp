@@ -1,6 +1,7 @@
 #include "bam_utils.h"
 
 #include "Version.h"
+#include "htslib/bgzf.h"
 #include "htslib/kroundup.h"
 #include "htslib/sam.h"
 #include "minimap.h"
@@ -307,10 +308,14 @@ void BamReader::read(MessageSink& read_sink, int max_reads) {
     read_sink.terminate();
 }
 
-BamWriter::BamWriter(const std::string& filename) : MessageSink(1000) {
+BamWriter::BamWriter(const std::string& filename, size_t threads) : MessageSink(1000) {
     m_file = hts_open(filename.c_str(), "wb");
     if (!m_file) {
         throw std::runtime_error("Could not open file: " + filename);
+    }
+    auto res = bgzf_mt(m_file->fp.bgzf, threads, 128);
+    if (res < 0) {
+        throw std::runtime_error("Could not enable multi threading for BAM generation.");
     }
     m_worker = std::make_unique<std::thread>(std::thread(&BamWriter::worker_thread, this));
 }

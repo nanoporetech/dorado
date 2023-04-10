@@ -53,7 +53,7 @@ private:
 
 class BamWriter : public MessageSink {
 public:
-    BamWriter(const std::string& filename);
+    BamWriter(const std::string& filename, size_t threads = 1);
     ~BamWriter();
     int write_header(const sam_hdr_t* header, const sq_t seqs);
     int write(bam1_t* record);

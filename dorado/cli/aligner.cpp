@@ -65,7 +65,7 @@ int aligner(int argc, char* argv[]) {
 
     spdlog::info("> loading index {}", index);
 
-    utils::BamWriter writer("-");
+    utils::BamWriter writer("-", threads);
     utils::Aligner aligner(writer, index, threads);
     utils::BamReader reader(reads[0]);
 
