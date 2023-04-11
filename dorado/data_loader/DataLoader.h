@@ -23,14 +23,17 @@ public:
                size_t num_worker_threads,
                size_t max_reads = 0,
                std::unordered_set<std::string> read_list = std::unordered_set<std::string>());
-    void load_reads(const std::string& path);
+    void load_reads(const std::string& path, bool recursive_file_loading = false);
 
-    static std::unordered_map<std::string, ReadGroup> load_read_groups(std::string data_path,
-                                                                       std::string model_path);
+    static std::unordered_map<std::string, ReadGroup> load_read_groups(
+            std::string data_path,
+            std::string model_path,
+            bool recursive_file_loading = false);
 
     static int get_num_reads(
             std::string data_path,
-            std::unordered_set<std::string> read_list = std::unordered_set<std::string>());
+            std::unordered_set<std::string> read_list = std::unordered_set<std::string>(),
+            bool recursive_file_loading = false);
 
 private:
     void load_fast5_reads_from_file(const std::string& path);

@@ -130,7 +130,7 @@ std::shared_ptr<dorado::Read> process_pod5_read(size_t row,
 
 namespace dorado {
 
-void DataLoader::load_reads(const std::string& path) {
+void DataLoader::load_reads(const std::string& path, bool recursive_file_loading) {
     if (!std::filesystem::exists(path)) {
         spdlog::error("Requested input path {} does not exist!", path);
         m_read_sink.terminate();
@@ -142,99 +142,141 @@ void DataLoader::load_reads(const std::string& path) {
         return;
     }
 
-    for (const auto& entry : std::filesystem::directory_iterator(path)) {
-        if (m_loaded_read_count == m_max_reads) {
-            break;
+    auto iterate_directory = [&](const auto& iterator_fn) {
+        for (const auto& entry : iterator_fn(path)) {
+            if (m_loaded_read_count == m_max_reads) {
+                break;
+            }
+            std::string ext = std::filesystem::path(entry).extension().string();
+            std::transform(ext.begin(), ext.end(), ext.begin(),
+                           [](unsigned char c) { return std::tolower(c); });
+            if (ext == ".fast5") {
+                load_fast5_reads_from_file(entry.path().string());
+            } else if (ext == ".pod5") {
+                load_pod5_reads_from_file(entry.path().string());
+            }
         }
-        std::string ext = std::filesystem::path(entry).extension().string();
-        std::transform(ext.begin(), ext.end(), ext.begin(),
-                       [](unsigned char c) { return std::tolower(c); });
-        if (ext == ".fast5") {
-            load_fast5_reads_from_file(entry.path().string());
-        } else if (ext == ".pod5") {
-            load_pod5_reads_from_file(entry.path().string());
-        }
+    };
+
+    if (recursive_file_loading) {
+        iterate_directory([](const auto& path) {
+            return std::filesystem::recursive_directory_iterator(path);
+        });
+    } else {
+        iterate_directory(
+                [](const auto& path) { return std::filesystem::directory_iterator(path); });
     }
+
     m_read_sink.terminate();
 }
 
-int DataLoader::get_num_reads(std::string data_path, std::unordered_set<std::string> read_list) {
+int DataLoader::get_num_reads(std::string data_path,
+                              std::unordered_set<std::string> read_list,
+                              bool recursive_file_loading) {
     size_t num_reads = 0;
-    for (const auto& entry : std::filesystem::directory_iterator(data_path)) {
-        std::string ext = std::filesystem::path(entry).extension().string();
-        std::transform(ext.begin(), ext.end(), ext.begin(),
-                       [](unsigned char c) { return std::tolower(c); });
-        if (ext == ".pod5") {
-            pod5_init();
 
-            // Open the file ready for walking:
-            Pod5FileReader_t* file = pod5_open_file(entry.path().string().c_str());
+    auto iterate_directory = [&](const auto& iterator_fn) {
+        for (const auto& entry : iterator_fn(data_path)) {
+            std::string ext = std::filesystem::path(entry).extension().string();
+            std::transform(ext.begin(), ext.end(), ext.begin(),
+                           [](unsigned char c) { return std::tolower(c); });
+            if (ext == ".pod5") {
+                pod5_init();
 
-            size_t read_count;
-            pod5_get_read_count(file, &read_count);
-            if (!file) {
-                spdlog::error("Failed to open file {}: {}", entry.path().string().c_str(),
-                              pod5_get_error_string());
-            }
+                // Open the file ready for walking:
+                Pod5FileReader_t* file = pod5_open_file(entry.path().string().c_str());
 
-            num_reads += read_count;
-            if (pod5_close_and_free_reader(file) != POD5_OK) {
-                spdlog::error("Failed to close and free POD5 reader");
+                size_t read_count;
+                pod5_get_read_count(file, &read_count);
+                if (!file) {
+                    spdlog::error("Failed to open file {}: {}", entry.path().string().c_str(),
+                                  pod5_get_error_string());
+                }
+
+                num_reads += read_count;
+                if (pod5_close_and_free_reader(file) != POD5_OK) {
+                    spdlog::error("Failed to close and free POD5 reader");
+                }
             }
         }
+    };
+
+    if (recursive_file_loading) {
+        iterate_directory([](const auto& path) {
+            return std::filesystem::recursive_directory_iterator(path);
+        });
+    } else {
+        iterate_directory(
+                [](const auto& path) { return std::filesystem::directory_iterator(path); });
     }
+
     return num_reads;
 }
 
-std::unordered_map<std::string, ReadGroup> DataLoader::load_read_groups(std::string data_path,
-                                                                        std::string model_path) {
+std::unordered_map<std::string, ReadGroup> DataLoader::load_read_groups(
+        std::string data_path,
+        std::string model_path,
+        bool recursive_file_loading) {
     std::unordered_map<std::string, ReadGroup> read_groups;
 
-    for (const auto& entry : std::filesystem::directory_iterator(data_path)) {
-        std::string ext = std::filesystem::path(entry).extension().string();
-        std::transform(ext.begin(), ext.end(), ext.begin(),
-                       [](unsigned char c) { return std::tolower(c); });
-        if (ext == ".pod5") {
-            pod5_init();
+    auto iterate_directory = [&](const auto& iterator_fn) {
+        for (const auto& entry : iterator_fn(data_path)) {
+            std::string ext = std::filesystem::path(entry).extension().string();
+            std::transform(ext.begin(), ext.end(), ext.begin(),
+                           [](unsigned char c) { return std::tolower(c); });
+            if (ext == ".pod5") {
+                pod5_init();
 
-            // Open the file ready for walking:
-            Pod5FileReader_t* file = pod5_open_file(entry.path().string().c_str());
+                // Open the file ready for walking:
+                Pod5FileReader_t* file = pod5_open_file(entry.path().string().c_str());
 
-            if (!file) {
-                spdlog::error("Failed to open file {}: {}", entry.path().string().c_str(),
-                              pod5_get_error_string());
-            }
+                if (!file) {
+                    spdlog::error("Failed to open file {}: {}", entry.path().string().c_str(),
+                                  pod5_get_error_string());
+                } else {
+                    // First get the run info count
+                    run_info_index_t run_info_count;
+                    pod5_get_file_run_info_count(file, &run_info_count);
+                    for (run_info_index_t idx = 0; idx < run_info_count; idx++) {
+                        RunInfoDictData_t* run_info_data;
+                        pod5_get_file_run_info(file, idx, &run_info_data);
 
-            // First get the run info count
-            run_info_index_t run_info_count;
-            pod5_get_file_run_info_count(file, &run_info_count);
-            for (run_info_index_t idx = 0; idx < run_info_count; idx++) {
-                RunInfoDictData_t* run_info_data;
-                pod5_get_file_run_info(file, idx, &run_info_data);
+                        auto exp_start_time_ms = run_info_data->protocol_start_time_ms;
+                        std::string flowcell_id = run_info_data->flow_cell_id;
+                        std::string device_id = run_info_data->system_name;
+                        std::string run_id = run_info_data->protocol_run_id;
+                        std::string sample_id = run_info_data->sample_id;
 
-                auto exp_start_time_ms = run_info_data->protocol_start_time_ms;
-                std::string flowcell_id = run_info_data->flow_cell_id;
-                std::string device_id = run_info_data->system_name;
-                std::string run_id = run_info_data->protocol_run_id;
-                std::string sample_id = run_info_data->sample_id;
+                        if (pod5_free_run_info(run_info_data) != POD5_OK) {
+                            spdlog::error("Failed to free run info");
+                        }
 
-                if (pod5_free_run_info(run_info_data) != POD5_OK) {
-                    spdlog::error("Failed to free run info");
+                        std::string id = run_id + "_" + model_path;
+                        read_groups[id] =
+                                ReadGroup{run_id,
+                                          model_path,
+                                          flowcell_id,
+                                          device_id,
+                                          get_string_timestamp_from_unix_time(exp_start_time_ms),
+                                          sample_id};
+                    }
+                    if (pod5_close_and_free_reader(file) != POD5_OK) {
+                        spdlog::error("Failed to close and free POD5 reader");
+                    }
                 }
-
-                std::string id = run_id + "_" + model_path;
-                read_groups[id] = ReadGroup{run_id,
-                                            model_path,
-                                            flowcell_id,
-                                            device_id,
-                                            get_string_timestamp_from_unix_time(exp_start_time_ms),
-                                            sample_id};
-            }
-            if (pod5_close_and_free_reader(file) != POD5_OK) {
-                spdlog::error("Failed to close and free POD5 reader");
             }
         }
+    };
+
+    if (recursive_file_loading) {
+        iterate_directory([](const auto& path) {
+            return std::filesystem::recursive_directory_iterator(path);
+        });
+    } else {
+        iterate_directory(
+                [](const auto& path) { return std::filesystem::directory_iterator(path); });
     }
+
     return read_groups;
 }
 

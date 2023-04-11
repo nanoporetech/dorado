@@ -30,7 +30,7 @@ TEST_CASE(TEST_GROUP "Test loading single-read POD5 files") {
 
     std::string data_path(get_pod5_data_dir());
     dorado::DataLoader loader(mock_sink, "cpu", 1);
-    loader.load_reads(data_path);
+    loader.load_reads(data_path, false);
 
     REQUIRE(mock_sink.get_read_count() == 1);
 }
@@ -42,7 +42,7 @@ TEST_CASE(TEST_GROUP "Test loading single-read POD5 file, empty read list") {
     auto read_list = std::unordered_set<std::string>();
     std::string data_path(get_pod5_data_dir());
     dorado::DataLoader loader(mock_sink, "cpu", 1, 0, read_list);
-    loader.load_reads(data_path);
+    loader.load_reads(data_path, false);
 
     REQUIRE(mock_sink.get_read_count() == 1);
 }
@@ -55,7 +55,7 @@ TEST_CASE(TEST_GROUP "Test loading single-read POD5 file, mismatched read list")
     read_list.insert("read_1");
     std::string data_path(get_pod5_data_dir());
     dorado::DataLoader loader(mock_sink, "cpu", 1, 0, read_list);
-    loader.load_reads(data_path);
+    loader.load_reads(data_path, false);
 
     REQUIRE(mock_sink.get_read_count() == 0);
 }
@@ -68,7 +68,7 @@ TEST_CASE(TEST_GROUP "Test loading single-read POD5 file, matched read list") {
     read_list.insert("002bd127-db82-436f-b828-28567c3d505d");  // read present in POD5
     std::string data_path(get_pod5_data_dir());
     dorado::DataLoader loader(mock_sink, "cpu", 1, 0, read_list);
-    loader.load_reads(data_path);
+    loader.load_reads(data_path, false);
 
     REQUIRE(mock_sink.get_read_count() == 1);
 }

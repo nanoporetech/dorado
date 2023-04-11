@@ -20,7 +20,7 @@ private:
     MessageSink&
             m_sink;  // MessageSink to consume scaled reads. Typically this will be a Basecaller Node.
     std::vector<std::unique_ptr<std::thread>> worker_threads;
-    int m_num_worker_threads;
+    std::atomic<int> m_num_worker_threads;
 };
 
 }  // namespace dorado
