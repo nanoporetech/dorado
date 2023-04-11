@@ -370,17 +370,16 @@ private:
         c10::cuda::CUDAGuard device_guard(in.device());
         auto stream = at::cuda::getCurrentCUDAStream().stream();
 
-        // Cutlass kernel currently requires SM8.0 (A100) or later
 #ifdef DORADO_TX2
-        const bool use_cutlass = false;
+        constexpr bool use_int8 = false;
 #else
         cudaDeviceProp *prop = at::cuda::getCurrentDeviceProperties();
         // Limit Cutlass usage to A100 and H100 GPUs
         const bool a100_gpu = (prop->major == 8) && (prop->minor == 0);
         const bool h100_gpu = (prop->major == 9) && (prop->minor == 0);
         const bool use_cutlass = a100_gpu || h100_gpu;
-#endif
         const bool use_int8 = !g_options_no_i8 && use_cutlass;
+#endif
 
         torch::Tensor mat_working_mem = in;
         const int chunk_size = in.size(0) - 1;
@@ -413,11 +412,8 @@ private:
             inout_all_f16 = in.view({chunk_size + 1, batch_size, -1});
             inout_left_f16 = in.slice(0, 0, chunk_size).select(2, 0);
             inout_right_f16 = in.slice(0, 1, chunk_size + 1).select(2, 1);
-#if TORCH_VERSION_MAJOR < 2
-            inout_all_i8 = in.select(2, 0).to(torch::kInt8);
-#else
+#ifndef DORADO_TX2
             inout_all_i8 = in.select(2, 0).view(torch::kInt8);
-#endif
             inout_left_i8 = inout_all_i8.slice(0, 0, chunk_size).slice(2, 0, layer_size);
             inout_right_i8 =
                     inout_all_i8.slice(0, 1, chunk_size + 1).slice(2, layer_size, 2 * layer_size);
@@ -429,6 +425,7 @@ private:
             inout_left_f16 = inout_all_i8.slice(0, 0, chunk_size).view(torch::kF16);
         }
         if (!use_cutlass) {
+#endif
             gate_buf = torch::empty({batch_size, gate_size}, in.options());
         }
 
