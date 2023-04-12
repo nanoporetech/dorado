@@ -313,19 +313,26 @@ void StereoDuplexEncoderNode::worker_thread() {
             }
         }
     }
+
+    int num_worker_threads = --m_num_worker_threads;
+    if (num_worker_threads == 0) {
+        m_sink.terminate();
+    }
 }
 
 StereoDuplexEncoderNode::StereoDuplexEncoderNode(
         MessageSink& sink,
         std::map<std::string, std::string> template_complement_map)
-        : MessageSink(1000), m_sink(sink), m_template_complement_map(template_complement_map) {
+        : MessageSink(1000),
+          m_sink(sink),
+          m_num_worker_threads(std::thread::hardware_concurrency()),
+          m_template_complement_map(template_complement_map) {
     // Set up the complement-template_map
     for (auto key : template_complement_map) {
         m_complement_template_map[key.second] = key.first;
     }
 
-    int num_worker_threads = std::thread::hardware_concurrency();
-    for (int i = 0; i < num_worker_threads; i++) {
+    for (int i = 0; i < m_num_worker_threads; i++) {
         std::unique_ptr<std::thread> stereo_encoder_worker_thread =
                 std::make_unique<std::thread>(&StereoDuplexEncoderNode::worker_thread, this);
         worker_threads.push_back(std::move(stereo_encoder_worker_thread));

@@ -2,6 +2,10 @@
 
 All notable changes to Dorado will be documented in this file.
 
+# [0.2.3] (06 Apr 2023)
+
+ * 6bf227b8139132854927884b59246922f92f0bdc - Upgrade to Pod5 v0.1.16
+
 # [0.2.2] (04 Apr 2023)
 
  * e1159c4aa8562f539f86d0d2d30899cb69ec9e54 - Add V4.1 modified base models
