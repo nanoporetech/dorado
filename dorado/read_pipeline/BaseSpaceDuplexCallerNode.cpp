@@ -81,11 +81,12 @@ void BaseSpaceDuplexCallerNode::basespace(std::string template_read_id,
     std::string_view template_sequence;
     std::shared_ptr<Read> template_read;
     std::vector<uint8_t> template_quality_scores;
-    if (m_reads.find(template_read_id) == m_reads.end()) {
+    auto template_read_it = m_reads.find(template_read_id);
+    if (template_read_it == m_reads.end()) {
         spdlog::debug("Template Read ID={} is present in pairs file but read was not found",
                       template_read_id);
     } else {
-        template_read = m_reads.at(template_read_id);
+        template_read = template_read_it->second;
         template_sequence = template_read->seq;
         template_quality_scores =
                 std::vector<uint8_t>(template_read->qstring.begin(), template_read->qstring.end());
@@ -95,7 +96,6 @@ void BaseSpaceDuplexCallerNode::basespace(std::string template_read_id,
     utils::preprocess_quality_scores(template_quality_scores);
 
     auto complement_read_it = m_reads.find(complement_read_id);
-
     if (complement_read_it == m_reads.end()) {
         spdlog::debug("Complement ID={} paired with Template ID={} was not found",
                       complement_read_id, template_read_id);
