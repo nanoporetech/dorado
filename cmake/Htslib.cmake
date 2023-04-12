@@ -1,7 +1,7 @@
 if(NOT DEFINED HTSLIB_LIBRARIES) # lazy include guard
     if(WIN32)
         message(STATUS "Fetching htslib from Box")
-        download_and_extract(https://nanoporetech.box.com/shared/static/9dnctbjw86d20qq8l8tw3dk93hu1nrul.gz htslib-win)
+        download_and_extract(https://cdn.oxfordnanoportal.com/software/analysis/test-htslib-win/htslib-win2.tar.gz htslib-win)
         set(HTSLIB_DIR ${DORADO_3RD_PARTY}/htslib-win CACHE STRING
                     "Path to htslib repo")
         set(HTSLIB_LIBRARIES hts-3)

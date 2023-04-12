@@ -19,6 +19,13 @@
 // seq_nt16_str is referred to in the hts-3.lib stub on windows, but has not been declared dllimport for
 //  client code, so it comes up as an undefined reference when linking the stub.
 const char seq_nt16_str[] = "=ACMGRSVTWYHKDBN";
+
+#include "htslib/ont_defs.h"
+#define _HTSLIB_FREE htslib_wrapped_free
+#define _HTSLIB_REALLOC htslib_wrapped_realloc
+#else
+#define _HTSLIB_FREE free
+#define _HTSLIB_REALLOC realloc
 #endif  // _WIN32
 
 namespace dorado::utils {
@@ -236,7 +243,7 @@ std::vector<bam1_t*> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
             int cigar_size = record->core.n_cigar * sizeof(uint32_t);
             uint32_t new_m_data = record->l_data + cigar_size;
             kroundup32(new_m_data);
-            uint8_t* data = (uint8_t*)realloc(record->data, new_m_data);
+            uint8_t* data = (uint8_t*)_HTSLIB_REALLOC(record->data, new_m_data);
 
             // shift existing data to make room for the new cigar field
             memmove(data + record->core.l_qname + cigar_size, data + record->core.l_qname,
@@ -289,7 +296,7 @@ BamReader::BamReader(const std::string& filename) {
 }
 
 BamReader::~BamReader() {
-    free(m_format);
+    _HTSLIB_FREE(m_format);
     sam_hdr_destroy(m_header);
     bam_destroy1(m_record);
     hts_close(m_file);
