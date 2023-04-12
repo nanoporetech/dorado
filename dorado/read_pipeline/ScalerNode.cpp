@@ -81,8 +81,8 @@ ScalerNode::~ScalerNode() {
 }
 
 int ScalerNode::trim(torch::Tensor signal,
-                     int window_size,
                      float threshold,
+                     int window_size,
                      int min_elements,
                      int max_samples,
                      float max_trim) {
