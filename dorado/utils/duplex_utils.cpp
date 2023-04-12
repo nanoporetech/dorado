@@ -15,7 +15,8 @@ namespace {
 #if defined(__GNUC__) && defined(__x86_64__) && !defined(__APPLE__)
 __attribute__((target("default")))
 #endif
-std::string reverse_complement_impl(const std::string& sequence) {
+std::string
+reverse_complement_impl(const std::string& sequence) {
     const auto num_bases = sequence.size();
     std::string rev_comp_sequence;
     rev_comp_sequence.resize(num_bases);
@@ -32,8 +33,8 @@ std::string reverse_complement_impl(const std::string& sequence) {
     }();
 
     // Run every template base through the table, reading in reverse order.
-    const char *template_ptr = &sequence[num_bases - 1];
-    char *complement_ptr = &rev_comp_sequence[0];
+    const char* template_ptr = &sequence[num_bases - 1];
+    char* complement_ptr = &rev_comp_sequence[0];
     for (size_t i = 0; i < num_bases; ++i) {
         const auto template_base = *template_ptr--;
         *complement_ptr++ = kComplementTable[template_base];
@@ -59,15 +60,14 @@ __attribute__((target("avx2"))) std::string reverse_complement_impl(const std::s
     // 'T' & 0xf = 4
     // 'G' & 0xf = 7
     const __m256i kComplementTable =
-            _mm256_setr_epi8(0, 'T', 0, 'G', 'A', 0, 0, 'C', 0, 0, 0, 0, 0, 0, 0, 0,
-                             0, 'T', 0, 'G', 'A', 0, 0, 'C', 0, 0, 0, 0, 0, 0, 0, 0);
+            _mm256_setr_epi8(0, 'T', 0, 'G', 'A', 0, 0, 'C', 0, 0, 0, 0, 0, 0, 0, 0, 0, 'T', 0, 'G',
+                             'A', 0, 0, 'C', 0, 0, 0, 0, 0, 0, 0, 0);
 
     // PSHUFB indices to reverse bytes within a 16 byte AVX lane.  Note that _mm256_set_..
     // intrinsics have a high to low ordering.
-    const __m256i kByteReverseTable = _mm256_set_epi8(0, 1, 2, 3, 4, 5, 6, 7, 8,
-                                                      9, 10, 11, 12, 13, 14, 15,
-                                                      0, 1, 2, 3, 4, 5, 6, 7, 8,
-                                                      9, 10, 11, 12, 13, 14, 15);
+    const __m256i kByteReverseTable =
+            _mm256_set_epi8(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 4, 5,
+                            6, 7, 8, 9, 10, 11, 12, 13, 14, 15);
 
     // Unroll to AVX register size.  Unrolling further would probably help performance.
     static constexpr size_t kUnroll = 32;
@@ -114,7 +114,7 @@ __attribute__((target("avx2"))) std::string reverse_complement_impl(const std::s
 }
 #endif
 
-}
+}  // namespace
 
 namespace dorado::utils {
 std::map<std::string, std::string> load_pairs_file(std::string pairs_file_path) {
@@ -156,7 +156,7 @@ std::unordered_set<std::string> get_read_list_from_pairs(
 
 // Multiversioned function dispatch doesn't work across the dorado_lib linking
 // boundary.  Without this wrapper, AVX machines still only execute the default
-// version. 
+// version.
 std::string reverse_complement(const std::string& sequence) {
     return reverse_complement_impl(sequence);
 }
