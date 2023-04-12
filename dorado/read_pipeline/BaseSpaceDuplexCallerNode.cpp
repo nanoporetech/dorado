@@ -108,31 +108,31 @@ void BaseSpaceDuplexCallerNode::basespace(std::string template_read_id,
 
     // We have both sequences and can perform the consensus
     auto complement_read = complement_read_it->second;
-    auto complement_quality_scores_reverse = std::vector<uint8_t>(
-            complement_read->qstring.begin(), complement_read->qstring.end());
+    auto complement_quality_scores_reverse =
+            std::vector<uint8_t>(complement_read->qstring.begin(), complement_read->qstring.end());
     std::reverse(complement_quality_scores_reverse.begin(),
-                    complement_quality_scores_reverse.end());
+                 complement_quality_scores_reverse.end());
 
     // For basespace, a q score filter is run over the quality scores.
     utils::preprocess_quality_scores(complement_quality_scores_reverse);
 
     // Compute the RC
-    auto complement_sequence_reverse_complement = dorado::utils::reverse_complement(complement_read->seq);
+    auto complement_sequence_reverse_complement =
+            dorado::utils::reverse_complement(complement_read->seq);
 
     EdlibAlignResult result =
             edlibAlign(template_sequence.data(), template_sequence.size(),
-                        complement_sequence_reverse_complement.data(),
-                        complement_sequence_reverse_complement.size(), align_config);
+                       complement_sequence_reverse_complement.data(),
+                       complement_sequence_reverse_complement.size(), align_config);
 
     // Now - we have to do the actual basespace alignment itself
     int query_cursor = 0;
     int target_cursor =
-            result.startLocations
-                    [0];  // 0-based position in the *target* where alignment starts.
+            result.startLocations[0];  // 0-based position in the *target* where alignment starts.
 
-    auto [alignment_start_end, cursors] = utils::get_trimmed_alignment(
-            11, result.alignment, result.alignmentLength, target_cursor, query_cursor, 0,
-            result.endLocations[0]);
+    auto [alignment_start_end, cursors] =
+            utils::get_trimmed_alignment(11, result.alignment, result.alignmentLength,
+                                         target_cursor, query_cursor, 0, result.endLocations[0]);
 
     query_cursor = cursors.first;
     target_cursor = cursors.second;
@@ -140,15 +140,15 @@ void BaseSpaceDuplexCallerNode::basespace(std::string template_read_id,
     int end_alignment_position = alignment_start_end.second;
 
     int min_trimmed_alignment_length = 200;
-    bool consensus_possible = (start_alignment_position < end_alignment_position) &&
-                                ((end_alignment_position - start_alignment_position) >
-                                min_trimmed_alignment_length);
+    bool consensus_possible =
+            (start_alignment_position < end_alignment_position) &&
+            ((end_alignment_position - start_alignment_position) > min_trimmed_alignment_length);
 
     if (consensus_possible) {
         auto [consensus, quality_scores_phred] = compute_basespace_consensus(
                 start_alignment_position, end_alignment_position, template_quality_scores,
-                target_cursor, complement_quality_scores_reverse, query_cursor,
-                template_sequence, complement_sequence_reverse_complement, result.alignment);
+                target_cursor, complement_quality_scores_reverse, query_cursor, template_sequence,
+                complement_sequence_reverse_complement, result.alignment);
 
         auto duplex_read = std::make_shared<Read>();
         duplex_read->seq = std::string(consensus.begin(), consensus.end());

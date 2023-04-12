@@ -32,7 +32,7 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
     align_config.task = EDLIB_TASK_PATH;
 
     const auto complement_sequence_reverse_complement =
-        dorado::utils::reverse_complement(complement_read->seq);
+            dorado::utils::reverse_complement(complement_read->seq);
 
     std::vector<uint8_t> complement_q_scores_reversed(complement_read->qstring.begin(),
                                                       complement_read->qstring.end());

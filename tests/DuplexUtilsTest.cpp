@@ -1,8 +1,8 @@
 #include "utils/duplex_utils.h"
 
-#include <cstdlib>
-
 #include <catch2/catch.hpp>
+
+#include <cstdlib>
 
 #define TEST_GROUP "DuplexUtils: "
 
