@@ -6,9 +6,115 @@
 #include <fstream>
 #include <vector>
 
-#if defined(__GNUC__) && defined(__x86_64__)
-#include <mmintrin.h>
+#if defined(__GNUC__) && defined(__x86_64__) && !defined(__APPLE__)
+#include <immintrin.h>
 #endif
+
+namespace {
+
+#if defined(__GNUC__) && defined(__x86_64__) && !defined(__APPLE__)
+__attribute__((target("default")))
+#endif
+std::string reverse_complement_impl(const std::string& sequence) {
+    const auto num_bases = sequence.size();
+    std::string rev_comp_sequence;
+    rev_comp_sequence.resize(num_bases);
+
+    // Compile-time constant lookup table.
+    static constexpr auto kComplementTable = [] {
+        std::array<char, 256> a{};
+        // Valid input will only touch the entries set here.
+        a['A'] = 'T';
+        a['T'] = 'A';
+        a['C'] = 'G';
+        a['G'] = 'C';
+        return a;
+    }();
+
+    // Run every template base through the table, reading in reverse order.
+    const char *template_ptr = &sequence[num_bases - 1];
+    char *complement_ptr = &rev_comp_sequence[0];
+    for (size_t i = 0; i < num_bases; ++i) {
+        const auto template_base = *template_ptr--;
+        *complement_ptr++ = kComplementTable[template_base];
+    }
+    return rev_comp_sequence;
+}
+
+#if defined(__GNUC__) && defined(__x86_64__) && !defined(__APPLE__)
+// AVX2 implementation that does in-register lookups of 32 bases at once, using
+// PSHUFB. On strings with over several thousand bases this was measured to be about 10x the speed
+// of the default implementation on Skylake.
+__attribute__((target("avx2"))) std::string reverse_complement_impl(const std::string& sequence) {
+    const auto len = sequence.size();
+    std::string rev_comp_sequence;
+    rev_comp_sequence.resize(len);
+
+    // Maps from lower 4 bits of template base ASCII to complement base ASCII.
+    // It happens that the low 4 bits of A, C, G and T ASCII encodings are unique, and
+    // these are the only bits the PSHUFB instruction we use cares about (aside from the high
+    // bit, which won't be set for valid input).
+    // 'A' & 0xf = 1
+    // 'C' & 0xf = 3
+    // 'T' & 0xf = 4
+    // 'G' & 0xf = 7
+    const __m256i kComplementTable =
+            _mm256_setr_epi8(0, 'T', 0, 'G', 'A', 0, 0, 'C', 0, 0, 0, 0, 0, 0, 0, 0,
+                             0, 'T', 0, 'G', 'A', 0, 0, 'C', 0, 0, 0, 0, 0, 0, 0, 0);
+
+    // PSHUFB indices to reverse bytes within a 16 byte AVX lane.  Note that _mm256_set_..
+    // intrinsics have a high to low ordering.
+    const __m256i kByteReverseTable = _mm256_set_epi8(0, 1, 2, 3, 4, 5, 6, 7, 8,
+                                                      9, 10, 11, 12, 13, 14, 15,
+                                                      0, 1, 2, 3, 4, 5, 6, 7, 8,
+                                                      9, 10, 11, 12, 13, 14, 15);
+
+    // Unroll to AVX register size.  Unrolling further would probably help performance.
+    static constexpr size_t kUnroll = 32;
+
+    // This starts pointing at the beginning of the first complete 32 byte template chunk
+    // that we load -- i.e. the one last in memory.
+    const char* template_ptr = &sequence[len - kUnroll];
+    char* complement_ptr = &rev_comp_sequence[0];
+
+    // Main vectorised loop: 32 bases per iteration.
+    for (size_t chunk_i = 0; chunk_i < len / kUnroll; ++chunk_i) {
+        // Load template bases.
+        const __m256i template_bases =
+                _mm256_loadu_si256(reinterpret_cast<const __m256i*>(template_ptr));
+        // Look up complement bases.
+        const __m256i complement_bases = _mm256_shuffle_epi8(kComplementTable, template_bases);
+        // Reverse byte order within 16 byte AVX lanes.
+        const __m256i reversed_lanes = _mm256_shuffle_epi8(complement_bases, kByteReverseTable);
+        // We store reversed lanes in reverse order to reverse 32 bytes overall.
+        // We could alternatively use VPERMQ and a 256 bit store, but the shuffle
+        // execution port (i.e. port 5 on Skylake) is oversubscribed.
+        const __m128i upper_lane = _mm256_extracti128_si256(reversed_lanes, 1);
+        const __m128i lower_lane = _mm256_castsi256_si128(reversed_lanes);
+        _mm_storeu_si128(reinterpret_cast<__m128i*>(complement_ptr), upper_lane);
+        _mm_storeu_si128(reinterpret_cast<__m128i*>(complement_ptr + 16), lower_lane);
+
+        template_ptr -= kUnroll;
+        complement_ptr += kUnroll;
+    }
+
+    // Loop for final 0-31 chars.
+    const size_t remaining_len = len % kUnroll;
+    const __m256i kZero = _mm256_setzero_si256();
+    template_ptr = &sequence[remaining_len - 1];
+    for (size_t i = 0; i < remaining_len; ++i) {
+        // Same steps as in the main loop, but char by char, so there's no
+        // reversal of byte ordering, and we load/store with scalar instructions.
+        const __m256i template_base = _mm256_insert_epi8(kZero, *template_ptr--, 0);
+        const __m256i complement_base = _mm256_shuffle_epi8(kComplementTable, template_base);
+        *complement_ptr++ = _mm256_extract_epi8(complement_base, 0);
+    }
+
+    return rev_comp_sequence;
+}
+#endif
+
+}
 
 namespace dorado::utils {
 std::map<std::string, std::string> load_pairs_file(std::string pairs_file_path) {
@@ -48,119 +154,12 @@ std::unordered_set<std::string> get_read_list_from_pairs(
     return read_list;
 }
 
-__attribute__((target("default")))
+// Multiversioned function dispatch doesn't work across the dorado_lib linking
+// boundary.  Without this wrapper, AVX machines still only execute the default
+// version. 
 std::string reverse_complement(const std::string& sequence) {
-    // Compile-time constant lookup table.
-    static constexpr auto kComplementTable = [] {
-        std::array<char, 256> a{};
-        for (int i = 0; i < 256; ++i) {
-            if (i == 'A')
-                a[i] = 'T';
-            else if (i == 'T')
-                a[i] = 'A';
-            else if (i == 'C')
-                a[i] = 'G';
-            else if (i == 'G')
-                a[i] = 'C';
-            else
-                a[i] = '\0';
-        }
-        return a;
-    }();
-
-    const auto len = sequence.size();
-    std::string rev_comp_sequence;
-    rev_comp_sequence.resize(len);
-
-    // Run every template base through the table, reading in reverse order.
-    const char *template_ptr = &sequence[len - 1];
-    char *complement_ptr = &rev_comp_sequence[0];
-    for (size_t i = 0; i < len; ++i) {
-        const auto template_base = *template_ptr--;
-        *complement_ptr++ = kComplementTable[template_base];
-    }
-
-    return rev_comp_sequence;
+    return reverse_complement_impl(sequence);
 }
-
-#if defined(__GNUC__) && defined(__x86_64__)
-
-// AVX2 implementation that does in-register lookups of 32 bases at once, using
-// PSHUFB.  This could be sped up further, but it's already arguably overengineered.
-// On strings over with several thousand bases this was measured to be about 8x the speed
-// of the default implementation on Skylake.
-__attribute__((target("avx2")))
-std::string reverse_complement(const std::string& sequence) {
-    const auto len = sequence.size();
-    std::string rev_comp_sequence;
-    rev_comp_sequence.resize(len);
-
-    const __m256i kA = _mm256_set1_epi8('A');
-    const __m256i kI = _mm256_set1_epi8('I');
-    // Maps from lookup indices to complement base ASCII,
-    // where lookup indices are base ASCII with T mapped to I, shifted
-    // to start at 0 rather than 65.  Entries correspond to A->T, blank, C->G, etc. 
-    const __m256i kComplementTable = _mm256_setr_epi8('T', 0, 'G',   0,   0,   0, 'C', 0,
-                                                      'A', 0,   0,   0,   0,   0,  0,  0,
-                                                      'T', 0, 'G',   0,   0,   0, 'C', 0,
-                                                      'A', 0,   0,   0,   0,   0,  0,  0);
-    // PSHUFB indices to reverse bytes across a 16 byte AVX lane.  Note that _mm256_set_..
-    // intrinsics have a high to low ordering.
-    const __m256i kByteReverseTable = _mm256_set_epi8(0, 1, 2, 3, 4, 5, 6, 7, 8,
-                                                      9, 10, 11, 12, 13, 14, 15,
-                                                      0, 1, 2, 3, 4, 5, 6, 7, 8,
-                                                      9, 10, 11, 12, 13, 14, 15);
-
-    // Unroll to AVX register size.  Unrolling further would probably help performance.
-    static constexpr size_t kUnroll = 32;
-
-    // This starts pointing at the beginning of the last in memory chunk we load.
-    const char *template_ptr = &sequence[len - kUnroll];
-    char *complement_ptr = &rev_comp_sequence[0];
-
-    // Main vectorised loop: 32 bases per iteration.
-    for (size_t chunk_i = 0; chunk_i < len / kUnroll; ++chunk_i) {
-        // Load template bases.
-        const __m256i template_bases = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(template_ptr));
-        // Map base T into a range we can use in the PSHUFB lookup, by turning it into an I.
-        const __m256i remapped_bases = _mm256_min_epu8(template_bases, kI);
-        // Map all bases down from ASCII to lookup index range.
-        const __m256i lookup_indices = _mm256_sub_epi8(remapped_bases, kA);
-        // Look up complement bases.
-        const __m256i complement_bases = _mm256_shuffle_epi8(kComplementTable, lookup_indices);
-        // Reverse byte order within 16 byte AVX lanes using PSHUFB.
-        const __m256i reversed_lanes =
-            _mm256_shuffle_epi8(complement_bases, kByteReverseTable);
-        // We store lanes in reverse order to overall reverse 32 bytes.
-        // We could alternatively use VPERMQ and a 256 bit store, but the shuffle
-        // execution port (i.e. port 5 on Skylake) is oversubscribed.
-        const __m128i upper_lane = _mm256_extracti128_si256(reversed_lanes, 1);
-        const __m128i lower_lane = _mm256_castsi256_si128(reversed_lanes);
-        _mm_storeu_si128(reinterpret_cast<__m128i*>(complement_ptr), upper_lane);
-        _mm_storeu_si128(reinterpret_cast<__m128i*>(complement_ptr + 16), lower_lane);
-
-        template_ptr -= kUnroll;
-        complement_ptr += kUnroll;
-    }
-
-    // Loop for final 0-31 chars.
-    const size_t remaining_len = len % kUnroll;
-    const __m256i kZero = _mm256_setzero_si256();
-    template_ptr = &sequence[remaining_len - 1];
-    for (size_t i = 0; i < remaining_len; ++i) {
-        // Same steps as in the main loop, but char by char, so there's no
-        // reversal of bytes, and we load/store with scalar instructions.
-        const __m256i template_base = _mm256_insert_epi8(kZero, *template_ptr--, 0);
-        const __m256i remapped_base = _mm256_min_epu8(template_base, kI);
-        const __m256i lookup_index =  _mm256_sub_epi8(remapped_base, kA);
-        const __m256i complement_base = _mm256_shuffle_epi8(kComplementTable, lookup_index);
-        *complement_ptr++ = _mm256_extract_epi8(complement_base, 0);
-    }
-
-    return rev_comp_sequence;
-}
-
-#endif
 
 std::pair<std::pair<int, int>, std::pair<int, int>> get_trimmed_alignment(
         int num_consecutive_wanted,
