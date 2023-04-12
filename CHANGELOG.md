@@ -4,7 +4,7 @@ All notable changes to Dorado will be documented in this file.
 
 # [0.2.4] (12 Apr 2023)
 
- * 92ef398874e9f4d09c7a57e5d979d4e704a12a74 - Fix out of bound access when modbase calling
+ * 92ef398874e9f4d09c7a57e5d979d4e704a12a74 - Fix out of bounds access when modbase calling
 
 # [0.2.3] (06 Apr 2023)
 
