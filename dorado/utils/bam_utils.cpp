@@ -20,6 +20,12 @@
 //  client code, so it comes up as an undefined reference when linking the stub.
 const char seq_nt16_str[] = "=ACMGRSVTWYHKDBN";
 
+// These special wrapped memory management function are needed
+// because on Windows, memory allocated and returned from one
+// DLL cannot be freed or managed from another DLL/exe unless
+// they share the runtime library. With htslib that was not
+// possible, so these wrapped functions had to be exposed.
+// TODO: Find a cleaner solution for this.
 #include "htslib/ont_defs.h"
 #define _HTSLIB_FREE htslib_wrapped_free
 #define _HTSLIB_REALLOC htslib_wrapped_realloc
@@ -91,10 +97,14 @@ void Aligner::worker_thread() {
     Message message;
     int tid = m_active++ % m_threads;
     while (m_work_queue.try_pop(message)) {
-        auto records = align(std::get<bam1_t*>(message), m_tbufs[tid]);
+        bam1_t* read = std::get<bam1_t*>(message);
+        auto records = align(read, m_tbufs[tid]);
         for (auto& record : records) {
             m_sink.push_message(std::move(record));
         }
+        // Free the bam alignment read from the input.
+        // Not used anymore after this.
+        bam_destroy1(read);
     }
     if (--m_active == 0) {
         terminate();
@@ -337,7 +347,11 @@ void BamWriter::join() { m_worker->join(); }
 void BamWriter::worker_thread() {
     Message message;
     while (m_work_queue.try_pop(message)) {
-        write(std::get<bam1_t*>(message));
+        bam1_t* aln = std::get<bam1_t*>(message);
+        write(aln);
+        // Free the bam alignment that's already written
+        // out to disk.
+        bam_destroy1(aln);
     }
     terminate();
 }
