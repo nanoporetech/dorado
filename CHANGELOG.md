@@ -2,6 +2,10 @@
 
 All notable changes to Dorado will be documented in this file.
 
+# [0.2.4] (12 Apr 2023)
+
+ * 92ef398874e9f4d09c7a57e5d979d4e704a12a74 - Fix out of bounds access when modbase calling
+
 # [0.2.3] (06 Apr 2023)
 
  * 6bf227b8139132854927884b59246922f92f0bdc - Upgrade to Pod5 v0.1.16

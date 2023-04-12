@@ -24,9 +24,7 @@ void RemoraEncoder::init(const std::vector<int>& sequence_ints,
                          const std::vector<uint64_t>& seq_to_sig_map) {
     // gcc9 doesn't support <ranges>, which would be useful here
     m_sequence_ints = sequence_ints;
-
-    // remove the final entry, we're only interested in where the bases start
-    m_sample_offsets = {std::begin(seq_to_sig_map), std::prev(std::end(seq_to_sig_map), 1)};
+    m_sample_offsets = {std::begin(seq_to_sig_map), std::end(seq_to_sig_map)};
 
     // last entry is the signal length
     m_signal_len = seq_to_sig_map.back();
@@ -65,7 +63,7 @@ RemoraEncoder::Context RemoraEncoder::get_context(size_t seq_pos) const {
     // find base position for first and last sample
     auto start_it = std::upper_bound(m_sample_offsets.begin(), m_sample_offsets.end(),
                                      context.first_sample);
-    auto end_it = std::upper_bound(m_sample_offsets.begin(), m_sample_offsets.end(),
+    auto end_it = std::lower_bound(m_sample_offsets.begin(), m_sample_offsets.end(),
                                    context.first_sample + context.num_samples);
 
     auto seq_start = std::distance(m_sample_offsets.begin(), start_it) - 1;
