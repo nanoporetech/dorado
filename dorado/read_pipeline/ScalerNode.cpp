@@ -43,7 +43,7 @@ void ScalerNode::worker_thread() {
         // 8000 value may be changed in future. Currently this is found to work well.
         int trim_start =
                 trim(read->raw_data.index({torch::indexing::Slice(torch::indexing::None, 8000)}),
-                     threshold);
+                     threshold, read->raw_data.size(0) / 2);
 
         read->raw_data =
                 read->raw_data.index({torch::indexing::Slice(trim_start, torch::indexing::None)});
@@ -82,10 +82,9 @@ ScalerNode::~ScalerNode() {
 
 int ScalerNode::trim(torch::Tensor signal,
                      float threshold,
-                     int window_size,
-                     int min_elements,
                      int max_samples,
-                     float max_trim) {
+                     int window_size,
+                     int min_elements) {
     int min_trim = 10;
     bool seen_peak = false;
     int num_samples = std::min(max_samples, static_cast<int>(signal.size(0)) - min_trim);
