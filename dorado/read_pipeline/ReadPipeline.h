@@ -100,6 +100,11 @@ using Message = std::variant<std::shared_ptr<Read>, bam1_t*>;
 
 // Base class for an object which consumes messages.
 // MessageSink is a node within a pipeline.
+// NOTE: In order to prevent potential deadlocks when
+// the writer to the node doesn't exit cleanly, always
+// call terminate() in the destructor of a class derived
+// from MessageSink (and before worker thread join() calls
+// if there are any).
 class MessageSink {
 public:
     MessageSink(size_t max_messages);

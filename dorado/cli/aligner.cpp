@@ -69,16 +69,16 @@ int aligner(int argc, char* argv[]) {
     utils::Aligner aligner(writer, index, threads);
     utils::BamReader reader(reads[0]);
 
-    spdlog::debug("> input fmt: {} aligned: {}", reader.m_format, reader.m_is_aligned);
-    writer.write_header(reader.m_header, aligner.sq());
+    spdlog::debug("> input fmt: {} aligned: {}", reader.format, reader.is_aligned);
+    writer.write_header(reader.header, aligner.sq());
 
     spdlog::info("> starting alignment");
     reader.read(aligner, max_reads);
     writer.join();
 
     spdlog::info("> finished alignment");
-    spdlog::info("> total/primary/unmapped {}/{}/{}", writer.m_total, writer.m_primary,
-                 writer.m_unmapped);
+    spdlog::info("> total/primary/unmapped {}/{}/{}", writer.total, writer.primary,
+                 writer.unmapped);
 
     return 0;
 }

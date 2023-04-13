@@ -41,10 +41,11 @@ public:
     ~BamReader();
     bool read();
     void read(MessageSink& read_sink, int max_reads = -1);
-    char* m_format{nullptr};
-    bool m_is_aligned{false};
-    bam1_t* m_record{nullptr};
-    sam_hdr_t* m_header{nullptr};
+
+    char* format{nullptr};
+    bool is_aligned{false};
+    bam1_t* record{nullptr};
+    sam_hdr_t* header{nullptr};
 
 private:
     htsFile* m_file{nullptr};
@@ -58,16 +59,15 @@ public:
     int write(bam1_t* record);
     void join();
 
-    size_t m_total{0};
-    size_t m_primary{0};
-    size_t m_unmapped{0};
-    size_t m_secondary{0};
-    size_t m_supplementary{0};
-
-    sam_hdr_t* m_header{nullptr};
+    size_t total{0};
+    size_t primary{0};
+    size_t unmapped{0};
+    size_t secondary{0};
+    size_t supplementary{0};
 
 private:
     htsFile* m_file{nullptr};
+    sam_hdr_t* m_header{nullptr};
     std::unique_ptr<std::thread> m_worker;
     void worker_thread();
     int write_hdr_pg();

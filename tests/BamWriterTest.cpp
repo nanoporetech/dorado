@@ -27,7 +27,7 @@ protected:
 
         dorado::utils::sq_t sequences;
         CHECK(sequences.size() == 0);  // No sequence information for this test.
-        writer.write_header(reader.m_header, sequences);
+        writer.write_header(reader.header, sequences);
         reader.read(writer, 1000);
 
         writer.join();

@@ -39,13 +39,15 @@ namespace dorado::utils {
 Aligner::Aligner(MessageSink& sink, const std::string& filename, int threads)
         : MessageSink(10000), m_sink(sink), m_threads(threads) {
     mm_set_opt(0, &m_idx_opt, &m_map_opt);
+    // Setting options to map-ont default till relevant args are exposed.
+    mm_set_opt("map-ont", &m_idx_opt, &m_map_opt);
 
-    m_idx_opt.k = 19;
-    m_idx_opt.w = 19;
-    m_idx_opt.flag = 1;
+    // Set batch sizes large enough to not require chunking since that's
+    // not supported yet.
     m_idx_opt.batch_size = 4000000000;
     m_idx_opt.mini_batch_size = 16000000000;
 
+    // Force cigar generation.
     m_map_opt.flag |= MM_F_CIGAR;
 
     mm_check_opt(&m_idx_opt, &m_map_opt);
@@ -291,28 +293,28 @@ BamReader::BamReader(const std::string& filename) {
     if (!m_file) {
         throw std::runtime_error("Could not open file: " + filename);
     }
-    m_format = hts_format_description(hts_get_format(m_file));
-    m_header = sam_hdr_read(m_file);
-    if (!m_header) {
+    format = hts_format_description(hts_get_format(m_file));
+    header = sam_hdr_read(m_file);
+    if (!header) {
         throw std::runtime_error("Could not read header from file: " + filename);
     }
-    m_is_aligned = m_header->n_targets > 0;
-    m_record = bam_init1();
+    is_aligned = header->n_targets > 0;
+    record = bam_init1();
 }
 
 BamReader::~BamReader() {
-    hts_free(m_format);
-    sam_hdr_destroy(m_header);
-    bam_destroy1(m_record);
+    hts_free(format);
+    sam_hdr_destroy(header);
+    bam_destroy1(record);
     hts_close(m_file);
 }
 
-bool BamReader::read() { return sam_read1(m_file, m_header, m_record) >= 0; }
+bool BamReader::read() { return sam_read1(m_file, header, record) >= 0; }
 
 void BamReader::read(MessageSink& read_sink, int max_reads) {
     int num_reads = 0;
     while (this->read()) {
-        read_sink.push_message(bam_dup1(m_record));
+        read_sink.push_message(bam_dup1(record));
         if (++num_reads >= max_reads) {
             break;
         }
@@ -335,6 +337,9 @@ BamWriter::BamWriter(const std::string& filename, size_t threads) : MessageSink(
 BamWriter::~BamWriter() {
     // Adding for thread safety in case worker thread throws exception.
     terminate();
+    if (m_worker->joinable()) {
+        join();
+    }
     sam_hdr_destroy(m_header);
     hts_close(m_file);
 }
@@ -354,17 +359,17 @@ void BamWriter::worker_thread() {
 
 int BamWriter::write(bam1_t* record) {
     // track stats
-    m_total++;
+    total++;
     if (record->core.flag & BAM_FUNMAP) {
-        m_unmapped++;
+        unmapped++;
     }
     if (record->core.flag & BAM_FSECONDARY) {
-        m_secondary++;
+        secondary++;
     }
     if (record->core.flag & BAM_FSUPPLEMENTARY) {
-        m_supplementary++;
+        supplementary++;
     }
-    m_primary = m_total - m_secondary - m_supplementary - m_unmapped;
+    primary = total - secondary - supplementary - unmapped;
 
     auto res = sam_write1(m_file, m_header, record);
     if (res < 0) {
@@ -399,16 +404,16 @@ read_map read_bam(const std::string& filename, const std::set<std::string>& read
     read_map reads;
 
     while (reader.read()) {
-        std::string read_id = bam_get_qname(reader.m_record);
+        std::string read_id = bam_get_qname(reader.record);
 
         if (read_ids.find(read_id) == read_ids.end()) {
             continue;
         }
 
-        uint8_t* qstring = bam_get_qual(reader.m_record);
-        uint8_t* sequence = bam_get_seq(reader.m_record);
+        uint8_t* qstring = bam_get_qual(reader.record);
+        uint8_t* sequence = bam_get_seq(reader.record);
 
-        uint32_t seqlen = reader.m_record->core.l_qseq;
+        uint32_t seqlen = reader.record->core.l_qseq;
         std::vector<uint8_t> qualities(seqlen);
         std::vector<char> nucleotides(seqlen);
 
