@@ -4,8 +4,8 @@
 
 namespace dorado::utils {
 int trim(torch::Tensor signal,
-         float threshold,
          int max_samples,
+         float threshold,
          int window_size,
          int min_elements) {
     int min_trim = 10;

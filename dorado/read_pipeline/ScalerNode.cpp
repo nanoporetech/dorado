@@ -39,12 +39,10 @@ void ScalerNode::worker_thread() {
         read->scale = read->scaling * scale;
         read->shift = read->scaling * (shift + read->offset);
 
-        float threshold = 2.4;
-
         // 8000 value may be changed in future. Currently this is found to work well.
         int trim_start = utils::trim(
                 read->raw_data.index({torch::indexing::Slice(torch::indexing::None, 8000)}),
-                threshold, read->raw_data.size(0) / 2);
+                read->raw_data.size(0) / 2);
 
         read->raw_data =
                 read->raw_data.index({torch::indexing::Slice(trim_start, torch::indexing::None)});
