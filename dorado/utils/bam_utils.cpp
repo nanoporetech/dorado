@@ -37,8 +37,17 @@ const char seq_nt16_str[] = "=ACMGRSVTWYHKDBN";
 
 namespace dorado::utils {
 
-const uint8_t nt16_seq_map[90] =
-        {['A'] = 0b1, ['C'] = 0b10, ['G'] = 0b100, ['T'] = 0b1000, ['N'] = 0b1111};
+static constexpr std::array<uint8_t, 90> generate_nt16_seq_map() {
+    std::array<uint8_t, 90> nt16_seq_map = {0};
+    nt16_seq_map['A'] = 0b1;
+    nt16_seq_map['C'] = 0b10;
+    nt16_seq_map['G'] = 0b100;
+    nt16_seq_map['T'] = 0b1000;
+    nt16_seq_map['N'] = 0b1111;
+    return nt16_seq_map;
+}
+
+const std::array<uint8_t, 90> nt16_seq_map = generate_nt16_seq_map();
 
 Aligner::Aligner(MessageSink& sink, const std::string& filename, int threads)
         : MessageSink(10000), m_sink(sink), m_threads(threads) {
@@ -59,6 +68,8 @@ Aligner::Aligner(MessageSink& sink, const std::string& filename, int threads)
     m_index_reader = mm_idx_reader_open(filename.c_str(), &m_idx_opt, 0);
     m_index = mm_idx_reader_read(m_index_reader, m_threads);
     mm_mapopt_update(&m_map_opt, m_index);
+
+    //std::cerr << "Using k:" << m_index->k << ", w:" << m_index->w << ", flag:" << m_index->flag << std::endl;
 
     if (mm_verbose >= 3) {
         mm_idx_stat(m_index);
@@ -287,10 +298,6 @@ std::vector<bam1_t*> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
             record->m_data = new_m_data;
 
             if (aln->rev) {
-                std::cerr << "Reverse "
-                          << std::string(bam_get_qname(record),
-                                         bam_get_qname(record) + record->core.l_qname)
-                          << std::endl;
                 for (int i = 0; i < seqlen; i++) {
                     bam_set_seqi(bam_get_seq(record), i, nt16_seq_map[seq_rev[i]]);
                 }
