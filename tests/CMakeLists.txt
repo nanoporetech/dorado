@@ -40,6 +40,6 @@ target_link_libraries(dorado_tests
 
 add_test(
     NAME dorado_tests
-    COMMAND dorado_tests -s
+    COMMAND dorado_tests
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )

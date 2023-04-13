@@ -63,7 +63,7 @@ endif()
 
 # ELZIP_DECOMPRESS_ONLY stops minizip from adding OpenSSL as a target, preventing use of three dylibs on osx.
 set(ELZIP_DECOMPRESS_ONLY ON)
-add_subdirectory(dorado/3rdparty/elzip)
+add_subdirectory(${DORADO_3RD_PARTY}/elzip)
 
 set(ONT_MM2_EXE OFF)
 add_subdirectory(${DORADO_3RD_PARTY}/ont-minimap2)

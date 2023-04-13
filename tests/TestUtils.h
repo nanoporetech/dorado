@@ -6,7 +6,7 @@
 #include <fstream>
 #include <iostream>
 
-static std::string get_data_dir(const char* sub_dir) {
+static std::string get_data_dir(const std::string& sub_dir) {
     const std::filesystem::path data_path = std::filesystem::path("./tests/data/") / sub_dir;
 
     if (!std::filesystem::exists(data_path)) {

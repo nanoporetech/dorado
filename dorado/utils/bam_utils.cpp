@@ -5,7 +5,9 @@
 #include "htslib/kroundup.h"
 #include "htslib/sam.h"
 #include "minimap.h"
-#include "mmpriv.h"  // todo: This is a private header from mm2. Ask lh3 to make some of these funcs publicly available?
+//todo: mmpriv.h is a private header from mm2 for the mm_event_identity function.
+//Ask lh3 t  make some of these funcs publicly available?
+#include "mmpriv.h"
 #include "read_pipeline/ReadPipeline.h"
 
 #include <iostream>
@@ -27,16 +29,14 @@ const char seq_nt16_str[] = "=ACMGRSVTWYHKDBN";
 // possible, so these wrapped functions had to be exposed.
 // TODO: Find a cleaner solution for this.
 #include "htslib/ont_defs.h"
-#define _HTSLIB_FREE htslib_wrapped_free
 #define _HTSLIB_REALLOC htslib_wrapped_realloc
 #else
-#define _HTSLIB_FREE free
 #define _HTSLIB_REALLOC realloc
 #endif  // _WIN32
 
 namespace dorado::utils {
 
-Aligner::Aligner(MessageSink& sink, const std::string& filename, const int threads)
+Aligner::Aligner(MessageSink& sink, const std::string& filename, int threads)
         : MessageSink(10000), m_sink(sink), m_threads(threads) {
     mm_set_opt(0, &m_idx_opt, &m_map_opt);
 
@@ -64,11 +64,12 @@ Aligner::Aligner(MessageSink& sink, const std::string& filename, const int threa
 
     for (size_t i = 0; i < m_threads; i++) {
         m_workers.push_back(
-                std::make_unique<std::thread>(std::thread(&Aligner::worker_thread, this)));
+                std::make_unique<std::thread>(std::thread(&Aligner::worker_thread, this, i)));
     }
 }
 
 Aligner::~Aligner() {
+    terminate();
     for (auto& m : m_workers) {
         m->join();
     }
@@ -77,6 +78,8 @@ Aligner::~Aligner() {
     }
     mm_idx_reader_close(m_index_reader);
     mm_idx_destroy(m_index);
+    // Adding for thread safety in case worker thread throws exception.
+    m_sink.terminate();
 }
 
 std::vector<std::pair<char*, uint32_t>> Aligner::sq() {
@@ -87,15 +90,10 @@ std::vector<std::pair<char*, uint32_t>> Aligner::sq() {
     return records;
 }
 
-std::pair<int, mm_reg1_t*> Aligner::align(const std::vector<char> seq) {
-    int hits = 0;
-    mm_reg1_t* reg = mm_map(m_index, seq.size(), seq.data(), &hits, m_tbufs[0], &m_map_opt, 0);
-    return std::make_pair(hits, reg);
-}
+void Aligner::worker_thread(size_t tid) {
+    m_active++;  // Track active threads.
 
-void Aligner::worker_thread() {
     Message message;
-    int tid = m_active++ % m_threads;
     while (m_work_queue.try_pop(message)) {
         bam1_t* read = std::get<bam1_t*>(message);
         auto records = align(read, m_tbufs[tid]);
@@ -106,7 +104,9 @@ void Aligner::worker_thread() {
         // Not used anymore after this.
         bam_destroy1(read);
     }
-    if (--m_active == 0) {
+
+    int num_active = --m_active;
+    if (num_active == 0) {
         terminate();
         m_sink.terminate();
     }
@@ -132,38 +132,27 @@ void Aligner::add_tags(bam1_t* record, const mm_reg1_t* aln, const std::vector<c
         int32_t nn = aln->p->n_ambi;
         bam_aux_append(record, "nn", 'i', sizeof(nm), (uint8_t*)&nn);
 
-        if (aln->p->trans_strand == 1 || aln->p->trans_strand == 2)
+        if (aln->p->trans_strand == 1 || aln->p->trans_strand == 2) {
             bam_aux_append(record, "ts", 'A', 2, (uint8_t*)&("?+-?"[aln->p->trans_strand]));
+        }
     }
 
     // de / dv
     if (aln->p) {
-        char buf[16];
         float div;
         div = 1.0 - mm_event_identity(aln);
-        if (div == 0.0)
-            buf[0] = '0', buf[1] = 0;
-        else
-            snprintf(buf, 16, "%.4f", 1.0 - mm_event_identity(aln));
-        auto ret = bam_aux_append(record, "de", 'f', sizeof(div), (uint8_t*)&div);
-        if (ret < 0)
-            std::cerr << "issue adding tag" << std::endl;
-        ;
+        bam_aux_append(record, "de", 'f', sizeof(div), (uint8_t*)&div);
     } else if (aln->div >= 0.0f && aln->div <= 1.0f) {
-        char buf[16];
-        if (aln->div == 0.0f)
-            buf[0] = '0', buf[1] = 0;
-        else
-            snprintf(buf, 16, "%.4f", aln->div);
         bam_aux_append(record, "dv", 'f', sizeof(aln->div), (uint8_t*)&aln->div);
     }
 
     // tp
     char type;
-    if (aln->id == aln->parent)
+    if (aln->id == aln->parent) {
         type = aln->inv ? 'I' : 'P';
-    else
+    } else {
         type = aln->inv ? 'i' : 'S';
+    }
     bam_aux_append(record, "tp", 'A', sizeof(type), (uint8_t*)&type);
 
     // cm
@@ -173,15 +162,17 @@ void Aligner::add_tags(bam1_t* record, const mm_reg1_t* aln, const std::vector<c
     bam_aux_append(record, "s1", 'i', sizeof(aln->score), (uint8_t*)&aln->score);
 
     // s2
-    if (aln->parent == aln->id)
+    if (aln->parent == aln->id) {
         bam_aux_append(record, "s2", 'i', sizeof(aln->subsc), (uint8_t*)&aln->subsc);
+    }
 
     // MD
     char* md = NULL;
     int max_len = 0;
     int md_len = mm_gen_MD(NULL, &md, &max_len, m_index, aln, seq.data());
-    if (md_len > 0)
+    if (md_len > 0) {
         bam_aux_append(record, "MD", 'Z', md_len + 1, (uint8_t*)md);
+    }
 
     // zd
     if (aln->split) {
@@ -209,7 +200,7 @@ std::vector<bam1_t*> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
 
     // just return the input record
     if (hits == 0) {
-        results.push_back(irecord);
+        results.push_back(bam_dup1(irecord));
     }
 
     for (int j = 0; j < hits; j++) {
@@ -217,22 +208,24 @@ std::vector<bam1_t*> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
         auto record = bam_dup1(irecord);
 
         // mapping region
-        auto a = &reg[j];
+        auto aln = &reg[j];
 
         uint16_t flag = 0x0;
 
-        if (a->rev)
+        if (aln->rev) {
             flag |= 0x10;
-        if (a->parent != a->id)
+        }
+        if (aln->parent != aln->id) {
             flag |= 0x100;
-        else if (!a->sam_pri)
+        } else if (!aln->sam_pri) {
             flag |= 0x800;
+        }
 
         record->core.flag = flag;
-        record->core.tid = a->rid;
-        record->core.pos = a->rs;
-        record->core.qual = a->mapq;
-        record->core.n_cigar = a->p ? a->p->n_cigar : 0;
+        record->core.tid = aln->rid;
+        record->core.pos = aln->rs;
+        record->core.qual = aln->mapq;
+        record->core.n_cigar = aln->p ? aln->p->n_cigar : 0;
 
         // Note: max_bam_cigar_op doesn't need to handled specially when
         // using htslib since the sam_write1 method already takes care
@@ -240,8 +233,8 @@ std::vector<bam1_t*> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
         // exceeds 65535.
         if (record->core.n_cigar != 0) {
             uint32_t clip_len[2] = {0};
-            clip_len[0] = a->rev ? record->core.l_qseq - a->qe : a->qs;
-            clip_len[1] = a->rev ? a->qs : record->core.l_qseq - a->qe;
+            clip_len[0] = aln->rev ? record->core.l_qseq - aln->qe : aln->qs;
+            clip_len[1] = aln->rev ? aln->qs : record->core.l_qseq - aln->qe;
 
             if (clip_len[0]) {
                 record->core.n_cigar++;
@@ -253,6 +246,7 @@ std::vector<bam1_t*> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
             int cigar_size = record->core.n_cigar * sizeof(uint32_t);
             uint32_t new_m_data = record->l_data + cigar_size;
             kroundup32(new_m_data);
+            // todo: this part could possibly by re-written without using realloc.
             uint8_t* data = (uint8_t*)_HTSLIB_REALLOC(record->data, new_m_data);
 
             // shift existing data to make room for the new cigar field
@@ -268,12 +262,13 @@ std::vector<bam1_t*> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
             }
 
             // write the cigar
-            memcpy(bam_get_cigar(record) + offset, a->p->cigar, a->p->n_cigar * sizeof(uint32_t));
+            memcpy(bam_get_cigar(record) + offset, aln->p->cigar,
+                   aln->p->n_cigar * sizeof(uint32_t));
 
             // write the right softclip
             if (clip_len[1]) {
                 auto clip = bam_cigar_gen(clip_len[1], BAM_CSOFT_CLIP);
-                memcpy(bam_get_cigar(record) + offset + a->p->n_cigar, &clip, sizeof(uint32_t));
+                memcpy(bam_get_cigar(record) + offset + aln->p->n_cigar, &clip, sizeof(uint32_t));
             }
 
             // update the data length
@@ -281,9 +276,9 @@ std::vector<bam1_t*> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
             record->m_data = new_m_data;
         }
 
-        add_tags(record, a, seq);
+        add_tags(record, aln, seq);
 
-        free(a->p);
+        free(aln->p);
         results.push_back(record);
     }
 
@@ -306,7 +301,7 @@ BamReader::BamReader(const std::string& filename) {
 }
 
 BamReader::~BamReader() {
-    _HTSLIB_FREE(m_format);
+    hts_free(m_format);
     sam_hdr_destroy(m_header);
     bam_destroy1(m_record);
     hts_close(m_file);
@@ -317,7 +312,7 @@ bool BamReader::read() { return sam_read1(m_file, m_header, m_record) >= 0; }
 void BamReader::read(MessageSink& read_sink, int max_reads) {
     int num_reads = 0;
     while (this->read()) {
-        read_sink.push_message(std::move(bam_dup1(m_record)));
+        read_sink.push_message(bam_dup1(m_record));
         if (++num_reads >= max_reads) {
             break;
         }
@@ -338,6 +333,8 @@ BamWriter::BamWriter(const std::string& filename, size_t threads) : MessageSink(
 }
 
 BamWriter::~BamWriter() {
+    // Adding for thread safety in case worker thread throws exception.
+    terminate();
     sam_hdr_destroy(m_header);
     hts_close(m_file);
 }
@@ -353,18 +350,20 @@ void BamWriter::worker_thread() {
         // out to disk.
         bam_destroy1(aln);
     }
-    terminate();
 }
 
 int BamWriter::write(bam1_t* record) {
     // track stats
     m_total++;
-    if (record->core.flag & BAM_FUNMAP)
+    if (record->core.flag & BAM_FUNMAP) {
         m_unmapped++;
-    if (record->core.flag & BAM_FSECONDARY)
+    }
+    if (record->core.flag & BAM_FSECONDARY) {
         m_secondary++;
-    if (record->core.flag & BAM_FSUPPLEMENTARY)
+    }
+    if (record->core.flag & BAM_FSUPPLEMENTARY) {
         m_supplementary++;
+    }
     m_primary = m_total - m_secondary - m_supplementary - m_unmapped;
 
     auto res = sam_write1(m_file, m_header, record);
@@ -397,7 +396,7 @@ int BamWriter::write_hdr_sq(char* name, uint32_t length) {
 read_map read_bam(const std::string& filename, const std::set<std::string>& read_ids) {
     BamReader reader(filename);
 
-    std::map<std::string, std::shared_ptr<Read>> reads;
+    read_map reads;
 
     while (reader.read()) {
         std::string read_id = bam_get_qname(reader.m_record);

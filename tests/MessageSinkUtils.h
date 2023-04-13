@@ -13,7 +13,6 @@ public:
         while (m_work_queue.try_pop(message)) {
             vec.push_back(std::get<T>(message));
         }
-        terminate();
         return vec;
     }
 };

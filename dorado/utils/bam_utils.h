@@ -10,7 +10,7 @@
 namespace dorado::utils {
 
 using sq_t = std::vector<std::pair<char*, uint32_t>>;
-using read_map = std::map<std::string, std::shared_ptr<Read>>;
+using read_map = std::unordered_map<std::string, std::shared_ptr<Read>>;
 
 class Aligner : public MessageSink {
 public:
@@ -18,7 +18,6 @@ public:
     ~Aligner();
     sq_t sq();
     std::vector<bam1_t*> align(bam1_t* record, mm_tbuf_t* buf);
-    std::pair<int, mm_reg1_t*> align(const std::vector<char> seq);
 
 private:
     MessageSink& m_sink;
@@ -26,7 +25,7 @@ private:
     std::atomic<size_t> m_active{0};
     std::vector<mm_tbuf_t*> m_tbufs;
     std::vector<std::unique_ptr<std::thread>> m_workers;
-    void worker_thread();
+    void worker_thread(size_t tid);
     void add_tags(bam1_t*, const mm_reg1_t*, const std::vector<char>&);
 
     mm_idxopt_t m_idx_opt;

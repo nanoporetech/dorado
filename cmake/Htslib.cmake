@@ -1,7 +1,8 @@
 if(NOT DEFINED HTSLIB_LIBRARIES) # lazy include guard
     if(WIN32)
-        message(STATUS "Fetching htslib from Box")
-        download_and_extract(https://cdn.oxfordnanoportal.com/software/analysis/test-htslib-win/htslib-win2.tar.gz htslib-win)
+        message(STATUS "Fetching htslib from internal ML-Hub link.")
+        message(WARNING "!!Please update link to external CDN before public release!!")
+        download_and_extract(http://ml-hub-dev.oxfordnanolabs.local/argus/static/test-htslib-win/htslib-win2.tar.gz htslib-win)
         set(HTSLIB_DIR ${DORADO_3RD_PARTY}/htslib-win CACHE STRING
                     "Path to htslib repo")
         set(HTSLIB_LIBRARIES hts-3)

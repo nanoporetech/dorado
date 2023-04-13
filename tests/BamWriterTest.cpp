@@ -1,4 +1,3 @@
-#include "MessageSinkUtils.h"
 #include "TestUtils.h"
 #include "htslib/sam.h"
 #include "utils/bam_utils.h"
@@ -11,16 +10,20 @@
 
 namespace fs = std::filesystem;
 
-TEMPLATE_TEST_CASE_SIG("BamWriterTest: Write BAM", TEST_GROUP, ((int threads), threads), 1, 10) {
-    fs::path aligner_test_dir = fs::path(get_data_dir("bam_reader"));
-    auto sam = aligner_test_dir / "small.sam";
-    auto bam_path = fs::temp_directory_path() / "out.bam";
+class BamWriterTestsFixture {
+public:
+    BamWriterTestsFixture() {
+        fs::path aligner_test_dir = fs::path(get_data_dir("bam_reader"));
+        m_in_sam = aligner_test_dir / "small.sam";
+        m_out_bam = fs::temp_directory_path() / "out.bam";
+    }
 
-    {
-        // Running within a local scope to ensure file paths are closed
-        // before removing the file.
-        dorado::utils::BamReader reader(sam.string());
-        dorado::utils::BamWriter writer(bam_path.string(), threads);
+    ~BamWriterTestsFixture() { fs::remove(m_out_bam); }
+
+protected:
+    void generate_bam(int num_threads) {
+        dorado::utils::BamReader reader(m_in_sam.string());
+        dorado::utils::BamWriter writer(m_out_bam.string(), num_threads);
 
         dorado::utils::sq_t sequences;
         CHECK(sequences.size() == 0);  // No sequence information for this test.
@@ -30,7 +33,12 @@ TEMPLATE_TEST_CASE_SIG("BamWriterTest: Write BAM", TEST_GROUP, ((int threads), t
         writer.join();
     }
 
-    // Test only checks that no API calls raised any exceptions.
-    REQUIRE(true);
-    CHECK(fs::remove(bam_path));
+private:
+    fs::path m_in_sam;
+    fs::path m_out_bam;
+};
+
+TEST_CASE_METHOD(BamWriterTestsFixture, "BamWriterTest: Write BAM", TEST_GROUP) {
+    int num_threads = GENERATE(1, 10);
+    REQUIRE_NOTHROW(generate_bam(num_threads));
 }
