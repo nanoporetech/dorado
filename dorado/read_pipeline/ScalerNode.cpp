@@ -38,7 +38,7 @@ void ScalerNode::worker_thread() {
         read->scale = read->scaling * scale;
         read->shift = read->scaling * (shift + read->offset);
 
-        float threshold = read->shift + read->scale * 2.4;
+        float threshold = 2.4;
 
         // 8000 value may be changed in future. Currently this is found to work well.
         int trim_start =
