@@ -11,6 +11,7 @@ set(SOURCE_FILES
     SequenceUtilsTest.cpp
     StitchTest.cpp
     StereoDuplexTest.cpp
+    TrimTest.cpp
 )
 
 if (DORADO_GPU_BUILD)
