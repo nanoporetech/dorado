@@ -7,6 +7,7 @@
 #include <chrono>
 
 using namespace std::chrono_literals;
+using Slice = torch::indexing::Slice;
 
 namespace {
 
@@ -40,12 +41,11 @@ void ScalerNode::worker_thread() {
         read->shift = read->scaling * (shift + read->offset);
 
         // 8000 value may be changed in future. Currently this is found to work well.
-        int trim_start = utils::trim(
-                read->raw_data.index({torch::indexing::Slice(torch::indexing::None, 8000)}),
-                read->raw_data.size(0) / 2);
+        int max_samples = std::min(8000, static_cast<int>(read->raw_data.size(0) / 2));
+        int trim_start =
+                utils::trim(read->raw_data.index({Slice(torch::indexing::None, max_samples)}));
 
-        read->raw_data =
-                read->raw_data.index({torch::indexing::Slice(trim_start, torch::indexing::None)});
+        read->raw_data = read->raw_data.index({Slice(trim_start, torch::indexing::None)});
         read->num_trimmed_samples = trim_start;
 
         // Pass the read to the next node

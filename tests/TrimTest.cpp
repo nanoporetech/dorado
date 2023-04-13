@@ -4,6 +4,8 @@
 
 #include <random>
 
+using Slice = torch::indexing::Slice;
+
 #define TEST_GROUP "[utils][trim]"
 
 TEST_CASE("Test trim signal", TEST_GROUP) {
@@ -35,14 +37,14 @@ TEST_CASE("Test trim signal", TEST_GROUP) {
     }
 
     SECTION("Reduced window size") {
-        int pos = dorado::utils::trim(signal_tensor, 8000, 2.4, 10);
+        int pos = dorado::utils::trim(signal_tensor, 2.4, 10);
 
         int expected_pos = 60;
         CHECK(pos == expected_pos);
     }
 
     SECTION("All signal below threshold") {
-        int pos = dorado::utils::trim(signal_tensor, 8000, 24);
+        int pos = dorado::utils::trim(signal_tensor, 24);
 
         int expected_pos = 10;  // minimum trim value
         CHECK(pos == expected_pos);
@@ -50,7 +52,7 @@ TEST_CASE("Test trim signal", TEST_GROUP) {
 
     SECTION("All signal above threshold") {
         std::fill(std::begin(signal), std::end(signal), 100.f);
-        int pos = dorado::utils::trim(signal_tensor, 8000, 24);
+        int pos = dorado::utils::trim(signal_tensor, 24);
 
         int expected_pos = 10;  // minimum trim value
         CHECK(pos == expected_pos);
@@ -61,7 +63,7 @@ TEST_CASE("Test trim signal", TEST_GROUP) {
             signal[i] += 50;
         }
 
-        int pos = dorado::utils::trim(signal_tensor, 400, 24);
+        int pos = dorado::utils::trim(signal_tensor.index({Slice(torch::indexing::None, 400)}), 24);
 
         int expected_pos = 10;  // minimum trim value
         CHECK(pos == expected_pos);

@@ -3,14 +3,10 @@
 #include <algorithm>
 
 namespace dorado::utils {
-int trim(torch::Tensor signal,
-         int max_samples,
-         float threshold,
-         int window_size,
-         int min_elements) {
+int trim(torch::Tensor signal, float threshold, int window_size, int min_elements) {
     int min_trim = 10;
     bool seen_peak = false;
-    int num_samples = std::min(max_samples, static_cast<int>(signal.size(0)) - min_trim);
+    int num_samples = static_cast<int>(signal.size(0)) - min_trim;
     int num_windows = num_samples / window_size;
 
     for (int pos = 0; pos < num_windows; pos++) {
