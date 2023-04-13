@@ -106,7 +106,7 @@ int ScalerNode::trim(torch::Tensor signal,
             if (end >= num_samples) {
                 return min_trim;
             } else {
-                return std::min(end, static_cast<int>(max_trim * signal.size(0)));
+                return end;
             }
         }
     }
