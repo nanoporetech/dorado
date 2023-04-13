@@ -24,16 +24,15 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
     float complement_len = complement_read->seq.size();
 
     float delta = std::max(template_len, complement_len) - std::min(template_len, complement_len);
-    if ((delta / std::max(template_len, complement_len)) > 0.05) {
+    if ((delta / std::max(template_len, complement_len)) > 0.05f) {
         return read;
     }
 
     EdlibAlignConfig align_config = edlibDefaultAlignConfig();
     align_config.task = EDLIB_TASK_PATH;
 
-    std::vector<char> complement_sequence_reverse_complement(complement_read->seq.begin(),
-                                                             complement_read->seq.end());
-    dorado::utils::reverse_complement(complement_sequence_reverse_complement);
+    const auto complement_sequence_reverse_complement =
+            dorado::utils::reverse_complement(complement_read->seq);
 
     std::vector<uint8_t> complement_q_scores_reversed(complement_read->qstring.begin(),
                                                       complement_read->qstring.end());
