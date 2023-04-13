@@ -21,6 +21,7 @@ private:
     std::mutex m_read_cache_mutex;
 
     std::vector<std::unique_ptr<std::thread>> worker_threads;
+    std::atomic<int> m_num_worker_threads;
 
     // Time when Basecaller Node is initialised. Used for benchmarking and debugging
     std::chrono::time_point<std::chrono::system_clock> initialization_time;

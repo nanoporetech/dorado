@@ -24,16 +24,15 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
     float complement_len = complement_read->seq.size();
 
     float delta = std::max(template_len, complement_len) - std::min(template_len, complement_len);
-    if ((delta / std::max(template_len, complement_len)) > 0.05) {
+    if ((delta / std::max(template_len, complement_len)) > 0.05f) {
         return read;
     }
 
     EdlibAlignConfig align_config = edlibDefaultAlignConfig();
     align_config.task = EDLIB_TASK_PATH;
 
-    std::vector<char> complement_sequence_reverse_complement(complement_read->seq.begin(),
-                                                             complement_read->seq.end());
-    dorado::utils::reverse_complement(complement_sequence_reverse_complement);
+    const auto complement_sequence_reverse_complement =
+            dorado::utils::reverse_complement(complement_read->seq);
 
     std::vector<uint8_t> complement_q_scores_reversed(complement_read->qstring.begin(),
                                                       complement_read->qstring.end());
@@ -314,19 +313,26 @@ void StereoDuplexEncoderNode::worker_thread() {
             }
         }
     }
+
+    int num_worker_threads = --m_num_worker_threads;
+    if (num_worker_threads == 0) {
+        m_sink.terminate();
+    }
 }
 
 StereoDuplexEncoderNode::StereoDuplexEncoderNode(
         MessageSink& sink,
         std::map<std::string, std::string> template_complement_map)
-        : MessageSink(1000), m_sink(sink), m_template_complement_map(template_complement_map) {
+        : MessageSink(1000),
+          m_sink(sink),
+          m_num_worker_threads(std::thread::hardware_concurrency()),
+          m_template_complement_map(template_complement_map) {
     // Set up the complement-template_map
     for (auto key : template_complement_map) {
         m_complement_template_map[key.second] = key.first;
     }
 
-    int num_worker_threads = std::thread::hardware_concurrency();
-    for (int i = 0; i < num_worker_threads; i++) {
+    for (int i = 0; i < m_num_worker_threads; i++) {
         std::unique_ptr<std::thread> stereo_encoder_worker_thread =
                 std::make_unique<std::thread>(&StereoDuplexEncoderNode::worker_thread, this);
         worker_threads.push_back(std::move(stereo_encoder_worker_thread));

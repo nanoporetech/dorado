@@ -52,6 +52,11 @@ void ScalerNode::worker_thread() {
         // Pass the read to the next node
         m_sink.push_message(read);
     }
+
+    int num_worker_threads = --m_num_worker_threads;
+    if (num_worker_threads == 0) {
+        m_sink.terminate();
+    }
 }
 
 ScalerNode::ScalerNode(MessageSink& sink, int num_worker_threads, size_t max_reads)

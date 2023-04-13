@@ -34,7 +34,7 @@ TEST_CASE(TEST_GROUP "Test loading single-read Fast5 files") {
     dorado::DataLoader loader(mock_sink, "cpu", 1);
     // Note: Upon completion load_reads calls terminate on its sink, so the
     // the loop in get_reads_count will finish as soon as the queue is empty.
-    loader.load_reads(data_path);
+    loader.load_reads(data_path, false);
 
     REQUIRE(mock_sink.get_read_count() == 1);
 }
@@ -46,7 +46,7 @@ TEST_CASE(TEST_GROUP "Test loading single-read Fast5 file, empty read list") {
     auto read_list = std::unordered_set<std::string>();
     std::string data_path(get_fast5_data_dir());
     dorado::DataLoader loader(mock_sink, "cpu", 1, 0, read_list);
-    loader.load_reads(data_path);
+    loader.load_reads(data_path, false);
 
     REQUIRE(mock_sink.get_read_count() == 1);
 }
@@ -59,7 +59,7 @@ TEST_CASE(TEST_GROUP "Test loading single-read Fast5 file, mismatched read list"
     read_list.insert("read_1");
     std::string data_path(get_fast5_data_dir());
     dorado::DataLoader loader(mock_sink, "cpu", 1, 0, read_list);
-    loader.load_reads(data_path);
+    loader.load_reads(data_path, false);
 
     REQUIRE(mock_sink.get_read_count() == 0);
 }
@@ -72,7 +72,7 @@ TEST_CASE(TEST_GROUP "Test loading single-read Fast5 file, matched read list") {
     read_list.insert("59097f00-0f1c-4fac-aea2-3c23d79b0a58");  // read present in Fast5 file
     std::string data_path(get_fast5_data_dir());
     dorado::DataLoader loader(mock_sink, "cpu", 1, 0, read_list);
-    loader.load_reads(data_path);
+    loader.load_reads(data_path, false);
 
     REQUIRE(mock_sink.get_read_count() == 1);
 }
