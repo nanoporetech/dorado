@@ -9,6 +9,7 @@
 //Ask lh3 t  make some of these funcs publicly available?
 #include "mmpriv.h"
 #include "read_pipeline/ReadPipeline.h"
+#include "utils/duplex_utils.h"
 
 #include <iostream>
 #include <map>
@@ -35,6 +36,9 @@ const char seq_nt16_str[] = "=ACMGRSVTWYHKDBN";
 #endif  // _WIN32
 
 namespace dorado::utils {
+
+const uint8_t nt16_seq_map[90] =
+        {['A'] = 0b1, ['C'] = 0b10, ['G'] = 0b100, ['T'] = 0b1000, ['N'] = 0b1111};
 
 Aligner::Aligner(MessageSink& sink, const std::string& filename, int threads)
         : MessageSink(10000), m_sink(sink), m_threads(threads) {
@@ -195,6 +199,11 @@ std::vector<bam1_t*> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
     for (int i = 0; i < seqlen; i++) {
         seq[i] = seq_nt16_str[bam_seqi(bseq, i)];
     }
+    std::vector<char> seq_rev(seq);
+    reverse_complement(seq_rev);
+
+    std::vector<uint8_t> qual(bam_get_qual(irecord), bam_get_qual(irecord) + seqlen);
+    std::vector<uint8_t> qual_rev(qual.rbegin(), qual.rend());
 
     // do the mapping
     int hits = 0;
@@ -276,6 +285,17 @@ std::vector<bam1_t*> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
             // update the data length
             record->l_data += cigar_size;
             record->m_data = new_m_data;
+
+            if (aln->rev) {
+                std::cerr << "Reverse "
+                          << std::string(bam_get_qname(record),
+                                         bam_get_qname(record) + record->core.l_qname)
+                          << std::endl;
+                for (int i = 0; i < seqlen; i++) {
+                    bam_set_seqi(bam_get_seq(record), i, nt16_seq_map[seq_rev[i]]);
+                }
+                memcpy(bam_get_qual(record), (void*)qual_rev.data(), seqlen);
+            }
         }
 
         add_tags(record, aln, seq);
@@ -323,7 +343,7 @@ void BamReader::read(MessageSink& read_sink, int max_reads) {
 }
 
 BamWriter::BamWriter(const std::string& filename, size_t threads) : MessageSink(1000) {
-    m_file = hts_open(filename.c_str(), "wb");
+    m_file = hts_open(filename.c_str(), "w");
     if (!m_file) {
         throw std::runtime_error("Could not open file: " + filename);
     }
