@@ -38,13 +38,20 @@ public:
 
         m_module = load_crf_model(model_path, model_config, m_options);
 
-        // Batch size will be rounded up to a mutliple of batch_size_granularity, regardless of user choice, this prevents
-        // Execution of batch size which may not be compatible with a CUDA/Metal kernel.
+        // Batch size will be rounded up to a multiple of batch_size_granularity, regardless of
+        // user choice. This makes sure batch size is compatible with GPU kernels.
         int batch_size_granularity = get_batch_size_granularity(model_config, m_options);
         m_batch_size = utils::pad_to(batch_size, batch_size_granularity);
         if (batch_size == 0) {
-            m_batch_size = utils::auto_gpu_batch_size(model_path.string(), batch_size_granularity,
-                                                      m_options.device(), memory_limit_fraction);
+            m_batch_size =
+                    utils::auto_gpu_batch_size(m_module, model_config, m_options,
+                                               batch_size_granularity, memory_limit_fraction);
+        } else {
+            // Warmup
+            auto input =
+                    torch::empty({m_batch_size, m_num_input_features, m_in_chunk_size}, m_options);
+            m_module->forward(input);
+            torch::cuda::synchronize();
         }
 
         m_cuda_thread.reset(new std::thread(&CudaCaller::cuda_thread_fn, this));
@@ -164,8 +171,6 @@ CudaModelRunner::CudaModelRunner(std::shared_ptr<CudaCaller> caller)
 
     m_output = torch::empty({3, caller->m_batch_size, caller->m_out_chunk_size},
                             opts.dtype(torch::kInt8));
-    // warm up
-    call_chunks(caller->m_batch_size);
 }
 
 void CudaModelRunner::accept_chunk(int chunk_idx, const torch::Tensor &chunk) {

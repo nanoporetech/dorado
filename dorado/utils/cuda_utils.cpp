@@ -1,6 +1,7 @@
 #include "cuda_utils.h"
 
 #include "cxxpool.h"
+#include "math_utils.h"
 #include "torch/torch.h"
 
 extern "C" {
@@ -179,89 +180,67 @@ size_t available_memory(torch::Device device) {
     return free;
 }
 
-int select_batchsize(int layer_size, int granularity, int max_batchsize, torch::Device device) {
-    int timesteps = 1000;
-    int best_batchsize = granularity;
-    float best_time = std::numeric_limits<float>::max();
-
-    c10::cuda::CUDAGuard device_guard(device);
-    auto stream = at::cuda::getCurrentCUDAStream().stream();
-    auto options = torch::TensorOptions().dtype(torch::kFloat16).device(device);
-    auto a = torch::empty({max_batchsize, layer_size * 2}, options);
-    auto b = torch::empty({layer_size * 2, layer_size * 4}, options);
-    auto c = torch::empty({max_batchsize, layer_size * 4}, options);
-    auto bias = torch::empty(layer_size * 4, options);
-    auto state_buf = torch::empty({max_batchsize, layer_size}, options);
-
-    // warmup
-    for (int t = 0; t < 10; t++) {
-        matmul_f16(a, b, c);
-        host_lstm_step_f16(stream, max_batchsize, layer_size, bias.data_ptr(), c.data_ptr(),
-                           state_buf.data_ptr(), a.data_ptr());
-    }
-
-    CUDATimer cuda_timer;
-    for (int batchsize = granularity; batchsize <= max_batchsize; batchsize += granularity) {
-        cuda_timer.start();
-        for (int t = 0; t < timesteps; t++) {
-            a = torch::empty({batchsize, layer_size * 2}, options);
-            c = torch::empty({batchsize, layer_size * 4}, options);
-            matmul_f16(a, b, c);
-            host_lstm_step_f16(stream, batchsize, layer_size, bias.data_ptr(), c.data_ptr(),
-                               state_buf.data_ptr(), a.data_ptr());
-        }
-        cuda_timer.stop();
-        float const time = cuda_timer.result_ms() / batchsize;
-
-        if (time < best_time) {
-            best_time = time;
-            best_batchsize = batchsize;
-        }
-    }
-
-    return best_batchsize;
-}
-
-int auto_gpu_batch_size(std::string model_path,
-                        int batchsize_granularity,
-                        torch::Device device,
+int auto_gpu_batch_size(torch::nn::ModuleHolder<torch::nn::AnyModule> module,
+                        const dorado::CRFModelConfig &model_config,
+                        const torch::TensorOptions &options,
+                        int granularity,
                         float memory_limit_fraction) {
 #ifdef DORADO_TX2
     return 256;
 #else
+    // TODO: we really need something better than this hardcoded table of max batch sizes,
+    // which fails to take into account chunk size as well as varying memory requirements of
+    // different GPU code paths.
+
     // memory breakpoints in GB
     const std::vector<int> breakpoints{8, 12, 16, 24, 32, 40};
     // {fast, hac, sup}
     const std::vector<std::array<int, 3>> batch_sizes = {
-            {960, 448, 128},     // 8GB
-            {1536, 640, 192},    // 12GB
-            {2048, 1024, 256},   // 16GB
-            {2048, 1536, 512},   // 24GB
-            {2560, 2560, 640},   // 32GB
-            {4096, 2560, 1024},  // 40GB
+            {960, 448, 128},    // 8GB
+            {1536, 640, 192},   // 12GB
+            {2048, 1024, 256},  // 16GB
+            {2560, 1536, 512},  // 24GB
+            {3072, 2048, 640},  // 32GB
+            {4096, 2880, 768},  // 40GB
     };
 
     // compute how much free gpu memory and pick the closest breakpoint
-    auto available = available_memory(device) * memory_limit_fraction / 1e+9;
+    auto available = available_memory(options.device()) * memory_limit_fraction / 1e+9;
+    spdlog::debug("Auto batch size: GPU memory available: {}GB", available);
     auto presets = details::try_select_max_batch_sizes(breakpoints, batch_sizes, available);
     if (!presets) {
         spdlog::warn(
-                "Auto batchsize detection failed. Insufficient memory"
-                ", required 8GB, available {}GB",
+                "Auto batchsize detection failed. Insufficient memory, required 8GB, available "
+                "{}GB",
                 available);
-        return 128;
+        return pad_to(128, granularity);
     }
 
-    if (model_path.find("_fast@v") != std::string::npos) {
-        return select_batchsize(96, batchsize_granularity, presets->at(0), device);
-    } else if (model_path.find("_hac@v") != std::string::npos) {
-        return select_batchsize(384, batchsize_granularity, presets->at(1), device);
-    } else if (model_path.find("_sup@v") != std::string::npos) {
-        return select_batchsize(1024, batchsize_granularity, presets->at(2), device);
+    int model_type_idx = (model_config.insize <= 128) ? 0 : ((model_config.insize <= 384) ? 1 : 2);
+    const int max_batch_size = presets->at(model_type_idx);
+
+    c10::cuda::CUDAGuard device_guard(options.device());
+
+    int best_batch_size = granularity;
+    float best_time = std::numeric_limits<float>::max();
+    const int chunk_size = model_config.stride * 200;
+    CUDATimer cuda_timer;
+    spdlog::debug("Auto batch size: testing up to {} in steps of {}", max_batch_size, granularity);
+    for (int batch_size = granularity; batch_size <= max_batch_size; batch_size += granularity) {
+        auto input = torch::empty({batch_size, model_config.num_features, chunk_size}, options);
+        cuda_timer.start();
+        module->forward(input);
+        cuda_timer.stop();
+        float const time = cuda_timer.result_ms() / batch_size;
+
+        spdlog::debug("Auto batchsize: {}, time per chunk {} ms", batch_size, time);
+        if (time < best_time) {
+            best_time = time;
+            best_batch_size = batch_size;
+        }
     }
 
-    spdlog::warn("Auto batchsize detection failed");
-    return 128;
+    return best_batch_size;
 #endif
 }
 

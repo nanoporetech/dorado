@@ -1,5 +1,7 @@
 #pragma once
 
+#include "../nn/CRFModel.h"
+
 #include <torch/torch.h>
 
 #include <array>
@@ -15,9 +17,10 @@ std::vector<std::string> parse_cuda_device_string(std::string device_string);
 
 // Reports the amount of available memory (in bytes) for a given device.
 size_t available_memory(torch::Device device);
-int auto_gpu_batch_size(std::string model_path,
+int auto_gpu_batch_size(torch::nn::ModuleHolder<torch::nn::AnyModule> module,
+                        const dorado::CRFModelConfig &model_config,
+                        const torch::TensorOptions &options,
                         int batch_size_granularity,
-                        torch::Device device,
                         float memory_limit_fraction);
 
 void matmul_f16(torch::Tensor const &A, torch::Tensor const &B, torch::Tensor &C);
