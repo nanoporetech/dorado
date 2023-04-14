@@ -131,7 +131,10 @@ void Aligner::worker_thread(size_t tid) {
 
 // Function to add auxiliary tags to the alignment record.
 // These are added to maintain parity with mm2.
-void Aligner::add_tags(bam1_t* record, const mm_reg1_t* aln, const std::vector<char>& seq) {
+void Aligner::add_tags(bam1_t* record,
+                       const mm_reg1_t* aln,
+                       const std::vector<char>& seq,
+                       const mm_tbuf_t* tbuf) {
     if (aln->p) {
         // NM
         int32_t nm = aln->blen - aln->mlen + aln->p->n_ambi;
@@ -196,6 +199,9 @@ void Aligner::add_tags(bam1_t* record, const mm_reg1_t* aln, const std::vector<c
         uint32_t split = uint32_t(aln->split);
         bam_aux_append(record, "zd", 'i', sizeof(split), (uint8_t*)&split);
     }
+
+    // rl
+    //bam_aux_append(record, "rl", 'i', sizeof(tbuf->rep_len), (uint8_t*)&(tbuf->rep_len));
 }
 
 std::vector<bam1_t*> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
@@ -227,7 +233,8 @@ std::vector<bam1_t*> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
 
     for (int j = 0; j < hits; j++) {
         // new output record
-        auto record = bam_dup1(irecord);
+        //auto record = bam_dup1(irecord);
+        bam1_t* record = bam_init1();
 
         // mapping region
         auto aln = &reg[j];
@@ -243,69 +250,77 @@ std::vector<bam1_t*> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
             flag |= 0x800;
         }
 
-        record->core.flag = flag;
-        record->core.tid = aln->rid;
-        record->core.pos = aln->rs;
-        record->core.qual = aln->mapq;
-        record->core.n_cigar = aln->p ? aln->p->n_cigar : 0;
+        int32_t tid = aln->rid;
+        hts_pos_t pos = aln->rs;
+        uint8_t mapq = aln->mapq;
+        //record->core.n_cigar = aln->p ? aln->p->n_cigar : 0;
 
         // Note: max_bam_cigar_op doesn't need to handled specially when
         // using htslib since the sam_write1 method already takes care
         // of moving the CIGAR string to the tags if the length
         // exceeds 65535.
-        if (record->core.n_cigar != 0) {
+
+        size_t n_cigar = aln->p ? aln->p->n_cigar : 0;
+        uint32_t* cigar = nullptr;
+        if (n_cigar != 0) {
             uint32_t clip_len[2] = {0};
-            clip_len[0] = aln->rev ? record->core.l_qseq - aln->qe : aln->qs;
-            clip_len[1] = aln->rev ? aln->qs : record->core.l_qseq - aln->qe;
+            clip_len[0] = aln->rev ? irecord->core.l_qseq - aln->qe : aln->qs;
+            clip_len[1] = aln->rev ? aln->qs : irecord->core.l_qseq - aln->qe;
 
             if (clip_len[0]) {
-                record->core.n_cigar++;
+                n_cigar++;
             }
             if (clip_len[1]) {
-                record->core.n_cigar++;
+                n_cigar++;
             }
             int offset = clip_len[0] ? 1 : 0;
-            int cigar_size = record->core.n_cigar * sizeof(uint32_t);
-            uint32_t new_m_data = record->l_data + cigar_size;
-            kroundup32(new_m_data);
-            // todo: this part could possibly by re-written without using realloc.
-            uint8_t* data = (uint8_t*)_HTSLIB_REALLOC(record->data, new_m_data);
+            int cigar_size = n_cigar * sizeof(uint32_t);
 
-            // shift existing data to make room for the new cigar field
-            memmove(data + record->core.l_qname + cigar_size, data + record->core.l_qname,
-                    record->l_data - record->core.l_qname);
-
-            record->data = data;
+            cigar = (uint32_t*)malloc(cigar_size);
 
             // write the left softclip
             if (clip_len[0]) {
                 auto clip = bam_cigar_gen(clip_len[0], BAM_CSOFT_CLIP);
-                memcpy(bam_get_cigar(record), &clip, sizeof(uint32_t));
+                memcpy(&cigar[0], &clip, sizeof(uint32_t));
             }
 
             // write the cigar
-            memcpy(bam_get_cigar(record) + offset, aln->p->cigar,
-                   aln->p->n_cigar * sizeof(uint32_t));
+            memcpy(&cigar[offset], aln->p->cigar, aln->p->n_cigar * sizeof(uint32_t));
 
             // write the right softclip
             if (clip_len[1]) {
                 auto clip = bam_cigar_gen(clip_len[1], BAM_CSOFT_CLIP);
-                memcpy(bam_get_cigar(record) + offset + aln->p->n_cigar, &clip, sizeof(uint32_t));
-            }
-
-            // update the data length
-            record->l_data += cigar_size;
-            record->m_data = new_m_data;
-
-            if (aln->rev) {
-                for (int i = 0; i < seqlen; i++) {
-                    bam_set_seqi(bam_get_seq(record), i, nt16_seq_map[seq_rev[i]]);
-                }
-                memcpy(bam_get_qual(record), (void*)qual_rev.data(), seqlen);
+                memcpy(&cigar[offset + aln->p->n_cigar], &clip, sizeof(uint32_t));
             }
         }
 
-        add_tags(record, aln, seq);
+        size_t l_seq = 0;
+        char* seq_tmp = nullptr;
+        unsigned char* qual_tmp = qual.data();
+        if (flag & 0x100) {
+        } else {
+            l_seq = seq.size();
+            if (aln->rev) {
+                seq_tmp = seq_rev.data();
+                qual_tmp = qual_rev.data();
+            } else {
+                seq_tmp = seq.data();
+                qual_tmp = qual_rev.data();
+            }
+        }
+
+        bam_set1(record, irecord->core.l_qname, bam_get_qname(irecord), flag, tid, pos, mapq,
+                 n_cigar, cigar, irecord->core.mtid, irecord->core.mpos, irecord->core.isize, l_seq,
+                 seq_tmp, (char*)qual_tmp, bam_get_l_aux(irecord));
+        if (cigar) {
+            free(cigar);
+        }
+
+        // Move over older tags.
+        memcpy(bam_get_aux(record), bam_get_aux(irecord), bam_get_l_aux(irecord));
+        record->l_data += bam_get_l_aux(irecord);
+
+        add_tags(record, aln, seq, buf);
 
         free(aln->p);
         results.push_back(record);
@@ -354,10 +369,10 @@ BamWriter::BamWriter(const std::string& filename, size_t threads) : MessageSink(
     if (!m_file) {
         throw std::runtime_error("Could not open file: " + filename);
     }
-    auto res = bgzf_mt(m_file->fp.bgzf, threads, 128);
-    if (res < 0) {
-        throw std::runtime_error("Could not enable multi threading for BAM generation.");
-    }
+    //auto res = bgzf_mt(m_file->fp.bgzf, threads, 128);
+    //if (res < 0) {
+    //    throw std::runtime_error("Could not enable multi threading for BAM generation.");
+    //}
     m_worker = std::make_unique<std::thread>(std::thread(&BamWriter::worker_thread, this));
 }
 
