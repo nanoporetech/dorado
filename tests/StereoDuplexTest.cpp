@@ -6,7 +6,6 @@
 #include <torch/torch.h>
 
 #include <filesystem>
-#include <fstream>
 #include <vector>
 
 #define TEST_GROUP "StereoDuplexTest"
@@ -19,16 +18,6 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
 namespace {
 std::filesystem::path DataPath(std::string_view filename) {
     return std::filesystem::path(get_stereo_data_dir()) / filename;
-}
-
-// Reads into a string.
-std::string ReadFileIntoString(const std::filesystem::path& path) {
-    const auto num_bytes = std::filesystem::file_size(path);
-    std::string content;
-    content.resize(num_bytes);
-    std::ifstream in_file(path.c_str(), std::ios::in | std::ios::binary);
-    in_file.read(content.data(), content.size());
-    return content;
 }
 
 // Reads into a vector<uint8_t>.

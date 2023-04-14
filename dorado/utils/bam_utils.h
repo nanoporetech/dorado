@@ -1,11 +1,78 @@
 #pragma once
 #include "htslib/sam.h"
+#include "minimap.h"
 #include "read_pipeline/ReadPipeline.h"
 
 #include <map>
 #include <set>
 #include <string>
+
 namespace dorado::utils {
+
+using sq_t = std::vector<std::pair<char*, uint32_t>>;
+using read_map = std::unordered_map<std::string, std::shared_ptr<Read>>;
+
+class Aligner : public MessageSink {
+public:
+    Aligner(MessageSink& read_sink, const std::string& filename, int threads);
+    ~Aligner();
+    sq_t sq();
+    std::vector<bam1_t*> align(bam1_t* record, mm_tbuf_t* buf);
+
+private:
+    MessageSink& m_sink;
+    size_t m_threads{1};
+    std::atomic<size_t> m_active{0};
+    std::vector<mm_tbuf_t*> m_tbufs;
+    std::vector<std::unique_ptr<std::thread>> m_workers;
+    void worker_thread(size_t tid);
+    void add_tags(bam1_t*, const mm_reg1_t*, const std::vector<char>&);
+
+    mm_idxopt_t m_idx_opt;
+    mm_mapopt_t m_map_opt;
+    mm_idx_t* m_index{nullptr};
+    mm_idx_reader_t* m_index_reader{nullptr};
+};
+
+class BamReader {
+public:
+    BamReader(const std::string& filename);
+    BamReader(MessageSink& read_sink, const std::string& filename);
+    ~BamReader();
+    bool read();
+    void read(MessageSink& read_sink, int max_reads = -1);
+
+    char* format{nullptr};
+    bool is_aligned{false};
+    bam1_t* record{nullptr};
+    sam_hdr_t* header{nullptr};
+
+private:
+    htsFile* m_file{nullptr};
+};
+
+class BamWriter : public MessageSink {
+public:
+    BamWriter(const std::string& filename, size_t threads = 1);
+    ~BamWriter();
+    int write_header(const sam_hdr_t* header, const sq_t seqs);
+    int write(bam1_t* record);
+    void join();
+
+    size_t total{0};
+    size_t primary{0};
+    size_t unmapped{0};
+    size_t secondary{0};
+    size_t supplementary{0};
+
+private:
+    htsFile* m_file{nullptr};
+    sam_hdr_t* m_header{nullptr};
+    std::unique_ptr<std::thread> m_worker;
+    void worker_thread();
+    int write_hdr_pg();
+    int write_hdr_sq(char* name, uint32_t length);
+};
 
 /**
  * @brief Reads a SAM/BAM/CRAM file and returns a map of read IDs to Read objects.
@@ -22,19 +89,6 @@ namespace dorado::utils {
  * @note The caller is responsible for managing the memory of the returned map.
  * @note The input BAM file must be properly formatted and readable.
  */
-std::map<std::string, std::shared_ptr<Read>> read_bam(const std::string& filename,
-                                                      const std::set<std::string>& read_ids);
-
-class BamReader {
-public:
-    BamReader(const std::string& filename);
-    ~BamReader();
-    bool next();
-    bam1_t* m_record;
-    sam_hdr_t* m_header;
-
-private:
-    htsFile* m_file;
-};
+read_map read_bam(const std::string& filename, const std::set<std::string>& read_ids);
 
 }  // namespace dorado::utils

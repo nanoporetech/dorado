@@ -164,7 +164,7 @@ void BaseSpaceDuplexCallerNode::basespace(std::string template_read_id,
 BaseSpaceDuplexCallerNode::BaseSpaceDuplexCallerNode(
         MessageSink& sink,
         std::map<std::string, std::string> template_complement_map,
-        std::map<std::string, std::shared_ptr<Read>> reads,
+        utils::read_map reads,
         size_t threads)
         : MessageSink(1000),
           m_sink(sink),

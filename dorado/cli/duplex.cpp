@@ -87,7 +87,6 @@ int duplex(int argc, char* argv[]) {
         torch::set_num_threads(1);
 
         if (model.compare("basespace") == 0) {  // Execute a Basespace duplex pipeline.
-
             // create a set of the read_ids
             std::set<std::string> read_ids;
             for (const auto& pair : template_complement_map) {
