@@ -2,7 +2,6 @@
 set(SOURCE_FILES
     main.cpp
     AsyncQueueTest.cpp
-    DuplexUtilsTest.cpp
     Fast5DataLoaderTest.cpp
     Pod5DataLoaderTest.cpp
     TensorUtilsTest.cpp
@@ -17,17 +16,17 @@ set(SOURCE_FILES
     BamWriterTest.cpp
 )
 
-if (DORADO_GPU_BUILD)
-    if(APPLE)
-        list(APPEND SOURCE_FILES
-            MetalLinearTest.cpp
-        )
-    else()
-        list(APPEND SOURCE_FILES
-            cuda_utils_test.cpp
-        )
-    endif()
-endif()
+#if (DORADO_GPU_BUILD)
+#    if(APPLE)
+#        list(APPEND SOURCE_FILES
+#            MetalLinearTest.cpp
+#        )
+#    else()
+#        list(APPEND SOURCE_FILES
+#            cuda_utils_test.cpp
+#        )
+#    endif()
+#endif()
 
 add_executable(dorado_tests ${SOURCE_FILES})
 

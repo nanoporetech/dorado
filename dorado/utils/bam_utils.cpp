@@ -9,7 +9,7 @@
 //Ask lh3 t  make some of these funcs publicly available?
 #include "mmpriv.h"
 #include "read_pipeline/ReadPipeline.h"
-#include "utils/duplex_utils.h"
+#include "utils/sequence_utils.h"
 
 #include <spdlog/spdlog.h>
 
@@ -111,7 +111,7 @@ void Aligner::worker_thread(size_t tid) {
 
 // Function to add auxiliary tags to the alignment record.
 // These are added to maintain parity with mm2.
-void Aligner::add_tags(bam1_t* record, const mm_reg1_t* aln, const std::vector<char>& seq) {
+void Aligner::add_tags(bam1_t* record, const mm_reg1_t* aln, const std::string& seq) {
     if (aln->p) {
         // NM
         int32_t nm = aln->blen - aln->mlen + aln->p->n_ambi;
@@ -166,7 +166,7 @@ void Aligner::add_tags(bam1_t* record, const mm_reg1_t* aln, const std::vector<c
     // MD
     char* md = NULL;
     int max_len = 0;
-    int md_len = mm_gen_MD(NULL, &md, &max_len, m_index, aln, seq.data());
+    int md_len = mm_gen_MD(NULL, &md, &max_len, m_index, aln, seq.c_str());
     if (md_len > 0) {
         bam_aux_append(record, "MD", 'Z', md_len + 1, (uint8_t*)md);
     }
@@ -186,12 +186,9 @@ std::vector<bam1_t*> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
     auto seqlen = irecord->core.l_qseq;
 
     auto bseq = bam_get_seq(irecord);
-    std::vector<char> seq(seqlen);
-    for (int i = 0; i < seqlen; i++) {
-        seq[i] = seq_nt16_str[bam_seqi(bseq, i)];
-    }
+    std::string seq = convert_nt16_to_str(bseq, seqlen);
     // Pre-generate reverse complement sequence.
-    std::string seq_rev = reverse_complement(std::string(seq.begin(), seq.end()));
+    std::string seq_rev = reverse_complement(seq);
 
     // Pre-generate reverse of quality string.
     std::vector<uint8_t> qual;
@@ -203,7 +200,7 @@ std::vector<bam1_t*> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
 
     // do the mapping
     int hits = 0;
-    mm_reg1_t* reg = mm_map(m_index, seq.size(), seq.data(), &hits, buf, &m_map_opt, 0);
+    mm_reg1_t* reg = mm_map(m_index, seq.length(), seq.c_str(), &hits, buf, &m_map_opt, 0);
 
     // just return the input record
     if (hits == 0) {
@@ -217,7 +214,7 @@ std::vector<bam1_t*> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
         // mapping region
         auto aln = &reg[j];
 
-        // Seet FLAGS>
+        // Set FLAGS
         uint16_t flag = 0x0;
 
         if (aln->rev) {
@@ -239,7 +236,7 @@ std::vector<bam1_t*> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
         // of moving the CIGAR string to the tags if the length
         // exceeds 65535.
         size_t n_cigar = aln->p ? aln->p->n_cigar : 0;
-        std::unique_ptr<uint32_t> cigar;
+        std::vector<uint32_t> cigar;
         if (n_cigar != 0) {
             uint32_t clip_len[2] = {0};
             clip_len[0] = aln->rev ? irecord->core.l_qseq - aln->qe : aln->qs;
@@ -253,21 +250,21 @@ std::vector<bam1_t*> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
             }
             int offset = clip_len[0] ? 1 : 0;
 
-            cigar.reset(new uint32_t[n_cigar]);
+            cigar = std::vector<uint32_t>(n_cigar);
 
             // write the left softclip
             if (clip_len[0]) {
                 auto clip = bam_cigar_gen(clip_len[0], BAM_CSOFT_CLIP);
-                memcpy(&cigar.get()[0], &clip, sizeof(uint32_t));
+                cigar.data()[0] = clip;
             }
 
             // write the cigar
-            memcpy(&cigar.get()[offset], aln->p->cigar, aln->p->n_cigar * sizeof(uint32_t));
+            memcpy(&cigar.data()[offset], aln->p->cigar, aln->p->n_cigar * sizeof(uint32_t));
 
             // write the right softclip
             if (clip_len[1]) {
                 auto clip = bam_cigar_gen(clip_len[1], BAM_CSOFT_CLIP);
-                memcpy(&cigar.get()[offset + aln->p->n_cigar], &clip, sizeof(uint32_t));
+                cigar.data()[offset + aln->p->n_cigar] = clip;
             }
         }
 
@@ -285,7 +282,7 @@ std::vector<bam1_t*> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
                 qual_tmp = qual_rev.data();
             } else {
                 seq_tmp = seq.data();
-                qual_tmp = qual_rev.data();
+                qual_tmp = qual.data();
             }
         }
 
@@ -298,7 +295,7 @@ std::vector<bam1_t*> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
         // terminated.
         // TODO: See if bam_get_qname(irecord) usage can be fixed.
         std::string_view qname(bam_get_qname(irecord));
-        bam_set1(record, qname.size(), qname.data(), flag, tid, pos, mapq, n_cigar, cigar.get(),
+        bam_set1(record, qname.size(), qname.data(), flag, tid, pos, mapq, n_cigar, cigar.data(),
                  irecord->core.mtid, irecord->core.mpos, irecord->core.isize, l_seq, seq_tmp,
                  (char*)qual_tmp, bam_get_l_aux(irecord));
 

@@ -23,4 +23,13 @@ std::vector<uint64_t> moves_to_map(const std::vector<uint8_t>& moves,
                                    size_t signal_len,
                                    std::optional<size_t> reserve_size = std::nullopt);
 
+// Compute reverse complement of a nucleotide sequence.
+// Bases are specified as capital letters.
+// Undefined output if characters other than A, C, G, T appear.
+std::string reverse_complement(const std::string& sequence);
+
+// Convert the 4bit encoded sequence in a bam1_t structure
+// into a string.
+std::string convert_nt16_to_str(uint8_t* bseq, size_t slen);
+
 }  // namespace dorado::utils
