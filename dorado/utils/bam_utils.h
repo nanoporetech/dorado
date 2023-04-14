@@ -26,7 +26,7 @@ private:
     std::vector<mm_tbuf_t*> m_tbufs;
     std::vector<std::unique_ptr<std::thread>> m_workers;
     void worker_thread(size_t tid);
-    void add_tags(bam1_t*, const mm_reg1_t*, const std::vector<char>&, const mm_tbuf_t*);
+    void add_tags(bam1_t*, const mm_reg1_t*, const std::vector<char>&);
 
     mm_idxopt_t m_idx_opt;
     mm_mapopt_t m_map_opt;

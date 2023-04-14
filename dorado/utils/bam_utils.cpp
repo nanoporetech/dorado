@@ -22,32 +22,9 @@
 // seq_nt16_str is referred to in the hts-3.lib stub on windows, but has not been declared dllimport for
 //  client code, so it comes up as an undefined reference when linking the stub.
 const char seq_nt16_str[] = "=ACMGRSVTWYHKDBN";
-
-// These special wrapped memory management function are needed
-// because on Windows, memory allocated and returned from one
-// DLL cannot be freed or managed from another DLL/exe unless
-// they share the runtime library. With htslib that was not
-// possible, so these wrapped functions had to be exposed.
-// TODO: Find a cleaner solution for this.
-#include "htslib/ont_defs.h"
-#define _HTSLIB_REALLOC htslib_wrapped_realloc
-#else
-#define _HTSLIB_REALLOC realloc
 #endif  // _WIN32
 
 namespace dorado::utils {
-
-static constexpr std::array<uint8_t, 90> generate_nt16_seq_map() {
-    std::array<uint8_t, 90> nt16_seq_map = {0};
-    nt16_seq_map['A'] = 0b1;
-    nt16_seq_map['C'] = 0b10;
-    nt16_seq_map['G'] = 0b100;
-    nt16_seq_map['T'] = 0b1000;
-    nt16_seq_map['N'] = 0b1111;
-    return nt16_seq_map;
-}
-
-const std::array<uint8_t, 90> nt16_seq_map = generate_nt16_seq_map();
 
 Aligner::Aligner(MessageSink& sink, const std::string& filename, int threads)
         : MessageSink(10000), m_sink(sink), m_threads(threads) {
@@ -131,10 +108,7 @@ void Aligner::worker_thread(size_t tid) {
 
 // Function to add auxiliary tags to the alignment record.
 // These are added to maintain parity with mm2.
-void Aligner::add_tags(bam1_t* record,
-                       const mm_reg1_t* aln,
-                       const std::vector<char>& seq,
-                       const mm_tbuf_t* tbuf) {
+void Aligner::add_tags(bam1_t* record, const mm_reg1_t* aln, const std::vector<char>& seq) {
     if (aln->p) {
         // NM
         int32_t nm = aln->blen - aln->mlen + aln->p->n_ambi;
@@ -199,9 +173,6 @@ void Aligner::add_tags(bam1_t* record,
         uint32_t split = uint32_t(aln->split);
         bam_aux_append(record, "zd", 'i', sizeof(split), (uint8_t*)&split);
     }
-
-    // rl
-    //bam_aux_append(record, "rl", 'i', sizeof(tbuf->rep_len), (uint8_t*)&(tbuf->rep_len));
 }
 
 std::vector<bam1_t*> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
@@ -216,11 +187,16 @@ std::vector<bam1_t*> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
     for (int i = 0; i < seqlen; i++) {
         seq[i] = seq_nt16_str[bam_seqi(bseq, i)];
     }
-    std::vector<char> seq_rev(seq);
-    reverse_complement(seq_rev);
+    // Pre-generate reverse complement sequence.
+    std::string seq_rev = reverse_complement(std::string(seq.begin(), seq.end()));
 
-    std::vector<uint8_t> qual(bam_get_qual(irecord), bam_get_qual(irecord) + seqlen);
-    std::vector<uint8_t> qual_rev(qual.rbegin(), qual.rend());
+    // Pre-generate reverse of quality string.
+    std::vector<uint8_t> qual;
+    std::vector<uint8_t> qual_rev;
+    if (bam_get_qual(irecord)) {
+        qual = std::vector<uint8_t>(bam_get_qual(irecord), bam_get_qual(irecord) + seqlen);
+        qual_rev = std::vector<uint8_t>(qual.rbegin(), qual.rend());
+    }
 
     // do the mapping
     int hits = 0;
@@ -233,35 +209,34 @@ std::vector<bam1_t*> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
 
     for (int j = 0; j < hits; j++) {
         // new output record
-        //auto record = bam_dup1(irecord);
         bam1_t* record = bam_init1();
 
         // mapping region
         auto aln = &reg[j];
 
+        // Seet FLAGS>
         uint16_t flag = 0x0;
 
         if (aln->rev) {
-            flag |= 0x10;
+            flag |= BAM_FREVERSE;
         }
         if (aln->parent != aln->id) {
-            flag |= 0x100;
+            flag |= BAM_FSECONDARY;
         } else if (!aln->sam_pri) {
-            flag |= 0x800;
+            flag |= BAM_FSUPPLEMENTARY;
         }
 
         int32_t tid = aln->rid;
         hts_pos_t pos = aln->rs;
         uint8_t mapq = aln->mapq;
-        //record->core.n_cigar = aln->p ? aln->p->n_cigar : 0;
 
+        // Create CIGAR.
         // Note: max_bam_cigar_op doesn't need to handled specially when
         // using htslib since the sam_write1 method already takes care
         // of moving the CIGAR string to the tags if the length
         // exceeds 65535.
-
         size_t n_cigar = aln->p ? aln->p->n_cigar : 0;
-        uint32_t* cigar = nullptr;
+        std::unique_ptr<uint32_t> cigar;
         if (n_cigar != 0) {
             uint32_t clip_len[2] = {0};
             clip_len[0] = aln->rev ? irecord->core.l_qseq - aln->qe : aln->qs;
@@ -274,30 +249,32 @@ std::vector<bam1_t*> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
                 n_cigar++;
             }
             int offset = clip_len[0] ? 1 : 0;
-            int cigar_size = n_cigar * sizeof(uint32_t);
 
-            cigar = (uint32_t*)malloc(cigar_size);
+            cigar.reset(new uint32_t[n_cigar]);
 
             // write the left softclip
             if (clip_len[0]) {
                 auto clip = bam_cigar_gen(clip_len[0], BAM_CSOFT_CLIP);
-                memcpy(&cigar[0], &clip, sizeof(uint32_t));
+                memcpy(&cigar.get()[0], &clip, sizeof(uint32_t));
             }
 
             // write the cigar
-            memcpy(&cigar[offset], aln->p->cigar, aln->p->n_cigar * sizeof(uint32_t));
+            memcpy(&cigar.get()[offset], aln->p->cigar, aln->p->n_cigar * sizeof(uint32_t));
 
             // write the right softclip
             if (clip_len[1]) {
                 auto clip = bam_cigar_gen(clip_len[1], BAM_CSOFT_CLIP);
-                memcpy(&cigar[offset + aln->p->n_cigar], &clip, sizeof(uint32_t));
+                memcpy(&cigar.get()[offset + aln->p->n_cigar], &clip, sizeof(uint32_t));
             }
         }
 
+        // Add SEQ and QUAL.
         size_t l_seq = 0;
         char* seq_tmp = nullptr;
-        unsigned char* qual_tmp = qual.data();
-        if (flag & 0x100) {
+        unsigned char* qual_tmp = nullptr;
+        if (flag & BAM_FSECONDARY) {
+            // To match minimap2 output behavior, don't emit sequence
+            // or quality info for secondary alignments.
         } else {
             l_seq = seq.size();
             if (aln->rev) {
@@ -309,18 +286,18 @@ std::vector<bam1_t*> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
             }
         }
 
-        bam_set1(record, irecord->core.l_qname, bam_get_qname(irecord), flag, tid, pos, mapq,
-                 n_cigar, cigar, irecord->core.mtid, irecord->core.mpos, irecord->core.isize, l_seq,
-                 seq_tmp, (char*)qual_tmp, bam_get_l_aux(irecord));
-        if (cigar) {
-            free(cigar);
-        }
+        // Set properties of the BAM record.
+        std::string_view qname(bam_get_qname(irecord));
+        bam_set1(record, qname.size(), qname.data(), flag, tid, pos, mapq, n_cigar, cigar.get(),
+                 irecord->core.mtid, irecord->core.mpos, irecord->core.isize, l_seq, seq_tmp,
+                 (char*)qual_tmp, bam_get_l_aux(irecord));
 
-        // Move over older tags.
+        // Copy over tags from input alignment.
         memcpy(bam_get_aux(record), bam_get_aux(irecord), bam_get_l_aux(irecord));
         record->l_data += bam_get_l_aux(irecord);
 
-        add_tags(record, aln, seq, buf);
+        // Add new tags to match minimap2.
+        add_tags(record, aln, seq);
 
         free(aln->p);
         results.push_back(record);
@@ -365,14 +342,14 @@ void BamReader::read(MessageSink& read_sink, int max_reads) {
 }
 
 BamWriter::BamWriter(const std::string& filename, size_t threads) : MessageSink(1000) {
-    m_file = hts_open(filename.c_str(), "w");
+    m_file = hts_open(filename.c_str(), "wb");
     if (!m_file) {
         throw std::runtime_error("Could not open file: " + filename);
     }
-    //auto res = bgzf_mt(m_file->fp.bgzf, threads, 128);
-    //if (res < 0) {
-    //    throw std::runtime_error("Could not enable multi threading for BAM generation.");
-    //}
+    auto res = bgzf_mt(m_file->fp.bgzf, threads, 128);
+    if (res < 0) {
+        throw std::runtime_error("Could not enable multi threading for BAM generation.");
+    }
     m_worker = std::make_unique<std::thread>(std::thread(&BamWriter::worker_thread, this));
 }
 
