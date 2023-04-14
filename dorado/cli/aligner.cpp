@@ -37,10 +37,6 @@ int aligner(int argc, char* argv[]) {
             .help("maxium number of reads to process (for debugging.")
             .default_value(1000000)
             .scan<'i', int>();
-    parser.add_argument("-n", "--max-reads")
-            .help("maxium number of reads to process (for debugging.")
-            .default_value(1000000)
-            .scan<'i', int>();
     parser.add_argument("-k").help("k-mer size (maximum 28).").default_value(15).scan<'i', int>();
     parser.add_argument("-w").help("minimizer window size.").default_value(10).scan<'i', int>();
     parser.add_argument("-v", "--verbose").default_value(false).implicit_value(true);
