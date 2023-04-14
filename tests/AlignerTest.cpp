@@ -20,7 +20,7 @@ TEST_CASE("AlignerTest: Check proper tag generation", TEST_GROUP) {
 
     // Run alignment.
     MessageSinkToVector<bam1_t*> sink(100);
-    dorado::utils::Aligner aligner(sink, ref.string(), 10);
+    dorado::utils::Aligner aligner(sink, ref.string(), 15, 15, 10);
     dorado::utils::BamReader reader(query.string());
     reader.read(aligner, 100);
     auto bam_records = sink.get_messages();

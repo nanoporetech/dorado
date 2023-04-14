@@ -10,6 +10,8 @@
 #include "mmpriv.h"
 #include "read_pipeline/ReadPipeline.h"
 
+#include <spdlog/spdlog.h>
+
 #include <iostream>
 #include <map>
 #include <set>
@@ -36,11 +38,17 @@ const char seq_nt16_str[] = "=ACMGRSVTWYHKDBN";
 
 namespace dorado::utils {
 
-Aligner::Aligner(MessageSink& sink, const std::string& filename, int threads)
+Aligner::Aligner(MessageSink& sink, const std::string& filename, int k, int w, int threads)
         : MessageSink(10000), m_sink(sink), m_threads(threads) {
+    // Initialize option structs.
     mm_set_opt(0, &m_idx_opt, &m_map_opt);
     // Setting options to map-ont default till relevant args are exposed.
     mm_set_opt("map-ont", &m_idx_opt, &m_map_opt);
+
+    m_idx_opt.k = k;
+    m_idx_opt.w = w;
+    spdlog::info("> Index parameters input by user: kmer size={} and window size={}.", m_idx_opt.k,
+                 m_idx_opt.w);
 
     // Set batch sizes large enough to not require chunking since that's
     // not supported yet.
@@ -55,6 +63,13 @@ Aligner::Aligner(MessageSink& sink, const std::string& filename, int threads)
     m_index_reader = mm_idx_reader_open(filename.c_str(), &m_idx_opt, 0);
     m_index = mm_idx_reader_read(m_index_reader, m_threads);
     mm_mapopt_update(&m_map_opt, m_index);
+
+    if (m_index->k != m_idx_opt.k || m_index->w != m_idx_opt.w) {
+        spdlog::warn(
+                "Indexing parameters overridden by parameters used in the prebuilt index: kmer "
+                "size={} and window size={}.",
+                m_index->k, m_index->w);
+    }
 
     if (mm_verbose >= 3) {
         mm_idx_stat(m_index);
