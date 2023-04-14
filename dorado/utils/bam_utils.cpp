@@ -11,6 +11,8 @@
 #include "read_pipeline/ReadPipeline.h"
 #include "utils/duplex_utils.h"
 
+#include <spdlog/spdlog.h>
+
 #include <iostream>
 #include <map>
 #include <set>
@@ -46,7 +48,8 @@ Aligner::Aligner(MessageSink& sink, const std::string& filename, int threads)
     m_index = mm_idx_reader_read(m_index_reader, m_threads);
     mm_mapopt_update(&m_map_opt, m_index);
 
-    //std::cerr << "Using k:" << m_index->k << ", w:" << m_index->w << ", flag:" << m_index->flag << std::endl;
+    spdlog::debug("> Minimap2 settings:\n> k: {}\n>w: {}\n>flag: {}", m_index->k, m_index->w,
+                  m_index->flag);
 
     if (mm_verbose >= 3) {
         mm_idx_stat(m_index);
@@ -287,6 +290,13 @@ std::vector<bam1_t*> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
         }
 
         // Set properties of the BAM record.
+        // NOTE: Passing bam_get_qname(irecord) + l_qname into bam_set1
+        // was causing the generated string to have some extra
+        // null characters. Not sure why yet. Using string_view
+        // resolved that issue, which is okay to use since it doesn't
+        // copy any data and we know the underlying string is null
+        // terminated.
+        // TODO: See if bam_get_qname(irecord) usage can be fixed.
         std::string_view qname(bam_get_qname(irecord));
         bam_set1(record, qname.size(), qname.data(), flag, tid, pos, mapq, n_cigar, cigar.get(),
                  irecord->core.mtid, irecord->core.mpos, irecord->core.isize, l_seq, seq_tmp,
