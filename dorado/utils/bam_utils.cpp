@@ -66,8 +66,8 @@ Aligner::Aligner(MessageSink& sink, const std::string& filename, int k, int w, i
 
     if (m_index->k != m_idx_opt.k || m_index->w != m_idx_opt.w) {
         spdlog::warn(
-                "Indexing parameters overridden by parameters used in the prebuilt index: kmer "
-                "size={} and window size={}.",
+                "Indexing parameters mismatch prebuilt index: using paramateres kmer "
+                "size={} and window size={} from prebuilt index.",
                 m_index->k, m_index->w);
     }
 
