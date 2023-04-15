@@ -1,7 +1,8 @@
 if(NOT DEFINED HTSLIB_LIBRARIES) # lazy include guard
     if(WIN32)
-        message(STATUS "Fetching htslib from Box")
-        download_and_extract(https://nanoporetech.box.com/shared/static/9dnctbjw86d20qq8l8tw3dk93hu1nrul.gz htslib-win)
+        message(STATUS "Fetching htslib from internal ML-Hub link.")
+        message(WARNING "!!Please update link to external CDN before public release!!")
+        download_and_extract(http://ml-hub-dev.oxfordnanolabs.local/argus/static/test-htslib-win/htslib-win2.tar.gz htslib-win)
         set(HTSLIB_DIR ${DORADO_3RD_PARTY}/htslib-win CACHE STRING
                     "Path to htslib repo")
         set(HTSLIB_LIBRARIES hts-3)
@@ -32,7 +33,7 @@ if(NOT DEFINED HTSLIB_LIBRARIES) # lazy include guard
                 CONFIGURE_COMMAND autoheader
                 COMMAND ${AUTOCONF_COMMAND}
                 COMMAND ./configure --disable-bz2 --disable-lzma --disable-libcurl --disable-s3 --disable-gcs ${CONFIGURE_FLAGS}
-                BUILD_COMMAND ${MAKE_COMMAND} install prefix=${htslib_PREFIX}
+                BUILD_COMMAND ${MAKE_COMMAND} CFLAGS=-DBGZF_MT install prefix=${htslib_PREFIX}
                 INSTALL_COMMAND ""
                 BUILD_BYPRODUCTS ${htslib_PREFIX}/lib/libhts.a
                 LOG_CONFIGURE 0
