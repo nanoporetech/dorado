@@ -99,19 +99,6 @@ std::string adjust_time_ms(const std::string& time_stamp, uint64_t offset_ms) {
                                                offset_ms);
 }
 
-//                           T  A     T        T  C     A     G        T     A  C
-//std::vector<uint8_t> moves{1, 1, 0, 1, 0, 0, 1, 1, 0, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 0};
-std::vector<uint64_t> move_cum_sums(const std::vector<uint8_t> moves) {
-    std::vector<uint64_t> ans(moves.size(), 0);
-    if (!moves.empty()) {
-        ans[0] = moves[0];
-    }
-    for (size_t i = 1, n = moves.size(); i < n; i++) {
-        ans[i] = ans[i - 1] + moves[i];
-    }
-    return ans;
-}
-
 std::string derive_uuid(const std::string& input_uuid, const std::string& desc) {
     // Hash the input UUID using SHA-256
     unsigned char hash[SHA256_DIGEST_LENGTH];
@@ -143,6 +130,7 @@ std::string derive_uuid(const std::string& input_uuid, const std::string& desc) 
     return ss.str();
 }
 
+//merges overlapping ranges and ranges separated by merge_dist or less
 //ranges supposed to be sorted by start coordinate
 PosRanges merge_ranges(const PosRanges& ranges, size_t merge_dist) {
     PosRanges merged;
@@ -161,11 +149,7 @@ std::vector<std::pair<size_t, size_t>> detect_pore_signal(torch::Tensor signal,
                                                           float threshold,
                                                           size_t cluster_dist,
                                                           size_t ignore_prefix) {
-    using namespace std::chrono;
-    const auto start_ts = high_resolution_clock::now();
-
     std::vector<std::pair<size_t, size_t>> ans;
-    //auto pore_a = signal.accessor<torch::kFloat16, 1>();
     auto pore_a = signal.accessor<float, 1>();
     size_t start = 0;
     size_t end = 0;
@@ -187,9 +171,6 @@ std::vector<std::pair<size_t, size_t>> detect_pore_signal(torch::Tensor signal,
     }
     assert(start < pore_a.size(0) && end <= pore_a.size(0));
 
-    const auto stop_ts = high_resolution_clock::now();
-    spdlog::trace("OPEN_PORE duration: {} microseconds",
-                  duration_cast<microseconds>(stop_ts - start_ts).count());
     return ans;
 }
 
@@ -372,7 +353,8 @@ namespace dorado {
 DuplexSplitNode::ExtRead::ExtRead(std::shared_ptr<Read> r)
         : read(r),
           data_as_float32(read->raw_data.to(torch::kFloat)),
-          move_sums(move_cum_sums(read->moves)) {
+          move_sums(read->moves.size(), 0) {
+    std::partial_sum(read->moves.begin(), read->moves.end(), move_sums.begin());
     assert(move_sums.back() == read->seq.length());
 }
 
@@ -396,11 +378,13 @@ PosRanges DuplexSplitNode::possible_pore_regions(const DuplexSplitNode::ExtRead&
                       pore_thr);
     }
 
-    for (auto pore_signal_region :
-         detect_pore_signal(read.data_as_float32, (pore_thr - read.read->shift) / read.read->scale,
-                            m_settings.pore_cl_dist, m_settings.expect_pore_prefix)) {
-        auto move_start = pore_signal_region.first / read.read->model_stride;
-        auto move_end = pore_signal_region.second / read.read->model_stride;
+    auto pore_sample_ranges = detect_pore_signal(read.data_as_float32,
+                                (pore_thr - read.read->shift) / read.read->scale,
+                                m_settings.pore_cl_dist, m_settings.expect_pore_prefix);
+
+    for (auto pore_sample_range : pore_sample_ranges) {
+        auto move_start = pore_sample_range.first / read.read->model_stride;
+        auto move_end = pore_sample_range.second / read.read->model_stride;
         assert(move_end >= move_start);
         //NB move_start can get to move_sums.size(), because of the stride rounding?
         if (move_start >= read.move_sums.size() || move_end >= read.move_sums.size() ||
@@ -607,7 +591,6 @@ void DuplexSplitNode::worker_thread() {
                     }
                 }
             }
-            //std::swap(to_split, split_round_result);
             to_split = std::move(split_round_result);
         }
 
@@ -626,7 +609,7 @@ void DuplexSplitNode::worker_thread() {
 }
 
 DuplexSplitNode::DuplexSplitNode(MessageSink& sink,
-                                 DuplexSplitSettings settings,
+                                 const DuplexSplitSettings& settings,
                                  int num_worker_threads,
                                  size_t max_reads)
         : MessageSink(max_reads),

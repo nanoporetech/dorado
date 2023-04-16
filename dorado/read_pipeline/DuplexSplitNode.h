@@ -5,7 +5,7 @@ namespace dorado {
 
 struct DuplexSplitSettings {
     bool enabled = true;
-    bool simplex_mode;
+    bool simplex_mode = false;
     float pore_thr = 160.;
     size_t pore_cl_dist = 4000;  // TODO maybe use frequency * 1sec here?
     float relaxed_pore_thr = 150.;
@@ -30,8 +30,6 @@ struct DuplexSplitSettings {
     //HEAD_ADAPTER = 'AATGTACTTCGTTCAGTTACGTATTGCT'
     //clipped 4 letters from the beginning of head adapter (24 left)
     std::string adapter = "TACTTCGTTCAGTTACGTATTGCT";
-
-    explicit DuplexSplitSettings(bool simplex_mode = false) : simplex_mode(simplex_mode) {}
 };
 
 class DuplexSplitNode : public MessageSink {
@@ -49,7 +47,7 @@ public:
     typedef std::vector<PosRange> PosRanges;
 
     DuplexSplitNode(MessageSink& sink,
-                    DuplexSplitSettings settings,
+                    const DuplexSplitSettings& settings,
                     int num_worker_threads = 5,
                     size_t max_reads = 1000);
     ~DuplexSplitNode();
