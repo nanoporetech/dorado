@@ -244,21 +244,21 @@ std::vector<bam1_t*> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
             }
             int offset = clip_len[0] ? 1 : 0;
 
-            cigar = std::vector<uint32_t>(n_cigar);
+            cigar.resize(n_cigar);
 
             // write the left softclip
             if (clip_len[0]) {
                 auto clip = bam_cigar_gen(clip_len[0], BAM_CSOFT_CLIP);
-                cigar.data()[0] = clip;
+                cigar[0] = clip;
             }
 
             // write the cigar
-            memcpy(&cigar.data()[offset], aln->p->cigar, aln->p->n_cigar * sizeof(uint32_t));
+            memcpy(&cigar[offset], aln->p->cigar, aln->p->n_cigar * sizeof(uint32_t));
 
             // write the right softclip
             if (clip_len[1]) {
                 auto clip = bam_cigar_gen(clip_len[1], BAM_CSOFT_CLIP);
-                cigar.data()[offset + aln->p->n_cigar] = clip;
+                cigar[offset + aln->p->n_cigar] = clip;
             }
         }
 
@@ -273,10 +273,10 @@ std::vector<bam1_t*> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
             l_seq = seq.size();
             if (aln->rev) {
                 seq_tmp = seq_rev.data();
-                qual_tmp = qual_rev.data();
+                qual_tmp = qual_rev.empty() ? nullptr : qual_rev.data();
             } else {
                 seq_tmp = seq.data();
-                qual_tmp = qual.data();
+                qual_tmp = qual.empty() ? nullptr : qual.data();
             }
         }
 
