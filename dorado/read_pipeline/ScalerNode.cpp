@@ -1,11 +1,13 @@
 #include "ScalerNode.h"
 
 #include "utils/tensor_utils.h"
+#include "utils/trim.h"
 
 #include <algorithm>
 #include <chrono>
 
 using namespace std::chrono_literals;
+using Slice = torch::indexing::Slice;
 
 namespace {
 
@@ -38,15 +40,12 @@ void ScalerNode::worker_thread() {
         read->scale = read->scaling * scale;
         read->shift = read->scaling * (shift + read->offset);
 
-        float threshold = read->shift + read->scale * 2.4;
-
         // 8000 value may be changed in future. Currently this is found to work well.
+        int max_samples = std::min(8000, static_cast<int>(read->raw_data.size(0) / 2));
         int trim_start =
-                trim(read->raw_data.index({torch::indexing::Slice(torch::indexing::None, 8000)}),
-                     threshold);
+                utils::trim(read->raw_data.index({Slice(torch::indexing::None, max_samples)}));
 
-        read->raw_data =
-                read->raw_data.index({torch::indexing::Slice(trim_start, torch::indexing::None)});
+        read->raw_data = read->raw_data.index({Slice(trim_start, torch::indexing::None)});
         read->num_trimmed_samples = trim_start;
 
         // Pass the read to the next node
@@ -78,40 +77,6 @@ ScalerNode::~ScalerNode() {
 
     // Notify the sink that the Scaler Node has terminated
     m_sink.terminate();
-}
-
-int ScalerNode::trim(torch::Tensor signal,
-                     int window_size,
-                     float threshold,
-                     int min_elements,
-                     int max_samples,
-                     float max_trim) {
-    int min_trim = 10;
-    bool seen_peak = false;
-    int num_samples = std::min(max_samples, static_cast<int>(signal.size(0)) - min_trim);
-    int num_windows = num_samples / window_size;
-
-    for (int pos = 0; pos < num_windows; pos++) {
-        int start = pos * window_size + min_trim;
-        int end = start + window_size;
-
-        auto window = signal.index({torch::indexing::Slice(start, end)});
-        auto elements = window > threshold;
-
-        if ((elements.sum().item<int>() > min_elements) || seen_peak) {
-            seen_peak = true;
-            if (window[-1].item<float>() > threshold) {
-                continue;
-            }
-            if (end >= num_samples || end >= (max_trim * signal.size(0))) {
-                return min_trim;
-            } else {
-                return end;
-            }
-        }
-    }
-
-    return min_trim;
 }
 
 }  // namespace dorado
