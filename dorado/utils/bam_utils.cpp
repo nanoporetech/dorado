@@ -289,9 +289,9 @@ std::vector<bam1_t*> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
         // terminated.
         // TODO: See if bam_get_qname(irecord) usage can be fixed.
         std::string_view qname(bam_get_qname(irecord));
-        bam_set1(record, qname.size(), qname.data(), flag, tid, pos, mapq, n_cigar, cigar.data(),
-                 irecord->core.mtid, irecord->core.mpos, irecord->core.isize, l_seq, seq_tmp,
-                 (char*)qual_tmp, bam_get_l_aux(irecord));
+        bam_set1(record, qname.size(), qname.data(), flag, tid, pos, mapq, n_cigar,
+                 cigar.empty() ? nullptr : cigar.data(), irecord->core.mtid, irecord->core.mpos,
+                 irecord->core.isize, l_seq, seq_tmp, (char*)qual_tmp, bam_get_l_aux(irecord));
 
         // Copy over tags from input alignment.
         memcpy(bam_get_aux(record), bam_get_aux(irecord), bam_get_l_aux(irecord));
