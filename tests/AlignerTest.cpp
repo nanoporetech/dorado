@@ -158,30 +158,26 @@ TEST_CASE("AlignerTest: Verify impact of updated aligner args", TEST_GROUP) {
     using Catch::Matchers::Contains;
 
     fs::path aligner_test_dir = fs::path(get_aligner_data_dir());
-    auto ref = aligner_test_dir / "target.fa";
-    auto query = aligner_test_dir / "target.fa";
+    auto ref = aligner_test_dir / "target.fq";
+    auto query = aligner_test_dir / "query.fa";
 
     // Run alignment with one set of k/w.
     {
         MessageSinkToVector<bam1_t*> sink(100);
-        dorado::utils::Aligner aligner(sink, ref.string(), 15, 15, 2);
+        dorado::utils::Aligner aligner(sink, ref.string(), 28, 28, 2);
         dorado::utils::BamReader reader(query.string());
         reader.read(aligner, 100);
         auto bam_records = sink.get_messages();
-        REQUIRE(bam_records.size() == 1);
-
-        bam1_t* rec = bam_records[0];
+        REQUIRE(bam_records.size() == 2);  // Generates 2 alignments.
     }
 
     // Run alignment with another set of k/w.
     {
         MessageSinkToVector<bam1_t*> sink(100);
-        dorado::utils::Aligner aligner(sink, ref.string(), 19, 19, 2);
+        dorado::utils::Aligner aligner(sink, ref.string(), 5, 5, 2);
         dorado::utils::BamReader reader(query.string());
         reader.read(aligner, 100);
         auto bam_records = sink.get_messages();
-        REQUIRE(bam_records.size() == 1);
-
-        bam1_t* rec = bam_records[0];
+        REQUIRE(bam_records.size() == 1);  // Generates 1 alignment.
     }
 }
