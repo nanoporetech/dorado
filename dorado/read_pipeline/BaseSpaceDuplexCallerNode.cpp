@@ -3,6 +3,7 @@
 #include "3rdparty/edlib/edlib/include/edlib.h"
 #include "cxxpool.h"
 #include "utils/duplex_utils.h"
+#include "utils/sequence_utils.h"
 
 #include <spdlog/spdlog.h>
 

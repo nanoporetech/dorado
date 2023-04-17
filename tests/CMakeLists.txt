@@ -2,7 +2,6 @@
 set(SOURCE_FILES
     main.cpp
     AsyncQueueTest.cpp
-    DuplexUtilsTest.cpp
     Fast5DataLoaderTest.cpp
     Pod5DataLoaderTest.cpp
     TensorUtilsTest.cpp

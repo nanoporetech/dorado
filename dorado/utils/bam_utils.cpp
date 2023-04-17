@@ -9,6 +9,9 @@
 //Ask lh3 t  make some of these funcs publicly available?
 #include "mmpriv.h"
 #include "read_pipeline/ReadPipeline.h"
+#include "utils/sequence_utils.h"
+
+#include <spdlog/spdlog.h>
 
 #include <iostream>
 #include <map>
@@ -16,23 +19,6 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
-
-#ifdef _WIN32
-// seq_nt16_str is referred to in the hts-3.lib stub on windows, but has not been declared dllimport for
-//  client code, so it comes up as an undefined reference when linking the stub.
-const char seq_nt16_str[] = "=ACMGRSVTWYHKDBN";
-
-// These special wrapped memory management function are needed
-// because on Windows, memory allocated and returned from one
-// DLL cannot be freed or managed from another DLL/exe unless
-// they share the runtime library. With htslib that was not
-// possible, so these wrapped functions had to be exposed.
-// TODO: Find a cleaner solution for this.
-#include "htslib/ont_defs.h"
-#define _HTSLIB_REALLOC htslib_wrapped_realloc
-#else
-#define _HTSLIB_REALLOC realloc
-#endif  // _WIN32
 
 namespace dorado::utils {
 
@@ -55,6 +41,9 @@ Aligner::Aligner(MessageSink& sink, const std::string& filename, int threads)
     m_index_reader = mm_idx_reader_open(filename.c_str(), &m_idx_opt, 0);
     m_index = mm_idx_reader_read(m_index_reader, m_threads);
     mm_mapopt_update(&m_map_opt, m_index);
+
+    spdlog::debug("> Minimap2 settings:\n> k: {}\n>w: {}\n>flag: {}", m_index->k, m_index->w,
+                  m_index->flag);
 
     if (mm_verbose >= 3) {
         mm_idx_stat(m_index);
@@ -116,7 +105,7 @@ void Aligner::worker_thread(size_t tid) {
 
 // Function to add auxiliary tags to the alignment record.
 // These are added to maintain parity with mm2.
-void Aligner::add_tags(bam1_t* record, const mm_reg1_t* aln, const std::vector<char>& seq) {
+void Aligner::add_tags(bam1_t* record, const mm_reg1_t* aln, const std::string& seq) {
     if (aln->p) {
         // NM
         int32_t nm = aln->blen - aln->mlen + aln->p->n_ambi;
@@ -171,7 +160,7 @@ void Aligner::add_tags(bam1_t* record, const mm_reg1_t* aln, const std::vector<c
     // MD
     char* md = NULL;
     int max_len = 0;
-    int md_len = mm_gen_MD(NULL, &md, &max_len, m_index, aln, seq.data());
+    int md_len = mm_gen_MD(NULL, &md, &max_len, m_index, aln, seq.c_str());
     if (md_len > 0) {
         bam_aux_append(record, "MD", 'Z', md_len + 1, (uint8_t*)md);
     }
@@ -191,14 +180,21 @@ std::vector<bam1_t*> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
     auto seqlen = irecord->core.l_qseq;
 
     auto bseq = bam_get_seq(irecord);
-    std::vector<char> seq(seqlen);
-    for (int i = 0; i < seqlen; i++) {
-        seq[i] = seq_nt16_str[bam_seqi(bseq, i)];
+    std::string seq = convert_nt16_to_str(bseq, seqlen);
+    // Pre-generate reverse complement sequence.
+    std::string seq_rev = reverse_complement(seq);
+
+    // Pre-generate reverse of quality string.
+    std::vector<uint8_t> qual;
+    std::vector<uint8_t> qual_rev;
+    if (bam_get_qual(irecord)) {
+        qual = std::vector<uint8_t>(bam_get_qual(irecord), bam_get_qual(irecord) + seqlen);
+        qual_rev = std::vector<uint8_t>(qual.rbegin(), qual.rend());
     }
 
     // do the mapping
     int hits = 0;
-    mm_reg1_t* reg = mm_map(m_index, seq.size(), seq.data(), &hits, buf, &m_map_opt, 0);
+    mm_reg1_t* reg = mm_map(m_index, seq.length(), seq.c_str(), &hits, buf, &m_map_opt, 0);
 
     // just return the input record
     if (hits == 0) {
@@ -207,77 +203,101 @@ std::vector<bam1_t*> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
 
     for (int j = 0; j < hits; j++) {
         // new output record
-        auto record = bam_dup1(irecord);
+        bam1_t* record = bam_init1();
 
         // mapping region
         auto aln = &reg[j];
 
+        // Set FLAGS
         uint16_t flag = 0x0;
 
         if (aln->rev) {
-            flag |= 0x10;
+            flag |= BAM_FREVERSE;
         }
         if (aln->parent != aln->id) {
-            flag |= 0x100;
+            flag |= BAM_FSECONDARY;
         } else if (!aln->sam_pri) {
-            flag |= 0x800;
+            flag |= BAM_FSUPPLEMENTARY;
         }
 
-        record->core.flag = flag;
-        record->core.tid = aln->rid;
-        record->core.pos = aln->rs;
-        record->core.qual = aln->mapq;
-        record->core.n_cigar = aln->p ? aln->p->n_cigar : 0;
+        int32_t tid = aln->rid;
+        hts_pos_t pos = aln->rs;
+        uint8_t mapq = aln->mapq;
 
+        // Create CIGAR.
         // Note: max_bam_cigar_op doesn't need to handled specially when
         // using htslib since the sam_write1 method already takes care
         // of moving the CIGAR string to the tags if the length
         // exceeds 65535.
-        if (record->core.n_cigar != 0) {
+        size_t n_cigar = aln->p ? aln->p->n_cigar : 0;
+        std::vector<uint32_t> cigar;
+        if (n_cigar != 0) {
             uint32_t clip_len[2] = {0};
-            clip_len[0] = aln->rev ? record->core.l_qseq - aln->qe : aln->qs;
-            clip_len[1] = aln->rev ? aln->qs : record->core.l_qseq - aln->qe;
+            clip_len[0] = aln->rev ? irecord->core.l_qseq - aln->qe : aln->qs;
+            clip_len[1] = aln->rev ? aln->qs : irecord->core.l_qseq - aln->qe;
 
             if (clip_len[0]) {
-                record->core.n_cigar++;
+                n_cigar++;
             }
             if (clip_len[1]) {
-                record->core.n_cigar++;
+                n_cigar++;
             }
             int offset = clip_len[0] ? 1 : 0;
-            int cigar_size = record->core.n_cigar * sizeof(uint32_t);
-            uint32_t new_m_data = record->l_data + cigar_size;
-            kroundup32(new_m_data);
-            // todo: this part could possibly by re-written without using realloc.
-            uint8_t* data = (uint8_t*)_HTSLIB_REALLOC(record->data, new_m_data);
 
-            // shift existing data to make room for the new cigar field
-            memmove(data + record->core.l_qname + cigar_size, data + record->core.l_qname,
-                    record->l_data - record->core.l_qname);
-
-            record->data = data;
+            cigar.resize(n_cigar);
 
             // write the left softclip
             if (clip_len[0]) {
                 auto clip = bam_cigar_gen(clip_len[0], BAM_CSOFT_CLIP);
-                memcpy(bam_get_cigar(record), &clip, sizeof(uint32_t));
+                cigar[0] = clip;
             }
 
             // write the cigar
-            memcpy(bam_get_cigar(record) + offset, aln->p->cigar,
-                   aln->p->n_cigar * sizeof(uint32_t));
+            memcpy(&cigar[offset], aln->p->cigar, aln->p->n_cigar * sizeof(uint32_t));
 
             // write the right softclip
             if (clip_len[1]) {
                 auto clip = bam_cigar_gen(clip_len[1], BAM_CSOFT_CLIP);
-                memcpy(bam_get_cigar(record) + offset + aln->p->n_cigar, &clip, sizeof(uint32_t));
+                cigar[offset + aln->p->n_cigar] = clip;
             }
-
-            // update the data length
-            record->l_data += cigar_size;
-            record->m_data = new_m_data;
         }
 
+        // Add SEQ and QUAL.
+        size_t l_seq = 0;
+        char* seq_tmp = nullptr;
+        unsigned char* qual_tmp = nullptr;
+        if (flag & BAM_FSECONDARY) {
+            // To match minimap2 output behavior, don't emit sequence
+            // or quality info for secondary alignments.
+        } else {
+            l_seq = seq.size();
+            if (aln->rev) {
+                seq_tmp = seq_rev.data();
+                qual_tmp = qual_rev.empty() ? nullptr : qual_rev.data();
+            } else {
+                seq_tmp = seq.data();
+                qual_tmp = qual.empty() ? nullptr : qual.data();
+            }
+        }
+
+        // Set properties of the BAM record.
+        // NOTE: Passing bam_get_qname(irecord) + l_qname into bam_set1
+        // was causing the generated string to have some extra
+        // null characters. Not sure why yet. Using string_view
+        // resolved that issue, which is okay to use since it doesn't
+        // copy any data and we know the underlying string is null
+        // terminated.
+        // TODO: See if bam_get_qname(irecord) usage can be fixed.
+        std::string_view qname(bam_get_qname(irecord));
+        bam_set1(record, qname.size(), qname.data(), flag, tid, pos, mapq, n_cigar,
+                 cigar.empty() ? nullptr : cigar.data(), irecord->core.mtid, irecord->core.mpos,
+                 irecord->core.isize, l_seq, seq_tmp, (char*)qual_tmp, bam_get_l_aux(irecord));
+
+        // Copy over tags from input alignment.
+        memcpy(bam_get_aux(record), bam_get_aux(irecord), bam_get_l_aux(irecord));
+        record->l_data += bam_get_l_aux(irecord);
+
+        // Add new tags to match minimap2.
         add_tags(record, aln, seq);
 
         free(aln->p);
