@@ -14,7 +14,7 @@ using read_map = std::unordered_map<std::string, std::shared_ptr<Read>>;
 
 class Aligner : public MessageSink {
 public:
-    Aligner(MessageSink& read_sink, const std::string& filename, int threads);
+    Aligner(MessageSink& read_sink, const std::string& filename, int k, int w, int threads);
     ~Aligner();
     sq_t sq();
     std::vector<bam1_t*> align(bam1_t* record, mm_tbuf_t* buf);
