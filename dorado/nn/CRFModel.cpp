@@ -381,7 +381,6 @@ private:
         const bool use_int8 = !g_options_no_i8 && use_cutlass;
 #endif
 
-        torch::Tensor mat_working_mem = in;
         const int chunk_size = in.size(0) - 1;
         const int batch_size = in.size(1);
         assert(layer_size == in.size(3));
@@ -492,8 +491,8 @@ private:
                                          inout_left_f16.stride(1), 0,
                                          inout_left_f16.size(0) * inout_left_f16.size(1),
                                          inout_left_f16.size(2));
-                    inout_all_i8.index({chunk_size, Slice(), 0}) = 0;
-                    inout_all_i8.index({0, Slice(), 1}) = 0;
+                    inout_all_i8.index({chunk_size, Slice(), Slice(0, layer_size)}) = 0;
+                    inout_all_i8.index({0, Slice(), Slice(layer_size, 2 * layer_size)}) = 0;
                 }
             } else
 #endif  // ifndef DORADO_TX2
