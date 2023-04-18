@@ -348,7 +348,11 @@ void BamReader::read(MessageSink& read_sink, int max_reads) {
         if (++num_reads >= max_reads) {
             break;
         }
+        if (num_reads % 50000 == 0) {
+            spdlog::debug("Processed {} reads", num_reads);
+        }
     }
+    spdlog::debug("Total reads processed: {}", num_reads);
     read_sink.terminate();
 }
 
@@ -378,13 +382,16 @@ void BamWriter::join() { m_worker->join(); }
 
 void BamWriter::worker_thread() {
     Message message;
+    size_t write_count = 0;
     while (m_work_queue.try_pop(message)) {
         bam1_t* aln = std::get<bam1_t*>(message);
         write(aln);
         // Free the bam alignment that's already written
         // out to disk.
         bam_destroy1(aln);
+        write_count++;
     }
+    spdlog::debug("Written {} alignments.", write_count);
 }
 
 int BamWriter::write(bam1_t* record) {

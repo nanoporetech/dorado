@@ -30,12 +30,8 @@ int aligner(int argc, char* argv[]) {
             "parameter names are not finalized and may change.");
     parser.add_argument("index").help("reference in (fastq/fasta/mmi).");
     parser.add_argument("reads").help("any HTS format.").nargs(argparse::nargs_pattern::any);
-    parser.add_argument("-at", "--aligner-threads")
-            .help("number of threads for alignment.")
-            .default_value(0)
-            .scan<'i', int>();
-    parser.add_argument("-wt", "--writer-threads")
-            .help("number of threads for BAM generation.")
+    parser.add_argument("-t", "--threads")
+            .help("number of threads for alignment and BAM writing.")
             .default_value(0)
             .scan<'i', int>();
     parser.add_argument("-n", "--max-reads")
@@ -62,17 +58,18 @@ int aligner(int argc, char* argv[]) {
 
     auto index(parser.get<std::string>("index"));
     auto reads(parser.get<std::vector<std::string>>("reads"));
-    auto aligner_threads(parser.get<int>("aligner-threads"));
-    auto writer_threads(parser.get<int>("writer-threads"));
+    auto threads(parser.get<int>("threads"));
     auto max_reads(parser.get<int>("max-reads"));
     auto kmer_size(parser.get<int>("k"));
     auto window_size(parser.get<int>("w"));
 
-    int available_threads = std::thread::hardware_concurrency();
-    // Heuristically use 25% of threads for alignment and rest for BAM generation.
-    // BAM generation is surprisingly expensive...
-    std::tie(aligner_threads, writer_threads) = utils::aligner_writer_thread_allocation(
-            aligner_threads, writer_threads, available_threads, 0.25f);
+    threads = threads == 0 ? std::thread::hardware_concurrency() : threads;
+    // The input thread is the total number of threads to use for dorado
+    // alignment. Heuristically use 10% of threads for BAM generation and
+    // rest for alignment. Empirically this shows good perf.
+    int aligner_threads, writer_threads;
+    std::tie(aligner_threads, writer_threads) =
+            utils::aligner_writer_thread_allocation(threads, 0.1f);
     spdlog::debug("> aligner threads {}, writer threads {}", aligner_threads, writer_threads);
 
     if (reads.size() == 0) {
