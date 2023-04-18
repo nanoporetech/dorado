@@ -33,7 +33,7 @@ if(NOT DEFINED HTSLIB_LIBRARIES) # lazy include guard
                 CONFIGURE_COMMAND autoheader
                 COMMAND ${AUTOCONF_COMMAND}
                 COMMAND ./configure --disable-bz2 --disable-lzma --disable-libcurl --disable-s3 --disable-gcs ${CONFIGURE_FLAGS}
-                BUILD_COMMAND ${MAKE_COMMAND} CFLAGS=-DBGZF_MT install prefix=${htslib_PREFIX}
+                BUILD_COMMAND ${MAKE_COMMAND} install prefix=${htslib_PREFIX}
                 INSTALL_COMMAND ""
                 BUILD_BYPRODUCTS ${htslib_PREFIX}/lib/libhts.a
                 LOG_CONFIGURE 0
