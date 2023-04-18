@@ -1,6 +1,7 @@
 #include "Version.h"
 #include "minimap.h"
 #include "utils/bam_utils.h"
+#include "utils/cli_utils.h"
 #include "utils/log_utils.h"
 
 #include <argparse.hpp>
@@ -63,7 +64,13 @@ int aligner(int argc, char* argv[]) {
     auto window_size(parser.get<int>("w"));
 
     threads = threads == 0 ? std::thread::hardware_concurrency() : threads;
-    spdlog::debug("> threads {}", threads);
+    // The input thread is the total number of threads to use for dorado
+    // alignment. Heuristically use 10% of threads for BAM generation and
+    // rest for alignment. Empirically this shows good perf.
+    int aligner_threads, writer_threads;
+    std::tie(aligner_threads, writer_threads) =
+            utils::aligner_writer_thread_allocation(threads, 0.1f);
+    spdlog::debug("> aligner threads {}, writer threads {}", aligner_threads, writer_threads);
 
     if (reads.size() == 0) {
 #ifndef _WIN32
@@ -80,8 +87,8 @@ int aligner(int argc, char* argv[]) {
 
     spdlog::info("> loading index {}", index);
 
-    utils::BamWriter writer("-", threads);
-    utils::Aligner aligner(writer, index, kmer_size, window_size, threads);
+    utils::BamWriter writer("-", writer_threads);
+    utils::Aligner aligner(writer, index, kmer_size, window_size, aligner_threads);
     utils::BamReader reader(reads[0]);
 
     spdlog::debug("> input fmt: {} aligned: {}", reader.format, reader.is_aligned);
