@@ -115,7 +115,10 @@ void Aligner::worker_thread(size_t tid) {
 
 // Function to add auxiliary tags to the alignment record.
 // These are added to maintain parity with mm2.
-void Aligner::add_tags(bam1_t* record, const mm_reg1_t* aln, const std::string& seq) {
+void Aligner::add_tags(bam1_t* record,
+                       const mm_reg1_t* aln,
+                       const std::string& seq,
+                       const mm_tbuf_t* buf) {
     if (aln->p) {
         // NM
         int32_t nm = aln->blen - aln->mlen + aln->p->n_ambi;
@@ -180,6 +183,9 @@ void Aligner::add_tags(bam1_t* record, const mm_reg1_t* aln, const std::string& 
         uint32_t split = uint32_t(aln->split);
         bam_aux_append(record, "zd", 'i', sizeof(split), (uint8_t*)&split);
     }
+
+    // rl
+    bam_aux_append(record, "rl", 'i', sizeof(buf->rep_len), (uint8_t*)&buf->rep_len);
 }
 
 std::vector<bam1_t*> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
@@ -308,7 +314,7 @@ std::vector<bam1_t*> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
         record->l_data += bam_get_l_aux(irecord);
 
         // Add new tags to match minimap2.
-        add_tags(record, aln, seq);
+        add_tags(record, aln, seq, buf);
 
         free(aln->p);
         results.push_back(record);
