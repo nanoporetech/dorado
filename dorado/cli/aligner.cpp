@@ -22,10 +22,23 @@ int aligner(int argc, char* argv[]) {
     utils::InitLogging();
 
     argparse::ArgumentParser parser("dorado", DORADO_VERSION, argparse::default_arguments::help);
+    parser.add_description(
+            "Alignment using minimap2. The outputs are expected to be equivalent to minimap2.\n"
+            "The default parameters use the map-ont preset.\n"
+            "NOTE: Not all arguments from minimap2 are currently available. Additionally, "
+            "parameter names are not finalized and may change.");
     parser.add_argument("index").help("reference in (fastq/fasta/mmi).");
     parser.add_argument("reads").help("any HTS format.").nargs(argparse::nargs_pattern::any);
-    parser.add_argument("-t", "--threads").default_value(0).scan<'i', int>();
-    parser.add_argument("-n", "--max-reads").default_value(1000).scan<'i', int>();
+    parser.add_argument("-t", "--threads")
+            .help("number of threads for alignment and BAM writing.")
+            .default_value(0)
+            .scan<'i', int>();
+    parser.add_argument("-n", "--max-reads")
+            .help("maxium number of reads to process (for debugging).")
+            .default_value(1000000)
+            .scan<'i', int>();
+    parser.add_argument("-k").help("k-mer size (maximum 28).").default_value(15).scan<'i', int>();
+    parser.add_argument("-w").help("minimizer window size.").default_value(10).scan<'i', int>();
     parser.add_argument("-v", "--verbose").default_value(false).implicit_value(true);
 
     try {
@@ -46,6 +59,8 @@ int aligner(int argc, char* argv[]) {
     auto reads(parser.get<std::vector<std::string>>("reads"));
     auto threads(parser.get<int>("threads"));
     auto max_reads(parser.get<int>("max-reads"));
+    auto kmer_size(parser.get<int>("k"));
+    auto window_size(parser.get<int>("w"));
 
     threads = threads == 0 ? std::thread::hardware_concurrency() : threads;
     spdlog::debug("> threads {}", threads);
@@ -66,7 +81,7 @@ int aligner(int argc, char* argv[]) {
     spdlog::info("> loading index {}", index);
 
     utils::BamWriter writer("-", threads);
-    utils::Aligner aligner(writer, index, threads);
+    utils::Aligner aligner(writer, index, kmer_size, window_size, threads);
     utils::BamReader reader(reads[0]);
 
     spdlog::debug("> input fmt: {} aligned: {}", reader.format, reader.is_aligned);

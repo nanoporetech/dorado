@@ -1,5 +1,6 @@
 #include "ReadPipeline.h"
 
+#include "htslib/sam.h"
 #include "utils/base_mod_utils.h"
 #include "utils/sequence_utils.h"
 

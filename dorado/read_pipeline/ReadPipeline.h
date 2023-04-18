@@ -1,5 +1,4 @@
 #pragma once
-#include "htslib/sam.h"
 #include "utils/AsyncQueue.h"
 
 #include <torch/torch.h>
@@ -10,6 +9,8 @@
 #include <string>
 #include <variant>
 #include <vector>
+
+struct bam1_t;
 
 namespace dorado {
 

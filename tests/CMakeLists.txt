@@ -2,7 +2,6 @@
 set(SOURCE_FILES
     main.cpp
     AsyncQueueTest.cpp
-    DuplexUtilsTest.cpp
     Fast5DataLoaderTest.cpp
     Pod5DataLoaderTest.cpp
     TensorUtilsTest.cpp
@@ -12,6 +11,7 @@ set(SOURCE_FILES
     SequenceUtilsTest.cpp
     StitchTest.cpp
     StereoDuplexTest.cpp
+    TrimTest.cpp
     AlignerTest.cpp
     BamReaderTest.cpp
     BamWriterTest.cpp

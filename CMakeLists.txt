@@ -126,6 +126,8 @@ set(LIB_SOURCE_FILES
     dorado/utils/stitch.h
     dorado/utils/tensor_utils.cpp
     dorado/utils/tensor_utils.h
+    dorado/utils/trim.cpp
+    dorado/utils/trim.h
     dorado/utils/bam_utils.cpp
     dorado/utils/bam_utils.h
     dorado/utils/duplex_utils.h
