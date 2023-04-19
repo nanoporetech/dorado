@@ -6,11 +6,9 @@
 
 #include <algorithm>
 #include <array>
-#include <chrono>
 #include <cstring>
 #include <vector>
 
-using namespace std::chrono_literals;
 using namespace torch::indexing;
 
 namespace stereo_internal {
