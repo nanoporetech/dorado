@@ -101,11 +101,6 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
     static constexpr int kFeatureComplementQScore = 12;
     auto tmp = torch::zeros({kNumFeatures, max_size}, opts);
 
-    // Diagnostics one: Is sum of move vector the same length as the sequence
-    // TODO -- is this worth keeping around?
-    const int num_moves = std::reduce(template_read->moves.cbegin(),
-        template_read->moves.cend(), static_cast<int>(0));
-
     int template_signal_cursor = 0;
     int complement_signal_cursor = 0;
 
@@ -172,11 +167,6 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
         auto& feature_ptr = feature_ptrs[feature_idx];
         feature_ptr = static_cast<SampleType*>(tmp[feature_idx].data_ptr());
     }
-
-    // Converts nucleotide letters to feature index offsets.
-    const auto nucleotide_feature_offset = [](char nucleotide) {
-        return 0b11 & (nucleotide >> 2 ^ nucleotide >> 1);
-    };
 
     int stereo_global_cursor = 0;  // Index into the stereo-encoded signal
     for (int i = start_alignment_position; i < end_alignment_position; i++) {
@@ -250,7 +240,7 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
         // Now, add the nucleotides and q scores
         if (result.alignment[i] != kAlignInsertionToQuery) {
             const char nucleotide = template_sequence.at(target_cursor);
-            const auto nucleotide_feature_idx = kFeatureTemplateFirstNucleotide + nucleotide_feature_offset(nucleotide);
+            const auto nucleotide_feature_idx = kFeatureTemplateFirstNucleotide + dorado::utils::base_to_int(nucleotide);
             std::fill_n(&feature_ptrs[nucleotide_feature_idx][start_ts], total_segment_length, static_cast<SampleType>(1.0f));
             std::fill_n(&feature_ptrs[kFeatureTemplateQScore][start_ts], total_segment_length,
                 convert_q_score(template_q_scores.at(target_cursor)));
@@ -262,7 +252,7 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
         // Now, add the nucleotides and q scores
         if (result.alignment[i] != kAlignInsertionToTarget) {
             const char nucleotide = complement_sequence_reverse_complement.at(query_cursor);
-            const auto nucleotide_feature_idx = kFeatureComplementFirstNucleotide + nucleotide_feature_offset(nucleotide);
+            const auto nucleotide_feature_idx = kFeatureComplementFirstNucleotide + dorado::utils::base_to_int(nucleotide);
 
             std::fill_n(&feature_ptrs[nucleotide_feature_idx][start_ts], total_segment_length, static_cast<SampleType>(1.0f));
             std::fill_n(&feature_ptrs[kFeatureComplementQScore][start_ts], total_segment_length,
