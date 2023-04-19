@@ -101,6 +101,14 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
     static constexpr int kFeatureComplementQScore = 12;
     auto tmp = torch::zeros({kNumFeatures, max_size}, opts);
 
+<<<<<<< HEAD
+=======
+    // Diagnostics one: Is sum of move vector the same length as the sequence
+    // TODO -- is this worth keeping around?
+    const int num_moves = std::reduce(template_read->moves.cbegin(), template_read->moves.cend(),
+                                      static_cast<int>(0));
+
+>>>>>>> origin/stereo_cpi
     int template_signal_cursor = 0;
     int complement_signal_cursor = 0;
 
@@ -149,7 +157,7 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
     }
 
     const float pad_value = 0.8 * std::min(torch::min(complement_signal).item<float>(),
-                                        torch::min(template_read->raw_data).item<float>());
+                                           torch::min(template_read->raw_data).item<float>());
 
     // Start with all signal feature entries equal to the padding value.
     tmp.index({torch::indexing::Slice(None, 2)}) = pad_value;
@@ -158,9 +166,9 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
     // allocations/deallocations and object constructions/destructions, and so are
     // glacially slow.  We therefore work with raw pointers within the main loop.
     const auto* const template_raw_data_ptr =
-        static_cast<SampleType*>(template_read->raw_data.data_ptr());
+            static_cast<SampleType*>(template_read->raw_data.data_ptr());
     const auto* const flipped_complement_raw_data_ptr =
-        static_cast<SampleType*>(complement_signal.data_ptr());
+            static_cast<SampleType*>(complement_signal.data_ptr());
 
     std::array<SampleType*, kNumFeatures> feature_ptrs;
     for (int feature_idx = 0; feature_idx < kNumFeatures; ++feature_idx) {
@@ -178,9 +186,9 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
         // If there is *not* an insertion to the query, add the nucleotide from the target cursor
         if (result.alignment[i] != kAlignInsertionToQuery) {
             // TODO -- these memcpys could be merged
-            std::memcpy(&feature_ptrs[kFeatureTemplateSignal][stereo_global_cursor + template_segment_length],
-                        &template_raw_data_ptr[template_signal_cursor],
-                        sizeof(SampleType));        
+            std::memcpy(&feature_ptrs[kFeatureTemplateSignal]
+                                     [stereo_global_cursor + template_segment_length],
+                        &template_raw_data_ptr[template_signal_cursor], sizeof(SampleType));
             template_segment_length++;
             template_signal_cursor++;
             auto max_signal_length = template_moves_expanded.size();
@@ -195,9 +203,10 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
                     next_move_ptr ? (next_move_ptr - start_ptr) : max_signal_length;
 
             // Assumes contiguity of successive elements.
-            std::memcpy(&feature_ptrs[kFeatureTemplateSignal][stereo_global_cursor + template_segment_length],
+            std::memcpy(&feature_ptrs[kFeatureTemplateSignal]
+                                     [stereo_global_cursor + template_segment_length],
                         &template_raw_data_ptr[template_signal_cursor],
-                        sample_count * sizeof(SampleType));            
+                        sample_count * sizeof(SampleType));
 
             template_signal_cursor += sample_count;
             template_segment_length += sample_count;
@@ -205,7 +214,8 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
 
         // If there is *not* an insertion to the target, add the nucleotide from the query cursor
         if (result.alignment[i] != kAlignInsertionToTarget) {
-            std::memcpy(&feature_ptrs[kFeatureComplementSignal][stereo_global_cursor + complement_segment_length],
+            std::memcpy(&feature_ptrs[kFeatureComplementSignal]
+                                     [stereo_global_cursor + complement_segment_length],
                         &flipped_complement_raw_data_ptr[complement_signal_cursor],
                         sizeof(SampleType));
 
@@ -220,7 +230,8 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
             const size_t sample_count =
                     next_move_ptr ? (next_move_ptr - start_ptr) : max_signal_length;
 
-            std::memcpy(&feature_ptrs[kFeatureComplementSignal][stereo_global_cursor + complement_segment_length],
+            std::memcpy(&feature_ptrs[kFeatureComplementSignal]
+                                     [stereo_global_cursor + complement_segment_length],
                         &flipped_complement_raw_data_ptr[complement_signal_cursor],
                         sample_count * sizeof(SampleType));
 
@@ -243,7 +254,7 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
             const auto nucleotide_feature_idx = kFeatureTemplateFirstNucleotide + dorado::utils::base_to_int(nucleotide);
             std::fill_n(&feature_ptrs[nucleotide_feature_idx][start_ts], total_segment_length, static_cast<SampleType>(1.0f));
             std::fill_n(&feature_ptrs[kFeatureTemplateQScore][start_ts], total_segment_length,
-                convert_q_score(template_q_scores.at(target_cursor)));
+                        convert_q_score(template_q_scores.at(target_cursor)));
 
             // Anything but a query insertion causes the target cursor to advance.
             ++target_cursor;
@@ -254,15 +265,17 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
             const char nucleotide = complement_sequence_reverse_complement.at(query_cursor);
             const auto nucleotide_feature_idx = kFeatureComplementFirstNucleotide + dorado::utils::base_to_int(nucleotide);
 
-            std::fill_n(&feature_ptrs[nucleotide_feature_idx][start_ts], total_segment_length, static_cast<SampleType>(1.0f));
+            std::fill_n(&feature_ptrs[nucleotide_feature_idx][start_ts], total_segment_length,
+                        static_cast<SampleType>(1.0f));
             std::fill_n(&feature_ptrs[kFeatureComplementQScore][start_ts], total_segment_length,
-                convert_q_score(complement_q_scores_reversed.at(query_cursor)));
+                        convert_q_score(complement_q_scores_reversed.at(query_cursor)));
 
             // Anything but a target insertion causes the query cursor to advance.
             ++query_cursor;
         }
 
-        feature_ptrs[kFeatureMoveTable][stereo_global_cursor] = static_cast<SampleType>(1);  // set the move table
+        feature_ptrs[kFeatureMoveTable][stereo_global_cursor] =
+                static_cast<SampleType>(1);  // set the move table
 
         // Update the global cursor
         stereo_global_cursor += total_segment_length;
