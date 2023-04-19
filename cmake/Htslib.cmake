@@ -1,12 +1,14 @@
-if(NOT DEFINED HTSLIB_LIBRARIES) # lazy include guard
+if(NOT TARGET htslib) # lazy include guard
     if(WIN32)
         message(STATUS "Fetching htslib from internal ML-Hub link.")
         message(WARNING "!!Please update link to external CDN before public release!!")
         download_and_extract(http://ml-hub-dev.oxfordnanolabs.local/argus/static/test-htslib-win/htslib-win2.tar.gz htslib-win)
         set(HTSLIB_DIR ${DORADO_3RD_PARTY}/htslib-win CACHE STRING
                     "Path to htslib repo")
-        set(HTSLIB_LIBRARIES hts-3)
-        link_directories(${HTSLIB_DIR})
+        add_library(htslib SHARED IMPORTED)
+        set_property(TARGET htslib APPEND PROPERTY IMPORTED_IMPLIB ${HTSLIB_DIR}/hts-3.lib)        
+        set_property(TARGET htslib APPEND PROPERTY IMPORTED_LOCATION ${HTSLIB_DIR}/hts-3.dll)        
+        target_link_directories(htslib INTERFACE ${HTSLIB_DIR})
     else()
         message(STATUS "Building htslib")
         set(HTSLIB_DIR ${DORADO_3RD_PARTY}/htslib CACHE STRING
@@ -43,7 +45,6 @@ if(NOT DEFINED HTSLIB_LIBRARIES) # lazy include guard
                 )
 
         include_directories(${htslib_PREFIX}/include/htslib)
-        set(HTSLIB_LIBRARIES htslib)
         add_library(htslib STATIC IMPORTED)
         set_property(TARGET htslib APPEND PROPERTY IMPORTED_LOCATION ${htslib_PREFIX}/lib/libhts.a)
         message(STATUS "Done Building htslib")

@@ -203,7 +203,7 @@ target_link_libraries(dorado_lib
     ${APPLE_FWK_METAL}
     ${TORCH_LIBRARIES}
     ${KOI_LIBRARIES}
-    ${HTSLIB_LIBRARIES}
+    htslib
     vbz_hdf_plugin
     OpenSSL::SSL
     edlib
