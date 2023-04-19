@@ -101,14 +101,6 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
     static constexpr int kFeatureComplementQScore = 12;
     auto tmp = torch::zeros({kNumFeatures, max_size}, opts);
 
-<<<<<<< HEAD
-=======
-    // Diagnostics one: Is sum of move vector the same length as the sequence
-    // TODO -- is this worth keeping around?
-    const int num_moves = std::reduce(template_read->moves.cbegin(), template_read->moves.cend(),
-                                      static_cast<int>(0));
-
->>>>>>> origin/stereo_cpi
     int template_signal_cursor = 0;
     int complement_signal_cursor = 0;
 
