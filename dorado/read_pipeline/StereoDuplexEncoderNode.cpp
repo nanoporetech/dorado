@@ -36,15 +36,6 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
     const auto complement_sequence_reverse_complement =
             dorado::utils::reverse_complement(complement_read->seq);
 
-    std::vector<uint8_t> complement_q_scores_reversed(complement_read->qstring.begin(),
-                                                      complement_read->qstring.end());
-    std::reverse(complement_q_scores_reversed.begin(), complement_q_scores_reversed.end());
-
-    std::vector<char> template_sequence(template_read->seq.begin(), template_read->seq.end());
-    // FIXME -- why do we do this copy/conversion?
-    std::vector<uint8_t> template_q_scores(template_read->qstring.begin(),
-                                           template_read->qstring.end());
-
     // Align the two reads to one another and print out the score.
     EdlibAlignResult result =
             edlibAlign(template_read->seq.data(), template_read->seq.size(),
@@ -232,20 +223,20 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
                 std::max(template_segment_length, complement_segment_length);
         const int start_ts = stereo_global_cursor;
 
-        // Converts Q scores from uint8_t to SampleType.
-        const auto convert_q_score = [](uint8_t q_in) {
+        // Converts Q scores from char to SampleType, with appropriate scale/offset.
+        const auto convert_q_score = [](char q_in) {
             return static_cast<SampleType>(static_cast<float>(q_in - 33) / 90.0f);
         };
 
         // Now, add the nucleotides and q scores
         if (result.alignment[i] != kAlignInsertionToQuery) {
-            const char nucleotide = template_sequence.at(target_cursor);
+            const char nucleotide = template_read->seq[target_cursor];
             const auto nucleotide_feature_idx =
                     kFeatureTemplateFirstNucleotide + dorado::utils::base_to_int(nucleotide);
             std::fill_n(&feature_ptrs[nucleotide_feature_idx][start_ts], total_segment_length,
                         static_cast<SampleType>(1.0f));
             std::fill_n(&feature_ptrs[kFeatureTemplateQScore][start_ts], total_segment_length,
-                        convert_q_score(template_q_scores.at(target_cursor)));
+                        convert_q_score(template_read->qstring[target_cursor]));
 
             // Anything but a query insertion causes the target cursor to advance.
             ++target_cursor;
@@ -260,7 +251,7 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
             std::fill_n(&feature_ptrs[nucleotide_feature_idx][start_ts], total_segment_length,
                         static_cast<SampleType>(1.0f));
             std::fill_n(&feature_ptrs[kFeatureComplementQScore][start_ts], total_segment_length,
-                        convert_q_score(complement_q_scores_reversed.at(query_cursor)));
+                        convert_q_score(complement_read->qstring.rbegin()[query_cursor]));
 
             // Anything but a target insertion causes the query cursor to advance.
             ++query_cursor;
