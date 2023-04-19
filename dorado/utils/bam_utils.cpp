@@ -195,6 +195,9 @@ std::vector<bam1_t*> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
     // get the sequence to map from the record
     auto seqlen = irecord->core.l_qseq;
 
+    // get query name.
+    std::string_view qname(bam_get_qname(irecord));
+
     auto bseq = bam_get_seq(irecord);
     std::string seq = convert_nt16_to_str(bseq, seqlen);
     // Pre-generate reverse complement sequence.
@@ -210,7 +213,8 @@ std::vector<bam1_t*> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
 
     // do the mapping
     int hits = 0;
-    mm_reg1_t* reg = mm_map(m_index, seq.length(), seq.c_str(), &hits, buf, &m_map_opt, 0);
+    mm_reg1_t* reg =
+            mm_map(m_index, seq.length(), seq.c_str(), &hits, buf, &m_map_opt, qname.data());
 
     // just return the input record
     if (hits == 0) {
@@ -304,7 +308,6 @@ std::vector<bam1_t*> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
         // copy any data and we know the underlying string is null
         // terminated.
         // TODO: See if bam_get_qname(irecord) usage can be fixed.
-        std::string_view qname(bam_get_qname(irecord));
         bam_set1(record, qname.size(), qname.data(), flag, tid, pos, mapq, n_cigar,
                  cigar.empty() ? nullptr : cigar.data(), irecord->core.mtid, irecord->core.mpos,
                  irecord->core.isize, l_seq, seq_tmp, (char*)qual_tmp, bam_get_l_aux(irecord));
