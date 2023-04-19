@@ -15,6 +15,7 @@ set(SOURCE_FILES
     AlignerTest.cpp
     BamReaderTest.cpp
     BamWriterTest.cpp
+    CliUtilsTest.cpp
 )
 
 if (DORADO_GPU_BUILD)

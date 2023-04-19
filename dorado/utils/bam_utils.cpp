@@ -115,7 +115,10 @@ void Aligner::worker_thread(size_t tid) {
 
 // Function to add auxiliary tags to the alignment record.
 // These are added to maintain parity with mm2.
-void Aligner::add_tags(bam1_t* record, const mm_reg1_t* aln, const std::string& seq) {
+void Aligner::add_tags(bam1_t* record,
+                       const mm_reg1_t* aln,
+                       const std::string& seq,
+                       const mm_tbuf_t* buf) {
     if (aln->p) {
         // NM
         int32_t nm = aln->blen - aln->mlen + aln->p->n_ambi;
@@ -180,6 +183,9 @@ void Aligner::add_tags(bam1_t* record, const mm_reg1_t* aln, const std::string& 
         uint32_t split = uint32_t(aln->split);
         bam_aux_append(record, "zd", 'i', sizeof(split), (uint8_t*)&split);
     }
+
+    // rl
+    bam_aux_append(record, "rl", 'i', sizeof(buf->rep_len), (uint8_t*)&buf->rep_len);
 }
 
 std::vector<bam1_t*> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
@@ -308,7 +314,7 @@ std::vector<bam1_t*> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
         record->l_data += bam_get_l_aux(irecord);
 
         // Add new tags to match minimap2.
-        add_tags(record, aln, seq);
+        add_tags(record, aln, seq, buf);
 
         free(aln->p);
         results.push_back(record);
@@ -348,7 +354,11 @@ void BamReader::read(MessageSink& read_sink, int max_reads) {
         if (++num_reads >= max_reads) {
             break;
         }
+        if (num_reads % 50000 == 0) {
+            spdlog::debug("Processed {} reads", num_reads);
+        }
     }
+    spdlog::debug("Total reads processed: {}", num_reads);
     read_sink.terminate();
 }
 
@@ -378,13 +388,16 @@ void BamWriter::join() { m_worker->join(); }
 
 void BamWriter::worker_thread() {
     Message message;
+    size_t write_count = 0;
     while (m_work_queue.try_pop(message)) {
         bam1_t* aln = std::get<bam1_t*>(message);
         write(aln);
         // Free the bam alignment that's already written
         // out to disk.
         bam_destroy1(aln);
+        write_count++;
     }
+    spdlog::debug("Written {} alignments.", write_count);
 }
 
 int BamWriter::write(bam1_t* record) {
