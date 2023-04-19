@@ -8,7 +8,6 @@
 #include <array>
 #include <chrono>
 #include <cstring>
-#include <numeric>
 #include <vector>
 
 using namespace std::chrono_literals;
@@ -154,7 +153,7 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
     // Start with all signal feature entries equal to the padding value.
     tmp.index({torch::indexing::Slice(None, 2)}) = pad_value;
 
-    // libtorch indexing calls goes on a carefree romp through various heap
+    // libtorch indexing calls go on a carefree romp through various heap
     // allocations/deallocations and object constructions/destructions, and so are
     // glacially slow.  We therefore work with raw pointers within the main loop.
     const auto* const template_raw_data_ptr =
