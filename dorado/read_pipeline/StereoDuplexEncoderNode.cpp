@@ -251,8 +251,10 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
         // Now, add the nucleotides and q scores
         if (result.alignment[i] != kAlignInsertionToQuery) {
             const char nucleotide = template_sequence.at(target_cursor);
-            const auto nucleotide_feature_idx = kFeatureTemplateFirstNucleotide + dorado::utils::base_to_int(nucleotide);
-            std::fill_n(&feature_ptrs[nucleotide_feature_idx][start_ts], total_segment_length, static_cast<SampleType>(1.0f));
+            const auto nucleotide_feature_idx =
+                    kFeatureTemplateFirstNucleotide + dorado::utils::base_to_int(nucleotide);
+            std::fill_n(&feature_ptrs[nucleotide_feature_idx][start_ts], total_segment_length,
+                        static_cast<SampleType>(1.0f));
             std::fill_n(&feature_ptrs[kFeatureTemplateQScore][start_ts], total_segment_length,
                         convert_q_score(template_q_scores.at(target_cursor)));
 
@@ -263,7 +265,8 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
         // Now, add the nucleotides and q scores
         if (result.alignment[i] != kAlignInsertionToTarget) {
             const char nucleotide = complement_sequence_reverse_complement.at(query_cursor);
-            const auto nucleotide_feature_idx = kFeatureComplementFirstNucleotide + dorado::utils::base_to_int(nucleotide);
+            const auto nucleotide_feature_idx =
+                    kFeatureComplementFirstNucleotide + dorado::utils::base_to_int(nucleotide);
 
             std::fill_n(&feature_ptrs[nucleotide_feature_idx][start_ts], total_segment_length,
                         static_cast<SampleType>(1.0f));
