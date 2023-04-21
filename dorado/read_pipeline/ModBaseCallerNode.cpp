@@ -292,8 +292,8 @@ void ModBaseCallerNode::call_current_batch(size_t caller_id) {
     // Convert results to float32 with one call and address via a raw pointer,
     // to avoid huge libtorch indexing overhead.
     auto results_f32 = results.to(torch::kFloat32);
-    assert(results_f32.IsContiguous());
-    const auto* const results_f32_ptr = static_cast<float*>(results_f32.data_ptr());
+    assert(results_f32.is_contiguous());
+    const auto* const results_f32_ptr = results_f32.data_ptr<float>();
 
     std::unique_lock processed_chunks_lock(m_processed_chunks_mutex);
     auto row_size = results.size(1);
