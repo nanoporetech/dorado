@@ -68,6 +68,13 @@ else()
     set(DORADO_GPU_BUILD TRUE)
 endif()
 
+# Use ccache for C and C++ if it's available
+find_program(CCACHE_EXE ccache)
+if (CCACHE_EXE)
+    set(CMAKE_C_COMPILER_LAUNCHER ${CCACHE_EXE})
+    set(CMAKE_CXX_COMPILER_LAUNCHER ${CCACHE_EXE})
+endif()
+
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     if((CMAKE_SYSTEM_PROCESSOR MATCHES "^aarch64*|^arm*") AND (${CUDAToolkit_VERSION} VERSION_LESS 11.0))
         add_compile_definitions(DORADO_TX2)
