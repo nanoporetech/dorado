@@ -96,6 +96,8 @@ set(LIB_SOURCE_FILES
     dorado/read_pipeline/ModBaseCallerNode.h
     dorado/read_pipeline/WriterNode.cpp
     dorado/read_pipeline/WriterNode.h
+    dorado/read_pipeline/ReadFilterNode.h
+    dorado/read_pipeline/ReadFilterNode.cpp
     dorado/read_pipeline/BaseSpaceDuplexCallerNode.cpp
     dorado/read_pipeline/BaseSpaceDuplexCallerNode.h
     dorado/decode/beam_search.cpp
