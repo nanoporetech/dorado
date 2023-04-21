@@ -47,10 +47,10 @@ static const std::vector<std::string> models = {
         "dna_r10.4.1_e8.2_400bps_hac@v4.1.0",
         "dna_r10.4.1_e8.2_400bps_sup@v4.1.0",
 
-        // v4.2.alpha
-        "dna_r10.4.1_e8.2_5khz_400bps_fast@v4.2.alpha",
-        "dna_r10.4.1_e8.2_5khz_400bps_hac@v4.2.alpha",
-        "dna_r10.4.1_e8.2_5khz_400bps_sup@v4.2.alpha",
+        // v4.2.0
+        "dna_r10.4.1_e8.2_5khz_400bps_fast@v4.2.0",
+        "dna_r10.4.1_e8.2_5khz_400bps_hac@v4.2.0",
+        "dna_r10.4.1_e8.2_5khz_400bps_sup@v4.2.0",
 
         // RNA003
         "rna003_120bps_sup@v3",
