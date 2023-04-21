@@ -10,7 +10,6 @@ TEST_CASE("ReadFilterNode: Filter read based on qscore", TEST_GROUP) {
     MessageSinkToVector<std::shared_ptr<dorado::Read>> sink(100);
     {
         std::shared_ptr<dorado::Read> read_1(new dorado::Read());
-        ;
         read_1->raw_data = torch::empty(100);
         read_1->sample_rate = 4000.0;
         read_1->shift = 128.3842f;
@@ -26,7 +25,6 @@ TEST_CASE("ReadFilterNode: Filter read based on qscore", TEST_GROUP) {
         read_1->attributes.fast5_filename = "batch_0.fast5";
 
         std::shared_ptr<dorado::Read> read_2(new dorado::Read());
-        ;
         read_2->raw_data = torch::empty(100);
         read_2->sample_rate = 4000.0;
         read_2->shift = 128.3842f;

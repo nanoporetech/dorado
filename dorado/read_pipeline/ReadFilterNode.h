@@ -1,14 +1,10 @@
 #pragma once
 
 #include "ReadPipeline.h"
-#include "data_loader/DataLoader.h"
 
 #include <atomic>
 #include <string>
 #include <vector>
-
-struct sam_hdr_t;
-struct htsFile;
 
 namespace dorado {
 
@@ -33,6 +29,7 @@ private:
 
     // Async worker for writing.
     std::vector<std::unique_ptr<std::thread>> m_workers;
+    std::atomic<size_t> m_active_threads;
 
     size_t m_min_qscore;
     std::atomic<size_t> m_num_reads_filtered;
