@@ -25,6 +25,7 @@
 #include "utils/parameters.h"
 
 #include <argparse.hpp>
+#include <htslib/sam.h>
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
@@ -34,6 +35,40 @@
 #include <thread>
 
 namespace dorado {
+
+void add_basecall_hdr(sam_hdr_t* hdr,
+                      const std::unordered_map<std::string, ReadGroup>& read_groups,
+                      const std::vector<std::string>& args) {
+    sam_hdr_add_lines(hdr, "@HD\tVN:1.6\tSO:unknown", 0);
+
+    std::stringstream pg;
+    pg << "@PG\tID:basecaller\tPN:dorado\tVN:" << DORADO_VERSION << "\tCL:dorado";
+    for (const auto& arg : args) {
+        pg << " " << arg;
+    }
+    pg << std::endl;
+    sam_hdr_add_lines(hdr, pg.str().c_str(), 0);
+
+    // Add read groups
+    for (auto const& x : read_groups) {
+        std::stringstream rg;
+        rg << "@RG\t";
+        rg << "ID:" << x.first << "\t";
+        rg << "PU:" << x.second.flowcell_id << "\t";
+        rg << "PM:" << x.second.device_id << "\t";
+        rg << "DT:" << x.second.exp_start_time << "\t";
+        rg << "PL:"
+           << "ONT"
+           << "\t";
+        rg << "DS:"
+           << "basecall_model=" << x.second.basecalling_model << " runid=" << x.second.run_id
+           << "\t";
+        rg << "LB:" << x.second.sample_id << "\t";
+        rg << "SM:" << x.second.sample_id;
+        rg << std::endl;
+        sam_hdr_add_lines(hdr, rg.str().c_str(), 0);
+    }
+}
 
 void setup(std::vector<std::string> args,
            const std::filesystem::path& model_path,
@@ -169,19 +204,20 @@ void setup(std::vector<std::string> args,
 
     bool rna = utils::is_rna_model(model_path), duplex = false;
 
-    std::unique_ptr<utils::BamWriter> bam_writer;
+    sam_hdr_t* hdr = sam_hdr_init();
+    add_basecall_hdr(hdr, read_groups, args);
+    std::shared_ptr<utils::BamWriter> bam_writer;
     std::shared_ptr<utils::Aligner> aligner;
-    std::shared_ptr<WriterNode> writer_node;
     MessageSink* filter_sink = nullptr;
     if (ref.empty()) {
-        writer_node =
-                std::make_shared<WriterNode>(std::move(args), emit_fastq, emit_moves, rna, duplex,
-                                             num_devices * 2, std::move(read_groups), num_reads);
-        filter_sink = writer_node.get();
+        utils::sq_t sq;
+        bam_writer = std::make_shared<utils::BamWriter>("-", num_devices * 2 /*writer_threads*/);
+        bam_writer->write_header(hdr, sq);
+        filter_sink = bam_writer.get();
     } else {
-        bam_writer = std::make_unique<utils::BamWriter>("-", num_devices /*writer_threads*/);
+        bam_writer = std::make_shared<utils::BamWriter>("-", num_devices /*writer_threads*/);
         aligner = std::make_shared<utils::Aligner>(*bam_writer, ref, 19, 19, num_devices * 5);
-        bam_writer->write_header(nullptr, aligner->sq());
+        bam_writer->write_header(hdr, aligner->sq());
         filter_sink = aligner.get();
     }
     ReadToBamType read_converter(*filter_sink, emit_moves, rna, duplex, 1 /*num_threads*/);
@@ -207,6 +243,8 @@ void setup(std::vector<std::string> args,
     DataLoader loader(scaler_node, "cpu", num_devices, max_reads, read_list);
 
     loader.load_reads(data_path, recursive_file_loading);
+
+    sam_hdr_destroy(hdr);
 }
 
 int basecaller(int argc, char* argv[]) {
@@ -277,7 +315,10 @@ int basecaller(int argc, char* argv[]) {
 
     parser.add_argument("--emit-moves").default_value(false).implicit_value(true);
 
-    parser.add_argument("--ref").help("Path to reference for alignment.");
+    parser.add_argument("--ref")
+            .help("Path to reference for alignment.")
+            .default_value(std::string(""));
+    ;
 
     try {
         parser.parse_args(argc, argv);
