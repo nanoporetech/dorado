@@ -425,7 +425,11 @@ int BamWriter::write(bam1_t* record) {
 }
 
 int BamWriter::write_header(const sam_hdr_t* header, const sq_t seqs) {
-    m_header = sam_hdr_dup(header);
+    if (header) {
+        m_header = sam_hdr_dup(header);
+    } else {
+        m_header = sam_hdr_init();
+    }
     write_hdr_pg();
     for (auto pair : seqs) {
         write_hdr_sq(std::get<0>(pair), std::get<1>(pair));

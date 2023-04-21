@@ -17,8 +17,10 @@
 #include "read_pipeline/BasecallerNode.h"
 #include "read_pipeline/ModBaseCallerNode.h"
 #include "read_pipeline/ReadFilterNode.h"
+#include "read_pipeline/ReadToBamTypeNode.h"
 #include "read_pipeline/ScalerNode.h"
 #include "read_pipeline/WriterNode.h"
+#include "utils/bam_utils.h"
 #include "utils/log_utils.h"
 #include "utils/parameters.h"
 
@@ -38,6 +40,7 @@ void setup(std::vector<std::string> args,
            const std::string& data_path,
            const std::string& remora_models,
            const std::string& device,
+           const std::string& ref,
            size_t chunk_size,
            size_t overlap,
            size_t batch_size,
@@ -165,9 +168,24 @@ void setup(std::vector<std::string> args,
     num_reads = max_reads == 0 ? num_reads : std::min(num_reads, max_reads);
 
     bool rna = utils::is_rna_model(model_path), duplex = false;
-    WriterNode writer_node(std::move(args), emit_fastq, emit_moves, rna, duplex, num_devices * 2,
-                           std::move(read_groups), num_reads);
-    ReadFilterNode read_filter_node(writer_node, min_qscore, 1, num_reads);
+
+    std::unique_ptr<utils::BamWriter> bam_writer;
+    std::shared_ptr<utils::Aligner> aligner;
+    std::shared_ptr<WriterNode> writer_node;
+    MessageSink* filter_sink = nullptr;
+    if (ref.empty()) {
+        writer_node =
+                std::make_shared<WriterNode>(std::move(args), emit_fastq, emit_moves, rna, duplex,
+                                             num_devices * 2, std::move(read_groups), num_reads);
+        filter_sink = writer_node.get();
+    } else {
+        bam_writer = std::make_unique<utils::BamWriter>("-", num_devices /*writer_threads*/);
+        aligner = std::make_shared<utils::Aligner>(*bam_writer, ref, 19, 19, num_devices * 5);
+        bam_writer->write_header(nullptr, aligner->sq());
+        filter_sink = aligner.get();
+    }
+    ReadToBamType read_converter(*filter_sink, emit_moves, rna, duplex, 1 /*num_threads*/);
+    ReadFilterNode read_filter_node(read_converter, min_qscore, 1, num_reads);
 
     std::unique_ptr<ModBaseCallerNode> mod_base_caller_node;
     std::unique_ptr<BasecallerNode> basecaller_node;
@@ -259,6 +277,8 @@ int basecaller(int argc, char* argv[]) {
 
     parser.add_argument("--emit-moves").default_value(false).implicit_value(true);
 
+    parser.add_argument("--ref").help("Path to reference for alignment.");
+
     try {
         parser.parse_args(argc, argv);
     } catch (const std::exception& e) {
@@ -296,12 +316,13 @@ int basecaller(int argc, char* argv[]) {
 
     try {
         setup(args, model, parser.get<std::string>("data"), mod_bases_models,
-              parser.get<std::string>("-x"), parser.get<int>("-c"), parser.get<int>("-o"),
-              parser.get<int>("-b"), default_parameters.num_runners,
-              default_parameters.remora_batchsize, default_parameters.remora_threads,
-              parser.get<bool>("--emit-fastq"), parser.get<bool>("--emit-moves"),
-              parser.get<int>("--max-reads"), parser.get<int>("--min-qscore"),
-              parser.get<std::string>("--read-ids"), parser.get<bool>("--recursive"));
+              parser.get<std::string>("-x"), parser.get<std::string>("--ref"),
+              parser.get<int>("-c"), parser.get<int>("-o"), parser.get<int>("-b"),
+              default_parameters.num_runners, default_parameters.remora_batchsize,
+              default_parameters.remora_threads, parser.get<bool>("--emit-fastq"),
+              parser.get<bool>("--emit-moves"), parser.get<int>("--max-reads"),
+              parser.get<int>("--min-qscore"), parser.get<std::string>("--read-ids"),
+              parser.get<bool>("--recursive"));
     } catch (const std::exception& e) {
         spdlog::error("{}", e.what());
         return 1;
