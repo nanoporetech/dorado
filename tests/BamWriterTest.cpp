@@ -25,9 +25,7 @@ protected:
         dorado::utils::BamReader reader(m_in_sam.string());
         dorado::utils::BamWriter writer(m_out_bam.string(), num_threads);
 
-        dorado::utils::sq_t sequences;
-        CHECK(sequences.size() == 0);  // No sequence information for this test.
-        writer.write_header(reader.header, sequences);
+        writer.write_header(reader.header);
         reader.read(writer, 1000);
 
         writer.join();

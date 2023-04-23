@@ -327,6 +327,15 @@ std::vector<bam1_t*> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
     return results;
 }
 
+void Aligner::add_sq_to_hdr(sam_hdr_t* hdr) {
+    for (auto pair : sq()) {
+        char* name;
+        int length;
+        std::tie(name, length) = pair;
+        sam_hdr_add_line(hdr, "SQ", "SN", name, "LN", std::to_string(length).c_str(), NULL);
+    }
+}
+
 BamReader::BamReader(const std::string& filename) {
     m_file = hts_open(filename.c_str(), "r");
     if (!m_file) {
@@ -424,28 +433,14 @@ int BamWriter::write(bam1_t* record) {
     return res;
 }
 
-int BamWriter::write_header(const sam_hdr_t* header, const sq_t seqs) {
+int BamWriter::write_header(const sam_hdr_t* header) {
     if (header) {
         m_header = sam_hdr_dup(header);
     } else {
         m_header = sam_hdr_init();
     }
-    write_hdr_pg();
-    for (auto pair : seqs) {
-        write_hdr_sq(std::get<0>(pair), std::get<1>(pair));
-    }
     auto res = sam_hdr_write(m_file, m_header);
     return res;
-}
-
-int BamWriter::write_hdr_pg() {
-    // todo: add CL Writer node
-    return sam_hdr_add_line(m_header, "PG", "ID", "aligner", "PN", "dorado", "VN", DORADO_VERSION,
-                            "DS", MM_VERSION, NULL);
-}
-
-int BamWriter::write_hdr_sq(char* name, uint32_t length) {
-    return sam_hdr_add_line(m_header, "SQ", "SN", name, "LN", std::to_string(length).c_str(), NULL);
 }
 
 read_map read_bam(const std::string& filename, const std::set<std::string>& read_ids) {

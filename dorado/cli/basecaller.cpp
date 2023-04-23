@@ -36,9 +36,7 @@
 
 namespace dorado {
 
-void add_basecall_hdr(sam_hdr_t* hdr,
-                      const std::unordered_map<std::string, ReadGroup>& read_groups,
-                      const std::vector<std::string>& args) {
+void add_pg_hdr(sam_hdr_t* hdr, const std::vector<std::string>& args) {
     sam_hdr_add_lines(hdr, "@HD\tVN:1.6\tSO:unknown", 0);
 
     std::stringstream pg;
@@ -48,7 +46,9 @@ void add_basecall_hdr(sam_hdr_t* hdr,
     }
     pg << std::endl;
     sam_hdr_add_lines(hdr, pg.str().c_str(), 0);
+}
 
+void add_rg_hdr(sam_hdr_t* hdr, const std::unordered_map<std::string, ReadGroup>& read_groups) {
     // Add read groups
     for (auto const& x : read_groups) {
         std::stringstream rg;
@@ -205,19 +205,20 @@ void setup(std::vector<std::string> args,
     bool rna = utils::is_rna_model(model_path), duplex = false;
 
     sam_hdr_t* hdr = sam_hdr_init();
-    add_basecall_hdr(hdr, read_groups, args);
+    add_pg_hdr(hdr, args);
+    add_rg_hdr(hdr, read_groups);
     std::shared_ptr<utils::BamWriter> bam_writer;
     std::shared_ptr<utils::Aligner> aligner;
     MessageSink* filter_sink = nullptr;
     if (ref.empty()) {
-        utils::sq_t sq;
         bam_writer = std::make_shared<utils::BamWriter>("-", num_devices * 2 /*writer_threads*/);
-        bam_writer->write_header(hdr, sq);
+        bam_writer->write_header(hdr);
         filter_sink = bam_writer.get();
     } else {
         bam_writer = std::make_shared<utils::BamWriter>("-", num_devices /*writer_threads*/);
         aligner = std::make_shared<utils::Aligner>(*bam_writer, ref, 19, 19, num_devices * 5);
-        bam_writer->write_header(hdr, aligner->sq());
+        aligner->add_sq_to_hdr(hdr);
+        bam_writer->write_header(hdr);
         filter_sink = aligner.get();
     }
     ReadToBamType read_converter(*filter_sink, emit_moves, rna, duplex, 1 /*num_threads*/);

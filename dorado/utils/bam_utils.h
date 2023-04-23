@@ -16,7 +16,7 @@ class Aligner : public MessageSink {
 public:
     Aligner(MessageSink& read_sink, const std::string& filename, int k, int w, int threads);
     ~Aligner();
-    sq_t sq();
+    void add_sq_to_hdr(sam_hdr_t* hdr);
     std::vector<bam1_t*> align(bam1_t* record, mm_tbuf_t* buf);
 
 private:
@@ -27,6 +27,7 @@ private:
     std::vector<std::unique_ptr<std::thread>> m_workers;
     void worker_thread(size_t tid);
     void add_tags(bam1_t*, const mm_reg1_t*, const std::string&, const mm_tbuf_t*);
+    sq_t sq();
 
     mm_idxopt_t m_idx_opt;
     mm_mapopt_t m_map_opt;
@@ -55,7 +56,7 @@ class BamWriter : public MessageSink {
 public:
     BamWriter(const std::string& filename, size_t threads = 1);
     ~BamWriter();
-    int write_header(const sam_hdr_t* header, const sq_t seqs);
+    int write_header(const sam_hdr_t* header);
     int write(bam1_t* record);
     void join();
 
@@ -70,7 +71,6 @@ private:
     sam_hdr_t* m_header{nullptr};
     std::unique_ptr<std::thread> m_worker;
     void worker_thread();
-    int write_hdr_pg();
     int write_hdr_sq(char* name, uint32_t length);
 };
 
