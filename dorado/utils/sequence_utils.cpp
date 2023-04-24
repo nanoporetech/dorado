@@ -26,6 +26,10 @@ __attribute__((target("default")))
 #endif
 std::string
 reverse_complement_impl(const std::string& sequence) {
+    if (sequence.empty()) {
+        return {};
+    }
+
     const auto num_bases = sequence.size();
     std::string rev_comp_sequence;
     rev_comp_sequence.resize(num_bases);
