@@ -3,6 +3,8 @@
 #include "minimap.h"
 #include "read_pipeline/ReadPipeline.h"
 
+#include <indicators/progress_bar.hpp>
+
 #include <map>
 #include <set>
 #include <string>
@@ -54,7 +56,7 @@ private:
 
 class BamWriter : public MessageSink {
 public:
-    BamWriter(const std::string& filename, size_t threads = 1);
+    BamWriter(const std::string& filename, size_t threads = 1, size_t num_reads = 0);
     ~BamWriter();
     int write_header(const sam_hdr_t* header);
     int write(bam1_t* record);
@@ -72,6 +74,14 @@ private:
     std::unique_ptr<std::thread> m_worker;
     void worker_thread();
     int write_hdr_sq(char* name, uint32_t length);
+
+    size_t m_num_reads_expected;
+    int m_progress_bar_increment;
+    indicators::ProgressBar m_progress_bar{
+            indicators::option::Stream{std::cerr},     indicators::option::BarWidth{30},
+            indicators::option::ShowElapsedTime{true}, indicators::option::ShowRemainingTime{true},
+            indicators::option::ShowPercentage{true},
+    };
 };
 
 /**

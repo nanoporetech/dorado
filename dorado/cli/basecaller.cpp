@@ -211,11 +211,13 @@ void setup(std::vector<std::string> args,
     std::shared_ptr<utils::Aligner> aligner;
     MessageSink* filter_sink = nullptr;
     if (ref.empty()) {
-        bam_writer = std::make_shared<utils::BamWriter>("-", num_devices * 2 /*writer_threads*/);
+        bam_writer = std::make_shared<utils::BamWriter>("-", num_devices * 2 /*writer_threads*/,
+                                                        num_reads);
         bam_writer->write_header(hdr);
         filter_sink = bam_writer.get();
     } else {
-        bam_writer = std::make_shared<utils::BamWriter>("-", num_devices /*writer_threads*/);
+        bam_writer =
+                std::make_shared<utils::BamWriter>("-", num_devices /*writer_threads*/, num_reads);
         aligner = std::make_shared<utils::Aligner>(*bam_writer, ref, 19, 19, num_devices * 5);
         aligner->add_sq_to_hdr(hdr);
         bam_writer->write_header(hdr);

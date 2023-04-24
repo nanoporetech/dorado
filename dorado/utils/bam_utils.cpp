@@ -11,6 +11,7 @@
 #include "read_pipeline/ReadPipeline.h"
 #include "utils/sequence_utils.h"
 
+#include <indicators/progress_bar.hpp>
 #include <spdlog/spdlog.h>
 
 #include <iostream>
@@ -374,15 +375,25 @@ void BamReader::read(MessageSink& read_sink, int max_reads) {
     read_sink.terminate();
 }
 
-BamWriter::BamWriter(const std::string& filename, size_t threads) : MessageSink(1000) {
+BamWriter::BamWriter(const std::string& filename, size_t threads, size_t num_reads)
+        : MessageSink(1000), m_num_reads_expected(num_reads) {
     m_file = hts_open(filename.c_str(), "wb");
     if (!m_file) {
         throw std::runtime_error("Could not open file: " + filename);
     }
-    auto res = bgzf_mt(m_file->fp.bgzf, threads, 128);
-    if (res < 0) {
-        throw std::runtime_error("Could not enable multi threading for BAM generation.");
+    if (m_file->format.compression == bgzf) {
+        auto res = bgzf_mt(m_file->fp.bgzf, threads, 128);
+        if (res < 0) {
+            throw std::runtime_error("Could not enable multi threading for BAM generation.");
+        }
     }
+
+    if (m_num_reads_expected <= 100) {
+        m_progress_bar_increment = 100;
+    } else {
+        m_progress_bar_increment = m_num_reads_expected / 100;
+    }
+
     m_worker = std::make_unique<std::thread>(std::thread(&BamWriter::worker_thread, this));
 }
 
@@ -408,6 +419,15 @@ void BamWriter::worker_thread() {
         // out to disk.
         bam_destroy1(aln);
         write_count++;
+
+        if (((write_count % m_progress_bar_increment) == 0) &&
+            ((write_count / m_progress_bar_increment) < 100)) {
+            if (m_num_reads_expected != 0) {
+                m_progress_bar.tick();
+            } else {
+                std::cerr << "\r> Reads processed: " << write_count;
+            }
+        }
     }
     spdlog::debug("Written {} alignments.", write_count);
 }
