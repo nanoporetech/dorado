@@ -89,10 +89,14 @@ public:
 
     Attributes attributes;
     std::vector<Mapping> mappings;
-    std::vector<std::string> generate_duplex_read_tags() const;
-    std::vector<std::string> generate_read_tags(bool emit_moves) const;
-    std::vector<std::string> extract_sam_lines(bool emit_moves, bool duplex) const;
-    std::string generate_modbase_string(uint8_t threshold = 0) const;
+    std::vector<bam1_t*> extract_sam_lines(bool emit_moves,
+                                           bool duplex,
+                                           uint8_t modbase_threshold = 0) const;
+
+private:
+    void generate_duplex_read_tags(bam1_t*) const;
+    void generate_read_tags(bam1_t* aln, bool emit_moves) const;
+    void generate_modbase_string(bam1_t* aln, uint8_t threshold = 0) const;
 };
 
 // As things stand, the only Message variant is shared_ptr<Read>.  Other Message types

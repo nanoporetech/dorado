@@ -9,6 +9,9 @@
 #include <string>
 #include <vector>
 
+struct sam_hdr_t;
+struct htsFile;
+
 namespace dorado {
 
 class WriterNode : public MessageSink {
@@ -28,7 +31,7 @@ public:
 private:
     void worker_thread();
 
-    void print_header();
+    void add_header();
 
     std::vector<std::string> m_args;
     // Read Groups - print these in header.
@@ -46,6 +49,7 @@ private:
     std::chrono::time_point<std::chrono::system_clock> m_initialization_time;
     // Async worker for writing.
     std::vector<std::unique_ptr<std::thread>> m_workers;
+    std::atomic<size_t> m_active_threads;
     std::mutex m_cout_mutex;
     std::mutex m_cerr_mutex;
     int m_progress_bar_increment;
@@ -56,6 +60,9 @@ private:
             indicators::option::ShowElapsedTime{true}, indicators::option::ShowRemainingTime{true},
             indicators::option::ShowPercentage{true},
     };
+
+    sam_hdr_t* m_header{nullptr};
+    htsFile* m_file{nullptr};
 };
 
 }  // namespace dorado

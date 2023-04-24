@@ -13,7 +13,7 @@
 using namespace std::chrono_literals;
 
 namespace {
-bool get_modbase_channel_name(std::string& channel_name, const std::string& mod_abbreviation) {
+bool get_modbase_channel_name(std::string &channel_name, const std::string &mod_abbreviation) {
     static const std::map<std::string, std::string> modbase_name_map = {// A
                                                                         {"6mA", "a"},
                                                                         // C
@@ -46,61 +46,67 @@ bool get_modbase_channel_name(std::string& channel_name, const std::string& mod_
 
 namespace dorado {
 
-std::vector<std::string> Read::generate_read_tags(bool emit_moves) const {
-    // GCC doesn't support <format> yet...
+void Read::generate_read_tags(bam1_t *aln, bool emit_moves) const {
+    int qs = static_cast<int>(std::round(utils::mean_qscore_from_qstring(qstring)));
+    bam_aux_append(aln, "qs", 'i', sizeof(qs), (uint8_t *)&qs);
 
-    std::stringstream stream;
-    stream << std::fixed << std::setprecision(3) << shift;
-    std::string shift_str = stream.str();
+    float du = (raw_data.size(0) + num_trimmed_samples) / sample_rate;
+    bam_aux_append(aln, "du", 'f', sizeof(du), (uint8_t *)&du);
 
-    stream = std::stringstream();
-    stream << std::fixed << std::setprecision(3) << scale;
-    std::string scale_str = stream.str();
+    int ns = raw_data.size(0) + num_trimmed_samples;
+    bam_aux_append(aln, "ns", 'i', sizeof(ns), (uint8_t *)&ns);
 
-    std::vector<std::string> tags = {
-            "qs:i:" + std::to_string(static_cast<int>(
-                              std::round(utils::mean_qscore_from_qstring(qstring)))),
-            "du:f:" + std::to_string((raw_data.size(0) + num_trimmed_samples) / sample_rate),
-            "ns:i:" + std::to_string(raw_data.size(0) + num_trimmed_samples),
-            "ts:i:" + std::to_string(num_trimmed_samples),
-            "mx:i:" + std::to_string(attributes.mux),
-            "ch:i:" + std::to_string(attributes.channel_number),
-            "st:Z:" + attributes.start_time,
-            "rn:i:" + std::to_string(attributes.read_number),
-            "f5:Z:" + attributes.fast5_filename,
-            "sm:f:" + shift_str,
-            "sd:f:" + scale_str,
-            "sv:Z:quantile"};
+    int ts = num_trimmed_samples;
+    bam_aux_append(aln, "ts", 'i', sizeof(ts), (uint8_t *)&ts);
+
+    int mx = attributes.mux;
+    bam_aux_append(aln, "mx", 'i', sizeof(mx), (uint8_t *)&mx);
+
+    int ch = attributes.channel_number;
+    bam_aux_append(aln, "ch", 'i', sizeof(ch), (uint8_t *)&ch);
+
+    bam_aux_append(aln, "st", 'Z', attributes.start_time.length() + 1,
+                   (uint8_t *)attributes.start_time.c_str());
+
+    int rn = attributes.read_number;
+    bam_aux_append(aln, "rn", 'i', sizeof(rn), (uint8_t *)&rn);
+
+    bam_aux_append(aln, "f5", 'Z', attributes.fast5_filename.length() + 1,
+                   (uint8_t *)attributes.fast5_filename.c_str());
+
+    float sm = shift;
+    bam_aux_append(aln, "sm", 'f', sizeof(sm), (uint8_t *)&sm);
+
+    float sd = scale;
+    bam_aux_append(aln, "sd", 'f', sizeof(sd), (uint8_t *)&sd);
+
+    bam_aux_append(aln, "sv", 'Z', 9, (uint8_t *)"quantile");
 
     if (run_id != "" && model_name != "") {
-        tags.push_back("RG:Z:" + run_id + "_" + model_name);
+        std::string rg("RG:Z:" + run_id + "_" + model_name);
+        bam_aux_append(aln, "RG", 'Z', rg.length() + 1, (uint8_t *)rg.c_str());
     }
 
     if (emit_moves) {
-        const std::string tag{"mv:B:c," + std::to_string(model_stride)};
-        std::string movess(moves.size() * 2 + tag.size(), ',');
-
-        for (size_t idx = 0; idx < tag.size(); idx++) {
-            movess[idx] = tag[idx];
-        }
+        std::vector<uint8_t> m(moves.size() + 1, 0);
+        m[0] = model_stride;
 
         for (size_t idx = 0; idx < moves.size(); idx++) {
-            movess[idx * 2 + tag.size() + 1] = static_cast<char>(moves[idx] + 48);
+            m[idx + 1] = static_cast<uint8_t>(moves[idx]);
         }
 
-        tags.push_back(movess);
+        bam_aux_update_array(aln, "mv", 'c', m.size(), (uint8_t *)m.data());
     }
-
-    return tags;
 }
 
-std::vector<std::string> Read::generate_duplex_read_tags() const {
-    std::vector<std::string> tags = {"qs:i:" + std::to_string(static_cast<int>(std::round(
-                                                       utils::mean_qscore_from_qstring(qstring))))};
-    return tags;
+void Read::generate_duplex_read_tags(bam1_t *aln) const {
+    int qs = static_cast<int>(std::round(utils::mean_qscore_from_qstring(qstring)));
+    bam_aux_append(aln, "qs", 'i', sizeof(qs), (uint8_t *)&qs);
 }
 
-std::vector<std::string> Read::extract_sam_lines(bool emit_moves, bool duplex) const {
+std::vector<bam1_t *> Read::extract_sam_lines(bool emit_moves,
+                                              bool duplex,
+                                              uint8_t modbase_threshold) const {
     if (read_id.empty()) {
         throw std::runtime_error("Empty read_name string provided");
     }
@@ -111,21 +117,10 @@ std::vector<std::string> Read::extract_sam_lines(bool emit_moves, bool duplex) c
         throw std::runtime_error("Empty sequence and qstring provided for read id " + read_id);
     }
 
-    std::ostringstream read_tags_stream;
-    std::vector<std::string> read_tags;
-
-    if (duplex) {
-        read_tags = generate_duplex_read_tags();
-    } else {
-        read_tags = generate_read_tags(emit_moves);
-    }
-
-    for (const auto& tag : read_tags) {
-        read_tags_stream << "\t" << tag;
-    }
-
-    std::vector<std::string> sam_lines;
+    std::vector<bam1_t *> alns;
+    bam1_t *aln;
     if (mappings.empty()) {
+        aln = bam_init1();
         uint32_t flags = 4;              // 4 = UNMAPPED
         std::string ref_seq = "*";       // UNMAPPED
         int leftmost_pos = -1;           // UNMAPPED - will be written as 0
@@ -135,38 +130,33 @@ std::vector<std::string> Read::extract_sam_lines(bool emit_moves, bool duplex) c
         int next_pos = -1;  // UNMAPPED - will be written as 0
         size_t template_length = seq.size();
 
-        std::ostringstream sam_line;
-        sam_line << read_id << "\t"             // QNAME
-                 << flags << "\t"               // FLAG
-                 << ref_seq << "\t"             // RNAME
-                 << (leftmost_pos + 1) << "\t"  // POS
-                 << map_q << "\t"               // MAPQ
-                 << cigar_string << "\t"        // CIGAR
-                 << r_next << "\t"              // RNEXT
-                 << (next_pos + 1) << "\t"      // PNEXT
-                 << 0 << "\t"                   // TLEN
-                 << seq << "\t"                 // SEQ
-                 << qstring;                    // QUAL
+        // Convert string qscore to phred vector.
+        std::vector<uint8_t> qscore;
+        std::transform(qstring.begin(), qstring.end(), std::back_inserter(qscore),
+                       [](char c) { return (uint8_t)(c)-33; });
 
-        sam_line << read_tags_stream.str();
-        sam_lines.push_back(sam_line.str());
+        bam_set1(aln, read_id.length(), read_id.c_str(), flags, -1, leftmost_pos, map_q, 0, nullptr,
+                 -1, next_pos, 0, seq.length(), seq.c_str(), (char *)qscore.data(), 0);
+
+        if (duplex) {
+            generate_duplex_read_tags(aln);
+        } else {
+            generate_read_tags(aln, emit_moves);
+        }
+        generate_modbase_string(aln, modbase_threshold);
+        alns.push_back(aln);
     }
 
-    for (const auto& mapping : mappings) {
+    for (const auto &mapping : mappings) {
         throw std::runtime_error("Mapped alignments not yet implemented");
     }
 
-    auto mod_base_string = generate_modbase_string();
-    if (!mod_base_string.empty()) {
-        sam_lines.front() += "\t";
-        sam_lines.front() += mod_base_string;
-    }
-    return sam_lines;
+    return alns;
 }
 
-std::string Read::generate_modbase_string(uint8_t threshold) const {
+void Read::generate_modbase_string(bam1_t *aln, uint8_t threshold) const {
     if (!base_mod_info) {
-        return {};
+        return;
     }
 
     const size_t num_channels = base_mod_info->alphabet.size();
@@ -179,8 +169,8 @@ std::string Read::generate_modbase_string(uint8_t threshold) const {
     }
 
     std::istringstream mod_name_stream(base_mod_info->long_names);
-    std::string modbase_string = "MM:Z:";
-    std::string modbase_prob_string = "ML:B:C";
+    std::string modbase_string = "";
+    std::vector<uint8_t> modbase_prob;
 
     // Create a mask indicating which bases are modified.
     std::map<char, bool> base_has_context = {
@@ -212,7 +202,7 @@ std::string Read::generate_modbase_string(uint8_t threshold) const {
             mod_name_stream >> modbase_name;
             std::string bam_name;
             if (!get_modbase_channel_name(bam_name, modbase_name)) {
-                return {};
+                return;
             }
 
             // Write out the results we found
@@ -226,10 +216,8 @@ std::string Read::generate_modbase_string(uint8_t threshold) const {
                     if (modbase_mask[base_idx] == 1) {
                         modbase_string += "," + std::to_string(skipped_bases);
                         skipped_bases = 0;
-                        modbase_prob_string +=
-                                "," +
-                                std::to_string(
-                                        base_mod_probs[base_idx * num_channels + channel_idx]);
+                        modbase_prob.push_back(
+                                base_mod_probs[base_idx * num_channels + channel_idx]);
                     } else {
                         // Skip this base
                         skipped_bases++;
@@ -240,11 +228,11 @@ std::string Read::generate_modbase_string(uint8_t threshold) const {
         }
     }
 
-    modbase_string += "\t" + modbase_prob_string;
-    return modbase_string;
+    bam_aux_append(aln, "MM", 'Z', modbase_string.length() + 1, (uint8_t *)modbase_string.c_str());
+    bam_aux_update_array(aln, "ML", 'C', modbase_prob.size(), (uint8_t *)modbase_prob.data());
 }
 
-void MessageSink::push_message(Message&& message) {
+void MessageSink::push_message(Message &&message) {
     const bool success = m_work_queue.try_push(std::move(message));
     // try_push will fail if the sink has been told to terminate.
     // We do not expect to be pushing reads from this source if that is the case.
