@@ -28,21 +28,21 @@ TEST_CASE(TEST_GROUP ": Test tag generation", TEST_GROUP) {
     REQUIRE(alignments.size() == 1);
     bam1_t* aln = alignments[0];
 
-    REQUIRE(bam_aux2i(bam_aux_get(aln, "qs")) == 14);
-    REQUIRE(bam_aux2i(bam_aux_get(aln, "ns")) == 4132);
-    REQUIRE(bam_aux2i(bam_aux_get(aln, "ts")) == 132);
-    REQUIRE(bam_aux2i(bam_aux_get(aln, "mx")) == 2);
-    REQUIRE(bam_aux2i(bam_aux_get(aln, "ch")) == 5);
-    REQUIRE(bam_aux2i(bam_aux_get(aln, "rn")) == 18501);
-    REQUIRE(bam_aux2i(bam_aux_get(aln, "rn")) == 18501);
+    CHECK(bam_aux2i(bam_aux_get(aln, "qs")) == 14);
+    CHECK(bam_aux2i(bam_aux_get(aln, "ns")) == 4132);
+    CHECK(bam_aux2i(bam_aux_get(aln, "ts")) == 132);
+    CHECK(bam_aux2i(bam_aux_get(aln, "mx")) == 2);
+    CHECK(bam_aux2i(bam_aux_get(aln, "ch")) == 5);
+    CHECK(bam_aux2i(bam_aux_get(aln, "rn")) == 18501);
+    CHECK(bam_aux2i(bam_aux_get(aln, "rn")) == 18501);
 
-    REQUIRE(bam_aux2f(bam_aux_get(aln, "du")) == 1.033000f);
-    REQUIRE(bam_aux2f(bam_aux_get(aln, "sm")) == 128.3842f);
-    REQUIRE(bam_aux2f(bam_aux_get(aln, "sd")) == 8.258f);
+    CHECK(bam_aux2f(bam_aux_get(aln, "du")) == 1.033000f);
+    CHECK(bam_aux2f(bam_aux_get(aln, "sm")) == 128.3842f);
+    CHECK(bam_aux2f(bam_aux_get(aln, "sd")) == 8.258f);
 
-    REQUIRE_THAT(bam_aux2Z(bam_aux_get(aln, "st")), Equals("2017-04-29T09:10:04Z"));
-    REQUIRE_THAT(bam_aux2Z(bam_aux_get(aln, "f5")), Equals("batch_0.fast5"));
-    REQUIRE_THAT(bam_aux2Z(bam_aux_get(aln, "sv")), Equals("quantile"));
+    CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "st")), Equals("2017-04-29T09:10:04Z"));
+    CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "f5")), Equals("batch_0.fast5"));
+    CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "sv")), Equals("quantile"));
 }
 
 TEST_CASE(TEST_GROUP ": Test sam record generation", TEST_GROUP) {
@@ -83,16 +83,18 @@ TEST_CASE(TEST_GROUP ": Test sam record generation", TEST_GROUP) {
         test_read.attributes.fast5_filename = "batch_0.fast5";
 
         bam1_t* rec = test_read.extract_sam_lines(false, false)[0];
-        REQUIRE(rec->core.pos == -1);
-        REQUIRE(rec->core.mpos == -1);
-        REQUIRE(rec->core.l_qseq == 8);
-        REQUIRE(rec->core.l_qname - rec->core.l_extranul - 1 ==
-                9);  // qname length is stored with padded nulls to be 4-char aligned
-        REQUIRE(rec->core.flag == 4);
+        CHECK(rec->core.pos == -1);
+        CHECK(rec->core.mpos == -1);
+        CHECK(rec->core.l_qseq == 8);
+        CHECK(rec->core.l_qname - rec->core.l_extranul - 1 ==
+              9);  // qname length is stored with padded nulls to be 4-char aligned
+        CHECK(rec->core.flag == 4);
+        // Construct qstring from quality scores
+        std::string qstring("");
         for (auto i = 0; i < rec->core.l_qseq; i++) {
-            REQUIRE(static_cast<char>(test_read.qstring[i]) ==
-                    static_cast<char>(bam_get_qual(rec)[i] + 33));
+            qstring += static_cast<char>(bam_get_qual(rec)[i] + 33);
         }
+        CHECK(test_read.qstring == qstring);
         //Note; Tag generation is already tested in another test.
     }
 }

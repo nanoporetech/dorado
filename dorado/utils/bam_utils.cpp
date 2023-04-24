@@ -376,7 +376,7 @@ void BamReader::read(MessageSink& read_sink, int max_reads) {
 }
 
 BamWriter::BamWriter(const std::string& filename, size_t threads, size_t num_reads)
-        : MessageSink(1000), m_num_reads_expected(num_reads) {
+        : MessageSink(10000), m_num_reads_expected(num_reads) {
     m_file = hts_open(filename.c_str(), "wb");
     if (!m_file) {
         throw std::runtime_error("Could not open file: " + filename);
@@ -426,12 +426,11 @@ void BamWriter::worker_thread() {
                     m_progress_bar.tick();
                 }
             } else {
-                std::cerr << "\r> Rows processed: " << write_count;
+                std::cerr << "\r> Alignments written: " << write_count;
             }
         }
     }
-    if (m_num_reads_expected != 0) {
-        // Line break after progress bar.
+    if (m_num_reads_expected != 0 || write_count > m_progress_bar_increment) {
         std::cerr << "\r" << std::endl;
     }
     spdlog::debug("Written {} alignments.", write_count);

@@ -11,7 +11,7 @@ TEST_CASE("ReadFilterNode: Filter read based on qscore", TEST_GROUP) {
     {
         std::shared_ptr<dorado::Read> read_1(new dorado::Read());
         read_1->raw_data = torch::empty(100);
-        read_1->sample_rate = 4000.0;
+        read_1->sample_rate = 4000.0f;
         read_1->shift = 128.3842f;
         read_1->scale = 8.258f;
         read_1->read_id = "read_1";
@@ -26,7 +26,7 @@ TEST_CASE("ReadFilterNode: Filter read based on qscore", TEST_GROUP) {
 
         std::shared_ptr<dorado::Read> read_2(new dorado::Read());
         read_2->raw_data = torch::empty(100);
-        read_2->sample_rate = 4000.0;
+        read_2->sample_rate = 4000.0f;
         read_2->shift = 128.3842f;
         read_2->scale = 8.258f;
         read_2->read_id = "read_2";
