@@ -19,7 +19,6 @@ public:
                bool emit_moves,
                bool rna,
                bool duplex,
-               size_t min_qscore,
                size_t num_worker_threads = 1,
                std::unordered_map<std::string, ReadGroup> = {},
                int num_reads = 0,
@@ -32,7 +31,6 @@ private:
     void print_header();
 
     std::vector<std::string> m_args;
-    size_t m_min_qscore;
     // Read Groups - print these in header.
     std::unordered_map<std::string, ReadGroup> m_read_groups;
     // Emit Fastq if true
@@ -44,8 +42,6 @@ private:
     std::atomic<int> m_num_reads_processed;
     //Total number of reads WriterNode expects to process
     std::atomic<int> m_num_reads_expected;
-    //Total number of reads with a mean qscore less the m_min_qscore
-    std::atomic<int> m_num_reads_failed;
     // Time when Node is initialised.
     std::chrono::time_point<std::chrono::system_clock> m_initialization_time;
     // Async worker for writing.
