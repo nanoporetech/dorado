@@ -145,8 +145,6 @@ float mean_qscore_from_qstring(const std::string& qstring) {
     return mean_qscore;
 }
 
-int base_to_int(char c) { return 0b11 & ((c >> 2) ^ (c >> 1)); }
-
 std::vector<int> sequence_to_ints(const std::string& sequence) {
     std::vector<int> sequence_ints;
     sequence_ints.reserve(sequence.size());

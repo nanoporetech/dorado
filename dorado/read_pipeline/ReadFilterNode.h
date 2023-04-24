@@ -3,7 +3,9 @@
 #include "ReadPipeline.h"
 
 #include <atomic>
+#include <memory>
 #include <string>
+#include <thread>
 #include <vector>
 
 namespace dorado {
@@ -16,7 +18,6 @@ namespace dorado {
 /// which are applied to each read.
 class ReadFilterNode : public MessageSink {
 public:
-    // Writer has no sink - reads go to output
     ReadFilterNode(MessageSink& sink,
                    size_t min_qscore,
                    size_t num_worker_threads = 1,
