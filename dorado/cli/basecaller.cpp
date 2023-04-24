@@ -216,15 +216,15 @@ void setup(std::vector<std::string> args,
         bam_writer->write_header(hdr);
         filter_sink = bam_writer.get();
     } else {
-        bam_writer =
-                std::make_shared<utils::BamWriter>("-", num_devices /*writer_threads*/, num_reads);
+        bam_writer = std::make_shared<utils::BamWriter>("-", num_devices /*writer_threads*/);
         aligner = std::make_shared<utils::Aligner>(*bam_writer, ref, 19, 19, num_devices * 5);
         aligner->add_sq_to_hdr(hdr);
         bam_writer->write_header(hdr);
         filter_sink = aligner.get();
     }
-    ReadToBamType read_converter(*filter_sink, emit_moves, rna, duplex, 1 /*num_threads*/);
-    ReadFilterNode read_filter_node(read_converter, min_qscore, 1, num_reads);
+    ReadToBamType read_converter(*filter_sink, emit_moves, rna, duplex,
+                                 num_devices * 2 /*num_threads*/, num_reads);
+    ReadFilterNode read_filter_node(read_converter, min_qscore, num_devices * 2, num_reads);
 
     std::unique_ptr<ModBaseCallerNode> mod_base_caller_node;
     std::unique_ptr<BasecallerNode> basecaller_node;

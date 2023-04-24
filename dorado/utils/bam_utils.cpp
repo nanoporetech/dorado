@@ -420,12 +420,13 @@ void BamWriter::worker_thread() {
         bam_destroy1(aln);
         write_count++;
 
-        if (((write_count % m_progress_bar_increment) == 0) &&
-            ((write_count / m_progress_bar_increment) < 100)) {
+        if ((write_count % m_progress_bar_increment) == 0) {
             if (m_num_reads_expected != 0) {
-                m_progress_bar.tick();
+                if ((write_count / m_progress_bar_increment) < 100) {
+                    m_progress_bar.tick();
+                }
             } else {
-                std::cerr << "\r> Reads processed: " << write_count;
+                std::cerr << "\r> Rows processed: " << write_count;
             }
         }
     }
