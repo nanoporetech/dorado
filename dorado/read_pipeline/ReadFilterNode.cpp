@@ -4,10 +4,6 @@
 
 #include <spdlog/spdlog.h>
 
-#ifndef _WIN32
-#include <unistd.h>
-#endif
-
 namespace dorado {
 
 void ReadFilterNode::worker_thread() {
@@ -20,7 +16,7 @@ void ReadFilterNode::worker_thread() {
 
         // Filter based on qscore.
         if (utils::mean_qscore_from_qstring(read->qstring) < m_min_qscore) {
-            m_num_reads_filtered += 1;
+            ++m_num_reads_filtered;
         } else {
             m_sink.push_message(read);
         }
