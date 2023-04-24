@@ -4,9 +4,7 @@
 
 #include <spdlog/spdlog.h>
 
-#ifndef _WIN32
-#include <unistd.h>
-#endif
+#include <chrono>
 
 namespace dorado {
 
@@ -17,6 +15,10 @@ void ReadToBamType::worker_thread() {
     while (m_work_queue.try_pop(message)) {
         // If this message isn't a read, we'll get a bad_variant_access exception.
         auto read = std::get<std::shared_ptr<Read>>(message);
+
+        m_num_bases_processed += read->seq.length();
+        m_num_samples_processed += read->raw_data.size(0);
+
         if (m_rna) {
             std::reverse(read->seq.begin(), read->seq.end());
             std::reverse(read->qstring.begin(), read->qstring.end());
@@ -31,6 +33,20 @@ void ReadToBamType::worker_thread() {
     auto num_active_threads = --m_active_threads;
     if (num_active_threads == 0) {
         m_sink.terminate();
+
+        auto end_time = std::chrono::system_clock::now();
+
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time -
+                                                                              m_initialization_time)
+                                .count();
+        std::ostringstream samples_sec;
+        if (m_duplex) {
+            samples_sec << std::scientific << m_num_bases_processed / (duration / 1000.0);
+            spdlog::info("> Bases/s: {}", samples_sec.str());
+        } else {
+            samples_sec << std::scientific << m_num_samples_processed / (duration / 1000.0);
+            spdlog::info("> Samples/s: {}", samples_sec.str());
+        }
     }
 }
 
@@ -47,7 +63,10 @@ ReadToBamType::ReadToBamType(MessageSink& sink,
           m_rna(rna),
           m_duplex(duplex),
           m_modbase_threshold(modbase_threshold),
-          m_active_threads(0) {
+          m_active_threads(0),
+          m_num_bases_processed(0),
+          m_num_samples_processed(0),
+          m_initialization_time(std::chrono::system_clock::now()) {
     for (size_t i = 0; i < num_worker_threads; i++) {
         m_workers.push_back(
                 std::make_unique<std::thread>(std::thread(&ReadToBamType::worker_thread, this)));

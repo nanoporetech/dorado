@@ -3,6 +3,7 @@
 #include "ReadPipeline.h"
 
 #include <atomic>
+#include <chrono>
 #include <string>
 #include <vector>
 
@@ -31,6 +32,11 @@ private:
     bool m_rna;
     bool m_duplex;
     uint8_t m_modbase_threshold;
+
+    std::atomic<int64_t> m_num_bases_processed;
+    std::atomic<int64_t> m_num_samples_processed;
+
+    std::chrono::time_point<std::chrono::system_clock> m_initialization_time;
 };
 
 }  // namespace dorado

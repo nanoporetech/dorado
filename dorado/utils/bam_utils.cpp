@@ -429,6 +429,10 @@ void BamWriter::worker_thread() {
             }
         }
     }
+    if (m_num_reads_expected != 0) {
+        // Line break after progress bar.
+        std::cerr << "\r" << std::endl;
+    }
     spdlog::debug("Written {} alignments.", write_count);
 }
 
