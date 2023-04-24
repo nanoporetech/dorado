@@ -206,11 +206,13 @@ int duplex(int argc, char* argv[]) {
             std::unordered_set<std::string> read_list =
                     utils::get_read_list_from_pairs(template_complement_map);
 
+            auto simplex_model_stride = runners.front()->model_stride();
+
             StereoDuplexEncoderNode stereo_node = StereoDuplexEncoderNode(
-                    *stereo_basecaller_node, std::move(template_complement_map));
+                    *stereo_basecaller_node, std::move(template_complement_map),
+                    simplex_model_stride);
 
             std::unique_ptr<BasecallerNode> basecaller_node;
-            auto simplex_model_stride = runners.front()->model_stride();
             const int kSimplexBatchTimeoutMS = 100;
 
             auto adjusted_simplex_overlap = (overlap / simplex_model_stride) * simplex_model_stride;
