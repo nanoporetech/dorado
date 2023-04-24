@@ -41,7 +41,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32)
         set(KOI_LIBRARIES koi)
     else()
 
-        set(KOI_VERSION 0.3.0)
+        set(KOI_VERSION 0.3.1)
         find_package(CUDAToolkit REQUIRED)
         get_best_compatible_koi_version(KOI_CUDA)
         set(KOI_DIR libkoi-${KOI_VERSION}-${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}-cuda-${KOI_CUDA})
