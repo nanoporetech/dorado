@@ -91,7 +91,7 @@ public:
     std::vector<Mapping> mappings;
     std::vector<bam1_t*> extract_sam_lines(bool emit_moves,
                                            bool duplex,
-                                           uint8_t modbase_threadhol = 0) const;
+                                           uint8_t modbase_threshold = 0) const;
 
 private:
     void generate_duplex_read_tags(bam1_t*) const;

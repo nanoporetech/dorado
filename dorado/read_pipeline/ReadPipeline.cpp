@@ -47,7 +47,6 @@ bool get_modbase_channel_name(std::string &channel_name, const std::string &mod_
 namespace dorado {
 
 void Read::generate_read_tags(bam1_t *aln, bool emit_moves) const {
-    // GCC doesn't support <format> yet...
     int qs = static_cast<int>(std::round(utils::mean_qscore_from_qstring(qstring)));
     bam_aux_append(aln, "qs", 'i', sizeof(qs), (uint8_t *)&qs);
 
@@ -107,7 +106,7 @@ void Read::generate_duplex_read_tags(bam1_t *aln) const {
 
 std::vector<bam1_t *> Read::extract_sam_lines(bool emit_moves,
                                               bool duplex,
-                                              uint8_t modbase_threadhol) const {
+                                              uint8_t modbase_threshold) const {
     if (read_id.empty()) {
         throw std::runtime_error("Empty read_name string provided");
     }
@@ -144,7 +143,7 @@ std::vector<bam1_t *> Read::extract_sam_lines(bool emit_moves,
         } else {
             generate_read_tags(aln, emit_moves);
         }
-        generate_modbase_string(aln, modbase_threadhol);
+        generate_modbase_string(aln, modbase_threshold);
         alns.push_back(aln);
     }
 

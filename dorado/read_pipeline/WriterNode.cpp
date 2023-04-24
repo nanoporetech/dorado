@@ -3,6 +3,7 @@
 #include "Version.h"
 #include "utils/sequence_utils.h"
 
+#include <htslib/kstring.h>
 #include <htslib/sam.h>
 #include <indicators/progress_bar.hpp>
 #include <spdlog/spdlog.h>
@@ -57,7 +58,7 @@ void WriterNode::add_header() {
     }
 
     if (sam_hdr_write(m_file, m_header) < 0) {
-        throw std::runtime_error("Unable to SAM/BAM header.");
+        throw std::runtime_error("Unable to write the SAM/BAM header.");
     };
 }
 
@@ -100,7 +101,11 @@ void WriterNode::worker_thread() {
                 for (const auto aln : alns) {
                     std::scoped_lock<std::mutex> lock(m_cout_mutex);
                     if (sam_write1(m_file, m_header, aln) < 0) {
-                        std::cerr << "Unable to write alignment " << std::endl;
+                        kstring_t str;
+                        ks_initialize(&str);
+                        sam_format1(nullptr, aln, &str);
+                        spdlog::warn("Unable to write alignment {}", str.s);
+                        ks_free(&str);
                     }
                 }
             } catch (const std::exception& ex) {
