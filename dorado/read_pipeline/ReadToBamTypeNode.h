@@ -35,6 +35,7 @@ private:
 
     std::atomic<int64_t> m_num_bases_processed;
     std::atomic<int64_t> m_num_samples_processed;
+    std::atomic<int> m_num_reads_processed;
 
     std::chrono::time_point<std::chrono::system_clock> m_initialization_time;
 };

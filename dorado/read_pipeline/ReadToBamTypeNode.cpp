@@ -18,6 +18,7 @@ void ReadToBamType::worker_thread() {
 
         m_num_bases_processed += read->seq.length();
         m_num_samples_processed += read->raw_data.size(0);
+        ++m_num_reads_processed;
 
         if (m_rna) {
             std::reverse(read->seq.begin(), read->seq.end());
@@ -40,6 +41,7 @@ void ReadToBamType::worker_thread() {
                                                                               m_initialization_time)
                                 .count();
         std::ostringstream samples_sec;
+        spdlog::info("> Reads basecalled: {}", m_num_reads_processed);
         if (m_duplex) {
             samples_sec << std::scientific << m_num_bases_processed / (duration / 1000.0);
             spdlog::info("> Bases/s: {}", samples_sec.str());
