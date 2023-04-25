@@ -269,44 +269,49 @@ if(NOT DORADO_LIB_ONLY)
 endif()
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    # CUDA toolkit DLLs we depend on:
+    set(VERSIONED_CUDA_LIBS
+        libcublas*.so.*
+        libcudart*.so.*
+        libnvrtc*.so.*
+        libnvToolsExt*.so.*
+    )
+
     if(CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
-        # CUDA toolkit DLLs we depend on:
-        set(PATTERNS
-            "*cublas*.so*"
-            "*cudart*.so*"
-            "*nvrtc*.so*"
-            "*nvToolsExt*.so*"
+        list(APPEND VERSIONED_CUDA_LIBS
             "*cusparse.so*"
             "*curand.so*"
             "*cusolver.so*"
             "*cufft.so*"
         )
-        foreach(PATTERN ${PATTERNS})
-            file(GLOB DEP_DLLS "${CUDAToolkit_ROOT}/targets/${CMAKE_SYSTEM_PROCESSOR}-linux/lib/${PATTERN}")
-            install(FILES ${DEP_DLLS} DESTINATION lib COMPONENT redist_libs)
-        endforeach()
-    else()
-        set(VERSIONED_CUDA_LIBS
-            libcublas-*.so.11
-            libcublasLt-*.so.11
-            libcudart-*.so.11.0
-            libnvrtc-*.so.11.2
-            libnvrtc-builtins-*.so.11.8
-            libnvToolsExt-*.so.1
-        )
+    endif()
 
-        foreach(LIB IN LISTS VERSIONED_CUDA_LIBS)
-            file(GLOB VERSIONED_CUDA_LIB "${TORCH_LIB}/lib/${LIB}")
-            if (VERSIONED_CUDA_LIB)
-                set(target ${VERSIONED_CUDA_LIB})
+    foreach(LIB IN LISTS VERSIONED_CUDA_LIBS)
+        # torch may bundle it's own specific copy of the cuda libs. if it does, we want everything to point at them
+        file(GLOB TORCH_CUDA_LIBS "${TORCH_LIB}/lib/${LIB}")
+        if(TORCH_CUDA_LIBS)
+            foreach(TORCH_CUDA_LIB IN LISTS TORCH_CUDA_LIBS)
+                # create links to the torch bundled libs with hashes in the name
+                # e.g. libcublas.so.11 => libcublas-3b81d170.so.11
+                set(target ${TORCH_CUDA_LIB})
                 string(REGEX REPLACE "-[0-9a-f]+[.]" "." link ${target})
                 get_filename_component(target_name ${target} NAME)
                 get_filename_component(link_name ${link} NAME)
                 execute_process(COMMAND ln -rfs ${target_name} ${link_name} WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
                 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${link_name} DESTINATION lib COMPONENT redist_libs)
-            endif()
-        endforeach()
-    endif()
+
+                # create links to the versioned links above
+                # e.g. libcublas.so => libcublas.so.11
+                string(REGEX REPLACE "[.]so[.0-9]*$" ".so" base_link ${link_name})
+                execute_process(COMMAND ln -rfs ${link_name} ${base_link} WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+                install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${base_link} DESTINATION lib COMPONENT redist_libs)                
+            endforeach()
+        else()
+            # bundle the libraries from the cuda toolkit
+            file(GLOB NATIVE_CUDA_LIBS "${CUDAToolkit_ROOT}/targets/${CMAKE_SYSTEM_PROCESSOR}-linux/lib/${LIB}")
+            install(FILES ${NATIVE_CUDA_LIBS} DESTINATION lib COMPONENT redist_libs)
+        endif()
+    endforeach()
 
     file(GLOB TORCH_DLLS "${TORCH_LIB}/lib/*.so*")
     install(FILES ${TORCH_DLLS} DESTINATION lib COMPONENT redist_libs)
