@@ -68,6 +68,7 @@ ReadToBamType::ReadToBamType(MessageSink& sink,
           m_active_threads(0),
           m_num_bases_processed(0),
           m_num_samples_processed(0),
+          m_num_reads_processed(0),
           m_initialization_time(std::chrono::system_clock::now()) {
     for (size_t i = 0; i < num_worker_threads; i++) {
         m_workers.push_back(
