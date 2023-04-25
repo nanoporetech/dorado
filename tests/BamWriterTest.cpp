@@ -21,11 +21,12 @@ public:
     ~BamWriterTestsFixture() { fs::remove(m_out_bam); }
 
 protected:
-    void generate_bam(int num_threads) {
+    void generate_bam(bool emit_fastq, int num_threads) {
         dorado::utils::BamReader reader(m_in_sam.string());
-        dorado::utils::BamWriter writer(m_out_bam.string(), num_threads);
+        dorado::utils::BamWriter writer(m_out_bam.string(), emit_fastq, num_threads);
 
-        writer.write_header(reader.header);
+        writer.add_header(reader.header);
+        writer.write_header();
         reader.read(writer, 1000);
 
         writer.join();
@@ -38,5 +39,6 @@ private:
 
 TEST_CASE_METHOD(BamWriterTestsFixture, "BamWriterTest: Write BAM", TEST_GROUP) {
     int num_threads = GENERATE(1, 10);
-    REQUIRE_NOTHROW(generate_bam(num_threads));
+    bool emit_fastq = GENERATE(true, false);
+    REQUIRE_NOTHROW(generate_bam(emit_fastq, num_threads));
 }

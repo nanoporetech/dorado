@@ -31,6 +31,7 @@
 #include <algorithm>
 #include <filesystem>
 #include <iostream>
+#include <memory>
 #include <sstream>
 #include <thread>
 
@@ -204,22 +205,25 @@ void setup(std::vector<std::string> args,
 
     bool rna = utils::is_rna_model(model_path), duplex = false;
 
-    sam_hdr_t* hdr = sam_hdr_init();
-    add_pg_hdr(hdr, args);
-    add_rg_hdr(hdr, read_groups);
+    std::unique_ptr<sam_hdr_t, void (*)(sam_hdr_t*)> hdr(sam_hdr_init(), sam_hdr_destroy);
+    add_pg_hdr(hdr.get(), args);
+    add_rg_hdr(hdr.get(), read_groups);
     std::shared_ptr<utils::BamWriter> bam_writer;
     std::shared_ptr<utils::Aligner> aligner;
     MessageSink* filter_sink = nullptr;
     if (ref.empty()) {
-        bam_writer = std::make_shared<utils::BamWriter>("-", num_devices * 2 /*writer_threads*/,
-                                                        num_reads);
-        bam_writer->write_header(hdr);
+        bam_writer = std::make_shared<utils::BamWriter>(
+                "-", emit_fastq, num_devices * 2 /*writer_threads*/, num_reads);
+        bam_writer->add_header(hdr.get());
+        bam_writer->write_header();
         filter_sink = bam_writer.get();
     } else {
-        bam_writer = std::make_shared<utils::BamWriter>("-", num_devices * 2 /*writer_threads*/);
+        bam_writer = std::make_shared<utils::BamWriter>("-", emit_fastq,
+                                                        num_devices * 2 /*writer_threads*/);
         aligner = std::make_shared<utils::Aligner>(*bam_writer, ref, 19, 19, num_devices * 5);
-        aligner->add_sq_to_hdr(hdr);
-        bam_writer->write_header(hdr);
+        aligner->add_sq_to_hdr(hdr.get());
+        bam_writer->add_header(hdr.get());
+        bam_writer->write_header();
         filter_sink = aligner.get();
     }
     ReadToBamType read_converter(*filter_sink, emit_moves, rna, duplex,
@@ -247,7 +251,8 @@ void setup(std::vector<std::string> args,
 
     loader.load_reads(data_path, recursive_file_loading);
 
-    sam_hdr_destroy(hdr);
+    bam_writer->join();
+    read_converter.dump_stats();
 }
 
 int basecaller(int argc, char* argv[]) {

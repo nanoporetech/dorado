@@ -92,14 +92,15 @@ int aligner(int argc, char* argv[]) {
 
     spdlog::info("> loading index {}", index);
 
-    utils::BamWriter writer("-", writer_threads);
+    utils::BamWriter writer("-", false /*emit_fastq*/, writer_threads);
     utils::Aligner aligner(writer, index, kmer_size, window_size, aligner_threads);
     utils::BamReader reader(reads[0]);
 
     spdlog::debug("> input fmt: {} aligned: {}", reader.format, reader.is_aligned);
-    add_pg_hdr(reader.header);
-    aligner.add_sq_to_hdr(reader.header);
-    writer.write_header(reader.header);
+    writer.add_header(reader.header);
+    add_pg_hdr(writer.header);
+    aligner.add_sq_to_hdr(writer.header);
+    writer.write_header();
 
     spdlog::info("> starting alignment");
     reader.read(aligner, max_reads);

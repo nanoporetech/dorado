@@ -19,6 +19,7 @@ public:
                   uint8_t modbase_threshold = 0,
                   size_t max_reads = 1000);
     ~ReadToBamType();
+    void dump_stats();
 
 private:
     MessageSink& m_sink;
@@ -38,6 +39,7 @@ private:
     std::atomic<int> m_num_reads_processed;
 
     std::chrono::time_point<std::chrono::system_clock> m_initialization_time;
+    std::chrono::time_point<std::chrono::system_clock> m_end_time;
 };
 
 }  // namespace dorado

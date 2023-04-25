@@ -35,20 +35,22 @@ void ReadToBamType::worker_thread() {
     if (num_active_threads == 0) {
         m_sink.terminate();
 
-        auto end_time = std::chrono::system_clock::now();
+        m_end_time = std::chrono::system_clock::now();
+    }
+}
 
-        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time -
-                                                                              m_initialization_time)
-                                .count();
-        std::ostringstream samples_sec;
-        spdlog::info("> Reads basecalled: {}", m_num_reads_processed);
-        if (m_duplex) {
-            samples_sec << std::scientific << m_num_bases_processed / (duration / 1000.0);
-            spdlog::info("> Bases/s: {}", samples_sec.str());
-        } else {
-            samples_sec << std::scientific << m_num_samples_processed / (duration / 1000.0);
-            spdlog::info("> Samples/s: {}", samples_sec.str());
-        }
+void ReadToBamType::dump_stats() {
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(m_end_time -
+                                                                          m_initialization_time)
+                            .count();
+    std::ostringstream samples_sec;
+    spdlog::info("> Reads basecalled: {}", m_num_reads_processed);
+    if (m_duplex) {
+        samples_sec << std::scientific << m_num_bases_processed / (duration / 1000.0);
+        spdlog::info("> Basecalled @ Bases/s: {}", samples_sec.str());
+    } else {
+        samples_sec << std::scientific << m_num_samples_processed / (duration / 1000.0);
+        spdlog::info("> Basecalled @ Samples/s: {}", samples_sec.str());
     }
 }
 

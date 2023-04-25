@@ -375,9 +375,13 @@ void BamReader::read(MessageSink& read_sink, int max_reads) {
     read_sink.terminate();
 }
 
-BamWriter::BamWriter(const std::string& filename, size_t threads, size_t num_reads)
+BamWriter::BamWriter(const std::string& filename, bool emit_fastq, size_t threads, size_t num_reads)
         : MessageSink(10000), m_num_reads_expected(num_reads) {
-    m_file = hts_open(filename.c_str(), "wb");
+    if (emit_fastq) {
+        m_file = hts_open(filename.c_str(), "wf");
+    } else {
+        m_file = hts_open(filename.c_str(), "wb");
+    }
     if (!m_file) {
         throw std::runtime_error("Could not open file: " + filename);
     }
@@ -403,7 +407,7 @@ BamWriter::~BamWriter() {
     if (m_worker->joinable()) {
         join();
     }
-    sam_hdr_destroy(m_header);
+    sam_hdr_destroy(header);
     hts_close(m_file);
 }
 
@@ -450,21 +454,20 @@ int BamWriter::write(bam1_t* record) {
     }
     primary = total - secondary - supplementary - unmapped;
 
-    auto res = sam_write1(m_file, m_header, record);
+    auto res = sam_write1(m_file, header, record);
     if (res < 0) {
         throw std::runtime_error("Failed to write SAM record, error code " + std::to_string(res));
     }
     return res;
 }
 
-int BamWriter::write_header(const sam_hdr_t* header) {
+void BamWriter::add_header(const sam_hdr_t* hdr) { header = sam_hdr_dup(hdr); }
+
+int BamWriter::write_header() {
     if (header) {
-        m_header = sam_hdr_dup(header);
-    } else {
-        m_header = sam_hdr_init();
+        return sam_hdr_write(m_file, header);
     }
-    auto res = sam_hdr_write(m_file, m_header);
-    return res;
+    return 0;
 }
 
 read_map read_bam(const std::string& filename, const std::set<std::string>& read_ids) {

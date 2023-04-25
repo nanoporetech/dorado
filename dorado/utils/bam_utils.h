@@ -56,9 +56,13 @@ private:
 
 class BamWriter : public MessageSink {
 public:
-    BamWriter(const std::string& filename, size_t threads = 1, size_t num_reads = 0);
+    BamWriter(const std::string& filename,
+              bool emit_fastq,
+              size_t threads = 1,
+              size_t num_reads = 0);
     ~BamWriter();
-    int write_header(const sam_hdr_t* header);
+    void add_header(const sam_hdr_t* header);
+    int write_header();
     int write(bam1_t* record);
     void join();
 
@@ -67,10 +71,10 @@ public:
     size_t unmapped{0};
     size_t secondary{0};
     size_t supplementary{0};
+    sam_hdr_t* header{nullptr};
 
 private:
     htsFile* m_file{nullptr};
-    sam_hdr_t* m_header{nullptr};
     std::unique_ptr<std::thread> m_worker;
     void worker_thread();
     int write_hdr_sq(char* name, uint32_t length);
