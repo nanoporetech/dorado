@@ -9,7 +9,14 @@
 #include <numeric>
 #include <vector>
 
-#if defined(__GNUC__) && defined(__x86_64__) && !defined(__APPLE__)
+// TSan's init breaks the call to __cpu_indicator_init (which determines which implementation to take)
+#if defined(__GNUC__) && defined(__x86_64__) && !defined(__APPLE__) && !defined(__SANITIZE_THREAD__)
+#define ENABLE_AVX2_IMPL 1
+#else
+#define ENABLE_AVX2_IMPL 0
+#endif
+
+#if ENABLE_AVX2_IMPL
 #include <immintrin.h>
 #endif
 
@@ -21,7 +28,7 @@ const char seq_nt16_str[] = "=ACMGRSVTWYHKDBN";
 
 namespace {
 
-#if defined(__GNUC__) && defined(__x86_64__) && !defined(__APPLE__)
+#if ENABLE_AVX2_IMPL
 __attribute__((target("default")))
 #endif
 std::string
@@ -55,7 +62,7 @@ reverse_complement_impl(const std::string& sequence) {
     return rev_comp_sequence;
 }
 
-#if defined(__GNUC__) && defined(__x86_64__) && !defined(__APPLE__)
+#if ENABLE_AVX2_IMPL
 // AVX2 implementation that does in-register lookups of 32 bases at once, using
 // PSHUFB. On strings with over several thousand bases this was measured to be about 10x the speed
 // of the default implementation on Skylake.
