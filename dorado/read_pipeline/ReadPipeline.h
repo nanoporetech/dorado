@@ -26,11 +26,14 @@ struct BaseModInfo;
 class Read;
 
 struct Chunk {
-    Chunk(std::shared_ptr<Read> read, size_t offset, size_t chunk_in_read_idx, size_t chunk_size)
+    Chunk(std::shared_ptr<Read> const& read,
+          size_t offset,
+          size_t chunk_in_read_idx,
+          size_t chunk_size)
             : source_read(read),
               input_offset(offset),
               idx_in_read(chunk_in_read_idx),
-              raw_chunk_size(chunk_size){};
+              raw_chunk_size(chunk_size) {}
 
     std::weak_ptr<Read> source_read;
     size_t input_offset;    // Where does this chunk start in the input raw read data
