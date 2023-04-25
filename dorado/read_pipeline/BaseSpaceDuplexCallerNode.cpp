@@ -3,6 +3,7 @@
 #include "3rdparty/edlib/edlib/include/edlib.h"
 #include "cxxpool.h"
 #include "utils/duplex_utils.h"
+#include "utils/sequence_utils.h"
 
 #include <spdlog/spdlog.h>
 
@@ -164,7 +165,7 @@ void BaseSpaceDuplexCallerNode::basespace(std::string template_read_id,
 BaseSpaceDuplexCallerNode::BaseSpaceDuplexCallerNode(
         MessageSink& sink,
         std::map<std::string, std::string> template_complement_map,
-        std::map<std::string, std::shared_ptr<Read>> reads,
+        utils::read_map reads,
         size_t threads)
         : MessageSink(1000),
           m_sink(sink),

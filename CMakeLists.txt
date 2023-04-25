@@ -63,7 +63,10 @@ endif()
 
 # ELZIP_DECOMPRESS_ONLY stops minizip from adding OpenSSL as a target, preventing use of three dylibs on osx.
 set(ELZIP_DECOMPRESS_ONLY ON)
-add_subdirectory(dorado/3rdparty/elzip)
+add_subdirectory(${DORADO_3RD_PARTY}/elzip)
+
+set(ONT_MM2_EXE OFF)
+add_subdirectory(${DORADO_3RD_PARTY}/ont-minimap2)
 
 set(BUILD_TESTING OFF)
 add_subdirectory(${DORADO_3RD_PARTY}/edlib EXCLUDE_FROM_ALL)
@@ -93,6 +96,8 @@ set(LIB_SOURCE_FILES
     dorado/read_pipeline/ModBaseCallerNode.h
     dorado/read_pipeline/WriterNode.cpp
     dorado/read_pipeline/WriterNode.h
+    dorado/read_pipeline/ReadFilterNode.cpp
+    dorado/read_pipeline/ReadFilterNode.h
     dorado/read_pipeline/BaseSpaceDuplexCallerNode.cpp
     dorado/read_pipeline/BaseSpaceDuplexCallerNode.h
     dorado/decode/beam_search.cpp
@@ -123,6 +128,8 @@ set(LIB_SOURCE_FILES
     dorado/utils/stitch.h
     dorado/utils/tensor_utils.cpp
     dorado/utils/tensor_utils.h
+    dorado/utils/trim.cpp
+    dorado/utils/trim.h
     dorado/utils/bam_utils.cpp
     dorado/utils/bam_utils.h
     dorado/utils/duplex_utils.h
@@ -180,9 +187,10 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR}/dorado
     ${DORADO_3RD_PARTY}/cxxpool/src
     ${DORADO_3RD_PARTY}/NVTX/c/include
     ${DORADO_3RD_PARTY}/spdlog/include
-    dorado
-    dorado/3rdparty/spdlog/include
-    dorado/3rdparty/indicators/include)
+    ${DORADO_3RD_PARTY}/spdlog/include
+    ${DORADO_3RD_PARTY}/indicators/include
+    ${DORADO_3RD_PARTY}/ont-minimap2/src/3rdparty/minimap2
+    dorado)
 
 enable_testing()
 
@@ -197,7 +205,7 @@ target_link_libraries(dorado_lib
     ${APPLE_FWK_METAL}
     ${TORCH_LIBRARIES}
     ${KOI_LIBRARIES}
-    ${HTSLIB_LIBRARIES}
+    htslib
     vbz_hdf_plugin
     OpenSSL::SSL
     edlib
@@ -231,6 +239,7 @@ if(NOT DORADO_LIB_ONLY)
 
     add_executable(dorado 
         dorado/main.cpp
+        dorado/cli/aligner.cpp
         dorado/cli/duplex.cpp
         dorado/cli/basecaller.cpp
         dorado/cli/benchmark.cpp        
@@ -247,6 +256,7 @@ if(NOT DORADO_LIB_ONLY)
         dorado_lib
         dorado_io_lib
         dorado_models_lib
+        minimap2
     )
 
     if (DEFINED DORADO_INSTALL_PATH)

@@ -3,6 +3,7 @@
 #include "decode/CPUDecoder.h"
 #include "read_pipeline/BaseSpaceDuplexCallerNode.h"
 #include "read_pipeline/BasecallerNode.h"
+#include "read_pipeline/ReadFilterNode.h"
 #include "read_pipeline/ScalerNode.h"
 #include "read_pipeline/StereoDuplexEncoderNode.h"
 #include "read_pipeline/WriterNode.h"
@@ -81,12 +82,12 @@ int duplex(int argc, char* argv[]) {
         spdlog::info("> Pairs file loaded");
 
         bool emit_moves = false, rna = false, duplex = true;
-        WriterNode writer_node(std::move(args), emit_fastq, emit_moves, rna, duplex, min_qscore, 4);
+        WriterNode writer_node(std::move(args), emit_fastq, emit_moves, rna, duplex, 4);
+        ReadFilterNode read_filter_node(writer_node, min_qscore, 1);
 
         torch::set_num_threads(1);
 
         if (model.compare("basespace") == 0) {  // Execute a Basespace duplex pipeline.
-
             // create a set of the read_ids
             std::set<std::string> read_ids;
             for (const auto& pair : template_complement_map) {
@@ -99,7 +100,7 @@ int duplex(int argc, char* argv[]) {
 
             spdlog::info("> Starting Basespace Duplex Pipeline");
             threads = threads == 0 ? std::thread::hardware_concurrency() : threads;
-            BaseSpaceDuplexCallerNode duplex_caller_node(writer_node, template_complement_map,
+            BaseSpaceDuplexCallerNode duplex_caller_node(read_filter_node, template_complement_map,
                                                          read_map, threads);
         } else {  // Execute a Stereo Duplex pipeline.
 
@@ -192,8 +193,9 @@ int duplex(int argc, char* argv[]) {
             spdlog::info("> Starting Stereo Duplex pipeline");
 
             const int kStereoBatchTimeoutMS = 500;
-            auto stereo_basecaller_node = std::make_unique<BasecallerNode>(
-                    writer_node, std::move(stereo_runners), overlap, kStereoBatchTimeoutMS);
+            stereo_basecaller_node = std::make_unique<BasecallerNode>(
+                    read_filter_node, std::move(stereo_runners), stereo_batch_size, chunk_size,
+                    overlap, stereo_model_stride, kStereoBatchTimeoutMS);
 
             std::unordered_set<std::string> read_list =
                     utils::get_read_list_from_pairs(template_complement_map);

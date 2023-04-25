@@ -3,6 +3,8 @@
 #include "Version.h"
 #include "utils/sequence_utils.h"
 
+#include <htslib/kstring.h>
+#include <htslib/sam.h>
 #include <indicators/progress_bar.hpp>
 #include <spdlog/spdlog.h>
 
@@ -19,36 +21,50 @@ using namespace std::chrono_literals;
 
 namespace dorado {
 
-void WriterNode::print_header() {
-    if (!m_emit_fastq) {
-        std::cout << "@HD\tVN:1.6\tSO:unknown\n"
-                  << "@PG\tID:basecaller\tPN:dorado\tVN:" << DORADO_VERSION << "\tCL:dorado";
-        for (const auto& arg : m_args) {
-            std::cout << " " << arg;
-        }
-        std::cout << "\n";
-
-        // Add read groups
-        for (auto const& x : m_read_groups) {
-            std::cout << "@RG\t";
-            std::cout << "ID:" << x.first << "\t";
-            std::cout << "PU:" << x.second.flowcell_id << "\t";
-            std::cout << "PM:" << x.second.device_id << "\t";
-            std::cout << "DT:" << x.second.exp_start_time << "\t";
-            std::cout << "PL:"
-                      << "ONT"
-                      << "\t";
-            std::cout << "DS:"
-                      << "basecall_model=" << x.second.basecalling_model
-                      << " runid=" << x.second.run_id << "\t";
-            std::cout << "LB:" << x.second.sample_id << "\t";
-            std::cout << "SM:" << x.second.sample_id;
-            std::cout << std::endl;
-        }
+void WriterNode::add_header() {
+    if (m_emit_fastq) {
+        return;  // No header for fastq.
     }
+
+    m_header = sam_hdr_init();
+    sam_hdr_add_lines(m_header, "@HD\tVN:1.6\tSO:unknown", 0);
+
+    std::stringstream pg;
+    pg << "@PG\tID:basecaller\tPN:dorado\tVN:" << DORADO_VERSION << "\tCL:dorado";
+    for (const auto& arg : m_args) {
+        pg << " " << arg;
+    }
+    pg << std::endl;
+    sam_hdr_add_lines(m_header, pg.str().c_str(), 0);
+
+    // Add read groups
+    for (auto const& x : m_read_groups) {
+        std::stringstream rg;
+        rg << "@RG\t";
+        rg << "ID:" << x.first << "\t";
+        rg << "PU:" << x.second.flowcell_id << "\t";
+        rg << "PM:" << x.second.device_id << "\t";
+        rg << "DT:" << x.second.exp_start_time << "\t";
+        rg << "PL:"
+           << "ONT"
+           << "\t";
+        rg << "DS:"
+           << "basecall_model=" << x.second.basecalling_model << " runid=" << x.second.run_id
+           << "\t";
+        rg << "LB:" << x.second.sample_id << "\t";
+        rg << "SM:" << x.second.sample_id;
+        rg << std::endl;
+        sam_hdr_add_lines(m_header, rg.str().c_str(), 0);
+    }
+
+    if (sam_hdr_write(m_file, m_header) < 0) {
+        throw std::runtime_error("Unable to write the SAM/BAM header.");
+    };
 }
 
 void WriterNode::worker_thread() {
+    m_active_threads++;
+
     Message message;
     while (m_work_queue.try_pop(message)) {
         // If this message isn't a read, we'll get a bad_variant_access exception.
@@ -73,11 +89,6 @@ void WriterNode::worker_thread() {
             }
         }
 
-        if (utils::mean_qscore_from_qstring(read->qstring) < m_min_qscore) {
-            m_num_reads_failed += 1;
-            continue;
-        }
-
         if (m_emit_fastq) {
             std::scoped_lock<std::mutex> lock(m_cout_mutex);
             std::cout << "@" << read->read_id << "\n"
@@ -86,14 +97,42 @@ void WriterNode::worker_thread() {
                       << read->qstring << "\n";
         } else {
             try {
-                for (const auto& sam_line : read->extract_sam_lines(m_emit_moves, m_duplex)) {
+                auto alns = read->extract_sam_lines(m_emit_moves, m_duplex);
+                for (const auto aln : alns) {
                     std::scoped_lock<std::mutex> lock(m_cout_mutex);
-                    std::cout << sam_line << "\n";
+                    if (sam_write1(m_file, m_header, aln) < 0) {
+                        kstring_t str;
+                        ks_initialize(&str);
+                        sam_format1(nullptr, aln, &str);
+                        spdlog::warn("Unable to write alignment {}", str.s);
+                        ks_free(&str);
+                    }
                 }
             } catch (const std::exception& ex) {
                 std::scoped_lock<std::mutex> lock(m_cerr_mutex);
                 spdlog::error("{}", ex.what());
             }
+        }
+    }
+
+    auto num_active_threads = --m_active_threads;
+    if (num_active_threads == 0) {
+        auto end_time = std::chrono::system_clock::now();
+
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time -
+                                                                              m_initialization_time)
+                                .count();
+        if (m_isatty) {
+            std::cerr << "\r";
+        }
+        spdlog::info("> Reads basecalled: {}", m_num_reads_processed);
+        std::ostringstream samples_sec;
+        if (m_duplex) {
+            samples_sec << std::scientific << m_num_bases_processed / (duration / 1000.0);
+            spdlog::info("> Bases/s: {}", samples_sec.str());
+        } else {
+            samples_sec << std::scientific << m_num_samples_processed / (duration / 1000.0);
+            spdlog::info("> Samples/s: {}", samples_sec.str());
         }
     }
 }
@@ -103,7 +142,6 @@ WriterNode::WriterNode(std::vector<std::string> args,
                        bool emit_moves,
                        bool rna,
                        bool duplex,
-                       size_t min_qscore,
                        size_t num_worker_threads,
                        std::unordered_map<std::string, ReadGroup> read_groups,
                        int num_reads,
@@ -114,14 +152,13 @@ WriterNode::WriterNode(std::vector<std::string> args,
           m_emit_moves(emit_moves),
           m_rna(rna),
           m_duplex(duplex),
-          m_min_qscore(min_qscore),
           m_read_groups(std::move(read_groups)),
           m_num_bases_processed(0),
           m_num_samples_processed(0),
           m_num_reads_processed(0),
-          m_num_reads_failed(0),
           m_initialization_time(std::chrono::system_clock::now()),
-          m_num_reads_expected(num_reads) {
+          m_num_reads_expected(num_reads),
+          m_active_threads(0) {
 #ifdef _WIN32
     m_isatty = true;
 #else
@@ -134,7 +171,10 @@ WriterNode::WriterNode(std::vector<std::string> args,
         m_progress_bar_increment = m_num_reads_expected / 100;
     }
 
-    print_header();
+    // Write to stdout for now.
+    m_file = hts_open("-", "w");
+
+    add_header();
     for (size_t i = 0; i < num_worker_threads; i++) {
         m_workers.push_back(
                 std::make_unique<std::thread>(std::thread(&WriterNode::worker_thread, this)));
@@ -146,25 +186,11 @@ WriterNode::~WriterNode() {
     for (auto& m : m_workers) {
         m->join();
     }
-    auto end_time = std::chrono::system_clock::now();
-
-    auto duration =
-            std::chrono::duration_cast<std::chrono::milliseconds>(end_time - m_initialization_time)
-                    .count();
-    if (m_isatty) {
-        std::cerr << "\r";
+    if (m_header) {
+        sam_hdr_destroy(m_header);
     }
-    spdlog::info("> Reads basecalled: {}", m_num_reads_processed);
-    if (m_min_qscore > 0) {
-        spdlog::info("> Reads skipped (qscore < {}): {}", m_min_qscore, m_num_reads_failed);
-    }
-    std::ostringstream samples_sec;
-    if (m_duplex) {
-        samples_sec << std::scientific << m_num_bases_processed / (duration / 1000.0);
-        spdlog::info("> Bases/s: {}", samples_sec.str());
-    } else {
-        samples_sec << std::scientific << m_num_samples_processed / (duration / 1000.0);
-        spdlog::info("> Samples/s: {}", samples_sec.str());
+    if (m_file) {
+        hts_close(m_file);
     }
 }
 

@@ -2,7 +2,6 @@
 set(SOURCE_FILES
     main.cpp
     AsyncQueueTest.cpp
-    DuplexUtilsTest.cpp
     Fast5DataLoaderTest.cpp
     Pod5DataLoaderTest.cpp
     TensorUtilsTest.cpp
@@ -12,6 +11,12 @@ set(SOURCE_FILES
     SequenceUtilsTest.cpp
     StitchTest.cpp
     StereoDuplexTest.cpp
+    TrimTest.cpp
+    AlignerTest.cpp
+    BamReaderTest.cpp
+    BamWriterTest.cpp
+    CliUtilsTest.cpp
+    ReadFilterNodeTest.cpp
 )
 
 if (DORADO_GPU_BUILD)
@@ -32,6 +37,7 @@ target_link_libraries(dorado_tests
     dorado_lib
     dorado_io_lib
     dorado_models_lib
+    minimap2
     ${ZLIB_LIBRARIES}
 )
 
