@@ -269,26 +269,44 @@ if(NOT DORADO_LIB_ONLY)
 endif()
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    # CUDA system DLLs we depend on:
-    set(PATTERNS
-        "*cudart.so*"
-        "*cublas*.so*"
-        "*nvToolsExt.so*"
-    )
-
-    if(${CMAKE_SYSTEM_PROCESSOR} STREQUAL "aarch64")
-        list(APPEND PATTERNS
+    if(CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
+        # CUDA toolkit DLLs we depend on:
+        set(PATTERNS
+            "*cublas*.so*"
+            "*cudart*.so*"
+            "*nvrtc*.so*"
+            "*nvToolsExt*.so*"
             "*cusparse.so*"
             "*curand.so*"
             "*cusolver.so*"
             "*cufft.so*"
         )
-    endif()
+        foreach(PATTERN ${PATTERNS})
+            file(GLOB DEP_DLLS "${CUDAToolkit_ROOT}/targets/${CMAKE_SYSTEM_PROCESSOR}-linux/lib/${PATTERN}")
+            install(FILES ${DEP_DLLS} DESTINATION lib COMPONENT redist_libs)
+        endforeach()
+    else()
+        set(VERSIONED_CUDA_LIBS
+            libcublas-*.so.11
+            libcublasLt-*.so.11
+            libcudart-*.so.11.0
+            libnvrtc-*.so.11.2
+            libnvrtc-builtins-*.so.11.8
+            libnvToolsExt-*.so.1
+        )
 
-    foreach(PATTERN ${PATTERNS})
-        file(GLOB DEP_DLLS "${CUDAToolkit_ROOT}/targets/${CMAKE_SYSTEM_PROCESSOR}-linux/lib/${PATTERN}")
-        install(FILES ${DEP_DLLS} DESTINATION lib COMPONENT redist_libs)
-    endforeach()
+        foreach(LIB IN LISTS VERSIONED_CUDA_LIBS)
+            file(GLOB VERSIONED_CUDA_LIB "${TORCH_LIB}/lib/${LIB}")
+            if (VERSIONED_CUDA_LIB)
+                set(target ${VERSIONED_CUDA_LIB})
+                string(REGEX REPLACE "-[0-9a-f]+[.]" "." link ${target})
+                get_filename_component(target_name ${target} NAME)
+                get_filename_component(link_name ${link} NAME)
+                execute_process(COMMAND ln -rfs ${target_name} ${link_name} WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+                install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${link_name} DESTINATION lib COMPONENT redist_libs)
+            endif()
+        endforeach()
+    endif()
 
     file(GLOB TORCH_DLLS "${TORCH_LIB}/lib/*.so*")
     install(FILES ${TORCH_DLLS} DESTINATION lib COMPONENT redist_libs)
