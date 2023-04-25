@@ -1,8 +1,8 @@
 #include "DuplexSplitNode.h"
 
-#include "3rdparty/edlib/edlib/include/edlib.h"
 #include "utils/duplex_utils.h"
 #include "utils/sequence_utils.h"
+#include "utils/alignment_utils.h"
 
 #include <openssl/sha.h>
 #include <spdlog/spdlog.h>
@@ -13,11 +13,15 @@
 #include <iomanip>
 #include <iostream>
 #include <optional>
-#include <sstream>
 #include <string>
 
-//TODO go via preprocessor?
-static const bool DEBUG = false;
+//To enable debug in build use 'cmake -DDEBUG_READ_SPLITTING -S . -B build'
+#ifdef DEBUG_READ_SPLITTING
+static constexpr bool DEBUG = true;
+#else
+static constexpr bool DEBUG = false;
+#endif
+
 namespace {
 
 using namespace dorado;
@@ -174,48 +178,6 @@ std::vector<std::pair<size_t, size_t>> detect_pore_signal(torch::Tensor signal,
     return ans;
 }
 
-std::string print_alignment(const char* query, const char* target, const EdlibAlignResult& result) {
-    std::stringstream ss;
-    int tpos = result.startLocations[0];
-
-    int qpos = 0;
-    for (int i = 0; i < result.alignmentLength; i++) {
-        if (result.alignment[i] == EDLIB_EDOP_DELETE) {
-            ss << "-";
-        } else {
-            ss << query[qpos];
-            qpos++;
-        }
-    }
-
-    ss << '\n';
-
-    for (int i = 0; i < result.alignmentLength; i++) {
-        if (result.alignment[i] == EDLIB_EDOP_MATCH) {
-            ss << "|";
-        } else if (result.alignment[i] == EDLIB_EDOP_INSERT) {
-            ss << " ";
-        } else if (result.alignment[i] == EDLIB_EDOP_DELETE) {
-            ss << " ";
-        } else if (result.alignment[i] == EDLIB_EDOP_MISMATCH) {
-            ss << "*";
-        }
-    }
-
-    ss << '\n';
-
-    for (int i = 0; i < result.alignmentLength; i++) {
-        if (result.alignment[i] == EDLIB_EDOP_INSERT) {
-            ss << "-";
-        } else {
-            ss << target[tpos];
-            tpos++;
-        }
-    }
-
-    return ss.str();
-}
-
 //[start, end)
 std::optional<PosRange> find_best_adapter_match(const std::string& adapter,
                                                 const std::string& seq,
@@ -244,7 +206,7 @@ std::optional<PosRange> find_best_adapter_match(const std::string& adapter,
             spdlog::debug("Match location: ({}, {})", edlib_result.startLocations[0] + shift,
                           edlib_result.endLocations[0] + shift + 1);
             spdlog::debug("\n{}",
-                          print_alignment(adapter.c_str(), seq.c_str() + shift, edlib_result));
+                          utils::print_alignment(adapter.c_str(), seq.c_str() + shift, edlib_result));
             if (edlib_result.editDistance <= dist_thr) {
                 res = {edlib_result.startLocations[0] + shift,
                        edlib_result.endLocations[0] + shift + 1};
@@ -295,7 +257,7 @@ bool check_rc_match(const std::string& seq, PosRange templ_r, PosRange compl_r, 
     if (DEBUG) {
         spdlog::debug("Checking ranges [{}, {}] vs [{}, {}]: edist={}\n{}", templ_r.first,
                       templ_r.second, compl_r.first, compl_r.second, edlib_result.editDistance,
-                      print_alignment(c_seq + templ_r.first, rc_compl.data(), edlib_result));
+                      utils::print_alignment(c_seq + templ_r.first, rc_compl.data(), edlib_result));
         match = match && (edlib_result.editDistance <= dist_thr);
     } else {
         assert(!match || edlib_result.editDistance <= dist_thr);
@@ -606,6 +568,7 @@ void DuplexSplitNode::worker_thread() {
             m_sink.push_message(std::move(subread.read));
         }
     }
+    m_sink.terminate();
 }
 
 DuplexSplitNode::DuplexSplitNode(MessageSink& sink,

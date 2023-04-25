@@ -26,15 +26,16 @@ struct DuplexSplitSettings {
     uint64_t expect_pore_prefix = 5000;
     int middle_adapter_search_span = 1000;
 
-    //TAIL_ADAPTER = 'GCAATACGTAACTGAACGAAGT'
-    //HEAD_ADAPTER = 'AATGTACTTCGTTCAGTTACGTATTGCT'
-    //clipped 4 letters from the beginning of head adapter (24 left)
+    //TODO put in config
+    //Adapter sequence we expect to see at the beginning of the read
+    //Sequence below corresponds to the current 'head' adapter 'AATGTACTTCGTTCAGTTACGTATTGCT'
+    // with 4bp clipped from the beginning (24bp left)
     std::string adapter = "TACTTCGTTCAGTTACGTATTGCT";
 };
 
 class DuplexSplitNode : public MessageSink {
 public:
-    //TODO consider precumputing and reusing ranges with high signal
+    //TODO consider precomputing and reusing ranges with high signal
     struct ExtRead {
         std::shared_ptr<Read> read;
         torch::Tensor data_as_float32;
@@ -65,7 +66,7 @@ private:
 
     std::vector<std::pair<std::string, SplitFinderF>> build_split_finders() const;
 
-    void worker_thread();  // Worker thread performs scaling and trimming asynchronously.
+    void worker_thread();  // Worker thread performs splitting asynchronously.
     MessageSink& m_sink;   // MessageSink to consume scaled reads.
 
     const DuplexSplitSettings m_settings;

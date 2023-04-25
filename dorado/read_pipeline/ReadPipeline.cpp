@@ -65,6 +65,7 @@ std::vector<std::string> Read::generate_read_tags(bool emit_moves) const {
             "mx:i:" + std::to_string(attributes.mux),
             "ch:i:" + std::to_string(attributes.channel_number),
             "st:Z:" + attributes.start_time,
+            //read_number is set to uint32_t(-1) for reads resulting from a split
             "rn:i:" + (attributes.read_number == uint32_t(-1) ? "-1" : std::to_string(attributes.read_number)),
             "f5:Z:" + attributes.fast5_filename,
             "sm:f:" + shift_str,

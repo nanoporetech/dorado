@@ -161,10 +161,7 @@ void setup(std::vector<std::string> args,
     WriterNode writer_node(std::move(args), emit_fastq, emit_moves, rna, duplex, min_qscore,
                            num_devices * 2, std::move(read_groups), num_reads);
 
-    DuplexSplitSettings splitter_settings;
-    splitter_settings.simplex_mode = true;
-    DuplexSplitNode splitter_node(writer_node, splitter_settings, num_devices);
-
+    std::unique_ptr<DuplexSplitNode> splitter_node;
     std::unique_ptr<ModBaseCallerNode> mod_base_caller_node;
     std::unique_ptr<BasecallerNode> basecaller_node;
 
@@ -177,8 +174,13 @@ void setup(std::vector<std::string> args,
                 *mod_base_caller_node, std::move(runners), batch_size, chunk_size, overlap,
                 model_stride, model_name);
     } else {
+        //TODO add separate factory methods for simplex/duplex modes
+        DuplexSplitSettings splitter_settings;
+        splitter_settings.simplex_mode = true;
+        splitter_node = std::make_unique<DuplexSplitNode>(writer_node, splitter_settings, num_devices);
+
         basecaller_node =
-                std::make_unique<BasecallerNode>(splitter_node, std::move(runners), batch_size,
+                std::make_unique<BasecallerNode>(*splitter_node, std::move(runners), batch_size,
                                                  chunk_size, overlap, model_stride, model_name);
     }
     ScalerNode scaler_node(*basecaller_node, num_devices * 2);

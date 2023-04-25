@@ -101,6 +101,8 @@ set(LIB_SOURCE_FILES
     dorado/modbase/remora_utils.cpp
     dorado/modbase/remora_utils.h
     dorado/utils/AsyncQueue.h
+    dorado/utils/alignment_utils.cpp
+    dorado/utils/alignment_utils.h
     dorado/utils/base_mod_utils.cpp
     dorado/utils/base_mod_utils.h
     dorado/utils/compat_utils.cpp
@@ -207,7 +209,7 @@ if(NOT DORADO_LIB_ONLY)
     if(NOT WIN32)
         # Set up RPATHs so we can find dependencies
         set(CMAKE_SKIP_RPATH FALSE)
-        # Note: we don't need the relative lib dir if everything is in 
+        # Note: we don't need the relative lib dir if everything is in
         if(APPLE)
             set(CMAKE_INSTALL_RPATH "@executable_path/;@executable_path/../lib")
         else()
@@ -216,11 +218,11 @@ if(NOT DORADO_LIB_ONLY)
         set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
     endif()
 
-    add_executable(dorado 
+    add_executable(dorado
         dorado/main.cpp
         dorado/cli/duplex.cpp
         dorado/cli/basecaller.cpp
-        dorado/cli/benchmark.cpp        
+        dorado/cli/benchmark.cpp
         dorado/cli/download.cpp
         dorado/cli/cli.h
     )
@@ -260,7 +262,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
             "*cufft.so*"
         )
     endif()
-    
+
     foreach(PATTERN ${PATTERNS})
         file(GLOB DEP_DLLS "${CUDAToolkit_ROOT}/targets/${CMAKE_SYSTEM_PROCESSOR}-linux/lib/${PATTERN}")
         install(FILES ${DEP_DLLS} DESTINATION lib COMPONENT redist_libs)
@@ -315,7 +317,7 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
        OpenSSL::SSL
        ${POD5_LIBRARIES}
        ${HDF5_C_LIBRARIES}
-       ${CMAKE_DL_LIBS}       
+       ${CMAKE_DL_LIBS}
        elzip
     )
 
