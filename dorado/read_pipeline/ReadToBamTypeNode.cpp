@@ -1,7 +1,5 @@
 #include "ReadToBamTypeNode.h"
 
-#include "utils/sequence_utils.h"
-
 #include <spdlog/spdlog.h>
 
 #include <chrono>
