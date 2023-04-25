@@ -51,3 +51,8 @@ add_test(
     COMMAND dorado_tests
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
+
+# GCC 8 ICEs trying to compile this file with ASAN+optimisations enabled, so knock down the optimisation to try and help it out.
+if (ECM_ENABLE_SANITIZERS AND (CMAKE_CXX_COMPILER_ID MATCHES "GNU") AND (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9.0))
+    set_source_files_properties(TrimTest.cpp PROPERTIES COMPILE_OPTIONS "-O0")
+endif()
