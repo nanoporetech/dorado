@@ -11,7 +11,7 @@ public:
         std::vector<T> vec;
         dorado::Message message;
         while (m_work_queue.try_pop(message)) {
-            vec.push_back(std::get<T>(message));
+            vec.push_back(std::get<T>(std::move(message)));
         }
         return vec;
     }

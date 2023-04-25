@@ -99,14 +99,11 @@ void Aligner::worker_thread(size_t tid) {
 
     Message message;
     while (m_work_queue.try_pop(message)) {
-        bam1_t* read = std::get<bam1_t*>(message);
-        auto records = align(read, m_tbufs[tid]);
+        auto read = std::get<BamPtr>(std::move(message));
+        auto records = align(read.get(), m_tbufs[tid]);
         for (auto& record : records) {
             m_sink.push_message(std::move(record));
         }
-        // Free the bam alignment read from the input.
-        // Not used anymore after this.
-        bam_destroy1(read);
     }
 
     int num_active = --m_active;
@@ -191,9 +188,9 @@ void Aligner::add_tags(bam1_t* record,
     bam_aux_append(record, "rl", 'i', sizeof(buf->rep_len), (uint8_t*)&buf->rep_len);
 }
 
-std::vector<bam1_t*> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
+std::vector<BamPtr> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
     // some where for the hits
-    std::vector<bam1_t*> results;
+    std::vector<BamPtr> results;
 
     // get the sequence to map from the record
     auto seqlen = irecord->core.l_qseq;
@@ -221,7 +218,7 @@ std::vector<bam1_t*> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
 
     // just return the input record
     if (hits == 0) {
-        results.push_back(bam_dup1(irecord));
+        results.push_back(BamPtr(bam_dup1(irecord)));
     }
 
     for (int j = 0; j < hits; j++) {
@@ -323,7 +320,7 @@ std::vector<bam1_t*> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
         add_tags(record, aln, seq, buf);
 
         free(aln->p);
-        results.push_back(record);
+        results.push_back(BamPtr(record));
     }
 
     free(reg);
@@ -341,22 +338,22 @@ HtsReader::HtsReader(const std::string& filename) {
         throw std::runtime_error("Could not read header from file: " + filename);
     }
     is_aligned = header->n_targets > 0;
-    record = bam_init1();
+    record.reset(bam_init1());
 }
 
 HtsReader::~HtsReader() {
     hts_free(format);
     sam_hdr_destroy(header);
-    bam_destroy1(record);
+    record.reset();
     hts_close(m_file);
 }
 
-bool HtsReader::read() { return sam_read1(m_file, header, record) >= 0; }
+bool HtsReader::read() { return sam_read1(m_file, header, record.get()) >= 0; }
 
 void HtsReader::read(MessageSink& read_sink, int max_reads) {
     int num_reads = 0;
     while (this->read()) {
-        read_sink.push_message(bam_dup1(record));
+        read_sink.push_message(BamPtr(bam_dup1(record.get())));
         if (++num_reads >= max_reads) {
             break;
         }
@@ -431,12 +428,12 @@ void HtsWriter::worker_thread() {
 
     Message message;
     while (m_work_queue.try_pop(message)) {
-        bam1_t* aln = std::get<bam1_t*>(message);
-        write(aln);
+        auto aln = std::get<BamPtr>(std::move(message));
+        write(aln.get());
+        processed_read_ids.emplace(bam_get_qname(aln));
         // Free the bam alignment that's already written
         // out to disk.
-        processed_read_ids.emplace(bam_get_qname(aln));
-        bam_destroy1(aln);
+        aln.reset();
 
         // Since multiple alignments can have the same read id, only
         // increment ticker counter if a new unique read is encountered when

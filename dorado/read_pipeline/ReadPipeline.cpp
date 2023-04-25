@@ -46,6 +46,8 @@ bool get_modbase_channel_name(std::string &channel_name, const std::string &mod_
 
 namespace dorado {
 
+void BamDestructor::operator()(bam1_t *bam) { bam_destroy1(bam); }
+
 void Read::generate_read_tags(bam1_t *aln, bool emit_moves) const {
     int qs = static_cast<int>(std::round(utils::mean_qscore_from_qstring(qstring)));
     bam_aux_append(aln, "qs", 'i', sizeof(qs), (uint8_t *)&qs);
@@ -104,9 +106,9 @@ void Read::generate_duplex_read_tags(bam1_t *aln) const {
     bam_aux_append(aln, "qs", 'i', sizeof(qs), (uint8_t *)&qs);
 }
 
-std::vector<bam1_t *> Read::extract_sam_lines(bool emit_moves,
-                                              bool duplex,
-                                              uint8_t modbase_threshold) const {
+std::vector<BamPtr> Read::extract_sam_lines(bool emit_moves,
+                                            bool duplex,
+                                            uint8_t modbase_threshold) const {
     if (read_id.empty()) {
         throw std::runtime_error("Empty read_name string provided");
     }
@@ -117,10 +119,9 @@ std::vector<bam1_t *> Read::extract_sam_lines(bool emit_moves,
         throw std::runtime_error("Empty sequence and qstring provided for read id " + read_id);
     }
 
-    std::vector<bam1_t *> alns;
-    bam1_t *aln;
+    std::vector<BamPtr> alns;
     if (mappings.empty()) {
-        aln = bam_init1();
+        bam1_t *aln = bam_init1();
         uint32_t flags = 4;              // 4 = UNMAPPED
         std::string ref_seq = "*";       // UNMAPPED
         int leftmost_pos = -1;           // UNMAPPED - will be written as 0
@@ -144,7 +145,7 @@ std::vector<bam1_t *> Read::extract_sam_lines(bool emit_moves,
             generate_read_tags(aln, emit_moves);
         }
         generate_modbase_string(aln, modbase_threshold);
-        alns.push_back(aln);
+        alns.push_back(BamPtr(aln));
     }
 
     for (const auto &mapping : mappings) {

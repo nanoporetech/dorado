@@ -19,7 +19,7 @@ class Aligner : public MessageSink {
 public:
     Aligner(MessageSink& read_sink, const std::string& filename, int k, int w, int threads);
     ~Aligner();
-    std::vector<bam1_t*> align(bam1_t* record, mm_tbuf_t* buf);
+    std::vector<BamPtr> align(bam1_t* record, mm_tbuf_t* buf);
     sq_t get_sequence_records_for_header();
 
 private:
@@ -47,7 +47,7 @@ public:
 
     char* format{nullptr};
     bool is_aligned{false};
-    bam1_t* record{nullptr};
+    BamPtr record{nullptr};
     sam_hdr_t* header{nullptr};
 
 private:

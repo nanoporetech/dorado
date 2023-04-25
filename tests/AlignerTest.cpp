@@ -20,15 +20,15 @@ TEST_CASE("AlignerTest: Check standard alignment", TEST_GROUP) {
     auto query = aligner_test_dir / "target.fq";
 
     // Run alignment.
-    MessageSinkToVector<bam1_t*> sink(100);
+    MessageSinkToVector<dorado::BamPtr> sink(100);
     dorado::utils::Aligner aligner(sink, ref.string(), 15, 15, 10);
     dorado::utils::HtsReader reader(query.string());
     reader.read(aligner, 100);
     auto bam_records = sink.get_messages();
     REQUIRE(bam_records.size() == 1);
 
-    bam1_t* rec = bam_records[0];
-    bam1_t* in_rec = reader.record;
+    auto& rec = bam_records[0];
+    auto& in_rec = reader.record;
 
     // Check input/output reads are matching.
     std::string orig_read =
@@ -60,7 +60,7 @@ TEST_CASE("AlignerTest: Check supplementary alignment", TEST_GROUP) {
     auto query = aligner_test_dir / "supplementary_aln_query.fa";
 
     // Run alignment.
-    MessageSinkToVector<bam1_t*> sink(100);
+    MessageSinkToVector<dorado::BamPtr> sink(100);
     dorado::utils::Aligner aligner(sink, ref.string(), 15, 15, 10);
     dorado::utils::HtsReader reader(query.string());
     reader.read(aligner, 100);
@@ -68,28 +68,26 @@ TEST_CASE("AlignerTest: Check supplementary alignment", TEST_GROUP) {
     REQUIRE(bam_records.size() == 2);
 
     // Check first alignment is primary.
-    bam1_t* rec = bam_records[0];
+    {
+        auto& rec = bam_records[0];
 
-    // Check aux tags.
-    uint32_t l_aux = bam_get_l_aux(rec);
-    std::string aux((char*)bam_get_aux(rec), (char*)(bam_get_aux(rec) + l_aux));
-    std::string tags[] = {"tpAP"};
-    for (auto tag : tags) {
-        REQUIRE_THAT(aux, Contains(tag));
+        // Check aux tags.
+        uint32_t l_aux = bam_get_l_aux(rec);
+        std::string aux((char*)bam_get_aux(rec), (char*)(bam_get_aux(rec) + l_aux));
+        REQUIRE_THAT(aux, Contains("tpAP"));
+        REQUIRE(rec->core.l_qseq > 0);  // Primary alignment should have SEQ.
     }
-    REQUIRE(rec->core.l_qseq > 0);  // Primary alignment should have SEQ.
 
     // Check second alignment is secondary.
-    rec = bam_records[1];
+    {
+        auto& rec = bam_records[1];
 
-    // Check aux tags.
-    l_aux = bam_get_l_aux(rec);
-    aux = std::string((char*)bam_get_aux(rec), (char*)(bam_get_aux(rec) + l_aux));
-    std::string sec_tags[] = {"tpAS"};
-    for (auto tag : sec_tags) {
-        REQUIRE_THAT(aux, Contains(tag));
+        // Check aux tags.
+        uint32_t l_aux = bam_get_l_aux(rec);
+        std::string aux((char*)bam_get_aux(rec), (char*)(bam_get_aux(rec) + l_aux));
+        REQUIRE_THAT(aux, Contains("tpAS"));
+        REQUIRE(rec->core.l_qseq == 0);  // Secondary alignment doesn't need SEQ.
     }
-    REQUIRE(rec->core.l_qseq == 0);  // Secondary alignment doesn't need SEQ.
 }
 
 TEST_CASE("AlignerTest: Check reverse complement alignment", TEST_GROUP) {
@@ -100,15 +98,15 @@ TEST_CASE("AlignerTest: Check reverse complement alignment", TEST_GROUP) {
     auto query = aligner_test_dir / "rev_target.fq";
 
     // Run alignment.
-    MessageSinkToVector<bam1_t*> sink(100);
+    MessageSinkToVector<dorado::BamPtr> sink(100);
     dorado::utils::Aligner aligner(sink, ref.string(), 15, 15, 10);
     dorado::utils::HtsReader reader(query.string());
     reader.read(aligner, 100);
     auto bam_records = sink.get_messages();
     REQUIRE(bam_records.size() == 1);
 
-    bam1_t* rec = bam_records[0];
-    bam1_t* in_rec = reader.record;
+    auto& rec = bam_records[0];
+    auto& in_rec = reader.record;
 
     // Check flag.
     REQUIRE(rec->core.flag & 0x10);
@@ -136,14 +134,14 @@ TEST_CASE("AlignerTest: Check dorado tags are retained", TEST_GROUP) {
     auto query = aligner_test_dir / "basecall.sam";
 
     // Run alignment.
-    MessageSinkToVector<bam1_t*> sink(100);
+    MessageSinkToVector<dorado::BamPtr> sink(100);
     dorado::utils::Aligner aligner(sink, ref.string(), 15, 15, 10);
     dorado::utils::HtsReader reader(query.string());
     reader.read(aligner, 100);
     auto bam_records = sink.get_messages();
     REQUIRE(bam_records.size() == 1);
 
-    bam1_t* rec = bam_records[0];
+    auto& rec = bam_records[0];
 
     // Check aux tags.
     uint32_t l_aux = bam_get_l_aux(rec);
@@ -163,7 +161,7 @@ TEST_CASE("AlignerTest: Verify impact of updated aligner args", TEST_GROUP) {
 
     // Run alignment with one set of k/w.
     {
-        MessageSinkToVector<bam1_t*> sink(100);
+        MessageSinkToVector<dorado::BamPtr> sink(100);
         dorado::utils::Aligner aligner(sink, ref.string(), 28, 28, 2);
         dorado::utils::HtsReader reader(query.string());
         reader.read(aligner, 100);
@@ -173,7 +171,7 @@ TEST_CASE("AlignerTest: Verify impact of updated aligner args", TEST_GROUP) {
 
     // Run alignment with another set of k/w.
     {
-        MessageSinkToVector<bam1_t*> sink(100);
+        MessageSinkToVector<dorado::BamPtr> sink(100);
         dorado::utils::Aligner aligner(sink, ref.string(), 5, 5, 2);
         dorado::utils::HtsReader reader(query.string());
         reader.read(aligner, 100);
