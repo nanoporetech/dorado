@@ -1,3 +1,6 @@
+include:
+  - local: sanitizers-ci.yml
+
 stages:
   - pre-flight
   - build

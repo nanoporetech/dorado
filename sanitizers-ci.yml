@@ -1,0 +1,48 @@
+# Common sanitizer parts
+
+.sanitizer_common:
+  parallel:
+    matrix:
+      - SANITIZER:
+        - "address"
+        - "undefined"
+        - "thread"
+  before_script:
+    # Add the sanitizer flag to the build
+    - export BUILD_OPTIONS="${BUILD_OPTIONS} -D ECM_ENABLE_SANITIZERS='${SANITIZER}'"
+    # Setup additional runtime options
+    - export ASAN_OPTIONS=detect_stack_use_after_return=1:check_initialization_order=1
+    - export UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1
+  needs:
+    - run_sanitizers
+  # No need to keep the build around
+  artifacts: []
+
+run_sanitizers:
+  stage: pre-flight
+  script: echo Will build and run sanitizers
+  when: manual
+  variables:
+      GIT_STRATEGY: none
+
+# Sanitizer jobs
+
+sanitize:linux:x86:focal:
+  extends:
+    - .sanitizer_common
+    - build:linux:x86:focal
+
+sanitize:linux:arm64:bionic:
+  extends:
+    - .sanitizer_common
+    - build:linux:arm64:bionic
+
+sanitize:macos:m1:
+  extends:
+    - .sanitizer_common
+    - build:macos:m1
+
+sanitize:macos:x64:
+  extends:
+    - .sanitizer_common
+    - build:macos:x64
