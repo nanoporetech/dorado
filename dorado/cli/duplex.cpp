@@ -193,9 +193,8 @@ int duplex(int argc, char* argv[]) {
             spdlog::info("> Starting Stereo Duplex pipeline");
 
             const int kStereoBatchTimeoutMS = 500;
-            stereo_basecaller_node = std::make_unique<BasecallerNode>(
-                    read_filter_node, std::move(stereo_runners), stereo_batch_size, chunk_size,
-                    overlap, stereo_model_stride, kStereoBatchTimeoutMS);
+            auto stereo_basecaller_node = std::make_unique<BasecallerNode>(
+                    read_filter_node, std::move(stereo_runners), overlap, kStereoBatchTimeoutMS);
 
             std::unordered_set<std::string> read_list =
                     utils::get_read_list_from_pairs(template_complement_map);
