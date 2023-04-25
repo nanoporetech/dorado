@@ -186,7 +186,7 @@ void setup(std::vector<std::string> args,
                 read_filter_node, std::move(runners), batch_size, chunk_size, overlap, model_stride,
                 kBatchTimeoutMS, model_name);
     }
-    ScalerNode scaler_node(*basecaller_node, num_devices * 2);
+    ScalerNode scaler_node(*basecaller_node, num_devices * 4);
     DataLoader loader(scaler_node, "cpu", num_devices, max_reads, read_list);
 
     loader.load_reads(data_path, recursive_file_loading);
