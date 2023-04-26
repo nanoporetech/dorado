@@ -88,7 +88,9 @@ void setup(std::vector<std::string> args,
            size_t max_reads,
            size_t min_qscore,
            std::string read_list_file_path,
-           bool recursive_file_loading) {
+           bool recursive_file_loading,
+           int kmer_size,
+           int window_size) {
     torch::set_num_threads(1);
     std::vector<Runner> runners;
 
@@ -163,6 +165,10 @@ void setup(std::vector<std::string> args,
         throw std::runtime_error("Modified base models cannot be used with FASTQ output");
     }
 
+    if (!ref.empty() && emit_fastq) {
+        throw std::runtime_error("Alignment to reference can be used with FASTQ output.");
+    }
+
     std::vector<std::filesystem::path> remora_model_list;
     std::istringstream stream{remora_models};
     std::string model;
@@ -210,23 +216,24 @@ void setup(std::vector<std::string> args,
     add_rg_hdr(hdr.get(), read_groups);
     std::shared_ptr<utils::BamWriter> bam_writer;
     std::shared_ptr<utils::Aligner> aligner;
-    MessageSink* filter_sink = nullptr;
+    MessageSink* converted_reads_sink = nullptr;
     if (ref.empty()) {
         bam_writer = std::make_shared<utils::BamWriter>(
                 "-", emit_fastq, num_devices * 2 /*writer_threads*/, num_reads);
         bam_writer->add_header(hdr.get());
         bam_writer->write_header();
-        filter_sink = bam_writer.get();
+        converted_reads_sink = bam_writer.get();
     } else {
         bam_writer = std::make_shared<utils::BamWriter>("-", emit_fastq,
                                                         num_devices * 2 /*writer_threads*/);
-        aligner = std::make_shared<utils::Aligner>(*bam_writer, ref, 19, 19, num_devices * 5);
+        aligner = std::make_shared<utils::Aligner>(*bam_writer, ref, kmer_size, window_size,
+                                                   num_devices * 5);
         aligner->add_sq_to_hdr(hdr.get());
         bam_writer->add_header(hdr.get());
         bam_writer->write_header();
-        filter_sink = aligner.get();
+        converted_reads_sink = aligner.get();
     }
-    ReadToBamType read_converter(*filter_sink, emit_moves, rna, duplex,
+    ReadToBamType read_converter(*converted_reads_sink, emit_moves, rna, duplex,
                                  num_devices * 2 /*num_threads*/, num_reads);
     ReadFilterNode read_filter_node(read_converter, min_qscore, num_devices * 2, num_reads);
 
@@ -326,7 +333,8 @@ int basecaller(int argc, char* argv[]) {
     parser.add_argument("--ref")
             .help("Path to reference for alignment.")
             .default_value(std::string(""));
-    ;
+    parser.add_argument("-k").help("k-mer size (maximum 28).").default_value(15).scan<'i', int>();
+    parser.add_argument("-w").help("minimizer window size.").default_value(10).scan<'i', int>();
 
     try {
         parser.parse_args(argc, argv);
@@ -371,7 +379,7 @@ int basecaller(int argc, char* argv[]) {
               default_parameters.remora_threads, parser.get<bool>("--emit-fastq"),
               parser.get<bool>("--emit-moves"), parser.get<int>("--max-reads"),
               parser.get<int>("--min-qscore"), parser.get<std::string>("--read-ids"),
-              parser.get<bool>("--recursive"));
+              parser.get<bool>("--recursive"), parser.get<int>("k"), parser.get<int>("w"));
     } catch (const std::exception& e) {
         spdlog::error("{}", e.what());
         return 1;

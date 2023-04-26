@@ -84,7 +84,7 @@ Aligner::~Aligner() {
     m_sink.terminate();
 }
 
-std::vector<std::pair<char*, uint32_t>> Aligner::sq() {
+std::vector<std::pair<char*, uint32_t>> Aligner::get_sequence_records_for_header() {
     std::vector<std::pair<char*, uint32_t>> records;
     for (int i = 0; i < m_index->n_seq; ++i) {
         records.push_back(std::make_pair(m_index->seq[i].name, m_index->seq[i].len));
@@ -329,7 +329,7 @@ std::vector<bam1_t*> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
 }
 
 void Aligner::add_sq_to_hdr(sam_hdr_t* hdr) {
-    for (auto pair : sq()) {
+    for (auto pair : get_sequence_records_for_header()) {
         char* name;
         int length;
         std::tie(name, length) = pair;
