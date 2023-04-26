@@ -137,7 +137,7 @@ std::string derive_uuid(const std::string& input_uuid, const std::string& desc) 
 //ranges supposed to be sorted by start coordinate
 PosRanges merge_ranges(const PosRanges& ranges, size_t merge_dist) {
     PosRanges merged;
-    for (auto r : ranges) {
+    for (auto& r : ranges) {
         assert(merged.empty() || r.first >= merged.back().first);
         if (merged.empty() || r.first > merged.back().second + merge_dist) {
             merged.push_back(r);
@@ -154,25 +154,29 @@ std::vector<std::pair<size_t, size_t>> detect_pore_signal(torch::Tensor signal,
                                                           size_t ignore_prefix) {
     std::vector<std::pair<size_t, size_t>> ans;
     auto pore_a = signal.accessor<float, 1>();
-    size_t start = 0;
-    size_t end = 0;
+    size_t cl_start = size_t(-1);
+    size_t cl_end = size_t(-1);
 
     for (size_t i = ignore_prefix; i < pore_a.size(0); i++) {
         if (pore_a[i] > threshold) {
-            if (end == 0 || i > end + cluster_dist) {
-                if (end > 0) {
-                    ans.push_back({start, end});
+            //check if we need to start new cluster
+            if (cl_end == size_t(-1) || i > cl_end + cluster_dist) {
+                //report previous cluster
+                if (cl_end != size_t(-1)) {
+                    assert(cl_start != size_t(-1));
+                    ans.push_back({cl_start, cl_end});
                 }
-                start = i;
-                end = i + 1;
+                cl_start = i;
             }
-            end = i + 1;
+            cl_end = i + 1;
         }
     }
-    if (end > 0) {
-        ans.push_back(std::pair{start, end});
+    //report last cluster
+    if (cl_end != size_t(-1)) {
+        assert(cl_start != size_t(-1));
+        ans.push_back(std::pair{cl_start, cl_end});
     }
-    assert(start < pore_a.size(0) && end <= pore_a.size(0));
+    assert(cl_start < pore_a.size(0) && cl_end <= pore_a.size(0));
 
     return ans;
 }
