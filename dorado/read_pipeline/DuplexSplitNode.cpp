@@ -1,8 +1,8 @@
 #include "DuplexSplitNode.h"
 
+#include "utils/alignment_utils.h"
 #include "utils/duplex_utils.h"
 #include "utils/sequence_utils.h"
-#include "utils/alignment_utils.h"
 
 #include <openssl/sha.h>
 #include <spdlog/spdlog.h>
@@ -190,23 +190,27 @@ std::optional<PosRange> find_best_adapter_match(const std::string& adapter,
     if (span == 0)
         return std::nullopt;
 
-    auto edlib_cfg =
-            /*debug*/ DEBUG ? edlibNewAlignConfig(-1, EDLIB_MODE_HW, EDLIB_TASK_PATH, NULL, 0)
-                            : edlibNewAlignConfig(dist_thr, EDLIB_MODE_HW, EDLIB_TASK_LOC, NULL, 0);
+    auto edlib_cfg = [&] {
+        if constexpr (DEBUG) {
+            return edlibNewAlignConfig(-1, EDLIB_MODE_HW, EDLIB_TASK_PATH, NULL, 0);
+        } else {
+            return edlibNewAlignConfig(dist_thr, EDLIB_MODE_HW, EDLIB_TASK_LOC, NULL, 0);
+        }
+    }();
 
     auto edlib_result =
             edlibAlign(adapter.c_str(), adapter.size(), seq.c_str() + shift, span, edlib_cfg);
     assert(edlib_result.status == EDLIB_STATUS_OK);
     std::optional<PosRange> res = std::nullopt;
     if (edlib_result.status == EDLIB_STATUS_OK && edlib_result.editDistance != -1) {
-        if (DEBUG) {
+        if constexpr (DEBUG) {
             spdlog::debug("Best adapter match edit distance: {} ; is middle {}",
                           edlib_result.editDistance,
                           abs(int(span / 2) - edlib_result.startLocations[0]) < 1000);
             spdlog::debug("Match location: ({}, {})", edlib_result.startLocations[0] + shift,
                           edlib_result.endLocations[0] + shift + 1);
-            spdlog::debug("\n{}",
-                          utils::print_alignment(adapter.c_str(), seq.c_str() + shift, edlib_result));
+            spdlog::debug("\n{}", utils::print_alignment(adapter.c_str(), seq.c_str() + shift,
+                                                         edlib_result));
             if (edlib_result.editDistance <= dist_thr) {
                 res = {edlib_result.startLocations[0] + shift,
                        edlib_result.endLocations[0] + shift + 1};
@@ -244,9 +248,13 @@ bool check_rc_match(const std::string& seq, PosRange templ_r, PosRange compl_r, 
     std::vector<char> rc_compl(c_seq + compl_r.first, c_seq + compl_r.second);
     dorado::utils::reverse_complement(rc_compl);
 
-    auto edlib_cfg =
-            DEBUG ? edlibNewAlignConfig(-1, EDLIB_MODE_HW, EDLIB_TASK_PATH, NULL, 0)
-                  : edlibNewAlignConfig(dist_thr, EDLIB_MODE_HW, EDLIB_TASK_DISTANCE, NULL, 0);
+    auto edlib_cfg = [&] {
+        if constexpr (DEBUG) {
+            return edlibNewAlignConfig(-1, EDLIB_MODE_HW, EDLIB_TASK_PATH, NULL, 0);
+        } else {
+            return edlibNewAlignConfig(dist_thr, EDLIB_MODE_HW, EDLIB_TASK_DISTANCE, NULL, 0);
+        }
+    }();
 
     auto edlib_result = edlibAlign(c_seq + templ_r.first, templ_r.second - templ_r.first,
                                    rc_compl.data(), rc_compl.size(), edlib_cfg);
@@ -254,7 +262,7 @@ bool check_rc_match(const std::string& seq, PosRange templ_r, PosRange compl_r, 
     std::optional<PosRange> res = std::nullopt;
 
     bool match = (edlib_result.status == EDLIB_STATUS_OK) && (edlib_result.editDistance != -1);
-    if (DEBUG) {
+    if constexpr (DEBUG) {
         spdlog::debug("Checking ranges [{}, {}] vs [{}, {}]: edist={}\n{}", templ_r.first,
                       templ_r.second, compl_r.first, compl_r.second, edlib_result.editDistance,
                       utils::print_alignment(c_seq + templ_r.first, rc_compl.data(), edlib_result));
@@ -313,7 +321,7 @@ std::shared_ptr<Read> subread(const Read& read, PosRange seq_range, PosRange sig
 namespace dorado {
 
 DuplexSplitNode::ExtRead::ExtRead(std::shared_ptr<Read> r)
-        : read(r),
+        : read(std::move(r)),
           data_as_float32(read->raw_data.to(torch::kFloat)),
           move_sums(read->moves.size(), 0) {
     std::partial_sum(read->moves.begin(), read->moves.end(), move_sums.begin());
@@ -330,7 +338,7 @@ PosRanges DuplexSplitNode::possible_pore_regions(const DuplexSplitNode::ExtRead&
     //pA = read->scale * raw + read->shift
     spdlog::debug("Analyzing signal in read {}", read.read->read_id);
 
-    if (DEBUG) {
+    if constexpr (DEBUG) {
         spdlog::debug("Max raw signal {} pA, threshold: {}",
                       (read.data_as_float32 * read.read->scale + read.read->shift)
                               .index({torch::indexing::Slice(m_settings.expect_pore_prefix,
@@ -340,9 +348,9 @@ PosRanges DuplexSplitNode::possible_pore_regions(const DuplexSplitNode::ExtRead&
                       pore_thr);
     }
 
-    auto pore_sample_ranges = detect_pore_signal(read.data_as_float32,
-                                (pore_thr - read.read->shift) / read.read->scale,
-                                m_settings.pore_cl_dist, m_settings.expect_pore_prefix);
+    auto pore_sample_ranges = detect_pore_signal(
+            read.data_as_float32, (pore_thr - read.read->shift) / read.read->scale,
+            m_settings.pore_cl_dist, m_settings.expect_pore_prefix);
 
     for (auto pore_sample_range : pore_sample_ranges) {
         auto move_start = pore_sample_range.first / read.read->model_stride;
@@ -361,7 +369,7 @@ PosRanges DuplexSplitNode::possible_pore_regions(const DuplexSplitNode::ExtRead&
         pore_regions.push_back({start_pos, end_pos});
     }
 
-    if (DEBUG) {
+    if constexpr (DEBUG) {
         std::ostringstream oss;
         std::copy(pore_regions.begin(), pore_regions.end(),
                   std::ostream_iterator<PosRange>(oss, "; "));
@@ -388,7 +396,6 @@ bool DuplexSplitNode::check_flank_match(const Read& read, PosRange r, int dist_t
                           {r.first, r.second + m_settings.start_flank}, dist_thr);
 }
 
-//std::vector<ReadRange>
 std::optional<DuplexSplitNode::PosRange> DuplexSplitNode::identify_extra_middle_split(
         const Read& read) const {
     const auto r_l = read.seq.size();
@@ -440,7 +447,7 @@ std::vector<std::shared_ptr<Read>> DuplexSplitNode::split(
     subreads.push_back(
             subread(*read, {start_pos, read->seq.size()}, {signal_start, read->raw_data.size(0)}));
 
-    if (DEBUG) {
+    if constexpr (DEBUG) {
         std::ostringstream spacer_oss;
         std::copy(spacers.begin(), spacers.end(),
                   std::ostream_iterator<PosRange>(spacer_oss, "; "));

@@ -27,6 +27,7 @@ struct DuplexSplitSettings {
     int middle_adapter_search_span = 1000;
 
     //TODO put in config
+    //TODO use string_view into a shared adapter string when we have it
     //Adapter sequence we expect to see at the beginning of the read
     //Sequence below corresponds to the current 'head' adapter 'AATGTACTTCGTTCAGTTACGTATTGCT'
     // with 4bp clipped from the beginning (24bp left)
