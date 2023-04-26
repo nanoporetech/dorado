@@ -47,17 +47,18 @@ void string_reader(HighFive::Attribute& attribute, std::string& target_str) {
 std::string get_string_timestamp_from_unix_time(time_t time_stamp_ms) {
     static std::mutex timestamp_mtx;
     std::unique_lock lock(timestamp_mtx);
-    //Convert a time_t (seconds from UNIX epoch) to a timestamp in %Y-%m-%dT%H:%M:%SZ format
+    //Convert a time_t (seconds from UNIX epoch) to a timestamp in %Y-%m-%dT%H:%M:%S format
     auto time_stamp_s = time_stamp_ms / 1000;
     int num_ms = time_stamp_ms % 1000;
     char buf[32];
     struct tm ts;
     ts = *gmtime(&time_stamp_s);
-    strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%S.", &ts);
-    std::string time_stamp_str = std::string(buf);
-    time_stamp_str += std::to_string(num_ms);  // add ms
-    time_stamp_str += "+00:00";                //add zero timezone
-    return time_stamp_str;
+
+    std::stringstream ss;
+    ss << std::put_time(&ts, "%Y-%m-%dT%H:%M:%S.");
+    ss << std::setfill('0') << std::setw(3) << num_ms;  // add ms
+    ss << "+00:00";                                     //add zero timezone
+    return ss.str();
 }
 
 std::string adjust_time(const std::string& time_stamp, uint32_t offset) {

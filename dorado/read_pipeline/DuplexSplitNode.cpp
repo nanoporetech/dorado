@@ -70,7 +70,7 @@ std::shared_ptr<Read> copy_read(const Read& read) {
     return copy;
 }
 
-//TODO copied from DataLoader.cpp along with the num_ms bug
+//TODO copied from DataLoader.cpp
 std::string get_string_timestamp_from_unix_time(time_t time_stamp_ms) {
     static std::mutex timestamp_mtx;
     std::unique_lock lock(timestamp_mtx);
