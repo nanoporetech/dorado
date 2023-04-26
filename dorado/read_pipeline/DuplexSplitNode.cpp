@@ -80,19 +80,23 @@ std::string get_string_timestamp_from_unix_time(time_t time_stamp_ms) {
     char buf[32];
     struct tm ts;
     ts = *gmtime(&time_stamp_s);
-    strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%S.", &ts);
-    std::string time_stamp_str = std::string(buf);
-    time_stamp_str += std::to_string(num_ms);  // add ms
-    time_stamp_str += "+00:00";                //add zero timezone
-    return time_stamp_str;
+
+    std::stringstream ss;
+    ss << std::put_time(&ts, "%Y-%m-%dT%H:%M:%S.");
+    ss << num_ms;    // add ms
+    ss << "+00:00";  //add zero timezone
+    return ss.str();
 }
 
 // Expects the time to be encoded like "2017-09-12T9:50:12.456+00:00".
 time_t get_unix_time_from_string_timestamp(const std::string& time_stamp) {
     static std::mutex timestamp_mtx;
     std::unique_lock lock(timestamp_mtx);
+
+    std::stringstream ss(time_stamp);
     std::tm base_time = {};
-    strptime(time_stamp.c_str(), "%Y-%m-%dT%H:%M:%S.", &base_time);
+    ss >> std::get_time(&base_time, "%Y-%m-%dT%H:%M:%S.");
+
     auto num_ms = std::stoi(time_stamp.substr(20, time_stamp.size() - 26));
     return mktime(&base_time) * 1000 + num_ms;
 }
