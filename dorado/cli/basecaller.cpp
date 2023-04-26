@@ -177,7 +177,8 @@ void setup(std::vector<std::string> args,
         //TODO add separate factory methods for simplex/duplex modes
         DuplexSplitSettings splitter_settings;
         splitter_settings.simplex_mode = true;
-        splitter_node = std::make_unique<DuplexSplitNode>(writer_node, splitter_settings, num_devices);
+        splitter_node =
+                std::make_unique<DuplexSplitNode>(writer_node, splitter_settings, num_devices);
 
         basecaller_node =
                 std::make_unique<BasecallerNode>(*splitter_node, std::move(runners), batch_size,
