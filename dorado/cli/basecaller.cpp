@@ -16,6 +16,7 @@
 #include "nn/RemoraModel.h"
 #include "read_pipeline/BasecallerNode.h"
 #include "read_pipeline/ModBaseCallerNode.h"
+#include "read_pipeline/ReadFilterNode.h"
 #include "read_pipeline/ScalerNode.h"
 #include "read_pipeline/WriterNode.h"
 #include "utils/log_utils.h"
@@ -164,8 +165,10 @@ void setup(std::vector<std::string> args,
     num_reads = max_reads == 0 ? num_reads : std::min(num_reads, max_reads);
 
     bool rna = utils::is_rna_model(model_path), duplex = false;
-    WriterNode writer_node(std::move(args), emit_fastq, emit_moves, rna, duplex, min_qscore,
-                           num_devices * 2, std::move(read_groups), num_reads);
+    WriterNode writer_node(std::move(args), emit_fastq, emit_moves, rna, duplex, num_devices * 2,
+                           std::move(read_groups), num_reads);
+    ReadFilterNode read_filter_node(writer_node, min_qscore, num_devices * 2 /*num_threads*/,
+                                    num_reads);
 
     std::unique_ptr<ModBaseCallerNode> mod_base_caller_node;
     std::unique_ptr<BasecallerNode> basecaller_node;
@@ -173,17 +176,17 @@ void setup(std::vector<std::string> args,
     const int kBatchTimeoutMS = 100;
     if (!remora_model_list.empty()) {
         mod_base_caller_node = std::make_unique<ModBaseCallerNode>(
-                writer_node, std::move(remora_callers), num_remora_threads, num_devices,
+                read_filter_node, std::move(remora_callers), num_remora_threads, num_devices,
                 model_stride, remora_batch_size);
         basecaller_node = std::make_unique<BasecallerNode>(
                 *mod_base_caller_node, std::move(runners), batch_size, chunk_size, overlap,
                 model_stride, kBatchTimeoutMS, model_name);
     } else {
         basecaller_node = std::make_unique<BasecallerNode>(
-                writer_node, std::move(runners), batch_size, chunk_size, overlap, model_stride,
+                read_filter_node, std::move(runners), batch_size, chunk_size, overlap, model_stride,
                 kBatchTimeoutMS, model_name);
     }
-    ScalerNode scaler_node(*basecaller_node, num_devices * 2);
+    ScalerNode scaler_node(*basecaller_node, num_devices * 4);
     DataLoader loader(scaler_node, "cpu", num_devices, max_reads, read_list);
 
     loader.load_reads(data_path, recursive_file_loading);
