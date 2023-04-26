@@ -12,7 +12,7 @@
     - export BUILD_OPTIONS="${BUILD_OPTIONS} -D ECM_ENABLE_SANITIZERS='${SANITIZER}'"
     # Setup additional runtime options
     - export ASAN_OPTIONS=detect_stack_use_after_return=1:check_initialization_order=1
-    - export UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1
+    - export UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1:suppressions=${PWD}/ubsan.supp
   needs:
     - run_sanitizers
   # No need to keep the build around
