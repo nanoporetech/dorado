@@ -173,10 +173,10 @@ std::vector<std::pair<size_t, size_t>> detect_pore_signal(torch::Tensor signal,
     }
     //report last cluster
     if (cl_end != size_t(-1)) {
+        assert(cl_start < pore_a.size(0) && cl_end <= pore_a.size(0));
         assert(cl_start != size_t(-1));
         ans.push_back(std::pair{cl_start, cl_end});
     }
-    assert(cl_start < pore_a.size(0) && cl_end <= pore_a.size(0));
 
     return ans;
 }
