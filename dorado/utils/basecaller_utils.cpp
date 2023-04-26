@@ -1,13 +1,14 @@
 #include "basecaller_utils.h"
 
 #include <fstream>
+#include <optional>
 
 namespace dorado::utils {
-std::unordered_set<std::string> load_read_list(std::string read_list) {
+std::optional<std::unordered_set<std::string>> load_read_list(std::string read_list) {
     std::unordered_set<std::string> read_ids;
 
     if (read_list == "") {
-        return read_ids;
+        return {};
     }
 
     std::ifstream dataFile;
