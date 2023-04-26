@@ -36,7 +36,6 @@ auto filter_ranges(const PosRanges& ranges, FilterF filter_f) {
     return filtered;
 }
 
-//TODO add copy constructor?
 std::shared_ptr<Read> copy_read(const Read& read) {
     auto copy = std::make_shared<Read>();
     copy->raw_data = read.raw_data;
@@ -243,7 +242,10 @@ std::vector<PosRange> find_adapter_matches(const std::string& adapter,
 
 //semi-global alignment of "template region" to "complement region"
 bool check_rc_match(const std::string& seq, PosRange templ_r, PosRange compl_r, int dist_thr) {
-    assert(templ_r.second > templ_r.first && compl_r.second > compl_r.first && dist_thr >= 0);
+    assert(templ_r.second > templ_r.first);
+    assert(compl_r.second > compl_r.first);
+    assert(dist_thr >= 0);
+
     const char* c_seq = seq.c_str();
     std::vector<char> rc_compl(c_seq + compl_r.first, c_seq + compl_r.second);
     dorado::utils::reverse_complement(rc_compl);
@@ -579,12 +581,12 @@ void DuplexSplitNode::worker_thread() {
 }
 
 DuplexSplitNode::DuplexSplitNode(MessageSink& sink,
-                                 const DuplexSplitSettings& settings,
+                                 DuplexSplitSettings settings,
                                  int num_worker_threads,
                                  size_t max_reads)
         : MessageSink(max_reads),
           m_sink(sink),
-          m_settings(settings),
+          m_settings(std::move(settings)),
           m_num_worker_threads(num_worker_threads) {
     m_split_finders = build_split_finders();
     for (int i = 0; i < m_num_worker_threads; i++) {
