@@ -177,11 +177,11 @@ void setup(std::vector<std::string> args,
                 model_stride, remora_batch_size);
         basecaller_node_sink = static_cast<MessageSink*>(mod_base_caller_node.get());
     }
-
     const int kBatchTimeoutMS = 100;
     BasecallerNode basecaller_node(*basecaller_node_sink, std::move(runners), overlap,
                                    kBatchTimeoutMS, model_name);
-    ScalerNode scaler_node(basecaller_node, num_devices * 2);
+    ScalerNode scaler_node(basecaller_node, num_devices * 4);
+
     DataLoader loader(scaler_node, "cpu", num_devices, max_reads, read_list);
 
     loader.load_reads(data_path, recursive_file_loading);
