@@ -83,8 +83,8 @@ std::string get_string_timestamp_from_unix_time(time_t time_stamp_ms) {
 
     std::stringstream ss;
     ss << std::put_time(&ts, "%Y-%m-%dT%H:%M:%S.");
-    ss << num_ms;    // add ms
-    ss << "+00:00";  //add zero timezone
+    ss << std::setfill('0') << std::setw(3) << num_ms;  // add ms
+    ss << "+00:00";                                     //add zero timezone
     return ss.str();
 }
 
