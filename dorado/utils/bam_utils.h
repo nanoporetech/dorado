@@ -1,4 +1,5 @@
 #pragma once
+#include "data_loader/DataLoader.h"
 #include "htslib/sam.h"
 #include "minimap.h"
 #include "read_pipeline/ReadPipeline.h"
@@ -18,8 +19,8 @@ class Aligner : public MessageSink {
 public:
     Aligner(MessageSink& read_sink, const std::string& filename, int k, int w, int threads);
     ~Aligner();
-    void add_sq_to_hdr(sam_hdr_t* hdr);
     std::vector<bam1_t*> align(bam1_t* record, mm_tbuf_t* buf);
+    sq_t get_sequence_records_for_header();
 
 private:
     MessageSink& m_sink;
@@ -29,7 +30,6 @@ private:
     std::vector<std::unique_ptr<std::thread>> m_workers;
     void worker_thread(size_t tid);
     void add_tags(bam1_t*, const mm_reg1_t*, const std::string&, const mm_tbuf_t*);
-    sq_t get_sequence_records_for_header();
 
     mm_idxopt_t m_idx_opt;
     mm_mapopt_t m_map_opt;
@@ -37,11 +37,11 @@ private:
     mm_idx_reader_t* m_index_reader{nullptr};
 };
 
-class BamReader {
+class HtsReader {
 public:
-    BamReader(const std::string& filename);
-    BamReader(MessageSink& read_sink, const std::string& filename);
-    ~BamReader();
+    HtsReader(const std::string& filename);
+    HtsReader(MessageSink& read_sink, const std::string& filename);
+    ~HtsReader();
     bool read();
     void read(MessageSink& read_sink, int max_reads = -1);
 
@@ -54,17 +54,25 @@ private:
     htsFile* m_file{nullptr};
 };
 
-class BamWriter : public MessageSink {
+class HtsWriter : public MessageSink {
 public:
-    BamWriter(const std::string& filename,
-              bool emit_fastq,
+    enum OutputMode {
+        BAM,
+        SAM,
+        FASTQ,
+    };
+
+    HtsWriter(const std::string& filename,
+              OutputMode mode,
               size_t threads = 1,
               size_t num_reads = 0);
-    ~BamWriter();
+    ~HtsWriter();
     void add_header(const sam_hdr_t* header);
     int write_header();
     int write(bam1_t* record);
     void join();
+
+    static OutputMode get_output_mode(std::string mode);
 
     size_t total{0};
     size_t primary{0};
@@ -104,5 +112,9 @@ private:
  * @note The input BAM file must be properly formatted and readable.
  */
 read_map read_bam(const std::string& filename, const std::set<std::string>& read_ids);
+
+void add_rg_hdr(sam_hdr_t* hdr, const std::unordered_map<std::string, ReadGroup>& read_groups);
+
+void add_sq_hdr(sam_hdr_t* hdr, const sq_t& seqs);
 
 }  // namespace dorado::utils

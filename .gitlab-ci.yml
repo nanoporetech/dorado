@@ -238,7 +238,7 @@ build_archive:macos:x64:
   script:
     - echo dorado basecaller test stage
     - ./dist/bin/dorado download --model dna_r9.4.1_e8_hac@v3.3
-    - ./dist/bin/dorado basecaller dna_r9.4.1_e8_hac@v3.3 ./tests/data/pod5 -b 384 --emit-fastq > ref.fq
+    - ./dist/bin/dorado basecaller dna_r9.4.1_e8_hac@v3.3 ./tests/data/pod5 -b 384 --output-mode fastq > ref.fq
     - ./dist/bin/dorado basecaller dna_r9.4.1_e8_hac@v3.3 ./tests/data/pod5 -b 384 --modified-bases 5mCG > calls.sam
     - ./dist/bin/dorado basecaller dna_r9.4.1_e8_hac@v3.3 ./tests/data/pod5 -x cpu --modified-bases 5mCG > calls.sam
     - samtools quickcheck -u calls.sam

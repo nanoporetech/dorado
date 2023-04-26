@@ -14,10 +14,6 @@ void ReadToBamType::worker_thread() {
         // If this message isn't a read, we'll get a bad_variant_access exception.
         auto read = std::get<std::shared_ptr<Read>>(message);
 
-        m_num_bases_processed += read->seq.length();
-        m_num_samples_processed += read->raw_data.size(0);
-        ++m_num_reads_processed;
-
         if (m_rna) {
             std::reverse(read->seq.begin(), read->seq.end());
             std::reverse(read->qstring.begin(), read->qstring.end());
@@ -32,23 +28,6 @@ void ReadToBamType::worker_thread() {
     auto num_active_threads = --m_active_threads;
     if (num_active_threads == 0) {
         m_sink.terminate();
-
-        m_end_time = std::chrono::system_clock::now();
-    }
-}
-
-void ReadToBamType::dump_stats() {
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(m_end_time -
-                                                                          m_initialization_time)
-                            .count();
-    std::ostringstream samples_sec;
-    spdlog::info("> Reads basecalled: {}", m_num_reads_processed);
-    if (m_duplex) {
-        samples_sec << std::scientific << m_num_bases_processed / (duration / 1000.0);
-        spdlog::info("> Basecalled @ Bases/s: {}", samples_sec.str());
-    } else {
-        samples_sec << std::scientific << m_num_samples_processed / (duration / 1000.0);
-        spdlog::info("> Basecalled @ Samples/s: {}", samples_sec.str());
     }
 }
 
@@ -65,11 +44,7 @@ ReadToBamType::ReadToBamType(MessageSink& sink,
           m_rna(rna),
           m_duplex(duplex),
           m_modbase_threshold(modbase_threshold),
-          m_active_threads(0),
-          m_num_bases_processed(0),
-          m_num_samples_processed(0),
-          m_num_reads_processed(0),
-          m_initialization_time(std::chrono::system_clock::now()) {
+          m_active_threads(0) {
     for (size_t i = 0; i < num_worker_threads; i++) {
         m_workers.push_back(
                 std::make_unique<std::thread>(std::thread(&ReadToBamType::worker_thread, this)));

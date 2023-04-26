@@ -19,7 +19,6 @@ public:
                   uint8_t modbase_threshold = 0,
                   size_t max_reads = 1000);
     ~ReadToBamType();
-    void dump_stats();
 
 private:
     MessageSink& m_sink;
@@ -33,13 +32,6 @@ private:
     bool m_rna;
     bool m_duplex;
     uint8_t m_modbase_threshold;
-
-    std::atomic<int64_t> m_num_bases_processed;
-    std::atomic<int64_t> m_num_samples_processed;
-    std::atomic<int> m_num_reads_processed;
-
-    std::chrono::time_point<std::chrono::system_clock> m_initialization_time;
-    std::chrono::time_point<std::chrono::system_clock> m_end_time;
 };
 
 }  // namespace dorado

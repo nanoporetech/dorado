@@ -19,6 +19,7 @@
 #include "read_pipeline/ReadFilterNode.h"
 #include "read_pipeline/ReadToBamTypeNode.h"
 #include "read_pipeline/ScalerNode.h"
+#include "read_pipeline/StatsCounter.h"
 #include "read_pipeline/WriterNode.h"
 #include "utils/bam_utils.h"
 #include "utils/log_utils.h"
@@ -37,6 +38,9 @@
 
 namespace dorado {
 
+using HtsWriter = utils::HtsWriter;
+using HtsReader = utils::HtsReader;
+
 void add_pg_hdr(sam_hdr_t* hdr, const std::vector<std::string>& args) {
     sam_hdr_add_lines(hdr, "@HD\tVN:1.6\tSO:unknown", 0);
 
@@ -47,28 +51,6 @@ void add_pg_hdr(sam_hdr_t* hdr, const std::vector<std::string>& args) {
     }
     pg << std::endl;
     sam_hdr_add_lines(hdr, pg.str().c_str(), 0);
-}
-
-void add_rg_hdr(sam_hdr_t* hdr, const std::unordered_map<std::string, ReadGroup>& read_groups) {
-    // Add read groups
-    for (auto const& x : read_groups) {
-        std::stringstream rg;
-        rg << "@RG\t";
-        rg << "ID:" << x.first << "\t";
-        rg << "PU:" << x.second.flowcell_id << "\t";
-        rg << "PM:" << x.second.device_id << "\t";
-        rg << "DT:" << x.second.exp_start_time << "\t";
-        rg << "PL:"
-           << "ONT"
-           << "\t";
-        rg << "DS:"
-           << "basecall_model=" << x.second.basecalling_model << " runid=" << x.second.run_id
-           << "\t";
-        rg << "LB:" << x.second.sample_id << "\t";
-        rg << "SM:" << x.second.sample_id;
-        rg << std::endl;
-        sam_hdr_add_lines(hdr, rg.str().c_str(), 0);
-    }
 }
 
 void setup(std::vector<std::string> args,
@@ -83,7 +65,7 @@ void setup(std::vector<std::string> args,
            size_t num_runners,
            size_t remora_batch_size,
            size_t num_remora_threads,
-           bool emit_fastq,
+           HtsWriter::OutputMode output_mode,
            bool emit_moves,
            size_t max_reads,
            size_t min_qscore,
@@ -161,11 +143,11 @@ void setup(std::vector<std::string> args,
         overlap = adjusted_overlap;
     }
 
-    if (!remora_models.empty() && emit_fastq) {
+    if (!remora_models.empty() && output_mode == HtsWriter::OutputMode::FASTQ) {
         throw std::runtime_error("Modified base models cannot be used with FASTQ output");
     }
 
-    if (!ref.empty() && emit_fastq) {
+    if (!ref.empty() && output_mode == HtsWriter::OutputMode::FASTQ) {
         throw std::runtime_error("Alignment to reference can be used with FASTQ output.");
     }
 
@@ -213,29 +195,30 @@ void setup(std::vector<std::string> args,
 
     std::unique_ptr<sam_hdr_t, void (*)(sam_hdr_t*)> hdr(sam_hdr_init(), sam_hdr_destroy);
     add_pg_hdr(hdr.get(), args);
-    add_rg_hdr(hdr.get(), read_groups);
-    std::shared_ptr<utils::BamWriter> bam_writer;
+    utils::add_rg_hdr(hdr.get(), read_groups);
+    std::shared_ptr<HtsWriter> bam_writer;
     std::shared_ptr<utils::Aligner> aligner;
     MessageSink* converted_reads_sink = nullptr;
     if (ref.empty()) {
-        bam_writer = std::make_shared<utils::BamWriter>(
-                "-", emit_fastq, num_devices * 2 /*writer_threads*/, num_reads);
+        bam_writer = std::make_shared<HtsWriter>("-", output_mode,
+                                                 num_devices * 2 /*writer_threads*/, num_reads);
         bam_writer->add_header(hdr.get());
         bam_writer->write_header();
         converted_reads_sink = bam_writer.get();
     } else {
-        bam_writer = std::make_shared<utils::BamWriter>("-", emit_fastq,
-                                                        num_devices * 2 /*writer_threads*/);
+        bam_writer =
+                std::make_shared<HtsWriter>("-", output_mode, num_devices * 2 /*writer_threads*/);
         aligner = std::make_shared<utils::Aligner>(*bam_writer, ref, kmer_size, window_size,
                                                    num_devices * 5);
-        aligner->add_sq_to_hdr(hdr.get());
+        utils::add_sq_hdr(hdr.get(), aligner->get_sequence_records_for_header());
         bam_writer->add_header(hdr.get());
         bam_writer->write_header();
         converted_reads_sink = aligner.get();
     }
     ReadToBamType read_converter(*converted_reads_sink, emit_moves, rna, duplex,
                                  num_devices * 2 /*num_threads*/, num_reads);
-    ReadFilterNode read_filter_node(read_converter, min_qscore, num_devices * 2, num_reads);
+    StatsCounterNode stats_node(read_converter, duplex);
+    ReadFilterNode read_filter_node(stats_node, min_qscore, num_devices * 2, num_reads);
 
     std::unique_ptr<ModBaseCallerNode> mod_base_caller_node;
     std::unique_ptr<BasecallerNode> basecaller_node;
@@ -259,7 +242,7 @@ void setup(std::vector<std::string> args,
     loader.load_reads(data_path, recursive_file_loading);
 
     bam_writer->join();
-    read_converter.dump_stats();
+    stats_node.dump_stats();
 }
 
 int basecaller(int argc, char* argv[]) {
@@ -326,15 +309,23 @@ int basecaller(int argc, char* argv[]) {
             .default_value(std::string())
             .help("a comma separated list of modified base models");
 
-    parser.add_argument("--emit-fastq").default_value(false).implicit_value(true);
+    parser.add_argument("--output-mode")
+            .help("Output mode for results. Options are sam, bam or fastq.")
+            .default_value(std::string("bam"));
 
     parser.add_argument("--emit-moves").default_value(false).implicit_value(true);
 
     parser.add_argument("--ref")
             .help("Path to reference for alignment.")
             .default_value(std::string(""));
-    parser.add_argument("-k").help("k-mer size (maximum 28).").default_value(15).scan<'i', int>();
-    parser.add_argument("-w").help("minimizer window size.").default_value(10).scan<'i', int>();
+    parser.add_argument("-k")
+            .help("k-mer size for alignment with minimap2 (maximum 28).")
+            .default_value(15)
+            .scan<'i', int>();
+    parser.add_argument("-w")
+            .help("minimizer window size for alignment with minimap2.")
+            .default_value(10)
+            .scan<'i', int>();
 
     try {
         parser.parse_args(argc, argv);
@@ -376,7 +367,8 @@ int basecaller(int argc, char* argv[]) {
               parser.get<std::string>("-x"), parser.get<std::string>("--ref"),
               parser.get<int>("-c"), parser.get<int>("-o"), parser.get<int>("-b"),
               default_parameters.num_runners, default_parameters.remora_batchsize,
-              default_parameters.remora_threads, parser.get<bool>("--emit-fastq"),
+              default_parameters.remora_threads,
+              HtsWriter::get_output_mode(parser.get<std::string>("--output-mode")),
               parser.get<bool>("--emit-moves"), parser.get<int>("--max-reads"),
               parser.get<int>("--min-qscore"), parser.get<std::string>("--read-ids"),
               parser.get<bool>("--recursive"), parser.get<int>("k"), parser.get<int>("w"));
