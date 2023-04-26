@@ -49,7 +49,7 @@ public:
     typedef std::vector<PosRange> PosRanges;
 
     DuplexSplitNode(MessageSink& sink,
-                    const DuplexSplitSettings& settings,
+                    DuplexSplitSettings settings,
                     int num_worker_threads = 5,
                     size_t max_reads = 1000);
     ~DuplexSplitNode();
