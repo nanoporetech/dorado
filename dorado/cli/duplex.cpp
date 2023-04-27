@@ -1,6 +1,7 @@
 #include "Version.h"
 #include "data_loader/DataLoader.h"
 #include "decode/CPUDecoder.h"
+#include "nn/CRFModel.h"
 #include "read_pipeline/BaseSpaceDuplexCallerNode.h"
 #include "read_pipeline/BasecallerNode.h"
 #include "read_pipeline/ReadFilterNode.h"
@@ -105,6 +106,19 @@ int duplex(int argc, char* argv[]) {
         } else {  // Execute a Stereo Duplex pipeline.
 
             const auto model_path = std::filesystem::canonical(std::filesystem::path(model));
+
+            // Check sample rate of model vs data.
+            auto data_sample_rate = DataLoader::get_sample_rate(reads);
+            if (data_sample_rate) {
+                auto model_sample_rate = get_model_sample_rate(model_path);
+                ;
+                if (*data_sample_rate != model_sample_rate) {
+                    std::stringstream err;
+                    err << "Sample rate for model (" << model_sample_rate << ") and data ("
+                        << *data_sample_rate << ") don't match." << std::endl;
+                    throw std::runtime_error(err.str());
+                }
+            }
 
             // Currently the stereo model is hardcoded.
             const std::string stereo_model_name("dna_r10.4.1_e8.2_4khz_stereo@v1.1");

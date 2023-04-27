@@ -35,6 +35,8 @@ public:
             std::unordered_set<std::string> read_list = std::unordered_set<std::string>(),
             bool recursive_file_loading = false);
 
+    static std::optional<uint16_t> get_sample_rate(std::string data_path);
+
 private:
     void load_fast5_reads_from_file(const std::string& path);
     void load_pod5_reads_from_file(const std::string& path);

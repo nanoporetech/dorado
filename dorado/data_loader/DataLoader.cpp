@@ -280,6 +280,36 @@ std::unordered_map<std::string, ReadGroup> DataLoader::load_read_groups(
     return read_groups;
 }
 
+std::optional<uint16_t> DataLoader::get_sample_rate(std::string data_path) {
+    for (const auto& entry : std::filesystem::directory_iterator((data_path))) {
+        std::string ext = std::filesystem::path(entry).extension().string();
+        std::transform(ext.begin(), ext.end(), ext.begin(),
+                       [](unsigned char c) { return std::tolower(c); });
+        if (ext == ".pod5") {
+            pod5_init();
+
+            // Open the file ready for walking:
+            Pod5FileReader_t* file = pod5_open_file(entry.path().string().c_str());
+
+            if (!file) {
+                spdlog::error("Failed to open file {}: {}", entry.path().string().c_str(),
+                              pod5_get_error_string());
+            } else {
+                // First get the run info count
+                run_info_index_t run_info_count;
+                pod5_get_file_run_info_count(file, &run_info_count);
+                if (run_info_count > static_cast<run_info_index_t>(0)) {
+                    RunInfoDictData_t* run_info_data;
+                    pod5_get_file_run_info(file, 0, &run_info_data);
+                    return run_info_data->sample_rate;
+                }
+            }
+        }
+    }
+
+    return {};
+}
+
 void DataLoader::load_pod5_reads_from_file(const std::string& path) {
     pod5_init();
 

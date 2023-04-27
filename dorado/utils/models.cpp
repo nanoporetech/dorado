@@ -99,4 +99,13 @@ std::string get_modification_model(const std::string& simplex_model,
     return modification_path.u8string();
 }
 
+uint16_t get_sample_rate_for_model(const std::string& model) {
+    auto iter = sample_rate_by_model.find(model);
+    if (iter != sample_rate_by_model.end()) {
+        return iter->second;
+    } else {
+        return 4000;
+    }
+}
+
 }  // namespace dorado::utils
