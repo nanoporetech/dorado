@@ -22,6 +22,7 @@
 #include "read_pipeline/StatsCounter.h"
 #include "read_pipeline/WriterNode.h"
 #include "utils/bam_utils.h"
+#include "utils/cli_utils.h"
 #include "utils/log_utils.h"
 #include "utils/parameters.h"
 
@@ -148,7 +149,7 @@ void setup(std::vector<std::string> args,
     }
 
     if (!ref.empty() && output_mode == HtsWriter::OutputMode::FASTQ) {
-        throw std::runtime_error("Alignment to reference can be used with FASTQ output.");
+        throw std::runtime_error("Alignment to reference cannot be used with FASTQ output.");
     }
 
     std::vector<std::filesystem::path> remora_model_list;
@@ -309,13 +310,18 @@ int basecaller(int argc, char* argv[]) {
             .default_value(std::string())
             .help("a comma separated list of modified base models");
 
-    parser.add_argument("--output-mode")
-            .help("Output mode for results. Options are sam, bam or fastq.")
-            .default_value(std::string("bam"));
+    parser.add_argument("--emit-fastq")
+            .help("Output in fastq format.")
+            .default_value(false)
+            .implicit_value(true);
+    parser.add_argument("--emit-sam")
+            .help("Output in SAM format.")
+            .default_value(false)
+            .implicit_value(true);
 
     parser.add_argument("--emit-moves").default_value(false).implicit_value(true);
 
-    parser.add_argument("--ref")
+    parser.add_argument("--reference")
             .help("Path to reference for alignment.")
             .default_value(std::string(""));
     parser.add_argument("-k")
@@ -360,18 +366,32 @@ int basecaller(int argc, char* argv[]) {
                                 [](std::string a, std::string b) { return a + "," + b; });
     }
 
+    auto output_mode = HtsWriter::OutputMode::BAM;
+
+    auto emit_fastq = parser.get<bool>("--emit-fastq");
+    auto emit_sam = parser.get<bool>("--emit-sam");
+
+    if (emit_fastq && emit_sam) {
+        throw std::runtime_error("Only one of --emit-{fastq, sam} can be set (or none).");
+    }
+
+    if (emit_fastq) {
+        output_mode = HtsWriter::OutputMode::FASTQ;
+    } else if (emit_sam || utils::is_fd_tty(stdout)) {
+        output_mode = HtsWriter::OutputMode::SAM;
+    }
+
     spdlog::info("> Creating basecall pipeline");
 
     try {
         setup(args, model, parser.get<std::string>("data"), mod_bases_models,
-              parser.get<std::string>("-x"), parser.get<std::string>("--ref"),
+              parser.get<std::string>("-x"), parser.get<std::string>("--reference"),
               parser.get<int>("-c"), parser.get<int>("-o"), parser.get<int>("-b"),
               default_parameters.num_runners, default_parameters.remora_batchsize,
-              default_parameters.remora_threads,
-              HtsWriter::get_output_mode(parser.get<std::string>("--output-mode")),
-              parser.get<bool>("--emit-moves"), parser.get<int>("--max-reads"),
-              parser.get<int>("--min-qscore"), parser.get<std::string>("--read-ids"),
-              parser.get<bool>("--recursive"), parser.get<int>("k"), parser.get<int>("w"));
+              default_parameters.remora_threads, output_mode, parser.get<bool>("--emit-moves"),
+              parser.get<int>("--max-reads"), parser.get<int>("--min-qscore"),
+              parser.get<std::string>("--read-ids"), parser.get<bool>("--recursive"),
+              parser.get<int>("k"), parser.get<int>("w"));
     } catch (const std::exception& e) {
         spdlog::error("{}", e.what());
         return 1;

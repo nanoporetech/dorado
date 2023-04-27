@@ -1,8 +1,14 @@
 // Add some utilities for CLI.
 
+#include <stdio.h>
+
 #include <algorithm>
 #include <cmath>
 #include <utility>
+
+#ifndef _WIN32
+#include <unistd.h>
+#endif
 
 namespace dorado {
 
@@ -18,6 +24,14 @@ static std::pair<int, int> aligner_writer_thread_allocation(int available_thread
                        available_threads - 1);
     int aligner_threads = std::clamp(available_threads - writer_threads, 1, available_threads - 1);
     return std::make_pair(aligner_threads, writer_threads);
+}
+
+static bool is_fd_tty(FILE* fd) {
+#ifdef _WIN32
+    return true;
+#else
+    return isatty(fileno(fd));
+#endif
 }
 
 }  // namespace utils
