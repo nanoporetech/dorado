@@ -3,8 +3,6 @@
 #include <indicators/progress_bar.hpp>
 #include <spdlog/spdlog.h>
 
-using namespace std::chrono_literals;
-
 namespace dorado {
 
 void NullNode::worker_thread() {

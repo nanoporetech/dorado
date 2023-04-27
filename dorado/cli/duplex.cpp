@@ -107,9 +107,7 @@ int duplex(int argc, char* argv[]) {
 
             const auto model_path = std::filesystem::canonical(std::filesystem::path(model));
 
-            // Currently the stereo model is hardcoded.
-
-            const std::string stereo_model_name = utils::get_stereo_model_name(model);
+            auto stereo_model_name = utils::get_stereo_model_name(model);
             const auto stereo_model_path =
                     model_path.parent_path() / std::filesystem::path(stereo_model_name);
 

@@ -1,13 +1,6 @@
 #pragma once
 
 #include "ReadPipeline.h"
-#include "data_loader/DataLoader.h"
-
-#include <indicators/progress_bar.hpp>
-
-#include <atomic>
-#include <string>
-#include <vector>
 
 namespace dorado {
 
