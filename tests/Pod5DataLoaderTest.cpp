@@ -103,3 +103,10 @@ TEST_CASE(TEST_GROUP "Test calculating number of reads from pod5, read ids list.
         CHECK(dorado::DataLoader::get_num_reads(data_path, read_list) == 1);
     }
 }
+
+TEST_CASE(TEST_GROUP "Find sample rate from pod5.") {
+    // Create a mock sink for testing output of reads
+    std::string data_path(get_pod5_data_dir());
+
+    CHECK(dorado::DataLoader::get_sample_rate(data_path) == 4000);
+}

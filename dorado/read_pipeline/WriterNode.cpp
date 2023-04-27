@@ -3,7 +3,6 @@
 #include "Version.h"
 #include "utils/sequence_utils.h"
 
-#include <htslib/kstring.h>
 #include <htslib/sam.h>
 #include <indicators/progress_bar.hpp>
 #include <spdlog/spdlog.h>
@@ -101,11 +100,7 @@ void WriterNode::worker_thread() {
                 for (const auto aln : alns) {
                     std::scoped_lock<std::mutex> lock(m_cout_mutex);
                     if (sam_write1(m_file, m_header, aln) < 0) {
-                        kstring_t str;
-                        ks_initialize(&str);
-                        sam_format1(nullptr, aln, &str);
-                        spdlog::warn("Unable to write alignment {}", str.s);
-                        ks_free(&str);
+                        spdlog::warn("Unable to write alignment for read {}", read->read_id);
                     }
                 }
             } catch (const std::exception& ex) {

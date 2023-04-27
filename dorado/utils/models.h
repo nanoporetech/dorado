@@ -1,5 +1,6 @@
 #include <filesystem>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace dorado {
@@ -114,6 +115,19 @@ static const std::vector<std::string> models = {
 
 namespace utils {
 
+static const std::unordered_map<std::string, uint16_t> sample_rate_by_model = {
+
+        //------ simplex ---------//
+        // v4.2
+        {"dna_r10.4.1_e8.2_5khz_400bps_fast@v4.2.0", 5000},
+        {"dna_r10.4.1_e8.2_5khz_400bps_hac@v4.2.0", 5000},
+        {"dna_r10.4.1_e8.2_5khz_400bps_sup@v4.2.0", 5000},
+
+        //------ duplex ---------//
+        // v4.2
+        {"dna_r10.4.1_e8.2_5khz_stereo@v1.0", 5000},
+};
+
 bool is_rna_model(const std::filesystem::path& model);
 bool is_valid_model(const std::string& selected_model);
 void download_models(const std::string& target_directory, const std::string& selected_model);
@@ -123,6 +137,10 @@ void download_models(const std::string& target_directory, const std::string& sel
 // model then it is downloaded.
 std::string get_modification_model(const std::string& simplex_model,
                                    const std::string& modification);
+
+// fetch the sampling rate that the model is compatible with. for models not
+// present in the mapping, assume a sampling rate of 4000.
+uint16_t get_sample_rate_by_model_name(const std::string& model_name);
 
 }  // namespace utils
 

@@ -286,6 +286,72 @@ std::unordered_map<std::string, ReadGroup> DataLoader::load_read_groups(
     return read_groups;
 }
 
+uint16_t DataLoader::get_sample_rate(std::string data_path) {
+    std::optional<uint16_t> sample_rate = std::nullopt;
+
+    for (const auto& entry : std::filesystem::directory_iterator((data_path))) {
+        std::string ext = std::filesystem::path(entry).extension().string();
+        std::transform(ext.begin(), ext.end(), ext.begin(),
+                       [](unsigned char c) { return std::tolower(c); });
+        if (ext == ".pod5") {
+            pod5_init();
+
+            // Open the file ready for walking:
+            Pod5FileReader_t* file = pod5_open_file(entry.path().string().c_str());
+
+            if (!file) {
+                spdlog::error("Failed to open file {}: {}", entry.path().string().c_str(),
+                              pod5_get_error_string());
+            } else {
+                // First get the run info count
+                run_info_index_t run_info_count;
+                pod5_get_file_run_info_count(file, &run_info_count);
+                if (run_info_count > static_cast<run_info_index_t>(0)) {
+                    RunInfoDictData_t* run_info_data;
+                    pod5_get_file_run_info(file, 0, &run_info_data);
+                    sample_rate = run_info_data->sample_rate;
+
+                    if (pod5_free_run_info(run_info_data) != POD5_OK) {
+                        spdlog::error("Failed to free POD5 run info");
+                    }
+                }
+            }
+
+            if (pod5_close_and_free_reader(file) != POD5_OK) {
+                spdlog::error("Failed to close and free POD5 reader");
+            }
+        } else if (ext == ".fast5") {
+            H5Easy::File file(entry.path().string(), H5Easy::File::ReadOnly);
+            HighFive::Group reads = file.getGroup("/");
+            int num_reads = reads.getNumberObjects();
+
+            if (num_reads > 0) {
+                auto read_id = reads.getObjectName(0);
+                HighFive::Group read = reads.getGroup(read_id);
+
+                HighFive::Group channel_id_group = read.getGroup("channel_id");
+                HighFive::Attribute sampling_rate_attr =
+                        channel_id_group.getAttribute("sampling_rate");
+
+                float sampling_rate;
+                sampling_rate_attr.read(sampling_rate);
+                sample_rate = static_cast<uint16_t>(sampling_rate);
+            }
+        }
+
+        // Break out of loop if sample rate is found.
+        if (sample_rate) {
+            break;
+        }
+    }
+
+    if (sample_rate) {
+        return *sample_rate;
+    } else {
+        throw std::runtime_error("Unable to determine sample rate for data.");
+    }
+}
+
 void DataLoader::load_pod5_reads_from_file(const std::string& path) {
     pod5_init();
 

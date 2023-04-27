@@ -1,5 +1,6 @@
 #include "CRFModel.h"
 
+#include "../utils/models.h"
 #include "../utils/module_utils.h"
 #include "../utils/tensor_utils.h"
 
@@ -308,6 +309,7 @@ struct CudaLSTMImpl : Module {
         auto options = torch::TensorOptions().dtype(torch::kFloat16);
         weights = torch::empty({layer_size * 4, layer_size * 2}, options).contiguous();
         auto weight_ih = weights.slice(1, 0, layer_size);
+
         auto weight_hh = weights.slice(1, layer_size, 2 * layer_size);
         if (reverse) {
             std::swap(weight_ih, weight_hh);
@@ -862,6 +864,15 @@ CRFModelConfig load_crf_model_config(const std::filesystem::path &path) {
     const auto PowerOf4 = [](int x) { return 1 << (x << 1); };
     config.outsize = PowerOf4(config.state_len + 1);
 
+    // Fetch run_info parameters.
+    try {
+        const auto &run_info = toml::find(config_toml, "run_info");
+        config.sample_rate = toml::find<int>(run_info, "sample_rate");
+    } catch (const std::out_of_range &oor) {
+        // Do nothing as run_info is not available in all config files.
+        config.sample_rate = -1;
+    }
+
     return config;
 }
 
@@ -921,6 +932,17 @@ ModuleHolder<AnyModule> load_crf_model(const std::filesystem::path &path,
         return populate_model(model, path, options, model_config.out_features.has_value(),
                               model_config.bias);
     }
+}
+
+uint16_t get_model_sample_rate(const std::filesystem::path &model_path) {
+    std::string model_name = std::filesystem::canonical(model_path).filename().string();
+    // Find the sample rate from model config.
+    int model_sample_rate = load_crf_model_config(model_path).sample_rate;
+    if (model_sample_rate < 0) {
+        // If unsuccessful, find sample rate by model name.
+        model_sample_rate = utils::get_sample_rate_by_model_name(model_name);
+    }
+    return model_sample_rate;
 }
 
 }  // namespace dorado

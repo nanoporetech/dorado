@@ -1,6 +1,7 @@
 #include "Version.h"
 #include "data_loader/DataLoader.h"
 #include "decode/CPUDecoder.h"
+#include "nn/CRFModel.h"
 #include "read_pipeline/BaseSpaceDuplexCallerNode.h"
 #include "read_pipeline/BasecallerNode.h"
 #include "read_pipeline/ReadFilterNode.h"
@@ -106,7 +107,8 @@ int duplex(int argc, char* argv[]) {
 
             const auto model_path = std::filesystem::canonical(std::filesystem::path(model));
 
-            auto stereo_model_name = utils::get_stereo_model_name(model);
+            auto data_sample_rate = DataLoader::get_sample_rate(reads);
+            auto stereo_model_name = utils::get_stereo_model_name(model, data_sample_rate);
             const auto stereo_model_path =
                     model_path.parent_path() / std::filesystem::path(stereo_model_name);
 

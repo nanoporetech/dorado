@@ -87,3 +87,8 @@ TEST_CASE(TEST_GROUP "Test loading single-read Fast5 file, matched read list") {
 
     REQUIRE(mock_sink.get_read_count() == 1);
 }
+
+TEST_CASE(TEST_GROUP "Test loading sample rate from fast5 returns nullopt") {
+    std::string data_path(get_fast5_data_dir());
+    REQUIRE(dorado::DataLoader::get_sample_rate(data_path) == 6024);
+}
