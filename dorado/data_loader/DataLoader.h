@@ -1,4 +1,5 @@
 #pragma once
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -22,7 +23,7 @@ public:
                const std::string& device,
                size_t num_worker_threads,
                size_t max_reads = 0,
-               std::unordered_set<std::string> read_list = std::unordered_set<std::string>());
+               std::optional<std::unordered_set<std::string>> read_list = std::nullopt);
     void load_reads(const std::string& path, bool recursive_file_loading = false);
 
     static std::unordered_map<std::string, ReadGroup> load_read_groups(
@@ -32,7 +33,7 @@ public:
 
     static int get_num_reads(
             std::string data_path,
-            std::unordered_set<std::string> read_list = std::unordered_set<std::string>(),
+            std::optional<std::unordered_set<std::string>> read_list = std::nullopt,
             bool recursive_file_loading = false);
 
 private:
@@ -43,7 +44,7 @@ private:
     std::string m_device;
     size_t m_num_worker_threads{1};
     size_t m_max_reads{0};
-    std::unordered_set<std::string> m_allowed_read_ids;
+    std::optional<std::unordered_set<std::string>> m_allowed_read_ids;
 };
 
 }  // namespace dorado
