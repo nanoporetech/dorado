@@ -119,14 +119,6 @@ static const std::unordered_map<std::string, uint16_t> sample_rate_by_model = {
 
         //------ simplex ---------//
         // v4.2
-        {"dna_r10.4.1_e8.2_5khz_400bps_fast@v4.2.alpha", 5000},
-        {"dna_r10.4.1_e8.2_5khz_400bps_hac@v4.2.alpha", 5000},
-        {"dna_r10.4.1_e8.2_5khz_400bps_sup@v4.2.alpha", 5000},
-
-        {"dna_r10.4.1_e8.2_5khz_400bps_fast@v4.2.beta", 5000},
-        {"dna_r10.4.1_e8.2_5khz_400bps_hac@v4.2.beta", 5000},
-        {"dna_r10.4.1_e8.2_5khz_400bps_sup@v4.2.beta", 5000},
-
         {"dna_r10.4.1_e8.2_5khz_400bps_fast@v4.2.0", 5000},
         {"dna_r10.4.1_e8.2_5khz_400bps_hac@v4.2.0", 5000},
         {"dna_r10.4.1_e8.2_5khz_400bps_sup@v4.2.0", 5000},

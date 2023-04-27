@@ -319,8 +319,6 @@ std::optional<uint16_t> DataLoader::get_sample_rate(std::string data_path) {
             if (pod5_close_and_free_reader(file) != POD5_OK) {
                 spdlog::error("Failed to close and free POD5 reader");
             }
-            // Break out of loop once first pod5 file has been found.
-            break;
         } else if (ext == ".fast5") {
             H5Easy::File file(entry.path().string(), H5Easy::File::ReadOnly);
             HighFive::Group reads = file.getGroup("/");
@@ -338,6 +336,11 @@ std::optional<uint16_t> DataLoader::get_sample_rate(std::string data_path) {
                 sampling_rate_attr.read(sampling_rate);
                 sample_rate = static_cast<uint16_t>(sampling_rate);
             }
+        }
+
+        // Break out of loop if sample rate is found.
+        if (sample_rate) {
+            break;
         }
     }
 
