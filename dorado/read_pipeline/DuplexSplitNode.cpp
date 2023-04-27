@@ -327,13 +327,27 @@ std::shared_ptr<Read> subread(const Read& read, PosRange seq_range, PosRange sig
 
 namespace dorado {
 
+std::vector<uint64_t> move_cum_sums(const std::vector<uint8_t> moves) {
+    std::vector<uint64_t> ans(moves.size(), 0);
+    if (!moves.empty()) {
+        ans[0] = moves[0];
+    }
+    for (size_t i = 1, n = moves.size(); i < n; i++) {
+        ans[i] = ans[i - 1] + moves[i];
+    }
+    return ans;
+}
+
 DuplexSplitNode::ExtRead::ExtRead(std::shared_ptr<Read> r)
         : read(std::move(r)),
           data_as_float32(read->raw_data.to(torch::kFloat)),
-          move_sums(read->moves.size(), 0) {
-    //Using std::inclusive_scan since std::partial_sum overflows
-    std::inclusive_scan(read->moves.begin(), read->moves.end(), move_sums.begin(), std::plus(),
-                        uint64_t(0));
+          move_sums(move_cum_sums(read->moves)) {
+    //TODO switch to inclusive_scan and remove manual cumulative sums implementation
+    // when arm64:bionic compiler really supports c++17
+    //      move_sums(read->moves.size(), 0) {
+    //Using std::inclusive_scan instead of std::partial_sum since the latter overflows
+    //std::inclusive_scan(read->moves.begin(), read->moves.end(), move_sums.begin(), std::plus(),
+    //                    uint64_t(0));
     assert(move_sums.back() == read->seq.length());
 }
 
