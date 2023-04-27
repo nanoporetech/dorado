@@ -108,5 +108,5 @@ TEST_CASE(TEST_GROUP "Find sample rate from pod5.") {
     // Create a mock sink for testing output of reads
     std::string data_path(get_pod5_data_dir());
 
-    CHECK(dorado::DataLoader::get_sample_rate(data_path).value() == 4000);
+    CHECK(dorado::DataLoader::get_sample_rate(data_path) == 4000);
 }

@@ -285,7 +285,7 @@ std::unordered_map<std::string, ReadGroup> DataLoader::load_read_groups(
     return read_groups;
 }
 
-std::optional<uint16_t> DataLoader::get_sample_rate(std::string data_path) {
+uint16_t DataLoader::get_sample_rate(std::string data_path) {
     std::optional<uint16_t> sample_rate = std::nullopt;
 
     for (const auto& entry : std::filesystem::directory_iterator((data_path))) {
@@ -344,7 +344,11 @@ std::optional<uint16_t> DataLoader::get_sample_rate(std::string data_path) {
         }
     }
 
-    return sample_rate;
+    if (sample_rate) {
+        return *sample_rate;
+    } else {
+        throw std::runtime_error("Unable to determine sample rate for data.");
+    }
 }
 
 void DataLoader::load_pod5_reads_from_file(const std::string& path) {

@@ -163,14 +163,12 @@ void setup(std::vector<std::string> args,
 
     // Check sample rate of model vs data.
     auto data_sample_rate = DataLoader::get_sample_rate(data_path);
-    if (data_sample_rate) {
-        auto model_sample_rate = get_model_sample_rate(model_path);
-        if (*data_sample_rate != model_sample_rate) {
-            std::stringstream err;
-            err << "Sample rate for model (" << model_sample_rate << ") and data ("
-                << *data_sample_rate << ") don't match." << std::endl;
-            throw std::runtime_error(err.str());
-        }
+    auto model_sample_rate = get_model_sample_rate(model_path);
+    if (data_sample_rate != model_sample_rate) {
+        std::stringstream err;
+        err << "Sample rate for model (" << model_sample_rate << ") and data (" << data_sample_rate
+            << ") don't match." << std::endl;
+        throw std::runtime_error(err.str());
     }
 
     size_t num_reads = DataLoader::get_num_reads(data_path, read_list, recursive_file_loading);
