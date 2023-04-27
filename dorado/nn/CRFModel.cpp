@@ -747,7 +747,7 @@ struct CRFModelImpl : Module {
                     "linear2", Linear(LinearOptions(decomposition, config.outsize).bias(false)));
             clamp1 = Clamp(-5.0, 5.0, config.clamp);
             encoder = Sequential(conv1, conv2, conv3, rnns, linear1, linear2, clamp1);
-        } else if (config.conv == 16) {
+        } else if ((config.conv == 16) && (config.num_features == 1)) {
             linear1 = register_module(
                     "linear1", Linear(LinearOptions(config.insize, config.outsize).bias(false)));
             clamp1 = Clamp(-5.0, 5.0, config.clamp);
