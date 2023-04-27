@@ -132,9 +132,10 @@ float mean_qscore_from_qstring(const std::string& qstring) {
         return 0.0f;
     }
 
-    // Compile-time constant lookup table avoids repeated invocation of std::pow, which
+    // Lookup table avoids repeated invocation of std::pow, which
     // otherwise dominates run time of this function.
-    static constexpr auto kCharToScoreTable = [] {
+    // Unfortunately std::pow is not constexpr, so this can't be.
+    static const auto kCharToScoreTable = [] {
         std::array<float, 256> a{};
         for (int q = 33; q <= 127; ++q) {
             auto shifted = static_cast<float>(q - 33);
