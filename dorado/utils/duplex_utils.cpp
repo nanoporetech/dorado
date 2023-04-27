@@ -1,6 +1,6 @@
 #include "duplex_utils.h"
 
-#include "torch/torch.h"
+#include <torch/torch.h>
 
 #include <algorithm>
 #include <fstream>
