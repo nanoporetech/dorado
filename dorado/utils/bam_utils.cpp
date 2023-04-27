@@ -10,7 +10,9 @@
 #include "mmpriv.h"
 #include "read_pipeline/ReadPipeline.h"
 #include "utils/sequence_utils.h"
+#include "utils/types.h"
 
+#include <indicators/progress_bar.hpp>
 #include <spdlog/spdlog.h>
 
 #include <iostream>
@@ -83,7 +85,7 @@ Aligner::~Aligner() {
     m_sink.terminate();
 }
 
-std::vector<std::pair<char*, uint32_t>> Aligner::sq() {
+std::vector<std::pair<char*, uint32_t>> Aligner::get_sequence_records_for_header() {
     std::vector<std::pair<char*, uint32_t>> records;
     for (int i = 0; i < m_index->n_seq; ++i) {
         records.push_back(std::make_pair(m_index->seq[i].name, m_index->seq[i].len));
@@ -327,7 +329,7 @@ std::vector<bam1_t*> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
     return results;
 }
 
-BamReader::BamReader(const std::string& filename) {
+HtsReader::HtsReader(const std::string& filename) {
     m_file = hts_open(filename.c_str(), "r");
     if (!m_file) {
         throw std::runtime_error("Could not open file: " + filename);
@@ -341,16 +343,16 @@ BamReader::BamReader(const std::string& filename) {
     record = bam_init1();
 }
 
-BamReader::~BamReader() {
+HtsReader::~HtsReader() {
     hts_free(format);
     sam_hdr_destroy(header);
     bam_destroy1(record);
     hts_close(m_file);
 }
 
-bool BamReader::read() { return sam_read1(m_file, header, record) >= 0; }
+bool HtsReader::read() { return sam_read1(m_file, header, record) >= 0; }
 
-void BamReader::read(MessageSink& read_sink, int max_reads) {
+void HtsReader::read(MessageSink& read_sink, int max_reads) {
     int num_reads = 0;
     while (this->read()) {
         read_sink.push_message(bam_dup1(record));
@@ -365,31 +367,64 @@ void BamReader::read(MessageSink& read_sink, int max_reads) {
     read_sink.terminate();
 }
 
-BamWriter::BamWriter(const std::string& filename, size_t threads) : MessageSink(1000) {
-    m_file = hts_open(filename.c_str(), "wb");
+HtsWriter::HtsWriter(const std::string& filename, OutputMode mode, size_t threads, size_t num_reads)
+        : MessageSink(10000), m_num_reads_expected(num_reads) {
+    switch (mode) {
+    case FASTQ:
+        m_file = hts_open(filename.c_str(), "wf");
+        break;
+    case BAM:
+        m_file = hts_open(filename.c_str(), "wb");
+        break;
+    case SAM:
+        m_file = hts_open(filename.c_str(), "w");
+        break;
+    default:
+        throw std::runtime_error("Unknown output mode selected: " + std::to_string(mode));
+    }
     if (!m_file) {
         throw std::runtime_error("Could not open file: " + filename);
     }
-    auto res = bgzf_mt(m_file->fp.bgzf, threads, 128);
-    if (res < 0) {
-        throw std::runtime_error("Could not enable multi threading for BAM generation.");
+    if (m_file->format.compression == bgzf) {
+        auto res = bgzf_mt(m_file->fp.bgzf, threads, 128);
+        if (res < 0) {
+            throw std::runtime_error("Could not enable multi threading for BAM generation.");
+        }
     }
-    m_worker = std::make_unique<std::thread>(std::thread(&BamWriter::worker_thread, this));
+
+    if (m_num_reads_expected <= 100) {
+        m_progress_bar_increment = 100;
+    } else {
+        m_progress_bar_increment = m_num_reads_expected / 100;
+    }
+
+    m_worker = std::make_unique<std::thread>(std::thread(&HtsWriter::worker_thread, this));
 }
 
-BamWriter::~BamWriter() {
+HtsWriter::~HtsWriter() {
     // Adding for thread safety in case worker thread throws exception.
     terminate();
     if (m_worker->joinable()) {
         join();
     }
-    sam_hdr_destroy(m_header);
+    sam_hdr_destroy(header);
     hts_close(m_file);
 }
 
-void BamWriter::join() { m_worker->join(); }
+HtsWriter::OutputMode HtsWriter::get_output_mode(std::string mode) {
+    if (mode == "sam") {
+        return SAM;
+    } else if (mode == "bam") {
+        return BAM;
+    } else if (mode == "fastq") {
+        return FASTQ;
+    }
+    throw std::runtime_error("Unknown output mode: " + mode);
+}
 
-void BamWriter::worker_thread() {
+void HtsWriter::join() { m_worker->join(); }
+
+void HtsWriter::worker_thread() {
     Message message;
     size_t write_count = 0;
     while (m_work_queue.try_pop(message)) {
@@ -399,11 +434,24 @@ void BamWriter::worker_thread() {
         // out to disk.
         bam_destroy1(aln);
         write_count++;
+
+        if ((write_count % m_progress_bar_increment) == 0) {
+            if (m_num_reads_expected != 0) {
+                if ((write_count / m_progress_bar_increment) < 100) {
+                    m_progress_bar.tick();
+                }
+            } else {
+                std::cerr << "\r> Alignments written: " << write_count;
+            }
+        }
+    }
+    if (m_num_reads_expected != 0 || write_count > m_progress_bar_increment) {
+        std::cerr << "\r" << std::endl;
     }
     spdlog::debug("Written {} alignments.", write_count);
 }
 
-int BamWriter::write(bam1_t* record) {
+int HtsWriter::write(bam1_t* record) {
     // track stats
     total++;
     if (record->core.flag & BAM_FUNMAP) {
@@ -417,35 +465,24 @@ int BamWriter::write(bam1_t* record) {
     }
     primary = total - secondary - supplementary - unmapped;
 
-    auto res = sam_write1(m_file, m_header, record);
+    auto res = sam_write1(m_file, header, record);
     if (res < 0) {
         throw std::runtime_error("Failed to write SAM record, error code " + std::to_string(res));
     }
     return res;
 }
 
-int BamWriter::write_header(const sam_hdr_t* header, const sq_t seqs) {
-    m_header = sam_hdr_dup(header);
-    write_hdr_pg();
-    for (auto pair : seqs) {
-        write_hdr_sq(std::get<0>(pair), std::get<1>(pair));
+void HtsWriter::add_header(const sam_hdr_t* hdr) { header = sam_hdr_dup(hdr); }
+
+int HtsWriter::write_header() {
+    if (header) {
+        return sam_hdr_write(m_file, header);
     }
-    auto res = sam_hdr_write(m_file, m_header);
-    return res;
-}
-
-int BamWriter::write_hdr_pg() {
-    // todo: add CL Writer node
-    return sam_hdr_add_line(m_header, "PG", "ID", "aligner", "PN", "dorado", "VN", DORADO_VERSION,
-                            "DS", MM_VERSION, NULL);
-}
-
-int BamWriter::write_hdr_sq(char* name, uint32_t length) {
-    return sam_hdr_add_line(m_header, "SQ", "SN", name, "LN", std::to_string(length).c_str(), NULL);
+    return 0;
 }
 
 read_map read_bam(const std::string& filename, const std::set<std::string>& read_ids) {
-    BamReader reader(filename);
+    HtsReader reader(filename);
 
     read_map reads;
 
@@ -477,6 +514,37 @@ read_map read_bam(const std::string& filename, const std::set<std::string>& read
     }
 
     return reads;
+}
+
+void add_rg_hdr(sam_hdr_t* hdr, const std::unordered_map<std::string, ReadGroup>& read_groups) {
+    // Add read groups
+    for (auto const& x : read_groups) {
+        std::stringstream rg;
+        rg << "@RG\t";
+        rg << "ID:" << x.first << "\t";
+        rg << "PU:" << x.second.flowcell_id << "\t";
+        rg << "PM:" << x.second.device_id << "\t";
+        rg << "DT:" << x.second.exp_start_time << "\t";
+        rg << "PL:"
+           << "ONT"
+           << "\t";
+        rg << "DS:"
+           << "basecall_model=" << x.second.basecalling_model << " runid=" << x.second.run_id
+           << "\t";
+        rg << "LB:" << x.second.sample_id << "\t";
+        rg << "SM:" << x.second.sample_id;
+        rg << std::endl;
+        sam_hdr_add_lines(hdr, rg.str().c_str(), 0);
+    }
+}
+
+void add_sq_hdr(sam_hdr_t* hdr, const sq_t& seqs) {
+    for (auto pair : seqs) {
+        char* name;
+        int length;
+        std::tie(name, length) = pair;
+        sam_hdr_add_line(hdr, "SQ", "SN", name, "LN", std::to_string(length).c_str(), NULL);
+    }
 }
 
 }  // namespace dorado::utils

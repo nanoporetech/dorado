@@ -98,6 +98,10 @@ set(LIB_SOURCE_FILES
     dorado/read_pipeline/WriterNode.h
     dorado/read_pipeline/ReadFilterNode.cpp
     dorado/read_pipeline/ReadFilterNode.h
+    dorado/read_pipeline/ReadToBamTypeNode.cpp
+    dorado/read_pipeline/ReadToBamTypeNode.h
+    dorado/read_pipeline/StatsCounter.cpp
+    dorado/read_pipeline/StatsCounter.h
     dorado/read_pipeline/BaseSpaceDuplexCallerNode.cpp
     dorado/read_pipeline/BaseSpaceDuplexCallerNode.h
     dorado/decode/beam_search.cpp
@@ -136,6 +140,7 @@ set(LIB_SOURCE_FILES
     dorado/utils/duplex_utils.cpp
     dorado/utils/basecaller_utils.h
     dorado/utils/basecaller_utils.cpp
+    dorado/utils/types.h
     dorado/read_pipeline/NullNode.h
     dorado/read_pipeline/NullNode.cpp)
 

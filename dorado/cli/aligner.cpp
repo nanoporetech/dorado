@@ -19,6 +19,14 @@ using namespace std::chrono_literals;
 
 namespace dorado {
 
+using HtsWriter = utils::HtsWriter;
+using HtsReader = utils::HtsReader;
+
+void add_pg_hdr(sam_hdr_t* hdr) {
+    sam_hdr_add_line(hdr, "PG", "ID", "aligner", "PN", "dorado", "VN", DORADO_VERSION, "DS",
+                     MM_VERSION, NULL);
+}
+
 int aligner(int argc, char* argv[]) {
     utils::InitLogging();
 
@@ -87,12 +95,15 @@ int aligner(int argc, char* argv[]) {
 
     spdlog::info("> loading index {}", index);
 
-    utils::BamWriter writer("-", writer_threads);
+    HtsWriter writer("-", HtsWriter::OutputMode::BAM, writer_threads);
     utils::Aligner aligner(writer, index, kmer_size, window_size, aligner_threads);
-    utils::BamReader reader(reads[0]);
+    HtsReader reader(reads[0]);
 
     spdlog::debug("> input fmt: {} aligned: {}", reader.format, reader.is_aligned);
-    writer.write_header(reader.header, aligner.sq());
+    writer.add_header(reader.header);
+    add_pg_hdr(writer.header);
+    utils::add_sq_hdr(writer.header, aligner.get_sequence_records_for_header());
+    writer.write_header();
 
     spdlog::info("> starting alignment");
     reader.read(aligner, max_reads);

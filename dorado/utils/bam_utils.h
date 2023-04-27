@@ -2,6 +2,9 @@
 #include "htslib/sam.h"
 #include "minimap.h"
 #include "read_pipeline/ReadPipeline.h"
+#include "utils/types.h"
+
+#include <indicators/progress_bar.hpp>
 
 #include <map>
 #include <set>
@@ -16,8 +19,8 @@ class Aligner : public MessageSink {
 public:
     Aligner(MessageSink& read_sink, const std::string& filename, int k, int w, int threads);
     ~Aligner();
-    sq_t sq();
     std::vector<bam1_t*> align(bam1_t* record, mm_tbuf_t* buf);
+    sq_t get_sequence_records_for_header();
 
 private:
     MessageSink& m_sink;
@@ -34,11 +37,11 @@ private:
     mm_idx_reader_t* m_index_reader{nullptr};
 };
 
-class BamReader {
+class HtsReader {
 public:
-    BamReader(const std::string& filename);
-    BamReader(MessageSink& read_sink, const std::string& filename);
-    ~BamReader();
+    HtsReader(const std::string& filename);
+    HtsReader(MessageSink& read_sink, const std::string& filename);
+    ~HtsReader();
     bool read();
     void read(MessageSink& read_sink, int max_reads = -1);
 
@@ -51,27 +54,46 @@ private:
     htsFile* m_file{nullptr};
 };
 
-class BamWriter : public MessageSink {
+class HtsWriter : public MessageSink {
 public:
-    BamWriter(const std::string& filename, size_t threads = 1);
-    ~BamWriter();
-    int write_header(const sam_hdr_t* header, const sq_t seqs);
+    enum OutputMode {
+        BAM,
+        SAM,
+        FASTQ,
+    };
+
+    HtsWriter(const std::string& filename,
+              OutputMode mode,
+              size_t threads = 1,
+              size_t num_reads = 0);
+    ~HtsWriter();
+    void add_header(const sam_hdr_t* header);
+    int write_header();
     int write(bam1_t* record);
     void join();
+
+    static OutputMode get_output_mode(std::string mode);
 
     size_t total{0};
     size_t primary{0};
     size_t unmapped{0};
     size_t secondary{0};
     size_t supplementary{0};
+    sam_hdr_t* header{nullptr};
 
 private:
     htsFile* m_file{nullptr};
-    sam_hdr_t* m_header{nullptr};
     std::unique_ptr<std::thread> m_worker;
     void worker_thread();
-    int write_hdr_pg();
     int write_hdr_sq(char* name, uint32_t length);
+
+    size_t m_num_reads_expected;
+    int m_progress_bar_increment;
+    indicators::ProgressBar m_progress_bar{
+            indicators::option::Stream{std::cerr},     indicators::option::BarWidth{30},
+            indicators::option::ShowElapsedTime{true}, indicators::option::ShowRemainingTime{true},
+            indicators::option::ShowPercentage{true},
+    };
 };
 
 /**
@@ -90,5 +112,9 @@ private:
  * @note The input BAM file must be properly formatted and readable.
  */
 read_map read_bam(const std::string& filename, const std::set<std::string>& read_ids);
+
+void add_rg_hdr(sam_hdr_t* hdr, const std::unordered_map<std::string, ReadGroup>& read_groups);
+
+void add_sq_hdr(sam_hdr_t* hdr, const sq_t& seqs);
 
 }  // namespace dorado::utils

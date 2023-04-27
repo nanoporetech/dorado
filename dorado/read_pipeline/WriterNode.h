@@ -1,7 +1,7 @@
 #pragma once
 
 #include "ReadPipeline.h"
-#include "data_loader/DataLoader.h"
+#include "utils/types.h"
 
 #include <indicators/progress_bar.hpp>
 

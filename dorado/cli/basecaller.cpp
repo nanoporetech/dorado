@@ -16,39 +16,63 @@
 #include "read_pipeline/BasecallerNode.h"
 #include "read_pipeline/ModBaseCallerNode.h"
 #include "read_pipeline/ReadFilterNode.h"
+#include "read_pipeline/ReadToBamTypeNode.h"
 #include "read_pipeline/ScalerNode.h"
+#include "read_pipeline/StatsCounter.h"
 #include "read_pipeline/WriterNode.h"
+#include "utils/bam_utils.h"
+#include "utils/cli_utils.h"
 #include "utils/log_utils.h"
 #include "utils/parameters.h"
 
 #include <argparse.hpp>
+#include <htslib/sam.h>
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <filesystem>
 #include <iostream>
+#include <memory>
 #include <sstream>
 #include <thread>
 
 namespace dorado {
+
+using HtsWriter = utils::HtsWriter;
+using HtsReader = utils::HtsReader;
+
+void add_pg_hdr(sam_hdr_t* hdr, const std::vector<std::string>& args) {
+    sam_hdr_add_lines(hdr, "@HD\tVN:1.6\tSO:unknown", 0);
+
+    std::stringstream pg;
+    pg << "@PG\tID:basecaller\tPN:dorado\tVN:" << DORADO_VERSION << "\tCL:dorado";
+    for (const auto& arg : args) {
+        pg << " " << arg;
+    }
+    pg << std::endl;
+    sam_hdr_add_lines(hdr, pg.str().c_str(), 0);
+}
 
 void setup(std::vector<std::string> args,
            const std::filesystem::path& model_path,
            const std::string& data_path,
            const std::string& remora_models,
            const std::string& device,
+           const std::string& ref,
            size_t chunk_size,
            size_t overlap,
            size_t batch_size,
            size_t num_runners,
            size_t remora_batch_size,
            size_t num_remora_threads,
-           bool emit_fastq,
+           HtsWriter::OutputMode output_mode,
            bool emit_moves,
            size_t max_reads,
            size_t min_qscore,
            std::string read_list_file_path,
-           bool recursive_file_loading) {
+           bool recursive_file_loading,
+           int kmer_size,
+           int window_size) {
     torch::set_num_threads(1);
     std::vector<Runner> runners;
 
@@ -119,8 +143,12 @@ void setup(std::vector<std::string> args,
         overlap = adjusted_overlap;
     }
 
-    if (!remora_models.empty() && emit_fastq) {
+    if (!remora_models.empty() && output_mode == HtsWriter::OutputMode::FASTQ) {
         throw std::runtime_error("Modified base models cannot be used with FASTQ output");
+    }
+
+    if (!ref.empty() && output_mode == HtsWriter::OutputMode::FASTQ) {
+        throw std::runtime_error("Alignment to reference cannot be used with FASTQ output.");
     }
 
     std::vector<std::filesystem::path> remora_model_list;
@@ -164,10 +192,33 @@ void setup(std::vector<std::string> args,
     num_reads = max_reads == 0 ? num_reads : std::min(num_reads, max_reads);
 
     bool rna = utils::is_rna_model(model_path), duplex = false;
-    WriterNode writer_node(std::move(args), emit_fastq, emit_moves, rna, duplex, num_devices * 2,
-                           std::move(read_groups), num_reads);
-    ReadFilterNode read_filter_node(writer_node, min_qscore, num_devices * 2 /*num_threads*/,
-                                    num_reads);
+
+    std::unique_ptr<sam_hdr_t, void (*)(sam_hdr_t*)> hdr(sam_hdr_init(), sam_hdr_destroy);
+    add_pg_hdr(hdr.get(), args);
+    utils::add_rg_hdr(hdr.get(), read_groups);
+    std::shared_ptr<HtsWriter> bam_writer;
+    std::shared_ptr<utils::Aligner> aligner;
+    MessageSink* converted_reads_sink = nullptr;
+    if (ref.empty()) {
+        bam_writer = std::make_shared<HtsWriter>("-", output_mode,
+                                                 num_devices * 2 /*writer_threads*/, num_reads);
+        bam_writer->add_header(hdr.get());
+        bam_writer->write_header();
+        converted_reads_sink = bam_writer.get();
+    } else {
+        bam_writer =
+                std::make_shared<HtsWriter>("-", output_mode, num_devices * 2 /*writer_threads*/);
+        aligner = std::make_shared<utils::Aligner>(*bam_writer, ref, kmer_size, window_size,
+                                                   num_devices * 5);
+        utils::add_sq_hdr(hdr.get(), aligner->get_sequence_records_for_header());
+        bam_writer->add_header(hdr.get());
+        bam_writer->write_header();
+        converted_reads_sink = aligner.get();
+    }
+    ReadToBamType read_converter(*converted_reads_sink, emit_moves, rna, duplex,
+                                 num_devices * 2 /*num_threads*/, num_reads);
+    StatsCounterNode stats_node(read_converter, duplex);
+    ReadFilterNode read_filter_node(stats_node, min_qscore, num_devices * 2, num_reads);
 
     std::unique_ptr<ModBaseCallerNode> mod_base_caller_node;
     MessageSink* basecaller_node_sink = static_cast<MessageSink*>(&read_filter_node);
@@ -185,6 +236,9 @@ void setup(std::vector<std::string> args,
     DataLoader loader(scaler_node, "cpu", num_devices, max_reads, read_list);
 
     loader.load_reads(data_path, recursive_file_loading);
+
+    bam_writer->join();
+    stats_node.dump_stats();
 }
 
 int basecaller(int argc, char* argv[]) {
@@ -251,9 +305,28 @@ int basecaller(int argc, char* argv[]) {
             .default_value(std::string())
             .help("a comma separated list of modified base models");
 
-    parser.add_argument("--emit-fastq").default_value(false).implicit_value(true);
+    parser.add_argument("--emit-fastq")
+            .help("Output in fastq format.")
+            .default_value(false)
+            .implicit_value(true);
+    parser.add_argument("--emit-sam")
+            .help("Output in SAM format.")
+            .default_value(false)
+            .implicit_value(true);
 
     parser.add_argument("--emit-moves").default_value(false).implicit_value(true);
+
+    parser.add_argument("--reference")
+            .help("Path to reference for alignment.")
+            .default_value(std::string(""));
+    parser.add_argument("-k")
+            .help("k-mer size for alignment with minimap2 (maximum 28).")
+            .default_value(15)
+            .scan<'i', int>();
+    parser.add_argument("-w")
+            .help("minimizer window size for alignment with minimap2.")
+            .default_value(10)
+            .scan<'i', int>();
 
     try {
         parser.parse_args(argc, argv);
@@ -288,16 +361,32 @@ int basecaller(int argc, char* argv[]) {
                                 [](std::string a, std::string b) { return a + "," + b; });
     }
 
+    auto output_mode = HtsWriter::OutputMode::BAM;
+
+    auto emit_fastq = parser.get<bool>("--emit-fastq");
+    auto emit_sam = parser.get<bool>("--emit-sam");
+
+    if (emit_fastq && emit_sam) {
+        throw std::runtime_error("Only one of --emit-{fastq, sam} can be set (or none).");
+    }
+
+    if (emit_fastq) {
+        output_mode = HtsWriter::OutputMode::FASTQ;
+    } else if (emit_sam || utils::is_fd_tty(stdout)) {
+        output_mode = HtsWriter::OutputMode::SAM;
+    }
+
     spdlog::info("> Creating basecall pipeline");
 
     try {
         setup(args, model, parser.get<std::string>("data"), mod_bases_models,
-              parser.get<std::string>("-x"), parser.get<int>("-c"), parser.get<int>("-o"),
-              parser.get<int>("-b"), default_parameters.num_runners,
-              default_parameters.remora_batchsize, default_parameters.remora_threads,
-              parser.get<bool>("--emit-fastq"), parser.get<bool>("--emit-moves"),
+              parser.get<std::string>("-x"), parser.get<std::string>("--reference"),
+              parser.get<int>("-c"), parser.get<int>("-o"), parser.get<int>("-b"),
+              default_parameters.num_runners, default_parameters.remora_batchsize,
+              default_parameters.remora_threads, output_mode, parser.get<bool>("--emit-moves"),
               parser.get<int>("--max-reads"), parser.get<int>("--min-qscore"),
-              parser.get<std::string>("--read-ids"), parser.get<bool>("--recursive"));
+              parser.get<std::string>("--read-ids"), parser.get<bool>("--recursive"),
+              parser.get<int>("k"), parser.get<int>("w"));
     } catch (const std::exception& e) {
         spdlog::error("{}", e.what());
         return 1;
