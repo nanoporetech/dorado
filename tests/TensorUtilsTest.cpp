@@ -1,7 +1,7 @@
-#include <torch/torch.h>
 #include "utils/tensor_utils.h"
 
 #include <catch2/catch.hpp>
+#include <torch/torch.h>
 
 #include <random>
 

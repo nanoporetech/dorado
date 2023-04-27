@@ -1,8 +1,8 @@
 #include "../utils/tensor_utils.h"
 #include "Version.h"
-#include <torch/torch.h>
 
 #include <argparse.hpp>
+#include <torch/torch.h>
 
 #include <chrono>
 #include <iostream>
