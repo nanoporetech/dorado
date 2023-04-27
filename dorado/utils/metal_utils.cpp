@@ -337,6 +337,4 @@ MTL::Buffer *extract_mtl_from_tensor(torch::Tensor &x) {
     return bfr;
 }
 
-int auto_gpu_batch_size() { return 48 * get_mtl_device_core_count(); }
-
 }  // namespace dorado::utils

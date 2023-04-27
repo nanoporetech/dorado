@@ -13,7 +13,6 @@
 #if DORADO_GPU_BUILD
 #ifdef __APPLE__
 #include "nn/MetalCRFModel.h"
-#include "utils/metal_utils.h"
 #else
 #include "nn/CudaCRFModel.h"
 #include "utils/cuda_utils.h"
@@ -128,7 +127,10 @@ int duplex(int argc, char* argv[]) {
             size_t stereo_batch_size;
 
             if (device == "cpu") {
-                batch_size = batch_size == 0 ? std::thread::hardware_concurrency() : batch_size;
+                if (batch_size == 0) {
+                    batch_size = std::thread::hardware_concurrency();
+                    spdlog::debug("- set batch size to {}", batch_size);
+                }
                 for (size_t i = 0; i < num_runners; i++) {
                     runners.push_back(std::make_shared<ModelRunner<CPUDecoder>>(
                             model_path, device, chunk_size, batch_size));
@@ -137,14 +139,12 @@ int duplex(int argc, char* argv[]) {
 #if DORADO_GPU_BUILD
 #ifdef __APPLE__
             else if (device == "metal") {
-                if (batch_size == 0) {
-                    batch_size = utils::auto_gpu_batch_size();
-                    spdlog::debug("- selected batchsize {}", batch_size);
-                }
                 auto simplex_caller = create_metal_caller(model_path, chunk_size, batch_size);
                 for (int i = 0; i < num_runners; i++) {
-                    runners.push_back(std::make_shared<MetalModelRunner>(simplex_caller, chunk_size,
-                                                                         batch_size));
+                    runners.push_back(std::make_shared<MetalModelRunner>(simplex_caller));
+                }
+                if (runners.back()->batch_size() != batch_size) {
+                    spdlog::debug("- set batch size to {}", runners.back()->batch_size());
                 }
 
                 // For now, the minimal batch size is used for the duplex model.
@@ -153,8 +153,7 @@ int duplex(int argc, char* argv[]) {
                 auto duplex_caller =
                         create_metal_caller(stereo_model_path, chunk_size, stereo_batch_size);
                 for (size_t i = 0; i < num_runners; i++) {
-                    stereo_runners.push_back(std::make_shared<MetalModelRunner>(
-                            duplex_caller, chunk_size, stereo_batch_size));
+                    stereo_runners.push_back(std::make_shared<MetalModelRunner>(duplex_caller));
                 }
             } else {
                 throw std::runtime_error(std::string("Unsupported device: ") + device);
@@ -166,15 +165,15 @@ int duplex(int argc, char* argv[]) {
                 if (num_devices == 0) {
                     throw std::runtime_error("CUDA device requested but no devices found.");
                 }
-                batch_size =
-                        batch_size == 0 ? utils::auto_gpu_batch_size(model, devices) : batch_size;
-                batch_size = batch_size / 2;  //Needed to support Stereo and Simplex in parallel
                 for (auto device_string : devices) {
-                    auto caller =
-                            create_cuda_caller(model_path, chunk_size, batch_size, device_string);
+                    auto caller = create_cuda_caller(model_path, chunk_size, batch_size,
+                                                     device_string, 0.5f);  // Use half the GPU mem
                     for (size_t i = 0; i < num_runners; i++) {
-                        runners.push_back(
-                                std::make_shared<CudaModelRunner>(caller, chunk_size, batch_size));
+                        runners.push_back(std::make_shared<CudaModelRunner>(caller));
+                    }
+                    if (runners.back()->batch_size() != batch_size) {
+                        spdlog::debug("- set batch size for {} to {}", device_string,
+                                      runners.back()->batch_size());
                     }
                 }
 
@@ -184,8 +183,7 @@ int duplex(int argc, char* argv[]) {
                     auto caller = create_cuda_caller(stereo_model_path, chunk_size,
                                                      stereo_batch_size, device_string);
                     for (size_t i = 0; i < num_runners; i++) {
-                        stereo_runners.push_back(std::make_shared<CudaModelRunner>(
-                                caller, chunk_size, stereo_batch_size));
+                        stereo_runners.push_back(std::make_shared<CudaModelRunner>(caller));
                     }
                 }
             }
@@ -193,16 +191,14 @@ int duplex(int argc, char* argv[]) {
 #endif  // DORADO_GPU_BUILD
             spdlog::info("> Starting Stereo Duplex pipeline");
 
-            std::unique_ptr<BasecallerNode> stereo_basecaller_node;
-
             auto stereo_model_stride = stereo_runners.front()->model_stride();
 
             auto adjusted_stereo_overlap = (overlap / stereo_model_stride) * stereo_model_stride;
 
             const int kStereoBatchTimeoutMS = 500;
-            stereo_basecaller_node = std::make_unique<BasecallerNode>(
-                    read_filter_node, std::move(stereo_runners), stereo_batch_size, chunk_size,
-                    adjusted_stereo_overlap, stereo_model_stride, kStereoBatchTimeoutMS);
+            auto stereo_basecaller_node = std::make_unique<BasecallerNode>(
+                    read_filter_node, std::move(stereo_runners), adjusted_stereo_overlap,
+                    kStereoBatchTimeoutMS);
 
             std::unordered_set<std::string> read_list =
                     utils::get_read_list_from_pairs(template_complement_map);
@@ -213,14 +209,13 @@ int duplex(int argc, char* argv[]) {
                     *stereo_basecaller_node, std::move(template_complement_map),
                     simplex_model_stride);
 
-            std::unique_ptr<BasecallerNode> basecaller_node;
-            const int kSimplexBatchTimeoutMS = 100;
-
             auto adjusted_simplex_overlap = (overlap / simplex_model_stride) * simplex_model_stride;
 
-            basecaller_node = std::make_unique<BasecallerNode>(
-                    stereo_node, std::move(runners), batch_size, chunk_size,
-                    adjusted_simplex_overlap, simplex_model_stride, kSimplexBatchTimeoutMS);
+            const int kSimplexBatchTimeoutMS = 100;
+            auto basecaller_node = std::make_unique<BasecallerNode>(stereo_node, std::move(runners),
+                                                                    adjusted_simplex_overlap,
+                                                                    kSimplexBatchTimeoutMS);
+
             ScalerNode scaler_node(*basecaller_node, num_devices * 2);
 
             DataLoader loader(scaler_node, "cpu", num_devices, 0, std::move(read_list));

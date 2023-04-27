@@ -4,6 +4,7 @@
 #include "MetalCRFModel.h"
 
 #include "../decode/beam_search.h"
+#include "../utils/math_utils.h"
 #include "../utils/metal_utils.h"
 #include "../utils/module_utils.h"
 #include "../utils/tensor_utils.h"
@@ -533,10 +534,6 @@ TORCH_MODULE(MetalModel);
 class MetalCaller {
 public:
     MetalCaller(const std::filesystem::path &model_path, int chunk_size, int batch_size) {
-        // LSTM kernels, which run with the full supplied batch size, require that the batch size
-        // be an integral multiple of 48.
-        assert(batch_size % 48 == 0);
-
         const auto model_config = load_crf_model_config(model_path);
         m_model_stride = static_cast<size_t>(model_config.stride);
         m_num_input_features = model_config.num_features;
@@ -547,17 +544,18 @@ public:
         m_decoder_options.q_shift = model_config.qbias;
         m_decoder_options.q_scale = model_config.qscale;
 
-        // adjust chunk size to a multiple of the stride
-        chunk_size -= chunk_size % model_config.stride;
-
         // TODO -- we don't honour the config n_base
         constexpr int n_base = 4;
         m_states = pow(n_base, model_config.state_len);
 
-        m_batch_size = batch_size;
+        constexpr int MTL_CORE_BATCH_SIZE = 48;
+        m_batch_size = (batch_size == 0) ? MTL_CORE_BATCH_SIZE * get_mtl_device_core_count()
+                                         : utils::pad_to(batch_size, MTL_CORE_BATCH_SIZE);
 
         // Chunk size after decimation via convolution stride.
         m_out_chunk_size = chunk_size / model_config.stride;
+        // round chunk size down to a multiple of the stride
+        m_in_chunk_size = m_out_chunk_size * model_config.stride;
 
         auto state_dict = load_crf_model_weights(model_path, model_config.out_features.has_value(),
                                                  model_config.bias);
@@ -579,9 +577,9 @@ public:
         // batch splitting factor must be an exact divisor of the batch_size / 48.
         constexpr auto kMaxBufferSize = static_cast<int64_t>(1) << 32;
         const auto complete_linear_out_size =
-                static_cast<int64_t>(m_out_chunk_size) * static_cast<int64_t>(batch_size) *
+                static_cast<int64_t>(m_out_chunk_size) * static_cast<int64_t>(m_batch_size) *
                 static_cast<int64_t>(model_config.outsize) * sizeof(float);
-        const int num_batch_pieces = batch_size / 48;
+        const int num_batch_pieces = m_batch_size / MTL_CORE_BATCH_SIZE;
         for (m_out_split = 1; m_out_split < num_batch_pieces; ++m_out_split) {
             if (num_batch_pieces % m_out_split == 0 &&
                 complete_linear_out_size / m_out_split < kMaxBufferSize)
@@ -592,11 +590,12 @@ public:
         // output buffers, given other reasonable parameters.
         assert(num_batch_pieces % m_out_split == 0);
         assert(complete_linear_out_size / m_out_split < kMaxBufferSize);
-        assert(batch_size % m_out_split == 0);
-        m_out_batch_size = batch_size / m_out_split;
-        assert(m_out_batch_size % 48 == 0);
+        assert(m_batch_size % m_out_split == 0);
+        m_out_batch_size = m_batch_size / m_out_split;
+        assert(m_out_batch_size % MTL_CORE_BATCH_SIZE == 0);
 
-        m_model = nn::MetalModel(model_config, chunk_size, batch_size, m_out_split, m_device);
+        m_model =
+                nn::MetalModel(model_config, m_in_chunk_size, m_batch_size, m_out_split, m_device);
         m_model->load_state_dict(state_dict);
         m_model->eval();
 
@@ -824,7 +823,7 @@ public:
     // Used to signal completion of an NNTask's decoding.
     MTL::SharedEvent *m_decode_complete_event = nullptr;
     std::vector<torch::Tensor> m_scores_int8, m_posts, m_bwd;
-    int m_out_chunk_size, m_batch_size, m_states, m_model_stride;
+    int m_in_chunk_size, m_out_chunk_size, m_batch_size, m_states, m_model_stride;
     // Number of pieces the linear output is split into, for reasons of
     // buffer size constraints.
     int m_out_split;
@@ -841,19 +840,14 @@ std::shared_ptr<MetalCaller> create_metal_caller(const std::filesystem::path &mo
     return std::make_shared<MetalCaller>(model_path, chunk_size, batch_size);
 }
 
-MetalModelRunner::MetalModelRunner(std::shared_ptr<MetalCaller> caller,
-                                   int chunk_size,
-                                   int batch_size)
-        : m_caller(caller) {
-    // adjust chunk size to be a multiple of the stride
-    chunk_size -= chunk_size % model_stride();
-
+MetalModelRunner::MetalModelRunner(std::shared_ptr<MetalCaller> caller) : m_caller(caller) {
     // Metal convolution kernels operate with channel ordering (N, T, C).  If m_input
     // is to be submitted directly then it must also have this arrangement.
     // Note that this is not the same as other caller implementations, which
     // have T innermost.
-    assert(m_caller->m_num_input_features > 0);
-    m_input = torch::empty({batch_size, chunk_size, caller->m_num_input_features}, torch::kF16);
+    m_input = torch::empty(
+            {caller->m_batch_size, caller->m_in_chunk_size, caller->m_num_input_features},
+            torch::kF16);
 }
 
 void MetalModelRunner::accept_chunk(int chunk_idx, const torch::Tensor &chunk) {
@@ -877,5 +871,6 @@ std::vector<DecodedChunk> MetalModelRunner::call_chunks(int num_chunks) {
 
 size_t MetalModelRunner::model_stride() const { return m_caller->m_model_stride; }
 size_t MetalModelRunner::chunk_size() const { return m_input.size(1); }
+size_t MetalModelRunner::batch_size() const { return m_input.size(0); }
 
 }  // namespace dorado

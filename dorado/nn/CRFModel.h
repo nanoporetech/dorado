@@ -36,8 +36,6 @@ std::vector<torch::Tensor> load_crf_model_weights(const std::filesystem::path& d
 
 torch::nn::ModuleHolder<torch::nn::AnyModule> load_crf_model(const std::filesystem::path& path,
                                                              const CRFModelConfig& model_config,
-                                                             int batch_size,
-                                                             int chunk_size,
                                                              const torch::TensorOptions& options);
 
 }  // namespace dorado
