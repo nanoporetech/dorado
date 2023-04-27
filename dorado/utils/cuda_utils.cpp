@@ -2,7 +2,8 @@
 
 #include "cxxpool.h"
 #include "math_utils.h"
-#include "torch/torch.h"
+
+#include <torch/torch.h>
 
 extern "C" {
 #include "koi.h"

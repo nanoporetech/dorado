@@ -1,8 +1,7 @@
 #include "tensor_utils.h"
 
-#include "torch/torch.h"
-
 #include <torch/csrc/jit/serialization/pickle.h>
+#include <torch/torch.h>
 
 #include <fstream>
 #include <vector>
