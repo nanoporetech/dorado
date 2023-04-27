@@ -310,7 +310,6 @@ struct CudaLSTMImpl : Module {
         weights = torch::empty({layer_size * 4, layer_size * 2}, options).contiguous();
         auto weight_ih = weights.slice(1, 0, layer_size);
 
-        config.sample_rate = toml::find<int>(run_info, "sample_rate");
         auto weight_hh = weights.slice(1, layer_size, 2 * layer_size);
         if (reverse) {
             std::swap(weight_ih, weight_hh);
