@@ -6,7 +6,9 @@
 #include <cmath>
 #include <utility>
 
-#ifndef _WIN32
+#ifdef _WIN32
+#include <io.h>
+#else
 #include <unistd.h>
 #endif
 
@@ -28,7 +30,7 @@ static std::pair<int, int> aligner_writer_thread_allocation(int available_thread
 
 static bool is_fd_tty(FILE* fd) {
 #ifdef _WIN32
-    return true;
+    return _isatty(_fileno(fd));
 #else
     return isatty(fileno(fd));
 #endif

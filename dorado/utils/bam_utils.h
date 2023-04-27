@@ -1,5 +1,4 @@
 #pragma once
-#include "data_loader/DataLoader.h"
 #include "htslib/sam.h"
 #include "minimap.h"
 #include "read_pipeline/ReadPipeline.h"
@@ -9,6 +8,8 @@
 #include <map>
 #include <set>
 #include <string>
+
+struct ReadGroup;
 
 namespace dorado::utils {
 
