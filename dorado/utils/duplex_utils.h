@@ -23,4 +23,20 @@ void preprocess_quality_scores(std::vector<uint8_t>& quality_scores, int pool_wi
 
 std::unordered_set<std::string> get_read_list_from_pairs(
         std::map<std::string, std::string> template_complement_map);
+
+/**
+ * Returns the stereo model name based on the presence of a specific substring in the input model.
+ *
+ * This function checks if the input model string contains the substring "4.2". If it does,
+ * the function returns the model name for the 5 kHz stereo model. Otherwise, it returns the model
+ * name for the 4 kHz stereo.
+ *
+ * @param model A string representing the input model.
+ * @return The corresponding stereo model name as a string.
+ *
+ * Note: This approach is not very clean but is necessary because the simplex model metadata
+ * does not include the sampling rate.
+ */
+const std::string get_stereo_model_name(const std::string& simplex_model_name);
+
 }  // namespace dorado::utils

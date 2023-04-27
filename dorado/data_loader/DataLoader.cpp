@@ -15,6 +15,7 @@
 #include <ctime>
 #include <filesystem>
 #include <mutex>
+#include <optional>
 
 namespace {
 void string_reader(HighFive::Attribute& attribute, std::string& target_str) {
@@ -172,7 +173,7 @@ void DataLoader::load_reads(const std::string& path, bool recursive_file_loading
 }
 
 int DataLoader::get_num_reads(std::string data_path,
-                              std::unordered_set<std::string> read_list,
+                              std::optional<std::unordered_set<std::string>> read_list,
                               bool recursive_file_loading) {
     size_t num_reads = 0;
 
@@ -209,6 +210,10 @@ int DataLoader::get_num_reads(std::string data_path,
     } else {
         iterate_directory(
                 [](const auto& path) { return std::filesystem::directory_iterator(path); });
+    }
+
+    if (read_list) {
+        num_reads = std::min(num_reads, read_list->size());
     }
 
     return num_reads;
@@ -328,8 +333,8 @@ void DataLoader::load_pod5_reads_from_file(const std::string& path) {
             char read_id_tmp[37];
             pod5_error_t err = pod5_format_read_id(read_data.read_id, read_id_tmp);
             std::string read_id_str(read_id_tmp);
-            if (m_allowed_read_ids.size() == 0 ||
-                (m_allowed_read_ids.find(read_id_str) != m_allowed_read_ids.end())) {
+            if (!m_allowed_read_ids ||
+                (m_allowed_read_ids->find(read_id_str) != m_allowed_read_ids->end())) {
                 futures.push_back(pool.push(process_pod5_read, row, batch, file, path, m_device));
             }
         }
@@ -433,8 +438,8 @@ void DataLoader::load_fast5_reads_from_file(const std::string& path) {
         new_read->attributes.start_time = start_time_str;
         new_read->attributes.fast5_filename = fast5_filename;
 
-        if (m_allowed_read_ids.size() == 0 ||
-            (m_allowed_read_ids.find(new_read->read_id) != m_allowed_read_ids.end())) {
+        if (!m_allowed_read_ids ||
+            (m_allowed_read_ids->find(new_read->read_id) != m_allowed_read_ids->end())) {
             m_read_sink.push_message(new_read);
             m_loaded_read_count++;
         }
@@ -445,7 +450,7 @@ DataLoader::DataLoader(MessageSink& read_sink,
                        const std::string& device,
                        size_t num_worker_threads,
                        size_t max_reads,
-                       std::unordered_set<std::string> read_list)
+                       std::optional<std::unordered_set<std::string>> read_list)
         : m_read_sink(read_sink),
           m_device(device),
           m_num_worker_threads(num_worker_threads),

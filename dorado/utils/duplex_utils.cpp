@@ -1,6 +1,6 @@
 #include "duplex_utils.h"
 
-#include "torch/torch.h"
+#include <torch/torch.h>
 
 #include <algorithm>
 #include <fstream>
@@ -114,6 +114,14 @@ void preprocess_quality_scores(std::vector<uint8_t>& quality_scores, int pool_wi
     auto t_float = t.to(torch::kFloat32);
     t.index({torch::indexing::Slice()}) =
             -torch::max_pool1d(-t_float, pool_window, 1, pool_window / 2);
+}
+
+const std::string get_stereo_model_name(const std::string& simplex_model_name) {
+    if (simplex_model_name.find("4.2") != std::string::npos) {
+        return "dna_r10.4.1_e8.2_5khz_stereo@v1.0";
+    } else {
+        return "dna_r10.4.1_e8.2_4khz_stereo@v1.1";
+    }
 }
 
 }  // namespace dorado::utils

@@ -6,7 +6,6 @@
 #if DORADO_GPU_BUILD
 #ifdef __APPLE__
 #include "nn/MetalCRFModel.h"
-#include "utils/metal_utils.h"
 #else
 #include "nn/CudaCRFModel.h"
 #include "utils/cuda_utils.h"
@@ -81,7 +80,10 @@ void setup(std::vector<std::string> args,
     int num_devices = 1;
 
     if (device == "cpu") {
-        batch_size = batch_size == 0 ? std::thread::hardware_concurrency() : batch_size;
+        if (batch_size == 0) {
+            batch_size = std::thread::hardware_concurrency();
+            spdlog::debug("- set batch size to {}", batch_size);
+        }
         for (size_t i = 0; i < num_runners; i++) {
             runners.push_back(std::make_shared<ModelRunner<CPUDecoder>>(model_path, device,
                                                                         chunk_size, batch_size));
@@ -90,13 +92,12 @@ void setup(std::vector<std::string> args,
 #if DORADO_GPU_BUILD
 #ifdef __APPLE__
     else if (device == "metal") {
-        if (batch_size == 0) {
-            batch_size = utils::auto_gpu_batch_size();
-            spdlog::debug("- selected batchsize {}", batch_size);
-        }
         auto caller = create_metal_caller(model_path, chunk_size, batch_size);
-        for (int i = 0; i < num_runners; i++) {
-            runners.push_back(std::make_shared<MetalModelRunner>(caller, chunk_size, batch_size));
+        for (size_t i = 0; i < num_runners; i++) {
+            runners.push_back(std::make_shared<MetalModelRunner>(caller));
+        }
+        if (runners.back()->batch_size() != batch_size) {
+            spdlog::debug("- set batch size to {}", runners.back()->batch_size());
         }
     } else {
         throw std::runtime_error(std::string("Unsupported device: ") + device);
@@ -108,16 +109,14 @@ void setup(std::vector<std::string> args,
         if (num_devices == 0) {
             throw std::runtime_error("CUDA device requested but no devices found.");
         }
-        batch_size = batch_size == 0 ? utils::auto_gpu_batch_size(model_path.string(), devices)
-                                     : batch_size;
-
-        spdlog::debug("- selected batchsize {}", batch_size);
-
         for (auto device_string : devices) {
             auto caller = create_cuda_caller(model_path, chunk_size, batch_size, device_string);
             for (size_t i = 0; i < num_runners; i++) {
-                runners.push_back(
-                        std::make_shared<CudaModelRunner>(caller, chunk_size, batch_size));
+                runners.push_back(std::make_shared<CudaModelRunner>(caller));
+            }
+            if (runners.back()->batch_size() != batch_size) {
+                spdlog::debug("- set batch size for {} to {}", device_string,
+                              runners.back()->batch_size());
             }
         }
     }
@@ -222,22 +221,18 @@ void setup(std::vector<std::string> args,
     ReadFilterNode read_filter_node(stats_node, min_qscore, num_devices * 2, num_reads);
 
     std::unique_ptr<ModBaseCallerNode> mod_base_caller_node;
-    std::unique_ptr<BasecallerNode> basecaller_node;
-
-    const int kBatchTimeoutMS = 100;
+    MessageSink* basecaller_node_sink = static_cast<MessageSink*>(&read_filter_node);
     if (!remora_model_list.empty()) {
         mod_base_caller_node = std::make_unique<ModBaseCallerNode>(
                 read_filter_node, std::move(remora_callers), num_remora_threads, num_devices,
                 model_stride, remora_batch_size);
-        basecaller_node = std::make_unique<BasecallerNode>(
-                *mod_base_caller_node, std::move(runners), batch_size, chunk_size, overlap,
-                model_stride, kBatchTimeoutMS, model_name);
-    } else {
-        basecaller_node = std::make_unique<BasecallerNode>(
-                read_filter_node, std::move(runners), batch_size, chunk_size, overlap, model_stride,
-                kBatchTimeoutMS, model_name);
+        basecaller_node_sink = static_cast<MessageSink*>(mod_base_caller_node.get());
     }
-    ScalerNode scaler_node(*basecaller_node, num_devices * 4);
+    const int kBatchTimeoutMS = 100;
+    BasecallerNode basecaller_node(*basecaller_node_sink, std::move(runners), overlap,
+                                   kBatchTimeoutMS, model_name);
+    ScalerNode scaler_node(basecaller_node, num_devices * 4);
+
     DataLoader loader(scaler_node, "cpu", num_devices, max_reads, read_list);
 
     loader.load_reads(data_path, recursive_file_loading);

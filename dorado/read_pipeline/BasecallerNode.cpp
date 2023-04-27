@@ -16,12 +16,17 @@ namespace dorado {
 
 void BasecallerNode::input_worker_thread() {
     Message message;
+
+    // Allow 5 batches per model runner on the chunks_in queue
+    size_t max_chunks_in = 0;
+    // Allows optimal batch size to be used for every GPU
+    for (auto &runner : m_model_runners) {
+        max_chunks_in += runner->batch_size() * 5;
+    }
+
     while (m_work_queue.try_pop(message)) {
         // If this message isn't a read, we'll get a bad_variant_access exception.
         auto read = std::get<std::shared_ptr<Read>>(message);
-
-        // Allow 5 batches per model runner on the chunks_in queue
-        const size_t max_chunks_in = m_batch_size * m_num_active_model_runners * 5;
 
         // Now that we have acquired a read, wait until we can push to chunks_in
         while (true) {
@@ -30,7 +35,7 @@ void BasecallerNode::input_worker_thread() {
                 return (m_chunks_in.size() < max_chunks_in);
             });
 
-            if (m_chunks_in.size() > max_chunks_in) {
+            if (m_chunks_in.size() >= max_chunks_in) {
                 continue;
             }
 
@@ -126,6 +131,7 @@ void BasecallerNode::working_reads_manager() {
 
 void BasecallerNode::basecall_worker_thread(int worker_id) {
     auto last_chunk_reserve_time = std::chrono::system_clock::now();
+    int batch_size = m_model_runners[worker_id]->batch_size();
     while (true) {
         std::unique_lock<std::mutex> chunks_lock(m_chunks_in_mutex);
 
@@ -166,7 +172,7 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
         }
 
         // There's chunks to get_scores, so let's add them to our input tensor
-        while (m_batched_chunks[worker_id].size() != m_batch_size && !m_chunks_in.empty()) {
+        while (m_batched_chunks[worker_id].size() != batch_size && !m_chunks_in.empty()) {
             std::shared_ptr<Chunk> chunk = m_chunks_in.front();
             m_chunks_in.pop_front();
             chunks_lock.unlock();
@@ -213,7 +219,7 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
 
         chunks_lock.unlock();
 
-        if (m_batched_chunks[worker_id].size() == m_batch_size) {
+        if (m_batched_chunks[worker_id].size() == batch_size) {
             // Input tensor is full, let's get_scores.
             basecall_current_batch(worker_id);
         }
@@ -222,20 +228,16 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
 
 BasecallerNode::BasecallerNode(MessageSink &sink,
                                std::vector<Runner> model_runners,
-                               size_t batch_size,
-                               size_t chunk_size,
                                size_t overlap,
-                               size_t model_stride,
                                int batch_timeout_ms,
                                std::string model_name,
                                size_t max_reads)
         : MessageSink(max_reads),
           m_sink(sink),
           m_model_runners(std::move(model_runners)),
-          m_batch_size(batch_size),
-          m_chunk_size(chunk_size),
+          m_chunk_size(m_model_runners.front()->chunk_size()),
           m_overlap(overlap),
-          m_model_stride(model_stride),
+          m_model_stride(m_model_runners.front()->model_stride()),
           m_terminate_basecaller(false),
           m_batch_timeout_ms(batch_timeout_ms),
           m_model_name(std::move(model_name)),
@@ -252,8 +254,6 @@ BasecallerNode::BasecallerNode(MessageSink &sink,
         std::deque<std::shared_ptr<Chunk>> chunk_queue;
         m_batched_chunks.push_back(chunk_queue);
     }
-    // adjust chunk size to be a multiple of the stride
-    m_chunk_size -= chunk_size % model_stride;
 
     initialization_time = std::chrono::system_clock::now();
 }

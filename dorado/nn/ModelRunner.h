@@ -17,6 +17,7 @@ public:
     virtual std::vector<DecodedChunk> call_chunks(int num_chunks) = 0;
     virtual size_t model_stride() const = 0;
     virtual size_t chunk_size() const = 0;
+    virtual size_t batch_size() const = 0;
 };
 
 using Runner = std::shared_ptr<ModelRunnerBase>;
@@ -32,6 +33,7 @@ public:
     std::vector<DecodedChunk> call_chunks(int num_chunks) final;
     size_t model_stride() const final { return m_model_stride; }
     size_t chunk_size() const final { return m_input.size(2); }
+    size_t batch_size() const final { return m_input.size(0); }
 
 private:
     std::string m_device;
@@ -57,7 +59,7 @@ ModelRunner<T>::ModelRunner(const std::filesystem::path &model_path,
     m_decoder = std::make_unique<T>();
 
     m_options = torch::TensorOptions().dtype(T::dtype).device(device);
-    m_module = load_crf_model(model_path, model_config, batch_size, chunk_size, m_options);
+    m_module = load_crf_model(model_path, model_config, m_options);
 
     // adjust chunk size to be a multiple of the stride
     chunk_size -= chunk_size % m_model_stride;
