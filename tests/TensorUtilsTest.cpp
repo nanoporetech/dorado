@@ -1,4 +1,4 @@
-#include "torch/torch.h"
+#include <torch/torch.h>
 #include "utils/tensor_utils.h"
 
 #include <catch2/catch.hpp>

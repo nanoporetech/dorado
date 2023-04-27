@@ -199,6 +199,11 @@ if(NOT SKIP_HDF_PLUGINS)
   add_hdf_vbz_plugin()
 endif()
 
+target_precompile_headers(dorado_lib
+    PRIVATE
+    <torch/torch.h>
+) 
+
 target_link_libraries(dorado_lib
     ${APPLE_FWK_FOUNDATION}
     ${APPLE_FWK_QUARTZ_CORE}
@@ -251,6 +256,8 @@ if(NOT DORADO_LIB_ONLY)
         PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
     )
+
+    target_precompile_headers(dorado REUSE_FROM dorado_lib)
 
     target_link_libraries(dorado
         dorado_lib
