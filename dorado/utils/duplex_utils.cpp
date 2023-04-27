@@ -118,7 +118,7 @@ void preprocess_quality_scores(std::vector<uint8_t>& quality_scores, int pool_wi
 }
 
 const std::string get_stereo_model_name(const std::string& simplex_model_name,
-                                        std::optional<uint16_t> data_sample_rate) {
+                                        const std::optional<uint16_t>& data_sample_rate) {
     bool use_5khz_model = (data_sample_rate && *data_sample_rate == 5000) ||
                           (simplex_model_name.find("4.2") != std::string::npos);
     if (use_5khz_model) {

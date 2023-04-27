@@ -39,6 +39,6 @@ std::unordered_set<std::string> get_read_list_from_pairs(
  * does not include the sampling rate.
  */
 const std::string get_stereo_model_name(const std::string& simplex_model_name,
-                                        std::optional<uint16_t> data_sample_rate);
+                                        const std::optional<uint16_t>& data_sample_rate);
 
 }  // namespace dorado::utils
