@@ -44,6 +44,17 @@ TEST_CASE(TEST_GROUP "Test loading single-read POD5 file, empty read list") {
     dorado::DataLoader loader(mock_sink, "cpu", 1, 0, read_list);
     loader.load_reads(data_path, false);
 
+    REQUIRE(mock_sink.get_read_count() == 0);
+}
+
+TEST_CASE(TEST_GROUP "Test loading single-read POD5 file, no read list") {
+    // Create a mock sink for testing output of reads
+    MockSink mock_sink;
+
+    std::string data_path(get_pod5_data_dir());
+    dorado::DataLoader loader(mock_sink, "cpu", 1, 0, std::nullopt);
+    loader.load_reads(data_path, false);
+
     REQUIRE(mock_sink.get_read_count() == 1);
 }
 
@@ -71,4 +82,24 @@ TEST_CASE(TEST_GROUP "Test loading single-read POD5 file, matched read list") {
     loader.load_reads(data_path, false);
 
     REQUIRE(mock_sink.get_read_count() == 1);
+}
+
+TEST_CASE(TEST_GROUP "Test calculating number of reads from pod5, read ids list.") {
+    // Create a mock sink for testing output of reads
+    std::string data_path(get_pod5_data_dir());
+
+    SECTION("pod5 file only, no read ids list") {
+        CHECK(dorado::DataLoader::get_num_reads(data_path, std::nullopt) == 1);
+    }
+
+    SECTION("pod5 file and read ids with 0 reads") {
+        auto read_list = std::unordered_set<std::string>();
+        CHECK(dorado::DataLoader::get_num_reads(data_path, read_list) == 0);
+    }
+    SECTION("pod5 file and read ids with 2 reads") {
+        auto read_list = std::unordered_set<std::string>();
+        read_list.insert("1");
+        read_list.insert("2");
+        CHECK(dorado::DataLoader::get_num_reads(data_path, read_list) == 1);
+    }
 }

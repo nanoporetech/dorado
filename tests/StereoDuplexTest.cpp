@@ -1,4 +1,5 @@
 #include "TestUtils.h"
+#include "read_pipeline/NullNode.h"
 #include "read_pipeline/ReadPipeline.h"
 #include "read_pipeline/StereoDuplexEncoderNode.h"
 
@@ -9,11 +10,6 @@
 #include <vector>
 
 #define TEST_GROUP "StereoDuplexTest"
-
-namespace stereo_internal {
-std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> template_read,
-                                            std::shared_ptr<dorado::Read> complement_read);
-}
 
 namespace {
 std::filesystem::path DataPath(std::string_view filename) {
@@ -50,6 +46,17 @@ TEST_CASE(TEST_GROUP "Encoder") {
     torch::load(stereo_raw_data, DataPath("stereo_raw_data.tensor").string());
     stereo_raw_data = stereo_raw_data.to(torch::kFloat16);
 
-    const auto stereo_read = stereo_internal::stereo_encode(template_read, complement_read);
+    std::map<std::string, std::string> template_complement_map = {
+            {template_read->read_id, complement_read->read_id}};
+    dorado::NullNode null_node;
+    dorado::StereoDuplexEncoderNode stereo_node =
+            dorado::StereoDuplexEncoderNode(null_node, std::move(template_complement_map), 5);
+
+    const auto stereo_read = stereo_node.stereo_encode(template_read, complement_read);
     REQUIRE(torch::equal(stereo_raw_data, stereo_read->raw_data));
+
+    // Encode with swapped template and complement reads
+    const auto swapped_stereo_read = stereo_node.stereo_encode(complement_read, template_read);
+    // Check if the encoded signal is NOT equal to the expected stereo_raw_data
+    REQUIRE(!torch::equal(stereo_raw_data, swapped_stereo_read->raw_data));
 }

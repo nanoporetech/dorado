@@ -48,6 +48,17 @@ TEST_CASE(TEST_GROUP "Test loading single-read Fast5 file, empty read list") {
     dorado::DataLoader loader(mock_sink, "cpu", 1, 0, read_list);
     loader.load_reads(data_path, false);
 
+    REQUIRE(mock_sink.get_read_count() == 0);
+}
+
+TEST_CASE(TEST_GROUP "Test loading single-read Fast5 file, no read list") {
+    // Create a mock sink for testing output of reads
+    MockSink mock_sink;
+
+    std::string data_path(get_fast5_data_dir());
+    dorado::DataLoader loader(mock_sink, "cpu", 1, 0, std::nullopt);
+    loader.load_reads(data_path, false);
+
     REQUIRE(mock_sink.get_read_count() == 1);
 }
 

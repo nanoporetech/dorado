@@ -107,21 +107,8 @@ int duplex(int argc, char* argv[]) {
 
             const auto model_path = std::filesystem::canonical(std::filesystem::path(model));
 
-            // Check sample rate of model vs data.
             auto data_sample_rate = DataLoader::get_sample_rate(reads);
-            if (data_sample_rate) {
-                auto model_sample_rate = get_model_sample_rate(model_path);
-                ;
-                if (*data_sample_rate != model_sample_rate) {
-                    std::stringstream err;
-                    err << "Sample rate for model (" << model_sample_rate << ") and data ("
-                        << *data_sample_rate << ") don't match." << std::endl;
-                    throw std::runtime_error(err.str());
-                }
-            }
-
-            // Currently the stereo model is hardcoded.
-            const std::string stereo_model_name("dna_r10.4.1_e8.2_4khz_stereo@v1.1");
+            auto stereo_model_name = utils::get_stereo_model_name(model, data_sample_rate);
             const auto stereo_model_path =
                     model_path.parent_path() / std::filesystem::path(stereo_model_name);
 
@@ -206,19 +193,31 @@ int duplex(int argc, char* argv[]) {
 #endif  // DORADO_GPU_BUILD
             spdlog::info("> Starting Stereo Duplex pipeline");
 
+            auto stereo_model_stride = stereo_runners.front()->model_stride();
+
+            auto adjusted_stereo_overlap = (overlap / stereo_model_stride) * stereo_model_stride;
+
             const int kStereoBatchTimeoutMS = 500;
             auto stereo_basecaller_node = std::make_unique<BasecallerNode>(
-                    read_filter_node, std::move(stereo_runners), overlap, kStereoBatchTimeoutMS);
+                    read_filter_node, std::move(stereo_runners), adjusted_stereo_overlap,
+                    kStereoBatchTimeoutMS);
 
             std::unordered_set<std::string> read_list =
                     utils::get_read_list_from_pairs(template_complement_map);
 
+            auto simplex_model_stride = runners.front()->model_stride();
+
             StereoDuplexEncoderNode stereo_node = StereoDuplexEncoderNode(
-                    *stereo_basecaller_node, std::move(template_complement_map));
+                    *stereo_basecaller_node, std::move(template_complement_map),
+                    simplex_model_stride);
+
+            auto adjusted_simplex_overlap = (overlap / simplex_model_stride) * simplex_model_stride;
 
             const int kSimplexBatchTimeoutMS = 100;
-            auto basecaller_node = std::make_unique<BasecallerNode>(
-                    stereo_node, std::move(runners), overlap, kSimplexBatchTimeoutMS);
+            auto basecaller_node = std::make_unique<BasecallerNode>(stereo_node, std::move(runners),
+                                                                    adjusted_simplex_overlap,
+                                                                    kSimplexBatchTimeoutMS);
+
             ScalerNode scaler_node(*basecaller_node, num_devices * 2);
 
             DataLoader loader(scaler_node, "cpu", num_devices, 0, std::move(read_list));

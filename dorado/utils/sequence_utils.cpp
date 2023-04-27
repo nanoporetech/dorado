@@ -129,20 +129,26 @@ namespace dorado::utils {
 
 float mean_qscore_from_qstring(const std::string& qstring) {
     if (qstring.empty()) {
-        return 0;
+        return 0.0f;
     }
 
-    std::vector<float> scores;
-    scores.reserve(qstring.length());
-    std::transform(qstring.begin(), qstring.end(),
-                   std::back_insert_iterator<std::vector<float>>(scores), [](const char& qchar) {
-                       float qscore = static_cast<float>(qchar - 33);
-                       return std::pow(10.f, -qscore / 10.f);
-                   });
-    float mean_error = std::accumulate(scores.begin(), scores.end(), 0.f) / scores.size();
-    float mean_qscore = -10.0f * log10(mean_error);
-    mean_qscore = std::min(50.0f, std::max(1.0f, mean_qscore));
-    return mean_qscore;
+    // Lookup table avoids repeated invocation of std::pow, which
+    // otherwise dominates run time of this function.
+    // Unfortunately std::pow is not constexpr, so this can't be.
+    static const auto kCharToScoreTable = [] {
+        std::array<float, 256> a{};
+        for (int q = 33; q <= 127; ++q) {
+            auto shifted = static_cast<float>(q - 33);
+            a[q] = std::pow(10.0f, -shifted / 10.0f);
+        }
+        return a;
+    }();
+    float total_error =
+            std::accumulate(qstring.cbegin(), qstring.cend(), 0.0f,
+                            [](float sum, char qchar) { return sum + kCharToScoreTable[qchar]; });
+    float mean_error = total_error / static_cast<float>(qstring.size());
+    float mean_qscore = -10.0f * std::log10(mean_error);
+    return std::clamp(mean_qscore, 1.0f, 50.0f);
 }
 
 std::vector<int> sequence_to_ints(const std::string& sequence) {

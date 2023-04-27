@@ -33,6 +33,8 @@ endif()
 
 add_executable(dorado_tests ${SOURCE_FILES})
 
+target_precompile_headers(dorado_tests REUSE_FROM dorado_lib)
+
 target_link_libraries(dorado_tests
     dorado_lib
     dorado_io_lib

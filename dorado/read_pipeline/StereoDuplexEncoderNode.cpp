@@ -11,9 +11,10 @@
 
 using namespace torch::indexing;
 
-namespace stereo_internal {
-std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> template_read,
-                                            std::shared_ptr<dorado::Read> complement_read) {
+namespace dorado {
+std::shared_ptr<dorado::Read> StereoDuplexEncoderNode::stereo_encode(
+        std::shared_ptr<dorado::Read> template_read,
+        std::shared_ptr<dorado::Read> complement_read) {
     // We rely on the incoming read raw data being of type float16 to allow direct memcpy
     // of tensor elements.
     assert(template_read->raw_data.dtype() == torch::kFloat16);
@@ -72,8 +73,6 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
     static constexpr unsigned char kAlignInsertionToQuery = 2;
     static constexpr unsigned char kAlignMismatch = 3;
 
-    const int stride = 5;  // TODO this needs to be passed in as a parameter
-
     // Move along the alignment, filling out the stereo-encoded tensor
     const int max_size = template_read->raw_data.size(0) + complement_read->raw_data.size(0);
     const auto opts = torch::TensorOptions().dtype(torch::kFloat16).device(torch::kCPU);
@@ -95,7 +94,7 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
     std::vector<uint8_t> template_moves_expanded;
     for (int i = 0; i < template_read->moves.size(); i++) {
         template_moves_expanded.push_back(template_read->moves[i]);
-        for (int j = 0; j < stride - 1; j++) {
+        for (int j = 0; j < m_input_signal_stride - 1; j++) {
             template_moves_expanded.push_back(0);
         }
     }
@@ -114,7 +113,7 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
     std::vector<uint8_t> complement_moves_expanded;
     for (int i = 0; i < complement_read->moves.size(); i++) {
         complement_moves_expanded.push_back(complement_read->moves[i]);
-        for (int j = 0; j < stride - 1; j++) {
+        for (int j = 0; j < m_input_signal_stride - 1; j++) {
             complement_moves_expanded.push_back(0);
         }
     }
@@ -274,7 +273,7 @@ std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> templa
 
     return read;
 }
-}  // namespace stereo_internal
+}  // namespace dorado
 
 namespace dorado {
 
@@ -329,7 +328,7 @@ void StereoDuplexEncoderNode::worker_thread() {
                 }
 
                 std::shared_ptr<Read> stereo_encoded_read =
-                        stereo_internal::stereo_encode(template_read, complement_read);
+                        stereo_encode(template_read, complement_read);
 
                 if (stereo_encoded_read->raw_data.ndimension() ==
                     2) {  // 2 dims for stereo encoding, 1 for simplex
@@ -348,8 +347,10 @@ void StereoDuplexEncoderNode::worker_thread() {
 
 StereoDuplexEncoderNode::StereoDuplexEncoderNode(
         MessageSink& sink,
-        std::map<std::string, std::string> template_complement_map)
-        : MessageSink(1000),
+        std::map<std::string, std::string> template_complement_map,
+        int input_signal_stride)
+        : m_input_signal_stride(input_signal_stride),
+          MessageSink(1000),
           m_sink(sink),
           m_num_worker_threads(std::thread::hardware_concurrency()),
           m_template_complement_map(template_complement_map) {

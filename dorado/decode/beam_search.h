@@ -1,6 +1,6 @@
 #pragma once
 
-#include "torch/torch.h"
+#include <torch/torch.h>
 
 #include <cstddef>
 #include <cstdint>
