@@ -3,18 +3,10 @@
 #include <unordered_map>
 #include <unordered_set>
 
-struct ReadGroup {
-    std::string run_id;
-    std::string basecalling_model;
-    std::string flowcell_id;
-    std::string device_id;
-    std::string exp_start_time;
-    std::string sample_id;
-};
-
 namespace dorado {
 
 class MessageSink;
+struct ReadGroup;
 
 class DataLoader {
 public:

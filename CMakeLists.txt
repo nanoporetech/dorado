@@ -139,7 +139,8 @@ set(LIB_SOURCE_FILES
     dorado/utils/duplex_utils.h
     dorado/utils/duplex_utils.cpp
     dorado/utils/basecaller_utils.h
-    dorado/utils/basecaller_utils.cpp)
+    dorado/utils/basecaller_utils.cpp
+    dorado/utils/types.h)
 
 if (DORADO_GPU_BUILD)
     if(APPLE)

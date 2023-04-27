@@ -2,14 +2,13 @@
 #include "htslib/sam.h"
 #include "minimap.h"
 #include "read_pipeline/ReadPipeline.h"
+#include "utils/types.h"
 
 #include <indicators/progress_bar.hpp>
 
 #include <map>
 #include <set>
 #include <string>
-
-struct ReadGroup;
 
 namespace dorado::utils {
 
