@@ -26,7 +26,7 @@ struct CRFModelConfig {
     float blank_score;
     float scale;
     int num_features;
-    int sample_rate = -1;
+    int sample_rate;
 };
 
 CRFModelConfig load_crf_model_config(const std::filesystem::path& path);

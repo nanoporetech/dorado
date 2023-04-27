@@ -130,6 +130,9 @@ static const std::unordered_map<std::string, uint16_t> sample_rate_by_model = {
         {"dna_r10.4.1_e8.2_5khz_400bps_hac@v4.2.0", 5000},
         {"dna_r10.4.1_e8.2_5khz_400bps_sup@v4.2.0", 5000},
 
+        //------ duplex ---------//
+        // v4.2
+        {"dna_r10.4.1_e8.2_5khz_stereo@v1.0", 5000},
 };
 
 bool is_rna_model(const std::filesystem::path& model);
@@ -144,7 +147,7 @@ std::string get_modification_model(const std::string& simplex_model,
 
 // fetch the sampling rate that the model is compatible with. for models not
 // present in the mapping, assume a sampling rate of 4000.
-uint16_t get_sample_rate_for_model(const std::string& model);
+uint16_t get_sample_rate_by_model_name(const std::string& model_name);
 
 }  // namespace utils
 

@@ -165,7 +165,6 @@ void setup(std::vector<std::string> args,
     auto data_sample_rate = DataLoader::get_sample_rate(data_path);
     if (data_sample_rate) {
         auto model_sample_rate = get_model_sample_rate(model_path);
-        ;
         if (*data_sample_rate != model_sample_rate) {
             std::stringstream err;
             err << "Sample rate for model (" << model_sample_rate << ") and data ("

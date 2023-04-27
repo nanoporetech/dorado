@@ -99,11 +99,12 @@ std::string get_modification_model(const std::string& simplex_model,
     return modification_path.u8string();
 }
 
-uint16_t get_sample_rate_for_model(const std::string& model) {
-    auto iter = sample_rate_by_model.find(model);
+uint16_t get_sample_rate_by_model_name(const std::string& model_name) {
+    auto iter = sample_rate_by_model.find(model_name);
     if (iter != sample_rate_by_model.end()) {
         return iter->second;
     } else {
+        // Assume any model not found in the list has sample rate 4000.
         return 4000;
     }
 }

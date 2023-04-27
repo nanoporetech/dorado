@@ -937,9 +937,11 @@ ModuleHolder<AnyModule> load_crf_model(const std::filesystem::path &path,
 
 uint16_t get_model_sample_rate(const std::filesystem::path &model_path) {
     std::string model_name = std::filesystem::canonical(model_path).filename().string();
+    // Find the sample rate from model config.
     int model_sample_rate = load_crf_model_config(model_path).sample_rate;
     if (model_sample_rate < 0) {
-        model_sample_rate = utils::get_sample_rate_for_model(model_name);
+        // If unsuccessful, find sample rate by model name.
+        model_sample_rate = utils::get_sample_rate_by_model_name(model_name);
     }
     return model_sample_rate;
 }

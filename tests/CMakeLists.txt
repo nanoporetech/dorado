@@ -17,6 +17,7 @@ set(SOURCE_FILES
     BamWriterTest.cpp
     CliUtilsTest.cpp
     ReadFilterNodeTest.cpp
+    ModelUtilsTest.cpp
 )
 
 if (DORADO_GPU_BUILD)
