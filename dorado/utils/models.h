@@ -52,9 +52,6 @@ static const std::vector<std::string> models = {
         "dna_r10.4.1_e8.2_400bps_hac@v4.2.0",
         "dna_r10.4.1_e8.2_400bps_sup@v4.2.0",
 
-        // Stereo
-        "dna_r10.4.1_e8.2_5khz_stereo@v1.0",
-
         // RNA003
         "rna003_120bps_sup@v3",
 };
@@ -63,9 +60,12 @@ static const std::vector<std::string> models = {
 
 namespace stereo {
 
-static const std::vector<std::string> models = {"dna_r10.4.1_e8.2_4khz_stereo@v1.1"};
+static const std::vector<std::string> models = {
+        "dna_r10.4.1_e8.2_4khz_stereo@v1.1",
+        "dna_r10.4.1_e8.2_5khz_stereo@v1.0",
+};
 
-}
+}  // namespace stereo
 
 namespace modified {
 
