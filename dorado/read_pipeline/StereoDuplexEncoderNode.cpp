@@ -26,18 +26,21 @@ std::shared_ptr<dorado::Read> StereoDuplexEncoderNode::stereo_encode(
     float template_len = template_read->seq.size();
     float complement_len = complement_read->seq.size();
 
-    float delta = std::max(template_len, complement_len) - std::min(template_len, complement_len);
-    if ((delta / std::max(template_len, complement_len)) > 0.05f) {
+    // If the sequence lengths are too dissimilar, we exit early
+    float sequence_length_delta =
+            std::max(template_len, complement_len) - std::min(template_len, complement_len);
+    if ((sequence_length_delta / std::max(template_len, complement_len)) > 0.05f) {
         return read;
     }
 
-    EdlibAlignConfig align_config = edlibDefaultAlignConfig();
-    align_config.task = EDLIB_TASK_PATH;
-
+    // We align the reverse complement of the complement read to the template read
     const auto complement_sequence_reverse_complement =
             dorado::utils::reverse_complement(complement_read->seq);
 
     // Align the two reads to one another and print out the score.
+    EdlibAlignConfig align_config = edlibDefaultAlignConfig();
+    align_config.task = EDLIB_TASK_PATH;
+
     EdlibAlignResult result =
             edlibAlign(template_read->seq.data(), template_read->seq.size(),
                        complement_sequence_reverse_complement.data(),
@@ -55,14 +58,14 @@ std::shared_ptr<dorado::Read> StereoDuplexEncoderNode::stereo_encode(
     int start_alignment_position = alignment_start_end.first;
     int end_alignment_position = alignment_start_end.second;
 
-    // TODO: perhaps its overkill having this function make this decision...
+    // TODO: its overkill having this function make this decision...
     const int kMinTrimmedAlignmentLength = 200;
     const bool consensus_possible =
             (start_alignment_position < end_alignment_position) &&
             ((end_alignment_position - start_alignment_position) > kMinTrimmedAlignmentLength);
 
     if (!consensus_possible) {
-        // There wasn't a good enough match -- return the simplex read.
+        // There wasn't a good enough match -- return early with an empty read.
         edlibFreeAlignResult(result);
         return read;
     }
@@ -99,9 +102,9 @@ std::shared_ptr<dorado::Read> StereoDuplexEncoderNode::stereo_encode(
         }
     }
 
-    int extra_moves = template_moves_expanded.size() - template_read->raw_data.size(0);
-    for (int i = 0; i < extra_moves; i++) {
-        template_moves_expanded.pop_back();
+    int extra_padding = template_read->raw_data.size(0) - template_moves_expanded.size();
+    for (int i = 0; i < extra_padding; i++) {
+        template_moves_expanded.push_back(0);
     }
 
     int template_moves_seen = template_moves_expanded[template_signal_cursor];
@@ -118,9 +121,9 @@ std::shared_ptr<dorado::Read> StereoDuplexEncoderNode::stereo_encode(
         }
     }
 
-    extra_moves = complement_moves_expanded.size() - complement_read->raw_data.size(0);
-    for (int i = 0; i < extra_moves; i++) {
-        complement_moves_expanded.pop_back();
+    extra_padding = complement_read->raw_data.size(0) - complement_moves_expanded.size();
+    for (int i = 0; i < extra_padding; i++) {
+        complement_moves_expanded.push_back(0);
     }
     complement_moves_expanded.push_back(1);
     std::reverse(complement_moves_expanded.begin(), complement_moves_expanded.end());
