@@ -27,7 +27,7 @@ std::vector<uint8_t> ReadFileIntoVector(const std::filesystem::path& path) {
 }  // namespace
 
 // Tests stereo encoder output for a real sample signal against known good output.
-TEST_CASE(TEST_GROUP "Encoder") {
+TEST_CASE(TEST_GROUP "Encoder", "[.]") {
     const auto template_read = std::make_shared<dorado::Read>();
     template_read->seq = ReadFileIntoString(DataPath("template_seq"));
     template_read->qstring = ReadFileIntoString(DataPath("template_qstring"));
