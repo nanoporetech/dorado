@@ -298,6 +298,7 @@ test:macos:x64:
   needs:
     - build:macos:x64
   variables:
+    GIT_STRATEGY: none
     MODEL: dna_r9.4.1_e8_fast@v3.4
 
 # Test that you can run dorado in a clean cuda 20.04 environment
