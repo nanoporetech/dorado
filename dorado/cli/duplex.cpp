@@ -107,7 +107,8 @@ int duplex(int argc, char* argv[]) {
 
             const auto model_path = std::filesystem::canonical(std::filesystem::path(model));
 
-            auto data_sample_rate = DataLoader::get_sample_rate(reads);
+            auto data_sample_rate =
+                    DataLoader::get_sample_rate(reads, parser.get<bool>("--recursive"));
             auto stereo_model_name = utils::get_stereo_model_name(model, data_sample_rate);
             const auto stereo_model_path =
                     model_path.parent_path() / std::filesystem::path(stereo_model_name);
