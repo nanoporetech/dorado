@@ -2,6 +2,8 @@
 
 #include <catch2/catch.hpp>
 
+#include <cstdlib>
+
 #define TEST_GROUP "[utils]"
 
 using namespace dorado::utils;
