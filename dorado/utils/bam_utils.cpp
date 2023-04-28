@@ -20,6 +20,7 @@
 #include <set>
 #include <stdexcept>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 namespace dorado::utils {
@@ -425,19 +426,34 @@ HtsWriter::OutputMode HtsWriter::get_output_mode(std::string mode) {
 void HtsWriter::join() { m_worker->join(); }
 
 void HtsWriter::worker_thread() {
-    Message message;
+    std::unordered_set<std::string> processed_read_ids;
     size_t write_count = 0;
+
+    Message message;
     while (m_work_queue.try_pop(message)) {
         bam1_t* aln = std::get<bam1_t*>(message);
         write(aln);
         // Free the bam alignment that's already written
         // out to disk.
+        processed_read_ids.emplace(bam_get_qname(aln));
         bam_destroy1(aln);
-        write_count++;
+
+        // Since multiple alignments can have the same read id, only
+        // increment ticker counter if a new unique read is encountered when
+        // num_reads has been specified.
+        bool new_count_acquired = false;
+        if (m_num_reads_expected != 0) {
+            if (processed_read_ids.size() != write_count) {
+                write_count = processed_read_ids.size();
+                new_count_acquired = true;
+            }
+        } else {
+            write_count++;
+        }
 
         if ((write_count % m_progress_bar_increment) == 0) {
             if (m_num_reads_expected != 0) {
-                if ((write_count / m_progress_bar_increment) < 100) {
+                if (new_count_acquired && (write_count / m_progress_bar_increment) < 100) {
                     m_progress_bar.tick();
                 }
             } else {
