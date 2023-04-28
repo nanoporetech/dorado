@@ -20,6 +20,7 @@
 #include <set>
 #include <stdexcept>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 namespace dorado::utils {
@@ -438,7 +439,8 @@ void HtsWriter::worker_thread() {
         bam_destroy1(aln);
 
         // Since multiple alignments can have the same read id, only
-        // increment ticket counter if a new unique read is encountered.
+        // increment ticker counter if a new unique read is encountered when
+        // num_reads has been specified.
         bool new_count_acquired = false;
         if (m_num_reads_expected != 0) {
             if (processed_read_ids.size() != write_count) {
