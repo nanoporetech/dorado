@@ -66,9 +66,10 @@ void BasecallerNode::input_worker_thread() {
             chunk_lock.unlock();
 
             // Put the read in the working list
-            std::unique_lock<std::mutex> working_reads_lock(m_working_reads_mutex);
-            m_working_reads.push_back(read);
-            working_reads_lock.unlock();
+            {
+                std::lock_guard working_reads_lock(m_working_reads_mutex);
+                m_working_reads.push_back(std::move(read));
+            }
             break;  // Go back to watching the input reads
         }
     }
@@ -98,23 +99,26 @@ void BasecallerNode::basecall_current_batch(int worker_id) {
 }
 
 void BasecallerNode::working_reads_manager() {
-    while (!m_terminate_manager.load(std::memory_order_relaxed) || !m_working_reads.empty()) {
+    while (true) {
         nvtx3::scoped_range loop{"working_reads_manager"};
-        std::deque<std::shared_ptr<Read>> completed_reads;
-        std::unique_lock<std::mutex> working_reads_lock(m_working_reads_mutex);
 
-        for (auto read_iter = m_working_reads.begin(); read_iter != m_working_reads.end();) {
-            if ((*read_iter)->num_chunks_called.load() == (*read_iter)->num_chunks) {
-                (*read_iter)->model_name =
-                        m_model_name;  // Before sending read to sink, assign its model name
-                completed_reads.push_back(*read_iter);
-                read_iter = m_working_reads.erase(read_iter);
-            } else {
-                read_iter++;
+        std::deque<std::shared_ptr<Read>> completed_reads;
+        {
+            std::lock_guard working_reads_lock(m_working_reads_mutex);
+            if (m_terminate_manager.load(std::memory_order_relaxed) && m_working_reads.empty()) {
+                break;
+            }
+            for (auto read_iter = m_working_reads.begin(); read_iter != m_working_reads.end();) {
+                if ((*read_iter)->num_chunks_called.load() == (*read_iter)->num_chunks) {
+                    (*read_iter)->model_name =
+                            m_model_name;  // Before sending read to sink, assign its model name
+                    completed_reads.push_back(*read_iter);
+                    read_iter = m_working_reads.erase(read_iter);
+                } else {
+                    read_iter++;
+                }
             }
         }
-
-        working_reads_lock.unlock();
 
         if (completed_reads.empty()) {
             std::this_thread::sleep_for(10ms);
@@ -143,8 +147,11 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
                     basecall_current_batch(worker_id);
                 }
 
-                if (!m_working_reads.empty()) {
-                    continue;
+                {
+                    std::lock_guard working_reads_lock(m_working_reads_mutex);
+                    if (!m_working_reads.empty()) {
+                        continue;
+                    }
                 }
 
                 size_t num_remaining_runners = --m_num_active_model_runners;
