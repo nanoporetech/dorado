@@ -149,7 +149,7 @@ PosRanges merge_ranges(const PosRanges& ranges, size_t merge_dist) {
     return merged;
 }
 
-std::vector<std::pair<size_t, size_t>> detect_pore_signal(torch::Tensor signal,
+std::vector<std::pair<size_t, size_t>> detect_pore_signal(const torch::Tensor& signal,
                                                           float threshold,
                                                           size_t cluster_dist,
                                                           size_t ignore_prefix) {
