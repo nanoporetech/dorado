@@ -444,7 +444,7 @@ std::optional<DuplexSplitNode::PosRange> DuplexSplitNode::identify_extra_middle_
     return std::nullopt;
 }
 
-std::vector<std::shared_ptr<Read>> DuplexSplitNode::split(
+std::vector<std::shared_ptr<Read>> DuplexSplitNode::subreads(
         std::shared_ptr<Read> read,
         const std::vector<PosRange>& spacers) const {
     if (spacers.empty()) {
@@ -548,54 +548,63 @@ DuplexSplitNode::build_split_finders() const {
     return split_finders;
 }
 
-void DuplexSplitNode::worker_thread() {
+std::vector<std::shared_ptr<Read>> DuplexSplitNode::split(std::shared_ptr<Read> init_read) const {
     using namespace std::chrono;
+
+    auto start_ts = high_resolution_clock::now();
+    spdlog::debug("Processing read {}; length {}", init_read->read_id, init_read->seq.size());
+
+    std::vector<ExtRead> to_split{ExtRead(init_read)};
+    for (const auto& [description, split_f] : m_split_finders) {
+        spdlog::trace("Running {}", description);
+        std::vector<ExtRead> split_round_result;
+        for (auto& r : to_split) {
+            //auto start = high_resolution_clock::now();
+            auto spacers = split_f(r);
+            //auto stop = high_resolution_clock::now();
+            //spdlog::trace("{} duration: {} microseconds", description, duration_cast<microseconds>(stop - start).count());
+            spdlog::debug("DSN: {} strategy {} splits in read {}", description, spacers.size(),
+                          init_read->read_id);
+
+            if (spacers.empty()) {
+                split_round_result.push_back(std::move(r));
+            } else {
+                for (auto sr : subreads(r.read, spacers)) {
+                    split_round_result.emplace_back(sr);
+                }
+            }
+        }
+        to_split = std::move(split_round_result);
+    }
+
+    std::vector<std::shared_ptr<Read>> split_result;
+    for (const auto& er : to_split) {
+        split_result.push_back(std::move(er.read));
+    }
+
+    spdlog::debug("Read {} split into {} subreads", init_read->read_id, split_result.size());
+
+    auto stop_ts = high_resolution_clock::now();
+    spdlog::trace("READ duration: {} microseconds (ID: {})",
+                  duration_cast<microseconds>(stop_ts - start_ts).count(), init_read->read_id);
+
+    return split_result;
+}
+
+void DuplexSplitNode::worker_thread() {
     Message message;
 
     while (m_work_queue.try_pop(message)) {
         if (!m_settings.enabled) {
             m_sink.push_message(std::move(message));
-            continue;
-        }
-
-        auto start_ts = high_resolution_clock::now();
-        // If this message isn't a read, we'll get a bad_variant_access exception.
-        auto init_read = std::get<std::shared_ptr<Read>>(message);
-        spdlog::debug("Processing read {}; length {}", init_read->read_id, init_read->seq.size());
-
-        std::vector<ExtRead> to_split{ExtRead(init_read)};
-        for (const auto& [description, split_f] : m_split_finders) {
-            spdlog::trace("Running {}", description);
-            std::vector<ExtRead> split_round_result;
-            for (auto& r : to_split) {
-                //auto start = high_resolution_clock::now();
-                auto spacers = split_f(r);
-                //auto stop = high_resolution_clock::now();
-                //spdlog::trace("{} duration: {} microseconds", description, duration_cast<microseconds>(stop - start).count());
-                spdlog::debug("DSN: {} strategy {} splits in read {}", description, spacers.size(),
-                              init_read->read_id);
-
-                if (spacers.empty()) {
-                    split_round_result.push_back(std::move(r));
-                } else {
-                    for (auto sr : split(r.read, spacers)) {
-                        split_round_result.emplace_back(sr);
-                    }
-                }
+        } else {
+            // If this message isn't a read, we'll get a bad_variant_access exception.
+            auto init_read = std::get<std::shared_ptr<Read>>(message);
+            for (auto& subread : split(init_read)) {
+                //TODO correctly process end_reason when we have them
+                subread->parent_read_id = init_read->read_id;
+                m_sink.push_message(std::move(subread));
             }
-            to_split = std::move(split_round_result);
-        }
-
-        spdlog::debug("Read {} split into {} subreads", init_read->read_id, to_split.size());
-
-        auto stop_ts = high_resolution_clock::now();
-        spdlog::trace("READ duration: {} microseconds (ID: {})",
-                      duration_cast<microseconds>(stop_ts - start_ts).count(), init_read->read_id);
-
-        for (auto subread : to_split) {
-            //TODO correctly process end_reason when we have them
-            subread.read->parent_read_id = init_read->read_id;
-            m_sink.push_message(std::move(subread.read));
         }
     }
     m_sink.terminate();

@@ -36,15 +36,6 @@ struct DuplexSplitSettings {
 
 class DuplexSplitNode : public MessageSink {
 public:
-    //TODO consider precomputing and reusing ranges with high signal
-    struct ExtRead {
-        std::shared_ptr<Read> read;
-        torch::Tensor data_as_float32;
-        std::vector<uint64_t> move_sums;
-
-        explicit ExtRead(std::shared_ptr<Read> r);
-    };
-
     typedef std::pair<uint64_t, uint64_t> PosRange;
     typedef std::vector<PosRange> PosRanges;
 
@@ -54,7 +45,18 @@ public:
                     size_t max_reads = 1000);
     ~DuplexSplitNode();
 
+    std::vector<std::shared_ptr<Read>> split(std::shared_ptr<Read> init_read) const;
+
 private:
+    //TODO consider precomputing and reusing ranges with high signal
+    struct ExtRead {
+        std::shared_ptr<Read> read;
+        torch::Tensor data_as_float32;
+        std::vector<uint64_t> move_sums;
+
+        explicit ExtRead(std::shared_ptr<Read> r);
+    };
+
     typedef std::function<PosRanges(const ExtRead&)> SplitFinderF;
 
     std::vector<PosRange> possible_pore_regions(const ExtRead& read, float pore_thr) const;
@@ -62,8 +64,8 @@ private:
     bool check_flank_match(const Read& read, PosRange r, int dist_thr) const;
     std::optional<PosRange> identify_extra_middle_split(const Read& read) const;
 
-    std::vector<std::shared_ptr<Read>> split(std::shared_ptr<Read> read,
-                                             const PosRanges& spacers) const;
+    std::vector<std::shared_ptr<Read>> subreads(std::shared_ptr<Read> read,
+                                                const PosRanges& spacers) const;
 
     std::vector<std::pair<std::string, SplitFinderF>> build_split_finders() const;
 
