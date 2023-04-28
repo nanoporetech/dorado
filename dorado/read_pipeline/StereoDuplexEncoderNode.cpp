@@ -59,7 +59,7 @@ std::shared_ptr<dorado::Read> StereoDuplexEncoderNode::stereo_encode(
     int end_alignment_position = alignment_start_end.second;
 
     // TODO: its overkill having this function make this decision...
-    const int kMinTrimmedAlignmentLength = 200;
+    const int kMinTrimmedAlignmentLength = 0;
     const bool consensus_possible =
             (start_alignment_position < end_alignment_position) &&
             ((end_alignment_position - start_alignment_position) > kMinTrimmedAlignmentLength);
