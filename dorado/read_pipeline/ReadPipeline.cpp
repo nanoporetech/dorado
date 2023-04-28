@@ -71,7 +71,7 @@ void Read::generate_read_tags(bam1_t *aln, bool emit_moves) const {
     int rn = attributes.read_number;
     bam_aux_append(aln, "rn", 'i', sizeof(rn), (uint8_t *)&rn);
 
-    bam_aux_append(aln, "f5", 'Z', attributes.fast5_filename.length() + 1,
+    bam_aux_append(aln, "fn", 'Z', attributes.fast5_filename.length() + 1,
                    (uint8_t *)attributes.fast5_filename.c_str());
 
     float sm = shift;
