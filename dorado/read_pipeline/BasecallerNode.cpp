@@ -240,29 +240,28 @@ BasecallerNode::BasecallerNode(MessageSink &sink,
           m_model_stride(m_model_runners.front()->model_stride()),
           m_terminate_basecaller(false),
           m_batch_timeout_ms(batch_timeout_ms),
-          m_model_name(std::move(model_name)),
-          m_working_reads_manager(
-                  std::make_unique<std::thread>(&BasecallerNode::working_reads_manager, this)),
-          m_input_worker(
-                  std::make_unique<std::thread>(&BasecallerNode::input_worker_thread, this)) {
-    // Spin up the model runners:
-    m_num_active_model_runners = m_model_runners.size();
-    for (int i = 0; i < m_num_active_model_runners; i++) {
-        std::unique_ptr<std::thread> t =
-                std::make_unique<std::thread>(&BasecallerNode::basecall_worker_thread, this, i);
-        m_basecall_workers.push_back(std::move(t));
-        std::deque<std::shared_ptr<Chunk>> chunk_queue;
-        m_batched_chunks.push_back(chunk_queue);
-    }
+          m_model_name(std::move(model_name)) {
+    // Setup worker state
+    size_t const num_workers = m_model_runners.size();
+    m_batched_chunks.resize(num_workers);
+    m_basecall_workers.resize(num_workers);
+    m_num_active_model_runners = num_workers;
 
     initialization_time = std::chrono::system_clock::now();
+
+    // Spin up any workers last so that we're not mutating |this| underneath them
+    m_working_reads_manager = std::make_unique<std::thread>([this] { working_reads_manager(); });
+    m_input_worker = std::make_unique<std::thread>([this] { input_worker_thread(); });
+    for (int i = 0; i < static_cast<int>(num_workers); i++) {
+        m_basecall_workers[i] = std::thread([this, i] { basecall_worker_thread(i); });
+    }
 }
 
 BasecallerNode::~BasecallerNode() {
     terminate();
     m_input_worker->join();
     for (auto &t : m_basecall_workers) {
-        t->join();
+        t.join();
     }
     m_working_reads_manager->join();
     termination_time = std::chrono::system_clock::now();

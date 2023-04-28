@@ -69,7 +69,7 @@ private:
     // initialisation is via initialiser lists.
     std::unique_ptr<std::thread>
             m_input_worker;  // Chunks up incoming reads and sticks them in the pending list.
-    std::vector<std::unique_ptr<std::thread>>
+    std::vector<std::thread>
             m_basecall_workers;  // Basecalls chunks from the queue and puts read on the sink.
     std::unique_ptr<std::thread>
             m_working_reads_manager;  // Stitches working reads into complete reads.
