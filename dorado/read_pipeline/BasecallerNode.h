@@ -42,8 +42,8 @@ private:
     // Model runners which have not terminated.
     std::atomic<int> m_num_active_model_runners{0};
 
-    bool m_terminate_basecaller{false};
-    bool m_terminate_manager{false};
+    std::atomic<bool> m_terminate_basecaller{false};
+    std::atomic<bool> m_terminate_manager{false};
 
     // Time when Basecaller Node is initialised. Used for benchmarking and debugging
     std::chrono::time_point<std::chrono::system_clock> initialization_time;

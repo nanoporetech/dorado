@@ -74,7 +74,7 @@ void BasecallerNode::input_worker_thread() {
     }
 
     // Notify the basecaller threads that it is safe to gracefully terminate the basecaller
-    m_terminate_basecaller = true;
+    m_terminate_basecaller.store(true, std::memory_order_relaxed);
 }
 
 void BasecallerNode::basecall_current_batch(int worker_id) {
@@ -98,7 +98,7 @@ void BasecallerNode::basecall_current_batch(int worker_id) {
 }
 
 void BasecallerNode::working_reads_manager() {
-    while (!m_terminate_manager || !m_working_reads.empty()) {
+    while (!m_terminate_manager.load(std::memory_order_relaxed) || !m_working_reads.empty()) {
         nvtx3::scoped_range loop{"working_reads_manager"};
         std::deque<std::shared_ptr<Read>> completed_reads;
         std::unique_lock<std::mutex> working_reads_lock(m_working_reads_mutex);
@@ -136,7 +136,7 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
         std::unique_lock<std::mutex> chunks_lock(m_chunks_in_mutex);
 
         if (m_chunks_in.empty()) {
-            if (m_terminate_basecaller) {
+            if (m_terminate_basecaller.load(std::memory_order_relaxed)) {
                 chunks_lock.unlock();  // Not strictly necessary
                 // We dispatch any part-full buffer here to finish basecalling.
                 if (!m_batched_chunks[worker_id].empty()) {
@@ -150,7 +150,7 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
                 size_t num_remaining_runners = --m_num_active_model_runners;
 
                 if (num_remaining_runners == 0) {
-                    m_terminate_manager = true;
+                    m_terminate_manager.store(true, std::memory_order_relaxed);
                 }
 
                 return;
