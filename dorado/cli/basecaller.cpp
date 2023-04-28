@@ -195,7 +195,7 @@ void setup(std::vector<std::string> args,
     if (data_sample_rate != model_sample_rate) {
         std::stringstream err;
         err << "Sample rate for model (" << model_sample_rate << ") and data (" << data_sample_rate
-            << ") don't match." << std::endl;
+            << ") don't match.";
         throw std::runtime_error(err.str());
     }
 

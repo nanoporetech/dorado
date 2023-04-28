@@ -445,8 +445,9 @@ void HtsWriter::worker_thread() {
             }
         }
     }
+    // Clear progress information.
     if (m_num_reads_expected != 0 || write_count > m_progress_bar_increment) {
-        std::cerr << "\r" << std::endl;
+        std::cerr << "\r";
     }
     spdlog::debug("Written {} alignments.", write_count);
 }
