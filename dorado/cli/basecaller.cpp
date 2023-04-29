@@ -190,7 +190,7 @@ void setup(std::vector<std::string> args,
     auto read_list = utils::load_read_list(read_list_file_path);
 
     // Check sample rate of model vs data.
-    auto data_sample_rate = DataLoader::get_sample_rate(data_path);
+    auto data_sample_rate = DataLoader::get_sample_rate(data_path, recursive_file_loading);
     auto model_sample_rate = get_model_sample_rate(model_path);
     if (data_sample_rate != model_sample_rate) {
         std::stringstream err;
