@@ -15,19 +15,21 @@ void PairingNode::worker_thread() {
         // Check if read is a template with corresponding complement
         std::unique_lock<std::mutex> tc_lock(m_tc_map_mutex);
 
-        if (m_template_complement_map.find(read->read_id) != m_template_complement_map.end()) {
-            partner_id = m_template_complement_map[read->read_id];
+        auto it = m_template_complement_map.find(read->read_id);
+        if (it != m_template_complement_map.end()) {
+            partner_id = it->second;
             tc_lock.unlock();
             read_is_template = true;
             partner_found = true;
         } else {
-            tc_lock.unlock();
-            std::unique_lock<std::mutex> ct_lock(m_ct_map_mutex);
-            if (m_complement_template_map.find(read->read_id) != m_complement_template_map.end()) {
-                partner_id = m_complement_template_map[read->read_id];
-                partner_found = true;
+            {
+                std::lock_guard<std::mutex> ct_lock(m_ct_map_mutex);
+                auto it = m_complement_template_map.find(read->read_id);
+                if (it != m_complement_template_map.end()) {
+                    partner_id = it->second;
+                    partner_found = true;
+                }
             }
-            ct_lock.unlock();
         }
 
         if (partner_found) {
@@ -74,7 +76,7 @@ PairingNode::PairingNode(MessageSink& sink,
           m_num_worker_threads(2),
           m_template_complement_map(template_complement_map) {
     // Set up the complement-template_map
-    for (auto key : template_complement_map) {
+    for (auto& key : template_complement_map) {
         m_complement_template_map[key.second] = key.first;
     }
 

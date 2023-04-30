@@ -6,7 +6,6 @@ namespace dorado {
 
 class StereoDuplexEncoderNode : public MessageSink {
 public:
-    // Chunk size and overlap are in raw samples
     StereoDuplexEncoderNode(MessageSink &sink, int input_signal_stride);
 
     std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> template_read,
