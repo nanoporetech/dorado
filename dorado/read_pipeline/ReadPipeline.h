@@ -99,9 +99,20 @@ private:
     void generate_modbase_string(bam1_t* aln, uint8_t threshold = 0) const;
 };
 
-// As things stand, the only Message variant is shared_ptr<Read>.  Other Message types
-// can be added here.
-using Message = std::variant<std::shared_ptr<Read>, bam1_t*>;
+// A pair of reads for Duplex calling
+class ReadPair {
+public:
+    std::shared_ptr<Read> read_1;
+    std::shared_ptr<Read> read_2;
+};
+
+// The Message type is a std::variant that can hold different types of message objects.
+// It is currently able to store:
+// - a std::shared_ptr<Read> object, which represents a single read
+// - a bam1_t* object, which represents a raw BAM alignment record
+// - a std::shared_ptr<ReadPair> object, which represents a pair of reads for duplex calling
+// To add more message types, simply add them to the list of types in the std::variant.
+using Message = std::variant<std::shared_ptr<Read>, bam1_t*, std::shared_ptr<ReadPair>>;
 
 // Base class for an object which consumes messages.
 // MessageSink is a node within a pipeline.
