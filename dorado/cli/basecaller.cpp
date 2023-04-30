@@ -190,12 +190,12 @@ void setup(std::vector<std::string> args,
     auto read_list = utils::load_read_list(read_list_file_path);
 
     // Check sample rate of model vs data.
-    auto data_sample_rate = DataLoader::get_sample_rate(data_path);
+    auto data_sample_rate = DataLoader::get_sample_rate(data_path, recursive_file_loading);
     auto model_sample_rate = get_model_sample_rate(model_path);
     if (data_sample_rate != model_sample_rate) {
         std::stringstream err;
         err << "Sample rate for model (" << model_sample_rate << ") and data (" << data_sample_rate
-            << ") don't match." << std::endl;
+            << ") don't match.";
         throw std::runtime_error(err.str());
     }
 
@@ -217,10 +217,10 @@ void setup(std::vector<std::string> args,
         bam_writer->write_header();
         converted_reads_sink = bam_writer.get();
     } else {
-        bam_writer =
-                std::make_shared<HtsWriter>("-", output_mode, num_devices * 2 /*writer_threads*/);
+        bam_writer = std::make_shared<HtsWriter>("-", output_mode,
+                                                 num_devices * 2 /*writer_threads*/, num_reads);
         aligner = std::make_shared<utils::Aligner>(*bam_writer, ref, kmer_size, window_size,
-                                                   num_devices * 5);
+                                                   num_devices * 10);
         utils::add_sq_hdr(hdr.get(), aligner->get_sequence_records_for_header());
         bam_writer->add_header(hdr.get());
         bam_writer->write_header();

@@ -28,7 +28,7 @@ public:
             std::optional<std::unordered_set<std::string>> read_list = std::nullopt,
             bool recursive_file_loading = false);
 
-    static uint16_t get_sample_rate(std::string data_path);
+    static uint16_t get_sample_rate(std::string data_path, bool recursive_file_loading = false);
 
 private:
     void load_fast5_reads_from_file(const std::string& path);
