@@ -142,7 +142,9 @@ set(LIB_SOURCE_FILES
     dorado/utils/basecaller_utils.cpp
     dorado/utils/types.h
     dorado/read_pipeline/NullNode.h
-    dorado/read_pipeline/NullNode.cpp)
+    dorado/read_pipeline/NullNode.cpp
+    dorado/read_pipeline/PairingNode.cpp
+    dorado/read_pipeline/PairingNode.h)
 
 if (DORADO_GPU_BUILD)
     if(APPLE)

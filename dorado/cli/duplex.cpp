@@ -4,6 +4,7 @@
 #include "nn/CRFModel.h"
 #include "read_pipeline/BaseSpaceDuplexCallerNode.h"
 #include "read_pipeline/BasecallerNode.h"
+#include "read_pipeline/PairingNode.h"
 #include "read_pipeline/ReadFilterNode.h"
 #include "read_pipeline/ScalerNode.h"
 #include "read_pipeline/StereoDuplexEncoderNode.h"
@@ -208,16 +209,17 @@ int duplex(int argc, char* argv[]) {
 
             auto simplex_model_stride = runners.front()->model_stride();
 
-            StereoDuplexEncoderNode stereo_node = StereoDuplexEncoderNode(
-                    *stereo_basecaller_node, std::move(template_complement_map),
-                    simplex_model_stride);
+            StereoDuplexEncoderNode stereo_node =
+                    StereoDuplexEncoderNode(*stereo_basecaller_node, simplex_model_stride);
+
+            PairingNode pairing_node(stereo_node, template_complement_map);
 
             auto adjusted_simplex_overlap = (overlap / simplex_model_stride) * simplex_model_stride;
 
             const int kSimplexBatchTimeoutMS = 100;
-            auto basecaller_node = std::make_unique<BasecallerNode>(stereo_node, std::move(runners),
-                                                                    adjusted_simplex_overlap,
-                                                                    kSimplexBatchTimeoutMS);
+            auto basecaller_node = std::make_unique<BasecallerNode>(
+                    pairing_node, std::move(runners), adjusted_simplex_overlap,
+                    kSimplexBatchTimeoutMS);
 
             ScalerNode scaler_node(*basecaller_node, num_devices * 2);
 
