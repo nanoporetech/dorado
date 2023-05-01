@@ -212,7 +212,7 @@ int duplex(int argc, char* argv[]) {
             StereoDuplexEncoderNode stereo_node =
                     StereoDuplexEncoderNode(*stereo_basecaller_node, simplex_model_stride);
 
-            PairingNode pairing_node(stereo_node, template_complement_map);
+            PairingNode pairing_node(stereo_node);
 
             auto adjusted_simplex_overlap = (overlap / simplex_model_stride) * simplex_model_stride;
 

@@ -110,9 +110,13 @@ std::shared_ptr<dorado::Read> process_pod5_read(size_t row,
     auto new_read = std::make_shared<dorado::Read>();
     new_read->raw_data = samples;
     new_read->sample_rate = run_sample_rate;
-    auto start_time_ms =
-            run_acquisition_start_time_ms + ((read_data.start_sample * 1000) / run_sample_rate);
+
+    auto start_time_ms = run_acquisition_start_time_ms +
+                         ((read_data.start_sample * 1000) /
+                          (uint64_t)run_sample_rate);  // TODO check if this cast is needed
     auto start_time = get_string_timestamp_from_unix_time(start_time_ms);
+    new_read->run_acqusition_start_time_ms = run_acquisition_start_time_ms;
+    new_read->start_time_ms = start_time_ms;
     new_read->scaling = read_data.calibration_scale;
     new_read->offset = read_data.calibration_offset;
     new_read->read_id = std::move(read_id_str);
@@ -120,9 +124,14 @@ std::shared_ptr<dorado::Read> process_pod5_read(size_t row,
     new_read->attributes.read_number = read_data.read_number;
     new_read->attributes.fast5_filename = std::filesystem::path(path.c_str()).filename().string();
     new_read->attributes.mux = read_data.well;
+    new_read->attributes.num_samples = read_data.num_samples;
     new_read->attributes.channel_number = read_data.channel;
     new_read->attributes.start_time = start_time;
     new_read->run_id = run_info_data->protocol_run_id;
+    new_read->start_sample = read_data.start_sample;
+    new_read->end_sample = read_data.start_sample + read_data.num_samples;
+    new_read->flowcell_id = run_info_data->flow_cell_id;
+
     if (pod5_free_run_info(run_info_data) != POD5_OK) {
         spdlog::error("Failed to free run info");
     }

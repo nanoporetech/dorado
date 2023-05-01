@@ -13,11 +13,14 @@ namespace dorado {
 
 class PairingNode : public MessageSink {
 public:
-    PairingNode(MessageSink& sink, std::map<std::string, std::string> template_complement_map);
+    PairingNode(MessageSink& sink,
+                std::optional<std::map<std::string, std::string>> = std::nullopt);
     ~PairingNode();
 
 private:
-    void worker_thread();
+    void pair_list_worker_thread();
+    void pair_generating_worker_thread();
+
     std::vector<std::unique_ptr<std::thread>> m_workers;
     MessageSink& m_sink;
     std::map<std::string, std::string> m_template_complement_map;
@@ -28,8 +31,15 @@ private:
     std::mutex m_read_cache_mutex;
 
     std::atomic<int> m_num_worker_threads;
-
+    bool is_within_time_and_length_criteria(const std::shared_ptr<Read>& read1,
+                                            const std::shared_ptr<Read>& read2);
     std::map<std::string, std::shared_ptr<Read>> read_cache;
+
+    std::map<std::tuple<int, int, std::string, std::string>, std::list<std::shared_ptr<Read>>>
+            channel_mux_read_map;
+    std::atomic<int> read_counter = 0;
+    std::mutex
+            m_channel_mux_read_map_mtx;  //TODO: Need to santiy check if this is thread-safe, should be static
 };
 
 }  // namespace dorado
