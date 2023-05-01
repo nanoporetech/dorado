@@ -6,10 +6,13 @@
 #include "read_pipeline/BasecallerNode.h"
 #include "read_pipeline/PairingNode.h"
 #include "read_pipeline/ReadFilterNode.h"
+#include "read_pipeline/ReadToBamTypeNode.h"
 #include "read_pipeline/ScalerNode.h"
+#include "read_pipeline/StatsCounter.h"
 #include "read_pipeline/StereoDuplexEncoderNode.h"
 #include "read_pipeline/WriterNode.h"
 #include "utils/bam_utils.h"
+#include "utils/cli_utils.h"
 #include "utils/duplex_utils.h"
 #include "utils/log_utils.h"
 #if DORADO_GPU_BUILD
@@ -25,12 +28,17 @@
 #include "utils/parameters.h"
 
 #include <argparse.hpp>
+#include <htslib/sam.h>
 #include <spdlog/spdlog.h>
 
+#include <memory>
 #include <set>
 #include <thread>
 
 namespace dorado {
+
+using HtsWriter = utils::HtsWriter;
+using HtsReader = utils::HtsReader;
 
 int duplex(int argc, char* argv[]) {
     using dorado::utils::default_parameters;
@@ -41,6 +49,10 @@ int duplex(int argc, char* argv[]) {
     parser.add_argument("reads").help("Reads in Pod5 format or BAM/SAM format for basespace.");
     parser.add_argument("--pairs").help("Space-delimited csv containing read ID pairs.");
     parser.add_argument("--emit-fastq").default_value(false).implicit_value(true);
+    parser.add_argument("--emit-sam")
+            .help("Output in SAM format.")
+            .default_value(false)
+            .implicit_value(true);
     parser.add_argument("-t", "--threads").default_value(0).scan<'i', int>();
 
     parser.add_argument("-x", "--device")
@@ -67,6 +79,20 @@ int duplex(int argc, char* argv[]) {
 
     parser.add_argument("--min-qscore").default_value(0).scan<'i', int>();
 
+    parser.add_argument("--reference")
+            .help("Path to reference for alignment.")
+            .default_value(std::string(""));
+
+    parser.add_argument("-k")
+            .help("k-mer size for alignment with minimap2 (maximum 28).")
+            .default_value(15)
+            .scan<'i', int>();
+
+    parser.add_argument("-w")
+            .help("minimizer window size for alignment with minimap2.")
+            .default_value(10)
+            .scan<'i', int>();
+
     try {
         parser.parse_args(argc, argv);
 
@@ -75,8 +101,8 @@ int duplex(int argc, char* argv[]) {
         auto reads(parser.get<std::string>("reads"));
         auto pairs_file(parser.get<std::string>("--pairs"));
         auto threads = static_cast<size_t>(parser.get<int>("--threads"));
-        bool emit_fastq = parser.get<bool>("--emit-fastq");
         auto min_qscore(parser.get<int>("--min-qscore"));
+        auto ref = parser.get<std::string>("--reference");
         std::vector<std::string> args(argv, argv + argc);
 
         spdlog::info("> Loading pairs file");
@@ -84,8 +110,46 @@ int duplex(int argc, char* argv[]) {
         spdlog::info("> Pairs file loaded");
 
         bool emit_moves = false, rna = false, duplex = true;
-        WriterNode writer_node(std::move(args), emit_fastq, emit_moves, rna, duplex, 4);
-        ReadFilterNode read_filter_node(writer_node, min_qscore, 1);
+
+        auto output_mode = HtsWriter::OutputMode::BAM;
+
+        auto emit_fastq = parser.get<bool>("--emit-fastq");
+        auto emit_sam = parser.get<bool>("--emit-sam");
+
+        if (emit_fastq && emit_sam) {
+            throw std::runtime_error("Only one of --emit-{fastq, sam} can be set (or none).");
+        }
+
+        if (emit_fastq) {
+            output_mode = HtsWriter::OutputMode::FASTQ;
+        } else if (emit_sam || utils::is_fd_tty(stdout)) {
+            output_mode = HtsWriter::OutputMode::SAM;
+        }
+
+        std::unique_ptr<sam_hdr_t, void (*)(sam_hdr_t*)> hdr(sam_hdr_init(), sam_hdr_destroy);
+        utils::add_pg_hdr(hdr.get(), args);
+        //utils::add_rg_hdr(hdr.get(), read_groups);
+        std::shared_ptr<HtsWriter> bam_writer;
+        std::shared_ptr<utils::Aligner> aligner;
+        MessageSink* converted_reads_sink = nullptr;
+        if (ref.empty()) {
+            bam_writer = std::make_shared<HtsWriter>("-", output_mode, 4);
+            bam_writer->add_header(hdr.get());
+            bam_writer->write_header();
+            converted_reads_sink = bam_writer.get();
+        } else {
+            bam_writer = std::make_shared<HtsWriter>("-", output_mode, 4);
+            aligner = std::make_shared<utils::Aligner>(*bam_writer, ref, parser.get<int>("k"),
+                                                       parser.get<int>("w"),
+                                                       std::thread::hardware_concurrency());
+            utils::add_sq_hdr(hdr.get(), aligner->get_sequence_records_for_header());
+            bam_writer->add_header(hdr.get());
+            bam_writer->write_header();
+            converted_reads_sink = aligner.get();
+        }
+        ReadToBamType read_converter(*converted_reads_sink, emit_moves, rna, duplex, 2);
+        StatsCounterNode stats_node(read_converter, duplex);
+        ReadFilterNode read_filter_node(stats_node, min_qscore, 1);
 
         torch::set_num_threads(1);
 

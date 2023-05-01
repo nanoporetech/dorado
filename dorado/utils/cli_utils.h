@@ -1,11 +1,16 @@
 // Add some utilities for CLI.
 
+#include "Version.h"
+
+#include <htslib/sam.h>
 #include <stdio.h>
 
 #include <algorithm>
 #include <cmath>
+#include <sstream>
+#include <string>
 #include <utility>
-
+#include <vector>
 #ifdef _WIN32
 #include <io.h>
 #else
@@ -34,6 +39,18 @@ static bool is_fd_tty(FILE* fd) {
 #else
     return isatty(fileno(fd));
 #endif
+}
+
+static void add_pg_hdr(sam_hdr_t* hdr, const std::vector<std::string>& args) {
+    sam_hdr_add_lines(hdr, "@HD\tVN:1.6\tSO:unknown", 0);
+
+    std::stringstream pg;
+    pg << "@PG\tID:basecaller\tPN:dorado\tVN:" << DORADO_VERSION << "\tCL:dorado";
+    for (const auto& arg : args) {
+        pg << " " << arg;
+    }
+    pg << std::endl;
+    sam_hdr_add_lines(hdr, pg.str().c_str(), 0);
 }
 
 }  // namespace utils

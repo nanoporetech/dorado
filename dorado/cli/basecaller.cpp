@@ -42,18 +42,6 @@ namespace dorado {
 using HtsWriter = utils::HtsWriter;
 using HtsReader = utils::HtsReader;
 
-void add_pg_hdr(sam_hdr_t* hdr, const std::vector<std::string>& args) {
-    sam_hdr_add_lines(hdr, "@HD\tVN:1.6\tSO:unknown", 0);
-
-    std::stringstream pg;
-    pg << "@PG\tID:basecaller\tPN:dorado\tVN:" << DORADO_VERSION << "\tCL:dorado";
-    for (const auto& arg : args) {
-        pg << " " << arg;
-    }
-    pg << std::endl;
-    sam_hdr_add_lines(hdr, pg.str().c_str(), 0);
-}
-
 void setup(std::vector<std::string> args,
            const std::filesystem::path& model_path,
            const std::string& data_path,
@@ -208,7 +196,7 @@ void setup(std::vector<std::string> args,
             num_devices, !remora_model_list.empty() ? num_remora_threads : 0);
 
     std::unique_ptr<sam_hdr_t, void (*)(sam_hdr_t*)> hdr(sam_hdr_init(), sam_hdr_destroy);
-    add_pg_hdr(hdr.get(), args);
+    utils::add_pg_hdr(hdr.get(), args);
     utils::add_rg_hdr(hdr.get(), read_groups);
     std::shared_ptr<HtsWriter> bam_writer;
     std::shared_ptr<utils::Aligner> aligner;
@@ -230,7 +218,7 @@ void setup(std::vector<std::string> args,
         converted_reads_sink = aligner.get();
     }
     ReadToBamType read_converter(*converted_reads_sink, emit_moves, rna, duplex,
-                                 thread_allocations.read_converter_threads, num_reads);
+                                 thread_allocations.read_converter_threads);
     StatsCounterNode stats_node(read_converter, duplex);
     ReadFilterNode read_filter_node(stats_node, min_qscore, thread_allocations.read_filter_threads,
                                     num_reads);
