@@ -128,7 +128,6 @@ int duplex(int argc, char* argv[]) {
 
         std::unique_ptr<sam_hdr_t, void (*)(sam_hdr_t*)> hdr(sam_hdr_init(), sam_hdr_destroy);
         utils::add_pg_hdr(hdr.get(), args);
-        //utils::add_rg_hdr(hdr.get(), read_groups);
         std::shared_ptr<HtsWriter> bam_writer;
         std::shared_ptr<utils::Aligner> aligner;
         MessageSink* converted_reads_sink = nullptr;
