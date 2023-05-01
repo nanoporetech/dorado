@@ -41,7 +41,7 @@ TEST_CASE(TEST_GROUP ": Test tag generation", TEST_GROUP) {
     CHECK(bam_aux2f(bam_aux_get(aln, "sd")) == 8.258f);
 
     CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "st")), Equals("2017-04-29T09:10:04Z"));
-    CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "f5")), Equals("batch_0.fast5"));
+    CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "fn")), Equals("batch_0.fast5"));
     CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "sv")), Equals("quantile"));
 }
 
