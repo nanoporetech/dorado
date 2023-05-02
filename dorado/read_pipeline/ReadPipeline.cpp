@@ -46,8 +46,6 @@ bool get_modbase_channel_name(std::string &channel_name, const std::string &mod_
 
 namespace dorado {
 
-void BamDestructor::operator()(bam1_t *bam) { bam_destroy1(bam); }
-
 void Read::generate_read_tags(bam1_t *aln, bool emit_moves) const {
     int qs = static_cast<int>(std::round(utils::mean_qscore_from_qstring(qstring)));
     bam_aux_append(aln, "qs", 'i', sizeof(qs), (uint8_t *)&qs);

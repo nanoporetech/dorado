@@ -1,5 +1,6 @@
 #pragma once
 #include "utils/AsyncQueue.h"
+#include "utils/types.h"
 
 #include <torch/torch.h>
 
@@ -10,14 +11,7 @@
 #include <variant>
 #include <vector>
 
-struct bam1_t;
-
 namespace dorado {
-
-struct BamDestructor {
-    void operator()(bam1_t*);
-};
-using BamPtr = std::unique_ptr<bam1_t, BamDestructor>;
 
 namespace utils {
 struct BaseModInfo;
