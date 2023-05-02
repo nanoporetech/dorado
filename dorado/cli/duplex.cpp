@@ -224,6 +224,8 @@ int duplex(int argc, char* argv[]) {
             ScalerNode scaler_node(*basecaller_node, num_devices * 2);
 
             DataLoader loader(scaler_node, "cpu", num_devices, 0, std::move(read_list));
+            // Test channel loading info.
+            loader.load_read_channels(reads, parser.get<bool>("--recursive"));
             loader.load_reads(reads, parser.get<bool>("--recursive"));
         }
     } catch (const std::exception& e) {

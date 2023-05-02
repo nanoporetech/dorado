@@ -144,18 +144,43 @@ void DataLoader::load_reads(const std::string& path, bool recursive_file_loading
         return;
     }
 
+    //auto iterate_directory = [&](const auto& iterator_fn) {
+    //    for (const auto& entry : iterator_fn(path)) {
+    //        if (m_loaded_read_count == m_max_reads) {
+    //            break;
+    //        }
+    //        std::string ext = std::filesystem::path(entry).extension().string();
+    //        std::transform(ext.begin(), ext.end(), ext.begin(),
+    //                       [](unsigned char c) { return std::tolower(c); });
+    //        if (ext == ".fast5") {
+    //            load_fast5_reads_from_file(entry.path().string());
+    //        } else if (ext == ".pod5") {
+    //            load_pod5_reads_from_file(entry.path().string());
+    //        }
+    //    }
+    //};
+
     auto iterate_directory = [&](const auto& iterator_fn) {
-        for (const auto& entry : iterator_fn(path)) {
-            if (m_loaded_read_count == m_max_reads) {
-                break;
-            }
-            std::string ext = std::filesystem::path(entry).extension().string();
-            std::transform(ext.begin(), ext.end(), ext.begin(),
-                           [](unsigned char c) { return std::tolower(c); });
-            if (ext == ".fast5") {
-                load_fast5_reads_from_file(entry.path().string());
-            } else if (ext == ".pod5") {
-                load_pod5_reads_from_file(entry.path().string());
+        for (int channel = 0; channel <= m_max_channel; channel++) {
+            //spdlog::info("channel {}", channel);
+            for (const auto& entry : iterator_fn(path)) {
+                if (m_loaded_read_count == m_max_reads) {
+                    break;
+                }
+                std::string ext = std::filesystem::path(entry).extension().string();
+                std::transform(ext.begin(), ext.end(), ext.begin(),
+                               [](unsigned char c) { return std::tolower(c); });
+                if (ext == ".fast5") {
+                    load_fast5_reads_from_file(entry.path().string());
+                } else if (ext == ".pod5") {
+                    auto& channel_to_read_id =
+                            m_file_read_order.find(std::filesystem::path(entry))->second;
+                    if (auto iter = channel_to_read_id.find(channel);
+                        iter != channel_to_read_id.end()) {
+                        auto& read_ids = iter->second;
+                        load_pod5_reads_from_file_by_read_ids(entry.path().string(), read_ids);
+                    }
+                }
             }
         }
     };
@@ -217,6 +242,95 @@ int DataLoader::get_num_reads(std::string data_path,
     }
 
     return num_reads;
+}
+
+void DataLoader::load_read_channels(std::string data_path, bool recursive_file_loading) {
+    int total_reads = 0;
+    auto iterate_directory = [&](const auto& iterator_fn) {
+        for (const auto& entry : iterator_fn(data_path)) {
+            std::string ext = std::filesystem::path(entry).extension().string();
+            std::transform(ext.begin(), ext.end(), ext.begin(),
+                           [](unsigned char c) { return std::tolower(c); });
+            if (ext != ".pod5") {
+                continue;
+            }
+            pod5_init();
+            channel_to_read_id_t channel_to_read_id;
+
+            // Open the file ready for walking:
+            Pod5FileReader_t* file = pod5_open_file(entry.path().string().c_str());
+
+            if (!file) {
+                spdlog::error("Failed to open file {}: {}", entry.path().string().c_str(),
+                              pod5_get_error_string());
+            }
+            std::size_t batch_count = 0;
+            if (pod5_get_read_batch_count(&batch_count, file) != POD5_OK) {
+                spdlog::error("Failed to query batch count: {}", pod5_get_error_string());
+            }
+
+            for (std::size_t batch_index = 0; batch_index < batch_count; ++batch_index) {
+                Pod5ReadRecordBatch_t* batch = nullptr;
+                if (pod5_get_read_batch(&batch, file, batch_index) != POD5_OK) {
+                    spdlog::error("Failed to get batch: {}", pod5_get_error_string());
+                }
+
+                std::size_t batch_row_count = 0;
+                if (pod5_get_read_batch_row_count(&batch_row_count, batch) != POD5_OK) {
+                    spdlog::error("Failed to get batch row count");
+                }
+
+                for (std::size_t row = 0; row < batch_row_count; ++row) {
+                    uint16_t read_table_version = 0;
+                    ReadBatchRowInfo_t read_data;
+                    if (pod5_get_read_batch_row_info_data(batch, row, READ_BATCH_ROW_INFO_VERSION,
+                                                          &read_data,
+                                                          &read_table_version) != POD5_OK) {
+                        spdlog::error("Failed to get read {}", row);
+                    }
+
+                    char read_id_tmp[37];
+                    pod5_error_t err = pod5_format_read_id(read_data.read_id, read_id_tmp);
+                    std::string read_id_str(read_id_tmp);
+                    uint8_t* read_id = (uint8_t*)malloc(sizeof(uint8_t) * 16);
+                    memcpy(read_id, read_data.read_id, 16);
+                    auto channel = read_data.channel;
+                    if (channel > m_max_channel) {
+                        m_max_channel = channel;
+                    }
+                    if (auto cid = channel_to_read_id.find(channel);
+                        cid != channel_to_read_id.end()) {
+                        cid->second.push_back(read_id);
+                    } else {
+                        std::vector<uint8_t*> my_vec;
+                        my_vec.push_back(read_id);
+                        channel_to_read_id.insert({channel, my_vec});
+                    }
+                    total_reads++;
+                }
+
+                if (pod5_free_read_batch(batch) != POD5_OK) {
+                    spdlog::error("Failed to release batch");
+                }
+            }
+            if (pod5_close_and_free_reader(file) != POD5_OK) {
+                spdlog::error("Failed to close and free POD5 reader");
+            }
+            m_file_read_order.insert({std::filesystem::path(entry), channel_to_read_id});
+        }
+    };
+
+    if (recursive_file_loading) {
+        iterate_directory([](const auto& path) {
+            return std::filesystem::recursive_directory_iterator(path);
+        });
+    } else {
+        iterate_directory(
+                [](const auto& path) { return std::filesystem::directory_iterator(path); });
+    }
+
+    std::cerr << "total files " << m_file_read_order.size() << ", total reads " << total_reads
+              << std::endl;
 }
 
 std::unordered_map<std::string, ReadGroup> DataLoader::load_read_groups(
@@ -360,6 +474,96 @@ uint16_t DataLoader::get_sample_rate(std::string data_path, bool recursive_file_
         return *sample_rate;
     } else {
         throw std::runtime_error("Unable to determine sample rate for data.");
+    }
+}
+
+void DataLoader::load_pod5_reads_from_file_by_read_ids(const std::string& path,
+                                                       const std::vector<uint8_t*>& read_ids) {
+    pod5_init();
+
+    // Open the file ready for walking:
+    Pod5FileReader_t* file = pod5_open_file(path.c_str());
+
+    if (!file) {
+        spdlog::error("Failed to open file {}: {}", path, pod5_get_error_string());
+    }
+
+    uint8_t* read_id_array = (uint8_t*)malloc(16 * sizeof(uint8_t) * read_ids.size());
+    for (int i = 0; i < read_ids.size(); i++) {
+        memcpy(read_id_array + 16 * i, read_ids[i], 16);
+    }
+
+    std::size_t batch_count = 0;
+    if (pod5_get_read_batch_count(&batch_count, file) != POD5_OK) {
+        spdlog::error("Failed to query batch count: {}", pod5_get_error_string());
+    }
+
+    std::vector<std::uint32_t> batch_counts(batch_count);
+    std::vector<std::uint32_t> batch_rows(read_ids.size());
+    size_t find_success_count;
+    pod5_error_t err =
+            pod5_plan_traversal(file, read_id_array, read_ids.size(), batch_counts.data(),
+                                batch_rows.data(), &find_success_count);
+    if (err != POD5_OK) {
+        spdlog::error("Couldn't create plan for {} with reads {}", path, read_ids.size());
+        return;
+    }
+
+    if (find_success_count != read_ids.size()) {
+        spdlog::error("plan {}, input {}", find_success_count, read_ids.size());
+        throw std::runtime_error("Plan traveral didn't yield correct number of reads");
+    }
+
+    cxxpool::thread_pool pool{m_num_worker_threads};
+
+    uint32_t row_offset = 0;
+    for (std::size_t batch_index = 0; batch_index < batch_count; ++batch_index) {
+        if (m_loaded_read_count == m_max_reads) {
+            break;
+        }
+        Pod5ReadRecordBatch_t* batch = nullptr;
+        if (pod5_get_read_batch(&batch, file, batch_index) != POD5_OK) {
+            spdlog::error("Failed to get batch: {}", pod5_get_error_string());
+        }
+
+        std::vector<std::future<std::shared_ptr<Read>>> futures;
+        for (std::size_t row_idx = 0; row_idx < batch_counts[batch_index]; row_idx++) {
+            uint32_t row = batch_rows[row_idx + row_offset];
+
+            uint16_t read_table_version = 0;
+            ReadBatchRowInfo_t read_data;
+            if (pod5_get_read_batch_row_info_data(batch, row, READ_BATCH_ROW_INFO_VERSION,
+                                                  &read_data, &read_table_version) != POD5_OK) {
+                spdlog::error("Failed to get read {}", row);
+            }
+
+            char read_id_tmp[37];
+            pod5_error_t err = pod5_format_read_id(read_data.read_id, read_id_tmp);
+            std::string read_id_str(read_id_tmp);
+            if (!m_allowed_read_ids ||
+                (m_allowed_read_ids->find(read_id_str) != m_allowed_read_ids->end())) {
+                futures.push_back(pool.push(process_pod5_read, row, batch, file, path, m_device));
+            }
+        }
+
+        for (auto& v : futures) {
+            auto read = v.get();
+            m_read_sink.push_message(read);
+            m_loaded_read_count++;
+        }
+
+        if (pod5_free_read_batch(batch) != POD5_OK) {
+            spdlog::error("Failed to release batch");
+        }
+
+        row_offset += batch_counts[batch_index];
+    }
+    free(read_id_array);
+    for (int i = 0; i < read_ids.size(); i++) {
+        free(read_ids[i]);
+    }
+    if (pod5_close_and_free_reader(file) != POD5_OK) {
+        spdlog::error("Failed to close and free POD5 reader");
     }
 }
 
