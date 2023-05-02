@@ -51,7 +51,7 @@ public:
             auto input =
                     torch::empty({m_batch_size, m_num_input_features, m_in_chunk_size}, m_options);
             m_module->forward(input);
-            torch::cuda::synchronize();
+            torch::cuda::synchronize(m_options.device().index());
         }
 
         m_cuda_thread.reset(new std::thread(&CudaCaller::cuda_thread_fn, this));
