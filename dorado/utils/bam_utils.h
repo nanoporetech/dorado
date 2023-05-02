@@ -40,7 +40,6 @@ private:
 class HtsReader {
 public:
     HtsReader(const std::string& filename);
-    HtsReader(MessageSink& read_sink, const std::string& filename);
     ~HtsReader();
     bool read();
     void read(MessageSink& read_sink, int max_reads = -1);
