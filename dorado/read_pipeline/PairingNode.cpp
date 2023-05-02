@@ -7,8 +7,6 @@ bool PairingNode::is_within_time_and_length_criteria(const std::shared_ptr<Read>
     int max_time_delta_ms = 5000;
     float min_seq_len_ratio = 0.9f;
     int delta = read2->start_time_ms - read1->get_end_time_ms();
-    int read2_start_time = read2->start_time_ms;
-    int read1_end_time = read1->get_end_time_ms();
     int seq_len1 = read1->seq.length();
     int seq_len2 = read2->seq.length();
     float len_ratio = static_cast<float>(std::min(seq_len1, seq_len2)) /
