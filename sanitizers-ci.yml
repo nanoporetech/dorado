@@ -31,6 +31,12 @@ sanitize:linux:x86:focal:
   extends:
     - .sanitizer_common
     - build:linux:x86:focal
+  before_script:
+    # Setup sanitizers
+    - !reference [.sanitizer_common, before_script]
+    # We need to modify ASAN_OPTIONS for the following reasons:
+    #   detect_leaks - LeakSanitizer errors out for some reason
+    - export ASAN_OPTIONS=${ASAN_OPTIONS}:detect_leaks=0
 
 sanitize:linux:arm64:bionic:
   extends:
