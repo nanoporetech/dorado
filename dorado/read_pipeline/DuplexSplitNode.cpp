@@ -304,9 +304,10 @@ std::shared_ptr<Read> subread(const Read& read, PosRange seq_range, PosRange sig
     subread->raw_data = subread->raw_data.index(
             {torch::indexing::Slice(signal_range.first, signal_range.second)});
     subread->attributes.read_number = uint32_t(-1);
-    subread->attributes.start_time = adjust_time_ms(
-            subread->attributes.start_time,
-            (subread->num_trimmed_samples + signal_range.first) * 1000. / subread->sample_rate);
+    subread->attributes.start_time =
+            adjust_time_ms(subread->attributes.start_time,
+                           uint64_t(std::round((subread->num_trimmed_samples + signal_range.first) *
+                                               1000. / subread->sample_rate)));
     //we adjust for it in new start time above
     subread->num_trimmed_samples = 0;
     ////FIXME update?
