@@ -27,8 +27,8 @@ TEST_CASE("AlignerTest: Check standard alignment", TEST_GROUP) {
     auto bam_records = sink.get_messages();
     REQUIRE(bam_records.size() == 1);
 
-    auto& rec = bam_records[0];
-    auto& in_rec = reader.record;
+    bam1_t* rec = bam_records[0].get();
+    bam1_t* in_rec = reader.record.get();
 
     // Check input/output reads are matching.
     std::string orig_read =
@@ -69,7 +69,7 @@ TEST_CASE("AlignerTest: Check supplementary alignment", TEST_GROUP) {
 
     // Check first alignment is primary.
     {
-        auto& rec = bam_records[0];
+        bam1_t* rec = bam_records[0].get();
 
         // Check aux tags.
         uint32_t l_aux = bam_get_l_aux(rec);
@@ -80,7 +80,7 @@ TEST_CASE("AlignerTest: Check supplementary alignment", TEST_GROUP) {
 
     // Check second alignment is secondary.
     {
-        auto& rec = bam_records[1];
+        bam1_t* rec = bam_records[1].get();
 
         // Check aux tags.
         uint32_t l_aux = bam_get_l_aux(rec);
@@ -105,8 +105,8 @@ TEST_CASE("AlignerTest: Check reverse complement alignment", TEST_GROUP) {
     auto bam_records = sink.get_messages();
     REQUIRE(bam_records.size() == 1);
 
-    auto& rec = bam_records[0];
-    auto& in_rec = reader.record;
+    bam1_t* rec = bam_records[0].get();
+    bam1_t* in_rec = reader.record.get();
 
     // Check flag.
     REQUIRE(rec->core.flag & 0x10);
@@ -141,7 +141,7 @@ TEST_CASE("AlignerTest: Check dorado tags are retained", TEST_GROUP) {
     auto bam_records = sink.get_messages();
     REQUIRE(bam_records.size() == 1);
 
-    auto& rec = bam_records[0];
+    bam1_t* rec = bam_records[0].get();
 
     // Check aux tags.
     uint32_t l_aux = bam_get_l_aux(rec);

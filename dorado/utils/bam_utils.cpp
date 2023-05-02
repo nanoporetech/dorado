@@ -430,7 +430,7 @@ void HtsWriter::worker_thread() {
     while (m_work_queue.try_pop(message)) {
         auto aln = std::get<BamPtr>(std::move(message));
         write(aln.get());
-        processed_read_ids.emplace(bam_get_qname(aln));
+        processed_read_ids.emplace(bam_get_qname(aln.get()));
         // Free the bam alignment that's already written
         // out to disk.
         aln.reset();
