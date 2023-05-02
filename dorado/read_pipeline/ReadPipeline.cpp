@@ -50,7 +50,7 @@ void Read::generate_read_tags(bam1_t *aln, bool emit_moves) const {
     int qs = static_cast<int>(std::round(utils::mean_qscore_from_qstring(qstring)));
     bam_aux_append(aln, "qs", 'i', sizeof(qs), (uint8_t *)&qs);
 
-    float du = (raw_data.size(0) + num_trimmed_samples) / sample_rate;
+    float du = (float)(raw_data.size(0) + num_trimmed_samples) / (float)sample_rate;
     bam_aux_append(aln, "du", 'f', sizeof(du), (uint8_t *)&du);
 
     int ns = raw_data.size(0) + num_trimmed_samples;

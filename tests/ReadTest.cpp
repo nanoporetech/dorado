@@ -36,7 +36,7 @@ TEST_CASE(TEST_GROUP ": Test tag generation", TEST_GROUP) {
     CHECK(bam_aux2i(bam_aux_get(aln, "rn")) == 18501);
     CHECK(bam_aux2i(bam_aux_get(aln, "rn")) == 18501);
 
-    CHECK(bam_aux2f(bam_aux_get(aln, "du")) == 1.033000f);
+    CHECK(bam_aux2f(bam_aux_get(aln, "du")) == Approx(1.033).margin(1e-6));
     CHECK(bam_aux2f(bam_aux_get(aln, "sm")) == 128.3842f);
     CHECK(bam_aux2f(bam_aux_get(aln, "sd")) == 8.258f);
 
