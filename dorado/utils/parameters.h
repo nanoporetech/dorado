@@ -48,9 +48,9 @@ struct ThreadAllocations {
     int aligner_threads{0};
 };
 
-static const ThreadAllocations default_thread_allocations(int num_devices,
-                                                          int num_remora_threads,
-                                                          int max_threads = 0) {
+inline ThreadAllocations default_thread_allocations(int num_devices,
+                                                    int num_remora_threads,
+                                                    int max_threads = 0) {
     return ThreadAllocations(num_devices, num_remora_threads, max_threads);
 }
 
