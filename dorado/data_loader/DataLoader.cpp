@@ -172,10 +172,9 @@ void DataLoader::load_reads(const std::string& path,
                                 path.string());
                     } else if (ext == ".pod5") {
                         auto& channel_to_read_ids =
-                                m_file_channel_read_order_map.find(path)->second;
+                                m_file_channel_read_order_map.find(path.string())->second;
                         if (channel_to_read_ids.find(channel) != channel_to_read_ids.end()) {
                             auto& read_ids = channel_to_read_ids[channel];
-                            ;
                             load_pod5_reads_from_file_by_read_ids(path.string(), read_ids);
                         }
                     }
@@ -258,7 +257,6 @@ int DataLoader::get_num_reads(std::string data_path,
 }
 
 void DataLoader::load_read_channels(std::string data_path, bool recursive_file_loading) {
-    int total_reads = 0;
     auto iterate_directory = [&](const auto& iterator_fn) {
         for (const auto& entry : iterator_fn(data_path)) {
             auto file_path = std::filesystem::path(entry);
@@ -271,8 +269,8 @@ void DataLoader::load_read_channels(std::string data_path, bool recursive_file_l
             pod5_init();
 
             // Use a std::map to store by sorted channel order.
-            m_file_channel_read_order_map.emplace(file_path, channel_to_read_id_t());
-            auto& channel_to_read_id = m_file_channel_read_order_map[file_path];
+            m_file_channel_read_order_map.emplace(file_path.string(), channel_to_read_id_t());
+            auto& channel_to_read_id = m_file_channel_read_order_map[file_path.string()];
 
             // Open the file ready for walking:
             Pod5FileReader_t* file = pod5_open_file(file_path.string().c_str());
@@ -330,7 +328,6 @@ void DataLoader::load_read_channels(std::string data_path, bool recursive_file_l
                                                    std::vector<std::unique_ptr<uint8_t>>());
                         channel_to_read_id[channel].push_back(std::move(read_id));
                     }
-                    total_reads++;
                 }
 
                 if (pod5_free_read_batch(batch) != POD5_OK) {
