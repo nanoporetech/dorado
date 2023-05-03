@@ -1,8 +1,7 @@
 if(NOT TARGET htslib) # lazy include guard
     if(WIN32)
-        message(STATUS "Fetching htslib from internal ML-Hub link.")
-        message(WARNING "!!Please update link to external CDN before public release!!")
-        download_and_extract(https://nanoporetech.box.com/shared/static/9dnctbjw86d20qq8l8tw3dk93hu1nrul.gz htslib-win)
+        message(STATUS "Fetching htslib")
+        download_and_extract(https://cdn.oxfordnanoportal.com/software/analysis/htslib-win.tar.gz htslib-win)
         set(HTSLIB_DIR ${DORADO_3RD_PARTY}/htslib-win CACHE STRING
                     "Path to htslib repo")
         add_library(htslib SHARED IMPORTED)

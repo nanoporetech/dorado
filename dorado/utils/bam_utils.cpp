@@ -180,6 +180,7 @@ void Aligner::add_tags(bam1_t* record,
     if (md_len > 0) {
         bam_aux_append(record, "MD", 'Z', md_len + 1, (uint8_t*)md);
     }
+    free(md);
 
     // zd
     if (aln->split) {

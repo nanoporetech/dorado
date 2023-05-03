@@ -23,6 +23,8 @@ TEST_CASE(TEST_GROUP ": Test tag generation", TEST_GROUP) {
     test_read.attributes.channel_number = 5;
     test_read.attributes.start_time = "2017-04-29T09:10:04Z";
     test_read.attributes.fast5_filename = "batch_0.fast5";
+    test_read.run_id = "xyz";
+    test_read.model_name = "test_model";
 
     auto alignments = test_read.extract_sam_lines(false, false);
     REQUIRE(alignments.size() == 1);
@@ -41,8 +43,9 @@ TEST_CASE(TEST_GROUP ": Test tag generation", TEST_GROUP) {
     CHECK(bam_aux2f(bam_aux_get(aln, "sd")) == 8.258f);
 
     CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "st")), Equals("2017-04-29T09:10:04Z"));
-    CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "f5")), Equals("batch_0.fast5"));
+    CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "fn")), Equals("batch_0.fast5"));
     CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "sv")), Equals("quantile"));
+    CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "RG")), Equals("xyz_test_model"));
 }
 
 TEST_CASE(TEST_GROUP ": Test sam record generation", TEST_GROUP) {
