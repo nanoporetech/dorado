@@ -132,6 +132,8 @@ std::shared_ptr<dorado::Read> process_pod5_read(size_t row,
 
 namespace dorado {
 
+void Pod5Destructor::operator()(Pod5FileReader_t* pod5) { pod5_close_and_free_reader(pod5); }
+
 void DataLoader::load_reads(const std::string& path,
                             bool recursive_file_loading,
                             bool traverse_in_channel_order) {
@@ -153,7 +155,9 @@ void DataLoader::load_reads(const std::string& path,
             // 1. iterate through all the read metadata to collect channel information
             // across all pod5 files
             // 2. store the read list sorted by channel number
+            spdlog::info("> Reading read channel info");
             load_read_channels(path, recursive_file_loading);
+            spdlog::info("> Processed read channel info");
             // 3. for each channel, iterate through all files and in each iteration
             // only load the reads that correspond to that channel.
             for (int channel = 0; channel <= m_max_channel; channel++) {
@@ -500,7 +504,11 @@ void DataLoader::load_pod5_reads_from_file_by_read_ids(
     pod5_init();
 
     // Open the file ready for walking:
-    Pod5FileReader_t* file = pod5_open_file(path.c_str());
+    Pod5FileReader_t* file;
+    if (m_file_handles.find(path) == m_file_handles.end()) {
+        m_file_handles.emplace(path, Pod5Ptr(pod5_open_file(path.c_str())));
+    }
+    file = m_file_handles[path].get();
 
     if (!file) {
         spdlog::error("Failed to open file {}: {}", path, pod5_get_error_string());
@@ -535,7 +543,6 @@ void DataLoader::load_pod5_reads_from_file_by_read_ids(
         throw std::runtime_error("Plan traveral didn't yield correct number of reads");
     }
 
-    m_num_worker_threads = 1;
     cxxpool::thread_pool pool{m_num_worker_threads};
 
     uint32_t row_offset = 0;
@@ -581,9 +588,6 @@ void DataLoader::load_pod5_reads_from_file_by_read_ids(
         }
 
         row_offset += traversal_batch_counts[batch_index];
-    }
-    if (pod5_close_and_free_reader(file) != POD5_OK) {
-        spdlog::error("Failed to close and free POD5 reader");
     }
 }
 

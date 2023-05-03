@@ -7,12 +7,19 @@
 #include <unordered_set>
 #include <vector>
 
+struct Pod5FileReader;
+
 namespace dorado {
 
 class MessageSink;
 struct ReadGroup;
 
 typedef std::map<int, std::vector<std::unique_ptr<uint8_t>>> channel_to_read_id_t;
+
+struct Pod5Destructor {
+    void operator()(Pod5FileReader*);
+};
+using Pod5Ptr = std::unique_ptr<Pod5FileReader, Pod5Destructor>;
 
 class DataLoader {
 public:
@@ -21,6 +28,7 @@ public:
                size_t num_worker_threads,
                size_t max_reads = 0,
                std::optional<std::unordered_set<std::string>> read_list = std::nullopt);
+    ~DataLoader() = default;
     void load_reads(const std::string& path,
                     bool recursive_file_loading = false,
                     bool traverse_in_channel_order = false);
@@ -53,6 +61,8 @@ private:
 
     std::unordered_map<std::string, channel_to_read_id_t> m_file_channel_read_order_map;
     int m_max_channel{0};
+
+    std::unordered_map<std::string, Pod5Ptr> m_file_handles;
 };
 
 }  // namespace dorado
