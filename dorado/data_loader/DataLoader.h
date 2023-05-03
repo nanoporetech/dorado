@@ -1,5 +1,6 @@
 #pragma once
 #include <map>
+#include <memory>
 #include <optional>
 #include <string>
 #include <unordered_map>
@@ -11,7 +12,7 @@ namespace dorado {
 class MessageSink;
 struct ReadGroup;
 
-typedef std::map<int, std::vector<uint8_t*>> channel_to_read_id_t;
+typedef std::map<int, std::vector<std::shared_ptr<uint8_t>>> channel_to_read_id_t;
 
 class DataLoader {
 public:
@@ -20,8 +21,9 @@ public:
                size_t num_worker_threads,
                size_t max_reads = 0,
                std::optional<std::unordered_set<std::string>> read_list = std::nullopt);
-    void load_reads(const std::string& path, bool recursive_file_loading = false);
-    void load_read_channels(std::string data_path, bool recursive_file_loading = false);
+    void load_reads(const std::string& path,
+                    bool recursive_file_loading = false,
+                    bool traverse_in_channel_order = false);
 
     static std::unordered_map<std::string, ReadGroup> load_read_groups(
             std::string data_path,
@@ -38,8 +40,10 @@ public:
 private:
     void load_fast5_reads_from_file(const std::string& path);
     void load_pod5_reads_from_file(const std::string& path);
-    void load_pod5_reads_from_file_by_read_ids(const std::string& path,
-                                               const std::vector<uint8_t*>& read_ids);
+    void load_pod5_reads_from_file_by_read_ids(
+            const std::string& path,
+            const std::vector<std::shared_ptr<uint8_t>>& read_ids);
+    void load_read_channels(std::string data_path, bool recursive_file_loading = false);
     MessageSink& m_read_sink;  // Where should the loaded reads go?
     size_t m_loaded_read_count{0};
     std::string m_device;
@@ -49,7 +53,7 @@ private:
     std::unordered_map<std::string, std::unordered_map<std::string, std::pair<int, int>>>
             m_file_to_bidx_ridx;
 
-    std::unordered_map<std::string, channel_to_read_id_t> m_file_read_order;
+    std::unordered_map<std::string, channel_to_read_id_t> m_file_channel_read_order_map;
     int m_max_channel{0};
 };
 
