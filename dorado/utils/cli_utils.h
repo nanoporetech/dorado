@@ -23,7 +23,7 @@ namespace utils {
 
 // Determine the thread allocation for writer and aligner threads
 // in dorado aligner.
-static std::pair<int, int> aligner_writer_thread_allocation(int available_threads,
+inline std::pair<int, int> aligner_writer_thread_allocation(int available_threads,
                                                             float writer_thread_fraction) {
     // clamping because we need at least 1 thread for alignment and for writing.
     int writer_threads =
@@ -33,7 +33,7 @@ static std::pair<int, int> aligner_writer_thread_allocation(int available_thread
     return std::make_pair(aligner_threads, writer_threads);
 }
 
-static bool is_fd_tty(FILE* fd) {
+inline bool is_fd_tty(FILE* fd) {
 #ifdef _WIN32
     return _isatty(_fileno(fd));
 #else
@@ -41,7 +41,7 @@ static bool is_fd_tty(FILE* fd) {
 #endif
 }
 
-static void add_pg_hdr(sam_hdr_t* hdr, const std::vector<std::string>& args) {
+inline void add_pg_hdr(sam_hdr_t* hdr, const std::vector<std::string>& args) {
     sam_hdr_add_lines(hdr, "@HD\tVN:1.6\tSO:unknown", 0);
 
     std::stringstream pg;
