@@ -12,7 +12,7 @@ namespace dorado {
 class MessageSink;
 struct ReadGroup;
 
-typedef std::map<int, std::vector<std::shared_ptr<uint8_t>>> channel_to_read_id_t;
+typedef std::map<int, std::vector<std::unique_ptr<uint8_t>>> channel_to_read_id_t;
 
 class DataLoader {
 public:
@@ -42,7 +42,7 @@ private:
     void load_pod5_reads_from_file(const std::string& path);
     void load_pod5_reads_from_file_by_read_ids(
             const std::string& path,
-            const std::vector<std::shared_ptr<uint8_t>>& read_ids);
+            const std::vector<std::unique_ptr<uint8_t>>& read_ids);
     void load_read_channels(std::string data_path, bool recursive_file_loading = false);
     MessageSink& m_read_sink;  // Where should the loaded reads go?
     size_t m_loaded_read_count{0};
