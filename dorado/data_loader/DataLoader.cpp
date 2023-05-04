@@ -585,7 +585,7 @@ void DataLoader::load_pod5_reads_from_file_by_read_ids(
 
         for (auto& v : futures) {
             auto read = v.get();
-            m_read_sink.push_message(read);
+            m_read_sink.push_message(std::move(read));
             m_loaded_read_count++;
         }
 
