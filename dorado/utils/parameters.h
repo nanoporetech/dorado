@@ -1,4 +1,8 @@
+#pragma once
+
+#include <algorithm>
 #include <string>
+#include <thread>
 
 namespace dorado::utils {
 
@@ -54,4 +58,4 @@ inline ThreadAllocations default_thread_allocations(int num_devices,
     return ThreadAllocations(num_devices, num_remora_threads, max_threads);
 }
 
-};  // namespace dorado::utils
+}  // namespace dorado::utils
