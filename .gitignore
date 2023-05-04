@@ -6,6 +6,7 @@
 dist
 build
 build-Release
+build-Debug
 archive
 cmake-build*
 cmake.lock
