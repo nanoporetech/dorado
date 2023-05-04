@@ -1,5 +1,6 @@
 #pragma once
 #include "utils/AsyncQueue.h"
+#include "utils/types.h"
 
 #include <torch/torch.h>
 
@@ -10,8 +11,6 @@
 #include <variant>
 #include <vector>
 
-struct bam1_t;
-
 namespace dorado {
 
 namespace utils {
@@ -21,11 +20,14 @@ struct BaseModInfo;
 class Read;
 
 struct Chunk {
-    Chunk(std::shared_ptr<Read> read, size_t offset, size_t chunk_in_read_idx, size_t chunk_size)
+    Chunk(std::shared_ptr<Read> const& read,
+          size_t offset,
+          size_t chunk_in_read_idx,
+          size_t chunk_size)
             : source_read(read),
               input_offset(offset),
               idx_in_read(chunk_in_read_idx),
-              raw_chunk_size(chunk_size){};
+              raw_chunk_size(chunk_size) {}
 
     std::weak_ptr<Read> source_read;
     size_t input_offset;    // Where does this chunk start in the input raw read data
@@ -89,9 +91,9 @@ public:
 
     Attributes attributes;
     std::vector<Mapping> mappings;
-    std::vector<bam1_t*> extract_sam_lines(bool emit_moves,
-                                           bool duplex,
-                                           uint8_t modbase_threshold = 0) const;
+    std::vector<BamPtr> extract_sam_lines(bool emit_moves,
+                                          bool duplex,
+                                          uint8_t modbase_threshold = 0) const;
 
 private:
     void generate_duplex_read_tags(bam1_t*) const;
@@ -109,10 +111,10 @@ public:
 // The Message type is a std::variant that can hold different types of message objects.
 // It is currently able to store:
 // - a std::shared_ptr<Read> object, which represents a single read
-// - a bam1_t* object, which represents a raw BAM alignment record
+// - a BamPtr object, which represents a raw BAM alignment record
 // - a std::shared_ptr<ReadPair> object, which represents a pair of reads for duplex calling
 // To add more message types, simply add them to the list of types in the std::variant.
-using Message = std::variant<std::shared_ptr<Read>, bam1_t*, std::shared_ptr<ReadPair>>;
+using Message = std::variant<std::shared_ptr<Read>, BamPtr, std::shared_ptr<ReadPair>>;
 
 // Base class for an object which consumes messages.
 // MessageSink is a node within a pipeline.
