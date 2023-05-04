@@ -152,11 +152,6 @@ void PairingNode::pair_generating_worker_thread() {
 
             channel_mux_read_map[key].insert(later_read, read);
 
-            // Check if the list length exceeds 100 elements.
-            if (channel_mux_read_map[key].size() > 100) {
-                // Pop the oldest (first) read from the list
-                channel_mux_read_map[key].pop_front();
-            }
         } else {
             channel_mux_read_map[key].push_back(read);
         }
