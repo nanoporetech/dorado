@@ -92,7 +92,35 @@ void PairingNode::pair_generating_worker_thread() {
         std::string run_id = read->run_id;
         std::string flowcell_id = read->flowcell_id;
 
-        auto key = std::make_tuple(channel, mux, run_id, flowcell_id);
+        int max_num_keys = 10;
+        using KeyType = std::tuple<int, int, std::string, std::string>;
+
+        std::list<KeyType> key_list;
+
+        auto add_key = [&](int channel, int mux, std::string, std::string) {
+            KeyType key = std::make_tuple(channel, mux, run_id, flowcell_id);
+
+            // Check if the key is already in the list
+            auto found = std::find(key_list.begin(), key_list.end(), key);
+
+            if (found == key_list.end()) {
+                // Key is not in the list
+
+                if (key_list.size() >= max_num_keys) {
+                    // Remove the oldest key (front of the list)
+                    auto oldest_key = key_list.front();
+                    key_list.pop_front();
+                    // Remove the oldest key from the map
+                    channel_mux_read_map.erase(key);
+                }
+
+                // Add the new key to the end of the list
+                key_list.push_back(key);
+            }
+            return key;
+        };
+
+        auto key = add_key(channel, mux, run_id, flowcell_id);
 
         std::unique_lock<std::mutex> lock(m_channel_mux_read_map_mtx);
 
