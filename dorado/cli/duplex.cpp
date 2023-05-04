@@ -289,6 +289,7 @@ int duplex(int argc, char* argv[]) {
             DataLoader loader(scaler_node, "cpu", num_devices, 0, std::move(read_list));
             loader.load_reads(reads, parser.get<bool>("--recursive"));
         }
+        stats_node.dump_stats();
     } catch (const std::exception& e) {
         spdlog::error(e.what());
         std::exit(1);
