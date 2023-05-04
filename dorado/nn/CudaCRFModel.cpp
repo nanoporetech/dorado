@@ -127,6 +127,7 @@ public:
             m_input_queue.pop_back();
             input_lock.unlock();
 
+            auto gpu_lock = dorado::utils::AcquireGPULock(m_options.device().index());
             std::unique_lock<std::mutex> task_lock(task->mut);
             auto scores = m_module->forward(task->input);
             torch::cuda::synchronize();
