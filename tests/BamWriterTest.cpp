@@ -24,7 +24,7 @@ public:
 protected:
     void generate_bam(HtsWriter::OutputMode mode, int num_threads) {
         HtsReader reader(m_in_sam.string());
-        HtsWriter writer(m_out_bam.string(), mode, num_threads);
+        HtsWriter writer(m_out_bam.string(), mode, num_threads, 0);
 
         writer.add_header(reader.header);
         writer.write_header();

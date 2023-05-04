@@ -61,10 +61,7 @@ public:
         FASTQ,
     };
 
-    HtsWriter(const std::string& filename,
-              OutputMode mode,
-              size_t threads = 1,
-              size_t num_reads = 0);
+    HtsWriter(const std::string& filename, OutputMode mode, size_t threads, size_t num_reads);
     ~HtsWriter();
     void add_header(const sam_hdr_t* header);
     int write_header();

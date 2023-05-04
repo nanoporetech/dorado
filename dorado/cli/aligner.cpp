@@ -95,7 +95,7 @@ int aligner(int argc, char* argv[]) {
 
     spdlog::info("> loading index {}", index);
 
-    HtsWriter writer("-", HtsWriter::OutputMode::BAM, writer_threads);
+    HtsWriter writer("-", HtsWriter::OutputMode::BAM, writer_threads, 0);
     utils::Aligner aligner(writer, index, kmer_size, window_size, aligner_threads);
     HtsReader reader(reads[0]);
 

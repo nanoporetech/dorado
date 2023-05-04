@@ -208,8 +208,8 @@ void setup(std::vector<std::string> args,
         bam_writer->write_header();
         converted_reads_sink = bam_writer.get();
     } else {
-        bam_writer =
-                std::make_shared<HtsWriter>("-", output_mode, thread_allocations.writer_threads);
+        bam_writer = std::make_shared<HtsWriter>("-", output_mode,
+                                                 thread_allocations.writer_threads, num_reads);
         aligner = std::make_shared<utils::Aligner>(*bam_writer, ref, kmer_size, window_size,
                                                    thread_allocations.aligner_threads);
         utils::add_sq_hdr(hdr.get(), aligner->get_sequence_records_for_header());
