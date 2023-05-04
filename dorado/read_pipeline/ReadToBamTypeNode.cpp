@@ -20,8 +20,8 @@ void ReadToBamType::worker_thread() {
         }
 
         auto alns = read->extract_sam_lines(m_emit_moves, m_duplex, m_modbase_threshold);
-        for (auto aln : alns) {
-            m_sink.push_message(aln);
+        for (auto& aln : alns) {
+            m_sink.push_message(std::move(aln));
         }
     }
 

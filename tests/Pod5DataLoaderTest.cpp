@@ -1,3 +1,4 @@
+#include "MessageSinkUtils.h"
 #include "TestUtils.h"
 #include "data_loader/DataLoader.h"
 #include "read_pipeline/ReadPipeline.h"
@@ -116,4 +117,19 @@ TEST_CASE(TEST_GROUP "Find sample rate from nested pod5.") {
     std::string data_path(get_nested_pod5_data_dir());
 
     CHECK(dorado::DataLoader::get_sample_rate(data_path, true) == 4000);
+}
+
+TEST_CASE(TEST_GROUP "Load data sorted by channel id.") {
+    std::string data_path(get_data_dir("multi_read_pod5"));
+
+    MessageSinkToVector<std::shared_ptr<dorado::Read>> sink(100);
+    dorado::DataLoader loader(sink, "cpu", 1, 0);
+    loader.load_reads(data_path, true, dorado::DataLoader::ReadOrder::BY_CHANNEL);
+
+    auto reads = sink.get_messages();
+    int start_channel_id = -1;
+    for (auto &i : reads) {
+        CHECK(i->attributes.channel_number >= start_channel_id);
+        start_channel_id = i->attributes.channel_number;
+    }
 }

@@ -162,9 +162,9 @@ $ pre-commit install
 ```
 
 ### Licence and Copyright
-(c) 2022 Oxford Nanopore Technologies Ltd.
+(c) 2022 Oxford Nanopore Technologies PLC.
 
 Dorado is distributed under the terms of the Oxford Nanopore
-Technologies, Ltd.  Public License, v. 1.0.  If a copy of the License
+Technologies PLC.  Public License, v. 1.0.  If a copy of the License
 was not distributed with this file, You can obtain one at
 http://nanoporetech.com
