@@ -15,7 +15,7 @@
 #include <optional>
 #include <string>
 
-//To enable debug in build use 'cmake -DDEBUG_READ_SPLITTING -S . -B build'
+//To enable debug in build use "cmake -D CMAKE_CXX_FLAGS='-DDEBUG_READ_SPLITTING' -S . -B build"
 #ifdef DEBUG_READ_SPLITTING
 static constexpr bool DEBUG = true;
 #else
