@@ -175,7 +175,7 @@ std::vector<std::string> parse_cuda_device_string(std::string device_string) {
     return devices;
 }
 
-std::unique_lock<std::mutex> AcquireGPULock(int gpu_index) {
+std::unique_lock<std::mutex> acquire_gpu_lock(int gpu_index) {
     static std::deque<std::mutex> gpu_mutexes;
     static std::mutex deque_mutex;
 
