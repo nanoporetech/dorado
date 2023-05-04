@@ -136,7 +136,7 @@ void Pod5Destructor::operator()(Pod5FileReader_t* pod5) { pod5_close_and_free_re
 
 void DataLoader::load_reads(const std::string& path,
                             bool recursive_file_loading,
-                            bool traverse_in_channel_order) {
+                            ReadOrder traversal_order) {
     if (!std::filesystem::exists(path)) {
         spdlog::error("Requested input path {} does not exist!", path);
         m_read_sink.terminate();
@@ -149,7 +149,8 @@ void DataLoader::load_reads(const std::string& path,
     }
 
     auto iterate_directory = [&](const auto& iterator_fn) {
-        if (traverse_in_channel_order) {
+        switch (traversal_order) {
+        case BY_CHANNEL:
             // If traversal in channel order is required, the following algorithm
             // is used -
             // 1. iterate through all the read metadata to collect channel information
@@ -170,9 +171,9 @@ void DataLoader::load_reads(const std::string& path,
                     std::transform(ext.begin(), ext.end(), ext.begin(),
                                    [](unsigned char c) { return std::tolower(c); });
                     if (ext == ".fast5") {
-                        spdlog::warn(
-                                "Traversing reads by channel is only available for POD5. Skipping "
-                                "{}",
+                        throw std::runtime_error(
+                                "Traversing reads by channel os only availabls for POD5. "
+                                "Encountered FAST5 at " +
                                 path.string());
                     } else if (ext == ".pod5") {
                         auto& channel_to_read_ids =
@@ -184,7 +185,8 @@ void DataLoader::load_reads(const std::string& path,
                     }
                 }
             }
-        } else {
+            break;
+        case UNRESTRICTED:
             for (const auto& entry : iterator_fn(path)) {
                 if (m_loaded_read_count == m_max_reads) {
                     break;
@@ -198,6 +200,10 @@ void DataLoader::load_reads(const std::string& path,
                     load_pod5_reads_from_file(entry.path().string());
                 }
             }
+            break;
+        default:
+            throw std::runtime_error("Unsupported traversal order detected " +
+                                     std::to_string(traversal_order));
         }
     };
 

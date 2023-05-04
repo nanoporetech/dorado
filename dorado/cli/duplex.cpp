@@ -225,7 +225,7 @@ int duplex(int argc, char* argv[]) {
 
             DataLoader loader(scaler_node, "cpu", num_devices, 0, std::move(read_list));
             loader.load_reads(reads, parser.get<bool>("--recursive"),
-                              true /* traverse reads in channel order */);
+                              DataLoader::ReadOrder::BY_CHANNEL);
         }
     } catch (const std::exception& e) {
         spdlog::error(e.what());

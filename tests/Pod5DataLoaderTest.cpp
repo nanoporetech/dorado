@@ -124,7 +124,7 @@ TEST_CASE(TEST_GROUP "Load data sorted by channel id.") {
 
     MessageSinkToVector<std::shared_ptr<dorado::Read>> sink(100);
     dorado::DataLoader loader(sink, "cpu", 1, 0);
-    loader.load_reads(data_path, true, true);
+    loader.load_reads(data_path, true, dorado::DataLoader::ReadOrder::BY_CHANNEL);
 
     auto reads = sink.get_messages();
     int start_channel_id = -1;

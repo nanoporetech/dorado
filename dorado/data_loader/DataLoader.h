@@ -23,6 +23,11 @@ using Pod5Ptr = std::unique_ptr<Pod5FileReader, Pod5Destructor>;
 
 class DataLoader {
 public:
+    enum ReadOrder {
+        UNRESTRICTED,
+        BY_CHANNEL,
+    };
+
     DataLoader(MessageSink& read_sink,
                const std::string& device,
                size_t num_worker_threads,
@@ -31,7 +36,7 @@ public:
     ~DataLoader() = default;
     void load_reads(const std::string& path,
                     bool recursive_file_loading = false,
-                    bool traverse_in_channel_order = false);
+                    ReadOrder traversal_order = UNRESTRICTED);
 
     static std::unordered_map<std::string, ReadGroup> load_read_groups(
             std::string data_path,
