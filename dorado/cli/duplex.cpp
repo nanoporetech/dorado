@@ -93,9 +93,8 @@ int duplex(int argc, char* argv[]) {
             .default_value(10)
             .scan<'i', int>();
 
-    parser.add_argument("--skip-sample-rate-check")
-            .help("(WARNING: For expert users only) Skip checking the sample rate compatibility "
-                  "between model and data.")
+    parser.add_argument("--skip-model-compatibility-check")
+            .help("(WARNING: For expert users only) Skip model and data compatibility checks.")
             .default_value(false)
             .implicit_value(true);
 
@@ -109,7 +108,7 @@ int duplex(int argc, char* argv[]) {
         auto threads = static_cast<size_t>(parser.get<int>("--threads"));
         auto min_qscore(parser.get<int>("--min-qscore"));
         auto ref = parser.get<std::string>("--reference");
-        auto skip_sample_rate_check = parser.get<bool>("--skip-sample-rate-check");
+        auto skip_model_compatibility_check = parser.get<bool>("--skip-model-compatibility-check");
         std::vector<std::string> args(argv, argv + argc);
 
         spdlog::info("> Loading pairs file");
@@ -181,7 +180,7 @@ int duplex(int argc, char* argv[]) {
             auto data_sample_rate =
                     DataLoader::get_sample_rate(reads, parser.get<bool>("--recursive"));
             auto model_sample_rate = get_model_sample_rate(model_path);
-            if (!skip_sample_rate_check && (data_sample_rate != model_sample_rate)) {
+            if (!skip_model_compatibility_check && (data_sample_rate != model_sample_rate)) {
                 std::stringstream err;
                 err << "Sample rate for model (" << model_sample_rate << ") and data ("
                     << data_sample_rate << ") don't match.";

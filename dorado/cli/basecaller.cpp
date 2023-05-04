@@ -62,7 +62,7 @@ void setup(std::vector<std::string> args,
            bool recursive_file_loading,
            int kmer_size,
            int window_size,
-           bool skip_sample_rate_check) {
+           bool skip_model_compatibility_check) {
     torch::set_num_threads(1);
     std::vector<Runner> runners;
 
@@ -181,7 +181,7 @@ void setup(std::vector<std::string> args,
     // Check sample rate of model vs data.
     auto data_sample_rate = DataLoader::get_sample_rate(data_path, recursive_file_loading);
     auto model_sample_rate = get_model_sample_rate(model_path);
-    if (!skip_sample_rate_check && (data_sample_rate != model_sample_rate)) {
+    if (!skip_model_compatibility_check && (data_sample_rate != model_sample_rate)) {
         std::stringstream err;
         err << "Sample rate for model (" << model_sample_rate << ") and data (" << data_sample_rate
             << ") don't match.";
@@ -332,9 +332,8 @@ int basecaller(int argc, char* argv[]) {
             .default_value(10)
             .scan<'i', int>();
 
-    parser.add_argument("--skip-sample-rate-check")
-            .help("(WARNING: For expert users only) Skip checking the sample rate compatibility "
-                  "between model and data.")
+    parser.add_argument("--skip-model-compatibility-check")
+            .help("(WARNING: For expert users only) Skip model and data compatibility checks.")
             .default_value(false)
             .implicit_value(true);
 
@@ -397,7 +396,7 @@ int basecaller(int argc, char* argv[]) {
               parser.get<int>("--max-reads"), parser.get<int>("--min-qscore"),
               parser.get<std::string>("--read-ids"), parser.get<bool>("--recursive"),
               parser.get<int>("k"), parser.get<int>("w"),
-              parser.get<bool>("--skip-sample-rate-check"));
+              parser.get<bool>("--skip-model-compatibility-check"));
     } catch (const std::exception& e) {
         spdlog::error("{}", e.what());
         return 1;
