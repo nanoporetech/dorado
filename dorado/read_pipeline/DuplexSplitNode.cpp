@@ -603,7 +603,9 @@ void DuplexSplitNode::worker_thread() {
             auto init_read = std::get<std::shared_ptr<Read>>(message);
             for (auto& subread : split(init_read)) {
                 //TODO correctly process end_reason when we have them
-                subread->parent_read_id = init_read->read_id;
+                if (subread->read_id != init_read->read_id) {
+                    subread->parent_read_id = init_read->read_id;
+                }
                 m_sink.push_message(std::move(subread));
             }
         }
