@@ -86,6 +86,7 @@ void BaseSpaceDuplexCallerNode::basespace(std::string template_read_id,
     if (template_read_it == m_reads.end()) {
         spdlog::debug("Template Read ID={} is present in pairs file but read was not found",
                       template_read_id);
+        return;
     } else {
         template_read = template_read_it->second;
         template_sequence = template_read->seq;
