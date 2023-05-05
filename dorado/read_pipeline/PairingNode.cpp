@@ -106,7 +106,6 @@ void PairingNode::pair_generating_worker_thread() {
                 // Key is not in the list
 
                 if (m_working_channel_mux_key_list.size() >= max_num_keys) {
-                    //std::cerr << "Number of keys in the channel mux read map is now: " << channel_mux_read_map.size() << std::endl;
                     // Remove the oldest key (front of the list)
                     auto oldest_key = m_working_channel_mux_key_list.front();
                     std::scoped_lock<std::mutex> m_working_channel_mux_key_list_lock(
