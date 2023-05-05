@@ -10,7 +10,6 @@
 #include "read_pipeline/ScalerNode.h"
 #include "read_pipeline/StatsCounter.h"
 #include "read_pipeline/StereoDuplexEncoderNode.h"
-#include "read_pipeline/WriterNode.h"
 #include "utils/bam_utils.h"
 #include "utils/cli_utils.h"
 #include "utils/duplex_utils.h"
