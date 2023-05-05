@@ -42,18 +42,6 @@ namespace dorado {
 using HtsWriter = utils::HtsWriter;
 using HtsReader = utils::HtsReader;
 
-void add_pg_hdr(sam_hdr_t* hdr, const std::vector<std::string>& args) {
-    sam_hdr_add_lines(hdr, "@HD\tVN:1.6\tSO:unknown", 0);
-
-    std::stringstream pg;
-    pg << "@PG\tID:basecaller\tPN:dorado\tVN:" << DORADO_VERSION << "\tCL:dorado";
-    for (const auto& arg : args) {
-        pg << " " << arg;
-    }
-    pg << std::endl;
-    sam_hdr_add_lines(hdr, pg.str().c_str(), 0);
-}
-
 void setup(std::vector<std::string> args,
            const std::filesystem::path& model_path,
            const std::string& data_path,
@@ -204,47 +192,51 @@ void setup(std::vector<std::string> args,
 
     bool rna = utils::is_rna_model(model_path), duplex = false;
 
+    auto const thread_allocations = utils::default_thread_allocations(
+            num_devices, !remora_model_list.empty() ? num_remora_threads : 0);
+
     std::unique_ptr<sam_hdr_t, void (*)(sam_hdr_t*)> hdr(sam_hdr_init(), sam_hdr_destroy);
-    add_pg_hdr(hdr.get(), args);
+    utils::add_pg_hdr(hdr.get(), args);
     utils::add_rg_hdr(hdr.get(), read_groups);
     std::shared_ptr<HtsWriter> bam_writer;
     std::shared_ptr<utils::Aligner> aligner;
     MessageSink* converted_reads_sink = nullptr;
     if (ref.empty()) {
         bam_writer = std::make_shared<HtsWriter>("-", output_mode,
-                                                 num_devices * 2 /*writer_threads*/, num_reads);
+                                                 thread_allocations.writer_threads, num_reads);
         bam_writer->add_header(hdr.get());
         bam_writer->write_header();
         converted_reads_sink = bam_writer.get();
     } else {
-        bam_writer = std::make_shared<HtsWriter>("-", output_mode,
-                                                 num_devices * 2 /*writer_threads*/, num_reads);
+        bam_writer =
+                std::make_shared<HtsWriter>("-", output_mode, thread_allocations.writer_threads);
         aligner = std::make_shared<utils::Aligner>(*bam_writer, ref, kmer_size, window_size,
-                                                   num_devices * 10);
+                                                   thread_allocations.aligner_threads);
         utils::add_sq_hdr(hdr.get(), aligner->get_sequence_records_for_header());
         bam_writer->add_header(hdr.get());
         bam_writer->write_header();
         converted_reads_sink = aligner.get();
     }
     ReadToBamType read_converter(*converted_reads_sink, emit_moves, rna, duplex,
-                                 num_devices * 2 /*num_threads*/, num_reads);
+                                 thread_allocations.read_converter_threads);
     StatsCounterNode stats_node(read_converter, duplex);
-    ReadFilterNode read_filter_node(stats_node, min_qscore, num_devices * 2, num_reads);
+    ReadFilterNode read_filter_node(stats_node, min_qscore, thread_allocations.read_filter_threads,
+                                    num_reads);
 
     std::unique_ptr<ModBaseCallerNode> mod_base_caller_node;
     MessageSink* basecaller_node_sink = static_cast<MessageSink*>(&read_filter_node);
     if (!remora_model_list.empty()) {
         mod_base_caller_node = std::make_unique<ModBaseCallerNode>(
-                read_filter_node, std::move(remora_callers), num_remora_threads, num_devices,
-                model_stride, remora_batch_size);
+                read_filter_node, std::move(remora_callers), thread_allocations.remora_threads,
+                num_devices, model_stride, remora_batch_size);
         basecaller_node_sink = static_cast<MessageSink*>(mod_base_caller_node.get());
     }
     const int kBatchTimeoutMS = 100;
     BasecallerNode basecaller_node(*basecaller_node_sink, std::move(runners), overlap,
                                    kBatchTimeoutMS, model_name);
-    ScalerNode scaler_node(basecaller_node, num_devices * 4);
+    ScalerNode scaler_node(basecaller_node, thread_allocations.scaler_node_threads);
 
-    DataLoader loader(scaler_node, "cpu", num_devices, max_reads, read_list);
+    DataLoader loader(scaler_node, "cpu", thread_allocations.loader_threads, max_reads, read_list);
 
     loader.load_reads(data_path, recursive_file_loading);
 

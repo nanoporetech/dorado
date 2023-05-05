@@ -15,7 +15,7 @@ TEST_CASE("HtsReaderTest: Read fasta to sink", TEST_GROUP) {
     fs::path aligner_test_dir = fs::path(get_data_dir("bam_reader"));
     auto fasta = aligner_test_dir / "input.fa";
 
-    MessageSinkToVector<bam1_t*> sink(100);
+    MessageSinkToVector<dorado::BamPtr> sink(100);
     dorado::utils::HtsReader reader(fasta.string());
     reader.read(sink, 100);
     auto bam_records = sink.get_messages();
@@ -47,7 +47,7 @@ TEST_CASE("HtsReaderTest: Read SAM to sink", TEST_GROUP) {
     fs::path aligner_test_dir = fs::path(get_data_dir("bam_reader"));
     auto sam = aligner_test_dir / "small.sam";
 
-    MessageSinkToVector<bam1_t*> sink(100);
+    MessageSinkToVector<dorado::BamPtr> sink(100);
     dorado::utils::HtsReader reader(sam.string());
     reader.read(sink, 100);
     auto bam_records = sink.get_messages();

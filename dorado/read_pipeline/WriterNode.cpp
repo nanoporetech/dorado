@@ -97,9 +97,9 @@ void WriterNode::worker_thread() {
         } else {
             try {
                 auto alns = read->extract_sam_lines(m_emit_moves, m_duplex);
-                for (const auto aln : alns) {
+                for (const auto& aln : alns) {
                     std::scoped_lock<std::mutex> lock(m_cout_mutex);
-                    if (sam_write1(m_file, m_header, aln) < 0) {
+                    if (sam_write1(m_file, m_header, aln.get()) < 0) {
                         spdlog::warn("Unable to write alignment for read {}", read->read_id);
                     }
                 }

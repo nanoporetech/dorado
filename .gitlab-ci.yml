@@ -248,6 +248,7 @@ build_archive:macos:x64:
     - echo dorado aligner test stage
     - ./dist/bin/dorado aligner ref.fq calls.sam > calls.bam
     - ./dist/bin/dorado basecaller ${MODEL} ./tests/data/pod5 -b ${BATCH} --modified-bases 5mCG | ./dist/bin/dorado aligner ref.fq > calls.bam
+    - ./dist/bin/dorado basecaller ${MODEL} ./tests/data/pod5 -b ${BATCH} --modified-bases 5mCG --reference ref.fq > calls.bam
     - samtools quickcheck -u calls.bam
     - samtools view -h calls.bam > calls.sam
 
