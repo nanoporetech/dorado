@@ -391,10 +391,10 @@ HtsWriter::HtsWriter(const std::string& filename, OutputMode mode, size_t thread
         }
     }
 
-    if (m_num_reads_expected <= 100) {
-        m_progress_bar_increment = 100;
+    if (m_num_reads_expected == 0) {
+        m_progress_bar_interval = 100;
     } else {
-        m_progress_bar_increment = m_num_reads_expected / 100;
+        m_progress_bar_interval = m_num_reads_expected < 100 ? 1 : 100;
     }
 
     m_worker = std::make_unique<std::thread>(std::thread(&HtsWriter::worker_thread, this));
@@ -429,6 +429,16 @@ void HtsWriter::worker_thread() {
 
     Message message;
     while (m_work_queue.try_pop(message)) {
+        // Print progress first so users know something is happening.
+        if ((write_count % m_progress_bar_interval) == 0) {
+            if (m_num_reads_expected != 0) {
+                float progress = 100.f * static_cast<float>(write_count) / m_num_reads_expected;
+                m_progress_bar.set_progress(progress);
+            } else {
+                std::cerr << "\r> Alignments written: " << write_count;
+            }
+        }
+
         auto aln = std::get<BamPtr>(std::move(message));
         write(aln.get());
         processed_read_ids.emplace(bam_get_qname(aln.get()));
@@ -436,31 +446,14 @@ void HtsWriter::worker_thread() {
         // out to disk.
         aln.reset();
 
-        // Since multiple alignments can have the same read id, only
-        // increment ticker counter if a new unique read is encountered when
-        // num_reads has been specified.
-        bool new_count_acquired = false;
         if (m_num_reads_expected != 0) {
-            if (processed_read_ids.size() != write_count) {
-                write_count = processed_read_ids.size();
-                new_count_acquired = true;
-            }
+            write_count = processed_read_ids.size();
         } else {
             write_count++;
         }
-
-        if ((write_count % m_progress_bar_increment) == 0) {
-            if (m_num_reads_expected != 0) {
-                if (new_count_acquired && (write_count / m_progress_bar_increment) < 100) {
-                    m_progress_bar.tick();
-                }
-            } else {
-                std::cerr << "\r> Alignments written: " << write_count;
-            }
-        }
     }
     // Clear progress information.
-    if (m_num_reads_expected != 0 || write_count > m_progress_bar_increment) {
+    if (m_num_reads_expected != 0 || write_count >= m_progress_bar_interval) {
         std::cerr << "\r";
     }
     spdlog::debug("Written {} alignments.", write_count);
@@ -496,7 +489,7 @@ int HtsWriter::write_header() {
     return 0;
 }
 
-read_map read_bam(const std::string& filename, const std::set<std::string>& read_ids) {
+read_map read_bam(const std::string& filename, const std::unordered_set<std::string>& read_ids) {
     HtsReader reader(filename);
 
     read_map reads;

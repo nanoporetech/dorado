@@ -4,7 +4,7 @@
 #include "read_pipeline/ReadPipeline.h"
 #include "utils/types.h"
 
-#include <indicators/progress_bar.hpp>
+#include <indicators/block_progress_bar.hpp>
 
 #include <map>
 #include <set>
@@ -84,8 +84,8 @@ private:
     int write_hdr_sq(char* name, uint32_t length);
 
     size_t m_num_reads_expected;
-    int m_progress_bar_increment;
-    indicators::ProgressBar m_progress_bar{
+    int m_progress_bar_interval;
+    indicators::BlockProgressBar m_progress_bar{
             indicators::option::Stream{std::cerr},     indicators::option::BarWidth{30},
             indicators::option::ShowElapsedTime{true}, indicators::option::ShowRemainingTime{true},
             indicators::option::ShowPercentage{true},
@@ -107,7 +107,7 @@ private:
  * @note The caller is responsible for managing the memory of the returned map.
  * @note The input BAM file must be properly formatted and readable.
  */
-read_map read_bam(const std::string& filename, const std::set<std::string>& read_ids);
+read_map read_bam(const std::string& filename, const std::unordered_set<std::string>& read_ids);
 
 void add_rg_hdr(sam_hdr_t* hdr, const std::unordered_map<std::string, ReadGroup>& read_groups);
 
