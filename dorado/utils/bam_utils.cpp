@@ -427,18 +427,15 @@ void HtsWriter::worker_thread() {
     std::unordered_set<std::string> processed_read_ids;
     size_t write_count = 0;
 
+    // Initialize progress logging.
+    if (m_num_reads_expected != 0) {
+        m_progress_bar.set_progress(0.0f);
+    } else {
+        std::cerr << "\r> Alignments written: " << write_count;
+    }
+
     Message message;
     while (m_work_queue.try_pop(message)) {
-        // Print progress first so users know something is happening.
-        if ((write_count % m_progress_bar_interval) == 0) {
-            if (m_num_reads_expected != 0) {
-                float progress = 100.f * static_cast<float>(write_count) / m_num_reads_expected;
-                m_progress_bar.set_progress(progress);
-            } else {
-                std::cerr << "\r> Alignments written: " << write_count;
-            }
-        }
-
         auto aln = std::get<BamPtr>(std::move(message));
         write(aln.get());
         processed_read_ids.emplace(bam_get_qname(aln.get()));
@@ -450,6 +447,15 @@ void HtsWriter::worker_thread() {
             write_count = processed_read_ids.size();
         } else {
             write_count++;
+        }
+
+        if ((write_count % m_progress_bar_interval) == 0) {
+            if (m_num_reads_expected != 0) {
+                float progress = 100.f * static_cast<float>(write_count) / m_num_reads_expected;
+                m_progress_bar.set_progress(progress);
+            } else {
+                std::cerr << "\r> Alignments written: " << write_count;
+            }
         }
     }
     // Clear progress information.
