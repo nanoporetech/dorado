@@ -32,8 +32,8 @@
 #include <spdlog/spdlog.h>
 
 #include <memory>
-#include <set>
 #include <thread>
+#include <unordered_set>
 
 namespace dorado {
 
@@ -107,7 +107,9 @@ int duplex(int argc, char* argv[]) {
 
         spdlog::info("> Loading pairs file");
         auto template_complement_map = utils::load_pairs_file(pairs_file);
-        spdlog::info("> Pairs file loaded");
+        std::unordered_set<std::string> read_list =
+                utils::get_read_list_from_pairs(template_complement_map);
+        spdlog::info("> Pairs file loaded with {} reads.", read_list.size());
 
         bool emit_moves = false, rna = false, duplex = true;
 
@@ -132,12 +134,12 @@ int duplex(int argc, char* argv[]) {
         std::shared_ptr<utils::Aligner> aligner;
         MessageSink* converted_reads_sink = nullptr;
         if (ref.empty()) {
-            bam_writer = std::make_shared<HtsWriter>("-", output_mode, 4);
+            bam_writer = std::make_shared<HtsWriter>("-", output_mode, 4, 0);
             bam_writer->add_header(hdr.get());
             bam_writer->write_header();
             converted_reads_sink = bam_writer.get();
         } else {
-            bam_writer = std::make_shared<HtsWriter>("-", output_mode, 4);
+            bam_writer = std::make_shared<HtsWriter>("-", output_mode, 4, 0);
             aligner = std::make_shared<utils::Aligner>(*bam_writer, ref, parser.get<int>("k"),
                                                        parser.get<int>("w"),
                                                        std::thread::hardware_concurrency());
@@ -153,15 +155,8 @@ int duplex(int argc, char* argv[]) {
         torch::set_num_threads(1);
 
         if (model.compare("basespace") == 0) {  // Execute a Basespace duplex pipeline.
-            // create a set of the read_ids
-            std::set<std::string> read_ids;
-            for (const auto& pair : template_complement_map) {
-                read_ids.insert(pair.first);
-                read_ids.insert(pair.second);
-            }
-
             spdlog::info("> Loading reads");
-            auto read_map = utils::read_bam(reads, read_ids);
+            auto read_map = utils::read_bam(reads, read_list);
 
             spdlog::info("> Starting Basespace Duplex Pipeline");
             threads = threads == 0 ? std::thread::hardware_concurrency() : threads;
@@ -266,9 +261,6 @@ int duplex(int argc, char* argv[]) {
             auto stereo_basecaller_node = std::make_unique<BasecallerNode>(
                     read_filter_node, std::move(stereo_runners), adjusted_stereo_overlap,
                     kStereoBatchTimeoutMS);
-
-            std::unordered_set<std::string> read_list =
-                    utils::get_read_list_from_pairs(template_complement_map);
 
             auto simplex_model_stride = runners.front()->model_stride();
 
