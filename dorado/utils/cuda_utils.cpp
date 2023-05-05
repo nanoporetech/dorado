@@ -18,11 +18,11 @@ extern "C" {
 
 #include <array>
 #include <chrono>
-#include <deque>
 #include <limits>
 #include <optional>
 #include <regex>
 #include <string>
+#include <unordered_map>
 #include <vector>
 using namespace std::chrono;
 
@@ -176,21 +176,14 @@ std::vector<std::string> parse_cuda_device_string(std::string device_string) {
 }
 
 std::unique_lock<std::mutex> acquire_gpu_lock(int gpu_index) {
-    static std::deque<std::mutex> gpu_mutexes;
-    static std::mutex deque_mutex;
+    static std::unordered_map<int, std::mutex> gpu_mutexes;
+    static std::mutex map_mutex;
 
-    // We don't know ahead of time how many GPUs, and therefore mutexes,
-    // we need to handle.  So keep mutexes in a deque that can grow, protected
-    // by its own mutex.  Indices are assumed to be small in number starting
-    // from near 0.
-    std::lock_guard<std::mutex> deque_lock(deque_mutex);
-
-    if (gpu_index >= static_cast<int>(gpu_mutexes.size())) {
-        spdlog::debug("Resizing gpu_mutexes to {}", gpu_index + 1);
-        gpu_mutexes.resize(static_cast<size_t>(gpu_index + 1));
-    }
-
-    return std::unique_lock<std::mutex>(gpu_mutexes.at(gpu_index));
+    // We don't assume a particular GPU index range ahead of time,
+    // so keep GPU mutexes in an unordered_map protected by its own
+    // mutex.
+    std::lock_guard<std::mutex> map_lock(map_mutex);
+    return std::unique_lock<std::mutex>(gpu_mutexes[gpu_index]);
 }
 
 // Note that in general the torch caching allocator may be consuming
