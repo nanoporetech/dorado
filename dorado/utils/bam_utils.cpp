@@ -378,6 +378,9 @@ HtsWriter::HtsWriter(const std::string& filename, OutputMode mode, size_t thread
     case SAM:
         m_file = hts_open(filename.c_str(), "w");
         break;
+    case UBAM:
+        m_file = hts_open(filename.c_str(), "wb0");
+        break;
     default:
         throw std::runtime_error("Unknown output mode selected: " + std::to_string(mode));
     }
