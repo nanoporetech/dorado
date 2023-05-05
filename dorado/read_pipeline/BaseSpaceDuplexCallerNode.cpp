@@ -26,7 +26,10 @@ std::pair<std::vector<char>, std::vector<char>> compute_basespace_consensus(
     std::vector<char> quality_scores_phred;
 
     // Loop over each alignment position, within given alignment boundaries
-    for (int i = alignment_start_position; i < alignment_end_position; i++) {
+    for (int i = alignment_start_position;
+         i < alignment_end_position && target_cursor < target_quality_scores.size() &&
+         query_cursor < query_quality_scores.size();
+         i++) {
         //Comparison between q-scores is done in Phred space which is offset by 33
         if (target_quality_scores.at(target_cursor) >=
             query_quality_scores.at(query_cursor)) {  // Target has a higher quality score
@@ -132,19 +135,27 @@ void BaseSpaceDuplexCallerNode::basespace(std::string template_read_id,
     int target_cursor =
             result.startLocations[0];  // 0-based position in the *target* where alignment starts.
 
-    auto [alignment_start_end, cursors] =
-            utils::get_trimmed_alignment(11, result.alignment, result.alignmentLength,
-                                         target_cursor, query_cursor, 0, result.endLocations[0]);
+    // Adjust min consecutive wanted based on sequence lengths. If reads are short (< 500bp), use an overlap of 5, otherwise use 11.
+    const int kMinNumConsecutiveWanted =
+            (std::min(template_sequence.size(), complement_sequence_reverse_complement.size()) < 500
+                     ? 5
+                     : 11);
+    auto [alignment_start_end, cursors] = utils::get_trimmed_alignment(
+            kMinNumConsecutiveWanted, result.alignment, result.alignmentLength, target_cursor,
+            query_cursor, 0, result.endLocations[0]);
 
     query_cursor = cursors.first;
     target_cursor = cursors.second;
     int start_alignment_position = alignment_start_end.first;
     int end_alignment_position = alignment_start_end.second;
 
-    int min_trimmed_alignment_length = 200;
+    const int kMinTrimmedAlignmentLength =
+            (std::min(template_sequence.size(), complement_sequence_reverse_complement.size()) < 500
+                     ? 25
+                     : 200);
     bool consensus_possible =
             (start_alignment_position < end_alignment_position) &&
-            ((end_alignment_position - start_alignment_position) > min_trimmed_alignment_length);
+            ((end_alignment_position - start_alignment_position) > kMinTrimmedAlignmentLength);
 
     if (consensus_possible) {
         auto [consensus, quality_scores_phred] = compute_basespace_consensus(
