@@ -69,10 +69,13 @@ void setup(std::vector<std::string> args,
     int num_devices = 1;
 
     if (device == "cpu") {
+        num_runners = std::thread::hardware_concurrency();
         if (batch_size == 0) {
-            batch_size = std::thread::hardware_concurrency();
-            spdlog::debug("- set batch size to {}", batch_size);
+            batch_size = 1;
         }
+        spdlog::debug("- CPU calling: set batch size to {}, num_runners to {}", batch_size,
+                      num_runners);
+
         for (size_t i = 0; i < num_runners; i++) {
             runners.push_back(std::make_shared<ModelRunner<CPUDecoder>>(model_path, device,
                                                                         chunk_size, batch_size));
