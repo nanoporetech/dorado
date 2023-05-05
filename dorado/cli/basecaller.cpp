@@ -332,13 +332,11 @@ int basecaller(int argc, char* argv[]) {
             .default_value(10)
             .scan<'i', int>();
 
-    parser.add_argument("--skip-model-compatibility-check")
-            .help("(WARNING: For expert users only) Skip model and data compatibility checks.")
-            .default_value(false)
-            .implicit_value(true);
+    argparse::ArgumentParser internal_parser;
 
     try {
-        parser.parse_args(argc, argv);
+        auto remaining_args = parser.parse_known_args(argc, argv);
+        internal_parser = utils::parse_internal_options(remaining_args);
     } catch (const std::exception& e) {
         std::ostringstream parser_stream;
         parser_stream << parser;
@@ -396,7 +394,7 @@ int basecaller(int argc, char* argv[]) {
               parser.get<int>("--max-reads"), parser.get<int>("--min-qscore"),
               parser.get<std::string>("--read-ids"), parser.get<bool>("--recursive"),
               parser.get<int>("k"), parser.get<int>("w"),
-              parser.get<bool>("--skip-model-compatibility-check"));
+              internal_parser.get<bool>("--skip-model-compatibility-check"));
     } catch (const std::exception& e) {
         spdlog::error("{}", e.what());
         return 1;
