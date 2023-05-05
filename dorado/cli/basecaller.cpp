@@ -220,8 +220,7 @@ void setup(std::vector<std::string> args,
     ReadToBamType read_converter(*converted_reads_sink, emit_moves, rna, duplex,
                                  thread_allocations.read_converter_threads);
     StatsCounterNode stats_node(read_converter, duplex);
-    ReadFilterNode read_filter_node(stats_node, min_qscore, thread_allocations.read_filter_threads,
-                                    num_reads);
+    ReadFilterNode read_filter_node(stats_node, min_qscore, thread_allocations.read_filter_threads);
 
     std::unique_ptr<ModBaseCallerNode> mod_base_caller_node;
     MessageSink* basecaller_node_sink = static_cast<MessageSink*>(&read_filter_node);
