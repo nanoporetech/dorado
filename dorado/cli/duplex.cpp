@@ -210,8 +210,6 @@ int duplex(int argc, char* argv[]) {
             int overlap(parser.get<int>("-o"));
             const size_t num_runners = default_parameters.num_runners;
 
-            size_t stereo_batch_size;
-
             if (device == "cpu") {
                 if (batch_size == 0) {
                     batch_size = std::thread::hardware_concurrency();
@@ -263,11 +261,9 @@ int duplex(int argc, char* argv[]) {
                     }
                 }
 
-                stereo_batch_size = 1024;
-
                 for (auto device_string : devices) {
-                    auto caller = create_cuda_caller(stereo_model_path, chunk_size,
-                                                     stereo_batch_size, device_string);
+                    auto caller = create_cuda_caller(stereo_model_path, chunk_size, batch_size,
+                                                     device_string, 0.5f);
                     for (size_t i = 0; i < num_runners; i++) {
                         stereo_runners.push_back(std::make_shared<CudaModelRunner>(caller));
                     }

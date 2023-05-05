@@ -95,27 +95,30 @@ void PairingNode::pair_generating_worker_thread() {
         int max_num_keys = 10;
         using KeyType = std::tuple<int, int, std::string, std::string>;
 
-        std::list<KeyType> key_list;
-
-        auto add_key = [&](int channel, int mux, std::string, std::string) {
+        auto add_key = [&](int channel, int mux, std::string run_id, std::string flowcell_id) {
             KeyType key = std::make_tuple(channel, mux, run_id, flowcell_id);
 
             // Check if the key is already in the list
-            auto found = std::find(key_list.begin(), key_list.end(), key);
+            auto found = std::find(m_working_channel_mux_key_list.begin(),
+                                   m_working_channel_mux_key_list.end(), key);
 
-            if (found == key_list.end()) {
+            if (found == m_working_channel_mux_key_list.end()) {
                 // Key is not in the list
 
-                if (key_list.size() >= max_num_keys) {
+                if (m_working_channel_mux_key_list.size() >= max_num_keys) {
+                    //std::cerr << "Number of keys in the channel mux read map is now: " << channel_mux_read_map.size() << std::endl;
                     // Remove the oldest key (front of the list)
-                    auto oldest_key = key_list.front();
-                    key_list.pop_front();
+                    auto oldest_key = m_working_channel_mux_key_list.front();
+                    std::scoped_lock<std::mutex> m_working_channel_mux_key_list_lock(
+                            m_working_channel_mux_key_list_mtx);
+                    m_working_channel_mux_key_list.pop_front();
+                    std::scoped_lock<std::mutex> m_channel_mux_read_map_lock(
+                            m_channel_mux_read_map_mtx);
                     // Remove the oldest key from the map
-                    channel_mux_read_map.erase(key);
+                    channel_mux_read_map.erase(oldest_key);
                 }
-
                 // Add the new key to the end of the list
-                key_list.push_back(key);
+                m_working_channel_mux_key_list.push_back(key);
             }
             return key;
         };

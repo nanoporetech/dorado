@@ -40,6 +40,9 @@ private:
     std::atomic<int> read_counter = 0;
     std::mutex
             m_channel_mux_read_map_mtx;  //TODO: Need to santiy check if this is thread-safe, should be static
+
+    std::list<std::tuple<int, int, std::string, std::string>> m_working_channel_mux_key_list;
+    std::mutex m_working_channel_mux_key_list_mtx;
 };
 
 }  // namespace dorado
