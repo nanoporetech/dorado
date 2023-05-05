@@ -5,10 +5,10 @@
 #include <torch/torch.h>
 
 #include <array>
+#include <mutex>
 #include <optional>
 #include <string>
 #include <vector>
-#include <mutex>
 
 namespace dorado::utils {
 
