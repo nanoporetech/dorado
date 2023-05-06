@@ -43,6 +43,8 @@ public:
     ~HtsReader();
     bool read();
     void read(MessageSink& read_sink, int max_reads = -1);
+    template <typename T>
+    T get_tag(std::string tagname);
 
     char* format{nullptr};
     bool is_aligned{false};
@@ -52,6 +54,25 @@ public:
 private:
     htsFile* m_file{nullptr};
 };
+
+template <typename T>
+T HtsReader::get_tag(std::string tagname) {
+    T tag_value;
+    uint8_t* tag = bam_aux_get(record.get(), tagname.c_str());
+
+    if (!tag) {
+        return tag_value;
+    }
+    if constexpr (std::is_integral_v<T>) {
+        tag_value = bam_aux2i(tag);
+    } else if constexpr (std::is_floating_point_v<T>) {
+        tag_value = bam_aux2f(tag);
+    } else {
+        tag_value = bam_aux2Z(tag);
+    }
+
+    return tag_value;
+}
 
 class HtsWriter : public MessageSink {
 public:
