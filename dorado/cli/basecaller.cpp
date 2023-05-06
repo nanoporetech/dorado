@@ -20,7 +20,6 @@
 #include "read_pipeline/ReadToBamTypeNode.h"
 #include "read_pipeline/ScalerNode.h"
 #include "read_pipeline/StatsCounter.h"
-#include "read_pipeline/WriterNode.h"
 #include "utils/bam_utils.h"
 #include "utils/cli_utils.h"
 #include "utils/log_utils.h"
