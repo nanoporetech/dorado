@@ -256,7 +256,8 @@ int basecaller(int argc, char* argv[]) {
     parser.add_argument("-v", "--verbose").default_value(false).implicit_value(true);
 
     parser.add_argument("-x", "--device")
-            .help("device string in format \"cuda:0,...,N\", \"cuda:all\", \"metal\" etc..")
+            .help("device string in format \"cuda:0,...,N\", \"cuda:all\", \"metal\", \"cpu\" "
+                  "etc..")
             .default_value(default_parameters.device);
 
     parser.add_argument("-l", "--read-ids")
