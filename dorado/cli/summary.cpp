@@ -54,8 +54,9 @@ int summary(int argc, char* argv[]) {
 
     HtsReader reader(reads);
     spdlog::debug("> input fmt: {} aligned: {}", reader.format, reader.is_aligned);
-
+#ifndef _WIN32
     std::signal(SIGPIPE, [](int signum) { interupt = 1; });
+#endif
     std::signal(SIGINT, [](int signum) { interupt = 1; });
 
     for (int col = 0; col < header.size(); col++) {
