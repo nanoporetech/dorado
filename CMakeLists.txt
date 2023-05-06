@@ -257,6 +257,7 @@ if(NOT DORADO_LIB_ONLY)
         dorado/cli/basecaller.cpp
         dorado/cli/benchmark.cpp        
         dorado/cli/download.cpp
+        dorado/cli/summary.cpp
         dorado/cli/cli.h
     )
 

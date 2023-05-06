@@ -35,10 +35,9 @@ int main(int argc, char* argv[]) {
     spdlog::cfg::load_env_levels();
 
     const std::map<std::string, entry_ptr> subcommands = {
-            {"basecaller", &dorado::basecaller},
-            {"duplex", &dorado::duplex},
-            {"download", &dorado::download},
-            {"aligner", &dorado::aligner},
+            {"basecaller", &dorado::basecaller}, {"duplex", &dorado::duplex},
+            {"download", &dorado::download},     {"aligner", &dorado::aligner},
+            {"summary", &dorado::summary},
     };
 
     std::vector<std::string> arguments(argv + 1, argv + argc);
