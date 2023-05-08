@@ -56,6 +56,7 @@ private:
 class HtsWriter : public MessageSink {
 public:
     enum OutputMode {
+        UBAM,
         BAM,
         SAM,
         FASTQ,

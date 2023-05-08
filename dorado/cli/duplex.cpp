@@ -125,6 +125,8 @@ int duplex(int argc, char* argv[]) {
             output_mode = HtsWriter::OutputMode::FASTQ;
         } else if (emit_sam || utils::is_fd_tty(stdout)) {
             output_mode = HtsWriter::OutputMode::SAM;
+        } else if (utils::is_fd_pipe(stdout)) {
+            output_mode = HtsWriter::OutputMode::UBAM;
         }
 
         std::unique_ptr<sam_hdr_t, void (*)(sam_hdr_t*)> hdr(sam_hdr_init(), sam_hdr_destroy);
