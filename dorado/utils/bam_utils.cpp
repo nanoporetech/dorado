@@ -431,7 +431,7 @@ void HtsWriter::worker_thread() {
     if (m_num_reads_expected != 0) {
         m_progress_bar.set_progress(0.0f);
     } else {
-        std::cerr << "\r> Alignments written: " << write_count;
+        std::cerr << "\r> Output rows written: " << write_count;
     }
 
     Message message;
