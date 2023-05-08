@@ -46,7 +46,6 @@ inline bool is_fd_pipe(FILE* fd) {
 #ifdef _WIN32
     return false;
 #else
-    // blah
     struct stat buffer;
     fstat(fileno(fd), &buffer);
     return S_ISFIFO(buffer.st_mode);
