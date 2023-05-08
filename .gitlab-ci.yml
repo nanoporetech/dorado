@@ -64,6 +64,7 @@ variables:
     paths:
       - dist
       - tests/*.sh
+      - tests/*.bat
       - tests/data
     expire_in: 1 day
 
@@ -239,6 +240,13 @@ build_archive:macos:x64:
   script:
     - for f in tests/*.sh; do echo $f; ./$f ./dist/bin/dorado || break; done
 
+.test_dorado_windows: &test_dorado_windows
+  stage: test
+  variables:
+    GIT_STRATEGY: none
+  script:
+    - .\\tests\\test_simple_basecaller_execution.bat .\\dist\\bin\\dorado.exe
+
 .test_archive: &test_archive
   stage: test
   variables:
@@ -250,6 +258,12 @@ build_archive:macos:x64:
     - ./dorado-*/bin/dorado -vv
 
 # Test stages
+
+test:windows:
+  <<: *windows_runner
+  <<: *test_dorado_windows
+  needs:
+    - build:windows
 
 test:linux:x86:focal:
   image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.1
