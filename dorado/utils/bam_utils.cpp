@@ -431,7 +431,7 @@ void HtsWriter::worker_thread() {
     if (m_num_reads_expected != 0) {
         m_progress_bar.set_progress(0.0f);
     } else {
-        std::cerr << "\r> Output rows written: " << write_count;
+        std::cerr << "\r> Output records written: " << write_count;
     }
 
     Message message;
@@ -454,7 +454,7 @@ void HtsWriter::worker_thread() {
                 float progress = 100.f * static_cast<float>(write_count) / m_num_reads_expected;
                 m_progress_bar.set_progress(progress);
             } else {
-                std::cerr << "\r> Alignments written: " << write_count;
+                std::cerr << "\r> Output records written: " << write_count;
             }
         }
     }
@@ -462,7 +462,7 @@ void HtsWriter::worker_thread() {
     if (m_num_reads_expected != 0 || write_count >= m_progress_bar_interval) {
         std::cerr << "\r";
     }
-    spdlog::debug("Written {} alignments.", write_count);
+    spdlog::debug("Written {} records.", write_count);
 }
 
 int HtsWriter::write(bam1_t* record) {
