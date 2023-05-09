@@ -99,10 +99,9 @@ void PairingNode::pair_generating_worker_thread() {
             KeyType key = std::make_tuple(channel, mux, run_id, flowcell_id);
 
             // Check if the key is already in the list
-            auto found = std::find(m_working_channel_mux_keys.begin(),
-                                   m_working_channel_mux_keys.end(), key);
+            auto found = channel_mux_read_map.find(key);
 
-            if (found == m_working_channel_mux_keys.end()) {
+            if (found == channel_mux_read_map.end()) {
                 // Key is not in the dequeue
 
                 if (m_working_channel_mux_keys.size() >= max_num_keys) {
