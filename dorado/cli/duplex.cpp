@@ -100,10 +100,10 @@ int duplex(int argc, char* argv[]) {
             .help("minimizer window size for alignment with minimap2.")
             .default_value(10)
             .scan<'i', int>();
+    parser.add_argument("-v", "--verbose").default_value(false).implicit_value(true);
 
     try {
         parser.parse_args(argc, argv);
-
         auto device(parser.get<std::string>("-x"));
         auto model(parser.get<std::string>("model"));
         auto reads(parser.get<std::string>("reads"));
@@ -112,7 +112,9 @@ int duplex(int argc, char* argv[]) {
         auto min_qscore(parser.get<int>("--min-qscore"));
         auto ref = parser.get<std::string>("--reference");
         std::vector<std::string> args(argv, argv + argc);
-
+        if (parser.get<bool>("--verbose")) {
+            spdlog::set_level(spdlog::level::debug);
+        }
         std::map<std::string, std::string> template_complement_map;
         std::unordered_set<std::string> read_list;
 
