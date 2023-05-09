@@ -5,11 +5,19 @@
 #include <torch/torch.h>
 
 #include <array>
+#include <mutex>
 #include <optional>
 #include <string>
 #include <vector>
 
 namespace dorado::utils {
+
+// Returns a lock providing exclusive access to the GPU with the specified index.
+// In cases where > 1 model is being used, this can prevent more than one from
+// attempting to allocate GPU memory on, or submit work to, the device in question.
+// Once the returned lock goes out of scope or is explicitly unlocked,
+// the GPU is available to other users again.
+std::unique_lock<std::mutex> acquire_gpu_lock(int gpu_index);
 
 // Given a string representing cuda devices (e.g "cuda:0,1,3") returns a vector of strings, one for
 // each device (e.g ["cuda:0", "cuda:2", ..., "cuda:7"]

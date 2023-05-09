@@ -94,8 +94,6 @@ set(LIB_SOURCE_FILES
     dorado/read_pipeline/BasecallerNode.h
     dorado/read_pipeline/ModBaseCallerNode.cpp
     dorado/read_pipeline/ModBaseCallerNode.h
-    dorado/read_pipeline/WriterNode.cpp
-    dorado/read_pipeline/WriterNode.h
     dorado/read_pipeline/ReadFilterNode.cpp
     dorado/read_pipeline/ReadFilterNode.h
     dorado/read_pipeline/ReadToBamTypeNode.cpp
