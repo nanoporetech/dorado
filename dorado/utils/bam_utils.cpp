@@ -39,7 +39,7 @@ Aligner::Aligner(MessageSink& sink, const std::string& filename, int k, int w, i
 
     // Set batch sizes large enough to not require chunking since that's
     // not supported yet.
-    m_idx_opt.batch_size = 4000000000;
+    m_idx_opt.batch_size = 16000000000;
     m_idx_opt.mini_batch_size = 16000000000;
 
     // Force cigar generation.
