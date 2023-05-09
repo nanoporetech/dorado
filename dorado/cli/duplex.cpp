@@ -232,7 +232,7 @@ int duplex(int argc, char* argv[]) {
                 }
 
                 // For now, the minimal batch size is used for the duplex model.
-                stereo_batch_size = 48;
+                int stereo_batch_size = 48;
 
                 auto duplex_caller =
                         create_metal_caller(stereo_model_path, chunk_size, stereo_batch_size);
