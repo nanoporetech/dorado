@@ -108,11 +108,9 @@ void PairingNode::pair_generating_worker_thread() {
                 if (m_working_channel_mux_keys.size() >= max_num_keys) {
                     // Remove the oldest key (front of the list)
                     auto oldest_key = m_working_channel_mux_keys.front();
-                    std::scoped_lock<std::mutex> m_working_channel_mux_key_list_lock(
-                            m_working_channel_mux_key_list_mtx);
+                    std::scoped_lock<std::mutex> m_working_channel_mux_key_list_lock(m_pairing_mtx);
                     m_working_channel_mux_keys.pop_front();
-                    std::scoped_lock<std::mutex> m_channel_mux_read_map_lock(
-                            m_channel_mux_read_map_mtx);
+                    std::scoped_lock<std::mutex> m_channel_mux_read_map_lock(m_pairing_mtx);
                     // Remove the oldest key from the map
                     channel_mux_read_map.erase(oldest_key);
                 }
@@ -124,7 +122,7 @@ void PairingNode::pair_generating_worker_thread() {
 
         auto key = add_key(channel, mux, run_id, flowcell_id);
 
-        std::unique_lock<std::mutex> lock(m_channel_mux_read_map_mtx);
+        std::unique_lock<std::mutex> lock(m_pairing_mtx);
 
         auto compare_reads_by_time = [](const std::shared_ptr<Read>& read1,
                                         const std::shared_ptr<Read>& read2) {
