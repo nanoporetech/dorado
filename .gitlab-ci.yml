@@ -281,7 +281,6 @@ test:linux:arm64:bionic:
     GIT_STRATEGY: none
     MODEL: dna_r9.4.1_e8_hac@v3.3
     BATCH: 0
-
   needs:
     - build:linux:arm64:bionic
 
