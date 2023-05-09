@@ -10,7 +10,6 @@
 #include "read_pipeline/ScalerNode.h"
 #include "read_pipeline/StatsCounter.h"
 #include "read_pipeline/StereoDuplexEncoderNode.h"
-#include "read_pipeline/WriterNode.h"
 #include "utils/bam_utils.h"
 #include "utils/cli_utils.h"
 #include "utils/duplex_utils.h"
@@ -33,8 +32,8 @@
 #include <utils/basecaller_utils.h>
 
 #include <memory>
-#include <set>
 #include <thread>
+#include <unordered_set>
 
 namespace dorado {
 
@@ -115,10 +114,13 @@ int duplex(int argc, char* argv[]) {
         std::vector<std::string> args(argv, argv + argc);
 
         std::map<std::string, std::string> template_complement_map;
+        std::unordered_set<std::string> read_list;
+
         if (!pairs_file.empty()) {
             spdlog::info("> Loading pairs file");
             template_complement_map = utils::load_pairs_file(pairs_file);
-            spdlog::info("> Pairs file loaded");
+            read_list = utils::get_read_list_from_pairs(template_complement_map);
+            spdlog::info("> Pairs file loaded with {} reads.", read_list.size());
         } else {
             spdlog::info(
                     "> No duplex pairs file provided, pairing will be performed automatically");
@@ -139,6 +141,8 @@ int duplex(int argc, char* argv[]) {
             output_mode = HtsWriter::OutputMode::FASTQ;
         } else if (emit_sam || utils::is_fd_tty(stdout)) {
             output_mode = HtsWriter::OutputMode::SAM;
+        } else if (utils::is_fd_pipe(stdout)) {
+            output_mode = HtsWriter::OutputMode::UBAM;
         }
 
         std::unique_ptr<sam_hdr_t, void (*)(sam_hdr_t*)> hdr(sam_hdr_init(), sam_hdr_destroy);
@@ -147,12 +151,12 @@ int duplex(int argc, char* argv[]) {
         std::shared_ptr<utils::Aligner> aligner;
         MessageSink* converted_reads_sink = nullptr;
         if (ref.empty()) {
-            bam_writer = std::make_shared<HtsWriter>("-", output_mode, 4);
+            bam_writer = std::make_shared<HtsWriter>("-", output_mode, 4, 0);
             bam_writer->add_header(hdr.get());
             bam_writer->write_header();
             converted_reads_sink = bam_writer.get();
         } else {
-            bam_writer = std::make_shared<HtsWriter>("-", output_mode, 4);
+            bam_writer = std::make_shared<HtsWriter>("-", output_mode, 4, 0);
             aligner = std::make_shared<utils::Aligner>(*bam_writer, ref, parser.get<int>("k"),
                                                        parser.get<int>("w"),
                                                        std::thread::hardware_concurrency());
@@ -173,14 +177,10 @@ int duplex(int argc, char* argv[]) {
                 return 1;  // Exit with an error code
             }
             // create a set of the read_ids
-            std::set<std::string> read_ids;
-            for (const auto& pair : template_complement_map) {
-                read_ids.insert(pair.first);
-                read_ids.insert(pair.second);
-            }
+            auto read_ids = utils::get_read_list_from_pairs(template_complement_map);
 
             spdlog::info("> Loading reads");
-            auto read_map = utils::read_bam(reads, read_ids);
+            auto read_map = utils::read_bam(reads, read_list);
 
             spdlog::info("> Starting Basespace Duplex Pipeline");
             threads = threads == 0 ? std::thread::hardware_concurrency() : threads;

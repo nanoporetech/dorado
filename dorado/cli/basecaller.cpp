@@ -20,7 +20,6 @@
 #include "read_pipeline/ReadToBamTypeNode.h"
 #include "read_pipeline/ScalerNode.h"
 #include "read_pipeline/StatsCounter.h"
-#include "read_pipeline/WriterNode.h"
 #include "utils/bam_utils.h"
 #include "utils/cli_utils.h"
 #include "utils/log_utils.h"
@@ -208,8 +207,8 @@ void setup(std::vector<std::string> args,
         bam_writer->write_header();
         converted_reads_sink = bam_writer.get();
     } else {
-        bam_writer =
-                std::make_shared<HtsWriter>("-", output_mode, thread_allocations.writer_threads);
+        bam_writer = std::make_shared<HtsWriter>("-", output_mode,
+                                                 thread_allocations.writer_threads, num_reads);
         aligner = std::make_shared<utils::Aligner>(*bam_writer, ref, kmer_size, window_size,
                                                    thread_allocations.aligner_threads);
         utils::add_sq_hdr(hdr.get(), aligner->get_sequence_records_for_header());
@@ -220,8 +219,7 @@ void setup(std::vector<std::string> args,
     ReadToBamType read_converter(*converted_reads_sink, emit_moves, rna, duplex,
                                  thread_allocations.read_converter_threads);
     StatsCounterNode stats_node(read_converter, duplex);
-    ReadFilterNode read_filter_node(stats_node, min_qscore, thread_allocations.read_filter_threads,
-                                    num_reads);
+    ReadFilterNode read_filter_node(stats_node, min_qscore, thread_allocations.read_filter_threads);
 
     std::unique_ptr<ModBaseCallerNode> mod_base_caller_node;
     MessageSink* basecaller_node_sink = static_cast<MessageSink*>(&read_filter_node);
@@ -258,7 +256,8 @@ int basecaller(int argc, char* argv[]) {
     parser.add_argument("-v", "--verbose").default_value(false).implicit_value(true);
 
     parser.add_argument("-x", "--device")
-            .help("device string in format \"cuda:0,...,N\", \"cuda:all\", \"metal\" etc..")
+            .help("device string in format \"cuda:0,...,N\", \"cuda:all\", \"metal\", \"cpu\" "
+                  "etc..")
             .default_value(default_parameters.device);
 
     parser.add_argument("-l", "--read-ids")
@@ -377,6 +376,8 @@ int basecaller(int argc, char* argv[]) {
         output_mode = HtsWriter::OutputMode::FASTQ;
     } else if (emit_sam || utils::is_fd_tty(stdout)) {
         output_mode = HtsWriter::OutputMode::SAM;
+    } else if (utils::is_fd_pipe(stdout)) {
+        output_mode = HtsWriter::OutputMode::UBAM;
     }
 
     spdlog::info("> Creating basecall pipeline");

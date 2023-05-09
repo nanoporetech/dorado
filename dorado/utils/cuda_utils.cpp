@@ -22,6 +22,7 @@ extern "C" {
 #include <optional>
 #include <regex>
 #include <string>
+#include <unordered_map>
 #include <vector>
 using namespace std::chrono;
 
@@ -174,6 +175,19 @@ std::vector<std::string> parse_cuda_device_string(std::string device_string) {
     return devices;
 }
 
+std::unique_lock<std::mutex> acquire_gpu_lock(int gpu_index) {
+    static std::unordered_map<int, std::mutex> gpu_mutexes;
+    static std::mutex map_mutex;
+
+    // We don't assume a particular GPU index range ahead of time,
+    // so keep GPU mutexes in an unordered_map protected by its own
+    // mutex.
+    std::lock_guard<std::mutex> map_lock(map_mutex);
+    return std::unique_lock<std::mutex>(gpu_mutexes[gpu_index]);
+}
+
+// Note that in general the torch caching allocator may be consuming
+// significant memory that could be freed if required.
 size_t available_memory(torch::Device device) {
     size_t free, total;
     c10::cuda::CUDAGuard device_guard(device);

@@ -18,10 +18,7 @@ namespace dorado {
 /// which are applied to each read.
 class ReadFilterNode : public MessageSink {
 public:
-    ReadFilterNode(MessageSink& sink,
-                   size_t min_qscore,
-                   size_t num_worker_threads = 1,
-                   size_t max_reads = 1000);
+    ReadFilterNode(MessageSink& sink, size_t min_qscore, size_t num_worker_threads);
     ~ReadFilterNode();
 
 private:
