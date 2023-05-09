@@ -94,11 +94,11 @@ void PairingNode::pair_generating_worker_thread() {
 
         int max_num_keys = 10;
 
-        auto add_key = [&](int channel, int mux, std::string run_id, std::string flowcell_id) {
-            UniquePoreIdentifierKey key = std::make_tuple(channel, mux, run_id, flowcell_id);
+        UniquePoreIdentifierKey key = std::make_tuple(channel, mux, run_id, flowcell_id);
+        {
+            std::scoped_lock<std::mutex> m_channel_mux_read_map_lock(m_pairing_mtx);
             auto found = channel_mux_read_map.find(key);
             // Check if the key is already in the list
-            std::scoped_lock<std::mutex> m_channel_mux_read_map_lock(m_pairing_mtx);
             if (found == channel_mux_read_map.end()) {
                 // Key is not in the dequeue
 
@@ -112,10 +112,7 @@ void PairingNode::pair_generating_worker_thread() {
                 // Add the new key to the end of the list
                 m_working_channel_mux_keys.push_back(key);
             }
-            return key;
-        };
-
-        auto key = add_key(channel, mux, run_id, flowcell_id);
+        }
 
         std::unique_lock<std::mutex> lock(m_pairing_mtx);
 
@@ -151,8 +148,7 @@ void PairingNode::pair_generating_worker_thread() {
             channel_mux_read_map[key].push_back(read);
         }
     }
-    int num_worker_threads = --m_num_worker_threads;
-    if (num_worker_threads == 0) {
+    if (--m_num_worker_threads == 0) {
         m_sink.terminate();
     }
 }
