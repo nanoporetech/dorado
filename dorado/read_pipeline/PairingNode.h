@@ -38,10 +38,9 @@ private:
 
     std::map<std::string, std::shared_ptr<Read>> read_cache;
 
-    std::map<std::tuple<int, int, std::string, std::string>, std::list<std::shared_ptr<Read>>>
-            channel_mux_read_map;
+    std::map<UniquePoreIdentifierKey, std::list<std::shared_ptr<Read>>> channel_mux_read_map;
 
-    std::deque<std::tuple<int, int, std::string, std::string>> m_working_channel_mux_keys;
+    std::deque<UniquePoreIdentifierKey> m_working_channel_mux_keys;
 
     std::mutex m_pairing_mtx;
 };
