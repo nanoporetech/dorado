@@ -208,9 +208,10 @@ std::optional<PosRange> find_best_adapter_match(const std::string& adapter,
     std::optional<PosRange> res = std::nullopt;
     if (edlib_result.status == EDLIB_STATUS_OK && edlib_result.editDistance != -1) {
         if constexpr (DEBUG) {
-            spdlog::debug("Best adapter match edit distance: {} ; is middle {}",
-                          edlib_result.editDistance,
-                          abs(int(span / 2) - edlib_result.startLocations[0]) < 1000);
+            spdlog::debug("Finding adapter in range: [{}, {}]", subrange.first, subrange.second),
+                    spdlog::debug("Best adapter match edit distance: {} ; is middle {}",
+                                  edlib_result.editDistance,
+                                  abs(int(span / 2) - edlib_result.startLocations[0]) < 1000);
             spdlog::debug("Match location: ({}, {})", edlib_result.startLocations[0] + shift,
                           edlib_result.endLocations[0] + shift + 1);
             spdlog::debug("\n{}", utils::print_alignment(adapter.c_str(), seq.c_str() + shift,
@@ -363,13 +364,15 @@ PosRanges DuplexSplitNode::possible_pore_regions(const DuplexSplitNode::ExtRead&
     spdlog::debug("Analyzing signal in read {}", read.read->read_id);
 
     if constexpr (DEBUG) {
-        spdlog::debug("Max raw signal {} pA, threshold: {}",
-                      (read.data_as_float32 * read.read->scale + read.read->shift)
-                              .index({torch::indexing::Slice(m_settings.expect_pore_prefix,
-                                                             torch::indexing::None)})
-                              .max()
-                              .item<float>(),
-                      pore_thr);
+        const auto max_val =
+                (m_settings.expect_pore_prefix >= read.read->raw_data.size(0))
+                        ? 0.0f
+                        : (read.data_as_float32 * read.read->scale + read.read->shift)
+                                  .index({torch::indexing::Slice(m_settings.expect_pore_prefix,
+                                                                 torch::indexing::None)})
+                                  .max()
+                                  .item<float>();
+        spdlog::debug("Max raw signal {} pA, threshold: {}", max_val, pore_thr);
     }
 
     auto pore_sample_ranges = detect_pore_signal(
@@ -423,16 +426,16 @@ bool DuplexSplitNode::check_flank_match(const Read& read, PosRange r, int dist_t
 std::optional<DuplexSplitNode::PosRange> DuplexSplitNode::identify_extra_middle_split(
         const Read& read) const {
     const auto r_l = read.seq.size();
-    if (r_l < m_settings.end_flank + m_settings.start_flank ||
-        r_l < m_settings.middle_adapter_search_span) {
+    const auto search_span = std::max(m_settings.middle_adapter_search_span,
+                                      int(std::round(m_settings.middle_adapter_search_frac * r_l)));
+    if (r_l < m_settings.end_flank + m_settings.start_flank || r_l < search_span) {
         return std::nullopt;
     }
 
     spdlog::trace("Searching for adapter match");
     if (auto adapter_match = find_best_adapter_match(
                 m_settings.adapter, read.seq, m_settings.relaxed_adapter_edist,
-                {r_l / 2 - m_settings.middle_adapter_search_span / 2,
-                 r_l / 2 + m_settings.middle_adapter_search_span / 2})) {
+                {r_l / 2 - search_span / 2, r_l / 2 + search_span / 2})) {
         auto adapter_start = adapter_match->first;
         spdlog::trace("Checking middle match & start/end match");
         if (check_flank_match(read, {adapter_start, adapter_start},

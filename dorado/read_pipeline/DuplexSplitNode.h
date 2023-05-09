@@ -25,6 +25,7 @@ struct DuplexSplitSettings {
     //in samples
     uint64_t expect_pore_prefix = 5000;
     int middle_adapter_search_span = 1000;
+    float middle_adapter_search_frac = 0.2;
 
     //TODO put in config
     //TODO use string_view into a shared adapter string when we have it
