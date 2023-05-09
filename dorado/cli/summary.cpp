@@ -112,104 +112,111 @@ int summary(int argc, char *argv[]) {
                   << template_duration << separator << seqlen << separator << mean_qscore;
 
         if (reader.is_aligned &&
-            !(reader.record->core.flag & (BAM_FSECONDARY | BAM_FSUPPLEMENTARY | BAM_FUNMAP))) {
-            //  ['*', -1, -1, -1, -1, '*', 0, 0, 0, 0, 0, 0, 0, 0.0, 0.0, 0.0]
-
-            std::string alignment_genome = reader.header->target_name[reader.record->core.tid];
-
-            int32_t alignment_genome_start = reader.record->core.pos;
-            int32_t alignment_genome_end = bam_endpos(reader.record.get());
-
-            // Depends on whether the read is aligned to the forward or reverse strand.
-            int32_t alignment_strand_start =
-                    bam_is_rev(reader.record) ? alignment_genome_end : alignment_genome_start;
-            int32_t alignment_strand_end =
-                    bam_is_rev(reader.record) ? alignment_genome_start : alignment_genome_end;
-
-            std::string alignment_direction = bam_is_rev(reader.record) ? "-" : "+";
-            int32_t alignment_length = reader.record->core.l_qseq;
-
-            uint32_t *cigar = bam_get_cigar(reader.record);
-            int n_cigar = reader.record->core.n_cigar;
-
-            // Initialize counts
+            !(reader.record->core.flag & (BAM_FSECONDARY | BAM_FSUPPLEMENTARY))) {
+            int32_t query_start = 0;
+            int32_t query_end = 0;
+            std::string alignment_genome = "*";
+            int32_t alignment_genome_start = -1;
+            int32_t alignment_genome_end = -1;
+            int32_t alignment_strand_start = -1;
+            int32_t alignment_strand_end = -1;
+            std::string alignment_direction = "*";
+            int32_t alignment_length = 0;
+            int32_t alignment_mapq = 0;
             int alignment_num_aligned = 0;
-            int alignment_num_correct = 0;  // Requires MD tag
+            int alignment_num_correct = 0;
             int alignment_num_insertions = 0;
             int alignment_num_deletions = 0;
-            int alignment_num_substitutions = 0;  // Requires MD tag
+            int alignment_num_substitutions = 0;
+            float strand_coverage = 0.0;
+            float alignment_identity = 0.0;
+            float alignment_accurary = 0.0;
 
-            int32_t query_start =
-                    reader.record->core
-                            .pos;  // 0-based leftmost position of the alignment in the reference
-            int32_t query_end = bam_endpos(reader.record.get());
+            if (!(reader.record->core.flag & BAM_FUNMAP)) {
+                query_start = reader.record->core.pos;
+                query_end = bam_endpos(reader.record.get());
 
-            for (int i = 0; i < n_cigar; ++i) {
-                int op = bam_cigar_op(cigar[i]);
-                int op_len = bam_cigar_oplen(cigar[i]);
+                alignment_mapq = static_cast<int>(reader.record->core.qual);
+                alignment_genome = reader.header->target_name[reader.record->core.tid];
 
-                switch (op) {
-                case BAM_CMATCH:
-                    alignment_num_aligned += op_len;
-                    break;
-                case BAM_CINS:
-                    alignment_num_insertions += op_len;
-                    break;
-                case BAM_CDEL:
-                    alignment_num_deletions += op_len;
-                    break;
-                default:
-                    break;
-                }
-            }
+                alignment_genome_start = reader.record->core.pos;
+                alignment_genome_end = bam_endpos(reader.record.get());
 
-            uint8_t *md_ptr = bam_aux_get(reader.record.get(), "MD");
+                alignment_strand_start =
+                        bam_is_rev(reader.record) ? alignment_genome_end : alignment_genome_start;
+                alignment_strand_end =
+                        bam_is_rev(reader.record) ? alignment_genome_start : alignment_genome_end;
 
-            if (md_ptr) {
-                char *md = bam_aux2Z(md_ptr);
+                alignment_direction = bam_is_rev(reader.record) ? "-" : "+";
+                alignment_length = reader.record->core.l_qseq;
 
-                int md_length = 0;
-                int i = 0;
-                while (md[i]) {
-                    if (std::isdigit(md[i])) {
-                        md_length = md_length * 10 + (md[i] - '0');
-                    } else {
-                        if (md[i] == '^') {
-                            // Skip deletions
-                            i++;
-                            while (md[i] && !std::isdigit(md[i])) {
-                                i++;
-                            }
-                        } else {
-                            // Substitution found
-                            alignment_num_substitutions++;
-                            md_length++;
-                        }
+                uint32_t *cigar = bam_get_cigar(reader.record);
+                int n_cigar = reader.record->core.n_cigar;
+
+                for (int i = 0; i < n_cigar; ++i) {
+                    int op = bam_cigar_op(cigar[i]);
+                    int op_len = bam_cigar_oplen(cigar[i]);
+
+                    switch (op) {
+                    case BAM_CMATCH:
+                        alignment_num_aligned += op_len;
+                        break;
+                    case BAM_CINS:
+                        alignment_num_insertions += op_len;
+                        break;
+                    case BAM_CDEL:
+                        alignment_num_deletions += op_len;
+                        break;
+                    default:
+                        break;
                     }
-                    i++;
                 }
-            }
-            alignment_num_correct = alignment_num_aligned - alignment_num_substitutions;
 
-            float alignment_idn = alignment_num_correct / static_cast<float>(alignment_num_aligned);
-            float alignment_acc = alignment_num_correct /
-                                  static_cast<float>(alignment_genome_end - alignment_genome_start);
-            float strand_coverage = (query_start - query_end) / static_cast<float>(seqlen);
+                uint8_t *md_ptr = bam_aux_get(reader.record.get(), "MD");
+
+                if (md_ptr) {
+                    char *md = bam_aux2Z(md_ptr);
+
+                    int md_length = 0;
+                    int i = 0;
+                    while (md[i]) {
+                        if (std::isdigit(md[i])) {
+                            md_length = md_length * 10 + (md[i] - '0');
+                        } else {
+                            if (md[i] == '^') {
+                                // Skip deletions
+                                i++;
+                                while (md[i] && !std::isdigit(md[i])) {
+                                    i++;
+                                }
+                            } else {
+                                // Substitution found
+                                alignment_num_substitutions++;
+                                md_length++;
+                            }
+                        }
+                        i++;
+                    }
+                }
+                alignment_num_correct = alignment_num_aligned - alignment_num_substitutions;
+
+                alignment_identity =
+                        alignment_num_correct / static_cast<float>(alignment_num_aligned);
+                alignment_accurary =
+                        alignment_num_correct /
+                        static_cast<float>(alignment_genome_end - alignment_genome_start);
+                strand_coverage = (query_end - query_start) / static_cast<float>(seqlen);
+            }
 
             std::cout << separator << alignment_genome << separator << alignment_genome_start
                       << separator << alignment_genome_end << separator << alignment_strand_start
                       << separator << alignment_strand_end << separator << alignment_direction
-                      << separator
-
-                      << alignment_genome_end - alignment_genome_start << separator  // length
-                      << alignment_num_aligned << separator                          // matches
-                      << alignment_num_correct << separator                          // correct
-
+                      << separator << alignment_genome_end - alignment_genome_start << separator
+                      << alignment_num_aligned << separator << alignment_num_correct << separator
                       << alignment_num_insertions << separator << alignment_num_deletions
-                      << separator << alignment_num_substitutions << separator
-
-                      << static_cast<int>(reader.record->core.qual) << separator << strand_coverage
-                      << separator << alignment_idn << separator << alignment_acc;
+                      << separator << alignment_num_substitutions << separator << alignment_mapq
+                      << separator << strand_coverage << separator << alignment_identity
+                      << separator << alignment_accurary;
         }
 
         std::cout << '\n';
