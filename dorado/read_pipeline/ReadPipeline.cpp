@@ -153,7 +153,7 @@ std::vector<BamPtr> Read::extract_sam_lines(bool emit_moves,
     return alns;
 }
 
-unsigned long long int Read::get_end_time_ms() {
+uint64_t Read::get_end_time_ms() {
     return start_time_ms +
            (attributes.num_samples * 1000) / sample_rate;  //TODO get rid of the trimmed thing?
 }

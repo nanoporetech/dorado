@@ -31,8 +31,7 @@ private:
     std::mutex m_read_cache_mutex;
 
     std::atomic<int> m_num_worker_threads;
-    bool is_within_time_and_length_criteria(const std::shared_ptr<Read>& read1,
-                                            const std::shared_ptr<Read>& read2);
+
     std::map<std::string, std::shared_ptr<Read>> read_cache;
 
     std::map<std::tuple<int, int, std::string, std::string>, std::list<std::shared_ptr<Read>>>
@@ -41,7 +40,7 @@ private:
     std::mutex
             m_channel_mux_read_map_mtx;  //TODO: Need to santiy check if this is thread-safe, should be static
 
-    std::list<std::tuple<int, int, std::string, std::string>> m_working_channel_mux_key_list;
+    std::deque<std::tuple<int, int, std::string, std::string>> m_working_channel_mux_keys;
     std::mutex m_working_channel_mux_key_list_mtx;
 };
 

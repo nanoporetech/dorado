@@ -63,8 +63,8 @@ public:
 
     uint64_t sample_rate;  // Loaded from source file
 
-    unsigned long long int start_time_ms;
-    unsigned long long int get_end_time_ms();
+    uint64_t start_time_ms;
+    uint64_t get_end_time_ms();
 
     float shift;  // To be set by scaler
     float scale;  // To be set by scaler

@@ -1,9 +1,7 @@
 #include "PairingNode.h"
-
-namespace dorado {
-
-bool PairingNode::is_within_time_and_length_criteria(const std::shared_ptr<Read>& read1,
-                                                     const std::shared_ptr<Read>& read2) {
+namespace {
+bool is_within_time_and_length_criteria(const std::shared_ptr<dorado::Read>& read1,
+                                        const std::shared_ptr<dorado::Read>& read2) {
     int max_time_delta_ms = 5000;
     float min_seq_len_ratio = 0.9f;
     int delta = read2->start_time_ms - read1->get_end_time_ms();
@@ -13,6 +11,9 @@ bool PairingNode::is_within_time_and_length_criteria(const std::shared_ptr<Read>
                       static_cast<float>(std::max(seq_len1, seq_len2));
     return (delta < max_time_delta_ms) && len_ratio >= min_seq_len_ratio;
 }
+}  // namespace
+
+namespace dorado {
 
 void PairingNode::pair_list_worker_thread() {
     Message message;
@@ -75,8 +76,7 @@ void PairingNode::pair_list_worker_thread() {
             }
         }
     }
-    int num_worker_threads = --m_num_worker_threads;
-    if (num_worker_threads == 0) {
+    if (--m_num_worker_threads == 0) {
         m_sink.terminate();
     }
 }
@@ -99,25 +99,25 @@ void PairingNode::pair_generating_worker_thread() {
             KeyType key = std::make_tuple(channel, mux, run_id, flowcell_id);
 
             // Check if the key is already in the list
-            auto found = std::find(m_working_channel_mux_key_list.begin(),
-                                   m_working_channel_mux_key_list.end(), key);
+            auto found = std::find(m_working_channel_mux_keys.begin(),
+                                   m_working_channel_mux_keys.end(), key);
 
-            if (found == m_working_channel_mux_key_list.end()) {
-                // Key is not in the list
+            if (found == m_working_channel_mux_keys.end()) {
+                // Key is not in the dequeue
 
-                if (m_working_channel_mux_key_list.size() >= max_num_keys) {
+                if (m_working_channel_mux_keys.size() >= max_num_keys) {
                     // Remove the oldest key (front of the list)
-                    auto oldest_key = m_working_channel_mux_key_list.front();
+                    auto oldest_key = m_working_channel_mux_keys.front();
                     std::scoped_lock<std::mutex> m_working_channel_mux_key_list_lock(
                             m_working_channel_mux_key_list_mtx);
-                    m_working_channel_mux_key_list.pop_front();
+                    m_working_channel_mux_keys.pop_front();
                     std::scoped_lock<std::mutex> m_channel_mux_read_map_lock(
                             m_channel_mux_read_map_mtx);
                     // Remove the oldest key from the map
                     channel_mux_read_map.erase(oldest_key);
                 }
                 // Add the new key to the end of the list
-                m_working_channel_mux_key_list.push_back(key);
+                m_working_channel_mux_keys.push_back(key);
             }
             return key;
         };
