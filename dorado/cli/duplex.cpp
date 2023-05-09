@@ -4,6 +4,7 @@
 #include "nn/CRFModel.h"
 #include "read_pipeline/BaseSpaceDuplexCallerNode.h"
 #include "read_pipeline/BasecallerNode.h"
+#include "read_pipeline/DuplexSplitNode.h"
 #include "read_pipeline/PairingNode.h"
 #include "read_pipeline/ReadFilterNode.h"
 #include "read_pipeline/ReadToBamTypeNode.h"
@@ -292,11 +293,15 @@ int duplex(int argc, char* argv[]) {
                                              ? std::optional<std::map<std::string, std::string>>{}
                                              : template_complement_map);
 
+            DuplexSplitSettings splitter_settings;
+            //splitter_settings.enabled = false;
+            DuplexSplitNode splitter_node(pairing_node, splitter_settings, num_devices);
+
             auto adjusted_simplex_overlap = (overlap / simplex_model_stride) * simplex_model_stride;
 
             const int kSimplexBatchTimeoutMS = 100;
             auto basecaller_node = std::make_unique<BasecallerNode>(
-                    pairing_node, std::move(runners), adjusted_simplex_overlap,
+                    splitter_node, std::move(runners), adjusted_simplex_overlap,
                     kSimplexBatchTimeoutMS);
 
             ScalerNode scaler_node(*basecaller_node, num_devices * 2);
