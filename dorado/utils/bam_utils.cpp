@@ -39,7 +39,7 @@ Aligner::Aligner(MessageSink& sink, const std::string& filename, int k, int w, i
 
     // Set batch sizes large enough to not require chunking since that's
     // not supported yet.
-    m_idx_opt.batch_size = 4000000000;
+    m_idx_opt.batch_size = 16000000000;
     m_idx_opt.mini_batch_size = 16000000000;
 
     // Force cigar generation.
@@ -434,7 +434,7 @@ void HtsWriter::worker_thread() {
     if (m_num_reads_expected != 0) {
         m_progress_bar.set_progress(0.0f);
     } else {
-        std::cerr << "\r> Alignments written: " << write_count;
+        std::cerr << "\r> Output records written: " << write_count;
     }
 
     Message message;
@@ -457,7 +457,7 @@ void HtsWriter::worker_thread() {
                 float progress = 100.f * static_cast<float>(write_count) / m_num_reads_expected;
                 m_progress_bar.set_progress(progress);
             } else {
-                std::cerr << "\r> Alignments written: " << write_count;
+                std::cerr << "\r> Output records written: " << write_count;
             }
         }
     }
@@ -465,7 +465,7 @@ void HtsWriter::worker_thread() {
     if (m_num_reads_expected != 0 || write_count >= m_progress_bar_interval) {
         std::cerr << "\r";
     }
-    spdlog::debug("Written {} alignments.", write_count);
+    spdlog::debug("Written {} records.", write_count);
 }
 
 int HtsWriter::write(bam1_t* record) {
