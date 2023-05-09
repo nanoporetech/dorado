@@ -1,4 +1,4 @@
-set(TORCH_VERSION 1.13.1)
+set(TORCH_VERSION 2.0.0)
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32)
     find_package(CUDAToolkit REQUIRED)
@@ -19,7 +19,8 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32)
 
     # use python3 to compute shorthash for libnvrtc.so
     # https://github.com/pytorch/pytorch/blob/7289d22d6749465d3bae2cb5a6ce04729318f55b/cmake/public/cuda.cmake#L173
-    set(PYTHON_EXECUTABLE "python3")
+    find_package(Python3 COMPONENTS "Interpreter" REQUIRED)
+    set(PYTHON_EXECUTABLE ${Python3_EXECUTABLE})
 
     set(CUDNN_LIBRARY_PATH ${DORADO_3RD_PARTY}/fake_cudnn/libcudnn.a)
     set(CUDNN_INCLUDE_PATH ${DORADO_3RD_PARTY}/fake_cudnn)
@@ -49,10 +50,12 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         endif()
     else()
         if(DORADO_USING_OLD_CPP_ABI)
-            set(TORCH_URL https://download.pytorch.org/libtorch/cu117/libtorch-shared-with-deps-${TORCH_VERSION}%2Bcu117.zip)
+            set(TORCH_URL https://download.pytorch.org/libtorch/cu118/libtorch-shared-with-deps-${TORCH_VERSION}%2Bcu118.zip)
+
             set(TORCH_LIB "${DORADO_3RD_PARTY}/torch-no-cxx11-abi-${TORCH_VERSION}-${CMAKE_SYSTEM_NAME}/libtorch")
         else()
-            set(TORCH_URL https://download.pytorch.org/libtorch/cu117/libtorch-cxx11-abi-shared-with-deps-${TORCH_VERSION}%2Bcu117.zip)
+            set(TORCH_URL https://download.pytorch.org/libtorch/cu118/libtorch-cxx11-abi-shared-with-deps-${TORCH_VERSION}%2Bcu118.zip)
+
             set(TORCH_LIB "${DORADO_3RD_PARTY}/torch-${TORCH_VERSION}-${CMAKE_SYSTEM_NAME}/libtorch")
         endif()
     endif()
@@ -61,12 +64,15 @@ elseif(APPLE)
     if (CMAKE_SYSTEM_NAME STREQUAL "iOS")
         set(TORCH_URL https://nanoporetech.box.com/shared/static/nzdq2wk45pzbwi2zex92j28dt3s5k9vt.tgz)
         set(TORCH_LIB "${DORADO_3RD_PARTY}/torch-${TORCH_VERSION}-${CMAKE_SYSTEM_NAME}")
+    elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
+        set(TORCH_URL https://download.pytorch.org/whl/cpu/torch-${TORCH_VERSION}-cp39-none-macosx_10_9_x86_64.whl)
+        set(TORCH_LIB "${DORADO_3RD_PARTY}/torch-${TORCH_VERSION}-${CMAKE_SYSTEM_NAME}/torch")
     else()
-        set(TORCH_URL https://files.pythonhosted.org/packages/2d/ab/8210e877debc6e16c5f64345b08abfd667ade733329ef8b38dd06a362513/torch-${TORCH_VERSION}-cp39-none-macosx_11_0_arm64.whl)
+        set(TORCH_URL https://files.pythonhosted.org/packages/4d/80/760f3edcf0179c3111fae496b97ee3fa9171116b4bccae6e073efe928e72/torch-${TORCH_VERSION}-cp39-none-macosx_11_0_arm64.whl)
         set(TORCH_LIB "${DORADO_3RD_PARTY}/torch-${TORCH_VERSION}-${CMAKE_SYSTEM_NAME}/torch")
     endif()
 elseif(WIN32)
-    set(TORCH_URL https://download.pytorch.org/libtorch/cu117/libtorch-win-shared-with-deps-${TORCH_VERSION}%2Bcu117.zip)
+    set(TORCH_URL https://download.pytorch.org/libtorch/cu118/libtorch-win-shared-with-deps-${TORCH_VERSION}%2Bcu118.zip)
     set(TORCH_LIB "${DORADO_3RD_PARTY}/torch-${TORCH_VERSION}-${CMAKE_SYSTEM_NAME}/libtorch")
     add_compile_options(
         # Note we need to use the generator expression to avoid setting this for CUDA.
@@ -87,6 +93,26 @@ else()
         download_and_extract(${TORCH_URL} torch-${TORCH_VERSION}-${CMAKE_SYSTEM_NAME})
     endif()
     list(APPEND CMAKE_PREFIX_PATH "${TORCH_LIB}")
+endif()
+
+if (APPLE AND CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
+    # For some reason the RPATHs of the dylibs are pointing to the libiomp5.dylib in functools rather
+    # than the one that's next to them, so correct that here before we import the package.
+    file(GLOB TORCH_DYLIBS "${TORCH_LIB}/lib/*.dylib")
+    foreach(TORCH_DYLIB IN LISTS TORCH_DYLIBS)
+        execute_process(
+            COMMAND
+                ${CMAKE_INSTALL_NAME_TOOL}
+                -change "@loader_path/../../functorch/.dylibs/libiomp5.dylib" "@loader_path/libiomp5.dylib"
+                ${TORCH_DYLIB}
+            RESULT_VARIABLE RETVAL
+            OUTPUT_VARIABLE OUTPUT
+            ERROR_VARIABLE ERRORS
+        )
+        if (NOT RETVAL EQUAL 0)
+            message(FATAL_ERROR "Error running ${CMAKE_INSTALL_NAME_TOOL}: ${RETVAL}\nOUTPUT=${OUTPUT}\nERRORS=${ERRORS}")
+        endif()
+    endforeach()
 endif()
 
 find_package(Torch REQUIRED)

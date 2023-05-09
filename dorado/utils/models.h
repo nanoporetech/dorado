@@ -1,5 +1,6 @@
 #include <filesystem>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace dorado {
@@ -47,6 +48,11 @@ static const std::vector<std::string> models = {
         "dna_r10.4.1_e8.2_400bps_hac@v4.1.0",
         "dna_r10.4.1_e8.2_400bps_sup@v4.1.0",
 
+        // v4.2.0
+        "dna_r10.4.1_e8.2_400bps_fast@v4.2.0",
+        "dna_r10.4.1_e8.2_400bps_hac@v4.2.0",
+        "dna_r10.4.1_e8.2_400bps_sup@v4.2.0",
+
         // RNA003
         "rna003_120bps_sup@v3",
 };
@@ -55,9 +61,12 @@ static const std::vector<std::string> models = {
 
 namespace stereo {
 
-static const std::vector<std::string> models = {"dna_r10.4.1_e8.2_4khz_stereo@v1.1"};
+static const std::vector<std::string> models = {
+        "dna_r10.4.1_e8.2_4khz_stereo@v1.1",
+        "dna_r10.4.1_e8.2_5khz_stereo@v1.0",
+};
 
-}
+}  // namespace stereo
 
 namespace modified {
 
@@ -91,11 +100,33 @@ static const std::vector<std::string> models = {
         "dna_r10.4.1_e8.2_400bps_hac@v4.0.0_5mCG_5hmCG@v2",
         "dna_r10.4.1_e8.2_400bps_sup@v4.0.0_5mCG_5hmCG@v2",
 
+        // v4.1.0
+        "dna_r10.4.1_e8.2_260bps_fast@v4.1.0_5mCG_5hmCG@v2",
+        "dna_r10.4.1_e8.2_260bps_hac@v4.1.0_5mCG_5hmCG@v2",
+        "dna_r10.4.1_e8.2_260bps_sup@v4.1.0_5mCG_5hmCG@v2",
+
+        "dna_r10.4.1_e8.2_400bps_fast@v4.1.0_5mCG_5hmCG@v2",
+        "dna_r10.4.1_e8.2_400bps_hac@v4.1.0_5mCG_5hmCG@v2",
+        "dna_r10.4.1_e8.2_400bps_sup@v4.1.0_5mCG_5hmCG@v2",
+
 };
 
 }  // namespace modified
 
 namespace utils {
+
+static const std::unordered_map<std::string, uint16_t> sample_rate_by_model = {
+
+        //------ simplex ---------//
+        // v4.2
+        {"dna_r10.4.1_e8.2_5khz_400bps_fast@v4.2.0", 5000},
+        {"dna_r10.4.1_e8.2_5khz_400bps_hac@v4.2.0", 5000},
+        {"dna_r10.4.1_e8.2_5khz_400bps_sup@v4.2.0", 5000},
+
+        //------ duplex ---------//
+        // v4.2
+        {"dna_r10.4.1_e8.2_5khz_stereo@v1.0", 5000},
+};
 
 bool is_rna_model(const std::filesystem::path& model);
 bool is_valid_model(const std::string& selected_model);
@@ -106,6 +137,10 @@ void download_models(const std::string& target_directory, const std::string& sel
 // model then it is downloaded.
 std::string get_modification_model(const std::string& simplex_model,
                                    const std::string& modification);
+
+// fetch the sampling rate that the model is compatible with. for models not
+// present in the mapping, assume a sampling rate of 4000.
+uint16_t get_sample_rate_by_model_name(const std::string& model_name);
 
 }  // namespace utils
 

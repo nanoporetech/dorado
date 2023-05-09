@@ -37,3 +37,6 @@
 [submodule "dorado/3rdparty/indicators"]
 	path = dorado/3rdparty/indicators
 	url = https://github.com/p-ranav/indicators.git
+[submodule "dorado/3rdparty/ont-minimap2"]
+	path = dorado/3rdparty/ont-minimap2
+	url = https://github.com/nanoporetech/ont-minimap2.git

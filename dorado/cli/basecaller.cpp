@@ -1,97 +1,116 @@
 #include "Version.h"
 #include "data_loader/DataLoader.h"
 #include "decode/CPUDecoder.h"
+#include "nn/CRFModel.h"
 #include "utils/basecaller_utils.h"
 #include "utils/models.h"
+#if DORADO_GPU_BUILD
 #ifdef __APPLE__
 #include "nn/MetalCRFModel.h"
-#include "utils/metal_utils.h"
 #else
 #include "nn/CudaCRFModel.h"
 #include "utils/cuda_utils.h"
 #endif
+#endif  // DORADO_GPU_BUILD
 #include "nn/ModelRunner.h"
 #include "nn/RemoraModel.h"
 #include "read_pipeline/BasecallerNode.h"
 #include "read_pipeline/DuplexSplitNode.h"
 #include "read_pipeline/ModBaseCallerNode.h"
+#include "read_pipeline/ReadFilterNode.h"
+#include "read_pipeline/ReadToBamTypeNode.h"
 #include "read_pipeline/ScalerNode.h"
-#include "read_pipeline/WriterNode.h"
+#include "read_pipeline/StatsCounter.h"
+#include "utils/bam_utils.h"
+#include "utils/cli_utils.h"
 #include "utils/log_utils.h"
 #include "utils/parameters.h"
 
 #include <argparse.hpp>
+#include <htslib/sam.h>
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <filesystem>
 #include <iostream>
+#include <memory>
 #include <sstream>
 #include <thread>
 
 namespace dorado {
+
+using HtsWriter = utils::HtsWriter;
+using HtsReader = utils::HtsReader;
 
 void setup(std::vector<std::string> args,
            const std::filesystem::path& model_path,
            const std::string& data_path,
            const std::string& remora_models,
            const std::string& device,
+           const std::string& ref,
            size_t chunk_size,
            size_t overlap,
            size_t batch_size,
            size_t num_runners,
            size_t remora_batch_size,
            size_t num_remora_threads,
-           bool emit_fastq,
+           HtsWriter::OutputMode output_mode,
            bool emit_moves,
            size_t max_reads,
            size_t min_qscore,
-           std::string read_list_file_path) {
+           std::string read_list_file_path,
+           bool recursive_file_loading,
+           int kmer_size,
+           int window_size) {
     torch::set_num_threads(1);
     std::vector<Runner> runners;
 
+    // Default is 1 device.  CUDA path may alter this.
     int num_devices = 1;
 
     if (device == "cpu") {
-        batch_size = batch_size == 0 ? std::thread::hardware_concurrency() : batch_size;
+        if (batch_size == 0) {
+            batch_size = std::thread::hardware_concurrency();
+            spdlog::debug("- set batch size to {}", batch_size);
+        }
         for (size_t i = 0; i < num_runners; i++) {
             runners.push_back(std::make_shared<ModelRunner<CPUDecoder>>(model_path, device,
                                                                         chunk_size, batch_size));
         }
+    }
+#if DORADO_GPU_BUILD
 #ifdef __APPLE__
-    } else if (device == "metal") {
-        if (batch_size == 0) {
-            batch_size = utils::auto_gpu_batch_size();
-            spdlog::debug("- selected batchsize {}", batch_size);
-        }
+    else if (device == "metal") {
         auto caller = create_metal_caller(model_path, chunk_size, batch_size);
-        for (int i = 0; i < num_runners; i++) {
-            runners.push_back(std::make_shared<MetalModelRunner>(caller, chunk_size, batch_size));
+        for (size_t i = 0; i < num_runners; i++) {
+            runners.push_back(std::make_shared<MetalModelRunner>(caller));
+        }
+        if (runners.back()->batch_size() != batch_size) {
+            spdlog::debug("- set batch size to {}", runners.back()->batch_size());
         }
     } else {
         throw std::runtime_error(std::string("Unsupported device: ") + device);
     }
 #else   // ifdef __APPLE__
-    } else {
+    else {
         auto devices = utils::parse_cuda_device_string(device);
         num_devices = devices.size();
         if (num_devices == 0) {
             throw std::runtime_error("CUDA device requested but no devices found.");
         }
-        batch_size = batch_size == 0 ? utils::auto_gpu_batch_size(model_path.string(), devices)
-                                     : batch_size;
-
-        spdlog::debug("- selected batchsize {}", batch_size);
-
         for (auto device_string : devices) {
             auto caller = create_cuda_caller(model_path, chunk_size, batch_size, device_string);
             for (size_t i = 0; i < num_runners; i++) {
-                runners.push_back(
-                        std::make_shared<CudaModelRunner>(caller, chunk_size, batch_size));
+                runners.push_back(std::make_shared<CudaModelRunner>(caller));
+            }
+            if (runners.back()->batch_size() != batch_size) {
+                spdlog::debug("- set batch size for {} to {}", device_string,
+                              runners.back()->batch_size());
             }
         }
     }
 #endif  // __APPLE__
+#endif  // DORADO_GPU_BUILD
 
     // verify that all runners are using the same stride, in case we allow multiple models in future
     auto model_stride = runners.front()->model_stride();
@@ -113,8 +132,12 @@ void setup(std::vector<std::string> args,
         overlap = adjusted_overlap;
     }
 
-    if (!remora_models.empty() && emit_fastq) {
+    if (!remora_models.empty() && output_mode == HtsWriter::OutputMode::FASTQ) {
         throw std::runtime_error("Modified base models cannot be used with FASTQ output");
+    }
+
+    if (!ref.empty() && output_mode == HtsWriter::OutputMode::FASTQ) {
+        throw std::runtime_error("Alignment to reference cannot be used with FASTQ output.");
     }
 
     std::vector<std::filesystem::path> remora_model_list;
@@ -127,7 +150,7 @@ void setup(std::vector<std::string> args,
     // generate model callers before nodes or it affects the speed calculations
     std::vector<std::shared_ptr<RemoraCaller>> remora_callers;
 
-#ifndef __APPLE__
+#if DORADO_GPU_BUILD && !defined(__APPLE__)
     if (device != "cpu") {
         auto devices = utils::parse_cuda_device_string(device);
         num_devices = devices.size();
@@ -150,44 +173,83 @@ void setup(std::vector<std::string> args,
     }
 
     std::string model_name = std::filesystem::canonical(model_path).filename().string();
-    auto read_groups = DataLoader::load_read_groups(data_path, model_name);
+    auto read_groups = DataLoader::load_read_groups(data_path, model_name, recursive_file_loading);
 
     auto read_list = utils::load_read_list(read_list_file_path);
 
-    size_t num_reads = DataLoader::get_num_reads(data_path, read_list);
+    // Check sample rate of model vs data.
+    auto data_sample_rate = DataLoader::get_sample_rate(data_path, recursive_file_loading);
+    auto model_sample_rate = get_model_sample_rate(model_path);
+    if (data_sample_rate != model_sample_rate) {
+        std::stringstream err;
+        err << "Sample rate for model (" << model_sample_rate << ") and data (" << data_sample_rate
+            << ") don't match.";
+        throw std::runtime_error(err.str());
+    }
+
+    size_t num_reads = DataLoader::get_num_reads(data_path, read_list, recursive_file_loading);
     num_reads = max_reads == 0 ? num_reads : std::min(num_reads, max_reads);
 
     bool rna = utils::is_rna_model(model_path), duplex = false;
-    WriterNode writer_node(std::move(args), emit_fastq, emit_moves, rna, duplex, min_qscore,
-                           num_devices * 2, std::move(read_groups), num_reads);
+
+    auto const thread_allocations = utils::default_thread_allocations(
+            num_devices, !remora_model_list.empty() ? num_remora_threads : 0);
+
+    std::unique_ptr<sam_hdr_t, void (*)(sam_hdr_t*)> hdr(sam_hdr_init(), sam_hdr_destroy);
+    utils::add_pg_hdr(hdr.get(), args);
+    utils::add_rg_hdr(hdr.get(), read_groups);
+    std::shared_ptr<HtsWriter> bam_writer;
+    std::shared_ptr<utils::Aligner> aligner;
+    MessageSink* converted_reads_sink = nullptr;
+    if (ref.empty()) {
+        bam_writer = std::make_shared<HtsWriter>("-", output_mode,
+                                                 thread_allocations.writer_threads, num_reads);
+        bam_writer->add_header(hdr.get());
+        bam_writer->write_header();
+        converted_reads_sink = bam_writer.get();
+    } else {
+        bam_writer = std::make_shared<HtsWriter>("-", output_mode,
+                                                 thread_allocations.writer_threads, num_reads);
+        aligner = std::make_shared<utils::Aligner>(*bam_writer, ref, kmer_size, window_size,
+                                                   thread_allocations.aligner_threads);
+        utils::add_sq_hdr(hdr.get(), aligner->get_sequence_records_for_header());
+        bam_writer->add_header(hdr.get());
+        bam_writer->write_header();
+        converted_reads_sink = aligner.get();
+    }
+    ReadToBamType read_converter(*converted_reads_sink, emit_moves, rna, duplex,
+                                 thread_allocations.read_converter_threads);
+    StatsCounterNode stats_node(read_converter, duplex);
+    ReadFilterNode read_filter_node(stats_node, min_qscore, thread_allocations.read_filter_threads);
 
     std::unique_ptr<DuplexSplitNode> splitter_node;
     std::unique_ptr<ModBaseCallerNode> mod_base_caller_node;
-    std::unique_ptr<BasecallerNode> basecaller_node;
-
+    MessageSink* basecaller_node_sink = nullptr;
     if (!remora_model_list.empty()) {
-        //FIXME use splitter_node here as well
         mod_base_caller_node = std::make_unique<ModBaseCallerNode>(
-                writer_node, std::move(remora_callers), num_remora_threads, num_devices,
-                model_stride, remora_batch_size);
-        basecaller_node = std::make_unique<BasecallerNode>(
-                *mod_base_caller_node, std::move(runners), batch_size, chunk_size, overlap,
-                model_stride, model_name);
+                read_filter_node, std::move(remora_callers), thread_allocations.remora_threads,
+                num_devices, model_stride, remora_batch_size);
+        basecaller_node_sink = static_cast<MessageSink*>(mod_base_caller_node.get());
     } else {
         //TODO add separate factory methods for simplex/duplex modes
         DuplexSplitSettings splitter_settings;
         splitter_settings.simplex_mode = true;
         splitter_node =
-                std::make_unique<DuplexSplitNode>(writer_node, splitter_settings, num_devices);
+                std::make_unique<DuplexSplitNode>(read_filter_node, splitter_settings, num_devices);
 
-        basecaller_node =
-                std::make_unique<BasecallerNode>(*splitter_node, std::move(runners), batch_size,
-                                                 chunk_size, overlap, model_stride, model_name);
+        basecaller_node_sink = static_cast<MessageSink*>(splitter_node.get());
     }
-    ScalerNode scaler_node(*basecaller_node, num_devices * 2);
-    DataLoader loader(scaler_node, "cpu", num_devices, max_reads, read_list);
+    const int kBatchTimeoutMS = 100;
+    BasecallerNode basecaller_node(*basecaller_node_sink, std::move(runners), overlap,
+                                   kBatchTimeoutMS, model_name);
+    ScalerNode scaler_node(basecaller_node, thread_allocations.scaler_node_threads);
 
-    loader.load_reads(data_path);
+    DataLoader loader(scaler_node, "cpu", thread_allocations.loader_threads, max_reads, read_list);
+
+    loader.load_reads(data_path, recursive_file_loading);
+
+    bam_writer->join();
+    stats_node.dump_stats();
 }
 
 int basecaller(int argc, char* argv[]) {
@@ -204,7 +266,8 @@ int basecaller(int argc, char* argv[]) {
     parser.add_argument("-v", "--verbose").default_value(false).implicit_value(true);
 
     parser.add_argument("-x", "--device")
-            .help("device string in format \"cuda:0,...,N\", \"cuda:all\", \"metal\" etc..")
+            .help("device string in format \"cuda:0,...,N\", \"cuda:all\", \"metal\", \"cpu\" "
+                  "etc..")
             .default_value(default_parameters.device);
 
     parser.add_argument("-l", "--read-ids")
@@ -229,9 +292,10 @@ int basecaller(int argc, char* argv[]) {
             .default_value(default_parameters.overlap)
             .scan<'i', int>();
 
-    parser.add_argument("-r", "--num_runners")
-            .default_value(default_parameters.num_runners)
-            .scan<'i', int>();
+    parser.add_argument("-r", "--recursive")
+            .default_value(false)
+            .implicit_value(true)
+            .help("Recursively scan through directories to load FAST5 and POD5 files");
 
     parser.add_argument("--modified-bases")
             .nargs(argparse::nargs_pattern::at_least_one)
@@ -253,9 +317,28 @@ int basecaller(int argc, char* argv[]) {
             .default_value(std::string())
             .help("a comma separated list of modified base models");
 
-    parser.add_argument("--emit-fastq").default_value(false).implicit_value(true);
+    parser.add_argument("--emit-fastq")
+            .help("Output in fastq format.")
+            .default_value(false)
+            .implicit_value(true);
+    parser.add_argument("--emit-sam")
+            .help("Output in SAM format.")
+            .default_value(false)
+            .implicit_value(true);
 
     parser.add_argument("--emit-moves").default_value(false).implicit_value(true);
+
+    parser.add_argument("--reference")
+            .help("Path to reference for alignment.")
+            .default_value(std::string(""));
+    parser.add_argument("-k")
+            .help("k-mer size for alignment with minimap2 (maximum 28).")
+            .default_value(15)
+            .scan<'i', int>();
+    parser.add_argument("-w")
+            .help("minimizer window size for alignment with minimap2.")
+            .default_value(10)
+            .scan<'i', int>();
 
     try {
         parser.parse_args(argc, argv);
@@ -290,15 +373,34 @@ int basecaller(int argc, char* argv[]) {
                                 [](std::string a, std::string b) { return a + "," + b; });
     }
 
+    auto output_mode = HtsWriter::OutputMode::BAM;
+
+    auto emit_fastq = parser.get<bool>("--emit-fastq");
+    auto emit_sam = parser.get<bool>("--emit-sam");
+
+    if (emit_fastq && emit_sam) {
+        throw std::runtime_error("Only one of --emit-{fastq, sam} can be set (or none).");
+    }
+
+    if (emit_fastq) {
+        output_mode = HtsWriter::OutputMode::FASTQ;
+    } else if (emit_sam || utils::is_fd_tty(stdout)) {
+        output_mode = HtsWriter::OutputMode::SAM;
+    } else if (utils::is_fd_pipe(stdout)) {
+        output_mode = HtsWriter::OutputMode::UBAM;
+    }
+
     spdlog::info("> Creating basecall pipeline");
 
     try {
         setup(args, model, parser.get<std::string>("data"), mod_bases_models,
-              parser.get<std::string>("-x"), parser.get<int>("-c"), parser.get<int>("-o"),
-              parser.get<int>("-b"), parser.get<int>("-r"), default_parameters.remora_batchsize,
-              default_parameters.remora_threads, parser.get<bool>("--emit-fastq"),
-              parser.get<bool>("--emit-moves"), parser.get<int>("--max-reads"),
-              parser.get<int>("--min-qscore"), parser.get<std::string>("--read-ids"));
+              parser.get<std::string>("-x"), parser.get<std::string>("--reference"),
+              parser.get<int>("-c"), parser.get<int>("-o"), parser.get<int>("-b"),
+              default_parameters.num_runners, default_parameters.remora_batchsize,
+              default_parameters.remora_threads, output_mode, parser.get<bool>("--emit-moves"),
+              parser.get<int>("--max-reads"), parser.get<int>("--min-qscore"),
+              parser.get<std::string>("--read-ids"), parser.get<bool>("--recursive"),
+              parser.get<int>("k"), parser.get<int>("w"));
     } catch (const std::exception& e) {
         spdlog::error("{}", e.what());
         return 1;

@@ -7,15 +7,23 @@ stages:
 variables:
   BUILD_DIR: build
   GIT_SUBMODULE_STRATEGY: recursive
-  CUDA: "11.7"
+  CUDA: "11.8"
   WIN_CUDA_TOOLKIT: "/c/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v${CUDA}"
 
 # Build stage components
 
-.macos_runner: &macos_runner
+.macos_m1_runner: &macos_m1_runner
   tags:
     - macos
     - m1
+  variables:
+    MACOSX_DEPLOYMENT_TARGET: "12.0"
+
+.macos_x64_runner: &macos_x64_runner
+  tags:
+    - osx_x86
+  variables:
+    MACOSX_DEPLOYMENT_TARGET: "10.15"
 
 .linux_runner: &linux_runner
   tags:
@@ -51,7 +59,7 @@ variables:
     - echo Dorado build stage
     - cmake ${BUILD_OPTIONS} -S . -B ${BUILD_DIR}
     - cmake --build ${BUILD_DIR} --config Release --target install -j 8
-    - ctest -C Release --test-dir ${BUILD_DIR} --output-on-failure
+    - ctest -C Release --test-dir ${BUILD_DIR} --output-on-failure --verbose
   artifacts:
     paths:
       - dist
@@ -83,7 +91,8 @@ pre-commit:
   script:
     - pip install pre-commit
     - pre-commit run --all-files
-  <<: *linux_runner
+  tags:
+    - linux
 
 # Build stages
 
@@ -95,7 +104,7 @@ build:linux:x86:focal:install_deps:
   when: manual
 
 build:linux:x86:focal:
-  image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.0
+  image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.1
   variables:
     BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/libtorch -DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN}"
   <<: *linux_runner
@@ -117,7 +126,7 @@ build:linux:arm64:focal:
   <<: *build_dorado
 
 build:linux:x86:focal_koi_download:
-  image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.0
+  image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.1
   variables:
     BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/libtorch"
   <<: *linux_runner
@@ -143,17 +152,22 @@ build:windows_koi_download:
 
 build:macos:m1:
   variables:
-  <<: *macos_runner
+  <<: *macos_m1_runner
+  <<: *build_dorado
+
+build:macos:x64:
+  variables:
+  <<: *macos_x64_runner
   <<: *build_dorado
 
 build:ios:m1:
   variables:
     BUILD_OPTIONS: "-DCMAKE_TOOLCHAIN_FILE=cmake/ios-cmake/ios.toolchain.cmake -DPLATFORM=OS64 -DSKIP_HDF_PLUGINS=1 -DDEPLOYMENT_TARGET=16.0"
-  <<: *macos_runner
+  <<: *macos_m1_runner
   <<: *build_dorado_lib_only
 
 build_archive:linux:x86:focal:
-  image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.0
+  image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.1
   variables:
     BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/libtorch -DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN}"
   <<: *linux_runner
@@ -187,7 +201,7 @@ build_archive:linux:arm64:focal:
   when: manual
 
 build_archive:linux:x86:centos7:
-  image: ${DORADO_DOCKER_ROOT}/dorado-deps-centos7-cuda-${CUDA}.0:1.0
+  image: ${DORADO_DOCKER_ROOT}/dorado-deps-centos7-cuda-${CUDA}.0:1.1
   variables:
     BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/libtorch -DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN} -DOPENSSL_ROOT_DIR=/usr/lib64/openssl11/ -DOPENSSL_INCLUDE_DIR=/usr/include/openssl11 -DDORADO_USING_OLD_CPP_ABI=ON -DDYNAMIC_HDF=ON"
   <<: *linux_runner
@@ -205,7 +219,13 @@ build_archive:windows:
 
 build_archive:macos:m1:
   variables:
-  <<: *macos_runner
+  <<: *macos_m1_runner
+  <<: *build_dorado_archive
+  when: manual
+
+build_archive:macos:x64:
+  variables:
+  <<: *macos_x64_runner
   <<: *build_dorado_archive
   when: manual
 
@@ -214,14 +234,23 @@ build_archive:macos:m1:
 .test_dorado: &test_dorado
   stage: test
   variables:
-    GIT_STRATEGY: none    
+    GIT_STRATEGY: none
+    MODEL: dna_r9.4.1_e8_hac@v3.3
+    BATCH: 384
   script:
-    - echo Dorado app test stage
-    - ./dist/bin/dorado download --model dna_r9.4.1_e8_hac@v3.3
-    - ./dist/bin/dorado basecaller dna_r9.4.1_e8_hac@v3.3 ./tests/data/pod5 -r 1 -b 384 --modified-bases 5mCG > calls.sam
-    - ./dist/bin/dorado basecaller dna_r9.4.1_e8_hac@v3.3 ./tests/data/pod5 -r 1 -x cpu --modified-bases 5mCG > calls.sam
+    - echo dorado basecaller test stage
+    - ./dist/bin/dorado download --model ${MODEL}
+    - ./dist/bin/dorado basecaller ${MODEL} ./tests/data/pod5 -b ${BATCH} --emit-fastq > ref.fq
+    - ./dist/bin/dorado basecaller ${MODEL} ./tests/data/pod5 -b ${BATCH} --modified-bases 5mCG > calls.sam
+    - ./dist/bin/dorado basecaller ${MODEL} ./tests/data/pod5 -x cpu --modified-bases 5mCG > calls.sam
     - samtools quickcheck -u calls.sam
     - samtools view -b calls.sam > calls.bam
+    - echo dorado aligner test stage
+    - ./dist/bin/dorado aligner ref.fq calls.sam > calls.bam
+    - ./dist/bin/dorado basecaller ${MODEL} ./tests/data/pod5 -b ${BATCH} --modified-bases 5mCG | ./dist/bin/dorado aligner ref.fq > calls.bam
+    - ./dist/bin/dorado basecaller ${MODEL} ./tests/data/pod5 -b ${BATCH} --modified-bases 5mCG --reference ref.fq > calls.bam
+    - samtools quickcheck -u calls.bam
+    - samtools view -h calls.bam > calls.sam
 
 .test_archive: &test_archive
   stage: test
@@ -236,7 +265,7 @@ build_archive:macos:m1:
 # Test stages
 
 test:linux:x86:focal:
-  image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.0
+  image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.1
   <<: *linux_dependencies
   <<: *linux_runner
   <<: *test_dorado
@@ -260,10 +289,20 @@ test:linux:arm64:focal:
     - build:linux:arm64:focal
 
 test:macos:m1:
-  <<: *macos_runner
+  <<: *macos_m1_runner
   <<: *test_dorado
   needs:
     - build:macos:m1
+
+test:macos:x64:
+  <<: *macos_x64_runner
+  <<: *test_dorado
+  needs:
+    - build:macos:x64
+  variables:
+    GIT_STRATEGY: none
+    MODEL: dna_r9.4.1_e8_fast@v3.4
+    BATCH: 0
 
 # Test that you can run dorado in a clean cuda 20.04 environment
 test_archive:linux:x86:20.04_nvidia:
@@ -305,38 +344,62 @@ test_archive:linux:arm64:20.04:
   needs:
     - build_archive:linux:arm64:focal
 
-# Single read eval
+# MLHub
 
-mlhub:sre:
+.mlhub: &mlhub
   stage: test
   when: manual
   image: ${TRIGGER_IMAGE}
   needs: []
   variables:
     GIT_STRATEGY: none
+
+# MLHub - Single read eval
+.mlhub_sre:
+  <<: *mlhub
   script:
+    - echo ${MODELS}
     - |
       curl -i --header "Content-Type: application/json" \
       --request POST \
       --data '{
-          "key": "'${MLHUB_TRIGGER_KEY}'",
-          "job_name": "Dorado SRE: '${CI_COMMIT_REF_NAME}' - '"$CI_COMMIT_TITLE"' ",
+          "key": "'${SRE_CONFIG_TRIGGER_KEY}'",
+          "job_name": "Dorado SRE: '${CONDITION}' '${CI_COMMIT_REF_NAME}' - '"$CI_COMMIT_TITLE"' ",
           "script_parameters": {
-              "git_checkout":"'${CI_COMMIT_SHA}'",
-              "branch_name":"'${CI_COMMIT_REF_NAME}'",
+              "models":'${MODELS}',
               "sre_output":"'${SRE_OUTPUT_ROOT}'/'${CI_COMMIT_SHA}'/",
-              "models":["dna_r10.4.1_e8.2_400bps_fast@v4.1.0","dna_r10.4.1_e8.2_400bps_hac@v4.1.0","dna_r10.4.1_e8.2_400bps_sup@v4.1.0"]
-          }
+              "dorado_branch":"'${CI_COMMIT_SHA}'"
+              }
       }' \
       ${MLHUB_TRIGGER_URL}
 
-.mlhub_remora:
-  stage: test
-  when: manual
-  image: ${TRIGGER_IMAGE}
-  needs: []
+mlhub:sre_4k_260bps:
+  extends:
+    .mlhub_sre
   variables:
-    GIT_STRATEGY: none
+    CONDITION: '4k_260bps'
+    SRE_CONFIG_TRIGGER_KEY: ${MLHUB_TRIGGER_KEY_SRE_4k_260bps}
+    MODELS: '["dna_r10.4.1_e8.2_260bps_fast@v4.1.0","dna_r10.4.1_e8.2_260bps_hac@v4.1.0","dna_r10.4.1_e8.2_260bps_sup@v4.1.0"]'
+
+mlhub:sre_4k_400bps:
+  extends:
+    .mlhub_sre
+  variables:
+    CONDITION: '4k_400bps'
+    SRE_CONFIG_TRIGGER_KEY: ${MLHUB_TRIGGER_KEY_SRE_4k_400bps}
+    MODELS: '["dna_r10.4.1_e8.2_400bps_fast@v4.1.0","dna_r10.4.1_e8.2_400bps_hac@v4.1.0","dna_r10.4.1_e8.2_400bps_sup@v4.1.0"]'
+    
+mlhub:sre_5k_400bps:
+  extends:
+    .mlhub_sre
+  variables:
+    CONDITION: '5k_400bps'
+    SRE_CONFIG_TRIGGER_KEY: ${MLHUB_TRIGGER_KEY_SRE_5k_400bps}
+    MODELS: '["dna_r10.4.1_e8.2_400bps_fast@v4.2.0","dna_r10.4.1_e8.2_400bps_hac@v4.2.0","dna_r10.4.1_e8.2_400bps_sup@v4.2.0"]'
+
+# MLHub - Remora
+mlhub:remora-validate:
+  <<: *mlhub
   script:
     - |
       curl --header "Content-Type: application/json" \
@@ -355,15 +418,11 @@ mlhub:sre:
           }
       }' \
       ${MLHUB_TRIGGER_URL}
-
-mlhub:remora-validate:
   parallel:
     matrix:
       - DEVICE: 
         - "cuda:all"
         - "cpu"
-  extends:
-    .mlhub_remora
 
 # Deploy
 
@@ -383,4 +442,5 @@ deploy:all:
     - build_archive:linux:arm64:bionic
     - build_archive:linux:arm64:focal
     - build_archive:macos:m1
+    - build_archive:macos:x64
     - build_archive:windows

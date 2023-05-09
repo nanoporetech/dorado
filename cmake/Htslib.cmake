@@ -1,11 +1,13 @@
-if(NOT DEFINED HTSLIB_LIBRARIES) # lazy include guard
+if(NOT TARGET htslib) # lazy include guard
     if(WIN32)
-        message(STATUS "Fetching htslib from Box")
-        download_and_extract(https://nanoporetech.box.com/shared/static/9dnctbjw86d20qq8l8tw3dk93hu1nrul.gz htslib-win)
+        message(STATUS "Fetching htslib")
+        download_and_extract(https://cdn.oxfordnanoportal.com/software/analysis/htslib-win.tar.gz htslib-win)
         set(HTSLIB_DIR ${DORADO_3RD_PARTY}/htslib-win CACHE STRING
                     "Path to htslib repo")
-        set(HTSLIB_LIBRARIES hts-3)
-        link_directories(${HTSLIB_DIR})
+        add_library(htslib SHARED IMPORTED)
+        set_property(TARGET htslib APPEND PROPERTY IMPORTED_IMPLIB ${HTSLIB_DIR}/hts-3.lib)        
+        set_property(TARGET htslib APPEND PROPERTY IMPORTED_LOCATION ${HTSLIB_DIR}/hts-3.dll)        
+        target_link_directories(htslib INTERFACE ${HTSLIB_DIR})
     else()
         message(STATUS "Building htslib")
         set(HTSLIB_DIR ${DORADO_3RD_PARTY}/htslib CACHE STRING
@@ -42,7 +44,6 @@ if(NOT DEFINED HTSLIB_LIBRARIES) # lazy include guard
                 )
 
         include_directories(${htslib_PREFIX}/include/htslib)
-        set(HTSLIB_LIBRARIES htslib)
         add_library(htslib STATIC IMPORTED)
         set_property(TARGET htslib APPEND PROPERTY IMPORTED_LOCATION ${htslib_PREFIX}/lib/libhts.a)
         message(STATUS "Done Building htslib")

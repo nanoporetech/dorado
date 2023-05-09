@@ -1,5 +1,6 @@
 #include "Version.h"
 #include "cli/cli.h"
+#include "minimap.h"
 #include "spdlog/cfg/env.h"
 
 #include <functional>
@@ -37,6 +38,7 @@ int main(int argc, char* argv[]) {
             {"basecaller", &dorado::basecaller},
             {"duplex", &dorado::duplex},
             {"download", &dorado::download},
+            {"aligner", &dorado::aligner},
     };
 
     std::vector<std::string> arguments(argv + 1, argv + argc);
@@ -62,6 +64,8 @@ int main(int argc, char* argv[]) {
         std::cerr << "dorado:   " << DORADO_VERSION << "+cu" << CUDA_VERSION << std::endl;
 #endif
         std::cerr << "libtorch: " << TORCH_BUILD_VERSION << std::endl;
+        std::cerr << "minimap2: " << MM_VERSION << std::endl;
+
     } else if (subcommand == "-h" || subcommand == "--help") {
         usage(keys);
         return 0;

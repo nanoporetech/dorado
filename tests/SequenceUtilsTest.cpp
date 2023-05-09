@@ -2,6 +2,8 @@
 
 #include <catch2/catch.hpp>
 
+#include <cstdlib>
+
 #define TEST_GROUP "[utils]"
 
 using namespace dorado::utils;
@@ -24,5 +26,48 @@ TEST_CASE(TEST_GROUP ": Test sequence_to_ints") {
         auto actual_results = sequence_to_ints("G");
         std::vector<int> expected_results = {2};
         CHECK(expected_results == actual_results);
+    }
+}
+
+TEST_CASE(TEST_GROUP "reverse_complement") {
+    CHECK(dorado::utils::reverse_complement("") == "");
+    CHECK(dorado::utils::reverse_complement("ACGT") == "ACGT");
+    std::srand(42);
+    const std::string bases("ACGT");
+    for (int i = 0; i < 10; ++i) {
+        const int len = std::rand() % 20000;
+        std::string temp(len, ' ');
+        std::string rev_comp(len, ' ');
+        for (int j = 0; j < len; ++j) {
+            const int base_index = std::rand() % 4;
+            temp.at(j) = bases.at(base_index);
+            rev_comp.at(len - 1 - j) = bases.at(3 - base_index);
+        }
+        CHECK(dorado::utils::reverse_complement(temp) == rev_comp);
+    }
+}
+
+TEST_CASE(TEST_GROUP "mean_q_score") {
+    CHECK(dorado::utils::mean_qscore_from_qstring("") == 0.0f);
+
+    // Repeated values within range.
+    std::srand(42);
+    for (int q = 1; q <= 50; ++q) {
+        std::string q_string(rand() % 100 + 1, '!' + static_cast<char>(q));
+        CHECK(dorado::utils::mean_qscore_from_qstring(q_string) == Approx(static_cast<float>(q)));
+    }
+
+    // Values outside normal range that will be clamped.
+    CHECK(dorado::utils::mean_qscore_from_qstring("!") == 1.0f);
+    CHECK(dorado::utils::mean_qscore_from_qstring("Z") == 50.0f);
+
+    // Sample inputs/golden output values.
+    const std::vector<std::tuple<std::string, float>> kExamples = {
+            {"$$$$$%$###%&$%$$$#$$%&//*.,+((())*((&&'&$$%/.)((-3:>1(-(4NB;?C@>78?B@3", 6.27468f},
+            {"464887/55.519;@=>?0..,-./*)+$&&/00)*++-//-20?@===@D:9/=<:<E@AB;98(&$%&+*", 11.61238f},
+            {"33B<87ESEA41GDDSGHDC?=>:84:<?568@", 23.70278f},
+            {"%$$')*(,*+78665;3378H@=>A42004.", 10.62169f}};
+    for (const auto& [str, score] : kExamples) {
+        CHECK(dorado::utils::mean_qscore_from_qstring(str) == Approx(score));
     }
 }

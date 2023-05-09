@@ -11,23 +11,36 @@ set(SOURCE_FILES
     SequenceUtilsTest.cpp
     StitchTest.cpp
     StereoDuplexTest.cpp
+    TrimTest.cpp
+    AlignerTest.cpp
+    BamReaderTest.cpp
+    BamWriterTest.cpp
+    CliUtilsTest.cpp
+    ReadFilterNodeTest.cpp
+    ModelUtilsTest.cpp
 )
 
-if(APPLE)
-    list(APPEND SOURCE_FILES
-        MetalLinearTest.cpp
-    )
-else()
-    list(APPEND SOURCE_FILES
-        cuda_utils_test.cpp
-    )
+if (DORADO_GPU_BUILD)
+    if(APPLE)
+        list(APPEND SOURCE_FILES
+            MetalLinearTest.cpp
+        )
+    else()
+        list(APPEND SOURCE_FILES
+            cuda_utils_test.cpp
+        )
+    endif()
 endif()
 
 add_executable(dorado_tests ${SOURCE_FILES})
 
+target_precompile_headers(dorado_tests REUSE_FROM dorado_lib)
+
 target_link_libraries(dorado_tests
     dorado_lib
     dorado_io_lib
+    dorado_models_lib
+    minimap2
     ${ZLIB_LIBRARIES}
 )
 

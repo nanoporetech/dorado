@@ -24,9 +24,7 @@ void RemoraEncoder::init(const std::vector<int>& sequence_ints,
                          const std::vector<uint64_t>& seq_to_sig_map) {
     // gcc9 doesn't support <ranges>, which would be useful here
     m_sequence_ints = sequence_ints;
-
-    // remove the final entry, we're only interested in where the bases start
-    m_sample_offsets = {std::begin(seq_to_sig_map), std::prev(std::end(seq_to_sig_map), 1)};
+    m_sample_offsets = {std::begin(seq_to_sig_map), std::end(seq_to_sig_map)};
 
     // last entry is the signal length
     m_signal_len = seq_to_sig_map.back();
@@ -65,7 +63,7 @@ RemoraEncoder::Context RemoraEncoder::get_context(size_t seq_pos) const {
     // find base position for first and last sample
     auto start_it = std::upper_bound(m_sample_offsets.begin(), m_sample_offsets.end(),
                                      context.first_sample);
-    auto end_it = std::upper_bound(m_sample_offsets.begin(), m_sample_offsets.end(),
+    auto end_it = std::lower_bound(m_sample_offsets.begin(), m_sample_offsets.end(),
                                    context.first_sample + context.num_samples);
 
     auto seq_start = std::distance(m_sample_offsets.begin(), start_it) - 1;
@@ -124,11 +122,11 @@ int RemoraEncoder::compute_sample_pos(int base_pos) const {
 
 std::vector<float> RemoraEncoder::encode_kmer(const std::vector<int>& seq,
                                               const std::vector<int>& seq_mappings) const {
-    int seq_len = seq.size() - m_bases_before - m_bases_after;
+    const size_t seq_len = seq.size() - m_bases_before - m_bases_after;
     std::vector<float> output(m_kmer_len * RemoraUtils::NUM_BASES * m_context_samples);
 
     for (size_t kmer_pos = 0; kmer_pos < m_kmer_len; ++kmer_pos) {
-        auto enc_offset = RemoraUtils::NUM_BASES * kmer_pos;
+        const auto enc_offset = RemoraUtils::NUM_BASES * kmer_pos;
         for (size_t seq_pos = 0; seq_pos < seq_len; ++seq_pos) {
             auto base = seq[seq_pos + kmer_pos];
             if (base == -1) {
@@ -136,9 +134,8 @@ std::vector<float> RemoraEncoder::encode_kmer(const std::vector<int>& seq,
             }
             auto base_st = seq_mappings[seq_pos];
             auto base_en = seq_mappings[seq_pos + 1];
-            for (size_t sig_pos = base_st; sig_pos < base_en; ++sig_pos) {
-                output[m_context_samples * (enc_offset + base) + sig_pos] = 1;
-            }
+            std::fill(&output[m_context_samples * (enc_offset + base) + base_st],
+                      &output[m_context_samples * (enc_offset + base) + base_en], 1.0f);
         }
     }
     return output;

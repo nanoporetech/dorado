@@ -1,5 +1,6 @@
 #pragma once
 #include "utils/AsyncQueue.h"
+#include "utils/types.h"
 
 #include <torch/torch.h>
 
@@ -19,11 +20,14 @@ struct BaseModInfo;
 class Read;
 
 struct Chunk {
-    Chunk(std::shared_ptr<Read> read, size_t offset, size_t chunk_in_read_idx, size_t chunk_size)
+    Chunk(std::shared_ptr<Read> const& read,
+          size_t offset,
+          size_t chunk_in_read_idx,
+          size_t chunk_size)
             : source_read(read),
               input_offset(offset),
               idx_in_read(chunk_in_read_idx),
-              raw_chunk_size(chunk_size){};
+              raw_chunk_size(chunk_size) {}
 
     std::weak_ptr<Read> source_read;
     size_t input_offset;    // Where does this chunk start in the input raw read data
@@ -45,6 +49,7 @@ public:
         int32_t channel_number{-1};  //Channel ID
         std::string start_time{};    //Read acquisition start time
         std::string fast5_filename{};
+        uint64_t num_samples;
     };
 
     struct Mapping {
@@ -55,7 +60,11 @@ public:
     float digitisation;      // Loaded from source file
     float range;             // Loaded from source file
     float offset;            // Loaded from source file
-    float sample_rate;       // Loaded from source file
+
+    uint64_t sample_rate;  // Loaded from source file
+
+    uint64_t start_time_ms;
+    uint64_t get_end_time_ms();
 
     float shift;  // To be set by scaler
     float scale;  // To be set by scaler
@@ -77,7 +86,8 @@ public:
     std::string qstring;                  // Read Qstring (Phred)
     std::vector<uint8_t> moves;           // Move table
     std::vector<uint8_t> base_mod_probs;  // Modified base probabilities
-    std::string run_id;                   // Read group
+    std::string run_id;                   // Run ID - used in read group
+    std::string flowcell_id;              // Flowcell ID - used in read group
     std::string model_name;               // Read group
 
     std::string parent_read_id;  // Origin read ID for all its subreads
@@ -89,18 +99,42 @@ public:
 
     Attributes attributes;
     std::vector<Mapping> mappings;
-    std::vector<std::string> generate_duplex_read_tags() const;
-    std::vector<std::string> generate_read_tags(bool emit_moves) const;
-    std::vector<std::string> extract_sam_lines(bool emit_moves, bool duplex) const;
-    std::string generate_modbase_string(uint8_t threshold = 0) const;
+    std::vector<BamPtr> extract_sam_lines(bool emit_moves,
+                                          bool duplex,
+                                          uint8_t modbase_threshold = 0) const;
+
+    uint64_t start_sample;
+    uint64_t end_sample;
+    uint64_t run_acqusition_start_time_ms;
+
+private:
+    void generate_duplex_read_tags(bam1_t*) const;
+    void generate_read_tags(bam1_t* aln, bool emit_moves) const;
+    void generate_modbase_string(bam1_t* aln, uint8_t threshold = 0) const;
 };
 
-// As things stand, the only Message variant is shared_ptr<Read>.  Other Message types
-// can be added here.
-using Message = std::variant<std::shared_ptr<Read>>;
+// A pair of reads for Duplex calling
+class ReadPair {
+public:
+    std::shared_ptr<Read> read_1;
+    std::shared_ptr<Read> read_2;
+};
+
+// The Message type is a std::variant that can hold different types of message objects.
+// It is currently able to store:
+// - a std::shared_ptr<Read> object, which represents a single read
+// - a BamPtr object, which represents a raw BAM alignment record
+// - a std::shared_ptr<ReadPair> object, which represents a pair of reads for duplex calling
+// To add more message types, simply add them to the list of types in the std::variant.
+using Message = std::variant<std::shared_ptr<Read>, BamPtr, std::shared_ptr<ReadPair>>;
 
 // Base class for an object which consumes messages.
 // MessageSink is a node within a pipeline.
+// NOTE: In order to prevent potential deadlocks when
+// the writer to the node doesn't exit cleanly, always
+// call terminate() in the destructor of a class derived
+// from MessageSink (and before worker thread join() calls
+// if there are any).
 class MessageSink {
 public:
     MessageSink(size_t max_messages);

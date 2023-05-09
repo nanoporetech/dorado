@@ -26,11 +26,12 @@ elseif(WIN32)
         execute_process(COMMAND cmake -S ${DORADO_3RD_PARTY}/zlib-${ZLIB_VER}/zlib-${ZLIB_VER} -B ${DORADO_3RD_PARTY}/zlib-${ZLIB_VER}/zlib-${ZLIB_VER}/cmake-build -A x64
             -DCMAKE_INSTALL_PREFIX=${DORADO_3RD_PARTY}/zlib-${ZLIB_VER}/install)
         execute_process(COMMAND cmake --build ${DORADO_3RD_PARTY}/zlib-${ZLIB_VER}/zlib-${ZLIB_VER}/cmake-build --config Release --target install)
-        list(APPEND CMAKE_PREFIX_PATH ${DORADO_3RD_PARTY}/zlib-${ZLIB_VER}/install)
 
         # HDF5 itself
         download_and_extract(https://nanoporetech.box.com/shared/static/h5u267duw3sa4l814yirmxamx3hgouwp.zip ${HDF_VER})
     endif()
+
+    list(APPEND CMAKE_PREFIX_PATH ${DORADO_3RD_PARTY}/zlib-${ZLIB_VER}/install)
 
     install(FILES ${DORADO_3RD_PARTY}/zlib-${ZLIB_VER}/install/bin/zlib.dll DESTINATION bin)
     list(APPEND CMAKE_PREFIX_PATH ${DORADO_3RD_PARTY}/${HDF_VER}/${HDF_VER})

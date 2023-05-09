@@ -1,6 +1,6 @@
 #include "duplex_utils.h"
 
-#include "torch/torch.h"
+#include <torch/torch.h>
 
 #include <algorithm>
 #include <fstream>
@@ -42,14 +42,6 @@ std::unordered_set<std::string> get_read_list_from_pairs(
         read_list.insert(x.second);
     }
     return read_list;
-}
-
-void reverse_complement(std::vector<char>& sequence) {
-    std::reverse(sequence.begin(), sequence.end());
-    std::map<char, char> complementary_nucleotides = {
-            {'A', 'T'}, {'C', 'G'}, {'G', 'C'}, {'T', 'A'}};
-    std::for_each(sequence.begin(), sequence.end(),
-                  [&complementary_nucleotides](char& c) { c = complementary_nucleotides[c]; });
 }
 
 std::pair<std::pair<int, int>, std::pair<int, int>> get_trimmed_alignment(
@@ -122,6 +114,15 @@ void preprocess_quality_scores(std::vector<uint8_t>& quality_scores, int pool_wi
     auto t_float = t.to(torch::kFloat32);
     t.index({torch::indexing::Slice()}) =
             -torch::max_pool1d(-t_float, pool_window, 1, pool_window / 2);
+}
+
+const std::string get_stereo_model_name(const std::string& simplex_model_name,
+                                        uint16_t data_sample_rate) {
+    if (data_sample_rate == 5000) {
+        return "dna_r10.4.1_e8.2_5khz_stereo@v1.0";
+    } else {
+        return "dna_r10.4.1_e8.2_4khz_stereo@v1.1";
+    }
 }
 
 }  // namespace dorado::utils

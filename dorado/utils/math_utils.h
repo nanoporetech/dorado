@@ -13,6 +13,7 @@ namespace dorado::utils {
 inline int div_round_closest(const int n, const int d) {
     return ((n < 0) ^ (d < 0)) ? ((n - d / 2) / d) : ((n + d / 2) / d);
 }
+inline int pad_to(const int a, const int b) { return ((a + b - 1) / b) * b; }
 
 // Adapted from https://stackoverflow.com/questions/11964552/finding-quartiles
 template <typename T, typename = typename std::enable_if<std::is_floating_point<T>::value, T>::type>

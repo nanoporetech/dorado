@@ -2,6 +2,42 @@
 
 All notable changes to Dorado will be documented in this file.
 
+# [0.2.4] (12 Apr 2023)
+
+ * 92ef398874e9f4d09c7a57e5d979d4e704a12a74 - Fix out of bounds access when modbase calling
+
+# [0.2.3] (06 Apr 2023)
+
+ * 6bf227b8139132854927884b59246922f92f0bdc - Upgrade to Pod5 v0.1.16
+
+# [0.2.2] (04 Apr 2023)
+
+ * e1159c4aa8562f539f86d0d2d30899cb69ec9e54 - Add V4.1 modified base models
+ * dd389f1239ab5372eadc9305064053a7ac8941ac - Add ability to load POD5/FAST5 files recursively, remove the `runners` flag
+ * 5a55416a9e414bb325d10c07e68904eb3816eeaa - Fix bug whereby the last read was ignored for read lists not terminated by a newline character
+ * 1c7988a3c47c34e4b87264e988489feb1a1af752 - Performance improvements to Stereo Basecalling with better batch size selection
+ * 27c8a2efbcbabc689eda0817e6a572cb9f2887c6 - Upgrade to Pod5 v0.1.13 which allows loading large files on vmem-limited systems
+ * 3a9bb7a4bed6490f7c7a913200c9534a8238329f - Incorporate improvements in Koi which give more predictive QV Scores
+ * 6896f096f1cfba67d3a831df6ff911bcff38a9ed - Fixes to dorado duplex basespace
+ * 1079b75303ddf642a6569141c7cdcbfd808e6826 - Upgrade to Torch 2.0 and Cuda 11.8
+ * bcfd64d2552aae5fc498c6722bed8fc3c2b87961 - If a Stereo model is not available for duplex basecalling, download it automatically
+ * 8b9064359140b882530a3b750b9b235019d56fad - Improve Dorado startup time when using POD5 files by getting ReadGroup information from metadata tables
+ * e86e9707a7a60dd030e2338e77c2562939cd6fdc - Use `jemalloc` to override allocator on Linux
+ * 4d6a898240ede28726079ba0418f62667e8d2b49 - Enable Stereo Duplex on M1
+ * db097be3849ea957092aaf34fe8791afc93c8c59 - Make metal stereo conv1 kernel available
+ * 17d97d3c5faccd6f0cdce17d2ae52bc923b25fee - Make ``MetalModel`` capable of handling > 1 input channel (Required for Stereo Duplex)
+ * 6d5f07f6784a6e77ed86339d57abb78b20cf3830 - Fix memory leak in getting read groups
+ * 3e3b21a4c5e571ee420e8b37cbafd42aa6b7fd5a - Remove deprecated use of FindCUDA and show real location of found toolkit
+ * ff80a9fae368389271d01f84419f776b93c84461 - Improvements to Mk1C performance
+ * 35dcb6558924b91160b16e6eb136696fd4eadebd - Fix meaning of TLEN in SAM output
+ * 7f13113ecc215a0eec59b62457b05fa9399bf551 - Add support for arbitrary messages in Dorado pipelines
+ * a93ae2cbeb8ea325b009b3932e798ff007284ee6 - Addition of a progress bar for basecalling
+ * a93ae2cbeb8ea325b009b3932e798ff007284ee6 - Solve bug which was occuring when a read had no mod base context hits
+ * 22a3140528f4b01ffb7e81c9bc668ec82aed20ab - Refactoring of Dorado pipeline system to Add AsyncQueue and use it in ReadSink/Nodes
+ * 824459e4f4b8a7fa4c160c1af76d2a5ef760c66f - Add `"cuda:auto"` as alternative to `"cuda:all"` when selecting a compute accelerator device on CLI
+ * d0c9387fc6083eddd5fb4c1659d0e73f99c32b10 - Store reads raw data internally in fp16 format
+ * 6cd81705f879e350f1bb15760c02204945679385 - Switch post-ScalerNode ``raw_data`` to float16
+
 # [0.2.1] (15 Feb 2023)
 
  * 121dddf9a3a288ca2c01dd2b732017a8f02c19a2 - Fix malformed SAM header

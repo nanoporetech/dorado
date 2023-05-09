@@ -252,9 +252,8 @@ bool check_rc_match(const std::string& seq, PosRange templ_r, PosRange compl_r, 
     assert(compl_r.second > compl_r.first);
     assert(dist_thr >= 0);
 
-    const char* c_seq = seq.c_str();
-    std::vector<char> rc_compl(c_seq + compl_r.first, c_seq + compl_r.second);
-    dorado::utils::reverse_complement(rc_compl);
+    auto rc_compl = dorado::utils::reverse_complement(
+            seq.substr(compl_r.first, compl_r.second - compl_r.first));
 
     auto edlib_cfg = [&] {
         if constexpr (DEBUG) {
@@ -264,8 +263,9 @@ bool check_rc_match(const std::string& seq, PosRange templ_r, PosRange compl_r, 
         }
     }();
 
+    const char* c_seq = seq.c_str();
     auto edlib_result = edlibAlign(c_seq + templ_r.first, templ_r.second - templ_r.first,
-                                   rc_compl.data(), rc_compl.size(), edlib_cfg);
+                                   rc_compl.c_str(), rc_compl.size(), edlib_cfg);
     assert(edlib_result.status == EDLIB_STATUS_OK);
     std::optional<PosRange> res = std::nullopt;
 

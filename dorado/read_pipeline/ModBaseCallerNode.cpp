@@ -63,24 +63,25 @@ ModBaseCallerNode::~ModBaseCallerNode() {
     m_output_worker->join();
 }
 
-void ModBaseCallerNode::init_modbase_info() {
-    struct Info {
+[[maybe_unused]] ModBaseCallerNode::Info ModBaseCallerNode::get_modbase_info_and_maybe_init(
+        std::vector<std::reference_wrapper<BaseModParams const>> const& base_mod_params,
+        ModBaseCallerNode* node) {
+    struct ModelInfo {
         std::vector<std::string> long_names;
         std::string alphabet;
         std::string motif;
         int motif_offset;
+        size_t base_counts = 1;
     };
 
-    std::string allowed_bases = "ACGT";
-    std::array<Info, 4> model_info;
+    std::string const allowed_bases = "ACGT";
+    std::array<ModelInfo, 4> model_info;
     for (int b = 0; b < 4; ++b) {
         model_info[b].alphabet = allowed_bases[b];
     }
 
-    std::array<size_t, 4> base_counts = {1, 1, 1, 1};
-    for (size_t id = 0; id < m_callers.size() / m_num_devices; ++id) {
-        const auto& params = m_callers[id]->params();
-
+    for (const auto& params_ref : base_mod_params) {
+        const auto& params = params_ref.get();
         auto base = params.motif[params.motif_offset];
         if (allowed_bases.find(base) == std::string::npos) {
             throw std::runtime_error("Invalid base in remora model metadata.");
@@ -88,34 +89,47 @@ void ModBaseCallerNode::init_modbase_info() {
         auto& map_entry = model_info[RemoraUtils::BASE_IDS[base]];
         map_entry.long_names = params.mod_long_names;
         map_entry.alphabet += params.mod_bases;
-        map_entry.motif = params.motif;
-        map_entry.motif_offset = params.motif_offset;
-
-        base_counts[RemoraUtils::BASE_IDS[base]] = params.base_mod_count + 1;
-        m_num_states += params.base_mod_count;
+        if (node) {
+            map_entry.motif = params.motif;
+            map_entry.motif_offset = params.motif_offset;
+            map_entry.base_counts = params.base_mod_count + 1;
+            node->m_num_states += params.base_mod_count;
+        }
     }
 
-    std::string long_names, alphabet;
+    Info result;
     utils::BaseModContext context_handler;
     for (const auto& info : model_info) {
         for (const auto& name : info.long_names) {
-            if (!long_names.empty())
-                long_names += ' ';
-            long_names += name;
+            if (!result.long_names.empty())
+                result.long_names += ' ';
+            result.long_names += name;
         }
-        alphabet += info.alphabet;
-        if (!info.motif.empty()) {
+        result.alphabet += info.alphabet;
+        if (node && !info.motif.empty()) {
             context_handler.set_context(info.motif, size_t(info.motif_offset));
         }
     }
 
-    m_base_mod_info =
-            std::make_shared<utils::BaseModInfo>(alphabet, long_names, context_handler.encode());
+    if (node) {
+        node->m_base_mod_info = std::make_shared<utils::BaseModInfo>(
+                result.alphabet, result.long_names, context_handler.encode());
 
-    m_base_prob_offsets[0] = 0;
-    m_base_prob_offsets[1] = base_counts[0];
-    m_base_prob_offsets[2] = base_counts[0] + base_counts[1];
-    m_base_prob_offsets[3] = base_counts[0] + base_counts[1] + base_counts[2];
+        node->m_base_prob_offsets[0] = 0;
+        node->m_base_prob_offsets[1] = model_info[0].base_counts;
+        node->m_base_prob_offsets[2] = node->m_base_prob_offsets[1] + model_info[1].base_counts;
+        node->m_base_prob_offsets[3] = node->m_base_prob_offsets[2] + model_info[2].base_counts;
+    }
+
+    return result;
+}
+
+void ModBaseCallerNode::init_modbase_info() {
+    std::vector<std::reference_wrapper<BaseModParams const>> base_mod_params;
+    for (size_t id = 0; id < m_callers.size() / m_num_devices; ++id) {
+        base_mod_params.emplace_back(m_callers[id]->params());
+    }
+    get_modbase_info_and_maybe_init(base_mod_params, this);
 }
 
 void ModBaseCallerNode::runner_worker_thread(size_t runner_id) {
@@ -275,6 +289,11 @@ void ModBaseCallerNode::caller_worker_thread(size_t caller_id) {
 void ModBaseCallerNode::call_current_batch(size_t caller_id) {
     auto& caller = m_callers[caller_id];
     auto results = caller->call_chunks(m_batched_chunks[caller_id].size());
+    // Convert results to float32 with one call and address via a raw pointer,
+    // to avoid huge libtorch indexing overhead.
+    auto results_f32 = results.to(torch::kFloat32);
+    assert(results_f32.is_contiguous());
+    const auto* const results_f32_ptr = results_f32.data_ptr<float>();
 
     std::unique_lock processed_chunks_lock(m_processed_chunks_mutex);
     auto row_size = results.size(1);
@@ -283,9 +302,7 @@ void ModBaseCallerNode::call_current_batch(size_t caller_id) {
     for (size_t i = 0; i < m_batched_chunks[caller_id].size(); ++i) {
         auto& chunk = m_batched_chunks[caller_id][i];
         chunk->scores.resize(row_size);
-        for (int j = 0; j < row_size; ++j) {
-            chunk->scores[j] = results.index({(int)i, j}).item().toFloat();
-        }
+        std::memcpy(chunk->scores.data(), &results_f32_ptr[i * row_size], row_size * sizeof(float));
         m_processed_chunks.push_back(chunk);
     }
 

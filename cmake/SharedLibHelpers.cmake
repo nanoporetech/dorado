@@ -1,5 +1,67 @@
 include(GetPrerequisites)
 
+### Pinched this from here: https://stackoverflow.com/a/30680445
+# Normally FindXXX returns libraries in a list format like this:
+# [optimized <release_dll_name> debug <debug_dll_name> [...]]
+# So all this does is go through that list and extract one or the other category
+macro(FILTER_LIST INPUT OUTPUT GOOD BAD EXT)
+    set(LST ${INPUT})   # can we avoid this?
+    set(PICKME YES)
+    foreach(ELEMENT IN LISTS LST)
+        if(${ELEMENT} STREQUAL general OR ${ELEMENT} STREQUAL ${GOOD})
+            set(PICKME YES)
+            continue()
+        elseif(${ELEMENT} STREQUAL ${BAD})
+            set(PICKME NO)
+            continue()
+        endif()
+        # Ignore libs with the wrong extension
+        if (WIN32)
+            # Windows libs will end with .lib and we'll replace that
+            # with $EXT later
+            string(REGEX MATCH "lib$" FOUND_EXT ${ELEMENT})
+        else()
+            string(REGEX MATCH "${EXT}$" FOUND_EXT ${ELEMENT})
+        endif()
+        if (NOT FOUND_EXT)
+            continue()
+        endif()
+        if(PICKME)
+            get_filename_component(LIB_DIR "${ELEMENT}" DIRECTORY)
+            get_filename_component(LIB_BASENAME "${ELEMENT}" NAME)
+            string(REPLACE .lib .${EXT} SEARCHNAMES ${LIB_BASENAME})
+            # Special cases for zlib.lib -> zlib1.dll
+            # and libcurl_imp.lib -> libcurl.dll
+            if(${LIB_BASENAME} MATCHES "zlib" AND WIN32)
+                string(REPLACE .lib 1.${EXT} EXTRA_ZLIB ${LIB_BASENAME})
+                list(APPEND SEARCHNAMES "${EXTRA_ZLIB}")
+            elseif(${LIB_BASENAME} MATCHES "libcurl" AND WIN32)
+                string(REPLACE _imp.lib .${EXT} EXTRA_LIBCURL ${LIB_BASENAME})
+                list(APPEND SEARCHNAMES "${EXTRA_LIBCURL}")
+            endif()
+            set(SEARCHDIRS "${LIB_DIR}")
+            if(WIN32)
+                list(APPEND SEARCHDIRS "${LIB_DIR}/../bin")
+            endif()
+            unset(DLL CACHE)
+            find_file(
+                DLL
+                NAMES ${SEARCHNAMES}
+                HINTS ${SEARCHDIRS}
+                NO_DEFAULT_PATH
+            )
+            # We could be incidentally searching for the "dll" that
+            # goes with a static .lib here, so it's ok for this to fail.
+            if(DLL)
+                list(APPEND ${OUTPUT} ${DLL})
+            endif()
+        else()
+            # By default we'll try and include unlabelled libraries
+            set(PICKME YES)
+        endif()
+    endforeach()
+endmacro(FILTER_LIST)
+
 macro(RESOLVE_SYMLINKS INPUT_LIST OUTPUT_LIST)
     foreach(LIB IN ITEMS ${INPUT_LIST})
         # This goes through the input list and sets up a new output list, where

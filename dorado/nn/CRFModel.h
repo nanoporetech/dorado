@@ -26,6 +26,7 @@ struct CRFModelConfig {
     float blank_score;
     float scale;
     int num_features;
+    int sample_rate;
 };
 
 CRFModelConfig load_crf_model_config(const std::filesystem::path& path);
@@ -36,8 +37,8 @@ std::vector<torch::Tensor> load_crf_model_weights(const std::filesystem::path& d
 
 torch::nn::ModuleHolder<torch::nn::AnyModule> load_crf_model(const std::filesystem::path& path,
                                                              const CRFModelConfig& model_config,
-                                                             int batch_size,
-                                                             int chunk_size,
                                                              const torch::TensorOptions& options);
+
+uint16_t get_model_sample_rate(const std::filesystem::path& model_path);
 
 }  // namespace dorado

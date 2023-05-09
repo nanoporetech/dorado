@@ -9,10 +9,8 @@ public:
     // Chunk size and overlap are in raw samples
     BasecallerNode(MessageSink &sink,
                    std::vector<Runner> model_runners,
-                   size_t batch_size,
-                   size_t chunk_size,
                    size_t overlap,
-                   size_t model_stride,
+                   int batch_timeout_ms,
                    std::string model_name = "",
                    size_t max_reads = 1000);
     ~BasecallerNode();
@@ -30,14 +28,14 @@ private:
     MessageSink &m_sink;
     // Vector of model runners (each with their own GPU access etc)
     std::vector<Runner> m_model_runners;
-    // Number of chunks in a batch
-    size_t m_batch_size;
     // Chunk length
     size_t m_chunk_size;
     // Minimum overlap between two adjacent chunks in a read. Overlap is used to reduce edge effects and improve accuracy.
     size_t m_overlap;
     // Stride of the model in the runners
     size_t m_model_stride;
+    // Time in milliseconds before partial batches are called.
+    int m_batch_timeout_ms;
     // model_name
     std::string m_model_name;
 

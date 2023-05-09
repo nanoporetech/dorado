@@ -10,7 +10,7 @@ class BaseSpaceDuplexCallerNode : public MessageSink {
 public:
     BaseSpaceDuplexCallerNode(MessageSink& sink,
                               std::map<std::string, std::string> template_complement_map,
-                              std::map<std::string, std::shared_ptr<Read>> reads,
+                              utils::read_map reads,
                               size_t threads);
     ~BaseSpaceDuplexCallerNode();
 
@@ -20,8 +20,8 @@ private:
     MessageSink&
             m_sink;  // MessageSink to consume Duplex Called Reads. This will typically be a writer node
     size_t m_num_worker_threads{1};
-    std::vector<std::unique_ptr<std::thread>> worker_threads;
+    std::unique_ptr<std::thread> m_worker_thread;
     std::map<std::string, std::string> m_template_complement_map;
-    std::map<std::string, std::shared_ptr<Read>> m_reads;
+    utils::read_map m_reads;
 };
 }  // namespace dorado
