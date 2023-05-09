@@ -93,28 +93,23 @@ void PairingNode::pair_generating_worker_thread() {
         std::string flowcell_id = read->flowcell_id;
 
         int max_num_keys = 10;
-
-        UniquePoreIdentifierKey key = std::make_tuple(channel, mux, run_id, flowcell_id);
-        {
-            std::scoped_lock<std::mutex> m_channel_mux_read_map_lock(m_pairing_mtx);
-            auto found = channel_mux_read_map.find(key);
-            // Check if the key is already in the list
-            if (found == channel_mux_read_map.end()) {
-                // Key is not in the dequeue
-
-                if (m_working_channel_mux_keys.size() >= max_num_keys) {
-                    // Remove the oldest key (front of the list)
-                    auto oldest_key = m_working_channel_mux_keys.front();
-                    m_working_channel_mux_keys.pop_front();
-                    // Remove the oldest key from the map
-                    channel_mux_read_map.erase(oldest_key);
-                }
-                // Add the new key to the end of the list
-                m_working_channel_mux_keys.push_back(key);
-            }
-        }
-
         std::unique_lock<std::mutex> lock(m_pairing_mtx);
+        UniquePoreIdentifierKey key = std::make_tuple(channel, mux, run_id, flowcell_id);
+        auto found = channel_mux_read_map.find(key);
+        // Check if the key is already in the list
+        if (found == channel_mux_read_map.end()) {
+            // Key is not in the dequeue
+
+            if (m_working_channel_mux_keys.size() >= max_num_keys) {
+                // Remove the oldest key (front of the list)
+                auto oldest_key = m_working_channel_mux_keys.front();
+                m_working_channel_mux_keys.pop_front();
+                // Remove the oldest key from the map
+                channel_mux_read_map.erase(oldest_key);
+            }
+            // Add the new key to the end of the list
+            m_working_channel_mux_keys.push_back(key);
+        }
 
         auto compare_reads_by_time = [](const std::shared_ptr<Read>& read1,
                                         const std::shared_ptr<Read>& read2) {
