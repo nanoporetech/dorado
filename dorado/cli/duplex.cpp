@@ -277,7 +277,7 @@ int duplex(int argc, char* argv[]) {
 
             auto adjusted_stereo_overlap = (overlap / stereo_model_stride) * stereo_model_stride;
 
-            const int kStereoBatchTimeoutMS = 500;
+            const int kStereoBatchTimeoutMS = 5000;
             auto stereo_basecaller_node = std::make_unique<BasecallerNode>(
                     read_filter_node, std::move(stereo_runners), adjusted_stereo_overlap,
                     kStereoBatchTimeoutMS);
