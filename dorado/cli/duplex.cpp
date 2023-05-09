@@ -282,6 +282,7 @@ int duplex(int argc, char* argv[]) {
             DataLoader loader(scaler_node, "cpu", num_devices, 0, std::move(read_list));
             loader.load_reads(reads, parser.get<bool>("--recursive"));
         }
+        bam_writer->join();  // Explicitly wait for all output rows to be written.
         stats_node.dump_stats();
     } catch (const std::exception& e) {
         spdlog::error(e.what());
