@@ -49,7 +49,7 @@ void string_reader(HighFive::Attribute& attribute, std::string& target_str) {
 std::string get_string_timestamp_from_unix_time(time_t time_stamp_ms) {
     static std::mutex timestamp_mtx;
     std::unique_lock lock(timestamp_mtx);
-    //Convert a time_t (seconds from UNIX epoch) to a timestamp in %Y-%m-%dT%H:%M:%S format
+    //Convert a time_t (seconds from UNIX epoch) to a timestamp in ISO 8601 (YYYY-MM-DDTHH:MM:SS.sss+00:00) format
     auto time_stamp_s = time_stamp_ms / 1000;
     int num_ms = time_stamp_ms % 1000;
     char buf[32];
