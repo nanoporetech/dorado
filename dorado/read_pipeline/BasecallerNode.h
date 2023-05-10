@@ -42,8 +42,8 @@ private:
     // Model runners which have not terminated.
     std::atomic<int> m_num_active_model_runners{0};
 
-    bool m_terminate_basecaller{false};
-    bool m_terminate_manager{false};
+    std::atomic<bool> m_terminate_basecaller{false};
+    std::atomic<bool> m_terminate_manager{false};
 
     // Time when Basecaller Node is initialised. Used for benchmarking and debugging
     std::chrono::time_point<std::chrono::system_clock> initialization_time;
@@ -69,7 +69,7 @@ private:
     // initialisation is via initialiser lists.
     std::unique_ptr<std::thread>
             m_input_worker;  // Chunks up incoming reads and sticks them in the pending list.
-    std::vector<std::unique_ptr<std::thread>>
+    std::vector<std::thread>
             m_basecall_workers;  // Basecalls chunks from the queue and puts read on the sink.
     std::unique_ptr<std::thread>
             m_working_reads_manager;  // Stitches working reads into complete reads.
