@@ -18,6 +18,10 @@
 #include <optional>
 
 namespace {
+
+// ReadID should be a drop-in replacement for read_id_t
+static_assert(sizeof(dorado::ReadID) == sizeof(read_id_t));
+
 void string_reader(HighFive::Attribute& attribute, std::string& target_str) {
     // Load as a variable string if possible
     if (attribute.getDataType().isVariableStr()) {
@@ -330,8 +334,8 @@ void DataLoader::load_read_channels(std::string data_path, bool recursive_file_l
                     // Fetch string representation of a read_id to store in the read list.
                     std::string read_id_str(37, '*');
                     pod5_error_t err = pod5_format_read_id(read_data.read_id, read_id_str.data());
-                    std::unique_ptr<uint8_t> read_id((uint8_t*)malloc(sizeof(uint8_t) * 16));
-                    memcpy(read_id.get(), read_data.read_id, 16);
+                    ReadID read_id;
+                    memcpy(read_id.data(), read_data.read_id, 16);
 
                     uint16_t channel = read_data.channel;
 
@@ -343,8 +347,7 @@ void DataLoader::load_read_channels(std::string data_path, bool recursive_file_l
                     if (channel_to_read_id.find(channel) != channel_to_read_id.end()) {
                         channel_to_read_id[channel].push_back(std::move(read_id));
                     } else {
-                        channel_to_read_id.emplace(channel,
-                                                   std::vector<std::unique_ptr<uint8_t>>());
+                        channel_to_read_id.emplace(channel, std::vector<ReadID>());
                         channel_to_read_id[channel].push_back(std::move(read_id));
                     }
                 }
@@ -513,9 +516,8 @@ uint16_t DataLoader::get_sample_rate(std::string data_path, bool recursive_file_
     }
 }
 
-void DataLoader::load_pod5_reads_from_file_by_read_ids(
-        const std::string& path,
-        const std::vector<std::unique_ptr<uint8_t>>& read_ids) {
+void DataLoader::load_pod5_reads_from_file_by_read_ids(const std::string& path,
+                                                       const std::vector<ReadID>& read_ids) {
     pod5_init();
 
     // Open the file ready for walking:
@@ -530,10 +532,9 @@ void DataLoader::load_pod5_reads_from_file_by_read_ids(
         return;
     }
 
-    std::unique_ptr<uint8_t> read_id_array(
-            (uint8_t*)malloc(16 * sizeof(uint8_t) * read_ids.size()));
+    std::vector<uint8_t> read_id_array(16 * read_ids.size());
     for (int i = 0; i < read_ids.size(); i++) {
-        memcpy(read_id_array.get() + 16 * i, read_ids[i].get(), 16);
+        memcpy(read_id_array.data() + 16 * i, read_ids[i].data(), 16);
     }
 
     std::size_t batch_count = 0;
@@ -544,7 +545,7 @@ void DataLoader::load_pod5_reads_from_file_by_read_ids(
     std::vector<std::uint32_t> traversal_batch_counts(batch_count);
     std::vector<std::uint32_t> traversal_batch_rows(read_ids.size());
     size_t find_success_count;
-    pod5_error_t err = pod5_plan_traversal(file, read_id_array.get(), read_ids.size(),
+    pod5_error_t err = pod5_plan_traversal(file, read_id_array.data(), read_ids.size(),
                                            traversal_batch_counts.data(),
                                            traversal_batch_rows.data(), &find_success_count);
     if (err != POD5_OK) {
