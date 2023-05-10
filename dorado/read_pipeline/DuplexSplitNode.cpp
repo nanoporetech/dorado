@@ -15,13 +15,6 @@
 #include <optional>
 #include <string>
 
-//To enable debug in build use "cmake -D CMAKE_CXX_FLAGS='-DDEBUG_READ_SPLITTING' -S . -B build"
-#ifdef DEBUG_READ_SPLITTING
-static constexpr bool DEBUG = true;
-#else
-static constexpr bool DEBUG = false;
-#endif
-
 namespace {
 
 using namespace dorado;
@@ -194,37 +187,15 @@ std::optional<PosRange> find_best_adapter_match(const std::string& adapter,
     if (span == 0)
         return std::nullopt;
 
-    auto edlib_cfg = [&] {
-        if constexpr (DEBUG) {
-            return edlibNewAlignConfig(-1, EDLIB_MODE_HW, EDLIB_TASK_PATH, NULL, 0);
-        } else {
-            return edlibNewAlignConfig(dist_thr, EDLIB_MODE_HW, EDLIB_TASK_LOC, NULL, 0);
-        }
-    }();
+    auto edlib_cfg = edlibNewAlignConfig(dist_thr, EDLIB_MODE_HW, EDLIB_TASK_LOC, NULL, 0);
 
     auto edlib_result =
             edlibAlign(adapter.c_str(), adapter.size(), seq.c_str() + shift, span, edlib_cfg);
     assert(edlib_result.status == EDLIB_STATUS_OK);
     std::optional<PosRange> res = std::nullopt;
     if (edlib_result.status == EDLIB_STATUS_OK && edlib_result.editDistance != -1) {
-        if constexpr (DEBUG) {
-            spdlog::debug("Finding adapter in range: [{}, {}]", subrange.first, subrange.second),
-                    spdlog::debug("Best adapter match edit distance: {} ; is middle {}",
-                                  edlib_result.editDistance,
-                                  abs(int(span / 2) - edlib_result.startLocations[0]) < 1000);
-            spdlog::debug("Match location: ({}, {})", edlib_result.startLocations[0] + shift,
-                          edlib_result.endLocations[0] + shift + 1);
-            spdlog::debug("\n{}", utils::print_alignment(adapter.c_str(), seq.c_str() + shift,
-                                                         edlib_result));
-            if (edlib_result.editDistance <= dist_thr) {
-                res = {edlib_result.startLocations[0] + shift,
-                       edlib_result.endLocations[0] + shift + 1};
-            }
-        } else {
-            assert(edlib_result.editDistance <= dist_thr);
-            res = {edlib_result.startLocations[0] + shift,
-                   edlib_result.endLocations[0] + shift + 1};
-        }
+        assert(edlib_result.editDistance <= dist_thr);
+        res = {edlib_result.startLocations[0] + shift, edlib_result.endLocations[0] + shift + 1};
     }
     edlibFreeAlignResult(edlib_result);
     return res;
@@ -255,13 +226,7 @@ bool check_rc_match(const std::string& seq, PosRange templ_r, PosRange compl_r, 
     auto rc_compl = dorado::utils::reverse_complement(
             seq.substr(compl_r.first, compl_r.second - compl_r.first));
 
-    auto edlib_cfg = [&] {
-        if constexpr (DEBUG) {
-            return edlibNewAlignConfig(-1, EDLIB_MODE_HW, EDLIB_TASK_PATH, NULL, 0);
-        } else {
-            return edlibNewAlignConfig(dist_thr, EDLIB_MODE_HW, EDLIB_TASK_DISTANCE, NULL, 0);
-        }
-    }();
+    auto edlib_cfg = edlibNewAlignConfig(dist_thr, EDLIB_MODE_HW, EDLIB_TASK_DISTANCE, NULL, 0);
 
     const char* c_seq = seq.c_str();
     auto edlib_result = edlibAlign(c_seq + templ_r.first, templ_r.second - templ_r.first,
@@ -270,14 +235,7 @@ bool check_rc_match(const std::string& seq, PosRange templ_r, PosRange compl_r, 
     std::optional<PosRange> res = std::nullopt;
 
     bool match = (edlib_result.status == EDLIB_STATUS_OK) && (edlib_result.editDistance != -1);
-    if constexpr (DEBUG) {
-        spdlog::debug("Checking ranges [{}, {}] vs [{}, {}]: edist={}\n{}", templ_r.first,
-                      templ_r.second, compl_r.first, compl_r.second, edlib_result.editDistance,
-                      utils::print_alignment(c_seq + templ_r.first, rc_compl.data(), edlib_result));
-        match = match && (edlib_result.editDistance <= dist_thr);
-    } else {
-        assert(!match || edlib_result.editDistance <= dist_thr);
-    }
+    assert(!match || edlib_result.editDistance <= dist_thr);
 
     edlibFreeAlignResult(edlib_result);
     return match;
@@ -363,18 +321,6 @@ PosRanges DuplexSplitNode::possible_pore_regions(const DuplexSplitNode::ExtRead&
     //pA = read->scale * raw + read->shift
     spdlog::debug("Analyzing signal in read {}", read.read->read_id);
 
-    if constexpr (DEBUG) {
-        const auto max_val =
-                (m_settings.expect_pore_prefix >= read.read->raw_data.size(0))
-                        ? 0.0f
-                        : (read.data_as_float32 * read.read->scale + read.read->shift)
-                                  .index({torch::indexing::Slice(m_settings.expect_pore_prefix,
-                                                                 torch::indexing::None)})
-                                  .max()
-                                  .item<float>();
-        spdlog::debug("Max raw signal {} pA, threshold: {}", max_val, pore_thr);
-    }
-
     auto pore_sample_ranges = detect_pore_signal(
             read.data_as_float32, (pore_thr - read.read->shift) / read.read->scale,
             m_settings.pore_cl_dist, m_settings.expect_pore_prefix);
@@ -394,13 +340,6 @@ PosRanges DuplexSplitNode::possible_pore_regions(const DuplexSplitNode::ExtRead&
         auto end_pos = read.move_sums[move_end];
         assert(end_pos > start_pos);
         pore_regions.push_back({start_pos, end_pos});
-    }
-
-    if constexpr (DEBUG) {
-        std::ostringstream oss;
-        std::copy(pore_regions.begin(), pore_regions.end(),
-                  std::ostream_iterator<PosRange>(oss, "; "));
-        spdlog::debug("{} regions to check: {}", pore_regions.size(), oss.str());
     }
 
     return pore_regions;
@@ -473,19 +412,6 @@ std::vector<std::shared_ptr<Read>> DuplexSplitNode::subreads(
     assert(read->raw_data.size(0) == seq_to_sig_map[read->seq.size()]);
     subreads.push_back(
             subread(*read, {start_pos, read->seq.size()}, {signal_start, read->raw_data.size(0)}));
-
-    if constexpr (DEBUG) {
-        std::ostringstream spacer_oss;
-        std::copy(spacers.begin(), spacers.end(),
-                  std::ostream_iterator<PosRange>(spacer_oss, "; "));
-
-        std::ostringstream id_oss;
-        std::transform(subreads.begin(), subreads.end(),
-                       std::ostream_iterator<std::string>(id_oss, "; "),
-                       [](std::shared_ptr<Read> sr) { return sr->read_id; });
-        spdlog::debug("{} spacing regions in subread {}: {}. New read ids: {}", spacers.size(),
-                      read->read_id, spacer_oss.str(), id_oss.str());
-    }
 
     return subreads;
 }
