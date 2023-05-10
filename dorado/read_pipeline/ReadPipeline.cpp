@@ -82,11 +82,6 @@ void Read::generate_read_tags(bam1_t *aln, bool emit_moves) const {
 
     bam_aux_append(aln, "sv", 'Z', 9, (uint8_t *)"quantile");
 
-    if (!parent_read_id.empty()) {
-        bam_aux_append(aln, "pi", 'Z', parent_read_id.length() + 1,
-                       (uint8_t *)parent_read_id.c_str());
-    }
-
     if (run_id != "" && model_name != "") {
         std::string rg(run_id + "_" + model_name);
         bam_aux_append(aln, "RG", 'Z', rg.length() + 1, (uint8_t *)rg.c_str());
