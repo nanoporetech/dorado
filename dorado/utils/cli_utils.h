@@ -7,6 +7,7 @@
 #include <stdio.h>
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <sstream>
 #include <string>
@@ -99,6 +100,32 @@ inline std::tuple<int, int, int> parse_version_str(const std::string& version) {
                 "Could not parse version " + version +
                 ". Only version in the format x.y.z where x/y/z are integers is supported");
     }
+}
+
+inline uint64_t parse_string_to_size(const std::string& num_str) {
+    // check if last character in K, M or G.
+    char last_char = num_str[num_str.length() - 1];
+    uint64_t multiplier = 1;
+    bool is_last_char_alpha = isalpha(last_char);
+    if (is_last_char_alpha) {
+        switch (last_char) {
+        case 'K':
+            multiplier = 1e3;
+            break;
+        case 'M':
+            multiplier = 1e6;
+            break;
+        case 'G':
+            multiplier = 1e9;
+            break;
+        default:
+            throw std::runtime_error("Unknown size " + std::to_string(last_char) +
+                                     " found. Please choose between K, M or G");
+        }
+    }
+    uint64_t size_num =
+            std::stoul(is_last_char_alpha ? num_str.substr(0, num_str.length() - 1) : num_str);
+    return size_num * multiplier;
 }
 
 }  // namespace utils

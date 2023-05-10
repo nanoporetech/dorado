@@ -25,7 +25,12 @@
 
 namespace dorado::utils {
 
-Aligner::Aligner(MessageSink& sink, const std::string& filename, int k, int w, int threads)
+Aligner::Aligner(MessageSink& sink,
+                 const std::string& filename,
+                 int k,
+                 int w,
+                 uint64_t index_batch_size,
+                 int threads)
         : MessageSink(10000), m_sink(sink), m_threads(threads) {
     // Initialize option structs.
     mm_set_opt(0, &m_idx_opt, &m_map_opt);
@@ -39,8 +44,8 @@ Aligner::Aligner(MessageSink& sink, const std::string& filename, int k, int w, i
 
     // Set batch sizes large enough to not require chunking since that's
     // not supported yet.
-    m_idx_opt.batch_size = 16000000000;
-    m_idx_opt.mini_batch_size = 16000000000;
+    m_idx_opt.batch_size = index_batch_size;
+    m_idx_opt.mini_batch_size = index_batch_size;
 
     // Force cigar generation.
     m_map_opt.flag |= MM_F_CIGAR;
@@ -49,7 +54,7 @@ Aligner::Aligner(MessageSink& sink, const std::string& filename, int k, int w, i
 
     m_index_reader = mm_idx_reader_open(filename.c_str(), &m_idx_opt, 0);
     m_index = mm_idx_reader_read(m_index_reader, m_threads);
-    if (mm_idx_reader_read(m_index_reader, m_threads) != 0) {
+    if (mm_idx_reader_read(m_index_reader, m_threads) != nullptr) {
         throw std::runtime_error(
                 "Dorado doesn't support split index for alignment. Please re-run with larger index "
                 "size.");

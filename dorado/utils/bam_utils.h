@@ -17,7 +17,12 @@ using read_map = std::unordered_map<std::string, std::shared_ptr<Read>>;
 
 class Aligner : public MessageSink {
 public:
-    Aligner(MessageSink& read_sink, const std::string& filename, int k, int w, int threads);
+    Aligner(MessageSink& read_sink,
+            const std::string& filename,
+            int k,
+            int w,
+            uint64_t index_batch_size,
+            int threads);
     ~Aligner();
     std::vector<BamPtr> align(bam1_t* record, mm_tbuf_t* buf);
     sq_t get_sequence_records_for_header();
