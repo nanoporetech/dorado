@@ -185,7 +185,7 @@ void DataLoader::load_reads(const std::string& path,
                                    [](unsigned char c) { return std::tolower(c); });
                     if (ext == ".fast5") {
                         throw std::runtime_error(
-                                "Traversing reads by channel os only availabls for POD5. "
+                                "Traversing reads by channel is only availabls for POD5. "
                                 "Encountered FAST5 at " +
                                 path.string());
                     } else if (ext == ".pod5") {
@@ -331,12 +331,10 @@ void DataLoader::load_read_channels(std::string data_path, bool recursive_file_l
                         continue;
                     }
 
-                    uint16_t channel = read_data.channel;
+                    int channel = read_data.channel;
 
                     // Update maximum number of channels encountered.
-                    if (channel > m_max_channel) {
-                        m_max_channel = channel;
-                    }
+                    m_max_channel = std::max(m_max_channel, channel);
 
                     // Store the read_id in the channel's list.
                     ReadID read_id;
