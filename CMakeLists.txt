@@ -149,7 +149,9 @@ set(LIB_SOURCE_FILES
     dorado/read_pipeline/PairingNode.cpp
     dorado/read_pipeline/PairingNode.h
     dorado/utils/time_utils.cpp
-    dorado/utils/time_utils.h)
+    dorado/utils/time_utils.h
+    dorado/utils/uuid_utils.cpp
+    dorado/utils/uuid_utils.h)
 
 if (DORADO_GPU_BUILD)
     if(APPLE)

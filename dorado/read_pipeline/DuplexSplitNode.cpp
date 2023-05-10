@@ -4,6 +4,7 @@
 #include "utils/duplex_utils.h"
 #include "utils/sequence_utils.h"
 #include "utils/time_utils.h"
+#include "utils/uuid_utils.h"
 
 #include <openssl/sha.h>
 #include <spdlog/spdlog.h>
@@ -62,37 +63,6 @@ std::shared_ptr<Read> copy_read(const Read& read) {
 
     copy->attributes = read.attributes;
     return copy;
-}
-
-std::string derive_uuid(const std::string& input_uuid, const std::string& desc) {
-    // Hash the input UUID using SHA-256
-    unsigned char hash[SHA256_DIGEST_LENGTH];
-    SHA256_CTX sha256;
-    SHA256_Init(&sha256);
-    SHA256_Update(&sha256, input_uuid.c_str(), input_uuid.size());
-    SHA256_Update(&sha256, desc.c_str(), desc.size());
-    SHA256_Final(hash, &sha256);
-
-    // Truncate the hash to 16 bytes (128 bits) to match the size of a UUID
-    std::array<unsigned char, 16> truncated_hash;
-    std::copy(std::begin(hash), std::begin(hash) + 16, std::begin(truncated_hash));
-
-    // Set the UUID version to 4 (random)
-    truncated_hash[6] = (truncated_hash[6] & 0x0F) | 0x40;
-
-    // Set the UUID variant to the RFC 4122 specified value (10)
-    truncated_hash[8] = (truncated_hash[8] & 0x3F) | 0x80;
-
-    // Convert the truncated hash to a UUID string
-    std::stringstream ss;
-    for (size_t i = 0; i < truncated_hash.size(); ++i) {
-        ss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(truncated_hash[i]);
-        if (i == 3 || i == 5 || i == 7 || i == 9) {
-            ss << "-";
-        }
-    }
-
-    return ss.str();
 }
 
 //merges overlapping ranges and ranges separated by merge_dist or less
@@ -221,11 +191,9 @@ std::shared_ptr<Read> subread(const Read& read, PosRange seq_range, PosRange sig
     assert(signal_range.second % stride == 0 ||
            (signal_range.second == read.raw_data.size(0) && seq_range.second == read.seq.size()));
 
-    //assert(read.called_chunks.empty() && read.num_chunks_called == 0 && read.num_modbase_chunks_called == 0);
     auto subread = copy_read(read);
 
-    //TODO is it ok, or do we want subread number here?
-    const auto subread_id = derive_uuid(
+    const auto subread_id = utils::derive_uuid(
             read.read_id, std::to_string(seq_range.first) + "-" + std::to_string(seq_range.second));
     subread->read_id = subread_id;
     subread->raw_data = subread->raw_data.index(
@@ -237,10 +205,6 @@ std::shared_ptr<Read> subread(const Read& read, PosRange seq_range, PosRange sig
                                 subread->sample_rate)));
     //we adjust for it in new start time above
     subread->num_trimmed_samples = 0;
-    ////FIXME update?
-    //subread->range = ???;
-    ////FIXME update?
-    //subread->offset = ???;
 
     subread->seq = subread->seq.substr(seq_range.first, seq_range.second - seq_range.first);
     subread->qstring = subread->qstring.substr(seq_range.first, seq_range.second - seq_range.first);
@@ -270,12 +234,6 @@ DuplexSplitNode::ExtRead::ExtRead(std::shared_ptr<Read> r)
         : read(std::move(r)),
           data_as_float32(read->raw_data.to(torch::kFloat)),
           move_sums(move_cum_sums(read->moves)) {
-    //TODO switch to inclusive_scan and remove manual cumulative sums implementation
-    // when arm64:bionic compiler really supports c++17
-    //      move_sums(read->moves.size(), 0) {
-    //Using std::inclusive_scan instead of std::partial_sum since the latter overflows
-    //std::inclusive_scan(read->moves.begin(), read->moves.end(), move_sums.begin(), std::plus(),
-    //                    uint64_t(0));
     assert(move_sums.back() == read->seq.length());
 }
 
