@@ -1,5 +1,7 @@
 #include "alignment_utils.h"
 
+#include <openssl/sha.h>
+
 #include <sstream>
 
 namespace dorado::utils {

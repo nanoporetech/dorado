@@ -9,11 +9,9 @@
 #include <openssl/sha.h>
 #include <spdlog/spdlog.h>
 
-#include <array>
 #include <chrono>
 #include <cmath>
 #include <iomanip>
-#include <iostream>
 #include <optional>
 #include <string>
 
