@@ -2,6 +2,7 @@
 
 #include "../read_pipeline/ReadPipeline.h"
 #include "../utils/compat_utils.h"
+#include "../utils/time_utils.h"
 #include "../utils/types.h"
 #include "cxxpool.h"
 #include "pod5_format/c_api.h"
@@ -46,36 +47,6 @@ void string_reader(HighFive::Attribute& attribute, std::string& target_str) {
     }
 };
 
-std::string get_string_timestamp_from_unix_time(time_t time_stamp_ms) {
-    static std::mutex timestamp_mtx;
-    std::unique_lock lock(timestamp_mtx);
-    //Convert a time_t (seconds from UNIX epoch) to a timestamp in ISO 8601 (YYYY-MM-DDTHH:MM:SS.sss+00:00) format
-    auto time_stamp_s = time_stamp_ms / 1000;
-    int num_ms = time_stamp_ms % 1000;
-    char buf[32];
-    struct tm ts;
-    ts = *gmtime(&time_stamp_s);
-
-    std::stringstream ss;
-    ss << std::put_time(&ts, "%Y-%m-%dT%H:%M:%S.");
-    ss << std::setfill('0') << std::setw(3) << num_ms;  // add ms
-    ss << "+00:00";                                     //add zero timezone
-    return ss.str();
-}
-
-std::string adjust_time(const std::string& time_stamp, uint32_t offset) {
-    // Expects the time to be encoded like "2017-09-12T9:50:12Z".
-    // Adds the offset (in seconds) to the timeStamp.
-    std::tm base_time = {};
-    strptime(time_stamp.c_str(), "%Y-%m-%dT%H:%M:%SZ", &base_time);
-    time_t timeObj = mktime(&base_time);
-    timeObj += offset;
-    std::tm* new_time = gmtime(&timeObj);
-    char buff[32];
-    strftime(buff, 32, "%FT%TZ", new_time);
-    return std::string(buff);
-}
-
 std::shared_ptr<dorado::Read> process_pod5_read(size_t row,
                                                 Pod5ReadRecordBatch* batch,
                                                 Pod5FileReader* file,
@@ -115,7 +86,7 @@ std::shared_ptr<dorado::Read> process_pod5_read(size_t row,
     auto start_time_ms = run_acquisition_start_time_ms +
                          ((read_data.start_sample * 1000) /
                           (uint64_t)run_sample_rate);  // TODO check if this cast is needed
-    auto start_time = get_string_timestamp_from_unix_time(start_time_ms);
+    auto start_time = dorado::utils::get_string_timestamp_from_unix_time(start_time_ms);
     new_read->run_acqusition_start_time_ms = run_acquisition_start_time_ms;
     new_read->start_time_ms = start_time_ms;
     new_read->scaling = read_data.calibration_scale;
@@ -409,13 +380,13 @@ std::unordered_map<std::string, ReadGroup> DataLoader::load_read_groups(
                         }
 
                         std::string id = run_id + "_" + model_path;
-                        read_groups[id] =
-                                ReadGroup{run_id,
-                                          model_path,
-                                          flowcell_id,
-                                          device_id,
-                                          get_string_timestamp_from_unix_time(exp_start_time_ms),
-                                          sample_id};
+                        read_groups[id] = ReadGroup{
+                                run_id,
+                                model_path,
+                                flowcell_id,
+                                device_id,
+                                utils::get_string_timestamp_from_unix_time(exp_start_time_ms),
+                                sample_id};
                     }
                     if (pod5_close_and_free_reader(file) != POD5_OK) {
                         spdlog::error("Failed to close and free POD5 reader");
@@ -741,8 +712,8 @@ void DataLoader::load_fast5_reads_from_file(const std::string& path) {
         std::string exp_start_time;
         string_reader(exp_start_time_attr, exp_start_time);
 
-        auto start_time_str =
-                adjust_time(exp_start_time, static_cast<uint32_t>(start_time / sampling_rate));
+        auto start_time_str = utils::adjust_time(exp_start_time,
+                                                 static_cast<uint32_t>(start_time / sampling_rate));
 
         auto new_read = std::make_shared<Read>();
         new_read->sample_rate = sampling_rate;

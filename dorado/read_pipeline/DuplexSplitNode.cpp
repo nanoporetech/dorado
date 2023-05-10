@@ -3,6 +3,7 @@
 #include "utils/alignment_utils.h"
 #include "utils/duplex_utils.h"
 #include "utils/sequence_utils.h"
+#include "utils/time_utils.h"
 
 #include <openssl/sha.h>
 #include <spdlog/spdlog.h>
@@ -61,39 +62,6 @@ std::shared_ptr<Read> copy_read(const Read& read) {
 
     copy->attributes = read.attributes;
     return copy;
-}
-
-//TODO copied from DataLoader.cpp
-std::string get_string_timestamp_from_unix_time(time_t time_stamp_ms) {
-    static std::mutex timestamp_mtx;
-    std::unique_lock lock(timestamp_mtx);
-    //Convert a time_t (seconds from UNIX epoch) to a timestamp in %Y-%m-%dT%H:%M:%S format
-    auto time_stamp_s = time_stamp_ms / 1000;
-    int num_ms = time_stamp_ms % 1000;
-    char buf[32];
-    struct tm ts;
-    ts = *gmtime(&time_stamp_s);
-
-    std::stringstream ss;
-    ss << std::put_time(&ts, "%Y-%m-%dT%H:%M:%S.");
-    ss << std::setfill('0') << std::setw(3) << num_ms;  // add ms
-    ss << "+00:00";                                     //add zero timezone
-    return ss.str();
-}
-
-// Expects the time to be encoded like "2017-09-12T9:50:12.456+00:00".
-time_t get_unix_time_from_string_timestamp(const std::string& time_stamp) {
-    std::stringstream ss(time_stamp);
-    std::tm base_time = {};
-    ss >> std::get_time(&base_time, "%Y-%m-%dT%H:%M:%S.");
-
-    auto num_ms = std::stoi(time_stamp.substr(20, time_stamp.size() - 26));
-    return mktime(&base_time) * 1000 + num_ms;
-}
-
-std::string adjust_time_ms(const std::string& time_stamp, uint64_t offset_ms) {
-    return get_string_timestamp_from_unix_time(get_unix_time_from_string_timestamp(time_stamp) +
-                                               offset_ms);
 }
 
 std::string derive_uuid(const std::string& input_uuid, const std::string& desc) {
@@ -263,10 +231,10 @@ std::shared_ptr<Read> subread(const Read& read, PosRange seq_range, PosRange sig
     subread->raw_data = subread->raw_data.index(
             {torch::indexing::Slice(signal_range.first, signal_range.second)});
     subread->attributes.read_number = uint32_t(-1);
-    subread->attributes.start_time =
-            adjust_time_ms(subread->attributes.start_time,
-                           uint64_t(std::round((subread->num_trimmed_samples + signal_range.first) *
-                                               1000. / subread->sample_rate)));
+    subread->attributes.start_time = utils::adjust_time_ms(
+            subread->attributes.start_time,
+            uint64_t(std::round((subread->num_trimmed_samples + signal_range.first) * 1000. /
+                                subread->sample_rate)));
     //we adjust for it in new start time above
     subread->num_trimmed_samples = 0;
     ////FIXME update?
