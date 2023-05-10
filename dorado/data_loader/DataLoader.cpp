@@ -344,12 +344,7 @@ void DataLoader::load_read_channels(std::string data_path, bool recursive_file_l
                         m_max_channel = channel;
                     }
 
-                    if (channel_to_read_id.find(channel) != channel_to_read_id.end()) {
-                        channel_to_read_id[channel].push_back(std::move(read_id));
-                    } else {
-                        channel_to_read_id.emplace(channel, std::vector<ReadID>());
-                        channel_to_read_id[channel].push_back(std::move(read_id));
-                    }
+                    channel_to_read_id[channel].push_back(std::move(read_id));
                 }
 
                 if (pod5_free_read_batch(batch) != POD5_OK) {
