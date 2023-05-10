@@ -140,4 +140,29 @@ void add_rg_hdr(sam_hdr_t* hdr, const std::unordered_map<std::string, ReadGroup>
 
 void add_sq_hdr(sam_hdr_t* hdr, const sq_t& seqs);
 
+/**
+ * @brief Retrieves read group information from a SAM/BAM/CRAM file header based on a specified key.
+ *
+ * This function extracts read group information from a SAM/BAM/CRAM file header
+ * and returns a map containing read group IDs and their associated tags for the specified key.
+ *
+ * @param header A pointer to a valid sam_hdr_t object representing the SAM/BAM/CRAM file header.
+ * @param key A null-terminated C-style string representing the tag key to be retrieved for each read group.
+ * @return A std::map containing read group IDs as keys and their associated tags for the specified key as values.
+ *
+ * @throws std::invalid_argument If the provided header is nullptr or key is nullptr/empty.
+ * @throws std::runtime_error If there are no read groups in the file.
+ *
+ * Example usage:
+ * 
+ * samFile *sam_fp = sam_open("example.bam", "r");
+ * sam_hdr_t *header = sam_hdr_read(sam_fp);
+ * std::map<std::string, std::string> read_group_info = get_read_group_info(header, "DT");
+ *
+ * for (const auto& rg_pair : read_group_info) {
+ *     std::cout << "Read Group ID: " << rg_pair.first << ", Date: " << rg_pair.second << std::endl;
+ * }
+ */
+std::map<std::string, std::string> get_read_group_info(sam_hdr_t* header, const char* key);
+
 }  // namespace dorado::utils
