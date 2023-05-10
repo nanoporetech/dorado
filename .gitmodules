@@ -40,3 +40,6 @@
 [submodule "dorado/3rdparty/ont-minimap2"]
 	path = dorado/3rdparty/ont-minimap2
 	url = https://github.com/nanoporetech/ont-minimap2.git
+[submodule "dorado/3rdparty/date"]
+	path = dorado/3rdparty/date
+	url = https://github.com/HowardHinnant/date.git

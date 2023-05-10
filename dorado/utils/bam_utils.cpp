@@ -561,4 +561,34 @@ void add_sq_hdr(sam_hdr_t* hdr, const sq_t& seqs) {
     }
 }
 
+std::map<std::string, std::string> get_read_group_info(sam_hdr_t* header, const char* key) {
+    if (header == nullptr) {
+        throw std::invalid_argument("header cannot be nullptr");
+    }
+
+    int num_read_groups = sam_hdr_count_lines(header, "RG");
+    if (num_read_groups == -1) {
+        throw std::runtime_error("no read groups in file");
+    }
+
+    kstring_t rg = {0, 0, NULL};
+    std::map<std::string, std::string> read_group_info;
+
+    for (int i = 0; i < num_read_groups; ++i) {
+        const char* id = sam_hdr_line_name(header, "RG", i);
+        if (id == nullptr) {
+            continue;
+        }
+
+        std::string read_group_id(id);
+        int res = sam_hdr_find_tag_id(header, "RG", "ID", id, key, &rg);
+        if (res == 0 && rg.l > 0) {
+            read_group_info[read_group_id] = std::string(rg.s, rg.l);
+        }
+    }
+
+    free(rg.s);
+    return read_group_info;
+}
+
 }  // namespace dorado::utils

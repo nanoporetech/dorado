@@ -72,6 +72,8 @@ set(BUILD_TESTING OFF)
 add_subdirectory(${DORADO_3RD_PARTY}/edlib EXCLUDE_FROM_ALL)
 set(BUILD_TESTING ON)
 
+add_subdirectory(${DORADO_3RD_PARTY}/date)
+
 enable_testing()
 
 configure_file(dorado/Version.h.in dorado/Version.h)
@@ -222,6 +224,7 @@ target_link_libraries(dorado_lib
     vbz_hdf_plugin
     OpenSSL::SSL
     edlib
+    date::date
 )
 
 if(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")

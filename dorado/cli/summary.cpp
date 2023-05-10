@@ -3,6 +3,8 @@
 #include "utils/log_utils.h"
 
 #include <argparse.hpp>
+#include <date/date.h>
+#include <date/tz.h>
 #include <spdlog/spdlog.h>
 
 #include <cctype>
@@ -37,6 +39,22 @@ std::vector<std::string> aligned_header = {
         "alignment_mapq",           "alignment_strand_coverage", "alignment_identity",
         "alignment_accuracy"};
 
+double time_difference_seconds(const std::string &timestamp1, const std::string &timestamp2) {
+    using namespace date;
+    using namespace std::chrono;
+    try {
+        std::istringstream ss1(timestamp1);
+        std::istringstream ss2(timestamp2);
+        sys_time<microseconds> time1, time2;
+        ss1 >> parse("%FT%T%Ez", time1);
+        ss2 >> parse("%FT%T%Ez", time2);
+        duration<double> diff = time1 - time2;
+        return diff.count();
+    } catch (const std::exception &e) {
+        throw std::runtime_error("Failed to parse timestamps");
+    }
+}
+
 int summary(int argc, char *argv[]) {
     utils::InitLogging();
 
@@ -62,6 +80,14 @@ int summary(int argc, char *argv[]) {
     auto separator(parser.get<std::string>("separator"));
 
     HtsReader reader(reads);
+
+    auto read_group_exp_start_time = utils::get_read_group_info(reader.header, "DT");
+
+    for (const auto &rg_pair : read_group_exp_start_time) {
+        std::cerr << "Read Group ID: " << rg_pair.first << ", Date: " << rg_pair.second
+                  << std::endl;
+    }
+
     spdlog::debug("> input fmt: {} aligned: {}", reader.format, reader.is_aligned);
 #ifndef _WIN32
     std::signal(SIGPIPE, [](int signum) { interupt = 1; });
@@ -88,31 +114,6 @@ int summary(int argc, char *argv[]) {
             continue;
         }
 
-        auto rg_value = reader.get_tag<std::string>("RG");
-        auto filename = reader.get_tag<std::string>("f5");
-        if (filename.empty()) {
-            filename = reader.get_tag<std::string>("fn");
-        }
-        auto read_id = bam_get_qname(reader.record);
-        auto channel = reader.get_tag<int>("ch");
-        auto mux = reader.get_tag<int>("mx");
-        auto start_time = reader.get_tag<std::string>("st");
-        auto duration = reader.get_tag<float>("du");
-        auto seqlen = reader.record->core.l_qseq;
-        auto mean_qscore = reader.get_tag<int>("qs");
-
-        auto num_samples = reader.get_tag<int>("ns");
-        auto trim_samples = reader.get_tag<int>("ts");
-
-        // todo: sample_rate and template_start_time
-        float template_duration = (num_samples - trim_samples) / 4000.0f;
-        auto template_start_time = start_time;
-
-        std::cout << filename << separator << read_id << separator << rg_value.substr(0, 36)
-                  << separator << channel << separator << mux << separator << start_time
-                  << separator << duration << separator << template_start_time << separator
-                  << template_duration << separator << seqlen << separator << mean_qscore;
-
         int32_t query_start = 0;
         int32_t query_end = 0;
         std::string alignment_genome = "*";
@@ -131,6 +132,30 @@ int summary(int argc, char *argv[]) {
         float strand_coverage = 0.0;
         float alignment_identity = 0.0;
         float alignment_accurary = 0.0;
+
+        auto rg_value = reader.get_tag<std::string>("RG");
+        auto filename = reader.get_tag<std::string>("f5");
+        if (filename.empty()) {
+            filename = reader.get_tag<std::string>("fn");
+        }
+        auto read_id = bam_get_qname(reader.record);
+        auto channel = reader.get_tag<int>("ch");
+        auto mux = reader.get_tag<int>("mx");
+
+        auto start_time_dt = reader.get_tag<std::string>("st");
+        auto duration = reader.get_tag<float>("du");
+
+        auto seqlen = reader.record->core.l_qseq;
+        auto mean_qscore = reader.get_tag<int>("qs");
+
+        auto num_samples = reader.get_tag<int>("ns");
+        auto trim_samples = reader.get_tag<int>("ts");
+
+        // todo: sample_rate
+        float template_duration = (num_samples - trim_samples) / 4000.0f;
+        auto start_time =
+                time_difference_seconds(start_time_dt, read_group_exp_start_time.at(rg_value));
+        auto template_start_time = start_time + (duration - template_duration);
 
         if (!(reader.record->core.flag & BAM_FUNMAP)) {
             alignment_mapq = static_cast<int>(reader.record->core.qual);
@@ -178,10 +203,10 @@ int summary(int argc, char *argv[]) {
             uint8_t *md_ptr = bam_aux_get(reader.record.get(), "MD");
 
             if (md_ptr) {
+                int i = 0;
+                int md_length = 0;
                 char *md = bam_aux2Z(md_ptr);
 
-                int md_length = 0;
-                int i = 0;
                 while (md[i]) {
                     if (std::isdigit(md[i])) {
                         md_length = md_length * 10 + (md[i] - '0');
@@ -201,14 +226,19 @@ int summary(int argc, char *argv[]) {
                     i++;
                 }
             }
-            alignment_num_correct = alignment_num_aligned - alignment_num_substitutions;
 
+            alignment_num_correct = alignment_num_aligned - alignment_num_substitutions;
             alignment_identity = alignment_num_correct / static_cast<float>(alignment_num_aligned);
             alignment_accurary = alignment_num_correct /
                                  static_cast<float>(alignment_genome_end - alignment_genome_start);
             strand_coverage =
                     (alignment_strand_end - alignment_strand_start) / static_cast<float>(seqlen);
         }
+
+        std::cout << filename << separator << read_id << separator << rg_value.substr(0, 36)
+                  << separator << channel << separator << mux << separator << start_time
+                  << separator << duration << separator << template_start_time << separator
+                  << template_duration << separator << seqlen << separator << mean_qscore;
 
         std::cout << separator << alignment_genome << separator << alignment_genome_start
                   << separator << alignment_genome_end << separator << alignment_strand_start
