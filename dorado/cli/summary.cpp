@@ -45,8 +45,6 @@ int summary(int argc, char *argv[]) {
     parser.add_argument("-s", "--separator").default_value(std::string("\t"));
     parser.add_argument("-v", "--verbose").default_value(false).implicit_value(true);
 
-    // --primary-only
-
     try {
         parser.parse_args(argc, argv);
     } catch (const std::exception &e) {
@@ -133,25 +131,28 @@ int summary(int argc, char *argv[]) {
             float alignment_accurary = 0.0;
 
             if (!(reader.record->core.flag & BAM_FUNMAP)) {
-                query_start = reader.record->core.pos;
-                query_end = bam_endpos(reader.record.get());
-
                 alignment_mapq = static_cast<int>(reader.record->core.qual);
                 alignment_genome = reader.header->target_name[reader.record->core.tid];
 
                 alignment_genome_start = reader.record->core.pos;
                 alignment_genome_end = bam_endpos(reader.record.get());
 
-                alignment_strand_start =
-                        bam_is_rev(reader.record) ? alignment_genome_end : alignment_genome_start;
-                alignment_strand_end =
-                        bam_is_rev(reader.record) ? alignment_genome_start : alignment_genome_end;
+                alignment_strand_start = 0;
+                alignment_strand_end = seqlen;
 
                 alignment_direction = bam_is_rev(reader.record) ? "-" : "+";
                 alignment_length = reader.record->core.l_qseq;
 
                 uint32_t *cigar = bam_get_cigar(reader.record);
                 int n_cigar = reader.record->core.n_cigar;
+
+                if (bam_cigar_op(cigar[0]) == BAM_CSOFT_CLIP) {
+                    alignment_strand_start += bam_cigar_oplen(cigar[0]);
+                }
+
+                if (bam_cigar_op(cigar[n_cigar - 1]) == BAM_CSOFT_CLIP) {
+                    alignment_strand_end -= bam_cigar_oplen(cigar[n_cigar - 1]);
+                }
 
                 for (int i = 0; i < n_cigar; ++i) {
                     int op = bam_cigar_op(cigar[i]);
@@ -205,7 +206,8 @@ int summary(int argc, char *argv[]) {
                 alignment_accurary =
                         alignment_num_correct /
                         static_cast<float>(alignment_genome_end - alignment_genome_start);
-                strand_coverage = (query_end - query_start) / static_cast<float>(seqlen);
+                strand_coverage = (alignment_strand_end - alignment_strand_start) /
+                                  static_cast<float>(seqlen);
             }
 
             std::cout << separator << alignment_genome << separator << alignment_genome_start
