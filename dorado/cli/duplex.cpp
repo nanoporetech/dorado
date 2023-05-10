@@ -293,8 +293,12 @@ int duplex(int argc, char* argv[]) {
                                              ? std::optional<std::map<std::string, std::string>>{}
                                              : template_complement_map);
 
+            // Initialize duplex split settings and create a duplex split node
+            // with the given settings and number of devices. If
+            // splitter_settings.enabled is set to false, the splitter node will
+            // act as a passthrough, meaning it won't perform any splitting
+            // operations and will just pass data through.
             DuplexSplitSettings splitter_settings;
-            //splitter_settings.enabled = false;
             DuplexSplitNode splitter_node(pairing_node, splitter_settings, num_devices);
 
             auto adjusted_simplex_overlap = (overlap / simplex_model_stride) * simplex_model_stride;
