@@ -15,7 +15,6 @@
 #include "nn/ModelRunner.h"
 #include "nn/RemoraModel.h"
 #include "read_pipeline/BasecallerNode.h"
-#include "read_pipeline/DuplexSplitNode.h"
 #include "read_pipeline/ModBaseCallerNode.h"
 #include "read_pipeline/ReadFilterNode.h"
 #include "read_pipeline/ReadToBamTypeNode.h"
@@ -61,7 +60,8 @@ void setup(std::vector<std::string> args,
            std::string read_list_file_path,
            bool recursive_file_loading,
            int kmer_size,
-           int window_size) {
+           int window_size,
+           bool skip_model_compatibility_check) {
     torch::set_num_threads(1);
     std::vector<Runner> runners;
 
@@ -180,7 +180,7 @@ void setup(std::vector<std::string> args,
     // Check sample rate of model vs data.
     auto data_sample_rate = DataLoader::get_sample_rate(data_path, recursive_file_loading);
     auto model_sample_rate = get_model_sample_rate(model_path);
-    if (data_sample_rate != model_sample_rate) {
+    if (!skip_model_compatibility_check && (data_sample_rate != model_sample_rate)) {
         std::stringstream err;
         err << "Sample rate for model (" << model_sample_rate << ") and data (" << data_sample_rate
             << ") don't match.";
@@ -222,22 +222,13 @@ void setup(std::vector<std::string> args,
     StatsCounterNode stats_node(read_converter, duplex);
     ReadFilterNode read_filter_node(stats_node, min_qscore, thread_allocations.read_filter_threads);
 
-    std::unique_ptr<DuplexSplitNode> splitter_node;
     std::unique_ptr<ModBaseCallerNode> mod_base_caller_node;
-    MessageSink* basecaller_node_sink = nullptr;
+    MessageSink* basecaller_node_sink = static_cast<MessageSink*>(&read_filter_node);
     if (!remora_model_list.empty()) {
         mod_base_caller_node = std::make_unique<ModBaseCallerNode>(
                 read_filter_node, std::move(remora_callers), thread_allocations.remora_threads,
                 num_devices, model_stride, remora_batch_size);
         basecaller_node_sink = static_cast<MessageSink*>(mod_base_caller_node.get());
-    } else {
-        //TODO add separate factory methods for simplex/duplex modes
-        DuplexSplitSettings splitter_settings;
-        splitter_settings.simplex_mode = true;
-        splitter_node =
-                std::make_unique<DuplexSplitNode>(read_filter_node, splitter_settings, num_devices);
-
-        basecaller_node_sink = static_cast<MessageSink*>(splitter_node.get());
     }
     const int kBatchTimeoutMS = 100;
     BasecallerNode basecaller_node(*basecaller_node_sink, std::move(runners), overlap,
@@ -340,8 +331,11 @@ int basecaller(int argc, char* argv[]) {
             .default_value(10)
             .scan<'i', int>();
 
+    argparse::ArgumentParser internal_parser;
+
     try {
-        parser.parse_args(argc, argv);
+        auto remaining_args = parser.parse_known_args(argc, argv);
+        internal_parser = utils::parse_internal_options(remaining_args);
     } catch (const std::exception& e) {
         std::ostringstream parser_stream;
         parser_stream << parser;
@@ -400,7 +394,8 @@ int basecaller(int argc, char* argv[]) {
               default_parameters.remora_threads, output_mode, parser.get<bool>("--emit-moves"),
               parser.get<int>("--max-reads"), parser.get<int>("--min-qscore"),
               parser.get<std::string>("--read-ids"), parser.get<bool>("--recursive"),
-              parser.get<int>("k"), parser.get<int>("w"));
+              parser.get<int>("k"), parser.get<int>("w"),
+              internal_parser.get<bool>("--skip-model-compatibility-check"));
     } catch (const std::exception& e) {
         spdlog::error("{}", e.what());
         return 1;
