@@ -1,7 +1,5 @@
 #pragma once
 
-#include "edlib.h"
-
 #include <string>
 
 namespace dorado::utils {

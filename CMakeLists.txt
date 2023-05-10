@@ -151,7 +151,9 @@ set(LIB_SOURCE_FILES
     dorado/utils/time_utils.cpp
     dorado/utils/time_utils.h
     dorado/utils/uuid_utils.cpp
-    dorado/utils/uuid_utils.h)
+    dorado/utils/uuid_utils.h
+    dorado/utils/read_utils.cpp
+    dorado/utils/read_utils.cpp)
 
 if (DORADO_GPU_BUILD)
     if(APPLE)

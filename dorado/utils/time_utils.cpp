@@ -1,3 +1,5 @@
+#include "time_utils.h"
+
 namespace dorado::utils {
 
 std::string get_string_timestamp_from_unix_time(time_t time_stamp_ms) {

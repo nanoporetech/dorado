@@ -2,6 +2,7 @@
 
 #include "utils/alignment_utils.h"
 #include "utils/duplex_utils.h"
+#include "utils/read_utils.h"
 #include "utils/sequence_utils.h"
 #include "utils/time_utils.h"
 #include "utils/uuid_utils.h"
@@ -27,40 +28,6 @@ auto filter_ranges(const PosRanges& ranges, FilterF filter_f) {
     PosRanges filtered;
     std::copy_if(ranges.begin(), ranges.end(), std::back_inserter(filtered), filter_f);
     return filtered;
-}
-
-std::shared_ptr<Read> copy_read(const Read& read) {
-    auto copy = std::make_shared<Read>();
-    copy->raw_data = read.raw_data;
-    copy->digitisation = read.digitisation;
-    copy->range = read.range;
-    copy->offset = read.offset;
-    copy->sample_rate = read.sample_rate;
-
-    copy->shift = read.shift;
-    copy->scale = read.scale;
-
-    copy->scaling = read.scaling;
-
-    copy->num_chunks = read.num_chunks;
-    copy->num_modbase_chunks = read.num_modbase_chunks;
-
-    copy->model_stride = read.model_stride;
-
-    copy->read_id = read.read_id;
-    copy->seq = read.seq;
-    copy->qstring = read.qstring;
-    copy->moves = read.moves;
-    copy->run_id = read.run_id;
-    copy->model_name = read.model_name;
-
-    copy->base_mod_probs = read.base_mod_probs;
-    copy->base_mod_info = read.base_mod_info;
-
-    copy->num_trimmed_samples = read.num_trimmed_samples;
-
-    copy->attributes = read.attributes;
-    return copy;
 }
 
 //merges overlapping ranges and ranges separated by merge_dist or less
@@ -189,7 +156,7 @@ std::shared_ptr<Read> subread(const Read& read, PosRange seq_range, PosRange sig
     assert(signal_range.second % stride == 0 ||
            (signal_range.second == read.raw_data.size(0) && seq_range.second == read.seq.size()));
 
-    auto subread = copy_read(read);
+    auto subread = utils::copy_read(read);
 
     const auto subread_id = utils::derive_uuid(
             read.read_id, std::to_string(seq_range.first) + "-" + std::to_string(seq_range.second));
