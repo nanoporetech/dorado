@@ -331,12 +331,6 @@ void DataLoader::load_read_channels(std::string data_path, bool recursive_file_l
                         continue;
                     }
 
-                    // Fetch string representation of a read_id to store in the read list.
-                    std::string read_id_str(37, '*');
-                    pod5_error_t err = pod5_format_read_id(read_data.read_id, read_id_str.data());
-                    ReadID read_id;
-                    memcpy(read_id.data(), read_data.read_id, 16);
-
                     uint16_t channel = read_data.channel;
 
                     // Update maximum number of channels encountered.
@@ -344,6 +338,9 @@ void DataLoader::load_read_channels(std::string data_path, bool recursive_file_l
                         m_max_channel = channel;
                     }
 
+                    // Store the read_id in the channel's list.
+                    ReadID read_id;
+                    memcpy(read_id.data(), read_data.read_id, 16);
                     channel_to_read_id[channel].push_back(std::move(read_id));
                 }
 
