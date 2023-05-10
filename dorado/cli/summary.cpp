@@ -168,7 +168,6 @@ int summary(int argc, char *argv[]) {
             alignment_strand_end = seqlen;
 
             alignment_direction = bam_is_rev(reader.record) ? "-" : "+";
-            alignment_length = reader.record->core.l_qseq;
 
             uint32_t *cigar = bam_get_cigar(reader.record);
             int n_cigar = reader.record->core.n_cigar;
@@ -200,6 +199,9 @@ int summary(int argc, char *argv[]) {
                 }
             }
 
+            alignment_length =
+                    alignment_num_aligned + alignment_num_insertions + alignment_num_deletions;
+
             uint8_t *md_ptr = bam_aux_get(reader.record.get(), "MD");
 
             if (md_ptr) {
@@ -229,8 +231,8 @@ int summary(int argc, char *argv[]) {
 
             alignment_num_correct = alignment_num_aligned - alignment_num_substitutions;
             alignment_identity = alignment_num_correct / static_cast<float>(alignment_num_aligned);
-            alignment_accurary = alignment_num_correct /
-                                 static_cast<float>(alignment_genome_end - alignment_genome_start);
+            alignment_accurary = alignment_num_correct / static_cast<float>(alignment_length);
+
             strand_coverage =
                     (alignment_strand_end - alignment_strand_start) / static_cast<float>(seqlen);
         }
@@ -243,9 +245,9 @@ int summary(int argc, char *argv[]) {
         std::cout << separator << alignment_genome << separator << alignment_genome_start
                   << separator << alignment_genome_end << separator << alignment_strand_start
                   << separator << alignment_strand_end << separator << alignment_direction
-                  << separator << alignment_genome_end - alignment_genome_start << separator
-                  << alignment_num_aligned << separator << alignment_num_correct << separator
-                  << alignment_num_insertions << separator << alignment_num_deletions << separator
+                  << separator << alignment_length << separator << alignment_num_aligned
+                  << separator << alignment_num_correct << separator << alignment_num_insertions
+                  << separator << alignment_num_deletions << separator
                   << alignment_num_substitutions << separator << alignment_mapq << separator
                   << strand_coverage << separator << alignment_identity << separator
                   << alignment_accurary;
