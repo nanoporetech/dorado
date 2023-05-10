@@ -489,10 +489,7 @@ std::vector<std::shared_ptr<Read>> DuplexSplitNode::split(std::shared_ptr<Read> 
         spdlog::trace("Running {}", description);
         std::vector<ExtRead> split_round_result;
         for (auto& r : to_split) {
-            //auto start = high_resolution_clock::now();
             auto spacers = split_f(r);
-            //auto stop = high_resolution_clock::now();
-            //spdlog::trace("{} duration: {} microseconds", description, duration_cast<microseconds>(stop - start).count());
             spdlog::debug("DSN: {} strategy {} splits in read {}", description, spacers.size(),
                           init_read->read_id);
 
