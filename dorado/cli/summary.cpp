@@ -114,25 +114,6 @@ int summary(int argc, char *argv[]) {
             continue;
         }
 
-        int32_t query_start = 0;
-        int32_t query_end = 0;
-        std::string alignment_genome = "*";
-        int32_t alignment_genome_start = -1;
-        int32_t alignment_genome_end = -1;
-        int32_t alignment_strand_start = -1;
-        int32_t alignment_strand_end = -1;
-        std::string alignment_direction = "*";
-        int32_t alignment_length = 0;
-        int32_t alignment_mapq = 0;
-        int alignment_num_aligned = 0;
-        int alignment_num_correct = 0;
-        int alignment_num_insertions = 0;
-        int alignment_num_deletions = 0;
-        int alignment_num_substitutions = 0;
-        float strand_coverage = 0.0;
-        float alignment_identity = 0.0;
-        float alignment_accurary = 0.0;
-
         auto rg_value = reader.get_tag<std::string>("RG");
         auto filename = reader.get_tag<std::string>("f5");
         if (filename.empty()) {
@@ -157,7 +138,31 @@ int summary(int argc, char *argv[]) {
                 time_difference_seconds(start_time_dt, read_group_exp_start_time.at(rg_value));
         auto template_start_time = start_time + (duration - template_duration);
 
+        std::cout << filename << separator << read_id << separator << rg_value.substr(0, 36)
+                  << separator << channel << separator << mux << separator << start_time
+                  << separator << duration << separator << template_start_time << separator
+                  << template_duration << separator << seqlen << separator << mean_qscore;
+
         if (!(reader.record->core.flag & BAM_FUNMAP)) {
+            int32_t query_start = 0;
+            int32_t query_end = 0;
+            std::string alignment_genome = "*";
+            int32_t alignment_genome_start = -1;
+            int32_t alignment_genome_end = -1;
+            int32_t alignment_strand_start = -1;
+            int32_t alignment_strand_end = -1;
+            std::string alignment_direction = "*";
+            int32_t alignment_length = 0;
+            int32_t alignment_mapq = 0;
+            int alignment_num_aligned = 0;
+            int alignment_num_correct = 0;
+            int alignment_num_insertions = 0;
+            int alignment_num_deletions = 0;
+            int alignment_num_substitutions = 0;
+            float strand_coverage = 0.0;
+            float alignment_identity = 0.0;
+            float alignment_accurary = 0.0;
+
             alignment_mapq = static_cast<int>(reader.record->core.qual);
             alignment_genome = reader.header->target_name[reader.record->core.tid];
 
@@ -235,22 +240,17 @@ int summary(int argc, char *argv[]) {
 
             strand_coverage =
                     (alignment_strand_end - alignment_strand_start) / static_cast<float>(seqlen);
+
+            std::cout << separator << alignment_genome << separator << alignment_genome_start
+                      << separator << alignment_genome_end << separator << alignment_strand_start
+                      << separator << alignment_strand_end << separator << alignment_direction
+                      << separator << alignment_length << separator << alignment_num_aligned
+                      << separator << alignment_num_correct << separator << alignment_num_insertions
+                      << separator << alignment_num_deletions << separator
+                      << alignment_num_substitutions << separator << alignment_mapq << separator
+                      << strand_coverage << separator << alignment_identity << separator
+                      << alignment_accurary;
         }
-
-        std::cout << filename << separator << read_id << separator << rg_value.substr(0, 36)
-                  << separator << channel << separator << mux << separator << start_time
-                  << separator << duration << separator << template_start_time << separator
-                  << template_duration << separator << seqlen << separator << mean_qscore;
-
-        std::cout << separator << alignment_genome << separator << alignment_genome_start
-                  << separator << alignment_genome_end << separator << alignment_strand_start
-                  << separator << alignment_strand_end << separator << alignment_direction
-                  << separator << alignment_length << separator << alignment_num_aligned
-                  << separator << alignment_num_correct << separator << alignment_num_insertions
-                  << separator << alignment_num_deletions << separator
-                  << alignment_num_substitutions << separator << alignment_mapq << separator
-                  << strand_coverage << separator << alignment_identity << separator
-                  << alignment_accurary;
 
         std::cout << '\n';
     }
