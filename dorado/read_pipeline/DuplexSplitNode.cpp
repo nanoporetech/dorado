@@ -131,11 +131,9 @@ bool check_rc_match(const std::string& seq, PosRange templ_r, PosRange compl_r, 
 
     auto edlib_cfg = edlibNewAlignConfig(dist_thr, EDLIB_MODE_HW, EDLIB_TASK_DISTANCE, NULL, 0);
 
-    const char* c_seq = seq.c_str();
-    auto edlib_result = edlibAlign(c_seq + templ_r.first, templ_r.second - templ_r.first,
+    auto edlib_result = edlibAlign(seq.c_str() + templ_r.first, templ_r.second - templ_r.first,
                                    rc_compl.c_str(), rc_compl.size(), edlib_cfg);
     assert(edlib_result.status == EDLIB_STATUS_OK);
-    std::optional<PosRange> res = std::nullopt;
 
     bool match = (edlib_result.status == EDLIB_STATUS_OK) && (edlib_result.editDistance != -1);
     assert(!match || edlib_result.editDistance <= dist_thr);
@@ -145,18 +143,21 @@ bool check_rc_match(const std::string& seq, PosRange templ_r, PosRange compl_r, 
 }
 
 //TODO end_reason access?
+//If read.parent_read_id is not empty then it will be used as parent_read_id of the subread
 //signal_range should already be 'adjusted' to stride (e.g. probably gotten from seq_range)
-//NB: doesn't set parent_read_id
 std::shared_ptr<Read> subread(const Read& read, PosRange seq_range, PosRange signal_range) {
     //TODO support mods
     //NB: currently doesn't support mods
-    assert(read.base_mod_info == nullptr && read.base_mod_probs.empty());
+    //assert(read.base_mod_info == nullptr && read.base_mod_probs.empty());
+    if (read.base_mod_info != nullptr || !read.base_mod_probs.empty()) {
+        throw std::runtime_error(std::string("Read splitting doesn't support mods yet"));
+    }
     const int stride = read.model_stride;
     assert(signal_range.first % stride == 0);
     assert(signal_range.second % stride == 0 ||
            (signal_range.second == read.raw_data.size(0) && seq_range.second == read.seq.size()));
 
-    auto subread = utils::copy_read(read);
+    auto subread = utils::shallow_copy_read(read);
 
     const auto subread_id = utils::derive_uuid(
             read.read_id, std::to_string(seq_range.first) + "-" + std::to_string(seq_range.second));
@@ -177,6 +178,17 @@ std::shared_ptr<Read> subread(const Read& read, PosRange seq_range, PosRange sig
                                           subread->moves.begin() + signal_range.second / stride);
     assert(signal_range.second == read.raw_data.size(0) ||
            subread->moves.size() * stride == subread->raw_data.size(0));
+
+    if (!read.parent_read_id.empty()) {
+        subread->parent_read_id = read.parent_read_id;
+    } else {
+        subread->parent_read_id = read.read_id;
+    }
+
+    //FIXME
+    //uint64_t start_sample;
+    //uint64_t end_sample;
+    //uint64_t run_acqusition_start_time_ms;
     return subread;
 }
 
@@ -184,21 +196,10 @@ std::shared_ptr<Read> subread(const Read& read, PosRange seq_range, PosRange sig
 
 namespace dorado {
 
-std::vector<uint64_t> move_cum_sums(const std::vector<uint8_t> moves) {
-    std::vector<uint64_t> ans(moves.size(), 0);
-    if (!moves.empty()) {
-        ans[0] = moves[0];
-    }
-    for (size_t i = 1, n = moves.size(); i < n; i++) {
-        ans[i] = ans[i - 1] + moves[i];
-    }
-    return ans;
-}
-
 DuplexSplitNode::ExtRead::ExtRead(std::shared_ptr<Read> r)
         : read(std::move(r)),
           data_as_float32(read->raw_data.to(torch::kFloat)),
-          move_sums(move_cum_sums(read->moves)) {
+          move_sums(utils::move_cum_sums(read->moves)) {
     assert(move_sums.back() == read->seq.length());
 }
 
@@ -396,8 +397,8 @@ std::vector<std::shared_ptr<Read>> DuplexSplitNode::split(std::shared_ptr<Read> 
     }
 
     std::vector<std::shared_ptr<Read>> split_result;
-    for (const auto& er : to_split) {
-        split_result.push_back(std::move(er.read));
+    for (const auto& ext_read : to_split) {
+        split_result.push_back(std::move(ext_read.read));
     }
 
     spdlog::debug("Read {} split into {} subreads", init_read->read_id, split_result.size());
@@ -410,6 +411,7 @@ std::vector<std::shared_ptr<Read>> DuplexSplitNode::split(std::shared_ptr<Read> 
 }
 
 void DuplexSplitNode::worker_thread() {
+    m_active++;  // Track active threads.
     Message message;
 
     while (m_work_queue.try_pop(message)) {
@@ -420,14 +422,16 @@ void DuplexSplitNode::worker_thread() {
             auto init_read = std::get<std::shared_ptr<Read>>(message);
             for (auto& subread : split(init_read)) {
                 //TODO correctly process end_reason when we have them
-                if (subread->read_id != init_read->read_id) {
-                    subread->parent_read_id = init_read->read_id;
-                }
                 m_sink.push_message(std::move(subread));
             }
         }
     }
-    m_sink.terminate();
+
+    int num_active = --m_active;
+    if (num_active == 0) {
+        terminate();
+        m_sink.terminate();
+    }
 }
 
 DuplexSplitNode::DuplexSplitNode(MessageSink& sink,

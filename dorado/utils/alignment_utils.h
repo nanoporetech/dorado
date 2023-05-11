@@ -17,7 +17,7 @@ namespace dorado::utils {
  * The function generates a formatted alignment string, which consists of:
  * 1. The aligned `query` sequence with deletions represented by dashes '-'
  * 2. A separator line with '|' for matches, '*' for mismatches, and spaces ' ' for insertions and deletions
- * 3. The aligned `target` sequence with insertions represented by dashes '-'
+* 3. The aligned `target` sequence with insertions represented by dashes '-'
  *
  * @param query A pointer to the query C-style string
  * @param target A pointer to the target C-style string
@@ -25,6 +25,6 @@ namespace dorado::utils {
  * @return A formatted string representation of the alignment
  */
 
-std::string print_alignment(const char* query, const char* target, const EdlibAlignResult& result);
+std::string alignment_to_str(const char* query, const char* target, const EdlibAlignResult& result);
 
 }  // namespace dorado::utils

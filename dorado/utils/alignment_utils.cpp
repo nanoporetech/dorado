@@ -4,7 +4,9 @@
 
 namespace dorado::utils {
 
-std::string print_alignment(const char* query, const char* target, const EdlibAlignResult& result) {
+std::string alignment_to_str(const char* query,
+                             const char* target,
+                             const EdlibAlignResult& result) {
     std::stringstream ss;
     int tpos = result.startLocations[0];
 

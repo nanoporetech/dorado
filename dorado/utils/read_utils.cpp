@@ -1,7 +1,7 @@
 #include "read_utils.h"
 
 namespace dorado::utils {
-std::shared_ptr<Read> copy_read(const Read& read) {
+std::shared_ptr<Read> shallow_copy_read(const Read& read) {
     auto copy = std::make_shared<Read>();
     copy->raw_data = read.raw_data;
     copy->digitisation = read.digitisation;
@@ -32,6 +32,22 @@ std::shared_ptr<Read> copy_read(const Read& read) {
     copy->num_trimmed_samples = read.num_trimmed_samples;
 
     copy->attributes = read.attributes;
+
+    copy->start_sample = read.start_sample;
+    copy->end_sample = read.end_sample;
+    copy->run_acqusition_start_time_ms = read.run_acqusition_start_time_ms;
     return copy;
 }
+
+std::vector<uint64_t> move_cum_sums(const std::vector<uint8_t>& moves) {
+    std::vector<uint64_t> ans(moves.size(), 0);
+    if (!moves.empty()) {
+        ans[0] = moves[0];
+    }
+    for (size_t i = 1, n = moves.size(); i < n; i++) {
+        ans[i] = ans[i - 1] + moves[i];
+    }
+    return ans;
+}
+
 }  // namespace dorado::utils
