@@ -13,6 +13,10 @@ const std::string& BaseModContext::motif(char base) const { return m_motifs[base
 size_t BaseModContext::motif_offset(char base) const { return m_offsets[base_to_int(base)]; }
 
 void BaseModContext::set_context(std::string motif, size_t offset) {
+    if (motif.size() < 2) {
+        // empty motif, or just the canonical base
+        return;
+    }
     char base = motif.at(offset);
     auto index = base_to_int(base);
     m_motifs[index] = std::move(motif);
