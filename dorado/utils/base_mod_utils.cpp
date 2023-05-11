@@ -67,7 +67,7 @@ std::string BaseModContext::encode() const {
     return s.str();
 }
 
-std::vector<int> BaseModContext::get_sequence_mask(const std::string& sequence) const {
+std::vector<int> BaseModContext::get_sequence_mask(std::string_view sequence) const {
     std::vector<int> mask(sequence.size(), 0);
     for (size_t p = 0; p < sequence.size(); ++p) {
         auto idx = base_to_int(sequence[p]);

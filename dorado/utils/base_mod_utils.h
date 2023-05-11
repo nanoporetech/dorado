@@ -3,6 +3,7 @@
 #include <array>
 #include <map>
 #include <string>
+#include <string_view>
 #include <vector>
 
 /** Helper class for managing modified base context.
@@ -25,10 +26,10 @@
 namespace dorado::utils {
 
 struct BaseModInfo {
-    BaseModInfo(const std::string& alphabet_,
-                const std::string& long_names_,
-                const std::string& context_)
-            : alphabet(alphabet_), long_names(long_names_), context(context_) {}
+    BaseModInfo(std::string alphabet_, std::string long_names_, std::string context_)
+            : alphabet(std::move(alphabet_)),
+              long_names(std::move(long_names_)),
+              context(std::move(context_)) {}
     std::string alphabet;
     std::string long_names;
     std::string context;
@@ -72,7 +73,7 @@ public:
     /** Return a vector of 0s and 1s indicating which bases have been checked for modification
      *  according to the context information.
      */
-    std::vector<int> get_sequence_mask(const std::string& sequence) const;
+    std::vector<int> get_sequence_mask(std::string_view sequence) const;
 
     /** Update a mask provided by the get_sequence_mask function to flag bases for which
      *  the modification probability exceeds the specified threshold.
