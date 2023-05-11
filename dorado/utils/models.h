@@ -73,6 +73,8 @@ namespace modified {
 static const std::vector<std::string> mods = {
         "5mCG",
         "5mCG_5hmCG",
+        "5mC",
+        "6mA",
 };
 
 static const std::vector<std::string> models = {
@@ -110,9 +112,11 @@ static const std::vector<std::string> models = {
         "dna_r10.4.1_e8.2_400bps_sup@v4.1.0_5mCG_5hmCG@v2",
 
         // v4.2.0
-        "dna_r10.4.1_e8.2_400bps_fast@v4.2.0_5mCG_5hmCG@v0",
-        "dna_r10.4.1_e8.2_400bps_hac@v4.2.0_5mCG_5hmCG@v0",
-        "dna_r10.4.1_e8.2_400bps_sup@v4.2.0_5mCG_5hmCG@v0",
+        "dna_r10.4.1_e8.2_400bps_fast@v4.2.0_5mCG_5hmCG@v2",
+        "dna_r10.4.1_e8.2_400bps_hac@v4.2.0_5mCG_5hmCG@v2",
+        "dna_r10.4.1_e8.2_400bps_sup@v4.2.0_5mCG_5hmCG@v2",
+        "dna_r10.4.1_e8.2_400bps_sup@v4.2.0_5mC@v2",
+        "dna_r10.4.1_e8.2_400bps_sup@v4.2.0_6mA@v2",
 
 };
 
