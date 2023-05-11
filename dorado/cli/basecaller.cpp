@@ -53,6 +53,7 @@ void setup(std::vector<std::string> args,
            size_t num_runners,
            size_t remora_batch_size,
            size_t num_remora_threads,
+           float methylation_threshold_pct,
            HtsWriter::OutputMode output_mode,
            bool emit_moves,
            size_t max_reads,
@@ -218,7 +219,8 @@ void setup(std::vector<std::string> args,
         converted_reads_sink = aligner.get();
     }
     ReadToBamType read_converter(*converted_reads_sink, emit_moves, rna, duplex,
-                                 thread_allocations.read_converter_threads);
+                                 thread_allocations.read_converter_threads,
+                                 methylation_threshold_pct);
     StatsCounterNode stats_node(read_converter, duplex);
     ReadFilterNode read_filter_node(stats_node, min_qscore, thread_allocations.read_filter_threads);
 
@@ -308,6 +310,12 @@ int basecaller(int argc, char* argv[]) {
             .default_value(std::string())
             .help("a comma separated list of modified base models");
 
+    parser.add_argument("--modified-bases-threshold")
+            .default_value(default_parameters.methylation_threshold)
+            .scan<'f', float>()
+            .help("the minimum predicted methylation probability for a modified base to be emitted "
+                  "in an all-context model, [0, 1]");
+
     parser.add_argument("--emit-fastq")
             .help("Output in fastq format.")
             .default_value(false)
@@ -367,6 +375,12 @@ int basecaller(int argc, char* argv[]) {
                                 [](std::string a, std::string b) { return a + "," + b; });
     }
 
+    auto methylation_threshold = parser.get<float>("--modified-bases-threshold");
+    if (methylation_threshold < 0.f || methylation_threshold > 1.f) {
+        spdlog::error("--modified-bases-threshold must be between 0 and 1.");
+        std::exit(EXIT_FAILURE);
+    }
+
     auto output_mode = HtsWriter::OutputMode::BAM;
 
     auto emit_fastq = parser.get<bool>("--emit-fastq");
@@ -391,10 +405,10 @@ int basecaller(int argc, char* argv[]) {
               parser.get<std::string>("-x"), parser.get<std::string>("--reference"),
               parser.get<int>("-c"), parser.get<int>("-o"), parser.get<int>("-b"),
               default_parameters.num_runners, default_parameters.remora_batchsize,
-              default_parameters.remora_threads, output_mode, parser.get<bool>("--emit-moves"),
-              parser.get<int>("--max-reads"), parser.get<int>("--min-qscore"),
-              parser.get<std::string>("--read-ids"), parser.get<bool>("--recursive"),
-              parser.get<int>("k"), parser.get<int>("w"),
+              default_parameters.remora_threads, methylation_threshold, output_mode,
+              parser.get<bool>("--emit-moves"), parser.get<int>("--max-reads"),
+              parser.get<int>("--min-qscore"), parser.get<std::string>("--read-ids"),
+              parser.get<bool>("--recursive"), parser.get<int>("k"), parser.get<int>("w"),
               internal_parser.get<bool>("--skip-model-compatibility-check"));
     } catch (const std::exception& e) {
         spdlog::error("{}", e.what());

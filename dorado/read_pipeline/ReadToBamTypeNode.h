@@ -16,7 +16,7 @@ public:
                   bool rna,
                   bool duplex,
                   size_t num_worker_threads,
-                  uint8_t modbase_threshold = 0,
+                  float modbase_threshold_frac = 0,
                   size_t max_reads = 1000);
     ~ReadToBamType();
 

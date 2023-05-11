@@ -145,39 +145,39 @@ TEST_CASE(TEST_GROUP ": Methylation tag generation", TEST_GROUP) {
                                                                           modbase_long_names, "");
 
         // Test generation
-        const char* expected_methylation_tag_10_score = "A+a,0,1;C+m,1,0;";
+        const char* expected_methylation_tag_10_score = "A+a.,0,1;C+m.,1,0;";
         std::vector<int64_t> expected_methylation_tag_10_score_prob{20, 254, 252, 252};
         auto lines = read.extract_sam_lines(false, false, 10);
         REQUIRE(!lines.empty());
         bam1_t* aln = lines[0].get();
-        REQUIRE_THAT(bam_aux2Z(bam_aux_get(aln, "MM")), Equals(expected_methylation_tag_10_score));
+        CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "MM")), Equals(expected_methylation_tag_10_score));
         require_sam_tag_B_int_matches(bam_aux_get(aln, "ML"),
                                       expected_methylation_tag_10_score_prob);
 
         // Test generation at higher rate excludes the correct mods.
-        const char* expected_methylation_tag_50_score = "A+a,2;C+m,1,0;";
+        const char* expected_methylation_tag_50_score = "A+a.,2;C+m.,1,0;";
         std::vector<int64_t> expected_methylation_tag_50_score_prob{254, 252, 252};
         lines = read.extract_sam_lines(false, false, 50);
         REQUIRE(!lines.empty());
         aln = lines[0].get();
-        REQUIRE_THAT(bam_aux2Z(bam_aux_get(aln, "MM")), Equals(expected_methylation_tag_50_score));
+        CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "MM")), Equals(expected_methylation_tag_50_score));
         require_sam_tag_B_int_matches(bam_aux_get(aln, "ML"),
                                       expected_methylation_tag_50_score_prob);
 
         // Test generation at max threshold rate excludes everything
-        const char* expected_methylation_tag_255_score = "A+a;C+m;";
+        const char* expected_methylation_tag_255_score = "A+a.;C+m.;";
         std::vector<int64_t> expected_methylation_tag_255_score_prob{};
         lines = read.extract_sam_lines(false, false, 255);
         REQUIRE(!lines.empty());
         aln = lines[0].get();
-        REQUIRE_THAT(bam_aux2Z(bam_aux_get(aln, "MM")), Equals(expected_methylation_tag_255_score));
+        CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "MM")), Equals(expected_methylation_tag_255_score));
         require_sam_tag_B_int_matches(bam_aux_get(aln, "ML"),
                                       expected_methylation_tag_255_score_prob);
     }
 
     SECTION("Test generation using CHEBI codes") {
         std::string modbase_long_names_CHEBI = "55555 12345";
-        const char* expected_methylation_tag_CHEBI = "A+55555,2;C+12345,1,0;";
+        const char* expected_methylation_tag_CHEBI = "A+55555.,2;C+12345.,1,0;";
         std::vector<int64_t> expected_methylation_tag_CHEBI_prob{254, 252, 252};
 
         read.base_mod_info = std::make_shared<dorado::utils::BaseModInfo>(
@@ -185,13 +185,13 @@ TEST_CASE(TEST_GROUP ": Methylation tag generation", TEST_GROUP) {
         auto lines = read.extract_sam_lines(false, false, 50);
         REQUIRE(!lines.empty());
         bam1_t* aln = lines[0].get();
-        REQUIRE_THAT(bam_aux2Z(bam_aux_get(aln, "MM")), Equals(expected_methylation_tag_CHEBI));
+        CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "MM")), Equals(expected_methylation_tag_CHEBI));
         require_sam_tag_B_int_matches(bam_aux_get(aln, "ML"), expected_methylation_tag_CHEBI_prob);
     }
 
     SECTION("Test generation using AC context for A methylation") {
         std::string context = "XC:_:_:_";
-        const char* expected_methylation_tag_with_context = "A+a?,0,1,2;C+m,1,0;";
+        const char* expected_methylation_tag_with_context = "A+a?,0,1,2;C+m.,1,0;";
         std::vector<int64_t> expected_methylation_tag_with_context_prob{20, 254, 0, 252, 252};
 
         read.base_mod_info = std::make_shared<dorado::utils::BaseModInfo>(
@@ -200,8 +200,8 @@ TEST_CASE(TEST_GROUP ": Methylation tag generation", TEST_GROUP) {
         auto lines = read.extract_sam_lines(false, false, 10);
         REQUIRE(!lines.empty());
         bam1_t* aln = lines[0].get();
-        REQUIRE_THAT(bam_aux2Z(bam_aux_get(aln, "MM")),
-                     Equals(expected_methylation_tag_with_context));
+        CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "MM")),
+                   Equals(expected_methylation_tag_with_context));
         require_sam_tag_B_int_matches(bam_aux_get(aln, "ML"),
                                       expected_methylation_tag_with_context_prob);
     }
@@ -214,7 +214,7 @@ TEST_CASE(TEST_GROUP ": Methylation tag generation", TEST_GROUP) {
         auto lines = read.extract_sam_lines(false, false, 50);
         REQUIRE(!lines.empty());
         bam1_t* aln = lines[0].get();
-        REQUIRE(bam_aux_get(aln, "MM") == NULL);
-        REQUIRE(bam_aux_get(aln, "ML") == NULL);
+        CHECK(bam_aux_get(aln, "MM") == NULL);
+        CHECK(bam_aux_get(aln, "ML") == NULL);
     }
 }

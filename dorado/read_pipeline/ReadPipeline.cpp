@@ -211,9 +211,7 @@ void Read::generate_modbase_string(bam1_t *aln, uint8_t threshold) const {
 
             // Write out the results we found
             modbase_string += std::string(1, current_cardinal) + "+" + bam_name;
-            if (base_has_context[current_cardinal]) {
-                modbase_string += "?";
-            }
+            modbase_string += base_has_context[current_cardinal] ? "?" : ".";
             int skipped_bases = 0;
             for (size_t base_idx = 0; base_idx < seq.size(); base_idx++) {
                 if (seq[base_idx] == current_cardinal) {
