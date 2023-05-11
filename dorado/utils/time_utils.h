@@ -1,6 +1,7 @@
 #pragma once
 #include "../utils/compat_utils.h"
 
+#include <ctime>
 #include <string>
 
 namespace dorado::utils {
