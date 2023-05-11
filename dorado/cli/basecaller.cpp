@@ -53,7 +53,7 @@ void setup(std::vector<std::string> args,
            size_t num_runners,
            size_t remora_batch_size,
            size_t num_remora_threads,
-           uint8_t methylation_threshold,
+           float methylation_threshold_pct,
            HtsWriter::OutputMode output_mode,
            bool emit_moves,
            size_t max_reads,
@@ -219,7 +219,8 @@ void setup(std::vector<std::string> args,
         converted_reads_sink = aligner.get();
     }
     ReadToBamType read_converter(*converted_reads_sink, emit_moves, rna, duplex,
-                                 thread_allocations.read_converter_threads, methylation_threshold);
+                                 thread_allocations.read_converter_threads,
+                                 methylation_threshold_pct);
     StatsCounterNode stats_node(read_converter, duplex);
     ReadFilterNode read_filter_node(stats_node, min_qscore, thread_allocations.read_filter_threads);
 
@@ -374,9 +375,6 @@ int basecaller(int argc, char* argv[]) {
                                 [](std::string a, std::string b) { return a + "," + b; });
     }
 
-    uint8_t methylation_threshold =
-            static_cast<uint8_t>(std::min((parser.get<float>("-t") / 100.0f) * 256.0f, 255.0f));
-
     auto output_mode = HtsWriter::OutputMode::BAM;
 
     auto emit_fastq = parser.get<bool>("--emit-fastq");
@@ -401,7 +399,7 @@ int basecaller(int argc, char* argv[]) {
               parser.get<std::string>("-x"), parser.get<std::string>("--reference"),
               parser.get<int>("-c"), parser.get<int>("-o"), parser.get<int>("-b"),
               default_parameters.num_runners, default_parameters.remora_batchsize,
-              default_parameters.remora_threads, methylation_threshold, output_mode,
+              default_parameters.remora_threads, parser.get<float>("-t"), output_mode,
               parser.get<bool>("--emit-moves"), parser.get<int>("--max-reads"),
               parser.get<int>("--min-qscore"), parser.get<std::string>("--read-ids"),
               parser.get<bool>("--recursive"), parser.get<int>("k"), parser.get<int>("w"),
