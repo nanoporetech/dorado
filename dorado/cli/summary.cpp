@@ -115,6 +115,10 @@ int summary(int argc, char *argv[]) {
         }
 
         auto rg_value = reader.get_tag<std::string>("RG");
+        auto rg_split = rg_value.find("_");
+        auto run_id = rg_value.substr(0, rg_split);
+        auto model = rg_value.substr(rg_split + 1, rg_value.length());
+
         auto filename = reader.get_tag<std::string>("f5");
         if (filename.empty()) {
             filename = reader.get_tag<std::string>("fn");
@@ -138,10 +142,10 @@ int summary(int argc, char *argv[]) {
                 time_difference_seconds(start_time_dt, read_group_exp_start_time.at(rg_value));
         auto template_start_time = start_time + (duration - template_duration);
 
-        std::cout << filename << separator << read_id << separator << rg_value.substr(0, 36)
-                  << separator << channel << separator << mux << separator << start_time
-                  << separator << duration << separator << template_start_time << separator
-                  << template_duration << separator << seqlen << separator << mean_qscore;
+        std::cout << filename << separator << read_id << separator << run_id << separator << channel
+                  << separator << mux << separator << start_time << separator << duration
+                  << separator << template_start_time << separator << template_duration << separator
+                  << seqlen << separator << mean_qscore;
 
         if (!(reader.record->core.flag & BAM_FUNMAP)) {
             int32_t query_start = 0;
