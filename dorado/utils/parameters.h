@@ -24,6 +24,7 @@ struct DefaultParameters {
     int remora_batchsize{1024};
 #endif
     int remora_threads{4};
+    float methylation_threshold{5.0f};
 };
 
 static const DefaultParameters default_parameters{};
