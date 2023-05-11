@@ -1,5 +1,6 @@
 #include "DataLoader.h"
 
+#include "../utils/compat_utils.h"
 #include "../utils/types.h"
 #include "cxxpool.h"
 #include "pod5_format/c_api.h"
