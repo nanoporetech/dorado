@@ -209,7 +209,7 @@ PosRanges DuplexSplitNode::possible_pore_regions(const DuplexSplitNode::ExtRead&
     //pA = read->scaling * (raw + read->offset);
     //pA formula after scaling:
     //pA = read->scale * raw + read->shift
-    spdlog::debug("Analyzing signal in read {}", read.read->read_id);
+    spdlog::trace("Analyzing signal in read {}", read.read->read_id);
 
     auto pore_sample_ranges = detect_pore_signal(
             read.data_as_float32, (pore_thr - read.read->shift) / read.read->scale,
@@ -372,7 +372,7 @@ std::vector<std::shared_ptr<Read>> DuplexSplitNode::split(std::shared_ptr<Read> 
     using namespace std::chrono;
 
     auto start_ts = high_resolution_clock::now();
-    spdlog::debug("Processing read {}; length {}", init_read->read_id, init_read->seq.size());
+    spdlog::trace("Processing read {}; length {}", init_read->read_id, init_read->seq.size());
 
     std::vector<ExtRead> to_split{ExtRead(init_read)};
     for (const auto& [description, split_f] : m_split_finders) {
@@ -380,7 +380,7 @@ std::vector<std::shared_ptr<Read>> DuplexSplitNode::split(std::shared_ptr<Read> 
         std::vector<ExtRead> split_round_result;
         for (auto& r : to_split) {
             auto spacers = split_f(r);
-            spdlog::debug("DSN: {} strategy {} splits in read {}", description, spacers.size(),
+            spdlog::trace("DSN: {} strategy {} splits in read {}", description, spacers.size(),
                           init_read->read_id);
 
             if (spacers.empty()) {
@@ -399,7 +399,7 @@ std::vector<std::shared_ptr<Read>> DuplexSplitNode::split(std::shared_ptr<Read> 
         split_result.push_back(std::move(ext_read.read));
     }
 
-    spdlog::debug("Read {} split into {} subreads", init_read->read_id, split_result.size());
+    spdlog::trace("Read {} split into {} subreads", init_read->read_id, split_result.size());
 
     auto stop_ts = high_resolution_clock::now();
     spdlog::trace("READ duration: {} microseconds (ID: {})",
