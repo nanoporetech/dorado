@@ -89,6 +89,8 @@ variables:
 
 pre-commit:
   image: ${DORADO_PRECOMMIT}
+  variables:
+    GIT_SUBMODULE_STRATEGY: none
   stage: pre-flight
   script:
     - pip install pre-commit
