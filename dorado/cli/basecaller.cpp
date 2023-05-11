@@ -71,7 +71,7 @@ void setup(std::vector<std::string> args,
     if (device == "cpu") {
         num_runners = std::thread::hardware_concurrency();
         if (batch_size == 0) {
-            batch_size = 1;
+            batch_size = 128;
         }
         spdlog::debug("- CPU calling: set batch size to {}, num_runners to {}", batch_size,
                       num_runners);
