@@ -105,7 +105,7 @@ public:
 
     uint64_t start_sample;
     uint64_t end_sample;
-    uint64_t run_acqusition_start_time_ms;
+    uint64_t run_acquisition_start_time_ms;
 
 private:
     void generate_duplex_read_tags(bam1_t*) const;

@@ -165,10 +165,13 @@ std::shared_ptr<Read> subread(const Read& read, PosRange seq_range, PosRange sig
     subread->raw_data = subread->raw_data.index(
             {torch::indexing::Slice(signal_range.first, signal_range.second)});
     subread->attributes.read_number = uint32_t(-1);
-    subread->attributes.start_time = utils::adjust_time_ms(
-            subread->attributes.start_time,
-            uint64_t(std::round((subread->num_trimmed_samples + signal_range.first) * 1000. /
-                                subread->sample_rate)));
+
+    subread->start_sample = read.start_sample + read.num_trimmed_samples + signal_range.first;
+    subread->end_sample = read.start_sample + read.num_trimmed_samples + signal_range.second;
+    auto start_time_ms = read.run_acquisition_start_time_ms +
+                         uint64_t(std::round(subread->start_sample * 1000. / subread->sample_rate));
+    subread->attributes.start_time = utils::get_string_timestamp_from_unix_time(start_time_ms);
+
     //we adjust for it in new start time above
     subread->num_trimmed_samples = 0;
 
@@ -184,11 +187,6 @@ std::shared_ptr<Read> subread(const Read& read, PosRange seq_range, PosRange sig
     } else {
         subread->parent_read_id = read.read_id;
     }
-
-    //FIXME
-    //uint64_t start_sample;
-    //uint64_t end_sample;
-    //uint64_t run_acqusition_start_time_ms;
     return subread;
 }
 

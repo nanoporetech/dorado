@@ -90,7 +90,7 @@ std::shared_ptr<dorado::Read> process_pod5_read(size_t row,
                          ((read_data.start_sample * 1000) /
                           (uint64_t)run_sample_rate);  // TODO check if this cast is needed
     auto start_time = utils::get_string_timestamp_from_unix_time(start_time_ms);
-    new_read->run_acqusition_start_time_ms = run_acquisition_start_time_ms;
+    new_read->run_acquisition_start_time_ms = run_acquisition_start_time_ms;
     new_read->start_time_ms = start_time_ms;
     new_read->scaling = read_data.calibration_scale;
     new_read->offset = read_data.calibration_offset;
