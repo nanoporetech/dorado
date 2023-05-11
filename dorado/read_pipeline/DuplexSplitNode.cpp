@@ -164,7 +164,7 @@ std::shared_ptr<Read> subread(const Read& read, PosRange seq_range, PosRange sig
     subread->read_id = subread_id;
     subread->raw_data = subread->raw_data.index(
             {torch::indexing::Slice(signal_range.first, signal_range.second)});
-    subread->attributes.read_number = uint32_t(-1);
+    subread->attributes.read_number = -1;
 
     subread->start_sample = read.start_sample + read.num_trimmed_samples + signal_range.first;
     subread->end_sample = read.start_sample + read.num_trimmed_samples + signal_range.second;

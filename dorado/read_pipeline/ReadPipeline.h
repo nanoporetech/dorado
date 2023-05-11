@@ -44,8 +44,7 @@ class Read {
 public:
     struct Attributes {
         uint32_t mux{std::numeric_limits<uint32_t>::max()};  // Channel mux
-        uint32_t read_number{std::numeric_limits<
-                uint32_t>::max()};  // Per-channel number of each read as it was acquired by minknow
+        int32_t read_number{-1};  // Per-channel number of each read as it was acquired by minknow
         int32_t channel_number{-1};  //Channel ID
         std::string start_time{};    //Read acquisition start time
         std::string fast5_filename{};
