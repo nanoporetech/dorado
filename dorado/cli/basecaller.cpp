@@ -314,7 +314,8 @@ int basecaller(int argc, char* argv[]) {
             .default_value(default_parameters.methylation_threshold)
             .scan<'f', float>()
             .help("the value below which a predicted methylation probability will "
-                  "not be emitted, expressed as a percentage");
+                  "not be emitted, expressed as a percentage. Only applies to all-context modbase "
+                  "models");
 
     parser.add_argument("--emit-fastq")
             .help("Output in fastq format.")
