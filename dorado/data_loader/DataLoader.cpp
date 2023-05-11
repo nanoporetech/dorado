@@ -18,6 +18,10 @@
 #include <optional>
 
 namespace {
+
+// ReadID should be a drop-in replacement for read_id_t
+static_assert(sizeof(dorado::ReadID) == sizeof(read_id_t));
+
 void string_reader(HighFive::Attribute& attribute, std::string& target_str) {
     // Load as a variable string if possible
     if (attribute.getDataType().isVariableStr()) {
@@ -110,9 +114,13 @@ std::shared_ptr<dorado::Read> process_pod5_read(size_t row,
     auto new_read = std::make_shared<dorado::Read>();
     new_read->raw_data = samples;
     new_read->sample_rate = run_sample_rate;
-    auto start_time_ms =
-            run_acquisition_start_time_ms + ((read_data.start_sample * 1000) / run_sample_rate);
+
+    auto start_time_ms = run_acquisition_start_time_ms +
+                         ((read_data.start_sample * 1000) /
+                          (uint64_t)run_sample_rate);  // TODO check if this cast is needed
     auto start_time = get_string_timestamp_from_unix_time(start_time_ms);
+    new_read->run_acqusition_start_time_ms = run_acquisition_start_time_ms;
+    new_read->start_time_ms = start_time_ms;
     new_read->scaling = read_data.calibration_scale;
     new_read->offset = read_data.calibration_offset;
     new_read->read_id = std::move(read_id_str);
@@ -120,9 +128,14 @@ std::shared_ptr<dorado::Read> process_pod5_read(size_t row,
     new_read->attributes.read_number = read_data.read_number;
     new_read->attributes.fast5_filename = std::filesystem::path(path.c_str()).filename().string();
     new_read->attributes.mux = read_data.well;
+    new_read->attributes.num_samples = read_data.num_samples;
     new_read->attributes.channel_number = read_data.channel;
     new_read->attributes.start_time = start_time;
     new_read->run_id = run_info_data->protocol_run_id;
+    new_read->start_sample = read_data.start_sample;
+    new_read->end_sample = read_data.start_sample + read_data.num_samples;
+    new_read->flowcell_id = run_info_data->flow_cell_id;
+
     if (pod5_free_run_info(run_info_data) != POD5_OK) {
         spdlog::error("Failed to free run info");
     }
@@ -172,7 +185,7 @@ void DataLoader::load_reads(const std::string& path,
                                    [](unsigned char c) { return std::tolower(c); });
                     if (ext == ".fast5") {
                         throw std::runtime_error(
-                                "Traversing reads by channel os only availabls for POD5. "
+                                "Traversing reads by channel is only availabls for POD5. "
                                 "Encountered FAST5 at " +
                                 path.string());
                     } else if (ext == ".pod5") {
@@ -318,26 +331,15 @@ void DataLoader::load_read_channels(std::string data_path, bool recursive_file_l
                         continue;
                     }
 
-                    // Fetch string representation of a read_id to store in the read list.
-                    std::string read_id_str(37, '*');
-                    pod5_error_t err = pod5_format_read_id(read_data.read_id, read_id_str.data());
-                    std::unique_ptr<uint8_t> read_id((uint8_t*)malloc(sizeof(uint8_t) * 16));
-                    memcpy(read_id.get(), read_data.read_id, 16);
-
-                    uint16_t channel = read_data.channel;
+                    int channel = read_data.channel;
 
                     // Update maximum number of channels encountered.
-                    if (channel > m_max_channel) {
-                        m_max_channel = channel;
-                    }
+                    m_max_channel = std::max(m_max_channel, channel);
 
-                    if (channel_to_read_id.find(channel) != channel_to_read_id.end()) {
-                        channel_to_read_id[channel].push_back(std::move(read_id));
-                    } else {
-                        channel_to_read_id.emplace(channel,
-                                                   std::vector<std::unique_ptr<uint8_t>>());
-                        channel_to_read_id[channel].push_back(std::move(read_id));
-                    }
+                    // Store the read_id in the channel's list.
+                    ReadID read_id;
+                    memcpy(read_id.data(), read_data.read_id, 16);
+                    channel_to_read_id[channel].push_back(std::move(read_id));
                 }
 
                 if (pod5_free_read_batch(batch) != POD5_OK) {
@@ -504,9 +506,8 @@ uint16_t DataLoader::get_sample_rate(std::string data_path, bool recursive_file_
     }
 }
 
-void DataLoader::load_pod5_reads_from_file_by_read_ids(
-        const std::string& path,
-        const std::vector<std::unique_ptr<uint8_t>>& read_ids) {
+void DataLoader::load_pod5_reads_from_file_by_read_ids(const std::string& path,
+                                                       const std::vector<ReadID>& read_ids) {
     pod5_init();
 
     // Open the file ready for walking:
@@ -521,10 +522,9 @@ void DataLoader::load_pod5_reads_from_file_by_read_ids(
         return;
     }
 
-    std::unique_ptr<uint8_t> read_id_array(
-            (uint8_t*)malloc(16 * sizeof(uint8_t) * read_ids.size()));
+    std::vector<uint8_t> read_id_array(16 * read_ids.size());
     for (int i = 0; i < read_ids.size(); i++) {
-        memcpy(read_id_array.get() + 16 * i, read_ids[i].get(), 16);
+        memcpy(read_id_array.data() + 16 * i, read_ids[i].data(), 16);
     }
 
     std::size_t batch_count = 0;
@@ -535,7 +535,7 @@ void DataLoader::load_pod5_reads_from_file_by_read_ids(
     std::vector<std::uint32_t> traversal_batch_counts(batch_count);
     std::vector<std::uint32_t> traversal_batch_rows(read_ids.size());
     size_t find_success_count;
-    pod5_error_t err = pod5_plan_traversal(file, read_id_array.get(), read_ids.size(),
+    pod5_error_t err = pod5_plan_traversal(file, read_id_array.data(), read_ids.size(),
                                            traversal_batch_counts.data(),
                                            traversal_batch_rows.data(), &find_success_count);
     if (err != POD5_OK) {

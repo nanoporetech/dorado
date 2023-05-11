@@ -63,6 +63,8 @@ variables:
   artifacts:
     paths:
       - dist
+      - tests/*.sh
+      - tests/*.bat
       - tests/data
     expire_in: 1 day
 
@@ -111,9 +113,9 @@ build:linux:x86:focal:
   <<: *build_dorado
 
 build:linux:arm64:bionic:
-  image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r32.4.3-deps:1.0
+  image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r32.4.3-deps:1.1
   variables:
-    BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/torch-1.10.0-Linux-aarch64/torch/"
+    BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/torch/"
   <<: *linux_arm64_runner
   <<: *build_dorado
 
@@ -184,9 +186,9 @@ build_archive:linux:x86:cuda12:
   when: manual
 
 build_archive:linux:arm64:bionic:
-  image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r32.4.3-deps:1.0
+  image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r32.4.3-deps:1.1
   variables:
-    BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/torch-1.10.0-Linux-aarch64/torch/"
+    BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/torch/"
   <<: *linux_arm64_runner
   <<: *build_dorado_archive
   when: manual
@@ -235,22 +237,15 @@ build_archive:macos:x64:
   stage: test
   variables:
     GIT_STRATEGY: none
-    MODEL: dna_r9.4.1_e8_hac@v3.3
-    BATCH: 384
   script:
-    - echo dorado basecaller test stage
-    - ./dist/bin/dorado download --model ${MODEL}
-    - ./dist/bin/dorado basecaller ${MODEL} ./tests/data/pod5 -b ${BATCH} --emit-fastq > ref.fq
-    - ./dist/bin/dorado basecaller ${MODEL} ./tests/data/pod5 -b ${BATCH} --modified-bases 5mCG > calls.sam
-    - ./dist/bin/dorado basecaller ${MODEL} ./tests/data/pod5 -x cpu --modified-bases 5mCG > calls.sam
-    - samtools quickcheck -u calls.sam
-    - samtools view -b calls.sam > calls.bam
-    - echo dorado aligner test stage
-    - ./dist/bin/dorado aligner ref.fq calls.sam > calls.bam
-    - ./dist/bin/dorado basecaller ${MODEL} ./tests/data/pod5 -b ${BATCH} --modified-bases 5mCG | ./dist/bin/dorado aligner ref.fq > calls.bam
-    - ./dist/bin/dorado basecaller ${MODEL} ./tests/data/pod5 -b ${BATCH} --modified-bases 5mCG --reference ref.fq > calls.bam
-    - samtools quickcheck -u calls.bam
-    - samtools view -h calls.bam > calls.sam
+    - for f in tests/*.sh; do echo $f; ./$f ./dist/bin/dorado || break; done
+
+.test_dorado_windows: &test_dorado_windows
+  stage: test
+  variables:
+    GIT_STRATEGY: none
+  script:
+    - .\\tests\\test_simple_basecaller_execution.bat .\\dist\\bin\\dorado.exe
 
 .test_archive: &test_archive
   stage: test
@@ -264,6 +259,12 @@ build_archive:macos:x64:
 
 # Test stages
 
+test:windows:
+  <<: *windows_runner
+  <<: *test_dorado_windows
+  needs:
+    - build:windows
+
 test:linux:x86:focal:
   image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.1
   <<: *linux_dependencies
@@ -273,10 +274,14 @@ test:linux:x86:focal:
     - build:linux:x86:focal
 
 test:linux:arm64:bionic:
-  image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r32.4.3-deps:1.0
+  image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r32.4.3-deps:1.1
   <<: *linux_dependencies
   <<: *linux_tegra_runner
   <<: *test_dorado
+  variables:
+    GIT_STRATEGY: none
+    MODEL: dna_r9.4.1_e8_hac@v3.3
+    BATCH: 0
   needs:
     - build:linux:arm64:bionic
 
