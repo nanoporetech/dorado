@@ -36,15 +36,15 @@ ReadToBamType::ReadToBamType(MessageSink& sink,
                              bool rna,
                              bool duplex,
                              size_t num_worker_threads,
-                             float modbase_threshold_pct,
+                             float modbase_threshold_frac,
                              size_t max_reads)
         : MessageSink(max_reads),
           m_sink(sink),
           m_emit_moves(emit_moves),
           m_rna(rna),
           m_duplex(duplex),
-          m_modbase_threshold(static_cast<uint8_t>(
-                  std::min((modbase_threshold_pct / 100.0f) * 256.0f, 255.0f))),
+          m_modbase_threshold(
+                  static_cast<uint8_t>(std::min(modbase_threshold_frac * 256.0f, 255.0f))),
           m_active_threads(0) {
     for (size_t i = 0; i < num_worker_threads; i++) {
         m_workers.push_back(

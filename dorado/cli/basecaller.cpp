@@ -313,9 +313,8 @@ int basecaller(int argc, char* argv[]) {
     parser.add_argument("--modified-bases-threshold")
             .default_value(default_parameters.methylation_threshold)
             .scan<'f', float>()
-            .help("the value below which a predicted methylation probability will "
-                  "not be emitted, expressed as a percentage. Only applies to all-context modbase "
-                  "models");
+            .help("the minimum predicted methylation probability for a modified base to be emitted "
+                  "in an all-context model, [0, 1]");
 
     parser.add_argument("--emit-fastq")
             .help("Output in fastq format.")
@@ -376,6 +375,12 @@ int basecaller(int argc, char* argv[]) {
                                 [](std::string a, std::string b) { return a + "," + b; });
     }
 
+    auto methylation_threshold = parser.get<float>("--modified-bases-threshold");
+    if (methylation_threshold < 0.f || methylation_threshold > 1.f) {
+        spdlog::error("--modified-bases-threshold must be between 0 and 1.");
+        std::exit(EXIT_FAILURE);
+    }
+
     auto output_mode = HtsWriter::OutputMode::BAM;
 
     auto emit_fastq = parser.get<bool>("--emit-fastq");
@@ -400,8 +405,8 @@ int basecaller(int argc, char* argv[]) {
               parser.get<std::string>("-x"), parser.get<std::string>("--reference"),
               parser.get<int>("-c"), parser.get<int>("-o"), parser.get<int>("-b"),
               default_parameters.num_runners, default_parameters.remora_batchsize,
-              default_parameters.remora_threads, parser.get<float>("--modified-bases-threshold"),
-              output_mode, parser.get<bool>("--emit-moves"), parser.get<int>("--max-reads"),
+              default_parameters.remora_threads, methylation_threshold, output_mode,
+              parser.get<bool>("--emit-moves"), parser.get<int>("--max-reads"),
               parser.get<int>("--min-qscore"), parser.get<std::string>("--read-ids"),
               parser.get<bool>("--recursive"), parser.get<int>("k"), parser.get<int>("w"),
               internal_parser.get<bool>("--skip-model-compatibility-check"));
