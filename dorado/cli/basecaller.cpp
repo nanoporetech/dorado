@@ -53,6 +53,7 @@ void setup(std::vector<std::string> args,
            size_t num_runners,
            size_t remora_batch_size,
            size_t num_remora_threads,
+           float methylation_threshold_pct,
            HtsWriter::OutputMode output_mode,
            bool emit_moves,
            size_t max_reads,
@@ -60,7 +61,8 @@ void setup(std::vector<std::string> args,
            std::string read_list_file_path,
            bool recursive_file_loading,
            int kmer_size,
-           int window_size) {
+           int window_size,
+           bool skip_model_compatibility_check) {
     torch::set_num_threads(1);
     std::vector<Runner> runners;
 
@@ -68,10 +70,13 @@ void setup(std::vector<std::string> args,
     int num_devices = 1;
 
     if (device == "cpu") {
+        num_runners = std::thread::hardware_concurrency();
         if (batch_size == 0) {
-            batch_size = std::thread::hardware_concurrency();
-            spdlog::debug("- set batch size to {}", batch_size);
+            batch_size = 128;
         }
+        spdlog::debug("- CPU calling: set batch size to {}, num_runners to {}", batch_size,
+                      num_runners);
+
         for (size_t i = 0; i < num_runners; i++) {
             runners.push_back(std::make_shared<ModelRunner<CPUDecoder>>(model_path, device,
                                                                         chunk_size, batch_size));
@@ -179,7 +184,7 @@ void setup(std::vector<std::string> args,
     // Check sample rate of model vs data.
     auto data_sample_rate = DataLoader::get_sample_rate(data_path, recursive_file_loading);
     auto model_sample_rate = get_model_sample_rate(model_path);
-    if (data_sample_rate != model_sample_rate) {
+    if (!skip_model_compatibility_check && (data_sample_rate != model_sample_rate)) {
         std::stringstream err;
         err << "Sample rate for model (" << model_sample_rate << ") and data (" << data_sample_rate
             << ") don't match.";
@@ -217,7 +222,8 @@ void setup(std::vector<std::string> args,
         converted_reads_sink = aligner.get();
     }
     ReadToBamType read_converter(*converted_reads_sink, emit_moves, rna, duplex,
-                                 thread_allocations.read_converter_threads);
+                                 thread_allocations.read_converter_threads,
+                                 methylation_threshold_pct);
     StatsCounterNode stats_node(read_converter, duplex);
     ReadFilterNode read_filter_node(stats_node, min_qscore, thread_allocations.read_filter_threads);
 
@@ -256,7 +262,8 @@ int basecaller(int argc, char* argv[]) {
     parser.add_argument("-v", "--verbose").default_value(false).implicit_value(true);
 
     parser.add_argument("-x", "--device")
-            .help("device string in format \"cuda:0,...,N\", \"cuda:all\", \"metal\" etc..")
+            .help("device string in format \"cuda:0,...,N\", \"cuda:all\", \"metal\", \"cpu\" "
+                  "etc..")
             .default_value(default_parameters.device);
 
     parser.add_argument("-l", "--read-ids")
@@ -306,6 +313,12 @@ int basecaller(int argc, char* argv[]) {
             .default_value(std::string())
             .help("a comma separated list of modified base models");
 
+    parser.add_argument("--modified-bases-threshold")
+            .default_value(default_parameters.methylation_threshold)
+            .scan<'f', float>()
+            .help("the minimum predicted methylation probability for a modified base to be emitted "
+                  "in an all-context model, [0, 1]");
+
     parser.add_argument("--emit-fastq")
             .help("Output in fastq format.")
             .default_value(false)
@@ -329,8 +342,11 @@ int basecaller(int argc, char* argv[]) {
             .default_value(10)
             .scan<'i', int>();
 
+    argparse::ArgumentParser internal_parser;
+
     try {
-        parser.parse_args(argc, argv);
+        auto remaining_args = parser.parse_known_args(argc, argv);
+        internal_parser = utils::parse_internal_options(remaining_args);
     } catch (const std::exception& e) {
         std::ostringstream parser_stream;
         parser_stream << parser;
@@ -362,6 +378,12 @@ int basecaller(int argc, char* argv[]) {
                                 [](std::string a, std::string b) { return a + "," + b; });
     }
 
+    auto methylation_threshold = parser.get<float>("--modified-bases-threshold");
+    if (methylation_threshold < 0.f || methylation_threshold > 1.f) {
+        spdlog::error("--modified-bases-threshold must be between 0 and 1.");
+        std::exit(EXIT_FAILURE);
+    }
+
     auto output_mode = HtsWriter::OutputMode::BAM;
 
     auto emit_fastq = parser.get<bool>("--emit-fastq");
@@ -375,6 +397,8 @@ int basecaller(int argc, char* argv[]) {
         output_mode = HtsWriter::OutputMode::FASTQ;
     } else if (emit_sam || utils::is_fd_tty(stdout)) {
         output_mode = HtsWriter::OutputMode::SAM;
+    } else if (utils::is_fd_pipe(stdout)) {
+        output_mode = HtsWriter::OutputMode::UBAM;
     }
 
     spdlog::info("> Creating basecall pipeline");
@@ -384,10 +408,11 @@ int basecaller(int argc, char* argv[]) {
               parser.get<std::string>("-x"), parser.get<std::string>("--reference"),
               parser.get<int>("-c"), parser.get<int>("-o"), parser.get<int>("-b"),
               default_parameters.num_runners, default_parameters.remora_batchsize,
-              default_parameters.remora_threads, output_mode, parser.get<bool>("--emit-moves"),
-              parser.get<int>("--max-reads"), parser.get<int>("--min-qscore"),
-              parser.get<std::string>("--read-ids"), parser.get<bool>("--recursive"),
-              parser.get<int>("k"), parser.get<int>("w"));
+              default_parameters.remora_threads, methylation_threshold, output_mode,
+              parser.get<bool>("--emit-moves"), parser.get<int>("--max-reads"),
+              parser.get<int>("--min-qscore"), parser.get<std::string>("--read-ids"),
+              parser.get<bool>("--recursive"), parser.get<int>("k"), parser.get<int>("w"),
+              internal_parser.get<bool>("--skip-model-compatibility-check"));
     } catch (const std::exception& e) {
         spdlog::error("{}", e.what());
         return 1;

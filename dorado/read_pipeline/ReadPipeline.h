@@ -49,6 +49,7 @@ public:
         int32_t channel_number{-1};  //Channel ID
         std::string start_time{};    //Read acquisition start time
         std::string fast5_filename{};
+        uint64_t num_samples;
     };
 
     struct Mapping {
@@ -59,7 +60,11 @@ public:
     float digitisation;      // Loaded from source file
     float range;             // Loaded from source file
     float offset;            // Loaded from source file
-    float sample_rate;       // Loaded from source file
+
+    uint64_t sample_rate;  // Loaded from source file
+
+    uint64_t start_time_ms;
+    uint64_t get_end_time_ms();
 
     float shift;  // To be set by scaler
     float scale;  // To be set by scaler
@@ -81,7 +86,8 @@ public:
     std::string qstring;                  // Read Qstring (Phred)
     std::vector<uint8_t> moves;           // Move table
     std::vector<uint8_t> base_mod_probs;  // Modified base probabilities
-    std::string run_id;                   // Read group
+    std::string run_id;                   // Run ID - used in read group
+    std::string flowcell_id;              // Flowcell ID - used in read group
     std::string model_name;               // Read group
 
     std::shared_ptr<const utils::BaseModInfo>
@@ -94,6 +100,10 @@ public:
     std::vector<BamPtr> extract_sam_lines(bool emit_moves,
                                           bool duplex,
                                           uint8_t modbase_threshold = 0) const;
+
+    uint64_t start_sample;
+    uint64_t end_sample;
+    uint64_t run_acqusition_start_time_ms;
 
 private:
     void generate_duplex_read_tags(bam1_t*) const;

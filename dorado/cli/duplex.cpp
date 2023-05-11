@@ -29,6 +29,7 @@
 #include <argparse.hpp>
 #include <htslib/sam.h>
 #include <spdlog/spdlog.h>
+#include <utils/basecaller_utils.h>
 
 #include <memory>
 #include <thread>
@@ -46,7 +47,10 @@ int duplex(int argc, char* argv[]) {
     argparse::ArgumentParser parser("dorado", DORADO_VERSION, argparse::default_arguments::help);
     parser.add_argument("model").help("Model");
     parser.add_argument("reads").help("Reads in Pod5 format or BAM/SAM format for basespace.");
-    parser.add_argument("--pairs").help("Space-delimited csv containing read ID pairs.");
+    parser.add_argument("--pairs")
+            .default_value(std::string(""))
+            .help("Space-delimited csv containing read ID pairs. If not provided, pairing will be "
+                  "performed automatically");
     parser.add_argument("--emit-fastq").default_value(false).implicit_value(true);
     parser.add_argument("--emit-sam")
             .help("Output in SAM format.")
@@ -76,6 +80,11 @@ int duplex(int argc, char* argv[]) {
             .implicit_value(true)
             .help("Recursively scan through directories to load FAST5 and POD5 files");
 
+    parser.add_argument("-l", "--read-ids")
+            .help("A file with a newline-delimited list of reads to basecall. If not provided, all "
+                  "reads will be basecalled")
+            .default_value(std::string(""));
+
     parser.add_argument("--min-qscore").default_value(0).scan<'i', int>();
 
     parser.add_argument("--reference")
@@ -91,24 +100,35 @@ int duplex(int argc, char* argv[]) {
             .help("minimizer window size for alignment with minimap2.")
             .default_value(10)
             .scan<'i', int>();
+    parser.add_argument("-v", "--verbose").default_value(false).implicit_value(true);
 
     try {
-        parser.parse_args(argc, argv);
+        auto remaining_args = parser.parse_known_args(argc, argv);
+        auto internal_parser = utils::parse_internal_options(remaining_args);
 
         auto device(parser.get<std::string>("-x"));
         auto model(parser.get<std::string>("model"));
         auto reads(parser.get<std::string>("reads"));
-        auto pairs_file(parser.get<std::string>("--pairs"));
+        std::string pairs_file = parser.get<std::string>("--pairs");
         auto threads = static_cast<size_t>(parser.get<int>("--threads"));
         auto min_qscore(parser.get<int>("--min-qscore"));
         auto ref = parser.get<std::string>("--reference");
         std::vector<std::string> args(argv, argv + argc);
+        if (parser.get<bool>("--verbose")) {
+            spdlog::set_level(spdlog::level::debug);
+        }
+        std::map<std::string, std::string> template_complement_map;
+        std::unordered_set<std::string> read_list;
 
-        spdlog::info("> Loading pairs file");
-        auto template_complement_map = utils::load_pairs_file(pairs_file);
-        std::unordered_set<std::string> read_list =
-                utils::get_read_list_from_pairs(template_complement_map);
-        spdlog::info("> Pairs file loaded with {} reads.", read_list.size());
+        if (!pairs_file.empty()) {
+            spdlog::info("> Loading pairs file");
+            template_complement_map = utils::load_pairs_file(pairs_file);
+            read_list = utils::get_read_list_from_pairs(template_complement_map);
+            spdlog::info("> Pairs file loaded with {} reads.", read_list.size());
+        } else {
+            spdlog::info(
+                    "> No duplex pairs file provided, pairing will be performed automatically");
+        }
 
         bool emit_moves = false, rna = false, duplex = true;
 
@@ -125,6 +145,8 @@ int duplex(int argc, char* argv[]) {
             output_mode = HtsWriter::OutputMode::FASTQ;
         } else if (emit_sam || utils::is_fd_tty(stdout)) {
             output_mode = HtsWriter::OutputMode::SAM;
+        } else if (utils::is_fd_pipe(stdout)) {
+            output_mode = HtsWriter::OutputMode::UBAM;
         }
 
         std::unique_ptr<sam_hdr_t, void (*)(sam_hdr_t*)> hdr(sam_hdr_init(), sam_hdr_destroy);
@@ -154,6 +176,13 @@ int duplex(int argc, char* argv[]) {
         torch::set_num_threads(1);
 
         if (model.compare("basespace") == 0) {  // Execute a Basespace duplex pipeline.
+            if (pairs_file.empty()) {
+                spdlog::error("The --pairs argument is required for the basespace model.");
+                return 1;  // Exit with an error code
+            }
+            // create a set of the read_ids
+            auto read_ids = utils::get_read_list_from_pairs(template_complement_map);
+
             spdlog::info("> Loading reads");
             auto read_map = utils::read_bam(reads, read_list);
 
@@ -167,6 +196,15 @@ int duplex(int argc, char* argv[]) {
 
             auto data_sample_rate =
                     DataLoader::get_sample_rate(reads, parser.get<bool>("--recursive"));
+            auto model_sample_rate = get_model_sample_rate(model_path);
+            auto skip_model_compatibility_check =
+                    internal_parser.get<bool>("--skip-model-compatibility-check");
+            if (!skip_model_compatibility_check && (data_sample_rate != model_sample_rate)) {
+                std::stringstream err;
+                err << "Sample rate for model (" << model_sample_rate << ") and data ("
+                    << data_sample_rate << ") don't match.";
+                throw std::runtime_error(err.str());
+            }
             auto stereo_model_name = utils::get_stereo_model_name(model, data_sample_rate);
             const auto stereo_model_path =
                     model_path.parent_path() / std::filesystem::path(stereo_model_name);
@@ -184,8 +222,6 @@ int duplex(int argc, char* argv[]) {
             int chunk_size(parser.get<int>("-c"));
             int overlap(parser.get<int>("-o"));
             const size_t num_runners = default_parameters.num_runners;
-
-            size_t stereo_batch_size;
 
             if (device == "cpu") {
                 if (batch_size == 0) {
@@ -209,7 +245,7 @@ int duplex(int argc, char* argv[]) {
                 }
 
                 // For now, the minimal batch size is used for the duplex model.
-                stereo_batch_size = 48;
+                int stereo_batch_size = 48;
 
                 auto duplex_caller =
                         create_metal_caller(stereo_model_path, chunk_size, stereo_batch_size);
@@ -238,11 +274,9 @@ int duplex(int argc, char* argv[]) {
                     }
                 }
 
-                stereo_batch_size = 1024;
-
                 for (auto device_string : devices) {
-                    auto caller = create_cuda_caller(stereo_model_path, chunk_size,
-                                                     stereo_batch_size, device_string);
+                    auto caller = create_cuda_caller(stereo_model_path, chunk_size, batch_size,
+                                                     device_string, 0.5f);
                     for (size_t i = 0; i < num_runners; i++) {
                         stereo_runners.push_back(std::make_shared<CudaModelRunner>(caller));
                     }
@@ -256,7 +290,7 @@ int duplex(int argc, char* argv[]) {
 
             auto adjusted_stereo_overlap = (overlap / stereo_model_stride) * stereo_model_stride;
 
-            const int kStereoBatchTimeoutMS = 500;
+            const int kStereoBatchTimeoutMS = 5000;
             auto stereo_basecaller_node = std::make_unique<BasecallerNode>(
                     read_filter_node, std::move(stereo_runners), adjusted_stereo_overlap,
                     kStereoBatchTimeoutMS);
@@ -266,7 +300,10 @@ int duplex(int argc, char* argv[]) {
             StereoDuplexEncoderNode stereo_node =
                     StereoDuplexEncoderNode(*stereo_basecaller_node, simplex_model_stride);
 
-            PairingNode pairing_node(stereo_node, template_complement_map);
+            PairingNode pairing_node(stereo_node,
+                                     template_complement_map.empty()
+                                             ? std::optional<std::map<std::string, std::string>>{}
+                                             : template_complement_map);
 
             auto adjusted_simplex_overlap = (overlap / simplex_model_stride) * simplex_model_stride;
 
@@ -277,9 +314,12 @@ int duplex(int argc, char* argv[]) {
 
             ScalerNode scaler_node(*basecaller_node, num_devices * 2);
 
+            auto read_list = utils::load_read_list(parser.get<std::string>("--read-ids"));
+
             DataLoader loader(scaler_node, "cpu", num_devices, 0, std::move(read_list));
-            loader.load_reads(reads, parser.get<bool>("--recursive"));
+            loader.load_reads(reads, parser.get<bool>("--recursive"), DataLoader::BY_CHANNEL);
         }
+        bam_writer->join();  // Explicitly wait for all output rows to be written.
         stats_node.dump_stats();
     } catch (const std::exception& e) {
         spdlog::error(e.what());

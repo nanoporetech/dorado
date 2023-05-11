@@ -2,6 +2,7 @@
 
 #include "Version.h"
 
+#include <argparse.hpp>
 #include <htslib/sam.h>
 #include <stdio.h>
 
@@ -14,6 +15,7 @@
 #ifdef _WIN32
 #include <io.h>
 #else
+#include <sys/stat.h>
 #include <unistd.h>
 #endif
 
@@ -41,6 +43,16 @@ inline bool is_fd_tty(FILE* fd) {
 #endif
 }
 
+inline bool is_fd_pipe(FILE* fd) {
+#ifdef _WIN32
+    return false;
+#else
+    struct stat buffer;
+    fstat(fileno(fd), &buffer);
+    return S_ISFIFO(buffer.st_mode);
+#endif
+}
+
 inline void add_pg_hdr(sam_hdr_t* hdr, const std::vector<std::string>& args) {
     sam_hdr_add_lines(hdr, "@HD\tVN:1.6\tSO:unknown", 0);
 
@@ -51,6 +63,21 @@ inline void add_pg_hdr(sam_hdr_t* hdr, const std::vector<std::string>& args) {
     }
     pg << std::endl;
     sam_hdr_add_lines(hdr, pg.str().c_str(), 0);
+}
+
+inline argparse::ArgumentParser parse_internal_options(
+        const std::vector<std::string>& unused_args) {
+    auto args = unused_args;
+    const std::string prog_name = std::string("internal_args");
+    argparse::ArgumentParser private_parser(prog_name);
+    private_parser.add_argument("--skip-model-compatibility-check")
+            .help("(WARNING: For expert users only) Skip model and data compatibility checks.")
+            .default_value(false)
+            .implicit_value(true);
+    args.insert(args.begin(), prog_name);
+    private_parser.parse_args(args);
+
+    return private_parser;
 }
 
 }  // namespace utils

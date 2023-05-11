@@ -50,7 +50,7 @@ void Read::generate_read_tags(bam1_t *aln, bool emit_moves) const {
     int qs = static_cast<int>(std::round(utils::mean_qscore_from_qstring(qstring)));
     bam_aux_append(aln, "qs", 'i', sizeof(qs), (uint8_t *)&qs);
 
-    float du = (raw_data.size(0) + num_trimmed_samples) / sample_rate;
+    float du = (float)(raw_data.size(0) + num_trimmed_samples) / (float)sample_rate;
     bam_aux_append(aln, "du", 'f', sizeof(du), (uint8_t *)&du);
 
     int ns = raw_data.size(0) + num_trimmed_samples;
@@ -153,6 +153,11 @@ std::vector<BamPtr> Read::extract_sam_lines(bool emit_moves,
     return alns;
 }
 
+uint64_t Read::get_end_time_ms() {
+    return start_time_ms +
+           (attributes.num_samples * 1000) / sample_rate;  //TODO get rid of the trimmed thing?
+}
+
 void Read::generate_modbase_string(bam1_t *aln, uint8_t threshold) const {
     if (!base_mod_info) {
         return;
@@ -206,9 +211,7 @@ void Read::generate_modbase_string(bam1_t *aln, uint8_t threshold) const {
 
             // Write out the results we found
             modbase_string += std::string(1, current_cardinal) + "+" + bam_name;
-            if (base_has_context[current_cardinal]) {
-                modbase_string += "?";
-            }
+            modbase_string += base_has_context[current_cardinal] ? "?" : ".";
             int skipped_bases = 0;
             for (size_t base_idx = 0; base_idx < seq.size(); base_idx++) {
                 if (seq[base_idx] == current_cardinal) {

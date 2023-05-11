@@ -77,6 +77,7 @@ T HtsReader::get_tag(std::string tagname) {
 class HtsWriter : public MessageSink {
 public:
     enum OutputMode {
+        UBAM,
         BAM,
         SAM,
         FASTQ,
