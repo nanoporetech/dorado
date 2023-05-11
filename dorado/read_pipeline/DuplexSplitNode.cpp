@@ -153,6 +153,9 @@ std::shared_ptr<Read> subread(const Read& read, PosRange seq_range, PosRange sig
         throw std::runtime_error(std::string("Read splitting doesn't support mods yet"));
     }
     const int stride = read.model_stride;
+    assert(signal_range.first <= signal_range.second);
+    assert(signal_range.first / stride <= read.moves.size());
+    assert(signal_range.second / stride <= read.moves.size());
     assert(signal_range.first % stride == 0);
     assert(signal_range.second % stride == 0 ||
            (signal_range.second == read.raw_data.size(0) && seq_range.second == read.seq.size()));
@@ -198,6 +201,7 @@ DuplexSplitNode::ExtRead::ExtRead(std::shared_ptr<Read> r)
         : read(std::move(r)),
           data_as_float32(read->raw_data.to(torch::kFloat)),
           move_sums(utils::move_cum_sums(read->moves)) {
+    assert(!move_sums.empty());
     assert(move_sums.back() == read->seq.length());
 }
 
@@ -287,21 +291,26 @@ std::vector<std::shared_ptr<Read>> DuplexSplitNode::subreads(
     std::vector<std::shared_ptr<Read>> subreads;
     subreads.reserve(spacers.size() + 1);
 
-    const auto seq_to_sig_map = utils::moves_to_map(read->moves, read->model_stride,
-                                                    read->raw_data.size(0), read->seq.size() + 1);
+    const auto stride = read->model_stride;
+    const auto seq_to_sig_map =
+            utils::moves_to_map(read->moves, stride, read->raw_data.size(0), read->seq.size() + 1);
 
     //TODO maybe simplify by adding begin/end stubs?
     uint64_t start_pos = 0;
     uint64_t signal_start = seq_to_sig_map[0];
     for (auto r : spacers) {
-        subreads.push_back(
-                subread(*read, {start_pos, r.first}, {signal_start, seq_to_sig_map[r.first]}));
+        if (start_pos < r.first && signal_start / stride < seq_to_sig_map[r.first] / stride) {
+            subreads.push_back(
+                    subread(*read, {start_pos, r.first}, {signal_start, seq_to_sig_map[r.first]}));
+        }
         start_pos = r.second;
         signal_start = seq_to_sig_map[r.second];
     }
     assert(read->raw_data.size(0) == seq_to_sig_map[read->seq.size()]);
-    subreads.push_back(
-            subread(*read, {start_pos, read->seq.size()}, {signal_start, read->raw_data.size(0)}));
+    if (start_pos < read->seq.size() && signal_start / stride < read->raw_data.size(0) / stride) {
+        subreads.push_back(subread(*read, {start_pos, read->seq.size()},
+                                   {signal_start, read->raw_data.size(0)}));
+    }
 
     return subreads;
 }
@@ -373,6 +382,13 @@ std::vector<std::shared_ptr<Read>> DuplexSplitNode::split(std::shared_ptr<Read> 
 
     auto start_ts = high_resolution_clock::now();
     spdlog::trace("Processing read {}; length {}", init_read->read_id, init_read->seq.size());
+
+    //assert(!init_read->seq.empty() && !init_read->moves.empty());
+    if (init_read->seq.empty() || init_read->moves.empty()) {
+        spdlog::trace("Empty read {}; length {}; moves {}", init_read->read_id,
+                      init_read->seq.size(), init_read->moves.size());
+        return std::vector<std::shared_ptr<Read>>{std::move(init_read)};
+    }
 
     std::vector<ExtRead> to_split{ExtRead(init_read)};
     for (const auto& [description, split_f] : m_split_finders) {
