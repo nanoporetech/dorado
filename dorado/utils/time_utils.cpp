@@ -30,8 +30,8 @@ time_t get_unix_time_from_string_timestamp(const std::string& time_stamp) {
 }
 
 std::string adjust_time_ms(const std::string& time_stamp, uint64_t offset_ms) {
-    return utils::get_string_timestamp_from_unix_time(
-            get_unix_time_from_string_timestamp(time_stamp) + offset_ms);
+    return get_string_timestamp_from_unix_time(get_unix_time_from_string_timestamp(time_stamp) +
+                                               offset_ms);
 }
 
 std::string adjust_time(const std::string& time_stamp, uint32_t offset) {

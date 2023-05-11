@@ -46,6 +46,9 @@ void string_reader(HighFive::Attribute& attribute, std::string& target_str) {
         target_str.resize(eol_pos);
     }
 };
+}  // namespace
+
+namespace dorado {
 
 std::shared_ptr<dorado::Read> process_pod5_read(size_t row,
                                                 Pod5ReadRecordBatch* batch,
@@ -86,7 +89,7 @@ std::shared_ptr<dorado::Read> process_pod5_read(size_t row,
     auto start_time_ms = run_acquisition_start_time_ms +
                          ((read_data.start_sample * 1000) /
                           (uint64_t)run_sample_rate);  // TODO check if this cast is needed
-    auto start_time = dorado::utils::get_string_timestamp_from_unix_time(start_time_ms);
+    auto start_time = utils::get_string_timestamp_from_unix_time(start_time_ms);
     new_read->run_acqusition_start_time_ms = run_acquisition_start_time_ms;
     new_read->start_time_ms = start_time_ms;
     new_read->scaling = read_data.calibration_scale;
@@ -109,9 +112,6 @@ std::shared_ptr<dorado::Read> process_pod5_read(size_t row,
     }
     return new_read;
 }
-} /* anonymous namespace */
-
-namespace dorado {
 
 void Pod5Destructor::operator()(Pod5FileReader_t* pod5) { pod5_close_and_free_reader(pod5); }
 
