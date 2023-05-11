@@ -48,6 +48,17 @@ double time_difference_seconds(const std::string &timestamp1, const std::string 
         sys_time<microseconds> time1, time2;
         ss1 >> parse("%FT%T%Ez", time1);
         ss2 >> parse("%FT%T%Ez", time2);
+        // If parsing with timezone offset failed, try parsing with 'Z' format
+        if (ss1.fail()) {
+            ss1.clear();
+            ss1.str(timestamp1);
+            ss1 >> parse("%FT%TZ", time1);
+        }
+        if (ss2.fail()) {
+            ss2.clear();
+            ss2.str(timestamp2);
+            ss2 >> parse("%FT%TZ", time2);
+        }
         duration<double> diff = time1 - time2;
         return diff.count();
     } catch (const std::exception &e) {
@@ -136,8 +147,13 @@ int summary(int argc, char *argv[]) {
         auto num_samples = reader.get_tag<int>("ns");
         auto trim_samples = reader.get_tag<int>("ts");
 
-        // todo: sample_rate
-        float template_duration = (num_samples - trim_samples) / 4000.0f;
+        // tmp: no du tag from guppy
+        if (!reader.has_tag("du")) {
+            duration = num_samples / 4000.0f;
+        }
+
+        float sample_rate = num_samples / duration;
+        float template_duration = (num_samples - trim_samples) / sample_rate;
         auto start_time =
                 time_difference_seconds(start_time_dt, read_group_exp_start_time.at(rg_value));
         auto template_start_time = start_time + (duration - template_duration);

@@ -361,6 +361,11 @@ HtsReader::~HtsReader() {
 
 bool HtsReader::read() { return sam_read1(m_file, header, record.get()) >= 0; }
 
+bool HtsReader::has_tag(std::string tagname) {
+    uint8_t* tag = bam_aux_get(record.get(), tagname.c_str());
+    return static_cast<bool>(tag);
+}
+
 void HtsReader::read(MessageSink& read_sink, int max_reads) {
     int num_reads = 0;
     while (this->read()) {

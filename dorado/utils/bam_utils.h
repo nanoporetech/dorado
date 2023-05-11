@@ -50,6 +50,7 @@ public:
     void read(MessageSink& read_sink, int max_reads = -1);
     template <typename T>
     T get_tag(std::string tagname);
+    bool has_tag(std::string tagname);
 
     char* format{nullptr};
     bool is_aligned{false};
