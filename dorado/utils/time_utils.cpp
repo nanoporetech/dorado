@@ -1,6 +1,7 @@
 #include "time_utils.h"
 
-namespace dorado::utils {
+namespace dorado {
+namespace utils {
 
 std::string get_string_timestamp_from_unix_time(time_t time_stamp_ms) {
     static std::mutex timestamp_mtx;
@@ -47,4 +48,5 @@ std::string adjust_time(const std::string& time_stamp, uint32_t offset) {
     return std::string(buff);
 }
 
-}  // namespace dorado::utils
+}  // namespace utils
+}  // namespace dorado
