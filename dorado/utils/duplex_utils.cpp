@@ -119,7 +119,7 @@ void preprocess_quality_scores(std::vector<uint8_t>& quality_scores, int pool_wi
 const std::string get_stereo_model_name(const std::string& simplex_model_name,
                                         uint16_t data_sample_rate) {
     if (data_sample_rate == 5000) {
-        return "dna_r10.4.1_e8.2_5khz_stereo@v1.0";
+        return "dna_r10.4.1_e8.2_5khz_stereo@v1.1";
     } else {
         return "dna_r10.4.1_e8.2_4khz_stereo@v1.1";
     }
