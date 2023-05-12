@@ -16,10 +16,11 @@ namespace simplex {
 
 static const std::vector<std::string> models = {
 
-        // v3.{3,4}
+        // v3.{3,4,6}
         "dna_r9.4.1_e8_fast@v3.4",
         "dna_r9.4.1_e8_hac@v3.3",
         "dna_r9.4.1_e8_sup@v3.3",
+        "dna_r9.4.1_e8_sup@v3.6",
 
         // v3.5.2
         "dna_r10.4.1_e8.2_260bps_fast@v3.5.2",
