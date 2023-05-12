@@ -189,10 +189,9 @@ void DataLoader::load_reads(const std::string& path,
                                 "Encountered FAST5 at " +
                                 path.string());
                     } else if (ext == ".pod5") {
-                        auto& channel_to_read_ids =
-                                m_file_channel_read_order_map.find(path.string())->second;
-                        if (channel_to_read_ids.find(channel) != channel_to_read_ids.end()) {
-                            auto& read_ids = channel_to_read_ids[channel];
+                        auto& channel_to_read_ids = m_file_channel_read_order_map.at(path.string());
+                        auto& read_ids = channel_to_read_ids[channel];
+                        if (!read_ids.empty()) {
                             load_pod5_reads_from_file_by_read_ids(path.string(), read_ids);
                         }
                     }
@@ -338,7 +337,7 @@ void DataLoader::load_read_channels(std::string data_path, bool recursive_file_l
 
                     // Store the read_id in the channel's list.
                     ReadID read_id;
-                    memcpy(read_id.data(), read_data.read_id, 16);
+                    std::memcpy(read_id.data(), read_data.read_id, POD5_READ_ID_SIZE);
                     channel_to_read_id[channel].push_back(std::move(read_id));
                 }
 
@@ -522,9 +521,10 @@ void DataLoader::load_pod5_reads_from_file_by_read_ids(const std::string& path,
         return;
     }
 
-    std::vector<uint8_t> read_id_array(16 * read_ids.size());
+    std::vector<uint8_t> read_id_array(POD5_READ_ID_SIZE * read_ids.size());
     for (int i = 0; i < read_ids.size(); i++) {
-        memcpy(read_id_array.data() + 16 * i, read_ids[i].data(), 16);
+        std::memcpy(read_id_array.data() + POD5_READ_ID_SIZE * i, read_ids[i].data(),
+                    POD5_READ_ID_SIZE);
     }
 
     std::size_t batch_count = 0;
