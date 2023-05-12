@@ -390,7 +390,7 @@ std::unordered_map<std::string, ReadGroup> DataLoader::load_read_groups(
                         RunInfoDictData_t* run_info_data;
                         pod5_get_file_run_info(file, idx, &run_info_data);
 
-                        auto exp_start_time_ms = run_info_data->protocol_start_time_ms;
+                        auto exp_start_time_ms = run_info_data->acquisition_start_time_ms;
                         std::string flowcell_id = run_info_data->flow_cell_id;
                         std::string device_id = run_info_data->system_name;
                         std::string run_id = run_info_data->acquisition_id;
