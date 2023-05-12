@@ -51,16 +51,16 @@ std::vector<std::pair<size_t, size_t>> detect_pore_signal(const torch::Tensor& s
                                                           size_t ignore_prefix) {
     std::vector<std::pair<size_t, size_t>> ans;
     auto pore_a = signal.accessor<float, 1>();
-    size_t cl_start = size_t(-1);
-    size_t cl_end = size_t(-1);
+    int64_t cl_start = -1;
+    int64_t cl_end = -1;
 
     for (size_t i = ignore_prefix; i < pore_a.size(0); i++) {
         if (pore_a[i] > threshold) {
             //check if we need to start new cluster
-            if (cl_end == size_t(-1) || i > cl_end + cluster_dist) {
+            if (cl_end == -1 || i > cl_end + cluster_dist) {
                 //report previous cluster
-                if (cl_end != size_t(-1)) {
-                    assert(cl_start != size_t(-1));
+                if (cl_end != -1) {
+                    assert(cl_start != -1);
                     ans.push_back({cl_start, cl_end});
                 }
                 cl_start = i;
@@ -69,9 +69,9 @@ std::vector<std::pair<size_t, size_t>> detect_pore_signal(const torch::Tensor& s
         }
     }
     //report last cluster
-    if (cl_end != size_t(-1)) {
+    if (cl_end != -1) {
+        assert(cl_start != -1);
         assert(cl_start < pore_a.size(0) && cl_end <= pore_a.size(0));
-        assert(cl_start != size_t(-1));
         ans.push_back(std::pair{cl_start, cl_end});
     }
 
