@@ -63,7 +63,7 @@ namespace stereo {
 
 static const std::vector<std::string> models = {
         "dna_r10.4.1_e8.2_4khz_stereo@v1.1",
-        "dna_r10.4.1_e8.2_5khz_stereo@v1.0",
+        "dna_r10.4.1_e8.2_5khz_stereo@v1.1",
 };
 
 }  // namespace stereo
@@ -134,7 +134,7 @@ static const std::unordered_map<std::string, uint16_t> sample_rate_by_model = {
 
         //------ duplex ---------//
         // v4.2
-        {"dna_r10.4.1_e8.2_5khz_stereo@v1.0", 5000},
+        {"dna_r10.4.1_e8.2_5khz_stereo@v1.1", 5000},
 };
 
 bool is_rna_model(const std::filesystem::path& model);
