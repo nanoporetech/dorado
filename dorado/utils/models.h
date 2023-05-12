@@ -63,7 +63,7 @@ namespace stereo {
 
 static const std::vector<std::string> models = {
         "dna_r10.4.1_e8.2_4khz_stereo@v1.1",
-        "dna_r10.4.1_e8.2_5khz_stereo@v1.0",
+        "dna_r10.4.1_e8.2_5khz_stereo@v1.1",
 };
 
 }  // namespace stereo
