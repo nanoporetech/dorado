@@ -16,14 +16,6 @@ std::filesystem::path DataPath(std::string_view filename) {
     return std::filesystem::path(get_stereo_data_dir()) / filename;
 }
 
-// Reads into a vector<uint8_t>.
-std::vector<uint8_t> ReadFileIntoVector(const std::filesystem::path& path) {
-    const std::string str = ReadFileIntoString(path);
-    std::vector<uint8_t> vec;
-    vec.resize(str.size());
-    std::memcpy(vec.data(), str.data(), str.size());
-    return vec;
-}
 }  // namespace
 
 // Tests stereo encoder output for a real sample signal against known good output.
