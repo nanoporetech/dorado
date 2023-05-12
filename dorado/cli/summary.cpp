@@ -17,28 +17,7 @@ volatile sig_atomic_t interupt = 0;
 
 using HtsReader = utils::HtsReader;
 
-std::vector<std::string> header = {
-        "filename",
-        "read_id",
-        "run_id",
-        "channel",
-        "mux",
-        "start_time",
-        "duration",
-        "template_start",
-        "template_duration",
-        "sequence_length_template",
-        "mean_qscore_template",
-};
-
-std::vector<std::string> aligned_header = {
-        "alignment_genome",         "alignment_genome_start",    "alignment_genome_end",
-        "alignment_strand_start",   "alignment_strand_end",      "alignment_direction",
-        "alignment_length",         "alignment_num_aligned",     "alignment_num_correct",
-        "alignment_num_insertions", "alignment_num_deletions",   "alignment_num_substitutions",
-        "alignment_mapq",           "alignment_strand_coverage", "alignment_identity",
-        "alignment_accuracy"};
-
+// todo: move to time_utils after !273
 double time_difference_seconds(const std::string &timestamp1, const std::string &timestamp2) {
     using namespace date;
     using namespace std::chrono;
@@ -87,6 +66,28 @@ int summary(int argc, char *argv[]) {
         spdlog::set_level(spdlog::level::debug);
     }
 
+    std::vector<std::string> header = {
+            "filename",
+            "read_id",
+            "run_id",
+            "channel",
+            "mux",
+            "start_time",
+            "duration",
+            "template_start",
+            "template_duration",
+            "sequence_length_template",
+            "mean_qscore_template",
+    };
+
+    std::vector<std::string> aligned_header = {
+            "alignment_genome",         "alignment_genome_start",    "alignment_genome_end",
+            "alignment_strand_start",   "alignment_strand_end",      "alignment_direction",
+            "alignment_length",         "alignment_num_aligned",     "alignment_num_correct",
+            "alignment_num_insertions", "alignment_num_deletions",   "alignment_num_substitutions",
+            "alignment_mapq",           "alignment_strand_coverage", "alignment_identity",
+            "alignment_accuracy"};
+
     auto reads(parser.get<std::string>("reads"));
     auto separator(parser.get<std::string>("separator"));
 
@@ -94,18 +95,12 @@ int summary(int argc, char *argv[]) {
 
     auto read_group_exp_start_time = utils::get_read_group_info(reader.header, "DT");
 
-    for (const auto &rg_pair : read_group_exp_start_time) {
-        std::cerr << "Read Group ID: " << rg_pair.first << ", Date: " << rg_pair.second
-                  << std::endl;
-    }
-
     spdlog::debug("> input fmt: {} aligned: {}", reader.format, reader.is_aligned);
 #ifndef _WIN32
     std::signal(SIGPIPE, [](int signum) { interupt = 1; });
 #endif
     std::signal(SIGINT, [](int signum) { interupt = 1; });
 
-    // HEADER
     for (int col = 0; col < header.size() - 1; col++) {
         std::cout << header[col] << separator;
     }
@@ -147,15 +142,10 @@ int summary(int argc, char *argv[]) {
         auto num_samples = reader.get_tag<int>("ns");
         auto trim_samples = reader.get_tag<int>("ts");
 
-        // tmp: no du tag from guppy
-        if (!reader.has_tag("du")) {
-            duration = num_samples / 4000.0f;
-        }
-
         float sample_rate = num_samples / duration;
         float template_duration = (num_samples - trim_samples) / sample_rate;
-        auto start_time =
-                time_difference_seconds(start_time_dt, read_group_exp_start_time.at(rg_value));
+        auto exp_start_dt = read_group_exp_start_time.at(rg_value);
+        auto start_time = time_difference_seconds(start_time_dt, exp_start_dt);
         auto template_start_time = start_time + (duration - template_duration);
 
         std::cout << filename << separator << read_id << separator << run_id << separator << channel
@@ -163,7 +153,7 @@ int summary(int argc, char *argv[]) {
                   << separator << template_start_time << separator << template_duration << separator
                   << seqlen << separator << mean_qscore;
 
-        if (!(reader.record->core.flag & BAM_FUNMAP)) {
+        if (reader.is_aligned) {
             int32_t query_start = 0;
             int32_t query_end = 0;
             std::string alignment_genome = "*";
@@ -183,83 +173,31 @@ int summary(int argc, char *argv[]) {
             float alignment_identity = 0.0;
             float alignment_accurary = 0.0;
 
-            alignment_mapq = static_cast<int>(reader.record->core.qual);
-            alignment_genome = reader.header->target_name[reader.record->core.tid];
+            if (!(reader.record->core.flag & BAM_FUNMAP)) {
+                alignment_mapq = static_cast<int>(reader.record->core.qual);
+                alignment_genome = reader.header->target_name[reader.record->core.tid];
 
-            alignment_genome_start = reader.record->core.pos;
-            alignment_genome_end = bam_endpos(reader.record.get());
+                alignment_genome_start = reader.record->core.pos;
+                alignment_genome_end = bam_endpos(reader.record.get());
+                alignment_direction = bam_is_rev(reader.record) ? "-" : "+";
 
-            alignment_strand_start = 0;
-            alignment_strand_end = seqlen;
+                auto alignment_counts = utils::get_alignment_op_counts(reader.record.get());
+                alignment_num_aligned = alignment_counts.matches;
+                alignment_num_correct = alignment_counts.matches - alignment_counts.substitutions;
+                alignment_num_insertions = alignment_counts.insertions;
+                alignment_num_deletions = alignment_counts.deletions;
+                alignment_num_substitutions = alignment_counts.substitutions;
+                alignment_length = alignment_counts.matches + alignment_counts.insertions +
+                                   alignment_counts.deletions;
+                alignment_strand_start = alignment_counts.softclip_start;
+                alignment_strand_end = seqlen - alignment_counts.softclip_end;
 
-            alignment_direction = bam_is_rev(reader.record) ? "-" : "+";
-
-            uint32_t *cigar = bam_get_cigar(reader.record);
-            int n_cigar = reader.record->core.n_cigar;
-
-            if (bam_cigar_op(cigar[0]) == BAM_CSOFT_CLIP) {
-                alignment_strand_start += bam_cigar_oplen(cigar[0]);
+                strand_coverage = (alignment_strand_end - alignment_strand_start) /
+                                  static_cast<float>(seqlen);
+                alignment_identity =
+                        alignment_num_correct / static_cast<float>(alignment_counts.matches);
+                alignment_accurary = alignment_num_correct / static_cast<float>(alignment_length);
             }
-
-            if (bam_cigar_op(cigar[n_cigar - 1]) == BAM_CSOFT_CLIP) {
-                alignment_strand_end -= bam_cigar_oplen(cigar[n_cigar - 1]);
-            }
-
-            for (int i = 0; i < n_cigar; ++i) {
-                int op = bam_cigar_op(cigar[i]);
-                int op_len = bam_cigar_oplen(cigar[i]);
-
-                switch (op) {
-                case BAM_CMATCH:
-                    alignment_num_aligned += op_len;
-                    break;
-                case BAM_CINS:
-                    alignment_num_insertions += op_len;
-                    break;
-                case BAM_CDEL:
-                    alignment_num_deletions += op_len;
-                    break;
-                default:
-                    break;
-                }
-            }
-
-            alignment_length =
-                    alignment_num_aligned + alignment_num_insertions + alignment_num_deletions;
-
-            uint8_t *md_ptr = bam_aux_get(reader.record.get(), "MD");
-
-            if (md_ptr) {
-                int i = 0;
-                int md_length = 0;
-                char *md = bam_aux2Z(md_ptr);
-
-                while (md[i]) {
-                    if (std::isdigit(md[i])) {
-                        md_length = md_length * 10 + (md[i] - '0');
-                    } else {
-                        if (md[i] == '^') {
-                            // Skip deletions
-                            i++;
-                            while (md[i] && !std::isdigit(md[i])) {
-                                i++;
-                            }
-                        } else {
-                            // Substitution found
-                            alignment_num_substitutions++;
-                            md_length++;
-                        }
-                    }
-                    i++;
-                }
-            }
-
-            alignment_num_correct = alignment_num_aligned - alignment_num_substitutions;
-            alignment_identity = alignment_num_correct / static_cast<float>(alignment_num_aligned);
-            alignment_accurary = alignment_num_correct / static_cast<float>(alignment_length);
-
-            strand_coverage =
-                    (alignment_strand_end - alignment_strand_start) / static_cast<float>(seqlen);
 
             std::cout << separator << alignment_genome << separator << alignment_genome_start
                       << separator << alignment_genome_end << separator << alignment_strand_start
