@@ -80,6 +80,27 @@ inline argparse::ArgumentParser parse_internal_options(
     return private_parser;
 }
 
+inline std::tuple<int, int, int> parse_version_str(const std::string& version) {
+    size_t first_pos = 0, pos = 0;
+    std::vector<int> tokens;
+    while ((pos = version.find(".", first_pos)) != std::string::npos) {
+        tokens.emplace_back(std::stoi(version.substr(first_pos, pos)));
+        first_pos = pos + 1;
+    }
+    tokens.emplace_back(std::stoi(version.substr(first_pos)));
+    if (tokens.size() == 3) {
+        return {tokens[0], tokens[1], tokens[2]};
+    } else if (tokens.size() == 2) {
+        return {tokens[0], tokens[1], 0};
+    } else if (tokens.size() == 1) {
+        return {tokens[0], 0, 0};
+    } else {
+        throw std::runtime_error(
+                "Could not parse version " + version +
+                ". Only version in the format x.y.z where x/y/z are integers is supported");
+    }
+}
+
 }  // namespace utils
 
 }  // namespace dorado
