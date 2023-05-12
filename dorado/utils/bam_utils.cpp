@@ -599,4 +599,67 @@ std::map<std::string, std::string> get_read_group_info(sam_hdr_t* header, const 
     return read_group_info;
 }
 
+AlignmentOps get_alignment_op_counts(bam1_t* record) {
+    AlignmentOps counts = {};
+
+    uint32_t* cigar = bam_get_cigar(record);
+    int n_cigar = record->core.n_cigar;
+
+    if (bam_cigar_op(cigar[0]) == BAM_CSOFT_CLIP) {
+        counts.softclip_start = bam_cigar_oplen(cigar[0]);
+    }
+
+    if (bam_cigar_op(cigar[n_cigar - 1]) == BAM_CSOFT_CLIP) {
+        counts.softclip_end = bam_cigar_oplen(cigar[n_cigar - 1]);
+    }
+
+    for (int i = 0; i < n_cigar; ++i) {
+        int op = bam_cigar_op(cigar[i]);
+        int op_len = bam_cigar_oplen(cigar[i]);
+
+        switch (op) {
+        case BAM_CMATCH:
+            counts.matches += op_len;
+            break;
+        case BAM_CINS:
+            counts.insertions += op_len;
+            break;
+        case BAM_CDEL:
+            counts.deletions += op_len;
+            break;
+        default:
+            break;
+        }
+    }
+
+    uint8_t* md_ptr = bam_aux_get(record, "MD");
+
+    if (md_ptr) {
+        int i = 0;
+        int md_length = 0;
+        char* md = bam_aux2Z(md_ptr);
+
+        while (md[i]) {
+            if (std::isdigit(md[i])) {
+                md_length = md_length * 10 + (md[i] - '0');
+            } else {
+                if (md[i] == '^') {
+                    // Skip deletions
+                    i++;
+                    while (md[i] && !std::isdigit(md[i])) {
+                        i++;
+                    }
+                } else {
+                    // Substitution found
+                    counts.substitutions++;
+                    md_length++;
+                }
+            }
+            i++;
+        }
+    }
+
+    return counts;
+}
+
 }  // namespace dorado::utils

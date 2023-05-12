@@ -15,6 +15,15 @@ namespace dorado::utils {
 using sq_t = std::vector<std::pair<char*, uint32_t>>;
 using read_map = std::unordered_map<std::string, std::shared_ptr<Read>>;
 
+struct AlignmentOps {
+    size_t softclip_start;
+    size_t softclip_end;
+    size_t matches;
+    size_t insertions;
+    size_t deletions;
+    size_t substitutions;
+};
+
 class Aligner : public MessageSink {
 public:
     Aligner(MessageSink& read_sink, const std::string& filename, int k, int w, int threads);
@@ -160,5 +169,17 @@ void add_sq_hdr(sam_hdr_t* hdr, const sq_t& seqs);
  * }
  */
 std::map<std::string, std::string> get_read_group_info(sam_hdr_t* header, const char* key);
+
+/**
+ * @brief Calculates the count of various alignment operations (soft clipping, matches, insertions, deletions, and substitutions) in a given BAM record.
+ *
+ * This function takes a pointer to a bam1_t structure as input and computes the count of soft clipping,
+ * matches, insertions, deletions, and substitutions in the alignment using the CIGAR string and MD tag.
+ * It returns an AlignmentOps structure containing these counts.
+ *
+ * @param record Pointer to a bam1_t structure representing a BAM record.
+ * @return AlignmentOps structure containing counts of soft clipping, matches, insertions, deletions, and substitutions in the alignment.
+ */
+AlignmentOps get_alignment_op_counts(bam1_t* record);
 
 }  // namespace dorado::utils
