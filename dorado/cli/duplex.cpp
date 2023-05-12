@@ -323,7 +323,7 @@ int duplex(int argc, char* argv[]) {
         stats_node.dump_stats();
     } catch (const std::exception& e) {
         spdlog::error(e.what());
-        std::exit(1);
+        return 1;
     }
     return 0;
 }
