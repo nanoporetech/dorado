@@ -3,6 +3,7 @@
 #include <catch2/catch.hpp>
 #include <torch/torch.h>
 
+#include <cstdlib>
 #include <random>
 
 #define CUT_TAG "[TensorUtils]"
@@ -82,5 +83,22 @@ TEST_CASE(CUT_TAG ": quantile_counting guppy comparison", CUT_TAG) {
     for (size_t i = 0; i < std::size(expected); i++) {
         CAPTURE(i);
         CHECK(expected[i] == computed[i].item<float>());
+    }
+}
+
+TEST_CASE(CUT_TAG ": convert_f32_to_f16", CUT_TAG) {
+    torch::manual_seed(42);
+    srand(42);
+
+    for (int i = 0; i < 10; ++i) {
+        const int num_elems = rand() % 100;
+        const auto elems_f32 = torch::rand({num_elems}, torch::kFloat32);
+        const auto elems_torch_f16 = elems_f32.to(torch::kHalf);
+        auto elems_converted_f16 = torch::zeros({num_elems}, torch::kHalf);
+        dorado::utils::convert_f32_to_f16(elems_converted_f16.data_ptr<c10::Half>(),
+                                          elems_f32.data_ptr<float>(), num_elems);
+        const float kRelTolerance = 0.0f;
+        const float kAbsTolerance = 0.0f;
+        CHECK(torch::allclose(elems_torch_f16, elems_converted_f16, kRelTolerance, kAbsTolerance));
     }
 }

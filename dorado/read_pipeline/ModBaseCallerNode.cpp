@@ -11,6 +11,7 @@
 #include <spdlog/spdlog.h>
 
 #include <chrono>
+#include <cstring>
 using namespace std::chrono_literals;
 
 namespace dorado {

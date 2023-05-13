@@ -71,7 +71,7 @@ public:
                                const std::vector<uint64_t>& seq_to_sig_map) const;
     std::vector<size_t> get_motif_hits(const std::string& seq) const;
 
-    void accept_chunk(int num_chunks, at::Tensor signal, const std::vector<float>& kmers);
+    void accept_chunk(int chunk_idx, at::Tensor signal, const std::vector<float>& kmers);
     torch::Tensor call_chunks(int num_chunks);
 };
 

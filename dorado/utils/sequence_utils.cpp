@@ -1,6 +1,7 @@
 #include "sequence_utils.h"
 
 #include "htslib/sam.h"
+#include "simd.h"
 
 #include <algorithm>
 #include <array>
@@ -8,17 +9,6 @@
 #include <iterator>
 #include <numeric>
 #include <vector>
-
-// TSan's init breaks the call to __cpu_indicator_init (which determines which implementation to take)
-#if defined(__GNUC__) && defined(__x86_64__) && !defined(__APPLE__) && !defined(__SANITIZE_THREAD__)
-#define ENABLE_AVX2_IMPL 1
-#else
-#define ENABLE_AVX2_IMPL 0
-#endif
-
-#if ENABLE_AVX2_IMPL
-#include <immintrin.h>
-#endif
 
 #ifdef _WIN32
 // seq_nt16_str is referred to in the hts-3.lib stub on windows, but has not been declared dllimport for

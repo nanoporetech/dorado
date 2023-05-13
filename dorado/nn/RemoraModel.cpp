@@ -13,6 +13,7 @@
 #include <c10/cuda/CUDAStream.h>
 #endif
 #include <nvtx3/nvtx3.hpp>
+#include <spdlog/spdlog.h>
 #include <toml.hpp>
 #include <torch/torch.h>
 
@@ -377,16 +378,27 @@ torch::Tensor RemoraCaller::scale_signal(torch::Tensor signal,
     return scaled_signal;
 }
 
-void RemoraCaller::accept_chunk(int num_chunks,
-                                at::Tensor signal,
-                                const std::vector<float>& kmers) {
-    m_input_sigs.index_put_({num_chunks, 0}, signal);
+void RemoraCaller::accept_chunk(int chunk_idx, at::Tensor signal, const std::vector<float>& kmers) {
+    // As usual, avoid torch indexing because it is glacially slow.
+    assert(m_input_sigs.is_contiguous());
+    assert(m_input_sigs.dtype() == torch::kFloat16);
+    assert(m_input_seqs.is_contiguous());
+    assert(m_input_seqs.dtype() == torch::kFloat16);
+    assert(signal.is_contiguous());
+    assert(signal.dtype() == torch::kFloat16);
+    assert(signal.size(0) == m_input_sigs.size(2));
 
-    auto sig_len = static_cast<int64_t>(m_params.context_before + m_params.context_after);
-    auto kmer_len = m_params.bases_after + m_params.bases_before + 1;
-    auto slice = torch::from_blob(const_cast<float*>(kmers.data()),
-                                  {kmer_len * RemoraUtils::NUM_BASES, sig_len});
-    m_input_seqs.index_put_({num_chunks}, slice);
+    const auto sig_len = signal.size(0);
+    using InputType = c10::Half;
+
+    const InputType* const signal_ptr = signal.data_ptr<InputType>();
+    InputType* const input_sigs_ptr = m_input_sigs.data_ptr<InputType>();
+    std::memcpy(&input_sigs_ptr[chunk_idx * sig_len], signal_ptr, sig_len * sizeof(InputType));
+
+    const auto elem_count = m_input_seqs.size(1) * m_input_seqs.size(2);
+    InputType* const input_seqs_ptr = m_input_seqs.data_ptr<InputType>();
+    dorado::utils::convert_f32_to_f16(&input_seqs_ptr[chunk_idx * elem_count], kmers.data(),
+                                      elem_count);
 }
 
 torch::Tensor RemoraCaller::call_chunks(int num_chunks) {
