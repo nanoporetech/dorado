@@ -106,7 +106,7 @@ std::shared_ptr<dorado::Read> process_pod5_read(size_t row,
     new_read->attributes.num_samples = read_data.num_samples;
     new_read->attributes.channel_number = read_data.channel;
     new_read->attributes.start_time = start_time;
-    new_read->run_id = run_info_data->protocol_run_id;
+    new_read->run_id = run_info_data->acquisition_id;
     new_read->start_sample = read_data.start_sample;
     new_read->end_sample = read_data.start_sample + read_data.num_samples;
     new_read->flowcell_id = run_info_data->flow_cell_id;
@@ -361,10 +361,10 @@ std::unordered_map<std::string, ReadGroup> DataLoader::load_read_groups(
                         RunInfoDictData_t* run_info_data;
                         pod5_get_file_run_info(file, idx, &run_info_data);
 
-                        auto exp_start_time_ms = run_info_data->protocol_start_time_ms;
+                        auto exp_start_time_ms = run_info_data->acquisition_start_time_ms;
                         std::string flowcell_id = run_info_data->flow_cell_id;
                         std::string device_id = run_info_data->system_name;
-                        std::string run_id = run_info_data->protocol_run_id;
+                        std::string run_id = run_info_data->acquisition_id;
                         std::string sample_id = run_info_data->sample_id;
 
                         if (pod5_free_run_info(run_info_data) != POD5_OK) {

@@ -15,6 +15,15 @@ namespace dorado::utils {
 using sq_t = std::vector<std::pair<char*, uint32_t>>;
 using read_map = std::unordered_map<std::string, std::shared_ptr<Read>>;
 
+struct AlignmentOps {
+    size_t softclip_start;
+    size_t softclip_end;
+    size_t matches;
+    size_t insertions;
+    size_t deletions;
+    size_t substitutions;
+};
+
 class Aligner : public MessageSink {
 public:
     Aligner(MessageSink& read_sink,
@@ -48,6 +57,9 @@ public:
     ~HtsReader();
     bool read();
     void read(MessageSink& read_sink, int max_reads = -1);
+    template <typename T>
+    T get_tag(std::string tagname);
+    bool has_tag(std::string tagname);
 
     char* format{nullptr};
     bool is_aligned{false};
@@ -57,6 +69,25 @@ public:
 private:
     htsFile* m_file{nullptr};
 };
+
+template <typename T>
+T HtsReader::get_tag(std::string tagname) {
+    T tag_value;
+    uint8_t* tag = bam_aux_get(record.get(), tagname.c_str());
+
+    if (!tag) {
+        return tag_value;
+    }
+    if constexpr (std::is_integral_v<T>) {
+        tag_value = bam_aux2i(tag);
+    } else if constexpr (std::is_floating_point_v<T>) {
+        tag_value = bam_aux2f(tag);
+    } else {
+        tag_value = bam_aux2Z(tag);
+    }
+
+    return tag_value;
+}
 
 class HtsWriter : public MessageSink {
 public:
@@ -118,5 +149,42 @@ read_map read_bam(const std::string& filename, const std::unordered_set<std::str
 void add_rg_hdr(sam_hdr_t* hdr, const std::unordered_map<std::string, ReadGroup>& read_groups);
 
 void add_sq_hdr(sam_hdr_t* hdr, const sq_t& seqs);
+
+/**
+ * @brief Retrieves read group information from a SAM/BAM/CRAM file header based on a specified key.
+ *
+ * This function extracts read group information from a SAM/BAM/CRAM file header
+ * and returns a map containing read group IDs and their associated tags for the specified key.
+ *
+ * @param header A pointer to a valid sam_hdr_t object representing the SAM/BAM/CRAM file header.
+ * @param key A null-terminated C-style string representing the tag key to be retrieved for each read group.
+ * @return A std::map containing read group IDs as keys and their associated tags for the specified key as values.
+ *
+ * @throws std::invalid_argument If the provided header is nullptr or key is nullptr/empty.
+ * @throws std::runtime_error If there are no read groups in the file.
+ *
+ * Example usage:
+ * 
+ * samFile *sam_fp = sam_open("example.bam", "r");
+ * sam_hdr_t *header = sam_hdr_read(sam_fp);
+ * std::map<std::string, std::string> read_group_info = get_read_group_info(header, "DT");
+ *
+ * for (const auto& rg_pair : read_group_info) {
+ *     std::cout << "Read Group ID: " << rg_pair.first << ", Date: " << rg_pair.second << std::endl;
+ * }
+ */
+std::map<std::string, std::string> get_read_group_info(sam_hdr_t* header, const char* key);
+
+/**
+ * @brief Calculates the count of various alignment operations (soft clipping, matches, insertions, deletions, and substitutions) in a given BAM record.
+ *
+ * This function takes a pointer to a bam1_t structure as input and computes the count of soft clipping,
+ * matches, insertions, deletions, and substitutions in the alignment using the CIGAR string and MD tag.
+ * It returns an AlignmentOps structure containing these counts.
+ *
+ * @param record Pointer to a bam1_t structure representing a BAM record.
+ * @return AlignmentOps structure containing counts of soft clipping, matches, insertions, deletions, and substitutions in the alignment.
+ */
+AlignmentOps get_alignment_op_counts(bam1_t* record);
 
 }  // namespace dorado::utils
