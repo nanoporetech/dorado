@@ -21,7 +21,7 @@ TEST_CASE("AlignerTest: Check standard alignment", TEST_GROUP) {
 
     // Run alignment.
     MessageSinkToVector<dorado::BamPtr> sink(100);
-    dorado::utils::Aligner aligner(sink, ref.string(), 15, 15, 10);
+    dorado::utils::Aligner aligner(sink, ref.string(), 15, 15, 1e9, 10);
     dorado::utils::HtsReader reader(query.string());
     reader.read(aligner, 100);
     auto bam_records = sink.get_messages();
@@ -61,7 +61,7 @@ TEST_CASE("AlignerTest: Check supplementary alignment", TEST_GROUP) {
 
     // Run alignment.
     MessageSinkToVector<dorado::BamPtr> sink(100);
-    dorado::utils::Aligner aligner(sink, ref.string(), 15, 15, 10);
+    dorado::utils::Aligner aligner(sink, ref.string(), 15, 15, 1e9, 10);
     dorado::utils::HtsReader reader(query.string());
     reader.read(aligner, 100);
     auto bam_records = sink.get_messages();
@@ -99,7 +99,7 @@ TEST_CASE("AlignerTest: Check reverse complement alignment", TEST_GROUP) {
 
     // Run alignment.
     MessageSinkToVector<dorado::BamPtr> sink(100);
-    dorado::utils::Aligner aligner(sink, ref.string(), 15, 15, 10);
+    dorado::utils::Aligner aligner(sink, ref.string(), 15, 15, 1e9, 10);
     dorado::utils::HtsReader reader(query.string());
     reader.read(aligner, 100);
     auto bam_records = sink.get_messages();
@@ -135,7 +135,7 @@ TEST_CASE("AlignerTest: Check dorado tags are retained", TEST_GROUP) {
 
     // Run alignment.
     MessageSinkToVector<dorado::BamPtr> sink(100);
-    dorado::utils::Aligner aligner(sink, ref.string(), 15, 15, 10);
+    dorado::utils::Aligner aligner(sink, ref.string(), 15, 15, 1e9, 10);
     dorado::utils::HtsReader reader(query.string());
     reader.read(aligner, 100);
     auto bam_records = sink.get_messages();
@@ -153,8 +153,6 @@ TEST_CASE("AlignerTest: Check dorado tags are retained", TEST_GROUP) {
 }
 
 TEST_CASE("AlignerTest: Verify impact of updated aligner args", TEST_GROUP) {
-    using Catch::Matchers::Contains;
-
     fs::path aligner_test_dir = fs::path(get_aligner_data_dir());
     auto ref = aligner_test_dir / "target.fq";
     auto query = aligner_test_dir / "query.fa";
@@ -162,7 +160,7 @@ TEST_CASE("AlignerTest: Verify impact of updated aligner args", TEST_GROUP) {
     // Run alignment with one set of k/w.
     {
         MessageSinkToVector<dorado::BamPtr> sink(100);
-        dorado::utils::Aligner aligner(sink, ref.string(), 28, 28, 2);
+        dorado::utils::Aligner aligner(sink, ref.string(), 28, 28, 1e9, 2);
         dorado::utils::HtsReader reader(query.string());
         reader.read(aligner, 100);
         auto bam_records = sink.get_messages();
@@ -172,10 +170,18 @@ TEST_CASE("AlignerTest: Verify impact of updated aligner args", TEST_GROUP) {
     // Run alignment with another set of k/w.
     {
         MessageSinkToVector<dorado::BamPtr> sink(100);
-        dorado::utils::Aligner aligner(sink, ref.string(), 5, 5, 2);
+        dorado::utils::Aligner aligner(sink, ref.string(), 5, 5, 1e9, 2);
         dorado::utils::HtsReader reader(query.string());
         reader.read(aligner, 100);
         auto bam_records = sink.get_messages();
         REQUIRE(bam_records.size() == 1);  // Generates 1 alignment.
     }
+}
+
+TEST_CASE("AlignerTest: Check Aligner crashes if multi index encountered", TEST_GROUP) {
+    fs::path aligner_test_dir = fs::path(get_aligner_data_dir());
+    auto ref = aligner_test_dir / "long_target.fa";
+
+    MessageSinkToVector<dorado::BamPtr> sink(100);
+    CHECK_THROWS(dorado::utils::Aligner(sink, ref.string(), 5, 5, 1e3, 1));
 }

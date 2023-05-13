@@ -62,6 +62,7 @@ void setup(std::vector<std::string> args,
            bool recursive_file_loading,
            int kmer_size,
            int window_size,
+           uint64_t mm2_index_batch_size,
            bool skip_model_compatibility_check) {
     torch::set_num_threads(1);
     std::vector<Runner> runners;
@@ -215,6 +216,7 @@ void setup(std::vector<std::string> args,
         bam_writer = std::make_shared<HtsWriter>("-", output_mode,
                                                  thread_allocations.writer_threads, num_reads);
         aligner = std::make_shared<utils::Aligner>(*bam_writer, ref, kmer_size, window_size,
+                                                   mm2_index_batch_size,
                                                    thread_allocations.aligner_threads);
         utils::add_sq_hdr(hdr.get(), aligner->get_sequence_records_for_header());
         bam_writer->add_header(hdr.get());
@@ -341,6 +343,7 @@ int basecaller(int argc, char* argv[]) {
             .help("minimizer window size for alignment with minimap2.")
             .default_value(10)
             .scan<'i', int>();
+    parser.add_argument("-I").help("minimap2 index batch size.").default_value(std::string("16G"));
 
     argparse::ArgumentParser internal_parser;
 
@@ -412,6 +415,7 @@ int basecaller(int argc, char* argv[]) {
               parser.get<bool>("--emit-moves"), parser.get<int>("--max-reads"),
               parser.get<int>("--min-qscore"), parser.get<std::string>("--read-ids"),
               parser.get<bool>("--recursive"), parser.get<int>("k"), parser.get<int>("w"),
+              utils::parse_string_to_size(parser.get<std::string>("I")),
               internal_parser.get<bool>("--skip-model-compatibility-check"));
     } catch (const std::exception& e) {
         spdlog::error("{}", e.what());

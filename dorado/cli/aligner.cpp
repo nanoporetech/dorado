@@ -49,6 +49,7 @@ int aligner(int argc, char* argv[]) {
             .scan<'i', int>();
     parser.add_argument("-k").help("k-mer size (maximum 28).").default_value(15).scan<'i', int>();
     parser.add_argument("-w").help("minimizer window size.").default_value(10).scan<'i', int>();
+    parser.add_argument("-I").help("minimap2 index batch size.").default_value(std::string("16G"));
     parser.add_argument("-v", "--verbose").default_value(false).implicit_value(true);
 
     try {
@@ -71,6 +72,7 @@ int aligner(int argc, char* argv[]) {
     auto max_reads(parser.get<int>("max-reads"));
     auto kmer_size(parser.get<int>("k"));
     auto window_size(parser.get<int>("w"));
+    auto index_batch_size = utils::parse_string_to_size(parser.get<std::string>("I"));
 
     threads = threads == 0 ? std::thread::hardware_concurrency() : threads;
     // The input thread is the total number of threads to use for dorado
@@ -101,7 +103,8 @@ int aligner(int argc, char* argv[]) {
     spdlog::info("> loading index {}", index);
 
     HtsWriter writer("-", HtsWriter::OutputMode::BAM, writer_threads, 0);
-    utils::Aligner aligner(writer, index, kmer_size, window_size, aligner_threads);
+    utils::Aligner aligner(writer, index, kmer_size, window_size, index_batch_size,
+                           aligner_threads);
     HtsReader reader(reads[0]);
 
     spdlog::debug("> input fmt: {} aligned: {}", reader.format, reader.is_aligned);

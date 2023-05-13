@@ -102,6 +102,8 @@ int duplex(int argc, char* argv[]) {
             .scan<'i', int>();
     parser.add_argument("-v", "--verbose").default_value(false).implicit_value(true);
 
+    parser.add_argument("-I").help("minimap2 index batch size.").default_value(std::string("16G"));
+
     try {
         auto remaining_args = parser.parse_known_args(argc, argv);
         auto internal_parser = utils::parse_internal_options(remaining_args);
@@ -161,9 +163,10 @@ int duplex(int argc, char* argv[]) {
             converted_reads_sink = bam_writer.get();
         } else {
             bam_writer = std::make_shared<HtsWriter>("-", output_mode, 4, 0);
-            aligner = std::make_shared<utils::Aligner>(*bam_writer, ref, parser.get<int>("k"),
-                                                       parser.get<int>("w"),
-                                                       std::thread::hardware_concurrency());
+            aligner = std::make_shared<utils::Aligner>(
+                    *bam_writer, ref, parser.get<int>("k"), parser.get<int>("w"),
+                    utils::parse_string_to_size(parser.get<std::string>("I")),
+                    std::thread::hardware_concurrency());
             utils::add_sq_hdr(hdr.get(), aligner->get_sequence_records_for_header());
             bam_writer->add_header(hdr.get());
             bam_writer->write_header();

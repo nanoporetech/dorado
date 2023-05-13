@@ -27,3 +27,14 @@ TEST_CASE("CliUtils: Check thread allocation", TEST_GROUP) {
         REQUIRE(writer_threads == 9);
     }
 }
+
+TEST_CASE("CliUtils: Check number string to unsigned long conversion", TEST_GROUP) {
+    SECTION("convert #K") { CHECK(parse_string_to_size("5K") == 5000); }
+    SECTION("convert #K") { CHECK(parse_string_to_size("5K") == 5000); }
+    SECTION("convert #M") { CHECK(parse_string_to_size("5M") == 5000000); }
+    SECTION("convert #G") { CHECK(parse_string_to_size("5G") == 5000000000); }
+    SECTION("convert #") { CHECK(parse_string_to_size("50") == 50); }
+    SECTION("convert 0") { CHECK(parse_string_to_size("000") == 0); }
+    SECTION("convert unexpected size character") { CHECK_THROWS(parse_string_to_size("5L")); }
+    SECTION("convert not a number") { CHECK_THROWS(parse_string_to_size("abcd")); }
+}
