@@ -24,4 +24,8 @@ torch::Tensor quantile(const torch::Tensor t, const torch::Tensor q);
 // Only `interpolation='lower'` is currently implemented.
 torch::Tensor quantile_counting(const torch::Tensor t, const torch::Tensor q);
 
+// Converts count float elements pointed to by src to half precision, with
+// the result pointed to by dest.
+void convert_f32_to_f16(c10::Half* dest, const float* src, std::size_t count);
+
 }  // namespace dorado::utils
