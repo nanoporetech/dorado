@@ -102,6 +102,8 @@ set(LIB_SOURCE_FILES
     dorado/read_pipeline/StatsCounter.h
     dorado/read_pipeline/BaseSpaceDuplexCallerNode.cpp
     dorado/read_pipeline/BaseSpaceDuplexCallerNode.h
+    dorado/read_pipeline/DuplexSplitNode.cpp
+    dorado/read_pipeline/DuplexSplitNode.h
     dorado/decode/beam_search.cpp
     dorado/decode/fast_hash.cpp
     dorado/decode/fast_hash.h
@@ -114,6 +116,8 @@ set(LIB_SOURCE_FILES
     dorado/modbase/remora_scaler.h
     dorado/modbase/remora_utils.cpp
     dorado/modbase/remora_utils.h
+    dorado/utils/alignment_utils.cpp
+    dorado/utils/alignment_utils.h
     dorado/utils/AsyncQueue.h
     dorado/utils/base_mod_utils.cpp
     dorado/utils/base_mod_utils.h
@@ -143,7 +147,12 @@ set(LIB_SOURCE_FILES
     dorado/read_pipeline/NullNode.h
     dorado/read_pipeline/NullNode.cpp
     dorado/read_pipeline/PairingNode.cpp
-    dorado/read_pipeline/PairingNode.h)
+    dorado/read_pipeline/PairingNode.h
+    dorado/utils/time_utils.h
+    dorado/utils/uuid_utils.cpp
+    dorado/utils/uuid_utils.h
+    dorado/utils/read_utils.h
+    dorado/utils/read_utils.cpp)
 
 if (DORADO_GPU_BUILD)
     if(APPLE)
@@ -210,7 +219,7 @@ endif()
 target_precompile_headers(dorado_lib
     PRIVATE
     <torch/torch.h>
-) 
+)
 
 target_link_libraries(dorado_lib
     ${APPLE_FWK_FOUNDATION}
@@ -241,7 +250,7 @@ if(NOT DORADO_LIB_ONLY)
     if(NOT WIN32)
         # Set up RPATHs so we can find dependencies
         set(CMAKE_SKIP_RPATH FALSE)
-        # Note: we don't need the relative lib dir if everything is in 
+        # Note: we don't need the relative lib dir if everything is in
         if(APPLE)
             set(CMAKE_INSTALL_RPATH "@executable_path/;@executable_path/../lib")
         else()
@@ -250,12 +259,12 @@ if(NOT DORADO_LIB_ONLY)
         set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
     endif()
 
-    add_executable(dorado 
+    add_executable(dorado
         dorado/main.cpp
         dorado/cli/aligner.cpp
         dorado/cli/duplex.cpp
         dorado/cli/basecaller.cpp
-        dorado/cli/benchmark.cpp        
+        dorado/cli/benchmark.cpp
         dorado/cli/download.cpp
         dorado/cli/cli.h
     )
@@ -319,7 +328,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
                 # e.g. libcublas.so => libcublas.so.11
                 string(REGEX REPLACE "[.]so[.0-9]*$" ".so" base_link ${link_name})
                 execute_process(COMMAND ln -rfs ${link_name} ${base_link} WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
-                install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${base_link} DESTINATION lib COMPONENT redist_libs)                
+                install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${base_link} DESTINATION lib COMPONENT redist_libs)
             endforeach()
         else()
             # bundle the libraries from the cuda toolkit

@@ -68,6 +68,7 @@ void Read::generate_read_tags(bam1_t *aln, bool emit_moves) const {
     bam_aux_append(aln, "st", 'Z', attributes.start_time.length() + 1,
                    (uint8_t *)attributes.start_time.c_str());
 
+    // For reads which are the result of read splitting, the read number will be set to -1
     int rn = attributes.read_number;
     bam_aux_append(aln, "rn", 'i', sizeof(rn), (uint8_t *)&rn);
 

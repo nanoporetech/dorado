@@ -33,7 +33,7 @@ std::shared_ptr<dorado::Read> StereoDuplexEncoderNode::stereo_encode(
         return read;
     }
 
-    // We align the reverse complement of the complement read to the template read
+    // We align the reverse complement of the complement read to the template read.
     const auto complement_sequence_reverse_complement =
             dorado::utils::reverse_complement(complement_read->seq);
 

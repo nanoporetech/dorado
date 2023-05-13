@@ -11,6 +11,7 @@ set(SOURCE_FILES
     SequenceUtilsTest.cpp
     StitchTest.cpp
     StereoDuplexTest.cpp
+    DuplexSplitTest.cpp
     TrimTest.cpp
     AlignerTest.cpp
     BamReaderTest.cpp

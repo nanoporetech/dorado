@@ -29,6 +29,15 @@ static std::string ReadFileIntoString(const std::filesystem::path& path) {
     return content;
 }
 
+// Reads into a vector<uint8_t>.
+static std::vector<uint8_t> ReadFileIntoVector(const std::filesystem::path& path) {
+    const std::string str = ReadFileIntoString(path);
+    std::vector<uint8_t> vec;
+    vec.resize(str.size());
+    std::memcpy(vec.data(), str.data(), str.size());
+    return vec;
+}
+
 #define get_fast5_data_dir() get_data_dir("fast5")
 
 #define get_pod5_data_dir() get_data_dir("pod5")
@@ -36,5 +45,7 @@ static std::string ReadFileIntoString(const std::filesystem::path& path) {
 #define get_nested_pod5_data_dir() get_data_dir("nested_pod5_folder")
 
 #define get_stereo_data_dir() get_data_dir("stereo")
+
+#define get_split_data_dir() get_data_dir("split")
 
 #define get_aligner_data_dir() get_data_dir("aligner_test")
