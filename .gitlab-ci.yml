@@ -67,6 +67,7 @@ variables:
       - tests/*.bat
       - tests/data
     expire_in: 1 day
+  interruptible: true
 
 .build_dorado_archive: &build_dorado_archive
   stage: build
@@ -78,12 +79,14 @@ variables:
     paths:
       - archive
     expire_in: 1 day
+  interruptible: true
 
 .build_dorado_lib_only: &build_dorado_lib_only
   stage: build
   script:
     - cmake ${BUILD_OPTIONS} -S . -B ${BUILD_DIR} -DDORADO_LIB_ONLY=1
     - cmake --build ${BUILD_DIR} -j 8
+  interruptible: true
 
 # Pre-flight stages
 
@@ -97,6 +100,7 @@ pre-commit:
     - pre-commit run --all-files
   tags:
     - linux
+  interruptible: true
 
 # Build stages
 
@@ -241,6 +245,7 @@ build_archive:macos:x64:
     GIT_STRATEGY: none
   script:
     - for f in tests/*.sh; do echo $f; ./$f ./dist/bin/dorado || break; done
+  interruptible: true
 
 .test_dorado_windows: &test_dorado_windows
   stage: test
@@ -248,6 +253,7 @@ build_archive:macos:x64:
     GIT_STRATEGY: none
   script:
     - .\\tests\\test_simple_basecaller_execution.bat .\\dist\\bin\\dorado.exe
+  interruptible: true
 
 .test_archive: &test_archive
   stage: test
@@ -258,6 +264,7 @@ build_archive:macos:x64:
     - ldd ./dorado-*/bin/dorado
     # We just want to check that dorado will run here, so simply display the verbose version info
     - ./dorado-*/bin/dorado -vv
+  interruptible: true
 
 # Test stages
 
@@ -360,6 +367,7 @@ test_archive:linux:arm64:20.04:
   needs: []
   variables:
     GIT_STRATEGY: none
+  interruptible: true
 
 # MLHub - Single read eval
 .mlhub_sre:
