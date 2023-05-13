@@ -131,7 +131,7 @@ std::shared_ptr<dorado::Read> process_pod5_read(size_t row,
     new_read->attributes.num_samples = read_data.num_samples;
     new_read->attributes.channel_number = read_data.channel;
     new_read->attributes.start_time = start_time;
-    new_read->run_id = run_info_data->acquisition__id;
+    new_read->run_id = run_info_data->acquisition_id;
     new_read->start_sample = read_data.start_sample;
     new_read->end_sample = read_data.start_sample + read_data.num_samples;
     new_read->flowcell_id = run_info_data->flow_cell_id;
