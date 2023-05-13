@@ -7,6 +7,9 @@
 #include "utils/math_utils.h"
 #include "utils/sequence_utils.h"
 
+#include <nvtx3/nvtx3.hpp>
+#include <spdlog/spdlog.h>
+
 #include <chrono>
 using namespace std::chrono_literals;
 
@@ -42,8 +45,7 @@ ModBaseCallerNode::ModBaseCallerNode(MessageSink& sink,
         m_caller_workers.push_back(std::move(t));
         ++m_num_active_model_callers;
     }
-
-    // Spin up the proessing threads:
+    // Spin up the processing threads:
     for (size_t i = 0; i < remora_threads * num_devices; ++i) {
         std::unique_ptr<std::thread> t =
                 std::make_unique<std::thread>(&ModBaseCallerNode::runner_worker_thread, this, i);
@@ -234,16 +236,19 @@ void ModBaseCallerNode::caller_worker_thread(size_t caller_id) {
     auto last_chunk_reserve_time = std::chrono::system_clock::now();
 
     while (true) {
+        nvtx3::scoped_range range{"caller_worker_thread"};
         std::unique_lock<std::mutex> chunks_lock(m_chunk_queues_mutex);
         if (chunk_queue.empty()) {
             if (m_terminate_callers) {
                 chunks_lock.unlock();  // Not strictly necessary
+
                 // We dispatch any part-full buffer here to finish basecalling.
                 if (!batched_chunks.empty()) {
                     call_current_batch(caller_id);
                 }
 
-                //Reduce the count of active model callers, if this was the last active model caller also send termination signal to sink
+                // Reduce the count of active model callers.  If this was the last active
+                // model caller also send termination signal to sink
                 int num_remaining_callers = --m_num_active_model_callers;
                 if (num_remaining_callers == 0) {
                     m_terminate_output = true;
@@ -259,26 +264,40 @@ void ModBaseCallerNode::caller_worker_thread(size_t caller_id) {
                 if (delta > FORCE_TIMEOUT && !batched_chunks.empty()) {
                     call_current_batch(caller_id);
                 } else {
-                    std::this_thread::sleep_for(100ms);
+                    std::this_thread::sleep_for(10ms);
                 }
                 continue;
             }
         }
 
+        // With the lock held, grab all the chunks we can accommodate in the
+        // current batch from the chunk queue, but don't yet pass them to
+        // the model input tensors.  We do this to minimise the time we need to
+        // hold the mutex, which is highly contended, without having to repeatedly
+        // lock/unlock, which is expensive enough in itself to slow down this thread
+        // significantly.  This matters because slack time in this thread currently
+        // gates Remora model GPU throughput on fast systems.
+        size_t previous_chunk_count = batched_chunks.size();
         while (batched_chunks.size() != m_batch_size && !chunk_queue.empty()) {
+            nvtx3::scoped_range range{"push_chunks"};
             std::shared_ptr<RemoraChunk> chunk = chunk_queue.front();
             chunk_queue.pop_front();
-            chunks_lock.unlock();
-
-            caller->accept_chunk(batched_chunks.size(), chunk->signal, chunk->encoded_kmers);
             batched_chunks.push_back(chunk);
-            chunks_lock.lock();
-
             last_chunk_reserve_time = std::chrono::system_clock::now();
         }
 
+        // Relinquish the chunk queue mutex, allowing other chunk queue
+        // activity to progress.
         chunks_lock.unlock();
         m_chunk_queues_cv.notify_one();
+
+        // Insert the chunks we just obtained into the model input tensors.
+        for (size_t chunk_idx = previous_chunk_count; chunk_idx < batched_chunks.size();
+             ++chunk_idx) {
+            const auto& chunk = batched_chunks[chunk_idx];
+            caller->accept_chunk(chunk_idx, chunk->signal, chunk->encoded_kmers);
+        }
+
         if (m_batched_chunks[caller_id].size() == m_batch_size) {
             // Input tensor is full, let's get_scores.
             call_current_batch(caller_id);
@@ -287,8 +306,11 @@ void ModBaseCallerNode::caller_worker_thread(size_t caller_id) {
 }
 
 void ModBaseCallerNode::call_current_batch(size_t caller_id) {
+    nvtx3::scoped_range loop{"call_current_batch"};
+
     auto& caller = m_callers[caller_id];
     auto results = caller->call_chunks(m_batched_chunks[caller_id].size());
+
     // Convert results to float32 with one call and address via a raw pointer,
     // to avoid huge libtorch indexing overhead.
     auto results_f32 = results.to(torch::kFloat32);
