@@ -121,13 +121,15 @@ int duplex(int argc, char* argv[]) {
             spdlog::set_level(spdlog::level::debug);
         }
         std::map<std::string, std::string> template_complement_map;
-        std::unordered_set<std::string> read_list;
+        auto read_list = utils::load_read_list(parser.get<std::string>("--read-ids"));
+
+        std::unordered_set<std::string> read_list_from_pairs;
 
         if (!pairs_file.empty()) {
             spdlog::info("> Loading pairs file");
             template_complement_map = utils::load_pairs_file(pairs_file);
-            read_list = utils::get_read_list_from_pairs(template_complement_map);
-            spdlog::info("> Pairs file loaded with {} reads.", read_list.size());
+            read_list_from_pairs = utils::get_read_list_from_pairs(template_complement_map);
+            spdlog::info("> Pairs file loaded with {} reads.", read_list_from_pairs.size());
         } else {
             spdlog::info(
                     "> No duplex pairs file provided, pairing will be performed automatically");
@@ -157,13 +159,18 @@ int duplex(int argc, char* argv[]) {
         std::shared_ptr<HtsWriter> bam_writer;
         std::shared_ptr<utils::Aligner> aligner;
         MessageSink* converted_reads_sink = nullptr;
+
+        bool recursive_file_loading = parser.get<bool>("--recursive");
+
+        size_t num_reads = DataLoader::get_num_reads(reads, read_list, recursive_file_loading);
+
         if (ref.empty()) {
-            bam_writer = std::make_shared<HtsWriter>("-", output_mode, 4, 0);
+            bam_writer = std::make_shared<HtsWriter>("-", output_mode, 4, num_reads);
             bam_writer->add_header(hdr.get());
             bam_writer->write_header();
             converted_reads_sink = bam_writer.get();
         } else {
-            bam_writer = std::make_shared<HtsWriter>("-", output_mode, 4, 0);
+            bam_writer = std::make_shared<HtsWriter>("-", output_mode, 4, num_reads);
             aligner = std::make_shared<utils::Aligner>(
                     *bam_writer, ref, parser.get<int>("k"), parser.get<int>("w"),
                     utils::parse_string_to_size(parser.get<std::string>("I")),
@@ -188,7 +195,7 @@ int duplex(int argc, char* argv[]) {
             auto read_ids = utils::get_read_list_from_pairs(template_complement_map);
 
             spdlog::info("> Loading reads");
-            auto read_map = utils::read_bam(reads, read_list);
+            auto read_map = utils::read_bam(reads, read_list_from_pairs);
 
             spdlog::info("> Starting Basespace Duplex Pipeline");
             threads = threads == 0 ? std::thread::hardware_concurrency() : threads;
@@ -198,8 +205,7 @@ int duplex(int argc, char* argv[]) {
 
             const auto model_path = std::filesystem::canonical(std::filesystem::path(model));
 
-            auto data_sample_rate =
-                    DataLoader::get_sample_rate(reads, parser.get<bool>("--recursive"));
+            auto data_sample_rate = DataLoader::get_sample_rate(reads, recursive_file_loading);
             auto model_sample_rate = get_model_sample_rate(model_path);
             auto skip_model_compatibility_check =
                     internal_parser.get<bool>("--skip-model-compatibility-check");
@@ -325,8 +331,6 @@ int duplex(int argc, char* argv[]) {
                     kSimplexBatchTimeoutMS);
 
             ScalerNode scaler_node(*basecaller_node, num_devices * 2);
-
-            auto read_list = utils::load_read_list(parser.get<std::string>("--read-ids"));
 
             DataLoader loader(scaler_node, "cpu", num_devices, 0, std::move(read_list));
             loader.load_reads(reads, parser.get<bool>("--recursive"), DataLoader::BY_CHANNEL);

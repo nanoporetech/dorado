@@ -104,7 +104,13 @@ void PairingNode::pair_generating_worker_thread() {
                 // Remove the oldest key (front of the list)
                 auto oldest_key = m_working_channel_mux_keys.front();
                 m_working_channel_mux_keys.pop_front();
+
+                auto oldest_key_it = channel_mux_read_map.find(oldest_key);
+
                 // Remove the oldest key from the map
+                for (auto read_ptr : oldest_key_it->second) {
+                    m_sink.push_message(read_ptr);
+                }
                 channel_mux_read_map.erase(oldest_key);
                 assert(channel_mux_read_map.size() == m_working_channel_mux_keys.size());
             }
@@ -145,6 +151,19 @@ void PairingNode::pair_generating_worker_thread() {
         }
     }
     if (--m_num_worker_threads == 0) {
+        std::unique_lock<std::mutex> lock(m_pairing_mtx);
+        // There are still reads in channel_mux_read_map. Push them to the sink.
+        // Last thread alive is responsible for cleaning up the cache.
+        for (const auto& kv : channel_mux_read_map) {
+            // kv is a std::pair<UniquePoreIdentifierKey, std::list<std::shared_ptr<Read>>>
+            const auto& reads_list = kv.second;
+
+            for (const auto& read_ptr : reads_list) {
+                // Push each read message
+                m_sink.push_message(read_ptr);
+            }
+        }
+
         m_sink.terminate();
     }
 }

@@ -119,7 +119,7 @@ private:
     std::unique_ptr<std::thread> m_worker;
     void worker_thread();
     int write_hdr_sq(char* name, uint32_t length);
-
+    bool m_prog_bar_initialized{false};
     size_t m_num_reads_expected;
     int m_progress_bar_interval;
     indicators::BlockProgressBar m_progress_bar{

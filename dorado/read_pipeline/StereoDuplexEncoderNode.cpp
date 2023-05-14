@@ -283,15 +283,19 @@ namespace dorado {
 void StereoDuplexEncoderNode::worker_thread() {
     Message message;
     while (m_work_queue.try_pop(message)) {
-        // If this message isn't a read, we'll get a bad_variant_access exception.
-        auto read_pair = std::get<std::shared_ptr<ReadPair>>(message);
-        std::shared_ptr<Read> stereo_encoded_read =
-                stereo_encode(read_pair->read_1, read_pair->read_2);
+        if (std::holds_alternative<std::shared_ptr<ReadPair>>(message)) {
+            auto read_pair = std::get<std::shared_ptr<ReadPair>>(message);
+            std::shared_ptr<Read> stereo_encoded_read =
+                    stereo_encode(read_pair->read_1, read_pair->read_2);
 
-        if (stereo_encoded_read->raw_data.ndimension() ==
-            2) {  // 2 dims for stereo encoding, 1 for simplex
-            m_sink.push_message(
-                    stereo_encoded_read);  // Strereo-encoded read created, send it to sink
+            if (stereo_encoded_read->raw_data.ndimension() ==
+                2) {  // 2 dims for stereo encoding, 1 for simplex
+                m_sink.push_message(
+                        stereo_encoded_read);  // Strereo-encoded read created, send it to sink
+            }
+        } else if (std::holds_alternative<std::shared_ptr<Read>>(message)) {
+            auto read = std::get<std::shared_ptr<Read>>(message);
+            m_sink.push_message(read);
         }
     }
 
