@@ -104,7 +104,13 @@ void PairingNode::pair_generating_worker_thread() {
                 // Remove the oldest key (front of the list)
                 auto oldest_key = m_working_channel_mux_keys.front();
                 m_working_channel_mux_keys.pop_front();
+
+                auto oldest_key_it = channel_mux_read_map.find(oldest_key);
+
                 // Remove the oldest key from the map
+                for (auto read_ptr : oldest_key_it->second) {
+                    m_sink.push_message(read_ptr);
+                }
                 channel_mux_read_map.erase(oldest_key);
                 assert(channel_mux_read_map.size() == m_working_channel_mux_keys.size());
             }

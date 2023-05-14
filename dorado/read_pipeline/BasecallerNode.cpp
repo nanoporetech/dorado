@@ -27,7 +27,14 @@ void BasecallerNode::input_worker_thread() {
     while (m_work_queue.try_pop(message)) {
         // If this message isn't a read, we'll get a bad_variant_access exception.
         auto read = std::get<std::shared_ptr<Read>>(message);
-
+        // If a read has already been basecalled, just send it to the sink without basecalling again
+        // TODO: This is necessary because some reads (e.g failed Stereo Encoding) will be passed
+        // to the basecaller node having already been called. This should be fixed in the future with
+        // support for graphs of nodes rather than linear pipelines.
+        if (!read->seq.empty()) {
+            m_sink.push_message(read);
+            continue;
+        }
         // Now that we have acquired a read, wait until we can push to chunks_in
         while (true) {
             std::unique_lock<std::mutex> chunk_lock(m_chunks_in_mutex);
