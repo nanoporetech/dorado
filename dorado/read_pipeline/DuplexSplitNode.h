@@ -18,8 +18,8 @@ struct DuplexSplitSettings {
     int flank_edist = 150;
     int relaxed_flank_edist = 250;
     int adapter_edist = 4;
-    int relaxed_adapter_edist = 6;
-    uint64_t pore_adapter_range = 100;  //bp
+    int relaxed_adapter_edist = 7;
+    uint64_t pore_adapter_range = 300;  //bp
     //in bases
     uint64_t expect_adapter_prefix = 200;
     //in samples
