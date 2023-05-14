@@ -21,7 +21,7 @@ public:
     ReadFilterNode(MessageSink& sink,
                    size_t min_qscore,
                    size_t num_worker_threads,
-                   size_t min_read_length = 5);
+                   size_t min_read_length = 0);
     ~ReadFilterNode();
 
 private:

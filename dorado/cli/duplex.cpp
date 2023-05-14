@@ -175,7 +175,7 @@ int duplex(int argc, char* argv[]) {
         }
         ReadToBamType read_converter(*converted_reads_sink, emit_moves, rna, duplex, 2);
         StatsCounterNode stats_node(read_converter, duplex);
-        ReadFilterNode read_filter_node(stats_node, min_qscore, 1);
+        ReadFilterNode read_filter_node(stats_node, min_qscore, 1, 5);
 
         torch::set_num_threads(1);
 
