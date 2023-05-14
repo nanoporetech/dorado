@@ -85,7 +85,7 @@ void Read::generate_read_tags(bam1_t *aln, bool emit_moves) const {
 
     uint32_t simplex_coverage = 1;
     // dx is the coverage of a read. In practice this is 1 for simplex and 2 for duplex.
-    bam_aux_append(aln, "dx", 'I', sizeof(simplex_coverage), (uint8_t *)&simplex_coverage);
+    bam_aux_append(aln, "dx", 'i', sizeof(simplex_coverage), (uint8_t *)&simplex_coverage);
 
     if (run_id != "" && model_name != "") {
         std::string rg(run_id + "_" + model_name);
@@ -109,7 +109,7 @@ void Read::generate_duplex_read_tags(bam1_t *aln) const {
     bam_aux_append(aln, "qs", 'i', sizeof(qs), (uint8_t *)&qs);
     // dx is the coverage of a read. In practice this is 1 for simplex and 2 for duplex.
     uint32_t duplex_coverage = 2;
-    bam_aux_append(aln, "dx", 'I', sizeof(duplex_coverage), (uint8_t *)&duplex_coverage);
+    bam_aux_append(aln, "dx", 'i', sizeof(duplex_coverage), (uint8_t *)&duplex_coverage);
 }
 
 std::vector<BamPtr> Read::extract_sam_lines(bool emit_moves,
