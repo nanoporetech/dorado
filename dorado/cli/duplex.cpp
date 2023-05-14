@@ -274,7 +274,7 @@ int duplex(int argc, char* argv[]) {
                 }
                 for (auto device_string : devices) {
                     auto caller = create_cuda_caller(model_path, chunk_size, batch_size,
-                                                     device_string, 0.5f);  // Use half the GPU mem
+                                                     device_string, 1.0f);  // Use half the GPU mem
                     for (size_t i = 0; i < num_runners; i++) {
                         runners.push_back(std::make_shared<CudaModelRunner>(caller));
                     }
