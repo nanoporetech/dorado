@@ -254,7 +254,9 @@ bool DuplexSplitNode::check_flank_match(const Read& read, PosRange r, float err_
     assert(s1 < e1);
     //including spacer region in search
     const auto s2 = r.first;
-    const auto e2 = std::min(r.second + m_settings.start_flank, rlen);
+    //(r.second - r.first) adjusts for potentially incorrectly detected split region
+    //, shifting into correct sequence
+    const auto e2 = std::min(r.second + m_settings.start_flank + (r.second - r.first), rlen);
 
     if (e2 == rlen) {
         //short read mode triggered
