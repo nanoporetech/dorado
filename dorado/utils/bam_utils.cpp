@@ -445,13 +445,6 @@ void HtsWriter::worker_thread() {
     std::unordered_set<std::string> processed_read_ids;
     size_t write_count = 0;
 
-    // Initialize progress logging.
-    if (m_num_reads_expected != 0) {
-        m_progress_bar.set_progress(0.0f);
-    } else {
-        std::cerr << "\r> Output records written: " << write_count;
-    }
-
     Message message;
     while (m_work_queue.try_pop(message)) {
         auto aln = std::get<BamPtr>(std::move(message));
