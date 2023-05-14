@@ -151,6 +151,18 @@ void PairingNode::pair_generating_worker_thread() {
         }
     }
     if (--m_num_worker_threads == 0) {
+        std::unique_lock<std::mutex> lock(m_pairing_mtx);
+        // There are still reads in channel_mux_read_map. Push them to the sink.
+        for (const auto& kv : channel_mux_read_map) {
+            // kv is a std::pair<UniquePoreIdentifierKey, std::list<std::shared_ptr<Read>>>
+            const auto& reads_list = kv.second;
+
+            for (const auto& read_ptr : reads_list) {
+                // Push each read message
+                m_sink.push_message(read_ptr);
+            }
+        }
+
         m_sink.terminate();
     }
 }
@@ -178,17 +190,6 @@ PairingNode::PairingNode(MessageSink& sink,
 }
 
 PairingNode::~PairingNode() {
-    // There are still reads in channel_mux_read_map. Push them to the sink.
-    for (const auto& kv : channel_mux_read_map) {
-        // kv is a std::pair<UniquePoreIdentifierKey, std::list<std::shared_ptr<Read>>>
-        const auto& reads_list = kv.second;
-
-        for (const auto& read_ptr : reads_list) {
-            // Push each read message
-            m_sink.push_message(read_ptr);
-        }
-    }
-
     terminate();
     for (auto& m : m_workers) {
         m->join();
