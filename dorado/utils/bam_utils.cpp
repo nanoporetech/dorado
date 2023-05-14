@@ -456,15 +456,24 @@ void HtsWriter::worker_thread() {
     while (m_work_queue.try_pop(message)) {
         auto aln = std::get<BamPtr>(std::move(message));
         write(aln.get());
-        processed_read_ids.emplace(bam_get_qname(aln.get()));
-        // Free the bam alignment that's already written
-        // out to disk.
-        aln.reset();
+        std::string read_id = bam_get_qname(aln.get());
+        aln.reset();  // Free the bam alignment that's already written
+
+        // For the purpose of estimating write count, we ignore duplex reads
+        // these can be identified by a semicolon in their ID.
+        // TODO: This is a hack, we should have a better way of identifying duplex reads.
+        bool ignore_read_id = read_id.find(';') != std::string::npos;
+
+        if (!ignore_read_id) {
+            processed_read_ids.emplace(std::move(read_id));
+        }
 
         if (m_num_reads_expected != 0) {
             write_count = processed_read_ids.size();
         } else {
-            write_count++;
+            if (!ignore_read_id) {
+                write_count++;
+            }
         }
 
         if ((write_count % m_progress_bar_interval) == 0) {
