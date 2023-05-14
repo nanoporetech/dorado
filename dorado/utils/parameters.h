@@ -27,7 +27,7 @@ struct DefaultParameters {
     float methylation_threshold{0.05f};
 
     // Minimum length for a sequence to be outputted.
-    size_t min_seqeuence_length{0};
+    size_t min_seqeuence_length{5};
 };
 
 static const DefaultParameters default_parameters{};
