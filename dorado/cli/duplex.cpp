@@ -294,6 +294,7 @@ int duplex(int argc, char* argv[]) {
             }
 #endif  // __APPLE__
 #endif  // DORADO_GPU_BUILD
+            std::cerr << "\r";
             spdlog::info("> Starting Stereo Duplex pipeline");
 
             auto stereo_model_stride = stereo_runners.front()->model_stride();
