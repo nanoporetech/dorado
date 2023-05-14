@@ -40,6 +40,7 @@ namespace dorado {
 
 using HtsWriter = utils::HtsWriter;
 using HtsReader = utils::HtsReader;
+using dorado::utils::default_parameters;
 
 int duplex(int argc, char* argv[]) {
     using dorado::utils::default_parameters;
@@ -182,7 +183,9 @@ int duplex(int argc, char* argv[]) {
         }
         ReadToBamType read_converter(*converted_reads_sink, emit_moves, rna, duplex, 2);
         StatsCounterNode stats_node(read_converter, duplex);
-        ReadFilterNode read_filter_node(stats_node, min_qscore, 1);
+        // The minimum sequence length is set to 5 to avoid issues with duplex node printing very short sequences for mismatched pairs.
+        ReadFilterNode read_filter_node(stats_node, min_qscore,
+                                        default_parameters.min_seqeuence_length, 5);
 
         torch::set_num_threads(1);
 
