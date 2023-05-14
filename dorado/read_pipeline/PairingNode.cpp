@@ -153,6 +153,7 @@ void PairingNode::pair_generating_worker_thread() {
     if (--m_num_worker_threads == 0) {
         std::unique_lock<std::mutex> lock(m_pairing_mtx);
         // There are still reads in channel_mux_read_map. Push them to the sink.
+        // Last thread alive is responsible for cleaning up the cache.
         for (const auto& kv : channel_mux_read_map) {
             // kv is a std::pair<UniquePoreIdentifierKey, std::list<std::shared_ptr<Read>>>
             const auto& reads_list = kv.second;

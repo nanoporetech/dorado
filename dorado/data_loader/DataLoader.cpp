@@ -141,6 +141,7 @@ void DataLoader::load_reads(const std::string& path,
             // 1. iterate through all the read metadata to collect channel information
             // across all pod5 files
             // 2. store the read list sorted by channel number
+            std::cerr < "\r";
             spdlog::info("> Reading read channel info");
             load_read_channels(path, recursive_file_loading);
             spdlog::info("> Processed read channel info");
