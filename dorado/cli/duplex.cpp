@@ -121,13 +121,15 @@ int duplex(int argc, char* argv[]) {
             spdlog::set_level(spdlog::level::debug);
         }
         std::map<std::string, std::string> template_complement_map;
-        std::unordered_set<std::string> read_list;
+        auto read_list = utils::load_read_list(parser.get<std::string>("--read-ids"));
+
+        std::unordered_set<std::string> read_list_from_pairs;
 
         if (!pairs_file.empty()) {
             spdlog::info("> Loading pairs file");
             template_complement_map = utils::load_pairs_file(pairs_file);
-            read_list = utils::get_read_list_from_pairs(template_complement_map);
-            spdlog::info("> Pairs file loaded with {} reads.", read_list.size());
+            read_list_from_pairs = utils::get_read_list_from_pairs(template_complement_map);
+            spdlog::info("> Pairs file loaded with {} reads.", read_list_from_pairs.size());
         } else {
             spdlog::info(
                     "> No duplex pairs file provided, pairing will be performed automatically");
@@ -193,7 +195,7 @@ int duplex(int argc, char* argv[]) {
             auto read_ids = utils::get_read_list_from_pairs(template_complement_map);
 
             spdlog::info("> Loading reads");
-            auto read_map = utils::read_bam(reads, read_list);
+            auto read_map = utils::read_bam(reads, read_list_from_pairs);
 
             spdlog::info("> Starting Basespace Duplex Pipeline");
             threads = threads == 0 ? std::thread::hardware_concurrency() : threads;
@@ -329,8 +331,6 @@ int duplex(int argc, char* argv[]) {
                     kSimplexBatchTimeoutMS);
 
             ScalerNode scaler_node(*basecaller_node, num_devices * 2);
-
-            auto read_list = utils::load_read_list(parser.get<std::string>("--read-ids"));
 
             DataLoader loader(scaler_node, "cpu", num_devices, 0, std::move(read_list));
             loader.load_reads(reads, parser.get<bool>("--recursive"), DataLoader::BY_CHANNEL);
