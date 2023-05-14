@@ -15,8 +15,10 @@ struct DuplexSplitSettings {
     size_t end_trim = 200;
     //adjusted to adapter presense and potential loss of bases on query, leading to 'shift'
     size_t start_flank = 1700;
-    int flank_edist = 150;
-    int relaxed_flank_edist = 250;
+    //minimal query size to consider in "short read" case
+    size_t min_short_flank = 300;
+    float flank_err = 0.175;
+    float relaxed_flank_err = 0.275;
     int adapter_edist = 4;
     int relaxed_adapter_edist = 7;
     uint64_t pore_adapter_range = 300;  //bp
@@ -62,7 +64,7 @@ private:
 
     std::vector<PosRange> possible_pore_regions(const ExtRead& read, float pore_thr) const;
     bool check_nearby_adapter(const Read& read, PosRange r, int adapter_edist) const;
-    bool check_flank_match(const Read& read, PosRange r, int dist_thr) const;
+    bool check_flank_match(const Read& read, PosRange r, float err_thr) const;
     std::optional<PosRange> identify_extra_middle_split(const Read& read) const;
 
     std::vector<std::shared_ptr<Read>> subreads(std::shared_ptr<Read> read,

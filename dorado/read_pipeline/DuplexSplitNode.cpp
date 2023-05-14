@@ -243,20 +243,49 @@ bool DuplexSplitNode::check_nearby_adapter(const Read& read, PosRange r, int ada
 }
 
 //r is potential spacer region
-bool DuplexSplitNode::check_flank_match(const Read& read, PosRange r, int dist_thr) const {
-    return r.first >= m_settings.end_flank &&
-           r.second + m_settings.start_flank <= read.seq.length() &&
-           check_rc_match(read.seq, {r.first - m_settings.end_flank, r.first - m_settings.end_trim},
-                          //including spacer region in search
-                          {r.first, r.second + m_settings.start_flank}, dist_thr);
-}
+bool DuplexSplitNode::check_flank_match(const Read& read, PosRange r, float err_thr) const {
+    const uint64_t rlen = read.seq.length();
+    assert(r.first <= r.second && r.second <= rlen);
+    if (r.first <= m_settings.end_trim || r.second == rlen) {
+        return false;
+    }
+    const auto s1 = (r.first > m_settings.end_flank) ? r.first - m_settings.end_flank : 0;
+    const auto e1 = r.first - m_settings.end_trim;
+    assert(s1 < e1);
+    //including spacer region in search
+    const auto s2 = r.first;
+    const auto e2 = std::min(r.second + m_settings.start_flank, rlen);
+
+    if (e2 == rlen) {
+        //short read mode triggered
+        if ((e1 - s1) < m_settings.min_short_flank ||
+                e2 - s2 < e1 - s1 || rlen > 3 * (e2 - s2)) {
+            return false;
+        }
+    }
+
+    const int dist_thr = std::round(err_thr * (e1 - s1));
+
+    return check_rc_match(read.seq, {s1, e1},
+                           //including spacer region in search
+                          {s2, e2}, dist_thr);
+ }
+
+//bool DuplexSplitNode::check_flank_match(const Read& read, PosRange r, int dist_thr) const {
+//    return r.first >= m_settings.end_flank &&
+//           r.second + m_settings.start_flank <= read.seq.length() &&
+//           check_rc_match(read.seq, {r.first - m_settings.end_flank, r.first - m_settings.end_trim},
+//                          //including spacer region in search
+//                          {r.first, r.second + m_settings.start_flank}, dist_thr);
+//}
 
 std::optional<DuplexSplitNode::PosRange> DuplexSplitNode::identify_extra_middle_split(
         const Read& read) const {
+    assert(m_settings.end_flank > m_settings.end_trim + m_settings.min_short_flank);
     const auto r_l = read.seq.size();
     const auto search_span = std::max(m_settings.middle_adapter_search_span,
                                       int(std::round(m_settings.middle_adapter_search_frac * r_l)));
-    if (r_l < m_settings.end_flank + m_settings.start_flank || r_l < search_span) {
+    if (r_l < search_span) {
         return std::nullopt;
     }
 
@@ -265,13 +294,17 @@ std::optional<DuplexSplitNode::PosRange> DuplexSplitNode::identify_extra_middle_
                 m_settings.adapter, read.seq, m_settings.relaxed_adapter_edist,
                 {r_l / 2 - search_span / 2, r_l / 2 + search_span / 2})) {
         auto adapter_start = adapter_match->first;
-        spdlog::trace("Checking middle match & start/end match");
-        if (check_flank_match(read, {adapter_start, adapter_start},
-                              m_settings.relaxed_flank_edist) &&
-            check_rc_match(read.seq, {r_l - m_settings.end_flank, r_l - m_settings.end_trim},
-                           {0, m_settings.start_flank}, m_settings.relaxed_flank_edist)) {
-            return PosRange{adapter_start - 1, adapter_start};
+        spdlog::trace("Checking middle match & start/end match (unless read is short)");
+        if (!check_flank_match(read, {adapter_start, adapter_start},
+                              m_settings.relaxed_flank_err)) {
+            return std::nullopt;
         }
+        const int dist_thr = std::round(m_settings.relaxed_flank_err * (m_settings.end_flank - m_settings.end_trim));
+        if (r_l < 2 * m_settings.end_flank ||
+            check_rc_match(read.seq, {r_l - m_settings.end_flank, r_l - m_settings.end_trim},
+                           {0, std::min(r_l, m_settings.start_flank)}, dist_thr)) {
+             return PosRange{adapter_start - 1, adapter_start};
+         }
     }
     return std::nullopt;
 }
@@ -328,7 +361,7 @@ DuplexSplitNode::build_split_finders() const {
                              filter_ranges(possible_pore_regions(read, m_settings.pore_thr),
                                            [&](PosRange r) {
                                                return check_flank_match(*read.read, r,
-                                                                        m_settings.flank_edist);
+                                                                        m_settings.flank_err);
                                            }),
                              m_settings.end_flank + m_settings.start_flank);
                  }});
@@ -343,7 +376,7 @@ DuplexSplitNode::build_split_finders() const {
                                                               m_settings.relaxed_adapter_edist) &&
                                                       check_flank_match(
                                                               *read.read, r,
-                                                              m_settings.relaxed_flank_edist);
+                                                              m_settings.relaxed_flank_err);
                                            }),
                              m_settings.end_flank + m_settings.start_flank);
                  }});
@@ -356,7 +389,7 @@ DuplexSplitNode::build_split_finders() const {
                                           [&](PosRange r) {
                                               return check_flank_match(*read.read,
                                                                        {r.first, r.first},
-                                                                       m_settings.flank_edist);
+                                                                       m_settings.flank_err);
                                           });
                  }});
 
