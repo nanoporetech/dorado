@@ -6,9 +6,9 @@ namespace dorado {
 struct DuplexSplitSettings {
     bool enabled = true;
     bool simplex_mode = false;
-    float pore_thr = 160.;
+    float pore_thr = 2.2;
     size_t pore_cl_dist = 4000;  // TODO maybe use frequency * 1sec here?
-    float relaxed_pore_thr = 150.;
+    float relaxed_pore_thr = 2.;
     //usually template read region to the left of potential spacer region
     size_t end_flank = 1200;
     //trim potentially erroneous (and/or PCR adapter) bases at end of query

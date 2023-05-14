@@ -207,18 +207,13 @@ DuplexSplitNode::ExtRead::ExtRead(std::shared_ptr<Read> r)
 
 PosRanges DuplexSplitNode::possible_pore_regions(const DuplexSplitNode::ExtRead& read,
                                                  float pore_thr) const {
-    PosRanges pore_regions;
-
-    //pA formula before scaling:
-    //pA = read->scaling * (raw + read->offset);
-    //pA formula after scaling:
-    //pA = read->scale * raw + read->shift
     spdlog::trace("Analyzing signal in read {}", read.read->read_id);
 
     auto pore_sample_ranges = detect_pore_signal(
-            read.data_as_float32, (pore_thr - read.read->shift) / read.read->scale,
+            read.data_as_float32, pore_thr,
             m_settings.pore_cl_dist, m_settings.expect_pore_prefix);
 
+    PosRanges pore_regions;
     for (auto pore_sample_range : pore_sample_ranges) {
         auto move_start = pore_sample_range.first / read.read->model_stride;
         auto move_end = pore_sample_range.second / read.read->model_stride;
