@@ -39,7 +39,7 @@ TEST_CASE("ReadFilterNode: Filter read based on qscore", TEST_GROUP) {
         read_2->attributes.start_time = "2017-04-29T09:10:04Z";
         read_2->attributes.fast5_filename = "batch_0.fast5";
 
-        dorado::ReadFilterNode filter(sink, 12 /*min_qscore*/, 2 /*threads*/);
+        dorado::ReadFilterNode filter(sink, 12 /*min_qscore*/, 0, 2 /*threads*/);
         filter.push_message(read_1);
         filter.push_message(read_2);
     }
