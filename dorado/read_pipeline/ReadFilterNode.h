@@ -20,8 +20,8 @@ class ReadFilterNode : public MessageSink {
 public:
     ReadFilterNode(MessageSink& sink,
                    size_t min_qscore,
-                   size_t num_worker_threads,
-                   size_t min_read_length = 0);
+                   size_t min_read_length,
+                   size_t num_worker_threads);
     ~ReadFilterNode();
 
 private:

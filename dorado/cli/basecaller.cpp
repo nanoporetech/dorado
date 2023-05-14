@@ -40,6 +40,7 @@ namespace dorado {
 
 using HtsWriter = utils::HtsWriter;
 using HtsReader = utils::HtsReader;
+using dorado::utils::default_parameters;
 
 void setup(std::vector<std::string> args,
            const std::filesystem::path& model_path,
@@ -227,7 +228,8 @@ void setup(std::vector<std::string> args,
                                  thread_allocations.read_converter_threads,
                                  methylation_threshold_pct);
     StatsCounterNode stats_node(read_converter, duplex);
-    ReadFilterNode read_filter_node(stats_node, min_qscore, thread_allocations.read_filter_threads);
+    ReadFilterNode read_filter_node(stats_node, min_qscore, default_parameters.min_seqeuence_length,
+                                    thread_allocations.read_filter_threads);
 
     std::unique_ptr<ModBaseCallerNode> mod_base_caller_node;
     MessageSink* basecaller_node_sink = static_cast<MessageSink*>(&read_filter_node);
@@ -251,8 +253,6 @@ void setup(std::vector<std::string> args,
 }
 
 int basecaller(int argc, char* argv[]) {
-    using dorado::utils::default_parameters;
-
     utils::InitLogging();
 
     argparse::ArgumentParser parser("dorado", DORADO_VERSION, argparse::default_arguments::help);
