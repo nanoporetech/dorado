@@ -157,13 +157,18 @@ int duplex(int argc, char* argv[]) {
         std::shared_ptr<HtsWriter> bam_writer;
         std::shared_ptr<utils::Aligner> aligner;
         MessageSink* converted_reads_sink = nullptr;
+
+        bool recursive_file_loading = parser.get<bool>("--recursive");
+
+        size_t num_reads = DataLoader::get_num_reads(reads, read_list, recursive_file_loading);
+
         if (ref.empty()) {
-            bam_writer = std::make_shared<HtsWriter>("-", output_mode, 4, 0);
+            bam_writer = std::make_shared<HtsWriter>("-", output_mode, 4, num_reads);
             bam_writer->add_header(hdr.get());
             bam_writer->write_header();
             converted_reads_sink = bam_writer.get();
         } else {
-            bam_writer = std::make_shared<HtsWriter>("-", output_mode, 4, 0);
+            bam_writer = std::make_shared<HtsWriter>("-", output_mode, 4, num_reads);
             aligner = std::make_shared<utils::Aligner>(
                     *bam_writer, ref, parser.get<int>("k"), parser.get<int>("w"),
                     utils::parse_string_to_size(parser.get<std::string>("I")),
@@ -198,8 +203,7 @@ int duplex(int argc, char* argv[]) {
 
             const auto model_path = std::filesystem::canonical(std::filesystem::path(model));
 
-            auto data_sample_rate =
-                    DataLoader::get_sample_rate(reads, parser.get<bool>("--recursive"));
+            auto data_sample_rate = DataLoader::get_sample_rate(reads, recursive_file_loading);
             auto model_sample_rate = get_model_sample_rate(model_path);
             auto skip_model_compatibility_check =
                     internal_parser.get<bool>("--skip-model-compatibility-check");
