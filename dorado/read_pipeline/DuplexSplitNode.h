@@ -17,7 +17,7 @@ struct DuplexSplitSettings {
     size_t start_flank = 1700;
     //minimal query size to consider in "short read" case
     size_t min_short_flank = 300;
-    float flank_err = 0.175;
+    float flank_err = 0.22;
     float relaxed_flank_err = 0.275;
     int adapter_edist = 4;
     int relaxed_adapter_edist = 7;
