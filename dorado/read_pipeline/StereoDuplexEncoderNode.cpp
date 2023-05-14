@@ -288,9 +288,8 @@ void StereoDuplexEncoderNode::worker_thread() {
             std::shared_ptr<Read> stereo_encoded_read =
                     stereo_encode(read_pair->read_1, read_pair->read_2);
 
-            if (stereo_encoded_read->raw_data
-                        .ndimension() ==  // TODO else send the individual reads from the pair
-                2) {                      // 2 dims for stereo encoding, 1 for simplex
+            if (stereo_encoded_read->raw_data.ndimension() ==
+                2) {  // 2 dims for stereo encoding, 1 for simplex
                 m_sink.push_message(
                         stereo_encoded_read);  // Strereo-encoded read created, send it to sink
             }
