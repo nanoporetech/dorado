@@ -521,15 +521,18 @@ std::vector<std::shared_ptr<Read>> DuplexSplitNode::split(std::shared_ptr<Read> 
     }
 
     std::vector<std::shared_ptr<Read>> split_result;
+    size_t max_sr_len = 0;
     for (const auto& ext_read : to_split) {
+        max_sr_len = std::max(ext_read.read->seq.size(), max_sr_len);
         split_result.push_back(std::move(ext_read.read));
     }
 
-    spdlog::trace("Read {} split into {} subreads", init_read->read_id, split_result.size());
+    spdlog::info("Read {} split into {} subreads. init_len {} max_subread_len {}",
+                 init_read->read_id, split_result.size(), init_read->seq.size(), max_sr_len);
 
     auto stop_ts = high_resolution_clock::now();
-    spdlog::trace("READ duration: {} microseconds (ID: {})",
-                  duration_cast<microseconds>(stop_ts - start_ts).count(), init_read->read_id);
+    spdlog::info("READ duration: {} microseconds (ID: {})",
+                 duration_cast<microseconds>(stop_ts - start_ts).count(), init_read->read_id);
 
     return split_result;
 }
