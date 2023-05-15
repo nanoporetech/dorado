@@ -64,7 +64,7 @@ std::shared_ptr<dorado::Read> StereoDuplexEncoderNode::stereo_encode(
     const bool consensus_possible =
             (start_alignment_position < end_alignment_position) &&
             ((end_alignment_position - start_alignment_position) > kMinTrimmedAlignmentLength) &&
-            alignment_error_rate < 0.1;
+            alignment_error_rate < 0.2;
 
     if (!consensus_possible) {
         // There wasn't a good enough match -- return early with an empty read.
