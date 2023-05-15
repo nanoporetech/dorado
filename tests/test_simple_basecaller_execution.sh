@@ -12,6 +12,7 @@ mkdir -p $output_dir
 test_output_file=$test_dir/output.log
 
 set -ex
+set -o pipefail
 
 echo dorado basecaller test stage
 $dorado_bin download --model ${model}
@@ -23,7 +24,9 @@ samtools view $output_dir/calls.bam > $output_dir/calls.sam
 
 echo dorado aligner test stage
 $dorado_bin aligner $output_dir/ref.fq $output_dir/calls.sam > $output_dir/calls.bam
-$dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --modified-bases 5mCG | $dorado_bin aligner ref.fq > $output_dir/calls.bam
+$dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --modified-bases 5mCG | $dorado_bin aligner $output_dir/ref.fq > $output_dir/calls.bam
 $dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --modified-bases 5mCG --reference $output_dir/ref.fq > $output_dir/calls.bam
 samtools quickcheck -u $output_dir/calls.bam
 samtools view -h $output_dir/calls.bam > $output_dir/calls.sam
+
+rm -rf $output_dir
