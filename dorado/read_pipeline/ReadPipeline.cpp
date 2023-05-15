@@ -83,6 +83,9 @@ void Read::generate_read_tags(bam1_t *aln, bool emit_moves) const {
 
     bam_aux_append(aln, "sv", 'Z', 9, (uint8_t *)"quantile");
 
+    uint32_t is_duplex = 0;
+    bam_aux_append(aln, "dx", 'i', sizeof(is_duplex), (uint8_t *)&is_duplex);
+
     if (run_id != "" && model_name != "") {
         std::string rg(run_id + "_" + model_name);
         bam_aux_append(aln, "RG", 'Z', rg.length() + 1, (uint8_t *)rg.c_str());
@@ -103,6 +106,8 @@ void Read::generate_read_tags(bam1_t *aln, bool emit_moves) const {
 void Read::generate_duplex_read_tags(bam1_t *aln) const {
     int qs = static_cast<int>(std::round(utils::mean_qscore_from_qstring(qstring)));
     bam_aux_append(aln, "qs", 'i', sizeof(qs), (uint8_t *)&qs);
+    uint32_t is_duplex = 1;
+    bam_aux_append(aln, "dx", 'i', sizeof(is_duplex), (uint8_t *)&is_duplex);
 }
 
 std::vector<BamPtr> Read::extract_sam_lines(bool emit_moves,
