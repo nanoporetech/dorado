@@ -48,6 +48,7 @@ std::shared_ptr<dorado::Read> StereoDuplexEncoderNode::stereo_encode(
 
     int query_cursor = 0;
     int target_cursor = result.startLocations[0];
+    float alignment_error_rate = (float)result.editDistance / (float)result.alignmentLength;
 
     auto [alignment_start_end, cursors] = dorado::utils::get_trimmed_alignment(
             11, result.alignment, result.alignmentLength, target_cursor, query_cursor, 0,
@@ -62,7 +63,8 @@ std::shared_ptr<dorado::Read> StereoDuplexEncoderNode::stereo_encode(
     const int kMinTrimmedAlignmentLength = 50;
     const bool consensus_possible =
             (start_alignment_position < end_alignment_position) &&
-            ((end_alignment_position - start_alignment_position) > kMinTrimmedAlignmentLength);
+            ((end_alignment_position - start_alignment_position) > kMinTrimmedAlignmentLength) &&
+            alignment_error_rate < 0.2;
 
     if (!consensus_possible) {
         // There wasn't a good enough match -- return early with an empty read.
