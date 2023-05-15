@@ -121,7 +121,9 @@ std::vector<PosRange> find_adapter_matches(const std::string& adapter,
 }
 
 //semi-global alignment of "template region" to "complement region"
-bool check_rc_match(const std::string& seq, PosRange templ_r, PosRange compl_r, int dist_thr) {
+//returns range in the compl_r
+std::optional<PosRange>
+check_rc_match(const std::string& seq, PosRange templ_r, PosRange compl_r, int dist_thr) {
     assert(templ_r.second > templ_r.first);
     assert(compl_r.second > compl_r.first);
     assert(dist_thr >= 0);
@@ -129,17 +131,24 @@ bool check_rc_match(const std::string& seq, PosRange templ_r, PosRange compl_r, 
     auto rc_compl = dorado::utils::reverse_complement(
             seq.substr(compl_r.first, compl_r.second - compl_r.first));
 
-    auto edlib_cfg = edlibNewAlignConfig(dist_thr, EDLIB_MODE_HW, EDLIB_TASK_DISTANCE, NULL, 0);
+    auto edlib_cfg = edlibNewAlignConfig(dist_thr, EDLIB_MODE_HW, EDLIB_TASK_LOC, NULL, 0);
 
     auto edlib_result = edlibAlign(seq.c_str() + templ_r.first, templ_r.second - templ_r.first,
                                    rc_compl.c_str(), rc_compl.size(), edlib_cfg);
     assert(edlib_result.status == EDLIB_STATUS_OK);
 
     bool match = (edlib_result.status == EDLIB_STATUS_OK) && (edlib_result.editDistance != -1);
-    assert(!match || edlib_result.editDistance <= dist_thr);
+    std::optional<PosRange> res = std::nullopt;
+    if (match) {
+        assert(edlib_result.editDistance <= dist_thr);
+        assert(edlib_result.numLocations > 0 &&
+                  edlib_result.endLocations[0] < compl_r.second &&
+                  edlib_result.startLocations[0] < compl_r.second);
+        res = PosRange(compl_r.second - edlib_result.endLocations[0], compl_r.second - edlib_result.startLocations[0]);
+    }
 
     edlibFreeAlignResult(edlib_result);
-    return match;
+    return res;
 }
 
 //TODO end_reason access?
@@ -258,6 +267,7 @@ bool DuplexSplitNode::check_flank_match(const Read& read, PosRange r, float err_
     //, shifting into correct sequence
     const auto e2 = std::min(r.second + m_settings.start_flank + (r.second - r.first), rlen);
 
+    //TODO magic constant 3 (determines minimal size of the 'right' region in terms of full read)
     if (e2 == rlen) {
         //short read mode triggered
         if ((e1 - s1) < m_settings.min_short_flank ||
@@ -270,7 +280,7 @@ bool DuplexSplitNode::check_flank_match(const Read& read, PosRange r, float err_
 
     return check_rc_match(read.seq, {s1, e1},
                            //including spacer region in search
-                          {s2, e2}, dist_thr);
+                          {s2, e2}, dist_thr).has_value();
  }
 
 //bool DuplexSplitNode::check_flank_match(const Read& read, PosRange r, int dist_thr) const {
@@ -281,7 +291,7 @@ bool DuplexSplitNode::check_flank_match(const Read& read, PosRange r, float err_
 //                          {r.first, r.second + m_settings.start_flank}, dist_thr);
 //}
 
-std::optional<DuplexSplitNode::PosRange> DuplexSplitNode::identify_extra_middle_split(
+std::optional<DuplexSplitNode::PosRange> DuplexSplitNode::identify_middle_adapter_split(
         const Read& read) const {
     assert(m_settings.end_flank > m_settings.end_trim + m_settings.min_short_flank);
     const auto r_l = read.seq.size();
@@ -307,6 +317,55 @@ std::optional<DuplexSplitNode::PosRange> DuplexSplitNode::identify_extra_middle_
                            {0, std::min(r_l, m_settings.start_flank)}, dist_thr)) {
              return PosRange{adapter_start - 1, adapter_start};
          }
+    }
+    return std::nullopt;
+}
+
+std::optional<DuplexSplitNode::PosRange> DuplexSplitNode::identify_extra_middle_split(
+        const Read& read) const {
+    const size_t r_l = read.seq.size();
+    //TODO parameterize
+    static const float ext_start_frac = 0.1;
+    //extend to tolerate some extra length difference
+    const auto ext_start_flank = std::max(size_t(ext_start_frac * r_l), m_settings.start_flank);
+    //further consider only reasonably long reads
+    if (r_l < 2 * m_settings.end_flank) {
+        return std::nullopt;
+    }
+
+    int relaxed_flank_edist = std::round(m_settings.relaxed_flank_err * (m_settings.end_flank - m_settings.end_trim));
+
+    spdlog::trace("Checking start/end match");
+    if (auto templ_start_match = check_rc_match(read.seq, {r_l - m_settings.end_flank, r_l - m_settings.end_trim},
+                    {0, std::min(r_l, ext_start_flank)}, relaxed_flank_edist)) {
+        //matched region and query overlap
+        if (templ_start_match->second + m_settings.end_flank >= r_l) {
+            return std::nullopt;
+        }
+        size_t est_middle = (templ_start_match->second + (r_l - m_settings.end_flank)) / 2;
+        spdlog::trace("Middle estimate {}", est_middle);
+        //TODO parameterize
+        static const int min_split_margin = 100;
+        static const float split_margin_frac = 0.05;
+        const auto split_margin = std::max(min_split_margin, int(split_margin_frac * r_l));
+
+        const auto s1 = (est_middle < split_margin + m_settings.end_flank) ? 0 : est_middle - split_margin - m_settings.end_flank;
+        const auto e1 = (est_middle < split_margin + m_settings.end_trim) ? 0 : est_middle - split_margin - m_settings.end_trim;
+
+        if (e1 - s1 < m_settings.min_short_flank) {
+            return std::nullopt;
+        }
+
+        const auto s2 = est_middle - split_margin;
+        const auto e2 = std::min(r_l, est_middle + 2 * split_margin + m_settings.start_flank);
+        spdlog::trace("Checking approx middle match");
+
+        relaxed_flank_edist = std::round(m_settings.relaxed_flank_err * (e1 - s1));
+        if (auto compl_start_match = check_rc_match(read.seq, {s1, e1}, {s2, e2}, relaxed_flank_edist)) {
+            est_middle = (e1 + compl_start_match->first) / 2;
+            spdlog::trace("Middle re-estimate {}", est_middle);
+            return PosRange{est_middle - 1, est_middle};
+        }
     }
     return std::nullopt;
 }
@@ -396,6 +455,14 @@ DuplexSplitNode::build_split_finders() const {
                  }});
 
         split_finders.push_back({"ADAPTER_MIDDLE", [&](const ExtRead& read) {
+                                     if (auto split = identify_middle_adapter_split(*read.read)) {
+                                         return PosRanges{*split};
+                                     } else {
+                                         return PosRanges();
+                                     }
+                                 }});
+
+        split_finders.push_back({"SPLIT_MIDDLE", [&](const ExtRead& read) {
                                      if (auto split = identify_extra_middle_split(*read.read)) {
                                          return PosRanges{*split};
                                      } else {
