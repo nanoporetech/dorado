@@ -237,7 +237,9 @@ PosRanges DuplexSplitNode::possible_pore_regions(const DuplexSplitNode::ExtRead&
         //NB. adding adapter length
         auto end_pos = read.move_sums[move_end];
         assert(end_pos > start_pos);
-        pore_regions.push_back({start_pos, end_pos});
+        if (end_pos <= start_pos + m_settings.max_pore_region) {
+            pore_regions.push_back({start_pos, end_pos});
+        }
     }
 
     return pore_regions;
