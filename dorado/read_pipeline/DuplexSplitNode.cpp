@@ -122,8 +122,10 @@ std::vector<PosRange> find_adapter_matches(const std::string& adapter,
 
 //semi-global alignment of "template region" to "complement region"
 //returns range in the compl_r
-std::optional<PosRange>
-check_rc_match(const std::string& seq, PosRange templ_r, PosRange compl_r, int dist_thr) {
+std::optional<PosRange> check_rc_match(const std::string& seq,
+                                       PosRange templ_r,
+                                       PosRange compl_r,
+                                       int dist_thr) {
     assert(templ_r.second > templ_r.first);
     assert(compl_r.second > compl_r.first);
     assert(dist_thr >= 0);
@@ -141,10 +143,10 @@ check_rc_match(const std::string& seq, PosRange templ_r, PosRange compl_r, int d
     std::optional<PosRange> res = std::nullopt;
     if (match) {
         assert(edlib_result.editDistance <= dist_thr);
-        assert(edlib_result.numLocations > 0 &&
-                  edlib_result.endLocations[0] < compl_r.second &&
-                  edlib_result.startLocations[0] < compl_r.second);
-        res = PosRange(compl_r.second - edlib_result.endLocations[0], compl_r.second - edlib_result.startLocations[0]);
+        assert(edlib_result.numLocations > 0 && edlib_result.endLocations[0] < compl_r.second &&
+               edlib_result.startLocations[0] < compl_r.second);
+        res = PosRange(compl_r.second - edlib_result.endLocations[0],
+                       compl_r.second - edlib_result.startLocations[0]);
     }
 
     edlibFreeAlignResult(edlib_result);
@@ -206,8 +208,7 @@ std::shared_ptr<Read> subread(const Read& read, PosRange seq_range, PosRange sig
 
 namespace dorado {
 
-DuplexSplitNode::ExtRead
-DuplexSplitNode::create_ext_read(std::shared_ptr<Read> r) const {
+DuplexSplitNode::ExtRead DuplexSplitNode::create_ext_read(std::shared_ptr<Read> r) const {
     ExtRead ext_read;
     ext_read.read = r;
     ext_read.move_sums = utils::move_cum_sums(r->moves);
@@ -221,9 +222,9 @@ DuplexSplitNode::create_ext_read(std::shared_ptr<Read> r) const {
 PosRanges DuplexSplitNode::possible_pore_regions(const DuplexSplitNode::ExtRead& read) const {
     spdlog::trace("Analyzing signal in read {}", read.read->read_id);
 
-    auto pore_sample_ranges = detect_pore_signal(
-            read.data_as_float32, m_settings.pore_thr,
-            m_settings.pore_cl_dist, m_settings.expect_pore_prefix);
+    auto pore_sample_ranges =
+            detect_pore_signal(read.data_as_float32, m_settings.pore_thr, m_settings.pore_cl_dist,
+                               m_settings.expect_pore_prefix);
 
     PosRanges pore_regions;
     for (auto pore_sample_range : pore_sample_ranges) {
@@ -275,8 +276,7 @@ bool DuplexSplitNode::check_flank_match(const Read& read, PosRange r, float err_
     //TODO magic constant 3 (determines minimal size of the 'right' region in terms of full read)
     if (e2 == rlen) {
         //short read mode triggered
-        if ((e1 - s1) < m_settings.min_short_flank ||
-                e2 - s2 < e1 - s1 || rlen > 3 * (e2 - s2)) {
+        if ((e1 - s1) < m_settings.min_short_flank || e2 - s2 < e1 - s1 || rlen > 3 * (e2 - s2)) {
             return false;
         }
     }
@@ -284,9 +284,10 @@ bool DuplexSplitNode::check_flank_match(const Read& read, PosRange r, float err_
     const int dist_thr = std::round(err_thr * (e1 - s1));
 
     return check_rc_match(read.seq, {s1, e1},
-                           //including spacer region in search
-                          {s2, e2}, dist_thr).has_value();
- }
+                          //including spacer region in search
+                          {s2, e2}, dist_thr)
+            .has_value();
+}
 
 //bool DuplexSplitNode::check_flank_match(const Read& read, PosRange r, int dist_thr) const {
 //    return r.first >= m_settings.end_flank &&
@@ -313,15 +314,16 @@ std::optional<DuplexSplitNode::PosRange> DuplexSplitNode::identify_middle_adapte
         auto adapter_start = adapter_match->first;
         spdlog::trace("Checking middle match & start/end match (unless read is short)");
         if (!check_flank_match(read, {adapter_start, adapter_start},
-                              m_settings.relaxed_flank_err)) {
+                               m_settings.relaxed_flank_err)) {
             return std::nullopt;
         }
-        const int dist_thr = std::round(m_settings.relaxed_flank_err * (m_settings.end_flank - m_settings.end_trim));
+        const int dist_thr = std::round(m_settings.relaxed_flank_err *
+                                        (m_settings.end_flank - m_settings.end_trim));
         if (r_l < 2 * m_settings.end_flank ||
             check_rc_match(read.seq, {r_l - m_settings.end_flank, r_l - m_settings.end_trim},
                            {0, std::min(r_l, m_settings.start_flank)}, dist_thr)) {
-             return PosRange{adapter_start - 1, adapter_start};
-         }
+            return PosRange{adapter_start - 1, adapter_start};
+        }
     }
     return std::nullopt;
 }
@@ -338,11 +340,13 @@ std::optional<DuplexSplitNode::PosRange> DuplexSplitNode::identify_extra_middle_
         return std::nullopt;
     }
 
-    int relaxed_flank_edist = std::round(m_settings.relaxed_flank_err * (m_settings.end_flank - m_settings.end_trim));
+    int relaxed_flank_edist =
+            std::round(m_settings.relaxed_flank_err * (m_settings.end_flank - m_settings.end_trim));
 
     spdlog::trace("Checking start/end match");
-    if (auto templ_start_match = check_rc_match(read.seq, {r_l - m_settings.end_flank, r_l - m_settings.end_trim},
-                    {0, std::min(r_l, ext_start_flank)}, relaxed_flank_edist)) {
+    if (auto templ_start_match =
+                check_rc_match(read.seq, {r_l - m_settings.end_flank, r_l - m_settings.end_trim},
+                               {0, std::min(r_l, ext_start_flank)}, relaxed_flank_edist)) {
         //matched region and query overlap
         if (templ_start_match->second + m_settings.end_flank >= r_l) {
             return std::nullopt;
@@ -354,8 +358,12 @@ std::optional<DuplexSplitNode::PosRange> DuplexSplitNode::identify_extra_middle_
         static const float split_margin_frac = 0.05;
         const auto split_margin = std::max(min_split_margin, int(split_margin_frac * r_l));
 
-        const auto s1 = (est_middle < split_margin + m_settings.end_flank) ? 0 : est_middle - split_margin - m_settings.end_flank;
-        const auto e1 = (est_middle < split_margin + m_settings.end_trim) ? 0 : est_middle - split_margin - m_settings.end_trim;
+        const auto s1 = (est_middle < split_margin + m_settings.end_flank)
+                                ? 0
+                                : est_middle - split_margin - m_settings.end_flank;
+        const auto e1 = (est_middle < split_margin + m_settings.end_trim)
+                                ? 0
+                                : est_middle - split_margin - m_settings.end_trim;
 
         if (e1 - s1 < m_settings.min_short_flank) {
             return std::nullopt;
@@ -366,7 +374,8 @@ std::optional<DuplexSplitNode::PosRange> DuplexSplitNode::identify_extra_middle_
         spdlog::trace("Checking approx middle match");
 
         relaxed_flank_edist = std::round(m_settings.relaxed_flank_err * (e1 - s1));
-        if (auto compl_start_match = check_rc_match(read.seq, {s1, e1}, {s2, e2}, relaxed_flank_edist)) {
+        if (auto compl_start_match =
+                    check_rc_match(read.seq, {s1, e1}, {s2, e2}, relaxed_flank_edist)) {
             est_middle = (e1 + compl_start_match->first) / 2;
             spdlog::trace("Middle re-estimate {}", est_middle);
             return PosRange{est_middle - 1, est_middle};
@@ -412,25 +421,24 @@ std::vector<std::shared_ptr<Read>> DuplexSplitNode::subreads(
 std::vector<std::pair<std::string, DuplexSplitNode::SplitFinderF>>
 DuplexSplitNode::build_split_finders() const {
     std::vector<std::pair<std::string, SplitFinderF>> split_finders;
-    split_finders.push_back(
-            {"PORE_ADAPTER", [&](const ExtRead& read) {
-                 return filter_ranges(
-                         read.possible_pore_regions, [&](PosRange r) {
-                             return check_nearby_adapter(*read.read, r, m_settings.adapter_edist);
-                         });
-             }});
+    split_finders.push_back({"PORE_ADAPTER", [&](const ExtRead& read) {
+                                 return filter_ranges(read.possible_pore_regions, [&](PosRange r) {
+                                     return check_nearby_adapter(*read.read, r,
+                                                                 m_settings.adapter_edist);
+                                 });
+                             }});
 
     if (!m_settings.simplex_mode) {
-        split_finders.push_back(
-                {"PORE_FLANK", [&](const ExtRead& read) {
-                     return merge_ranges(
-                             filter_ranges(read.possible_pore_regions,
-                                           [&](PosRange r) {
-                                               return check_flank_match(*read.read, r,
-                                                                        m_settings.flank_err);
-                                           }),
-                             m_settings.end_flank + m_settings.start_flank);
-                 }});
+        split_finders.push_back({"PORE_FLANK", [&](const ExtRead& read) {
+                                     return merge_ranges(
+                                             filter_ranges(read.possible_pore_regions,
+                                                           [&](PosRange r) {
+                                                               return check_flank_match(
+                                                                       *read.read, r,
+                                                                       m_settings.flank_err);
+                                                           }),
+                                             m_settings.end_flank + m_settings.start_flank);
+                                 }});
 
         split_finders.push_back(
                 {"PORE_ALL", [&](const ExtRead& read) {
