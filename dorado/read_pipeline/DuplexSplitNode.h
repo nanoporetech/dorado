@@ -9,7 +9,7 @@ struct DuplexSplitSettings {
     float pore_thr = 2.2;
     size_t pore_cl_dist = 4000;  // TODO maybe use frequency * 1sec here?
     //maximal 'open pore' region to consider (bp)
-    size_t max_pore_region = 200;
+    size_t max_pore_region = 500;
     //usually template read region to the left of potential spacer region
     size_t end_flank = 1200;
     //trim potentially erroneous (and/or PCR adapter) bases at end of query
