@@ -8,7 +8,6 @@ struct DuplexSplitSettings {
     bool simplex_mode = false;
     float pore_thr = 2.2;
     size_t pore_cl_dist = 4000;  // TODO maybe use frequency * 1sec here?
-    float relaxed_pore_thr = 2.;
     //maximal 'open pore' region to consider (bp)
     size_t max_pore_region = 200;
     //usually template read region to the left of potential spacer region
@@ -58,13 +57,13 @@ private:
         std::shared_ptr<Read> read;
         torch::Tensor data_as_float32;
         std::vector<uint64_t> move_sums;
-
-        explicit ExtRead(std::shared_ptr<Read> r);
+        PosRanges possible_pore_regions;
     };
 
     typedef std::function<PosRanges(const ExtRead&)> SplitFinderF;
 
-    std::vector<PosRange> possible_pore_regions(const ExtRead& read, float pore_thr) const;
+    ExtRead create_ext_read(std::shared_ptr<Read> r) const;
+    std::vector<PosRange> possible_pore_regions(const ExtRead& read) const;
     bool check_nearby_adapter(const Read& read, PosRange r, int adapter_edist) const;
     bool check_flank_match(const Read& read, PosRange r, float err_thr) const;
     std::optional<PosRange> identify_middle_adapter_split(const Read& read) const;

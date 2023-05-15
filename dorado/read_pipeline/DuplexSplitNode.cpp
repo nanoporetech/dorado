@@ -206,20 +206,23 @@ std::shared_ptr<Read> subread(const Read& read, PosRange seq_range, PosRange sig
 
 namespace dorado {
 
-DuplexSplitNode::ExtRead::ExtRead(std::shared_ptr<Read> r)
-        : read(std::move(r)),
-          data_as_float32(read->raw_data.to(torch::kFloat)),
-          move_sums(utils::move_cum_sums(read->moves)) {
-    assert(!move_sums.empty());
-    assert(move_sums.back() == read->seq.length());
+DuplexSplitNode::ExtRead
+DuplexSplitNode::create_ext_read(std::shared_ptr<Read> r) const {
+    ExtRead ext_read;
+    ext_read.read = r;
+    ext_read.move_sums = utils::move_cum_sums(r->moves);
+    assert(!ext_read.move_sums.empty());
+    assert(ext_read.move_sums.back() == r->seq.length());
+    ext_read.data_as_float32 = r->raw_data.to(torch::kFloat);
+    ext_read.possible_pore_regions = possible_pore_regions(ext_read);
+    return ext_read;
 }
 
-PosRanges DuplexSplitNode::possible_pore_regions(const DuplexSplitNode::ExtRead& read,
-                                                 float pore_thr) const {
+PosRanges DuplexSplitNode::possible_pore_regions(const DuplexSplitNode::ExtRead& read) const {
     spdlog::trace("Analyzing signal in read {}", read.read->read_id);
 
     auto pore_sample_ranges = detect_pore_signal(
-            read.data_as_float32, pore_thr,
+            read.data_as_float32, m_settings.pore_thr,
             m_settings.pore_cl_dist, m_settings.expect_pore_prefix);
 
     PosRanges pore_regions;
@@ -412,7 +415,7 @@ DuplexSplitNode::build_split_finders() const {
     split_finders.push_back(
             {"PORE_ADAPTER", [&](const ExtRead& read) {
                  return filter_ranges(
-                         possible_pore_regions(read, m_settings.pore_thr), [&](PosRange r) {
+                         read.possible_pore_regions, [&](PosRange r) {
                              return check_nearby_adapter(*read.read, r, m_settings.adapter_edist);
                          });
              }});
@@ -421,7 +424,7 @@ DuplexSplitNode::build_split_finders() const {
         split_finders.push_back(
                 {"PORE_FLANK", [&](const ExtRead& read) {
                      return merge_ranges(
-                             filter_ranges(possible_pore_regions(read, m_settings.pore_thr),
+                             filter_ranges(read.possible_pore_regions,
                                            [&](PosRange r) {
                                                return check_flank_match(*read.read, r,
                                                                         m_settings.flank_err);
@@ -432,7 +435,7 @@ DuplexSplitNode::build_split_finders() const {
         split_finders.push_back(
                 {"PORE_ALL", [&](const ExtRead& read) {
                      return merge_ranges(
-                             filter_ranges(possible_pore_regions(read, m_settings.relaxed_pore_thr),
+                             filter_ranges(read.possible_pore_regions,
                                            [&](PosRange r) {
                                                return check_nearby_adapter(
                                                               *read.read, r,
@@ -489,7 +492,7 @@ std::vector<std::shared_ptr<Read>> DuplexSplitNode::split(std::shared_ptr<Read> 
         return std::vector<std::shared_ptr<Read>>{std::move(init_read)};
     }
 
-    std::vector<ExtRead> to_split{ExtRead(init_read)};
+    std::vector<ExtRead> to_split{create_ext_read(init_read)};
     for (const auto& [description, split_f] : m_split_finders) {
         spdlog::trace("Running {}", description);
         std::vector<ExtRead> split_round_result;
@@ -502,7 +505,7 @@ std::vector<std::shared_ptr<Read>> DuplexSplitNode::split(std::shared_ptr<Read> 
                 split_round_result.push_back(std::move(r));
             } else {
                 for (auto sr : subreads(r.read, spacers)) {
-                    split_round_result.emplace_back(sr);
+                    split_round_result.push_back(create_ext_read(sr));
                 }
             }
         }
