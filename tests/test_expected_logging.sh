@@ -19,7 +19,7 @@ test_output_file=$test_dir/output.log
 $dorado_bin download --model ${model} > /dev/null
 
 # Test commands
-$dorado_bin basecaller dna_r9.4.1_e8_hac@v3.3 $data_dir/pod5 -b ${batch} > $output_dir/output.bam 2>$test_output_file
+$dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} > $output_dir/output.bam 2>$test_output_file
 grep "Reads basecalled: 1" $test_output_file
 ret_val=$?
 if [ $ret_val -ne 0 ]; then
