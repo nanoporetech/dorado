@@ -41,7 +41,7 @@ __attribute__((target("avx2,f16c"))) void convert_f32_to_f16_impl(c10::Half* con
     const auto* src_ptr = src;
     auto* dest_ptr = dest;
     for (size_t chunk_i = 0; chunk_i < count / kUnroll; ++chunk_i) {
-        const __m256 elems_f32 = _mm256_load_ps(src_ptr);
+        const __m256 elems_f32 = _mm256_loadu_ps(src_ptr);
         const __m128i elems_f16 = _mm256_cvtps_ph(elems_f32, kRoundNearestEven);
         _mm_storeu_si128(reinterpret_cast<__m128i*>(dest_ptr), elems_f16);
         src_ptr += kUnroll;
@@ -140,6 +140,37 @@ torch::Tensor quantile_counting(const torch::Tensor t, const torch::Tensor q) {
 // version.
 void convert_f32_to_f16(c10::Half* const dest, const float* const src, std::size_t count) {
     return convert_f32_to_f16_impl(dest, src, count);
+}
+
+void copy_tensor_elems(torch::Tensor& dest_tensor,
+                       std::size_t dest_offset,
+                       const torch::Tensor& src_tensor,
+                       std::size_t src_offset,
+                       std::size_t count) {
+    assert(dest_tensor.is_contiguous());
+    assert(src_tensor.is_contiguous());
+    assert(dest_offset + count <= dest_tensor.numel());
+    assert(src_offset + count <= src_tensor.numel());
+
+    if (dest_tensor.dtype() == src_tensor.dtype()) {
+        // No conversion.
+        auto* const dest_ptr = reinterpret_cast<std::byte*>(dest_tensor.data_ptr());
+        const auto* const src_ptr = reinterpret_cast<std::byte*>(src_tensor.data_ptr());
+        const size_t elem_size = dest_tensor.element_size();
+        std::memcpy(&dest_ptr[dest_offset * elem_size], &src_ptr[src_offset * elem_size],
+                    count * elem_size);
+    } else if (dest_tensor.dtype() == torch::kFloat16 && src_tensor.dtype() == torch::kFloat32) {
+        // float32 -> float16 conversion.
+        auto* const dest_ptr = dest_tensor.data_ptr<c10::Half>();
+        const auto* const src_ptr = src_tensor.data_ptr<float>();
+        convert_f32_to_f16_impl(&dest_ptr[dest_offset], &src_ptr[src_offset], count);
+    } else {
+        // Slow fallback path for other conversions.
+        using torch::indexing::Slice;
+        dest_tensor.flatten().index_put_(
+                {Slice(dest_offset, dest_offset + count)},
+                src_tensor.flatten().index({Slice(src_offset, src_offset + count)}));
+    }
 }
 
 }  // namespace dorado::utils
