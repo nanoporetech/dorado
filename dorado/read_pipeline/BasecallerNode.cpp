@@ -48,7 +48,7 @@ void BasecallerNode::input_worker_thread() {
             // A new condition was added to the condition variable which adjusts the predicate
             // to check for enough free space in the chunk array to fit the next
             // read (with some additional buffer). Without this buffer, there were some
-            // degernate cases during duplex basecalling wherein the simplex calling was
+            // degenerate cases during duplex basecalling wherein the simplex calling was
             // much faster than duplex calling (e.g. w/ the fast model), leading to several new chunks
             // being added incrementally which led to many partial reads being in flight. These partial
             // reads were causing a growth in memory which sometimes led to a creash on some systems.

@@ -271,7 +271,7 @@ int duplex(int argc, char* argv[]) {
 #else   // ifdef __APPLE__
             else {
                 // Note: The memory assignment between simplex and duplex callers have been
-                // performed based on empirical results considering a SUP model for simpmlex
+                // performed based on empirical results considering a SUP model for simplex
                 // calling.
                 auto devices = utils::parse_cuda_device_string(device);
                 num_devices = devices.size();
