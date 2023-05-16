@@ -68,8 +68,6 @@ private:
 
     std::unordered_map<std::string, channel_to_read_id_t> m_file_channel_read_order_map;
     int m_max_channel{0};
-
-    std::unordered_map<std::string, Pod5Ptr> m_file_handles;
 };
 
 }  // namespace dorado

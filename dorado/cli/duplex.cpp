@@ -155,15 +155,15 @@ int duplex(int argc, char* argv[]) {
             output_mode = HtsWriter::OutputMode::UBAM;
         }
 
+        bool recursive_file_loading = parser.get<bool>("--recursive");
+
+        size_t num_reads = DataLoader::get_num_reads(reads, read_list, recursive_file_loading);
+
         std::unique_ptr<sam_hdr_t, void (*)(sam_hdr_t*)> hdr(sam_hdr_init(), sam_hdr_destroy);
         utils::add_pg_hdr(hdr.get(), args);
         std::shared_ptr<HtsWriter> bam_writer;
         std::shared_ptr<utils::Aligner> aligner;
         MessageSink* converted_reads_sink = nullptr;
-
-        bool recursive_file_loading = parser.get<bool>("--recursive");
-
-        size_t num_reads = DataLoader::get_num_reads(reads, read_list, recursive_file_loading);
 
         if (ref.empty()) {
             bam_writer = std::make_shared<HtsWriter>("-", output_mode, 4, num_reads);
@@ -270,14 +270,18 @@ int duplex(int argc, char* argv[]) {
             }
 #else   // ifdef __APPLE__
             else {
+                // Note: The memory assignment between simplex and duplex callers have been
+                // performed based on empirical results considering a SUP model for simpmlex
+                // calling.
                 auto devices = utils::parse_cuda_device_string(device);
                 num_devices = devices.size();
                 if (num_devices == 0) {
                     throw std::runtime_error("CUDA device requested but no devices found.");
                 }
                 for (auto device_string : devices) {
+                    // Use most of GPU mem but leave some for buffer.
                     auto caller = create_cuda_caller(model_path, chunk_size, batch_size,
-                                                     device_string, 1.0f);  // Use half the GPU mem
+                                                     device_string, 0.9f);
                     for (size_t i = 0; i < num_runners; i++) {
                         runners.push_back(std::make_shared<CudaModelRunner>(caller));
                     }
@@ -288,8 +292,12 @@ int duplex(int argc, char* argv[]) {
                 }
 
                 for (auto device_string : devices) {
-                    auto caller = create_cuda_caller(stereo_model_path, chunk_size, batch_size,
-                                                     device_string, 0.5f);
+                    // The fraction argument for GPU memory allocates the fraction of the
+                    // _remaining_ memory to the caller. So, we allocate all of the available
+                    // memory after simplex caller has been instantiated to the duplex caller.
+                    // ALWAYS auto tune the duplex batch size (i.e. batch_size passed in is 0.)
+                    auto caller = create_cuda_caller(stereo_model_path, chunk_size, 0,
+                                                     device_string, 1.f);
                     for (size_t i = 0; i < num_runners; i++) {
                         stereo_runners.push_back(std::make_shared<CudaModelRunner>(caller));
                     }
@@ -307,7 +315,6 @@ int duplex(int argc, char* argv[]) {
             auto stereo_basecaller_node = std::make_unique<BasecallerNode>(
                     read_filter_node, std::move(stereo_runners), adjusted_stereo_overlap,
                     kStereoBatchTimeoutMS);
-
             auto simplex_model_stride = runners.front()->model_stride();
 
             StereoDuplexEncoderNode stereo_node =

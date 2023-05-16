@@ -37,22 +37,34 @@ void BasecallerNode::input_worker_thread() {
         }
         // Now that we have acquired a read, wait until we can push to chunks_in
         while (true) {
-            std::unique_lock<std::mutex> chunk_lock(m_chunks_in_mutex);
-            m_chunks_in_has_space_cv.wait_for(chunk_lock, 10ms, [this, &max_chunks_in] {
-                return (m_chunks_in.size() < max_chunks_in);
-            });
+            // Chunk up the read and put the chunks into the pending chunk list.
+            const size_t raw_size =
+                    read->raw_data.sizes()[read->raw_data.sizes().size() - 1];  // Time dimension.
+            const size_t signal_chunk_step = m_chunk_size - m_overlap;
 
-            if (m_chunks_in.size() >= max_chunks_in) {
+            const size_t max_chunks = (raw_size / signal_chunk_step) * 5;
+
+            std::unique_lock<std::mutex> chunk_lock(m_chunks_in_mutex);
+            // A new condition was added to the condition variable which adjusts the predicate
+            // to check for enough free space in the chunk array to fit the next
+            // read (with some additional buffer). Without this buffer, there were some
+            // degernate cases during duplex basecalling wherein the simplex calling was
+            // much faster than duplex calling (e.g. w/ the fast model), leading to several new chunks
+            // being added incrementally which led to many partial reads being in flight. These partial
+            // reads were causing a growth in memory which sometimes led to a creash on some systems.
+            // This change below more effectively puts a ceiling on the max number of chunks by tying the
+            // condition variable predicate to the next read size.
+            m_chunks_in_has_space_cv.wait_for(
+                    chunk_lock, 10ms, [this, &max_chunks_in, &max_chunks] {
+                        return (m_chunks_in.size() + max_chunks < max_chunks_in);
+                    });
+
+            if (m_chunks_in.size() + max_chunks >= max_chunks_in) {
                 continue;
             }
 
-            // Chunk up the read and put the chunks into the pending chunk list.
-            size_t raw_size =
-                    read->raw_data.sizes()[read->raw_data.sizes().size() - 1];  // Time dimension.
-
             size_t offset = 0;
             size_t chunk_in_read_idx = 0;
-            size_t signal_chunk_step = m_chunk_size - m_overlap;
             m_chunks_in.push_back(
                     std::make_shared<Chunk>(read, offset, chunk_in_read_idx++, m_chunk_size));
             read->num_chunks = 1;
@@ -87,6 +99,7 @@ void BasecallerNode::input_worker_thread() {
 
 void BasecallerNode::basecall_current_batch(int worker_id) {
     NVTX3_FUNC_RANGE();
+
     auto model_runner = m_model_runners[worker_id];
     auto decode_results = model_runner->call_chunks(m_batched_chunks[worker_id].size());
 
