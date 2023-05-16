@@ -5,6 +5,7 @@
 #include <torch/csrc/jit/serialization/pickle.h>
 #include <torch/torch.h>
 
+#include <cstddef>
 #include <cstring>
 #include <fstream>
 #include <vector>
