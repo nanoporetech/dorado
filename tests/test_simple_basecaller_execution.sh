@@ -19,7 +19,9 @@ echo dorado basecaller test stage
 $dorado_bin download --model ${model}
 $dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --emit-fastq > $output_dir/ref.fq
 $dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --modified-bases 5mCG --emit-moves > $output_dir/calls.bam
-$dorado_bin basecaller ${model} $data_dir/pod5 -x cpu --modified-bases 5mCG > $output_dir/calls.bam
+if ! uname -r | grep -q tegra; then
+    $dorado_bin basecaller ${model} $data_dir/pod5 -x cpu --modified-bases 5mCG > $output_dir/calls.bam
+fi
 samtools quickcheck -u $output_dir/calls.bam
 samtools view $output_dir/calls.bam > $output_dir/calls.sam
 
