@@ -244,8 +244,8 @@ build_archive:macos:x64:
   variables:
     GIT_STRATEGY: none
   script:
-    - sh ./tests/test_simple_basecaller_execution.sh ./dist/bin/dorado
-    - sh ./tests/test_expected_logging.sh ./dist/bin/dorado
+    - bash ./tests/test_simple_basecaller_execution.sh ./dist/bin/dorado
+    - bash ./tests/test_expected_logging.sh ./dist/bin/dorado
   interruptible: true
 
 .test_dorado_windows: &test_dorado_windows
