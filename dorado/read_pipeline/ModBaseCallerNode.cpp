@@ -138,6 +138,7 @@ void ModBaseCallerNode::init_modbase_info() {
 void ModBaseCallerNode::runner_worker_thread(size_t runner_id) {
     Message message;
     while (m_work_queue.try_pop(message)) {
+        nvtx3::scoped_range range{"runner_worker_thread"};
         // If this message isn't a read, we'll get a bad_variant_access exception.
         auto read = std::get<std::shared_ptr<Read>>(message);
 
@@ -150,10 +151,7 @@ void ModBaseCallerNode::runner_worker_thread(size_t runner_id) {
 
         while (true) {
             std::unique_lock<std::mutex> chunk_lock(m_chunk_queues_mutex);
-            m_chunk_queues_cv.wait_for(chunk_lock, 10ms, chunk_queues_available);
-            if (!chunk_queues_available()) {
-                continue;
-            }
+            m_chunk_queues_cv.wait(chunk_lock, chunk_queues_available);
             chunk_lock.unlock();
 
             // initialize base_mod_probs _before_ we start handing out chunks
@@ -190,6 +188,7 @@ void ModBaseCallerNode::runner_worker_thread(size_t runner_id) {
                 encoder.init(sequence_ints, seq_to_sig_map);
 
                 auto context_hits = caller->get_motif_hits(read->seq);
+                std::deque<std::shared_ptr<RemoraChunk>> reads_to_enqueue;
                 for (auto context_hit : context_hits) {
                     auto slice = encoder.get_context(context_hit);
                     auto input_signal = scaled_signal.index({torch::indexing::Slice(
@@ -200,13 +199,14 @@ void ModBaseCallerNode::runner_worker_thread(size_t runner_id) {
                                                                (int64_t)slice.tail_samples_needed});
                     }
 
-                    chunk_lock.lock();
-                    chunk_queue.push_back(std::make_shared<RemoraChunk>(
+                    reads_to_enqueue.push_back(std::make_shared<RemoraChunk>(
                             read, input_signal, std::move(slice.data), context_hit));
-                    chunk_lock.unlock();
 
                     ++read->num_modbase_chunks;
                 }
+                chunk_lock.lock();
+                chunk_queue.insert(chunk_queue.end(), reads_to_enqueue.begin(), reads_to_enqueue.end());
+                chunk_lock.unlock();
             }
 
             if (read->num_modbase_chunks != 0) {
@@ -253,6 +253,7 @@ void ModBaseCallerNode::caller_worker_thread(size_t caller_id) {
                 int num_remaining_callers = --m_num_active_model_callers;
                 if (num_remaining_callers == 0) {
                     m_terminate_output = true;
+                    m_processed_chunks_cv.notify_one();
                 }
                 return;
             } else {
@@ -279,14 +280,15 @@ void ModBaseCallerNode::caller_worker_thread(size_t caller_id) {
         // significantly.  This matters because slack time in this thread currently
         // gates Remora model GPU throughput on fast systems.
         size_t previous_chunk_count = batched_chunks.size();
-        while (batched_chunks.size() != m_batch_size && !chunk_queue.empty()) {
+        {
             nvtx3::scoped_range range{"push_chunks"};
-            std::shared_ptr<RemoraChunk> chunk = chunk_queue.front();
-            chunk_queue.pop_front();
-            batched_chunks.push_back(chunk);
-            last_chunk_reserve_time = std::chrono::system_clock::now();
+            while (batched_chunks.size() != m_batch_size && !chunk_queue.empty()) {
+                std::shared_ptr<RemoraChunk> chunk = chunk_queue.front();
+                chunk_queue.pop_front();
+                batched_chunks.push_back(chunk);
+                last_chunk_reserve_time = std::chrono::system_clock::now();
+            }
         }
-
         // Relinquish the chunk queue mutex, allowing other chunk queue
         // activity to progress.
         chunks_lock.unlock();
@@ -332,24 +334,17 @@ void ModBaseCallerNode::call_current_batch(size_t caller_id) {
     processed_chunks_lock.unlock();
     m_processed_chunks_cv.notify_one();
 
-    std::unique_lock<std::mutex> chunks_lock(m_chunk_queues_mutex);
     m_batched_chunks[caller_id].clear();
-    chunks_lock.unlock();
 }
 
 void ModBaseCallerNode::output_worker_thread() {
     while (true) {
         // Wait until we are provided with a read
         std::unique_lock processed_chunks_lock(m_processed_chunks_mutex);
-        m_processed_chunks_cv.wait_for(processed_chunks_lock, 100ms,
-                                       [this] { return !m_processed_chunks.empty(); });
-        if (m_processed_chunks.empty()) {
-            if (m_terminate_output) {
-                m_sink.terminate();
-                return;
-            } else {
-                continue;
-            }
+        m_processed_chunks_cv.wait(processed_chunks_lock, [this] { return !m_processed_chunks.empty() || m_terminate_output; });
+        if (m_terminate_output && m_processed_chunks.empty()) {
+            m_sink.terminate();
+            return;
         }
 
         for (const auto& chunk : m_processed_chunks) {
