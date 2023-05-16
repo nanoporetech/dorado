@@ -2,6 +2,7 @@
 
 #include <torch/torch.h>
 
+#include <cstddef>
 #include <filesystem>
 #include <string>
 #include <vector>
@@ -27,5 +28,13 @@ torch::Tensor quantile_counting(const torch::Tensor t, const torch::Tensor q);
 // Converts count float elements pointed to by src to half precision, with
 // the result pointed to by dest.
 void convert_f32_to_f16(c10::Half* dest, const float* src, std::size_t count);
+
+// Copies count elements from src_offset elements into src to
+// dest_elements into dst.  The tensors must be contiguous.
+void copy_tensor_elems(torch::Tensor& dest_tensor,
+                       size_t dest_offset,
+                       const torch::Tensor& src_tensor,
+                       std::size_t src_offset,
+                       std::size_t count);
 
 }  // namespace dorado::utils
