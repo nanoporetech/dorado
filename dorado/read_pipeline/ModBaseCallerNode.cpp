@@ -208,6 +208,7 @@ void ModBaseCallerNode::runner_worker_thread(size_t runner_id) {
                 chunk_queue.insert(chunk_queue.end(), reads_to_enqueue.begin(),
                                    reads_to_enqueue.end());
                 chunk_lock.unlock();
+                m_chunks_added_cv.notify_one();
             }
 
             if (read->num_modbase_chunks != 0) {
@@ -226,6 +227,7 @@ void ModBaseCallerNode::runner_worker_thread(size_t runner_id) {
     int num_remaining_runners = --m_num_active_model_runners;
     if (num_remaining_runners == 0) {
         m_terminate_callers = true;
+        m_chunks_added_cv.notify_all();
     }
 }
 
@@ -240,37 +242,32 @@ void ModBaseCallerNode::caller_worker_thread(size_t caller_id) {
     while (true) {
         nvtx3::scoped_range range{"caller_worker_thread"};
         std::unique_lock<std::mutex> chunks_lock(m_chunk_queues_mutex);
-        if (chunk_queue.empty()) {
-            if (m_terminate_callers) {
-                chunks_lock.unlock();  // Not strictly necessary
-
-                // We dispatch any part-full buffer here to finish basecalling.
-                if (!batched_chunks.empty()) {
-                    call_current_batch(caller_id);
-                }
-
-                // Reduce the count of active model callers.  If this was the last active
-                // model caller also send termination signal to sink
-                int num_remaining_callers = --m_num_active_model_callers;
-                if (num_remaining_callers == 0) {
-                    m_terminate_output = true;
-                    m_processed_chunks_cv.notify_one();
-                }
-                return;
-            } else {
-                // There's no chunks available to call at the moment, sleep and try again
-                chunks_lock.unlock();
-
-                auto current_time = std::chrono::system_clock::now();
-                auto delta = std::chrono::duration_cast<std::chrono::milliseconds>(
-                        current_time - last_chunk_reserve_time);
-                if (delta > FORCE_TIMEOUT && !batched_chunks.empty()) {
-                    call_current_batch(caller_id);
-                } else {
-                    std::this_thread::sleep_for(10ms);
-                }
-                continue;
+        if (!m_chunks_added_cv.wait_until(
+                    chunks_lock, last_chunk_reserve_time + FORCE_TIMEOUT,
+                    [&chunk_queue, this] { return !chunk_queue.empty() || m_terminate_callers; })) {
+            // timeout without new chunks or termination call
+            chunks_lock.unlock();
+            if (!batched_chunks.empty()) {
+                call_current_batch(caller_id);
             }
+            continue;
+        }
+
+        if (chunk_queue.empty() && m_terminate_callers) {
+            // no remaining chunks and we've been told to terminate
+            // call the remaining batch
+            chunks_lock.unlock();  // Not strictly necessary
+            if (!batched_chunks.empty()) {
+                call_current_batch(caller_id);
+            }
+            // Reduce the count of active model callers.  If this was the last active
+            // model caller also send termination signal to sink
+            int num_remaining_callers = --m_num_active_model_callers;
+            if (num_remaining_callers == 0) {
+                m_terminate_output = true;
+                m_processed_chunks_cv.notify_one();
+            }
+            return;
         }
 
         // With the lock held, grab all the chunks we can accommodate in the
