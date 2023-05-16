@@ -1,7 +1,11 @@
 #!/bin/bash
 
 # Test expected log output from the dorado binary execution.
-dorado_bin=$(readlink -f $1)
+
+set -ex
+set -o pipefail
+
+dorado_bin=$(cd "$(dirname $1)"; pwd -P)/$(basename $1)
 test_dir=$(dirname $0)
 data_dir=$test_dir/data
 model=dna_r9.4.1_e8_hac@v3.3
@@ -10,9 +14,6 @@ output_dir=${test_dir}/test_output
 mkdir -p $output_dir
 
 test_output_file=$test_dir/output.log
-
-set -ex
-set -o pipefail
 
 echo dorado basecaller test stage
 $dorado_bin download --model ${model}

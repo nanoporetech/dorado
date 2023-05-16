@@ -1,7 +1,11 @@
 #!/bin/bash
 
 # Test expected log output from the dorado binary execution.
-dorado_bin=$(readlink -f $1)
+
+set -ex
+set -o pipefail
+
+dorado_bin=$(cd "$(dirname $1)"; pwd -P)/$(basename $1)
 test_dir=$(dirname $0)
 data_dir=$test_dir/data
 output_dir=${test_dir}/test_output
