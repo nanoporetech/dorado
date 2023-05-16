@@ -205,7 +205,8 @@ void ModBaseCallerNode::runner_worker_thread(size_t runner_id) {
                     ++read->num_modbase_chunks;
                 }
                 chunk_lock.lock();
-                chunk_queue.insert(chunk_queue.end(), reads_to_enqueue.begin(), reads_to_enqueue.end());
+                chunk_queue.insert(chunk_queue.end(), reads_to_enqueue.begin(),
+                                   reads_to_enqueue.end());
                 chunk_lock.unlock();
             }
 
@@ -341,7 +342,9 @@ void ModBaseCallerNode::output_worker_thread() {
     while (true) {
         // Wait until we are provided with a read
         std::unique_lock processed_chunks_lock(m_processed_chunks_mutex);
-        m_processed_chunks_cv.wait(processed_chunks_lock, [this] { return !m_processed_chunks.empty() || m_terminate_output; });
+        m_processed_chunks_cv.wait(processed_chunks_lock, [this] {
+            return !m_processed_chunks.empty() || m_terminate_output;
+        });
         if (m_terminate_output && m_processed_chunks.empty()) {
             m_sink.terminate();
             return;
