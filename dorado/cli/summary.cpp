@@ -121,6 +121,10 @@ int summary(int argc, char *argv[]) {
         }
 
         auto rg_value = reader.get_tag<std::string>("RG");
+        if (rg_value.length() == 0) {
+            spdlog::error("> Cannot generate sequencing summary for files with no RG tags");
+            return 1;
+        }
         auto rg_split = rg_value.find("_");
         auto run_id = rg_value.substr(0, rg_split);
         auto model = rg_value.substr(rg_split + 1, rg_value.length());
