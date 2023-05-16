@@ -102,3 +102,37 @@ TEST_CASE(CUT_TAG ": convert_f32_to_f16", CUT_TAG) {
         CHECK(torch::allclose(elems_torch_f16, elems_converted_f16, kRelTolerance, kAbsTolerance));
     }
 }
+
+TEST_CASE(CUT_TAG ": copy_tensor_elems", CUT_TAG) {
+    torch::manual_seed(42);
+    srand(42);
+
+    for (auto src_dtype : {torch::kFloat16, torch::kFloat32}) {
+        for (auto dest_dtype : {torch::kFloat16, torch::kFloat32}) {
+            for (int i = 0; i < 10; ++i) {
+                const int src_size = rand() % 1000;
+                const torch::Tensor src_tensor = torch::rand({src_size}, src_dtype);
+                const int dest_size = src_size + rand() % 1000;
+                const torch::Tensor orig_dest_tensor = torch::rand({dest_size}, dest_dtype);
+
+                const int dest_offset = rand() % dest_size;
+                const int src_offset = rand() % src_size;
+                const int max_count = std::min(dest_size - dest_offset, src_size - src_offset);
+                const int count = rand() % max_count;
+
+                using torch::indexing::Slice;
+                auto torch_result = orig_dest_tensor.clone();
+                torch_result.index_put_({Slice(dest_offset, dest_offset + count)},
+                                        src_tensor.index({Slice(src_offset, src_offset + count)}));
+
+                auto copy_elems_result = orig_dest_tensor.clone();
+                dorado::utils::copy_tensor_elems(copy_elems_result, dest_offset, src_tensor,
+                                                 src_offset, count);
+                const float kRelTolerance = 0.0f;
+                const float kAbsTolerance = 0.0f;
+                CHECK(torch::allclose(torch_result, copy_elems_result, kRelTolerance,
+                                      kAbsTolerance));
+            }
+        }
+    }
+}

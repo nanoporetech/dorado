@@ -378,27 +378,35 @@ torch::Tensor RemoraCaller::scale_signal(torch::Tensor signal,
     return scaled_signal;
 }
 
-void RemoraCaller::accept_chunk(int chunk_idx, at::Tensor signal, const std::vector<float>& kmers) {
+void RemoraCaller::accept_chunk(int chunk_idx,
+                                const at::Tensor& signal,
+                                const std::vector<float>& kmers) {
     // As usual, avoid torch indexing because it is glacially slow.
-    assert(m_input_sigs.is_contiguous());
-    assert(m_input_sigs.dtype() == torch::kFloat16);
-    assert(m_input_seqs.is_contiguous());
-    assert(m_input_seqs.dtype() == torch::kFloat16);
-    assert(signal.is_contiguous());
-    assert(signal.dtype() == torch::kFloat16);
+    // GPU base calling uses float16 signals and input tensors, but float32
+    // sequence encodings.
+    // CPU base calling uses float16 signals, float32 input tensors, and
+    // float32 sequence encodings.
     assert(signal.size(0) == m_input_sigs.size(2));
 
     const auto sig_len = signal.size(0);
-    using InputType = c10::Half;
+    dorado::utils::copy_tensor_elems(m_input_sigs, chunk_idx * sig_len, signal, 0, sig_len);
 
-    const InputType* const signal_ptr = signal.data_ptr<InputType>();
-    InputType* const input_sigs_ptr = m_input_sigs.data_ptr<InputType>();
-    std::memcpy(&input_sigs_ptr[chunk_idx * sig_len], signal_ptr, sig_len * sizeof(InputType));
-
-    const auto elem_count = m_input_seqs.size(1) * m_input_seqs.size(2);
-    InputType* const input_seqs_ptr = m_input_seqs.data_ptr<InputType>();
-    dorado::utils::convert_f32_to_f16(&input_seqs_ptr[chunk_idx * elem_count], kmers.data(),
-                                      elem_count);
+    const auto kmer_elem_count = m_input_seqs.size(1) * m_input_seqs.size(2);
+    if (m_input_seqs.dtype() == torch::kFloat16) {
+        // float32 kmer encoding -> float16 kmer encoding input
+        using InputType = c10::Half;
+        InputType* const input_seqs_ptr = m_input_seqs.data_ptr<InputType>();
+        dorado::utils::convert_f32_to_f16(&input_seqs_ptr[chunk_idx * kmer_elem_count],
+                                          kmers.data(), kmer_elem_count);
+    } else if (m_input_seqs.dtype() == torch::kFloat32) {
+        // float32 kmer encoding -> float32 kmer encoding input
+        using InputType = float;
+        InputType* const input_seqs_ptr = m_input_seqs.data_ptr<InputType>();
+        std::memcpy(&input_seqs_ptr[chunk_idx * kmer_elem_count], kmers.data(),
+                    kmer_elem_count * sizeof(InputType));
+    } else {
+        throw std::runtime_error("Unsupported input dtype");
+    }
 }
 
 torch::Tensor RemoraCaller::call_chunks(int num_chunks) {
