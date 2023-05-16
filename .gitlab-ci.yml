@@ -243,8 +243,10 @@ build_archive:macos:x64:
   stage: test
   variables:
     GIT_STRATEGY: none
+    MODEL: dna_r9.4.1_e8_hac@v3.3
+    BATCH: 384
   script:
-    - bash ./tests/test_simple_basecaller_execution.sh ./dist/bin/dorado
+    - bash ./tests/test_simple_basecaller_execution.sh ./dist/bin/dorado ${MODEL} ${BATCH}
     - bash ./tests/test_expected_logging.sh ./dist/bin/dorado
   interruptible: true
 
