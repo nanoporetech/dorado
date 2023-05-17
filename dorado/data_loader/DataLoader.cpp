@@ -721,6 +721,7 @@ void DataLoader::load_fast5_reads_from_file(const std::string& path) {
         new_read->attributes.channel_number = channel_number;
         new_read->attributes.start_time = start_time_str;
         new_read->attributes.fast5_filename = fast5_filename;
+        new_read->is_duplex = false;
 
         if (!m_allowed_read_ids ||
             (m_allowed_read_ids->find(new_read->read_id) != m_allowed_read_ids->end())) {

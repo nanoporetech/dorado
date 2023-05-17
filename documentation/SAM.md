@@ -38,6 +38,7 @@
 | sd:f:	 | scaling dispersion  (pA to ~0-mean/1-sd)                   |
 | sv:Z:	 | scaling version                                            |
 | mv:B:c | sequence to signal move table _(optional)_                 |
+| dx:i:  | bool to signify duplex read _(only in duplex mode)_        |
 
 #### Modified Base Tags
 
