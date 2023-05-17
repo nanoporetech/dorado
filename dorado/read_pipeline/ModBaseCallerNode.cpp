@@ -188,7 +188,8 @@ void ModBaseCallerNode::runner_worker_thread(size_t runner_id) {
                 encoder.init(sequence_ints, seq_to_sig_map);
 
                 auto context_hits = caller->get_motif_hits(read->seq);
-                std::deque<std::shared_ptr<RemoraChunk>> reads_to_enqueue;
+                std::vector<std::shared_ptr<RemoraChunk>> reads_to_enqueue;
+                reads_to_enqueue.reserve(context_hits.size());
                 for (auto context_hit : context_hits) {
                     auto slice = encoder.get_context(context_hit);
                     auto input_signal = scaled_signal.index({torch::indexing::Slice(
@@ -208,14 +209,14 @@ void ModBaseCallerNode::runner_worker_thread(size_t runner_id) {
                 chunk_queue.insert(chunk_queue.end(), reads_to_enqueue.begin(),
                                    reads_to_enqueue.end());
                 chunk_lock.unlock();
-                m_chunks_added_cv.notify_one();
+                reads_to_enqueue.size() > m_batch_size ? m_chunks_added_cv.notify_all()
+                                                       : m_chunks_added_cv.notify_one();
             }
 
             if (read->num_modbase_chunks != 0) {
                 // Put the read in the working list
-                std::unique_lock<std::mutex> working_reads_lock(m_working_reads_mutex);
+                std::scoped_lock<std::mutex> working_reads_lock(m_working_reads_mutex);
                 m_working_reads.push_back(read);
-                working_reads_lock.unlock();
             } else {
                 // No modbases to call, pass directly to next node
                 m_sink.push_message(read);
