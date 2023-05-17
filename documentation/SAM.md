@@ -43,7 +43,7 @@
 
 When modified base output is requested (via the `--modified-bases` CLI argument), the modified base calls will be output directly in the output files via SAM tags.
 The `MM` and `ML` tags are specified in the [SAM format specification documentation](https://samtools.github.io/hts-specs/SAMtags.pdf).
-Breifly, these tags represent the relative positions and probability that particular canonical bases have the specified modified bases.
+Briefly, these tags represent the relative positions and probability that particular canonical bases have the specified modified bases.
 
 These tags in the SAM/BAM/CRAM formats can be parsed by the [`modkit`](https://github.com/nanoporetech/modkit) software for downstream analysis.
-For algined outputs, visualization of these tags is available in popular genome browsers, including IGV and JBrowse.
+For aligned outputs, visualization of these tags is available in popular genome browsers, including IGV and JBrowse.
