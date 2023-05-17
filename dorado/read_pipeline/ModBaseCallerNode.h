@@ -78,6 +78,7 @@ private:
 
     std::mutex m_chunk_queues_mutex;
     std::condition_variable m_chunk_queues_cv;
+    std::condition_variable m_chunks_added_cv;
 
     std::mutex m_processed_chunks_mutex;
     std::condition_variable m_processed_chunks_cv;
