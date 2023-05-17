@@ -46,6 +46,9 @@ TEST_CASE(TEST_GROUP "Encoder", "[.]") {
     const auto stereo_read = stereo_node.stereo_encode(template_read, complement_read);
     REQUIRE(torch::equal(stereo_raw_data, stereo_read->raw_data));
 
+    // Check that the duplex tag is set correctly.
+    REQUIRE(stereo_read->is_duplex);
+
     // Encode with swapped template and complement reads
     const auto swapped_stereo_read = stereo_node.stereo_encode(complement_read, template_read);
     // Check if the encoded signal is NOT equal to the expected stereo_raw_data

@@ -110,6 +110,7 @@ std::shared_ptr<dorado::Read> process_pod5_read(size_t row,
     new_read->start_sample = read_data.start_sample;
     new_read->end_sample = read_data.start_sample + read_data.num_samples;
     new_read->flowcell_id = run_info_data->flow_cell_id;
+    new_read->is_duplex = false;
 
     if (pod5_free_run_info(run_info_data) != POD5_OK) {
         spdlog::error("Failed to free run info");
@@ -720,6 +721,7 @@ void DataLoader::load_fast5_reads_from_file(const std::string& path) {
         new_read->attributes.channel_number = channel_number;
         new_read->attributes.start_time = start_time_str;
         new_read->attributes.fast5_filename = fast5_filename;
+        new_read->is_duplex = false;
 
         if (!m_allowed_read_ids ||
             (m_allowed_read_ids->find(new_read->read_id) != m_allowed_read_ids->end())) {
