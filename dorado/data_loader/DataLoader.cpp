@@ -110,6 +110,7 @@ std::shared_ptr<dorado::Read> process_pod5_read(size_t row,
     new_read->start_sample = read_data.start_sample;
     new_read->end_sample = read_data.start_sample + read_data.num_samples;
     new_read->flowcell_id = run_info_data->flow_cell_id;
+    new_read->is_duplex = false;
 
     if (pod5_free_run_info(run_info_data) != POD5_OK) {
         spdlog::error("Failed to free run info");

@@ -36,6 +36,7 @@ std::shared_ptr<Read> shallow_copy_read(const Read& read) {
     copy->start_sample = read.start_sample;
     copy->end_sample = read.end_sample;
     copy->run_acquisition_start_time_ms = read.run_acquisition_start_time_ms;
+    copy->is_duplex = read.is_duplex;
     return copy;
 }
 

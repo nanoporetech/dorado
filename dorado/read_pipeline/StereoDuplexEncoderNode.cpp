@@ -273,6 +273,7 @@ std::shared_ptr<dorado::Read> StereoDuplexEncoderNode::stereo_encode(
 
     read->read_id = template_read->read_id + ";" + complement_read->read_id;
     read->raw_data = tmp;  // use the encoded signal
+    read->is_duplex = true;
 
     edlibFreeAlignResult(result);
 

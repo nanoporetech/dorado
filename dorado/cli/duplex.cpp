@@ -181,7 +181,7 @@ int duplex(int argc, char* argv[]) {
             bam_writer->write_header();
             converted_reads_sink = aligner.get();
         }
-        ReadToBamType read_converter(*converted_reads_sink, emit_moves, rna, duplex, 2);
+        ReadToBamType read_converter(*converted_reads_sink, emit_moves, rna, 2);
         StatsCounterNode stats_node(read_converter, duplex);
         // The minimum sequence length is set to 5 to avoid issues with duplex node printing very short sequences for mismatched pairs.
         ReadFilterNode read_filter_node(stats_node, min_qscore,

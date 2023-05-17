@@ -83,8 +83,8 @@ void Read::generate_read_tags(bam1_t *aln, bool emit_moves) const {
 
     bam_aux_append(aln, "sv", 'Z', 9, (uint8_t *)"quantile");
 
-    uint32_t is_duplex = 0;
-    bam_aux_append(aln, "dx", 'i', sizeof(is_duplex), (uint8_t *)&is_duplex);
+    uint32_t duplex = 0;
+    bam_aux_append(aln, "dx", 'i', sizeof(duplex), (uint8_t *)&duplex);
 
     if (run_id != "" && model_name != "") {
         std::string rg(run_id + "_" + model_name);
@@ -106,13 +106,11 @@ void Read::generate_read_tags(bam1_t *aln, bool emit_moves) const {
 void Read::generate_duplex_read_tags(bam1_t *aln) const {
     int qs = static_cast<int>(std::round(utils::mean_qscore_from_qstring(qstring)));
     bam_aux_append(aln, "qs", 'i', sizeof(qs), (uint8_t *)&qs);
-    uint32_t is_duplex = 1;
-    bam_aux_append(aln, "dx", 'i', sizeof(is_duplex), (uint8_t *)&is_duplex);
+    uint32_t duplex = 1;
+    bam_aux_append(aln, "dx", 'i', sizeof(duplex), (uint8_t *)&duplex);
 }
 
-std::vector<BamPtr> Read::extract_sam_lines(bool emit_moves,
-                                            bool duplex,
-                                            uint8_t modbase_threshold) const {
+std::vector<BamPtr> Read::extract_sam_lines(bool emit_moves, uint8_t modbase_threshold) const {
     if (read_id.empty()) {
         throw std::runtime_error("Empty read_name string provided");
     }
@@ -143,7 +141,7 @@ std::vector<BamPtr> Read::extract_sam_lines(bool emit_moves,
         bam_set1(aln, read_id.length(), read_id.c_str(), flags, -1, leftmost_pos, map_q, 0, nullptr,
                  -1, next_pos, 0, seq.length(), seq.c_str(), (char *)qscore.data(), 0);
 
-        if (duplex) {
+        if (is_duplex) {
             generate_duplex_read_tags(aln);
         } else {
             generate_read_tags(aln, emit_moves);
