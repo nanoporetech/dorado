@@ -58,11 +58,14 @@ std::pair<float, float> RemoraScaler::rescale(const torch::Tensor samples,
 
     {
         nvtx3::scoped_range loop{"initialize_vectors"};
-
+        assert(samples.is_contiguous());
+        assert(samples.dtype() == torch::kFloat16);
+        using SignalType = c10::Half;
+        SignalType* samples_ptr = samples.data_ptr<SignalType>();
         // get the mid-point of the base
         for (size_t i = 0; i < n; i++) {
             int pos = (seq_to_sig_map[i] + seq_to_sig_map[i + 1]) / 2;
-            optim_dacs[i] = samples[pos].item<float>();
+            optim_dacs[i] = static_cast<float>(samples_ptr[pos]);
             new_levels[i] = levels[i];
         }
     }
