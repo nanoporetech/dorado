@@ -38,6 +38,8 @@ private:
     int m_batch_timeout_ms;
     // model_name
     std::string m_model_name;
+    // max reads
+    size_t m_max_reads;
 
     // Model runners which have not terminated.
     std::atomic<int> m_num_active_model_runners{0};
