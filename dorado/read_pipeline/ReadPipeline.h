@@ -98,13 +98,12 @@ public:
 
     Attributes attributes;
     std::vector<Mapping> mappings;
-    std::vector<BamPtr> extract_sam_lines(bool emit_moves,
-                                          bool duplex,
-                                          uint8_t modbase_threshold = 0) const;
+    std::vector<BamPtr> extract_sam_lines(bool emit_moves, uint8_t modbase_threshold = 0) const;
 
     uint64_t start_sample;
     uint64_t end_sample;
     uint64_t run_acquisition_start_time_ms;
+    bool is_duplex;
 
 private:
     void generate_duplex_read_tags(bam1_t*) const;

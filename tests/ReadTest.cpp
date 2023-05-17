@@ -25,8 +25,9 @@ TEST_CASE(TEST_GROUP ": Test tag generation", TEST_GROUP) {
     test_read.attributes.fast5_filename = "batch_0.fast5";
     test_read.run_id = "xyz";
     test_read.model_name = "test_model";
+    test_read.is_duplex = false;
 
-    auto alignments = test_read.extract_sam_lines(false, false);
+    auto alignments = test_read.extract_sam_lines(false);
     REQUIRE(alignments.size() == 1);
     bam1_t* aln = alignments[0].get();
 
@@ -37,6 +38,7 @@ TEST_CASE(TEST_GROUP ": Test tag generation", TEST_GROUP) {
     CHECK(bam_aux2i(bam_aux_get(aln, "ch")) == 5);
     CHECK(bam_aux2i(bam_aux_get(aln, "rn")) == 18501);
     CHECK(bam_aux2i(bam_aux_get(aln, "rn")) == 18501);
+    CHECK(bam_aux2i(bam_aux_get(aln, "dx")) == 0);
 
     CHECK(bam_aux2f(bam_aux_get(aln, "du")) == Approx(1.033).margin(1e-6));
     CHECK(bam_aux2f(bam_aux_get(aln, "sm")) == 128.3842f);
@@ -46,29 +48,38 @@ TEST_CASE(TEST_GROUP ": Test tag generation", TEST_GROUP) {
     CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "fn")), Equals("batch_0.fast5"));
     CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "sv")), Equals("quantile"));
     CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "RG")), Equals("xyz_test_model"));
+
+    // Update read to be duplex
+    test_read.is_duplex = true;
+
+    alignments = test_read.extract_sam_lines(false);
+    REQUIRE(alignments.size() == 1);
+    aln = alignments[0].get();
+
+    CHECK(bam_aux2i(bam_aux_get(aln, "dx")) == 1);
 }
 
 TEST_CASE(TEST_GROUP ": Test sam record generation", TEST_GROUP) {
     dorado::Read test_read{};
     SECTION("Generating sam record for empty read throws") {
-        REQUIRE_THROWS(test_read.extract_sam_lines(false, false));
+        REQUIRE_THROWS(test_read.extract_sam_lines(false));
     }
     SECTION("Generating sam record for empty seq and qstring throws") {
         test_read.read_id = "test_read";
-        REQUIRE_THROWS(test_read.extract_sam_lines(false, false));
+        REQUIRE_THROWS(test_read.extract_sam_lines(false));
     }
     SECTION("Generating sam record for mismatched seq and qstring throws") {
         test_read.read_id = "test_read";
         test_read.seq = "ACGTACGT";
         test_read.qstring = "!!!!";
-        REQUIRE_THROWS(test_read.extract_sam_lines(false, false));
+        REQUIRE_THROWS(test_read.extract_sam_lines(false));
     }
     SECTION("Generating sam record for read with non-empty mappings throws") {
         test_read.read_id = "test_read";
         test_read.seq = "ACGTACGT";
         test_read.qstring = "!!!!!!!!";
         test_read.mappings.resize(1);
-        REQUIRE_THROWS(test_read.extract_sam_lines(false, false));
+        REQUIRE_THROWS(test_read.extract_sam_lines(false));
     }
     SECTION("Generated sam record for unaligned read is correct") {
         test_read.raw_data = torch::empty(4000);
@@ -85,7 +96,7 @@ TEST_CASE(TEST_GROUP ": Test sam record generation", TEST_GROUP) {
         test_read.attributes.start_time = "2017-04-29T09:10:04Z";
         test_read.attributes.fast5_filename = "batch_0.fast5";
 
-        auto lines = test_read.extract_sam_lines(false, false);
+        auto lines = test_read.extract_sam_lines(false);
         REQUIRE(!lines.empty());
         auto& rec = lines[0];
         CHECK(rec->core.pos == -1);
@@ -147,7 +158,7 @@ TEST_CASE(TEST_GROUP ": Methylation tag generation", TEST_GROUP) {
         // Test generation
         const char* expected_methylation_tag_10_score = "A+a.,0,1;C+m.,1,0;";
         std::vector<int64_t> expected_methylation_tag_10_score_prob{20, 254, 252, 252};
-        auto lines = read.extract_sam_lines(false, false, 10);
+        auto lines = read.extract_sam_lines(false, 10);
         REQUIRE(!lines.empty());
         bam1_t* aln = lines[0].get();
         CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "MM")), Equals(expected_methylation_tag_10_score));
@@ -157,7 +168,7 @@ TEST_CASE(TEST_GROUP ": Methylation tag generation", TEST_GROUP) {
         // Test generation at higher rate excludes the correct mods.
         const char* expected_methylation_tag_50_score = "A+a.,2;C+m.,1,0;";
         std::vector<int64_t> expected_methylation_tag_50_score_prob{254, 252, 252};
-        lines = read.extract_sam_lines(false, false, 50);
+        lines = read.extract_sam_lines(false, 50);
         REQUIRE(!lines.empty());
         aln = lines[0].get();
         CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "MM")), Equals(expected_methylation_tag_50_score));
@@ -167,7 +178,7 @@ TEST_CASE(TEST_GROUP ": Methylation tag generation", TEST_GROUP) {
         // Test generation at max threshold rate excludes everything
         const char* expected_methylation_tag_255_score = "A+a.;C+m.;";
         std::vector<int64_t> expected_methylation_tag_255_score_prob{};
-        lines = read.extract_sam_lines(false, false, 255);
+        lines = read.extract_sam_lines(false, 255);
         REQUIRE(!lines.empty());
         aln = lines[0].get();
         CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "MM")), Equals(expected_methylation_tag_255_score));
@@ -182,7 +193,7 @@ TEST_CASE(TEST_GROUP ": Methylation tag generation", TEST_GROUP) {
 
         read.base_mod_info = std::make_shared<dorado::utils::BaseModInfo>(
                 modbase_alphabet, modbase_long_names_CHEBI, "");
-        auto lines = read.extract_sam_lines(false, false, 50);
+        auto lines = read.extract_sam_lines(false, 50);
         REQUIRE(!lines.empty());
         bam1_t* aln = lines[0].get();
         CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "MM")), Equals(expected_methylation_tag_CHEBI));
@@ -197,7 +208,7 @@ TEST_CASE(TEST_GROUP ": Methylation tag generation", TEST_GROUP) {
         read.base_mod_info = std::make_shared<dorado::utils::BaseModInfo>(
                 modbase_alphabet, modbase_long_names, context);
 
-        auto lines = read.extract_sam_lines(false, false, 10);
+        auto lines = read.extract_sam_lines(false, 10);
         REQUIRE(!lines.empty());
         bam1_t* aln = lines[0].get();
         CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "MM")),
@@ -211,7 +222,7 @@ TEST_CASE(TEST_GROUP ": Methylation tag generation", TEST_GROUP) {
 
         read.base_mod_info = std::make_shared<dorado::utils::BaseModInfo>(
                 modbase_alphabet, modbase_long_names_unknown, "");
-        auto lines = read.extract_sam_lines(false, false, 50);
+        auto lines = read.extract_sam_lines(false, 50);
         REQUIRE(!lines.empty());
         bam1_t* aln = lines[0].get();
         CHECK(bam_aux_get(aln, "MM") == NULL);

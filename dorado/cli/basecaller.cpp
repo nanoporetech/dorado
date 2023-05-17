@@ -224,7 +224,7 @@ void setup(std::vector<std::string> args,
         bam_writer->write_header();
         converted_reads_sink = aligner.get();
     }
-    ReadToBamType read_converter(*converted_reads_sink, emit_moves, rna, duplex,
+    ReadToBamType read_converter(*converted_reads_sink, emit_moves, rna,
                                  thread_allocations.read_converter_threads,
                                  methylation_threshold_pct);
     StatsCounterNode stats_node(read_converter, duplex);
