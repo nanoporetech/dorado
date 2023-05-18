@@ -72,7 +72,7 @@ $ dorado duplex dna_r10.4.1_e8.2_400bps_sup@v4.1.0 pod5s/ > duplex.bam
 ```
 
 Duplex pair detection and read splitting previously used a separate tool, but this is now integrated into Dorado.
-```
+
 
 ## Available basecalling models
 
