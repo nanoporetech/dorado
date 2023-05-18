@@ -52,32 +52,27 @@ Dorado is still in alpha stage and not feature-complete, the following features 
 
 ## Running
 
-To run Dorado, download a model and point it to POD5 files _(Fast5 files are supported but will not be as performant)_.
+To run Dorado basecalling, download a model and point it to POD5 files _(Fast5 files are supported but will not be as performant)_.
 
 ```
 $ dorado download --model dna_r10.4.1_e8.2_400bps_hac@v4.1.0
-$ dorado basecaller dna_r10.4.1_e8.2_400bps_hac@v4.1.0 pod5s/ > calls.sam
+$ dorado basecaller dna_r10.4.1_e8.2_400bps_hac@v4.1.0 pod5s/ > calls.bam
 ```
 
 To call modifications simply add `--modified-bases`.
 
 ```
-$ dorado basecaller dna_r10.4.1_e8.2_400bps_hac@v4.1.0 pod5s/ --modified-bases 5mCG_5hmCG > calls.sam
+$ dorado basecaller dna_r10.4.1_e8.2_400bps_hac@v4.1.0 pod5s/ --modified-bases 5mCG_5hmCG > calls.bam
 ```
 
-For unaligned BAM output, dorado output can be piped to BAM using samtoools:
+To run Duplex basecalling run the command:
 
 ```
-$ dorado basecaller dna_r10.4.1_e8.2_400bps_hac@v4.1.0 pod5s/ | samtools view -Sh > calls.bam
+$ dorado duplex dna_r10.4.1_e8.2_400bps_sup@v4.1.0 pod5s/ > duplex.bam
 ```
 
-Stereo Duplex Calling:
-
+Duplex pair detection and read splitting previously used a separate tool, but this is now integrated into Dorado.
 ```
-$ dorado duplex dna_r10.4.1_e8.2_400bps_sup@v4.1.0 pod5s/ --pairs pairs.txt > duplex.sam
-```
-
-See [duplex-tools](https://github.com/nanoporetech/duplex-tools#usage-with-dorado-recommended) for creating a `pairs.txt`.
 
 ## Available basecalling models
 
