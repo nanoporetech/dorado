@@ -82,7 +82,7 @@ To download all available dorado models run:
 $ dorado download --model all
 ```
 
-The latest simplex models are v4.1.0:
+Simplex models for most customers are V4.1.0 4kHz models:
 
 * dna_r10.4.1_e8.2_260bps_fast@v4.1.0
 * dna_r10.4.1_e8.2_260bps_hac@v4.1.0
@@ -93,21 +93,61 @@ The latest simplex models are v4.1.0:
 
 The following models are also available:
 
-* dna_r10.4.1_e8.2_260bps_fast@v4.0.0
-* dna_r10.4.1_e8.2_260bps_hac@v4.0.0
-* dna_r10.4.1_e8.2_260bps_sup@v4.0.0
-* dna_r10.4.1_e8.2_400bps_fast@v4.0.0
-* dna_r10.4.1_e8.2_400bps_hac@v4.0.0
-* dna_r10.4.1_e8.2_400bps_sup@v4.0.0
+**Simplex models:**
+
+* dna_r9.4.1_e8_fast@v3.4
+* dna_r9.4.1_e8_hac@v3.3
+* dna_r9.4.1_e8_sup@v3.3
+* dna_r9.4.1_e8_sup@v3.6
 * dna_r10.4.1_e8.2_260bps_fast@v3.5.2
 * dna_r10.4.1_e8.2_260bps_hac@v3.5.2
 * dna_r10.4.1_e8.2_260bps_sup@v3.5.2
 * dna_r10.4.1_e8.2_400bps_fast@v3.5.2
 * dna_r10.4.1_e8.2_400bps_hac@v3.5.2
 * dna_r10.4.1_e8.2_400bps_sup@v3.5.2
-* dna_r9.4.1_e8_fast@v3.4
-* dna_r9.4.1_e8_hac@v3.3
-* dna_r9.4.1_e8_sup@v3.3
+* dna_r10.4.1_e8.2_260bps_fast@v4.0.0
+* dna_r10.4.1_e8.2_260bps_hac@v4.0.0
+* dna_r10.4.1_e8.2_260bps_sup@v4.0.0
+* dna_r10.4.1_e8.2_400bps_fast@v4.0.0
+* dna_r10.4.1_e8.2_400bps_hac@v4.0.0
+* dna_r10.4.1_e8.2_400bps_sup@v4.0.0
+* dna_r10.4.1_e8.2_400bps_fast@v4.2.0 (5kHz)
+* dna_r10.4.1_e8.2_400bps_hac@v4.2.0 (5kHz)
+* dna_r10.4.1_e8.2_400bps_sup@v4.2.0 (5kHz)
+
+
+**RNA models:***
+
+* rna003_120bps_sup@v3
+
+**Modified base models***
+
+* dna_r9.4.1_e8_fast@v3.4_5mCG@v0
+* dna_r9.4.1_e8_hac@v3.3_5mCG@v0
+* dna_r9.4.1_e8_sup@v3.3_5mCG@v0
+* dna_r10.4.1_e8.2_260bps_fast@v3.5.2_5mCG@v2
+* dna_r10.4.1_e8.2_260bps_hac@v3.5.2_5mCG@v2
+* dna_r10.4.1_e8.2_260bps_sup@v3.5.2_5mCG@v2
+* dna_r10.4.1_e8.2_400bps_fast@v3.5.2_5mCG@v2
+* dna_r10.4.1_e8.2_400bps_hac@v3.5.2_5mCG@v2
+* dna_r10.4.1_e8.2_400bps_sup@v3.5.2_5mCG@v2
+* dna_r10.4.1_e8.2_260bps_fast@v4.0.0_5mCG_5hmCG@v2
+* dna_r10.4.1_e8.2_260bps_hac@v4.0.0_5mCG_5hmCG@v2
+* dna_r10.4.1_e8.2_260bps_sup@v4.0.0_5mCG_5hmCG@v2
+* dna_r10.4.1_e8.2_400bps_fast@v4.0.0_5mCG_5hmCG@v2
+* dna_r10.4.1_e8.2_400bps_hac@v4.0.0_5mCG_5hmCG@v2
+* dna_r10.4.1_e8.2_400bps_sup@v4.0.0_5mCG_5hmCG@v2
+* dna_r10.4.1_e8.2_260bps_fast@v4.1.0_5mCG_5hmCG@v2
+* dna_r10.4.1_e8.2_260bps_hac@v4.1.0_5mCG_5hmCG@v2
+* dna_r10.4.1_e8.2_260bps_sup@v4.1.0_5mCG_5hmCG@v2
+* dna_r10.4.1_e8.2_400bps_fast@v4.1.0_5mCG_5hmCG@v2
+* dna_r10.4.1_e8.2_400bps_hac@v4.1.0_5mCG_5hmCG@v2
+* dna_r10.4.1_e8.2_400bps_sup@v4.1.0_5mCG_5hmCG@v2
+* dna_r10.4.1_e8.2_400bps_fast@v4.2.0_5mCG_5hmCG@v2 (5kHz)
+* dna_r10.4.1_e8.2_400bps_hac@v4.2.0_5mCG_5hmCG@v2 (5kHz)
+* dna_r10.4.1_e8.2_400bps_sup@v4.2.0_5mCG_5hmCG@v2 (5kHz)
+* dna_r10.4.1_e8.2_400bps_sup@v4.2.0_5mC@v2 (5kHz)
+* dna_r10.4.1_e8.2_400bps_sup@v4.2.0_6mA@v2 (5kHz)
 
 ## Developer quickstart
 
