@@ -38,8 +38,17 @@ void BasecallerNode::input_worker_thread() {
         // Now that we have acquired a read, wait until we can push to chunks_in
         while (true) {
             std::unique_lock<std::mutex> chunk_lock(m_chunks_in_mutex);
+            // A new condition was added to the condition variable which adjusts the predicate
+            // to check for number of working reads. This is to deal with some degenerate cases during
+            // duplex basecalling wherein the due to GPU contention between simplex and duplex stages
+            // reads are not fully called, leading to a build up of working reads. These partial
+            // reads were causing a growth in memory which sometimes led to a crash on some systems.
+            // This change below more effectively puts a ceiling on the host memory usage.
+            // Keeping the condition a function of the current sink size (empmirically at 5k reads this
+            // caps memory around 30GB).
             m_chunks_in_has_space_cv.wait_for(chunk_lock, 10ms, [this, &max_chunks_in] {
-                return (m_chunks_in.size() < max_chunks_in);
+                return (m_chunks_in.size() < max_chunks_in) &&
+                       (m_working_reads.size() < 5 * m_max_reads);
             });
 
             if (m_chunks_in.size() >= max_chunks_in) {
@@ -254,7 +263,8 @@ BasecallerNode::BasecallerNode(MessageSink &sink,
           m_model_stride(m_model_runners.front()->model_stride()),
           m_terminate_basecaller(false),
           m_batch_timeout_ms(batch_timeout_ms),
-          m_model_name(std::move(model_name)) {
+          m_model_name(std::move(model_name)),
+          m_max_reads(max_reads) {
     // Setup worker state
     size_t const num_workers = m_model_runners.size();
     m_batched_chunks.resize(num_workers);

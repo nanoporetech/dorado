@@ -23,16 +23,6 @@ std::shared_ptr<dorado::Read> StereoDuplexEncoderNode::stereo_encode(
 
     std::shared_ptr<dorado::Read> read = std::make_shared<dorado::Read>();  // Return read
 
-    float template_len = template_read->seq.size();
-    float complement_len = complement_read->seq.size();
-
-    // If the sequence lengths are too dissimilar, we exit early
-    float sequence_length_delta =
-            std::max(template_len, complement_len) - std::min(template_len, complement_len);
-    if ((sequence_length_delta / std::max(template_len, complement_len)) > 0.05f) {
-        return read;
-    }
-
     // We align the reverse complement of the complement read to the template read.
     const auto complement_sequence_reverse_complement =
             dorado::utils::reverse_complement(complement_read->seq);

@@ -483,11 +483,12 @@ void DataLoader::load_pod5_reads_from_file_by_read_ids(const std::string& path,
     pod5_init();
 
     // Open the file ready for walking:
-    Pod5FileReader_t* file;
-    if (m_file_handles.find(path) == m_file_handles.end()) {
-        m_file_handles.emplace(path, Pod5Ptr(pod5_open_file(path.c_str())));
-    }
-    file = m_file_handles[path].get();
+    // TODO: The earlier implementation was caching the pod5 readers into a
+    // map and re-using it during each iteration. However, we found a leak
+    // in the pod5 traversal API which persists unless the reader is opened
+    // and closed everytime. So the caching logic was reverted until the
+    // leak is fixed in pod5 API.
+    Pod5FileReader_t* file = pod5_open_file(path.c_str());
 
     if (!file) {
         spdlog::error("Failed to open file {}: {}", path, pod5_get_error_string());
@@ -567,6 +568,9 @@ void DataLoader::load_pod5_reads_from_file_by_read_ids(const std::string& path,
         }
 
         row_offset += traversal_batch_counts[batch_index];
+    }
+    if (pod5_close_and_free_reader(file) != POD5_OK) {
+        spdlog::error("Failed to close and free POD5 reader");
     }
 }
 

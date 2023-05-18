@@ -106,6 +106,13 @@ int duplex(int argc, char* argv[]) {
 
     parser.add_argument("-I").help("minimap2 index batch size.").default_value(std::string("16G"));
 
+    parser.add_argument("--guard-gpus")
+            .default_value(false)
+            .implicit_value(true)
+            .help("In case of GPU OOM, use this option to be more defensive with GPU memory. May "
+                  "cause "
+                  "performance regression.");
+
     try {
         auto remaining_args = parser.parse_known_args(argc, argv);
         auto internal_parser = utils::parse_internal_options(remaining_args);
@@ -117,6 +124,7 @@ int duplex(int argc, char* argv[]) {
         auto threads = static_cast<size_t>(parser.get<int>("--threads"));
         auto min_qscore(parser.get<int>("--min-qscore"));
         auto ref = parser.get<std::string>("--reference");
+        bool guard_gpus = parser.get<bool>("--guard-gpus");
         std::vector<std::string> args(argv, argv + argc);
         if (parser.get<bool>("--verbose")) {
             spdlog::set_level(spdlog::level::debug);
@@ -155,15 +163,15 @@ int duplex(int argc, char* argv[]) {
             output_mode = HtsWriter::OutputMode::UBAM;
         }
 
+        bool recursive_file_loading = parser.get<bool>("--recursive");
+
+        size_t num_reads = DataLoader::get_num_reads(reads, read_list, recursive_file_loading);
+
         std::unique_ptr<sam_hdr_t, void (*)(sam_hdr_t*)> hdr(sam_hdr_init(), sam_hdr_destroy);
         utils::add_pg_hdr(hdr.get(), args);
         std::shared_ptr<HtsWriter> bam_writer;
         std::shared_ptr<utils::Aligner> aligner;
         MessageSink* converted_reads_sink = nullptr;
-
-        bool recursive_file_loading = parser.get<bool>("--recursive");
-
-        size_t num_reads = DataLoader::get_num_reads(reads, read_list, recursive_file_loading);
 
         if (ref.empty()) {
             bam_writer = std::make_shared<HtsWriter>("-", output_mode, 4, num_reads);
@@ -270,14 +278,18 @@ int duplex(int argc, char* argv[]) {
             }
 #else   // ifdef __APPLE__
             else {
+                // Note: The memory assignment between simplex and duplex callers have been
+                // performed based on empirical results considering a SUP model for simplex
+                // calling.
                 auto devices = utils::parse_cuda_device_string(device);
                 num_devices = devices.size();
                 if (num_devices == 0) {
                     throw std::runtime_error("CUDA device requested but no devices found.");
                 }
                 for (auto device_string : devices) {
+                    // Use most of GPU mem but leave some for buffer.
                     auto caller = create_cuda_caller(model_path, chunk_size, batch_size,
-                                                     device_string, 1.0f);  // Use half the GPU mem
+                                                     device_string, 0.9f, guard_gpus);
                     for (size_t i = 0; i < num_runners; i++) {
                         runners.push_back(std::make_shared<CudaModelRunner>(caller));
                     }
@@ -288,8 +300,12 @@ int duplex(int argc, char* argv[]) {
                 }
 
                 for (auto device_string : devices) {
-                    auto caller = create_cuda_caller(stereo_model_path, chunk_size, batch_size,
-                                                     device_string, 0.5f);
+                    // The fraction argument for GPU memory allocates the fraction of the
+                    // _remaining_ memory to the caller. So, we allocate all of the available
+                    // memory after simplex caller has been instantiated to the duplex caller.
+                    // ALWAYS auto tune the duplex batch size (i.e. batch_size passed in is 0.)
+                    auto caller = create_cuda_caller(stereo_model_path, chunk_size, 0,
+                                                     device_string, 1.f, guard_gpus);
                     for (size_t i = 0; i < num_runners; i++) {
                         stereo_runners.push_back(std::make_shared<CudaModelRunner>(caller));
                     }
@@ -307,7 +323,6 @@ int duplex(int argc, char* argv[]) {
             auto stereo_basecaller_node = std::make_unique<BasecallerNode>(
                     read_filter_node, std::move(stereo_runners), adjusted_stereo_overlap,
                     kStereoBatchTimeoutMS);
-
             auto simplex_model_stride = runners.front()->model_stride();
 
             StereoDuplexEncoderNode stereo_node =

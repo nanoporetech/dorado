@@ -3,7 +3,7 @@ namespace {
 bool is_within_time_and_length_criteria(const std::shared_ptr<dorado::Read>& read1,
                                         const std::shared_ptr<dorado::Read>& read2) {
     int max_time_delta_ms = 5000;
-    float min_seq_len_ratio = 0.9f;
+    float min_seq_len_ratio = 0.95f;
     int delta = read2->start_time_ms - read1->get_end_time_ms();
     int seq_len1 = read1->seq.length();
     int seq_len2 = read2->seq.length();
