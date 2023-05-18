@@ -116,7 +116,7 @@ The following models are also available:
 * dna_r10.4.1_e8.2_400bps_sup@v4.2.0 (5kHz)
 
 
-**RNA models:***
+**RNA models:**
 
 * rna003_120bps_sup@v3
 
