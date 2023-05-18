@@ -72,7 +72,7 @@ This command will output both simplex and duplex reads. Duplex reads will have t
 
 Dorado duplex previously required a separate tool to perform duplex pair detection and read splitting, but this is now integrated into Dorado.
 
-## Alignment
+### Alignment
 
 Dorado supports aligning existing basecalls or producing aligned output directly.
 
