@@ -72,6 +72,24 @@ This command will output both simplex and duplex reads. Duplex reads will have t
 
 Dorado duplex previously required a separate tool to perform duplex pair detection and read splitting, but this is now integrated into Dorado.
 
+## Alignment
+
+Dorado supports aligning existing basecalls or producing aligned output directly.
+
+To align existing basecalls run:
+
+```
+dorado aligner <index> <reads> 
+```
+where index is a reference to aign to in (fastq/fasta/mmi) format and reads is  a file in any HTS format.
+
+to basecall with alignment with duplex or simplex run with the `--reference` option:
+
+```
+dorado basecaller <model> <reads> --reference <index>
+```
+
+Alignment uses [minimap2](https://github.com/lh3/minimap2) and by default uses the `map-ont` preset. This can be overridden with the `-k` and `-w` options to set kmer and window size respectively.
 
 ## Available basecalling models
 
