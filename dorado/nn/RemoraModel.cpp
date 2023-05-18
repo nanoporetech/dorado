@@ -347,6 +347,7 @@ RemoraCaller::RemoraCaller(const std::filesystem::path& model_path,
 }
 
 std::vector<size_t> RemoraCaller::get_motif_hits(const std::string& seq) const {
+    NVTX3_FUNC_RANGE();
     std::vector<size_t> context_hits;
     const auto& motif = m_params.motif;
     const auto motif_offset = m_params.motif_offset;
@@ -365,6 +366,7 @@ std::vector<size_t> RemoraCaller::get_motif_hits(const std::string& seq) const {
 torch::Tensor RemoraCaller::scale_signal(torch::Tensor signal,
                                          const std::vector<int>& seq_ints,
                                          const std::vector<uint64_t>& seq_to_sig_map) const {
+    NVTX3_FUNC_RANGE();
     if (!m_scaler) {
         return signal;
     }

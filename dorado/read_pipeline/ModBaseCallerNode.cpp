@@ -154,15 +154,18 @@ void ModBaseCallerNode::runner_worker_thread(size_t runner_id) {
             m_chunk_queues_cv.wait(chunk_lock, chunk_queues_available);
             chunk_lock.unlock();
 
-            // initialize base_mod_probs _before_ we start handing out chunks
-            read->base_mod_probs.resize(read->seq.size() * m_num_states, 0);
-            for (size_t i = 0; i < read->seq.size(); ++i) {
-                // Initialize for what corresponds to 100% canonical base for each position.
-                int base_id = RemoraUtils::BASE_IDS[read->seq[i]];
-                if (base_id < 0) {
-                    throw std::runtime_error("Invalid character in sequence.");
+            {
+                nvtx3::scoped_range range{"base_mod_probs_init"};
+                // initialize base_mod_probs _before_ we start handing out chunks
+                read->base_mod_probs.resize(read->seq.size() * m_num_states, 0);
+                for (size_t i = 0; i < read->seq.size(); ++i) {
+                    // Initialize for what corresponds to 100% canonical base for each position.
+                    int base_id = RemoraUtils::BASE_IDS[read->seq[i]];
+                    if (base_id < 0) {
+                        throw std::runtime_error("Invalid character in sequence.");
+                    }
+                    read->base_mod_probs[i * m_num_states + m_base_prob_offsets[base_id]] = 1.0f;
                 }
-                read->base_mod_probs[i * m_num_states + m_base_prob_offsets[base_id]] = 1.0f;
             }
             read->base_mod_info = m_base_mod_info;
 
@@ -173,6 +176,7 @@ void ModBaseCallerNode::runner_worker_thread(size_t runner_id) {
             read->num_modbase_chunks = 0;
             read->num_modbase_chunks_called = 0;
             for (size_t caller_id = 0; caller_id < m_callers.size() / m_num_devices; ++caller_id) {
+                nvtx3::scoped_range range{"generate_chunks"};
                 const auto& caller = m_callers[caller_id];
                 auto& chunk_queue = m_chunk_queues[caller_id];
 

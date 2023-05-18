@@ -3,6 +3,8 @@
 #include "remora_utils.h"
 #include "utils/math_utils.h"
 
+#include <nvtx3/nvtx3.hpp>
+
 #include <algorithm>
 #include <iterator>
 
@@ -44,6 +46,7 @@ std::pair<float, float> RemoraScaler::rescale(const torch::Tensor samples,
                                               const std::vector<float>& levels,
                                               size_t clip_bases,
                                               size_t max_bases) const {
+    NVTX3_FUNC_RANGE();
     if (m_kmer_levels.empty()) {
         return {0.f, 1.f};
     }
@@ -53,11 +56,18 @@ std::pair<float, float> RemoraScaler::rescale(const torch::Tensor samples,
     std::vector<float> optim_dacs(n, 0.f);
     std::vector<float> new_levels(n, 0.f);
 
-    // get the mid-point of the base
-    for (size_t i = 0; i < n; i++) {
-        int pos = (seq_to_sig_map[i] + seq_to_sig_map[i + 1]) / 2;
-        optim_dacs[i] = samples[pos].item<float>();
-        new_levels[i] = levels[i];
+    {
+        nvtx3::scoped_range loop{"initialize_vectors"};
+        assert(samples.is_contiguous());
+        assert(samples.dtype() == torch::kFloat16);
+        using SignalType = c10::Half;
+        SignalType* samples_ptr = samples.data_ptr<SignalType>();
+        // get the mid-point of the base
+        for (size_t i = 0; i < n; i++) {
+            int pos = (seq_to_sig_map[i] + seq_to_sig_map[i + 1]) / 2;
+            optim_dacs[i] = static_cast<float>(samples_ptr[pos]);
+            new_levels[i] = levels[i];
+        }
     }
 
     if (clip_bases > 0 && levels.size() > clip_bases * 2) {

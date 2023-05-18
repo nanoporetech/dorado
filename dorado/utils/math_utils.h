@@ -1,5 +1,7 @@
 #pragma once
 
+#include <nvtx3/nvtx3.hpp>
+
 #include <algorithm>
 #include <cassert>
 #include <cmath>
@@ -18,6 +20,7 @@ inline int pad_to(const int a, const int b) { return ((a + b - 1) / b) * b; }
 // Adapted from https://stackoverflow.com/questions/11964552/finding-quartiles
 template <typename T, typename = typename std::enable_if<std::is_floating_point<T>::value, T>::type>
 inline std::vector<T> quantiles(const std::vector<T>& in_data, const std::vector<T>& quants) {
+    NVTX3_FUNC_RANGE();
     if (in_data.empty()) {
         return {};
     }
@@ -53,6 +56,7 @@ inline std::vector<T> quantiles(const std::vector<T>& in_data, const std::vector
 // Adapted from https://stackoverflow.com/questions/5083465/fast-efficient-least-squares-fit-algorithm-in-c
 template <typename T, typename = typename std::enable_if<std::is_floating_point<T>::value, T>::type>
 std::tuple<T, T, T> linear_regression(const std::vector<T>& x, const std::vector<T>& y) {
+    NVTX3_FUNC_RANGE();
     assert(x.size() == y.size());
     auto sum_square = [](auto s2, auto q) { return s2 + q * q; };
 
