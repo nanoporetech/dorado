@@ -6,8 +6,9 @@ Dorado is a high-performance, easy-to-use, open source basecaller for Oxford Nan
 
 * One executable with sensible defaults, automatic hardware detection and configuration.
 * Runs on Apple silicon (M1/2 family) and Nvidia GPUs including multi-GPU with linear scaling.
-* Modified basecalling (Remora models).
+* Modified basecalling.
 * Duplex basecalling.
+* Support for aligned read output in SAM/BAM.
 * [POD5](https://github.com/nanoporetech/pod5-file-format) support for highest basecalling performance.
 * Based on libtorch, the C++ API for pytorch.
 * Multiple custom optimisations in CUDA and Metal for maximising inference performance.
@@ -23,13 +24,15 @@ If you encounter any problems building or running Dorado please [report an issue
 
 ## Platforms
 
-Dorado has been tested on the following systems:
+Dorado is heavily-optimised for Nvidia A100 and H100 GPUs and will deliver maximal performance on systems with these GPUs.
+
+Dorado has been tested extensively and supported on the following systems:
 
 | Platform | GPU/CPU                      |
-| -------- | ---------------------------- |
-| Windows  | (G)V100, A100                |
+| -------- |------------------------------|
+| Windows  | (G)V100, A100, H100          |
 | Apple    | M1, M1 Pro, M1 Max, M1 Ultra |
-| Linux    | (G)V100, A100                |
+| Linux    | (G)V100, A100, H100          |
 
 Systems not listed above but which have Nvidia GPUs with >=8GB VRAM and architecture from Volta onwards have not been widely tested but are expected to work. If you encounter problems with running on your system please [report an issue](https://github.com/nanoporetech/dorado/issues)
 
