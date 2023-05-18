@@ -81,7 +81,7 @@ To align existing basecalls run:
 ```
 dorado aligner <index> <reads> 
 ```
-where index is a reference to aign to in (fastq/fasta/mmi) format and reads is  a file in any HTS format.
+where `index` is a reference to align to in (fastq/fasta/mmi) format and `reads` is a file in any HTS format.
 
 to basecall with alignment with duplex or simplex run with the `--reference` option:
 
