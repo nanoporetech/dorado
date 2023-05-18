@@ -82,7 +82,7 @@ To download all available dorado models run:
 $ dorado download --model all
 ```
 
-Simplex models for most customers are V4.1.0 4kHz models:
+Simplex models for our latesat released condition are V4.1.0 (4kHz)
 
 * dna_r10.4.1_e8.2_260bps_fast@v4.1.0
 * dna_r10.4.1_e8.2_260bps_hac@v4.1.0
