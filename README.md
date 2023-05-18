@@ -52,6 +52,8 @@ Dorado is still in alpha stage and not feature-complete, the following features 
 
 ## Running
 
+### Simplex basecalling
+
 To run Dorado basecalling, download a model and point it to POD5 files _(Fast5 files are supported but will not be as performant)_.
 
 ```
@@ -59,19 +61,24 @@ $ dorado download --model dna_r10.4.1_e8.2_400bps_hac@v4.1.0
 $ dorado basecaller dna_r10.4.1_e8.2_400bps_hac@v4.1.0 pod5s/ > calls.bam
 ```
 
-To call modifications simply add `--modified-bases`.
+### Modified basecalling
+
+To call modifications simply add `--modified-bases` to the basecaller command
 
 ```
 $ dorado basecaller dna_r10.4.1_e8.2_400bps_hac@v4.1.0 pod5s/ --modified-bases 5mCG_5hmCG > calls.bam
 ```
 
+### Duplex
 To run Duplex basecalling run the command:
 
 ```
 $ dorado duplex dna_r10.4.1_e8.2_400bps_sup@v4.1.0 pod5s/ > duplex.bam
 ```
 
-Duplex pair detection and read splitting previously used a separate tool, but this is now integrated into Dorado.
+This command will output both simplex and duplex reads. Duplex reads will have the `dx` tag set to `1` in the output BAM, simplex reads will have the `dx` tag set to `0`.
+
+Dorado duplex previously required a separate tool to perform duplex pair detection and read splitting, but this is now integrated into Dorado.
 
 
 ## Available basecalling models
@@ -198,6 +205,7 @@ $ pre-commit install
 ```
 
 ### Licence and Copyright
+
 (c) 2022 Oxford Nanopore Technologies PLC.
 
 Dorado is distributed under the terms of the Oxford Nanopore
