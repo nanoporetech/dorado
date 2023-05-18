@@ -36,14 +36,6 @@ Dorado has been tested extensively and supported on the following systems:
 
 Systems not listed above but which have Nvidia GPUs with >=8GB VRAM and architecture from Volta onwards have not been widely tested but are expected to work. If you encounter problems with running on your system please [report an issue](https://github.com/nanoporetech/dorado/issues)
 
-## Roadmap
-
-Dorado is still in alpha stage and not feature-complete, the following features form the core of our roadmap:
-
-1. DNA Barcode multiplexing
-2. Alignment *(output aligned BAMs)*.
-3. Python API
-
 ## Performance tips
 
 1. For optimal performance Dorado requires POD5 file input. Please [convert your Fast5 files](https://github.com/nanoporetech/pod5-file-format) before basecalling.
