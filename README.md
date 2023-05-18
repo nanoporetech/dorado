@@ -82,7 +82,8 @@ To download all available dorado models run:
 $ dorado download --model all
 ```
 
-Simplex models for our latesat released condition are V4.1.0 (4kHz)
+**Simplex models:**
+v4.1.0 models are recommended for our latest released condition (4kHz).
 
 * dna_r10.4.1_e8.2_260bps_fast@v4.1.0
 * dna_r10.4.1_e8.2_260bps_hac@v4.1.0
@@ -91,9 +92,7 @@ Simplex models for our latesat released condition are V4.1.0 (4kHz)
 * dna_r10.4.1_e8.2_400bps_hac@v4.1.0
 * dna_r10.4.1_e8.2_400bps_sup@v4.1.0
 
-The following models are also available:
-
-**Simplex models:**
+The following simplex models are also available:
 
 * dna_r9.4.1_e8_fast@v3.4
 * dna_r9.4.1_e8_hac@v3.3
@@ -114,7 +113,6 @@ The following models are also available:
 * dna_r10.4.1_e8.2_400bps_fast@v4.2.0 (5kHz)
 * dna_r10.4.1_e8.2_400bps_hac@v4.2.0 (5kHz)
 * dna_r10.4.1_e8.2_400bps_sup@v4.2.0 (5kHz)
-
 
 **RNA models:**
 
