@@ -4,7 +4,7 @@ All notable changes to Dorado will be documented in this file.
 
 # [0.3.0] (18 May 2023)
 
-This is a major release of Dorado which introuduces: Duplex pairing and splitting for directly going from POD5 to duplex reads, major performance improvements to simplex and duplex basecalling on A100 GPUs via int8 model quantization and the output of aligned BAM from Doradoa and support for producing summary tsv files from BAM.
+This is a major release of Dorado which introuduces: Duplex pairing and splitting for directly going from POD5 to duplex reads, major performance improvements to simplex and duplex basecalling on A100 GPUs via int8 model quantization and the output of aligned BAM from Dorado and support for producing summary tsv files from BAM.
 
  * ddb7c1e20b8df5935764cf1d014d3f2202eb29a4 - Improvements to modified basecalling performance
  * f879af586dd122a5e9f071fa28970e1531ba1530 - Add support for CPU basecalling of modified bases
