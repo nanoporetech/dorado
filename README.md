@@ -79,14 +79,14 @@ Dorado supports aligning existing basecalls or producing aligned output directly
 To align existing basecalls run:
 
 ```
-dorado aligner <index> <reads> 
+$ dorado aligner <index> <reads> 
 ```
 where `index` is a reference to align to in (fastq/fasta/mmi) format and `reads` is a file in any HTS format.
 
 to basecall with alignment with duplex or simplex run with the `--reference` option:
 
 ```
-dorado basecaller <model> <reads> --reference <index>
+$ dorado basecaller <model> <reads> --reference <index>
 ```
 
 Alignment uses [minimap2](https://github.com/lh3/minimap2) and by default uses the `map-ont` preset. This can be overridden with the `-k` and `-w` options to set kmer and window size respectively.
@@ -100,6 +100,7 @@ $ dorado download --model all
 ```
 
 **Simplex models:**
+
 v4.1.0 models are recommended for our latest released condition (4kHz).
 
 * dna_r10.4.1_e8.2_260bps_fast@v4.1.0
