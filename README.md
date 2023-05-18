@@ -214,7 +214,7 @@ $ pip install pre-commit
 $ pre-commit install
 ```
 
-### Licence and Copyright
+## Licence and Copyright
 
 (c) 2022 Oxford Nanopore Technologies PLC.
 
