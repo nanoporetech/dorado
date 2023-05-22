@@ -216,7 +216,9 @@ public:
     void cuda_thread_fn(size_t model_id) {
         NVTX3_FUNC_RANGE();
         auto& caller_data = m_caller_data[model_id];
+#if DORADO_GPU_BUILD && !defined(__APPLE__)
         const bool has_stream = caller_data->stream.has_value();
+#endif
         while (true) {
             torch::InferenceMode guard;
 #if DORADO_GPU_BUILD && !defined(__APPLE__)
