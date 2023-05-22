@@ -54,7 +54,11 @@ Aligner::Aligner(MessageSink& sink,
 
     m_index_reader = mm_idx_reader_open(filename.c_str(), &m_idx_opt, 0);
     m_index = mm_idx_reader_read(m_index_reader, m_threads);
-    if (mm_idx_reader_read(m_index_reader, m_threads) != nullptr) {
+    auto* split_index = mm_idx_reader_read(m_index_reader, m_threads);
+    if (split_index != nullptr) {
+        mm_idx_destroy(m_index);
+        mm_idx_destroy(split_index);
+        mm_idx_reader_close(m_index_reader);
         throw std::runtime_error(
                 "Dorado doesn't support split index for alignment. Please re-run with larger index "
                 "size.");
