@@ -171,8 +171,8 @@ public:
             }
 
             m_caller_data.push_back(std::move(caller_data));
-            m_cuda_threads.push_back(
-                    std::make_unique<std::thread>(&ModBaseCaller::cuda_thread_fn, this, model_id));
+            m_task_threads.push_back(std::make_unique<std::thread>(
+                    &ModBaseCaller::modbase_task_thread_fn, this, model_id));
         }
     }
 
@@ -182,8 +182,8 @@ public:
             caller_data->input_cv.notify_one();
         }
 
-        for (auto& cuda_thread : m_cuda_threads) {
-            cuda_thread->join();
+        for (auto& task_thread : m_task_threads) {
+            task_thread->join();
         }
     }
 
@@ -213,7 +213,7 @@ public:
         return task.out;
     }
 
-    void cuda_thread_fn(size_t model_id) {
+    void modbase_task_thread_fn(size_t model_id) {
         NVTX3_FUNC_RANGE();
         auto& caller_data = m_caller_data[model_id];
 #if DORADO_GPU_BUILD && !defined(__APPLE__)
@@ -256,7 +256,7 @@ public:
     torch::TensorOptions m_options;
     std::atomic<bool> m_terminate{false};
     std::vector<std::unique_ptr<ModBaseData>> m_caller_data;
-    std::vector<std::unique_ptr<std::thread>> m_cuda_threads;
+    std::vector<std::unique_ptr<std::thread>> m_task_threads;
 };
 
 std::shared_ptr<ModBaseCaller> create_modbase_caller(
