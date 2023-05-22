@@ -162,8 +162,11 @@ public:
             auto input_seqs = torch::empty({batch_size, RemoraUtils::NUM_BASES * kmer_len, sig_len},
                                            m_options);
             caller_data->module_holder->forward(input_sigs, input_seqs);
-            torch::cuda::synchronize(m_options.device().index());
-
+#if DORADO_GPU_BUILD && !defined(__APPLE__)
+            if (m_options.device().is_cuda()) {
+                torch::cuda::synchronize(m_options.device().index());
+            }
+#endif
             if (caller_data->params.refine_do_rough_rescale) {
                 caller_data->scaler = std::make_unique<RemoraScaler>(
                         caller_data->params.refine_kmer_levels, caller_data->params.refine_kmer_len,
