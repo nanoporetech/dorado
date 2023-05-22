@@ -12,8 +12,8 @@
 #include "utils/cuda_utils.h"
 #endif
 #endif  // DORADO_GPU_BUILD
+#include "nn/ModBaseRunner.h"
 #include "nn/ModelRunner.h"
-#include "nn/RemoraModel.h"
 #include "read_pipeline/BasecallerNode.h"
 #include "read_pipeline/ModBaseCallerNode.h"
 #include "read_pipeline/ReadFilterNode.h"
@@ -154,29 +154,19 @@ void setup(std::vector<std::string> args,
     }
 
     // generate model callers before nodes or it affects the speed calculations
-    std::vector<std::shared_ptr<RemoraCaller>> remora_callers;
-
+    std::vector<std::shared_ptr<ModBaseRunner>> remora_runners;
+    std::vector<std::string> modbase_devices;
 #if DORADO_GPU_BUILD && !defined(__APPLE__)
     if (device != "cpu") {
-        auto devices = utils::parse_cuda_device_string(device);
-        num_devices = devices.size();
-
-        for (auto device_string : devices) {
-            for (const auto& remora_model : remora_model_list) {
-                auto caller = std::make_shared<RemoraCaller>(remora_model, device_string,
-                                                             remora_batch_size, model_stride);
-                remora_callers.push_back(caller);
-            }
-        }
-    } else
-#endif
-    {
-        for (const auto& remora_model : remora_model_list) {
-            auto caller = std::make_shared<RemoraCaller>(remora_model, device, remora_batch_size,
-                                                         model_stride);
-            remora_callers.push_back(caller);
-        }
+        modbase_devices = utils::parse_cuda_device_string(device);
     }
+#endif
+    for (auto device_string : modbase_devices) {
+        auto caller = create_modbase_caller(remora_model_list, remora_batch_size, device_string);
+        for (size_t i = 0; i < default_parameters.remora_runners_per_caller; i++) {
+            remora_runners.push_back(std::make_shared<ModBaseRunner>(caller));
+        }
+    };
 
     std::string model_name = std::filesystem::canonical(model_path).filename().string();
     auto read_groups = DataLoader::load_read_groups(data_path, model_name, recursive_file_loading);
@@ -235,8 +225,8 @@ void setup(std::vector<std::string> args,
     MessageSink* basecaller_node_sink = static_cast<MessageSink*>(&read_filter_node);
     if (!remora_model_list.empty()) {
         mod_base_caller_node = std::make_unique<ModBaseCallerNode>(
-                read_filter_node, std::move(remora_callers), thread_allocations.remora_threads,
-                num_devices, model_stride, remora_batch_size);
+                read_filter_node, std::move(remora_runners),
+                thread_allocations.remora_threads * num_devices, model_stride, remora_batch_size);
         basecaller_node_sink = static_cast<MessageSink*>(mod_base_caller_node.get());
     }
     const int kBatchTimeoutMS = 100;

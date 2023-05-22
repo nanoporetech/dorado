@@ -84,6 +84,8 @@ set(LIB_SOURCE_FILES
     dorado/nn/ModelRunner.h
     dorado/nn/RemoraModel.cpp
     dorado/nn/RemoraModel.h
+    dorado/nn/ModBaseRunner.cpp
+    dorado/nn/ModBaseRunner.h
     dorado/read_pipeline/FakeDataLoader.cpp
     dorado/read_pipeline/FakeDataLoader.h
     dorado/read_pipeline/ReadPipeline.cpp
