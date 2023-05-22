@@ -136,7 +136,7 @@ void ModBaseCallerNode::init_modbase_info() {
 void ModBaseCallerNode::input_worker_thread() {
     Message message;
     while (m_work_queue.try_pop(message)) {
-        nvtx3::scoped_range range{"runner_worker_thread"};
+        nvtx3::scoped_range range{"modbase_input_worker_thread"};
         // If this message isn't a read, we'll get a bad_variant_access exception.
         auto read = std::get<std::shared_ptr<Read>>(message);
 
@@ -342,6 +342,7 @@ void ModBaseCallerNode::call_current_batch(
 
 void ModBaseCallerNode::output_worker_thread() {
     while (true) {
+        nvtx3::scoped_range range{"modbase_output_worker_thread"};
         // Wait until we are provided with a read
         std::unique_lock processed_chunks_lock(m_processed_chunks_mutex);
         m_processed_chunks_cv.wait(processed_chunks_lock, [this] {
