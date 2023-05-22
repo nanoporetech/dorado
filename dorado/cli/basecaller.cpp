@@ -159,8 +159,11 @@ void setup(std::vector<std::string> args,
 #if DORADO_GPU_BUILD && !defined(__APPLE__)
     if (device != "cpu") {
         modbase_devices = utils::parse_cuda_device_string(device);
-    }
+    } else
 #endif
+    {
+        modbase_devices.push_back(device);
+    }
     for (auto device_string : modbase_devices) {
         auto caller = create_modbase_caller(remora_model_list, remora_batch_size, device_string);
         for (size_t i = 0; i < default_parameters.remora_runners_per_caller; i++) {
