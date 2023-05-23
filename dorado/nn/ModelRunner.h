@@ -36,7 +36,6 @@ public:
     size_t batch_size() const final { return m_input.size(0); }
 
 private:
-    std::string m_device;
     torch::Tensor m_input;
     torch::TensorOptions m_options;
     std::unique_ptr<T> m_decoder;
