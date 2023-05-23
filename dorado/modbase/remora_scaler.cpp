@@ -26,7 +26,7 @@ size_t RemoraScaler::index_from_int_kmer(const int* int_kmer_start, size_t kmer_
     return index;
 }
 
-torch::Tensor RemoraScaler::scale_signal(torch::Tensor signal,
+torch::Tensor RemoraScaler::scale_signal(const torch::Tensor& signal,
                                          const std::vector<int>& seq_ints,
                                          const std::vector<uint64_t>& seq_to_sig_map) const {
     NVTX3_FUNC_RANGE();
@@ -54,7 +54,7 @@ std::vector<float> RemoraScaler::extract_levels(const std::vector<int>& int_seq)
     return levels;
 }
 
-std::pair<float, float> RemoraScaler::rescale(const torch::Tensor samples,
+std::pair<float, float> RemoraScaler::rescale(const torch::Tensor& samples,
                                               const std::vector<uint64_t>& seq_to_sig_map,
                                               const std::vector<float>& levels,
                                               size_t clip_bases,

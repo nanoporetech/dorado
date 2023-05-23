@@ -38,7 +38,7 @@ private:
      *
      *  @return The new offset and scale values
      */
-    std::pair<float, float> rescale(const torch::Tensor samples,
+    std::pair<float, float> rescale(const torch::Tensor& samples,
                                     const std::vector<uint64_t>& seq_to_sig_map,
                                     const std::vector<float>& levels,
                                     size_t clip_bases = 10,
@@ -52,7 +52,7 @@ public:
      * @param seq_to_sig_map The indices of the samples corresponding to moves in the move table
      * @return The rescaled input signal
     */
-    torch::Tensor scale_signal(torch::Tensor signal,
+    torch::Tensor scale_signal(const torch::Tensor& signal,
                                const std::vector<int>& seq_ints,
                                const std::vector<uint64_t>& seq_to_sig_map) const;
 
