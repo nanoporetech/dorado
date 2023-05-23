@@ -6,6 +6,7 @@
 #include "utils/base_mod_utils.h"
 #include "utils/math_utils.h"
 #include "utils/sequence_utils.h"
+#include "utils/tensor_utils.h"
 
 #include <nvtx3/nvtx3.hpp>
 #include <spdlog/spdlog.h>
@@ -204,14 +205,13 @@ void ModBaseCallerNode::input_worker_thread() {
                 for (auto context_hit : context_hits) {
                     nvtx3::scoped_range range{"create_chunk"};
                     auto slice = encoder.get_context(context_hit);
+                    // signal
+                    utils::copy_tensor_elems(input_signal, slice.lead_samples_needed, scaled_signal,
+                                             slice.first_sample, slice.num_samples);
+
                     auto input_signal_ptr = input_signal.data_ptr<c10::Half>();
-                    auto scaled_signal_ptr = scaled_signal.data_ptr<c10::Half>();
                     // zero-pad before
                     std::memset(input_signal_ptr, 0, sizeof(c10::Half) * slice.lead_samples_needed);
-                    // signal
-                    std::memcpy(&input_signal_ptr[slice.lead_samples_needed],
-                                &scaled_signal_ptr[slice.first_sample],
-                                sizeof(c10::Half) * slice.num_samples);
                     // zero-pad after
                     std::memset(&input_signal_ptr[slice.lead_samples_needed + slice.num_samples], 0,
                                 sizeof(c10::Half) * slice.tail_samples_needed);
