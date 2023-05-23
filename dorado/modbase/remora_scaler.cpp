@@ -34,7 +34,7 @@ torch::Tensor RemoraScaler::scale_signal(const torch::Tensor& signal,
 
     // generate the signal values at the centre of each base, create the nx5% quantiles (sorted)
     // and perform a linear regression against the expected kmer levels to generate a new shift and scale
-    auto [offset, scale] = rescale(signal, seq_to_sig_map, levels);
+    auto [offset, scale] = calc_offset_scale(signal, seq_to_sig_map, levels);
     auto scaled_signal = signal * scale + offset;
     return scaled_signal;
 }
@@ -54,11 +54,11 @@ std::vector<float> RemoraScaler::extract_levels(const std::vector<int>& int_seq)
     return levels;
 }
 
-std::pair<float, float> RemoraScaler::rescale(const torch::Tensor& samples,
-                                              const std::vector<uint64_t>& seq_to_sig_map,
-                                              const std::vector<float>& levels,
-                                              size_t clip_bases,
-                                              size_t max_bases) const {
+std::pair<float, float> RemoraScaler::calc_offset_scale(const torch::Tensor& samples,
+                                                        const std::vector<uint64_t>& seq_to_sig_map,
+                                                        const std::vector<float>& levels,
+                                                        size_t clip_bases,
+                                                        size_t max_bases) const {
     NVTX3_FUNC_RANGE();
     if (m_kmer_levels.empty()) {
         return {0.f, 1.f};

@@ -38,11 +38,11 @@ private:
      *
      *  @return The new offset and scale values
      */
-    std::pair<float, float> rescale(const torch::Tensor& samples,
-                                    const std::vector<uint64_t>& seq_to_sig_map,
-                                    const std::vector<float>& levels,
-                                    size_t clip_bases = 10,
-                                    size_t max_bases = 1000) const;
+    std::pair<float, float> calc_offset_scale(const torch::Tensor& samples,
+                                              const std::vector<uint64_t>& seq_to_sig_map,
+                                              const std::vector<float>& levels,
+                                              size_t clip_bases = 10,
+                                              size_t max_bases = 1000) const;
 
 public:
     /**
