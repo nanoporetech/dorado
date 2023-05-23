@@ -19,7 +19,7 @@ namespace dorado {
 constexpr auto FORCE_TIMEOUT = 100ms;
 
 ModBaseCallerNode::ModBaseCallerNode(MessageSink& sink,
-                                     std::vector<std::shared_ptr<ModBaseRunner>> model_runners,
+                                     std::vector<std::unique_ptr<ModBaseRunner>> model_runners,
                                      size_t remora_threads,
                                      size_t block_stride,
                                      size_t batch_size,
@@ -252,7 +252,7 @@ void ModBaseCallerNode::modbasecall_worker_thread(size_t worker_id, size_t calle
             // timeout without new chunks or termination call
             chunks_lock.unlock();
             if (!batched_chunks.empty()) {
-                call_current_batch(runner, caller_id, batched_chunks);
+                call_current_batch(worker_id, caller_id, batched_chunks);
             }
             continue;
         }
@@ -262,7 +262,7 @@ void ModBaseCallerNode::modbasecall_worker_thread(size_t worker_id, size_t calle
             // call the remaining batch
             chunks_lock.unlock();  // Not strictly necessary
             if (!batched_chunks.empty()) {
-                call_current_batch(runner, caller_id, batched_chunks);
+                call_current_batch(worker_id, caller_id, batched_chunks);
             }
             // Reduce the count of active runner threads.  If this was the last active
             // thread also send termination signal to sink
@@ -305,17 +305,17 @@ void ModBaseCallerNode::modbasecall_worker_thread(size_t worker_id, size_t calle
 
         if (batched_chunks.size() == m_batch_size) {
             // Input tensor is full, let's get_scores.
-            call_current_batch(runner, caller_id, batched_chunks);
+            call_current_batch(worker_id, caller_id, batched_chunks);
         }
     }
 }
 
 void ModBaseCallerNode::call_current_batch(
-        std::shared_ptr<ModBaseRunner> runner,
+        size_t worker_id,
         size_t caller_id,
         std::vector<std::shared_ptr<RemoraChunk>>& batched_chunks) {
     nvtx3::scoped_range loop{"call_current_batch"};
-    auto results = runner->call_chunks(caller_id, batched_chunks.size());
+    auto results = m_runners[worker_id]->call_chunks(caller_id, batched_chunks.size());
 
     // Convert results to float32 with one call and address via a raw pointer,
     // to avoid huge libtorch indexing overhead.

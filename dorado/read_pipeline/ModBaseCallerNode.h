@@ -16,7 +16,7 @@ struct ModBaseParams;
 class ModBaseCallerNode : public MessageSink {
 public:
     ModBaseCallerNode(MessageSink& sink,
-                      std::vector<std::shared_ptr<ModBaseRunner>> model_runners,
+                      std::vector<std::unique_ptr<ModBaseRunner>> model_runners,
                       size_t remora_threads,
                       size_t block_stride,
                       size_t batch_size,
@@ -51,7 +51,7 @@ private:
     void modbasecall_worker_thread(size_t worker_id, size_t caller_id);
 
     // Called by modbasecall_worker_thread, calls the model and enqueues the results
-    void call_current_batch(std::shared_ptr<ModBaseRunner> runner,
+    void call_current_batch(size_t worker_id,
                             size_t caller_id,
                             std::vector<std::shared_ptr<RemoraChunk>>& batched_chunks);
 
@@ -62,7 +62,7 @@ private:
     size_t m_batch_size;
     size_t m_block_stride;
 
-    std::vector<std::shared_ptr<ModBaseRunner>> m_runners;
+    std::vector<std::unique_ptr<ModBaseRunner>> m_runners;
 
     std::unique_ptr<std::thread> m_output_worker;
     std::vector<std::unique_ptr<std::thread>> m_runner_workers;

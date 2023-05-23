@@ -154,7 +154,7 @@ void setup(std::vector<std::string> args,
     }
 
     // generate model callers before nodes or it affects the speed calculations
-    std::vector<std::shared_ptr<ModBaseRunner>> remora_runners;
+    std::vector<std::unique_ptr<ModBaseRunner>> remora_runners;
     std::vector<std::string> modbase_devices;
 #if DORADO_GPU_BUILD && !defined(__APPLE__)
     if (device != "cpu") {
@@ -167,7 +167,7 @@ void setup(std::vector<std::string> args,
     for (auto device_string : modbase_devices) {
         auto caller = create_modbase_caller(remora_model_list, remora_batch_size, device_string);
         for (size_t i = 0; i < default_parameters.remora_runners_per_caller; i++) {
-            remora_runners.push_back(std::make_shared<ModBaseRunner>(caller));
+            remora_runners.push_back(std::make_unique<ModBaseRunner>(caller));
         }
     };
 
