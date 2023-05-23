@@ -63,7 +63,8 @@ void ModBaseParams::parse(std::filesystem::path const& model_path, bool all_memb
         }
 
     } catch (const std::out_of_range& ex) {
-        // no refinement parameters
+        // if the toml file doesn't contain any of the above parameters, it will throw `std::out_of_range`
+        // in this case the model doesn't support rescaling, so turn it off
         refine_do_rough_rescale = false;
     }
 }
