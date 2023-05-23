@@ -94,23 +94,6 @@ public:
 #endif
         int batch_size = 0;
 
-        torch::Tensor scale_signal(torch::Tensor signal,
-                                   const std::vector<int>& seq_ints,
-                                   const std::vector<uint64_t>& seq_to_sig_map) const {
-            NVTX3_FUNC_RANGE();
-            if (!scaler) {
-                return signal;
-            }
-
-            auto levels = scaler->extract_levels(seq_ints);
-
-            // generate the signal values at the centre of each base, create the nx5% quantiles (sorted)
-            // and perform a linear regression against the expected kmer levels to generate a new shift and scale
-            auto [offset, scale] = scaler->rescale(signal, seq_to_sig_map, levels);
-            auto scaled_signal = signal * scale + offset;
-            return scaled_signal;
-        }
-
         std::vector<size_t> get_motif_hits(const std::string& seq) const {
             NVTX3_FUNC_RANGE();
             std::vector<size_t> context_hits;
@@ -329,7 +312,11 @@ torch::Tensor ModBaseRunner::scale_signal(size_t caller_id,
                                           torch::Tensor signal,
                                           const std::vector<int>& seq_ints,
                                           const std::vector<uint64_t>& seq_to_sig_map) const {
-    return m_caller->m_caller_data[caller_id]->scale_signal(signal, seq_ints, seq_to_sig_map);
+    auto& scaler = m_caller->m_caller_data[caller_id]->scaler;
+    if (scaler) {
+        return scaler->scale_signal(signal, seq_ints, seq_to_sig_map);
+    }
+    return signal;
 }
 
 std::vector<size_t> ModBaseRunner::get_motif_hits(size_t caller_id, const std::string& seq) const {
