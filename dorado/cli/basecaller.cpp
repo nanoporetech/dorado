@@ -164,7 +164,7 @@ void setup(std::vector<std::string> args,
     {
         modbase_devices.push_back(device);
     }
-    for (auto device_string : modbase_devices) {
+    for (const auto& device_string : modbase_devices) {
         auto caller = create_modbase_caller(remora_model_list, remora_batch_size, device_string);
         for (size_t i = 0; i < default_parameters.remora_runners_per_caller; i++) {
             remora_runners.push_back(std::make_unique<ModBaseRunner>(caller));
