@@ -380,17 +380,21 @@ void ModBaseCallerNode::output_worker_thread() {
         processed_chunks_lock.unlock();
 
         // Now move any completed reads to the output queue
+        std::vector<std::shared_ptr<Read>> completed_reads;
         std::unique_lock<std::mutex> working_reads_lock(m_working_reads_mutex);
         for (auto read_iter = m_working_reads.begin(); read_iter != m_working_reads.end();) {
             if ((*read_iter)->num_modbase_chunks_called.load() ==
                 (*read_iter)->num_modbase_chunks) {
-                m_sink.push_message(*read_iter);
+                completed_reads.push_back(*read_iter);
                 read_iter = m_working_reads.erase(read_iter);
             } else {
                 ++read_iter;
             }
         }
         working_reads_lock.unlock();
+        for (auto& read : completed_reads) {
+            m_sink.push_message(read);
+        }
     }
 }
 
