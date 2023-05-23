@@ -269,7 +269,7 @@ std::shared_ptr<ModBaseCaller> create_modbase_caller(
     return std::make_shared<ModBaseCaller>(model_paths, batch_size, device);
 }
 
-ModBaseRunner::ModBaseRunner(std::shared_ptr<ModBaseCaller> caller) : m_caller(caller) {
+ModBaseRunner::ModBaseRunner(std::shared_ptr<ModBaseCaller> caller) : m_caller(std::move(caller)) {
     auto opts = torch::TensorOptions()
                         .device(torch::kCPU)
                         .pinned_memory(m_caller->m_options.device().is_cuda())
