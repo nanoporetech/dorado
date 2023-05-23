@@ -3,6 +3,8 @@
 #include "remora_utils.h"
 #include "utils/sequence_utils.h"
 
+#include <nvtx3/nvtx3.hpp>
+
 #include <algorithm>
 #include <stdexcept>
 
@@ -34,6 +36,7 @@ void RemoraEncoder::init(const std::vector<int>& sequence_ints,
 }
 
 RemoraEncoder::Context RemoraEncoder::get_context(size_t seq_pos) const {
+    NVTX3_FUNC_RANGE();
     if (seq_pos >= size_t(m_seq_len)) {
         throw std::out_of_range("Sequence position out of range.");
     }
@@ -122,6 +125,7 @@ int RemoraEncoder::compute_sample_pos(int base_pos) const {
 
 std::vector<float> RemoraEncoder::encode_kmer(const std::vector<int>& seq,
                                               const std::vector<int>& seq_mappings) const {
+    NVTX3_FUNC_RANGE();
     const size_t seq_len = seq.size() - m_bases_before - m_bases_after;
     std::vector<float> output(m_kmer_len * RemoraUtils::NUM_BASES * m_context_samples);
 
