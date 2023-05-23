@@ -265,6 +265,8 @@ void ModBaseCallerNode::modbasecall_worker_thread(size_t worker_id, size_t calle
             if (!batched_chunks.empty()) {
                 call_current_batch(worker_id, caller_id, batched_chunks);
             }
+            // reset wait period
+            last_chunk_reserve_time = std::chrono::system_clock::now();
             continue;
         }
 
