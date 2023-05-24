@@ -2,6 +2,13 @@
 
 #include <utility>
 
+// Some NS types make use of tagged pointers which aren't aligned and trip up UBSan.
+#ifdef __clang__
+#define DISABLE_UBSAN_ALIGNMENT_CHECKS __attribute__((no_sanitize("alignment")))
+#else
+#define DISABLE_UBSAN_ALIGNMENT_CHECKS
+#endif
+
 namespace dorado::utils {
 
 // Backport of NS::SharedPtr<> that's introduced in a more recent version of metal-cpp.
@@ -16,12 +23,12 @@ class SharedPtr {
     template <typename U>
     friend SharedPtr<U> RetainPtr(U *object);
 
-    void retain() {
+    void retain() DISABLE_UBSAN_ALIGNMENT_CHECKS {
         if (m_object) {
             m_object->retain();
         }
     }
-    void release() {
+    void release() DISABLE_UBSAN_ALIGNMENT_CHECKS {
         if (m_object) {
             m_object->release();
         }
@@ -64,8 +71,8 @@ SharedPtr<T> TransferPtr(T *object) {
 template <typename T>
 SharedPtr<T> RetainPtr(T *object) {
     SharedPtr<T> ptr;
-    object->retain();
     ptr.m_object = object;
+    ptr.retain();
     return ptr;
 }
 
