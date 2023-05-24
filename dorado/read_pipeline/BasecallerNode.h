@@ -55,6 +55,8 @@ private:
     std::condition_variable m_chunks_in_has_space_cv;
     // Global chunk input list
     std::mutex m_chunks_in_mutex;
+    // Signalled when chunks are added to m_chunks_in
+    std::condition_variable m_chunks_added_cv;
     // Gets filled with chunks from the input reads
     std::deque<std::shared_ptr<Chunk>> m_chunks_in;
 
