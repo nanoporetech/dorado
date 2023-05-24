@@ -38,8 +38,6 @@ void BasecallerNode::input_worker_thread() {
         // Now that we have acquired a read, wait until we can push to chunks_in
         while (true) {
             std::unique_lock<std::mutex> chunk_lock(m_chunks_in_mutex);
-            std::unique_lock<std::mutex> working_reads_lock(m_working_reads_mutex);
-
             // A new condition was added to the condition variable which adjusts the predicate
             // to check for number of working reads. This is to deal with some degenerate cases during
             // duplex basecalling wherein the due to GPU contention between simplex and duplex stages
@@ -48,12 +46,14 @@ void BasecallerNode::input_worker_thread() {
             // This change below more effectively puts a ceiling on the host memory usage.
             // Keeping the condition a function of the current sink size (empmirically at 5k reads this
             // caps memory around 30GB).
-            m_chunks_in_has_space_cv.wait(chunk_lock, [this, &max_chunks_in] {
+            m_chunks_in_has_space_cv.wait_for(chunk_lock, 10ms, [this, &max_chunks_in] {
                 return (m_chunks_in.size() < max_chunks_in) &&
                        (m_working_reads.size() < 5 * m_max_reads);
             });
 
-            working_reads_lock.unlock();
+            if (m_chunks_in.size() >= max_chunks_in) {
+                continue;
+            }
 
             // Chunk up the read and put the chunks into the pending chunk list.
             size_t raw_size =
@@ -82,9 +82,10 @@ void BasecallerNode::input_worker_thread() {
             chunk_lock.unlock();
 
             // Put the read in the working list
-            working_reads_lock.lock();
-            m_working_reads.push_back(std::move(read));
-            working_reads_lock.unlock();
+            {
+                std::lock_guard working_reads_lock(m_working_reads_mutex);
+                m_working_reads.push_back(std::move(read));
+            }
 
             m_chunks_added_cv.notify_one();
 
