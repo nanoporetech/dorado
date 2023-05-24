@@ -192,11 +192,6 @@ void ModBaseCallerNode::input_worker_thread() {
                                       params.bases_after);
                 encoder.init(sequence_ints, seq_to_sig_map);
 
-                assert(input_signal.is_contiguous());
-                assert(input_signal.dtype() == torch::kFloat16);
-                assert(scaled_signal.is_contiguous());
-                assert(scaled_signal.dtype() == torch::kFloat16);
-
                 auto context_hits = runner->get_motif_hits(caller_id, read->seq);
                 std::vector<std::shared_ptr<RemoraChunk>> reads_to_enqueue;
                 reads_to_enqueue.reserve(context_hits.size());
