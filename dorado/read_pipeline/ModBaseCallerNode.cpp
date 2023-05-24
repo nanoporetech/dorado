@@ -199,10 +199,13 @@ void ModBaseCallerNode::input_worker_thread() {
                     nvtx3::scoped_range range{"create_chunk"};
                     auto slice = encoder.get_context(context_hit);
                     // signal
-                    auto input_signal =
-                            torch::zeros({(int64_t)(context_samples)}, scaled_signal.dtype());
-                    utils::copy_tensor_elems(input_signal, slice.lead_samples_needed, scaled_signal,
-                                             slice.first_sample, slice.num_samples);
+                    auto input_signal = scaled_signal.index({torch::indexing::Slice(
+                            slice.first_sample, slice.first_sample + slice.num_samples)});
+                    if (slice.lead_samples_needed != 0 || slice.tail_samples_needed != 0) {
+                        input_signal = torch::constant_pad_nd(input_signal,
+                                                              {(int64_t)slice.lead_samples_needed,
+                                                               (int64_t)slice.tail_samples_needed});
+                    }
                     reads_to_enqueue.push_back(std::make_shared<RemoraChunk>(
                             read, input_signal, std::move(slice.data), context_hit));
 
