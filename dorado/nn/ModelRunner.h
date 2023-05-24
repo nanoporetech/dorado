@@ -18,6 +18,7 @@ public:
     virtual size_t model_stride() const = 0;
     virtual size_t chunk_size() const = 0;
     virtual size_t batch_size() const = 0;
+    virtual void terminate() = 0;
 };
 
 using Runner = std::shared_ptr<ModelRunnerBase>;
@@ -34,6 +35,7 @@ public:
     size_t model_stride() const final { return m_model_stride; }
     size_t chunk_size() const final { return m_input.size(2); }
     size_t batch_size() const final { return m_input.size(0); }
+    void terminate() final {}
 
 private:
     std::string m_device;

@@ -168,6 +168,7 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
             if (!m_batched_chunks[worker_id].empty()) {
                 basecall_current_batch(worker_id);
             }
+
             // reset wait period
             last_chunk_reserve_time = std::chrono::system_clock::now();
             continue;
@@ -180,6 +181,9 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
             if (!m_batched_chunks[worker_id].empty()) {
                 basecall_current_batch(worker_id);
             }
+
+            m_model_runners[worker_id]->terminate();
+
             // Reduce the count of active runner threads.  If this was the last active
             // thread also send termination signal to sink
             int num_remaining_runners = --m_num_active_model_runners;
