@@ -233,7 +233,7 @@ void ModBaseCallerNode::input_worker_thread() {
 
     int num_remaining_workers = --m_num_active_input_worker;
     if (num_remaining_workers == 0) {
-        m_terminate_runners = true;
+        m_terminate_runners.store(true);
         m_chunks_added_cv.notify_all();
     }
 }
@@ -249,8 +249,9 @@ void ModBaseCallerNode::modbasecall_worker_thread(size_t worker_id, size_t calle
         nvtx3::scoped_range range{"modbasecall_worker_thread"};
         std::unique_lock<std::mutex> chunks_lock(m_chunk_queues_mutex);
         if (!m_chunks_added_cv.wait_until(
-                    chunks_lock, last_chunk_reserve_time + FORCE_TIMEOUT,
-                    [&chunk_queue, this] { return !chunk_queue.empty() || m_terminate_runners; })) {
+                    chunks_lock, last_chunk_reserve_time + FORCE_TIMEOUT, [&chunk_queue, this] {
+                        return !chunk_queue.empty() || m_terminate_runners.load();
+                    })) {
             // timeout without new chunks or termination call
             chunks_lock.unlock();
             if (!batched_chunks.empty()) {
@@ -261,7 +262,7 @@ void ModBaseCallerNode::modbasecall_worker_thread(size_t worker_id, size_t calle
             continue;
         }
 
-        if (chunk_queue.empty() && m_terminate_runners) {
+        if (chunk_queue.empty() && m_terminate_runners.load()) {
             // no remaining chunks and we've been told to terminate
             // call the remaining batch
             chunks_lock.unlock();  // Not strictly necessary
@@ -272,7 +273,7 @@ void ModBaseCallerNode::modbasecall_worker_thread(size_t worker_id, size_t calle
             // thread also send termination signal to sink
             int num_remaining_runners = --m_num_active_runner_workers;
             if (num_remaining_runners == 0) {
-                m_terminate_output = true;
+                m_terminate_output.store(true);
                 m_processed_chunks_cv.notify_one();
             }
             return;
@@ -350,9 +351,9 @@ void ModBaseCallerNode::output_worker_thread() {
         // Wait until we are provided with a read
         std::unique_lock processed_chunks_lock(m_processed_chunks_mutex);
         m_processed_chunks_cv.wait(processed_chunks_lock, [this] {
-            return !m_processed_chunks.empty() || m_terminate_output;
+            return !m_processed_chunks.empty() || m_terminate_output.load();
         });
-        if (m_terminate_output && m_processed_chunks.empty()) {
+        if (m_terminate_output.load() && m_processed_chunks.empty()) {
             m_sink.terminate();
             return;
         }
