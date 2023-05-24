@@ -26,7 +26,7 @@ struct overloaded : Ts... {
 template <class... Ts>
 overloaded(Ts...) -> overloaded<Ts...>;
 
-NS::String *get_library_location() {
+auto get_library_location() {
     char ns_path[PATH_MAX + 1];
     uint32_t size = sizeof(ns_path);
     _NSGetExecutablePath(ns_path, &size);
@@ -35,7 +35,7 @@ NS::String *get_library_location() {
     fs::path mtllib{"../lib/default.metallib"};
     fs::path fspath = exepth.parent_path() / mtllib;
 
-    return NS::String::string(fspath.c_str(), NS::ASCIIStringEncoding);
+    return dorado::utils::TransferPtr(NS::String::string(fspath.c_str(), NS::ASCIIStringEncoding));
 }
 
 // Returns an ASCII std::string associated with the given CFStringRef.
@@ -124,59 +124,57 @@ bool retrieve_ioreg_props(const std::string &service_class,
 
 namespace dorado::utils {
 
-MTL::Buffer *create_buffer(MTL::Device *device, size_t length) {
-    return device->newBuffer(length, MTL::ResourceStorageModeShared);
+SharedPtr<MTL::Buffer> create_buffer(MTL::Device *device, size_t length) {
+    return TransferPtr(device->newBuffer(length, MTL::ResourceStorageModeShared));
 }
 
-MTL::ComputePipelineState *make_cps(
+SharedPtr<MTL::ComputePipelineState> make_cps(
         MTL::Device *const device,
         const std::string &name,
         const std::vector<std::tuple<std::string, MetalConstant>> &named_constants,
         const int max_total_threads_per_tg) {
     NS::Error *error;
-    auto default_library = device->newDefaultLibrary();
+    auto default_library = TransferPtr(device->newDefaultLibrary());
 
     if (!default_library) {
         auto lib_path = get_library_location();
-        default_library = device->newLibrary(lib_path, &error);
+        default_library = TransferPtr(device->newLibrary(lib_path.get(), &error));
         if (!default_library) {
             throw std::runtime_error("Failed to load metallib library.");
         }
     }
 
-    auto constant_vals = FunctionConstantValues::alloc();
-    constant_vals->init();
+    auto constant_vals = TransferPtr(FunctionConstantValues::alloc()->init());
     for (auto &[name, constant] : named_constants) {
-        const auto ns_name = NS::String::string(name.c_str(), NS::ASCIIStringEncoding);
-        std::visit(overloaded{[&](int val) {
-                                  constant_vals->setConstantValue(&val, DataTypeInt, ns_name);
-                              },
-                              [&](bool val) {
-                                  constant_vals->setConstantValue(&val, DataTypeBool, ns_name);
-                              },
-                              [&](float val) {
-                                  constant_vals->setConstantValue(&val, DataTypeFloat, ns_name);
-                              }},
-                   constant);
+        const auto ns_name = TransferPtr(NS::String::string(name.c_str(), NS::ASCIIStringEncoding));
+        std::visit(
+                overloaded{[&](int val) {
+                               constant_vals->setConstantValue(&val, DataTypeInt, ns_name.get());
+                           },
+                           [&](bool val) {
+                               constant_vals->setConstantValue(&val, DataTypeBool, ns_name.get());
+                           },
+                           [&](float val) {
+                               constant_vals->setConstantValue(&val, DataTypeFloat, ns_name.get());
+                           }},
+                constant);
     }
 
-    auto kernel_name = NS::String::string(name.c_str(), NS::ASCIIStringEncoding);
-    auto kernel = default_library->newFunction(kernel_name, constant_vals, &error);
-    CFRelease(constant_vals);
+    auto kernel_name = TransferPtr(NS::String::string(name.c_str(), NS::ASCIIStringEncoding));
+    auto kernel = TransferPtr(
+            default_library->newFunction(kernel_name.get(), constant_vals.get(), &error));
     if (!kernel) {
         throw std::runtime_error("Failed to find the kernel: " + name);
     }
 
-    auto cp_descriptor = MTL::ComputePipelineDescriptor::alloc();
-    cp_descriptor->init();
-    cp_descriptor->setComputeFunction(kernel);
+    auto cp_descriptor = TransferPtr(MTL::ComputePipelineDescriptor::alloc()->init());
+    cp_descriptor->setComputeFunction(kernel.get());
     if (max_total_threads_per_tg != -1)
         cp_descriptor->setMaxTotalThreadsPerThreadgroup(max_total_threads_per_tg);
 
-    auto cps = device->newComputePipelineState(cp_descriptor, MTL::PipelineOptionNone, nullptr,
-                                               &error);
-    CFRelease(cp_descriptor);
-    if (cps == nullptr) {
+    auto cps = TransferPtr(device->newComputePipelineState(
+            cp_descriptor.get(), MTL::PipelineOptionNone, nullptr, &error));
+    if (!cps) {
         auto e_code = std::to_string(((int)error->code()));
         auto e_str = error->domain()->cString(NS::ASCIIStringEncoding);
         throw std::runtime_error("failed to build compute pipeline for " + name + " - " + e_str +
@@ -225,7 +223,7 @@ void launch_kernel_no_wait(ComputePipelineState *const pipeline,
     compute_encoder->endEncoding();
 }
 
-static MTL::Device *mtl_device{nullptr};
+static SharedPtr<MTL::Device> mtl_device;
 
 struct MTLAllocator : torch::Allocator {
     virtual ~MTLAllocator() = default;
@@ -244,9 +242,9 @@ struct MTLAllocator : torch::Allocator {
 };
 static MTLAllocator mtl_allocator;
 
-MTL::Device *get_mtl_device() {
-    if (mtl_device == nullptr) {
-        mtl_device = MTL::CreateSystemDefaultDevice();
+SharedPtr<MTL::Device> get_mtl_device() {
+    if (!mtl_device) {
+        mtl_device = TransferPtr(MTL::CreateSystemDefaultDevice());
         torch::SetAllocator(torch::DeviceType::CPU, &mtl_allocator);
     }
     return mtl_device;
@@ -330,9 +328,8 @@ MTL::Buffer *mtl_for_tensor(const torch::Tensor &x) {
     return ptr;
 }
 
-MTL::Buffer *extract_mtl_from_tensor(torch::Tensor &x) {
-    auto bfr = mtl_for_tensor(x);
-    bfr->retain();
+SharedPtr<MTL::Buffer> extract_mtl_from_tensor(torch::Tensor &x) {
+    auto bfr = RetainPtr(mtl_for_tensor(x));
     x.reset();
     return bfr;
 }
