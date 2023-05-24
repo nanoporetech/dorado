@@ -115,7 +115,7 @@ public:
         auto stream = c10::cuda::getCurrentCUDAStream(m_options.device().index());
 
         while (true) {
-            NVTX3_FUNC_RANGE();
+            nvtx3::scoped_range loop{"cuda_thread_fn"};
             std::unique_lock<std::mutex> input_lock(m_input_lock);
             while (m_input_queue.empty() && !m_terminate.load()) {
                 m_input_cv.wait_for(input_lock, 100ms);

@@ -206,7 +206,7 @@ public:
         const bool has_stream = caller_data->stream.has_value();
 #endif
         while (true) {
-            NVTX3_FUNC_RANGE();
+            nvtx3::scoped_range loop{"modbase_task_thread_fn"};
             torch::InferenceMode guard;
 #if DORADO_GPU_BUILD && !defined(__APPLE__)
             // If caller_data->stream is set, sets the current stream to caller_data->stream, and the current device to
