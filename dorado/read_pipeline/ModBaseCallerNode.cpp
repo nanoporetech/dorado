@@ -192,8 +192,6 @@ void ModBaseCallerNode::input_worker_thread() {
                                       params.bases_after);
                 encoder.init(sequence_ints, seq_to_sig_map);
 
-                auto input_signal =
-                        torch::empty({(int64_t)(context_samples)}, scaled_signal.dtype());
                 assert(input_signal.is_contiguous());
                 assert(input_signal.dtype() == torch::kFloat16);
                 assert(scaled_signal.is_contiguous());
@@ -206,15 +204,10 @@ void ModBaseCallerNode::input_worker_thread() {
                     nvtx3::scoped_range range{"create_chunk"};
                     auto slice = encoder.get_context(context_hit);
                     // signal
+                    auto input_signal =
+                            torch::zeros({(int64_t)(context_samples)}, scaled_signal.dtype());
                     utils::copy_tensor_elems(input_signal, slice.lead_samples_needed, scaled_signal,
                                              slice.first_sample, slice.num_samples);
-
-                    auto input_signal_ptr = input_signal.data_ptr<c10::Half>();
-                    // zero-pad before
-                    std::memset(input_signal_ptr, 0, sizeof(c10::Half) * slice.lead_samples_needed);
-                    // zero-pad after
-                    std::memset(&input_signal_ptr[slice.lead_samples_needed + slice.num_samples], 0,
-                                sizeof(c10::Half) * slice.tail_samples_needed);
                     reads_to_enqueue.push_back(std::make_shared<RemoraChunk>(
                             read, input_signal, std::move(slice.data), context_hit));
 
