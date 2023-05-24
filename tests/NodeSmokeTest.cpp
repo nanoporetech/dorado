@@ -161,7 +161,7 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
             runners.push_back(std::make_shared<dorado::MetalModelRunner>(caller));
         }
 #else   // __APPLE__
-        auto devices = utils::parse_cuda_device_string("cuda:all");
+        auto devices = dorado::utils::parse_cuda_device_string("cuda:all");
         if (devices.empty()) {
             SKIP("No CUDA devices found");
         }
@@ -208,7 +208,7 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
     std::vector<std::shared_ptr<dorado::RemoraCaller>> remora_callers;
     if (gpu) {
 #if DORADO_GPU_BUILD && !defined(__APPLE__)
-        auto devices = utils::parse_cuda_device_string("cuda:all");
+        auto devices = dorado::utils::parse_cuda_device_string("cuda:all");
         if (devices.empty()) {
             SKIP("No CUDA devices found");
         }
