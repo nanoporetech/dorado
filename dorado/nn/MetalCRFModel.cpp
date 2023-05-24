@@ -408,7 +408,7 @@ struct MetalBlockImpl : Module {
             auto linear_w = torch::concat({t_w.transpose(0, 1), t_b.unsqueeze(0)}, 0)
                                     .contiguous()
                                     .to(torch_dtype);
-            return extract_mtl_from_tensor(linear_w);
+            return extract_mtl_from_tensor(std::move(linear_w));
         };
         if (config.out_features.has_value()) {
             // Linear layer is decomposed into 2 matmuls. the first with a bias.

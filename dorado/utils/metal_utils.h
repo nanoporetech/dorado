@@ -50,6 +50,6 @@ SharedPtr<MTL::Device> get_mtl_device();
 int get_mtl_device_core_count();
 int get_apple_cpu_perf_core_count();
 MTL::Buffer *mtl_for_tensor(const torch::Tensor &t);
-SharedPtr<MTL::Buffer> extract_mtl_from_tensor(torch::Tensor &t);
+SharedPtr<MTL::Buffer> extract_mtl_from_tensor(torch::Tensor &&t);
 
 }  // namespace dorado::utils

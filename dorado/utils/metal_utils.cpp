@@ -328,7 +328,7 @@ MTL::Buffer *mtl_for_tensor(const torch::Tensor &x) {
     return ptr;
 }
 
-SharedPtr<MTL::Buffer> extract_mtl_from_tensor(torch::Tensor &x) {
+SharedPtr<MTL::Buffer> extract_mtl_from_tensor(torch::Tensor &&x) {
     auto bfr = RetainPtr(mtl_for_tensor(x));
     x.reset();
     return bfr;
