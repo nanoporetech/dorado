@@ -24,6 +24,7 @@ public:
     size_t model_stride() const final;
     size_t chunk_size() const final;
     size_t batch_size() const final;
+    void terminate() final;
 
 private:
     std::shared_ptr<MetalCaller> m_caller;
