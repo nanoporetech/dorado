@@ -109,6 +109,7 @@ private:
     void generate_duplex_read_tags(bam1_t*) const;
     void generate_read_tags(bam1_t* aln, bool emit_moves) const;
     void generate_modbase_string(bam1_t* aln, uint8_t threshold = 0) const;
+    std::string generate_read_group() const;
 };
 
 // A pair of reads for Duplex calling

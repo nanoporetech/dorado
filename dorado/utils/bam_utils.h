@@ -100,8 +100,7 @@ public:
 
     HtsWriter(const std::string& filename, OutputMode mode, size_t threads, size_t num_reads);
     ~HtsWriter();
-    void add_header(const sam_hdr_t* header);
-    int write_header();
+    int write_header(const sam_hdr_t* header);
     int write(bam1_t* record);
     void join();
 

@@ -516,10 +516,9 @@ int HtsWriter::write(bam1_t* record) {
     return res;
 }
 
-void HtsWriter::add_header(const sam_hdr_t* hdr) { header = sam_hdr_dup(hdr); }
-
-int HtsWriter::write_header() {
-    if (header) {
+int HtsWriter::write_header(const sam_hdr_t* hdr) {
+    if (hdr) {
+        header = sam_hdr_dup(hdr);
         return sam_hdr_write(m_file, header);
     }
     return 0;
