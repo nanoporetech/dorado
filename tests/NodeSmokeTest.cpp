@@ -1,5 +1,6 @@
 #include "MessageSinkUtils.h"
 #include "decode/CPUDecoder.h"
+#include "nn/ModBaseRunner.h"
 #include "nn/ModelRunner.h"
 #include "nn/RemoraModel.h"
 #include "read_pipeline/BasecallerNode.h"
@@ -203,28 +204,28 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
     std::size_t const model_stride =
             dorado::load_crf_model_config(model_dir.m_path / model_name).stride;
 
-    // Create callers
-    std::size_t num_devices;
-    std::vector<std::shared_ptr<dorado::RemoraCaller>> remora_callers;
+    // Create runners
+    std::vector<std::unique_ptr<dorado::ModBaseRunner>> remora_runners;
+    std::vector<std::string> modbase_devices;
     if (gpu) {
-#if DORADO_GPU_BUILD && !defined(__APPLE__)
-        auto devices = dorado::utils::parse_cuda_device_string("cuda:all");
-        if (devices.empty()) {
-            SKIP("No CUDA devices found");
-        }
-        num_devices = devices.size();
-        for (auto const& device : devices) {
-            remora_callers.push_back(std::make_shared<dorado::RemoraCaller>(
-                    remora_model, device, default_params.remora_batchsize, model_stride));
-        }
-#else
-        SKIP("Can't test GPU without DORADO_GPU_BUILD + __APPLE__");
-#endif
+#if DORADO_GPU_BUILD
+#ifdef __APPLE__
+        modbase_devices.push_back("metal");
+#else   //__APPLE__
+        modbase_devices = dorado::utils::parse_cuda_device_string("cuda:all");
+#endif  // __APPLE__
+#else   // DORADO_GPU_BUILD
+        SKIP("Can't test GPU without DORADO_GPU_BUILD");
+#endif  // DORADO_GPU_BUILD
     } else {
-        num_devices = 1;
-        auto caller = std::make_shared<dorado::RemoraCaller>(
-                remora_model, "cpu", default_params.remora_batchsize, model_stride);
-        remora_callers.push_back(caller);
+        modbase_devices.push_back("cpu");
+    }
+    for (const auto& device_string : modbase_devices) {
+        auto caller = dorado::create_modbase_caller({remora_model}, default_params.remora_batchsize,
+                                                    device_string);
+        for (size_t i = 0; i < default_params.remora_runners_per_caller; i++) {
+            remora_runners.push_back(std::make_unique<dorado::ModBaseRunner>(caller));
+        }
     }
 
     // ModBase node expects half input and needs a move table
@@ -238,8 +239,8 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
         std::shuffle(std::next(read->moves.begin()), read->moves.end(), m_rng);
     };
 
-    dorado::ModBaseCallerNode mod_base_caller_node(m_sink, std::move(remora_callers), 2,
-                                                   num_devices, model_stride,
+    dorado::ModBaseCallerNode mod_base_caller_node(m_sink, std::move(remora_runners), 2,
+                                                   modbase_devices.size(), model_stride,
                                                    default_params.remora_batchsize);
     run_smoke_test(mod_base_caller_node);
 }
