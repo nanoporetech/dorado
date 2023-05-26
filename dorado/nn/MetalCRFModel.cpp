@@ -634,9 +634,7 @@ public:
     }
 
     ~MetalCaller() {
-        std::unique_lock<std::mutex> input_lock(m_input_lock);
-        m_terminate = true;
-        input_lock.unlock();
+        m_terminate.store(true);
         m_input_cv.notify_one();
         m_decode_cv.notify_all();
 
@@ -693,11 +691,12 @@ public:
 
         while (true) {
             std::unique_lock<std::mutex> input_lock(m_input_lock);
-            while (m_input_queue.empty() && !m_terminate) {
+            while (m_input_queue.empty() && !m_terminate.load()) {
                 m_input_cv.wait_for(input_lock, 100ms);
             }
-            // TODO: finish work before terminating?
-            if (m_terminate) {
+
+            if (m_input_queue.empty() && m_terminate.load()) {
+                m_terminate_decode.store(true);
                 return;
             }
 
@@ -762,11 +761,11 @@ public:
     void decode_thread_fn(int thread_id) {
         while (true) {
             std::unique_lock<std::mutex> decode_lock(m_decode_lock);
-            while (m_decode_queue.empty() && !m_terminate) {
+            while (m_decode_queue.empty() && !m_terminate_decode.load()) {
                 m_decode_cv.wait_for(decode_lock, 100ms);
             }
-            // TODO: finish work before terminating?
-            if (m_terminate) {
+
+            if (m_decode_queue.empty() && m_terminate_decode.load()) {
                 return;
             }
             NNTask *const task = m_decode_queue.back();
@@ -807,7 +806,10 @@ public:
         }
     }
 
-    bool m_terminate{false};
+    void terminate() { m_terminate.store(true); }
+
+    std::atomic<bool> m_terminate{false};
+    std::atomic<bool> m_terminate_decode{false};
     std::deque<NNTask *> m_input_queue;
     std::deque<NNTask *> m_decode_queue;
     std::mutex m_input_lock;
@@ -872,5 +874,7 @@ std::vector<DecodedChunk> MetalModelRunner::call_chunks(int num_chunks) {
 size_t MetalModelRunner::model_stride() const { return m_caller->m_model_stride; }
 size_t MetalModelRunner::chunk_size() const { return m_input.size(1); }
 size_t MetalModelRunner::batch_size() const { return m_input.size(0); }
+
+void MetalModelRunner::terminate() { m_caller->terminate(); }
 
 }  // namespace dorado

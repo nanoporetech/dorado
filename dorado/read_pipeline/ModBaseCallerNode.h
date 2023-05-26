@@ -85,8 +85,8 @@ private:
     std::atomic<int> m_num_active_runner_workers{0};
     std::atomic<int> m_num_active_input_worker{0};
 
-    bool m_terminate_runners{false};
-    bool m_terminate_output{false};
+    std::atomic<bool> m_terminate_runners{false};
+    std::atomic<bool> m_terminate_output{false};
 
     std::shared_ptr<const utils::BaseModInfo> m_base_mod_info;
     // The offsets to the canonical bases in the modbase alphabet

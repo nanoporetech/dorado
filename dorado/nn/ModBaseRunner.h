@@ -47,6 +47,7 @@ public:
     std::vector<size_t> get_motif_hits(size_t caller_id, const std::string& seq) const;
     ModBaseParams& caller_params(size_t caller_id) const;
     size_t num_callers() const;
+    void terminate();
 
 private:
     std::shared_ptr<ModBaseCaller> m_caller;
