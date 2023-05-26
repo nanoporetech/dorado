@@ -27,9 +27,9 @@ TEST_CASE(TEST_GROUP "Linear") {
     // Basic device setup.
     // get_mtl_device sets up an allocator that provides GPU/CPU shared memory
     // launch_kernel will create a MTL::CommandBuffer for us.
-    SharedPtr<MTL::Device> const device = get_mtl_device();
+    const SharedPtr<MTL::Device> device = get_mtl_device();
     REQUIRE(device);
-    SharedPtr<MTL::CommandQueue> const command_queue = TransferPtr(device->newCommandQueue());
+    const SharedPtr<MTL::CommandQueue> command_queue = TransferPtr(device->newCommandQueue());
     REQUIRE(command_queue);
 
     // Example values for HAC model run.
@@ -62,7 +62,7 @@ TEST_CASE(TEST_GROUP "Linear") {
     const std::vector<int> tg_buffer_lens{kOutBufSize, kOutBufF32Size};
 
     // Create a ComputePipelineState for the input reordering kernel.
-    SharedPtr<MTL::ComputePipelineState> const reorder_input_cps = make_cps(
+    const SharedPtr<MTL::ComputePipelineState> reorder_input_cps = make_cps(
             device.get(), "reorder_input_to_rev_lstm_output", {{"kLstmLayerSize", layer_size}});
     REQUIRE(reorder_input_cps);
 
@@ -70,7 +70,7 @@ TEST_CASE(TEST_GROUP "Linear") {
     // batch_tiles
     // chunk_size
     const std::vector<int32_t> args_reorder_{in_batch_size / tile_size, lstm_chunk_size};
-    SharedPtr<MTL::Buffer> const args_reorder = create_vec_buffer(device.get(), args_reorder_);
+    const SharedPtr<MTL::Buffer> args_reorder = create_vec_buffer(device.get(), args_reorder_);
     REQUIRE(args_reorder);
 
     // Ensure we get the same random values for each run.
@@ -128,7 +128,7 @@ TEST_CASE(TEST_GROUP "Linear") {
                 for (bool input_from_lstm : {false, true}) {
                     DYNAMIC_SECTION("Metal linear layer " << output_clamp << output_tanh
                                                           << output_as_byte << input_from_lstm) {
-                        SharedPtr<MTL::ComputePipelineState> const linear_cps = make_cps(
+                        const SharedPtr<MTL::ComputePipelineState> linear_cps = make_cps(
                                 device.get(), input_from_lstm ? "linear_from_rev_lstm" : "linear",
                                 {{"kLinearInSize", layer_size},
                                  {"kLinearOutSize", out_size},
@@ -151,7 +151,7 @@ TEST_CASE(TEST_GROUP "Linear") {
                             const std::vector<int32_t> args_linear_{
                                     in_batch_tiles, in_batch_tile_offset, out_batch_tiles,
                                     lstm_chunk_size};
-                            SharedPtr<MTL::Buffer> const args_linear =
+                            const SharedPtr<MTL::Buffer> args_linear =
                                     create_vec_buffer(device.get(), args_linear_);
                             REQUIRE(args_linear);
 
