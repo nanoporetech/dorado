@@ -198,7 +198,15 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
     auto const remora_model_dir = download_model(remora_model_name);
     auto const remora_model = remora_model_dir.m_path / remora_model_name;
 
-    // The model stride for RemoraCaller isn't in its config so grab it separately
+    // Add a second model into the mix
+    char const remora_model_6mA_name[] = "dna_r10.4.1_e8.2_400bps_sup@v4.2.0_6mA@v2";
+    auto const remora_model_6mA_dir = download_model(remora_model_6mA_name);
+    auto const remora_model_6mA = remora_model_6mA_dir.m_path / remora_model_6mA_name;
+
+    // The model stride for RemoraCaller isn't in its config so grab it separately.
+    // Note: We only look at the stride of one of the models since it's not what we're
+    // testing for. In theory we could hardcode the stride to any number here, but to
+    // be somewhat realistic we'll use an actual one.
     char const model_name[] = "dna_r10.4.1_e8.2_400bps_fast@v4.2.0";
     auto const model_dir = download_model(model_name);
     std::size_t const model_stride =
@@ -224,8 +232,8 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
         modbase_devices.push_back("cpu");
     }
     for (const auto& device_string : modbase_devices) {
-        auto caller = dorado::create_modbase_caller({remora_model}, default_params.remora_batchsize,
-                                                    device_string);
+        auto caller = dorado::create_modbase_caller({remora_model, remora_model_6mA},
+                                                    default_params.remora_batchsize, device_string);
         for (size_t i = 0; i < default_params.remora_runners_per_caller; i++) {
             remora_runners.push_back(std::make_unique<dorado::ModBaseRunner>(caller));
         }
