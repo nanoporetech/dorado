@@ -213,6 +213,9 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
         modbase_devices.push_back("metal");
 #else   //__APPLE__
         modbase_devices = dorado::utils::parse_cuda_device_string("cuda:all");
+        if (modbase_devices.empty()) {
+            SKIP("No CUDA devices found");
+        }
 #endif  // __APPLE__
 #else   // DORADO_GPU_BUILD
         SKIP("Can't test GPU without DORADO_GPU_BUILD");
