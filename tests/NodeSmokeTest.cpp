@@ -244,7 +244,9 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
         read->raw_data = read->raw_data.to(torch::kHalf);
 
         read->model_stride = model_stride;
-        read->moves.resize(read->raw_data.size(0) / model_stride);
+        // The move table size needs rounding up.
+        size_t const move_table_size = (read->raw_data.size(0) + model_stride - 1) / model_stride;
+        read->moves.resize(move_table_size);
         std::fill_n(read->moves.begin(), read->seq.size(), 1);
         // First element must be 1, the rest can be shuffled
         std::shuffle(std::next(read->moves.begin()), read->moves.end(), m_rng);
