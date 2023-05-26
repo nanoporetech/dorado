@@ -35,7 +35,7 @@ auto get_library_location() {
     fs::path mtllib{"../lib/default.metallib"};
     fs::path fspath = exepth.parent_path() / mtllib;
 
-    return dorado::utils::TransferPtr(NS::String::string(fspath.c_str(), NS::ASCIIStringEncoding));
+    return NS::TransferPtr(NS::String::string(fspath.c_str(), NS::ASCIIStringEncoding));
 }
 
 // Returns an ASCII std::string associated with the given CFStringRef.
@@ -124,29 +124,30 @@ bool retrieve_ioreg_props(const std::string &service_class,
 
 namespace dorado::utils {
 
-SharedPtr<MTL::Buffer> create_buffer(MTL::Device *device, size_t length) {
-    return TransferPtr(device->newBuffer(length, MTL::ResourceStorageModeShared));
+NS::SharedPtr<MTL::Buffer> create_buffer(MTL::Device *device, size_t length) {
+    return NS::TransferPtr(device->newBuffer(length, MTL::ResourceStorageModeShared));
 }
 
-SharedPtr<MTL::ComputePipelineState> make_cps(
+NS::SharedPtr<MTL::ComputePipelineState> make_cps(
         MTL::Device *const device,
         const std::string &name,
         const std::vector<std::tuple<std::string, MetalConstant>> &named_constants,
         const int max_total_threads_per_tg) {
     NS::Error *error;
-    auto default_library = TransferPtr(device->newDefaultLibrary());
+    auto default_library = NS::TransferPtr(device->newDefaultLibrary());
 
     if (!default_library) {
         auto lib_path = get_library_location();
-        default_library = TransferPtr(device->newLibrary(lib_path.get(), &error));
+        default_library = NS::TransferPtr(device->newLibrary(lib_path.get(), &error));
         if (!default_library) {
             throw std::runtime_error("Failed to load metallib library.");
         }
     }
 
-    auto constant_vals = TransferPtr(FunctionConstantValues::alloc()->init());
+    auto constant_vals = NS::TransferPtr(FunctionConstantValues::alloc()->init());
     for (auto &[name, constant] : named_constants) {
-        const auto ns_name = TransferPtr(NS::String::string(name.c_str(), NS::ASCIIStringEncoding));
+        const auto ns_name =
+                NS::TransferPtr(NS::String::string(name.c_str(), NS::ASCIIStringEncoding));
         std::visit(
                 overloaded{[&](int val) {
                                constant_vals->setConstantValue(&val, DataTypeInt, ns_name.get());
@@ -160,19 +161,19 @@ SharedPtr<MTL::ComputePipelineState> make_cps(
                 constant);
     }
 
-    auto kernel_name = TransferPtr(NS::String::string(name.c_str(), NS::ASCIIStringEncoding));
-    auto kernel = TransferPtr(
+    auto kernel_name = NS::TransferPtr(NS::String::string(name.c_str(), NS::ASCIIStringEncoding));
+    auto kernel = NS::TransferPtr(
             default_library->newFunction(kernel_name.get(), constant_vals.get(), &error));
     if (!kernel) {
         throw std::runtime_error("Failed to find the kernel: " + name);
     }
 
-    auto cp_descriptor = TransferPtr(MTL::ComputePipelineDescriptor::alloc()->init());
+    auto cp_descriptor = NS::TransferPtr(MTL::ComputePipelineDescriptor::alloc()->init());
     cp_descriptor->setComputeFunction(kernel.get());
     if (max_total_threads_per_tg != -1)
         cp_descriptor->setMaxTotalThreadsPerThreadgroup(max_total_threads_per_tg);
 
-    auto cps = TransferPtr(device->newComputePipelineState(
+    auto cps = NS::TransferPtr(device->newComputePipelineState(
             cp_descriptor.get(), MTL::PipelineOptionNone, nullptr, &error));
     if (!cps) {
         auto e_code = std::to_string(((int)error->code()));
@@ -223,7 +224,7 @@ void launch_kernel_no_wait(ComputePipelineState *const pipeline,
     compute_encoder->endEncoding();
 }
 
-static SharedPtr<MTL::Device> mtl_device;
+static NS::SharedPtr<MTL::Device> mtl_device;
 
 struct MTLAllocator : torch::Allocator {
     virtual ~MTLAllocator() = default;
@@ -242,9 +243,9 @@ struct MTLAllocator : torch::Allocator {
 };
 static MTLAllocator mtl_allocator;
 
-SharedPtr<MTL::Device> get_mtl_device() {
+NS::SharedPtr<MTL::Device> get_mtl_device() {
     if (!mtl_device) {
-        mtl_device = TransferPtr(MTL::CreateSystemDefaultDevice());
+        mtl_device = NS::TransferPtr(MTL::CreateSystemDefaultDevice());
         torch::SetAllocator(torch::DeviceType::CPU, &mtl_allocator);
     }
     return mtl_device;
@@ -328,8 +329,8 @@ MTL::Buffer *mtl_for_tensor(const torch::Tensor &x) {
     return ptr;
 }
 
-SharedPtr<MTL::Buffer> extract_mtl_from_tensor(torch::Tensor &&x) {
-    auto bfr = RetainPtr(mtl_for_tensor(x));
+NS::SharedPtr<MTL::Buffer> extract_mtl_from_tensor(torch::Tensor &&x) {
+    auto bfr = NS::RetainPtr(mtl_for_tensor(x));
     x.reset();
     return bfr;
 }

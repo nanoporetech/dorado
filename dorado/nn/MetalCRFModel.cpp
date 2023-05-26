@@ -172,8 +172,8 @@ struct MetalConv1dImpl : Module {
     }
 
     torch::Tensor t_weights_bias;
-    SharedPtr<MTL::Buffer> args;
-    SharedPtr<MTL::ComputePipelineState> conv_cps, weights_cps;
+    NS::SharedPtr<MTL::Buffer> args;
+    NS::SharedPtr<MTL::ComputePipelineState> conv_cps, weights_cps;
     int kernel_simd_groups, kernel_thread_groups;
     int in_size, out_size, win_size, stride, chunk_size, batch_size, w_pad_rows, repeats;
 };
@@ -214,7 +214,7 @@ struct MetalBlockImpl : Module {
               in_chunk_size(chunk_size_),
               batch_size(batch_size_),
               config(config_) {
-        command_queue = TransferPtr(device->newCommandQueue());
+        command_queue = NS::TransferPtr(device->newCommandQueue());
 
         lstm_chunk_size = in_chunk_size / config.stride;
 
@@ -397,7 +397,8 @@ struct MetalBlockImpl : Module {
         }
 
         // Load and prepare linear layer weights.
-        auto get_linear_weights = [](MetalLinear &linear, bool use_bias) -> SharedPtr<MTL::Buffer> {
+        auto get_linear_weights = [](MetalLinear &linear,
+                                     bool use_bias) -> NS::SharedPtr<MTL::Buffer> {
             auto params = linear->named_parameters();
             auto t_w = *params.find("weight");
             const auto num_states = t_w.size(0);
@@ -492,11 +493,11 @@ struct MetalBlockImpl : Module {
     }
 
     MTL::Device *device;
-    SharedPtr<MTL::CommandQueue> command_queue;
-    SharedPtr<MTL::ComputePipelineState> lstm_cps[2], to_half_cps, linear_cps[2];
-    SharedPtr<MTL::Buffer> mat_working_mem, mat_state, mat_temp, args_lstm, args_to_half,
+    NS::SharedPtr<MTL::CommandQueue> command_queue;
+    NS::SharedPtr<MTL::ComputePipelineState> lstm_cps[2], to_half_cps, linear_cps[2];
+    NS::SharedPtr<MTL::Buffer> mat_working_mem, mat_state, mat_temp, args_lstm, args_to_half,
             linear_weights[2], args_linear2;
-    std::vector<SharedPtr<MTL::Buffer>> args_linear;
+    std::vector<NS::SharedPtr<MTL::Buffer>> args_linear;
     int in_chunk_size, lstm_chunk_size, batch_size, kernel_thread_groups, kernel_simd_groups;
     CRFModelConfig config;
     MetalLSTM rnn1{nullptr}, rnn2{nullptr}, rnn3{nullptr}, rnn4{nullptr}, rnn5{nullptr};
@@ -603,7 +604,7 @@ public:
         m_model->load_state_dict(state_dict);
         m_model->eval();
 
-        m_decode_complete_event = TransferPtr(m_device->newSharedEvent());
+        m_decode_complete_event = NS::TransferPtr(m_device->newSharedEvent());
         m_bwd_scan_cps = make_cps(m_device.get(), "backward_scan", {});
         m_fwd_scan_cps = make_cps(m_device.get(), "forward_scan", {});
         m_add_softmax_cps = make_cps(m_device.get(), "add_softmax", {});
@@ -822,10 +823,10 @@ public:
     std::vector<std::unique_ptr<std::thread>> m_decode_threads;
     DecoderOptions m_decoder_options;
     nn::MetalModel m_model{nullptr};
-    SharedPtr<MTL::Device> m_device;
-    SharedPtr<MTL::ComputePipelineState> m_bwd_scan_cps, m_fwd_scan_cps, m_add_softmax_cps;
+    NS::SharedPtr<MTL::Device> m_device;
+    NS::SharedPtr<MTL::ComputePipelineState> m_bwd_scan_cps, m_fwd_scan_cps, m_add_softmax_cps;
     // Used to signal completion of an NNTask's decoding.
-    SharedPtr<MTL::SharedEvent> m_decode_complete_event;
+    NS::SharedPtr<MTL::SharedEvent> m_decode_complete_event;
     std::vector<torch::Tensor> m_scores_int8, m_posts, m_bwd;
     int m_in_chunk_size, m_out_chunk_size, m_batch_size, m_states, m_model_stride;
     // Number of pieces the linear output is split into, for reasons of
