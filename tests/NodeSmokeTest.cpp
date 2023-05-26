@@ -60,15 +60,31 @@ protected:
         return read;
     }
 
+private:
+    std::size_t m_num_reads = 200;
+    using Sink = MessageSinkToVector<MessageT>;
+    std::unique_ptr<Sink> m_sink;
+    using ReadMutator = std::function<void(std::unique_ptr<dorado::Read>& read)>;
+    ReadMutator m_read_mutator;
+
 protected:
-    static constexpr std::size_t num_reads = 200;
-    MessageSinkToVector<MessageT> m_sink{num_reads / 3};
-    std::function<void(std::unique_ptr<dorado::Read>& read)> m_read_mutator;
+    void set_num_reads(std::size_t num_reads) {
+        REQUIRE_FALSE(m_sink);
+        m_num_reads = num_reads;
+    }
+
+    void set_read_mutator(ReadMutator mutator) { m_read_mutator = std::move(mutator); }
+
+    Sink& get_sink() {
+        REQUIRE_FALSE(m_sink);
+        m_sink = std::make_unique<Sink>(m_num_reads / 3);
+        return *m_sink;
+    }
 
     template <typename Node>
     void run_smoke_test(Node& node) {
         // Throw some reads at it
-        for (std::size_t i = 0; i < num_reads; i++) {
+        for (std::size_t i = 0; i < m_num_reads; i++) {
             auto read = make_test_read("read_" + std::to_string(i));
             if (m_read_mutator) {
                 m_read_mutator(read);
@@ -77,7 +93,7 @@ protected:
         }
 
         // Wait for them to complete
-        m_sink.wait_for_messages(num_reads);
+        m_sink->wait_for_messages(m_num_reads);
     }
 };
 
@@ -133,11 +149,11 @@ TempDir download_model(std::string const& model) {
 
 DEFINE_TEST(NodeSmokeTestRead, "ScalerNode") {
     // Scaler node expects i16 input
-    m_read_mutator = [](std::unique_ptr<dorado::Read>& read) {
+    set_read_mutator([](std::unique_ptr<dorado::Read>& read) {
         read->raw_data = read->raw_data.to(torch::kI16);
-    };
+    });
 
-    dorado::ScalerNode scaler_node(m_sink, 2);
+    dorado::ScalerNode scaler_node(get_sink(), 2);
     run_smoke_test(scaler_node);
 }
 
@@ -183,7 +199,7 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
                 model_path, "cpu", default_params.chunksize, batch_size));
     }
 
-    dorado::BasecallerNode basecaller_node(m_sink, std::move(runners),
+    dorado::BasecallerNode basecaller_node(get_sink(), std::move(runners),
                                            dorado::utils::default_parameters.overlap,
                                            kBatchTimeoutMS, model_name);
     run_smoke_test(basecaller_node);
@@ -229,6 +245,8 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
         SKIP("Can't test GPU without DORADO_GPU_BUILD");
 #endif  // DORADO_GPU_BUILD
     } else {
+        // CPU processing is very slow, so reduce the number of test reads we throw at it.
+        set_num_reads(20);
         modbase_devices.push_back("cpu");
     }
     for (const auto& device_string : modbase_devices) {
@@ -240,7 +258,7 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
     }
 
     // ModBase node expects half input and needs a move table
-    m_read_mutator = [this, model_stride](std::unique_ptr<dorado::Read>& read) {
+    set_read_mutator([this, model_stride](std::unique_ptr<dorado::Read>& read) {
         read->raw_data = read->raw_data.to(torch::kHalf);
 
         read->model_stride = model_stride;
@@ -250,9 +268,9 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
         std::fill_n(read->moves.begin(), read->seq.size(), 1);
         // First element must be 1, the rest can be shuffled
         std::shuffle(std::next(read->moves.begin()), read->moves.end(), m_rng);
-    };
+    });
 
-    dorado::ModBaseCallerNode mod_base_caller_node(m_sink, std::move(remora_runners), 2,
+    dorado::ModBaseCallerNode mod_base_caller_node(get_sink(), std::move(remora_runners), 2,
                                                    modbase_devices.size(), model_stride,
                                                    default_params.remora_batchsize);
     run_smoke_test(mod_base_caller_node);
@@ -262,7 +280,7 @@ DEFINE_TEST(NodeSmokeTestRead, "StatsCounterNode") {
     auto duplex = GENERATE(true, false);
     CAPTURE(duplex);
 
-    dorado::StatsCounterNode stats_node(m_sink, duplex);
+    dorado::StatsCounterNode stats_node(get_sink(), duplex);
     run_smoke_test(stats_node);
 }
 
@@ -272,7 +290,7 @@ DEFINE_TEST(NodeSmokeTestBam, "ReadToBamType") {
     CAPTURE(emit_moves);
     CAPTURE(rna);
 
-    dorado::ReadToBamType read_converter(m_sink, emit_moves, rna, 2,
+    dorado::ReadToBamType read_converter(get_sink(), emit_moves, rna, 2,
                                          dorado::utils::default_parameters.methylation_threshold);
     run_smoke_test(read_converter);
 }
