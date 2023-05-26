@@ -60,9 +60,7 @@ public:
     }
 
     ~CudaCaller() {
-        std::unique_lock<std::mutex> input_lock(m_input_lock);
         m_terminate.store(true);
-        input_lock.unlock();
         m_input_cv.notify_one();
         m_cuda_thread->join();
     }
