@@ -238,8 +238,8 @@ void setup(std::vector<std::string> args,
         basecaller_node_sink = static_cast<MessageSink*>(mod_base_caller_node.get());
     }
     const int kBatchTimeoutMS = 100;
-    BasecallerNode basecaller_node(*basecaller_node_sink, runners, overlap, kBatchTimeoutMS,
-                                   model_name);
+    BasecallerNode basecaller_node(*basecaller_node_sink, std::move(runners), overlap,
+                                   kBatchTimeoutMS, model_name);
     ScalerNode scaler_node(basecaller_node, thread_allocations.scaler_node_threads);
 
     DataLoader loader(scaler_node, "cpu", thread_allocations.loader_threads, max_reads, read_list);
