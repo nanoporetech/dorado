@@ -234,7 +234,8 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
     if (gpu) {
 #if DORADO_GPU_BUILD
 #ifdef __APPLE__
-        modbase_devices.push_back("metal");
+        // Metal falls back to CPU, which is very slow, so skip that since we're not testing anything new.
+        SKIP("No metal backend for modbase");
 #else   //__APPLE__
         modbase_devices = dorado::utils::parse_cuda_device_string("cuda:all");
         if (modbase_devices.empty()) {
