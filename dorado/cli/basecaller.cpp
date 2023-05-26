@@ -273,7 +273,8 @@ int basecaller(int argc, char* argv[]) {
     parser.add_argument("-b", "--batchsize")
             .default_value(default_parameters.batchsize)
             .scan<'i', int>()
-            .help("if 0 an optimal batchsize will be selected");
+            .help("if 0 an optimal batchsize will be selected. batchsizes are rounded to the "
+                  "closest multiple of 64.");
 
     parser.add_argument("-c", "--chunksize")
             .default_value(default_parameters.chunksize)
