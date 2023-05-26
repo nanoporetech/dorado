@@ -4,7 +4,6 @@
 #if !TARGET_OS_IPHONE
 #include <IOKit/IOKitLib.h>
 #endif
-#include <Metal/Metal.hpp>
 #include <mach-o/dyld.h>
 #include <spdlog/spdlog.h>
 #include <sys/sysctl.h>

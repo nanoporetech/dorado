@@ -1,5 +1,9 @@
 #pragma once
+// Some NS types make use of tagged pointers which aren't aligned and trip up UBSan.
+#pragma clang attribute push(__attribute__((no_sanitize("alignment"))), apply_to = function)
 #include <Metal/Metal.hpp>
+#pragma clang attribute pop
+
 #include <torch/torch.h>
 
 #include <string>
