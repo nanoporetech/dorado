@@ -183,12 +183,15 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
                 basecall_current_batch(worker_id);
             }
 
-            m_model_runners[worker_id]->terminate();
-
             // Reduce the count of active runner threads.  If this was the last active
             // thread also send termination signal to sink
             int num_remaining_runners = --m_num_active_model_runners;
             if (num_remaining_runners == 0) {
+                // runners can share a caller, so shutdown when all runners are done
+                // rather than terminating each runner as it finishes
+                for (auto &runner : m_model_runners) {
+                    runner->terminate();
+                }
                 m_terminate_manager.store(true);
             }
             return;

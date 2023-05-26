@@ -271,12 +271,15 @@ void ModBaseCallerNode::modbasecall_worker_thread(size_t worker_id, size_t calle
                 call_current_batch(worker_id, caller_id, batched_chunks);
             }
 
-            runner->terminate();
-
             // Reduce the count of active runner threads.  If this was the last active
             // thread also send termination signal to sink
             int num_remaining_runners = --m_num_active_runner_workers;
             if (num_remaining_runners == 0) {
+                // runners can share a caller, so shutdown when all runners are done
+                // rather than terminating each runner as it finishes
+                for (auto& runner : m_runners) {
+                    runner->terminate();
+                }
                 m_terminate_output.store(true);
                 m_processed_chunks_cv.notify_one();
             }
