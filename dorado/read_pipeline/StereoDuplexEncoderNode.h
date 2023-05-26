@@ -1,6 +1,11 @@
 #pragma once
-#include "../nn/ModelRunner.h"
 #include "ReadPipeline.h"
+#include "utils/stats.h"
+
+#include <atomic>
+#include <chrono>
+#include <memory>
+#include <vector>
 
 namespace dorado {
 
@@ -12,6 +17,8 @@ public:
                                                 std::shared_ptr<dorado::Read> complement_read);
 
     ~StereoDuplexEncoderNode();
+    std::string get_name() const override { return "StereoDuplexEncoderNode"; }
+    stats::NamedStats sample_stats() const override;
 
 private:
     // Consume reads from input queue

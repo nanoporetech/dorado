@@ -319,4 +319,9 @@ StereoDuplexEncoderNode::~StereoDuplexEncoderNode() {
     m_sink.terminate();
 }
 
+stats::NamedStats StereoDuplexEncoderNode::sample_stats() const {
+    stats::NamedStats stats = m_work_queue.sample_stats();
+    return stats;
+}
+
 }  // namespace dorado

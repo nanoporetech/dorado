@@ -6,6 +6,7 @@
 #include "utils/base_mod_utils.h"
 #include "utils/math_utils.h"
 #include "utils/sequence_utils.h"
+#include "utils/stats.h"
 #include "utils/tensor_utils.h"
 
 #include <nvtx3/nvtx3.hpp>
@@ -153,6 +154,7 @@ void ModBaseCallerNode::input_worker_thread() {
             m_chunk_queues_cv.wait(chunk_lock, chunk_queues_available);
             chunk_lock.unlock();
 
+            stats::Timer timer;
             {
                 nvtx3::scoped_range range{"base_mod_probs_init"};
                 // initialize base_mod_probs _before_ we start handing out chunks
@@ -193,6 +195,7 @@ void ModBaseCallerNode::input_worker_thread() {
                 encoder.init(sequence_ints, seq_to_sig_map);
 
                 auto context_hits = runner->get_motif_hits(caller_id, read->seq);
+                m_num_context_hits += static_cast<int64_t>(context_hits.size());
                 std::vector<std::shared_ptr<RemoraChunk>> reads_to_enqueue;
                 reads_to_enqueue.reserve(context_hits.size());
                 for (auto context_hit : context_hits) {
@@ -218,6 +221,7 @@ void ModBaseCallerNode::input_worker_thread() {
                 reads_to_enqueue.size() > m_batch_size ? m_chunks_added_cv.notify_all()
                                                        : m_chunks_added_cv.notify_one();
             }
+            m_chunk_generation_ms += timer.GetElapsedMS();
 
             if (read->num_modbase_chunks != 0) {
                 // Put the read in the working list
@@ -226,6 +230,7 @@ void ModBaseCallerNode::input_worker_thread() {
             } else {
                 // No modbases to call, pass directly to next node
                 m_sink.push_message(read);
+                ++m_num_non_mod_base_reads_pushed;
             }
             break;
         }
@@ -319,7 +324,10 @@ void ModBaseCallerNode::call_current_batch(
         size_t caller_id,
         std::vector<std::shared_ptr<RemoraChunk>>& batched_chunks) {
     nvtx3::scoped_range loop{"call_current_batch"};
+
+    dorado::stats::Timer timer;
     auto results = m_runners[worker_id]->call_chunks(caller_id, batched_chunks.size());
+    m_call_chunks_ms += timer.GetElapsedMS();
 
     // Convert results to float32 with one call and address via a raw pointer,
     // to avoid huge libtorch indexing overhead.
@@ -342,6 +350,7 @@ void ModBaseCallerNode::call_current_batch(
     m_processed_chunks_cv.notify_one();
 
     batched_chunks.clear();
+    ++m_num_batches_called;
 }
 
 void ModBaseCallerNode::output_worker_thread() {
@@ -387,8 +396,26 @@ void ModBaseCallerNode::output_worker_thread() {
         working_reads_lock.unlock();
         for (auto& read : completed_reads) {
             m_sink.push_message(read);
+            ++m_num_mod_base_reads_pushed;
         }
     }
+}
+
+std::unordered_map<std::string, double> ModBaseCallerNode::sample_stats() const {
+    stats::NamedStats stats = stats::from_obj(m_work_queue);
+    for (const auto& runner : m_runners) {
+        const auto runner_stats = stats::from_obj(*runner);
+        stats.insert(runner_stats.begin(), runner_stats.end());
+    }
+    stats["batches_called"] = m_num_batches_called;
+    stats["partial_batches_called"] = m_num_partial_batches_called;
+    stats["input_chunks_sleeps"] = m_num_input_chunks_sleeps;
+    stats["call_chunks_ms"] = m_call_chunks_ms;
+    stats["context_hits"] = m_num_context_hits;
+    stats["mod_base_reads_pushed"] = m_num_mod_base_reads_pushed;
+    stats["non_mod_base_reads_pushed"] = m_num_non_mod_base_reads_pushed;
+    stats["chunk_generation_ms"] = m_chunk_generation_ms;
+    return stats;
 }
 
 }  // namespace dorado

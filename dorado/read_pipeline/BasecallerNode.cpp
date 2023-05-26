@@ -1,7 +1,8 @@
 #include "BasecallerNode.h"
 
 #include "../decode/CPUDecoder.h"
-#include "../utils/stitch.h"
+#include "utils/stats.h"
+#include "utils/stitch.h"
 
 #include <nvtx3/nvtx3.hpp>
 
@@ -97,7 +98,9 @@ void BasecallerNode::input_worker_thread() {
 void BasecallerNode::basecall_current_batch(int worker_id) {
     NVTX3_FUNC_RANGE();
     auto model_runner = m_model_runners[worker_id];
+    dorado::stats::Timer timer;
     auto decode_results = model_runner->call_chunks(m_batched_chunks[worker_id].size());
+    m_call_chunks_ms += timer.GetElapsedMS();
 
     for (size_t i = 0; i < m_batched_chunks[worker_id].size(); i++) {
         m_batched_chunks[worker_id][i]->seq = decode_results[i].sequence;
@@ -112,6 +115,7 @@ void BasecallerNode::basecall_current_batch(int worker_id) {
         ++source_read->num_chunks_called;
     }
     m_batched_chunks[worker_id].clear();
+    ++m_num_batches_called;
 }
 
 void BasecallerNode::working_reads_manager() {
@@ -143,6 +147,7 @@ void BasecallerNode::working_reads_manager() {
         for (auto &read : completed_reads) {
             utils::stitch_chunks(read);
             m_sink.push_message(read);
+            ++m_called_reads_pushed;
         }
     }
 
@@ -187,8 +192,10 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
                         current_time - last_chunk_reserve_time);
                 if (delta.count() > m_batch_timeout_ms && !m_batched_chunks[worker_id].empty()) {
                     basecall_current_batch(worker_id);
+                    ++m_num_partial_batches_called;
                 } else {
                     std::this_thread::sleep_for(100ms);
+                    ++m_num_input_chunks_sleeps;
                 }
                 continue;
             }
@@ -289,6 +296,20 @@ BasecallerNode::~BasecallerNode() {
     }
     m_working_reads_manager->join();
     termination_time = std::chrono::system_clock::now();
+}
+
+stats::NamedStats BasecallerNode::sample_stats() const {
+    stats::NamedStats stats = stats::from_obj(m_work_queue);
+    for (const auto &runner : m_model_runners) {
+        const auto runner_stats = stats::from_obj(*runner);
+        stats.insert(runner_stats.begin(), runner_stats.end());
+    }
+    stats["batches_called"] = m_num_batches_called;
+    stats["partial_batches_called"] = m_num_partial_batches_called;
+    stats["input_chunks_sleeps"] = m_num_input_chunks_sleeps;
+    stats["call_chunks_ms"] = m_call_chunks_ms;
+    stats["called_reads_pushed"] = m_called_reads_pushed;
+    return stats;
 }
 
 }  // namespace dorado

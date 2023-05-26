@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ReadPipeline.h"
+#include "utils/stats.h"
 
 #include <atomic>
 #include <map>
@@ -16,6 +17,8 @@ public:
     PairingNode(MessageSink& sink,
                 std::optional<std::map<std::string, std::string>> = std::nullopt);
     ~PairingNode();
+    std::string get_name() const override { return "PairingNode"; }
+    stats::NamedStats sample_stats() const override;
 
 private:
     void pair_list_worker_thread();

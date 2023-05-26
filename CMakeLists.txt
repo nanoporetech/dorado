@@ -146,6 +146,7 @@ set(LIB_SOURCE_FILES
     dorado/utils/duplex_utils.cpp
     dorado/utils/basecaller_utils.h
     dorado/utils/basecaller_utils.cpp
+    dorado/utils/stats.h
     dorado/utils/types.cpp
     dorado/utils/types.h
     dorado/read_pipeline/NullNode.h

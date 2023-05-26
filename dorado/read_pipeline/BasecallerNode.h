@@ -1,6 +1,11 @@
 #pragma once
+
 #include "../nn/ModelRunner.h"
 #include "ReadPipeline.h"
+#include "utils/stats.h"
+
+#include <atomic>
+#include <cstdint>
 
 namespace dorado {
 
@@ -14,6 +19,8 @@ public:
                    std::string model_name = "",
                    size_t max_reads = 1000);
     ~BasecallerNode();
+    std::string get_name() const override { return "BasecallerNode"; }
+    stats::NamedStats sample_stats() const override;
 
 private:
     // Consume reads from input queue
@@ -75,6 +82,13 @@ private:
             m_basecall_workers;  // Basecalls chunks from the queue and puts read on the sink.
     std::unique_ptr<std::thread>
             m_working_reads_manager;  // Stitches working reads into complete reads.
+
+    // Performance monitoring stats.
+    std::atomic<int64_t> m_num_batches_called = 0;
+    std::atomic<int64_t> m_num_partial_batches_called = 0;
+    std::atomic<int64_t> m_num_input_chunks_sleeps = 0;
+    std::atomic<int64_t> m_call_chunks_ms = 0;
+    std::atomic<int64_t> m_called_reads_pushed = 0;
 };
 
 }  // namespace dorado

@@ -4,6 +4,7 @@
 #include "modbase/remora_scaler.h"
 #include "modbase/remora_utils.h"
 #include "utils/base_mod_utils.h"
+#include "utils/stats.h"
 #include "utils/tensor_utils.h"
 
 #if DORADO_GPU_BUILD && !defined(__APPLE__)
@@ -227,23 +228,44 @@ public:
             input_lock.unlock();
 
             std::unique_lock<std::mutex> task_lock(task->mut);
+            stats::Timer timer;
             auto scores = caller_data->module_holder->forward(task->input_sigs, task->input_seqs);
             task->out = scores.to(torch::kCPU);
 #if DORADO_GPU_BUILD && !defined(__APPLE__)
             if (has_stream) {
                 caller_data->stream->synchronize();
             }
+            // Only meaningful if we're syncing the stream.
+            m_model_ms += timer.GetElapsedMS();
 #endif
+            ++m_num_batches_called;
             task->done = true;
             task->cv.notify_one();
             task_lock.unlock();
         }
     }
 
+    std::string get_name() const {
+        return std::string("ModBaseCaller_") + m_options.device().str();
+    }
+
+    stats::NamedStats sample_stats() const {
+        stats::NamedStats stats;
+        stats["batches_called"] = m_num_batches_called;
+#if DORADO_GPU_BUILD && !defined(__APPLE__)
+        stats["model_ms"] = m_model_ms;
+#endif
+        return stats;
+    }
+
     torch::TensorOptions m_options;
     std::atomic<bool> m_terminate{false};
     std::vector<std::unique_ptr<ModBaseData>> m_caller_data;
     std::vector<std::unique_ptr<std::thread>> m_task_threads;
+
+    // Performance monitoring stats.
+    std::atomic<int64_t> m_num_batches_called = 0;
+    std::atomic<int64_t> m_model_ms = 0;
 };
 
 std::shared_ptr<ModBaseCaller> create_modbase_caller(
@@ -329,5 +351,21 @@ ModBaseParams& ModBaseRunner::caller_params(size_t caller_id) const {
 }
 
 size_t ModBaseRunner::num_callers() const { return m_caller->m_caller_data.size(); }
+
+std::string ModBaseRunner::get_name() const {
+    std::ostringstream name_stream;
+    name_stream << "ModBaseRunner_" << this;
+    return name_stream.str();
+}
+
+stats::NamedStats ModBaseRunner::sample_stats() const {
+    // We don't have direct access to the caller object when the pipeline is set up,
+    // so pass through stats here.
+    // Each runner will retrieve stats from the caller.
+    // Only the last retrieved version will appear, but they should be very similar.
+    stats::NamedStats stats = stats::from_obj(*m_caller);
+    stats["batches_called"] = m_num_batches_called;
+    return stats;
+}
 
 }  // namespace dorado

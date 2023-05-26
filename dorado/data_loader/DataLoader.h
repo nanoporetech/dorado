@@ -1,4 +1,6 @@
 #pragma once
+#include "utils/stats.h"
+
 #include <array>
 #include <map>
 #include <memory>
@@ -53,6 +55,9 @@ public:
 
     static uint16_t get_sample_rate(std::string data_path, bool recursive_file_loading = false);
 
+    std::string get_name() const { return "Dataloader"; }
+    stats::NamedStats sample_stats() const;
+
 private:
     void load_fast5_reads_from_file(const std::string& path);
     void load_pod5_reads_from_file(const std::string& path);
@@ -60,7 +65,7 @@ private:
                                                const std::vector<ReadID>& read_ids);
     void load_read_channels(std::string data_path, bool recursive_file_loading = false);
     MessageSink& m_read_sink;  // Where should the loaded reads go?
-    size_t m_loaded_read_count{0};
+    std::atomic<size_t> m_loaded_read_count{0};
     std::string m_device;
     size_t m_num_worker_threads{1};
     size_t m_max_reads{0};

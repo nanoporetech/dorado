@@ -475,4 +475,6 @@ DuplexSplitNode::~DuplexSplitNode() {
     m_sink.terminate();
 }
 
+stats::NamedStats DuplexSplitNode::sample_stats() const { return stats::from_obj(m_work_queue); }
+
 }  // namespace dorado

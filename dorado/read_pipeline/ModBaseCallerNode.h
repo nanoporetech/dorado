@@ -1,5 +1,6 @@
 #pragma once
 #include "ReadPipeline.h"
+#include "utils/stats.h"
 
 #include <atomic>
 #include <deque>
@@ -22,6 +23,8 @@ public:
                       size_t batch_size,
                       size_t max_reads = 1000);
     ~ModBaseCallerNode();
+    std::string get_name() const override { return "ModBaseCallerNode"; }
+    stats::NamedStats sample_stats() const override;
 
     struct Info {
         std::string long_names;
@@ -92,6 +95,16 @@ private:
     // The offsets to the canonical bases in the modbase alphabet
     std::array<size_t, 4> m_base_prob_offsets;
     size_t m_num_states{4};
+
+    // Performance monitoring stats.
+    std::atomic<int64_t> m_num_batches_called = 0;
+    std::atomic<int64_t> m_num_partial_batches_called = 0;
+    std::atomic<int64_t> m_num_input_chunks_sleeps = 0;
+    std::atomic<int64_t> m_call_chunks_ms = 0;
+    std::atomic<int64_t> m_num_context_hits = 0;
+    std::atomic<int64_t> m_num_mod_base_reads_pushed = 0;
+    std::atomic<int64_t> m_num_non_mod_base_reads_pushed = 0;
+    std::atomic<int64_t> m_chunk_generation_ms = 0;
 };
 
 }  // namespace dorado

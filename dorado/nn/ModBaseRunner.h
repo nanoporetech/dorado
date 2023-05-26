@@ -1,5 +1,8 @@
 #pragma once
 
+#include "utils/stats.h"
+
+#include <atomic>
 #include <filesystem>
 #include <string>
 #include <vector>
@@ -47,11 +50,16 @@ public:
     std::vector<size_t> get_motif_hits(size_t caller_id, const std::string& seq) const;
     ModBaseParams& caller_params(size_t caller_id) const;
     size_t num_callers() const;
+    std::string get_name() const;
+    stats::NamedStats sample_stats() const;
 
 private:
     std::shared_ptr<ModBaseCaller> m_caller;
     std::vector<torch::Tensor> m_input_sigs;
     std::vector<torch::Tensor> m_input_seqs;
+
+    // Performance monitoring stats.
+    std::atomic<int64_t> m_num_batches_called = 0;
 };
 
 }  // namespace dorado
