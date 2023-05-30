@@ -128,14 +128,14 @@ private:
     int m_progress_bar_interval;
 
 #ifdef WIN32
-    indicators::ProgressBar m_progress_bar{
+    indicators::ProgressBar m_progress_bar {
 #else
     indicators::BlockProgressBar m_progress_bar{
 #endif
-            indicators::option::Stream{std::cerr},     indicators::option::BarWidth{30},
-            indicators::option::ShowElapsedTime{true}, indicators::option::ShowRemainingTime{true},
-            indicators::option::ShowPercentage{true},
-
+        indicators::option::Stream{std::cerr}, indicators::option::BarWidth{30},
+                indicators::option::ShowElapsedTime{true},
+                indicators::option::ShowRemainingTime{true},
+                indicators::option::ShowPercentage{true},
     };
 };
 

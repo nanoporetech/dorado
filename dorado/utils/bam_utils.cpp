@@ -484,7 +484,7 @@ void HtsWriter::worker_thread() {
                 m_progress_bar.set_progress(progress);
 #ifndef WIN32
                 std::cerr << "\033[K";
-#endif // WIN32
+#endif  // WIN32
             } else {
                 std::cerr << "\r> Output records written: " << write_count;
             }
