@@ -6,6 +6,7 @@ called_from_lib:libcuda.so
 
 # Torch isn't instrumented
 called_from_lib:libtorch_cpu.so
+called_from_lib:libtorch_cuda.so
 
 # According to TSan the Dispatcher's mutex is unlocked after it's been destroyed during process
 # exit inside TORCH_LIBRARY_static_init_cuda's destructor (libtorch_cuda.so). However, setting a
@@ -14,3 +15,6 @@ called_from_lib:libtorch_cpu.so
 # meaningful way, so it's unclear why this is being triggered. Note that the singleton lives in
 # libtorch_cpu.so which might be confusing TSan since we're at process exit.
 mutex:c10::Dispatcher::realSingleton()::_singleton
+# A similar thing also happens in another part of torch but only on arm CI which uses an older
+# version of libtorch (1.10.2). When it's updated this can probably be removed.
+mutex:torch::autograd::Engine::get_base_engine()::engine
