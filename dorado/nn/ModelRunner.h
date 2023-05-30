@@ -38,7 +38,6 @@ public:
     void terminate() final {}
 
 private:
-    std::string m_device;
     torch::Tensor m_input;
     torch::TensorOptions m_options;
     std::unique_ptr<T> m_decoder;

@@ -19,6 +19,7 @@ set(SOURCE_FILES
     CliUtilsTest.cpp
     ReadFilterNodeTest.cpp
     ModelUtilsTest.cpp
+    NodeSmokeTest.cpp
 )
 
 if (DORADO_GPU_BUILD)

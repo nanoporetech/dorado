@@ -124,7 +124,13 @@ public:
             m_options = torch::TensorOptions().device(device).dtype(torch::kFloat16);
         }
 
-        for (size_t model_id = 0; model_id < model_paths.size(); ++model_id) {
+        // Allocate enough elements up-front so that m_caller_data.push_back() doesn't reallocate while
+        // other threads can be referencing elements that it's holding.
+        const std::size_t num_models = model_paths.size();
+        m_caller_data.reserve(num_models);
+        m_task_threads.reserve(num_models);
+
+        for (size_t model_id = 0; model_id < num_models; ++model_id) {
             const auto& model_path = model_paths[model_id];
             auto caller_data = std::make_unique<ModBaseData>();
 #if DORADO_GPU_BUILD && !defined(__APPLE__)
