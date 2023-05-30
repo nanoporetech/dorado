@@ -27,10 +27,11 @@ TEST_CASE(TEST_GROUP "Linear") {
     // Basic device setup.
     // get_mtl_device sets up an allocator that provides GPU/CPU shared memory
     // launch_kernel will create a MTL::CommandBuffer for us.
-    MTL::Device *const device = get_mtl_device();
-    REQUIRE(device != nullptr);
-    MTL::CommandQueue *const command_queue = device->newCommandQueue();
-    REQUIRE(command_queue != nullptr);
+    const NS::SharedPtr<MTL::Device> device = get_mtl_device();
+    REQUIRE(device);
+    const NS::SharedPtr<MTL::CommandQueue> command_queue =
+            NS::TransferPtr(device->newCommandQueue());
+    REQUIRE(command_queue);
 
     // Example values for HAC model run.
     const int layer_size = 384;       // Typical LSTM layer size for HAC model.
@@ -62,16 +63,16 @@ TEST_CASE(TEST_GROUP "Linear") {
     const std::vector<int> tg_buffer_lens{kOutBufSize, kOutBufF32Size};
 
     // Create a ComputePipelineState for the input reordering kernel.
-    MTL::ComputePipelineState *const reorder_input_cps =
-            make_cps(device, "reorder_input_to_rev_lstm_output", {{"kLstmLayerSize", layer_size}});
-    REQUIRE(reorder_input_cps != nullptr);
+    const NS::SharedPtr<MTL::ComputePipelineState> reorder_input_cps = make_cps(
+            device.get(), "reorder_input_to_rev_lstm_output", {{"kLstmLayerSize", layer_size}});
+    REQUIRE(reorder_input_cps);
 
     // Order in LstmArgs struct (which is also used by reorder_input):
     // batch_tiles
     // chunk_size
     const std::vector<int32_t> args_reorder_{in_batch_size / tile_size, lstm_chunk_size};
-    MTL::Buffer *const args_reorder = create_vec_buffer(device, args_reorder_);
-    REQUIRE(args_reorder != nullptr);
+    const NS::SharedPtr<MTL::Buffer> args_reorder = create_vec_buffer(device.get(), args_reorder_);
+    REQUIRE(args_reorder);
 
     // Ensure we get the same random values for each run.
     torch::manual_seed(42);
@@ -98,9 +99,9 @@ TEST_CASE(TEST_GROUP "Linear") {
     // 3) Converts from float32 to float16.
     torch::Tensor in_f16_reordered =
             torch::zeros({lstm_chunk_size + 3, in_batch_size, layer_size}, torch::kFloat16);
-    launch_kernel(reorder_input_cps, command_queue,
-                  {args_reorder, mtl_for_tensor(in_f32), mtl_for_tensor(in_f16_reordered)}, {},
-                  kernel_thread_groups, threads_per_thread_group);
+    launch_kernel(reorder_input_cps.get(), command_queue.get(),
+                  {args_reorder.get(), mtl_for_tensor(in_f32), mtl_for_tensor(in_f16_reordered)},
+                  {}, kernel_thread_groups, threads_per_thread_group);
 
     // CPU comparison calculation.
     const torch::Tensor out_cpu_f32 = torch::addmm(biases_f32, in_f32, weights_f32);
@@ -128,8 +129,8 @@ TEST_CASE(TEST_GROUP "Linear") {
                 for (bool input_from_lstm : {false, true}) {
                     DYNAMIC_SECTION("Metal linear layer " << output_clamp << output_tanh
                                                           << output_as_byte << input_from_lstm) {
-                        MTL::ComputePipelineState *const linear_cps = make_cps(
-                                device, input_from_lstm ? "linear_from_rev_lstm" : "linear",
+                        const NS::SharedPtr<MTL::ComputePipelineState> linear_cps = make_cps(
+                                device.get(), input_from_lstm ? "linear_from_rev_lstm" : "linear",
                                 {{"kLinearInSize", layer_size},
                                  {"kLinearOutSize", out_size},
                                  {"kLinearOutputScale", output_scale},
@@ -137,7 +138,7 @@ TEST_CASE(TEST_GROUP "Linear") {
                                  {"kLinearOutputTanh", output_tanh},
                                  {"kLinearOutputAsByte", output_as_byte}},
                                 threads_per_thread_group);
-                        REQUIRE(linear_cps != nullptr);
+                        REQUIRE(linear_cps);
 
                         auto out_gpu_f32 = torch::zeros({lstm_chunk_size, in_batch_size, out_size},
                                                         torch::kF32);
@@ -151,17 +152,17 @@ TEST_CASE(TEST_GROUP "Linear") {
                             const std::vector<int32_t> args_linear_{
                                     in_batch_tiles, in_batch_tile_offset, out_batch_tiles,
                                     lstm_chunk_size};
-                            MTL::Buffer *const args_linear =
-                                    create_vec_buffer(device, args_linear_);
-                            REQUIRE(args_linear != nullptr);
+                            const NS::SharedPtr<MTL::Buffer> args_linear =
+                                    create_vec_buffer(device.get(), args_linear_);
+                            REQUIRE(args_linear);
 
                             auto out_dtype = output_as_byte ? torch::kI8 : torch::kF16;
                             auto out_gpu_partial = torch::zeros(
                                     {lstm_chunk_size, out_batch_size, out_size}, out_dtype);
 
                             launch_kernel(
-                                    linear_cps, command_queue,
-                                    {args_linear,
+                                    linear_cps.get(), command_queue.get(),
+                                    {args_linear.get(),
                                      mtl_for_tensor(input_from_lstm ? in_f16_reordered : in_f16),
                                      mtl_for_tensor(weights_biases_f16),
                                      mtl_for_tensor(out_gpu_partial)},
