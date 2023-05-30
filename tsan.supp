@@ -1,0 +1,16 @@
+# This file contains a suppression list for TSan
+# See https://github.com/google/sanitizers/wiki/ThreadSanitizerSuppressions for the schema
+
+# CUDA isn't instrumented
+called_from_lib:libcuda.so
+
+# Torch isn't instrumented
+called_from_lib:libtorch_cpu.so
+
+# According to TSan the Dispatcher's mutex is unlocked after it's been destroyed during process
+# exit inside TORCH_LIBRARY_static_init_cuda's destructor (libtorch_cuda.so). However, setting a
+# breakpoint on the Dispatcher's destructor reveals that it's not destroyed until after the error
+# is reported and AFAICT the TORCH_LIBRARY code shouldn't interact with the Dispatcher in any
+# meaningful way, so it's unclear why this is being triggered. Note that the singleton lives in
+# libtorch_cpu.so which might be confusing TSan since we're at process exit.
+mutex:c10::Dispatcher::realSingleton()::_singleton
