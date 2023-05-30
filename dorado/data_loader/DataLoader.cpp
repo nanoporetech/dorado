@@ -421,10 +421,18 @@ uint16_t DataLoader::get_sample_rate(std::string data_path, bool recursive_file_
                 } else {
                     // First get the run info count
                     run_info_index_t run_info_count;
-                    pod5_get_file_run_info_count(file, &run_info_count);
+                    if (pod5_get_file_run_info_count(file, &run_info_count) != POD5_OK) {
+                        spdlog::error("Failed to fetch POD5 run info count: {}",
+                                      pod5_get_error_string());
+                        continue;
+                    }
                     if (run_info_count > static_cast<run_info_index_t>(0)) {
                         RunInfoDictData_t* run_info_data;
-                        pod5_get_file_run_info(file, 0, &run_info_data);
+                        if (pod5_get_file_run_info(file, 0, &run_info_data) != POD5_OK) {
+                            spdlog::error("Failed to fetch POD5 run info dict: {}",
+                                          pod5_get_error_string());
+                            continue;
+                        }
                         sample_rate = run_info_data->sample_rate;
 
                         if (pod5_free_run_info(run_info_data) != POD5_OK) {
