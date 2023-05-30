@@ -15,4 +15,17 @@ public:
         }
         return vec;
     }
+
+    /// Wait for @a count messages to be produced by the source.
+    std::vector<T> wait_for_messages(std::size_t count) {
+        std::vector<T> msgs(count);
+        for (T &msg : msgs) {
+            dorado::Message message;
+            if (!m_work_queue.try_pop(message)) {
+                throw std::runtime_error("Sink was terminated early");
+            }
+            msg = std::get<T>(std::move(message));
+        }
+        return msgs;
+    }
 };

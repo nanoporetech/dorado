@@ -60,9 +60,7 @@ public:
     }
 
     ~CudaCaller() {
-        std::unique_lock<std::mutex> input_lock(m_input_lock);
-        m_terminate = true;
-        input_lock.unlock();
+        m_terminate.store(true);
         m_input_cv.notify_one();
         m_cuda_thread->join();
     }
@@ -110,18 +108,18 @@ public:
     }
 
     void cuda_thread_fn() {
-        NVTX3_FUNC_RANGE();
         torch::InferenceMode guard;
         c10::cuda::CUDAGuard device_guard(m_options.device());
         auto stream = c10::cuda::getCurrentCUDAStream(m_options.device().index());
 
         while (true) {
+            nvtx3::scoped_range loop{"cuda_thread_fn"};
             std::unique_lock<std::mutex> input_lock(m_input_lock);
-            while (m_input_queue.empty() && !m_terminate) {
+            while (m_input_queue.empty() && !m_terminate.load()) {
                 m_input_cv.wait_for(input_lock, 100ms);
             }
-            // TODO: finish work before terminating?
-            if (m_terminate) {
+
+            if (m_input_queue.empty() && m_terminate.load()) {
                 return;
             }
 
@@ -142,13 +140,15 @@ public:
         }
     }
 
+    void terminate() { m_terminate.store(true); }
+
     std::string m_device;
     torch::TensorOptions m_options;
     std::unique_ptr<GPUDecoder> m_decoder;
     DecoderOptions m_decoder_options;
     torch::nn::ModuleHolder<torch::nn::AnyModule> m_module{nullptr};
     size_t m_model_stride;
-    bool m_terminate{false};
+    std::atomic<bool> m_terminate{false};
     std::deque<NNTask *> m_input_queue;
     std::mutex m_input_lock;
     std::condition_variable m_input_cv;
@@ -190,5 +190,7 @@ std::vector<DecodedChunk> CudaModelRunner::call_chunks(int num_chunks) {
 size_t CudaModelRunner::model_stride() const { return m_caller->m_model_stride; }
 size_t CudaModelRunner::chunk_size() const { return m_input.size(2); }
 size_t CudaModelRunner::batch_size() const { return m_input.size(0); }
+
+void CudaModelRunner::terminate() { m_caller->terminate(); }
 
 }  // namespace dorado

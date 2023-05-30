@@ -36,6 +36,15 @@ Dorado has been tested extensively and supported on the following systems:
 
 Systems not listed above but which have Nvidia GPUs with >=8GB VRAM and architecture from Volta onwards have not been widely tested but are expected to work. If you encounter problems with running on your system please [report an issue](https://github.com/nanoporetech/dorado/issues)
 
+## Roadmap
+
+Dorado is Oxford Nanopore's recommended basecaller for offline basecalling. We are working on a number of features which we expect to release soon:
+
+1. DNA Barcode multiplexing
+2. Adapter trimming
+3. Python API
+4. Statically linked binary
+
 ## Performance tips
 
 1. For optimal performance Dorado requires POD5 file input. Please [convert your Fast5 files](https://github.com/nanoporetech/pod5-file-format) before basecalling.
