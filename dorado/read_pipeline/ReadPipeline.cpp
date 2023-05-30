@@ -47,7 +47,7 @@ bool get_modbase_channel_name(std::string &channel_name, const std::string &mod_
 namespace dorado {
 
 std::string Read::generate_read_group() const {
-    if (run_id != "" && model_name != "") {
+    if (!run_id.empty() && !model_name.empty()) {
         return std::string(run_id + "_" + model_name);
     }
     return "";
