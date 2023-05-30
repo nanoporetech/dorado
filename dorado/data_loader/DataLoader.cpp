@@ -409,32 +409,46 @@ uint16_t DataLoader::get_sample_rate(std::string data_path, bool recursive_file_
             std::string ext = std::filesystem::path(entry).extension().string();
             std::transform(ext.begin(), ext.end(), ext.begin(),
                            [](unsigned char c) { return std::tolower(c); });
+            auto file_path = entry.path().string();
             if (ext == ".pod5") {
                 pod5_init();
 
                 // Open the file ready for walking:
-                Pod5FileReader_t* file = pod5_open_file(entry.path().string().c_str());
+                Pod5FileReader_t* file = pod5_open_file(file_path.c_str());
 
                 if (!file) {
-                    spdlog::error("Failed to open file {}: {}", entry.path().string().c_str(),
+                    spdlog::error("Failed to open file {}: {}", file_path.c_str(),
                                   pod5_get_error_string());
                 } else {
                     // First get the run info count
                     run_info_index_t run_info_count;
-                    pod5_get_file_run_info_count(file, &run_info_count);
+                    if (pod5_get_file_run_info_count(file, &run_info_count) != POD5_OK) {
+                        spdlog::error("Failed to fetch POD5 run info count for file {} : {}",
+                                      file_path.c_str(), pod5_get_error_string());
+                        continue;
+                    }
                     if (run_info_count > static_cast<run_info_index_t>(0)) {
                         RunInfoDictData_t* run_info_data;
-                        pod5_get_file_run_info(file, 0, &run_info_data);
+                        if (pod5_get_file_run_info(file, 0, &run_info_data) != POD5_OK) {
+                            spdlog::error(
+                                    "Failed to fetch POD5 run info dict for file {} and run info "
+                                    "index 0: {}",
+                                    file_path.c_str(), pod5_get_error_string());
+                            continue;
+                        }
                         sample_rate = run_info_data->sample_rate;
 
                         if (pod5_free_run_info(run_info_data) != POD5_OK) {
-                            spdlog::error("Failed to free POD5 run info");
+                            spdlog::error(
+                                    "Failed to free POD5 run info for file {} and run info index 0",
+                                    file_path.c_str());
                         }
                     }
                 }
 
                 if (pod5_close_and_free_reader(file) != POD5_OK) {
-                    spdlog::error("Failed to close and free POD5 reader");
+                    spdlog::error("Failed to close and free POD5 reader for file {}",
+                                  file_path.c_str());
                 }
             } else if (ext == ".fast5") {
                 H5Easy::File file(entry.path().string(), H5Easy::File::ReadOnly);
