@@ -145,7 +145,7 @@ inline std::vector<int8_t> encode_kmer_generic(const std::vector<int>& seq,
             for (size_t kmer_pos = 0; kmer_pos < kmer_len; ++kmer_pos) {
                 auto base = seq[seq_pos + kmer_pos];
                 uint32_t base_oh = (base == -1) ? 0ul : (1ul << (base << 3));
-                // memcpy will be translated ot a single 32 bit write.
+                // memcpy will be translated to a single 32 bit write.
                 std::memcpy(output_ptr, &base_oh, sizeof(base_oh));
                 output_ptr += 4;
             }

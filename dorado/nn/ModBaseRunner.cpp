@@ -294,8 +294,9 @@ void ModBaseRunner::accept_chunk(int model_id,
     dorado::utils::copy_tensor_elems(input_sigs, chunk_idx * sig_len, signal, 0, sig_len);
 
     const auto kmer_elem_count = input_seqs.size(1) * input_seqs.size(2);
-    if (input_seqs.dtype() != torch::kInt8)
+    if (input_seqs.dtype() != torch::kInt8) {
         throw std::runtime_error("Unsupported input dtype");
+    }
     using SeqInputType = int8_t;
     SeqInputType* const input_seqs_ptr = input_seqs.data_ptr<SeqInputType>();
     std::memcpy(&input_seqs_ptr[chunk_idx * kmer_elem_count], kmers.data(),
