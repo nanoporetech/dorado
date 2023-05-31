@@ -69,6 +69,11 @@ struct RemoraConvModelImpl : Module {
         sigs = sig_conv2(sigs);
         sigs = sig_conv3(sigs);
 
+        // We are supplied one hot encoded sequences as (batch, signal, kmer_len * base_count) int8.
+        // We need (batch, kmer_len * base_count, signal) and a dtype compatible with the float16
+        // weights.
+        const auto conv_dtype = (seqs.device() == torch::kCPU) ? torch::kFloat32 : torch::kFloat16;
+        seqs = seqs.permute({0, 2, 1}).to(conv_dtype);
         seqs = seq_conv1(seqs);
         seqs = seq_conv2(seqs);
         seqs = seq_conv3(seqs);
@@ -152,6 +157,11 @@ struct RemoraConvLSTMModelImpl : Module {
         sigs = sig_conv2(sigs);
         sigs = sig_conv3(sigs);
 
+        // We are supplied one hot encoded sequences as (batch, signal, kmer_len * base_count) int8.
+        // We need (batch, kmer_len * base_count, signal) and a dtype compatible with the float16
+        // weights.
+        const auto conv_dtype = (seqs.device() == torch::kCPU) ? torch::kFloat32 : torch::kFloat16;
+        seqs = seqs.permute({0, 2, 1}).to(conv_dtype);
         seqs = seq_conv1(seqs);
         seqs = seq_conv2(seqs);
 
