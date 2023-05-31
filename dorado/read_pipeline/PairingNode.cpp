@@ -9,7 +9,7 @@ bool is_within_time_and_length_criteria(const std::shared_ptr<dorado::Read>& rea
     int seq_len2 = read2->seq.length();
     float len_ratio = static_cast<float>(std::min(seq_len1, seq_len2)) /
                       static_cast<float>(std::max(seq_len1, seq_len2));
-    return (delta < max_time_delta_ms) && len_ratio >= min_seq_len_ratio;
+    return (delta >= 0) && (delta < max_time_delta_ms) && (len_ratio >= min_seq_len_ratio);
 }
 }  // namespace
 
