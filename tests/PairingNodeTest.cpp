@@ -16,7 +16,6 @@ std::shared_ptr<dorado::Read> make_read(int delay_ms, size_t seq_len) {
     read->attributes.mux = 3;
     read->attributes.num_samples = 10000;
     read->start_sample = 29767426 + (delay_ms * read->sample_rate) / 1000;
-    ;
     read->end_sample = read->start_sample + read->attributes.num_samples;
     read->run_acquisition_start_time_ms = 1676976119670;
     read->start_time_ms = read->run_acquisition_start_time_ms +
