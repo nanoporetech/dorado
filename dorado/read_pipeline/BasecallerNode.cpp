@@ -86,6 +86,7 @@ void BasecallerNode::input_worker_thread() {
             {
                 std::lock_guard working_reads_lock(m_working_reads_mutex);
                 m_working_reads.push_back(std::move(read));
+                ++m_working_reads_size;
             }
 
             m_chunks_added_cv.notify_one();
@@ -138,6 +139,7 @@ void BasecallerNode::working_reads_manager() {
                             m_model_name;  // Before sending read to sink, assign its model name
                     completed_reads.push_back(*read_iter);
                     read_iter = m_working_reads.erase(read_iter);
+                    --m_working_reads_size;
                 } else {
                     read_iter++;
                 }
@@ -309,6 +311,7 @@ stats::NamedStats BasecallerNode::sample_stats() const {
     stats["partial_batches_called"] = m_num_partial_batches_called;
     stats["call_chunks_ms"] = m_call_chunks_ms;
     stats["called_reads_pushed"] = m_called_reads_pushed;
+    stats["working_reads_items"] = m_working_reads_size;
     return stats;
 }
 
