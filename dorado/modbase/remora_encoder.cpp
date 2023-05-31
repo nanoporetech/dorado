@@ -168,14 +168,12 @@ encode_kmer_len9(const std::vector<int>& seq,
 }
 
 #if ENABLE_AVX2_IMPL
-__attribute__((target("avx2")))
-#endif
-std::vector<int8_t>
-encode_kmer_len9(const std::vector<int>& seq,
-                 const std::vector<int>& seq_mappings,
-                 int bases_before,
-                 int bases_after,
-                 int context_samples) {
+__attribute__((target("avx2"))) std::vector<int8_t> encode_kmer_len9(
+        const std::vector<int>& seq,
+        const std::vector<int>& seq_mappings,
+        int bases_before,
+        int bases_after,
+        int context_samples) {
     // These cannot change without a rewrite.
     constexpr int kKmerLen = 9;
     constexpr int kNumBases = 4;
@@ -260,6 +258,7 @@ encode_kmer_len9(const std::vector<int>& seq,
 
     return output_t;
 }
+#endif
 
 }  // namespace
 
