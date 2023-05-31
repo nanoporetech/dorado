@@ -159,7 +159,7 @@ std::vector<BamPtr> Read::extract_sam_lines(bool emit_moves, uint8_t modbase_thr
 
 uint64_t Read::get_end_time_ms() {
     return start_time_ms +
-           (attributes.num_samples * 1000) / sample_rate;  //TODO get rid of the trimmed thing?
+           ((end_sample - start_sample) * 1000) / sample_rate;  //TODO get rid of the trimmed thing?
 }
 
 void Read::generate_modbase_string(bam1_t *aln, uint8_t threshold) const {
