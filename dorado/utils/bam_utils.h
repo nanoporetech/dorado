@@ -5,7 +5,11 @@
 #include "utils/stats.h"
 #include "utils/types.h"
 
+#ifdef WIN32
+#include <indicators/progress_bar.hpp>
+#else
 #include <indicators/block_progress_bar.hpp>
+#endif
 
 #include <atomic>
 #include <map>
@@ -36,7 +40,7 @@ public:
             uint64_t index_batch_size,
             int threads);
     ~Aligner();
-    std::string get_name() const override { return "HtsWriter"; }
+    std::string get_name() const override { return "Aligner"; }
     stats::NamedStats sample_stats() const override;
     std::vector<BamPtr> align(bam1_t* record, mm_tbuf_t* buf);
     sq_t get_sequence_records_for_header();
@@ -129,10 +133,16 @@ private:
     bool m_prog_bar_initialized{false};
     size_t m_num_reads_expected;
     int m_progress_bar_interval;
+
+#ifdef WIN32
+    indicators::ProgressBar m_progress_bar {
+#else
     indicators::BlockProgressBar m_progress_bar{
-            indicators::option::Stream{std::cerr},     indicators::option::BarWidth{30},
-            indicators::option::ShowElapsedTime{true}, indicators::option::ShowRemainingTime{true},
-            indicators::option::ShowPercentage{true},
+#endif
+        indicators::option::Stream{std::cerr}, indicators::option::BarWidth{30},
+                indicators::option::ShowElapsedTime{true},
+                indicators::option::ShowRemainingTime{true},
+                indicators::option::ShowPercentage{true},
     };
 };
 

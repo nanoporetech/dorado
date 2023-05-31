@@ -484,7 +484,9 @@ void HtsWriter::worker_thread() {
             if (m_num_reads_expected != 0) {
                 float progress = 100.f * static_cast<float>(write_count) / m_num_reads_expected;
                 m_progress_bar.set_progress(progress);
+#ifndef WIN32
                 std::cerr << "\033[K";
+#endif  // WIN32
             } else {
                 std::cerr << "\r> Output records written: " << write_count;
             }

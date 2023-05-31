@@ -50,6 +50,7 @@ public:
     std::vector<size_t> get_motif_hits(size_t caller_id, const std::string& seq) const;
     ModBaseParams& caller_params(size_t caller_id) const;
     size_t num_callers() const;
+    void terminate();
     std::string get_name() const;
     stats::NamedStats sample_stats() const;
 

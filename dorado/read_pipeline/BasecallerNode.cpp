@@ -87,12 +87,16 @@ void BasecallerNode::input_worker_thread() {
                 std::lock_guard working_reads_lock(m_working_reads_mutex);
                 m_working_reads.push_back(std::move(read));
             }
+
+            m_chunks_added_cv.notify_one();
+
             break;  // Go back to watching the input reads
         }
     }
 
     // Notify the basecaller threads that it is safe to gracefully terminate the basecaller
     m_terminate_basecaller.store(true);
+    m_chunks_added_cv.notify_all();
 }
 
 void BasecallerNode::basecall_current_batch(int worker_id) {
@@ -142,6 +146,8 @@ void BasecallerNode::working_reads_manager() {
 
         if (completed_reads.empty()) {
             std::this_thread::sleep_for(10ms);
+        } else {
+            m_chunks_in_has_space_cv.notify_one();
         }
 
         for (auto &read : completed_reads) {
@@ -159,46 +165,41 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
     int batch_size = m_model_runners[worker_id]->batch_size();
     while (true) {
         std::unique_lock<std::mutex> chunks_lock(m_chunks_in_mutex);
-
-        if (m_chunks_in.empty()) {
-            if (m_terminate_basecaller.load()) {
-                chunks_lock.unlock();  // Not strictly necessary
-                // We dispatch any part-full buffer here to finish basecalling.
-                if (!m_batched_chunks[worker_id].empty()) {
-                    basecall_current_batch(worker_id);
-                }
-
-                {
-                    std::lock_guard working_reads_lock(m_working_reads_mutex);
-                    if (!m_working_reads.empty()) {
-                        continue;
-                    }
-                }
-
-                size_t num_remaining_runners = --m_num_active_model_runners;
-
-                if (num_remaining_runners == 0) {
-                    m_terminate_manager.store(true);
-                }
-
-                return;
-
-            } else {
-                // There's no chunks available to call at the moment, sleep and try again
-                chunks_lock.unlock();
-
-                auto current_time = std::chrono::system_clock::now();
-                auto delta = std::chrono::duration_cast<std::chrono::milliseconds>(
-                        current_time - last_chunk_reserve_time);
-                if (delta.count() > m_batch_timeout_ms && !m_batched_chunks[worker_id].empty()) {
-                    basecall_current_batch(worker_id);
-                    ++m_num_partial_batches_called;
-                } else {
-                    std::this_thread::sleep_for(100ms);
-                    ++m_num_input_chunks_sleeps;
-                }
-                continue;
+        if (!m_chunks_added_cv.wait_until(
+                    chunks_lock,
+                    last_chunk_reserve_time + std::chrono::milliseconds(m_batch_timeout_ms),
+                    [this] { return !m_chunks_in.empty() || m_terminate_basecaller.load(); })) {
+            // timeout without new chunks or termination call
+            chunks_lock.unlock();
+            if (!m_batched_chunks[worker_id].empty()) {
+                basecall_current_batch(worker_id);
             }
+
+            // reset wait period
+            last_chunk_reserve_time = std::chrono::system_clock::now();
+            continue;
+        }
+
+        if (m_chunks_in.empty() && m_terminate_basecaller.load()) {
+            // no remaining chunks and we've been told to terminate
+            // call the remaining batch
+            chunks_lock.unlock();  // Not strictly necessary
+            if (!m_batched_chunks[worker_id].empty()) {
+                basecall_current_batch(worker_id);
+            }
+
+            // Reduce the count of active runner threads.  If this was the last active
+            // thread also send termination signal to sink
+            int num_remaining_runners = --m_num_active_model_runners;
+            if (num_remaining_runners == 0) {
+                // runners can share a caller, so shutdown when all runners are done
+                // rather than terminating each runner as it finishes
+                for (auto &runner : m_model_runners) {
+                    runner->terminate();
+                }
+                m_terminate_manager.store(true);
+            }
+            return;
         }
 
         // There's chunks to get_scores, so let's add them to our input tensor
@@ -306,7 +307,6 @@ stats::NamedStats BasecallerNode::sample_stats() const {
     }
     stats["batches_called"] = m_num_batches_called;
     stats["partial_batches_called"] = m_num_partial_batches_called;
-    stats["input_chunks_sleeps"] = m_num_input_chunks_sleeps;
     stats["call_chunks_ms"] = m_call_chunks_ms;
     stats["called_reads_pushed"] = m_called_reads_pushed;
     return stats;

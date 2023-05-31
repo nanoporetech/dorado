@@ -125,7 +125,13 @@ public:
             m_options = torch::TensorOptions().device(device).dtype(torch::kFloat16);
         }
 
-        for (size_t model_id = 0; model_id < model_paths.size(); ++model_id) {
+        // Allocate enough elements up-front so that m_caller_data.push_back() doesn't reallocate while
+        // other threads can be referencing elements that it's holding.
+        const std::size_t num_models = model_paths.size();
+        m_caller_data.reserve(num_models);
+        m_task_threads.reserve(num_models);
+
+        for (size_t model_id = 0; model_id < num_models; ++model_id) {
             const auto& model_path = model_paths[model_id];
             auto caller_data = std::make_unique<ModBaseData>();
 #if DORADO_GPU_BUILD && !defined(__APPLE__)
@@ -202,12 +208,12 @@ public:
     }
 
     void modbase_task_thread_fn(size_t model_id) {
-        NVTX3_FUNC_RANGE();
         auto& caller_data = m_caller_data[model_id];
 #if DORADO_GPU_BUILD && !defined(__APPLE__)
         const bool has_stream = caller_data->stream.has_value();
 #endif
         while (true) {
+            nvtx3::scoped_range loop{"modbase_task_thread_fn"};
             torch::InferenceMode guard;
 #if DORADO_GPU_BUILD && !defined(__APPLE__)
             // If caller_data->stream is set, sets the current stream to caller_data->stream, and the current device to
@@ -244,6 +250,8 @@ public:
             task_lock.unlock();
         }
     }
+
+    void terminate() { m_terminate.store(true); }
 
     std::string get_name() const {
         return std::string("ModBaseCaller_") + m_options.device().str();
@@ -351,6 +359,7 @@ ModBaseParams& ModBaseRunner::caller_params(size_t caller_id) const {
 }
 
 size_t ModBaseRunner::num_callers() const { return m_caller->m_caller_data.size(); }
+void ModBaseRunner::terminate() { m_caller->terminate(); }
 
 std::string ModBaseRunner::get_name() const {
     std::ostringstream name_stream;

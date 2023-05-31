@@ -21,6 +21,7 @@ public:
     virtual size_t model_stride() const = 0;
     virtual size_t chunk_size() const = 0;
     virtual size_t batch_size() const = 0;
+    virtual void terminate() = 0;
     virtual std::string get_name() const = 0;
     virtual stats::NamedStats sample_stats() const = 0;
 };
@@ -39,11 +40,11 @@ public:
     size_t model_stride() const final { return m_model_stride; }
     size_t chunk_size() const final { return m_input.size(2); }
     size_t batch_size() const final { return m_input.size(0); }
-    std::string get_name() const final;
+    void terminate() final {}
+    std::string get_name() const final { return "ModelRunner"; }
     stats::NamedStats sample_stats() const final;
 
 private:
-    std::string m_device;
     torch::Tensor m_input;
     torch::TensorOptions m_options;
     std::unique_ptr<T> m_decoder;
@@ -97,15 +98,6 @@ std::vector<DecodedChunk> ModelRunner<T>::call_chunks(int num_chunks) {
 template <typename T>
 void ModelRunner<T>::accept_chunk(int chunk_idx, const torch::Tensor &chunk) {
     m_input.index_put_({chunk_idx, 0}, chunk);
-}
-
-template <typename T>
-std::string ModelRunner<T>::get_name() const {
-    // The name must be unique across multiple instances.
-    // We could take a unique ID at setup time, but for now just use the address.
-    std::ostringstream name_stream;
-    name_stream << "ModelRunner_" << m_device << " " << this;
-    return name_stream.str();
 }
 
 template <typename T>

@@ -59,6 +59,7 @@ std::shared_ptr<dorado::Read> StereoDuplexEncoderNode::stereo_encode(
     if (!consensus_possible) {
         // There wasn't a good enough match -- return early with an empty read.
         edlibFreeAlignResult(result);
+        ++m_num_discarded_pairs;
         return read;
     }
 
@@ -321,6 +322,7 @@ StereoDuplexEncoderNode::~StereoDuplexEncoderNode() {
 
 stats::NamedStats StereoDuplexEncoderNode::sample_stats() const {
     stats::NamedStats stats = m_work_queue.sample_stats();
+    stats["discarded_pairs"] = m_num_discarded_pairs;
     return stats;
 }
 

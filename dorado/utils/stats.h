@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <fstream>
 #include <functional>
 #include <optional>
 #include <regex>
@@ -39,7 +40,7 @@ public:
     }
 
     // Dumps stats in CSV form, with entries filtered optionally according to name_filter.
-    void dump_stats(std::ostream& out_stream,
+    void dump_stats(std::ofstream& out_stream,
                     std::optional<std::regex> name_filter = std::nullopt) const {
         if (m_records.empty())
             return;

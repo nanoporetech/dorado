@@ -28,6 +28,7 @@ public:
     size_t model_stride() const final;
     size_t chunk_size() const final;
     size_t batch_size() const final;
+    void terminate() final;
     std::string get_name() const final;
     stats::NamedStats sample_stats() const final;
 
