@@ -169,8 +169,10 @@ void PairingNode::pair_generating_worker_thread() {
 }
 
 PairingNode::PairingNode(MessageSink& sink,
-                         std::optional<std::map<std::string, std::string>> template_complement_map)
-        : m_sink(sink), MessageSink(1000), m_num_worker_threads(2) {
+                         std::optional<std::map<std::string, std::string>> template_complement_map,
+                         int num_worker_threads,
+                         size_t max_reads)
+        : MessageSink(max_reads), m_sink(sink), m_num_worker_threads(num_worker_threads) {
     if (template_complement_map.has_value()) {
         m_template_complement_map = template_complement_map.value();
         // Set up the complement-template_map
