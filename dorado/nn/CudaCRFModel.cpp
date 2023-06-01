@@ -38,6 +38,7 @@ public:
         m_options = torch::TensorOptions().dtype(GPUDecoder::dtype).device(device);
         assert(m_options.device().is_cuda());
 
+        torch::InferenceMode guard;
         m_module = load_crf_model(model_path, model_config, m_options);
 
         // Batch size will be rounded up to a multiple of batch_size_granularity, regardless of
