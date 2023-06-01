@@ -406,14 +406,8 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     )
 
     if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
-        add_library(dorado_allocator_lib STATIC
-            dorado/utils/allocator_override.cpp
-        )
-        target_link_libraries(dorado_allocator_lib
-            ${POD5_LIBRARIES}
-        )
-
-        target_link_libraries(dorado_io_lib dorado_allocator_lib)
+        # Link the jemalloc library that ships with POD5.
+        target_link_libraries(dorado_io_lib ${POD5_LIBRARIES})
     endif()
 
     target_link_libraries(dorado_io_lib
