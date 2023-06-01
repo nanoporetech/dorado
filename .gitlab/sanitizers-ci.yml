@@ -16,14 +16,15 @@
     - export LSAN_OPTIONS=suppressions=${PWD}/.gitlab/lsan.supp
     - export TSAN_OPTIONS=suppressions=${PWD}/.gitlab/tsan.supp
   # No need to keep the build around
-  artifacts: []
+  # Note that this requires .sanitizer_common to come last in the extends list
+  artifacts: null
 
 # Sanitizer jobs
 
 sanitize:linux:x86:focal:
   extends:
-    - .sanitizer_common
     - build:linux:x86:focal
+    - .sanitizer_common
   before_script:
     # Setup sanitizers
     - !reference [.sanitizer_common, before_script]
@@ -33,15 +34,15 @@ sanitize:linux:x86:focal:
 
 sanitize:linux:arm64:bionic:
   extends:
-    - .sanitizer_common
     - build:linux:arm64:bionic
+    - .sanitizer_common
 
 sanitize:macos:m1:
   extends:
-    - .sanitizer_common
     - build:macos:m1
+    - .sanitizer_common
 
 sanitize:macos:x64:
   extends:
-    - .sanitizer_common
     - build:macos:x64
+    - .sanitizer_common
