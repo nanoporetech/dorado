@@ -283,7 +283,9 @@ void StereoDuplexEncoderNode::worker_thread() {
                 m_sink.push_message(
                         stereo_encoded_read);  // Stereo-encoded read created, send it to sink
             } else {
+                // announce to downstream that we rejected a candidate pair
                 --read_pair->read_1->num_duplex_candidate_pairs;
+                m_sink.push_message(CandidatePairRejectedMessage{});
             }
         } else if (std::holds_alternative<std::shared_ptr<Read>>(message)) {
             auto read = std::get<std::shared_ptr<Read>>(message);

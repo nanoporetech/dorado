@@ -25,6 +25,11 @@ void BasecallerNode::input_worker_thread() {
     }
 
     while (m_work_queue.try_pop(message)) {
+        if (std::holds_alternative<CandidatePairRejectedMessage>(message)) {
+            m_sink.push_message(std::move(message));
+            continue;
+        }
+
         // If this message isn't a read, we'll get a bad_variant_access exception.
         auto read = std::get<std::shared_ptr<Read>>(message);
         // If a read has already been basecalled, just send it to the sink without basecalling again

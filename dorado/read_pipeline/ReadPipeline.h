@@ -122,13 +122,19 @@ public:
     std::shared_ptr<Read> read_2;
 };
 
+class CandidatePairRejectedMessage {};
+
 // The Message type is a std::variant that can hold different types of message objects.
 // It is currently able to store:
 // - a std::shared_ptr<Read> object, which represents a single read
 // - a BamPtr object, which represents a raw BAM alignment record
 // - a std::shared_ptr<ReadPair> object, which represents a pair of reads for duplex calling
+// - a std::shared_ptr<CandidatePairRejectedMessage> object, which informs downstream processing that a candidate pair has been rejected
 // To add more message types, simply add them to the list of types in the std::variant.
-using Message = std::variant<std::shared_ptr<Read>, BamPtr, std::shared_ptr<ReadPair>>;
+using Message = std::variant<std::shared_ptr<Read>,
+                             BamPtr,
+                             std::shared_ptr<ReadPair>,
+                             CandidatePairRejectedMessage>;
 
 // Base class for an object which consumes messages.
 // MessageSink is a node within a pipeline.
