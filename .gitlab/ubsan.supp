@@ -1,0 +1,12 @@
+# This file contains a suppression list for UBSan
+# See https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html#runtime-suppressions
+
+# Torch doesn't appear to export vtables for its types on macOS, leading to UBSan thinking that
+# we're calling virtual methods through the wrong pointer type:
+#   torch/include/c10/core/Storage.h:96:33: runtime error: member call on address 0x60000356c0a0
+#   which does not point to an object of type 'c10::StorageImpl'
+#   0x60000356c0a0: note: object is of type 'c10::StorageImpl'
+# See https://bugs.llvm.org/show_bug.cgi?id=39191 for the fun details.
+# Note that Linux is fine (https://github.com/pytorch/pytorch/pull/20461), but suppression files
+# don't support conditionals so we have to suppress them globally.
+vptr:torch/include/*

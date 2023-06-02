@@ -1,0 +1,6 @@
+# This file contains a suppression list for LSan
+# See https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html#runtime-suppressions
+
+# There's a leak in the NNPACK backend
+# See https://github.com/pytorch/pytorch/pull/102276
+leak:_nnpack_spatial_convolution

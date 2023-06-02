@@ -14,7 +14,9 @@ namespace dorado {
 class PairingNode : public MessageSink {
 public:
     PairingNode(MessageSink& sink,
-                std::optional<std::map<std::string, std::string>> = std::nullopt);
+                std::optional<std::map<std::string, std::string>> = std::nullopt,
+                int num_worker_threads = 2,
+                size_t max_reads = 1000);
     ~PairingNode();
 
 private:

@@ -118,6 +118,7 @@ int duplex(int argc, char* argv[]) {
         auto threads = static_cast<size_t>(parser.get<int>("--threads"));
         auto min_qscore(parser.get<int>("--min-qscore"));
         auto ref = parser.get<std::string>("--reference");
+        const bool basespace_duplex = (model.compare("basespace") == 0);
         std::vector<std::string> args(argv, argv + argc);
         if (parser.get<bool>("--verbose")) {
             spdlog::set_level(spdlog::level::debug);
@@ -158,7 +159,9 @@ int duplex(int argc, char* argv[]) {
 
         bool recursive_file_loading = parser.get<bool>("--recursive");
 
-        size_t num_reads = DataLoader::get_num_reads(reads, read_list, recursive_file_loading);
+        size_t num_reads = (basespace_duplex ? read_list_from_pairs.size()
+                                             : DataLoader::get_num_reads(reads, read_list,
+                                                                         recursive_file_loading));
 
         std::unique_ptr<sam_hdr_t, void (*)(sam_hdr_t*)> hdr(sam_hdr_init(), sam_hdr_destroy);
         utils::add_pg_hdr(hdr.get(), args);
@@ -168,8 +171,6 @@ int duplex(int argc, char* argv[]) {
 
         if (ref.empty()) {
             bam_writer = std::make_shared<HtsWriter>("-", output_mode, 4, num_reads);
-            bam_writer->add_header(hdr.get());
-            bam_writer->write_header();
             converted_reads_sink = bam_writer.get();
         } else {
             bam_writer = std::make_shared<HtsWriter>("-", output_mode, 4, num_reads);
@@ -178,8 +179,6 @@ int duplex(int argc, char* argv[]) {
                     utils::parse_string_to_size(parser.get<std::string>("I")),
                     std::thread::hardware_concurrency());
             utils::add_sq_hdr(hdr.get(), aligner->get_sequence_records_for_header());
-            bam_writer->add_header(hdr.get());
-            bam_writer->write_header();
             converted_reads_sink = aligner.get();
         }
         ReadToBamType read_converter(*converted_reads_sink, emit_moves, rna, 2);
@@ -190,13 +189,13 @@ int duplex(int argc, char* argv[]) {
 
         torch::set_num_threads(1);
 
-        if (model.compare("basespace") == 0) {  // Execute a Basespace duplex pipeline.
+        if (basespace_duplex) {  // Execute a Basespace duplex pipeline.
             if (pairs_file.empty()) {
                 spdlog::error("The --pairs argument is required for the basespace model.");
                 return 1;  // Exit with an error code
             }
-            // create a set of the read_ids
-            auto read_ids = utils::get_read_list_from_pairs(template_complement_map);
+            // Write header as no read group info is needed.
+            bam_writer->write_header(hdr.get());
 
             spdlog::info("> Loading reads");
             auto read_map = utils::read_bam(reads, read_list_from_pairs);
@@ -208,6 +207,7 @@ int duplex(int argc, char* argv[]) {
         } else {  // Execute a Stereo Duplex pipeline.
 
             const auto model_path = std::filesystem::canonical(std::filesystem::path(model));
+            model = model_path.filename().string();
 
             auto data_sample_rate = DataLoader::get_sample_rate(reads, recursive_file_loading);
             auto model_sample_rate = get_model_sample_rate(model_path);
@@ -226,6 +226,14 @@ int duplex(int argc, char* argv[]) {
             if (!std::filesystem::exists(stereo_model_path)) {
                 utils::download_models(model_path.parent_path().u8string(), stereo_model_name);
             }
+
+            // Write read group info to header.
+            auto read_groups = DataLoader::load_read_groups(reads, model, recursive_file_loading);
+            auto duplex_rg_name = std::string(model + "_" + stereo_model_name);
+            read_groups.merge(
+                    DataLoader::load_read_groups(reads, duplex_rg_name, recursive_file_loading));
+            utils::add_rg_hdr(hdr.get(), read_groups);
+            bam_writer->write_header(hdr.get());
 
             std::vector<Runner> runners;
             std::vector<Runner> stereo_runners;
@@ -315,7 +323,7 @@ int duplex(int argc, char* argv[]) {
             const int kStereoBatchTimeoutMS = 5000;
             auto stereo_basecaller_node = std::make_unique<BasecallerNode>(
                     read_filter_node, std::move(stereo_runners), adjusted_stereo_overlap,
-                    kStereoBatchTimeoutMS);
+                    kStereoBatchTimeoutMS, duplex_rg_name);
             auto simplex_model_stride = runners.front()->model_stride();
 
             StereoDuplexEncoderNode stereo_node =
@@ -339,7 +347,7 @@ int duplex(int argc, char* argv[]) {
             const int kSimplexBatchTimeoutMS = 100;
             auto basecaller_node = std::make_unique<BasecallerNode>(
                     splitter_node, std::move(runners), adjusted_simplex_overlap,
-                    kSimplexBatchTimeoutMS);
+                    kSimplexBatchTimeoutMS, model);
 
             ScalerNode scaler_node(*basecaller_node, num_devices * 2);
 

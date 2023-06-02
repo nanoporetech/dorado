@@ -26,8 +26,7 @@ protected:
         HtsReader reader(m_in_sam.string());
         HtsWriter writer(m_out_bam.string(), mode, num_threads, 0);
 
-        writer.add_header(reader.header);
-        writer.write_header();
+        writer.write_header(reader.header);
         reader.read(writer, 1000);
 
         writer.join();

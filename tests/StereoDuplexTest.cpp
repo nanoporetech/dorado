@@ -26,6 +26,7 @@ TEST_CASE(TEST_GROUP "Encoder", "[.]") {
     template_read->moves = ReadFileIntoVector(DataPath("template_moves"));
     torch::load(template_read->raw_data, DataPath("template_raw_data.tensor").string());
     template_read->raw_data = template_read->raw_data.to(torch::kFloat16);
+    template_read->run_id = "test_run";
 
     const auto complement_read = std::make_shared<dorado::Read>();
     complement_read->seq = ReadFileIntoString(DataPath("complement_seq"));
@@ -46,8 +47,9 @@ TEST_CASE(TEST_GROUP "Encoder", "[.]") {
     const auto stereo_read = stereo_node.stereo_encode(template_read, complement_read);
     REQUIRE(torch::equal(stereo_raw_data, stereo_read->raw_data));
 
-    // Check that the duplex tag is set correctly.
+    // Check that the duplex tag and run id is set correctly.
     REQUIRE(stereo_read->is_duplex);
+    REQUIRE(stereo_read->run_id == template_read->run_id);
 
     // Encode with swapped template and complement reads
     const auto swapped_stereo_read = stereo_node.stereo_encode(complement_read, template_read);

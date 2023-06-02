@@ -108,10 +108,10 @@ int aligner(int argc, char* argv[]) {
     HtsReader reader(reads[0]);
 
     spdlog::debug("> input fmt: {} aligned: {}", reader.format, reader.is_aligned);
-    writer.add_header(reader.header);
-    add_pg_hdr(writer.header);
-    utils::add_sq_hdr(writer.header, aligner.get_sequence_records_for_header());
-    writer.write_header();
+    auto header = sam_hdr_dup(reader.header);
+    add_pg_hdr(header);
+    utils::add_sq_hdr(header, aligner.get_sequence_records_for_header());
+    writer.write_header(header);
 
     spdlog::info("> starting alignment");
     reader.read(aligner, max_reads);
