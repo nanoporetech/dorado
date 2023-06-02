@@ -57,6 +57,7 @@ TEST_CASE(TEST_GROUP ": Test tag generation", TEST_GROUP) {
     aln = alignments[0].get();
 
     CHECK(bam_aux2i(bam_aux_get(aln, "dx")) == 1);
+    CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "RG")), Equals("xyz_test_model"));
 }
 
 TEST_CASE(TEST_GROUP ": Test sam record generation", TEST_GROUP) {
