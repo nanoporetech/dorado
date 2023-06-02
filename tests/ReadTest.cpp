@@ -150,6 +150,7 @@ TEST_CASE(TEST_GROUP ": Methylation tag generation", TEST_GROUP) {
     read.seq = "ACAGTGACTAAACTC";
     read.qstring = "***************";
     read.base_mod_probs = modbase_probs;
+    read.is_duplex = false;
 
     std::string methylation_tag;
     SECTION("Methylation threshold is correctly applied") {

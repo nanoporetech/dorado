@@ -42,10 +42,23 @@ include(cmake/Torch.cmake)
 include(cmake/OpenSSL.cmake)
 include(cmake/Htslib.cmake)
 
+# Add sanitizer options to compilation flags
+include(cmake/ECMEnableSanitizers.cmake)
+if (ECM_ENABLE_SANITIZERS)
+    # Always emit debug info to provide better stack traces
+    add_compile_options(-g)
+    # Add a way to detect if we're compiling with sanitizers enabled, since UBSan
+    # detection isn't available in GCC
+    foreach (SANITIZER ${ECM_ENABLE_SANITIZERS})
+        string(TOUPPER ${SANITIZER} SANITIZER)
+        add_compile_definitions(DORADO_SANITIZE_${SANITIZER})
+    endforeach()
+endif()
+
 if(DORADO_USING_OLD_CPP_ABI)
   # We need to force the use of the old ABI here, if we are building in an old ABI context, as otherwise elzip builds
   # with the libc++11 ABI and we can't link against it.
-  add_compile_options(-D_GLIBCXX_USE_CXX11_ABI=0)
+  add_compile_definitions(_GLIBCXX_USE_CXX11_ABI=0)
 endif()
 
 # We don't support GPU builds on macOS/x64
@@ -53,6 +66,13 @@ if (APPLE AND CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
     set(DORADO_GPU_BUILD FALSE)
 else()
     set(DORADO_GPU_BUILD TRUE)
+endif()
+
+# Use ccache for C and C++ if it's available
+find_program(CCACHE_EXE ccache)
+if (CCACHE_EXE)
+    set(CMAKE_C_COMPILER_LAUNCHER ${CCACHE_EXE})
+    set(CMAKE_CXX_COMPILER_LAUNCHER ${CCACHE_EXE})
 endif()
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
