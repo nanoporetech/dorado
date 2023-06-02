@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <condition_variable>
 #include <mutex>
 #include <optional>
@@ -12,7 +13,7 @@ class AsyncQueue {
     // Guards the entire structure.  Should be held while adding/removing items,
     // or interacting with m_terminate.
     // Used for not-empty and not-full CV waits.
-    std::mutex m_mutex;
+    mutable std::mutex m_mutex;
     // Signalled when an item has been consumed, and the queue therefore has space
     // for new items.
     std::condition_variable m_not_full_cv;
@@ -26,6 +27,9 @@ class AsyncQueue {
     // If true, CV waits should terminate regardless of other state.
     // Pending attempts to push or pop items will fail.
     bool m_terminate = false;
+    // Stats for monitoring queue usage.
+    int64_t m_num_pushes = 0;
+    int64_t m_num_pops = 0;
 
 public:
     // Attempts to push items beyond capacity will block.
@@ -53,6 +57,7 @@ public:
         if (m_terminate)
             return false;
         m_items.push(std::move(item));
+        ++m_num_pushes;
 
         // Inform a waiting thread that there is now an item available.
         lock.unlock();
@@ -76,6 +81,7 @@ public:
 
         item = std::move(m_items.front());
         m_items.pop();
+        ++m_num_pops;
 
         // Inform a waiting thread that the queue is not full.
         lock.unlock();
@@ -97,5 +103,16 @@ public:
         // inside try_push/try_pop.
         m_not_full_cv.notify_all();
         m_not_empty_cv.notify_all();
+    }
+
+    std::string get_name() const { return "queue"; }
+
+    std::unordered_map<std::string, double> sample_stats() const {
+        std::unordered_map<std::string, double> stats;
+        std::lock_guard<std::mutex> lock(m_mutex);
+        stats["items"] = m_items.size();
+        stats["pushes"] = m_num_pushes;
+        stats["pops"] = m_num_pops;
+        return stats;
     }
 };

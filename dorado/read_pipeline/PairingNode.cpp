@@ -198,4 +198,10 @@ PairingNode::~PairingNode() {
         m->join();
     }
 }
+
+stats::NamedStats PairingNode::sample_stats() const {
+    stats::NamedStats stats = m_work_queue.sample_stats();
+    return stats;
+}
+
 }  // namespace dorado

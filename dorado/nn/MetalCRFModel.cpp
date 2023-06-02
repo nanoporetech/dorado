@@ -871,6 +871,7 @@ void MetalModelRunner::accept_chunk(int chunk_idx, const torch::Tensor &chunk) {
 }
 
 std::vector<DecodedChunk> MetalModelRunner::call_chunks(int num_chunks) {
+    ++m_num_batches_called;
     std::vector<DecodedChunk> out_chunks(num_chunks);
     m_caller->call_chunks(m_input, num_chunks, out_chunks);
     return out_chunks;
@@ -881,5 +882,11 @@ size_t MetalModelRunner::chunk_size() const { return m_input.size(1); }
 size_t MetalModelRunner::batch_size() const { return m_input.size(0); }
 
 void MetalModelRunner::terminate() { m_caller->terminate(); }
+
+stats::NamedStats MetalModelRunner::sample_stats() const {
+    stats::NamedStats stats;
+    stats["batches_called"] = m_num_batches_called;
+    return stats;
+}
 
 }  // namespace dorado

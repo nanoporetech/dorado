@@ -28,12 +28,17 @@ public:
     size_t chunk_size() const final;
     size_t batch_size() const final;
     void terminate() final;
+    std::string get_name() const final;
+    stats::NamedStats sample_stats() const final;
 
 private:
     std::shared_ptr<CudaCaller> m_caller;
     c10::cuda::CUDAStream m_stream;
     torch::Tensor m_input;
     torch::Tensor m_output;
+
+    // Performance monitoring stats.
+    std::atomic<int64_t> m_num_batches_called = 0;
 };
 
 }  // namespace dorado
