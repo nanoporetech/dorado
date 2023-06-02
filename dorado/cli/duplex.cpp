@@ -203,8 +203,6 @@ int duplex(int argc, char* argv[]) {
                 spdlog::error("The --pairs argument is required for the basespace model.");
                 return 1;  // Exit with an error code
             }
-            // create a set of the read_ids
-            auto read_ids = utils::get_read_list_from_pairs(template_complement_map);
 
             spdlog::info("> Loading reads");
             auto read_map = utils::read_bam(reads, read_list_from_pairs);
