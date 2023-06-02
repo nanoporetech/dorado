@@ -24,6 +24,7 @@
 #include "utils/cli_utils.h"
 #include "utils/log_utils.h"
 #include "utils/parameters.h"
+#include "utils/stats.h"
 
 #include <argparse.hpp>
 #include <htslib/sam.h>
@@ -31,6 +32,7 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <memory>
 #include <sstream>
@@ -41,6 +43,7 @@ namespace dorado {
 using HtsWriter = utils::HtsWriter;
 using HtsReader = utils::HtsReader;
 using dorado::utils::default_parameters;
+using namespace std::chrono_literals;
 
 void setup(std::vector<std::string> args,
            const std::filesystem::path& model_path,
@@ -64,7 +67,9 @@ void setup(std::vector<std::string> args,
            int kmer_size,
            int window_size,
            uint64_t mm2_index_batch_size,
-           bool skip_model_compatibility_check) {
+           bool skip_model_compatibility_check,
+           const std::string& dump_stats_file,
+           const std::string& dump_stats_filter) {
     torch::set_num_threads(1);
     std::vector<Runner> runners;
 
@@ -237,9 +242,38 @@ void setup(std::vector<std::string> args,
 
     DataLoader loader(scaler_node, "cpu", thread_allocations.loader_threads, max_reads, read_list);
 
+    std::unique_ptr<dorado::stats::StatsSampler> stats_sampler;
+    if (!dump_stats_file.empty()) {
+        std::vector<dorado::stats::StatsReporter> stats_reporters;
+        using dorado::stats::make_stats_reporter;
+        stats_reporters.push_back(make_stats_reporter(basecaller_node));
+        if (mod_base_caller_node) {
+            stats_reporters.push_back(make_stats_reporter(*mod_base_caller_node));
+        }
+        if (aligner) {
+            stats_reporters.push_back(make_stats_reporter(*aligner));
+        }
+        stats_reporters.push_back(make_stats_reporter(*bam_writer));
+        stats_reporters.push_back(make_stats_reporter(loader));
+        stats_reporters.push_back(make_stats_reporter(scaler_node));
+        stats_reporters.push_back(make_stats_reporter(read_filter_node));
+
+        constexpr auto kStatsPeriod = 100ms;
+        stats_sampler =
+                std::make_unique<dorado::stats::StatsSampler>(kStatsPeriod, stats_reporters);
+    }
+
     loader.load_reads(data_path, recursive_file_loading);
 
     bam_writer->join();
+    if (stats_sampler) {
+        stats_sampler->terminate();
+        std::ofstream stats_file(dump_stats_file);
+        stats_sampler->dump_stats(stats_file,
+                                  dump_stats_filter.empty()
+                                          ? std::nullopt
+                                          : std::optional<std::regex>(dump_stats_filter));
+    }
     stats_node.dump_stats();
 }
 
@@ -408,7 +442,9 @@ int basecaller(int argc, char* argv[]) {
               parser.get<int>("--min-qscore"), parser.get<std::string>("--read-ids"),
               parser.get<bool>("--recursive"), parser.get<int>("k"), parser.get<int>("w"),
               utils::parse_string_to_size(parser.get<std::string>("I")),
-              internal_parser.get<bool>("--skip-model-compatibility-check"));
+              internal_parser.get<bool>("--skip-model-compatibility-check"),
+              internal_parser.get<std::string>("--dump_stats_file"),
+              internal_parser.get<std::string>("--dump_stats_filter"));
     } catch (const std::exception& e) {
         spdlog::error("{}", e.what());
         return 1;

@@ -342,6 +342,8 @@ std::vector<BamPtr> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
     return results;
 }
 
+stats::NamedStats Aligner::sample_stats() const { return stats::from_obj(m_work_queue); }
+
 HtsReader::HtsReader(const std::string& filename) {
     m_file = hts_open(filename.c_str(), "r");
     if (!m_file) {
@@ -529,6 +531,8 @@ int HtsWriter::write_header(const sam_hdr_t* hdr) {
     }
     return 0;
 }
+
+stats::NamedStats HtsWriter::sample_stats() const { return stats::from_obj(m_work_queue); }
 
 read_map read_bam(const std::string& filename, const std::unordered_set<std::string>& read_ids) {
     HtsReader reader(filename);

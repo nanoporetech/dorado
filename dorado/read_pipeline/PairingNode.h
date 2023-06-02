@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ReadPipeline.h"
+#include "utils/stats.h"
 
 #include <atomic>
 #include <map>
@@ -18,6 +19,8 @@ public:
                 int num_worker_threads = 2,
                 size_t max_reads = 1000);
     ~PairingNode();
+    std::string get_name() const override { return "PairingNode"; }
+    stats::NamedStats sample_stats() const override;
 
 private:
     void pair_list_worker_thread();

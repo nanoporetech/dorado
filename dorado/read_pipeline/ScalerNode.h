@@ -1,5 +1,11 @@
 #pragma once
 #include "ReadPipeline.h"
+#include "utils/stats.h"
+
+#include <atomic>
+#include <string>
+#include <thread>
+#include <vector>
 
 namespace dorado {
 
@@ -7,6 +13,8 @@ class ScalerNode : public MessageSink {
 public:
     ScalerNode(MessageSink& sink, int num_worker_threads = 5, size_t max_reads = 1000);
     ~ScalerNode();
+    std::string get_name() const override { return "ScalerNode"; }
+    stats::NamedStats sample_stats() const override;
 
 private:
     void worker_thread();  // Worker thread performs scaling and trimming asynchronously.

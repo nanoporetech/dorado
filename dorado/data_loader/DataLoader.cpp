@@ -764,4 +764,7 @@ DataLoader::DataLoader(MessageSink& read_sink,
     std::call_once(vbz_init_flag, vbz_register);
 }
 
+stats::NamedStats DataLoader::sample_stats() const {
+    return stats::NamedStats{{"loaded_read_count", static_cast<double>(m_loaded_read_count)}};
+}
 }  // namespace dorado

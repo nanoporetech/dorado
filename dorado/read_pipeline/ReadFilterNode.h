@@ -1,8 +1,10 @@
 #pragma once
 
 #include "ReadPipeline.h"
+#include "utils/stats.h"
 
 #include <atomic>
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <thread>
@@ -23,6 +25,8 @@ public:
                    size_t min_read_length,
                    size_t num_worker_threads);
     ~ReadFilterNode();
+    std::string get_name() const override { return "ReadFilterNode"; }
+    stats::NamedStats sample_stats() const override;
 
 private:
     MessageSink& m_sink;
@@ -34,7 +38,7 @@ private:
 
     size_t m_min_qscore;
     size_t m_min_read_length;
-    std::atomic<size_t> m_num_reads_filtered;
+    std::atomic<int64_t> m_num_reads_filtered;
 };
 
 }  // namespace dorado
