@@ -133,6 +133,8 @@ public:
         for (size_t model_id = 0; model_id < num_models; ++model_id) {
             const auto& model_path = model_paths[model_id];
             auto caller_data = std::make_unique<ModBaseData>();
+
+            torch::InferenceMode guard;
             caller_data->module_holder = load_remora_model(model_path, m_options);
             caller_data->params.parse(model_path);
             caller_data->batch_size = batch_size;
