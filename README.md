@@ -180,7 +180,7 @@ The names of Dorado models are systematically structured, each segment correspon
 
 `dna_r10.4.1_e8.2_400bps_fast@v4.2.0`
 
-- **Analyte Type (`dna`/`rna`)**: This denotes the type of analyte being sequenced. For DNA sequencing, it's represented as `dna`. If you're using the direct RNA kit, this will be `rna`.
+- **Analyte Type (`dna`)**: This denotes the type of analyte being sequenced. For DNA sequencing, it's represented as `dna`. If you're using the direct RNA kit, this will be `rna`.
 
 - **Pore Type (`r10.4.1`)**: This section corresponds to the type of flow cell used. For instance, FLO-MIN114/FLO-FLG114 is indicated by `r10.4.1`, while FLO-MIN106/FLO-FLG001 is signified by `r9.4.1`.
 
