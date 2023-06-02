@@ -72,6 +72,8 @@ void PairingNode::pair_list_worker_thread() {
                 read_pair.read_1 = template_read;
                 read_pair.read_2 = complement_read;
 
+                ++template_read->num_duplex_candidate_pairs;
+
                 m_sink.push_message(std::make_shared<ReadPair>(read_pair));
             }
         }
@@ -133,6 +135,7 @@ void PairingNode::pair_generating_worker_thread() {
 
                 if (is_within_time_and_length_criteria(*earlier_read, read)) {
                     ReadPair pair = {*earlier_read, read};
+                    ++(*earlier_read)->num_duplex_candidate_pairs;
                     m_sink.push_message(std::make_shared<ReadPair>(pair));
                 }
             }
@@ -140,6 +143,7 @@ void PairingNode::pair_generating_worker_thread() {
             if (later_read != channel_mux_read_map[key].end()) {
                 if (is_within_time_and_length_criteria(read, *later_read)) {
                     ReadPair pair = {read, *later_read};
+                    ++read->num_duplex_candidate_pairs;
                     m_sink.push_message(std::make_shared<ReadPair>(pair));
                 }
             }

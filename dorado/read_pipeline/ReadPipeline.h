@@ -104,6 +104,7 @@ public:
     uint64_t end_sample;
     uint64_t run_acquisition_start_time_ms;
     bool is_duplex;
+    std::atomic_size_t num_duplex_candidate_pairs{0};
 
     size_t subread_id{0};
     size_t split_count{1};
