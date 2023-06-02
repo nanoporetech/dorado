@@ -5,9 +5,9 @@ Dorado is a high-performance, easy-to-use, open source basecaller for Oxford Nan
 ## Features
 
 * One executable with sensible defaults, automatic hardware detection and configuration.
-* Runs on Apple silicon (M1/2 family) and Nvidia GPUs including multi-GPU with linear scaling.
-* Modified basecalling.
-* Duplex basecalling.
+* Runs on Apple silicon (M1/2 family) and Nvidia GPUs including multi-GPU with linear scaling (see [Platforms](#platforms)).
+* [Modified basecalling](#modified-basecalling).
+* [Duplex basecalling](#duplex) (watch the following video for an introduction to [Duplex](https://youtu.be/8DVMG7FEBys)).
 * Support for aligned read output in SAM/BAM.
 * [POD5](https://github.com/nanoporetech/pod5-file-format) support for highest basecalling performance.
 * Based on libtorch, the C++ API for pytorch.
@@ -36,6 +36,8 @@ Dorado has been tested extensively and supported on the following systems:
 
 Systems not listed above but which have Nvidia GPUs with >=8GB VRAM and architecture from Volta onwards have not been widely tested but are expected to work. If you encounter problems with running on your system please [report an issue](https://github.com/nanoporetech/dorado/issues)
 
+AWS Benchmarks on NVIDIA GPUs are available [here](https://aws.amazon.com/blogs/hpc/benchmarking-the-oxford-nanopore-technologies-basecallers-on-aws/).
+
 ## Roadmap
 
 Dorado is Oxford Nanopore's recommended basecaller for offline basecalling. We are working on a number of features which we expect to release soon:
@@ -52,6 +54,9 @@ Dorado is Oxford Nanopore's recommended basecaller for offline basecalling. We a
 3. Dorado will automatically run in multi-GPU `cuda:all` mode. If you have a hetrogenous collection of GPUs select the faster GPUs using the `--device` flag (e.g `--device cuda:0,2`). Not doing this will have a detrimental impact on performance.
 
 ## Running
+
+The following are helpful commands for getting started with `dorado`.
+To see all options and their defaults, please run `dorado -h` and `dorado <subcommand> -h`.
 
 ### Simplex basecalling
 
@@ -70,6 +75,8 @@ To call modifications simply add `--modified-bases` to the basecaller command
 $ dorado basecaller dna_r10.4.1_e8.2_400bps_hac@v4.1.0 pod5s/ --modified-bases 5mCG_5hmCG > calls.bam
 ```
 
+Refer to the [modified base models](#modified-base-models) section to see available modifications.
+
 ### Duplex
 To run Duplex basecalling run the command:
 
@@ -80,6 +87,8 @@ $ dorado duplex dna_r10.4.1_e8.2_400bps_sup@v4.1.0 pod5s/ > duplex.bam
 This command will output both simplex and duplex reads. Duplex reads will have the `dx` tag set to `1` in the output BAM, simplex reads will have the `dx` tag set to `0`.
 
 Dorado duplex previously required a separate tool to perform duplex pair detection and read splitting, but this is now integrated into Dorado.
+
+Note that modified basecalling is not supported in duplex mode (yet).
 
 ### Alignment
 
@@ -108,7 +117,7 @@ To download all available dorado models run:
 $ dorado download --model all
 ```
 
-**Simplex models:**
+### **Simplex models:**
 
 v4.1.0 models are recommended for our latest released condition (4kHz).
 
@@ -141,11 +150,11 @@ The following simplex models are also available:
 * dna_r10.4.1_e8.2_400bps_hac@v4.2.0 (5kHz)
 * dna_r10.4.1_e8.2_400bps_sup@v4.2.0 (5kHz)
 
-**RNA models:**
+### **RNA models:**
 
 * rna003_120bps_sup@v3
 
-**Modified base models**
+### **Modified base models**
 
 * dna_r9.4.1_e8_fast@v3.4_5mCG@v0
 * dna_r9.4.1_e8_hac@v3.3_5mCG@v0
