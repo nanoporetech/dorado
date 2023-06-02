@@ -178,7 +178,7 @@ The following simplex models are also available:
 
 The names of Dorado models are systematically structured, each segment corresponding to a different aspect of the model, which include both chemistry and run settings. To help understand this, let's dissect a sample model name:
 
-`dna_r10.4.1_e8.2_400bps_fast@v4.2.0`
+`dna_r10.4.1_e8.2_400bps_hac@v4.2.0`
 
 - **Analyte Type (`dna`)**: This denotes the type of analyte being sequenced. For DNA sequencing, it's represented as `dna`. If you're using the direct RNA kit, this will be `rna`.
 
@@ -188,7 +188,7 @@ The names of Dorado models are systematically structured, each segment correspon
 
 - **Translocation Speed (`400bps`)**: This parameter, selected at the run setup in MinKNOW, refers to the speed of translocation. Prior to starting your run, a prompt will ask if you prefer to run at 260bps or 400bps. The former yields more accurate results but provides less data. As of MinKNOW version 23.04, the 260bps option has been deprecated.
 
-- **Model Type (`fast`)**: This represents the size of the model, where larger models yield more accurate basecalls but take more time. The three types of models are `fast`, `hac`, and `sup`. The `fast` model is the quickest, `sup` is the most accurate, and `hac` provides a balance between speed and accuracy. For most users, the `hac` model is recommended.
+- **Model Type (`hac`)**: This represents the size of the model, where larger models yield more accurate basecalls but take more time. The three types of models are `fast`, `hac`, and `sup`. The `fast` model is the quickest, `sup` is the most accurate, and `hac` provides a balance between speed and accuracy. For most users, the `hac` model is recommended.
 
 - **Model Version Number (`v4.2.0`)**: This denotes the version of the model. Model updates are regularly released, and higher version numbers typically signify greater accuracy.
 
