@@ -105,6 +105,9 @@ public:
     uint64_t run_acquisition_start_time_ms;
     bool is_duplex;
 
+    size_t subread_id{0};
+    size_t split_count{1};
+
 private:
     void generate_duplex_read_tags(bam1_t*) const;
     void generate_read_tags(bam1_t* aln, bool emit_moves) const;
