@@ -269,9 +269,6 @@ std::shared_ptr<dorado::Read> StereoDuplexEncoderNode::stereo_encode(
 
     return read;
 }
-}  // namespace dorado
-
-namespace dorado {
 
 void StereoDuplexEncoderNode::worker_thread() {
     Message message;
@@ -299,10 +296,10 @@ void StereoDuplexEncoderNode::worker_thread() {
 }
 
 StereoDuplexEncoderNode::StereoDuplexEncoderNode(MessageSink& sink, int input_signal_stride)
-        : m_input_signal_stride(input_signal_stride),
-          MessageSink(1000),
+        : MessageSink(1000),
           m_sink(sink),
-          m_num_worker_threads(std::thread::hardware_concurrency()) {
+          m_num_worker_threads(std::thread::hardware_concurrency()),
+          m_input_signal_stride(input_signal_stride) {
     for (int i = 0; i < m_num_worker_threads; i++) {
         std::unique_ptr<std::thread> stereo_encoder_worker_thread =
                 std::make_unique<std::thread>(&StereoDuplexEncoderNode::worker_thread, this);
