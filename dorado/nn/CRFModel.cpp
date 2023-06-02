@@ -232,7 +232,7 @@ struct ConvolutionImpl : Module {
         // Alternative route - non CUDALSTM route.
         x = activation(conv(x));
         if (clamp) {
-            x = x.clamp(c10::nullopt, max_value);
+            x.clamp_(c10::nullopt, max_value);
         }
         if (to_lstm) {
             // Output is [N, T_out, C_out], non-contiguous
@@ -710,10 +710,9 @@ struct ClampImpl : Module {
 
     torch::Tensor forward(torch::Tensor x) {
         if (active) {
-            return x.clamp(min, max);
-        } else {
-            return x;
+            x.clamp_(min, max);
         }
+        return x;
     }
 
     bool active;
