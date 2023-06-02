@@ -111,8 +111,7 @@ public:
     ~HtsWriter();
     std::string get_name() const override { return "HtsWriter"; }
     stats::NamedStats sample_stats() const override;
-    void add_header(const sam_hdr_t* header);
-    int write_header();
+    int write_header(const sam_hdr_t* header);
     int write(bam1_t* record);
     void join();
 

@@ -174,6 +174,7 @@ std::shared_ptr<Read> subread(const Read& read, PosRange seq_range, PosRange sig
     auto start_time_ms = read.run_acquisition_start_time_ms +
                          uint64_t(std::round(subread->start_sample * 1000. / subread->sample_rate));
     subread->attributes.start_time = utils::get_string_timestamp_from_unix_time(start_time_ms);
+    subread->start_time_ms = start_time_ms;
 
     //we adjust for it in new start time above
     subread->num_trimmed_samples = 0;

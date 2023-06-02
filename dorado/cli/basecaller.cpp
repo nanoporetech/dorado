@@ -208,8 +208,7 @@ void setup(std::vector<std::string> args,
     if (ref.empty()) {
         bam_writer = std::make_shared<HtsWriter>("-", output_mode,
                                                  thread_allocations.writer_threads, num_reads);
-        bam_writer->add_header(hdr.get());
-        bam_writer->write_header();
+        bam_writer->write_header(hdr.get());
         converted_reads_sink = bam_writer.get();
     } else {
         bam_writer = std::make_shared<HtsWriter>("-", output_mode,
@@ -218,8 +217,7 @@ void setup(std::vector<std::string> args,
                                                    mm2_index_batch_size,
                                                    thread_allocations.aligner_threads);
         utils::add_sq_hdr(hdr.get(), aligner->get_sequence_records_for_header());
-        bam_writer->add_header(hdr.get());
-        bam_writer->write_header();
+        bam_writer->write_header(hdr.get());
         converted_reads_sink = aligner.get();
     }
     ReadToBamType read_converter(*converted_reads_sink, emit_moves, rna,
