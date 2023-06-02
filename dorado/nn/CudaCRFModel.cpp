@@ -110,11 +110,12 @@ public:
         c10::cuda::CUDAGuard device_guard(m_options.device());
         auto stream = c10::cuda::getCurrentCUDAStream(m_options.device().index());
 
-        std::string loop_scope_str =
+        const std::string loop_scope_str =
                 "cuda_thread_fn_device_" + std::to_string(m_options.device().index());
-        std::string input_q_cv_scope_str =
+        const std::string input_q_cv_scope_str =
                 "input_queue_cv_device_" + std::to_string(m_options.device().index());
-        std::string gpu_lock_scope_str = "gpu_lock_" + std::to_string(m_options.device().index());
+        const std::string gpu_lock_scope_str =
+                "gpu_lock_" + std::to_string(m_options.device().index());
         while (true) {
             nvtx3::scoped_range loop{loop_scope_str};
             std::unique_lock<std::mutex> input_lock(m_input_lock);

@@ -176,12 +176,10 @@ std::vector<std::string> parse_cuda_device_string(std::string device_string) {
 }
 
 std::unique_lock<std::mutex> acquire_gpu_lock(int gpu_index) {
-    // Assume a maximum of 32 GPUs for now. Should be enough for practical
-    // purposes.
-    static std::array<std::mutex, 32> gpu_mutexes;
+    static std::vector<std::mutex> gpu_mutexes(torch::cuda::device_count());
     assert(gpu_index < gpu_mutexes.size());
 
-    return std::unique_lock<std::mutex>(gpu_mutexes[gpu_index]);
+    return std::unique_lock<std::mutex>(gpu_mutexes.at(gpu_index));
 }
 
 // Note that in general the torch caching allocator may be consuming
