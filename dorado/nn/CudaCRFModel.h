@@ -17,8 +17,7 @@ std::shared_ptr<CudaCaller> create_cuda_caller(const std::filesystem::path& mode
                                                int chunk_size,
                                                int batch_size,
                                                const std::string& device,
-                                               float memory_limit_fraction = 1.f,
-                                               bool exclusive_gpu_access = false);
+                                               float memory_limit_fraction = 1.f);
 
 class CudaModelRunner : public ModelRunnerBase {
 public:

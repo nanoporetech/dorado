@@ -107,13 +107,6 @@ int duplex(int argc, char* argv[]) {
 
     parser.add_argument("-I").help("minimap2 index batch size.").default_value(std::string("16G"));
 
-    parser.add_argument("--guard-gpus")
-            .default_value(false)
-            .implicit_value(true)
-            .help("In case of GPU OOM, use this option to be more defensive with GPU memory. May "
-                  "cause "
-                  "performance regression.");
-
     try {
         auto remaining_args = parser.parse_known_args(argc, argv);
         auto internal_parser = utils::parse_internal_options(remaining_args);
@@ -125,7 +118,6 @@ int duplex(int argc, char* argv[]) {
         auto threads = static_cast<size_t>(parser.get<int>("--threads"));
         auto min_qscore(parser.get<int>("--min-qscore"));
         auto ref = parser.get<std::string>("--reference");
-        bool guard_gpus = parser.get<bool>("--guard-gpus");
         std::vector<std::string> args(argv, argv + argc);
         if (parser.get<bool>("--verbose")) {
             spdlog::set_level(spdlog::level::debug);
@@ -290,7 +282,7 @@ int duplex(int argc, char* argv[]) {
                 for (auto device_string : devices) {
                     // Use most of GPU mem but leave some for buffer.
                     auto caller = create_cuda_caller(model_path, chunk_size, batch_size,
-                                                     device_string, 0.9f, guard_gpus);
+                                                     device_string, 0.9f);
                     for (size_t i = 0; i < num_runners; i++) {
                         runners.push_back(std::make_shared<CudaModelRunner>(caller));
                     }
@@ -306,7 +298,7 @@ int duplex(int argc, char* argv[]) {
                     // memory after simplex caller has been instantiated to the duplex caller.
                     // ALWAYS auto tune the duplex batch size (i.e. batch_size passed in is 0.)
                     auto caller = create_cuda_caller(stereo_model_path, chunk_size, 0,
-                                                     device_string, 1.f, guard_gpus);
+                                                     device_string, 1.f);
                     for (size_t i = 0; i < num_runners; i++) {
                         stereo_runners.push_back(std::make_shared<CudaModelRunner>(caller));
                     }
