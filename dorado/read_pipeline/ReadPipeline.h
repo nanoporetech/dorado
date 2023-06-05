@@ -10,6 +10,7 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -136,6 +137,8 @@ using Message = std::variant<std::shared_ptr<Read>, BamPtr, std::shared_ptr<Read
 // call terminate() in the destructor of a class derived
 // from MessageSink (and before worker thread join() calls
 // if there are any).
+// TODO -- rename to PipelineNode or DAGNode or similar.  The fundamental attribute here
+// is not being a MessageSink any longer.  Pure source nodes should be part of this.
 class MessageSink {
 public:
     MessageSink(size_t max_messages);
@@ -155,6 +158,27 @@ public:
 protected:
     // Queue of work items for this node.
     AsyncQueue<Message> m_work_queue;
+};
+
+// Manages creation and destruction of pipeline nodes.
+// TODO -- change name to DAG or Graph or similar?  Or is it worth living with
+// the slightly misleading implications of Pipeline?
+class Pipeline {
+public:
+    // TODO -- this is returning a shared_ptr for use by current code.  In the
+    // end we can wire up nodes inside Pipeline and not expose their pointers at all to
+    // users of Pipeline.  There's also no reason to use shared_ptr instead of
+    // unique_ptr.
+    template <class NodeType, class... Args>
+    std::shared_ptr<NodeType> AddNode(Args&&... args) {
+        // TODO -- probably want to make node constructors private, which would entail
+        // avoiding make_shared/make_unique.
+        m_nodes.push_back(std::make_shared<NodeType>(std::forward<Args>(args)...));
+        return std::dynamic_pointer_cast<NodeType>(m_nodes.back());
+    }
+
+private:
+    std::vector<std::shared_ptr<MessageSink>> m_nodes;
 };
 
 }  // namespace dorado
