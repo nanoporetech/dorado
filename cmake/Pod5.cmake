@@ -1,4 +1,4 @@
-set(POD5_VERSION 0.1.21)
+set(POD5_VERSION 0.2.1)
 set(POD5_DIR pod5-${POD5_VERSION}-${CMAKE_SYSTEM_NAME})
 set(POD5_REPO "https://github.com/nanoporetech/pod5-file-format")
 set(POD5_INCLUDE ${DORADO_3RD_PARTY}/${POD5_DIR}/include)
