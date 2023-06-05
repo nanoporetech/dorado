@@ -16,14 +16,14 @@ namespace dorado {
 
 class CudaCaller {
 public:
-    CudaCaller(const std::filesystem::path &model_path,
+    CudaCaller(const CRFModelConfig &model_config,
+               const std::filesystem::path &model_path,
                int chunk_size,
                int batch_size,
                const std::string &device,
                float memory_limit_fraction,
                bool exclusive_gpu_access)
             : m_device(device) {
-        const auto model_config = load_crf_model_config(model_path);
         m_model_stride = static_cast<size_t>(model_config.stride);
 
         m_decoder_options = DecoderOptions();
@@ -179,13 +179,14 @@ public:
     std::atomic<int64_t> m_decode_ms = 0;
 };
 
-std::shared_ptr<CudaCaller> create_cuda_caller(const std::filesystem::path &model_path,
+std::shared_ptr<CudaCaller> create_cuda_caller(const CRFModelConfig &model_config,
+                                               const std::filesystem::path &model_path,
                                                int chunk_size,
                                                int batch_size,
                                                const std::string &device,
                                                float memory_limit_fraction,
                                                bool exclusive_gpu_access) {
-    return std::make_shared<CudaCaller>(model_path, chunk_size, batch_size, device,
+    return std::make_shared<CudaCaller>(model_config, model_path, chunk_size, batch_size, device,
                                         memory_limit_fraction, exclusive_gpu_access);
 }
 

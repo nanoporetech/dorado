@@ -8,6 +8,13 @@
 
 namespace dorado {
 
+struct SignalNormalisationParams {
+    float quantile_a;
+    float quantile_b;
+    float shift_multiplier;
+    float scale_multiplier;
+};
+
 // Values extracted from config.toml used in construction of the model module.
 struct CRFModelConfig {
     float qscale;
@@ -27,6 +34,7 @@ struct CRFModelConfig {
     float scale;
     int num_features;
     int sample_rate;
+    SignalNormalisationParams signal_norm_params;
 };
 
 CRFModelConfig load_crf_model_config(const std::filesystem::path& path);

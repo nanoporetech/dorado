@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ModelRunner.h"
+#include "nn/CRFModel.h"
 
 #include <c10/cuda/CUDAStream.h>
 #include <torch/torch.h>
@@ -13,7 +14,8 @@ namespace dorado {
 
 class CudaCaller;
 
-std::shared_ptr<CudaCaller> create_cuda_caller(const std::filesystem::path& model_path,
+std::shared_ptr<CudaCaller> create_cuda_caller(const CRFModelConfig& model_config,
+                                               const std::filesystem::path& model_path,
                                                int chunk_size,
                                                int batch_size,
                                                const std::string& device,
