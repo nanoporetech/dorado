@@ -17,7 +17,7 @@ namespace dorado::utils {
 // attempting to allocate GPU memory on, or submit work to, the device in question.
 // Once the returned lock goes out of scope or is explicitly unlocked,
 // the GPU is available to other users again.
-std::unique_lock<std::mutex> acquire_gpu_lock(int gpu_index);
+std::unique_lock<std::mutex> acquire_gpu_lock(int gpu_index, bool use_lock);
 
 // Given a string representing cuda devices (e.g "cuda:0,1,3") returns a vector of strings, one for
 // each device (e.g ["cuda:0", "cuda:2", ..., "cuda:7"]

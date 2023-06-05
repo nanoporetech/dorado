@@ -20,8 +20,9 @@ public:
                int chunk_size,
                int batch_size,
                const std::string &device,
-               float memory_limit_fraction)
-            : m_device(device) {
+               float memory_limit_fraction,
+               bool exclusive_gpu_access)
+            : m_device(device), m_exclusive_gpu_access(exclusive_gpu_access) {
         const auto model_config = load_crf_model_config(model_path);
         m_model_stride = static_cast<size_t>(model_config.stride);
 
@@ -136,7 +137,8 @@ public:
             input_lock.unlock();
 
             nvtxRangePushA(gpu_lock_scope_str.c_str());
-            auto gpu_lock = dorado::utils::acquire_gpu_lock(m_options.device().index());
+            auto gpu_lock = dorado::utils::acquire_gpu_lock(m_options.device().index(),
+                                                            m_exclusive_gpu_access);
             nvtxRangePop();
 
             std::unique_lock<std::mutex> task_lock(task->mut);
@@ -178,6 +180,7 @@ public:
     std::condition_variable m_input_cv;
     std::unique_ptr<std::thread> m_cuda_thread;
     int m_num_input_features, m_batch_size, m_in_chunk_size, m_out_chunk_size;
+    bool m_exclusive_gpu_access;
 
     // Performance monitoring stats.
     std::atomic<int64_t> m_num_batches_called = 0;
@@ -189,9 +192,10 @@ std::shared_ptr<CudaCaller> create_cuda_caller(const std::filesystem::path &mode
                                                int chunk_size,
                                                int batch_size,
                                                const std::string &device,
-                                               float memory_limit_fraction) {
+                                               float memory_limit_fraction,
+                                               bool exclusive_gpu_access) {
     return std::make_shared<CudaCaller>(model_path, chunk_size, batch_size, device,
-                                        memory_limit_fraction);
+                                        memory_limit_fraction, exclusive_gpu_access);
 }
 
 CudaModelRunner::CudaModelRunner(std::shared_ptr<CudaCaller> caller)
