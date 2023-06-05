@@ -177,7 +177,6 @@ std::vector<std::string> parse_cuda_device_string(std::string device_string) {
 
 std::unique_lock<std::mutex> acquire_gpu_lock(int gpu_index) {
     static std::vector<std::mutex> gpu_mutexes(torch::cuda::device_count());
-    assert(gpu_index < gpu_mutexes.size());
 
     return std::unique_lock<std::mutex>(gpu_mutexes.at(gpu_index));
 }
