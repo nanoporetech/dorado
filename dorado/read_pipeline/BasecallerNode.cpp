@@ -1,7 +1,8 @@
 #include "BasecallerNode.h"
 
 #include "../decode/CPUDecoder.h"
-#include "../utils/stitch.h"
+#include "utils/stats.h"
+#include "utils/stitch.h"
 
 #include <nvtx3/nvtx3.hpp>
 
@@ -38,8 +39,17 @@ void BasecallerNode::input_worker_thread() {
         // Now that we have acquired a read, wait until we can push to chunks_in
         while (true) {
             std::unique_lock<std::mutex> chunk_lock(m_chunks_in_mutex);
+            // A new condition was added to the condition variable which adjusts the predicate
+            // to check for number of working reads. This is to deal with some degenerate cases during
+            // duplex basecalling wherein the due to GPU contention between simplex and duplex stages
+            // reads are not fully called, leading to a build up of working reads. These partial
+            // reads were causing a growth in memory which sometimes led to a crash on some systems.
+            // This change below more effectively puts a ceiling on the host memory usage.
+            // Keeping the condition a function of the current sink size (empmirically at 5k reads this
+            // caps memory around 30GB).
             m_chunks_in_has_space_cv.wait_for(chunk_lock, 10ms, [this, &max_chunks_in] {
-                return (m_chunks_in.size() < max_chunks_in);
+                return (m_chunks_in.size() < max_chunks_in) &&
+                       (m_working_reads.size() < 5 * m_max_reads);
             });
 
             if (m_chunks_in.size() >= max_chunks_in) {
@@ -76,19 +86,26 @@ void BasecallerNode::input_worker_thread() {
             {
                 std::lock_guard working_reads_lock(m_working_reads_mutex);
                 m_working_reads.push_back(std::move(read));
+                ++m_working_reads_size;
             }
+
+            m_chunks_added_cv.notify_one();
+
             break;  // Go back to watching the input reads
         }
     }
 
     // Notify the basecaller threads that it is safe to gracefully terminate the basecaller
     m_terminate_basecaller.store(true);
+    m_chunks_added_cv.notify_all();
 }
 
 void BasecallerNode::basecall_current_batch(int worker_id) {
     NVTX3_FUNC_RANGE();
     auto model_runner = m_model_runners[worker_id];
+    dorado::stats::Timer timer;
     auto decode_results = model_runner->call_chunks(m_batched_chunks[worker_id].size());
+    m_call_chunks_ms += timer.GetElapsedMS();
 
     for (size_t i = 0; i < m_batched_chunks[worker_id].size(); i++) {
         m_batched_chunks[worker_id][i]->seq = decode_results[i].sequence;
@@ -103,6 +120,7 @@ void BasecallerNode::basecall_current_batch(int worker_id) {
         ++source_read->num_chunks_called;
     }
     m_batched_chunks[worker_id].clear();
+    ++m_num_batches_called;
 }
 
 void BasecallerNode::working_reads_manager() {
@@ -121,6 +139,7 @@ void BasecallerNode::working_reads_manager() {
                             m_model_name;  // Before sending read to sink, assign its model name
                     completed_reads.push_back(*read_iter);
                     read_iter = m_working_reads.erase(read_iter);
+                    --m_working_reads_size;
                 } else {
                     read_iter++;
                 }
@@ -129,11 +148,14 @@ void BasecallerNode::working_reads_manager() {
 
         if (completed_reads.empty()) {
             std::this_thread::sleep_for(10ms);
+        } else {
+            m_chunks_in_has_space_cv.notify_one();
         }
 
         for (auto &read : completed_reads) {
             utils::stitch_chunks(read);
             m_sink.push_message(read);
+            ++m_called_reads_pushed;
         }
     }
 
@@ -145,44 +167,41 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
     int batch_size = m_model_runners[worker_id]->batch_size();
     while (true) {
         std::unique_lock<std::mutex> chunks_lock(m_chunks_in_mutex);
-
-        if (m_chunks_in.empty()) {
-            if (m_terminate_basecaller.load()) {
-                chunks_lock.unlock();  // Not strictly necessary
-                // We dispatch any part-full buffer here to finish basecalling.
-                if (!m_batched_chunks[worker_id].empty()) {
-                    basecall_current_batch(worker_id);
-                }
-
-                {
-                    std::lock_guard working_reads_lock(m_working_reads_mutex);
-                    if (!m_working_reads.empty()) {
-                        continue;
-                    }
-                }
-
-                size_t num_remaining_runners = --m_num_active_model_runners;
-
-                if (num_remaining_runners == 0) {
-                    m_terminate_manager.store(true);
-                }
-
-                return;
-
-            } else {
-                // There's no chunks available to call at the moment, sleep and try again
-                chunks_lock.unlock();
-
-                auto current_time = std::chrono::system_clock::now();
-                auto delta = std::chrono::duration_cast<std::chrono::milliseconds>(
-                        current_time - last_chunk_reserve_time);
-                if (delta.count() > m_batch_timeout_ms && !m_batched_chunks[worker_id].empty()) {
-                    basecall_current_batch(worker_id);
-                } else {
-                    std::this_thread::sleep_for(100ms);
-                }
-                continue;
+        if (!m_chunks_added_cv.wait_until(
+                    chunks_lock,
+                    last_chunk_reserve_time + std::chrono::milliseconds(m_batch_timeout_ms),
+                    [this] { return !m_chunks_in.empty() || m_terminate_basecaller.load(); })) {
+            // timeout without new chunks or termination call
+            chunks_lock.unlock();
+            if (!m_batched_chunks[worker_id].empty()) {
+                basecall_current_batch(worker_id);
             }
+
+            // reset wait period
+            last_chunk_reserve_time = std::chrono::system_clock::now();
+            continue;
+        }
+
+        if (m_chunks_in.empty() && m_terminate_basecaller.load()) {
+            // no remaining chunks and we've been told to terminate
+            // call the remaining batch
+            chunks_lock.unlock();  // Not strictly necessary
+            if (!m_batched_chunks[worker_id].empty()) {
+                basecall_current_batch(worker_id);
+            }
+
+            // Reduce the count of active runner threads.  If this was the last active
+            // thread also send termination signal to sink
+            int num_remaining_runners = --m_num_active_model_runners;
+            if (num_remaining_runners == 0) {
+                // runners can share a caller, so shutdown when all runners are done
+                // rather than terminating each runner as it finishes
+                for (auto &runner : m_model_runners) {
+                    runner->terminate();
+                }
+                m_terminate_manager.store(true);
+            }
+            return;
         }
 
         // There's chunks to get_scores, so let's add them to our input tensor
@@ -254,7 +273,8 @@ BasecallerNode::BasecallerNode(MessageSink &sink,
           m_model_stride(m_model_runners.front()->model_stride()),
           m_terminate_basecaller(false),
           m_batch_timeout_ms(batch_timeout_ms),
-          m_model_name(std::move(model_name)) {
+          m_model_name(std::move(model_name)),
+          m_max_reads(max_reads) {
     // Setup worker state
     size_t const num_workers = m_model_runners.size();
     m_batched_chunks.resize(num_workers);
@@ -279,6 +299,20 @@ BasecallerNode::~BasecallerNode() {
     }
     m_working_reads_manager->join();
     termination_time = std::chrono::system_clock::now();
+}
+
+stats::NamedStats BasecallerNode::sample_stats() const {
+    stats::NamedStats stats = stats::from_obj(m_work_queue);
+    for (const auto &runner : m_model_runners) {
+        const auto runner_stats = stats::from_obj(*runner);
+        stats.insert(runner_stats.begin(), runner_stats.end());
+    }
+    stats["batches_called"] = m_num_batches_called;
+    stats["partial_batches_called"] = m_num_partial_batches_called;
+    stats["call_chunks_ms"] = m_call_chunks_ms;
+    stats["called_reads_pushed"] = m_called_reads_pushed;
+    stats["working_reads_items"] = m_working_reads_size;
+    return stats;
 }
 
 }  // namespace dorado

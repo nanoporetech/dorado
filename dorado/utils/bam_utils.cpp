@@ -54,7 +54,11 @@ Aligner::Aligner(MessageSink& sink,
 
     m_index_reader = mm_idx_reader_open(filename.c_str(), &m_idx_opt, 0);
     m_index = mm_idx_reader_read(m_index_reader, m_threads);
-    if (mm_idx_reader_read(m_index_reader, m_threads) != nullptr) {
+    auto* split_index = mm_idx_reader_read(m_index_reader, m_threads);
+    if (split_index != nullptr) {
+        mm_idx_destroy(m_index);
+        mm_idx_destroy(split_index);
+        mm_idx_reader_close(m_index_reader);
         throw std::runtime_error(
                 "Dorado doesn't support split index for alignment. Please re-run with larger index "
                 "size.");
@@ -338,6 +342,8 @@ std::vector<BamPtr> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
     return results;
 }
 
+stats::NamedStats Aligner::sample_stats() const { return stats::from_obj(m_work_queue); }
+
 HtsReader::HtsReader(const std::string& filename) {
     m_file = hts_open(filename.c_str(), "r");
     if (!m_file) {
@@ -482,7 +488,9 @@ void HtsWriter::worker_thread() {
             if (m_num_reads_expected != 0) {
                 float progress = 100.f * static_cast<float>(write_count) / m_num_reads_expected;
                 m_progress_bar.set_progress(progress);
+#ifndef WIN32
                 std::cerr << "\033[K";
+#endif  // WIN32
             } else {
                 std::cerr << "\r> Output records written: " << write_count;
             }
@@ -516,14 +524,15 @@ int HtsWriter::write(bam1_t* record) {
     return res;
 }
 
-void HtsWriter::add_header(const sam_hdr_t* hdr) { header = sam_hdr_dup(hdr); }
-
-int HtsWriter::write_header() {
-    if (header) {
+int HtsWriter::write_header(const sam_hdr_t* hdr) {
+    if (hdr) {
+        header = sam_hdr_dup(hdr);
         return sam_hdr_write(m_file, header);
     }
     return 0;
 }
+
+stats::NamedStats HtsWriter::sample_stats() const { return stats::from_obj(m_work_queue); }
 
 read_map read_bam(const std::string& filename, const std::unordered_set<std::string>& read_ids) {
     HtsReader reader(filename);

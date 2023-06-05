@@ -1,6 +1,11 @@
 #pragma once
+
 #include "../nn/ModelRunner.h"
 #include "ReadPipeline.h"
+#include "utils/stats.h"
+
+#include <atomic>
+#include <cstdint>
 
 namespace dorado {
 
@@ -14,6 +19,8 @@ public:
                    std::string model_name = "",
                    size_t max_reads = 1000);
     ~BasecallerNode();
+    std::string get_name() const override { return "BasecallerNode"; }
+    stats::NamedStats sample_stats() const override;
 
 private:
     // Consume reads from input queue
@@ -38,6 +45,8 @@ private:
     int m_batch_timeout_ms;
     // model_name
     std::string m_model_name;
+    // max reads
+    size_t m_max_reads;
 
     // Model runners which have not terminated.
     std::atomic<int> m_num_active_model_runners{0};
@@ -53,6 +62,8 @@ private:
     std::condition_variable m_chunks_in_has_space_cv;
     // Global chunk input list
     std::mutex m_chunks_in_mutex;
+    // Signalled when chunks are added to m_chunks_in
+    std::condition_variable m_chunks_added_cv;
     // Gets filled with chunks from the input reads
     std::deque<std::shared_ptr<Chunk>> m_chunks_in;
 
@@ -73,6 +84,13 @@ private:
             m_basecall_workers;  // Basecalls chunks from the queue and puts read on the sink.
     std::unique_ptr<std::thread>
             m_working_reads_manager;  // Stitches working reads into complete reads.
+
+    // Performance monitoring stats.
+    std::atomic<int64_t> m_num_batches_called = 0;
+    std::atomic<int64_t> m_num_partial_batches_called = 0;
+    std::atomic<int64_t> m_call_chunks_ms = 0;
+    std::atomic<int64_t> m_called_reads_pushed = 0;
+    std::atomic<int64_t> m_working_reads_size = 0;
 };
 
 }  // namespace dorado

@@ -1,5 +1,6 @@
 #pragma once
 #include "utils/AsyncQueue.h"
+#include "utils/stats.h"
 #include "utils/types.h"
 
 #include <torch/torch.h>
@@ -8,6 +9,7 @@
 #include <limits>
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <variant>
 #include <vector>
 
@@ -98,18 +100,18 @@ public:
 
     Attributes attributes;
     std::vector<Mapping> mappings;
-    std::vector<BamPtr> extract_sam_lines(bool emit_moves,
-                                          bool duplex,
-                                          uint8_t modbase_threshold = 0) const;
+    std::vector<BamPtr> extract_sam_lines(bool emit_moves, uint8_t modbase_threshold = 0) const;
 
     uint64_t start_sample;
     uint64_t end_sample;
     uint64_t run_acquisition_start_time_ms;
+    bool is_duplex;
 
 private:
     void generate_duplex_read_tags(bam1_t*) const;
     void generate_read_tags(bam1_t* aln, bool emit_moves) const;
     void generate_modbase_string(bam1_t* aln, uint8_t threshold = 0) const;
+    std::string generate_read_group() const;
 };
 
 // A pair of reads for Duplex calling
@@ -142,6 +144,12 @@ public:
             Message&&
                     message);  // Push a message into message sink.  This can block if the sink's queue is full.
     void terminate() { m_work_queue.terminate(); }
+
+    // StatsSampler will ignore nodes with an empty name.
+    virtual std::string get_name() const { return std::string(""); }
+    virtual stats::NamedStats sample_stats() const {
+        return std::unordered_map<std::string, double>();
+    }
 
 protected:
     // Queue of work items for this node.

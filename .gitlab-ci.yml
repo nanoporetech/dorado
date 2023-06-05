@@ -1,3 +1,6 @@
+include:
+  - local: .gitlab/sanitizers-ci.yml
+
 stages:
   - pre-flight
   - build

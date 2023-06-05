@@ -12,8 +12,8 @@
 #include "utils/cuda_utils.h"
 #endif
 #endif  // DORADO_GPU_BUILD
+#include "nn/ModBaseRunner.h"
 #include "nn/ModelRunner.h"
-#include "nn/RemoraModel.h"
 #include "read_pipeline/BasecallerNode.h"
 #include "read_pipeline/ModBaseCallerNode.h"
 #include "read_pipeline/ReadFilterNode.h"
@@ -24,6 +24,7 @@
 #include "utils/cli_utils.h"
 #include "utils/log_utils.h"
 #include "utils/parameters.h"
+#include "utils/stats.h"
 
 #include <argparse.hpp>
 #include <htslib/sam.h>
@@ -31,6 +32,7 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <memory>
 #include <sstream>
@@ -41,6 +43,7 @@ namespace dorado {
 using HtsWriter = utils::HtsWriter;
 using HtsReader = utils::HtsReader;
 using dorado::utils::default_parameters;
+using namespace std::chrono_literals;
 
 void setup(std::vector<std::string> args,
            const std::filesystem::path& model_path,
@@ -64,7 +67,9 @@ void setup(std::vector<std::string> args,
            int kmer_size,
            int window_size,
            uint64_t mm2_index_batch_size,
-           bool skip_model_compatibility_check) {
+           bool skip_model_compatibility_check,
+           const std::string& dump_stats_file,
+           const std::string& dump_stats_filter) {
     torch::set_num_threads(1);
     std::vector<Runner> runners;
 
@@ -154,29 +159,22 @@ void setup(std::vector<std::string> args,
     }
 
     // generate model callers before nodes or it affects the speed calculations
-    std::vector<std::shared_ptr<RemoraCaller>> remora_callers;
-
+    std::vector<std::unique_ptr<ModBaseRunner>> remora_runners;
+    std::vector<std::string> modbase_devices;
 #if DORADO_GPU_BUILD && !defined(__APPLE__)
     if (device != "cpu") {
-        auto devices = utils::parse_cuda_device_string(device);
-        num_devices = devices.size();
-
-        for (auto device_string : devices) {
-            for (const auto& remora_model : remora_model_list) {
-                auto caller = std::make_shared<RemoraCaller>(remora_model, device_string,
-                                                             remora_batch_size, model_stride);
-                remora_callers.push_back(caller);
-            }
-        }
+        modbase_devices = utils::parse_cuda_device_string(device);
     } else
 #endif
     {
-        for (const auto& remora_model : remora_model_list) {
-            auto caller = std::make_shared<RemoraCaller>(remora_model, device, remora_batch_size,
-                                                         model_stride);
-            remora_callers.push_back(caller);
-        }
+        modbase_devices.push_back(device);
     }
+    for (const auto& device_string : modbase_devices) {
+        auto caller = create_modbase_caller(remora_model_list, remora_batch_size, device_string);
+        for (size_t i = 0; i < default_parameters.remora_runners_per_caller; i++) {
+            remora_runners.push_back(std::make_unique<ModBaseRunner>(caller));
+        }
+    };
 
     std::string model_name = std::filesystem::canonical(model_path).filename().string();
     auto read_groups = DataLoader::load_read_groups(data_path, model_name, recursive_file_loading);
@@ -210,8 +208,7 @@ void setup(std::vector<std::string> args,
     if (ref.empty()) {
         bam_writer = std::make_shared<HtsWriter>("-", output_mode,
                                                  thread_allocations.writer_threads, num_reads);
-        bam_writer->add_header(hdr.get());
-        bam_writer->write_header();
+        bam_writer->write_header(hdr.get());
         converted_reads_sink = bam_writer.get();
     } else {
         bam_writer = std::make_shared<HtsWriter>("-", output_mode,
@@ -220,11 +217,10 @@ void setup(std::vector<std::string> args,
                                                    mm2_index_batch_size,
                                                    thread_allocations.aligner_threads);
         utils::add_sq_hdr(hdr.get(), aligner->get_sequence_records_for_header());
-        bam_writer->add_header(hdr.get());
-        bam_writer->write_header();
+        bam_writer->write_header(hdr.get());
         converted_reads_sink = aligner.get();
     }
-    ReadToBamType read_converter(*converted_reads_sink, emit_moves, rna, duplex,
+    ReadToBamType read_converter(*converted_reads_sink, emit_moves, rna,
                                  thread_allocations.read_converter_threads,
                                  methylation_threshold_pct);
     StatsCounterNode stats_node(read_converter, duplex);
@@ -235,8 +231,8 @@ void setup(std::vector<std::string> args,
     MessageSink* basecaller_node_sink = static_cast<MessageSink*>(&read_filter_node);
     if (!remora_model_list.empty()) {
         mod_base_caller_node = std::make_unique<ModBaseCallerNode>(
-                read_filter_node, std::move(remora_callers), thread_allocations.remora_threads,
-                num_devices, model_stride, remora_batch_size);
+                read_filter_node, std::move(remora_runners),
+                thread_allocations.remora_threads * num_devices, model_stride, remora_batch_size);
         basecaller_node_sink = static_cast<MessageSink*>(mod_base_caller_node.get());
     }
     const int kBatchTimeoutMS = 100;
@@ -246,9 +242,38 @@ void setup(std::vector<std::string> args,
 
     DataLoader loader(scaler_node, "cpu", thread_allocations.loader_threads, max_reads, read_list);
 
+    std::unique_ptr<dorado::stats::StatsSampler> stats_sampler;
+    if (!dump_stats_file.empty()) {
+        std::vector<dorado::stats::StatsReporter> stats_reporters;
+        using dorado::stats::make_stats_reporter;
+        stats_reporters.push_back(make_stats_reporter(basecaller_node));
+        if (mod_base_caller_node) {
+            stats_reporters.push_back(make_stats_reporter(*mod_base_caller_node));
+        }
+        if (aligner) {
+            stats_reporters.push_back(make_stats_reporter(*aligner));
+        }
+        stats_reporters.push_back(make_stats_reporter(*bam_writer));
+        stats_reporters.push_back(make_stats_reporter(loader));
+        stats_reporters.push_back(make_stats_reporter(scaler_node));
+        stats_reporters.push_back(make_stats_reporter(read_filter_node));
+
+        constexpr auto kStatsPeriod = 100ms;
+        stats_sampler =
+                std::make_unique<dorado::stats::StatsSampler>(kStatsPeriod, stats_reporters);
+    }
+
     loader.load_reads(data_path, recursive_file_loading);
 
     bam_writer->join();
+    if (stats_sampler) {
+        stats_sampler->terminate();
+        std::ofstream stats_file(dump_stats_file);
+        stats_sampler->dump_stats(stats_file,
+                                  dump_stats_filter.empty()
+                                          ? std::nullopt
+                                          : std::optional<std::regex>(dump_stats_filter));
+    }
     stats_node.dump_stats();
 }
 
@@ -280,7 +305,8 @@ int basecaller(int argc, char* argv[]) {
     parser.add_argument("-b", "--batchsize")
             .default_value(default_parameters.batchsize)
             .scan<'i', int>()
-            .help("if 0 an optimal batchsize will be selected");
+            .help("if 0 an optimal batchsize will be selected. batchsizes are rounded to the "
+                  "closest multiple of 64.");
 
     parser.add_argument("-c", "--chunksize")
             .default_value(default_parameters.chunksize)
@@ -416,7 +442,9 @@ int basecaller(int argc, char* argv[]) {
               parser.get<int>("--min-qscore"), parser.get<std::string>("--read-ids"),
               parser.get<bool>("--recursive"), parser.get<int>("k"), parser.get<int>("w"),
               utils::parse_string_to_size(parser.get<std::string>("I")),
-              internal_parser.get<bool>("--skip-model-compatibility-check"));
+              internal_parser.get<bool>("--skip-model-compatibility-check"),
+              internal_parser.get<std::string>("--dump_stats_file"),
+              internal_parser.get<std::string>("--dump_stats_filter"));
     } catch (const std::exception& e) {
         spdlog::error("{}", e.what());
         return 1;

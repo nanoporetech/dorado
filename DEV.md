@@ -32,3 +32,10 @@ $ brew uninstall autoconf # not necessary if autoconf is not already installed
 $ brew install autoconf@2.69
 $ brew link autoconf@2.69
 ```
+
+The following other packages need to be available as well
+```bash
+brew install openssl
+brew install zstd
+brew install libaec
+```

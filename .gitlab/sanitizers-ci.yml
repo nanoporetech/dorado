@@ -1,0 +1,48 @@
+# Common sanitizer parts
+
+.sanitizer_common:
+  parallel:
+    matrix:
+      - SANITIZER:
+        - "address"
+        - "undefined"
+        - "thread"
+  before_script:
+    # Add the sanitizer flag to the build
+    - export BUILD_OPTIONS="${BUILD_OPTIONS} -D ECM_ENABLE_SANITIZERS='${SANITIZER}'"
+    # Setup additional runtime options
+    - export ASAN_OPTIONS=detect_stack_use_after_return=1:check_initialization_order=1
+    - export UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1:suppressions=${PWD}/.gitlab/ubsan.supp
+    - export LSAN_OPTIONS=suppressions=${PWD}/.gitlab/lsan.supp
+    - export TSAN_OPTIONS=suppressions=${PWD}/.gitlab/tsan.supp
+  # No need to keep the build around
+  # Note that this requires .sanitizer_common to come last in the extends list
+  artifacts: null
+
+# Sanitizer jobs
+
+sanitize:linux:x86:focal:
+  extends:
+    - build:linux:x86:focal
+    - .sanitizer_common
+  before_script:
+    # Setup sanitizers
+    - !reference [.sanitizer_common, before_script]
+    # We need to modify ASAN_OPTIONS for the following reasons:
+    #   detect_leaks - LeakSanitizer errors out for some reason
+    - export ASAN_OPTIONS=${ASAN_OPTIONS}:detect_leaks=0
+
+sanitize:linux:arm64:bionic:
+  extends:
+    - build:linux:arm64:bionic
+    - .sanitizer_common
+
+sanitize:macos:m1:
+  extends:
+    - build:macos:m1
+    - .sanitizer_common
+
+sanitize:macos:x64:
+  extends:
+    - build:macos:x64
+    - .sanitizer_common

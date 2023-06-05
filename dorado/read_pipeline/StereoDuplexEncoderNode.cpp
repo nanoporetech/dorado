@@ -23,16 +23,6 @@ std::shared_ptr<dorado::Read> StereoDuplexEncoderNode::stereo_encode(
 
     std::shared_ptr<dorado::Read> read = std::make_shared<dorado::Read>();  // Return read
 
-    float template_len = template_read->seq.size();
-    float complement_len = complement_read->seq.size();
-
-    // If the sequence lengths are too dissimilar, we exit early
-    float sequence_length_delta =
-            std::max(template_len, complement_len) - std::min(template_len, complement_len);
-    if ((sequence_length_delta / std::max(template_len, complement_len)) > 0.05f) {
-        return read;
-    }
-
     // We align the reverse complement of the complement read to the template read.
     const auto complement_sequence_reverse_complement =
             dorado::utils::reverse_complement(complement_read->seq);
@@ -69,6 +59,7 @@ std::shared_ptr<dorado::Read> StereoDuplexEncoderNode::stereo_encode(
     if (!consensus_possible) {
         // There wasn't a good enough match -- return early with an empty read.
         edlibFreeAlignResult(result);
+        ++m_num_discarded_pairs;
         return read;
     }
 
@@ -273,6 +264,8 @@ std::shared_ptr<dorado::Read> StereoDuplexEncoderNode::stereo_encode(
 
     read->read_id = template_read->read_id + ";" + complement_read->read_id;
     read->raw_data = tmp;  // use the encoded signal
+    read->is_duplex = true;
+    read->run_id = template_read->run_id;
 
     edlibFreeAlignResult(result);
 
@@ -326,6 +319,12 @@ StereoDuplexEncoderNode::~StereoDuplexEncoderNode() {
     }
 
     m_sink.terminate();
+}
+
+stats::NamedStats StereoDuplexEncoderNode::sample_stats() const {
+    stats::NamedStats stats = m_work_queue.sample_stats();
+    stats["discarded_pairs"] = m_num_discarded_pairs;
+    return stats;
 }
 
 }  // namespace dorado

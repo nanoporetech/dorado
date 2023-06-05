@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <utility>
 
 using namespace std::chrono_literals;
 using Slice = torch::indexing::Slice;
@@ -78,5 +79,7 @@ ScalerNode::~ScalerNode() {
     // Notify the sink that the Scaler Node has terminated
     m_sink.terminate();
 }
+
+stats::NamedStats ScalerNode::sample_stats() const { return stats::from_obj(m_work_queue); }
 
 }  // namespace dorado
