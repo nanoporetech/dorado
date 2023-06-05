@@ -405,11 +405,6 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
         dorado/data_loader/DataLoader.h
     )
 
-    if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
-        # Link the jemalloc library that ships with POD5.
-        target_link_libraries(dorado_io_lib ${POD5_LIBRARIES})
-    endif()
-
     target_link_libraries(dorado_io_lib
        ${POD5_LIBRARIES}
        ${HDF5_C_LIBRARIES}
