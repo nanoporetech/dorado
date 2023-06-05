@@ -1,3 +1,6 @@
+# Guard against double-inclusion errors. See https://github.com/pytorch/pytorch/issues/25004
+include_guard(GLOBAL)
+
 set(TORCH_VERSION 2.0.0)
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32)
