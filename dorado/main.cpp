@@ -12,16 +12,16 @@
 
 #ifdef __linux__
 extern "C" {
-// There's a bug in GLIBC < 2.25 (Bug 11941) which can cause the
-// dynamically loaded library to be dlclose-d twice, once by ld.so and potentially
-// once by the plugin that opened the DSO (more details available
-// at https://sourceware.org/legacy-ml/libc-alpha/2016-12/msg00859.html). This triggers
-// an assert in GLIBC. However, this can sometimes also corrupt the _at_exit registered
-// subroutines, causing seg faults at program teardown. The workaround below
-// bypasses the dlclose subroutine entirely by making it a no-op. This will cause
-// a memory leak as loaded shared libs won't be closed, but in practice this happens
-// at teardown anyway so the leak will be subsumed by termination.
-// Borrowed from https://mailman.mit.edu/pipermail/cvs-krb5/2019-October/014884.html
+// There's a bug in GLIBC < 2.25 (Bug 11941) which can trigger an assertion/
+// seg fault when a dynamically loaded library is dlclose-d twice - once by ld.so and then
+// once by the code that opened the DSO in the first place (more details available
+// at https://sourceware.org/legacy-ml/libc-alpha/2016-12/msg00859.html). Dorado
+// is seemingly running into this issue transitively through some dependent libraries
+// (backtraces indicate libcudnn could be a source). The workaround below bypasses
+// the dlclose subroutine entirely by making it a no-op. This will cause a memory
+// leak as loaded shared libs won't be closed, but in practice this happens at
+// teardown anyway so the leak will be subsumed by termination.
+// Fix is borrowed from https://mailman.mit.edu/pipermail/cvs-krb5/2019-October/014884.html
 #if !__GLIBC_PREREQ(2, 25)
 int dlclose(void*) { return 0; };
 #endif  // __GLIBC_PREREQ
