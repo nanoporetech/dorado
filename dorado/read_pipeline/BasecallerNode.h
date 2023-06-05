@@ -2,6 +2,7 @@
 
 #include "../nn/ModelRunner.h"
 #include "ReadPipeline.h"
+#include "StatsCounter.h"
 #include "utils/stats.h"
 
 #include <atomic>
@@ -12,12 +13,13 @@ namespace dorado {
 class BasecallerNode : public MessageSink {
 public:
     // Chunk size and overlap are in raw samples
-    BasecallerNode(MessageSink &sink,
+    BasecallerNode(MessageSink& sink,
                    std::vector<Runner> model_runners,
                    size_t overlap,
                    int batch_timeout_ms,
                    std::string model_name = "",
-                   size_t max_reads = 1000);
+                   size_t max_reads = 1000,
+                   StatsCounter* stats_counter = nullptr);
     ~BasecallerNode();
     std::string get_name() const override { return "BasecallerNode"; }
     stats::NamedStats sample_stats() const override;
@@ -32,7 +34,7 @@ private:
     // Construct complete reads
     void working_reads_manager();
 
-    MessageSink &m_sink;
+    MessageSink& m_sink;
     // Vector of model runners (each with their own GPU access etc)
     std::vector<Runner> m_model_runners;
     // Chunk length
@@ -47,6 +49,8 @@ private:
     std::string m_model_name;
     // max reads
     size_t m_max_reads;
+    // Stats counter
+    StatsCounter* m_stats_counter;
 
     // Model runners which have not terminated.
     std::atomic<int> m_num_active_model_runners{0};

@@ -170,6 +170,7 @@ int duplex(int argc, char* argv[]) {
         size_t num_reads = (basespace_duplex ? read_list_from_pairs.size()
                                              : DataLoader::get_num_reads(reads, read_list,
                                                                          recursive_file_loading));
+        StatsCounter stats_counter(num_reads, duplex);
 
         std::unique_ptr<sam_hdr_t, void (*)(sam_hdr_t*)> hdr(sam_hdr_init(), sam_hdr_destroy);
         utils::add_pg_hdr(hdr.get(), args);
@@ -178,10 +179,12 @@ int duplex(int argc, char* argv[]) {
         MessageSink* converted_reads_sink = nullptr;
 
         if (ref.empty()) {
-            bam_writer = std::make_shared<HtsWriter>("-", output_mode, 4, num_reads);
+            bam_writer =
+                    std::make_shared<HtsWriter>("-", output_mode, 4, num_reads, &stats_counter);
             converted_reads_sink = bam_writer.get();
         } else {
-            bam_writer = std::make_shared<HtsWriter>("-", output_mode, 4, num_reads);
+            bam_writer =
+                    std::make_shared<HtsWriter>("-", output_mode, 4, num_reads, &stats_counter);
             aligner = std::make_shared<Aligner>(
                     *bam_writer, ref, parser.get<int>("k"), parser.get<int>("w"),
                     utils::parse_string_to_size(parser.get<std::string>("I")),
@@ -190,10 +193,9 @@ int duplex(int argc, char* argv[]) {
             converted_reads_sink = aligner.get();
         }
         ReadToBamType read_converter(*converted_reads_sink, emit_moves, rna, 2);
-        StatsCounterNode stats_node(read_converter, duplex);
         // The minimum sequence length is set to 5 to avoid issues with duplex node printing very short sequences for mismatched pairs.
-        ReadFilterNode read_filter_node(stats_node, min_qscore,
-                                        default_parameters.min_seqeuence_length, 5);
+        ReadFilterNode read_filter_node(read_converter, min_qscore,
+                                        default_parameters.min_seqeuence_length, 5, &stats_counter);
 
         torch::set_num_threads(1);
 
@@ -331,7 +333,7 @@ int duplex(int argc, char* argv[]) {
             const int kStereoBatchTimeoutMS = 5000;
             auto stereo_basecaller_node = std::make_unique<BasecallerNode>(
                     read_filter_node, std::move(stereo_runners), adjusted_stereo_overlap,
-                    kStereoBatchTimeoutMS, duplex_rg_name);
+                    kStereoBatchTimeoutMS, duplex_rg_name, 1000, &stats_counter);
             auto simplex_model_stride = runners.front()->model_stride();
 
             StereoDuplexEncoderNode stereo_node =
@@ -355,7 +357,7 @@ int duplex(int argc, char* argv[]) {
             const int kSimplexBatchTimeoutMS = 100;
             auto basecaller_node = std::make_unique<BasecallerNode>(
                     splitter_node, std::move(runners), adjusted_simplex_overlap,
-                    kSimplexBatchTimeoutMS, model);
+                    kSimplexBatchTimeoutMS, model, 1000, &stats_counter);
 
             ScalerNode scaler_node(*basecaller_node, num_devices * 2);
 
@@ -363,7 +365,7 @@ int duplex(int argc, char* argv[]) {
             loader.load_reads(reads, parser.get<bool>("--recursive"), DataLoader::BY_CHANNEL);
         }
         bam_writer->join();  // Explicitly wait for all output rows to be written.
-        stats_node.dump_stats();
+        stats_counter.dump_stats();
     } catch (const std::exception& e) {
         spdlog::error(e.what());
         return 1;

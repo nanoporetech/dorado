@@ -18,6 +18,9 @@ void ReadFilterNode::worker_thread() {
         if ((utils::mean_qscore_from_qstring(read->qstring) < m_min_qscore) ||
             read->seq.size() < m_min_read_length) {
             ++m_num_reads_filtered;
+            if (m_stats_counter) {
+                m_stats_counter->add_filtered_read_id(read->read_id);
+            }
         } else {
             m_sink.push_message(read);
         }
@@ -35,13 +38,15 @@ void ReadFilterNode::worker_thread() {
 ReadFilterNode::ReadFilterNode(MessageSink& sink,
                                size_t min_qscore,
                                size_t min_read_length,
-                               size_t num_worker_threads)
+                               size_t num_worker_threads,
+                               StatsCounter* stats_counter)
         : MessageSink(1000),
           m_sink(sink),
           m_min_qscore(min_qscore),
           m_min_read_length(min_read_length),
           m_num_reads_filtered(0),
-          m_active_threads(0) {
+          m_active_threads(0),
+          m_stats_counter(stats_counter) {
     for (size_t i = 0; i < num_worker_threads; i++) {
         m_workers.push_back(
                 std::make_unique<std::thread>(std::thread(&ReadFilterNode::worker_thread, this)));

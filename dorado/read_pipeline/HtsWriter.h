@@ -1,6 +1,7 @@
 #pragma once
 #include "htslib/sam.h"
 #include "read_pipeline/ReadPipeline.h"
+#include "read_pipeline/StatsCounter.h"
 #include "utils/stats.h"
 
 #ifdef WIN32
@@ -23,7 +24,11 @@ public:
         FASTQ,
     };
 
-    HtsWriter(const std::string& filename, OutputMode mode, size_t threads, size_t num_reads);
+    HtsWriter(const std::string& filename,
+              OutputMode mode,
+              size_t threads,
+              size_t num_reads,
+              StatsCounter* stats_counter = nullptr);
     ~HtsWriter();
     std::string get_name() const override { return "HtsWriter"; }
     stats::NamedStats sample_stats() const override;
@@ -45,20 +50,8 @@ private:
     std::unique_ptr<std::thread> m_worker;
     void worker_thread();
     int write_hdr_sq(char* name, uint32_t length);
-    bool m_prog_bar_initialized{false};
     size_t m_num_reads_expected;
-    int m_progress_bar_interval;
-
-#ifdef WIN32
-    indicators::ProgressBar m_progress_bar {
-#else
-    indicators::BlockProgressBar m_progress_bar{
-#endif
-        indicators::option::Stream{std::cerr}, indicators::option::BarWidth{30},
-                indicators::option::ShowElapsedTime{true},
-                indicators::option::ShowRemainingTime{true},
-                indicators::option::ShowPercentage{true},
-    };
+    StatsCounter* m_stats_counter;
 };
 
 }  // namespace dorado

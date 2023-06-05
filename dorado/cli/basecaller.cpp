@@ -196,6 +196,8 @@ void setup(std::vector<std::string> args,
 
     bool rna = utils::is_rna_model(model_path), duplex = false;
 
+    StatsCounter stats_counter(num_reads, duplex);
+
     auto const thread_allocations = utils::default_thread_allocations(
             num_devices, !remora_model_list.empty() ? num_remora_threads : 0);
 
@@ -206,8 +208,8 @@ void setup(std::vector<std::string> args,
     std::shared_ptr<Aligner> aligner;
     MessageSink* converted_reads_sink = nullptr;
     if (ref.empty()) {
-        bam_writer = std::make_shared<HtsWriter>("-", output_mode,
-                                                 thread_allocations.writer_threads, num_reads);
+        bam_writer = std::make_shared<HtsWriter>(
+                "-", output_mode, thread_allocations.writer_threads, num_reads, &stats_counter);
         bam_writer->write_header(hdr.get());
         converted_reads_sink = bam_writer.get();
     } else {
@@ -223,9 +225,9 @@ void setup(std::vector<std::string> args,
     ReadToBamType read_converter(*converted_reads_sink, emit_moves, rna,
                                  thread_allocations.read_converter_threads,
                                  methylation_threshold_pct);
-    StatsCounterNode stats_node(read_converter, duplex);
-    ReadFilterNode read_filter_node(stats_node, min_qscore, default_parameters.min_seqeuence_length,
-                                    thread_allocations.read_filter_threads);
+    ReadFilterNode read_filter_node(read_converter, min_qscore,
+                                    default_parameters.min_seqeuence_length,
+                                    thread_allocations.read_filter_threads, &stats_counter);
 
     std::unique_ptr<ModBaseCallerNode> mod_base_caller_node;
     MessageSink* basecaller_node_sink = static_cast<MessageSink*>(&read_filter_node);
@@ -237,7 +239,7 @@ void setup(std::vector<std::string> args,
     }
     const int kBatchTimeoutMS = 100;
     BasecallerNode basecaller_node(*basecaller_node_sink, std::move(runners), overlap,
-                                   kBatchTimeoutMS, model_name);
+                                   kBatchTimeoutMS, model_name, 1000, &stats_counter);
     ScalerNode scaler_node(basecaller_node, thread_allocations.scaler_node_threads);
 
     DataLoader loader(scaler_node, "cpu", thread_allocations.loader_threads, max_reads, read_list);
@@ -264,6 +266,7 @@ void setup(std::vector<std::string> args,
     }
 
     loader.load_reads(data_path, recursive_file_loading);
+    stats_counter.dump_stats();
 
     bam_writer->join();
     if (stats_sampler) {
@@ -274,7 +277,6 @@ void setup(std::vector<std::string> args,
                                           ? std::nullopt
                                           : std::optional<std::regex>(dump_stats_filter));
     }
-    stats_node.dump_stats();
 }
 
 int basecaller(int argc, char* argv[]) {

@@ -3,6 +3,7 @@
 #include "read_pipeline/AlignerNode.h"
 #include "read_pipeline/HtsReader.h"
 #include "read_pipeline/HtsWriter.h"
+#include "read_pipeline/StatsCounter.h"
 #include "utils/bam_utils.h"
 #include "utils/cli_utils.h"
 #include "utils/log_utils.h"
@@ -102,7 +103,9 @@ int aligner(int argc, char* argv[]) {
     }
     spdlog::info("> loading index {}", index);
 
-    HtsWriter writer("-", HtsWriter::OutputMode::BAM, writer_threads, 0);
+    StatsCounter stats_counter(0, false);
+
+    HtsWriter writer("-", HtsWriter::OutputMode::BAM, writer_threads, 0, &stats_counter);
     Aligner aligner(writer, index, kmer_size, window_size, index_batch_size, aligner_threads);
     HtsReader reader(reads[0]);
 
@@ -115,6 +118,8 @@ int aligner(int argc, char* argv[]) {
     spdlog::info("> starting alignment");
     reader.read(aligner, max_reads);
     writer.join();
+
+    stats_counter.dump_stats();
 
     spdlog::info("> finished alignment");
     spdlog::info("> total/primary/unmapped {}/{}/{}", writer.total, writer.primary,
