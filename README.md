@@ -5,15 +5,15 @@ Dorado is a high-performance, easy-to-use, open source basecaller for Oxford Nan
 ## Features
 
 * One executable with sensible defaults, automatic hardware detection and configuration.
-* Runs on Apple silicon (M1/2 family) and Nvidia GPUs including multi-GPU with linear scaling.
-* Modified basecalling.
-* Duplex basecalling.
+* Runs on Apple silicon (M1/2 family) and Nvidia GPUs including multi-GPU with linear scaling (see [Platforms](#platforms)).
+* [Modified basecalling](#modified-basecalling).
+* [Duplex basecalling](#duplex) (watch the following video for an introduction to [Duplex](https://youtu.be/8DVMG7FEBys)).
 * Support for aligned read output in SAM/BAM.
 * [POD5](https://github.com/nanoporetech/pod5-file-format) support for highest basecalling performance.
 * Based on libtorch, the C++ API for pytorch.
 * Multiple custom optimisations in CUDA and Metal for maximising inference performance.
 
-If you encounter any problems building or running Dorado please [report an issue](https://github.com/nanoporetech/dorado/issues).
+If you encounter any problems building or running Dorado, please [report an issue](https://github.com/nanoporetech/dorado/issues).
 
 ## Installation
 
@@ -34,28 +34,33 @@ Dorado has been tested extensively and supported on the following systems:
 | Apple    | M1, M1 Pro, M1 Max, M1 Ultra |
 | Linux    | (G)V100, A100, H100          |
 
-Systems not listed above but which have Nvidia GPUs with >=8GB VRAM and architecture from Volta onwards have not been widely tested but are expected to work. If you encounter problems with running on your system please [report an issue](https://github.com/nanoporetech/dorado/issues)
+Systems not listed above but which have Nvidia GPUs with ≥8 GB VRAM and architecture from Volta onwards have not been widely tested but are expected to work. If you encounter problems with running on your system, please [report an issue](https://github.com/nanoporetech/dorado/issues)
+
+AWS Benchmarks on NVIDIA GPUs are available [here](https://aws.amazon.com/blogs/hpc/benchmarking-the-oxford-nanopore-technologies-basecallers-on-aws/).
 
 ## Roadmap
 
 Dorado is Oxford Nanopore's recommended basecaller for offline basecalling. We are working on a number of features which we expect to release soon:
 
-1. DNA Barcode multiplexing
+1. DNA barcode multiplexing
 2. Adapter trimming
 3. Python API
 4. Statically linked binary
 
 ## Performance tips
 
-1. For optimal performance Dorado requires POD5 file input. Please [convert your Fast5 files](https://github.com/nanoporetech/pod5-file-format) before basecalling.
-2. Dorado will automatically detect your GPUs' free memory and select an appropriate batch size.
-3. Dorado will automatically run in multi-GPU `cuda:all` mode. If you have a hetrogenous collection of GPUs select the faster GPUs using the `--device` flag (e.g `--device cuda:0,2`). Not doing this will have a detrimental impact on performance.
+1. For optimal performance, Dorado requires POD5 file input. Please [convert your .fast5 files](https://github.com/nanoporetech/pod5-file-format) before basecalling.
+2. Dorado will automatically detect your GPU's free memory and select an appropriate batch size.
+3. Dorado will automatically run in multi-GPU `cuda:all` mode. If you have a hetrogenous collection of GPUs, select the faster GPUs using the `--device` flag (e.g `--device cuda:0,2`). Not doing this will have a detrimental impact on performance.
 
 ## Running
 
+The following are helpful commands for getting started with Dorado.
+To see all options and their defaults, run `dorado -h` and `dorado <subcommand> -h`.
+
 ### Simplex basecalling
 
-To run Dorado basecalling, download a model and point it to POD5 files _(Fast5 files are supported but will not be as performant)_.
+To run Dorado basecalling, download a model and point it to POD5 files _(.fast5 files are supported but will not be as performant)_.
 
 ```
 $ dorado download --model dna_r10.4.1_e8.2_400bps_hac@v4.1.0
@@ -64,14 +69,17 @@ $ dorado basecaller dna_r10.4.1_e8.2_400bps_hac@v4.1.0 pod5s/ > calls.bam
 
 ### Modified basecalling
 
-To call modifications simply add `--modified-bases` to the basecaller command
+To call modifications, add `--modified-bases` to the basecaller command:
 
 ```
 $ dorado basecaller dna_r10.4.1_e8.2_400bps_hac@v4.1.0 pod5s/ --modified-bases 5mCG_5hmCG > calls.bam
 ```
 
+Refer to the [modified base models](#modified-base-models) section to see available modifications.
+
 ### Duplex
-To run Duplex basecalling run the command:
+
+To run Duplex basecalling, run the command:
 
 ```
 $ dorado duplex dna_r10.4.1_e8.2_400bps_sup@v4.1.0 pod5s/ > duplex.bam
@@ -81,18 +89,20 @@ This command will output both simplex and duplex reads. Duplex reads will have t
 
 Dorado duplex previously required a separate tool to perform duplex pair detection and read splitting, but this is now integrated into Dorado.
 
+Note that modified basecalling is not yet supported in duplex mode.
+
 ### Alignment
 
 Dorado supports aligning existing basecalls or producing aligned output directly.
 
-To align existing basecalls run:
+To align existing basecalls, run:
 
 ```
 $ dorado aligner <index> <reads> 
 ```
-where `index` is a reference to align to in (fastq/fasta/mmi) format and `reads` is a file in any HTS format.
+where `index` is a reference to align to in (FASTQ/FASTA/.mmi) format and `reads` is a file in any HTS format.
 
-to basecall with alignment with duplex or simplex run with the `--reference` option:
+To basecall with alignment with duplex or simplex, run with the `--reference` option:
 
 ```
 $ dorado basecaller <model> <reads> --reference <index>
@@ -102,15 +112,15 @@ Alignment uses [minimap2](https://github.com/lh3/minimap2) and by default uses t
 
 ## Available basecalling models
 
-To download all available dorado models run:
+To download all available Dorado models, run:
 
 ```
 $ dorado download --model all
 ```
 
-**Simplex models:**
+### **Simplex models:**
 
-v4.1.0 models are recommended for our latest released condition (4kHz).
+v4.1.0 models are recommended for our latest released condition (4 kHz).
 
 * dna_r10.4.1_e8.2_260bps_fast@v4.1.0
 * dna_r10.4.1_e8.2_260bps_hac@v4.1.0
@@ -141,11 +151,11 @@ The following simplex models are also available:
 * dna_r10.4.1_e8.2_400bps_hac@v4.2.0 (5kHz)
 * dna_r10.4.1_e8.2_400bps_sup@v4.2.0 (5kHz)
 
-**RNA models:**
+### **RNA models:**
 
 * rna003_120bps_sup@v3
 
-**Modified base models**
+### **Modified base models**
 
 * dna_r9.4.1_e8_fast@v3.4_5mCG@v0
 * dna_r9.4.1_e8_hac@v3.3_5mCG@v0
@@ -174,19 +184,19 @@ The following simplex models are also available:
 * dna_r10.4.1_e8.2_400bps_sup@v4.2.0_5mC@v2 (5kHz)
 * dna_r10.4.1_e8.2_400bps_sup@v4.2.0_6mA@v2 (5kHz)
 
-## Decoding Dorado Model Names
+## Decoding Dorado model names
 
-The names of Dorado models are systematically structured, each segment corresponding to a different aspect of the model, which include both chemistry and run settings. To help understand this, let's dissect a sample model name:
+The names of Dorado models are systematically structured, each segment corresponding to a different aspect of the model, which include both chemistry and run settings. Below is a sample model name explained:
 
 `dna_r10.4.1_e8.2_400bps_hac@v4.2.0`
 
-- **Analyte Type (`dna`)**: This denotes the type of analyte being sequenced. For DNA sequencing, it's represented as `dna`. If you're using the direct RNA kit, this will be `rna`.
+- **Analyte Type (`dna`)**: This denotes the type of analyte being sequenced. For DNA sequencing, it is represented as `dna`. If you are using the Direct RNA Sequencing Kit, this will be `rna`.
 
-- **Pore Type (`r10.4.1`)**: This section corresponds to the type of flow cell used. For instance, FLO-MIN114/FLO-FLG114 is indicated by `r10.4.1`, while FLO-MIN106/FLO-FLG001 is signified by `r9.4.1`.
+- **Pore Type (`r10.4.1`)**: This section corresponds to the type of flow cell used. For instance, FLO-MIN114/FLO-FLG114 is indicated by `r10.4.1`, while FLO-MIN106D/FLO-FLG001 is signified by `r9.4.1`.
 
-- **Chemistry Type (`e.8.2`)**: This represents the chemistry type, which corresponds to the kit used for sequencing. For example, kit 14 is denoted by `e.8.2`.
+- **Chemistry Type (`e.8.2`)**: This represents the chemistry type, which corresponds to the kit used for sequencing. For example, Kit 14 chemistry is denoted by `e.8.2`.
 
-- **Translocation Speed (`400bps`)**: This parameter, selected at the run setup in MinKNOW, refers to the speed of translocation. Prior to starting your run, a prompt will ask if you prefer to run at 260bps or 400bps. The former yields more accurate results but provides less data. As of MinKNOW version 23.04, the 260bps option has been deprecated.
+- **Translocation Speed (`400bps`)**: This parameter, selected at the run setup in MinKNOW, refers to the speed of translocation. Prior to starting your run, a prompt will ask if you prefer to run at 260 bps or 400 bps. The former yields more accurate results but provides less data. As of MinKNOW version 23.04, the 260 bps option has been deprecated.
 
 - **Model Type (`hac`)**: This represents the size of the model, where larger models yield more accurate basecalls but take more time. The three types of models are `fast`, `hac`, and `sup`. The `fast` model is the quickest, `sup` is the most accurate, and `hac` provides a balance between speed and accuracy. For most users, the `hac` model is recommended.
 
@@ -196,7 +206,7 @@ The names of Dorado models are systematically structured, each segment correspon
 
 ### Linux dependencies
 
-The following packages are necessary to build dorado in a barebones environment (e.g. the official ubuntu:jammy docker image)
+The following packages are necessary to build Dorado in a barebones environment (e.g. the official ubuntu:jammy docker image).
 
 ```
 $ apt-get update && apt-get install -y --no-install-recommends \
@@ -223,19 +233,19 @@ $ cmake --build cmake-build --config Release -j
 $ ctest --test-dir cmake-build
 ```
 
-The `-j` flag will use all available threads to build dorado and usage is around 1-2GB per thread. If you are constrained
-by the amount of available memory on your system you can lower the number of threads i.e.` -j 4`.
+The `-j` flag will use all available threads to build Dorado and usage is around 1-2 GB per thread. If you are constrained
+by the amount of available memory on your system, you can lower the number of threads i.e.` -j 4`.
 
-After building you can run dorado from the build directory `./cmake-build/bin/dorado` or install it somewhere else on your
+After building, you can run Dorado from the build directory `./cmake-build/bin/dorado` or install it somewhere else on your
 system i.e. `/opt` *(note: you will need the relevant permissions for the target installation directory)*.
 
 ```
 $ cmake --install cmake-build --prefix /opt
 ```
 
-### Pre commit
+### Pre-commit
 
-The project uses pre-commit to ensure code is consistently formatted, you can set this up using pip:
+The project uses pre-commit to ensure code is consistently formatted; you can set this up using pip:
 
 ```bash
 $ pip install pre-commit
