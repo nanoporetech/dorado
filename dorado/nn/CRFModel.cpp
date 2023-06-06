@@ -880,7 +880,7 @@ CRFModelConfig load_crf_model_config(const std::filesystem::path &path) {
         config.signal_norm_params.shift_multiplier = toml::find<float>(norm, "shift_multiplier");
         config.signal_norm_params.scale_multiplier = toml::find<float>(norm, "scale_multiplier");
     } catch (const std::out_of_range &oor) {
-        // Do nothing as run_info is not available in all config files.
+        // Use default values if normalisation section is not found.
         config.signal_norm_params.quantile_a = 0.2f;
         config.signal_norm_params.quantile_b = 0.9f;
         config.signal_norm_params.shift_multiplier = 0.51f;
