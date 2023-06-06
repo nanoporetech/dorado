@@ -444,17 +444,6 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
         dorado/data_loader/DataLoader.h
     )
 
-    if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
-        add_library(dorado_allocator_lib STATIC
-            dorado/utils/allocator_override.cpp
-        )
-        target_link_libraries(dorado_allocator_lib
-            ${POD5_LIBRARIES}
-        )
-
-        target_link_libraries(dorado_io_lib dorado_allocator_lib)
-    endif()
-
     target_link_libraries(dorado_io_lib
        ${POD5_LIBRARIES}
        ${HDF5_C_LIBRARIES}
