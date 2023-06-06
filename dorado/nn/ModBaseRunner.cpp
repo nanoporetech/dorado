@@ -150,7 +150,7 @@ public:
 
             // Warmup
             auto input_sigs = torch::empty({batch_size, 1, sig_len}, m_options);
-            auto input_seqs = torch::empty({batch_size, RemoraUtils::NUM_BASES * kmer_len, sig_len},
+            auto input_seqs = torch::empty({batch_size, sig_len, RemoraUtils::NUM_BASES * kmer_len},
                                            m_options);
             caller_data->module_holder->forward(input_sigs, input_seqs);
 #if DORADO_GPU_BUILD && !defined(__APPLE__)
@@ -289,25 +289,30 @@ ModBaseRunner::ModBaseRunner(std::shared_ptr<ModBaseCaller> caller) : m_caller(s
                         .pinned_memory(m_caller->m_options.device().is_cuda())
                         .dtype(m_caller->m_options.dtype());
 
+    auto seq_input_options = torch::TensorOptions()
+                                     .device(torch::kCPU)
+                                     .pinned_memory(m_caller->m_options.device().is_cuda())
+                                     .dtype(torch::kInt8);
+
     for (auto& caller_data : m_caller->m_caller_data) {
         auto sig_len = static_cast<int64_t>(caller_data->params.context_before +
                                             caller_data->params.context_after);
         auto kmer_len = caller_data->params.bases_after + caller_data->params.bases_before + 1;
         m_input_sigs.push_back(torch::empty({caller_data->batch_size, 1, sig_len}, opts));
-        m_input_seqs.push_back(torch::empty(
-                {caller_data->batch_size, RemoraUtils::NUM_BASES * kmer_len, sig_len}, opts));
+        m_input_seqs.push_back(
+                torch::empty({caller_data->batch_size, sig_len, RemoraUtils::NUM_BASES * kmer_len},
+                             seq_input_options));
     }
 }
 
 void ModBaseRunner::accept_chunk(int model_id,
                                  int chunk_idx,
                                  const torch::Tensor& signal,
-                                 const std::vector<float>& kmers) {
+                                 const std::vector<int8_t>& kmers) {
     // As usual, avoid torch indexing because it is glacially slow.
-    // GPU base calling uses float16 signals and input tensors, but float32
-    // sequence encodings.
-    // CPU base calling uses float16 signals, float32 input tensors, and
-    // float32 sequence encodings.
+    // GPU base calling uses float16 signals and input tensors.
+    // CPU base calling uses float16 signals, float32 input tensors.
+    // Both versions take int8 sequence encodings.
 
     auto& input_sigs = m_input_sigs[model_id];
     auto& input_seqs = m_input_seqs[model_id];
@@ -317,21 +322,13 @@ void ModBaseRunner::accept_chunk(int model_id,
     dorado::utils::copy_tensor_elems(input_sigs, chunk_idx * sig_len, signal, 0, sig_len);
 
     const auto kmer_elem_count = input_seqs.size(1) * input_seqs.size(2);
-    if (input_seqs.dtype() == torch::kFloat16) {
-        // float32 kmer encoding -> float16 kmer encoding input
-        using InputType = c10::Half;
-        InputType* const input_seqs_ptr = input_seqs.data_ptr<InputType>();
-        dorado::utils::convert_f32_to_f16(&input_seqs_ptr[chunk_idx * kmer_elem_count],
-                                          kmers.data(), kmer_elem_count);
-    } else if (input_seqs.dtype() == torch::kFloat32) {
-        // float32 kmer encoding -> float32 kmer encoding input
-        using InputType = float;
-        InputType* const input_seqs_ptr = input_seqs.data_ptr<InputType>();
-        std::memcpy(&input_seqs_ptr[chunk_idx * kmer_elem_count], kmers.data(),
-                    kmer_elem_count * sizeof(InputType));
-    } else {
+    if (input_seqs.dtype() != torch::kInt8) {
         throw std::runtime_error("Unsupported input dtype");
     }
+    using SeqInputType = int8_t;
+    SeqInputType* const input_seqs_ptr = input_seqs.data_ptr<SeqInputType>();
+    std::memcpy(&input_seqs_ptr[chunk_idx * kmer_elem_count], kmers.data(),
+                kmer_elem_count * sizeof(SeqInputType));
 }
 
 torch::Tensor ModBaseRunner::call_chunks(int model_id, int num_chunks) {

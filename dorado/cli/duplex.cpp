@@ -2,9 +2,11 @@
 #include "data_loader/DataLoader.h"
 #include "decode/CPUDecoder.h"
 #include "nn/CRFModel.h"
+#include "read_pipeline/AlignerNode.h"
 #include "read_pipeline/BaseSpaceDuplexCallerNode.h"
 #include "read_pipeline/BasecallerNode.h"
 #include "read_pipeline/DuplexSplitNode.h"
+#include "read_pipeline/HtsWriter.h"
 #include "read_pipeline/PairingNode.h"
 #include "read_pipeline/ReadFilterNode.h"
 #include "read_pipeline/ReadToBamTypeNode.h"
@@ -38,8 +40,6 @@
 
 namespace dorado {
 
-using HtsWriter = utils::HtsWriter;
-using HtsReader = utils::HtsReader;
 using dorado::utils::default_parameters;
 
 int duplex(int argc, char* argv[]) {
@@ -107,13 +107,6 @@ int duplex(int argc, char* argv[]) {
 
     parser.add_argument("-I").help("minimap2 index batch size.").default_value(std::string("16G"));
 
-    parser.add_argument("--guard-gpus")
-            .default_value(false)
-            .implicit_value(true)
-            .help("In case of GPU OOM, use this option to be more defensive with GPU memory. May "
-                  "cause "
-                  "performance regression.");
-
     try {
         auto remaining_args = parser.parse_known_args(argc, argv);
         auto internal_parser = utils::parse_internal_options(remaining_args);
@@ -125,7 +118,6 @@ int duplex(int argc, char* argv[]) {
         auto threads = static_cast<size_t>(parser.get<int>("--threads"));
         auto min_qscore(parser.get<int>("--min-qscore"));
         auto ref = parser.get<std::string>("--reference");
-        bool guard_gpus = parser.get<bool>("--guard-gpus");
         const bool basespace_duplex = (model.compare("basespace") == 0);
         std::vector<std::string> args(argv, argv + argc);
         if (parser.get<bool>("--verbose")) {
@@ -174,7 +166,7 @@ int duplex(int argc, char* argv[]) {
         std::unique_ptr<sam_hdr_t, void (*)(sam_hdr_t*)> hdr(sam_hdr_init(), sam_hdr_destroy);
         utils::add_pg_hdr(hdr.get(), args);
         std::shared_ptr<HtsWriter> bam_writer;
-        std::shared_ptr<utils::Aligner> aligner;
+        std::shared_ptr<Aligner> aligner;
         MessageSink* converted_reads_sink = nullptr;
 
         if (ref.empty()) {
@@ -182,7 +174,7 @@ int duplex(int argc, char* argv[]) {
             converted_reads_sink = bam_writer.get();
         } else {
             bam_writer = std::make_shared<HtsWriter>("-", output_mode, 4, num_reads);
-            aligner = std::make_shared<utils::Aligner>(
+            aligner = std::make_shared<Aligner>(
                     *bam_writer, ref, parser.get<int>("k"), parser.get<int>("w"),
                     utils::parse_string_to_size(parser.get<std::string>("I")),
                     std::thread::hardware_concurrency());
@@ -206,7 +198,7 @@ int duplex(int argc, char* argv[]) {
             bam_writer->write_header(hdr.get());
 
             spdlog::info("> Loading reads");
-            auto read_map = utils::read_bam(reads, read_list_from_pairs);
+            auto read_map = read_bam(reads, read_list_from_pairs);
 
             spdlog::info("> Starting Basespace Duplex Pipeline");
             threads = threads == 0 ? std::thread::hardware_concurrency() : threads;
@@ -301,7 +293,7 @@ int duplex(int argc, char* argv[]) {
                 for (auto device_string : devices) {
                     // Use most of GPU mem but leave some for buffer.
                     auto caller = create_cuda_caller(model_config, model_path, chunk_size,
-                                                     batch_size, device_string, 0.9f, guard_gpus);
+                                                     batch_size, device_string, 0.9f);
                     for (size_t i = 0; i < num_runners; i++) {
                         runners.push_back(std::make_shared<CudaModelRunner>(caller));
                     }
@@ -317,7 +309,7 @@ int duplex(int argc, char* argv[]) {
                     // memory after simplex caller has been instantiated to the duplex caller.
                     // ALWAYS auto tune the duplex batch size (i.e. batch_size passed in is 0.)
                     auto caller = create_cuda_caller(stereo_model_config, stereo_model_path,
-                                                     chunk_size, 0, device_string, 1.f, guard_gpus);
+                                                     chunk_size, 0, device_string, 1.f);
                     for (size_t i = 0; i < num_runners; i++) {
                         stereo_runners.push_back(std::make_shared<CudaModelRunner>(caller));
                     }

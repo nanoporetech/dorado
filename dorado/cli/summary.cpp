@@ -1,4 +1,5 @@
 #include "Version.h"
+#include "read_pipeline/HtsReader.h"
 #include "utils/bam_utils.h"
 #include "utils/log_utils.h"
 
@@ -14,8 +15,6 @@
 namespace dorado {
 
 volatile sig_atomic_t interrupt = 0;
-
-using HtsReader = utils::HtsReader;
 
 // todo: move to time_utils after !273
 double time_difference_seconds(const std::string &timestamp1, const std::string &timestamp2) {

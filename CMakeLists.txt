@@ -128,6 +128,12 @@ set(LIB_SOURCE_FILES
     dorado/read_pipeline/BaseSpaceDuplexCallerNode.h
     dorado/read_pipeline/DuplexSplitNode.cpp
     dorado/read_pipeline/DuplexSplitNode.h
+    dorado/read_pipeline/AlignerNode.cpp
+    dorado/read_pipeline/AlignerNode.h
+    dorado/read_pipeline/HtsReader.cpp
+    dorado/read_pipeline/HtsReader.h
+    dorado/read_pipeline/HtsWriter.cpp
+    dorado/read_pipeline/HtsWriter.h
     dorado/decode/beam_search.cpp
     dorado/decode/fast_hash.cpp
     dorado/decode/fast_hash.h
@@ -443,17 +449,6 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
         dorado/data_loader/DataLoader.cpp
         dorado/data_loader/DataLoader.h
     )
-
-    if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
-        add_library(dorado_allocator_lib STATIC
-            dorado/utils/allocator_override.cpp
-        )
-        target_link_libraries(dorado_allocator_lib
-            ${POD5_LIBRARIES}
-        )
-
-        target_link_libraries(dorado_io_lib dorado_allocator_lib)
-    endif()
 
     target_link_libraries(dorado_io_lib
        ${POD5_LIBRARIES}

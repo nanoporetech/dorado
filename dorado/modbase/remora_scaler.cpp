@@ -82,7 +82,6 @@ std::pair<float, float> RemoraScaler::calc_offset_scale(const torch::Tensor& sam
             new_levels[i] = levels[i];
         }
     }
-
     if (clip_bases > 0 && levels.size() > clip_bases * 2) {
         new_levels = {std::begin(new_levels) + clip_bases, std::end(new_levels) - clip_bases};
         optim_dacs = {std::begin(optim_dacs) + clip_bases, std::end(optim_dacs) - clip_bases};

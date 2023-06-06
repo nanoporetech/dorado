@@ -14,7 +14,9 @@
 #endif  // DORADO_GPU_BUILD
 #include "nn/ModBaseRunner.h"
 #include "nn/ModelRunner.h"
+#include "read_pipeline/AlignerNode.h"
 #include "read_pipeline/BasecallerNode.h"
+#include "read_pipeline/HtsWriter.h"
 #include "read_pipeline/ModBaseCallerNode.h"
 #include "read_pipeline/ReadFilterNode.h"
 #include "read_pipeline/ReadToBamTypeNode.h"
@@ -40,8 +42,6 @@
 
 namespace dorado {
 
-using HtsWriter = utils::HtsWriter;
-using HtsReader = utils::HtsReader;
 using dorado::utils::default_parameters;
 using namespace std::chrono_literals;
 
@@ -206,7 +206,7 @@ void setup(std::vector<std::string> args,
     utils::add_pg_hdr(hdr.get(), args);
     utils::add_rg_hdr(hdr.get(), read_groups);
     std::shared_ptr<HtsWriter> bam_writer;
-    std::shared_ptr<utils::Aligner> aligner;
+    std::shared_ptr<Aligner> aligner;
     MessageSink* converted_reads_sink = nullptr;
     if (ref.empty()) {
         bam_writer = std::make_shared<HtsWriter>("-", output_mode,
@@ -216,9 +216,9 @@ void setup(std::vector<std::string> args,
     } else {
         bam_writer = std::make_shared<HtsWriter>("-", output_mode,
                                                  thread_allocations.writer_threads, num_reads);
-        aligner = std::make_shared<utils::Aligner>(*bam_writer, ref, kmer_size, window_size,
-                                                   mm2_index_batch_size,
-                                                   thread_allocations.aligner_threads);
+        aligner =
+                std::make_shared<Aligner>(*bam_writer, ref, kmer_size, window_size,
+                                          mm2_index_batch_size, thread_allocations.aligner_threads);
         utils::add_sq_hdr(hdr.get(), aligner->get_sequence_records_for_header());
         bam_writer->write_header(hdr.get());
         converted_reads_sink = aligner.get();
