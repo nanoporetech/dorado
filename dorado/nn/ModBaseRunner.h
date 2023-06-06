@@ -2,6 +2,8 @@
 
 #include "utils/stats.h"
 
+#include <torch/torch.h>
+
 #include <atomic>
 #include <filesystem>
 #include <string>
