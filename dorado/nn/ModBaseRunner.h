@@ -41,7 +41,7 @@ public:
     void accept_chunk(int model_id,
                       int chunk_idx,
                       const torch::Tensor& signal,
-                      const std::vector<float>& kmers);
+                      const std::vector<int8_t>& kmers);
     torch::Tensor call_chunks(int model_id, int num_chunks);
     torch::Tensor scale_signal(size_t caller_id,
                                torch::Tensor signal,
