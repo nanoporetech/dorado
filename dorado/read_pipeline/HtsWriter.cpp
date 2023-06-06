@@ -88,7 +88,7 @@ void HtsWriter::worker_thread() {
         // TODO: This is a hack, we should have a better way of identifying duplex reads.
         bool ignore_read_id = read_id.find(';') != std::string::npos;
 
-        if (!ignore_read_id) {
+        if (m_stats_counter && !ignore_read_id) {
             m_stats_counter->add_written_read_id(read_id);
         }
     }
