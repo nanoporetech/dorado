@@ -266,9 +266,9 @@ void setup(std::vector<std::string> args,
     }
 
     loader.load_reads(data_path, recursive_file_loading);
-    stats_counter.dump_stats();
 
     bam_writer->join();
+    stats_counter.dump_stats();
     if (stats_sampler) {
         stats_sampler->terminate();
         std::ofstream stats_file(dump_stats_file);
