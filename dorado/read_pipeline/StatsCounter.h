@@ -37,7 +37,7 @@ private:
     std::atomic<int64_t> m_num_bases_processed;
     std::atomic<int64_t> m_num_samples_processed;
     std::atomic<int> m_num_reads_processed;
-    std::atomic<int> m_num_reads_filtered;
+    std::atomic<int> m_num_reads_written;
 
     int m_num_reads_expected;
 

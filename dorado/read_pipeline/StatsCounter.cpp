@@ -12,7 +12,7 @@ StatsCounter::StatsCounter(int total_reads, bool duplex)
         : m_num_bases_processed(0),
           m_num_samples_processed(0),
           m_num_reads_processed(0),
-          m_num_reads_filtered(0),
+          m_num_reads_written(0),
           m_num_reads_expected(total_reads),
           m_initialization_time(std::chrono::system_clock::now()),
           m_duplex(duplex) {
@@ -28,6 +28,7 @@ void StatsCounter::add_basecalled_read(std::shared_ptr<Read> read) {
 void StatsCounter::add_written_read_id(const std::string& read_id) {
     const std::lock_guard<std::mutex> lock(m_reads_mutex);
     m_processed_read_ids.emplace(std::move(read_id));
+    m_num_reads_written++;
 }
 
 void StatsCounter::add_filtered_read_id(const std::string& read_id) {
@@ -79,7 +80,7 @@ void StatsCounter::dump_stats() {
                             .count();
     if (m_num_reads_processed > 0) {
         std::ostringstream samples_sec;
-        spdlog::info("> Reads basecalled: {}", m_num_reads_processed);
+        spdlog::info("> Reads basecalled: {}", m_num_reads_written);
         if (m_duplex) {
             samples_sec << std::scientific << m_num_bases_processed / (duration / 1000.0);
             spdlog::info("> Basecalled @ Bases/s: {}", samples_sec.str());
