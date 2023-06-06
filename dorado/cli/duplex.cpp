@@ -2,9 +2,11 @@
 #include "data_loader/DataLoader.h"
 #include "decode/CPUDecoder.h"
 #include "nn/CRFModel.h"
+#include "read_pipeline/AlignerNode.h"
 #include "read_pipeline/BaseSpaceDuplexCallerNode.h"
 #include "read_pipeline/BasecallerNode.h"
 #include "read_pipeline/DuplexSplitNode.h"
+#include "read_pipeline/HtsWriter.h"
 #include "read_pipeline/PairingNode.h"
 #include "read_pipeline/ReadFilterNode.h"
 #include "read_pipeline/ReadToBamTypeNode.h"
@@ -38,8 +40,6 @@
 
 namespace dorado {
 
-using HtsWriter = utils::HtsWriter;
-using HtsReader = utils::HtsReader;
 using dorado::utils::default_parameters;
 
 int duplex(int argc, char* argv[]) {
@@ -174,7 +174,7 @@ int duplex(int argc, char* argv[]) {
         std::unique_ptr<sam_hdr_t, void (*)(sam_hdr_t*)> hdr(sam_hdr_init(), sam_hdr_destroy);
         utils::add_pg_hdr(hdr.get(), args);
         std::shared_ptr<HtsWriter> bam_writer;
-        std::shared_ptr<utils::Aligner> aligner;
+        std::shared_ptr<Aligner> aligner;
         MessageSink* converted_reads_sink = nullptr;
 
         if (ref.empty()) {
@@ -182,7 +182,7 @@ int duplex(int argc, char* argv[]) {
             converted_reads_sink = bam_writer.get();
         } else {
             bam_writer = std::make_shared<HtsWriter>("-", output_mode, 4, num_reads);
-            aligner = std::make_shared<utils::Aligner>(
+            aligner = std::make_shared<Aligner>(
                     *bam_writer, ref, parser.get<int>("k"), parser.get<int>("w"),
                     utils::parse_string_to_size(parser.get<std::string>("I")),
                     std::thread::hardware_concurrency());
@@ -206,7 +206,7 @@ int duplex(int argc, char* argv[]) {
             bam_writer->write_header(hdr.get());
 
             spdlog::info("> Loading reads");
-            auto read_map = utils::read_bam(reads, read_list_from_pairs);
+            auto read_map = read_bam(reads, read_list_from_pairs);
 
             spdlog::info("> Starting Basespace Duplex Pipeline");
             threads = threads == 0 ? std::thread::hardware_concurrency() : threads;

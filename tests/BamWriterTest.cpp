@@ -1,5 +1,7 @@
 #include "TestUtils.h"
 #include "htslib/sam.h"
+#include "read_pipeline/HtsReader.h"
+#include "read_pipeline/HtsWriter.h"
 #include "utils/bam_utils.h"
 
 #include <catch2/catch.hpp>
@@ -9,7 +11,7 @@
 #define TEST_GROUP "[bam_utils][hts_writer]"
 
 namespace fs = std::filesystem;
-using namespace dorado::utils;
+using namespace dorado;
 
 class HtsWriterTestsFixture {
 public:
