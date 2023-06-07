@@ -52,6 +52,7 @@ private:
     int write_hdr_sq(char* name, uint32_t length);
     size_t m_num_reads_expected;
     StatsCounter* m_stats_counter;
+    std::unordered_set<std::string> m_processed_read_ids;
 };
 
 }  // namespace dorado

@@ -156,6 +156,8 @@ void BasecallerNode::working_reads_manager() {
             utils::stitch_chunks(read);
             m_sink.push_message(read);
             ++m_called_reads_pushed;
+            m_num_bases_processed += read->seq.length();
+            m_num_samples_processed += read->raw_data.size(0);
             if (m_stats_counter) {
                 m_stats_counter->add_basecalled_read(read);
             }
@@ -317,6 +319,8 @@ stats::NamedStats BasecallerNode::sample_stats() const {
     stats["call_chunks_ms"] = m_call_chunks_ms;
     stats["called_reads_pushed"] = m_called_reads_pushed;
     stats["working_reads_items"] = m_working_reads_size;
+    stats["bases_processed"] = m_num_bases_processed;
+    stats["samples_processed"] = m_num_samples_processed;
     return stats;
 }
 

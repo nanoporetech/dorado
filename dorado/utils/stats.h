@@ -34,6 +34,10 @@ public:
             terminate();
     }
 
+    void register_stats_callable(std::function<void(const NamedStats&)> callable) {
+        m_callables.push_back(callable);
+    }
+
     void terminate() {
         m_should_terminate = true;
         m_sampling_thread.join();
@@ -84,6 +88,7 @@ private:
     std::chrono::system_clock::duration m_sampling_period;
     std::chrono::time_point<std::chrono::system_clock> m_start_time;
     std::thread m_sampling_thread;
+    std::vector<std::function<void(const NamedStats&)>> m_callables;
 
     // Stats returned by nodes, and recorded per sample time,
     // are of this form.
@@ -116,6 +121,10 @@ private:
             }
 
             m_records.push_back(stats_record);
+
+            for (auto& c : m_callables) {
+                c(stats_record.stats);
+            }
         }
     }
 };
@@ -123,8 +132,10 @@ private:
 // Constructs a callable StatsReporter object based on an object
 // that implements get_name / sample_stats.
 template <class T>
-StatsReporter make_stats_reporter(const T& node) {
-    return [&node]() { return std::make_tuple(node.get_name(), node.sample_stats()); };
+StatsReporter make_stats_reporter(const T& node, const std::string& name = "") {
+    return [&node, &name]() {
+        return std::make_tuple(name.empty() ? node.get_name() : name, node.sample_stats());
+    };
 }
 
 // Returns NamedStats containing the given object's stats. with their names prefixed by

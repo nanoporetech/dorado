@@ -88,8 +88,11 @@ void HtsWriter::worker_thread() {
         // TODO: This is a hack, we should have a better way of identifying duplex reads.
         bool ignore_read_id = read_id.find(';') != std::string::npos;
 
-        if (m_stats_counter && !ignore_read_id) {
-            m_stats_counter->add_written_read_id(read_id);
+        if (!ignore_read_id) {
+            m_processed_read_ids.emplace(std::move(read_id));
+            if (m_stats_counter) {
+                m_stats_counter->add_written_read_id(read_id);
+            }
         }
     }
     spdlog::debug("Written {} records.", write_count);
@@ -124,6 +127,10 @@ int HtsWriter::write_header(const sam_hdr_t* hdr) {
     return 0;
 }
 
-stats::NamedStats HtsWriter::sample_stats() const { return stats::from_obj(m_work_queue); }
+stats::NamedStats HtsWriter::sample_stats() const {
+    auto stats = stats::from_obj(m_work_queue);
+    stats["unique_simplex_reads_written"] = m_processed_read_ids.size();
+    return stats;
+}
 
 }  // namespace dorado

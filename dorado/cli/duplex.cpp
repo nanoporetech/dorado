@@ -8,10 +8,10 @@
 #include "read_pipeline/DuplexSplitNode.h"
 #include "read_pipeline/HtsWriter.h"
 #include "read_pipeline/PairingNode.h"
+#include "read_pipeline/ProgressTracker.h"
 #include "read_pipeline/ReadFilterNode.h"
 #include "read_pipeline/ReadToBamTypeNode.h"
 #include "read_pipeline/ScalerNode.h"
-#include "read_pipeline/StatsCounter.h"
 #include "read_pipeline/StereoDuplexEncoderNode.h"
 #include "utils/bam_utils.h"
 #include "utils/cli_utils.h"
@@ -41,6 +41,7 @@
 namespace dorado {
 
 using dorado::utils::default_parameters;
+using namespace std::chrono_literals;
 
 int duplex(int argc, char* argv[]) {
     using dorado::utils::default_parameters;
@@ -170,7 +171,8 @@ int duplex(int argc, char* argv[]) {
         size_t num_reads = (basespace_duplex ? read_list_from_pairs.size()
                                              : DataLoader::get_num_reads(reads, read_list,
                                                                          recursive_file_loading));
-        StatsCounter stats_counter(num_reads, duplex);
+        std::unique_ptr<dorado::stats::StatsSampler> stats_sampler;
+        ProgressTracker tracker(num_reads, duplex);
 
         std::unique_ptr<sam_hdr_t, void (*)(sam_hdr_t*)> hdr(sam_hdr_init(), sam_hdr_destroy);
         utils::add_pg_hdr(hdr.get(), args);
@@ -179,12 +181,10 @@ int duplex(int argc, char* argv[]) {
         MessageSink* converted_reads_sink = nullptr;
 
         if (ref.empty()) {
-            bam_writer =
-                    std::make_shared<HtsWriter>("-", output_mode, 4, num_reads, &stats_counter);
+            bam_writer = std::make_shared<HtsWriter>("-", output_mode, 4, num_reads, nullptr);
             converted_reads_sink = bam_writer.get();
         } else {
-            bam_writer =
-                    std::make_shared<HtsWriter>("-", output_mode, 4, num_reads, &stats_counter);
+            bam_writer = std::make_shared<HtsWriter>("-", output_mode, 4, num_reads, nullptr);
             aligner = std::make_shared<Aligner>(
                     *bam_writer, ref, parser.get<int>("k"), parser.get<int>("w"),
                     utils::parse_string_to_size(parser.get<std::string>("I")),
@@ -195,7 +195,7 @@ int duplex(int argc, char* argv[]) {
         ReadToBamType read_converter(*converted_reads_sink, emit_moves, rna, 2);
         // The minimum sequence length is set to 5 to avoid issues with duplex node printing very short sequences for mismatched pairs.
         ReadFilterNode read_filter_node(read_converter, min_qscore,
-                                        default_parameters.min_seqeuence_length, 5, &stats_counter);
+                                        default_parameters.min_seqeuence_length, 5, nullptr);
 
         torch::set_num_threads(1);
 
@@ -333,7 +333,7 @@ int duplex(int argc, char* argv[]) {
             const int kStereoBatchTimeoutMS = 5000;
             auto stereo_basecaller_node = std::make_unique<BasecallerNode>(
                     read_filter_node, std::move(stereo_runners), adjusted_stereo_overlap,
-                    kStereoBatchTimeoutMS, duplex_rg_name, 1000, &stats_counter);
+                    kStereoBatchTimeoutMS, duplex_rg_name, 1000, nullptr);
             auto simplex_model_stride = runners.front()->model_stride();
 
             StereoDuplexEncoderNode stereo_node =
@@ -357,15 +357,43 @@ int duplex(int argc, char* argv[]) {
             const int kSimplexBatchTimeoutMS = 100;
             auto basecaller_node = std::make_unique<BasecallerNode>(
                     splitter_node, std::move(runners), adjusted_simplex_overlap,
-                    kSimplexBatchTimeoutMS, model, 1000, &stats_counter);
+                    kSimplexBatchTimeoutMS, model, 1000, nullptr);
 
             ScalerNode scaler_node(*basecaller_node, num_devices * 2);
 
             DataLoader loader(scaler_node, "cpu", num_devices, 0, std::move(read_list));
+
+            // Setup stats counting
+            std::vector<dorado::stats::StatsReporter> stats_reporters;
+            using dorado::stats::make_stats_reporter;
+            stats_reporters.push_back(
+                    make_stats_reporter(*stereo_basecaller_node, "StereoBasecallerNode"));
+            stats_reporters.push_back(make_stats_reporter(stereo_node));
+            stats_reporters.push_back(make_stats_reporter(pairing_node));
+            stats_reporters.push_back(make_stats_reporter(splitter_node));
+            stats_reporters.push_back(make_stats_reporter(*basecaller_node));
+            if (aligner) {
+                stats_reporters.push_back(make_stats_reporter(*aligner));
+            }
+            stats_reporters.push_back(make_stats_reporter(*bam_writer));
+            stats_reporters.push_back(make_stats_reporter(loader));
+            stats_reporters.push_back(make_stats_reporter(scaler_node));
+            stats_reporters.push_back(make_stats_reporter(read_filter_node));
+
+            constexpr auto kStatsPeriod = 100ms;
+            stats_sampler =
+                    std::make_unique<dorado::stats::StatsSampler>(kStatsPeriod, stats_reporters);
+
+            stats_sampler->register_stats_callable([&tracker](const stats::NamedStats& stats) {
+                tracker.update_progress_bar(stats);
+            });
+            // End stats counting setup.
+
             loader.load_reads(reads, parser.get<bool>("--recursive"), DataLoader::BY_CHANNEL);
         }
         bam_writer->join();  // Explicitly wait for all output rows to be written.
-        stats_counter.dump_stats();
+        stats_sampler->terminate();
+        tracker.summarize();
     } catch (const std::exception& e) {
         spdlog::error(e.what());
         return 1;

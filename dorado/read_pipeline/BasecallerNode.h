@@ -95,6 +95,8 @@ private:
     std::atomic<int64_t> m_call_chunks_ms = 0;
     std::atomic<int64_t> m_called_reads_pushed = 0;
     std::atomic<int64_t> m_working_reads_size = 0;
+    std::atomic<int64_t> m_num_bases_processed = 0;
+    std::atomic<int64_t> m_num_samples_processed = 0;
 };
 
 }  // namespace dorado

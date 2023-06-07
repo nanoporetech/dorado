@@ -3,10 +3,11 @@
 #include "read_pipeline/AlignerNode.h"
 #include "read_pipeline/HtsReader.h"
 #include "read_pipeline/HtsWriter.h"
-#include "read_pipeline/StatsCounter.h"
+#include "read_pipeline/ProgressTracker.h"
 #include "utils/bam_utils.h"
 #include "utils/cli_utils.h"
 #include "utils/log_utils.h"
+#include "utils/stats.h"
 
 #include <argparse.hpp>
 #include <spdlog/spdlog.h>
@@ -103,9 +104,9 @@ int aligner(int argc, char* argv[]) {
     }
     spdlog::info("> loading index {}", index);
 
-    StatsCounter stats_counter(0, false);
+    ProgressTracker tracker(0, false);
 
-    HtsWriter writer("-", HtsWriter::OutputMode::BAM, writer_threads, 0, &stats_counter);
+    HtsWriter writer("-", HtsWriter::OutputMode::BAM, writer_threads, 0, nullptr);
     Aligner aligner(writer, index, kmer_size, window_size, index_batch_size, aligner_threads);
     HtsReader reader(reads[0]);
 
@@ -115,11 +116,26 @@ int aligner(int argc, char* argv[]) {
     utils::add_sq_hdr(header, aligner.get_sequence_records_for_header());
     writer.write_header(header);
 
+    // Setup stats counting.
+    std::unique_ptr<dorado::stats::StatsSampler> stats_sampler;
+    std::vector<dorado::stats::StatsReporter> stats_reporters;
+    using dorado::stats::make_stats_reporter;
+    stats_reporters.push_back(make_stats_reporter(writer));
+    stats_reporters.push_back(make_stats_reporter(aligner));
+
+    constexpr auto kStatsPeriod = 100ms;
+    stats_sampler = std::make_unique<dorado::stats::StatsSampler>(kStatsPeriod, stats_reporters);
+
+    stats_sampler->register_stats_callable(
+            [&tracker](const stats::NamedStats& stats) { tracker.update_progress_bar(stats); });
+    // End stats counting setup.
+
     spdlog::info("> starting alignment");
     reader.read(aligner, max_reads);
     writer.join();
 
-    stats_counter.dump_stats();
+    stats_sampler->terminate();
+    tracker.summarize();
 
     spdlog::info("> finished alignment");
     spdlog::info("> total/primary/unmapped {}/{}/{}", writer.total, writer.primary,

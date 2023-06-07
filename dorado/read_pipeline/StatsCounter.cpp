@@ -43,7 +43,7 @@ void StatsCounter::worker_thread() {
     bool bar_initialized = false;
     while (!m_terminate.load()) {
         if (m_num_reads_expected != 0 && !bar_initialized) {
-            m_progress_bar.set_progress(0.f);
+            //m_progress_bar.set_progress(0.f);
             bar_initialized = true;
         }
 
@@ -55,7 +55,7 @@ void StatsCounter::worker_thread() {
         if (m_num_reads_expected != 0) {
             float progress = 100.f * static_cast<float>(write_count) / m_num_reads_expected;
             if (progress > m_last_progress_written) {
-                m_progress_bar.set_progress(progress);
+                //m_progress_bar.set_progress(progress);
 #ifndef WIN32
                 std::cerr << "\033[K";
 #endif  // WIN32
@@ -78,17 +78,17 @@ void StatsCounter::dump_stats() {
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(m_end_time -
                                                                           m_initialization_time)
                             .count();
-    if (m_num_reads_processed > 0) {
-        std::ostringstream samples_sec;
-        spdlog::info("> Reads basecalled: {}", m_num_reads_written);
-        if (m_duplex) {
-            samples_sec << std::scientific << m_num_bases_processed / (duration / 1000.0);
-            spdlog::info("> Basecalled @ Bases/s: {}", samples_sec.str());
-        } else {
-            samples_sec << std::scientific << m_num_samples_processed / (duration / 1000.0);
-            spdlog::info("> Basecalled @ Samples/s: {}", samples_sec.str());
-        }
-    }
+    //if (m_num_reads_processed > 0) {
+    //    std::ostringstream samples_sec;
+    //    spdlog::info("> Reads basecalled: {}", m_num_reads_written);
+    //    if (m_duplex) {
+    //        samples_sec << std::scientific << m_num_bases_processed / (duration / 1000.0);
+    //        spdlog::info("> Basecalled @ Bases/s: {}", samples_sec.str());
+    //    } else {
+    //        samples_sec << std::scientific << m_num_samples_processed / (duration / 1000.0);
+    //        spdlog::info("> Basecalled @ Samples/s: {}", samples_sec.str());
+    //    }
+    //}
 }
 
 }  // namespace dorado
