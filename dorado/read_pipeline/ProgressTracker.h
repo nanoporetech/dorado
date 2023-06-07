@@ -34,10 +34,14 @@ public:
         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(m_end_time -
                                                                               m_initialization_time)
                                 .count();
-        if (m_num_reads_processed > 0) {
-            std::ostringstream samples_sec;
+        if (m_num_reads_written > 0) {
             spdlog::info("> Reads basecalled: {}", m_num_reads_written);
+        }
+        if (m_num_reads_filtered > 0) {
             spdlog::info("> Reads filtered: {}", m_num_reads_filtered);
+        }
+        if (m_num_bases_processed > 0) {
+            std::ostringstream samples_sec;
             if (m_duplex) {
                 samples_sec << std::scientific << m_num_bases_processed / (duration / 1000.0);
                 spdlog::info("> Basecalled @ Bases/s: {}", samples_sec.str());
@@ -92,16 +96,11 @@ public:
     }
 
 private:
-    void worker_thread();
-
-    // Async worker for writing.
-    std::unique_ptr<std::thread> m_thread;
-
-    std::atomic<int64_t> m_num_bases_processed;
-    std::atomic<int64_t> m_num_samples_processed;
-    std::atomic<int> m_num_reads_processed;
-    std::atomic<int> m_num_reads_written;
-    std::atomic<int> m_num_reads_filtered;
+    std::atomic<int64_t> m_num_bases_processed{0};
+    std::atomic<int64_t> m_num_samples_processed{0};
+    std::atomic<int> m_num_reads_processed{0};
+    std::atomic<int> m_num_reads_written{0};
+    std::atomic<int> m_num_reads_filtered{0};
 
     int m_num_reads_expected;
     bool m_bar_initialized = false;
@@ -121,12 +120,7 @@ private:
                 indicators::option::ShowPercentage{true},
     };
 
-    std::atomic<bool> m_terminate{false};
-
-    std::unordered_set<std::string> m_processed_read_ids;
     float m_last_progress_written = -1.f;
-
-    std::mutex m_reads_mutex;
 };
 
 }  // namespace dorado
