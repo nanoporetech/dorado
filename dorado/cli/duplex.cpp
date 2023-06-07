@@ -181,10 +181,10 @@ int duplex(int argc, char* argv[]) {
         MessageSink* converted_reads_sink = nullptr;
 
         if (ref.empty()) {
-            bam_writer = std::make_shared<HtsWriter>("-", output_mode, 4, num_reads, nullptr);
+            bam_writer = std::make_shared<HtsWriter>("-", output_mode, 4, num_reads);
             converted_reads_sink = bam_writer.get();
         } else {
-            bam_writer = std::make_shared<HtsWriter>("-", output_mode, 4, num_reads, nullptr);
+            bam_writer = std::make_shared<HtsWriter>("-", output_mode, 4, num_reads);
             aligner = std::make_shared<Aligner>(
                     *bam_writer, ref, parser.get<int>("k"), parser.get<int>("w"),
                     utils::parse_string_to_size(parser.get<std::string>("I")),
@@ -195,7 +195,7 @@ int duplex(int argc, char* argv[]) {
         ReadToBamType read_converter(*converted_reads_sink, emit_moves, rna, 2);
         // The minimum sequence length is set to 5 to avoid issues with duplex node printing very short sequences for mismatched pairs.
         ReadFilterNode read_filter_node(read_converter, min_qscore,
-                                        default_parameters.min_seqeuence_length, 5, nullptr);
+                                        default_parameters.min_seqeuence_length, 5);
 
         torch::set_num_threads(1);
 
@@ -333,7 +333,7 @@ int duplex(int argc, char* argv[]) {
             const int kStereoBatchTimeoutMS = 5000;
             auto stereo_basecaller_node = std::make_unique<BasecallerNode>(
                     read_filter_node, std::move(stereo_runners), adjusted_stereo_overlap,
-                    kStereoBatchTimeoutMS, duplex_rg_name, 1000, nullptr);
+                    kStereoBatchTimeoutMS, duplex_rg_name, 1000);
             auto simplex_model_stride = runners.front()->model_stride();
 
             StereoDuplexEncoderNode stereo_node =
@@ -357,7 +357,7 @@ int duplex(int argc, char* argv[]) {
             const int kSimplexBatchTimeoutMS = 100;
             auto basecaller_node = std::make_unique<BasecallerNode>(
                     splitter_node, std::move(runners), adjusted_simplex_overlap,
-                    kSimplexBatchTimeoutMS, model, 1000, nullptr);
+                    kSimplexBatchTimeoutMS, model, 1000);
 
             ScalerNode scaler_node(*basecaller_node, num_devices * 2);
 

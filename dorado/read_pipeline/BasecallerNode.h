@@ -2,7 +2,6 @@
 
 #include "../nn/ModelRunner.h"
 #include "ReadPipeline.h"
-#include "StatsCounter.h"
 #include "utils/stats.h"
 
 #include <atomic>
@@ -18,8 +17,7 @@ public:
                    size_t overlap,
                    int batch_timeout_ms,
                    std::string model_name = "",
-                   size_t max_reads = 1000,
-                   StatsCounter* stats_counter = nullptr);
+                   size_t max_reads = 1000);
     ~BasecallerNode();
     std::string get_name() const override { return "BasecallerNode"; }
     stats::NamedStats sample_stats() const override;
@@ -49,8 +47,6 @@ private:
     std::string m_model_name;
     // max reads
     size_t m_max_reads;
-    // Stats counter
-    StatsCounter* m_stats_counter;
 
     // Model runners which have not terminated.
     std::atomic<int> m_num_active_model_runners{0};

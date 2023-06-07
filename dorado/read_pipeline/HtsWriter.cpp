@@ -15,12 +15,8 @@
 
 namespace dorado {
 
-HtsWriter::HtsWriter(const std::string& filename,
-                     OutputMode mode,
-                     size_t threads,
-                     size_t num_reads,
-                     StatsCounter* stats_counter)
-        : MessageSink(10000), m_num_reads_expected(num_reads), m_stats_counter(stats_counter) {
+HtsWriter::HtsWriter(const std::string& filename, OutputMode mode, size_t threads, size_t num_reads)
+        : MessageSink(10000), m_num_reads_expected(num_reads) {
     switch (mode) {
     case FASTQ:
         m_file = hts_open(filename.c_str(), "wf");
@@ -90,9 +86,6 @@ void HtsWriter::worker_thread() {
 
         if (!ignore_read_id) {
             m_processed_read_ids.emplace(std::move(read_id));
-            if (m_stats_counter) {
-                m_stats_counter->add_written_read_id(read_id);
-            }
         }
     }
     spdlog::debug("Written {} records.", write_count);

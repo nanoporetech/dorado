@@ -1,7 +1,6 @@
 #pragma once
 
 #include "ReadPipeline.h"
-#include "StatsCounter.h"
 #include "utils/stats.h"
 
 #include <atomic>
@@ -24,8 +23,7 @@ public:
     ReadFilterNode(MessageSink& sink,
                    size_t min_qscore,
                    size_t min_read_length,
-                   size_t num_worker_threads,
-                   StatsCounter* stats_counter = nullptr);
+                   size_t num_worker_threads);
     ~ReadFilterNode();
     std::string get_name() const override { return "ReadFilterNode"; }
     stats::NamedStats sample_stats() const override;
@@ -40,7 +38,6 @@ private:
 
     size_t m_min_qscore;
     size_t m_min_read_length;
-    StatsCounter* m_stats_counter;
     std::atomic<int64_t> m_num_reads_filtered;
 };
 

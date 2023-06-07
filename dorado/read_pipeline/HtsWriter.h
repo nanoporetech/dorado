@@ -1,7 +1,6 @@
 #pragma once
 #include "htslib/sam.h"
 #include "read_pipeline/ReadPipeline.h"
-#include "read_pipeline/StatsCounter.h"
 #include "utils/stats.h"
 
 #ifdef WIN32
@@ -24,11 +23,7 @@ public:
         FASTQ,
     };
 
-    HtsWriter(const std::string& filename,
-              OutputMode mode,
-              size_t threads,
-              size_t num_reads,
-              StatsCounter* stats_counter = nullptr);
+    HtsWriter(const std::string& filename, OutputMode mode, size_t threads, size_t num_reads);
     ~HtsWriter();
     std::string get_name() const override { return "HtsWriter"; }
     stats::NamedStats sample_stats() const override;
@@ -51,7 +46,6 @@ private:
     void worker_thread();
     int write_hdr_sq(char* name, uint32_t length);
     size_t m_num_reads_expected;
-    StatsCounter* m_stats_counter;
     std::unordered_set<std::string> m_processed_read_ids;
 };
 

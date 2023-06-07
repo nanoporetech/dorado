@@ -106,7 +106,7 @@ int aligner(int argc, char* argv[]) {
 
     ProgressTracker tracker(0, false);
 
-    HtsWriter writer("-", HtsWriter::OutputMode::BAM, writer_threads, 0, nullptr);
+    HtsWriter writer("-", HtsWriter::OutputMode::BAM, writer_threads, 0);
     Aligner aligner(writer, index, kmer_size, window_size, index_batch_size, aligner_threads);
     HtsReader reader(reads[0]);
 
