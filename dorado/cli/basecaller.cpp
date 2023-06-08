@@ -196,8 +196,6 @@ void setup(std::vector<std::string> args,
 
     bool rna = utils::is_rna_model(model_path), duplex = false;
 
-    ProgressTracker tracker(num_reads, duplex);
-
     auto const thread_allocations = utils::default_thread_allocations(
             num_devices, !remora_model_list.empty() ? num_remora_threads : 0);
 
@@ -260,16 +258,22 @@ void setup(std::vector<std::string> args,
     stats_reporters.push_back(make_stats_reporter(scaler_node));
     stats_reporters.push_back(make_stats_reporter(read_filter_node));
 
-    constexpr auto kStatsPeriod = 100ms;
-    stats_sampler = std::make_unique<dorado::stats::StatsSampler>(kStatsPeriod, stats_reporters);
-
-    stats_sampler->register_stats_callable(
+    std::vector<dorado::stats::StatsCallable> stats_callables;
+    ProgressTracker tracker(num_reads, duplex);
+    stats_callables.push_back(
             [&tracker](const stats::NamedStats& stats) { tracker.update_progress_bar(stats); });
+
+    constexpr auto kStatsPeriod = 100ms;
+    stats_sampler = std::make_unique<dorado::stats::StatsSampler>(kStatsPeriod, stats_reporters,
+                                                                  stats_callables);
     // End stats counting setup.
 
+    // Run pipeline.
     loader.load_reads(data_path, recursive_file_loading);
 
     bam_writer->join();
+    // End pipeline
+
     stats_sampler->terminate();
     tracker.summarize();
     if (!dump_stats_file.empty()) {

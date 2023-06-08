@@ -30,7 +30,6 @@ public:
     ~ProgressTracker() = default;
 
     void summarize() const {
-        auto m_end_time = std::chrono::system_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(m_end_time -
                                                                               m_initialization_time)
                                 .count();
@@ -53,59 +52,59 @@ public:
     }
 
     void update_progress_bar(const stats::NamedStats& stats) {
-        //for (const auto& [name, value] : stats)
-        //{
-        //    std::cerr << name << std::endl;
-        //}
-        if (m_num_reads_expected != 0 && !m_bar_initialized) {
-            m_progress_bar.set_progress(0.f);
-            m_bar_initialized = true;
-        }
+        // Instead of capturing end time when summarizer is called,
+        // which suffers from delays due to sampler and pipeline termination
+        // costs, store it whenever stats are updated.
+        m_end_time = std::chrono::system_clock::now();
 
-        m_num_reads_written = stats.at("HtsWriter.unique_simplex_reads_written");
-        // TODO: Clean up how stats are captured from the stats object. Not all
-        // stats are available in all runs, so more error handling is needed.
-        // The current conditions take care of basecaling vs alignment runs,
-        // but this may not be sufficient in the future.
+        auto fetch_stat = [&stats](const std::string& name) {
+            auto res = stats.find(name);
+            if (res != stats.end()) {
+                return res->second;
+            }
+            return 0.;
+        };
+
+        m_num_reads_written = fetch_stat("HtsWriter.unique_simplex_reads_written");
         if (m_num_reads_expected != 0) {
-            m_num_reads_filtered = stats.at("ReadFilterNode.reads_filtered");
-            m_num_bases_processed = stats.at("BasecallerNode.bases_processed");
-            m_num_samples_processed = stats.at("BasecallerNode.samples_processed");
+            m_num_reads_filtered = fetch_stat("ReadFilterNode.reads_filtered");
+            m_num_bases_processed = fetch_stat("BasecallerNode.bases_processed");
+            m_num_samples_processed = fetch_stat("BasecallerNode.samples_processed");
             if (m_duplex) {
-                auto res = stats.find("StereoBasecallerNode.bases_processed");
-                if (res != stats.end()) {
-                    m_num_bases_processed += res->second;
-                    m_num_samples_processed = stats.at("StereoBasecallerNode.samples_processed");
-                }
+                m_num_bases_processed += fetch_stat("StereoBasecallerNode.bases_processed");
+                m_num_samples_processed += fetch_stat("StereoBasecallerNode.samples_processed");
             }
 
-            float progress = 100.f *
-                             static_cast<float>(m_num_reads_written + m_num_reads_filtered) /
-                             m_num_reads_expected;
-            if (progress > m_last_progress_written) {
+            // TODO: Add the max because in the case of duplex, reads written can exceed reads expected
+            // because of the read splitting. that needs to be handled properly.
+            float progress = std::min(
+                    100.f, 100.f * static_cast<float>(m_num_reads_written + m_num_reads_filtered) /
+                                   m_num_reads_expected);
+            if (m_num_reads_written > 0 && progress > m_last_progress_written) {
                 m_progress_bar.set_progress(progress);
 #ifndef WIN32
                 std::cerr << "\033[K";
 #endif  // WIN32
                 m_last_progress_written = progress;
+                std::cerr << "\r";
             }
         } else {
             std::cerr << "\r> Output records written: " << m_num_reads_written;
+            std::cerr << "\r";
         }
-        std::cerr << "\r";
     }
 
 private:
-    std::atomic<int64_t> m_num_bases_processed{0};
-    std::atomic<int64_t> m_num_samples_processed{0};
-    std::atomic<int> m_num_reads_processed{0};
-    std::atomic<int> m_num_reads_written{0};
-    std::atomic<int> m_num_reads_filtered{0};
+    int64_t m_num_bases_processed{0};
+    int64_t m_num_samples_processed{0};
+    int m_num_reads_processed{0};
+    int m_num_reads_written{0};
+    int m_num_reads_filtered{0};
 
     int m_num_reads_expected;
-    bool m_bar_initialized = false;
 
     std::chrono::time_point<std::chrono::system_clock> m_initialization_time;
+    std::chrono::time_point<std::chrono::system_clock> m_end_time;
 
     bool m_duplex;
 

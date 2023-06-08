@@ -18,24 +18,23 @@ namespace stats {
 
 using NamedStats = std::unordered_map<std::string, double>;
 using StatsReporter = std::function<std::tuple<std::string, NamedStats>()>;
+using StatsCallable = std::function<void(const NamedStats&)>;
 
 class StatsSampler {
 public:
     // Takes a vector of callable objects that will be periodically queried.
     // State to which they refer must outlive this object.
     StatsSampler(std::chrono::system_clock::duration sampling_period,
-                 std::vector<StatsReporter> stats_reporters)
+                 std::vector<StatsReporter> stats_reporters,
+                 std::vector<StatsCallable> callables)
             : m_stats_reporters(std::move(stats_reporters)),
+              m_callables(std::move(callables)),
               m_sampling_period(sampling_period),
               m_sampling_thread(&StatsSampler::sampling_thread_fn, this) {}
 
     ~StatsSampler() {
         if (m_sampling_thread.joinable())
             terminate();
-    }
-
-    void register_stats_callable(std::function<void(const NamedStats&)> callable) {
-        m_callables.push_back(callable);
     }
 
     void terminate() {
@@ -84,11 +83,11 @@ public:
 
 private:
     std::vector<StatsReporter> m_stats_reporters;  // Entities we monitor
+    std::vector<StatsCallable> m_callables;
     std::atomic<bool> m_should_terminate{false};
     std::chrono::system_clock::duration m_sampling_period;
     std::chrono::time_point<std::chrono::system_clock> m_start_time;
     std::thread m_sampling_thread;
-    std::vector<std::function<void(const NamedStats&)>> m_callables;
 
     // Stats returned by nodes, and recorded per sample time,
     // are of this form.

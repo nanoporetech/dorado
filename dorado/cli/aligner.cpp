@@ -104,7 +104,10 @@ int aligner(int argc, char* argv[]) {
     }
     spdlog::info("> loading index {}", index);
 
+    std::vector<dorado::stats::StatsCallable> stats_callables;
     ProgressTracker tracker(0, false);
+    stats_callables.push_back(
+            [&tracker](const stats::NamedStats& stats) { tracker.update_progress_bar(stats); });
 
     HtsWriter writer("-", HtsWriter::OutputMode::BAM, writer_threads, 0);
     Aligner aligner(writer, index, kmer_size, window_size, index_batch_size, aligner_threads);
@@ -124,10 +127,8 @@ int aligner(int argc, char* argv[]) {
     stats_reporters.push_back(make_stats_reporter(aligner));
 
     constexpr auto kStatsPeriod = 100ms;
-    stats_sampler = std::make_unique<dorado::stats::StatsSampler>(kStatsPeriod, stats_reporters);
-
-    stats_sampler->register_stats_callable(
-            [&tracker](const stats::NamedStats& stats) { tracker.update_progress_bar(stats); });
+    stats_sampler = std::make_unique<dorado::stats::StatsSampler>(kStatsPeriod, stats_reporters,
+                                                                  stats_callables);
     // End stats counting setup.
 
     spdlog::info("> starting alignment");
