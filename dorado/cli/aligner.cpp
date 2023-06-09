@@ -14,6 +14,7 @@
 
 #include <chrono>
 #include <filesystem>
+#include <memory>
 #include <string>
 #include <thread>
 #include <vector>

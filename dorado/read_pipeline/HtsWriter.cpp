@@ -85,7 +85,7 @@ void HtsWriter::worker_thread() {
         bool ignore_read_id = read_id.find(';') != std::string::npos;
 
         if (!ignore_read_id) {
-            m_processed_read_ids.emplace(std::move(read_id));
+            m_processed_read_ids.insert(std::move(read_id));
         }
     }
     spdlog::debug("Written {} records.", write_count);

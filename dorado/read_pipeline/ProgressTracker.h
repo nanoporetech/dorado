@@ -1,6 +1,5 @@
 #pragma once
 
-#include "ReadPipeline.h"
 #include "utils/stats.h"
 
 #ifdef WIN32
@@ -10,10 +9,12 @@
 #endif
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
 #include <chrono>
-#include <mutex>
+#include <cstdint>
+#include <iomanip>
+#include <sstream>
 #include <string>
-#include <unordered_map>
 
 namespace dorado {
 
@@ -75,8 +76,8 @@ public:
                 m_num_samples_processed += fetch_stat("StereoBasecallerNode.samples_processed");
             }
 
-            // TODO: Add the max because in the case of duplex, reads written can exceed reads expected
-            // because of the read splitting. that needs to be handled properly.
+            // TODO: Add the ceiling because in duplex, reads written can exceed reads expected
+            // because of the read splitting. That needs to be handled properly.
             float progress = std::min(
                     100.f, 100.f * static_cast<float>(m_num_reads_written + m_num_reads_filtered) /
                                    m_num_reads_expected);
