@@ -16,6 +16,7 @@
 #include "nn/ModelRunner.h"
 #include "read_pipeline/AlignerNode.h"
 #include "read_pipeline/BasecallerNode.h"
+#include "read_pipeline/HtsReader.h"
 #include "read_pipeline/HtsWriter.h"
 #include "read_pipeline/ModBaseCallerNode.h"
 #include "read_pipeline/ProgressTracker.h"
@@ -69,7 +70,8 @@ void setup(std::vector<std::string> args,
            uint64_t mm2_index_batch_size,
            bool skip_model_compatibility_check,
            const std::string& dump_stats_file,
-           const std::string& dump_stats_filter) {
+           const std::string& dump_stats_filter,
+           std::string resume_from_file) {
     torch::set_num_threads(1);
     std::vector<Runner> runners;
 
@@ -183,6 +185,10 @@ void setup(std::vector<std::string> args,
     auto read_groups = DataLoader::load_read_groups(data_path, model_name, recursive_file_loading);
 
     auto read_list = utils::load_read_list(read_list_file_path);
+    auto reads_already_processed = fetch_read_ids(resume_from_file);
+    if (reads_already_processed.size() > 0) {
+        spdlog::info("{} reads found in resume file.", reads_already_processed.size());
+    }
 
     // Check sample rate of model vs data.
     auto data_sample_rate = DataLoader::get_sample_rate(data_path, recursive_file_loading);
@@ -194,7 +200,8 @@ void setup(std::vector<std::string> args,
         throw std::runtime_error(err.str());
     }
 
-    size_t num_reads = DataLoader::get_num_reads(data_path, read_list, recursive_file_loading);
+    size_t num_reads = DataLoader::get_num_reads(data_path, read_list, reads_already_processed,
+                                                 recursive_file_loading);
     num_reads = max_reads == 0 ? num_reads : std::min(num_reads, max_reads);
 
     bool rna = utils::is_rna_model(model_path), duplex = false;
@@ -244,7 +251,8 @@ void setup(std::vector<std::string> args,
     ScalerNode scaler_node(basecaller_node, model_config.signal_norm_params,
                            thread_allocations.scaler_node_threads);
 
-    DataLoader loader(scaler_node, "cpu", thread_allocations.loader_threads, max_reads, read_list);
+    DataLoader loader(scaler_node, "cpu", thread_allocations.loader_threads, max_reads, read_list,
+                      reads_already_processed);
 
     // Setup stats counting
     std::unique_ptr<dorado::stats::StatsSampler> stats_sampler;
@@ -308,6 +316,9 @@ int basecaller(int argc, char* argv[]) {
     parser.add_argument("-l", "--read-ids")
             .help("A file with a newline-delimited list of reads to basecall. If not provided, all "
                   "reads will be basecalled")
+            .default_value(std::string(""));
+    parser.add_argument("--resume-from")
+            .help("Resume basecalling from the given HTS file output.")
             .default_value(std::string(""));
 
     parser.add_argument("-n", "--max-reads").default_value(0).scan<'i', int>();
@@ -456,7 +467,8 @@ int basecaller(int argc, char* argv[]) {
               utils::parse_string_to_size(parser.get<std::string>("I")),
               internal_parser.get<bool>("--skip-model-compatibility-check"),
               internal_parser.get<std::string>("--dump_stats_file"),
-              internal_parser.get<std::string>("--dump_stats_filter"));
+              internal_parser.get<std::string>("--dump_stats_filter"),
+              parser.get<std::string>("--resume-from"));
     } catch (const std::exception& e) {
         spdlog::error("{}", e.what());
         return 1;

@@ -161,7 +161,7 @@ int duplex(int argc, char* argv[]) {
         bool recursive_file_loading = parser.get<bool>("--recursive");
 
         size_t num_reads = (basespace_duplex ? read_list_from_pairs.size()
-                                             : DataLoader::get_num_reads(reads, read_list,
+                                             : DataLoader::get_num_reads(reads, read_list, {},
                                                                          recursive_file_loading));
 
         std::unique_ptr<sam_hdr_t, void (*)(sam_hdr_t*)> hdr(sam_hdr_init(), sam_hdr_destroy);

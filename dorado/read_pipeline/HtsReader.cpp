@@ -92,4 +92,26 @@ read_map read_bam(const std::string& filename, const std::unordered_set<std::str
     return reads;
 }
 
+std::unordered_set<std::string> fetch_read_ids(const std::string& filename) {
+    if (filename.empty()) {
+        return {};
+    }
+    if (!std::filesystem::exists(filename)) {
+        throw std::runtime_error("Resume file cannot be found: " + filename);
+    }
+
+    std::unordered_set<std::string> read_ids;
+    HtsReader reader(filename);
+    try {
+        while (reader.read()) {
+            std::string read_id = bam_get_qname(reader.record);
+            read_ids.insert(read_id);
+        }
+    } catch (std::exception& e) {
+        // Do nothing.
+    }
+
+    return read_ids;
+}
+
 }  // namespace dorado

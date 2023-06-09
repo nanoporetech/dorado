@@ -68,4 +68,6 @@ T HtsReader::get_tag(std::string tagname) {
  */
 read_map read_bam(const std::string& filename, const std::unordered_set<std::string>& read_ids);
 
+std::unordered_set<std::string> fetch_read_ids(const std::string& filename);
+
 }  // namespace dorado
