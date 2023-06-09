@@ -134,10 +134,8 @@ private:
 // Constructs a callable StatsReporter object based on an object
 // that implements get_name / sample_stats.
 template <class T>
-StatsReporter make_stats_reporter(const T& node, const std::string& name = "") {
-    return [&node, &name]() {
-        return std::make_tuple(name.empty() ? node.get_name() : name, node.sample_stats());
-    };
+StatsReporter make_stats_reporter(const T& node) {
+    return [&node]() { return std::make_tuple(node.get_name(), node.sample_stats()); };
 }
 
 // Returns NamedStats containing the given object's stats. with their names prefixed by

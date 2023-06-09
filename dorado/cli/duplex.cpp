@@ -348,7 +348,7 @@ int duplex(int argc, char* argv[]) {
             const int kStereoBatchTimeoutMS = 5000;
             auto stereo_basecaller_node = std::make_unique<BasecallerNode>(
                     read_filter_node, std::move(stereo_runners), adjusted_stereo_overlap,
-                    kStereoBatchTimeoutMS, duplex_rg_name, 1000);
+                    kStereoBatchTimeoutMS, duplex_rg_name, 1000, "StereoBasecallerNode");
             auto simplex_model_stride = runners.front()->model_stride();
 
             StereoDuplexEncoderNode stereo_node =
@@ -381,8 +381,7 @@ int duplex(int argc, char* argv[]) {
 
             // Setup stats counting
             using dorado::stats::make_stats_reporter;
-            stats_reporters.push_back(
-                    make_stats_reporter(*stereo_basecaller_node, "StereoBasecallerNode"));
+            stats_reporters.push_back(make_stats_reporter(*stereo_basecaller_node));
             stats_reporters.push_back(make_stats_reporter(stereo_node));
             stats_reporters.push_back(make_stats_reporter(pairing_node));
             stats_reporters.push_back(make_stats_reporter(splitter_node));

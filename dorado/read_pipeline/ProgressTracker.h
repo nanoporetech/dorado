@@ -81,7 +81,7 @@ public:
             float progress = std::min(
                     100.f, 100.f * static_cast<float>(m_num_reads_written + m_num_reads_filtered) /
                                    m_num_reads_expected);
-            if (m_num_reads_written > 0 && progress > m_last_progress_written) {
+            if (progress > 0 && progress > m_last_progress_written) {
                 m_progress_bar.set_progress(progress);
 #ifndef WIN32
                 std::cerr << "\033[K";

@@ -266,7 +266,8 @@ BasecallerNode::BasecallerNode(MessageSink &sink,
                                size_t overlap,
                                int batch_timeout_ms,
                                std::string model_name,
-                               size_t max_reads)
+                               size_t max_reads,
+                               const std::string &node_name)
         : MessageSink(max_reads),
           m_sink(sink),
           m_model_runners(std::move(model_runners)),
@@ -276,7 +277,8 @@ BasecallerNode::BasecallerNode(MessageSink &sink,
           m_terminate_basecaller(false),
           m_batch_timeout_ms(batch_timeout_ms),
           m_model_name(std::move(model_name)),
-          m_max_reads(max_reads) {
+          m_max_reads(max_reads),
+          m_node_name(node_name) {
     // Setup worker state
     size_t const num_workers = m_model_runners.size();
     m_batched_chunks.resize(num_workers);

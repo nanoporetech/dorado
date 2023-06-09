@@ -17,9 +17,10 @@ public:
                    size_t overlap,
                    int batch_timeout_ms,
                    std::string model_name = "",
-                   size_t max_reads = 1000);
+                   size_t max_reads = 1000,
+                   const std::string& node_name = "BasecallerNode");
     ~BasecallerNode();
-    std::string get_name() const override { return "BasecallerNode"; }
+    std::string get_name() const override { return m_node_name; }
     stats::NamedStats sample_stats() const override;
 
 private:
@@ -86,6 +87,7 @@ private:
             m_working_reads_manager;  // Stitches working reads into complete reads.
 
     // Performance monitoring stats.
+    std::string m_node_name;
     std::atomic<int64_t> m_num_batches_called = 0;
     std::atomic<int64_t> m_num_partial_batches_called = 0;
     std::atomic<int64_t> m_call_chunks_ms = 0;
