@@ -110,6 +110,7 @@ std::shared_ptr<dorado::Read> process_pod5_read(size_t row,
     new_read->start_sample = read_data.start_sample;
     new_read->end_sample = read_data.start_sample + read_data.num_samples;
     new_read->flowcell_id = run_info_data->flow_cell_id;
+    new_read->is_duplex = false;
 
     if (pod5_free_run_info(run_info_data) != POD5_OK) {
         spdlog::error("Failed to free run info");
@@ -408,32 +409,46 @@ uint16_t DataLoader::get_sample_rate(std::string data_path, bool recursive_file_
             std::string ext = std::filesystem::path(entry).extension().string();
             std::transform(ext.begin(), ext.end(), ext.begin(),
                            [](unsigned char c) { return std::tolower(c); });
+            auto file_path = entry.path().string();
             if (ext == ".pod5") {
                 pod5_init();
 
                 // Open the file ready for walking:
-                Pod5FileReader_t* file = pod5_open_file(entry.path().string().c_str());
+                Pod5FileReader_t* file = pod5_open_file(file_path.c_str());
 
                 if (!file) {
-                    spdlog::error("Failed to open file {}: {}", entry.path().string().c_str(),
+                    spdlog::error("Failed to open file {}: {}", file_path.c_str(),
                                   pod5_get_error_string());
                 } else {
                     // First get the run info count
                     run_info_index_t run_info_count;
-                    pod5_get_file_run_info_count(file, &run_info_count);
+                    if (pod5_get_file_run_info_count(file, &run_info_count) != POD5_OK) {
+                        spdlog::error("Failed to fetch POD5 run info count for file {} : {}",
+                                      file_path.c_str(), pod5_get_error_string());
+                        continue;
+                    }
                     if (run_info_count > static_cast<run_info_index_t>(0)) {
                         RunInfoDictData_t* run_info_data;
-                        pod5_get_file_run_info(file, 0, &run_info_data);
+                        if (pod5_get_file_run_info(file, 0, &run_info_data) != POD5_OK) {
+                            spdlog::error(
+                                    "Failed to fetch POD5 run info dict for file {} and run info "
+                                    "index 0: {}",
+                                    file_path.c_str(), pod5_get_error_string());
+                            continue;
+                        }
                         sample_rate = run_info_data->sample_rate;
 
                         if (pod5_free_run_info(run_info_data) != POD5_OK) {
-                            spdlog::error("Failed to free POD5 run info");
+                            spdlog::error(
+                                    "Failed to free POD5 run info for file {} and run info index 0",
+                                    file_path.c_str());
                         }
                     }
                 }
 
                 if (pod5_close_and_free_reader(file) != POD5_OK) {
-                    spdlog::error("Failed to close and free POD5 reader");
+                    spdlog::error("Failed to close and free POD5 reader for file {}",
+                                  file_path.c_str());
                 }
             } else if (ext == ".fast5") {
                 H5Easy::File file(entry.path().string(), H5Easy::File::ReadOnly);
@@ -482,11 +497,12 @@ void DataLoader::load_pod5_reads_from_file_by_read_ids(const std::string& path,
     pod5_init();
 
     // Open the file ready for walking:
-    Pod5FileReader_t* file;
-    if (m_file_handles.find(path) == m_file_handles.end()) {
-        m_file_handles.emplace(path, Pod5Ptr(pod5_open_file(path.c_str())));
-    }
-    file = m_file_handles[path].get();
+    // TODO: The earlier implementation was caching the pod5 readers into a
+    // map and re-using it during each iteration. However, we found a leak
+    // in the pod5 traversal API which persists unless the reader is opened
+    // and closed everytime. So the caching logic was reverted until the
+    // leak is fixed in pod5 API.
+    Pod5FileReader_t* file = pod5_open_file(path.c_str());
 
     if (!file) {
         spdlog::error("Failed to open file {}: {}", path, pod5_get_error_string());
@@ -566,6 +582,9 @@ void DataLoader::load_pod5_reads_from_file_by_read_ids(const std::string& path,
         }
 
         row_offset += traversal_batch_counts[batch_index];
+    }
+    if (pod5_close_and_free_reader(file) != POD5_OK) {
+        spdlog::error("Failed to close and free POD5 reader");
     }
 }
 
@@ -720,6 +739,7 @@ void DataLoader::load_fast5_reads_from_file(const std::string& path) {
         new_read->attributes.channel_number = channel_number;
         new_read->attributes.start_time = start_time_str;
         new_read->attributes.fast5_filename = fast5_filename;
+        new_read->is_duplex = false;
 
         if (!m_allowed_read_ids ||
             (m_allowed_read_ids->find(new_read->read_id) != m_allowed_read_ids->end())) {
@@ -744,4 +764,7 @@ DataLoader::DataLoader(MessageSink& read_sink,
     std::call_once(vbz_init_flag, vbz_register);
 }
 
+stats::NamedStats DataLoader::sample_stats() const {
+    return stats::NamedStats{{"loaded_read_count", static_cast<double>(m_loaded_read_count)}};
+}
 }  // namespace dorado

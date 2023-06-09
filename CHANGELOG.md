@@ -2,6 +2,53 @@
 
 All notable changes to Dorado will be documented in this file.
 
+# [0.3.0] (18 May 2023)
+
+This is a major release of Dorado which introuduces: Duplex pairing and splitting for directly going from POD5 to duplex reads, major performance improvements to simplex and duplex basecalling on A100 GPUs via int8 model quantization and the output of aligned BAM from Dorado and support for producing summary tsv files from BAM.
+
+ * ddb7c1e20b8df5935764cf1d014d3f2202eb29a4 - Improvements to modified basecalling performance
+ * f879af586dd122a5e9f071fa28970e1531ba1530 - Add support for CPU basecalling of modified bases
+ * 282a66c4730b381694c170385db3fd124a4c2048 - Add duplex pair alignment accuracy check to reduce risk of incorrect matches
+ * 3bb0ffc3cc44ca2319b02b6e91b7a0a0fc0a8ca3 - Add `dx:i` tag to Dorado output to indicate whether a read is duplex `dx:i:1` or simplex `dx:i:0`
+ * 78d6bc403ff840b917ffe89c0bdfc24f779df224 - Improvements to Duplex calling performance
+ * 20972d4638f8c2d6a3dfbbb3350590cb5c006e7e - Added ability to filter reads by read length, default of 5
+ * b8ceee484a112f9982d581f15fc143f1a2e1404e - Include simplex output in SAM when running duplex basecalling
+ * 724bafd32cea0603771c6bb07bd24e7201669a31 - Add `dorado summary` command which produces a summary.tsv file from a SAM/BAM file
+ * da13d36cd4aa25aa5d2c76c9a8f1da8a6491a783 - Add splitting of live splitting of concatemer reads into duplex pairs
+ * 8992e6731cf416ef1c29a5eb09b6ecb11d5993ff - Fix for segfault in older glibc version
+ * d1377a0f838b2823ee906795ae4e19474b5d8655 - Add `dna_r9.4.1_e8_sup@v3.6` simplex model
+ * 88b547ce61adedcc73bbd19428707c7bc81bde31 - Add 5kHz duplex Stereo model and duplex 5kHz support
+ * 26609569c401c19bc2b31135f7c99f09522ee731 - Various CPU performance improvements
+ * f4ea66453971fedb7eaf9f8c82e539c0fefa014b - All context modbase tags
+ * 338911db23fdeb96345e4aab34184c35283d18c6 - Add v4.2 6mA 5mC modbase models
+ * 1684168809f9126611d752624fb47339e21f7b31 - Improved support for short read duplex basecalling
+ * 6fe6adb381fde06778f8f56ac8d8f76adae3de99 - Add verbose logging option for duplex basecalling.
+ * a035d7f12f60753a7f027d3e881bfeae1843dd9f - Check model sample rate agrees with raw data, add option to skip check
+ * 26c11122478d8593d2d5f34fe57d8b0744aec750 - Add ability to perform automatic duplex pairing in dorado.
+ * a824a7d344051beb7ee0e14cf1cb829143365f24 - Output uncompressed BAM when dorado output is a pipe.
+ * f27d672f32a7d567cdf116314b0edcb64086403e - Add CPU to list of devices in help
+ * 3329bb5cb1e850536d38c570770fe89544aa9f8b - Fix Fast5 basecalling
+ * 4d91533610ca908dd4daf61a81e3a3fe634ace89 - Improvements to reduce possibility of out of memory issues on CUDA devices via a GPU device mutex
+ * 14de2e8e05bc737948a7ec2f82fe14b8a8d7b7b7 - Improvements to progress bar reporting
+ * 2095fea10169121d52051a50d48e37648b31defd - Add alignment and BAM generation to duplex and simplex
+ * fef15ae0a74155460f175e55d2adf0421201cb48 - Improvements to stereo duplex encoding.
+ * c6dc18796c7f77d7276972798af1606d7b76ceff - Add `--reference` option to basecalling to allow basecalls to be aligned to a reference.
+ * 51ca9e7c1968827e07c8720b872acdab66adb9d9 - Add v4.2.0 5kHz simplex models
+ * 1a215e793146a1c7625e55c95d0e57c4bbfd7b12 - Reduce CPU load from mean_q_score_from_qstring
+ * d3f7320469822ae69b76afbbd58156ef82f44ea8 - Handle empty read-ids file
+ * 25e2cd103561df1feb55c9bea6809d966e480e94 - Upgrade to Pod5 v0.1.20
+ * 98eb30d3a23c0e40121d030cb73be38a045dbfa2 - Add Cutlass LSTM kernels for significant performance improvement on A100 GPUs
+ * 6aea63a9bd747de727ac909f8ecb7c7901d1d5a6 - Reduce CPU load due to trimming
+ * 7459371e837a0be3ab4e502d5efcb071e37ce543 - Increase per-device ScalerNode thread count
+ * 758d0d9e17196327fbdcce53a0b20c2e163cec3d - Minor improvements to RemoraEncoder::encode_kmer
+ * b2af21b40b511cd77b90b171c78a7433026310ff - Add read filter node to filter reads by Q score, length etc.
+ * fb604256639fd6513ce501fa8eb432ac4badd522 - Reduce stereo duplex CPU load
+ * 0bca7d84ee23cb8827499e6c7578a9974df42a2c - Reduce torch indexing overhead in modified basecalling
+ * 4632f05a194a081e076bb36031480a325b710da7 - Expose `k`, `w` comandmline options to dorado aligner
+ * d560661ad52d51dca36d8d946b9d80aa0b848039 - Improved read trimming
+ * 3cd1c80faf45b8df44180b6bd9e8bf3294924df2 - Improve performance of reverse_complement calculation
+ * 92ef398874e9f4d09c7a57e5d979d4e704a12a74 - Fix segfault in modified basecalling
+
 # [0.2.4] (12 Apr 2023)
 
  * 92ef398874e9f4d09c7a57e5d979d4e704a12a74 - Fix out of bounds access when modbase calling

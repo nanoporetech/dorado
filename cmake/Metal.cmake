@@ -1,4 +1,4 @@
-download_and_extract(https://developer.apple.com/metal/cpp/files/metal-cpp_macOS12_iOS15.zip metal-cpp)
+download_and_extract(https://developer.apple.com/metal/cpp/files/metal-cpp_macOS13_iOS16.zip metal-cpp)
 find_library(APPLE_FWK_FOUNDATION Foundation REQUIRED)
 find_library(APPLE_FWK_QUARTZ_CORE QuartzCore REQUIRED)
 find_library(APPLE_FWK_METAL Metal REQUIRED)

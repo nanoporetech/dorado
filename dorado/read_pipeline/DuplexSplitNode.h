@@ -1,6 +1,14 @@
 #pragma once
 #include "ReadPipeline.h"
 
+#include <utils/stats.h>
+
+#include <cstdint>
+#include <memory>
+#include <optional>
+#include <utility>
+#include <vector>
+
 namespace dorado {
 
 struct DuplexSplitSettings {
@@ -48,6 +56,8 @@ public:
                     int num_worker_threads = 5,
                     size_t max_reads = 1000);
     ~DuplexSplitNode();
+    std::string get_name() const override { return "DuplexSplitNode"; }
+    stats::NamedStats sample_stats() const override;
 
     std::vector<std::shared_ptr<Read>> split(std::shared_ptr<Read> init_read) const;
 

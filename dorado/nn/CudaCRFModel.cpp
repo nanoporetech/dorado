@@ -16,12 +16,14 @@ namespace dorado {
 
 class CudaCaller {
 public:
-    CudaCaller(const std::filesystem::path &model_path,
+    CudaCaller(const CRFModelConfig &model_config,
+               const std::filesystem::path &model_path,
                int chunk_size,
                int batch_size,
                const std::string &device,
-               float memory_limit_fraction) {
-        const auto model_config = load_crf_model_config(model_path);
+               float memory_limit_fraction,
+               bool exclusive_gpu_access)
+            : m_device(device), m_exclusive_gpu_access(exclusive_gpu_access) {
         m_model_stride = static_cast<size_t>(model_config.stride);
 
         m_decoder_options = DecoderOptions();
@@ -36,6 +38,7 @@ public:
         m_options = torch::TensorOptions().dtype(GPUDecoder::dtype).device(device);
         assert(m_options.device().is_cuda());
 
+        torch::InferenceMode guard;
         m_module = load_crf_model(model_path, model_config, m_options);
 
         // Batch size will be rounded up to a multiple of batch_size_granularity, regardless of
@@ -58,9 +61,7 @@ public:
     }
 
     ~CudaCaller() {
-        std::unique_lock<std::mutex> input_lock(m_input_lock);
-        m_terminate = true;
-        input_lock.unlock();
+        m_terminate.store(true);
         m_input_cv.notify_one();
         m_cuda_thread->join();
     }
@@ -108,18 +109,26 @@ public:
     }
 
     void cuda_thread_fn() {
-        NVTX3_FUNC_RANGE();
         torch::InferenceMode guard;
         c10::cuda::CUDAGuard device_guard(m_options.device());
         auto stream = c10::cuda::getCurrentCUDAStream(m_options.device().index());
 
+        const std::string loop_scope_str =
+                "cuda_thread_fn_device_" + std::to_string(m_options.device().index());
+        const std::string input_q_cv_scope_str =
+                "input_queue_cv_device_" + std::to_string(m_options.device().index());
+        const std::string gpu_lock_scope_str =
+                "gpu_lock_" + std::to_string(m_options.device().index());
         while (true) {
+            nvtx3::scoped_range loop{loop_scope_str};
             std::unique_lock<std::mutex> input_lock(m_input_lock);
-            while (m_input_queue.empty() && !m_terminate) {
+            nvtxRangePushA(input_q_cv_scope_str.c_str());
+            while (m_input_queue.empty() && !m_terminate.load()) {
                 m_input_cv.wait_for(input_lock, 100ms);
             }
-            // TODO: finish work before terminating?
-            if (m_terminate) {
+            nvtxRangePop();
+
+            if (m_input_queue.empty() && m_terminate.load()) {
                 return;
             }
 
@@ -127,16 +136,36 @@ public:
             m_input_queue.pop_back();
             input_lock.unlock();
 
-            auto gpu_lock = dorado::utils::acquire_gpu_lock(m_options.device().index());
+            nvtxRangePushA(gpu_lock_scope_str.c_str());
+            auto gpu_lock = dorado::utils::acquire_gpu_lock(m_options.device().index(),
+                                                            m_exclusive_gpu_access);
+            nvtxRangePop();
+
             std::unique_lock<std::mutex> task_lock(task->mut);
+            stats::Timer timer;
             auto scores = m_module->forward(task->input);
-            torch::cuda::synchronize();
+            const auto forward_ms = timer.GetElapsedMS();
             task->out = m_decoder->gpu_part(scores, task->num_chunks, m_decoder_options);
             stream.synchronize();
+            const auto forward_plus_decode_ms = timer.GetElapsedMS();
+            ++m_num_batches_called;
+            m_model_ms += forward_ms;
+            m_decode_ms += forward_plus_decode_ms - forward_ms;
             task->done = true;
             task->cv.notify_one();
             task_lock.unlock();
         }
+    }
+    void terminate() { m_terminate.store(true); }
+
+    std::string get_name() const { return std::string("CudaCaller_") + m_device; }
+
+    stats::NamedStats sample_stats() const {
+        stats::NamedStats stats;
+        stats["batches_called"] = m_num_batches_called;
+        stats["model_ms"] = m_model_ms;
+        stats["decode_ms"] = m_decode_ms;
+        return stats;
     }
 
     std::string m_device;
@@ -145,21 +174,29 @@ public:
     DecoderOptions m_decoder_options;
     torch::nn::ModuleHolder<torch::nn::AnyModule> m_module{nullptr};
     size_t m_model_stride;
-    bool m_terminate{false};
+    std::atomic<bool> m_terminate{false};
     std::deque<NNTask *> m_input_queue;
     std::mutex m_input_lock;
     std::condition_variable m_input_cv;
     std::unique_ptr<std::thread> m_cuda_thread;
     int m_num_input_features, m_batch_size, m_in_chunk_size, m_out_chunk_size;
+    bool m_exclusive_gpu_access;
+
+    // Performance monitoring stats.
+    std::atomic<int64_t> m_num_batches_called = 0;
+    std::atomic<int64_t> m_model_ms = 0;
+    std::atomic<int64_t> m_decode_ms = 0;
 };
 
-std::shared_ptr<CudaCaller> create_cuda_caller(const std::filesystem::path &model_path,
+std::shared_ptr<CudaCaller> create_cuda_caller(const CRFModelConfig &model_config,
+                                               const std::filesystem::path &model_path,
                                                int chunk_size,
                                                int batch_size,
                                                const std::string &device,
-                                               float memory_limit_fraction) {
-    return std::make_shared<CudaCaller>(model_path, chunk_size, batch_size, device,
-                                        memory_limit_fraction);
+                                               float memory_limit_fraction,
+                                               bool exclusive_gpu_access) {
+    return std::make_shared<CudaCaller>(model_config, model_path, chunk_size, batch_size, device,
+                                        memory_limit_fraction, exclusive_gpu_access);
 }
 
 CudaModelRunner::CudaModelRunner(std::shared_ptr<CudaCaller> caller)
@@ -179,11 +216,33 @@ void CudaModelRunner::accept_chunk(int chunk_idx, const torch::Tensor &chunk) {
 }
 
 std::vector<DecodedChunk> CudaModelRunner::call_chunks(int num_chunks) {
-    return m_caller->call_chunks(m_input, m_output, num_chunks, m_stream);
+    ++m_num_batches_called;
+    stats::Timer timer;
+    auto decoded_chunks = m_caller->call_chunks(m_input, m_output, num_chunks, m_stream);
+    return decoded_chunks;
 }
 
 size_t CudaModelRunner::model_stride() const { return m_caller->m_model_stride; }
 size_t CudaModelRunner::chunk_size() const { return m_input.size(2); }
 size_t CudaModelRunner::batch_size() const { return m_input.size(0); }
+void CudaModelRunner::terminate() { m_caller->terminate(); }
+
+std::string CudaModelRunner::get_name() const {
+    // The name must be unique across multiple instances.
+    // We could take a unique ID at setup time, but for now just use the address.
+    std::ostringstream name_stream;
+    name_stream << "CudaModelRunner_" << this;
+    return name_stream.str();
+}
+
+stats::NamedStats CudaModelRunner::sample_stats() const {
+    // We don't have direct access to the caller object when the pipeline is set up,
+    // so pass through stats here.
+    // Each runner will retrieve stats from the caller.
+    // Only the last retrieved version will appear, but they should be very similar.
+    stats::NamedStats stats = stats::from_obj(*m_caller);
+    stats["batches_called"] = m_num_batches_called;
+    return stats;
+}
 
 }  // namespace dorado

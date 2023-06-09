@@ -3,6 +3,8 @@
 #include "htslib/sam.h"
 #include "simd.h"
 
+#include <nvtx3/nvtx3.hpp>
+
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -153,6 +155,7 @@ float mean_qscore_from_qstring(const std::string& qstring) {
 }
 
 std::vector<int> sequence_to_ints(const std::string& sequence) {
+    NVTX3_FUNC_RANGE();
     std::vector<int> sequence_ints;
     sequence_ints.reserve(sequence.size());
     std::transform(std::begin(sequence), std::end(sequence),
@@ -165,6 +168,7 @@ std::vector<uint64_t> moves_to_map(const std::vector<uint8_t>& moves,
                                    size_t block_stride,
                                    size_t signal_len,
                                    std::optional<size_t> reserve_size) {
+    NVTX3_FUNC_RANGE();
     std::vector<uint64_t> seq_to_sig_map;
     if (reserve_size) {
         seq_to_sig_map.reserve(*reserve_size);
@@ -194,6 +198,7 @@ std::vector<uint64_t> move_cum_sums(const std::vector<uint8_t>& moves) {
 // boundary.  Without this wrapper, AVX machines still only execute the default
 // version.
 std::string reverse_complement(const std::string& sequence) {
+    NVTX3_FUNC_RANGE();
     return reverse_complement_impl(sequence);
 }
 

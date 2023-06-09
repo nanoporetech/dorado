@@ -23,7 +23,6 @@ private:
      */
     static inline size_t index_from_int_kmer(const int* int_kmer_start, size_t kmer_len);
 
-public:
     /** Get the expected normalized daq levels for in the input basecall sequence.
      *  @param int_seq The basecall sequence, encoded as integers with A=0, C=1, G=2, T=3
      *  @return A vector of the expected normalized daq level for each base
@@ -39,11 +38,23 @@ public:
      *
      *  @return The new offset and scale values
      */
-    std::pair<float, float> rescale(const torch::Tensor samples,
-                                    const std::vector<uint64_t>& seq_to_sig_map,
-                                    const std::vector<float>& levels,
-                                    size_t clip_bases = 10,
-                                    size_t max_bases = 1000) const;
+    std::pair<float, float> calc_offset_scale(const torch::Tensor& samples,
+                                              const std::vector<uint64_t>& seq_to_sig_map,
+                                              const std::vector<float>& levels,
+                                              size_t clip_bases = 10,
+                                              size_t max_bases = 1000) const;
+
+public:
+    /**
+     * Scale the input signal based on the expected kmer levels of the input basecalled sequence
+     * @param signal The signal for the basecalled sequence
+     * @param seq_ints The basecall sequence, encoded as integers with A=0, C=1, G=2, T=3
+     * @param seq_to_sig_map The indices of the samples corresponding to moves in the move table
+     * @return The rescaled input signal
+    */
+    torch::Tensor scale_signal(const torch::Tensor& signal,
+                               const std::vector<int>& seq_ints,
+                               const std::vector<uint64_t>& seq_to_sig_map) const;
 
     /** Scale calculator for v1 Remora-style modified base detection.
      *  @param kmer_levels A vector of expected signal levels per kmer.

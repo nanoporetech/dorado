@@ -3,13 +3,13 @@ namespace {
 bool is_within_time_and_length_criteria(const std::shared_ptr<dorado::Read>& read1,
                                         const std::shared_ptr<dorado::Read>& read2) {
     int max_time_delta_ms = 5000;
-    float min_seq_len_ratio = 0.9f;
+    float min_seq_len_ratio = 0.95f;
     int delta = read2->start_time_ms - read1->get_end_time_ms();
     int seq_len1 = read1->seq.length();
     int seq_len2 = read2->seq.length();
     float len_ratio = static_cast<float>(std::min(seq_len1, seq_len2)) /
                       static_cast<float>(std::max(seq_len1, seq_len2));
-    return (delta < max_time_delta_ms) && len_ratio >= min_seq_len_ratio;
+    return (delta >= 0) && (delta < max_time_delta_ms) && (len_ratio >= min_seq_len_ratio);
 }
 }  // namespace
 
@@ -169,8 +169,10 @@ void PairingNode::pair_generating_worker_thread() {
 }
 
 PairingNode::PairingNode(MessageSink& sink,
-                         std::optional<std::map<std::string, std::string>> template_complement_map)
-        : m_sink(sink), MessageSink(1000), m_num_worker_threads(2) {
+                         std::optional<std::map<std::string, std::string>> template_complement_map,
+                         int num_worker_threads,
+                         size_t max_reads)
+        : MessageSink(max_reads), m_sink(sink), m_num_worker_threads(num_worker_threads) {
     if (template_complement_map.has_value()) {
         m_template_complement_map = template_complement_map.value();
         // Set up the complement-template_map
@@ -196,4 +198,10 @@ PairingNode::~PairingNode() {
         m->join();
     }
 }
+
+stats::NamedStats PairingNode::sample_stats() const {
+    stats::NamedStats stats = m_work_queue.sample_stats();
+    return stats;
+}
+
 }  // namespace dorado

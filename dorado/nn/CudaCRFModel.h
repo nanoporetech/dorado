@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ModelRunner.h"
+#include "nn/CRFModel.h"
 
 #include <c10/cuda/CUDAStream.h>
 #include <torch/torch.h>
@@ -13,11 +14,13 @@ namespace dorado {
 
 class CudaCaller;
 
-std::shared_ptr<CudaCaller> create_cuda_caller(const std::filesystem::path& model_path,
+std::shared_ptr<CudaCaller> create_cuda_caller(const CRFModelConfig& model_config,
+                                               const std::filesystem::path& model_path,
                                                int chunk_size,
                                                int batch_size,
                                                const std::string& device,
-                                               float memory_limit_fraction = 1.f);
+                                               float memory_limit_fraction = 1.f,
+                                               bool exclusive_gpu_access = true);
 
 class CudaModelRunner : public ModelRunnerBase {
 public:
@@ -27,12 +30,18 @@ public:
     size_t model_stride() const final;
     size_t chunk_size() const final;
     size_t batch_size() const final;
+    void terminate() final;
+    std::string get_name() const final;
+    stats::NamedStats sample_stats() const final;
 
 private:
     std::shared_ptr<CudaCaller> m_caller;
     c10::cuda::CUDAStream m_stream;
     torch::Tensor m_input;
     torch::Tensor m_output;
+
+    // Performance monitoring stats.
+    std::atomic<int64_t> m_num_batches_called = 0;
 };
 
 }  // namespace dorado

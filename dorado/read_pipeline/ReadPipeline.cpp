@@ -46,6 +46,13 @@ bool get_modbase_channel_name(std::string &channel_name, const std::string &mod_
 
 namespace dorado {
 
+std::string Read::generate_read_group() const {
+    if (!run_id.empty() && !model_name.empty()) {
+        return std::string(run_id + "_" + model_name);
+    }
+    return "";
+}
+
 void Read::generate_read_tags(bam1_t *aln, bool emit_moves) const {
     int qs = static_cast<int>(std::round(utils::mean_qscore_from_qstring(qstring)));
     bam_aux_append(aln, "qs", 'i', sizeof(qs), (uint8_t *)&qs);
@@ -83,8 +90,11 @@ void Read::generate_read_tags(bam1_t *aln, bool emit_moves) const {
 
     bam_aux_append(aln, "sv", 'Z', 9, (uint8_t *)"quantile");
 
-    if (run_id != "" && model_name != "") {
-        std::string rg(run_id + "_" + model_name);
+    uint32_t duplex = 0;
+    bam_aux_append(aln, "dx", 'i', sizeof(duplex), (uint8_t *)&duplex);
+
+    auto rg = generate_read_group();
+    if (!rg.empty()) {
         bam_aux_append(aln, "RG", 'Z', rg.length() + 1, (uint8_t *)rg.c_str());
     }
 
@@ -103,11 +113,16 @@ void Read::generate_read_tags(bam1_t *aln, bool emit_moves) const {
 void Read::generate_duplex_read_tags(bam1_t *aln) const {
     int qs = static_cast<int>(std::round(utils::mean_qscore_from_qstring(qstring)));
     bam_aux_append(aln, "qs", 'i', sizeof(qs), (uint8_t *)&qs);
+    uint32_t duplex = 1;
+    bam_aux_append(aln, "dx", 'i', sizeof(duplex), (uint8_t *)&duplex);
+
+    auto rg = generate_read_group();
+    if (!rg.empty()) {
+        bam_aux_append(aln, "RG", 'Z', rg.length() + 1, (uint8_t *)rg.c_str());
+    }
 }
 
-std::vector<BamPtr> Read::extract_sam_lines(bool emit_moves,
-                                            bool duplex,
-                                            uint8_t modbase_threshold) const {
+std::vector<BamPtr> Read::extract_sam_lines(bool emit_moves, uint8_t modbase_threshold) const {
     if (read_id.empty()) {
         throw std::runtime_error("Empty read_name string provided");
     }
@@ -138,7 +153,7 @@ std::vector<BamPtr> Read::extract_sam_lines(bool emit_moves,
         bam_set1(aln, read_id.length(), read_id.c_str(), flags, -1, leftmost_pos, map_q, 0, nullptr,
                  -1, next_pos, 0, seq.length(), seq.c_str(), (char *)qscore.data(), 0);
 
-        if (duplex) {
+        if (is_duplex) {
             generate_duplex_read_tags(aln);
         } else {
             generate_read_tags(aln, emit_moves);
@@ -156,7 +171,7 @@ std::vector<BamPtr> Read::extract_sam_lines(bool emit_moves,
 
 uint64_t Read::get_end_time_ms() {
     return start_time_ms +
-           (attributes.num_samples * 1000) / sample_rate;  //TODO get rid of the trimmed thing?
+           ((end_sample - start_sample) * 1000) / sample_rate;  //TODO get rid of the trimmed thing?
 }
 
 void Read::generate_modbase_string(bam1_t *aln, uint8_t threshold) const {

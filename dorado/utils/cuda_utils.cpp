@@ -175,15 +175,12 @@ std::vector<std::string> parse_cuda_device_string(std::string device_string) {
     return devices;
 }
 
-std::unique_lock<std::mutex> acquire_gpu_lock(int gpu_index) {
-    static std::unordered_map<int, std::mutex> gpu_mutexes;
-    static std::mutex map_mutex;
+std::unique_lock<std::mutex> acquire_gpu_lock(int gpu_index, bool use_lock) {
+    static std::vector<std::mutex> gpu_mutexes(torch::cuda::device_count());
 
-    // We don't assume a particular GPU index range ahead of time,
-    // so keep GPU mutexes in an unordered_map protected by its own
-    // mutex.
-    std::lock_guard<std::mutex> map_lock(map_mutex);
-    return std::unique_lock<std::mutex>(gpu_mutexes[gpu_index]);
+    return (use_lock ? std::unique_lock<std::mutex>(gpu_mutexes.at(gpu_index))
+                     : std::unique_lock<std::mutex>());
+    ;
 }
 
 // Note that in general the torch caching allocator may be consuming

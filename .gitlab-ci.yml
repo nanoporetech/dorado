@@ -1,3 +1,6 @@
+include:
+  - local: .gitlab/sanitizers-ci.yml
+
 stages:
   - pre-flight
   - build
@@ -243,8 +246,11 @@ build_archive:macos:x64:
   stage: test
   variables:
     GIT_STRATEGY: none
+    MODEL: dna_r9.4.1_e8_hac@v3.3
+    BATCH: 384
   script:
-    - for f in tests/*.sh; do echo $f; ./$f ./dist/bin/dorado || break; done
+    - bash ./tests/test_simple_basecaller_execution.sh ./dist/bin/dorado ${MODEL} ${BATCH}
+    - bash ./tests/test_expected_logging.sh ./dist/bin/dorado ${MODEL} ${BATCH}
   interruptible: true
 
 .test_dorado_windows: &test_dorado_windows

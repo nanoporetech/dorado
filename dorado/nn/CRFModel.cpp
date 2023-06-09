@@ -232,7 +232,7 @@ struct ConvolutionImpl : Module {
         // Alternative route - non CUDALSTM route.
         x = activation(conv(x));
         if (clamp) {
-            x = x.clamp(c10::nullopt, max_value);
+            x.clamp_(c10::nullopt, max_value);
         }
         if (to_lstm) {
             // Output is [N, T_out, C_out], non-contiguous
@@ -710,10 +710,9 @@ struct ClampImpl : Module {
 
     torch::Tensor forward(torch::Tensor x) {
         if (active) {
-            return x.clamp(min, max);
-        } else {
-            return x;
+            x.clamp_(min, max);
         }
+        return x;
     }
 
     bool active;
@@ -796,8 +795,6 @@ CRFModelConfig load_crf_model_config(const std::filesystem::path &path) {
     const auto config_toml = toml::parse(path / "config.toml");
 
     CRFModelConfig config;
-    config.qscale = 1.0f;
-    config.qbias = 0.0f;
 
     if (config_toml.contains("qscore")) {
         const auto &qscore = toml::find(config_toml, "qscore");
@@ -806,16 +803,6 @@ CRFModelConfig load_crf_model_config(const std::filesystem::path &path) {
     } else {
         spdlog::debug("> no qscore calibration found");
     }
-
-    config.conv = 4;
-    config.insize = 0;
-    config.stride = 1;
-    config.bias = true;
-    config.clamp = false;
-
-    // The encoder scale only appears in pre-v4 models.  In v4 models
-    // the value of 1 is used.
-    config.scale = 1.0f;
 
     const auto &input = toml::find(config_toml, "input");
     config.num_features = toml::find<int>(input, "features");
@@ -870,7 +857,17 @@ CRFModelConfig load_crf_model_config(const std::filesystem::path &path) {
         config.sample_rate = toml::find<int>(run_info, "sample_rate");
     } catch (const std::out_of_range &oor) {
         // Do nothing as run_info is not available in all config files.
-        config.sample_rate = -1;
+    }
+
+    // Fetch signal normalisation parameters.
+    try {
+        const auto &norm = toml::find(config_toml, "normalisation");
+        config.signal_norm_params.quantile_a = toml::find<float>(norm, "quantile_a");
+        config.signal_norm_params.quantile_b = toml::find<float>(norm, "quantile_b");
+        config.signal_norm_params.shift_multiplier = toml::find<float>(norm, "shift_multiplier");
+        config.signal_norm_params.scale_multiplier = toml::find<float>(norm, "scale_multiplier");
+    } catch (const std::out_of_range &oor) {
+        // Use default values if normalisation section is not found.
     }
 
     return config;
