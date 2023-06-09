@@ -21,7 +21,7 @@ using namespace torch::nn;
 namespace F = torch::nn::functional;
 using torch::indexing::Ellipsis;
 using torch::indexing::Slice;
-
+    
 static constexpr auto torch_dtype = torch::kF16;
 static const size_t dtype_bytes = torch::elementSize(torch_dtype);
 
