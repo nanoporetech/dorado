@@ -14,7 +14,8 @@ namespace dorado {
 
 class MetalCaller;
 
-std::shared_ptr<MetalCaller> create_metal_caller(const std::filesystem::path& model_path,
+std::shared_ptr<MetalCaller> create_metal_caller(const CRFModelConfig& model_config,
+                                                 const std::filesystem::path& model_path,
                                                  int chunk_size,
                                                  int batch_size);
 

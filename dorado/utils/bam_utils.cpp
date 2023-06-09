@@ -3,6 +3,7 @@
 #include "htslib/sam.h"
 #include "read_pipeline/ReadPipeline.h"
 
+#include <cctype>
 #include <iostream>
 #include <map>
 #include <string>

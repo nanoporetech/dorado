@@ -73,6 +73,8 @@ void setup(std::vector<std::string> args,
     torch::set_num_threads(1);
     std::vector<Runner> runners;
 
+    auto model_config = load_crf_model_config(model_path);
+
     // Default is 1 device.  CUDA path may alter this.
     int num_devices = 1;
 
@@ -92,7 +94,7 @@ void setup(std::vector<std::string> args,
 #if DORADO_GPU_BUILD
 #ifdef __APPLE__
     else if (device == "metal") {
-        auto caller = create_metal_caller(model_path, chunk_size, batch_size);
+        auto caller = create_metal_caller(model_config, model_path, chunk_size, batch_size);
         for (size_t i = 0; i < num_runners; i++) {
             runners.push_back(std::make_shared<MetalModelRunner>(caller));
         }
@@ -110,7 +112,8 @@ void setup(std::vector<std::string> args,
             throw std::runtime_error("CUDA device requested but no devices found.");
         }
         for (auto device_string : devices) {
-            auto caller = create_cuda_caller(model_path, chunk_size, batch_size, device_string);
+            auto caller = create_cuda_caller(model_config, model_path, chunk_size, batch_size,
+                                             device_string);
             for (size_t i = 0; i < num_runners; i++) {
                 runners.push_back(std::make_shared<CudaModelRunner>(caller));
             }
@@ -238,7 +241,8 @@ void setup(std::vector<std::string> args,
     const int kBatchTimeoutMS = 100;
     BasecallerNode basecaller_node(*basecaller_node_sink, std::move(runners), overlap,
                                    kBatchTimeoutMS, model_name, 1000);
-    ScalerNode scaler_node(basecaller_node, thread_allocations.scaler_node_threads);
+    ScalerNode scaler_node(basecaller_node, model_config.signal_norm_params,
+                           thread_allocations.scaler_node_threads);
 
     DataLoader loader(scaler_node, "cpu", thread_allocations.loader_threads, max_reads, read_list);
 

@@ -1,5 +1,6 @@
 #include "MessageSinkUtils.h"
 #include "decode/CPUDecoder.h"
+#include "nn/CRFModel.h"
 #include "nn/ModBaseRunner.h"
 #include "nn/ModelRunner.h"
 #include "nn/RemoraModel.h"
@@ -152,7 +153,12 @@ DEFINE_TEST(NodeSmokeTestRead, "ScalerNode") {
         read->raw_data = read->raw_data.to(torch::kI16);
     });
 
-    dorado::ScalerNode scaler_node(get_sink(), 2);
+    dorado::SignalNormalisationParams config;
+    config.quantile_a = 0.2;
+    config.quantile_b = 0.9;
+    config.shift_multiplier = 0.51;
+    config.scale_multiplier = 0.53;
+    dorado::ScalerNode scaler_node(get_sink(), config, 2);
     run_smoke_test(scaler_node);
 }
 
@@ -165,14 +171,15 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
     char const model_name[] = "dna_r10.4.1_e8.2_400bps_fast@v4.2.0";
     auto const model_dir = download_model(model_name);
     auto const model_path = (model_dir.m_path / model_name).string();
+    auto model_config = dorado::load_crf_model_config(model_path);
 
     // Create runners
     std::vector<dorado::Runner> runners;
     if (gpu) {
 #if DORADO_GPU_BUILD
 #ifdef __APPLE__
-        auto caller = dorado::create_metal_caller(model_path, default_params.chunksize,
-                                                  default_params.batchsize);
+        auto caller = dorado::create_metal_caller(
+                model_config, model_path, default_params.chunksize, default_params.batchsize);
         for (size_t i = 0; i < default_params.num_runners; i++) {
             runners.push_back(std::make_shared<dorado::MetalModelRunner>(caller));
         }
@@ -182,8 +189,9 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
             SKIP("No CUDA devices found");
         }
         for (auto const& device : devices) {
-            auto caller = dorado::create_cuda_caller(model_path, default_params.chunksize,
-                                                     default_params.batchsize, device);
+            auto caller =
+                    dorado::create_cuda_caller(model_config, model_path, default_params.chunksize,
+                                               default_params.batchsize, device);
             for (size_t i = 0; i < default_params.num_runners; i++) {
                 runners.push_back(std::make_shared<dorado::CudaModelRunner>(caller));
             }

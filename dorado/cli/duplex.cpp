@@ -108,13 +108,6 @@ int duplex(int argc, char* argv[]) {
 
     parser.add_argument("-I").help("minimap2 index batch size.").default_value(std::string("16G"));
 
-    parser.add_argument("--guard-gpus")
-            .default_value(false)
-            .implicit_value(true)
-            .help("In case of GPU OOM, use this option to be more defensive with GPU memory. May "
-                  "cause "
-                  "performance regression.");
-
     try {
         auto remaining_args = parser.parse_known_args(argc, argv);
         auto internal_parser = utils::parse_internal_options(remaining_args);
@@ -126,7 +119,6 @@ int duplex(int argc, char* argv[]) {
         auto threads = static_cast<size_t>(parser.get<int>("--threads"));
         auto min_qscore(parser.get<int>("--min-qscore"));
         auto ref = parser.get<std::string>("--reference");
-        bool guard_gpus = parser.get<bool>("--guard-gpus");
         const bool basespace_duplex = (model.compare("basespace") == 0);
         std::vector<std::string> args(argv, argv + argc);
         if (parser.get<bool>("--verbose")) {
@@ -238,6 +230,7 @@ int duplex(int argc, char* argv[]) {
 
             const auto model_path = std::filesystem::canonical(std::filesystem::path(model));
             model = model_path.filename().string();
+            auto model_config = load_crf_model_config(model_path);
 
             auto data_sample_rate = DataLoader::get_sample_rate(reads, recursive_file_loading);
             auto model_sample_rate = get_model_sample_rate(model_path);
@@ -256,6 +249,7 @@ int duplex(int argc, char* argv[]) {
             if (!std::filesystem::exists(stereo_model_path)) {
                 utils::download_models(model_path.parent_path().u8string(), stereo_model_name);
             }
+            auto stereo_model_config = load_crf_model_config(stereo_model_path);
 
             // Write read group info to header.
             auto read_groups = DataLoader::load_read_groups(reads, model, recursive_file_loading);
@@ -288,7 +282,8 @@ int duplex(int argc, char* argv[]) {
 #if DORADO_GPU_BUILD
 #ifdef __APPLE__
             else if (device == "metal") {
-                auto simplex_caller = create_metal_caller(model_path, chunk_size, batch_size);
+                auto simplex_caller =
+                        create_metal_caller(model_config, model_path, chunk_size, batch_size);
                 for (int i = 0; i < num_runners; i++) {
                     runners.push_back(std::make_shared<MetalModelRunner>(simplex_caller));
                 }
@@ -299,8 +294,8 @@ int duplex(int argc, char* argv[]) {
                 // For now, the minimal batch size is used for the duplex model.
                 int stereo_batch_size = 48;
 
-                auto duplex_caller =
-                        create_metal_caller(stereo_model_path, chunk_size, stereo_batch_size);
+                auto duplex_caller = create_metal_caller(stereo_model_config, stereo_model_path,
+                                                         chunk_size, stereo_batch_size);
                 for (size_t i = 0; i < num_runners; i++) {
                     stereo_runners.push_back(std::make_shared<MetalModelRunner>(duplex_caller));
                 }
@@ -319,8 +314,8 @@ int duplex(int argc, char* argv[]) {
                 }
                 for (auto device_string : devices) {
                     // Use most of GPU mem but leave some for buffer.
-                    auto caller = create_cuda_caller(model_path, chunk_size, batch_size,
-                                                     device_string, 0.9f, guard_gpus);
+                    auto caller = create_cuda_caller(model_config, model_path, chunk_size,
+                                                     batch_size, device_string, 0.9f);
                     for (size_t i = 0; i < num_runners; i++) {
                         runners.push_back(std::make_shared<CudaModelRunner>(caller));
                     }
@@ -335,8 +330,8 @@ int duplex(int argc, char* argv[]) {
                     // _remaining_ memory to the caller. So, we allocate all of the available
                     // memory after simplex caller has been instantiated to the duplex caller.
                     // ALWAYS auto tune the duplex batch size (i.e. batch_size passed in is 0.)
-                    auto caller = create_cuda_caller(stereo_model_path, chunk_size, 0,
-                                                     device_string, 1.f, guard_gpus);
+                    auto caller = create_cuda_caller(stereo_model_config, stereo_model_path,
+                                                     chunk_size, 0, device_string, 1.f);
                     for (size_t i = 0; i < num_runners; i++) {
                         stereo_runners.push_back(std::make_shared<CudaModelRunner>(caller));
                     }
@@ -379,7 +374,8 @@ int duplex(int argc, char* argv[]) {
                     splitter_node, std::move(runners), adjusted_simplex_overlap,
                     kSimplexBatchTimeoutMS, model, 1000);
 
-            ScalerNode scaler_node(*basecaller_node, num_devices * 2);
+            ScalerNode scaler_node(*basecaller_node, model_config.signal_norm_params,
+                                   num_devices * 2);
 
             DataLoader loader(scaler_node, "cpu", num_devices, 0, std::move(read_list));
 

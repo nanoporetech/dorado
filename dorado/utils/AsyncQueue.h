@@ -5,6 +5,8 @@
 #include <mutex>
 #include <optional>
 #include <queue>
+#include <string>
+#include <unordered_map>
 
 // Asynchronous queue for producer/consumer use.
 // Items must be movable.
