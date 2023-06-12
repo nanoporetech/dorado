@@ -1,4 +1,5 @@
 #pragma once
+#include "HtsReader.h"
 #include "ReadPipeline.h"
 #include "utils/bam_utils.h"
 
@@ -10,7 +11,7 @@ class BaseSpaceDuplexCallerNode : public MessageSink {
 public:
     BaseSpaceDuplexCallerNode(MessageSink& sink,
                               std::map<std::string, std::string> template_complement_map,
-                              utils::read_map reads,
+                              read_map reads,
                               size_t threads);
     ~BaseSpaceDuplexCallerNode();
 
@@ -22,6 +23,6 @@ private:
     size_t m_num_worker_threads{1};
     std::unique_ptr<std::thread> m_worker_thread;
     std::map<std::string, std::string> m_template_complement_map;
-    utils::read_map m_reads;
+    read_map m_reads;
 };
 }  // namespace dorado

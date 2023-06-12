@@ -1,7 +1,8 @@
 #include "BasecallerNode.h"
 
 #include "../decode/CPUDecoder.h"
-#include "../utils/stitch.h"
+#include "utils/stats.h"
+#include "utils/stitch.h"
 
 #include <nvtx3/nvtx3.hpp>
 
@@ -90,6 +91,7 @@ void BasecallerNode::input_worker_thread() {
             {
                 std::lock_guard working_reads_lock(m_working_reads_mutex);
                 m_working_reads.push_back(std::move(read));
+                ++m_working_reads_size;
             }
 
             m_chunks_added_cv.notify_one();
@@ -106,7 +108,9 @@ void BasecallerNode::input_worker_thread() {
 void BasecallerNode::basecall_current_batch(int worker_id) {
     NVTX3_FUNC_RANGE();
     auto model_runner = m_model_runners[worker_id];
+    dorado::stats::Timer timer;
     auto decode_results = model_runner->call_chunks(m_batched_chunks[worker_id].size());
+    m_call_chunks_ms += timer.GetElapsedMS();
 
     for (size_t i = 0; i < m_batched_chunks[worker_id].size(); i++) {
         m_batched_chunks[worker_id][i]->seq = decode_results[i].sequence;
@@ -121,6 +125,7 @@ void BasecallerNode::basecall_current_batch(int worker_id) {
         ++source_read->num_chunks_called;
     }
     m_batched_chunks[worker_id].clear();
+    ++m_num_batches_called;
 }
 
 void BasecallerNode::working_reads_manager() {
@@ -139,6 +144,7 @@ void BasecallerNode::working_reads_manager() {
                             m_model_name;  // Before sending read to sink, assign its model name
                     completed_reads.push_back(*read_iter);
                     read_iter = m_working_reads.erase(read_iter);
+                    --m_working_reads_size;
                 } else {
                     read_iter++;
                 }
@@ -154,6 +160,7 @@ void BasecallerNode::working_reads_manager() {
         for (auto &read : completed_reads) {
             utils::stitch_chunks(read);
             m_sink.push_message(read);
+            ++m_called_reads_pushed;
         }
     }
 
@@ -297,6 +304,20 @@ BasecallerNode::~BasecallerNode() {
     }
     m_working_reads_manager->join();
     termination_time = std::chrono::system_clock::now();
+}
+
+stats::NamedStats BasecallerNode::sample_stats() const {
+    stats::NamedStats stats = stats::from_obj(m_work_queue);
+    for (const auto &runner : m_model_runners) {
+        const auto runner_stats = stats::from_obj(*runner);
+        stats.insert(runner_stats.begin(), runner_stats.end());
+    }
+    stats["batches_called"] = m_num_batches_called;
+    stats["partial_batches_called"] = m_num_partial_batches_called;
+    stats["call_chunks_ms"] = m_call_chunks_ms;
+    stats["called_reads_pushed"] = m_called_reads_pushed;
+    stats["working_reads_items"] = m_working_reads_size;
+    return stats;
 }
 
 }  // namespace dorado

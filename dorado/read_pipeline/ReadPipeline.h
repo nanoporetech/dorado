@@ -1,5 +1,6 @@
 #pragma once
 #include "utils/AsyncQueue.h"
+#include "utils/stats.h"
 #include "utils/types.h"
 
 #include <torch/torch.h>
@@ -8,6 +9,7 @@
 #include <limits>
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <variant>
 #include <vector>
 
@@ -113,6 +115,7 @@ private:
     void generate_duplex_read_tags(bam1_t*) const;
     void generate_read_tags(bam1_t* aln, bool emit_moves) const;
     void generate_modbase_string(bam1_t* aln, uint8_t threshold = 0) const;
+    std::string generate_read_group() const;
 };
 
 // A pair of reads for Duplex calling
@@ -146,11 +149,18 @@ using Message = std::variant<std::shared_ptr<Read>,
 class MessageSink {
 public:
     MessageSink(size_t max_messages);
+    virtual ~MessageSink() = default;
     // Pushed messages must be rvalues: the sink takes ownership.
     void push_message(
             Message&&
                     message);  // Push a message into message sink.  This can block if the sink's queue is full.
     void terminate() { m_work_queue.terminate(); }
+
+    // StatsSampler will ignore nodes with an empty name.
+    virtual std::string get_name() const { return std::string(""); }
+    virtual stats::NamedStats sample_stats() const {
+        return std::unordered_map<std::string, double>();
+    }
 
 protected:
     // Queue of work items for this node.

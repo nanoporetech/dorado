@@ -14,7 +14,9 @@
 #endif  // DORADO_GPU_BUILD
 #include "nn/ModBaseRunner.h"
 #include "nn/ModelRunner.h"
+#include "read_pipeline/AlignerNode.h"
 #include "read_pipeline/BasecallerNode.h"
+#include "read_pipeline/HtsWriter.h"
 #include "read_pipeline/ModBaseCallerNode.h"
 #include "read_pipeline/ReadFilterNode.h"
 #include "read_pipeline/ReadToBamTypeNode.h"
@@ -24,6 +26,7 @@
 #include "utils/cli_utils.h"
 #include "utils/log_utils.h"
 #include "utils/parameters.h"
+#include "utils/stats.h"
 
 #include <argparse.hpp>
 #include <htslib/sam.h>
@@ -31,6 +34,7 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <memory>
 #include <sstream>
@@ -38,9 +42,8 @@
 
 namespace dorado {
 
-using HtsWriter = utils::HtsWriter;
-using HtsReader = utils::HtsReader;
 using dorado::utils::default_parameters;
+using namespace std::chrono_literals;
 
 void setup(std::vector<std::string> args,
            const std::filesystem::path& model_path,
@@ -64,9 +67,13 @@ void setup(std::vector<std::string> args,
            int kmer_size,
            int window_size,
            uint64_t mm2_index_batch_size,
-           bool skip_model_compatibility_check) {
+           bool skip_model_compatibility_check,
+           const std::string& dump_stats_file,
+           const std::string& dump_stats_filter) {
     torch::set_num_threads(1);
     std::vector<Runner> runners;
+
+    auto model_config = load_crf_model_config(model_path);
 
     // Default is 1 device.  CUDA path may alter this.
     int num_devices = 1;
@@ -87,7 +94,7 @@ void setup(std::vector<std::string> args,
 #if DORADO_GPU_BUILD
 #ifdef __APPLE__
     else if (device == "metal") {
-        auto caller = create_metal_caller(model_path, chunk_size, batch_size);
+        auto caller = create_metal_caller(model_config, model_path, chunk_size, batch_size);
         for (size_t i = 0; i < num_runners; i++) {
             runners.push_back(std::make_shared<MetalModelRunner>(caller));
         }
@@ -105,7 +112,8 @@ void setup(std::vector<std::string> args,
             throw std::runtime_error("CUDA device requested but no devices found.");
         }
         for (auto device_string : devices) {
-            auto caller = create_cuda_caller(model_path, chunk_size, batch_size, device_string);
+            auto caller = create_cuda_caller(model_config, model_path, chunk_size, batch_size,
+                                             device_string);
             for (size_t i = 0; i < num_runners; i++) {
                 runners.push_back(std::make_shared<CudaModelRunner>(caller));
             }
@@ -198,23 +206,21 @@ void setup(std::vector<std::string> args,
     utils::add_pg_hdr(hdr.get(), args);
     utils::add_rg_hdr(hdr.get(), read_groups);
     std::shared_ptr<HtsWriter> bam_writer;
-    std::shared_ptr<utils::Aligner> aligner;
+    std::shared_ptr<Aligner> aligner;
     MessageSink* converted_reads_sink = nullptr;
     if (ref.empty()) {
         bam_writer = std::make_shared<HtsWriter>("-", output_mode,
                                                  thread_allocations.writer_threads, num_reads);
-        bam_writer->add_header(hdr.get());
-        bam_writer->write_header();
+        bam_writer->write_header(hdr.get());
         converted_reads_sink = bam_writer.get();
     } else {
         bam_writer = std::make_shared<HtsWriter>("-", output_mode,
                                                  thread_allocations.writer_threads, num_reads);
-        aligner = std::make_shared<utils::Aligner>(*bam_writer, ref, kmer_size, window_size,
-                                                   mm2_index_batch_size,
-                                                   thread_allocations.aligner_threads);
+        aligner =
+                std::make_shared<Aligner>(*bam_writer, ref, kmer_size, window_size,
+                                          mm2_index_batch_size, thread_allocations.aligner_threads);
         utils::add_sq_hdr(hdr.get(), aligner->get_sequence_records_for_header());
-        bam_writer->add_header(hdr.get());
-        bam_writer->write_header();
+        bam_writer->write_header(hdr.get());
         converted_reads_sink = aligner.get();
     }
     ReadToBamType read_converter(*converted_reads_sink, emit_moves, rna,
@@ -235,13 +241,43 @@ void setup(std::vector<std::string> args,
     const int kBatchTimeoutMS = 100;
     BasecallerNode basecaller_node(*basecaller_node_sink, std::move(runners), overlap,
                                    kBatchTimeoutMS, model_name);
-    ScalerNode scaler_node(basecaller_node, thread_allocations.scaler_node_threads);
+    ScalerNode scaler_node(basecaller_node, model_config.signal_norm_params,
+                           thread_allocations.scaler_node_threads);
 
     DataLoader loader(scaler_node, "cpu", thread_allocations.loader_threads, max_reads, read_list);
+
+    std::unique_ptr<dorado::stats::StatsSampler> stats_sampler;
+    if (!dump_stats_file.empty()) {
+        std::vector<dorado::stats::StatsReporter> stats_reporters;
+        using dorado::stats::make_stats_reporter;
+        stats_reporters.push_back(make_stats_reporter(basecaller_node));
+        if (mod_base_caller_node) {
+            stats_reporters.push_back(make_stats_reporter(*mod_base_caller_node));
+        }
+        if (aligner) {
+            stats_reporters.push_back(make_stats_reporter(*aligner));
+        }
+        stats_reporters.push_back(make_stats_reporter(*bam_writer));
+        stats_reporters.push_back(make_stats_reporter(loader));
+        stats_reporters.push_back(make_stats_reporter(scaler_node));
+        stats_reporters.push_back(make_stats_reporter(read_filter_node));
+
+        constexpr auto kStatsPeriod = 100ms;
+        stats_sampler =
+                std::make_unique<dorado::stats::StatsSampler>(kStatsPeriod, stats_reporters);
+    }
 
     loader.load_reads(data_path, recursive_file_loading);
 
     bam_writer->join();
+    if (stats_sampler) {
+        stats_sampler->terminate();
+        std::ofstream stats_file(dump_stats_file);
+        stats_sampler->dump_stats(stats_file,
+                                  dump_stats_filter.empty()
+                                          ? std::nullopt
+                                          : std::optional<std::regex>(dump_stats_filter));
+    }
     stats_node.dump_stats();
 }
 
@@ -410,7 +446,9 @@ int basecaller(int argc, char* argv[]) {
               parser.get<int>("--min-qscore"), parser.get<std::string>("--read-ids"),
               parser.get<bool>("--recursive"), parser.get<int>("k"), parser.get<int>("w"),
               utils::parse_string_to_size(parser.get<std::string>("I")),
-              internal_parser.get<bool>("--skip-model-compatibility-check"));
+              internal_parser.get<bool>("--skip-model-compatibility-check"),
+              internal_parser.get<std::string>("--dump_stats_file"),
+              internal_parser.get<std::string>("--dump_stats_filter"));
     } catch (const std::exception& e) {
         spdlog::error("{}", e.what());
         return 1;

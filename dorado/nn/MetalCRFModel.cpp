@@ -538,8 +538,10 @@ TORCH_MODULE(MetalModel);
 
 class MetalCaller {
 public:
-    MetalCaller(const std::filesystem::path &model_path, int chunk_size, int batch_size) {
-        const auto model_config = load_crf_model_config(model_path);
+    MetalCaller(const CRFModelConfig &model_config,
+                const std::filesystem::path &model_path,
+                int chunk_size,
+                int batch_size) {
         m_model_stride = static_cast<size_t>(model_config.stride);
         m_num_input_features = model_config.num_features;
 
@@ -841,10 +843,11 @@ public:
     int m_num_input_features = -1;
 };
 
-std::shared_ptr<MetalCaller> create_metal_caller(const std::filesystem::path &model_path,
+std::shared_ptr<MetalCaller> create_metal_caller(const CRFModelConfig &model_config,
+                                                 const std::filesystem::path &model_path,
                                                  int chunk_size,
                                                  int batch_size) {
-    return std::make_shared<MetalCaller>(model_path, chunk_size, batch_size);
+    return std::make_shared<MetalCaller>(model_config, model_path, chunk_size, batch_size);
 }
 
 MetalModelRunner::MetalModelRunner(std::shared_ptr<MetalCaller> caller) : m_caller(caller) {
@@ -871,6 +874,7 @@ void MetalModelRunner::accept_chunk(int chunk_idx, const torch::Tensor &chunk) {
 }
 
 std::vector<DecodedChunk> MetalModelRunner::call_chunks(int num_chunks) {
+    ++m_num_batches_called;
     std::vector<DecodedChunk> out_chunks(num_chunks);
     m_caller->call_chunks(m_input, num_chunks, out_chunks);
     return out_chunks;
@@ -881,5 +885,11 @@ size_t MetalModelRunner::chunk_size() const { return m_input.size(1); }
 size_t MetalModelRunner::batch_size() const { return m_input.size(0); }
 
 void MetalModelRunner::terminate() { m_caller->terminate(); }
+
+stats::NamedStats MetalModelRunner::sample_stats() const {
+    stats::NamedStats stats;
+    stats["batches_called"] = m_num_batches_called;
+    return stats;
+}
 
 }  // namespace dorado

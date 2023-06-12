@@ -61,4 +61,10 @@ ReadFilterNode::~ReadFilterNode() {
     m_sink.terminate();
 }
 
+stats::NamedStats ReadFilterNode::sample_stats() const {
+    stats::NamedStats stats = stats::from_obj(m_work_queue);
+    stats["reads_filtered"] = m_num_reads_filtered;
+    return stats;
+}
+
 }  // namespace dorado

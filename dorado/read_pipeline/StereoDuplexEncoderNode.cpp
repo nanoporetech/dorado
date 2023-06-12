@@ -59,6 +59,7 @@ std::shared_ptr<dorado::Read> StereoDuplexEncoderNode::stereo_encode(
     if (!consensus_possible) {
         // There wasn't a good enough match -- return early with an empty read.
         edlibFreeAlignResult(result);
+        ++m_num_discarded_pairs;
         return read;
     }
 
@@ -264,6 +265,7 @@ std::shared_ptr<dorado::Read> StereoDuplexEncoderNode::stereo_encode(
     read->read_id = template_read->read_id + ";" + complement_read->read_id;
     read->raw_data = tmp;  // use the encoded signal
     read->is_duplex = true;
+    read->run_id = template_read->run_id;
 
     edlibFreeAlignResult(result);
 
@@ -318,6 +320,12 @@ StereoDuplexEncoderNode::~StereoDuplexEncoderNode() {
     }
 
     m_sink.terminate();
+}
+
+stats::NamedStats StereoDuplexEncoderNode::sample_stats() const {
+    stats::NamedStats stats = m_work_queue.sample_stats();
+    stats["discarded_pairs"] = m_num_discarded_pairs;
+    return stats;
 }
 
 }  // namespace dorado

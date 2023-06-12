@@ -18,7 +18,7 @@ public:
 struct RemoraChunk {
     RemoraChunk(std::shared_ptr<Read> read,
                 torch::Tensor input_signal,
-                std::vector<float> kmer_data,
+                std::vector<int8_t> kmer_data,
                 size_t position)
             : source_read(read),
               signal(input_signal),
@@ -27,7 +27,7 @@ struct RemoraChunk {
 
     std::weak_ptr<Read> source_read;
     torch::Tensor signal;
-    std::vector<float> encoded_kmers;
+    std::vector<int8_t> encoded_kmers;
     size_t context_hit;
     std::vector<float> scores;
 };

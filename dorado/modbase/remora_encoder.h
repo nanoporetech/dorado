@@ -2,6 +2,7 @@
 
 #include <torch/torch.h>
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -22,8 +23,8 @@ private:
 
     int compute_sample_pos(int base_pos) const;
 
-    std::vector<float> encode_kmer(const std::vector<int>& seq,
-                                   const std::vector<int>& seq_mappings) const;
+    std::vector<int8_t> encode_kmer(const std::vector<int>& seq,
+                                    const std::vector<int>& seq_mappings) const;
 
 public:
     /** Encoder for Remora-style modified base detection.
@@ -43,9 +44,9 @@ public:
 
     /// Helper structure for specifying the context and returning the corresponding encoded data.
     struct Context {
-        std::vector<float> data;  ///< Encoded data slice
-        size_t first_sample;      ///< Index of first raw data sample for the slice.
-        size_t num_samples;       ///< Number of samples of raw data in the slice.
+        std::vector<int8_t> data;  ///< Encoded data slice
+        size_t first_sample;       ///< Index of first raw data sample for the slice.
+        size_t num_samples;        ///< Number of samples of raw data in the slice.
         size_t lead_samples_needed;  ///< Number of samples, if any, to pad the beginning of the raw data slice with.
         size_t tail_samples_needed;  ///< Number of samples, if any, to pad the end of the raw data slice with.
     };

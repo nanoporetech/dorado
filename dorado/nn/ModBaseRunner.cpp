@@ -4,6 +4,7 @@
 #include "modbase/remora_scaler.h"
 #include "modbase/remora_utils.h"
 #include "utils/base_mod_utils.h"
+#include "utils/stats.h"
 #include "utils/tensor_utils.h"
 
 #if DORADO_GPU_BUILD && !defined(__APPLE__)
@@ -149,7 +150,7 @@ public:
 
             // Warmup
             auto input_sigs = torch::empty({batch_size, 1, sig_len}, m_options);
-            auto input_seqs = torch::empty({batch_size, RemoraUtils::NUM_BASES * kmer_len, sig_len},
+            auto input_seqs = torch::empty({batch_size, sig_len, RemoraUtils::NUM_BASES * kmer_len},
                                            m_options);
             caller_data->module_holder->forward(input_sigs, input_seqs);
 #if DORADO_GPU_BUILD && !defined(__APPLE__)
@@ -233,13 +234,17 @@ public:
             input_lock.unlock();
 
             std::unique_lock<std::mutex> task_lock(task->mut);
+            stats::Timer timer;
             auto scores = caller_data->module_holder->forward(task->input_sigs, task->input_seqs);
             task->out = scores.to(torch::kCPU);
 #if DORADO_GPU_BUILD && !defined(__APPLE__)
             if (has_stream) {
                 caller_data->stream->synchronize();
             }
+            // Only meaningful if we're syncing the stream.
+            m_model_ms += timer.GetElapsedMS();
 #endif
+            ++m_num_batches_called;
             task->done = true;
             task->cv.notify_one();
             task_lock.unlock();
@@ -248,10 +253,27 @@ public:
 
     void terminate() { m_terminate.store(true); }
 
+    std::string get_name() const {
+        return std::string("ModBaseCaller_") + m_options.device().str();
+    }
+
+    stats::NamedStats sample_stats() const {
+        stats::NamedStats stats;
+        stats["batches_called"] = m_num_batches_called;
+#if DORADO_GPU_BUILD && !defined(__APPLE__)
+        stats["model_ms"] = m_model_ms;
+#endif
+        return stats;
+    }
+
     torch::TensorOptions m_options;
     std::atomic<bool> m_terminate{false};
     std::vector<std::unique_ptr<ModBaseData>> m_caller_data;
     std::vector<std::unique_ptr<std::thread>> m_task_threads;
+
+    // Performance monitoring stats.
+    std::atomic<int64_t> m_num_batches_called = 0;
+    std::atomic<int64_t> m_model_ms = 0;
 };
 
 std::shared_ptr<ModBaseCaller> create_modbase_caller(
@@ -267,25 +289,30 @@ ModBaseRunner::ModBaseRunner(std::shared_ptr<ModBaseCaller> caller) : m_caller(s
                         .pinned_memory(m_caller->m_options.device().is_cuda())
                         .dtype(m_caller->m_options.dtype());
 
+    auto seq_input_options = torch::TensorOptions()
+                                     .device(torch::kCPU)
+                                     .pinned_memory(m_caller->m_options.device().is_cuda())
+                                     .dtype(torch::kInt8);
+
     for (auto& caller_data : m_caller->m_caller_data) {
         auto sig_len = static_cast<int64_t>(caller_data->params.context_before +
                                             caller_data->params.context_after);
         auto kmer_len = caller_data->params.bases_after + caller_data->params.bases_before + 1;
         m_input_sigs.push_back(torch::empty({caller_data->batch_size, 1, sig_len}, opts));
-        m_input_seqs.push_back(torch::empty(
-                {caller_data->batch_size, RemoraUtils::NUM_BASES * kmer_len, sig_len}, opts));
+        m_input_seqs.push_back(
+                torch::empty({caller_data->batch_size, sig_len, RemoraUtils::NUM_BASES * kmer_len},
+                             seq_input_options));
     }
 }
 
 void ModBaseRunner::accept_chunk(int model_id,
                                  int chunk_idx,
                                  const torch::Tensor& signal,
-                                 const std::vector<float>& kmers) {
+                                 const std::vector<int8_t>& kmers) {
     // As usual, avoid torch indexing because it is glacially slow.
-    // GPU base calling uses float16 signals and input tensors, but float32
-    // sequence encodings.
-    // CPU base calling uses float16 signals, float32 input tensors, and
-    // float32 sequence encodings.
+    // GPU base calling uses float16 signals and input tensors.
+    // CPU base calling uses float16 signals, float32 input tensors.
+    // Both versions take int8 sequence encodings.
 
     auto& input_sigs = m_input_sigs[model_id];
     auto& input_seqs = m_input_seqs[model_id];
@@ -295,21 +322,13 @@ void ModBaseRunner::accept_chunk(int model_id,
     dorado::utils::copy_tensor_elems(input_sigs, chunk_idx * sig_len, signal, 0, sig_len);
 
     const auto kmer_elem_count = input_seqs.size(1) * input_seqs.size(2);
-    if (input_seqs.dtype() == torch::kFloat16) {
-        // float32 kmer encoding -> float16 kmer encoding input
-        using InputType = c10::Half;
-        InputType* const input_seqs_ptr = input_seqs.data_ptr<InputType>();
-        dorado::utils::convert_f32_to_f16(&input_seqs_ptr[chunk_idx * kmer_elem_count],
-                                          kmers.data(), kmer_elem_count);
-    } else if (input_seqs.dtype() == torch::kFloat32) {
-        // float32 kmer encoding -> float32 kmer encoding input
-        using InputType = float;
-        InputType* const input_seqs_ptr = input_seqs.data_ptr<InputType>();
-        std::memcpy(&input_seqs_ptr[chunk_idx * kmer_elem_count], kmers.data(),
-                    kmer_elem_count * sizeof(InputType));
-    } else {
+    if (input_seqs.dtype() != torch::kInt8) {
         throw std::runtime_error("Unsupported input dtype");
     }
+    using SeqInputType = int8_t;
+    SeqInputType* const input_seqs_ptr = input_seqs.data_ptr<SeqInputType>();
+    std::memcpy(&input_seqs_ptr[chunk_idx * kmer_elem_count], kmers.data(),
+                kmer_elem_count * sizeof(SeqInputType));
 }
 
 torch::Tensor ModBaseRunner::call_chunks(int model_id, int num_chunks) {
@@ -337,7 +356,22 @@ ModBaseParams& ModBaseRunner::caller_params(size_t caller_id) const {
 }
 
 size_t ModBaseRunner::num_callers() const { return m_caller->m_caller_data.size(); }
-
 void ModBaseRunner::terminate() { m_caller->terminate(); }
+
+std::string ModBaseRunner::get_name() const {
+    std::ostringstream name_stream;
+    name_stream << "ModBaseRunner_" << this;
+    return name_stream.str();
+}
+
+stats::NamedStats ModBaseRunner::sample_stats() const {
+    // We don't have direct access to the caller object when the pipeline is set up,
+    // so pass through stats here.
+    // Each runner will retrieve stats from the caller.
+    // Only the last retrieved version will appear, but they should be very similar.
+    stats::NamedStats stats = stats::from_obj(*m_caller);
+    stats["batches_called"] = m_num_batches_called;
+    return stats;
+}
 
 }  // namespace dorado
