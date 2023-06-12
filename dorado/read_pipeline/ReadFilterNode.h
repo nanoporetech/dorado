@@ -14,11 +14,8 @@
 namespace dorado {
 
 /// Class to filter reads based on some criteria.
-/// Currently only supports one baked in type of
-/// filtering based on qscore.
-/// TODO: Should be replaced with more general
-/// mechanism to define and pass in arbitrary filters
-/// which are applied to each read.
+/// Currently only supports filtering based on
+/// minimum Q-score, read length and read id.
 class ReadFilterNode : public MessageSink {
 public:
     ReadFilterNode(MessageSink& sink,

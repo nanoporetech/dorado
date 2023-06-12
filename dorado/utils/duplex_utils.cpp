@@ -125,9 +125,9 @@ const std::string get_stereo_model_name(const std::string& simplex_model_name,
     }
 }
 
-void split_duplex_reads_by_stats(std::unordered_set<std::string>& completed_duplex_reads,
-                                 std::unordered_set<std::string>& completed_simplex_reads,
-                                 const std::unordered_set<std::string>& read_ids) {
+void split_completed_duplex_reads(std::unordered_set<std::string>& completed_duplex_reads,
+                                  std::unordered_set<std::string>& completed_simplex_reads,
+                                  const std::unordered_set<std::string>& read_ids) {
     for (const auto& read_id : read_ids) {
         bool duplex_read = read_id.find(";") != std::string::npos;
         if (duplex_read) {

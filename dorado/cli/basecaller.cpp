@@ -71,7 +71,7 @@ void setup(std::vector<std::string> args,
            bool skip_model_compatibility_check,
            const std::string& dump_stats_file,
            const std::string& dump_stats_filter,
-           std::string resume_from_file) {
+           const std::string& resume_from_file) {
     torch::set_num_threads(1);
     std::vector<Runner> runners;
 
@@ -322,7 +322,8 @@ int basecaller(int argc, char* argv[]) {
             .default_value(std::string(""));
 
     parser.add_argument("--resume-from")
-            .help("Resume basecalling from the given HTS file output.")
+            .help("Resume basecalling from the given HTS file. Fully written read records are not "
+                  "processed again.")
             .default_value(std::string(""));
 
     parser.add_argument("-n", "--max-reads").default_value(0).scan<'i', int>();

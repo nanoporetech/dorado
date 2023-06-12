@@ -246,9 +246,12 @@ int DataLoader::get_num_reads(std::string data_path,
                 [](const auto& path) { return std::filesystem::directory_iterator(path); });
     }
 
+    // Remove the reads in the ignore list from the total dataset read count.
     num_reads -= ignore_read_list.size();
 
     if (read_list) {
+        // Get the unique read ids in the read list, since everything in the ignore
+        // list will be skipped over.
         std::vector<std::string> final_read_list;
         std::set_difference(read_list->begin(), read_list->end(), ignore_read_list.begin(),
                             ignore_read_list.end(),
