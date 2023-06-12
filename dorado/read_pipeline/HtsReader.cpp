@@ -6,6 +6,7 @@
 
 #include <spdlog/spdlog.h>
 
+#include <filesystem>
 #include <set>
 #include <stdexcept>
 #include <string>
@@ -100,6 +101,9 @@ std::unordered_set<std::string> fetch_read_ids(const std::string& filename) {
         throw std::runtime_error("Resume file cannot be found: " + filename);
     }
 
+    auto initial_hts_log_level = hts_get_log_level();
+    hts_set_log_level(HTS_LOG_OFF);
+
     std::unordered_set<std::string> read_ids;
     HtsReader reader(filename);
     try {
@@ -110,6 +114,8 @@ std::unordered_set<std::string> fetch_read_ids(const std::string& filename) {
     } catch (std::exception& e) {
         // Do nothing.
     }
+
+    hts_set_log_level(initial_hts_log_level);
 
     return read_ids;
 }

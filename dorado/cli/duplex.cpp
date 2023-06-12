@@ -131,14 +131,17 @@ int duplex(int argc, char* argv[]) {
         std::map<std::string, std::string> template_complement_map;
         auto read_list = utils::load_read_list(parser.get<std::string>("--read-ids"));
         auto resume_from_file = parser.get<std::string>("--resume-from");
-        auto reads_already_processed = fetch_read_ids(resume_from_file);
+
         std::unordered_set<std::string> completed_duplex_reads;
         std::unordered_set<std::string> completed_simplex_reads;
-        utils::split_duplex_reads_by_stats(completed_duplex_reads, completed_simplex_reads,
-                                           reads_already_processed);
-        if (completed_duplex_reads.size() > 0 || completed_simplex_reads.size() > 0) {
-            spdlog::info("Duplex reads generated for {} reads.", completed_duplex_reads.size());
-            spdlog::info("Analyzing {} simplex reads to check for duplex.",
+        std::unordered_set<std::string> reads_already_processed;
+        if (!resume_from_file.empty()) {
+            spdlog::info("> Inspecting resume file...");
+            reads_already_processed = fetch_read_ids(resume_from_file);
+            utils::split_duplex_reads_by_stats(completed_duplex_reads, completed_simplex_reads,
+                                               reads_already_processed);
+            spdlog::info("> Duplex reads generated for {} reads.", completed_duplex_reads.size());
+            spdlog::info("> Analyzing {} simplex reads to check for duplex.",
                          completed_simplex_reads.size());
         }
 
@@ -179,6 +182,7 @@ int duplex(int argc, char* argv[]) {
                                              : DataLoader::get_num_reads(reads, read_list,
                                                                          completed_duplex_reads,
                                                                          recursive_file_loading));
+        std::cerr << "Number of duplex reads " << num_reads << std::endl;
 
         std::unique_ptr<sam_hdr_t, void (*)(sam_hdr_t*)> hdr(sam_hdr_init(), sam_hdr_destroy);
         utils::add_pg_hdr(hdr.get(), args);

@@ -185,9 +185,12 @@ void setup(std::vector<std::string> args,
     auto read_groups = DataLoader::load_read_groups(data_path, model_name, recursive_file_loading);
 
     auto read_list = utils::load_read_list(read_list_file_path);
-    auto reads_already_processed = fetch_read_ids(resume_from_file);
-    if (reads_already_processed.size() > 0) {
-        spdlog::info("{} reads found in resume file.", reads_already_processed.size());
+
+    std::unordered_set<std::string> reads_already_processed;
+    if (!resume_from_file.empty()) {
+        spdlog::info("> Inspecting resume file...");
+        reads_already_processed = fetch_read_ids(resume_from_file);
+        spdlog::info("> {} reads found in resume file.", reads_already_processed.size());
     }
 
     // Check sample rate of model vs data.
