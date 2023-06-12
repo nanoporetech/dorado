@@ -5,25 +5,23 @@
 
 #include <algorithm>
 #include <chrono>
+#include <utility>
 
 using namespace std::chrono_literals;
 using Slice = torch::indexing::Slice;
 
-namespace {
+namespace dorado {
 
-std::pair<float, float> normalisation(torch::Tensor& x) {
+std::pair<float, float> ScalerNode::normalisation(torch::Tensor& x) {
     // Calculate shift and scale factors for normalisation.
-    auto quantiles = dorado::utils::quantile_counting(x, torch::tensor({0.2, 0.9}));
-    float q20 = quantiles[0].item<float>();
-    float q90 = quantiles[1].item<float>();
-    float shift = std::max(10.0f, 0.51f * (q20 + q90));
-    float scale = std::max(1.0f, 0.53f * (q90 - q20));
+    auto quantiles = dorado::utils::quantile_counting(
+            x, torch::tensor({m_scaling_params.quantile_a, m_scaling_params.quantile_b}));
+    float q_a = quantiles[0].item<float>();
+    float q_b = quantiles[1].item<float>();
+    float shift = std::max(10.0f, m_scaling_params.shift_multiplier * (q_a + q_b));
+    float scale = std::max(1.0f, m_scaling_params.scale_multiplier * (q_b - q_a));
     return {shift, scale};
 }
-
-}  // namespace
-
-namespace dorado {
 
 void ScalerNode::worker_thread() {
     Message message;
@@ -58,8 +56,14 @@ void ScalerNode::worker_thread() {
     }
 }
 
-ScalerNode::ScalerNode(MessageSink& sink, int num_worker_threads, size_t max_reads)
-        : MessageSink(max_reads), m_sink(sink), m_num_worker_threads(num_worker_threads) {
+ScalerNode::ScalerNode(MessageSink& sink,
+                       const SignalNormalisationParams& config,
+                       int num_worker_threads,
+                       size_t max_reads)
+        : MessageSink(max_reads),
+          m_sink(sink),
+          m_scaling_params(config),
+          m_num_worker_threads(num_worker_threads) {
     for (int i = 0; i < m_num_worker_threads; i++) {
         std::unique_ptr<std::thread> scaler_worker_thread =
                 std::make_unique<std::thread>(&ScalerNode::worker_thread, this);
@@ -78,5 +82,7 @@ ScalerNode::~ScalerNode() {
     // Notify the sink that the Scaler Node has terminated
     m_sink.terminate();
 }
+
+stats::NamedStats ScalerNode::sample_stats() const { return stats::from_obj(m_work_queue); }
 
 }  // namespace dorado

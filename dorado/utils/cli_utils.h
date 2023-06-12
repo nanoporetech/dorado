@@ -75,6 +75,12 @@ inline argparse::ArgumentParser parse_internal_options(
             .help("(WARNING: For expert users only) Skip model and data compatibility checks.")
             .default_value(false)
             .implicit_value(true);
+    private_parser.add_argument("--dump_stats_file")
+            .help("Internal processing stats. output filename.")
+            .default_value(std::string(""));
+    private_parser.add_argument("--dump_stats_filter")
+            .help("Internal processing stats. name filter regex.")
+            .default_value(std::string(""));
     args.insert(args.begin(), prog_name);
     private_parser.parse_args(args);
 

@@ -1,5 +1,10 @@
 #pragma once
 
+#include "utils/stats.h"
+
+#include <torch/torch.h>
+
+#include <atomic>
 #include <filesystem>
 #include <string>
 #include <vector>
@@ -38,7 +43,7 @@ public:
     void accept_chunk(int model_id,
                       int chunk_idx,
                       const torch::Tensor& signal,
-                      const std::vector<float>& kmers);
+                      const std::vector<int8_t>& kmers);
     torch::Tensor call_chunks(int model_id, int num_chunks);
     torch::Tensor scale_signal(size_t caller_id,
                                torch::Tensor signal,
@@ -48,11 +53,16 @@ public:
     ModBaseParams& caller_params(size_t caller_id) const;
     size_t num_callers() const;
     void terminate();
+    std::string get_name() const;
+    stats::NamedStats sample_stats() const;
 
 private:
     std::shared_ptr<ModBaseCaller> m_caller;
     std::vector<torch::Tensor> m_input_sigs;
     std::vector<torch::Tensor> m_input_seqs;
+
+    // Performance monitoring stats.
+    std::atomic<int64_t> m_num_batches_called = 0;
 };
 
 }  // namespace dorado

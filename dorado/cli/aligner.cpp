@@ -1,5 +1,8 @@
 #include "Version.h"
 #include "minimap.h"
+#include "read_pipeline/AlignerNode.h"
+#include "read_pipeline/HtsReader.h"
+#include "read_pipeline/HtsWriter.h"
 #include "utils/bam_utils.h"
 #include "utils/cli_utils.h"
 #include "utils/log_utils.h"
@@ -19,9 +22,6 @@ using namespace std::chrono_literals;
 #endif
 
 namespace dorado {
-
-using HtsWriter = utils::HtsWriter;
-using HtsReader = utils::HtsReader;
 
 void add_pg_hdr(sam_hdr_t* hdr) {
     sam_hdr_add_line(hdr, "PG", "ID", "aligner", "PN", "dorado", "VN", DORADO_VERSION, "DS",
@@ -103,15 +103,14 @@ int aligner(int argc, char* argv[]) {
     spdlog::info("> loading index {}", index);
 
     HtsWriter writer("-", HtsWriter::OutputMode::BAM, writer_threads, 0);
-    utils::Aligner aligner(writer, index, kmer_size, window_size, index_batch_size,
-                           aligner_threads);
+    Aligner aligner(writer, index, kmer_size, window_size, index_batch_size, aligner_threads);
     HtsReader reader(reads[0]);
 
     spdlog::debug("> input fmt: {} aligned: {}", reader.format, reader.is_aligned);
-    writer.add_header(reader.header);
-    add_pg_hdr(writer.header);
-    utils::add_sq_hdr(writer.header, aligner.get_sequence_records_for_header());
-    writer.write_header();
+    auto header = sam_hdr_dup(reader.header);
+    add_pg_hdr(header);
+    utils::add_sq_hdr(header, aligner.get_sequence_records_for_header());
+    writer.write_header(header);
 
     spdlog::info("> starting alignment");
     reader.read(aligner, max_reads);

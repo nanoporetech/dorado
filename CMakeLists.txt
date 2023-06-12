@@ -42,10 +42,23 @@ include(cmake/Torch.cmake)
 include(cmake/OpenSSL.cmake)
 include(cmake/Htslib.cmake)
 
+# Add sanitizer options to compilation flags
+include(cmake/ECMEnableSanitizers.cmake)
+if (ECM_ENABLE_SANITIZERS)
+    # Always emit debug info to provide better stack traces
+    add_compile_options(-g)
+    # Add a way to detect if we're compiling with sanitizers enabled, since UBSan
+    # detection isn't available in GCC
+    foreach (SANITIZER ${ECM_ENABLE_SANITIZERS})
+        string(TOUPPER ${SANITIZER} SANITIZER)
+        add_compile_definitions(DORADO_SANITIZE_${SANITIZER})
+    endforeach()
+endif()
+
 if(DORADO_USING_OLD_CPP_ABI)
   # We need to force the use of the old ABI here, if we are building in an old ABI context, as otherwise elzip builds
   # with the libc++11 ABI and we can't link against it.
-  add_compile_options(-D_GLIBCXX_USE_CXX11_ABI=0)
+  add_compile_definitions(_GLIBCXX_USE_CXX11_ABI=0)
 endif()
 
 # We don't support GPU builds on macOS/x64
@@ -53,6 +66,13 @@ if (APPLE AND CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
     set(DORADO_GPU_BUILD FALSE)
 else()
     set(DORADO_GPU_BUILD TRUE)
+endif()
+
+# Use ccache for C and C++ if it's available
+find_program(CCACHE_EXE ccache)
+if (CCACHE_EXE)
+    set(CMAKE_C_COMPILER_LAUNCHER ${CCACHE_EXE})
+    set(CMAKE_CXX_COMPILER_LAUNCHER ${CCACHE_EXE})
 endif()
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
@@ -108,6 +128,12 @@ set(LIB_SOURCE_FILES
     dorado/read_pipeline/BaseSpaceDuplexCallerNode.h
     dorado/read_pipeline/DuplexSplitNode.cpp
     dorado/read_pipeline/DuplexSplitNode.h
+    dorado/read_pipeline/AlignerNode.cpp
+    dorado/read_pipeline/AlignerNode.h
+    dorado/read_pipeline/HtsReader.cpp
+    dorado/read_pipeline/HtsReader.h
+    dorado/read_pipeline/HtsWriter.cpp
+    dorado/read_pipeline/HtsWriter.h
     dorado/decode/beam_search.cpp
     dorado/decode/fast_hash.cpp
     dorado/decode/fast_hash.h
@@ -146,6 +172,7 @@ set(LIB_SOURCE_FILES
     dorado/utils/duplex_utils.cpp
     dorado/utils/basecaller_utils.h
     dorado/utils/basecaller_utils.cpp
+    dorado/utils/stats.h
     dorado/utils/types.cpp
     dorado/utils/types.h
     dorado/read_pipeline/NullNode.h
@@ -387,6 +414,24 @@ elseif(WIN32)
 elseif(APPLE)
     file(GLOB TORCH_DLLS "${TORCH_LIB}/lib/*.dylib")
     install(FILES ${TORCH_DLLS} DESTINATION lib COMPONENT redist_libs)
+
+    find_library(AEC_DLL aec REQUIRED)
+    get_filename_component(AEC_DLL_PATH ${AEC_DLL} DIRECTORY)
+    file(GLOB AEC_DLLS "${AEC_DLL_PATH}/libaec*dylib*")
+    RESOLVE_SYMLINKS("${AEC_DLLS}" RESOLVED_AEC_DLLS)
+    install(FILES ${RESOLVED_AEC_DLLS} DESTINATION lib COMPONENT redist_libs)
+
+    find_library(SZ_DLL sz REQUIRED)
+    get_filename_component(SZ_DLL_PATH ${SZ_DLL} DIRECTORY)
+    file(GLOB SZ_DLLS "${SZ_DLL_PATH}/libsz*dylib*")
+    RESOLVE_SYMLINKS("${SZ_DLLS}" RESOLVED_SZ_DLLS)
+    install(FILES ${RESOLVED_SZ_DLLS} DESTINATION lib COMPONENT redist_libs)
+
+    # If zstd has been dynamically linked, add the .so to the package
+    get_filename_component(ZSTD_LIBRARY_PATH ${ZSTD_LIBRARY_RELEASE} DIRECTORY)
+    file(GLOB ZSTD_DLLS "${ZSTD_LIBRARY_PATH}/*zstd*dylib*")
+    RESOLVE_SYMLINKS("${ZSTD_DLLS}" RESOLVED_ZSTD_DLLS)
+    install(FILES ${RESOLVED_ZSTD_DLLS} DESTINATION lib COMPONENT redist_libs)
 endif()
 
 add_library(dorado_models_lib
@@ -404,17 +449,6 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
         dorado/data_loader/DataLoader.cpp
         dorado/data_loader/DataLoader.h
     )
-
-    if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
-        add_library(dorado_allocator_lib STATIC
-            dorado/utils/allocator_override.cpp
-        )
-        target_link_libraries(dorado_allocator_lib
-            ${POD5_LIBRARIES}
-        )
-
-        target_link_libraries(dorado_io_lib dorado_allocator_lib)
-    endif()
 
     target_link_libraries(dorado_io_lib
        ${POD5_LIBRARIES}
