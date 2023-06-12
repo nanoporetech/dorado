@@ -11,7 +11,6 @@
 #include <spdlog/spdlog.h>
 
 #include <chrono>
-#include <filesystem>
 #include <string>
 #include <thread>
 #include <vector>
@@ -96,10 +95,6 @@ int aligner(int argc, char* argv[]) {
         return 1;
     }
 
-    if (!std::filesystem::exists(index)) {
-        spdlog::error("Requested index {} does not exist!", index);
-        return 1;
-    }
     spdlog::info("> loading index {}", index);
 
     HtsWriter writer("-", HtsWriter::OutputMode::BAM, writer_threads, 0);
