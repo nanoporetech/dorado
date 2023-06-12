@@ -1,4 +1,8 @@
+#pragma once
+
+#include <iostream>
 #include <map>
+#include <sstream>
 #include <string>
 #include <unordered_set>
 #include <vector>
@@ -39,5 +43,9 @@ std::unordered_set<std::string> get_read_list_from_pairs(
  */
 const std::string get_stereo_model_name(const std::string& simplex_model_name,
                                         uint16_t data_sample_rate);
+
+void split_duplex_reads_by_stats(std::unordered_set<std::string>& completed_duplex_reads,
+                                 std::unordered_set<std::string>& completed_simplex_reads,
+                                 const std::unordered_set<std::string>& read_ids);
 
 }  // namespace dorado::utils

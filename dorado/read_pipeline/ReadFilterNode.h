@@ -8,6 +8,7 @@
 #include <memory>
 #include <string>
 #include <thread>
+#include <unordered_set>
 #include <vector>
 
 namespace dorado {
@@ -23,6 +24,7 @@ public:
     ReadFilterNode(MessageSink& sink,
                    size_t min_qscore,
                    size_t min_read_length,
+                   const std::unordered_set<std::string>& read_ids_to_filter,
                    size_t num_worker_threads);
     ~ReadFilterNode();
     std::string get_name() const override { return "ReadFilterNode"; }
@@ -38,6 +40,7 @@ private:
 
     size_t m_min_qscore;
     size_t m_min_read_length;
+    std::unordered_set<std::string> m_read_ids_to_filter;
     std::atomic<int64_t> m_num_reads_filtered;
 };
 

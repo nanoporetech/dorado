@@ -234,7 +234,7 @@ void setup(std::vector<std::string> args,
                                  thread_allocations.read_converter_threads,
                                  methylation_threshold_pct);
     ReadFilterNode read_filter_node(read_converter, min_qscore,
-                                    default_parameters.min_seqeuence_length,
+                                    default_parameters.min_seqeuence_length, {},
                                     thread_allocations.read_filter_threads);
 
     std::unique_ptr<ModBaseCallerNode> mod_base_caller_node;
@@ -317,6 +317,7 @@ int basecaller(int argc, char* argv[]) {
             .help("A file with a newline-delimited list of reads to basecall. If not provided, all "
                   "reads will be basecalled")
             .default_value(std::string(""));
+
     parser.add_argument("--resume-from")
             .help("Resume basecalling from the given HTS file output.")
             .default_value(std::string(""));
