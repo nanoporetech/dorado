@@ -75,7 +75,7 @@ elseif(APPLE)
         set(TORCH_LIB "${DORADO_3RD_PARTY}/torch-${TORCH_VERSION}-${CMAKE_SYSTEM_NAME}/torch")
     endif()
 elseif(WIN32)
-    set(TORCH_URL file://oxfordnanolabs.local/public/argus/Groups/ofan/active/mbicknell/dorado_static_dist_test/torch-2.0.0-Windows-ont.zip)
+    set(TORCH_URL https://cdn.oxfordnanoportal.com/software/analysis/torch-2.0.0-Windows-ont.zip)
     set(TORCH_LIB "${DORADO_3RD_PARTY}/torch-${TORCH_VERSION}-${CMAKE_SYSTEM_NAME}/libtorch")
     add_compile_options(
         # Note we need to use the generator expression to avoid setting this for CUDA.
