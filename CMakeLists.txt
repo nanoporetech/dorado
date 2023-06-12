@@ -122,12 +122,17 @@ set(LIB_SOURCE_FILES
     dorado/read_pipeline/ReadFilterNode.h
     dorado/read_pipeline/ReadToBamTypeNode.cpp
     dorado/read_pipeline/ReadToBamTypeNode.h
-    dorado/read_pipeline/StatsCounter.cpp
-    dorado/read_pipeline/StatsCounter.h
     dorado/read_pipeline/BaseSpaceDuplexCallerNode.cpp
     dorado/read_pipeline/BaseSpaceDuplexCallerNode.h
     dorado/read_pipeline/DuplexSplitNode.cpp
     dorado/read_pipeline/DuplexSplitNode.h
+    dorado/read_pipeline/AlignerNode.cpp
+    dorado/read_pipeline/AlignerNode.h
+    dorado/read_pipeline/HtsReader.cpp
+    dorado/read_pipeline/HtsReader.h
+    dorado/read_pipeline/HtsWriter.cpp
+    dorado/read_pipeline/HtsWriter.h
+    dorado/read_pipeline/ProgressTracker.h
     dorado/decode/beam_search.cpp
     dorado/decode/fast_hash.cpp
     dorado/decode/fast_hash.h

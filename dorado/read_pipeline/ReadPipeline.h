@@ -139,6 +139,7 @@ using Message = std::variant<std::shared_ptr<Read>, BamPtr, std::shared_ptr<Read
 class MessageSink {
 public:
     MessageSink(size_t max_messages);
+    virtual ~MessageSink() = default;
     // Pushed messages must be rvalues: the sink takes ownership.
     void push_message(
             Message&&
