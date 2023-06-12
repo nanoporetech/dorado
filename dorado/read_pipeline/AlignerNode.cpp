@@ -10,6 +10,7 @@
 
 #include <spdlog/spdlog.h>
 
+#include <filesystem>
 #include <string>
 #include <vector>
 
@@ -22,6 +23,10 @@ Aligner::Aligner(MessageSink& sink,
                  uint64_t index_batch_size,
                  int threads)
         : MessageSink(10000), m_sink(sink), m_threads(threads) {
+    // Check if reference file exists.
+    if (!std::filesystem::exists(filename)) {
+        throw std::runtime_error("Aligner reference path does not exist: " + filename);
+    }
     // Initialize option structs.
     mm_set_opt(0, &m_idx_opt, &m_map_opt);
     // Setting options to map-ont default till relevant args are exposed.

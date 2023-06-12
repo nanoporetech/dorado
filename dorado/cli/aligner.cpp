@@ -99,10 +99,6 @@ int aligner(int argc, char* argv[]) {
         return 1;
     }
 
-    if (!std::filesystem::exists(index)) {
-        spdlog::error("Requested index {} does not exist!", index);
-        return 1;
-    }
     spdlog::info("> loading index {}", index);
 
     std::vector<dorado::stats::StatsCallable> stats_callables;
