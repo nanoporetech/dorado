@@ -256,7 +256,7 @@ int DataLoader::get_num_reads(std::string data_path,
         std::set_difference(read_list->begin(), read_list->end(), ignore_read_list.begin(),
                             ignore_read_list.end(),
                             std::inserter(final_read_list, final_read_list.begin()));
-        num_reads = std::min(num_reads, read_list->size());
+        num_reads = std::min(num_reads, final_read_list.size());
     }
 
     return num_reads;

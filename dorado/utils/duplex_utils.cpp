@@ -139,7 +139,9 @@ void split_completed_duplex_reads(std::unordered_set<std::string>& completed_dup
                 completed_simplex_reads.erase(s);
             }
         } else {
-            completed_simplex_reads.insert(read_id);
+            if (completed_duplex_reads.find(read_id) == completed_duplex_reads.end()) {
+                completed_simplex_reads.insert(read_id);
+            }
         }
     }
 }
