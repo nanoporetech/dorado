@@ -57,7 +57,6 @@ static const std::vector<std::string> models = {
         // RNA002
         "rna002_70bps_fast@v3",
         "rna002_70bps_hac@v3",
-        "rna002_70bps_sup@v3",
         // RNA003
         "rna003_120bps_sup@v3",
 
