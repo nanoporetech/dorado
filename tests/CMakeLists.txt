@@ -53,9 +53,10 @@ add_test(
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
 
-# The tests need to be able to find the libs in order to run
+# The tests need to be able to find the libs in order to run.
+# We also want these libs to take priority over any installed on the system, so prepend them.
 if (MSVC)
-    set_tests_properties(dorado_tests PROPERTIES ENVIRONMENT_MODIFICATION "PATH=path_list_append:${CMAKE_INSTALL_PREFIX}/bin")
+    set_tests_properties(dorado_tests PROPERTIES ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${CMAKE_INSTALL_PREFIX}/bin")
 endif()
 
 # GCC 8 ICEs trying to compile this file with ASAN+optimisations enabled, so knock down the optimisation to try and help it out.
