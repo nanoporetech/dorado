@@ -25,6 +25,12 @@ fi
 samtools quickcheck -u $output_dir/calls.bam
 samtools view $output_dir/calls.bam > $output_dir/calls.sam
 
+# nohup redirecting stderr to stdout: check output is still valid
+nohup $dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --modified-bases 5mCG --emit-moves > $output_dir/calls.bam &
+wait
+samtools quickcheck -u $output_dir/calls.bam
+samtools view $output_dir/calls.bam > $output_dir/calls.sam
+
 echo dorado aligner test stage
 $dorado_bin aligner $output_dir/ref.fq $output_dir/calls.sam > $output_dir/calls.bam
 $dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --modified-bases 5mCG | $dorado_bin aligner $output_dir/ref.fq > $output_dir/calls.bam
