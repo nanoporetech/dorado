@@ -25,6 +25,14 @@ struct overloaded : Ts... {
 template <class... Ts>
 overloaded(Ts...) -> overloaded<Ts...>;
 
+// Note: NS::String objects created via NS::String::string are placed in the autorelease pool,
+// which means they will be released at a later time dictated by the autorelease pool setup.
+// Setting up an NS::SharedPtr via NS::TransferPtr to hold them will result in an invalid attempt
+// to free them second time, entailing sending a message to a destroyed object, generally
+// leading to invalid address accesses.  This is in contrast to other NSObjects here created
+// using methods beginning with Create, alloc, new, which do require releasing via NS::SharedPtr
+// or other means.
+
 auto get_library_location() {
     char ns_path[PATH_MAX + 1];
     uint32_t size = sizeof(ns_path);
@@ -34,7 +42,7 @@ auto get_library_location() {
     fs::path mtllib{"../lib/default.metallib"};
     fs::path fspath = exepth.parent_path() / mtllib;
 
-    return NS::TransferPtr(NS::String::string(fspath.c_str(), NS::ASCIIStringEncoding));
+    return NS::String::string(fspath.c_str(), NS::ASCIIStringEncoding);
 }
 
 // Returns an ASCII std::string associated with the given CFStringRef.
@@ -137,7 +145,7 @@ NS::SharedPtr<MTL::ComputePipelineState> make_cps(
 
     if (!default_library) {
         auto lib_path = get_library_location();
-        default_library = NS::TransferPtr(device->newLibrary(lib_path.get(), &error));
+        default_library = NS::TransferPtr(device->newLibrary(lib_path, &error));
         if (!default_library) {
             throw std::runtime_error("Failed to load metallib library.");
         }
@@ -145,24 +153,22 @@ NS::SharedPtr<MTL::ComputePipelineState> make_cps(
 
     auto constant_vals = NS::TransferPtr(FunctionConstantValues::alloc()->init());
     for (auto &[name, constant] : named_constants) {
-        const auto ns_name =
-                NS::TransferPtr(NS::String::string(name.c_str(), NS::ASCIIStringEncoding));
-        std::visit(
-                overloaded{[&](int val) {
-                               constant_vals->setConstantValue(&val, DataTypeInt, ns_name.get());
-                           },
-                           [&](bool val) {
-                               constant_vals->setConstantValue(&val, DataTypeBool, ns_name.get());
-                           },
-                           [&](float val) {
-                               constant_vals->setConstantValue(&val, DataTypeFloat, ns_name.get());
-                           }},
-                constant);
+        const auto ns_name = NS::String::string(name.c_str(), NS::ASCIIStringEncoding);
+        std::visit(overloaded{[&](int val) {
+                                  constant_vals->setConstantValue(&val, DataTypeInt, ns_name);
+                              },
+                              [&](bool val) {
+                                  constant_vals->setConstantValue(&val, DataTypeBool, ns_name);
+                              },
+                              [&](float val) {
+                                  constant_vals->setConstantValue(&val, DataTypeFloat, ns_name);
+                              }},
+                   constant);
     }
 
-    auto kernel_name = NS::TransferPtr(NS::String::string(name.c_str(), NS::ASCIIStringEncoding));
-    auto kernel = NS::TransferPtr(
-            default_library->newFunction(kernel_name.get(), constant_vals.get(), &error));
+    auto kernel_name = NS::String::string(name.c_str(), NS::ASCIIStringEncoding);
+    auto kernel =
+            NS::TransferPtr(default_library->newFunction(kernel_name, constant_vals.get(), &error));
     if (!kernel) {
         throw std::runtime_error("Failed to find the kernel: " + name);
     }
