@@ -28,7 +28,7 @@ overloaded(Ts...) -> overloaded<Ts...>;
 // Note: NS::String objects created via NS::String::string are placed in the autorelease pool,
 // which means they will be released at a later time dictated by the autorelease pool setup.
 // Setting up an NS::SharedPtr via NS::TransferPtr to hold them will result in an invalid attempt
-// to free them second time, entailing sending a message to a destroyed object, generally
+// to free them a second time, entailing sending a message to a destroyed object, generally
 // leading to invalid address accesses.  This is in contrast to other NSObjects here created
 // using methods beginning with Create, alloc, new, which do require releasing via NS::SharedPtr
 // or other means.
