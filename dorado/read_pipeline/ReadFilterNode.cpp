@@ -26,9 +26,6 @@ void ReadFilterNode::worker_thread() {
     auto num_active_threads = --m_active_threads;
     if (num_active_threads == 0) {
         m_sink.terminate();
-        if (m_min_qscore > 0) {
-            spdlog::info("> Reads skipped (qscore < {}): {}", m_min_qscore, m_num_reads_filtered);
-        }
     }
 }
 

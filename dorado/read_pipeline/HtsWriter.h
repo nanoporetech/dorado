@@ -45,20 +45,8 @@ private:
     std::unique_ptr<std::thread> m_worker;
     void worker_thread();
     int write_hdr_sq(char* name, uint32_t length);
-    bool m_prog_bar_initialized{false};
     size_t m_num_reads_expected;
-    int m_progress_bar_interval;
-
-#ifdef WIN32
-    indicators::ProgressBar m_progress_bar {
-#else
-    indicators::BlockProgressBar m_progress_bar{
-#endif
-        indicators::option::Stream{std::cerr}, indicators::option::BarWidth{30},
-                indicators::option::ShowElapsedTime{true},
-                indicators::option::ShowRemainingTime{true},
-                indicators::option::ShowPercentage{true},
-    };
+    std::unordered_set<std::string> m_processed_read_ids;
 };
 
 }  // namespace dorado
