@@ -259,49 +259,46 @@ bool DuplexSplitNode::check_nearby_adapter(const Read& read, PosRange r, int ada
             .has_value();
 }
 
-//r is potential spacer region
-bool DuplexSplitNode::check_flank_match(const Read& read, PosRange r, float err_thr) const {
+//'spacer' is region potentially containing templ/compl strand boundary
+//returns optional pair of matching ranges (first strictly to the left of spacer region)
+std::optional<std::pair<PosRange, PosRange>>
+DuplexSplitNode::check_flank_match(const Read& read, PosRange spacer, float err_thr) const {
     const uint64_t rlen = read.seq.length();
-    assert(r.first <= r.second && r.second <= rlen);
-    if (r.first <= m_settings.end_trim || r.second == rlen) {
-        return false;
+    assert(spacer.first <= spacer.second && spacer.second <= rlen);
+    if (spacer.first <= m_settings.strand_end_trim || spacer.second == rlen) {
+        return std::nullopt;
     }
-    const auto s1 = (r.first > m_settings.end_flank) ? r.first - m_settings.end_flank : 0;
-    const auto e1 = r.first - m_settings.end_trim;
-    assert(s1 < e1);
+
+    const uint64_t left_start = (spacer.first > m_settings.strand_end_flank)
+                                        ? spacer.first - m_settings.strand_end_flank
+                                        : 0;
+    const uint64_t left_end = spacer.first - m_settings.strand_end_trim;
+    assert(left_start < left_end);
+    const uint64_t left_span = left_end - left_start;
+
     //including spacer region in search
-    const auto s2 = r.first;
+    const uint64_t right_start = spacer.first;
     //(r.second - r.first) adjusts for potentially incorrectly detected split region
     //, shifting into correct sequence
-    const auto e2 = std::min(r.second + m_settings.start_flank + (r.second - r.first), rlen);
+    const uint64_t right_end = std::min(
+            spacer.second + m_settings.strand_start_flank + (spacer.second - spacer.first), rlen);
+    assert(right_start < right_end);
+    const uint64_t right_span = right_end - right_start;
 
-    //TODO magic constant 3 (determines minimal size of the 'right' region in terms of full read)
-    if (e2 == rlen) {
-        //short read mode triggered
-        if ((e1 - s1) < m_settings.min_short_flank || e2 - s2 < e1 - s1 || rlen > 3 * (e2 - s2)) {
-            return false;
+    const int dist_thr = std::round(err_thr * left_span);
+    if (left_span >= m_settings.min_flank && right_span >= left_span) {
+        if (auto match = check_rc_match(read.seq, {left_start, left_end},
+                                        //including spacer region in search
+                                        {right_start, right_end}, dist_thr)) {
+            return std::pair{PosRange{left_start, left_end}, *match};
         }
     }
-
-    const int dist_thr = std::round(err_thr * (e1 - s1));
-
-    return check_rc_match(read.seq, {s1, e1},
-                          //including spacer region in search
-                          {s2, e2}, dist_thr)
-            .has_value();
+    return std::nullopt;
 }
-
-//bool DuplexSplitNode::check_flank_match(const Read& read, PosRange r, int dist_thr) const {
-//    return r.first >= m_settings.end_flank &&
-//           r.second + m_settings.start_flank <= read.seq.length() &&
-//           check_rc_match(read.seq, {r.first - m_settings.end_flank, r.first - m_settings.end_trim},
-//                          //including spacer region in search
-//                          {r.first, r.second + m_settings.start_flank}, dist_thr);
-//}
 
 std::optional<DuplexSplitNode::PosRange> DuplexSplitNode::identify_middle_adapter_split(
         const Read& read) const {
-    assert(m_settings.end_flank > m_settings.end_trim + m_settings.min_short_flank);
+    assert(m_settings.strand_end_flank > m_settings.strand_end_trim + m_settings.min_flank);
     const auto r_l = read.seq.size();
     const auto search_span = std::max(m_settings.middle_adapter_search_span,
                                       int(std::round(m_settings.middle_adapter_search_frac * r_l)));
@@ -313,18 +310,29 @@ std::optional<DuplexSplitNode::PosRange> DuplexSplitNode::identify_middle_adapte
     if (auto adapter_match = find_best_adapter_match(
                 m_settings.adapter, read.seq, m_settings.relaxed_adapter_edist,
                 {r_l / 2 - search_span / 2, r_l / 2 + search_span / 2})) {
-        auto adapter_start = adapter_match->first;
-        spdlog::trace("Checking middle match & start/end match (unless read is short)");
-        if (!check_flank_match(read, {adapter_start, adapter_start},
-                               m_settings.relaxed_flank_err)) {
-            return std::nullopt;
-        }
-        const int dist_thr = std::round(m_settings.relaxed_flank_err *
-                                        (m_settings.end_flank - m_settings.end_trim));
-        if (r_l < 2 * m_settings.end_flank ||
-            check_rc_match(read.seq, {r_l - m_settings.end_flank, r_l - m_settings.end_trim},
-                           {0, std::min(r_l, m_settings.start_flank)}, dist_thr)) {
-            return PosRange{adapter_start - 1, adapter_start};
+        const uint64_t adapter_start = adapter_match->first;
+        const uint64_t adapter_end = adapter_match->second;
+        spdlog::trace("Checking middle match & start/end match");
+        //Checking match around adapter
+        if (check_flank_match(read, {adapter_start, adapter_start}, m_settings.relaxed_flank_err)) {
+            //Checking start/end match
+            //some initializations might 'overflow' and not make sense, but not if check_rc_match below actually ends up checked!
+            const uint64_t query_start = r_l - m_settings.strand_end_flank;
+            const uint64_t query_end = r_l - m_settings.strand_end_trim;
+            const uint64_t query_span = query_end - query_start;
+            const int dist_thr = std::round(m_settings.relaxed_flank_err * query_span);
+
+            const uint64_t template_start = 0;
+            const uint64_t template_end = std::min(m_settings.strand_start_flank, adapter_start);
+            const uint64_t template_span = template_end - template_start;
+
+            if (adapter_end + m_settings.strand_end_flank > r_l || template_span < query_span ||
+                check_rc_match(
+                        read.seq,
+                        {r_l - m_settings.strand_end_flank, r_l - m_settings.strand_end_trim},
+                        {0, std::min(m_settings.strand_start_flank, r_l)}, dist_thr)) {
+                return PosRange{adapter_start - 1, adapter_start};
+            }
         }
     }
     return std::nullopt;
@@ -336,49 +344,38 @@ std::optional<DuplexSplitNode::PosRange> DuplexSplitNode::identify_extra_middle_
     //TODO parameterize
     static const float ext_start_frac = 0.1;
     //extend to tolerate some extra length difference
-    const auto ext_start_flank = std::max(size_t(ext_start_frac * r_l), m_settings.start_flank);
+    const auto ext_start_flank =
+            std::max(size_t(ext_start_frac * r_l), m_settings.strand_start_flank);
     //further consider only reasonably long reads
-    if (r_l < 2 * m_settings.end_flank) {
+    if (ext_start_flank + m_settings.strand_end_flank > r_l) {
         return std::nullopt;
     }
 
     int relaxed_flank_edist =
-            std::round(m_settings.relaxed_flank_err * (m_settings.end_flank - m_settings.end_trim));
+            std::round(m_settings.relaxed_flank_err *
+                       (m_settings.strand_end_flank - m_settings.strand_end_trim));
 
     spdlog::trace("Checking start/end match");
-    if (auto templ_start_match =
-                check_rc_match(read.seq, {r_l - m_settings.end_flank, r_l - m_settings.end_trim},
-                               {0, std::min(r_l, ext_start_flank)}, relaxed_flank_edist)) {
-        //matched region and query overlap
-        if (templ_start_match->second + m_settings.end_flank >= r_l) {
+    if (auto templ_start_match = check_rc_match(
+                read.seq, {r_l - m_settings.strand_end_flank, r_l - m_settings.strand_end_trim},
+                {0, std::min(r_l, ext_start_flank)}, relaxed_flank_edist)) {
+        //check if matched region and query overlap
+        if (templ_start_match->second + m_settings.strand_end_flank > r_l) {
             return std::nullopt;
         }
-        size_t est_middle = (templ_start_match->second + (r_l - m_settings.end_flank)) / 2;
+        size_t est_middle = (templ_start_match->second + (r_l - m_settings.strand_end_flank)) / 2;
         spdlog::trace("Middle estimate {}", est_middle);
         //TODO parameterize
         static const int min_split_margin = 100;
         static const float split_margin_frac = 0.05;
         const auto split_margin = std::max(min_split_margin, int(split_margin_frac * r_l));
 
-        const auto s1 = (est_middle < split_margin + m_settings.end_flank)
-                                ? 0
-                                : est_middle - split_margin - m_settings.end_flank;
-        const auto e1 = (est_middle < split_margin + m_settings.end_trim)
-                                ? 0
-                                : est_middle - split_margin - m_settings.end_trim;
-
-        if (e1 - s1 < m_settings.min_short_flank) {
-            return std::nullopt;
-        }
-
-        const auto s2 = est_middle - split_margin;
-        const auto e2 = std::min(r_l, est_middle + 2 * split_margin + m_settings.start_flank);
         spdlog::trace("Checking approx middle match");
-
-        relaxed_flank_edist = std::round(m_settings.relaxed_flank_err * (e1 - s1));
-        if (auto compl_start_match =
-                    check_rc_match(read.seq, {s1, e1}, {s2, e2}, relaxed_flank_edist)) {
-            est_middle = (e1 + compl_start_match->first) / 2;
+        if (auto middle_match_ranges =
+                    check_flank_match(read, {est_middle - split_margin, est_middle + split_margin},
+                                      m_settings.relaxed_flank_err)) {
+            est_middle =
+                    (middle_match_ranges->first.second + middle_match_ranges->second.first) / 2;
             spdlog::trace("Middle re-estimate {}", est_middle);
             return PosRange{est_middle - 1, est_middle};
         }
@@ -431,16 +428,16 @@ DuplexSplitNode::build_split_finders() const {
                              }});
 
     if (!m_settings.simplex_mode) {
-        split_finders.push_back({"PORE_FLANK", [&](const ExtRead& read) {
-                                     return merge_ranges(
-                                             filter_ranges(read.possible_pore_regions,
-                                                           [&](PosRange r) {
-                                                               return check_flank_match(
-                                                                       *read.read, r,
-                                                                       m_settings.flank_err);
-                                                           }),
-                                             m_settings.end_flank + m_settings.start_flank);
-                                 }});
+        split_finders.push_back(
+                {"PORE_FLANK", [&](const ExtRead& read) {
+                     return merge_ranges(
+                             filter_ranges(read.possible_pore_regions,
+                                           [&](PosRange r) {
+                                               return check_flank_match(*read.read, r,
+                                                                        m_settings.flank_err);
+                                           }),
+                             m_settings.strand_end_flank + m_settings.strand_start_flank);
+                 }});
 
         split_finders.push_back(
                 {"PORE_ALL", [&](const ExtRead& read) {
@@ -454,7 +451,7 @@ DuplexSplitNode::build_split_finders() const {
                                                               *read.read, r,
                                                               m_settings.relaxed_flank_err);
                                            }),
-                             m_settings.end_flank + m_settings.start_flank);
+                             m_settings.strand_end_flank + m_settings.strand_start_flank);
                  }});
 
         split_finders.push_back(

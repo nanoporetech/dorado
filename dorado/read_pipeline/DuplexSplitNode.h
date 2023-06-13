@@ -19,13 +19,13 @@ struct DuplexSplitSettings {
     //maximal 'open pore' region to consider (bp)
     size_t max_pore_region = 500;
     //usually template read region to the left of potential spacer region
-    size_t end_flank = 1200;
+    size_t strand_end_flank = 1200;
     //trim potentially erroneous (and/or PCR adapter) bases at end of query
-    size_t end_trim = 200;
+    size_t strand_end_trim = 200;
     //adjusted to adapter presense and potential loss of bases on query, leading to 'shift'
-    size_t start_flank = 1700;
+    size_t strand_start_flank = 1700;
     //minimal query size to consider in "short read" case
-    size_t min_short_flank = 300;
+    size_t min_flank = 300;
     float flank_err = 0.22;
     float relaxed_flank_err = 0.275;
     int adapter_edist = 4;
@@ -75,7 +75,9 @@ private:
     ExtRead create_ext_read(std::shared_ptr<Read> r) const;
     std::vector<PosRange> possible_pore_regions(const ExtRead& read) const;
     bool check_nearby_adapter(const Read& read, PosRange r, int adapter_edist) const;
-    bool check_flank_match(const Read& read, PosRange r, float err_thr) const;
+    std::optional<std::pair<PosRange, PosRange>> check_flank_match(const Read& read,
+                                                                   PosRange r,
+                                                                   float err_thr) const;
     std::optional<PosRange> identify_middle_adapter_split(const Read& read) const;
     std::optional<PosRange> identify_extra_middle_split(const Read& read) const;
 
