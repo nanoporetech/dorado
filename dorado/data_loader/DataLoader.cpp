@@ -119,6 +119,34 @@ std::shared_ptr<dorado::Read> process_pod5_read(size_t row,
     return new_read;
 }
 
+void process_pod5_row(Pod5ReadRecordBatch_t* batch,
+                      int row,
+                      std::optional<std::unordered_set<std::string>> allowed_read_ids,
+                      const std::unordered_set<std::string>& ignored_read_ids,
+                      const std::string& device,
+                      Pod5FileReader* file,
+                      const std::string path,
+                      cxxpool::thread_pool& pool,
+                      std::vector<std::future<std::shared_ptr<Read>>>& futures) {
+    uint16_t read_table_version = 0;
+    ReadBatchRowInfo_t read_data;
+    if (pod5_get_read_batch_row_info_data(batch, row, READ_BATCH_ROW_INFO_VERSION, &read_data,
+                                          &read_table_version) != POD5_OK) {
+        spdlog::error("Failed to get read {}", row);
+        return;
+    }
+
+    char read_id_tmp[37];
+    pod5_error_t err = pod5_format_read_id(read_data.read_id, read_id_tmp);
+    std::string read_id_str(read_id_tmp);
+    bool read_in_ignore_list = ignored_read_ids.find(read_id_str) != ignored_read_ids.end();
+    bool read_in_read_list =
+            !allowed_read_ids || (allowed_read_ids->find(read_id_str) != allowed_read_ids->end());
+    if (!read_in_ignore_list && read_in_read_list) {
+        futures.push_back(pool.push(process_pod5_read, row, batch, file, path, device));
+    }
+}
+
 void Pod5Destructor::operator()(Pod5FileReader_t* pod5) { pod5_close_and_free_reader(pod5); }
 
 void DataLoader::load_reads(const std::string& path,
@@ -565,25 +593,8 @@ void DataLoader::load_pod5_reads_from_file_by_read_ids(const std::string& path,
         for (std::size_t row_idx = 0; row_idx < traversal_batch_counts[batch_index]; row_idx++) {
             uint32_t row = traversal_batch_rows[row_idx + row_offset];
 
-            uint16_t read_table_version = 0;
-            ReadBatchRowInfo_t read_data;
-            if (pod5_get_read_batch_row_info_data(batch, row, READ_BATCH_ROW_INFO_VERSION,
-                                                  &read_data, &read_table_version) != POD5_OK) {
-                spdlog::error("Failed to get read {}", row);
-                continue;
-            }
-
-            char read_id_tmp[37];
-            pod5_error_t err = pod5_format_read_id(read_data.read_id, read_id_tmp);
-            std::string read_id_str(read_id_tmp);
-            bool read_in_ignore_list =
-                    m_ignored_read_ids.find(read_id_str) != m_ignored_read_ids.end();
-            bool read_in_read_list =
-                    !m_allowed_read_ids ||
-                    (m_allowed_read_ids->find(read_id_str) != m_allowed_read_ids->end());
-            if (!read_in_ignore_list && read_in_read_list) {
-                futures.push_back(pool.push(process_pod5_read, row, batch, file, path, m_device));
-            }
+            process_pod5_row(batch, row, m_allowed_read_ids, m_ignored_read_ids, m_device, file,
+                             path, pool, futures);
         }
 
         for (auto& v : futures) {
@@ -640,24 +651,8 @@ void DataLoader::load_pod5_reads_from_file(const std::string& path) {
         for (std::size_t row = 0; row < batch_row_count; ++row) {
             // TODO - check the read ID here, for each one, only send the row if it is in the list of ones we care about
 
-            uint16_t read_table_version = 0;
-            ReadBatchRowInfo_t read_data;
-            if (pod5_get_read_batch_row_info_data(batch, row, READ_BATCH_ROW_INFO_VERSION,
-                                                  &read_data, &read_table_version) != POD5_OK) {
-                spdlog::error("Failed to get read {}", row);
-            }
-
-            char read_id_tmp[37];
-            pod5_error_t err = pod5_format_read_id(read_data.read_id, read_id_tmp);
-            std::string read_id_str(read_id_tmp);
-            bool read_in_ignore_list =
-                    m_ignored_read_ids.find(read_id_str) != m_ignored_read_ids.end();
-            bool read_in_read_list =
-                    !m_allowed_read_ids ||
-                    (m_allowed_read_ids->find(read_id_str) != m_allowed_read_ids->end());
-            if (!read_in_ignore_list && read_in_read_list) {
-                futures.push_back(pool.push(process_pod5_read, row, batch, file, path, m_device));
-            }
+            process_pod5_row(batch, row, m_allowed_read_ids, m_ignored_read_ids, m_device, file,
+                             path, pool, futures);
         }
 
         for (auto& v : futures) {
