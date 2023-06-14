@@ -233,7 +233,7 @@ void setup(std::vector<std::string> args,
         spdlog::info("> Inspecting resume file...");
         // Turn off warning logging as header info is fetched.
         auto initial_hts_log_level = hts_get_log_level();
-        hts_set_log_level(HTS_LOG_ERROR);
+        hts_set_log_level(HTS_LOG_OFF);
         auto pg_keys = utils::extract_pg_keys_from_hdr(resume_from_file, {"CL"});
         hts_set_log_level(initial_hts_log_level);
 

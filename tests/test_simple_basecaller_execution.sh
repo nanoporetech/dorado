@@ -32,4 +32,10 @@ $dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --modified-bases 5mCG
 samtools quickcheck -u $output_dir/calls.bam
 samtools view -h $output_dir/calls.bam > $output_dir/calls.sam
 
+echo dorado basecaller resume feature
+$dorado_bin basecaller ${model} $data_dir/multi_read_pod5 -b ${batch} > $output_dir/tmp.bam
+truncate -s 20K $output_dir/tmp.bam
+$dorado_bin basecaller ${model} $data_dir/multi_read_pod5 -b ${batch} --resume-from $output_dir/tmp.bam > $output_dir/calls.bam
+samtools quickcheck -u $output_dir/calls.bam
+
 rm -rf $output_dir

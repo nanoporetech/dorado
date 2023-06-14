@@ -29,7 +29,7 @@ void ResumeLoaderNode::copy_completed_reads() {
 
     // Turn off logging for warnings.
     auto initial_hts_log_level = hts_get_log_level();
-    hts_set_log_level(HTS_LOG_ERROR);
+    hts_set_log_level(HTS_LOG_OFF);
 
     auto reader = std::make_unique<HtsReader>(m_resume_file);
 
