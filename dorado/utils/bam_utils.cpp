@@ -134,4 +134,29 @@ AlignmentOps get_alignment_op_counts(bam1_t* record) {
     return counts;
 }
 
+std::map<std::string, std::string> extract_pg_keys_from_hdr(const std::string filename,
+                                                            const std::vector<std::string>& keys) {
+    std::map<std::string, std::string> pg_keys;
+    auto file = hts_open(filename.c_str(), "r");
+    if (!file) {
+        throw std::runtime_error("Could not open file: " + filename);
+    }
+    auto header = sam_hdr_read(file);
+    if (!header) {
+        throw std::runtime_error("Could not open header from file: " + filename);
+    }
+    for (auto& k : keys) {
+        kstring_t val;
+        ks_initialize(&val);
+        auto ret = sam_hdr_find_tag_id(header, "PG", NULL, NULL, k.c_str(), &val);
+        if (ret != 0) {
+            throw std::runtime_error("Required key " + k + " not found in header of " + filename);
+        }
+        pg_keys[k] = std::string(val.s);
+        ks_release(&val);
+    }
+    sam_hdr_destroy(header);
+    return pg_keys;
+}
+
 }  // namespace dorado::utils

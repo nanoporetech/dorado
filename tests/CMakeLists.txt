@@ -22,6 +22,8 @@ set(SOURCE_FILES
     NodeSmokeTest.cpp
     PairingNodeTest.cpp
     DuplexUtilsTest.cpp
+    BamUtilsTest.cpp
+    ResumeLoaderTest.cpp
 )
 
 if (DORADO_GPU_BUILD)

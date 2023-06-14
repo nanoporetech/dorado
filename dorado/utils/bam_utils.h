@@ -60,4 +60,15 @@ std::map<std::string, std::string> get_read_group_info(sam_hdr_t* header, const 
  */
 AlignmentOps get_alignment_op_counts(bam1_t* record);
 
+/**
+ * Extract keys for PG header from BAM header.
+ *
+ * @param filepath Path to input BAM file.
+ * @params keys Vector of keys to parse
+ * @return Map of keys to their values
+ * @throws An error if a key is requested that doesn't exist.
+ */
+std::map<std::string, std::string> extract_pg_keys_from_hdr(const std::string filename,
+                                                            const std::vector<std::string>& keys);
+
 }  // namespace dorado::utils

@@ -22,6 +22,7 @@
 #include "read_pipeline/ProgressTracker.h"
 #include "read_pipeline/ReadFilterNode.h"
 #include "read_pipeline/ReadToBamTypeNode.h"
+#include "read_pipeline/ResumeLoaderNode.h"
 #include "read_pipeline/ScalerNode.h"
 #include "utils/bam_utils.h"
 #include "utils/cli_utils.h"
@@ -186,13 +187,6 @@ void setup(std::vector<std::string> args,
 
     auto read_list = utils::load_read_list(read_list_file_path);
 
-    std::unordered_set<std::string> reads_already_processed;
-    if (!resume_from_file.empty()) {
-        spdlog::info("> Inspecting resume file...");
-        reads_already_processed = fetch_read_ids(resume_from_file);
-        spdlog::info("> {} reads found in resume file.", reads_already_processed.size());
-    }
-
     // Check sample rate of model vs data.
     auto data_sample_rate = DataLoader::get_sample_rate(data_path, recursive_file_loading);
     auto model_sample_rate = get_model_sample_rate(model_path);
@@ -203,8 +197,8 @@ void setup(std::vector<std::string> args,
         throw std::runtime_error(err.str());
     }
 
-    size_t num_reads = DataLoader::get_num_reads(data_path, read_list, reads_already_processed,
-                                                 recursive_file_loading);
+    size_t num_reads = DataLoader::get_num_reads(
+            data_path, read_list, {} /*reads_already_processed*/, recursive_file_loading);
     num_reads = max_reads == 0 ? num_reads : std::min(num_reads, max_reads);
 
     bool rna = utils::is_rna_model(model_path), duplex = false;
@@ -233,6 +227,28 @@ void setup(std::vector<std::string> args,
         bam_writer->write_header(hdr.get());
         converted_reads_sink = aligner.get();
     }
+
+    std::unordered_set<std::string> reads_already_processed;
+    if (!resume_from_file.empty()) {
+        spdlog::info("> Inspecting resume file...");
+        // Turn off warning logging as header info is fetched.
+        auto initial_hts_log_level = hts_get_log_level();
+        hts_set_log_level(HTS_LOG_ERROR);
+        auto pg_keys = utils::extract_pg_keys_from_hdr(resume_from_file, {"CL"});
+        hts_set_log_level(initial_hts_log_level);
+
+        auto tokens = utils::extract_token_from_cli(pg_keys["CL"]);
+        auto resume_model_name = utils::extract_model_from_model_path(tokens[2]);
+        if (model_name != resume_model_name) {
+            throw std::runtime_error(
+                    "Resume only works if the same model is used. Resume model was " +
+                    resume_model_name + " and current model is " + model_name);
+        }
+        ResumeLoaderNode resume_loader(*bam_writer, resume_from_file);
+        resume_loader.copy_completed_reads();
+        reads_already_processed = resume_loader.get_processed_read_ids();
+    }
+
     ReadToBamType read_converter(*converted_reads_sink, emit_moves, rna,
                                  thread_allocations.read_converter_threads,
                                  methylation_threshold_pct);

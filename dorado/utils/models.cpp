@@ -109,4 +109,9 @@ uint16_t get_sample_rate_by_model_name(const std::string& model_name) {
     }
 }
 
+std::string extract_model_from_model_path(const std::string& model_path) {
+    std::filesystem::path path(model_path);
+    return std::filesystem::canonical(path).filename();
+}
+
 }  // namespace dorado::utils
