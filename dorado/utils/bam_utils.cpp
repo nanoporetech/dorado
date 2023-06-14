@@ -156,6 +156,7 @@ std::map<std::string, std::string> extract_pg_keys_from_hdr(const std::string fi
         ks_release(&val);
     }
     sam_hdr_destroy(header);
+    hts_close(file);
     return pg_keys;
 }
 
