@@ -92,8 +92,8 @@ TEST_CASE("ReadFilterNode: Filter read based on read name", TEST_GROUP) {
         read_2->attributes.fast5_filename = "batch_0.fast5";
 
         dorado::ReadFilterNode filter(sink, 0 /*min_qscore*/, 0, {"read_2"}, 2 /*threads*/);
-        filter.push_message(read_1);
-        filter.push_message(read_2);
+        filter.push_message(std::move(read_1));
+        filter.push_message(std::move(read_2));
     }
 
     auto messages = sink.get_messages();

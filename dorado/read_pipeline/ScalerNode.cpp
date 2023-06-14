@@ -73,7 +73,7 @@ void ScalerNode::worker_thread() {
         read->num_trimmed_samples = trim_start;
 
         // Pass the read to the next node
-        send_message_to_sink(read);
+        send_message_to_sink(std::move(read));
     }
 }
 
