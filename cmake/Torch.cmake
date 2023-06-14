@@ -1,3 +1,6 @@
+# Guard against double-inclusion errors. See https://github.com/pytorch/pytorch/issues/25004
+include_guard(GLOBAL)
+
 set(TORCH_VERSION 2.0.0)
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32)
@@ -72,12 +75,15 @@ elseif(APPLE)
         set(TORCH_LIB "${DORADO_3RD_PARTY}/torch-${TORCH_VERSION}-${CMAKE_SYSTEM_NAME}/torch")
     endif()
 elseif(WIN32)
-    set(TORCH_URL https://download.pytorch.org/libtorch/cu118/libtorch-win-shared-with-deps-${TORCH_VERSION}%2Bcu118.zip)
+    set(TORCH_URL https://cdn.oxfordnanoportal.com/software/analysis/torch-2.0.0-Windows-ont.zip)
     set(TORCH_LIB "${DORADO_3RD_PARTY}/torch-${TORCH_VERSION}-${CMAKE_SYSTEM_NAME}/libtorch")
     add_compile_options(
         # Note we need to use the generator expression to avoid setting this for CUDA.
         $<$<COMPILE_LANGUAGE:CXX>:/wd4624> # from libtorch: destructor was implicitly defined as deleted 
     )
+
+    # Torch Windows static build includes some win headers without defining NOMINMAX.
+    add_compile_options(-DNOMINMAX)
 endif()
 
 if(DEFINED DORADO_LIBTORCH_DIR)
