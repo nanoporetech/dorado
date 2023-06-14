@@ -154,8 +154,10 @@ void BasecallerNode::working_reads_manager() {
 
         for (auto &read : completed_reads) {
             utils::stitch_chunks(read);
-            m_sink.push_message(read);
             ++m_called_reads_pushed;
+            m_num_bases_processed += read->seq.length();
+            m_num_samples_processed += read->raw_data.size(0);
+            m_sink.push_message(std::move(read));
         }
     }
 
@@ -264,7 +266,8 @@ BasecallerNode::BasecallerNode(MessageSink &sink,
                                size_t overlap,
                                int batch_timeout_ms,
                                std::string model_name,
-                               size_t max_reads)
+                               size_t max_reads,
+                               const std::string &node_name)
         : MessageSink(max_reads),
           m_sink(sink),
           m_model_runners(std::move(model_runners)),
@@ -274,7 +277,8 @@ BasecallerNode::BasecallerNode(MessageSink &sink,
           m_terminate_basecaller(false),
           m_batch_timeout_ms(batch_timeout_ms),
           m_model_name(std::move(model_name)),
-          m_max_reads(max_reads) {
+          m_max_reads(max_reads),
+          m_node_name(node_name) {
     // Setup worker state
     size_t const num_workers = m_model_runners.size();
     m_batched_chunks.resize(num_workers);
@@ -312,6 +316,8 @@ stats::NamedStats BasecallerNode::sample_stats() const {
     stats["call_chunks_ms"] = m_call_chunks_ms;
     stats["called_reads_pushed"] = m_called_reads_pushed;
     stats["working_reads_items"] = m_working_reads_size;
+    stats["bases_processed"] = m_num_bases_processed;
+    stats["samples_processed"] = m_num_samples_processed;
     return stats;
 }
 

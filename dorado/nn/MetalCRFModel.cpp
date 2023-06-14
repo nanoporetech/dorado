@@ -806,7 +806,7 @@ public:
             if (done) {
                 // Now that all chunks are decoded, signal that the GPU can overwrite the scores
                 // buffer with subsequent work.
-                assert(m_decode_complete_event != nullptr);
+                assert(m_decode_complete_event);
                 m_decode_complete_event->setSignaledValue(task->decode_complete_event_id);
                 task->cv.notify_one();
             }

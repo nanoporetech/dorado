@@ -12,14 +12,15 @@ namespace dorado {
 class BasecallerNode : public MessageSink {
 public:
     // Chunk size and overlap are in raw samples
-    BasecallerNode(MessageSink &sink,
+    BasecallerNode(MessageSink& sink,
                    std::vector<Runner> model_runners,
                    size_t overlap,
                    int batch_timeout_ms,
                    std::string model_name = "",
-                   size_t max_reads = 1000);
+                   size_t max_reads = 1000,
+                   const std::string& node_name = "BasecallerNode");
     ~BasecallerNode();
-    std::string get_name() const override { return "BasecallerNode"; }
+    std::string get_name() const override { return m_node_name; }
     stats::NamedStats sample_stats() const override;
 
 private:
@@ -32,7 +33,7 @@ private:
     // Construct complete reads
     void working_reads_manager();
 
-    MessageSink &m_sink;
+    MessageSink& m_sink;
     // Vector of model runners (each with their own GPU access etc)
     std::vector<Runner> m_model_runners;
     // Chunk length
@@ -86,11 +87,14 @@ private:
             m_working_reads_manager;  // Stitches working reads into complete reads.
 
     // Performance monitoring stats.
+    std::string m_node_name;
     std::atomic<int64_t> m_num_batches_called = 0;
     std::atomic<int64_t> m_num_partial_batches_called = 0;
     std::atomic<int64_t> m_call_chunks_ms = 0;
     std::atomic<int64_t> m_called_reads_pushed = 0;
     std::atomic<int64_t> m_working_reads_size = 0;
+    std::atomic<int64_t> m_num_bases_processed = 0;
+    std::atomic<int64_t> m_num_samples_processed = 0;
 };
 
 }  // namespace dorado

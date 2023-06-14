@@ -18,10 +18,10 @@
 #include "read_pipeline/BasecallerNode.h"
 #include "read_pipeline/HtsWriter.h"
 #include "read_pipeline/ModBaseCallerNode.h"
+#include "read_pipeline/ProgressTracker.h"
 #include "read_pipeline/ReadFilterNode.h"
 #include "read_pipeline/ReadToBamTypeNode.h"
 #include "read_pipeline/ScalerNode.h"
-#include "read_pipeline/StatsCounter.h"
 #include "utils/bam_utils.h"
 #include "utils/cli_utils.h"
 #include "utils/log_utils.h"
@@ -226,8 +226,8 @@ void setup(std::vector<std::string> args,
     ReadToBamType read_converter(*converted_reads_sink, emit_moves, rna,
                                  thread_allocations.read_converter_threads,
                                  methylation_threshold_pct);
-    StatsCounterNode stats_node(read_converter, duplex);
-    ReadFilterNode read_filter_node(stats_node, min_qscore, default_parameters.min_seqeuence_length,
+    ReadFilterNode read_filter_node(read_converter, min_qscore,
+                                    default_parameters.min_seqeuence_length,
                                     thread_allocations.read_filter_threads);
 
     std::unique_ptr<ModBaseCallerNode> mod_base_caller_node;
@@ -240,45 +240,53 @@ void setup(std::vector<std::string> args,
     }
     const int kBatchTimeoutMS = 100;
     BasecallerNode basecaller_node(*basecaller_node_sink, std::move(runners), overlap,
-                                   kBatchTimeoutMS, model_name);
+                                   kBatchTimeoutMS, model_name, 1000);
     ScalerNode scaler_node(basecaller_node, model_config.signal_norm_params,
                            thread_allocations.scaler_node_threads);
 
     DataLoader loader(scaler_node, "cpu", thread_allocations.loader_threads, max_reads, read_list);
 
+    // Setup stats counting
     std::unique_ptr<dorado::stats::StatsSampler> stats_sampler;
-    if (!dump_stats_file.empty()) {
-        std::vector<dorado::stats::StatsReporter> stats_reporters;
-        using dorado::stats::make_stats_reporter;
-        stats_reporters.push_back(make_stats_reporter(basecaller_node));
-        if (mod_base_caller_node) {
-            stats_reporters.push_back(make_stats_reporter(*mod_base_caller_node));
-        }
-        if (aligner) {
-            stats_reporters.push_back(make_stats_reporter(*aligner));
-        }
-        stats_reporters.push_back(make_stats_reporter(*bam_writer));
-        stats_reporters.push_back(make_stats_reporter(loader));
-        stats_reporters.push_back(make_stats_reporter(scaler_node));
-        stats_reporters.push_back(make_stats_reporter(read_filter_node));
-
-        constexpr auto kStatsPeriod = 100ms;
-        stats_sampler =
-                std::make_unique<dorado::stats::StatsSampler>(kStatsPeriod, stats_reporters);
+    std::vector<dorado::stats::StatsReporter> stats_reporters;
+    using dorado::stats::make_stats_reporter;
+    stats_reporters.push_back(make_stats_reporter(basecaller_node));
+    if (mod_base_caller_node) {
+        stats_reporters.push_back(make_stats_reporter(*mod_base_caller_node));
     }
+    if (aligner) {
+        stats_reporters.push_back(make_stats_reporter(*aligner));
+    }
+    stats_reporters.push_back(make_stats_reporter(*bam_writer));
+    stats_reporters.push_back(make_stats_reporter(loader));
+    stats_reporters.push_back(make_stats_reporter(scaler_node));
+    stats_reporters.push_back(make_stats_reporter(read_filter_node));
 
+    std::vector<dorado::stats::StatsCallable> stats_callables;
+    ProgressTracker tracker(num_reads, duplex);
+    stats_callables.push_back(
+            [&tracker](const stats::NamedStats& stats) { tracker.update_progress_bar(stats); });
+
+    constexpr auto kStatsPeriod = 100ms;
+    stats_sampler = std::make_unique<dorado::stats::StatsSampler>(kStatsPeriod, stats_reporters,
+                                                                  stats_callables);
+    // End stats counting setup.
+
+    // Run pipeline.
     loader.load_reads(data_path, recursive_file_loading);
 
     bam_writer->join();
-    if (stats_sampler) {
-        stats_sampler->terminate();
+    // End pipeline
+
+    stats_sampler->terminate();
+    tracker.summarize();
+    if (!dump_stats_file.empty()) {
         std::ofstream stats_file(dump_stats_file);
         stats_sampler->dump_stats(stats_file,
                                   dump_stats_filter.empty()
                                           ? std::nullopt
                                           : std::optional<std::regex>(dump_stats_filter));
     }
-    stats_node.dump_stats();
 }
 
 int basecaller(int argc, char* argv[]) {

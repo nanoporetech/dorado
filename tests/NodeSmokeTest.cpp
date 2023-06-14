@@ -9,7 +9,6 @@
 #include "read_pipeline/ReadFilterNode.h"
 #include "read_pipeline/ReadToBamTypeNode.h"
 #include "read_pipeline/ScalerNode.h"
-#include "read_pipeline/StatsCounter.h"
 #include "utils/models.h"
 #include "utils/parameters.h"
 
@@ -283,14 +282,6 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
                                                    modbase_devices.size(), model_stride,
                                                    default_params.remora_batchsize);
     run_smoke_test(mod_base_caller_node);
-}
-
-DEFINE_TEST(NodeSmokeTestRead, "StatsCounterNode") {
-    auto duplex = GENERATE(true, false);
-    CAPTURE(duplex);
-
-    dorado::StatsCounterNode stats_node(get_sink(), duplex);
-    run_smoke_test(stats_node);
 }
 
 DEFINE_TEST(NodeSmokeTestBam, "ReadToBamType") {

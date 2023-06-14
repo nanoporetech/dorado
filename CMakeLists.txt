@@ -96,6 +96,12 @@ add_subdirectory(${DORADO_3RD_PARTY}/date)
 
 enable_testing()
 
+if("${CUDA_VERSION}" STREQUAL "")
+  set(CUDA_VERSION ${CUDAToolkit_VERSION})
+else()
+  message(STATUS "CUDA VERSION ALREADY SET TO ${CUDA_VERSION}")
+endif()
+
 configure_file(dorado/Version.h.in dorado/Version.h)
 
 set(LIB_SOURCE_FILES
@@ -122,8 +128,6 @@ set(LIB_SOURCE_FILES
     dorado/read_pipeline/ReadFilterNode.h
     dorado/read_pipeline/ReadToBamTypeNode.cpp
     dorado/read_pipeline/ReadToBamTypeNode.h
-    dorado/read_pipeline/StatsCounter.cpp
-    dorado/read_pipeline/StatsCounter.h
     dorado/read_pipeline/BaseSpaceDuplexCallerNode.cpp
     dorado/read_pipeline/BaseSpaceDuplexCallerNode.h
     dorado/read_pipeline/DuplexSplitNode.cpp
@@ -134,6 +138,7 @@ set(LIB_SOURCE_FILES
     dorado/read_pipeline/HtsReader.h
     dorado/read_pipeline/HtsWriter.cpp
     dorado/read_pipeline/HtsWriter.h
+    dorado/read_pipeline/ProgressTracker.h
     dorado/decode/beam_search.cpp
     dorado/decode/fast_hash.cpp
     dorado/decode/fast_hash.h
@@ -264,6 +269,17 @@ target_link_libraries(dorado_lib
     edlib
     date::date
 )
+
+if(WIN32)
+    # Static Windows build requires a few libs to be added:
+    target_link_libraries(dorado_lib
+      CUDA::cudart_static
+      CUDA::cublas
+      CUDA::cufft
+      CUDA::cusolver
+      CUDA::cusparse
+      )
+endif()
 
 if(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     target_link_libraries(dorado_lib ${IOKIT})
@@ -411,7 +427,7 @@ elseif(WIN32)
     install(FILES ${TORCH_DLLS} DESTINATION bin COMPONENT redist_libs)
     file(GLOB HTSLIB_DLLS "${HTSLIB_DIR}/*.dll")
     install(FILES ${HTSLIB_DLLS} DESTINATION bin COMPONENT redist_libs)
-elseif(APPLE)
+elseif(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     file(GLOB TORCH_DLLS "${TORCH_LIB}/lib/*.dylib")
     install(FILES ${TORCH_DLLS} DESTINATION lib COMPONENT redist_libs)
 
