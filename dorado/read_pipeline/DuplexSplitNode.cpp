@@ -46,9 +46,9 @@ PosRanges merge_ranges(const PosRanges& ranges, uint64_t merge_dist) {
 }
 
 std::vector<std::pair<uint64_t, uint64_t>> detect_pore_signal(const torch::Tensor& signal,
-                                                          float threshold,
-                                                          uint64_t cluster_dist,
-                                                          uint64_t ignore_prefix) {
+                                                              float threshold,
+                                                              uint64_t cluster_dist,
+                                                              uint64_t ignore_prefix) {
     std::vector<std::pair<uint64_t, uint64_t>> ans;
     auto pore_a = signal.accessor<float, 1>();
     int64_t cl_start = -1;
@@ -300,8 +300,9 @@ std::optional<DuplexSplitNode::PosRange> DuplexSplitNode::identify_middle_adapte
         const Read& read) const {
     assert(m_settings.strand_end_flank > m_settings.strand_end_trim + m_settings.min_flank);
     const uint64_t r_l = read.seq.size();
-    const uint64_t search_span = std::max(m_settings.middle_adapter_search_span,
-                                      uint64_t(std::round(m_settings.middle_adapter_search_frac * r_l)));
+    const uint64_t search_span =
+            std::max(m_settings.middle_adapter_search_span,
+                     uint64_t(std::round(m_settings.middle_adapter_search_frac * r_l)));
     if (r_l < search_span) {
         return std::nullopt;
     }
