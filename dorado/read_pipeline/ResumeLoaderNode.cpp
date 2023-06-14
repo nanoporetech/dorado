@@ -1,10 +1,13 @@
 #include "ResumeLoaderNode.h"
 
-#include "utils/sequence_utils.h"
+#include "HtsReader.h"
 
 #include <htslib/sam.h>
 #include <indicators/indeterminate_progress_bar.hpp>
 #include <spdlog/spdlog.h>
+
+#include <filesystem>
+#include <memory>
 
 namespace dorado {
 

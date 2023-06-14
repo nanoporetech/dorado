@@ -1,16 +1,9 @@
 #pragma once
 
-#include "HtsReader.h"
 #include "ReadPipeline.h"
-#include "utils/stats.h"
 
-#include <atomic>
-#include <cstdint>
-#include <memory>
 #include <string>
-#include <thread>
 #include <unordered_set>
-#include <vector>
 
 namespace dorado {
 
