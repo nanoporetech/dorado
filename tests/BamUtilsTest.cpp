@@ -13,7 +13,7 @@ TEST_CASE("BamUtilsTest: fetch keys from PG header", TEST_GROUP) {
     fs::path aligner_test_dir = fs::path(get_data_dir("aligner_test"));
     auto sam = aligner_test_dir / "basecall.sam";
 
-    auto keys = dorado::utils::extract_pg_keys_from_hdr(sam, {"PN", "CL", "VN"});
+    auto keys = dorado::utils::extract_pg_keys_from_hdr(sam.string(), {"PN", "CL", "VN"});
     CHECK(keys["PN"] == "dorado");
     CHECK(keys["VN"] == "0.2.3+0f041c4+dirty");
     CHECK(keys["CL"] ==
