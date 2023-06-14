@@ -32,7 +32,7 @@ auto filter_ranges(const PosRanges& ranges, FilterF filter_f) {
 
 //merges overlapping ranges and ranges separated by merge_dist or less
 //ranges supposed to be sorted by start coordinate
-PosRanges merge_ranges(const PosRanges& ranges, size_t merge_dist) {
+PosRanges merge_ranges(const PosRanges& ranges, uint64_t merge_dist) {
     PosRanges merged;
     for (auto& r : ranges) {
         assert(merged.empty() || r.first >= merged.back().first);
@@ -45,16 +45,16 @@ PosRanges merge_ranges(const PosRanges& ranges, size_t merge_dist) {
     return merged;
 }
 
-std::vector<std::pair<size_t, size_t>> detect_pore_signal(const torch::Tensor& signal,
+std::vector<std::pair<uint64_t, uint64_t>> detect_pore_signal(const torch::Tensor& signal,
                                                           float threshold,
-                                                          size_t cluster_dist,
-                                                          size_t ignore_prefix) {
-    std::vector<std::pair<size_t, size_t>> ans;
+                                                          uint64_t cluster_dist,
+                                                          uint64_t ignore_prefix) {
+    std::vector<std::pair<uint64_t, uint64_t>> ans;
     auto pore_a = signal.accessor<float, 1>();
     int64_t cl_start = -1;
     int64_t cl_end = -1;
 
-    for (size_t i = ignore_prefix; i < pore_a.size(0); i++) {
+    for (auto i = ignore_prefix; i < pore_a.size(0); i++) {
         if (pore_a[i] > threshold) {
             //check if we need to start new cluster
             if (cl_end == -1 || i > cl_end + cluster_dist) {
@@ -299,9 +299,9 @@ DuplexSplitNode::check_flank_match(const Read& read, PosRange spacer, float err_
 std::optional<DuplexSplitNode::PosRange> DuplexSplitNode::identify_middle_adapter_split(
         const Read& read) const {
     assert(m_settings.strand_end_flank > m_settings.strand_end_trim + m_settings.min_flank);
-    const auto r_l = read.seq.size();
-    const auto search_span = std::max(m_settings.middle_adapter_search_span,
-                                      int(std::round(m_settings.middle_adapter_search_frac * r_l)));
+    const uint64_t r_l = read.seq.size();
+    const uint64_t search_span = std::max(m_settings.middle_adapter_search_span,
+                                      uint64_t(std::round(m_settings.middle_adapter_search_frac * r_l)));
     if (r_l < search_span) {
         return std::nullopt;
     }
@@ -340,12 +340,12 @@ std::optional<DuplexSplitNode::PosRange> DuplexSplitNode::identify_middle_adapte
 
 std::optional<DuplexSplitNode::PosRange> DuplexSplitNode::identify_extra_middle_split(
         const Read& read) const {
-    const size_t r_l = read.seq.size();
+    const uint64_t r_l = read.seq.size();
     //TODO parameterize
     static const float ext_start_frac = 0.1;
     //extend to tolerate some extra length difference
-    const auto ext_start_flank =
-            std::max(size_t(ext_start_frac * r_l), m_settings.strand_start_flank);
+    const uint64_t ext_start_flank =
+            std::max(uint64_t(ext_start_frac * r_l), m_settings.strand_start_flank);
     //further consider only reasonably long reads
     if (ext_start_flank + m_settings.strand_end_flank > r_l) {
         return std::nullopt;
@@ -363,7 +363,7 @@ std::optional<DuplexSplitNode::PosRange> DuplexSplitNode::identify_extra_middle_
         if (templ_start_match->second + m_settings.strand_end_flank > r_l) {
             return std::nullopt;
         }
-        size_t est_middle = (templ_start_match->second + (r_l - m_settings.strand_end_flank)) / 2;
+        uint64_t est_middle = (templ_start_match->second + (r_l - m_settings.strand_end_flank)) / 2;
         spdlog::trace("Middle estimate {}", est_middle);
         //TODO parameterize
         static const int min_split_margin = 100;
