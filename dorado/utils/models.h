@@ -54,8 +54,12 @@ static const std::vector<std::string> models = {
         "dna_r10.4.1_e8.2_400bps_hac@v4.2.0",
         "dna_r10.4.1_e8.2_400bps_sup@v4.2.0",
 
+        // RNA002
+        "rna002_70bps_fast@v3",
+        "rna002_70bps_hac@v3",
         // RNA003
         "rna003_120bps_sup@v3",
+
 };
 
 }  // namespace simplex

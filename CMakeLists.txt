@@ -96,6 +96,12 @@ add_subdirectory(${DORADO_3RD_PARTY}/date)
 
 enable_testing()
 
+if("${CUDA_VERSION}" STREQUAL "")
+  set(CUDA_VERSION ${CUDAToolkit_VERSION})
+else()
+  message(STATUS "CUDA VERSION ALREADY SET TO ${CUDA_VERSION}")
+endif()
+
 configure_file(dorado/Version.h.in dorado/Version.h)
 
 set(LIB_SOURCE_FILES
@@ -266,6 +272,17 @@ target_link_libraries(dorado_lib
     date::date
 )
 
+if(WIN32)
+    # Static Windows build requires a few libs to be added:
+    target_link_libraries(dorado_lib
+      CUDA::cudart_static
+      CUDA::cublas
+      CUDA::cufft
+      CUDA::cusolver
+      CUDA::cusparse
+      )
+endif()
+
 if(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     target_link_libraries(dorado_lib ${IOKIT})
 endif()
@@ -412,7 +429,7 @@ elseif(WIN32)
     install(FILES ${TORCH_DLLS} DESTINATION bin COMPONENT redist_libs)
     file(GLOB HTSLIB_DLLS "${HTSLIB_DIR}/*.dll")
     install(FILES ${HTSLIB_DLLS} DESTINATION bin COMPONENT redist_libs)
-elseif(APPLE)
+elseif(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     file(GLOB TORCH_DLLS "${TORCH_LIB}/lib/*.dylib")
     install(FILES ${TORCH_DLLS} DESTINATION lib COMPONENT redist_libs)
 
