@@ -89,11 +89,6 @@ int duplex(int argc, char* argv[]) {
                   "reads will be basecalled")
             .default_value(std::string(""));
 
-    parser.add_argument("--resume-from")
-            .help("Resume basecalling from the given HTS file. Fully formed duplex reads \n"
-                  "are not processed again. All other reads are re-analyzed.")
-            .default_value(std::string(""));
-
     parser.add_argument("--min-qscore").default_value(0).scan<'i', int>();
 
     parser.add_argument("--reference")
@@ -131,20 +126,6 @@ int duplex(int argc, char* argv[]) {
         }
         std::map<std::string, std::string> template_complement_map;
         auto read_list = utils::load_read_list(parser.get<std::string>("--read-ids"));
-        auto resume_from_file = parser.get<std::string>("--resume-from");
-
-        std::unordered_set<std::string> completed_duplex_reads;
-        std::unordered_set<std::string> completed_simplex_reads;
-        std::unordered_set<std::string> reads_already_processed;
-        if (!resume_from_file.empty()) {
-            spdlog::info("> Inspecting resume file...");
-            reads_already_processed = fetch_read_ids(resume_from_file);
-            utils::split_completed_duplex_reads(completed_duplex_reads, completed_simplex_reads,
-                                                reads_already_processed);
-            spdlog::info("> Duplex reads generated for {} reads.", completed_duplex_reads.size());
-            spdlog::info("> Analyzing {} simplex reads to check for duplex.",
-                         completed_simplex_reads.size());
-        }
 
         std::unordered_set<std::string> read_list_from_pairs;
 
@@ -180,8 +161,7 @@ int duplex(int argc, char* argv[]) {
         bool recursive_file_loading = parser.get<bool>("--recursive");
 
         size_t num_reads = (basespace_duplex ? read_list_from_pairs.size()
-                                             : DataLoader::get_num_reads(reads, read_list,
-                                                                         completed_duplex_reads,
+                                             : DataLoader::get_num_reads(reads, read_list, {},
                                                                          recursive_file_loading));
         spdlog::debug("> Reads to process: {}", num_reads);
 
@@ -206,8 +186,7 @@ int duplex(int argc, char* argv[]) {
         ReadToBamType read_converter(*converted_reads_sink, emit_moves, rna, 2);
         // The minimum sequence length is set to 5 to avoid issues with duplex node printing very short sequences for mismatched pairs.
         ReadFilterNode read_filter_node(read_converter, min_qscore,
-                                        default_parameters.min_seqeuence_length,
-                                        completed_simplex_reads, 5);
+                                        default_parameters.min_seqeuence_length, {}, 5);
 
         torch::set_num_threads(1);
 
@@ -399,8 +378,7 @@ int duplex(int argc, char* argv[]) {
             ScalerNode scaler_node(*basecaller_node, model_config.signal_norm_params,
                                    num_devices * 2);
 
-            DataLoader loader(scaler_node, "cpu", num_devices, 0, std::move(read_list),
-                              completed_duplex_reads);
+            DataLoader loader(scaler_node, "cpu", num_devices, 0, std::move(read_list));
 
             // Setup stats counting
             using dorado::stats::make_stats_reporter;

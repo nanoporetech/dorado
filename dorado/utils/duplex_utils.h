@@ -44,22 +44,4 @@ std::unordered_set<std::string> get_read_list_from_pairs(
 const std::string get_stereo_model_name(const std::string& simplex_model_name,
                                         uint16_t data_sample_rate);
 
-/**
- * Given a set of read ids, divide it into a set of completed duplex reads and remaining simplex reads.
- *
- * This function iterates through all the reads in the input and groups them into
- * a set of completed duplex reads and unpaired simplex reads. The grouping is done
- * based on the read id, where a name containing `;` is considered a duplex read.
- * Duplex read id names are split based on the ';' character, and the corresponding
- * "parent" read ids are considered complete. Any remaining read ids are put into
- * the simplex set.
- *
- * @param completed_duplex_reads Output set for completed duplex reads.
- * @param completed_simplex_reads Output set for simplex reads.
- * @param read_ids Input set of read ids.
- */
-void split_completed_duplex_reads(std::unordered_set<std::string>& completed_duplex_reads,
-                                  std::unordered_set<std::string>& completed_simplex_reads,
-                                  const std::unordered_set<std::string>& read_ids);
-
 }  // namespace dorado::utils

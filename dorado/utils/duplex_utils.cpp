@@ -125,25 +125,4 @@ const std::string get_stereo_model_name(const std::string& simplex_model_name,
     }
 }
 
-void split_completed_duplex_reads(std::unordered_set<std::string>& completed_duplex_reads,
-                                  std::unordered_set<std::string>& completed_simplex_reads,
-                                  const std::unordered_set<std::string>& read_ids) {
-    for (const auto& read_id : read_ids) {
-        bool duplex_read = read_id.find(";") != std::string::npos;
-        if (duplex_read) {
-            std::stringstream ss(read_id);
-
-            std::string s;
-            while (std::getline(ss, s, ';')) {
-                completed_duplex_reads.insert(s);
-                completed_simplex_reads.erase(s);
-            }
-        } else {
-            if (completed_duplex_reads.find(read_id) == completed_duplex_reads.end()) {
-                completed_simplex_reads.insert(read_id);
-            }
-        }
-    }
-}
-
 }  // namespace dorado::utils
