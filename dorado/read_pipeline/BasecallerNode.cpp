@@ -154,10 +154,10 @@ void BasecallerNode::working_reads_manager() {
 
         for (auto &read : completed_reads) {
             utils::stitch_chunks(read);
-            m_sink.push_message(read);
             ++m_called_reads_pushed;
             m_num_bases_processed += read->seq.length();
             m_num_samples_processed += read->raw_data.size(0);
+            m_sink.push_message(std::move(read));
         }
     }
 
