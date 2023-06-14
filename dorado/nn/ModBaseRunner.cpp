@@ -134,36 +134,36 @@ public:
         for (size_t model_id = 0; model_id < num_models; ++model_id) {
             const auto& model_path = model_paths[model_id];
             auto caller_data = std::make_unique<ModBaseData>();
-#if DORADO_GPU_BUILD && !defined(__APPLE__)
-            if (m_options.device().is_cuda()) {
-                caller_data->stream =
-                        c10::cuda::getStreamFromPool(false, m_options.device().index());
-            }
-#endif
+
+            torch::InferenceMode guard;
             caller_data->module_holder = load_remora_model(model_path, m_options);
             caller_data->params.parse(model_path);
             caller_data->batch_size = batch_size;
 
-            auto sig_len = static_cast<int64_t>(caller_data->params.context_before +
-                                                caller_data->params.context_after);
-            auto kmer_len = caller_data->params.bases_after + caller_data->params.bases_before + 1;
-
-            // Warmup
-            auto input_sigs = torch::empty({batch_size, 1, sig_len}, m_options);
-            auto input_seqs = torch::empty({batch_size, sig_len, RemoraUtils::NUM_BASES * kmer_len},
-                                           m_options);
-            caller_data->module_holder->forward(input_sigs, input_seqs);
-#if DORADO_GPU_BUILD && !defined(__APPLE__)
-            if (m_options.device().is_cuda()) {
-                torch::cuda::synchronize(m_options.device().index());
-            }
-#endif
             if (caller_data->params.refine_do_rough_rescale) {
                 caller_data->scaler = std::make_unique<RemoraScaler>(
                         caller_data->params.refine_kmer_levels, caller_data->params.refine_kmer_len,
                         caller_data->params.refine_kmer_center_idx);
             }
 
+#if DORADO_GPU_BUILD && !defined(__APPLE__)
+            if (m_options.device().is_cuda()) {
+                caller_data->stream =
+                        c10::cuda::getStreamFromPool(false, m_options.device().index());
+
+                auto sig_len = static_cast<int64_t>(caller_data->params.context_before +
+                                                    caller_data->params.context_after);
+                auto kmer_len =
+                        caller_data->params.bases_after + caller_data->params.bases_before + 1;
+
+                // Warmup
+                auto input_sigs = torch::empty({batch_size, 1, sig_len}, m_options);
+                auto input_seqs = torch::empty(
+                        {batch_size, sig_len, RemoraUtils::NUM_BASES * kmer_len}, m_options);
+                caller_data->module_holder->forward(input_sigs, input_seqs);
+                torch::cuda::synchronize(m_options.device().index());
+            }
+#endif
             m_caller_data.push_back(std::move(caller_data));
             m_task_threads.push_back(std::make_unique<std::thread>(
                     &ModBaseCaller::modbase_task_thread_fn, this, model_id));
