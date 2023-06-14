@@ -1,5 +1,6 @@
 #pragma once
 
+#include "utils/cli_utils.h"
 #include "utils/stats.h"
 
 #ifdef WIN32
@@ -53,6 +54,11 @@ public:
     }
 
     void update_progress_bar(const stats::NamedStats& stats) {
+        // do nothing if stderr is not a tty
+        if (!utils::is_fd_tty(stderr)) {
+            return;
+        }
+
         // Instead of capturing end time when summarizer is called,
         // which suffers from delays due to sampler and pipeline termination
         // costs, store it whenever stats are updated.

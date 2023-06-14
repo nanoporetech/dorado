@@ -122,7 +122,7 @@ int duplex(int argc, char* argv[]) {
         const bool basespace_duplex = (model.compare("basespace") == 0);
         std::vector<std::string> args(argv, argv + argc);
         if (parser.get<bool>("--verbose")) {
-            spdlog::set_level(spdlog::level::debug);
+            utils::SetDebugLogging();
         }
         std::map<std::string, std::string> template_complement_map;
         auto read_list = utils::load_read_list(parser.get<std::string>("--read-ids"));
