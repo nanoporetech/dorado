@@ -43,7 +43,8 @@ bool finishCommandBuffer(const char *label, MTL::CommandBuffer *cb, int try_coun
         if (status == MTL::CommandBufferStatusError) {
             const auto *const error_ptr = cb->error();
             if (error_ptr)
-                spdlog::warn("Command buffer error code: {}", error_ptr->code());
+                spdlog::warn("Command buffer error code: {} ({})", error_ptr->code(),
+                             error_ptr->localizedDescription()->utf8String());
         }
     }
     return success;
