@@ -114,6 +114,11 @@ int duplex(int argc, char* argv[]) {
 
         auto device(parser.get<std::string>("-x"));
         auto model(parser.get<std::string>("model"));
+
+        if (model.find("fast") != std::string::npos) {
+            spdlog::warn("Fast models are currently not recommended for duplex basecalling.");
+        }
+
         auto reads(parser.get<std::string>("reads"));
         std::string pairs_file = parser.get<std::string>("--pairs");
         auto threads = static_cast<size_t>(parser.get<int>("--threads"));
