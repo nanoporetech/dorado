@@ -145,16 +145,23 @@ std::map<std::string, std::string> extract_pg_keys_from_hdr(const std::string fi
     if (!header) {
         throw std::runtime_error("Could not open header from file: " + filename);
     }
+    kstring_t val = {0, 0, NULL};
+    // The kstring is pre-allocated with 1MB of space to work around a Windows DLL
+    // cross-heap segmentation fault. The ks_resize/ks_free functions from htslib
+    // are inline functions. When htslib is shipped as a DLL, some of these functions
+    // are inlined into the DLL code through other htslib APIs. But those same functions
+    // also get inlined into dorado code when invoked directly. As a result, it's possible
+    // that an htslib APIs resizes a string using the DLL code. But when a ks_free
+    // is attempted on it from dorado, there's cross-heap behavior and a segfault occurs.
+    ks_resize(&val, 1e6);
     for (auto& k : keys) {
-        kstring_t val;
-        ks_initialize(&val);
         auto ret = sam_hdr_find_tag_id(header, "PG", NULL, NULL, k.c_str(), &val);
         if (ret != 0) {
             throw std::runtime_error("Required key " + k + " not found in header of " + filename);
         }
         pg_keys[k] = std::string(val.s);
-        ks_free(&val);
     }
+    ks_free(&val);
     sam_hdr_destroy(header);
     hts_close(file);
     return pg_keys;
