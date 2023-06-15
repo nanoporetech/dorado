@@ -97,6 +97,10 @@ public:
                 std::cerr << "\r";
             }
         } else {
+            // don't output progress is stderr is not a tty
+            if (!utils::is_fd_tty(stderr)) {
+                return;
+            }
             std::cerr << "\r> Output records written: " << m_num_reads_written;
             std::cerr << "\r";
         }
