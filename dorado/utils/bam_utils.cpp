@@ -153,7 +153,7 @@ std::map<std::string, std::string> extract_pg_keys_from_hdr(const std::string fi
             throw std::runtime_error("Required key " + k + " not found in header of " + filename);
         }
         pg_keys[k] = std::string(val.s);
-        ks_release(&val);
+        ks_free(&val);
     }
     sam_hdr_destroy(header);
     hts_close(file);
