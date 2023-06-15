@@ -116,7 +116,7 @@ int duplex(int argc, char* argv[]) {
         auto model(parser.get<std::string>("model"));
 
         if (model.find("fast") != std::string::npos) {
-            spdlog::warn("Fast models are currently not recommended for with duplex basecalling.");
+            spdlog::warn("Fast models are currently not recommended for duplex basecalling.");
         }
 
         auto reads(parser.get<std::string>("reads"));
