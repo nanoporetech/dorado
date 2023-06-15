@@ -93,10 +93,11 @@ void PairingNode::pair_generating_worker_thread() {
         int mux = read->attributes.mux;
         std::string run_id = read->run_id;
         std::string flowcell_id = read->flowcell_id;
+        int32_t client_id = read->client_id;
 
         int max_num_keys = 10;
         std::unique_lock<std::mutex> lock(m_pairing_mtx);
-        UniquePoreIdentifierKey key = std::make_tuple(channel, mux, run_id, flowcell_id);
+        UniquePoreIdentifierKey key = std::make_tuple(channel, mux, run_id, flowcell_id, client_id);
         auto found = channel_mux_read_map.find(key);
         // Check if the key is already in the list
         if (found == channel_mux_read_map.end()) {

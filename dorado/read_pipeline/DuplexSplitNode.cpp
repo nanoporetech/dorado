@@ -165,6 +165,7 @@ std::shared_ptr<Read> subread(const Read& read, PosRange seq_range, PosRange sig
     const auto subread_id = utils::derive_uuid(
             read.read_id, std::to_string(seq_range.first) + "-" + std::to_string(seq_range.second));
     subread->read_id = subread_id;
+    subread->read_tag = read.read_tag;
     subread->raw_data = subread->raw_data.index(
             {torch::indexing::Slice(signal_range.first, signal_range.second)});
     subread->attributes.read_number = -1;

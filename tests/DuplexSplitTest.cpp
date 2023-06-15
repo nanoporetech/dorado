@@ -45,6 +45,8 @@ std::shared_ptr<dorado::Read> make_read() {
     read->moves = ReadFileIntoVector(DataPath("moves"));
     torch::load(read->raw_data, DataPath("raw.tensor").string());
     read->raw_data = read->raw_data.to(torch::kFloat16);
+    read->read_tag = 42;
+
     return read;
 }
 }  // namespace
@@ -78,6 +80,8 @@ TEST_CASE("4 subread splitting test", TEST_GROUP) {
         names.insert(r->read_id);
     }
     REQUIRE(names.size() == 4);
+    REQUIRE(std::all_of(split_res.begin(), split_res.end(),
+                        [](const auto &r) { return r->read_tag == 42; }));
 }
 
 TEST_CASE("4 subread split tagging", TEST_GROUP) {
@@ -102,11 +106,12 @@ TEST_CASE("4 subread split tagging", TEST_GROUP) {
     for (const auto &subread : reads) {
         subread_ids.push_back(subread->subread_id);
     }
-std:
-    sort(std::begin(subread_ids), std::end(subread_ids));
+
+    std::sort(std::begin(subread_ids), std::end(subread_ids));
     CHECK(subread_ids == expected_subread_ids);
     CHECK(std::all_of(reads.begin(), reads.end(),
                       [split_count = expected_subread_ids.size()](const auto &read) {
                           return read->split_count == split_count;
                       }));
+    CHECK(std::all_of(reads.begin(), reads.end(), [](const auto &r) { return r->read_tag == 42; }));
 }

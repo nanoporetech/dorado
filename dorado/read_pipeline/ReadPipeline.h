@@ -111,6 +111,12 @@ public:
     size_t subread_id{0};
     size_t split_count{1};
 
+    // A unique identifier for each input read
+    // Split (duplex) reads have the read_tag of the parent (template) and their own subread_id
+    uint64_t read_tag{0};
+    // The id of the client to which this read belongs. -1 in standalone mode
+    int32_t client_id{-1};
+
 private:
     void generate_duplex_read_tags(bam1_t*) const;
     void generate_read_tags(bam1_t* aln, bool emit_moves) const;

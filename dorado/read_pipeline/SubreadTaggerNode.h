@@ -22,7 +22,7 @@ private:
     std::atomic<int> m_num_worker_threads;
 
     std::mutex m_subread_groups_mutex;
-    std::unordered_map<std::string, std::vector<std::shared_ptr<Read>>> m_subread_groups;
+    std::unordered_map<uint64_t, std::vector<std::shared_ptr<Read>>> m_subread_groups;
 
     std::mutex m_duplex_reads_mutex;
     std::list<std::shared_ptr<Read>> m_duplex_reads;

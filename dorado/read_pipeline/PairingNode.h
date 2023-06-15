@@ -27,8 +27,8 @@ private:
     void pair_generating_worker_thread();
 
     // A key for a unique Pore, Duplex reads must have the same UniquePoreIdentifierKey
-    // The values are channel, mux, run_id, flowcell_id
-    using UniquePoreIdentifierKey = std::tuple<int, int, std::string, std::string>;
+    // The values are channel, mux, run_id, flowcell_id, client_id
+    using UniquePoreIdentifierKey = std::tuple<int, int, std::string, std::string, int32_t>;
 
     std::vector<std::unique_ptr<std::thread>> m_workers;
     MessageSink& m_sink;

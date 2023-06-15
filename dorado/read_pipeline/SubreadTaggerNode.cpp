@@ -27,10 +27,8 @@ void SubreadTaggerNode::worker_thread() {
                     continue;
                 }
 
-                std::string read_id =
-                        read->parent_read_id.empty() ? read->read_id : read->parent_read_id;
                 std::lock_guard subreads_lock(m_subread_groups_mutex);
-                auto& subreads = m_subread_groups[read_id];
+                auto& subreads = m_subread_groups[read->read_tag];
                 subreads.push_back(read);
 
                 if (subreads.size() == read->split_count) {
@@ -52,7 +50,7 @@ void SubreadTaggerNode::worker_thread() {
                         check_complete_groups = true;
                     }
 
-                    m_subread_groups.erase(read_id);
+                    m_subread_groups.erase(read->read_tag);
                 }
             }
         }
@@ -66,12 +64,14 @@ void SubreadTaggerNode::worker_thread() {
                     auto& duplex_read = *duplex_read_iter;
                     std::string template_read_id =
                             duplex_read->read_id.substr(0, duplex_read->read_id.find(';'));
-
+                    uint64_t read_tag = duplex_read->read_tag;
                     // do any of the subreads match the template read id for this duplex read?
-                    if (std::any_of(subreads->begin(), subreads->end(),
-                                    [template_read_id](const std::shared_ptr<Read>& subread) {
-                                        return subread->read_id == template_read_id;
-                                    })) {
+                    if (std::any_of(
+                                subreads->begin(), subreads->end(),
+                                [template_read_id, read_tag](const std::shared_ptr<Read>& subread) {
+                                    return subread->read_id == template_read_id &&
+                                           subread->read_tag == read_tag;
+                                })) {
                         duplex_read->subread_id = subreads->size();
                         subreads->push_back(duplex_read);
                         duplex_read_iter = m_duplex_reads.erase(duplex_read_iter);
