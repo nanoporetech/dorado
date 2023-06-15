@@ -54,11 +54,6 @@ public:
     }
 
     void update_progress_bar(const stats::NamedStats& stats) {
-        // do nothing if stderr is not a tty
-        if (!utils::is_fd_tty(stderr)) {
-            return;
-        }
-
         // Instead of capturing end time when summarizer is called,
         // which suffers from delays due to sampler and pipeline termination
         // costs, store it whenever stats are updated.
@@ -73,6 +68,7 @@ public:
         };
 
         m_num_reads_written = fetch_stat("HtsWriter.unique_simplex_reads_written");
+
         if (m_num_reads_expected != 0) {
             m_num_reads_filtered = fetch_stat("ReadFilterNode.reads_filtered");
             m_num_bases_processed = fetch_stat("BasecallerNode.bases_processed");
@@ -80,6 +76,11 @@ public:
             if (m_duplex) {
                 m_num_bases_processed += fetch_stat("StereoBasecallerNode.bases_processed");
                 m_num_samples_processed += fetch_stat("StereoBasecallerNode.samples_processed");
+            }
+
+            // don't output progress bar is stderr is not a tty
+            if (!utils::is_fd_tty(stderr)) {
+                return;
             }
 
             // TODO: Add the ceiling because in duplex, reads written can exceed reads expected
