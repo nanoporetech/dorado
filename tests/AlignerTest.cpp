@@ -17,6 +17,8 @@
 
 namespace fs = std::filesystem;
 
+namespace {
+
 template <class... Args>
 std::vector<dorado::BamPtr> RunAlignmentPipeline(dorado::HtsReader& reader,
      Args&&... args) {
@@ -29,6 +31,8 @@ std::vector<dorado::BamPtr> RunAlignmentPipeline(dorado::HtsReader& reader,
     reader.read(*pipeline, 100);
     pipeline.reset();
     return ConvertMessages<dorado::BamPtr>(messages);
+}
+
 }
 
 TEST_CASE("AlignerTest: Check standard alignment", TEST_GROUP) {

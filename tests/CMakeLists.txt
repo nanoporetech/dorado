@@ -2,8 +2,8 @@
 set(SOURCE_FILES
     main.cpp
     AsyncQueueTest.cpp
-    #Fast5DataLoaderTest.cpp
-    #Pod5DataLoaderTest.cpp
+    Fast5DataLoaderTest.cpp
+    Pod5DataLoaderTest.cpp
     TensorUtilsTest.cpp
     MathUtilsTest.cpp
     ReadTest.cpp
@@ -14,20 +14,20 @@ set(SOURCE_FILES
     DuplexSplitTest.cpp
     TrimTest.cpp
     AlignerTest.cpp
-    #BamReaderTest.cpp
-    #BamWriterTest.cpp
+    BamReaderTest.cpp
+    BamWriterTest.cpp
     CliUtilsTest.cpp
-    #ReadFilterNodeTest.cpp
+    ReadFilterNodeTest.cpp
     ModelUtilsTest.cpp
-    #NodeSmokeTest.cpp
-    #PairingNodeTest.cpp
+    NodeSmokeTest.cpp
+    PairingNodeTest.cpp
     PipelineTest.cpp
 )
 
 if (DORADO_GPU_BUILD)
     if(APPLE)
         list(APPEND SOURCE_FILES
-            #MetalLinearTest.cpp
+            MetalLinearTest.cpp
         )
     else()
         list(APPEND SOURCE_FILES

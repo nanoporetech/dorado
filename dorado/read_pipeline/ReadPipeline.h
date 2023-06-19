@@ -254,9 +254,6 @@ public:
     // remain able to accept subsequent work.
     void wait_until_done() const;
 
-    // Terminates all nodes.  The pipeline will not accept subsequent work.
-    //void terminate_nodes();
-
     // Returns a pointer to the node associated with the given handle.
     // Intended for testing purposes.
     MessageSink* get_node_ptr(NodeHandle handle) {

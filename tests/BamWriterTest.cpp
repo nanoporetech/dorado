@@ -26,12 +26,12 @@ public:
 protected:
     void generate_bam(HtsWriter::OutputMode mode, int num_threads) {
         HtsReader reader(m_in_sam.string());
-        HtsWriter writer(m_out_bam.string(), mode, num_threads, 0);
+        PipelineDescriptor pipeline_desc;
+        pipeline_desc.add_node<HtsWriter>({}, m_out_bam.string(), mode, num_threads, 0, reader.header);
+        auto pipeline = Pipeline::create(std::move(pipeline_desc));
 
-        writer.write_header(reader.header);
-        reader.read(writer, 1000);
-
-        writer.join();
+        reader.read(*pipeline, 1000);
+        pipeline.reset();
     }
 
 private:

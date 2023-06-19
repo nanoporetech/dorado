@@ -310,7 +310,6 @@ std::unique_ptr<Pipeline> Pipeline::create(PipelineDescriptor&& descriptor,
     }
     auto source_it = std::find(is_sink.cbegin(), is_sink.cend(), false);
     auto source_node = std::distance(is_sink.cbegin(), source_it);
-    spdlog::error("Source node {}", source_node);
 
     // Perform a depth first search from the source to determine the
     // source-to-sink destruction order.  At the same time, cycles are detected.
@@ -325,10 +324,6 @@ std::unique_ptr<Pipeline> Pipeline::create(PipelineDescriptor&& descriptor,
     // If the graph is fully connected then we should have visited all nodes.
     assert(std::all_of(dfs_state.cbegin(), dfs_state.cend(), [](DFSState v) { return v == DFSState::Visited; }));
     assert(source_to_sink_order.size() == descriptor.m_node_descriptors.size());
-
-    /*spdlog::error("Source-to-sink order: ");
-    for (auto x : source_to_sink_order)
-        spdlog::error("{}", x);*/
 
     return std::unique_ptr<Pipeline>(new Pipeline(std::move(descriptor), source_to_sink_order, stats_reporters));
 }
@@ -366,7 +361,6 @@ void Pipeline::push_message(Message&& message) {
 
 Pipeline::~Pipeline() {
     for (auto handle : m_source_to_sink_order) {
-        //spdlog::error("Tearing down {}", m_nodes.at(handle)->get_name());
         m_nodes.at(handle).reset();  
     }
 }
@@ -376,13 +370,5 @@ void Pipeline::wait_until_done() const {
         m_nodes.at(handle)->wait_until_done();  
     }
 }
-
-/*void Pipeline::terminate_nodes() {
-    for (auto handle : m_source_to_sink_order) {
-        std::cerr << "Calling terminate on "<< m_nodes.at(handle)->get_name() << "\n";
-        m_nodes.at(handle)->terminate();  
-    }
-    std::cerr << "Terminated all nodes\n";
-}*/
 
 }  // namespace dorado
