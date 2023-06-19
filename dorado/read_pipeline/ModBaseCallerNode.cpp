@@ -20,14 +20,12 @@ namespace dorado {
 
 constexpr auto FORCE_TIMEOUT = 100ms;
 
-ModBaseCallerNode::ModBaseCallerNode(MessageSink& sink,
-                                     std::vector<std::unique_ptr<ModBaseRunner>> model_runners,
+ModBaseCallerNode::ModBaseCallerNode(std::vector<std::unique_ptr<ModBaseRunner>> model_runners,
                                      size_t remora_threads,
                                      size_t block_stride,
                                      size_t batch_size,
                                      size_t max_reads)
         : MessageSink(max_reads),
-          m_sink(sink),
           m_batch_size(batch_size),
           m_block_stride(block_stride),
           m_runners(std::move(model_runners)) {
@@ -229,7 +227,7 @@ void ModBaseCallerNode::input_worker_thread() {
                 m_working_reads.push_back(read);
             } else {
                 // No modbases to call, pass directly to next node
-                m_sink.push_message(read);
+                send_message_to_sink(read);
                 ++m_num_non_mod_base_reads_pushed;
             }
             break;
@@ -370,7 +368,6 @@ void ModBaseCallerNode::output_worker_thread() {
             return !m_processed_chunks.empty() || m_terminate_output.load();
         });
         if (m_terminate_output.load() && m_processed_chunks.empty()) {
-            m_sink.terminate();
             return;
         }
 
@@ -403,7 +400,7 @@ void ModBaseCallerNode::output_worker_thread() {
         }
         working_reads_lock.unlock();
         for (auto& read : completed_reads) {
-            m_sink.push_message(read);
+            send_message_to_sink(read);
             ++m_num_mod_base_reads_pushed;
         }
     }

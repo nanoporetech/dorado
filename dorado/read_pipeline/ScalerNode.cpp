@@ -3,6 +3,8 @@
 #include "utils/tensor_utils.h"
 #include "utils/trim.h"
 
+#include <spdlog/spdlog.h>
+
 #include <algorithm>
 #include <chrono>
 #include <utility>
@@ -12,7 +14,7 @@ using Slice = torch::indexing::Slice;
 
 namespace dorado {
 
-std::pair<float, float> ScalerNode::normalisation(torch::Tensor& x) {
+std::pair<float, float> ScalerNode::normalisation(const torch::Tensor& x) {
     // Calculate shift and scale factors for normalisation.
     auto quantiles = dorado::utils::quantile_counting(
             x, torch::tensor({m_scaling_params.quantile_a, m_scaling_params.quantile_b}));
@@ -29,6 +31,7 @@ void ScalerNode::worker_thread() {
         // If this message isn't a read, we'll get a bad_variant_access exception.
         auto read = std::get<std::shared_ptr<Read>>(message);
 
+        assert(read->raw_data.dtype() == torch::kInt16);
         const auto [shift, scale] = normalisation(read->raw_data);
         // raw_data comes from DataLoader with dtype int16.  We send it on as float16 after
         // shifting/scaling in float32 form.
@@ -47,21 +50,16 @@ void ScalerNode::worker_thread() {
         read->num_trimmed_samples = trim_start;
 
         // Pass the read to the next node
-        m_sink.push_message(read);
+        send_message_to_sink(read);
     }
 
     int num_worker_threads = --m_num_worker_threads;
-    if (num_worker_threads == 0) {
-        m_sink.terminate();
-    }
 }
 
-ScalerNode::ScalerNode(MessageSink& sink,
-                       const SignalNormalisationParams& config,
+ScalerNode::ScalerNode(const SignalNormalisationParams& config,
                        int num_worker_threads,
                        size_t max_reads)
         : MessageSink(max_reads),
-          m_sink(sink),
           m_scaling_params(config),
           m_num_worker_threads(num_worker_threads) {
     for (int i = 0; i < m_num_worker_threads; i++) {
@@ -78,9 +76,6 @@ ScalerNode::~ScalerNode() {
     for (auto& t : worker_threads) {
         t->join();
     }
-
-    // Notify the sink that the Scaler Node has terminated
-    m_sink.terminate();
 }
 
 stats::NamedStats ScalerNode::sample_stats() const { return stats::from_obj(m_work_queue); }

@@ -73,11 +73,7 @@ void setup(std::vector<std::string> args,
     torch::set_num_threads(1);
     std::vector<Runner> runners;
 
-<<<<<<< HEAD
     auto model_config = load_crf_model_config(model_path);
-=======
-    Pipeline pipeline;
->>>>>>> acf0936 (Pipeline construction example)
 
     // Default is 1 device.  CUDA path may alter this.
     int num_devices = 1;
@@ -209,93 +205,75 @@ void setup(std::vector<std::string> args,
     std::unique_ptr<sam_hdr_t, void (*)(sam_hdr_t*)> hdr(sam_hdr_init(), sam_hdr_destroy);
     utils::add_pg_hdr(hdr.get(), args);
     utils::add_rg_hdr(hdr.get(), read_groups);
-    std::shared_ptr<HtsWriter> bam_writer;
-    std::shared_ptr<Aligner> aligner;
-    MessageSink* converted_reads_sink = nullptr;
+
+    PipelineDescriptor pipeline_desc;
+    auto bam_writer = PipelineDescriptor::InvalidNodeHandle;
+    auto aligner = PipelineDescriptor::InvalidNodeHandle;
+    auto converted_reads_sink = PipelineDescriptor::InvalidNodeHandle;
     if (ref.empty()) {
-        bam_writer = pipeline.AddNode<HtsWriter>("-", output_mode,
-                                                 thread_allocations.writer_threads, num_reads);
-        bam_writer->write_header(hdr.get());
-        converted_reads_sink = bam_writer.get();
+        bam_writer = pipeline_desc.add_node<HtsWriter>({}, "-", output_mode,
+                                                 thread_allocations.writer_threads, num_reads,
+                                                 hdr.get());
+        converted_reads_sink = bam_writer;
     } else {
-        bam_writer = pipeline.AddNode<HtsWriter>("-", output_mode,
-                                                 thread_allocations.writer_threads, num_reads);
-        aligner = pipeline.AddNode<utils::Aligner>(*bam_writer, ref, kmer_size, window_size,
+        // Aligner constructor fills in header_sequence_records.
+        sq_t header_sequence_records;
+        aligner = pipeline_desc.add_node<Aligner>({}, ref, kmer_size, window_size,
                                                    mm2_index_batch_size,
-                                                   thread_allocations.aligner_threads);
-        utils::add_sq_hdr(hdr.get(), aligner->get_sequence_records_for_header());
-        bam_writer->write_header(hdr.get());
-        converted_reads_sink = aligner.get();
+                                                   thread_allocations.aligner_threads,
+                                                   header_sequence_records);
+        utils::add_sq_hdr(hdr.get(), header_sequence_records);
+        bam_writer = pipeline_desc.add_node<HtsWriter>({}, "-", output_mode,
+                                                 thread_allocations.writer_threads, num_reads,
+                                                 hdr.get());
+        pipeline_desc.add_node_sink(aligner, bam_writer);
+        converted_reads_sink = aligner;
     }
-    auto read_converter = pipeline.AddNode<ReadToBamType>(*converted_reads_sink, emit_moves, rna,
+    auto read_converter = pipeline_desc.add_node<ReadToBamType>({converted_reads_sink}, emit_moves, rna,
                                  thread_allocations.read_converter_threads,
                                  methylation_threshold_pct);
-    auto read_filter_node = pipeline.AddNode<ReadFilterNode>(*stats_node, min_qscore, default_parameters.min_seqeuence_length,
+    auto read_filter_node = pipeline_desc.add_node<ReadFilterNode>({read_converter}, min_qscore, default_parameters.min_sequence_length,
                                     thread_allocations.read_filter_threads);
 
-    std::shared_ptr<ModBaseCallerNode> mod_base_caller_node;
-    MessageSink* basecaller_node_sink = dynamic_cast<MessageSink*>(read_filter_node.get());
+    auto mod_base_caller_node = PipelineDescriptor::InvalidNodeHandle;
+    auto basecaller_node_sink = read_filter_node;
     if (!remora_model_list.empty()) {
-        mod_base_caller_node = pipeline.AddNode<ModBaseCallerNode>( *read_filter_node, std::move(remora_runners),
+        mod_base_caller_node = pipeline_desc.add_node<ModBaseCallerNode>({read_filter_node}, std::move(remora_runners),
                 thread_allocations.remora_threads * num_devices, model_stride, remora_batch_size);
-        basecaller_node_sink = dynamic_cast<MessageSink*>(mod_base_caller_node.get());
+        basecaller_node_sink = mod_base_caller_node;
     }
     const int kBatchTimeoutMS = 100;
-    std::shared_ptr<BasecallerNode> basecaller_node = 
-        pipeline.AddNode<BasecallerNode>(*basecaller_node_sink, runners, overlap,
+    auto basecaller_node = 
+        pipeline_desc.add_node<BasecallerNode>({basecaller_node_sink}, runners, overlap,
                                    kBatchTimeoutMS, model_name, 1000);
 
+    auto scaler_node = pipeline_desc.add_node<ScalerNode>({basecaller_node}, model_config.signal_norm_params,
+                           thread_allocations.scaler_node_threads);
 
-    auto scaler_node = pipeline.AddNode<ScalerNode>(*basecaller_node, thread_allocations.scaler_node_threads);
-
-    // This needs to be part of the same class hierarchy as other nodes to be treated
-    // in the same way.
-    DataLoader loader(*scaler_node, "cpu", thread_allocations.loader_threads, max_reads, read_list);
-
-    // Setup stats counting
-    std::unique_ptr<dorado::stats::StatsSampler> stats_sampler;
-    if (!dump_stats_file.empty()) {
-        std::vector<dorado::stats::StatsReporter> stats_reporters;
-        using dorado::stats::make_stats_reporter;
-        stats_reporters.push_back(make_stats_reporter(*basecaller_node));
-        if (mod_base_caller_node) {
-            stats_reporters.push_back(make_stats_reporter(*mod_base_caller_node));
-        }
-        if (aligner) {
-            stats_reporters.push_back(make_stats_reporter(*aligner));
-        }
-        stats_reporters.push_back(make_stats_reporter(*bam_writer));
-        stats_reporters.push_back(make_stats_reporter(loader));
-        stats_reporters.push_back(make_stats_reporter(*scaler_node));
-        stats_reporters.push_back(make_stats_reporter(*read_filter_node));
-
-        constexpr auto kStatsPeriod = 100ms;
-        stats_sampler =
-                std::make_unique<dorado::stats::StatsSampler>(kStatsPeriod, stats_reporters);
+    // Create the Pipeline from our description.
+    std::vector<dorado::stats::StatsReporter> stats_reporters;
+    auto pipeline = Pipeline::create(std::move(pipeline_desc), &stats_reporters);
+    if (pipeline == nullptr) {
+        spdlog::error("Failed to create pipeline");
+        std::exit(EXIT_FAILURE);
     }
-    if (aligner) {
-        stats_reporters.push_back(make_stats_reporter(*aligner));
-    }
-    stats_reporters.push_back(make_stats_reporter(*bam_writer));
-    stats_reporters.push_back(make_stats_reporter(loader));
-    stats_reporters.push_back(make_stats_reporter(scaler_node));
-    stats_reporters.push_back(make_stats_reporter(read_filter_node));
 
+    // Set up stats counting
     std::vector<dorado::stats::StatsCallable> stats_callables;
     ProgressTracker tracker(num_reads, duplex);
     stats_callables.push_back(
             [&tracker](const stats::NamedStats& stats) { tracker.update_progress_bar(stats); });
-
     constexpr auto kStatsPeriod = 100ms;
-    stats_sampler = std::make_unique<dorado::stats::StatsSampler>(kStatsPeriod, stats_reporters,
+    auto stats_sampler = std::make_unique<dorado::stats::StatsSampler>(kStatsPeriod, stats_reporters,
                                                                   stats_callables);
-    // End stats counting setup.
+
+    DataLoader loader(*pipeline, "cpu", thread_allocations.loader_threads, max_reads, read_list);
 
     // Run pipeline.
     loader.load_reads(data_path, recursive_file_loading);
 
-    bam_writer->join();
-    // End pipeline
+    // Wait until work is finished before summarising stats.
+    pipeline->wait_until_done();
 
     stats_sampler->terminate();
     tracker.summarize();

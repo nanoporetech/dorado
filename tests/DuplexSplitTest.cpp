@@ -44,9 +44,8 @@ TEST_CASE("4 subread splitting test", TEST_GROUP) {
     torch::load(read->raw_data, DataPath("raw.tensor").string());
     read->raw_data = read->raw_data.to(torch::kFloat16);
 
-    dorado::NullNode null_node;
     dorado::DuplexSplitSettings splitter_settings;
-    dorado::DuplexSplitNode splitter_node(null_node, splitter_settings, 1);
+    dorado::DuplexSplitNode splitter_node(splitter_settings, 1);
 
     const auto split_res = splitter_node.split(read);
     REQUIRE(split_res.size() == 4);

@@ -3,9 +3,12 @@
 
 #include <utils/stats.h>
 
+#include <atomic>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <optional>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -48,8 +51,7 @@ public:
     typedef std::pair<uint64_t, uint64_t> PosRange;
     typedef std::vector<PosRange> PosRanges;
 
-    DuplexSplitNode(MessageSink& sink,
-                    DuplexSplitSettings settings,
+    DuplexSplitNode(DuplexSplitSettings settings,
                     int num_worker_threads = 5,
                     size_t max_reads = 1000);
     ~DuplexSplitNode();
@@ -81,7 +83,6 @@ private:
     std::vector<std::pair<std::string, SplitFinderF>> build_split_finders() const;
 
     void worker_thread();  // Worker thread performs splitting asynchronously.
-    MessageSink& m_sink;   // MessageSink to consume scaled reads.
 
     const DuplexSplitSettings m_settings;
     std::vector<std::pair<std::string, SplitFinderF>> m_split_finders;

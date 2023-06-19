@@ -3,11 +3,13 @@
 #include "utils/stats.h"
 #include "utils/types.h"
 
+#include <spdlog/spdlog.h>
 #include <torch/torch.h>
 
 #include <cstdint>
 #include <limits>
 #include <memory>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -130,24 +132,15 @@ public:
 // To add more message types, simply add them to the list of types in the std::variant.
 using Message = std::variant<std::shared_ptr<Read>, BamPtr, std::shared_ptr<ReadPair>>;
 
-// Base class for an object which consumes messages.
-// MessageSink is a node within a pipeline.
-// NOTE: In order to prevent potential deadlocks when
-// the writer to the node doesn't exit cleanly, always
-// call terminate() in the destructor of a class derived
-// from MessageSink (and before worker thread join() calls
-// if there are any).
-// TODO -- rename to PipelineNode or DAGNode or similar.  The fundamental attribute here
-// is not being a MessageSink any longer.  Pure source nodes should be part of this.
+using NodeHandle = int;
+
+// Base class for an object which consumes messages as part of the processing pipeline.
+// Destructors of derived classes must call terminate() in order to shut down
+// waits on the input queue before attempting to join input worker threads.
 class MessageSink {
 public:
     MessageSink(size_t max_messages);
     virtual ~MessageSink() = default;
-    // Pushed messages must be rvalues: the sink takes ownership.
-    void push_message(
-            Message&&
-                    message);  // Push a message into message sink.  This can block if the sink's queue is full.
-    void terminate() { m_work_queue.terminate(); }
 
     // StatsSampler will ignore nodes with an empty name.
     virtual std::string get_name() const { return std::string(""); }
@@ -155,30 +148,138 @@ public:
         return std::unordered_map<std::string, double>();
     }
 
+    // Adds a message to the input queue.  This can block if the sink's queue is full.
+    // Pushed messages must be rvalues: the input queue takes ownership.
+    void push_message(Message&& message);
+
+    // Blocks until the node is finished with work.
+    // If work is being sent to this node this may block indefinitely.
+    virtual void wait_until_done() const;
+
+    // Terminates waits on the input queue.
+    void terminate() { m_work_queue.terminate(); }
+
 protected:
+    // Sends message to the designated sink.
+    void send_message_to_sink(int sink_index, Message&& message);
+
+    // Version for nodes with a single sink that is implicit.
+    void send_message_to_sink(Message&& message) {
+        assert(m_sinks.size() == 1);
+        send_message_to_sink(0, std::move(message));
+    }
+
     // Queue of work items for this node.
     AsyncQueue<Message> m_work_queue;
+
+private:
+    // The sinks to which this node can send messages.
+    std::vector<std::reference_wrapper<MessageSink>> m_sinks;
+
+    friend class Pipeline;
+    void add_sink(MessageSink& sink);
 };
 
-// Manages creation and destruction of pipeline nodes.
-// TODO -- change name to DAG or Graph or similar?  Or is it worth living with
-// the slightly misleading implications of Pipeline?
+// Object from which a Pipeline is created.
+// While this currently embodies constructed pipeline nodes, the intent is that this
+// could be evolve toward, or be augmented by, other means of describing the pipeline.
+class PipelineDescriptor {
+    friend class Pipeline;
+
+    std::vector<std::unique_ptr<MessageSink>> m_nodes;
+    std::vector<std::vector<NodeHandle>> m_node_sink_handles;
+
+    struct NodeDescriptor {
+        std::unique_ptr<MessageSink> node;
+        std::vector<NodeHandle> sink_handles;
+    };
+    std::vector<NodeDescriptor> m_node_descriptors;
+
+    bool is_handle_valid(NodeHandle handle) const {
+        return handle >= 0 && handle < m_node_descriptors.size();
+    }
+
+public:
+    static const NodeHandle InvalidNodeHandle = -1;
+
+    // Adds the node of specified type, returning a handle.
+    // 0 or more sinks can be specified here, and augmented subsequently via AddNodeSink.
+    template <class NodeType, class... Args>
+    NodeHandle add_node(std::initializer_list<NodeHandle> sink_handles, Args&&... args) {
+        // TODO -- probably want to make node constructors private, which would entail
+        // avoiding make_unique.
+        auto node = std::make_unique<NodeType>(std::forward<Args>(args)...);
+        auto sink_handles_vec { sink_handles };
+        NodeDescriptor node_desc { std::move(node), std::move(sink_handles_vec) };
+        m_node_descriptors.push_back(std::move(node_desc));
+        return static_cast<NodeHandle>(m_node_descriptors.size() - 1);
+    }
+
+    // Adds a sink the specified node.
+    // Returns true on success.
+    bool add_node_sink(NodeHandle node_handle, NodeHandle sink_handle) {
+        if (!is_handle_valid(node_handle) || !is_handle_valid(sink_handle)) {
+            spdlog::error("Invalid node handle");
+            return false;
+        }
+        m_node_descriptors[node_handle].sink_handles.push_back(sink_handle);
+        return true;
+    }
+};
+
+// Created from PipelineDescriptor.  Accepts messages and processes them.
+// When the Pipeline object is destroyed, the nodes it owns will be destroyed
+// in an ordering where sources come before sinks.
 class Pipeline {
 public:
-    // TODO -- this is returning a shared_ptr for use by current code.  In the
-    // end we can wire up nodes inside Pipeline and not expose their pointers at all to
-    // users of Pipeline.  There's also no reason to use shared_ptr instead of
-    // unique_ptr.
-    template <class NodeType, class... Args>
-    std::shared_ptr<NodeType> AddNode(Args&&... args) {
-        // TODO -- probably want to make node constructors private, which would entail
-        // avoiding make_shared/make_unique.
-        m_nodes.push_back(std::make_shared<NodeType>(std::forward<Args>(args)...));
-        return std::dynamic_pointer_cast<NodeType>(m_nodes.back());
+    ~Pipeline();
+
+    Pipeline(const Pipeline&) = delete;
+    Pipeline& operator=(const Pipeline&) = delete;
+
+    Pipeline(Pipeline&&) = default;
+    Pipeline& operator=(Pipeline&&) = default;
+
+    // Factory method that creates a Pipeline from a PipelineDescriptor, which is
+    // consumed during creation.
+    // If non-null, stats_reporters has node stats reporters added to it.
+    // Returns the resulting pipeline, or a null unique_ptr on error.
+    static std::unique_ptr<Pipeline> create(PipelineDescriptor&& descriptor,
+        std::vector<dorado::stats::StatsReporter>* stats_reporters = nullptr);
+
+    // Routes the given message to the pipeline source node.
+    void push_message(Message&& message);
+
+    // Waits until all nodes report that they have finished work.  The nodes
+    // remain able to accept subsequent work.
+    void wait_until_done() const;
+
+    // Terminates all nodes.  The pipeline will not accept subsequent work.
+    //void terminate_nodes();
+
+    // Returns a pointer to the node associated with the given handle.
+    // Intended for testing purposes.
+    MessageSink* get_node_ptr(NodeHandle handle) {
+        return m_nodes.at(handle).get();
     }
 
 private:
-    std::vector<std::shared_ptr<MessageSink>> m_nodes;
+    // Constructor is private to ensure instances of this class are created
+    // through the create function.
+    Pipeline(PipelineDescriptor&& descriptor, std::vector<NodeHandle> source_to_sink_order,
+        std::vector<dorado::stats::StatsReporter>* stats_reporters);
+
+    std::vector<std::unique_ptr<MessageSink>> m_nodes;
+    std::vector<NodeHandle> m_source_to_sink_order;
+
+    enum class DFSState {
+        Unvisited,
+        Visiting,
+        Visited
+    };
+
+    static bool DFS(const std::vector<PipelineDescriptor::NodeDescriptor>& node_descriptors, NodeHandle node_handle,
+        std::vector<DFSState>& dfs_state, std::vector<NodeHandle>& source_to_sink_order);
 };
 
 }  // namespace dorado

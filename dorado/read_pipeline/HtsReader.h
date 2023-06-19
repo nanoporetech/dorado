@@ -4,6 +4,7 @@
 #include "utils/stats.h"
 #include "utils/types.h"
 
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -13,12 +14,14 @@ namespace dorado {
 
 using read_map = std::unordered_map<std::string, std::shared_ptr<Read>>;
 
+class Pipeline;
+
 class HtsReader {
 public:
     HtsReader(const std::string& filename);
     ~HtsReader();
     bool read();
-    void read(MessageSink& read_sink, int max_reads = -1);
+    void read(Pipeline& pipeline, int max_reads = -1);
     template <typename T>
     T get_tag(std::string tagname);
     bool has_tag(std::string tagname);

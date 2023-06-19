@@ -4,18 +4,19 @@
 #include "utils/stats.h"
 
 #include <atomic>
+#include <deque>
 #include <map>
 #include <mutex>
 #include <string>
 #include <thread>
+#include <tuple>
 #include <vector>
 
 namespace dorado {
 
 class PairingNode : public MessageSink {
 public:
-    PairingNode(MessageSink& sink,
-                std::optional<std::map<std::string, std::string>> = std::nullopt,
+    PairingNode(std::optional<std::map<std::string, std::string>> = std::nullopt,
                 int num_worker_threads = 2,
                 size_t max_reads = 1000);
     ~PairingNode();
@@ -31,7 +32,6 @@ private:
     using UniquePoreIdentifierKey = std::tuple<int, int, std::string, std::string>;
 
     std::vector<std::unique_ptr<std::thread>> m_workers;
-    MessageSink& m_sink;
     std::map<std::string, std::string> m_template_complement_map;
     std::map<std::string, std::string> m_complement_template_map;
 

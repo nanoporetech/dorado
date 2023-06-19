@@ -20,8 +20,7 @@ namespace dorado {
 /// which are applied to each read.
 class ReadFilterNode : public MessageSink {
 public:
-    ReadFilterNode(MessageSink& sink,
-                   size_t min_qscore,
+    ReadFilterNode(size_t min_qscore,
                    size_t min_read_length,
                    size_t num_worker_threads);
     ~ReadFilterNode();
@@ -29,12 +28,10 @@ public:
     stats::NamedStats sample_stats() const override;
 
 private:
-    MessageSink& m_sink;
     void worker_thread();
 
     // Async worker for writing.
     std::vector<std::unique_ptr<std::thread>> m_workers;
-    std::atomic<size_t> m_active_threads;
 
     size_t m_min_qscore;
     size_t m_min_read_length;

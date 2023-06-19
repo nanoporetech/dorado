@@ -33,7 +33,7 @@ void BasecallerNode::input_worker_thread() {
         // to the basecaller node having already been called. This should be fixed in the future with
         // support for graphs of nodes rather than linear pipelines.
         if (!read->seq.empty()) {
-            m_sink.push_message(read);
+            send_message_to_sink(read);
             continue;
         }
         // Now that we have acquired a read, wait until we can push to chunks_in
@@ -98,6 +98,7 @@ void BasecallerNode::input_worker_thread() {
     // Notify the basecaller threads that it is safe to gracefully terminate the basecaller
     m_terminate_basecaller.store(true);
     m_chunks_added_cv.notify_all();
+    spdlog::error("input_worker_thread finishing");
 }
 
 void BasecallerNode::basecall_current_batch(int worker_id) {
@@ -157,11 +158,9 @@ void BasecallerNode::working_reads_manager() {
             ++m_called_reads_pushed;
             m_num_bases_processed += read->seq.length();
             m_num_samples_processed += read->raw_data.size(0);
-            m_sink.push_message(std::move(read));
+            send_message_to_sink(std::move(read));
         }
     }
-
-    m_sink.terminate();
 }
 
 void BasecallerNode::basecall_worker_thread(int worker_id) {
@@ -261,15 +260,13 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
     }
 }
 
-BasecallerNode::BasecallerNode(MessageSink &sink,
-                               std::vector<Runner> model_runners,
+BasecallerNode::BasecallerNode(std::vector<Runner> model_runners,
                                size_t overlap,
                                int batch_timeout_ms,
                                std::string model_name,
                                size_t max_reads,
                                const std::string &node_name)
         : MessageSink(max_reads),
-          m_sink(sink),
           m_model_runners(std::move(model_runners)),
           m_chunk_size(m_model_runners.front()->chunk_size()),
           m_overlap(overlap),

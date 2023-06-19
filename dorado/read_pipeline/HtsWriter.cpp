@@ -15,8 +15,8 @@
 
 namespace dorado {
 
-HtsWriter::HtsWriter(const std::string& filename, OutputMode mode, size_t threads, size_t num_reads)
-        : MessageSink(10000), m_num_reads_expected(num_reads) {
+HtsWriter::HtsWriter(const std::string& filename, OutputMode mode, size_t threads, size_t num_reads, const sam_hdr_t* header)
+        : MessageSink(10000), m_num_reads_expected(num_reads), m_header(sam_hdr_dup(header)) {
     switch (mode) {
     case FASTQ:
         m_file = hts_open(filename.c_str(), "wf");
@@ -43,6 +43,10 @@ HtsWriter::HtsWriter(const std::string& filename, OutputMode mode, size_t thread
         }
     }
 
+    if (sam_hdr_write(m_file, m_header)) {
+        throw std::runtime_error("Failed to write header");
+    }
+
     m_worker = std::make_unique<std::thread>(std::thread(&HtsWriter::worker_thread, this));
 }
 
@@ -50,13 +54,14 @@ HtsWriter::~HtsWriter() {
     // Adding for thread safety in case worker thread throws exception.
     terminate();
     if (m_worker->joinable()) {
-        join();
+        m_worker->join();
     }
-    sam_hdr_destroy(header);
+    sam_hdr_destroy(m_header);
     hts_close(m_file);
+    spdlog::info("> total/primary/unmapped {}/{}/{}", total, primary, unmapped);
 }
 
-HtsWriter::OutputMode HtsWriter::get_output_mode(std::string mode) {
+HtsWriter::OutputMode HtsWriter::get_output_mode(const std::string& mode) {
     if (mode == "sam") {
         return SAM;
     } else if (mode == "bam") {
@@ -66,8 +71,6 @@ HtsWriter::OutputMode HtsWriter::get_output_mode(std::string mode) {
     }
     throw std::runtime_error("Unknown output mode: " + mode);
 }
-
-void HtsWriter::join() { m_worker->join(); }
 
 void HtsWriter::worker_thread() {
     size_t write_count = 0;
@@ -105,19 +108,11 @@ int HtsWriter::write(bam1_t* record) {
     }
     primary = total - secondary - supplementary - unmapped;
 
-    auto res = sam_write1(m_file, header, record);
+    auto res = sam_write1(m_file, m_header, record);
     if (res < 0) {
         throw std::runtime_error("Failed to write SAM record, error code " + std::to_string(res));
     }
     return res;
-}
-
-int HtsWriter::write_header(const sam_hdr_t* hdr) {
-    if (hdr) {
-        header = sam_hdr_dup(hdr);
-        return sam_hdr_write(m_file, header);
-    }
-    return 0;
 }
 
 stats::NamedStats HtsWriter::sample_stats() const {

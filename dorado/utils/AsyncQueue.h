@@ -3,7 +3,6 @@
 #include <atomic>
 #include <condition_variable>
 #include <mutex>
-#include <optional>
 #include <queue>
 #include <string>
 #include <unordered_map>
@@ -18,7 +17,7 @@ class AsyncQueue {
     mutable std::mutex m_mutex;
     // Signalled when an item has been consumed, and the queue therefore has space
     // for new items.
-    std::condition_variable m_not_full_cv;
+    mutable std::condition_variable m_item_consumed_cv;
     // Signalled when an item has been added, and the queue therefore is not empty.
     std::condition_variable m_not_empty_cv;
     // Holds the items.
@@ -52,7 +51,7 @@ public:
         std::unique_lock lock(m_mutex);
 
         // Ensure there is space for the new item, given our limit on capacity.
-        m_not_full_cv.wait(lock, [this] { return m_items.size() < m_capacity || m_terminate; });
+        m_item_consumed_cv.wait(lock, [this] { return m_items.size() < m_capacity || m_terminate; });
 
         // We hold the mutex, and either there is space in the queue, or we have been
         // asked to terminate.
@@ -87,7 +86,7 @@ public:
 
         // Inform a waiting thread that the queue is not full.
         lock.unlock();
-        m_not_full_cv.notify_one();
+        m_item_consumed_cv.notify_one();
 
         return true;
     }
@@ -103,8 +102,15 @@ public:
         // necessary.
         // notify_all, since in general an arbitrary number of threads can be
         // inside try_push/try_pop.
-        m_not_full_cv.notify_all();
+        m_item_consumed_cv.notify_all();
         m_not_empty_cv.notify_all();
+    }
+
+    // Blocks until the queue is empty, on the assumption that items are being consumed
+    // and not added, or until we are asked to terminate.
+    void wait_until_empty() const {
+        std::unique_lock lock(m_mutex);
+        m_item_consumed_cv.wait(lock, [this] { return m_items.empty() || m_terminate; });
     }
 
     std::string get_name() const { return "queue"; }

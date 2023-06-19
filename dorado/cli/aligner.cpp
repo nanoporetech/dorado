@@ -101,43 +101,44 @@ int aligner(int argc, char* argv[]) {
 
     spdlog::info("> loading index {}", index);
 
+    HtsReader reader(reads[0]);
+    spdlog::debug("> input fmt: {} aligned: {}", reader.format, reader.is_aligned);
+    auto header = sam_hdr_dup(reader.header);
+    add_pg_hdr(header);
+
+    PipelineDescriptor pipeline_desc;
+    sq_t header_sequence_records;
+    auto aligner = pipeline_desc.add_node<Aligner>({}, index, kmer_size, window_size, index_batch_size, aligner_threads, header_sequence_records);
+    utils::add_sq_hdr(header, header_sequence_records);
+    auto writer = pipeline_desc.add_node<HtsWriter>({}, "-", HtsWriter::OutputMode::BAM, writer_threads, 0, header);
+    pipeline_desc.add_node_sink(aligner, writer);
+
+    // Create the Pipeline from our description.
+    std::vector<dorado::stats::StatsReporter> stats_reporters;
+    auto pipeline = Pipeline::create(std::move(pipeline_desc), &stats_reporters);
+    if (pipeline == nullptr) {
+        spdlog::error("Failed to create pipeline");
+        std::exit(EXIT_FAILURE);
+    }
+
+    // Set up stats counting
     std::vector<dorado::stats::StatsCallable> stats_callables;
     ProgressTracker tracker(0, false);
     stats_callables.push_back(
             [&tracker](const stats::NamedStats& stats) { tracker.update_progress_bar(stats); });
-
-    HtsWriter writer("-", HtsWriter::OutputMode::BAM, writer_threads, 0);
-    Aligner aligner(writer, index, kmer_size, window_size, index_batch_size, aligner_threads);
-    HtsReader reader(reads[0]);
-
-    spdlog::debug("> input fmt: {} aligned: {}", reader.format, reader.is_aligned);
-    auto header = sam_hdr_dup(reader.header);
-    add_pg_hdr(header);
-    utils::add_sq_hdr(header, aligner.get_sequence_records_for_header());
-    writer.write_header(header);
-
-    // Setup stats counting.
-    std::unique_ptr<dorado::stats::StatsSampler> stats_sampler;
-    std::vector<dorado::stats::StatsReporter> stats_reporters;
-    using dorado::stats::make_stats_reporter;
-    stats_reporters.push_back(make_stats_reporter(writer));
-    stats_reporters.push_back(make_stats_reporter(aligner));
-
     constexpr auto kStatsPeriod = 100ms;
-    stats_sampler = std::make_unique<dorado::stats::StatsSampler>(kStatsPeriod, stats_reporters,
+    auto stats_sampler = std::make_unique<dorado::stats::StatsSampler>(kStatsPeriod, stats_reporters,
                                                                   stats_callables);
-    // End stats counting setup.
 
     spdlog::info("> starting alignment");
-    reader.read(aligner, max_reads);
-    writer.join();
+    reader.read(*pipeline, max_reads);
+
+    pipeline->wait_until_done();
 
     stats_sampler->terminate();
     tracker.summarize();
 
     spdlog::info("> finished alignment");
-    spdlog::info("> total/primary/unmapped {}/{}/{}", writer.total, writer.primary,
-                 writer.unmapped);
 
     return 0;
 }

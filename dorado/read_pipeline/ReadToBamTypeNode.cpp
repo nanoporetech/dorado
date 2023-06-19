@@ -2,6 +2,7 @@
 
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
 #include <chrono>
 
 namespace dorado {
@@ -21,24 +22,19 @@ void ReadToBamType::worker_thread() {
 
         auto alns = read->extract_sam_lines(m_emit_moves, m_modbase_threshold);
         for (auto& aln : alns) {
-            m_sink.push_message(std::move(aln));
+            send_message_to_sink(std::move(aln));
         }
     }
 
     auto num_active_threads = --m_active_threads;
-    if (num_active_threads == 0) {
-        m_sink.terminate();
-    }
 }
 
-ReadToBamType::ReadToBamType(MessageSink& sink,
-                             bool emit_moves,
+ReadToBamType::ReadToBamType(bool emit_moves,
                              bool rna,
                              size_t num_worker_threads,
                              float modbase_threshold_frac,
                              size_t max_reads)
         : MessageSink(max_reads),
-          m_sink(sink),
           m_emit_moves(emit_moves),
           m_rna(rna),
           m_modbase_threshold(
@@ -55,7 +51,6 @@ ReadToBamType::~ReadToBamType() {
     for (auto& m : m_workers) {
         m->join();
     }
-    m_sink.terminate();
 }
 
 }  // namespace dorado

@@ -45,6 +45,6 @@ TEST_CASE("ReadFilterNode: Filter read based on qscore", TEST_GROUP) {
     }
 
     auto messages = sink.get_messages();
-    REQUIRE(messages.size() == 1);
-    REQUIRE(messages[0]->read_id == "read_2");
+    CHECK(messages.size() == 1);
+    CHECK(messages[0]->read_id == "read_2");
 }

@@ -431,13 +431,13 @@ void DuplexSplitNode::worker_thread() {
 
     while (m_work_queue.try_pop(message)) {
         if (!m_settings.enabled) {
-            m_sink.push_message(std::move(message));
+            send_message_to_sink(std::move(message));
         } else {
             // If this message isn't a read, we'll get a bad_variant_access exception.
             auto init_read = std::get<std::shared_ptr<Read>>(message);
             for (auto& subread : split(init_read)) {
                 //TODO correctly process end_reason when we have them
-                m_sink.push_message(std::move(subread));
+                send_message_to_sink(std::move(subread));
             }
         }
     }
@@ -445,16 +445,13 @@ void DuplexSplitNode::worker_thread() {
     int num_active = --m_active;
     if (num_active == 0) {
         terminate();
-        m_sink.terminate();
     }
 }
 
-DuplexSplitNode::DuplexSplitNode(MessageSink& sink,
-                                 DuplexSplitSettings settings,
+DuplexSplitNode::DuplexSplitNode(DuplexSplitSettings settings,
                                  int num_worker_threads,
                                  size_t max_reads)
         : MessageSink(max_reads),
-          m_sink(sink),
           m_settings(std::move(settings)),
           m_num_worker_threads(num_worker_threads) {
     m_split_finders = build_split_finders();
@@ -471,9 +468,6 @@ DuplexSplitNode::~DuplexSplitNode() {
     for (auto& t : worker_threads) {
         t->join();
     }
-
-    // Notify the sink that the Node has terminated
-    m_sink.terminate();
 }
 
 stats::NamedStats DuplexSplitNode::sample_stats() const { return stats::from_obj(m_work_queue); }

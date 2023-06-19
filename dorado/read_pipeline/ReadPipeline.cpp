@@ -9,6 +9,7 @@
 #include <chrono>
 #include <iomanip>
 #include <sstream>
+#include <stack>
 
 using namespace std::chrono_literals;
 
@@ -250,6 +251,15 @@ void Read::generate_modbase_string(bam1_t *aln, uint8_t threshold) const {
     bam_aux_update_array(aln, "ML", 'C', modbase_prob.size(), (uint8_t *)modbase_prob.data());
 }
 
+MessageSink::MessageSink(size_t max_messages) : m_work_queue(max_messages) {}
+
+void MessageSink::wait_until_done() const {
+    // This only waits for the input queue to be empty.  Waiting for outstanding message
+    // processing work within the node, including work in other queues, requires a
+    // node-specific implementation.
+    m_work_queue.wait_until_empty();
+}
+
 void MessageSink::push_message(Message &&message) {
     const bool success = m_work_queue.try_push(std::move(message));
     // try_push will fail if the sink has been told to terminate.
@@ -257,6 +267,122 @@ void MessageSink::push_message(Message &&message) {
     assert(success);
 }
 
-MessageSink::MessageSink(size_t max_messages) : m_work_queue(max_messages) {}
+// Depth first search that establishes a topological ordering for node destruction.
+// Returns true if a cycle is found.
+bool Pipeline::DFS(const std::vector<PipelineDescriptor::NodeDescriptor>& node_descriptors, NodeHandle node_handle,
+    std::vector<DFSState>& dfs_state, std::vector<NodeHandle>& source_to_sink_order) {
+    auto& node_state = dfs_state.at(node_handle);
+    if (node_state == DFSState::Visited) {
+        // Already reached this node via another route.
+        return false;
+    }
+    if (node_state == DFSState::Visiting) {
+        // Back edge => cycle.
+        return true;
+    }
+    node_state = DFSState::Visiting;
+    auto sink_handles = node_descriptors.at(node_handle).sink_handles;
+    for (auto sink_handle : sink_handles) {
+        if (DFS(node_descriptors, sink_handle, dfs_state, source_to_sink_order)) {
+            return true;
+        }
+    }
+    node_state = DFSState::Visited;
+    source_to_sink_order.push_back(node_handle);
+    return false;
+}
+
+std::unique_ptr<Pipeline> Pipeline::create(PipelineDescriptor&& descriptor,
+        std::vector<dorado::stats::StatsReporter>* const stats_reporters) {
+    // Find a source node, i.e. one that is not the sink of any other node.
+    // There should be exactly 1 one for a valid pipeline.
+    const auto node_count = descriptor.m_node_descriptors.size();
+    std::vector<bool> is_sink(node_count, false);
+    for (auto& [desc_node, sink_handles] : descriptor.m_node_descriptors) {
+        for (auto sink_handle : sink_handles) {
+            is_sink.at(sink_handle) = true;
+        }
+    }
+    const auto num_sources = std::count(is_sink.cbegin(), is_sink.cend(), false);
+    if (num_sources != 1) {
+        spdlog::error("There must be exactly 1 source node.  {} were present.", num_sources);
+        return nullptr;
+    }
+    auto source_it = std::find(is_sink.cbegin(), is_sink.cend(), false);
+    auto source_node = std::distance(is_sink.cbegin(), source_it);
+    spdlog::error("Source node {}", source_node);
+
+    // Perform a depth first search from the source to determine the
+    // source-to-sink destruction order.  At the same time, cycles are detected.
+    std::vector<NodeHandle> source_to_sink_order;
+    std::vector<DFSState> dfs_state(node_count, DFSState::Unvisited);
+    const bool has_cycle = DFS(descriptor.m_node_descriptors, source_node, dfs_state, source_to_sink_order);
+    if (has_cycle) {
+        spdlog::error("Graph has cycle");
+        return nullptr;
+    }
+    std::reverse(source_to_sink_order.begin(), source_to_sink_order.end());
+    // If the graph is fully connected then we should have visited all nodes.
+    assert(std::all_of(dfs_state.cbegin(), dfs_state.cend(), [](DFSState v) { return v == DFSState::Visited; }));
+    assert(source_to_sink_order.size() == descriptor.m_node_descriptors.size());
+
+    /*spdlog::error("Source-to-sink order: ");
+    for (auto x : source_to_sink_order)
+        spdlog::error("{}", x);*/
+
+    return std::unique_ptr<Pipeline>(new Pipeline(std::move(descriptor), source_to_sink_order, stats_reporters));
+}
+
+Pipeline::Pipeline(PipelineDescriptor&& descriptor, std::vector<NodeHandle> source_to_sink_order,
+    std::vector<dorado::stats::StatsReporter>* const stats_reporters) :
+    m_source_to_sink_order(std::move(source_to_sink_order)) {
+    for (auto& [desc_node, _] : descriptor.m_node_descriptors) {
+        m_nodes.push_back(std::move(desc_node));
+        if (stats_reporters) {
+            stats_reporters->push_back(stats::make_stats_reporter(*m_nodes.back()));
+        }
+    }
+
+    for (size_t i = 0; i < m_nodes.size(); ++i) {
+        auto& node = m_nodes.at(i);
+        const auto& sink_handles = descriptor.m_node_descriptors.at(i).sink_handles;
+        for (const auto sink_handle : sink_handles) 
+            node->add_sink(dynamic_cast<MessageSink&>(*m_nodes.at(sink_handle)));
+    }
+}
+
+void MessageSink::add_sink(MessageSink& sink) {
+    m_sinks.push_back(std::ref(sink));
+}
+
+void MessageSink::send_message_to_sink(int sink_index, Message&& message) {
+    m_sinks.at(sink_index).get().push_message(std::move(message));
+}
+
+void Pipeline::push_message(Message&& message) {
+    assert(!m_nodes.empty());
+    dynamic_cast<MessageSink&>(*m_nodes.back()).push_message(std::move(message));
+}
+
+Pipeline::~Pipeline() {
+    for (auto handle : m_source_to_sink_order) {
+        //spdlog::error("Tearing down {}", m_nodes.at(handle)->get_name());
+        m_nodes.at(handle).reset();  
+    }
+}
+
+void Pipeline::wait_until_done() const {
+    for (auto handle : m_source_to_sink_order) {
+        m_nodes.at(handle)->wait_until_done();  
+    }
+}
+
+/*void Pipeline::terminate_nodes() {
+    for (auto handle : m_source_to_sink_order) {
+        std::cerr << "Calling terminate on "<< m_nodes.at(handle)->get_name() << "\n";
+        m_nodes.at(handle)->terminate();  
+    }
+    std::cerr << "Terminated all nodes\n";
+}*/
 
 }  // namespace dorado

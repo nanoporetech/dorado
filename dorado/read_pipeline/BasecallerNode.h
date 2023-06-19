@@ -12,8 +12,7 @@ namespace dorado {
 class BasecallerNode : public MessageSink {
 public:
     // Chunk size and overlap are in raw samples
-    BasecallerNode(MessageSink& sink,
-                   std::vector<Runner> model_runners,
+    BasecallerNode(std::vector<Runner> model_runners,
                    size_t overlap,
                    int batch_timeout_ms,
                    std::string model_name = "",
@@ -33,7 +32,6 @@ private:
     // Construct complete reads
     void working_reads_manager();
 
-    MessageSink& m_sink;
     // Vector of model runners (each with their own GPU access etc)
     std::vector<Runner> m_model_runners;
     // Chunk length

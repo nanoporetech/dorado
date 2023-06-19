@@ -16,13 +16,13 @@
 
 namespace dorado {
 
-Aligner::Aligner(MessageSink& sink,
-                 const std::string& filename,
+Aligner::Aligner(const std::string& filename,
                  int k,
                  int w,
                  uint64_t index_batch_size,
-                 int threads)
-        : MessageSink(10000), m_sink(sink), m_threads(threads) {
+                 int threads,
+                 std::vector<std::pair<char*, uint32_t>>& header_sequence_records)
+        : MessageSink(10000), m_threads(threads) {
     // Check if reference file exists.
     if (!std::filesystem::exists(filename)) {
         throw std::runtime_error("Aligner reference path does not exist: " + filename);
@@ -79,6 +79,8 @@ Aligner::Aligner(MessageSink& sink,
         m_workers.push_back(
                 std::make_unique<std::thread>(std::thread(&Aligner::worker_thread, this, i)));
     }
+
+    header_sequence_records = get_sequence_records_for_header();
 }
 
 Aligner::~Aligner() {
@@ -91,11 +93,9 @@ Aligner::~Aligner() {
     }
     mm_idx_reader_close(m_index_reader);
     mm_idx_destroy(m_index);
-    // Adding for thread safety in case worker thread throws exception.
-    m_sink.terminate();
 }
 
-std::vector<std::pair<char*, uint32_t>> Aligner::get_sequence_records_for_header() {
+sq_t Aligner::get_sequence_records_for_header() {
     std::vector<std::pair<char*, uint32_t>> records;
     for (int i = 0; i < m_index->n_seq; ++i) {
         records.push_back(std::make_pair(m_index->seq[i].name, m_index->seq[i].len));
@@ -104,21 +104,13 @@ std::vector<std::pair<char*, uint32_t>> Aligner::get_sequence_records_for_header
 }
 
 void Aligner::worker_thread(size_t tid) {
-    m_active++;  // Track active threads.
-
     Message message;
     while (m_work_queue.try_pop(message)) {
         auto read = std::get<BamPtr>(std::move(message));
         auto records = align(read.get(), m_tbufs[tid]);
         for (auto& record : records) {
-            m_sink.push_message(std::move(record));
+            send_message_to_sink(std::move(record));
         }
-    }
-
-    int num_active = --m_active;
-    if (num_active == 0) {
-        terminate();
-        m_sink.terminate();
     }
 }
 
