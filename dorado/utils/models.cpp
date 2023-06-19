@@ -29,6 +29,19 @@ void download_models(const std::string& target_directory, const std::string& sel
     http.enable_server_certificate_verification(false);
     http.set_follow_location(true);
 
+    const char* proxy_url = getenv("dorado_proxy");
+    const char* ps = getenv("dorado_proxy_port");
+
+    int proxy_port = 3128;
+    if (ps) {
+        proxy_port = atoi(ps);
+    }
+
+    if (proxy_url) {
+        spdlog::info("using proxy: {}:{}", proxy_url, proxy_port);
+        http.set_proxy(proxy_url, proxy_port);
+    }
+
     auto download_model_set = [&](std::vector<std::string> models) {
         for (const auto& model : models) {
             if (selected_model == "all" || selected_model == model) {
