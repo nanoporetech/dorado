@@ -78,7 +78,7 @@ public:
                 m_num_samples_processed += fetch_stat("StereoBasecallerNode.samples_processed");
             }
 
-            // don't output progress bar is stderr is not a tty
+            // don't output progress bar if stderr is not a tty
             if (!utils::is_fd_tty(stderr)) {
                 return;
             }
@@ -97,7 +97,7 @@ public:
                 std::cerr << "\r";
             }
         } else {
-            // don't output progress is stderr is not a tty
+            // don't output progress if stderr is not a tty
             if (!utils::is_fd_tty(stderr)) {
                 return;
             }
