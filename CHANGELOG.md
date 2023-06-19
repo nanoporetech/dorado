@@ -2,9 +2,37 @@
 
 All notable changes to Dorado will be documented in this file.
 
+# [0.3.1] (?? Jun 2023)
+
+This is a minor release of Dorado. It introduces various bug fixes, as well as performance and usability enhancements. Of particular note, this release adds RNA002 models, improves the speed of modified base calling and duplex calling, and solves an issue whereby Dorado users were experiencing segmentation faults on Ubuntu16.04.
+
+a62465cd7fd555cc64a5592b6b05cffeff3a03f0 - Added warning if user tries to use duplex with fast model
+99f7483c22aa292682b9cd3a48f3795b99451a57 - Improved error reporting on OSX
+4f61c18498ffa846ff11b3b8ba3ef1ecdfb4aae0 - Removed source of error related to race-condition
+b1405ab50c831281c36647fcd07acee40380b228 - Added new RNA002 models with V3 architecture
+e75e327f2a52a4d77afbc9b2384b662725ea42b0 - Aligner throws error when reference path does not exist
+a9779164e2b29793617a03128017b75433154d1e - Refactor of progress bar
+f1627051edba1bff67a8b8fba510bc456b1e6621 - Fix the build when compiling with VS2017
+a6f6997a725903b609fd8f20c0c9603078b05185 - Improve GPU utilisation during Duplex by removing pipeline "bubbles"
+84ecf32158fb4a587b7e0263021eea19c5533d1f - Update Koi to v0.3.3
+d6463b351264dacecf100aeb89c8b493966649fd - Refactor aligner/hts nodes
+c46a2a3558f42831e85efce56765b37be12040b9 - Fix segfault on Ubuntu16.04
+2a96f891e35fb567e696c3fe91cdba708c005d8a - Improve performance of mod base calling by changing encoding format
+612ba2043739ee0418d3addb643bfd145f04d58e - Node performance stats monitoring
+dc9ea3b11c1df8521285fd075b562ec7e8d83a5e - CRFModel: perform clamp on torch tensors in-place. Use ``torch::InferenceMode``
+bf183144f2b9caceea64a690f6946b9d1683c5a2 - Solve various bugs in duplex pairing algorithm
+164ca6ea3e2ca7491c8cf82162ecb19d540642ab - Add support for running sanitizers as part of CI
+379fc21b16834eeee88a335a1da8bd34ac211be0 - Add RG tag to duplex pipeline
+68b5b81aaacea8f9f48402147a6421ddf74f0052 - Add missing dependencies for Mac
+628722d0e8f85f334cbe4b8662423e4954f1fd21 - Add error checking to pod5 api calls
+c48ab081a681025c34a462bee2816444ff44bb92 - Progress bar fixes for Windows
+ce68b552c98cf5e2ee11331e4a6a7d7157507baf - Update metal-cpp so we can make use of ``NS::SharedPtr<>``
+53aec516b9a017880e47ba81deeb9084b092b311 - Update Readme to include roadmap
+5ea670504c052426ef9cc8e2b51f3b213be1b58a - Adding smoke tests
+
 # [0.3.0] (18 May 2023)
 
-This is a major release of Dorado which introuduces: Duplex pairing and splitting for directly going from POD5 to duplex reads, major performance improvements to simplex and duplex basecalling on A100 GPUs via int8 model quantization and the output of aligned BAM from Dorado and support for producing summary tsv files from BAM.
+This is a major release of Dorado which introduces: Duplex pairing and splitting for directly going from POD5 to duplex reads, major performance improvements to simplex and duplex basecalling on A100 GPUs via int8 model quantization and the output of aligned BAM from Dorado and support for producing summary tsv files from BAM.
 
  * ddb7c1e20b8df5935764cf1d014d3f2202eb29a4 - Improvements to modified basecalling performance
  * f879af586dd122a5e9f071fa28970e1531ba1530 - Add support for CPU basecalling of modified bases
