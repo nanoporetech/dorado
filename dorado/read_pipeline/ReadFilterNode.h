@@ -20,9 +20,7 @@ namespace dorado {
 /// which are applied to each read.
 class ReadFilterNode : public MessageSink {
 public:
-    ReadFilterNode(size_t min_qscore,
-                   size_t min_read_length,
-                   size_t num_worker_threads);
+    ReadFilterNode(size_t min_qscore, size_t min_read_length, size_t num_worker_threads);
     ~ReadFilterNode();
     std::string get_name() const override { return "ReadFilterNode"; }
     stats::NamedStats sample_stats() const override;

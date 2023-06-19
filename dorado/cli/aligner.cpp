@@ -108,9 +108,12 @@ int aligner(int argc, char* argv[]) {
 
     PipelineDescriptor pipeline_desc;
     sq_t header_sequence_records;
-    auto aligner = pipeline_desc.add_node<Aligner>({}, index, kmer_size, window_size, index_batch_size, aligner_threads, header_sequence_records);
+    auto aligner =
+            pipeline_desc.add_node<Aligner>({}, index, kmer_size, window_size, index_batch_size,
+                                            aligner_threads, header_sequence_records);
     utils::add_sq_hdr(header, header_sequence_records);
-    auto writer = pipeline_desc.add_node<HtsWriter>({}, "-", HtsWriter::OutputMode::BAM, writer_threads, 0, header);
+    auto writer = pipeline_desc.add_node<HtsWriter>({}, "-", HtsWriter::OutputMode::BAM,
+                                                    writer_threads, 0, header);
     pipeline_desc.add_node_sink(aligner, writer);
 
     // Create the Pipeline from our description.
@@ -127,8 +130,8 @@ int aligner(int argc, char* argv[]) {
     stats_callables.push_back(
             [&tracker](const stats::NamedStats& stats) { tracker.update_progress_bar(stats); });
     constexpr auto kStatsPeriod = 100ms;
-    auto stats_sampler = std::make_unique<dorado::stats::StatsSampler>(kStatsPeriod, stats_reporters,
-                                                                  stats_callables);
+    auto stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
+            kStatsPeriod, stats_reporters, stats_callables);
 
     spdlog::info("> starting alignment");
     reader.read(*pipeline, max_reads);

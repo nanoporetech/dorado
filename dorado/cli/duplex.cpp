@@ -197,18 +197,20 @@ int duplex(int argc, char* argv[]) {
         } else {
             // Aligner constructor fills in header_sequence_records.
             sq_t header_sequence_records;
-            aligner = pipeline_desc.add_node<Aligner>({},
-                    ref, parser.get<int>("k"), parser.get<int>("w"),
+            aligner = pipeline_desc.add_node<Aligner>(
+                    {}, ref, parser.get<int>("k"), parser.get<int>("w"),
                     utils::parse_string_to_size(parser.get<std::string>("I")),
                     std::thread::hardware_concurrency(), header_sequence_records);
-            bam_writer = pipeline_desc.add_node<HtsWriter>({}, "-", output_mode, 4, num_reads, hdr.get());
+            bam_writer = pipeline_desc.add_node<HtsWriter>({}, "-", output_mode, 4, num_reads,
+                                                           hdr.get());
             pipeline_desc.add_node_sink(aligner, bam_writer);
             converted_reads_sink = aligner;
         }
-        auto read_converter = pipeline_desc.add_node<ReadToBamType>({converted_reads_sink}, emit_moves, rna, 2);
+        auto read_converter =
+                pipeline_desc.add_node<ReadToBamType>({converted_reads_sink}, emit_moves, rna, 2);
         // The minimum sequence length is set to 5 to avoid issues with duplex node printing very short sequences for mismatched pairs.
-        auto read_filter_node = pipeline_desc.add_node<ReadFilterNode>({read_converter}, min_qscore,
-                                        default_parameters.min_sequence_length, 5);
+        auto read_filter_node = pipeline_desc.add_node<ReadFilterNode>(
+                {read_converter}, min_qscore, default_parameters.min_sequence_length, 5);
 
         torch::set_num_threads(1);
 
@@ -229,11 +231,8 @@ int duplex(int argc, char* argv[]) {
             spdlog::info("> Starting Basespace Duplex Pipeline");
             threads = threads == 0 ? std::thread::hardware_concurrency() : threads;
 
-
-            auto duplex_caller_node = pipeline_desc.add_node<BaseSpaceDuplexCallerNode>({read_filter_node}, template_complement_map,
-                                                         read_map, threads);
-
-
+            auto duplex_caller_node = pipeline_desc.add_node<BaseSpaceDuplexCallerNode>(
+                    {read_filter_node}, template_complement_map, read_map, threads);
 
             std::vector<dorado::stats::StatsReporter> stats_reporters;
             auto pipeline = Pipeline::create(std::move(pipeline_desc), &stats_reporters);
@@ -367,13 +366,13 @@ int duplex(int argc, char* argv[]) {
                     kStereoBatchTimeoutMS, duplex_rg_name, 1000, "StereoBasecallerNode");
             auto simplex_model_stride = runners.front()->model_stride();
 
-            auto stereo_node = pipeline_desc.add_node<StereoDuplexEncoderNode>
-                    ({stereo_basecaller_node}, simplex_model_stride);
+            auto stereo_node = pipeline_desc.add_node<StereoDuplexEncoderNode>(
+                    {stereo_basecaller_node}, simplex_model_stride);
 
-            auto pairing_node = pipeline_desc.add_node<PairingNode>({stereo_node},
-                                     template_complement_map.empty()
-                                             ? std::optional<std::map<std::string, std::string>>{}
-                                             : template_complement_map);
+            auto pairing_node = pipeline_desc.add_node<PairingNode>(
+                    {stereo_node}, template_complement_map.empty()
+                                           ? std::optional<std::map<std::string, std::string>>{}
+                                           : template_complement_map);
 
             // Initialize duplex split settings and create a duplex split node
             // with the given settings and number of devices. If
@@ -381,18 +380,18 @@ int duplex(int argc, char* argv[]) {
             // act as a passthrough, meaning it won't perform any splitting
             // operations and will just pass data through.
             DuplexSplitSettings splitter_settings;
-            auto splitter_node = pipeline_desc.add_node<DuplexSplitNode>({pairing_node}, splitter_settings, num_devices);
+            auto splitter_node = pipeline_desc.add_node<DuplexSplitNode>(
+                    {pairing_node}, splitter_settings, num_devices);
 
             auto adjusted_simplex_overlap = (overlap / simplex_model_stride) * simplex_model_stride;
 
             const int kSimplexBatchTimeoutMS = 100;
-            auto basecaller_node = 
-                pipeline_desc.add_node<BasecallerNode>({splitter_node}, std::move(runners),
-                    adjusted_simplex_overlap,
+            auto basecaller_node = pipeline_desc.add_node<BasecallerNode>(
+                    {splitter_node}, std::move(runners), adjusted_simplex_overlap,
                     kSimplexBatchTimeoutMS, model, 1000);
 
-            auto scaler_node = pipeline_desc.add_node<ScalerNode>({basecaller_node}, model_config.signal_norm_params,
-                                   num_devices * 2);
+            auto scaler_node = pipeline_desc.add_node<ScalerNode>(
+                    {basecaller_node}, model_config.signal_norm_params, num_devices * 2);
 
             std::vector<dorado::stats::StatsReporter> stats_reporters;
             auto pipeline = Pipeline::create(std::move(pipeline_desc), &stats_reporters);

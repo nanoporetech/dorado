@@ -51,7 +51,8 @@ public:
         std::unique_lock lock(m_mutex);
 
         // Ensure there is space for the new item, given our limit on capacity.
-        m_item_consumed_cv.wait(lock, [this] { return m_items.size() < m_capacity || m_terminate; });
+        m_item_consumed_cv.wait(lock,
+                                [this] { return m_items.size() < m_capacity || m_terminate; });
 
         // We hold the mutex, and either there is space in the queue, or we have been
         // asked to terminate.

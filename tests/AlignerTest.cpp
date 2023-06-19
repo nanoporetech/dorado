@@ -20,20 +20,20 @@ namespace fs = std::filesystem;
 namespace {
 
 template <class... Args>
-std::vector<dorado::BamPtr> RunAlignmentPipeline(dorado::HtsReader& reader,
-     Args&&... args) {
+std::vector<dorado::BamPtr> RunAlignmentPipeline(dorado::HtsReader& reader, Args&&... args) {
     dorado::PipelineDescriptor pipeline_desc;
     std::vector<dorado::Message> messages;
     auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
     dorado::sq_t header_sequence_records;
-    auto aligner = pipeline_desc.add_node<dorado::Aligner>({sink}, args..., header_sequence_records);
+    auto aligner =
+            pipeline_desc.add_node<dorado::Aligner>({sink}, args..., header_sequence_records);
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
     reader.read(*pipeline, 100);
     pipeline.reset();
     return ConvertMessages<dorado::BamPtr>(messages);
 }
 
-}
+}  // namespace
 
 TEST_CASE("AlignerTest: Check standard alignment", TEST_GROUP) {
     using Catch::Matchers::Contains;

@@ -292,9 +292,8 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
         std::shuffle(std::next(read->moves.begin()), read->moves.end(), m_rng);
     });
 
-    run_smoke_test<dorado::ModBaseCallerNode>(std::move(remora_runners), 2,
-                                                   modbase_devices.size(), model_stride,
-                                                   default_params.remora_batchsize);
+    run_smoke_test<dorado::ModBaseCallerNode>(std::move(remora_runners), 2, modbase_devices.size(),
+                                              model_stride, default_params.remora_batchsize);
 }
 
 DEFINE_TEST(NodeSmokeTestBam, "ReadToBamType") {
@@ -304,7 +303,7 @@ DEFINE_TEST(NodeSmokeTestBam, "ReadToBamType") {
     CAPTURE(rna);
 
     run_smoke_test<dorado::ReadToBamType>(emit_moves, rna, 2,
-                                         dorado::utils::default_parameters.methylation_threshold);
+                                          dorado::utils::default_parameters.methylation_threshold);
 }
 
 }  // namespace

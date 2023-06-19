@@ -25,7 +25,11 @@ public:
         FASTQ,
     };
 
-    HtsWriter(const std::string& filename, OutputMode mode, size_t threads, size_t num_reads, const sam_hdr_t* header);
+    HtsWriter(const std::string& filename,
+              OutputMode mode,
+              size_t threads,
+              size_t num_reads,
+              const sam_hdr_t* header);
     ~HtsWriter();
     std::string get_name() const override { return "HtsWriter"; }
     stats::NamedStats sample_stats() const override;

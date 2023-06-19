@@ -209,8 +209,8 @@ public:
         // TODO -- probably want to make node constructors private, which would entail
         // avoiding make_unique.
         auto node = std::make_unique<NodeType>(std::forward<Args>(args)...);
-        auto sink_handles_vec { sink_handles };
-        NodeDescriptor node_desc { std::move(node), std::move(sink_handles_vec) };
+        auto sink_handles_vec{sink_handles};
+        NodeDescriptor node_desc{std::move(node), std::move(sink_handles_vec)};
         m_node_descriptors.push_back(std::move(node_desc));
         return static_cast<NodeHandle>(m_node_descriptors.size() - 1);
     }
@@ -244,8 +244,9 @@ public:
     // consumed during creation.
     // If non-null, stats_reporters has node stats reporters added to it.
     // Returns the resulting pipeline, or a null unique_ptr on error.
-    static std::unique_ptr<Pipeline> create(PipelineDescriptor&& descriptor,
-        std::vector<dorado::stats::StatsReporter>* stats_reporters = nullptr);
+    static std::unique_ptr<Pipeline> create(
+            PipelineDescriptor&& descriptor,
+            std::vector<dorado::stats::StatsReporter>* stats_reporters = nullptr);
 
     // Routes the given message to the pipeline source node.
     void push_message(Message&& message);
@@ -256,27 +257,24 @@ public:
 
     // Returns a pointer to the node associated with the given handle.
     // Intended for testing purposes.
-    MessageSink* get_node_ptr(NodeHandle handle) {
-        return m_nodes.at(handle).get();
-    }
+    MessageSink* get_node_ptr(NodeHandle handle) { return m_nodes.at(handle).get(); }
 
 private:
     // Constructor is private to ensure instances of this class are created
     // through the create function.
-    Pipeline(PipelineDescriptor&& descriptor, std::vector<NodeHandle> source_to_sink_order,
-        std::vector<dorado::stats::StatsReporter>* stats_reporters);
+    Pipeline(PipelineDescriptor&& descriptor,
+             std::vector<NodeHandle> source_to_sink_order,
+             std::vector<dorado::stats::StatsReporter>* stats_reporters);
 
     std::vector<std::unique_ptr<MessageSink>> m_nodes;
     std::vector<NodeHandle> m_source_to_sink_order;
 
-    enum class DFSState {
-        Unvisited,
-        Visiting,
-        Visited
-    };
+    enum class DFSState { Unvisited, Visiting, Visited };
 
-    static bool DFS(const std::vector<PipelineDescriptor::NodeDescriptor>& node_descriptors, NodeHandle node_handle,
-        std::vector<DFSState>& dfs_state, std::vector<NodeHandle>& source_to_sink_order);
+    static bool DFS(const std::vector<PipelineDescriptor::NodeDescriptor>& node_descriptors,
+                    NodeHandle node_handle,
+                    std::vector<DFSState>& dfs_state,
+                    std::vector<NodeHandle>& source_to_sink_order);
 };
 
 }  // namespace dorado

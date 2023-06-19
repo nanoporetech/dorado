@@ -3,9 +3,9 @@
 #include "ReadPipeline.h"
 #include "utils/bam_utils.h"
 
-#include <string>
 #include <map>
 #include <memory>
+#include <string>
 
 namespace dorado {
 // Duplex caller node receives a map of template_id to complement_id (typically generated from a pairs file),
@@ -17,8 +17,7 @@ public:
                               read_map reads,
                               size_t threads);
     ~BaseSpaceDuplexCallerNode();
-        std::string get_name() const override { return "BaseSpaceDuplexCallerNode"; }
-
+    std::string get_name() const override { return "BaseSpaceDuplexCallerNode"; }
 
 private:
     void worker_thread();

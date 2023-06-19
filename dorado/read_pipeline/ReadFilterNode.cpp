@@ -22,9 +22,7 @@ void ReadFilterNode::worker_thread() {
     }
 }
 
-ReadFilterNode::ReadFilterNode(size_t min_qscore,
-                               size_t min_read_length,
-                               size_t num_worker_threads)
+ReadFilterNode::ReadFilterNode(size_t min_qscore, size_t min_read_length, size_t num_worker_threads)
         : MessageSink(1000),
           m_min_qscore(min_qscore),
           m_min_read_length(min_read_length),

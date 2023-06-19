@@ -10,8 +10,8 @@
 #include <algorithm>
 #include <chrono>
 #include <cstdint>
-#include <vector>
 #include <utility>
+#include <vector>
 
 using namespace std::chrono_literals;
 namespace {

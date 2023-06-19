@@ -17,7 +17,7 @@ using sq_t = std::vector<std::pair<char*, uint32_t>>;
 
 class Aligner : public MessageSink {
 public:
-    // header_sequence_records is populated by the constructor. 
+    // header_sequence_records is populated by the constructor.
     Aligner(const std::string& filename,
             int k,
             int w,

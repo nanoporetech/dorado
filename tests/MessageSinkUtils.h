@@ -8,8 +8,10 @@
 
 class MessageSinkToVector : public dorado::MessageSink {
 public:
-    MessageSinkToVector(size_t max_messages, std::vector<dorado::Message>& messages) : MessageSink(max_messages), m_messages(messages) {
-        m_worker_thread = std::make_unique<std::thread>(std::thread(&MessageSinkToVector::worker_thread, this));
+    MessageSinkToVector(size_t max_messages, std::vector<dorado::Message>& messages)
+            : MessageSink(max_messages), m_messages(messages) {
+        m_worker_thread = std::make_unique<std::thread>(
+                std::thread(&MessageSinkToVector::worker_thread, this));
     }
     ~MessageSinkToVector() {
         terminate();
@@ -28,7 +30,7 @@ private:
     }
 };
 
-template<class T>
+template <class T>
 std::vector<T> ConvertMessages(std::vector<dorado::Message>& messages) {
     std::vector<T> converted_messages;
     for (auto& message : messages) {
@@ -37,7 +39,7 @@ std::vector<T> ConvertMessages(std::vector<dorado::Message>& messages) {
     return converted_messages;
 }
 
-template<class... Args>
+template <class... Args>
 size_t CountSinkReads(const std::string& data_path, Args&&... args) {
     dorado::PipelineDescriptor pipeline_desc;
     std::vector<dorado::Message> messages;

@@ -1,15 +1,15 @@
-#include "read_pipeline/ReadPipeline.h"
 #include "read_pipeline/NullNode.h"
+#include "read_pipeline/ReadPipeline.h"
 
 #include <catch2/catch.hpp>
 
 #define TEST_GROUP "[Pipeline]"
 
-using dorado::PipelineDescriptor;
 using dorado::MessageSink;
-using dorado::Pipeline;
 using dorado::NodeHandle;
 using dorado::NullNode;
+using dorado::Pipeline;
+using dorado::PipelineDescriptor;
 
 TEST_CASE("Creation", TEST_GROUP) {
     {
@@ -45,7 +45,6 @@ TEST_CASE("Creation", TEST_GROUP) {
         CHECK(pipeline != nullptr);
     }
 
-
     {
         // Sinks can be specified after construction.
         PipelineDescriptor pipeline_desc;
@@ -80,7 +79,7 @@ TEST_CASE("Creation", TEST_GROUP) {
     {
         // Undirected cycles are allowed.
         PipelineDescriptor pipeline_desc;
-        auto sink_c = pipeline_desc.add_node<NullNode>({}); 
+        auto sink_c = pipeline_desc.add_node<NullNode>({});
         auto sink_a = pipeline_desc.add_node<NullNode>({sink_c});
         auto sink_b = pipeline_desc.add_node<NullNode>({sink_c});
         auto source = pipeline_desc.add_node<NullNode>({sink_a, sink_b});
@@ -94,13 +93,11 @@ TEST_CASE("LinearDestructionOrder") {
     // Node that records destruction order.
     class OrderTestNode : public MessageSink {
     public:
-        OrderTestNode(int index, std::vector<NodeHandle>& destruction_order) :
-            MessageSink(1), m_destruction_order(destruction_order), m_index(index) { }
-        ~OrderTestNode() {
-            m_destruction_order.push_back(m_index);
-        }
+        OrderTestNode(int index, std::vector<NodeHandle>& destruction_order)
+                : MessageSink(1), m_destruction_order(destruction_order), m_index(index) {}
+        ~OrderTestNode() { m_destruction_order.push_back(m_index); }
         std::string get_name() const override { return "OrderTestNode"; }
-        void wait_until_done() const override { }
+        void wait_until_done() const override {}
 
     private:
         std::vector<int>& m_destruction_order;

@@ -285,7 +285,7 @@ void StereoDuplexEncoderNode::worker_thread() {
 
             if (stereo_encoded_read->raw_data.ndimension() ==
                 2) {  // 2 dims for stereo encoding, 1 for simplex
-               send_message_to_sink(
+                send_message_to_sink(
                         stereo_encoded_read);  // Stereo-encoded read created, send it to sink
             }
         } else if (std::holds_alternative<std::shared_ptr<Read>>(message)) {
@@ -296,8 +296,7 @@ void StereoDuplexEncoderNode::worker_thread() {
 }
 
 StereoDuplexEncoderNode::StereoDuplexEncoderNode(int input_signal_stride)
-        : m_input_signal_stride(input_signal_stride),
-          MessageSink(1000) {
+        : m_input_signal_stride(input_signal_stride), MessageSink(1000) {
     const int num_worker_threads = std::thread::hardware_concurrency();
     for (int i = 0; i < num_worker_threads; i++) {
         std::unique_ptr<std::thread> stereo_encoder_worker_thread =
