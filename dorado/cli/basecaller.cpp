@@ -16,11 +16,13 @@
 #include "nn/ModelRunner.h"
 #include "read_pipeline/AlignerNode.h"
 #include "read_pipeline/BasecallerNode.h"
+#include "read_pipeline/HtsReader.h"
 #include "read_pipeline/HtsWriter.h"
 #include "read_pipeline/ModBaseCallerNode.h"
 #include "read_pipeline/ProgressTracker.h"
 #include "read_pipeline/ReadFilterNode.h"
 #include "read_pipeline/ReadToBamTypeNode.h"
+#include "read_pipeline/ResumeLoaderNode.h"
 #include "read_pipeline/ScalerNode.h"
 #include "utils/bam_utils.h"
 #include "utils/cli_utils.h"
@@ -69,7 +71,8 @@ void setup(std::vector<std::string> args,
            uint64_t mm2_index_batch_size,
            bool skip_model_compatibility_check,
            const std::string& dump_stats_file,
-           const std::string& dump_stats_filter) {
+           const std::string& dump_stats_filter,
+           const std::string& resume_from_file) {
     torch::set_num_threads(1);
     std::vector<Runner> runners;
 
@@ -194,7 +197,8 @@ void setup(std::vector<std::string> args,
         throw std::runtime_error(err.str());
     }
 
-    size_t num_reads = DataLoader::get_num_reads(data_path, read_list, recursive_file_loading);
+    size_t num_reads = DataLoader::get_num_reads(
+            data_path, read_list, {} /*reads_already_processed*/, recursive_file_loading);
     num_reads = max_reads == 0 ? num_reads : std::min(num_reads, max_reads);
 
     bool rna = utils::is_rna_model(model_path), duplex = false;
@@ -223,11 +227,33 @@ void setup(std::vector<std::string> args,
         bam_writer->write_header(hdr.get());
         converted_reads_sink = aligner.get();
     }
+
+    std::unordered_set<std::string> reads_already_processed;
+    if (!resume_from_file.empty()) {
+        spdlog::info("> Inspecting resume file...");
+        // Turn off warning logging as header info is fetched.
+        auto initial_hts_log_level = hts_get_log_level();
+        hts_set_log_level(HTS_LOG_OFF);
+        auto pg_keys = utils::extract_pg_keys_from_hdr(resume_from_file, {"CL"});
+        hts_set_log_level(initial_hts_log_level);
+
+        auto tokens = utils::extract_token_from_cli(pg_keys["CL"]);
+        auto resume_model_name = utils::extract_model_from_model_path(tokens[2]);
+        if (model_name != resume_model_name) {
+            throw std::runtime_error(
+                    "Resume only works if the same model is used. Resume model was " +
+                    resume_model_name + " and current model is " + model_name);
+        }
+        ResumeLoaderNode resume_loader(*bam_writer, resume_from_file);
+        resume_loader.copy_completed_reads();
+        reads_already_processed = resume_loader.get_processed_read_ids();
+    }
+
     ReadToBamType read_converter(*converted_reads_sink, emit_moves, rna,
                                  thread_allocations.read_converter_threads,
                                  methylation_threshold_pct);
     ReadFilterNode read_filter_node(read_converter, min_qscore,
-                                    default_parameters.min_seqeuence_length,
+                                    default_parameters.min_seqeuence_length, {},
                                     thread_allocations.read_filter_threads);
 
     std::unique_ptr<ModBaseCallerNode> mod_base_caller_node;
@@ -244,7 +270,8 @@ void setup(std::vector<std::string> args,
     ScalerNode scaler_node(basecaller_node, model_config.signal_norm_params,
                            thread_allocations.scaler_node_threads);
 
-    DataLoader loader(scaler_node, "cpu", thread_allocations.loader_threads, max_reads, read_list);
+    DataLoader loader(scaler_node, "cpu", thread_allocations.loader_threads, max_reads, read_list,
+                      reads_already_processed);
 
     // Setup stats counting
     std::unique_ptr<dorado::stats::StatsSampler> stats_sampler;
@@ -308,6 +335,11 @@ int basecaller(int argc, char* argv[]) {
     parser.add_argument("-l", "--read-ids")
             .help("A file with a newline-delimited list of reads to basecall. If not provided, all "
                   "reads will be basecalled")
+            .default_value(std::string(""));
+
+    parser.add_argument("--resume-from")
+            .help("Resume basecalling from the given HTS file. Fully written read records are not "
+                  "processed again.")
             .default_value(std::string(""));
 
     parser.add_argument("-n", "--max-reads").default_value(0).scan<'i', int>();
@@ -456,7 +488,8 @@ int basecaller(int argc, char* argv[]) {
               utils::parse_string_to_size(parser.get<std::string>("I")),
               internal_parser.get<bool>("--skip-model-compatibility-check"),
               internal_parser.get<std::string>("--dump_stats_file"),
-              internal_parser.get<std::string>("--dump_stats_filter"));
+              internal_parser.get<std::string>("--dump_stats_filter"),
+              parser.get<std::string>("--resume-from"));
     } catch (const std::exception& e) {
         spdlog::error("{}", e.what());
         return 1;

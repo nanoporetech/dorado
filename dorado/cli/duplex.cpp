@@ -166,8 +166,9 @@ int duplex(int argc, char* argv[]) {
         bool recursive_file_loading = parser.get<bool>("--recursive");
 
         size_t num_reads = (basespace_duplex ? read_list_from_pairs.size()
-                                             : DataLoader::get_num_reads(reads, read_list,
+                                             : DataLoader::get_num_reads(reads, read_list, {},
                                                                          recursive_file_loading));
+        spdlog::debug("> Reads to process: {}", num_reads);
 
         std::unique_ptr<sam_hdr_t, void (*)(sam_hdr_t*)> hdr(sam_hdr_init(), sam_hdr_destroy);
         utils::add_pg_hdr(hdr.get(), args);
@@ -190,7 +191,7 @@ int duplex(int argc, char* argv[]) {
         ReadToBamType read_converter(*converted_reads_sink, emit_moves, rna, 2);
         // The minimum sequence length is set to 5 to avoid issues with duplex node printing very short sequences for mismatched pairs.
         ReadFilterNode read_filter_node(read_converter, min_qscore,
-                                        default_parameters.min_seqeuence_length, 5);
+                                        default_parameters.min_seqeuence_length, {}, 5);
 
         torch::set_num_threads(1);
 
