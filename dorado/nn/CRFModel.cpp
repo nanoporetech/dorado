@@ -434,7 +434,7 @@ private:
         for (auto &rnn : {rnn1, rnn2, rnn3, rnn4, rnn5}) {
             ScopedProfileRange spr_lstm("lstm_layer");
             auto state_buf = torch::zeros({batch_size, layer_size}, opts_f16);
-            auto sync_buf = torch::zeros({3}, opts_i32);
+            auto workspace_buf = torch::empty({1024}, opts_i32);
             auto weights_cpu = rnn->weights;
 #ifndef DORADO_TX2  // Koi for TX2 does not have Cutlass kernels
             if (use_cutlass) {
@@ -472,20 +472,12 @@ private:
 
                 auto in = (type_id == KOI_I8) ? inout_all_i8 : inout_all_f16;
 
-                if (layer_size == 384 && type_id == KOI_I8) {
-                    host_cutlass_lstm_384_i8(
-                            stream, layer_idx, batch_size, chunk_size, rnn->reverse ? -1 : 1,
-                            in.stride(1), in.data_ptr(), device_weights[layer_idx].data_ptr(),
-                            device_bias[layer_idx].data_ptr(), device_scale[layer_idx].data_ptr(),
-                            state_buf.data_ptr(), &m_koi_sync, false);
-                } else {
-                    host_cutlass_lstm(stream, type_id, layer_idx, batch_size, layer_size,
-                                      chunk_size, rnn->reverse ? -1 : 1, in.stride(1),
-                                      in.data_ptr(), device_weights[layer_idx].data_ptr(),
-                                      device_bias[layer_idx].data_ptr(),
-                                      device_scale[layer_idx].data_ptr(), state_buf.data_ptr(),
-                                      sync_buf.data_ptr());
-                }
+                host_cutlass_lstm(stream, type_id, layer_idx, batch_size, layer_size, chunk_size,
+                                  rnn->reverse ? -1 : 1, in.stride(1), in.data_ptr(),
+                                  device_weights[layer_idx].data_ptr(),
+                                  device_bias[layer_idx].data_ptr(),
+                                  device_scale[layer_idx].data_ptr(), state_buf.data_ptr(),
+                                  workspace_buf.data_ptr(), 0, 1);
 
                 if (layer_idx == convert_to_int8_layer_idx) {
                     ScopedProfileRange spr_convert("f16_to_int8");
@@ -671,8 +663,6 @@ private:
     quantized_lstm _host_run_lstm_fwd_quantized{nullptr};
     quantized_lstm _host_run_lstm_rev_quantized{nullptr};
     CudaLSTM rnn1{nullptr}, rnn2{nullptr}, rnn3{nullptr}, rnn4{nullptr}, rnn5{nullptr};
-    // Buffer which contains buffers, used for the cutlass_brf kernel
-    KoiSync m_koi_sync{nullptr};
 };
 
 TORCH_MODULE(CudaLSTMStack);
