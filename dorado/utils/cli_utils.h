@@ -1,4 +1,5 @@
 // Add some utilities for CLI.
+#pragma once
 
 #include "Version.h"
 

@@ -430,7 +430,7 @@ int basecaller(int argc, char* argv[]) {
     std::vector<std::string> args(argv, argv + argc);
 
     if (parser.get<bool>("--verbose")) {
-        spdlog::set_level(spdlog::level::debug);
+        utils::SetDebugLogging();
     }
 
     auto model = parser.get<std::string>("model");

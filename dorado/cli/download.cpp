@@ -40,7 +40,7 @@ int download(int argc, char* argv[]) {
     }
 
     if (parser.get<bool>("--verbose")) {
-        spdlog::set_level(spdlog::level::debug);
+        utils::SetDebugLogging();
     }
 
     auto list = parser.get<bool>("--list");

@@ -62,7 +62,7 @@ int summary(int argc, char *argv[]) {
     }
 
     if (parser.get<bool>("--verbose")) {
-        spdlog::set_level(spdlog::level::debug);
+        utils::SetDebugLogging();
     }
 
     std::vector<std::string> header = {
