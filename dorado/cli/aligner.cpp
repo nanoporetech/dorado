@@ -136,9 +136,9 @@ int aligner(int argc, char* argv[]) {
     spdlog::info("> starting alignment");
     reader.read(*pipeline, max_reads);
 
-    pipeline->wait_until_done();
-
     stats_sampler->terminate();
+    auto final_stats = pipeline->terminate();
+    tracker.update_progress_bar(final_stats);
     tracker.summarize();
 
     spdlog::info("> finished alignment");

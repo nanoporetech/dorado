@@ -19,11 +19,14 @@ public:
     PairingNode(std::optional<std::map<std::string, std::string>> = std::nullopt,
                 int num_worker_threads = 2,
                 size_t max_reads = 1000);
-    ~PairingNode();
+    ~PairingNode() { terminate_impl(); }
     std::string get_name() const override { return "PairingNode"; }
     stats::NamedStats sample_stats() const override;
+    void terminate() override { terminate_impl(); }
 
 private:
+    void terminate_impl();
+
     void pair_list_worker_thread();
     void pair_generating_worker_thread();
 

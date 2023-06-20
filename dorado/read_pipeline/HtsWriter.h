@@ -33,10 +33,12 @@ public:
     ~HtsWriter();
     std::string get_name() const override { return "HtsWriter"; }
     stats::NamedStats sample_stats() const override;
+    void terminate() override { terminate_impl(); }
 
     static OutputMode get_output_mode(const std::string& mode);
 
 private:
+    void terminate_impl();
     size_t total{0};
     size_t primary{0};
     size_t unmapped{0};

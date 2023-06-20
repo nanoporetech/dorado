@@ -253,13 +253,6 @@ void Read::generate_modbase_string(bam1_t *aln, uint8_t threshold) const {
 
 MessageSink::MessageSink(size_t max_messages) : m_work_queue(max_messages) {}
 
-void MessageSink::wait_until_done() const {
-    // This only waits for the input queue to be empty.  Waiting for outstanding message
-    // processing work within the node, including work in other queues, requires a
-    // node-specific implementation.
-    m_work_queue.wait_until_empty();
-}
-
 void MessageSink::push_message(Message &&message) {
     const bool success = m_work_queue.try_push(std::move(message));
     // try_push will fail if the sink has been told to terminate.
@@ -296,7 +289,8 @@ bool Pipeline::DFS(const std::vector<PipelineDescriptor::NodeDescriptor> &node_d
 
 std::unique_ptr<Pipeline> Pipeline::create(
         PipelineDescriptor &&descriptor,
-        std::vector<dorado::stats::StatsReporter> *const stats_reporters) {
+        std::vector<dorado::stats::StatsReporter> *const stats_reporters,
+        stats::NamedStats *const final_stats) {
     // Find a source node, i.e. one that is not the sink of any other node.
     // There should be exactly 1 one for a valid pipeline.
     const auto node_count = descriptor.m_node_descriptors.size();
@@ -364,15 +358,24 @@ void Pipeline::push_message(Message &&message) {
     dynamic_cast<MessageSink &>(*m_nodes.back()).push_message(std::move(message));
 }
 
-Pipeline::~Pipeline() {
+stats::NamedStats Pipeline::terminate() {
+    stats::NamedStats final_stats;
     for (auto handle : m_source_to_sink_order) {
-        m_nodes.at(handle).reset();
+        auto &node = m_nodes.at(handle);
+        node->terminate();
+        auto node_stats = node->sample_stats();
+        const auto node_name = node->get_name();
+        for (const auto &[name, value] : node_stats) {
+            final_stats[node_name + "." + name] = value;
+        }
     }
+    return final_stats;
 }
 
-void Pipeline::wait_until_done() const {
+Pipeline::~Pipeline() {
     for (auto handle : m_source_to_sink_order) {
-        m_nodes.at(handle)->wait_until_done();
+        auto &node = m_nodes.at(handle);
+        node.reset();
     }
 }
 

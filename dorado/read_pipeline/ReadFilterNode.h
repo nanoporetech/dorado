@@ -21,11 +21,13 @@ namespace dorado {
 class ReadFilterNode : public MessageSink {
 public:
     ReadFilterNode(size_t min_qscore, size_t min_read_length, size_t num_worker_threads);
-    ~ReadFilterNode();
+    ~ReadFilterNode() { terminate_impl(); }
     std::string get_name() const override { return "ReadFilterNode"; }
     stats::NamedStats sample_stats() const override;
+    void terminate() override { terminate_impl(); }
 
 private:
+    void terminate_impl();
     void worker_thread();
 
     // Async worker for writing.

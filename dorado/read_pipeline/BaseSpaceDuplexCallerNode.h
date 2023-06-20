@@ -16,10 +16,12 @@ public:
     BaseSpaceDuplexCallerNode(std::map<std::string, std::string> template_complement_map,
                               read_map reads,
                               size_t threads);
-    ~BaseSpaceDuplexCallerNode();
+    ~BaseSpaceDuplexCallerNode() { terminate_impl(); }
     std::string get_name() const override { return "BaseSpaceDuplexCallerNode"; }
+    void terminate() override { terminate_impl(); }
 
 private:
+    void terminate_impl();
     void worker_thread();
     void basespace(const std::string& template_read_id, const std::string& complement_read_id);
 

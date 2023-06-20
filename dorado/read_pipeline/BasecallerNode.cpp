@@ -98,7 +98,6 @@ void BasecallerNode::input_worker_thread() {
     // Notify the basecaller threads that it is safe to gracefully terminate the basecaller
     m_terminate_basecaller.store(true);
     m_chunks_added_cv.notify_all();
-    spdlog::error("input_worker_thread finishing");
 }
 
 void BasecallerNode::basecall_current_batch(int worker_id) {
@@ -292,13 +291,19 @@ BasecallerNode::BasecallerNode(std::vector<Runner> model_runners,
     }
 }
 
-BasecallerNode::~BasecallerNode() {
-    terminate();
-    m_input_worker->join();
-    for (auto &t : m_basecall_workers) {
-        t.join();
+void BasecallerNode::terminate_impl() {
+    terminate_input_queue();
+    if (m_input_worker->joinable()) {
+        m_input_worker->join();
     }
-    m_working_reads_manager->join();
+    for (auto &t : m_basecall_workers) {
+        if (t.joinable()) {
+            t.join();
+        }
+    }
+    if (m_working_reads_manager->joinable()) {
+        m_working_reads_manager->join();
+    }
     termination_time = std::chrono::system_clock::now();
 }
 

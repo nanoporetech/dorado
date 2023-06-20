@@ -33,10 +33,12 @@ ReadFilterNode::ReadFilterNode(size_t min_qscore, size_t min_read_length, size_t
     }
 }
 
-ReadFilterNode::~ReadFilterNode() {
-    terminate();
+void ReadFilterNode::terminate_impl() {
+    terminate_input_queue();
     for (auto& m : m_workers) {
-        m->join();
+        if (m->joinable()) {
+            m->join();
+        }
     }
 }
 

@@ -18,11 +18,13 @@ public:
     ScalerNode(const SignalNormalisationParams& config,
                int num_worker_threads = 5,
                size_t max_reads = 1000);
-    ~ScalerNode();
+    ~ScalerNode() { terminate_impl(); }
     std::string get_name() const override { return "ScalerNode"; }
     stats::NamedStats sample_stats() const override;
+    void terminate() override { terminate_impl(); }
 
 private:
+    void terminate_impl();
     void worker_thread();  // Worker thread performs scaling and trimming asynchronously.
     std::vector<std::unique_ptr<std::thread>> worker_threads;
     std::atomic<int> m_num_worker_threads;

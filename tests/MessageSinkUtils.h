@@ -13,12 +13,15 @@ public:
         m_worker_thread = std::make_unique<std::thread>(
                 std::thread(&MessageSinkToVector::worker_thread, this));
     }
-    ~MessageSinkToVector() {
-        terminate();
+    ~MessageSinkToVector() { terminate_impl(); }
+    void terminate() override { terminate_impl(); }
+
+private:
+    void terminate_impl() {
+        terminate_input_queue();
         m_worker_thread->join();
     }
 
-private:
     std::unique_ptr<std::thread> m_worker_thread;
     std::vector<dorado::Message>& m_messages;
 

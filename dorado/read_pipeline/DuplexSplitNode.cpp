@@ -442,10 +442,7 @@ void DuplexSplitNode::worker_thread() {
         }
     }
 
-    int num_active = --m_active;
-    if (num_active == 0) {
-        terminate();
-    }
+    --m_active;
 }
 
 DuplexSplitNode::DuplexSplitNode(DuplexSplitSettings settings,
@@ -461,12 +458,14 @@ DuplexSplitNode::DuplexSplitNode(DuplexSplitSettings settings,
     }
 }
 
-DuplexSplitNode::~DuplexSplitNode() {
-    terminate();
+void DuplexSplitNode::terminate_impl() {
+    terminate_input_queue();
 
     // Wait for all the Node's worker threads to terminate
     for (auto& t : worker_threads) {
-        t->join();
+        if (t->joinable()) {
+            t->join();
+        }
     }
 }
 

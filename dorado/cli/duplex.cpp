@@ -218,6 +218,7 @@ int duplex(int argc, char* argv[]) {
         ProgressTracker tracker(num_reads, duplex);
         stats_callables.push_back(
                 [&tracker](const stats::NamedStats& stats) { tracker.update_progress_bar(stats); });
+        stats::NamedStats final_stats;
 
         if (basespace_duplex) {  // Execute a Basespace duplex pipeline.
             if (pairs_file.empty()) {
@@ -245,9 +246,8 @@ int duplex(int argc, char* argv[]) {
             auto stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
                     kStatsPeriod, stats_reporters, stats_callables);
 
-            pipeline->wait_until_done();
-
             stats_sampler->terminate();
+            final_stats = pipeline->terminate();
         } else {  // Execute a Stereo Duplex pipeline.
 
             const auto model_path = std::filesystem::canonical(std::filesystem::path(model));
@@ -409,11 +409,11 @@ int duplex(int argc, char* argv[]) {
             // Run pipeline.
             loader.load_reads(reads, parser.get<bool>("--recursive"), DataLoader::BY_CHANNEL);
 
-            // Wait until work is finished before summarising stats.
-            pipeline->wait_until_done();
-
             stats_sampler->terminate();
+            final_stats = pipeline->terminate();
         }
+
+        tracker.update_progress_bar(final_stats);
         tracker.summarize();
     } catch (const std::exception& e) {
         spdlog::error(e.what());

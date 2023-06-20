@@ -187,9 +187,11 @@ BaseSpaceDuplexCallerNode::BaseSpaceDuplexCallerNode(
             std::make_unique<std::thread>(&BaseSpaceDuplexCallerNode::worker_thread, this);
 }
 
-BaseSpaceDuplexCallerNode::~BaseSpaceDuplexCallerNode() {
-    terminate();
-    m_worker_thread->join();
+void BaseSpaceDuplexCallerNode::terminate_impl() {
+    terminate_input_queue();
+    if (m_worker_thread->joinable()) {
+        m_worker_thread->join();
+    }
 }
 
 }  // namespace dorado

@@ -152,14 +152,14 @@ public:
     // Pushed messages must be rvalues: the input queue takes ownership.
     void push_message(Message&& message);
 
-    // Blocks until the node is finished with work.
-    // If work is being sent to this node this may block indefinitely.
-    virtual void wait_until_done() const;
-
-    // Terminates waits on the input queue.
-    void terminate() { m_work_queue.terminate(); }
+    // Waits until work is finished and shuts down worker threads.
+    // No work can be done by the node after this returns.
+    virtual void terminate() = 0;
 
 protected:
+    // Terminates waits on the input queue.
+    void terminate_input_queue() { m_work_queue.terminate(); }
+
     // Sends message to the designated sink.
     void send_message_to_sink(int sink_index, Message&& message);
 
@@ -245,18 +245,16 @@ public:
     // Returns the resulting pipeline, or a null unique_ptr on error.
     static std::unique_ptr<Pipeline> create(
             PipelineDescriptor&& descriptor,
-            std::vector<dorado::stats::StatsReporter>* stats_reporters = nullptr);
+            std::vector<stats::StatsReporter>* stats_reporters = nullptr,
+            stats::NamedStats* final_stats = nullptr);
 
     // Routes the given message to the pipeline source node.
     void push_message(Message&& message);
 
-    // Waits until all nodes report that they have finished work.  The nodes
-    // remain able to accept subsequent work.
-    void wait_until_done() const;
-
-    // Returns a pointer to the node associated with the given handle.
-    // Intended for testing purposes.
-    MessageSink* get_node_ptr(NodeHandle handle) { return m_nodes.at(handle).get(); }
+    // Stops all pipeline nodes in source to sink order.
+    // Returns stats from nodes' final states.
+    // After this is called the pipeline will do no further work processing subsequent inputs.
+    stats::NamedStats terminate();
 
 private:
     // Constructor is private to ensure instances of this class are created

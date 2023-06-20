@@ -187,10 +187,12 @@ PairingNode::PairingNode(std::optional<std::map<std::string, std::string>> templ
     }
 }
 
-PairingNode::~PairingNode() {
-    terminate();
+void PairingNode::terminate_impl() {
+    terminate_input_queue();
     for (auto& m : m_workers) {
-        m->join();
+        if (m->joinable()) {
+            m->join();
+        }
     }
 }
 

@@ -54,12 +54,15 @@ HtsWriter::HtsWriter(const std::string& filename,
     m_worker = std::make_unique<std::thread>(std::thread(&HtsWriter::worker_thread, this));
 }
 
-HtsWriter::~HtsWriter() {
-    // Adding for thread safety in case worker thread throws exception.
-    terminate();
+void HtsWriter::terminate_impl() {
+    terminate_input_queue();
     if (m_worker->joinable()) {
         m_worker->join();
     }
+}
+
+HtsWriter::~HtsWriter() {
+    terminate_impl();
     sam_hdr_destroy(m_header);
     hts_close(m_file);
     spdlog::info("> total/primary/unmapped {}/{}/{}", total, primary, unmapped);

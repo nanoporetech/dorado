@@ -21,9 +21,10 @@ public:
                       size_t block_stride,
                       size_t batch_size,
                       size_t max_reads = 1000);
-    ~ModBaseCallerNode();
+    ~ModBaseCallerNode() { terminate_impl(); }
     std::string get_name() const override { return "ModBaseCallerNode"; }
     stats::NamedStats sample_stats() const override;
+    void terminate() override { terminate_impl(); }
 
     struct Info {
         std::string long_names;
@@ -37,6 +38,8 @@ public:
     };
 
 private:
+    void terminate_impl();
+
     // Determine the modbase alphabet from parameters and calculate offset positions for the results
     // if node is not null it will populate its members
     [[maybe_unused]] static Info get_modbase_info_and_maybe_init(

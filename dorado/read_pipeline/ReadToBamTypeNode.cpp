@@ -46,10 +46,12 @@ ReadToBamType::ReadToBamType(bool emit_moves,
     }
 }
 
-ReadToBamType::~ReadToBamType() {
-    terminate();
+void ReadToBamType::terminate_impl() {
+    terminate_input_queue();
     for (auto& m : m_workers) {
-        m->join();
+        if (m->joinable()) {
+            m->join();
+        }
     }
 }
 

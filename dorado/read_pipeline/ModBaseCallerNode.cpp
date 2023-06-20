@@ -52,15 +52,21 @@ ModBaseCallerNode::ModBaseCallerNode(std::vector<std::unique_ptr<ModBaseRunner>>
     }
 }
 
-ModBaseCallerNode::~ModBaseCallerNode() {
-    terminate();
+void ModBaseCallerNode::terminate_impl() {
+    terminate_input_queue();
     for (auto& t : m_input_worker) {
-        t->join();
+        if (t->joinable()) {
+            t->join();
+        }
     }
     for (auto& t : m_runner_workers) {
-        t->join();
+        if (t->joinable()) {
+            t->join();
+        }
     }
-    m_output_worker->join();
+    if (m_output_worker->joinable()) {
+        m_output_worker->join();
+    }
 }
 
 [[maybe_unused]] ModBaseCallerNode::Info ModBaseCallerNode::get_modbase_info_and_maybe_init(

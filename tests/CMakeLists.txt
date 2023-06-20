@@ -27,7 +27,7 @@ set(SOURCE_FILES
 if (DORADO_GPU_BUILD)
     if(APPLE)
         list(APPEND SOURCE_FILES
-            MetalLinearTest.cpp
+	    MetalLinearTest.cpp
         )
     else()
         list(APPEND SOURCE_FILES

@@ -69,12 +69,14 @@ ScalerNode::ScalerNode(const SignalNormalisationParams& config,
     }
 }
 
-ScalerNode::~ScalerNode() {
-    terminate();
+void ScalerNode::terminate_impl() {
+    terminate_input_queue();
 
     // Wait for all the Scaler Node's worker threads to terminate
     for (auto& t : worker_threads) {
-        t->join();
+        if (t->joinable()) {
+            t->join();
+        }
     }
 }
 

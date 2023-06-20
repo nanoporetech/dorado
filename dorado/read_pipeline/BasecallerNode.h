@@ -18,11 +18,13 @@ public:
                    std::string model_name = "",
                    size_t max_reads = 1000,
                    const std::string& node_name = "BasecallerNode");
-    ~BasecallerNode();
+    ~BasecallerNode() { terminate_impl(); }
     std::string get_name() const override { return m_node_name; }
     stats::NamedStats sample_stats() const override;
+    void terminate() override { terminate_impl(); }
 
 private:
+    void terminate_impl();
     // Consume reads from input queue
     void input_worker_thread();
     // Basecall reads

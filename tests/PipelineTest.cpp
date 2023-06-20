@@ -97,7 +97,7 @@ TEST_CASE("LinearDestructionOrder") {
                 : MessageSink(1), m_destruction_order(destruction_order), m_index(index) {}
         ~OrderTestNode() { m_destruction_order.push_back(m_index); }
         std::string get_name() const override { return "OrderTestNode"; }
-        void wait_until_done() const override {}
+        void terminate() override {}
 
     private:
         std::vector<int>& m_destruction_order;

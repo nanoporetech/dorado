@@ -16,11 +16,13 @@ public:
     std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> template_read,
                                                 std::shared_ptr<dorado::Read> complement_read);
 
-    ~StereoDuplexEncoderNode();
+    ~StereoDuplexEncoderNode() { terminate_impl(); };
     std::string get_name() const override { return "StereoDuplexEncoderNode"; }
     stats::NamedStats sample_stats() const override;
+    void terminate() override { terminate_impl(); }
 
 private:
+    void terminate_impl();
     // Consume reads from input queue
     void worker_thread();
 

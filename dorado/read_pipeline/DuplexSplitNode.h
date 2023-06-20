@@ -54,13 +54,15 @@ public:
     DuplexSplitNode(DuplexSplitSettings settings,
                     int num_worker_threads = 5,
                     size_t max_reads = 1000);
-    ~DuplexSplitNode();
+    ~DuplexSplitNode() { terminate_impl(); }
     std::string get_name() const override { return "DuplexSplitNode"; }
     stats::NamedStats sample_stats() const override;
+    void terminate() override { terminate_impl(); }
 
     std::vector<std::shared_ptr<Read>> split(std::shared_ptr<Read> init_read) const;
 
 private:
+    void terminate_impl();
     //TODO consider precomputing and reusing ranges with high signal
     struct ExtRead {
         std::shared_ptr<Read> read;

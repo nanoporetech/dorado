@@ -83,11 +83,17 @@ Aligner::Aligner(const std::string& filename,
     header_sequence_records = get_sequence_records_for_header();
 }
 
-Aligner::~Aligner() {
-    terminate();
+void Aligner::terminate_impl() {
+    terminate_input_queue();
     for (auto& m : m_workers) {
-        m->join();
+        if (m->joinable()) {
+            m->join();
+        }
     }
+}
+
+Aligner::~Aligner() {
+    terminate_impl();
     for (int i = 0; i < m_threads; i++) {
         mm_tbuf_destroy(m_tbufs[i]);
     }

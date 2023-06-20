@@ -27,8 +27,10 @@ public:
     ~Aligner();
     std::string get_name() const override { return "Aligner"; }
     stats::NamedStats sample_stats() const override;
+    void terminate() override { terminate_impl(); }
 
 private:
+    void terminate_impl();
     size_t m_threads{1};
     std::vector<mm_tbuf_t*> m_tbufs;
     std::vector<std::unique_ptr<std::thread>> m_workers;

@@ -305,10 +305,12 @@ StereoDuplexEncoderNode::StereoDuplexEncoderNode(int input_signal_stride)
     }
 }
 
-StereoDuplexEncoderNode::~StereoDuplexEncoderNode() {
-    terminate();
+void StereoDuplexEncoderNode::terminate_impl() {
+    terminate_input_queue();
     for (auto& t : worker_threads) {
-        t->join();
+        if (t->joinable()) {
+            t->join();
+        }
     }
 }
 

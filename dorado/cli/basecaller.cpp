@@ -271,10 +271,14 @@ void setup(std::vector<std::string> args,
     // Run pipeline.
     loader.load_reads(data_path, recursive_file_loading);
 
-    // Wait until work is finished before summarising stats.
-    pipeline->wait_until_done();
-
+    // Stop the stats sampler thread before tearing down any pipeline objects.
     stats_sampler->terminate();
+
+    // Stop the pipeline, as we do so collecting final processing stats.
+    // Then update progress tracking one more time from this thread, to
+    // allow accurate summarisation.
+    auto final_stats = pipeline->terminate();
+    tracker.update_progress_bar(final_stats);
     tracker.summarize();
     if (!dump_stats_file.empty()) {
         std::ofstream stats_file(dump_stats_file);
