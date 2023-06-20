@@ -205,12 +205,11 @@ public:
     // Adds the node of specified type, returning a handle.
     // 0 or more sinks can be specified here, and augmented subsequently via AddNodeSink.
     template <class NodeType, class... Args>
-    NodeHandle add_node(std::initializer_list<NodeHandle> sink_handles, Args&&... args) {
+    NodeHandle add_node(std::vector<NodeHandle> sink_handles, Args&&... args) {
         // TODO -- probably want to make node constructors private, which would entail
         // avoiding make_unique.
         auto node = std::make_unique<NodeType>(std::forward<Args>(args)...);
-        auto sink_handles_vec{sink_handles};
-        NodeDescriptor node_desc{std::move(node), std::move(sink_handles_vec)};
+        NodeDescriptor node_desc{std::move(node), std::move(sink_handles)};
         m_node_descriptors.push_back(std::move(node_desc));
         return static_cast<NodeHandle>(m_node_descriptors.size() - 1);
     }
