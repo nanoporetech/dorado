@@ -23,6 +23,8 @@ void ReadFilterNode::worker_thread() {
         if ((utils::mean_qscore_from_qstring(read->qstring) < m_min_qscore) ||
             read->seq.size() < m_min_read_length) {
             ++m_num_reads_filtered;
+        } else if (m_read_ids_to_filter.find(read->read_id) != m_read_ids_to_filter.end()) {
+            ++m_num_reads_filtered;
         } else {
             m_sink.push_message(read);
         }
@@ -31,20 +33,19 @@ void ReadFilterNode::worker_thread() {
     auto num_active_threads = --m_active_threads;
     if (num_active_threads == 0) {
         m_sink.terminate();
-        if (m_min_qscore > 0) {
-            spdlog::info("> Reads skipped (qscore < {}): {}", m_min_qscore, m_num_reads_filtered);
-        }
     }
 }
 
 ReadFilterNode::ReadFilterNode(MessageSink& sink,
                                size_t min_qscore,
                                size_t min_read_length,
+                               const std::unordered_set<std::string>& read_ids_to_filter,
                                size_t num_worker_threads)
         : MessageSink(1000),
           m_sink(sink),
           m_min_qscore(min_qscore),
           m_min_read_length(min_read_length),
+          m_read_ids_to_filter(std::move(read_ids_to_filter)),
           m_num_reads_filtered(0),
           m_active_threads(0) {
     for (size_t i = 0; i < num_worker_threads; i++) {

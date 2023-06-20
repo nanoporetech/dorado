@@ -43,12 +43,6 @@ HtsWriter::HtsWriter(const std::string& filename, OutputMode mode, size_t thread
         }
     }
 
-    if (m_num_reads_expected == 0) {
-        m_progress_bar_interval = 100;
-    } else {
-        m_progress_bar_interval = m_num_reads_expected < 100 ? 1 : 100;
-    }
-
     m_worker = std::make_unique<std::thread>(std::thread(&HtsWriter::worker_thread, this));
 }
 
@@ -76,13 +70,7 @@ HtsWriter::OutputMode HtsWriter::get_output_mode(std::string mode) {
 void HtsWriter::join() { m_worker->join(); }
 
 void HtsWriter::worker_thread() {
-    std::unordered_set<std::string> processed_read_ids;
     size_t write_count = 0;
-
-    // Initialize progress logging.
-    if (m_num_reads_expected == 0) {
-        std::cerr << "\r> Output records written: " << write_count;
-    }
 
     Message message;
     while (m_work_queue.try_pop(message)) {
@@ -97,36 +85,8 @@ void HtsWriter::worker_thread() {
         bool ignore_read_id = read_id.find(';') != std::string::npos;
 
         if (!ignore_read_id) {
-            processed_read_ids.emplace(std::move(read_id));
+            m_processed_read_ids.insert(std::move(read_id));
         }
-
-        if (m_num_reads_expected != 0) {
-            write_count = processed_read_ids.size();
-        } else {
-            if (!ignore_read_id) {
-                write_count++;
-            }
-        }
-
-        if ((write_count % m_progress_bar_interval) == 0) {
-            if ((write_count == 0) && !m_prog_bar_initialized) {
-                m_progress_bar.set_progress(0.0f);
-                m_prog_bar_initialized = true;
-            }
-            if (m_num_reads_expected != 0) {
-                float progress = 100.f * static_cast<float>(write_count) / m_num_reads_expected;
-                m_progress_bar.set_progress(progress);
-#ifndef WIN32
-                std::cerr << "\033[K";
-#endif  // WIN32
-            } else {
-                std::cerr << "\r> Output records written: " << write_count;
-            }
-        }
-    }
-    // Clear progress information.
-    if (m_num_reads_expected != 0 || write_count >= m_progress_bar_interval) {
-        std::cerr << "\r";
     }
     spdlog::debug("Written {} records.", write_count);
 }
@@ -160,6 +120,10 @@ int HtsWriter::write_header(const sam_hdr_t* hdr) {
     return 0;
 }
 
-stats::NamedStats HtsWriter::sample_stats() const { return stats::from_obj(m_work_queue); }
+stats::NamedStats HtsWriter::sample_stats() const {
+    auto stats = stats::from_obj(m_work_queue);
+    stats["unique_simplex_reads_written"] = m_processed_read_ids.size();
+    return stats;
+}
 
 }  // namespace dorado

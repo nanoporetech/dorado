@@ -43,7 +43,8 @@ bool finishCommandBuffer(const char *label, MTL::CommandBuffer *cb, int try_coun
         if (status == MTL::CommandBufferStatusError) {
             const auto *const error_ptr = cb->error();
             if (error_ptr)
-                spdlog::warn("Command buffer error code: {}", error_ptr->code());
+                spdlog::warn("Command buffer error code: {} ({})", error_ptr->code(),
+                             error_ptr->localizedDescription()->utf8String());
         }
     }
     return success;
@@ -806,7 +807,7 @@ public:
             if (done) {
                 // Now that all chunks are decoded, signal that the GPU can overwrite the scores
                 // buffer with subsequent work.
-                assert(m_decode_complete_event != nullptr);
+                assert(m_decode_complete_event);
                 m_decode_complete_event->setSignaledValue(task->decode_complete_event_id);
                 task->cv.notify_one();
             }

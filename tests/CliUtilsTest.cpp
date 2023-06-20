@@ -38,3 +38,14 @@ TEST_CASE("CliUtils: Check number string to unsigned long conversion", TEST_GROU
     SECTION("convert unexpected size character") { CHECK_THROWS(parse_string_to_size("5L")); }
     SECTION("convert not a number") { CHECK_THROWS(parse_string_to_size("abcd")); }
 }
+
+TEST_CASE("CliUtils: Extract tokens from dorado cmdline", TEST_GROUP) {
+    std::string cmdline = "dorado basecaller model_path dataset --option1 blah";
+    std::vector<std::string> expected_tokens = {"dorado",  "basecaller", "model_path",
+                                                "dataset", "--option1",  "blah"};
+    auto tokens = extract_token_from_cli(cmdline);
+    CHECK(tokens.size() == 6);
+    for (int i = 0; i < tokens.size(); i++) {
+        CHECK(tokens[i] == expected_tokens[i]);
+    }
+}

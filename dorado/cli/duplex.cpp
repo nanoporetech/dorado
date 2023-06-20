@@ -8,10 +8,10 @@
 #include "read_pipeline/DuplexSplitNode.h"
 #include "read_pipeline/HtsWriter.h"
 #include "read_pipeline/PairingNode.h"
+#include "read_pipeline/ProgressTracker.h"
 #include "read_pipeline/ReadFilterNode.h"
 #include "read_pipeline/ReadToBamTypeNode.h"
 #include "read_pipeline/ScalerNode.h"
-#include "read_pipeline/StatsCounter.h"
 #include "read_pipeline/StereoDuplexEncoderNode.h"
 #include "utils/bam_utils.h"
 #include "utils/cli_utils.h"
@@ -41,6 +41,7 @@
 namespace dorado {
 
 using dorado::utils::default_parameters;
+using namespace std::chrono_literals;
 
 int duplex(int argc, char* argv[]) {
     using dorado::utils::default_parameters;
@@ -113,6 +114,11 @@ int duplex(int argc, char* argv[]) {
 
         auto device(parser.get<std::string>("-x"));
         auto model(parser.get<std::string>("model"));
+
+        if (model.find("fast") != std::string::npos) {
+            spdlog::warn("Fast models are currently not recommended for duplex basecalling.");
+        }
+
         auto reads(parser.get<std::string>("reads"));
         std::string pairs_file = parser.get<std::string>("--pairs");
         auto threads = static_cast<size_t>(parser.get<int>("--threads"));
@@ -160,8 +166,9 @@ int duplex(int argc, char* argv[]) {
         bool recursive_file_loading = parser.get<bool>("--recursive");
 
         size_t num_reads = (basespace_duplex ? read_list_from_pairs.size()
-                                             : DataLoader::get_num_reads(reads, read_list,
+                                             : DataLoader::get_num_reads(reads, read_list, {},
                                                                          recursive_file_loading));
+        spdlog::debug("> Reads to process: {}", num_reads);
 
         std::unique_ptr<sam_hdr_t, void (*)(sam_hdr_t*)> hdr(sam_hdr_init(), sam_hdr_destroy);
         utils::add_pg_hdr(hdr.get(), args);
@@ -182,12 +189,25 @@ int duplex(int argc, char* argv[]) {
             converted_reads_sink = aligner.get();
         }
         ReadToBamType read_converter(*converted_reads_sink, emit_moves, rna, 2);
-        StatsCounterNode stats_node(read_converter, duplex);
         // The minimum sequence length is set to 5 to avoid issues with duplex node printing very short sequences for mismatched pairs.
-        ReadFilterNode read_filter_node(stats_node, min_qscore,
-                                        default_parameters.min_seqeuence_length, 5);
+        ReadFilterNode read_filter_node(read_converter, min_qscore,
+                                        default_parameters.min_seqeuence_length, {}, 5);
 
         torch::set_num_threads(1);
+
+        // Add stats reporting for shared nodes.
+        using dorado::stats::make_stats_reporter;
+        std::vector<dorado::stats::StatsReporter> stats_reporters;
+        if (aligner) {
+            stats_reporters.push_back(make_stats_reporter(*aligner));
+        }
+        stats_reporters.push_back(make_stats_reporter(*bam_writer));
+        stats_reporters.push_back(make_stats_reporter(read_filter_node));
+
+        std::vector<dorado::stats::StatsCallable> stats_callables;
+        ProgressTracker tracker(num_reads, duplex);
+        stats_callables.push_back(
+                [&tracker](const stats::NamedStats& stats) { tracker.update_progress_bar(stats); });
 
         if (basespace_duplex) {  // Execute a Basespace duplex pipeline.
             if (pairs_file.empty()) {
@@ -202,8 +222,16 @@ int duplex(int argc, char* argv[]) {
 
             spdlog::info("> Starting Basespace Duplex Pipeline");
             threads = threads == 0 ? std::thread::hardware_concurrency() : threads;
+
+            constexpr auto kStatsPeriod = 100ms;
+            auto stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
+                    kStatsPeriod, stats_reporters, stats_callables);
+            // End stats counting setup.
+
             BaseSpaceDuplexCallerNode duplex_caller_node(read_filter_node, template_complement_map,
                                                          read_map, threads);
+            bam_writer->join();  // Explicitly wait for all output rows to be written.
+            stats_sampler->terminate();
         } else {  // Execute a Stereo Duplex pipeline.
 
             const auto model_path = std::filesystem::canonical(std::filesystem::path(model));
@@ -326,7 +354,7 @@ int duplex(int argc, char* argv[]) {
             const int kStereoBatchTimeoutMS = 5000;
             auto stereo_basecaller_node = std::make_unique<BasecallerNode>(
                     read_filter_node, std::move(stereo_runners), adjusted_stereo_overlap,
-                    kStereoBatchTimeoutMS, duplex_rg_name);
+                    kStereoBatchTimeoutMS, duplex_rg_name, 1000, "StereoBasecallerNode");
             auto simplex_model_stride = runners.front()->model_stride();
 
             StereoDuplexEncoderNode stereo_node =
@@ -350,16 +378,33 @@ int duplex(int argc, char* argv[]) {
             const int kSimplexBatchTimeoutMS = 100;
             auto basecaller_node = std::make_unique<BasecallerNode>(
                     splitter_node, std::move(runners), adjusted_simplex_overlap,
-                    kSimplexBatchTimeoutMS, model);
+                    kSimplexBatchTimeoutMS, model, 1000);
 
             ScalerNode scaler_node(*basecaller_node, model_config.signal_norm_params,
                                    num_devices * 2);
 
             DataLoader loader(scaler_node, "cpu", num_devices, 0, std::move(read_list));
+
+            // Setup stats counting
+            using dorado::stats::make_stats_reporter;
+            stats_reporters.push_back(make_stats_reporter(*stereo_basecaller_node));
+            stats_reporters.push_back(make_stats_reporter(stereo_node));
+            stats_reporters.push_back(make_stats_reporter(pairing_node));
+            stats_reporters.push_back(make_stats_reporter(splitter_node));
+            stats_reporters.push_back(make_stats_reporter(*basecaller_node));
+            stats_reporters.push_back(make_stats_reporter(loader));
+            stats_reporters.push_back(make_stats_reporter(scaler_node));
+
+            constexpr auto kStatsPeriod = 100ms;
+            auto stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
+                    kStatsPeriod, stats_reporters, stats_callables);
+            // End stats counting setup.
+
             loader.load_reads(reads, parser.get<bool>("--recursive"), DataLoader::BY_CHANNEL);
+            bam_writer->join();  // Explicitly wait for all output rows to be written.
+            stats_sampler->terminate();
         }
-        bam_writer->join();  // Explicitly wait for all output rows to be written.
-        stats_node.dump_stats();
+        tracker.summarize();
     } catch (const std::exception& e) {
         spdlog::error(e.what());
         return 1;

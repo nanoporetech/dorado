@@ -49,7 +49,9 @@ variables:
 
 .windows_runner: &windows_runner
   tags:
-    - win10-gpu
+    - windows-10
+    - VS2019
+    - cuda-${CUDA}
 
 .linux_dependencies: &linux_dependencies
   before_script:
