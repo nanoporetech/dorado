@@ -204,6 +204,19 @@ The names of Dorado models are systematically structured, each segment correspon
 
 - **Model Version Number (`v4.2.0`)**: This denotes the version of the model. Model updates are regularly released, and higher version numbers typically signify greater accuracy.
 
+## Miscalenous usage instructions and tips
+
+### Resume functionality
+
+If bascalling is interrupted, it is possible to resume basecalling from a BAM file. To do so, use the `--resume-from` flag and specify the path to the incomplete BAM file. For example:
+
+```
+dorado basecaller dna_r10.4.1_e8.2_400bps_sup@v4.2.0 /path/to/pod5s >  /path/to/bam/file.bam # This gets interrupted during basecalling
+dorado basecaller dna_r10.4.1_e8.2_400bps_sup@v4.2.0 /path/to/pod5s --resume-from /path/to/bam/file.bam > /path/to/bam/file2.bam 
+```
+
+*Note* - it is important to chose a different name for the BAM file you are writing to when resuming basecalling. If you use the same name, the original BAM file will be corrupted and basecalling will not resume.
+
 ## Developer quickstart
 
 ### Linux dependencies
