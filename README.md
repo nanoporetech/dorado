@@ -17,10 +17,10 @@ If you encounter any problems building or running Dorado, please [report an issu
 
 ## Installation
 
- - [dorado-0.3.0-linux-x64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.3.0-linux-x64.tar.gz)
- - [dorado-0.3.0-linux-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.3.0-linux-arm64.tar.gz)
- - [dorado-0.3.0-osx-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.3.0-osx-arm64.tar.gz)
- - [dorado-0.3.0-win64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.3.0-win64.zip)
+ - [dorado-0.3.1-linux-x64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.3.1-linux-x64.tar.gz)
+ - [dorado-0.3.1-linux-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.3.1-linux-arm64.tar.gz)
+ - [dorado-0.3.1-osx-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.3.1-osx-arm64.tar.gz)
+ - [dorado-0.3.1-win64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.3.1-win64.zip)
 
 ## Platforms
 
