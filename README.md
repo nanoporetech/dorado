@@ -67,6 +67,16 @@ $ dorado download --model dna_r10.4.1_e8.2_400bps_hac@v4.1.0
 $ dorado basecaller dna_r10.4.1_e8.2_400bps_hac@v4.1.0 pod5s/ > calls.bam
 ```
 
+If basecalling is interrupted, it is possible to resume basecalling from a BAM file. To do so, use the `--resume-from` flag to specify the path to the incomplete BAM file. For example:
+
+```
+$ dorado basecaller dna_r10.4.1_e8.2_400bps_hac@v4.1.0 pod5s --resume-from incomplete.bam > calls.bam
+```
+
+`calls.bam` will contain all of the reads from `incomplete.bam` plus the new basecalls **(`incomplete.bam` can be discarded after basecalling is complete)**.
+
+*Note: it is important to choose a different filename for the BAM file you are writing to when using `--resuming-from`*. If you use the same filename, the interrupted BAM file will lose the existing basecalls and basecalling will restart from the beginning.
+
 ### Modified basecalling
 
 To call modifications, add `--modified-bases` to the basecaller command:
@@ -203,19 +213,6 @@ The names of Dorado models are systematically structured, each segment correspon
 - **Model Type (`hac`)**: This represents the size of the model, where larger models yield more accurate basecalls but take more time. The three types of models are `fast`, `hac`, and `sup`. The `fast` model is the quickest, `sup` is the most accurate, and `hac` provides a balance between speed and accuracy. For most users, the `hac` model is recommended.
 
 - **Model Version Number (`v4.2.0`)**: This denotes the version of the model. Model updates are regularly released, and higher version numbers typically signify greater accuracy.
-
-## Miscellaneous usage instructions and tips
-
-### Resume functionality
-
-If basecalling is interrupted, it is possible to resume basecalling from a BAM file. To do so, use the `--resume-from` flag and specify the path to the incomplete BAM file. For example:
-
-```
-dorado basecaller dna_r10.4.1_e8.2_400bps_sup@v4.2.0 /path/to/pod5s >  /path/to/bam/file.bam # This gets interrupted during basecalling
-dorado basecaller dna_r10.4.1_e8.2_400bps_sup@v4.2.0 /path/to/pod5s --resume-from /path/to/bam/file.bam > /path/to/bam/file2.bam 
-```
-
-*Note* - it is important to chose a different name for the BAM file you are writing to when resuming basecalling. If you use the same name, the original BAM file will be corrupted and basecalling will not resume.
 
 ## Developer quickstart
 
