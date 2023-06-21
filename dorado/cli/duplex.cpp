@@ -121,6 +121,11 @@ int duplex(int argc, char* argv[]) {
 
         auto device(parser.get<std::string>("-x"));
         auto model(parser.get<std::string>("model"));
+
+        if (model.find("fast") != std::string::npos) {
+            spdlog::warn("Fast models are currently not recommended for duplex basecalling.");
+        }
+
         auto reads(parser.get<std::string>("reads"));
         std::string pairs_file = parser.get<std::string>("--pairs");
         auto threads = static_cast<size_t>(parser.get<int>("--threads"));
@@ -129,7 +134,7 @@ int duplex(int argc, char* argv[]) {
         const bool basespace_duplex = (model.compare("basespace") == 0);
         std::vector<std::string> args(argv, argv + argc);
         if (parser.get<bool>("--verbose")) {
-            spdlog::set_level(spdlog::level::debug);
+            utils::SetDebugLogging();
         }
         std::map<std::string, std::string> template_complement_map;
         auto read_list = utils::load_read_list(parser.get<std::string>("--read-ids"));
@@ -168,8 +173,9 @@ int duplex(int argc, char* argv[]) {
         bool recursive_file_loading = parser.get<bool>("--recursive");
 
         size_t num_reads = (basespace_duplex ? read_list_from_pairs.size()
-                                             : DataLoader::get_num_reads(reads, read_list,
+                                             : DataLoader::get_num_reads(reads, read_list, {},
                                                                          recursive_file_loading));
+        spdlog::debug("> Reads to process: {}", num_reads);
 
         std::unique_ptr<sam_hdr_t, void (*)(sam_hdr_t*)> hdr(sam_hdr_init(), sam_hdr_destroy);
         utils::add_pg_hdr(hdr.get(), args);
@@ -209,8 +215,10 @@ int duplex(int argc, char* argv[]) {
         auto read_converter =
                 pipeline_desc.add_node<ReadToBamType>({converted_reads_sink}, emit_moves, rna, 2);
         // The minimum sequence length is set to 5 to avoid issues with duplex node printing very short sequences for mismatched pairs.
+        std::unordered_set<std::string> read_ids_to_filter;
         auto read_filter_node = pipeline_desc.add_node<ReadFilterNode>(
-                {read_converter}, min_qscore, default_parameters.min_sequence_length, 5);
+                {read_converter}, min_qscore, default_parameters.min_sequence_length,
+                read_ids_to_filter, 5);
 
         torch::set_num_threads(1);
 

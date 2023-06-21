@@ -256,6 +256,11 @@ public:
     // After this is called the pipeline will do no further work processing subsequent inputs.
     stats::NamedStats terminate();
 
+    // Returns a reference to the node associated with the given handle.
+    // Exists purely to accommodate feeding in messages from a resumed file.
+    // TODO -- find a way to avoid exposing node handles.
+    MessageSink& get_node_ref(NodeHandle node_handle) { return *m_nodes.at(node_handle); }
+
 private:
     // Constructor is private to ensure instances of this class are created
     // through the create function.

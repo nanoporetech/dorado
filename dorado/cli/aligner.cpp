@@ -66,7 +66,7 @@ int aligner(int argc, char* argv[]) {
 
     if (parser.get<bool>("--verbose")) {
         mm_verbose = 3;
-        spdlog::set_level(spdlog::level::debug);
+        utils::SetDebugLogging();
     }
 
     auto index(parser.get<std::string>("index"));

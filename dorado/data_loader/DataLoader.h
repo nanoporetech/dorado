@@ -37,7 +37,8 @@ public:
                const std::string& device,
                size_t num_worker_threads,
                size_t max_reads = 0,
-               std::optional<std::unordered_set<std::string>> read_list = std::nullopt);
+               std::optional<std::unordered_set<std::string>> read_list = std::nullopt,
+               std::unordered_set<std::string> read_ignore_list = {});
     ~DataLoader() = default;
     void load_reads(const std::string& path,
                     bool recursive_file_loading = false,
@@ -51,6 +52,7 @@ public:
     static int get_num_reads(
             std::string data_path,
             std::optional<std::unordered_set<std::string>> read_list = std::nullopt,
+            const std::unordered_set<std::string>& ignore_read_list = {},
             bool recursive_file_loading = false);
 
     static uint16_t get_sample_rate(std::string data_path, bool recursive_file_loading = false);
@@ -70,6 +72,7 @@ private:
     size_t m_num_worker_threads{1};
     size_t m_max_reads{0};
     std::optional<std::unordered_set<std::string>> m_allowed_read_ids;
+    std::unordered_set<std::string> m_ignored_read_ids;
 
     std::unordered_map<std::string, channel_to_read_id_t> m_file_channel_read_order_map;
     int m_max_channel{0};

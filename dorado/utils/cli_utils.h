@@ -1,4 +1,5 @@
 // Add some utilities for CLI.
+#pragma once
 
 #include "Version.h"
 
@@ -9,6 +10,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <iostream>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -132,6 +134,20 @@ inline uint64_t parse_string_to_size(const std::string& num_str) {
     uint64_t size_num =
             std::stoul(is_last_char_alpha ? num_str.substr(0, num_str.length() - 1) : num_str);
     return size_num * multiplier;
+}
+
+inline std::vector<std::string> extract_token_from_cli(const std::string& cmd) {
+    std::stringstream ss(cmd);
+    std::string token;
+    std::vector<std::string> tokens;
+    while (std::getline(ss, token, ' ')) {
+        tokens.push_back(token);
+    }
+    if (tokens.size() < 4) {
+        throw std::runtime_error(
+                "Cmdline requires at least 4 tokens including binary name, found: " + cmd);
+    }
+    return tokens;
 }
 
 }  // namespace utils

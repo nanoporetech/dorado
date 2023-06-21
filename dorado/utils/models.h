@@ -156,6 +156,9 @@ std::string get_modification_model(const std::string& simplex_model,
 // present in the mapping, assume a sampling rate of 4000.
 uint16_t get_sample_rate_by_model_name(const std::string& model_name);
 
+// Extract the model name from the model path.
+std::string extract_model_from_model_path(const std::string& model_path);
+
 }  // namespace utils
 
 }  // namespace dorado

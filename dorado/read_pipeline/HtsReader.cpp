@@ -6,6 +6,7 @@
 
 #include <spdlog/spdlog.h>
 
+#include <filesystem>
 #include <set>
 #include <stdexcept>
 #include <string>
@@ -89,6 +90,33 @@ read_map read_bam(const std::string& filename, const std::unordered_set<std::str
     }
 
     return reads;
+}
+
+std::unordered_set<std::string> fetch_read_ids(const std::string& filename) {
+    if (filename.empty()) {
+        return {};
+    }
+    if (!std::filesystem::exists(filename)) {
+        throw std::runtime_error("Resume file cannot be found: " + filename);
+    }
+
+    auto initial_hts_log_level = hts_get_log_level();
+    hts_set_log_level(HTS_LOG_OFF);
+
+    std::unordered_set<std::string> read_ids;
+    HtsReader reader(filename);
+    try {
+        while (reader.read()) {
+            std::string read_id = bam_get_qname(reader.record);
+            read_ids.insert(read_id);
+        }
+    } catch (std::exception& e) {
+        // Do nothing.
+    }
+
+    hts_set_log_level(initial_hts_log_level);
+
+    return read_ids;
 }
 
 }  // namespace dorado

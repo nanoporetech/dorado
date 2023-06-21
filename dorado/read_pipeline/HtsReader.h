@@ -71,4 +71,16 @@ T HtsReader::get_tag(std::string tagname) {
  */
 read_map read_bam(const std::string& filename, const std::unordered_set<std::string>& read_ids);
 
+/**
+ * @brief Reads an HTS file format (SAM/BAM/FASTX/etc) and returns a set of read ids.
+ *
+ * This function opens the HTS file using the htslib APIs and iterates through
+ * all records. When an unreadable record is encountered, the iteration is stopped
+ * and all read ids seen so far are returned.
+ *
+ * @param filename The path to the input HTS file.
+ * @return An unordered set with read ids.
+ */
+std::unordered_set<std::string> fetch_read_ids(const std::string& filename);
+
 }  // namespace dorado

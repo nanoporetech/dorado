@@ -12,6 +12,7 @@
 #include <highfive/H5File.hpp>
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
 #include <cctype>
 #include <ctime>
 #include <filesystem>
@@ -202,6 +203,7 @@ void DataLoader::load_reads(const std::string& path,
 
 int DataLoader::get_num_reads(std::string data_path,
                               std::optional<std::unordered_set<std::string>> read_list,
+                              const std::unordered_set<std::string>& ignore_read_list,
                               bool recursive_file_loading) {
     size_t num_reads = 0;
 
@@ -240,8 +242,17 @@ int DataLoader::get_num_reads(std::string data_path,
                 [](const auto& path) { return std::filesystem::directory_iterator(path); });
     }
 
+    // Remove the reads in the ignore list from the total dataset read count.
+    num_reads -= ignore_read_list.size();
+
     if (read_list) {
-        num_reads = std::min(num_reads, read_list->size());
+        // Get the unique read ids in the read list, since everything in the ignore
+        // list will be skipped over.
+        std::vector<std::string> final_read_list;
+        std::set_difference(read_list->begin(), read_list->end(), ignore_read_list.begin(),
+                            ignore_read_list.end(),
+                            std::inserter(final_read_list, final_read_list.begin()));
+        num_reads = std::min(num_reads, final_read_list.size());
     }
 
     return num_reads;
@@ -561,8 +572,12 @@ void DataLoader::load_pod5_reads_from_file_by_read_ids(const std::string& path,
             char read_id_tmp[37];
             pod5_error_t err = pod5_format_read_id(read_data.read_id, read_id_tmp);
             std::string read_id_str(read_id_tmp);
-            if (!m_allowed_read_ids ||
-                (m_allowed_read_ids->find(read_id_str) != m_allowed_read_ids->end())) {
+            bool read_in_ignore_list =
+                    m_ignored_read_ids.find(read_id_str) != m_ignored_read_ids.end();
+            bool read_in_read_list =
+                    !m_allowed_read_ids ||
+                    (m_allowed_read_ids->find(read_id_str) != m_allowed_read_ids->end());
+            if (!read_in_ignore_list && read_in_read_list) {
                 futures.push_back(pool.push(process_pod5_read, row, batch, file, path, m_device));
             }
         }
@@ -631,8 +646,12 @@ void DataLoader::load_pod5_reads_from_file(const std::string& path) {
             char read_id_tmp[37];
             pod5_error_t err = pod5_format_read_id(read_data.read_id, read_id_tmp);
             std::string read_id_str(read_id_tmp);
-            if (!m_allowed_read_ids ||
-                (m_allowed_read_ids->find(read_id_str) != m_allowed_read_ids->end())) {
+            bool read_in_ignore_list =
+                    m_ignored_read_ids.find(read_id_str) != m_ignored_read_ids.end();
+            bool read_in_read_list =
+                    !m_allowed_read_ids ||
+                    (m_allowed_read_ids->find(read_id_str) != m_allowed_read_ids->end());
+            if (!read_in_ignore_list && read_in_read_list) {
                 futures.push_back(pool.push(process_pod5_read, row, batch, file, path, m_device));
             }
         }
@@ -749,11 +768,13 @@ DataLoader::DataLoader(Pipeline& pipeline,
                        const std::string& device,
                        size_t num_worker_threads,
                        size_t max_reads,
-                       std::optional<std::unordered_set<std::string>> read_list)
+                       std::optional<std::unordered_set<std::string>> read_list,
+                       std::unordered_set<std::string> read_ignore_list)
         : m_pipeline(pipeline),
           m_device(device),
           m_num_worker_threads(num_worker_threads),
-          m_allowed_read_ids(std::move(read_list)) {
+          m_allowed_read_ids(std::move(read_list)),
+          m_ignored_read_ids(std::move(read_ignore_list)) {
     m_max_reads = max_reads == 0 ? std::numeric_limits<decltype(m_max_reads)>::max() : max_reads;
     assert(m_num_worker_threads > 0);
     static std::once_flag vbz_init_flag;

@@ -25,11 +25,30 @@ fi
 samtools quickcheck -u $output_dir/calls.bam
 samtools view $output_dir/calls.bam > $output_dir/calls.sam
 
+# redirecting stderr to stdout: check output is still valid
+$dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --modified-bases 5mCG --emit-moves > $output_dir/calls.bam 2>&1
+samtools quickcheck -u $output_dir/calls.bam
+samtools view $output_dir/calls.bam > $output_dir/calls.sam
+
 echo dorado aligner test stage
 $dorado_bin aligner $output_dir/ref.fq $output_dir/calls.sam > $output_dir/calls.bam
 $dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --modified-bases 5mCG | $dorado_bin aligner $output_dir/ref.fq > $output_dir/calls.bam
 $dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --modified-bases 5mCG --reference $output_dir/ref.fq > $output_dir/calls.bam
 samtools quickcheck -u $output_dir/calls.bam
 samtools view -h $output_dir/calls.bam > $output_dir/calls.sam
+
+if command -v truncate > /dev/null
+then
+    echo dorado basecaller resume feature
+    $dorado_bin basecaller ${model} $data_dir/multi_read_pod5 -b ${batch} > $output_dir/tmp.bam
+    truncate -s 20K $output_dir/tmp.bam
+    $dorado_bin basecaller ${model} $data_dir/multi_read_pod5 -b ${batch} --resume-from $output_dir/tmp.bam > $output_dir/calls.bam
+    samtools quickcheck -u $output_dir/calls.bam
+    num_reads=$(samtools view -c $output_dir/calls.bam)
+    if [[ $num_reads -ne "4" ]]; then
+        echo "Resumed basecalling has incorrect number of reads."
+        exit 1
+    fi
+fi
 
 rm -rf $output_dir

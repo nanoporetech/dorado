@@ -79,3 +79,25 @@ TEST_CASE(TEST_GROUP "Load data sorted by channel id.") {
         start_channel_id = i->attributes.channel_number;
     }
 }
+
+TEST_CASE(TEST_GROUP "Test loading POD5 file with read ignore list") {
+    std::string data_path(get_data_dir("multi_read_pod5"));
+
+    SECTION("read ignore list with 1 read") {
+        auto read_ignore_list = std::unordered_set<std::string>();
+        read_ignore_list.insert("0007f755-bc82-432c-82be-76220b107ec5");  // read present in POD5
+
+        CHECK(dorado::DataLoader::get_num_reads(data_path, std::nullopt, read_ignore_list) == 3);
+        CHECK(CountSinkReads(data_path, "cpu", 1, 0, std::nullopt, read_ignore_list) == 1);
+    }
+
+    SECTION("same read in read_ids and ignore list") {
+        auto read_list = std::unordered_set<std::string>();
+        read_list.insert("0007f755-bc82-432c-82be-76220b107ec5");  // read present in POD5
+        auto read_ignore_list = std::unordered_set<std::string>();
+        read_ignore_list.insert("0007f755-bc82-432c-82be-76220b107ec5");  // read present in POD5
+
+        CHECK(dorado::DataLoader::get_num_reads(data_path, read_list, read_ignore_list) == 3);
+        CHECK(CountSinkReads(data_path, "cpu", 1, 0, std::nullopt, read_ignore_list) == 0);
+    }
+}
