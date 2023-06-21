@@ -282,17 +282,6 @@ target_link_libraries(dorado_lib
     date::date
 )
 
-if(WIN32)
-    # Static Windows build requires a few libs to be added:
-    target_link_libraries(dorado_lib
-      CUDA::cudart_static
-      CUDA::cublas
-      CUDA::cufft
-      CUDA::cusolver
-      CUDA::cusparse
-      )
-endif()
-
 if(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     target_link_libraries(dorado_lib ${IOKIT})
 endif()

@@ -142,3 +142,25 @@ endif()
 if(WIN32 AND DEFINED MKL_ROOT)
     link_directories(${MKL_ROOT}/lib/intel64)
 endif()
+
+# Static builds require a few libs to be added
+if(WIN32)
+    list(APPEND TORCH_LIBRARIES
+        CUDA::cudart_static
+        CUDA::cublas
+        CUDA::cufft
+        CUDA::cusolver
+        CUDA::cusparse
+    )
+elseif(APPLE AND NOT CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
+    find_library(ACCELERATE_FRAMEWORK Accelerate REQUIRED)
+    find_library(METAL_FRAMEWORK Metal REQUIRED)
+    find_library(MPS_FRAMEWORK MetalPerformanceShaders REQUIRED)
+    find_library(MPSG_FRAMEWORK MetalPerformanceShadersGraph REQUIRED)
+    list(APPEND TORCH_LIBRARIES
+        ${ACCELERATE_FRAMEWORK}
+        ${METAL_FRAMEWORK}
+        ${MPS_FRAMEWORK}
+        ${MPSG_FRAMEWORK}
+    )
+endif()
