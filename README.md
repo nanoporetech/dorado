@@ -73,9 +73,9 @@ If basecalling is interrupted, it is possible to resume basecalling from a BAM f
 $ dorado basecaller dna_r10.4.1_e8.2_400bps_hac@v4.1.0 pod5s --resume-from incomplete.bam > calls.bam
 ```
 
-`calls.bam` will contain all of the reads from `incomplete.bam` plus the new basecalls **(`incomplete.bam` can be discarded after basecalling is complete)**.
+`calls.bam` will contain all of the reads from `incomplete.bam` plus the new basecalls *(`incomplete.bam` can be discarded after basecalling is complete)*.
 
-*Note: it is important to choose a different filename for the BAM file you are writing to when using `--resuming-from`*. If you use the same filename, the interrupted BAM file will lose the existing basecalls and basecalling will restart from the beginning.
+**Note: it is important to choose a different filename for the BAM file you are writing to when using `--resuming-from`**. If you use the same filename, the interrupted BAM file will lose the existing basecalls and basecalling will restart from the beginning.
 
 ### Modified basecalling
 

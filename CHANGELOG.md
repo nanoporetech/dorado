@@ -6,6 +6,7 @@ All notable changes to Dorado will be documented in this file.
 
 This is a minor release of Dorado. It introduces various bug fixes, as well as performance and usability enhancements. Of particular note, this release introduces the ability to resume basecalling if interrupted, adds RNA002 models, improves the speed of modified base calling and duplex calling, and solves an issue whereby Dorado users were experiencing segmentation faults on version of Linux with older glibc.
 
+ * 08218cda24dae7af12115bc749e038d89b41ec5a - Added `--resume-from` for simplex basecalling.
  * e0c1beb96daf88a932146bee878b8c7195d5e265 - Turn off all logging if stdout and stderr point to the same file to avoid curruption
  * ae1e5e39190860d5eadac1191c4baa7114ca259d - Support for http proxies in `dorado download` via `dorado_proxy` and `dorado_proxy_port` envvars.
  * a62465cd7fd555cc64a5592b6b05cffeff3a03f0 - Added warning if user tries to use duplex with fast model
