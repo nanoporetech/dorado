@@ -2,7 +2,7 @@
 
 All notable changes to Dorado will be documented in this file.
 
-# [0.3.1] (?? Jun 2023)
+# [0.3.1] (21 Jun 2023)
 
 This is a minor release of Dorado. It introduces various bug fixes, as well as performance and usability enhancements. Of particular note, this release adds RNA002 models, improves the speed of modified base calling and duplex calling, and solves an issue whereby Dorado users were experiencing segmentation faults on Ubuntu16.04.
 
