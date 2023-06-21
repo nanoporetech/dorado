@@ -4,7 +4,7 @@ All notable changes to Dorado will be documented in this file.
 
 # [0.3.1] (21 Jun 2023)
 
-This is a minor release of Dorado. It introduces various bug fixes, as well as performance and usability enhancements. Of particular note, this release adds RNA002 models, improves the speed of modified base calling and duplex calling, and solves an issue whereby Dorado users were experiencing segmentation faults on Ubuntu16.04.
+This is a minor release of Dorado. It introduces various bug fixes, as well as performance and usability enhancements. Of particular note, this release introduces the ability to resume basecalling if interrupted, adds RNA002 models, improves the speed of modified base calling and duplex calling, and solves an issue whereby Dorado users were experiencing segmentation faults on Ubuntu16.04.
 
  * e0c1beb96daf88a932146bee878b8c7195d5e265 - Turn off all logging if stdout and stderr point to the same file to avoid curruption
  * ae1e5e39190860d5eadac1191c4baa7114ca259d - Support for http proxies in `dorado download` via `dorado_proxy` and `dorado_proxy_port` envvars.
