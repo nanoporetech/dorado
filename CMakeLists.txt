@@ -92,7 +92,7 @@ set(BUILD_TESTING OFF)
 add_subdirectory(${DORADO_3RD_PARTY}/edlib EXCLUDE_FROM_ALL)
 set(BUILD_TESTING ON)
 
-add_subdirectory(${DORADO_3RD_PARTY}/date)
+add_subdirectory(${DORADO_3RD_PARTY}/date EXCLUDE_FROM_ALL)
 
 enable_testing()
 
