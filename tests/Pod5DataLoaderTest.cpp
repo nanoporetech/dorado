@@ -88,7 +88,7 @@ TEST_CASE(TEST_GROUP "Test loading POD5 file with read ignore list") {
         read_ignore_list.insert("0007f755-bc82-432c-82be-76220b107ec5");  // read present in POD5
 
         CHECK(dorado::DataLoader::get_num_reads(data_path, std::nullopt, read_ignore_list) == 3);
-        CHECK(CountSinkReads(data_path, "cpu", 1, 0, std::nullopt, read_ignore_list) == 1);
+        CHECK(CountSinkReads(data_path, "cpu", 1, 0, std::nullopt, read_ignore_list) == 3);
     }
 
     SECTION("same read in read_ids and ignore list") {
@@ -97,7 +97,7 @@ TEST_CASE(TEST_GROUP "Test loading POD5 file with read ignore list") {
         auto read_ignore_list = std::unordered_set<std::string>();
         read_ignore_list.insert("0007f755-bc82-432c-82be-76220b107ec5");  // read present in POD5
 
-        CHECK(dorado::DataLoader::get_num_reads(data_path, read_list, read_ignore_list) == 3);
-        CHECK(CountSinkReads(data_path, "cpu", 1, 0, std::nullopt, read_ignore_list) == 0);
+        CHECK(dorado::DataLoader::get_num_reads(data_path, read_list, read_ignore_list) == 0);
+        CHECK(CountSinkReads(data_path, "cpu", 1, 0, read_list, read_ignore_list) == 0);
     }
 }

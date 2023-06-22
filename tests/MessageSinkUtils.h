@@ -19,7 +19,9 @@ public:
 private:
     void terminate_impl() {
         terminate_input_queue();
-        m_worker_thread->join();
+        if (m_worker_thread->joinable()) {
+            m_worker_thread->join();
+        }
     }
 
     std::unique_ptr<std::thread> m_worker_thread;
