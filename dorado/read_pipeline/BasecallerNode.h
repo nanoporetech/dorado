@@ -2,6 +2,7 @@
 
 #include "../nn/ModelRunner.h"
 #include "ReadPipeline.h"
+#include "utils/AsyncQueue.h"
 #include "utils/stats.h"
 
 #include <atomic>
@@ -55,21 +56,12 @@ private:
     // Model runners which have not terminated.
     std::atomic<int> m_num_active_model_runners{0};
 
-    std::atomic<bool> m_terminate_basecaller{false};
-    std::atomic<bool> m_terminate_manager{false};
-
     // Time when Basecaller Node is initialised. Used for benchmarking and debugging
     std::chrono::time_point<std::chrono::system_clock> initialization_time;
     // Time when Basecaller Node terminates. Used for benchmarking and debugging
     std::chrono::time_point<std::chrono::system_clock> termination_time;
-    // Signalled when there is space in m_chunks_in
-    std::condition_variable m_chunks_in_has_space_cv;
-    // Global chunk input list
-    std::mutex m_chunks_in_mutex;
-    // Signalled when chunks are added to m_chunks_in
-    std::condition_variable m_chunks_added_cv;
-    // Gets filled with chunks from the input reads
-    std::deque<std::shared_ptr<Chunk>> m_chunks_in;
+    // Async queue to keep track of basecalling chunks.
+    AsyncQueue<std::shared_ptr<Chunk>> m_chunks_in;
 
     std::mutex m_working_reads_mutex;
     // Reads removed from input queue and being basecalled.
@@ -77,6 +69,8 @@ private:
 
     // If we go multi-threaded, there will be one of these batches per thread
     std::vector<std::deque<std::shared_ptr<Chunk>>> m_batched_chunks;
+
+    AsyncQueue<std::shared_ptr<Chunk>> m_processed_chunks;
 
     // Class members are initialised in declaration order regardless of initialiser list order.
     // Class data members whose construction launches threads must therefore have their
