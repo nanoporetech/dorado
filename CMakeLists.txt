@@ -472,6 +472,7 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
        ${POD5_LIBRARIES}
        ${HDF5_C_LIBRARIES}
        ${CMAKE_DL_LIBS}
+       date::date
     )
 
     if(WIN32)
