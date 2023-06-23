@@ -80,7 +80,7 @@ void SubreadTaggerNode::worker_thread() {
                     }
                 }
 
-                // check that all candidiate pairs have been evaluated and that we have received a duplex read for all accepted candidate pairs
+                // check that all candidate pairs have been evaluated and that we have received a duplex read for all accepted candidate pairs
                 auto num_duplex_candidates = std::accumulate(
                         subreads->begin(), subreads->end(), size_t(0),
                         [](const size_t& running_total, const std::shared_ptr<Read>& subread) {
