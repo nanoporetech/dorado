@@ -11,6 +11,9 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32)
     # 2. https://github.com/pytorch/pytorch/blob/5fa71207222620b4efb78989849525d4ee6032e8/cmake/public/cuda.cmake#L40
     if(DEFINED CUDAToolkit_ROOT)
       set(CUDA_TOOLKIT_ROOT_DIR ${CUDAToolkit_ROOT})
+    else()
+        # Bodge for Torch, since static linking assumes find_package(CUDA) has already been called
+        find_package(CUDA REQUIRED)
     endif()
     if(NOT DEFINED CMAKE_CUDA_COMPILER)
       if(DEFINED CUDAToolkit_ROOT)
@@ -151,6 +154,38 @@ if(WIN32)
         CUDA::cufft
         CUDA::cusolver
         CUDA::cusparse
+    )
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    # Note: When changing this list, libs that have undefined symbols (ie Torch) must come first
+    list(APPEND TORCH_LIBRARIES
+        # These 2 libs depend on each other, but only libdnnl.a is added to Torch's install cmake, so we
+        # need to add it again after bringing in libdnnl_graph.a to fill in the missing symbols.
+        ${TORCH_LIB}/lib/libdnnl_graph.a
+        ${TORCH_LIB}/lib/libdnnl.a
+        # I'm assuming we need this for https://github.com/pytorch/pytorch/issues/50153
+        -Wl,--whole-archive
+            # Note: libtorch is setup to link to these dynamically, which shouldn't be a problem on Linux
+            ${TORCH_LIB}/lib/libcudnn_ops_infer_static.a
+            ${TORCH_LIB}/lib/libcudnn_adv_infer_static.a
+            ${TORCH_LIB}/lib/libcudnn_cnn_infer_static.a
+            ${TORCH_LIB}/lib/libcudnn_ops_train_static.a
+            ${TORCH_LIB}/lib/libcudnn_adv_train_static.a
+            ${TORCH_LIB}/lib/libcudnn_cnn_train_static.a
+        -Wl,--no-whole-archive
+        CUDA::cudart_static
+        CUDA::cublas
+        CUDA::cublasLt
+        CUDA::cufft
+        CUDA::cusolver
+        CUDA::cusparse
+        CUDA::cupti
+        CUDA::nvrtc
+        CUDA::culibos
+        ${TORCH_LIB}/lib/libnccl_static.a
+        ${TORCH_LIB}/lib/libmkl_core.so
+        ${TORCH_LIB}/lib/libmkl_intel_lp64.so
+        ${TORCH_LIB}/lib/libmkl_intel_thread.so
+        ${TORCH_LIB}/lib/libiomp5.so
     )
 elseif(APPLE AND NOT CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
     find_library(ACCELERATE_FRAMEWORK Accelerate REQUIRED)
