@@ -48,7 +48,8 @@ void BasecallerNode::input_worker_thread() {
             // Keeping the condition a function of the current sink size (empmirically at 5k reads this
             // caps memory around 30GB).
             m_chunks_in_has_space_cv.wait_for(chunk_lock, 10ms, [this, &max_chunks_in] {
-                auto under_read_limit = m_in_duplex_pipeline ? (m_working_reads.size() < 5 * m_max_reads) : true;
+                auto under_read_limit =
+                        m_in_duplex_pipeline ? (m_working_reads.size() < 5 * m_max_reads) : true;
                 return (m_chunks_in.size() < max_chunks_in) && under_read_limit;
             });
 
