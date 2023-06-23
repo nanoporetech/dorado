@@ -48,8 +48,9 @@ void BasecallerNode::input_worker_thread() {
             // Keeping the condition a function of the current sink size (empmirically at 5k reads this
             // caps memory around 30GB).
             m_chunks_in_has_space_cv.wait_for(chunk_lock, 10ms, [this, &max_chunks_in] {
-                return (m_chunks_in.size() < max_chunks_in) &&
-                       (m_working_reads.size() < 5 * m_max_reads);
+                auto under_read_limit =
+                        m_in_duplex_pipeline ? (m_working_reads.size() < 5 * m_max_reads) : true;
+                return (m_chunks_in.size() < max_chunks_in) && under_read_limit;
             });
 
             if (m_chunks_in.size() >= max_chunks_in) {
@@ -267,7 +268,8 @@ BasecallerNode::BasecallerNode(MessageSink &sink,
                                int batch_timeout_ms,
                                std::string model_name,
                                size_t max_reads,
-                               const std::string &node_name)
+                               const std::string &node_name,
+                               bool in_duplex_pipeline)
         : MessageSink(max_reads),
           m_sink(sink),
           m_model_runners(std::move(model_runners)),
@@ -278,6 +280,7 @@ BasecallerNode::BasecallerNode(MessageSink &sink,
           m_batch_timeout_ms(batch_timeout_ms),
           m_model_name(std::move(model_name)),
           m_max_reads(max_reads),
+          m_in_duplex_pipeline(in_duplex_pipeline),
           m_node_name(node_name) {
     // Setup worker state
     size_t const num_workers = m_model_runners.size();
