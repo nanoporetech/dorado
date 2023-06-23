@@ -54,7 +54,7 @@ std::string Read::generate_read_group() const {
 }
 
 void Read::generate_read_tags(bam1_t *aln, bool emit_moves) const {
-    int qs = static_cast<int>(std::round(utils::mean_qscore_from_qstring(qstring)));
+    int qs = static_cast<int>(std::round(calculate_mean_qscore()));
     bam_aux_append(aln, "qs", 'i', sizeof(qs), (uint8_t *)&qs);
 
     float du = (float)(raw_data.size(0) + num_trimmed_samples) / (float)sample_rate;
@@ -111,7 +111,7 @@ void Read::generate_read_tags(bam1_t *aln, bool emit_moves) const {
 }
 
 void Read::generate_duplex_read_tags(bam1_t *aln) const {
-    int qs = static_cast<int>(std::round(utils::mean_qscore_from_qstring(qstring)));
+    int qs = static_cast<int>(std::round(calculate_mean_qscore()));
     bam_aux_append(aln, "qs", 'i', sizeof(qs), (uint8_t *)&qs);
     uint32_t duplex = 1;
     bam_aux_append(aln, "dx", 'i', sizeof(duplex), (uint8_t *)&duplex);
@@ -248,6 +248,12 @@ void Read::generate_modbase_string(bam1_t *aln, uint8_t threshold) const {
 
     bam_aux_append(aln, "MM", 'Z', modbase_string.length() + 1, (uint8_t *)modbase_string.c_str());
     bam_aux_update_array(aln, "ML", 'C', modbase_prob.size(), (uint8_t *)modbase_prob.data());
+}
+
+float Read::calculate_mean_qscore() const {
+    const int kShortReadLenThreshold = 500;
+    auto qscore_start_pos = (seq.length() < kShortReadLenThreshold ? mean_qscore_start_pos : 0);
+    return utils::mean_qscore_from_qstring(qstring, qscore_start_pos);
 }
 
 void MessageSink::push_message(Message &&message) {

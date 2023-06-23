@@ -266,7 +266,8 @@ void setup(std::vector<std::string> args,
     }
     const int kBatchTimeoutMS = 100;
     BasecallerNode basecaller_node(*basecaller_node_sink, std::move(runners), overlap,
-                                   kBatchTimeoutMS, model_name, 1000);
+                                   kBatchTimeoutMS, model_name, 1000, "BasecallerNode",
+                                   get_model_mean_qscore_start_pos(model_path));
     ScalerNode scaler_node(basecaller_node, model_config.signal_norm_params,
                            thread_allocations.scaler_node_threads);
 

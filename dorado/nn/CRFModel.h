@@ -37,6 +37,10 @@ struct CRFModelConfig {
     int num_features;
     int sample_rate = -1;
     SignalNormalisationParams signal_norm_params;
+
+    // Start position for mean Q-score calculation for
+    // short reads.
+    int32_t mean_qscore_start_pos = -1;
 };
 
 CRFModelConfig load_crf_model_config(const std::filesystem::path& path);
@@ -50,5 +54,7 @@ torch::nn::ModuleHolder<torch::nn::AnyModule> load_crf_model(const std::filesyst
                                                              const torch::TensorOptions& options);
 
 uint16_t get_model_sample_rate(const std::filesystem::path& model_path);
+
+uint32_t get_model_mean_qscore_start_pos(const std::filesystem::path& model_path);
 
 }  // namespace dorado

@@ -102,10 +102,15 @@ public:
     std::vector<Mapping> mappings;
     std::vector<BamPtr> extract_sam_lines(bool emit_moves, uint8_t modbase_threshold = 0) const;
 
+    float calculate_mean_qscore() const;
+
     uint64_t start_sample;
     uint64_t end_sample;
     uint64_t run_acquisition_start_time_ms;
     bool is_duplex;
+    // Calculate mean Q-score from this position onwards if read is
+    // a short read.
+    uint32_t mean_qscore_start_pos = 0;
 
 private:
     void generate_duplex_read_tags(bam1_t*) const;

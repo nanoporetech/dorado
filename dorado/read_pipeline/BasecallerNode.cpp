@@ -158,6 +158,7 @@ void BasecallerNode::working_reads_manager() {
             ++m_called_reads_pushed;
             m_num_bases_processed += read->seq.length();
             m_num_samples_processed += read->raw_data.size(0);
+            read->mean_qscore_start_pos = m_mean_qscore_start_pos;
             m_sink.push_message(std::move(read));
         }
     }
@@ -269,7 +270,8 @@ BasecallerNode::BasecallerNode(MessageSink &sink,
                                std::string model_name,
                                size_t max_reads,
                                const std::string &node_name,
-                               bool in_duplex_pipeline)
+                               bool in_duplex_pipeline,
+                               uint32_t read_mean_qscore_start_pos)
         : MessageSink(max_reads),
           m_sink(sink),
           m_model_runners(std::move(model_runners)),
@@ -281,6 +283,7 @@ BasecallerNode::BasecallerNode(MessageSink &sink,
           m_model_name(std::move(model_name)),
           m_max_reads(max_reads),
           m_in_duplex_pipeline(in_duplex_pipeline),
+          m_mean_qscore_start_pos(read_mean_qscore_start_pos),
           m_node_name(node_name) {
     // Setup worker state
     size_t const num_workers = m_model_runners.size();

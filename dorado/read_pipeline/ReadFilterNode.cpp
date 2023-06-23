@@ -1,7 +1,5 @@
 #include "ReadFilterNode.h"
 
-#include "utils/sequence_utils.h"
-
 #include <spdlog/spdlog.h>
 
 namespace dorado {
@@ -15,7 +13,7 @@ void ReadFilterNode::worker_thread() {
         auto read = std::get<std::shared_ptr<Read>>(message);
 
         // Filter based on qscore.
-        if ((utils::mean_qscore_from_qstring(read->qstring) < m_min_qscore) ||
+        if ((read->calculate_mean_qscore() < m_min_qscore) ||
             read->seq.size() < m_min_read_length) {
             ++m_num_reads_filtered;
         } else if (m_read_ids_to_filter.find(read->read_id) != m_read_ids_to_filter.end()) {

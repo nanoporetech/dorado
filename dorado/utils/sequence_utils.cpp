@@ -130,7 +130,7 @@ __attribute__((target("avx2"))) std::string reverse_complement_impl(const std::s
 
 namespace dorado::utils {
 
-float mean_qscore_from_qstring(const std::string& qstring) {
+float mean_qscore_from_qstring(const std::string& qstring, int start_pos) {
     if (qstring.empty()) {
         return 0.0f;
     }
@@ -147,7 +147,7 @@ float mean_qscore_from_qstring(const std::string& qstring) {
         return a;
     }();
     float total_error =
-            std::accumulate(qstring.cbegin(), qstring.cend(), 0.0f,
+            std::accumulate(qstring.cbegin() + start_pos, qstring.cend(), 0.0f,
                             [](float sum, char qchar) { return sum + kCharToScoreTable[qchar]; });
     float mean_error = total_error / static_cast<float>(qstring.size());
     float mean_qscore = -10.0f * std::log10(mean_error);
