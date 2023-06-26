@@ -2,7 +2,7 @@
 
 All notable changes to Dorado will be documented in this file.
 
-# [0.3.1] (21 Jun 2023)
+# [0.3.1] (26 Jun 2023)
 
 This is a minor release of Dorado. It introduces various bug fixes, as well as performance and usability enhancements. Of particular note, this release introduces the ability to resume simplex basecalling if interrupted, adds RNA002 models, improves the speed of modified base calling and duplex calling, and solves an issue whereby Dorado users were experiencing segmentation faults on version of Linux with older glibc.
 
@@ -15,9 +15,8 @@ This is a minor release of Dorado. It introduces various bug fixes, as well as p
  * 4f61c18498ffa846ff11b3b8ba3ef1ecdfb4aae0 - Removed source of error related to race-condition
  * b1405ab50c831281c36647fcd07acee40380b228 - Added new RNA002 models with V3 architecture
  * e75e327f2a52a4d77afbc9b2384b662725ea42b0 - Aligner throws error when reference path does not exist
- * a9779164e2b29793617a03128017b75433154d1e - Refactor of progress bar
+ * a9779164e2b29793617a03128017b75433154d1e - Refactor of progress bar and account for filtered reads
  * f1627051edba1bff67a8b8fba510bc456b1e6621 - Fix the build when compiling with VS2017
- * a6f6997a725903b609fd8f20c0c9603078b05185 - Improve GPU utilisation during Duplex by removing pipeline "bubbles"
  * 84ecf32158fb4a587b7e0263021eea19c5533d1f - Update Koi to v0.3.3
  * d6463b351264dacecf100aeb89c8b493966649fd - Refactor aligner/hts nodes
  * c46a2a3558f42831e85efce56765b37be12040b9 - Fix segfault on Ubuntu 16.04
