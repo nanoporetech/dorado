@@ -177,7 +177,7 @@ int duplex(int argc, char* argv[]) {
         MessageSink* converted_reads_sink = nullptr;
 
         if (ref.empty()) {
-            bam_writer = std::make_shared<HtsWriter>("/dev/null", output_mode, 4, num_reads);
+            bam_writer = std::make_shared<HtsWriter>("-", output_mode, 4, num_reads);
             converted_reads_sink = bam_writer.get();
         } else {
             bam_writer = std::make_shared<HtsWriter>("-", output_mode, 4, num_reads);

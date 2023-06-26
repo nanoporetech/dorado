@@ -135,6 +135,7 @@ void BasecallerNode::working_reads_manager() {
                     }
                 }
             }
+            source_read->model_name = m_model_name;
             m_sink.push_message(std::move(source_read));
         }
     }
@@ -146,7 +147,19 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
     auto last_chunk_reserve_time = std::chrono::system_clock::now();
     int batch_size = m_model_runners[worker_id]->batch_size();
     std::shared_ptr<Chunk> chunk;
-    while (m_chunks_in.try_pop(chunk)) {
+    while (m_chunks_in.try_pop_until(
+            chunk, last_chunk_reserve_time + std::chrono::milliseconds(m_batch_timeout_ms))) {
+        // If chunk is empty, then try_pop timed out without getting a new chunk.
+        if (!chunk) {
+            if (!m_batched_chunks[worker_id].empty()) {
+                // get scores for whatever chunks are available.
+                basecall_current_batch(worker_id);
+            }
+
+            last_chunk_reserve_time = std::chrono::system_clock::now();
+            continue;
+        }
+
         // There's chunks to get_scores, so let's add them to our input tensor
         if (m_batched_chunks[worker_id].size() != batch_size) {
             // Copy the chunk into the input tensor
@@ -187,12 +200,11 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
             last_chunk_reserve_time = std::chrono::system_clock::now();
         }
 
-        auto timed_out = (std::chrono::system_clock::now() - last_chunk_reserve_time) >
-                         std::chrono::milliseconds(m_batch_timeout_ms);
-        if (m_batched_chunks[worker_id].size() == batch_size || timed_out) {
+        if (m_batched_chunks[worker_id].size() == batch_size) {
             // Input tensor is full, let's get_scores.
             basecall_current_batch(worker_id);
         }
+        chunk.reset();
     }
 
     if (!m_batched_chunks[worker_id].empty()) {

@@ -213,7 +213,7 @@ void setup(std::vector<std::string> args,
     std::shared_ptr<Aligner> aligner;
     MessageSink* converted_reads_sink = nullptr;
     if (ref.empty()) {
-        bam_writer = std::make_shared<HtsWriter>("/dev/null", output_mode,
+        bam_writer = std::make_shared<HtsWriter>("-", output_mode,
                                                  thread_allocations.writer_threads, num_reads);
         bam_writer->write_header(hdr.get());
         converted_reads_sink = bam_writer.get();

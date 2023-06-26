@@ -8,6 +8,8 @@
 #include <string>
 #include <unordered_map>
 
+using namespace std::chrono_literals;
+
 // Asynchronous queue for producer/consumer use.
 // Items must be movable.
 template <class Item>
@@ -69,12 +71,22 @@ public:
     }
 
     // Obtains the next item in the queue, returning true on success.
+    // If the queue is empty and timeout is reached, but we are not
+    // terminating, returns true without updating the reference.
     // If the queue is empty, and we are terminating, returns false.
     // Otherwise we block if the queue is empty.
-    bool try_pop(Item& item) {
+    template <class Clock, class Duration>
+    bool try_pop_until(Item& item, const std::chrono::time_point<Clock, Duration>& timeout_time) {
         std::unique_lock lock(m_mutex);
-        // Wait until either an item is added, or we're asked to terminate.
-        m_not_empty_cv.wait(lock, [this] { return !m_items.empty() || m_terminate; });
+        // Wait until either an item is added, a timeout is hit or we're asked to terminate.
+        m_not_empty_cv.wait_until(lock, timeout_time,
+                                  [this] { return !m_items.empty() || m_terminate; });
+
+        // Condition variable timed out. The queue is still empty
+        // and terminate isn't called yet.
+        if (!m_terminate && m_items.empty()) {
+            return true;
+        }
 
         // Termination takes effect once all items have been popped from the queue.
         if (m_terminate && m_items.empty()) {
@@ -90,6 +102,14 @@ public:
         m_not_full_cv.notify_one();
 
         return true;
+    }
+
+    // Obtains the next item in the queue, returning true on success.
+    // If the queue is empty, and we are terminating, returns false.
+    // Otherwise we block if the queue is empty.
+    bool try_pop(Item& item) {
+        // Use arbitrarily large timeout as a proxy for no timeout.
+        return try_pop_until(item, std::chrono::system_clock::now() + 96h);
     }
 
     // Tells the queue to terminate any CV waits.
