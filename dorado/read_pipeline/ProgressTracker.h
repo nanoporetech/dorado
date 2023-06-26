@@ -1,5 +1,6 @@
 #pragma once
 
+#include "utils/cli_utils.h"
 #include "utils/stats.h"
 
 #ifdef WIN32
@@ -67,6 +68,7 @@ public:
         };
 
         m_num_reads_written = fetch_stat("HtsWriter.unique_simplex_reads_written");
+
         if (m_num_reads_expected != 0) {
             m_num_reads_filtered = fetch_stat("ReadFilterNode.reads_filtered");
             m_num_bases_processed = fetch_stat("BasecallerNode.bases_processed");
@@ -74,6 +76,11 @@ public:
             if (m_duplex) {
                 m_num_bases_processed += fetch_stat("StereoBasecallerNode.bases_processed");
                 m_num_samples_processed += fetch_stat("StereoBasecallerNode.samples_processed");
+            }
+
+            // don't output progress bar if stderr is not a tty
+            if (!utils::is_fd_tty(stderr)) {
+                return;
             }
 
             // TODO: Add the ceiling because in duplex, reads written can exceed reads expected
@@ -90,6 +97,10 @@ public:
                 std::cerr << "\r";
             }
         } else {
+            // don't output progress if stderr is not a tty
+            if (!utils::is_fd_tty(stderr)) {
+                return;
+            }
             std::cerr << "\r> Output records written: " << m_num_reads_written;
             std::cerr << "\r";
         }

@@ -18,7 +18,8 @@ public:
                    int batch_timeout_ms,
                    std::string model_name = "",
                    size_t max_reads = 1000,
-                   const std::string& node_name = "BasecallerNode");
+                   const std::string& node_name = "BasecallerNode",
+                   bool in_duplex_pipeline = false);
     ~BasecallerNode();
     std::string get_name() const override { return m_node_name; }
     stats::NamedStats sample_stats() const override;
@@ -48,6 +49,8 @@ private:
     std::string m_model_name;
     // max reads
     size_t m_max_reads;
+    // is this node part of a duplex pipeline?
+    bool m_in_duplex_pipeline;
 
     // Model runners which have not terminated.
     std::atomic<int> m_num_active_model_runners{0};

@@ -23,6 +23,7 @@ set(SOURCE_FILES
     PairingNodeTest.cpp
     BamUtilsTest.cpp
     ResumeLoaderTest.cpp
+    TimeUtilsTest.cpp
 )
 
 if (DORADO_GPU_BUILD)
