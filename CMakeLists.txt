@@ -128,6 +128,8 @@ set(LIB_SOURCE_FILES
     dorado/read_pipeline/ReadFilterNode.h
     dorado/read_pipeline/ReadToBamTypeNode.cpp
     dorado/read_pipeline/ReadToBamTypeNode.h
+    dorado/read_pipeline/SubreadTaggerNode.cpp
+    dorado/read_pipeline/SubreadTaggerNode.h
     dorado/read_pipeline/BaseSpaceDuplexCallerNode.cpp
     dorado/read_pipeline/BaseSpaceDuplexCallerNode.h
     dorado/read_pipeline/DuplexSplitNode.cpp
