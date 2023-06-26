@@ -413,7 +413,7 @@ std::vector<std::shared_ptr<Read>> DuplexSplitNode::split(std::shared_ptr<Read> 
     }
 
     std::vector<std::shared_ptr<Read>> split_result;
-    int subread_id = 0;
+    size_t subread_id = 0;
     for (const auto& ext_read : to_split) {
         ext_read.read->subread_id = subread_id++;
         ext_read.read->split_count = to_split.size();
