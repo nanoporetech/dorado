@@ -127,7 +127,7 @@ uint32_t get_mean_qscore_start_pos_by_model_name(const std::string& model_name) 
     if (iter != mean_qscore_start_pos_by_model.end()) {
         return iter->second;
     } else {
-        // Assume any model not found in the list has sample rate 4000.
+        // Assume start position of 0 for unknown models.
         return 0;
     }
 }

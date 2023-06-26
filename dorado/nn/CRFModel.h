@@ -55,6 +55,6 @@ torch::nn::ModuleHolder<torch::nn::AnyModule> load_crf_model(const std::filesyst
 
 uint16_t get_model_sample_rate(const std::filesystem::path& model_path);
 
-uint32_t get_model_mean_qscore_start_pos(const std::filesystem::path& model_path);
+int32_t get_model_mean_qscore_start_pos(const std::filesystem::path& model_path);
 
 }  // namespace dorado

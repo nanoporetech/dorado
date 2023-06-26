@@ -135,6 +135,12 @@ float mean_qscore_from_qstring(const std::string& qstring, int start_pos) {
         return 0.0f;
     }
 
+    if (start_pos >= qstring.length()) {
+        throw std::runtime_error("Mean q-score start position (" + std::to_string(start_pos) +
+                                 ") is >= length of qstring (" + std::to_string(qstring.length()) +
+                                 ")");
+    }
+
     // Lookup table avoids repeated invocation of std::pow, which
     // otherwise dominates run time of this function.
     // Unfortunately std::pow is not constexpr, so this can't be.

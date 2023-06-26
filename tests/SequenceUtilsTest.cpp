@@ -6,6 +6,7 @@
 
 #define TEST_GROUP "[utils]"
 
+using std::make_tuple;
 using namespace dorado::utils;
 
 TEST_CASE(TEST_GROUP ": Test base_to_int") {
@@ -75,10 +76,9 @@ TEST_CASE(TEST_GROUP "mean_q_score") {
 TEST_CASE(TEST_GROUP "mean_q_score from non-zero start position") {
     CHECK(dorado::utils::mean_qscore_from_qstring("") == 0.0f);
 
-    // Sample inputs/golden output values.
-    const std::vector<std::tuple<std::string, int, float>> kExamples = {{"####%%%%", 0, 2.88587f},
-                                                                        {"####%%%%", 4, 7.0103f}};
-    for (const auto& [str, start_pos, score] : kExamples) {
-        CHECK(dorado::utils::mean_qscore_from_qstring(str, start_pos) == Approx(score));
-    }
+    auto [str, start_pos, score] = GENERATE(table<std::string, int, float>(
+            {make_tuple("####%%%%", 0, 2.88587f), make_tuple("####%%%%", 4, 7.0103f)}));
+    CHECK(dorado::utils::mean_qscore_from_qstring(str, start_pos) == Approx(score));
+
+    CHECK_THROWS_AS(dorado::utils::mean_qscore_from_qstring("####", 10), std::runtime_error);
 }

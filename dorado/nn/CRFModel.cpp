@@ -945,12 +945,15 @@ uint16_t get_model_sample_rate(const std::filesystem::path &model_path) {
     return model_sample_rate;
 }
 
-uint32_t get_model_mean_qscore_start_pos(const std::filesystem::path &model_path) {
+int32_t get_model_mean_qscore_start_pos(const std::filesystem::path &model_path) {
     std::string model_name = std::filesystem::canonical(model_path).filename().string();
-    int mean_qscore_start_pos = load_crf_model_config(model_path).mean_qscore_start_pos;
+    int32_t mean_qscore_start_pos = load_crf_model_config(model_path).mean_qscore_start_pos;
     if (mean_qscore_start_pos < 0) {
         // If unsuccessful, find start position by model name.
         mean_qscore_start_pos = utils::get_mean_qscore_start_pos_by_model_name(model_name);
+    }
+    if (mean_qscore_start_pos < 0) {
+        throw std::runtime_error("Mean q-score start position cannot be < 0");
     }
     return mean_qscore_start_pos;
 }
