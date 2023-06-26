@@ -4,10 +4,12 @@
 #include "utils/stats.h"
 
 #include <atomic>
+#include <deque>
 #include <map>
 #include <mutex>
 #include <string>
 #include <thread>
+#include <tuple>
 #include <vector>
 
 namespace dorado {
