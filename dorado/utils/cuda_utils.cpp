@@ -262,13 +262,14 @@ int auto_gpu_batch_size(torch::nn::ModuleHolder<torch::nn::AnyModule> module,
 }
 
 void handle_cuda_result(int cuda_result) {
-    if (cuda_result == cudaSuccess) return;
+    if (cuda_result == cudaSuccess)
+        return;
 
     if (cuda_result == cudaErrorNoKernelImageForDevice) {
-        throw std::runtime_error(std::string("Dorado cannot support the CUDA device being used,"
-            " as the compute capability version is incompatible."));
-    }
-    else {
+        throw std::runtime_error(
+                std::string("Dorado cannot support the CUDA device being used,"
+                            " as the compute capability version is incompatible."));
+    } else {
         spdlog::warn("Cuda error: {}", cudaGetErrorString(cudaError_t(cuda_result)));
     }
 }
