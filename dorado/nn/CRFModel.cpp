@@ -852,22 +852,20 @@ CRFModelConfig load_crf_model_config(const std::filesystem::path &path) {
     config.outsize = PowerOf4(config.state_len + 1);
 
     // Fetch run_info parameters.
-    try {
+    // Do nothing if run_info is not available in config file.
+    if (config_toml.contains("run_info")) {
         const auto &run_info = toml::find(config_toml, "run_info");
         config.sample_rate = toml::find<int>(run_info, "sample_rate");
-    } catch (const std::out_of_range &oor) {
-        // Do nothing as run_info is not available in all config files.
     }
 
     // Fetch signal normalisation parameters.
-    try {
+    // Use default values if normalisation section is not found.
+    if (config_toml.contains("normalisation")) {
         const auto &norm = toml::find(config_toml, "normalisation");
         config.signal_norm_params.quantile_a = toml::find<float>(norm, "quantile_a");
         config.signal_norm_params.quantile_b = toml::find<float>(norm, "quantile_b");
         config.signal_norm_params.shift_multiplier = toml::find<float>(norm, "shift_multiplier");
         config.signal_norm_params.scale_multiplier = toml::find<float>(norm, "scale_multiplier");
-    } catch (const std::out_of_range &oor) {
-        // Use default values if normalisation section is not found.
     }
 
     return config;
