@@ -4,14 +4,12 @@
 #include <Metal/Metal.hpp>
 #pragma clang attribute pop
 
-#include <spdlog/spdlog.h>
 #include <torch/torch.h>
 
 #include <string>
 #include <tuple>
 #include <variant>
 #include <vector>
-extern "C" void _CFAutoreleasePoolPrintPools(void);
 
 namespace dorado::utils {
 
