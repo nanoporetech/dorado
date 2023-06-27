@@ -10,7 +10,7 @@
 #include <cstdlib>
 #include <memory>
 
-#ifdef __APPLE__
+#ifdef defined(__APPLE__) && !defined(__x86_64__)
 #include "utils/metal_utils.h"
 #endif
 
@@ -175,7 +175,7 @@ void BasecallerNode::working_reads_manager() {
 }
 
 void BasecallerNode::basecall_worker_thread(int worker_id) {
-#ifdef __APPLE__
+#ifdef defined(__APPLE__) && !defined(__x86_64__)
     // Model execution creates GPU-related autorelease objects.
     utils::ScopedAutoReleasePool autorelease_pool;
 #endif
