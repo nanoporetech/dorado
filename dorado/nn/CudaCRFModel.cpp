@@ -31,7 +31,6 @@ public:
         m_decoder_options.q_scale = model_config.qscale;
         m_decoder = std::make_unique<GPUDecoder>();
         m_num_input_features = model_config.num_features;
-        m_exclusive_gpu_access = exclusive_gpu_access;
         // adjust chunk size to be a multiple of the stride
         m_out_chunk_size = chunk_size / m_model_stride;
         m_in_chunk_size = m_out_chunk_size * m_model_stride;
@@ -114,12 +113,20 @@ public:
         c10::cuda::CUDAGuard device_guard(m_options.device());
         auto stream = c10::cuda::getCurrentCUDAStream(m_options.device().index());
 
+        const std::string loop_scope_str =
+                "cuda_thread_fn_device_" + std::to_string(m_options.device().index());
+        const std::string input_q_cv_scope_str =
+                "input_queue_cv_device_" + std::to_string(m_options.device().index());
+        const std::string gpu_lock_scope_str =
+                "gpu_lock_" + std::to_string(m_options.device().index());
         while (true) {
-            nvtx3::scoped_range loop{"cuda_thread_fn"};
+            nvtx3::scoped_range loop{loop_scope_str};
             std::unique_lock<std::mutex> input_lock(m_input_lock);
+            nvtxRangePushA(input_q_cv_scope_str.c_str());
             while (m_input_queue.empty() && !m_terminate.load()) {
                 m_input_cv.wait_for(input_lock, 100ms);
             }
+            nvtxRangePop();
 
             if (m_input_queue.empty() && m_terminate.load()) {
                 return;
@@ -129,12 +136,14 @@ public:
             m_input_queue.pop_back();
             input_lock.unlock();
 
+            nvtxRangePushA(gpu_lock_scope_str.c_str());
             auto gpu_lock = dorado::utils::acquire_gpu_lock(m_options.device().index(),
                                                             m_exclusive_gpu_access);
+            nvtxRangePop();
+
             std::unique_lock<std::mutex> task_lock(task->mut);
             stats::Timer timer;
             auto scores = m_module->forward(task->input);
-            torch::cuda::synchronize();
             const auto forward_ms = timer.GetElapsedMS();
             task->out = m_decoder->gpu_part(scores, task->num_chunks, m_decoder_options);
             stream.synchronize();
@@ -171,7 +180,7 @@ public:
     std::condition_variable m_input_cv;
     std::unique_ptr<std::thread> m_cuda_thread;
     int m_num_input_features, m_batch_size, m_in_chunk_size, m_out_chunk_size;
-    bool m_exclusive_gpu_access{false};
+    bool m_exclusive_gpu_access;
 
     // Performance monitoring stats.
     std::atomic<int64_t> m_num_batches_called = 0;
