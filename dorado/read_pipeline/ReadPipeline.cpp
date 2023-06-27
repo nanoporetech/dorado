@@ -251,9 +251,10 @@ void Read::generate_modbase_string(bam1_t *aln, uint8_t threshold) const {
 }
 
 float Read::calculate_mean_qscore() const {
-    const int kShortReadLenThreshold = 500;
-    auto qscore_start_pos = (seq.length() < kShortReadLenThreshold ? mean_qscore_start_pos : 0);
-    return utils::mean_qscore_from_qstring(qstring, qscore_start_pos);
+    if (qstring.length() < mean_qscore_start_pos) {
+        return 0.f;
+    }
+    return utils::mean_qscore_from_qstring(qstring, mean_qscore_start_pos);
 }
 
 void MessageSink::push_message(Message &&message) {

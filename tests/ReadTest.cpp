@@ -237,8 +237,7 @@ TEST_CASE(TEST_GROUP ": Test mean q-score generation", TEST_GROUP) {
     test_read.read_id = "read1";
     test_read.raw_data = torch::empty(4000);
     test_read.seq = std::string("A", 400);
-    test_read.qstring = "!!" + std::string(398, '/');
-    ;
+    test_read.qstring = std::string("!!").append(std::string(398, '/'));
     test_read.sample_rate = 4000.0;
     test_read.shift = 128.3842f;
     test_read.scale = 8.258f;
@@ -251,13 +250,19 @@ TEST_CASE(TEST_GROUP ": Test mean q-score generation", TEST_GROUP) {
     test_read.run_id = "xyz";
     test_read.model_name = "test_model";
     test_read.is_duplex = false;
-    test_read.mean_qscore_start_pos = 0;
 
-    CHECK(test_read.calculate_mean_qscore() == Approx(13.5055f));
+    SECTION("Check with start pos = 0") {
+        test_read.mean_qscore_start_pos = 0;
+        CHECK(test_read.calculate_mean_qscore() == Approx(13.5055f));
+    }
 
-    // Now change qscore start position to >0.
-    // Since this read is short, the qscore start position
-    // should be used.
-    test_read.mean_qscore_start_pos = 2;
-    CHECK(test_read.calculate_mean_qscore() == Approx(14.02175f));
+    SECTION("Check with start pos > 0") {
+        test_read.mean_qscore_start_pos = 2;
+        CHECK(test_read.calculate_mean_qscore() == Approx(14.02175f));
+    }
+
+    SECTION("Check start pos > qstring length returns 0.f") {
+        test_read.mean_qscore_start_pos = 1000;
+        CHECK(test_read.calculate_mean_qscore() == Approx(0.f));
+    }
 }
