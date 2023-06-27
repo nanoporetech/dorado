@@ -18,13 +18,6 @@ namespace dorado {
 void BasecallerNode::input_worker_thread() {
     Message message;
 
-    // Allow 5 batches per model runner on the chunks_in queue
-    size_t max_chunks_in = 0;
-    // Allows optimal batch size to be used for every GPU
-    for (auto &runner : m_model_runners) {
-        max_chunks_in += runner->batch_size() * 5;
-    }
-
     while (m_work_queue.try_pop(message)) {
         if (std::holds_alternative<CandidatePairRejectedMessage>(message)) {
             m_sink.push_message(std::move(message));
@@ -110,14 +103,15 @@ void BasecallerNode::basecall_current_batch(int worker_id) {
 }
 
 void BasecallerNode::working_reads_manager() {
+    m_working_reads_managers_count++;
     std::shared_ptr<Chunk> chunk;
     while (m_processed_chunks->try_pop(chunk)) {
         nvtx3::scoped_range loop{"working_reads_manager"};
 
         auto source_read = chunk->source_read.lock();
-        ++source_read->num_chunks_called;
         source_read->called_chunks[chunk->idx_in_read] = chunk;
-        if (source_read->num_chunks_called.load() == source_read->num_chunks) {
+        auto num_chunks_called = ++source_read->num_chunks_called;
+        if (num_chunks_called == source_read->num_chunks) {
             utils::stitch_chunks(source_read);
             ++m_called_reads_pushed;
             m_num_bases_processed += source_read->seq.length();
@@ -128,19 +122,23 @@ void BasecallerNode::working_reads_manager() {
                 for (auto read_iter = m_working_reads.begin();
                      read_iter != m_working_reads.end();) {
                     if ((*read_iter)->read_id == source_read->read_id) {
+                        (*read_iter)->model_name = m_model_name;
+                        m_sink.push_message(std::move(*read_iter));
                         read_iter = m_working_reads.erase(read_iter);
                         --m_working_reads_size;
+                        break;
                     } else {
                         ++read_iter;
                     }
                 }
             }
-            source_read->model_name = m_model_name;
-            m_sink.push_message(std::move(source_read));
         }
     }
 
-    m_sink.terminate();
+    auto remaining = --m_working_reads_managers_count;
+    if (remaining == 0) {
+        m_sink.terminate();
+    }
 }
 
 void BasecallerNode::basecall_worker_thread(int worker_id) {
@@ -242,8 +240,6 @@ BasecallerNode::BasecallerNode(MessageSink &sink,
           m_model_name(std::move(model_name)),
           m_max_reads(max_reads),
           m_in_duplex_pipeline(in_duplex_pipeline),
-          //m_chunks_in(10000),
-          //m_processed_chunks(10000),
           m_node_name(node_name) {
     // Setup worker state
     size_t const num_workers = m_model_runners.size();
@@ -257,14 +253,16 @@ BasecallerNode::BasecallerNode(MessageSink &sink,
     for (auto &runner : m_model_runners) {
         max_chunks_in += runner->batch_size() * 5;
     }
-    std::cerr << max_chunks_in << std::endl;
     m_chunks_in = std::make_unique<AsyncQueue<std::shared_ptr<Chunk>>>(max_chunks_in);
     m_processed_chunks = std::make_unique<AsyncQueue<std::shared_ptr<Chunk>>>(max_chunks_in);
 
     initialization_time = std::chrono::system_clock::now();
 
     // Spin up any workers last so that we're not mutating |this| underneath them
-    m_working_reads_manager = std::make_unique<std::thread>([this] { working_reads_manager(); });
+    m_working_reads_managers.resize(num_workers / 2);
+    for (int i = 0; i < m_working_reads_managers.size(); i++) {
+        m_working_reads_managers[i] = std::thread([this] { working_reads_manager(); });
+    }
     m_input_worker = std::make_unique<std::thread>([this] { input_worker_thread(); });
     for (int i = 0; i < static_cast<int>(num_workers); i++) {
         m_basecall_workers[i] = std::thread([this, i] { basecall_worker_thread(i); });
@@ -277,7 +275,9 @@ BasecallerNode::~BasecallerNode() {
     for (auto &t : m_basecall_workers) {
         t.join();
     }
-    m_working_reads_manager->join();
+    for (auto &t : m_working_reads_managers) {
+        t.join();
+    }
     termination_time = std::chrono::system_clock::now();
 }
 

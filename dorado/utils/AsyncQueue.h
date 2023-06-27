@@ -142,6 +142,12 @@ public:
         m_not_empty_cv.notify_all();
     }
 
+    // Return the current size of the queue.
+    auto size() {
+        std::lock_guard lock(m_mutex);
+        return m_items.size();
+    }
+
     std::string get_name() const { return "queue"; }
 
     std::unordered_map<std::string, double> sample_stats() const {

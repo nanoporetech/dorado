@@ -76,12 +76,14 @@ private:
     // Class data members whose construction launches threads must therefore have their
     // declarations follow those of the state on which they rely, e.g. mutexes, if their
     // initialisation is via initialiser lists.
-    std::unique_ptr<std::thread>
-            m_input_worker;  // Chunks up incoming reads and sticks them in the pending list.
-    std::vector<std::thread>
-            m_basecall_workers;  // Basecalls chunks from the queue and puts read on the sink.
-    std::unique_ptr<std::thread>
-            m_working_reads_manager;  // Stitches working reads into complete reads.
+    // Chunks up incoming reads and sticks them in the pending list.
+    std::unique_ptr<std::thread> m_input_worker;
+    // Basecalls chunks from the queue and puts read on the sink.
+    std::vector<std::thread> m_basecall_workers;
+    // Stitches working reads into complete reads.
+    std::vector<std::thread> m_working_reads_managers;
+    // Working read managers that have not been terminated.
+    std::atomic<int> m_working_reads_managers_count{0};
 
     // Performance monitoring stats.
     std::string m_node_name;
