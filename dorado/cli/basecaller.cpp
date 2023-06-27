@@ -64,7 +64,7 @@ std::pair<std::vector<dorado::Runner>, size_t> create_basecall_runners(
 
         for (size_t i = 0; i < num_runners; i++) {
             runners.push_back(std::make_shared<dorado::ModelRunner<dorado::CPUDecoder>>(
-                    model_config.model_path, device, chunk_size, batch_size));
+                    model_config, device, chunk_size, batch_size));
         }
     }
 #if DORADO_GPU_BUILD

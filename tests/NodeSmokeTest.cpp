@@ -202,7 +202,7 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
     } else {
         const std::size_t batch_size = 128;
         runners.push_back(std::make_shared<dorado::ModelRunner<dorado::CPUDecoder>>(
-                model_path, "cpu", default_params.chunksize, batch_size));
+                model_config, "cpu", default_params.chunksize, batch_size));
     }
 
     dorado::BasecallerNode basecaller_node(get_sink(), std::move(runners),

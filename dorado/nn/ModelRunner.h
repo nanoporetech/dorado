@@ -31,7 +31,7 @@ using Runner = std::shared_ptr<ModelRunnerBase>;
 template <typename T>
 class ModelRunner final : public ModelRunnerBase {
 public:
-    ModelRunner(const std::filesystem::path &model,
+    ModelRunner(const CRFModelConfig &model_config,
                 const std::string &device,
                 int chunk_size,
                 int batch_size);
@@ -59,11 +59,10 @@ private:
 };
 
 template <typename T>
-ModelRunner<T>::ModelRunner(const std::filesystem::path &model_path,
+ModelRunner<T>::ModelRunner(const CRFModelConfig &model_config,
                             const std::string &device,
                             int chunk_size,
                             int batch_size) {
-    const auto model_config = load_crf_model_config(model_path);
     m_model_stride = static_cast<size_t>(model_config.stride);
 
     m_decoder_options = DecoderOptions();

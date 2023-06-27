@@ -290,7 +290,7 @@ int duplex(int argc, char* argv[]) {
                 }
                 for (size_t i = 0; i < num_runners; i++) {
                     runners.push_back(std::make_shared<ModelRunner<CPUDecoder>>(
-                            model_path, device, chunk_size, batch_size));
+                            model_config, device, chunk_size, batch_size));
                 }
             }
 #if DORADO_GPU_BUILD
