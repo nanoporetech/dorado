@@ -263,6 +263,7 @@ std::shared_ptr<dorado::Read> StereoDuplexEncoderNode::stereo_encode(
             {torch::indexing::Slice(None), torch::indexing::Slice(None, stereo_global_cursor)});
 
     read->read_id = template_read->read_id + ";" + complement_read->read_id;
+    read->read_tag = template_read->read_tag;
     read->raw_data = tmp;  // use the encoded signal
     read->is_duplex = true;
     read->run_id = template_read->run_id;
@@ -271,9 +272,6 @@ std::shared_ptr<dorado::Read> StereoDuplexEncoderNode::stereo_encode(
 
     return read;
 }
-}  // namespace dorado
-
-namespace dorado {
 
 void StereoDuplexEncoderNode::worker_thread() {
     Message message;
@@ -286,7 +284,11 @@ void StereoDuplexEncoderNode::worker_thread() {
             if (stereo_encoded_read->raw_data.ndimension() ==
                 2) {  // 2 dims for stereo encoding, 1 for simplex
                 m_sink.push_message(
-                        stereo_encoded_read);  // Strereo-encoded read created, send it to sink
+                        stereo_encoded_read);  // Stereo-encoded read created, send it to sink
+            } else {
+                // announce to downstream that we rejected a candidate pair
+                --read_pair->read_1->num_duplex_candidate_pairs;
+                m_sink.push_message(CandidatePairRejectedMessage{});
             }
         } else if (std::holds_alternative<std::shared_ptr<Read>>(message)) {
             auto read = std::get<std::shared_ptr<Read>>(message);
@@ -301,10 +303,10 @@ void StereoDuplexEncoderNode::worker_thread() {
 }
 
 StereoDuplexEncoderNode::StereoDuplexEncoderNode(MessageSink& sink, int input_signal_stride)
-        : m_input_signal_stride(input_signal_stride),
-          MessageSink(1000),
+        : MessageSink(1000),
           m_sink(sink),
-          m_num_worker_threads(std::thread::hardware_concurrency()) {
+          m_num_worker_threads(std::thread::hardware_concurrency()),
+          m_input_signal_stride(input_signal_stride) {
     for (int i = 0; i < m_num_worker_threads; i++) {
         std::unique_ptr<std::thread> stereo_encoder_worker_thread =
                 std::make_unique<std::thread>(&StereoDuplexEncoderNode::worker_thread, this);
