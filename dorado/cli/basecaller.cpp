@@ -280,8 +280,6 @@ void setup(std::vector<std::string> args,
                     "Resume only works if the same model is used. Resume model was " +
                     resume_model_name + " and current model is " + model_name);
         }
-        // FIXME -- ResumeLoaderNode wants to write to a node at the end of the pipeline,
-        // but the pipeline doesn't even exist yet.
         auto& bam_writer_ref = pipeline->get_node_ref(bam_writer);
         ResumeLoaderNode resume_loader(bam_writer_ref, resume_from_file);
         resume_loader.copy_completed_reads();
