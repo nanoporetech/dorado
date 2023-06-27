@@ -21,7 +21,7 @@ std::shared_ptr<dorado::Read> StereoDuplexEncoderNode::stereo_encode(
     assert(complement_read->raw_data.dtype() == torch::kFloat16);
 
     assert(complement_read->attributes.mux == template_read->attributes.mux);
-    assert(complement_read->attributes.channel_number = template_read->attributes.channel_number);
+    assert(complement_read->attributes.channel_number == template_read->attributes.channel_number);
     assert(complement_read->start_time_ms > template_read->start_time_ms);
 
     using SampleType = c10::Half;
