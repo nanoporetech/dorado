@@ -10,6 +10,10 @@
 #include <cstdlib>
 #include <memory>
 
+#ifdef __APPLE__
+#include "utils/metal_utils.h"
+#endif
+
 using namespace std::chrono_literals;
 using namespace torch::indexing;
 
@@ -171,6 +175,10 @@ void BasecallerNode::working_reads_manager() {
 }
 
 void BasecallerNode::basecall_worker_thread(int worker_id) {
+#ifdef __APPLE__
+    // Model execution creates GPU-related autorelease objects.
+    utils::ScopedAutoReleasePool autorelease_pool;
+#endif
     auto last_chunk_reserve_time = std::chrono::system_clock::now();
     int batch_size = m_model_runners[worker_id]->batch_size();
     while (true) {

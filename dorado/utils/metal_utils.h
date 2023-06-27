@@ -4,12 +4,14 @@
 #include <Metal/Metal.hpp>
 #pragma clang attribute pop
 
+#include <spdlog/spdlog.h>
 #include <torch/torch.h>
 
 #include <string>
 #include <tuple>
 #include <variant>
 #include <vector>
+extern "C" void _CFAutoreleasePoolPrintPools(void);
 
 namespace dorado::utils {
 
@@ -53,5 +55,16 @@ int get_mtl_device_core_count();
 int get_apple_cpu_perf_core_count();
 MTL::Buffer *mtl_for_tensor(const torch::Tensor &t);
 NS::SharedPtr<MTL::Buffer> extract_mtl_from_tensor(torch::Tensor &&t);
+
+// On construction, creates an autorelease pool for the current thread.
+// On destruction, drains the autorelease pool.
+class ScopedAutoReleasePool {
+public:
+    ScopedAutoReleasePool();
+    ~ScopedAutoReleasePool();
+
+private:
+    id m_autorelease_pool;
+};
 
 }  // namespace dorado::utils
