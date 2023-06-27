@@ -1,5 +1,6 @@
 #include "GPUDecoder.h"
 
+#include "../utils/cuda_utils.h"
 #include "Decoder.h"
 
 #include <c10/cuda/CUDAGuard.h>
