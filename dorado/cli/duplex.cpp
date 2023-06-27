@@ -296,8 +296,7 @@ int duplex(int argc, char* argv[]) {
 #if DORADO_GPU_BUILD
 #ifdef __APPLE__
             else if (device == "metal") {
-                auto simplex_caller =
-                        create_metal_caller(model_config, model_path, chunk_size, batch_size);
+                auto simplex_caller = create_metal_caller(model_config, chunk_size, batch_size);
                 for (int i = 0; i < num_runners; i++) {
                     runners.push_back(std::make_shared<MetalModelRunner>(simplex_caller));
                 }
@@ -308,8 +307,8 @@ int duplex(int argc, char* argv[]) {
                 // For now, the minimal batch size is used for the duplex model.
                 int stereo_batch_size = 48;
 
-                auto duplex_caller = create_metal_caller(stereo_model_config, stereo_model_path,
-                                                         chunk_size, stereo_batch_size);
+                auto duplex_caller =
+                        create_metal_caller(stereo_model_config, chunk_size, stereo_batch_size);
                 for (size_t i = 0; i < num_runners; i++) {
                     stereo_runners.push_back(std::make_shared<MetalModelRunner>(duplex_caller));
                 }
@@ -328,8 +327,8 @@ int duplex(int argc, char* argv[]) {
                 }
                 for (auto device_string : devices) {
                     // Use most of GPU mem but leave some for buffer.
-                    auto caller = create_cuda_caller(model_config, model_path, chunk_size,
-                                                     batch_size, device_string, 0.9f, guard_gpus);
+                    auto caller = create_cuda_caller(model_config, chunk_size, batch_size,
+                                                     device_string, 0.9f, guard_gpus);
                     for (size_t i = 0; i < num_runners; i++) {
                         runners.push_back(std::make_shared<CudaModelRunner>(caller));
                     }
@@ -344,8 +343,8 @@ int duplex(int argc, char* argv[]) {
                     // _remaining_ memory to the caller. So, we allocate all of the available
                     // memory after simplex caller has been instantiated to the duplex caller.
                     // ALWAYS auto tune the duplex batch size (i.e. batch_size passed in is 0.)
-                    auto caller = create_cuda_caller(stereo_model_config, stereo_model_path,
-                                                     chunk_size, 0, device_string, 1.f, guard_gpus);
+                    auto caller = create_cuda_caller(stereo_model_config, chunk_size, 0,
+                                                     device_string, 1.f, guard_gpus);
                     for (size_t i = 0; i < num_runners; i++) {
                         stereo_runners.push_back(std::make_shared<CudaModelRunner>(caller));
                     }
