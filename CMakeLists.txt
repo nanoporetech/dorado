@@ -103,9 +103,6 @@ else()
 endif()
 
 configure_file(dorado/Version.h.in dorado/Version.h)
-if (DORADO_GPU_BUILD AND APPLE)
-    include(cmake/Metal.cmake)
-endif()
  
 set(LIB_SOURCE_FILES
     dorado/nn/CRFModel.h
@@ -199,6 +196,7 @@ set(LIB_SOURCE_FILES
 
 if (DORADO_GPU_BUILD)
     if(APPLE)
+        include(cmake/Metal.cmake)
         list(APPEND LIB_SOURCE_FILES
             dorado/nn/MetalCRFModel.h
             dorado/nn/MetalCRFModel.cpp
