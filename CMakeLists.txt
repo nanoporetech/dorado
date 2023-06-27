@@ -103,7 +103,7 @@ else()
 endif()
 
 configure_file(dorado/Version.h.in dorado/Version.h)
- 
+
 set(LIB_SOURCE_FILES
     dorado/nn/CRFModel.h
     dorado/nn/CRFModel.cpp
