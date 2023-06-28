@@ -102,10 +102,11 @@ void setup(std::vector<std::string> args,
     // Check sample rate of model vs data.
     auto data_sample_rate = DataLoader::get_sample_rate(data_path, recursive_file_loading);
     auto model_sample_rate = get_model_sample_rate(model_path);
-    if (!skip_model_compatibility_check && (data_sample_rate != model_sample_rate)) {
+    if (!skip_model_compatibility_check &&
+        !sample_rates_compatible(data_sample_rate, model_sample_rate)) {
         std::stringstream err;
         err << "Sample rate for model (" << model_sample_rate << ") and data (" << data_sample_rate
-            << ") don't match.";
+            << ") are not compatible.";
         throw std::runtime_error(err.str());
     }
 

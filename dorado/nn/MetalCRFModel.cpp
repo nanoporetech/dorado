@@ -540,6 +540,8 @@ TORCH_MODULE(MetalModel);
 class MetalCaller {
 public:
     MetalCaller(const CRFModelConfig &model_config, int chunk_size, int batch_size) {
+        ScopedAutoReleasePool autorelease_pool;
+
         m_model_stride = static_cast<size_t>(model_config.stride);
         m_num_input_features = model_config.num_features;
 
@@ -684,6 +686,8 @@ public:
     }
 
     void metal_thread_fn() {
+        ScopedAutoReleasePool autorelease_pool;
+
         // Incrementing ID used to prevent the linear layer of run i+1 overwriting the scores of
         // run i before the CPU has finished decoding all run i's chunks.
         // Start at 1, since at event creation ID 0 is deemed to have been signalled.
