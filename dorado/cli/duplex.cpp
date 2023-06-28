@@ -250,10 +250,11 @@ int duplex(int argc, char* argv[]) {
             auto model_sample_rate = get_model_sample_rate(model_path);
             auto skip_model_compatibility_check =
                     internal_parser.get<bool>("--skip-model-compatibility-check");
-            if (!skip_model_compatibility_check && (data_sample_rate != model_sample_rate)) {
+            if (!skip_model_compatibility_check &&
+                !sample_rates_compatible(data_sample_rate, model_sample_rate)) {
                 std::stringstream err;
                 err << "Sample rate for model (" << model_sample_rate << ") and data ("
-                    << data_sample_rate << ") don't match.";
+                    << data_sample_rate << ") are not compatible.";
                 throw std::runtime_error(err.str());
             }
             auto stereo_model_name = utils::get_stereo_model_name(model, data_sample_rate);

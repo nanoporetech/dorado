@@ -236,8 +236,8 @@ TEST_CASE(TEST_GROUP ": Test mean q-score generation", TEST_GROUP) {
     dorado::Read test_read;
     test_read.read_id = "read1";
     test_read.raw_data = torch::empty(4000);
-    test_read.seq = std::string("A", 400);
-    test_read.qstring = std::string("!!").append(std::string(398, '/'));
+    test_read.seq = std::string("A", 10);
+    test_read.qstring = std::string("$$////////");
     test_read.sample_rate = 4000.0;
     test_read.shift = 128.3842f;
     test_read.scale = 8.258f;
@@ -253,12 +253,12 @@ TEST_CASE(TEST_GROUP ": Test mean q-score generation", TEST_GROUP) {
 
     SECTION("Check with start pos = 0") {
         test_read.mean_qscore_start_pos = 0;
-        CHECK(test_read.calculate_mean_qscore() == Approx(13.5055f));
+        CHECK(test_read.calculate_mean_qscore() == Approx(8.79143f));
     }
 
     SECTION("Check with start pos > 0") {
         test_read.mean_qscore_start_pos = 2;
-        CHECK(test_read.calculate_mean_qscore() == Approx(14.02175f));
+        CHECK(test_read.calculate_mean_qscore() == Approx(14.9691f));
     }
 
     SECTION("Check start pos > qstring length returns 0.f") {
