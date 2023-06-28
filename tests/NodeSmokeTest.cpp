@@ -257,7 +257,7 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
         // CPU processing is very slow, so reduce the number of test reads we throw at it.
         set_num_reads(5);
         modbase_devices.push_back("cpu");
-        batch_size = 8;  // reduce batch size so we're doing work on empty entries
+        batch_size = 8;  // reduce batch size so we're not doing work on empty entries
     }
     for (const auto& device_string : modbase_devices) {
         auto caller = dorado::create_modbase_caller({remora_model, remora_model_6mA}, batch_size,
