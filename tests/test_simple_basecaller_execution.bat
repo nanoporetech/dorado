@@ -7,5 +7,8 @@ echo dorado basecaller test stage
 %dorado_bin% basecaller %model% tests/data/pod5 -b %batch% --emit-fastq > ref.fq
 %dorado_bin% basecaller %model% tests/data/pod5 -b %batch% --modified-bases 5mCG --emit-moves --reference ref.fq --emit-sam > calls.sam
 
+echo dorado summary test stage
+%dorado_bin% summary calls.sam
+
 echo dorado aligner test stage
 %dorado_bin% aligner ref.fq calls.sam > aligned-calls.bam

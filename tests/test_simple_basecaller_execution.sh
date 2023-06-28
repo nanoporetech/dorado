@@ -25,7 +25,10 @@ fi
 samtools quickcheck -u $output_dir/calls.bam
 samtools view $output_dir/calls.bam > $output_dir/calls.sam
 
-# redirecting stderr to stdout: check output is still valid
+echo dorado summary test stage
+$dorado_bin summary $output_dir/calls.bam
+
+echo redirecting stderr to stdout: check output is still valid
 $dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --modified-bases 5mCG --emit-moves > $output_dir/calls.bam 2>&1
 samtools quickcheck -u $output_dir/calls.bam
 samtools view $output_dir/calls.bam > $output_dir/calls.sam
