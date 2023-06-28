@@ -159,6 +159,8 @@ set(LIB_SOURCE_FILES
     dorado/read_pipeline/ResumeLoaderNode.h
     dorado/read_pipeline/DuplexReadTaggingNode.cpp
     dorado/read_pipeline/DuplexReadTaggingNode.h
+    dorado/read_pipeline/Barcoder.cpp
+    dorado/read_pipeline/Barcoder.h
     dorado/decode/beam_search.cpp
     dorado/decode/fast_hash.cpp
     dorado/decode/fast_hash.h
@@ -324,6 +326,7 @@ if(NOT DORADO_LIB_ONLY)
     add_executable(dorado
         dorado/main.cpp
         dorado/cli/aligner.cpp
+        dorado/cli/barcoder.cpp
         dorado/cli/duplex.cpp
         dorado/cli/basecaller.cpp
         dorado/cli/benchmark.cpp
