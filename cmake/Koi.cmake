@@ -35,7 +35,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32)
         endif()
         # Update Koi even if it previously existed.
         execute_process(COMMAND git fetch WORKING_DIRECTORY ${KOI_DIR})
-        execute_process(COMMAND git checkout d56c93909a7a26fb82c33920898395406b949c73 WORKING_DIRECTORY ${KOI_DIR})
+        execute_process(COMMAND git checkout 7d50a1d9455f74261383782094c53b51484c6283 WORKING_DIRECTORY ${KOI_DIR})
         execute_process(COMMAND git submodule update --init --checkout WORKING_DIRECTORY ${KOI_DIR})
         add_subdirectory(${KOI_DIR}/koi/lib)
 
