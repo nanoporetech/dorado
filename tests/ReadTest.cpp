@@ -236,8 +236,8 @@ TEST_CASE(TEST_GROUP ": Test mean q-score generation", TEST_GROUP) {
     dorado::Read test_read;
     test_read.read_id = "read1";
     test_read.raw_data = torch::empty(4000);
-    test_read.seq = std::string("A", 10);
-    test_read.qstring = std::string("$$////////");
+    test_read.seq = "AAAAAAAAAA";
+    test_read.qstring = "$$////////";
     test_read.sample_rate = 4000.0;
     test_read.shift = 128.3842f;
     test_read.scale = 8.258f;
@@ -265,7 +265,7 @@ TEST_CASE(TEST_GROUP ": Test mean q-score generation", TEST_GROUP) {
         test_read.mean_qscore_start_pos = 1000;
         CHECK(test_read.calculate_mean_qscore() == Approx(0.f));
 
-        test_read.mean_qscore_start_pos = 400;
+        test_read.mean_qscore_start_pos = test_read.qstring.length();
         CHECK(test_read.calculate_mean_qscore() == Approx(0.f));
     }
 }
