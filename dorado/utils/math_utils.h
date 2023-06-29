@@ -86,4 +86,9 @@ std::tuple<T, T, T> linear_regression(const std::vector<T>& x, const std::vector
     return {m, b, r};
 }
 
+template <typename T>
+bool eq_with_tolerance(T a, T b, T tol) {
+    return std::abs(a - b) <= tol;
+}
+
 }  // namespace dorado::utils

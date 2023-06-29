@@ -10,6 +10,10 @@
 #include <cstdlib>
 #include <memory>
 
+#if defined(__APPLE__) && !defined(__x86_64__)
+#include "utils/metal_utils.h"
+#endif
+
 using namespace std::chrono_literals;
 using namespace torch::indexing;
 
@@ -26,6 +30,11 @@ void BasecallerNode::input_worker_thread() {
     }
 
     while (m_work_queue.try_pop(message)) {
+        if (std::holds_alternative<CandidatePairRejectedMessage>(message)) {
+            m_sink.push_message(std::move(message));
+            continue;
+        }
+
         // If this message isn't a read, we'll get a bad_variant_access exception.
         auto read = std::get<std::shared_ptr<Read>>(message);
         // If a read has already been basecalled, just send it to the sink without basecalling again
@@ -166,6 +175,10 @@ void BasecallerNode::working_reads_manager() {
 }
 
 void BasecallerNode::basecall_worker_thread(int worker_id) {
+#if defined(__APPLE__) && !defined(__x86_64__)
+    // Model execution creates GPU-related autorelease objects.
+    utils::ScopedAutoReleasePool autorelease_pool;
+#endif
     auto last_chunk_reserve_time = std::chrono::system_clock::now();
     int batch_size = m_model_runners[worker_id]->batch_size();
     while (true) {

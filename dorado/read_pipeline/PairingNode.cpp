@@ -72,6 +72,8 @@ void PairingNode::pair_list_worker_thread() {
                 read_pair.read_1 = template_read;
                 read_pair.read_2 = complement_read;
 
+                ++template_read->num_duplex_candidate_pairs;
+
                 m_sink.push_message(std::make_shared<ReadPair>(read_pair));
             }
         }
@@ -91,10 +93,11 @@ void PairingNode::pair_generating_worker_thread() {
         int mux = read->attributes.mux;
         std::string run_id = read->run_id;
         std::string flowcell_id = read->flowcell_id;
+        int32_t client_id = read->client_id;
 
         int max_num_keys = 10;
         std::unique_lock<std::mutex> lock(m_pairing_mtx);
-        UniquePoreIdentifierKey key = std::make_tuple(channel, mux, run_id, flowcell_id);
+        UniquePoreIdentifierKey key = std::make_tuple(channel, mux, run_id, flowcell_id, client_id);
         auto found = channel_mux_read_map.find(key);
         // Check if the key is already in the list
         if (found == channel_mux_read_map.end()) {
@@ -133,6 +136,7 @@ void PairingNode::pair_generating_worker_thread() {
 
                 if (is_within_time_and_length_criteria(*earlier_read, read)) {
                     ReadPair pair = {*earlier_read, read};
+                    ++(*earlier_read)->num_duplex_candidate_pairs;
                     m_sink.push_message(std::make_shared<ReadPair>(pair));
                 }
             }
@@ -140,6 +144,7 @@ void PairingNode::pair_generating_worker_thread() {
             if (later_read != channel_mux_read_map[key].end()) {
                 if (is_within_time_and_length_criteria(read, *later_read)) {
                     ReadPair pair = {read, *later_read};
+                    ++read->num_duplex_candidate_pairs;
                     m_sink.push_message(std::make_shared<ReadPair>(pair));
                 }
             }

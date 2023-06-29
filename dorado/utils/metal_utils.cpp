@@ -5,6 +5,7 @@
 #include <IOKit/IOKitLib.h>
 #endif
 #include <mach-o/dyld.h>
+#include <objc/objc-runtime.h>
 #include <spdlog/spdlog.h>
 #include <sys/sysctl.h>
 #include <sys/syslimits.h>
@@ -17,6 +18,7 @@ using namespace MTL;
 namespace fs = std::filesystem;
 
 namespace {
+
 // Allows less ugliness in use of std::visit.
 template <class... Ts>
 struct overloaded : Ts... {
@@ -32,6 +34,8 @@ overloaded(Ts...) -> overloaded<Ts...>;
 // leading to invalid address accesses.  This is in contrast to other NSObjects here created
 // using methods beginning with Create, alloc, new, which do require releasing via NS::SharedPtr
 // or other means.
+// Functions here that create autorelease objects should be called with an autorelease pool set up,
+// which on MacOS isn't the case unless something like ScopedAutoReleasePool is used.
 
 auto get_library_location() {
     char ns_path[PATH_MAX + 1];
@@ -338,6 +342,20 @@ NS::SharedPtr<MTL::Buffer> extract_mtl_from_tensor(torch::Tensor &&x) {
     auto bfr = NS::RetainPtr(mtl_for_tensor(x));
     x.reset();
     return bfr;
+}
+
+ScopedAutoReleasePool::ScopedAutoReleasePool() {
+    Class ns_autorelease_pool_class = objc_getClass("NSAutoreleasePool");
+    id autorelease_pool_alloc =
+            ((id(*)(Class, SEL))objc_msgSend)(ns_autorelease_pool_class, sel_registerName("alloc"));
+    m_autorelease_pool =
+            ((id(*)(id, SEL))objc_msgSend)(autorelease_pool_alloc, sel_registerName("init"));
+}
+
+ScopedAutoReleasePool::~ScopedAutoReleasePool() {
+    // Note: This destroys the autorelease pool object itself, along with the objects it is responsible
+    // for deleting.
+    ((void (*)(id, SEL))objc_msgSend)(m_autorelease_pool, sel_registerName("drain"));
 }
 
 }  // namespace dorado::utils
