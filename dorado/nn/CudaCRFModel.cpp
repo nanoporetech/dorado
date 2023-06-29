@@ -17,7 +17,6 @@ namespace dorado {
 class CudaCaller {
 public:
     CudaCaller(const CRFModelConfig &model_config,
-               const std::filesystem::path &model_path,
                int chunk_size,
                int batch_size,
                const std::string &device,
@@ -40,7 +39,7 @@ public:
         assert(m_options.device().is_cuda());
 
         torch::InferenceMode guard;
-        m_module = load_crf_model(model_path, model_config, m_options);
+        m_module = load_crf_model(model_config, m_options);
 
         // Batch size will be rounded up to a multiple of batch_size_granularity, regardless of
         // user choice. This makes sure batch size is compatible with GPU kernels.
@@ -180,13 +179,12 @@ public:
 };
 
 std::shared_ptr<CudaCaller> create_cuda_caller(const CRFModelConfig &model_config,
-                                               const std::filesystem::path &model_path,
                                                int chunk_size,
                                                int batch_size,
                                                const std::string &device,
                                                float memory_limit_fraction,
                                                bool exclusive_gpu_access) {
-    return std::make_shared<CudaCaller>(model_config, model_path, chunk_size, batch_size, device,
+    return std::make_shared<CudaCaller>(model_config, chunk_size, batch_size, device,
                                         memory_limit_fraction, exclusive_gpu_access);
 }
 

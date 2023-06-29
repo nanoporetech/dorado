@@ -15,7 +15,6 @@ namespace dorado {
 class CudaCaller;
 
 std::shared_ptr<CudaCaller> create_cuda_caller(const CRFModelConfig& model_config,
-                                               const std::filesystem::path& model_path,
                                                int chunk_size,
                                                int batch_size,
                                                const std::string& device,
