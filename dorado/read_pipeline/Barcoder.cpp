@@ -24,6 +24,9 @@ Barcoder::Barcoder(MessageSink& sink, const std::vector<std::string>& barcodes, 
     mm_set_opt(0, &m_idx_opt, &m_map_opt);
     // Setting options to map-ont default till relevant args are exposed.
     mm_set_opt("map-ont", &m_idx_opt, &m_map_opt);
+    m_idx_opt.k = 20;
+    m_idx_opt.w = 15;
+    m_idx_opt.bucket_bits = 14;
 
     mm_check_opt(&m_idx_opt, &m_map_opt);
 
@@ -34,12 +37,14 @@ Barcoder::Barcoder(MessageSink& sink, const std::vector<std::string>& barcodes, 
     for (auto& [bc, seq] : barcoding::barcodes) {
         seqs[index] = seq.c_str();
         names[index] = bc.c_str();
+        spdlog::info("{}: {} - length {}", bc, seq, seq.length());
         index++;
     }
 
-    m_index = mm_idx_str(10, 15, 0, 4, num_barcodes, seqs.get(), names.get());
+    m_index = mm_idx_str(m_idx_opt.w, m_idx_opt.k, 0, m_idx_opt.bucket_bits, num_barcodes,
+                         seqs.get(), names.get());
 
-    if (mm_verbose >= 3) {
+    if (true /*mm_verbose >= 3*/) {
         mm_idx_stat(m_index);
     }
 
@@ -82,6 +87,7 @@ void Barcoder::worker_thread(size_t tid) {
     if (num_active == 0) {
         terminate();
         m_sink.terminate();
+        spdlog::info("> Barcoded {}", matched.load());
     }
 }
 
@@ -104,6 +110,7 @@ std::vector<BamPtr> Barcoder::align(bam1_t* irecord, mm_tbuf_t* buf) {
 
     auto bseq = bam_get_seq(irecord);
     std::string seq = utils::convert_nt16_to_str(bseq, seqlen);
+    seq = seq.substr(0, 250);
     // Pre-generate reverse complement sequence.
     std::string seq_rev = utils::reverse_complement(seq);
 
@@ -138,6 +145,7 @@ std::vector<BamPtr> Barcoder::align(bam1_t* irecord, mm_tbuf_t* buf) {
 
         free(best_map->p);
         results.push_back(BamPtr(record));
+        matched++;
     }
 
     free(reg);
