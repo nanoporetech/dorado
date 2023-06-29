@@ -44,8 +44,8 @@ TEST_CASE("Split read pairing", TEST_GROUP) {
     // clang-format on
 
     MessageSinkToVector<dorado::Message> sink(5);
-    dorado::PairingNode pairing_node(sink, std::nullopt, 1,
-                                     1);  // one thread, one read - force reads through in order
+    // one thread, one read - force reads through in order
+    dorado::PairingNode pairing_node(sink, 1, 1);
     for (auto& read : reads) {
         pairing_node.push_message(std::move(read));
     }

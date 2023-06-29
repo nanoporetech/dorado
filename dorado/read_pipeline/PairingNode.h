@@ -16,10 +16,14 @@ namespace dorado {
 
 class PairingNode : public MessageSink {
 public:
+    // Template-complement map: uses the pair_list pairing method
     PairingNode(MessageSink& sink,
-                std::optional<std::map<std::string, std::string>> = std::nullopt,
+                std::map<std::string, std::string> template_complement_map,
                 int num_worker_threads = 2,
                 size_t max_reads = 1000);
+
+    // No template-complement map: uses the pair_generation pairing method
+    PairingNode(MessageSink& sink, int num_worker_threads = 2, size_t max_reads = 1000);
     ~PairingNode();
     std::string get_name() const override { return "PairingNode"; }
     stats::NamedStats sample_stats() const override;

@@ -174,26 +174,29 @@ void PairingNode::pair_generating_worker_thread() {
 }
 
 PairingNode::PairingNode(MessageSink& sink,
-                         std::optional<std::map<std::string, std::string>> template_complement_map,
+                         std::map<std::string, std::string> template_complement_map,
                          int num_worker_threads,
                          size_t max_reads)
-        : MessageSink(max_reads), m_sink(sink), m_num_worker_threads(num_worker_threads) {
-    if (template_complement_map.has_value()) {
-        m_template_complement_map = template_complement_map.value();
-        // Set up the complement-template_map
-        for (auto& key : m_template_complement_map) {
-            m_complement_template_map[key.second] = key.first;
-        }
+        : MessageSink(max_reads),
+          m_sink(sink),
+          m_template_complement_map(std::move(template_complement_map)),
+          m_num_worker_threads(num_worker_threads) {
+    // Set up the complement-template_map
+    for (auto& key : m_template_complement_map) {
+        m_complement_template_map[key.second] = key.first;
+    }
 
-        for (size_t i = 0; i < m_num_worker_threads; i++) {
-            m_workers.push_back(std::make_unique<std::thread>(
-                    std::thread(&PairingNode::pair_list_worker_thread, this)));
-        }
-    } else {
-        for (size_t i = 0; i < m_num_worker_threads; i++) {
-            m_workers.push_back(std::make_unique<std::thread>(
-                    std::thread(&PairingNode::pair_generating_worker_thread, this)));
-        }
+    for (size_t i = 0; i < m_num_worker_threads; i++) {
+        m_workers.push_back(std::make_unique<std::thread>(
+                std::thread(&PairingNode::pair_list_worker_thread, this)));
+    }
+}
+
+PairingNode::PairingNode(MessageSink& sink, int num_worker_threads, size_t max_reads)
+        : MessageSink(max_reads), m_sink(sink), m_num_worker_threads(num_worker_threads) {
+    for (size_t i = 0; i < m_num_worker_threads; i++) {
+        m_workers.push_back(std::make_unique<std::thread>(
+                std::thread(&PairingNode::pair_generating_worker_thread, this)));
     }
 }
 
