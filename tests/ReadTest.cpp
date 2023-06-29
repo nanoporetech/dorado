@@ -263,9 +263,11 @@ TEST_CASE(TEST_GROUP ": Test mean q-score generation", TEST_GROUP) {
 
     SECTION("Check start pos > qstring length returns 0.f") {
         test_read.mean_qscore_start_pos = 1000;
-        CHECK(test_read.calculate_mean_qscore() == Approx(0.f));
+        CHECK(test_read.calculate_mean_qscore() == Approx(8.79143f));
+    }
 
+    SECTION("Check start pos = qstring length") {
         test_read.mean_qscore_start_pos = test_read.qstring.length();
-        CHECK(test_read.calculate_mean_qscore() == Approx(0.f));
+        CHECK(test_read.calculate_mean_qscore() == Approx(8.79143f));
     }
 }

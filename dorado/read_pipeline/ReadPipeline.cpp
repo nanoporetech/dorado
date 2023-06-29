@@ -251,11 +251,11 @@ void Read::generate_modbase_string(bam1_t *aln, uint8_t threshold) const {
 }
 
 float Read::calculate_mean_qscore() const {
-    // TODO: Return Q-score as 0 if qstring length is less than the
-    // Q-score start position. This may need to be adjusted later
-    // depending on how that information is consumed downstream.
+    // If Q-score start position is greater than the
+    // read length, then calculate mean Q-score from the
+    // start of the read.
     if (qstring.length() <= mean_qscore_start_pos) {
-        return 0.f;
+        return utils::mean_qscore_from_qstring(qstring, 0);
     }
     return utils::mean_qscore_from_qstring(qstring, mean_qscore_start_pos);
 }
