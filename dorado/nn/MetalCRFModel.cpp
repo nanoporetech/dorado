@@ -539,10 +539,9 @@ TORCH_MODULE(MetalModel);
 
 class MetalCaller {
 public:
-    MetalCaller(const CRFModelConfig &model_config,
-                const std::filesystem::path &model_path,
-                int chunk_size,
-                int batch_size) {
+    MetalCaller(const CRFModelConfig &model_config, int chunk_size, int batch_size) {
+        ScopedAutoReleasePool autorelease_pool;
+
         m_model_stride = static_cast<size_t>(model_config.stride);
         m_num_input_features = model_config.num_features;
 
@@ -565,8 +564,8 @@ public:
         // round chunk size down to a multiple of the stride
         m_in_chunk_size = m_out_chunk_size * model_config.stride;
 
-        auto state_dict = load_crf_model_weights(model_path, model_config.out_features.has_value(),
-                                                 model_config.bias);
+        auto state_dict = load_crf_model_weights(
+                model_config.model_path, model_config.out_features.has_value(), model_config.bias);
 
         // Allocations beyond 4GB can fail, and the linear layer output buffer
         // hits this limit with batch sizes larger than 384 with typical
@@ -687,6 +686,8 @@ public:
     }
 
     void metal_thread_fn() {
+        ScopedAutoReleasePool autorelease_pool;
+
         // Incrementing ID used to prevent the linear layer of run i+1 overwriting the scores of
         // run i before the CPU has finished decoding all run i's chunks.
         // Start at 1, since at event creation ID 0 is deemed to have been signalled.
@@ -845,10 +846,9 @@ public:
 };
 
 std::shared_ptr<MetalCaller> create_metal_caller(const CRFModelConfig &model_config,
-                                                 const std::filesystem::path &model_path,
                                                  int chunk_size,
                                                  int batch_size) {
-    return std::make_shared<MetalCaller>(model_config, model_path, chunk_size, batch_size);
+    return std::make_shared<MetalCaller>(model_config, chunk_size, batch_size);
 }
 
 MetalModelRunner::MetalModelRunner(std::shared_ptr<MetalCaller> caller) : m_caller(caller) {

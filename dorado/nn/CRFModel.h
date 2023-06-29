@@ -1,5 +1,7 @@
 #pragma once
 
+#include "utils/math_utils.h"
+
 #include <torch/torch.h>
 
 #include <filesystem>
@@ -37,6 +39,7 @@ struct CRFModelConfig {
     int num_features;
     int sample_rate = -1;
     SignalNormalisationParams signal_norm_params;
+    std::filesystem::path model_path;
 };
 
 CRFModelConfig load_crf_model_config(const std::filesystem::path& path);
@@ -45,10 +48,14 @@ std::vector<torch::Tensor> load_crf_model_weights(const std::filesystem::path& d
                                                   bool decomposition,
                                                   bool bias);
 
-torch::nn::ModuleHolder<torch::nn::AnyModule> load_crf_model(const std::filesystem::path& path,
-                                                             const CRFModelConfig& model_config,
+torch::nn::ModuleHolder<torch::nn::AnyModule> load_crf_model(const CRFModelConfig& model_config,
                                                              const torch::TensorOptions& options);
 
 uint16_t get_model_sample_rate(const std::filesystem::path& model_path);
+
+inline bool sample_rates_compatible(uint16_t data_sample_rate, uint16_t model_sample_rate) {
+    return utils::eq_with_tolerance(data_sample_rate, model_sample_rate,
+                                    static_cast<uint16_t>(100));
+}
 
 }  // namespace dorado

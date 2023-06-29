@@ -1,5 +1,6 @@
 #include "GPUDecoder.h"
 
+#include "../utils/cuda_utils.h"
 #include "Decoder.h"
 
 #include <c10/cuda/CUDAGuard.h>
@@ -51,26 +52,29 @@ torch::Tensor GPUDecoder::gpu_part(torch::Tensor scores, int num_chunks, Decoder
     auto qstring = moves_sequence_qstring[2];
 
     c10::cuda::CUDAGuard device_guard(scores.device());
-    host_back_guide_step(chunks.data_ptr(), chunk_results.data_ptr(), N, scores.data_ptr(), C,
-                         aux.data_ptr(), path.data_ptr(), moves.data_ptr(), NULL,
-                         sequence.data_ptr(), qstring.data_ptr(), options.q_scale, options.q_shift,
-                         options.beam_width, options.beam_cut, options.blank_score);
+    dorado::utils::handle_cuda_result(host_back_guide_step(
+            chunks.data_ptr(), chunk_results.data_ptr(), N, scores.data_ptr(), C, aux.data_ptr(),
+            path.data_ptr(), moves.data_ptr(), NULL, sequence.data_ptr(), qstring.data_ptr(),
+            options.q_scale, options.q_shift, options.beam_width, options.beam_cut,
+            options.blank_score));
 
-    host_beam_search_step(chunks.data_ptr(), chunk_results.data_ptr(), N, scores.data_ptr(), C,
-                          aux.data_ptr(), path.data_ptr(), moves.data_ptr(), NULL,
-                          sequence.data_ptr(), qstring.data_ptr(), options.q_scale, options.q_shift,
-                          options.beam_width, options.beam_cut, options.blank_score);
+    dorado::utils::handle_cuda_result(host_beam_search_step(
+            chunks.data_ptr(), chunk_results.data_ptr(), N, scores.data_ptr(), C, aux.data_ptr(),
+            path.data_ptr(), moves.data_ptr(), NULL, sequence.data_ptr(), qstring.data_ptr(),
+            options.q_scale, options.q_shift, options.beam_width, options.beam_cut,
+            options.blank_score));
 
-    host_compute_posts_step(chunks.data_ptr(), chunk_results.data_ptr(), N, scores.data_ptr(), C,
-                            aux.data_ptr(), path.data_ptr(), moves.data_ptr(), NULL,
-                            sequence.data_ptr(), qstring.data_ptr(), options.q_scale,
-                            options.q_shift, options.beam_width, options.beam_cut,
-                            options.blank_score);
+    dorado::utils::handle_cuda_result(host_compute_posts_step(
+            chunks.data_ptr(), chunk_results.data_ptr(), N, scores.data_ptr(), C, aux.data_ptr(),
+            path.data_ptr(), moves.data_ptr(), NULL, sequence.data_ptr(), qstring.data_ptr(),
+            options.q_scale, options.q_shift, options.beam_width, options.beam_cut,
+            options.blank_score));
 
-    host_run_decode(chunks.data_ptr(), chunk_results.data_ptr(), N, scores.data_ptr(), C,
-                    aux.data_ptr(), path.data_ptr(), moves.data_ptr(), NULL, sequence.data_ptr(),
-                    qstring.data_ptr(), options.q_scale, options.q_shift, options.beam_width,
-                    options.beam_cut, options.blank_score, options.move_pad);
+    dorado::utils::handle_cuda_result(host_run_decode(
+            chunks.data_ptr(), chunk_results.data_ptr(), N, scores.data_ptr(), C, aux.data_ptr(),
+            path.data_ptr(), moves.data_ptr(), NULL, sequence.data_ptr(), qstring.data_ptr(),
+            options.q_scale, options.q_shift, options.beam_width, options.beam_cut,
+            options.blank_score, options.move_pad));
 
     return moves_sequence_qstring.reshape({3, N, -1});
 }
