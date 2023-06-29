@@ -35,7 +35,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32)
         endif()
         # Update Koi even if it previously existed.
         execute_process(COMMAND git fetch WORKING_DIRECTORY ${KOI_DIR})
-        execute_process(COMMAND git checkout 7d50a1d9455f74261383782094c53b51484c6283 WORKING_DIRECTORY ${KOI_DIR})
+        execute_process(COMMAND git checkout v0.3.4 WORKING_DIRECTORY ${KOI_DIR})
         execute_process(COMMAND git submodule update --init --checkout WORKING_DIRECTORY ${KOI_DIR})
         add_subdirectory(${KOI_DIR}/koi/lib)
 
@@ -43,7 +43,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32)
         set(KOI_LIBRARIES koi)
     else()
 
-        set(KOI_VERSION 0.3.3)
+        set(KOI_VERSION 0.3.4)
         find_package(CUDAToolkit REQUIRED)
         get_best_compatible_koi_version(KOI_CUDA)
         set(KOI_DIR libkoi-${KOI_VERSION}-${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}-cuda-${KOI_CUDA})
