@@ -16,6 +16,8 @@ namespace dorado {
 
 class PairingNode : public MessageSink {
 public:
+    enum class ReadOrder { pore_order = 0, time_order };
+
     // Template-complement map: uses the pair_list pairing method
     PairingNode(MessageSink& sink,
                 std::map<std::string, std::string> template_complement_map,
@@ -23,14 +25,17 @@ public:
                 size_t max_reads = 1000);
 
     // No template-complement map: uses the pair_generation pairing method
-    PairingNode(MessageSink& sink, int num_worker_threads = 2, size_t max_reads = 1000);
+    PairingNode(MessageSink& sink,
+                ReadOrder read_order = ReadOrder::pore_order,
+                int num_worker_threads = 2,
+                size_t max_reads = 1000);
     ~PairingNode();
     std::string get_name() const override { return "PairingNode"; }
     stats::NamedStats sample_stats() const override;
 
 private:
     void pair_list_worker_thread();
-    void pair_generating_worker_thread();
+    void pair_generating_worker_thread(size_t max_num_keys, size_t max_num_reads);
 
     // A key for a unique Pore, Duplex reads must have the same UniquePoreIdentifierKey
     // The values are channel, mux, run_id, flowcell_id, client_id

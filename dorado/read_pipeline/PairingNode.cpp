@@ -83,7 +83,7 @@ void PairingNode::pair_list_worker_thread() {
     }
 }
 
-void PairingNode::pair_generating_worker_thread() {
+void PairingNode::pair_generating_worker_thread(size_t max_num_keys, size_t max_num_reads) {
     auto compare_reads_by_time = [](const std::shared_ptr<Read>& read1,
                                     const std::shared_ptr<Read>& read2) {
         return read1->start_time_ms < read2->start_time_ms;
@@ -100,7 +100,6 @@ void PairingNode::pair_generating_worker_thread() {
         std::string flowcell_id = read->flowcell_id;
         int32_t client_id = read->client_id;
 
-        int max_num_keys = 10;
         std::unique_lock<std::mutex> lock(m_pairing_mtx);
         UniquePoreIdentifierKey key = std::make_tuple(channel, mux, run_id, flowcell_id, client_id);
         auto read_list_iter = channel_mux_read_map.find(key);
@@ -149,8 +148,12 @@ void PairingNode::pair_generating_worker_thread() {
             }
 
             cached_read_list.insert(later_read, read);
+            while (cached_read_list.size() > max_num_reads) {
+                cached_read_list.pop_front();
+            }
         }
     }
+
     if (--m_num_worker_threads == 0) {
         std::unique_lock<std::mutex> lock(m_pairing_mtx);
         // There are still reads in channel_mux_read_map. Push them to the sink.
@@ -188,11 +191,23 @@ PairingNode::PairingNode(MessageSink& sink,
     }
 }
 
-PairingNode::PairingNode(MessageSink& sink, int num_worker_threads, size_t max_reads)
+PairingNode::PairingNode(MessageSink& sink,
+                         ReadOrder read_order,
+                         int num_worker_threads,
+                         size_t max_reads)
         : MessageSink(max_reads), m_sink(sink), m_num_worker_threads(num_worker_threads) {
+    size_t max_num_keys = std::numeric_limits<size_t>::max();
+    size_t max_num_reads = std::numeric_limits<size_t>::max();
+
+    if (read_order == ReadOrder::pore_order) {
+        max_num_keys = 10;
+    } else if (read_order == ReadOrder::time_order) {
+        max_num_reads = 10;
+    }
+
     for (size_t i = 0; i < m_num_worker_threads; i++) {
-        m_workers.push_back(std::make_unique<std::thread>(
-                std::thread(&PairingNode::pair_generating_worker_thread, this)));
+        m_workers.push_back(std::make_unique<std::thread>(std::thread(
+                &PairingNode::pair_generating_worker_thread, this, max_num_keys, max_num_reads)));
     }
 }
 

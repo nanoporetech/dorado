@@ -45,7 +45,7 @@ TEST_CASE("Split read pairing", TEST_GROUP) {
 
     MessageSinkToVector<dorado::Message> sink(5);
     // one thread, one read - force reads through in order
-    dorado::PairingNode pairing_node(sink, 1, 1);
+    dorado::PairingNode pairing_node(sink, dorado::PairingNode::ReadOrder::pore_order, 1, 1);
     for (auto& read : reads) {
         pairing_node.push_message(std::move(read));
     }
