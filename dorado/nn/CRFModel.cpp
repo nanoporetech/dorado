@@ -795,6 +795,7 @@ CRFModelConfig load_crf_model_config(const std::filesystem::path &path) {
     const auto config_toml = toml::parse(path / "config.toml");
 
     CRFModelConfig config;
+    config.model_path = path;
 
     if (config_toml.contains("qscore")) {
         const auto &qscore = toml::find(config_toml, "qscore");
@@ -913,22 +914,21 @@ std::vector<torch::Tensor> load_crf_model_weights(const std::filesystem::path &d
     return utils::load_tensors(dir, tensors);
 }
 
-ModuleHolder<AnyModule> load_crf_model(const std::filesystem::path &path,
-                                       const CRFModelConfig &model_config,
+ModuleHolder<AnyModule> load_crf_model(const CRFModelConfig &model_config,
                                        const torch::TensorOptions &options) {
 #if USE_CUDA_LSTM
     if (options.device().is_cuda()) {
         const bool expand_blanks = false;
         auto model = nn::CudaCRFModel(model_config, expand_blanks);
-        return populate_model(model, path, options, model_config.out_features.has_value(),
-                              model_config.bias);
+        return populate_model(model, model_config.model_path, options,
+                              model_config.out_features.has_value(), model_config.bias);
     } else
 #endif
     {
         const bool expand_blanks = true;
         auto model = nn::CpuCRFModel(model_config, expand_blanks);
-        return populate_model(model, path, options, model_config.out_features.has_value(),
-                              model_config.bias);
+        return populate_model(model, model_config.model_path, options,
+                              model_config.out_features.has_value(), model_config.bias);
     }
 }
 

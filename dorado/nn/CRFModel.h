@@ -39,6 +39,7 @@ struct CRFModelConfig {
     int num_features;
     int sample_rate = -1;
     SignalNormalisationParams signal_norm_params;
+    std::filesystem::path model_path;
 
     // Start position for mean Q-score calculation for
     // short reads.
@@ -51,8 +52,7 @@ std::vector<torch::Tensor> load_crf_model_weights(const std::filesystem::path& d
                                                   bool decomposition,
                                                   bool bias);
 
-torch::nn::ModuleHolder<torch::nn::AnyModule> load_crf_model(const std::filesystem::path& path,
-                                                             const CRFModelConfig& model_config,
+torch::nn::ModuleHolder<torch::nn::AnyModule> load_crf_model(const CRFModelConfig& model_config,
                                                              const torch::TensorOptions& options);
 
 uint16_t get_model_sample_rate(const std::filesystem::path& model_path);
