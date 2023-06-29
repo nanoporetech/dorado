@@ -123,7 +123,7 @@ void PairingNode::pair_generating_worker_thread() {
 
         auto compare_reads_by_time = [](const std::shared_ptr<Read>& read1,
                                         const std::shared_ptr<Read>& read2) {
-            return read1->attributes.start_time < read2->attributes.start_time;
+            return read1->start_time_ms < read2->start_time_ms;
         };
 
         if (channel_mux_read_map.count(key)) {
