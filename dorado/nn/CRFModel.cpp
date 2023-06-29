@@ -620,38 +620,38 @@ private:
 
         auto buffer = torch::matmul(x, _r_wih[0]);
 
-        _host_run_lstm_rev_quantized(
+        dorado::utils::handle_cuda_result(_host_run_lstm_rev_quantized(
                 _chunks.data_ptr(), buffer.data_ptr(), _quantized_buffers[0].data_ptr(),
                 rnn1->named_parameters()["bias_ih"].data_ptr(),
-                _quantization_scale_factors[0].data_ptr(), x.data_ptr(), x.size(0));
+                _quantization_scale_factors[0].data_ptr(), x.data_ptr(), x.size(0)));
 
         buffer = torch::matmul(x, _r_wih[1]);
 
-        _host_run_lstm_fwd_quantized(
+        dorado::utils::handle_cuda_result(_host_run_lstm_fwd_quantized(
                 _chunks.data_ptr(), buffer.data_ptr(), _quantized_buffers[1].data_ptr(),
                 rnn2->named_parameters()["bias_ih"].data_ptr(),
-                _quantization_scale_factors[1].data_ptr(), x.data_ptr(), x.size(0));
+                _quantization_scale_factors[1].data_ptr(), x.data_ptr(), x.size(0)));
 
         buffer = torch::matmul(x, _r_wih[2]);
 
-        _host_run_lstm_rev_quantized(
+        dorado::utils::handle_cuda_result(_host_run_lstm_rev_quantized(
                 _chunks.data_ptr(), buffer.data_ptr(), _quantized_buffers[2].data_ptr(),
                 rnn3->named_parameters()["bias_ih"].data_ptr(),
-                _quantization_scale_factors[2].data_ptr(), x.data_ptr(), x.size(0));
+                _quantization_scale_factors[2].data_ptr(), x.data_ptr(), x.size(0)));
 
         buffer = torch::matmul(x, _r_wih[3]);
 
-        _host_run_lstm_fwd_quantized(
+        dorado::utils::handle_cuda_result(_host_run_lstm_fwd_quantized(
                 _chunks.data_ptr(), buffer.data_ptr(), _quantized_buffers[3].data_ptr(),
                 rnn4->named_parameters()["bias_ih"].data_ptr(),
-                _quantization_scale_factors[3].data_ptr(), x.data_ptr(), x.size(0));
+                _quantization_scale_factors[3].data_ptr(), x.data_ptr(), x.size(0)));
 
         buffer = torch::matmul(x, _r_wih[4]);
 
-        _host_run_lstm_rev_quantized(
+        dorado::utils::handle_cuda_result(_host_run_lstm_rev_quantized(
                 _chunks.data_ptr(), buffer.data_ptr(), _quantized_buffers[4].data_ptr(),
                 rnn5->named_parameters()["bias_ih"].data_ptr(),
-                _quantization_scale_factors[4].data_ptr(), x.data_ptr(), x.size(0));
+                _quantization_scale_factors[4].data_ptr(), x.data_ptr(), x.size(0)));
 
         // Output is [N, T, C], contiguous
         return x;
