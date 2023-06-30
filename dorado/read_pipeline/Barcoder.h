@@ -19,8 +19,8 @@ static const std::unordered_map<std::string, std::string> barcodes = {
         {"RLB05", "CTTGTCCAGGGTTTGTGTAACCTT"}, {"RLB06", "TTCTCGCAAAGGCAGAAAGTAGTC"},
         {"RLB07", "GTGTTACCGTGGGAATGAATCCTT"}, {"RLB08", "TTCAGGGAACAAACCAAGTTACGT"},
         {"RLB09", "AACTAGGCACAGCGAGTCTTGGTT"}, {"RLB10", "AAGCGTTGAAACCTTTGTCCTCTC"},
-        {"RLB11", "GTTTCATCTATCGGAGGGAATGGA"}, {"RLB12", "CAGGTAGAAAGAAGCAGAATCGGA"},
-        {"RLB13", "GTTGAGTTACAAAGCACCGATCAG"},
+        {"RLB11", "GTTTCATCTATCGGAGGGAATGGA"}, {"RLB12A", "GTTGAGTTACAAAGCACCGATCAG"},
+        //{"RLB11", "ATCGCCTACCGTGACGTTTCATCTATCGGAGGGAATGGACGTTTTTCGTGCGCCGCTTC"},
 };
 
 }  // namespace barcoding
@@ -29,7 +29,13 @@ using sq_t = std::vector<std::pair<char*, uint32_t>>;
 
 class Barcoder : public MessageSink {
 public:
-    Barcoder(MessageSink& read_sink, const std::vector<std::string>& barcodes, int threads);
+    Barcoder(MessageSink& read_sink,
+             const std::vector<std::string>& barcodes,
+             int threads,
+             int k,
+             int w,
+             int m,
+             int q);
     ~Barcoder();
     std::string get_name() const override { return "Barcoder"; }
     stats::NamedStats sample_stats() const override;
@@ -44,6 +50,10 @@ private:
     void add_tags(bam1_t* record, const mm_reg1_t* aln);
     std::vector<BamPtr> align(bam1_t* irecord, mm_tbuf_t* buf);
     std::atomic<int> matched{0};
+    int q;
+
+    void init_mm2_settings(int k, int w, int m);
+    std::string mm2_barcode(const std::string& seq, const std::string_view& qname, mm_tbuf_t* buf);
 
     mm_idxopt_t m_idx_opt;
     mm_mapopt_t m_map_opt;

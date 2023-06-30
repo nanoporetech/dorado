@@ -18,15 +18,47 @@
 
 namespace dorado {
 
-Barcoder::Barcoder(MessageSink& sink, const std::vector<std::string>& barcodes, int threads)
-        : MessageSink(10000), m_sink(sink), m_threads(threads) {
+Barcoder::Barcoder(MessageSink& sink,
+                   const std::vector<std::string>& barcodes,
+                   int threads,
+                   int k,
+                   int w,
+                   int m,
+                   int q)
+        : MessageSink(10000), m_sink(sink), m_threads(threads), q(q) {
+    init_mm2_settings(k, w, m);
+
+    for (size_t i = 0; i < m_threads; i++) {
+        m_workers.push_back(
+                std::make_unique<std::thread>(std::thread(&Barcoder::worker_thread, this, i)));
+    }
+}
+
+Barcoder::~Barcoder() {
+    terminate();
+    for (auto& m : m_workers) {
+        m->join();
+    }
+    for (int i = 0; i < m_threads; i++) {
+        mm_tbuf_destroy(m_tbufs[i]);
+    }
+    mm_idx_destroy(m_index);
+    // Adding for thread safety in case worker thread throws exception.
+    m_sink.terminate();
+}
+
+void Barcoder::init_mm2_settings(int k, int w, int m) {
+    // Initialization for minimap2 based barcoding.
     // Initialize option structs.
     mm_set_opt(0, &m_idx_opt, &m_map_opt);
     // Setting options to map-ont default till relevant args are exposed.
-    mm_set_opt("map-ont", &m_idx_opt, &m_map_opt);
-    m_idx_opt.k = 20;
-    m_idx_opt.w = 15;
-    m_idx_opt.bucket_bits = 14;
+    m_idx_opt.k = k;
+    m_idx_opt.w = w;
+
+    m_map_opt.min_chain_score = m;
+    m_map_opt.min_cnt = 5;
+    m_map_opt.occ_dist = 5;
+    //m_map_opt.mid_occ_frac = 0.9;
 
     mm_check_opt(&m_idx_opt, &m_map_opt);
 
@@ -51,24 +83,6 @@ Barcoder::Barcoder(MessageSink& sink, const std::vector<std::string>& barcodes, 
     for (int i = 0; i < m_threads; i++) {
         m_tbufs.push_back(mm_tbuf_init());
     }
-
-    for (size_t i = 0; i < m_threads; i++) {
-        m_workers.push_back(
-                std::make_unique<std::thread>(std::thread(&Barcoder::worker_thread, this, i)));
-    }
-}
-
-Barcoder::~Barcoder() {
-    terminate();
-    for (auto& m : m_workers) {
-        m->join();
-    }
-    for (int i = 0; i < m_threads; i++) {
-        mm_tbuf_destroy(m_tbufs[i]);
-    }
-    mm_idx_destroy(m_index);
-    // Adding for thread safety in case worker thread throws exception.
-    m_sink.terminate();
 }
 
 void Barcoder::worker_thread(size_t tid) {
@@ -98,6 +112,41 @@ void Barcoder::add_tags(bam1_t* record, const mm_reg1_t* aln) {
     bam_aux_append(record, "BC", 'Z', bc.length() + 1, (uint8_t*)bc.c_str());
 }
 
+std::string Barcoder::mm2_barcode(const std::string& seq,
+                                  const std::string_view& qname,
+                                  mm_tbuf_t* buf) {
+    std::string barcode = "unclassified";
+    auto short_seq = seq.substr(0, 250);
+    // do the mapping
+    int hits = 0;
+    mm_reg1_t* reg = mm_map(m_index, short_seq.length(), short_seq.c_str(), &hits, buf, &m_map_opt,
+                            qname.data());
+
+    // just return the input record
+    if (hits > 0) {
+        auto best_map = std::max_element(
+                reg, reg + hits,
+                [&](const mm_reg1_t& a, const mm_reg1_t& b) { return a.mapq < b.mapq; });
+
+        int32_t tid = best_map->rid;
+        hts_pos_t qs = best_map->qs;
+        hts_pos_t qe = best_map->qe;
+        uint8_t mapq = best_map->mapq;
+
+        if (hits > 1) {
+            spdlog::debug("Found {} hits, best mapq {} qs {} qe {}, strand {}", hits, mapq, qs, qe,
+                          best_map->rev ? '-' : '+');
+        }
+        if (!best_map->rev && mapq > q) {
+            barcode = std::string(m_index->seq[best_map->rid].name);
+        }
+
+        free(best_map->p);
+    }
+    free(reg);
+    return barcode;
+}
+
 std::vector<BamPtr> Barcoder::align(bam1_t* irecord, mm_tbuf_t* buf) {
     // some where for the hits
     std::vector<BamPtr> results;
@@ -110,45 +159,16 @@ std::vector<BamPtr> Barcoder::align(bam1_t* irecord, mm_tbuf_t* buf) {
 
     auto bseq = bam_get_seq(irecord);
     std::string seq = utils::convert_nt16_to_str(bseq, seqlen);
-    seq = seq.substr(0, 250);
     // Pre-generate reverse complement sequence.
     std::string seq_rev = utils::reverse_complement(seq);
 
-    // do the mapping
-    int hits = 0;
-    mm_reg1_t* reg =
-            mm_map(m_index, seq.length(), seq.c_str(), &hits, buf, &m_map_opt, qname.data());
-
-    // just return the input record
-    if (hits == 0) {
-        std::string bc("unknown");
-        bam_aux_append(irecord, "BC", 'Z', bc.length() + 1, (uint8_t*)bc.c_str());
-        results.push_back(BamPtr(bam_dup1(irecord)));
-    } else {
-        spdlog::debug("Found {} hits", hits);
-        auto best_map = std::max_element(
-                reg, reg + hits,
-                [&](const mm_reg1_t& a, const mm_reg1_t& b) { return a.mapq < b.mapq; });
-
-        // new output record
-        bam1_t* record = bam_dup1(irecord);
-
-        int32_t tid = best_map->rid;
-        hts_pos_t qs = best_map->qs;
-        hts_pos_t qe = best_map->qe;
-        uint8_t mapq = best_map->mapq;
-
-        if (mapq > 10) {
-            // Add new tags to match minimap2.
-            add_tags(record, best_map);
-        }
-
-        free(best_map->p);
-        results.push_back(BamPtr(record));
+    auto bc = mm2_barcode(seq, qname, buf);
+    bam_aux_append(irecord, "BC", 'Z', bc.length() + 1, (uint8_t*)bc.c_str());
+    if (bc != "unclassified") {
         matched++;
     }
+    results.push_back(BamPtr(bam_dup1(irecord)));
 
-    free(reg);
     return results;
 }
 
