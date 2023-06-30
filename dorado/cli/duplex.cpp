@@ -296,7 +296,8 @@ int duplex(int argc, char* argv[]) {
             const int kStereoBatchTimeoutMS = 5000;
             auto stereo_basecaller_node = std::make_unique<BasecallerNode>(
                     read_filter_node, std::move(stereo_runners), adjusted_stereo_overlap,
-                    kStereoBatchTimeoutMS, duplex_rg_name, 1000, "StereoBasecallerNode", true);
+                    kStereoBatchTimeoutMS, duplex_rg_name, 1000, "StereoBasecallerNode", true,
+                    get_model_mean_qscore_start_pos(stereo_model_config));
             auto simplex_model_stride = runners.front()->model_stride();
 
             StereoDuplexEncoderNode stereo_node =
@@ -320,7 +321,8 @@ int duplex(int argc, char* argv[]) {
             const int kSimplexBatchTimeoutMS = 100;
             auto basecaller_node = std::make_unique<BasecallerNode>(
                     splitter_node, std::move(runners), adjusted_simplex_overlap,
-                    kSimplexBatchTimeoutMS, model, 1000, "BasecallerNode", true);
+                    kSimplexBatchTimeoutMS, model, 1000, "BasecallerNode", true,
+                    get_model_mean_qscore_start_pos(model_config));
 
             ScalerNode scaler_node(*basecaller_node, model_config.signal_norm_params,
                                    num_devices * 2);

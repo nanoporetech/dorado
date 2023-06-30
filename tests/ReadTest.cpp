@@ -231,3 +231,43 @@ TEST_CASE(TEST_GROUP ": Methylation tag generation", TEST_GROUP) {
         CHECK(bam_aux_get(aln, "ML") == NULL);
     }
 }
+
+TEST_CASE(TEST_GROUP ": Test mean q-score generation", TEST_GROUP) {
+    dorado::Read test_read;
+    test_read.read_id = "read1";
+    test_read.raw_data = torch::empty(4000);
+    test_read.seq = "AAAAAAAAAA";
+    test_read.qstring = "$$////////";
+    test_read.sample_rate = 4000.0;
+    test_read.shift = 128.3842f;
+    test_read.scale = 8.258f;
+    test_read.num_trimmed_samples = 132;
+    test_read.attributes.mux = 2;
+    test_read.attributes.read_number = 18501;
+    test_read.attributes.channel_number = 5;
+    test_read.attributes.start_time = "2017-04-29T09:10:04Z";
+    test_read.attributes.fast5_filename = "batch_0.fast5";
+    test_read.run_id = "xyz";
+    test_read.model_name = "test_model";
+    test_read.is_duplex = false;
+
+    SECTION("Check with start pos = 0") {
+        test_read.mean_qscore_start_pos = 0;
+        CHECK(test_read.calculate_mean_qscore() == Approx(8.79143f));
+    }
+
+    SECTION("Check with start pos > 0") {
+        test_read.mean_qscore_start_pos = 2;
+        CHECK(test_read.calculate_mean_qscore() == Approx(14.9691f));
+    }
+
+    SECTION("Check start pos > qstring length returns 0.f") {
+        test_read.mean_qscore_start_pos = 1000;
+        CHECK(test_read.calculate_mean_qscore() == Approx(8.79143f));
+    }
+
+    SECTION("Check start pos = qstring length") {
+        test_read.mean_qscore_start_pos = test_read.qstring.length();
+        CHECK(test_read.calculate_mean_qscore() == Approx(8.79143f));
+    }
+}
