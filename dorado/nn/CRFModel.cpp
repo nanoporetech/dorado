@@ -801,6 +801,9 @@ CRFModelConfig load_crf_model_config(const std::filesystem::path &path) {
         const auto &qscore = toml::find(config_toml, "qscore");
         config.qbias = toml::find<float>(qscore, "bias");
         config.qscale = toml::find<float>(qscore, "scale");
+        if (qscore.contains("mean_qscore_start_pos")) {
+            config.mean_qscore_start_pos = toml::find<int32_t>(qscore, "mean_qscore_start_pos");
+        }
     } else {
         spdlog::debug("> no qscore calibration found");
     }
@@ -938,6 +941,19 @@ uint16_t get_model_sample_rate(const std::filesystem::path &model_path) {
         model_sample_rate = utils::get_sample_rate_by_model_name(model_name);
     }
     return model_sample_rate;
+}
+
+int32_t get_model_mean_qscore_start_pos(const CRFModelConfig &model_config) {
+    int32_t mean_qscore_start_pos = model_config.mean_qscore_start_pos;
+    if (mean_qscore_start_pos < 0) {
+        // If unsuccessful, find start position by model name.
+        std::string model_name = model_config.model_path.filename().string();
+        mean_qscore_start_pos = utils::get_mean_qscore_start_pos_by_model_name(model_name);
+    }
+    if (mean_qscore_start_pos < 0) {
+        throw std::runtime_error("Mean q-score start position cannot be < 0");
+    }
+    return mean_qscore_start_pos;
 }
 
 }  // namespace dorado

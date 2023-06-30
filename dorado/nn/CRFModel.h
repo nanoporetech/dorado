@@ -40,6 +40,10 @@ struct CRFModelConfig {
     int sample_rate = -1;
     SignalNormalisationParams signal_norm_params;
     std::filesystem::path model_path;
+
+    // Start position for mean Q-score calculation for
+    // short reads.
+    int32_t mean_qscore_start_pos = -1;
 };
 
 CRFModelConfig load_crf_model_config(const std::filesystem::path& path);
@@ -57,5 +61,7 @@ inline bool sample_rates_compatible(uint16_t data_sample_rate, uint16_t model_sa
     return utils::eq_with_tolerance(data_sample_rate, model_sample_rate,
                                     static_cast<uint16_t>(100));
 }
+
+int32_t get_model_mean_qscore_start_pos(const CRFModelConfig& model_config);
 
 }  // namespace dorado
