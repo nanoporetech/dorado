@@ -48,14 +48,14 @@ void PairingNode::pair_list_worker_thread() {
 
         if (partner_found) {
             std::unique_lock<std::mutex> read_cache_lock(m_read_cache_mutex);
-            if (read_cache.find(partner_id) == read_cache.end()) {
+            auto partner_read_itr = m_read_cache.find(partner_id);
+            if (partner_read_itr == m_read_cache.end()) {
                 // Partner is not in the read cache
-                read_cache[read->read_id] = read;
+                m_read_cache.insert({read->read_id, read});
                 read_cache_lock.unlock();
             } else {
-                auto partner_read_itr = read_cache.find(partner_id);
                 auto partner_read = partner_read_itr->second;
-                read_cache.erase(partner_read_itr);
+                m_read_cache.erase(partner_read_itr);
                 read_cache_lock.unlock();
 
                 std::shared_ptr<Read> template_read;
@@ -103,27 +103,27 @@ void PairingNode::pair_generating_worker_thread(size_t max_num_keys, size_t max_
 
         std::unique_lock<std::mutex> lock(m_pairing_mtx);
         UniquePoreIdentifierKey key = std::make_tuple(channel, mux, run_id, flowcell_id, client_id);
-        auto read_list_iter = channel_mux_read_map.find(key);
+        auto read_list_iter = m_channel_mux_read_map.find(key);
         // Check if the key is already in the list
-        if (read_list_iter == channel_mux_read_map.end()) {
+        if (read_list_iter == m_channel_mux_read_map.end()) {
             // Key is not in the dequeue
             // Add the new key to the end of the list
             m_working_channel_mux_keys.push_back(key);
-            channel_mux_read_map.insert({key, {read}});
+            m_channel_mux_read_map.insert({key, {read}});
 
             if (m_working_channel_mux_keys.size() > max_num_keys) {
                 // Remove the oldest key (front of the list)
                 auto oldest_key = m_working_channel_mux_keys.front();
                 m_working_channel_mux_keys.pop_front();
 
-                auto oldest_key_it = channel_mux_read_map.find(oldest_key);
+                auto oldest_key_it = m_channel_mux_read_map.find(oldest_key);
 
                 // Remove the oldest key from the map
                 for (auto read_ptr : oldest_key_it->second) {
                     m_sink.push_message(read_ptr);
                 }
-                channel_mux_read_map.erase(oldest_key);
-                assert(channel_mux_read_map.size() == m_working_channel_mux_keys.size());
+                m_channel_mux_read_map.erase(oldest_key);
+                assert(m_channel_mux_read_map.size() == m_working_channel_mux_keys.size());
             }
         } else {
             auto& cached_read_list = read_list_iter->second;
@@ -159,7 +159,7 @@ void PairingNode::pair_generating_worker_thread(size_t max_num_keys, size_t max_
         std::unique_lock<std::mutex> lock(m_pairing_mtx);
         // There are still reads in channel_mux_read_map. Push them to the sink.
         // Last thread alive is responsible for cleaning up the cache.
-        for (const auto& kv : channel_mux_read_map) {
+        for (const auto& kv : m_channel_mux_read_map) {
             // kv is a std::pair<UniquePoreIdentifierKey, std::list<std::shared_ptr<Read>>>
             const auto& reads_list = kv.second;
 
@@ -179,8 +179,8 @@ PairingNode::PairingNode(MessageSink& sink,
                          size_t max_reads)
         : MessageSink(max_reads),
           m_sink(sink),
-          m_template_complement_map(std::move(template_complement_map)),
-          m_num_worker_threads(num_worker_threads) {
+          m_num_worker_threads(num_worker_threads),
+          m_template_complement_map(std::move(template_complement_map)) {
     // Set up the complement-template_map
     for (auto& key : m_template_complement_map) {
         m_complement_template_map[key.second] = key.first;
