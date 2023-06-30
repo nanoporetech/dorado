@@ -36,6 +36,7 @@ void PairingNode::pair_list_worker_thread() {
             partner_found = true;
         } else {
             {
+                tc_lock.unlock();
                 std::lock_guard<std::mutex> ct_lock(m_ct_map_mutex);
                 auto it = m_complement_template_map.find(read->read_id);
                 if (it != m_complement_template_map.end()) {
