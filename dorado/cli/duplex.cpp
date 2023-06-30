@@ -28,6 +28,7 @@
 
 #include "utils/models.h"
 #include "utils/parameters.h"
+#include "utils/types.h"
 
 #include <argparse.hpp>
 #include <htslib/sam.h>
@@ -371,7 +372,7 @@ int duplex(int argc, char* argv[]) {
 
             std::unique_ptr<PairingNode> pairing_node =
                     template_complement_map.empty()
-                            ? std::make_unique<PairingNode>(stereo_node)
+                            ? std::make_unique<PairingNode>(stereo_node, ReadOrder::BY_CHANNEL)
                             : std::make_unique<PairingNode>(stereo_node,
                                                             std::move(template_complement_map));
 
@@ -410,7 +411,7 @@ int duplex(int argc, char* argv[]) {
                     kStatsPeriod, stats_reporters, stats_callables);
             // End stats counting setup.
 
-            loader.load_reads(reads, parser.get<bool>("--recursive"), DataLoader::BY_CHANNEL);
+            loader.load_reads(reads, parser.get<bool>("--recursive"), ReadOrder::BY_CHANNEL);
             bam_writer->join();  // Explicitly wait for all output rows to be written.
             stats_sampler->terminate();
         }

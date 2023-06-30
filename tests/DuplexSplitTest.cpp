@@ -90,7 +90,7 @@ TEST_CASE("4 subread split tagging", TEST_GROUP) {
     MessageSinkToVector<std::shared_ptr<dorado::Read>> sink(3);
     dorado::SubreadTaggerNode tag_node(sink);
     dorado::StereoDuplexEncoderNode stereo_node(tag_node, read->model_stride);
-    dorado::PairingNode pairing_node(stereo_node);
+    dorado::PairingNode pairing_node(stereo_node, dorado::ReadOrder::BY_CHANNEL);
 
     dorado::DuplexSplitSettings splitter_settings;
     dorado::DuplexSplitNode splitter_node(pairing_node, splitter_settings, 1);

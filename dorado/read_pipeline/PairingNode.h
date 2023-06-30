@@ -2,6 +2,7 @@
 
 #include "ReadPipeline.h"
 #include "utils/stats.h"
+#include "utils/types.h"
 
 #include <atomic>
 #include <deque>
@@ -16,8 +17,6 @@ namespace dorado {
 
 class PairingNode : public MessageSink {
 public:
-    enum class ReadOrder { pore_order = 0, time_order };
-
     // Template-complement map: uses the pair_list pairing method
     PairingNode(MessageSink& sink,
                 std::map<std::string, std::string> template_complement_map,
@@ -26,7 +25,7 @@ public:
 
     // No template-complement map: uses the pair_generation pairing method
     PairingNode(MessageSink& sink,
-                ReadOrder read_order = ReadOrder::pore_order,
+                ReadOrder read_order,
                 int num_worker_threads = 2,
                 size_t max_reads = 1000);
     ~PairingNode();

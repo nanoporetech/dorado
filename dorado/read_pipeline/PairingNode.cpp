@@ -201,10 +201,16 @@ PairingNode::PairingNode(MessageSink& sink,
           m_num_worker_threads(num_worker_threads),
           m_max_num_keys(std::numeric_limits<size_t>::max()),
           m_max_num_reads(std::numeric_limits<size_t>::max()) {
-    if (read_order == ReadOrder::pore_order) {
+    switch (read_order) {
+    case ReadOrder::BY_CHANNEL:
         m_max_num_keys = 10;
-    } else if (read_order == ReadOrder::time_order) {
+        break;
+    case ReadOrder::BY_TIME:
         m_max_num_reads = 10;
+        break;
+    default:
+        throw std::runtime_error("Unsupported read order detected: " +
+                                 dorado::to_string(read_order));
     }
 
     for (size_t i = 0; i < m_num_worker_threads; i++) {
