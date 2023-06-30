@@ -315,13 +315,13 @@ std::optional<DuplexSplitNode::PosRange> DuplexSplitNode::identify_middle_adapte
         const uint64_t adapter_end = adapter_match->second;
         spdlog::trace("Checking middle match & start/end match");
         //Checking match around adapter
-        if (check_flank_match(read, {adapter_start, adapter_start}, m_settings.relaxed_flank_err)) {
+        if (check_flank_match(read, {adapter_start, adapter_start}, m_settings.flank_err)) {
             //Checking start/end match
             //some initializations might 'overflow' and not make sense, but not if check_rc_match below actually ends up checked!
             const uint64_t query_start = r_l - m_settings.strand_end_flank;
             const uint64_t query_end = r_l - m_settings.strand_end_trim;
             const uint64_t query_span = query_end - query_start;
-            const int dist_thr = std::round(m_settings.relaxed_flank_err * query_span);
+            const int dist_thr = std::round(m_settings.flank_err * query_span);
 
             const uint64_t template_start = 0;
             const uint64_t template_end = std::min(m_settings.strand_start_flank, adapter_start);
@@ -352,14 +352,13 @@ std::optional<DuplexSplitNode::PosRange> DuplexSplitNode::identify_extra_middle_
         return std::nullopt;
     }
 
-    int relaxed_flank_edist =
-            std::round(m_settings.relaxed_flank_err *
-                       (m_settings.strand_end_flank - m_settings.strand_end_trim));
+    int flank_edist = std::round(m_settings.flank_err *
+                                 (m_settings.strand_end_flank - m_settings.strand_end_trim));
 
     spdlog::trace("Checking start/end match");
     if (auto templ_start_match = check_rc_match(
                 read.seq, {r_l - m_settings.strand_end_flank, r_l - m_settings.strand_end_trim},
-                {0, std::min(r_l, ext_start_flank)}, relaxed_flank_edist)) {
+                {0, std::min(r_l, ext_start_flank)}, flank_edist)) {
         //check if matched region and query overlap
         if (templ_start_match->second + m_settings.strand_end_flank > r_l) {
             return std::nullopt;
@@ -374,7 +373,7 @@ std::optional<DuplexSplitNode::PosRange> DuplexSplitNode::identify_extra_middle_
         spdlog::trace("Checking approx middle match");
         if (auto middle_match_ranges =
                     check_flank_match(read, {est_middle - split_margin, est_middle + split_margin},
-                                      m_settings.relaxed_flank_err)) {
+                                      m_settings.flank_err)) {
             est_middle =
                     (middle_match_ranges->first.second + middle_match_ranges->second.first) / 2;
             spdlog::trace("Middle re-estimate {}", est_middle);
