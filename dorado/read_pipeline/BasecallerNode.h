@@ -7,6 +7,7 @@
 
 #include <atomic>
 #include <cstdint>
+#include <unordered_set>
 
 namespace dorado {
 
@@ -65,7 +66,7 @@ private:
 
     std::mutex m_working_reads_mutex;
     // Reads removed from input queue and being basecalled.
-    std::deque<std::shared_ptr<Read>> m_working_reads;
+    std::unordered_set<std::shared_ptr<Read>> m_working_reads;
 
     // If we go multi-threaded, there will be one of these batches per thread
     std::vector<std::deque<std::shared_ptr<Chunk>>> m_batched_chunks;

@@ -181,7 +181,6 @@ std::unique_lock<std::mutex> acquire_gpu_lock(int gpu_index, bool use_lock) {
 
     return (use_lock ? std::unique_lock<std::mutex>(gpu_mutexes.at(gpu_index))
                      : std::unique_lock<std::mutex>());
-    ;
 }
 
 // Note that in general the torch caching allocator may be consuming

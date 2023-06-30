@@ -69,7 +69,7 @@ void BasecallerNode::input_worker_thread() {
             // Put the read in the working list
             {
                 std::lock_guard working_reads_lock(m_working_reads_mutex);
-                m_working_reads.push_back(std::move(read));
+                m_working_reads.insert(std::move(read));
                 ++m_working_reads_size;
             }
 
@@ -121,21 +121,21 @@ void BasecallerNode::working_reads_manager() {
             m_num_bases_processed += source_read->seq.length();
             m_num_samples_processed += source_read->raw_data.size(0);
 
+            std::shared_ptr<Read> found_read;
             {
                 std::unique_lock<std::mutex> working_reads_lock(m_working_reads_mutex);
-                for (auto read_iter = m_working_reads.begin();
-                     read_iter != m_working_reads.end();) {
-                    if ((*read_iter)->read_id == source_read->read_id) {
-                        (*read_iter)->model_name = m_model_name;
-                        m_sink.push_message(std::move(*read_iter));
-                        read_iter = m_working_reads.erase(read_iter);
-                        --m_working_reads_size;
-                        break;
-                    } else {
-                        ++read_iter;
-                    }
+                auto read_iter = m_working_reads.find(source_read);
+                if (read_iter != m_working_reads.end()) {
+                    (*read_iter)->model_name = m_model_name;
+                    found_read = std::move(*read_iter);
+                    m_working_reads.erase(read_iter);
+                    --m_working_reads_size;
+                } else {
+                    throw std::runtime_error("Expected to find read id " + source_read->read_id +
+                                             " in working reads cache but it doesn't exist.");
                 }
             }
+            m_sink.push_message(std::move(found_read));
         }
     }
 
