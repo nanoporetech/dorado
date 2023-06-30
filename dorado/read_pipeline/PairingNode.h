@@ -34,7 +34,21 @@ public:
     stats::NamedStats sample_stats() const override;
 
 private:
+    /**
+     * This is a worker thread function for pairing reads based on a specified list of template-complement pairs.
+     */
     void pair_list_worker_thread();
+
+    /**
+     * This is a worker thread function for generating pairs of reads that fall within pairing criteria.
+     * 
+     * The function goes through the incoming messages, which are expected to be reads. For each read, it finds its pore 
+     * in the list of active pores. If the pore isn't in the list yet, it is added. If the list of active pores has reached 
+     * its maximum size (m_max_num_keys), the oldest pore is removed from the list, and its associated reads are discarded.
+     * The function then inserts the new read into the sorted list of reads for its pore, and checks if it can be paired 
+     * with the reads immediately before and after it in the list. If the list of reads for a pore has reached its maximum 
+     * size (m_max_num_reads), the oldest read is removed from the list.
+     */
     void pair_generating_worker_thread();
 
     // A key for a unique Pore, Duplex reads must have the same UniquePoreIdentifierKey
@@ -61,7 +75,21 @@ private:
 
     std::map<UniquePoreIdentifierKey, std::list<std::shared_ptr<Read>>> m_channel_mux_read_map;
     std::deque<UniquePoreIdentifierKey> m_working_channel_mux_keys;
+
+    /**
+     * The maximum number of different channels (pores) to keep in memory concurrently. 
+     * This parameter is crucial when reads are expected to be delivered in channel/pore order. In this order, 
+     * once a read from a specific pore is processed, it is guaranteed that no other reads from that pore will appear.
+     * Thus, the function can limit memory usage by only keeping reads from a fixed number of pores (channels) in memory.
+     */
     size_t m_max_num_keys;
+
+    /**
+     * The maximum number of reads from a specific pore to keep in memory. This parameter is 
+     * crucial when reads are expected to be delivered in time order. In this order, reads from the same pore could 
+     * appear at any point in the stream. Thus, the function keeps a limited history of reads for each pore in memory.
+     * It ensures that the memory usage is controlled, while the reads needed for pairing are available.    
+     */
     size_t m_max_num_reads;
 };
 
