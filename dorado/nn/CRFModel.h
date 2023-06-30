@@ -62,6 +62,6 @@ inline bool sample_rates_compatible(uint16_t data_sample_rate, uint16_t model_sa
                                     static_cast<uint16_t>(100));
 }
 
-int32_t get_model_mean_qscore_start_pos(const std::filesystem::path& model_path);
+int32_t get_model_mean_qscore_start_pos(const CRFModelConfig& model_config);
 
 }  // namespace dorado
