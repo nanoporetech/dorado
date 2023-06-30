@@ -84,7 +84,7 @@ void PairingNode::pair_list_worker_thread() {
     }
 }
 
-void PairingNode::pair_generating_worker_thread(size_t max_num_keys, size_t max_num_reads) {
+void PairingNode::pair_generating_worker_thread() {
     auto compare_reads_by_time = [](const std::shared_ptr<Read>& read1,
                                     const std::shared_ptr<Read>& read2) {
         return read1->start_time_ms < read2->start_time_ms;
@@ -111,7 +111,7 @@ void PairingNode::pair_generating_worker_thread(size_t max_num_keys, size_t max_
             m_working_channel_mux_keys.push_back(key);
             m_channel_mux_read_map.insert({key, {read}});
 
-            if (m_working_channel_mux_keys.size() > max_num_keys) {
+            if (m_working_channel_mux_keys.size() > m_max_num_keys) {
                 // Remove the oldest key (front of the list)
                 auto oldest_key = m_working_channel_mux_keys.front();
                 m_working_channel_mux_keys.pop_front();
@@ -149,7 +149,7 @@ void PairingNode::pair_generating_worker_thread(size_t max_num_keys, size_t max_
             }
 
             cached_read_list.insert(later_read, read);
-            while (cached_read_list.size() > max_num_reads) {
+            while (cached_read_list.size() > m_max_num_reads) {
                 cached_read_list.pop_front();
             }
         }
@@ -196,19 +196,20 @@ PairingNode::PairingNode(MessageSink& sink,
                          ReadOrder read_order,
                          int num_worker_threads,
                          size_t max_reads)
-        : MessageSink(max_reads), m_sink(sink), m_num_worker_threads(num_worker_threads) {
-    size_t max_num_keys = std::numeric_limits<size_t>::max();
-    size_t max_num_reads = std::numeric_limits<size_t>::max();
-
+        : MessageSink(max_reads),
+          m_sink(sink),
+          m_num_worker_threads(num_worker_threads),
+          m_max_num_keys(std::numeric_limits<size_t>::max()),
+          m_max_num_reads(std::numeric_limits<size_t>::max()) {
     if (read_order == ReadOrder::pore_order) {
-        max_num_keys = 10;
+        m_max_num_keys = 10;
     } else if (read_order == ReadOrder::time_order) {
-        max_num_reads = 10;
+        m_max_num_reads = 10;
     }
 
     for (size_t i = 0; i < m_num_worker_threads; i++) {
-        m_workers.push_back(std::make_unique<std::thread>(std::thread(
-                &PairingNode::pair_generating_worker_thread, this, max_num_keys, max_num_reads)));
+        m_workers.push_back(std::make_unique<std::thread>(
+                std::thread(&PairingNode::pair_generating_worker_thread, this)));
     }
 }
 

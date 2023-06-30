@@ -35,7 +35,7 @@ public:
 
 private:
     void pair_list_worker_thread();
-    void pair_generating_worker_thread(size_t max_num_keys, size_t max_num_reads);
+    void pair_generating_worker_thread();
 
     // A key for a unique Pore, Duplex reads must have the same UniquePoreIdentifierKey
     // The values are channel, mux, run_id, flowcell_id, client_id
@@ -61,6 +61,8 @@ private:
 
     std::map<UniquePoreIdentifierKey, std::list<std::shared_ptr<Read>>> m_channel_mux_read_map;
     std::deque<UniquePoreIdentifierKey> m_working_channel_mux_keys;
+    size_t m_max_num_keys;
+    size_t m_max_num_reads;
 };
 
 }  // namespace dorado
