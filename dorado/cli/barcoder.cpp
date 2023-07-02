@@ -45,10 +45,12 @@ int barcoder(int argc, char* argv[]) {
             .help("maxium number of reads to process (for debugging).")
             .default_value(1000000)
             .scan<'i', int>();
-    parser.add_argument("-k").default_value(15).scan<'i', int>();
-    parser.add_argument("-w").default_value(10).scan<'i', int>();
-    parser.add_argument("-m").default_value(5).scan<'i', int>();
-    parser.add_argument("-q").default_value(10).scan<'i', int>();
+    parser.add_argument("-k").default_value(6).scan<'i', int>();
+    parser.add_argument("-w").default_value(2).scan<'i', int>();
+    parser.add_argument("-m").default_value(20).scan<'i', int>();
+    parser.add_argument("-q").default_value(0).scan<'i', int>();
+    parser.add_argument("--barcodes").help("barcodes file").default_value("");
+    parser.add_argument("--kit_name").help("kit name").default_value("");
     parser.add_argument("-v", "--verbose").default_value(false).implicit_value(true);
 
     try {
@@ -72,6 +74,8 @@ int barcoder(int argc, char* argv[]) {
     auto w(parser.get<int>("w"));
     auto m(parser.get<int>("m"));
     auto q(parser.get<int>("q"));
+    auto bc_file(parser.get<std::string>("--barcodes"));
+    auto kit_name(parser.get<std::string>("--kit_name"));
 
     threads = threads == 0 ? std::thread::hardware_concurrency() : threads;
     // The input thread is the total number of threads to use for dorado
@@ -101,7 +105,8 @@ int barcoder(int argc, char* argv[]) {
             [&tracker](const stats::NamedStats& stats) { tracker.update_progress_bar(stats); });
 
     HtsWriter writer("-", HtsWriter::OutputMode::BAM, writer_threads, 0);
-    Barcoder barcoder(writer, {}, aligner_threads, k, w, m, q);
+    std::cerr << "FILE " << bc_file << std::endl;
+    Barcoder barcoder(writer, {}, aligner_threads, k, w, m, q, bc_file, kit_name);
     HtsReader reader(reads[0]);
 
     spdlog::debug("> input fmt: {} aligned: {}", reader.format, reader.is_aligned);
