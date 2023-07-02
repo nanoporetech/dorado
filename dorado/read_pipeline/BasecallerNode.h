@@ -2,10 +2,12 @@
 
 #include "../nn/ModelRunner.h"
 #include "ReadPipeline.h"
+#include "utils/AsyncQueue.h"
 #include "utils/stats.h"
 
 #include <atomic>
 #include <cstdint>
+#include <unordered_set>
 
 namespace dorado {
 
@@ -58,39 +60,34 @@ private:
     // Model runners which have not terminated.
     std::atomic<int> m_num_active_model_runners{0};
 
-    std::atomic<bool> m_terminate_basecaller{false};
-    std::atomic<bool> m_terminate_manager{false};
-
     // Time when Basecaller Node is initialised. Used for benchmarking and debugging
     std::chrono::time_point<std::chrono::system_clock> initialization_time;
     // Time when Basecaller Node terminates. Used for benchmarking and debugging
     std::chrono::time_point<std::chrono::system_clock> termination_time;
-    // Signalled when there is space in m_chunks_in
-    std::condition_variable m_chunks_in_has_space_cv;
-    // Global chunk input list
-    std::mutex m_chunks_in_mutex;
-    // Signalled when chunks are added to m_chunks_in
-    std::condition_variable m_chunks_added_cv;
-    // Gets filled with chunks from the input reads
-    std::deque<std::shared_ptr<Chunk>> m_chunks_in;
+    // Async queue to keep track of basecalling chunks.
+    std::unique_ptr<AsyncQueue<std::shared_ptr<Chunk>>> m_chunks_in;
 
     std::mutex m_working_reads_mutex;
     // Reads removed from input queue and being basecalled.
-    std::deque<std::shared_ptr<Read>> m_working_reads;
+    std::unordered_set<std::shared_ptr<Read>> m_working_reads;
 
     // If we go multi-threaded, there will be one of these batches per thread
     std::vector<std::deque<std::shared_ptr<Chunk>>> m_batched_chunks;
+
+    std::unique_ptr<AsyncQueue<std::shared_ptr<Chunk>>> m_processed_chunks;
 
     // Class members are initialised in declaration order regardless of initialiser list order.
     // Class data members whose construction launches threads must therefore have their
     // declarations follow those of the state on which they rely, e.g. mutexes, if their
     // initialisation is via initialiser lists.
-    std::unique_ptr<std::thread>
-            m_input_worker;  // Chunks up incoming reads and sticks them in the pending list.
-    std::vector<std::thread>
-            m_basecall_workers;  // Basecalls chunks from the queue and puts read on the sink.
-    std::unique_ptr<std::thread>
-            m_working_reads_manager;  // Stitches working reads into complete reads.
+    // Chunks up incoming reads and sticks them in the pending list.
+    std::unique_ptr<std::thread> m_input_worker;
+    // Basecalls chunks from the queue and puts read on the sink.
+    std::vector<std::thread> m_basecall_workers;
+    // Stitches working reads into complete reads.
+    std::vector<std::thread> m_working_reads_managers;
+    // Working read managers that have not been terminated.
+    std::atomic<int> m_working_reads_managers_count{0};
 
     // Performance monitoring stats.
     std::string m_node_name;
