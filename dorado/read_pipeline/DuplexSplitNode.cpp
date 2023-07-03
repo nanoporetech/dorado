@@ -343,7 +343,7 @@ std::optional<DuplexSplitNode::PosRange> DuplexSplitNode::identify_extra_middle_
         const Read& read) const {
     const uint64_t r_l = read.seq.size();
     //TODO parameterize
-    static const float ext_start_frac = 0.1;
+    const float ext_start_frac = 0.1;
     //extend to tolerate some extra length difference
     const uint64_t ext_start_flank =
             std::max(uint64_t(ext_start_frac * r_l), m_settings.strand_start_flank);
@@ -366,8 +366,8 @@ std::optional<DuplexSplitNode::PosRange> DuplexSplitNode::identify_extra_middle_
         uint64_t est_middle = (templ_start_match->second + (r_l - m_settings.strand_end_flank)) / 2;
         spdlog::trace("Middle estimate {}", est_middle);
         //TODO parameterize
-        static const int min_split_margin = 100;
-        static const float split_margin_frac = 0.05;
+        const int min_split_margin = 100;
+        const float split_margin_frac = 0.05;
         const auto split_margin = std::max(min_split_margin, int(split_margin_frac * r_l));
 
         spdlog::trace("Checking approx middle match");
