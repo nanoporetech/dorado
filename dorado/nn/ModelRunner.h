@@ -76,7 +76,7 @@ ModelRunner<T>::ModelRunner(const CRFModelConfig &model_config,
     // adjust chunk size to be a multiple of the stride
     chunk_size -= chunk_size % m_model_stride;
 
-    m_input = torch::zeros({batch_size, 1, chunk_size},
+    m_input = torch::zeros({batch_size, model_config.num_features, chunk_size},
                            torch::TensorOptions().dtype(T::dtype).device(torch::kCPU));
 }
 
@@ -96,7 +96,7 @@ std::vector<DecodedChunk> ModelRunner<T>::call_chunks(int num_chunks) {
 
 template <typename T>
 void ModelRunner<T>::accept_chunk(int chunk_idx, const torch::Tensor &chunk) {
-    m_input.index_put_({chunk_idx, 0}, chunk);
+    m_input.index_put_({chunk_idx, torch::indexing::Ellipsis}, chunk);
 }
 
 template <typename T>
