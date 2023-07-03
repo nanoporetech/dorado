@@ -116,6 +116,15 @@ void Read::generate_duplex_read_tags(bam1_t *aln) const {
     uint32_t duplex = 1;
     bam_aux_append(aln, "dx", 'i', sizeof(duplex), (uint8_t *)&duplex);
 
+    int mx = attributes.mux;
+    bam_aux_append(aln, "mx", 'i', sizeof(mx), (uint8_t *)&mx);
+
+    int ch = attributes.channel_number;
+    bam_aux_append(aln, "ch", 'i', sizeof(ch), (uint8_t *)&ch);
+
+    bam_aux_append(aln, "st", 'Z', attributes.start_time.length() + 1,
+                   (uint8_t *)attributes.start_time.c_str());
+
     auto rg = generate_read_group();
     if (!rg.empty()) {
         bam_aux_append(aln, "RG", 'Z', rg.length() + 1, (uint8_t *)rg.c_str());
