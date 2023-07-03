@@ -1,5 +1,6 @@
 #include "spdlog/sinks/stdout_color_sinks.h"
 #include "spdlog/spdlog.h"
+#include "utils/cli_utils.h"
 
 #ifndef _WIN32
 #include <fcntl.h>
@@ -47,7 +48,14 @@ bool is_safe_to_log() {
 #ifdef _WIN32
     return true;
 #else
-    return get_file_path(fileno(stdout)) != get_file_path(fileno(stderr));
+    if (get_file_path(fileno(stdout)) == get_file_path(fileno(stderr))) {
+        // if both stdout and stderr are ttys it's safe to log
+        if (utils::is_fd_tty(stderr)) {
+            return true;
+        }
+        return false;
+    }
+    return true;
 #endif
 }
 

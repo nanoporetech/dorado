@@ -178,8 +178,8 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
     if (gpu) {
 #if DORADO_GPU_BUILD
 #ifdef __APPLE__
-        auto caller = dorado::create_metal_caller(
-                model_config, model_path, default_params.chunksize, default_params.batchsize);
+        auto caller = dorado::create_metal_caller(model_config, default_params.chunksize,
+                                                  default_params.batchsize);
         for (size_t i = 0; i < default_params.num_runners; i++) {
             runners.push_back(std::make_shared<dorado::MetalModelRunner>(caller));
         }
@@ -189,9 +189,8 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
             SKIP("No CUDA devices found");
         }
         for (auto const& device : devices) {
-            auto caller =
-                    dorado::create_cuda_caller(model_config, model_path, default_params.chunksize,
-                                               default_params.batchsize, device);
+            auto caller = dorado::create_cuda_caller(model_config, default_params.chunksize,
+                                                     default_params.batchsize, device);
             for (size_t i = 0; i < default_params.num_runners; i++) {
                 runners.push_back(std::make_shared<dorado::CudaModelRunner>(caller));
             }
@@ -203,7 +202,7 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
     } else {
         const std::size_t batch_size = 128;
         runners.push_back(std::make_shared<dorado::ModelRunner<dorado::CPUDecoder>>(
-                model_path, "cpu", default_params.chunksize, batch_size));
+                model_config, "cpu", default_params.chunksize, batch_size));
     }
 
     dorado::BasecallerNode basecaller_node(get_sink(), std::move(runners),
