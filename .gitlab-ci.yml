@@ -386,12 +386,14 @@ test_archive:linux:arm64:20.04:
       curl -i --header "Content-Type: application/json" \
       --request POST \
       --data '{
-          "key": "'${SRE_CONFIG_TRIGGER_KEY}'",
+          "key": "'${MLHUB_TRIGGER_SRE}'",
           "job_name": "Dorado SRE: '${CONDITION}' '${CI_COMMIT_REF_NAME}' - '"$CI_COMMIT_TITLE"' ",
           "script_parameters": {
               "models":'${MODELS}',
               "sre_output":"'${SRE_OUTPUT_ROOT}'/'${CI_COMMIT_SHA}'/",
-              "dorado_branch":"'${CI_COMMIT_SHA}'"
+              "sre_config":"${projectDir}/configs/'${SRE_CONFIG}'",
+              "dorado_branch":"'${CI_COMMIT_SHA}'",
+              "dorado_exe":""
               }
       }' \
       ${MLHUB_TRIGGER_URL}
@@ -401,7 +403,7 @@ mlhub:sre_4k_260bps:
     .mlhub_sre
   variables:
     CONDITION: '4k_260bps'
-    SRE_CONFIG_TRIGGER_KEY: ${MLHUB_TRIGGER_KEY_SRE_4k_260bps}
+    SRE_CONFIG: "dna_r10.4.1-e8.2-4khz-260bps-prom.json",
     MODELS: '["dna_r10.4.1_e8.2_260bps_fast@v4.1.0","dna_r10.4.1_e8.2_260bps_hac@v4.1.0","dna_r10.4.1_e8.2_260bps_sup@v4.1.0"]'
 
 mlhub:sre_4k_400bps:
@@ -409,7 +411,7 @@ mlhub:sre_4k_400bps:
     .mlhub_sre
   variables:
     CONDITION: '4k_400bps'
-    SRE_CONFIG_TRIGGER_KEY: ${MLHUB_TRIGGER_KEY_SRE_4k_400bps}
+    SRE_CONFIG: "dna_r10.4.1-e8.2-4khz-400bps-prom.json",
     MODELS: '["dna_r10.4.1_e8.2_400bps_fast@v4.1.0","dna_r10.4.1_e8.2_400bps_hac@v4.1.0","dna_r10.4.1_e8.2_400bps_sup@v4.1.0"]'
     
 mlhub:sre_5k_400bps:
@@ -417,7 +419,7 @@ mlhub:sre_5k_400bps:
     .mlhub_sre
   variables:
     CONDITION: '5k_400bps'
-    SRE_CONFIG_TRIGGER_KEY: ${MLHUB_TRIGGER_KEY_SRE_5k_400bps}
+    SRE_CONFIG: "dna_r10.4.1-e8.2-5khz-400bps-prom.json",
     MODELS: '["dna_r10.4.1_e8.2_400bps_fast@v4.2.0","dna_r10.4.1_e8.2_400bps_hac@v4.2.0","dna_r10.4.1_e8.2_400bps_sup@v4.2.0"]'
 
 # MLHub - Remora
