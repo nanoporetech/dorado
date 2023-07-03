@@ -182,9 +182,11 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         CUDA::nvrtc
         CUDA::culibos
         ${TORCH_LIB}/lib/libnccl_static.a
-        ${TORCH_LIB}/lib/libmkl_core.so
-        ${TORCH_LIB}/lib/libmkl_intel_lp64.so
-        ${TORCH_LIB}/lib/libmkl_intel_thread.so
+        -Wl,--start-group
+            ${TORCH_LIB}/lib/libmkl_core.a
+            ${TORCH_LIB}/lib/libmkl_intel_lp64.a
+            ${TORCH_LIB}/lib/libmkl_intel_thread.a
+        -Wl,--end-group
         ${TORCH_LIB}/lib/libiomp5.so
     )
 elseif(APPLE AND NOT CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
