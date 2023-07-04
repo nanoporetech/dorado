@@ -11,8 +11,10 @@
 #include <sys/syslimits.h>
 #include <torch/torch.h>
 
+#include <cstdint>
 #include <filesystem>
 #include <optional>
+#include <string>
 
 using namespace MTL;
 
@@ -249,7 +251,6 @@ int get_mtl_device_core_count() {
 
 #if !TARGET_OS_IPHONE
     // Attempt to directly query the GPU core count.
-    std::unordered_map<std::string, int64_t> gpu_specs;
     if (auto core_count_opt = retrieve_ioreg_prop("AGXAccelerator", "gpu-core-count");
         core_count_opt.has_value()) {
         gpu_core_count = static_cast<int>(core_count_opt.value());
