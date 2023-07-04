@@ -12,6 +12,7 @@
 #include <torch/torch.h>
 
 #include <filesystem>
+#include <optional>
 
 using namespace MTL;
 
@@ -69,15 +70,14 @@ std::string cfstringref_to_string(const CFStringRef cfstringref) {
 
 #if !TARGET_OS_IPHONE
 
-// Retrieves a dictionary of int64_t properties associated with a given service/property.
-// Returns true on success.
-bool retrieve_ioreg_props(const std::string &service_class,
-                          const std::string &property_name,
-                          std::unordered_map<std::string, int64_t> &props) {
+// Retrieves a single int64_t property associated with the given class/name.
+// Returns empty std::optional on failure.
+std::optional<int64_t> retrieve_ioreg_prop(const std::string &service_class,
+                                           const std::string &property_name) {
     // Look for a service matching the supplied class name.
     CFMutableDictionaryRef matching_dict = IOServiceMatching(service_class.c_str());
     if (!matching_dict) {
-        return false;
+        return std::nullopt;
     }
     // Note: kIOMainPortDefault was introduced on MacOS 12.  If support for earlier versions
     // is needed an alternate constant will be needed.
@@ -85,7 +85,7 @@ bool retrieve_ioreg_props(const std::string &service_class,
     // to release it ourselves.
     io_service_t service = IOServiceGetMatchingService(kIOMainPortDefault, matching_dict);
     if (!service) {
-        return false;
+        return std::nullopt;
     }
 
     // Create a CF representation of the registry property of interest.
@@ -96,37 +96,18 @@ bool retrieve_ioreg_props(const std::string &service_class,
     IOObjectRelease(service);
     CFRelease(cfs_property_name);
     if (!property) {
-        return false;
+        return std::nullopt;
     }
-    if (CFGetTypeID(property) != CFDictionaryGetTypeID()) {
-        CFRelease(property);
-        return false;
-    }
-
-    // Retrieve entries with integer keys from the CFDictionary we constructed.
-
-    // No implicit conversion from lambda to function pointer if it captures, so
-    // just use the context parameter to point to the unordered_map being populated.
-    const auto process_kvs = [](CFTypeRef key_ref, CFTypeRef value_ref, void *ctx) {
-        auto props_ptr = static_cast<std::unordered_map<std::string, int64_t> *>(ctx);
-        // Presumably keys are always strings -- ignore anything that isn't.
-        // Also ignore non-integer values, of which there are examples that are not
-        // currently relevant.
-        if (CFGetTypeID(key_ref) != CFStringGetTypeID() ||
-            CFGetTypeID(value_ref) != CFNumberGetTypeID())
-            return;
-        const std::string key = cfstringref_to_string(static_cast<CFStringRef>(key_ref));
+    if (CFGetTypeID(property) == CFNumberGetTypeID()) {
         int64_t value = -1;
-        if (!CFNumberGetValue(static_cast<CFNumberRef>(value_ref), kCFNumberSInt64Type, &value)) {
-            return;
+        if (!CFNumberGetValue(static_cast<CFNumberRef>(property), kCFNumberSInt64Type, &value)) {
+            return std::nullopt;
         }
-        props_ptr->insert({key, value});
-    };
+        return std::make_optional<int64_t>(value);
+    }
 
-    CFDictionaryApplyFunction(static_cast<CFDictionaryRef>(property), process_kvs, &props);
-    CFRelease(property);
-
-    return true;
+    // It was not of the expected type.
+    return std::nullopt;
 }
 
 #endif  // if !TARGET_OS_IPHONE
@@ -269,12 +250,11 @@ int get_mtl_device_core_count() {
 #if !TARGET_OS_IPHONE
     // Attempt to directly query the GPU core count.
     std::unordered_map<std::string, int64_t> gpu_specs;
-    if (retrieve_ioreg_props("AGXAccelerator", "GPUConfigurationVariable", gpu_specs)) {
-        if (auto gpu_cores_it = gpu_specs.find("num_cores"); gpu_cores_it != gpu_specs.cend()) {
-            gpu_core_count = gpu_cores_it->second;
-            spdlog::debug("Retrieved GPU core count of {} from IO Registry", gpu_core_count);
-            return gpu_core_count;
-        }
+    if (auto core_count_opt = retrieve_ioreg_prop("AGXAccelerator", "gpu-core-count");
+        core_count_opt.has_value()) {
+        gpu_core_count = static_cast<int>(core_count_opt.value());
+        spdlog::debug("Retrieved GPU core count of {} from IO Registry", gpu_core_count);
+        return gpu_core_count;
     }
 #endif  // if !TARGET_OS_IPHONE
 
