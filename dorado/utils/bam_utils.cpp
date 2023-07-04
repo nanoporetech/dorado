@@ -13,20 +13,23 @@ namespace dorado::utils {
 void add_rg_hdr(sam_hdr_t* hdr, const std::unordered_map<std::string, ReadGroup>& read_groups) {
     // Add read groups
     for (auto const& x : read_groups) {
+        // Lambda function to return "Unknown" if string is empty
+        auto value_or_unknown = [](const std::string& s) { return s.empty() ? "Unknown" : s; };
+
         std::stringstream rg;
         rg << "@RG\t";
         rg << "ID:" << x.first << "\t";
-        rg << "PU:" << x.second.flowcell_id << "\t";
-        rg << "PM:" << x.second.device_id << "\t";
-        rg << "DT:" << x.second.exp_start_time << "\t";
+        rg << "PU:" << value_or_unknown(x.second.flowcell_id) << "\t";
+        rg << "PM:" << value_or_unknown(x.second.device_id) << "\t";
+        rg << "DT:" << value_or_unknown(x.second.exp_start_time) << "\t";
         rg << "PL:"
            << "ONT"
            << "\t";
         rg << "DS:"
-           << "basecall_model=" << x.second.basecalling_model << " runid=" << x.second.run_id
-           << "\t";
-        rg << "LB:" << x.second.sample_id << "\t";
-        rg << "SM:" << x.second.sample_id;
+           << "basecall_model=" << value_or_unknown(x.second.basecalling_model)
+           << " runid=" << value_or_unknown(x.second.run_id) << "\t";
+        rg << "LB:" << value_or_unknown(x.second.sample_id) << "\t";
+        rg << "SM:" << value_or_unknown(x.second.sample_id);
         rg << std::endl;
         sam_hdr_add_lines(hdr, rg.str().c_str(), 0);
     }
