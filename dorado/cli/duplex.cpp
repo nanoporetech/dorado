@@ -19,6 +19,7 @@
 #include "utils/log_utils.h"
 #include "utils/models.h"
 #include "utils/parameters.h"
+#include "utils/types.h"
 
 #include <argparse.hpp>
 #include <htslib/sam.h>
@@ -303,10 +304,11 @@ int duplex(int argc, char* argv[]) {
             StereoDuplexEncoderNode stereo_node =
                     StereoDuplexEncoderNode(*stereo_basecaller_node, simplex_model_stride);
 
-            PairingNode pairing_node(stereo_node,
-                                     template_complement_map.empty()
-                                             ? std::optional<std::map<std::string, std::string>>{}
-                                             : template_complement_map);
+            std::unique_ptr<PairingNode> pairing_node =
+                    template_complement_map.empty()
+                            ? std::make_unique<PairingNode>(stereo_node, ReadOrder::BY_CHANNEL)
+                            : std::make_unique<PairingNode>(stereo_node,
+                                                            std::move(template_complement_map));
 
             // Initialize duplex split settings and create a duplex split node
             // with the given settings and number of devices. If
@@ -314,7 +316,7 @@ int duplex(int argc, char* argv[]) {
             // act as a passthrough, meaning it won't perform any splitting
             // operations and will just pass data through.
             DuplexSplitSettings splitter_settings;
-            DuplexSplitNode splitter_node(pairing_node, splitter_settings, num_devices);
+            DuplexSplitNode splitter_node(*pairing_node, splitter_settings, num_devices);
 
             auto adjusted_simplex_overlap = (overlap / simplex_model_stride) * simplex_model_stride;
 
@@ -333,7 +335,7 @@ int duplex(int argc, char* argv[]) {
             using dorado::stats::make_stats_reporter;
             stats_reporters.push_back(make_stats_reporter(*stereo_basecaller_node));
             stats_reporters.push_back(make_stats_reporter(stereo_node));
-            stats_reporters.push_back(make_stats_reporter(pairing_node));
+            stats_reporters.push_back(make_stats_reporter(*pairing_node));
             stats_reporters.push_back(make_stats_reporter(splitter_node));
             stats_reporters.push_back(make_stats_reporter(*basecaller_node));
             stats_reporters.push_back(make_stats_reporter(loader));
@@ -344,7 +346,7 @@ int duplex(int argc, char* argv[]) {
                     kStatsPeriod, stats_reporters, stats_callables);
             // End stats counting setup.
 
-            loader.load_reads(reads, parser.get<bool>("--recursive"), DataLoader::BY_CHANNEL);
+            loader.load_reads(reads, parser.get<bool>("--recursive"), ReadOrder::BY_CHANNEL);
             bam_writer->join();  // Explicitly wait for all output rows to be written.
             stats_sampler->terminate();
         }

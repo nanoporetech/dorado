@@ -164,7 +164,7 @@ void DataLoader::load_reads(const std::string& path,
 
     auto iterate_directory = [&](const auto& iterator_fn) {
         switch (traversal_order) {
-        case BY_CHANNEL:
+        case ReadOrder::BY_CHANNEL:
             // If traversal in channel order is required, the following algorithm
             // is used -
             // 1. iterate through all the read metadata to collect channel information
@@ -199,7 +199,7 @@ void DataLoader::load_reads(const std::string& path,
                 }
             }
             break;
-        case UNRESTRICTED:
+        case ReadOrder::UNRESTRICTED:
             for (const auto& entry : iterator_fn(path)) {
                 if (m_loaded_read_count == m_max_reads) {
                     break;
@@ -215,8 +215,8 @@ void DataLoader::load_reads(const std::string& path,
             }
             break;
         default:
-            throw std::runtime_error("Unsupported traversal order detected " +
-                                     std::to_string(traversal_order));
+            throw std::runtime_error("Unsupported traversal order detected: " +
+                                     dorado::to_string(traversal_order));
         }
     };
 
