@@ -14,7 +14,7 @@ void add_rg_hdr(sam_hdr_t* hdr, const std::unordered_map<std::string, ReadGroup>
     // Add read groups
     for (auto const& x : read_groups) {
         // Lambda function to return "Unknown" if string is empty
-        auto value_or_unknown = [](const std::string& s) { return s.empty() ? "Unknown" : s; };
+        auto value_or_unknown = [](const std::string& s) { return s.empty() ? "unknown" : s; };
 
         std::stringstream rg;
         rg << "@RG\t";
