@@ -177,7 +177,7 @@ int duplex(int argc, char* argv[]) {
         auto aligner = PipelineDescriptor::InvalidNodeHandle;
         auto converted_reads_sink = PipelineDescriptor::InvalidNodeHandle;
         if (ref.empty()) {
-            pipeline_desc.add_node<HtsWriter>({}, "-", output_mode, 4, num_reads);
+            hts_writer = pipeline_desc.add_node<HtsWriter>({}, "-", output_mode, 4, num_reads);
             converted_reads_sink = hts_writer;
         } else {
             aligner = pipeline_desc.add_node<Aligner>(
