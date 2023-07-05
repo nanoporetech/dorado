@@ -184,7 +184,6 @@ void setup(std::vector<std::string> args,
 
     if (model_name.rfind("dna_r9.4.1", 0) == 0) {
         spdlog::debug("- using medmad scaling");
-        model_config.signal_norm_params.quantile_scaling = false;
     }
 
     ScalerNode scaler_node(basecaller_node, model_config.signal_norm_params,
