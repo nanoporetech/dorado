@@ -17,6 +17,7 @@ TEST_CASE(TEST_GROUP ": Test tag generation", TEST_GROUP) {
     test_read.sample_rate = 4000.0;
     test_read.shift = 128.3842f;
     test_read.scale = 8.258f;
+    test_read.scaling_method = "quantile";
     test_read.num_trimmed_samples = 132;
     test_read.attributes.mux = 2;
     test_read.attributes.read_number = 18501;
