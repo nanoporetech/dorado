@@ -10,6 +10,10 @@
 #include <cstdlib>
 #include <memory>
 
+#if defined(__APPLE__) && !defined(__x86_64__)
+#include "utils/metal_utils.h"
+#endif
+
 using namespace std::chrono_literals;
 using namespace torch::indexing;
 
@@ -18,14 +22,12 @@ namespace dorado {
 void BasecallerNode::input_worker_thread() {
     Message message;
 
-    // Allow 5 batches per model runner on the chunks_in queue
-    size_t max_chunks_in = 0;
-    // Allows optimal batch size to be used for every GPU
-    for (auto &runner : m_model_runners) {
-        max_chunks_in += runner->batch_size() * 5;
-    }
-
     while (m_work_queue.try_pop(message)) {
+        if (std::holds_alternative<CandidatePairRejectedMessage>(message)) {
+            send_message_to_sink(std::move(message));
+            continue;
+        }
+
         // If this message isn't a read, we'll get a bad_variant_access exception.
         auto read = std::get<std::shared_ptr<Read>>(message);
         // If a read has already been basecalled, just send it to the sink without basecalling again
@@ -33,29 +35,11 @@ void BasecallerNode::input_worker_thread() {
         // to the basecaller node having already been called. This should be fixed in the future with
         // support for graphs of nodes rather than linear pipelines.
         if (!read->seq.empty()) {
-            send_message_to_sink(read);
+            send_message_to_sink(std::move(read));
             continue;
         }
         // Now that we have acquired a read, wait until we can push to chunks_in
         while (true) {
-            std::unique_lock<std::mutex> chunk_lock(m_chunks_in_mutex);
-            // A new condition was added to the condition variable which adjusts the predicate
-            // to check for number of working reads. This is to deal with some degenerate cases during
-            // duplex basecalling wherein the due to GPU contention between simplex and duplex stages
-            // reads are not fully called, leading to a build up of working reads. These partial
-            // reads were causing a growth in memory which sometimes led to a crash on some systems.
-            // This change below more effectively puts a ceiling on the host memory usage.
-            // Keeping the condition a function of the current sink size (empmirically at 5k reads this
-            // caps memory around 30GB).
-            m_chunks_in_has_space_cv.wait_for(chunk_lock, 10ms, [this, &max_chunks_in] {
-                return (m_chunks_in.size() < max_chunks_in) &&
-                       (m_working_reads.size() < 5 * m_max_reads);
-            });
-
-            if (m_chunks_in.size() >= max_chunks_in) {
-                continue;
-            }
-
             // Chunk up the read and put the chunks into the pending chunk list.
             size_t raw_size =
                     read->raw_data.sizes()[read->raw_data.sizes().size() - 1];  // Time dimension.
@@ -63,7 +47,8 @@ void BasecallerNode::input_worker_thread() {
             size_t offset = 0;
             size_t chunk_in_read_idx = 0;
             size_t signal_chunk_step = m_chunk_size - m_overlap;
-            m_chunks_in.push_back(
+            std::vector<std::shared_ptr<Chunk>> read_chunks;
+            read_chunks.push_back(
                     std::make_shared<Chunk>(read, offset, chunk_in_read_idx++, m_chunk_size));
             read->num_chunks = 1;
             auto last_chunk_offset = raw_size - m_chunk_size;
@@ -74,30 +59,30 @@ void BasecallerNode::input_worker_thread() {
             }
             while (offset + m_chunk_size < raw_size) {
                 offset = std::min(offset + signal_chunk_step, last_chunk_offset);
-                m_chunks_in.push_back(
+                read_chunks.push_back(
                         std::make_shared<Chunk>(read, offset, chunk_in_read_idx++, m_chunk_size));
                 read->num_chunks++;
             }
             read->called_chunks.resize(read->num_chunks);
             read->num_chunks_called.store(0);
-            chunk_lock.unlock();
 
             // Put the read in the working list
             {
                 std::lock_guard working_reads_lock(m_working_reads_mutex);
-                m_working_reads.push_back(std::move(read));
+                m_working_reads.insert(std::move(read));
                 ++m_working_reads_size;
             }
 
-            m_chunks_added_cv.notify_one();
+            for (auto &chunk : read_chunks) {
+                m_chunks_in->try_push(std::move(chunk));
+            }
 
             break;  // Go back to watching the input reads
         }
     }
 
     // Notify the basecaller threads that it is safe to gracefully terminate the basecaller
-    m_terminate_basecaller.store(true);
-    m_chunks_added_cv.notify_all();
+    m_chunks_in->terminate();
 }
 
 void BasecallerNode::basecall_current_batch(int worker_id) {
@@ -113,104 +98,71 @@ void BasecallerNode::basecall_current_batch(int worker_id) {
         m_batched_chunks[worker_id][i]->moves = decode_results[i].moves;
     }
 
-    // We need to assign each chunk back to the read it came from
     for (auto &complete_chunk : m_batched_chunks[worker_id]) {
-        std::shared_ptr<Read> source_read = complete_chunk->source_read.lock();
-        source_read->called_chunks[complete_chunk->idx_in_read] = complete_chunk;
-        ++source_read->num_chunks_called;
+        m_processed_chunks->try_push(std::move(complete_chunk));
     }
+
     m_batched_chunks[worker_id].clear();
     ++m_num_batches_called;
 }
 
 void BasecallerNode::working_reads_manager() {
-    while (true) {
+    std::shared_ptr<Chunk> chunk;
+    while (m_processed_chunks->try_pop(chunk)) {
         nvtx3::scoped_range loop{"working_reads_manager"};
 
-        std::deque<std::shared_ptr<Read>> completed_reads;
-        {
-            std::lock_guard working_reads_lock(m_working_reads_mutex);
-            if (m_terminate_manager.load() && m_working_reads.empty()) {
-                break;
-            }
-            for (auto read_iter = m_working_reads.begin(); read_iter != m_working_reads.end();) {
-                if ((*read_iter)->num_chunks_called.load() == (*read_iter)->num_chunks) {
-                    (*read_iter)->model_name =
-                            m_model_name;  // Before sending read to sink, assign its model name
-                    completed_reads.push_back(*read_iter);
-                    read_iter = m_working_reads.erase(read_iter);
+        auto source_read = chunk->source_read.lock();
+        source_read->called_chunks[chunk->idx_in_read] = chunk;
+        auto num_chunks_called = ++source_read->num_chunks_called;
+        if (num_chunks_called == source_read->num_chunks) {
+            utils::stitch_chunks(source_read);
+            ++m_called_reads_pushed;
+            m_num_bases_processed += source_read->seq.length();
+            m_num_samples_processed += source_read->raw_data.size(0);
+
+            std::shared_ptr<Read> found_read;
+            {
+                std::unique_lock<std::mutex> working_reads_lock(m_working_reads_mutex);
+                auto read_iter = m_working_reads.find(source_read);
+                if (read_iter != m_working_reads.end()) {
+                    (*read_iter)->model_name = m_model_name;
+                    (*read_iter)->mean_qscore_start_pos = m_mean_qscore_start_pos;
+                    found_read = std::move(*read_iter);
+                    m_working_reads.erase(read_iter);
                     --m_working_reads_size;
                 } else {
-                    read_iter++;
+                    throw std::runtime_error("Expected to find read id " + source_read->read_id +
+                                             " in working reads cache but it doesn't exist.");
                 }
             }
-        }
-
-        if (completed_reads.empty()) {
-            std::this_thread::sleep_for(10ms);
-        } else {
-            m_chunks_in_has_space_cv.notify_one();
-        }
-
-        for (auto &read : completed_reads) {
-            utils::stitch_chunks(read);
-            ++m_called_reads_pushed;
-            m_num_bases_processed += read->seq.length();
-            m_num_samples_processed += read->raw_data.size(0);
-            send_message_to_sink(std::move(read));
+            send_message_to_sink(std::move(found_read));
         }
     }
 }
 
 void BasecallerNode::basecall_worker_thread(int worker_id) {
+#if defined(__APPLE__) && !defined(__x86_64__)
+    // Model execution creates GPU-related autorelease objects.
+    utils::ScopedAutoReleasePool autorelease_pool;
+#endif
     auto last_chunk_reserve_time = std::chrono::system_clock::now();
     int batch_size = m_model_runners[worker_id]->batch_size();
-    while (true) {
-        std::unique_lock<std::mutex> chunks_lock(m_chunks_in_mutex);
-        if (!m_chunks_added_cv.wait_until(
-                    chunks_lock,
-                    last_chunk_reserve_time + std::chrono::milliseconds(m_batch_timeout_ms),
-                    [this] { return !m_chunks_in.empty() || m_terminate_basecaller.load(); })) {
-            // timeout without new chunks or termination call
-            chunks_lock.unlock();
+    std::shared_ptr<Chunk> chunk;
+    while (m_chunks_in->try_pop_until(
+            chunk, last_chunk_reserve_time + std::chrono::milliseconds(m_batch_timeout_ms))) {
+        // If chunk is empty, then try_pop timed out without getting a new chunk.
+        if (!chunk) {
             if (!m_batched_chunks[worker_id].empty()) {
+                // get scores for whatever chunks are available.
                 basecall_current_batch(worker_id);
             }
 
-            // reset wait period
             last_chunk_reserve_time = std::chrono::system_clock::now();
             continue;
         }
 
-        if (m_chunks_in.empty() && m_terminate_basecaller.load()) {
-            // no remaining chunks and we've been told to terminate
-            // call the remaining batch
-            chunks_lock.unlock();  // Not strictly necessary
-            if (!m_batched_chunks[worker_id].empty()) {
-                basecall_current_batch(worker_id);
-            }
-
-            // Reduce the count of active runner threads.  If this was the last active
-            // thread also send termination signal to sink
-            int num_remaining_runners = --m_num_active_model_runners;
-            if (num_remaining_runners == 0) {
-                // runners can share a caller, so shutdown when all runners are done
-                // rather than terminating each runner as it finishes
-                for (auto &runner : m_model_runners) {
-                    runner->terminate();
-                }
-                m_terminate_manager.store(true);
-            }
-            return;
-        }
-
         // There's chunks to get_scores, so let's add them to our input tensor
-        while (m_batched_chunks[worker_id].size() != batch_size && !m_chunks_in.empty()) {
-            std::shared_ptr<Chunk> chunk = m_chunks_in.front();
-            m_chunks_in.pop_front();
-            chunks_lock.unlock();
-            m_chunks_in_has_space_cv.notify_one();
-
+        if (m_batched_chunks[worker_id].size() != batch_size) {
             // Copy the chunk into the input tensor
             std::shared_ptr<Read> source_read = chunk->source_read.lock();
 
@@ -245,17 +197,31 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
                     static_cast<int>(m_batched_chunks[worker_id].size()), input_slice);
 
             m_batched_chunks[worker_id].push_back(chunk);
-            chunks_lock.lock();
 
             last_chunk_reserve_time = std::chrono::system_clock::now();
         }
-
-        chunks_lock.unlock();
 
         if (m_batched_chunks[worker_id].size() == batch_size) {
             // Input tensor is full, let's get_scores.
             basecall_current_batch(worker_id);
         }
+        chunk.reset();
+    }
+
+    if (!m_batched_chunks[worker_id].empty()) {
+        basecall_current_batch(worker_id);
+    }
+
+    // Reduce the count of active runner threads.  If this was the last active
+    // thread also send termination signal to sink
+    int num_remaining_runners = --m_num_active_model_runners;
+    if (num_remaining_runners == 0) {
+        // runners can share a caller, so shutdown when all runners are done
+        // rather than terminating each runner as it finishes
+        for (auto &runner : m_model_runners) {
+            runner->terminate();
+        }
+        m_processed_chunks->terminate();
     }
 }
 
@@ -264,16 +230,19 @@ BasecallerNode::BasecallerNode(std::vector<Runner> model_runners,
                                int batch_timeout_ms,
                                std::string model_name,
                                size_t max_reads,
-                               const std::string &node_name)
+                               const std::string &node_name,
+                               bool in_duplex_pipeline,
+                               uint32_t read_mean_qscore_start_pos)
         : MessageSink(max_reads),
           m_model_runners(std::move(model_runners)),
           m_chunk_size(m_model_runners.front()->chunk_size()),
           m_overlap(overlap),
           m_model_stride(m_model_runners.front()->model_stride()),
-          m_terminate_basecaller(false),
           m_batch_timeout_ms(batch_timeout_ms),
           m_model_name(std::move(model_name)),
           m_max_reads(max_reads),
+          m_in_duplex_pipeline(in_duplex_pipeline),
+          m_mean_qscore_start_pos(read_mean_qscore_start_pos),
           m_node_name(node_name) {
     // Setup worker state
     size_t const num_workers = m_model_runners.size();
@@ -281,10 +250,22 @@ BasecallerNode::BasecallerNode(std::vector<Runner> model_runners,
     m_basecall_workers.resize(num_workers);
     m_num_active_model_runners = num_workers;
 
+    // Allow 5 batches per model runner on the chunks_in queue
+    size_t max_chunks_in = 0;
+    // Allows optimal batch size to be used for every GPU
+    for (auto &runner : m_model_runners) {
+        max_chunks_in += runner->batch_size() * 5;
+    }
+    m_chunks_in = std::make_unique<AsyncQueue<std::shared_ptr<Chunk>>>(max_chunks_in);
+    m_processed_chunks = std::make_unique<AsyncQueue<std::shared_ptr<Chunk>>>(max_chunks_in);
+
     initialization_time = std::chrono::system_clock::now();
 
     // Spin up any workers last so that we're not mutating |this| underneath them
-    m_working_reads_manager = std::make_unique<std::thread>([this] { working_reads_manager(); });
+    m_working_reads_managers.resize(num_workers / 2);
+    for (int i = 0; i < m_working_reads_managers.size(); i++) {
+        m_working_reads_managers[i] = std::thread([this] { working_reads_manager(); });
+    }
     m_input_worker = std::make_unique<std::thread>([this] { input_worker_thread(); });
     for (int i = 0; i < static_cast<int>(num_workers); i++) {
         m_basecall_workers[i] = std::thread([this, i] { basecall_worker_thread(i); });
@@ -301,8 +282,10 @@ void BasecallerNode::terminate_impl() {
             t.join();
         }
     }
-    if (m_working_reads_manager->joinable()) {
-        m_working_reads_manager->join();
+    for (auto &t : m_working_reads_managers) {
+        if (t.joinable()) {
+            t.join();
+        }
     }
     termination_time = std::chrono::system_clock::now();
 }

@@ -108,6 +108,10 @@ int HtsWriter::write(bam1_t* const record) {
     }
     m_primary = m_total - m_secondary - m_supplementary - m_unmapped;
 
+    // FIXME -- HtsWriter is constructed in a state where attempting to write
+    // will segfault, since set_and_write_header has to have been called
+    // in order to set m_header.
+    assert(m_header);
     auto res = sam_write1(m_file, m_header, record);
     if (res < 0) {
         throw std::runtime_error("Failed to write SAM record, error code " + std::to_string(res));

@@ -92,7 +92,7 @@ set(BUILD_TESTING OFF)
 add_subdirectory(${DORADO_3RD_PARTY}/edlib EXCLUDE_FROM_ALL)
 set(BUILD_TESTING ON)
 
-add_subdirectory(${DORADO_3RD_PARTY}/date)
+add_subdirectory(${DORADO_3RD_PARTY}/date EXCLUDE_FROM_ALL)
 
 enable_testing()
 
@@ -112,6 +112,8 @@ set(LIB_SOURCE_FILES
     dorado/nn/RemoraModel.h
     dorado/nn/ModBaseRunner.cpp
     dorado/nn/ModBaseRunner.h
+    dorado/nn/Runners.cpp
+    dorado/nn/Runners.h
     dorado/read_pipeline/FakeDataLoader.cpp
     dorado/read_pipeline/FakeDataLoader.h
     dorado/read_pipeline/ReadPipeline.cpp
@@ -128,6 +130,8 @@ set(LIB_SOURCE_FILES
     dorado/read_pipeline/ReadFilterNode.h
     dorado/read_pipeline/ReadToBamTypeNode.cpp
     dorado/read_pipeline/ReadToBamTypeNode.h
+    dorado/read_pipeline/SubreadTaggerNode.cpp
+    dorado/read_pipeline/SubreadTaggerNode.h
     dorado/read_pipeline/BaseSpaceDuplexCallerNode.cpp
     dorado/read_pipeline/BaseSpaceDuplexCallerNode.h
     dorado/read_pipeline/DuplexSplitNode.cpp
@@ -472,6 +476,7 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
        ${POD5_LIBRARIES}
        ${HDF5_C_LIBRARIES}
        ${CMAKE_DL_LIBS}
+       date::date
     )
 
     if(WIN32)

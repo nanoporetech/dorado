@@ -26,3 +26,14 @@ TEST_CASE(CUT_TAG ": test linear_regression", CUT_TAG) {
     REQUIRE(b == Approx(expected_b));
     REQUIRE(r == Approx(expected_r));
 }
+
+TEST_CASE(CUT_TAG ": test equality within tolerance", CUT_TAG) {
+    SECTION("Check for ints") {
+        CHECK(dorado::utils::eq_with_tolerance(100, 110, 20) == true);
+        CHECK(dorado::utils::eq_with_tolerance(110, 100, 5) == false);
+    }
+    SECTION("Check for floats") {
+        CHECK(dorado::utils::eq_with_tolerance(100.f, 101.f, 1.1f) == true);
+        CHECK(dorado::utils::eq_with_tolerance(100.f, 101.f, 0.9f) == false);
+    }
+}

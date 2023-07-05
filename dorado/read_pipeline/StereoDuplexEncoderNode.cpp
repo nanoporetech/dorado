@@ -19,6 +19,11 @@ std::shared_ptr<dorado::Read> StereoDuplexEncoderNode::stereo_encode(
     // of tensor elements.
     assert(template_read->raw_data.dtype() == torch::kFloat16);
     assert(complement_read->raw_data.dtype() == torch::kFloat16);
+
+    assert(complement_read->attributes.mux == template_read->attributes.mux);
+    assert(complement_read->attributes.channel_number == template_read->attributes.channel_number);
+    assert(complement_read->start_time_ms > template_read->start_time_ms);
+
     using SampleType = c10::Half;
 
     std::shared_ptr<dorado::Read> read = std::make_shared<dorado::Read>();  // Return read
@@ -263,6 +268,13 @@ std::shared_ptr<dorado::Read> StereoDuplexEncoderNode::stereo_encode(
             {torch::indexing::Slice(None), torch::indexing::Slice(None, stereo_global_cursor)});
 
     read->read_id = template_read->read_id + ";" + complement_read->read_id;
+
+    read->attributes.mux = template_read->attributes.mux;
+    read->attributes.channel_number = template_read->attributes.channel_number;
+    read->attributes.start_time = template_read->attributes.start_time;
+    read->start_time_ms = template_read->start_time_ms;
+
+    read->read_tag = template_read->read_tag;
     read->raw_data = tmp;  // use the encoded signal
     read->is_duplex = true;
     read->run_id = template_read->run_id;
@@ -271,9 +283,6 @@ std::shared_ptr<dorado::Read> StereoDuplexEncoderNode::stereo_encode(
 
     return read;
 }
-}  // namespace dorado
-
-namespace dorado {
 
 void StereoDuplexEncoderNode::worker_thread() {
     Message message;
@@ -287,6 +296,10 @@ void StereoDuplexEncoderNode::worker_thread() {
                 2) {  // 2 dims for stereo encoding, 1 for simplex
                 send_message_to_sink(
                         stereo_encoded_read);  // Stereo-encoded read created, send it to sink
+            } else {
+                // announce to downstream that we rejected a candidate pair
+                --read_pair->read_1->num_duplex_candidate_pairs;
+                send_message_to_sink(CandidatePairRejectedMessage{});
             }
         } else if (std::holds_alternative<std::shared_ptr<Read>>(message)) {
             auto read = std::get<std::shared_ptr<Read>>(message);
@@ -296,9 +309,9 @@ void StereoDuplexEncoderNode::worker_thread() {
 }
 
 StereoDuplexEncoderNode::StereoDuplexEncoderNode(int input_signal_stride)
-        : m_input_signal_stride(input_signal_stride), MessageSink(1000) {
+        : MessageSink(1000), m_input_signal_stride(input_signal_stride) {
     const int num_worker_threads = std::thread::hardware_concurrency();
-    for (int i = 0; i < num_worker_threads; i++) {
+    for (int i = 0; i < num_worker_threads; ++i) {
         std::unique_ptr<std::thread> stereo_encoder_worker_thread =
                 std::make_unique<std::thread>(&StereoDuplexEncoderNode::worker_thread, this);
         worker_threads.push_back(std::move(stereo_encoder_worker_thread));

@@ -17,7 +17,7 @@ class AsyncQueue {
     mutable std::mutex m_mutex;
     // Signalled when an item has been consumed, and the queue therefore has space
     // for new items.
-    mutable std::condition_variable m_item_consumed_cv;
+    mutable std::condition_variable m_not_full_cv;
     // Signalled when an item has been added, and the queue therefore is not empty.
     std::condition_variable m_not_empty_cv;
     // Holds the items.
@@ -51,8 +51,7 @@ public:
         std::unique_lock lock(m_mutex);
 
         // Ensure there is space for the new item, given our limit on capacity.
-        m_item_consumed_cv.wait(lock,
-                                [this] { return m_items.size() < m_capacity || m_terminate; });
+        m_not_full_cv.wait(lock, [this] { return m_items.size() < m_capacity || m_terminate; });
 
         // We hold the mutex, and either there is space in the queue, or we have been
         // asked to terminate.
@@ -64,6 +63,39 @@ public:
         // Inform a waiting thread that there is now an item available.
         lock.unlock();
         m_not_empty_cv.notify_one();
+
+        return true;
+    }
+
+    // Obtains the next item in the queue, returning true on success.
+    // If the queue is empty and timeout is reached, but we are not
+    // terminating, returns true without updating the reference.
+    // If the queue is empty, and we are terminating, returns false.
+    // Otherwise we block if the queue is empty.
+    template <class Clock, class Duration>
+    bool try_pop_until(Item& item, const std::chrono::time_point<Clock, Duration>& timeout_time) {
+        std::unique_lock lock(m_mutex);
+        // Wait until either an item is added, a timeout is hit or we're asked to terminate.
+        auto cv_status = m_not_empty_cv.wait_until(
+                lock, timeout_time, [this] { return !m_items.empty() || m_terminate; });
+        if (cv_status == false) {
+            // Condition variable timed out and the predicate returned false.
+            // In this case, we don't terminate and return without any output.
+            return true;
+        }
+
+        // Termination takes effect once all items have been popped from the queue.
+        if (m_terminate && m_items.empty()) {
+            return false;
+        }
+
+        item = std::move(m_items.front());
+        m_items.pop();
+        ++m_num_pops;
+
+        // Inform a waiting thread that the queue is not full.
+        lock.unlock();
+        m_not_full_cv.notify_one();
 
         return true;
     }
@@ -87,7 +119,7 @@ public:
 
         // Inform a waiting thread that the queue is not full.
         lock.unlock();
-        m_item_consumed_cv.notify_one();
+        m_not_full_cv.notify_one();
 
         return true;
     }
@@ -103,15 +135,14 @@ public:
         // necessary.
         // notify_all, since in general an arbitrary number of threads can be
         // inside try_push/try_pop.
-        m_item_consumed_cv.notify_all();
+        m_not_full_cv.notify_all();
         m_not_empty_cv.notify_all();
     }
 
-    // Blocks until the queue is empty, on the assumption that items are being consumed
-    // and not added, or until we are asked to terminate.
-    void wait_until_empty() const {
-        std::unique_lock lock(m_mutex);
-        m_item_consumed_cv.wait(lock, [this] { return m_items.empty() || m_terminate; });
+    // Return the current size of the queue.
+    size_t size() {
+        std::lock_guard lock(m_mutex);
+        return m_items.size();
     }
 
     std::string get_name() const { return "queue"; }

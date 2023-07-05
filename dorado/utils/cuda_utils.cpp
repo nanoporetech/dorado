@@ -18,6 +18,7 @@ extern "C" {
 
 #include <array>
 #include <chrono>
+#include <exception>
 #include <limits>
 #include <optional>
 #include <regex>
@@ -180,7 +181,6 @@ std::unique_lock<std::mutex> acquire_gpu_lock(int gpu_index, bool use_lock) {
 
     return (use_lock ? std::unique_lock<std::mutex>(gpu_mutexes.at(gpu_index))
                      : std::unique_lock<std::mutex>());
-    ;
 }
 
 // Note that in general the torch caching allocator may be consuming
@@ -254,6 +254,20 @@ int auto_gpu_batch_size(torch::nn::ModuleHolder<torch::nn::AnyModule> module,
 
     return best_batch_size;
 #endif
+}
+
+void handle_cuda_result(int cuda_result) {
+    if (cuda_result == cudaSuccess)
+        return;
+
+    if (cuda_result == cudaErrorNoKernelImageForDevice) {
+        throw std::runtime_error(
+                std::string("Dorado cannot support the CUDA device being used,"
+                            " as the compute capability version is incompatible."));
+    } else {
+        throw std::runtime_error(std::string("Cuda error: {}") +
+                                 cudaGetErrorString(cudaError_t(cuda_result)));
+    }
 }
 
 namespace details {

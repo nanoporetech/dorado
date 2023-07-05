@@ -31,7 +31,7 @@ using Runner = std::shared_ptr<ModelRunnerBase>;
 template <typename T>
 class ModelRunner final : public ModelRunnerBase {
 public:
-    ModelRunner(const std::filesystem::path &model,
+    ModelRunner(const CRFModelConfig &model_config,
                 const std::string &device,
                 int chunk_size,
                 int batch_size);
@@ -59,11 +59,10 @@ private:
 };
 
 template <typename T>
-ModelRunner<T>::ModelRunner(const std::filesystem::path &model_path,
+ModelRunner<T>::ModelRunner(const CRFModelConfig &model_config,
                             const std::string &device,
                             int chunk_size,
                             int batch_size) {
-    const auto model_config = load_crf_model_config(model_path);
     m_model_stride = static_cast<size_t>(model_config.stride);
 
     m_decoder_options = DecoderOptions();
@@ -72,12 +71,12 @@ ModelRunner<T>::ModelRunner(const std::filesystem::path &model_path,
     m_decoder = std::make_unique<T>();
 
     m_options = torch::TensorOptions().dtype(T::dtype).device(device);
-    m_module = load_crf_model(model_path, model_config, m_options);
+    m_module = load_crf_model(model_config, m_options);
 
     // adjust chunk size to be a multiple of the stride
     chunk_size -= chunk_size % m_model_stride;
 
-    m_input = torch::zeros({batch_size, 1, chunk_size},
+    m_input = torch::zeros({batch_size, model_config.num_features, chunk_size},
                            torch::TensorOptions().dtype(T::dtype).device(torch::kCPU));
 }
 
@@ -97,7 +96,7 @@ std::vector<DecodedChunk> ModelRunner<T>::call_chunks(int num_chunks) {
 
 template <typename T>
 void ModelRunner<T>::accept_chunk(int chunk_idx, const torch::Tensor &chunk) {
-    m_input.index_put_({chunk_idx, 0}, chunk);
+    m_input.index_put_({chunk_idx, torch::indexing::Ellipsis}, chunk);
 }
 
 template <typename T>

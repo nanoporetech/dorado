@@ -3,7 +3,6 @@
 #include "utils/stats.h"
 
 #include <atomic>
-#include <chrono>
 #include <memory>
 #include <vector>
 
@@ -27,12 +26,6 @@ private:
     void worker_thread();
 
     std::vector<std::unique_ptr<std::thread>> worker_threads;
-
-    // Time when Basecaller Node is initialised. Used for benchmarking and debugging
-    std::chrono::time_point<std::chrono::system_clock> initialization_time;
-
-    // Time when Basecaller Node terminates. Used for benchmarking and debugging
-    std::chrono::time_point<std::chrono::system_clock> termination_time;
 
     // The stride which was used to simplex call the data
     int m_input_signal_stride;

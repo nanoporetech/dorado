@@ -165,6 +165,7 @@ std::shared_ptr<Read> subread(const Read& read, PosRange seq_range, PosRange sig
     const auto subread_id = utils::derive_uuid(
             read.read_id, std::to_string(seq_range.first) + "-" + std::to_string(seq_range.second));
     subread->read_id = subread_id;
+    subread->read_tag = read.read_tag;
     subread->raw_data = subread->raw_data.index(
             {torch::indexing::Slice(signal_range.first, signal_range.second)});
     subread->attributes.read_number = -1;
@@ -412,7 +413,10 @@ std::vector<std::shared_ptr<Read>> DuplexSplitNode::split(std::shared_ptr<Read> 
     }
 
     std::vector<std::shared_ptr<Read>> split_result;
+    size_t subread_id = 0;
     for (const auto& ext_read : to_split) {
+        ext_read.read->subread_id = subread_id++;
+        ext_read.read->split_count = to_split.size();
         split_result.push_back(std::move(ext_read.read));
     }
 

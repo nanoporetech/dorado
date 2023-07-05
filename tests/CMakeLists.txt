@@ -24,6 +24,7 @@ set(SOURCE_FILES
     PipelineTest.cpp
     BamUtilsTest.cpp
     ResumeLoaderTest.cpp
+    TimeUtilsTest.cpp
 )
 
 if (DORADO_GPU_BUILD)

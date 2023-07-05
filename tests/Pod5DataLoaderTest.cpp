@@ -69,7 +69,7 @@ TEST_CASE(TEST_GROUP "Load data sorted by channel id.") {
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
 
     dorado::DataLoader loader(*pipeline, "cpu", 1, 0);
-    loader.load_reads(data_path, true, dorado::DataLoader::ReadOrder::BY_CHANNEL);
+    loader.load_reads(data_path, true, dorado::ReadOrder::BY_CHANNEL);
     pipeline.reset();
     auto reads = ConvertMessages<std::shared_ptr<dorado::Read>>(messages);
 

@@ -46,7 +46,7 @@ void ModBaseParams::parse(std::filesystem::path const& model_path, bool all_memb
     bases_after = toml::find<int>(params, "kmer_context_bases_1");
     offset = toml::find<int>(params, "offset");
 
-    try {
+    if (config.contains("refinement")) {
         // these may not exist if we convert older models
         const auto& refinement_params = toml::find(config, "refinement");
         refine_do_rough_rescale =
@@ -63,9 +63,9 @@ void ModBaseParams::parse(std::filesystem::path const& model_path, bool all_memb
                     std::round(std::log(refine_kmer_levels.size()) / std::log(4)));
         }
 
-    } catch (const std::out_of_range& ex) {
-        // if the toml file doesn't contain any of the above parameters, it will throw `std::out_of_range`
-        // in this case the model doesn't support rescaling, so turn it off
+    } else {
+        // if the toml file doesn't contain any of the above parameters then
+        // the model doesn't support rescaling so turn it off
         refine_do_rough_rescale = false;
     }
 }

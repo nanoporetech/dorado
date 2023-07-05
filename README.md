@@ -17,10 +17,10 @@ If you encounter any problems building or running Dorado, please [report an issu
 
 ## Installation
 
- - [dorado-0.3.0-linux-x64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.3.0-linux-x64.tar.gz)
- - [dorado-0.3.0-linux-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.3.0-linux-arm64.tar.gz)
- - [dorado-0.3.0-osx-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.3.0-osx-arm64.tar.gz)
- - [dorado-0.3.0-win64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.3.0-win64.zip)
+ - [dorado-0.3.1-linux-x64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.3.1-linux-x64.tar.gz)
+ - [dorado-0.3.1-linux-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.3.1-linux-arm64.tar.gz)
+ - [dorado-0.3.1-osx-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.3.1-osx-arm64.tar.gz)
+ - [dorado-0.3.1-win64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.3.1-win64.zip)
 
 ## Platforms
 
@@ -34,7 +34,7 @@ Dorado has been tested extensively and supported on the following systems:
 | Apple    | M1, M1 Pro, M1 Max, M1 Ultra |
 | Linux    | (G)V100, A100, H100          |
 
-Systems not listed above but which have Nvidia GPUs with ≥8 GB VRAM and architecture from Volta onwards have not been widely tested but are expected to work. If you encounter problems with running on your system, please [report an issue](https://github.com/nanoporetech/dorado/issues)
+Systems not listed above but which have Nvidia GPUs with ≥8 GB VRAM and architecture from Pascal onwards (except P100/GP100) have not been widely tested but are expected to work. If you encounter problems with running on your system, please [report an issue](https://github.com/nanoporetech/dorado/issues)
 
 AWS Benchmarks on NVIDIA GPUs are available [here](https://aws.amazon.com/blogs/hpc/benchmarking-the-oxford-nanopore-technologies-basecallers-on-aws/).
 
@@ -66,6 +66,16 @@ To run Dorado basecalling, download a model and point it to POD5 files _(.fast5 
 $ dorado download --model dna_r10.4.1_e8.2_400bps_hac@v4.1.0
 $ dorado basecaller dna_r10.4.1_e8.2_400bps_hac@v4.1.0 pod5s/ > calls.bam
 ```
+
+If basecalling is interrupted, it is possible to resume basecalling from a BAM file. To do so, use the `--resume-from` flag to specify the path to the incomplete BAM file. For example:
+
+```
+$ dorado basecaller dna_r10.4.1_e8.2_400bps_hac@v4.1.0 pod5s --resume-from incomplete.bam > calls.bam
+```
+
+`calls.bam` will contain all of the reads from `incomplete.bam` plus the new basecalls *(`incomplete.bam` can be discarded after basecalling is complete)*.
+
+**Note: it is important to choose a different filename for the BAM file you are writing to when using `--resuming-from`**. If you use the same filename, the interrupted BAM file will lose the existing basecalls and basecalling will restart from the beginning.
 
 ### Modified basecalling
 
@@ -153,6 +163,8 @@ The following simplex models are also available:
 
 ### **RNA models:**
 
+* rna002_70bps_fast@v3
+* rna002_70bps_hac@v3
 * rna003_120bps_sup@v3
 
 ### **Modified base models**

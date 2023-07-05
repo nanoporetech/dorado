@@ -170,6 +170,8 @@ void BaseSpaceDuplexCallerNode::basespace(const std::string& template_read_id,
                 std::string(quality_scores_phred.begin(), quality_scores_phred.end());
 
         duplex_read->read_id = template_read->read_id + ";" + complement_read->read_id;
+        duplex_read->read_tag = template_read->read_tag;
+
         send_message_to_sink(duplex_read);
     }
     edlibFreeAlignResult(result);

@@ -193,8 +193,8 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
     if (gpu) {
 #if DORADO_GPU_BUILD
 #ifdef __APPLE__
-        auto caller = dorado::create_metal_caller(
-                model_config, model_path, default_params.chunksize, default_params.batchsize);
+        auto caller = dorado::create_metal_caller(model_config, default_params.chunksize,
+                                                  default_params.batchsize);
         for (size_t i = 0; i < default_params.num_runners; i++) {
             runners.push_back(std::make_shared<dorado::MetalModelRunner>(caller));
         }
@@ -204,9 +204,8 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
             SKIP("No CUDA devices found");
         }
         for (auto const& device : devices) {
-            auto caller =
-                    dorado::create_cuda_caller(model_config, model_path, default_params.chunksize,
-                                               default_params.batchsize, device);
+            auto caller = dorado::create_cuda_caller(model_config, default_params.chunksize,
+                                                     default_params.batchsize, device);
             for (size_t i = 0; i < default_params.num_runners; i++) {
                 runners.push_back(std::make_shared<dorado::CudaModelRunner>(caller));
             }
@@ -218,7 +217,7 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
     } else {
         const std::size_t batch_size = 128;
         runners.push_back(std::make_shared<dorado::ModelRunner<dorado::CPUDecoder>>(
-                model_path, "cpu", default_params.chunksize, batch_size));
+                model_config, "cpu", default_params.chunksize, batch_size));
     }
 
     run_smoke_test<dorado::BasecallerNode>(std::move(runners),
@@ -252,6 +251,7 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
     // Create runners
     std::vector<std::unique_ptr<dorado::ModBaseRunner>> remora_runners;
     std::vector<std::string> modbase_devices;
+    int batch_size = default_params.remora_batchsize;
     if (gpu) {
 #if DORADO_GPU_BUILD
 #ifdef __APPLE__
@@ -268,12 +268,13 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
 #endif  // DORADO_GPU_BUILD
     } else {
         // CPU processing is very slow, so reduce the number of test reads we throw at it.
-        set_num_reads(20);
+        set_num_reads(5);
         modbase_devices.push_back("cpu");
+        batch_size = 8;  // reduce batch size so we're not doing work on empty entries
     }
     for (const auto& device_string : modbase_devices) {
-        auto caller = dorado::create_modbase_caller({remora_model, remora_model_6mA},
-                                                    default_params.remora_batchsize, device_string);
+        auto caller = dorado::create_modbase_caller({remora_model, remora_model_6mA}, batch_size,
+                                                    device_string);
         for (size_t i = 0; i < default_params.remora_runners_per_caller; i++) {
             remora_runners.push_back(std::make_unique<dorado::ModBaseRunner>(caller));
         }

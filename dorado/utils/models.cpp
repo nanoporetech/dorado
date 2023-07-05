@@ -122,6 +122,16 @@ uint16_t get_sample_rate_by_model_name(const std::string& model_name) {
     }
 }
 
+uint32_t get_mean_qscore_start_pos_by_model_name(const std::string& model_name) {
+    auto iter = mean_qscore_start_pos_by_model.find(model_name);
+    if (iter != mean_qscore_start_pos_by_model.end()) {
+        return iter->second;
+    } else {
+        // Assume start position of 60 as default.
+        return 60;
+    }
+}
+
 std::string extract_model_from_model_path(const std::string& model_path) {
     std::filesystem::path path(model_path);
     return std::filesystem::canonical(path).filename().string();

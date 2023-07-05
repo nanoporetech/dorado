@@ -33,6 +33,9 @@ int auto_gpu_batch_size(torch::nn::ModuleHolder<torch::nn::AnyModule> module,
 
 void matmul_f16(torch::Tensor const &A, torch::Tensor const &B, torch::Tensor &C);
 
+// Deal with a result from a cudaGetLastError call.  May raise an exception to provide information to the user.
+void handle_cuda_result(int cuda_result);
+
 namespace details {
 // Exposed in the header for testability
 std::optional<std::array<int, 3>> try_select_max_batch_sizes(

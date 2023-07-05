@@ -105,10 +105,26 @@ public:
     std::vector<Mapping> mappings;
     std::vector<BamPtr> extract_sam_lines(bool emit_moves, uint8_t modbase_threshold = 0) const;
 
+    float calculate_mean_qscore() const;
+
     uint64_t start_sample;
     uint64_t end_sample;
     uint64_t run_acquisition_start_time_ms;
     bool is_duplex;
+    // Calculate mean Q-score from this position onwards if read is
+    // a short read.
+    uint32_t mean_qscore_start_pos = 0;
+
+    std::atomic_size_t num_duplex_candidate_pairs{0};
+
+    size_t subread_id{0};
+    size_t split_count{1};
+
+    // A unique identifier for each input read
+    // Split (duplex) reads have the read_tag of the parent (template) and their own subread_id
+    uint64_t read_tag{0};
+    // The id of the client to which this read belongs. -1 in standalone mode
+    int32_t client_id{-1};
 
 private:
     void generate_duplex_read_tags(bam1_t*) const;
@@ -124,13 +140,19 @@ public:
     std::shared_ptr<Read> read_2;
 };
 
+class CandidatePairRejectedMessage {};
+
 // The Message type is a std::variant that can hold different types of message objects.
 // It is currently able to store:
 // - a std::shared_ptr<Read> object, which represents a single read
 // - a BamPtr object, which represents a raw BAM alignment record
 // - a std::shared_ptr<ReadPair> object, which represents a pair of reads for duplex calling
+// - a std::shared_ptr<CandidatePairRejectedMessage> object, which informs downstream processing that a candidate pair has been rejected
 // To add more message types, simply add them to the list of types in the std::variant.
-using Message = std::variant<std::shared_ptr<Read>, BamPtr, std::shared_ptr<ReadPair>>;
+using Message = std::variant<std::shared_ptr<Read>,
+                             BamPtr,
+                             std::shared_ptr<ReadPair>,
+                             CandidatePairRejectedMessage>;
 
 using NodeHandle = int;
 
