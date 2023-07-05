@@ -160,7 +160,7 @@ void setup(std::vector<std::string> args,
     const int kBatchTimeoutMS = 100;
     auto basecaller_node = pipeline_desc.add_node<BasecallerNode>(
             {basecaller_node_sink}, std::move(runners), overlap, kBatchTimeoutMS, model_name, 1000,
-            "BasecallerNode", get_model_mean_qscore_start_pos(model_config));
+            "BasecallerNode", false, get_model_mean_qscore_start_pos(model_config));
 
     auto scaler_node =
             pipeline_desc.add_node<ScalerNode>({basecaller_node}, model_config.signal_norm_params,
