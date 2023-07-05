@@ -134,12 +134,11 @@ void setup(std::vector<std::string> args,
                 {}, "-", output_mode, thread_allocations.writer_threads, num_reads);
         converted_reads_sink = hts_writer;
     } else {
-        aligner = pipeline_desc.add_node<Aligner>({}, ref, kmer_size, window_size,
-                                                  mm2_index_batch_size,
-                                                  thread_allocations.aligner_threads);
         hts_writer = pipeline_desc.add_node<HtsWriter>(
                 {}, "-", output_mode, thread_allocations.writer_threads, num_reads);
-        pipeline_desc.add_node_sink(aligner, hts_writer);
+        aligner = pipeline_desc.add_node<Aligner>({hts_writer}, ref, kmer_size, window_size,
+                                                  mm2_index_batch_size,
+                                                  thread_allocations.aligner_threads);
         converted_reads_sink = aligner;
     }
     auto read_converter = pipeline_desc.add_node<ReadToBamType>(
