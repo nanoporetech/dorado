@@ -25,7 +25,10 @@ std::pair<float, float> ScalerNode::normalisation(torch::Tensor& x) {
     return {shift, scale};
 }
 
-std::pair<float, float> ScalerNode::med_mad(torch::Tensor& x, float factor = 1.4826) {
+std::pair<float, float> ScalerNode::med_mad(torch::Tensor& x) {
+    // See https://en.wikipedia.org/wiki/Median_absolute_deviation
+    //  (specifically the "Relation to standard deviation" section)
+    constexpr float factor = 1.4826;
     //Calculate signal median and median absolute deviation
     auto med = x.median();
     auto mad = torch::median(torch::abs(x - med)) * factor + EPS;
@@ -41,6 +44,7 @@ void ScalerNode::worker_thread() {
         const auto [shift, scale] = m_scaling_params.quantile_scaling
                                             ? normalisation(read->raw_data)
                                             : med_mad(read->raw_data);
+        read->scaling_method = m_scaling_params.quantile_scaling ? "quantile" : "med_mad";
         // raw_data comes from DataLoader with dtype int16.  We send it on as float16 after
         // shifting/scaling in float32 form.
         read->raw_data = ((read->raw_data.to(torch::kFloat) - shift) / scale).to(torch::kFloat16);

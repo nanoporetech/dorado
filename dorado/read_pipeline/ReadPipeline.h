@@ -67,8 +67,9 @@ public:
     uint64_t start_time_ms;
     uint64_t get_end_time_ms();
 
-    float shift;  // To be set by scaler
-    float scale;  // To be set by scaler
+    float shift;                 // To be set by scaler
+    float scale;                 // To be set by scaler
+    std::string scaling_method;  // To be set by scaler
 
     float scaling;  // Scale factor applied to convert raw integers from sequencer into pore current values
 
