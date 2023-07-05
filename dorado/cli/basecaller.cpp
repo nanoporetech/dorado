@@ -211,25 +211,22 @@ void setup(std::vector<std::string> args,
     utils::add_rg_hdr(hdr.get(), read_groups);
 
     PipelineDescriptor pipeline_desc;
-    auto bam_writer = PipelineDescriptor::InvalidNodeHandle;
+    auto hts_writer = PipelineDescriptor::InvalidNodeHandle;
     auto aligner = PipelineDescriptor::InvalidNodeHandle;
     auto converted_reads_sink = PipelineDescriptor::InvalidNodeHandle;
     std::unordered_set<std::string> reads_already_processed;
     // TODO -- refactor to avoid repeated code here.
     if (ref.empty()) {
-        bam_writer = pipeline_desc.add_node<HtsWriter>(
-                {}, "-", output_mode, thread_allocations.writer_threads, num_reads, hdr.get());
-        converted_reads_sink = bam_writer;
+        hts_writer = pipeline_desc.add_node<HtsWriter>(
+                {}, "-", output_mode, thread_allocations.writer_threads, num_reads);
+        converted_reads_sink = hts_writer;
     } else {
-        // Aligner constructor fills in header_sequence_records.
-        sq_t header_sequence_records;
-        aligner = pipeline_desc.add_node<Aligner>(
-                {}, ref, kmer_size, window_size, mm2_index_batch_size,
-                thread_allocations.aligner_threads, header_sequence_records);
-        utils::add_sq_hdr(hdr.get(), header_sequence_records);
-        bam_writer = pipeline_desc.add_node<HtsWriter>(
-                {}, "-", output_mode, thread_allocations.writer_threads, num_reads, hdr.get());
-        pipeline_desc.add_node_sink(aligner, bam_writer);
+        aligner = pipeline_desc.add_node<Aligner>({}, ref, kmer_size, window_size,
+                                                  mm2_index_batch_size,
+                                                  thread_allocations.aligner_threads);
+        hts_writer = pipeline_desc.add_node<HtsWriter>(
+                {}, "-", output_mode, thread_allocations.writer_threads, num_reads);
+        pipeline_desc.add_node_sink(aligner, hts_writer);
         converted_reads_sink = aligner;
     }
     auto read_converter = pipeline_desc.add_node<ReadToBamType>(
@@ -265,6 +262,15 @@ void setup(std::vector<std::string> args,
         std::exit(EXIT_FAILURE);
     }
 
+    // At present, header output file header writing relies on direct node method calls
+    // rather than the pipeline framework.
+    auto& hts_writer_ref = dynamic_cast<HtsWriter&>(pipeline->get_node_ref(hts_writer));
+    if (!ref.empty()) {
+        const auto& aligner_ref = dynamic_cast<Aligner&>(pipeline->get_node_ref(aligner));
+        utils::add_sq_hdr(hdr.get(), aligner_ref.get_sequence_records_for_header());
+    }
+    hts_writer_ref.set_and_write_header(hdr.get());
+
     if (!resume_from_file.empty()) {
         spdlog::info("> Inspecting resume file...");
         // Turn off warning logging as header info is fetched.
@@ -280,8 +286,8 @@ void setup(std::vector<std::string> args,
                     "Resume only works if the same model is used. Resume model was " +
                     resume_model_name + " and current model is " + model_name);
         }
-        auto& bam_writer_ref = pipeline->get_node_ref(bam_writer);
-        ResumeLoaderNode resume_loader(bam_writer_ref, resume_from_file);
+        // Resume functionality injects reads directly into the writer node.
+        ResumeLoaderNode resume_loader(hts_writer_ref, resume_from_file);
         resume_loader.copy_completed_reads();
         reads_already_processed = resume_loader.get_processed_read_ids();
     }

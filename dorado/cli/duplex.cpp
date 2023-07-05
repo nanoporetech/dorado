@@ -180,36 +180,20 @@ int duplex(int argc, char* argv[]) {
         std::unique_ptr<sam_hdr_t, void (*)(sam_hdr_t*)> hdr(sam_hdr_init(), sam_hdr_destroy);
         utils::add_pg_hdr(hdr.get(), args);
 
-        if (!basespace_duplex) {
-            // Write read group info to header.
-            // This must be done before HtsWriter is created.
-            // TODO -- this code should probably be refactored into separate base space / stereo paths.
-            auto read_groups = DataLoader::load_read_groups(reads, model, recursive_file_loading);
-            auto data_sample_rate = DataLoader::get_sample_rate(reads, recursive_file_loading);
-            auto stereo_model_name = utils::get_stereo_model_name(model, data_sample_rate);
-            auto duplex_rg_name = std::string(model + "_" + stereo_model_name);
-            read_groups.merge(
-                    DataLoader::load_read_groups(reads, duplex_rg_name, recursive_file_loading));
-            utils::add_rg_hdr(hdr.get(), read_groups);
-        }
-
         PipelineDescriptor pipeline_desc;
-        auto bam_writer = PipelineDescriptor::InvalidNodeHandle;
+        auto hts_writer = PipelineDescriptor::InvalidNodeHandle;
         auto aligner = PipelineDescriptor::InvalidNodeHandle;
         auto converted_reads_sink = PipelineDescriptor::InvalidNodeHandle;
         if (ref.empty()) {
-            pipeline_desc.add_node<HtsWriter>({}, "-", output_mode, 4, num_reads, hdr.get());
-            converted_reads_sink = bam_writer;
+            pipeline_desc.add_node<HtsWriter>({}, "-", output_mode, 4, num_reads);
+            converted_reads_sink = hts_writer;
         } else {
-            // Aligner constructor fills in header_sequence_records.
-            sq_t header_sequence_records;
             aligner = pipeline_desc.add_node<Aligner>(
                     {}, ref, parser.get<int>("k"), parser.get<int>("w"),
                     utils::parse_string_to_size(parser.get<std::string>("I")),
-                    std::thread::hardware_concurrency(), header_sequence_records);
-            bam_writer = pipeline_desc.add_node<HtsWriter>({}, "-", output_mode, 4, num_reads,
-                                                           hdr.get());
-            pipeline_desc.add_node_sink(aligner, bam_writer);
+                    std::thread::hardware_concurrency());
+            hts_writer = pipeline_desc.add_node<HtsWriter>({}, "-", output_mode, 4, num_reads);
+            pipeline_desc.add_node_sink(aligner, hts_writer);
             converted_reads_sink = aligner;
         }
         auto read_converter =
@@ -250,6 +234,10 @@ int duplex(int argc, char* argv[]) {
                 std::exit(EXIT_FAILURE);
             }
 
+            // Write header as no read group info is needed.
+            auto& hts_writer_ref = dynamic_cast<HtsWriter&>(pipeline->get_node_ref(hts_writer));
+            hts_writer_ref.set_and_write_header(hdr.get());
+
             constexpr auto kStatsPeriod = 100ms;
             auto stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
                     kStatsPeriod, stats_reporters, stats_callables);
@@ -280,6 +268,13 @@ int duplex(int argc, char* argv[]) {
                 utils::download_models(model_path.parent_path().u8string(), stereo_model_name);
             }
             auto stereo_model_config = load_crf_model_config(stereo_model_path);
+
+            // Write read group info to header.
+            auto duplex_rg_name = std::string(model + "_" + stereo_model_name);
+            auto read_groups = DataLoader::load_read_groups(reads, model, recursive_file_loading);
+            read_groups.merge(
+                    DataLoader::load_read_groups(reads, duplex_rg_name, recursive_file_loading));
+            utils::add_rg_hdr(hdr.get(), read_groups);
 
             std::vector<Runner> runners;
             std::vector<Runner> stereo_runners;
@@ -368,7 +363,6 @@ int duplex(int argc, char* argv[]) {
             auto adjusted_stereo_overlap = (overlap / stereo_model_stride) * stereo_model_stride;
 
             const int kStereoBatchTimeoutMS = 5000;
-            auto duplex_rg_name = std::string(model + "_" + stereo_model_name);
             auto stereo_basecaller_node = pipeline_desc.add_node<BasecallerNode>(
                     {read_filter_node}, std::move(stereo_runners), adjusted_stereo_overlap,
                     kStereoBatchTimeoutMS, duplex_rg_name, 1000, "StereoBasecallerNode");
@@ -407,6 +401,15 @@ int duplex(int argc, char* argv[]) {
                 spdlog::error("Failed to create pipeline");
                 std::exit(EXIT_FAILURE);
             }
+
+            // At present, header output file header writing relies on direct node method calls
+            // rather than the pipeline framework.
+            auto& hts_writer_ref = dynamic_cast<HtsWriter&>(pipeline->get_node_ref(hts_writer));
+            if (!ref.empty()) {
+                const auto& aligner_ref = dynamic_cast<Aligner&>(pipeline->get_node_ref(aligner));
+                utils::add_sq_hdr(hdr.get(), aligner_ref.get_sequence_records_for_header());
+            }
+            hts_writer_ref.set_and_write_header(hdr.get());
 
             DataLoader loader(*pipeline, "cpu", num_devices, 0, std::move(read_list));
 

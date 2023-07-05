@@ -13,21 +13,17 @@
 
 namespace dorado {
 
-using sq_t = std::vector<std::pair<char*, uint32_t>>;
-
 class Aligner : public MessageSink {
 public:
     // header_sequence_records is populated by the constructor.
-    Aligner(const std::string& filename,
-            int k,
-            int w,
-            uint64_t index_batch_size,
-            int threads,
-            std::vector<std::pair<char*, uint32_t>>& header_sequence_records);
+    Aligner(const std::string& filename, int k, int w, uint64_t index_batch_size, int threads);
     ~Aligner();
     std::string get_name() const override { return "Aligner"; }
     stats::NamedStats sample_stats() const override;
     void terminate() override { terminate_impl(); }
+
+    using bam_header_sq_t = std::vector<std::pair<char*, uint32_t>>;
+    bam_header_sq_t get_sequence_records_for_header() const;
 
 private:
     void terminate_impl();
@@ -37,7 +33,6 @@ private:
     void worker_thread(size_t tid);
     void add_tags(bam1_t*, const mm_reg1_t*, const std::string&, const mm_tbuf_t*);
     std::vector<BamPtr> align(bam1_t* record, mm_tbuf_t* buf);
-    sq_t get_sequence_records_for_header();
 
     mm_idxopt_t m_idx_opt;
     mm_mapopt_t m_map_opt;

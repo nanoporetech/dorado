@@ -107,14 +107,11 @@ int aligner(int argc, char* argv[]) {
     add_pg_hdr(header);
 
     PipelineDescriptor pipeline_desc;
-    sq_t header_sequence_records;
-    auto aligner =
-            pipeline_desc.add_node<Aligner>({}, index, kmer_size, window_size, index_batch_size,
-                                            aligner_threads, header_sequence_records);
-    utils::add_sq_hdr(header, header_sequence_records);
-    auto writer = pipeline_desc.add_node<HtsWriter>({}, "-", HtsWriter::OutputMode::BAM,
-                                                    writer_threads, 0, header);
-    pipeline_desc.add_node_sink(aligner, writer);
+    auto aligner = pipeline_desc.add_node<Aligner>({}, index, kmer_size, window_size,
+                                                   index_batch_size, aligner_threads);
+    auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, "-", HtsWriter::OutputMode::BAM,
+                                                        writer_threads, 0);
+    pipeline_desc.add_node_sink(aligner, hts_writer);
 
     // Create the Pipeline from our description.
     std::vector<dorado::stats::StatsReporter> stats_reporters;
@@ -123,6 +120,13 @@ int aligner(int argc, char* argv[]) {
         spdlog::error("Failed to create pipeline");
         std::exit(EXIT_FAILURE);
     }
+
+    // At present, header output file header writing relies on direct node method calls
+    // rather than the pipeline framework.
+    const auto& aligner_ref = dynamic_cast<Aligner&>(pipeline->get_node_ref(aligner));
+    utils::add_sq_hdr(header, aligner_ref.get_sequence_records_for_header());
+    auto& hts_writer_ref = dynamic_cast<HtsWriter&>(pipeline->get_node_ref(hts_writer));
+    hts_writer_ref.set_and_write_header(header);
 
     // Set up stats counting
     std::vector<dorado::stats::StatsCallable> stats_callables;

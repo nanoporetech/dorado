@@ -24,9 +24,7 @@ std::vector<dorado::BamPtr> RunAlignmentPipeline(dorado::HtsReader& reader, Args
     dorado::PipelineDescriptor pipeline_desc;
     std::vector<dorado::Message> messages;
     auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
-    dorado::sq_t header_sequence_records;
-    auto aligner =
-            pipeline_desc.add_node<dorado::Aligner>({sink}, args..., header_sequence_records);
+    auto aligner = pipeline_desc.add_node<dorado::Aligner>({sink}, args...);
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
     reader.read(*pipeline, 100);
     pipeline.reset();
@@ -182,6 +180,5 @@ TEST_CASE("AlignerTest: Check Aligner crashes if multi index encountered", TEST_
     fs::path aligner_test_dir = fs::path(get_aligner_data_dir());
     auto ref = aligner_test_dir / "long_target.fa";
 
-    dorado::sq_t header_sequence_records;
-    CHECK_THROWS(dorado::Aligner(ref.string(), 5, 5, 1e3, 1, header_sequence_records));
+    CHECK_THROWS(dorado::Aligner(ref.string(), 5, 5, 1e3, 1));
 }

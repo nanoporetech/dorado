@@ -16,12 +16,7 @@
 
 namespace dorado {
 
-Aligner::Aligner(const std::string& filename,
-                 int k,
-                 int w,
-                 uint64_t index_batch_size,
-                 int threads,
-                 std::vector<std::pair<char*, uint32_t>>& header_sequence_records)
+Aligner::Aligner(const std::string& filename, int k, int w, uint64_t index_batch_size, int threads)
         : MessageSink(10000), m_threads(threads) {
     // Check if reference file exists.
     if (!std::filesystem::exists(filename)) {
@@ -79,8 +74,6 @@ Aligner::Aligner(const std::string& filename,
         m_workers.push_back(
                 std::make_unique<std::thread>(std::thread(&Aligner::worker_thread, this, i)));
     }
-
-    header_sequence_records = get_sequence_records_for_header();
 }
 
 void Aligner::terminate_impl() {
@@ -101,7 +94,7 @@ Aligner::~Aligner() {
     mm_idx_destroy(m_index);
 }
 
-sq_t Aligner::get_sequence_records_for_header() {
+Aligner::bam_header_sq_t Aligner::get_sequence_records_for_header() const {
     std::vector<std::pair<char*, uint32_t>> records;
     for (int i = 0; i < m_index->n_seq; ++i) {
         records.push_back(std::make_pair(m_index->seq[i].name, m_index->seq[i].len));

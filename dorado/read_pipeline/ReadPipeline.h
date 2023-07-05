@@ -257,8 +257,7 @@ public:
     stats::NamedStats terminate();
 
     // Returns a reference to the node associated with the given handle.
-    // Exists purely to accommodate feeding in messages from a resumed file.
-    // TODO -- find a way to avoid exposing node handles.
+    // Exists to accommodate situations where client code avoids using the pipeline framework.
     MessageSink& get_node_ref(NodeHandle node_handle) { return *m_nodes.at(node_handle); }
 
 private:
