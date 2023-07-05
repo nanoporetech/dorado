@@ -147,6 +147,14 @@ static const std::unordered_map<std::string, uint16_t> sample_rate_by_model = {
         {"dna_r10.4.1_e8.2_5khz_stereo@v1.1", 5000},
 };
 
+static const std::unordered_map<std::string, uint16_t> mean_qscore_start_pos_by_model = {
+
+        // To add model specific start positions for older models,
+        // create an entry keyed by model name with the value as
+        // the desired start position.
+        // e.g. {"dna_r10.4.1_e8.2_5khz_400bps_fast@v4.2.0", 10}
+};
+
 bool is_rna_model(const std::filesystem::path& model);
 bool is_valid_model(const std::string& selected_model);
 void download_models(const std::string& target_directory, const std::string& selected_model);
@@ -160,6 +168,12 @@ std::string get_modification_model(const std::string& simplex_model,
 // fetch the sampling rate that the model is compatible with. for models not
 // present in the mapping, assume a sampling rate of 4000.
 uint16_t get_sample_rate_by_model_name(const std::string& model_name);
+
+// the mean Q-score of short reads are artificially lowered because of
+// some lower quality bases at the beginning of the read. to correct for
+// that, mean Q-score calculation should ignore the first few bases. The
+// number of bases to ignore is dependent on the model.
+uint32_t get_mean_qscore_start_pos_by_model_name(const std::string& model_name);
 
 // Extract the model name from the model path.
 std::string extract_model_from_model_path(const std::string& model_path);

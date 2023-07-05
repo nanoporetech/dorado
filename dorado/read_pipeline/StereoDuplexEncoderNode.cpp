@@ -19,6 +19,11 @@ std::shared_ptr<dorado::Read> StereoDuplexEncoderNode::stereo_encode(
     // of tensor elements.
     assert(template_read->raw_data.dtype() == torch::kFloat16);
     assert(complement_read->raw_data.dtype() == torch::kFloat16);
+
+    assert(complement_read->attributes.mux == template_read->attributes.mux);
+    assert(complement_read->attributes.channel_number == template_read->attributes.channel_number);
+    assert(complement_read->start_time_ms > template_read->start_time_ms);
+
     using SampleType = c10::Half;
 
     std::shared_ptr<dorado::Read> read = std::make_shared<dorado::Read>();  // Return read
@@ -263,6 +268,12 @@ std::shared_ptr<dorado::Read> StereoDuplexEncoderNode::stereo_encode(
             {torch::indexing::Slice(None), torch::indexing::Slice(None, stereo_global_cursor)});
 
     read->read_id = template_read->read_id + ";" + complement_read->read_id;
+
+    read->attributes.mux = template_read->attributes.mux;
+    read->attributes.channel_number = template_read->attributes.channel_number;
+    read->attributes.start_time = template_read->attributes.start_time;
+    read->start_time_ms = template_read->start_time_ms;
+
     read->read_tag = template_read->read_tag;
     read->raw_data = tmp;  // use the encoded signal
     read->is_duplex = true;

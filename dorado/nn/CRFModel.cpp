@@ -620,38 +620,38 @@ private:
 
         auto buffer = torch::matmul(x, _r_wih[0]);
 
-        _host_run_lstm_rev_quantized(
+        dorado::utils::handle_cuda_result(_host_run_lstm_rev_quantized(
                 _chunks.data_ptr(), buffer.data_ptr(), _quantized_buffers[0].data_ptr(),
                 rnn1->named_parameters()["bias_ih"].data_ptr(),
-                _quantization_scale_factors[0].data_ptr(), x.data_ptr(), x.size(0));
+                _quantization_scale_factors[0].data_ptr(), x.data_ptr(), x.size(0)));
 
         buffer = torch::matmul(x, _r_wih[1]);
 
-        _host_run_lstm_fwd_quantized(
+        dorado::utils::handle_cuda_result(_host_run_lstm_fwd_quantized(
                 _chunks.data_ptr(), buffer.data_ptr(), _quantized_buffers[1].data_ptr(),
                 rnn2->named_parameters()["bias_ih"].data_ptr(),
-                _quantization_scale_factors[1].data_ptr(), x.data_ptr(), x.size(0));
+                _quantization_scale_factors[1].data_ptr(), x.data_ptr(), x.size(0)));
 
         buffer = torch::matmul(x, _r_wih[2]);
 
-        _host_run_lstm_rev_quantized(
+        dorado::utils::handle_cuda_result(_host_run_lstm_rev_quantized(
                 _chunks.data_ptr(), buffer.data_ptr(), _quantized_buffers[2].data_ptr(),
                 rnn3->named_parameters()["bias_ih"].data_ptr(),
-                _quantization_scale_factors[2].data_ptr(), x.data_ptr(), x.size(0));
+                _quantization_scale_factors[2].data_ptr(), x.data_ptr(), x.size(0)));
 
         buffer = torch::matmul(x, _r_wih[3]);
 
-        _host_run_lstm_fwd_quantized(
+        dorado::utils::handle_cuda_result(_host_run_lstm_fwd_quantized(
                 _chunks.data_ptr(), buffer.data_ptr(), _quantized_buffers[3].data_ptr(),
                 rnn4->named_parameters()["bias_ih"].data_ptr(),
-                _quantization_scale_factors[3].data_ptr(), x.data_ptr(), x.size(0));
+                _quantization_scale_factors[3].data_ptr(), x.data_ptr(), x.size(0)));
 
         buffer = torch::matmul(x, _r_wih[4]);
 
-        _host_run_lstm_rev_quantized(
+        dorado::utils::handle_cuda_result(_host_run_lstm_rev_quantized(
                 _chunks.data_ptr(), buffer.data_ptr(), _quantized_buffers[4].data_ptr(),
                 rnn5->named_parameters()["bias_ih"].data_ptr(),
-                _quantization_scale_factors[4].data_ptr(), x.data_ptr(), x.size(0));
+                _quantization_scale_factors[4].data_ptr(), x.data_ptr(), x.size(0)));
 
         // Output is [N, T, C], contiguous
         return x;
@@ -795,11 +795,15 @@ CRFModelConfig load_crf_model_config(const std::filesystem::path &path) {
     const auto config_toml = toml::parse(path / "config.toml");
 
     CRFModelConfig config;
+    config.model_path = path;
 
     if (config_toml.contains("qscore")) {
         const auto &qscore = toml::find(config_toml, "qscore");
         config.qbias = toml::find<float>(qscore, "bias");
         config.qscale = toml::find<float>(qscore, "scale");
+        if (qscore.contains("mean_qscore_start_pos")) {
+            config.mean_qscore_start_pos = toml::find<int32_t>(qscore, "mean_qscore_start_pos");
+        }
     } else {
         spdlog::debug("> no qscore calibration found");
     }
@@ -910,22 +914,21 @@ std::vector<torch::Tensor> load_crf_model_weights(const std::filesystem::path &d
     return utils::load_tensors(dir, tensors);
 }
 
-ModuleHolder<AnyModule> load_crf_model(const std::filesystem::path &path,
-                                       const CRFModelConfig &model_config,
+ModuleHolder<AnyModule> load_crf_model(const CRFModelConfig &model_config,
                                        const torch::TensorOptions &options) {
 #if USE_CUDA_LSTM
     if (options.device().is_cuda()) {
         const bool expand_blanks = false;
         auto model = nn::CudaCRFModel(model_config, expand_blanks);
-        return populate_model(model, path, options, model_config.out_features.has_value(),
-                              model_config.bias);
+        return populate_model(model, model_config.model_path, options,
+                              model_config.out_features.has_value(), model_config.bias);
     } else
 #endif
     {
         const bool expand_blanks = true;
         auto model = nn::CpuCRFModel(model_config, expand_blanks);
-        return populate_model(model, path, options, model_config.out_features.has_value(),
-                              model_config.bias);
+        return populate_model(model, model_config.model_path, options,
+                              model_config.out_features.has_value(), model_config.bias);
     }
 }
 
@@ -938,6 +941,19 @@ uint16_t get_model_sample_rate(const std::filesystem::path &model_path) {
         model_sample_rate = utils::get_sample_rate_by_model_name(model_name);
     }
     return model_sample_rate;
+}
+
+int32_t get_model_mean_qscore_start_pos(const CRFModelConfig &model_config) {
+    int32_t mean_qscore_start_pos = model_config.mean_qscore_start_pos;
+    if (mean_qscore_start_pos < 0) {
+        // If unsuccessful, find start position by model name.
+        std::string model_name = model_config.model_path.filename().string();
+        mean_qscore_start_pos = utils::get_mean_qscore_start_pos_by_model_name(model_name);
+    }
+    if (mean_qscore_start_pos < 0) {
+        throw std::runtime_error("Mean q-score start position cannot be < 0");
+    }
+    return mean_qscore_start_pos;
 }
 
 }  // namespace dorado

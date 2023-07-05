@@ -18,6 +18,7 @@ extern "C" {
 
 #include <array>
 #include <chrono>
+#include <exception>
 #include <limits>
 #include <optional>
 #include <regex>
@@ -176,14 +177,9 @@ std::vector<std::string> parse_cuda_device_string(std::string device_string) {
 }
 
 std::unique_lock<std::mutex> acquire_gpu_lock(int gpu_index, bool use_lock) {
-    static std::unordered_map<int, std::mutex> gpu_mutexes;
-    static std::mutex map_mutex;
+    static std::vector<std::mutex> gpu_mutexes(torch::cuda::device_count());
 
-    // We don't assume a particular GPU index range ahead of time,
-    // so keep GPU mutexes in an unordered_map protected by its own
-    // mutex.
-    std::lock_guard<std::mutex> map_lock(map_mutex);
-    return (use_lock ? std::unique_lock<std::mutex>(gpu_mutexes[gpu_index])
+    return (use_lock ? std::unique_lock<std::mutex>(gpu_mutexes.at(gpu_index))
                      : std::unique_lock<std::mutex>());
 }
 
@@ -258,6 +254,20 @@ int auto_gpu_batch_size(torch::nn::ModuleHolder<torch::nn::AnyModule> module,
 
     return best_batch_size;
 #endif
+}
+
+void handle_cuda_result(int cuda_result) {
+    if (cuda_result == cudaSuccess)
+        return;
+
+    if (cuda_result == cudaErrorNoKernelImageForDevice) {
+        throw std::runtime_error(
+                std::string("Dorado cannot support the CUDA device being used,"
+                            " as the compute capability version is incompatible."));
+    } else {
+        throw std::runtime_error(std::string("Cuda error: {}") +
+                                 cudaGetErrorString(cudaError_t(cuda_result)));
+    }
 }
 
 namespace details {

@@ -34,7 +34,7 @@ Dorado has been tested extensively and supported on the following systems:
 | Apple    | M1, M1 Pro, M1 Max, M1 Ultra |
 | Linux    | (G)V100, A100, H100          |
 
-Systems not listed above but which have Nvidia GPUs with ≥8 GB VRAM and architecture from Volta onwards have not been widely tested but are expected to work. If you encounter problems with running on your system, please [report an issue](https://github.com/nanoporetech/dorado/issues)
+Systems not listed above but which have Nvidia GPUs with ≥8 GB VRAM and architecture from Pascal onwards (except P100/GP100) have not been widely tested but are expected to work. If you encounter problems with running on your system, please [report an issue](https://github.com/nanoporetech/dorado/issues)
 
 AWS Benchmarks on NVIDIA GPUs are available [here](https://aws.amazon.com/blogs/hpc/benchmarking-the-oxford-nanopore-technologies-basecallers-on-aws/).
 
