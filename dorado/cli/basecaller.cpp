@@ -268,6 +268,12 @@ void setup(std::vector<std::string> args,
     const int kBatchTimeoutMS = 100;
     BasecallerNode basecaller_node(*basecaller_node_sink, std::move(runners), overlap,
                                    kBatchTimeoutMS, model_name, 1000);
+
+    if (model_name.rfind("dna_r9.4.1", 0) == 0) {
+        spdlog::debug("- using medmad scaling");
+        model_config.signal_norm_params.quantile_scaling = false;
+    }
+
     ScalerNode scaler_node(basecaller_node, model_config.signal_norm_params,
                            thread_allocations.scaler_node_threads);
 

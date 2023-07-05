@@ -7,6 +7,8 @@
 #include <chrono>
 #include <utility>
 
+#define EPS 1e-9f
+
 using namespace std::chrono_literals;
 using Slice = torch::indexing::Slice;
 
@@ -23,13 +25,10 @@ std::pair<float, float> ScalerNode::normalisation(torch::Tensor& x) {
     return {shift, scale};
 }
 
-#define EPS 1e-9f
-
-std::pair<float, float> calculate_med_mad(torch::Tensor& x, float factor = 1.4826) {
+std::pair<float, float> ScalerNode::med_mad(torch::Tensor& x, float factor = 1.4826) {
     //Calculate signal median and median absolute deviation
     auto med = x.median();
     auto mad = torch::median(torch::abs(x - med)) * factor + EPS;
-
     return {med.item<float>(), mad.item<float>()};
 }
 
@@ -39,7 +38,9 @@ void ScalerNode::worker_thread() {
         // If this message isn't a read, we'll get a bad_variant_access exception.
         auto read = std::get<std::shared_ptr<Read>>(message);
 
-        const auto [shift, scale] = calculate_med_mad(read->raw_data);
+        const auto [shift, scale] = m_scaling_params.quantile_scaling
+                                            ? normalisation(read->raw_data)
+                                            : med_mad(read->raw_data);
         // raw_data comes from DataLoader with dtype int16.  We send it on as float16 after
         // shifting/scaling in float32 form.
         read->raw_data = ((read->raw_data.to(torch::kFloat) - shift) / scale).to(torch::kFloat16);
