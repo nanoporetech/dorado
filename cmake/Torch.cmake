@@ -156,22 +156,43 @@ if(WIN32)
         CUDA::cusparse
     )
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    # Note: When changing this list, libs that have undefined symbols (ie Torch) must come first
-    list(APPEND TORCH_LIBRARIES
+    # Create a helper lib that holds most of the CUDA fatbins since there's too many to have in a single binary
+    add_library(dorado_torch_lib SHARED
+        dorado/torch_half.cpp
+    )
+    target_link_libraries(dorado_torch_lib PRIVATE
+        # Note: When changing this list, libs that have undefined symbols (ie Torch) must come first
+        ${TORCH_LIBRARIES}
         # These 2 libs depend on each other, but only libdnnl.a is added to Torch's install cmake, so we
         # need to add it again after bringing in libdnnl_graph.a to fill in the missing symbols.
         ${TORCH_LIB}/lib/libdnnl_graph.a
         ${TORCH_LIB}/lib/libdnnl.a
         # I'm assuming we need this for https://github.com/pytorch/pytorch/issues/50153
         -Wl,--whole-archive
-            # Note: libtorch is setup to link to these dynamically, which shouldn't be a problem on Linux
+            # Note: libtorch is still setup to link to these dynamically (https://github.com/pytorch/pytorch/issues/81692)
+            # though that shouldn't be a problem on Linux
             ${TORCH_LIB}/lib/libcudnn_ops_infer_static.a
             ${TORCH_LIB}/lib/libcudnn_adv_infer_static.a
             ${TORCH_LIB}/lib/libcudnn_cnn_infer_static.a
-            ${TORCH_LIB}/lib/libcudnn_ops_train_static.a
-            ${TORCH_LIB}/lib/libcudnn_adv_train_static.a
-            ${TORCH_LIB}/lib/libcudnn_cnn_train_static.a
         -Wl,--no-whole-archive
+        # We aren't going to do any training, so these don't need to be whole-archived
+        ${TORCH_LIB}/lib/libcudnn_adv_train_static.a
+        ${TORCH_LIB}/lib/libcudnn_cnn_train_static.a
+        # Except ops, which is needed for |cudnnPooling[45]dBackward|
+        -Wl,--whole-archive
+            ${TORCH_LIB}/lib/libcudnn_ops_train_static.a
+        -Wl,--no-whole-archive
+        # culibos symbols have internal linkage, so it must be part of the helper lib
+        CUDA::culibos
+    )
+    # Replace the torch libs with the helper lib
+    set(TORCH_LIBRARIES dorado_torch_lib)
+
+    # Don't forget to install it
+    install(TARGETS dorado_torch_lib LIBRARY)
+
+    # Add missing libs (these weren't set by Torch, even before the helper lib)
+    list(APPEND TORCH_LIBRARIES
         CUDA::cudart_static
         CUDA::cublas
         CUDA::cublasLt
@@ -180,7 +201,6 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         CUDA::cusparse
         CUDA::cupti
         CUDA::nvrtc
-        CUDA::culibos
         ${TORCH_LIB}/lib/libnccl_static.a
         -Wl,--start-group
             ${TORCH_LIB}/lib/libmkl_core.a
