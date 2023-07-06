@@ -1,3 +1,4 @@
+#include "MessageSinkUtils.h"
 #include "read_pipeline/NullNode.h"
 #include "read_pipeline/ReadPipeline.h"
 
@@ -89,7 +90,7 @@ TEST_CASE("Creation", TEST_GROUP) {
 }
 
 // Tests destruction order of a random linear pipeline.
-TEST_CASE("LinearDestructionOrder") {
+TEST_CASE("LinearDestructionOrder", TEST_GROUP) {
     // Node that records destruction order.
     class OrderTestNode : public MessageSink {
     public:
@@ -135,4 +136,36 @@ TEST_CASE("LinearDestructionOrder") {
 
     // Verify that nodes were destroyed in source-to-sink order.
     CHECK(std::equal(destruction_order.cbegin(), destruction_order.cend(), indices.cbegin()));
+}
+
+// Test inputs flow in the expected way from the source node.
+TEST_CASE("PipelineFlow", TEST_GROUP) {
+    // NullNode passes nothing on, so the sink should get no messages
+    // if they are sent to that node first.
+    {
+        // Natural construction order: sink to source.
+        PipelineDescriptor pipeline_desc;
+        std::vector<dorado::Message> messages;
+        auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
+        pipeline_desc.add_node<NullNode>({sink});
+        auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
+        REQUIRE(pipeline != nullptr);
+        pipeline->push_message(std::shared_ptr<dorado::Read>());
+        pipeline.reset();
+        CHECK(messages.size() == 0);
+    }
+
+    {
+        // Peverse construction order: source to sink.
+        PipelineDescriptor pipeline_desc;
+        std::vector<dorado::Message> messages;
+        auto null_node = pipeline_desc.add_node<NullNode>({});
+        auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
+        pipeline_desc.add_node_sink(null_node, sink);
+        auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
+        REQUIRE(pipeline != nullptr);
+        pipeline->push_message(std::shared_ptr<dorado::Read>());
+        pipeline.reset();
+        CHECK(messages.size() == 0);
+    }
 }

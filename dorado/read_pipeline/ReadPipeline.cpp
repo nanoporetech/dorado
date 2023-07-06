@@ -374,7 +374,8 @@ void MessageSink::send_message_to_sink(int sink_index, Message &&message) {
 
 void Pipeline::push_message(Message &&message) {
     assert(!m_nodes.empty());
-    dynamic_cast<MessageSink &>(*m_nodes.back()).push_message(std::move(message));
+    const auto source_node_index = m_source_to_sink_order.front();
+    dynamic_cast<MessageSink &>(*m_nodes.at(source_node_index)).push_message(std::move(message));
 }
 
 stats::NamedStats Pipeline::terminate() {

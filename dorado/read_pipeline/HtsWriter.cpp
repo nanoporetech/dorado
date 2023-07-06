@@ -58,7 +58,6 @@ HtsWriter::~HtsWriter() {
     terminate_impl();
     sam_hdr_destroy(m_header);
     hts_close(m_file);
-    spdlog::info("> total/primary/unmapped {}/{}/{}", m_total, m_primary, m_unmapped);
 }
 
 HtsWriter::OutputMode HtsWriter::get_output_mode(const std::string& mode) {
