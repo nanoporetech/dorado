@@ -47,7 +47,7 @@ int barcoder(int argc, char* argv[]) {
             .help("maxium number of reads to process (for debugging).")
             .default_value(1000000)
             .scan<'i', int>();
-    parser.add_argument("--kit_name").help("kit name").default_value("");
+    parser.add_argument("--kit_name").help("kit name");
     parser.add_argument("-v", "--verbose").default_value(false).implicit_value(true);
 
     try {
@@ -67,7 +67,6 @@ int barcoder(int argc, char* argv[]) {
     auto reads(parser.get<std::vector<std::string>>("reads"));
     auto threads(parser.get<int>("threads"));
     auto max_reads(parser.get<int>("max-reads"));
-    auto kit_name(parser.get<std::string>("--kit_name"));
 
     threads = threads == 0 ? std::thread::hardware_concurrency() : threads;
     // The input thread is the total number of threads to use for dorado
@@ -98,7 +97,10 @@ int barcoder(int argc, char* argv[]) {
     PipelineDescriptor pipeline_desc;
     auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, "-", HtsWriter::OutputMode::BAM,
                                                         writer_threads, 0);
-    std::vector<std::string> kit_names = {kit_name};
+    std::vector<std::string> kit_names;
+    if (parser.present("--kit_name")) {
+        kit_names.push_back(parser.get<std::string>("--kit_name"));
+    };
     auto barcoder = pipeline_desc.add_node<BarcoderNode>({hts_writer}, barcoder_threads, kit_names);
 
     // Create the Pipeline from our description.

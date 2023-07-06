@@ -12,7 +12,8 @@
 namespace dorado {
 
 struct KitInfo {
-    bool fwd_rev_separate;
+    bool double_ends;
+    bool ends_different;
     std::string top_front_flank;
     std::string top_rear_flank;
     std::string bottom_front_flank;
@@ -34,7 +35,7 @@ struct AdapterSequence {
 };
 
 struct ScoreResults {
-    int score;
+    float score;
     std::string adapter_name;
     std::string kit;
 };
@@ -42,6 +43,7 @@ struct ScoreResults {
 static const std::unordered_map<std::string, KitInfo> kit_info = {
         {"SQK-RBK004",
          {false,
+          false,
           "GCTTGGGTGTTTAACC",
           "GTTTTCGCATTTATCGTGAAACGCTTTCGCGTTTTTCGTGCGCCGCTTCA",
           "",
@@ -50,6 +52,7 @@ static const std::unordered_map<std::string, KitInfo> kit_info = {
            "BC12"}}},
         {"SQK-RBK114.24",
          {false,
+          false,
           "GCTTGGGTGTTTAACC",
           "GTTTTCGCATTTATCGTGAAACGCTTTCGCGTTTTTCGTGCGCCGCTTCA",
           "",
@@ -59,6 +62,7 @@ static const std::unordered_map<std::string, KitInfo> kit_info = {
            "BC17", "BC18", "BC19", "BC20", "BC21", "BC22", "BC23", "BC24"}}},
         {"SQK-RBK110.96",
          {false,
+          false,
           "GCTTGGGTGTTTAACC",
           "GTTTTCGCATTTATCGTGAAACGCTTTCGCGTTTTTCGTGCGCCGCTTCA",
           "",
@@ -74,6 +78,7 @@ static const std::unordered_map<std::string, KitInfo> kit_info = {
            "BC89", "BC90", "BC91", "BC92", "BC93", "BC94", "BC95", "BC96"}}},
         {"SQK-RBK114.96",
          {false,
+          false,
           "GCTTGGGTGTTTAACC",
           "GTTTTCGCATTTATCGTGAAACGCTTTCGCGTTTTTCGTGCGCCGCTTCA",
           "",
@@ -88,7 +93,8 @@ static const std::unordered_map<std::string, KitInfo> kit_info = {
            "BC78", "BC79", "BC80", "BC81", "BC82", "BC83", "BC84", "BC85", "BC86", "BC87", "BC88",
            "BC89", "BC90", "BC91", "BC92", "BC93", "BC94", "BC95", "BC96"}}},
         {"SQK-RPB004",
-         {false,
+         {true,
+          false,
           "ATCGCCTACCGTGAC",
           "CGTTTTTCGTGCGCCGCTTC",
           "",
@@ -164,8 +170,13 @@ private:
 
     std::vector<AdapterSequence> generate_adapter_sequence(
             const std::vector<std::string>& kit_names);
+    ScoreResults calculate_adapter_score_double_ends(const std::string_view& read_seq,
+                                                     const AdapterSequence& as,
+                                                     bool with_flanks);
+    ScoreResults calculate_adapter_score_different_double_ends(const std::string_view& read_seq,
+                                                               const AdapterSequence& as,
+                                                               bool with_flanks);
     ScoreResults calculate_adapter_score(const std::string_view& read_seq,
-                                         const std::string_view& read_seq_rev,
                                          const AdapterSequence& as,
                                          bool with_flanks);
     ScoreResults find_best_adapter(const std::string& read_seq,
@@ -185,6 +196,7 @@ private:
     std::atomic<size_t> m_active{0};
     std::vector<std::unique_ptr<std::thread>> m_workers;
     std::atomic<int> m_matched{0};
+    std::atomic<int> m_fp{0};
     std::string m_kit_name;
     Barcoder m_barcoder;
 
