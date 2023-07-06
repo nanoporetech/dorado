@@ -89,7 +89,7 @@ void Read::generate_read_tags(bam1_t *aln, bool emit_moves) const {
     float sd = scale;
     bam_aux_append(aln, "sd", 'f', sizeof(sd), (uint8_t *)&sd);
 
-    bam_aux_append(aln, "sv", 'Z', 9, (uint8_t *)"quantile");
+    bam_aux_append(aln, "sv", 'Z', scaling_method.size() + 1, (uint8_t *)scaling_method.c_str());
 
     uint32_t duplex = 0;
     bam_aux_append(aln, "dx", 'i', sizeof(duplex), (uint8_t *)&duplex);

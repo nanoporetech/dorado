@@ -172,6 +172,9 @@ The following simplex models are also available:
 * dna_r9.4.1_e8_fast@v3.4_5mCG@v0
 * dna_r9.4.1_e8_hac@v3.3_5mCG@v0
 * dna_r9.4.1_e8_sup@v3.3_5mCG@v0
+* dna_r9.4.1_e8_fast@v3.4_5mCG_5hmCG@v0
+* dna_r9.4.1_e8_hac@v3.3_5mCG_5hmCG@v0
+* dna_r9.4.1_e8_sup@v3.3_5mCG_5hmCG@v0
 * dna_r10.4.1_e8.2_260bps_fast@v3.5.2_5mCG@v2
 * dna_r10.4.1_e8.2_260bps_hac@v3.5.2_5mCG@v2
 * dna_r10.4.1_e8.2_260bps_sup@v3.5.2_5mCG@v2

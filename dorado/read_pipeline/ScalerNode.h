@@ -31,6 +31,7 @@ private:
 
     SignalNormalisationParams m_scaling_params;
 
+    std::pair<float, float> med_mad(const torch::Tensor& x);
     std::pair<float, float> normalisation(const torch::Tensor& x);
 };
 
