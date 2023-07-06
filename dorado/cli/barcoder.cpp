@@ -31,7 +31,7 @@ int barcoder(int argc, char* argv[]) {
     parser.add_description("Barcoding tool. Users need to pass the kit name.");
     parser.add_argument("reads").help("any HTS format.").nargs(argparse::nargs_pattern::any);
     parser.add_argument("-t", "--threads")
-            .help("number of threads for alignment and BAM writing.")
+            .help("number of threads for barcoding and BAM writing.")
             .default_value(0)
             .scan<'i', int>();
     parser.add_argument("-n", "--max-reads")
@@ -62,12 +62,12 @@ int barcoder(int argc, char* argv[]) {
 
     threads = threads == 0 ? std::thread::hardware_concurrency() : threads;
     // The input thread is the total number of threads to use for dorado
-    // alignment. Heuristically use 10% of threads for BAM generation and
-    // rest for alignment. Empirically this shows good perf.
-    int aligner_threads, writer_threads;
-    std::tie(aligner_threads, writer_threads) =
+    // barcoding. Heuristically use 10% of threads for BAM generation and
+    // rest for barcoding. Empirically this shows good perf.
+    int barcoder_threads, writer_threads;
+    std::tie(barcoder_threads, writer_threads) =
             utils::aligner_writer_thread_allocation(threads, 0.1f);
-    spdlog::debug("> aligner threads {}, writer threads {}", aligner_threads, writer_threads);
+    spdlog::debug("> barcoding threads {}, writer threads {}", barcoder_threads, writer_threads);
 
     if (reads.size() == 0) {
 #ifndef _WIN32
@@ -88,10 +88,9 @@ int barcoder(int argc, char* argv[]) {
             [&tracker](const stats::NamedStats& stats) { tracker.update_progress_bar(stats); });
 
     HtsWriter writer("-", HtsWriter::OutputMode::BAM, writer_threads, 0);
-    BarcoderNode barcoder(writer, {}, aligner_threads, {kit_name});
+    BarcoderNode barcoder(writer, {}, barcoder_threads, {kit_name});
     HtsReader reader(reads[0]);
 
-    spdlog::debug("> input fmt: {} aligned: {}", reader.format, reader.is_aligned);
     auto header = sam_hdr_dup(reader.header);
     writer.write_header(header);
 

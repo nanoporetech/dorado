@@ -2,19 +2,13 @@
 
 #include "3rdparty/edlib/edlib/include/edlib.h"
 #include "htslib/sam.h"
-#include "utils/alignment_utils.h"
 #include "utils/sequence_utils.h"
 #include "utils/types.h"
 
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
-#include <filesystem>
-#include <fstream>
-#include <iomanip>
-#include <iostream>
 #include <memory>
-#include <sstream>
 #include <string>
 #include <vector>
 
@@ -92,6 +86,10 @@ ScoreResults Barcoder::barcode(const std::string& seq) {
     return best_adapter;
 }
 
+// Generate all possible barcode adapters. If kit name is passed
+// limit the adapters generated to only the specified kits.
+// Returns a vector all barcode adapter sequences to test the
+// input read sequence against.
 std::vector<AdapterSequence> Barcoder::generate_adapter_sequence(
         const std::vector<std::string>& kit_names) {
     std::vector<AdapterSequence> adapters;
@@ -129,6 +127,9 @@ std::vector<AdapterSequence> Barcoder::generate_adapter_sequence(
     return adapters;
 }
 
+// Calculate a score for each barcode against the front and/or back "windows"
+// of a read. A window is a segment of 150bp at the beginning or end of a read.
+// The score returned is the edit distance to convert the adapter into the window.
 ScoreResults Barcoder::calculate_adapter_score(const std::string_view& read_seq,
                                                const std::string_view& read_seq_rev,
                                                const AdapterSequence& as,
@@ -143,15 +144,15 @@ ScoreResults Barcoder::calculate_adapter_score(const std::string_view& read_seq,
     align_config.task = EDLIB_TASK_LOC;
 
     if (!with_flanks) {
-        // Calculate score for adapter match against template strand
-        // Match top strand front
+        // Calculate score for the raw barcode sequence (without flanks)
+        // against the front and back windows. Return the best match found.
         EdlibAlignResult temp_top_strand =
                 edlibAlign(as.adapter.data(), as.adapter.length(), temp_top.data(),
                            temp_top.length(), align_config);
         results.push_back(temp_top_strand);
 
         EdlibAlignResult comp_bottom_strand =
-                edlibAlign(as.adapter.data(), as.adapter_rev.length(), comp_bottom.data(),
+                edlibAlign(as.adapter.data(), as.adapter.length(), comp_bottom.data(),
                            comp_bottom.length(), align_config);
         results.push_back(comp_bottom_strand);
 
@@ -160,15 +161,15 @@ ScoreResults Barcoder::calculate_adapter_score(const std::string_view& read_seq,
                 [](const auto& l, const auto& r) { return l.editDistance < r.editDistance; });
         return {best_res->editDistance, as.adapter_name, as.kit};
     } else {
-        // Calculate score for adapter match against template strand
-        // Match top strand front
+        // Calculate score for the raw barcode sequence (with flanks)
+        // against the front and back windows. Return the best match found.
         EdlibAlignResult temp_top_strand =
                 edlibAlign(as.top_primer.data(), as.top_primer.length(), temp_top.data(),
                            temp_top.length(), align_config);
         results.push_back(temp_top_strand);
 
         EdlibAlignResult comp_bottom_strand =
-                edlibAlign(as.top_primer.data(), as.top_primer_rev.length(), comp_bottom.data(),
+                edlibAlign(as.top_primer.data(), as.top_primer.length(), comp_bottom.data(),
                            comp_bottom.length(), align_config);
         results.push_back(comp_bottom_strand);
 
@@ -179,6 +180,8 @@ ScoreResults Barcoder::calculate_adapter_score(const std::string_view& read_seq,
     }
 }
 
+// Score every barcode against the input read and returns the best match,
+// or an unclassified match, based on certain heuristics.
 ScoreResults Barcoder::find_best_adapter(const std::string& read_seq,
                                          std::vector<AdapterSequence>& adapters) {
     std::vector<ScoreResults> scores;
@@ -186,6 +189,8 @@ ScoreResults Barcoder::find_best_adapter(const std::string& read_seq,
     std::string fwd = read_seq;
     std::string rev = utils::reverse_complement(read_seq);
 
+    // Stage 1 - Attempt to match the barcodes without flanks to the read.
+    // The acceptance criteria is much stricter here, to reduce false positives.
     for (auto& as : adapters) {
         scores.push_back(calculate_adapter_score(fwd, rev, as, false));
     }
@@ -200,6 +205,9 @@ ScoreResults Barcoder::find_best_adapter(const std::string& read_seq,
         return *best_score;
     }
 
+    // Stage 2 - If stage 1 checks fail, then match the barcodes with flanking regions
+    // against the read. Loosen the criteria a bit since longer sequences are being
+    // matched, but still keep it tight enough to cap false positives.
     scores.clear();
     for (auto& as : adapters) {
         scores.push_back(calculate_adapter_score(fwd, rev, as, true));
@@ -212,9 +220,14 @@ ScoreResults Barcoder::find_best_adapter(const std::string& read_seq,
     if (best_score->score <= 18 && count_min == 1) {
         return *best_score;
     }
+
+    // If nothing is found, report as unclassified.
     return {100000, UNCLASSIFIED_BARCODE, UNCLASSIFIED_BARCODE};
 }
 
+// Calculate the edit distance for an alignment just within the region
+// which maps to the barcode sequence. i.e. Ignore any edits made to the
+// flanking regions.
 int calculate_edit_dist(const EdlibAlignResult& res, int flank_len, int query_len) {
     int dist = 0;
     int qpos = 0;
