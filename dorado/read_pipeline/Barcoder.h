@@ -11,15 +11,32 @@
 
 namespace dorado {
 
-namespace barcoding {
-
 struct KitInfo {
     bool fwd_rev_separate;
-    std::string fwd_front_flank;
-    std::string fwd_rear_flank;
-    std::string rev_front_flank;
-    std::string rev_rear_flank;
+    std::string top_front_flank;
+    std::string top_rear_flank;
+    std::string bottom_front_flank;
+    std::string bottom_rear_flank;
     std::vector<std::string> barcodes;
+};
+
+struct AdapterSequence {
+    std::string adapter;
+    std::string adapter_rev;
+    std::string top_primer;
+    std::string top_primer_rev;
+    std::string bottom_primer;
+    std::string bottom_primer_rev;
+    int top_primer_flank_len;
+    int bottom_primer_flank_len;
+    std::string adapter_name;
+    std::string kit;
+};
+
+struct ScoreResults {
+    int score;
+    std::string adapter_name;
+    std::string kit;
 };
 
 static const std::unordered_map<std::string, KitInfo> kit_info = {
@@ -80,8 +97,6 @@ static const std::unordered_map<std::string, KitInfo> kit_info = {
            "RLB12A"}}},
 };
 
-}  // namespace barcoding
-
 using sq_t = std::vector<std::pair<char*, uint32_t>>;
 
 class Barcoder : public MessageSink {
@@ -89,10 +104,6 @@ public:
     Barcoder(MessageSink& read_sink,
              const std::vector<std::string>& barcodes,
              int threads,
-             int k,
-             int w,
-             int m,
-             int q,
              const std::string& barcode_file,
              const std::string& kit_name);
     ~Barcoder();
@@ -103,26 +114,26 @@ private:
     MessageSink& m_sink;
     size_t m_threads{1};
     std::atomic<size_t> m_active{0};
-    std::vector<mm_tbuf_t*> m_tbufs;
     std::vector<std::unique_ptr<std::thread>> m_workers;
     void worker_thread(size_t tid);
-    void add_tags(bam1_t* record, const mm_reg1_t* aln);
-    std::vector<BamPtr> barcode(bam1_t* irecord, mm_tbuf_t* buf);
+    std::vector<BamPtr> barcode(bam1_t* irecord);
     std::atomic<int> m_matched{0};
-    int m_q;
-
-    void init_mm2_settings(int k, int w, int m);
-    std::string mm2_barcode(const std::string& seq, const std::string_view& qname, mm_tbuf_t* buf);
-    std::string edlib_barcode(const std::string& seq, const std::string& seq_rev);
-
-    mm_idxopt_t m_idx_opt;
-    mm_mapopt_t m_map_opt;
-    mm_idx_t* m_index{nullptr};
 
     void read_barcodes(const std::string& barcode_file);
 
     std::unordered_map<std::string, std::string> m_barcodes;
     std::string m_kit_name;
+
+    std::vector<AdapterSequence> generate_adapter_sequence(
+            const std::vector<std::string>& kit_names);
+
+    ScoreResults calculate_adapter_score(const std::string_view& read_seq,
+                                         const std::string_view& read_seq_rev,
+                                         const AdapterSequence& as,
+                                         bool with_flanks);
+
+    ScoreResults find_best_adapter(const std::string& read_seq,
+                                   std::vector<AdapterSequence>& adapter);
 };
 
 }  // namespace dorado

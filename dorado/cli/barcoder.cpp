@@ -45,10 +45,6 @@ int barcoder(int argc, char* argv[]) {
             .help("maxium number of reads to process (for debugging).")
             .default_value(1000000)
             .scan<'i', int>();
-    parser.add_argument("-k").default_value(6).scan<'i', int>();
-    parser.add_argument("-w").default_value(2).scan<'i', int>();
-    parser.add_argument("-m").default_value(20).scan<'i', int>();
-    parser.add_argument("-q").default_value(0).scan<'i', int>();
     parser.add_argument("--barcodes").help("barcodes file").default_value("");
     parser.add_argument("--kit_name").help("kit name").default_value("");
     parser.add_argument("-v", "--verbose").default_value(false).implicit_value(true);
@@ -70,10 +66,6 @@ int barcoder(int argc, char* argv[]) {
     auto reads(parser.get<std::vector<std::string>>("reads"));
     auto threads(parser.get<int>("threads"));
     auto max_reads(parser.get<int>("max-reads"));
-    auto k(parser.get<int>("k"));
-    auto w(parser.get<int>("w"));
-    auto m(parser.get<int>("m"));
-    auto q(parser.get<int>("q"));
     auto bc_file(parser.get<std::string>("--barcodes"));
     auto kit_name(parser.get<std::string>("--kit_name"));
 
@@ -105,8 +97,7 @@ int barcoder(int argc, char* argv[]) {
             [&tracker](const stats::NamedStats& stats) { tracker.update_progress_bar(stats); });
 
     HtsWriter writer("-", HtsWriter::OutputMode::BAM, writer_threads, 0);
-    std::cerr << "FILE " << bc_file << std::endl;
-    Barcoder barcoder(writer, {}, aligner_threads, k, w, m, q, bc_file, kit_name);
+    Barcoder barcoder(writer, {}, aligner_threads, bc_file, kit_name);
     HtsReader reader(reads[0]);
 
     spdlog::debug("> input fmt: {} aligned: {}", reader.format, reader.is_aligned);
