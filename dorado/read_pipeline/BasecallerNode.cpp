@@ -24,7 +24,7 @@ void BasecallerNode::input_worker_thread() {
 
     while (m_work_queue.try_pop(message)) {
         if (std::holds_alternative<CandidatePairRejectedMessage>(message)) {
-            m_sink.push_message(std::move(message));
+            send_message_to_sink(std::move(message));
             continue;
         }
 
@@ -35,7 +35,7 @@ void BasecallerNode::input_worker_thread() {
         // to the basecaller node having already been called. This should be fixed in the future with
         // support for graphs of nodes rather than linear pipelines.
         if (!read->seq.empty()) {
-            m_sink.push_message(read);
+            send_message_to_sink(std::move(read));
             continue;
         }
         // Now that we have acquired a read, wait until we can push to chunks_in
@@ -107,7 +107,6 @@ void BasecallerNode::basecall_current_batch(int worker_id) {
 }
 
 void BasecallerNode::working_reads_manager() {
-    m_working_reads_managers_count++;
     std::shared_ptr<Chunk> chunk;
     while (m_processed_chunks->try_pop(chunk)) {
         nvtx3::scoped_range loop{"working_reads_manager"};
@@ -136,13 +135,8 @@ void BasecallerNode::working_reads_manager() {
                                              " in working reads cache but it doesn't exist.");
                 }
             }
-            m_sink.push_message(std::move(found_read));
+            send_message_to_sink(std::move(found_read));
         }
-    }
-
-    auto remaining = --m_working_reads_managers_count;
-    if (remaining == 0) {
-        m_sink.terminate();
     }
 }
 
@@ -231,8 +225,7 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
     }
 }
 
-BasecallerNode::BasecallerNode(MessageSink &sink,
-                               std::vector<Runner> model_runners,
+BasecallerNode::BasecallerNode(std::vector<Runner> model_runners,
                                size_t overlap,
                                int batch_timeout_ms,
                                std::string model_name,
@@ -241,7 +234,6 @@ BasecallerNode::BasecallerNode(MessageSink &sink,
                                bool in_duplex_pipeline,
                                uint32_t read_mean_qscore_start_pos)
         : MessageSink(max_reads),
-          m_sink(sink),
           m_model_runners(std::move(model_runners)),
           m_chunk_size(m_model_runners.front()->chunk_size()),
           m_overlap(overlap),
@@ -280,14 +272,20 @@ BasecallerNode::BasecallerNode(MessageSink &sink,
     }
 }
 
-BasecallerNode::~BasecallerNode() {
-    terminate();
-    m_input_worker->join();
+void BasecallerNode::terminate_impl() {
+    terminate_input_queue();
+    if (m_input_worker->joinable()) {
+        m_input_worker->join();
+    }
     for (auto &t : m_basecall_workers) {
-        t.join();
+        if (t.joinable()) {
+            t.join();
+        }
     }
     for (auto &t : m_working_reads_managers) {
-        t.join();
+        if (t.joinable()) {
+            t.join();
+        }
     }
     termination_time = std::chrono::system_clock::now();
 }

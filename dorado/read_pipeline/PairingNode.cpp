@@ -75,13 +75,11 @@ void PairingNode::pair_list_worker_thread() {
 
                 ++template_read->num_duplex_candidate_pairs;
 
-                m_sink.push_message(std::make_shared<ReadPair>(read_pair));
+                send_message_to_sink(std::make_shared<ReadPair>(read_pair));
             }
         }
     }
-    if (--m_num_worker_threads == 0) {
-        m_sink.terminate();
-    }
+    --m_num_worker_threads;
 }
 
 void PairingNode::pair_generating_worker_thread() {
@@ -120,7 +118,7 @@ void PairingNode::pair_generating_worker_thread() {
 
                 // Remove the oldest key from the map
                 for (auto read_ptr : oldest_key_it->second) {
-                    m_sink.push_message(read_ptr);
+                    send_message_to_sink(read_ptr);
                 }
                 m_channel_mux_read_map.erase(oldest_key);
                 assert(m_channel_mux_read_map.size() == m_working_channel_mux_keys.size());
@@ -136,7 +134,7 @@ void PairingNode::pair_generating_worker_thread() {
                 if (is_within_time_and_length_criteria(*earlier_read, read)) {
                     ReadPair pair = {*earlier_read, read};
                     ++(*earlier_read)->num_duplex_candidate_pairs;
-                    m_sink.push_message(std::make_shared<ReadPair>(pair));
+                    send_message_to_sink(std::make_shared<ReadPair>(pair));
                 }
             }
 
@@ -144,7 +142,7 @@ void PairingNode::pair_generating_worker_thread() {
                 if (is_within_time_and_length_criteria(read, *later_read)) {
                     ReadPair pair = {read, *later_read};
                     ++read->num_duplex_candidate_pairs;
-                    m_sink.push_message(std::make_shared<ReadPair>(pair));
+                    send_message_to_sink(std::make_shared<ReadPair>(pair));
                 }
             }
 
@@ -165,20 +163,16 @@ void PairingNode::pair_generating_worker_thread() {
 
             for (const auto& read_ptr : reads_list) {
                 // Push each read message
-                m_sink.push_message(read_ptr);
+                send_message_to_sink(read_ptr);
             }
         }
-
-        m_sink.terminate();
     }
 }
 
-PairingNode::PairingNode(MessageSink& sink,
-                         std::map<std::string, std::string> template_complement_map,
+PairingNode::PairingNode(std::map<std::string, std::string> template_complement_map,
                          int num_worker_threads,
                          size_t max_reads)
         : MessageSink(max_reads),
-          m_sink(sink),
           m_num_worker_threads(num_worker_threads),
           m_template_complement_map(std::move(template_complement_map)) {
     // Set up the complement-template_map
@@ -192,12 +186,8 @@ PairingNode::PairingNode(MessageSink& sink,
     }
 }
 
-PairingNode::PairingNode(MessageSink& sink,
-                         ReadOrder read_order,
-                         int num_worker_threads,
-                         size_t max_reads)
+PairingNode::PairingNode(ReadOrder read_order, int num_worker_threads, size_t max_reads)
         : MessageSink(max_reads),
-          m_sink(sink),
           m_num_worker_threads(num_worker_threads),
           m_max_num_keys(std::numeric_limits<size_t>::max()),
           m_max_num_reads(std::numeric_limits<size_t>::max()) {
@@ -219,10 +209,12 @@ PairingNode::PairingNode(MessageSink& sink,
     }
 }
 
-PairingNode::~PairingNode() {
-    terminate();
+void PairingNode::terminate_impl() {
+    terminate_input_queue();
     for (auto& m : m_workers) {
-        m->join();
+        if (m->joinable()) {
+            m->join();
+        }
     }
 }
 

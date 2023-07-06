@@ -20,10 +20,12 @@ NullNode::NullNode() : MessageSink(1000) {
     }
 }
 
-NullNode::~NullNode() {
-    terminate();
+void NullNode::terminate_impl() {
+    terminate_input_queue();
     for (auto& m : m_workers) {
-        m->join();
+        if (m->joinable()) {
+            m->join();
+        }
     }
 }
 

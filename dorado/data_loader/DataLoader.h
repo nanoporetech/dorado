@@ -15,7 +15,7 @@ struct Pod5FileReader;
 
 namespace dorado {
 
-class MessageSink;
+class Pipeline;
 struct ReadGroup;
 
 constexpr size_t POD5_READ_ID_SIZE = 16;
@@ -29,7 +29,7 @@ using Pod5Ptr = std::unique_ptr<Pod5FileReader, Pod5Destructor>;
 
 class DataLoader {
 public:
-    DataLoader(MessageSink& read_sink,
+    DataLoader(Pipeline& pipeline,
                const std::string& device,
                size_t num_worker_threads,
                size_t max_reads = 0,
@@ -62,7 +62,7 @@ private:
     void load_pod5_reads_from_file_by_read_ids(const std::string& path,
                                                const std::vector<ReadID>& read_ids);
     void load_read_channels(std::string data_path, bool recursive_file_loading = false);
-    MessageSink& m_read_sink;  // Where should the loaded reads go?
+    Pipeline& m_pipeline;  // Where should the loaded reads go?
     std::atomic<size_t> m_loaded_read_count{0};
     std::string m_device;
     size_t m_num_worker_threads{1};

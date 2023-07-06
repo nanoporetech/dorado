@@ -3,6 +3,7 @@
 
 #include <atomic>
 #include <list>
+#include <memory>
 #include <mutex>
 #include <thread>
 #include <vector>
@@ -11,15 +12,15 @@ namespace dorado {
 
 class SubreadTaggerNode : public MessageSink {
 public:
-    SubreadTaggerNode(MessageSink& sink, int num_worker_threads = 1, size_t max_reads = 1000);
-    ~SubreadTaggerNode();
+    SubreadTaggerNode(int num_worker_threads = 1, size_t max_reads = 1000);
+    ~SubreadTaggerNode() { terminate_impl(); }
+    void terminate() override { terminate_impl(); }
 
 private:
+    void terminate_impl();
     void worker_thread();
 
-    MessageSink& m_sink;
     std::vector<std::unique_ptr<std::thread>> worker_threads;
-    std::atomic<int> m_num_worker_threads;
 
     std::mutex m_subread_groups_mutex;
     std::unordered_map<uint64_t, std::vector<std::shared_ptr<Read>>> m_subread_groups;

@@ -16,15 +16,15 @@ struct ModBaseParams;
 
 class ModBaseCallerNode : public MessageSink {
 public:
-    ModBaseCallerNode(MessageSink& sink,
-                      std::vector<std::unique_ptr<ModBaseRunner>> model_runners,
+    ModBaseCallerNode(std::vector<std::unique_ptr<ModBaseRunner>> model_runners,
                       size_t remora_threads,
                       size_t block_stride,
                       size_t batch_size,
                       size_t max_reads = 1000);
-    ~ModBaseCallerNode();
+    ~ModBaseCallerNode() { terminate_impl(); }
     std::string get_name() const override { return "ModBaseCallerNode"; }
     stats::NamedStats sample_stats() const override;
+    void terminate() override { terminate_impl(); }
 
     struct Info {
         std::string long_names;
@@ -38,6 +38,8 @@ public:
     };
 
 private:
+    void terminate_impl();
+
     // Determine the modbase alphabet from parameters and calculate offset positions for the results
     // if node is not null it will populate its members
     [[maybe_unused]] static Info get_modbase_info_and_maybe_init(
@@ -61,7 +63,6 @@ private:
     // Worker thread, processes chunk results back into the reads
     void output_worker_thread();
 
-    MessageSink& m_sink;
     size_t m_batch_size;
     size_t m_block_stride;
 

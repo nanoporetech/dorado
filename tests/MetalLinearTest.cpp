@@ -182,8 +182,8 @@ TEST_CASE(TEST_GROUP "Linear") {
                         const float kMeanAbsDiffTolerance = output_as_byte ? 0.15f : 0.008f;
 
                         auto out_gpu_2d = out_gpu_f32.view({-1, out_size});
-                        REQUIRE(torch::allclose(out_cpu, out_gpu_2d, kRelTolerance, kAbsTolerance));
-                        REQUIRE(MeanAbsDiff(out_cpu, out_gpu_2d) < kMeanAbsDiffTolerance);
+                        CHECK(torch::allclose(out_cpu, out_gpu_2d, kRelTolerance, kAbsTolerance));
+                        CHECK(MeanAbsDiff(out_cpu, out_gpu_2d) < kMeanAbsDiffTolerance);
                     }
                 }
             }

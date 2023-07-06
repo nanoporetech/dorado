@@ -7,7 +7,11 @@
 
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
 #include <chrono>
+#include <cstdint>
+#include <utility>
+#include <vector>
 
 using namespace std::chrono_literals;
 namespace {
@@ -72,13 +76,10 @@ void BaseSpaceDuplexCallerNode::worker_thread() {
     for (auto& v : futures) {
         v.get();
     }
-
-    // Notify the sink that the Node has terminated
-    m_sink.terminate();
 }
 
-void BaseSpaceDuplexCallerNode::basespace(std::string template_read_id,
-                                          std::string complement_read_id) {
+void BaseSpaceDuplexCallerNode::basespace(const std::string& template_read_id,
+                                          const std::string& complement_read_id) {
     EdlibAlignConfig align_config = edlibDefaultAlignConfig();
     align_config.task = EDLIB_TASK_PATH;
 
@@ -171,18 +172,16 @@ void BaseSpaceDuplexCallerNode::basespace(std::string template_read_id,
         duplex_read->read_id = template_read->read_id + ";" + complement_read->read_id;
         duplex_read->read_tag = template_read->read_tag;
 
-        m_sink.push_message(duplex_read);
+        send_message_to_sink(duplex_read);
     }
     edlibFreeAlignResult(result);
 }
 
 BaseSpaceDuplexCallerNode::BaseSpaceDuplexCallerNode(
-        MessageSink& sink,
         std::map<std::string, std::string> template_complement_map,
         read_map reads,
         size_t threads)
         : MessageSink(1000),
-          m_sink(sink),
           m_template_complement_map(std::move(template_complement_map)),
           m_reads(std::move(reads)),
           m_num_worker_threads(threads) {
@@ -190,11 +189,11 @@ BaseSpaceDuplexCallerNode::BaseSpaceDuplexCallerNode(
             std::make_unique<std::thread>(&BaseSpaceDuplexCallerNode::worker_thread, this);
 }
 
-BaseSpaceDuplexCallerNode::~BaseSpaceDuplexCallerNode() {
-    terminate();
-    m_worker_thread->join();
-    // Notify the sink that the Node has terminated
-    m_sink.terminate();
+void BaseSpaceDuplexCallerNode::terminate_impl() {
+    terminate_input_queue();
+    if (m_worker_thread->joinable()) {
+        m_worker_thread->join();
+    }
 }
 
 }  // namespace dorado
