@@ -28,8 +28,6 @@ Barcoder::Barcoder(MessageSink& sink,
                    const std::string& barcode_file,
                    const std::string& kit_name)
         : MessageSink(10000), m_sink(sink), m_threads(threads), m_kit_name(kit_name) {
-    read_barcodes(barcode_file);
-
     for (size_t i = 0; i < m_threads; i++) {
         m_workers.push_back(
                 std::make_unique<std::thread>(std::thread(&Barcoder::worker_thread, this, i)));
@@ -135,24 +133,6 @@ std::vector<BamPtr> Barcoder::barcode(bam1_t* irecord) {
     return results;
 }
 
-void Barcoder::read_barcodes(const std::string& barcode_file) {
-    std::ifstream testFile(barcode_file);
-    std::string bc_name;
-    std::string bc_seq;
-    std::string str;
-    while (std::getline(testFile, str)) {
-        if (bc_name.empty()) {
-            bc_name = str;
-        } else {
-            bc_seq = str;
-            m_barcodes[bc_name] = bc_seq;
-            bc_name = "";
-        }
-    }
-
-    spdlog::info("Number of barcodes {}", m_barcodes.size());
-}
-
 std::vector<AdapterSequence> Barcoder::generate_adapter_sequence(
         const std::vector<std::string>& kit_names) {
     std::vector<AdapterSequence> adapters;
@@ -169,7 +149,8 @@ std::vector<AdapterSequence> Barcoder::generate_adapter_sequence(
         auto kit_info = dorado::kit_info.at(kit_name);
         for (auto& bc_name : kit_info.barcodes) {
             AdapterSequence as;
-            as.adapter = m_barcodes.at(bc_name);
+            //as.adapter = m_barcodes.at(bc_name);
+            as.adapter = barcodes.at(bc_name);
             as.adapter_rev = utils::reverse_complement(as.adapter);
 
             as.top_primer = kit_info.top_front_flank + as.adapter + kit_info.top_rear_flank;

@@ -97,6 +97,58 @@ static const std::unordered_map<std::string, KitInfo> kit_info = {
            "RLB12A"}}},
 };
 
+static const std::unordered_map<std::string, std::string> barcodes = {
+        {"BC01", "AAGAAAGTTGTCGGTGTCTTTGTG"},   {"BC02", "TCGATTCCGTTTGTAGTCGTCTGT"},
+        {"BC03", "GAGTCTTGTGTCCCAGTTACCAGG"},   {"BC04", "TTCGGATTCTATCGTGTTTCCCTA"},
+        {"BC05", "CTTGTCCAGGGTTTGTGTAACCTT"},   {"BC06", "TTCTCGCAAAGGCAGAAAGTAGTC"},
+        {"BC07", "GTGTTACCGTGGGAATGAATCCTT"},   {"BC08", "TTCAGGGAACAAACCAAGTTACGT"},
+        {"BC09", "AACTAGGCACAGCGAGTCTTGGTT"},   {"BC10", "AAGCGTTGAAACCTTTGTCCTCTC"},
+        {"BC11", "GTTTCATCTATCGGAGGGAATGGA"},   {"BC12", "CAGGTAGAAAGAAGCAGAATCGGA"},
+        {"RLB12A", "GTTGAGTTACAAAGCACCGATCAG"}, {"BC13", "AGAACGACTTCCATACTCGTGTGA"},
+        {"BC14", "AACGAGTCTCTTGGGACCCATAGA"},   {"BC15", "AGGTCTACCTCGCTAACACCACTG"},
+        {"BC16", "CGTCAACTGACAGTGGTTCGTACT"},   {"BC17", "ACCCTCCAGGAAAGTACCTCTGAT"},
+        {"BC18", "CCAAACCCAACAACCTAGATAGGC"},   {"BC19", "GTTCCTCGTGCAGTGTCAAGAGAT"},
+        {"BC20", "TTGCGTCCTGTTACGAGAACTCAT"},   {"BC21", "GAGCCTCTCATTGTCCGTTCTCTA"},
+        {"BC22", "ACCACTGCCATGTATCAAAGTACG"},   {"BC23", "CTTACTACCCAGTGAACCTCCTCG"},
+        {"BC24", "GCATAGTTCTGCATGATGGGTTAG"},   {"BC25", "GTAAGTTGGGTATGCAACGCAATG"},
+        {"BC26", "CATACAGCGACTACGCATTCTCAT"},   {"BC27", "CGACGGTTAGATTCACCTCTTACA"},
+        {"BC28", "TGAAACCTAAGAAGGCACCGTATC"},   {"BC29", "CTAGACACCTTGGGTTGACAGACC"},
+        {"BC30", "TCAGTGAGGATCTACTTCGACCCA"},   {"BC31", "TGCGTACAGCAATCAGTTACATTG"},
+        {"BC32", "CCAGTAGAAGTCCGACAACGTCAT"},   {"BC33", "CAGACTTGGTACGGTTGGGTAACT"},
+        {"BC34", "GGACGAAGAACTCAAGTCAAAGGC"},   {"BC35", "CTACTTACGAAGCTGAGGGACTGC"},
+        {"BC36", "ATGTCCCAGTTAGAGGAGGAAACA"},   {"BC37", "GCTTGCGATTGATGCTTAGTATCA"},
+        {"BC38", "ACCACAGGAGGACGATACAGAGAA"},   {"BC39", "CCACAGTGTCAACTAGAGCCTCTC"},
+        {"BC40", "TAGTTTGGATGACCAAGGATAGCC"},   {"BC41", "GGAGTTCGTCCAGAGAAGTACACG"},
+        {"BC42", "CTACGTGTAAGGCATACCTGCCAG"},   {"BC43", "CTTTCGTTGTTGACTCGACGGTAG"},
+        {"BC44", "AGTAGAAAGGGTTCCTTCCCACTC"},   {"BC45", "GATCCAACAGAGATGCCTTCAGTG"},
+        {"BC46", "GCTGTGTTCCACTTCATTCTCCTG"},   {"BC47", "GTGCAACTTTCCCACAGGTAGTTC"},
+        {"BC48", "CATCTGGAACGTGGTACACCTGTA"},   {"BC49", "ACTGGTGCAGCTTTGAACATCTAG"},
+        {"BC50", "ATGGACTTTGGTAACTTCCTGCGT"},   {"BC51", "GTTGAATGAGCCTACTGGGTCCTC"},
+        {"BC52", "TGAGAGACAAGATTGTTCGTGGAC"},   {"BC53", "AGATTCAGACCGTCTCATGCAAAG"},
+        {"BC54", "CAAGAGCTTTGACTAAGGAGCATG"},   {"BC55", "TGGAAGATGAGACCCTGATCTACG"},
+        {"BC56", "TCACTACTCAACAGGTGGCATGAA"},   {"BC57", "GCTAGGTCAATCTCCTTCGGAAGT"},
+        {"BC58", "CAGGTTACTCCTCCGTGAGTCTGA"},   {"BC59", "TCAATCAAGAAGGGAAAGCAAGGT"},
+        {"BC60", "CATGTTCAACCAAGGCTTCTATGG"},   {"BC61", "AGAGGGTACTATGTGCCTCAGCAC"},
+        {"BC62", "CACCCACACTTACTTCAGGACGTA"},   {"BC63", "TTCTGAAGTTCCTGGGTCTTGAAC"},
+        {"BC64", "GACAGACACCGTTCATCGACTTTC"},   {"BC65", "TTCTCAGTCTTCCTCCAGACAAGG"},
+        {"BC66", "CCGATCCTTGTGGCTTCTAACTTC"},   {"BC67", "GTTTGTCATACTCGTGTGCTCACC"},
+        {"BC68", "GAATCTAAGCAAACACGAAGGTGG"},   {"BC69", "TACAGTCCGAGCCTCATGTGATCT"},
+        {"BC70", "ACCGAGATCCTACGAATGGAGTGT"},   {"BC71", "CCTGGGAGCATCAGGTAGTAACAG"},
+        {"BC72", "TAGCTGACTGTCTTCCATACCGAC"},   {"BC73", "AAGAAACAGGATGACAGAACCCTC"},
+        {"BC74", "TACAAGCATCCCAACACTTCCACT"},   {"BC75", "GACCATTGTGATGAACCCTGTTGT"},
+        {"BC76", "ATGCTTGTTACATCAACCCTGGAC"},   {"BC77", "CGACCTGTTTCTCAGGGATACAAC"},
+        {"BC78", "AACAACCGAACCTTTGAATCAGAA"},   {"BC79", "TCTCGGAGATAGTTCTCACTGCTG"},
+        {"BC80", "CGGATGAACATAGGATAGCGATTC"},   {"BC81", "CCTCATCTTGTGAAGTTGTTTCGG"},
+        {"BC82", "ACGGTATGTCGAGTTCCAGGACTA"},   {"BC83", "TGGCTTGATCTAGGTAAGGTCGAA"},
+        {"BC84", "GTAGTGGACCTAGAACCTGTGCCA"},   {"BC85", "AACGGAGGAGTTAGTTGGATGATC"},
+        {"BC86", "AGGTGATCCCAACAAGCGTAAGTA"},   {"BC87", "TACATGCTCCTGTTGTTAGGGAGG"},
+        {"BC88", "TCTTCTACTACCGATCCGAAGCAG"},   {"BC89", "ACAGCATCAATGTTTGGCTAGTTG"},
+        {"BC90", "GATGTAGAGGGTACGGTTTGAGGC"},   {"BC91", "GGCTCCATAGGAACTCACGCTACT"},
+        {"BC92", "TTGTGAGTGGAAAGATACAGGACC"},   {"BC93", "AGTTTCCATCACTTCAGACTTGGG"},
+        {"BC94", "GATTGTCCTCAAACTGCCACCTAC"},   {"BC95", "CCTGTCTGGAAGAAGAATGGACTT"},
+        {"BC96", "CTGAACGGTCATAGAGTCCACCAT"},
+};
+
 using sq_t = std::vector<std::pair<char*, uint32_t>>;
 
 class Barcoder : public MessageSink {
@@ -115,23 +167,17 @@ private:
     size_t m_threads{1};
     std::atomic<size_t> m_active{0};
     std::vector<std::unique_ptr<std::thread>> m_workers;
-    void worker_thread(size_t tid);
-    std::vector<BamPtr> barcode(bam1_t* irecord);
     std::atomic<int> m_matched{0};
-
-    void read_barcodes(const std::string& barcode_file);
-
-    std::unordered_map<std::string, std::string> m_barcodes;
     std::string m_kit_name;
 
+    void worker_thread(size_t tid);
+    std::vector<BamPtr> barcode(bam1_t* irecord);
     std::vector<AdapterSequence> generate_adapter_sequence(
             const std::vector<std::string>& kit_names);
-
     ScoreResults calculate_adapter_score(const std::string_view& read_seq,
                                          const std::string_view& read_seq_rev,
                                          const AdapterSequence& as,
                                          bool with_flanks);
-
     ScoreResults find_best_adapter(const std::string& read_seq,
                                    std::vector<AdapterSequence>& adapter);
 };
