@@ -18,21 +18,20 @@ namespace dorado {
 class PairingNode : public MessageSink {
 public:
     // Template-complement map: uses the pair_list pairing method
-    PairingNode(MessageSink& sink,
-                std::map<std::string, std::string> template_complement_map,
+    PairingNode(std::map<std::string, std::string> template_complement_map,
                 int num_worker_threads = 2,
                 size_t max_reads = 1000);
 
     // No template-complement map: uses the pair_generation pairing method
-    PairingNode(MessageSink& sink,
-                ReadOrder read_order,
-                int num_worker_threads = 2,
-                size_t max_reads = 1000);
-    ~PairingNode();
+    PairingNode(ReadOrder read_order, int num_worker_threads = 2, size_t max_reads = 1000);
+    ~PairingNode() { terminate_impl(); }
     std::string get_name() const override { return "PairingNode"; }
     stats::NamedStats sample_stats() const override;
+    void terminate() override { terminate_impl(); }
 
 private:
+    void terminate_impl();
+
     /**
      * This is a worker thread function for pairing reads based on a specified list of template-complement pairs.
      */
@@ -54,7 +53,6 @@ private:
     // The values are channel, mux, run_id, flowcell_id, client_id
     using UniquePoreIdentifierKey = std::tuple<int, int, std::string, std::string, int32_t>;
 
-    MessageSink& m_sink;
     std::vector<std::unique_ptr<std::thread>> m_workers;
     std::atomic<int> m_num_worker_threads;
 

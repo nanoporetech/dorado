@@ -7,9 +7,6 @@
 
 namespace dorado {
 
-/// Class to filter reads based on some criteria.
-/// Currently only supports filtering based on
-/// minimum Q-score, read length and read id.
 class ResumeLoaderNode {
 public:
     ResumeLoaderNode(MessageSink& sink, const std::string& resume_file);

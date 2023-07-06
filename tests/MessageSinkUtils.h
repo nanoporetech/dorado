@@ -1,61 +1,58 @@
 #pragma once
 
+#include "data_loader/DataLoader.h"
 #include "read_pipeline/ReadPipeline.h"
 
-template <typename T>
+#include <memory>
+#include <vector>
+
 class MessageSinkToVector : public dorado::MessageSink {
 public:
-    MessageSinkToVector(size_t max_messages) : MessageSink(max_messages) {}
+    MessageSinkToVector(size_t max_messages, std::vector<dorado::Message>& messages)
+            : MessageSink(max_messages), m_messages(messages) {
+        m_worker_thread = std::make_unique<std::thread>(
+                std::thread(&MessageSinkToVector::worker_thread, this));
+    }
+    ~MessageSinkToVector() { terminate_impl(); }
+    void terminate() override { terminate_impl(); }
 
-    std::vector<T> get_messages() {
-        std::vector<T> vec;
-        dorado::Message message;
-        while (m_work_queue.try_pop(message)) {
-            vec.push_back(std::get<T>(std::move(message)));
+private:
+    void terminate_impl() {
+        terminate_input_queue();
+        if (m_worker_thread->joinable()) {
+            m_worker_thread->join();
         }
-        return vec;
     }
 
-    /// Wait for @a count messages to be produced by the source.
-    std::vector<T> wait_for_messages(std::size_t count) {
-        std::vector<T> msgs(count);
-        for (T &msg : msgs) {
-            dorado::Message message;
-            if (!m_work_queue.try_pop(message)) {
-                throw std::runtime_error("Sink was terminated early");
-            }
-            msg = std::get<T>(std::move(message));
+    std::unique_ptr<std::thread> m_worker_thread;
+    std::vector<dorado::Message>& m_messages;
+
+    void worker_thread() {
+        dorado::Message message;
+        while (m_work_queue.try_pop(message)) {
+            m_messages.push_back(std::move(message));
         }
-        return msgs;
     }
 };
 
-// Template specialization to allow messages of all types
-// Useful when testing nodes that may return several different types
-template <>
-class MessageSinkToVector<dorado::Message> : public dorado::MessageSink {
-public:
-    MessageSinkToVector(size_t max_messages) : MessageSink(max_messages) {}
-
-    std::vector<dorado::Message> get_messages() {
-        std::vector<dorado::Message> vec;
-        dorado::Message message;
-        while (m_work_queue.try_pop(message)) {
-            vec.push_back(std::move(message));
-        }
-        return vec;
+template <class T>
+std::vector<T> ConvertMessages(std::vector<dorado::Message>& messages) {
+    std::vector<T> converted_messages;
+    for (auto& message : messages) {
+        converted_messages.push_back(std::get<T>(std::move(message)));
     }
+    return converted_messages;
+}
 
-    /// Wait for @a count messages to be produced by the source.
-    std::vector<dorado::Message> wait_for_messages(std::size_t count) {
-        std::vector<dorado::Message> msgs(count);
-        for (dorado::Message &msg : msgs) {
-            dorado::Message message;
-            if (!m_work_queue.try_pop(message)) {
-                throw std::runtime_error("Sink was terminated early");
-            }
-            msg = std::move(message);
-        }
-        return msgs;
-    }
-};
+template <class... Args>
+size_t CountSinkReads(const std::string& data_path, Args&&... args) {
+    dorado::PipelineDescriptor pipeline_desc;
+    std::vector<dorado::Message> messages;
+    pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
+    auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
+
+    dorado::DataLoader loader(*pipeline, args...);
+    loader.load_reads(data_path, false);
+    pipeline.reset();
+    return messages.size();
+}

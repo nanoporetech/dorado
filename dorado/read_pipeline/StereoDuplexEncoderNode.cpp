@@ -294,44 +294,37 @@ void StereoDuplexEncoderNode::worker_thread() {
 
             if (stereo_encoded_read->raw_data.ndimension() ==
                 2) {  // 2 dims for stereo encoding, 1 for simplex
-                m_sink.push_message(
+                send_message_to_sink(
                         stereo_encoded_read);  // Stereo-encoded read created, send it to sink
             } else {
                 // announce to downstream that we rejected a candidate pair
                 --read_pair->read_1->num_duplex_candidate_pairs;
-                m_sink.push_message(CandidatePairRejectedMessage{});
+                send_message_to_sink(CandidatePairRejectedMessage{});
             }
         } else if (std::holds_alternative<std::shared_ptr<Read>>(message)) {
             auto read = std::get<std::shared_ptr<Read>>(message);
-            m_sink.push_message(read);
+            send_message_to_sink(read);
         }
-    }
-
-    int num_worker_threads = --m_num_worker_threads;
-    if (num_worker_threads == 0) {
-        m_sink.terminate();
     }
 }
 
-StereoDuplexEncoderNode::StereoDuplexEncoderNode(MessageSink& sink, int input_signal_stride)
-        : MessageSink(1000),
-          m_sink(sink),
-          m_num_worker_threads(std::thread::hardware_concurrency()),
-          m_input_signal_stride(input_signal_stride) {
-    for (int i = 0; i < m_num_worker_threads; i++) {
+StereoDuplexEncoderNode::StereoDuplexEncoderNode(int input_signal_stride)
+        : MessageSink(1000), m_input_signal_stride(input_signal_stride) {
+    const int num_worker_threads = std::thread::hardware_concurrency();
+    for (int i = 0; i < num_worker_threads; ++i) {
         std::unique_ptr<std::thread> stereo_encoder_worker_thread =
                 std::make_unique<std::thread>(&StereoDuplexEncoderNode::worker_thread, this);
         worker_threads.push_back(std::move(stereo_encoder_worker_thread));
     }
 }
 
-StereoDuplexEncoderNode::~StereoDuplexEncoderNode() {
-    terminate();
+void StereoDuplexEncoderNode::terminate_impl() {
+    terminate_input_queue();
     for (auto& t : worker_threads) {
-        t->join();
+        if (t->joinable()) {
+            t->join();
+        }
     }
-
-    m_sink.terminate();
 }
 
 stats::NamedStats StereoDuplexEncoderNode::sample_stats() const {

@@ -3,12 +3,9 @@
 #include <atomic>
 #include <condition_variable>
 #include <mutex>
-#include <optional>
 #include <queue>
 #include <string>
 #include <unordered_map>
-
-using namespace std::chrono_literals;
 
 // Asynchronous queue for producer/consumer use.
 // Items must be movable.
@@ -20,7 +17,7 @@ class AsyncQueue {
     mutable std::mutex m_mutex;
     // Signalled when an item has been consumed, and the queue therefore has space
     // for new items.
-    std::condition_variable m_not_full_cv;
+    mutable std::condition_variable m_not_full_cv;
     // Signalled when an item has been added, and the queue therefore is not empty.
     std::condition_variable m_not_empty_cv;
     // Holds the items.
@@ -143,7 +140,7 @@ public:
     }
 
     // Return the current size of the queue.
-    auto size() {
+    size_t size() {
         std::lock_guard lock(m_mutex);
         return m_items.size();
     }
