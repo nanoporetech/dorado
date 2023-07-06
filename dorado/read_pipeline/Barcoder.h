@@ -174,16 +174,13 @@ private:
 
 class BarcoderNode : public MessageSink {
 public:
-    BarcoderNode(MessageSink& read_sink,
-                 const std::vector<std::string>& barcodes,
-                 int threads,
-                 const std::vector<std::string>& kit_name);
+    BarcoderNode(int threads, const std::vector<std::string>& kit_name);
     ~BarcoderNode();
     std::string get_name() const override { return "BarcoderNode"; }
     stats::NamedStats sample_stats() const override;
+    void terminate() override { terminate_impl(); }
 
 private:
-    MessageSink& m_sink;
     size_t m_threads{1};
     std::atomic<size_t> m_active{0};
     std::vector<std::unique_ptr<std::thread>> m_workers;
@@ -193,6 +190,7 @@ private:
 
     void worker_thread(size_t tid);
     std::vector<BamPtr> barcode(bam1_t* irecord);
+    void terminate_impl();
 };
 
 }  // namespace dorado

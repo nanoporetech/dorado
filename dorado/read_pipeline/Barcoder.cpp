@@ -16,43 +16,36 @@ namespace dorado {
 
 const std::string UNCLASSIFIED_BARCODE = "unclassified";
 
-BarcoderNode::BarcoderNode(MessageSink& sink,
-                           const std::vector<std::string>& barcodes,
-                           int threads,
-                           const std::vector<std::string>& kit_names)
-        : MessageSink(10000), m_sink(sink), m_threads(threads), m_barcoder(kit_names) {
+BarcoderNode::BarcoderNode(int threads, const std::vector<std::string>& kit_names)
+        : MessageSink(10000), m_threads(threads), m_barcoder(kit_names) {
     for (size_t i = 0; i < m_threads; i++) {
         m_workers.push_back(
                 std::make_unique<std::thread>(std::thread(&BarcoderNode::worker_thread, this, i)));
     }
 }
 
-BarcoderNode::~BarcoderNode() {
-    terminate();
+void BarcoderNode::terminate_impl() {
+    terminate_input_queue();
     for (auto& m : m_workers) {
-        m->join();
+        if (m->joinable()) {
+            m->join();
+        }
     }
-    // Adding for thread safety in case worker thread throws exception.
-    m_sink.terminate();
+}
+
+BarcoderNode::~BarcoderNode() {
+    terminate_impl();
+    spdlog::debug("> Barcoded: {}", m_matched.load());
 }
 
 void BarcoderNode::worker_thread(size_t tid) {
-    m_active++;  // Track active threads.
-
     Message message;
     while (m_work_queue.try_pop(message)) {
         auto read = std::get<BamPtr>(std::move(message));
         auto records = barcode(read.get());
         for (auto& record : records) {
-            m_sink.push_message(std::move(record));
+            send_message_to_sink(std::move(record));
         }
-    }
-
-    int num_active = --m_active;
-    if (num_active == 0) {
-        terminate();
-        m_sink.terminate();
-        spdlog::info("> Barcoded {}", m_matched.load());
     }
 }
 

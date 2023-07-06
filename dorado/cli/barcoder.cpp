@@ -24,6 +24,15 @@ using namespace std::chrono_literals;
 
 namespace dorado {
 
+namespace {
+
+void add_pg_hdr(sam_hdr_t* hdr) {
+    sam_hdr_add_line(hdr, "PG", "ID", "barcoder", "PN", "dorado", "VN", DORADO_VERSION, "DS",
+                     MM_VERSION, NULL);
+}
+
+}  // anonymous namespace
+
 int barcoder(int argc, char* argv[]) {
     utils::InitLogging();
 
@@ -82,35 +91,45 @@ int barcoder(int argc, char* argv[]) {
         return 1;
     }
 
+    HtsReader reader(reads[0]);
+    auto header = sam_hdr_dup(reader.header);
+    add_pg_hdr(header);
+
+    PipelineDescriptor pipeline_desc;
+    auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, "-", HtsWriter::OutputMode::BAM,
+                                                        writer_threads, 0);
+    std::vector<std::string> kit_names = {kit_name};
+    auto barcoder = pipeline_desc.add_node<BarcoderNode>({hts_writer}, barcoder_threads, kit_names);
+
+    // Create the Pipeline from our description.
+    std::vector<dorado::stats::StatsReporter> stats_reporters;
+    auto pipeline = Pipeline::create(std::move(pipeline_desc), &stats_reporters);
+    if (pipeline == nullptr) {
+        spdlog::error("Failed to create pipeline");
+        std::exit(EXIT_FAILURE);
+    }
+
+    // At present, header output file header writing relies on direct node method calls
+    // rather than the pipeline framework.
+    auto& hts_writer_ref = dynamic_cast<HtsWriter&>(pipeline->get_node_ref(hts_writer));
+    hts_writer_ref.set_and_write_header(header);
+
+    // Set up stats counting
     std::vector<dorado::stats::StatsCallable> stats_callables;
     ProgressTracker tracker(0, false);
     stats_callables.push_back(
             [&tracker](const stats::NamedStats& stats) { tracker.update_progress_bar(stats); });
-
-    HtsWriter writer("-", HtsWriter::OutputMode::BAM, writer_threads, 0);
-    BarcoderNode barcoder(writer, {}, barcoder_threads, {kit_name});
-    HtsReader reader(reads[0]);
-
-    auto header = sam_hdr_dup(reader.header);
-    writer.write_header(header);
-
-    // Setup stats counting.
-    std::unique_ptr<dorado::stats::StatsSampler> stats_sampler;
-    std::vector<dorado::stats::StatsReporter> stats_reporters;
-    using dorado::stats::make_stats_reporter;
-    stats_reporters.push_back(make_stats_reporter(writer));
-    stats_reporters.push_back(make_stats_reporter(barcoder));
-
     constexpr auto kStatsPeriod = 100ms;
-    stats_sampler = std::make_unique<dorado::stats::StatsSampler>(kStatsPeriod, stats_reporters,
-                                                                  stats_callables);
+    auto stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
+            kStatsPeriod, stats_reporters, stats_callables);
     // End stats counting setup.
 
     spdlog::info("> starting barcoding");
-    reader.read(barcoder, max_reads);
-    writer.join();
+    reader.read(*pipeline, max_reads);
 
     stats_sampler->terminate();
+    auto final_stats = pipeline->terminate();
+    tracker.update_progress_bar(final_stats);
     tracker.summarize();
 
     spdlog::info("> finished barcoding");
