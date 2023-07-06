@@ -13,16 +13,17 @@ namespace dorado {
 
 class ReadToBamType : public MessageSink {
 public:
-    ReadToBamType(MessageSink& sink,
-                  bool emit_moves,
+    ReadToBamType(bool emit_moves,
                   bool rna,
                   size_t num_worker_threads,
                   float modbase_threshold_frac = 0,
                   size_t max_reads = 1000);
-    ~ReadToBamType();
+    ~ReadToBamType() { terminate_impl(); }
+    std::string get_name() const override { return "ReadToBamType"; }
+    void terminate() override { terminate_impl(); };
 
 private:
-    MessageSink& m_sink;
+    void terminate_impl();
     void worker_thread();
 
     // Async worker for writing.

@@ -3,16 +3,20 @@
 #include "utils/tensor_utils.h"
 #include "utils/trim.h"
 
+#include <spdlog/spdlog.h>
+
 #include <algorithm>
 #include <chrono>
 #include <utility>
+
+#define EPS 1e-9f
 
 using namespace std::chrono_literals;
 using Slice = torch::indexing::Slice;
 
 namespace dorado {
 
-std::pair<float, float> ScalerNode::normalisation(torch::Tensor& x) {
+std::pair<float, float> ScalerNode::normalisation(const torch::Tensor& x) {
     // Calculate shift and scale factors for normalisation.
     auto quantiles = dorado::utils::quantile_counting(
             x, torch::tensor({m_scaling_params.quantile_a, m_scaling_params.quantile_b}));
@@ -23,13 +27,27 @@ std::pair<float, float> ScalerNode::normalisation(torch::Tensor& x) {
     return {shift, scale};
 }
 
+std::pair<float, float> ScalerNode::med_mad(const torch::Tensor& x) {
+    // See https://en.wikipedia.org/wiki/Median_absolute_deviation
+    //  (specifically the "Relation to standard deviation" section)
+    constexpr float factor = 1.4826;
+    //Calculate signal median and median absolute deviation
+    auto med = x.median();
+    auto mad = torch::median(torch::abs(x - med)) * factor + EPS;
+    return {med.item<float>(), mad.item<float>()};
+}
+
 void ScalerNode::worker_thread() {
     Message message;
     while (m_work_queue.try_pop(message)) {
         // If this message isn't a read, we'll get a bad_variant_access exception.
         auto read = std::get<std::shared_ptr<Read>>(message);
+        assert(read->raw_data.dtype() == torch::kInt16);
+        const auto [shift, scale] = m_scaling_params.quantile_scaling
+                                            ? normalisation(read->raw_data)
+                                            : med_mad(read->raw_data);
+        read->scaling_method = m_scaling_params.quantile_scaling ? "quantile" : "med_mad";
 
-        const auto [shift, scale] = normalisation(read->raw_data);
         // raw_data comes from DataLoader with dtype int16.  We send it on as float16 after
         // shifting/scaling in float32 form.
         read->raw_data = ((read->raw_data.to(torch::kFloat) - shift) / scale).to(torch::kFloat16);
@@ -47,21 +65,16 @@ void ScalerNode::worker_thread() {
         read->num_trimmed_samples = trim_start;
 
         // Pass the read to the next node
-        m_sink.push_message(read);
+        send_message_to_sink(read);
     }
 
     int num_worker_threads = --m_num_worker_threads;
-    if (num_worker_threads == 0) {
-        m_sink.terminate();
-    }
 }
 
-ScalerNode::ScalerNode(MessageSink& sink,
-                       const SignalNormalisationParams& config,
+ScalerNode::ScalerNode(const SignalNormalisationParams& config,
                        int num_worker_threads,
                        size_t max_reads)
         : MessageSink(max_reads),
-          m_sink(sink),
           m_scaling_params(config),
           m_num_worker_threads(num_worker_threads) {
     for (int i = 0; i < m_num_worker_threads; i++) {
@@ -71,16 +84,15 @@ ScalerNode::ScalerNode(MessageSink& sink,
     }
 }
 
-ScalerNode::~ScalerNode() {
-    terminate();
+void ScalerNode::terminate_impl() {
+    terminate_input_queue();
 
     // Wait for all the Scaler Node's worker threads to terminate
     for (auto& t : worker_threads) {
-        t->join();
+        if (t->joinable()) {
+            t->join();
+        }
     }
-
-    // Notify the sink that the Scaler Node has terminated
-    m_sink.terminate();
 }
 
 stats::NamedStats ScalerNode::sample_stats() const { return stats::from_obj(m_work_queue); }

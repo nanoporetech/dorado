@@ -18,22 +18,21 @@ namespace dorado {
 /// minimum Q-score, read length and read id.
 class ReadFilterNode : public MessageSink {
 public:
-    ReadFilterNode(MessageSink& sink,
-                   size_t min_qscore,
+    ReadFilterNode(size_t min_qscore,
                    size_t min_read_length,
                    const std::unordered_set<std::string>& read_ids_to_filter,
                    size_t num_worker_threads);
-    ~ReadFilterNode();
+    ~ReadFilterNode() { terminate_impl(); }
     std::string get_name() const override { return "ReadFilterNode"; }
     stats::NamedStats sample_stats() const override;
+    void terminate() override { terminate_impl(); }
 
 private:
-    MessageSink& m_sink;
+    void terminate_impl();
     void worker_thread();
 
     // Async worker for writing.
     std::vector<std::unique_ptr<std::thread>> m_workers;
-    std::atomic<size_t> m_active_threads;
 
     size_t m_min_qscore;
     size_t m_min_read_length;

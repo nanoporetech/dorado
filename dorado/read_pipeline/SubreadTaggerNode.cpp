@@ -23,7 +23,7 @@ void SubreadTaggerNode::worker_thread() {
             } else {
                 if (read->split_count == 1 && read->num_duplex_candidate_pairs == 0) {
                     // Unsplit, unpaired simplex read: pass directly to the next node
-                    m_sink.push_message(std::move(read));
+                    send_message_to_sink(std::move(read));
                     continue;
                 }
 
@@ -41,7 +41,7 @@ void SubreadTaggerNode::worker_thread() {
                     if (num_expected_duplex == 0) {
                         // Got all subreads, no duplex to add
                         for (auto& subread : subreads) {
-                            m_sink.push_message(std::move(subread));
+                            send_message_to_sink(std::move(subread));
                         }
                     } else {
                         std::unique_lock duplex_lock(m_duplex_reads_mutex);
@@ -92,7 +92,7 @@ void SubreadTaggerNode::worker_thread() {
                 if (num_duplex_candidates == num_duplex) {
                     for (auto& subread : (*subreads)) {
                         subread->split_count = subreads->size();
-                        m_sink.push_message(std::move(subread));
+                        send_message_to_sink(std::move(subread));
                     }
                     subreads = m_full_subread_groups.erase(subreads);
                 } else {
@@ -101,32 +101,26 @@ void SubreadTaggerNode::worker_thread() {
             }
         }
     }
-
-    int num_workers = --m_num_worker_threads;
-    if (num_workers == 0) {
-        m_sink.terminate();
-    }
 }
 
-SubreadTaggerNode::SubreadTaggerNode(MessageSink& sink, int num_worker_threads, size_t max_reads)
-        : MessageSink(max_reads), m_sink(sink), m_num_worker_threads(num_worker_threads) {
-    for (int i = 0; i < m_num_worker_threads; i++) {
+SubreadTaggerNode::SubreadTaggerNode(int num_worker_threads, size_t max_reads)
+        : MessageSink(max_reads) {
+    for (int i = 0; i < num_worker_threads; i++) {
         std::unique_ptr<std::thread> worker_thread =
                 std::make_unique<std::thread>(&SubreadTaggerNode::worker_thread, this);
         worker_threads.push_back(std::move(worker_thread));
     }
 }
 
-SubreadTaggerNode::~SubreadTaggerNode() {
-    terminate();
+void SubreadTaggerNode::terminate_impl() {
+    terminate_input_queue();
 
     // Wait for all the node's worker threads to terminate
     for (auto& t : worker_threads) {
-        t->join();
+        if (t->joinable()) {
+            t->join();
+        }
     }
-
-    // Notify the sink that the node has terminated
-    m_sink.terminate();
 }
 
 }  // namespace dorado

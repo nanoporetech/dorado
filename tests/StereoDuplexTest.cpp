@@ -41,8 +41,7 @@ TEST_CASE(TEST_GROUP "Encoder", "[.]") {
 
     std::map<std::string, std::string> template_complement_map = {
             {template_read->read_id, complement_read->read_id}};
-    dorado::NullNode null_node;
-    dorado::StereoDuplexEncoderNode stereo_node = dorado::StereoDuplexEncoderNode(null_node, 5);
+    dorado::StereoDuplexEncoderNode stereo_node = dorado::StereoDuplexEncoderNode(5);
 
     const auto stereo_read = stereo_node.stereo_encode(template_read, complement_read);
     REQUIRE(torch::equal(stereo_raw_data, stereo_read->raw_data));

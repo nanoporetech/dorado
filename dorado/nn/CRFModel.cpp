@@ -862,6 +862,12 @@ CRFModelConfig load_crf_model_config(const std::filesystem::path &path) {
         config.signal_norm_params.scale_multiplier = toml::find<float>(norm, "scale_multiplier");
     }
 
+    // Set quantile scaling method based on the model filename
+    std::string model_name = std::filesystem::canonical(config.model_path).filename().string();
+    if (model_name.rfind("dna_r9.4.1", 0) == 0) {
+        config.signal_norm_params.quantile_scaling = false;
+    }
+
     return config;
 }
 

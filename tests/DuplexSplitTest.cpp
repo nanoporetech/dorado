@@ -10,6 +10,7 @@
 #include <catch2/catch.hpp>
 #include <torch/torch.h>
 
+#include <algorithm>
 #include <filesystem>
 #include <vector>
 
@@ -54,9 +55,8 @@ std::shared_ptr<dorado::Read> make_read() {
 TEST_CASE("4 subread splitting test", TEST_GROUP) {
     const auto read = make_read();
 
-    dorado::NullNode null_node;
     dorado::DuplexSplitSettings splitter_settings;
-    dorado::DuplexSplitNode splitter_node(null_node, splitter_settings, 1);
+    dorado::DuplexSplitNode splitter_node(splitter_settings, 1);
 
     const auto split_res = splitter_node.split(read);
     REQUIRE(split_res.size() == 4);
@@ -87,17 +87,22 @@ TEST_CASE("4 subread splitting test", TEST_GROUP) {
 TEST_CASE("4 subread split tagging", TEST_GROUP) {
     const auto read = make_read();
 
-    MessageSinkToVector<std::shared_ptr<dorado::Read>> sink(3);
-    dorado::SubreadTaggerNode tag_node(sink);
-    dorado::StereoDuplexEncoderNode stereo_node(tag_node, read->model_stride);
-    dorado::PairingNode pairing_node(stereo_node);
+    dorado::PipelineDescriptor pipeline_desc;
+    std::vector<dorado::Message> messages;
+    auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 3, messages);
+    auto tag_node = pipeline_desc.add_node<dorado::SubreadTaggerNode>({sink});
+    auto stereo_node =
+            pipeline_desc.add_node<dorado::StereoDuplexEncoderNode>({tag_node}, read->model_stride);
+    auto pairing_node = pipeline_desc.add_node<dorado::PairingNode>({stereo_node},
+                                                                    dorado::ReadOrder::BY_CHANNEL);
+    auto splitter_node = pipeline_desc.add_node<dorado::DuplexSplitNode>(
+            {pairing_node}, dorado::DuplexSplitSettings{}, 1);
+    auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
 
-    dorado::DuplexSplitSettings splitter_settings;
-    dorado::DuplexSplitNode splitter_node(pairing_node, splitter_settings, 1);
-    splitter_node.push_message(read);
-    splitter_node.terminate();
+    pipeline->push_message(read);
+    pipeline.reset();
 
-    auto reads = sink.get_messages();
+    auto reads = ConvertMessages<std::shared_ptr<dorado::Read>>(messages);
 
     REQUIRE(reads.size() == 5);
 

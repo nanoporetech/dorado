@@ -14,8 +14,7 @@ namespace dorado {
 class BasecallerNode : public MessageSink {
 public:
     // Chunk size and overlap are in raw samples
-    BasecallerNode(MessageSink& sink,
-                   std::vector<Runner> model_runners,
+    BasecallerNode(std::vector<Runner> model_runners,
                    size_t overlap,
                    int batch_timeout_ms,
                    std::string model_name = "",
@@ -23,11 +22,13 @@ public:
                    const std::string& node_name = "BasecallerNode",
                    bool in_duplex_pipeline = false,
                    uint32_t read_mean_qscore_start_pos = 0);
-    ~BasecallerNode();
+    ~BasecallerNode() { terminate_impl(); }
     std::string get_name() const override { return m_node_name; }
     stats::NamedStats sample_stats() const override;
+    void terminate() override { terminate_impl(); }
 
 private:
+    void terminate_impl();
     // Consume reads from input queue
     void input_worker_thread();
     // Basecall reads
@@ -37,7 +38,6 @@ private:
     // Construct complete reads
     void working_reads_manager();
 
-    MessageSink& m_sink;
     // Vector of model runners (each with their own GPU access etc)
     std::vector<Runner> m_model_runners;
     // Chunk length
@@ -86,8 +86,6 @@ private:
     std::vector<std::thread> m_basecall_workers;
     // Stitches working reads into complete reads.
     std::vector<std::thread> m_working_reads_managers;
-    // Working read managers that have not been terminated.
-    std::atomic<int> m_working_reads_managers_count{0};
 
     // Performance monitoring stats.
     std::string m_node_name;
