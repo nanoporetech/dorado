@@ -1,6 +1,7 @@
 #include "read_pipeline/Barcoder.h"
 
 #include "Version.h"
+#include "read_pipeline/BarcodeDemuxer.h"
 #include "read_pipeline/HtsReader.h"
 #include "read_pipeline/HtsWriter.h"
 #include "read_pipeline/ProgressTracker.h"
@@ -39,6 +40,7 @@ int barcoder(int argc, char* argv[]) {
     argparse::ArgumentParser parser("dorado", DORADO_VERSION, argparse::default_arguments::help);
     parser.add_description("Barcoding tool. Users need to pass the kit name.");
     parser.add_argument("reads").help("any HTS format.").nargs(argparse::nargs_pattern::any);
+    parser.add_argument("--output-dir").help("Output folder for demuxed reads.").required();
     parser.add_argument("-t", "--threads")
             .help("number of threads for barcoding and BAM writing.")
             .default_value(0)
@@ -65,6 +67,7 @@ int barcoder(int argc, char* argv[]) {
     }
 
     auto reads(parser.get<std::vector<std::string>>("reads"));
+    auto output_dir(parser.get<std::string>("output-dir"));
     auto threads(parser.get<int>("threads"));
     auto max_reads(parser.get<int>("max-reads"));
 
@@ -95,8 +98,7 @@ int barcoder(int argc, char* argv[]) {
     add_pg_hdr(header);
 
     PipelineDescriptor pipeline_desc;
-    auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, "-", HtsWriter::OutputMode::BAM,
-                                                        writer_threads, 0);
+    auto hts_writer = pipeline_desc.add_node<BarcodeDemuxer>({}, output_dir, writer_threads, 0);
     std::vector<std::string> kit_names;
     if (parser.present("--kit_name")) {
         kit_names.push_back(parser.get<std::string>("--kit_name"));
@@ -113,8 +115,8 @@ int barcoder(int argc, char* argv[]) {
 
     // At present, header output file header writing relies on direct node method calls
     // rather than the pipeline framework.
-    auto& hts_writer_ref = dynamic_cast<HtsWriter&>(pipeline->get_node_ref(hts_writer));
-    hts_writer_ref.set_and_write_header(header);
+    auto& hts_writer_ref = dynamic_cast<BarcodeDemuxer&>(pipeline->get_node_ref(hts_writer));
+    hts_writer_ref.set_header(header);
 
     // Set up stats counting
     std::vector<dorado::stats::StatsCallable> stats_callables;
