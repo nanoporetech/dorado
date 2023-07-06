@@ -22,19 +22,18 @@ namespace dorado {
 
 const std::string UNCLASSIFIED_BARCODE = "unclassified";
 
-Barcoder::Barcoder(MessageSink& sink,
-                   const std::vector<std::string>& barcodes,
-                   int threads,
-                   const std::string& barcode_file,
-                   const std::string& kit_name)
-        : MessageSink(10000), m_sink(sink), m_threads(threads), m_kit_name(kit_name) {
+BarcoderNode::BarcoderNode(MessageSink& sink,
+                           const std::vector<std::string>& barcodes,
+                           int threads,
+                           const std::vector<std::string>& kit_names)
+        : MessageSink(10000), m_sink(sink), m_threads(threads), m_barcoder(kit_names) {
     for (size_t i = 0; i < m_threads; i++) {
         m_workers.push_back(
-                std::make_unique<std::thread>(std::thread(&Barcoder::worker_thread, this, i)));
+                std::make_unique<std::thread>(std::thread(&BarcoderNode::worker_thread, this, i)));
     }
 }
 
-Barcoder::~Barcoder() {
+BarcoderNode::~BarcoderNode() {
     terminate();
     for (auto& m : m_workers) {
         m->join();
@@ -43,7 +42,7 @@ Barcoder::~Barcoder() {
     m_sink.terminate();
 }
 
-void Barcoder::worker_thread(size_t tid) {
+void BarcoderNode::worker_thread(size_t tid) {
     m_active++;  // Track active threads.
 
     Message message;
@@ -63,67 +62,16 @@ void Barcoder::worker_thread(size_t tid) {
     }
 }
 
-int calculate_gaps(const EdlibAlignResult& res) {
-    int count = 0;
-    for (int i = 0; i < res.alignmentLength; i++) {
-        if (res.alignment[i] == 2 || res.alignment[i] == 3)
-            count++;
-    }
-    return count;
-}
-
-int calculate_edit_dist(const EdlibAlignResult& res, int flank_len, int query_len) {
-    int dist = 0;
-    int qpos = 0;
-    for (int i = 0; i < res.alignmentLength; i++) {
-        if (qpos < flank_len) {
-            if (res.alignment[i] == EDLIB_EDOP_MATCH) {
-                qpos++;
-            } else if (res.alignment[i] == EDLIB_EDOP_MISMATCH) {
-                qpos++;
-            } else if (res.alignment[i] == EDLIB_EDOP_DELETE) {
-            } else if (res.alignment[i] == EDLIB_EDOP_INSERT) {
-                qpos++;
-            }
-        } else {
-            if (query_len == 0) {
-                break;
-            }
-            if (res.alignment[i] == EDLIB_EDOP_MATCH) {
-                query_len--;
-            } else if (res.alignment[i] == EDLIB_EDOP_MISMATCH) {
-                dist++;
-                query_len--;
-            } else if (res.alignment[i] == EDLIB_EDOP_DELETE) {
-                dist += 1;
-            } else if (res.alignment[i] == EDLIB_EDOP_INSERT) {
-                dist += 1;
-                query_len--;
-            }
-        }
-    }
-    return dist;
-}
-
-std::vector<BamPtr> Barcoder::barcode(bam1_t* irecord) {
+std::vector<BamPtr> BarcoderNode::barcode(bam1_t* irecord) {
     // some where for the hits
     std::vector<BamPtr> results;
 
     // get the sequence to map from the record
     auto seqlen = irecord->core.l_qseq;
-
-    // get query name.
-    std::string_view qname(bam_get_qname(irecord));
-
     auto bseq = bam_get_seq(irecord);
     std::string seq = utils::convert_nt16_to_str(bseq, seqlen);
-    // Pre-generate reverse complement sequence.
-    std::string seq_rev = utils::reverse_complement(seq);
 
-    // Try out new method
-    auto adapter_sequences = generate_adapter_sequence({m_kit_name});
-    auto best_adapter = find_best_adapter(seq, adapter_sequences);
-    auto bc = best_adapter.adapter_name;
+    auto bc = m_barcoder.barcode(seq).adapter_name;
     bam_aux_append(irecord, "BC", 'Z', bc.length() + 1, (uint8_t*)bc.c_str());
     if (bc != UNCLASSIFIED_BARCODE) {
         m_matched++;
@@ -131,6 +79,17 @@ std::vector<BamPtr> Barcoder::barcode(bam1_t* irecord) {
     results.push_back(BamPtr(bam_dup1(irecord)));
 
     return results;
+}
+
+stats::NamedStats BarcoderNode::sample_stats() const { return stats::from_obj(m_work_queue); }
+
+Barcoder::Barcoder(const std::vector<std::string>& kit_names) {
+    m_adapter_sequences = generate_adapter_sequence(kit_names);
+}
+
+ScoreResults Barcoder::barcode(const std::string& seq) {
+    auto best_adapter = find_best_adapter(seq, m_adapter_sequences);
+    return best_adapter;
 }
 
 std::vector<AdapterSequence> Barcoder::generate_adapter_sequence(
@@ -253,9 +212,40 @@ ScoreResults Barcoder::find_best_adapter(const std::string& read_seq,
     if (best_score->score <= 18 && count_min == 1) {
         return *best_score;
     }
-    return {1000, UNCLASSIFIED_BARCODE, UNCLASSIFIED_BARCODE};
+    return {100000, UNCLASSIFIED_BARCODE, UNCLASSIFIED_BARCODE};
 }
 
-stats::NamedStats Barcoder::sample_stats() const { return stats::from_obj(m_work_queue); }
+int calculate_edit_dist(const EdlibAlignResult& res, int flank_len, int query_len) {
+    int dist = 0;
+    int qpos = 0;
+    for (int i = 0; i < res.alignmentLength; i++) {
+        if (qpos < flank_len) {
+            if (res.alignment[i] == EDLIB_EDOP_MATCH) {
+                qpos++;
+            } else if (res.alignment[i] == EDLIB_EDOP_MISMATCH) {
+                qpos++;
+            } else if (res.alignment[i] == EDLIB_EDOP_DELETE) {
+            } else if (res.alignment[i] == EDLIB_EDOP_INSERT) {
+                qpos++;
+            }
+        } else {
+            if (query_len == 0) {
+                break;
+            }
+            if (res.alignment[i] == EDLIB_EDOP_MATCH) {
+                query_len--;
+            } else if (res.alignment[i] == EDLIB_EDOP_MISMATCH) {
+                dist++;
+                query_len--;
+            } else if (res.alignment[i] == EDLIB_EDOP_DELETE) {
+                dist += 1;
+            } else if (res.alignment[i] == EDLIB_EDOP_INSERT) {
+                dist += 1;
+                query_len--;
+            }
+        }
+    }
+    return dist;
+}
 
 }  // namespace dorado

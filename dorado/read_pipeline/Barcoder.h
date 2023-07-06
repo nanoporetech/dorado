@@ -151,15 +151,35 @@ static const std::unordered_map<std::string, std::string> barcodes = {
 
 using sq_t = std::vector<std::pair<char*, uint32_t>>;
 
-class Barcoder : public MessageSink {
+class Barcoder {
 public:
-    Barcoder(MessageSink& read_sink,
-             const std::vector<std::string>& barcodes,
-             int threads,
-             const std::string& barcode_file,
-             const std::string& kit_name);
-    ~Barcoder();
-    std::string get_name() const override { return "Barcoder"; }
+    Barcoder(const std::vector<std::string>& kit_names);
+    ~Barcoder() = default;
+
+    ScoreResults barcode(const std::string& seq);
+
+private:
+    std::string m_kit_name;
+    std::vector<AdapterSequence> m_adapter_sequences;
+
+    std::vector<AdapterSequence> generate_adapter_sequence(
+            const std::vector<std::string>& kit_names);
+    ScoreResults calculate_adapter_score(const std::string_view& read_seq,
+                                         const std::string_view& read_seq_rev,
+                                         const AdapterSequence& as,
+                                         bool with_flanks);
+    ScoreResults find_best_adapter(const std::string& read_seq,
+                                   std::vector<AdapterSequence>& adapter);
+};
+
+class BarcoderNode : public MessageSink {
+public:
+    BarcoderNode(MessageSink& read_sink,
+                 const std::vector<std::string>& barcodes,
+                 int threads,
+                 const std::vector<std::string>& kit_name);
+    ~BarcoderNode();
+    std::string get_name() const override { return "BarcoderNode"; }
     stats::NamedStats sample_stats() const override;
 
 private:
@@ -169,17 +189,10 @@ private:
     std::vector<std::unique_ptr<std::thread>> m_workers;
     std::atomic<int> m_matched{0};
     std::string m_kit_name;
+    Barcoder m_barcoder;
 
     void worker_thread(size_t tid);
     std::vector<BamPtr> barcode(bam1_t* irecord);
-    std::vector<AdapterSequence> generate_adapter_sequence(
-            const std::vector<std::string>& kit_names);
-    ScoreResults calculate_adapter_score(const std::string_view& read_seq,
-                                         const std::string_view& read_seq_rev,
-                                         const AdapterSequence& as,
-                                         bool with_flanks);
-    ScoreResults find_best_adapter(const std::string& read_seq,
-                                   std::vector<AdapterSequence>& adapter);
 };
 
 }  // namespace dorado

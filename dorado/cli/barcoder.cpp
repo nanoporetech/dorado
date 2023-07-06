@@ -1,11 +1,9 @@
 #include "read_pipeline/Barcoder.h"
 
 #include "Version.h"
-#include "minimap.h"
 #include "read_pipeline/HtsReader.h"
 #include "read_pipeline/HtsWriter.h"
 #include "read_pipeline/ProgressTracker.h"
-#include "utils/bam_utils.h"
 #include "utils/cli_utils.h"
 #include "utils/log_utils.h"
 #include "utils/stats.h"
@@ -14,7 +12,6 @@
 #include <spdlog/spdlog.h>
 
 #include <chrono>
-#include <filesystem>
 #include <memory>
 #include <string>
 #include <thread>
@@ -31,11 +28,7 @@ int barcoder(int argc, char* argv[]) {
     utils::InitLogging();
 
     argparse::ArgumentParser parser("dorado", DORADO_VERSION, argparse::default_arguments::help);
-    parser.add_description(
-            "Alignment using minimap2. The outputs are expected to be equivalent to minimap2.\n"
-            "The default parameters use the map-ont preset.\n"
-            "NOTE: Not all arguments from minimap2 are currently available. Additionally, "
-            "parameter names are not finalized and may change.");
+    parser.add_description("Barcoding tool. Users need to pass the kit name.");
     parser.add_argument("reads").help("any HTS format.").nargs(argparse::nargs_pattern::any);
     parser.add_argument("-t", "--threads")
             .help("number of threads for alignment and BAM writing.")
@@ -45,7 +38,6 @@ int barcoder(int argc, char* argv[]) {
             .help("maxium number of reads to process (for debugging).")
             .default_value(1000000)
             .scan<'i', int>();
-    parser.add_argument("--barcodes").help("barcodes file").default_value("");
     parser.add_argument("--kit_name").help("kit name").default_value("");
     parser.add_argument("-v", "--verbose").default_value(false).implicit_value(true);
 
@@ -66,7 +58,6 @@ int barcoder(int argc, char* argv[]) {
     auto reads(parser.get<std::vector<std::string>>("reads"));
     auto threads(parser.get<int>("threads"));
     auto max_reads(parser.get<int>("max-reads"));
-    auto bc_file(parser.get<std::string>("--barcodes"));
     auto kit_name(parser.get<std::string>("--kit_name"));
 
     threads = threads == 0 ? std::thread::hardware_concurrency() : threads;
@@ -97,7 +88,7 @@ int barcoder(int argc, char* argv[]) {
             [&tracker](const stats::NamedStats& stats) { tracker.update_progress_bar(stats); });
 
     HtsWriter writer("-", HtsWriter::OutputMode::BAM, writer_threads, 0);
-    Barcoder barcoder(writer, {}, aligner_threads, bc_file, kit_name);
+    BarcoderNode barcoder(writer, {}, aligner_threads, {kit_name});
     HtsReader reader(reads[0]);
 
     spdlog::debug("> input fmt: {} aligned: {}", reader.format, reader.is_aligned);
