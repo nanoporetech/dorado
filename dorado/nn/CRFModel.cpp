@@ -364,7 +364,7 @@ struct CudaLSTMStackImpl : Module {
         if (mode == QUANTISED_NTC) {
             // Output is [N, T, C], contiguous
             return forward_quantized(x);
-        } else if (mode = CUBLAS_TN2C) {
+        } else if (mode == CUBLAS_TN2C) {
             // Output is [N, T, C], non-contiguous
             return forward_cublas(x);
         } else {
