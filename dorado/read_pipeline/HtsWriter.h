@@ -28,6 +28,9 @@ public:
 
     int set_and_write_header(const sam_hdr_t* header);
     static OutputMode get_output_mode(const std::string& mode);
+    size_t get_total() const { return m_total; }
+    size_t get_primary() const { return m_primary; }
+    size_t get_unmapped() const { return m_unmapped; }
 
 private:
     void terminate_impl();

@@ -107,11 +107,10 @@ int aligner(int argc, char* argv[]) {
     add_pg_hdr(header);
 
     PipelineDescriptor pipeline_desc;
-    auto aligner = pipeline_desc.add_node<Aligner>({}, index, kmer_size, window_size,
-                                                   index_batch_size, aligner_threads);
     auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, "-", HtsWriter::OutputMode::BAM,
                                                         writer_threads, 0);
-    pipeline_desc.add_node_sink(aligner, hts_writer);
+    auto aligner = pipeline_desc.add_node<Aligner>({hts_writer}, index, kmer_size, window_size,
+                                                   index_batch_size, aligner_threads);
 
     // Create the Pipeline from our description.
     std::vector<dorado::stats::StatsReporter> stats_reporters;
@@ -146,7 +145,8 @@ int aligner(int argc, char* argv[]) {
     tracker.summarize();
 
     spdlog::info("> finished alignment");
-
+    spdlog::info("> total/primary/unmapped {}/{}/{}", hts_writer_ref.get_total(),
+                 hts_writer_ref.get_primary(), hts_writer_ref.get_unmapped());
     return 0;
 }
 

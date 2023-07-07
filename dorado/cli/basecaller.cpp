@@ -148,11 +148,10 @@ void setup(std::vector<std::string> args,
             {read_converter}, min_qscore, default_parameters.min_sequence_length,
             std::unordered_set<std::string>{}, thread_allocations.read_filter_threads);
 
-    auto mod_base_caller_node = PipelineDescriptor::InvalidNodeHandle;
     auto basecaller_node_sink = read_filter_node;
 
     if (!remora_runners.empty()) {
-        mod_base_caller_node = pipeline_desc.add_node<ModBaseCallerNode>(
+        auto mod_base_caller_node = pipeline_desc.add_node<ModBaseCallerNode>(
                 {read_filter_node}, std::move(remora_runners),
                 thread_allocations.remora_threads * num_devices, model_stride, remora_batch_size);
         basecaller_node_sink = mod_base_caller_node;
