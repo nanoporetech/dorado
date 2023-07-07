@@ -43,9 +43,21 @@ using quantized_lstm = std::function<int(void *, void *, void *, void *, void *,
 
 #if USE_CUDA_LSTM
 
-static bool cuda_lstm_is_quantized(int layer_size, cudaDeviceProp *prop) {
-    return !(prop->major == 6 && prop->minor == 2) &&
-           ((layer_size == 96) || (layer_size == 128 && prop->major < 8));
+enum LstmMode { CUBLAS_TN2C, QUANTISED_NTC, CUTLASS_TNC_I8, CUTLASS_TNC_F16 };
+
+static LstmMode get_cuda_lstm_mode(int layer_idx, int layer_size) {
+    cudaDeviceProp *prop = at::cuda::getCurrentDeviceProperties();
+    if (!(prop->major == 6 && prop->minor == 2) &&
+        ((layer_size == 96) || (layer_size == 128 && prop->major < 8))) {
+        return QUANTISED_NTC;
+    } else if (layer_size <= 1024 && (layer_size % 128) == 0 &&
+               (prop->major == 8 || prop->major == 9) && prop->minor == 0) {
+        if (g_options_no_i8 || (layer_idx == 0 && g_options_no_conv_i8)) {
+            return CUTLASS_TNC_F16;
+        }
+        return CUTLASS_TNC_I8;
+    }
+    return CUBLAS_TN2C;
 }
 
 #endif  // if USE_CUDA_LSTM
@@ -163,12 +175,8 @@ struct ConvolutionImpl : Module {
                                     .contiguous();
             auto b_device = conv->bias.to(x.options());
 
-            cudaDeviceProp *prop = at::cuda::getCurrentDeviceProperties();
-            const bool output_NTC = cuda_lstm_is_quantized(out_size, prop);
-            const bool output_int8 = !g_options_no_conv_i8 && !g_options_no_i8 && !output_NTC &&
-                                     clamp && prop->major >= 8;
-
-            if (output_NTC) {
+            auto lstm_mode = get_cuda_lstm_mode(0, out_size);
+            if (lstm_mode == QUANTISED_NTC) {
                 auto res = torch::empty({batch_size, chunk_size_out, out_size}, x.options());
                 auto res_2D = res.view({-1, out_size});
                 auto ntcw_mat = torch::empty({batch_size, chunk_size_out, in_size, window_size},
@@ -181,17 +189,23 @@ struct ConvolutionImpl : Module {
                                           res_2D);
                 host_bias_swish_f16_clamp(stream, res_2D.size(0), res_2D.size(1), res_2D.stride(0),
                                           res_2D.data_ptr(), b_device.data_ptr(), max_value);
-                // Output is [N, T_out, C_out], contiguous
+                // Output is [N, T_out, C_out], F16, contiguous
                 return res;
             } else {
                 torch::Tensor res, mm_out;
-                if (output_int8) {
-                    res = torch::empty({chunk_size_out + 1, batch_size, 2, out_size},
-                                       x.options().dtype(torch::kInt8));
-                    mm_out = res.slice(0, 1, chunk_size_out + 1)
-                                     .view({-1, 2 * out_size})
-                                     .view(torch::kF16);
-                } else {
+                if (lstm_mode == CUTLASS_TNC_I8) {
+                    // Output is [T_out + 3, N, C_out], I8, non-contiguous (`stride(2)` is
+                    // doubled)
+                    auto res_f16 =
+                            torch::empty({chunk_size_out + 3, batch_size, out_size}, x.options());
+                    res = res_f16.view(torch::kI8).slice(2, 0, out_size);
+                    mm_out = res_f16.slice(0, 1, chunk_size_out + 1);
+                } else if (lstm_mode == CUTLASS_TNC_F16) {
+                    // Output is [T_out + 3, N, C_out], F16, contiguous
+                    res = torch::empty({chunk_size_out + 3, batch_size, out_size}, x.options());
+                    mm_out = res.slice(0, 1, chunk_size_out + 1).view({-1, out_size});
+                } else if (lstm_mode == CUBLAS_TN2C) {
+                    // Output is [T_out + 1, N, 2, C_out], F16, contiguous
                     res = torch::empty({chunk_size_out + 1, batch_size, 2, out_size}, x.options());
                     auto res_TNC = res.slice(0, 1, chunk_size_out + 1).select(2, 1);
                     mm_out = res_TNC.view({-1, out_size});
@@ -205,26 +219,27 @@ struct ConvolutionImpl : Module {
                                      tncw_mat.stride(3), x.data_ptr(), tncw_mat.data_ptr());
                 dorado::utils::matmul_f16(tncw_mat.view({-1, in_size * window_size}), w_device,
                                           mm_out);
-                if (output_int8) {
-                    host_bias_swish_f16_clamp(stream, mm_out.size(0), mm_out.size(1),
-                                              mm_out.stride(0), mm_out.data_ptr(),
-                                              b_device.data_ptr(), max_value);
-                    float scale_i8 = g_options_scale_i8;
-                    if (scale_i8) {
-                        mm_out /= scale_i8;
+                host_bias_swish_f16_clamp(stream, mm_out.size(0), mm_out.size(1), mm_out.stride(0),
+                                          mm_out.data_ptr(), b_device.data_ptr(), max_value);
+
+                if (lstm_mode == CUTLASS_TNC_I8) {
+                    // Convert F16 to I8 in-place. Each C_out-wide F16 vector gets converted such
+                    // that its first half contains the I8 data while its second half is unused.
+                    if (g_options_scale_i8) {
+                        mm_out /= g_options_scale_i8;
                     }
                     host_convert_inplace(stream, mm_out.data_ptr(), KOI_F16, KOI_I8,
-                                         mm_out.stride(0), out_size, mm_out.size(0),
-                                         mm_out.size(1));
-                } else {
-                    host_bias_swish_f16_clamp(stream, mm_out.size(0), mm_out.size(1),
-                                              mm_out.stride(0), mm_out.data_ptr(),
-                                              b_device.data_ptr(), max_value);
+                                         mm_out.stride(0), 0, mm_out.size(0), mm_out.size(1));
                 }
-                // Output is [T_out + 1, N, 2, C_out], contiguous, which serves as
-                // working memory for CuBLAS LSTM
-                res.index({0, Slice(), 1}) = 0;
-                res.index({chunk_size_out, Slice(), 0}) = 0;
+
+                // Zero-fill the timesteps representing initial LSTM input (in both directions)
+                if (lstm_mode == CUBLAS_TN2C) {
+                    res[0].select(1, 1) = 0;
+                    res[-1].select(1, 0) = 0;
+                } else {
+                    res[0] = 0;
+                    res[-1] = 0;
+                }
                 return res;
             }
         }
@@ -337,16 +352,6 @@ struct CudaLSTMStackImpl : Module {
         rnn3 = register_module("rnn_3", CudaLSTM(layer_size, true));
         rnn4 = register_module("rnn_4", CudaLSTM(layer_size, false));
         rnn5 = register_module("rnn_5", CudaLSTM(layer_size, true));
-
-        m_quantize = cuda_lstm_is_quantized(layer_size, at::cuda::getCurrentDeviceProperties());
-
-        if (layer_size == 96) {
-            _host_run_lstm_fwd_quantized = host_run_lstm_fwd_quantized96;
-            _host_run_lstm_rev_quantized = host_run_lstm_reverse_quantized96;
-        } else if (layer_size == 128) {
-            _host_run_lstm_fwd_quantized = host_run_lstm_fwd_quantized128;
-            _host_run_lstm_rev_quantized = host_run_lstm_reverse_quantized128;
-        }
     }
 
     // Dispatch to different forward method depending on whether we use quantized LSTMs or not
@@ -355,43 +360,30 @@ struct CudaLSTMStackImpl : Module {
         c10::cuda::CUDAGuard device_guard(x.device());
         ScopedProfileRange spr("lstm_stack");
 
-        // This is persistent block-based quantization, rather than cutlass-based inter-SM
-        // quantization.
-        if (m_quantize) {
+        auto mode = get_cuda_lstm_mode(0, layer_size);
+        if (mode == QUANTISED_NTC) {
             // Output is [N, T, C], contiguous
             return forward_quantized(x);
+        } else if (mode = CUBLAS_TN2C) {
+            // Output is [N, T, C], non-contiguous
+            return forward_cublas(x);
         } else {
             // Output is [N, T, C], non-contiguous
-            return forward_cublas_or_cutlass(x);
+            return forward_cutlass(x);
         }
     }
 
 private:
-    torch::Tensor forward_cublas_or_cutlass(torch::Tensor in) {
+    torch::Tensor forward_cublas(torch::Tensor in) {
         // input is ([T+1, N, 2, C], contiguous) (see below)
-        c10::cuda::CUDAGuard device_guard(in.device());
         auto stream = at::cuda::getCurrentCUDAStream().stream();
-
-#ifdef DORADO_TX2
-        constexpr bool use_int8 = false;
-#else
-        cudaDeviceProp *prop = at::cuda::getCurrentDeviceProperties();
-        // Limit Cutlass usage to A100 and H100 GPUs
-        const bool a100_gpu = (prop->major == 8) && (prop->minor == 0);
-        const bool h100_gpu = (prop->major == 9) && (prop->minor == 0);
-        const bool use_cutlass = a100_gpu || h100_gpu;
-        const bool use_int8 = !g_options_no_i8 && use_cutlass;
-#endif
 
         const int chunk_size = in.size(0) - 1;
         const int batch_size = in.size(1);
         assert(layer_size == in.size(3));
         assert(in.dim() == 4 && in.size(2) == 2);
-        assert(in.dtype() == torch::kF16 || (use_int8 && in.dtype() == torch::kInt8));
+        assert(in.dtype() == torch::kF16);
         assert(in.is_contiguous());
-        auto opts_f16 = in.options().dtype(torch::kF16);
-        auto opts_i32 = in.options().dtype(torch::kI32);
-        const int gate_size = layer_size * 4;
 
         // Working memory is laid out as [T+1][N][2][C] in memory, where the 2 serves to
         // interleave input and output for each LSTM layer in a specific way. The reverse LSTM
@@ -403,103 +395,25 @@ private:
         // perform a single matmul with the concatenated WU matrix
         // Note that both working_mem[chunk_size][:][0][:] and working_mem[0][:][1][:] remain
         // all zeroes, representing the initial LSTM state h(-1) in either direction.
-
-        torch::Tensor inout_all_f16, inout_left_f16, inout_right_f16;
-        torch::Tensor inout_all_i8, inout_left_i8, inout_right_i8, gate_buf;
-        // F16 and Int8 tensors share the same memory. We can convert in-place,
-        // doubling stride(-2) for the Int8 tensor.
-        int convert_to_int8_layer_idx = -1;
-        if (in.dtype() == torch::kF16) {
-            inout_all_f16 = in.view({chunk_size + 1, batch_size, -1});
-            inout_left_f16 = in.slice(0, 0, chunk_size).select(2, 0);
-            inout_right_f16 = in.slice(0, 1, chunk_size + 1).select(2, 1);
-#ifndef DORADO_TX2
-            inout_all_i8 = in.select(2, 0).view(torch::kInt8);
-            inout_left_i8 = inout_all_i8.slice(0, 0, chunk_size).slice(2, 0, layer_size);
-            inout_right_i8 =
-                    inout_all_i8.slice(0, 1, chunk_size + 1).slice(2, layer_size, 2 * layer_size);
-            convert_to_int8_layer_idx = use_int8 ? 0 : 6;  // convert after first layer, or never
-        } else if (in.dtype() == torch::kInt8) {
-            inout_all_i8 = in.view({chunk_size + 1, batch_size, -1});
-            inout_left_i8 = in.slice(0, 0, chunk_size).select(2, 0);
-            inout_right_i8 = in.slice(0, 1, chunk_size + 1).select(2, 1);
-            inout_left_f16 = inout_all_i8.slice(0, 0, chunk_size).view(torch::kF16);
-        }
-        if (!use_cutlass) {
-#endif
-            gate_buf = torch::empty({batch_size, gate_size}, in.options());
-        }
+        auto inout_all = in.view({chunk_size + 1, batch_size, -1});
+        auto inout_left = in.slice(0, 0, chunk_size).select(2, 0);
+        auto inout_right = in.slice(0, 1, chunk_size + 1).select(2, 1);
+        auto gate_buf = torch::empty({batch_size, layer_size * 4}, in.options());
 
         int layer_idx = 0;
         for (auto &rnn : {rnn1, rnn2, rnn3, rnn4, rnn5}) {
             ScopedProfileRange spr_lstm("lstm_layer");
-            auto state_buf = torch::zeros({batch_size, layer_size}, opts_f16);
-            auto workspace_buf = torch::empty({1024}, opts_i32);
+            auto state_buf = torch::zeros({batch_size, layer_size}, in.options());
             auto weights_cpu = rnn->weights;
-#ifndef DORADO_TX2  // Koi for TX2 does not have Cutlass kernels
-            if (use_cutlass) {
-                auto type_id = (layer_idx > convert_to_int8_layer_idx) ? KOI_I8 : KOI_F16;
-                if (int(device_weights.size()) == layer_idx) {
-                    auto layer_device_bias = rnn->bias.to(opts_f16).view({4, layer_size}).t();
-                    if (type_id == KOI_I8) {
-                        auto weights_f32 = weights_cpu.t().to(torch::kF32);
-                        auto [scale, quantized] = quantize_tensor(weights_f32);
-                        weights_cpu = quantized.t();
-                        if (layer_idx == 0) {
-                            scale_i8 = g_options_scale_i8_lstm;
-                            if (scale_i8) {
-                                scale /= scale_i8;
-                            }
-                        }
-                        scale = scale.view({4, layer_size}).t();
-                        device_scale.push_back(scale.to(opts_f16).contiguous());
-                    } else {
-                        device_scale.push_back(torch::ones_like(layer_device_bias));
-                    }
-                    device_bias.push_back(layer_device_bias.contiguous());
-                    // Cutlass kernel expects weights reordered as <igigigigfofofofo>
-                    auto weights_cpu_cutlass = torch::empty_like(weights_cpu);
-                    for (int i = 0; i < layer_size; ++i) {
-                        int i0 = i / 4;
-                        int i1 = i % 4;
-                        weights_cpu_cutlass[i0 * 16 + i1 * 2 + 0] = weights_cpu[i + 0 * layer_size];
-                        weights_cpu_cutlass[i0 * 16 + i1 * 2 + 1] = weights_cpu[i + 1 * layer_size];
-                        weights_cpu_cutlass[i0 * 16 + i1 * 2 + 8] = weights_cpu[i + 2 * layer_size];
-                        weights_cpu_cutlass[i0 * 16 + i1 * 2 + 9] = weights_cpu[i + 3 * layer_size];
-                    }
-                    device_weights.push_back(weights_cpu_cutlass.contiguous().to(in.device()));
-                }
-
-                auto in = (type_id == KOI_I8) ? inout_all_i8 : inout_all_f16;
-
-                host_cutlass_lstm(stream, type_id, layer_idx, batch_size, layer_size, chunk_size,
-                                  rnn->reverse ? -1 : 1, in.stride(1), in.data_ptr(),
-                                  device_weights[layer_idx].data_ptr(),
-                                  device_bias[layer_idx].data_ptr(),
-                                  device_scale[layer_idx].data_ptr(), state_buf.data_ptr(),
-                                  workspace_buf.data_ptr(), 0, 1);
-
-                if (layer_idx == convert_to_int8_layer_idx) {
-                    ScopedProfileRange spr_convert("f16_to_int8");
-                    host_convert_inplace(stream, inout_left_f16.data_ptr(), KOI_F16, KOI_I8,
-                                         inout_left_f16.stride(1), 0,
-                                         inout_left_f16.size(0) * inout_left_f16.size(1),
-                                         inout_left_f16.size(2));
-                    inout_all_i8.index({chunk_size, Slice(), Slice(0, layer_size)}) = 0;
-                    inout_all_i8.index({0, Slice(), Slice(layer_size, 2 * layer_size)}) = 0;
-                }
-            } else
-#endif  // ifndef DORADO_TX2
             {
                 if (int(device_weights.size()) == layer_idx) {
                     device_bias.push_back(rnn->bias.to(in.device()));
                     device_weights.push_back(rnn->weights.t().contiguous().to(in.device()));
                 }
                 for (int ts = 0; ts < chunk_size; ++ts) {
-                    auto timestep_in = inout_all_f16[rnn->reverse ? (chunk_size - ts) : ts];
-                    auto timestep_out = rnn->reverse ? inout_left_f16[chunk_size - ts - 1]
-                                                     : inout_right_f16[ts];
-
+                    auto timestep_in = inout_all[rnn->reverse ? (chunk_size - ts) : ts];
+                    auto timestep_out =
+                            rnn->reverse ? inout_left[chunk_size - ts - 1] : inout_right[ts];
                     // Timestep matrix mulitplication
                     dorado::utils::matmul_f16(timestep_in, device_weights[layer_idx], gate_buf);
                     host_lstm_step_f16(stream, batch_size, layer_size,
@@ -510,15 +424,121 @@ private:
             ++layer_idx;
         }
 
-        if (use_int8) {
+        // Output is [N, T, C], non-contiguous
+        return inout_left.transpose(1, 0);
+    }
+
+    torch::Tensor forward_cutlass(torch::Tensor in) {
+#ifdef DORADO_TX2  // Koi for TX2 does not have Cutlass kernels
+        throw std::logic_error("No Cutlass kernels in Jetson TX2 build.");
+        return in;
+#else
+        // input is ([T+3, N, C], contiguous) (see below)
+        auto stream = at::cuda::getCurrentCUDAStream().stream();
+
+        const int chunk_size = in.size(0) - 3;
+        const int batch_size = in.size(1);
+        assert(layer_size == in.size(2));
+        assert(in.dim() == 3);
+        assert(in.dtype() == torch::kF16 || (use_int8 && in.dtype() == torch::kInt8));
+        auto opts_f16 = in.options().dtype(torch::kF16);
+        auto opts_i32 = in.options().dtype(torch::kI32);
+
+        // Working memory is laid out as [T+3][N][C] in memory, where the reverse LSTM
+        // layers (rnn1, rnn3, rnn5) use [1:-2] as input and [2:-1] as output, whereas the
+        // forward LSTM layers (rnn2, rnn4) use [2:-1] as input and [1:-2] as output.
+        // Note that both inout[0] and inout[-1] remain all zeroes, representing the initial
+        // LSTM state h(-1) in either direction.
+
+        // F16 and Int8 tensors share the same memory. We can convert in-place,
+        // doubling stride(2) for the Int8 tensor.
+        torch::Tensor inout_all_f16, inout_all_i8;
+        int convert_to_int8_layer_idx = -1;
+        if (in.dtype() == torch::kF16) {
+            inout_all_i8 = in.view(torch::kI8).slice(2, 0, layer_size);
+            inout_all_f16 = in;
+            convert_to_int8_layer_idx =
+                    g_options_no_i8 ? 6 : 0;  // convert after first layer, or never
+        } else if (in.dtype() == torch::kInt8) {
+            inout_all_i8 = in;
+            inout_all_f16 = in.view(torch::kF16);
+        }
+
+        // These illustrate the memory layout of the inputs to the fwd and reverse layers (not used)
+        //    auto in_rev_i8 = inout_all_i8.slice(0, 1, chunk_size + 1);
+        //    auto in_fwd_i8 = inout_all_i8.slice(0, 2, chunk_size + 2);
+        //    auto in_rev_f16 = inout_all_f16.slice(0, 1, chunk_size + 1);
+        auto in_fwd_f16 = inout_all_f16.slice(0, 2, chunk_size + 2);
+
+        int layer_idx = 0;
+        for (auto &rnn : {rnn1, rnn2, rnn3, rnn4, rnn5}) {
+            ScopedProfileRange spr_lstm("lstm_layer");
+            auto state_buf = torch::zeros({batch_size, layer_size}, opts_f16);
+            auto workspace_buf = torch::empty({1024}, opts_i32);
+            auto weights_cpu = rnn->weights;
+            auto type_id = (layer_idx > convert_to_int8_layer_idx) ? KOI_I8 : KOI_F16;
+            int interleave = 0;  //(type_id == KOI_I8) ? 64 : 32;
+
+            if (int(device_weights.size()) == layer_idx) {
+                auto layer_device_bias = rnn->bias.to(opts_f16).view({4, layer_size}).t();
+                if (type_id == KOI_I8) {
+                    auto weights_f32 = weights_cpu.t().to(torch::kF32);
+                    auto [scale, quantized] = quantize_tensor(weights_f32);
+                    weights_cpu = quantized.t();
+                    if (layer_idx == 0) {
+                        if (g_options_scale_i8_lstm) {
+                            scale /= g_options_scale_i8_lstm;
+                        }
+                    }
+                    scale = scale.view({4, layer_size}).t();
+                    device_scale.push_back(scale.to(opts_f16).contiguous());
+                } else {
+                    device_scale.push_back(torch::ones_like(layer_device_bias));
+                }
+                device_bias.push_back(layer_device_bias.contiguous());
+                // Cutlass kernel expects weights reordered as <igigigigfofofofo>
+                auto weights_cpu_cutlass = torch::empty_like(weights_cpu);
+                for (int i = 0; i < layer_size; ++i) {
+                    int i0 = i / 4;
+                    int i1 = i % 4;
+                    weights_cpu_cutlass[i0 * 16 + i1 * 2 + 0] = weights_cpu[i + 0 * layer_size];
+                    weights_cpu_cutlass[i0 * 16 + i1 * 2 + 1] = weights_cpu[i + 1 * layer_size];
+                    weights_cpu_cutlass[i0 * 16 + i1 * 2 + 8] = weights_cpu[i + 2 * layer_size];
+                    weights_cpu_cutlass[i0 * 16 + i1 * 2 + 9] = weights_cpu[i + 3 * layer_size];
+                }
+                if (interleave) {
+                    weights_cpu_cutlass = weights_cpu_cutlass.view({4 * layer_size, -1, interleave})
+                                                  .permute({1, 0, 2});
+                }
+                device_weights.push_back(weights_cpu_cutlass.contiguous().to(in.device()));
+            }
+
+            auto in = (type_id == KOI_I8) ? inout_all_i8 : inout_all_f16;
+            host_cutlass_lstm(stream, type_id, layer_idx, batch_size, layer_size, chunk_size,
+                              rnn->reverse ? -1 : 1, in.stride(1), in.data_ptr(),
+                              device_weights[layer_idx].data_ptr(),
+                              device_bias[layer_idx].data_ptr(), device_scale[layer_idx].data_ptr(),
+                              state_buf.data_ptr(), workspace_buf.data_ptr(), interleave, 0);
+
+            if (layer_idx == convert_to_int8_layer_idx) {
+                ScopedProfileRange spr_convert("f16_to_int8");
+                host_convert_inplace(stream, in.data_ptr(), KOI_F16, KOI_I8, in.stride(1), 0,
+                                     in.size(0) * inout_all_f16.size(1), in.size(2));
+            }
+
+            ++layer_idx;
+        }
+
+        if (!g_options_no_i8) {
             ScopedProfileRange spr_convert("int8_to_f16");
-            // inout_left_i8 shares storage with inout_left_f16[:][:][0:layer_size/2]
-            host_convert_inplace(
-                    stream, inout_left_f16.data_ptr(), KOI_I8, KOI_F16, inout_left_f16.stride(1), 0,
-                    inout_left_f16.size(0) * inout_left_f16.size(1), inout_left_f16.size(2));
+            // in_fwd_f16 shares storage with in_fwd_i8
+            host_convert_inplace(stream, in_fwd_f16.data_ptr(), KOI_I8, KOI_F16,
+                                 in_fwd_f16.stride(1), 0, in_fwd_f16.size(0) * in_fwd_f16.size(1),
+                                 in_fwd_f16.size(2));
         }
         // Output is [N, T, C], non-contiguous
-        return inout_left_f16.transpose(1, 0);
+        return in_fwd_f16.transpose(1, 0);
+#endif  // ifdef DORADO_TX2 else
     }
 
     void rearrange_individual_weights(torch::Tensor buffer) {
@@ -610,37 +630,42 @@ private:
         _chunks.index({torch::indexing::Slice(), 3}) = 0;
         _chunks = _chunks.to(x.device());
 
+        auto host_run_lstm_fwd =
+                (layer_size == 96) ? host_run_lstm_fwd_quantized96 : host_run_lstm_fwd_quantized128;
+        auto host_run_lstm_rev = (layer_size == 96) ? host_run_lstm_reverse_quantized96
+                                                    : host_run_lstm_reverse_quantized128;
+
         auto buffer = torch::matmul(x, _r_wih[0]);
 
-        dorado::utils::handle_cuda_result(_host_run_lstm_rev_quantized(
+        dorado::utils::handle_cuda_result(host_run_lstm_rev(
                 _chunks.data_ptr(), buffer.data_ptr(), _quantized_buffers[0].data_ptr(),
                 rnn1->named_parameters()["bias_ih"].data_ptr(),
                 _quantization_scale_factors[0].data_ptr(), x.data_ptr(), x.size(0)));
 
         buffer = torch::matmul(x, _r_wih[1]);
 
-        dorado::utils::handle_cuda_result(_host_run_lstm_fwd_quantized(
+        dorado::utils::handle_cuda_result(host_run_lstm_fwd(
                 _chunks.data_ptr(), buffer.data_ptr(), _quantized_buffers[1].data_ptr(),
                 rnn2->named_parameters()["bias_ih"].data_ptr(),
                 _quantization_scale_factors[1].data_ptr(), x.data_ptr(), x.size(0)));
 
         buffer = torch::matmul(x, _r_wih[2]);
 
-        dorado::utils::handle_cuda_result(_host_run_lstm_rev_quantized(
+        dorado::utils::handle_cuda_result(host_run_lstm_rev(
                 _chunks.data_ptr(), buffer.data_ptr(), _quantized_buffers[2].data_ptr(),
                 rnn3->named_parameters()["bias_ih"].data_ptr(),
                 _quantization_scale_factors[2].data_ptr(), x.data_ptr(), x.size(0)));
 
         buffer = torch::matmul(x, _r_wih[3]);
 
-        dorado::utils::handle_cuda_result(_host_run_lstm_fwd_quantized(
+        dorado::utils::handle_cuda_result(host_run_lstm_fwd(
                 _chunks.data_ptr(), buffer.data_ptr(), _quantized_buffers[3].data_ptr(),
                 rnn4->named_parameters()["bias_ih"].data_ptr(),
                 _quantization_scale_factors[3].data_ptr(), x.data_ptr(), x.size(0)));
 
         buffer = torch::matmul(x, _r_wih[4]);
 
-        dorado::utils::handle_cuda_result(_host_run_lstm_rev_quantized(
+        dorado::utils::handle_cuda_result(host_run_lstm_rev(
                 _chunks.data_ptr(), buffer.data_ptr(), _quantized_buffers[4].data_ptr(),
                 rnn5->named_parameters()["bias_ih"].data_ptr(),
                 _quantization_scale_factors[4].data_ptr(), x.data_ptr(), x.size(0)));
@@ -653,15 +678,12 @@ private:
     float scale_i8;
     float zero_offset_i8;
     bool _weights_rearranged = false;
-    bool m_quantize;
     std::vector<torch::Tensor> device_weights;
     std::vector<torch::Tensor> device_bias;
     std::vector<torch::Tensor> device_scale;
     std::vector<torch::Tensor> _r_wih;
     std::vector<torch::Tensor> _quantized_buffers;
     std::vector<torch::Tensor> _quantization_scale_factors;
-    quantized_lstm _host_run_lstm_fwd_quantized{nullptr};
-    quantized_lstm _host_run_lstm_rev_quantized{nullptr};
     CudaLSTM rnn1{nullptr}, rnn2{nullptr}, rnn3{nullptr}, rnn4{nullptr}, rnn5{nullptr};
 };
 
