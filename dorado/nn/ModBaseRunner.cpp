@@ -88,7 +88,7 @@ public:
         torch::nn::ModuleHolder<torch::nn::AnyModule> module_holder{nullptr};
         std::unique_ptr<RemoraScaler> scaler{nullptr};
         ModBaseParams params{};
-        std::deque<ModBaseTask*> input_queue;
+        std::deque<std::shared_ptr<ModBaseTask>> input_queue;
         std::mutex input_lock;
         std::condition_variable input_cv;
 #if DORADO_GPU_BUILD && !defined(__APPLE__)
@@ -191,20 +191,20 @@ public:
 #if DORADO_GPU_BUILD && !defined(__APPLE__)
         c10::cuda::OptionalCUDAStreamGuard stream_guard(caller_data->stream);
 #endif
-        ModBaseTask task(input_sigs.to(m_options.device()), input_seqs.to(m_options.device()),
-                         num_chunks);
+        auto task = std::make_shared<ModBaseTask>(input_sigs.to(m_options.device()),
+                                                  input_seqs.to(m_options.device()), num_chunks);
         {
             std::lock_guard<std::mutex> lock(caller_data->input_lock);
-            caller_data->input_queue.push_front(&task);
+            caller_data->input_queue.push_front(task);
         }
         caller_data->input_cv.notify_one();
 
-        std::unique_lock lock(task.mut);
-        while (!task.done) {
-            task.cv.wait(lock);
+        std::unique_lock lock(task->mut);
+        while (!task->done) {
+            task->cv.wait(lock);
         }
 
-        return task.out;
+        return task->out;
     }
 
     void modbase_task_thread_fn(size_t model_id) {
@@ -229,7 +229,7 @@ public:
                 return;
             }
 
-            ModBaseTask* task = caller_data->input_queue.back();
+            auto task = caller_data->input_queue.back();
             caller_data->input_queue.pop_back();
             input_lock.unlock();
 
@@ -246,8 +246,8 @@ public:
 #endif
             ++m_num_batches_called;
             task->done = true;
-            task->cv.notify_one();
             task_lock.unlock();
+            task->cv.notify_one();
         }
     }
 

@@ -72,11 +72,12 @@ public:
     }
 
     struct NNTask {
-        NNTask(torch::Tensor input_, int num_chunks_) : input(input_), num_chunks(num_chunks_) {}
+        NNTask(torch::Tensor input_, torch::Tensor &output_, int num_chunks_)
+                : input(input_), out(output_), num_chunks(num_chunks_) {}
         torch::Tensor input;
+        torch::Tensor &out;
         std::mutex mut;
         std::condition_variable cv;
-        torch::Tensor out;
         bool done{false};
         int num_chunks;
     };
@@ -91,19 +92,18 @@ public:
         if (num_chunks == 0) {
             return std::vector<DecodedChunk>();
         }
-        NNTask task(input.to(m_options.device()), num_chunks);
+        auto task = std::make_shared<NNTask>(input.to(m_options.device()), output, num_chunks);
         {
             std::lock_guard<std::mutex> lock(m_input_lock);
-            m_input_queue.push_front(&task);
+            m_input_queue.push_front(task);
         }
         m_input_cv.notify_one();
 
-        std::unique_lock lock(task.mut);
-        while (!task.done) {
-            task.cv.wait(lock);
+        std::unique_lock lock(task->mut);
+        while (!task->done) {
+            task->cv.wait(lock);
         }
 
-        output.copy_(task.out);
         return m_decoder->cpu_part(output);
     }
 
@@ -131,7 +131,7 @@ public:
                 return;
             }
 
-            NNTask *task = m_input_queue.back();
+            auto task = m_input_queue.back();
             m_input_queue.pop_back();
             input_lock.unlock();
 
@@ -144,15 +144,15 @@ public:
             stats::Timer timer;
             auto scores = m_module->forward(task->input);
             const auto forward_ms = timer.GetElapsedMS();
-            task->out = m_decoder->gpu_part(scores, task->num_chunks, m_decoder_options);
+            task->out.copy_(m_decoder->gpu_part(scores, task->num_chunks, m_decoder_options));
             stream.synchronize();
             const auto forward_plus_decode_ms = timer.GetElapsedMS();
             ++m_num_batches_called;
             m_model_ms += forward_ms;
             m_decode_ms += forward_plus_decode_ms - forward_ms;
             task->done = true;
-            task->cv.notify_one();
             task_lock.unlock();
+            task->cv.notify_one();
         }
     }
     void terminate() { m_terminate.store(true); }
@@ -174,7 +174,7 @@ public:
     torch::nn::ModuleHolder<torch::nn::AnyModule> m_module{nullptr};
     size_t m_model_stride;
     std::atomic<bool> m_terminate{false};
-    std::deque<NNTask *> m_input_queue;
+    std::deque<std::shared_ptr<NNTask>> m_input_queue;
     std::mutex m_input_lock;
     std::condition_variable m_input_cv;
     std::unique_ptr<std::thread> m_cuda_thread;
