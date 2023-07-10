@@ -196,7 +196,8 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
             CUDA::cudart_static
             CUDA::cublas_static
             CUDA::cublasLt_static
-            CUDA::cufft
+            # AFAICT Torch doesn't provide the symbol required for the callback, so use the nocallback variant
+            CUDA::cufft_static_nocallback
             CUDA::cusolver_static
             CUDA::cusparse_static
             CUDA::cupti_static
