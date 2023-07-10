@@ -105,7 +105,7 @@ public:
     // Otherwise we block if the queue is empty.
     bool try_pop(Item& item) {
         std::unique_lock lock(m_mutex);
-        // Wait until either an item is added, or we're asked to terminate.
+        // Wait until the queue is non-empty, or we're asked to terminate.
         m_not_empty_cv.wait(lock, [this] { return !m_items.empty() || m_terminate; });
 
         // Termination takes effect once all items have been popped from the queue.
@@ -116,6 +116,34 @@ public:
         item = std::move(m_items.front());
         m_items.pop();
         ++m_num_pops;
+
+        // Inform a waiting thread that the queue is not full.
+        lock.unlock();
+        m_not_full_cv.notify_one();
+
+        return true;
+    }
+
+    // Obtains all items in the queue once the lock is obtained.
+    // Return value is false if we are terminating.
+    // If the lock is contended this could be more efficient than repeated
+    // calls to try_pop.
+    template <class ProcessFn>
+    bool process_and_pop_all(ProcessFn process_fn) {
+        std::unique_lock lock(m_mutex);
+        // Wait until the queue is non-empty, or we're asked to terminate.
+        m_not_empty_cv.wait(lock, [this] { return !m_items.empty() || m_terminate; });
+
+        // Termination takes effect once all items have been popped from the queue.
+        if (m_terminate && m_items.empty()) {
+            return false;
+        }
+
+        while (!m_items.empty()) {
+            process_fn(m_items.front());
+            m_items.pop();
+            ++m_num_pops;
+        }
 
         // Inform a waiting thread that the queue is not full.
         lock.unlock();

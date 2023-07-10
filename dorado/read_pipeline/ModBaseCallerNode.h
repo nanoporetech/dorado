@@ -1,11 +1,18 @@
 #pragma once
+
 #include "ReadPipeline.h"
+#include "utils/AsyncQueue.h"
 #include "utils/stats.h"
 
+#include <array>
 #include <atomic>
+#include <condition_variable>
+#include <cstdint>
 #include <deque>
 #include <functional>
 #include <memory>
+#include <mutex>
+#include <string>
 #include <vector>
 
 namespace dorado {
@@ -72,7 +79,7 @@ private:
     std::vector<std::unique_ptr<std::thread>> m_runner_workers;
     std::vector<std::unique_ptr<std::thread>> m_input_worker;
 
-    std::deque<std::shared_ptr<RemoraChunk>> m_processed_chunks;
+    AsyncQueue<std::shared_ptr<RemoraChunk>> m_processed_chunks;
     std::vector<std::deque<std::shared_ptr<RemoraChunk>>> m_chunk_queues;
 
     std::mutex m_working_reads_mutex;
@@ -82,9 +89,6 @@ private:
     std::mutex m_chunk_queues_mutex;
     std::condition_variable m_chunk_queues_cv;
     std::condition_variable m_chunks_added_cv;
-
-    std::mutex m_processed_chunks_mutex;
-    std::condition_variable m_processed_chunks_cv;
 
     std::atomic<int> m_num_active_runner_workers{0};
     std::atomic<int> m_num_active_input_worker{0};

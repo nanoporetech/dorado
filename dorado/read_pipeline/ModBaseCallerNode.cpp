@@ -28,7 +28,9 @@ ModBaseCallerNode::ModBaseCallerNode(std::vector<std::unique_ptr<ModBaseRunner>>
         : MessageSink(max_reads),
           m_batch_size(batch_size),
           m_block_stride(block_stride),
-          m_runners(std::move(model_runners)) {
+          m_runners(std::move(model_runners)),
+          // TODO -- more principled calculation of output queue size
+          m_processed_chunks(10 * max_reads) {
     init_modbase_info();
 
     m_output_worker = std::make_unique<std::thread>(&ModBaseCallerNode::output_worker_thread, this);
@@ -289,8 +291,7 @@ void ModBaseCallerNode::modbasecall_worker_thread(size_t worker_id, size_t calle
                 for (auto& runner : m_runners) {
                     runner->terminate();
                 }
-                m_terminate_output.store(true);
-                m_processed_chunks_cv.notify_one();
+                m_processed_chunks.terminate();
             }
             return;
         }
@@ -347,7 +348,6 @@ void ModBaseCallerNode::call_current_batch(
     assert(results_f32.is_contiguous());
     const auto* const results_f32_ptr = results_f32.data_ptr<float>();
 
-    std::unique_lock processed_chunks_lock(m_processed_chunks_mutex);
     auto row_size = results.size(1);
 
     // Put results into chunk
@@ -355,42 +355,35 @@ void ModBaseCallerNode::call_current_batch(
         auto& chunk = batched_chunks[i];
         chunk->scores.resize(row_size);
         std::memcpy(chunk->scores.data(), &results_f32_ptr[i * row_size], row_size * sizeof(float));
-        m_processed_chunks.push_back(chunk);
+        m_processed_chunks.try_push(std::move(chunk));
     }
-
-    processed_chunks_lock.unlock();
-    m_processed_chunks_cv.notify_one();
 
     batched_chunks.clear();
     ++m_num_batches_called;
 }
 
 void ModBaseCallerNode::output_worker_thread() {
-    while (true) {
+    // The m_processed_chunks lock is sufficiently contended that it's worth taking all
+    // chunks available once we obtain it.
+    std::vector<std::shared_ptr<RemoraChunk>> processed_chunks;
+    auto grab_chunk = [&processed_chunks](std::shared_ptr<RemoraChunk>& chunk) {
+        processed_chunks.push_back(std::move(chunk));
+    };
+    while (m_processed_chunks.process_and_pop_all(grab_chunk)) {
         nvtx3::scoped_range range{"modbase_output_worker_thread"};
-        // Wait until we are provided with a read
-        std::unique_lock processed_chunks_lock(m_processed_chunks_mutex);
-        m_processed_chunks_cv.wait(processed_chunks_lock, [this] {
-            return !m_processed_chunks.empty() || m_terminate_output.load();
-        });
-        if (m_terminate_output.load() && m_processed_chunks.empty()) {
-            return;
-        }
 
-        for (const auto& chunk : m_processed_chunks) {
+        for (const auto& chunk : processed_chunks) {
             auto source_read = chunk->source_read.lock();
             int64_t result_pos = chunk->context_hit;
             int64_t offset =
                     m_base_prob_offsets[RemoraUtils::BASE_IDS[source_read->seq[result_pos]]];
             for (size_t i = 0; i < chunk->scores.size(); ++i) {
                 source_read->base_mod_probs[m_num_states * result_pos + offset + i] =
-                        uint8_t(std::min(std::floor(chunk->scores[i] * 256), 255.0f));
+                        static_cast<uint8_t>(std::min(std::floor(chunk->scores[i] * 256), 255.0f));
             }
-            source_read->num_modbase_chunks_called += 1;
+            ++source_read->num_modbase_chunks_called;
         }
-
-        m_processed_chunks.clear();
-        processed_chunks_lock.unlock();
+        processed_chunks.clear();
 
         // Now move any completed reads to the output queue
         std::vector<std::shared_ptr<Read>> completed_reads;
