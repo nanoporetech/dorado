@@ -36,6 +36,11 @@ struct AdapterSequence {
 
 struct ScoreResults {
     float score;
+    float top_score;
+    float bottom_score;
+    float flank_score = 1.f;
+    float top_flank_score = -1.f;
+    float bottom_flank_score = -1.f;
     std::string adapter_name;
     std::string kit;
 };

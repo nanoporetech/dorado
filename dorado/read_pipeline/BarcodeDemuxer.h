@@ -3,6 +3,7 @@
 #include "read_pipeline/ReadPipeline.h"
 #include "utils/stats.h"
 
+#include <atomic>
 #include <cstdint>
 #include <filesystem>
 #include <memory>
@@ -32,6 +33,7 @@ private:
     size_t m_secondary{0};
     size_t m_supplementary{0};
     sam_hdr_t* m_header{nullptr};
+    std::atomic<int> m_processed_reads{0};
 
     std::unordered_map<std::string, htsFile*> m_files;
     std::unique_ptr<std::thread> m_worker;

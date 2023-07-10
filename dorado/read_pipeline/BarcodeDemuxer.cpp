@@ -78,6 +78,7 @@ int BarcodeDemuxer::write(bam1_t* const record) {
         throw std::runtime_error("Failed to write SAM record, error code " +
                                  std::to_string(hts_res));
     }
+    m_processed_reads++;
     return hts_res;
 }
 
@@ -93,6 +94,7 @@ void BarcodeDemuxer::set_header(const sam_hdr_t* const header) {
 
 stats::NamedStats BarcodeDemuxer::sample_stats() const {
     auto stats = stats::from_obj(m_work_queue);
+    stats["demuxed_reads_written"] = m_processed_reads.load();
     return stats;
 }
 

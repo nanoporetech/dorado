@@ -2,6 +2,7 @@
 
 #include "3rdparty/edlib/edlib/include/edlib.h"
 #include "htslib/sam.h"
+#include "utils/alignment_utils.h"
 #include "utils/sequence_utils.h"
 #include "utils/types.h"
 
@@ -13,6 +14,47 @@
 #include <vector>
 
 namespace dorado {
+
+namespace {
+
+// Calculate the edit distance for an alignment just within the region
+// which maps to the barcode sequence. i.e. Ignore any edits made to the
+// flanking regions.
+int calculate_edit_dist(const EdlibAlignResult& res, int flank_len, int query_len) {
+    int dist = 0;
+    int qpos = 0;
+    for (int i = 0; i < res.alignmentLength; i++) {
+        if (qpos < flank_len) {
+            if (res.alignment[i] == EDLIB_EDOP_MATCH) {
+                qpos++;
+            } else if (res.alignment[i] == EDLIB_EDOP_MISMATCH) {
+                qpos++;
+            } else if (res.alignment[i] == EDLIB_EDOP_DELETE) {
+            } else if (res.alignment[i] == EDLIB_EDOP_INSERT) {
+                qpos++;
+            }
+            //std::cerr << qpos << ", " << i << std::endl;
+        } else {
+            if (query_len == 0) {
+                break;
+            }
+            if (res.alignment[i] == EDLIB_EDOP_MATCH) {
+                query_len--;
+            } else if (res.alignment[i] == EDLIB_EDOP_MISMATCH) {
+                dist++;
+                query_len--;
+            } else if (res.alignment[i] == EDLIB_EDOP_DELETE) {
+                dist += 1;
+            } else if (res.alignment[i] == EDLIB_EDOP_INSERT) {
+                query_len--;
+                dist += 1;
+            }
+        }
+    }
+    return dist;
+}
+
+}  // namespace
 
 const std::string UNCLASSIFIED_BARCODE = "unclassified";
 
@@ -113,7 +155,10 @@ std::vector<AdapterSequence> Barcoder::generate_adapter_sequence(
             as.bottom_primer_rev = utils::reverse_complement(as.bottom_primer);
 
             as.top_primer_flank_len = kit_info.top_front_flank.length();
-            as.bottom_primer_flank_len = kit_info.bottom_front_flank.length();
+            as.bottom_primer_flank_len =
+                    (kit_info.ends_different ? kit_info.bottom_front_flank.length()
+                                             : as.top_primer_flank_len);
+            ;
 
             as.adapter_name = bc_name;
             as.kit = kit_name;
@@ -123,63 +168,113 @@ std::vector<AdapterSequence> Barcoder::generate_adapter_sequence(
     return adapters;
 }
 
-// Calculate a score for each barcode against the front and/or back "windows"
-// of a read. A window is a segment of 150bp at the beginning or end of a read.
-// The score returned is the edit distance to convert the adapter into the window.
+// Calculate barcode score for the following barcoding scenario:
+// 5' >-=====----------------=====-> 3'
+//      BCXX_1             RC(BCXX_2)
+//
+// 3' <-=====----------------=====-< 5'
+//    RC(BCXX_1)             BCXX_2
+//
+// In this scenario, the barcode (and its flanks) ligate to both ends
+// of the read. The adapter sequence is also different for top and bottom strands.
+// So we need to check bottom ends of the read. Since the adapters always ligate to
+// 5' end of the read, the 3' end of the other strand has the reverse complement
+// of that adapter sequence.
 ScoreResults Barcoder::calculate_adapter_score_different_double_ends(
         const std::string_view& read_seq,
         const AdapterSequence& as,
         bool with_flanks) {
     // This calculates the score for barcodes which ligate to both ends
     // of the strand.
-    std::string_view temp_top = read_seq.substr(0, 150);
-    std::string_view temp_bottom = read_seq.substr(std::max(0, (int)read_seq.length() - 150), 150);
+    std::string_view read_top = read_seq.substr(0, 150);
+    std::string_view read_bottom = read_seq.substr(std::max(0, (int)read_seq.length() - 150), 150);
 
     EdlibAlignConfig align_config = edlibDefaultAlignConfig();
     align_config.mode = EDLIB_MODE_HW;
     align_config.task = EDLIB_TASK_LOC;
 
-    std::string_view top_strand;
-    std::string_view bottom_strand;
+    // Track the score for each variant.
+    // v1 = BCXX_1 ---- RC(BCXX_2)
+    // v2 = BCXX_2 ---- RC(BCXX_1)
+    std::string_view top_strand_v1;
+    std::string_view bottom_strand_v1;
+    std::string_view top_strand_v2;
+    std::string_view bottom_strand_v2;
     if (with_flanks) {
-        top_strand = as.top_primer;
-        bottom_strand = as.bottom_primer_rev;
+        top_strand_v1 = as.top_primer;
+        bottom_strand_v1 = as.bottom_primer_rev;
+        top_strand_v2 = as.bottom_primer;
+        bottom_strand_v2 = as.top_primer_rev;
     } else {
-        top_strand = as.adapter;
-        bottom_strand = as.adapter_rev;
+        top_strand_v1 = as.adapter;
+        bottom_strand_v1 = as.adapter_rev;
+        top_strand_v2 = as.adapter;
+        bottom_strand_v2 = as.adapter_rev;
     }
 
-    // Calculate score for the raw barcode sequence (without flanks)
-    // against the front and back windows. Return the best match found.
-    EdlibAlignResult temp_top_strand = edlibAlign(top_strand.data(), top_strand.length(),
-                                                  temp_top.data(), temp_top.length(), align_config);
-    float top_match_factor = 1.f - (float)temp_top_strand.editDistance / top_strand.length();
+    // Score for each variant is the average edit distance score for the
+    // top and bottom windows.
+    ScoreResults v1;
+    EdlibAlignResult read_top_aln = edlibAlign(top_strand_v1.data(), top_strand_v1.length(),
+                                               read_top.data(), read_top.length(), align_config);
+    float top_match_factor = 1.f - (float)read_top_aln.editDistance / top_strand_v1.length();
+    v1.top_score = top_match_factor;
 
-    EdlibAlignResult comp_bottom_strand =
-            edlibAlign(bottom_strand.data(), bottom_strand.length(), temp_bottom.data(),
-                       temp_bottom.length(), align_config);
+    EdlibAlignResult read_bottom_aln =
+            edlibAlign(bottom_strand_v1.data(), bottom_strand_v1.length(), read_bottom.data(),
+                       read_bottom.length(), align_config);
     float bottom_match_factor =
-            1.f - (float)comp_bottom_strand.editDistance / bottom_strand.length();
+            1.f - (float)read_bottom_aln.editDistance / bottom_strand_v1.length();
+    v1.bottom_score = bottom_match_factor;
+    v1.score = 0.5f * (v1.top_score + v1.bottom_score);
 
-    return {0.5f * (top_match_factor + bottom_match_factor), as.adapter_name, as.kit};
+    ScoreResults v2;
+    EdlibAlignResult read_top_aln_v2 = edlibAlign(top_strand_v2.data(), top_strand_v2.length(),
+                                                  read_top.data(), read_top.length(), align_config);
+    float top_match_factor_v2 = 1.f - (float)read_top_aln_v2.editDistance / top_strand_v2.length();
+    v2.top_score = top_match_factor_v2;
+
+    EdlibAlignResult read_bottom_aln_v2 =
+            edlibAlign(bottom_strand_v2.data(), bottom_strand_v2.length(), read_bottom.data(),
+                       read_bottom.length(), align_config);
+    float bottom_match_factor_v2 =
+            1.f - (float)read_bottom_aln_v2.editDistance / bottom_strand_v2.length();
+    v2.bottom_score = bottom_match_factor_v2;
+    v2.score = 0.5f * (v2.top_score + v2.bottom_score);
+
+    // Final score is the minimum of the 2 variants.
+    ScoreResults res;
+    if (v1.score > v2.score) {
+        res = v1;
+    } else {
+        res = v2;
+    }
+    res.adapter_name = as.adapter_name;
+    res.kit = as.kit;
+    return res;
 }
 
-// Calculate a score for each barcode against the front and/or back "windows"
-// of a read. A window is a segment of 150bp at the beginning or end of a read.
-// The score returned is the edit distance to convert the adapter into the window.
+// Calculate barcode score for the following barcoding scenario:
+// 5' >-=====--------------=====-> 3'
+//      BCXXX            RC(BCXXX)
+//
+// 3' <-=====--------------=====-< 5'
+//    RC(BCXXX)           (BCXXX)
+//
+// In this scenario, the barcode (and its flanks) potentially ligate to both ends
+// of the read. But the adapter sequence is the same for both top and bottom strands.
+// So we need to check bottom ends of the read. However since adapter sequence is the
+// same for top and bottom strands, we simply need to look for the adapter and its
+// reverse complement sequence in the top/bottom windows.
 ScoreResults Barcoder::calculate_adapter_score_double_ends(const std::string_view& read_seq,
                                                            const AdapterSequence& as,
                                                            bool with_flanks) {
-    // This calculates the score for barcodes which ligate to both ends
-    // of the strand.
-    std::vector<EdlibAlignResult> results;
-
-    std::string_view temp_top = read_seq.substr(0, 150);
-    std::string_view temp_bottom = read_seq.substr(std::max(0, (int)read_seq.length() - 150), 150);
+    std::string_view read_top = read_seq.substr(0, 150);
+    std::string_view read_bottom = read_seq.substr(std::max(0, (int)read_seq.length() - 150), 150);
 
     EdlibAlignConfig align_config = edlibDefaultAlignConfig();
     align_config.mode = EDLIB_MODE_HW;
-    align_config.task = EDLIB_TASK_LOC;
+    align_config.task = (with_flanks ? EDLIB_TASK_PATH : EDLIB_TASK_PATH);
 
     std::string_view top_strand;
     std::string_view bottom_strand;
@@ -191,26 +286,60 @@ ScoreResults Barcoder::calculate_adapter_score_double_ends(const std::string_vie
         bottom_strand = as.adapter_rev;
     }
 
-    // Calculate score for the raw barcode sequence (without flanks)
-    // against the front and back windows. Return the best match found.
-    EdlibAlignResult temp_top_strand = edlibAlign(top_strand.data(), top_strand.length(),
-                                                  temp_top.data(), temp_top.length(), align_config);
-    results.push_back(temp_top_strand);
+    // Common score struct to track the score for both the top and bottom windows.
+    ScoreResults res;
+    res.adapter_name = as.adapter_name;
+    res.kit = as.kit;
 
-    EdlibAlignResult comp_bottom_strand =
-            edlibAlign(bottom_strand.data(), bottom_strand.length(), temp_bottom.data(),
-                       temp_bottom.length(), align_config);
-    results.push_back(comp_bottom_strand);
+    auto scorer = [&as, &align_config, &with_flanks](const std::string_view& primer,
+                                                     const std::string_view& read,
+                                                     int flank_len) -> std::pair<float, float> {
+        EdlibAlignResult aln = edlibAlign(primer.data(), primer.length(), read.data(),
+                                          read.length(), align_config);
+        float flank_score = -1.f;
+        int adapter_edit_dist = aln.editDistance;
+        spdlog::debug("{}: {}, {}", as.adapter_name, primer, read);
+        if (with_flanks) {
+            // Calculate edit distance of just the adapter portion without flanks.
+            int primer_edit_dist = adapter_edit_dist;
+            adapter_edit_dist = calculate_edit_dist(aln, flank_len, as.adapter.length());
+            spdlog::debug("Top Full flank dist {}, no flank dist {}", primer_edit_dist,
+                          adapter_edit_dist);
+            flank_score = 1.f - ((float)primer_edit_dist - adapter_edit_dist) /
+                                        (primer.length() - as.adapter.length());
+        } else {
+            spdlog::debug("Top No flank dist {}", adapter_edit_dist);
+        }
+        spdlog::debug("\n{}", utils::alignment_to_str(primer.data(), read.data(), aln));
+        float adapter_score = 1.f - (float)adapter_edit_dist / as.adapter.length();
+        return {adapter_score, flank_score};
+    };
 
-    auto best_res = std::min_element(
-            results.begin(), results.end(),
-            [](const auto& l, const auto& r) { return l.editDistance < r.editDistance; });
-    return {1.f - (float)best_res->editDistance / top_strand.length(), as.adapter_name, as.kit};
+    // Generate top window score.
+    std::tie(res.top_score, res.top_flank_score) =
+            scorer(top_strand, read_top, as.top_primer_flank_len);
+    // Generate top window score.
+    std::tie(res.bottom_score, res.bottom_flank_score) =
+            scorer(bottom_strand, read_bottom, as.bottom_primer_flank_len);
+
+    // Then choose the window with the best score.
+    if (res.top_score > res.bottom_score) {
+        res.score = res.top_score;
+        res.flank_score = res.top_flank_score;
+    } else {
+        res.score = res.bottom_score;
+        res.flank_score = res.bottom_flank_score;
+    }
+    return res;
 }
 
-// Calculate a score for each barcode against the front and/or back "windows"
-// of a read. A window is a segment of 150bp at the beginning or end of a read.
-// The score returned is the edit distance to convert the adapter into the window.
+// Calculate barcode score for the following barcoding scenario:
+// 5' >-=====---------------> 3'
+//      BCXXX
+//
+// In this scenario, the barcode (and its flanks) only ligate to the 5' end
+// of the read. So we only look for adapter sequence in the top "window" (first
+// 150bp) of the read.
 ScoreResults Barcoder::calculate_adapter_score(const std::string_view& read_seq,
                                                const AdapterSequence& as,
                                                bool with_flanks) {
@@ -231,8 +360,12 @@ ScoreResults Barcoder::calculate_adapter_score(const std::string_view& read_seq,
     // against the front and back windows. Return the best match found.
     EdlibAlignResult temp_top_strand = edlibAlign(top_strand.data(), top_strand.length(),
                                                   temp_top.data(), temp_top.length(), align_config);
-    return {1.f - (float)temp_top_strand.editDistance / top_strand.length(), as.adapter_name,
-            as.kit};
+    float score = 1.f - (float)temp_top_strand.editDistance / top_strand.length();
+    ScoreResults res;
+    res.score = score;
+    res.top_score = score;
+    res.bottom_score = score;
+    return res;
 }
 
 // Score every barcode against the input read and returns the best match,
@@ -259,55 +392,48 @@ ScoreResults Barcoder::find_best_adapter(const std::string& read_seq,
             }
         }
 
-        auto best_score =
-                std::max_element(scores.begin(), scores.end(),
-                                 [](const auto& l, const auto& r) { return l.score < r.score; });
-        auto count_min = std::count_if(scores.begin(), scores.end(), [best_score](const auto& l) {
-            return l.score == best_score->score;
-        });
-        if (best_score->score >= 0.75f && count_min == 1) {
-            return *best_score;
+        // Sore the scores windows by their adapter score.
+        std::sort(scores.begin(), scores.end(),
+                  [](const auto& l, const auto& r) { return l.score > r.score; });
+        auto best_score = scores.begin();
+        // At minimum, the best window must meet the adapter score threshold.
+        const float kThres = 0.78f;
+        if (best_score->score >= kThres) {
+            // If there's only one window and it meets the threshold, choose it.
+            if (scores.size() == 1) {
+                return *best_score;
+            } else {
+                // Choose the best if it's sufficiently better than the second best score.
+                auto second_best_score = std::next(scores.begin());
+                auto& best_kit = kit_info.at(best_score->kit);
+                auto& second_best_kit = kit_info.at(second_best_score->kit);
+                if (best_kit.double_ends && second_best_kit.double_ends && use_flank) {
+                    // If the best and 2nd best scores both are double ended adapters and
+                    // we have the flank scores, choose the best only it has better adapter
+                    // AND flank scores.
+                    if (best_score->flank_score >= second_best_score->flank_score) {
+                        spdlog::debug(
+                                "Use flank {}: Best score {} (flank {}) 2nd best score {} (flank "
+                                "{})",
+                                use_flank, best_score->score, best_score->flank_score,
+                                second_best_score->score, second_best_score->flank_score);
+                        return *best_score;
+                    }
+                } else {
+                    // Pick the best score only if it's better than the 2nd best score by a margin.
+                    const float kMargin = 0.1f;
+                    if (std::abs(best_score->score - second_best_score->score) >= kMargin) {
+                        spdlog::debug("Use flank {}: Best score {} 2nd best score {}", use_flank,
+                                      best_score->score, second_best_score->score);
+                        return *best_score;
+                    }
+                }
+            }
         }
     }
 
     // If nothing is found, report as unclassified.
-    return {-1.f, UNCLASSIFIED_BARCODE, UNCLASSIFIED_BARCODE};
-}
-
-// Calculate the edit distance for an alignment just within the region
-// which maps to the barcode sequence. i.e. Ignore any edits made to the
-// flanking regions.
-int calculate_edit_dist(const EdlibAlignResult& res, int flank_len, int query_len) {
-    int dist = 0;
-    int qpos = 0;
-    for (int i = 0; i < res.alignmentLength; i++) {
-        if (qpos < flank_len) {
-            if (res.alignment[i] == EDLIB_EDOP_MATCH) {
-                qpos++;
-            } else if (res.alignment[i] == EDLIB_EDOP_MISMATCH) {
-                qpos++;
-            } else if (res.alignment[i] == EDLIB_EDOP_DELETE) {
-            } else if (res.alignment[i] == EDLIB_EDOP_INSERT) {
-                qpos++;
-            }
-        } else {
-            if (query_len == 0) {
-                break;
-            }
-            if (res.alignment[i] == EDLIB_EDOP_MATCH) {
-                query_len--;
-            } else if (res.alignment[i] == EDLIB_EDOP_MISMATCH) {
-                dist++;
-                query_len--;
-            } else if (res.alignment[i] == EDLIB_EDOP_DELETE) {
-                dist += 1;
-            } else if (res.alignment[i] == EDLIB_EDOP_INSERT) {
-                dist += 1;
-                query_len--;
-            }
-        }
-    }
-    return dist;
+    return {-1.f, -1.f, -1.f, -1.f, -1.f, -1.f, UNCLASSIFIED_BARCODE, UNCLASSIFIED_BARCODE};
 }
 
 }  // namespace dorado

@@ -47,7 +47,7 @@ int barcoder(int argc, char* argv[]) {
             .scan<'i', int>();
     parser.add_argument("-n", "--max-reads")
             .help("maxium number of reads to process (for debugging).")
-            .default_value(1000000)
+            .default_value(10000000)
             .scan<'i', int>();
     parser.add_argument("--kit_name").help("kit name");
     parser.add_argument("-v", "--verbose").default_value(false).implicit_value(true);
