@@ -174,6 +174,21 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         )
         target_link_libraries(dorado_torch_lib PRIVATE
             ${TORCH_LIBRARIES}
+
+            # Note: the order of the cuDNN libs matter
+            # We aren't going to do any training, so these don't need to be whole-archived
+            ${TORCH_LIB}/lib/libcudnn_adv_train_static.a
+            ${TORCH_LIB}/lib/libcudnn_cnn_train_static.a
+            ${TORCH_LIB}/lib/libcudnn_ops_train_static.a
+            # I'm assuming we need this for https://github.com/pytorch/pytorch/issues/50153
+            -Wl,--whole-archive
+                # Note: libtorch is still setup to link to these dynamically (https://github.com/pytorch/pytorch/issues/81692)
+                # though that shouldn't be a problem on Linux
+                ${TORCH_LIB}/lib/libcudnn_adv_infer_static.a
+                ${TORCH_LIB}/lib/libcudnn_cnn_infer_static.a
+                ${TORCH_LIB}/lib/libcudnn_ops_infer_static.a
+            -Wl,--no-whole-archive
+
             # Some CUDA lib symbols have internal linkage, so they must be part of the helper lib too
             CUDA::culibos
             CUDA::cupti_static
@@ -187,10 +202,6 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
 
     # Add missing libs (these weren't set by Torch, even before the helper lib)
     list(APPEND TORCH_LIBRARIES
-        # Dynamic cuDNN is faster than static cuDNN.
-        # See https://github.com/pytorch/pytorch/issues/50153 and https://github.com/pytorch/pytorch/pull/87502.
-        # Note that linking to it statically requires some changes too: https://github.com/pytorch/pytorch/issues/81692.
-        /data/blawrence/work2/pytorch/cudnn-linux-x86_64-8.9.2.26_cuda11-archive/lib/libcudnn.so
         # Some of the CUDA libs have inter-dependencies, so group them together
         -Wl,--start-group
             CUDA::cudart_static
