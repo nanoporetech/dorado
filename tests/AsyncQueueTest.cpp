@@ -4,8 +4,10 @@
 
 #define TEST_GROUP "AsyncQueue "
 
+#include <algorithm>
 #include <atomic>
 #include <iostream>
+#include <numeric>
 #include <thread>
 
 TEST_CASE(TEST_GROUP ": InputsMatchOutputs") {
@@ -19,7 +21,8 @@ TEST_CASE(TEST_GROUP ": InputsMatchOutputs") {
     for (int i = 0; i < n; ++i) {
         int val = -1;
         const bool success = queue.try_pop(val);
-        REQUIRE(val == i);
+        REQUIRE(success);
+        CHECK(val == i);
     }
 }
 
@@ -27,7 +30,7 @@ TEST_CASE(TEST_GROUP ": PushFailsIfTerminating") {
     AsyncQueue<int> queue(1);
     queue.terminate();
     const bool success = queue.try_push(42);
-    REQUIRE(!success);
+    CHECK(!success);
 }
 
 TEST_CASE(TEST_GROUP ": PopFailsIfTerminating") {
@@ -35,7 +38,7 @@ TEST_CASE(TEST_GROUP ": PopFailsIfTerminating") {
     queue.terminate();
     int val;
     const bool success = queue.try_pop(val);
-    REQUIRE(!success);
+    CHECK(!success);
 }
 
 // Spawned thread sits waiting for an item.
@@ -62,7 +65,7 @@ TEST_CASE(TEST_GROUP ": PopFromOtherThread") {
     REQUIRE(success);
 
     popping_thread.join();
-    REQUIRE(try_pop_result);
+    CHECK(try_pop_result);
 }
 
 // Spawned thread sits waiting for an item.
@@ -89,5 +92,24 @@ TEST_CASE(TEST_GROUP ": TerminateFromOtherThread") {
     popping_thread.join();
 
     // This will fail, since the wait is terminated.
-    REQUIRE(!try_pop_result);
+    CHECK(!try_pop_result);
+}
+
+TEST_CASE(TEST_GROUP ": process_and_pop_all") {
+    const int n = 10;
+    AsyncQueue<int> queue(n);
+    for (int i = 0; i < n; ++i) {
+        const bool success = queue.try_push(std::move(i));
+        REQUIRE(success);
+    }
+
+    std::vector<int> popped_items;
+    const bool success = queue.process_and_pop_all(
+            [&popped_items](int popped) { popped_items.push_back(popped); });
+    REQUIRE(success);
+    std::vector<int> expected(n);
+    std::iota(expected.begin(), expected.end(), 0);
+    REQUIRE(popped_items.size() == expected.size());
+    CHECK(std::equal(popped_items.cbegin(), popped_items.cend(), expected.cbegin()));
+    CHECK(queue.size() == 0);
 }
