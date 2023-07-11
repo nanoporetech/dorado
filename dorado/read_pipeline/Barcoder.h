@@ -28,8 +28,10 @@ struct AdapterSequence {
     std::string top_primer_rev;
     std::string bottom_primer;
     std::string bottom_primer_rev;
-    int top_primer_flank_len;
-    int bottom_primer_flank_len;
+    int top_primer_front_flank_len;
+    int top_primer_rear_flank_len;
+    int bottom_primer_front_flank_len;
+    int bottom_primer_rear_flank_len;
     std::string adapter_name;
     std::string kit;
 };
