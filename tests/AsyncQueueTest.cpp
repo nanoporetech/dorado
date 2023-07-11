@@ -110,6 +110,6 @@ TEST_CASE(TEST_GROUP ": process_and_pop_all") {
     std::vector<int> expected(n);
     std::iota(expected.begin(), expected.end(), 0);
     REQUIRE(popped_items.size() == expected.size());
-    CHECK(std::equal(popped_items.cbegin(), popped_items.cend(), expected.cbegin()));
+    CHECK(popped_items == expected);
     CHECK(queue.size() == 0);
 }
