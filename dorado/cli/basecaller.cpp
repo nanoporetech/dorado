@@ -65,7 +65,7 @@ void setup(std::vector<std::string> args,
            const std::string& dump_stats_file,
            const std::string& dump_stats_filter,
            const std::string& resume_from_file,
-           argparse::ArgumentParser resume_parser) {
+           argparse::ArgumentParser& resume_parser) {
     torch::set_num_threads(1);
 
     // create modbase runners first so basecall runners can pick batch sizes based on available memory
