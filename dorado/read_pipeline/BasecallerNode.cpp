@@ -74,7 +74,7 @@ void BasecallerNode::input_worker_thread() {
             }
 
             for (auto &chunk : read_chunks) {
-                m_chunks_in->try_push(std::move(chunk));
+                m_chunks_in.try_push(std::move(chunk));
             }
 
             break;  // Go back to watching the input reads
@@ -82,7 +82,7 @@ void BasecallerNode::input_worker_thread() {
     }
 
     // Notify the basecaller threads that it is safe to gracefully terminate the basecaller
-    m_chunks_in->terminate();
+    m_chunks_in.terminate();
 }
 
 void BasecallerNode::basecall_current_batch(int worker_id) {
@@ -99,7 +99,7 @@ void BasecallerNode::basecall_current_batch(int worker_id) {
     }
 
     for (auto &complete_chunk : m_batched_chunks[worker_id]) {
-        m_processed_chunks->try_push(std::move(complete_chunk));
+        m_processed_chunks.try_push(std::move(complete_chunk));
     }
 
     m_batched_chunks[worker_id].clear();
@@ -108,7 +108,7 @@ void BasecallerNode::basecall_current_batch(int worker_id) {
 
 void BasecallerNode::working_reads_manager() {
     std::shared_ptr<Chunk> chunk;
-    while (m_processed_chunks->try_pop(chunk)) {
+    while (m_processed_chunks.try_pop(chunk)) {
         nvtx3::scoped_range loop{"working_reads_manager"};
 
         auto source_read = chunk->source_read.lock();
@@ -148,7 +148,7 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
     auto last_chunk_reserve_time = std::chrono::system_clock::now();
     int batch_size = m_model_runners[worker_id]->batch_size();
     std::shared_ptr<Chunk> chunk;
-    while (m_chunks_in->try_pop_until(
+    while (m_chunks_in.try_pop_until(
             chunk, last_chunk_reserve_time + std::chrono::milliseconds(m_batch_timeout_ms))) {
         // If chunk is empty, then try_pop timed out without getting a new chunk.
         if (!chunk) {
@@ -221,9 +221,24 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
         for (auto &runner : m_model_runners) {
             runner->terminate();
         }
-        m_processed_chunks->terminate();
+        m_processed_chunks.terminate();
     }
 }
+
+namespace {
+
+// Calculates the input queue size.
+size_t CalcMaxChunksIn(const std::vector<Runner> &model_runners) {
+    // Allow 5 batches per model runner on the chunks_in queue
+    size_t max_chunks_in = 0;
+    // Allows optimal batch size to be used for every GPU
+    for (auto &runner : model_runners) {
+        max_chunks_in += runner->batch_size() * 5;
+    }
+    return max_chunks_in;
+}
+
+}  // namespace
 
 BasecallerNode::BasecallerNode(std::vector<Runner> model_runners,
                                size_t overlap,
@@ -243,21 +258,14 @@ BasecallerNode::BasecallerNode(std::vector<Runner> model_runners,
           m_max_reads(max_reads),
           m_in_duplex_pipeline(in_duplex_pipeline),
           m_mean_qscore_start_pos(read_mean_qscore_start_pos),
+          m_chunks_in(CalcMaxChunksIn(m_model_runners)),
+          m_processed_chunks(CalcMaxChunksIn(m_model_runners)),
           m_node_name(node_name) {
     // Setup worker state
-    size_t const num_workers = m_model_runners.size();
+    const size_t num_workers = m_model_runners.size();
     m_batched_chunks.resize(num_workers);
     m_basecall_workers.resize(num_workers);
     m_num_active_model_runners = num_workers;
-
-    // Allow 5 batches per model runner on the chunks_in queue
-    size_t max_chunks_in = 0;
-    // Allows optimal batch size to be used for every GPU
-    for (auto &runner : m_model_runners) {
-        max_chunks_in += runner->batch_size() * 5;
-    }
-    m_chunks_in = std::make_unique<AsyncQueue<std::shared_ptr<Chunk>>>(max_chunks_in);
-    m_processed_chunks = std::make_unique<AsyncQueue<std::shared_ptr<Chunk>>>(max_chunks_in);
 
     initialization_time = std::chrono::system_clock::now();
 
