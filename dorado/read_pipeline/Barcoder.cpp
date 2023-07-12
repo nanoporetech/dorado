@@ -237,6 +237,7 @@ ScoreResults Barcoder::calculate_adapter_score_different_double_ends(
         }
         spdlog::debug("\n{}", utils::alignment_to_str(primer.data(), read.data(), aln));
         float adapter_score = 1.f - (float)adapter_edit_dist / as.adapter.length();
+        edlibFreeAlignResult(aln);
         return {adapter_score, flank_score};
     };
 
@@ -327,6 +328,7 @@ ScoreResults Barcoder::calculate_adapter_score_double_ends(const std::string_vie
         }
         spdlog::debug("\n{}", utils::alignment_to_str(primer.data(), read.data(), aln));
         float adapter_score = 1.f - (float)adapter_edit_dist / as.adapter.length();
+        edlibFreeAlignResult(aln);
         return {adapter_score, flank_score};
     };
 
@@ -385,6 +387,7 @@ ScoreResults Barcoder::calculate_adapter_score(const std::string_view& read_seq,
         }
         spdlog::debug("\n{}", utils::alignment_to_str(primer.data(), read.data(), aln));
         float adapter_score = 1.f - (float)adapter_edit_dist / as.adapter.length();
+        edlibFreeAlignResult(aln);
         return {adapter_score, flank_score};
     };
 
