@@ -13,7 +13,11 @@ public:
     StereoDuplexEncoderNode(int input_signal_stride);
 
     std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> template_read,
-                                                std::shared_ptr<dorado::Read> complement_read);
+                                                std::shared_ptr<dorado::Read> complement_read,
+                                                uint32_t temp_start,
+                                                uint32_t temp_end,
+                                                uint32_t comp_start,
+                                                uint32_t comp_end);
 
     ~StereoDuplexEncoderNode() { terminate_impl(); };
     std::string get_name() const override { return "StereoDuplexEncoderNode"; }

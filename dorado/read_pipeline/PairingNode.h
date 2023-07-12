@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ReadPipeline.h"
+#include "minimap.h"
 #include "utils/stats.h"
 #include "utils/types.h"
 
@@ -61,7 +62,7 @@ private:
      * with the reads immediately before and after it in the list. If the list of reads for a pore has reached its maximum 
      * size (m_max_num_reads), the oldest read is removed from the list.
      */
-    void pair_generating_worker_thread();
+    void pair_generating_worker_thread(int tid);
 
     std::vector<std::unique_ptr<std::thread>> m_workers;
     int m_num_worker_threads = 0;
@@ -100,6 +101,13 @@ private:
      * It ensures that the memory usage is controlled, while the reads needed for pairing are available.    
      */
     size_t m_max_num_reads;
+
+    std::tuple<bool, uint32_t, uint32_t, uint32_t, uint32_t> is_within_time_and_length_criteria(
+            const std::shared_ptr<dorado::Read>& read1,
+            const std::shared_ptr<dorado::Read>& read2,
+            int tid);
+
+    std::vector<mm_tbuf_t*> m_tbufs;
 };
 
 }  // namespace dorado

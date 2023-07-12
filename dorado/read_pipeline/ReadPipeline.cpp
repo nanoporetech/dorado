@@ -386,6 +386,7 @@ stats::NamedStats Pipeline::terminate(const FlushOptions &flush_options) {
     for (auto handle : m_source_to_sink_order) {
         auto &node = m_nodes.at(handle);
         node->terminate(flush_options);
+        spdlog::info(">>>> Terminate {}", node->get_name());
         auto node_stats = node->sample_stats();
         const auto node_name = node->get_name();
         for (const auto &[name, value] : node_stats) {

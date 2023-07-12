@@ -52,8 +52,6 @@ void SubreadTaggerNode::worker_thread() {
                     m_subread_groups.erase(read->read_tag);
                 }
             }
-        } else if (std::holds_alternative<CandidatePairRejectedMessage>(message)) {
-            check_complete_groups = true;
         } else {
             spdlog::warn("SubreadTaggerNode received unexpected message type: {}.",
                          message.index());

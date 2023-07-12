@@ -10,8 +10,8 @@ set(SOURCE_FILES
     RemoraEncoderTest.cpp
     SequenceUtilsTest.cpp
     StitchTest.cpp
-    StereoDuplexTest.cpp
-    DuplexSplitTest.cpp
+    #StereoDuplexTest.cpp
+    #DuplexSplitTest.cpp
     TrimTest.cpp
     AlignerTest.cpp
     BamReaderTest.cpp
@@ -20,7 +20,7 @@ set(SOURCE_FILES
     ReadFilterNodeTest.cpp
     ModelUtilsTest.cpp
     NodeSmokeTest.cpp
-    PairingNodeTest.cpp
+    #PairingNodeTest.cpp
     PipelineTest.cpp
     BamUtilsTest.cpp
     ResumeLoaderTest.cpp

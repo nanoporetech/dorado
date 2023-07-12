@@ -29,6 +29,7 @@ void BasecallerNode::input_worker_thread() {
             continue;
         }
 
+        //spdlog::info("{} queue {}", get_name(), m_work_queue.size());
         // If this message isn't a read, we'll get a bad_variant_access exception.
         auto read = std::get<std::shared_ptr<Read>>(message);
         // If a read has already been basecalled, just send it to the sink without basecalling again
@@ -135,6 +136,10 @@ void BasecallerNode::working_reads_manager() {
                     throw std::runtime_error("Expected to find read id " + source_read->read_id +
                                              " in working reads cache but it doesn't exist.");
                 }
+            }
+            if (m_node_name == "StereoBasecallerNode") {
+                spdlog::debug("Duplex read {} size {}", found_read->read_id,
+                              found_read->seq.length());
             }
             send_message_to_sink(std::move(found_read));
         }
