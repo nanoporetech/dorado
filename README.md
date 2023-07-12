@@ -120,7 +120,7 @@ $ dorado basecaller <model> <reads> --reference <index>
 
 Alignment uses [minimap2](https://github.com/lh3/minimap2) and by default uses the `map-ont` preset. This can be overridden with the `-k` and `-w` options to set kmer and window size respectively.
 
-### Summary
+### Sequencing Summary
 
 The `dorado summary` command outputs a tab-separated file with read level sequencing information from the BAM file generated during basecalling. To create a summary, run:
 
@@ -128,7 +128,7 @@ The `dorado summary` command outputs a tab-separated file with read level sequen
 $ dorado summary <bam>
 ```
 
-Note that summary generation is only available for reads basecalled from pod5s. fast5 based basecalls are not compatible with the summary command.
+Note that summary generation is only available for reads basecalled from POD5 files. Reads basecalled from .fast5 files are not compatible with the summary command.
 
 ## Available basecalling models
 
