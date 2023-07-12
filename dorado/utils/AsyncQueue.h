@@ -145,9 +145,10 @@ public:
             ++m_num_pops;
         }
 
-        // Inform a waiting thread that the queue is not full.
+        // Inform all waiting threads that the queue is not full, since in general
+        // we have removed > 1 item and there can be > 1 thread waiting to push.
         lock.unlock();
-        m_not_full_cv.notify_one();
+        m_not_full_cv.notify_all();
 
         return true;
     }
