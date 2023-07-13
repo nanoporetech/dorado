@@ -17,6 +17,7 @@ public:
     SubreadTaggerNode(int num_worker_threads = 1, size_t max_reads = 1000);
     ~SubreadTaggerNode() { terminate_impl(); }
     void terminate() override { terminate_impl(); }
+    void restart() override;
 
 private:
     void start_threads();

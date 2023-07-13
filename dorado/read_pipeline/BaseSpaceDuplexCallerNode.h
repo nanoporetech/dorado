@@ -19,6 +19,7 @@ public:
     ~BaseSpaceDuplexCallerNode() { terminate_impl(); }
     std::string get_name() const override { return "BaseSpaceDuplexCallerNode"; }
     void terminate() override { terminate_impl(); }
+    void restart() override;
 
 private:
     void start_threads();

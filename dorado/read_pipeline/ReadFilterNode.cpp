@@ -57,6 +57,11 @@ void ReadFilterNode::terminate_impl() {
     m_workers.clear();
 }
 
+void ReadFilterNode::restart() {
+    restart_input_queue();
+    start_threads();
+}
+
 stats::NamedStats ReadFilterNode::sample_stats() const {
     stats::NamedStats stats = stats::from_obj(m_work_queue);
     stats["reads_filtered"] = m_num_reads_filtered;

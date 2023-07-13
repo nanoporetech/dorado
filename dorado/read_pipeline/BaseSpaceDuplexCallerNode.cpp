@@ -201,4 +201,9 @@ void BaseSpaceDuplexCallerNode::terminate_impl() {
     m_worker_thread.reset();
 }
 
+void BaseSpaceDuplexCallerNode::restart() {
+    restart_input_queue();
+    start_threads();
+}
+
 }  // namespace dorado

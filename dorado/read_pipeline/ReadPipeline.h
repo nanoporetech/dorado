@@ -182,11 +182,14 @@ public:
 
     // Restarts the node following a terminate call.
     // Has no effect if terminate has not been called.
-    //virtual void restart() = 0;
+    virtual void restart() = 0;
 
 protected:
     // Terminates waits on the input queue.
     void terminate_input_queue() { m_work_queue.terminate(); }
+
+    // Allows inputs again.
+    void restart_input_queue() { m_work_queue.restart(); }
 
     // Sends message to the designated sink.
     void send_message_to_sink(int sink_index, Message&& message);

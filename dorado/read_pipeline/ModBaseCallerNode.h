@@ -32,6 +32,7 @@ public:
     std::string get_name() const override { return "ModBaseCallerNode"; }
     stats::NamedStats sample_stats() const override;
     void terminate() override { terminate_impl(); }
+    void restart() override;
 
     struct Info {
         std::string long_names;
@@ -96,7 +97,6 @@ private:
     std::atomic<int> m_num_active_input_workers{0};
 
     std::atomic<bool> m_terminate_runners{false};
-    std::atomic<bool> m_terminate_output{false};
 
     std::shared_ptr<const utils::BaseModInfo> m_base_mod_info;
     // The offsets to the canonical bases in the modbase alphabet

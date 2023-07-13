@@ -306,6 +306,13 @@ void BasecallerNode::terminate_impl() {
     termination_time = std::chrono::system_clock::now();
 }
 
+void BasecallerNode::restart() {
+    restart_input_queue();
+    m_chunks_in.restart();
+    m_processed_chunks.restart();
+    start_threads();
+}
+
 stats::NamedStats BasecallerNode::sample_stats() const {
     stats::NamedStats stats = stats::from_obj(m_work_queue);
     for (const auto &runner : m_model_runners) {

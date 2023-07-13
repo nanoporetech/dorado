@@ -32,4 +32,9 @@ void NullNode::terminate_impl() {
     m_workers.clear();
 }
 
+void NullNode::restart() {
+    restart_input_queue();
+    start_threads();
+}
+
 }  // namespace dorado

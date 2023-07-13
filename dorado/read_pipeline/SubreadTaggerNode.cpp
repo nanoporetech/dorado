@@ -109,7 +109,7 @@ SubreadTaggerNode::SubreadTaggerNode(int num_worker_threads, size_t max_reads)
 }
 
 void SubreadTaggerNode::start_threads() {
-    for (int i = 0; i < m_num_worker_threads; i++) {
+    for (int i = 0; i < m_num_worker_threads; ++i) {
         auto worker_thread = std::make_unique<std::thread>(&SubreadTaggerNode::worker_thread, this);
         m_worker_threads.push_back(std::move(worker_thread));
     }
@@ -125,6 +125,11 @@ void SubreadTaggerNode::terminate_impl() {
         }
     }
     m_worker_threads.clear();
+}
+
+void SubreadTaggerNode::restart() {
+    restart_input_queue();
+    start_threads();
 }
 
 }  // namespace dorado

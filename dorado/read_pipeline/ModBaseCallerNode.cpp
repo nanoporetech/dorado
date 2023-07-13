@@ -77,6 +77,13 @@ void ModBaseCallerNode::terminate_impl() {
     m_output_worker.reset();
 }
 
+void ModBaseCallerNode::restart() {
+    restart_input_queue();
+    m_terminate_runners.store(false);
+    m_processed_chunks.restart();
+    start_threads();
+}
+
 [[maybe_unused]] ModBaseCallerNode::Info ModBaseCallerNode::get_modbase_info_and_maybe_init(
         std::vector<std::reference_wrapper<ModBaseParams const>> const& base_mod_params,
         ModBaseCallerNode* node) {

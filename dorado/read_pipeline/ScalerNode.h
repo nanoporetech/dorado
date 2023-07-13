@@ -22,6 +22,7 @@ public:
     std::string get_name() const override { return "ScalerNode"; }
     stats::NamedStats sample_stats() const override;
     void terminate() override { terminate_impl(); }
+    void restart() override;
 
 private:
     void start_threads();

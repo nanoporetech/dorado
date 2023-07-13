@@ -202,6 +202,7 @@ PairingNode::PairingNode(ReadOrder read_order, int num_worker_threads, size_t ma
         throw std::runtime_error("Unsupported read order detected: " +
                                  dorado::to_string(read_order));
     }
+    start_threads();
 }
 
 void PairingNode::start_threads() {
@@ -219,6 +220,11 @@ void PairingNode::terminate_impl() {
         }
     }
     m_workers.clear();
+}
+
+void PairingNode::restart() {
+    restart_input_queue();
+    start_threads();
 }
 
 stats::NamedStats PairingNode::sample_stats() const {

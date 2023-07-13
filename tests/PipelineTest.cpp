@@ -99,6 +99,7 @@ TEST_CASE("LinearDestructionOrder", TEST_GROUP) {
         ~OrderTestNode() { m_destruction_order.push_back(m_index); }
         std::string get_name() const override { return "OrderTestNode"; }
         void terminate() override {}
+        void restart() override {}
 
     private:
         std::vector<int>& m_destruction_order;

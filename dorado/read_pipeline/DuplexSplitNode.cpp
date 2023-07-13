@@ -586,6 +586,11 @@ void DuplexSplitNode::terminate_impl() {
     m_worker_threads.clear();
 }
 
+void DuplexSplitNode::restart() {
+    restart_input_queue();
+    start_threads();
+}
+
 stats::NamedStats DuplexSplitNode::sample_stats() const { return stats::from_obj(m_work_queue); }
 
 }  // namespace dorado

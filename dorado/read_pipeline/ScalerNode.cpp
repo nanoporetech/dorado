@@ -100,6 +100,11 @@ void ScalerNode::terminate_impl() {
     m_worker_threads.clear();
 }
 
+void ScalerNode::restart() {
+    restart_input_queue();
+    start_threads();
+}
+
 stats::NamedStats ScalerNode::sample_stats() const { return stats::from_obj(m_work_queue); }
 
 }  // namespace dorado

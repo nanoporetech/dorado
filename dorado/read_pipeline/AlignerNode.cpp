@@ -90,6 +90,11 @@ void Aligner::terminate_impl() {
     m_workers.clear();
 }
 
+void Aligner::restart() {
+    restart_input_queue();
+    start_threads();
+}
+
 Aligner::~Aligner() {
     terminate_impl();
     for (int i = 0; i < m_threads; i++) {

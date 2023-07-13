@@ -21,6 +21,7 @@ public:
     std::string get_name() const override { return "Aligner"; }
     stats::NamedStats sample_stats() const override;
     void terminate() override { terminate_impl(); }
+    void restart() override;
 
     using bam_header_sq_t = std::vector<std::pair<char*, uint32_t>>;
     bam_header_sq_t get_sequence_records_for_header() const;

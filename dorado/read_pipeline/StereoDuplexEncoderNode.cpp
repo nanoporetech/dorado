@@ -332,6 +332,11 @@ void StereoDuplexEncoderNode::terminate_impl() {
     m_worker_threads.clear();
 }
 
+void StereoDuplexEncoderNode::restart() {
+    restart_input_queue();
+    start_threads();
+}
+
 stats::NamedStats StereoDuplexEncoderNode::sample_stats() const {
     stats::NamedStats stats = m_work_queue.sample_stats();
     stats["discarded_pairs"] = m_num_discarded_pairs;

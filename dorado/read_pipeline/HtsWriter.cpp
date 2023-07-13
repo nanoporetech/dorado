@@ -58,6 +58,11 @@ void HtsWriter::terminate_impl() {
     m_worker.reset();
 }
 
+void HtsWriter::restart() {
+    restart_input_queue();
+    start_threads();
+}
+
 HtsWriter::~HtsWriter() {
     terminate_impl();
     sam_hdr_destroy(m_header);

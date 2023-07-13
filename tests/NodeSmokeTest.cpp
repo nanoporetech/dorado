@@ -66,33 +66,10 @@ private:
     ReadMutator m_read_mutator;
 
 protected:
-    void set_num_reads(std::size_t num_reads) {
-        //REQUIRE_FALSE(m_sink);
-        m_num_reads = num_reads;
-    }
+    void set_num_reads(std::size_t num_reads) { m_num_reads = num_reads; }
 
     void set_read_mutator(ReadMutator mutator) { m_read_mutator = std::move(mutator); }
 
-    /*Sink& get_sink() {
-        REQUIRE_FALSE(m_sink);
-        m_sink = std::make_unique<Sink>(m_num_reads / 3);
-        return *m_sink;
-    }
-
-    template <typename Node>
-    void run_smoke_test(Node& node) {
-        // Throw some reads at it
-        for (std::size_t i = 0; i < m_num_reads; i++) {
-            auto read = make_test_read("read_" + std::to_string(i));
-            if (m_read_mutator) {
-                m_read_mutator(read);
-            }
-            node.push_message(std::move(read));
-        }
-
-        // Wait for them to complete
-        m_sink->wait_for_messages(m_num_reads);
-    }*/
     template <class NodeType, class... Args>
     void run_smoke_test(Args&&... args) {
         dorado::PipelineDescriptor pipeline_desc;
