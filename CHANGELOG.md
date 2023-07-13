@@ -5,11 +5,16 @@ All notable changes to Dorado will be documented in this file.
 
 # [0.3.2] (13 Jul 2023)
 
+This release of Dorado introduces basecalilng models for the RNA004 chemistry, better identification of duplex read pairs and improved read Q score estimation. It also incorporates various important bug fixes which improve the stability and usability of Dorado.
+
+ * - Add RNA004 models
+ * - Add troubleshooting guide to README.md
+ * 9d55b446bce88e22de3584ad6c106cdfa5f7abb4 - Fix bug with resume file header parsing
  * f9289e2f5c93641bfc2d2e753e5d612c87f7b34e - Improvements to duplex read splitting algorithm for improved accuracy
  * 2869dbc52326d148f9562686d8d89a6dc373072a - Solve memory leak during modified base calling
  * 4d8ca172128cb4854e39599077d7c477eeb02504 - Fix race condition which was introducing nondeterministic basecalls
  * ddb6f711bf22c3b1f14690a85e6980e4e39a6c9f - Fix aligner regressions from pipeline change
- * a57987f2fef3cdb17f1a92e76dbf3110e9adf5bd - Add R941 v3.3 5m cg 5hm cg models
+ * a57987f2fef3cdb17f1a92e76dbf3110e9adf5bd - Add R941 v3.3 5mCG 5hmCG models
  * ba40e53e697bfcfd33beeaa44583a8cc56ca8976 - Refactor of basecalling pipeline management strategy
  * 26be1a017baf7131a82271ebb624a484135d29ba - Query enabled Apple silicon cores, not all cores
  * 185058ef226d508e2ead05659149514530e90adb - Replace empty value with "Unknown" in read group tags to satisfy SAM specification
@@ -22,7 +27,7 @@ All notable changes to Dorado will be documented in this file.
  * 7e70de7197ffc09586fe6f097f9b25c30dc17802 - Add support for compute 6.1 (GTX 1080 Ti) plus handling CUDA failures
  * 995d0fb60c2ce3209e45c3645d59012326ce515d - Runner creation refactor
  * 9d21036b309e4dde1125ccddae382a5f1729f725 - Modbase smoke test BLAS fix
- * 30658c4d7b0823bd8924257aac5a09d3f1f96b22 - `Add ScopedAutoReleasePool` to prevent autorelease leaks on MacOS
+ * 30658c4d7b0823bd8924257aac5a09d3f1f96b22 - Add `ScopedAutoReleasePool` to prevent autorelease leaks on MacOS
  * cf502e3c67809b263e9d7645608e67643f90769e - Update sample rate check to allow some tolerance
 
 # [0.3.1] (26 Jun 2023)
