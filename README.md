@@ -283,10 +283,10 @@ $ pre-commit install
 
 Dorado comes equipped with the necessary CUDA libraries for its execution. However, on some operating systems, the system libraries might be chosen over Dorado's. This discrepancy can result in various errors, for instance, the `CuBLAS error 8`.
 
-To resolve this issue, you need to set the `LD_LIBRARY_PATH` to point to Dorado's libraries. Use the following command:
+To resolve this issue, you need to set the `LD_LIBRARY_PATH` to point to Dorado's libraries. Use a command like the following (change path as appropriate):
 
 ```
-$ export LD_LIBRARY_PATH=<PATH_TO_DORADO>/dorado0.x.x/dorado-0.x.x-linux-x64/lib:$LD_LIBRARY_PATH
+$ export LD_LIBRARY_PATH=<PATH_TO_DORADO>/dorado-0.3.2-linux-x64/lib:$LD_LIBRARY_PATH
 ```
 
 ### GPU Out of Memory Errors
