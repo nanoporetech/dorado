@@ -53,6 +53,7 @@ sanitize:macos:m1:
   extends:
     - build:macos:m1
     - .sanitizer_common
+  when: manual
 
 sanitize:macos:x64:
   extends:

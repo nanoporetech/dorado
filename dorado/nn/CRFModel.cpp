@@ -769,6 +769,15 @@ struct CRFModelImpl : Module {
             // Output is [T, N, C], which CPU decoding requires.
             return encoder->forward(x).transpose(0, 1);
         }
+#if DORADO_GPU_BUILD && !defined(__APPLE__)
+        try {
+            // Output is [N, T, C]
+            return encoder->forward(x);
+        } catch (c10::Error &e) {
+            spdlog::warn("Caught Torch error '{}', clearing CUDA cache and retrying.", e.msg());
+            c10::cuda::CUDACachingAllocator::emptyCache();
+        }
+#endif
         // Output is [N, T, C]
         return encoder->forward(x);
     }

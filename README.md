@@ -176,6 +176,9 @@ The following simplex models are also available:
 * rna002_70bps_fast@v3
 * rna002_70bps_hac@v3
 * rna003_120bps_sup@v3
+* rna004_130bps_fast@v3
+* rna004_130bps_hac@v3
+* rna004_130bps_sup@v3
 
 ### **Modified base models**
 
@@ -276,6 +279,47 @@ The project uses pre-commit to ensure code is consistently formatted; you can se
 $ pip install pre-commit
 $ pre-commit install
 ```
+
+## Troubleshooting Guide
+
+### Library Path Errors
+
+Dorado comes equipped with the necessary libraries (such as CUDA) for its execution. However, on some operating systems, the system libraries might be chosen over Dorado's. This discrepancy can result in various errors, for instance,  `CuBLAS error 8`.
+
+To resolve this issue, you need to set the `LD_LIBRARY_PATH` to point to Dorado's libraries. Use a command like the following on Linux (change path as appropriate):
+
+```
+$ export LD_LIBRARY_PATH=<PATH_TO_DORADO>/dorado-0.3.2-linux-x64/lib:$LD_LIBRARY_PATH
+```
+
+on MacOS, the equivalent export would be:
+
+```
+export DYLD_LIBRARY_PATH=<path_to_dorado_lib>:$DYLD_LIBRARY_PATH
+```
+
+This will let the Dorado binary pick up the shipped libraries and not require manual installation of zstd, etc
+
+### GPU Out of Memory Errors
+
+Dorado operates on a broad range of GPUs but it is primarily developed for Nvidia A100/H100 and Apple Silicon. Dorado attempts to find the optimal batch size for basecalling. Nevertheless, on some low-RAM GPUs, users may face out of memory crashes.
+
+A potential solution to this issue could be setting a manual batch size using the following command:
+
+`dorado basecaller --batchsize 64 ...`
+
+To determine the batch size picked by `dorado`, run it in verbose mode by adding the `-v` option.
+
+**Note:** Reducing memory consumption by modifying the `chunksize` parameter is not recommended as it influences the basecalling results.
+
+### Low GPU Utilization
+
+Low GPU utilization can lead to reduced basecalling speed. This problem can be identified using tools such as `nvidia-smi` and `nvtop`. Low GPU utilization often stems from I/O bottlenecks in basecalling. Here are a few steps you can take to improve the situation:
+
+1. Opt for POD5 instead of FAST5: POD5 has superior I/O performance and will enhance the basecall speed in I/O constrained environments.
+2. Transfer data to the local disk before basecalling: Slow basecalling often occurs because network disks cannot supply Dorado with adequate speed. To mitigate this, make sure your data is as close to your host machine as possible.
+3. Choose SSD over HDD: Particularly for duplex basecalling, using a local SSD can offer significant speed advantages. This is due to the duplex basecalling algorithm's reliance on heavy random access of data.
+
 
 ## Licence and Copyright
 
