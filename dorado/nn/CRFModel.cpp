@@ -769,8 +769,20 @@ struct CRFModelImpl : Module {
             // Output is [T, N, C], which CPU decoding requires.
             return encoder->forward(x).transpose(0, 1);
         }
+#if DORADO_GPU_BUILD && !defined(__APPLE__)
+        try {
+            // Output is [N, T, C]
+            return encoder->forward(x);
+        } catch (c10::OutOfMemoryError &e) {
+            spdlog::warn("Caught CUDA out of memory error, clearing cache and retrying.");
+            c10::cuda::CUDACachingAllocator::emptyCache();
+            // Output is [N, T, C]
+            return encoder->forward(x);
+        }
+#else
         // Output is [N, T, C]
         return encoder->forward(x);
+#endif
     }
 
     LSTMStackType rnns{nullptr};
