@@ -176,6 +176,9 @@ The following simplex models are also available:
 * rna002_70bps_fast@v3
 * rna002_70bps_hac@v3
 * rna003_120bps_sup@v3
+* rna004_120bps_fast@v3
+* rna004_120bps_hac@v3
+* rna004_120bps_sup@v3
 
 ### **Modified base models**
 

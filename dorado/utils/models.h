@@ -61,6 +61,10 @@ static const std::vector<std::string> models = {
         // RNA003
         "rna003_120bps_sup@v3",
 
+        // RNA004
+        "rna004_120bps_fast@v3",
+        "rna004_120bps_hac@v3",
+        "rna004_120bps_sup@v3",
 };
 
 }  // namespace simplex
