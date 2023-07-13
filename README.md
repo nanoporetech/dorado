@@ -17,10 +17,10 @@ If you encounter any problems building or running Dorado, please [report an issu
 
 ## Installation
 
- - [dorado-0.3.1-linux-x64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.3.1-linux-x64.tar.gz)
- - [dorado-0.3.1-linux-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.3.1-linux-arm64.tar.gz)
- - [dorado-0.3.1-osx-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.3.1-osx-arm64.tar.gz)
- - [dorado-0.3.1-win64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.3.1-win64.zip)
+ - [dorado-0.3.2-linux-x64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.3.2-linux-x64.tar.gz)
+ - [dorado-0.3.2-linux-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.3.2-linux-arm64.tar.gz)
+ - [dorado-0.3.2-osx-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.3.2-osx-arm64.tar.gz)
+ - [dorado-0.3.2-win64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.3.2-win64.zip)
 
 ## Platforms
 
@@ -269,7 +269,7 @@ $ pre-commit install
 
 ## Licence and Copyright
 
-(c) 2022 Oxford Nanopore Technologies PLC.
+(c) 2023 Oxford Nanopore Technologies PLC.
 
 Dorado is distributed under the terms of the Oxford Nanopore
 Technologies PLC.  Public License, v. 1.0.  If a copy of the License
