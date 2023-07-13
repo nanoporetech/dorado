@@ -55,14 +55,19 @@ public:
             m_module->forward(input);
             torch::cuda::synchronize(m_options.device().index());
         }
+        start_threads();
+    }
 
+    void start_threads() {
         m_cuda_thread.reset(new std::thread(&CudaCaller::cuda_thread_fn, this));
     }
 
     ~CudaCaller() {
         m_terminate.store(true);
         m_input_cv.notify_one();
-        m_cuda_thread->join();
+        if (m_cuda_thread && m_cuda_thread->joinable()) {
+            m_cuda_thread->join();
+        }
     }
 
     static int get_batch_size_granularity(const CRFModelConfig &model_config,
@@ -155,7 +160,23 @@ public:
             task->cv.notify_one();
         }
     }
-    void terminate() { m_terminate.store(true); }
+
+    void terminate() {
+        m_terminate.store(true);
+        m_input_cv.notify_one();
+        if (m_cuda_thread && m_cuda_thread->joinable()) {
+            m_cuda_thread->join();
+        }
+        m_cuda_thread.reset();
+    }
+
+    void restart() {
+        // This can be called more than one, via multiple runners.
+        if (m_terminate.load()) {
+            m_terminate.store(false);
+            start_threads();
+        }
+    }
 
     std::string get_name() const { return std::string("CudaCaller_") + m_device; }
 
@@ -224,6 +245,7 @@ size_t CudaModelRunner::model_stride() const { return m_caller->m_model_stride; 
 size_t CudaModelRunner::chunk_size() const { return m_input.size(2); }
 size_t CudaModelRunner::batch_size() const { return m_input.size(0); }
 void CudaModelRunner::terminate() { m_caller->terminate(); }
+void CudaModelRunner::restart() { m_caller->restart(); }
 
 std::string CudaModelRunner::get_name() const {
     // The name must be unique across multiple instances.

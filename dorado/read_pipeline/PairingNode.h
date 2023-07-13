@@ -7,6 +7,7 @@
 #include <atomic>
 #include <deque>
 #include <map>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -57,7 +58,8 @@ private:
     using UniquePoreIdentifierKey = std::tuple<int, int, std::string, std::string, int32_t>;
 
     std::vector<std::unique_ptr<std::thread>> m_workers;
-    std::atomic<int> m_num_worker_threads;
+    int m_num_worker_threads = 0;
+    std::atomic<int> m_num_active_worker_threads = 0;
     std::atomic<bool> m_preserve_cache_during_flush = false;
 
     // Members for pair_list method

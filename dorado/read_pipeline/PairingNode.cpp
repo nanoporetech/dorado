@@ -1,4 +1,9 @@
 #include "PairingNode.h"
+
+#include <algorithm>
+#include <cstdint>
+#include <limits>
+
 namespace {
 bool is_within_time_and_length_criteria(const std::shared_ptr<dorado::Read>& read1,
                                         const std::shared_ptr<dorado::Read>& read2) {
@@ -79,7 +84,7 @@ void PairingNode::pair_list_worker_thread() {
             }
         }
     }
-    --m_num_worker_threads;
+    --m_num_active_worker_threads;
 }
 
 void PairingNode::pair_generating_worker_thread() {
@@ -153,7 +158,7 @@ void PairingNode::pair_generating_worker_thread() {
         }
     }
 
-    if (--m_num_worker_threads == 0) {
+    if (--m_num_active_worker_threads == 0) {
         if (!m_preserve_cache_during_flush) {
             std::unique_lock<std::mutex> lock(m_pairing_mtx);
             // There are still reads in channel_mux_read_map. Push them to the sink.
@@ -208,6 +213,7 @@ void PairingNode::start_threads() {
     for (size_t i = 0; i < m_num_worker_threads; i++) {
         m_workers.push_back(std::make_unique<std::thread>(
                 std::thread(&PairingNode::pair_generating_worker_thread, this)));
+        ++m_num_active_worker_threads;
     }
 }
 

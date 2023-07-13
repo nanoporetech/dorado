@@ -53,6 +53,7 @@ public:
     ModBaseParams& caller_params(size_t caller_id) const;
     size_t num_callers() const;
     void terminate();
+    void restart();
     std::string get_name() const;
     stats::NamedStats sample_stats() const;
 

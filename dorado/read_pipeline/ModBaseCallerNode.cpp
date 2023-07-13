@@ -78,6 +78,9 @@ void ModBaseCallerNode::terminate_impl() {
 }
 
 void ModBaseCallerNode::restart() {
+    for (auto& runner : m_runners) {
+        runner->restart();
+    }
     restart_input_queue();
     m_terminate_runners.store(false);
     m_processed_chunks.restart();

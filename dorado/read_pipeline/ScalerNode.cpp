@@ -42,6 +42,9 @@ void ScalerNode::worker_thread() {
     while (m_work_queue.try_pop(message)) {
         // If this message isn't a read, we'll get a bad_variant_access exception.
         auto read = std::get<std::shared_ptr<Read>>(message);
+
+        //spdlog::error("ScalerNode got read");
+
         assert(read->raw_data.dtype() == torch::kInt16);
         const auto [shift, scale] = m_scaling_params.quantile_scaling
                                             ? normalisation(read->raw_data)
@@ -67,8 +70,6 @@ void ScalerNode::worker_thread() {
         // Pass the read to the next node
         send_message_to_sink(read);
     }
-
-    int num_worker_threads = --m_num_worker_threads;
 }
 
 ScalerNode::ScalerNode(const SignalNormalisationParams& config,

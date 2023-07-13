@@ -611,14 +611,6 @@ public:
         m_fwd_scan_cps = make_cps(m_device.get(), "forward_scan", {});
         m_add_softmax_cps = make_cps(m_device.get(), "add_softmax", {});
 
-        m_metal_thread.reset(new std::thread(&MetalCaller::metal_thread_fn, this));
-
-        int num_decode_threads = std::max(1, get_apple_cpu_perf_core_count() - 1);
-        m_decode_threads.reserve(num_decode_threads);
-        for (int i = 0; i < num_decode_threads; ++i) {
-            m_decode_threads.emplace_back(new std::thread(&MetalCaller::decode_thread_fn, this, i));
-        }
-
         int T = m_out_chunk_size;
         int C = model_config.outsize;
         int Cs = m_states;
@@ -638,6 +630,18 @@ public:
         // fit into bytes.
         // In both cases beam search applies the same 5/127 factor to scores.
         score_scale = static_cast<float>(5.0 / 127.0);
+
+        start_threads();
+    }
+
+    void start_threads() {
+        m_metal_thread.reset(new std::thread(&MetalCaller::metal_thread_fn, this));
+
+        int num_decode_threads = std::max(1, get_apple_cpu_perf_core_count() - 1);
+        m_decode_threads.reserve(num_decode_threads);
+        for (int i = 0; i < num_decode_threads; ++i) {
+            m_decode_threads.emplace_back(new std::thread(&MetalCaller::decode_thread_fn, this, i));
+        }
     }
 
     ~MetalCaller() {
@@ -815,7 +819,29 @@ public:
         }
     }
 
-    void terminate() { m_terminate.store(true); }
+    void terminate() {
+        m_terminate.store(true);
+        m_input_cv.notify_one();
+        m_decode_cv.notify_all();
+        if (m_metal_thread && m_metal_thread->joinable()) {
+            m_metal_thread->join();
+        }
+        m_metal_thread.reset();
+        for (auto &thr : m_decode_threads) {
+            if (thr->joinable()) {
+                thr->join();
+            }
+        }
+        m_decode_threads.clear();
+    }
+
+    void restart() {
+        // This can be called more than one, via multiple runners.
+        if (m_terminate.load()) {
+            m_terminate.store(false);
+            start_threads();
+        }
+    }
 
     std::atomic<bool> m_terminate{false};
     std::atomic<bool> m_terminate_decode{false};
@@ -886,6 +912,7 @@ size_t MetalModelRunner::chunk_size() const { return m_input.size(1); }
 size_t MetalModelRunner::batch_size() const { return m_input.size(0); }
 
 void MetalModelRunner::terminate() { m_caller->terminate(); }
+void MetalModelRunner::restart() { m_caller->restart(); }
 
 stats::NamedStats MetalModelRunner::sample_stats() const {
     stats::NamedStats stats;

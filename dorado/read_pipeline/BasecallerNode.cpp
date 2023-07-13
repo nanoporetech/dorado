@@ -23,6 +23,8 @@ void BasecallerNode::input_worker_thread() {
     Message message;
 
     while (m_work_queue.try_pop(message)) {
+        //spdlog::error("{} popped message", m_node_name);
+
         if (std::holds_alternative<CandidatePairRejectedMessage>(message)) {
             send_message_to_sink(std::move(message));
             continue;
@@ -150,7 +152,7 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
     std::shared_ptr<Chunk> chunk;
     while (m_chunks_in.try_pop_until(
             chunk, last_chunk_reserve_time + std::chrono::milliseconds(m_batch_timeout_ms))) {
-        // If chunk is empty, then try_pop timed out without getting a new chunk.
+        // If chunk is empty, then try_pop_until timed out without getting a new chunk.
         if (!chunk) {
             if (!m_batched_chunks[worker_id].empty()) {
                 // get scores for whatever chunks are available.
@@ -307,6 +309,9 @@ void BasecallerNode::terminate_impl() {
 }
 
 void BasecallerNode::restart() {
+    for (auto &runner : m_model_runners) {
+        runner->restart();
+    }
     restart_input_queue();
     m_chunks_in.restart();
     m_processed_chunks.restart();
