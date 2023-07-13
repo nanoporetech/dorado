@@ -310,21 +310,26 @@ void StereoDuplexEncoderNode::worker_thread() {
 
 StereoDuplexEncoderNode::StereoDuplexEncoderNode(int input_signal_stride)
         : MessageSink(1000), m_input_signal_stride(input_signal_stride) {
+    start_threads();
+}
+
+void StereoDuplexEncoderNode::start_threads() {
     const int num_worker_threads = std::thread::hardware_concurrency();
     for (int i = 0; i < num_worker_threads; ++i) {
         std::unique_ptr<std::thread> stereo_encoder_worker_thread =
                 std::make_unique<std::thread>(&StereoDuplexEncoderNode::worker_thread, this);
-        worker_threads.push_back(std::move(stereo_encoder_worker_thread));
+        m_worker_threads.push_back(std::move(stereo_encoder_worker_thread));
     }
 }
 
 void StereoDuplexEncoderNode::terminate_impl() {
     terminate_input_queue();
-    for (auto& t : worker_threads) {
+    for (auto& t : m_worker_threads) {
         if (t->joinable()) {
             t->join();
         }
     }
+    m_worker_threads.clear();
 }
 
 stats::NamedStats StereoDuplexEncoderNode::sample_stats() const {

@@ -28,47 +28,53 @@ ModBaseCallerNode::ModBaseCallerNode(std::vector<std::unique_ptr<ModBaseRunner>>
         : MessageSink(max_reads),
           m_batch_size(batch_size),
           m_block_stride(block_stride),
+          m_num_input_workers(remora_threads),
           m_runners(std::move(model_runners)),
           // TODO -- more principled calculation of output queue size
           m_processed_chunks(10 * max_reads) {
     init_modbase_info();
-
-    m_output_worker = std::make_unique<std::thread>(&ModBaseCallerNode::output_worker_thread, this);
-
     m_chunk_queues.resize(m_runners[0]->num_callers());
+
+    // Spin up the processing threads:
+    start_threads();
+}
+
+void ModBaseCallerNode::start_threads() {
+    m_output_worker = std::make_unique<std::thread>(&ModBaseCallerNode::output_worker_thread, this);
 
     for (size_t worker_id = 0; worker_id < m_runners.size(); ++worker_id) {
         for (size_t model_id = 0; model_id < m_runners[worker_id]->num_callers(); ++model_id) {
-            std::unique_ptr<std::thread> t = std::make_unique<std::thread>(
-                    &ModBaseCallerNode::modbasecall_worker_thread, this, worker_id, model_id);
+            auto t = std::make_unique<std::thread>(&ModBaseCallerNode::modbasecall_worker_thread,
+                                                   this, worker_id, model_id);
             m_runner_workers.push_back(std::move(t));
             ++m_num_active_runner_workers;
         }
     }
-    // Spin up the processing threads:
-    for (size_t i = 0; i < remora_threads; ++i) {
-        std::unique_ptr<std::thread> t =
-                std::make_unique<std::thread>(&ModBaseCallerNode::input_worker_thread, this);
-        m_input_worker.push_back(std::move(t));
-        ++m_num_active_input_worker;
+    for (size_t i = 0; i < m_num_input_workers; ++i) {
+        auto t = std::make_unique<std::thread>(&ModBaseCallerNode::input_worker_thread, this);
+        m_input_workers.push_back(std::move(t));
+        ++m_num_active_input_workers;
     }
 }
 
 void ModBaseCallerNode::terminate_impl() {
     terminate_input_queue();
-    for (auto& t : m_input_worker) {
+    for (auto& t : m_input_workers) {
         if (t->joinable()) {
             t->join();
         }
     }
+    m_input_workers.clear();
     for (auto& t : m_runner_workers) {
         if (t->joinable()) {
             t->join();
         }
     }
-    if (m_output_worker->joinable()) {
+    m_runner_workers.clear();
+    if (m_output_worker && m_output_worker->joinable()) {
         m_output_worker->join();
     }
+    m_output_worker.reset();
 }
 
 [[maybe_unused]] ModBaseCallerNode::Info ModBaseCallerNode::get_modbase_info_and_maybe_init(
@@ -242,7 +248,7 @@ void ModBaseCallerNode::input_worker_thread() {
         }
     }
 
-    int num_remaining_workers = --m_num_active_input_worker;
+    int num_remaining_workers = --m_num_active_input_workers;
     if (num_remaining_workers == 0) {
         m_terminate_runners.store(true);
         m_chunks_added_cv.notify_all();

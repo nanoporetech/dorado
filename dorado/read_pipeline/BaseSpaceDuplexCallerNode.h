@@ -21,6 +21,7 @@ public:
     void terminate() override { terminate_impl(); }
 
 private:
+    void start_threads();
     void terminate_impl();
     void worker_thread();
     void basespace(const std::string& template_read_id, const std::string& complement_read_id);

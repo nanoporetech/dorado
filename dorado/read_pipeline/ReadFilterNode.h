@@ -28,11 +28,13 @@ public:
     void terminate() override { terminate_impl(); }
 
 private:
+    void start_threads();
     void terminate_impl();
     void worker_thread();
 
     // Async worker for writing.
     std::vector<std::unique_ptr<std::thread>> m_workers;
+    size_t m_num_worker_threads = 0;
 
     size_t m_min_qscore;
     size_t m_min_read_length;

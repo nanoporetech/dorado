@@ -33,6 +33,7 @@ public:
     size_t get_unmapped() const { return m_unmapped; }
 
 private:
+    void start_threads();
     void terminate_impl();
     size_t m_total{0};
     size_t m_primary{0};

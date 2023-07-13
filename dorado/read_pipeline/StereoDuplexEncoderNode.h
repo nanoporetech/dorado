@@ -21,11 +21,12 @@ public:
     void terminate() override { terminate_impl(); }
 
 private:
+    void start_threads();
     void terminate_impl();
     // Consume reads from input queue
     void worker_thread();
 
-    std::vector<std::unique_ptr<std::thread>> worker_threads;
+    std::vector<std::unique_ptr<std::thread>> m_worker_threads;
 
     // The stride which was used to simplex call the data
     int m_input_signal_stride;

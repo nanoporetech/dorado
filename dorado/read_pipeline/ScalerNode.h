@@ -24,9 +24,10 @@ public:
     void terminate() override { terminate_impl(); }
 
 private:
+    void start_threads();
     void terminate_impl();
     void worker_thread();  // Worker thread performs scaling and trimming asynchronously.
-    std::vector<std::unique_ptr<std::thread>> worker_threads;
+    std::vector<std::unique_ptr<std::thread>> m_worker_threads;
     std::atomic<int> m_num_worker_threads;
 
     SignalNormalisationParams m_scaling_params;

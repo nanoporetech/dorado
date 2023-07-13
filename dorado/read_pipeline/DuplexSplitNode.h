@@ -65,6 +65,7 @@ public:
     std::vector<std::shared_ptr<Read>> split(std::shared_ptr<Read> init_read) const;
 
 private:
+    void start_threads();
     void terminate_impl();
     //TODO consider precomputing and reusing ranges with high signal
     struct ExtRead {
@@ -96,7 +97,7 @@ private:
     std::vector<std::pair<std::string, SplitFinderF>> m_split_finders;
     std::atomic<size_t> m_active{0};
     const int m_num_worker_threads;
-    std::vector<std::unique_ptr<std::thread>> worker_threads;
+    std::vector<std::unique_ptr<std::thread>> m_worker_threads;
 };
 
 }  // namespace dorado

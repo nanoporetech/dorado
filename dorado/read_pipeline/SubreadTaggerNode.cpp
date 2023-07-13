@@ -104,11 +104,14 @@ void SubreadTaggerNode::worker_thread() {
 }
 
 SubreadTaggerNode::SubreadTaggerNode(int num_worker_threads, size_t max_reads)
-        : MessageSink(max_reads) {
-    for (int i = 0; i < num_worker_threads; i++) {
-        std::unique_ptr<std::thread> worker_thread =
-                std::make_unique<std::thread>(&SubreadTaggerNode::worker_thread, this);
-        worker_threads.push_back(std::move(worker_thread));
+        : MessageSink(max_reads), m_num_worker_threads(num_worker_threads) {
+    start_threads();
+}
+
+void SubreadTaggerNode::start_threads() {
+    for (int i = 0; i < m_num_worker_threads; i++) {
+        auto worker_thread = std::make_unique<std::thread>(&SubreadTaggerNode::worker_thread, this);
+        m_worker_threads.push_back(std::move(worker_thread));
     }
 }
 
@@ -116,11 +119,12 @@ void SubreadTaggerNode::terminate_impl() {
     terminate_input_queue();
 
     // Wait for all the node's worker threads to terminate
-    for (auto& t : worker_threads) {
+    for (auto& t : m_worker_threads) {
         if (t->joinable()) {
             t->join();
         }
     }
+    m_worker_threads.clear();
 }
 
 }  // namespace dorado

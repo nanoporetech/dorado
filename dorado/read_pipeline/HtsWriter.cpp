@@ -43,15 +43,19 @@ HtsWriter::HtsWriter(const std::string& filename, OutputMode mode, size_t thread
             throw std::runtime_error("Could not enable multi threading for BAM generation.");
         }
     }
+    start_threads();
+}
 
+void HtsWriter::start_threads() {
     m_worker = std::make_unique<std::thread>(std::thread(&HtsWriter::worker_thread, this));
 }
 
 void HtsWriter::terminate_impl() {
     terminate_input_queue();
-    if (m_worker->joinable()) {
+    if (m_worker && m_worker->joinable()) {
         m_worker->join();
     }
+    m_worker.reset();
 }
 
 HtsWriter::~HtsWriter() {

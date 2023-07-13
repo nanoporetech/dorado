@@ -13,6 +13,7 @@ public:
     void terminate() override { terminate_impl(); }
 
 private:
+    void start_threads();
     void terminate_impl();
     void worker_thread();
     std::vector<std::unique_ptr<std::thread>> m_workers;

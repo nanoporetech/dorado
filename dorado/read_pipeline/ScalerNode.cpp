@@ -77,10 +77,14 @@ ScalerNode::ScalerNode(const SignalNormalisationParams& config,
         : MessageSink(max_reads),
           m_scaling_params(config),
           m_num_worker_threads(num_worker_threads) {
+    start_threads();
+}
+
+void ScalerNode::start_threads() {
     for (int i = 0; i < m_num_worker_threads; i++) {
         std::unique_ptr<std::thread> scaler_worker_thread =
                 std::make_unique<std::thread>(&ScalerNode::worker_thread, this);
-        worker_threads.push_back(std::move(scaler_worker_thread));
+        m_worker_threads.push_back(std::move(scaler_worker_thread));
     }
 }
 
@@ -88,11 +92,12 @@ void ScalerNode::terminate_impl() {
     terminate_input_queue();
 
     // Wait for all the Scaler Node's worker threads to terminate
-    for (auto& t : worker_threads) {
+    for (auto& t : m_worker_threads) {
         if (t->joinable()) {
             t->join();
         }
     }
+    m_worker_threads.clear();
 }
 
 stats::NamedStats ScalerNode::sample_stats() const { return stats::from_obj(m_work_queue); }

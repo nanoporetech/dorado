@@ -264,37 +264,45 @@ BasecallerNode::BasecallerNode(std::vector<Runner> model_runners,
     // Setup worker state
     const size_t num_workers = m_model_runners.size();
     m_batched_chunks.resize(num_workers);
-    m_basecall_workers.resize(num_workers);
-    m_num_active_model_runners = num_workers;
 
     initialization_time = std::chrono::system_clock::now();
 
     // Spin up any workers last so that we're not mutating |this| underneath them
+    start_threads();
+}
+
+void BasecallerNode::start_threads() {
+    m_input_worker = std::make_unique<std::thread>([this] { input_worker_thread(); });
+    const size_t num_workers = m_model_runners.size();
     m_working_reads_managers.resize(num_workers / 2);
     for (int i = 0; i < m_working_reads_managers.size(); i++) {
         m_working_reads_managers[i] = std::thread([this] { working_reads_manager(); });
     }
-    m_input_worker = std::make_unique<std::thread>([this] { input_worker_thread(); });
+    m_basecall_workers.resize(num_workers);
     for (int i = 0; i < static_cast<int>(num_workers); i++) {
         m_basecall_workers[i] = std::thread([this, i] { basecall_worker_thread(i); });
     }
+    m_num_active_model_runners = num_workers;
 }
 
 void BasecallerNode::terminate_impl() {
     terminate_input_queue();
-    if (m_input_worker->joinable()) {
+    if (m_input_worker && m_input_worker->joinable()) {
         m_input_worker->join();
     }
+    m_input_worker.reset();
     for (auto &t : m_basecall_workers) {
         if (t.joinable()) {
             t.join();
         }
     }
+    m_basecall_workers.clear();
     for (auto &t : m_working_reads_managers) {
         if (t.joinable()) {
             t.join();
         }
     }
+    m_working_reads_managers.clear();
     termination_time = std::chrono::system_clock::now();
 }
 

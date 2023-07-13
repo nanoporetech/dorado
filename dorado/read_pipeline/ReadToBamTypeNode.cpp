@@ -35,12 +35,17 @@ ReadToBamType::ReadToBamType(bool emit_moves,
                              float modbase_threshold_frac,
                              size_t max_reads)
         : MessageSink(max_reads),
+          m_num_worker_threads(num_worker_threads),
           m_emit_moves(emit_moves),
           m_rna(rna),
           m_modbase_threshold(
                   static_cast<uint8_t>(std::min(modbase_threshold_frac * 256.0f, 255.0f))),
           m_active_threads(0) {
-    for (size_t i = 0; i < num_worker_threads; i++) {
+    start_threads();
+}
+
+void ReadToBamType::start_threads() {
+    for (size_t i = 0; i < m_num_worker_threads; i++) {
         m_workers.push_back(
                 std::make_unique<std::thread>(std::thread(&ReadToBamType::worker_thread, this)));
     }
@@ -53,6 +58,7 @@ void ReadToBamType::terminate_impl() {
             m->join();
         }
     }
+    m_workers.clear();
 }
 
 }  // namespace dorado

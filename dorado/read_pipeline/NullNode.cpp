@@ -12,7 +12,9 @@ void NullNode::worker_thread() {
     }
 }
 
-NullNode::NullNode() : MessageSink(1000) {
+NullNode::NullNode() : MessageSink(1000) { start_threads(); }
+
+void NullNode::start_threads() {
     int num_worker_threads = 4;
     for (size_t i = 0; i < num_worker_threads; i++) {
         m_workers.push_back(
@@ -27,6 +29,7 @@ void NullNode::terminate_impl() {
             m->join();
         }
     }
+    m_workers.clear();
 }
 
 }  // namespace dorado

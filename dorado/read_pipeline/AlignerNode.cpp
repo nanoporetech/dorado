@@ -70,6 +70,10 @@ Aligner::Aligner(const std::string& filename, int k, int w, uint64_t index_batch
         m_tbufs.push_back(mm_tbuf_init());
     }
 
+    start_threads();
+}
+
+void Aligner::start_threads() {
     for (size_t i = 0; i < m_threads; i++) {
         m_workers.push_back(
                 std::make_unique<std::thread>(std::thread(&Aligner::worker_thread, this, i)));
@@ -83,6 +87,7 @@ void Aligner::terminate_impl() {
             m->join();
         }
     }
+    m_workers.clear();
 }
 
 Aligner::~Aligner() {

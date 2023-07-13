@@ -26,6 +26,7 @@ public:
     bam_header_sq_t get_sequence_records_for_header() const;
 
 private:
+    void start_threads();
     void terminate_impl();
     size_t m_threads{1};
     std::vector<mm_tbuf_t*> m_tbufs;

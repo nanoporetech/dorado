@@ -564,8 +564,12 @@ DuplexSplitNode::DuplexSplitNode(DuplexSplitSettings settings,
           m_settings(std::move(settings)),
           m_num_worker_threads(num_worker_threads) {
     m_split_finders = build_split_finders();
-    for (int i = 0; i < m_num_worker_threads; i++) {
-        worker_threads.push_back(
+    start_threads();
+}
+
+void DuplexSplitNode::start_threads() {
+    for (int i = 0; i < m_num_worker_threads; ++i) {
+        m_worker_threads.push_back(
                 std::make_unique<std::thread>(&DuplexSplitNode::worker_thread, this));
     }
 }
@@ -574,11 +578,12 @@ void DuplexSplitNode::terminate_impl() {
     terminate_input_queue();
 
     // Wait for all the Node's worker threads to terminate
-    for (auto& t : worker_threads) {
+    for (auto& t : m_worker_threads) {
         if (t->joinable()) {
             t->join();
         }
     }
+    m_worker_threads.clear();
 }
 
 stats::NamedStats DuplexSplitNode::sample_stats() const { return stats::from_obj(m_work_queue); }

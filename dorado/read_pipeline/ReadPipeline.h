@@ -176,8 +176,13 @@ public:
     void push_message(Message&& message);
 
     // Waits until work is finished and shuts down worker threads.
-    // No work can be done by the node after this returns.
+    // No work can be done by the node after this returns until
+    // restart is subsequently called.
     virtual void terminate() = 0;
+
+    // Restarts the node following a terminate call.
+    // Has no effect if terminate has not been called.
+    //virtual void restart() = 0;
 
 protected:
     // Terminates waits on the input queue.

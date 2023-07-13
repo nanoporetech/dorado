@@ -2,10 +2,12 @@
 #include "ReadPipeline.h"
 
 #include <atomic>
+#include <cstdint>
 #include <list>
 #include <memory>
 #include <mutex>
 #include <thread>
+#include <unordered_map>
 #include <vector>
 
 namespace dorado {
@@ -17,10 +19,12 @@ public:
     void terminate() override { terminate_impl(); }
 
 private:
+    void start_threads();
     void terminate_impl();
     void worker_thread();
 
-    std::vector<std::unique_ptr<std::thread>> worker_threads;
+    int m_num_worker_threads = 0;
+    std::vector<std::unique_ptr<std::thread>> m_worker_threads;
 
     std::mutex m_subread_groups_mutex;
     std::unordered_map<uint64_t, std::vector<std::shared_ptr<Read>>> m_subread_groups;
