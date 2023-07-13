@@ -120,16 +120,6 @@ $ dorado basecaller <model> <reads> --reference <index>
 
 Alignment uses [minimap2](https://github.com/lh3/minimap2) and by default uses the `map-ont` preset. This can be overridden with the `-k` and `-w` options to set kmer and window size respectively.
 
-### Sequencing Summary
-
-The `dorado summary` command outputs a tab-separated file with read level sequencing information from the BAM file generated during basecalling. To create a summary, run:
-
-```
-$ dorado summary <bam>
-```
-
-Note that summary generation is only available for reads basecalled from POD5 files. Reads basecalled from .fast5 files are not compatible with the summary command.
-
 ## Available basecalling models
 
 To download all available Dorado models, run:
@@ -276,6 +266,31 @@ The project uses pre-commit to ensure code is consistently formatted; you can se
 $ pip install pre-commit
 $ pre-commit install
 ```
+
+## Troubleshooting
+
+### Installation Errors
+
+#### Setting paths
+
+* Library locations -- setting the paths so that you pick up the right libs from the cudnn folder that gets shipped with the package
+
+### Basecalling
+
+#### OOM Errors
+
+* GPU OOM stuff -- adjusting batch size, pytorch environment variables; don't want them to change chunk size
+  * It is not advisable to change the chunk size because it can affect the accuracy of the basecalling model. Instead, we recommend adjusting the batch size [and pytorch environment variables?]
+* Host OOM -- could consider splitting with Pod5 APIs
+* Low GPU utilisation: check where your data is, make sure it's as close to the GPU as possible, could be I/O issues
+
+### Post-run analysis
+
+#### Barcoding
+
+* Barcoding: we're working on adding to Dorado but recommendation is to use standalone Guppy barcoder.
+* BAM file: when running duplex, same file contains both simplex & duplex but there's a tag in the read. A few people have asked about splitting; there are some SAM tools we've narrowed in on.
+        * https://github.com/nanoporetech/dorado/issues/189
 
 ## Licence and Copyright
 
