@@ -267,34 +267,40 @@ $ pip install pre-commit
 $ pre-commit install
 ```
 
-## Troubleshooting
+## Troubleshooting Guide
 
-### Installation Errors
+### CUDA Library Path Errors
 
-#### Setting paths
+Dorado comes equipped with the necessary CUDA libraries for its execution. However, on some operating systems, the system libraries might be chosen over Dorado's. This discrepancy can result in various errors, for instance, the `CuBLAS error 8`.
 
-* Library locations -- setting the paths so that you pick up the right libs from the cudnn folder that gets shipped with the package
+To resolve this issue, you need to set the `LD_LIBRARY_PATH` to point to Dorado's libraries. Use the following command:
 
-### Basecalling
+```
+$ export LD_LIBRARY_PATH=<PATH_TO_DORADO>/dorado0.x.x/dorado-0.x.x-linux-x64/lib:$LD_LIBRARY_PATH
+```
 
-#### OOM Errors
+### GPU Out of Memory Errors
 
-* GPU OOM stuff -- adjusting batch size, pytorch environment variables; don't want them to change chunk size
-  * It is not advisable to change the chunk size because it can affect the accuracy of the basecalling model. Instead, we recommend adjusting the batch size [and pytorch environment variables?]
-* Host OOM -- could consider splitting with Pod5 APIs
-* Low GPU utilisation: check where your data is, make sure it's as close to the GPU as possible, could be I/O issues
+Dorado operates on a broad range of GPUs but it's primarily developed for Nvidia A100/H100 and Apple Silicon. Dorado attempts to find the optimal batch size for basecalling. Nevertheless, on some low-RAM GPUs, users may face out of memory crashes.
 
-### Post-run analysis
+A potential solution to this issue could be setting a manual batch size using the following command:
 
-#### Barcoding
+`dorado basecaller --batchsize 64 ...`
 
-* Barcoding: we're working on adding to Dorado but recommendation is to use standalone Guppy barcoder.
-* BAM file: when running duplex, same file contains both simplex & duplex but there's a tag in the read. A few people have asked about splitting; there are some SAM tools we've narrowed in on.
-        * https://github.com/nanoporetech/dorado/issues/189
+**Note:** Reducing memory consumption by modifying the `chunksize` parameter is not recommended as it influences the basecalling results.
+
+### Low GPU Utilization
+
+Low GPU utilization can lead to reduced basecalling speed. This problem can be identified using tools such as `nvidia-smi`. Low GPU utilization often stems from I/O bottlenecks in basecalling. Here are a few steps you can take to improve the situation:
+
+1. Opt for POD5 instead of FAST5: POD5 has superior I/O performance and will enhance the basecall speed in I/O constrained environments.
+2. Transfer data to the local disk before basecalling: Slow basecalling often occurs because network disks cannot supply Dorado with adequate speed. To mitigate this, make sure your data is as close to your host machine as possible.
+3. Choose SSD over HDD: Particularly for duplex basecalling, using a local SSD can offer significant speed advantages. This is due to the duplex basecalling algorithm's reliance on heavy random access of data.
+
 
 ## Licence and Copyright
 
-(c) 2022 Oxford Nanopore Technologies PLC.
+(c) 2023 Oxford Nanopore Technologies PLC.
 
 Dorado is distributed under the terms of the Oxford Nanopore
 Technologies PLC.  Public License, v. 1.0.  If a copy of the License
