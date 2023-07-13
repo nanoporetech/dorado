@@ -291,7 +291,7 @@ $ export LD_LIBRARY_PATH=<PATH_TO_DORADO>/dorado0.x.x/dorado-0.x.x-linux-x64/lib
 
 ### GPU Out of Memory Errors
 
-Dorado operates on a broad range of GPUs but it's primarily developed for Nvidia A100/H100 and Apple Silicon. Dorado attempts to find the optimal batch size for basecalling. Nevertheless, on some low-RAM GPUs, users may face out of memory crashes.
+Dorado operates on a broad range of GPUs but it is primarily developed for Nvidia A100/H100 and Apple Silicon. Dorado attempts to find the optimal batch size for basecalling. Nevertheless, on some low-RAM GPUs, users may face out of memory crashes.
 
 A potential solution to this issue could be setting a manual batch size using the following command:
 
