@@ -154,16 +154,18 @@ void PairingNode::pair_generating_worker_thread() {
     }
 
     if (--m_num_worker_threads == 0) {
-        std::unique_lock<std::mutex> lock(m_pairing_mtx);
-        // There are still reads in channel_mux_read_map. Push them to the sink.
-        // Last thread alive is responsible for cleaning up the cache.
-        for (const auto& kv : m_channel_mux_read_map) {
-            // kv is a std::pair<UniquePoreIdentifierKey, std::list<std::shared_ptr<Read>>>
-            const auto& reads_list = kv.second;
+        if (!m_preserve_cache_during_flush) {
+            std::unique_lock<std::mutex> lock(m_pairing_mtx);
+            // There are still reads in channel_mux_read_map. Push them to the sink.
+            // Last thread alive is responsible for cleaning up the cache.
+            for (const auto& kv : m_channel_mux_read_map) {
+                // kv is a std::pair<UniquePoreIdentifierKey, std::list<std::shared_ptr<Read>>>
+                const auto& reads_list = kv.second;
 
-            for (const auto& read_ptr : reads_list) {
-                // Push each read message
-                send_message_to_sink(read_ptr);
+                for (const auto& read_ptr : reads_list) {
+                    // Push each read message
+                    send_message_to_sink(read_ptr);
+                }
             }
         }
     }
@@ -180,10 +182,7 @@ PairingNode::PairingNode(std::map<std::string, std::string> template_complement_
         m_complement_template_map[key.second] = key.first;
     }
 
-    for (size_t i = 0; i < m_num_worker_threads; i++) {
-        m_workers.push_back(std::make_unique<std::thread>(
-                std::thread(&PairingNode::pair_list_worker_thread, this)));
-    }
+    start_threads();
 }
 
 PairingNode::PairingNode(ReadOrder read_order, int num_worker_threads, size_t max_reads)
@@ -210,6 +209,12 @@ void PairingNode::start_threads() {
         m_workers.push_back(std::make_unique<std::thread>(
                 std::thread(&PairingNode::pair_generating_worker_thread, this)));
     }
+}
+
+void PairingNode::terminate(const FlushOptions& flush_options) {
+    m_preserve_cache_during_flush = flush_options.preserve_pairing_caches;
+    terminate_impl();
+    m_preserve_cache_during_flush = false;
 }
 
 void PairingNode::terminate_impl() {

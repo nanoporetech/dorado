@@ -140,7 +140,7 @@ int aligner(int argc, char* argv[]) {
     reader.read(*pipeline, max_reads);
 
     stats_sampler->terminate();
-    auto final_stats = pipeline->terminate();
+    auto final_stats = pipeline->terminate(DefaultFlushOptions());
     tracker.update_progress_bar(final_stats);
     tracker.summarize();
 

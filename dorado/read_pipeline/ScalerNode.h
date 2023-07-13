@@ -21,7 +21,7 @@ public:
     ~ScalerNode() { terminate_impl(); }
     std::string get_name() const override { return "ScalerNode"; }
     stats::NamedStats sample_stats() const override;
-    void terminate() override { terminate_impl(); }
+    void terminate(const FlushOptions& flush_options) override { terminate_impl(); }
     void restart() override;
 
 private:

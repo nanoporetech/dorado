@@ -229,7 +229,7 @@ void setup(std::vector<std::string> args,
     // Stop the pipeline, as we do so collecting final processing stats.
     // Then update progress tracking one more time from this thread, to
     // allow accurate summarisation.
-    auto final_stats = pipeline->terminate();
+    auto final_stats = pipeline->terminate(DefaultFlushOptions());
     tracker.update_progress_bar(final_stats);
     tracker.summarize();
     if (!dump_stats_file.empty()) {

@@ -13,7 +13,7 @@ public:
         start_threads();
     }
     ~MessageSinkToVector() { terminate_impl(); }
-    void terminate() override { terminate_impl(); }
+    void terminate(const dorado::FlushOptions& flush_options) override { terminate_impl(); }
     void restart() override {
         restart_input_queue();
         start_threads();

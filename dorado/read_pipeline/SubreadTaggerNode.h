@@ -16,7 +16,7 @@ class SubreadTaggerNode : public MessageSink {
 public:
     SubreadTaggerNode(int num_worker_threads = 1, size_t max_reads = 1000);
     ~SubreadTaggerNode() { terminate_impl(); }
-    void terminate() override { terminate_impl(); }
+    void terminate(const FlushOptions& flush_options) override { terminate_impl(); }
     void restart() override;
 
 private:

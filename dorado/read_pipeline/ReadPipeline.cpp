@@ -378,11 +378,14 @@ void Pipeline::push_message(Message &&message) {
     dynamic_cast<MessageSink &>(*m_nodes.at(source_node_index)).push_message(std::move(message));
 }
 
-stats::NamedStats Pipeline::terminate() {
+stats::NamedStats Pipeline::terminate(const FlushOptions &flush_options) {
     stats::NamedStats final_stats;
+    // Nodes must be terminated in source to sink order to ensure all in flight
+    // processing is completed, and sources still have valid sinks as they finish
+    // work.
     for (auto handle : m_source_to_sink_order) {
         auto &node = m_nodes.at(handle);
-        node->terminate();
+        node->terminate(flush_options);
         auto node_stats = node->sample_stats();
         const auto node_name = node->get_name();
         for (const auto &[name, value] : node_stats) {
@@ -390,6 +393,14 @@ stats::NamedStats Pipeline::terminate() {
         }
     }
     return final_stats;
+}
+
+void Pipeline::restart() {
+    // The order in which we restart nodes shouldn't matter, so
+    // we go source to sink.
+    for (auto handle : m_source_to_sink_order) {
+        m_nodes.at(handle)->restart();
+    }
 }
 
 Pipeline::~Pipeline() {

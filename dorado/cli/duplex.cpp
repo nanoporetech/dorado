@@ -235,7 +235,7 @@ int duplex(int argc, char* argv[]) {
                     kStatsPeriod, stats_reporters, stats_callables);
 
             stats_sampler->terminate();
-            final_stats = pipeline->terminate();
+            final_stats = pipeline->terminate(DefaultFlushOptions());
         } else {  // Execute a Stereo Duplex pipeline.
 
             const auto model_path = std::filesystem::canonical(std::filesystem::path(model));
@@ -368,7 +368,7 @@ int duplex(int argc, char* argv[]) {
             loader.load_reads(reads, parser.get<bool>("--recursive"), ReadOrder::BY_CHANNEL);
 
             stats_sampler->terminate();
-            final_stats = pipeline->terminate();
+            final_stats = pipeline->terminate(DefaultFlushOptions());
         }
 
         tracker.update_progress_bar(final_stats);

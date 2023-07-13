@@ -27,7 +27,7 @@ public:
     ~PairingNode() { terminate_impl(); }
     std::string get_name() const override { return "PairingNode"; }
     stats::NamedStats sample_stats() const override;
-    void terminate() override { terminate_impl(); }
+    void terminate(const FlushOptions& flush_options) override;
     void restart() override;
 
 private:
@@ -36,6 +36,7 @@ private:
 
     /**
      * This is a worker thread function for pairing reads based on a specified list of template-complement pairs.
+     * UNUSED.
      */
     void pair_list_worker_thread();
 
@@ -57,6 +58,7 @@ private:
 
     std::vector<std::unique_ptr<std::thread>> m_workers;
     std::atomic<int> m_num_worker_threads;
+    std::atomic<bool> m_preserve_cache_during_flush = false;
 
     // Members for pair_list method
 

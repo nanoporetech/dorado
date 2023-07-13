@@ -157,6 +157,11 @@ using Message = std::variant<std::shared_ptr<Read>,
 
 using NodeHandle = int;
 
+struct FlushOptions {
+    bool preserve_pairing_caches = false;
+};
+inline FlushOptions DefaultFlushOptions() { return {false}; }
+
 // Base class for an object which consumes messages as part of the processing pipeline.
 // Destructors of derived classes must call terminate() in order to shut down
 // waits on the input queue before attempting to join input worker threads.
@@ -178,7 +183,7 @@ public:
     // Waits until work is finished and shuts down worker threads.
     // No work can be done by the node after this returns until
     // restart is subsequently called.
-    virtual void terminate() = 0;
+    virtual void terminate(const FlushOptions& flush_options) = 0;
 
     // Restarts the node following a terminate call.
     // Has no effect if terminate has not been called.
@@ -284,8 +289,12 @@ public:
 
     // Stops all pipeline nodes in source to sink order.
     // Returns stats from nodes' final states.
-    // After this is called the pipeline will do no further work processing subsequent inputs.
-    stats::NamedStats terminate();
+    // After this is called the pipeline will do no further work processing subsequent inputs,
+    // unless restart is called first.
+    stats::NamedStats terminate(const FlushOptions& flush_options);
+
+    // Restarts pipeline after a call to terminate.
+    void restart();
 
     // Returns a reference to the node associated with the given handle.
     // Exists to accommodate situations where client code avoids using the pipeline framework.
