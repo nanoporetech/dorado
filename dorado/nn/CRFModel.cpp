@@ -773,16 +773,13 @@ struct CRFModelImpl : Module {
         try {
             // Output is [N, T, C]
             return encoder->forward(x);
-        } catch (c10::OutOfMemoryError &e) {
-            spdlog::warn("Caught CUDA out of memory error, clearing cache and retrying.");
+        } catch (c10::Error &e) {
+            spdlog::warn("Caught Torch error '{}', clearing CUDA cache and retrying.", e.msg());
             c10::cuda::CUDACachingAllocator::emptyCache();
-            // Output is [N, T, C]
-            return encoder->forward(x);
         }
-#else
+#endif
         // Output is [N, T, C]
         return encoder->forward(x);
-#endif
     }
 
     LSTMStackType rnns{nullptr};
