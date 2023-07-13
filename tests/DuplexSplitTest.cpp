@@ -75,6 +75,19 @@ TEST_CASE("4 subread splitting test", TEST_GROUP) {
                                                     "2023-02-21T12:46:39.607+00:00",
                                                     "2023-02-21T12:46:53.105+00:00"});
 
+    std::vector<uint64_t> start_time_mss;
+    for (auto &r : split_res) {
+        start_time_mss.push_back(r->start_time_ms);
+    }
+    REQUIRE(start_time_mss ==
+            std::vector<uint64_t>{1676983561529, 1676983585837, 1676983599607, 1676983613105});
+
+    std::vector<uint64_t> num_sampless;
+    for (auto &r : split_res) {
+        num_sampless.push_back(r->attributes.num_samples);
+    }
+    REQUIRE(num_sampless == std::vector<uint64_t>{97125, 55055, 53940, 50475});
+
     std::set<std::string> names;
     for (auto &r : split_res) {
         names.insert(r->read_id);

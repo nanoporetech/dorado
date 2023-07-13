@@ -219,7 +219,7 @@ class PipelineDescriptor {
     std::vector<NodeDescriptor> m_node_descriptors;
 
     bool is_handle_valid(NodeHandle handle) const {
-        return handle >= 0 && handle < m_node_descriptors.size();
+        return handle >= 0 && handle < static_cast<int>(m_node_descriptors.size());
     }
 
 public:

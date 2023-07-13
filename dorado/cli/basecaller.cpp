@@ -64,7 +64,8 @@ void setup(std::vector<std::string> args,
            bool skip_model_compatibility_check,
            const std::string& dump_stats_file,
            const std::string& dump_stats_filter,
-           const std::string& resume_from_file) {
+           const std::string& resume_from_file,
+           argparse::ArgumentParser& resume_parser) {
     torch::set_num_threads(1);
 
     // create modbase runners first so basecall runners can pick batch sizes based on available memory
@@ -191,7 +192,12 @@ void setup(std::vector<std::string> args,
         hts_set_log_level(initial_hts_log_level);
 
         auto tokens = utils::extract_token_from_cli(pg_keys["CL"]);
-        auto resume_model_name = utils::extract_model_from_model_path(tokens[2]);
+        // First token is the dorado binary name. Remove that because the
+        // sub parser only knows about the `basecaller` command.
+        tokens.erase(tokens.begin());
+        resume_parser.parse_args(tokens);
+        auto resume_model_name =
+                utils::extract_model_from_model_path(resume_parser.get<std::string>("model"));
         if (model_name != resume_model_name) {
             throw std::runtime_error(
                     "Resume only works if the same model is used. Resume model was " +
@@ -336,6 +342,11 @@ int basecaller(int argc, char* argv[]) {
 
     argparse::ArgumentParser internal_parser;
 
+    // Create a copy of the parser to use if the resume feature is enabled. Needed
+    // to parse the model used for the file being resumed from. Note that this copy
+    // needs to be made __before__ the parser is used.
+    argparse::ArgumentParser resume_parser = parser;
+
     try {
         auto remaining_args = parser.parse_known_args(argc, argv);
         internal_parser = utils::parse_internal_options(remaining_args);
@@ -408,7 +419,7 @@ int basecaller(int argc, char* argv[]) {
               internal_parser.get<bool>("--skip-model-compatibility-check"),
               internal_parser.get<std::string>("--dump_stats_file"),
               internal_parser.get<std::string>("--dump_stats_filter"),
-              parser.get<std::string>("--resume-from"));
+              parser.get<std::string>("--resume-from"), resume_parser);
     } catch (const std::exception& e) {
         spdlog::error("{}", e.what());
         return 1;
