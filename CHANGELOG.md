@@ -2,6 +2,35 @@
 
 All notable changes to Dorado will be documented in this file.
 
+
+# [0.3.2] (13 Jul 2023)
+
+This release of Dorado introduces basecalling models for the RNA004 chemistry, better identification of duplex read pairs and improved read Q score estimation. It also incorporates various important bug fixes which improve the stability and usability of Dorado.
+
+ * 4ce0cb038eebbaa3de6d561caa11f0ee80d2e82a - Add RNA004 models
+ * 24b6c4e2854c32aaca37b039c7bdf5a773db8995 - Retry basecalling on CUDA OOM after clearing allocator cache
+ * 3897ba505bdda80ff1f0fe9f517cb463bc5347bf - Add troubleshooting guide to README.md
+ * 9d55b446bce88e22de3584ad6c106cdfa5f7abb4 - Fix bug with resume file header parsing
+ * f9289e2f5c93641bfc2d2e753e5d612c87f7b34e - Improvements to duplex read splitting algorithm for improved accuracy
+ * 2869dbc52326d148f9562686d8d89a6dc373072a - Solve memory leak during modified base calling
+ * 4d8ca172128cb4854e39599077d7c477eeb02504 - Fix race condition which was introducing nondeterministic basecalls
+ * ddb6f711bf22c3b1f14690a85e6980e4e39a6c9f - Fix aligner regressions from pipeline change
+ * a57987f2fef3cdb17f1a92e76dbf3110e9adf5bd - Add R941 v3.3 5mCG 5hmCG models
+ * ba40e53e697bfcfd33beeaa44583a8cc56ca8976 - Refactor of basecalling pipeline management strategy
+ * 26be1a017baf7131a82271ebb624a484135d29ba - Query enabled Apple silicon cores, not all cores
+ * 185058ef226d508e2ead05659149514530e90adb - Replace empty value with "Unknown" in read group tags to satisfy SAM specification
+ * d953f339e1ad32533bfb3d53c7427bbbabea4d1d - Add time ordered reads pair cache strategy to PairingNode to support greater variety of ways to run duplex basecalling
+ * d2700dd44a0a5fbdbf6cbbc71d1f1a791ba25aa9 - Fix to enable Duplex basecalling on CPU. This will be slow but functionally correct.
+ * f5ccd0d261ac384e05107290e214b3a422eacb26 - Add channel/mux/start_time/start_time_ms to the duplex read
+ * 0ee5a9b5a24022fdb5330b512e14213c4cbe0e24 - Fixes to host OOM issues
+ * 2fe609bcbec5158b3ba1f1a1c200212cf1a66a0c - Exclude some non-informative bases at read start from mean qscore calculation
+ * 3090328a5b12689b649537a4dc83a25c00730c59 - Fix no output when stdout == stderr and both are the tty
+ * 7e70de7197ffc09586fe6f097f9b25c30dc17802 - Add support for compute 6.1 (GTX 1080 Ti) plus handling CUDA failures
+ * 995d0fb60c2ce3209e45c3645d59012326ce515d - Runner creation refactor
+ * 9d21036b309e4dde1125ccddae382a5f1729f725 - Modbase smoke test BLAS fix
+ * 30658c4d7b0823bd8924257aac5a09d3f1f96b22 - Add `ScopedAutoReleasePool` to prevent autorelease leaks on MacOS
+ * cf502e3c67809b263e9d7645608e67643f90769e - Update sample rate check to allow some tolerance
+
 # [0.3.1] (26 Jun 2023)
 
 This is a minor release of Dorado. It introduces various bug fixes, as well as performance and usability enhancements. Of particular note, this release introduces the ability to resume simplex basecalling if interrupted, adds RNA002 models, improves the speed of modified base calling and duplex calling, and solves an issue whereby Dorado users were experiencing segmentation faults on version of Linux with older glibc.
