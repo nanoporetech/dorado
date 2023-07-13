@@ -5,9 +5,10 @@ All notable changes to Dorado will be documented in this file.
 
 # [0.3.2] (13 Jul 2023)
 
-This release of Dorado introduces basecalilng models for the RNA004 chemistry, better identification of duplex read pairs and improved read Q score estimation. It also incorporates various important bug fixes which improve the stability and usability of Dorado.
+This release of Dorado introduces basecalling models for the RNA004 chemistry, better identification of duplex read pairs and improved read Q score estimation. It also incorporates various important bug fixes which improve the stability and usability of Dorado.
 
- * - Add RNA004 models
+ * 4ce0cb038eebbaa3de6d561caa11f0ee80d2e82a - Add RNA004 models
+ * 24b6c4e2854c32aaca37b039c7bdf5a773db8995 - Retry basecalling on CUDA OOM after clearing allocator cache
  * 3897ba505bdda80ff1f0fe9f517cb463bc5347bf - Add troubleshooting guide to README.md
  * 9d55b446bce88e22de3584ad6c106cdfa5f7abb4 - Fix bug with resume file header parsing
  * f9289e2f5c93641bfc2d2e753e5d612c87f7b34e - Improvements to duplex read splitting algorithm for improved accuracy
