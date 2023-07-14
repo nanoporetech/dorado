@@ -159,7 +159,9 @@ void PairingNode::pair_generating_worker_thread() {
 
             cached_read_list.insert(later_read, read);
             while (cached_read_list.size() > m_max_num_reads) {
+                auto cached_read = cached_read_list.front();
                 cached_read_list.pop_front();
+                send_message_to_sink(std::move(cached_read));
             }
         }
     }
