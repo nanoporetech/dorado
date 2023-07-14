@@ -203,6 +203,9 @@ int duplex(int argc, char* argv[]) {
         stats_callables.push_back(
                 [&tracker](const stats::NamedStats& stats) { tracker.update_progress_bar(stats); });
         stats::NamedStats final_stats;
+        std::unique_ptr<dorado::stats::StatsSampler> stats_sampler;
+        std::unique_ptr<dorado::Pipeline> pipeline;
+        constexpr auto kStatsPeriod = 100ms;
 
         if (basespace_duplex) {  // Execute a Basespace duplex pipeline.
             if (pairs_file.empty()) {
@@ -220,7 +223,7 @@ int duplex(int argc, char* argv[]) {
                     {read_filter_node}, template_complement_map, read_map, threads);
 
             std::vector<dorado::stats::StatsReporter> stats_reporters;
-            auto pipeline = Pipeline::create(std::move(pipeline_desc), &stats_reporters);
+            pipeline = Pipeline::create(std::move(pipeline_desc), &stats_reporters);
             if (pipeline == nullptr) {
                 spdlog::error("Failed to create pipeline");
                 std::exit(EXIT_FAILURE);
@@ -231,11 +234,8 @@ int duplex(int argc, char* argv[]) {
             hts_writer_ref.set_and_write_header(hdr.get());
 
             constexpr auto kStatsPeriod = 100ms;
-            auto stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
+            stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
                     kStatsPeriod, stats_reporters, stats_callables);
-
-            stats_sampler->terminate();
-            final_stats = pipeline->terminate();
         } else {  // Execute a Stereo Duplex pipeline.
 
             const auto model_path = std::filesystem::canonical(std::filesystem::path(model));
@@ -343,7 +343,7 @@ int duplex(int argc, char* argv[]) {
                     {basecaller_node}, model_config.signal_norm_params, num_devices * 2);
 
             std::vector<dorado::stats::StatsReporter> stats_reporters;
-            auto pipeline = Pipeline::create(std::move(pipeline_desc), &stats_reporters);
+            pipeline = Pipeline::create(std::move(pipeline_desc), &stats_reporters);
             if (pipeline == nullptr) {
                 spdlog::error("Failed to create pipeline");
                 std::exit(EXIT_FAILURE);
@@ -360,16 +360,19 @@ int duplex(int argc, char* argv[]) {
 
             DataLoader loader(*pipeline, "cpu", num_devices, 0, std::move(read_list));
 
-            constexpr auto kStatsPeriod = 100ms;
-            auto stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
+            stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
                     kStatsPeriod, stats_reporters, stats_callables);
 
             // Run pipeline.
             loader.load_reads(reads, parser.get<bool>("--recursive"), ReadOrder::BY_CHANNEL);
-
-            stats_sampler->terminate();
-            final_stats = pipeline->terminate();
         }
+
+        // Wait for the pipeline to complete.  When it does, we collect
+        // final stats to allow accurate summarisation.
+        final_stats = pipeline->terminate();
+
+        // Stop the stats sampler thread before tearing down any pipeline objects.
+        stats_sampler->terminate();
 
         tracker.update_progress_bar(final_stats);
         tracker.summarize();

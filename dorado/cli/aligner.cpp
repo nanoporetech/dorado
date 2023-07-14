@@ -139,8 +139,13 @@ int aligner(int argc, char* argv[]) {
     spdlog::info("> starting alignment");
     reader.read(*pipeline, max_reads);
 
-    stats_sampler->terminate();
+    // Wait for the pipeline to complete.  When it does, we collect
+    // final stats to allow accurate summarisation.
     auto final_stats = pipeline->terminate();
+
+    // Stop the stats sampler thread before tearing down any pipeline objects.
+    stats_sampler->terminate();
+
     tracker.update_progress_bar(final_stats);
     tracker.summarize();
 
