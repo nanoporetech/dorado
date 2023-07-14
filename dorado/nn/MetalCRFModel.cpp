@@ -649,7 +649,9 @@ public:
         m_input_cv.notify_one();
         m_decode_cv.notify_all();
 
-        m_metal_thread->join();
+        if (m_metal_thread && m_metal_thread->joinable()) {
+            m_metal_thread->join();
+        }
         for (auto &thr : m_decode_threads) {
             thr->join();
         }
@@ -839,6 +841,7 @@ public:
         // This can be called more than one, via multiple runners.
         if (m_terminate.load()) {
             m_terminate.store(false);
+            m_terminate_decode.store(false);
             start_threads();
         }
     }
