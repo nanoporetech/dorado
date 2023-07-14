@@ -142,6 +142,10 @@ public:
 };
 
 class CandidatePairRejectedMessage {};
+class CacheFlushMessage {
+public:
+    int32_t client_id;
+};
 
 // The Message type is a std::variant that can hold different types of message objects.
 // It is currently able to store:
@@ -153,7 +157,8 @@ class CandidatePairRejectedMessage {};
 using Message = std::variant<std::shared_ptr<Read>,
                              BamPtr,
                              std::shared_ptr<ReadPair>,
-                             CandidatePairRejectedMessage>;
+                             CandidatePairRejectedMessage,
+                             CacheFlushMessage>;
 
 using NodeHandle = int;
 

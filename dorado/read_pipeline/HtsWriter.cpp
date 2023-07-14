@@ -86,6 +86,11 @@ void HtsWriter::worker_thread() {
 
     Message message;
     while (m_work_queue.try_pop(message)) {
+        // If this message isn't a BamPtr, ignore it.
+        if (!std::holds_alternative<BamPtr>(message)) {
+            continue;
+        }
+
         auto aln = std::move(std::get<BamPtr>(message));
         write(aln.get());
         std::string read_id = bam_get_qname(aln.get());

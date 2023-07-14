@@ -275,6 +275,7 @@ std::shared_ptr<dorado::Read> StereoDuplexEncoderNode::stereo_encode(
     read->start_time_ms = template_read->start_time_ms;
 
     read->read_tag = template_read->read_tag;
+    read->client_id = template_read->client_id;
     read->raw_data = tmp;  // use the encoded signal
     read->is_duplex = true;
     read->run_id = template_read->run_id;
@@ -287,23 +288,23 @@ std::shared_ptr<dorado::Read> StereoDuplexEncoderNode::stereo_encode(
 void StereoDuplexEncoderNode::worker_thread() {
     Message message;
     while (m_work_queue.try_pop(message)) {
-        if (std::holds_alternative<std::shared_ptr<ReadPair>>(message)) {
-            auto read_pair = std::get<std::shared_ptr<ReadPair>>(message);
-            std::shared_ptr<Read> stereo_encoded_read =
-                    stereo_encode(read_pair->read_1, read_pair->read_2);
+        if (!std::holds_alternative<std::shared_ptr<ReadPair>>(message)) {
+            send_message_to_sink(std::move(message));
+            continue;
+        }
 
-            if (stereo_encoded_read->raw_data.ndimension() ==
-                2) {  // 2 dims for stereo encoding, 1 for simplex
-                send_message_to_sink(
-                        stereo_encoded_read);  // Stereo-encoded read created, send it to sink
-            } else {
-                // announce to downstream that we rejected a candidate pair
-                --read_pair->read_1->num_duplex_candidate_pairs;
-                send_message_to_sink(CandidatePairRejectedMessage{});
-            }
-        } else if (std::holds_alternative<std::shared_ptr<Read>>(message)) {
-            auto read = std::get<std::shared_ptr<Read>>(message);
-            send_message_to_sink(read);
+        auto read_pair = std::get<std::shared_ptr<ReadPair>>(message);
+        std::shared_ptr<Read> stereo_encoded_read =
+                stereo_encode(read_pair->read_1, read_pair->read_2);
+
+        if (stereo_encoded_read->raw_data.ndimension() ==
+            2) {  // 2 dims for stereo encoding, 1 for simplex
+            send_message_to_sink(
+                    stereo_encoded_read);  // Stereo-encoded read created, send it to sink
+        } else {
+            // announce to downstream that we rejected a candidate pair
+            --read_pair->read_1->num_duplex_candidate_pairs;
+            send_message_to_sink(CandidatePairRejectedMessage{});
         }
     }
 }

@@ -23,6 +23,12 @@ namespace dorado {
 void PairingNode::pair_list_worker_thread() {
     Message message;
     while (m_work_queue.try_pop(message)) {
+        // If this message isn't a read, just forward it to the sink.
+        if (!std::holds_alternative<std::shared_ptr<Read>>(message)) {
+            send_message_to_sink(std::move(message));
+            continue;
+        }
+
         // If this message isn't a read, we'll get a bad_variant_access exception.
         auto read = std::get<std::shared_ptr<Read>>(message);
 

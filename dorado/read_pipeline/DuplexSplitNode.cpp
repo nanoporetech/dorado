@@ -177,6 +177,7 @@ std::shared_ptr<Read> subread(const Read& read, PosRange seq_range, PosRange sig
             read.read_id, std::to_string(seq_range.first) + "-" + std::to_string(seq_range.second));
     subread->read_id = subread_id;
     subread->read_tag = read.read_tag;
+    subread->client_id = read.client_id;
     subread->raw_data = subread->raw_data.index(
             {torch::indexing::Slice(signal_range.first, signal_range.second)});
     subread->attributes.read_number = -1;
@@ -542,15 +543,17 @@ void DuplexSplitNode::worker_thread() {
     Message message;
 
     while (m_work_queue.try_pop(message)) {
-        if (!m_settings.enabled) {
+        // If this message isn't a read, just forward it to the sink.
+        if (!m_settings.enabled || !std::holds_alternative<std::shared_ptr<Read>>(message)) {
             send_message_to_sink(std::move(message));
-        } else {
-            // If this message isn't a read, we'll get a bad_variant_access exception.
-            auto init_read = std::get<std::shared_ptr<Read>>(message);
-            for (auto& subread : split(init_read)) {
-                //TODO correctly process end_reason when we have them
-                send_message_to_sink(std::move(subread));
-            }
+            continue;
+        }
+
+        // If this message isn't a read, we'll get a bad_variant_access exception.
+        auto init_read = std::get<std::shared_ptr<Read>>(message);
+        for (auto& subread : split(init_read)) {
+            //TODO correctly process end_reason when we have them
+            send_message_to_sink(std::move(subread));
         }
     }
 

@@ -11,7 +11,7 @@ void SubreadTaggerNode::worker_thread() {
 
         if (std::holds_alternative<CandidatePairRejectedMessage>(message)) {
             check_complete_groups = true;
-        } else {
+        } else if (std::holds_alternative<std::shared_ptr<Read>>(message)) {
             // If this message isn't a read, we'll get a bad_variant_access exception.
             auto read = std::get<std::shared_ptr<Read>>(message);
 
