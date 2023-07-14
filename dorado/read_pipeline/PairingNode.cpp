@@ -101,6 +101,27 @@ void PairingNode::pair_generating_worker_thread() {
 
     Message message;
     while (m_work_queue.try_pop(message)) {
+        if (std::holds_alternative<CacheFlushMessage>(message)) {
+            std::unique_lock<std::mutex> lock(m_pairing_mtx);
+            auto flush_message = std::get<CacheFlushMessage>(message);
+            auto& read_cache = m_read_caches[flush_message.client_id];
+            for (const auto& [key, reads_list] : read_cache.channel_mux_read_map) {
+                // kv is a std::pair<UniquePoreIdentifierKey, std::list<std::shared_ptr<Read>>>
+                for (const auto& read_ptr : reads_list) {
+                    // Push each read message
+                    send_message_to_sink(std::move(read_ptr));
+                }
+            }
+            m_read_caches.erase(flush_message.client_id);
+            continue;
+        }
+
+        // If this message isn't a read, just forward it to the sink.
+        if (!std::holds_alternative<std::shared_ptr<Read>>(message)) {
+            send_message_to_sink(std::move(message));
+            continue;
+        }
+
         // If this message isn't a read, we'll get a bad_variant_access exception.
         auto read = std::get<std::shared_ptr<Read>>(message);
 
