@@ -9,6 +9,7 @@
 #include <chrono>
 #include <iomanip>
 #include <sstream>
+#include <stack>
 
 using namespace std::chrono_literals;
 
@@ -88,7 +89,7 @@ void Read::generate_read_tags(bam1_t *aln, bool emit_moves) const {
     float sd = scale;
     bam_aux_append(aln, "sd", 'f', sizeof(sd), (uint8_t *)&sd);
 
-    bam_aux_append(aln, "sv", 'Z', 9, (uint8_t *)"quantile");
+    bam_aux_append(aln, "sv", 'Z', scaling_method.size() + 1, (uint8_t *)scaling_method.c_str());
 
     uint32_t duplex = 0;
     bam_aux_append(aln, "dx", 'i', sizeof(duplex), (uint8_t *)&duplex);
@@ -269,6 +270,8 @@ float Read::calculate_mean_qscore() const {
     return utils::mean_qscore_from_qstring(qstring, mean_qscore_start_pos);
 }
 
+MessageSink::MessageSink(size_t max_messages) : m_work_queue(max_messages) {}
+
 void MessageSink::push_message(Message &&message) {
     const bool success = m_work_queue.try_push(std::move(message));
     // try_push will fail if the sink has been told to terminate.
@@ -276,6 +279,124 @@ void MessageSink::push_message(Message &&message) {
     assert(success);
 }
 
-MessageSink::MessageSink(size_t max_messages) : m_work_queue(max_messages) {}
+// Depth first search that establishes a topological ordering for node destruction.
+// Returns true if a cycle is found.
+bool Pipeline::DFS(const std::vector<PipelineDescriptor::NodeDescriptor> &node_descriptors,
+                   NodeHandle node_handle,
+                   std::vector<DFSState> &dfs_state,
+                   std::vector<NodeHandle> &source_to_sink_order) {
+    auto &node_state = dfs_state.at(node_handle);
+    if (node_state == DFSState::Visited) {
+        // Already reached this node via another route.
+        return false;
+    }
+    if (node_state == DFSState::Visiting) {
+        // Back edge => cycle.
+        return true;
+    }
+    node_state = DFSState::Visiting;
+    auto sink_handles = node_descriptors.at(node_handle).sink_handles;
+    for (auto sink_handle : sink_handles) {
+        if (DFS(node_descriptors, sink_handle, dfs_state, source_to_sink_order)) {
+            return true;
+        }
+    }
+    node_state = DFSState::Visited;
+    source_to_sink_order.push_back(node_handle);
+    return false;
+}
+
+std::unique_ptr<Pipeline> Pipeline::create(
+        PipelineDescriptor &&descriptor,
+        std::vector<dorado::stats::StatsReporter> *const stats_reporters,
+        stats::NamedStats *const final_stats) {
+    // Find a source node, i.e. one that is not the sink of any other node.
+    // There should be exactly 1 one for a valid pipeline.
+    const auto node_count = descriptor.m_node_descriptors.size();
+    std::vector<bool> is_sink(node_count, false);
+    for (auto &[desc_node, sink_handles] : descriptor.m_node_descriptors) {
+        for (auto sink_handle : sink_handles) {
+            is_sink.at(sink_handle) = true;
+        }
+    }
+    const auto num_sources = std::count(is_sink.cbegin(), is_sink.cend(), false);
+    if (num_sources != 1) {
+        spdlog::error("There must be exactly 1 source node.  {} were present.", num_sources);
+        return nullptr;
+    }
+    auto source_it = std::find(is_sink.cbegin(), is_sink.cend(), false);
+    auto source_node = std::distance(is_sink.cbegin(), source_it);
+
+    // Perform a depth first search from the source to determine the
+    // source-to-sink destruction order.  At the same time, cycles are detected.
+    std::vector<NodeHandle> source_to_sink_order;
+    std::vector<DFSState> dfs_state(node_count, DFSState::Unvisited);
+    const bool has_cycle =
+            DFS(descriptor.m_node_descriptors, source_node, dfs_state, source_to_sink_order);
+    if (has_cycle) {
+        spdlog::error("Graph has cycle");
+        return nullptr;
+    }
+    std::reverse(source_to_sink_order.begin(), source_to_sink_order.end());
+    // If the graph is fully connected then we should have visited all nodes.
+    assert(std::all_of(dfs_state.cbegin(), dfs_state.cend(),
+                       [](DFSState v) { return v == DFSState::Visited; }));
+    assert(source_to_sink_order.size() == descriptor.m_node_descriptors.size());
+
+    return std::unique_ptr<Pipeline>(
+            new Pipeline(std::move(descriptor), source_to_sink_order, stats_reporters));
+}
+
+Pipeline::Pipeline(PipelineDescriptor &&descriptor,
+                   std::vector<NodeHandle> source_to_sink_order,
+                   std::vector<dorado::stats::StatsReporter> *const stats_reporters)
+        : m_source_to_sink_order(std::move(source_to_sink_order)) {
+    for (auto &[desc_node, _] : descriptor.m_node_descriptors) {
+        m_nodes.push_back(std::move(desc_node));
+        if (stats_reporters) {
+            stats_reporters->push_back(stats::make_stats_reporter(*m_nodes.back()));
+        }
+    }
+
+    for (size_t i = 0; i < m_nodes.size(); ++i) {
+        auto &node = m_nodes.at(i);
+        const auto &sink_handles = descriptor.m_node_descriptors.at(i).sink_handles;
+        for (const auto sink_handle : sink_handles)
+            node->add_sink(dynamic_cast<MessageSink &>(*m_nodes.at(sink_handle)));
+    }
+}
+
+void MessageSink::add_sink(MessageSink &sink) { m_sinks.push_back(std::ref(sink)); }
+
+void MessageSink::send_message_to_sink(int sink_index, Message &&message) {
+    m_sinks.at(sink_index).get().push_message(std::move(message));
+}
+
+void Pipeline::push_message(Message &&message) {
+    assert(!m_nodes.empty());
+    const auto source_node_index = m_source_to_sink_order.front();
+    dynamic_cast<MessageSink &>(*m_nodes.at(source_node_index)).push_message(std::move(message));
+}
+
+stats::NamedStats Pipeline::terminate() {
+    stats::NamedStats final_stats;
+    for (auto handle : m_source_to_sink_order) {
+        auto &node = m_nodes.at(handle);
+        node->terminate();
+        auto node_stats = node->sample_stats();
+        const auto node_name = node->get_name();
+        for (const auto &[name, value] : node_stats) {
+            final_stats[node_name + "." + name] = value;
+        }
+    }
+    return final_stats;
+}
+
+Pipeline::~Pipeline() {
+    for (auto handle : m_source_to_sink_order) {
+        auto &node = m_nodes.at(handle);
+        node.reset();
+    }
+}
 
 }  // namespace dorado

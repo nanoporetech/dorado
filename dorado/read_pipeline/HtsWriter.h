@@ -3,20 +3,17 @@
 #include "read_pipeline/ReadPipeline.h"
 #include "utils/stats.h"
 
-#ifdef WIN32
-#include <indicators/progress_bar.hpp>
-#else
-#include <indicators/block_progress_bar.hpp>
-#endif
-
+#include <cstdint>
 #include <memory>
 #include <string>
+#include <thread>
+#include <unordered_set>
 
 namespace dorado {
 
 class HtsWriter : public MessageSink {
 public:
-    enum OutputMode {
+    enum class OutputMode {
         UBAM,
         BAM,
         SAM,
@@ -27,24 +24,27 @@ public:
     ~HtsWriter();
     std::string get_name() const override { return "HtsWriter"; }
     stats::NamedStats sample_stats() const override;
-    int write_header(const sam_hdr_t* header);
-    int write(bam1_t* record);
-    void join();
+    void terminate() override { terminate_impl(); }
 
-    static OutputMode get_output_mode(std::string mode);
-
-    size_t total{0};
-    size_t primary{0};
-    size_t unmapped{0};
-    size_t secondary{0};
-    size_t supplementary{0};
-    sam_hdr_t* header{nullptr};
+    int set_and_write_header(const sam_hdr_t* header);
+    static OutputMode get_output_mode(const std::string& mode);
+    size_t get_total() const { return m_total; }
+    size_t get_primary() const { return m_primary; }
+    size_t get_unmapped() const { return m_unmapped; }
 
 private:
+    void terminate_impl();
+    size_t m_total{0};
+    size_t m_primary{0};
+    size_t m_unmapped{0};
+    size_t m_secondary{0};
+    size_t m_supplementary{0};
+    sam_hdr_t* m_header{nullptr};
+
     htsFile* m_file{nullptr};
     std::unique_ptr<std::thread> m_worker;
     void worker_thread();
-    int write_hdr_sq(char* name, uint32_t length);
+    int write(bam1_t* record);
     size_t m_num_reads_expected;
     std::unordered_set<std::string> m_processed_read_ids;
 };

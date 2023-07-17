@@ -1,11 +1,18 @@
 #pragma once
+
 #include "ReadPipeline.h"
+#include "utils/AsyncQueue.h"
 #include "utils/stats.h"
 
+#include <array>
 #include <atomic>
+#include <condition_variable>
+#include <cstdint>
 #include <deque>
 #include <functional>
 #include <memory>
+#include <mutex>
+#include <string>
 #include <vector>
 
 namespace dorado {
@@ -16,15 +23,15 @@ struct ModBaseParams;
 
 class ModBaseCallerNode : public MessageSink {
 public:
-    ModBaseCallerNode(MessageSink& sink,
-                      std::vector<std::unique_ptr<ModBaseRunner>> model_runners,
+    ModBaseCallerNode(std::vector<std::unique_ptr<ModBaseRunner>> model_runners,
                       size_t remora_threads,
                       size_t block_stride,
                       size_t batch_size,
                       size_t max_reads = 1000);
-    ~ModBaseCallerNode();
+    ~ModBaseCallerNode() { terminate_impl(); }
     std::string get_name() const override { return "ModBaseCallerNode"; }
     stats::NamedStats sample_stats() const override;
+    void terminate() override { terminate_impl(); }
 
     struct Info {
         std::string long_names;
@@ -38,6 +45,8 @@ public:
     };
 
 private:
+    void terminate_impl();
+
     // Determine the modbase alphabet from parameters and calculate offset positions for the results
     // if node is not null it will populate its members
     [[maybe_unused]] static Info get_modbase_info_and_maybe_init(
@@ -61,7 +70,6 @@ private:
     // Worker thread, processes chunk results back into the reads
     void output_worker_thread();
 
-    MessageSink& m_sink;
     size_t m_batch_size;
     size_t m_block_stride;
 
@@ -71,7 +79,7 @@ private:
     std::vector<std::unique_ptr<std::thread>> m_runner_workers;
     std::vector<std::unique_ptr<std::thread>> m_input_worker;
 
-    std::deque<std::shared_ptr<RemoraChunk>> m_processed_chunks;
+    AsyncQueue<std::shared_ptr<RemoraChunk>> m_processed_chunks;
     std::vector<std::deque<std::shared_ptr<RemoraChunk>>> m_chunk_queues;
 
     std::mutex m_working_reads_mutex;
@@ -81,9 +89,6 @@ private:
     std::mutex m_chunk_queues_mutex;
     std::condition_variable m_chunk_queues_cv;
     std::condition_variable m_chunks_added_cv;
-
-    std::mutex m_processed_chunks_mutex;
-    std::condition_variable m_processed_chunks_cv;
 
     std::atomic<int> m_num_active_runner_workers{0};
     std::atomic<int> m_num_active_input_worker{0};

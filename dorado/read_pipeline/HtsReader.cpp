@@ -43,10 +43,10 @@ bool HtsReader::has_tag(std::string tagname) {
     return static_cast<bool>(tag);
 }
 
-void HtsReader::read(MessageSink& read_sink, int max_reads) {
+void HtsReader::read(Pipeline& pipeline, int max_reads) {
     int num_reads = 0;
     while (this->read()) {
-        read_sink.push_message(BamPtr(bam_dup1(record.get())));
+        pipeline.push_message(BamPtr(bam_dup1(record.get())));
         if (++num_reads >= max_reads) {
             break;
         }
@@ -55,7 +55,6 @@ void HtsReader::read(MessageSink& read_sink, int max_reads) {
         }
     }
     spdlog::debug("Total reads processed: {}", num_reads);
-    read_sink.terminate();
 }
 
 read_map read_bam(const std::string& filename, const std::unordered_set<std::string>& read_ids) {

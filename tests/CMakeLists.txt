@@ -21,6 +21,7 @@ set(SOURCE_FILES
     ModelUtilsTest.cpp
     NodeSmokeTest.cpp
     PairingNodeTest.cpp
+    PipelineTest.cpp
     BamUtilsTest.cpp
     ResumeLoaderTest.cpp
     TimeUtilsTest.cpp
@@ -29,7 +30,7 @@ set(SOURCE_FILES
 if (DORADO_GPU_BUILD)
     if(APPLE)
         list(APPEND SOURCE_FILES
-            MetalLinearTest.cpp
+	    MetalLinearTest.cpp
         )
     else()
         list(APPEND SOURCE_FILES

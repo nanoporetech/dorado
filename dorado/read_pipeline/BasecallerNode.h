@@ -14,8 +14,7 @@ namespace dorado {
 class BasecallerNode : public MessageSink {
 public:
     // Chunk size and overlap are in raw samples
-    BasecallerNode(MessageSink& sink,
-                   std::vector<Runner> model_runners,
+    BasecallerNode(std::vector<Runner> model_runners,
                    size_t overlap,
                    int batch_timeout_ms,
                    std::string model_name = "",
@@ -23,11 +22,13 @@ public:
                    const std::string& node_name = "BasecallerNode",
                    bool in_duplex_pipeline = false,
                    uint32_t read_mean_qscore_start_pos = 0);
-    ~BasecallerNode();
+    ~BasecallerNode() { terminate_impl(); }
     std::string get_name() const override { return m_node_name; }
     stats::NamedStats sample_stats() const override;
+    void terminate() override { terminate_impl(); }
 
 private:
+    void terminate_impl();
     // Consume reads from input queue
     void input_worker_thread();
     // Basecall reads
@@ -37,7 +38,6 @@ private:
     // Construct complete reads
     void working_reads_manager();
 
-    MessageSink& m_sink;
     // Vector of model runners (each with their own GPU access etc)
     std::vector<Runner> m_model_runners;
     // Chunk length
@@ -65,7 +65,7 @@ private:
     // Time when Basecaller Node terminates. Used for benchmarking and debugging
     std::chrono::time_point<std::chrono::system_clock> termination_time;
     // Async queue to keep track of basecalling chunks.
-    std::unique_ptr<AsyncQueue<std::shared_ptr<Chunk>>> m_chunks_in;
+    AsyncQueue<std::shared_ptr<Chunk>> m_chunks_in;
 
     std::mutex m_working_reads_mutex;
     // Reads removed from input queue and being basecalled.
@@ -74,7 +74,7 @@ private:
     // If we go multi-threaded, there will be one of these batches per thread
     std::vector<std::deque<std::shared_ptr<Chunk>>> m_batched_chunks;
 
-    std::unique_ptr<AsyncQueue<std::shared_ptr<Chunk>>> m_processed_chunks;
+    AsyncQueue<std::shared_ptr<Chunk>> m_processed_chunks;
 
     // Class members are initialised in declaration order regardless of initialiser list order.
     // Class data members whose construction launches threads must therefore have their
@@ -86,8 +86,6 @@ private:
     std::vector<std::thread> m_basecall_workers;
     // Stitches working reads into complete reads.
     std::vector<std::thread> m_working_reads_managers;
-    // Working read managers that have not been terminated.
-    std::atomic<int> m_working_reads_managers_count{0};
 
     // Performance monitoring stats.
     std::string m_node_name;

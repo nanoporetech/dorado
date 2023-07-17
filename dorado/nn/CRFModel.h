@@ -15,6 +15,7 @@ struct SignalNormalisationParams {
     float quantile_b = 0.9f;
     float shift_multiplier = 0.51f;
     float scale_multiplier = 0.53f;
+    bool quantile_scaling = true;
 };
 
 // Values extracted from config.toml used in construction of the model module.

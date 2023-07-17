@@ -769,6 +769,15 @@ struct CRFModelImpl : Module {
             // Output is [T, N, C], which CPU decoding requires.
             return encoder->forward(x).transpose(0, 1);
         }
+#if DORADO_GPU_BUILD && !defined(__APPLE__)
+        try {
+            // Output is [N, T, C]
+            return encoder->forward(x);
+        } catch (c10::Error &e) {
+            spdlog::warn("Caught Torch error '{}', clearing CUDA cache and retrying.", e.msg());
+            c10::cuda::CUDACachingAllocator::emptyCache();
+        }
+#endif
         // Output is [N, T, C]
         return encoder->forward(x);
     }
@@ -870,6 +879,12 @@ CRFModelConfig load_crf_model_config(const std::filesystem::path &path) {
         config.signal_norm_params.quantile_b = toml::find<float>(norm, "quantile_b");
         config.signal_norm_params.shift_multiplier = toml::find<float>(norm, "shift_multiplier");
         config.signal_norm_params.scale_multiplier = toml::find<float>(norm, "scale_multiplier");
+    }
+
+    // Set quantile scaling method based on the model filename
+    std::string model_name = std::filesystem::canonical(config.model_path).filename().string();
+    if (model_name.rfind("dna_r9.4.1", 0) == 0) {
+        config.signal_norm_params.quantile_scaling = false;
     }
 
     return config;

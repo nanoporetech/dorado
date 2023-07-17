@@ -18,20 +18,21 @@ namespace dorado {
 HtsWriter::HtsWriter(const std::string& filename, OutputMode mode, size_t threads, size_t num_reads)
         : MessageSink(10000), m_num_reads_expected(num_reads) {
     switch (mode) {
-    case FASTQ:
+    case OutputMode::FASTQ:
         m_file = hts_open(filename.c_str(), "wf");
         break;
-    case BAM:
+    case OutputMode::BAM:
         m_file = hts_open(filename.c_str(), "wb");
         break;
-    case SAM:
+    case OutputMode::SAM:
         m_file = hts_open(filename.c_str(), "w");
         break;
-    case UBAM:
+    case OutputMode::UBAM:
         m_file = hts_open(filename.c_str(), "wb0");
         break;
     default:
-        throw std::runtime_error("Unknown output mode selected: " + std::to_string(mode));
+        throw std::runtime_error("Unknown output mode selected: " +
+                                 std::to_string(static_cast<int>(mode)));
     }
     if (!m_file) {
         throw std::runtime_error("Could not open file: " + filename);
@@ -46,38 +47,39 @@ HtsWriter::HtsWriter(const std::string& filename, OutputMode mode, size_t thread
     m_worker = std::make_unique<std::thread>(std::thread(&HtsWriter::worker_thread, this));
 }
 
-HtsWriter::~HtsWriter() {
-    // Adding for thread safety in case worker thread throws exception.
-    terminate();
+void HtsWriter::terminate_impl() {
+    terminate_input_queue();
     if (m_worker->joinable()) {
-        join();
+        m_worker->join();
     }
-    sam_hdr_destroy(header);
+}
+
+HtsWriter::~HtsWriter() {
+    terminate_impl();
+    sam_hdr_destroy(m_header);
     hts_close(m_file);
 }
 
-HtsWriter::OutputMode HtsWriter::get_output_mode(std::string mode) {
+HtsWriter::OutputMode HtsWriter::get_output_mode(const std::string& mode) {
     if (mode == "sam") {
-        return SAM;
+        return OutputMode::SAM;
     } else if (mode == "bam") {
-        return BAM;
+        return OutputMode::BAM;
     } else if (mode == "fastq") {
-        return FASTQ;
+        return OutputMode::FASTQ;
     }
     throw std::runtime_error("Unknown output mode: " + mode);
 }
 
-void HtsWriter::join() { m_worker->join(); }
-
 void HtsWriter::worker_thread() {
+    // FIXME -- either remove this or add the code to set it to something other than 0
     size_t write_count = 0;
 
     Message message;
     while (m_work_queue.try_pop(message)) {
-        auto aln = std::get<BamPtr>(std::move(message));
+        auto aln = std::move(std::get<BamPtr>(message));
         write(aln.get());
         std::string read_id = bam_get_qname(aln.get());
-        aln.reset();  // Free the bam alignment that's already written
 
         // For the purpose of estimating write count, we ignore duplex reads
         // these can be identified by a semicolon in their ID.
@@ -91,31 +93,39 @@ void HtsWriter::worker_thread() {
     spdlog::debug("Written {} records.", write_count);
 }
 
-int HtsWriter::write(bam1_t* record) {
+int HtsWriter::write(bam1_t* const record) {
     // track stats
-    total++;
+    m_total++;
     if (record->core.flag & BAM_FUNMAP) {
-        unmapped++;
+        m_unmapped++;
     }
     if (record->core.flag & BAM_FSECONDARY) {
-        secondary++;
+        m_secondary++;
     }
     if (record->core.flag & BAM_FSUPPLEMENTARY) {
-        supplementary++;
+        m_supplementary++;
     }
-    primary = total - secondary - supplementary - unmapped;
+    m_primary = m_total - m_secondary - m_supplementary - m_unmapped;
 
-    auto res = sam_write1(m_file, header, record);
+    // FIXME -- HtsWriter is constructed in a state where attempting to write
+    // will segfault, since set_and_write_header has to have been called
+    // in order to set m_header.
+    assert(m_header);
+    auto res = sam_write1(m_file, m_header, record);
     if (res < 0) {
         throw std::runtime_error("Failed to write SAM record, error code " + std::to_string(res));
     }
     return res;
 }
 
-int HtsWriter::write_header(const sam_hdr_t* hdr) {
-    if (hdr) {
-        header = sam_hdr_dup(hdr);
-        return sam_hdr_write(m_file, header);
+int HtsWriter::set_and_write_header(const sam_hdr_t* const header) {
+    if (header) {
+        // Avoid leaking memory if this is called twice.
+        if (m_header) {
+            sam_hdr_destroy(m_header);
+        }
+        m_header = sam_hdr_dup(header);
+        return sam_hdr_write(m_file, m_header);
     }
     return 0;
 }

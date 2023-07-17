@@ -153,18 +153,16 @@ void DataLoader::load_reads(const std::string& path,
                             ReadOrder traversal_order) {
     if (!std::filesystem::exists(path)) {
         spdlog::error("Requested input path {} does not exist!", path);
-        m_read_sink.terminate();
         return;
     }
     if (!std::filesystem::is_directory(path)) {
         spdlog::error("Requested input path {} is not a directory!", path);
-        m_read_sink.terminate();
         return;
     }
 
     auto iterate_directory = [&](const auto& iterator_fn) {
         switch (traversal_order) {
-        case BY_CHANNEL:
+        case ReadOrder::BY_CHANNEL:
             // If traversal in channel order is required, the following algorithm
             // is used -
             // 1. iterate through all the read metadata to collect channel information
@@ -199,7 +197,7 @@ void DataLoader::load_reads(const std::string& path,
                 }
             }
             break;
-        case UNRESTRICTED:
+        case ReadOrder::UNRESTRICTED:
             for (const auto& entry : iterator_fn(path)) {
                 if (m_loaded_read_count == m_max_reads) {
                     break;
@@ -215,8 +213,8 @@ void DataLoader::load_reads(const std::string& path,
             }
             break;
         default:
-            throw std::runtime_error("Unsupported traversal order detected " +
-                                     std::to_string(traversal_order));
+            throw std::runtime_error("Unsupported traversal order detected: " +
+                                     dorado::to_string(traversal_order));
         }
     };
 
@@ -228,8 +226,6 @@ void DataLoader::load_reads(const std::string& path,
         iterate_directory(
                 [](const auto& path) { return std::filesystem::directory_iterator(path); });
     }
-
-    m_read_sink.terminate();
 }
 
 int DataLoader::get_num_reads(std::string data_path,
@@ -599,7 +595,7 @@ void DataLoader::load_pod5_reads_from_file_by_read_ids(const std::string& path,
 
         for (auto& v : futures) {
             auto read = v.get();
-            m_read_sink.push_message(std::move(read));
+            m_pipeline.push_message(std::move(read));
             m_loaded_read_count++;
         }
 
@@ -658,7 +654,7 @@ void DataLoader::load_pod5_reads_from_file(const std::string& path) {
 
         for (auto& v : futures) {
             auto read = v.get();
-            m_read_sink.push_message(read);
+            m_pipeline.push_message(std::move(read));
             m_loaded_read_count++;
         }
 
@@ -758,19 +754,19 @@ void DataLoader::load_fast5_reads_from_file(const std::string& path) {
 
         if (!m_allowed_read_ids ||
             (m_allowed_read_ids->find(new_read->read_id) != m_allowed_read_ids->end())) {
-            m_read_sink.push_message(new_read);
+            m_pipeline.push_message(std::move(new_read));
             m_loaded_read_count++;
         }
     }
 }
 
-DataLoader::DataLoader(MessageSink& read_sink,
+DataLoader::DataLoader(Pipeline& pipeline,
                        const std::string& device,
                        size_t num_worker_threads,
                        size_t max_reads,
                        std::optional<std::unordered_set<std::string>> read_list,
                        std::unordered_set<std::string> read_ignore_list)
-        : m_read_sink(read_sink),
+        : m_pipeline(pipeline),
           m_device(device),
           m_num_worker_threads(num_worker_threads),
           m_allowed_read_ids(std::move(read_list)),
