@@ -10,3 +10,5 @@
 # Note that Linux is fine (https://github.com/pytorch/pytorch/pull/20461), but suppression files
 # don't support conditionals so we have to suppress them globally.
 vptr:torch/include/*
+# The same issue happens with stdlib types in older Xcode versions.
+vptr:MacOSX12.3.sdk/usr/include/c++/v1/fstream
