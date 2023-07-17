@@ -238,16 +238,18 @@ if (TORCH_STATIC_LIB)
             )
         endif()
 
-    elseif(APPLE AND NOT CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
+    elseif(APPLE)
         find_library(ACCELERATE_FRAMEWORK Accelerate REQUIRED)
         find_library(METAL_FRAMEWORK Metal REQUIRED)
         find_library(MPS_FRAMEWORK MetalPerformanceShaders REQUIRED)
         find_library(MPSG_FRAMEWORK MetalPerformanceShadersGraph REQUIRED)
+        find_library(FOUNDATION_FRAMEWORK Foundation REQUIRED)
         list(APPEND TORCH_LIBRARIES
             ${ACCELERATE_FRAMEWORK}
             ${METAL_FRAMEWORK}
             ${MPS_FRAMEWORK}
             ${MPSG_FRAMEWORK}
+            ${FOUNDATION_FRAMEWORK}
         )
     endif()
 endif()
