@@ -3,7 +3,15 @@ include_guard(GLOBAL)
 
 set(TORCH_VERSION 2.0.0)
 unset(TORCH_PATCH_SUFFIX)
-set(TORCH_STATIC_LIB FALSE)
+
+# If we're building with sanitizers then we want Torch to be dynamic since we don't build the
+# static lib with instrumentation and hence get some false-positives.
+if(ECM_ENABLE_SANITIZERS)
+    set(TRY_USING_STATIC_TORCH_LIB FALSE)
+else()
+    set(TRY_USING_STATIC_TORCH_LIB TRUE)
+endif()
+set(USING_STATIC_TORCH_LIB FALSE)
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32)
     find_package(CUDAToolkit REQUIRED)
@@ -64,15 +72,25 @@ else()
             endif()
             set(TORCH_LIB_SUFFIX "/torch")
         else()
-            if(DORADO_USING_OLD_CPP_ABI)
-                set(TORCH_URL https://cdn.oxfordnanoportal.com/software/analysis/torch-2.0.0-linux-x64-ont-pre-cxx11.zip)
-                set(TORCH_PATCH_SUFFIX -ont-pre-cxx11)
+            if (TRY_USING_STATIC_TORCH_LIB)
+                if(DORADO_USING_OLD_CPP_ABI)
+                    set(TORCH_URL https://cdn.oxfordnanoportal.com/software/analysis/torch-2.0.0-linux-x64-ont-pre-cxx11.zip)
+                    set(TORCH_PATCH_SUFFIX -pre-cxx11)
+                else()
+                    set(TORCH_URL https://cdn.oxfordnanoportal.com/software/analysis/torch-2.0.0-linux-x64-ont-cxx11-abi.zip)
+                    set(TORCH_PATCH_SUFFIX -cxx11-abi)
+                endif()
+                set(USING_STATIC_TORCH_LIB TRUE)
             else()
-                set(TORCH_URL https://cdn.oxfordnanoportal.com/software/analysis/torch-2.0.0-linux-x64-ont-cxx11-abi.zip)
-                set(TORCH_PATCH_SUFFIX -ont-cxx11-abi)
+                if(DORADO_USING_OLD_CPP_ABI)
+                    set(TORCH_URL https://download.pytorch.org/libtorch/cu118/libtorch-shared-with-deps-${TORCH_VERSION}%2Bcu118.zip)
+                    set(TORCH_PATCH_SUFFIX -pre-cxx11)
+                else()
+                    set(TORCH_URL https://download.pytorch.org/libtorch/cu118/libtorch-cxx11-abi-shared-with-deps-${TORCH_VERSION}%2Bcu118.zip)
+                    set(TORCH_PATCH_SUFFIX -cxx11-abi)
+                endif()
             endif()
             set(TORCH_LIB_SUFFIX "/libtorch")
-            set(TORCH_STATIC_LIB TRUE)
         endif()
 
     elseif(APPLE)
@@ -83,23 +101,36 @@ else()
             set(TORCH_URL https://download.pytorch.org/whl/cpu/torch-${TORCH_VERSION}-cp39-none-macosx_10_9_x86_64.whl)
             set(TORCH_LIB_SUFFIX "/torch")
         else()
-            set(TORCH_URL https://cdn.oxfordnanoportal.com/software/analysis/torch-2.0.0-macos-m1-ont.zip)
-            set(TORCH_PATCH_SUFFIX -ont)
-            set(TORCH_LIB_SUFFIX "/libtorch")
-            set(TORCH_STATIC_LIB TRUE)
+            if (TRY_USING_STATIC_TORCH_LIB)
+                set(TORCH_URL https://cdn.oxfordnanoportal.com/software/analysis/torch-2.0.0-macos-m1-ont.zip)
+                set(TORCH_LIB_SUFFIX "/libtorch")
+                set(USING_STATIC_TORCH_LIB TRUE)
+            else()
+                set(TORCH_URL https://files.pythonhosted.org/packages/4d/80/760f3edcf0179c3111fae496b97ee3fa9171116b4bccae6e073efe928e72/torch-${TORCH_VERSION}-cp39-none-macosx_11_0_arm64.whl)
+                set(TORCH_LIB_SUFFIX "/torch")
+            endif()
         endif()
     elseif(WIN32)
-        set(TORCH_URL https://cdn.oxfordnanoportal.com/software/analysis/torch-2.0.0.2-Windows-ont.zip)
-        set(TORCH_PATCH_SUFFIX -ont-2)
-        set(TORCH_LIB_SUFFIX "/libtorch")
-        set(TORCH_STATIC_LIB TRUE)
-        add_compile_options(
-            # Note we need to use the generator expression to avoid setting this for CUDA.
-            $<$<COMPILE_LANGUAGE:CXX>:/wd4624> # from libtorch: destructor was implicitly defined as deleted 
-        )
+        if (TRY_USING_STATIC_TORCH_LIB)
+            set(TORCH_URL https://cdn.oxfordnanoportal.com/software/analysis/torch-2.0.0.2-Windows-ont.zip)
+            set(TORCH_PATCH_SUFFIX -ont-2)
+            set(TORCH_LIB_SUFFIX "/libtorch")
+            set(USING_STATIC_TORCH_LIB TRUE)
+            add_compile_options(
+                # Note we need to use the generator expression to avoid setting this for CUDA.
+                $<$<COMPILE_LANGUAGE:CXX>:/wd4624> # from libtorch: destructor was implicitly defined as deleted 
+            )
 
-        # Torch Windows static build includes some win headers without defining NOMINMAX.
-        add_compile_options(-DNOMINMAX)
+            # Torch Windows static build includes some win headers without defining NOMINMAX.
+            add_compile_options(-DNOMINMAX)
+        else()
+            set(TORCH_URL https://download.pytorch.org/libtorch/cu118/libtorch-win-shared-with-deps-${TORCH_VERSION}%2Bcu118.zip)
+            set(TORCH_LIB_SUFFIX "/libtorch")
+        endif()
+    endif()
+
+    if (USING_STATIC_TORCH_LIB)
+        set(TORCH_PATCH_SUFFIX "${TORCH_PATCH_SUFFIX}-static")
     endif()
 
     # Get libtorch (if we don't already have it)
@@ -152,7 +183,7 @@ if(WIN32 AND DEFINED MKL_ROOT)
 endif()
 
 # Static builds require a few libs to be added
-if (TORCH_STATIC_LIB)
+if (USING_STATIC_TORCH_LIB)
     if(WIN32)
         list(APPEND TORCH_LIBRARIES
             CUDA::cudart_static
