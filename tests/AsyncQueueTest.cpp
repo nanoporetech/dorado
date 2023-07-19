@@ -41,6 +41,17 @@ TEST_CASE(TEST_GROUP ": PopFailsIfTerminating") {
     CHECK(!success);
 }
 
+TEST_CASE(TEST_GROUP ": PushPopSucceedAfterRestarting") {
+    AsyncQueue<int> queue(1);
+    queue.terminate();
+    queue.restart();
+    const bool push_success = queue.try_push(42);
+    CHECK(push_success);
+    int val;
+    const bool pop_success = queue.try_pop(val);
+    CHECK(pop_success);
+}
+
 // Spawned thread sits waiting for an item.
 // Main thread supplies that item.
 TEST_CASE(TEST_GROUP ": PopFromOtherThread") {
