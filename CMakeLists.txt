@@ -18,6 +18,12 @@ if(WIN32)
   message(STATUS "vs platform: ${CMAKE_VS_PLATFORM_NAME}")
 endif()
 
+if (APPLE)
+    # Prefer static libs if they exist so that we don't run into issues
+    # linking to dynamic libraries that live in brew.
+    list(PREPEND CMAKE_FIND_LIBRARY_SUFFIXES ".a")
+endif()
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(DORADO_3RD_PARTY ${CMAKE_CURRENT_SOURCE_DIR}/dorado/3rdparty)
