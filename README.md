@@ -140,16 +140,13 @@ $ dorado download --model all
 
 ### **Simplex models:**
 
-v4.1.0 models are recommended for our latest released condition (4 kHz).
+v4.2.0 models are recommended for our latest released condition (5 kHz).
 
-* dna_r10.4.1_e8.2_260bps_fast@v4.1.0
-* dna_r10.4.1_e8.2_260bps_hac@v4.1.0
-* dna_r10.4.1_e8.2_260bps_sup@v4.1.0
-* dna_r10.4.1_e8.2_400bps_fast@v4.1.0
-* dna_r10.4.1_e8.2_400bps_hac@v4.1.0
-* dna_r10.4.1_e8.2_400bps_sup@v4.1.0
+* dna_r10.4.1_e8.2_400bps_fast@v4.2.0
+* dna_r10.4.1_e8.2_400bps_hac@v4.2.0
+* dna_r10.4.1_e8.2_400bps_sup@v4.2.0
 
-The following simplex models are also available:
+The following simplex models are also available (all for 4 kHz data):
 
 * dna_r9.4.1_e8_fast@v3.4
 * dna_r9.4.1_e8_hac@v3.3
@@ -167,9 +164,12 @@ The following simplex models are also available:
 * dna_r10.4.1_e8.2_400bps_fast@v4.0.0
 * dna_r10.4.1_e8.2_400bps_hac@v4.0.0
 * dna_r10.4.1_e8.2_400bps_sup@v4.0.0
-* dna_r10.4.1_e8.2_400bps_fast@v4.2.0 (5kHz)
-* dna_r10.4.1_e8.2_400bps_hac@v4.2.0 (5kHz)
-* dna_r10.4.1_e8.2_400bps_sup@v4.2.0 (5kHz)
+* dna_r10.4.1_e8.2_260bps_fast@v4.1.0
+* dna_r10.4.1_e8.2_260bps_hac@v4.1.0
+* dna_r10.4.1_e8.2_260bps_sup@v4.1.0
+* dna_r10.4.1_e8.2_400bps_fast@v4.1.0
+* dna_r10.4.1_e8.2_400bps_hac@v4.1.0
+* dna_r10.4.1_e8.2_400bps_sup@v4.1.0
 
 ### **RNA models:**
 
@@ -206,11 +206,11 @@ The following simplex models are also available:
 * dna_r10.4.1_e8.2_400bps_fast@v4.1.0_5mCG_5hmCG@v2
 * dna_r10.4.1_e8.2_400bps_hac@v4.1.0_5mCG_5hmCG@v2
 * dna_r10.4.1_e8.2_400bps_sup@v4.1.0_5mCG_5hmCG@v2
-* dna_r10.4.1_e8.2_400bps_fast@v4.2.0_5mCG_5hmCG@v2 (5kHz)
-* dna_r10.4.1_e8.2_400bps_hac@v4.2.0_5mCG_5hmCG@v2 (5kHz)
-* dna_r10.4.1_e8.2_400bps_sup@v4.2.0_5mCG_5hmCG@v2 (5kHz)
-* dna_r10.4.1_e8.2_400bps_sup@v4.2.0_5mC@v2 (5kHz)
-* dna_r10.4.1_e8.2_400bps_sup@v4.2.0_6mA@v2 (5kHz)
+* dna_r10.4.1_e8.2_400bps_fast@v4.2.0_5mCG_5hmCG@v2 (5 kHz)
+* dna_r10.4.1_e8.2_400bps_hac@v4.2.0_5mCG_5hmCG@v2 (5 kHz)
+* dna_r10.4.1_e8.2_400bps_sup@v4.2.0_5mCG_5hmCG@v2 (5 kHz)
+* dna_r10.4.1_e8.2_400bps_sup@v4.2.0_5mC@v2 (5 kHz)
+* dna_r10.4.1_e8.2_400bps_sup@v4.2.0_6mA@v2 (5 kHz)
 
 ## Decoding Dorado model names
 
