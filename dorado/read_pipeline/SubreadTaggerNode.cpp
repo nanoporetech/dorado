@@ -1,5 +1,7 @@
 #include "SubreadTaggerNode.h"
 
+#include <spdlog/spdlog.h>
+
 #include <algorithm>
 
 namespace dorado {
@@ -9,10 +11,7 @@ void SubreadTaggerNode::worker_thread() {
     while (m_work_queue.try_pop(message)) {
         bool check_complete_groups = false;
 
-        if (std::holds_alternative<CandidatePairRejectedMessage>(message)) {
-            check_complete_groups = true;
-        } else if (std::holds_alternative<std::shared_ptr<Read>>(message)) {
-            // If this message isn't a read, we'll get a bad_variant_access exception.
+        if (std::holds_alternative<std::shared_ptr<Read>>(message)) {
             auto read = std::get<std::shared_ptr<Read>>(message);
 
             if (read->is_duplex) {
@@ -53,6 +52,12 @@ void SubreadTaggerNode::worker_thread() {
                     m_subread_groups.erase(read->read_tag);
                 }
             }
+        } else if (std::holds_alternative<CandidatePairRejectedMessage>(message)) {
+            check_complete_groups = true;
+        } else {
+            spdlog::warn("SubreadTaggerNode received unexpected message type: {}.",
+                         message.index());
+            continue;
         }
 
         if (check_complete_groups) {
