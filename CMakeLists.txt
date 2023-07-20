@@ -18,6 +18,12 @@ if(WIN32)
   message(STATUS "vs platform: ${CMAKE_VS_PLATFORM_NAME}")
 endif()
 
+if (APPLE)
+    # Prefer static libs if they exist so that we don't run into issues
+    # linking to dynamic libraries that live in brew.
+    list(PREPEND CMAKE_FIND_LIBRARY_SUFFIXES ".a")
+endif()
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(DORADO_3RD_PARTY ${CMAKE_CURRENT_SOURCE_DIR}/dorado/3rdparty)
@@ -436,24 +442,6 @@ elseif(WIN32)
 elseif(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     file(GLOB TORCH_DLLS "${TORCH_LIB}/lib/*.dylib")
     install(FILES ${TORCH_DLLS} DESTINATION lib COMPONENT redist_libs)
-
-    find_library(AEC_DLL aec REQUIRED)
-    get_filename_component(AEC_DLL_PATH ${AEC_DLL} DIRECTORY)
-    file(GLOB AEC_DLLS "${AEC_DLL_PATH}/libaec*dylib*")
-    RESOLVE_SYMLINKS("${AEC_DLLS}" RESOLVED_AEC_DLLS)
-    install(FILES ${RESOLVED_AEC_DLLS} DESTINATION lib COMPONENT redist_libs)
-
-    find_library(SZ_DLL sz REQUIRED)
-    get_filename_component(SZ_DLL_PATH ${SZ_DLL} DIRECTORY)
-    file(GLOB SZ_DLLS "${SZ_DLL_PATH}/libsz*dylib*")
-    RESOLVE_SYMLINKS("${SZ_DLLS}" RESOLVED_SZ_DLLS)
-    install(FILES ${RESOLVED_SZ_DLLS} DESTINATION lib COMPONENT redist_libs)
-
-    # If zstd has been dynamically linked, add the .so to the package
-    get_filename_component(ZSTD_LIBRARY_PATH ${ZSTD_LIBRARY_RELEASE} DIRECTORY)
-    file(GLOB ZSTD_DLLS "${ZSTD_LIBRARY_PATH}/*zstd*dylib*")
-    RESOLVE_SYMLINKS("${ZSTD_DLLS}" RESOLVED_ZSTD_DLLS)
-    install(FILES ${RESOLVED_ZSTD_DLLS} DESTINATION lib COMPONENT redist_libs)
 endif()
 
 add_library(dorado_models_lib
