@@ -182,9 +182,9 @@ The following simplex models are also available (all for 4 kHz data):
 
 ### **Modified base models**
 
-* dna_r9.4.1_e8_fast@v3.4_5mCG@v0
-* dna_r9.4.1_e8_hac@v3.3_5mCG@v0
-* dna_r9.4.1_e8_sup@v3.3_5mCG@v0
+* dna_r9.4.1_e8_fast@v3.4_5mCG@v0.1
+* dna_r9.4.1_e8_hac@v3.3_5mCG@v0.1
+* dna_r9.4.1_e8_sup@v3.3_5mCG@v0.1
 * dna_r9.4.1_e8_fast@v3.4_5mCG_5hmCG@v0
 * dna_r9.4.1_e8_hac@v3.3_5mCG_5hmCG@v0
 * dna_r9.4.1_e8_sup@v3.3_5mCG_5hmCG@v0
