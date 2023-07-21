@@ -184,7 +184,7 @@ void DataLoader::load_reads(const std::string& path,
                                    [](unsigned char c) { return std::tolower(c); });
                     if (ext == ".fast5") {
                         throw std::runtime_error(
-                                "Traversing reads by channel is only availabls for POD5. "
+                                "Traversing reads by channel is only available for POD5. "
                                 "Encountered FAST5 at " +
                                 path.string());
                     } else if (ext == ".pod5") {
