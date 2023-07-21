@@ -177,6 +177,7 @@ std::shared_ptr<Read> subread(const Read& read, PosRange seq_range, PosRange sig
             read.read_id, std::to_string(seq_range.first) + "-" + std::to_string(seq_range.second));
     subread->read_id = subread_id;
     subread->read_tag = read.read_tag;
+    subread->client_id = read.client_id;
     subread->raw_data = subread->raw_data.index(
             {torch::indexing::Slice(signal_range.first, signal_range.second)});
     subread->attributes.read_number = -1;
@@ -542,15 +543,17 @@ void DuplexSplitNode::worker_thread() {
     Message message;
 
     while (m_work_queue.try_pop(message)) {
-        if (!m_settings.enabled) {
+        // If this message isn't a read, just forward it to the sink.
+        if (!m_settings.enabled || !std::holds_alternative<std::shared_ptr<Read>>(message)) {
             send_message_to_sink(std::move(message));
-        } else {
-            // If this message isn't a read, we'll get a bad_variant_access exception.
-            auto init_read = std::get<std::shared_ptr<Read>>(message);
-            for (auto& subread : split(init_read)) {
-                //TODO correctly process end_reason when we have them
-                send_message_to_sink(std::move(subread));
-            }
+            continue;
+        }
+
+        // If this message isn't a read, we'll get a bad_variant_access exception.
+        auto init_read = std::get<std::shared_ptr<Read>>(message);
+        for (auto& subread : split(init_read)) {
+            //TODO correctly process end_reason when we have them
+            send_message_to_sink(std::move(subread));
         }
     }
 
@@ -564,8 +567,12 @@ DuplexSplitNode::DuplexSplitNode(DuplexSplitSettings settings,
           m_settings(std::move(settings)),
           m_num_worker_threads(num_worker_threads) {
     m_split_finders = build_split_finders();
-    for (int i = 0; i < m_num_worker_threads; i++) {
-        worker_threads.push_back(
+    start_threads();
+}
+
+void DuplexSplitNode::start_threads() {
+    for (int i = 0; i < m_num_worker_threads; ++i) {
+        m_worker_threads.push_back(
                 std::make_unique<std::thread>(&DuplexSplitNode::worker_thread, this));
     }
 }
@@ -574,11 +581,17 @@ void DuplexSplitNode::terminate_impl() {
     terminate_input_queue();
 
     // Wait for all the Node's worker threads to terminate
-    for (auto& t : worker_threads) {
+    for (auto& t : m_worker_threads) {
         if (t->joinable()) {
             t->join();
         }
     }
+    m_worker_threads.clear();
+}
+
+void DuplexSplitNode::restart() {
+    restart_input_queue();
+    start_threads();
 }
 
 stats::NamedStats DuplexSplitNode::sample_stats() const { return stats::from_obj(m_work_queue); }

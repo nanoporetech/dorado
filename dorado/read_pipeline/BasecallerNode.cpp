@@ -23,7 +23,8 @@ void BasecallerNode::input_worker_thread() {
     Message message;
 
     while (m_work_queue.try_pop(message)) {
-        if (std::holds_alternative<CandidatePairRejectedMessage>(message)) {
+        // If this message isn't a read, just forward it to the sink.
+        if (!std::holds_alternative<std::shared_ptr<Read>>(message)) {
             send_message_to_sink(std::move(message));
             continue;
         }
@@ -150,7 +151,7 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
     std::shared_ptr<Chunk> chunk;
     while (m_chunks_in.try_pop_until(
             chunk, last_chunk_reserve_time + std::chrono::milliseconds(m_batch_timeout_ms))) {
-        // If chunk is empty, then try_pop timed out without getting a new chunk.
+        // If chunk is empty, then try_pop_until timed out without getting a new chunk.
         if (!chunk) {
             if (!m_batched_chunks[worker_id].empty()) {
                 // get scores for whatever chunks are available.
@@ -264,38 +265,56 @@ BasecallerNode::BasecallerNode(std::vector<Runner> model_runners,
     // Setup worker state
     const size_t num_workers = m_model_runners.size();
     m_batched_chunks.resize(num_workers);
-    m_basecall_workers.resize(num_workers);
-    m_num_active_model_runners = num_workers;
 
     initialization_time = std::chrono::system_clock::now();
 
     // Spin up any workers last so that we're not mutating |this| underneath them
+    start_threads();
+}
+
+void BasecallerNode::start_threads() {
+    m_input_worker = std::make_unique<std::thread>([this] { input_worker_thread(); });
+    const size_t num_workers = m_model_runners.size();
     m_working_reads_managers.resize(num_workers / 2);
     for (int i = 0; i < m_working_reads_managers.size(); i++) {
         m_working_reads_managers[i] = std::thread([this] { working_reads_manager(); });
     }
-    m_input_worker = std::make_unique<std::thread>([this] { input_worker_thread(); });
+    m_basecall_workers.resize(num_workers);
     for (int i = 0; i < static_cast<int>(num_workers); i++) {
         m_basecall_workers[i] = std::thread([this, i] { basecall_worker_thread(i); });
     }
+    m_num_active_model_runners = num_workers;
 }
 
 void BasecallerNode::terminate_impl() {
     terminate_input_queue();
-    if (m_input_worker->joinable()) {
+    if (m_input_worker && m_input_worker->joinable()) {
         m_input_worker->join();
     }
+    m_input_worker.reset();
     for (auto &t : m_basecall_workers) {
         if (t.joinable()) {
             t.join();
         }
     }
+    m_basecall_workers.clear();
     for (auto &t : m_working_reads_managers) {
         if (t.joinable()) {
             t.join();
         }
     }
+    m_working_reads_managers.clear();
     termination_time = std::chrono::system_clock::now();
+}
+
+void BasecallerNode::restart() {
+    for (auto &runner : m_model_runners) {
+        runner->restart();
+    }
+    restart_input_queue();
+    m_chunks_in.restart();
+    m_processed_chunks.restart();
+    start_threads();
 }
 
 stats::NamedStats BasecallerNode::sample_stats() const {

@@ -17,10 +17,10 @@ If you encounter any problems building or running Dorado, please [report an issu
 
 ## Installation
 
- - [dorado-0.3.1-linux-x64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.3.1-linux-x64.tar.gz)
- - [dorado-0.3.1-linux-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.3.1-linux-arm64.tar.gz)
- - [dorado-0.3.1-osx-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.3.1-osx-arm64.tar.gz)
- - [dorado-0.3.1-win64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.3.1-win64.zip)
+ - [dorado-0.3.2-linux-x64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.3.2-linux-x64.tar.gz)
+ - [dorado-0.3.2-linux-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.3.2-linux-arm64.tar.gz)
+ - [dorado-0.3.2-osx-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.3.2-osx-arm64.tar.gz)
+ - [dorado-0.3.2-win64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.3.2-win64.zip)
 
 ## Platforms
 
@@ -140,16 +140,13 @@ $ dorado download --model all
 
 ### **Simplex models:**
 
-v4.1.0 models are recommended for our latest released condition (4 kHz).
+v4.2.0 models are recommended for our latest released condition (5 kHz).
 
-* dna_r10.4.1_e8.2_260bps_fast@v4.1.0
-* dna_r10.4.1_e8.2_260bps_hac@v4.1.0
-* dna_r10.4.1_e8.2_260bps_sup@v4.1.0
-* dna_r10.4.1_e8.2_400bps_fast@v4.1.0
-* dna_r10.4.1_e8.2_400bps_hac@v4.1.0
-* dna_r10.4.1_e8.2_400bps_sup@v4.1.0
+* dna_r10.4.1_e8.2_400bps_fast@v4.2.0
+* dna_r10.4.1_e8.2_400bps_hac@v4.2.0
+* dna_r10.4.1_e8.2_400bps_sup@v4.2.0
 
-The following simplex models are also available:
+The following simplex models are also available (all for 4 kHz data):
 
 * dna_r9.4.1_e8_fast@v3.4
 * dna_r9.4.1_e8_hac@v3.3
@@ -167,15 +164,21 @@ The following simplex models are also available:
 * dna_r10.4.1_e8.2_400bps_fast@v4.0.0
 * dna_r10.4.1_e8.2_400bps_hac@v4.0.0
 * dna_r10.4.1_e8.2_400bps_sup@v4.0.0
-* dna_r10.4.1_e8.2_400bps_fast@v4.2.0 (5kHz)
-* dna_r10.4.1_e8.2_400bps_hac@v4.2.0 (5kHz)
-* dna_r10.4.1_e8.2_400bps_sup@v4.2.0 (5kHz)
+* dna_r10.4.1_e8.2_260bps_fast@v4.1.0
+* dna_r10.4.1_e8.2_260bps_hac@v4.1.0
+* dna_r10.4.1_e8.2_260bps_sup@v4.1.0
+* dna_r10.4.1_e8.2_400bps_fast@v4.1.0
+* dna_r10.4.1_e8.2_400bps_hac@v4.1.0
+* dna_r10.4.1_e8.2_400bps_sup@v4.1.0
 
 ### **RNA models:**
 
 * rna002_70bps_fast@v3
 * rna002_70bps_hac@v3
 * rna003_120bps_sup@v3
+* rna004_130bps_fast@v3
+* rna004_130bps_hac@v3
+* rna004_130bps_sup@v3
 
 ### **Modified base models**
 
@@ -203,11 +206,11 @@ The following simplex models are also available:
 * dna_r10.4.1_e8.2_400bps_fast@v4.1.0_5mCG_5hmCG@v2
 * dna_r10.4.1_e8.2_400bps_hac@v4.1.0_5mCG_5hmCG@v2
 * dna_r10.4.1_e8.2_400bps_sup@v4.1.0_5mCG_5hmCG@v2
-* dna_r10.4.1_e8.2_400bps_fast@v4.2.0_5mCG_5hmCG@v2 (5kHz)
-* dna_r10.4.1_e8.2_400bps_hac@v4.2.0_5mCG_5hmCG@v2 (5kHz)
-* dna_r10.4.1_e8.2_400bps_sup@v4.2.0_5mCG_5hmCG@v2 (5kHz)
-* dna_r10.4.1_e8.2_400bps_sup@v4.2.0_5mC@v2 (5kHz)
-* dna_r10.4.1_e8.2_400bps_sup@v4.2.0_6mA@v2 (5kHz)
+* dna_r10.4.1_e8.2_400bps_fast@v4.2.0_5mCG_5hmCG@v2 (5 kHz)
+* dna_r10.4.1_e8.2_400bps_hac@v4.2.0_5mCG_5hmCG@v2 (5 kHz)
+* dna_r10.4.1_e8.2_400bps_sup@v4.2.0_5mCG_5hmCG@v2 (5 kHz)
+* dna_r10.4.1_e8.2_400bps_sup@v4.2.0_5mC@v2 (5 kHz)
+* dna_r10.4.1_e8.2_400bps_sup@v4.2.0_6mA@v2 (5 kHz)
 
 ## Decoding Dorado model names
 
@@ -277,9 +280,50 @@ $ pip install pre-commit
 $ pre-commit install
 ```
 
+## Troubleshooting Guide
+
+### Library Path Errors
+
+Dorado comes equipped with the necessary libraries (such as CUDA) for its execution. However, on some operating systems, the system libraries might be chosen over Dorado's. This discrepancy can result in various errors, for instance,  `CuBLAS error 8`.
+
+To resolve this issue, you need to set the `LD_LIBRARY_PATH` to point to Dorado's libraries. Use a command like the following on Linux (change path as appropriate):
+
+```
+$ export LD_LIBRARY_PATH=<PATH_TO_DORADO>/dorado-x.y.z-linux-x64/lib:$LD_LIBRARY_PATH
+```
+
+On macOS, the equivalent export would be (change path as appropriate):
+
+```
+$ export DYLD_LIBRARY_PATH=<PATH_TO_DORADO>/dorado-x.y.z-osx-arm64/lib:$DYLD_LIBRARY_PATH
+```
+
+This will let the Dorado binary pick up the shipped libraries and you will not need to manually install `libaec` and `zstd`. 
+
+### GPU Out of Memory Errors
+
+Dorado operates on a broad range of GPUs but it is primarily developed for Nvidia A100/H100 and Apple Silicon. Dorado attempts to find the optimal batch size for basecalling. Nevertheless, on some low-RAM GPUs, users may face out of memory crashes.
+
+A potential solution to this issue could be setting a manual batch size using the following command:
+
+`dorado basecaller --batchsize 64 ...`
+
+To determine the batch size picked by `dorado`, run it in verbose mode by adding the `-v` option.
+
+**Note:** Reducing memory consumption by modifying the `chunksize` parameter is not recommended as it influences the basecalling results.
+
+### Low GPU Utilization
+
+Low GPU utilization can lead to reduced basecalling speed. This problem can be identified using tools such as `nvidia-smi` and `nvtop`. Low GPU utilization often stems from I/O bottlenecks in basecalling. Here are a few steps you can take to improve the situation:
+
+1. Opt for POD5 instead of FAST5: POD5 has superior I/O performance and will enhance the basecall speed in I/O constrained environments.
+2. Transfer data to the local disk before basecalling: Slow basecalling often occurs because network disks cannot supply Dorado with adequate speed. To mitigate this, make sure your data is as close to your host machine as possible.
+3. Choose SSD over HDD: Particularly for duplex basecalling, using a local SSD can offer significant speed advantages. This is due to the duplex basecalling algorithm's reliance on heavy random access of data.
+
+
 ## Licence and Copyright
 
-(c) 2022 Oxford Nanopore Technologies PLC.
+(c) 2023 Oxford Nanopore Technologies PLC.
 
 Dorado is distributed under the terms of the Oxford Nanopore
 Technologies PLC.  Public License, v. 1.0.  If a copy of the License
