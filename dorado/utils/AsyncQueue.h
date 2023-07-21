@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <atomic>
 #include <condition_variable>
 #include <mutex>
@@ -32,14 +33,70 @@ class AsyncQueue {
     int64_t m_num_pushes = 0;
     int64_t m_num_pops = 0;
 
+    // Sets item to the next element in the queue and
+    // notifies a waiting thread that the queue is not full.
+    // Should only be called with the mutex locked via lock.
+    void pop_item(std::unique_lock<std::mutex>& lock, Item& item) {
+        assert(!m_items.empty());
+        item = std::move(m_items.front());
+        m_items.pop();
+        ++m_num_pops;
+
+        // Inform a waiting thread that the queue is not full.
+        lock.unlock();
+        m_not_full_cv.notify_one();
+    }
+
+    // Calls process_fn on the up to max_count items in the queue,
+    // popping them.  Notifies all waiting threads that the queue is
+    // not full.
+    // Should only be called with the mutex locked via lock.
+    template <class ProcessFn>
+    void process_items(std::unique_lock<std::mutex>& lock, ProcessFn process_fn, size_t max_count) {
+        assert(!m_items.empty());
+        size_t num_to_pop = std::min(m_items.size(), max_count);
+        for (size_t i = 0; i < num_to_pop; ++i) {
+            process_fn(m_items.front());
+            m_items.pop();
+        }
+        m_num_pops += num_to_pop;
+
+        // Inform all waiting threads that the queue is not full, since in general
+        // we have removed > 1 item and there can be > 1 thread waiting to push.
+        lock.unlock();
+        m_not_full_cv.notify_all();
+    }
+
+    // Waits until the queue is not empty or we are asked to terminate.
+    // Returns a unique_lock holding m_mutex.
+    std::unique_lock<std::mutex> wait_for_item() {
+        std::unique_lock lock(m_mutex);
+        m_not_empty_cv.wait(lock, [this] { return !m_items.empty() || m_terminate; });
+        return lock;
+    }
+
+    // Same as wait_for_item, but will also time out, setting cv_status accordingly.
+    std::unique_lock<std::mutex> wait_for_item_or_timeout(const std::chrono::time_point<Clock, Duration>& timeout_time, bool& cv_status) {
+        std::unique_lock lock(m_mutex);
+        cv_status = m_not_empty_cv.wait_until(
+        lock, timeout_time, [this] { return !m_items.empty() || m_terminate; });
+        return lock;
+    }
+
 public:
     // Attempts to push items beyond capacity will block.
-    AsyncQueue(size_t capacity) : m_capacity(capacity) {}
+    explicit AsyncQueue(size_t capacity) : m_capacity(capacity) {}
 
     ~AsyncQueue() {
         // Ensure CV waits terminate before destruction.
         terminate();
     }
+
+    // Contains std::mutex and std::condition_variable, so is not copyable or movable.
+    AsyncQueue(const AsyncQueue&) = delete;
+    AsyncQueue(AsyncQueue&&) = delete;
+    AsyncQueue& operator=(const AsyncQueue&) = delete;
+    AsyncQueue& operator=(AsyncQueue&&) = delete;
 
     // Attempts to add an item to the queue.
     // If the queue is full, this method blocks until there is space or
@@ -74,10 +131,9 @@ public:
     // Otherwise we block if the queue is empty.
     template <class Clock, class Duration>
     bool try_pop_until(Item& item, const std::chrono::time_point<Clock, Duration>& timeout_time) {
-        std::unique_lock lock(m_mutex);
-        // Wait until either an item is added, a timeout is hit or we're asked to terminate.
-        auto cv_status = m_not_empty_cv.wait_until(
-                lock, timeout_time, [this] { return !m_items.empty() || m_terminate; });
+        bool cv_status;
+        auto lock = wait_for_item_or_timeout(timeout_time, &cv_status);
+
         if (cv_status == false) {
             // Condition variable timed out and the predicate returned false.
             // In this case, we don't terminate and return without any output.
@@ -89,14 +145,7 @@ public:
             return false;
         }
 
-        item = std::move(m_items.front());
-        m_items.pop();
-        ++m_num_pops;
-
-        // Inform a waiting thread that the queue is not full.
-        lock.unlock();
-        m_not_full_cv.notify_one();
-
+        pop_item(lock, item);
         return true;
     }
 
@@ -104,52 +153,36 @@ public:
     // If the queue is empty, and we are terminating, returns false.
     // Otherwise we block if the queue is empty.
     bool try_pop(Item& item) {
-        std::unique_lock lock(m_mutex);
-        // Wait until the queue is non-empty, or we're asked to terminate.
-        m_not_empty_cv.wait(lock, [this] { return !m_items.empty() || m_terminate; });
+        auto lock = wait_for_item();
 
         // Termination takes effect once all items have been popped from the queue.
         if (m_terminate && m_items.empty()) {
             return false;
         }
 
-        item = std::move(m_items.front());
-        m_items.pop();
-        ++m_num_pops;
-
-        // Inform a waiting thread that the queue is not full.
-        lock.unlock();
-        m_not_full_cv.notify_one();
-
+        pop_item(lock, item);
         return true;
     }
 
-    // Obtains all items in the queue once the lock is obtained.
+    // Obtains all items in the queue, up to the limit of max_count if non-zero,
+    // once the lock is obtained.
     // Return value is false if we are terminating.
     // If the lock is contended this could be more efficient than repeated
     // calls to try_pop.
     template <class ProcessFn>
-    bool process_and_pop_all(ProcessFn process_fn) {
-        std::unique_lock lock(m_mutex);
-        // Wait until the queue is non-empty, or we're asked to terminate.
-        m_not_empty_cv.wait(lock, [this] { return !m_items.empty() || m_terminate; });
+    bool process_and_pop_all(ProcessFn process_fn, size_t max_count = 0) {
+        if (max_count == 0) {
+            max_count = m_capacity;
+        }
+
+        auto lock = wait_for_item();
 
         // Termination takes effect once all items have been popped from the queue.
         if (m_terminate && m_items.empty()) {
             return false;
         }
 
-        while (!m_items.empty()) {
-            process_fn(m_items.front());
-            m_items.pop();
-            ++m_num_pops;
-        }
-
-        // Inform all waiting threads that the queue is not full, since in general
-        // we have removed > 1 item and there can be > 1 thread waiting to push.
-        lock.unlock();
-        m_not_full_cv.notify_all();
-
+        process_items(lock, process_fn, max_count);
         return true;
     }
 

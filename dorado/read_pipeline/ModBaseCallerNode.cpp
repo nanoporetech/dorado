@@ -35,7 +35,10 @@ ModBaseCallerNode::ModBaseCallerNode(std::vector<std::unique_ptr<ModBaseRunner>>
 
     m_output_worker = std::make_unique<std::thread>(&ModBaseCallerNode::output_worker_thread, this);
 
-    m_chunk_queues.resize(m_runners[0]->num_callers());
+    for (int i = 0; i < m_runners[0]->num_callers(); i++) {
+        m_chunk_queues.emplace_back(
+                std::make_unique<AsyncQueue<std::shared_ptr<RemoraChunk>>>(batch_size * 5));
+    }
 
     for (size_t worker_id = 0; worker_id < m_runners.size(); ++worker_id) {
         for (size_t model_id = 0; model_id < m_runners[worker_id]->num_callers(); ++model_id) {
@@ -148,18 +151,8 @@ void ModBaseCallerNode::input_worker_thread() {
         // If this message isn't a read, we'll get a bad_variant_access exception.
         auto read = std::get<std::shared_ptr<Read>>(message);
 
-        const size_t max_chunks_in = m_batch_size * 5;  // size per queue: one queue per caller
-        auto chunk_queues_available = [this, &max_chunks_in] {
-            return std::all_of(
-                    std::begin(m_chunk_queues), std::end(m_chunk_queues),
-                    [&max_chunks_in](const auto& queue) { return queue.size() < max_chunks_in; });
-        };
 
         while (true) {
-            std::unique_lock<std::mutex> chunk_lock(m_chunk_queues_mutex);
-            m_chunk_queues_cv.wait(chunk_lock, chunk_queues_available);
-            chunk_lock.unlock();
-
             stats::Timer timer;
             {
                 nvtx3::scoped_range range{"base_mod_probs_init"};
@@ -187,7 +180,7 @@ void ModBaseCallerNode::input_worker_thread() {
             auto& runner = m_runners[0];
             for (size_t caller_id = 0; caller_id < runner->num_callers(); ++caller_id) {
                 nvtx3::scoped_range range{"generate_chunks"};
-                auto& chunk_queue = m_chunk_queues[caller_id];
+                auto& chunk_queue = m_chunk_queues.at(caller_id);
 
                 // scale signal based on model parameters
                 auto scaled_signal = runner->scale_signal(caller_id, read->raw_data, sequence_ints,
@@ -220,12 +213,9 @@ void ModBaseCallerNode::input_worker_thread() {
 
                     ++read->num_modbase_chunks;
                 }
-                chunk_lock.lock();
-                chunk_queue.insert(chunk_queue.end(), reads_to_enqueue.begin(),
-                                   reads_to_enqueue.end());
-                chunk_lock.unlock();
-                reads_to_enqueue.size() > m_batch_size ? m_chunks_added_cv.notify_all()
-                                                       : m_chunks_added_cv.notify_one();
+                for (auto& chunk : reads_to_enqueue) {
+                    chunk_queue->try_push(std::move(chunk));
+                }                
             }
             m_chunk_generation_ms += timer.GetElapsedMS();
 
@@ -244,8 +234,9 @@ void ModBaseCallerNode::input_worker_thread() {
 
     int num_remaining_workers = --m_num_active_input_worker;
     if (num_remaining_workers == 0) {
-        m_terminate_runners.store(true);
-        m_chunks_added_cv.notify_all();
+        for (auto& chunk_queue : m_chunk_queues) {
+            chunk_queue->terminate();
+        }
     }
 }
 
@@ -253,75 +244,47 @@ void ModBaseCallerNode::modbasecall_worker_thread(size_t worker_id, size_t calle
     auto& runner = m_runners[worker_id];
     auto& chunk_queue = m_chunk_queues[caller_id];
 
-    auto batched_chunks = std::vector<std::shared_ptr<RemoraChunk>>{};
+    std::vector<std::shared_ptr<RemoraChunk>> batched_chunks;
     auto last_chunk_reserve_time = std::chrono::system_clock::now();
 
-    while (true) {
+    
+
+    // Repeatedly attempt to complete the current batch with one acquisition of the
+    // chunk queue mutex.
+    size_t previous_chunk_count = 0;
+    auto grab_chunk = [&batched_chunks](std::shared_ptr<RemoraChunk>& chunk) {
+        batched_chunks.push_back(std::move(chunk));
+    };
+    while (chunk_queue->process_and_pop_all(grab_chunk, m_batch_size - batched_chunks.size())) {
         nvtx3::scoped_range range{"modbasecall_worker_thread"};
-        std::unique_lock<std::mutex> chunks_lock(m_chunk_queues_mutex);
-        if (!m_chunks_added_cv.wait_until(
-                    chunks_lock, last_chunk_reserve_time + FORCE_TIMEOUT, [&chunk_queue, this] {
-                        return !chunk_queue.empty() || m_terminate_runners.load();
-                    })) {
-            // timeout without new chunks or termination call
-            chunks_lock.unlock();
-            if (!batched_chunks.empty()) {
-                call_current_batch(worker_id, caller_id, batched_chunks);
-            }
 
-            // reset wait period
-            last_chunk_reserve_time = std::chrono::system_clock::now();
-            continue;
-        }
-
-        if (chunk_queue.empty() && m_terminate_runners.load()) {
-            // no remaining chunks and we've been told to terminate
-            // call the remaining batch
-            chunks_lock.unlock();  // Not strictly necessary
-            if (!batched_chunks.empty()) {
-                call_current_batch(worker_id, caller_id, batched_chunks);
-            }
-
-            // Reduce the count of active runner threads.  If this was the last active
-            // thread also send termination signal to sink
-            int num_remaining_runners = --m_num_active_runner_workers;
-            if (num_remaining_runners == 0) {
-                // runners can share a caller, so shutdown when all runners are done
-                // rather than terminating each runner as it finishes
-                for (auto& runner : m_runners) {
-                    runner->terminate();
-                }
-                m_processed_chunks.terminate();
-            }
-            return;
-        }
-
-        // With the lock held, grab all the chunks we can accommodate in the
-        // current batch from the chunk queue, but don't yet pass them to
-        // the model input tensors.  We do this to minimise the time we need to
-        // hold the mutex, which is highly contended, without having to repeatedly
-        // lock/unlock, which is expensive enough in itself to slow down this thread
-        // significantly.  This matters because slack time in this thread currently
-        // gates Remora model GPU throughput on fast systems.
-        size_t previous_chunk_count = batched_chunks.size();
-        {
-            nvtx3::scoped_range range{"push_chunks"};
-            while (batched_chunks.size() != m_batch_size && !chunk_queue.empty()) {
-                std::shared_ptr<RemoraChunk> chunk = chunk_queue.front();
-                chunk_queue.pop_front();
-                batched_chunks.push_back(chunk);
-                last_chunk_reserve_time = std::chrono::system_clock::now();
-            }
-        }
-        // Relinquish the chunk queue mutex, allowing other chunk queue
-        // activity to progress.
-        chunks_lock.unlock();
-        m_chunk_queues_cv.notify_one();
-
-        // Insert the chunks we just obtained into the model input tensors.
+        // We have just grabbed some number of chunks from the chunk queue and added
+        // them to batched_chunks.  Insert those chunks into the model input tensors.
         for (size_t chunk_idx = previous_chunk_count; chunk_idx < batched_chunks.size();
              ++chunk_idx) {
             const auto& chunk = batched_chunks[chunk_idx];
+            runner->accept_chunk(caller_id, chunk_idx, chunk->signal, chunk->encoded_kmers);
+        }
+
+        // If we have a complete batch, call it immediately.
+        if (batched_chunks.size() == m_batch_size) {
+            // Input tensor is full, let's get scores.
+            call_current_batch(worker_id, caller_id, batched_chunks);
+        }
+
+        previous_chunk_count = batched_chunks.size();
+    }
+
+
+
+    /*std::shared_ptr<RemoraChunk> chunk;
+    while (chunk_queue->try_pop(chunk)) {
+        nvtx3::scoped_range range{"modbasecall_worker_thread"};
+        if (batched_chunks.size() != m_batch_size) {
+            size_t chunk_idx = batched_chunks.size();
+            batched_chunks.push_back(chunk);
+            // reset wait period
+            last_chunk_reserve_time = std::chrono::system_clock::now();
             runner->accept_chunk(caller_id, chunk_idx, chunk->signal, chunk->encoded_kmers);
         }
 
@@ -329,6 +292,19 @@ void ModBaseCallerNode::modbasecall_worker_thread(size_t worker_id, size_t calle
             // Input tensor is full, let's get_scores.
             call_current_batch(worker_id, caller_id, batched_chunks);
         }
+    }*/
+
+
+    // Basecall any remaining chunks.
+    if (!batched_chunks.empty()) {
+        call_current_batch(worker_id, caller_id, batched_chunks);
+    }
+
+    // Reduce the count of active model callers.  If this was the last active
+    // model caller also send termination signal to sink
+    int num_remaining_callers = --m_num_active_runner_workers;
+    if (num_remaining_callers == 0) {
+        m_processed_chunks.terminate();
     }
 }
 
