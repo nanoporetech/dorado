@@ -571,6 +571,7 @@ void DataLoader::load_pod5_reads_from_file_by_read_ids(const std::string& path,
         throw std::runtime_error("Plan traveral didn't yield correct number of reads");
     }
 
+    // Create static threadpool so it is reused across calls to this function.
     static cxxpool::thread_pool pool{m_num_worker_threads};
 
     uint32_t row_offset = 0;

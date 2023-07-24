@@ -47,8 +47,8 @@ std::shared_ptr<dorado::Read> StereoDuplexEncoderNode::stereo_encode(
     EdlibAlignResult result = edlibAlign(temp_strand.data(), temp_strand.length(),
                                          comp_strand.data(), comp_strand.length(), align_config);
 
-    int query_cursor = comp_start;
     int target_cursor = temp_start;
+    int query_cursor = comp_start;
 
     int start_alignment_position = result.startLocations[0];
     int end_alignment_position = result.endLocations[0];
@@ -283,10 +283,7 @@ void StereoDuplexEncoderNode::worker_thread() {
                 read_pair->read_1, read_pair->read_2, read_pair->read_1_start,
                 read_pair->read_1_end, read_pair->read_2_start, read_pair->read_2_end);
 
-        //spdlog::info("{} pair {}", get_name(), m_work_queue.size());
-        //spdlog::info("{} processed {}", __LINE__, m_num_sent_pairs.load());
-        send_message_to_sink(
-                stereo_encoded_read);  // Stereo-encoded read created, send it to sink
+        send_message_to_sink(stereo_encoded_read);  // Stereo-encoded read created, send it to sink
     }
 }
 

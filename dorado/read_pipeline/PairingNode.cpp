@@ -3,6 +3,7 @@
 #include "minimap.h"
 
 #include <nvtx3/nvtx3.hpp>
+#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <cstdint>
@@ -10,28 +11,41 @@
 
 namespace dorado {
 
+// Determine whether 2 proposed reads form a duplex pair or not.
+// The algorithm utilizes the following heuristics to make a decision -
+// 1. Reads must be within 1000ms of each other, and the ratio of their
+//    lengths must be at least 20%.
+// 2. If the lengths are >98% similar and time delta is <100ms, consider
+//    them to be a pair.
+// 3. If the early acceptance fails, then run minimap2 to generate overlap
+//    coordinates. If the mapping quality is high (>50), the overlap covers
+//    most of the shorter read (80%), one read maps to the reverse strand
+//    of the other, and the end of the complement is mapped to the beginning
+//    of the template read, then consider them a pair.
 std::tuple<bool, uint32_t, uint32_t, uint32_t, uint32_t>
-PairingNode::is_within_time_and_length_criteria(const std::shared_ptr<dorado::Read>& read1,
-                                                const std::shared_ptr<dorado::Read>& read2,
+PairingNode::is_within_time_and_length_criteria(const std::shared_ptr<dorado::Read>& temp,
+                                                const std::shared_ptr<dorado::Read>& comp,
                                                 int tid) {
-    const int max_time_delta_ms = 1000;
-    int delta = read2->start_time_ms - read1->get_end_time_ms();
-    int seq_len1 = read1->seq.length();
-    int seq_len2 = read2->seq.length();
+    const int kMaxTimeDeltaMs = 1000;
+    const float kMinSeqLenRatio = 0.2f;
+    int delta = comp->start_time_ms - temp->get_end_time_ms();
+    int seq_len1 = temp->seq.length();
+    int seq_len2 = comp->seq.length();
     float len_ratio = static_cast<float>(std::min(seq_len1, seq_len2)) /
                       static_cast<float>(std::max(seq_len1, seq_len2));
-    float min_seq_len_ratio = 0.2f;
 
-    if ((delta >= 0) && (delta < max_time_delta_ms) && (len_ratio > min_seq_len_ratio)) {
-        float accept_seq_len_ratio = 0.98;
-        if (delta <= 100 && len_ratio >= accept_seq_len_ratio) {
-            spdlog::debug("Early acceptance: len frac {}, delta {} read1 len {}, read2 len {}",
-                          len_ratio, delta, read1->seq.length(), read2->seq.length());
-            return {true, 0, read1->seq.length() - 1, 0, read2->seq.length() - 1};
+    if ((delta >= 0) && (delta < kMaxTimeDeltaMs) && (len_ratio > kMinSeqLenRatio)) {
+        const float kEarlyAcceptSeqLenRatio = 0.98;
+        const int kEarlyAcceptTimeDeltaMs = 100;
+        if (delta <= kEarlyAcceptTimeDeltaMs && len_ratio >= kEarlyAcceptSeqLenRatio) {
+            spdlog::debug(
+                    "Early acceptance: len frac {}, delta {} temp len {}, comp len {}, {} and {}",
+                    len_ratio, delta, temp->seq.length(), comp->seq.length(), temp->read_id,
+                    comp->read_id);
+            return {true, 0, temp->seq.length() - 1, 0, comp->seq.length() - 1};
         }
 
-        //spdlog::info("{} tid {} mm2 start", std::string(tid, '\t'), tid);
-        const std::string nvtx_id = "pairing_mm2_" + std::to_string(tid);
+        const std::string nvtx_id = "pairing_map_" + std::to_string(tid);
         nvtx3::scoped_range loop{nvtx_id};
         // Add mm2 based overlap check.
         mm_idxopt_t m_idx_opt;
@@ -39,63 +53,68 @@ PairingNode::is_within_time_and_length_criteria(const std::shared_ptr<dorado::Re
         mm_set_opt(0, &m_idx_opt, &m_map_opt);
         mm_set_opt("map-hifi", &m_idx_opt, &m_map_opt);
 
-        std::vector<const char*> seqs = {read1->seq.c_str()};
-        std::vector<const char*> names = {read1->read_id.c_str()};
-        //spdlog::info("{} tid {} index start", std::string(tid, '\t'), tid);
+        std::vector<const char*> seqs = {temp->seq.c_str()};
+        std::vector<const char*> names = {temp->read_id.c_str()};
         mm_idx_t* m_index = mm_idx_str(m_idx_opt.w, m_idx_opt.k, 0, m_idx_opt.bucket_bits, 1,
                                        seqs.data(), names.data());
-        //spdlog::info("{} tid {} index end", std::string(tid, '\t'), tid);
         mm_mapopt_update(&m_map_opt, m_index);
 
-        //mm_tbuf_t* tbuf = mm_tbuf_init();
         mm_tbuf_t* tbuf = m_tbufs[tid];
 
         int hits = 0;
-        //spdlog::info("{} tid {} map start", std::string(tid, '\t'), tid);
-        mm_reg1_t* reg = mm_map(m_index, read2->seq.length(), read2->seq.c_str(), &hits, tbuf,
-                                &m_map_opt, read2->read_id.c_str());
-        //spdlog::info("{} tid {} map end ({} to {})", std::string(tid, '\t'), tid, read2->seq.length(), read1->seq.length());
+        mm_reg1_t* reg = mm_map(m_index, comp->seq.length(), comp->seq.c_str(), &hits, tbuf,
+                                &m_map_opt, comp->read_id.c_str());
 
         uint8_t mapq = 0;
-        int32_t r1s = 0;
-        int32_t r1e = 0;
-        int32_t r2s = 0;
-        int32_t r2e = 0;
+        int32_t temp_start = 0;
+        int32_t temp_end = 0;
+        int32_t comp_start = 0;
+        int32_t comp_end = 0;
         bool rev = false;
-        if (hits > 0) {
+        // Multiple hits implies ambiguous mapping, so ignore those pairs.
+        if (hits == 1) {
             auto best_map =
                     std::max_element(reg, reg + hits, [&](const mm_reg1_t& a, const mm_reg1_t& b) {
                         return std::abs(a.qe - a.qs) < std::abs(b.qe - b.qs);
                     });
             mapq = best_map->mapq;
-            r1s = best_map->rs;
-            r1e = best_map->re;
-            r2s = best_map->qs;
-            r2e = best_map->qe;
+            temp_start = best_map->rs;
+            temp_end = best_map->re;
+            comp_start = best_map->qs;
+            comp_end = best_map->qe;
             rev = best_map->rev;
 
             free(best_map->p);
         }
 
-        bool meets_mapq = (mapq >= 50);
-        float overlap_frac = std::max(static_cast<float>(r1e - r1s) / read1->seq.length(),
-                                      static_cast<float>(r2e - r2s) / read2->seq.length());
-        bool meets_length = overlap_frac > 0.8f;
-        bool cond = (meets_mapq && meets_length && rev);
-
-        //mm_tbuf_destroy(tbuf);
         mm_idx_destroy(m_index);
+
+        const int kMinMapQ = 50;
+        const float kMinOverlapFraction = 0.8f;
+
+        // Require high mapping quality.
+        bool meets_mapq = (mapq >= kMinMapQ);
+        // Require overlap to cover most of at least one of the reads.
+        float overlap_frac =
+                std::max(static_cast<float>(temp_end - temp_start) / temp->seq.length(),
+                         static_cast<float>(comp_end - comp_start) / comp->seq.length());
+        bool meets_length = overlap_frac > kMinOverlapFraction;
+        // Require the start of the complement strand to map to end
+        // of the template strand.
+        bool ends_anchored = (static_cast<float>(comp_start) / comp->seq.length() < 0.02f &&
+                              static_cast<float>(temp_end) / temp->seq.length() > 0.98f);
+        bool cond = (meets_mapq && meets_length && rev && ends_anchored);
 
         spdlog::debug(
                 "hits {}, mapq {}, overlap length {}, overlap frac {}, delta {}, read 1 {}, read 2 "
-                "{}, strand {}, pass {}, qs {} qe {}, rs {} re {}, {} and {}",
-                hits, mapq, r1e - r1s, overlap_frac, delta, read1->seq.length(),
-                read2->seq.length(), rev ? "-" : "+", cond, r1s, r1e, r2s, r2e, read1->read_id,
-                read2->read_id);
+                "{}, strand {}, pass {}, temp start {} temp end {}, comp start {} comp end {}, {} "
+                "and {}",
+                hits, mapq, temp_end - temp_start, overlap_frac, delta, temp->seq.length(),
+                comp->seq.length(), rev ? "-" : "+", cond, temp_start, temp_end, comp_start,
+                comp_end, temp->read_id, comp->read_id);
 
-        //spdlog::info("{} tid {} mm2 end", std::string(tid, '\t'), tid);
         if (cond) {
-            return {true, r1s, r1e, r2s, r2e};
+            return {true, temp_start, temp_end, comp_start, comp_end};
         }
     }
     return {false, 0, 0, 0, 0};
@@ -207,7 +226,6 @@ void PairingNode::pair_generating_worker_thread(int tid) {
         const std::string nvtx_id = "pairing_code_" + std::to_string(tid);
         nvtx3::scoped_range loop{nvtx_id};
         auto read = std::get<std::shared_ptr<Read>>(message);
-        //spdlog::info("{} tid {} pop read", std::string(tid, '\t'), tid);
 
         int channel = read->attributes.channel_number;
         int mux = read->attributes.mux;
@@ -264,7 +282,6 @@ void PairingNode::pair_generating_worker_thread(int tid) {
 
             lock.unlock();  // Release mutex around read cache.
 
-            //spdlog::info("{} tid {} check start", std::string(tid, '\t'), tid);
             if (later_read) {
                 auto [is_pair, qs, qe, rs, re] =
                         is_within_time_and_length_criteria(read, later_read, tid);
@@ -291,13 +308,11 @@ void PairingNode::pair_generating_worker_thread(int tid) {
                 }
             }
         }
-        //spdlog::info("{} tid {} done", std::string(tid, '\t'), tid);
     }
 
     if (--m_num_active_worker_threads == 0) {
         if (!m_preserve_cache_during_flush) {
             std::unique_lock<std::mutex> lock(m_pairing_mtx);
-            //spdlog::info("Push leftover reads to encoder");
             // There are still reads in channel_mux_read_map. Push them to the sink.
             // Last thread alive is responsible for cleaning up the cache.
             for (const auto& [client_id, read_cache] : m_read_caches) {

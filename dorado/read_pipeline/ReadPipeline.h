@@ -113,13 +113,15 @@ public:
     uint64_t run_acquisition_start_time_ms;
     bool is_duplex{false};
     bool is_duplex_parent{false};
-    ;
     // Calculate mean Q-score from this position onwards if read is
     // a short read.
     uint32_t mean_qscore_start_pos = 0;
 
     std::atomic_size_t num_duplex_candidate_pairs{0};
 
+    // subread_id is used to track 2 types of offsprings of a read
+    // (1) read splits
+    // (2) duplex pairs which share this read as the template read
     size_t subread_id{0};
     size_t split_count{1};
 
@@ -158,10 +160,8 @@ public:
 // - a BamPtr object, which represents a raw BAM alignment record
 // - a std::shared_ptr<ReadPair> object, which represents a pair of reads for duplex calling
 // To add more message types, simply add them to the list of types in the std::variant.
-using Message = std::variant<std::shared_ptr<Read>,
-                             BamPtr,
-                             std::shared_ptr<ReadPair>,
-                             CacheFlushMessage>;
+using Message =
+        std::variant<std::shared_ptr<Read>, BamPtr, std::shared_ptr<ReadPair>, CacheFlushMessage>;
 
 using NodeHandle = int;
 
