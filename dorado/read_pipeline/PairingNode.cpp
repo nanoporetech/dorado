@@ -17,7 +17,7 @@ namespace dorado {
 
 void PairingNode::pair_list_worker_thread() {
     Message message;
-    while (m_work_queue.try_pop(message)) {
+    while (get_input_message(message)) {
         // If this message isn't a read, we'll get a bad_variant_access exception.
         auto read = std::get<std::shared_ptr<Read>>(message);
 
@@ -89,7 +89,7 @@ void PairingNode::pair_generating_worker_thread() {
     };
 
     Message message;
-    while (m_work_queue.try_pop(message)) {
+    while (get_input_message(message)) {
         // If this message isn't a read, we'll get a bad_variant_access exception.
         auto read = std::get<std::shared_ptr<Read>>(message);
 

@@ -1,11 +1,17 @@
 #pragma once
 
+#include <algorithm>
 #include <atomic>
+#include <cassert>
 #include <condition_variable>
 #include <mutex>
 #include <queue>
 #include <string>
 #include <unordered_map>
+
+namespace dorado::utils {
+
+enum class AsyncQueueStatus { Success, Timeout, Terminate };
 
 // Asynchronous queue for producer/consumer use.
 // Items must be movable.
@@ -32,22 +38,80 @@ class AsyncQueue {
     int64_t m_num_pushes = 0;
     int64_t m_num_pops = 0;
 
+    // Sets item to the next element in the queue and
+    // notifies a waiting thread that the queue is not full.
+    // Should only be called with the mutex locked via lock.
+    void pop_item(std::unique_lock<std::mutex>& lock, Item& item) {
+        assert(!m_items.empty());
+        item = std::move(m_items.front());
+        m_items.pop();
+        ++m_num_pops;
+
+        // Inform a waiting thread that the queue is not full.
+        lock.unlock();
+        m_not_full_cv.notify_one();
+    }
+
+    // Calls process_fn on the up to max_count items in the queue,
+    // popping them.  Notifies all waiting threads that the queue is
+    // not full.
+    // Should only be called with the mutex locked via lock.
+    template <class ProcessFn>
+    void process_items(std::unique_lock<std::mutex>& lock, ProcessFn process_fn, size_t max_count) {
+        assert(!m_items.empty());
+        size_t num_to_pop = std::min(m_items.size(), max_count);
+        for (size_t i = 0; i < num_to_pop; ++i) {
+            process_fn(m_items.front());
+            m_items.pop();
+        }
+        m_num_pops += num_to_pop;
+
+        // Inform all waiting threads that the queue is not full, since in general
+        // we have removed > 1 item and there can be > 1 thread waiting to push.
+        lock.unlock();
+        m_not_full_cv.notify_all();
+    }
+
+    // Waits until the queue is not empty or we are asked to terminate.
+    // Returns a unique_lock holding m_mutex.
+    std::unique_lock<std::mutex> wait_for_item() {
+        std::unique_lock lock(m_mutex);
+        m_not_empty_cv.wait(lock, [this] { return !m_items.empty() || m_terminate; });
+        return lock;
+    }
+
+    // Same as wait_for_item, but will also time out, returning wait_status accordingly.
+    template <class Clock, class Duration>
+    std::tuple<std::unique_lock<std::mutex>, bool> wait_for_item_or_timeout(
+            const std::chrono::time_point<Clock, Duration>& timeout_time) {
+        std::unique_lock lock(m_mutex);
+        auto wait_status = m_not_empty_cv.wait_until(
+                lock, timeout_time, [this] { return !m_items.empty() || m_terminate; });
+        return {std::move(lock), wait_status};
+    }
+
 public:
     // Attempts to push items beyond capacity will block.
-    AsyncQueue(size_t capacity) : m_capacity(capacity) {}
+    explicit AsyncQueue(size_t capacity) : m_capacity(capacity) {}
 
     ~AsyncQueue() {
         // Ensure CV waits terminate before destruction.
         terminate();
     }
 
+    // Contains std::mutex and std::condition_variable, so is not copyable or movable.
+    AsyncQueue(const AsyncQueue&) = delete;
+    AsyncQueue(AsyncQueue&&) = delete;
+    AsyncQueue& operator=(const AsyncQueue&) = delete;
+    AsyncQueue& operator=(AsyncQueue&&) = delete;
+
     // Attempts to add an item to the queue.
     // If the queue is full, this method blocks until there is space or
     // terminate() is called.
     // If space was available and the item was added, true is returned.
-    // If Terminate() was called, the item is not added and false is returned.
+    // If terminate() was called, the item is not added and false is returned.
     // Items pushed must be rvalues, since we assume sole ownership.
-    bool try_push(Item&& item) {
+    AsyncQueueStatus try_push(Item&& item) {
         std::unique_lock lock(m_mutex);
 
         // Ensure there is space for the new item, given our limit on capacity.
@@ -55,8 +119,10 @@ public:
 
         // We hold the mutex, and either there is space in the queue, or we have been
         // asked to terminate.
-        if (m_terminate)
-            return false;
+        if (m_terminate) {
+            return AsyncQueueStatus::Terminate;
+        }
+
         m_items.push(std::move(item));
         ++m_num_pushes;
 
@@ -64,7 +130,7 @@ public:
         lock.unlock();
         m_not_empty_cv.notify_one();
 
-        return true;
+        return AsyncQueueStatus::Success;
     }
 
     // Obtains the next item in the queue, returning true on success.
@@ -73,84 +139,79 @@ public:
     // If the queue is empty, and we are terminating, returns false.
     // Otherwise we block if the queue is empty.
     template <class Clock, class Duration>
-    bool try_pop_until(Item& item, const std::chrono::time_point<Clock, Duration>& timeout_time) {
-        std::unique_lock lock(m_mutex);
-        // Wait until either an item is added, a timeout is hit or we're asked to terminate.
-        auto cv_status = m_not_empty_cv.wait_until(
-                lock, timeout_time, [this] { return !m_items.empty() || m_terminate; });
-        if (cv_status == false) {
+    AsyncQueueStatus try_pop_until(Item& item,
+                                   const std::chrono::time_point<Clock, Duration>& timeout_time) {
+        auto [lock, wait_status] = wait_for_item_or_timeout(timeout_time);
+
+        if (wait_status == false) {
             // Condition variable timed out and the predicate returned false.
             // In this case, we don't terminate and return without any output.
-            return true;
+            return AsyncQueueStatus::Timeout;
         }
 
         // Termination takes effect once all items have been popped from the queue.
         if (m_terminate && m_items.empty()) {
-            return false;
+            return AsyncQueueStatus::Terminate;
         }
 
-        item = std::move(m_items.front());
-        m_items.pop();
-        ++m_num_pops;
-
-        // Inform a waiting thread that the queue is not full.
-        lock.unlock();
-        m_not_full_cv.notify_one();
-
-        return true;
+        pop_item(lock, item);
+        return AsyncQueueStatus::Success;
     }
 
     // Obtains the next item in the queue, returning true on success.
     // If the queue is empty, and we are terminating, returns false.
     // Otherwise we block if the queue is empty.
-    bool try_pop(Item& item) {
-        std::unique_lock lock(m_mutex);
-        // Wait until the queue is non-empty, or we're asked to terminate.
-        m_not_empty_cv.wait(lock, [this] { return !m_items.empty() || m_terminate; });
+    AsyncQueueStatus try_pop(Item& item) {
+        auto lock = wait_for_item();
 
         // Termination takes effect once all items have been popped from the queue.
         if (m_terminate && m_items.empty()) {
-            return false;
+            return AsyncQueueStatus::Terminate;
         }
 
-        item = std::move(m_items.front());
-        m_items.pop();
-        ++m_num_pops;
-
-        // Inform a waiting thread that the queue is not full.
-        lock.unlock();
-        m_not_full_cv.notify_one();
-
-        return true;
+        pop_item(lock, item);
+        return AsyncQueueStatus::Success;
     }
 
-    // Obtains all items in the queue once the lock is obtained.
+    // Obtains all items in the queue, up to the limit of max_count,
+    // once the lock is obtained.
     // Return value is false if we are terminating.
     // If the lock is contended this could be more efficient than repeated
     // calls to try_pop.
     template <class ProcessFn>
-    bool process_and_pop_all(ProcessFn process_fn) {
-        std::unique_lock lock(m_mutex);
-        // Wait until the queue is non-empty, or we're asked to terminate.
-        m_not_empty_cv.wait(lock, [this] { return !m_items.empty() || m_terminate; });
+    AsyncQueueStatus process_and_pop_n(ProcessFn process_fn, size_t max_count) {
+        auto lock = wait_for_item();
 
         // Termination takes effect once all items have been popped from the queue.
         if (m_terminate && m_items.empty()) {
-            return false;
+            return AsyncQueueStatus::Terminate;
         }
 
-        while (!m_items.empty()) {
-            process_fn(m_items.front());
-            m_items.pop();
-            ++m_num_pops;
+        process_items(lock, process_fn, max_count);
+        return AsyncQueueStatus::Success;
+    }
+
+    // Like process_and_pop_n, except it also has a timeout.
+    template <class ProcessFn, class Clock, class Duration>
+    AsyncQueueStatus process_and_pop_n_with_timeout(
+            ProcessFn process_fn,
+            size_t max_count,
+            const std::chrono::time_point<Clock, Duration>& timeout_time) {
+        auto [lock, wait_status] = wait_for_item_or_timeout(timeout_time);
+
+        if (wait_status == false) {
+            // Condition variable timed out and the predicate returned false.
+            // In this case, we don't terminate and return without any output.
+            return AsyncQueueStatus::Timeout;
         }
 
-        // Inform all waiting threads that the queue is not full, since in general
-        // we have removed > 1 item and there can be > 1 thread waiting to push.
-        lock.unlock();
-        m_not_full_cv.notify_all();
+        // Termination takes effect once all items have been popped from the queue.
+        if (m_terminate && m_items.empty()) {
+            return AsyncQueueStatus::Terminate;
+        }
 
-        return true;
+        process_items(lock, process_fn, max_count);
+        return AsyncQueueStatus::Success;
     }
 
     // Tells the queue to terminate any CV waits.
@@ -168,8 +229,12 @@ public:
         m_not_empty_cv.notify_all();
     }
 
-    // Return the current size of the queue.
-    size_t size() {
+    // Maximum number of items the queue can contain.
+    size_t capacity() const { return m_capacity; }
+
+    // Current number of items in the queue.  Only useful for stats sampling and
+    // testing.
+    size_t size() const {
         std::lock_guard lock(m_mutex);
         return m_items.size();
     }
@@ -185,3 +250,5 @@ public:
         return stats;
     }
 };
+
+}  // namespace dorado::utils

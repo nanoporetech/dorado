@@ -192,8 +192,15 @@ protected:
         send_message_to_sink(0, std::move(message));
     }
 
+    // Pops the next input message, returning true on success.
+    // If terminating, returns false.
+    bool get_input_message(Message& message) {
+        auto status = m_work_queue.try_pop(message);
+        return status == utils::AsyncQueueStatus::Success;
+    }
+
     // Queue of work items for this node.
-    AsyncQueue<Message> m_work_queue;
+    utils::AsyncQueue<Message> m_work_queue;
 
 private:
     // The sinks to which this node can send messages.

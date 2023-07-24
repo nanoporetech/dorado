@@ -273,10 +273,10 @@ float Read::calculate_mean_qscore() const {
 MessageSink::MessageSink(size_t max_messages) : m_work_queue(max_messages) {}
 
 void MessageSink::push_message(Message &&message) {
-    const bool success = m_work_queue.try_push(std::move(message));
+    const auto success = m_work_queue.try_push(std::move(message));
     // try_push will fail if the sink has been told to terminate.
     // We do not expect to be pushing reads from this source if that is the case.
-    assert(success);
+    assert(success == utils::AsyncQueueStatus::Success);
 }
 
 // Depth first search that establishes a topological ordering for node destruction.

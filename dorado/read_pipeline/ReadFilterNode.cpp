@@ -6,7 +6,7 @@ namespace dorado {
 
 void ReadFilterNode::worker_thread() {
     Message message;
-    while (m_work_queue.try_pop(message)) {
+    while (get_input_message(message)) {
         if (std::holds_alternative<CandidatePairRejectedMessage>(message)) {
             // discard, nothing downstream of this node is interested in this message
             continue;

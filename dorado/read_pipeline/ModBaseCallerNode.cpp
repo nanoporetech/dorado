@@ -143,7 +143,7 @@ void ModBaseCallerNode::init_modbase_info() {
 
 void ModBaseCallerNode::input_worker_thread() {
     Message message;
-    while (m_work_queue.try_pop(message)) {
+    while (get_input_message(message)) {
         nvtx3::scoped_range range{"modbase_input_worker_thread"};
         // If this message isn't a read, we'll get a bad_variant_access exception.
         auto read = std::get<std::shared_ptr<Read>>(message);
@@ -369,7 +369,8 @@ void ModBaseCallerNode::output_worker_thread() {
     auto grab_chunk = [&processed_chunks](std::shared_ptr<RemoraChunk>& chunk) {
         processed_chunks.push_back(std::move(chunk));
     };
-    while (m_processed_chunks.process_and_pop_all(grab_chunk)) {
+    while (m_processed_chunks.process_and_pop_n(grab_chunk, m_processed_chunks.capacity()) ==
+           utils::AsyncQueueStatus::Success) {
         nvtx3::scoped_range range{"modbase_output_worker_thread"};
 
         for (const auto& chunk : processed_chunks) {

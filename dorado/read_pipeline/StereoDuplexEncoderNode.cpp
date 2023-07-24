@@ -286,7 +286,7 @@ std::shared_ptr<dorado::Read> StereoDuplexEncoderNode::stereo_encode(
 
 void StereoDuplexEncoderNode::worker_thread() {
     Message message;
-    while (m_work_queue.try_pop(message)) {
+    while (get_input_message(message)) {
         if (std::holds_alternative<std::shared_ptr<ReadPair>>(message)) {
             auto read_pair = std::get<std::shared_ptr<ReadPair>>(message);
             std::shared_ptr<Read> stereo_encoded_read =

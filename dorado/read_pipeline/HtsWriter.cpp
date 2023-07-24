@@ -76,7 +76,7 @@ void HtsWriter::worker_thread() {
     size_t write_count = 0;
 
     Message message;
-    while (m_work_queue.try_pop(message)) {
+    while (get_input_message(message)) {
         auto aln = std::move(std::get<BamPtr>(message));
         write(aln.get());
         std::string read_id = bam_get_qname(aln.get());

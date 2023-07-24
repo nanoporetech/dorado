@@ -39,7 +39,7 @@ std::pair<float, float> ScalerNode::med_mad(const torch::Tensor& x) {
 
 void ScalerNode::worker_thread() {
     Message message;
-    while (m_work_queue.try_pop(message)) {
+    while (get_input_message(message)) {
         // If this message isn't a read, we'll get a bad_variant_access exception.
         auto read = std::get<std::shared_ptr<Read>>(message);
         assert(read->raw_data.dtype() == torch::kInt16);
