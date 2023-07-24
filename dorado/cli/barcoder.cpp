@@ -1,9 +1,8 @@
-#include "read_pipeline/Barcoder.h"
-
 #include "Version.h"
 #include "read_pipeline/BarcodeDemuxer.h"
 #include "read_pipeline/HtsReader.h"
 #include "read_pipeline/HtsWriter.h"
+#include "read_pipeline/NewBarcoder.h"
 #include "read_pipeline/ProgressTracker.h"
 #include "utils/cli_utils.h"
 #include "utils/log_utils.h"
