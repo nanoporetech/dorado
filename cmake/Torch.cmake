@@ -65,8 +65,14 @@ else()
         if(CMAKE_SYSTEM_PROCESSOR MATCHES "^aarch64*|^arm*")
             if(${CUDAToolkit_VERSION} VERSION_LESS 11.0)
                 set(TORCH_VERSION 1.10.2)
-                set(TORCH_URL https://cdn.oxfordnanoportal.com/software/analysis/torch-1.10.2-Linux-aarch64.zip)
-                set(TORCH_PATCH_SUFFIX -ont)
+                if (TRY_USING_STATIC_TORCH_LIB)
+                    set(TORCH_URL https://cdn.oxfordnanoportal.com/software/analysis/torch-1.10.2-linux-aarch64-ont-static.zip)
+                    set(TORCH_PATCH_SUFFIX -ont-static)
+                    set(USING_STATIC_TORCH_LIB TRUE)
+                else()
+                    set(TORCH_URL https://cdn.oxfordnanoportal.com/software/analysis/torch-1.10.2-Linux-aarch64.zip)
+                    set(TORCH_PATCH_SUFFIX -ont)
+                endif()
             else()
                 set(TORCH_URL https://developer.download.nvidia.com/compute/redist/jp/v502/pytorch/torch-1.13.0a0+d0d6b1f2.nv22.09-cp38-cp38-linux_aarch64.whl)
             endif()
@@ -197,6 +203,35 @@ if (USING_STATIC_TORCH_LIB)
             CUDA::cufft
             CUDA::cusolver
             CUDA::cusparse
+        )
+
+    elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR MATCHES "^aarch64*|^arm*")
+        list(APPEND TORCH_LIBRARIES
+            # Missing libs that Torch forgets to link to
+            ${TORCH_LIB}/lib/libbreakpad.a
+            ${TORCH_LIB}/lib/libbreakpad_common.a
+
+            # Some of the CUDA libs have inter-dependencies, so group them together
+            -Wl,--start-group
+                CUDA::cudart_static
+                CUDA::cublas_static
+                CUDA::cublasLt_static
+                # AFAICT Torch doesn't provide the symbol required for the callback, so use the nocallback variant
+                CUDA::cufft_static_nocallback
+                CUDA::cusolver_static
+                # cusolver is missing this and I don't know why
+                ${CUDAToolkit_TARGET_DIR}/lib64/liblapack_static.a
+                CUDA::cusparse_static
+                CUDA::cupti
+                CUDA::curand_static
+                CUDA::nvrtc
+                CUDA::culibos
+            -Wl,--end-group
+            # OMP implementation (i=Intel, g=GNU)
+            ${TORCH_LIB}/lib/libgomp.so.1.0.0
+            # BLAS rather than MKL
+            ${TORCH_LIB}/lib/libopenblas.a
+            ${TORCH_LIB}/lib/libgfortran.so.4.0.0
         )
 
     elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
