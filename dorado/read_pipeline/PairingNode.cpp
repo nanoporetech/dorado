@@ -59,7 +59,7 @@ PairingNode::is_within_time_and_length_criteria(const std::shared_ptr<dorado::Re
                                        seqs.data(), names.data());
         mm_mapopt_update(&m_map_opt, m_index);
 
-        mm_tbuf_t* tbuf = m_tbufs[tid];
+        mm_tbuf_t* tbuf = m_tbufs[tid].get();
 
         int hits = 0;
         mm_reg1_t* reg = mm_map(m_index, comp->seq.length(), comp->seq.c_str(), &hits, tbuf,
@@ -238,6 +238,8 @@ void PairingNode::pair_generating_worker_thread(int tid) {
         auto& read_cache = m_read_caches[client_id];
         UniquePoreIdentifierKey key = std::make_tuple(channel, mux, run_id, flowcell_id);
         auto read_list_iter = read_cache.channel_mux_read_map.find(key);
+        // To track and clear earlier and later reads in the list.
+        std::shared_ptr<Read> later_read, earlier_read;
         // Check if the key is already in the list
         if (read_list_iter == read_cache.channel_mux_read_map.end()) {
             // Key is not in the dequeue
@@ -254,34 +256,42 @@ void PairingNode::pair_generating_worker_thread(int tid) {
 
                 // Remove the oldest key from the map
                 for (auto read_ptr : oldest_key_it->second) {
-                    send_message_to_sink(read_ptr);
+                    m_reads_to_clear.insert(std::move(read_ptr));
                 }
                 read_cache.channel_mux_read_map.erase(oldest_key);
                 assert(read_cache.channel_mux_read_map.size() ==
                        read_cache.working_channel_mux_keys.size());
             }
+
+            // Release mutex so it can be re-acquired to check reads
+            // in-flight.
+            lock.unlock();
         } else {
             auto& cached_read_list = read_list_iter->second;
-            std::shared_ptr<Read> later_read, earlier_read;
             auto later_read_iter = std::lower_bound(
                     cached_read_list.begin(), cached_read_list.end(), read, compare_reads_by_time);
             if (later_read_iter != cached_read_list.end()) {
                 later_read = *later_read_iter;
+                m_reads_in_flight_ctr[later_read]++;
             }
 
             if (later_read_iter != cached_read_list.begin()) {
                 earlier_read = *(std::prev(later_read_iter));
+                m_reads_in_flight_ctr[earlier_read]++;
             }
 
             cached_read_list.insert(later_read_iter, read);
+            m_reads_in_flight_ctr[read]++;
+
             while (cached_read_list.size() > m_max_num_reads) {
                 auto cached_read = cached_read_list.front();
                 cached_read_list.pop_front();
-                send_message_to_sink(std::move(cached_read));
+                m_reads_to_clear.insert(std::move(cached_read));
             }
 
             lock.unlock();  // Release mutex around read cache.
 
+            bool found_pair = false;
             if (later_read) {
                 auto [is_pair, qs, qe, rs, re] =
                         is_within_time_and_length_criteria(read, later_read, tid);
@@ -291,11 +301,11 @@ void PairingNode::pair_generating_worker_thread(int tid) {
                     later_read->is_duplex_parent = true;
                     ++read->num_duplex_candidate_pairs;
                     send_message_to_sink(std::make_shared<ReadPair>(pair));
-                    continue;
+                    found_pair = true;
                 }
             }
 
-            if (earlier_read) {
+            if (!found_pair && earlier_read) {
                 auto [is_pair, qs, qe, rs, re] =
                         is_within_time_and_length_criteria(earlier_read, read, tid);
                 if (is_pair) {
@@ -304,7 +314,42 @@ void PairingNode::pair_generating_worker_thread(int tid) {
                     read->is_duplex_parent = true;
                     ++(earlier_read)->num_duplex_candidate_pairs;
                     send_message_to_sink(std::make_shared<ReadPair>(pair));
-                    continue;
+                }
+            }
+        }
+
+        // Once pairs have been evaluated, check if any of the in-flight reads
+        // need to be purged from the cache.
+        {
+            const std::string nvtx_id = "clear_cache_" + std::to_string(tid);
+            nvtx3::scoped_range loop{nvtx_id};
+            std::unique_lock<std::mutex> lock(m_pairing_mtx);
+            // Decrement in-flight counter for each read.
+            m_reads_in_flight_ctr[read]--;
+            if (earlier_read) {
+                m_reads_in_flight_ctr[earlier_read]--;
+            }
+            if (later_read) {
+                m_reads_in_flight_ctr[later_read]--;
+            }
+            for (auto to_clear_itr = m_reads_to_clear.begin();
+                 to_clear_itr != m_reads_to_clear.end();) {
+                auto in_flight_itr = m_reads_in_flight_ctr.find(*to_clear_itr);
+                bool ok_to_clear = false;
+                // If a read to clear is not in-flight (not in the in-flight list
+                // or in-flight counter is 0), then clear it
+                // from the cache.
+                if (in_flight_itr == m_reads_in_flight_ctr.end()) {
+                    ok_to_clear = true;
+                } else if (in_flight_itr->second.load() == 0) {
+                    m_reads_in_flight_ctr.erase(in_flight_itr);
+                    ok_to_clear = true;
+                }
+                if (ok_to_clear) {
+                    send_message_to_sink(std::move(*to_clear_itr));
+                    to_clear_itr = m_reads_to_clear.erase(to_clear_itr);
+                } else {
+                    ++to_clear_itr;
                 }
             }
         }
@@ -328,6 +373,7 @@ void PairingNode::pair_generating_worker_thread(int tid) {
             }
             m_read_caches.clear();
         }
+        m_reads_in_flight_ctr.clear();
     }
 }
 
@@ -366,7 +412,7 @@ PairingNode::PairingNode(ReadOrder read_order, int num_worker_threads, size_t ma
 
 void PairingNode::start_threads() {
     for (size_t i = 0; i < m_num_worker_threads; i++) {
-        m_tbufs.push_back(mm_tbuf_init());
+        m_tbufs.push_back(MmTbufPtr(mm_tbuf_init()));
         m_workers.push_back(std::make_unique<std::thread>(
                 std::thread(&PairingNode::pair_generating_worker_thread, this, i)));
         ++m_num_active_worker_threads;
@@ -388,9 +434,6 @@ void PairingNode::terminate_impl() {
     }
     m_workers.clear();
 
-    for (int i = 0; i < m_tbufs.size(); i++) {
-        mm_tbuf_destroy(m_tbufs[i]);
-    }
     m_tbufs.clear();
 }
 

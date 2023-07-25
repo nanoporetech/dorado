@@ -107,7 +107,13 @@ private:
             const std::shared_ptr<dorado::Read>& read2,
             int tid);
 
-    std::vector<mm_tbuf_t*> m_tbufs;
+    // Store the minimap2 buffers used for mapping. One buffer per thread.
+    std::vector<MmTbufPtr> m_tbufs;
+
+    // Track reads which need to be emptied from the cache but are still being
+    // evaluated for pairs by other threads.
+    std::unordered_map<std::shared_ptr<Read>, std::atomic<int>> m_reads_in_flight_ctr;
+    std::unordered_set<std::shared_ptr<Read>> m_reads_to_clear;
 };
 
 }  // namespace dorado
