@@ -96,7 +96,7 @@ private:
 
     std::atomic<bool> m_terminate_runners{false};
 
-    std::shared_ptr<const utils::BaseModInfo> m_base_mod_info;
+    std::shared_ptr<const BaseModInfo> m_base_mod_info;
     // The offsets to the canonical bases in the modbase alphabet
     std::array<size_t, 4> m_base_prob_offsets;
     size_t m_num_states{4};
