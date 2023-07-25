@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ReadPipeline.h"
+#include "utils/types.h"
 
 #include <map>
 #include <memory>
@@ -13,7 +14,6 @@ namespace dorado {
 class CRFModelConfig;
 class ModelRunnerBase;
 class ModBaseRunner;
-struct DuplexSplitSettings;
 
 using Runner = class std::shared_ptr<dorado::ModelRunnerBase>;
 using PairingParameters = std::variant<ReadOrder, std::map<std::string, std::string>>;
@@ -46,7 +46,7 @@ void create_stereo_duplex_pipeline(
         int scaler_node_threads,
         int splitter_node_threads,
         PairingParameters pairing_parameters,
-        const DuplexSplitSettings& splitter_settings,
+        DuplexSplitSettings splitter_settings,
         NodeHandle sink_node_handle = PipelineDescriptor::InvalidNodeHandle,
         NodeHandle source_node_handle = PipelineDescriptor::InvalidNodeHandle);
 

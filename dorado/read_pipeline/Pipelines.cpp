@@ -71,19 +71,18 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
     }
 }
 
-void create_stereo_duplex_pipeline(
-        PipelineDescriptor& pipeline_desc,
-        const CRFModelConfig& model_config,
-        const CRFModelConfig& stereo_model_config,
-        std::vector<dorado::Runner>&& runners,
-        std::vector<dorado::Runner>&& stereo_runners,
-        size_t overlap,
-        int scaler_node_threads,               // num_devices * 2
-        int splitter_node_threads,             // num_devices
-        PairingParameters pairing_parameters,  // template_complement_map / BY_CHANNEL
-        const DuplexSplitSettings& splitter_settings,
-        NodeHandle sink_node_handle,
-        NodeHandle source_node_handle) {
+void create_stereo_duplex_pipeline(PipelineDescriptor& pipeline_desc,
+                                   const CRFModelConfig& model_config,
+                                   const CRFModelConfig& stereo_model_config,
+                                   std::vector<dorado::Runner>&& runners,
+                                   std::vector<dorado::Runner>&& stereo_runners,
+                                   size_t overlap,
+                                   int scaler_node_threads,
+                                   int splitter_node_threads,
+                                   PairingParameters pairing_parameters,
+                                   DuplexSplitSettings splitter_settings,
+                                   NodeHandle sink_node_handle,
+                                   NodeHandle source_node_handle) {
     std::string model_name =
             std::filesystem::canonical(model_config.model_path).filename().string();
     auto stereo_model_name =
