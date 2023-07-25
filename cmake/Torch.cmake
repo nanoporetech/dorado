@@ -205,6 +205,20 @@ if (USING_STATIC_TORCH_LIB)
             # need to add it again after bringing in libdnnl_graph.a to fill in the missing symbols.
             ${TORCH_LIB}/lib/libdnnl_graph.a
             ${TORCH_LIB}/lib/libdnnl.a
+
+            # Note: the order of the cuDNN libs matter
+            # We aren't going to do any training, so these don't need to be whole-archived
+            ${TORCH_LIB}/lib/libcudnn_adv_train_static.a
+            ${TORCH_LIB}/lib/libcudnn_cnn_train_static.a
+            ${TORCH_LIB}/lib/libcudnn_ops_train_static.a
+            # I'm assuming we need this for https://github.com/pytorch/pytorch/issues/50153
+            -Wl,--whole-archive
+                # Note: libtorch is still setup to link to these dynamically (https://github.com/pytorch/pytorch/issues/81692)
+                # though that shouldn't be a problem on Linux
+                ${TORCH_LIB}/lib/libcudnn_adv_infer_static.a
+                ${TORCH_LIB}/lib/libcudnn_cnn_infer_static.a
+                ${TORCH_LIB}/lib/libcudnn_ops_infer_static.a
+            -Wl,--no-whole-archive
         )
 
         # Currently we need to make use of a separate lib to avoid getting relocation errors at link time
@@ -217,21 +231,6 @@ if (USING_STATIC_TORCH_LIB)
             )
             target_link_libraries(dorado_torch_lib PRIVATE
                 ${TORCH_LIBRARIES}
-
-                # Note: the order of the cuDNN libs matter
-                # We aren't going to do any training, so these don't need to be whole-archived
-                ${TORCH_LIB}/lib/libcudnn_adv_train_static.a
-                ${TORCH_LIB}/lib/libcudnn_cnn_train_static.a
-                ${TORCH_LIB}/lib/libcudnn_ops_train_static.a
-                # I'm assuming we need this for https://github.com/pytorch/pytorch/issues/50153
-                -Wl,--whole-archive
-                    # Note: libtorch is still setup to link to these dynamically (https://github.com/pytorch/pytorch/issues/81692)
-                    # though that shouldn't be a problem on Linux
-                    ${TORCH_LIB}/lib/libcudnn_adv_infer_static.a
-                    ${TORCH_LIB}/lib/libcudnn_cnn_infer_static.a
-                    ${TORCH_LIB}/lib/libcudnn_ops_infer_static.a
-                -Wl,--no-whole-archive
-
                 # Some CUDA lib symbols have internal linkage, so they must be part of the helper lib too
                 CUDA::culibos
                 CUDA::cupti_static
