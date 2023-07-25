@@ -63,11 +63,7 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
 
     // if we've been provided a sink node, connect it to the end of our pipeline
     if (sink_node_handle != PipelineDescriptor::InvalidNodeHandle) {
-        if (mod_base_caller_node != PipelineDescriptor::InvalidNodeHandle) {
-            pipeline_desc.add_node_sink(mod_base_caller_node, sink_node_handle);
-        } else {
-            pipeline_desc.add_node_sink(basecaller_node, sink_node_handle);
-        }
+        pipeline_desc.add_node_sink(last_node_handle, sink_node_handle);
     }
 }
 
