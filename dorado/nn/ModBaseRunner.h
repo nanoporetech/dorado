@@ -52,6 +52,7 @@ public:
     std::vector<size_t> get_motif_hits(size_t caller_id, const std::string& seq) const;
     ModBaseParams& caller_params(size_t caller_id) const;
     size_t num_callers() const;
+    size_t batch_size() const { return m_input_sigs[0].size(0); }
     void terminate();
     void restart();
     std::string get_name() const;
