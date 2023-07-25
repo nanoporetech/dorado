@@ -289,7 +289,6 @@ if (USING_STATIC_TORCH_LIB)
                 CUDA::cusolver_static
                 CUDA::cusparse_static
                 CUDA::cupti_static
-                CUDA::nvrtc
                 CUDA::culibos
                 # I don't know why the MKL libs need to be part of the CUDA group, but having them in a
                 # separate group causes missing symbol errors
