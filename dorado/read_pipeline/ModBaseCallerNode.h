@@ -26,7 +26,6 @@ public:
     ModBaseCallerNode(std::vector<std::unique_ptr<ModBaseRunner>> model_runners,
                       size_t remora_threads,
                       size_t block_stride,
-                      size_t batch_size,
                       size_t max_reads = 1000);
     ~ModBaseCallerNode() { terminate_impl(); }
     std::string get_name() const override { return "ModBaseCallerNode"; }
@@ -72,11 +71,10 @@ private:
     // Worker thread, processes chunk results back into the reads
     void output_worker_thread();
 
-    size_t m_batch_size;
-    size_t m_block_stride;
-    size_t m_num_input_workers = 0;
-
     std::vector<std::unique_ptr<ModBaseRunner>> m_runners;
+    size_t m_num_input_workers = 0;
+    size_t m_block_stride;
+    size_t m_batch_size;
 
     std::unique_ptr<std::thread> m_output_worker;
     std::vector<std::unique_ptr<std::thread>> m_runner_workers;
