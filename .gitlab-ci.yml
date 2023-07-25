@@ -268,6 +268,7 @@ build_archive:macos:x64:
   script:
     - tar -xzf archive/dorado-*.gz
     - ldd ./dorado-*/bin/dorado
+    - if [ -e ./dorado-*/lib/libdorado_torch_lib.so ]; then ldd ./dorado-*/lib/libdorado_torch_lib.so; fi
     # We just want to check that dorado will run here, so simply display the verbose version info
     - ./dorado-*/bin/dorado -vv
   interruptible: true
