@@ -18,10 +18,11 @@ namespace dorado {
 // 2. If the lengths are >98% similar and time delta is <100ms, consider
 //    them to be a pair.
 // 3. If the early acceptance fails, then run minimap2 to generate overlap
-//    coordinates. If the mapping quality is high (>50), the overlap covers
+//    coordinates. If there is only 1 hit from minimap2 mapping,
+//    the mapping quality is high (>50), the overlap covers
 //    most of the shorter read (80%), one read maps to the reverse strand
-//    of the other, and the end of the complement is mapped to the beginning
-//    of the template read, then consider them a pair.
+//    of the other, and the end of the template is mapped to the beginning
+//    of the complement read, then consider them a pair.
 std::tuple<bool, uint32_t, uint32_t, uint32_t, uint32_t>
 PairingNode::is_within_time_and_length_criteria(const std::shared_ptr<dorado::Read>& temp,
                                                 const std::shared_ptr<dorado::Read>& comp,
@@ -65,18 +66,18 @@ PairingNode::is_within_time_and_length_criteria(const std::shared_ptr<dorado::Re
         mm_reg1_t* reg = mm_map(m_index, comp->seq.length(), comp->seq.c_str(), &hits, tbuf,
                                 &m_map_opt, comp->read_id.c_str());
 
-        uint8_t mapq = 0;
-        int32_t temp_start = 0;
-        int32_t temp_end = 0;
-        int32_t comp_start = 0;
-        int32_t comp_end = 0;
-        bool rev = false;
+        mm_idx_destroy(m_index);
+
         // Multiple hits implies ambiguous mapping, so ignore those pairs.
         if (hits == 1) {
-            auto best_map =
-                    std::max_element(reg, reg + hits, [&](const mm_reg1_t& a, const mm_reg1_t& b) {
-                        return std::abs(a.qe - a.qs) < std::abs(b.qe - b.qs);
-                    });
+            uint8_t mapq = 0;
+            int32_t temp_start = 0;
+            int32_t temp_end = 0;
+            int32_t comp_start = 0;
+            int32_t comp_end = 0;
+            bool rev = false;
+
+            auto best_map = &reg[0];
             mapq = best_map->mapq;
             temp_start = best_map->rs;
             temp_end = best_map->re;
@@ -85,36 +86,36 @@ PairingNode::is_within_time_and_length_criteria(const std::shared_ptr<dorado::Re
             rev = best_map->rev;
 
             free(best_map->p);
-        }
 
-        mm_idx_destroy(m_index);
+            const int kMinMapQ = 50;
+            const float kMinOverlapFraction = 0.8f;
 
-        const int kMinMapQ = 50;
-        const float kMinOverlapFraction = 0.8f;
+            // Require high mapping quality.
+            bool meets_mapq = (mapq >= kMinMapQ);
+            // Require overlap to cover most of at least one of the reads.
+            float overlap_frac =
+                    std::max(static_cast<float>(temp_end - temp_start) / temp->seq.length(),
+                             static_cast<float>(comp_end - comp_start) / comp->seq.length());
+            bool meets_length = overlap_frac > kMinOverlapFraction;
+            // Require the start of the complement strand to map to end
+            // of the template strand.
+            bool ends_anchored = (static_cast<float>(comp_start) / comp->seq.length() < 0.02f &&
+                                  static_cast<float>(temp_end) / temp->seq.length() > 0.98f);
+            bool cond = (meets_mapq && meets_length && rev && ends_anchored);
 
-        // Require high mapping quality.
-        bool meets_mapq = (mapq >= kMinMapQ);
-        // Require overlap to cover most of at least one of the reads.
-        float overlap_frac =
-                std::max(static_cast<float>(temp_end - temp_start) / temp->seq.length(),
-                         static_cast<float>(comp_end - comp_start) / comp->seq.length());
-        bool meets_length = overlap_frac > kMinOverlapFraction;
-        // Require the start of the complement strand to map to end
-        // of the template strand.
-        bool ends_anchored = (static_cast<float>(comp_start) / comp->seq.length() < 0.02f &&
-                              static_cast<float>(temp_end) / temp->seq.length() > 0.98f);
-        bool cond = (meets_mapq && meets_length && rev && ends_anchored);
+            spdlog::debug(
+                    "hits {}, mapq {}, overlap length {}, overlap frac {}, delta {}, read 1 {}, "
+                    "read 2 "
+                    "{}, strand {}, pass {}, temp start {} temp end {}, comp start {} comp end {}, "
+                    "{} "
+                    "and {}",
+                    hits, mapq, temp_end - temp_start, overlap_frac, delta, temp->seq.length(),
+                    comp->seq.length(), rev ? "-" : "+", cond, temp_start, temp_end, comp_start,
+                    comp_end, temp->read_id, comp->read_id);
 
-        spdlog::debug(
-                "hits {}, mapq {}, overlap length {}, overlap frac {}, delta {}, read 1 {}, read 2 "
-                "{}, strand {}, pass {}, temp start {} temp end {}, comp start {} comp end {}, {} "
-                "and {}",
-                hits, mapq, temp_end - temp_start, overlap_frac, delta, temp->seq.length(),
-                comp->seq.length(), rev ? "-" : "+", cond, temp_start, temp_end, comp_start,
-                comp_end, temp->read_id, comp->read_id);
-
-        if (cond) {
-            return {true, temp_start, temp_end, comp_start, comp_end};
+            if (cond) {
+                return {true, temp_start, temp_end, comp_start, comp_end};
+            }
         }
     }
     return {false, 0, 0, 0, 0};
@@ -411,6 +412,7 @@ PairingNode::PairingNode(ReadOrder read_order, int num_worker_threads, size_t ma
 }
 
 void PairingNode::start_threads() {
+    m_tbufs.reserve(m_num_worker_threads);
     for (size_t i = 0; i < m_num_worker_threads; i++) {
         m_tbufs.push_back(MmTbufPtr(mm_tbuf_init()));
         m_workers.push_back(std::make_unique<std::thread>(
