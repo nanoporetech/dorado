@@ -337,6 +337,10 @@ if(NOT DORADO_LIB_ONLY)
         RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
     )
 
+    if(MSVC)
+        set_target_properties(dorado PROPERTIES LINK_OPTIONS "/ignore:4099")
+    endif()
+
     target_precompile_headers(dorado REUSE_FROM dorado_lib)
 
     target_link_libraries(dorado
