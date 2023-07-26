@@ -55,7 +55,6 @@ endif()
 
 if(DEFINED DORADO_LIBTORCH_DIR)
     # Use the existing libtorch we have been pointed at
-    list(APPEND CMAKE_PREFIX_PATH ${DORADO_LIBTORCH_DIR})
     message(STATUS "Using existing libtorch at ${DORADO_LIBTORCH_DIR}")
     set(TORCH_LIB ${DORADO_LIBTORCH_DIR})
 
@@ -149,8 +148,10 @@ else()
     set(TORCH_LIB_DIR torch-${TORCH_VERSION}${TORCH_PATCH_SUFFIX}-${CMAKE_SYSTEM_NAME})
     download_and_extract(${TORCH_URL} ${TORCH_LIB_DIR})
     set(TORCH_LIB "${DORADO_3RD_PARTY}/${TORCH_LIB_DIR}/${TORCH_LIB_SUFFIX}")
-    list(APPEND CMAKE_PREFIX_PATH "${TORCH_LIB}")
 endif()
+
+# Our libtorch should be chosen over any others on the system
+list(PREPEND CMAKE_PREFIX_PATH "${TORCH_LIB}")
 
 if (APPLE AND CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
     # For some reason the RPATHs of the dylibs are pointing to the libiomp5.dylib in functools rather
