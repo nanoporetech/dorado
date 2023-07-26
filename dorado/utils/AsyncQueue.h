@@ -80,7 +80,7 @@ class AsyncQueue {
     std::unique_lock<std::mutex> wait_for_item() {
         std::unique_lock lock(m_mutex);
         m_not_empty_cv.wait(lock, [this] { return !m_items.empty() || m_terminate; });
-        // Note: don't use std::move, so we have a the opportunity of NRVO on lock.
+        // Note: don't use std::move, so we have the opportunity of NRVO on lock.
         return lock;
     }
 
