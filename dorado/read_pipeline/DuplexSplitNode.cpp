@@ -520,9 +520,9 @@ std::vector<std::shared_ptr<Read>> DuplexSplitNode::split(std::shared_ptr<Read> 
     std::vector<std::shared_ptr<Read>> split_result;
     size_t subread_id = 0;
     for (const auto& ext_read : to_split) {
-        ext_read.read->subread_id = subread_id++;
-        ext_read.read->split_count = to_split.size();
         if (to_split.size() > 1) {
+            ext_read.read->subread_id = subread_id++;
+            ext_read.read->split_count = to_split.size();
             const auto subread_uuid = utils::derive_uuid(ext_read.read->parent_read_id,
                                                          std::to_string(ext_read.read->subread_id));
             ext_read.read->read_id = subread_uuid;
