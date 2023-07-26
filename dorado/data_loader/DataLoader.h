@@ -51,6 +51,8 @@ public:
             const std::unordered_set<std::string>& ignore_read_list = {},
             bool recursive_file_loading = false);
 
+    static bool is_read_data_present(std::string data_path, bool recursive_file_loading);
+
     static uint16_t get_sample_rate(std::string data_path, bool recursive_file_loading = false);
 
     std::string get_name() const { return "Dataloader"; }
