@@ -117,7 +117,7 @@ private:
 
     // Stats tracking for pairing node.
     std::atomic<int> m_early_accepted_pairs{0};
-    std::atomic<int> m_overlap_accepter_pairs{0};
+    std::atomic<int> m_overlap_accepted_pairs{0};
 };
 
 }  // namespace dorado

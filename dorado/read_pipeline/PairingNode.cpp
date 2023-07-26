@@ -28,6 +28,7 @@ std::tuple<bool, uint32_t, uint32_t, uint32_t, uint32_t>
 PairingNode::is_within_time_and_length_criteria(const std::shared_ptr<dorado::Read>& temp,
                                                 const std::shared_ptr<dorado::Read>& comp,
                                                 int tid) {
+    std::tuple<bool, uint32_t, uint32_t, uint32_t, uint32_t> pair_result = {false, 0, 0, 0, 0};
     const int kMaxTimeDeltaMs = 1000;
     const float kMinSeqLenRatio = 0.2f;
     const int kMinOverlapLength = 50;
@@ -121,12 +122,14 @@ PairingNode::is_within_time_and_length_criteria(const std::shared_ptr<dorado::Re
                     comp_end, temp->read_id, comp->read_id);
 
             if (cond) {
-                m_overlap_accepter_pairs++;
-                return {true, temp_start, temp_end, comp_start, comp_end};
+                m_overlap_accepted_pairs++;
+                pair_result = {true, temp_start, temp_end, comp_start, comp_end};
             }
         }
+        free(reg);
     }
-    return {false, 0, 0, 0, 0};
+    return pair_result;
+    ;
 }
 
 void PairingNode::pair_list_worker_thread() {
@@ -450,7 +453,7 @@ void PairingNode::restart() {
 stats::NamedStats PairingNode::sample_stats() const {
     stats::NamedStats stats = m_work_queue.sample_stats();
     stats["early_accepted_pairs"] = m_early_accepted_pairs.load();
-    stats["overlap_accepted_pairs"] = m_overlap_accepter_pairs.load();
+    stats["overlap_accepted_pairs"] = m_overlap_accepted_pairs.load();
     return stats;
 }
 
