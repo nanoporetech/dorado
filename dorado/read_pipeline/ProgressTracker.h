@@ -24,8 +24,10 @@ namespace dorado {
 // overall performance.
 class ProgressTracker {
 public:
-    ProgressTracker(int total_reads, bool duplex)
-            : m_num_reads_expected(total_reads), m_duplex(duplex) {
+    ProgressTracker(int total_reads, bool duplex, bool enable_progress_bar = true)
+            : m_num_reads_expected(total_reads),
+              m_enable_progress_bar(enable_progress_bar),
+              m_duplex(duplex) {
         m_initialization_time = std::chrono::system_clock::now();
     }
 
@@ -79,7 +81,7 @@ public:
             }
 
             // don't output progress bar if stderr is not a tty
-            if (!utils::is_fd_tty(stderr)) {
+            if (!utils::is_fd_tty(stderr) & !m_enable_progress_bar) {
                 return;
             }
 
@@ -92,13 +94,14 @@ public:
                 m_progress_bar.set_progress(progress);
 #ifndef WIN32
                 std::cerr << "\033[K";
+#else
+                std::cerr << "\r";
 #endif  // WIN32
                 m_last_progress_written = progress;
-                std::cerr << "\r";
             }
         } else {
             // don't output progress if stderr is not a tty
-            if (!utils::is_fd_tty(stderr)) {
+            if (!utils::is_fd_tty(stderr) & !m_enable_progress_bar) {
                 return;
             }
             std::cerr << "\r> Output records written: " << m_num_reads_written;
@@ -119,6 +122,7 @@ private:
     std::chrono::time_point<std::chrono::system_clock> m_end_time;
 
     bool m_duplex;
+    bool m_enable_progress_bar;
 
 #ifdef WIN32
     indicators::ProgressBar m_progress_bar {
