@@ -83,7 +83,7 @@ public:
             m_num_samples_processed += fetch_stat("StereoBasecallerNode.samples_processed");
         }
         m_num_duplex_reads_written = fetch_stat("HtsWriter.duplex_reads_written");
-        m_num_duplex_reads_filtered = fetch_stat("HtsWriter.duplex_reads_filtered");
+        m_num_duplex_reads_filtered = fetch_stat("ReadFilterNode.duplex_reads_filtered");
 
         // don't output progress bar if stderr is not a tty
         if (!utils::is_fd_tty(stderr)) {
