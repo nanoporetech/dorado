@@ -248,6 +248,7 @@ int duplex(int argc, char* argv[]) {
                 throw std::runtime_error(err.str());
             }
 
+            // Check sample rate of model vs data.
             auto data_sample_rate = DataLoader::get_sample_rate(reads, recursive_file_loading);
             auto model_sample_rate = get_model_sample_rate(model_path);
             auto skip_model_compatibility_check =
