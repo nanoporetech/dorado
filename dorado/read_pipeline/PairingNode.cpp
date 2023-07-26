@@ -20,8 +20,9 @@ namespace dorado {
 // 3. If the early acceptance fails, then run minimap2 to generate overlap
 //    coordinates. If there is only 1 hit from minimap2 mapping,
 //    the mapping quality is high (>50), the overlap covers
-//    most of the shorter read (80%), one read maps to the reverse strand
-//    of the other, and the end of the template is mapped to the beginning
+//    most of the shorter read (80%), the overlap is at least 50 bp long,
+//    one read maps to the reverse strand of the other, and the end
+//    of the template is mapped to the beginning
 //    of the complement read, then consider them a pair.
 std::tuple<bool, uint32_t, uint32_t, uint32_t, uint32_t>
 PairingNode::is_within_time_and_length_criteria(const std::shared_ptr<dorado::Read>& temp,
@@ -29,13 +30,15 @@ PairingNode::is_within_time_and_length_criteria(const std::shared_ptr<dorado::Re
                                                 int tid) {
     const int kMaxTimeDeltaMs = 1000;
     const float kMinSeqLenRatio = 0.2f;
+    const int kMinOverlapLength = 50;
     int delta = comp->start_time_ms - temp->get_end_time_ms();
     int seq_len1 = temp->seq.length();
     int seq_len2 = comp->seq.length();
     float len_ratio = static_cast<float>(std::min(seq_len1, seq_len2)) /
                       static_cast<float>(std::max(seq_len1, seq_len2));
 
-    if ((delta >= 0) && (delta < kMaxTimeDeltaMs) && (len_ratio > kMinSeqLenRatio)) {
+    if ((delta >= 0) && (delta < kMaxTimeDeltaMs) && (len_ratio > kMinSeqLenRatio) &&
+        (std::min(seq_len1, seq_len2) > kMinOverlapLength)) {
         const float kEarlyAcceptSeqLenRatio = 0.98;
         const int kEarlyAcceptTimeDeltaMs = 100;
         if (delta <= kEarlyAcceptTimeDeltaMs && len_ratio >= kEarlyAcceptSeqLenRatio) {
@@ -43,6 +46,7 @@ PairingNode::is_within_time_and_length_criteria(const std::shared_ptr<dorado::Re
                     "Early acceptance: len frac {}, delta {} temp len {}, comp len {}, {} and {}",
                     len_ratio, delta, temp->seq.length(), comp->seq.length(), temp->read_id,
                     comp->read_id);
+            m_early_accepted_pairs++;
             return {true, 0, temp->seq.length() - 1, 0, comp->seq.length() - 1};
         }
 
@@ -101,7 +105,10 @@ PairingNode::is_within_time_and_length_criteria(const std::shared_ptr<dorado::Re
             // of the template strand.
             bool ends_anchored = (static_cast<float>(comp_start) / comp->seq.length() < 0.02f &&
                                   static_cast<float>(temp_end) / temp->seq.length() > 0.98f);
-            bool cond = (meets_mapq && meets_length && rev && ends_anchored);
+            int min_overlap_length = std::min(temp_end - temp_start, comp_end - comp_start);
+            bool meets_min_overlap_length = min_overlap_length > kMinOverlapLength;
+            bool cond = (meets_mapq && meets_length && rev && ends_anchored &&
+                         meets_min_overlap_length);
 
             spdlog::debug(
                     "hits {}, mapq {}, overlap length {}, overlap frac {}, delta {}, read 1 {}, "
@@ -114,6 +121,7 @@ PairingNode::is_within_time_and_length_criteria(const std::shared_ptr<dorado::Re
                     comp_end, temp->read_id, comp->read_id);
 
             if (cond) {
+                m_overlap_accepter_pairs++;
                 return {true, temp_start, temp_end, comp_start, comp_end};
             }
         }
@@ -446,6 +454,8 @@ void PairingNode::restart() {
 
 stats::NamedStats PairingNode::sample_stats() const {
     stats::NamedStats stats = m_work_queue.sample_stats();
+    stats["early_accepted_pairs"] = m_early_accepted_pairs.load();
+    stats["overlap_accepted_pairs"] = m_overlap_accepter_pairs.load();
     return stats;
 }
 

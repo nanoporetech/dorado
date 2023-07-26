@@ -267,6 +267,8 @@ std::shared_ptr<dorado::Read> StereoDuplexEncoderNode::stereo_encode(
 
     edlibFreeAlignResult(result);
 
+    m_num_encoded_pairs++;
+
     return read;
 }
 
@@ -318,7 +320,7 @@ void StereoDuplexEncoderNode::restart() {
 
 stats::NamedStats StereoDuplexEncoderNode::sample_stats() const {
     stats::NamedStats stats = m_work_queue.sample_stats();
-    stats["discarded_pairs"] = m_num_discarded_pairs;
+    stats["encoded_pairs"] = m_num_encoded_pairs;
     return stats;
 }
 

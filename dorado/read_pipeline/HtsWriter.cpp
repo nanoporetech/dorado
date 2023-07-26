@@ -81,9 +81,6 @@ HtsWriter::OutputMode HtsWriter::get_output_mode(const std::string& mode) {
 }
 
 void HtsWriter::worker_thread() {
-    // FIXME -- either remove this or add the code to set it to something other than 0
-    size_t write_count = 0;
-
     Message message;
     while (m_work_queue.try_pop(message)) {
         // If this message isn't a BamPtr, ignore it.
@@ -100,11 +97,13 @@ void HtsWriter::worker_thread() {
         // TODO: This is a hack, we should have a better way of identifying duplex reads.
         bool ignore_read_id = read_id.find(';') != std::string::npos;
 
-        if (!ignore_read_id) {
+        if (ignore_read_id) {
+            // Read is a duplex read.
+            m_duplex_reads_written++;
+        } else {
             m_processed_read_ids.insert(std::move(read_id));
         }
     }
-    spdlog::debug("Written {} records.", write_count);
 }
 
 int HtsWriter::write(bam1_t* const record) {
@@ -147,6 +146,7 @@ int HtsWriter::set_and_write_header(const sam_hdr_t* const header) {
 stats::NamedStats HtsWriter::sample_stats() const {
     auto stats = stats::from_obj(m_work_queue);
     stats["unique_simplex_reads_written"] = m_processed_read_ids.size();
+    stats["duplex_reads_written"] = m_duplex_reads_written.load();
     return stats;
 }
 

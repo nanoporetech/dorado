@@ -37,7 +37,7 @@ private:
     int m_input_signal_stride;
 
     // Performance monitoring stats.
-    std::atomic<int64_t> m_num_discarded_pairs = 0;
+    std::atomic<int64_t> m_num_encoded_pairs = 0;
 };
 
 }  // namespace dorado
