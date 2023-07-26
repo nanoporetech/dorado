@@ -114,7 +114,7 @@ Aligner::bam_header_sq_t Aligner::get_sequence_records_for_header() const {
 
 void Aligner::worker_thread(size_t tid) {
     Message message;
-    while (m_work_queue.try_pop(message)) {
+    while (get_input_message(message)) {
         // If this message isn't a BamPtr, just forward it to the sink.
         if (!std::holds_alternative<BamPtr>(message)) {
             send_message_to_sink(std::move(message));

@@ -542,7 +542,7 @@ void DuplexSplitNode::worker_thread() {
     m_active++;  // Track active threads.
     Message message;
 
-    while (m_work_queue.try_pop(message)) {
+    while (get_input_message(message)) {
         // If this message isn't a read, just forward it to the sink.
         if (!m_settings.enabled || !std::holds_alternative<std::shared_ptr<Read>>(message)) {
             send_message_to_sink(std::move(message));
