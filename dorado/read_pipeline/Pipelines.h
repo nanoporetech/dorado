@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ReadPipeline.h"
+#include "nn/ModelRunner.h"
 #include "utils/types.h"
 
 #include <map>
@@ -15,7 +16,7 @@ class CRFModelConfig;
 class ModelRunnerBase;
 class ModBaseRunner;
 
-using Runner = class std::shared_ptr<dorado::ModelRunnerBase>;
+using Runner = std::shared_ptr<dorado::ModelRunnerBase>;
 using PairingParameters = std::variant<ReadOrder, std::map<std::string, std::string>>;
 
 namespace pipelines {
