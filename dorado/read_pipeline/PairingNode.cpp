@@ -247,8 +247,6 @@ void PairingNode::pair_generating_worker_thread(int tid) {
         auto& read_cache = m_read_caches[client_id];
         UniquePoreIdentifierKey key = std::make_tuple(channel, mux, run_id, flowcell_id);
         auto read_list_iter = read_cache.channel_mux_read_map.find(key);
-        // To track and clear earlier and later reads in the list.
-        std::shared_ptr<Read> later_read, earlier_read;
         // Check if the key is already in the list
         if (read_list_iter == read_cache.channel_mux_read_map.end()) {
             // Key is not in the dequeue
@@ -271,12 +269,9 @@ void PairingNode::pair_generating_worker_thread(int tid) {
                 assert(read_cache.channel_mux_read_map.size() ==
                        read_cache.working_channel_mux_keys.size());
             }
-
-            // Release mutex so it can be re-acquired to check reads
-            // in-flight.
-            lock.unlock();
         } else {
             auto& cached_read_list = read_list_iter->second;
+            std::shared_ptr<Read> later_read, earlier_read;
             auto later_read_iter = std::lower_bound(
                     cached_read_list.begin(), cached_read_list.end(), read, compare_reads_by_time);
             if (later_read_iter != cached_read_list.end()) {
@@ -298,7 +293,8 @@ void PairingNode::pair_generating_worker_thread(int tid) {
                 m_reads_to_clear.insert(std::move(cached_read));
             }
 
-            lock.unlock();  // Release mutex around read cache.
+            // Release mutex around read cache to run pair evaluations.
+            lock.unlock();
 
             bool found_pair = false;
             if (later_read) {
@@ -325,14 +321,10 @@ void PairingNode::pair_generating_worker_thread(int tid) {
                     send_message_to_sink(std::make_shared<ReadPair>(pair));
                 }
             }
-        }
 
-        // Once pairs have been evaluated, check if any of the in-flight reads
-        // need to be purged from the cache.
-        {
-            const std::string nvtx_id = "clear_cache_" + std::to_string(tid);
-            nvtx3::scoped_range loop{nvtx_id};
-            std::unique_lock<std::mutex> lock(m_pairing_mtx);
+            // Acquire read cache lock again to decrement in flight read counters.
+            lock.lock();
+
             // Decrement in-flight counter for each read.
             m_reads_in_flight_ctr[read]--;
             if (earlier_read) {
@@ -341,25 +333,28 @@ void PairingNode::pair_generating_worker_thread(int tid) {
             if (later_read) {
                 m_reads_in_flight_ctr[later_read]--;
             }
-            for (auto to_clear_itr = m_reads_to_clear.begin();
-                 to_clear_itr != m_reads_to_clear.end();) {
-                auto in_flight_itr = m_reads_in_flight_ctr.find(*to_clear_itr);
-                bool ok_to_clear = false;
-                // If a read to clear is not in-flight (not in the in-flight list
-                // or in-flight counter is 0), then clear it
-                // from the cache.
-                if (in_flight_itr == m_reads_in_flight_ctr.end()) {
-                    ok_to_clear = true;
-                } else if (in_flight_itr->second.load() == 0) {
-                    m_reads_in_flight_ctr.erase(in_flight_itr);
-                    ok_to_clear = true;
-                }
-                if (ok_to_clear) {
-                    send_message_to_sink(std::move(*to_clear_itr));
-                    to_clear_itr = m_reads_to_clear.erase(to_clear_itr);
-                } else {
-                    ++to_clear_itr;
-                }
+        }
+
+        // Once pairs have been evaluated, check if any of the in-flight reads
+        // need to be purged from the cache.
+        for (auto to_clear_itr = m_reads_to_clear.begin();
+             to_clear_itr != m_reads_to_clear.end();) {
+            auto in_flight_itr = m_reads_in_flight_ctr.find(*to_clear_itr);
+            bool ok_to_clear = false;
+            // If a read to clear is not in-flight (not in the in-flight list
+            // or in-flight counter is 0), then clear it
+            // from the cache.
+            if (in_flight_itr == m_reads_in_flight_ctr.end()) {
+                ok_to_clear = true;
+            } else if (in_flight_itr->second.load() == 0) {
+                m_reads_in_flight_ctr.erase(in_flight_itr);
+                ok_to_clear = true;
+            }
+            if (ok_to_clear) {
+                send_message_to_sink(std::move(*to_clear_itr));
+                to_clear_itr = m_reads_to_clear.erase(to_clear_itr);
+            } else {
+                ++to_clear_itr;
             }
         }
     }
