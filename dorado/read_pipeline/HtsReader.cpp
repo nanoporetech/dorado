@@ -47,8 +47,8 @@ void HtsReader::read(Pipeline& pipeline, int max_reads) {
     int num_reads = 0;
     while (this->read()) {
         std::string read_id = bam_get_qname(record.get());
-        //if (read_id != "3bd5a348-1cb5-4aed-a95a-3c95266b36e")
-        //    continue;
+        if (read_id != "996907bd-06c6-471f-a7fc-81e28bc6f7fc")
+            continue;
         pipeline.push_message(BamPtr(bam_dup1(record.get())));
         if (max_reads > 0 && ++num_reads >= max_reads) {
             break;

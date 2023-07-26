@@ -311,6 +311,7 @@ int extract_mask_location(EdlibAlignResult aln, const std::string_view& query) {
 ScoreResults Barcoder::calculate_adapter_score_double_ends(const std::string_view& read_seq,
                                                            const AdapterSequence& as,
                                                            bool with_flanks) {
+    spdlog::debug("Barcoder {}", as.adapter_name);
     std::string_view read_top = read_seq.substr(0, 150);
     std::string_view read_bottom = read_seq.substr(std::max(0, (int)read_seq.length() - 150), 150);
 
@@ -324,7 +325,7 @@ ScoreResults Barcoder::calculate_adapter_score_double_ends(const std::string_vie
 
     EdlibAlignConfig mask_config = edlibDefaultAlignConfig();
     mask_config.mode = EDLIB_MODE_NW;
-    mask_config.task = EDLIB_TASK_LOC;
+    mask_config.task = EDLIB_TASK_PATH;
 
     std::string_view top_strand;
     std::string_view bottom_strand;
@@ -340,6 +341,9 @@ ScoreResults Barcoder::calculate_adapter_score_double_ends(const std::string_vie
 
     auto top_mask_result = edlibAlign(as.adapter.data(), as.adapter.length(), top_mask.data(),
                                       top_mask.length(), mask_config);
+    spdlog::debug("top window {}", top_mask_result.editDistance);
+    spdlog::debug("\n{}",
+                  utils::alignment_to_str(as.adapter.data(), top_mask.data(), top_mask_result));
 
     EdlibAlignResult bottom_result =
             edlibAlign(bottom_strand.data(), bottom_strand.length(), read_bottom.data(),
@@ -352,6 +356,9 @@ ScoreResults Barcoder::calculate_adapter_score_double_ends(const std::string_vie
     auto bottom_mask_result = edlibAlign(as.adapter_rev.data(), as.adapter_rev.length(),
                                          bottom_mask.data(), bottom_mask.length(), mask_config);
 
+    spdlog::debug("bottom window {}", bottom_mask_result.editDistance);
+    spdlog::debug("\n{}", utils::alignment_to_str(as.adapter_rev.data(), bottom_mask.data(),
+                                                  bottom_mask_result));
     ScoreResults res;
     res.adapter_name = as.adapter_name;
     res.kit = as.kit;
