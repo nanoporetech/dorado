@@ -82,7 +82,7 @@ HtsWriter::OutputMode HtsWriter::get_output_mode(const std::string& mode) {
 
 void HtsWriter::worker_thread() {
     Message message;
-    while (m_work_queue.try_pop(message)) {
+    while (get_input_message(message)) {
         // If this message isn't a BamPtr, ignore it.
         if (!std::holds_alternative<BamPtr>(message)) {
             continue;

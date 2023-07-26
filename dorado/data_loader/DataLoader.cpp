@@ -184,7 +184,7 @@ void DataLoader::load_reads(const std::string& path,
                                    [](unsigned char c) { return std::tolower(c); });
                     if (ext == ".fast5") {
                         throw std::runtime_error(
-                                "Traversing reads by channel is only availabls for POD5. "
+                                "Traversing reads by channel is only available for POD5. "
                                 "Encountered FAST5 at " +
                                 path.string());
                     } else if (ext == ".pod5") {
@@ -256,6 +256,10 @@ int DataLoader::get_num_reads(std::string data_path,
                 if (pod5_close_and_free_reader(file) != POD5_OK) {
                     spdlog::error("Failed to close and free POD5 reader");
                 }
+            } else if (ext == ".fast5") {
+                H5Easy::File file(entry.path().string(), H5Easy::File::ReadOnly);
+                HighFive::Group reads = file.getGroup("/");
+                num_reads += reads.getNumberObjects();
             }
         }
     };

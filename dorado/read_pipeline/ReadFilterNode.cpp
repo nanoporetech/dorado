@@ -6,7 +6,7 @@ namespace dorado {
 
 void ReadFilterNode::worker_thread() {
     Message message;
-    while (m_work_queue.try_pop(message)) {
+    while (get_input_message(message)) {
         // If this message isn't a read, just forward it to the sink.
         if (!std::holds_alternative<std::shared_ptr<Read>>(message)) {
             send_message_to_sink(std::move(message));

@@ -82,7 +82,7 @@ private:
     std::vector<std::unique_ptr<std::thread>> m_runner_workers;
     std::vector<std::unique_ptr<std::thread>> m_input_workers;
 
-    AsyncQueue<std::shared_ptr<RemoraChunk>> m_processed_chunks;
+    utils::AsyncQueue<std::shared_ptr<RemoraChunk>> m_processed_chunks;
     std::vector<std::deque<std::shared_ptr<RemoraChunk>>> m_chunk_queues;
 
     std::mutex m_working_reads_mutex;

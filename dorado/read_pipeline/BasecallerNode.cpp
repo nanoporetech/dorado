@@ -22,7 +22,7 @@ namespace dorado {
 void BasecallerNode::input_worker_thread() {
     Message message;
 
-    while (m_work_queue.try_pop(message)) {
+    while (get_input_message(message)) {
         // If this message isn't a read, just forward it to the sink.
         if (!std::holds_alternative<std::shared_ptr<Read>>(message)) {
             send_message_to_sink(std::move(message));
@@ -109,7 +109,7 @@ void BasecallerNode::basecall_current_batch(int worker_id) {
 
 void BasecallerNode::working_reads_manager() {
     std::shared_ptr<Chunk> chunk;
-    while (m_processed_chunks.try_pop(chunk)) {
+    while (m_processed_chunks.try_pop(chunk) == utils::AsyncQueueStatus::Success) {
         nvtx3::scoped_range loop{"working_reads_manager"};
 
         auto source_read = chunk->source_read.lock();
@@ -149,10 +149,16 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
     auto last_chunk_reserve_time = std::chrono::system_clock::now();
     int batch_size = m_model_runners[worker_id]->batch_size();
     std::shared_ptr<Chunk> chunk;
-    while (m_chunks_in.try_pop_until(
-            chunk, last_chunk_reserve_time + std::chrono::milliseconds(m_batch_timeout_ms))) {
-        // If chunk is empty, then try_pop_until timed out without getting a new chunk.
-        if (!chunk) {
+    while (true) {
+        const auto pop_status = m_chunks_in.try_pop_until(
+                chunk, last_chunk_reserve_time + std::chrono::milliseconds(m_batch_timeout_ms));
+
+        if (pop_status == utils::AsyncQueueStatus::Terminate) {
+            break;
+        }
+
+        if (pop_status == utils::AsyncQueueStatus::Timeout) {
+            // try_pop_until timed out without getting a new chunk.
             if (!m_batched_chunks[worker_id].empty()) {
                 // get scores for whatever chunks are available.
                 basecall_current_batch(worker_id);
@@ -163,6 +169,7 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
         }
 
         // There's chunks to get_scores, so let's add them to our input tensor
+        // FIXME -- it should not be possible to for this condition to be untrue.
         if (m_batched_chunks[worker_id].size() != batch_size) {
             // Copy the chunk into the input tensor
             std::shared_ptr<Read> source_read = chunk->source_read.lock();
