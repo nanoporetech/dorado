@@ -40,8 +40,14 @@ std::pair<float, float> ScalerNode::med_mad(const torch::Tensor& x) {
 void ScalerNode::worker_thread() {
     Message message;
     while (get_input_message(message)) {
-        // If this message isn't a read, we'll get a bad_variant_access exception.
+        // If this message isn't a read, just forward it to the sink.
+        if (!std::holds_alternative<std::shared_ptr<Read>>(message)) {
+            send_message_to_sink(std::move(message));
+            continue;
+        }
+
         auto read = std::get<std::shared_ptr<Read>>(message);
+
         assert(read->raw_data.dtype() == torch::kInt16);
         const auto [shift, scale] = m_scaling_params.quantile_scaling
                                             ? normalisation(read->raw_data)
@@ -67,8 +73,6 @@ void ScalerNode::worker_thread() {
         // Pass the read to the next node
         send_message_to_sink(read);
     }
-
-    int num_worker_threads = --m_num_worker_threads;
 }
 
 ScalerNode::ScalerNode(const SignalNormalisationParams& config,
@@ -77,10 +81,14 @@ ScalerNode::ScalerNode(const SignalNormalisationParams& config,
         : MessageSink(max_reads),
           m_scaling_params(config),
           m_num_worker_threads(num_worker_threads) {
+    start_threads();
+}
+
+void ScalerNode::start_threads() {
     for (int i = 0; i < m_num_worker_threads; i++) {
         std::unique_ptr<std::thread> scaler_worker_thread =
                 std::make_unique<std::thread>(&ScalerNode::worker_thread, this);
-        worker_threads.push_back(std::move(scaler_worker_thread));
+        m_worker_threads.push_back(std::move(scaler_worker_thread));
     }
 }
 
@@ -88,11 +96,17 @@ void ScalerNode::terminate_impl() {
     terminate_input_queue();
 
     // Wait for all the Scaler Node's worker threads to terminate
-    for (auto& t : worker_threads) {
+    for (auto& t : m_worker_threads) {
         if (t->joinable()) {
             t->join();
         }
     }
+    m_worker_threads.clear();
+}
+
+void ScalerNode::restart() {
+    restart_input_queue();
+    start_threads();
 }
 
 stats::NamedStats ScalerNode::sample_stats() const { return stats::from_obj(m_work_queue); }

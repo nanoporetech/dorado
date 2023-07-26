@@ -98,7 +98,8 @@ TEST_CASE("LinearDestructionOrder", TEST_GROUP) {
                 : MessageSink(1), m_destruction_order(destruction_order), m_index(index) {}
         ~OrderTestNode() { m_destruction_order.push_back(m_index); }
         std::string get_name() const override { return "OrderTestNode"; }
-        void terminate() override {}
+        void terminate(const dorado::FlushOptions& flush_options) override {}
+        void restart() override {}
 
     private:
         std::vector<int>& m_destruction_order;
@@ -156,7 +157,7 @@ TEST_CASE("PipelineFlow", TEST_GROUP) {
     }
 
     {
-        // Peverse construction order: source to sink.
+        // Perverse construction order: source to sink.
         PipelineDescriptor pipeline_desc;
         std::vector<dorado::Message> messages;
         auto null_node = pipeline_desc.add_node<NullNode>({});
@@ -168,4 +169,22 @@ TEST_CASE("PipelineFlow", TEST_GROUP) {
         pipeline.reset();
         CHECK(messages.size() == 0);
     }
+}
+
+// Test reads make it through after the pipeline has been restarted.
+TEST_CASE("TerminateRestart", TEST_GROUP) {
+    PipelineDescriptor pipeline_desc;
+    std::vector<dorado::Message> messages;
+    auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
+    auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
+    REQUIRE(pipeline != nullptr);
+    pipeline->push_message(std::shared_ptr<dorado::Read>());
+    pipeline->terminate(dorado::DefaultFlushOptions());
+    // Messages should get through as soon as we have terminated.
+    CHECK(messages.size() == 1);
+    // If we restart we should be able to get another message through.
+    pipeline->restart();
+    pipeline->push_message(std::shared_ptr<dorado::Read>());
+    pipeline.reset();
+    CHECK(messages.size() == 2);
 }

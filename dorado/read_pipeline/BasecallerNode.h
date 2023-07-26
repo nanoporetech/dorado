@@ -25,9 +25,11 @@ public:
     ~BasecallerNode() { terminate_impl(); }
     std::string get_name() const override { return m_node_name; }
     stats::NamedStats sample_stats() const override;
-    void terminate() override { terminate_impl(); }
+    void terminate(const FlushOptions& flush_options) override { terminate_impl(); }
+    void restart() override;
 
 private:
+    void start_threads();
     void terminate_impl();
     // Consume reads from input queue
     void input_worker_thread();

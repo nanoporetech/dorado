@@ -185,6 +185,10 @@ BaseSpaceDuplexCallerNode::BaseSpaceDuplexCallerNode(
           m_template_complement_map(std::move(template_complement_map)),
           m_reads(std::move(reads)),
           m_num_worker_threads(threads) {
+    start_threads();
+}
+
+void BaseSpaceDuplexCallerNode::start_threads() {
     m_worker_thread =
             std::make_unique<std::thread>(&BaseSpaceDuplexCallerNode::worker_thread, this);
 }
@@ -194,6 +198,12 @@ void BaseSpaceDuplexCallerNode::terminate_impl() {
     if (m_worker_thread->joinable()) {
         m_worker_thread->join();
     }
+    m_worker_thread.reset();
+}
+
+void BaseSpaceDuplexCallerNode::restart() {
+    restart_input_queue();
+    start_threads();
 }
 
 }  // namespace dorado

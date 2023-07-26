@@ -75,7 +75,7 @@ $ dorado basecaller dna_r10.4.1_e8.2_400bps_hac@v4.1.0 pod5s --resume-from incom
 
 `calls.bam` will contain all of the reads from `incomplete.bam` plus the new basecalls *(`incomplete.bam` can be discarded after basecalling is complete)*.
 
-**Note: it is important to choose a different filename for the BAM file you are writing to when using `--resuming-from`**. If you use the same filename, the interrupted BAM file will lose the existing basecalls and basecalling will restart from the beginning.
+**Note: it is important to choose a different filename for the BAM file you are writing to when using `--resume-from`**. If you use the same filename, the interrupted BAM file will lose the existing basecalls and basecalling will restart from the beginning.
 
 ### Modified basecalling
 
@@ -140,16 +140,13 @@ $ dorado download --model all
 
 ### **Simplex models:**
 
-v4.1.0 models are recommended for our latest released condition (4 kHz).
+v4.2.0 models are recommended for our latest released condition (5 kHz).
 
-* dna_r10.4.1_e8.2_260bps_fast@v4.1.0
-* dna_r10.4.1_e8.2_260bps_hac@v4.1.0
-* dna_r10.4.1_e8.2_260bps_sup@v4.1.0
-* dna_r10.4.1_e8.2_400bps_fast@v4.1.0
-* dna_r10.4.1_e8.2_400bps_hac@v4.1.0
-* dna_r10.4.1_e8.2_400bps_sup@v4.1.0
+* dna_r10.4.1_e8.2_400bps_fast@v4.2.0
+* dna_r10.4.1_e8.2_400bps_hac@v4.2.0
+* dna_r10.4.1_e8.2_400bps_sup@v4.2.0
 
-The following simplex models are also available:
+The following simplex models are also available (all for 4 kHz data):
 
 * dna_r9.4.1_e8_fast@v3.4
 * dna_r9.4.1_e8_hac@v3.3
@@ -167,24 +164,26 @@ The following simplex models are also available:
 * dna_r10.4.1_e8.2_400bps_fast@v4.0.0
 * dna_r10.4.1_e8.2_400bps_hac@v4.0.0
 * dna_r10.4.1_e8.2_400bps_sup@v4.0.0
-* dna_r10.4.1_e8.2_400bps_fast@v4.2.0 (5kHz)
-* dna_r10.4.1_e8.2_400bps_hac@v4.2.0 (5kHz)
-* dna_r10.4.1_e8.2_400bps_sup@v4.2.0 (5kHz)
+* dna_r10.4.1_e8.2_260bps_fast@v4.1.0
+* dna_r10.4.1_e8.2_260bps_hac@v4.1.0
+* dna_r10.4.1_e8.2_260bps_sup@v4.1.0
+* dna_r10.4.1_e8.2_400bps_fast@v4.1.0
+* dna_r10.4.1_e8.2_400bps_hac@v4.1.0
+* dna_r10.4.1_e8.2_400bps_sup@v4.1.0
 
 ### **RNA models:**
 
 * rna002_70bps_fast@v3
 * rna002_70bps_hac@v3
-* rna003_120bps_sup@v3
 * rna004_130bps_fast@v3
 * rna004_130bps_hac@v3
 * rna004_130bps_sup@v3
 
 ### **Modified base models**
 
-* dna_r9.4.1_e8_fast@v3.4_5mCG@v0
-* dna_r9.4.1_e8_hac@v3.3_5mCG@v0
-* dna_r9.4.1_e8_sup@v3.3_5mCG@v0
+* dna_r9.4.1_e8_fast@v3.4_5mCG@v0.1
+* dna_r9.4.1_e8_hac@v3.3_5mCG@v0.1
+* dna_r9.4.1_e8_sup@v3.3_5mCG@v0.1
 * dna_r9.4.1_e8_fast@v3.4_5mCG_5hmCG@v0
 * dna_r9.4.1_e8_hac@v3.3_5mCG_5hmCG@v0
 * dna_r9.4.1_e8_sup@v3.3_5mCG_5hmCG@v0
@@ -206,11 +205,11 @@ The following simplex models are also available:
 * dna_r10.4.1_e8.2_400bps_fast@v4.1.0_5mCG_5hmCG@v2
 * dna_r10.4.1_e8.2_400bps_hac@v4.1.0_5mCG_5hmCG@v2
 * dna_r10.4.1_e8.2_400bps_sup@v4.1.0_5mCG_5hmCG@v2
-* dna_r10.4.1_e8.2_400bps_fast@v4.2.0_5mCG_5hmCG@v2 (5kHz)
-* dna_r10.4.1_e8.2_400bps_hac@v4.2.0_5mCG_5hmCG@v2 (5kHz)
-* dna_r10.4.1_e8.2_400bps_sup@v4.2.0_5mCG_5hmCG@v2 (5kHz)
-* dna_r10.4.1_e8.2_400bps_sup@v4.2.0_5mC@v2 (5kHz)
-* dna_r10.4.1_e8.2_400bps_sup@v4.2.0_6mA@v2 (5kHz)
+* dna_r10.4.1_e8.2_400bps_fast@v4.2.0_5mCG_5hmCG@v2 (5 kHz)
+* dna_r10.4.1_e8.2_400bps_hac@v4.2.0_5mCG_5hmCG@v2 (5 kHz)
+* dna_r10.4.1_e8.2_400bps_sup@v4.2.0_5mCG_5hmCG@v2 (5 kHz)
+* dna_r10.4.1_e8.2_400bps_sup@v4.2.0_5mC@v2 (5 kHz)
+* dna_r10.4.1_e8.2_400bps_sup@v4.2.0_6mA@v2 (5 kHz)
 
 ## Decoding Dorado model names
 
@@ -316,7 +315,7 @@ To determine the batch size picked by `dorado`, run it in verbose mode by adding
 
 Low GPU utilization can lead to reduced basecalling speed. This problem can be identified using tools such as `nvidia-smi` and `nvtop`. Low GPU utilization often stems from I/O bottlenecks in basecalling. Here are a few steps you can take to improve the situation:
 
-1. Opt for POD5 instead of FAST5: POD5 has superior I/O performance and will enhance the basecall speed in I/O constrained environments.
+1. Opt for POD5 instead of .fast5: POD5 has superior I/O performance and will enhance the basecall speed in I/O constrained environments.
 2. Transfer data to the local disk before basecalling: Slow basecalling often occurs because network disks cannot supply Dorado with adequate speed. To mitigate this, make sure your data is as close to your host machine as possible.
 3. Choose SSD over HDD: Particularly for duplex basecalling, using a local SSD can offer significant speed advantages. This is due to the duplex basecalling algorithm's reliance on heavy random access of data.
 

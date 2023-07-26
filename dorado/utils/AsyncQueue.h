@@ -215,6 +215,8 @@ public:
     }
 
     // Tells the queue to terminate any CV waits.
+    // Pushes will fail until restart is called.
+    // Pops will return false once the queue is empty.
     void terminate() {
         {
             std::lock_guard lock(m_mutex);
@@ -227,6 +229,12 @@ public:
         // inside try_push/try_pop.
         m_not_full_cv.notify_all();
         m_not_empty_cv.notify_all();
+    }
+
+    // Resets state to active following a terminate call.
+    void restart() {
+        std::lock_guard lock(m_mutex);
+        m_terminate = false;
     }
 
     // Maximum number of items the queue can contain.

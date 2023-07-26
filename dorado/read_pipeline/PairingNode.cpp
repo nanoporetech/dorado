@@ -1,4 +1,9 @@
 #include "PairingNode.h"
+
+#include <algorithm>
+#include <cstdint>
+#include <limits>
+
 namespace {
 bool is_within_time_and_length_criteria(const std::shared_ptr<dorado::Read>& read1,
                                         const std::shared_ptr<dorado::Read>& read2) {
@@ -18,6 +23,12 @@ namespace dorado {
 void PairingNode::pair_list_worker_thread() {
     Message message;
     while (get_input_message(message)) {
+        // If this message isn't a read, just forward it to the sink.
+        if (!std::holds_alternative<std::shared_ptr<Read>>(message)) {
+            send_message_to_sink(std::move(message));
+            continue;
+        }
+
         // If this message isn't a read, we'll get a bad_variant_access exception.
         auto read = std::get<std::shared_ptr<Read>>(message);
 
@@ -79,7 +90,7 @@ void PairingNode::pair_list_worker_thread() {
             }
         }
     }
-    --m_num_worker_threads;
+    --m_num_active_worker_threads;
 }
 
 void PairingNode::pair_generating_worker_thread() {
@@ -90,6 +101,27 @@ void PairingNode::pair_generating_worker_thread() {
 
     Message message;
     while (get_input_message(message)) {
+        if (std::holds_alternative<CacheFlushMessage>(message)) {
+            std::unique_lock<std::mutex> lock(m_pairing_mtx);
+            auto flush_message = std::get<CacheFlushMessage>(message);
+            auto& read_cache = m_read_caches[flush_message.client_id];
+            for (const auto& [key, reads_list] : read_cache.channel_mux_read_map) {
+                // kv is a std::pair<UniquePoreIdentifierKey, std::list<std::shared_ptr<Read>>>
+                for (const auto& read_ptr : reads_list) {
+                    // Push each read message
+                    send_message_to_sink(std::move(read_ptr));
+                }
+            }
+            m_read_caches.erase(flush_message.client_id);
+            continue;
+        }
+
+        // If this message isn't a read, just forward it to the sink.
+        if (!std::holds_alternative<std::shared_ptr<Read>>(message)) {
+            send_message_to_sink(std::move(message));
+            continue;
+        }
+
         // If this message isn't a read, we'll get a bad_variant_access exception.
         auto read = std::get<std::shared_ptr<Read>>(message);
 
@@ -100,28 +132,31 @@ void PairingNode::pair_generating_worker_thread() {
         int32_t client_id = read->client_id;
 
         std::unique_lock<std::mutex> lock(m_pairing_mtx);
-        UniquePoreIdentifierKey key = std::make_tuple(channel, mux, run_id, flowcell_id, client_id);
-        auto read_list_iter = m_channel_mux_read_map.find(key);
+
+        auto& read_cache = m_read_caches[client_id];
+        UniquePoreIdentifierKey key = std::make_tuple(channel, mux, run_id, flowcell_id);
+        auto read_list_iter = read_cache.channel_mux_read_map.find(key);
         // Check if the key is already in the list
-        if (read_list_iter == m_channel_mux_read_map.end()) {
+        if (read_list_iter == read_cache.channel_mux_read_map.end()) {
             // Key is not in the dequeue
             // Add the new key to the end of the list
-            m_working_channel_mux_keys.push_back(key);
-            m_channel_mux_read_map.insert({key, {read}});
+            read_cache.working_channel_mux_keys.push_back(key);
+            read_cache.channel_mux_read_map.insert({key, {read}});
 
-            if (m_working_channel_mux_keys.size() > m_max_num_keys) {
+            if (read_cache.working_channel_mux_keys.size() > m_max_num_keys) {
                 // Remove the oldest key (front of the list)
-                auto oldest_key = m_working_channel_mux_keys.front();
-                m_working_channel_mux_keys.pop_front();
+                auto oldest_key = read_cache.working_channel_mux_keys.front();
+                read_cache.working_channel_mux_keys.pop_front();
 
-                auto oldest_key_it = m_channel_mux_read_map.find(oldest_key);
+                auto oldest_key_it = read_cache.channel_mux_read_map.find(oldest_key);
 
                 // Remove the oldest key from the map
                 for (auto read_ptr : oldest_key_it->second) {
                     send_message_to_sink(read_ptr);
                 }
-                m_channel_mux_read_map.erase(oldest_key);
-                assert(m_channel_mux_read_map.size() == m_working_channel_mux_keys.size());
+                read_cache.channel_mux_read_map.erase(oldest_key);
+                assert(read_cache.channel_mux_read_map.size() ==
+                       read_cache.working_channel_mux_keys.size());
             }
         } else {
             auto& cached_read_list = read_list_iter->second;
@@ -148,23 +183,30 @@ void PairingNode::pair_generating_worker_thread() {
 
             cached_read_list.insert(later_read, read);
             while (cached_read_list.size() > m_max_num_reads) {
+                auto cached_read = cached_read_list.front();
                 cached_read_list.pop_front();
+                send_message_to_sink(std::move(cached_read));
             }
         }
     }
 
-    if (--m_num_worker_threads == 0) {
-        std::unique_lock<std::mutex> lock(m_pairing_mtx);
-        // There are still reads in channel_mux_read_map. Push them to the sink.
-        // Last thread alive is responsible for cleaning up the cache.
-        for (const auto& kv : m_channel_mux_read_map) {
-            // kv is a std::pair<UniquePoreIdentifierKey, std::list<std::shared_ptr<Read>>>
-            const auto& reads_list = kv.second;
+    if (--m_num_active_worker_threads == 0) {
+        if (!m_preserve_cache_during_flush) {
+            std::unique_lock<std::mutex> lock(m_pairing_mtx);
+            // There are still reads in channel_mux_read_map. Push them to the sink.
+            // Last thread alive is responsible for cleaning up the cache.
+            for (const auto& [client_id, read_cache] : m_read_caches) {
+                for (const auto& kv : read_cache.channel_mux_read_map) {
+                    // kv is a std::pair<UniquePoreIdentifierKey, std::list<std::shared_ptr<Read>>>
+                    const auto& reads_list = kv.second;
 
-            for (const auto& read_ptr : reads_list) {
-                // Push each read message
-                send_message_to_sink(read_ptr);
+                    for (const auto& read_ptr : reads_list) {
+                        // Push each read message
+                        send_message_to_sink(read_ptr);
+                    }
+                }
             }
+            m_read_caches.clear();
         }
     }
 }
@@ -180,10 +222,7 @@ PairingNode::PairingNode(std::map<std::string, std::string> template_complement_
         m_complement_template_map[key.second] = key.first;
     }
 
-    for (size_t i = 0; i < m_num_worker_threads; i++) {
-        m_workers.push_back(std::make_unique<std::thread>(
-                std::thread(&PairingNode::pair_list_worker_thread, this)));
-    }
+    start_threads();
 }
 
 PairingNode::PairingNode(ReadOrder read_order, int num_worker_threads, size_t max_reads)
@@ -202,11 +241,21 @@ PairingNode::PairingNode(ReadOrder read_order, int num_worker_threads, size_t ma
         throw std::runtime_error("Unsupported read order detected: " +
                                  dorado::to_string(read_order));
     }
+    start_threads();
+}
 
+void PairingNode::start_threads() {
     for (size_t i = 0; i < m_num_worker_threads; i++) {
         m_workers.push_back(std::make_unique<std::thread>(
                 std::thread(&PairingNode::pair_generating_worker_thread, this)));
+        ++m_num_active_worker_threads;
     }
+}
+
+void PairingNode::terminate(const FlushOptions& flush_options) {
+    m_preserve_cache_during_flush = flush_options.preserve_pairing_caches;
+    terminate_impl();
+    m_preserve_cache_during_flush = false;
 }
 
 void PairingNode::terminate_impl() {
@@ -216,6 +265,12 @@ void PairingNode::terminate_impl() {
             m->join();
         }
     }
+    m_workers.clear();
+}
+
+void PairingNode::restart() {
+    restart_input_queue();
+    start_threads();
 }
 
 stats::NamedStats PairingNode::sample_stats() const {

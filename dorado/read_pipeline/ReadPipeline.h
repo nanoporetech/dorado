@@ -142,6 +142,10 @@ public:
 };
 
 class CandidatePairRejectedMessage {};
+class CacheFlushMessage {
+public:
+    int32_t client_id;
+};
 
 // The Message type is a std::variant that can hold different types of message objects.
 // It is currently able to store:
@@ -153,9 +157,15 @@ class CandidatePairRejectedMessage {};
 using Message = std::variant<std::shared_ptr<Read>,
                              BamPtr,
                              std::shared_ptr<ReadPair>,
-                             CandidatePairRejectedMessage>;
+                             CandidatePairRejectedMessage,
+                             CacheFlushMessage>;
 
 using NodeHandle = int;
+
+struct FlushOptions {
+    bool preserve_pairing_caches = false;
+};
+inline FlushOptions DefaultFlushOptions() { return {false}; }
 
 // Base class for an object which consumes messages as part of the processing pipeline.
 // Destructors of derived classes must call terminate() in order to shut down
@@ -176,12 +186,20 @@ public:
     void push_message(Message&& message);
 
     // Waits until work is finished and shuts down worker threads.
-    // No work can be done by the node after this returns.
-    virtual void terminate() = 0;
+    // No work can be done by the node after this returns until
+    // restart is subsequently called.
+    virtual void terminate(const FlushOptions& flush_options) = 0;
+
+    // Restarts the node following a terminate call.
+    // Has no effect if terminate has not been called.
+    virtual void restart() = 0;
 
 protected:
     // Terminates waits on the input queue.
     void terminate_input_queue() { m_work_queue.terminate(); }
+
+    // Allows inputs again.
+    void restart_input_queue() { m_work_queue.restart(); }
 
     // Sends message to the designated sink.
     void send_message_to_sink(int sink_index, Message&& message);
@@ -283,8 +301,12 @@ public:
 
     // Stops all pipeline nodes in source to sink order.
     // Returns stats from nodes' final states.
-    // After this is called the pipeline will do no further work processing subsequent inputs.
-    stats::NamedStats terminate();
+    // After this is called the pipeline will do no further work processing subsequent inputs,
+    // unless restart is called first.
+    stats::NamedStats terminate(const FlushOptions& flush_options);
+
+    // Restarts pipeline after a call to terminate.
+    void restart();
 
     // Returns a reference to the node associated with the given handle.
     // Exists to accommodate situations where client code avoids using the pipeline framework.

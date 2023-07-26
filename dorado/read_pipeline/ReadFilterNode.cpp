@@ -7,8 +7,9 @@ namespace dorado {
 void ReadFilterNode::worker_thread() {
     Message message;
     while (get_input_message(message)) {
-        if (std::holds_alternative<CandidatePairRejectedMessage>(message)) {
-            // discard, nothing downstream of this node is interested in this message
+        // If this message isn't a read, just forward it to the sink.
+        if (!std::holds_alternative<std::shared_ptr<Read>>(message)) {
+            send_message_to_sink(std::move(message));
             continue;
         }
 
@@ -32,11 +33,16 @@ ReadFilterNode::ReadFilterNode(size_t min_qscore,
                                const std::unordered_set<std::string>& read_ids_to_filter,
                                size_t num_worker_threads)
         : MessageSink(1000),
+          m_num_worker_threads(num_worker_threads),
           m_min_qscore(min_qscore),
           m_min_read_length(min_read_length),
           m_read_ids_to_filter(std::move(read_ids_to_filter)),
           m_num_reads_filtered(0) {
-    for (size_t i = 0; i < num_worker_threads; i++) {
+    start_threads();
+}
+
+void ReadFilterNode::start_threads() {
+    for (size_t i = 0; i < m_num_worker_threads; ++i) {
         m_workers.push_back(
                 std::make_unique<std::thread>(std::thread(&ReadFilterNode::worker_thread, this)));
     }
@@ -49,6 +55,12 @@ void ReadFilterNode::terminate_impl() {
             m->join();
         }
     }
+    m_workers.clear();
+}
+
+void ReadFilterNode::restart() {
+    restart_input_queue();
+    start_threads();
 }
 
 stats::NamedStats ReadFilterNode::sample_stats() const {

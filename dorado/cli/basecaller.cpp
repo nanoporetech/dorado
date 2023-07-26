@@ -225,7 +225,7 @@ void setup(std::vector<std::string> args,
 
     // Wait for the pipeline to complete.  When it does, we collect
     // final stats to allow accurate summarisation.
-    auto final_stats = pipeline->terminate();
+    auto final_stats = pipeline->terminate(DefaultFlushOptions());
 
     // Stop the stats sampler thread before tearing down any pipeline objects.
     stats_sampler->terminate();
