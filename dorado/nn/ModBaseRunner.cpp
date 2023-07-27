@@ -118,10 +118,19 @@ public:
                   int batch_size,
                   const std::string& device)
             : m_num_models(model_paths.size()) {
-        // no metal implementation yet, force to cpu
-        if (device == "metal" || device == "cpu") {
+        if (device == "cpu") {
             // no slow_conv2d_cpu for type Half, need to use float32
             m_options = torch::TensorOptions().device(torch::kCPU).dtype(torch::kFloat32);
+        } else if (device == "metal") {
+#if TORCH_VERSION_MAJOR < 2
+            // no metal implementation yet, force to cpu
+            auto torchMetalBackend = torch::kCPU;
+            auto torchMetalDType = torch::kFloat32;
+#else
+            auto torchMetalBackend = torch::kMPS;
+            auto torchMetalDtype = torch::kFloat16;
+#endif
+            m_options = torch::TensorOptions().device(torchMetalBackend).dtype(torchMetalDtype);
         } else {
             m_options = torch::TensorOptions().device(device).dtype(torch::kFloat16);
         }
