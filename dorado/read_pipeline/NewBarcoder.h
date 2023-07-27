@@ -22,8 +22,8 @@ struct KitInfo {
 };
 
 struct AdapterSequence {
-    std::string adapter;
-    std::string adapter_rev;
+    std::vector<std::string> adapter;
+    std::vector<std::string> adapter_rev;
     std::string top_primer;
     std::string top_primer_rev;
     std::string bottom_primer;
@@ -32,7 +32,7 @@ struct AdapterSequence {
     int top_primer_rear_flank_len;
     int bottom_primer_front_flank_len;
     int bottom_primer_rear_flank_len;
-    std::string adapter_name;
+    std::vector<std::string> adapter_name;
     std::string kit;
 };
 
@@ -453,15 +453,17 @@ private:
 
     std::vector<AdapterSequence> generate_adapter_sequence(
             const std::vector<std::string>& kit_names);
-    ScoreResults calculate_adapter_score_double_ends(const std::string_view& read_seq,
-                                                     const AdapterSequence& as,
-                                                     bool with_flanks);
-    ScoreResults calculate_adapter_score_different_double_ends(const std::string_view& read_seq,
-                                                               const AdapterSequence& as,
-                                                               bool with_flanks);
-    ScoreResults calculate_adapter_score(const std::string_view& read_seq,
-                                         const AdapterSequence& as,
-                                         bool with_flanks);
+    std::vector<ScoreResults> calculate_adapter_score_double_ends(const std::string_view& read_seq,
+                                                                  const AdapterSequence& as,
+                                                                  bool with_flanks,
+                                                                  std::vector<ScoreResults>& res);
+    std::vector<ScoreResults> calculate_adapter_score_different_double_ends(
+            const std::string_view& read_seq,
+            const AdapterSequence& as,
+            bool with_flanks);
+    std::vector<ScoreResults> calculate_adapter_score(const std::string_view& read_seq,
+                                                      const AdapterSequence& as,
+                                                      bool with_flanks);
     ScoreResults find_best_adapter(const std::string& read_seq,
                                    std::vector<AdapterSequence>& adapter);
 };

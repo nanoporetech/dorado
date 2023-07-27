@@ -143,35 +143,31 @@ std::vector<AdapterSequence> Barcoder::generate_adapter_sequence(
 
     for (auto& kit_name : final_kit_names) {
         auto kit_info = dorado::kit_info.at(kit_name);
+        AdapterSequence as;
+        as.kit = kit_name;
+        auto& ref_bc = barcodes.at(kit_info.barcodes[0]);
+
+        as.top_primer = kit_info.top_front_flank + std::string(ref_bc.length(), 'N') +
+                        kit_info.top_rear_flank;
+        as.top_primer_rev = utils::reverse_complement(kit_info.top_rear_flank) +
+                            std::string(ref_bc.length(), 'N') +
+                            utils::reverse_complement(kit_info.top_front_flank);
+        as.bottom_primer = kit_info.bottom_front_flank + std::string(ref_bc.length(), 'N') +
+                           kit_info.bottom_rear_flank;
+        as.bottom_primer_rev = utils::reverse_complement(kit_info.bottom_rear_flank) +
+                               std::string(ref_bc.length(), 'N') +
+                               utils::reverse_complement(kit_info.bottom_front_flank);
+
         for (auto& bc_name : kit_info.barcodes) {
-            AdapterSequence as;
-            as.adapter = barcodes.at(bc_name);
-            as.adapter_rev = utils::reverse_complement(as.adapter);
+            auto adapter = barcodes.at(bc_name);
+            auto adapter_rev = utils::reverse_complement(adapter);
 
-            as.top_primer = kit_info.top_front_flank + std::string(as.adapter.length(), 'N') +
-                            kit_info.top_rear_flank;
-            as.top_primer_rev = utils::reverse_complement(kit_info.top_rear_flank) +
-                                std::string(as.adapter.length(), 'N') +
-                                utils::reverse_complement(kit_info.top_front_flank);
-            as.bottom_primer = kit_info.bottom_front_flank + std::string(as.adapter.length(), 'N') +
-                               kit_info.bottom_rear_flank;
-            as.bottom_primer_rev = utils::reverse_complement(kit_info.bottom_rear_flank) +
-                                   std::string(as.adapter.length(), 'N') +
-                                   utils::reverse_complement(kit_info.bottom_front_flank);
+            as.adapter.push_back(adapter);
+            as.adapter_rev.push_back(adapter_rev);
 
-            as.top_primer_front_flank_len = kit_info.top_front_flank.length();
-            as.top_primer_rear_flank_len = kit_info.top_rear_flank.length();
-            as.bottom_primer_front_flank_len =
-                    (kit_info.ends_different ? kit_info.bottom_front_flank.length()
-                                             : as.top_primer_front_flank_len);
-            as.bottom_primer_rear_flank_len =
-                    (kit_info.ends_different ? kit_info.bottom_rear_flank.length()
-                                             : as.top_primer_rear_flank_len);
-
-            as.adapter_name = bc_name;
-            as.kit = kit_name;
-            adapters.push_back(as);
+            as.adapter_name.push_back(bc_name);
         }
+        adapters.push_back(as);
     }
     return adapters;
 }
@@ -188,91 +184,91 @@ std::vector<AdapterSequence> Barcoder::generate_adapter_sequence(
 // So we need to check bottom ends of the read. Since the adapters always ligate to
 // 5' end of the read, the 3' end of the other strand has the reverse complement
 // of that adapter sequence.
-ScoreResults Barcoder::calculate_adapter_score_different_double_ends(
-        const std::string_view& read_seq,
-        const AdapterSequence& as,
-        bool with_flanks) {
-    // This calculates the score for barcodes which ligate to both ends
-    // of the strand.
-    std::string_view read_top = read_seq.substr(0, 150);
-    std::string_view read_bottom = read_seq.substr(std::max(0, (int)read_seq.length() - 150), 150);
-
-    EdlibAlignConfig align_config = edlibDefaultAlignConfig();
-    align_config.mode = EDLIB_MODE_HW;
-    align_config.task = (with_flanks ? EDLIB_TASK_PATH : EDLIB_TASK_LOC);
-
-    // Track the score for each variant.
-    // v1 = BCXX_1 ---- RC(BCXX_2)
-    // v2 = BCXX_2 ---- RC(BCXX_1)
-    std::string_view top_strand_v1;
-    std::string_view bottom_strand_v1;
-    std::string_view top_strand_v2;
-    std::string_view bottom_strand_v2;
-    if (with_flanks) {
-        top_strand_v1 = as.top_primer;
-        bottom_strand_v1 = as.bottom_primer_rev;
-        top_strand_v2 = as.bottom_primer;
-        bottom_strand_v2 = as.top_primer_rev;
-    } else {
-        top_strand_v1 = as.adapter;
-        bottom_strand_v1 = as.adapter_rev;
-        top_strand_v2 = as.adapter;
-        bottom_strand_v2 = as.adapter_rev;
-    }
-
-    auto scorer = [&as, &align_config, &with_flanks](
-                          const std::string_view& primer, const std::string_view& read,
-                          int flank_len,
-                          const std::string& window_name) -> std::pair<float, float> {
-        EdlibAlignResult aln = edlibAlign(primer.data(), primer.length(), read.data(),
-                                          read.length(), align_config);
-        float flank_score = -1.f;
-        int adapter_edit_dist = aln.editDistance;
-        spdlog::debug("{}: {}, {}", as.adapter_name, primer, read);
-        if (with_flanks) {
-            // Calculate edit distance of just the adapter portion without flanks.
-            int primer_edit_dist = adapter_edit_dist;
-            adapter_edit_dist = calculate_edit_dist(aln, flank_len, as.adapter.length());
-            spdlog::debug("{} with flank dist {}, no flank dist {}", window_name, primer_edit_dist,
-                          adapter_edit_dist);
-            flank_score = 1.f - ((float)primer_edit_dist - adapter_edit_dist) /
-                                        (primer.length() - as.adapter.length());
-        } else {
-            spdlog::debug("{} no flank dist {}", window_name, adapter_edit_dist);
-        }
-        spdlog::debug("\n{}", utils::alignment_to_str(primer.data(), read.data(), aln));
-        float adapter_score = 1.f - (float)adapter_edit_dist / as.adapter.length();
-        edlibFreeAlignResult(aln);
-        return {adapter_score, flank_score};
-    };
-
-    // Score for each variant is the max edit distance score for the
-    // top and bottom windows.
-    ScoreResults v1;
-    std::tie(v1.top_score, v1.top_flank_score) =
-            scorer(top_strand_v1, read_top, as.top_primer_front_flank_len, "v1 top");
-    std::tie(v1.bottom_score, v1.bottom_flank_score) =
-            scorer(bottom_strand_v1, read_bottom, as.bottom_primer_rear_flank_len, "v1 bottom");
-    v1.score = std::max(v1.top_score, v1.bottom_score);
-
-    ScoreResults v2;
-    std::tie(v2.top_score, v2.top_flank_score) =
-            scorer(top_strand_v2, read_top, as.bottom_primer_front_flank_len, "v2 top");
-    std::tie(v2.bottom_score, v1.bottom_flank_score) =
-            scorer(bottom_strand_v2, read_bottom, as.top_primer_rear_flank_len, "v2 bottom");
-    v2.score = std::max(v2.top_score, v2.bottom_score);
-
-    // Final score is the minimum of the 2 variants.
-    ScoreResults res;
-    if (v1.score > v2.score) {
-        res = v1;
-    } else {
-        res = v2;
-    }
-    res.adapter_name = as.adapter_name;
-    res.kit = as.kit;
-    return res;
-}
+//ScoreResults Barcoder::calculate_adapter_score_different_double_ends(
+//        const std::string_view& read_seq,
+//        const AdapterSequence& as,
+//        bool with_flanks) {
+//    // This calculates the score for barcodes which ligate to both ends
+//    // of the strand.
+//    std::string_view read_top = read_seq.substr(0, 150);
+//    std::string_view read_bottom = read_seq.substr(std::max(0, (int)read_seq.length() - 150), 150);
+//
+//    EdlibAlignConfig align_config = edlibDefaultAlignConfig();
+//    align_config.mode = EDLIB_MODE_HW;
+//    align_config.task = (with_flanks ? EDLIB_TASK_PATH : EDLIB_TASK_LOC);
+//
+//    // Track the score for each variant.
+//    // v1 = BCXX_1 ---- RC(BCXX_2)
+//    // v2 = BCXX_2 ---- RC(BCXX_1)
+//    std::string_view top_strand_v1;
+//    std::string_view bottom_strand_v1;
+//    std::string_view top_strand_v2;
+//    std::string_view bottom_strand_v2;
+//    if (with_flanks) {
+//        top_strand_v1 = as.top_primer;
+//        bottom_strand_v1 = as.bottom_primer_rev;
+//        top_strand_v2 = as.bottom_primer;
+//        bottom_strand_v2 = as.top_primer_rev;
+//    } else {
+//        top_strand_v1 = as.adapter;
+//        bottom_strand_v1 = as.adapter_rev;
+//        top_strand_v2 = as.adapter;
+//        bottom_strand_v2 = as.adapter_rev;
+//    }
+//
+//    auto scorer = [&as, &align_config, &with_flanks](
+//                          const std::string_view& primer, const std::string_view& read,
+//                          int flank_len,
+//                          const std::string& window_name) -> std::pair<float, float> {
+//        EdlibAlignResult aln = edlibAlign(primer.data(), primer.length(), read.data(),
+//                                          read.length(), align_config);
+//        float flank_score = -1.f;
+//        int adapter_edit_dist = aln.editDistance;
+//        spdlog::debug("{}: {}, {}", as.adapter_name, primer, read);
+//        if (with_flanks) {
+//            // Calculate edit distance of just the adapter portion without flanks.
+//            int primer_edit_dist = adapter_edit_dist;
+//            adapter_edit_dist = calculate_edit_dist(aln, flank_len, as.adapter.length());
+//            spdlog::debug("{} with flank dist {}, no flank dist {}", window_name, primer_edit_dist,
+//                          adapter_edit_dist);
+//            flank_score = 1.f - ((float)primer_edit_dist - adapter_edit_dist) /
+//                                        (primer.length() - as.adapter.length());
+//        } else {
+//            spdlog::debug("{} no flank dist {}", window_name, adapter_edit_dist);
+//        }
+//        spdlog::debug("\n{}", utils::alignment_to_str(primer.data(), read.data(), aln));
+//        float adapter_score = 1.f - (float)adapter_edit_dist / as.adapter.length();
+//        edlibFreeAlignResult(aln);
+//        return {adapter_score, flank_score};
+//    };
+//
+//    // Score for each variant is the max edit distance score for the
+//    // top and bottom windows.
+//    ScoreResults v1;
+//    std::tie(v1.top_score, v1.top_flank_score) =
+//            scorer(top_strand_v1, read_top, as.top_primer_front_flank_len, "v1 top");
+//    std::tie(v1.bottom_score, v1.bottom_flank_score) =
+//            scorer(bottom_strand_v1, read_bottom, as.bottom_primer_rear_flank_len, "v1 bottom");
+//    v1.score = std::max(v1.top_score, v1.bottom_score);
+//
+//    ScoreResults v2;
+//    std::tie(v2.top_score, v2.top_flank_score) =
+//            scorer(top_strand_v2, read_top, as.bottom_primer_front_flank_len, "v2 top");
+//    std::tie(v2.bottom_score, v1.bottom_flank_score) =
+//            scorer(bottom_strand_v2, read_bottom, as.top_primer_rear_flank_len, "v2 bottom");
+//    v2.score = std::max(v2.top_score, v2.bottom_score);
+//
+//    // Final score is the minimum of the 2 variants.
+//    ScoreResults res;
+//    if (v1.score > v2.score) {
+//        res = v1;
+//    } else {
+//        res = v2;
+//    }
+//    res.adapter_name = as.adapter_name;
+//    res.kit = as.kit;
+//    return res;
+//}
 
 int extract_mask_location(EdlibAlignResult aln, const std::string_view& query) {
     int query_cursor = 0;
@@ -308,10 +304,14 @@ int extract_mask_location(EdlibAlignResult aln, const std::string_view& query) {
 // So we need to check bottom ends of the read. However since adapter sequence is the
 // same for top and bottom strands, we simply need to look for the adapter and its
 // reverse complement sequence in the top/bottom windows.
-ScoreResults Barcoder::calculate_adapter_score_double_ends(const std::string_view& read_seq,
-                                                           const AdapterSequence& as,
-                                                           bool with_flanks) {
-    spdlog::debug("Barcoder {}", as.adapter_name);
+std::vector<ScoreResults> Barcoder::calculate_adapter_score_double_ends(
+        const std::string_view& read_seq,
+        const AdapterSequence& as,
+        bool with_flanks,
+        std::vector<ScoreResults>& results) {
+    if (read_seq.length() < 150) {
+        return {};
+    }
     std::string_view read_top = read_seq.substr(0, 150);
     std::string_view read_bottom = read_seq.substr(std::max(0, (int)read_seq.length() - 150), 150);
 
@@ -325,7 +325,7 @@ ScoreResults Barcoder::calculate_adapter_score_double_ends(const std::string_vie
 
     EdlibAlignConfig mask_config = edlibDefaultAlignConfig();
     mask_config.mode = EDLIB_MODE_NW;
-    mask_config.task = EDLIB_TASK_PATH;
+    mask_config.task = EDLIB_TASK_LOC;  //EDLIB_TASK_PATH;
 
     std::string_view top_strand;
     std::string_view bottom_strand;
@@ -337,13 +337,7 @@ ScoreResults Barcoder::calculate_adapter_score_double_ends(const std::string_vie
     //spdlog::info("top score {}", top_result.editDistance);
     //spdlog::info("\n{}", utils::alignment_to_str(top_strand.data(), read_top.data(), top_result));
     int top_bc_loc = extract_mask_location(top_result, top_strand);
-    const std::string_view& top_mask = read_top.substr(top_bc_loc, as.adapter.length());
-
-    auto top_mask_result = edlibAlign(as.adapter.data(), as.adapter.length(), top_mask.data(),
-                                      top_mask.length(), mask_config);
-    spdlog::debug("top window {}", top_mask_result.editDistance);
-    spdlog::debug("\n{}",
-                  utils::alignment_to_str(as.adapter.data(), top_mask.data(), top_mask_result));
+    const std::string_view& top_mask = read_top.substr(top_bc_loc, as.adapter[0].length());
 
     EdlibAlignResult bottom_result =
             edlibAlign(bottom_strand.data(), bottom_strand.length(), read_bottom.data(),
@@ -351,95 +345,49 @@ ScoreResults Barcoder::calculate_adapter_score_double_ends(const std::string_vie
     //spdlog::info("bottom score {}", bottom_result.editDistance);
     //spdlog::info("\n{}", utils::alignment_to_str(bottom_strand.data(), read_bottom.data(), bottom_result));
     int bottom_bc_loc = extract_mask_location(bottom_result, bottom_strand);
-    const std::string_view& bottom_mask = read_bottom.substr(bottom_bc_loc, as.adapter.length());
+    const std::string_view& bottom_mask =
+            read_bottom.substr(bottom_bc_loc, as.adapter_rev[0].length());
 
-    auto bottom_mask_result = edlibAlign(as.adapter_rev.data(), as.adapter_rev.length(),
-                                         bottom_mask.data(), bottom_mask.length(), mask_config);
+    //std::vector<ScoreResults> results;
+    for (int i = 0; i < as.adapter.size(); i++) {
+        auto& adapter = as.adapter[i];
+        auto& adapter_rev = as.adapter[i];
+        auto& adapter_name = as.adapter_name[i];
+        spdlog::debug("Barcoder {}", adapter_name);
 
-    spdlog::debug("bottom window {}", bottom_mask_result.editDistance);
-    spdlog::debug("\n{}", utils::alignment_to_str(as.adapter_rev.data(), bottom_mask.data(),
-                                                  bottom_mask_result));
-    ScoreResults res;
-    res.adapter_name = as.adapter_name;
-    res.kit = as.kit;
-    res.top_flank_score = 1.f - static_cast<float>(top_result.editDistance) /
-                                        (top_strand.length() - as.adapter.length());
-    res.bottom_flank_score = 1.f - static_cast<float>(bottom_result.editDistance) /
-                                           (bottom_strand.length() - as.adapter_rev.length());
-    res.flank_score = std::max(res.top_flank_score, res.bottom_flank_score);
-    res.top_score = 1.f - static_cast<float>(top_mask_result.editDistance) / as.adapter.length();
-    res.bottom_score =
-            1.f - static_cast<float>(bottom_mask_result.editDistance) / as.adapter_rev.length();
-    res.score = std::max(res.top_score, res.bottom_score);
+        auto top_mask_result = edlibAlign(adapter.data(), adapter.length(), top_mask.data(),
+                                          top_mask.length(), mask_config);
+        //spdlog::debug("top window {}", top_mask_result.editDistance);
+        //spdlog::debug("\n{}",
+        //        utils::alignment_to_str(adapter.data(), top_mask.data(), top_mask_result));
 
+        auto bottom_mask_result = edlibAlign(adapter_rev.data(), adapter_rev.length(),
+                                             bottom_mask.data(), bottom_mask.length(), mask_config);
+
+        //spdlog::debug("bottom window {}", bottom_mask_result.editDistance);
+        //spdlog::debug("\n{}", utils::alignment_to_str(adapter_rev.data(), bottom_mask.data(),
+        //            bottom_mask_result));
+
+        ScoreResults res;
+        res.adapter_name = adapter_name;
+        res.kit = as.kit;
+        res.top_flank_score = 1.f - static_cast<float>(top_result.editDistance) /
+                                            (top_strand.length() - adapter.length());
+        res.bottom_flank_score = 1.f - static_cast<float>(bottom_result.editDistance) /
+                                               (bottom_strand.length() - adapter_rev.length());
+        res.flank_score = std::max(res.top_flank_score, res.bottom_flank_score);
+        res.top_score = 1.f - static_cast<float>(top_mask_result.editDistance) / adapter.length();
+        res.bottom_score =
+                1.f - static_cast<float>(bottom_mask_result.editDistance) / adapter_rev.length();
+        res.score = std::max(res.top_score, res.bottom_score);
+
+        edlibFreeAlignResult(top_mask_result);
+        edlibFreeAlignResult(bottom_mask_result);
+        results.push_back(res);
+    }
     edlibFreeAlignResult(top_result);
     edlibFreeAlignResult(bottom_result);
-    edlibFreeAlignResult(top_mask_result);
-    edlibFreeAlignResult(bottom_mask_result);
-    return res;
-    ////////
-
-    EdlibAlignConfig align_config = edlibDefaultAlignConfig();
-    align_config.mode = EDLIB_MODE_HW;
-    align_config.task = (with_flanks ? EDLIB_TASK_PATH : EDLIB_TASK_LOC);
-
-    //std::string_view top_strand;
-    //std::string_view bottom_strand;
-    if (with_flanks) {
-        top_strand = as.top_primer;
-        bottom_strand = as.top_primer_rev;
-    } else {
-        top_strand = as.adapter;
-        bottom_strand = as.adapter_rev;
-    }
-
-    // Common score struct to track the score for both the top and bottom windows.
-    //ScoreResults res;
-    //res.adapter_name = as.adapter_name;
-    //res.kit = as.kit;
-
-    auto scorer = [&as, &align_config, &with_flanks](
-                          const std::string_view& primer, const std::string_view& read,
-                          int flank_len,
-                          const std::string& window_name) -> std::pair<float, float> {
-        EdlibAlignResult aln = edlibAlign(primer.data(), primer.length(), read.data(),
-                                          read.length(), align_config);
-        float flank_score = -1.f;
-        int adapter_edit_dist = aln.editDistance;
-        spdlog::debug("{}: {}, {}", as.adapter_name, primer, read);
-        if (with_flanks) {
-            // Calculate edit distance of just the adapter portion without flanks.
-            int primer_edit_dist = adapter_edit_dist;
-            adapter_edit_dist = calculate_edit_dist(aln, flank_len, as.adapter.length());
-            spdlog::debug("{} with flank dist {}, no flank dist {}", window_name, primer_edit_dist,
-                          adapter_edit_dist);
-            flank_score = 1.f - ((float)primer_edit_dist - adapter_edit_dist) /
-                                        (primer.length() - as.adapter.length());
-        } else {
-            spdlog::debug("{} no flank dist {}", window_name, adapter_edit_dist);
-        }
-        spdlog::debug("\n{}", utils::alignment_to_str(primer.data(), read.data(), aln));
-        float adapter_score = 1.f - (float)adapter_edit_dist / as.adapter.length();
-        edlibFreeAlignResult(aln);
-        return {adapter_score, flank_score};
-    };
-
-    // Generate top window score.
-    std::tie(res.top_score, res.top_flank_score) =
-            scorer(top_strand, read_top, as.top_primer_front_flank_len, "top");
-    // Generate bottom window score.
-    std::tie(res.bottom_score, res.bottom_flank_score) =
-            scorer(bottom_strand, read_bottom, as.bottom_primer_rear_flank_len, "bottom");
-
-    // Then choose the window with the best score.
-    if (res.top_score > res.bottom_score) {
-        res.score = res.top_score;
-        res.flank_score = res.top_flank_score;
-    } else {
-        res.score = res.bottom_score;
-        res.flank_score = res.bottom_flank_score;
-    }
-    return res;
+    return {};  //results;
 }
 
 // Calculate barcode score for the following barcoding scenario:
@@ -449,57 +397,57 @@ ScoreResults Barcoder::calculate_adapter_score_double_ends(const std::string_vie
 // In this scenario, the barcode (and its flanks) only ligate to the 5' end
 // of the read. So we only look for adapter sequence in the top "window" (first
 // 150bp) of the read.
-ScoreResults Barcoder::calculate_adapter_score(const std::string_view& read_seq,
-                                               const AdapterSequence& as,
-                                               bool with_flanks) {
-    std::string_view read_top = read_seq.substr(0, 150);
-
-    EdlibAlignConfig align_config = edlibDefaultAlignConfig();
-    align_config.mode = EDLIB_MODE_HW;
-    align_config.task = (with_flanks ? EDLIB_TASK_PATH : EDLIB_TASK_LOC);
-
-    auto scorer = [&as, &align_config, &with_flanks](const std::string_view& primer,
-                                                     const std::string_view& read,
-                                                     int flank_len) -> std::pair<float, float> {
-        EdlibAlignResult aln = edlibAlign(primer.data(), primer.length(), read.data(),
-                                          read.length(), align_config);
-        float flank_score = -1.f;
-        int adapter_edit_dist = aln.editDistance;
-        spdlog::debug("{}: {}, {}", as.adapter_name, primer, read);
-        if (with_flanks) {
-            // Calculate edit distance of just the adapter portion without flanks.
-            int primer_edit_dist = adapter_edit_dist;
-            adapter_edit_dist = calculate_edit_dist(aln, flank_len, as.adapter.length());
-            spdlog::debug("Top Full flank dist {}, no flank dist {}", primer_edit_dist,
-                          adapter_edit_dist);
-            flank_score = 1.f - ((float)primer_edit_dist - adapter_edit_dist) /
-                                        (primer.length() - as.adapter.length());
-        } else {
-            spdlog::debug("Top No flank dist {}", adapter_edit_dist);
-        }
-        spdlog::debug("\n{}", utils::alignment_to_str(primer.data(), read.data(), aln));
-        float adapter_score = 1.f - (float)adapter_edit_dist / as.adapter.length();
-        edlibFreeAlignResult(aln);
-        return {adapter_score, flank_score};
-    };
-
-    std::string_view top_strand;
-    if (with_flanks) {
-        top_strand = as.top_primer;
-    } else {
-        top_strand = as.adapter;
-    }
-
-    ScoreResults res;
-    res.adapter_name = as.adapter_name;
-    res.kit = as.kit;
-
-    std::tie(res.top_score, res.top_flank_score) =
-            scorer(top_strand, read_top, as.top_primer_front_flank_len);
-
-    res.score = res.top_score;
-    return res;
-}
+//ScoreResults Barcoder::calculate_adapter_score(const std::string_view& read_seq,
+//                                               const AdapterSequence& as,
+//                                               bool with_flanks) {
+//    std::string_view read_top = read_seq.substr(0, 150);
+//
+//    EdlibAlignConfig align_config = edlibDefaultAlignConfig();
+//    align_config.mode = EDLIB_MODE_HW;
+//    align_config.task = (with_flanks ? EDLIB_TASK_PATH : EDLIB_TASK_LOC);
+//
+//    auto scorer = [&as, &align_config, &with_flanks](const std::string_view& primer,
+//                                                     const std::string_view& read,
+//                                                     int flank_len) -> std::pair<float, float> {
+//        EdlibAlignResult aln = edlibAlign(primer.data(), primer.length(), read.data(),
+//                                          read.length(), align_config);
+//        float flank_score = -1.f;
+//        int adapter_edit_dist = aln.editDistance;
+//        spdlog::debug("{}: {}, {}", as.adapter_name, primer, read);
+//        if (with_flanks) {
+//            // Calculate edit distance of just the adapter portion without flanks.
+//            int primer_edit_dist = adapter_edit_dist;
+//            adapter_edit_dist = calculate_edit_dist(aln, flank_len, as.adapter.length());
+//            spdlog::debug("Top Full flank dist {}, no flank dist {}", primer_edit_dist,
+//                          adapter_edit_dist);
+//            flank_score = 1.f - ((float)primer_edit_dist - adapter_edit_dist) /
+//                                        (primer.length() - as.adapter.length());
+//        } else {
+//            spdlog::debug("Top No flank dist {}", adapter_edit_dist);
+//        }
+//        spdlog::debug("\n{}", utils::alignment_to_str(primer.data(), read.data(), aln));
+//        float adapter_score = 1.f - (float)adapter_edit_dist / as.adapter.length();
+//        edlibFreeAlignResult(aln);
+//        return {adapter_score, flank_score};
+//    };
+//
+//    std::string_view top_strand;
+//    if (with_flanks) {
+//        top_strand = as.top_primer;
+//    } else {
+//        top_strand = as.adapter;
+//    }
+//
+//    ScoreResults res;
+//    res.adapter_name = as.adapter_name;
+//    res.kit = as.kit;
+//
+//    std::tie(res.top_score, res.top_flank_score) =
+//            scorer(top_strand, read_top, as.top_primer_front_flank_len);
+//
+//    res.score = res.top_score;
+//    return res;
+//}
 
 // Score every barcode against the input read and returns the best match,
 // or an unclassified match, based on certain heuristics.
@@ -507,74 +455,71 @@ ScoreResults Barcoder::find_best_adapter(const std::string& read_seq,
                                          std::vector<AdapterSequence>& adapters) {
     std::string fwd = read_seq;
 
-    // Attempt to match the barcodes without and then with flanks.
-    //std::array<bool, 2> use_flanks{false, true};
-    std::array<bool, 1> use_flanks{true};
-    for (auto& use_flank : use_flanks) {
-        std::vector<ScoreResults> scores;
-        for (auto& as : adapters) {
-            auto& kit = kit_info.at(as.kit);
-            if (kit.double_ends) {
-                if (kit.ends_different) {
-                    scores.push_back(
-                            calculate_adapter_score_different_double_ends(fwd, as, use_flank));
-                } else {
-                    scores.push_back(calculate_adapter_score_double_ends(fwd, as, use_flank));
+    bool use_flank = true;
+    std::vector<ScoreResults> scores;
+    for (auto& as : adapters) {
+        auto& kit = kit_info.at(as.kit);
+        if (kit.double_ends) {
+            if (kit.ends_different) {
+                //scores.push_back(
+                //        calculate_adapter_score_different_double_ends(fwd, as, use_flank));
+            } else {
+                calculate_adapter_score_double_ends(fwd, as, use_flank, scores);
+                //scores.push_back(calculate_adapter_score_double_ends(fwd, as, use_flank));
+            }
+        } else {
+            //scores.push_back(calculate_adapter_score(fwd, as, use_flank));
+        }
+    }
+
+    // Sore the scores windows by their adapter score.
+    std::sort(scores.begin(), scores.end(),
+              [](const auto& l, const auto& r) { return l.score > r.score; });
+    auto best_score = scores.begin();
+    // At minimum, the best window must meet the adapter score threshold.
+    spdlog::debug("Best candidate from list {} barcode {}", best_score->score,
+                  best_score->adapter_name);
+    const float kThres = 0.5f;
+    const float kMargin = 0.2f;
+    if (best_score != scores.end() && best_score->score >= kThres) {
+        // If there's only one window and it meets the threshold, choose it.
+        if (scores.size() == 1) {
+            return *best_score;
+        } else {
+            // Choose the best if it's sufficiently better than the second best score.
+            auto second_best_score = std::next(scores.begin());
+            spdlog::debug("2nd Best candidate from list {} barcode {}", second_best_score->score,
+                          second_best_score->adapter_name);
+            auto& best_kit = kit_info.at(best_score->kit);
+            auto& second_best_kit = kit_info.at(second_best_score->kit);
+            if (best_kit.double_ends && second_best_kit.double_ends && use_flank) {
+                // If the best and 2nd best scores both are double ended adapters and
+                // we have the flank scores, choose the best only it has better adapter
+                // AND flank scores.
+                auto margin = std::abs(best_score->score - second_best_score->score);
+                auto better_flank = best_score->flank_score >= second_best_score->flank_score;
+                if (margin >= kMargin && better_flank) {
+                    spdlog::debug(
+                            "Use flank {}: Best score {} (flank {}) 2nd best score {} (flank "
+                            "{})",
+                            use_flank, best_score->score, best_score->flank_score,
+                            second_best_score->score, second_best_score->flank_score);
+                    return *best_score;
+                } else if (margin >= kMargin / 2.f && better_flank &&
+                           std::min(best_score->top_score, best_score->bottom_score) >= 0.6f) {
+                    spdlog::debug(
+                            "Use flank {}: Best score {} (flank {}) 2nd best score {} (flank "
+                            "{}), margin {}, both windows better than 0.6f",
+                            use_flank, best_score->score, best_score->flank_score,
+                            second_best_score->score, second_best_score->flank_score, margin);
+                    return *best_score;
                 }
             } else {
-                scores.push_back(calculate_adapter_score(fwd, as, use_flank));
-            }
-        }
-
-        // Sore the scores windows by their adapter score.
-        std::sort(scores.begin(), scores.end(),
-                  [](const auto& l, const auto& r) { return l.score > r.score; });
-        auto best_score = scores.begin();
-        // At minimum, the best window must meet the adapter score threshold.
-        spdlog::debug("Best candidate from list {} barcode {}", best_score->score,
-                      best_score->adapter_name);
-        const float kThres = 0.5f;
-        const float kMargin = 0.2f;
-        if (best_score->score >= kThres) {
-            // If there's only one window and it meets the threshold, choose it.
-            if (scores.size() == 1) {
-                return *best_score;
-            } else {
-                // Choose the best if it's sufficiently better than the second best score.
-                auto second_best_score = std::next(scores.begin());
-                spdlog::debug("2nd Best candidate from list {} barcode {}",
-                              second_best_score->score, second_best_score->adapter_name);
-                auto& best_kit = kit_info.at(best_score->kit);
-                auto& second_best_kit = kit_info.at(second_best_score->kit);
-                if (best_kit.double_ends && second_best_kit.double_ends && use_flank) {
-                    // If the best and 2nd best scores both are double ended adapters and
-                    // we have the flank scores, choose the best only it has better adapter
-                    // AND flank scores.
-                    auto margin = std::abs(best_score->score - second_best_score->score);
-                    auto better_flank = best_score->flank_score >= second_best_score->flank_score;
-                    if (margin >= kMargin && better_flank) {
-                        spdlog::debug(
-                                "Use flank {}: Best score {} (flank {}) 2nd best score {} (flank "
-                                "{})",
-                                use_flank, best_score->score, best_score->flank_score,
-                                second_best_score->score, second_best_score->flank_score);
-                        return *best_score;
-                    } else if (margin >= kMargin / 2.f && better_flank &&
-                               std::min(best_score->top_score, best_score->bottom_score) >= 0.6f) {
-                        spdlog::debug(
-                                "Use flank {}: Best score {} (flank {}) 2nd best score {} (flank "
-                                "{}), margin {}, both windows better than 0.6f",
-                                use_flank, best_score->score, best_score->flank_score,
-                                second_best_score->score, second_best_score->flank_score, margin);
-                        return *best_score;
-                    }
-                } else {
-                    // Pick the best score only if it's better than the 2nd best score by a margin.
-                    if (std::abs(best_score->score - second_best_score->score) >= kMargin) {
-                        spdlog::debug("Use flank {}: Best score {} 2nd best score {}", use_flank,
-                                      best_score->score, second_best_score->score);
-                        return *best_score;
-                    }
+                // Pick the best score only if it's better than the 2nd best score by a margin.
+                if (std::abs(best_score->score - second_best_score->score) >= kMargin) {
+                    spdlog::debug("Use flank {}: Best score {} 2nd best score {}", use_flank,
+                                  best_score->score, second_best_score->score);
+                    return *best_score;
                 }
             }
         }
