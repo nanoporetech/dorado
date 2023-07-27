@@ -1,8 +1,6 @@
 #pragma once
 
 #include "ReadPipeline.h"
-#include "nn/ModelRunner.h"  // Windows builds appear to require this?
-#include "utils/types.h"
 
 #include <map>
 #include <memory>
@@ -12,9 +10,11 @@
 
 namespace dorado {
 
-class CRFModelConfig;
+struct CRFModelConfig;
 class ModBaseRunner;
+class ModelRunnerBase;
 
+using Runner = std::shared_ptr<ModelRunnerBase>;
 using PairingParameters = std::variant<ReadOrder, std::map<std::string, std::string>>;
 
 namespace pipelines {
@@ -45,7 +45,6 @@ void create_stereo_duplex_pipeline(
         int scaler_node_threads,
         int splitter_node_threads,
         PairingParameters pairing_parameters,
-        DuplexSplitSettings splitter_settings,
         NodeHandle sink_node_handle = PipelineDescriptor::InvalidNodeHandle,
         NodeHandle source_node_handle = PipelineDescriptor::InvalidNodeHandle);
 

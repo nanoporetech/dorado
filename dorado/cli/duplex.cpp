@@ -303,12 +303,11 @@ int duplex(int argc, char* argv[]) {
             } else {
                 pairing_parameters = std::move(template_complement_map);
             }
-            DuplexSplitSettings splitter_settings;
 
             pipelines::create_stereo_duplex_pipeline(
                     pipeline_desc, model_config, stereo_model_config, std::move(runners),
                     std::move(stereo_runners), overlap, num_devices * 2, num_devices,
-                    std::move(pairing_parameters), splitter_settings, read_filter_node);
+                    std::move(pairing_parameters), read_filter_node);
 
             std::vector<dorado::stats::StatsReporter> stats_reporters;
             pipeline = Pipeline::create(std::move(pipeline_desc), &stats_reporters);

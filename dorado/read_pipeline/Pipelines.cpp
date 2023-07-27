@@ -9,6 +9,7 @@
 #include "nn/CRFModel.h"
 #include "nn/ModBaseRunner.h"
 #include "nn/ModelRunner.h"
+#include "utils/types.h"
 
 #include <spdlog/spdlog.h>
 
@@ -76,7 +77,6 @@ void create_stereo_duplex_pipeline(PipelineDescriptor& pipeline_desc,
                                    int scaler_node_threads,
                                    int splitter_node_threads,
                                    PairingParameters pairing_parameters,
-                                   DuplexSplitSettings splitter_settings,
                                    NodeHandle sink_node_handle,
                                    NodeHandle source_node_handle) {
     std::string model_name =
@@ -109,6 +109,7 @@ void create_stereo_duplex_pipeline(PipelineDescriptor& pipeline_desc,
     // If splitter_settings.enabled is set to false, the splitter node will act
     // as a passthrough, meaning it won't perform any splitting operations and
     // will just pass data through.
+    DuplexSplitSettings splitter_settings;
     auto splitter_node = pipeline_desc.add_node<DuplexSplitNode>({pairing_node}, splitter_settings,
                                                                  splitter_node_threads);
 
