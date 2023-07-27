@@ -125,7 +125,7 @@ public:
 #if TORCH_VERSION_MAJOR < 2
             // no metal implementation yet, force to cpu
             auto torchMetalBackend = torch::kCPU;
-            auto torchMetalDType = torch::kFloat32;
+            auto torchMetalDtype = torch::kFloat32;
 #else
             auto torchMetalBackend = torch::kMPS;
             auto torchMetalDtype = torch::kFloat16;
