@@ -784,7 +784,6 @@ public:
                 }
 
                 // linear/scan/softmax CB failed, so retry.
-                spdlog::error("linear/scan/softmax CB failed -- retrying");
                 std::this_thread::sleep_for(20ms);
             }
 
