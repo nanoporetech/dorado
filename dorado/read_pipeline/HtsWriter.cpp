@@ -85,7 +85,7 @@ void HtsWriter::worker_thread() {
     size_t write_count = 0;
 
     Message message;
-    while (m_work_queue.try_pop(message)) {
+    while (get_input_message(message)) {
         // If this message isn't a BamPtr, ignore it.
         if (!std::holds_alternative<BamPtr>(message)) {
             continue;

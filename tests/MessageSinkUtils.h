@@ -38,7 +38,7 @@ private:
 
     void worker_thread() {
         dorado::Message message;
-        while (m_work_queue.try_pop(message)) {
+        while (get_input_message(message)) {
             m_messages.push_back(std::move(message));
         }
     }
