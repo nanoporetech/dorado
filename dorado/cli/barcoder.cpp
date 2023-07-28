@@ -55,6 +55,10 @@ int barcoder(int argc, char* argv[]) {
             .default_value(std::string(""));
     parser.add_argument("--kit_name").help("kit name");
     parser.add_argument("-v", "--verbose").default_value(false).implicit_value(true);
+    parser.add_argument("--emit-fastq")
+            .help("Output in fastq format.")
+            .default_value(false)
+            .implicit_value(true);
 
     try {
         parser.parse_args(argc, argv);
@@ -104,7 +108,8 @@ int barcoder(int argc, char* argv[]) {
     add_pg_hdr(header);
 
     PipelineDescriptor pipeline_desc;
-    auto hts_writer = pipeline_desc.add_node<BarcodeDemuxer>({}, output_dir, writer_threads, 0);
+    auto hts_writer = pipeline_desc.add_node<BarcodeDemuxer>({}, output_dir, writer_threads, 0,
+                                                             parser.get<bool>("--emit-fastq"));
     std::vector<std::string> kit_names;
     if (parser.present("--kit_name")) {
         kit_names.push_back(parser.get<std::string>("--kit_name"));

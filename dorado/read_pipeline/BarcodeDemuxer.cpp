@@ -15,11 +15,15 @@
 
 namespace dorado {
 
-BarcodeDemuxer::BarcodeDemuxer(const std::string& output_dir, size_t threads, size_t num_reads)
+BarcodeDemuxer::BarcodeDemuxer(const std::string& output_dir,
+                               size_t threads,
+                               size_t num_reads,
+                               bool write_fastq)
         : MessageSink(10000),
           m_output_dir(output_dir),
           m_threads(threads),
-          m_num_reads_expected(num_reads) {
+          m_num_reads_expected(num_reads),
+          m_write_fastq(write_fastq) {
     std::filesystem::create_directory(m_output_dir);
     m_worker = std::make_unique<std::thread>(std::thread(&BarcodeDemuxer::worker_thread, this));
 }
@@ -57,9 +61,9 @@ int BarcodeDemuxer::write(bam1_t* const record) {
     if (res != m_files.end()) {
         file = res->second;
     } else {
-        std::string filename = bc + ".bam";
+        std::string filename = bc + (m_write_fastq ? ".fastq" : ".bam");
         auto filepath = m_output_dir / filename;
-        file = hts_open(filepath.c_str(), "wb");
+        file = hts_open(filepath.c_str(), (m_write_fastq ? "wf" : "wb"));
         if (file->format.compression == bgzf) {
             auto res = bgzf_mt(file->fp.bgzf, m_threads, 128);
             if (res < 0) {

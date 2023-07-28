@@ -15,7 +15,10 @@ namespace dorado {
 
 class BarcodeDemuxer : public MessageSink {
 public:
-    BarcodeDemuxer(const std::string& output_dir, size_t threads, size_t num_reads);
+    BarcodeDemuxer(const std::string& output_dir,
+                   size_t threads,
+                   size_t num_reads,
+                   bool write_fastq);
     ~BarcodeDemuxer();
     std::string get_name() const override { return "BarcodeDemuxer"; }
     stats::NamedStats sample_stats() const override;
@@ -40,6 +43,7 @@ private:
     void worker_thread();
     int write(bam1_t* record);
     size_t m_num_reads_expected;
+    bool m_write_fastq{false};
 };
 
 }  // namespace dorado
