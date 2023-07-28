@@ -4,6 +4,7 @@
 #include "read_pipeline/HtsWriter.h"
 #include "read_pipeline/NewBarcoder.h"
 #include "read_pipeline/ProgressTracker.h"
+#include "utils/basecaller_utils.h"
 #include "utils/cli_utils.h"
 #include "utils/log_utils.h"
 #include "utils/stats.h"
@@ -48,6 +49,10 @@ int barcoder(int argc, char* argv[]) {
             .help("maxium number of reads to process (for debugging).")
             .default_value(10000000)
             .scan<'i', int>();
+    parser.add_argument("-l", "--read-ids")
+            .help("A file with a newline-delimited list of reads to basecall. If not provided, all "
+                  "reads will be basecalled")
+            .default_value(std::string(""));
     parser.add_argument("--kit_name").help("kit name");
     parser.add_argument("-v", "--verbose").default_value(false).implicit_value(true);
 
@@ -79,6 +84,8 @@ int barcoder(int argc, char* argv[]) {
             utils::aligner_writer_thread_allocation(threads, 0.1f);
     spdlog::debug("> barcoding threads {}, writer threads {}", barcoder_threads, writer_threads);
 
+    auto read_list = utils::load_read_list(parser.get<std::string>("--read-ids"));
+
     if (reads.size() == 0) {
 #ifndef _WIN32
         if (isatty(fileno(stdin))) {
@@ -92,7 +99,7 @@ int barcoder(int argc, char* argv[]) {
         return 1;
     }
 
-    HtsReader reader(reads[0]);
+    HtsReader reader(reads[0], read_list);
     auto header = sam_hdr_dup(reader.header);
     add_pg_hdr(header);
 

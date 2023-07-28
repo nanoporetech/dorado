@@ -453,17 +453,15 @@ private:
 
     std::vector<AdapterSequence> generate_adapter_sequence(
             const std::vector<std::string>& kit_names);
-    std::vector<ScoreResults> calculate_adapter_score_double_ends(const std::string_view& read_seq,
-                                                                  const AdapterSequence& as,
-                                                                  bool with_flanks,
-                                                                  std::vector<ScoreResults>& res);
-    std::vector<ScoreResults> calculate_adapter_score_different_double_ends(
-            const std::string_view& read_seq,
-            const AdapterSequence& as,
-            bool with_flanks);
-    std::vector<ScoreResults> calculate_adapter_score(const std::string_view& read_seq,
-                                                      const AdapterSequence& as,
-                                                      bool with_flanks);
+    void calculate_adapter_score_different_double_ends(const std::string_view& read_seq,
+                                                       const AdapterSequence& as,
+                                                       std::vector<ScoreResults>& res);
+    void calculate_adapter_score_double_ends(const std::string_view& read_seq,
+                                             const AdapterSequence& as,
+                                             std::vector<ScoreResults>& res);
+    void calculate_adapter_score(const std::string_view& read_seq,
+                                 const AdapterSequence& as,
+                                 std::vector<ScoreResults>& res);
     ScoreResults find_best_adapter(const std::string& read_seq,
                                    std::vector<AdapterSequence>& adapter);
 };
@@ -482,6 +480,7 @@ private:
     std::vector<std::unique_ptr<std::thread>> m_workers;
     std::atomic<int> m_matched{0};
     std::atomic<int> m_fp{0};
+    std::atomic<int64_t> m_bases{0};
     std::string m_kit_name;
     Barcoder m_barcoder;
 
