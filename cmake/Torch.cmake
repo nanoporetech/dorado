@@ -343,6 +343,9 @@ if (USING_STATIC_TORCH_LIB)
                 ${TORCH_LIBRARIES}
                 ${ont_cuda_internal_linkage_libs}
             )
+            target_include_directories(dorado_torch_lib PUBLIC
+                ${TORCH_INCLUDE_DIRS}
+            )
             # Replace the torch libs with the helper lib
             set(TORCH_LIBRARIES dorado_torch_lib)
             # Don't forget to install it
