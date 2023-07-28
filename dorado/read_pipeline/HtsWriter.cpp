@@ -91,11 +91,11 @@ void HtsWriter::worker_thread() {
         auto aln = std::move(std::get<BamPtr>(message));
         write(aln.get());
         std::string read_id = bam_get_qname(aln.get());
+        int64_t dx_tag = bam_aux2i(bam_aux_get(aln.get(), "dx"));
 
         // For the purpose of estimating write count, we ignore duplex reads
         // these can be identified by a semicolon in their ID.
-        // TODO: This is a hack, we should have a better way of identifying duplex reads.
-        bool ignore_read_id = read_id.find(';') != std::string::npos;
+        bool ignore_read_id = dx_tag == 1;
 
         if (ignore_read_id) {
             // Read is a duplex read.
