@@ -215,7 +215,7 @@ if (USING_STATIC_TORCH_LIB)
             CUDA::cusparse
         )
 
-    elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR MATCHES "^aarch64*|^arm*" AND ${CUDAToolkit_VERSION} VERSION_LESS 11.0)
+    elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND ${CUDAToolkit_VERSION} VERSION_LESS 11.0)
         list(APPEND TORCH_LIBRARIES
             # Missing libs that Torch forgets to link to
             ${TORCH_LIB}/lib/libbreakpad.a
@@ -244,141 +244,105 @@ if (USING_STATIC_TORCH_LIB)
             ${TORCH_LIB}/lib/libgfortran.so.4.0.0
         )
 
-    elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR MATCHES "^aarch64*|^arm*")
+    elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         # Older versions of cmake don't have the static_nocallback target for cuFFT that Torch needs, so we
         # make it ourselves.
         if (TARGET CUDA::cufft_static_nocallback)
-            set(ont_cufft_static CUDA::cufft_static_nocallback)
+            set(ont_cufft_static_libs CUDA::cufft_static_nocallback)
         else()
-            set(ont_cufft_static ${CUDAToolkit_TARGET_DIR}/lib64/libcufft_static_nocallback.a)
+            set(ont_cufft_static_libs ${CUDAToolkit_TARGET_DIR}/lib64/libcufft_static_nocallback.a)
         endif()
 
-        list(APPEND TORCH_LIBRARIES
-            # Note: the order of the cuDNN libs matter
-            # We aren't going to do any training, so these don't need to be whole-archived
-            ${TORCH_LIB}/lib/libcudnn_adv_train_static.a
-            ${TORCH_LIB}/lib/libcudnn_cnn_train_static.a
-            ${TORCH_LIB}/lib/libcudnn_ops_train_static.a
-            # I'm assuming we need this for https://github.com/pytorch/pytorch/issues/50153
-            -Wl,--whole-archive
-                # Note: libtorch is still setup to link to these dynamically (https://github.com/pytorch/pytorch/issues/81692)
-                # though that shouldn't be a problem on Linux
-                ${TORCH_LIB}/lib/libcudnn_adv_infer_static.a
-                ${TORCH_LIB}/lib/libcudnn_cnn_infer_static.a
-                ${TORCH_LIB}/lib/libcudnn_ops_infer_static.a
-            -Wl,--no-whole-archive
-        )
-
-        # Currently we need to make use of a separate lib to avoid getting relocation errors at link time
-        # because the final binary would end up too big.
-        # See https://github.com/pytorch/pytorch/issues/39968
-        option(USE_TORCH_HELPER_LIB "Make use of a separate torch helper lib" ON)
-        if (USE_TORCH_HELPER_LIB)
-            add_library(dorado_torch_lib SHARED
-                dorado/torch_half.cpp
-            )
-            target_link_libraries(dorado_torch_lib PRIVATE
-                ${TORCH_LIBRARIES}
-                # Some CUDA lib symbols have internal linkage, so they must be part of the helper lib too
-                CUDA::culibos
-                CUDA::cupti
-            )
-            # Replace the torch libs with the helper lib
-            set(TORCH_LIBRARIES dorado_torch_lib)
-            # Don't forget to install it
-            install(TARGETS dorado_torch_lib LIBRARY)
+        # Some CUDA lib symbols have internal linkage, so they must be part of the helper lib too
+        if (TARGET CUDA::cupti_static)
+            set(ont_cuda_internal_linkage_libs CUDA::culibos CUDA::cupti_static)
+        else()
+            # CUDA::cupti appears to be static if CUDA::cupti_static doesn't exist
+            set(ont_cuda_internal_linkage_libs CUDA::culibos CUDA::cupti)
         endif()
 
-        list(APPEND TORCH_LIBRARIES
-            # Some of the CUDA libs have inter-dependencies, so group them together
-            -Wl,--start-group
-                CUDA::cudart_static
-                CUDA::cublas_static
-                CUDA::cublasLt_static
-                ${ont_cufft_static}
-                CUDA::cusolver_static
-                # cusolver is missing this and I don't know why
-                ${CUDAToolkit_TARGET_DIR}/lib64/liblapack_static.a
-                CUDA::cusparse_static
-                CUDA::cupti
-                CUDA::curand_static
-                CUDA::nvrtc
-                CUDA::culibos
-            -Wl,--end-group
-            # OMP implementation (i=Intel, g=GNU)
-            ${TORCH_LIB}/lib/libgomp.so.1.0.0
-            # BLAS rather than MKL
-            ${TORCH_LIB}/lib/libopenblas.a
-            ${TORCH_LIB}/lib/libgfortran.so.5
-            # Dragostea
-            numa
-        )
-
-    elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-        list(APPEND TORCH_LIBRARIES
-            # These 2 libs depend on each other, but only libdnnl.a is added to Torch's install cmake, so we
-            # need to add it again after bringing in libdnnl_graph.a to fill in the missing symbols.
-            ${TORCH_LIB}/lib/libdnnl_graph.a
-            ${TORCH_LIB}/lib/libdnnl.a
-
-            # Note: the order of the cuDNN libs matter
-            # We aren't going to do any training, so these don't need to be whole-archived
-            ${TORCH_LIB}/lib/libcudnn_adv_train_static.a
-            ${TORCH_LIB}/lib/libcudnn_cnn_train_static.a
-            ${TORCH_LIB}/lib/libcudnn_ops_train_static.a
-            # I'm assuming we need this for https://github.com/pytorch/pytorch/issues/50153
-            -Wl,--whole-archive
-                # Note: libtorch is still setup to link to these dynamically (https://github.com/pytorch/pytorch/issues/81692)
-                # though that shouldn't be a problem on Linux
-                ${TORCH_LIB}/lib/libcudnn_adv_infer_static.a
-                ${TORCH_LIB}/lib/libcudnn_cnn_infer_static.a
-                ${TORCH_LIB}/lib/libcudnn_ops_infer_static.a
-            -Wl,--no-whole-archive
-        )
-
-        # Currently we need to make use of a separate lib to avoid getting relocation errors at link time
-        # because the final binary would end up too big.
-        # See https://github.com/pytorch/pytorch/issues/39968
-        option(USE_TORCH_HELPER_LIB "Make use of a separate torch helper lib" ON)
-        if (USE_TORCH_HELPER_LIB)
-            add_library(dorado_torch_lib SHARED
-                dorado/torch_half.cpp
+        # Setup differences between platforms
+        if (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
+            list(APPEND TORCH_LIBRARIES
+                # These 2 libs depend on each other, but only libdnnl.a is added to Torch's install cmake, so we
+                # need to add it again after bringing in libdnnl_graph.a to fill in the missing symbols.
+                ${TORCH_LIB}/lib/libdnnl_graph.a
+                ${TORCH_LIB}/lib/libdnnl.a
             )
-            target_link_libraries(dorado_torch_lib PRIVATE
-                ${TORCH_LIBRARIES}
-                # Some CUDA lib symbols have internal linkage, so they must be part of the helper lib too
-                CUDA::culibos
-                CUDA::cupti_static
-            )
-            # Replace the torch libs with the helper lib
-            set(TORCH_LIBRARIES dorado_torch_lib)
-
-            # Don't forget to install it
-            install(TARGETS dorado_torch_lib LIBRARY)
-        endif()
-
-        # Add missing libs (these weren't set by Torch, even before the helper lib)
-        list(APPEND TORCH_LIBRARIES
-            # Some of the CUDA libs have inter-dependencies, so group them together
-            -Wl,--start-group
-                CUDA::cudart_static
-                CUDA::cublas_static
-                CUDA::cublasLt_static
-                # AFAICT Torch doesn't provide the symbol required for the callback, so use the nocallback variant
-                CUDA::cufft_static_nocallback
-                CUDA::cusolver_static
-                CUDA::cusparse_static
-                CUDA::cupti_static
-                CUDA::culibos
+            set(ont_torch_extra_cuda_libs
                 # I don't know why the MKL libs need to be part of the CUDA group, but having them in a
                 # separate group causes missing symbol errors
                 ${TORCH_LIB}/lib/libmkl_core.a
                 ${TORCH_LIB}/lib/libmkl_intel_lp64.a
                 ${TORCH_LIB}/lib/libmkl_intel_thread.a
+            )
+            set(ont_torch_extra_platform_libs
+                ${TORCH_LIB}/lib/libnccl_static.a
+                ${TORCH_LIB}/lib/libiomp5.so
+            )
+        else()
+            set(ont_torch_extra_cuda_libs
+                # cusolver is missing this and I don't know why
+                ${CUDAToolkit_TARGET_DIR}/lib64/liblapack_static.a
+                CUDA::curand_static
+                CUDA::nvrtc
+            )
+            set(ont_torch_extra_platform_libs
+                ${TORCH_LIB}/lib/libopenblas.a
+                ${TORCH_LIB}/lib/libgfortran.so.5
+                ${TORCH_LIB}/lib/libgomp.so.1.0.0
+                numa
+            )
+        endif()
+
+        # Link to the cuDNN libs
+        list(APPEND TORCH_LIBRARIES
+            # Note: the order of the cuDNN libs matter
+            # We aren't going to do any training, so these don't need to be whole-archived
+            ${TORCH_LIB}/lib/libcudnn_adv_train_static.a
+            ${TORCH_LIB}/lib/libcudnn_cnn_train_static.a
+            ${TORCH_LIB}/lib/libcudnn_ops_train_static.a
+            # I'm assuming we need this for https://github.com/pytorch/pytorch/issues/50153
+            -Wl,--whole-archive
+                # Note: libtorch is still setup to link to these dynamically (https://github.com/pytorch/pytorch/issues/81692)
+                # though that shouldn't be a problem on Linux
+                ${TORCH_LIB}/lib/libcudnn_adv_infer_static.a
+                ${TORCH_LIB}/lib/libcudnn_cnn_infer_static.a
+                ${TORCH_LIB}/lib/libcudnn_ops_infer_static.a
+            -Wl,--no-whole-archive
+        )
+
+        # Currently we need to make use of a separate lib to avoid getting relocation errors at link time
+        # because the final binary would end up too big.
+        # See https://github.com/pytorch/pytorch/issues/39968
+        option(USE_TORCH_HELPER_LIB "Make use of a separate torch helper lib" ON)
+        if (USE_TORCH_HELPER_LIB)
+            add_library(dorado_torch_lib SHARED
+                dorado/torch_half.cpp
+            )
+            target_link_libraries(dorado_torch_lib PRIVATE
+                ${TORCH_LIBRARIES}
+                ${ont_cuda_internal_linkage_libs}
+            )
+            # Replace the torch libs with the helper lib
+            set(TORCH_LIBRARIES dorado_torch_lib)
+            # Don't forget to install it
+            install(TARGETS dorado_torch_lib LIBRARY)
+        endif()
+
+        list(APPEND TORCH_LIBRARIES
+            # Some of the CUDA libs have inter-dependencies, so group them together
+            -Wl,--start-group
+                CUDA::cudart_static
+                CUDA::cublas_static
+                CUDA::cublasLt_static
+                ${ont_cufft_static_libs}
+                CUDA::cusolver_static
+                CUDA::cusparse_static
+                ${ont_cuda_internal_linkage_libs}
+                ${ont_torch_extra_cuda_libs}
             -Wl,--end-group
-            ${TORCH_LIB}/lib/libnccl_static.a
-            # MKL depends on an OMP implementation (i=Intel, g=GNU)
-            ${TORCH_LIB}/lib/libiomp5.so
+            ${ont_torch_extra_platform_libs}
         )
 
         if (${CMAKE_VERSION} VERSION_LESS 3.23.4)
