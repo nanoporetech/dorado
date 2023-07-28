@@ -91,10 +91,13 @@ void HtsWriter::worker_thread() {
         auto aln = std::move(std::get<BamPtr>(message));
         write(aln.get());
         std::string read_id = bam_get_qname(aln.get());
-        int64_t dx_tag = bam_aux2i(bam_aux_get(aln.get(), "dx"));
+        int64_t dx_tag = 0;
+        auto tag_str = bam_aux_get(aln.get(), "dx");
+        if (tag_str) {
+            dx_tag = bam_aux2i(tag_str);
+        }
 
         // For the purpose of estimating write count, we ignore duplex reads
-        // these can be identified by a semicolon in their ID.
         bool ignore_read_id = dx_tag == 1;
 
         if (ignore_read_id) {
