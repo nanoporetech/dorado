@@ -1,6 +1,9 @@
 #include "Runners.h"
 
+#include "ModBaseRunner.h"
+#include "ModelRunner.h"
 #include "decode/CPUDecoder.h"
+#include "nn/CRFModel.h"
 
 #if DORADO_GPU_BUILD
 #ifdef __APPLE__
