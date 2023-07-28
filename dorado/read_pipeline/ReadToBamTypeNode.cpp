@@ -11,7 +11,13 @@ void ReadToBamType::worker_thread() {
     m_active_threads++;
 
     Message message;
-    while (m_work_queue.try_pop(message)) {
+    while (get_input_message(message)) {
+        // If this message isn't a read, just forward it to the sink.
+        if (!std::holds_alternative<std::shared_ptr<Read>>(message)) {
+            send_message_to_sink(std::move(message));
+            continue;
+        }
+
         // If this message isn't a read, we'll get a bad_variant_access exception.
         auto read = std::get<std::shared_ptr<Read>>(message);
 
@@ -35,12 +41,17 @@ ReadToBamType::ReadToBamType(bool emit_moves,
                              float modbase_threshold_frac,
                              size_t max_reads)
         : MessageSink(max_reads),
+          m_num_worker_threads(num_worker_threads),
           m_emit_moves(emit_moves),
           m_rna(rna),
           m_modbase_threshold(
                   static_cast<uint8_t>(std::min(modbase_threshold_frac * 256.0f, 255.0f))),
           m_active_threads(0) {
-    for (size_t i = 0; i < num_worker_threads; i++) {
+    start_threads();
+}
+
+void ReadToBamType::start_threads() {
+    for (size_t i = 0; i < m_num_worker_threads; i++) {
         m_workers.push_back(
                 std::make_unique<std::thread>(std::thread(&ReadToBamType::worker_thread, this)));
     }
@@ -53,6 +64,12 @@ void ReadToBamType::terminate_impl() {
             m->join();
         }
     }
+    m_workers.clear();
+}
+
+void ReadToBamType::restart() {
+    restart_input_queue();
+    start_threads();
 }
 
 }  // namespace dorado

@@ -7,15 +7,26 @@
 #include <atomic>
 #include <deque>
 #include <map>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <thread>
 #include <tuple>
+#include <unordered_map>
 #include <vector>
 
 namespace dorado {
 
 class PairingNode : public MessageSink {
+    // A key for a unique Pore, Duplex reads must have the same UniquePoreIdentifierKey
+    // The values are channel, mux, run_id, flowcell_id
+    using UniquePoreIdentifierKey = std::tuple<int, int, std::string, std::string>;
+
+    struct ReadCache {
+        std::map<UniquePoreIdentifierKey, std::list<std::shared_ptr<Read>>> channel_mux_read_map;
+        std::deque<UniquePoreIdentifierKey> working_channel_mux_keys;
+    };
+
 public:
     // Template-complement map: uses the pair_list pairing method
     PairingNode(std::map<std::string, std::string> template_complement_map,
@@ -27,13 +38,16 @@ public:
     ~PairingNode() { terminate_impl(); }
     std::string get_name() const override { return "PairingNode"; }
     stats::NamedStats sample_stats() const override;
-    void terminate() override { terminate_impl(); }
+    void terminate(const FlushOptions& flush_options) override;
+    void restart() override;
 
 private:
+    void start_threads();
     void terminate_impl();
 
     /**
      * This is a worker thread function for pairing reads based on a specified list of template-complement pairs.
+     * UNUSED.
      */
     void pair_list_worker_thread();
 
@@ -49,12 +63,10 @@ private:
      */
     void pair_generating_worker_thread();
 
-    // A key for a unique Pore, Duplex reads must have the same UniquePoreIdentifierKey
-    // The values are channel, mux, run_id, flowcell_id, client_id
-    using UniquePoreIdentifierKey = std::tuple<int, int, std::string, std::string, int32_t>;
-
     std::vector<std::unique_ptr<std::thread>> m_workers;
-    std::atomic<int> m_num_worker_threads;
+    int m_num_worker_threads = 0;
+    std::atomic<int> m_num_active_worker_threads = 0;
+    std::atomic<bool> m_preserve_cache_during_flush = false;
 
     // Members for pair_list method
 
@@ -70,8 +82,8 @@ private:
 
     std::mutex m_pairing_mtx;
 
-    std::map<UniquePoreIdentifierKey, std::list<std::shared_ptr<Read>>> m_channel_mux_read_map;
-    std::deque<UniquePoreIdentifierKey> m_working_channel_mux_keys;
+    // individual read caches per client, keyed by client_id
+    std::unordered_map<int32_t, ReadCache> m_read_caches;
 
     /**
      * The maximum number of different channels (pores) to keep in memory concurrently. 

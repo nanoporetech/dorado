@@ -16,7 +16,7 @@ TEST_CASE(TEST_GROUP) {
 
     dorado::ResumeLoaderNode loader(sink, sam.string());
     loader.copy_completed_reads();
-    sink.terminate();
+    sink.terminate(dorado::DefaultFlushOptions());
     CHECK(messages.size() == 1);
     auto read_ids = loader.get_processed_read_ids();
     CHECK(read_ids.count("002bd127-db82-436f-b828-28567c3d505d") == 1);

@@ -172,11 +172,8 @@ std::shared_ptr<Read> subread(const Read& read, PosRange seq_range, PosRange sig
            (signal_range.second == read.raw_data.size(0) && seq_range.second == read.seq.size()));
 
     auto subread = utils::shallow_copy_read(read);
-
-    const auto subread_id = utils::derive_uuid(
-            read.read_id, std::to_string(seq_range.first) + "-" + std::to_string(seq_range.second));
-    subread->read_id = subread_id;
     subread->read_tag = read.read_tag;
+    subread->client_id = read.client_id;
     subread->raw_data = subread->raw_data.index(
             {torch::indexing::Slice(signal_range.first, signal_range.second)});
     subread->attributes.read_number = -1;
@@ -523,8 +520,14 @@ std::vector<std::shared_ptr<Read>> DuplexSplitNode::split(std::shared_ptr<Read> 
     std::vector<std::shared_ptr<Read>> split_result;
     size_t subread_id = 0;
     for (const auto& ext_read : to_split) {
-        ext_read.read->subread_id = subread_id++;
-        ext_read.read->split_count = to_split.size();
+        if (to_split.size() > 1) {
+            ext_read.read->subread_id = subread_id++;
+            ext_read.read->split_count = to_split.size();
+            const auto subread_uuid = utils::derive_uuid(ext_read.read->parent_read_id,
+                                                         std::to_string(ext_read.read->subread_id));
+            ext_read.read->read_id = subread_uuid;
+        }
+
         split_result.push_back(std::move(ext_read.read));
     }
 
@@ -541,16 +544,18 @@ void DuplexSplitNode::worker_thread() {
     m_active++;  // Track active threads.
     Message message;
 
-    while (m_work_queue.try_pop(message)) {
-        if (!m_settings.enabled) {
+    while (get_input_message(message)) {
+        // If this message isn't a read, just forward it to the sink.
+        if (!m_settings.enabled || !std::holds_alternative<std::shared_ptr<Read>>(message)) {
             send_message_to_sink(std::move(message));
-        } else {
-            // If this message isn't a read, we'll get a bad_variant_access exception.
-            auto init_read = std::get<std::shared_ptr<Read>>(message);
-            for (auto& subread : split(init_read)) {
-                //TODO correctly process end_reason when we have them
-                send_message_to_sink(std::move(subread));
-            }
+            continue;
+        }
+
+        // If this message isn't a read, we'll get a bad_variant_access exception.
+        auto init_read = std::get<std::shared_ptr<Read>>(message);
+        for (auto& subread : split(init_read)) {
+            //TODO correctly process end_reason when we have them
+            send_message_to_sink(std::move(subread));
         }
     }
 
@@ -564,8 +569,12 @@ DuplexSplitNode::DuplexSplitNode(DuplexSplitSettings settings,
           m_settings(std::move(settings)),
           m_num_worker_threads(num_worker_threads) {
     m_split_finders = build_split_finders();
-    for (int i = 0; i < m_num_worker_threads; i++) {
-        worker_threads.push_back(
+    start_threads();
+}
+
+void DuplexSplitNode::start_threads() {
+    for (int i = 0; i < m_num_worker_threads; ++i) {
+        m_worker_threads.push_back(
                 std::make_unique<std::thread>(&DuplexSplitNode::worker_thread, this));
     }
 }
@@ -574,11 +583,17 @@ void DuplexSplitNode::terminate_impl() {
     terminate_input_queue();
 
     // Wait for all the Node's worker threads to terminate
-    for (auto& t : worker_threads) {
+    for (auto& t : m_worker_threads) {
         if (t->joinable()) {
             t->join();
         }
     }
+    m_worker_threads.clear();
+}
+
+void DuplexSplitNode::restart() {
+    restart_input_queue();
+    start_threads();
 }
 
 stats::NamedStats DuplexSplitNode::sample_stats() const { return stats::from_obj(m_work_queue); }

@@ -20,12 +20,14 @@ public:
     ~Aligner();
     std::string get_name() const override { return "Aligner"; }
     stats::NamedStats sample_stats() const override;
-    void terminate() override { terminate_impl(); }
+    void terminate(const FlushOptions& flush_options) override { terminate_impl(); }
+    void restart() override;
 
     using bam_header_sq_t = std::vector<std::pair<char*, uint32_t>>;
     bam_header_sq_t get_sequence_records_for_header() const;
 
 private:
+    void start_threads();
     void terminate_impl();
     size_t m_threads{1};
     std::vector<mm_tbuf_t*> m_tbufs;

@@ -28,50 +28,65 @@ ModBaseCallerNode::ModBaseCallerNode(std::vector<std::unique_ptr<ModBaseRunner>>
         : MessageSink(max_reads),
           m_batch_size(batch_size),
           m_block_stride(block_stride),
+          m_num_input_workers(remora_threads),
           m_runners(std::move(model_runners)),
           // TODO -- more principled calculation of output queue size
           m_processed_chunks(10 * max_reads) {
     init_modbase_info();
-
-    m_output_worker = std::make_unique<std::thread>(&ModBaseCallerNode::output_worker_thread, this);
-
     for (int i = 0; i < m_runners[0]->num_callers(); i++) {
         m_chunk_queues.emplace_back(
-                std::make_unique<AsyncQueue<std::shared_ptr<RemoraChunk>>>(batch_size * 5));
+                std::make_unique<utils::AsyncQueue<std::shared_ptr<RemoraChunk>>>(batch_size * 5));
     }
+
+    // Spin up the processing threads:
+    start_threads();
+}
+
+void ModBaseCallerNode::start_threads() {
+    m_output_worker = std::make_unique<std::thread>(&ModBaseCallerNode::output_worker_thread, this);
 
     for (size_t worker_id = 0; worker_id < m_runners.size(); ++worker_id) {
         for (size_t model_id = 0; model_id < m_runners[worker_id]->num_callers(); ++model_id) {
-            std::unique_ptr<std::thread> t = std::make_unique<std::thread>(
-                    &ModBaseCallerNode::modbasecall_worker_thread, this, worker_id, model_id);
+            auto t = std::make_unique<std::thread>(&ModBaseCallerNode::modbasecall_worker_thread,
+                                                   this, worker_id, model_id);
             m_runner_workers.push_back(std::move(t));
             ++m_num_active_runner_workers;
         }
     }
-    // Spin up the processing threads:
-    for (size_t i = 0; i < remora_threads; ++i) {
-        std::unique_ptr<std::thread> t =
-                std::make_unique<std::thread>(&ModBaseCallerNode::input_worker_thread, this);
-        m_input_worker.push_back(std::move(t));
-        ++m_num_active_input_worker;
+    for (size_t i = 0; i < m_num_input_workers; ++i) {
+        auto t = std::make_unique<std::thread>(&ModBaseCallerNode::input_worker_thread, this);
+        m_input_workers.push_back(std::move(t));
+        ++m_num_active_input_workers;
     }
 }
 
 void ModBaseCallerNode::terminate_impl() {
     terminate_input_queue();
-    for (auto& t : m_input_worker) {
+    for (auto& t : m_input_workers) {
         if (t->joinable()) {
             t->join();
         }
     }
+    m_input_workers.clear();
     for (auto& t : m_runner_workers) {
         if (t->joinable()) {
             t->join();
         }
     }
-    if (m_output_worker->joinable()) {
+    m_runner_workers.clear();
+    if (m_output_worker && m_output_worker->joinable()) {
         m_output_worker->join();
     }
+    m_output_worker.reset();
+}
+
+void ModBaseCallerNode::restart() {
+    for (auto& runner : m_runners) {
+        runner->restart();
+    }
+    restart_input_queue();
+    m_processed_chunks.restart();
+    start_threads();
 }
 
 [[maybe_unused]] ModBaseCallerNode::Info ModBaseCallerNode::get_modbase_info_and_maybe_init(
@@ -146,7 +161,13 @@ void ModBaseCallerNode::init_modbase_info() {
 
 void ModBaseCallerNode::input_worker_thread() {
     Message message;
-    while (m_work_queue.try_pop(message)) {
+    while (get_input_message(message)) {
+        // If this message isn't a read, just forward it to the sink.
+        if (!std::holds_alternative<std::shared_ptr<Read>>(message)) {
+            send_message_to_sink(std::move(message));
+            continue;
+        }
+
         nvtx3::scoped_range range{"modbase_input_worker_thread"};
         // If this message isn't a read, we'll get a bad_variant_access exception.
         auto read = std::get<std::shared_ptr<Read>>(message);
@@ -232,7 +253,7 @@ void ModBaseCallerNode::input_worker_thread() {
         }
     }
 
-    int num_remaining_workers = --m_num_active_input_worker;
+    int num_remaining_workers = --m_num_active_input_workers;
     if (num_remaining_workers == 0) {
         for (auto& chunk_queue : m_chunk_queues) {
             chunk_queue->terminate();
@@ -255,7 +276,7 @@ void ModBaseCallerNode::modbasecall_worker_thread(size_t worker_id, size_t calle
     auto grab_chunk = [&batched_chunks](std::shared_ptr<RemoraChunk>& chunk) {
         batched_chunks.push_back(std::move(chunk));
     };
-    while (chunk_queue->process_and_pop_all(grab_chunk, m_batch_size - batched_chunks.size())) {
+    while (chunk_queue->process_and_pop_n(grab_chunk, m_batch_size - batched_chunks.size()) == utils::AsyncQueueStatus::Success) {
         nvtx3::scoped_range range{"modbasecall_worker_thread"};
 
         // We have just grabbed some number of chunks from the chunk queue and added
@@ -345,7 +366,8 @@ void ModBaseCallerNode::output_worker_thread() {
     auto grab_chunk = [&processed_chunks](std::shared_ptr<RemoraChunk>& chunk) {
         processed_chunks.push_back(std::move(chunk));
     };
-    while (m_processed_chunks.process_and_pop_all(grab_chunk)) {
+    while (m_processed_chunks.process_and_pop_n(grab_chunk, m_processed_chunks.capacity()) ==
+           utils::AsyncQueueStatus::Success) {
         nvtx3::scoped_range range{"modbase_output_worker_thread"};
 
         for (const auto& chunk : processed_chunks) {

@@ -43,15 +43,24 @@ HtsWriter::HtsWriter(const std::string& filename, OutputMode mode, size_t thread
             throw std::runtime_error("Could not enable multi threading for BAM generation.");
         }
     }
+    start_threads();
+}
 
+void HtsWriter::start_threads() {
     m_worker = std::make_unique<std::thread>(std::thread(&HtsWriter::worker_thread, this));
 }
 
 void HtsWriter::terminate_impl() {
     terminate_input_queue();
-    if (m_worker->joinable()) {
+    if (m_worker && m_worker->joinable()) {
         m_worker->join();
     }
+    m_worker.reset();
+}
+
+void HtsWriter::restart() {
+    restart_input_queue();
+    start_threads();
 }
 
 HtsWriter::~HtsWriter() {
@@ -76,7 +85,12 @@ void HtsWriter::worker_thread() {
     size_t write_count = 0;
 
     Message message;
-    while (m_work_queue.try_pop(message)) {
+    while (get_input_message(message)) {
+        // If this message isn't a BamPtr, ignore it.
+        if (!std::holds_alternative<BamPtr>(message)) {
+            continue;
+        }
+
         auto aln = std::move(std::get<BamPtr>(message));
         write(aln.get());
         std::string read_id = bam_get_qname(aln.get());
