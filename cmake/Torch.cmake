@@ -336,7 +336,8 @@ if (USING_STATIC_TORCH_LIB)
         option(USE_TORCH_HELPER_LIB "Make use of a separate torch helper lib" ON)
         if (USE_TORCH_HELPER_LIB)
             add_library(dorado_torch_lib SHARED
-                dorado/torch_half.cpp
+                # We need to use listdir here so projects including us use the correct path
+                ${CMAKE_CURRENT_LIST_DIR}/../dorado/torch_half.cpp
             )
             target_link_libraries(dorado_torch_lib PRIVATE
                 ${TORCH_LIBRARIES}
