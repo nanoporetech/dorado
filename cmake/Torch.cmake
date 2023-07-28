@@ -364,7 +364,7 @@ if (USING_STATIC_TORCH_LIB)
             ${ont_torch_extra_platform_libs}
         )
 
-        if (${CMAKE_VERSION} VERSION_LESS 3.23.4)
+        if (${CMAKE_VERSION} VERSION_LESS 3.23.4 AND EXISTS ${CUDAToolkit_TARGET_DIR}/lib64/libcusolver_lapack_static.a)
             # CUDA::cusolver_static is missing the cusolver_lapack_static target+dependency in older versions of cmake
             list(APPEND TORCH_LIBRARIES
                 ${CUDAToolkit_TARGET_DIR}/lib64/libcusolver_lapack_static.a
