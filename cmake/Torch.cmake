@@ -126,7 +126,7 @@ else()
     elseif(WIN32)
         if (TRY_USING_STATIC_TORCH_LIB)
             set(TORCH_URL https://cdn.oxfordnanoportal.com/software/analysis/torch-2.0.0.2-Windows-ont.zip)
-            set(TORCH_PATCH_SUFFIX -ont-2)
+            set(TORCH_PATCH_SUFFIX -ont.2)
             set(TORCH_LIB_SUFFIX "/libtorch")
             set(USING_STATIC_TORCH_LIB TRUE)
             add_compile_options(
