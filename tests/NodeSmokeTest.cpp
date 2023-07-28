@@ -282,8 +282,7 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
     });
 
     run_smoke_test<dorado::ModBaseCallerNode>(pipeline_restart, std::move(remora_runners), 2,
-                                              modbase_devices.size(), model_stride,
-                                              default_params.remora_batchsize);
+                                              model_stride);
 }
 
 DEFINE_TEST(NodeSmokeTestBam, "ReadToBamType") {

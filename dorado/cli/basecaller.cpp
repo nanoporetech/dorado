@@ -154,7 +154,7 @@ void setup(std::vector<std::string> args,
     if (!remora_runners.empty()) {
         auto mod_base_caller_node = pipeline_desc.add_node<ModBaseCallerNode>(
                 {read_filter_node}, std::move(remora_runners),
-                thread_allocations.remora_threads * num_devices, model_stride, remora_batch_size);
+                thread_allocations.remora_threads * num_devices, model_stride);
         basecaller_node_sink = mod_base_caller_node;
     }
     const int kBatchTimeoutMS = 100;
