@@ -102,7 +102,7 @@ static const std::unordered_map<std::string, KitInfo> kit_info = {
         {"SQK-RPB004",
          {true,
           false,
-          "ATCGCCTACCGTGAC",
+          "CCGTGAC",
           "CGTTTTTCGTGCGCCGCTTC",
           "",
           "",

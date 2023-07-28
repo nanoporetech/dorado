@@ -584,53 +584,22 @@ ScoreResults Barcoder::find_best_adapter(const std::string& read_seq,
               [](const auto& l, const auto& r) { return l.score > r.score; });
     auto best_score = scores.begin();
     // At minimum, the best window must meet the adapter score threshold.
-    spdlog::debug("Best candidate from list {} flank {} barcode {}", best_score->score,
-                  best_score->flank_score, best_score->adapter_name);
-    const float kThresBc = 0.5f;
+    //spdlog::debug("Best candidate from list {} flank {} barcode {}", best_score->score,
+    //              best_score->flank_score, best_score->adapter_name);
+    std::string d = "";
+    for (auto& s : scores) {
+        d += std::to_string(s.score) + " " + s.adapter_name + ", ";
+    }
+    spdlog::debug("Scores: {}", d);
+    const float kThresBc = 0.7f;
     const float kThresFlank = 0.5f;
     const float kMargin = 0.05f;
-    if (best_score != scores.end() && best_score->score >= kThresBc) {
-        // If there's only one window and it meets the threshold, choose it.
-        if (scores.size() == 1) {
+    //if (best_score != scores.end() && best_score->score >= kThresBc) {
+    if (best_score != scores.end()) {  // && best_score->score >= kThresBc) {
+        if (best_score->flank_score >= 0.7 && best_score->score >= 0.66) {
             return *best_score;
-        } else {
-            // Choose the best if it's sufficiently better than the second best score.
-            auto second_best_score = std::next(scores.begin());
-            spdlog::debug("2nd Best candidate from list {} flank {} barcode {}",
-                          second_best_score->score, second_best_score->flank_score,
-                          second_best_score->adapter_name);
-            auto& best_kit = kit_info.at(best_score->kit);
-            auto& second_best_kit = kit_info.at(second_best_score->kit);
-            if (best_kit.double_ends && second_best_kit.double_ends) {
-                // If the best and 2nd best scores both are double ended adapters and
-                // we have the flank scores, choose the best only it has better adapter
-                // AND flank scores.
-                auto margin = std::abs(best_score->score - second_best_score->score);
-                auto better_flank = best_score->flank_score >= second_best_score->flank_score;
-                if (margin >= kMargin) {  // && better_flank) {
-                    spdlog::debug(
-                            "Best score {} (flank {}) 2nd best score {} (flank "
-                            "{})",
-                            best_score->score, best_score->flank_score, second_best_score->score,
-                            second_best_score->flank_score);
-                    return *best_score;
-                } else if (margin >= kMargin / 2.f && better_flank &&
-                           std::min(best_score->top_score, best_score->bottom_score) >= 0.6f) {
-                    spdlog::debug(
-                            "Best score {} (flank {}) 2nd best score {} (flank "
-                            "{}), margin {}, both windows better than 0.6f",
-                            best_score->score, best_score->flank_score, second_best_score->score,
-                            second_best_score->flank_score, margin);
-                    return *best_score;
-                }
-            } else {
-                // Pick the best score only if it's better than the 2nd best score by a margin.
-                if (std::abs(best_score->score - second_best_score->score) >= kMargin) {
-                    spdlog::debug("Best score {} 2nd best score {}", best_score->score,
-                                  second_best_score->score);
-                    return *best_score;
-                }
-            }
+        } else if (best_score->score >= 0.7 && best_score->flank_score >= 0.6) {
+            return *best_score;
         }
     }
 
