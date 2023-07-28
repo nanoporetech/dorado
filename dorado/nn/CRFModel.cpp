@@ -32,14 +32,11 @@ extern "C" {
 // Different configurations for running Quantised LSTM
 constexpr bool g_options_no_i8 = false;
 constexpr bool g_options_no_conv_i8 = true;
-constexpr float g_options_scale_i8 = 1.0f;
-constexpr float g_options_scale_i8_lstm = 1.0f;
 constexpr float g_options_conv3_max = 3.5f;
 
 using namespace torch::nn;
 namespace F = torch::nn::functional;
 using Slice = torch::indexing::Slice;
-using quantized_lstm = std::function<int(void *, void *, void *, void *, void *, void *, int)>;
 
 #if USE_CUDA_LSTM
 
@@ -225,9 +222,6 @@ struct ConvolutionImpl : Module {
                 if (lstm_mode == CUTLASS_TNC_I8) {
                     // Convert F16 to I8 in-place. Each C_out-wide F16 vector gets converted such
                     // that its first half contains the I8 data while its second half is unused.
-                    if (g_options_scale_i8) {
-                        mm_out /= g_options_scale_i8;
-                    }
                     host_convert_inplace(stream, mm_out.data_ptr(), KOI_F16, KOI_I8,
                                          mm_out.stride(0), 0, mm_out.size(0), mm_out.size(1));
                 }
@@ -317,62 +311,48 @@ struct LinearCRFImpl : Module {
     Tanh activation{nullptr};
 };
 
-#if USE_CUDA_LSTM
-
-struct CudaLSTMImpl : Module {
-    CudaLSTMImpl(int layer_size, bool reverse_) : reverse(reverse_) {
-        auto options = torch::TensorOptions().dtype(torch::kFloat16);
-        weights = torch::empty({layer_size * 4, layer_size * 2}, options).contiguous();
-        auto weight_ih = weights.slice(1, 0, layer_size);
-
-        auto weight_hh = weights.slice(1, layer_size, 2 * layer_size);
-        if (reverse) {
-            std::swap(weight_ih, weight_hh);
-        }
-        bias = torch::empty({layer_size * 4}, options).contiguous();
-        auto bias_hh = torch::empty({layer_size * 4}, options).contiguous();
-
-        register_parameter("weight_ih", weight_ih, false);
-        register_parameter("weight_hh", weight_hh, false);
-        register_parameter("bias_ih", bias, false);
-        register_parameter("bias_hh", bias_hh, false);
-    }
-
-    torch::Tensor weights, bias;
-    bool reverse;
-};
-
-TORCH_MODULE(CudaLSTM);
-
-struct CudaLSTMStackImpl : Module {
-    CudaLSTMStackImpl(int layer_size_, float scale_i8_, float zero_offset_i8_)
-            : layer_size(layer_size_), scale_i8(scale_i8_), zero_offset_i8(zero_offset_i8_) {
-        rnn1 = register_module("rnn_1", CudaLSTM(layer_size, true));
-        rnn2 = register_module("rnn_2", CudaLSTM(layer_size, false));
-        rnn3 = register_module("rnn_3", CudaLSTM(layer_size, true));
-        rnn4 = register_module("rnn_4", CudaLSTM(layer_size, false));
-        rnn5 = register_module("rnn_5", CudaLSTM(layer_size, true));
-    }
+struct LSTMStackImpl : Module {
+    LSTMStackImpl(int size) : layer_size(size) {
+        // torch::nn::LSTM expects/produces [N, T, C] with batch_first == true
+        rnn1 = register_module("rnn1", LSTM(LSTMOptions(size, size).batch_first(true)));
+        rnn2 = register_module("rnn2", LSTM(LSTMOptions(size, size).batch_first(true)));
+        rnn3 = register_module("rnn3", LSTM(LSTMOptions(size, size).batch_first(true)));
+        rnn4 = register_module("rnn4", LSTM(LSTMOptions(size, size).batch_first(true)));
+        rnn5 = register_module("rnn5", LSTM(LSTMOptions(size, size).batch_first(true)));
+    };
 
     // Dispatch to different forward method depending on whether we use quantized LSTMs or not
     torch::Tensor forward(torch::Tensor x) {
         // Input x is [N, T, C], contiguity optional
-        c10::cuda::CUDAGuard device_guard(x.device());
-        ScopedProfileRange spr("lstm_stack");
+#if USE_CUDA_LSTM
+        if (x.is_cuda()) {
+            c10::cuda::CUDAGuard device_guard(x.device());
+            ScopedProfileRange spr("lstm_stack");
 
-        auto mode = get_cuda_lstm_mode(0, layer_size);
-        if (mode == QUANTISED_NTC) {
-            // Output is [N, T, C], contiguous
-            return forward_quantized(x);
-        } else if (mode == CUBLAS_TN2C) {
-            // Output is [N, T, C], non-contiguous
-            return forward_cublas(x);
-        } else {
-            // Output is [N, T, C], non-contiguous
-            return forward_cutlass(x);
+            auto mode = get_cuda_lstm_mode(0, layer_size);
+            if (mode == QUANTISED_NTC) {
+                // Output is [N, T, C], contiguous
+                return forward_quantized(x);
+            } else if (mode == CUBLAS_TN2C) {
+                // Output is [N, T, C], non-contiguous
+                return forward_cublas(x);
+            } else {
+                // Output is [N, T, C], non-contiguous
+                return forward_cutlass(x);
+            }
         }
+#endif
+        auto [y1, h1] = rnn1(x.flip(1));
+        auto [y2, h2] = rnn2(y1.flip(1));
+        auto [y3, h3] = rnn3(y2.flip(1));
+        auto [y4, h4] = rnn4(y3.flip(1));
+        auto [y5, h5] = rnn5(y4.flip(1));
+
+        // Output is [N, T, C], non-contiguous
+        return y5.flip(1);
     }
 
+#if USE_CUDA_LSTM
 private:
     torch::Tensor forward_cublas(torch::Tensor in) {
         // input is ([T+1, N, 2, C], contiguous) (see below)
@@ -402,18 +382,21 @@ private:
 
         int layer_idx = 0;
         for (auto &rnn : {rnn1, rnn2, rnn3, rnn4, rnn5}) {
+            bool reverse = !(layer_idx & 1);
             ScopedProfileRange spr_lstm("lstm_layer");
             auto state_buf = torch::zeros({batch_size, layer_size}, in.options());
-            auto weights_cpu = rnn->weights;
             {
                 if (int(device_weights.size()) == layer_idx) {
-                    device_bias.push_back(rnn->bias.to(in.device()));
-                    device_weights.push_back(rnn->weights.t().contiguous().to(in.device()));
+                    auto const &params = rnn->named_parameters();
+                    auto w_ih = params["weight_ih_l0"];
+                    auto w_hh = params["weight_hh_l0"];
+                    device_bias.push_back(params["bias_ih_l0"].to(in.options()));
+                    auto weights = torch::cat({reverse ? w_hh : w_ih, reverse ? w_ih : w_hh}, 1);
+                    device_weights.push_back(weights.t().contiguous().to(in.options()));
                 }
                 for (int ts = 0; ts < chunk_size; ++ts) {
-                    auto timestep_in = inout_all[rnn->reverse ? (chunk_size - ts) : ts];
-                    auto timestep_out =
-                            rnn->reverse ? inout_left[chunk_size - ts - 1] : inout_right[ts];
+                    auto timestep_in = inout_all[reverse ? (chunk_size - ts) : ts];
+                    auto timestep_out = reverse ? inout_left[chunk_size - ts - 1] : inout_right[ts];
                     // Timestep matrix mulitplication
                     dorado::utils::matmul_f16(timestep_in, device_weights[layer_idx], gate_buf);
                     host_lstm_step_f16(stream, batch_size, layer_size,
@@ -472,24 +455,26 @@ private:
 
         int layer_idx = 0;
         for (auto &rnn : {rnn1, rnn2, rnn3, rnn4, rnn5}) {
+            bool reverse = !(layer_idx & 1);
             ScopedProfileRange spr_lstm("lstm_layer");
             auto state_buf = torch::zeros({batch_size, layer_size}, opts_f16);
             auto workspace_buf = torch::empty({1024}, opts_i32);
-            auto weights_cpu = rnn->weights;
             auto type_id = (layer_idx > convert_to_int8_layer_idx) ? KOI_I8 : KOI_F16;
             int interleave = 0;  //(type_id == KOI_I8) ? 64 : 32;
 
             if (int(device_weights.size()) == layer_idx) {
-                auto layer_device_bias = rnn->bias.to(opts_f16).view({4, layer_size}).t();
+                auto const &params = rnn->named_parameters();
+                auto w_ih = params["weight_ih_l0"].to(opts_f16);
+                auto w_hh = params["weight_hh_l0"].to(opts_f16);
+                auto weights_cpu = torch::cat({reverse ? w_hh : w_ih, reverse ? w_ih : w_hh}, 1);
+                auto bias_cpu = params["bias_ih_l0"].to(opts_f16);
+
+                auto layer_device_bias =
+                        params["bias_ih_l0"].to(opts_f16).view({4, layer_size}).t();
                 if (type_id == KOI_I8) {
                     auto weights_f32 = weights_cpu.t().to(torch::kF32);
                     auto [scale, quantized] = quantize_tensor(weights_f32);
                     weights_cpu = quantized.t();
-                    if (layer_idx == 0) {
-                        if (g_options_scale_i8_lstm) {
-                            scale /= g_options_scale_i8_lstm;
-                        }
-                    }
                     scale = scale.view({4, layer_size}).t();
                     device_scale.push_back(scale.to(opts_f16).contiguous());
                 } else {
@@ -515,7 +500,7 @@ private:
 
             auto in = (type_id == KOI_I8) ? inout_all_i8 : inout_all_f16;
             host_cutlass_lstm(stream, type_id, layer_idx, batch_size, layer_size, chunk_size,
-                              rnn->reverse ? -1 : 1, in.stride(1), in.data_ptr(),
+                              reverse ? -1 : 1, in.stride(1), in.data_ptr(),
                               device_weights[layer_idx].data_ptr(),
                               device_bias[layer_idx].data_ptr(), device_scale[layer_idx].data_ptr(),
                               state_buf.data_ptr(), workspace_buf.data_ptr(), interleave, 0);
@@ -560,17 +545,6 @@ private:
         buffer.index({torch::indexing::Slice()}) = tmp;
     }
 
-    void rearrange_weights() {
-        for (auto &rnn : {rnn1, rnn2, rnn3, rnn4, rnn5}) {
-            rearrange_individual_weights(rnn->named_parameters()["weight_hh"]);
-            rearrange_individual_weights(rnn->named_parameters()["weight_ih"]);
-            _r_wih.push_back(rnn->named_parameters()["weight_ih"].transpose(0, 1).contiguous());
-            rearrange_individual_weights(rnn->named_parameters()["bias_hh"]);
-            rearrange_individual_weights(rnn->named_parameters()["bias_ih"]);
-        }
-        _weights_rearranged = true;
-    }
-
     std::pair<torch::Tensor, torch::Tensor> quantize_tensor(torch::Tensor tensor,
                                                             int levels = 256) {
         //Quantize a tensor to int8, returning per-channel scales and the quantized tensor
@@ -598,22 +572,23 @@ private:
                                                        tensor_quantized);
     }
 
-    void quantize_weights() {
-        for (auto &rnn : {rnn1, rnn2, rnn3, rnn4, rnn5}) {
-            auto [factors, quantized] = quantize_tensor(rnn->named_parameters()["weight_hh"].t());
-            _quantization_scale_factors.push_back(factors.contiguous());
-            _quantized_buffers.push_back(quantized.contiguous());
-        }
-    }
-
     torch::Tensor forward_quantized(torch::Tensor x) {
         // Input x is [N, T, C], contiguity optional
         x = x.contiguous();
 
         // If this is the first time the forward method is being applied, do some startup
-        if (!_weights_rearranged) {
-            rearrange_weights();
-            quantize_weights();
+        if (device_w_hh.empty()) {
+            for (auto &rnn : {rnn1, rnn2, rnn3, rnn4, rnn5}) {
+                auto const &params = rnn->named_parameters();
+                rearrange_individual_weights(params["weight_hh_l0"]);
+                rearrange_individual_weights(params["weight_ih_l0"]);
+                rearrange_individual_weights(params["bias_ih_l0"]);
+                auto [scale, quantized] = quantize_tensor(params["weight_hh_l0"].t());
+                device_w_ih.push_back(params["weight_ih_l0"].transpose(0, 1).contiguous());
+                device_w_hh.push_back(quantized.contiguous());
+                device_bias.push_back(params["bias_ih_l0"]);
+                device_scale.push_back(scale.contiguous());
+            }
         }
 
         // chunk_size * batch_size can not be > 2**31 (2147483648).
@@ -635,85 +610,47 @@ private:
         auto host_run_lstm_rev = (layer_size == 96) ? host_run_lstm_reverse_quantized96
                                                     : host_run_lstm_reverse_quantized128;
 
-        auto buffer = torch::matmul(x, _r_wih[0]);
+        auto buffer = torch::matmul(x, device_w_ih[0]);
 
         dorado::utils::handle_cuda_result(host_run_lstm_rev(
-                _chunks.data_ptr(), buffer.data_ptr(), _quantized_buffers[0].data_ptr(),
-                rnn1->named_parameters()["bias_ih"].data_ptr(),
-                _quantization_scale_factors[0].data_ptr(), x.data_ptr(), x.size(0)));
+                _chunks.data_ptr(), buffer.data_ptr(), device_w_hh[0].data_ptr(),
+                device_bias[0].data_ptr(), device_scale[0].data_ptr(), x.data_ptr(), x.size(0)));
 
-        buffer = torch::matmul(x, _r_wih[1]);
+        buffer = torch::matmul(x, device_w_ih[1]);
 
         dorado::utils::handle_cuda_result(host_run_lstm_fwd(
-                _chunks.data_ptr(), buffer.data_ptr(), _quantized_buffers[1].data_ptr(),
-                rnn2->named_parameters()["bias_ih"].data_ptr(),
-                _quantization_scale_factors[1].data_ptr(), x.data_ptr(), x.size(0)));
+                _chunks.data_ptr(), buffer.data_ptr(), device_w_hh[1].data_ptr(),
+                device_bias[1].data_ptr(), device_scale[1].data_ptr(), x.data_ptr(), x.size(0)));
 
-        buffer = torch::matmul(x, _r_wih[2]);
+        buffer = torch::matmul(x, device_w_ih[2]);
 
         dorado::utils::handle_cuda_result(host_run_lstm_rev(
-                _chunks.data_ptr(), buffer.data_ptr(), _quantized_buffers[2].data_ptr(),
-                rnn3->named_parameters()["bias_ih"].data_ptr(),
-                _quantization_scale_factors[2].data_ptr(), x.data_ptr(), x.size(0)));
+                _chunks.data_ptr(), buffer.data_ptr(), device_w_hh[2].data_ptr(),
+                device_bias[2].data_ptr(), device_scale[2].data_ptr(), x.data_ptr(), x.size(0)));
 
-        buffer = torch::matmul(x, _r_wih[3]);
+        buffer = torch::matmul(x, device_w_ih[3]);
 
         dorado::utils::handle_cuda_result(host_run_lstm_fwd(
-                _chunks.data_ptr(), buffer.data_ptr(), _quantized_buffers[3].data_ptr(),
-                rnn4->named_parameters()["bias_ih"].data_ptr(),
-                _quantization_scale_factors[3].data_ptr(), x.data_ptr(), x.size(0)));
+                _chunks.data_ptr(), buffer.data_ptr(), device_w_hh[3].data_ptr(),
+                device_bias[3].data_ptr(), device_scale[3].data_ptr(), x.data_ptr(), x.size(0)));
 
-        buffer = torch::matmul(x, _r_wih[4]);
+        buffer = torch::matmul(x, device_w_ih[4]);
 
         dorado::utils::handle_cuda_result(host_run_lstm_rev(
-                _chunks.data_ptr(), buffer.data_ptr(), _quantized_buffers[4].data_ptr(),
-                rnn5->named_parameters()["bias_ih"].data_ptr(),
-                _quantization_scale_factors[4].data_ptr(), x.data_ptr(), x.size(0)));
+                _chunks.data_ptr(), buffer.data_ptr(), device_w_hh[4].data_ptr(),
+                device_bias[4].data_ptr(), device_scale[4].data_ptr(), x.data_ptr(), x.size(0)));
 
         // Output is [N, T, C], contiguous
         return x;
     }
 
-    int layer_size;
-    float scale_i8;
-    float zero_offset_i8;
-    bool _weights_rearranged = false;
     std::vector<torch::Tensor> device_weights;
+    std::vector<torch::Tensor> device_w_ih;
+    std::vector<torch::Tensor> device_w_hh;
     std::vector<torch::Tensor> device_bias;
     std::vector<torch::Tensor> device_scale;
-    std::vector<torch::Tensor> _r_wih;
-    std::vector<torch::Tensor> _quantized_buffers;
-    std::vector<torch::Tensor> _quantization_scale_factors;
-    CudaLSTM rnn1{nullptr}, rnn2{nullptr}, rnn3{nullptr}, rnn4{nullptr}, rnn5{nullptr};
-};
-
-TORCH_MODULE(CudaLSTMStack);
-
 #endif  // if USE_CUDA_LSTM
-
-struct LSTMStackImpl : Module {
-    LSTMStackImpl(int size, float, float) {
-        // torch::nn::LSTM expects/produces [N, T, C] with batch_first == true
-        rnn1 = register_module("rnn1", LSTM(LSTMOptions(size, size).batch_first(true)));
-        rnn2 = register_module("rnn2", LSTM(LSTMOptions(size, size).batch_first(true)));
-        rnn3 = register_module("rnn3", LSTM(LSTMOptions(size, size).batch_first(true)));
-        rnn4 = register_module("rnn4", LSTM(LSTMOptions(size, size).batch_first(true)));
-        rnn5 = register_module("rnn5", LSTM(LSTMOptions(size, size).batch_first(true)));
-    };
-
-    torch::Tensor forward(torch::Tensor x) {
-        // Input is [N, T, C], contiguity optional
-
-        auto [y1, h1] = rnn1(x.flip(1));
-        auto [y2, h2] = rnn2(y1.flip(1));
-        auto [y3, h3] = rnn3(y2.flip(1));
-        auto [y4, h4] = rnn4(y3.flip(1));
-        auto [y5, h5] = rnn5(y4.flip(1));
-
-        // Output is [N, T, C], non-contiguous
-        return y5.flip(1);
-    }
-
+    int layer_size;
     LSTM rnn1{nullptr}, rnn2{nullptr}, rnn3{nullptr}, rnn4{nullptr}, rnn5{nullptr};
 };
 
@@ -736,7 +673,6 @@ TORCH_MODULE(LinearCRF);
 TORCH_MODULE(Convolution);
 TORCH_MODULE(Clamp);
 
-template <class LSTMStackType>
 struct CRFModelImpl : Module {
     CRFModelImpl(const CRFModelConfig &config, bool expand_blanks) {
         constexpr float conv_max_value = 3.5f;
@@ -748,9 +684,7 @@ struct CRFModelImpl : Module {
         conv3 = register_module("conv3", Convolution(16, config.insize, 19, config.stride,
                                                      config.clamp, conv3_max_value, true));
 
-        float scale = I8_RANGE;
-        float zero_offset = 0.f;
-        rnns = register_module("rnns", LSTMStackType(config.insize, scale, zero_offset));
+        rnns = register_module("rnns", LSTMStack(config.insize));
 
         if (config.out_features.has_value()) {
             // The linear layer is decomposed into 2 matmuls.
@@ -794,7 +728,7 @@ struct CRFModelImpl : Module {
         return encoder->forward(x);
     }
 
-    LSTMStackType rnns{nullptr};
+    LSTMStack rnns{nullptr};
     LinearCRF linear{nullptr};
     Linear linear1{nullptr}, linear2{nullptr};
     Sequential encoder{nullptr};
@@ -802,13 +736,7 @@ struct CRFModelImpl : Module {
     Clamp clamp1{nullptr};
 };
 
-#if USE_CUDA_LSTM
-using CudaCRFModelImpl = CRFModelImpl<CudaLSTMStack>;
-TORCH_MODULE(CudaCRFModel);
-#endif
-
-using CpuCRFModelImpl = CRFModelImpl<LSTMStack>;
-TORCH_MODULE(CpuCRFModel);
+TORCH_MODULE(CRFModel);
 
 }  // namespace nn
 
@@ -943,20 +871,10 @@ std::vector<torch::Tensor> load_crf_model_weights(const std::filesystem::path &d
 
 ModuleHolder<AnyModule> load_crf_model(const CRFModelConfig &model_config,
                                        const torch::TensorOptions &options) {
-#if USE_CUDA_LSTM
-    if (options.device().is_cuda()) {
-        const bool expand_blanks = false;
-        auto model = nn::CudaCRFModel(model_config, expand_blanks);
-        return populate_model(model, model_config.model_path, options,
-                              model_config.out_features.has_value(), model_config.bias);
-    } else
-#endif
-    {
-        const bool expand_blanks = true;
-        auto model = nn::CpuCRFModel(model_config, expand_blanks);
-        return populate_model(model, model_config.model_path, options,
-                              model_config.out_features.has_value(), model_config.bias);
-    }
+    const bool expand_blanks = !(USE_CUDA_LSTM && options.device().is_cuda());
+    auto model = nn::CRFModel(model_config, expand_blanks);
+    return populate_model(model, model_config.model_path, options,
+                          model_config.out_features.has_value(), model_config.bias);
 }
 
 uint16_t get_model_sample_rate(const std::filesystem::path &model_path) {
