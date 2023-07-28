@@ -75,8 +75,15 @@ else()
                     set(TORCH_LIB_SUFFIX "/torch")
                 endif()
             else()
-                set(TORCH_URL https://developer.download.nvidia.com/compute/redist/jp/v502/pytorch/torch-1.13.0a0+d0d6b1f2.nv22.09-cp38-cp38-linux_aarch64.whl)
-                set(TORCH_LIB_SUFFIX "/torch")
+                if (TRY_USING_STATIC_TORCH_LIB)
+                    set(TORCH_URL https://cdn.oxfordnanoportal.com/software/analysis/torch-2.0.0-linux-aarch64-ont.zip)
+                    set(TORCH_PATCH_SUFFIX -ont)
+                    set(TORCH_LIB_SUFFIX "/libtorch")
+                    set(USING_STATIC_TORCH_LIB TRUE)
+                else()
+                    set(TORCH_URL https://developer.download.nvidia.com/compute/redist/jp/v502/pytorch/torch-1.13.0a0+d0d6b1f2.nv22.09-cp38-cp38-linux_aarch64.whl)
+                    set(TORCH_LIB_SUFFIX "/torch")
+                endif()
             endif()
         else()
             if (TRY_USING_STATIC_TORCH_LIB)
@@ -208,7 +215,7 @@ if (USING_STATIC_TORCH_LIB)
             CUDA::cusparse
         )
 
-    elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR MATCHES "^aarch64*|^arm*")
+    elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR MATCHES "^aarch64*|^arm*" AND ${CUDAToolkit_VERSION} VERSION_LESS 11.0)
         list(APPEND TORCH_LIBRARIES
             # Missing libs that Torch forgets to link to
             ${TORCH_LIB}/lib/libbreakpad.a
@@ -235,6 +242,76 @@ if (USING_STATIC_TORCH_LIB)
             # BLAS rather than MKL
             ${TORCH_LIB}/lib/libopenblas.a
             ${TORCH_LIB}/lib/libgfortran.so.4.0.0
+        )
+
+    elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR MATCHES "^aarch64*|^arm*")
+        # Older versions of cmake don't have the static_nocallback target for cuFFT that Torch needs, so we
+        # make it ourselves.
+        if (TARGET CUDA::cufft_static_nocallback)
+            set(ont_cufft_static CUDA::cufft_static_nocallback)
+        else()
+            set(ont_cufft_static ${CUDAToolkit_TARGET_DIR}/lib64/libcufft_static_nocallback.a)
+        endif()
+
+        list(APPEND TORCH_LIBRARIES
+            # Note: the order of the cuDNN libs matter
+            # We aren't going to do any training, so these don't need to be whole-archived
+            ${TORCH_LIB}/lib/libcudnn_adv_train_static.a
+            ${TORCH_LIB}/lib/libcudnn_cnn_train_static.a
+            ${TORCH_LIB}/lib/libcudnn_ops_train_static.a
+            # I'm assuming we need this for https://github.com/pytorch/pytorch/issues/50153
+            -Wl,--whole-archive
+                # Note: libtorch is still setup to link to these dynamically (https://github.com/pytorch/pytorch/issues/81692)
+                # though that shouldn't be a problem on Linux
+                ${TORCH_LIB}/lib/libcudnn_adv_infer_static.a
+                ${TORCH_LIB}/lib/libcudnn_cnn_infer_static.a
+                ${TORCH_LIB}/lib/libcudnn_ops_infer_static.a
+            -Wl,--no-whole-archive
+        )
+
+        # Currently we need to make use of a separate lib to avoid getting relocation errors at link time
+        # because the final binary would end up too big.
+        # See https://github.com/pytorch/pytorch/issues/39968
+        option(USE_TORCH_HELPER_LIB "Make use of a separate torch helper lib" ON)
+        if (USE_TORCH_HELPER_LIB)
+            add_library(dorado_torch_lib SHARED
+                dorado/torch_half.cpp
+            )
+            target_link_libraries(dorado_torch_lib PRIVATE
+                ${TORCH_LIBRARIES}
+                # Some CUDA lib symbols have internal linkage, so they must be part of the helper lib too
+                CUDA::culibos
+                CUDA::cupti
+            )
+            # Replace the torch libs with the helper lib
+            set(TORCH_LIBRARIES dorado_torch_lib)
+            # Don't forget to install it
+            install(TARGETS dorado_torch_lib LIBRARY)
+        endif()
+
+        list(APPEND TORCH_LIBRARIES
+            # Some of the CUDA libs have inter-dependencies, so group them together
+            -Wl,--start-group
+                CUDA::cudart_static
+                CUDA::cublas_static
+                CUDA::cublasLt_static
+                ${ont_cufft_static}
+                CUDA::cusolver_static
+                # cusolver is missing this and I don't know why
+                ${CUDAToolkit_TARGET_DIR}/lib64/liblapack_static.a
+                CUDA::cusparse_static
+                CUDA::cupti
+                CUDA::curand_static
+                CUDA::nvrtc
+                CUDA::culibos
+            -Wl,--end-group
+            # OMP implementation (i=Intel, g=GNU)
+            ${TORCH_LIB}/lib/libgomp.so.1.0.0
+            # BLAS rather than MKL
+            ${TORCH_LIB}/lib/libopenblas.a
+            ${TORCH_LIB}/lib/libgfortran.so.5
+            # Dragostea
+            numa
         )
 
     elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
