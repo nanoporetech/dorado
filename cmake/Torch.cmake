@@ -81,6 +81,7 @@ else()
                     set(TORCH_LIB_SUFFIX "/libtorch")
                     set(USING_STATIC_TORCH_LIB TRUE)
                 else()
+                    # Grab from NVidia rather than pytorch so that it has the magic NVidia sauce
                     set(TORCH_URL https://developer.download.nvidia.com/compute/redist/jp/v502/pytorch/torch-1.13.0a0+d0d6b1f2.nv22.09-cp38-cp38-linux_aarch64.whl)
                     set(TORCH_LIB_SUFFIX "/torch")
                 endif()
