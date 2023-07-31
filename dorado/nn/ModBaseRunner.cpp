@@ -13,6 +13,7 @@
 #endif
 
 #include <nvtx3/nvtx3.hpp>
+#include <spdlog/spdlog.h>
 #include <toml.hpp>
 #include <torch/torch.h>
 
@@ -126,6 +127,8 @@ public:
             // no metal implementation yet, force to cpu
             auto torchMetalBackend = torch::kCPU;
             auto torchMetalDtype = torch::kFloat32;
+            spdlog::debug(
+                    "- no metal backend available for modified basecalling, defaulting to CPU.");
 #else
             auto torchMetalBackend = torch::kMPS;
             auto torchMetalDtype = torch::kFloat16;
