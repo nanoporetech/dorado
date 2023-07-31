@@ -335,7 +335,7 @@ if (USING_STATIC_TORCH_LIB)
         # Currently we need to make use of a separate lib to avoid getting relocation errors at link time
         # because the final binary would end up too big.
         # See https://github.com/pytorch/pytorch/issues/39968
-        option(USE_TORCH_HELPER_LIB "Make use of a separate torch helper lib" ON)
+        set(USE_TORCH_HELPER_LIB TRUE)
         if (USE_TORCH_HELPER_LIB)
             add_library(dorado_torch_lib SHARED
                 # We need to use listdir here so projects including us use the correct path
