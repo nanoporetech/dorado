@@ -23,13 +23,12 @@ constexpr auto FORCE_TIMEOUT = 100ms;
 ModBaseCallerNode::ModBaseCallerNode(std::vector<std::unique_ptr<ModBaseRunner>> model_runners,
                                      size_t remora_threads,
                                      size_t block_stride,
-                                     size_t batch_size,
                                      size_t max_reads)
         : MessageSink(max_reads),
-          m_batch_size(batch_size),
-          m_block_stride(block_stride),
-          m_num_input_workers(remora_threads),
           m_runners(std::move(model_runners)),
+          m_num_input_workers(remora_threads),
+          m_block_stride(block_stride),
+          m_batch_size(m_runners[0]->batch_size()),
           // TODO -- more principled calculation of output queue size
           m_processed_chunks(10 * max_reads) {
     init_modbase_info();
