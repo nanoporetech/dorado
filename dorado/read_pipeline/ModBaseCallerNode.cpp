@@ -172,7 +172,6 @@ void ModBaseCallerNode::input_worker_thread() {
         // If this message isn't a read, we'll get a bad_variant_access exception.
         auto read = std::get<std::shared_ptr<Read>>(message);
 
-
         while (true) {
             stats::Timer timer;
             {
@@ -236,7 +235,7 @@ void ModBaseCallerNode::input_worker_thread() {
                 }
                 for (auto& chunk : reads_to_enqueue) {
                     chunk_queue->try_push(std::move(chunk));
-                }                
+                }
             }
             m_chunk_generation_ms += timer.GetElapsedMS();
 
@@ -268,53 +267,45 @@ void ModBaseCallerNode::modbasecall_worker_thread(size_t worker_id, size_t calle
     std::vector<std::shared_ptr<RemoraChunk>> batched_chunks;
     auto last_chunk_reserve_time = std::chrono::system_clock::now();
 
-    
-
-    // Repeatedly attempt to complete the current batch with one acquisition of the
-    // chunk queue mutex.
     size_t previous_chunk_count = 0;
-    auto grab_chunk = [&batched_chunks](std::shared_ptr<RemoraChunk>& chunk) {
-        batched_chunks.push_back(std::move(chunk));
-    };
-    while (chunk_queue->process_and_pop_n(grab_chunk, m_batch_size - batched_chunks.size()) == utils::AsyncQueueStatus::Success) {
+    while (true) {
         nvtx3::scoped_range range{"modbasecall_worker_thread"};
+        // Repeatedly attempt to complete the current batch with one acquisition of the
+        // chunk queue mutex.
+        auto grab_chunk = [&batched_chunks](std::shared_ptr<RemoraChunk>& chunk) {
+            batched_chunks.push_back(std::move(chunk));
+        };
+        const auto status = chunk_queue->process_and_pop_n_with_timeout(
+                grab_chunk, m_batch_size - batched_chunks.size(),
+                last_chunk_reserve_time + FORCE_TIMEOUT);
+        if (status == utils::AsyncQueueStatus::Terminate) {
+            break;
+        }
 
-        // We have just grabbed some number of chunks from the chunk queue and added
-        // them to batched_chunks.  Insert those chunks into the model input tensors.
+        // Reset timeout.
+        last_chunk_reserve_time = std::chrono::system_clock::now();
+
+        // We have just grabbed a number of chunks (0 in the case of timeout) from
+        // the chunk queue and added them to batched_chunks.  Insert those chunks
+        // into the model input tensors.
+        assert(!batched_chunks.empty());
         for (size_t chunk_idx = previous_chunk_count; chunk_idx < batched_chunks.size();
              ++chunk_idx) {
+            assert(chunk_idx < m_batch_size);
             const auto& chunk = batched_chunks[chunk_idx];
             runner->accept_chunk(caller_id, chunk_idx, chunk->signal, chunk->encoded_kmers);
         }
 
-        // If we have a complete batch, call it immediately.
-        if (batched_chunks.size() == m_batch_size) {
+        // If we have a complete batch, or we have a partial batch and timed out,
+        // then call what we have.
+        if (batched_chunks.size() == m_batch_size ||
+            (status == utils::AsyncQueueStatus::Timeout && !batched_chunks.empty())) {
             // Input tensor is full, let's get scores.
             call_current_batch(worker_id, caller_id, batched_chunks);
         }
 
         previous_chunk_count = batched_chunks.size();
     }
-
-
-
-    /*std::shared_ptr<RemoraChunk> chunk;
-    while (chunk_queue->try_pop(chunk)) {
-        nvtx3::scoped_range range{"modbasecall_worker_thread"};
-        if (batched_chunks.size() != m_batch_size) {
-            size_t chunk_idx = batched_chunks.size();
-            batched_chunks.push_back(chunk);
-            // reset wait period
-            last_chunk_reserve_time = std::chrono::system_clock::now();
-            runner->accept_chunk(caller_id, chunk_idx, chunk->signal, chunk->encoded_kmers);
-        }
-
-        if (batched_chunks.size() == m_batch_size) {
-            // Input tensor is full, let's get_scores.
-            call_current_batch(worker_id, caller_id, batched_chunks);
-        }
-    }*/
-
 
     // Basecall any remaining chunks.
     if (!batched_chunks.empty()) {
