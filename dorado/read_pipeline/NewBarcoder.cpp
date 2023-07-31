@@ -238,51 +238,53 @@ void Barcoder::calculate_adapter_score_different_double_ends(const std::string_v
     EdlibAlignResult top_result_v1 =
             edlibAlign(top_strand_v1.data(), top_strand_v1.length(), read_top.data(),
                        read_top.length(), placement_config);
-    spdlog::debug("top score v1 {}", top_result_v1.editDistance);
+    float top_flank_score_v1 = 1.f - static_cast<float>(top_result_v1.editDistance) /
+                                             (top_strand_v1.length() - as.adapter[0].length());
+    spdlog::debug("top score v1 {} score {}", top_result_v1.editDistance, top_flank_score_v1);
     spdlog::debug("\n{}",
                   utils::alignment_to_str(top_strand_v1.data(), read_top.data(), top_result_v1));
     int top_bc_loc_v1 = extract_mask_location(top_result_v1, top_strand_v1);
     const std::string_view& top_mask_v1 = read_top.substr(top_bc_loc_v1, as.adapter[0].length());
-    float top_flank_score_v1 = 1.f - static_cast<float>(top_result_v1.editDistance) /
-                                             (top_strand_v1.length() - as.adapter[0].length());
 
     EdlibAlignResult bottom_result_v1 =
             edlibAlign(bottom_strand_v1.data(), bottom_strand_v1.length(), read_bottom.data(),
                        read_bottom.length(), placement_config);
-    spdlog::debug("bottom score v1 {}", bottom_result_v1.editDistance);
+    float bottom_flank_score_v1 =
+            1.f - static_cast<float>(bottom_result_v1.editDistance) /
+                          (bottom_strand_v1.length() - as.adapter[0].length());
+    spdlog::debug("bottom score v1 {} score {}", bottom_result_v1.editDistance,
+                  bottom_flank_score_v1);
     spdlog::debug("\n{}", utils::alignment_to_str(bottom_strand_v1.data(), read_bottom.data(),
                                                   bottom_result_v1));
     int bottom_bc_loc_v1 = extract_mask_location(bottom_result_v1, bottom_strand_v1);
     const std::string_view& bottom_mask_v1 =
             read_bottom.substr(bottom_bc_loc_v1, as.adapter_rev[0].length());
-    float bottom_flank_score_v1 =
-            1.f - static_cast<float>(bottom_result_v1.editDistance) /
-                          (bottom_strand_v1.length() - as.adapter[0].length());
 
     // Fetch barcode mask locations for variant 2
     EdlibAlignResult top_result_v2 =
             edlibAlign(top_strand_v2.data(), top_strand_v2.length(), read_top.data(),
                        read_top.length(), placement_config);
-    spdlog::debug("top score v2 {}", top_result_v2.editDistance);
+    float top_flank_score_v2 = 1.f - static_cast<float>(top_result_v2.editDistance) /
+                                             (top_strand_v2.length() - as.adapter[0].length());
+    spdlog::debug("top score v2 {} score {}", top_result_v2.editDistance, top_flank_score_v2);
     spdlog::debug("\n{}",
                   utils::alignment_to_str(top_strand_v2.data(), read_top.data(), top_result_v2));
     int top_bc_loc_v2 = extract_mask_location(top_result_v2, top_strand_v2);
     const std::string_view& top_mask_v2 = read_top.substr(top_bc_loc_v2, as.adapter[0].length());
-    float top_flank_score_v2 = 1.f - static_cast<float>(top_result_v2.editDistance) /
-                                             (top_strand_v2.length() - as.adapter[0].length());
 
     EdlibAlignResult bottom_result_v2 =
             edlibAlign(bottom_strand_v2.data(), bottom_strand_v2.length(), read_bottom.data(),
                        read_bottom.length(), placement_config);
-    spdlog::debug("bottom score v2 {}", bottom_result_v2.editDistance);
+    float bottom_flank_score_v2 =
+            1.f - static_cast<float>(bottom_result_v2.editDistance) /
+                          (bottom_strand_v2.length() - as.adapter[0].length());
+    spdlog::debug("bottom score v2 {} score {}", bottom_result_v2.editDistance,
+                  bottom_flank_score_v2);
     spdlog::debug("\n{}", utils::alignment_to_str(bottom_strand_v2.data(), read_bottom.data(),
                                                   bottom_result_v2));
     int bottom_bc_loc_v2 = extract_mask_location(bottom_result_v2, bottom_strand_v2);
     const std::string_view& bottom_mask_v2 =
             read_bottom.substr(bottom_bc_loc_v2, as.adapter_rev[0].length());
-    float bottom_flank_score_v2 =
-            1.f - static_cast<float>(bottom_result_v2.editDistance) /
-                          (bottom_strand_v2.length() - as.adapter[0].length());
 
     // Find the best variant of the two.
     int total_v1_score = top_result_v1.editDistance + bottom_result_v1.editDistance;
@@ -583,6 +585,7 @@ ScoreResults Barcoder::find_best_adapter(const std::string& read_seq,
     std::sort(scores.begin(), scores.end(),
               [](const auto& l, const auto& r) { return l.score > r.score; });
     auto best_score = scores.begin();
+    auto second_best_score = std::next(best_score);
     // At minimum, the best window must meet the adapter score threshold.
     //spdlog::debug("Best candidate from list {} flank {} barcode {}", best_score->score,
     //              best_score->flank_score, best_score->adapter_name);
@@ -593,12 +596,14 @@ ScoreResults Barcoder::find_best_adapter(const std::string& read_seq,
     spdlog::debug("Scores: {}", d);
     const float kThresBc = 0.7f;
     const float kThresFlank = 0.5f;
-    const float kMargin = 0.05f;
+    const float kMargin = 0.2f;
     //if (best_score != scores.end() && best_score->score >= kThresBc) {
     if (best_score != scores.end()) {  // && best_score->score >= kThresBc) {
         if (best_score->flank_score >= 0.7 && best_score->score >= 0.66) {
             return *best_score;
         } else if (best_score->score >= 0.7 && best_score->flank_score >= 0.6) {
+            return *best_score;
+        } else if (best_score->score - second_best_score->score >= kMargin) {
             return *best_score;
         }
     }
