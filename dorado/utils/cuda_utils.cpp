@@ -39,28 +39,20 @@ class CUDATimer {
     CUDATimer(const CUDATimer &) = delete;
     CUDATimer &operator=(const CUDATimer &) = delete;
 
-    static void check_cuda_result(cudaError_t err) {
-        if (err != cudaSuccess) {
-            spdlog::error("CUDA event error: {} - {}", cudaGetErrorName(err),
-                          cudaGetErrorString(err));
-            exit(EXIT_FAILURE);
-        }
-    }
-
 public:
     /**
      * Mark the beginning of a profiling section.
      * The timer will start once all previously submitted CUDA work
      * has completed on the active stream.
      */
-    void start() { check_cuda_result(cudaEventRecord(m_start)); }
+    void start() { handle_cuda_result(cudaEventRecord(m_start)); }
 
     /**
      * Mark the end of a profiling section.
      * The timer will stop once all previously submitted CUDA work
      * has completed on the active stream.
      */
-    void stop() { check_cuda_result(cudaEventRecord(m_stop)); }
+    void stop() { handle_cuda_result(cudaEventRecord(m_stop)); }
 
     /**
      * Get the time spent on the GPU between the begin and end markers.
@@ -68,50 +60,23 @@ public:
      * has been reached on the active stream.
      */
     float result_ms() {
-        check_cuda_result(cudaEventSynchronize(m_stop));
+        handle_cuda_result(cudaEventSynchronize(m_stop));
         float ms = 0;
-        check_cuda_result(cudaEventElapsedTime(&ms, m_start, m_stop));
+        handle_cuda_result(cudaEventElapsedTime(&ms, m_start, m_stop));
         return ms;
     }
 
     CUDATimer() {
-        check_cuda_result(cudaEventCreate(&m_start));
-        check_cuda_result(cudaEventCreate(&m_stop));
+        handle_cuda_result(cudaEventCreate(&m_start));
+        handle_cuda_result(cudaEventCreate(&m_stop));
     }
     ~CUDATimer() {
-        check_cuda_result(cudaEventDestroy(m_start));
-        check_cuda_result(cudaEventDestroy(m_stop));
+        handle_cuda_result(cudaEventDestroy(m_start));
+        handle_cuda_result(cudaEventDestroy(m_stop));
     }
 };
 
 }  // namespace
-
-namespace details {
-
-void matmul_f16_cublas(torch::Tensor const &A, torch::Tensor const &B, torch::Tensor &C) {
-    constexpr uint16_t HALF_ZERO = 0;      // 0.0 in __half format
-    constexpr uint16_t HALF_ONE = 0x3C00;  // 1.0 in __half format
-    assert(A.dtype() == torch::kF16 && B.dtype() == torch::kF16 && C.dtype() == torch::kF16);
-    assert(A.stride(1) == 1 && B.stride(1) == 1 && C.stride(1) == 1);
-    assert(A.size(0) == C.size(0));  // M
-    assert(B.size(1) == C.size(1));  // N
-    assert(A.size(1) == B.size(0));  // K
-    auto res =
-            cublasGemmEx(at::cuda::getCurrentCUDABlasHandle(), CUBLAS_OP_N, CUBLAS_OP_N, B.size(1),
-                         A.size(0), A.size(1), &HALF_ONE, B.data_ptr(), CUDA_R_16F, B.stride(0),
-                         A.data_ptr(), CUDA_R_16F, A.stride(0), &HALF_ZERO, C.data_ptr(),
-                         CUDA_R_16F, C.stride(0), CUDA_R_16F, CUBLAS_GEMM_DEFAULT_TENSOR_OP);
-    if (res != CUBLAS_STATUS_SUCCESS) {
-        spdlog::error("CuBLAS error {}", int(res));
-        exit(EXIT_FAILURE);
-    }
-}
-
-void matmul_f16_torch(torch::Tensor const &A, torch::Tensor const &B, torch::Tensor &C) {
-    C.copy_(torch::matmul(A, B));
-}
-
-}  // namespace details
 
 void matmul_f16(torch::Tensor const &A, torch::Tensor const &B, torch::Tensor &C) {
     // torch::matmul() is a bit slower than cublasGemmEx() on A100 and half the speed on V100,
@@ -181,6 +146,23 @@ std::unique_lock<std::mutex> acquire_gpu_lock(int gpu_index, bool use_lock) {
 
     return (use_lock ? std::unique_lock<std::mutex>(gpu_mutexes.at(gpu_index))
                      : std::unique_lock<std::mutex>());
+}
+
+// This might come in handy for tracking down where big Torch allocations happen
+void print_cuda_alloc_info(const std::string &label) {
+    auto stats = c10::cuda::CUDACachingAllocator::getDeviceStats(0);
+    auto print_stat_array = [](c10::cuda::CUDACachingAllocator::StatArray &stat,
+                               const std::string &lbl) {
+        constexpr float gig = 1024.f * 1024.f * 1024.f;
+        std::cerr << lbl << "[" << stat[0].current / gig << ", " << stat[0].peak / gig << ", "
+                  << stat[0].allocated / gig << ", " << stat[0].freed / gig << "] ";
+    };
+    std::cerr << "CUDAAlloc cpaf, " << label << " ";
+    print_stat_array(stats.allocated_bytes, "All");
+    print_stat_array(stats.reserved_bytes, "Rs");
+    print_stat_array(stats.active_bytes, "Act");
+    print_stat_array(stats.inactive_split_bytes, "In");
+    std::cerr << std::endl;
 }
 
 // Note that in general the torch caching allocator may be consuming
@@ -283,6 +265,30 @@ std::optional<std::array<int, 3>> try_select_max_batch_sizes(
     }
     return batch_sizes[idx];
 }
+
+void matmul_f16_cublas(torch::Tensor const &A, torch::Tensor const &B, torch::Tensor &C) {
+    constexpr uint16_t HALF_ZERO = 0;      // 0.0 in __half format
+    constexpr uint16_t HALF_ONE = 0x3C00;  // 1.0 in __half format
+    assert(A.dtype() == torch::kF16 && B.dtype() == torch::kF16 && C.dtype() == torch::kF16);
+    assert(A.stride(1) == 1 && B.stride(1) == 1 && C.stride(1) == 1);
+    assert(A.size(0) == C.size(0));  // M
+    assert(B.size(1) == C.size(1));  // N
+    assert(A.size(1) == B.size(0));  // K
+    auto res =
+            cublasGemmEx(at::cuda::getCurrentCUDABlasHandle(), CUBLAS_OP_N, CUBLAS_OP_N, B.size(1),
+                         A.size(0), A.size(1), &HALF_ONE, B.data_ptr(), CUDA_R_16F, B.stride(0),
+                         A.data_ptr(), CUDA_R_16F, A.stride(0), &HALF_ZERO, C.data_ptr(),
+                         CUDA_R_16F, C.stride(0), CUDA_R_16F, CUBLAS_GEMM_DEFAULT_TENSOR_OP);
+    if (res != CUBLAS_STATUS_SUCCESS) {
+        spdlog::error("CuBLAS error {}", int(res));
+        exit(EXIT_FAILURE);
+    }
+}
+
+void matmul_f16_torch(torch::Tensor const &A, torch::Tensor const &B, torch::Tensor &C) {
+    C.copy_(torch::matmul(A, B));
+}
+
 }  // namespace details
 
 }  // namespace dorado::utils

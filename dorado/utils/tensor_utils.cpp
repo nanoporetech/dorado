@@ -1,5 +1,6 @@
 #include "tensor_utils.h"
 
+#include "math_utils.h"
 #include "simd.h"
 
 #include <torch/csrc/jit/serialization/pickle.h>
@@ -172,6 +173,26 @@ void copy_tensor_elems(torch::Tensor& dest_tensor,
                 {Slice(dest_offset, dest_offset + count)},
                 src_tensor.flatten().index({Slice(src_offset, src_offset + count)}));
     }
+}
+
+torch::Tensor from_working_mem(torch::Tensor working_mem,
+                               torch::IntArrayRef sizes,
+                               torch::Dtype dtype,
+                               bool from_front) {
+    auto elems =
+            std::accumulate(sizes.begin(), sizes.end(), int64_t(1), std::multiplies<int64_t>());
+
+    auto wm_dtype = working_mem.flatten().view(dtype);
+    auto start_pos = from_front ? int64_t(0)
+                                : ((wm_dtype.numel() - elems) / WORKING_MEM_ALIGNMENT) *
+                                          WORKING_MEM_ALIGNMENT;
+    return wm_dtype.slice(0, start_pos, start_pos + elems).view(sizes);
+}
+
+int64_t tensor_bytes(torch::IntArrayRef sizes, torch::Dtype dtype) {
+    int64_t elems =
+            std::accumulate(sizes.begin(), sizes.end(), int64_t(1), std::multiplies<int64_t>());
+    return pad_to<int64_t>(elems * torch::elementSize(dtype), WORKING_MEM_ALIGNMENT);
 }
 
 }  // namespace dorado::utils

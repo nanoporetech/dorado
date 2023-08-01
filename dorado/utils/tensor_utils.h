@@ -37,4 +37,19 @@ void copy_tensor_elems(torch::Tensor& dest_tensor,
                        std::size_t src_offset,
                        std::size_t count);
 
+static constexpr int WORKING_MEM_ALIGNMENT = 256;
+
+// Create a contiguous tensor view with `sizes` and `dtype`, using `working_mem` as backing memory.
+// If `from_front` is true, place at the front of `working_mem`, otherwise at the back.
+// `data_ptr()` of the returned tensor will be aligned to WORKING_MEM_ALIGNMENT bytes, relative
+// to the `data_ptr()` of `working_mem`.
+torch::Tensor from_working_mem(torch::Tensor working_mem,
+                               torch::IntArrayRef sizes,
+                               torch::Dtype dtype,
+                               bool from_front);
+
+// Calculate the size of backing memory a contiguous tensor with `sizes` and `dtype` would need,
+// padded to WORKING_MEM_ALIGNMENT
+int64_t tensor_bytes(torch::IntArrayRef sizes, torch::Dtype dtype);
+
 }  // namespace dorado::utils
