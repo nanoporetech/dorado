@@ -25,6 +25,10 @@ BarcodeDemuxer::BarcodeDemuxer(const std::string& output_dir,
           m_num_reads_expected(num_reads),
           m_write_fastq(write_fastq) {
     std::filesystem::create_directory(m_output_dir);
+    start_threads();
+}
+
+void BarcodeDemuxer::start_threads() {
     m_worker = std::make_unique<std::thread>(std::thread(&BarcodeDemuxer::worker_thread, this));
 }
 
@@ -33,6 +37,11 @@ void BarcodeDemuxer::terminate_impl() {
     if (m_worker->joinable()) {
         m_worker->join();
     }
+}
+
+void BarcodeDemuxer::restart() {
+    restart_input_queue();
+    start_threads();
 }
 
 BarcodeDemuxer::~BarcodeDemuxer() {
@@ -45,7 +54,7 @@ BarcodeDemuxer::~BarcodeDemuxer() {
 
 void BarcodeDemuxer::worker_thread() {
     Message message;
-    while (m_work_queue.try_pop(message)) {
+    while (get_input_message(message)) {
         auto aln = std::move(std::get<BamPtr>(message));
         write(aln.get());
     }

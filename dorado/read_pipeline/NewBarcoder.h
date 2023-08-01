@@ -472,9 +472,12 @@ public:
     ~BarcoderNode();
     std::string get_name() const override { return "BarcoderNode"; }
     stats::NamedStats sample_stats() const override;
-    void terminate() override { terminate_impl(); }
+    void terminate(const FlushOptions& flush_options) override { terminate_impl(); }
+    void restart() override;
 
 private:
+    void start_threads();
+
     size_t m_threads{1};
     std::atomic<size_t> m_active{0};
     std::vector<std::unique_ptr<std::thread>> m_workers;

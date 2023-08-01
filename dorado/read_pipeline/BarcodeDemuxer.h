@@ -22,12 +22,14 @@ public:
     ~BarcodeDemuxer();
     std::string get_name() const override { return "BarcodeDemuxer"; }
     stats::NamedStats sample_stats() const override;
-    void terminate() override { terminate_impl(); }
+    void terminate(const FlushOptions& flush_options) override { terminate_impl(); }
+    void restart() override;
 
     void set_header(const sam_hdr_t* header);
 
 private:
     void terminate_impl();
+    void start_threads();
     std::filesystem::path m_output_dir;
     int m_threads;
     size_t m_total{0};

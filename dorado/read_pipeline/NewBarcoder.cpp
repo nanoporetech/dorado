@@ -60,6 +60,10 @@ const std::string UNCLASSIFIED_BARCODE = "unclassified";
 
 BarcoderNode::BarcoderNode(int threads, const std::vector<std::string>& kit_names)
         : MessageSink(10000), m_threads(threads), m_barcoder(kit_names) {
+    start_threads();
+}
+
+void BarcoderNode::start_threads() {
     for (size_t i = 0; i < m_threads; i++) {
         m_workers.push_back(
                 std::make_unique<std::thread>(std::thread(&BarcoderNode::worker_thread, this, i)));
@@ -75,6 +79,11 @@ void BarcoderNode::terminate_impl() {
     }
 }
 
+void BarcoderNode::restart() {
+    restart_input_queue();
+    start_threads();
+}
+
 BarcoderNode::~BarcoderNode() {
     terminate_impl();
     spdlog::info("> Barcoded: {}", m_matched.load());
@@ -83,7 +92,7 @@ BarcoderNode::~BarcoderNode() {
 
 void BarcoderNode::worker_thread(size_t tid) {
     Message message;
-    while (m_work_queue.try_pop(message)) {
+    while (get_input_message(message)) {
         auto read = std::get<BamPtr>(std::move(message));
         auto records = barcode(read.get());
         for (auto& record : records) {
