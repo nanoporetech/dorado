@@ -100,7 +100,8 @@ void create_stereo_duplex_pipeline(PipelineDescriptor& pipeline_desc,
     auto pairing_node =
             std::holds_alternative<ReadOrder>(pairing_parameters)
                     ? pipeline_desc.add_node<PairingNode>({stereo_node},
-                                                          std::get<ReadOrder>(pairing_parameters))
+                                                          std::get<ReadOrder>(pairing_parameters),
+                                                          std::thread::hardware_concurrency())
                     : pipeline_desc.add_node<PairingNode>(
                               {stereo_node}, std::move(std::get<std::map<std::string, std::string>>(
                                                      pairing_parameters)));

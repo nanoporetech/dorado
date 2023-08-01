@@ -117,9 +117,9 @@ TEST_CASE("4 subread split tagging", TEST_GROUP) {
 
     auto reads = ConvertMessages<std::shared_ptr<dorado::Read>>(messages);
 
-    REQUIRE(reads.size() == 5);
+    CHECK(reads.size() == 6);
 
-    std::vector<size_t> expected_subread_ids = {0, 1, 2, 3, 4};
+    std::vector<size_t> expected_subread_ids = {0, 1, 2, 3, 4, 5};
     std::vector<size_t> subread_ids;
     for (const auto &subread : reads) {
         subread_ids.push_back(subread->subread_id);

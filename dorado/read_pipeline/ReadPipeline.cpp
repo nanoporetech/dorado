@@ -91,8 +91,8 @@ void Read::generate_read_tags(bam1_t *aln, bool emit_moves) const {
 
     bam_aux_append(aln, "sv", 'Z', scaling_method.size() + 1, (uint8_t *)scaling_method.c_str());
 
-    uint32_t duplex = 0;
-    bam_aux_append(aln, "dx", 'i', sizeof(duplex), (uint8_t *)&duplex);
+    int32_t dx = (is_duplex_parent ? -1 : 0);
+    bam_aux_append(aln, "dx", 'i', sizeof(dx), (uint8_t *)&dx);
 
     auto rg = generate_read_group();
     if (!rg.empty()) {

@@ -4,6 +4,7 @@
 #include <string>
 
 struct bam1_t;
+struct mm_tbuf_s;
 
 namespace dorado {
 
@@ -55,6 +56,11 @@ struct BamDestructor {
     void operator()(bam1_t *);
 };
 using BamPtr = std::unique_ptr<bam1_t, BamDestructor>;
+
+struct MmTbufDestructor {
+    void operator()(mm_tbuf_s *);
+};
+using MmTbufPtr = std::unique_ptr<mm_tbuf_s, MmTbufDestructor>;
 
 enum class ReadOrder { UNRESTRICTED, BY_CHANNEL, BY_TIME };
 

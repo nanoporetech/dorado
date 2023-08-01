@@ -114,19 +114,32 @@ std::vector<std::unique_ptr<dorado::ModBaseRunner>> create_modbase_runners(
     // generate model callers before nodes or it affects the speed calculations
     std::vector<std::unique_ptr<dorado::ModBaseRunner>> remora_runners;
     std::vector<std::string> modbase_devices;
-#if DORADO_GPU_BUILD && !defined(__APPLE__)
-    if (device != "cpu") {
-        modbase_devices = dorado::utils::parse_cuda_device_string(device);
-    } else
-#endif
-    {
+
+    int remora_callers = 1;
+    if (device == "cpu") {
+        modbase_devices.push_back(device);
+        remora_batch_size = 128;
+        remora_runners_per_caller = 1;
+        remora_callers = std::thread::hardware_concurrency();
+    }
+#if DORADO_GPU_BUILD
+#ifdef __APPLE__
+    else if (device == "metal") {
         modbase_devices.push_back(device);
     }
+#else   // ifdef __APPLE__
+    else {
+        modbase_devices = dorado::utils::parse_cuda_device_string(device);
+    }
+#endif  // __APPLE__
+#endif  // DORADO_GPU_BUILD
     for (const auto& device_string : modbase_devices) {
-        auto caller =
-                dorado::create_modbase_caller(remora_model_list, remora_batch_size, device_string);
-        for (size_t i = 0; i < remora_runners_per_caller; i++) {
-            remora_runners.push_back(std::make_unique<dorado::ModBaseRunner>(caller));
+        for (int i = 0; i < remora_callers; ++i) {
+            auto caller = dorado::create_modbase_caller(remora_model_list, remora_batch_size,
+                                                        device_string);
+            for (size_t i = 0; i < remora_runners_per_caller; i++) {
+                remora_runners.push_back(std::make_unique<dorado::ModBaseRunner>(caller));
+            }
         }
     };
 
