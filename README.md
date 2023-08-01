@@ -299,44 +299,6 @@ $ export DYLD_LIBRARY_PATH=<PATH_TO_DORADO>/dorado-x.y.z-osx-arm64/lib:$DYLD_LIB
 
 This will let the Dorado binary pick up the shipped libraries and you will not need to manually install `libaec` and `zstd`. 
 
-### Improving the Speed of Duplex Basecalling
-
-Duplex basecalling is an IO-intensive process and can perform poorly if using networked storage or HDD. This can generally be improved by splitting up POD5 files appropriately.
-
-Firstly install the POD5 python tool:
-
-```
-pip install pod5
-```
-
-Then run `pod5 view` to generate a table containing information to split on specifically, the "channel" information.
-
-```
-pod5 view /path/to/your/dataset/ --include "read_id, channel" --output summary.tsv
-```
-
-This will create "summary.tsv" file which should look like:
-
-```
-read_id channel
-0000173c-bf67-44e7-9a9c-1ad0bc728e74    109
-002fde30-9e23-4125-9eae-d112c18a81a7    463
-...
-```
-
-Now run `pod5 subset` to copy records from your source data into outputs per-channel. This might take some time depending on the size of your dataset
-```
-pod5 subset /path/to/your/dataset/ --summary summary.tsv --columns channel --output split_by_channel
-```
-
-The command above will create the output directory `split_by_channel` and write into it one pod5 file per unique channel.  Duplex basecalling these split reads will now be much faster.
-
-### Running Duplex Basecalling in a Distributed Fashion
-
-If running duplex basecalling in a distributed fashion (e.g on a SLURM or Kubernetes cluster) it is important to split POD5 files as described above. The reason is that duplex basecalling requires aggregation of reads from across a whole sequecing run, which will be distriubuted over multiple POD5 files.
-The splitting strategy described above ensures that all reads which need to be aggregated are in the same POD5 file. Once the split is performed one can execute multiple jobs against smaller subsets of POD5 (e.g one job per 100 channels). This will allow basecalling to be distributed across nodes on a cluster. 
-This will generate multiple BAMs which can be merged. This apporach also offers some resilience as if any job fails it can be restarted without having to re-run basecaling against the entire dataset.
-
 ### GPU Out of Memory Errors
 
 Dorado operates on a broad range of GPUs but it is primarily developed for Nvidia A100/H100 and Apple Silicon. Dorado attempts to find the optimal batch size for basecalling. Nevertheless, on some low-RAM GPUs, users may face out of memory crashes.
