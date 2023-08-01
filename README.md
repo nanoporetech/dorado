@@ -303,7 +303,10 @@ This will let the Dorado binary pick up the shipped libraries and you will not n
 
 Duplex basecalling is an IO-intensive process and can perform poorly if using networked storage or HDD. This can generally be improved by splitting up POD5 files appropriately.
 
-Firstly install the POD5 python tool:
+Firstly install the POD5 python tools:
+
+The POD5 documentation can be found [here](https://pod5-file-format.readthedocs.io/en/latest/docs/tools.html).
+
 
 ```
 pip install pod5
