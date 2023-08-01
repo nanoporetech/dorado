@@ -397,10 +397,13 @@ std::vector<BamPtr> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
         add_tags(record, aln, seq, buf);
         add_sa_tag(record, aln, reg, hits, j, l_seq, m_index);
 
-        free(aln->p);
         results.push_back(BamPtr(record));
     }
 
+    // Free all mm2 alignment memory.
+    for (int j = 0; j < hits; j++) {
+        free(reg[j].p);
+    }
     free(reg);
     return results;
 }
