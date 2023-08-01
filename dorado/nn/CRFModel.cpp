@@ -120,14 +120,14 @@ struct ConvolutionImpl : Module {
                     int stride_,
                     bool clamp_,
                     float max_value_,
-                    bool to_lstm_)
+                    bool next_layer_is_lstm_)
             : in_size(size),
               out_size(outsize),
               window_size(k),
               stride(stride_),
               clamp(clamp_),
               max_value(clamp_ ? max_value_ : std::numeric_limits<float>::max()),
-              to_lstm(to_lstm_) {
+              next_layer_is_lstm(next_layer_is_lstm_) {
         conv = register_module(
                 "conv", Conv1d(Conv1dOptions(size, outsize, k).stride(stride).padding(k / 2)));
         activation = register_module("activation", SiLU());
@@ -140,37 +140,41 @@ struct ConvolutionImpl : Module {
         int64_t chunk_size_in = in_sizes[1];
         int64_t chunk_size_out = chunk_size_in / stride;
         int64_t in_buf_size = utils::tensor_bytes(in_sizes, torch::kF16);
-        if (to_lstm) {
-            auto lstm_mode = get_cuda_lstm_mode(0, out_size);
+        if (next_layer_is_lstm) {
             auto window_buf_size = utils::tensor_bytes(
                     {chunk_size_out, batch_size, in_size, window_size}, torch::kF16);
-            if (lstm_mode == LstmMode::CUTLASS_TNC_I8) {
-                std::vector<int64_t> out_sizes{chunk_size_out + 3, batch_size, out_size};
+            std::vector<int64_t> out_sizes;
+
+            switch (auto lstm_mode = get_cuda_lstm_mode(0, out_size)) {
+            case LstmMode::CUTLASS_TNC_I8: {
+                out_sizes = {chunk_size_out + 3, batch_size, out_size};
                 auto mm_buf_size =
                         utils::tensor_bytes({chunk_size_out, batch_size, out_size}, torch::kF16);
                 auto out_buf_size = utils::tensor_bytes(out_sizes, torch::kI8);
                 auto working_buf_size =
                         std::max(window_buf_size + std::max(in_buf_size, mm_buf_size),
                                  mm_buf_size + out_buf_size);
-                return std::pair(working_buf_size, out_sizes);
-            } else {
-                std::vector<int64_t> out_sizes;
-                if (lstm_mode == LstmMode::QUANTISED_NTC) {
-                    out_sizes = std::vector<int64_t>{chunk_size_out, batch_size, out_size};
-                } else if (lstm_mode == LstmMode::CUTLASS_TNC_F16) {
-                    out_sizes = std::vector<int64_t>{chunk_size_out + 3, batch_size, out_size};
-                } else if (lstm_mode == LstmMode::CUBLAS_TN2C) {
-                    out_sizes = std::vector<int64_t>{chunk_size_out + 1, batch_size, 2, out_size};
-                } else {
-                    throw std::logic_error("Unknown LSTM mode");
-                }
-                auto out_buf_size = utils::tensor_bytes(out_sizes, torch::kF16);
-                return std::pair(window_buf_size + std::max(in_buf_size, out_buf_size), out_sizes);
+                return {working_buf_size, out_sizes};
             }
+            case LstmMode::QUANTISED_NTC:
+                out_sizes = {chunk_size_out, batch_size, out_size};
+                break;
+            case LstmMode::CUTLASS_TNC_F16:
+                out_sizes = {chunk_size_out + 3, batch_size, out_size};
+                break;
+            case LstmMode::CUBLAS_TN2C:
+                out_sizes = {chunk_size_out + 1, batch_size, 2, out_size};
+                break;
+            default:
+                throw std::logic_error("Unknown LSTM mode");
+            }
+
+            auto out_buf_size = utils::tensor_bytes(out_sizes, torch::kF16);
+            return {window_buf_size + std::max(in_buf_size, out_buf_size), out_sizes};
         } else {
             std::vector<int64_t> out_sizes{batch_size, chunk_size_out, out_size};
             auto out_buf_size = utils::tensor_bytes(out_sizes, torch::kF16);
-            return std::pair(in_buf_size + out_buf_size, out_sizes);
+            return {in_buf_size + out_buf_size, out_sizes};
         }
     }
 
@@ -191,7 +195,7 @@ struct ConvolutionImpl : Module {
                                 .contiguous();
         auto b_device = conv->bias.to(in_view.options());
 
-        if (to_lstm) {
+        if (next_layer_is_lstm) {
             auto lstm_mode = get_cuda_lstm_mode(0, out_size);
             if (lstm_mode == LstmMode::QUANTISED_NTC) {
                 auto ntcw_mat = utils::from_working_mem(
@@ -287,7 +291,7 @@ struct ConvolutionImpl : Module {
         if (clamp) {
             x.clamp_(c10::nullopt, max_value);
         }
-        if (to_lstm) {
+        if (next_layer_is_lstm) {
             // Output is [N, T_out, C_out], non-contiguous
             return x.transpose(1, 2);
         } else {
@@ -304,7 +308,7 @@ struct ConvolutionImpl : Module {
     int stride;
     const bool clamp;
     const float max_value;
-    const bool to_lstm;
+    const bool next_layer_is_lstm;
 };
 
 struct LinearCRFImpl : Module {
@@ -373,7 +377,7 @@ struct LinearWrapperImpl : Module {
         std::vector out_sizes{in_sizes[0], in_sizes[1], linear->weight.size(0)};
         auto in_bytes = utils::tensor_bytes(in_sizes, torch::kF16);
         auto out_bytes = utils::tensor_bytes(out_sizes, torch::kF16);
-        return std::pair(in_bytes + out_bytes, out_sizes);
+        return {in_bytes + out_bytes, out_sizes};
     }
 
     torch::Tensor run_koi(torch::Tensor working_mem, torch::Tensor in_view) {
@@ -677,21 +681,10 @@ private:
     }
 
     void rearrange_individual_weights(torch::Tensor buffer) {
-        torch::Tensor tmp = torch::empty_like(buffer);
-        int layer_width = tmp.size(0) / 4;
-
         //Mapping of LSTM gate weights from IFGO to GIFO order.
-        std::vector<std::pair<int, int>> idxs = {{0, 2}, {1, 0}, {2, 1}, { 3, 3 }};
-
-        for (auto idx : idxs) {
-            int start_idx = idx.second * layer_width;
-            int end_idx = start_idx + layer_width;
-            tmp.index({torch::indexing::Slice(idx.first * layer_width,
-                                              (idx.first + 1) * layer_width)}) =
-                    buffer.index({torch::indexing::Slice(start_idx, end_idx)});
-        }
-
-        buffer.index({torch::indexing::Slice()}) = tmp;
+        auto tmp = buffer.view({4, -1});
+        tmp = torch::cat({tmp[2], tmp[0], tmp[1], tmp[3]});
+        buffer.index({torch::indexing::Slice()}) = tmp.view(buffer.sizes());
     }
 
     std::pair<torch::Tensor, torch::Tensor> quantize_tensor(torch::Tensor tensor,
@@ -717,8 +710,7 @@ private:
                                         .clip(-quantization_max, quantization_max)
                                         .to(torch::kI8);
 
-        return std::pair<torch::Tensor, torch::Tensor>(quantization_scale.to(torch::kFloat32),
-                                                       tensor_quantized);
+        return {quantization_scale.to(torch::kFloat32), tensor_quantized};
     }
 
     torch::Tensor forward_quantized(torch::Tensor working_mem, torch::Tensor in_view) {
