@@ -34,7 +34,8 @@ ModBaseCallerNode::ModBaseCallerNode(std::vector<std::unique_ptr<ModBaseRunner>>
     init_modbase_info();
     for (int i = 0; i < m_runners[0]->num_callers(); i++) {
         m_chunk_queues.emplace_back(
-                std::make_unique<utils::AsyncQueue<std::shared_ptr<RemoraChunk>>>(batch_size * 5));
+                std::make_unique<utils::AsyncQueue<std::shared_ptr<RemoraChunk>>>(m_batch_size *
+                                                                                  5));
     }
 
     // Spin up the processing threads:
