@@ -9,7 +9,6 @@
 #include "nn/CRFModel.h"
 #include "nn/ModBaseRunner.h"
 #include "nn/ModelRunner.h"
-#include "utils/types.h"
 
 #include <spdlog/spdlog.h>
 
