@@ -26,7 +26,6 @@ public:
     ModBaseCallerNode(std::vector<std::unique_ptr<ModBaseRunner>> model_runners,
                       size_t remora_threads,
                       size_t block_stride,
-                      size_t batch_size,
                       size_t max_reads = 1000);
     ~ModBaseCallerNode() { terminate_impl(); }
     std::string get_name() const override { return "ModBaseCallerNode"; }
@@ -72,18 +71,17 @@ private:
     // Worker thread, processes chunk results back into the reads
     void output_worker_thread();
 
-    size_t m_batch_size;
-    size_t m_block_stride;
-    size_t m_num_input_workers = 0;
-
     std::vector<std::unique_ptr<ModBaseRunner>> m_runners;
+    size_t m_num_input_workers = 0;
+    size_t m_block_stride;
+    size_t m_batch_size;
 
     std::unique_ptr<std::thread> m_output_worker;
     std::vector<std::unique_ptr<std::thread>> m_runner_workers;
     std::vector<std::unique_ptr<std::thread>> m_input_workers;
 
     utils::AsyncQueue<std::shared_ptr<RemoraChunk>> m_processed_chunks;
-    std::vector<std::deque<std::shared_ptr<RemoraChunk>>> m_chunk_queues;
+    std::vector<std::unique_ptr<utils::AsyncQueue<std::shared_ptr<RemoraChunk>>>> m_chunk_queues;
 
     std::mutex m_working_reads_mutex;
     // Reads removed from input queue and being modbasecalled.
@@ -95,8 +93,6 @@ private:
 
     std::atomic<int> m_num_active_runner_workers{0};
     std::atomic<int> m_num_active_input_workers{0};
-
-    std::atomic<bool> m_terminate_runners{false};
 
     std::shared_ptr<const utils::BaseModInfo> m_base_mod_info;
     // The offsets to the canonical bases in the modbase alphabet

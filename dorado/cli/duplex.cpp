@@ -317,8 +317,9 @@ int duplex(int argc, char* argv[]) {
 
             auto pairing_node =
                     template_complement_map.empty()
-                            ? pipeline_desc.add_node<PairingNode>({stereo_node},
-                                                                  ReadOrder::BY_CHANNEL)
+                            ? pipeline_desc.add_node<PairingNode>(
+                                      {stereo_node}, ReadOrder::BY_CHANNEL,
+                                      std::thread::hardware_concurrency())
                             : pipeline_desc.add_node<PairingNode>(
                                       {stereo_node}, std::move(template_complement_map));
 

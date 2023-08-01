@@ -243,8 +243,7 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
     if (gpu) {
 #if DORADO_GPU_BUILD
 #ifdef __APPLE__
-        // Metal falls back to CPU, which is very slow, so skip that since we're not testing anything new.
-        SKIP("No metal backend for modbase");
+        modbase_devices.push_back("metal");
 #else   //__APPLE__
         modbase_devices = dorado::utils::parse_cuda_device_string("cuda:all");
         if (modbase_devices.empty()) {
@@ -282,8 +281,7 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
     });
 
     run_smoke_test<dorado::ModBaseCallerNode>(pipeline_restart, std::move(remora_runners), 2,
-                                              modbase_devices.size(), model_stride,
-                                              default_params.remora_batchsize);
+                                              model_stride);
 }
 
 DEFINE_TEST(NodeSmokeTestBam, "ReadToBamType") {

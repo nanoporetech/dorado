@@ -1,24 +1,136 @@
 #include "PairingNode.h"
 
+#include "minimap.h"
+
+#include <nvtx3/nvtx3.hpp>
+#include <spdlog/spdlog.h>
+
 #include <algorithm>
 #include <cstdint>
 #include <limits>
 
-namespace {
-bool is_within_time_and_length_criteria(const std::shared_ptr<dorado::Read>& read1,
-                                        const std::shared_ptr<dorado::Read>& read2) {
-    int max_time_delta_ms = 5000;
-    float min_seq_len_ratio = 0.95f;
-    int delta = read2->start_time_ms - read1->get_end_time_ms();
-    int seq_len1 = read1->seq.length();
-    int seq_len2 = read2->seq.length();
-    float len_ratio = static_cast<float>(std::min(seq_len1, seq_len2)) /
-                      static_cast<float>(std::max(seq_len1, seq_len2));
-    return (delta >= 0) && (delta < max_time_delta_ms) && (len_ratio >= min_seq_len_ratio);
-}
-}  // namespace
-
 namespace dorado {
+
+// Determine whether 2 proposed reads form a duplex pair or not.
+// The algorithm utilizes the following heuristics to make a decision -
+// 1. Reads must be within 1000ms of each other, and the ratio of their
+//    lengths must be at least 20%.
+// 2. If the lengths are >98% similar, reads are at least 5KB, and time
+//    delta is <100ms, consider them to be a pair.
+// 3. If the early acceptance fails, then run minimap2 to generate overlap
+//    coordinates. If there is only 1 hit from minimap2 mapping,
+//    the mapping quality is high (>50), the overlap covers
+//    most of the shorter read (80%), the overlap is at least 50 bp long,
+//    one read maps to the reverse strand of the other, and the end
+//    of the template is mapped to the beginning
+//    of the complement read, then consider them a pair.
+std::tuple<bool, uint32_t, uint32_t, uint32_t, uint32_t>
+PairingNode::is_within_time_and_length_criteria(const std::shared_ptr<dorado::Read>& temp,
+                                                const std::shared_ptr<dorado::Read>& comp,
+                                                int tid) {
+    std::tuple<bool, uint32_t, uint32_t, uint32_t, uint32_t> pair_result = {false, 0, 0, 0, 0};
+    const int kMaxTimeDeltaMs = 1000;
+    const float kMinSeqLenRatio = 0.2f;
+    const int kMinOverlapLength = 50;
+    int delta = comp->start_time_ms - temp->get_end_time_ms();
+    int seq_len1 = temp->seq.length();
+    int seq_len2 = comp->seq.length();
+    int min_seq_len = std::min(seq_len1, seq_len2);
+    int max_seq_len = std::max(seq_len1, seq_len2);
+    float len_ratio = static_cast<float>(min_seq_len) / static_cast<float>(max_seq_len);
+
+    if ((delta >= 0) && (delta < kMaxTimeDeltaMs) && (len_ratio > kMinSeqLenRatio) &&
+        (min_seq_len > kMinOverlapLength)) {
+        const float kEarlyAcceptSeqLenRatio = 0.98;
+        const int kEarlyAcceptTimeDeltaMs = 100;
+        if (delta <= kEarlyAcceptTimeDeltaMs && len_ratio >= kEarlyAcceptSeqLenRatio &&
+            min_seq_len >= 5000) {
+            spdlog::debug(
+                    "Early acceptance: len frac {}, delta {} temp len {}, comp len {}, {} and {}",
+                    len_ratio, delta, temp->seq.length(), comp->seq.length(), temp->read_id,
+                    comp->read_id);
+            m_early_accepted_pairs++;
+            return {true, 0, temp->seq.length() - 1, 0, comp->seq.length() - 1};
+        }
+
+        const std::string nvtx_id = "pairing_map_" + std::to_string(tid);
+        nvtx3::scoped_range loop{nvtx_id};
+        // Add mm2 based overlap check.
+        mm_idxopt_t m_idx_opt;
+        mm_mapopt_t m_map_opt;
+        mm_set_opt(0, &m_idx_opt, &m_map_opt);
+        mm_set_opt("map-hifi", &m_idx_opt, &m_map_opt);
+
+        std::vector<const char*> seqs = {temp->seq.c_str()};
+        std::vector<const char*> names = {temp->read_id.c_str()};
+        mm_idx_t* m_index = mm_idx_str(m_idx_opt.w, m_idx_opt.k, 0, m_idx_opt.bucket_bits, 1,
+                                       seqs.data(), names.data());
+        mm_mapopt_update(&m_map_opt, m_index);
+
+        mm_tbuf_t* tbuf = m_tbufs[tid].get();
+
+        int hits = 0;
+        mm_reg1_t* reg = mm_map(m_index, comp->seq.length(), comp->seq.c_str(), &hits, tbuf,
+                                &m_map_opt, comp->read_id.c_str());
+
+        mm_idx_destroy(m_index);
+
+        // Multiple hits implies ambiguous mapping, so ignore those pairs.
+        if (hits == 1) {
+            uint8_t mapq = 0;
+            int32_t temp_start = 0;
+            int32_t temp_end = 0;
+            int32_t comp_start = 0;
+            int32_t comp_end = 0;
+            bool rev = false;
+
+            auto best_map = &reg[0];
+            mapq = best_map->mapq;
+            temp_start = best_map->rs;
+            temp_end = best_map->re;
+            comp_start = best_map->qs;
+            comp_end = best_map->qe;
+            rev = best_map->rev;
+
+            free(best_map->p);
+
+            const int kMinMapQ = 50;
+            const float kMinOverlapFraction = 0.8f;
+
+            // Require high mapping quality.
+            bool meets_mapq = (mapq >= kMinMapQ);
+            // Require overlap to cover most of at least one of the reads.
+            float overlap_frac =
+                    std::max(static_cast<float>(temp_end - temp_start) / temp->seq.length(),
+                             static_cast<float>(comp_end - comp_start) / comp->seq.length());
+            bool meets_length = overlap_frac > kMinOverlapFraction;
+            // Require the start of the complement strand to map to end
+            // of the template strand.
+            bool ends_anchored = (comp_start + (temp->seq.length() - temp_end)) <= 500;
+            int min_overlap_length = std::min(temp_end - temp_start, comp_end - comp_start);
+            bool meets_min_overlap_length = min_overlap_length > kMinOverlapLength;
+            bool cond = (meets_mapq && meets_length && rev && ends_anchored &&
+                         meets_min_overlap_length);
+
+            spdlog::debug(
+                    "hits {}, mapq {}, overlap length {}, overlap frac {}, delta {}, read 1 {}, "
+                    "read 2 "
+                    "{}, strand {}, pass {}, temp start {} temp end {}, comp start {} comp end {}, "
+                    "{} "
+                    "and {}",
+                    hits, mapq, temp_end - temp_start, overlap_frac, delta, temp->seq.length(),
+                    comp->seq.length(), rev ? "-" : "+", cond, temp_start, temp_end, comp_start,
+                    comp_end, temp->read_id, comp->read_id);
+
+            if (cond) {
+                m_overlap_accepted_pairs++;
+                pair_result = {true, temp_start, temp_end, comp_start, comp_end};
+            }
+        }
+        free(reg);
+    }
+    return pair_result;
+}
 
 void PairingNode::pair_list_worker_thread() {
     Message message;
@@ -93,7 +205,7 @@ void PairingNode::pair_list_worker_thread() {
     --m_num_active_worker_threads;
 }
 
-void PairingNode::pair_generating_worker_thread() {
+void PairingNode::pair_generating_worker_thread(int tid) {
     auto compare_reads_by_time = [](const std::shared_ptr<Read>& read1,
                                     const std::shared_ptr<Read>& read2) {
         return read1->start_time_ms < read2->start_time_ms;
@@ -123,6 +235,8 @@ void PairingNode::pair_generating_worker_thread() {
         }
 
         // If this message isn't a read, we'll get a bad_variant_access exception.
+        const std::string nvtx_id = "pairing_code_" + std::to_string(tid);
+        nvtx3::scoped_range loop{nvtx_id};
         auto read = std::get<std::shared_ptr<Read>>(message);
 
         int channel = read->attributes.channel_number;
@@ -152,7 +266,7 @@ void PairingNode::pair_generating_worker_thread() {
 
                 // Remove the oldest key from the map
                 for (auto read_ptr : oldest_key_it->second) {
-                    send_message_to_sink(read_ptr);
+                    m_reads_to_clear.insert(std::move(read_ptr));
                 }
                 read_cache.channel_mux_read_map.erase(oldest_key);
                 assert(read_cache.channel_mux_read_map.size() ==
@@ -160,32 +274,90 @@ void PairingNode::pair_generating_worker_thread() {
             }
         } else {
             auto& cached_read_list = read_list_iter->second;
-            auto later_read = std::lower_bound(cached_read_list.begin(), cached_read_list.end(),
-                                               read, compare_reads_by_time);
-
-            if (later_read != cached_read_list.begin()) {
-                auto earlier_read = std::prev(later_read);
-
-                if (is_within_time_and_length_criteria(*earlier_read, read)) {
-                    ReadPair pair = {*earlier_read, read};
-                    ++(*earlier_read)->num_duplex_candidate_pairs;
-                    send_message_to_sink(std::make_shared<ReadPair>(pair));
-                }
+            std::shared_ptr<Read> later_read, earlier_read;
+            auto later_read_iter = std::lower_bound(
+                    cached_read_list.begin(), cached_read_list.end(), read, compare_reads_by_time);
+            if (later_read_iter != cached_read_list.end()) {
+                later_read = *later_read_iter;
+                m_reads_in_flight_ctr[later_read]++;
             }
 
-            if (later_read != cached_read_list.end()) {
-                if (is_within_time_and_length_criteria(read, *later_read)) {
-                    ReadPair pair = {read, *later_read};
-                    ++read->num_duplex_candidate_pairs;
-                    send_message_to_sink(std::make_shared<ReadPair>(pair));
-                }
+            if (later_read_iter != cached_read_list.begin()) {
+                earlier_read = *(std::prev(later_read_iter));
+                m_reads_in_flight_ctr[earlier_read]++;
             }
 
-            cached_read_list.insert(later_read, read);
+            cached_read_list.insert(later_read_iter, read);
+            m_reads_in_flight_ctr[read]++;
+
             while (cached_read_list.size() > m_max_num_reads) {
                 auto cached_read = cached_read_list.front();
                 cached_read_list.pop_front();
-                send_message_to_sink(std::move(cached_read));
+                m_reads_to_clear.insert(std::move(cached_read));
+            }
+
+            // Release mutex around read cache to run pair evaluations.
+            lock.unlock();
+
+            bool found_pair = false;
+            if (later_read) {
+                auto [is_pair, qs, qe, rs, re] =
+                        is_within_time_and_length_criteria(read, later_read, tid);
+                if (is_pair) {
+                    ReadPair pair = {read, later_read, qs, qe, rs, re};
+                    read->is_duplex_parent = true;
+                    later_read->is_duplex_parent = true;
+                    ++read->num_duplex_candidate_pairs;
+                    send_message_to_sink(std::make_shared<ReadPair>(pair));
+                    found_pair = true;
+                }
+            }
+
+            if (!found_pair && earlier_read) {
+                auto [is_pair, qs, qe, rs, re] =
+                        is_within_time_and_length_criteria(earlier_read, read, tid);
+                if (is_pair) {
+                    ReadPair pair = {earlier_read, read, qs, qe, rs, re};
+                    earlier_read->is_duplex_parent = true;
+                    read->is_duplex_parent = true;
+                    ++(earlier_read)->num_duplex_candidate_pairs;
+                    send_message_to_sink(std::make_shared<ReadPair>(pair));
+                }
+            }
+
+            // Acquire read cache lock again to decrement in flight read counters.
+            lock.lock();
+
+            // Decrement in-flight counter for each read.
+            m_reads_in_flight_ctr[read]--;
+            if (earlier_read) {
+                m_reads_in_flight_ctr[earlier_read]--;
+            }
+            if (later_read) {
+                m_reads_in_flight_ctr[later_read]--;
+            }
+        }
+
+        // Once pairs have been evaluated, check if any of the in-flight reads
+        // need to be purged from the cache.
+        for (auto to_clear_itr = m_reads_to_clear.begin();
+             to_clear_itr != m_reads_to_clear.end();) {
+            auto in_flight_itr = m_reads_in_flight_ctr.find(*to_clear_itr);
+            bool ok_to_clear = false;
+            // If a read to clear is not in-flight (not in the in-flight list
+            // or in-flight counter is 0), then clear it
+            // from the cache.
+            if (in_flight_itr == m_reads_in_flight_ctr.end()) {
+                ok_to_clear = true;
+            } else if (in_flight_itr->second.load() == 0) {
+                m_reads_in_flight_ctr.erase(in_flight_itr);
+                ok_to_clear = true;
+            }
+            if (ok_to_clear) {
+                send_message_to_sink(std::move(*to_clear_itr));
+                to_clear_itr = m_reads_to_clear.erase(to_clear_itr);
+            } else {
+                ++to_clear_itr;
             }
         }
     }
@@ -208,6 +380,7 @@ void PairingNode::pair_generating_worker_thread() {
             }
             m_read_caches.clear();
         }
+        m_reads_in_flight_ctr.clear();
     }
 }
 
@@ -245,9 +418,11 @@ PairingNode::PairingNode(ReadOrder read_order, int num_worker_threads, size_t ma
 }
 
 void PairingNode::start_threads() {
+    m_tbufs.reserve(m_num_worker_threads);
     for (size_t i = 0; i < m_num_worker_threads; i++) {
+        m_tbufs.push_back(MmTbufPtr(mm_tbuf_init()));
         m_workers.push_back(std::make_unique<std::thread>(
-                std::thread(&PairingNode::pair_generating_worker_thread, this)));
+                std::thread(&PairingNode::pair_generating_worker_thread, this, i)));
         ++m_num_active_worker_threads;
     }
 }
@@ -266,6 +441,8 @@ void PairingNode::terminate_impl() {
         }
     }
     m_workers.clear();
+
+    m_tbufs.clear();
 }
 
 void PairingNode::restart() {
@@ -275,6 +452,8 @@ void PairingNode::restart() {
 
 stats::NamedStats PairingNode::sample_stats() const {
     stats::NamedStats stats = m_work_queue.sample_stats();
+    stats["early_accepted_pairs"] = m_early_accepted_pairs.load();
+    stats["overlap_accepted_pairs"] = m_overlap_accepted_pairs.load();
     return stats;
 }
 
