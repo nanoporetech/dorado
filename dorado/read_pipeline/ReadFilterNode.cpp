@@ -6,7 +6,7 @@ namespace dorado {
 
 void ReadFilterNode::worker_thread() {
     Message message;
-    while (m_work_queue.try_pop(message)) {
+    while (get_input_message(message)) {
         // If this message isn't a read, just forward it to the sink.
         if (!std::holds_alternative<std::shared_ptr<Read>>(message)) {
             send_message_to_sink(std::move(message));
@@ -19,9 +19,17 @@ void ReadFilterNode::worker_thread() {
         // Filter based on qscore.
         if ((read->calculate_mean_qscore() < m_min_qscore) ||
             read->seq.size() < m_min_read_length) {
-            ++m_num_reads_filtered;
+            if (read->is_duplex) {
+                ++m_num_duplex_reads_filtered;
+            } else {
+                ++m_num_simplex_reads_filtered;
+            }
         } else if (m_read_ids_to_filter.find(read->read_id) != m_read_ids_to_filter.end()) {
-            ++m_num_reads_filtered;
+            if (read->is_duplex) {
+                ++m_num_duplex_reads_filtered;
+            } else {
+                ++m_num_simplex_reads_filtered;
+            }
         } else {
             send_message_to_sink(read);
         }
@@ -37,7 +45,8 @@ ReadFilterNode::ReadFilterNode(size_t min_qscore,
           m_min_qscore(min_qscore),
           m_min_read_length(min_read_length),
           m_read_ids_to_filter(std::move(read_ids_to_filter)),
-          m_num_reads_filtered(0) {
+          m_num_simplex_reads_filtered(0),
+          m_num_duplex_reads_filtered(0) {
     start_threads();
 }
 
@@ -65,7 +74,8 @@ void ReadFilterNode::restart() {
 
 stats::NamedStats ReadFilterNode::sample_stats() const {
     stats::NamedStats stats = stats::from_obj(m_work_queue);
-    stats["reads_filtered"] = m_num_reads_filtered;
+    stats["simplex_reads_filtered"] = m_num_simplex_reads_filtered;
+    stats["duplex_reads_filtered"] = m_num_duplex_reads_filtered;
     return stats;
 }
 

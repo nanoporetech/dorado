@@ -3,6 +3,7 @@
 #include "read_pipeline/ReadPipeline.h"
 #include "utils/stats.h"
 
+#include <atomic>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -49,6 +50,7 @@ private:
     int write(bam1_t* record);
     size_t m_num_reads_expected;
     std::unordered_set<std::string> m_processed_read_ids;
+    std::atomic<int> m_duplex_reads_written{0};
 };
 
 }  // namespace dorado

@@ -8,7 +8,7 @@ namespace dorado {
 
 void SubreadTaggerNode::worker_thread() {
     Message message;
-    while (m_work_queue.try_pop(message)) {
+    while (get_input_message(message)) {
         bool check_complete_groups = false;
 
         if (std::holds_alternative<std::shared_ptr<Read>>(message)) {
@@ -52,8 +52,6 @@ void SubreadTaggerNode::worker_thread() {
                     m_subread_groups.erase(read->read_tag);
                 }
             }
-        } else if (std::holds_alternative<CandidatePairRejectedMessage>(message)) {
-            check_complete_groups = true;
         } else {
             spdlog::warn("SubreadTaggerNode received unexpected message type: {}.",
                          message.index());

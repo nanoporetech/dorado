@@ -117,9 +117,9 @@ TEST_CASE("4 subread split tagging", TEST_GROUP) {
 
     auto reads = ConvertMessages<std::shared_ptr<dorado::Read>>(messages);
 
-    REQUIRE(reads.size() == 5);
+    CHECK(reads.size() == 6);
 
-    std::vector<size_t> expected_subread_ids = {0, 1, 2, 3, 4};
+    std::vector<size_t> expected_subread_ids = {0, 1, 2, 3, 4, 5};
     std::vector<size_t> subread_ids;
     for (const auto &subread : reads) {
         subread_ids.push_back(subread->subread_id);
@@ -132,4 +132,52 @@ TEST_CASE("4 subread split tagging", TEST_GROUP) {
                           return read->split_count == split_count;
                       }));
     CHECK(std::all_of(reads.begin(), reads.end(), [](const auto &r) { return r->read_tag == 42; }));
+}
+
+TEST_CASE("No split output read properties", TEST_GROUP) {
+    const std::string init_read_id = "00a2dd45-f6a9-49ba-86ee-5d2a37b861cb";
+    std::shared_ptr<dorado::Read> read = std::make_shared<dorado::Read>();
+    read->range = 0;
+    read->sample_rate = 4000;
+    read->offset = -287;
+    read->scaling = 0.14620706;
+    read->shift = 94.717316;
+    read->scale = 26.888939;
+    read->model_stride = 5;
+    read->read_id = init_read_id;
+    read->num_trimmed_samples = 10;
+    read->attributes.read_number = 321;
+    read->attributes.channel_number = 664;
+    read->attributes.mux = 3;
+    read->attributes.start_time = "2023-02-21T12:46:01.526+00:00";
+    read->attributes.num_samples = 256790;
+    read->start_sample = 29767426;
+    read->end_sample = 30024216;
+    read->run_acquisition_start_time_ms = 1676976119670;
+
+    read->seq = "AAAAAAAAAAAAAAAAAAAAAA";
+    read->qstring = std::string(read->seq.length(), '!');
+    ;
+    read->moves = std::vector<uint8_t>(read->seq.length(), 0);
+    ;
+    read->raw_data = torch::zeros(read->seq.length() * 10).to(torch::kFloat16);
+    read->read_tag = 42;
+
+    dorado::PipelineDescriptor pipeline_desc;
+    std::vector<dorado::Message> messages;
+    auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 3, messages);
+    auto splitter_node = pipeline_desc.add_node<dorado::DuplexSplitNode>(
+            {sink}, dorado::DuplexSplitSettings{}, 1);
+    auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
+
+    pipeline->push_message(read);
+    pipeline.reset();
+
+    auto reads = ConvertMessages<std::shared_ptr<dorado::Read>>(messages);
+    CHECK(reads.size() == 1);
+
+    // Since the original read itself is modified, use the same pointer.
+    CHECK(read->read_id == init_read_id);
+    CHECK(read->subread_id == 0);
+    CHECK(read->split_count == 1);
 }

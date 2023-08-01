@@ -14,7 +14,11 @@ using namespace torch::indexing;
 namespace dorado {
 std::shared_ptr<dorado::Read> StereoDuplexEncoderNode::stereo_encode(
         std::shared_ptr<dorado::Read> template_read,
-        std::shared_ptr<dorado::Read> complement_read) {
+        std::shared_ptr<dorado::Read> complement_read,
+        uint32_t temp_start,
+        uint32_t temp_end,
+        uint32_t comp_start,
+        uint32_t comp_end) {
     // We rely on the incoming read raw data being of type float16 to allow direct memcpy
     // of tensor elements.
     assert(template_read->raw_data.dtype() == torch::kFloat16);
@@ -36,37 +40,18 @@ std::shared_ptr<dorado::Read> StereoDuplexEncoderNode::stereo_encode(
     EdlibAlignConfig align_config = edlibDefaultAlignConfig();
     align_config.task = EDLIB_TASK_PATH;
 
-    EdlibAlignResult result =
-            edlibAlign(template_read->seq.data(), template_read->seq.size(),
-                       complement_sequence_reverse_complement.data(),
-                       complement_sequence_reverse_complement.size(), align_config);
+    auto temp_strand = template_read->seq.substr(temp_start, temp_end - temp_start);
+    auto comp_strand =
+            complement_sequence_reverse_complement.substr(comp_start, comp_end - comp_start);
 
-    int query_cursor = 0;
-    int target_cursor = result.startLocations[0];
-    float alignment_error_rate = (float)result.editDistance / (float)result.alignmentLength;
+    EdlibAlignResult result = edlibAlign(temp_strand.data(), temp_strand.length(),
+                                         comp_strand.data(), comp_strand.length(), align_config);
 
-    auto [alignment_start_end, cursors] = dorado::utils::get_trimmed_alignment(
-            11, result.alignment, result.alignmentLength, target_cursor, query_cursor, 0,
-            result.endLocations[0]);
+    int target_cursor = temp_start;
+    int query_cursor = comp_start;
 
-    query_cursor = cursors.first;
-    target_cursor = cursors.second;
-    int start_alignment_position = alignment_start_end.first;
-    int end_alignment_position = alignment_start_end.second;
-
-    // TODO: its overkill having this function make this decision...
-    const int kMinTrimmedAlignmentLength = 50;
-    const bool consensus_possible =
-            (start_alignment_position < end_alignment_position) &&
-            ((end_alignment_position - start_alignment_position) > kMinTrimmedAlignmentLength) &&
-            alignment_error_rate < 0.2;
-
-    if (!consensus_possible) {
-        // There wasn't a good enough match -- return early with an empty read.
-        edlibFreeAlignResult(result);
-        ++m_num_discarded_pairs;
-        return read;
-    }
+    int start_alignment_position = result.startLocations[0];
+    int end_alignment_position = result.endLocations[0];
 
     // Edlib doesn't provide named constants for alignment array entries, so do it here.
     static constexpr unsigned char kAlignMatch = 0;
@@ -282,30 +267,25 @@ std::shared_ptr<dorado::Read> StereoDuplexEncoderNode::stereo_encode(
 
     edlibFreeAlignResult(result);
 
+    m_num_encoded_pairs++;
+
     return read;
 }
 
 void StereoDuplexEncoderNode::worker_thread() {
     Message message;
-    while (m_work_queue.try_pop(message)) {
+    while (get_input_message(message)) {
         if (!std::holds_alternative<std::shared_ptr<ReadPair>>(message)) {
             send_message_to_sink(std::move(message));
             continue;
         }
 
         auto read_pair = std::get<std::shared_ptr<ReadPair>>(message);
-        std::shared_ptr<Read> stereo_encoded_read =
-                stereo_encode(read_pair->read_1, read_pair->read_2);
+        std::shared_ptr<Read> stereo_encoded_read = stereo_encode(
+                read_pair->read_1, read_pair->read_2, read_pair->read_1_start,
+                read_pair->read_1_end, read_pair->read_2_start, read_pair->read_2_end);
 
-        if (stereo_encoded_read->raw_data.ndimension() ==
-            2) {  // 2 dims for stereo encoding, 1 for simplex
-            send_message_to_sink(
-                    stereo_encoded_read);  // Stereo-encoded read created, send it to sink
-        } else {
-            // announce to downstream that we rejected a candidate pair
-            --read_pair->read_1->num_duplex_candidate_pairs;
-            send_message_to_sink(CandidatePairRejectedMessage{});
-        }
+        send_message_to_sink(stereo_encoded_read);  // Stereo-encoded read created, send it to sink
     }
 }
 
@@ -340,7 +320,7 @@ void StereoDuplexEncoderNode::restart() {
 
 stats::NamedStats StereoDuplexEncoderNode::sample_stats() const {
     stats::NamedStats stats = m_work_queue.sample_stats();
-    stats["discarded_pairs"] = m_num_discarded_pairs;
+    stats["encoded_pairs"] = m_num_encoded_pairs;
     return stats;
 }
 
