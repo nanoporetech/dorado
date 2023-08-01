@@ -276,10 +276,10 @@ if (USING_STATIC_TORCH_LIB)
 
         # Some CUDA lib symbols have internal linkage, so they must be part of the helper lib too
         if (TARGET CUDA::cupti_static)
-            set(ont_cuda_internal_linkage_libs CUDA::culibos CUDA::cupti_static)
+            set(ont_cuda_internal_linkage_libs CUDA::culibos CUDA::cupti_static CUDA::cudart_static)
         else()
             # CUDA::cupti appears to be static if CUDA::cupti_static doesn't exist
-            set(ont_cuda_internal_linkage_libs CUDA::culibos CUDA::cupti)
+            set(ont_cuda_internal_linkage_libs CUDA::culibos CUDA::cupti CUDA::cudart_static)
         endif()
 
         # Setup differences between platforms
