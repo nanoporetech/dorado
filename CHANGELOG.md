@@ -2,6 +2,25 @@
 
 All notable changes to Dorado will be documented in this file.
 
+# [0.3.3] (3 Aug 2023)
+
+This release of Dorado introduces: duplex pairing improvements - improve duplex yields; reduction in memory requirement; improved mod base performance on M1; statically linked binaries - user requires very few dependencies to install
+
+* bcdeb8f0093bc5c01ef42befecda7f524b894aee - Static builds of (macOS|Linux)+(arm|x64)
+* 65b8b8a81a202d0166ca2d0ea4724941aa3102a4 - Metal modbases: fix slow mod base calling on macOS
+* e14a7e61a6a3e60c0516342df7516b0ba5b92e62 - Improve Metal command buffer error handling
+* ca1d191ffba5cc1397e4b704e3dab1014fa07175 - [ReadSplit] Fix read ids for non-split reads
+* 5d9238a809656d6fab59713c7ab8346790efd2cc - Revamp AsyncQueue interface
+* 3f0af88fa77dabd19a56245be2892b61750a297d - Changed uuid to be based on subread id, instead of split point.
+* 6a3ccb6af5a56527571bf4938447bf85ab5c38e5 - Removed RNA003 model
+* 1a94facbad52db0908eae3a7fe3242d525cbd6da - Fast5 stats
+* 0abea5fb58545a679fcc1638ababe2a866789921 - 5mCG@v0.1 medmad compatible models
+* eec657d113aa12ec2819fd6d597c4691e03ec374 - Prefer static libs to dynamic ones
+* 072ed964276fc8e26f0a705c89055cece900edbf - Add pipeline restart capability and pairing cache retention option to termination
+* efba0c874716d5adb213f7f39ecaf48c9e150f56 - mlhub single read eval triggers
+* 01acbd5628948bf934985777bcade6bf51103200 - Stop progress bar cutting out near the end of the run
+* 211968cd38fee6fa7476a4033a2b59ca37b19199 - Add suppression for false-positive vptr issues in older Xcodes
+
 
 # [0.3.2] (13 Jul 2023)
 
