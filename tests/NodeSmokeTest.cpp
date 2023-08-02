@@ -64,20 +64,21 @@ private:
     std::size_t m_num_reads = 200;
     using ReadMutator = std::function<void(std::unique_ptr<dorado::Read>& read)>;
     ReadMutator m_read_mutator;
+    bool m_pipeline_restart = false;
 
 protected:
     void set_num_reads(std::size_t num_reads) { m_num_reads = num_reads; }
-
     void set_read_mutator(ReadMutator mutator) { m_read_mutator = std::move(mutator); }
+    void set_pipeline_restart(bool restart) { m_pipeline_restart = restart; }
 
     template <class NodeType, class... Args>
-    void run_smoke_test(bool pipeline_restart, Args&&... args) {
+    void run_smoke_test(Args&&... args) {
         dorado::PipelineDescriptor pipeline_desc;
         std::vector<dorado::Message> messages;
         auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
         pipeline_desc.add_node<NodeType>({sink}, std::forward<Args>(args)...);
         auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
-        if (pipeline_restart) {
+        if (m_pipeline_restart) {
             pipeline->terminate(dorado::DefaultFlushOptions());
             pipeline->restart();
         }
@@ -153,6 +154,8 @@ DEFINE_TEST(NodeSmokeTestRead, "ScalerNode") {
     auto pipeline_restart = GENERATE(false, true);
     CAPTURE(pipeline_restart);
 
+    set_pipeline_restart(pipeline_restart);
+
     // Scaler node expects i16 input
     set_read_mutator([](std::unique_ptr<dorado::Read>& read) {
         read->raw_data = read->raw_data.to(torch::kI16);
@@ -163,7 +166,7 @@ DEFINE_TEST(NodeSmokeTestRead, "ScalerNode") {
     config.quantile_b = 0.9;
     config.shift_multiplier = 0.51;
     config.scale_multiplier = 0.53;
-    run_smoke_test<dorado::ScalerNode>(pipeline_restart, config, 2);
+    run_smoke_test<dorado::ScalerNode>(config, 2);
 }
 
 DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
@@ -171,6 +174,8 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
     CAPTURE(gpu);
     auto pipeline_restart = GENERATE(false, true);
     CAPTURE(pipeline_restart);
+
+    set_pipeline_restart(pipeline_restart);
 
     const int kBatchTimeoutMS = 100;
     auto const& default_params = dorado::utils::default_parameters;
@@ -211,7 +216,7 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
                 model_config, "cpu", default_params.chunksize, batch_size));
     }
 
-    run_smoke_test<dorado::BasecallerNode>(pipeline_restart, std::move(runners),
+    run_smoke_test<dorado::BasecallerNode>(std::move(runners),
                                            dorado::utils::default_parameters.overlap,
                                            kBatchTimeoutMS, model_name);
 }
@@ -221,6 +226,8 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
     CAPTURE(gpu);
     auto pipeline_restart = GENERATE(false, true);
     CAPTURE(pipeline_restart);
+
+    set_pipeline_restart(pipeline_restart);
 
     auto const& default_params = dorado::utils::default_parameters;
     char const remora_model_name[] = "dna_r10.4.1_e8.2_400bps_fast@v4.2.0_5mCG_5hmCG@v2";
@@ -285,15 +292,18 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
         std::shuffle(std::next(read->moves.begin()), read->moves.end(), m_rng);
     });
 
-    run_smoke_test<dorado::ModBaseCallerNode>(pipeline_restart, std::move(remora_runners), 2,
-                                              model_stride);
+    run_smoke_test<dorado::ModBaseCallerNode>(std::move(remora_runners), 2, model_stride);
 }
 
 DEFINE_TEST(NodeSmokeTestBam, "ReadToBamType") {
     auto emit_moves = GENERATE(true, false);
     auto rna = GENERATE(true, false);
+    auto pipeline_restart = GENERATE(false, true);
     CAPTURE(emit_moves);
     CAPTURE(rna);
+    CAPTURE(pipeline_restart);
+
+    set_pipeline_restart(pipeline_restart);
 
     run_smoke_test<dorado::ReadToBamType>(emit_moves, rna, 2,
                                           dorado::utils::default_parameters.methylation_threshold);
