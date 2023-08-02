@@ -31,7 +31,7 @@
 namespace {
 
 // Fixture for smoke testing nodes
-template <typename MessageT>
+template <typename... MessageTs>
 class NodeSmokeTestBase {
 protected:
     std::minstd_rand m_rng{Catch::rngSeed()};
@@ -91,6 +91,11 @@ protected:
         }
         // Wait for them to complete.
         pipeline.reset();
+        // Check the message types match
+        for (auto& message : messages) {
+            CAPTURE(message.index());
+            CHECK((std::holds_alternative<MessageTs>(message) || ...));
+        }
     }
 };
 
