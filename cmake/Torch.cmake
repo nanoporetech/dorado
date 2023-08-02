@@ -275,11 +275,17 @@ if (USING_STATIC_TORCH_LIB)
         endif()
 
         # Some CUDA lib symbols have internal linkage, so they must be part of the helper lib too
+        set(ont_cuda_internal_linkage_libs CUDA::culibos CUDA::cudart_static)
         if (TARGET CUDA::cupti_static)
-            set(ont_cuda_internal_linkage_libs CUDA::culibos CUDA::cupti_static CUDA::cudart_static)
-        else()
+            list(APPEND ont_cuda_internal_linkage_libs CUDA::cupti_static)
+        elseif(TARGET CUDA::cupti)
             # CUDA::cupti appears to be static if CUDA::cupti_static doesn't exist
-            set(ont_cuda_internal_linkage_libs CUDA::culibos CUDA::cupti CUDA::cudart_static)
+            list(APPEND ont_cuda_internal_linkage_libs CUDA::cupti)
+        elseif(EXISTS ${CUDAToolkit_TARGET_DIR}/extras/CUPTI/lib64/libcupti_static.a)
+            # CMake sometimes can't find cupti for reasons which are not fully clear
+            list(APPEND ont_cuda_internal_linkage_libs ${CUDAToolkit_TARGET_DIR}/extras/CUPTI/lib64/libcupti_static.a)
+        else()
+            message(FATAL_ERROR "Can't find CUPTI")
         endif()
 
         # Setup differences between platforms
