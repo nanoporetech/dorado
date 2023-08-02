@@ -309,13 +309,13 @@ The POD5 documentation can be found [here](https://pod5-file-format.readthedocs.
 
 
 ```
-pip install pod5
+$ pip install pod5
 ```
 
 Then run `pod5 view` to generate a table containing information to split on specifically, the "channel" information.
 
 ```
-pod5 view /path/to/your/dataset/ --include "read_id, channel" --output summary.tsv
+$ pod5 view /path/to/your/dataset/ --include "read_id, channel" --output summary.tsv
 ```
 
 This will create "summary.tsv" file which should look like:
@@ -329,16 +329,16 @@ read_id channel
 
 Now run `pod5 subset` to copy records from your source data into outputs per-channel. This might take some time depending on the size of your dataset
 ```
-pod5 subset /path/to/your/dataset/ --summary summary.tsv --columns channel --output split_by_channel
+$ pod5 subset /path/to/your/dataset/ --summary summary.tsv --columns channel --output split_by_channel
 ```
 
 The command above will create the output directory `split_by_channel` and write into it one pod5 file per unique channel.  Duplex basecalling these split reads will now be much faster.
 
 ### Running Duplex Basecalling in a Distributed Fashion
 
-If running duplex basecalling in a distributed fashion (e.g on a SLURM or Kubernetes cluster) it is important to split POD5 files as described above. The reason is that duplex basecalling requires aggregation of reads from across a whole sequecing run, which will be distriubuted over multiple POD5 files.
+If running duplex basecalling in a distributed fashion (e.g. on a SLURM or Kubernetes cluster) it is important to split POD5 files as described above. The reason is that duplex basecalling requires aggregation of reads from across a whole sequencing run, which will be distributed over multiple POD5 files.
 The splitting strategy described above ensures that all reads which need to be aggregated are in the same POD5 file. Once the split is performed one can execute multiple jobs against smaller subsets of POD5 (e.g one job per 100 channels). This will allow basecalling to be distributed across nodes on a cluster. 
-This will generate multiple BAMs which can be merged. This apporach also offers some resilience as if any job fails it can be restarted without having to re-run basecaling against the entire dataset.
+This will generate multiple BAMs which can be merged. This apporach also offers some resilience as if any job fails it can be restarted without having to re-run basecalling against the entire dataset.
 
 ### GPU Out of Memory Errors
 
