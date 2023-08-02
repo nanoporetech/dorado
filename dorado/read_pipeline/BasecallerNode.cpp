@@ -20,8 +20,9 @@ using namespace torch::indexing;
 namespace dorado {
 
 void BasecallerNode::input_worker_thread() {
-    Message message;
+    torch::InferenceMode inference_mode_guard;
 
+    Message message;
     while (get_input_message(message)) {
         // If this message isn't a read, just forward it to the sink.
         if (!std::holds_alternative<std::shared_ptr<Read>>(message)) {
@@ -108,6 +109,8 @@ void BasecallerNode::basecall_current_batch(int worker_id) {
 }
 
 void BasecallerNode::working_reads_manager() {
+    torch::InferenceMode inference_mode_guard;
+
     std::shared_ptr<Chunk> chunk;
     while (m_processed_chunks.try_pop(chunk) == utils::AsyncQueueStatus::Success) {
         nvtx3::scoped_range loop{"working_reads_manager"};
@@ -146,6 +149,8 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
     // Model execution creates GPU-related autorelease objects.
     utils::ScopedAutoReleasePool autorelease_pool;
 #endif
+    torch::InferenceMode inference_mode_guard;
+
     auto last_chunk_reserve_time = std::chrono::system_clock::now();
     int batch_size = m_model_runners[worker_id]->batch_size();
     std::shared_ptr<Chunk> chunk;

@@ -8,6 +8,7 @@
 namespace dorado {
 
 void ReadToBamType::worker_thread() {
+    torch::InferenceMode inference_mode_guard;
     m_active_threads++;
 
     Message message;
