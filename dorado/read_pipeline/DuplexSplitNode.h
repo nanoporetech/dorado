@@ -96,7 +96,6 @@ private:
 
     const DuplexSplitSettings m_settings;
     std::vector<std::pair<std::string, SplitFinderF>> m_split_finders;
-    std::atomic<size_t> m_active{0};
     const int m_num_worker_threads;
     std::vector<std::unique_ptr<std::thread>> m_worker_threads;
 };

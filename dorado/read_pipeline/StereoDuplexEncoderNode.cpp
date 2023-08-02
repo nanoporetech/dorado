@@ -273,6 +273,8 @@ std::shared_ptr<dorado::Read> StereoDuplexEncoderNode::stereo_encode(
 }
 
 void StereoDuplexEncoderNode::worker_thread() {
+    torch::InferenceMode inference_mode_guard;
+
     Message message;
     while (get_input_message(message)) {
         if (!std::holds_alternative<std::shared_ptr<ReadPair>>(message)) {
