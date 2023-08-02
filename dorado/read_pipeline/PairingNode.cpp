@@ -206,6 +206,8 @@ void PairingNode::pair_list_worker_thread() {
 }
 
 void PairingNode::pair_generating_worker_thread(int tid) {
+    torch::InferenceMode inference_mode_guard;
+
     auto compare_reads_by_time = [](const std::shared_ptr<Read>& read1,
                                     const std::shared_ptr<Read>& read2) {
         return read1->start_time_ms < read2->start_time_ms;

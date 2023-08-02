@@ -541,9 +541,9 @@ std::vector<std::shared_ptr<Read>> DuplexSplitNode::split(std::shared_ptr<Read> 
 }
 
 void DuplexSplitNode::worker_thread() {
-    m_active++;  // Track active threads.
-    Message message;
+    torch::InferenceMode inference_mode_guard;
 
+    Message message;
     while (get_input_message(message)) {
         // If this message isn't a read, just forward it to the sink.
         if (!m_settings.enabled || !std::holds_alternative<std::shared_ptr<Read>>(message)) {
@@ -558,8 +558,6 @@ void DuplexSplitNode::worker_thread() {
             send_message_to_sink(std::move(subread));
         }
     }
-
-    --m_active;
 }
 
 DuplexSplitNode::DuplexSplitNode(DuplexSplitSettings settings,
