@@ -100,6 +100,11 @@ void setup(std::vector<std::string> args,
 
     auto read_list = utils::load_read_list(read_list_file_path);
 
+    if (!DataLoader::is_read_data_present(data_path, recursive_file_loading)) {
+        std::string err = "No POD5 or FAST5 data found in path: " + data_path;
+        throw std::runtime_error(err);
+    }
+
     // Check sample rate of model vs data.
     auto data_sample_rate = DataLoader::get_sample_rate(data_path, recursive_file_loading);
     auto model_sample_rate = get_model_sample_rate(model_path);

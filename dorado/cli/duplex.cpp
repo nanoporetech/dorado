@@ -242,6 +242,12 @@ int duplex(int argc, char* argv[]) {
             model = model_path.filename().string();
             auto model_config = load_crf_model_config(model_path);
 
+            if (!DataLoader::is_read_data_present(reads, recursive_file_loading)) {
+                std::string err = "No POD5 or FAST5 data found in path: " + reads;
+                throw std::runtime_error(err);
+            }
+
+            // Check sample rate of model vs data.
             auto data_sample_rate = DataLoader::get_sample_rate(reads, recursive_file_loading);
             auto model_sample_rate = get_model_sample_rate(model_path);
             auto skip_model_compatibility_check =

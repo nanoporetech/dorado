@@ -439,6 +439,29 @@ std::unordered_map<std::string, ReadGroup> DataLoader::load_read_groups(
     return read_groups;
 }
 
+bool DataLoader::is_read_data_present(std::string data_path, bool recursive_file_loading) {
+    auto check_directory = [&](const auto& iterator_fn) {
+        for (const auto& entry : iterator_fn(data_path)) {
+            std::string ext = std::filesystem::path(entry).extension().string();
+            std::transform(ext.begin(), ext.end(), ext.begin(),
+                           [](unsigned char c) { return std::tolower(c); });
+            if (ext == ".pod5" || ext == ".fast5") {
+                return true;
+            }
+        }
+        return false;
+    };
+
+    if (recursive_file_loading) {
+        return check_directory([](const auto& path) {
+            return std::filesystem::recursive_directory_iterator(path);
+        });
+    } else {
+        return check_directory(
+                [](const auto& path) { return std::filesystem::directory_iterator(path); });
+    }
+}
+
 uint16_t DataLoader::get_sample_rate(std::string data_path, bool recursive_file_loading) {
     std::optional<uint16_t> sample_rate = std::nullopt;
 
