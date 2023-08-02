@@ -282,7 +282,7 @@ BasecallerNode::BasecallerNode(std::vector<Runner> model_runners,
 void BasecallerNode::start_threads() {
     m_input_worker = std::make_unique<std::thread>([this] { input_worker_thread(); });
     const size_t num_workers = m_model_runners.size();
-    m_working_reads_managers.resize(num_workers / 2);
+    m_working_reads_managers.resize(std::max(size_t{1}, num_workers / 2));
     for (int i = 0; i < m_working_reads_managers.size(); i++) {
         m_working_reads_managers[i] = std::thread([this] { working_reads_manager(); });
     }
