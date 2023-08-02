@@ -5,6 +5,8 @@
 namespace dorado {
 
 void ReadFilterNode::worker_thread() {
+    torch::InferenceMode inference_mode_guard;
+
     Message message;
     while (get_input_message(message)) {
         // If this message isn't a read, just forward it to the sink.

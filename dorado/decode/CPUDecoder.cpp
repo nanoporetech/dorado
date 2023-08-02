@@ -109,6 +109,8 @@ std::vector<DecodedChunk> CPUDecoder::beam_search(const torch::Tensor& scores,
     for (int i = 0; i < num_threads; ++i) {
         threads.emplace_back(new std::thread(
                 [&](int i) {
+                    torch::InferenceMode inference_mode_guard;
+
                     int t_first_chunk =
                             i * chunks_per_thread + std::min(i, num_threads_with_one_more_chunk);
                     int t_num_chunks = chunks_per_thread + int(i < num_threads_with_one_more_chunk);
