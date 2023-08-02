@@ -115,6 +115,7 @@ std::vector<BamPtr> BarcoderNode::barcode(bam1_t* irecord) {
     auto bc = (bc_res.adapter_name == UNCLASSIFIED_BARCODE)
                       ? UNCLASSIFIED_BARCODE
                       : bc_res.kit + "_" + bc_res.adapter_name;
+    spdlog::debug("BC: {}", bc);
     bam_aux_append(irecord, "BC", 'Z', bc.length() + 1, (uint8_t*)bc.c_str());
     if (bc != UNCLASSIFIED_BARCODE) {
         m_matched++;
@@ -605,20 +606,22 @@ ScoreResults Barcoder::find_best_adapter(const std::string& read_seq,
     spdlog::debug("Scores: {}", d);
     const float kThresBc = 0.7f;
     const float kThresFlank = 0.5f;
-    const float kMargin = 0.2f;
+    const float kMargin = 0.25f;
     //if (best_score != scores.end() && best_score->score >= kThresBc) {
-    if (best_score != scores.end()) {  // && best_score->score >= kThresBc) {
-        if (best_score->flank_score >= 0.7 && best_score->score >= 0.66) {
-            return *best_score;
-        } else if (best_score->score >= 0.7 && best_score->flank_score >= 0.6) {
-            return *best_score;
-        } else if (best_score->score - second_best_score->score >= kMargin) {
-            return *best_score;
+    if (best_score != scores.end()) {
+        if (best_score->score - second_best_score->score >= 0.1f) {
+            if (best_score->flank_score >= 0.7 && best_score->score >= 0.6) {
+                return *best_score;
+            } else if (best_score->score >= 0.7 && best_score->flank_score >= 0.6) {
+                return *best_score;
+            } else if (best_score->score - second_best_score->score >= kMargin) {
+                return *best_score;
+            }
         }
     }
 
     // If nothing is found, report as unclassified.
-    return {-1.f, -1.f, -1.f, -1.f, -1.f, -1.f, UNCLASSIFIED_BARCODE, UNCLASSIFIED_BARCODE};
+    return UNCLASSIFIED;
 }
 
 }  // namespace dorado

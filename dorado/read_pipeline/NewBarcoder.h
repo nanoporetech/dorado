@@ -47,6 +47,9 @@ struct ScoreResults {
     std::string kit;
 };
 
+const ScoreResults UNCLASSIFIED = {-1.f, -1.f, -1.f,           -1.f,
+                                   -1.f, -1.f, "unclassified", "unclassified"};
+
 static const std::unordered_map<std::string, KitInfo> kit_info = {
         {"SQK-RBK004",
          {false,
