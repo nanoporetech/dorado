@@ -2,7 +2,6 @@
 
 #include "../nn/CRFModel.h"
 
-#include <nvtx3/nvtx3.hpp>
 #include <torch/torch.h>
 
 #include <array>
@@ -41,47 +40,6 @@ void matmul_f16(torch::Tensor const &A, torch::Tensor const &B, torch::Tensor &C
 
 // Deal with a result from a cudaGetLastError call.  May raise an exception to provide information to the user.
 void handle_cuda_result(int cuda_result);
-
-#if CUDA_PROFILE_TO_CERR
-// Times range and prints it to console so you don't have to generate a QDREP file to perform
-// basic profiling
-class ScopedProfileRange {
-public:
-    explicit ScopedProfileRange(const char *label) : m_nvtx_range(label), m_label(label) {
-        m_stream = at::cuda::getCurrentCUDAStream().stream();
-        handle_cuda_result(cudaEventCreate(&m_start));
-        handle_cuda_result(cudaEventRecord(m_start, m_stream));
-        m_active = true;
-    }
-
-    ~ScopedProfileRange() { finish(); }
-
-private:
-    void finish() {
-        if (!m_active) {
-            return;
-        }
-        cudaEvent_t stop;
-        handle_cuda_result(cudaEventCreate(&stop));
-        handle_cuda_result(cudaEventRecord(stop, m_stream));
-        handle_cuda_result(cudaEventSynchronize(stop));
-        float timeMs = 0.0f;
-        handle_cuda_result(cudaEventElapsedTime(&timeMs, m_start, stop));
-        handle_cuda_result(cudaEventDestroy(m_start));
-        handle_cuda_result(cudaEventDestroy(stop));
-        std::cerr << "[" << m_label << " " << timeMs << " ms]" << std::endl;
-        m_active = false;
-    }
-
-    nvtx3::scoped_range m_nvtx_range;
-    const char *m_label;
-    cudaStream_t m_stream;
-    cudaEvent_t m_start;
-    bool m_active;
-};
-#else  // if CUDA_PROFILE_TO_CERR
-using ScopedProfileRange = nvtx3::scoped_range;
-#endif
 
 namespace details {
 // Exposed in the header for testability

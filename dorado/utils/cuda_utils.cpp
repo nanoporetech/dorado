@@ -247,7 +247,7 @@ void handle_cuda_result(int cuda_result) {
                 std::string("Dorado cannot support the CUDA device being used,"
                             " as the compute capability version is incompatible."));
     } else {
-        throw std::runtime_error(std::string("Cuda error: {}") +
+        throw std::runtime_error(std::string("Cuda error: ") +
                                  cudaGetErrorString(cudaError_t(cuda_result)));
     }
 }
