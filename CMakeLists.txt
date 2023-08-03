@@ -18,7 +18,7 @@ if(WIN32)
   message(STATUS "vs platform: ${CMAKE_VS_PLATFORM_NAME}")
 endif()
 
-if (APPLE)
+if (APPLE AND NOT ECM_ENABLE_SANITIZERS MATCHES "thread")
     # Prefer static libs if they exist so that we don't run into issues
     # linking to dynamic libraries that live in brew.
     list(PREPEND CMAKE_FIND_LIBRARY_SUFFIXES ".a")
