@@ -242,7 +242,6 @@ target_include_directories(dorado_lib
         ${CMAKE_CURRENT_SOURCE_DIR}/dorado
         ${KOI_INCLUDE}
         ${POD5_INCLUDE}
-        ${DORADO_3RD_PARTY}/ont-minimap2/src/3rdparty/minimap2
 )
 # 3rdparty libs should be considered SYSTEM headers
 target_include_directories(dorado_lib
@@ -260,6 +259,7 @@ target_include_directories(dorado_lib
         ${DORADO_3RD_PARTY}/NVTX/c/include
         ${DORADO_3RD_PARTY}/spdlog/include
         ${DORADO_3RD_PARTY}/indicators/include
+        ${DORADO_3RD_PARTY}/ont-minimap2/src/3rdparty/minimap2
 )
 
 enable_testing()
