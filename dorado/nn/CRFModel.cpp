@@ -119,7 +119,7 @@ static LstmMode get_cuda_lstm_mode(int layer_idx, int layer_size) {
 class WorkingMemory {
     // This may be overly conservative, but all CUDA allocation functions are guaranteed to
     // return 256-byte aligned pointers (even though GPU cache lines are at most 128 bytes).
-    static constexpr int ALIGNMENT = 256;
+    static constexpr int64_t ALIGNMENT = 256;
 
     int64_t tensor_bytes(torch::IntArrayRef sizes, torch::Dtype dtype) {
         auto elems = c10::multiply_integers(sizes);
@@ -137,9 +137,10 @@ public:
         bool current_is_front =
                 current.defined() && current.data_ptr() == backing_tensor.data_ptr();
         auto elems = c10::multiply_integers(sizes);
-        auto bt_dtype = backing_tensor.flatten().view(dtype);
-        auto start_pos = current_is_front ? ((bt_dtype.numel() - elems) / ALIGNMENT) * ALIGNMENT
-                                          : int64_t(0);
+        auto bt_dtype = backing_tensor.view(dtype);
+        auto start_pos = current_is_front
+                                 ? (reservation_bytes - new_bytes) / torch::elementSize(dtype)
+                                 : int64_t(0);
         auto new_tensor = bt_dtype.slice(0, start_pos, start_pos + elems).view(sizes);
         if (make_current) {
             current_bytes = new_bytes;
@@ -162,8 +163,10 @@ public:
     }
 
     void allocate_backing_tensor(torch::Device dev) {
-        backing_tensor = torch::empty({reservation_bytes},
-                                      torch::TensorOptions().device(dev).dtype(torch::kI8));
+        // Using kF16 here because the libtorch version on TX2 doesn't support `Tensor::view()`
+        // with a dtype of a different size, and all buffers are kF16 on TX2.
+        backing_tensor = torch::empty({reservation_bytes / 2},
+                                      torch::TensorOptions().device(dev).dtype(torch::kF16));
         current_sizes.clear();
         current_bytes = 0;
     }
