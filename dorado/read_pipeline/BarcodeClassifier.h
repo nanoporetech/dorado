@@ -484,9 +484,8 @@ private:
     size_t m_threads{1};
     std::atomic<size_t> m_active{0};
     std::vector<std::unique_ptr<std::thread>> m_workers;
-    std::atomic<int> m_matched{0};
+    std::atomic<int> m_num_records{0};
     std::atomic<int> m_fp{0};
-    std::atomic<int64_t> m_bases{0};
     std::string m_kit_name;
     Barcoder m_barcoder;
 

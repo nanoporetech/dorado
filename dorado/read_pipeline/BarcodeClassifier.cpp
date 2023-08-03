@@ -1,4 +1,4 @@
-#include "NewBarcoder.h"
+#include "BarcodeClassifier.h"
 
 #include "3rdparty/edlib/edlib/include/edlib.h"
 #include "htslib/sam.h"
@@ -84,11 +84,7 @@ void BarcoderNode::restart() {
     start_threads();
 }
 
-BarcoderNode::~BarcoderNode() {
-    terminate_impl();
-    spdlog::info("> Barcoded: {}", m_matched.load());
-    spdlog::info("> Bases Processed: {}", m_bases.load());
-}
+BarcoderNode::~BarcoderNode() { terminate_impl(); }
 
 void BarcoderNode::worker_thread(size_t tid) {
     Message message;
@@ -109,7 +105,6 @@ std::vector<BamPtr> BarcoderNode::barcode(bam1_t* irecord) {
     auto seqlen = irecord->core.l_qseq;
     auto bseq = bam_get_seq(irecord);
     std::string seq = utils::convert_nt16_to_str(bseq, seqlen);
-    m_bases += seq.length();
 
     auto bc_res = m_barcoder.barcode(seq);
     auto bc = (bc_res.adapter_name == UNCLASSIFIED_BARCODE)
@@ -117,15 +112,17 @@ std::vector<BamPtr> BarcoderNode::barcode(bam1_t* irecord) {
                       : bc_res.kit + "_" + bc_res.adapter_name;
     spdlog::debug("BC: {}", bc);
     bam_aux_append(irecord, "BC", 'Z', bc.length() + 1, (uint8_t*)bc.c_str());
-    if (bc != UNCLASSIFIED_BARCODE) {
-        m_matched++;
-    }
     results.push_back(BamPtr(bam_dup1(irecord)));
 
+    m_num_records++;
     return results;
 }
 
-stats::NamedStats BarcoderNode::sample_stats() const { return stats::from_obj(m_work_queue); }
+stats::NamedStats BarcoderNode::sample_stats() const {
+    auto stats = stats::from_obj(m_work_queue);
+    stats["num_barcodes_demuxed"] = m_num_records.load();
+    return stats;
+}
 
 Barcoder::Barcoder(const std::vector<std::string>& kit_names) {
     m_adapter_sequences = generate_adapter_sequence(kit_names);

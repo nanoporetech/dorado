@@ -56,7 +56,7 @@ int main(int argc, char* argv[]) {
     const std::map<std::string, entry_ptr> subcommands = {
             {"basecaller", &dorado::basecaller}, {"duplex", &dorado::duplex},
             {"download", &dorado::download},     {"aligner", &dorado::aligner},
-            {"summary", &dorado::summary},       {"barcoder", &dorado::barcoder},
+            {"summary", &dorado::summary},       {"demux", &dorado::barcoder},
     };
 
     std::vector<std::string> arguments(argv + 1, argv + argc);
