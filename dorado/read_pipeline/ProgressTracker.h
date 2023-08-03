@@ -67,7 +67,7 @@ public:
         if (m_num_barcodes_demuxed > 0) {
             std::ostringstream rate_str;
             rate_str << std::scientific << m_num_barcodes_demuxed / (duration / 1000.0);
-            spdlog::info("> {} Barcodes demuxed @ classifications/s: {}", m_num_barcodes_demuxed,
+            spdlog::info("> {} reads demuxed @ classifications/s: {}", m_num_barcodes_demuxed,
                          rate_str.str());
         }
     }
@@ -86,8 +86,7 @@ public:
             return 0.;
         };
 
-        //m_num_simplex_reads_written = fetch_stat("HtsWriter.unique_simplex_reads_written");
-        m_num_simplex_reads_written = fetch_stat("BarcodeDemuxer.demuxed_reads_written");
+        m_num_simplex_reads_written = fetch_stat("HtsWriter.unique_simplex_reads_written");
 
         m_num_simplex_reads_filtered = fetch_stat("ReadFilterNode.simplex_reads_filtered");
         m_num_simplex_bases_filtered = fetch_stat("ReadFilterNode.simplex_bases_filtered");

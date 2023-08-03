@@ -1,17 +1,13 @@
 #include "BarcodeDemuxer.h"
 
 #include "htslib/bgzf.h"
-#include "htslib/kroundup.h"
-#include "htslib/sam.h"
 #include "read_pipeline/ReadPipeline.h"
 #include "utils/sequence_utils.h"
-
-#include <indicators/progress_bar.hpp>
-#include <spdlog/spdlog.h>
+//#include "htslib/kroundup.h"
+#include "htslib/sam.h"
 
 #include <stdexcept>
 #include <string>
-#include <unordered_set>
 
 namespace dorado {
 
@@ -60,19 +56,26 @@ void BarcodeDemuxer::worker_thread() {
     }
 }
 
+// Each barcode is mapped to it's own file. Depending
+// on the barcode assigned to each read, the read is
+// written to the corresponding barcode file.
 int BarcodeDemuxer::write(bam1_t* const record) {
-    // track stats
-    // Fetch the barcode name
     assert(m_header);
+    // Fetch the barcode name.
     std::string bc(bam_aux2Z(bam_aux_get(record, "BC")));
+    // Check of existence of file for that barcode.
     auto res = m_files.find(bc);
     htsFile* file = nullptr;
     if (res != m_files.end()) {
         file = res->second;
     } else {
+        // For new barcodes, create a new HTS file (either fastq or BAM).
         std::string filename = bc + (m_write_fastq ? ".fastq" : ".bam");
         auto filepath = m_output_dir / filename;
         file = hts_open(filepath.c_str(), (m_write_fastq ? "wf" : "wb"));
+        if (!file) {
+            throw std::runtime_error("Failed to open new HTS output file at " + filepath.string());
+        }
         if (file->format.compression == bgzf) {
             auto res = bgzf_mt(file->fp.bgzf, m_threads, 128);
             if (res < 0) {
