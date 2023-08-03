@@ -2,7 +2,6 @@
 #include "read_pipeline/BarcodeClassifier.h"
 #include "read_pipeline/BarcodeDemuxer.h"
 #include "read_pipeline/HtsReader.h"
-#include "read_pipeline/HtsWriter.h"
 #include "read_pipeline/ProgressTracker.h"
 #include "utils/basecaller_utils.h"
 #include "utils/cli_utils.h"
@@ -28,8 +27,7 @@ namespace dorado {
 namespace {
 
 void add_pg_hdr(sam_hdr_t* hdr) {
-    sam_hdr_add_line(hdr, "PG", "ID", "barcoder", "PN", "dorado", "VN", DORADO_VERSION, "DS",
-                     MM_VERSION, NULL);
+    sam_hdr_add_line(hdr, "PG", "ID", "demux", "PN", "dorado", "VN", DORADO_VERSION, NULL);
 }
 
 }  // anonymous namespace
@@ -41,6 +39,7 @@ int barcoder(int argc, char* argv[]) {
     parser.add_description("Barcoding tool. Users need to pass the kit name.");
     parser.add_argument("reads").help("any HTS format.").nargs(argparse::nargs_pattern::any);
     parser.add_argument("--output-dir").help("Output folder for demuxed reads.").required();
+    parser.add_argument("--kit_name").help("Barcoding kit name").required();
     parser.add_argument("-t", "--threads")
             .help("number of threads for barcoding and BAM writing.")
             .default_value(0)
@@ -53,7 +52,6 @@ int barcoder(int argc, char* argv[]) {
             .help("A file with a newline-delimited list of reads to basecall. If not provided, all "
                   "reads will be basecalled")
             .default_value(std::string(""));
-    parser.add_argument("--kit_name").help("kit name");
     parser.add_argument("-v", "--verbose").default_value(false).implicit_value(true);
     parser.add_argument("--emit-fastq")
             .help("Output in fastq format.")
@@ -70,7 +68,6 @@ int barcoder(int argc, char* argv[]) {
     }
 
     if (parser.get<bool>("--verbose")) {
-        mm_verbose = 3;
         utils::SetDebugLogging();
     }
 
@@ -83,10 +80,10 @@ int barcoder(int argc, char* argv[]) {
     // The input thread is the total number of threads to use for dorado
     // barcoding. Heuristically use 10% of threads for BAM generation and
     // rest for barcoding. Empirically this shows good perf.
-    int barcoder_threads, writer_threads;
-    std::tie(barcoder_threads, writer_threads) =
+    auto [barcoder_threads, demux_writer_threads] =
             utils::aligner_writer_thread_allocation(threads, 0.1f);
-    spdlog::debug("> barcoding threads {}, writer threads {}", barcoder_threads, writer_threads);
+    spdlog::debug("> barcoding threads {}, writer threads {}", barcoder_threads,
+                  demux_writer_threads);
 
     auto read_list = utils::load_read_list(parser.get<std::string>("--read-ids"));
 
@@ -108,13 +105,14 @@ int barcoder(int argc, char* argv[]) {
     add_pg_hdr(header);
 
     PipelineDescriptor pipeline_desc;
-    auto hts_writer = pipeline_desc.add_node<BarcodeDemuxer>({}, output_dir, writer_threads, 0,
-                                                             parser.get<bool>("--emit-fastq"));
+    auto demux_writer = pipeline_desc.add_node<BarcodeDemuxer>({}, output_dir, demux_writer_threads,
+                                                               0, parser.get<bool>("--emit-fastq"));
     std::vector<std::string> kit_names;
     if (parser.present("--kit_name")) {
         kit_names.push_back(parser.get<std::string>("--kit_name"));
     };
-    auto barcoder = pipeline_desc.add_node<BarcoderNode>({hts_writer}, barcoder_threads, kit_names);
+    auto barcoder =
+            pipeline_desc.add_node<BarcoderNode>({demux_writer}, barcoder_threads, kit_names);
 
     // Create the Pipeline from our description.
     std::vector<dorado::stats::StatsReporter> stats_reporters;
@@ -126,8 +124,8 @@ int barcoder(int argc, char* argv[]) {
 
     // At present, header output file header writing relies on direct node method calls
     // rather than the pipeline framework.
-    auto& hts_writer_ref = dynamic_cast<BarcodeDemuxer&>(pipeline->get_node_ref(hts_writer));
-    hts_writer_ref.set_header(header);
+    auto& demux_writer_ref = dynamic_cast<BarcodeDemuxer&>(pipeline->get_node_ref(demux_writer));
+    demux_writer_ref.set_header(header);
 
     // Set up stats counting
     std::vector<dorado::stats::StatsCallable> stats_callables;

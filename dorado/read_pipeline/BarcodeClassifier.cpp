@@ -17,6 +17,8 @@ namespace dorado {
 
 namespace {
 
+// Create edlib configuration for detecting barcode region
+// using the flanks.
 EdlibAlignConfig init_edlib_config_for_flanks() {
     EdlibAlignConfig placement_config = edlibDefaultAlignConfig();
     placement_config.mode = EDLIB_MODE_HW;
@@ -29,6 +31,8 @@ EdlibAlignConfig init_edlib_config_for_flanks() {
     return placement_config;
 }
 
+// Create edlib configuration for aligning each barcode against
+// the detected region.
 EdlibAlignConfig init_edlib_config_for_mask() {
     EdlibAlignConfig mask_config = edlibDefaultAlignConfig();
     mask_config.mode = EDLIB_MODE_NW;
@@ -37,6 +41,8 @@ EdlibAlignConfig init_edlib_config_for_mask() {
     return mask_config;
 }
 
+// Extract the position of the barcode mask in the read based
+// on the local alignment result from edlib.
 int extract_mask_location(EdlibAlignResult aln, const std::string_view& query) {
     int query_cursor = 0;
     int target_cursor = 0;
@@ -59,6 +65,9 @@ int extract_mask_location(EdlibAlignResult aln, const std::string_view& query) {
     return aln.startLocations[0] + target_cursor;
 }
 
+// Helper function to locally align the flanks with barcode mask
+// against a subsequence of the read (either front or read window)
+// and return the alignment, score & barcode position.
 std::tuple<EdlibAlignResult, float, int> extract_flank_fit(const std::string_view& strand,
                                                            const std::string_view& read,
                                                            int adapter_len,
@@ -73,14 +82,16 @@ std::tuple<EdlibAlignResult, float, int> extract_flank_fit(const std::string_vie
     return {result, score, bc_loc};
 }
 
+// Helper function to globally align a barcode to a region
+// within the read.
 float extract_mask_score(const std::string& adapter,
-                         const std::string_view& mask,
+                         const std::string_view& read,
                          const EdlibAlignConfig& config,
                          const char* debug_prefix) {
-    auto result = edlibAlign(adapter.data(), adapter.length(), mask.data(), mask.length(), config);
+    auto result = edlibAlign(adapter.data(), adapter.length(), read.data(), read.length(), config);
     float score = 1.f - static_cast<float>(result.editDistance) / adapter.length();
     spdlog::debug("top window v1 {}", result.editDistance);
-    spdlog::debug("\n{}", utils::alignment_to_str(adapter.data(), mask.data(), result));
+    spdlog::debug("\n{}", utils::alignment_to_str(adapter.data(), read.data(), result));
     edlibFreeAlignResult(result);
     return score;
 }
@@ -89,6 +100,7 @@ float extract_mask_score(const std::string& adapter,
 
 const std::string UNCLASSIFIED_BARCODE = "unclassified";
 
+// A Node which encapsulate running barcode classification on each read.
 BarcoderNode::BarcoderNode(int threads, const std::vector<std::string>& kit_names)
         : MessageSink(10000), m_threads(threads), m_barcoder(kit_names) {
     start_threads();
@@ -121,17 +133,12 @@ void BarcoderNode::worker_thread(size_t tid) {
     Message message;
     while (get_input_message(message)) {
         auto read = std::get<BamPtr>(std::move(message));
-        auto records = barcode(read.get());
-        for (auto& record : records) {
-            send_message_to_sink(std::move(record));
-        }
+        auto record = barcode(read.get());
+        send_message_to_sink(std::move(record));
     }
 }
 
-std::vector<BamPtr> BarcoderNode::barcode(bam1_t* irecord) {
-    // some where for the hits
-    std::vector<BamPtr> results;
-
+BamPtr BarcoderNode::barcode(bam1_t* irecord) {
     // get the sequence to map from the record
     auto seqlen = irecord->core.l_qseq;
     auto bseq = bam_get_seq(irecord);
@@ -141,12 +148,11 @@ std::vector<BamPtr> BarcoderNode::barcode(bam1_t* irecord) {
     auto bc = (bc_res.adapter_name == UNCLASSIFIED_BARCODE)
                       ? UNCLASSIFIED_BARCODE
                       : bc_res.kit + "_" + bc_res.adapter_name;
+    //auto bc = UNCLASSIFIED_BARCODE;
     spdlog::debug("BC: {}", bc);
     bam_aux_append(irecord, "BC", 'Z', bc.length() + 1, (uint8_t*)bc.c_str());
-    results.push_back(BamPtr(bam_dup1(irecord)));
-
     m_num_records++;
-    return results;
+    return BamPtr(bam_dup1(irecord));
 }
 
 stats::NamedStats BarcoderNode::sample_stats() const {
@@ -165,7 +171,10 @@ ScoreResults Barcoder::barcode(const std::string& seq) {
 }
 
 // Generate all possible barcode adapters. If kit name is passed
-// limit the adapters generated to only the specified kits.
+// limit the adapters generated to only the specified kits. This is done
+// to frontload some of the computation, such as calculating flanks
+// and their reverse complements, adapters and their reverse complements,
+// etc.
 // Returns a vector all barcode adapter sequences to test the
 // input read sequence against.
 std::vector<AdapterSequence> Barcoder::generate_adapter_sequence(
@@ -223,9 +232,9 @@ std::vector<AdapterSequence> Barcoder::generate_adapter_sequence(
 //
 // In this scenario, the barcode (and its flanks) ligate to both ends
 // of the read. The adapter sequence is also different for top and bottom strands.
-// So we need to check bottom ends of the read. Since the adapters always ligate to
+// So we need to check both ends of the read. Since the adapters always ligate to
 // 5' end of the read, the 3' end of the other strand has the reverse complement
-// of that adapter sequence.
+// of that adapter sequence. This leads to 2 variants of the barcode arrangements.
 void Barcoder::calculate_adapter_score_different_double_ends(const std::string_view& read_seq,
                                                              const AdapterSequence& as,
                                                              std::vector<ScoreResults>& results) {
@@ -311,6 +320,7 @@ void Barcoder::calculate_adapter_score_different_double_ends(const std::string_v
         v2.flank_score =
                 (v2.top_score > v2.bottom_score) ? top_flank_score_v2 : bottom_flank_score_v2;
 
+        // The best score is the higher score between the 2 variants.
         ScoreResults res = (v1.score > v2.score) ? v1 : v2;
         res.adapter_name = adapter_name;
         res.kit = as.kit;

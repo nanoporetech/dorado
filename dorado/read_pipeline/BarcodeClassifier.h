@@ -1,6 +1,4 @@
 #pragma once
-#include "htslib/sam.h"
-#include "minimap.h"
 #include "read_pipeline/ReadPipeline.h"
 #include "utils/stats.h"
 #include "utils/types.h"
@@ -509,7 +507,7 @@ private:
     Barcoder m_barcoder;
 
     void worker_thread(size_t tid);
-    std::vector<BamPtr> barcode(bam1_t* irecord);
+    BamPtr barcode(bam1_t* irecord);
     void terminate_impl();
 };
 

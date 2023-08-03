@@ -86,7 +86,8 @@ public:
             return 0.;
         };
 
-        m_num_simplex_reads_written = fetch_stat("HtsWriter.unique_simplex_reads_written");
+        m_num_simplex_reads_written = fetch_stat("HtsWriter.unique_simplex_reads_written") +
+                                      fetch_stat("BarcodeDemuxer.demuxed_reads_written");
 
         m_num_simplex_reads_filtered = fetch_stat("ReadFilterNode.simplex_reads_filtered");
         m_num_simplex_bases_filtered = fetch_stat("ReadFilterNode.simplex_bases_filtered");
