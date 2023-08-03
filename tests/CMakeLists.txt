@@ -51,6 +51,12 @@ target_link_libraries(dorado_tests
     ${ZLIB_LIBRARIES}
 )
 
+target_include_directories(dorado_tests
+    SYSTEM
+    PRIVATE
+        ${DORADO_3RD_PARTY}/catch2
+)
+
 add_test(
     NAME dorado_tests
     COMMAND dorado_tests
