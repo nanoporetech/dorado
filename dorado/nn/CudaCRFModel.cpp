@@ -10,6 +10,10 @@
 #include <toml.hpp>
 #include <torch/torch.h>
 
+#include <algorithm>
+#include <cassert>
+#include <limits>
+
 using namespace std::chrono_literals;
 
 namespace dorado {
@@ -42,13 +46,11 @@ public:
 
         // Batch size will be rounded up to a multiple of batch_size_granularity, regardless of
         // user choice. This makes sure batch size is compatible with GPU kernels.
-        int batch_size_granularity = get_batch_size_granularity(model_config, m_options);
-        m_batch_size = utils::pad_to(batch_size, batch_size_granularity);
         if (batch_size == 0) {
-            m_batch_size = utils::auto_gpu_batch_size(m_module, model_config, m_decoder_options,
-                                                      m_options, batch_size_granularity, chunk_size,
-                                                      memory_limit_fraction);
+            m_batch_size = auto_batch_size(model_config, chunk_size, memory_limit_fraction);
         } else {
+            int batch_size_granularity = get_batch_size_granularity(model_config, m_options);
+            m_batch_size = utils::pad_to(batch_size, batch_size_granularity);
             // Warmup
             auto input =
                     torch::empty({m_batch_size, m_num_input_features, m_in_chunk_size}, m_options);
@@ -74,6 +76,105 @@ public:
                                           const torch::TensorOptions &options) {
         // TODO: we may want to use different numbers based on model type and GPU arch
         return 64;
+    }
+
+    int auto_batch_size(const dorado::CRFModelConfig &model_config,
+                        int chunk_size_in,
+                        float memory_limit_fraction) {
+#ifdef DORADO_TX2
+        return 256;
+#else
+        int64_t available = utils::available_memory(m_options.device()) * memory_limit_fraction;
+        spdlog::debug("Auto batch size: GPU memory available: {}GB", available / 1.0e9f);
+
+        int granularity = get_batch_size_granularity(model_config, m_options);
+
+        // Determine size of working memory for CRFModel divided by (batch_size * chunk_size)
+        // These values have been derermined by running dorado with different models and
+        // reporting the actual allocation size per chunk-timestep.
+        int64_t crfmodel_bytes_per_chunk_timestep;
+        if (model_config.out_features.has_value()) {
+            auto out_features = model_config.out_features.value();
+            std::unordered_map<int, int64_t> out_features_map{{128, 2312}, {256, 8712}};
+            crfmodel_bytes_per_chunk_timestep = out_features_map[out_features];
+            if (crfmodel_bytes_per_chunk_timestep == 0) {
+                spdlog::warn("Auto batchsize detection failed. Unexpected model out_features {}.",
+                             out_features);
+                return granularity;
+            }
+        } else {
+            std::unordered_map<int, int64_t> insize_map{
+                    {96, 960}, {128, 1280}, {384, 2816}, {768, 9728}, {1024, 10240}};
+            crfmodel_bytes_per_chunk_timestep = insize_map[model_config.insize];
+            if (crfmodel_bytes_per_chunk_timestep == 0) {
+                spdlog::warn("Auto batchsize detection failed. Unexpected model insize {}.",
+                             model_config.insize);
+                return granularity;
+            }
+        }
+
+        // Determine size of working memory for decoder divided by (batch_size * chunk_size)
+        // Decoder needs roughly (beam_width * 4) + num_states + 10 extra bytes
+        // where num_states = 4^(state_len+1)
+        // See `dorado::GPUDecoder::gpu_part()`, block beginning with `if (!initialized) {`
+        // for more details.
+        int64_t decode_bytes_per_chunk_timestep =
+                10 + m_decoder_options.beam_width * 4 + (1 << (model_config.state_len * 2 + 2));
+
+        auto bytes_per_chunk_timestep =
+                decode_bytes_per_chunk_timestep + crfmodel_bytes_per_chunk_timestep;
+        int64_t chunk_size_out = chunk_size_in / model_config.stride;
+        available = available - 1.0e9f;  // Allow 1GB for model weights, etc.
+        if (available < 0) {
+            spdlog::warn("Auto batchsize detection failed. Less than 1GB GPU memory available.");
+            return granularity;
+        }
+
+        const int max_batch_size = available / (bytes_per_chunk_timestep * chunk_size_out);
+        if (max_batch_size < utils::pad_to(128, granularity) + granularity) {
+            spdlog::warn("Auto batchsize detection failed. Estimated max batch size only {}.",
+                         max_batch_size);
+            return granularity;
+        }
+
+        c10::cuda::CUDAGuard device_guard(m_options.device());
+
+        int best_batch_size = granularity;
+        float best_time = std::numeric_limits<float>::max();
+        const int chunk_size = std::min(chunk_size_in, model_config.stride * 300);
+        spdlog::debug("Auto batch size: testing up to {} in steps of {}", max_batch_size,
+                      granularity);
+        for (int batch_size = granularity; batch_size <= max_batch_size;
+             batch_size += granularity) {
+            auto input =
+                    torch::empty({batch_size, model_config.num_features, chunk_size}, m_options);
+
+            float time = std::numeric_limits<float>::max();
+            for (int i = 0; i < 2; ++i) {  // run twice to eliminate outliers
+                using utils::handle_cuda_result;
+                cudaEvent_t start, stop;
+                handle_cuda_result(cudaEventCreate(&start));
+                handle_cuda_result(cudaEventCreate(&stop));
+                handle_cuda_result(cudaEventRecord(start));
+                m_module->forward(input);
+                handle_cuda_result(cudaEventRecord(stop));
+                handle_cuda_result(cudaEventSynchronize(stop));
+                float ms = 0;
+                handle_cuda_result(cudaEventElapsedTime(&ms, start, stop));
+                time = std::min(time, ms / batch_size);
+                handle_cuda_result(cudaEventDestroy(start));
+                handle_cuda_result(cudaEventDestroy(stop));
+            }
+
+            spdlog::debug("Auto batchsize: {}, time per chunk {} ms", batch_size, time);
+            if (time < best_time) {
+                best_time = time;
+                best_batch_size = batch_size;
+            }
+        }
+
+        return best_batch_size;
+#endif
     }
 
     struct NNTask {

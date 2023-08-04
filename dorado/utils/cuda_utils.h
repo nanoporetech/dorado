@@ -1,6 +1,5 @@
 #pragma once
 
-#include "../decode/Decoder.h"
 #include "../nn/CRFModel.h"
 
 #include <torch/torch.h>
@@ -30,14 +29,6 @@ size_t available_memory(torch::Device device);
 // Print `label` and stats for Torch CUDACachingAllocator to stderr. Useful for tracking down
 // where Torch allocates GPU memory.
 void print_cuda_alloc_info(const std::string &label);
-
-int auto_gpu_batch_size(torch::nn::ModuleHolder<torch::nn::AnyModule> module,
-                        const dorado::CRFModelConfig &model_config,
-                        const DecoderOptions &decoder_options,
-                        const torch::TensorOptions &options,
-                        int batch_size_granularity,
-                        int chunk_size_in,
-                        float memory_limit_fraction);
 
 void matmul_f16(torch::Tensor const &A, torch::Tensor const &B, torch::Tensor &C);
 

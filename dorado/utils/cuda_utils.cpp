@@ -17,6 +17,7 @@ extern "C" {
 #include <spdlog/spdlog.h>
 
 #include <array>
+#include <cassert>
 #include <chrono>
 #include <exception>
 #include <limits>
@@ -172,83 +173,6 @@ size_t available_memory(torch::Device device) {
     c10::cuda::CUDAGuard device_guard(device);
     cudaMemGetInfo(&free, &total);
     return free;
-}
-
-int auto_gpu_batch_size(torch::nn::ModuleHolder<torch::nn::AnyModule> module,
-                        const dorado::CRFModelConfig &model_config,
-                        const DecoderOptions &decoder_options,
-                        const torch::TensorOptions &options,
-                        int granularity,
-                        int chunk_size_in,
-                        float memory_limit_fraction) {
-#ifdef DORADO_TX2
-    return 256;
-#else
-    int64_t available = available_memory(options.device()) * memory_limit_fraction;
-    spdlog::debug("Auto batch size: GPU memory available: {}GB", available / 1.0e9f);
-
-    int64_t crfmodel_bytes_per_nt;
-    if (model_config.out_features.has_value()) {
-        auto out_features = model_config.out_features.value();
-        std::unordered_map<int, int64_t> out_features_map{{128, 2312}, {256, 8712}};
-        crfmodel_bytes_per_nt = out_features_map[out_features];
-        if (crfmodel_bytes_per_nt == 0) {
-            spdlog::warn("Auto batchsize detection failed. Unexpected model out_features {}.",
-                         out_features);
-            return pad_to(128, granularity);
-        }
-    } else {
-        std::unordered_map<int, int64_t> insize_map{
-                {96, 960}, {128, 1280}, {384, 2816}, {768, 9728}, {1024, 10240}};
-        crfmodel_bytes_per_nt = insize_map[model_config.insize];
-        if (crfmodel_bytes_per_nt == 0) {
-            spdlog::warn("Auto batchsize detection failed. Unexpected model insize {}.",
-                         model_config.insize);
-            return pad_to(128, granularity);
-        }
-    }
-
-    int64_t decode_bytes_per_nt =
-            10 + decoder_options.beam_width * 4 + (1 << (model_config.state_len * 2 + 2));
-
-    auto bytes_per_nt = decode_bytes_per_nt + crfmodel_bytes_per_nt;
-    int64_t chunk_size_out = chunk_size_in / model_config.stride;
-    available = available - 1.0e9f;  // Allow 1GB for model weights, etc.
-    const int max_batch_size = available / (bytes_per_nt * chunk_size_out);
-
-    if (max_batch_size < pad_to(128, granularity) + granularity) {
-        spdlog::warn("Auto batchsize detection failed. Estimated max batch size only {}.",
-                     max_batch_size);
-        return pad_to(128, granularity);
-    }
-
-    c10::cuda::CUDAGuard device_guard(options.device());
-
-    int best_batch_size = granularity;
-    float best_time = std::numeric_limits<float>::max();
-    const int chunk_size = std::min(chunk_size_in, model_config.stride * 300);
-    CUDATimer cuda_timer;
-    spdlog::debug("Auto batch size: testing up to {} in steps of {}", max_batch_size, granularity);
-    for (int batch_size = granularity; batch_size <= max_batch_size; batch_size += granularity) {
-        auto input = torch::empty({batch_size, model_config.num_features, chunk_size}, options);
-
-        float time = std::numeric_limits<float>::max();
-        for (int i = 0; i < 2; ++i) {  // run twice to eliminate outliers
-            cuda_timer.start();
-            module->forward(input);
-            cuda_timer.stop();
-            time = std::min(time, cuda_timer.result_ms() / batch_size);
-        }
-
-        spdlog::debug("Auto batchsize: {}, time per chunk {} ms", batch_size, time);
-        if (time < best_time) {
-            best_time = time;
-            best_batch_size = batch_size;
-        }
-    }
-
-    return best_batch_size;
-#endif
 }
 
 void handle_cuda_result(int cuda_result) {

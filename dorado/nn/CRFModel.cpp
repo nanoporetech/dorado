@@ -370,12 +370,7 @@ struct ConvolutionImpl : Module {
 };
 
 struct LinearCRFImpl : Module {
-    LinearCRFImpl(int insize,
-                  int outsize,
-                  bool bias_,
-                  bool tanh_and_scale = false,
-                  bool expand_blanks_ = false)
-            : bias(bias_), expand_blanks(expand_blanks_) {
+    LinearCRFImpl(int insize, int outsize, bool bias_, bool tanh_and_scale = false) : bias(bias_) {
         linear = register_module("linear", Linear(LinearOptions(insize, outsize).bias(bias)));
         if (tanh_and_scale) {
             activation = register_module("activation", Tanh());
@@ -389,15 +384,6 @@ struct LinearCRFImpl : Module {
         if (activation) {
             scores = activation(scores) * scale;
         }
-        if (expand_blanks) {
-            scores = scores.contiguous();
-            auto N = scores.size(0);
-            auto T = scores.size(1);
-            constexpr int blank_score = 2;
-            scores = F::pad(scores.view({N, T, -1, 4}),
-                            F::PadFuncOptions({1, 0, 0, 0, 0, 0, 0, 0}).value(blank_score))
-                             .view({N, T, -1});
-        }
 
         // Output is [N, T, C], contiguous
         return scores;
@@ -408,10 +394,6 @@ struct LinearCRFImpl : Module {
         wm.reserve({wm.current_sizes[0], wm.current_sizes[1], linear->weight.size(0)}, torch::kF16);
     }
     void run_koi(WorkingMemory &wm) {
-        if (expand_blanks) {
-            throw std::logic_error("LinearCRF: Running GPU code path with expand_blanks set.");
-        }
-
         utils::ScopedProfileRange spr("linear", 2);
         if (wt.numel() == 0) {
             wt = linear->weight.t().contiguous();
@@ -438,7 +420,6 @@ struct LinearCRFImpl : Module {
     torch::Tensor wt;
 #endif  // if USE_KOI
     bool bias;
-    bool expand_blanks;
     static constexpr int scale = 5;
     Linear linear{nullptr};
     Tanh activation{nullptr};
@@ -809,7 +790,7 @@ TORCH_MODULE(Convolution);
 TORCH_MODULE(Clamp);
 
 struct CRFModelImpl : Module {
-    CRFModelImpl(const CRFModelConfig &config, bool expand_blanks) {
+    explicit CRFModelImpl(const CRFModelConfig &config) {
         constexpr float conv_max_value = 3.5f;
         conv1 = register_module("conv1", Convolution(config.num_features, config.conv, 5, 1,
                                                      config.clamp, conv_max_value, false));
@@ -832,8 +813,8 @@ struct CRFModelImpl : Module {
             clamp1 = Clamp(-5.0, 5.0, config.clamp);
             encoder = Sequential(conv1, conv2, conv3, rnns, linear1, clamp1);
         } else {
-            linear1 = register_module(
-                    "linear1", LinearCRF(config.insize, config.outsize, true, true, expand_blanks));
+            linear1 = register_module("linear1",
+                                      LinearCRF(config.insize, config.outsize, true, true));
             encoder = Sequential(conv1, conv2, conv3, rnns, linear1);
         }
     }
@@ -1052,8 +1033,7 @@ std::vector<torch::Tensor> load_crf_model_weights(const std::filesystem::path &d
 
 ModuleHolder<AnyModule> load_crf_model(const CRFModelConfig &model_config,
                                        const torch::TensorOptions &options) {
-    const bool expand_blanks = !(USE_KOI && options.device().is_cuda());
-    auto model = nn::CRFModel(model_config, expand_blanks);
+    auto model = nn::CRFModel(model_config);
     return populate_model(model, model_config.model_path, options,
                           model_config.out_features.has_value(), model_config.bias);
 }
