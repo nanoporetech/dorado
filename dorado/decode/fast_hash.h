@@ -28,6 +28,8 @@
 #include <stdint.h>
 #include <stdio.h>
 
+namespace fasthash {
+
 /**
  * fasthash32 - 32-bit implementation of fasthash
  * @buf:  data buffer
@@ -50,3 +52,5 @@ uint64_t fasthash64(const void *buf, size_t len, uint64_t seed);
  * @val:  New value to chain to hash
  */
 uint64_t chainfasthash64(uint64_t hash, uint64_t val);
+
+}  // namespace fasthash

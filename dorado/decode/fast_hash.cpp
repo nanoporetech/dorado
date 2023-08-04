@@ -25,6 +25,8 @@
 
 #include "fast_hash.h"
 
+namespace fasthash {
+
 // Compression function for Merkle-Damgard construction.
 // This function is generated using the framework provided.
 static uint64_t mix(uint64_t h) {
@@ -107,3 +109,5 @@ uint64_t chainfasthash64(uint64_t hash, uint64_t val) {
     hash *= m;
     return mix(hash);
 }
+
+}  // namespace fasthash
