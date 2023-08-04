@@ -223,8 +223,21 @@ struct MetalBlockImpl : Module {
 
         // args for LSTM kernel
         {
-            std::vector<int32_t> args_lstm_{batch_size / kTileSize, lstm_chunk_size};
-            args_lstm = create_vec_buffer(m_device, args_lstm_);
+            // We enforce a maximum time step count for each LSTM kernel because long running
+            // kernels increase the likelihood of command buffer submission errors, of various
+            // types.  Each args buffer here is for a different time step range.
+            constexpr int kMaxTimeSteps = 100;
+            const int num_pieces = (lstm_chunk_size + kMaxTimeSteps - 1) / kMaxTimeSteps;
+            for (int i = 0; i < num_pieces; ++i) {
+                const int time_step_begin = i * kMaxTimeSteps;
+                const int time_step_end = std::min((i + 1) * kMaxTimeSteps, lstm_chunk_size);
+                std::vector<int32_t> args{batch_size / kTileSize, lstm_chunk_size, time_step_begin,
+                                          time_step_end};
+                auto args_buffer = create_vec_buffer(m_device, args);
+                m_args_lstm.push_back(args_buffer);
+            }
+            spdlog::debug("lstm_chunk_size {} => {} LSTM kernel launches", lstm_chunk_size,
+                          num_pieces);
         }
 
         // args for conversion to half
@@ -451,14 +464,17 @@ struct MetalBlockImpl : Module {
         command_buffer = m_command_queue->commandBuffer();
 
         for (auto &rnn : {rnn1, rnn2, rnn3, rnn4, rnn5}) {
-            const std::vector<MTL::Buffer *> buffers{args_lstm.get(), mat_working_mem.get(),
-                                                     mtl_for_tensor(rnn->t_weights_bias),
-                                                     mat_state.get()};
             const int kResBufSize = dtype_bytes * kernel_simd_groups * 2 * kTileSize * kTileSize;
             const int kOutBufSize = dtype_bytes * kernel_simd_groups * kTileSize * kTileSize;
             const std::vector<int> tg_buffer_lens{kResBufSize, kOutBufSize};
-            launch_kernel_no_wait(lstm_cps[rnn->reverse].get(), command_buffer, buffers,
-                                  tg_buffer_lens, kernel_thread_groups, kernel_simd_groups * 32);
+            for (size_t i = 0; i < m_args_lstm.size(); ++i) {
+                const std::vector<MTL::Buffer *> buffers{
+                        m_args_lstm.at(i).get(), mat_working_mem.get(),
+                        mtl_for_tensor(rnn->t_weights_bias), mat_state.get()};
+                launch_kernel_no_wait(lstm_cps[rnn->reverse].get(), command_buffer, buffers,
+                                      tg_buffer_lens, kernel_thread_groups,
+                                      kernel_simd_groups * 32);
+            }
         }
         if (!finishCommandBuffer("lstm", command_buffer, try_count)) {
             return nullptr;
@@ -505,8 +521,10 @@ struct MetalBlockImpl : Module {
     MTL::Device *m_device;
     NS::SharedPtr<MTL::CommandQueue> m_command_queue;
     NS::SharedPtr<MTL::ComputePipelineState> lstm_cps[2], to_half_cps, linear_cps[2];
-    NS::SharedPtr<MTL::Buffer> mat_working_mem, mat_state, mat_temp, args_lstm, args_to_half,
+    NS::SharedPtr<MTL::Buffer> mat_working_mem, mat_state, mat_temp, args_to_half,
             linear_weights[2], args_linear2;
+    // Each LSTM kernel is run with a sequence of different args.
+    std::vector<NS::SharedPtr<MTL::Buffer>> m_args_lstm;
     std::vector<NS::SharedPtr<MTL::Buffer>> args_linear;
     int in_chunk_size, lstm_chunk_size, batch_size, kernel_thread_groups, kernel_simd_groups;
     CRFModelConfig config;
