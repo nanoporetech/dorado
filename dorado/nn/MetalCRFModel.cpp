@@ -523,7 +523,7 @@ struct MetalBlockImpl : Module {
     NS::SharedPtr<MTL::ComputePipelineState> lstm_cps[2], to_half_cps, linear_cps[2];
     NS::SharedPtr<MTL::Buffer> mat_working_mem, mat_state, mat_temp, args_to_half,
             linear_weights[2], args_linear2;
-    // Each LSTM kernel is run with a sequence of different args.
+    // Each args buffer corresponds to a different time span of the LSTM layer.
     std::vector<NS::SharedPtr<MTL::Buffer>> m_args_lstm;
     std::vector<NS::SharedPtr<MTL::Buffer>> args_linear;
     int in_chunk_size, lstm_chunk_size, batch_size, kernel_thread_groups, kernel_simd_groups;
