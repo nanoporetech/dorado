@@ -7,7 +7,6 @@
 #include "utils/time_utils.h"
 #include "utils/uuid_utils.h"
 
-#include <openssl/sha.h>
 #include <spdlog/spdlog.h>
 
 #include <chrono>
