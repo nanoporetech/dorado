@@ -467,10 +467,10 @@ struct MetalBlockImpl : Module {
             const int kResBufSize = dtype_bytes * kernel_simd_groups * 2 * kTileSize * kTileSize;
             const int kOutBufSize = dtype_bytes * kernel_simd_groups * kTileSize * kTileSize;
             const std::vector<int> tg_buffer_lens{kResBufSize, kOutBufSize};
-            for (size_t i = 0; i < m_args_lstm.size(); ++i) {
-                const std::vector<MTL::Buffer *> buffers{
-                        m_args_lstm.at(i).get(), mat_working_mem.get(),
-                        mtl_for_tensor(rnn->t_weights_bias), mat_state.get()};
+            for (const auto &args_lstm : m_args_lstm) {
+                const std::vector<MTL::Buffer *> buffers{args_lstm.get(), mat_working_mem.get(),
+                                                         mtl_for_tensor(rnn->t_weights_bias),
+                                                         mat_state.get()};
                 launch_kernel_no_wait(lstm_cps[rnn->reverse].get(), command_buffer, buffers,
                                       tg_buffer_lens, kernel_thread_groups,
                                       kernel_simd_groups * 32);
