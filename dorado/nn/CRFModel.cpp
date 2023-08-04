@@ -370,38 +370,31 @@ struct ConvolutionImpl : Module {
 };
 
 struct LinearCRFImpl : Module {
-    LinearCRFImpl(int insize, int outsize) : scale(5), blank_score(2.0), expand_blanks(false) {
-        linear = register_module("linear", Linear(insize, outsize));
-        activation = register_module("activation", Tanh());
+    LinearCRFImpl(int insize,
+                  int outsize,
+                  bool bias_,
+                  bool tanh_and_scale = false,
+                  bool expand_blanks_ = false)
+            : bias(bias_), expand_blanks(expand_blanks_) {
+        linear = register_module("linear", Linear(LinearOptions(insize, outsize).bias(bias)));
+        if (tanh_and_scale) {
+            activation = register_module("activation", Tanh());
+        }
     };
 
     torch::Tensor forward(torch::Tensor x) {
+        utils::ScopedProfileRange spr("linear", 2);
         // Input x is [N, T, C], contiguity optional
-        auto N = x.size(0);
-        auto T = x.size(1);
-
-        torch::Tensor scores;
-#if USE_KOI
-        if (x.device() != torch::kCPU) {
-            // Optimised version of the else branch for CUDA devices
-            c10::cuda::CUDAGuard device_guard(x.device());
-            auto stream = at::cuda::getCurrentCUDAStream().stream();
-
-            x = x.contiguous().reshape({N * T, -1});
-            scores = torch::matmul(x, linear->weight.t());
-            host_bias_tanh_scale_f16(stream, N * T, scores.size(1), scale, scores.data_ptr(),
-                                     linear->bias.data_ptr());
-            scores = scores.view({N, T, -1});
-        } else
-#endif  // if USE_KOI
-        {
-            scores = activation(linear(x)) * scale;
+        auto scores = linear(x);
+        if (activation) {
+            scores = activation(scores) * scale;
         }
-
-        if (expand_blanks == true) {
+        if (expand_blanks) {
             scores = scores.contiguous();
-            int C = scores.size(2);
-            scores = F::pad(scores.view({N, T, C / 4, 4}),
+            auto N = scores.size(0);
+            auto T = scores.size(1);
+            constexpr int blank_score = 2;
+            scores = F::pad(scores.view({N, T, -1, 4}),
                             F::PadFuncOptions({1, 0, 0, 0, 0, 0, 0, 0}).value(blank_score))
                              .view({N, T, -1});
         }
@@ -410,33 +403,16 @@ struct LinearCRFImpl : Module {
         return scores;
     }
 
-    int scale;
-    int blank_score;
-    bool expand_blanks;
-    Linear linear{nullptr};
-    Tanh activation{nullptr};
-};
-
-struct LinearWrapperImpl : Module {
-    LinearWrapperImpl(int insize, int outsize, bool bias_) : bias(bias_) {
-        linear = register_module("linear", Linear(LinearOptions(insize, outsize).bias(bias)));
-    };
-
-    torch::Tensor forward(torch::Tensor x) {
-        utils::ScopedProfileRange spr("linear", 2);
-        // Input is [N, T, C], contiguity optional
-        // Output is [N, T, C], contiguous
-        return linear(x);
-    }
-
 #if USE_KOI
     void reserve_working_memory(WorkingMemory &wm) {
         wm.reserve({wm.current_sizes[0], wm.current_sizes[1], linear->weight.size(0)}, torch::kF16);
     }
-
     void run_koi(WorkingMemory &wm) {
-        utils::ScopedProfileRange spr("linear", 2);
+        if (expand_blanks) {
+            throw std::logic_error("LinearCRF: Running GPU code path with expand_blanks set.");
+        }
 
+        utils::ScopedProfileRange spr("linear", 2);
         if (wt.numel() == 0) {
             wt = linear->weight.t().contiguous();
         }
@@ -447,17 +423,25 @@ struct LinearWrapperImpl : Module {
         auto Cin = in.size(2);
         auto Cout = linear->weight.size(0);
         // Output is [N, T, Cout], contiguous
-        auto out = wm.next({N, T, Cout}, torch::kF16).view({-1, Cout});
-        dorado::utils::matmul_f16(in.view({-1, Cin}), wt, out);
-        if (bias) {
-            out += linear->bias;
+        auto out = wm.next({N, T, Cout}, torch::kF16);
+        auto out_2D = out.view({-1, Cout});
+        dorado::utils::matmul_f16(in.view({-1, Cin}), wt, out_2D);
+        if (activation) {
+            auto stream = at::cuda::getCurrentCUDAStream().stream();
+            host_bias_tanh_scale_f16(stream, N * T, out_2D.size(1), scale, out_2D.data_ptr(),
+                                     linear->bias.data_ptr());
+        } else if (bias) {
+            out_2D += linear->bias;
         }
     }
 
     torch::Tensor wt;
 #endif  // if USE_KOI
     bool bias;
+    bool expand_blanks;
+    static constexpr int scale = 5;
     Linear linear{nullptr};
+    Tanh activation{nullptr};
 };
 
 struct LSTMStackImpl : Module {
@@ -808,8 +792,8 @@ struct ClampImpl : Module {
     ClampImpl(float _min, float _max, bool _active) : min(_min), max(_max), active(_active){};
 
     torch::Tensor forward(torch::Tensor x) {
-        utils::ScopedProfileRange spr("clamp", 2);
         if (active) {
+            utils::ScopedProfileRange spr("clamp", 2);
             x.clamp_(min, max);
         }
         return x;
@@ -821,7 +805,6 @@ struct ClampImpl : Module {
 
 TORCH_MODULE(LSTMStack);
 TORCH_MODULE(LinearCRF);
-TORCH_MODULE(LinearWrapper);
 TORCH_MODULE(Convolution);
 TORCH_MODULE(Clamp);
 
@@ -840,19 +823,18 @@ struct CRFModelImpl : Module {
         if (config.out_features.has_value()) {
             // The linear layer is decomposed into 2 matmuls.
             const int decomposition = config.out_features.value();
-            linear1 = register_module("linear1", LinearWrapper(config.insize, decomposition, true));
-            linear2 =
-                    register_module("linear2", LinearWrapper(decomposition, config.outsize, false));
+            linear1 = register_module("linear1", LinearCRF(config.insize, decomposition, true));
+            linear2 = register_module("linear2", LinearCRF(decomposition, config.outsize, false));
             clamp1 = Clamp(-5.0, 5.0, config.clamp);
             encoder = Sequential(conv1, conv2, conv3, rnns, linear1, linear2, clamp1);
         } else if ((config.conv == 16) && (config.num_features == 1)) {
-            linear1 =
-                    register_module("linear1", LinearWrapper(config.insize, config.outsize, false));
+            linear1 = register_module("linear1", LinearCRF(config.insize, config.outsize, false));
             clamp1 = Clamp(-5.0, 5.0, config.clamp);
             encoder = Sequential(conv1, conv2, conv3, rnns, linear1, clamp1);
         } else {
-            linear = register_module("linear1", LinearCRF(config.insize, config.outsize));
-            encoder = Sequential(conv1, conv2, conv3, rnns, linear);
+            linear1 = register_module(
+                    "linear1", LinearCRF(config.insize, config.outsize, true, true, expand_blanks));
+            encoder = Sequential(conv1, conv2, conv3, rnns, linear1);
         }
     }
 
@@ -872,9 +854,7 @@ struct CRFModelImpl : Module {
         conv2->reserve_working_memory(wm);
         conv3->reserve_working_memory(wm);
         rnns->reserve_working_memory(wm);
-        if (linear1) {
-            linear1->reserve_working_memory(wm);
-        }
+        linear1->reserve_working_memory(wm);
         if (linear2) {
             linear2->reserve_working_memory(wm);
         }
@@ -892,18 +872,19 @@ struct CRFModelImpl : Module {
         conv3->run_koi(wm);
         rnns->run_koi(wm);
 
-        // Output is [N, T, C], F16, contiguous
-        if (linear1) {
-            linear1->run_koi(wm);
-            if (linear2) {
-                linear2->run_koi(wm);
-            }
+        linear1->run_koi(wm);
+        if (linear2) {
+            linear2->run_koi(wm);
+        }
+
+        out = wm.current;
+        if (clamp1) {
             // TODO: clamp is entirely memory bandwidth bound, and relatively expensive due to the
             //  matrix size. Can we merge it into a custom linear kernel?
-            return clamp1->forward(wm.current);
+            out = clamp1->forward(out);
         }
-        // TODO: run_koi version of LinearCRF layer?
-        return linear->forward(wm.current);
+        // Output is [N, T, C], F16, contiguous
+        return out;
     }
 #endif
 
@@ -930,8 +911,7 @@ struct CRFModelImpl : Module {
     }
 
     LSTMStack rnns{nullptr};
-    LinearCRF linear{nullptr};
-    LinearWrapper linear1{nullptr}, linear2{nullptr};
+    LinearCRF linear1{nullptr}, linear2{nullptr};
     Sequential encoder{nullptr};
     Convolution conv1{nullptr}, conv2{nullptr}, conv3{nullptr};
     Clamp clamp1{nullptr};
