@@ -9,6 +9,7 @@
 #include "read_pipeline/HtsReader.h"
 #include "read_pipeline/HtsWriter.h"
 #include "read_pipeline/Pipelines.h"
+#include "read_pipeline/PolyACalculator.h"
 #include "read_pipeline/ProgressTracker.h"
 #include "read_pipeline/ReadFilterNode.h"
 #include "read_pipeline/ReadToBamTypeNode.h"
@@ -137,8 +138,9 @@ void setup(std::vector<std::string> args,
     auto read_converter = pipeline_desc.add_node<ReadToBamType>(
             {converted_reads_sink}, emit_moves, rna, thread_allocations.read_converter_threads,
             methylation_threshold_pct);
+    auto polya_calculator = pipeline_desc.add_node<PolyACalculator>({read_converter}, 1);
     auto read_filter_node = pipeline_desc.add_node<ReadFilterNode>(
-            {read_converter}, min_qscore, default_parameters.min_sequence_length,
+            {polya_calculator}, min_qscore, default_parameters.min_sequence_length,
             std::unordered_set<std::string>{}, thread_allocations.read_filter_threads);
 
     auto mean_qscore_start_pos = model_config.mean_qscore_start_pos;

@@ -1,0 +1,32 @@
+#pragma once
+
+#include "ReadPipeline.h"
+#include "utils/stats.h"
+
+#include <atomic>
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <vector>
+
+namespace dorado {
+
+class PolyACalculator : public MessageSink {
+public:
+    PolyACalculator(size_t num_worker_threads, size_t max_reads = 1000);
+    ~PolyACalculator() { terminate_impl(); }
+    std::string get_name() const override { return "PolyACalculator"; }
+    void terminate(const FlushOptions& flush_options) override { terminate_impl(); };
+    void restart() override;
+
+private:
+    void start_threads();
+    void terminate_impl();
+    void worker_thread();
+
+    // Async worker for writing.
+    std::vector<std::unique_ptr<std::thread>> m_workers;
+    size_t m_num_worker_threads = 0;
+};
+
+}  // namespace dorado
