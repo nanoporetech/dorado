@@ -1,7 +1,6 @@
 #include "alignment_utils.h"
 
 #include <openssl/evp.h>
-#include <openssl/sha.h>
 
 #include <algorithm>
 #include <array>
@@ -16,8 +15,8 @@ std::string derive_uuid(const std::string& input_uuid, const std::string& desc) 
     EVP_DigestInit_ex(mdctx, EVP_sha256(), NULL);
     EVP_DigestUpdate(mdctx, input_uuid.c_str(), input_uuid.size());
     EVP_DigestUpdate(mdctx, desc.c_str(), desc.size());
-    unsigned char* hash = (unsigned char*)OPENSSL_malloc(EVP_MD_size(EVP_sha256()));
-    unsigned int digest_len = SHA256_DIGEST_LENGTH;
+    unsigned int digest_len = EVP_MD_CTX_get_size(mdctx);
+    unsigned char* hash = static_cast<unsigned char*>(OPENSSL_malloc(digest_len));
     EVP_DigestFinal_ex(mdctx, hash, &digest_len);
     EVP_MD_CTX_free(mdctx);
 
