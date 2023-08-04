@@ -31,7 +31,6 @@ private:
     // Async worker for writing.
     std::vector<std::unique_ptr<std::thread>> m_workers;
     size_t m_num_worker_threads = 0;
-    std::atomic<size_t> m_active_threads;
 
     bool m_emit_moves;
     bool m_rna;

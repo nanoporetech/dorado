@@ -703,6 +703,7 @@ public:
     }
 
     void metal_thread_fn() {
+        torch::InferenceMode inference_mode_guard;
         ScopedAutoReleasePool autorelease_pool;
 
         // Incrementing ID used to prevent the linear layer of run i+1 overwriting the scores of
@@ -802,6 +803,7 @@ public:
     }
 
     void decode_thread_fn(int thread_id) {
+        torch::InferenceMode inference_mode_guard;
         while (true) {
             std::unique_lock<std::mutex> decode_lock(m_decode_lock);
             while (m_decode_queue.empty() && !m_terminate_decode.load()) {

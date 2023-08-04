@@ -160,6 +160,8 @@ void ModBaseCallerNode::init_modbase_info() {
 }
 
 void ModBaseCallerNode::input_worker_thread() {
+    torch::InferenceMode inference_mode_guard;
+
     Message message;
     while (get_input_message(message)) {
         // If this message isn't a read, just forward it to the sink.
@@ -261,6 +263,8 @@ void ModBaseCallerNode::input_worker_thread() {
 }
 
 void ModBaseCallerNode::modbasecall_worker_thread(size_t worker_id, size_t caller_id) {
+    torch::InferenceMode inference_mode_guard;
+
     auto& runner = m_runners[worker_id];
     auto& chunk_queue = m_chunk_queues[caller_id];
 
@@ -351,6 +355,8 @@ void ModBaseCallerNode::call_current_batch(
 }
 
 void ModBaseCallerNode::output_worker_thread() {
+    torch::InferenceMode inference_mode_guard;
+
     // The m_processed_chunks lock is sufficiently contended that it's worth taking all
     // chunks available once we obtain it.
     std::vector<std::shared_ptr<RemoraChunk>> processed_chunks;

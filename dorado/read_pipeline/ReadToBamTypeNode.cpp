@@ -8,7 +8,7 @@
 namespace dorado {
 
 void ReadToBamType::worker_thread() {
-    m_active_threads++;
+    torch::InferenceMode inference_mode_guard;
 
     Message message;
     while (get_input_message(message)) {
@@ -31,8 +31,6 @@ void ReadToBamType::worker_thread() {
             send_message_to_sink(std::move(aln));
         }
     }
-
-    auto num_active_threads = --m_active_threads;
 }
 
 ReadToBamType::ReadToBamType(bool emit_moves,
@@ -45,8 +43,7 @@ ReadToBamType::ReadToBamType(bool emit_moves,
           m_emit_moves(emit_moves),
           m_rna(rna),
           m_modbase_threshold(
-                  static_cast<uint8_t>(std::min(modbase_threshold_frac * 256.0f, 255.0f))),
-          m_active_threads(0) {
+                  static_cast<uint8_t>(std::min(modbase_threshold_frac * 256.0f, 255.0f))) {
     start_threads();
 }
 
