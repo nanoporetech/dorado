@@ -27,6 +27,9 @@ private:
     // Async worker for writing.
     std::vector<std::unique_ptr<std::thread>> m_workers;
     size_t m_num_worker_threads = 0;
+    std::atomic<int> polyA{0};
+    std::atomic<int> num_reads{0};
+    std::atomic<int> not_called{0};
 };
 
 }  // namespace dorado

@@ -76,13 +76,14 @@ void PolyACalculator::worker_thread() {
         float x_n = 0, x_n_1 = 0;
         float v_n = 1, v_n_1 = 0;
         int n = 0;
+        float stdev;
         int signal_start = 0;
         const c10::Half* signal = static_cast<c10::Half*>(read->raw_data.data_ptr());
         for (int i = signal_end; (fwd ? i > 0 : i < read->raw_data.size(0)); (fwd ? i-- : i++)) {
             x_n_1 = x_n;
             v_n_1 = v_n;
             float x = signal[i];
-            auto stdev = std::sqrt(v_n_1);
+            stdev = std::sqrt(v_n_1);
             spdlog::debug("input {}, Mean {} stddev {}", x, x_n, stdev);
             if (n > 10 and x > x_n_1 + 4 * stdev) {
                 spdlog::debug("Reached end at {}", i);
@@ -111,15 +112,19 @@ void PolyACalculator::worker_thread() {
         //int start_base = (read->seq.length() >> 1) - (kNumBases >> 1);
         //float num_samples_per_base = static_cast<float>(seq_to_sig_map[start_base + kNumBases + 1] - seq_to_sig_map[start_base]) / kNumBases;
         int num_bases = static_cast<int>((signal_end - signal_start) / num_samples_per_base);
-        if (num_bases < 50) {
+        if (num_bases > 0 && num_bases < 250) {
             spdlog::debug("{} PolyA bases {}, Signal range is {} {}, primer {}", read->read_id,
                           num_bases, signal_start, signal_end, end);
             spdlog::debug("Region is {}", read->seq.substr(end - num_bases, num_bases));
+
+            polyA += num_bases;
         } else {
             spdlog::warn("{} PolyA bases {}, Signal range is {} {} primer {}", read->read_id,
                          num_bases, signal_start, signal_end, end);
+            not_called++;
         }
 
+        num_reads += 1;
         send_message_to_sink(std::move(read));
     }
 }
@@ -144,6 +149,8 @@ void PolyACalculator::terminate_impl() {
         }
     }
     m_workers.clear();
+    spdlog::info("Total {}, not called {}, Avg polyA length {}", num_reads.load(),
+                 not_called.load(), polyA.load() / num_reads.load());
 }
 
 void PolyACalculator::restart() {
