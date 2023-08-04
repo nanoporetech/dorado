@@ -15,14 +15,13 @@ std::string derive_uuid(const std::string& input_uuid, const std::string& desc) 
     EVP_DigestInit_ex(mdctx, EVP_sha256(), nullptr);
     EVP_DigestUpdate(mdctx, input_uuid.c_str(), input_uuid.size());
     EVP_DigestUpdate(mdctx, desc.c_str(), desc.size());
-    unsigned int digest_len = EVP_MD_CTX_get_size(mdctx);
     unsigned char hash[EVP_MAX_MD_SIZE];
     EVP_DigestFinal_ex(mdctx, hash, nullptr);
     EVP_MD_CTX_free(mdctx);
 
     // Truncate the hash to 16 bytes (128 bits) to match the size of a UUID
     std::array<unsigned char, 16> truncated_hash;
-    std::copy(std::begin(hash), std::next(std::begin(hash), 16), std::begin(truncated_hash));
+    std::copy_n(std::begin(hash), truncated_hash.size(), std::begin(truncated_hash));
 
     // Set the UUID version to 4 (random)
     truncated_hash[6] = (truncated_hash[6] & 0x0F) | 0x40;
