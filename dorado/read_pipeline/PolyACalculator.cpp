@@ -9,6 +9,106 @@
 #include <chrono>
 #include <cmath>
 
+namespace {
+std::pair<int, int> determine_signal_bounds(int signal_end,
+                                            const c10::Half* signal,
+                                            const std::vector<uint64_t>& seq_to_sig_map,
+                                            bool fwd,
+                                            const dorado::ReadPtr& read) {
+    float x_n = 0, x_n_1 = 0;
+    float v_n = 1, v_n_1 = 0;
+    int n = 0;
+    float stdev;
+    int signal_start = 0;
+    for (int i = signal_end; (fwd ? i > 0 : i < read->raw_data.size(0)); (fwd ? i-- : i++)) {
+        float x = signal[i];
+        x_n_1 = x_n;
+        v_n_1 = v_n;
+        if (n == 25) {
+            spdlog::debug("idx {} input {}, Mean {} stddev {}", i, x, x_n, stdev);
+        }
+        if (n > 25 and std::abs(x - x_n_1) > 2 * stdev) {
+            spdlog::debug("Reached end at {} at mean {} stdev {}", i, x_n, stdev);
+            break;
+        }
+        n++;
+        x_n = x_n_1 + float(x - x_n_1) / (n + 1);
+        v_n = v_n_1 + float((x - x_n_1) * (x - x_n) - v_n_1) / (n + 1);
+        stdev = std::sqrt(v_n);
+        signal_start = i;
+    }
+    spdlog::debug("Loop end at mean {} stdev {}", x_n, stdev);
+    if (!fwd) {
+        std::swap(signal_start, signal_end);
+    }
+    return {signal_start, signal_end};
+}
+
+std::pair<int, int> determine_signal_bounds2(int signal_end,
+                                             const c10::Half* signal,
+                                             const std::vector<uint64_t>& seq_to_sig_map,
+                                             bool fwd,
+                                             const std::shared_ptr<dorado::Read>& read) {
+    // Determine avg signal val for A or T.
+    float x_n = 0, x_n_1 = 0;
+    float v_n = 1, v_n_1 = 0;
+    int n = 0;
+    float stdev;
+    int signal_start;
+    for (int i = 0; i < read->seq.length(); i++) {
+        if (read->seq[i] == (fwd ? 'A' : 'T')) {
+            auto s = seq_to_sig_map[i];
+            auto e = seq_to_sig_map[i + 1];
+            for (int j = s; j < e; j++) {
+                n++;
+                x_n_1 = x_n;
+                v_n_1 = v_n;
+                float x = signal[j];
+                x_n = x_n_1 + float(x - x_n_1) / (n + 1);
+                v_n = v_n_1 + float((x - x_n_1) * (x - x_n) - v_n_1) / (n + 1);
+                stdev = std::sqrt(v_n);
+            }
+        }
+    }
+    spdlog::debug("Mean {}, stdev {}", x_n, stdev);
+    for (int i = signal_end; (fwd ? i > 0 : i < read->raw_data.size(0)); (fwd ? i-- : i++)) {
+        float x = signal[i];
+        if (std::abs(x - x_n) > 1 * stdev) {
+            spdlog::debug("Reached end at {}", i);
+            break;
+        }
+        signal_start = i;
+    }
+    if (!fwd) {
+        std::swap(signal_start, signal_end);
+    }
+    return {signal_start, signal_end};
+}
+
+int estimate_samples_per_base(const std::vector<uint64_t>& seq_to_sig_map,
+                              const std::string& seq,
+                              bool fwd) {
+    const int kNumBases = 200000;
+    int c = 0;
+    int j = 0;
+    const char s = (fwd ? 'A' : 'T');
+    for (int i = 0; i < seq.length() && j < kNumBases; i++) {
+        if (seq[i] == s) {
+            c += seq_to_sig_map[i + 1] - seq_to_sig_map[i];
+            j++;
+        }
+    }
+    const float kFudgeFactor = (s == 'T' ? 1.5f : 1.f);
+    float num_samples_per_base = static_cast<float>(c * kFudgeFactor) / j;
+    return static_cast<int>(num_samples_per_base);
+}
+
+int estimate_samples_per_base(const std::shared_ptr<dorado::Read>& read) {
+    float num_samples_per_base = static_cast<float>(read->raw_data.size(0)) / read->seq.length();
+    return static_cast<int>(num_samples_per_base);
+}
+}  // namespace
+
 namespace dorado {
 
 void PolyACalculator::worker_thread() {
@@ -58,69 +158,55 @@ void PolyACalculator::worker_thread() {
                                                 read_bottom.length(), align_config);
 
         int dist_v2 = top_v2.editDistance + bottom_v2.editDistance;
+        spdlog::debug("v1 dist {}, v2 dist {}", dist_v1, dist_v2);
 
-        bool fwd = true;
-        int start = 0, end = 0;
-        if (dist_v2 < dist_v1) {
-            fwd = false;
-            start = top_v2.endLocations[0];
-        } else {
-            end = bottom_start + bottom_v1.startLocations[0];
-        }
+        bool proceed = std::min(dist_v1, dist_v2) < 10;
 
-        int signal_end = fwd ? seq_to_sig_map[end + 1] : seq_to_sig_map[start];
-        spdlog::debug("Strand {}; poly A/T signal begin {}", fwd ? '+' : '-', signal_end);
-
-        // Walk through signal
-
-        float x_n = 0, x_n_1 = 0;
-        float v_n = 1, v_n_1 = 0;
-        int n = 0;
-        float stdev;
-        int signal_start = 0;
-        const c10::Half* signal = static_cast<c10::Half*>(read->raw_data.data_ptr());
-        for (int i = signal_end; (fwd ? i > 0 : i < read->raw_data.size(0)); (fwd ? i-- : i++)) {
-            x_n_1 = x_n;
-            v_n_1 = v_n;
-            float x = signal[i];
-            stdev = std::sqrt(v_n_1);
-            spdlog::debug("input {}, Mean {} stddev {}", x, x_n, stdev);
-            if (n > 10 and x > x_n_1 + 4 * stdev) {
-                spdlog::debug("Reached end at {}", i);
-                break;
+        if (proceed) {
+            bool fwd = true;
+            int start = 0, end = 0;
+            if (dist_v2 < dist_v1) {
+                fwd = false;
+                start = top_v2.endLocations[0];
+            } else {
+                end = bottom_start + bottom_v1.startLocations[0];
             }
-            x_n = x_n_1 + float(x - x_n_1) / (n + 1);
-            v_n = v_n_1 + float((x - x_n_1) * (x - x_n) - v_n_1) / (n + 1);
-            n++;
-            signal_start = i;
-        }
-        if (!fwd) {
-            std::swap(signal_start, signal_end);
-        }
-        float num_samples_per_base =
-                static_cast<float>(read->raw_data.size(0)) / read->seq.length();
-        const int kNumBases = 200;
-        //int c = 0;
-        //int j = 0;
-        //for(int i = 0; i < read->seq.length() && j < kNumBases; i++) {
-        //    if (read->seq[i] == (fwd ? 'A' : 'T')) {
-        //        c += seq_to_sig_map[i + 1] - seq_to_sig_map[i];
-        //        j++;
-        //    }
-        //}
-        //float num_samples_per_base = static_cast<float>(c) / j;
-        //int start_base = (read->seq.length() >> 1) - (kNumBases >> 1);
-        //float num_samples_per_base = static_cast<float>(seq_to_sig_map[start_base + kNumBases + 1] - seq_to_sig_map[start_base]) / kNumBases;
-        int num_bases = static_cast<int>((signal_end - signal_start) / num_samples_per_base);
-        if (num_bases > 0 && num_bases < 250) {
-            spdlog::debug("{} PolyA bases {}, Signal range is {} {}, primer {}", read->read_id,
-                          num_bases, signal_start, signal_end, end);
-            spdlog::debug("Region is {}", read->seq.substr(end - num_bases, num_bases));
 
-            polyA += num_bases;
+            int signal_end = fwd ? seq_to_sig_map[end] : seq_to_sig_map[start];
+            spdlog::debug(
+                    "Strand {}; poly A/T signal begin {}, shift/scale {} {}, samples trimmed {}",
+                    fwd ? '+' : '-', signal_end, read->mshift, read->mscale,
+                    read->num_trimmed_samples);
+
+            // Walk through signal
+            const c10::Half* signal = static_cast<c10::Half*>(read->raw_data.data_ptr());
+
+            int signal_start;
+            std::tie(signal_start, signal_end) =
+                    determine_signal_bounds(signal_end, signal, seq_to_sig_map, fwd, read);
+
+            //auto num_samples_per_base = estimate_samples_per_base(read);
+            auto num_samples_per_base = estimate_samples_per_base(seq_to_sig_map, read->seq, fwd);
+            ;
+            int num_bases = static_cast<int>((signal_end - signal_start) / num_samples_per_base);
+            if (num_bases >= 0 && num_bases < 250) {
+                spdlog::debug(
+                        "{} PolyA bases {}, region {} Signal range is {} {}, primer {}, "
+                        "samples/base {}",
+                        read->read_id, num_bases,
+                        read->seq.substr(fwd ? (end - num_bases) : start, num_bases), signal_start,
+                        signal_end, fwd ? end : start, num_samples_per_base);
+                polyA += num_bases;
+                read->rna_poly_tail_length = num_bases;
+            } else {
+                spdlog::warn("{} PolyA bases {}, Signal range is {} {} primer {}, samples/base {}",
+                             read->read_id, num_bases, signal_start, signal_end, fwd ? end : start,
+                             num_samples_per_base);
+                not_called++;
+            }
         } else {
-            spdlog::warn("{} PolyA bases {}, Signal range is {} {} primer {}", read->read_id,
-                         num_bases, signal_start, signal_end, end);
+            spdlog::warn("{} primer edit distance too high {}", read->read_id,
+                         std::min(dist_v1, dist_v2));
             not_called++;
         }
 
