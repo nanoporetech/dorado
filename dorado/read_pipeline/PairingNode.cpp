@@ -132,7 +132,7 @@ PairingNode::is_within_time_and_length_criteria(const std::shared_ptr<dorado::Re
     return pair_result;
 }
 
-void PairingNode::pair_list_worker_thread() {
+void PairingNode::pair_list_worker_thread(int tid) {
     Message message;
     while (get_input_message(message)) {
         // If this message isn't a read, just forward it to the sink.
@@ -397,6 +397,7 @@ PairingNode::PairingNode(std::map<std::string, std::string> template_complement_
         m_complement_template_map[key.second] = key.first;
     }
 
+    m_pairing_func = &PairingNode::pair_list_worker_thread;
     start_threads();
 }
 
@@ -416,6 +417,7 @@ PairingNode::PairingNode(ReadOrder read_order, int num_worker_threads, size_t ma
         throw std::runtime_error("Unsupported read order detected: " +
                                  dorado::to_string(read_order));
     }
+    m_pairing_func = &PairingNode::pair_generating_worker_thread;
     start_threads();
 }
 
@@ -423,8 +425,7 @@ void PairingNode::start_threads() {
     m_tbufs.reserve(m_num_worker_threads);
     for (size_t i = 0; i < m_num_worker_threads; i++) {
         m_tbufs.push_back(MmTbufPtr(mm_tbuf_init()));
-        m_workers.push_back(std::make_unique<std::thread>(
-                std::thread(&PairingNode::pair_generating_worker_thread, this, i)));
+        m_workers.push_back(std::make_unique<std::thread>(std::thread(m_pairing_func, this, i)));
         ++m_num_active_worker_threads;
     }
 }

@@ -47,9 +47,8 @@ private:
 
     /**
      * This is a worker thread function for pairing reads based on a specified list of template-complement pairs.
-     * UNUSED.
      */
-    void pair_list_worker_thread();
+    void pair_list_worker_thread(int tid);
 
     /**
      * This is a worker thread function for generating pairs of reads that fall within pairing criteria.
@@ -67,6 +66,9 @@ private:
     int m_num_worker_threads = 0;
     std::atomic<int> m_num_active_worker_threads = 0;
     std::atomic<bool> m_preserve_cache_during_flush = false;
+
+    using FPairingFunc = void (PairingNode::*)(int);
+    FPairingFunc m_pairing_func = nullptr;
 
     // Members for pair_list method
 

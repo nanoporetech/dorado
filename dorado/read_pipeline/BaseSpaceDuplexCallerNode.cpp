@@ -165,6 +165,7 @@ void BaseSpaceDuplexCallerNode::basespace(const std::string& template_read_id,
                 complement_sequence_reverse_complement, result.alignment);
 
         auto duplex_read = std::make_shared<Read>();
+        duplex_read->is_duplex = true;
         duplex_read->seq = std::string(consensus.begin(), consensus.end());
         duplex_read->qstring =
                 std::string(quality_scores_phred.begin(), quality_scores_phred.end());
@@ -195,7 +196,7 @@ void BaseSpaceDuplexCallerNode::start_threads() {
 
 void BaseSpaceDuplexCallerNode::terminate_impl() {
     terminate_input_queue();
-    if (m_worker_thread->joinable()) {
+    if (m_worker_thread && m_worker_thread->joinable()) {
         m_worker_thread->join();
     }
     m_worker_thread.reset();

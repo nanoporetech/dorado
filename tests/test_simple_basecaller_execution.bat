@@ -12,3 +12,6 @@ echo dorado summary test stage
 
 echo dorado aligner test stage
 %dorado_bin% aligner ref.fq calls.sam > aligned-calls.bam
+
+echo dorado duplex basespace test stage
+%dorado_bin% duplex basespace tests/data/basespace/pairs.bam --threads 1 --pairs tests/data/basespace/pairs.txt > calls.bam
