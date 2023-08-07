@@ -27,6 +27,8 @@ if(NOT DEFINED OPENSSL_ROOT_DIR)
             set(OPENSSL_ROOT_DIR ${DORADO_3RD_PARTY}/openssl3-Linux-aarch64)
         endif()
     endif()
+else()
+    message(STATUS "Using existing OpenSSL at ${OPENSSL_ROOT_DIR}")
 endif()
 
 set(CMAKE_PREFIX_PATH ${OPENSSL_ROOT_DIR} ${CMAKE_PREFIX_PATH}) # put the selected openssl path before any older imported one.
