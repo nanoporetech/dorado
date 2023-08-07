@@ -4,6 +4,7 @@
 #include "htslib/sam.h"
 #include "read_pipeline/ReadPipeline.h"
 
+#include <cassert>
 #include <stdexcept>
 #include <string>
 

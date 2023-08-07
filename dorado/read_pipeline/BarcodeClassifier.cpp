@@ -11,6 +11,8 @@
 #include <algorithm>
 #include <memory>
 #include <string>
+#include <string_view>
+#include <tuple>
 #include <vector>
 
 namespace dorado {
@@ -43,7 +45,7 @@ EdlibAlignConfig init_edlib_config_for_mask() {
 
 // Extract the position of the barcode mask in the read based
 // on the local alignment result from edlib.
-int extract_mask_location(EdlibAlignResult aln, const std::string_view& query) {
+int extract_mask_location(EdlibAlignResult aln, std::string_view query) {
     int query_cursor = 0;
     int target_cursor = 0;
     for (int i = 0; i < aln.alignmentLength; i++) {
@@ -68,8 +70,8 @@ int extract_mask_location(EdlibAlignResult aln, const std::string_view& query) {
 // Helper function to locally align the flanks with barcode mask
 // against a subsequence of the read (either front or read window)
 // and return the alignment, score & barcode position.
-std::tuple<EdlibAlignResult, float, int> extract_flank_fit(const std::string_view& strand,
-                                                           const std::string_view& read,
+std::tuple<EdlibAlignResult, float, int> extract_flank_fit(std::string_view strand,
+                                                           std::string_view read,
                                                            int adapter_len,
                                                            const EdlibAlignConfig& placement_config,
                                                            const char* debug_prefix) {
@@ -85,7 +87,7 @@ std::tuple<EdlibAlignResult, float, int> extract_flank_fit(const std::string_vie
 // Helper function to globally align a barcode to a region
 // within the read.
 float extract_mask_score(const std::string& adapter,
-                         const std::string_view& read,
+                         std::string_view read,
                          const EdlibAlignConfig& config,
                          const char* debug_prefix) {
     auto result = edlibAlign(adapter.data(), adapter.length(), read.data(), read.length(), config);
@@ -148,7 +150,6 @@ BamPtr BarcoderNode::barcode(bam1_t* irecord) {
     auto bc = (bc_res.adapter_name == UNCLASSIFIED_BARCODE)
                       ? UNCLASSIFIED_BARCODE
                       : bc_res.kit + "_" + bc_res.adapter_name;
-    //auto bc = UNCLASSIFIED_BARCODE;
     spdlog::debug("BC: {}", bc);
     bam_aux_append(irecord, "BC", 'Z', bc.length() + 1, (uint8_t*)bc.c_str());
     m_num_records++;
@@ -196,15 +197,12 @@ std::vector<AdapterSequence> Barcoder::generate_adapter_sequence(
         as.kit = kit_name;
         auto& ref_bc = barcodes.at(kit_info.barcodes[0]);
 
-        as.top_primer = kit_info.top_front_flank + std::string(ref_bc.length(), 'N') +
-                        kit_info.top_rear_flank;
-        as.top_primer_rev = utils::reverse_complement(kit_info.top_rear_flank) +
-                            std::string(ref_bc.length(), 'N') +
+        std::string bc_mask(ref_bc.length(), 'N');
+        as.top_primer = kit_info.top_front_flank + bc_mask + kit_info.top_rear_flank;
+        as.top_primer_rev = utils::reverse_complement(kit_info.top_rear_flank) + bc_mask +
                             utils::reverse_complement(kit_info.top_front_flank);
-        as.bottom_primer = kit_info.bottom_front_flank + std::string(ref_bc.length(), 'N') +
-                           kit_info.bottom_rear_flank;
-        as.bottom_primer_rev = utils::reverse_complement(kit_info.bottom_rear_flank) +
-                               std::string(ref_bc.length(), 'N') +
+        as.bottom_primer = kit_info.bottom_front_flank + bc_mask + kit_info.bottom_rear_flank;
+        as.bottom_primer_rev = utils::reverse_complement(kit_info.bottom_rear_flank) + bc_mask +
                                utils::reverse_complement(kit_info.bottom_front_flank);
 
         for (auto& bc_name : kit_info.barcodes) {
@@ -235,7 +233,7 @@ std::vector<AdapterSequence> Barcoder::generate_adapter_sequence(
 // So we need to check both ends of the read. Since the adapters always ligate to
 // 5' end of the read, the 3' end of the other strand has the reverse complement
 // of that adapter sequence. This leads to 2 variants of the barcode arrangements.
-void Barcoder::calculate_adapter_score_different_double_ends(const std::string_view& read_seq,
+void Barcoder::calculate_adapter_score_different_double_ends(std::string_view read_seq,
                                                              const AdapterSequence& as,
                                                              std::vector<ScoreResults>& results) {
     std::string_view read_top = read_seq.substr(0, 150);
@@ -255,32 +253,40 @@ void Barcoder::calculate_adapter_score_different_double_ends(const std::string_v
     // Fetch barcode mask locations for variant 1
     auto [top_result_v1, top_flank_score_v1, top_bc_loc_v1] = extract_flank_fit(
             top_strand_v1, read_top, adapter_len, placement_config, "top score v1");
-    const std::string_view& top_mask_v1 = read_top.substr(top_bc_loc_v1, adapter_len);
+    std::string_view top_mask_v1 = read_top.substr(top_bc_loc_v1, adapter_len);
 
     auto [bottom_result_v1, bottom_flank_score_v1, bottom_bc_loc_v1] = extract_flank_fit(
             bottom_strand_v1, read_bottom, adapter_len, placement_config, "bottom score v1");
-    const std::string_view& bottom_mask_v1 = read_bottom.substr(bottom_bc_loc_v1, adapter_len);
+    std::string_view bottom_mask_v1 = read_bottom.substr(bottom_bc_loc_v1, adapter_len);
 
     // Fetch barcode mask locations for variant 2
     auto [top_result_v2, top_flank_score_v2, top_bc_loc_v2] = extract_flank_fit(
             top_strand_v2, read_top, adapter_len, placement_config, "top score v2");
-    const std::string_view& top_mask_v2 = read_top.substr(top_bc_loc_v2, adapter_len);
+    std::string_view top_mask_v2 = read_top.substr(top_bc_loc_v2, adapter_len);
 
     auto [bottom_result_v2, bottom_flank_score_v2, bottom_bc_loc_v2] = extract_flank_fit(
             bottom_strand_v2, read_bottom, adapter_len, placement_config, "bottom score v2");
-    const std::string_view& bottom_mask_v2 = read_bottom.substr(bottom_bc_loc_v2, adapter_len);
+    std::string_view bottom_mask_v2 = read_bottom.substr(bottom_bc_loc_v2, adapter_len);
 
     // Find the best variant of the two.
     int total_v1_score = top_result_v1.editDistance + bottom_result_v1.editDistance;
     int total_v2_score = top_result_v2.editDistance + bottom_result_v2.editDistance;
 
-    spdlog::debug("best variant {}", (total_v1_score < total_v2_score) ? "v1" : "v2");
-    const auto& top_mask = (total_v1_score < total_v2_score) ? top_mask_v1 : top_mask_v2;
-    const auto& bottom_mask = (total_v1_score < total_v2_score) ? bottom_mask_v1 : bottom_mask_v2;
-    float top_flank_score =
-            (total_v1_score < total_v2_score) ? top_flank_score_v1 : top_flank_score_v2;
-    float bottom_flank_score =
-            (total_v1_score < total_v2_score) ? bottom_flank_score_v1 : bottom_flank_score_v2;
+    std::string_view top_mask, bottom_mask;
+    float top_flank_score, bottom_flank_score;
+    if (total_v1_score < total_v2_score) {
+        top_mask = top_mask_v1;
+        bottom_mask = bottom_mask_v1;
+        top_flank_score = top_flank_score_v1;
+        bottom_flank_score = bottom_flank_score_v1;
+        spdlog::debug("best variant v1");
+    } else {
+        top_mask = top_mask_v2;
+        bottom_mask = bottom_mask_v2;
+        top_flank_score = top_flank_score_v2;
+        bottom_flank_score = bottom_flank_score_v2;
+        spdlog::debug("best variant v2");
+    }
 
     for (int i = 0; i < as.adapter.size(); i++) {
         auto& adapter = as.adapter[i];
@@ -346,7 +352,7 @@ void Barcoder::calculate_adapter_score_different_double_ends(const std::string_v
 // So we need to check bottom ends of the read. However since adapter sequence is the
 // same for top and bottom strands, we simply need to look for the adapter and its
 // reverse complement sequence in the top/bottom windows.
-void Barcoder::calculate_adapter_score_double_ends(const std::string_view& read_seq,
+void Barcoder::calculate_adapter_score_double_ends(std::string_view read_seq,
                                                    const AdapterSequence& as,
                                                    std::vector<ScoreResults>& results) {
     bool debug_mode = (spdlog::get_level() == spdlog::level::debug);
@@ -366,11 +372,11 @@ void Barcoder::calculate_adapter_score_double_ends(const std::string_view& read_
 
     auto [top_result, top_flank_score, top_bc_loc] =
             extract_flank_fit(top_strand, read_top, adapter_len, placement_config, "top score");
-    const std::string_view& top_mask = read_top.substr(top_bc_loc, adapter_len);
+    std::string_view top_mask = read_top.substr(top_bc_loc, adapter_len);
 
     auto [bottom_result, bottom_flank_score, bottom_bc_loc] = extract_flank_fit(
             bottom_strand, read_bottom, adapter_len, placement_config, "bottom score");
-    const std::string_view& bottom_mask = read_bottom.substr(bottom_bc_loc, adapter_len);
+    std::string_view bottom_mask = read_bottom.substr(bottom_bc_loc, adapter_len);
 
     for (int i = 0; i < as.adapter.size(); i++) {
         auto& adapter = as.adapter[i];
@@ -407,7 +413,7 @@ void Barcoder::calculate_adapter_score_double_ends(const std::string_view& read_
 // In this scenario, the barcode (and its flanks) only ligate to the 5' end
 // of the read. So we only look for adapter sequence in the top "window" (first
 // 150bp) of the read.
-void Barcoder::calculate_adapter_score(const std::string_view& read_seq,
+void Barcoder::calculate_adapter_score(std::string_view read_seq,
                                        const AdapterSequence& as,
                                        std::vector<ScoreResults>& results) {
     bool debug_mode = (spdlog::get_level() == spdlog::level::debug);
@@ -424,7 +430,7 @@ void Barcoder::calculate_adapter_score(const std::string_view& read_seq,
 
     auto [top_result, top_flank_score, top_bc_loc] =
             extract_flank_fit(top_strand, read_top, adapter_len, placement_config, "top score");
-    const std::string_view& top_mask = read_top.substr(top_bc_loc, adapter_len);
+    std::string_view top_mask = read_top.substr(top_bc_loc, adapter_len);
 
     for (int i = 0; i < as.adapter.size(); i++) {
         auto& adapter = as.adapter[i];
@@ -485,11 +491,9 @@ ScoreResults Barcoder::find_best_adapter(const std::string& read_seq,
     spdlog::debug("Scores: {}", d.str());
     const float kMargin = 0.25f;
     if (best_score->score - second_best_score->score >= 0.1f) {
-        if (best_score->flank_score >= 0.7 && best_score->score >= 0.6) {
-            return *best_score;
-        } else if (best_score->score >= 0.7 && best_score->flank_score >= 0.6) {
-            return *best_score;
-        } else if (best_score->score - second_best_score->score >= kMargin) {
+        if ((best_score->flank_score >= 0.7 && best_score->score >= 0.6) ||
+            (best_score->score >= 0.7 && best_score->flank_score >= 0.6) ||
+            (best_score->score - second_best_score->score >= kMargin)) {
             return *best_score;
         }
     }

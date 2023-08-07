@@ -5,6 +5,7 @@
 
 #include <atomic>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace dorado {
@@ -473,13 +474,13 @@ private:
 
     std::vector<AdapterSequence> generate_adapter_sequence(
             const std::vector<std::string>& kit_names);
-    void calculate_adapter_score_different_double_ends(const std::string_view& read_seq,
+    void calculate_adapter_score_different_double_ends(std::string_view read_seq,
                                                        const AdapterSequence& as,
                                                        std::vector<ScoreResults>& res);
-    void calculate_adapter_score_double_ends(const std::string_view& read_seq,
+    void calculate_adapter_score_double_ends(std::string_view read_seq,
                                              const AdapterSequence& as,
                                              std::vector<ScoreResults>& res);
-    void calculate_adapter_score(const std::string_view& read_seq,
+    void calculate_adapter_score(std::string_view read_seq,
                                  const AdapterSequence& as,
                                  std::vector<ScoreResults>& res);
     ScoreResults find_best_adapter(const std::string& read_seq,

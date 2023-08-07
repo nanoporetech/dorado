@@ -87,7 +87,7 @@ int barcoder(int argc, char* argv[]) {
 
     auto read_list = utils::load_read_list(parser.get<std::string>("--read-ids"));
 
-    if (reads.size() == 0) {
+    if (reads.empty()) {
 #ifndef _WIN32
         if (isatty(fileno(stdin))) {
             std::cout << parser << std::endl;
