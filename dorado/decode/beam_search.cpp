@@ -168,7 +168,7 @@ float beam_search(const T* const scores,
          state++) {
         if (back_guide[state] >= beam_init_threshold) {
             // Note that this first element has a prev_element_index of 0
-            (*prev_beam_front)[beam_element++] = {chainfasthash64(hash_seed, state), 0.0f,
+            (*prev_beam_front)[beam_element++] = {fasthash::chainfasthash64(hash_seed, state), 0.0f,
                                                   state_t(state), 0, false};
         }
     }
@@ -250,7 +250,7 @@ float beam_search(const T* const scores,
                                                              num_bases, num_states);
                 float new_score = previous_element.score + fetch_block_score(move_idx) +
                                   static_cast<float>(block_back_scores[new_state]);
-                uint64_t new_hash = chainfasthash64(previous_element.hash, new_state);
+                uint64_t new_hash = fasthash::chainfasthash64(previous_element.hash, new_state);
 
                 // Add new element to the candidate list
                 (*current_beam_front)[new_elem_count++] = {new_hash, new_score, new_state,
