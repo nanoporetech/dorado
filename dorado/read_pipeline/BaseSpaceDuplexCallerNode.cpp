@@ -195,7 +195,7 @@ void BaseSpaceDuplexCallerNode::start_threads() {
 
 void BaseSpaceDuplexCallerNode::terminate_impl() {
     terminate_input_queue();
-    if (m_worker_thread->joinable()) {
+    if (m_worker_thread && m_worker_thread->joinable()) {
         m_worker_thread->join();
     }
     m_worker_thread.reset();
