@@ -32,7 +32,7 @@ namespace fasthash {
 
 // Compression function for Merkle-Damgard construction.
 // This function is generated using the framework provided.
-static uint64_t mix(uint64_t h) {
+inline uint64_t mix(uint64_t h) {
     h ^= h >> 23;
     h *= 0x2127599bf4325c37ULL;
     h ^= h >> 47;
@@ -72,7 +72,7 @@ uint64_t fasthash64(const void *buf, size_t len, uint64_t seed);
  *   Returns:
  *       uint64_t: New hash with value added
  **/
-static uint64_t chainfasthash64(uint64_t hash, uint64_t val) {
+inline uint64_t chainfasthash64(uint64_t hash, uint64_t val) {
     const uint64_t m = 0x880355f21e6d1965ULL;
 
     hash ^= mix(val);
