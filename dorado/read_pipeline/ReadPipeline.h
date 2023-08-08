@@ -143,10 +143,10 @@ class ReadPair {
 public:
     std::shared_ptr<Read> read_1;
     std::shared_ptr<Read> read_2;
-    uint32_t read_1_start;
-    uint32_t read_1_end;
-    uint32_t read_2_start;
-    uint32_t read_2_end;
+    uint64_t read_1_start;
+    uint64_t read_1_end;
+    uint64_t read_2_start;
+    uint64_t read_2_end;
 };
 
 class CacheFlushMessage {
