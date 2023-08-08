@@ -130,7 +130,9 @@ public:
             return granularity;
         }
 
-        const int max_batch_size = available / (bytes_per_chunk_timestep * chunk_size_out);
+        const int64_t max_batch_size_limit = 10240;
+        const int max_batch_size = std::min(available / (bytes_per_chunk_timestep * chunk_size_out),
+                                            max_batch_size_limit);
         if (max_batch_size < utils::pad_to(128, granularity) + granularity) {
             spdlog::warn("Auto batchsize detection failed. Estimated max batch size only {}.",
                          max_batch_size);
@@ -166,7 +168,8 @@ public:
                 handle_cuda_result(cudaEventDestroy(stop));
             }
 
-            spdlog::debug("Auto batchsize: {}, time per chunk {} ms", batch_size, time);
+            spdlog::debug("Auto batchsize {}: {}, time per chunk {} ms", m_device, batch_size,
+                          time);
             if (time < best_time) {
                 best_time = time;
                 best_batch_size = batch_size;
