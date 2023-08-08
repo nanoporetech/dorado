@@ -126,13 +126,11 @@ PairingNode::PairingResult PairingNode::is_within_alignment_criteria(
 
         spdlog::debug(
                 "hits {}, mapq {}, overlap length {}, overlap frac {}, delta {}, read 1 {}, "
-                "read 2 "
-                "{}, strand {}, pass {}, temp start {} temp end {}, comp start {} comp end {}, "
-                "{} "
-                "and {}",
+                "read 2 {}, strand {}, pass {}, accepted {}, temp start {} temp end {}, "
+                "comp start {} comp end {}, {} and {}",
                 hits, mapq, temp_end - temp_start, overlap_frac, delta, temp->seq.length(),
-                comp->seq.length(), rev ? "-" : "+", cond, temp_start, temp_end, comp_start,
-                comp_end, temp->read_id, comp->read_id);
+                comp->seq.length(), rev ? "-" : "+", cond, !allow_rejection, temp_start, temp_end,
+                comp_start, comp_end, temp->read_id, comp->read_id);
 
         if (cond || !allow_rejection) {
             m_overlap_accepted_pairs++;
