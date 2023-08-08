@@ -106,8 +106,6 @@ PairingNode::PairingResult PairingNode::is_within_alignment_criteria(
         comp_end = best_map->qe;
         rev = best_map->rev;
 
-        free(best_map->p);
-
         const int kMinMapQ = 50;
         const float kMinOverlapFraction = 0.8f;
 
@@ -141,7 +139,12 @@ PairingNode::PairingResult PairingNode::is_within_alignment_criteria(
             pair_result = {true, temp_start, temp_end, comp_start, comp_end};
         }
     }
+
+    for (int i = 0; i < hits; ++i) {
+        free(reg[i].p);
+    }
     free(reg);
+
     return pair_result;
 }
 
