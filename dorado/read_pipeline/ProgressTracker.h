@@ -46,8 +46,10 @@ public:
             if (m_num_duplex_reads_filtered > 0) {
                 spdlog::info("> Duplex reads filtered: {}", m_num_duplex_reads_filtered);
             }
-            spdlog::info("> Duplex rate: {}%", (static_cast<float>(m_num_duplex_bases_processed) *
-                                                2) / m_num_simplex_bases_processed);
+            spdlog::info("> Duplex rate: {}%",
+                         ((static_cast<float>(m_num_duplex_bases_processed) * 2) /
+                          m_num_simplex_bases_processed) *
+                                 100);
         }
         if (m_num_bases_processed > 0) {
             std::ostringstream samples_sec;
