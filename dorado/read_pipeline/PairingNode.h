@@ -103,10 +103,15 @@ private:
      */
     size_t m_max_num_reads;
 
-    std::tuple<bool, uint32_t, uint32_t, uint32_t, uint32_t> is_within_time_and_length_criteria(
-            const std::shared_ptr<dorado::Read>& read1,
-            const std::shared_ptr<dorado::Read>& read2,
-            int tid);
+    using PairingResult = std::tuple<bool, uint32_t, uint32_t, uint32_t, uint32_t>;
+    PairingResult is_within_time_and_length_criteria(const std::shared_ptr<dorado::Read>& read1,
+                                                     const std::shared_ptr<dorado::Read>& read2,
+                                                     int tid);
+
+    PairingResult is_within_alignment_criteria(const std::shared_ptr<dorado::Read>& temp,
+                                               const std::shared_ptr<dorado::Read>& comp,
+                                               int delta,
+                                               int tid);
 
     // Store the minimap2 buffers used for mapping. One buffer per thread.
     std::vector<MmTbufPtr> m_tbufs;
