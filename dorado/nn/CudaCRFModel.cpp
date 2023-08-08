@@ -168,7 +168,8 @@ public:
                 handle_cuda_result(cudaEventDestroy(stop));
             }
 
-            spdlog::debug("Auto batchsize: {}, time per chunk {} ms", batch_size, time);
+            spdlog::debug("Auto batchsize {}: {}, time per chunk {} ms", m_device, batch_size,
+                          time);
             if (time < best_time) {
                 best_time = time;
                 best_batch_size = batch_size;
