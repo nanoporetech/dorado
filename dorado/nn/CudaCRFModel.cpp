@@ -130,7 +130,9 @@ public:
             return granularity;
         }
 
-        const int max_batch_size = available / (bytes_per_chunk_timestep * chunk_size_out);
+        const int64_t max_batch_size_limit = 10240;
+        const int max_batch_size = std::min(available / (bytes_per_chunk_timestep * chunk_size_out),
+                                            max_batch_size_limit);
         if (max_batch_size < utils::pad_to(128, granularity) + granularity) {
             spdlog::warn("Auto batchsize detection failed. Estimated max batch size only {}.",
                          max_batch_size);
