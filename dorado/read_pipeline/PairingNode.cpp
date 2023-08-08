@@ -63,8 +63,8 @@ PairingNode::PairingResult PairingNode::is_within_time_and_length_criteria(
 PairingNode::PairingResult PairingNode::is_within_alignment_criteria(
         const std::shared_ptr<dorado::Read>& temp,
         const std::shared_ptr<dorado::Read>& comp,
-        bool allow_rejection,
         int delta,
+        bool allow_rejection,
         int tid) {
     PairingResult pair_result = {false, 0, 0, 0, 0};
     const std::string nvtx_id = "pairing_map_" + std::to_string(tid);
