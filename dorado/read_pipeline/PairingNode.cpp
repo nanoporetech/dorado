@@ -192,10 +192,17 @@ void PairingNode::pair_list_worker_thread(int tid) {
                     template_read = partner_read;
                 }
 
-                ReadPair read_pair;
-                read_pair.read_1 = template_read;
-                read_pair.read_2 = complement_read;
+                ReadPair read_pair{template_read,
+                                   complement_read,
+                                   0,
+                                   template_read->seq.size(),
+                                   0,
+                                   complement_read->seq.size()};
+                template_read->is_duplex_parent = true;
+                complement_read->is_duplex_parent = true;
 
+                std::cerr << template_read->parent_read_id;
+                std::cerr << complement_read->parent_read_id;
                 ++template_read->num_duplex_candidate_pairs;
 
                 send_message_to_sink(std::make_shared<ReadPair>(read_pair));

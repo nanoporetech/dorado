@@ -15,10 +15,10 @@ namespace dorado {
 std::shared_ptr<dorado::Read> StereoDuplexEncoderNode::stereo_encode(
         std::shared_ptr<dorado::Read> template_read,
         std::shared_ptr<dorado::Read> complement_read,
-        uint32_t temp_start,
-        uint32_t temp_end,
-        uint32_t comp_start,
-        uint32_t comp_end) {
+        uint64_t temp_start,
+        uint64_t temp_end,
+        uint64_t comp_start,
+        uint64_t comp_end) {
     // We rely on the incoming read raw data being of type float16 to allow direct memcpy
     // of tensor elements.
     assert(template_read->raw_data.dtype() == torch::kFloat16);
