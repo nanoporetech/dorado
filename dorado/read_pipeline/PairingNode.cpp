@@ -57,12 +57,13 @@ PairingNode::PairingResult PairingNode::is_within_time_and_length_criteria(
         return {true, 0, temp->seq.length() - 1, 0, comp->seq.length() - 1};
     }
 
-    return is_within_alignment_criteria(temp, comp, delta, tid);
+    return is_within_alignment_criteria(temp, comp, delta, true, tid);
 }
 
 PairingNode::PairingResult PairingNode::is_within_alignment_criteria(
         const std::shared_ptr<dorado::Read>& temp,
         const std::shared_ptr<dorado::Read>& comp,
+        bool allow_rejection,
         int delta,
         int tid) {
     PairingResult pair_result = {false, 0, 0, 0, 0};
@@ -89,7 +90,7 @@ PairingNode::PairingResult PairingNode::is_within_alignment_criteria(
     mm_idx_destroy(m_index);
 
     // Multiple hits implies ambiguous mapping, so ignore those pairs.
-    if (hits == 1) {
+    if (hits == 1 || (!allow_rejection && hits > 0)) {
         uint8_t mapq = 0;
         int32_t temp_start = 0;
         int32_t temp_end = 0;
@@ -135,7 +136,7 @@ PairingNode::PairingResult PairingNode::is_within_alignment_criteria(
                 comp->seq.length(), rev ? "-" : "+", cond, temp_start, temp_end, comp_start,
                 comp_end, temp->read_id, comp->read_id);
 
-        if (cond) {
+        if (cond || !allow_rejection) {
             m_overlap_accepted_pairs++;
             pair_result = {true, temp_start, temp_end, comp_start, comp_end};
         }
@@ -205,8 +206,8 @@ void PairingNode::pair_list_worker_thread(int tid) {
                 }
 
                 int delta = complement_read->start_time_ms - template_read->get_end_time_ms();
-                auto [is_pair, qs, qe, rs, re] =
-                        is_within_alignment_criteria(template_read, complement_read, delta, tid);
+                auto [is_pair, qs, qe, rs, re] = is_within_alignment_criteria(
+                        template_read, complement_read, delta, false, tid);
                 if (is_pair) {
                     ReadPair read_pair = {template_read, complement_read, qs, qe, rs, re};
                     template_read->is_duplex_parent = true;

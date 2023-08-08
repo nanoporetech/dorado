@@ -111,6 +111,7 @@ private:
     PairingResult is_within_alignment_criteria(const std::shared_ptr<dorado::Read>& temp,
                                                const std::shared_ptr<dorado::Read>& comp,
                                                int delta,
+                                               bool allow_rejection,
                                                int tid);
 
     // Store the minimap2 buffers used for mapping. One buffer per thread.
