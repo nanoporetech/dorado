@@ -95,7 +95,10 @@ To run Duplex basecalling, run the command:
 $ dorado duplex dna_r10.4.1_e8.2_400bps_sup@v4.1.0 pod5s/ > duplex.bam
 ```
 
-This command will output both simplex and duplex reads. Duplex reads will have the `dx` tag set to `1` in the output BAM, simplex reads will have the `dx` tag set to `0`.
+This command will output both simplex and duplex reads. The `dx` tag in the output BAM can be used to distinguish between them:
+* `dx:i:1` for duplex reads.
+* `dx:i:0` for simplex reads which don't have duplex offsprings.
+* `dx:i:-1` for simplex reads which have duplex offsprings.
 
 Dorado duplex previously required a separate tool to perform duplex pair detection and read splitting, but this is now integrated into Dorado.
 
