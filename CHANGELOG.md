@@ -2,6 +2,12 @@
 
 All notable changes to Dorado will be documented in this file.
 
+# [0.3.4] (10 Aug 2023)
+
+This release of Dorado contains a hotfix for CUDA out of memory issues encountered during duplex runs with v0.3.3.
+
+ * XXX - Pre-allocate input device tensor to address duplex CUDA OOM 
+
 # [0.3.3] (8 Aug 2023)
 
 This release of Dorado introduces improvements to Duplex pair identification for improved duplex yields, faster basecalling on A100 and H100, improvements to modified base calling speed on Apple silicon, and major enhancements to the portability of Dorado binaries.
