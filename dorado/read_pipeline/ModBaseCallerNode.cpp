@@ -84,6 +84,9 @@ void ModBaseCallerNode::restart() {
     for (auto& runner : m_runners) {
         runner->restart();
     }
+    for (auto& chunk_queue : m_chunk_queues) {
+        chunk_queue->restart();
+    }
     restart_input_queue();
     m_processed_chunks.restart();
     start_threads();

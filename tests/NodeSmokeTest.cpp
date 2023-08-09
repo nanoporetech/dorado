@@ -62,12 +62,14 @@ protected:
 
 private:
     std::size_t m_num_reads = 200;
+    std::size_t m_num_messages = m_num_reads;
     using ReadMutator = std::function<void(std::unique_ptr<dorado::Read>& read)>;
     ReadMutator m_read_mutator;
     bool m_pipeline_restart = false;
 
 protected:
     void set_num_reads(std::size_t num_reads) { m_num_reads = num_reads; }
+    void set_expected_messages(std::size_t num_messages) { m_num_messages = num_messages; }
     void set_read_mutator(ReadMutator mutator) { m_read_mutator = std::move(mutator); }
     void set_pipeline_restart(bool restart) { m_pipeline_restart = restart; }
 
@@ -92,6 +94,8 @@ protected:
         }
         // Wait for them to complete.
         pipeline.reset();
+        // Check that we get the expected number of outputs
+        CHECK(messages.size() == m_num_messages);
         // Check the message types match
         for (auto& message : messages) {
             CAPTURE(message.index());
@@ -268,6 +272,7 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
     } else {
         // CPU processing is very slow, so reduce the number of test reads we throw at it.
         set_num_reads(5);
+        set_expected_messages(5);
         modbase_devices.push_back("cpu");
         batch_size = 8;  // reduce batch size so we're not doing work on empty entries
     }
