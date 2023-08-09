@@ -38,6 +38,7 @@ EdlibAlignConfig init_edlib_config_for_flanks() {
 EdlibAlignConfig init_edlib_config_for_mask() {
     EdlibAlignConfig mask_config = edlibDefaultAlignConfig();
     mask_config.mode = EDLIB_MODE_NW;
+    //mask_config.mode = EDLIB_MODE_HW;
     mask_config.task =
             (spdlog::get_level() == spdlog::level::debug) ? EDLIB_TASK_PATH : EDLIB_TASK_LOC;
     return mask_config;
@@ -86,7 +87,7 @@ std::tuple<EdlibAlignResult, float, int> extract_flank_fit(std::string_view stra
 
 // Helper function to globally align a barcode to a region
 // within the read.
-float extract_mask_score(const std::string& adapter,
+float extract_mask_score(std::string_view adapter,
                          std::string_view read,
                          const EdlibAlignConfig& config,
                          const char* debug_prefix) {
@@ -100,7 +101,10 @@ float extract_mask_score(const std::string& adapter,
 
 }  // namespace
 
+namespace demux {
+
 const std::string UNCLASSIFIED_BARCODE = "unclassified";
+const int TRIM_LENGTH = 150;
 
 // A Node which encapsulate running barcode classification on each read.
 BarcoderNode::BarcoderNode(int threads, const std::vector<std::string>& kit_names)
@@ -192,7 +196,7 @@ std::vector<AdapterSequence> Barcoder::generate_adapter_sequence(
     spdlog::debug("> Kits to evaluate: {}", final_kit_names.size());
 
     for (auto& kit_name : final_kit_names) {
-        auto kit_info = dorado::kit_info.at(kit_name);
+        auto kit_info = dorado::demux::kit_info.at(kit_name);
         AdapterSequence as;
         as.kit = kit_name;
         auto& ref_bc = barcodes.at(kit_info.barcodes[0]);
@@ -236,8 +240,9 @@ std::vector<AdapterSequence> Barcoder::generate_adapter_sequence(
 void Barcoder::calculate_adapter_score_different_double_ends(std::string_view read_seq,
                                                              const AdapterSequence& as,
                                                              std::vector<ScoreResults>& results) {
-    std::string_view read_top = read_seq.substr(0, 150);
-    std::string_view read_bottom = read_seq.substr(std::max(0, (int)read_seq.length() - 150), 150);
+    std::string_view read_top = read_seq.substr(0, TRIM_LENGTH);
+    std::string_view read_bottom =
+            read_seq.substr(std::max(0, (int)read_seq.length() - TRIM_LENGTH), TRIM_LENGTH);
 
     // Try to find the location of the barcode + flanks in the top and bottom windows.
     EdlibAlignConfig placement_config = init_edlib_config_for_flanks();
@@ -356,8 +361,9 @@ void Barcoder::calculate_adapter_score_double_ends(std::string_view read_seq,
                                                    const AdapterSequence& as,
                                                    std::vector<ScoreResults>& results) {
     bool debug_mode = (spdlog::get_level() == spdlog::level::debug);
-    std::string_view read_top = read_seq.substr(0, 150);
-    std::string_view read_bottom = read_seq.substr(std::max(0, (int)read_seq.length() - 150), 150);
+    std::string_view read_top = read_seq.substr(0, TRIM_LENGTH);
+    std::string_view read_bottom =
+            read_seq.substr(std::max(0, (int)read_seq.length() - TRIM_LENGTH), TRIM_LENGTH);
 
     // Try to find the location of the barcode + flanks in the top and bottom windows.
     EdlibAlignConfig placement_config = init_edlib_config_for_flanks();
@@ -417,7 +423,7 @@ void Barcoder::calculate_adapter_score(std::string_view read_seq,
                                        const AdapterSequence& as,
                                        std::vector<ScoreResults>& results) {
     bool debug_mode = (spdlog::get_level() == spdlog::level::debug);
-    std::string_view read_top = read_seq.substr(0, 150);
+    std::string_view read_top = read_seq.substr(0, TRIM_LENGTH);
 
     // Try to find the location of the barcode + flanks in the top and bottom windows.
     EdlibAlignConfig placement_config = init_edlib_config_for_flanks();
@@ -431,13 +437,17 @@ void Barcoder::calculate_adapter_score(std::string_view read_seq,
     auto [top_result, top_flank_score, top_bc_loc] =
             extract_flank_fit(top_strand, read_top, adapter_len, placement_config, "top score");
     std::string_view top_mask = read_top.substr(top_bc_loc, adapter_len);
+    spdlog::debug("BC location {}", top_bc_loc);
 
     for (int i = 0; i < as.adapter.size(); i++) {
+        //auto& kit_info = dorado::demux::kit_info.at(as.kit);
         auto& adapter = as.adapter[i];
         auto& adapter_name = as.adapter_name[i];
         spdlog::debug("Checking barcode {}", adapter_name);
 
         auto top_mask_score = extract_mask_score(adapter, top_mask, mask_config, "top window");
+        //const std::string bc = kit_info.top_front_flank + adapter + kit_info.top_rear_flank;
+        //auto top_mask_score = extract_mask_score(bc, read_top, mask_config, "top window");
 
         ScoreResults res;
         res.adapter_name = adapter_name;
@@ -459,7 +469,7 @@ void Barcoder::calculate_adapter_score(std::string_view read_seq,
 // or an unclassified match, based on certain heuristics.
 ScoreResults Barcoder::find_best_adapter(const std::string& read_seq,
                                          std::vector<AdapterSequence>& adapters) {
-    if (read_seq.length() < 150) {
+    if (read_seq.length() < TRIM_LENGTH) {
         return UNCLASSIFIED;
     }
     std::string fwd = read_seq;
@@ -501,5 +511,7 @@ ScoreResults Barcoder::find_best_adapter(const std::string& read_seq,
     // If nothing is found, report as unclassified.
     return UNCLASSIFIED;
 }
+
+}  // namespace demux
 
 }  // namespace dorado

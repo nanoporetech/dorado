@@ -10,6 +10,8 @@
 
 namespace dorado {
 
+namespace demux {
+
 struct KitInfo {
     bool double_ends;
     bool ends_different;
@@ -88,19 +90,20 @@ static const std::unordered_map<std::string, KitInfo> kit_info = {
         {"SQK-RBK114.96",
          {false,
           false,
-          "GCTTGGGTGTTTAACC",
+          "C",
           "GTTTTCGCATTTATCGTGAAACGCTTTCGCGTTTTTCGTGCGCCGCTTCA",
           "",
           "",
-          {"BC01", "BC02", "BC03", "BC04", "BC05", "BC06", "BC07", "BC08", "BC09", "BC10", "BC11",
-           "BC12", "BC13", "BC14", "BC15", "BC16", "BC17", "BC18", "BC19", "BC20", "BC21", "BC22",
-           "BC23", "BC24", "BC25", "BC26", "BC27", "BC28", "BC29", "BC30", "BC31", "BC32", "BC33",
-           "BC34", "BC35", "BC36", "BC37", "BC38", "BC39", "BC40", "BC41", "BC42", "BC43", "BC44",
-           "BC45", "BC46", "BC47", "BC48", "BC49", "BC50", "BC51", "BC52", "BC53", "BC54", "BC55",
-           "BC56", "BC57", "BC58", "BC59", "BC60", "BC61", "BC62", "BC63", "BC64", "BC65", "BC66",
-           "BC67", "BC68", "BC69", "BC70", "BC71", "BC72", "BC73", "BC74", "BC75", "BC76", "BC77",
-           "BC78", "BC79", "BC80", "BC81", "BC82", "BC83", "BC84", "BC85", "BC86", "BC87", "BC88",
-           "BC89", "BC90", "BC91", "BC92", "BC93", "BC94", "BC95", "BC96"}}},
+          {"BC01", "BC02", "BC03", "BC04",  "BC05", "BC06",  "BC07", "BC08",  "BC09",  "BC10",
+           "BC11", "BC12", "BC13", "BC14",  "BC15", "BC16",  "BC17", "BC18",  "BC19",  "BC20",
+           "BC21", "BC22", "BC23", "BC24",  "BC25", "RBK26", "BC27", "BC28",  "BC29",  "BC30",
+           "BC31", "BC32", "BC33", "BC34",  "BC35", "BC36",  "BC37", "BC38",  "RBK39", "RBK40",
+           "BC41", "BC42", "BC43", "BC44",  "BC45", "BC46",  "BC47", "RBK48", "BC49",  "BC50",
+           "BC51", "BC52", "BC53", "RBK54", "BC55", "BC56",  "BC57", "BC58",  "BC59",  "RBK60",
+           "BC61", "BC62", "BC63", "BC64",  "BC65", "BC66",  "BC67", "BC68",  "BC69",  "BC70",
+           "BC71", "BC72", "BC73", "BC74",  "BC75", "BC76",  "BC77", "BC78",  "BC79",  "BC80",
+           "BC81", "BC82", "BC83", "BC84",  "BC85", "BC86",  "BC87", "BC88",  "BC89",  "BC90",
+           "BC91", "BC92", "BC93", "BC94",  "BC95", "BC96"}}},
         {"SQK-RPB004",
          {true,
           false,
@@ -265,6 +268,7 @@ static const std::unordered_map<std::string, std::string> barcodes = {
         {"BC24", "GCATAGTTCTGCATGATGGGTTAG"},
         {"BC25", "GTAAGTTGGGTATGCAACGCAATG"},
         {"BC26", "CATACAGCGACTACGCATTCTCAT"},
+        {"RBK26", "ACTATGCCTTTCCGTGAAACAGTT"},
         {"BC27", "CGACGGTTAGATTCACCTCTTACA"},
         {"BC28", "TGAAACCTAAGAAGGCACCGTATC"},
         {"BC29", "CTAGACACCTTGGGTTGACAGACC"},
@@ -278,7 +282,9 @@ static const std::unordered_map<std::string, std::string> barcodes = {
         {"BC37", "GCTTGCGATTGATGCTTAGTATCA"},
         {"BC38", "ACCACAGGAGGACGATACAGAGAA"},
         {"BC39", "CCACAGTGTCAACTAGAGCCTCTC"},
+        {"RBK39", "TCTGCCACACACTCGTAAGTCCTT"},
         {"BC40", "TAGTTTGGATGACCAAGGATAGCC"},
+        {"RBK40", "GTCGATACTGGACCTATCCCTTGG"},
         {"BC41", "GGAGTTCGTCCAGAGAAGTACACG"},
         {"BC42", "CTACGTGTAAGGCATACCTGCCAG"},
         {"BC43", "CTTTCGTTGTTGACTCGACGGTAG"},
@@ -287,18 +293,21 @@ static const std::unordered_map<std::string, std::string> barcodes = {
         {"BC46", "GCTGTGTTCCACTTCATTCTCCTG"},
         {"BC47", "GTGCAACTTTCCCACAGGTAGTTC"},
         {"BC48", "CATCTGGAACGTGGTACACCTGTA"},
+        {"RBK48", "GAGTCCGTGACAACTTCTGAAAGC"},
         {"BC49", "ACTGGTGCAGCTTTGAACATCTAG"},
         {"BC50", "ATGGACTTTGGTAACTTCCTGCGT"},
         {"BC51", "GTTGAATGAGCCTACTGGGTCCTC"},
         {"BC52", "TGAGAGACAAGATTGTTCGTGGAC"},
         {"BC53", "AGATTCAGACCGTCTCATGCAAAG"},
         {"BC54", "CAAGAGCTTTGACTAAGGAGCATG"},
+        {"RBK54", "GGGTGCCAACTACATACCAAACCT"},
         {"BC55", "TGGAAGATGAGACCCTGATCTACG"},
         {"BC56", "TCACTACTCAACAGGTGGCATGAA"},
         {"BC57", "GCTAGGTCAATCTCCTTCGGAAGT"},
         {"BC58", "CAGGTTACTCCTCCGTGAGTCTGA"},
         {"BC59", "TCAATCAAGAAGGGAAAGCAAGGT"},
         {"BC60", "CATGTTCAACCAAGGCTTCTATGG"},
+        {"RBK60", "GAACCCTACTTTGGACAGACACCT"},
         {"BC61", "AGAGGGTACTATGTGCCTCAGCAC"},
         {"BC62", "CACCCACACTTACTTCAGGACGTA"},
         {"BC63", "TTCTGAAGTTCCTGGGTCTTGAAC"},
@@ -511,5 +520,7 @@ private:
     BamPtr barcode(bam1_t* irecord);
     void terminate_impl();
 };
+
+}  // namespace demux
 
 }  // namespace dorado

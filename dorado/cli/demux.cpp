@@ -32,7 +32,7 @@ void add_pg_hdr(sam_hdr_t* hdr) {
 
 }  // anonymous namespace
 
-int barcoder(int argc, char* argv[]) {
+int demuxer(int argc, char* argv[]) {
     utils::InitLogging();
 
     argparse::ArgumentParser parser("dorado", DORADO_VERSION, argparse::default_arguments::help);
@@ -80,10 +80,9 @@ int barcoder(int argc, char* argv[]) {
     // The input thread is the total number of threads to use for dorado
     // barcoding. Heuristically use 10% of threads for BAM generation and
     // rest for barcoding. Empirically this shows good perf.
-    auto [barcoder_threads, demux_writer_threads] =
+    auto [demux_threads, demux_writer_threads] =
             utils::aligner_writer_thread_allocation(threads, 0.1f);
-    spdlog::debug("> barcoding threads {}, writer threads {}", barcoder_threads,
-                  demux_writer_threads);
+    spdlog::debug("> barcoding threads {}, writer threads {}", demux_threads, demux_writer_threads);
 
     auto read_list = utils::load_read_list(parser.get<std::string>("--read-ids"));
 
@@ -111,8 +110,8 @@ int barcoder(int argc, char* argv[]) {
     if (parser.present("--kit_name")) {
         kit_names.push_back(parser.get<std::string>("--kit_name"));
     };
-    auto barcoder =
-            pipeline_desc.add_node<BarcoderNode>({demux_writer}, barcoder_threads, kit_names);
+    auto demux =
+            pipeline_desc.add_node<demux::BarcoderNode>({demux_writer}, demux_threads, kit_names);
 
     // Create the Pipeline from our description.
     std::vector<dorado::stats::StatsReporter> stats_reporters;

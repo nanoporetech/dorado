@@ -55,7 +55,7 @@ void BarcodeDemuxer::worker_thread() {
     }
 }
 
-// Each barcode is mapped to it's own file. Depending
+// Each barcode is mapped to its own file. Depending
 // on the barcode assigned to each read, the read is
 // written to the corresponding barcode file.
 int BarcodeDemuxer::write(bam1_t* const record) {
