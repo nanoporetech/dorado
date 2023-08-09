@@ -289,7 +289,7 @@ int duplex(int argc, char* argv[]) {
             // performed based on empirical results considering a SUP model for simplex
             // calling.
             auto [runners, num_devices] = create_basecall_runners(
-                    model_config, device, num_runners, batch_size, chunk_size, 0.9f, true);
+                    model_config, device, num_runners, batch_size, chunk_size, 0.8f, true);
 
             std::vector<Runner> stereo_runners;
             // The fraction argument for GPU memory allocates the fraction of the
@@ -299,7 +299,7 @@ int duplex(int argc, char* argv[]) {
             // except for on metal
             std::tie(stereo_runners, std::ignore) =
                     create_basecall_runners(stereo_model_config, device, num_runners,
-                                            stereo_batch_size, chunk_size, 1.f, true);
+                                            stereo_batch_size, chunk_size, 0.8f, true);
 
             spdlog::info("> Starting Stereo Duplex pipeline");
 

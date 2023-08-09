@@ -57,6 +57,11 @@ public:
             m_module->forward(input);
             torch::cuda::synchronize(m_options.device().index());
         }
+
+        c10::cuda::CUDACachingAllocator::emptyCache();
+
+        m_input_device =
+                torch::empty({m_batch_size, m_num_input_features, m_in_chunk_size}, m_options);
         start_threads();
     }
 
@@ -201,7 +206,8 @@ public:
         if (num_chunks == 0) {
             return std::vector<DecodedChunk>();
         }
-        auto task = std::make_shared<NNTask>(input.to(m_options.device()), output, num_chunks);
+
+        auto task = std::make_shared<NNTask>(input, output, num_chunks);
         {
             std::lock_guard<std::mutex> lock(m_input_lock);
             m_input_queue.push_front(task);
@@ -251,7 +257,8 @@ public:
 
             std::unique_lock<std::mutex> task_lock(task->mut);
             stats::Timer timer;
-            auto scores = m_module->forward(task->input);
+            m_input_device.copy_(task->input, true);
+            auto scores = m_module->forward(m_input_device);
             const auto forward_ms = timer.GetElapsedMS();
             task->out.copy_(m_decoder->gpu_part(scores, task->num_chunks, m_decoder_options));
             stream.synchronize();
@@ -305,6 +312,7 @@ public:
     std::unique_ptr<std::thread> m_cuda_thread;
     int m_num_input_features, m_batch_size, m_in_chunk_size, m_out_chunk_size;
     bool m_exclusive_gpu_access;
+    torch::Tensor m_input_device;
 
     // Performance monitoring stats.
     std::atomic<int64_t> m_num_batches_called = 0;
