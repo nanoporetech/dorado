@@ -12,7 +12,9 @@
 
 #include <algorithm>
 #include <cassert>
+#include <chrono>
 #include <limits>
+#include <thread>
 
 using namespace std::chrono_literals;
 
@@ -57,6 +59,7 @@ public:
             m_module->forward(input);
             torch::cuda::synchronize(m_options.device().index());
         }
+        //c10::cuda::CUDACachingAllocator::emptyCache();
         start_threads();
     }
 
@@ -201,7 +204,8 @@ public:
         if (num_chunks == 0) {
             return std::vector<DecodedChunk>();
         }
-        auto task = std::make_shared<NNTask>(input.to(m_options.device()), output, num_chunks);
+
+        auto task = std::make_shared<NNTask>(input, output, num_chunks);
         {
             std::lock_guard<std::mutex> lock(m_input_lock);
             m_input_queue.push_front(task);
@@ -329,6 +333,11 @@ CudaModelRunner::CudaModelRunner(std::shared_ptr<CudaCaller> caller)
     m_input = torch::empty(
             {caller->m_batch_size, caller->m_num_input_features, caller->m_in_chunk_size},
             opts.dtype(m_caller->m_options.dtype()));
+    m_input_device = torch::empty(
+            {caller->m_batch_size, caller->m_num_input_features, caller->m_in_chunk_size},
+            opts.dtype(m_caller->m_options.dtype())
+                    .device(m_caller->m_options.device())
+                    .pinned_memory(false));
 
     m_output = torch::empty({3, caller->m_batch_size, caller->m_out_chunk_size},
                             opts.dtype(torch::kInt8));
@@ -341,7 +350,8 @@ void CudaModelRunner::accept_chunk(int chunk_idx, const torch::Tensor &chunk) {
 std::vector<DecodedChunk> CudaModelRunner::call_chunks(int num_chunks) {
     ++m_num_batches_called;
     stats::Timer timer;
-    auto decoded_chunks = m_caller->call_chunks(m_input, m_output, num_chunks, m_stream);
+    m_input.to(m_input_device);
+    auto decoded_chunks = m_caller->call_chunks(m_input_device, m_output, num_chunks, m_stream);
     return decoded_chunks;
 }
 

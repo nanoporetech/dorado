@@ -38,6 +38,7 @@ private:
     std::shared_ptr<CudaCaller> m_caller;
     c10::cuda::CUDAStream m_stream;
     torch::Tensor m_input;
+    torch::Tensor m_input_device;
     torch::Tensor m_output;
 
     // Performance monitoring stats.
