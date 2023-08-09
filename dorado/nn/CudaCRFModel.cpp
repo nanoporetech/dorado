@@ -59,7 +59,11 @@ public:
             m_module->forward(input);
             torch::cuda::synchronize(m_options.device().index());
         }
-        //c10::cuda::CUDACachingAllocator::emptyCache();
+
+        c10::cuda::CUDACachingAllocator::emptyCache();
+
+        m_input_device =
+                torch::empty({m_batch_size, m_num_input_features, m_in_chunk_size}, m_options);
         start_threads();
     }
 
@@ -255,7 +259,8 @@ public:
 
             std::unique_lock<std::mutex> task_lock(task->mut);
             stats::Timer timer;
-            auto scores = m_module->forward(task->input);
+            m_input_device.copy_(task->input, true);
+            auto scores = m_module->forward(m_input_device);
             const auto forward_ms = timer.GetElapsedMS();
             task->out.copy_(m_decoder->gpu_part(scores, task->num_chunks, m_decoder_options));
             stream.synchronize();
@@ -309,6 +314,7 @@ public:
     std::unique_ptr<std::thread> m_cuda_thread;
     int m_num_input_features, m_batch_size, m_in_chunk_size, m_out_chunk_size;
     bool m_exclusive_gpu_access;
+    torch::Tensor m_input_device;
 
     // Performance monitoring stats.
     std::atomic<int64_t> m_num_batches_called = 0;
@@ -333,11 +339,6 @@ CudaModelRunner::CudaModelRunner(std::shared_ptr<CudaCaller> caller)
     m_input = torch::empty(
             {caller->m_batch_size, caller->m_num_input_features, caller->m_in_chunk_size},
             opts.dtype(m_caller->m_options.dtype()));
-    m_input_device = torch::empty(
-            {caller->m_batch_size, caller->m_num_input_features, caller->m_in_chunk_size},
-            opts.dtype(m_caller->m_options.dtype())
-                    .device(m_caller->m_options.device())
-                    .pinned_memory(false));
 
     m_output = torch::empty({3, caller->m_batch_size, caller->m_out_chunk_size},
                             opts.dtype(torch::kInt8));
@@ -350,8 +351,7 @@ void CudaModelRunner::accept_chunk(int chunk_idx, const torch::Tensor &chunk) {
 std::vector<DecodedChunk> CudaModelRunner::call_chunks(int num_chunks) {
     ++m_num_batches_called;
     stats::Timer timer;
-    m_input.to(m_input_device);
-    auto decoded_chunks = m_caller->call_chunks(m_input_device, m_output, num_chunks, m_stream);
+    auto decoded_chunks = m_caller->call_chunks(m_input, m_output, num_chunks, m_stream);
     return decoded_chunks;
 }
 
