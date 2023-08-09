@@ -67,6 +67,7 @@ add_test(
 # We also want these libs to take priority over any installed on the system, so prepend them.
 if (MSVC)
     set_tests_properties(dorado_tests PROPERTIES ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${CMAKE_INSTALL_PREFIX}/bin")
+    set_target_properties(dorado_tests PROPERTIES LINK_OPTIONS "/ignore:4099")
 endif()
 
 # GCC 8 ICEs trying to compile this file with ASAN+optimisations enabled, so knock down the optimisation to try and help it out.

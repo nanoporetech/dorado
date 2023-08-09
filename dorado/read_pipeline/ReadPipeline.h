@@ -18,10 +18,6 @@
 
 namespace dorado {
 
-namespace utils {
-struct BaseModInfo;
-}
-
 class Read;
 
 struct Chunk {
@@ -97,7 +93,7 @@ public:
 
     std::string parent_read_id;  // Origin read ID for all its subreads. Empty for nonsplit reads.
 
-    std::shared_ptr<const utils::BaseModInfo>
+    std::shared_ptr<const BaseModInfo>
             base_mod_info;  // Modified base settings of the models that ran on this read
 
     uint64_t num_trimmed_samples;  // Number of samples which have been trimmed from the raw read.

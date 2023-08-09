@@ -4,15 +4,11 @@
 #include "nn/Runners.h"
 #include "read_pipeline/AlignerNode.h"
 #include "read_pipeline/BaseSpaceDuplexCallerNode.h"
-#include "read_pipeline/BasecallerNode.h"
-#include "read_pipeline/DuplexSplitNode.h"
 #include "read_pipeline/HtsWriter.h"
-#include "read_pipeline/PairingNode.h"
+#include "read_pipeline/Pipelines.h"
 #include "read_pipeline/ProgressTracker.h"
 #include "read_pipeline/ReadFilterNode.h"
 #include "read_pipeline/ReadToBamTypeNode.h"
-#include "read_pipeline/ScalerNode.h"
-#include "read_pipeline/StereoDuplexEncoderNode.h"
 #include "utils/bam_utils.h"
 #include "utils/cli_utils.h"
 #include "utils/duplex_utils.h"
@@ -307,47 +303,17 @@ int duplex(int argc, char* argv[]) {
 
             spdlog::info("> Starting Stereo Duplex pipeline");
 
-            auto stereo_model_stride = stereo_runners.front()->model_stride();
+            PairingParameters pairing_parameters;
+            if (template_complement_map.empty()) {
+                pairing_parameters = ReadOrder::BY_CHANNEL;
+            } else {
+                pairing_parameters = std::move(template_complement_map);
+            }
 
-            auto adjusted_stereo_overlap = (overlap / stereo_model_stride) * stereo_model_stride;
-
-            const int kStereoBatchTimeoutMS = 5000;
-            auto stereo_basecaller_node = pipeline_desc.add_node<BasecallerNode>(
-                    {read_filter_node}, std::move(stereo_runners), adjusted_stereo_overlap,
-                    kStereoBatchTimeoutMS, duplex_rg_name, 1000, "StereoBasecallerNode", true,
-                    get_model_mean_qscore_start_pos(stereo_model_config));
-            auto simplex_model_stride = runners.front()->model_stride();
-
-            auto stereo_node = pipeline_desc.add_node<StereoDuplexEncoderNode>(
-                    {stereo_basecaller_node}, simplex_model_stride);
-
-            auto pairing_node =
-                    template_complement_map.empty()
-                            ? pipeline_desc.add_node<PairingNode>(
-                                      {stereo_node}, ReadOrder::BY_CHANNEL,
-                                      std::thread::hardware_concurrency())
-                            : pipeline_desc.add_node<PairingNode>(
-                                      {stereo_node}, std::move(template_complement_map));
-
-            // Initialize duplex split settings and create a duplex split node
-            // with the given settings and number of devices. If
-            // splitter_settings.enabled is set to false, the splitter node will
-            // act as a passthrough, meaning it won't perform any splitting
-            // operations and will just pass data through.
-            DuplexSplitSettings splitter_settings;
-            auto splitter_node = pipeline_desc.add_node<DuplexSplitNode>(
-                    {pairing_node}, splitter_settings, num_devices);
-
-            auto adjusted_simplex_overlap = (overlap / simplex_model_stride) * simplex_model_stride;
-
-            const int kSimplexBatchTimeoutMS = 100;
-            auto basecaller_node = pipeline_desc.add_node<BasecallerNode>(
-                    {splitter_node}, std::move(runners), adjusted_simplex_overlap,
-                    kSimplexBatchTimeoutMS, model, 1000, "BasecallerNode", true,
-                    get_model_mean_qscore_start_pos(model_config));
-
-            auto scaler_node = pipeline_desc.add_node<ScalerNode>(
-                    {basecaller_node}, model_config.signal_norm_params, num_devices * 2);
+            pipelines::create_stereo_duplex_pipeline(
+                    pipeline_desc, model_config, stereo_model_config, std::move(runners),
+                    std::move(stereo_runners), overlap, num_devices * 2, num_devices,
+                    std::move(pairing_parameters), read_filter_node);
 
             std::vector<dorado::stats::StatsReporter> stats_reporters;
             pipeline = Pipeline::create(std::move(pipeline_desc), &stats_reporters);

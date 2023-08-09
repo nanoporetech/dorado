@@ -1,7 +1,7 @@
 #pragma once
 #include "ReadPipeline.h"
-
-#include <utils/stats.h>
+#include "utils/stats.h"
+#include "utils/types.h"
 
 #include <atomic>
 #include <cstdint>

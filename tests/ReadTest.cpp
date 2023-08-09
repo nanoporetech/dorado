@@ -155,8 +155,8 @@ TEST_CASE(TEST_GROUP ": Methylation tag generation", TEST_GROUP) {
 
     std::string methylation_tag;
     SECTION("Methylation threshold is correctly applied") {
-        read.base_mod_info = std::make_shared<dorado::utils::BaseModInfo>(modbase_alphabet,
-                                                                          modbase_long_names, "");
+        read.base_mod_info =
+                std::make_shared<dorado::BaseModInfo>(modbase_alphabet, modbase_long_names, "");
 
         // Test generation
         const char* expected_methylation_tag_10_score = "A+a.,0,1;C+m.,1,0;";
@@ -194,8 +194,8 @@ TEST_CASE(TEST_GROUP ": Methylation tag generation", TEST_GROUP) {
         const char* expected_methylation_tag_CHEBI = "A+55555.,2;C+12345.,1,0;";
         std::vector<int64_t> expected_methylation_tag_CHEBI_prob{254, 252, 252};
 
-        read.base_mod_info = std::make_shared<dorado::utils::BaseModInfo>(
-                modbase_alphabet, modbase_long_names_CHEBI, "");
+        read.base_mod_info = std::make_shared<dorado::BaseModInfo>(modbase_alphabet,
+                                                                   modbase_long_names_CHEBI, "");
         auto lines = read.extract_sam_lines(false, 50);
         REQUIRE(!lines.empty());
         bam1_t* aln = lines[0].get();
@@ -208,8 +208,8 @@ TEST_CASE(TEST_GROUP ": Methylation tag generation", TEST_GROUP) {
         const char* expected_methylation_tag_with_context = "A+a?,0,1,2;C+m.,1,0;";
         std::vector<int64_t> expected_methylation_tag_with_context_prob{20, 254, 0, 252, 252};
 
-        read.base_mod_info = std::make_shared<dorado::utils::BaseModInfo>(
-                modbase_alphabet, modbase_long_names, context);
+        read.base_mod_info = std::make_shared<dorado::BaseModInfo>(modbase_alphabet,
+                                                                   modbase_long_names, context);
 
         auto lines = read.extract_sam_lines(false, 10);
         REQUIRE(!lines.empty());
@@ -223,8 +223,8 @@ TEST_CASE(TEST_GROUP ": Methylation tag generation", TEST_GROUP) {
     SECTION("Test handling of incorrect base names") {
         std::string modbase_long_names_unknown = "12mA 5mq";
 
-        read.base_mod_info = std::make_shared<dorado::utils::BaseModInfo>(
-                modbase_alphabet, modbase_long_names_unknown, "");
+        read.base_mod_info = std::make_shared<dorado::BaseModInfo>(modbase_alphabet,
+                                                                   modbase_long_names_unknown, "");
         auto lines = read.extract_sam_lines(false, 50);
         REQUIRE(!lines.empty());
         bam1_t* aln = lines[0].get();
