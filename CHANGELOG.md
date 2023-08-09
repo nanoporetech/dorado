@@ -7,6 +7,8 @@ All notable changes to Dorado will be documented in this file.
 This release of Dorado contains a hotfix for CUDA out of memory issues encountered during duplex runs with v0.3.3.
 
  * XXX - Pre-allocate input device tensor to address duplex CUDA OOM 
+ * 9614ebaccbed591a82be2b3683a406023f4fab32 - Fix potential hang in modbase calling node.
+ * c5c0ea003d2b2019f8d400ef203f45ef28aed3d3 - Introduce pipeline API functions to simplify setup for simplex/duplex basecalling.
 
 # [0.3.3] (8 Aug 2023)
 
