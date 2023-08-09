@@ -47,9 +47,8 @@ private:
 
     /**
      * This is a worker thread function for pairing reads based on a specified list of template-complement pairs.
-     * UNUSED.
      */
-    void pair_list_worker_thread();
+    void pair_list_worker_thread(int tid);
 
     /**
      * This is a worker thread function for generating pairs of reads that fall within pairing criteria.
@@ -67,6 +66,9 @@ private:
     int m_num_worker_threads = 0;
     std::atomic<int> m_num_active_worker_threads = 0;
     std::atomic<bool> m_preserve_cache_during_flush = false;
+
+    using FPairingFunc = void (PairingNode::*)(int);
+    FPairingFunc m_pairing_func = nullptr;
 
     // Members for pair_list method
 
@@ -101,10 +103,16 @@ private:
      */
     size_t m_max_num_reads;
 
-    std::tuple<bool, uint32_t, uint32_t, uint32_t, uint32_t> is_within_time_and_length_criteria(
-            const std::shared_ptr<dorado::Read>& read1,
-            const std::shared_ptr<dorado::Read>& read2,
-            int tid);
+    using PairingResult = std::tuple<bool, uint32_t, uint32_t, uint32_t, uint32_t>;
+    PairingResult is_within_time_and_length_criteria(const std::shared_ptr<dorado::Read>& read1,
+                                                     const std::shared_ptr<dorado::Read>& read2,
+                                                     int tid);
+
+    PairingResult is_within_alignment_criteria(const std::shared_ptr<dorado::Read>& temp,
+                                               const std::shared_ptr<dorado::Read>& comp,
+                                               int delta,
+                                               bool allow_rejection,
+                                               int tid);
 
     // Store the minimap2 buffers used for mapping. One buffer per thread.
     std::vector<MmTbufPtr> m_tbufs;
