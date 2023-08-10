@@ -7,6 +7,7 @@
 #include <c10/cuda/CUDAGuard.h>
 #include <c10/cuda/CUDAStream.h>
 #include <nvtx3/nvtx3.hpp>
+#include <spdlog/spdlog.h>
 #include <toml.hpp>
 #include <torch/torch.h>
 
@@ -60,8 +61,6 @@ public:
 
         c10::cuda::CUDACachingAllocator::emptyCache();
 
-        m_input_device =
-                torch::empty({m_batch_size, m_num_input_features, m_in_chunk_size}, m_options);
         start_threads();
     }
 
@@ -135,6 +134,8 @@ public:
             return granularity;
         }
 
+        //std::cerr << "Decode bytes " << static_cast<float>(decode_bytes_per_chunk_timestep * chunk_size_out) / 1e9f << std::endl;
+        //std::cerr << "Model bytes " << static_cast<float>(crfmodel_bytes_per_chunk_timestep * chunk_size_out) / 1e9f << std::endl;
         const int64_t max_batch_size_limit = 10240;
         const int max_batch_size = std::min(available / (bytes_per_chunk_timestep * chunk_size_out),
                                             max_batch_size_limit);
@@ -163,7 +164,7 @@ public:
                 handle_cuda_result(cudaEventCreate(&start));
                 handle_cuda_result(cudaEventCreate(&stop));
                 handle_cuda_result(cudaEventRecord(start));
-                m_module->forward(input);
+                auto tmp = m_module->forward(input);
                 handle_cuda_result(cudaEventRecord(stop));
                 handle_cuda_result(cudaEventSynchronize(stop));
                 float ms = 0;
@@ -181,6 +182,8 @@ public:
             }
         }
 
+        //std::cerr << "Decode for best batch size " << best_batch_size << " " << (best_batch_size * decode_bytes_per_chunk_timestep * chunk_size_out) / 1e9f << " " << m_device << std::endl;
+        //std::cerr << "Model for best batch size " << best_batch_size << " " <<(best_batch_size * crfmodel_bytes_per_chunk_timestep * chunk_size_out) / 1e9f << " " << m_device << std::endl;
         return best_batch_size;
 #endif
     }
@@ -233,6 +236,8 @@ public:
                 "input_queue_cv_device_" + std::to_string(m_options.device().index());
         const std::string gpu_lock_scope_str =
                 "gpu_lock_" + std::to_string(m_options.device().index());
+        bool first_call = true;
+        static int thread = 0;
         while (true) {
             nvtx3::scoped_range loop{loop_scope_str};
             std::unique_lock<std::mutex> input_lock(m_input_lock);
@@ -255,12 +260,25 @@ public:
                                                             m_exclusive_gpu_access);
             nvtxRangePop();
 
+            if (first_call) {
+                spdlog::info("first call with {} for {}", loop_scope_str,
+                             m_batch_size < 1000 ? "simplex" : "duplex");
+                first_call = false;
+            }
+
             std::unique_lock<std::mutex> task_lock(task->mut);
             stats::Timer timer;
-            m_input_device.copy_(task->input, true);
-            auto scores = m_module->forward(m_input_device);
+
+            auto scores = m_module->forward(task->input.to(m_options.device()));
             const auto forward_ms = timer.GetElapsedMS();
-            task->out.copy_(m_decoder->gpu_part(scores, task->num_chunks, m_decoder_options));
+            try {
+                task->out.copy_(m_decoder->gpu_part(scores, task->num_chunks, m_decoder_options));
+            } catch (c10::Error &e) {
+                spdlog::warn("Caught Torch error in decode '{}', clearing CUDA cache and retrying.",
+                             e.msg());
+                c10::cuda::CUDACachingAllocator::emptyCache();
+                task->out.copy_(m_decoder->gpu_part(scores, task->num_chunks, m_decoder_options));
+            }
             stream.synchronize();
             const auto forward_plus_decode_ms = timer.GetElapsedMS();
             ++m_num_batches_called;
@@ -312,7 +330,6 @@ public:
     std::unique_ptr<std::thread> m_cuda_thread;
     int m_num_input_features, m_batch_size, m_in_chunk_size, m_out_chunk_size;
     bool m_exclusive_gpu_access;
-    torch::Tensor m_input_device;
 
     // Performance monitoring stats.
     std::atomic<int64_t> m_num_batches_called = 0;

@@ -58,6 +58,11 @@ int duplex(int argc, char* argv[]) {
             .scan<'i', int>()
             .help("if 0 an optimal batchsize will be selected. batchsizes are rounded to the "
                   "closest multiple of 64.");
+    parser.add_argument("--sbatchsize")
+            .default_value(default_parameters.batchsize)
+            .scan<'i', int>()
+            .help("if 0 an optimal batchsize will be selected. batchsizes are rounded to the "
+                  "closest multiple of 64.");
 
     parser.add_argument("-c", "--chunksize")
             .default_value(default_parameters.chunksize)
@@ -272,11 +277,12 @@ int duplex(int argc, char* argv[]) {
             utils::add_rg_hdr(hdr.get(), read_groups);
 
             int batch_size(parser.get<int>("-b"));
+            int stereo_batch_size(parser.get<int>("--sbatchsize"));
             int chunk_size(parser.get<int>("-c"));
             int overlap(parser.get<int>("-o"));
             const size_t num_runners = default_parameters.num_runners;
 
-            int stereo_batch_size = 0;
+            //int stereo_batch_size = 0;
 #if DORADO_GPU_BUILD
 #ifdef __APPLE__
             if (device == "metal") {
@@ -289,7 +295,7 @@ int duplex(int argc, char* argv[]) {
             // performed based on empirical results considering a SUP model for simplex
             // calling.
             auto [runners, num_devices] = create_basecall_runners(
-                    model_config, device, num_runners, batch_size, chunk_size, 0.8f, true);
+                    model_config, device, num_runners, batch_size, chunk_size, 1.f, true);
 
             std::vector<Runner> stereo_runners;
             // The fraction argument for GPU memory allocates the fraction of the
@@ -299,7 +305,7 @@ int duplex(int argc, char* argv[]) {
             // except for on metal
             std::tie(stereo_runners, std::ignore) =
                     create_basecall_runners(stereo_model_config, device, num_runners,
-                                            stereo_batch_size, chunk_size, 0.8f, true);
+                                            stereo_batch_size, chunk_size, 1.f, true);
 
             spdlog::info("> Starting Stereo Duplex pipeline");
 

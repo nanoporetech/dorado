@@ -8,6 +8,8 @@ namespace dorado {
 
 class GPUDecoder : Decoder {
 public:
+    GPUDecoder() { std::cerr << "create new decoder" << std::endl; }
+    ~GPUDecoder() { std::cerr << "destry decoder" << std::endl; }
     std::vector<DecodedChunk> beam_search(const torch::Tensor& scores,
                                           int num_chunks,
                                           const DecoderOptions& options) final;
@@ -18,14 +20,6 @@ public:
     // on another thread.
     torch::Tensor gpu_part(torch::Tensor scores, int num_chunks, DecoderOptions options);
     std::vector<DecodedChunk> cpu_part(torch::Tensor moves_sequence_qstring_cpu);
-
-private:
-    torch::Tensor chunks;
-    torch::Tensor chunk_results;
-    torch::Tensor aux;
-    torch::Tensor path;
-    torch::Tensor moves_sequence_qstring;
-    bool initialized{false};
 };
 
 }  // namespace dorado

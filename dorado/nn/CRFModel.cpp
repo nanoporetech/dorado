@@ -884,7 +884,6 @@ struct CRFModelImpl : Module {
                 spdlog::warn("Caught Torch error '{}', clearing CUDA cache and retrying.", e.msg());
                 c10::cuda::CUDACachingAllocator::emptyCache();
             }
-            return run_koi(x);
         }
 #endif
         // Output is [N, T, C]
