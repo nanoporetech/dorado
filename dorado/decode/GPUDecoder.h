@@ -8,8 +8,6 @@ namespace dorado {
 
 class GPUDecoder : Decoder {
 public:
-    GPUDecoder() { std::cerr << "create new decoder" << std::endl; }
-    ~GPUDecoder() { std::cerr << "destry decoder" << std::endl; }
     std::vector<DecodedChunk> beam_search(const torch::Tensor& scores,
                                           int num_chunks,
                                           const DecoderOptions& options) final;

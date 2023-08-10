@@ -164,7 +164,7 @@ public:
                 handle_cuda_result(cudaEventCreate(&start));
                 handle_cuda_result(cudaEventCreate(&stop));
                 handle_cuda_result(cudaEventRecord(start));
-                auto tmp = m_module->forward(input);
+                m_module->forward(input);
                 handle_cuda_result(cudaEventRecord(stop));
                 handle_cuda_result(cudaEventSynchronize(stop));
                 float ms = 0;
@@ -237,7 +237,6 @@ public:
         const std::string gpu_lock_scope_str =
                 "gpu_lock_" + std::to_string(m_options.device().index());
         bool first_call = true;
-        static int thread = 0;
         while (true) {
             nvtx3::scoped_range loop{loop_scope_str};
             std::unique_lock<std::mutex> input_lock(m_input_lock);
@@ -260,30 +259,36 @@ public:
                                                             m_exclusive_gpu_access);
             nvtxRangePop();
 
-            if (first_call) {
-                spdlog::info("first call with {} for {}", loop_scope_str,
-                             m_batch_size < 1000 ? "simplex" : "duplex");
-                first_call = false;
-            }
+            //if (first_call) {
+            //    spdlog::info("first call with {} for {}", loop_scope_str,
+            //                 m_batch_size < 1000 ? "simplex" : "duplex");
+            //    first_call = false;
+            //}
 
             std::unique_lock<std::mutex> task_lock(task->mut);
-            stats::Timer timer;
 
-            auto scores = m_module->forward(task->input.to(m_options.device()));
-            const auto forward_ms = timer.GetElapsedMS();
+            auto run_basecalling = [&]() -> std::pair<int64_t, int64_t> {
+                stats::Timer timer;
+                auto scores = m_module->forward(task->input.to(m_options.device(), true));
+                const auto forward_ms = timer.GetElapsedMS();
+                task->out.copy_(m_decoder->gpu_part(scores, task->num_chunks, m_decoder_options));
+                stream.synchronize();
+                const auto forward_plus_decode_ms = timer.GetElapsedMS();
+                m_model_ms += forward_ms;
+                m_decode_ms += forward_plus_decode_ms - forward_ms;
+                return {forward_ms, forward_plus_decode_ms};
+            };
+
+            int64_t forward_ms, forward_plus_decode_ms;
+
             try {
-                task->out.copy_(m_decoder->gpu_part(scores, task->num_chunks, m_decoder_options));
+                std::tie(forward_ms, forward_plus_decode_ms) = run_basecalling();
             } catch (c10::Error &e) {
-                spdlog::warn("Caught Torch error in decode '{}', clearing CUDA cache and retrying.",
-                             e.msg());
+                spdlog::warn("Caught Torch error '{}', clearing CUDA cache and retrying.", e.msg());
                 c10::cuda::CUDACachingAllocator::emptyCache();
-                task->out.copy_(m_decoder->gpu_part(scores, task->num_chunks, m_decoder_options));
+                std::tie(forward_ms, forward_plus_decode_ms) = run_basecalling();
             }
-            stream.synchronize();
-            const auto forward_plus_decode_ms = timer.GetElapsedMS();
             ++m_num_batches_called;
-            m_model_ms += forward_ms;
-            m_decode_ms += forward_plus_decode_ms - forward_ms;
             task->done = true;
             task_lock.unlock();
             task->cv.notify_one();

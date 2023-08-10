@@ -878,12 +878,7 @@ struct CRFModelImpl : Module {
 #if USE_KOI
         if (x.is_cuda() && x.dtype() == torch::kF16) {
             // Output is [N, T, C]
-            try {
-                return run_koi(x);
-            } catch (c10::Error &e) {
-                spdlog::warn("Caught Torch error '{}', clearing CUDA cache and retrying.", e.msg());
-                c10::cuda::CUDACachingAllocator::emptyCache();
-            }
+            return run_koi(x);
         }
 #endif
         // Output is [N, T, C]
