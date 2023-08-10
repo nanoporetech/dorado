@@ -134,8 +134,6 @@ public:
             return granularity;
         }
 
-        //std::cerr << "Decode bytes " << static_cast<float>(decode_bytes_per_chunk_timestep * chunk_size_out) / 1e9f << std::endl;
-        //std::cerr << "Model bytes " << static_cast<float>(crfmodel_bytes_per_chunk_timestep * chunk_size_out) / 1e9f << std::endl;
         const int64_t max_batch_size_limit = 10240;
         const int max_batch_size = std::min(available / (bytes_per_chunk_timestep * chunk_size_out),
                                             max_batch_size_limit);
@@ -182,8 +180,6 @@ public:
             }
         }
 
-        //std::cerr << "Decode for best batch size " << best_batch_size << " " << (best_batch_size * decode_bytes_per_chunk_timestep * chunk_size_out) / 1e9f << " " << m_device << std::endl;
-        //std::cerr << "Model for best batch size " << best_batch_size << " " <<(best_batch_size * crfmodel_bytes_per_chunk_timestep * chunk_size_out) / 1e9f << " " << m_device << std::endl;
         return best_batch_size;
 #endif
     }
@@ -236,7 +232,6 @@ public:
                 "input_queue_cv_device_" + std::to_string(m_options.device().index());
         const std::string gpu_lock_scope_str =
                 "gpu_lock_" + std::to_string(m_options.device().index());
-        bool first_call = true;
         while (true) {
             nvtx3::scoped_range loop{loop_scope_str};
             std::unique_lock<std::mutex> input_lock(m_input_lock);
@@ -259,15 +254,9 @@ public:
                                                             m_exclusive_gpu_access);
             nvtxRangePop();
 
-            //if (first_call) {
-            //    spdlog::info("first call with {} for {}", loop_scope_str,
-            //                 m_batch_size < 1000 ? "simplex" : "duplex");
-            //    first_call = false;
-            //}
-
             std::unique_lock<std::mutex> task_lock(task->mut);
 
-            auto run_basecalling = [&]() -> std::pair<int64_t, int64_t> {
+            auto run_basecalling = [&]() {
                 stats::Timer timer;
                 auto scores = m_module->forward(task->input.to(m_options.device(), true));
                 const auto forward_ms = timer.GetElapsedMS();
@@ -276,17 +265,14 @@ public:
                 const auto forward_plus_decode_ms = timer.GetElapsedMS();
                 m_model_ms += forward_ms;
                 m_decode_ms += forward_plus_decode_ms - forward_ms;
-                return {forward_ms, forward_plus_decode_ms};
             };
 
-            int64_t forward_ms, forward_plus_decode_ms;
-
             try {
-                std::tie(forward_ms, forward_plus_decode_ms) = run_basecalling();
+                run_basecalling();
             } catch (c10::Error &e) {
                 spdlog::warn("Caught Torch error '{}', clearing CUDA cache and retrying.", e.msg());
                 c10::cuda::CUDACachingAllocator::emptyCache();
-                std::tie(forward_ms, forward_plus_decode_ms) = run_basecalling();
+                run_basecalling();
             }
             ++m_num_batches_called;
             task->done = true;
