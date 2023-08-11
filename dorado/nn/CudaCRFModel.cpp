@@ -7,6 +7,7 @@
 #include <c10/cuda/CUDAGuard.h>
 #include <c10/cuda/CUDAStream.h>
 #include <nvtx3/nvtx3.hpp>
+#include <spdlog/spdlog.h>
 #include <toml.hpp>
 #include <torch/torch.h>
 
@@ -60,8 +61,6 @@ public:
 
         c10::cuda::CUDACachingAllocator::emptyCache();
 
-        m_input_device =
-                torch::empty({m_batch_size, m_num_input_features, m_in_chunk_size}, m_options);
         start_threads();
     }
 
@@ -256,16 +255,26 @@ public:
             nvtxRangePop();
 
             std::unique_lock<std::mutex> task_lock(task->mut);
-            stats::Timer timer;
-            m_input_device.copy_(task->input, true);
-            auto scores = m_module->forward(m_input_device);
-            const auto forward_ms = timer.GetElapsedMS();
-            task->out.copy_(m_decoder->gpu_part(scores, task->num_chunks, m_decoder_options));
-            stream.synchronize();
-            const auto forward_plus_decode_ms = timer.GetElapsedMS();
+
+            auto run_basecalling = [&]() {
+                stats::Timer timer;
+                auto scores = m_module->forward(task->input.to(m_options.device(), true));
+                const auto forward_ms = timer.GetElapsedMS();
+                task->out.copy_(m_decoder->gpu_part(scores, task->num_chunks, m_decoder_options));
+                stream.synchronize();
+                const auto forward_plus_decode_ms = timer.GetElapsedMS();
+                m_model_ms += forward_ms;
+                m_decode_ms += forward_plus_decode_ms - forward_ms;
+            };
+
+            try {
+                run_basecalling();
+            } catch (c10::Error &e) {
+                spdlog::warn("Caught Torch error '{}', clearing CUDA cache and retrying.", e.msg());
+                c10::cuda::CUDACachingAllocator::emptyCache();
+                run_basecalling();
+            }
             ++m_num_batches_called;
-            m_model_ms += forward_ms;
-            m_decode_ms += forward_plus_decode_ms - forward_ms;
             task->done = true;
             task_lock.unlock();
             task->cv.notify_one();
@@ -312,7 +321,6 @@ public:
     std::unique_ptr<std::thread> m_cuda_thread;
     int m_num_input_features, m_batch_size, m_in_chunk_size, m_out_chunk_size;
     bool m_exclusive_gpu_access;
-    torch::Tensor m_input_device;
 
     // Performance monitoring stats.
     std::atomic<int64_t> m_num_batches_called = 0;

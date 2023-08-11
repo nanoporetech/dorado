@@ -29,24 +29,20 @@ torch::Tensor GPUDecoder::gpu_part(torch::Tensor scores, int num_chunks, Decoder
     auto tensor_options_int8 =
             torch::TensorOptions().dtype(torch::kInt8).device(scores.device()).requires_grad(false);
 
-    if (!initialized) {
-        chunks = torch::empty({N, 4}, tensor_options_int32);
-        chunks.index({torch::indexing::Slice(), 0}) = torch::arange(0, int(T * N), int(T));
-        chunks.index({torch::indexing::Slice(), 2}) = torch::arange(0, int(T * N), int(T));
-        chunks.index({torch::indexing::Slice(), 1}) = int(T);
-        chunks.index({torch::indexing::Slice(), 3}) = 0;
+    auto chunks = torch::empty({N, 4}, tensor_options_int32);
+    chunks.index({torch::indexing::Slice(), 0}) = torch::arange(0, int(T * N), int(T));
+    chunks.index({torch::indexing::Slice(), 2}) = torch::arange(0, int(T * N), int(T));
+    chunks.index({torch::indexing::Slice(), 1}) = int(T);
+    chunks.index({torch::indexing::Slice(), 3}) = 0;
 
-        chunk_results = torch::empty({N, 8}, tensor_options_int32);
+    auto chunk_results = torch::empty({N, 8}, tensor_options_int32);
 
-        chunk_results = chunk_results.contiguous();
+    chunk_results = chunk_results.contiguous();
 
-        aux = torch::empty(N * (T + 1) * (C + 4 * options.beam_width), tensor_options_int8);
-        path = torch::zeros(N * (T + 1), tensor_options_int32);
+    auto aux = torch::empty(N * (T + 1) * (C + 4 * options.beam_width), tensor_options_int8);
+    auto path = torch::zeros(N * (T + 1), tensor_options_int32);
 
-        moves_sequence_qstring = torch::zeros({3, N * T}, tensor_options_int8);
-
-        initialized = true;
-    }
+    auto moves_sequence_qstring = torch::zeros({3, N * T}, tensor_options_int8);
 
     moves_sequence_qstring.index({torch::indexing::Slice()}) = 0.0;
     auto moves = moves_sequence_qstring[0];
