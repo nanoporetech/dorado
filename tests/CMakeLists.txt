@@ -25,6 +25,7 @@ set(SOURCE_FILES
     BamUtilsTest.cpp
     ResumeLoaderTest.cpp
     TimeUtilsTest.cpp
+    DuplexReadTaggingNodeTest.cpp
 )
 
 if (DORADO_GPU_BUILD)
