@@ -87,10 +87,6 @@ private:
     // Reads removed from input queue and being modbasecalled.
     std::deque<std::shared_ptr<Read>> m_working_reads;
 
-    std::mutex m_chunk_queues_mutex;
-    std::condition_variable m_chunk_queues_cv;
-    std::condition_variable m_chunks_added_cv;
-
     std::atomic<int> m_num_active_runner_workers{0};
     std::atomic<int> m_num_active_input_workers{0};
 
