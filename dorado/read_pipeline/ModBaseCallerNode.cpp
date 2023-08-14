@@ -428,6 +428,7 @@ std::unordered_map<std::string, double> ModBaseCallerNode::sample_stats() const 
     stats["mod_base_reads_pushed"] = m_num_mod_base_reads_pushed;
     stats["non_mod_base_reads_pushed"] = m_num_non_mod_base_reads_pushed;
     stats["chunk_generation_ms"] = m_chunk_generation_ms;
+    stats["working_reads_items"] = m_working_reads_size;
     return stats;
 }
 
