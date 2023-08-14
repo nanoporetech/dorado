@@ -34,7 +34,7 @@ void DuplexReadTaggingNode::worker_thread() {
         // * Lastly, if the parent has not been seen yet, then the parent is
         // added to a set of parents to look for.
         // 2. When a simplex parent comes by:
-        // * Check if its already being asked for by a duplex offspring. If so,
+        // * Check if it's already being asked for by a duplex offspring. If so,
         // we process the parent and pass it down, while removing it from
         // the set of duplex parents being looked for.
         // * If no duplex child for this parent has been seen, then add it to
@@ -74,13 +74,13 @@ void DuplexReadTaggingNode::worker_thread() {
             auto find_read = m_parents_wanted.find(read->read_id);
             if (find_read != m_parents_wanted.end()) {
                 // If a read is in the parents wanted list, then sent it downstream
-                // and add it to the set of processed reads. It is also be removed
+                // and add it to the set of processed reads. It will also be removed
                 // from the parent reads being looked for.
                 send_message_to_sink(read);
                 m_parents_processed.insert(read->read_id);
                 m_parents_wanted.erase(find_read);
             } else {
-                // No duplex offsprint is seen so far, so hold it and track
+                // No duplex offspring is seen so far, so hold it and track
                 // it as available parents.
                 m_duplex_parents[read->read_id] = std::move(read);
             }
