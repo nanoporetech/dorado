@@ -4,12 +4,13 @@ All notable changes to Dorado will be documented in this file.
 
 # [0.3.4] (10 Aug 2023)
 
-This release of Dorado contains a hotfix for CUDA out of memory issues encountered during duplex runs with v0.3.3.
+This release of Dorado contains a few bug fixes and a hotfix for CUDA out of memory issues encountered during duplex runs with v0.3.3.
 
- * d177c606791e961aaf3e5f3ba7951ac453b05035 - Pre-allocate input device tensor to address duplex CUDA OOM.
- * 9614ebaccbed591a82be2b3683a406023f4fab32 - Fix potential hang in modbase calling node.
  * c5c0ea003d2b2019f8d400ef203f45ef28aed3d3 - Introduce pipeline API functions to simplify setup for simplex/duplex basecalling.
+ * 9614ebaccbed591a82be2b3683a406023f4fab32 - Fix potential hang in modbase calling node.
  * 67f84a69b6ae3ed12729c9723d7c827daaeaa3a7 - Set the `--max-reads` default to unlimited for `dorado aligner`
+ * f6a0422b34cdd89637bddb939364a38ea507d198 - Fix CUDA OOM in duplex by removing tensor caching in decode and updating memory fraction for stereo model.
+ * 107ebba28c9f77424c0ba271b663338dcd49a902 - Account for filtered duplex reads when tagging simplex parents and calculating duplex yield.
 
 # [0.3.3] (8 Aug 2023)
 
