@@ -13,35 +13,35 @@ TEST_CASE("DuplexReadTaggingNode", TEST_GROUP) {
     pipeline_desc.add_node<dorado::DuplexReadTaggingNode>({sink});
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
     {
-        std::shared_ptr<dorado::Read> read_12(new dorado::Read());
+        auto read_12 = std::make_shared<dorado::Read>();
         read_12->read_id = "1;2";
         read_12->is_duplex = true;
 
-        std::shared_ptr<dorado::Read> read_1(new dorado::Read());
+        auto read_1 = std::make_shared<dorado::Read>();
         read_1->read_id = "1";
         read_1->is_duplex_parent = true;
 
-        std::shared_ptr<dorado::Read> read_2(new dorado::Read());
+        auto read_2 = std::make_shared<dorado::Read>();
         read_2->read_id = "2";
         read_2->is_duplex_parent = true;
 
-        std::shared_ptr<dorado::Read> read_3(new dorado::Read());
+        auto read_3 = std::make_shared<dorado::Read>();
         read_3->read_id = "3";
         read_3->is_duplex_parent = true;
 
-        std::shared_ptr<dorado::Read> read_4(new dorado::Read());
+        auto read_4 = std::make_shared<dorado::Read>();
         read_4->read_id = "4";
         read_4->is_duplex_parent = true;
 
-        std::shared_ptr<dorado::Read> read_5(new dorado::Read());
+        auto read_5 = std::make_shared<dorado::Read>();
         read_5->read_id = "5";
         read_5->is_duplex_parent = true;
 
-        std::shared_ptr<dorado::Read> read_6(new dorado::Read());
+        auto read_6 = std::make_shared<dorado::Read>();
         read_6->read_id = "6";
         read_6->is_duplex_parent = true;
 
-        std::shared_ptr<dorado::Read> read_56(new dorado::Read());
+        auto read_56 = std::make_shared<dorado::Read>();
         read_6->read_id = "5;6";
         read_6->is_duplex = true;
 

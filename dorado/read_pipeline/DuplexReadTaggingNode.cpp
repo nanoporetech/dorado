@@ -9,9 +9,40 @@ void DuplexReadTaggingNode::worker_thread() {
 
     Message message;
     while (get_input_message(message)) {
+        // If this message isn't a read, just forward it to the sink.
+        if (!std::holds_alternative<std::shared_ptr<Read>>(message)) {
+            send_message_to_sink(std::move(message));
+            continue;
+        }
+
         // If this message isn't a read, we'll get a bad_variant_access exception.
         auto read = std::get<std::shared_ptr<Read>>(message);
 
+        // The algorithm is as follows -
+        // There's no inherent ordering between when a duplex or its parent
+        // simplex reads are expected in the pipeline (yet). So both cases need
+        // to be handled, where the simplex parents come first or the duplex
+        // offspring comes first.
+        // 1. When a duplex read comes by, we derive its parent reads
+        // from the name and check:
+        // * If the parent read has already been processed and sent downstream, do
+        // nothing. This can happen because 2 duplex parents can share the same
+        // read (nothing in our pipeline prevents that right now even though
+        // biologically that's not possible).
+        // * If the parent has been seen but not processed yet, then the parent
+        // read is added to the processed list and sent downstream.
+        // * Lastly, if the parent has not been seen yet, then the parent is
+        // added to a set of parents to look for.
+        // 2. When a simplex parent comes by:
+        // * Check if its already being asked for by a duplex offspring. If so,
+        // we process the parent and pass it down, while it removing it from
+        // the set of duplex parents being looked for.
+        // * If no duplex child for this parent has been seen, then add it to
+        // the map of available parents.
+        //
+        // Once all reads have been processed, any leftover parent simplex reads are
+        // those whose duplex offpsings never came. They are retagged to not be
+        // duplex parents and then sent downstream.
         if (!read->is_duplex && !read->is_duplex_parent) {
             send_message_to_sink(read);
         } else if (read->is_duplex) {
@@ -40,15 +71,17 @@ void DuplexReadTaggingNode::worker_thread() {
                 }
             }
         } else {
-            // If a read has already been seen and processed, send it on
-            if (m_parents_processed.find(read->read_id) != m_parents_processed.end()) {
-                send_message_to_sink(read);
-            }
             auto find_read = m_parents_wanted.find(read->read_id);
             if (find_read != m_parents_wanted.end()) {
+                // If a read is in the parents wanted list, then sent it downstream
+                // and add it to the set of processed reads. It is also be removed
+                // from the parent reads being looked for.
                 send_message_to_sink(read);
                 m_parents_processed.insert(read->read_id);
+                m_parents_wanted.erase(find_read);
             } else {
+                // No duplex offsprint is seen so far, so hold it and track
+                // it as available parents.
                 m_duplex_parents[read->read_id] = std::move(read);
             }
         }
@@ -76,6 +109,9 @@ void DuplexReadTaggingNode::terminate_impl() {
 
 void DuplexReadTaggingNode::restart() {
     restart_input_queue();
+    m_duplex_parents.clear();
+    m_parents_processed.clear();
+    m_parents_wanted.clear();
     start_threads();
 }
 
