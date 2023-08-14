@@ -35,13 +35,13 @@ void DuplexReadTaggingNode::worker_thread() {
         // added to a set of parents to look for.
         // 2. When a simplex parent comes by:
         // * Check if its already being asked for by a duplex offspring. If so,
-        // we process the parent and pass it down, while it removing it from
+        // we process the parent and pass it down, while removing it from
         // the set of duplex parents being looked for.
         // * If no duplex child for this parent has been seen, then add it to
         // the map of available parents.
         //
         // Once all reads have been processed, any leftover parent simplex reads are
-        // those whose duplex offpsings never came. They are retagged to not be
+        // the ones whose duplex offsprings never came. They are retagged to not be
         // duplex parents and then sent downstream.
         if (!read->is_duplex && !read->is_duplex_parent) {
             send_message_to_sink(read);
