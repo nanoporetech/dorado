@@ -297,9 +297,13 @@ int duplex(int argc, char* argv[]) {
             // memory after simplex caller has been instantiated to the duplex caller.
             // ALWAYS auto tune the duplex batch size (i.e. batch_size passed in is 0.)
             // except for on metal
+            // WORKAROUND: As a workaround to CUDA OOM, force stereo to have a smaller
+            // memory footprint for both model and decode function. This will increase the
+            // chances for the stereo model to use the cached allocations from the simplex
+            // model.
             std::tie(stereo_runners, std::ignore) =
                     create_basecall_runners(stereo_model_config, device, num_runners,
-                                            stereo_batch_size, chunk_size, 0.9f, true);
+                                            stereo_batch_size, chunk_size, 0.5f, true);
 
             spdlog::info("> Starting Stereo Duplex pipeline");
 

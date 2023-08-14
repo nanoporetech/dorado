@@ -180,6 +180,11 @@ public:
             }
         }
 
+        spdlog::debug(
+                "Device {} Model memory {}", m_device,
+                (crfmodel_bytes_per_chunk_timestep * chunk_size_out * best_batch_size) / 1e9f);
+        spdlog::debug("Device {} Decode memory {}", m_device,
+                      (decode_bytes_per_chunk_timestep * chunk_size_out * best_batch_size) / 1e9f);
         return best_batch_size;
 #endif
     }
@@ -256,6 +261,29 @@ public:
 
             std::unique_lock<std::mutex> task_lock(task->mut);
 
+#ifndef DORADO_TX2
+            auto device_stats =
+                    c10::cuda::CUDACachingAllocator::getDeviceStats(m_options.device().index());
+
+            auto print_stat = [](c10::cuda::CUDACachingAllocator::StatArray &st) {
+                std::string s("");
+                s += "aggregate current " + std::to_string(st[0].current);
+                s += "\n";
+                return s;
+            };
+            spdlog::trace(
+                    "allocation {}, segment {}, active {}, inactive_split {}, alloc_bytes {}, "
+                    "reserved_bytes {}, active_bytes {}, inactive_split_bytes {}, requested_bytes "
+                    "{}, num_alloc_retries {}, num_ooms {}, max_split_size {}",
+                    print_stat(device_stats.allocation), print_stat(device_stats.segment),
+                    print_stat(device_stats.active), print_stat(device_stats.inactive_split),
+                    print_stat(device_stats.allocated_bytes),
+                    print_stat(device_stats.reserved_bytes), print_stat(device_stats.active_bytes),
+                    print_stat(device_stats.inactive_split_bytes),
+                    print_stat(device_stats.requested_bytes), device_stats.num_alloc_retries,
+                    device_stats.num_alloc_retries, device_stats.num_ooms,
+                    device_stats.max_split_size);
+#endif  // #ifndef DORADO_TX2
             auto run_basecalling = [&]() {
                 stats::Timer timer;
                 auto scores = m_module->forward(task->input.to(m_options.device(), true));
