@@ -2,7 +2,7 @@
 
 All notable changes to Dorado will be documented in this file.
 
-# [0.3.4] (10 Aug 2023)
+# [0.3.4] (14 Aug 2023)
 
 This release of Dorado contains a few bug fixes and a hotfix for CUDA out of memory issues encountered during duplex runs with v0.3.3.
 
