@@ -47,8 +47,10 @@ public:
                 spdlog::info("> Duplex reads filtered: {}", m_num_duplex_reads_filtered);
             }
             spdlog::info("> Duplex rate: {}%",
-                         ((static_cast<float>(m_num_duplex_bases_processed) * 2) /
-                          m_num_simplex_bases_processed) *
+                         ((static_cast<float>(m_num_duplex_bases_processed -
+                                              m_num_duplex_bases_filtered) *
+                           2) /
+                          (m_num_simplex_bases_processed - m_num_simplex_bases_filtered)) *
                                  100);
         }
         if (m_num_bases_processed > 0) {
@@ -80,6 +82,7 @@ public:
         m_num_simplex_reads_written = fetch_stat("HtsWriter.unique_simplex_reads_written");
 
         m_num_simplex_reads_filtered = fetch_stat("ReadFilterNode.simplex_reads_filtered");
+        m_num_simplex_bases_filtered = fetch_stat("ReadFilterNode.simplex_bases_filtered");
         m_num_simplex_bases_processed = fetch_stat("BasecallerNode.bases_processed");
         m_num_bases_processed = m_num_simplex_bases_processed;
         m_num_samples_processed = fetch_stat("BasecallerNode.samples_processed");
@@ -90,6 +93,7 @@ public:
         }
         m_num_duplex_reads_written = fetch_stat("HtsWriter.duplex_reads_written");
         m_num_duplex_reads_filtered = fetch_stat("ReadFilterNode.duplex_reads_filtered");
+        m_num_duplex_bases_filtered = fetch_stat("ReadFilterNode.duplex_bases_filtered");
 
         // don't output progress bar if stderr is not a tty
         if (!utils::is_fd_tty(stderr)) {
@@ -126,8 +130,10 @@ private:
     int m_num_reads_processed{0};
     int m_num_simplex_reads_written{0};
     int m_num_simplex_reads_filtered{0};
+    int m_num_simplex_bases_filtered{0};
     int m_num_duplex_reads_written{0};
     int m_num_duplex_reads_filtered{0};
+    int m_num_duplex_bases_filtered{0};
 
     int m_num_reads_expected;
 

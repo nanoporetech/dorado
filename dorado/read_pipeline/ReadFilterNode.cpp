@@ -18,20 +18,21 @@ void ReadFilterNode::worker_thread() {
         // If this message isn't a read, we'll get a bad_variant_access exception.
         auto read = std::get<std::shared_ptr<Read>>(message);
 
+        auto log_filtering = [&]() {
+            if (read->is_duplex) {
+                ++m_num_duplex_reads_filtered;
+                m_num_duplex_bases_filtered += read->seq.length();
+            } else {
+                ++m_num_simplex_reads_filtered;
+                m_num_simplex_bases_filtered += read->seq.length();
+            }
+        };
+
         // Filter based on qscore.
         if ((read->calculate_mean_qscore() < m_min_qscore) ||
-            read->seq.size() < m_min_read_length) {
-            if (read->is_duplex) {
-                ++m_num_duplex_reads_filtered;
-            } else {
-                ++m_num_simplex_reads_filtered;
-            }
-        } else if (m_read_ids_to_filter.find(read->read_id) != m_read_ids_to_filter.end()) {
-            if (read->is_duplex) {
-                ++m_num_duplex_reads_filtered;
-            } else {
-                ++m_num_simplex_reads_filtered;
-            }
+            read->seq.size() < m_min_read_length ||
+            (m_read_ids_to_filter.find(read->read_id) != m_read_ids_to_filter.end())) {
+            log_filtering();
         } else {
             send_message_to_sink(read);
         }

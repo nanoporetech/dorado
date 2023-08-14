@@ -4,6 +4,7 @@
 #include "nn/Runners.h"
 #include "read_pipeline/AlignerNode.h"
 #include "read_pipeline/BaseSpaceDuplexCallerNode.h"
+#include "read_pipeline/DuplexReadTaggingNode.h"
 #include "read_pipeline/HtsWriter.h"
 #include "read_pipeline/Pipelines.h"
 #include "read_pipeline/ProgressTracker.h"
@@ -186,10 +187,11 @@ int duplex(int argc, char* argv[]) {
         }
         auto read_converter =
                 pipeline_desc.add_node<ReadToBamType>({converted_reads_sink}, emit_moves, rna, 2);
+        auto duplex_read_tagger = pipeline_desc.add_node<DuplexReadTaggingNode>({read_converter});
         // The minimum sequence length is set to 5 to avoid issues with duplex node printing very short sequences for mismatched pairs.
         std::unordered_set<std::string> read_ids_to_filter;
         auto read_filter_node = pipeline_desc.add_node<ReadFilterNode>(
-                {read_converter}, min_qscore, default_parameters.min_sequence_length,
+                {duplex_read_tagger}, min_qscore, default_parameters.min_sequence_length,
                 read_ids_to_filter, 5);
 
         torch::set_num_threads(1);
