@@ -171,7 +171,7 @@ build:linux:x86:focal:install_deps:
   <<: *build_dorado
   when: manual
 
-.build:linux:x86:focal:
+.build_linux_x86_focal: &build_linux_x86_focal
   image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.1
   variables:
     BUILD_OPTIONS: "-DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN}"
@@ -179,12 +179,13 @@ build:linux:x86:focal:install_deps:
   <<: *build_dorado
 
 build:linux:x86:focal:
-  <<: *build:linux:x86:focal
+  <<: *build_linux_x86_focal
 
 build:linux:x86:focal_debug:
   variables:
     BUILD_TYPE: "Debug"
-  <<: *build:linux:x86:focal
+  <<: *build_linux_x86_focal
+  when: manual
 
 build:linux:x86:focal_coverage:
   stage: build
@@ -218,7 +219,7 @@ build:linux:x86:focal_koi_download:
   <<: *linux_runner
   <<: *build_dorado
 
-build:windows:
+.build_windows: &build_windows
   <<: *windows_runner
   <<: *build_dorado
   before_script:
@@ -226,6 +227,15 @@ build:windows:
     - export CUDA_TOOLKIT=$(cygpath -u $(cygpath -d "${WIN_CUDA_TOOLKIT}"))
     - export BUILD_OPTIONS="-A x64 -T cuda=${CUDA} -DCUDAToolkit_ROOT=${CUDA_TOOLKIT} -DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN}"
     - echo BUILD_OPTIONS is ${BUILD_OPTIONS}
+
+build:windows:
+  <<: *build_windows
+
+build:windows_debug:
+  variables:
+    BUILD_TYPE: "Debug"
+  <<: *build_windows
+  when: manual
 
 build:windows_koi_download:
   <<: *windows_runner
