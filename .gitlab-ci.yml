@@ -16,6 +16,7 @@ stages:
 variables:
   BUILD_DIR: build
   BUILD_TARGET: install
+  BUILD_TYPE: Release
   GIT_SUBMODULE_STRATEGY: recursive
   CUDA: "11.8"
   WIN_CUDA_TOOLKIT: "/c/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v${CUDA}"
@@ -71,14 +72,13 @@ variables:
   - export CCACHE_DIR=/data/gitlab-ci-cache
   - fi
   - ccache -s || true
-  - cmake ${BUILD_OPTIONS} -S . -B ${BUILD_DIR}
-  - cmake --build ${BUILD_DIR} --config Release --target ${BUILD_TARGET} -j 8
+  - cmake ${BUILD_OPTIONS} -S . -B ${BUILD_DIR} -DCMAKE_BUILD_TYPE=${BUILD_TYPE}
+  - cmake --build ${BUILD_DIR} --config ${BUILD_TYPE} --target ${BUILD_TARGET} -j 8
 
 .run_dorado_cmake_ctest: &run_dorado_cmake_ctest
   - ctest -C Release --test-dir ${BUILD_DIR} --output-on-failure --verbose
 
-.build_dorado: &build_dorado
-  stage: build
+.build_template: &build_template
   script:
     - echo Dorado build stage
     - *run_dorado_cmake_build
@@ -91,6 +91,18 @@ variables:
       - tests/data
     expire_in: 1 day
   interruptible: true
+
+build_dorado: # For backward compatibility, keeping this for Release
+  stage: build
+  variables:
+    BUILD_MODE: Release
+  <<: *build_template
+
+build_dorado_debug:
+  stage: build
+  variables:
+    BUILD_MODE: Debug
+  <<: *build_template
 
 .build_dorado_archive: &build_dorado_archive
   stage: build
@@ -170,12 +182,20 @@ build:linux:x86:focal:install_deps:
   <<: *build_dorado
   when: manual
 
-build:linux:x86:focal:
+.build:linux:x86:focal:
   image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.1
   variables:
     BUILD_OPTIONS: "-DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN}"
   <<: *linux_runner
   <<: *build_dorado
+
+build:linux:x86:focal:
+  <<: *build:linux:x86:focal
+
+build:linux:x86:focal_debug:
+  variables:
+    BUILD_TYPE: "Debug"
+  <<: *build:linux:x86:focal
 
 build:linux:x86:focal_coverage:
   stage: build
