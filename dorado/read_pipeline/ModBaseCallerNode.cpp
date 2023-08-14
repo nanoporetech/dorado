@@ -409,7 +409,7 @@ void ModBaseCallerNode::output_worker_thread() {
         // Send completed reads on to the sink.
         for (auto& completed_read : completed_reads) {
             send_message_to_sink(std::move(completed_read));
-            ++m_num_mod_base_reads_pushed;            
+            ++m_num_mod_base_reads_pushed;
         }
     }
 }
