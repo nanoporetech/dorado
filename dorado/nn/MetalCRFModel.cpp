@@ -568,10 +568,10 @@ TORCH_MODULE(MetalModel);
 
 class MetalCaller {
 public:
-    MetalCaller(const CRFModelConfig &model_config, int chunk_size, int batch_size) {
+    MetalCaller(const CRFModelConfig &model_config, int chunk_size, int batch_size)
+            : m_config(model_config) {
         ScopedAutoReleasePool autorelease_pool;
 
-        m_model_stride = static_cast<size_t>(model_config.stride);
         m_num_input_features = model_config.num_features;
 
         m_device = get_mtl_device();
@@ -894,6 +894,7 @@ public:
         }
     }
 
+    const CRFModelConfig m_config;
     std::atomic<bool> m_terminate{false};
     std::atomic<bool> m_terminate_decode{false};
     std::deque<NNTask *> m_input_queue;
@@ -911,7 +912,7 @@ public:
     // Used to signal completion of an NNTask's decoding.
     NS::SharedPtr<MTL::SharedEvent> m_decode_complete_event;
     std::vector<torch::Tensor> m_scores_int8, m_posts, m_bwd;
-    int m_in_chunk_size, m_out_chunk_size, m_batch_size, m_states, m_model_stride;
+    int m_in_chunk_size, m_out_chunk_size, m_batch_size, m_states;
     // Number of pieces the linear output is split into, for reasons of
     // buffer size constraints.
     int m_out_split;
@@ -958,7 +959,8 @@ std::vector<DecodedChunk> MetalModelRunner::call_chunks(int num_chunks) {
     return out_chunks;
 }
 
-size_t MetalModelRunner::model_stride() const { return m_caller->m_model_stride; }
+const CRFModelConfig &MetalModelRunner::config() const { return m_caller->m_config; }
+size_t MetalModelRunner::model_stride() const { return m_caller->m_config.stride; }
 size_t MetalModelRunner::chunk_size() const { return m_input.size(1); }
 size_t MetalModelRunner::batch_size() const { return m_input.size(0); }
 

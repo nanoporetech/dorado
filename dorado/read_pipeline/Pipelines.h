@@ -10,7 +10,6 @@
 
 namespace dorado {
 
-struct CRFModelConfig;
 class ModBaseRunner;
 class ModelRunnerBase;
 
@@ -23,7 +22,6 @@ namespace pipelines {
 /// If source_node_handle is valid, set this to be the source of the simplex pipeline
 /// If sink_node_handle is valid, set this to be the sink of the simplex pipeline
 void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
-                             const CRFModelConfig& model_config,
                              std::vector<dorado::Runner>&& runners,
                              std::vector<std::unique_ptr<dorado::ModBaseRunner>>&& modbase_runners,
                              size_t overlap,
@@ -37,8 +35,6 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
 /// If sink_node_handle is valid, set this to be the sink of the simplex pipeline
 void create_stereo_duplex_pipeline(
         PipelineDescriptor& pipeline_desc,
-        const CRFModelConfig& model_config,
-        const CRFModelConfig& stereo_model_config,
         std::vector<dorado::Runner>&& runners,
         std::vector<dorado::Runner>&& stereo_runners,
         size_t overlap,

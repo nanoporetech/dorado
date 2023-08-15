@@ -96,7 +96,7 @@ void setup(std::vector<std::string> args,
 
     auto model_config = dorado::load_crf_model_config(model_path);
     auto [runners, num_devices] =
-            create_basecall_runners(model_config, device, num_runners, batch_size, chunk_size);
+            create_basecall_runners(model_config, device, num_runners, 0, batch_size, chunk_size);
 
     std::string model_name = std::filesystem::canonical(model_path).filename().string();
     auto read_groups = DataLoader::load_read_groups(data_path, model_name, recursive_file_loading);
@@ -136,10 +136,10 @@ void setup(std::vector<std::string> args,
             {read_converter}, min_qscore, default_parameters.min_sequence_length,
             std::unordered_set<std::string>{}, thread_allocations.read_filter_threads);
 
-    pipelines::create_simplex_pipeline(
-            pipeline_desc, model_config, std::move(runners), std::move(remora_runners), overlap,
-            thread_allocations.scaler_node_threads, thread_allocations.remora_threads * num_devices,
-            read_filter_node);
+    pipelines::create_simplex_pipeline(pipeline_desc, std::move(runners), std::move(remora_runners),
+                                       overlap, thread_allocations.scaler_node_threads,
+                                       thread_allocations.remora_threads * num_devices,
+                                       read_filter_node);
 
     // Create the Pipeline from our description.
     std::vector<dorado::stats::StatsReporter> stats_reporters;

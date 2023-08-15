@@ -22,7 +22,8 @@ namespace dorado {
 std::pair<std::vector<dorado::Runner>, size_t> create_basecall_runners(
         const dorado::CRFModelConfig& model_config,
         const std::string& device,
-        size_t num_runners,
+        size_t num_gpu_runners,
+        size_t num_cpu_runners,
         size_t batch_size,
         size_t chunk_size,
         float memory_fraction,
@@ -33,14 +34,16 @@ std::pair<std::vector<dorado::Runner>, size_t> create_basecall_runners(
     size_t num_devices = 1;
 
     if (device == "cpu") {
-        num_runners = std::thread::hardware_concurrency();
+        if (num_cpu_runners == 0) {
+            num_cpu_runners = std::thread::hardware_concurrency();
+        }
         if (batch_size == 0) {
             batch_size = 128;
         }
-        spdlog::debug("- CPU calling: set batch size to {}, num_runners to {}", batch_size,
-                      num_runners);
+        spdlog::debug("- CPU calling: set batch size to {}, num_cpu_runners to {}", batch_size,
+                      num_cpu_runners);
 
-        for (size_t i = 0; i < num_runners; i++) {
+        for (size_t i = 0; i < num_cpu_runners; i++) {
             runners.push_back(std::make_shared<dorado::ModelRunner<dorado::CPUDecoder>>(
                     model_config, device, chunk_size, batch_size));
         }
@@ -49,7 +52,7 @@ std::pair<std::vector<dorado::Runner>, size_t> create_basecall_runners(
 #ifdef __APPLE__
     else if (device == "metal") {
         auto caller = dorado::create_metal_caller(model_config, chunk_size, batch_size);
-        for (size_t i = 0; i < num_runners; i++) {
+        for (size_t i = 0; i < num_gpu_runners; i++) {
             runners.push_back(std::make_shared<dorado::MetalModelRunner>(caller));
         }
         if (runners.back()->batch_size() != batch_size) {
@@ -80,7 +83,7 @@ std::pair<std::vector<dorado::Runner>, size_t> create_basecall_runners(
         }
 
         for (size_t j = 0; j < num_devices; j++) {
-            for (size_t i = 0; i < num_runners; i++) {
+            for (size_t i = 0; i < num_gpu_runners; i++) {
                 runners.push_back(std::make_shared<dorado::CudaModelRunner>(callers[j]));
             }
             if (runners.back()->batch_size() != batch_size) {
