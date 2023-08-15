@@ -1,15 +1,17 @@
 #pragma once
 
-#include "ModBaseRunner.h"
-#include "ModelRunner.h"
-#include "nn/CRFModel.h"
-
 #include <memory>
 #include <string>
 #include <utility>
 #include <vector>
 
 namespace dorado {
+
+struct CRFModelConfig;
+class ModelRunnerBase;
+class ModBaseRunner;
+
+using Runner = std::shared_ptr<ModelRunnerBase>;
 
 std::pair<std::vector<dorado::Runner>, size_t> create_basecall_runners(
         const dorado::CRFModelConfig& model_config,

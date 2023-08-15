@@ -20,10 +20,12 @@ using namespace torch::indexing;
 namespace dorado {
 
 void BasecallerNode::input_worker_thread() {
-    Message message;
+    torch::InferenceMode inference_mode_guard;
 
-    while (m_work_queue.try_pop(message)) {
-        if (std::holds_alternative<CandidatePairRejectedMessage>(message)) {
+    Message message;
+    while (get_input_message(message)) {
+        // If this message isn't a read, just forward it to the sink.
+        if (!std::holds_alternative<std::shared_ptr<Read>>(message)) {
             send_message_to_sink(std::move(message));
             continue;
         }
@@ -107,8 +109,10 @@ void BasecallerNode::basecall_current_batch(int worker_id) {
 }
 
 void BasecallerNode::working_reads_manager() {
+    torch::InferenceMode inference_mode_guard;
+
     std::shared_ptr<Chunk> chunk;
-    while (m_processed_chunks.try_pop(chunk)) {
+    while (m_processed_chunks.try_pop(chunk) == utils::AsyncQueueStatus::Success) {
         nvtx3::scoped_range loop{"working_reads_manager"};
 
         auto source_read = chunk->source_read.lock();
@@ -145,13 +149,21 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
     // Model execution creates GPU-related autorelease objects.
     utils::ScopedAutoReleasePool autorelease_pool;
 #endif
+    torch::InferenceMode inference_mode_guard;
+
     auto last_chunk_reserve_time = std::chrono::system_clock::now();
     int batch_size = m_model_runners[worker_id]->batch_size();
     std::shared_ptr<Chunk> chunk;
-    while (m_chunks_in.try_pop_until(
-            chunk, last_chunk_reserve_time + std::chrono::milliseconds(m_batch_timeout_ms))) {
-        // If chunk is empty, then try_pop timed out without getting a new chunk.
-        if (!chunk) {
+    while (true) {
+        const auto pop_status = m_chunks_in.try_pop_until(
+                chunk, last_chunk_reserve_time + std::chrono::milliseconds(m_batch_timeout_ms));
+
+        if (pop_status == utils::AsyncQueueStatus::Terminate) {
+            break;
+        }
+
+        if (pop_status == utils::AsyncQueueStatus::Timeout) {
+            // try_pop_until timed out without getting a new chunk.
             if (!m_batched_chunks[worker_id].empty()) {
                 // get scores for whatever chunks are available.
                 basecall_current_batch(worker_id);
@@ -162,6 +174,7 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
         }
 
         // There's chunks to get_scores, so let's add them to our input tensor
+        // FIXME -- it should not be possible to for this condition to be untrue.
         if (m_batched_chunks[worker_id].size() != batch_size) {
             // Copy the chunk into the input tensor
             std::shared_ptr<Read> source_read = chunk->source_read.lock();
@@ -264,38 +277,56 @@ BasecallerNode::BasecallerNode(std::vector<Runner> model_runners,
     // Setup worker state
     const size_t num_workers = m_model_runners.size();
     m_batched_chunks.resize(num_workers);
-    m_basecall_workers.resize(num_workers);
-    m_num_active_model_runners = num_workers;
 
     initialization_time = std::chrono::system_clock::now();
 
     // Spin up any workers last so that we're not mutating |this| underneath them
-    m_working_reads_managers.resize(num_workers / 2);
+    start_threads();
+}
+
+void BasecallerNode::start_threads() {
+    m_input_worker = std::make_unique<std::thread>([this] { input_worker_thread(); });
+    const size_t num_workers = m_model_runners.size();
+    m_working_reads_managers.resize(std::max(size_t{1}, num_workers / 2));
     for (int i = 0; i < m_working_reads_managers.size(); i++) {
         m_working_reads_managers[i] = std::thread([this] { working_reads_manager(); });
     }
-    m_input_worker = std::make_unique<std::thread>([this] { input_worker_thread(); });
+    m_basecall_workers.resize(num_workers);
     for (int i = 0; i < static_cast<int>(num_workers); i++) {
         m_basecall_workers[i] = std::thread([this, i] { basecall_worker_thread(i); });
     }
+    m_num_active_model_runners = num_workers;
 }
 
 void BasecallerNode::terminate_impl() {
     terminate_input_queue();
-    if (m_input_worker->joinable()) {
+    if (m_input_worker && m_input_worker->joinable()) {
         m_input_worker->join();
     }
+    m_input_worker.reset();
     for (auto &t : m_basecall_workers) {
         if (t.joinable()) {
             t.join();
         }
     }
+    m_basecall_workers.clear();
     for (auto &t : m_working_reads_managers) {
         if (t.joinable()) {
             t.join();
         }
     }
+    m_working_reads_managers.clear();
     termination_time = std::chrono::system_clock::now();
+}
+
+void BasecallerNode::restart() {
+    for (auto &runner : m_model_runners) {
+        runner->restart();
+    }
+    restart_input_queue();
+    m_chunks_in.restart();
+    m_processed_chunks.restart();
+    start_threads();
 }
 
 stats::NamedStats BasecallerNode::sample_stats() const {

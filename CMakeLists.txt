@@ -18,6 +18,12 @@ if(WIN32)
   message(STATUS "vs platform: ${CMAKE_VS_PLATFORM_NAME}")
 endif()
 
+if (APPLE AND NOT ECM_ENABLE_SANITIZERS)
+    # Prefer static libs if they exist so that we don't run into issues
+    # linking to dynamic libraries that live in brew.
+    list(PREPEND CMAKE_FIND_LIBRARY_SUFFIXES ".a")
+endif()
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(DORADO_3RD_PARTY ${CMAKE_CURRENT_SOURCE_DIR}/dorado/3rdparty)
@@ -114,6 +120,8 @@ set(LIB_SOURCE_FILES
     dorado/nn/ModBaseRunner.h
     dorado/nn/Runners.cpp
     dorado/nn/Runners.h
+    dorado/read_pipeline/Pipelines.cpp
+    dorado/read_pipeline/Pipelines.h
     dorado/read_pipeline/FakeDataLoader.cpp
     dorado/read_pipeline/FakeDataLoader.h
     dorado/read_pipeline/ReadPipeline.cpp
@@ -145,6 +153,8 @@ set(LIB_SOURCE_FILES
     dorado/read_pipeline/ProgressTracker.h
     dorado/read_pipeline/ResumeLoaderNode.cpp
     dorado/read_pipeline/ResumeLoaderNode.h
+    dorado/read_pipeline/DuplexReadTaggingNode.cpp
+    dorado/read_pipeline/DuplexReadTaggingNode.h
     dorado/decode/beam_search.cpp
     dorado/decode/fast_hash.cpp
     dorado/decode/fast_hash.h
@@ -230,26 +240,31 @@ target_compile_definitions(dorado_lib
         DORADO_GPU_BUILD=$<BOOL:${DORADO_GPU_BUILD}>
 )
 
-include_directories(${CMAKE_CURRENT_BINARY_DIR}/dorado
-    ${TORCH_INCLUDE_DIRS}
-    ${HDF5_INCLUDE_DIRS}
-    ${KOI_INCLUDE}
-    ${POD5_INCLUDE}
-    ${HTSLIB_DIR}
-    ${DORADO_3RD_PARTY}/HighFive/include
-    ${DORADO_3RD_PARTY}/catch2
-    ${DORADO_3RD_PARTY}/argparse
-    ${DORADO_3RD_PARTY}/toml11
-    ${DORADO_3RD_PARTY}/cpp-httplib
-    ${DORADO_3RD_PARTY}/metal-cpp/metal-cpp
-    ${DORADO_3RD_PARTY}/hdf_plugins/vbz_plugin
-    ${DORADO_3RD_PARTY}/cxxpool/src
-    ${DORADO_3RD_PARTY}/NVTX/c/include
-    ${DORADO_3RD_PARTY}/spdlog/include
-    ${DORADO_3RD_PARTY}/spdlog/include
-    ${DORADO_3RD_PARTY}/indicators/include
-    ${DORADO_3RD_PARTY}/ont-minimap2/src/3rdparty/minimap2
-    dorado)
+target_include_directories(dorado_lib
+    PUBLIC
+        ${CMAKE_CURRENT_BINARY_DIR}/dorado
+        ${CMAKE_CURRENT_SOURCE_DIR}/dorado
+        ${KOI_INCLUDE}
+        ${POD5_INCLUDE}
+)
+# 3rdparty libs should be considered SYSTEM headers
+target_include_directories(dorado_lib
+    SYSTEM
+    PUBLIC
+        ${TORCH_INCLUDE_DIRS}
+        ${HDF5_INCLUDE_DIRS}
+        ${HTSLIB_DIR}
+        ${DORADO_3RD_PARTY}/HighFive/include
+        ${DORADO_3RD_PARTY}/argparse
+        ${DORADO_3RD_PARTY}/toml11
+        ${DORADO_3RD_PARTY}/metal-cpp/metal-cpp
+        ${DORADO_3RD_PARTY}/hdf_plugins/vbz_plugin
+        ${DORADO_3RD_PARTY}/cxxpool/src
+        ${DORADO_3RD_PARTY}/NVTX/c/include
+        ${DORADO_3RD_PARTY}/spdlog/include
+        ${DORADO_3RD_PARTY}/indicators/include
+        ${DORADO_3RD_PARTY}/ont-minimap2/src/3rdparty/minimap2
+)
 
 enable_testing()
 
@@ -275,17 +290,6 @@ target_link_libraries(dorado_lib
     edlib
     date::date
 )
-
-if(WIN32)
-    # Static Windows build requires a few libs to be added:
-    target_link_libraries(dorado_lib
-      CUDA::cudart_static
-      CUDA::cublas
-      CUDA::cufft
-      CUDA::cusolver
-      CUDA::cusparse
-      )
-endif()
 
 if(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     target_link_libraries(dorado_lib ${IOKIT})
@@ -328,6 +332,10 @@ if(NOT DORADO_LIB_ONLY)
         PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
     )
+
+    if(MSVC)
+        set_target_properties(dorado PROPERTIES LINK_OPTIONS "/ignore:4099")
+    endif()
 
     target_precompile_headers(dorado REUSE_FROM dorado_lib)
 
@@ -436,24 +444,6 @@ elseif(WIN32)
 elseif(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     file(GLOB TORCH_DLLS "${TORCH_LIB}/lib/*.dylib")
     install(FILES ${TORCH_DLLS} DESTINATION lib COMPONENT redist_libs)
-
-    find_library(AEC_DLL aec REQUIRED)
-    get_filename_component(AEC_DLL_PATH ${AEC_DLL} DIRECTORY)
-    file(GLOB AEC_DLLS "${AEC_DLL_PATH}/libaec*dylib*")
-    RESOLVE_SYMLINKS("${AEC_DLLS}" RESOLVED_AEC_DLLS)
-    install(FILES ${RESOLVED_AEC_DLLS} DESTINATION lib COMPONENT redist_libs)
-
-    find_library(SZ_DLL sz REQUIRED)
-    get_filename_component(SZ_DLL_PATH ${SZ_DLL} DIRECTORY)
-    file(GLOB SZ_DLLS "${SZ_DLL_PATH}/libsz*dylib*")
-    RESOLVE_SYMLINKS("${SZ_DLLS}" RESOLVED_SZ_DLLS)
-    install(FILES ${RESOLVED_SZ_DLLS} DESTINATION lib COMPONENT redist_libs)
-
-    # If zstd has been dynamically linked, add the .so to the package
-    get_filename_component(ZSTD_LIBRARY_PATH ${ZSTD_LIBRARY_RELEASE} DIRECTORY)
-    file(GLOB ZSTD_DLLS "${ZSTD_LIBRARY_PATH}/*zstd*dylib*")
-    RESOLVE_SYMLINKS("${ZSTD_DLLS}" RESOLVED_ZSTD_DLLS)
-    install(FILES ${RESOLVED_ZSTD_DLLS} DESTINATION lib COMPONENT redist_libs)
 endif()
 
 add_library(dorado_models_lib
@@ -464,6 +454,13 @@ add_library(dorado_models_lib
 target_link_libraries(dorado_models_lib
     OpenSSL::SSL
     elzip
+)
+
+target_include_directories(dorado_models_lib
+    SYSTEM
+    PRIVATE
+        ${DORADO_3RD_PARTY}/cpp-httplib
+        ${DORADO_3RD_PARTY}/spdlog/include
 )
 
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
@@ -477,6 +474,7 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
        ${HDF5_C_LIBRARIES}
        ${CMAKE_DL_LIBS}
        date::date
+       dorado_lib
     )
 
     if(WIN32)
@@ -491,7 +489,9 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
         ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
     )
 
-    add_subdirectory(tests)
+    if (NOT DORADO_LIB_ONLY)
+        add_subdirectory(tests)
+    endif()
 endif()
 
 if(NOT DORADO_LIB_ONLY)

@@ -25,16 +25,6 @@
 
 namespace dorado::utils {
 
-struct BaseModInfo {
-    BaseModInfo(std::string alphabet_, std::string long_names_, std::string context_)
-            : alphabet(std::move(alphabet_)),
-              long_names(std::move(long_names_)),
-              context(std::move(context_)) {}
-    std::string alphabet;
-    std::string long_names;
-    std::string context;
-};
-
 class BaseModContext {
 public:
     /// Constructor.

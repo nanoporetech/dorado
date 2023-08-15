@@ -8,6 +8,10 @@ called_from_lib:libcuda.so
 called_from_lib:libtorch_cpu.so
 called_from_lib:libtorch_cuda.so
 
+# OpenSSL isn't instrumented
+called_from_lib:libssl.dylib
+called_from_lib:libcrypto.dylib
+
 # According to TSan the Dispatcher's mutex is unlocked after it's been destroyed during process
 # exit inside TORCH_LIBRARY_static_init_cuda's destructor (libtorch_cuda.so). However, setting a
 # breakpoint on the Dispatcher's destructor reveals that it's not destroyed until after the error

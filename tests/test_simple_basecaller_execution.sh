@@ -40,6 +40,9 @@ $dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --modified-bases 5mCG
 samtools quickcheck -u $output_dir/calls.bam
 samtools view -h $output_dir/calls.bam > $output_dir/calls.sam
 
+echo dorado duplex basespace test stage
+$dorado_bin duplex basespace $data_dir/basespace/pairs.bam --threads 1 --pairs $data_dir/basespace/pairs.txt > $output_dir/calls.bam
+
 if command -v truncate > /dev/null
 then
     echo dorado basecaller resume feature

@@ -7,12 +7,14 @@ namespace dorado {
 
 void NullNode::worker_thread() {
     Message message;
-    while (m_work_queue.try_pop(message)) {
+    while (get_input_message(message)) {
         // Do nothing with the popped message.
     }
 }
 
-NullNode::NullNode() : MessageSink(1000) {
+NullNode::NullNode() : MessageSink(1000) { start_threads(); }
+
+void NullNode::start_threads() {
     int num_worker_threads = 4;
     for (size_t i = 0; i < num_worker_threads; i++) {
         m_workers.push_back(
@@ -27,6 +29,12 @@ void NullNode::terminate_impl() {
             m->join();
         }
     }
+    m_workers.clear();
+}
+
+void NullNode::restart() {
+    restart_input_queue();
+    start_threads();
 }
 
 }  // namespace dorado

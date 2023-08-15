@@ -836,6 +836,8 @@ kernel void conv3_simd
 struct LstmArgs {
     int batch_tiles;
     int chunk_size;
+    int time_step_begin; // Inclusive
+    int time_step_end;   // Exclusive
 };
 
 template<typename InLayout, typename OutLayout>
@@ -911,6 +913,8 @@ kernel void lstm(
 {
     const int chunk_size = args->chunk_size;
     const int batch_tiles = args->batch_tiles;
+    const int time_step_begin = args->time_step_begin;
+    const int time_step_end = args->time_step_end;
     const int m_blks = batch_tiles / SIMD_TILES_M;
     const int n_blks = kLstmLayerSize * 4 / (TILE_SIZE * SIMD_TILES_N);
     const int k_tiles = kLstmLayerSize / TILE_SIZE;
@@ -925,15 +929,17 @@ kernel void lstm(
     const uint row = t_idx >> 2;
     const uint rb_idx = t_idx * 4;
 
-    for (int m_blk = gid; m_blk < m_blks; m_blk += threadgroups) {
-        for (int chunk = tid; chunk < SIMD_TILES_M * TILE_SIZE; chunk += threads) {
-            for (int i = 0; i < kLstmLayerSize; ++i) {
-                state_buf[i * batch_tiles * TILE_SIZE + m_blk * SIMD_TILES_M * TILE_SIZE + chunk] = 0;
+    if (time_step_begin == 0) {
+        for (int m_blk = gid; m_blk < m_blks; m_blk += threadgroups) {
+            for (int chunk = tid; chunk < SIMD_TILES_M * TILE_SIZE; chunk += threads) {
+                for (int i = 0; i < kLstmLayerSize; ++i) {
+                    state_buf[i * batch_tiles * TILE_SIZE + m_blk * SIMD_TILES_M * TILE_SIZE + chunk] = 0;
+                }
             }
         }
     }
 
-    for (int iter = 0; iter < chunk_size; ++iter) {
+    for (int iter = time_step_begin; iter < time_step_end; ++iter) {
         threadgroup_barrier(mem_flags::mem_device | mem_flags::mem_threadgroup);
         const int timestep_in = kLstmReversedInTime ? chunk_size - iter : iter;
         for (int m_blk = gid; m_blk < m_blks; m_blk += threadgroups) {

@@ -18,10 +18,6 @@
 
 namespace dorado {
 
-namespace utils {
-struct BaseModInfo;
-}
-
 class Read;
 
 struct Chunk {
@@ -97,7 +93,7 @@ public:
 
     std::string parent_read_id;  // Origin read ID for all its subreads. Empty for nonsplit reads.
 
-    std::shared_ptr<const utils::BaseModInfo>
+    std::shared_ptr<const BaseModInfo>
             base_mod_info;  // Modified base settings of the models that ran on this read
 
     uint64_t num_trimmed_samples;  // Number of samples which have been trimmed from the raw read.
@@ -111,13 +107,17 @@ public:
     uint64_t start_sample;
     uint64_t end_sample;
     uint64_t run_acquisition_start_time_ms;
-    bool is_duplex;
+    bool is_duplex{false};
+    bool is_duplex_parent{false};
     // Calculate mean Q-score from this position onwards if read is
     // a short read.
     uint32_t mean_qscore_start_pos = 0;
 
     std::atomic_size_t num_duplex_candidate_pairs{0};
 
+    // subread_id is used to track 2 types of offsprings of a read
+    // (1) read splits
+    // (2) duplex pairs which share this read as the template read
     size_t subread_id{0};
     size_t split_count{1};
 
@@ -139,23 +139,32 @@ class ReadPair {
 public:
     std::shared_ptr<Read> read_1;
     std::shared_ptr<Read> read_2;
+    uint64_t read_1_start;
+    uint64_t read_1_end;
+    uint64_t read_2_start;
+    uint64_t read_2_end;
 };
 
-class CandidatePairRejectedMessage {};
+class CacheFlushMessage {
+public:
+    int32_t client_id;
+};
 
 // The Message type is a std::variant that can hold different types of message objects.
 // It is currently able to store:
 // - a std::shared_ptr<Read> object, which represents a single read
 // - a BamPtr object, which represents a raw BAM alignment record
 // - a std::shared_ptr<ReadPair> object, which represents a pair of reads for duplex calling
-// - a std::shared_ptr<CandidatePairRejectedMessage> object, which informs downstream processing that a candidate pair has been rejected
 // To add more message types, simply add them to the list of types in the std::variant.
-using Message = std::variant<std::shared_ptr<Read>,
-                             BamPtr,
-                             std::shared_ptr<ReadPair>,
-                             CandidatePairRejectedMessage>;
+using Message =
+        std::variant<std::shared_ptr<Read>, BamPtr, std::shared_ptr<ReadPair>, CacheFlushMessage>;
 
 using NodeHandle = int;
+
+struct FlushOptions {
+    bool preserve_pairing_caches = false;
+};
+inline FlushOptions DefaultFlushOptions() { return {false}; }
 
 // Base class for an object which consumes messages as part of the processing pipeline.
 // Destructors of derived classes must call terminate() in order to shut down
@@ -176,12 +185,20 @@ public:
     void push_message(Message&& message);
 
     // Waits until work is finished and shuts down worker threads.
-    // No work can be done by the node after this returns.
-    virtual void terminate() = 0;
+    // No work can be done by the node after this returns until
+    // restart is subsequently called.
+    virtual void terminate(const FlushOptions& flush_options) = 0;
+
+    // Restarts the node following a terminate call.
+    // Has no effect if terminate has not been called.
+    virtual void restart() = 0;
 
 protected:
     // Terminates waits on the input queue.
     void terminate_input_queue() { m_work_queue.terminate(); }
+
+    // Allows inputs again.
+    void restart_input_queue() { m_work_queue.restart(); }
 
     // Sends message to the designated sink.
     void send_message_to_sink(int sink_index, Message&& message);
@@ -192,8 +209,15 @@ protected:
         send_message_to_sink(0, std::move(message));
     }
 
+    // Pops the next input message, returning true on success.
+    // If terminating, returns false.
+    bool get_input_message(Message& message) {
+        auto status = m_work_queue.try_pop(message);
+        return status == utils::AsyncQueueStatus::Success;
+    }
+
     // Queue of work items for this node.
-    AsyncQueue<Message> m_work_queue;
+    utils::AsyncQueue<Message> m_work_queue;
 
 private:
     // The sinks to which this node can send messages.
@@ -276,8 +300,12 @@ public:
 
     // Stops all pipeline nodes in source to sink order.
     // Returns stats from nodes' final states.
-    // After this is called the pipeline will do no further work processing subsequent inputs.
-    stats::NamedStats terminate();
+    // After this is called the pipeline will do no further work processing subsequent inputs,
+    // unless restart is called first.
+    stats::NamedStats terminate(const FlushOptions& flush_options);
+
+    // Restarts pipeline after a call to terminate.
+    void restart();
 
     // Returns a reference to the node associated with the given handle.
     // Exists to accommodate situations where client code avoids using the pipeline framework.

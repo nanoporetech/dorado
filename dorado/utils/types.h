@@ -4,6 +4,7 @@
 #include <string>
 
 struct bam1_t;
+struct mm_tbuf_s;
 
 namespace dorado {
 
@@ -21,6 +22,11 @@ struct BamDestructor {
 };
 using BamPtr = std::unique_ptr<bam1_t, BamDestructor>;
 
+struct MmTbufDestructor {
+    void operator()(mm_tbuf_s *);
+};
+using MmTbufPtr = std::unique_ptr<mm_tbuf_s, MmTbufDestructor>;
+
 enum class ReadOrder { UNRESTRICTED, BY_CHANNEL, BY_TIME };
 
 inline std::string to_string(ReadOrder read_order) {
@@ -35,5 +41,15 @@ inline std::string to_string(ReadOrder read_order) {
         return "Unknown";
     }
 }
+
+struct BaseModInfo {
+    BaseModInfo(std::string alphabet_, std::string long_names_, std::string context_)
+            : alphabet(std::move(alphabet_)),
+              long_names(std::move(long_names_)),
+              context(std::move(context_)) {}
+    std::string alphabet;
+    std::string long_names;
+    std::string context;
+};
 
 }  // namespace dorado

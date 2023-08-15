@@ -184,7 +184,7 @@ void DataLoader::load_reads(const std::string& path,
                                    [](unsigned char c) { return std::tolower(c); });
                     if (ext == ".fast5") {
                         throw std::runtime_error(
-                                "Traversing reads by channel is only availabls for POD5. "
+                                "Traversing reads by channel is only available for POD5. "
                                 "Encountered FAST5 at " +
                                 path.string());
                     } else if (ext == ".pod5") {
@@ -256,6 +256,10 @@ int DataLoader::get_num_reads(std::string data_path,
                 if (pod5_close_and_free_reader(file) != POD5_OK) {
                     spdlog::error("Failed to close and free POD5 reader");
                 }
+            } else if (ext == ".fast5") {
+                H5Easy::File file(entry.path().string(), H5Easy::File::ReadOnly);
+                HighFive::Group reads = file.getGroup("/");
+                num_reads += reads.getNumberObjects();
             }
         }
     };
@@ -435,6 +439,29 @@ std::unordered_map<std::string, ReadGroup> DataLoader::load_read_groups(
     return read_groups;
 }
 
+bool DataLoader::is_read_data_present(std::string data_path, bool recursive_file_loading) {
+    auto check_directory = [&](const auto& iterator_fn) {
+        for (const auto& entry : iterator_fn(data_path)) {
+            std::string ext = std::filesystem::path(entry).extension().string();
+            std::transform(ext.begin(), ext.end(), ext.begin(),
+                           [](unsigned char c) { return std::tolower(c); });
+            if (ext == ".pod5" || ext == ".fast5") {
+                return true;
+            }
+        }
+        return false;
+    };
+
+    if (recursive_file_loading) {
+        return check_directory([](const auto& path) {
+            return std::filesystem::recursive_directory_iterator(path);
+        });
+    } else {
+        return check_directory(
+                [](const auto& path) { return std::filesystem::directory_iterator(path); });
+    }
+}
+
 uint16_t DataLoader::get_sample_rate(std::string data_path, bool recursive_file_loading) {
     std::optional<uint16_t> sample_rate = std::nullopt;
 
@@ -571,7 +598,8 @@ void DataLoader::load_pod5_reads_from_file_by_read_ids(const std::string& path,
         throw std::runtime_error("Plan traveral didn't yield correct number of reads");
     }
 
-    cxxpool::thread_pool pool{m_num_worker_threads};
+    // Create static threadpool so it is reused across calls to this function.
+    static cxxpool::thread_pool pool{m_num_worker_threads};
 
     uint32_t row_offset = 0;
     for (std::size_t batch_index = 0; batch_index < batch_count; ++batch_index) {

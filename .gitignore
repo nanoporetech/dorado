@@ -21,6 +21,7 @@ dorado/3rdparty/libkoi-*
 dorado/3rdparty/metal-cpp
 dorado/3rdparty/pod5-*
 dorado/3rdparty/openssl-win
+dorado/3rdparty/openssl3-*
 dorado/3rdparty/torch-*
 dorado/3rdparty/vbz_plugin
 dorado/3rdparty/zlib-1.2.*

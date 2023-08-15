@@ -25,9 +25,11 @@ public:
     ~BasecallerNode() { terminate_impl(); }
     std::string get_name() const override { return m_node_name; }
     stats::NamedStats sample_stats() const override;
-    void terminate() override { terminate_impl(); }
+    void terminate(const FlushOptions& flush_options) override { terminate_impl(); }
+    void restart() override;
 
 private:
+    void start_threads();
     void terminate_impl();
     // Consume reads from input queue
     void input_worker_thread();
@@ -65,7 +67,7 @@ private:
     // Time when Basecaller Node terminates. Used for benchmarking and debugging
     std::chrono::time_point<std::chrono::system_clock> termination_time;
     // Async queue to keep track of basecalling chunks.
-    AsyncQueue<std::shared_ptr<Chunk>> m_chunks_in;
+    utils::AsyncQueue<std::shared_ptr<Chunk>> m_chunks_in;
 
     std::mutex m_working_reads_mutex;
     // Reads removed from input queue and being basecalled.
@@ -74,7 +76,7 @@ private:
     // If we go multi-threaded, there will be one of these batches per thread
     std::vector<std::deque<std::shared_ptr<Chunk>>> m_batched_chunks;
 
-    AsyncQueue<std::shared_ptr<Chunk>> m_processed_chunks;
+    utils::AsyncQueue<std::shared_ptr<Chunk>> m_processed_chunks;
 
     // Class members are initialised in declaration order regardless of initialiser list order.
     // Class data members whose construction launches threads must therefore have their

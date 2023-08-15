@@ -17,10 +17,10 @@ If you encounter any problems building or running Dorado, please [report an issu
 
 ## Installation
 
- - [dorado-0.3.2-linux-x64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.3.2-linux-x64.tar.gz)
- - [dorado-0.3.2-linux-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.3.2-linux-arm64.tar.gz)
- - [dorado-0.3.2-osx-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.3.2-osx-arm64.tar.gz)
- - [dorado-0.3.2-win64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.3.2-win64.zip)
+ - [dorado-0.3.4-linux-x64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.3.4-linux-x64.tar.gz)
+ - [dorado-0.3.4-linux-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.3.4-linux-arm64.tar.gz)
+ - [dorado-0.3.4-osx-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.3.4-osx-arm64.tar.gz)
+ - [dorado-0.3.4-win64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.3.4-win64.zip)
 
 ## Platforms
 
@@ -75,7 +75,7 @@ $ dorado basecaller dna_r10.4.1_e8.2_400bps_hac@v4.1.0 pod5s --resume-from incom
 
 `calls.bam` will contain all of the reads from `incomplete.bam` plus the new basecalls *(`incomplete.bam` can be discarded after basecalling is complete)*.
 
-**Note: it is important to choose a different filename for the BAM file you are writing to when using `--resuming-from`**. If you use the same filename, the interrupted BAM file will lose the existing basecalls and basecalling will restart from the beginning.
+**Note: it is important to choose a different filename for the BAM file you are writing to when using `--resume-from`**. If you use the same filename, the interrupted BAM file will lose the existing basecalls and basecalling will restart from the beginning.
 
 ### Modified basecalling
 
@@ -95,7 +95,10 @@ To run Duplex basecalling, run the command:
 $ dorado duplex dna_r10.4.1_e8.2_400bps_sup@v4.1.0 pod5s/ > duplex.bam
 ```
 
-This command will output both simplex and duplex reads. Duplex reads will have the `dx` tag set to `1` in the output BAM, simplex reads will have the `dx` tag set to `0`.
+This command will output both simplex and duplex reads. The `dx` tag in the output BAM can be used to distinguish between them:
+* `dx:i:1` for duplex reads.
+* `dx:i:0` for simplex reads which don't have duplex offsprings.
+* `dx:i:-1` for simplex reads which have duplex offsprings.
 
 Dorado duplex previously required a separate tool to perform duplex pair detection and read splitting, but this is now integrated into Dorado.
 
@@ -175,16 +178,15 @@ The following simplex models are also available (all for 4 kHz data):
 
 * rna002_70bps_fast@v3
 * rna002_70bps_hac@v3
-* rna003_120bps_sup@v3
 * rna004_130bps_fast@v3
 * rna004_130bps_hac@v3
 * rna004_130bps_sup@v3
 
 ### **Modified base models**
 
-* dna_r9.4.1_e8_fast@v3.4_5mCG@v0
-* dna_r9.4.1_e8_hac@v3.3_5mCG@v0
-* dna_r9.4.1_e8_sup@v3.3_5mCG@v0
+* dna_r9.4.1_e8_fast@v3.4_5mCG@v0.1
+* dna_r9.4.1_e8_hac@v3.3_5mCG@v0.1
+* dna_r9.4.1_e8_sup@v3.3_5mCG@v0.1
 * dna_r9.4.1_e8_fast@v3.4_5mCG_5hmCG@v0
 * dna_r9.4.1_e8_hac@v3.3_5mCG_5hmCG@v0
 * dna_r9.4.1_e8_sup@v3.3_5mCG_5hmCG@v0
@@ -300,6 +302,47 @@ $ export DYLD_LIBRARY_PATH=<PATH_TO_DORADO>/dorado-x.y.z-osx-arm64/lib:$DYLD_LIB
 
 This will let the Dorado binary pick up the shipped libraries and you will not need to manually install `libaec` and `zstd`. 
 
+### Improving the Speed of Duplex Basecalling
+
+Duplex basecalling is an IO-intensive process and can perform poorly if using networked storage or HDD. This can generally be improved by splitting up POD5 files appropriately.
+
+Firstly install the POD5 python tools:
+
+The POD5 documentation can be found [here](https://pod5-file-format.readthedocs.io/en/latest/docs/tools.html).
+
+
+```
+$ pip install pod5
+```
+
+Then run `pod5 view` to generate a table containing information to split on specifically, the "channel" information.
+
+```
+$ pod5 view /path/to/your/dataset/ --include "read_id, channel" --output summary.tsv
+```
+
+This will create "summary.tsv" file which should look like:
+
+```
+read_id channel
+0000173c-bf67-44e7-9a9c-1ad0bc728e74    109
+002fde30-9e23-4125-9eae-d112c18a81a7    463
+...
+```
+
+Now run `pod5 subset` to copy records from your source data into outputs per-channel. This might take some time depending on the size of your dataset
+```
+$ pod5 subset /path/to/your/dataset/ --summary summary.tsv --columns channel --output split_by_channel
+```
+
+The command above will create the output directory `split_by_channel` and write into it one pod5 file per unique channel.  Duplex basecalling these split reads will now be much faster.
+
+### Running Duplex Basecalling in a Distributed Fashion
+
+If running duplex basecalling in a distributed fashion (e.g. on a SLURM or Kubernetes cluster) it is important to split POD5 files as described above. The reason is that duplex basecalling requires aggregation of reads from across a whole sequencing run, which will be distributed over multiple POD5 files.
+The splitting strategy described above ensures that all reads which need to be aggregated are in the same POD5 file. Once the split is performed one can execute multiple jobs against smaller subsets of POD5 (e.g one job per 100 channels). This will allow basecalling to be distributed across nodes on a cluster. 
+This will generate multiple BAMs which can be merged. This apporach also offers some resilience as if any job fails it can be restarted without having to re-run basecalling against the entire dataset.
+
 ### GPU Out of Memory Errors
 
 Dorado operates on a broad range of GPUs but it is primarily developed for Nvidia A100/H100 and Apple Silicon. Dorado attempts to find the optimal batch size for basecalling. Nevertheless, on some low-RAM GPUs, users may face out of memory crashes.
@@ -316,7 +359,7 @@ To determine the batch size picked by `dorado`, run it in verbose mode by adding
 
 Low GPU utilization can lead to reduced basecalling speed. This problem can be identified using tools such as `nvidia-smi` and `nvtop`. Low GPU utilization often stems from I/O bottlenecks in basecalling. Here are a few steps you can take to improve the situation:
 
-1. Opt for POD5 instead of FAST5: POD5 has superior I/O performance and will enhance the basecall speed in I/O constrained environments.
+1. Opt for POD5 instead of .fast5: POD5 has superior I/O performance and will enhance the basecall speed in I/O constrained environments.
 2. Transfer data to the local disk before basecalling: Slow basecalling often occurs because network disks cannot supply Dorado with adequate speed. To mitigate this, make sure your data is as close to your host machine as possible.
 3. Choose SSD over HDD: Particularly for duplex basecalling, using a local SSD can offer significant speed advantages. This is due to the duplex basecalling algorithm's reliance on heavy random access of data.
 

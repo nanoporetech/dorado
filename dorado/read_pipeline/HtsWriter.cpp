@@ -43,15 +43,24 @@ HtsWriter::HtsWriter(const std::string& filename, OutputMode mode, size_t thread
             throw std::runtime_error("Could not enable multi threading for BAM generation.");
         }
     }
+    start_threads();
+}
 
+void HtsWriter::start_threads() {
     m_worker = std::make_unique<std::thread>(std::thread(&HtsWriter::worker_thread, this));
 }
 
 void HtsWriter::terminate_impl() {
     terminate_input_queue();
-    if (m_worker->joinable()) {
+    if (m_worker && m_worker->joinable()) {
         m_worker->join();
     }
+    m_worker.reset();
+}
+
+void HtsWriter::restart() {
+    restart_input_queue();
+    start_threads();
 }
 
 HtsWriter::~HtsWriter() {
@@ -72,25 +81,32 @@ HtsWriter::OutputMode HtsWriter::get_output_mode(const std::string& mode) {
 }
 
 void HtsWriter::worker_thread() {
-    // FIXME -- either remove this or add the code to set it to something other than 0
-    size_t write_count = 0;
-
     Message message;
-    while (m_work_queue.try_pop(message)) {
+    while (get_input_message(message)) {
+        // If this message isn't a BamPtr, ignore it.
+        if (!std::holds_alternative<BamPtr>(message)) {
+            continue;
+        }
+
         auto aln = std::move(std::get<BamPtr>(message));
         write(aln.get());
         std::string read_id = bam_get_qname(aln.get());
+        int64_t dx_tag = 0;
+        auto tag_str = bam_aux_get(aln.get(), "dx");
+        if (tag_str) {
+            dx_tag = bam_aux2i(tag_str);
+        }
 
         // For the purpose of estimating write count, we ignore duplex reads
-        // these can be identified by a semicolon in their ID.
-        // TODO: This is a hack, we should have a better way of identifying duplex reads.
-        bool ignore_read_id = read_id.find(';') != std::string::npos;
+        bool ignore_read_id = dx_tag == 1;
 
-        if (!ignore_read_id) {
+        if (ignore_read_id) {
+            // Read is a duplex read.
+            m_duplex_reads_written++;
+        } else {
             m_processed_read_ids.insert(std::move(read_id));
         }
     }
-    spdlog::debug("Written {} records.", write_count);
 }
 
 int HtsWriter::write(bam1_t* const record) {
@@ -133,6 +149,7 @@ int HtsWriter::set_and_write_header(const sam_hdr_t* const header) {
 stats::NamedStats HtsWriter::sample_stats() const {
     auto stats = stats::from_obj(m_work_queue);
     stats["unique_simplex_reads_written"] = m_processed_read_ids.size();
+    stats["duplex_reads_written"] = m_duplex_reads_written.load();
     return stats;
 }
 

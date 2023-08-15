@@ -91,8 +91,8 @@ void Read::generate_read_tags(bam1_t *aln, bool emit_moves) const {
 
     bam_aux_append(aln, "sv", 'Z', scaling_method.size() + 1, (uint8_t *)scaling_method.c_str());
 
-    uint32_t duplex = 0;
-    bam_aux_append(aln, "dx", 'i', sizeof(duplex), (uint8_t *)&duplex);
+    int32_t dx = (is_duplex_parent ? -1 : 0);
+    bam_aux_append(aln, "dx", 'i', sizeof(dx), (uint8_t *)&dx);
 
     auto rg = generate_read_group();
     if (!rg.empty()) {
@@ -273,10 +273,10 @@ float Read::calculate_mean_qscore() const {
 MessageSink::MessageSink(size_t max_messages) : m_work_queue(max_messages) {}
 
 void MessageSink::push_message(Message &&message) {
-    const bool success = m_work_queue.try_push(std::move(message));
+    const auto status = m_work_queue.try_push(std::move(message));
     // try_push will fail if the sink has been told to terminate.
     // We do not expect to be pushing reads from this source if that is the case.
-    assert(success);
+    assert(status == utils::AsyncQueueStatus::Success);
 }
 
 // Depth first search that establishes a topological ordering for node destruction.
@@ -378,11 +378,14 @@ void Pipeline::push_message(Message &&message) {
     dynamic_cast<MessageSink &>(*m_nodes.at(source_node_index)).push_message(std::move(message));
 }
 
-stats::NamedStats Pipeline::terminate() {
+stats::NamedStats Pipeline::terminate(const FlushOptions &flush_options) {
     stats::NamedStats final_stats;
+    // Nodes must be terminated in source to sink order to ensure all in flight
+    // processing is completed, and sources still have valid sinks as they finish
+    // work.
     for (auto handle : m_source_to_sink_order) {
         auto &node = m_nodes.at(handle);
-        node->terminate();
+        node->terminate(flush_options);
         auto node_stats = node->sample_stats();
         const auto node_name = node->get_name();
         for (const auto &[name, value] : node_stats) {
@@ -390,6 +393,14 @@ stats::NamedStats Pipeline::terminate() {
         }
     }
     return final_stats;
+}
+
+void Pipeline::restart() {
+    // The order in which we restart nodes shouldn't matter, so
+    // we go source to sink.
+    for (auto handle : m_source_to_sink_order) {
+        m_nodes.at(handle)->restart();
+    }
 }
 
 Pipeline::~Pipeline() {

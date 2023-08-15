@@ -28,6 +28,17 @@
 #include <stdint.h>
 #include <stdio.h>
 
+namespace fasthash {
+
+// Compression function for Merkle-Damgard construction.
+// This function is generated using the framework provided.
+inline uint64_t mix(uint64_t h) {
+    h ^= h >> 23;
+    h *= 0x2127599bf4325c37ULL;
+    h ^= h >> 47;
+    return h;
+}
+
 /**
  * fasthash32 - 32-bit implementation of fasthash
  * @buf:  data buffer
@@ -44,9 +55,29 @@ uint32_t fasthash32(const void *buf, size_t len, uint32_t seed);
  */
 uint64_t fasthash64(const void *buf, size_t len, uint64_t seed);
 
-/**
- * chainfasthash64 - chain values to hash
- * @hash: Hash of previous data
- * @val:  New value to chain to hash
- */
-uint64_t chainfasthash64(uint64_t hash, uint64_t val);
+/**  Chain a new value to hash
+ *
+ *   `fasthash64` specialised to case of calculating the new hash
+ *   from the previous data when a new value is appended.
+ *
+ *   Note:
+ *       It is assumed that the value added is always 64bits wide,
+ *   unlike `fasthash64` which combines blocks of bytes into 64bits
+ *   values.
+ *
+ *   Args:
+ *       hash (uint64_t): Hash of previous data
+ *       val  (uint64_t): Value to chain to hash
+ *
+ *   Returns:
+ *       uint64_t: New hash with value added
+ **/
+inline uint64_t chainfasthash64(uint64_t hash, uint64_t val) {
+    const uint64_t m = 0x880355f21e6d1965ULL;
+
+    hash ^= mix(val);
+    hash *= m;
+    return mix(hash);
+}
+
+}  // namespace fasthash

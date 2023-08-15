@@ -58,9 +58,6 @@ static const std::vector<std::string> models = {
         "rna002_70bps_fast@v3",
         "rna002_70bps_hac@v3",
 
-        // RNA003
-        "rna003_120bps_sup@v3",
-
         // RNA004
         "rna004_130bps_fast@v3",
         "rna004_130bps_hac@v3",
@@ -90,9 +87,9 @@ static const std::vector<std::string> mods = {
 static const std::vector<std::string> models = {
 
         // v3.{3,4}
-        "dna_r9.4.1_e8_fast@v3.4_5mCG@v0",
-        "dna_r9.4.1_e8_hac@v3.3_5mCG@v0",
-        "dna_r9.4.1_e8_sup@v3.3_5mCG@v0",
+        "dna_r9.4.1_e8_fast@v3.4_5mCG@v0.1",
+        "dna_r9.4.1_e8_hac@v3.3_5mCG@v0.1",
+        "dna_r9.4.1_e8_sup@v3.3_5mCG@v0.1",
 
         "dna_r9.4.1_e8_fast@v3.4_5mCG_5hmCG@v0",
         "dna_r9.4.1_e8_hac@v3.3_5mCG_5hmCG@v0",
