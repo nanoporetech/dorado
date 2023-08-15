@@ -7,6 +7,7 @@
         - "address"
         - "undefined"
         - "thread"
+  timeout: 1h 30m
   before_script:
     # Add the sanitizer flag to the build
     - export BUILD_OPTIONS="${BUILD_OPTIONS} -D ECM_ENABLE_SANITIZERS='${SANITIZER}'"
