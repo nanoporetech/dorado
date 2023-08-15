@@ -98,7 +98,7 @@ public:
         m_num_duplex_bases_filtered = fetch_stat("ReadFilterNode.duplex_bases_filtered");
 
         // don't output progress bar if stderr is not a tty
-        if (!utils::is_fd_tty(stderr)) {
+        if (!utils::is_fd_tty(stderr) & !m_enable_progress_bar) {
             return;
         }
 
