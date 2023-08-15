@@ -6,13 +6,12 @@
 
 #include <array>
 #include <atomic>
-#include <condition_variable>
 #include <cstdint>
-#include <deque>
 #include <functional>
 #include <memory>
 #include <mutex>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 namespace dorado {
@@ -85,11 +84,7 @@ private:
 
     std::mutex m_working_reads_mutex;
     // Reads removed from input queue and being modbasecalled.
-    std::deque<std::shared_ptr<Read>> m_working_reads;
-
-    std::mutex m_chunk_queues_mutex;
-    std::condition_variable m_chunk_queues_cv;
-    std::condition_variable m_chunks_added_cv;
+    std::unordered_set<std::shared_ptr<Read>> m_working_reads;
 
     std::atomic<int> m_num_active_runner_workers{0};
     std::atomic<int> m_num_active_input_workers{0};
@@ -108,6 +103,7 @@ private:
     std::atomic<int64_t> m_num_mod_base_reads_pushed = 0;
     std::atomic<int64_t> m_num_non_mod_base_reads_pushed = 0;
     std::atomic<int64_t> m_chunk_generation_ms = 0;
+    std::atomic<int64_t> m_working_reads_size = 0;
 };
 
 }  // namespace dorado

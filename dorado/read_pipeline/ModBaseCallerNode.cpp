@@ -246,8 +246,9 @@ void ModBaseCallerNode::input_worker_thread() {
 
             if (read->num_modbase_chunks != 0) {
                 // Put the read in the working list
-                std::scoped_lock<std::mutex> working_reads_lock(m_working_reads_mutex);
-                m_working_reads.push_back(read);
+                std::lock_guard<std::mutex> working_reads_lock(m_working_reads_mutex);
+                m_working_reads.insert(std::move(read));
+                ++m_working_reads_size;
             } else {
                 // No modbases to call, pass directly to next node
                 send_message_to_sink(read);
@@ -370,6 +371,8 @@ void ModBaseCallerNode::output_worker_thread() {
            utils::AsyncQueueStatus::Success) {
         nvtx3::scoped_range range{"modbase_output_worker_thread"};
 
+        std::vector<std::shared_ptr<Read>> completed_reads;
+
         for (const auto& chunk : processed_chunks) {
             auto source_read = chunk->source_read.lock();
             int64_t result_pos = chunk->context_hit;
@@ -379,25 +382,33 @@ void ModBaseCallerNode::output_worker_thread() {
                 source_read->base_mod_probs[m_num_states * result_pos + offset + i] =
                         static_cast<uint8_t>(std::min(std::floor(chunk->scores[i] * 256), 255.0f));
             }
-            ++source_read->num_modbase_chunks_called;
+            // If all chunks for the read associated with this chunk have now been called,
+            // add it to the completed_reads vector for subsequent sending on to the sink.
+            auto num_chunks_called = ++source_read->num_modbase_chunks_called;
+            if (num_chunks_called == source_read->num_modbase_chunks) {
+                completed_reads.push_back(std::move(source_read));
+            }
         }
         processed_chunks.clear();
 
-        // Now move any completed reads to the output queue
-        std::vector<std::shared_ptr<Read>> completed_reads;
-        std::unique_lock<std::mutex> working_reads_lock(m_working_reads_mutex);
-        for (auto read_iter = m_working_reads.begin(); read_iter != m_working_reads.end();) {
-            if ((*read_iter)->num_modbase_chunks_called.load() ==
-                (*read_iter)->num_modbase_chunks) {
-                completed_reads.push_back(*read_iter);
-                read_iter = m_working_reads.erase(read_iter);
-            } else {
-                ++read_iter;
+        // Remove any completed reads from the working reads set while holding its mutex.
+        if (!completed_reads.empty()) {
+            std::lock_guard<std::mutex> working_reads_lock(m_working_reads_mutex);
+            for (auto& completed_read : completed_reads) {
+                auto read_iter = m_working_reads.find(completed_read);
+                if (read_iter != m_working_reads.end()) {
+                    m_working_reads.erase(*read_iter);
+                } else {
+                    throw std::runtime_error("Expected to find read id " + completed_read->read_id +
+                                             " in working reads set but it doesn't exist.");
+                }
             }
+            m_working_reads_size -= completed_reads.size();
         }
-        working_reads_lock.unlock();
-        for (auto& read : completed_reads) {
-            send_message_to_sink(read);
+
+        // Send completed reads on to the sink.
+        for (auto& completed_read : completed_reads) {
+            send_message_to_sink(std::move(completed_read));
             ++m_num_mod_base_reads_pushed;
         }
     }
@@ -417,6 +428,7 @@ std::unordered_map<std::string, double> ModBaseCallerNode::sample_stats() const 
     stats["mod_base_reads_pushed"] = m_num_mod_base_reads_pushed;
     stats["non_mod_base_reads_pushed"] = m_num_non_mod_base_reads_pushed;
     stats["chunk_generation_ms"] = m_chunk_generation_ms;
+    stats["working_reads_items"] = m_working_reads_size;
     return stats;
 }
 
