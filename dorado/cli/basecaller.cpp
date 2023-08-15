@@ -96,7 +96,7 @@ void setup(std::vector<std::string> args,
 
     auto model_config = dorado::load_crf_model_config(model_path);
     auto [runners, num_devices] =
-            create_basecall_runners(model_config, device, num_runners, batch_size, chunk_size);
+            create_basecall_runners(model_config, device, num_runners, 0, batch_size, chunk_size);
 
     std::string model_name = std::filesystem::canonical(model_path).filename().string();
     auto read_groups = DataLoader::load_read_groups(data_path, model_name, recursive_file_loading);
