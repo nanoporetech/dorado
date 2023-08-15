@@ -70,6 +70,10 @@ Aligner::Aligner(const std::string& filename, int k, int w, uint64_t index_batch
         m_tbufs.push_back(mm_tbuf_init());
     }
 
+    start_threads();
+}
+
+void Aligner::start_threads() {
     for (size_t i = 0; i < m_threads; i++) {
         m_workers.push_back(
                 std::make_unique<std::thread>(std::thread(&Aligner::worker_thread, this, i)));
@@ -83,6 +87,12 @@ void Aligner::terminate_impl() {
             m->join();
         }
     }
+    m_workers.clear();
+}
+
+void Aligner::restart() {
+    restart_input_queue();
+    start_threads();
 }
 
 Aligner::~Aligner() {
@@ -104,12 +114,78 @@ Aligner::bam_header_sq_t Aligner::get_sequence_records_for_header() const {
 
 void Aligner::worker_thread(size_t tid) {
     Message message;
-    while (m_work_queue.try_pop(message)) {
+    while (get_input_message(message)) {
+        // If this message isn't a BamPtr, just forward it to the sink.
+        if (!std::holds_alternative<BamPtr>(message)) {
+            send_message_to_sink(std::move(message));
+            continue;
+        }
+
         auto read = std::get<BamPtr>(std::move(message));
         auto records = align(read.get(), m_tbufs[tid]);
         for (auto& record : records) {
             send_message_to_sink(std::move(record));
         }
+    }
+}
+
+// If an alignment has secondary alignments, add that informatino
+// to each record. Follows minimap2 conventions.
+void add_sa_tag(bam1_t* record,
+                const mm_reg1_t* aln,
+                const mm_reg1_t* regs,
+                int32_t hits,
+                int32_t aln_idx,
+                int32_t l_seq,
+                const mm_idx_t* idx) {
+    std::stringstream ss;
+    for (int i = 0; i < hits; i++) {
+        if (i == aln_idx) {
+            continue;
+        }
+        const mm_reg1_t* r = &regs[i];
+
+        if (r->parent != r->id || r->p == 0) {
+            continue;
+        }
+
+        int num_matches = 0, num_inserts = 0, num_deletes = 0;
+        int clip3 = 0, clip5 = 0;
+
+        if (r->qe - r->qs < r->re - r->rs) {
+            num_matches = r->qe - r->qs;
+            num_deletes = (r->re - r->rs) - num_matches;
+        } else {
+            num_matches = r->re - r->rs;
+            num_inserts = (r->qe - r->qs) - num_matches;
+        }
+
+        clip5 = r->rev ? l_seq - r->qe : r->qs;
+        clip3 = r->rev ? r->qs : l_seq - r->qe;
+
+        ss << std::string(idx->seq[r->rid].name) << ",";
+        ss << r->rs + 1 << ",";
+        ss << "+-"[r->rev] << ",";
+        if (clip5) {
+            ss << clip5 << "S";
+        }
+        if (num_matches) {
+            ss << num_matches << "M";
+        }
+        if (num_inserts) {
+            ss << num_inserts << "I";
+        }
+        if (num_deletes) {
+            ss << num_deletes << "D";
+        }
+        if (clip3) {
+            ss << clip3 << "S";
+        }
+        ss << "," << r->mapq << "," << (r->blen - r->mlen + r->p->n_ambi) << ";";
+    }
+    std::string sa = ss.str();
+    if (!sa.empty()) {
+        bam_aux_append(record, "SA", 'Z', sa.length() + 1, (uint8_t*)sa.c_str());
     }
 }
 
@@ -319,11 +395,15 @@ std::vector<BamPtr> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
 
         // Add new tags to match minimap2.
         add_tags(record, aln, seq, buf);
+        add_sa_tag(record, aln, reg, hits, j, l_seq, m_index);
 
-        free(aln->p);
         results.push_back(BamPtr(record));
     }
 
+    // Free all mm2 alignment memory.
+    for (int j = 0; j < hits; j++) {
+        free(reg[j].p);
+    }
     free(reg);
     return results;
 }

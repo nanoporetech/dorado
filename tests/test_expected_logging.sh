@@ -20,7 +20,7 @@ $dorado_bin download --model ${model} > /dev/null
 
 # Test commands
 $dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} > $output_dir/output.bam 2>$test_output_file
-grep "Reads basecalled: 1" $test_output_file
+grep "Simplex reads basecalled: 1" $test_output_file
 ret_val=$?
 if [ $ret_val -ne 0 ]; then
     echo "Couldn't find number of reads called in output"

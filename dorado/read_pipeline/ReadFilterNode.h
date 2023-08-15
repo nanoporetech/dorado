@@ -25,19 +25,25 @@ public:
     ~ReadFilterNode() { terminate_impl(); }
     std::string get_name() const override { return "ReadFilterNode"; }
     stats::NamedStats sample_stats() const override;
-    void terminate() override { terminate_impl(); }
+    void terminate(const FlushOptions& flush_options) override { terminate_impl(); }
+    void restart() override;
 
 private:
+    void start_threads();
     void terminate_impl();
     void worker_thread();
 
     // Async worker for writing.
     std::vector<std::unique_ptr<std::thread>> m_workers;
+    size_t m_num_worker_threads = 0;
 
     size_t m_min_qscore;
     size_t m_min_read_length;
     std::unordered_set<std::string> m_read_ids_to_filter;
-    std::atomic<int64_t> m_num_reads_filtered;
+    std::atomic<int64_t> m_num_simplex_reads_filtered;
+    std::atomic<int64_t> m_num_simplex_bases_filtered;
+    std::atomic<int64_t> m_num_duplex_reads_filtered;
+    std::atomic<int64_t> m_num_duplex_bases_filtered;
 };
 
 }  // namespace dorado

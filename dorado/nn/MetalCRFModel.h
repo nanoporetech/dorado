@@ -27,6 +27,7 @@ public:
     size_t chunk_size() const final;
     size_t batch_size() const final;
     void terminate() final;
+    void restart() final;
     std::string get_name() const final { return "MetalModelRunner"; }
     stats::NamedStats sample_stats() const final;
 

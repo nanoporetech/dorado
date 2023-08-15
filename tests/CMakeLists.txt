@@ -25,6 +25,7 @@ set(SOURCE_FILES
     BamUtilsTest.cpp
     ResumeLoaderTest.cpp
     TimeUtilsTest.cpp
+    DuplexReadTaggingNodeTest.cpp
 )
 
 if (DORADO_GPU_BUILD)
@@ -51,6 +52,12 @@ target_link_libraries(dorado_tests
     ${ZLIB_LIBRARIES}
 )
 
+target_include_directories(dorado_tests
+    SYSTEM
+    PRIVATE
+        ${DORADO_3RD_PARTY}/catch2
+)
+
 add_test(
     NAME dorado_tests
     COMMAND dorado_tests
@@ -61,6 +68,7 @@ add_test(
 # We also want these libs to take priority over any installed on the system, so prepend them.
 if (MSVC)
     set_tests_properties(dorado_tests PROPERTIES ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${CMAKE_INSTALL_PREFIX}/bin")
+    set_target_properties(dorado_tests PROPERTIES LINK_OPTIONS "/ignore:4099")
 endif()
 
 # GCC 8 ICEs trying to compile this file with ASAN+optimisations enabled, so knock down the optimisation to try and help it out.

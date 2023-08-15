@@ -20,7 +20,7 @@ variables:
     - xcode-13.3.1
     - m1
   variables:
-    MACOSX_DEPLOYMENT_TARGET: "12.0"
+    MACOSX_DEPLOYMENT_TARGET: "12.3"
 
 .macos_x64_runner: &macos_x64_runner
   tags:
@@ -119,29 +119,23 @@ build:linux:x86:focal:install_deps:
 build:linux:x86:focal:
   image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.1
   variables:
-    BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/libtorch -DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN}"
+    BUILD_OPTIONS: "-DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN}"
   <<: *linux_runner
   <<: *build_dorado
 
 build:linux:arm64:bionic:
   image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r32.4.3-deps:1.1
-  variables:
-    BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/torch/"
   <<: *linux_arm64_runner
   <<: *build_dorado
 
 build:linux:arm64:focal:
   image: nvcr.io/nvidia/l4t-pytorch:r35.1.0-pth1.13-py3
-  variables:
-    BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/lib/python3.8/dist-packages/torch"
   <<: *linux_dependencies
   <<: *linux_arm64_runner
   <<: *build_dorado
 
 build:linux:x86:focal_koi_download:
   image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.1
-  variables:
-    BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/libtorch"
   <<: *linux_runner
   <<: *build_dorado
 
@@ -182,7 +176,7 @@ build:ios:m1:
 build_archive:linux:x86:focal:
   image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.1
   variables:
-    BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/libtorch -DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN}"
+    BUILD_OPTIONS: "-DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN}"
   <<: *linux_runner
   <<: *build_dorado_archive
   when: manual
@@ -198,16 +192,12 @@ build_archive:linux:x86:cuda12:
 
 build_archive:linux:arm64:bionic:
   image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r32.4.3-deps:1.1
-  variables:
-    BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/torch/"
   <<: *linux_arm64_runner
   <<: *build_dorado_archive
   when: manual
 
 build_archive:linux:arm64:focal:
   image: nvcr.io/nvidia/l4t-pytorch:r35.1.0-pth1.13-py3
-  variables:
-    BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/lib/python3.8/dist-packages/torch"
   <<: *linux_dependencies
   <<: *linux_arm64_runner
   <<: *build_dorado_archive
@@ -216,7 +206,7 @@ build_archive:linux:arm64:focal:
 build_archive:linux:x86:centos7:
   image: ${DORADO_DOCKER_ROOT}/dorado-deps-centos7-cuda-${CUDA}.0:1.1
   variables:
-    BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/libtorch -DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN} -DOPENSSL_ROOT_DIR=/usr/lib64/openssl11/ -DOPENSSL_INCLUDE_DIR=/usr/include/openssl11 -DDORADO_USING_OLD_CPP_ABI=ON -DDYNAMIC_HDF=ON"
+    BUILD_OPTIONS: "-DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN} -DDORADO_USING_OLD_CPP_ABI=ON -DDYNAMIC_HDF=ON"
   <<: *linux_runner
   <<: *build_dorado_archive
   when: manual
@@ -270,6 +260,7 @@ build_archive:macos:x64:
   script:
     - tar -xzf archive/dorado-*.gz
     - ldd ./dorado-*/bin/dorado
+    - if [ -e ./dorado-*/lib/libdorado_torch_lib.so ]; then ldd ./dorado-*/lib/libdorado_torch_lib.so; fi
     # We just want to check that dorado will run here, so simply display the verbose version info
     - ./dorado-*/bin/dorado -vv
   interruptible: true

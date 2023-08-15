@@ -7,15 +7,26 @@
 #include <atomic>
 #include <deque>
 #include <map>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <thread>
 #include <tuple>
+#include <unordered_map>
 #include <vector>
 
 namespace dorado {
 
 class PairingNode : public MessageSink {
+    // A key for a unique Pore, Duplex reads must have the same UniquePoreIdentifierKey
+    // The values are channel, mux, run_id, flowcell_id
+    using UniquePoreIdentifierKey = std::tuple<int, int, std::string, std::string>;
+
+    struct ReadCache {
+        std::map<UniquePoreIdentifierKey, std::list<std::shared_ptr<Read>>> channel_mux_read_map;
+        std::deque<UniquePoreIdentifierKey> working_channel_mux_keys;
+    };
+
 public:
     // Template-complement map: uses the pair_list pairing method
     PairingNode(std::map<std::string, std::string> template_complement_map,
@@ -27,15 +38,17 @@ public:
     ~PairingNode() { terminate_impl(); }
     std::string get_name() const override { return "PairingNode"; }
     stats::NamedStats sample_stats() const override;
-    void terminate() override { terminate_impl(); }
+    void terminate(const FlushOptions& flush_options) override;
+    void restart() override;
 
 private:
+    void start_threads();
     void terminate_impl();
 
     /**
      * This is a worker thread function for pairing reads based on a specified list of template-complement pairs.
      */
-    void pair_list_worker_thread();
+    void pair_list_worker_thread(int tid);
 
     /**
      * This is a worker thread function for generating pairs of reads that fall within pairing criteria.
@@ -47,14 +60,15 @@ private:
      * with the reads immediately before and after it in the list. If the list of reads for a pore has reached its maximum 
      * size (m_max_num_reads), the oldest read is removed from the list.
      */
-    void pair_generating_worker_thread();
-
-    // A key for a unique Pore, Duplex reads must have the same UniquePoreIdentifierKey
-    // The values are channel, mux, run_id, flowcell_id, client_id
-    using UniquePoreIdentifierKey = std::tuple<int, int, std::string, std::string, int32_t>;
+    void pair_generating_worker_thread(int tid);
 
     std::vector<std::unique_ptr<std::thread>> m_workers;
-    std::atomic<int> m_num_worker_threads;
+    int m_num_worker_threads = 0;
+    std::atomic<int> m_num_active_worker_threads = 0;
+    std::atomic<bool> m_preserve_cache_during_flush = false;
+
+    using FPairingFunc = void (PairingNode::*)(int);
+    FPairingFunc m_pairing_func = nullptr;
 
     // Members for pair_list method
 
@@ -70,8 +84,8 @@ private:
 
     std::mutex m_pairing_mtx;
 
-    std::map<UniquePoreIdentifierKey, std::list<std::shared_ptr<Read>>> m_channel_mux_read_map;
-    std::deque<UniquePoreIdentifierKey> m_working_channel_mux_keys;
+    // individual read caches per client, keyed by client_id
+    std::unordered_map<int32_t, ReadCache> m_read_caches;
 
     /**
      * The maximum number of different channels (pores) to keep in memory concurrently. 
@@ -88,6 +102,29 @@ private:
      * It ensures that the memory usage is controlled, while the reads needed for pairing are available.    
      */
     size_t m_max_num_reads;
+
+    using PairingResult = std::tuple<bool, uint32_t, uint32_t, uint32_t, uint32_t>;
+    PairingResult is_within_time_and_length_criteria(const std::shared_ptr<dorado::Read>& read1,
+                                                     const std::shared_ptr<dorado::Read>& read2,
+                                                     int tid);
+
+    PairingResult is_within_alignment_criteria(const std::shared_ptr<dorado::Read>& temp,
+                                               const std::shared_ptr<dorado::Read>& comp,
+                                               int delta,
+                                               bool allow_rejection,
+                                               int tid);
+
+    // Store the minimap2 buffers used for mapping. One buffer per thread.
+    std::vector<MmTbufPtr> m_tbufs;
+
+    // Track reads which need to be emptied from the cache but are still being
+    // evaluated for pairs by other threads.
+    std::unordered_map<std::shared_ptr<Read>, std::atomic<int>> m_reads_in_flight_ctr;
+    std::unordered_set<std::shared_ptr<Read>> m_reads_to_clear;
+
+    // Stats tracking for pairing node.
+    std::atomic<int> m_early_accepted_pairs{0};
+    std::atomic<int> m_overlap_accepted_pairs{0};
 };
 
 }  // namespace dorado

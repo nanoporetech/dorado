@@ -13,6 +13,7 @@
 #endif
 
 #include <nvtx3/nvtx3.hpp>
+#include <spdlog/spdlog.h>
 #include <toml.hpp>
 #include <torch/torch.h>
 
@@ -116,22 +117,33 @@ public:
 
     ModBaseCaller(const std::vector<std::filesystem::path>& model_paths,
                   int batch_size,
-                  const std::string& device) {
-        // no metal implementation yet, force to cpu
-        if (device == "metal" || device == "cpu") {
+                  const std::string& device)
+            : m_num_models(model_paths.size()) {
+        if (device == "cpu") {
             // no slow_conv2d_cpu for type Half, need to use float32
             m_options = torch::TensorOptions().device(torch::kCPU).dtype(torch::kFloat32);
+        } else if (device == "metal") {
+#if TORCH_VERSION_MAJOR < 2
+            // no metal implementation yet, force to cpu
+            auto torchMetalBackend = torch::kCPU;
+            auto torchMetalDtype = torch::kFloat32;
+            spdlog::debug(
+                    "- no metal backend available for modified basecalling, defaulting to CPU.");
+#else
+            auto torchMetalBackend = torch::kMPS;
+            auto torchMetalDtype = torch::kFloat16;
+#endif
+            m_options = torch::TensorOptions().device(torchMetalBackend).dtype(torchMetalDtype);
         } else {
             m_options = torch::TensorOptions().device(device).dtype(torch::kFloat16);
         }
 
         // Allocate enough elements up-front so that m_caller_data.push_back() doesn't reallocate while
         // other threads can be referencing elements that it's holding.
-        const std::size_t num_models = model_paths.size();
-        m_caller_data.reserve(num_models);
-        m_task_threads.reserve(num_models);
+        m_caller_data.reserve(m_num_models);
+        m_task_threads.reserve(m_num_models);
 
-        for (size_t model_id = 0; model_id < num_models; ++model_id) {
+        for (size_t model_id = 0; model_id < m_num_models; ++model_id) {
             const auto& model_path = model_paths[model_id];
             auto caller_data = std::make_unique<ModBaseData>();
 
@@ -165,6 +177,13 @@ public:
             }
 #endif
             m_caller_data.push_back(std::move(caller_data));
+        }
+
+        start_threads();
+    }
+
+    void start_threads() {
+        for (size_t model_id = 0; model_id < m_num_models; ++model_id) {
             m_task_threads.push_back(std::make_unique<std::thread>(
                     &ModBaseCaller::modbase_task_thread_fn, this, model_id));
         }
@@ -251,7 +270,23 @@ public:
         }
     }
 
-    void terminate() { m_terminate.store(true); }
+    void terminate() {
+        m_terminate.store(true);
+        for (auto& caller_data : m_caller_data) {
+            caller_data->input_cv.notify_one();
+        }
+        for (auto& task_thread : m_task_threads) {
+            task_thread->join();
+        }
+        m_task_threads.clear();
+    }
+
+    void restart() {
+        if (m_terminate.load()) {
+            m_terminate.store(false);
+            start_threads();
+        }
+    }
 
     std::string get_name() const {
         return std::string("ModBaseCaller_") + m_options.device().str();
@@ -265,6 +300,8 @@ public:
 #endif
         return stats;
     }
+
+    size_t m_num_models = 0;
 
     torch::TensorOptions m_options;
     std::atomic<bool> m_terminate{false};
@@ -357,6 +394,7 @@ ModBaseParams& ModBaseRunner::caller_params(size_t caller_id) const {
 
 size_t ModBaseRunner::num_callers() const { return m_caller->m_caller_data.size(); }
 void ModBaseRunner::terminate() { m_caller->terminate(); }
+void ModBaseRunner::restart() { m_caller->restart(); }
 
 std::string ModBaseRunner::get_name() const {
     std::ostringstream name_stream;
