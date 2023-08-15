@@ -136,10 +136,10 @@ void setup(std::vector<std::string> args,
             {read_converter}, min_qscore, default_parameters.min_sequence_length,
             std::unordered_set<std::string>{}, thread_allocations.read_filter_threads);
 
-    pipelines::create_simplex_pipeline(
-            pipeline_desc, model_config, std::move(runners), std::move(remora_runners), overlap,
-            thread_allocations.scaler_node_threads, thread_allocations.remora_threads * num_devices,
-            read_filter_node);
+    pipelines::create_simplex_pipeline(pipeline_desc, std::move(runners), std::move(remora_runners),
+                                       overlap, thread_allocations.scaler_node_threads,
+                                       thread_allocations.remora_threads * num_devices,
+                                       read_filter_node);
 
     // Create the Pipeline from our description.
     std::vector<dorado::stats::StatsReporter> stats_reporters;

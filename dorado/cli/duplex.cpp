@@ -317,9 +317,8 @@ int duplex(int argc, char* argv[]) {
             }
 
             pipelines::create_stereo_duplex_pipeline(
-                    pipeline_desc, model_config, stereo_model_config, std::move(runners),
-                    std::move(stereo_runners), overlap, num_devices * 2, num_devices,
-                    std::move(pairing_parameters), read_filter_node);
+                    pipeline_desc, std::move(runners), std::move(stereo_runners), overlap,
+                    num_devices * 2, num_devices, std::move(pairing_parameters), read_filter_node);
 
             std::vector<dorado::stats::StatsReporter> stats_reporters;
             pipeline = Pipeline::create(std::move(pipeline_desc), &stats_reporters);

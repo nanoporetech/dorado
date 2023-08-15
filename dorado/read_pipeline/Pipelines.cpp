@@ -15,7 +15,6 @@
 namespace dorado::pipelines {
 
 void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
-                             const CRFModelConfig& model_config,
                              std::vector<dorado::Runner>&& runners,
                              std::vector<std::unique_ptr<dorado::ModBaseRunner>>&& modbase_runners,
                              size_t overlap,
@@ -23,6 +22,7 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
                              int modbase_node_threads,
                              NodeHandle sink_node_handle,
                              NodeHandle source_node_handle) {
+    const auto& model_config = runners.front()->config();
     auto model_stride = runners.front()->model_stride();
     auto adjusted_overlap = (overlap / model_stride) * model_stride;
     if (overlap != adjusted_overlap) {
@@ -68,8 +68,6 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
 }
 
 void create_stereo_duplex_pipeline(PipelineDescriptor& pipeline_desc,
-                                   const CRFModelConfig& model_config,
-                                   const CRFModelConfig& stereo_model_config,
                                    std::vector<dorado::Runner>&& runners,
                                    std::vector<dorado::Runner>&& stereo_runners,
                                    size_t overlap,
@@ -78,6 +76,8 @@ void create_stereo_duplex_pipeline(PipelineDescriptor& pipeline_desc,
                                    PairingParameters pairing_parameters,
                                    NodeHandle sink_node_handle,
                                    NodeHandle source_node_handle) {
+    const auto& model_config = runners.front()->config();
+    const auto& stereo_model_config = stereo_runners.front()->config();
     std::string model_name =
             std::filesystem::canonical(model_config.model_path).filename().string();
     auto stereo_model_name =
