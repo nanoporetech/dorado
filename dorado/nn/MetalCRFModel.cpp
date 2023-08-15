@@ -568,7 +568,8 @@ TORCH_MODULE(MetalModel);
 
 class MetalCaller {
 public:
-    MetalCaller(const CRFModelConfig &model_config, int chunk_size, int batch_size) {
+    MetalCaller(const CRFModelConfig &model_config, int chunk_size, int batch_size)
+            : m_config(model_config) {
         ScopedAutoReleasePool autorelease_pool;
 
         m_model_stride = static_cast<size_t>(model_config.stride);
@@ -894,6 +895,7 @@ public:
         }
     }
 
+    const CRFModelConfig m_config;
     std::atomic<bool> m_terminate{false};
     std::atomic<bool> m_terminate_decode{false};
     std::deque<NNTask *> m_input_queue;
@@ -958,6 +960,7 @@ std::vector<DecodedChunk> MetalModelRunner::call_chunks(int num_chunks) {
     return out_chunks;
 }
 
+const CRFModelConfig &MetalModelRunner::config() const { return m_caller->m_config; }
 size_t MetalModelRunner::model_stride() const { return m_caller->m_model_stride; }
 size_t MetalModelRunner::chunk_size() const { return m_input.size(1); }
 size_t MetalModelRunner::batch_size() const { return m_input.size(0); }

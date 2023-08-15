@@ -27,7 +27,9 @@ public:
                const std::string &device,
                float memory_limit_fraction,
                bool exclusive_gpu_access)
-            : m_device(device), m_exclusive_gpu_access(exclusive_gpu_access) {
+            : m_config(model_config),
+              m_device(device),
+              m_exclusive_gpu_access(exclusive_gpu_access) {
         m_model_stride = static_cast<size_t>(model_config.stride);
 
         m_decoder_options = DecoderOptions();
@@ -336,6 +338,7 @@ public:
         return stats;
     }
 
+    const CRFModelConfig m_config;
     std::string m_device;
     torch::TensorOptions m_options;
     std::unique_ptr<GPUDecoder> m_decoder;
@@ -389,6 +392,7 @@ std::vector<DecodedChunk> CudaModelRunner::call_chunks(int num_chunks) {
     return decoded_chunks;
 }
 
+const CRFModelConfig &CudaModelRunner::config() const { return m_caller->m_config; }
 size_t CudaModelRunner::model_stride() const { return m_caller->m_model_stride; }
 size_t CudaModelRunner::chunk_size() const { return m_input.size(2); }
 size_t CudaModelRunner::batch_size() const { return m_input.size(0); }
