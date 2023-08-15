@@ -40,7 +40,7 @@ public:
     void accept_chunk(int chunk_idx, const torch::Tensor &chunk) final;
     std::vector<DecodedChunk> call_chunks(int num_chunks) final;
     const CRFModelConfig &config() const final { return m_config; };
-    size_t model_stride() const final { return m_model_stride; }
+    size_t model_stride() const final { return m_config.stride; }
     size_t chunk_size() const final { return m_input.size(2); }
     size_t batch_size() const final { return m_input.size(0); }
     void terminate() final {}
@@ -55,7 +55,6 @@ private:
     std::unique_ptr<T> m_decoder;
     DecoderOptions m_decoder_options;
     torch::nn::ModuleHolder<torch::nn::AnyModule> m_module{nullptr};
-    size_t m_model_stride;
 
     // Performance monitoring stats.
     std::atomic<int64_t> m_num_batches_called = 0;
@@ -68,7 +67,7 @@ ModelRunner<T>::ModelRunner(const CRFModelConfig &model_config,
                             const std::string &device,
                             int chunk_size,
                             int batch_size)
-        : m_config(model_config), m_model_stride(static_cast<size_t>(model_config.stride)) {
+        : m_config(model_config) {
     m_decoder_options = DecoderOptions();
     m_decoder_options.q_shift = model_config.qbias;
     m_decoder_options.q_scale = model_config.qscale;
@@ -78,7 +77,7 @@ ModelRunner<T>::ModelRunner(const CRFModelConfig &model_config,
     m_module = load_crf_model(model_config, m_options);
 
     // adjust chunk size to be a multiple of the stride
-    chunk_size -= chunk_size % m_model_stride;
+    chunk_size -= chunk_size % model_config.stride;
 
     m_input = torch::zeros({batch_size, model_config.num_features, chunk_size},
                            torch::TensorOptions().dtype(T::dtype).device(torch::kCPU));

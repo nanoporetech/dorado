@@ -30,16 +30,14 @@ public:
             : m_config(model_config),
               m_device(device),
               m_exclusive_gpu_access(exclusive_gpu_access) {
-        m_model_stride = static_cast<size_t>(model_config.stride);
-
         m_decoder_options = DecoderOptions();
         m_decoder_options.q_shift = model_config.qbias;
         m_decoder_options.q_scale = model_config.qscale;
         m_decoder = std::make_unique<GPUDecoder>();
         m_num_input_features = model_config.num_features;
         // adjust chunk size to be a multiple of the stride
-        m_out_chunk_size = chunk_size / m_model_stride;
-        m_in_chunk_size = m_out_chunk_size * m_model_stride;
+        m_out_chunk_size = chunk_size / model_config.stride;
+        m_in_chunk_size = m_out_chunk_size * model_config.stride;
 
         m_options = torch::TensorOptions().dtype(GPUDecoder::dtype).device(device);
         assert(m_options.device().is_cuda());
@@ -344,7 +342,6 @@ public:
     std::unique_ptr<GPUDecoder> m_decoder;
     DecoderOptions m_decoder_options;
     torch::nn::ModuleHolder<torch::nn::AnyModule> m_module{nullptr};
-    size_t m_model_stride;
     std::atomic<bool> m_terminate{false};
     std::deque<std::shared_ptr<NNTask>> m_input_queue;
     std::mutex m_input_lock;
@@ -393,7 +390,7 @@ std::vector<DecodedChunk> CudaModelRunner::call_chunks(int num_chunks) {
 }
 
 const CRFModelConfig &CudaModelRunner::config() const { return m_caller->m_config; }
-size_t CudaModelRunner::model_stride() const { return m_caller->m_model_stride; }
+size_t CudaModelRunner::model_stride() const { return m_caller->m_config.stride; }
 size_t CudaModelRunner::chunk_size() const { return m_input.size(2); }
 size_t CudaModelRunner::batch_size() const { return m_input.size(0); }
 void CudaModelRunner::terminate() { m_caller->terminate(); }
