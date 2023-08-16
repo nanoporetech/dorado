@@ -8,7 +8,7 @@
 
 namespace dorado {
 
-struct RemoraModelConfig {
+struct ModBaseModelConfig {
     std::vector<std::string> mod_long_names;  ///< The long names of the modified bases.
     std::string motif;                        ///< The motif to look for modified bases within.
     size_t base_mod_count;                    ///< The number of modifications for the base.
@@ -25,10 +25,10 @@ struct RemoraModelConfig {
     bool refine_do_rough_rescale;   ///< Whether to perform rough rescaling
 };
 
-RemoraModelConfig load_remora_model_config(std::filesystem::path const& model_path);
+ModBaseModelConfig load_modbase_model_config(std::filesystem::path const& model_path);
 
 // Determine the modbase alphabet from parameters and calculate offset positions for the results
-BaseModInfo get_modbase_info(
-        std::vector<std::reference_wrapper<RemoraModelConfig const>> const& base_mod_params);
+ModBaseInfo get_modbase_info(
+        std::vector<std::reference_wrapper<ModBaseModelConfig const>> const& base_mod_params);
 
 }  // namespace dorado

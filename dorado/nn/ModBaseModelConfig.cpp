@@ -1,4 +1,4 @@
-#include "RemoraModelConfig.h"
+#include "ModBaseModelConfig.h"
 
 #include "utils/sequence_utils.h"
 #include "utils/tensor_utils.h"
@@ -7,8 +7,8 @@
 
 namespace dorado {
 
-RemoraModelConfig load_remora_model_config(std::filesystem::path const& model_path) {
-    RemoraModelConfig config;
+ModBaseModelConfig load_modbase_model_config(std::filesystem::path const& model_path) {
+    ModBaseModelConfig config;
     auto config_toml = toml::parse(model_path / "config.toml");
     const auto& params = toml::find(config_toml, "modbases");
     config.motif = toml::find<std::string>(params, "motif");
@@ -54,8 +54,8 @@ RemoraModelConfig load_remora_model_config(std::filesystem::path const& model_pa
     return config;
 }
 
-BaseModInfo get_modbase_info(
-        std::vector<std::reference_wrapper<RemoraModelConfig const>> const& base_mod_params) {
+ModBaseInfo get_modbase_info(
+        std::vector<std::reference_wrapper<ModBaseModelConfig const>> const& base_mod_params) {
     struct ModelInfo {
         std::vector<std::string> long_names;
         std::string alphabet;
@@ -82,7 +82,7 @@ BaseModInfo get_modbase_info(
         map_entry.base_counts = params.base_mod_count + 1;
     }
 
-    BaseModInfo result;
+    ModBaseInfo result;
     size_t index = 0;
     for (const auto& info : model_info) {
         for (const auto& name : info.long_names) {

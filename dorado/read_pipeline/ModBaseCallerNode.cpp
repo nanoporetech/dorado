@@ -1,8 +1,8 @@
 #include "ModBaseCallerNode.h"
 
-#include "modbase/remora_encoder.h"
+#include "modbase/modbase_encoder.h"
+#include "nn/ModBaseModelConfig.h"
 #include "nn/ModBaseRunner.h"
-#include "nn/RemoraModelConfig.h"
 #include "utils/base_mod_utils.h"
 #include "utils/math_utils.h"
 #include "utils/sequence_utils.h"
@@ -110,7 +110,7 @@ void ModBaseCallerNode::restart() {
 }
 
 void ModBaseCallerNode::init_modbase_info() {
-    std::vector<std::reference_wrapper<RemoraModelConfig const>> base_mod_params;
+    std::vector<std::reference_wrapper<ModBaseModelConfig const>> base_mod_params;
     auto& runner = m_runners[0];
     utils::BaseModContext context_handler;
     for (size_t caller_id = 0; caller_id < runner->num_callers(); ++caller_id) {
@@ -123,7 +123,7 @@ void ModBaseCallerNode::init_modbase_info() {
     }
 
     auto result = get_modbase_info(base_mod_params);
-    m_base_mod_info = std::make_shared<BaseModInfo>(result.alphabet, result.long_names,
+    m_base_mod_info = std::make_shared<ModBaseInfo>(result.alphabet, result.long_names,
                                                     context_handler.encode());
 
     m_base_prob_offsets[0] = 0;
@@ -184,8 +184,8 @@ void ModBaseCallerNode::input_worker_thread() {
                 auto& params = runner->caller_params(caller_id);
                 auto context_samples = (params.context_before + params.context_after);
                 // One-hot encodes the kmer at each signal step for input into the network
-                RemoraEncoder encoder(m_block_stride, context_samples, params.bases_before,
-                                      params.bases_after);
+                ModBaseEncoder encoder(m_block_stride, context_samples, params.bases_before,
+                                       params.bases_after);
                 encoder.init(sequence_ints, seq_to_sig_map);
 
                 auto context_hits = runner->get_motif_hits(caller_id, read->seq);

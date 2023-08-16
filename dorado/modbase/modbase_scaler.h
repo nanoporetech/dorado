@@ -10,7 +10,7 @@
 namespace dorado {
 
 /// Calculates new scaling values for improved modified base detection
-class RemoraScaler {
+class ModBaseScaler {
 private:
     const std::vector<float>& m_kmer_levels;
     const size_t m_kmer_len;
@@ -61,7 +61,7 @@ public:
      *  @param kmer_len The length of the kmers referred to in kmer_levels.
      *  @param centre_index The position in the kmer at which to set the levels.
      */
-    RemoraScaler(const std::vector<float>& kmer_levels, size_t kmer_len, size_t centre_index);
+    ModBaseScaler(const std::vector<float>& kmer_levels, size_t kmer_len, size_t centre_index);
 };
 
 }  // namespace dorado

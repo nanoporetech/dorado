@@ -1,8 +1,8 @@
 #include "ModBaseRunner.h"
 
-#include "RemoraModel.h"
-#include "RemoraModelConfig.h"
-#include "modbase/remora_scaler.h"
+#include "ModBaseModel.h"
+#include "ModBaseModelConfig.h"
+#include "modbase/modbase_scaler.h"
 #include "utils/sequence_utils.h"
 #include "utils/stats.h"
 #include "utils/tensor_utils.h"
@@ -39,8 +39,8 @@ public:
 
     struct ModBaseData {
         torch::nn::ModuleHolder<torch::nn::AnyModule> module_holder{nullptr};
-        std::unique_ptr<RemoraScaler> scaler{nullptr};
-        RemoraModelConfig params{};
+        std::unique_ptr<ModBaseScaler> scaler{nullptr};
+        ModBaseModelConfig params{};
         std::deque<std::shared_ptr<ModBaseTask>> input_queue;
         std::mutex input_lock;
         std::condition_variable input_cv;
@@ -100,12 +100,12 @@ public:
             auto caller_data = std::make_unique<ModBaseData>();
 
             torch::InferenceMode guard;
-            caller_data->module_holder = load_remora_model(model_path, m_options);
-            caller_data->params = load_remora_model_config(model_path);
+            caller_data->module_holder = load_modbase_model(model_path, m_options);
+            caller_data->params = load_modbase_model_config(model_path);
             caller_data->batch_size = batch_size;
 
             if (caller_data->params.refine_do_rough_rescale) {
-                caller_data->scaler = std::make_unique<RemoraScaler>(
+                caller_data->scaler = std::make_unique<ModBaseScaler>(
                         caller_data->params.refine_kmer_levels, caller_data->params.refine_kmer_len,
                         caller_data->params.refine_kmer_center_idx);
             }
@@ -340,7 +340,7 @@ std::vector<size_t> ModBaseRunner::get_motif_hits(size_t caller_id, const std::s
     return m_caller->m_caller_data[caller_id]->get_motif_hits(seq);
 }
 
-RemoraModelConfig const& ModBaseRunner::caller_params(size_t caller_id) const {
+ModBaseModelConfig const& ModBaseRunner::caller_params(size_t caller_id) const {
     return m_caller->m_caller_data[caller_id]->params;
 }
 
