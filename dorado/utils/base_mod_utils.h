@@ -24,7 +24,7 @@
  */
 
 namespace dorado {
-struct ModBaseParams;
+struct RemoraModelConfig;
 struct BaseModInfo;
 }  // namespace dorado
 
@@ -91,9 +91,5 @@ private:
     std::array<std::string, 4> m_motifs;
     std::array<size_t, 4> m_offsets = {0, 0, 0, 0};
 };
-
-// Determine the modbase alphabet from parameters and calculate offset positions for the results
-BaseModInfo get_modbase_info(
-        std::vector<std::reference_wrapper<ModBaseParams const>> const& base_mod_params);
 
 }  // namespace dorado::utils

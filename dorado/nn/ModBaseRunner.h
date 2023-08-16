@@ -1,7 +1,6 @@
 #pragma once
 
 #include "utils/stats.h"
-#include "utils/types.h"
 
 #include <torch/torch.h>
 
@@ -12,6 +11,7 @@
 
 namespace dorado {
 
+struct RemoraModelConfig;
 class ModBaseCaller;
 
 std::shared_ptr<ModBaseCaller> create_modbase_caller(
@@ -32,7 +32,7 @@ public:
                                const std::vector<int>& seq_ints,
                                const std::vector<uint64_t>& seq_to_sig_map) const;
     std::vector<size_t> get_motif_hits(size_t caller_id, const std::string& seq) const;
-    ModBaseParams& caller_params(size_t caller_id) const;
+    RemoraModelConfig const& caller_params(size_t caller_id) const;
     size_t num_callers() const;
     size_t batch_size() const { return m_input_sigs[0].size(0); }
     void terminate();

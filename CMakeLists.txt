@@ -118,6 +118,8 @@ set(LIB_SOURCE_FILES
     dorado/nn/ModelRunner.h
     dorado/nn/RemoraModel.cpp
     dorado/nn/RemoraModel.h
+    dorado/nn/RemoraModelConfig.cpp
+    dorado/nn/RemoraModelConfig.h    
     dorado/nn/ModBaseRunner.cpp
     dorado/nn/ModBaseRunner.h
     dorado/nn/Runners.cpp

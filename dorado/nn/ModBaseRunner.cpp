@@ -1,8 +1,8 @@
 #include "ModBaseRunner.h"
 
 #include "RemoraModel.h"
+#include "RemoraModelConfig.h"
 #include "modbase/remora_scaler.h"
-#include "utils/base_mod_utils.h"
 #include "utils/stats.h"
 #include "utils/tensor_utils.h"
 
@@ -39,7 +39,7 @@ public:
     struct ModBaseData {
         torch::nn::ModuleHolder<torch::nn::AnyModule> module_holder{nullptr};
         std::unique_ptr<RemoraScaler> scaler{nullptr};
-        ModBaseParams params{};
+        RemoraModelConfig params{};
         std::deque<std::shared_ptr<ModBaseTask>> input_queue;
         std::mutex input_lock;
         std::condition_variable input_cv;
@@ -100,7 +100,7 @@ public:
 
             torch::InferenceMode guard;
             caller_data->module_holder = load_remora_model(model_path, m_options);
-            caller_data->params.parse(model_path);
+            caller_data->params = load_remora_model_config(model_path);
             caller_data->batch_size = batch_size;
 
             if (caller_data->params.refine_do_rough_rescale) {
@@ -339,7 +339,7 @@ std::vector<size_t> ModBaseRunner::get_motif_hits(size_t caller_id, const std::s
     return m_caller->m_caller_data[caller_id]->get_motif_hits(seq);
 }
 
-ModBaseParams& ModBaseRunner::caller_params(size_t caller_id) const {
+RemoraModelConfig const& ModBaseRunner::caller_params(size_t caller_id) const {
     return m_caller->m_caller_data[caller_id]->params;
 }
 

@@ -2,6 +2,7 @@
 
 #include "modbase/remora_encoder.h"
 #include "nn/ModBaseRunner.h"
+#include "nn/RemoraModelConfig.h"
 #include "utils/base_mod_utils.h"
 #include "utils/math_utils.h"
 #include "utils/sequence_utils.h"
@@ -109,7 +110,7 @@ void ModBaseCallerNode::restart() {
 }
 
 void ModBaseCallerNode::init_modbase_info() {
-    std::vector<std::reference_wrapper<ModBaseParams const>> base_mod_params;
+    std::vector<std::reference_wrapper<RemoraModelConfig const>> base_mod_params;
     auto& runner = m_runners[0];
     utils::BaseModContext context_handler;
     for (size_t caller_id = 0; caller_id < runner->num_callers(); ++caller_id) {
@@ -121,7 +122,7 @@ void ModBaseCallerNode::init_modbase_info() {
         m_num_states += params.base_mod_count;
     }
 
-    auto result = utils::get_modbase_info(base_mod_params);
+    auto result = get_modbase_info(base_mod_params);
     m_base_mod_info = std::make_shared<BaseModInfo>(result.alphabet, result.long_names,
                                                     context_handler.encode());
 

@@ -1,6 +1,6 @@
 #include "htslib/sam.h"
 #include "read_pipeline/ReadPipeline.h"
-#include "utils/base_mod_utils.h"
+#include "utils/types.h"
 
 #include <catch2/catch.hpp>
 
