@@ -6,7 +6,7 @@
 #include "PairingNode.h"
 #include "ScalerNode.h"
 #include "StereoDuplexEncoderNode.h"
-#include "nn/CRFModel.h"
+#include "nn/CRFModelConfig.h"
 #include "nn/ModBaseRunner.h"
 #include "nn/ModelRunner.h"
 
