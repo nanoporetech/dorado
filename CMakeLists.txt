@@ -165,8 +165,6 @@ set(LIB_SOURCE_FILES
     dorado/modbase/remora_encoder.h
     dorado/modbase/remora_scaler.cpp
     dorado/modbase/remora_scaler.h
-    dorado/modbase/remora_utils.cpp
-    dorado/modbase/remora_utils.h
     dorado/utils/alignment_utils.cpp
     dorado/utils/alignment_utils.h
     dorado/utils/AsyncQueue.h

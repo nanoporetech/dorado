@@ -1,6 +1,5 @@
 #include "remora_scaler.h"
 
-#include "remora_utils.h"
 #include "utils/math_utils.h"
 
 #include <nvtx3/nvtx3.hpp>

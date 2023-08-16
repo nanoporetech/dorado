@@ -1,7 +1,6 @@
 #include "ModBaseCallerNode.h"
 
 #include "modbase/remora_encoder.h"
-#include "modbase/remora_utils.h"
 #include "nn/ModBaseRunner.h"
 #include "utils/base_mod_utils.h"
 #include "utils/math_utils.h"
@@ -19,6 +18,23 @@ using namespace std::chrono_literals;
 namespace dorado {
 
 constexpr auto FORCE_TIMEOUT = 100ms;
+
+struct RemoraChunk {
+    RemoraChunk(std::shared_ptr<Read> read,
+                torch::Tensor input_signal,
+                std::vector<int8_t> kmer_data,
+                size_t position)
+            : source_read(read),
+              signal(input_signal),
+              encoded_kmers(std::move(kmer_data)),
+              context_hit(position) {}
+
+    std::weak_ptr<Read> source_read;
+    torch::Tensor signal;
+    std::vector<int8_t> encoded_kmers;
+    size_t context_hit;
+    std::vector<float> scores;
+};
 
 ModBaseCallerNode::ModBaseCallerNode(std::vector<std::unique_ptr<ModBaseRunner>> model_runners,
                                      size_t remora_threads,
@@ -92,74 +108,27 @@ void ModBaseCallerNode::restart() {
     start_threads();
 }
 
-[[maybe_unused]] ModBaseCallerNode::Info ModBaseCallerNode::get_modbase_info_and_maybe_init(
-        std::vector<std::reference_wrapper<ModBaseParams const>> const& base_mod_params,
-        ModBaseCallerNode* node) {
-    struct ModelInfo {
-        std::vector<std::string> long_names;
-        std::string alphabet;
-        std::string motif;
-        int motif_offset;
-        size_t base_counts = 1;
-    };
-
-    std::string const allowed_bases = "ACGT";
-    std::array<ModelInfo, 4> model_info;
-    for (int b = 0; b < 4; ++b) {
-        model_info[b].alphabet = allowed_bases[b];
-    }
-
-    for (const auto& params_ref : base_mod_params) {
-        const auto& params = params_ref.get();
-        auto base = params.motif[params.motif_offset];
-        if (allowed_bases.find(base) == std::string::npos) {
-            throw std::runtime_error("Invalid base in remora model metadata.");
-        }
-        auto& map_entry = model_info[RemoraUtils::BASE_IDS[base]];
-        map_entry.long_names = params.mod_long_names;
-        map_entry.alphabet += params.mod_bases;
-        if (node) {
-            map_entry.motif = params.motif;
-            map_entry.motif_offset = params.motif_offset;
-            map_entry.base_counts = params.base_mod_count + 1;
-            node->m_num_states += params.base_mod_count;
-        }
-    }
-
-    Info result;
-    utils::BaseModContext context_handler;
-    for (const auto& info : model_info) {
-        for (const auto& name : info.long_names) {
-            if (!result.long_names.empty())
-                result.long_names += ' ';
-            result.long_names += name;
-        }
-        result.alphabet += info.alphabet;
-        if (node && !info.motif.empty()) {
-            context_handler.set_context(info.motif, size_t(info.motif_offset));
-        }
-    }
-
-    if (node) {
-        node->m_base_mod_info = std::make_shared<BaseModInfo>(result.alphabet, result.long_names,
-                                                              context_handler.encode());
-
-        node->m_base_prob_offsets[0] = 0;
-        node->m_base_prob_offsets[1] = model_info[0].base_counts;
-        node->m_base_prob_offsets[2] = node->m_base_prob_offsets[1] + model_info[1].base_counts;
-        node->m_base_prob_offsets[3] = node->m_base_prob_offsets[2] + model_info[2].base_counts;
-    }
-
-    return result;
-}
-
 void ModBaseCallerNode::init_modbase_info() {
     std::vector<std::reference_wrapper<ModBaseParams const>> base_mod_params;
     auto& runner = m_runners[0];
+    utils::BaseModContext context_handler;
     for (size_t caller_id = 0; caller_id < runner->num_callers(); ++caller_id) {
+        const auto& params = runner->caller_params(caller_id);
+        if (!params.motif.empty()) {
+            context_handler.set_context(params.motif, size_t(params.motif_offset));
+        }
         base_mod_params.emplace_back(runner->caller_params(caller_id));
+        m_num_states += params.base_mod_count;
     }
-    get_modbase_info_and_maybe_init(base_mod_params, this);
+
+    auto result = utils::get_modbase_info(base_mod_params);
+    m_base_mod_info = std::make_shared<BaseModInfo>(result.alphabet, result.long_names,
+                                                    context_handler.encode());
+
+    m_base_prob_offsets[0] = 0;
+    m_base_prob_offsets[1] = result.base_counts[0];
+    m_base_prob_offsets[2] = m_base_prob_offsets[1] + result.base_counts[1];
+    m_base_prob_offsets[3] = m_base_prob_offsets[2] + result.base_counts[2];
 }
 
 void ModBaseCallerNode::input_worker_thread() {

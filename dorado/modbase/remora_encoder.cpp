@@ -1,8 +1,8 @@
 #include "remora_encoder.h"
 
-#include "remora_utils.h"
 #include "utils/sequence_utils.h"
 #include "utils/simd.h"
+#include "utils/types.h"
 
 #include <nvtx3/nvtx3.hpp>
 

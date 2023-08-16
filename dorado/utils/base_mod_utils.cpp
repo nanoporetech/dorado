@@ -1,6 +1,7 @@
 #include "base_mod_utils.h"
 
 #include "sequence_utils.h"
+#include "types.h"
 
 #include <sstream>
 
@@ -110,6 +111,49 @@ void BaseModContext::update_mask(std::vector<int>& mask,
             }
         }
     }
+}
+
+BaseModInfo get_modbase_info(
+        std::vector<std::reference_wrapper<ModBaseParams const>> const& base_mod_params) {
+    struct ModelInfo {
+        std::vector<std::string> long_names;
+        std::string alphabet;
+        std::string motif;
+        int motif_offset;
+        size_t base_counts = 1;
+    };
+
+    std::string const allowed_bases = "ACGT";
+    std::array<ModelInfo, 4> model_info;
+    for (int b = 0; b < 4; ++b) {
+        model_info[b].alphabet = allowed_bases[b];
+    }
+
+    for (const auto& params_ref : base_mod_params) {
+        const auto& params = params_ref.get();
+        auto base = params.motif[params.motif_offset];
+        if (allowed_bases.find(base) == std::string::npos) {
+            throw std::runtime_error("Invalid base in remora model metadata.");
+        }
+        auto& map_entry = model_info[RemoraUtils::BASE_IDS[base]];
+        map_entry.long_names = params.mod_long_names;
+        map_entry.alphabet += params.mod_bases;
+        map_entry.base_counts = params.base_mod_count + 1;
+    }
+
+    BaseModInfo result;
+    size_t index = 0;
+    for (const auto& info : model_info) {
+        for (const auto& name : info.long_names) {
+            if (!result.long_names.empty())
+                result.long_names += ' ';
+            result.long_names += name;
+        }
+        result.alphabet += info.alphabet;
+        result.base_counts[index++] = info.base_counts;
+    }
+
+    return result;
 }
 
 }  // namespace dorado::utils
