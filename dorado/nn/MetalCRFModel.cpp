@@ -101,9 +101,32 @@ struct MetalConv1dImpl : Module {
             assert(win_size = 5);
         }
 
-        const std::vector<int32_t> args_{in_size,      win_size,   out_size,  stride,
-                                         win_size / 2, chunk_size, batch_size};
-        args = create_vec_buffer(device, args_);
+        if (layer != 3) {
+            // Layers 1 and 2 are executed with a single kernel launch.
+            // The last 2 arguments are unused.
+            const std::vector<int32_t> args{in_size,    win_size,   out_size, stride, win_size / 2,
+                                            chunk_size, batch_size, 0,        0};
+            m_args.push_back(create_vec_buffer(device, args));
+        } else {
+            // We cut up the time span for individual kernel launches for conv3 since it is by far
+            // the most time consuming, and sup times can be of the order of seconds, which
+            // is known to provoke command buffer errors.
+            // The last 2 arguments specify the output time step range, i.e. time step range after
+            // dividing by stride.
+            const int output_time_step_count = chunk_size / stride;
+            constexpr int kMaxTimeSteps = 20;
+            const int num_pieces = (output_time_step_count + kMaxTimeSteps - 1) / kMaxTimeSteps;
+            for (int i = 0; i < num_pieces; ++i) {
+                const int time_step_begin = i * kMaxTimeSteps;
+                const int time_step_end = std::min((i + 1) * kMaxTimeSteps, output_time_step_count);
+                const std::vector<int32_t> args{in_size,    win_size,        out_size,
+                                                stride,     win_size / 2,    chunk_size,
+                                                batch_size, time_step_begin, time_step_end};
+                m_args.push_back(create_vec_buffer(device, args));
+            }
+            spdlog::debug("conv3 output_time_step_count {} => {} kernel launches",
+                          output_time_step_count, num_pieces);
+        }
 
         auto weight = torch::empty({out_size, in_size, win_size}, torch::kF32);
         auto bias = torch::empty({out_size}, torch::kF32);
@@ -146,17 +169,21 @@ struct MetalConv1dImpl : Module {
     }
 
     void run(MTL::CommandQueue *command_queue, MTL::Buffer *mat_in, MTL::Buffer *mat_out) {
-        std::vector<MTL::Buffer *> buffers{args.get(), mat_in, mtl_for_tensor(t_weights_bias),
-                                           mat_out};
-        launch_kernel(conv_cps.get(), command_queue, buffers, {}, kernel_thread_groups,
-                      kernel_simd_groups * 32);
+        for (const auto &args : m_args) {
+            std::vector<MTL::Buffer *> buffers{args.get(), mat_in, mtl_for_tensor(t_weights_bias),
+                                               mat_out};
+            launch_kernel(conv_cps.get(), command_queue, buffers, {}, kernel_thread_groups,
+                          kernel_simd_groups * 32);
+        }
     }
 
     void run(MTL::CommandBuffer *command_buffer, MTL::Buffer *mat_in, MTL::Buffer *mat_out) {
-        std::vector<MTL::Buffer *> buffers{args.get(), mat_in, mtl_for_tensor(t_weights_bias),
-                                           mat_out};
-        launch_kernel_no_wait(conv_cps.get(), command_buffer, buffers, {}, kernel_thread_groups,
-                              kernel_simd_groups * 32);
+        for (const auto &args : m_args) {
+            std::vector<MTL::Buffer *> buffers{args.get(), mat_in, mtl_for_tensor(t_weights_bias),
+                                               mat_out};
+            launch_kernel_no_wait(conv_cps.get(), command_buffer, buffers, {}, kernel_thread_groups,
+                                  kernel_simd_groups * 32);
+        }
     }
 
     void load_weights() {
@@ -176,7 +203,7 @@ struct MetalConv1dImpl : Module {
     }
 
     torch::Tensor t_weights_bias;
-    NS::SharedPtr<MTL::Buffer> args;
+    std::vector<NS::SharedPtr<MTL::Buffer>> m_args;
     NS::SharedPtr<MTL::ComputePipelineState> conv_cps, weights_cps;
     int kernel_simd_groups, kernel_thread_groups;
     int in_size, out_size, win_size, stride, chunk_size, batch_size, w_pad_rows, repeats;
@@ -227,7 +254,7 @@ struct MetalBlockImpl : Module {
             // We enforce a maximum time step count for each LSTM kernel because long running
             // kernels increase the likelihood of command buffer submission errors, of various
             // types.  Each args buffer here is for a different time step range.
-            constexpr int kMaxTimeSteps = 100;
+            constexpr int kMaxTimeSteps = 20;
             const int num_pieces = (lstm_chunk_size + kMaxTimeSteps - 1) / kMaxTimeSteps;
             for (int i = 0; i < num_pieces; ++i) {
                 const int time_step_begin = i * kMaxTimeSteps;
@@ -612,7 +639,9 @@ public:
         // that is an integral multiple of 48.  Since the LSTM batch size is
         // already constrained to be an integral multiple of 48, this means the
         // batch splitting factor must be an exact divisor of the batch_size / 48.
-        constexpr auto kMaxBufferSize = static_cast<int64_t>(1) << 32;
+        // On top of this, we want to restrict kernel run times, so we use a lower
+        // limit than 4 GB.
+        constexpr auto kMaxBufferSize = static_cast<int64_t>(1) << 28;
         const auto complete_linear_out_size =
                 static_cast<int64_t>(m_out_chunk_size) * static_cast<int64_t>(m_batch_size) *
                 static_cast<int64_t>(model_config.outsize) * sizeof(float);
@@ -622,6 +651,7 @@ public:
                 complete_linear_out_size / m_out_split < kMaxBufferSize)
                 break;
         }
+        spdlog::debug("Linear layer split {}", m_out_split);
         // If we exited the loop above without breaking, then m_out_split = num_batch_pieces,
         // which satisfies the divisor criterion, and should mean small enough linear layer
         // output buffers, given other reasonable parameters.
