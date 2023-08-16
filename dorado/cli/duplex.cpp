@@ -1,6 +1,6 @@
 #include "Version.h"
 #include "data_loader/DataLoader.h"
-#include "nn/CRFModel.h"
+#include "nn/CRFModelConfig.h"
 #include "nn/Runners.h"
 #include "read_pipeline/AlignerNode.h"
 #include "read_pipeline/BaseSpaceDuplexCallerNode.h"
