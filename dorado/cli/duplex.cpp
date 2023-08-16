@@ -97,13 +97,6 @@ int duplex(int argc, char* argv[]) {
 
     parser.add_argument("-I").help("minimap2 index batch size.").default_value(std::string("16G"));
 
-    parser.add_argument("--guard-gpus")
-            .default_value(false)
-            .implicit_value(true)
-            .help("In case of GPU OOM, use this option to be more defensive with GPU memory. May "
-                  "cause "
-                  "performance regression.");
-
     try {
         auto remaining_args = parser.parse_known_args(argc, argv);
         auto internal_parser = utils::parse_internal_options(remaining_args);
