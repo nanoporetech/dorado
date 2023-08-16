@@ -52,34 +52,34 @@ torch::Tensor GPUDecoder::gpu_part(torch::Tensor scores, int num_chunks, Decoder
     {
         utils::ScopedProfileRange spr{"back_guides", 2};
         dorado::utils::handle_cuda_result(host_back_guide_step(
-                chunks.data_ptr(), chunk_results.data_ptr(), N, scores.data_ptr(), C,
-                aux.data_ptr(), path.data_ptr(), moves.data_ptr(), NULL, sequence.data_ptr(),
-                qstring.data_ptr(), options.q_scale, options.q_shift, options.beam_width,
-                options.beam_cut, options.blank_score));
+                chunks.data_ptr(), chunk_results.data_ptr(), N, scores.data_ptr(),
+                m_score_clamp_val, C, aux.data_ptr(), path.data_ptr(), moves.data_ptr(), NULL,
+                sequence.data_ptr(), qstring.data_ptr(), options.q_scale, options.q_shift,
+                options.beam_width, options.beam_cut, options.blank_score));
     }
     {
         utils::ScopedProfileRange spr{"beam_search", 2};
         dorado::utils::handle_cuda_result(host_beam_search_step(
-                chunks.data_ptr(), chunk_results.data_ptr(), N, scores.data_ptr(), C,
-                aux.data_ptr(), path.data_ptr(), moves.data_ptr(), NULL, sequence.data_ptr(),
-                qstring.data_ptr(), options.q_scale, options.q_shift, options.beam_width,
-                options.beam_cut, options.blank_score));
+                chunks.data_ptr(), chunk_results.data_ptr(), N, scores.data_ptr(),
+                m_score_clamp_val, C, aux.data_ptr(), path.data_ptr(), moves.data_ptr(), NULL,
+                sequence.data_ptr(), qstring.data_ptr(), options.q_scale, options.q_shift,
+                options.beam_width, options.beam_cut, options.blank_score));
     }
     {
         utils::ScopedProfileRange spr{"compute_posts", 2};
         dorado::utils::handle_cuda_result(host_compute_posts_step(
-                chunks.data_ptr(), chunk_results.data_ptr(), N, scores.data_ptr(), C,
-                aux.data_ptr(), path.data_ptr(), moves.data_ptr(), NULL, sequence.data_ptr(),
-                qstring.data_ptr(), options.q_scale, options.q_shift, options.beam_width,
-                options.beam_cut, options.blank_score));
+                chunks.data_ptr(), chunk_results.data_ptr(), N, scores.data_ptr(),
+                m_score_clamp_val, C, aux.data_ptr(), path.data_ptr(), moves.data_ptr(), NULL,
+                sequence.data_ptr(), qstring.data_ptr(), options.q_scale, options.q_shift,
+                options.beam_width, options.beam_cut, options.blank_score));
     }
     {
         utils::ScopedProfileRange spr{"decode", 2};
         dorado::utils::handle_cuda_result(host_run_decode(
-                chunks.data_ptr(), chunk_results.data_ptr(), N, scores.data_ptr(), C,
-                aux.data_ptr(), path.data_ptr(), moves.data_ptr(), NULL, sequence.data_ptr(),
-                qstring.data_ptr(), options.q_scale, options.q_shift, options.beam_width,
-                options.beam_cut, options.blank_score, options.move_pad));
+                chunks.data_ptr(), chunk_results.data_ptr(), N, scores.data_ptr(),
+                m_score_clamp_val, C, aux.data_ptr(), path.data_ptr(), moves.data_ptr(), NULL,
+                sequence.data_ptr(), qstring.data_ptr(), options.q_scale, options.q_shift,
+                options.beam_width, options.beam_cut, options.blank_score, options.move_pad));
     }
     return moves_sequence_qstring.reshape({3, N, -1});
 }
