@@ -2,7 +2,6 @@
 
 #include "utils/sequence_utils.h"
 #include "utils/simd.h"
-#include "utils/types.h"
 
 #include <nvtx3/nvtx3.hpp>
 
@@ -42,7 +41,7 @@ RemoraEncoder::Context RemoraEncoder::get_context(size_t seq_pos) const {
         throw std::out_of_range("Sequence position out of range.");
     }
 
-    auto encoded_kmer_len = m_kmer_len * RemoraUtils::NUM_BASES;
+    auto encoded_kmer_len = m_kmer_len * utils::BaseInfo::NUM_BASES;
     Context context{};
     int base_sample_pos =
             (compute_sample_pos(int(seq_pos)) + compute_sample_pos(int(seq_pos) + 1)) / 2;
@@ -134,7 +133,7 @@ inline std::vector<int8_t> encode_kmer_generic(const std::vector<int>& seq,
                                                int context_samples,
                                                int kmer_len) {
     const size_t seq_len = seq.size() - bases_before - bases_after;
-    std::vector<int8_t> output(kmer_len * RemoraUtils::NUM_BASES * context_samples);
+    std::vector<int8_t> output(kmer_len * utils::BaseInfo::NUM_BASES * context_samples);
 
     int8_t* output_ptr = &output[0];
     for (size_t seq_pos = 0; seq_pos < seq_len; ++seq_pos) {

@@ -155,7 +155,7 @@ void ModBaseCallerNode::input_worker_thread() {
                 read->base_mod_probs.resize(read->seq.size() * m_num_states, 0);
                 for (size_t i = 0; i < read->seq.size(); ++i) {
                     // Initialize for what corresponds to 100% canonical base for each position.
-                    int base_id = RemoraUtils::BASE_IDS[read->seq[i]];
+                    int base_id = utils::BaseInfo::BASE_IDS[read->seq[i]];
                     if (base_id < 0) {
                         throw std::runtime_error("Invalid character in sequence.");
                     }
@@ -347,7 +347,7 @@ void ModBaseCallerNode::output_worker_thread() {
             auto source_read = chunk->source_read.lock();
             int64_t result_pos = chunk->context_hit;
             int64_t offset =
-                    m_base_prob_offsets[RemoraUtils::BASE_IDS[source_read->seq[result_pos]]];
+                    m_base_prob_offsets[utils::BaseInfo::BASE_IDS[source_read->seq[result_pos]]];
             for (size_t i = 0; i < chunk->scores.size(); ++i) {
                 source_read->base_mod_probs[m_num_states * result_pos + offset + i] =
                         static_cast<uint8_t>(std::min(std::floor(chunk->scores[i] * 256), 255.0f));

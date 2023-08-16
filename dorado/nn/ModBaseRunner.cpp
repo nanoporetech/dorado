@@ -3,6 +3,7 @@
 #include "RemoraModel.h"
 #include "RemoraModelConfig.h"
 #include "modbase/remora_scaler.h"
+#include "utils/sequence_utils.h"
 #include "utils/stats.h"
 #include "utils/tensor_utils.h"
 
@@ -122,7 +123,7 @@ public:
                 // Warmup
                 auto input_sigs = torch::empty({batch_size, 1, sig_len}, m_options);
                 auto input_seqs = torch::empty(
-                        {batch_size, sig_len, RemoraUtils::NUM_BASES * kmer_len}, m_options);
+                        {batch_size, sig_len, utils::BaseInfo::NUM_BASES * kmer_len}, m_options);
                 caller_data->module_holder->forward(input_sigs, input_seqs);
                 torch::cuda::synchronize(m_options.device().index());
             }
@@ -287,9 +288,9 @@ ModBaseRunner::ModBaseRunner(std::shared_ptr<ModBaseCaller> caller) : m_caller(s
                                             caller_data->params.context_after);
         auto kmer_len = caller_data->params.bases_after + caller_data->params.bases_before + 1;
         m_input_sigs.push_back(torch::empty({caller_data->batch_size, 1, sig_len}, opts));
-        m_input_seqs.push_back(
-                torch::empty({caller_data->batch_size, sig_len, RemoraUtils::NUM_BASES * kmer_len},
-                             seq_input_options));
+        m_input_seqs.push_back(torch::empty(
+                {caller_data->batch_size, sig_len, utils::BaseInfo::NUM_BASES * kmer_len},
+                seq_input_options));
     }
 }
 

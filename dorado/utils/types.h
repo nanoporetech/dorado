@@ -43,12 +43,6 @@ inline std::string to_string(ReadOrder read_order) {
     }
 }
 
-class RemoraUtils {
-public:
-    static constexpr int NUM_BASES = 4;
-    static const std::vector<int> BASE_IDS;
-};
-
 struct BaseModInfo {
     BaseModInfo() = default;
     BaseModInfo(std::string alphabet_, std::string long_names_, std::string context_)

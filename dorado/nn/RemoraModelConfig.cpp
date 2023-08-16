@@ -1,5 +1,6 @@
 #include "RemoraModelConfig.h"
 
+#include "utils/sequence_utils.h"
 #include "utils/tensor_utils.h"
 
 #include <toml.hpp>
@@ -75,7 +76,7 @@ BaseModInfo get_modbase_info(
         if (allowed_bases.find(base) == std::string::npos) {
             throw std::runtime_error("Invalid base in remora model metadata.");
         }
-        auto& map_entry = model_info[RemoraUtils::BASE_IDS[base]];
+        auto& map_entry = model_info[utils::BaseInfo::BASE_IDS[base]];
         map_entry.long_names = params.mod_long_names;
         map_entry.alphabet += params.mod_bases;
         map_entry.base_counts = params.base_mod_count + 1;

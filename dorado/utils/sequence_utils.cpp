@@ -216,4 +216,13 @@ std::string convert_nt16_to_str(uint8_t* bseq, size_t slen) {
     return seq;
 }
 
+const std::vector<int> BaseInfo::BASE_IDS = []() {
+    std::vector<int> base_ids(256, -1);
+    base_ids['A'] = 0;
+    base_ids['C'] = 1;
+    base_ids['G'] = 2;
+    base_ids['T'] = 3;
+    return base_ids;
+}();
+
 }  // namespace dorado::utils

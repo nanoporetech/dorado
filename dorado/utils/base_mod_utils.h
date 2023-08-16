@@ -25,7 +25,6 @@
 
 namespace dorado {
 struct RemoraModelConfig;
-struct BaseModInfo;
 }  // namespace dorado
 
 namespace dorado::utils {
