@@ -12,6 +12,7 @@
 
 namespace dorado {
 
+struct CRFModelConfig;
 class CudaCaller;
 
 std::shared_ptr<CudaCaller> create_cuda_caller(const CRFModelConfig& model_config,

@@ -113,6 +113,8 @@ configure_file(dorado/Version.h.in dorado/Version.h)
 set(LIB_SOURCE_FILES
     dorado/nn/CRFModel.h
     dorado/nn/CRFModel.cpp
+    dorado/nn/CRFModelConfig.h
+    dorado/nn/CRFModelConfig.cpp
     dorado/nn/ModelRunner.h
     dorado/nn/RemoraModel.cpp
     dorado/nn/RemoraModel.h

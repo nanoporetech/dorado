@@ -1,6 +1,6 @@
 #pragma once
 #include "ReadPipeline.h"
-#include "nn/CRFModel.h"
+#include "nn/CRFModelConfig.h"
 #include "utils/stats.h"
 
 #include <torch/torch.h>

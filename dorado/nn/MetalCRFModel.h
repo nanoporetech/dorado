@@ -12,6 +12,7 @@
 
 namespace dorado {
 
+struct CRFModelConfig;
 class MetalCaller;
 
 std::shared_ptr<MetalCaller> create_metal_caller(const CRFModelConfig& model_config,
