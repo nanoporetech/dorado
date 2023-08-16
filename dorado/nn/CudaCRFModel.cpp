@@ -59,6 +59,7 @@ public:
             torch::cuda::synchronize(m_options.device().index());
         }
 
+        c10::cuda::CUDAGuard device_guard(m_options.device());
         c10::cuda::CUDACachingAllocator::emptyCache();
 
         start_threads();
