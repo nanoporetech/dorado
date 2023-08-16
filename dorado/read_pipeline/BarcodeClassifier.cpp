@@ -241,8 +241,8 @@ void Barcoder::calculate_adapter_score_different_double_ends(std::string_view re
                                                              const AdapterSequence& as,
                                                              std::vector<ScoreResults>& results) {
     std::string_view read_top = read_seq.substr(0, TRIM_LENGTH);
-    std::string_view read_bottom =
-            read_seq.substr(std::max(0, (int)read_seq.length() - TRIM_LENGTH), TRIM_LENGTH);
+    int bottom_start = std::max(0, (int)read_seq.length() - TRIM_LENGTH);
+    std::string_view read_bottom = read_seq.substr(bottom_start, TRIM_LENGTH);
 
     // Try to find the location of the barcode + flanks in the top and bottom windows.
     EdlibAlignConfig placement_config = init_edlib_config_for_flanks();
@@ -310,10 +310,11 @@ void Barcoder::calculate_adapter_score_different_double_ends(std::string_view re
         v1.top_score = top_mask_result_score_v1;
         v1.bottom_score = bottom_mask_result_score_v1;
         v1.score = std::max(v1.top_score, v1.bottom_score);
+        v1.use_top = v1.top_score > v1.bottom_score;
         v1.top_flank_score = top_flank_score_v1;
         v1.bottom_flank_score = bottom_flank_score_v1;
-        v1.flank_score =
-                (v1.top_score > v1.bottom_score) ? top_flank_score_v1 : bottom_flank_score_v1;
+        v1.flank_score = v1.use_top ? top_flank_score_v1 : bottom_flank_score_v1;
+        v1.barcode_start = v1.use_top ? top_bc_loc_v1 : bottom_start + bottom_bc_loc_v1;
 
         // Calculate barcode scores for v2.
         auto top_mask_result_score_v2 =
@@ -326,10 +327,11 @@ void Barcoder::calculate_adapter_score_different_double_ends(std::string_view re
         v2.top_score = top_mask_result_score_v2;
         v2.bottom_score = bottom_mask_result_score_v2;
         v2.score = std::max(v2.top_score, v2.bottom_score);
+        v2.use_top = v2.top_score > v2.bottom_score;
         v2.top_flank_score = top_flank_score_v2;
         v2.bottom_flank_score = bottom_flank_score_v2;
-        v2.flank_score =
-                (v2.top_score > v2.bottom_score) ? top_flank_score_v2 : bottom_flank_score_v2;
+        v2.flank_score = v2.use_top ? top_flank_score_v2 : bottom_flank_score_v2;
+        v2.barcode_start = v2.use_top ? top_bc_loc_v2 : bottom_start + bottom_bc_loc_v2;
 
         // The best score is the higher score between the 2 variants.
         ScoreResults res = (v1.score > v2.score) ? v1 : v2;
@@ -362,8 +364,8 @@ void Barcoder::calculate_adapter_score_double_ends(std::string_view read_seq,
                                                    std::vector<ScoreResults>& results) {
     bool debug_mode = (spdlog::get_level() == spdlog::level::debug);
     std::string_view read_top = read_seq.substr(0, TRIM_LENGTH);
-    std::string_view read_bottom =
-            read_seq.substr(std::max(0, (int)read_seq.length() - TRIM_LENGTH), TRIM_LENGTH);
+    int bottom_start = std::max(0, (int)read_seq.length() - TRIM_LENGTH);
+    std::string_view read_bottom = read_seq.substr(bottom_start, TRIM_LENGTH);
 
     // Try to find the location of the barcode + flanks in the top and bottom windows.
     EdlibAlignConfig placement_config = init_edlib_config_for_flanks();
@@ -398,12 +400,14 @@ void Barcoder::calculate_adapter_score_double_ends(std::string_view read_seq,
         ScoreResults res;
         res.adapter_name = adapter_name;
         res.kit = as.kit;
-        res.top_flank_score = top_flank_score;
-        res.bottom_flank_score = bottom_flank_score;
-        res.flank_score = std::max(res.top_flank_score, res.bottom_flank_score);
         res.top_score = top_mask_score;
         res.bottom_score = bottom_mask_score;
         res.score = std::max(res.top_score, res.bottom_score);
+        res.use_top = res.top_score > res.bottom_score;
+        res.top_flank_score = top_flank_score;
+        res.bottom_flank_score = bottom_flank_score;
+        res.flank_score = res.use_top ? res.top_flank_score : res.bottom_flank_score;
+        res.barcode_start = res.use_top ? top_bc_loc : bottom_start + bottom_bc_loc;
 
         results.push_back(res);
     }
@@ -457,12 +461,100 @@ void Barcoder::calculate_adapter_score(std::string_view read_seq,
         res.flank_score = std::max(res.top_flank_score, res.bottom_flank_score);
         res.top_score = top_mask_score;
         res.bottom_score = -1.f;
-        res.score = std::max(res.top_score, res.bottom_score);
+        res.score = res.top_score;
+        res.use_top = true;
+        res.barcode_start = top_bc_loc;
 
         results.push_back(res);
     }
     edlibFreeAlignResult(top_result);
     return;
+}
+
+std::tuple<ScoreResults, int, bool> check_bc_with_longest_match(const ScoreResults& a,
+                                                                const ScoreResults& b,
+                                                                const std::string& read) {
+    EdlibAlignConfig mask_config = edlibDefaultAlignConfig();
+    mask_config.mode = EDLIB_MODE_NW;
+    mask_config.task = EDLIB_TASK_PATH;
+
+    auto find_best_length = [](EdlibAlignResult& res) -> std::pair<int, int> {
+        // Find the longest run of matches in the alignment, and the start
+        // position of that alignment.
+        int longest_run = 0;
+        int run_start_pos = 0;
+        int best_run = 0;
+        int best_run_start_pos = 0;
+        bool last_was_match = false;
+        int query_cursor = 0;
+        for (int i = 0; i < res.alignmentLength; i++) {
+            if (res.alignment[i] == EDLIB_EDOP_MATCH) {
+                if (!last_was_match) {
+                    longest_run = 1;
+                    last_was_match = true;
+                    run_start_pos = query_cursor;
+                } else {
+                    longest_run++;
+                }
+                query_cursor++;
+            } else {
+                if (longest_run > best_run) {
+                    best_run = longest_run;
+                    best_run_start_pos = run_start_pos;
+                }
+                longest_run = 0;
+                run_start_pos = 0;
+                last_was_match = false;
+                if (res.alignment[i] == EDLIB_EDOP_MISMATCH ||
+                    res.alignment[i] == EDLIB_EDOP_INSERT) {
+                    query_cursor++;
+                }
+            }
+        }
+        if (longest_run > best_run) {
+            best_run = longest_run;
+            best_run_start_pos = run_start_pos;
+        }
+        return {best_run, best_run_start_pos};
+    };
+
+    const std::string& bc_a = barcodes.at(a.adapter_name);
+    auto read_a = read.substr(a.barcode_start, bc_a.length());
+    EdlibAlignResult result_a =
+            edlibAlign(bc_a.data(), bc_a.length(), read_a.data(), read_a.length(), mask_config);
+    auto [run_length_a, run_start_a] = find_best_length(result_a);
+    // This bool checks if the longest run extends into the half of the barcode
+    // that is closer to the read. e.g. in the case where the top strand of a double ended
+    // barcode is being checked, the longest run should extend into the latter half of the barcode.
+    // Whereas if the bottom strand is being checked, then the run should start from the
+    // first half of the barcode.
+    bool run_a_extends_close_to_read = a.use_top ? (run_start_a + run_length_a > bc_a.length() / 2)
+                                                 : (run_start_a < bc_a.length() / 2);
+    spdlog::debug(
+            "Barcode {} longest run {} from position {} in {} strand, extends close to read {}",
+            a.adapter_name, run_length_a, run_start_a, a.use_top ? "top" : "bottom",
+            run_a_extends_close_to_read);
+
+    const std::string& bc_b = barcodes.at(b.adapter_name);
+    auto read_b = read.substr(b.barcode_start, bc_b.length());
+    EdlibAlignResult result_b =
+            edlibAlign(bc_b.data(), bc_b.length(), read_b.data(), read_b.length(), mask_config);
+    auto [run_length_b, run_start_b] = find_best_length(result_b);
+    bool run_b_extends_close_to_read = b.use_top ? (run_start_b + run_length_b > bc_b.length() / 2)
+                                                 : (run_start_b < bc_b.length() / 2);
+    spdlog::debug(
+            "Barcode {} longest run {} from position {} in {} strand, extends close to read {}",
+            b.adapter_name, run_length_b, run_start_b, b.use_top ? "top" : "bottom",
+            run_b_extends_close_to_read);
+
+    edlibFreeAlignResult(result_a);
+    edlibFreeAlignResult(result_b);
+
+    if (run_length_a > run_length_b) {
+        return {a, run_length_a, run_start_a};
+    } else {
+        return {b, run_length_b, run_start_b};
+    }
 }
 
 // Score every barcode against the input read and returns the best match,
@@ -505,6 +597,18 @@ ScoreResults Barcoder::find_best_adapter(const std::string& read_seq,
             (best_score->score >= 0.7 && best_score->flank_score >= 0.6) ||
             (best_score->score - second_best_score->score >= kMargin)) {
             return *best_score;
+        }
+    } else if (best_score->score > second_best_score->score) {
+        // Check the actual alignment to see which has a longer
+        // run of matches.
+        auto [best, matches, run_extends_close_to_read] =
+                check_bc_with_longest_match(*best_score, *second_best_score, read_seq);
+        // The heuristic here attempts to ensure that the longest running run of matches
+        // is at least 8 bases long and extends into the half of the barcode that is closer
+        // to the read. More details in the lambda function above.
+        if (matches >= 8 && run_extends_close_to_read &&
+            best.adapter_name == best_score->adapter_name) {
+            return best;
         }
     }
 

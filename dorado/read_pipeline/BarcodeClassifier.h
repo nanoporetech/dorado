@@ -44,8 +44,10 @@ struct ScoreResults {
     float flank_score = 1.f;
     float top_flank_score = -1.f;
     float bottom_flank_score = -1.f;
+    bool use_top;
     std::string adapter_name;
     std::string kit;
+    int barcode_start;
 };
 
 const ScoreResults UNCLASSIFIED = {-1.f, -1.f, -1.f,           -1.f,
