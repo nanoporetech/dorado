@@ -245,7 +245,10 @@ int basecaller(int argc, char* argv[]) {
 
     parser.add_argument("-n", "--max-reads").default_value(0).scan<'i', int>();
 
-    parser.add_argument("--min-qscore").default_value(0).scan<'i', int>();
+    parser.add_argument("--min-qscore")
+            .help("Filter reads with mean Q-score below this threshold.")
+            .default_value(0)
+            .scan<'i', int>();
 
     parser.add_argument("-b", "--batchsize")
             .default_value(default_parameters.batchsize)

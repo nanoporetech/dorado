@@ -78,7 +78,10 @@ int duplex(int argc, char* argv[]) {
                   "reads will be basecalled")
             .default_value(std::string(""));
 
-    parser.add_argument("--min-qscore").default_value(0).scan<'i', int>();
+    parser.add_argument("--min-qscore")
+            .help("Filter reads with mean Q-score below this threshold.")
+            .default_value(0)
+            .scan<'i', int>();
 
     parser.add_argument("--reference")
             .help("Path to reference for alignment.")
