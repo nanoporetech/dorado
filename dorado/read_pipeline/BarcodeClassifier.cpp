@@ -197,7 +197,9 @@ std::vector<AdapterSequence> Barcoder::generate_adapter_sequence(
     for (auto& kit_name : final_kit_names) {
         auto kit_iter = kit_info_map.find(kit_name);
         if (kit_iter == kit_info_map.end()) {
-            throw std::runtime_error(kit_name + " is not a valid barcode kit name.");
+            throw std::runtime_error(kit_name +
+                                     " is not a valid barcode kit name. Please run the help "
+                                     "command to find out available barcode kits.");
         }
         auto kit_info = kit_iter->second;
         AdapterSequence as;

@@ -38,16 +38,16 @@ struct AdapterSequence {
 };
 
 struct ScoreResults {
-    float score;
-    float top_score;
-    float bottom_score;
+    float score = -1.f;
+    float top_score = -1.f;
+    float bottom_score = -1.f;
     float flank_score = 1.f;
     float top_flank_score = -1.f;
     float bottom_flank_score = -1.f;
-    bool use_top;
+    bool use_top = false;
     std::string adapter_name;
     std::string kit;
-    int barcode_start;
+    int barcode_start = -1;
 };
 
 const ScoreResults UNCLASSIFIED = {-1.f, -1.f, -1.f,           -1.f,
@@ -63,17 +63,7 @@ static const std::unordered_map<std::string, KitInfo> kit_info_map = {
           "",
           {"BC01", "BC02", "BC03", "BC04", "BC05", "BC06", "BC07", "BC08", "BC09", "BC10", "BC11",
            "BC12"}}},
-        {"SQK-RBK114.24",
-         {false,
-          false,
-          "GCTTGGGTGTTTAACC",
-          "GTTTTCGCATTTATCGTGAAACGCTTTCGCGTTTTTCGTGCGCCGCTTCA",
-          "",
-          "",
-          {"BC01", "BC02", "BC03", "BC04", "BC05", "BC06", "BC07", "BC08",
-           "BC09", "BC10", "BC11", "BC12", "BC13", "BC14", "BC15", "BC16",
-           "BC17", "BC18", "BC19", "BC20", "BC21", "BC22", "BC23", "BC24"}}},
-        {"SQK-RBK110.96",
+        {"SQK-RBK110-96",
          {false,
           false,
           "GCTTGGGTGTTTAACC",
@@ -89,7 +79,17 @@ static const std::unordered_map<std::string, KitInfo> kit_info_map = {
            "BC67", "BC68", "BC69", "BC70", "BC71", "BC72", "BC73", "BC74", "BC75", "BC76", "BC77",
            "BC78", "BC79", "BC80", "BC81", "BC82", "BC83", "BC84", "BC85", "BC86", "BC87", "BC88",
            "BC89", "BC90", "BC91", "BC92", "BC93", "BC94", "BC95", "BC96"}}},
-        {"SQK-RBK114.96",
+        {"SQK-RBK114-24",
+         {false,
+          false,
+          "C",
+          "GTTTTCGCATTTATCGTGAAACGCTTTCGCGTTTTTCGTGCGCCGCTTCA",
+          "",
+          "",
+          {"BC01", "BC02", "BC03", "BC04", "BC05", "BC06", "BC07", "BC08",
+           "BC09", "BC10", "BC11", "BC12", "BC13", "BC14", "BC15", "BC16",
+           "BC17", "BC18", "BC19", "BC20", "BC21", "BC22", "BC23", "BC24"}}},
+        {"SQK-RBK114-96",
          {false,
           false,
           "C",
@@ -153,7 +153,7 @@ static const std::unordered_map<std::string, KitInfo> kit_info_map = {
           {"BP01", "BP02", "BP03", "BP04", "BP05", "BP06", "BP07", "BP08",
            "BP09", "BP10", "BP11", "BP12", "BP13", "BP14", "BP15", "BP16",
            "BP17", "BP18", "BP19", "BP20", "BP21", "BP22", "BP23", "BP24"}}},
-        {"SQK-PCB111.24",
+        {"SQK-PCB111-24",
          {true,
           true,
           "ATCGCCTACCGTGA",
@@ -179,7 +179,7 @@ static const std::unordered_map<std::string, KitInfo> kit_info_map = {
            "BC67", "BC68", "BC69", "BC70", "BC71", "BC72", "BC73", "BC74", "BC75", "BC76", "BC77",
            "BC78", "BC79", "BC80", "BC81", "BC82", "BC83", "BC84", "BC85", "BC86", "BC87", "BC88",
            "BC89", "BC90", "BC91", "BC92", "BC93", "BC94", "BC95", "BC96"}}},
-        {"SQK-NBD114.24",
+        {"SQK-NBD114-24",
          {true,
           true,
           "ATCGCCTACCGTGA",
@@ -207,7 +207,7 @@ static const std::unordered_map<std::string, KitInfo> kit_info_map = {
           "CAGCACC",
           {"NB13", "NB14", "NB15", "NB16", "NB17", "NB18", "NB19", "NB20", "NB21", "NB22", "NB23",
            "NB24"}}},
-        {"SQK-NBD114.96",
+        {"SQK-NBD114-96",
          {true,
           true,
           "AAGGTTAA",
