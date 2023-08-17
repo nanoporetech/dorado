@@ -29,10 +29,10 @@ struct ModBaseModelConfig;
 
 namespace dorado::utils {
 
-class BaseModContext {
+class ModBaseContext {
 public:
     /// Constructor.
-    BaseModContext();
+    ModBaseContext();
 
     /// Get the context set for the specified base (if any).
     const std::string& motif(char base) const;

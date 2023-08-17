@@ -1,9 +1,9 @@
 #include "ModBaseCallerNode.h"
 
+#include "modbase/ModBaseContext.h"
 #include "modbase/modbase_encoder.h"
 #include "nn/ModBaseModelConfig.h"
 #include "nn/ModBaseRunner.h"
-#include "utils/base_mod_utils.h"
 #include "utils/math_utils.h"
 #include "utils/sequence_utils.h"
 #include "utils/stats.h"
@@ -112,7 +112,7 @@ void ModBaseCallerNode::restart() {
 void ModBaseCallerNode::init_modbase_info() {
     std::vector<std::reference_wrapper<ModBaseModelConfig const>> base_mod_params;
     auto& runner = m_runners[0];
-    utils::BaseModContext context_handler;
+    utils::ModBaseContext context_handler;
     for (size_t caller_id = 0; caller_id < runner->num_callers(); ++caller_id) {
         const auto& params = runner->caller_params(caller_id);
         if (!params.motif.empty()) {
@@ -123,7 +123,7 @@ void ModBaseCallerNode::init_modbase_info() {
     }
 
     auto result = get_modbase_info(base_mod_params);
-    m_base_mod_info = std::make_shared<ModBaseInfo>(result.alphabet, result.long_names,
+    m_mod_base_info = std::make_shared<ModBaseInfo>(result.alphabet, result.long_names,
                                                     context_handler.encode());
 
     m_base_prob_offsets[0] = 0;
@@ -162,7 +162,7 @@ void ModBaseCallerNode::input_worker_thread() {
                     read->base_mod_probs[i * m_num_states + m_base_prob_offsets[base_id]] = 1.0f;
                 }
             }
-            read->base_mod_info = m_base_mod_info;
+            read->mod_base_info = m_mod_base_info;
 
             std::vector<int> sequence_ints = utils::sequence_to_ints(read->seq);
             std::vector<uint64_t> seq_to_sig_map = utils::moves_to_map(

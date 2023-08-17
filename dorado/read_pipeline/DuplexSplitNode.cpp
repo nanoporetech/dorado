@@ -158,8 +158,8 @@ std::optional<PosRange> check_rc_match(const std::string& seq,
 std::shared_ptr<Read> subread(const Read& read, PosRange seq_range, PosRange signal_range) {
     //TODO support mods
     //NB: currently doesn't support mods
-    //assert(read.base_mod_info == nullptr && read.base_mod_probs.empty());
-    if (read.base_mod_info != nullptr || !read.base_mod_probs.empty()) {
+    //assert(read.mod_base_info == nullptr && read.base_mod_probs.empty());
+    if (read.mod_base_info != nullptr || !read.base_mod_probs.empty()) {
         throw std::runtime_error(std::string("Read splitting doesn't support mods yet"));
     }
     const int stride = read.model_stride;

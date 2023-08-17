@@ -94,7 +94,7 @@ public:
     std::string parent_read_id;  // Origin read ID for all its subreads. Empty for nonsplit reads.
 
     std::shared_ptr<const ModBaseInfo>
-            base_mod_info;  // Modified base settings of the models that ran on this read
+            mod_base_info;  // Modified base settings of the models that ran on this read
 
     uint64_t num_trimmed_samples;  // Number of samples which have been trimmed from the raw read.
 

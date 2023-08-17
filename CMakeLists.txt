@@ -169,11 +169,11 @@ set(LIB_SOURCE_FILES
     dorado/modbase/modbase_encoder.h
     dorado/modbase/modbase_scaler.cpp
     dorado/modbase/modbase_scaler.h
+    dorado/modbase/ModBaseContext.cpp
+    dorado/modbase/ModBaseContext.h
     dorado/utils/alignment_utils.cpp
     dorado/utils/alignment_utils.h
     dorado/utils/AsyncQueue.h
-    dorado/utils/base_mod_utils.cpp
-    dorado/utils/base_mod_utils.h
     dorado/utils/compat_utils.cpp
     dorado/utils/compat_utils.h
     dorado/utils/log_utils.h
