@@ -113,9 +113,13 @@ configure_file(dorado/Version.h.in dorado/Version.h)
 set(LIB_SOURCE_FILES
     dorado/nn/CRFModel.h
     dorado/nn/CRFModel.cpp
+    dorado/nn/CRFModelConfig.h
+    dorado/nn/CRFModelConfig.cpp
     dorado/nn/ModelRunner.h
-    dorado/nn/RemoraModel.cpp
-    dorado/nn/RemoraModel.h
+    dorado/nn/ModBaseModel.cpp
+    dorado/nn/ModBaseModel.h
+    dorado/nn/ModBaseModelConfig.cpp
+    dorado/nn/ModBaseModelConfig.h    
     dorado/nn/ModBaseRunner.cpp
     dorado/nn/ModBaseRunner.h
     dorado/nn/Runners.cpp
@@ -161,17 +165,15 @@ set(LIB_SOURCE_FILES
     dorado/decode/beam_search.h
     dorado/decode/CPUDecoder.cpp
     dorado/decode/CPUDecoder.h
-    dorado/modbase/remora_encoder.cpp
-    dorado/modbase/remora_encoder.h
-    dorado/modbase/remora_scaler.cpp
-    dorado/modbase/remora_scaler.h
-    dorado/modbase/remora_utils.cpp
-    dorado/modbase/remora_utils.h
+    dorado/modbase/modbase_encoder.cpp
+    dorado/modbase/modbase_encoder.h
+    dorado/modbase/modbase_scaler.cpp
+    dorado/modbase/modbase_scaler.h
+    dorado/modbase/ModBaseContext.cpp
+    dorado/modbase/ModBaseContext.h
     dorado/utils/alignment_utils.cpp
     dorado/utils/alignment_utils.h
     dorado/utils/AsyncQueue.h
-    dorado/utils/base_mod_utils.cpp
-    dorado/utils/base_mod_utils.h
     dorado/utils/compat_utils.cpp
     dorado/utils/compat_utils.h
     dorado/utils/log_utils.h

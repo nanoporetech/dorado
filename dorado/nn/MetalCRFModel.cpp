@@ -3,11 +3,12 @@
 
 #include "MetalCRFModel.h"
 
-#include "../decode/beam_search.h"
-#include "../utils/math_utils.h"
-#include "../utils/metal_utils.h"
-#include "../utils/module_utils.h"
-#include "../utils/tensor_utils.h"
+#include "CRFModelConfig.h"
+#include "decode/beam_search.h"
+#include "utils/math_utils.h"
+#include "utils/metal_utils.h"
+#include "utils/module_utils.h"
+#include "utils/tensor_utils.h"
 
 #include <math.h>
 #include <spdlog/spdlog.h>

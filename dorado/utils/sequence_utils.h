@@ -35,4 +35,10 @@ std::string reverse_complement(const std::string& sequence);
 // into a string.
 std::string convert_nt16_to_str(uint8_t* bseq, size_t slen);
 
+class BaseInfo {
+public:
+    static constexpr int NUM_BASES = 4;
+    static const std::vector<int> BASE_IDS;
+};
+
 }  // namespace dorado::utils

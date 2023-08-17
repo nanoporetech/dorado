@@ -1,6 +1,5 @@
-#include "remora_encoder.h"
+#include "modbase_encoder.h"
 
-#include "remora_utils.h"
 #include "utils/sequence_utils.h"
 #include "utils/simd.h"
 
@@ -11,10 +10,10 @@
 
 namespace dorado {
 
-RemoraEncoder::RemoraEncoder(size_t block_stride,
-                             size_t context_samples,
-                             int bases_before,
-                             int bases_after)
+ModBaseEncoder::ModBaseEncoder(size_t block_stride,
+                               size_t context_samples,
+                               int bases_before,
+                               int bases_after)
         : m_bases_before(bases_before),
           m_bases_after(bases_after),
           m_kmer_len(bases_before + bases_after + 1),
@@ -23,8 +22,8 @@ RemoraEncoder::RemoraEncoder(size_t block_stride,
           m_seq_len(0),
           m_signal_len(0) {}
 
-void RemoraEncoder::init(const std::vector<int>& sequence_ints,
-                         const std::vector<uint64_t>& seq_to_sig_map) {
+void ModBaseEncoder::init(const std::vector<int>& sequence_ints,
+                          const std::vector<uint64_t>& seq_to_sig_map) {
     // gcc9 doesn't support <ranges>, which would be useful here
     m_sequence_ints = sequence_ints;
     m_sample_offsets = {std::begin(seq_to_sig_map), std::end(seq_to_sig_map)};
@@ -36,13 +35,13 @@ void RemoraEncoder::init(const std::vector<int>& sequence_ints,
     m_seq_len = int(sequence_ints.size());
 }
 
-RemoraEncoder::Context RemoraEncoder::get_context(size_t seq_pos) const {
+ModBaseEncoder::Context ModBaseEncoder::get_context(size_t seq_pos) const {
     NVTX3_FUNC_RANGE();
     if (seq_pos >= size_t(m_seq_len)) {
         throw std::out_of_range("Sequence position out of range.");
     }
 
-    auto encoded_kmer_len = m_kmer_len * RemoraUtils::NUM_BASES;
+    auto encoded_kmer_len = m_kmer_len * utils::BaseInfo::NUM_BASES;
     Context context{};
     int base_sample_pos =
             (compute_sample_pos(int(seq_pos)) + compute_sample_pos(int(seq_pos) + 1)) / 2;
@@ -109,7 +108,7 @@ RemoraEncoder::Context RemoraEncoder::get_context(size_t seq_pos) const {
     return context;
 }
 
-int RemoraEncoder::compute_sample_pos(int base_pos) const {
+int ModBaseEncoder::compute_sample_pos(int base_pos) const {
     int base_offset = base_pos;
     if (base_offset < 0) {
         return m_block_stride * (base_offset);
@@ -134,7 +133,7 @@ inline std::vector<int8_t> encode_kmer_generic(const std::vector<int>& seq,
                                                int context_samples,
                                                int kmer_len) {
     const size_t seq_len = seq.size() - bases_before - bases_after;
-    std::vector<int8_t> output(kmer_len * RemoraUtils::NUM_BASES * context_samples);
+    std::vector<int8_t> output(kmer_len * utils::BaseInfo::NUM_BASES * context_samples);
 
     int8_t* output_ptr = &output[0];
     for (size_t seq_pos = 0; seq_pos < seq_len; ++seq_pos) {
@@ -262,8 +261,8 @@ __attribute__((target("avx2"))) std::vector<int8_t> encode_kmer_len9(
 
 }  // namespace
 
-std::vector<int8_t> RemoraEncoder::encode_kmer(const std::vector<int>& seq,
-                                               const std::vector<int>& seq_mappings) const {
+std::vector<int8_t> ModBaseEncoder::encode_kmer(const std::vector<int>& seq,
+                                                const std::vector<int>& seq_mappings) const {
     // Specialised version for the case of kmer_len 9 that can be faster.
     if (m_kmer_len == 9)
         return encode_kmer_len9(seq, seq_mappings, m_bases_before, m_bases_after,

@@ -8,7 +8,7 @@
 
 namespace dorado {
 
-class RemoraEncoder {
+class ModBaseEncoder {
 private:
     int m_bases_before;
     int m_bases_after;
@@ -33,7 +33,7 @@ public:
      *  @param bases_before The number of bases before the primary base of each kmer.
      *  @param bases_after The number of bases after the primary base of each kmer.
      */
-    RemoraEncoder(size_t block_stride, size_t context_samples, int bases_before, int bases_after);
+    ModBaseEncoder(size_t block_stride, size_t context_samples, int bases_before, int bases_after);
 
     /** Initialize the sequence and movement map from which to generate encodings
      *  @param sequence_ints The basecall sequence encoded as integers (A=0, C=1, G=2, T=3)

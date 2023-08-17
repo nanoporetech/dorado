@@ -1,6 +1,5 @@
-#include "remora_scaler.h"
+#include "modbase_scaler.h"
 
-#include "remora_utils.h"
 #include "utils/math_utils.h"
 
 #include <nvtx3/nvtx3.hpp>
@@ -10,15 +9,15 @@
 
 namespace dorado {
 
-RemoraScaler::RemoraScaler(const std::vector<float>& kmer_levels,
-                           size_t kmer_len,
-                           size_t centre_index)
+ModBaseScaler::ModBaseScaler(const std::vector<float>& kmer_levels,
+                             size_t kmer_len,
+                             size_t centre_index)
         : m_kmer_levels(kmer_levels), m_kmer_len(kmer_len), m_centre_index(centre_index) {
     // ensure that the levels were the length we expected
     assert(m_kmer_levels.size() == static_cast<size_t>(1 << (2 * m_kmer_len)));
 }
 
-size_t RemoraScaler::index_from_int_kmer(const int* int_kmer_start, size_t kmer_len) {
+size_t ModBaseScaler::index_from_int_kmer(const int* int_kmer_start, size_t kmer_len) {
     size_t index = 0;
     for (int kmer_pos = 0; kmer_pos < static_cast<int>(kmer_len); ++kmer_pos) {
         index += *(int_kmer_start + kmer_len - kmer_pos - 1) * (1 << (2 * kmer_pos));
@@ -26,9 +25,9 @@ size_t RemoraScaler::index_from_int_kmer(const int* int_kmer_start, size_t kmer_
     return index;
 }
 
-torch::Tensor RemoraScaler::scale_signal(const torch::Tensor& signal,
-                                         const std::vector<int>& seq_ints,
-                                         const std::vector<uint64_t>& seq_to_sig_map) const {
+torch::Tensor ModBaseScaler::scale_signal(const torch::Tensor& signal,
+                                          const std::vector<int>& seq_ints,
+                                          const std::vector<uint64_t>& seq_to_sig_map) const {
     NVTX3_FUNC_RANGE();
     auto levels = extract_levels(seq_ints);
 
@@ -39,7 +38,7 @@ torch::Tensor RemoraScaler::scale_signal(const torch::Tensor& signal,
     return scaled_signal;
 }
 
-std::vector<float> RemoraScaler::extract_levels(const std::vector<int>& int_seq) const {
+std::vector<float> ModBaseScaler::extract_levels(const std::vector<int>& int_seq) const {
     std::vector<float> levels(int_seq.size(), 0.f);
     if (int_seq.size() < m_kmer_len) {
         return levels;
@@ -54,11 +53,12 @@ std::vector<float> RemoraScaler::extract_levels(const std::vector<int>& int_seq)
     return levels;
 }
 
-std::pair<float, float> RemoraScaler::calc_offset_scale(const torch::Tensor& samples,
-                                                        const std::vector<uint64_t>& seq_to_sig_map,
-                                                        const std::vector<float>& levels,
-                                                        size_t clip_bases,
-                                                        size_t max_bases) const {
+std::pair<float, float> ModBaseScaler::calc_offset_scale(
+        const torch::Tensor& samples,
+        const std::vector<uint64_t>& seq_to_sig_map,
+        const std::vector<float>& levels,
+        size_t clip_bases,
+        size_t max_bases) const {
     NVTX3_FUNC_RANGE();
     if (m_kmer_levels.empty()) {
         return {0.f, 1.f};

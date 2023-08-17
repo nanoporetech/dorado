@@ -7,7 +7,7 @@ set(SOURCE_FILES
     TensorUtilsTest.cpp
     MathUtilsTest.cpp
     ReadTest.cpp
-    RemoraEncoderTest.cpp
+    ModBaseEncoderTest.cpp
     SequenceUtilsTest.cpp
     StitchTest.cpp
     StereoDuplexTest.cpp
