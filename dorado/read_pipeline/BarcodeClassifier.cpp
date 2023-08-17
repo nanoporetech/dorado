@@ -26,10 +26,10 @@ EdlibAlignConfig init_edlib_config_for_flanks() {
     placement_config.mode = EDLIB_MODE_HW;
     placement_config.task = EDLIB_TASK_PATH;
     // The Ns are the barcode mask. The M is for the wobble base in the 16S barcode flanks.
-    static EdlibEqualityPair additionalEqualities[6] = {{'N', 'A'}, {'N', 'T'}, {'N', 'C'},
-                                                        {'N', 'G'}, {'M', 'A'}, {'M', 'C'}};
+    static EdlibEqualityPair additionalEqualities[7] = {
+            {'N', 'A'}, {'N', 'T'}, {'N', 'C'}, {'N', 'G'}, {'N', 'U'}, {'M', 'A'}, {'M', 'C'}};
     placement_config.additionalEqualities = additionalEqualities;
-    placement_config.additionalEqualitiesLength = 6;
+    placement_config.additionalEqualitiesLength = 7;
     return placement_config;
 }
 
@@ -38,7 +38,6 @@ EdlibAlignConfig init_edlib_config_for_flanks() {
 EdlibAlignConfig init_edlib_config_for_mask() {
     EdlibAlignConfig mask_config = edlibDefaultAlignConfig();
     mask_config.mode = EDLIB_MODE_NW;
-    //mask_config.mode = EDLIB_MODE_HW;
     mask_config.task =
             (spdlog::get_level() == spdlog::level::debug) ? EDLIB_TASK_PATH : EDLIB_TASK_LOC;
     return mask_config;
@@ -187,7 +186,7 @@ std::vector<AdapterSequence> Barcoder::generate_adapter_sequence(
     std::vector<AdapterSequence> adapters;
     std::vector<std::string> final_kit_names;
     if (kit_names.empty()) {
-        for (auto& [kit_name, kit] : kit_info) {
+        for (auto& [kit_name, _] : kit_info_map) {
             final_kit_names.push_back(kit_name);
         }
     } else {
@@ -196,7 +195,11 @@ std::vector<AdapterSequence> Barcoder::generate_adapter_sequence(
     spdlog::debug("> Kits to evaluate: {}", final_kit_names.size());
 
     for (auto& kit_name : final_kit_names) {
-        auto kit_info = dorado::demux::kit_info.at(kit_name);
+        auto kit_iter = kit_info_map.find(kit_name);
+        if (kit_iter == kit_info_map.end()) {
+            throw std::runtime_error(kit_name + " is not a valid barcode kit name.");
+        }
+        auto kit_info = kit_iter->second;
         AdapterSequence as;
         as.kit = kit_name;
         auto& ref_bc = barcodes.at(kit_info.barcodes[0]);
@@ -444,14 +447,11 @@ void Barcoder::calculate_adapter_score(std::string_view read_seq,
     spdlog::debug("BC location {}", top_bc_loc);
 
     for (int i = 0; i < as.adapter.size(); i++) {
-        //auto& kit_info = dorado::demux::kit_info.at(as.kit);
         auto& adapter = as.adapter[i];
         auto& adapter_name = as.adapter_name[i];
         spdlog::debug("Checking barcode {}", adapter_name);
 
         auto top_mask_score = extract_mask_score(adapter, top_mask, mask_config, "top window");
-        //const std::string bc = kit_info.top_front_flank + adapter + kit_info.top_rear_flank;
-        //auto top_mask_score = extract_mask_score(bc, read_top, mask_config, "top window");
 
         ScoreResults res;
         res.adapter_name = adapter_name;
@@ -551,9 +551,9 @@ std::tuple<ScoreResults, int, bool> check_bc_with_longest_match(const ScoreResul
     edlibFreeAlignResult(result_b);
 
     if (run_length_a > run_length_b) {
-        return {a, run_length_a, run_start_a};
+        return {a, run_length_a, run_a_extends_close_to_read};
     } else {
-        return {b, run_length_b, run_start_b};
+        return {b, run_length_b, run_b_extends_close_to_read};
     }
 }
 
@@ -566,18 +566,25 @@ ScoreResults Barcoder::find_best_adapter(const std::string& read_seq,
     }
     std::string fwd = read_seq;
 
+    // First find best barcode kit.
+    AdapterSequence* as;
+    if (adapters.size() == 1) {
+        as = &adapters[0];
+    } else {
+        // TODO: Implement finding best kit match.
+    }
+
+    // Then find the best barcode hit within that kit.
     std::vector<ScoreResults> scores;
-    for (auto& as : adapters) {
-        auto& kit = kit_info.at(as.kit);
-        if (kit.double_ends) {
-            if (kit.ends_different) {
-                calculate_adapter_score_different_double_ends(fwd, as, scores);
-            } else {
-                calculate_adapter_score_double_ends(fwd, as, scores);
-            }
+    auto& kit = kit_info_map.at(as->kit);
+    if (kit.double_ends) {
+        if (kit.ends_different) {
+            calculate_adapter_score_different_double_ends(fwd, *as, scores);
         } else {
-            calculate_adapter_score(fwd, as, scores);
+            calculate_adapter_score_double_ends(fwd, *as, scores);
         }
+    } else {
+        calculate_adapter_score(fwd, *as, scores);
     }
 
     // Sore the scores windows by their adapter score.

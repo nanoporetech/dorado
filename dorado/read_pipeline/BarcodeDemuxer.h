@@ -16,7 +16,7 @@ namespace dorado {
 class BarcodeDemuxer : public MessageSink {
 public:
     BarcodeDemuxer(const std::string& output_dir,
-                   size_t threads,
+                   size_t htslib_threads,
                    size_t num_reads,
                    bool write_fastq);
     ~BarcodeDemuxer();
@@ -31,12 +31,7 @@ private:
     void terminate_impl();
     void start_threads();
     std::filesystem::path m_output_dir;
-    int m_threads;
-    size_t m_total{0};
-    size_t m_primary{0};
-    size_t m_unmapped{0};
-    size_t m_secondary{0};
-    size_t m_supplementary{0};
+    int m_htslib_threads;
     sam_hdr_t* m_header{nullptr};
     std::atomic<int> m_processed_reads{0};
 

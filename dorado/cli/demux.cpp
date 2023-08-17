@@ -36,25 +36,30 @@ int demuxer(int argc, char* argv[]) {
     utils::InitLogging();
 
     argparse::ArgumentParser parser("dorado", DORADO_VERSION, argparse::default_arguments::help);
-    parser.add_description("Barcoding tool. Users need to pass the kit name.");
-    parser.add_argument("reads").help("any HTS format.").nargs(argparse::nargs_pattern::any);
-    parser.add_argument("--output-dir").help("Output folder for demuxed reads.").required();
-    parser.add_argument("--kit_name").help("Barcoding kit name").required();
+    parser.add_description("Barcode demultiplexing tool. Users need to specify the kit name(s).");
+    parser.add_argument("reads")
+            .help("Path to a file with reads to demultiplex. Can be in any HTS format.")
+            .nargs(argparse::nargs_pattern::any);
+    parser.add_argument("--output-dir").help("Output folder for demultiplexed reads.").required();
+    parser.add_argument("--kit_name")
+            .help("Barcoding kit name. Choose from: \n" + dorado::demux::barcode_kits_list_str())
+            .required();
     parser.add_argument("-t", "--threads")
-            .help("number of threads for barcoding and BAM writing.")
+            .help("Combined number of threads for barcoding and output generation. Default uses "
+                  "all available threads.")
             .default_value(0)
             .scan<'i', int>();
     parser.add_argument("-n", "--max-reads")
-            .help("maxium number of reads to process (for debugging).")
-            .default_value(10000000)
+            .help("Maximum number of reads to process. Mainly for debugging. Process all reads by "
+                  "default.")
+            .default_value(0)
             .scan<'i', int>();
     parser.add_argument("-l", "--read-ids")
-            .help("A file with a newline-delimited list of reads to basecall. If not provided, all "
-                  "reads will be basecalled")
+            .help("A file with a newline-delimited list of reads to demux.")
             .default_value(std::string(""));
     parser.add_argument("-v", "--verbose").default_value(false).implicit_value(true);
     parser.add_argument("--emit-fastq")
-            .help("Output in fastq format.")
+            .help("Output in fastq format. Default is BAM.")
             .default_value(false)
             .implicit_value(true);
 
@@ -81,7 +86,7 @@ int demuxer(int argc, char* argv[]) {
     // barcoding. Heuristically use 10% of threads for BAM generation and
     // rest for barcoding. Empirically this shows good perf.
     auto [demux_threads, demux_writer_threads] =
-            utils::aligner_writer_thread_allocation(threads, 0.1f);
+            utils::worker_vs_writer_thread_allocation(threads, 0.1f);
     spdlog::debug("> barcoding threads {}, writer threads {}", demux_threads, demux_writer_threads);
 
     auto read_list = utils::load_read_list(parser.get<std::string>("--read-ids"));

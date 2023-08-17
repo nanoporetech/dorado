@@ -11,15 +11,15 @@
 namespace dorado {
 
 BarcodeDemuxer::BarcodeDemuxer(const std::string& output_dir,
-                               size_t threads,
+                               size_t htslib_threads,
                                size_t num_reads,
                                bool write_fastq)
         : MessageSink(10000),
           m_output_dir(output_dir),
-          m_threads(threads),
+          m_htslib_threads(htslib_threads),
           m_num_reads_expected(num_reads),
           m_write_fastq(write_fastq) {
-    std::filesystem::create_directory(m_output_dir);
+    std::filesystem::create_directories(m_output_dir);
     start_threads();
 }
 
@@ -76,7 +76,7 @@ int BarcodeDemuxer::write(bam1_t* const record) {
             throw std::runtime_error("Failed to open new HTS output file at " + filepath.string());
         }
         if (file->format.compression == bgzf) {
-            auto res = bgzf_mt(file->fp.bgzf, m_threads, 128);
+            auto res = bgzf_mt(file->fp.bgzf, m_htslib_threads, 128);
             if (res < 0) {
                 throw std::runtime_error("Could not enable multi threading for BAM generation.");
             }

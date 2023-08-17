@@ -53,7 +53,7 @@ struct ScoreResults {
 const ScoreResults UNCLASSIFIED = {-1.f, -1.f, -1.f,           -1.f,
                                    -1.f, -1.f, "unclassified", "unclassified"};
 
-static const std::unordered_map<std::string, KitInfo> kit_info = {
+static const std::unordered_map<std::string, KitInfo> kit_info_map = {
         {"SQK-RBK004",
          {false,
           false,
@@ -470,7 +470,12 @@ static const std::unordered_map<std::string, std::string> barcodes = {
         {"NB96", "CTGAACGGTCATAGAGTCCACCAT"},
 };
 
-using sq_t = std::vector<std::pair<char*, uint32_t>>;
+static std::string barcode_kits_list_str() {
+    return std::accumulate(kit_info_map.begin(), kit_info_map.end(), std::string(),
+                           [](std::string& a, auto& b) -> std::string {
+                               return a + (a.empty() ? "" : " ") + b.first;
+                           });
+}
 
 class Barcoder {
 public:
@@ -480,7 +485,6 @@ public:
     ScoreResults barcode(const std::string& seq);
 
 private:
-    std::string m_kit_name;
     std::vector<AdapterSequence> m_adapter_sequences;
 
     std::vector<AdapterSequence> generate_adapter_sequence(
@@ -514,8 +518,6 @@ private:
     std::atomic<size_t> m_active{0};
     std::vector<std::unique_ptr<std::thread>> m_workers;
     std::atomic<int> m_num_records{0};
-    std::atomic<int> m_fp{0};
-    std::string m_kit_name;
     Barcoder m_barcoder;
 
     void worker_thread(size_t tid);
