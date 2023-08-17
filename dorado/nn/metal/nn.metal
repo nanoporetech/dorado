@@ -216,6 +216,10 @@ struct ConvArgs {
     int pad;
     int chunk_size_in; // NOTE: multiple of stride!
     int num_chunks; // Actually batch size
+    // These are in strided (output) time steps.
+    // Ignored except by conv3.
+    int conv3_time_step_begin; // Inclusive.
+    int conv3_time_step_end;   // Exclusive
 };
 
 /*
@@ -785,6 +789,9 @@ kernel void conv3_simd
     const int chunk_size_in = args->chunk_size_in;
     const int chunk_size_out = chunk_size_in / stride;
     const int num_chunks = args->num_chunks;
+    // These are in terms of output time steps.
+    const int time_step_begin = args->conv3_time_step_begin;
+    const int time_step_end = args->conv3_time_step_end;
     const int m_blks = num_chunks / (TILE_SIZE * SIMD_TILES_M);
     const int n_blks = out_size / (TILE_SIZE * SIMD_TILES_N);
     const int k_blks = dp_size / TILE_SIZE;
@@ -797,7 +804,7 @@ kernel void conv3_simd
     MatLayoutLSTM::zero_initial_state(out_buf, chunk_size_out, num_chunks, out_size, gid, threadgroups, sid, simdgroups);
 
     for (int m_blk = gid; m_blk < m_blks; m_blk += threadgroups) {
-        for (int ts = 0; ts < chunk_size_out; ++ts) {
+        for (int ts = time_step_begin; ts < time_step_end; ++ts) {
             int start_pos = ts * stride - pad;
             int start_pad_tiles = max(0, -start_pos) * in_size_tiles;
             int end_pad_tiles = max(0, start_pos + win_size - chunk_size_in) * in_size_tiles;
