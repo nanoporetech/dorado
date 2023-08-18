@@ -79,7 +79,7 @@ int duplex(int argc, char* argv[]) {
             .default_value(std::string(""));
 
     parser.add_argument("--min-qscore")
-            .help("Filter reads with mean Q-score below this threshold.")
+            .help("Discard reads with mean Q-score below this threshold.")
             .default_value(0)
             .scan<'i', int>();
 
