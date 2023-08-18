@@ -25,6 +25,7 @@ set(UNIT_TEST_SOURCE_FILES
     ResumeLoaderTest.cpp
     TimeUtilsTest.cpp
     DuplexReadTaggingNodeTest.cpp
+    BarcodeClassifierTest.cpp
 )
 
 if (DORADO_GPU_BUILD)
