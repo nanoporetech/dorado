@@ -477,10 +477,10 @@ static std::string barcode_kits_list_str() {
                            });
 }
 
-class Barcoder {
+class BarcodeClassifier {
 public:
-    Barcoder(const std::vector<std::string>& kit_names);
-    ~Barcoder() = default;
+    BarcodeClassifier(const std::vector<std::string>& kit_names);
+    ~BarcodeClassifier() = default;
 
     ScoreResults barcode(const std::string& seq);
 
@@ -500,29 +500,6 @@ private:
                                  std::vector<ScoreResults>& res);
     ScoreResults find_best_adapter(const std::string& read_seq,
                                    std::vector<AdapterSequence>& adapter);
-};
-
-class BarcoderNode : public MessageSink {
-public:
-    BarcoderNode(int threads, const std::vector<std::string>& kit_name);
-    ~BarcoderNode();
-    std::string get_name() const override { return "BarcoderNode"; }
-    stats::NamedStats sample_stats() const override;
-    void terminate(const FlushOptions& flush_options) override { terminate_impl(); }
-    void restart() override;
-
-private:
-    void start_threads();
-
-    size_t m_threads{1};
-    std::atomic<size_t> m_active{0};
-    std::vector<std::unique_ptr<std::thread>> m_workers;
-    std::atomic<int> m_num_records{0};
-    Barcoder m_barcoder;
-
-    void worker_thread(size_t tid);
-    BamPtr barcode(bam1_t* irecord);
-    void terminate_impl();
 };
 
 }  // namespace demux

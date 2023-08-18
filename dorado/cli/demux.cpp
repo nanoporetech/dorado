@@ -1,5 +1,6 @@
 #include "Version.h"
 #include "read_pipeline/BarcodeClassifier.h"
+#include "read_pipeline/BarcodeClassifierNode.h"
 #include "read_pipeline/BarcodeDemuxer.h"
 #include "read_pipeline/HtsReader.h"
 #include "read_pipeline/ProgressTracker.h"
@@ -116,7 +117,7 @@ int demuxer(int argc, char* argv[]) {
         kit_names.push_back(parser.get<std::string>("--kit_name"));
     };
     auto demux =
-            pipeline_desc.add_node<demux::BarcoderNode>({demux_writer}, demux_threads, kit_names);
+            pipeline_desc.add_node<BarcodeClassifierNode>({demux_writer}, demux_threads, kit_names);
 
     // Create the Pipeline from our description.
     std::vector<dorado::stats::StatsReporter> stats_reporters;

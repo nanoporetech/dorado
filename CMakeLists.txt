@@ -161,6 +161,8 @@ set(LIB_SOURCE_FILES
     dorado/read_pipeline/DuplexReadTaggingNode.h
     dorado/read_pipeline/BarcodeClassifier.cpp
     dorado/read_pipeline/BarcodeClassifier.h
+    dorado/read_pipeline/BarcodeClassifierNode.cpp
+    dorado/read_pipeline/BarcodeClassifierNode.h
     dorado/read_pipeline/BarcodeDemuxer.cpp
     dorado/read_pipeline/BarcodeDemuxer.h
     dorado/decode/beam_search.cpp
