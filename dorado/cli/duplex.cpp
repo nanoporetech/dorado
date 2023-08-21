@@ -243,7 +243,12 @@ int duplex(int argc, char* argv[]) {
 
             // Check sample rate of model vs data.
             auto data_sample_rate = DataLoader::get_sample_rate(reads, recursive_file_loading);
-            auto model_sample_rate = get_model_sample_rate(model_path);
+            auto model_sample_rate = model_config.sample_rate;
+            if (model_sample_rate < 0) {
+                // If unsuccessful, find sample rate by model name.
+                model_sample_rate = utils::get_sample_rate_by_model_name(
+                        model_config.model_path.filename().string());
+            }
             auto skip_model_compatibility_check =
                     internal_parser.get<bool>("--skip-model-compatibility-check");
             if (!skip_model_compatibility_check &&
@@ -312,9 +317,18 @@ int duplex(int argc, char* argv[]) {
                 pairing_parameters = std::move(template_complement_map);
             }
 
+            auto mean_qscore_start_pos = model_config.mean_qscore_start_pos;
+            if (mean_qscore_start_pos < 0) {
+                mean_qscore_start_pos =
+                        utils::get_mean_qscore_start_pos_by_model_name(stereo_model_name);
+                if (mean_qscore_start_pos < 0) {
+                    throw std::runtime_error("Mean q-score start position cannot be < 0");
+                }
+            }
             pipelines::create_stereo_duplex_pipeline(
                     pipeline_desc, std::move(runners), std::move(stereo_runners), overlap,
-                    num_devices * 2, num_devices, std::move(pairing_parameters), read_filter_node);
+                    mean_qscore_start_pos, num_devices * 2, num_devices,
+                    std::move(pairing_parameters), read_filter_node);
 
             std::vector<dorado::stats::StatsReporter> stats_reporters;
             pipeline = Pipeline::create(std::move(pipeline_desc), &stats_reporters);
