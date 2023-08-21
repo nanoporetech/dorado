@@ -2,16 +2,16 @@
 
 namespace dorado {
 
-class MessageSink;
+class Pipeline;
 
 // Supplies a stream of reads with random signals for testing purposes.
 class FakeDataLoader {
 public:
-    FakeDataLoader(MessageSink& read_sink);
+    FakeDataLoader(Pipeline& read_sink);
     void load_reads(int num_reads);
 
 private:
-    MessageSink& m_read_sink;
+    Pipeline& m_pipeline;
 };
 
 }  // namespace dorado
