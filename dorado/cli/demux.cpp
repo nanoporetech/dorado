@@ -1,7 +1,7 @@
 #include "Version.h"
 #include "read_pipeline/BarcodeClassifier.h"
 #include "read_pipeline/BarcodeClassifierNode.h"
-#include "read_pipeline/BarcodeDemuxer.h"
+#include "read_pipeline/BarcodeDemuxerNode.h"
 #include "read_pipeline/HtsReader.h"
 #include "read_pipeline/ProgressTracker.h"
 #include "utils/basecaller_utils.h"
@@ -110,8 +110,8 @@ int demuxer(int argc, char* argv[]) {
     add_pg_hdr(header);
 
     PipelineDescriptor pipeline_desc;
-    auto demux_writer = pipeline_desc.add_node<BarcodeDemuxer>({}, output_dir, demux_writer_threads,
-                                                               0, parser.get<bool>("--emit-fastq"));
+    auto demux_writer = pipeline_desc.add_node<BarcodeDemuxerNode>(
+            {}, output_dir, demux_writer_threads, 0, parser.get<bool>("--emit-fastq"));
     std::vector<std::string> kit_names;
     if (parser.present("--kit_name")) {
         kit_names.push_back(parser.get<std::string>("--kit_name"));
@@ -129,7 +129,8 @@ int demuxer(int argc, char* argv[]) {
 
     // At present, header output file header writing relies on direct node method calls
     // rather than the pipeline framework.
-    auto& demux_writer_ref = dynamic_cast<BarcodeDemuxer&>(pipeline->get_node_ref(demux_writer));
+    auto& demux_writer_ref =
+            dynamic_cast<BarcodeDemuxerNode&>(pipeline->get_node_ref(demux_writer));
     demux_writer_ref.set_header(header);
 
     // Set up stats counting

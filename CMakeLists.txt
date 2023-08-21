@@ -163,8 +163,8 @@ set(LIB_SOURCE_FILES
     dorado/read_pipeline/BarcodeClassifier.h
     dorado/read_pipeline/BarcodeClassifierNode.cpp
     dorado/read_pipeline/BarcodeClassifierNode.h
-    dorado/read_pipeline/BarcodeDemuxer.cpp
-    dorado/read_pipeline/BarcodeDemuxer.h
+    dorado/read_pipeline/BarcodeDemuxerNode.cpp
+    dorado/read_pipeline/BarcodeDemuxerNode.h
     dorado/decode/beam_search.cpp
     dorado/decode/fast_hash.cpp
     dorado/decode/fast_hash.h
