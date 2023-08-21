@@ -50,8 +50,16 @@ struct ScoreResults {
     int barcode_start = -1;
 };
 
-const ScoreResults UNCLASSIFIED = {-1.f, -1.f, -1.f,           -1.f,
-                                   -1.f, -1.f, "unclassified", "unclassified"};
+const ScoreResults UNCLASSIFIED = {.score = -1.f,
+                                   .top_score = -1.f,
+                                   .bottom_score = -1.f,
+                                   .flank_score = -1.f,
+                                   .top_flank_score = -1.f,
+                                   .bottom_flank_score = -1.f,
+                                   .use_top = false,
+                                   .adapter_name = "unclassified",
+                                   .kit = "unclassified",
+                                   .barcode_start = -1};
 
 static const std::unordered_map<std::string, KitInfo> kit_info_map = {
         {"SQK-RBK004",

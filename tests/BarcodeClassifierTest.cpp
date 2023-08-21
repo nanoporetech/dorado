@@ -46,7 +46,7 @@ TEST_CASE("BarcodeClassifier: instantiate barcode with unknown kit", TEST_GROUP)
     CHECK_THROWS(demux::BarcodeClassifier({"MY_RANDOM_KIT"}));
 }
 
-TEST_CASE("BarcodeCLassifier: test single ended barcode", TEST_GROUP) {
+TEST_CASE("BarcodeClassifier: test single ended barcode", TEST_GROUP) {
     fs::path data_dir = fs::path(get_data_dir("barcode_demux/single_end"));
 
     demux::BarcodeClassifier classifier({"SQK-RBK114-96"});
@@ -69,7 +69,7 @@ TEST_CASE("BarcodeCLassifier: test single ended barcode", TEST_GROUP) {
     }
 }
 
-TEST_CASE("BarcodeCLassifier: test double ended barcode", TEST_GROUP) {
+TEST_CASE("BarcodeClassifier: test double ended barcode", TEST_GROUP) {
     fs::path data_dir = fs::path(get_data_dir("barcode_demux/double_end"));
 
     demux::BarcodeClassifier classifier({"SQK-RPB004"});
@@ -92,7 +92,7 @@ TEST_CASE("BarcodeCLassifier: test double ended barcode", TEST_GROUP) {
     }
 }
 
-TEST_CASE("BarcodeCLassifier: test double ended barcode with different variants", TEST_GROUP) {
+TEST_CASE("BarcodeClassifier: test double ended barcode with different variants", TEST_GROUP) {
     fs::path data_dir = fs::path(get_data_dir("barcode_demux/double_end_variant"));
 
     demux::BarcodeClassifier classifier({"EXP-PBC096"});
