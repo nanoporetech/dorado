@@ -3,9 +3,9 @@
 #include <CoreFoundation/CoreFoundation.h>
 #if !TARGET_OS_IPHONE
 #include <IOKit/IOKitLib.h>
+#include <objc/objc-runtime.h>
 #endif
 #include <mach-o/dyld.h>
-#include <objc/objc-runtime.h>
 #include <spdlog/spdlog.h>
 #include <sys/sysctl.h>
 #include <sys/syslimits.h>
