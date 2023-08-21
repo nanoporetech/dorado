@@ -9,6 +9,7 @@ stages:
 
 variables:
   BUILD_DIR: build
+  BUILD_TARGET: install
   GIT_SUBMODULE_STRATEGY: recursive
   CUDA: "11.8"
   WIN_CUDA_TOOLKIT: "/c/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v${CUDA}"
@@ -57,14 +58,21 @@ variables:
   before_script:
     - echo Dorado dependency stage
     - apt-get update && apt-get install -y --no-install-recommends samtools curl libhdf5-dev libssl-dev libzstd-dev libsz2
+    - pip install gcovr
+
+.run_dorado_cmake_build: &run_dorado_cmake_build
+  - cmake ${BUILD_OPTIONS} -S . -B ${BUILD_DIR}
+  - cmake --build ${BUILD_DIR} --config Release --target ${BUILD_TARGET} -j 8
+
+.run_dorado_cmake_ctest: &run_dorado_cmake_ctest
+  - ctest -C Release --test-dir ${BUILD_DIR} --output-on-failure --verbose
 
 .build_dorado: &build_dorado
   stage: build
   script:
     - echo Dorado build stage
-    - cmake ${BUILD_OPTIONS} -S . -B ${BUILD_DIR}
-    - cmake --build ${BUILD_DIR} --config Release --target install -j 8
-    - ctest -C Release --test-dir ${BUILD_DIR} --output-on-failure --verbose
+    - *run_dorado_cmake_build
+    - *run_dorado_cmake_ctest
   artifacts:
     paths:
       - dist
@@ -122,6 +130,24 @@ build:linux:x86:focal:
     BUILD_OPTIONS: "-DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN}"
   <<: *linux_runner
   <<: *build_dorado
+
+build:linux:x86:focal:coverage:
+  stage: build
+  image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.1
+  variables:
+    BUILD_OPTIONS: "-DGITLAB_CI_TOKEN=${CI_JOB_TOKEN} -DGENERATE_TEST_COVERAGE=1"
+    BUILD_TARGET: "dorado_test_coverage"
+  <<: *linux_dependencies
+  <<: *linux_runner
+  script:
+    - *run_dorado_cmake_build
+  rules:
+      - if: $CI_PIPELINE_SOURCE == "schedule"
+        if: $CI_PIPELINE_SOURCE == "push"
+        when: manual
+  artifacts:
+    paths:
+      - build/dorado_test_coverage/*
 
 build:linux:arm64:bionic:
   image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r32.4.3-deps:1.1

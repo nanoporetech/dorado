@@ -80,18 +80,3 @@ endif()
 if ((ECM_ENABLE_SANITIZERS MATCHES "thread") AND (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64") AND (CMAKE_SYSTEM_NAME STREQUAL "Linux"))
     set_tests_properties(dorado_tests PROPERTIES ENVIRONMENT_MODIFICATION "LD_LIBRARY_PATH=path_list_append:${TORCH_LIB}/lib")
 endif()
-
-if (GENERATE_TEST_COVERAGE)
-    if (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" AND NOT DORADO_LIB_ONLY)
-        include(../cmake/CodeCoverage.cmake)
-        append_coverage_compiler_flags()
-        setup_target_for_coverage_gcovr_html(
-            NAME dorado_test_coverage
-            EXECUTABLE ctest --test-dir ${CMAKE_BINARY_DIR} --verbose
-            DEPENDENCIES dorado_tests
-            BASE_DIRECTORY "${PROJECT_SOURCE_DIR}"
-            EXCLUDE "${PROJECT_SOURCE_DIR}/dorado/3rdparty/*"
-            )
-        target_link_libraries(dorado_tests gcov)
-    endif()
-endif()
