@@ -41,7 +41,7 @@ struct ScoreResults {
     float score = -1.f;
     float top_score = -1.f;
     float bottom_score = -1.f;
-    float flank_score = 1.f;
+    float flank_score = -1.f;
     float top_flank_score = -1.f;
     float bottom_flank_score = -1.f;
     bool use_top = false;
