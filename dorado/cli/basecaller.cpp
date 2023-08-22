@@ -63,6 +63,9 @@ void setup(std::vector<std::string> args,
            const std::string& dump_stats_filter,
            const std::string& resume_from_file,
            argparse::ArgumentParser& resume_parser) {
+    auto model_config = load_crf_model_config(model_path);
+    std::string model_name = utils::extract_model_from_model_path(model_path.string());
+
     torch::set_num_threads(1);
 
     if (!DataLoader::is_read_data_present(data_path, recursive_file_loading)) {
@@ -72,7 +75,11 @@ void setup(std::vector<std::string> args,
 
     // Check sample rate of model vs data.
     auto data_sample_rate = DataLoader::get_sample_rate(data_path, recursive_file_loading);
-    auto model_sample_rate = get_model_sample_rate(model_path);
+    auto model_sample_rate = model_config.sample_rate;
+    if (model_sample_rate < 0) {
+        // If unsuccessful, find sample rate by model name.
+        model_sample_rate = utils::get_sample_rate_by_model_name(model_name);
+    }
     if (!skip_model_compatibility_check &&
         !sample_rates_compatible(data_sample_rate, model_sample_rate)) {
         std::stringstream err;
@@ -93,11 +100,9 @@ void setup(std::vector<std::string> args,
         throw std::runtime_error("Modified base models cannot be used with FASTQ output");
     }
 
-    auto model_config = dorado::load_crf_model_config(model_path);
     auto [runners, num_devices] =
             create_basecall_runners(model_config, device, num_runners, 0, batch_size, chunk_size);
 
-    std::string model_name = std::filesystem::canonical(model_path).filename().string();
     auto read_groups = DataLoader::load_read_groups(data_path, model_name, recursive_file_loading);
     auto read_list = utils::load_read_list(read_list_file_path);
 
@@ -135,10 +140,17 @@ void setup(std::vector<std::string> args,
             {read_converter}, min_qscore, default_parameters.min_sequence_length,
             std::unordered_set<std::string>{}, thread_allocations.read_filter_threads);
 
-    pipelines::create_simplex_pipeline(pipeline_desc, std::move(runners), std::move(remora_runners),
-                                       overlap, thread_allocations.scaler_node_threads,
-                                       thread_allocations.remora_threads * num_devices,
-                                       read_filter_node);
+    auto mean_qscore_start_pos = model_config.mean_qscore_start_pos;
+    if (mean_qscore_start_pos < 0) {
+        mean_qscore_start_pos = utils::get_mean_qscore_start_pos_by_model_name(model_name);
+        if (mean_qscore_start_pos < 0) {
+            throw std::runtime_error("Mean q-score start position cannot be < 0");
+        }
+    }
+    pipelines::create_simplex_pipeline(
+            pipeline_desc, std::move(runners), std::move(remora_runners), overlap,
+            mean_qscore_start_pos, thread_allocations.scaler_node_threads,
+            thread_allocations.remora_threads * num_devices, read_filter_node);
 
     // Create the Pipeline from our description.
     std::vector<dorado::stats::StatsReporter> stats_reporters;
