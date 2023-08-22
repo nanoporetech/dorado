@@ -179,6 +179,8 @@ set(LIB_SOURCE_FILES
     dorado/utils/log_utils.h
     dorado/utils/log_utils.cpp
     dorado/utils/math_utils.h
+    dorado/utils/memory_utils.cpp
+    dorado/utils/memory_utils.h
     dorado/utils/module_utils.h
     dorado/utils/parameters.h
     dorado/utils/sequence_utils.cpp
