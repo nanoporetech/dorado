@@ -1,7 +1,7 @@
 #include "memory_utils.h"
 
 #if defined(WIN32)
-#include <sysinfoapi.h>
+#include <windows.h>
 #elif defined(__linux__)
 #include <sys/sysinfo.h>
 #elif defined(__APPLE__)
