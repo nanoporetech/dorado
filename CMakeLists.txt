@@ -176,6 +176,8 @@ set(LIB_SOURCE_FILES
     dorado/utils/AsyncQueue.h
     dorado/utils/compat_utils.cpp
     dorado/utils/compat_utils.h
+    dorado/utils/dev_utils.cpp
+    dorado/utils/dev_utils.h
     dorado/utils/log_utils.h
     dorado/utils/log_utils.cpp
     dorado/utils/math_utils.h
