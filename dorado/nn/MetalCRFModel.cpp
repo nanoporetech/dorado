@@ -742,16 +742,16 @@ public:
             return;
         }
 
-        NNTask task(&input, num_chunks, &out_chunks);
+        auto task = std::make_shared<NNTask>(&input, num_chunks, &out_chunks);
         {
             std::lock_guard<std::mutex> lock(m_input_lock);
-            m_input_queue.push_front(&task);
+            m_input_queue.push_front(task);
         }
         m_input_cv.notify_one();
 
-        std::unique_lock lock(task.mut);
-        while (task.decode_chunks_finished != num_chunks) {
-            task.cv.wait(lock);
+        std::unique_lock lock(task->mut);
+        while (task->decode_chunks_finished != num_chunks) {
+            task->cv.wait(lock);
         }
     }
 
@@ -780,7 +780,7 @@ public:
                 return;
             }
 
-            NNTask *const task = m_input_queue.back();
+            auto task = std::move(m_input_queue.back());
             m_input_queue.pop_back();
             input_lock.unlock();
 
@@ -866,7 +866,7 @@ public:
             if (m_decode_queue.empty() && m_terminate_decode.load()) {
                 return;
             }
-            NNTask *const task = m_decode_queue.back();
+            auto task = m_decode_queue.back();
             int chunk_idx = task->decode_chunks_started++;
             // If all chunks have been picked up for decoding, remove task from queue
             if (chunk_idx == task->num_chunks - 1) {
@@ -932,8 +932,8 @@ public:
     const CRFModelConfig m_config;
     std::atomic<bool> m_terminate{false};
     std::atomic<bool> m_terminate_decode{false};
-    std::deque<NNTask *> m_input_queue;
-    std::deque<NNTask *> m_decode_queue;
+    std::deque<std::shared_ptr<NNTask>> m_input_queue;
+    std::deque<std::shared_ptr<NNTask>> m_decode_queue;
     std::mutex m_input_lock;
     std::condition_variable m_input_cv;
     std::unique_ptr<std::thread> m_metal_thread;
