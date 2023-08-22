@@ -3,9 +3,9 @@
 namespace dorado::utils::details {
 
 const char* const g_env_var_name = "DORADO_DEV_OPTS";
-std::map<std::string, std::pair<double, bool>> g_dev_options;
+std::unordered_map<std::string, std::pair<double, bool>> g_dev_options;
 
-void extract_dev_options(std::string env_string) {
+void extract_dev_options(const std::string& env_string) {
     constexpr char SEPARATOR = ';';
     std::vector<std::string> parts;
     size_t start = 0;

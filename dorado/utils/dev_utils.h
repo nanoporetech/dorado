@@ -2,16 +2,16 @@
 
 #include <spdlog/spdlog.h>
 
-#include <map>
 #include <string>
+#include <unordered_map>
 #include <utility>
 
 namespace dorado::utils {
 
 namespace details {
 extern const char* const g_env_var_name;
-extern std::map<std::string, std::pair<double, bool>> g_dev_options;
-void extract_dev_options(std::string env_string);
+extern std::unordered_map<std::string, std::pair<double, bool>> g_dev_options;
+void extract_dev_options(const std::string& env_string);
 }  // namespace details
 
 // This is intended for dev/testing/debugging purposes, providing a way to influence runtime
@@ -23,7 +23,7 @@ void extract_dev_options(std::string env_string);
 //  $ DORADO_DEV_OPTS="some_opt=42;other_opt=0.5" dorado basecaller ...
 //
 template <typename T>
-T get_dev_opt(const std::string name, T default_value) {
+T get_dev_opt(const std::string& name, T default_value) {
     if (details::g_dev_options.empty()) {
         const char* env_var = getenv(details::g_env_var_name);
         if (env_var != nullptr) {
