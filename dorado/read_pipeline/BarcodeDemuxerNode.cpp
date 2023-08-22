@@ -71,7 +71,8 @@ int BarcodeDemuxerNode::write(bam1_t* const record) {
         // For new barcodes, create a new HTS file (either fastq or BAM).
         std::string filename = bc + (m_write_fastq ? ".fastq" : ".bam");
         auto filepath = m_output_dir / filename;
-        file = hts_open(filepath.c_str(), (m_write_fastq ? "wf" : "wb"));
+        auto filepath_str = filepath.string();
+        file = hts_open(filepath_str.c_str(), (m_write_fastq ? "wf" : "wb"));
         if (!file) {
             throw std::runtime_error("Failed to open new HTS output file at " + filepath.string());
         }

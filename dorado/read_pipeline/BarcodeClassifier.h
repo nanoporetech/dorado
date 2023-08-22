@@ -488,15 +488,13 @@ private:
 
     std::vector<AdapterSequence> generate_adapter_sequence(
             const std::vector<std::string>& kit_names);
-    void calculate_adapter_score_different_double_ends(std::string_view read_seq,
-                                                       const AdapterSequence& as,
-                                                       std::vector<ScoreResults>& res);
-    void calculate_adapter_score_double_ends(std::string_view read_seq,
-                                             const AdapterSequence& as,
-                                             std::vector<ScoreResults>& res);
-    void calculate_adapter_score(std::string_view read_seq,
-                                 const AdapterSequence& as,
-                                 std::vector<ScoreResults>& res);
+    std::vector<ScoreResults> calculate_adapter_score_different_double_ends(
+            std::string_view read_seq,
+            const AdapterSequence& as);
+    std::vector<ScoreResults> calculate_adapter_score_double_ends(std::string_view read_seq,
+                                                                  const AdapterSequence& as);
+    std::vector<ScoreResults> calculate_adapter_score(std::string_view read_seq,
+                                                      const AdapterSequence& as);
     ScoreResults find_best_adapter(const std::string& read_seq,
                                    std::vector<AdapterSequence>& adapter);
 };

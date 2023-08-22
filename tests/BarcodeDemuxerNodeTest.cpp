@@ -63,7 +63,7 @@ TEST_CASE("BarcodeDemuxerNode: check correct output files are created", TEST_GRO
     const std::unordered_set<std::string> expected_files = {"bc01.bam", "bc02.bam", "bc03.bam"};
 
     for (const auto& entry : fs::directory_iterator(tmp_dir)) {
-        CHECK(expected_files.find(entry.path().filename()) != expected_files.end());
+        CHECK(expected_files.find(entry.path().filename().string()) != expected_files.end());
     }
 
     fs::remove_all(tmp_dir);

@@ -18,7 +18,7 @@ namespace dorado {
 
 const std::string UNCLASSIFIED_BARCODE = "unclassified";
 
-// A Node which encapsulate running barcode classification on each read.
+// A Node which encapsulates running barcode classification on each read.
 BarcodeClassifierNode::BarcodeClassifierNode(int threads, const std::vector<std::string>& kit_names)
         : MessageSink(10000), m_threads(threads), m_barcoder(kit_names) {
     start_threads();
