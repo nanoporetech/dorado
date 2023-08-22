@@ -63,8 +63,8 @@ void setup(std::vector<std::string> args,
            const std::string& dump_stats_filter,
            const std::string& resume_from_file,
            argparse::ArgumentParser& resume_parser) {
-    auto model_config = dorado::load_crf_model_config(model_path);
-    std::string model_name = std::filesystem::canonical(model_path).filename().string();
+    auto model_config = load_crf_model_config(model_path);
+    std::string model_name = utils::extract_model_from_model_path(model_path);
 
     torch::set_num_threads(1);
 
