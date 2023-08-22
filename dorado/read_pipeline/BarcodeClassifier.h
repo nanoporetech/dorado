@@ -45,21 +45,12 @@ struct ScoreResults {
     float top_flank_score = -1.f;
     float bottom_flank_score = -1.f;
     bool use_top = false;
-    std::string adapter_name;
-    std::string kit;
+    std::string adapter_name = "unclassified";
+    std::string kit = "unclassified";
     int barcode_start = -1;
 };
 
-const ScoreResults UNCLASSIFIED = {.score = -1.f,
-                                   .top_score = -1.f,
-                                   .bottom_score = -1.f,
-                                   .flank_score = -1.f,
-                                   .top_flank_score = -1.f,
-                                   .bottom_flank_score = -1.f,
-                                   .use_top = false,
-                                   .adapter_name = "unclassified",
-                                   .kit = "unclassified",
-                                   .barcode_start = -1};
+const ScoreResults UNCLASSIFIED{};
 
 static const std::unordered_map<std::string, KitInfo> kit_info_map = {
         {"SQK-RBK004",
