@@ -247,7 +247,7 @@ int duplex(int argc, char* argv[]) {
             if (model_sample_rate < 0) {
                 // If unsuccessful, find sample rate by model name.
                 model_sample_rate = utils::get_sample_rate_by_model_name(
-                        utils::extract_model_from_model_path(model_path));
+                        utils::extract_model_from_model_path(model));
             }
             auto skip_model_compatibility_check =
                     internal_parser.get<bool>("--skip-model-compatibility-check");
