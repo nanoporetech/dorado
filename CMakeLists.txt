@@ -506,10 +506,10 @@ endif()
 if (GENERATE_TEST_COVERAGE)
     if (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" AND NOT DORADO_LIB_ONLY)
         include(cmake/CodeCoverage.cmake)
-        append_coverage_compiler_flags()
+        append_coverage_compiler_flags_to_target(dorado_tests)
         setup_target_for_coverage_gcovr_html(
             NAME dorado_test_coverage
-            EXECUTABLE ctest --test-dir ${CMAKE_BINARY_DIR} --verbose
+            EXECUTABLE ctest --test-dir ${CMAKE_BINARY_DIR} --verbose -R dorado_tests
             DEPENDENCIES dorado_tests
             BASE_DIRECTORY "${PROJECT_SOURCE_DIR}"
             EXCLUDE "${PROJECT_SOURCE_DIR}/dorado/3rdparty/*" "${PROJECT_SOURCE_DIR}/tests/*"
