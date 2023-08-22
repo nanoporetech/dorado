@@ -2,8 +2,10 @@
 
 #if defined(WIN32)
 #include <sysinfoapi.h>
-#else
+#elif defined(__linux__)
 #include <sys/sysinfo.h>
+#elif defined(__APPLE__)
+#include <mach/mach.h>
 #endif
 
 namespace {
@@ -25,12 +27,22 @@ size_t available_host_memory_GB() {
         return 0;
     }
 
-    auto avail_mem_GB = (info.freeram / BYTES_PER_GB) * info.mem_unit;
+    auto avail_mem_GB = static_cast<size_t>(info.freeram) * info.mem_unit / BYTES_PER_GB;
     return avail_mem_GB;
 
+#elif defined(__APPLE__)
+    size_t unused_mem = 0;
+    vm_size_t page_size;
+    vm_statistics_data_t vm_stats;
+    mach_msg_type_number_t count = sizeof(vm_stats) / sizeof(natural_t);
+    mach_port_t mach_port = mach_host_self();
+    if (KERN_SUCCESS == host_page_size(mach_port, &page_size) &&
+        KERN_SUCCESS == host_statistics(mach_port, HOST_VM_INFO, (host_info_t)&vm_stats, &count)) {
+        unused_mem = static_cast<size_t>(vm_stats.free_count) * page_size / BYTES_PER_GB;
+    }
+    return unused_mem;
 #else
-    // APPLE - TODO
-    // sysctlbyname?
+    // Unsupported
     return 0;
 #endif
 }
