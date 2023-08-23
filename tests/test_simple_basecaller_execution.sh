@@ -10,7 +10,7 @@ dorado_bin=$(cd "$(dirname $1)"; pwd -P)/$(basename $1)
 model_name=${2:-dna_r10.4.1_e8.2_400bps_hac@v4.1.0}
 batch=${3:-384}
 data_dir=$test_dir/data
-output_dir_name=$(echo $RANDOM | md5sum | head -c 10)
+output_dir_name=$(echo $RANDOM | head -c 10)
 output_dir=${test_dir}/${output_dir_name}
 mkdir -p $output_dir
 
@@ -54,7 +54,7 @@ if ! uname -r | grep -q tegra; then
     duplex_model=${output_dir}/${duplex_model_name}
     $dorado_bin duplex $duplex_model $data_dir/duplex/pod5 > $output_dir/duplex_calls.bam
     samtools quickcheck -u $output_dir/duplex_calls.bam
-    num_duplex_reads=$(samtools view -c -d "dx:1" $output_dir/duplex_calls.bam)
+    num_duplex_reads=$(samtools view $output_dir/duplex_calls.bam | grep dx:i:1 | wc -l | awk '{print $1}')
     if [[ $num_duplex_reads -ne "2" ]]; then
         echo "Duplex basecalling missing reads."
         exit 1
@@ -63,7 +63,7 @@ if ! uname -r | grep -q tegra; then
     echo dorado pairs file based duplex test stage
     $dorado_bin duplex $duplex_model $data_dir/duplex/pod5 --pairs $data_dir/duplex/pairs.txt > $output_dir/duplex_calls.bam
     samtools quickcheck -u $output_dir/duplex_calls.bam
-    num_duplex_reads=$(samtools view -c -d "dx:1" $output_dir/duplex_calls.bam)
+    num_duplex_reads=$(samtools view $output_dir/duplex_calls.bam | grep dx:i:1 | wc -l | awk '{print $1}')
     if [[ $num_duplex_reads -ne "2" ]]; then
         echo "Duplex basecalling missing reads."
         exit 1
