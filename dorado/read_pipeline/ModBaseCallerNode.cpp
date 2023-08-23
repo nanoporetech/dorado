@@ -266,7 +266,6 @@ void ModBaseCallerNode::modbasecall_worker_thread(size_t worker_id, size_t calle
         // We have just grabbed a number of chunks (0 in the case of timeout) from
         // the chunk queue and added them to batched_chunks.  Insert those chunks
         // into the model input tensors.
-        assert(!batched_chunks.empty());
         for (size_t chunk_idx = previous_chunk_count; chunk_idx < batched_chunks.size();
              ++chunk_idx) {
             assert(chunk_idx < m_batch_size);

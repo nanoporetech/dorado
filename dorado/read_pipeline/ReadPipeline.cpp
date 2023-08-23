@@ -20,7 +20,7 @@ bool get_modbase_channel_name(std::string &channel_name, const std::string &mod_
                                                                         // C
                                                                         {"5mC", "m"},
                                                                         {"5hmC", "h"},
-                                                                        {"5fc", "f"},
+                                                                        {"5fC", "f"},
                                                                         {"5caC", "c"},
                                                                         // G
                                                                         {"8oxoG", "o"},
