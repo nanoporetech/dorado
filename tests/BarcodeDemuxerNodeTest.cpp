@@ -40,30 +40,37 @@ TEST_CASE("BarcodeDemuxerNode: check correct output files are created", TEST_GRO
 
     auto tmp_dir = fs::temp_directory_path() / "dorado_demuxer";
 
-    dorado::PipelineDescriptor pipeline_desc;
-    auto demuxer = pipeline_desc.add_node<BarcodeDemuxerNode>({}, tmp_dir.string(), 8, 10, false);
+    {
+        // Creating local scope for the pipeline because on windows
+        // the temporary directory is still being considered open unless
+        // the pipeline object is closed. This needs to be looked at.
+        // TODO: Address open file issue on windows.
+        dorado::PipelineDescriptor pipeline_desc;
+        auto demuxer =
+                pipeline_desc.add_node<BarcodeDemuxerNode>({}, tmp_dir.string(), 8, 10, false);
 
-    auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
+        auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
 
-    auto hdr = sam_hdr_init();
-    sam_hdr_add_line(hdr, "SQ", "ID", "foo", "LN", "100", NULL);
+        auto hdr = sam_hdr_init();
+        sam_hdr_add_line(hdr, "SQ", "ID", "foo", "LN", "100", NULL);
 
-    auto& demux_writer_ref = dynamic_cast<BarcodeDemuxerNode&>(pipeline->get_node_ref(demuxer));
-    demux_writer_ref.set_header(hdr);
+        auto& demux_writer_ref = dynamic_cast<BarcodeDemuxerNode&>(pipeline->get_node_ref(demuxer));
+        demux_writer_ref.set_header(hdr);
 
-    for (auto bc : {"bc01", "bc02", "bc03"}) {
-        auto records = create_bam_reader(bc);
-        for (auto& rec : records) {
-            pipeline->push_message(std::move(rec));
+        for (auto bc : {"bc01", "bc02", "bc03"}) {
+            auto records = create_bam_reader(bc);
+            for (auto& rec : records) {
+                pipeline->push_message(std::move(rec));
+            }
         }
-    }
 
-    pipeline->terminate(DefaultFlushOptions());
+        pipeline->terminate(DefaultFlushOptions());
 
-    const std::unordered_set<std::string> expected_files = {"bc01.bam", "bc02.bam", "bc03.bam"};
+        const std::unordered_set<std::string> expected_files = {"bc01.bam", "bc02.bam", "bc03.bam"};
 
-    for (const auto& entry : fs::directory_iterator(tmp_dir)) {
-        CHECK(expected_files.find(entry.path().filename().string()) != expected_files.end());
+        for (const auto& entry : fs::directory_iterator(tmp_dir)) {
+            CHECK(expected_files.find(entry.path().filename().string()) != expected_files.end());
+        }
     }
 
     fs::remove_all(tmp_dir);
