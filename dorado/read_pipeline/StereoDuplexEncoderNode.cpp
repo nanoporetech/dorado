@@ -287,7 +287,8 @@ void StereoDuplexEncoderNode::worker_thread() {
                 read_pair->read_1, read_pair->read_2, read_pair->read_1_start,
                 read_pair->read_1_end, read_pair->read_2_start, read_pair->read_2_end);
 
-        send_message_to_sink(stereo_encoded_read);  // Stereo-encoded read created, send it to sink
+        send_message_to_sink(
+                std::move(stereo_encoded_read));  // Stereo-encoded read created, send it to sink
     }
 }
 

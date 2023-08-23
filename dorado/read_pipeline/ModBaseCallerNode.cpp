@@ -221,7 +221,7 @@ void ModBaseCallerNode::input_worker_thread() {
                 ++m_working_reads_size;
             } else {
                 // No modbases to call, pass directly to next node
-                send_message_to_sink(read);
+                send_message_to_sink(std::move(read));
                 ++m_num_non_mod_base_reads_pushed;
             }
             break;
