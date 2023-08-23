@@ -68,6 +68,11 @@ int duplex(int argc, char* argv[]) {
             .default_value(default_parameters.overlap)
             .scan<'i', int>();
 
+    parser.add_argument("-p", "--enable-progress-bar")
+            .default_value(false)
+            .implicit_value(true)
+            .help("Enable progress bar output to stderr");
+
     parser.add_argument("-r", "--recursive")
             .default_value(false)
             .implicit_value(true)
@@ -113,6 +118,7 @@ int duplex(int argc, char* argv[]) {
 
         auto reads(parser.get<std::string>("reads"));
         std::string pairs_file = parser.get<std::string>("--pairs");
+        auto enable_progress_bar = parser.get<bool>("--enable-progress-bar");
         auto threads = static_cast<size_t>(parser.get<int>("--threads"));
         auto min_qscore(parser.get<int>("--min-qscore"));
         auto ref = parser.get<std::string>("--reference");
@@ -193,7 +199,7 @@ int duplex(int argc, char* argv[]) {
         torch::set_num_threads(1);
 
         std::vector<dorado::stats::StatsCallable> stats_callables;
-        ProgressTracker tracker(num_reads, duplex);
+        ProgressTracker tracker(num_reads, duplex, enable_progress_bar);
         stats_callables.push_back(
                 [&tracker](const stats::NamedStats& stats) { tracker.update_progress_bar(stats); });
         stats::NamedStats final_stats;
