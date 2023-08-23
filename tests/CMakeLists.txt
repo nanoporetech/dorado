@@ -56,7 +56,6 @@ foreach(TEST_BIN dorado_tests dorado_smoke_tests)
         dorado_io_lib
         dorado_models_lib
         minimap2
-        ${ZLIB_LIBRARIES}
         )
 
     target_include_directories(${TEST_BIN}
