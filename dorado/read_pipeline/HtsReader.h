@@ -6,6 +6,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -18,7 +19,8 @@ class Pipeline;
 
 class HtsReader {
 public:
-    HtsReader(const std::string& filename);
+    HtsReader(const std::string& filename,
+              std::optional<std::unordered_set<std::string>> read_list = std::nullopt);
     ~HtsReader();
     bool read();
     void read(Pipeline& pipeline, int max_reads = -1);
@@ -33,6 +35,8 @@ public:
 
 private:
     htsFile* m_file{nullptr};
+
+    std::optional<std::unordered_set<std::string>> m_read_list;
 };
 
 template <typename T>

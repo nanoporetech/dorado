@@ -28,8 +28,8 @@ namespace utils {
 
 // Determine the thread allocation for writer and aligner threads
 // in dorado aligner.
-inline std::pair<int, int> aligner_writer_thread_allocation(int available_threads,
-                                                            float writer_thread_fraction) {
+inline std::pair<int, int> worker_vs_writer_thread_allocation(int available_threads,
+                                                              float writer_thread_fraction) {
     // clamping because we need at least 1 thread for alignment and for writing.
     int writer_threads =
             std::clamp(static_cast<int>(std::floor(writer_thread_fraction * available_threads)), 1,

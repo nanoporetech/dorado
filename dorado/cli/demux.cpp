@@ -1,10 +1,10 @@
 #include "Version.h"
-#include "minimap.h"
-#include "read_pipeline/AlignerNode.h"
+#include "read_pipeline/BarcodeClassifier.h"
+#include "read_pipeline/BarcodeClassifierNode.h"
+#include "read_pipeline/BarcodeDemuxerNode.h"
 #include "read_pipeline/HtsReader.h"
-#include "read_pipeline/HtsWriter.h"
 #include "read_pipeline/ProgressTracker.h"
-#include "utils/bam_utils.h"
+#include "utils/basecaller_utils.h"
 #include "utils/cli_utils.h"
 #include "utils/log_utils.h"
 #include "utils/stats.h"
@@ -13,7 +13,6 @@
 #include <spdlog/spdlog.h>
 
 #include <chrono>
-#include <filesystem>
 #include <memory>
 #include <string>
 #include <thread>
@@ -26,34 +25,44 @@ using namespace std::chrono_literals;
 
 namespace dorado {
 
+namespace {
+
 void add_pg_hdr(sam_hdr_t* hdr) {
-    sam_hdr_add_line(hdr, "PG", "ID", "aligner", "PN", "dorado", "VN", DORADO_VERSION, "DS",
-                     MM_VERSION, NULL);
+    sam_hdr_add_line(hdr, "PG", "ID", "demux", "PN", "dorado", "VN", DORADO_VERSION, NULL);
 }
 
-int aligner(int argc, char* argv[]) {
+}  // anonymous namespace
+
+int demuxer(int argc, char* argv[]) {
     utils::InitLogging();
 
     argparse::ArgumentParser parser("dorado", DORADO_VERSION, argparse::default_arguments::help);
-    parser.add_description(
-            "Alignment using minimap2. The outputs are expected to be equivalent to minimap2.\n"
-            "The default parameters use the map-ont preset.\n"
-            "NOTE: Not all arguments from minimap2 are currently available. Additionally, "
-            "parameter names are not finalized and may change.");
-    parser.add_argument("index").help("reference in (fastq/fasta/mmi).");
-    parser.add_argument("reads").help("any HTS format.").nargs(argparse::nargs_pattern::any);
+    parser.add_description("Barcode demultiplexing tool. Users need to specify the kit name(s).");
+    parser.add_argument("reads")
+            .help("Path to a file with reads to demultiplex. Can be in any HTS format.")
+            .nargs(argparse::nargs_pattern::any);
+    parser.add_argument("--output-dir").help("Output folder for demultiplexed reads.").required();
+    parser.add_argument("--kit_name")
+            .help("Barcoding kit name. Choose from: " + dorado::demux::barcode_kits_list_str())
+            .required();
     parser.add_argument("-t", "--threads")
-            .help("number of threads for alignment and BAM writing.")
+            .help("Combined number of threads for barcoding and output generation. Default uses "
+                  "all available threads.")
             .default_value(0)
             .scan<'i', int>();
     parser.add_argument("-n", "--max-reads")
-            .help("maximum number of reads to process (for debugging, 0=unlimited).")
+            .help("Maximum number of reads to process. Mainly for debugging. Process all reads by "
+                  "default.")
             .default_value(0)
             .scan<'i', int>();
-    parser.add_argument("-k").help("k-mer size (maximum 28).").default_value(15).scan<'i', int>();
-    parser.add_argument("-w").help("minimizer window size.").default_value(10).scan<'i', int>();
-    parser.add_argument("-I").help("minimap2 index batch size.").default_value(std::string("16G"));
+    parser.add_argument("-l", "--read-ids")
+            .help("A file with a newline-delimited list of reads to demux.")
+            .default_value(std::string(""));
     parser.add_argument("-v", "--verbose").default_value(false).implicit_value(true);
+    parser.add_argument("--emit-fastq")
+            .help("Output in fastq format. Default is BAM.")
+            .default_value(false)
+            .implicit_value(true);
 
     try {
         parser.parse_args(argc, argv);
@@ -65,28 +74,25 @@ int aligner(int argc, char* argv[]) {
     }
 
     if (parser.get<bool>("--verbose")) {
-        mm_verbose = 3;
         utils::SetDebugLogging();
     }
 
-    auto index(parser.get<std::string>("index"));
     auto reads(parser.get<std::vector<std::string>>("reads"));
+    auto output_dir(parser.get<std::string>("output-dir"));
     auto threads(parser.get<int>("threads"));
     auto max_reads(parser.get<int>("max-reads"));
-    auto kmer_size(parser.get<int>("k"));
-    auto window_size(parser.get<int>("w"));
-    auto index_batch_size = utils::parse_string_to_size(parser.get<std::string>("I"));
 
     threads = threads == 0 ? std::thread::hardware_concurrency() : threads;
     // The input thread is the total number of threads to use for dorado
-    // alignment. Heuristically use 10% of threads for BAM generation and
-    // rest for alignment. Empirically this shows good perf.
-    int aligner_threads, writer_threads;
-    std::tie(aligner_threads, writer_threads) =
+    // barcoding. Heuristically use 10% of threads for BAM generation and
+    // rest for barcoding. Empirically this shows good perf.
+    auto [demux_threads, demux_writer_threads] =
             utils::worker_vs_writer_thread_allocation(threads, 0.1f);
-    spdlog::debug("> aligner threads {}, writer threads {}", aligner_threads, writer_threads);
+    spdlog::debug("> barcoding threads {}, writer threads {}", demux_threads, demux_writer_threads);
 
-    if (reads.size() == 0) {
+    auto read_list = utils::load_read_list(parser.get<std::string>("--read-ids"));
+
+    if (reads.empty()) {
 #ifndef _WIN32
         if (isatty(fileno(stdin))) {
             std::cout << parser << std::endl;
@@ -99,18 +105,19 @@ int aligner(int argc, char* argv[]) {
         return 1;
     }
 
-    spdlog::info("> loading index {}", index);
-
-    HtsReader reader(reads[0]);
-    spdlog::debug("> input fmt: {} aligned: {}", reader.format, reader.is_aligned);
+    HtsReader reader(reads[0], read_list);
     auto header = sam_hdr_dup(reader.header);
     add_pg_hdr(header);
 
     PipelineDescriptor pipeline_desc;
-    auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, "-", HtsWriter::OutputMode::BAM,
-                                                        writer_threads, 0);
-    auto aligner = pipeline_desc.add_node<Aligner>({hts_writer}, index, kmer_size, window_size,
-                                                   index_batch_size, aligner_threads);
+    auto demux_writer = pipeline_desc.add_node<BarcodeDemuxerNode>(
+            {}, output_dir, demux_writer_threads, 0, parser.get<bool>("--emit-fastq"));
+    std::vector<std::string> kit_names;
+    if (parser.present("--kit_name")) {
+        kit_names.push_back(parser.get<std::string>("--kit_name"));
+    };
+    auto demux =
+            pipeline_desc.add_node<BarcodeClassifierNode>({demux_writer}, demux_threads, kit_names);
 
     // Create the Pipeline from our description.
     std::vector<dorado::stats::StatsReporter> stats_reporters;
@@ -122,10 +129,9 @@ int aligner(int argc, char* argv[]) {
 
     // At present, header output file header writing relies on direct node method calls
     // rather than the pipeline framework.
-    const auto& aligner_ref = dynamic_cast<Aligner&>(pipeline->get_node_ref(aligner));
-    utils::add_sq_hdr(header, aligner_ref.get_sequence_records_for_header());
-    auto& hts_writer_ref = dynamic_cast<HtsWriter&>(pipeline->get_node_ref(hts_writer));
-    hts_writer_ref.set_and_write_header(header);
+    auto& demux_writer_ref =
+            dynamic_cast<BarcodeDemuxerNode&>(pipeline->get_node_ref(demux_writer));
+    demux_writer_ref.set_header(header);
 
     // Set up stats counting
     std::vector<dorado::stats::StatsCallable> stats_callables;
@@ -135,23 +141,22 @@ int aligner(int argc, char* argv[]) {
     constexpr auto kStatsPeriod = 100ms;
     auto stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
             kStatsPeriod, stats_reporters, stats_callables);
+    // End stats counting setup.
 
-    spdlog::info("> starting alignment");
+    spdlog::info("> starting barcoding");
     reader.read(*pipeline, max_reads);
 
     // Wait for the pipeline to complete.  When it does, we collect
     // final stats to allow accurate summarisation.
     auto final_stats = pipeline->terminate(DefaultFlushOptions());
 
-    // Stop the stats sampler thread before tearing down any pipeline objects.
     stats_sampler->terminate();
 
     tracker.update_progress_bar(final_stats);
     tracker.summarize();
 
-    spdlog::info("> finished alignment");
-    spdlog::info("> total/primary/unmapped {}/{}/{}", hts_writer_ref.get_total(),
-                 hts_writer_ref.get_primary(), hts_writer_ref.get_unmapped());
+    spdlog::info("> finished barcoding");
+
     return 0;
 }
 
