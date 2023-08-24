@@ -73,7 +73,7 @@ public:
     float scaling;  // Scale factor applied to convert raw integers from sequencer into pore current values
 
     size_t num_chunks;  // Number of chunks in the read. Reads raw data is split into chunks for efficient basecalling.
-    std::vector<std::shared_ptr<Chunk>> called_chunks;  // Vector of basecalled chunks.
+    std::vector<std::unique_ptr<Chunk>> called_chunks;  // Vector of basecalled chunks.
     std::atomic_size_t num_chunks_called;  // Number of chunks which have been basecalled
 
     size_t num_modbase_chunks;

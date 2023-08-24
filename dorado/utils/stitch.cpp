@@ -15,8 +15,8 @@ void stitch_chunks(std::shared_ptr<Read> read) {
     std::vector<std::string> qstrings;
 
     for (int i = 0; i < read->num_chunks - 1; i++) {
-        auto current_chunk = read->called_chunks[i];
-        auto next_chunk = read->called_chunks[i + 1];
+        auto& current_chunk = read->called_chunks[i];
+        auto& next_chunk = read->called_chunks[i + 1];
         int overlap_size = (current_chunk->raw_chunk_size + current_chunk->input_offset) -
                            (next_chunk->input_offset);
         assert(overlap_size % read->model_stride == 0);

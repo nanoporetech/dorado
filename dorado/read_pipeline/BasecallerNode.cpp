@@ -49,9 +49,9 @@ void BasecallerNode::input_worker_thread() {
             size_t offset = 0;
             size_t chunk_in_read_idx = 0;
             size_t signal_chunk_step = m_chunk_size - m_overlap;
-            std::vector<std::shared_ptr<Chunk>> read_chunks;
+            std::vector<std::unique_ptr<Chunk>> read_chunks;
             read_chunks.push_back(
-                    std::make_shared<Chunk>(read, offset, chunk_in_read_idx++, m_chunk_size));
+                    std::make_unique<Chunk>(read, offset, chunk_in_read_idx++, m_chunk_size));
             read->num_chunks = 1;
             auto last_chunk_offset = raw_size - m_chunk_size;
             auto misalignment = last_chunk_offset % m_model_stride;
@@ -62,7 +62,7 @@ void BasecallerNode::input_worker_thread() {
             while (offset + m_chunk_size < raw_size) {
                 offset = std::min(offset + signal_chunk_step, last_chunk_offset);
                 read_chunks.push_back(
-                        std::make_shared<Chunk>(read, offset, chunk_in_read_idx++, m_chunk_size));
+                        std::make_unique<Chunk>(read, offset, chunk_in_read_idx++, m_chunk_size));
                 read->num_chunks++;
             }
             read->called_chunks.resize(read->num_chunks);
@@ -111,12 +111,13 @@ void BasecallerNode::basecall_current_batch(int worker_id) {
 void BasecallerNode::working_reads_manager() {
     torch::InferenceMode inference_mode_guard;
 
-    std::shared_ptr<Chunk> chunk;
+    std::unique_ptr<Chunk> chunk;
     while (m_processed_chunks.try_pop(chunk) == utils::AsyncQueueStatus::Success) {
         nvtx3::scoped_range loop{"working_reads_manager"};
 
         auto source_read = chunk->source_read.lock();
-        source_read->called_chunks[chunk->idx_in_read] = chunk;
+        auto idx_in_read = chunk->idx_in_read;
+        source_read->called_chunks[idx_in_read] = std::move(chunk);
         auto num_chunks_called = ++source_read->num_chunks_called;
         if (num_chunks_called == source_read->num_chunks) {
             utils::stitch_chunks(source_read);
@@ -153,8 +154,8 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
 
     auto last_chunk_reserve_time = std::chrono::system_clock::now();
     int batch_size = m_model_runners[worker_id]->batch_size();
-    std::shared_ptr<Chunk> chunk;
     while (true) {
+        std::unique_ptr<Chunk> chunk;
         const auto pop_status = m_chunks_in.try_pop_until(
                 chunk, last_chunk_reserve_time + std::chrono::milliseconds(m_batch_timeout_ms));
 
@@ -209,7 +210,7 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
             m_model_runners[worker_id]->accept_chunk(
                     static_cast<int>(m_batched_chunks[worker_id].size()), input_slice);
 
-            m_batched_chunks[worker_id].push_back(chunk);
+            m_batched_chunks[worker_id].push_back(std::move(chunk));
 
             last_chunk_reserve_time = std::chrono::system_clock::now();
         }
@@ -218,7 +219,6 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
             // Input tensor is full, let's get_scores.
             basecall_current_batch(worker_id);
         }
-        chunk.reset();
     }
 
     if (!m_batched_chunks[worker_id].empty()) {

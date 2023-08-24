@@ -67,16 +67,16 @@ private:
     // Time when Basecaller Node terminates. Used for benchmarking and debugging
     std::chrono::time_point<std::chrono::system_clock> termination_time;
     // Async queue to keep track of basecalling chunks.
-    utils::AsyncQueue<std::shared_ptr<Chunk>> m_chunks_in;
+    utils::AsyncQueue<std::unique_ptr<Chunk>> m_chunks_in;
 
     std::mutex m_working_reads_mutex;
     // Reads removed from input queue and being basecalled.
     std::unordered_set<std::shared_ptr<Read>> m_working_reads;
 
     // If we go multi-threaded, there will be one of these batches per thread
-    std::vector<std::deque<std::shared_ptr<Chunk>>> m_batched_chunks;
+    std::vector<std::deque<std::unique_ptr<Chunk>>> m_batched_chunks;
 
-    utils::AsyncQueue<std::shared_ptr<Chunk>> m_processed_chunks;
+    utils::AsyncQueue<std::unique_ptr<Chunk>> m_processed_chunks;
 
     // Class members are initialised in declaration order regardless of initialiser list order.
     // Class data members whose construction launches threads must therefore have their

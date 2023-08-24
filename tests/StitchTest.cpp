@@ -48,19 +48,21 @@ TEST_CASE("Test stitch_chunks", TEST_GROUP) {
     size_t offset = 0;
     size_t chunk_in_read_idx = 0;
     size_t signal_chunk_step = CHUNK_SIZE - OVERLAP;
-    auto chunk = std::make_shared<dorado::Chunk>(read, offset, chunk_in_read_idx++, CHUNK_SIZE);
-    chunk->qstring = QSTR[read->num_chunks];
-    chunk->seq = SEQS[read->num_chunks];
-    chunk->moves = MOVES[read->num_chunks];
-    read->called_chunks.push_back(chunk);
-    read->num_chunks++;
-    while (offset + CHUNK_SIZE < RAW_SIGNAL_SIZE) {
-        offset = std::min(offset + signal_chunk_step, RAW_SIGNAL_SIZE - CHUNK_SIZE);
-        chunk = std::make_shared<dorado::Chunk>(read, offset, chunk_in_read_idx++, CHUNK_SIZE);
+    {
+        auto chunk = std::make_unique<dorado::Chunk>(read, offset, chunk_in_read_idx++, CHUNK_SIZE);
         chunk->qstring = QSTR[read->num_chunks];
         chunk->seq = SEQS[read->num_chunks];
         chunk->moves = MOVES[read->num_chunks];
-        read->called_chunks.push_back(chunk);
+        read->called_chunks.push_back(std::move(chunk));
+    }
+    read->num_chunks++;
+    while (offset + CHUNK_SIZE < RAW_SIGNAL_SIZE) {
+        offset = std::min(offset + signal_chunk_step, RAW_SIGNAL_SIZE - CHUNK_SIZE);
+        auto chunk = std::make_unique<dorado::Chunk>(read, offset, chunk_in_read_idx++, CHUNK_SIZE);
+        chunk->qstring = QSTR[read->num_chunks];
+        chunk->seq = SEQS[read->num_chunks];
+        chunk->moves = MOVES[read->num_chunks];
+        read->called_chunks.push_back(std::move(chunk));
         read->num_chunks++;
     }
 
