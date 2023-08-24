@@ -131,7 +131,7 @@ build:linux:x86:focal:
   <<: *linux_runner
   <<: *build_dorado
 
-build:linux:x86:focal:coverage:
+build:linux:x86:focal_coverage:
   stage: build
   image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.1
   variables:
@@ -143,8 +143,6 @@ build:linux:x86:focal:coverage:
     - *run_dorado_cmake_build
   rules:
       - if: $CI_PIPELINE_SOURCE == "schedule"
-        if: $CI_PIPELINE_SOURCE == "push"
-        when: manual
   artifacts:
     paths:
       - build/dorado_test_coverage/*

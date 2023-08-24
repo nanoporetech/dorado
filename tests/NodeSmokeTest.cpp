@@ -20,28 +20,13 @@
 #include "utils/cuda_utils.h"
 #endif
 #endif  // DORADO_GPU_BUILD
-#include <nvtx3/nvtx3.hpp>
 
-#define CATCH_CONFIG_EXTERNAL_INTERFACES
 #include <catch2/catch.hpp>
 
 #include <algorithm>
 #include <filesystem>
 #include <functional>
 #include <random>
-
-// Initialize NVTX first before any tests are run. This is
-// needed because the NVTX initialization is not thread safe,
-// and some of the smoke tests launch multiple threads each
-// of which trigger an NVTX init which causes the thread
-// sanitizers to fail.
-struct testRunListener : Catch::TestEventListenerBase {
-    using Catch::TestEventListenerBase::TestEventListenerBase;
-
-    void testRunStarting(Catch::TestRunInfo const&) override { nvtx3::scoped_range loop{__func__}; }
-};
-
-CATCH_REGISTER_LISTENER(testRunListener)
 
 namespace {
 
