@@ -149,7 +149,7 @@ void setup(std::vector<std::string> args,
     }
     pipelines::create_simplex_pipeline(
             pipeline_desc, std::move(runners), std::move(remora_runners), overlap,
-            mean_qscore_start_pos, thread_allocations.scaler_node_threads,
+            mean_qscore_start_pos, rna, thread_allocations.scaler_node_threads,
             thread_allocations.remora_threads * num_devices, read_filter_node);
 
     // Create the Pipeline from our description.
