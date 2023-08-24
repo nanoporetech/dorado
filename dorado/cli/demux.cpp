@@ -42,7 +42,7 @@ int demuxer(int argc, char* argv[]) {
             .help("Path to a file with reads to demultiplex. Can be in any HTS format.")
             .nargs(argparse::nargs_pattern::any);
     parser.add_argument("--output-dir").help("Output folder for demultiplexed reads.").required();
-    parser.add_argument("--kit_name")
+    parser.add_argument("--kit-name")
             .help("Barcoding kit name. Choose from: " + dorado::demux::barcode_kits_list_str())
             .required();
     parser.add_argument("-t", "--threads")
@@ -61,6 +61,11 @@ int demuxer(int argc, char* argv[]) {
     parser.add_argument("-v", "--verbose").default_value(false).implicit_value(true);
     parser.add_argument("--emit-fastq")
             .help("Output in fastq format. Default is BAM.")
+            .default_value(false)
+            .implicit_value(true);
+    parser.add_argument("--barcode-both-ends")
+            .help("Check both ends of a read to ensure ligation on each for a double ended "
+                  "barcode.")
             .default_value(false)
             .implicit_value(true);
 
@@ -113,11 +118,11 @@ int demuxer(int argc, char* argv[]) {
     auto demux_writer = pipeline_desc.add_node<BarcodeDemuxerNode>(
             {}, output_dir, demux_writer_threads, 0, parser.get<bool>("--emit-fastq"));
     std::vector<std::string> kit_names;
-    if (parser.present("--kit_name")) {
-        kit_names.push_back(parser.get<std::string>("--kit_name"));
+    if (parser.present("--kit-name")) {
+        kit_names.push_back(parser.get<std::string>("--kit-name"));
     };
-    auto demux =
-            pipeline_desc.add_node<BarcodeClassifierNode>({demux_writer}, demux_threads, kit_names);
+    auto demux = pipeline_desc.add_node<BarcodeClassifierNode>(
+            {demux_writer}, demux_threads, kit_names, parser.get<bool>("--barcode-both-ends"));
 
     // Create the Pipeline from our description.
     std::vector<dorado::stats::StatsReporter> stats_reporters;

@@ -13,7 +13,9 @@ namespace dorado {
 
 class BarcodeClassifierNode : public MessageSink {
 public:
-    BarcodeClassifierNode(int threads, const std::vector<std::string>& kit_name);
+    BarcodeClassifierNode(int threads,
+                          const std::vector<std::string>& kit_name,
+                          bool barcode_both_ends);
     ~BarcodeClassifierNode();
     std::string get_name() const override { return "BarcodeClassifierNode"; }
     stats::NamedStats sample_stats() const override;

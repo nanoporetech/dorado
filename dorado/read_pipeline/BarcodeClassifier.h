@@ -478,12 +478,13 @@ static std::string barcode_kits_list_str() {
 
 class BarcodeClassifier {
 public:
-    BarcodeClassifier(const std::vector<std::string>& kit_names);
+    BarcodeClassifier(const std::vector<std::string>& kit_names, bool barcode_both_ends);
     ~BarcodeClassifier() = default;
 
     ScoreResults barcode(const std::string& seq);
 
 private:
+    bool m_barcode_both_ends;
     std::vector<AdapterSequence> m_adapter_sequences;
 
     std::vector<AdapterSequence> generate_adapter_sequence(
