@@ -11,6 +11,8 @@
 
 namespace {
 
+int kMaxTailLength = 500;
+
 std::pair<int, int> determine_signal_bounds4(int signal_anchor,
                                              const c10::Half* signal,
                                              const std::vector<uint64_t>& seq_to_sig_map,
@@ -37,9 +39,18 @@ std::pair<int, int> determine_signal_bounds4(int signal_anchor,
         return val / (e - s);
     };
 
-    std::pair<int, int> best_interval{0, 0};
-    int best_interval_len = 0;
-    float last_x_best_interval = 0.f;
+    auto check_for_peak = [&](float ref_x, float thres, int start, int end) -> bool {
+        float max = signal[start];
+        for (int i = start + 1; i < end; i++) {
+            max = std::max(max, float(signal[i]));
+        }
+        return (std::abs(ref_x - max) > thres);
+    };
+
+    std::vector<std::pair<int, int>> intervals;
+    std::pair<int, int> last_interval{0, 0};
+    int last_interval_len = 0;
+    float last_x_last_interval = 0.f;
 
     // Maximum variance between consecutive values to be
     // considered part of the same interval.
@@ -49,7 +60,7 @@ std::pair<int, int> determine_signal_bounds4(int signal_anchor,
     // consider based on the anchor. Go further in the direction
     // the polyA/T tail is running, and less in the other, assuming
     // that the anchor provides a reasonable starting position.
-    const int kSpread = num_samples_per_base * 150;
+    const int kSpread = num_samples_per_base * kMaxTailLength;
     int left_end = (fwd ? std::max(0, signal_anchor - kSpread)
                         : std::max(0, signal_anchor - kSpread / 10));
     int right_end = (fwd ? std::min(signal_len, signal_anchor + kSpread / 10)
@@ -66,26 +77,54 @@ std::pair<int, int> determine_signal_bounds4(int signal_anchor,
             if (range > (num_samples_per_base * 3)) {
                 // Opportunistically merge consecutive intervals if they look like
                 // they could belong to the same run.
-                if (signal_start - best_interval.second < kMaxSampleGap &&
-                    std::abs(x_last - last_x_best_interval) < kVar) {
-                    signal_start = best_interval.first;
-                    best_interval = {signal_start, signal_end};
-                    best_interval_len = signal_end - signal_start;
-                    spdlog::debug("Update range {} {}", best_interval.first, best_interval.second);
-                } else if (range > best_interval_len) {
-                    best_interval = {signal_start, signal_end};
-                    best_interval_len = signal_end - signal_start;
-                    spdlog::debug("New range {} {}", best_interval.first, best_interval.second);
-                    last_x_best_interval = x_last;
+                if (signal_start - last_interval.second < kMaxSampleGap &&
+                    std::abs(x_last - last_x_last_interval) < kVar &&
+                    check_for_peak(x_last, kVar, last_interval.second, signal_start)) {
+                    signal_start = last_interval.first;
+                    last_interval = {signal_start, signal_end};
+                    last_interval_len = signal_end - signal_start;
+                    spdlog::debug("Update range {} {}", last_interval.first, last_interval.second);
+                    auto last_ref = intervals.back();
+                    last_ref = last_interval;
+                } else if (range > last_interval_len) {
+                    last_interval = {signal_start, signal_end};
+                    last_interval_len = signal_end - signal_start;
+                    spdlog::debug("New range {} {}", last_interval.first, last_interval.second);
+                    last_x_last_interval = x_last;
+                    intervals.push_back(last_interval);
                 }
             }
             signal_start = i;
         }
         x_last = smoother(i);
     }
-    spdlog::debug("Anchor {} Range {} {}", signal_anchor, best_interval.first,
-                  best_interval.second);
-    return best_interval;
+
+    std::vector<std::pair<int, int>> filtered_intervals;
+    // In forward strand, the poly A/T signal should end within 100bp of the
+    // signal anchor, and in reverse strand it should start within 100bp of the
+    // anchor.
+    int kAnchorProximity = 100 * num_samples_per_base;
+    if (fwd) {
+        std::copy_if(
+                intervals.begin(), intervals.end(), std::back_inserter(filtered_intervals),
+                [&](auto& i) { return std::abs(signal_anchor - i.second) < kAnchorProximity; });
+    } else {
+        std::copy_if(intervals.begin(), intervals.end(), std::back_inserter(filtered_intervals),
+                     [&](auto& i) { return std::abs(signal_anchor - i.first) < kAnchorProximity; });
+    }
+
+    if (filtered_intervals.empty()) {
+        spdlog::debug("Anchor {} No range within anchor proximity found", signal_anchor);
+        return {0, 0};
+    }
+
+    auto best_interval = std::max_element(
+            filtered_intervals.begin(), filtered_intervals.end(),
+            [](auto& l, auto& r) { return (l.second - l.first) < (r.second - r.first); });
+
+    spdlog::debug("Anchor {} Range {} {}", signal_anchor, best_interval->first,
+                  best_interval->second);
+    return *best_interval;
 }
 
 std::pair<int, int> determine_signal_bounds3(int signal_end,
@@ -284,15 +323,15 @@ void PolyACalculator::worker_thread() {
         // If this message isn't a read, we'll get a bad_variant_access exception.
         auto read = std::get<ReadPtr>(std::move(message));
 
-        int window_size = 150;
-        std::string read_top = read->seq.substr(0, window_size);
-        auto bottom_start = std::max(0, (int)read->seq.length() - window_size);
-        std::string read_bottom = read->seq.substr(bottom_start, window_size);
-
         const std::string SSP = "TTTCTGTTGGTGCTGATATTGCTTT";
         const std::string SSP_rc = utils::reverse_complement(SSP);
         const std::string VNP = "ACTTGCCTGTCGCTCTATCTTCAGAGGAGAGTCCGCCGCCCGCAAGTTTT";
         const std::string VNP_rc = utils::reverse_complement(VNP);
+
+        int window_size = 150;
+        std::string read_top = read->seq.substr(0, window_size);
+        auto bottom_start = std::max(0, (int)read->seq.length() - window_size);
+        std::string read_bottom = read->seq.substr(bottom_start, window_size);
 
         EdlibAlignConfig align_config = edlibDefaultAlignConfig();
         align_config.task = EDLIB_TASK_LOC;
@@ -331,10 +370,10 @@ void PolyACalculator::worker_thread() {
             const auto seq_to_sig_map = utils::moves_to_map(
                     read->moves, stride, read->raw_data.size(0), read->seq.size() + 1);
 
-            int signal_end = fwd ? seq_to_sig_map[end] : seq_to_sig_map[start];
+            int signal_anchor = fwd ? seq_to_sig_map[end] : seq_to_sig_map[start];
             spdlog::debug(
-                    "Strand {}; poly A/T signal begin {}, shift/scale {} {}, samples trimmed {}",
-                    fwd ? '+' : '-', signal_end, read->mshift, read->mscale,
+                    "Strand {}; poly A/T signal anchor {}, shift/scale {} {}, samples trimmed {}",
+                    fwd ? '+' : '-', signal_anchor, read->mshift, read->mscale,
                     read->num_trimmed_samples);
 
             // Walk through signal
@@ -343,24 +382,26 @@ void PolyACalculator::worker_thread() {
             auto num_samples_per_base = estimate_samples_per_base(read);
             //auto num_samples_per_base = estimate_samples_per_base(seq_to_sig_map, read->seq, fwd, signal_start, signal_end);
 
-            int signal_start;
-            std::tie(signal_start, signal_end) = determine_signal_bounds4(
-                    signal_end, signal, seq_to_sig_map, fwd, read, num_samples_per_base);
+            auto [signal_start, signal_end] = determine_signal_bounds4(
+                    signal_anchor, signal, seq_to_sig_map, fwd, read, num_samples_per_base);
 
             int num_bases = static_cast<int>((signal_end - signal_start) / num_samples_per_base);
-            if (num_bases >= 0 && num_bases < 250) {
+            if (num_bases >= 0 && num_bases < kMaxTailLength) {
                 spdlog::debug(
-                        "{} PolyA bases {}, region {} Signal range is {} {}, primer {}, "
+                        "{} PolyA bases {}, signal anchor {} region {} Signal range is {} {}, "
+                        "primer {}, "
                         "samples/base {}",
-                        read->read_id, num_bases,
-                        read->seq.substr(fwd ? (end - num_bases) : start, num_bases), signal_start,
-                        signal_end, fwd ? end : start, num_samples_per_base);
+                        read->read_id, num_bases, signal_anchor,
+                        read->seq.substr(fwd ? std::max(0, (end - num_bases)) : start, num_bases),
+                        signal_start, signal_end, fwd ? end : start, num_samples_per_base);
                 polyA += num_bases;
                 read->rna_poly_tail_length = num_bases;
             } else {
-                spdlog::warn("{} PolyA bases {}, Signal range is {} {} primer {}, samples/base {}",
-                             read->read_id, num_bases, signal_start, signal_end, fwd ? end : start,
-                             num_samples_per_base);
+                spdlog::warn(
+                        "{} PolyA bases {}, signal anchor {} Signal range is {} {} primer {}, "
+                        "samples/base {}",
+                        read->read_id, num_bases, signal_anchor, signal_start, signal_end,
+                        fwd ? end : start, num_samples_per_base);
                 not_called++;
             }
         } else {
