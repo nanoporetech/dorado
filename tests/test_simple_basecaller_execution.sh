@@ -84,4 +84,13 @@ then
     fi
 fi
 
+echo dorado demux test stage
+$dorado_bin demux $data_dir/barcode_demux/double_end_variant/EXP-PBC096_BC04.fastq --kit-name EXP-PBC096 --output-dir $output_dir/demux
+samtools quickcheck -u $output_dir/demux/EXP-PBC096_BC04.bam
+num_demuxed_reads=$(samtools view -c $output_dir/demux/EXP-PBC096_BC04.bam)
+if [[ $num_demuxed_reads -ne "3" ]]; then
+    echo "3 demuxed reads expected. Found ${num_demuxed_reads}"
+    exit 1
+fi
+
 rm -rf $output_dir
