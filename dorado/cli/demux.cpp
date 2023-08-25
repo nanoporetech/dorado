@@ -64,8 +64,7 @@ int demuxer(int argc, char* argv[]) {
             .default_value(false)
             .implicit_value(true);
     parser.add_argument("--barcode-both-ends")
-            .help("Check both ends of a read to ensure ligation on each for a double ended "
-                  "barcode.")
+            .help("Require both ends of a read to be barcoded for a double ended barcode.")
             .default_value(false)
             .implicit_value(true);
 

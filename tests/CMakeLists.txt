@@ -1,30 +1,30 @@
 
 set(UNIT_TEST_SOURCE_FILES
     main.cpp
-    #AsyncQueueTest.cpp
-    #Fast5DataLoaderTest.cpp
-    #Pod5DataLoaderTest.cpp
-    #TensorUtilsTest.cpp
-    #MathUtilsTest.cpp
-    #ReadTest.cpp
-    #ModBaseEncoderTest.cpp
-    #SequenceUtilsTest.cpp
-    #StitchTest.cpp
-    #StereoDuplexTest.cpp
-    #DuplexSplitTest.cpp
-    #TrimTest.cpp
-    #AlignerTest.cpp
-    #BamReaderTest.cpp
-    #BamWriterTest.cpp
-    #CliUtilsTest.cpp
-    #ReadFilterNodeTest.cpp
-    #ModelUtilsTest.cpp
-    #PairingNodeTest.cpp
-    #PipelineTest.cpp
-    #BamUtilsTest.cpp
-    #ResumeLoaderTest.cpp
-    #TimeUtilsTest.cpp
-    #DuplexReadTaggingNodeTest.cpp
+    AsyncQueueTest.cpp
+    Fast5DataLoaderTest.cpp
+    Pod5DataLoaderTest.cpp
+    TensorUtilsTest.cpp
+    MathUtilsTest.cpp
+    ReadTest.cpp
+    ModBaseEncoderTest.cpp
+    SequenceUtilsTest.cpp
+    StitchTest.cpp
+    StereoDuplexTest.cpp
+    DuplexSplitTest.cpp
+    TrimTest.cpp
+    AlignerTest.cpp
+    BamReaderTest.cpp
+    BamWriterTest.cpp
+    CliUtilsTest.cpp
+    ReadFilterNodeTest.cpp
+    ModelUtilsTest.cpp
+    PairingNodeTest.cpp
+    PipelineTest.cpp
+    BamUtilsTest.cpp
+    ResumeLoaderTest.cpp
+    TimeUtilsTest.cpp
+    DuplexReadTaggingNodeTest.cpp
     BarcodeClassifierTest.cpp
     BarcodeDemuxerNodeTest.cpp
 )
