@@ -64,25 +64,31 @@ void ScalerNode::worker_thread() {
         read->scale = read->scaling * scale;
         read->shift = read->scaling * (shift + read->offset);
 
-        // 8000 value may be changed in future. Currently this is found to work well.
-        int max_samples = std::min(8000, static_cast<int>(read->raw_data.size(0) / 2));
-        int trim_start =
-                utils::trim(read->raw_data.index({Slice(torch::indexing::None, max_samples)}));
+        // Don't perform DNA trimming on RNA since it looks too different and we lose useful signal.
+        int trim_start = 0;
+        if (!m_is_rna) {
+            // 8000 value may be changed in future. Currently this is found to work well.
+            int max_samples = std::min(8000, static_cast<int>(read->raw_data.size(0) / 2));
+            trim_start =
+                    utils::trim(read->raw_data.index({Slice(torch::indexing::None, max_samples)}));
+        }
 
         read->raw_data = read->raw_data.index({Slice(trim_start, torch::indexing::None)});
         read->num_trimmed_samples = trim_start;
 
         // Pass the read to the next node
-        send_message_to_sink(read);
+        send_message_to_sink(std::move(read));
     }
 }
 
 ScalerNode::ScalerNode(const SignalNormalisationParams& config,
+                       bool is_rna,
                        int num_worker_threads,
                        size_t max_reads)
         : MessageSink(max_reads),
           m_scaling_params(config),
-          m_num_worker_threads(num_worker_threads) {
+          m_num_worker_threads(num_worker_threads),
+          m_is_rna(is_rna) {
     start_threads();
 }
 

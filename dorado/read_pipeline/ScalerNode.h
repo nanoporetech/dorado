@@ -16,6 +16,7 @@ namespace dorado {
 class ScalerNode : public MessageSink {
 public:
     ScalerNode(const SignalNormalisationParams& config,
+               bool is_rna,
                int num_worker_threads = 5,
                size_t max_reads = 1000);
     ~ScalerNode() { terminate_impl(); }
@@ -32,6 +33,7 @@ private:
     std::atomic<int> m_num_worker_threads;
 
     SignalNormalisationParams m_scaling_params;
+    bool const m_is_rna;
 
     std::pair<float, float> med_mad(const torch::Tensor& x);
     std::pair<float, float> normalisation(const torch::Tensor& x);

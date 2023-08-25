@@ -83,7 +83,7 @@ int aligner(int argc, char* argv[]) {
     // rest for alignment. Empirically this shows good perf.
     int aligner_threads, writer_threads;
     std::tie(aligner_threads, writer_threads) =
-            utils::aligner_writer_thread_allocation(threads, 0.1f);
+            utils::worker_vs_writer_thread_allocation(threads, 0.1f);
     spdlog::debug("> aligner threads {}, writer threads {}", aligner_threads, writer_threads);
 
     if (reads.size() == 0) {

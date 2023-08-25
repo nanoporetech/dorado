@@ -34,7 +34,7 @@ void ReadFilterNode::worker_thread() {
             (m_read_ids_to_filter.find(read->read_id) != m_read_ids_to_filter.end())) {
             log_filtering();
         } else {
-            send_message_to_sink(read);
+            send_message_to_sink(std::move(read));
         }
     }
 }

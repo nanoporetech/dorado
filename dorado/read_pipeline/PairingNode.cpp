@@ -241,9 +241,9 @@ void PairingNode::pair_generating_worker_thread(int tid) {
             std::unique_lock<std::mutex> lock(m_pairing_mtx);
             auto flush_message = std::get<CacheFlushMessage>(message);
             auto& read_cache = m_read_caches[flush_message.client_id];
-            for (const auto& [key, reads_list] : read_cache.channel_mux_read_map) {
+            for (auto& [key, reads_list] : read_cache.channel_mux_read_map) {
                 // kv is a std::pair<UniquePoreIdentifierKey, std::list<std::shared_ptr<Read>>>
-                for (const auto& read_ptr : reads_list) {
+                for (auto& read_ptr : reads_list) {
                     // Push each read message
                     send_message_to_sink(std::move(read_ptr));
                 }
@@ -378,8 +378,8 @@ void PairingNode::pair_generating_worker_thread(int tid) {
                 ok_to_clear = true;
             }
             if (ok_to_clear) {
-                send_message_to_sink(std::move(*to_clear_itr));
-                to_clear_itr = m_reads_to_clear.erase(to_clear_itr);
+                auto read_handle = m_reads_to_clear.extract(*to_clear_itr++);
+                send_message_to_sink(std::move(read_handle.value()));
             } else {
                 ++to_clear_itr;
             }
@@ -391,14 +391,14 @@ void PairingNode::pair_generating_worker_thread(int tid) {
             std::unique_lock<std::mutex> lock(m_pairing_mtx);
             // There are still reads in channel_mux_read_map. Push them to the sink.
             // Last thread alive is responsible for cleaning up the cache.
-            for (const auto& [client_id, read_cache] : m_read_caches) {
-                for (const auto& kv : read_cache.channel_mux_read_map) {
+            for (auto& [client_id, read_cache] : m_read_caches) {
+                for (auto& kv : read_cache.channel_mux_read_map) {
                     // kv is a std::pair<UniquePoreIdentifierKey, std::list<std::shared_ptr<Read>>>
-                    const auto& reads_list = kv.second;
+                    auto& reads_list = kv.second;
 
-                    for (const auto& read_ptr : reads_list) {
+                    for (auto& read_ptr : reads_list) {
                         // Push each read message
-                        send_message_to_sink(read_ptr);
+                        send_message_to_sink(std::move(read_ptr));
                     }
                 }
             }

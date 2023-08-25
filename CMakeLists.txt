@@ -159,6 +159,12 @@ set(LIB_SOURCE_FILES
     dorado/read_pipeline/ResumeLoaderNode.h
     dorado/read_pipeline/DuplexReadTaggingNode.cpp
     dorado/read_pipeline/DuplexReadTaggingNode.h
+    dorado/read_pipeline/BarcodeClassifier.cpp
+    dorado/read_pipeline/BarcodeClassifier.h
+    dorado/read_pipeline/BarcodeClassifierNode.cpp
+    dorado/read_pipeline/BarcodeClassifierNode.h
+    dorado/read_pipeline/BarcodeDemuxerNode.cpp
+    dorado/read_pipeline/BarcodeDemuxerNode.h
     dorado/decode/beam_search.cpp
     dorado/decode/fast_hash.cpp
     dorado/decode/fast_hash.h
@@ -181,6 +187,8 @@ set(LIB_SOURCE_FILES
     dorado/utils/log_utils.h
     dorado/utils/log_utils.cpp
     dorado/utils/math_utils.h
+    dorado/utils/memory_utils.cpp
+    dorado/utils/memory_utils.h
     dorado/utils/module_utils.h
     dorado/utils/parameters.h
     dorado/utils/sequence_utils.cpp
@@ -324,6 +332,7 @@ if(NOT DORADO_LIB_ONLY)
     add_executable(dorado
         dorado/main.cpp
         dorado/cli/aligner.cpp
+        dorado/cli/demux.cpp
         dorado/cli/duplex.cpp
         dorado/cli/basecaller.cpp
         dorado/cli/benchmark.cpp
@@ -500,4 +509,22 @@ endif()
 
 if(NOT DORADO_LIB_ONLY)
     include(cmake/DoradoPackaging.cmake)
+endif()
+
+# For capturing test coverage.
+if (GENERATE_TEST_COVERAGE)
+    if (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" AND NOT DORADO_LIB_ONLY)
+        include(cmake/CodeCoverage.cmake)
+        foreach(COVERAGE_TARGET dorado_tests dorado_lib dorado_io_lib dorado_models_lib)
+            append_coverage_compiler_flags_to_target(${COVERAGE_TARGET})
+        endforeach()
+        setup_target_for_coverage_gcovr_html(
+            NAME dorado_test_coverage
+            EXECUTABLE ctest --test-dir ${CMAKE_BINARY_DIR} --verbose -R dorado_tests
+            DEPENDENCIES dorado_tests
+            BASE_DIRECTORY "${PROJECT_SOURCE_DIR}"
+            EXCLUDE "${PROJECT_SOURCE_DIR}/dorado/3rdparty/*" "${PROJECT_SOURCE_DIR}/tests/*"
+            )
+        target_link_libraries(dorado_tests gcov)
+    endif()
 endif()

@@ -20,7 +20,7 @@ bool get_modbase_channel_name(std::string &channel_name, const std::string &mod_
                                                                         // C
                                                                         {"5mC", "m"},
                                                                         {"5hmC", "h"},
-                                                                        {"5fc", "f"},
+                                                                        {"5fC", "f"},
                                                                         {"5caC", "c"},
                                                                         // G
                                                                         {"8oxoG", "o"},
@@ -272,7 +272,7 @@ float Read::calculate_mean_qscore() const {
 
 MessageSink::MessageSink(size_t max_messages) : m_work_queue(max_messages) {}
 
-void MessageSink::push_message(Message &&message) {
+void MessageSink::push_message_internal(Message &&message) {
     const auto status = m_work_queue.try_push(std::move(message));
     // try_push will fail if the sink has been told to terminate.
     // We do not expect to be pushing reads from this source if that is the case.
@@ -367,10 +367,6 @@ Pipeline::Pipeline(PipelineDescriptor &&descriptor,
 }
 
 void MessageSink::add_sink(MessageSink &sink) { m_sinks.push_back(std::ref(sink)); }
-
-void MessageSink::send_message_to_sink(int sink_index, Message &&message) {
-    m_sinks.at(sink_index).get().push_message(std::move(message));
-}
 
 void Pipeline::push_message(Message &&message) {
     assert(!m_nodes.empty());

@@ -15,7 +15,9 @@
 
 namespace dorado {
 
-HtsReader::HtsReader(const std::string& filename) {
+HtsReader::HtsReader(const std::string& filename,
+                     std::optional<std::unordered_set<std::string>> read_list)
+        : m_read_list(std::move(read_list)) {
     m_file = hts_open(filename.c_str(), "r");
     if (!m_file) {
         throw std::runtime_error("Could not open file: " + filename);
@@ -46,6 +48,12 @@ bool HtsReader::has_tag(std::string tagname) {
 void HtsReader::read(Pipeline& pipeline, int max_reads) {
     int num_reads = 0;
     while (this->read()) {
+        if (m_read_list) {
+            std::string read_id = bam_get_qname(record.get());
+            if (m_read_list->find(read_id) == m_read_list->end()) {
+                continue;
+            }
+        }
         pipeline.push_message(BamPtr(bam_dup1(record.get())));
         if (max_reads > 0 && ++num_reads >= max_reads) {
             break;

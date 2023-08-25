@@ -221,7 +221,7 @@ void ModBaseCallerNode::input_worker_thread() {
                 ++m_working_reads_size;
             } else {
                 // No modbases to call, pass directly to next node
-                send_message_to_sink(read);
+                send_message_to_sink(std::move(read));
                 ++m_num_non_mod_base_reads_pushed;
             }
             break;
@@ -266,7 +266,6 @@ void ModBaseCallerNode::modbasecall_worker_thread(size_t worker_id, size_t calle
         // We have just grabbed a number of chunks (0 in the case of timeout) from
         // the chunk queue and added them to batched_chunks.  Insert those chunks
         // into the model input tensors.
-        assert(!batched_chunks.empty());
         for (size_t chunk_idx = previous_chunk_count; chunk_idx < batched_chunks.size();
              ++chunk_idx) {
             assert(chunk_idx < m_batch_size);

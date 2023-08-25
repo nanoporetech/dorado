@@ -18,6 +18,8 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
                              std::vector<dorado::Runner>&& runners,
                              std::vector<std::unique_ptr<dorado::ModBaseRunner>>&& modbase_runners,
                              size_t overlap,
+                             uint32_t mean_qscore_start_pos,
+                             bool model_is_rna,
                              int scaler_node_threads,
                              int modbase_node_threads,
                              NodeHandle sink_node_handle,
@@ -43,7 +45,7 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
 
     auto basecaller_node = pipeline_desc.add_node<BasecallerNode>(
             {}, std::move(runners), overlap, kBatchTimeoutMS, model_name, 1000, "BasecallerNode",
-            false, get_model_mean_qscore_start_pos(model_config));
+            false, mean_qscore_start_pos);
 
     NodeHandle last_node_handle = PipelineDescriptor::InvalidNodeHandle;
     if (mod_base_caller_node != PipelineDescriptor::InvalidNodeHandle) {
@@ -54,7 +56,7 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
     }
 
     auto scaler_node = pipeline_desc.add_node<ScalerNode>(
-            {basecaller_node}, model_config.signal_norm_params, scaler_node_threads);
+            {basecaller_node}, model_config.signal_norm_params, model_is_rna, scaler_node_threads);
 
     // if we've been provided a source node, connect it to the start of our pipeline
     if (source_node_handle != PipelineDescriptor::InvalidNodeHandle) {
@@ -71,6 +73,8 @@ void create_stereo_duplex_pipeline(PipelineDescriptor& pipeline_desc,
                                    std::vector<dorado::Runner>&& runners,
                                    std::vector<dorado::Runner>&& stereo_runners,
                                    size_t overlap,
+                                   uint32_t mean_qscore_start_pos,
+                                   bool model_is_rna,
                                    int scaler_node_threads,
                                    int splitter_node_threads,
                                    PairingParameters pairing_parameters,
@@ -89,8 +93,7 @@ void create_stereo_duplex_pipeline(PipelineDescriptor& pipeline_desc,
 
     auto stereo_basecaller_node = pipeline_desc.add_node<BasecallerNode>(
             {}, std::move(stereo_runners), adjusted_stereo_overlap, kStereoBatchTimeoutMS,
-            duplex_rg_name, 1000, "StereoBasecallerNode", true,
-            get_model_mean_qscore_start_pos(stereo_model_config));
+            duplex_rg_name, 1000, "StereoBasecallerNode", true, mean_qscore_start_pos);
 
     auto simplex_model_stride = runners.front()->model_stride();
     auto stereo_node = pipeline_desc.add_node<StereoDuplexEncoderNode>({stereo_basecaller_node},
@@ -118,11 +121,10 @@ void create_stereo_duplex_pipeline(PipelineDescriptor& pipeline_desc,
     const int kSimplexBatchTimeoutMS = 100;
     auto basecaller_node = pipeline_desc.add_node<BasecallerNode>(
             {splitter_node}, std::move(runners), adjusted_simplex_overlap, kSimplexBatchTimeoutMS,
-            model_name, 1000, "BasecallerNode", true,
-            get_model_mean_qscore_start_pos(model_config));
+            model_name, 1000, "BasecallerNode", true, mean_qscore_start_pos);
 
     auto scaler_node = pipeline_desc.add_node<ScalerNode>(
-            {basecaller_node}, model_config.signal_norm_params, scaler_node_threads);
+            {basecaller_node}, model_config.signal_norm_params, model_is_rna, scaler_node_threads);
 
     // if we've been provided a source node, connect it to the start of our pipeline
     if (source_node_handle != PipelineDescriptor::InvalidNodeHandle) {
