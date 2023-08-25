@@ -22,6 +22,8 @@
 #include <unistd.h>
 #endif
 
+#include "dev_utils.h"
+
 namespace dorado {
 
 namespace utils {
@@ -83,8 +85,12 @@ inline argparse::ArgumentParser parse_internal_options(
     private_parser.add_argument("--dump_stats_filter")
             .help("Internal processing stats. name filter regex.")
             .default_value(std::string(""));
+    private_parser.add_argument("--devopts")
+            .help("Internal options for testing & debugging, 'key=value' pairs separated by ';'")
+            .default_value(std::string(""));
     args.insert(args.begin(), prog_name);
     private_parser.parse_args(args);
+    details::extract_dev_options(private_parser.get<std::string>("--devopts"));
 
     return private_parser;
 }
