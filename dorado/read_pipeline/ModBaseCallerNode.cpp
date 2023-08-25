@@ -51,13 +51,15 @@ ModBaseCallerNode::ModBaseCallerNode(std::vector<std::unique_ptr<ModBaseRunner>>
     init_modbase_info();
     for (int i = 0; i < m_runners[0]->num_callers(); i++) {
         m_chunk_queues.emplace_back(
-                std::make_unique<utils::AsyncQueue<std::shared_ptr<RemoraChunk>>>(m_batch_size *
+                std::make_unique<utils::AsyncQueue<std::unique_ptr<RemoraChunk>>>(m_batch_size *
                                                                                   5));
     }
 
     // Spin up the processing threads:
     start_threads();
 }
+
+ModBaseCallerNode::~ModBaseCallerNode() { terminate_impl(); }
 
 void ModBaseCallerNode::start_threads() {
     m_output_worker = std::make_unique<std::thread>(&ModBaseCallerNode::output_worker_thread, this);
@@ -190,7 +192,7 @@ void ModBaseCallerNode::input_worker_thread() {
 
                 auto context_hits = runner->get_motif_hits(caller_id, read->seq);
                 m_num_context_hits += static_cast<int64_t>(context_hits.size());
-                std::vector<std::shared_ptr<RemoraChunk>> reads_to_enqueue;
+                std::vector<std::unique_ptr<RemoraChunk>> reads_to_enqueue;
                 reads_to_enqueue.reserve(context_hits.size());
                 for (auto context_hit : context_hits) {
                     nvtx3::scoped_range range{"create_chunk"};
@@ -203,7 +205,7 @@ void ModBaseCallerNode::input_worker_thread() {
                                                               {(int64_t)slice.lead_samples_needed,
                                                                (int64_t)slice.tail_samples_needed});
                     }
-                    reads_to_enqueue.push_back(std::make_shared<RemoraChunk>(
+                    reads_to_enqueue.push_back(std::make_unique<RemoraChunk>(
                             read, input_signal, std::move(slice.data), context_hit));
 
                     ++read->num_modbase_chunks;
@@ -242,7 +244,7 @@ void ModBaseCallerNode::modbasecall_worker_thread(size_t worker_id, size_t calle
     auto& runner = m_runners[worker_id];
     auto& chunk_queue = m_chunk_queues[caller_id];
 
-    std::vector<std::shared_ptr<RemoraChunk>> batched_chunks;
+    std::vector<std::unique_ptr<RemoraChunk>> batched_chunks;
     auto last_chunk_reserve_time = std::chrono::system_clock::now();
 
     size_t previous_chunk_count = 0;
@@ -250,7 +252,7 @@ void ModBaseCallerNode::modbasecall_worker_thread(size_t worker_id, size_t calle
         nvtx3::scoped_range range{"modbasecall_worker_thread"};
         // Repeatedly attempt to complete the current batch with one acquisition of the
         // chunk queue mutex.
-        auto grab_chunk = [&batched_chunks](std::shared_ptr<RemoraChunk>& chunk) {
+        auto grab_chunk = [&batched_chunks](std::unique_ptr<RemoraChunk> chunk) {
             batched_chunks.push_back(std::move(chunk));
         };
         const auto status = chunk_queue->process_and_pop_n_with_timeout(
@@ -300,7 +302,7 @@ void ModBaseCallerNode::modbasecall_worker_thread(size_t worker_id, size_t calle
 void ModBaseCallerNode::call_current_batch(
         size_t worker_id,
         size_t caller_id,
-        std::vector<std::shared_ptr<RemoraChunk>>& batched_chunks) {
+        std::vector<std::unique_ptr<RemoraChunk>>& batched_chunks) {
     nvtx3::scoped_range loop{"call_current_batch"};
 
     dorado::stats::Timer timer;
@@ -332,8 +334,8 @@ void ModBaseCallerNode::output_worker_thread() {
 
     // The m_processed_chunks lock is sufficiently contended that it's worth taking all
     // chunks available once we obtain it.
-    std::vector<std::shared_ptr<RemoraChunk>> processed_chunks;
-    auto grab_chunk = [&processed_chunks](std::shared_ptr<RemoraChunk>& chunk) {
+    std::vector<std::unique_ptr<RemoraChunk>> processed_chunks;
+    auto grab_chunk = [&processed_chunks](std::unique_ptr<RemoraChunk> chunk) {
         processed_chunks.push_back(std::move(chunk));
     };
     while (m_processed_chunks.process_and_pop_n(grab_chunk, m_processed_chunks.capacity()) ==
