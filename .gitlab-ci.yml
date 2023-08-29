@@ -101,6 +101,23 @@ variables:
     - cmake --build ${BUILD_DIR} -j 8
   interruptible: true
 
+.sign_dorado:macos:
+  script:
+    # We sign the executable as part of CPack's packaging steps, so the package that it
+    # produces should be ready to be notarized. That can be done asynchronously, but
+    # doing everything in one pass (--wait flag) saves complicating the jobs.
+    - |
+      xcrun notarytool submit archive/dorado-*.zip \
+        --apple-id ${APPLE_NOTARIZATION_ID} \
+        --password ${APPLE_NOTARIZATION_PASSWORD} \
+        --team-id ${APPLE_NOTARIZATION_TEAM} \
+        --progress --verbose --wait
+    # No stapling for now since it requires unpacking, stapling, and repackaging, though
+    # that'd look something like this:
+    #- unzip dorado-*.zip bin/dorado
+    #- xcrun stapler staple bin/dorado
+    #- zip dorado-*.zip -f bin/dorado
+
 # Pre-flight stages
 
 pre-commit:
@@ -243,15 +260,21 @@ build_archive:windows:
   when: manual
 
 build_archive:macos:m1:
-  variables:
-  <<: *macos_m1_runner
-  <<: *build_dorado_archive
+  extends:
+    - .macos_m1_runner
+    - .build_dorado_archive
+  script:
+    - !reference [.build_dorado_archive, script]
+    - !reference [.sign_dorado:macos, script]
   when: manual
 
 build_archive:macos:x64:
-  variables:
-  <<: *macos_x64_runner
-  <<: *build_dorado_archive
+  extends:
+    - .macos_x64_runner
+    - .build_dorado_archive
+  script:
+    - !reference [.build_dorado_archive, script]
+    - !reference [.sign_dorado:macos, script]
   when: manual
 
 # Test stage components
