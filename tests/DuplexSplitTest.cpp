@@ -115,7 +115,7 @@ TEST_CASE("4 subread split tagging", TEST_GROUP) {
     pipeline->push_message(read);
     pipeline.reset();
 
-    auto reads = ConvertMessages<std::shared_ptr<dorado::Read>>(messages);
+    auto reads = ConvertMessages<std::shared_ptr<dorado::Read>>(std::move(messages));
 
     CHECK(reads.size() == 6);
 
@@ -173,7 +173,7 @@ TEST_CASE("No split output read properties", TEST_GROUP) {
     pipeline->push_message(read);
     pipeline.reset();
 
-    auto reads = ConvertMessages<std::shared_ptr<dorado::Read>>(messages);
+    auto reads = ConvertMessages<std::shared_ptr<dorado::Read>>(std::move(messages));
     CHECK(reads.size() == 1);
 
     // Since the original read itself is modified, use the same pointer.

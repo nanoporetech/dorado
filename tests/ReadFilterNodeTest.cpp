@@ -58,7 +58,7 @@ TEST_CASE("ReadFilterNode: Filter read based on qscore", TEST_GROUP) {
         pipeline->push_message(std::move(read_2));
     }
 
-    auto reads = ConvertMessages<std::shared_ptr<dorado::Read>>(messages);
+    auto reads = ConvertMessages<std::shared_ptr<dorado::Read>>(std::move(messages));
     REQUIRE(reads.size() == 1);
     CHECK(reads[0]->read_id == "read_2");
 }

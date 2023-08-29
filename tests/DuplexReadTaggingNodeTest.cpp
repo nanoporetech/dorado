@@ -56,7 +56,7 @@ TEST_CASE("DuplexReadTaggingNode", TEST_GROUP) {
     }
     pipeline.reset();
 
-    auto reads = ConvertMessages<std::shared_ptr<dorado::Read>>(messages);
+    auto reads = ConvertMessages<std::shared_ptr<dorado::Read>>(std::move(messages));
     for (auto& read : reads) {
         if (read->read_id == "1;2") {
             CHECK(read->is_duplex == true);
