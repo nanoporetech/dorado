@@ -42,7 +42,6 @@ void create_stereo_duplex_pipeline(
         std::vector<dorado::Runner>&& stereo_runners,
         size_t overlap,
         uint32_t mean_qscore_start_pos,
-        bool model_is_rna,
         int scaler_node_threads,
         int splitter_node_threads,
         PairingParameters pairing_parameters,
