@@ -6,16 +6,24 @@
 
 #define TEST_GROUP "[read_pipeline][ReadFilterNode]"
 
-#if 1
-TEST_CASE("ReadFilterNode: Filter read based on qscore", TEST_GROUP) {
+namespace {
+auto make_filtered_pipeline(std::vector<dorado::Message>& messages,
+                            size_t min_qscore,
+                            size_t min_read_length,
+                            std::unordered_set<std::string> reads_to_filter) {
     dorado::PipelineDescriptor pipeline_desc;
-    std::vector<dorado::Message> messages;
     auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
-    std::unordered_set<std::string> reads_to_filter;
-    pipeline_desc.add_node<dorado::ReadFilterNode>({sink}, 12 /*min_qscore*/, 0, reads_to_filter,
-                                                   2 /*threads*/);
-    auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
+    pipeline_desc.add_node<dorado::ReadFilterNode>({sink}, min_qscore, min_read_length,
+                                                   std::move(reads_to_filter), 2 /*threads*/);
+    return dorado::Pipeline::create(std::move(pipeline_desc));
+}
+}  // namespace
+
+TEST_CASE("ReadFilterNode: Filter read based on qscore", TEST_GROUP) {
+    std::vector<dorado::Message> messages;
     {
+        auto pipeline = make_filtered_pipeline(messages, 12, 0, {});
+
         std::shared_ptr<dorado::Read> read_1(new dorado::Read());
         read_1->raw_data = torch::empty(100);
         read_1->sample_rate = 4000;
@@ -46,21 +54,20 @@ TEST_CASE("ReadFilterNode: Filter read based on qscore", TEST_GROUP) {
         read_2->attributes.start_time = "2017-04-29T09:10:04Z";
         read_2->attributes.fast5_filename = "batch_0.fast5";
 
-        pipeline->push_message(read_1);
-        pipeline->push_message(read_2);
+        pipeline->push_message(std::move(read_1));
+        pipeline->push_message(std::move(read_2));
     }
-    pipeline.reset();
 
     auto reads = ConvertMessages<std::shared_ptr<dorado::Read>>(messages);
     CHECK(reads.size() == 1);
     CHECK(reads[0]->read_id == "read_2");
 }
-#endif
 
-#if 0
 TEST_CASE("ReadFilterNode: Filter read based on read name", TEST_GROUP) {
-    MessageSinkToVector<std::shared_ptr<dorado::Read>> sink(100);
+    std::vector<dorado::Message> messages;
     {
+        auto pipeline = make_filtered_pipeline(messages, 0, 0, {"read_2"});
+
         std::shared_ptr<dorado::Read> read_1(new dorado::Read());
         read_1->raw_data = torch::empty(100);
         read_1->sample_rate = 4000;
@@ -91,19 +98,20 @@ TEST_CASE("ReadFilterNode: Filter read based on read name", TEST_GROUP) {
         read_2->attributes.start_time = "2017-04-29T09:10:04Z";
         read_2->attributes.fast5_filename = "batch_0.fast5";
 
-        dorado::ReadFilterNode filter(sink, 0 /*min_qscore*/, 0, {"read_2"}, 2 /*threads*/);
-        filter.push_message(std::move(read_1));
-        filter.push_message(std::move(read_2));
+        pipeline->push_message(std::move(read_1));
+        pipeline->push_message(std::move(read_2));
     }
 
-    auto messages = sink.get_messages();
-    REQUIRE(messages.size() == 1);
-    REQUIRE(messages[0]->read_id == "read_1");
+    auto reads = ConvertMessages<std::shared_ptr<dorado::Read>>(messages);
+    REQUIRE(reads.size() == 1);
+    REQUIRE(reads[0]->read_id == "read_1");
 }
 
 TEST_CASE("ReadFilterNode: Filter read based on read length", TEST_GROUP) {
-    MessageSinkToVector sink(100);
+    std::vector<dorado::Message> messages;
     {
+        auto pipeline = make_filtered_pipeline(messages, 0, 5, {});
+
         std::shared_ptr<dorado::Read> read_1(new dorado::Read());
         read_1->raw_data = torch::empty(100);
         read_1->sample_rate = 4000;
@@ -134,13 +142,11 @@ TEST_CASE("ReadFilterNode: Filter read based on read length", TEST_GROUP) {
         read_2->attributes.start_time = "2017-04-29T09:10:04Z";
         read_2->attributes.fast5_filename = "batch_0.fast5";
 
-        dorado::ReadFilterNode filter(sink, 0 /*min_qscore*/, 5, {}, 2 /*threads*/);
-        filter.push_message(read_1);
-        filter.push_message(read_2);
+        pipeline->push_message(std::move(read_1));
+        pipeline->push_message(std::move(read_2));
     }
 
-    auto messages = sink.get_messages();
-    REQUIRE(messages.size() == 1);
-    REQUIRE(messages[0]->read_id == "read_1");
+    auto reads = ConvertMessages<std::shared_ptr<dorado::Read>>(messages);
+    REQUIRE(reads.size() == 1);
+    REQUIRE(reads[0]->read_id == "read_1");
 }
-#endif
