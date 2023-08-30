@@ -74,7 +74,6 @@ void create_stereo_duplex_pipeline(PipelineDescriptor& pipeline_desc,
                                    std::vector<dorado::Runner>&& stereo_runners,
                                    size_t overlap,
                                    uint32_t mean_qscore_start_pos,
-                                   bool model_is_rna,
                                    int scaler_node_threads,
                                    int splitter_node_threads,
                                    PairingParameters pairing_parameters,
@@ -124,7 +123,7 @@ void create_stereo_duplex_pipeline(PipelineDescriptor& pipeline_desc,
             model_name, 1000, "BasecallerNode", true, mean_qscore_start_pos);
 
     auto scaler_node = pipeline_desc.add_node<ScalerNode>(
-            {basecaller_node}, model_config.signal_norm_params, model_is_rna, scaler_node_threads);
+            {basecaller_node}, model_config.signal_norm_params, false, scaler_node_threads);
 
     // if we've been provided a source node, connect it to the start of our pipeline
     if (source_node_handle != PipelineDescriptor::InvalidNodeHandle) {

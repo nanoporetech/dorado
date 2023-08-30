@@ -327,7 +327,7 @@ int duplex(int argc, char* argv[]) {
             }
             pipelines::create_stereo_duplex_pipeline(
                     pipeline_desc, std::move(runners), std::move(stereo_runners), overlap,
-                    mean_qscore_start_pos, rna, num_devices * 2, num_devices,
+                    mean_qscore_start_pos, num_devices * 2, num_devices,
                     std::move(pairing_parameters), read_filter_node);
 
             std::vector<dorado::stats::StatsReporter> stats_reporters;
