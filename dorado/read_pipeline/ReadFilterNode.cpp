@@ -41,7 +41,7 @@ void ReadFilterNode::worker_thread() {
 
 ReadFilterNode::ReadFilterNode(size_t min_qscore,
                                size_t min_read_length,
-                               const std::unordered_set<std::string>& read_ids_to_filter,
+                               std::unordered_set<std::string> read_ids_to_filter,
                                size_t num_worker_threads)
         : MessageSink(1000),
           m_num_worker_threads(num_worker_threads),

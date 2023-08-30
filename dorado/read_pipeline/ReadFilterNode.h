@@ -20,7 +20,7 @@ class ReadFilterNode : public MessageSink {
 public:
     ReadFilterNode(size_t min_qscore,
                    size_t min_read_length,
-                   const std::unordered_set<std::string>& read_ids_to_filter,
+                   std::unordered_set<std::string> read_ids_to_filter,
                    size_t num_worker_threads);
     ~ReadFilterNode() { terminate_impl(); }
     std::string get_name() const override { return "ReadFilterNode"; }
