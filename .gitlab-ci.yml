@@ -182,12 +182,10 @@ build:windows_koi_download:
     - echo BUILD_OPTIONS is ${BUILD_OPTIONS}
 
 build:macos:m1:
-  variables:
   <<: *macos_m1_runner
   <<: *build_dorado
 
 build:macos:x64:
-  variables:
   <<: *macos_x64_runner
   <<: *build_dorado
 
