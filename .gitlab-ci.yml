@@ -114,11 +114,15 @@ variables:
     # If notarization fails you need to run `xcrun notarytool log <request id>` to get
     # information about what failed.
     #
-    # No stapling for now since it requires unpacking, stapling, and repackaging, though
-    # that'd look something like this:
-    #- unzip dorado-*.zip bin/dorado
-    #- xcrun stapler staple bin/dorado
-    #- zip dorado-*.zip -f bin/dorado
+    # Extract the binary and check that it's notarized, since notarytool doesn't appear
+    # to return an error on failure.
+    - rm -rf notarization_check
+    - unzip archive/dorado-*.zip -d notarization_check
+    - spctl -a -t install -vvvv notarization_check/dorado-*/bin/dorado
+    #
+    # No stapling for now since you can only staple packages and not executables, hence
+    # we'd need to switch to a dmg instead and do something like:
+    #- xcrun stapler staple dorado-*.dmg
 
 # Pre-flight stages
 
