@@ -101,6 +101,38 @@ variables:
     - cmake --build ${BUILD_DIR} -j 8
   interruptible: true
 
+.sign_dorado:macos:
+  script:
+    # Older versions of macOS (10.15) can't run notarytool through xcrun, but can make
+    # use of the standalone notarytool executable if it's copied from a newer system.
+    # See https://developer.apple.com/forums/thread/712665.
+    - |
+      if command -v notarytool > /dev/null; then
+        NOTARYTOOL=(notarytool)
+      else
+        NOTARYTOOL=(xcrun notarytool)
+      fi
+    # We sign the executable as part of CPack's packaging steps, so the package that it
+    # produces should be ready to be notarized. That can be done asynchronously, but
+    # doing everything in one pass (--wait flag) saves complicating the jobs.
+    - ${NOTARYTOOL[@]} submit archive/dorado-*.zip
+        --apple-id ${APPLE_NOTARIZATION_ID}
+        --password ${APPLE_NOTARIZATION_PASSWORD}
+        --team-id ${APPLE_NOTARIZATION_TEAM}
+        --progress --verbose --wait
+    # If notarization fails you need to run `xcrun notarytool log <request id>` to get
+    # information about what failed.
+    #
+    # Extract the binary and check that it's notarized, since notarytool doesn't appear
+    # to return an error on failure.
+    - rm -rf notarization_check
+    - unzip archive/dorado-*.zip -d notarization_check
+    - spctl -a -t install -vvvv notarization_check/dorado-*/bin/dorado
+    #
+    # No stapling for now since you can only staple packages and not executables, hence
+    # we'd need to switch to a dmg instead and do something like:
+    #- xcrun stapler staple dorado-*.dmg
+
 # Pre-flight stages
 
 pre-commit:
@@ -182,12 +214,10 @@ build:windows_koi_download:
     - echo BUILD_OPTIONS is ${BUILD_OPTIONS}
 
 build:macos:m1:
-  variables:
   <<: *macos_m1_runner
   <<: *build_dorado
 
 build:macos:x64:
-  variables:
   <<: *macos_x64_runner
   <<: *build_dorado
 
@@ -245,15 +275,23 @@ build_archive:windows:
   when: manual
 
 build_archive:macos:m1:
-  variables:
-  <<: *macos_m1_runner
-  <<: *build_dorado_archive
+  extends:
+    - .macos_m1_runner
+    - .build_dorado_archive
+  script:
+    - !reference [.build_dorado_archive, script]
+    - !reference [.sign_dorado:macos, script]
   when: manual
 
 build_archive:macos:x64:
-  variables:
-  <<: *macos_x64_runner
-  <<: *build_dorado_archive
+  extends:
+    - .macos_x64_runner
+    - .build_dorado_archive
+  script:
+    - !reference [.build_dorado_archive, script]
+    # Signing on x64 disabled for now since our CI machines are on 10.15.
+    # See https://developer.apple.com/forums/thread/712665.
+    #- !reference [.sign_dorado:macos, script]
   when: manual
 
 # Test stage components
