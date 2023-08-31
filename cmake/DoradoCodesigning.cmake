@@ -13,7 +13,12 @@ endif()
 message(STATUS "Signing dorado")
 execute_process(
     COMMAND
-        codesign --sign "${DORADO_CODESIGN_IDENTITY}" --timestamp -vvvv "${CPACK_TEMPORARY_INSTALL_DIRECTORY}/bin/dorado"
+        codesign
+        --sign "${DORADO_CODESIGN_IDENTITY}"
+        --timestamp
+        --options=runtime
+        -vvvv
+        "${CPACK_TEMPORARY_INSTALL_DIRECTORY}/bin/dorado"
     RESULT_VARIABLE
         SIGNING_RESULT
 )
