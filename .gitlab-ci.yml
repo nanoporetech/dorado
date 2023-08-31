@@ -103,10 +103,19 @@ variables:
 
 .sign_dorado:macos:
   script:
+    # Older versions of macOS (10.15) can't run notarytool through xcrun, but can make
+    # use of the standalone notarytool executable if it's copied from a newer system.
+    # See https://developer.apple.com/forums/thread/712665.
+    - |
+      if command -v notarytool > /dev/null; then
+        NOTARYTOOL=(notarytool)
+      else
+        NOTARYTOOL=(xcrun notarytool)
+      fi
     # We sign the executable as part of CPack's packaging steps, so the package that it
     # produces should be ready to be notarized. That can be done asynchronously, but
     # doing everything in one pass (--wait flag) saves complicating the jobs.
-    - xcrun notarytool submit archive/dorado-*.zip
+    - ${NOTARYTOOL[@]} submit archive/dorado-*.zip
         --apple-id ${APPLE_NOTARIZATION_ID}
         --password ${APPLE_NOTARIZATION_PASSWORD}
         --team-id ${APPLE_NOTARIZATION_TEAM}
@@ -280,7 +289,9 @@ build_archive:macos:x64:
     - .build_dorado_archive
   script:
     - !reference [.build_dorado_archive, script]
-    - !reference [.sign_dorado:macos, script]
+    # Signing on x64 disabled for now since our CI machines are on 10.15.
+    # See https://developer.apple.com/forums/thread/712665.
+    #- !reference [.sign_dorado:macos, script]
   when: manual
 
 # Test stage components
