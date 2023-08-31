@@ -1,5 +1,5 @@
 if(APPLE)
-    set(CPACK_GENERATOR "TGZ")
+    set(CPACK_GENERATOR "ZIP")
     if(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
         set(CPACK_SYSTEM_NAME "osx-x64")
     else()
