@@ -106,12 +106,14 @@ variables:
     # We sign the executable as part of CPack's packaging steps, so the package that it
     # produces should be ready to be notarized. That can be done asynchronously, but
     # doing everything in one pass (--wait flag) saves complicating the jobs.
-    - |
-      xcrun notarytool submit archive/dorado-*.zip \
-        --apple-id ${APPLE_NOTARIZATION_ID} \
-        --password ${APPLE_NOTARIZATION_PASSWORD} \
-        --team-id ${APPLE_NOTARIZATION_TEAM} \
+    - xcrun notarytool submit archive/dorado-*.zip
+        --apple-id ${APPLE_NOTARIZATION_ID}
+        --password ${APPLE_NOTARIZATION_PASSWORD}
+        --team-id ${APPLE_NOTARIZATION_TEAM}
         --progress --verbose --wait
+    # If notarization fails you need to run `xcrun notarytool log <request id>` to get
+    # information about what failed.
+    #
     # No stapling for now since it requires unpacking, stapling, and repackaging, though
     # that'd look something like this:
     #- unzip dorado-*.zip bin/dorado
