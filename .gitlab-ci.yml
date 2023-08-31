@@ -9,6 +9,7 @@ stages:
 
 variables:
   BUILD_DIR: build
+  BUILD_TARGET: install
   GIT_SUBMODULE_STRATEGY: recursive
   CUDA: "11.8"
   WIN_CUDA_TOOLKIT: "/c/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v${CUDA}"
@@ -57,14 +58,21 @@ variables:
   before_script:
     - echo Dorado dependency stage
     - apt-get update && apt-get install -y --no-install-recommends samtools curl libhdf5-dev libssl-dev libzstd-dev libsz2
+    - pip install gcovr
+
+.run_dorado_cmake_build: &run_dorado_cmake_build
+  - cmake ${BUILD_OPTIONS} -S . -B ${BUILD_DIR}
+  - cmake --build ${BUILD_DIR} --config Release --target ${BUILD_TARGET} -j 8
+
+.run_dorado_cmake_ctest: &run_dorado_cmake_ctest
+  - ctest -C Release --test-dir ${BUILD_DIR} --output-on-failure --verbose
 
 .build_dorado: &build_dorado
   stage: build
   script:
     - echo Dorado build stage
-    - cmake ${BUILD_OPTIONS} -S . -B ${BUILD_DIR}
-    - cmake --build ${BUILD_DIR} --config Release --target install -j 8
-    - ctest -C Release --test-dir ${BUILD_DIR} --output-on-failure --verbose
+    - *run_dorado_cmake_build
+    - *run_dorado_cmake_ctest
   artifacts:
     paths:
       - dist
@@ -122,6 +130,22 @@ build:linux:x86:focal:
     BUILD_OPTIONS: "-DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN}"
   <<: *linux_runner
   <<: *build_dorado
+
+build:linux:x86:focal_coverage:
+  stage: build
+  image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.1
+  variables:
+    BUILD_OPTIONS: "-DGITLAB_CI_TOKEN=${CI_JOB_TOKEN} -DGENERATE_TEST_COVERAGE=1"
+    BUILD_TARGET: "dorado_test_coverage"
+  <<: *linux_dependencies
+  <<: *linux_runner
+  script:
+    - *run_dorado_cmake_build
+  rules:
+      - if: $CI_PIPELINE_SOURCE == "schedule"
+  artifacts:
+    paths:
+      - build/dorado_test_coverage/*
 
 build:linux:arm64:bionic:
   image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r32.4.3-deps:1.1
@@ -238,7 +262,7 @@ build_archive:macos:x64:
   stage: test
   variables:
     GIT_STRATEGY: none
-    MODEL: dna_r9.4.1_e8_hac@v3.3
+    MODEL: dna_r10.4.1_e8.2_400bps_hac@v4.1.0
     BATCH: 384
   script:
     - bash ./tests/test_simple_basecaller_execution.sh ./dist/bin/dorado ${MODEL} ${BATCH}
@@ -280,6 +304,11 @@ test:linux:x86:focal:
   <<: *test_dorado
   needs:
     - build:linux:x86:focal
+  artifacts:
+    when: on_failure
+    paths:
+      - tests
+    expire_in: 1 day
 
 test:linux:arm64:bionic:
   image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r32.4.3-deps:1.1
@@ -288,7 +317,7 @@ test:linux:arm64:bionic:
   <<: *test_dorado
   variables:
     GIT_STRATEGY: none
-    MODEL: dna_r9.4.1_e8_hac@v3.3
+    MODEL: dna_r10.4.1_e8.2_400bps_hac@v4.1.0
     BATCH: 0
   needs:
     - build:linux:arm64:bionic
@@ -314,7 +343,7 @@ test:macos:x64:
     - build:macos:x64
   variables:
     GIT_STRATEGY: none
-    MODEL: dna_r9.4.1_e8_fast@v3.4
+    MODEL: dna_r10.4.1_e8.2_400bps_fast@v4.1.0
     BATCH: 0
 
 # Test that you can run dorado in a clean cuda 20.04 environment
@@ -381,6 +410,7 @@ test_archive:linux:arm64:20.04:
           "job_name": "Dorado SRE: '${CONDITION}' '${CI_COMMIT_REF_NAME}' - '"$CI_COMMIT_TITLE"' ",
           "script_parameters": {
               "models":'${MODELS}',
+              "duplex_models":'${DUPLEX_MODELS}',
               "sre_output":"'${SRE_OUTPUT_ROOT}'/'${CI_COMMIT_SHA}'/",
               "sre_config":"${projectDir}/configs/'${SRE_CONFIG}'",
               "dorado_branch":"'${CI_COMMIT_SHA}'",
@@ -396,6 +426,7 @@ mlhub:sre_4k_260bps:
     CONDITION: '4k_260bps'
     SRE_CONFIG: "dna_r10.4.1-e8.2-4khz-260bps-prom.json"
     MODELS: '["dna_r10.4.1_e8.2_260bps_fast@v4.1.0","dna_r10.4.1_e8.2_260bps_hac@v4.1.0","dna_r10.4.1_e8.2_260bps_sup@v4.1.0"]'
+    DUPLEX_MODELS: '[]'
 
 mlhub:sre_4k_400bps:
   extends:
@@ -404,7 +435,8 @@ mlhub:sre_4k_400bps:
     CONDITION: '4k_400bps'
     SRE_CONFIG: "dna_r10.4.1-e8.2-4khz-400bps-prom.json"
     MODELS: '["dna_r10.4.1_e8.2_400bps_fast@v4.1.0","dna_r10.4.1_e8.2_400bps_hac@v4.1.0","dna_r10.4.1_e8.2_400bps_sup@v4.1.0"]'
-    
+    DUPLEX_MODELS: '[]'
+
 mlhub:sre_5k_400bps:
   extends:
     .mlhub_sre
@@ -412,6 +444,7 @@ mlhub:sre_5k_400bps:
     CONDITION: '5k_400bps'
     SRE_CONFIG: "dna_r10.4.1-e8.2-5khz-400bps-prom.json"
     MODELS: '["dna_r10.4.1_e8.2_400bps_fast@v4.2.0","dna_r10.4.1_e8.2_400bps_hac@v4.2.0","dna_r10.4.1_e8.2_400bps_sup@v4.2.0"]'
+    DUPLEX_MODELS: '[]'
 
 mlhub:sre_5k_400bps_duplex:
   extends:
@@ -420,6 +453,7 @@ mlhub:sre_5k_400bps_duplex:
     CONDITION: '5k_400bps_duplex'
     SRE_CONFIG: "dna_r10.4.2-e8.2-5khz-400bps-prom.json"
     MODELS: '["dna_r10.4.1_e8.2_400bps_hac@v4.2.0","dna_r10.4.1_e8.2_400bps_sup@v4.2.0"]'
+    DUPLEX_MODELS: '["dna_r10.4.1_e8.2_5khz_stereo@v1.1"]'
 
 # MLHub - Remora
 mlhub:remora-validate:

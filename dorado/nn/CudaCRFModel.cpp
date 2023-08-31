@@ -1,5 +1,6 @@
 #include "CudaCRFModel.h"
 
+#include "CRFModelConfig.h"
 #include "decode/GPUDecoder.h"
 #include "utils/cuda_utils.h"
 #include "utils/math_utils.h"
@@ -59,6 +60,7 @@ public:
             torch::cuda::synchronize(m_options.device().index());
         }
 
+        c10::cuda::CUDAGuard device_guard(m_options.device());
         c10::cuda::CUDACachingAllocator::emptyCache();
 
         start_threads();

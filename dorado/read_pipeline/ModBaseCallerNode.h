@@ -6,20 +6,18 @@
 
 #include <array>
 #include <atomic>
-#include <condition_variable>
 #include <cstdint>
-#include <deque>
 #include <functional>
 #include <memory>
 #include <mutex>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 namespace dorado {
 
 class ModBaseRunner;
 struct RemoraChunk;
-struct ModBaseParams;
 
 class ModBaseCallerNode : public MessageSink {
 public:
@@ -33,26 +31,9 @@ public:
     void terminate(const FlushOptions& flush_options) override { terminate_impl(); }
     void restart() override;
 
-    struct Info {
-        std::string long_names;
-        std::string alphabet;
-    };
-
-    // Expose long_names and alphabet computed by get_modbase_info
-    static Info get_modbase_info(
-            std::vector<std::reference_wrapper<ModBaseParams const>> const& base_mod_params) {
-        return get_modbase_info_and_maybe_init(base_mod_params, nullptr);
-    };
-
 private:
     void start_threads();
     void terminate_impl();
-
-    // Determine the modbase alphabet from parameters and calculate offset positions for the results
-    // if node is not null it will populate its members
-    [[maybe_unused]] static Info get_modbase_info_and_maybe_init(
-            std::vector<std::reference_wrapper<ModBaseParams const>> const& base_mod_params,
-            ModBaseCallerNode* node);
 
     // Determine the modbase alphabet from all callers and calculate offset positions for the results
     void init_modbase_info();
@@ -85,16 +66,12 @@ private:
 
     std::mutex m_working_reads_mutex;
     // Reads removed from input queue and being modbasecalled.
-    std::deque<std::shared_ptr<Read>> m_working_reads;
-
-    std::mutex m_chunk_queues_mutex;
-    std::condition_variable m_chunk_queues_cv;
-    std::condition_variable m_chunks_added_cv;
+    std::unordered_set<std::shared_ptr<Read>> m_working_reads;
 
     std::atomic<int> m_num_active_runner_workers{0};
     std::atomic<int> m_num_active_input_workers{0};
 
-    std::shared_ptr<const BaseModInfo> m_base_mod_info;
+    std::shared_ptr<const ModBaseInfo> m_mod_base_info;
     // The offsets to the canonical bases in the modbase alphabet
     std::array<size_t, 4> m_base_prob_offsets;
     size_t m_num_states{4};
@@ -108,6 +85,7 @@ private:
     std::atomic<int64_t> m_num_mod_base_reads_pushed = 0;
     std::atomic<int64_t> m_num_non_mod_base_reads_pushed = 0;
     std::atomic<int64_t> m_chunk_generation_ms = 0;
+    std::atomic<int64_t> m_working_reads_size = 0;
 };
 
 }  // namespace dorado

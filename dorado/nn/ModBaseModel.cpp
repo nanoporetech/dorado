@@ -1,4 +1,4 @@
-#include "RemoraModel.h"
+#include "ModBaseModel.h"
 
 #include "utils/module_utils.h"
 #include "utils/tensor_utils.h"
@@ -46,8 +46,8 @@ struct UnpaddedConvolutionImpl : Module {
 
 TORCH_MODULE(UnpaddedConvolution);
 
-struct RemoraConvModelImpl : Module {
-    RemoraConvModelImpl(int size, int kmer_len, int num_out) {
+struct ModBaseConvModelImpl : Module {
+    ModBaseConvModelImpl(int size, int kmer_len, int num_out) {
         sig_conv1 = register_module("sig_conv1", UnpaddedConvolution(1, 4, 11, 1));
         sig_conv2 = register_module("sig_conv2", UnpaddedConvolution(4, 16, 11, 1));
         sig_conv3 = register_module("sig_conv3", UnpaddedConvolution(16, size, 9, 3));
@@ -116,7 +116,7 @@ struct RemoraConvModelImpl : Module {
     Linear linear{nullptr};
 };
 
-const std::vector<std::string> RemoraConvModelImpl::weight_tensors{
+const std::vector<std::string> ModBaseConvModelImpl::weight_tensors{
         "sig_conv1.weight.tensor",   "sig_conv1.bias.tensor",
         "sig_conv2.weight.tensor",   "sig_conv2.bias.tensor",
         "sig_conv3.weight.tensor",   "sig_conv3.bias.tensor",
@@ -133,8 +133,8 @@ const std::vector<std::string> RemoraConvModelImpl::weight_tensors{
         "fc.weight.tensor",          "fc.bias.tensor",
 };
 
-struct RemoraConvLSTMModelImpl : Module {
-    RemoraConvLSTMModelImpl(int size, int kmer_len, int num_out) {
+struct ModBaseConvLSTMModelImpl : Module {
+    ModBaseConvLSTMModelImpl(int size, int kmer_len, int num_out) {
         sig_conv1 = register_module("sig_conv1", UnpaddedConvolution(1, 4, 5, 1));
         sig_conv2 = register_module("sig_conv2", UnpaddedConvolution(4, 16, 5, 1));
         sig_conv3 = register_module("sig_conv3", UnpaddedConvolution(16, size, 9, 3));
@@ -208,7 +208,7 @@ struct RemoraConvLSTMModelImpl : Module {
     SiLU activation{nullptr};
 };
 
-const std::vector<std::string> RemoraConvLSTMModelImpl::weight_tensors{
+const std::vector<std::string> ModBaseConvLSTMModelImpl::weight_tensors{
         "sig_conv1.weight.tensor",   "sig_conv1.bias.tensor",
         "sig_conv2.weight.tensor",   "sig_conv2.bias.tensor",
         "sig_conv3.weight.tensor",   "sig_conv3.bias.tensor",
@@ -227,13 +227,13 @@ const std::vector<std::string> RemoraConvLSTMModelImpl::weight_tensors{
         "fc.weight.tensor",          "fc.bias.tensor",
 };
 
-TORCH_MODULE(RemoraConvModel);
-TORCH_MODULE(RemoraConvLSTMModel);
+TORCH_MODULE(ModBaseConvModel);
+TORCH_MODULE(ModBaseConvLSTMModel);
 
 }  // namespace nn
 
-ModuleHolder<AnyModule> load_remora_model(const std::filesystem::path& model_path,
-                                          torch::TensorOptions options) {
+ModuleHolder<AnyModule> load_modbase_model(const std::filesystem::path& model_path,
+                                           torch::TensorOptions options) {
     auto config = toml::parse(model_path / "config.toml");
 
     const auto& general_params = toml::find(config, "general");
@@ -245,12 +245,12 @@ ModuleHolder<AnyModule> load_remora_model(const std::filesystem::path& model_pat
     const auto num_out = toml::find<int>(model_params, "num_out");
 
     if (model_type == "conv_lstm") {
-        auto model = nn::RemoraConvLSTMModel(size, kmer_len, num_out);
+        auto model = nn::ModBaseConvLSTMModel(size, kmer_len, num_out);
         return populate_model(model, model_path, options);
     }
 
     if (model_type == "conv_only") {
-        auto model = nn::RemoraConvModel(size, kmer_len, num_out);
+        auto model = nn::ModBaseConvModel(size, kmer_len, num_out);
         return populate_model(model, model_path, options);
     }
 

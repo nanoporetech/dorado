@@ -34,11 +34,11 @@ std::pair<std::vector<dorado::Runner>, size_t> create_basecall_runners(
     size_t num_devices = 1;
 
     if (device == "cpu") {
-        if (num_cpu_runners == 0) {
-            num_cpu_runners = std::thread::hardware_concurrency();
-        }
         if (batch_size == 0) {
             batch_size = 128;
+        }
+        if (num_cpu_runners == 0) {
+            num_cpu_runners = auto_calculate_num_runners(model_config, batch_size, memory_fraction);
         }
         spdlog::debug("- CPU calling: set batch size to {}, num_cpu_runners to {}", batch_size,
                       num_cpu_runners);

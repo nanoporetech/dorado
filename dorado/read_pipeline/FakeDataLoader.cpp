@@ -4,6 +4,7 @@
 
 #include <torch/torch.h>
 
+#include <cstdint>
 #include <memory>
 
 namespace dorado {
@@ -16,10 +17,10 @@ void FakeDataLoader::load_reads(const int num_reads) {
         fake_read->raw_data = torch::randint(0, 10000, {read_size}, torch::kInt16);
         fake_read->read_id = "Placeholder-read-id";
 
-        m_read_sink.push_message(fake_read);
+        m_pipeline.push_message(std::move(fake_read));
     }
 }
 
-FakeDataLoader::FakeDataLoader(MessageSink& read_sink) : m_read_sink(read_sink) {}
+FakeDataLoader::FakeDataLoader(Pipeline& pipeline) : m_pipeline(pipeline) {}
 
 }  // namespace dorado

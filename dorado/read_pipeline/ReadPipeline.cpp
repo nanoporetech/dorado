@@ -1,7 +1,7 @@
 #include "ReadPipeline.h"
 
 #include "htslib/sam.h"
-#include "utils/base_mod_utils.h"
+#include "modbase/ModBaseContext.h"
 #include "utils/sequence_utils.h"
 
 #include <spdlog/spdlog.h>
@@ -20,7 +20,7 @@ bool get_modbase_channel_name(std::string &channel_name, const std::string &mod_
                                                                         // C
                                                                         {"5mC", "m"},
                                                                         {"5hmC", "h"},
-                                                                        {"5fc", "f"},
+                                                                        {"5fC", "f"},
                                                                         {"5caC", "c"},
                                                                         // G
                                                                         {"8oxoG", "o"},
@@ -185,11 +185,11 @@ uint64_t Read::get_end_time_ms() {
 }
 
 void Read::generate_modbase_string(bam1_t *aln, uint8_t threshold) const {
-    if (!base_mod_info) {
+    if (!mod_base_info) {
         return;
     }
 
-    const size_t num_channels = base_mod_info->alphabet.size();
+    const size_t num_channels = mod_base_info->alphabet.size();
     const std::string cardinal_bases = "ACGT";
     char current_cardinal = 0;
     if (seq.length() * num_channels != base_mod_probs.size()) {
@@ -198,16 +198,16 @@ void Read::generate_modbase_string(bam1_t *aln, uint8_t threshold) const {
                 "modbase_alphabet!");
     }
 
-    std::istringstream mod_name_stream(base_mod_info->long_names);
+    std::istringstream mod_name_stream(mod_base_info->long_names);
     std::string modbase_string = "";
     std::vector<uint8_t> modbase_prob;
 
     // Create a mask indicating which bases are modified.
     std::map<char, bool> base_has_context = {
             {'A', false}, {'C', false}, {'G', false}, {'T', false}};
-    utils::BaseModContext context_handler;
-    if (!base_mod_info->context.empty()) {
-        if (!context_handler.decode(base_mod_info->context)) {
+    utils::ModBaseContext context_handler;
+    if (!mod_base_info->context.empty()) {
+        if (!context_handler.decode(mod_base_info->context)) {
             throw std::runtime_error("Invalid base modification context string.");
         }
         for (auto base : cardinal_bases) {
@@ -218,14 +218,14 @@ void Read::generate_modbase_string(bam1_t *aln, uint8_t threshold) const {
         }
     }
     auto modbase_mask = context_handler.get_sequence_mask(seq);
-    context_handler.update_mask(modbase_mask, seq, base_mod_info->alphabet, base_mod_probs,
+    context_handler.update_mask(modbase_mask, seq, mod_base_info->alphabet, base_mod_probs,
                                 threshold);
 
     // Iterate over the provided alphabet and find all the channels we need to write out
     for (size_t channel_idx = 0; channel_idx < num_channels; channel_idx++) {
-        if (cardinal_bases.find(base_mod_info->alphabet[channel_idx]) != std::string::npos) {
+        if (cardinal_bases.find(mod_base_info->alphabet[channel_idx]) != std::string::npos) {
             // A cardinal base
-            current_cardinal = base_mod_info->alphabet[channel_idx];
+            current_cardinal = mod_base_info->alphabet[channel_idx];
         } else {
             // A modification on the previous cardinal base
             std::string modbase_name;
@@ -272,7 +272,7 @@ float Read::calculate_mean_qscore() const {
 
 MessageSink::MessageSink(size_t max_messages) : m_work_queue(max_messages) {}
 
-void MessageSink::push_message(Message &&message) {
+void MessageSink::push_message_internal(Message &&message) {
     const auto status = m_work_queue.try_push(std::move(message));
     // try_push will fail if the sink has been told to terminate.
     // We do not expect to be pushing reads from this source if that is the case.
@@ -367,10 +367,6 @@ Pipeline::Pipeline(PipelineDescriptor &&descriptor,
 }
 
 void MessageSink::add_sink(MessageSink &sink) { m_sinks.push_back(std::ref(sink)); }
-
-void MessageSink::send_message_to_sink(int sink_index, Message &&message) {
-    m_sinks.at(sink_index).get().push_message(std::move(message));
-}
 
 void Pipeline::push_message(Message &&message) {
     assert(!m_nodes.empty());

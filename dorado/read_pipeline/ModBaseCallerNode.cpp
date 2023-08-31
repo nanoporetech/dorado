@@ -1,9 +1,9 @@
 #include "ModBaseCallerNode.h"
 
-#include "modbase/remora_encoder.h"
-#include "modbase/remora_utils.h"
+#include "modbase/ModBaseContext.h"
+#include "modbase/modbase_encoder.h"
+#include "nn/ModBaseModelConfig.h"
 #include "nn/ModBaseRunner.h"
-#include "utils/base_mod_utils.h"
 #include "utils/math_utils.h"
 #include "utils/sequence_utils.h"
 #include "utils/stats.h"
@@ -19,6 +19,23 @@ using namespace std::chrono_literals;
 namespace dorado {
 
 constexpr auto FORCE_TIMEOUT = 100ms;
+
+struct RemoraChunk {
+    RemoraChunk(std::shared_ptr<Read> read,
+                torch::Tensor input_signal,
+                std::vector<int8_t> kmer_data,
+                size_t position)
+            : source_read(read),
+              signal(input_signal),
+              encoded_kmers(std::move(kmer_data)),
+              context_hit(position) {}
+
+    std::weak_ptr<Read> source_read;
+    torch::Tensor signal;
+    std::vector<int8_t> encoded_kmers;
+    size_t context_hit;
+    std::vector<float> scores;
+};
 
 ModBaseCallerNode::ModBaseCallerNode(std::vector<std::unique_ptr<ModBaseRunner>> model_runners,
                                      size_t remora_threads,
@@ -92,74 +109,27 @@ void ModBaseCallerNode::restart() {
     start_threads();
 }
 
-[[maybe_unused]] ModBaseCallerNode::Info ModBaseCallerNode::get_modbase_info_and_maybe_init(
-        std::vector<std::reference_wrapper<ModBaseParams const>> const& base_mod_params,
-        ModBaseCallerNode* node) {
-    struct ModelInfo {
-        std::vector<std::string> long_names;
-        std::string alphabet;
-        std::string motif;
-        int motif_offset;
-        size_t base_counts = 1;
-    };
-
-    std::string const allowed_bases = "ACGT";
-    std::array<ModelInfo, 4> model_info;
-    for (int b = 0; b < 4; ++b) {
-        model_info[b].alphabet = allowed_bases[b];
-    }
-
-    for (const auto& params_ref : base_mod_params) {
-        const auto& params = params_ref.get();
-        auto base = params.motif[params.motif_offset];
-        if (allowed_bases.find(base) == std::string::npos) {
-            throw std::runtime_error("Invalid base in remora model metadata.");
-        }
-        auto& map_entry = model_info[RemoraUtils::BASE_IDS[base]];
-        map_entry.long_names = params.mod_long_names;
-        map_entry.alphabet += params.mod_bases;
-        if (node) {
-            map_entry.motif = params.motif;
-            map_entry.motif_offset = params.motif_offset;
-            map_entry.base_counts = params.base_mod_count + 1;
-            node->m_num_states += params.base_mod_count;
-        }
-    }
-
-    Info result;
-    utils::BaseModContext context_handler;
-    for (const auto& info : model_info) {
-        for (const auto& name : info.long_names) {
-            if (!result.long_names.empty())
-                result.long_names += ' ';
-            result.long_names += name;
-        }
-        result.alphabet += info.alphabet;
-        if (node && !info.motif.empty()) {
-            context_handler.set_context(info.motif, size_t(info.motif_offset));
-        }
-    }
-
-    if (node) {
-        node->m_base_mod_info = std::make_shared<BaseModInfo>(result.alphabet, result.long_names,
-                                                              context_handler.encode());
-
-        node->m_base_prob_offsets[0] = 0;
-        node->m_base_prob_offsets[1] = model_info[0].base_counts;
-        node->m_base_prob_offsets[2] = node->m_base_prob_offsets[1] + model_info[1].base_counts;
-        node->m_base_prob_offsets[3] = node->m_base_prob_offsets[2] + model_info[2].base_counts;
-    }
-
-    return result;
-}
-
 void ModBaseCallerNode::init_modbase_info() {
-    std::vector<std::reference_wrapper<ModBaseParams const>> base_mod_params;
+    std::vector<std::reference_wrapper<ModBaseModelConfig const>> base_mod_params;
     auto& runner = m_runners[0];
+    utils::ModBaseContext context_handler;
     for (size_t caller_id = 0; caller_id < runner->num_callers(); ++caller_id) {
+        const auto& params = runner->caller_params(caller_id);
+        if (!params.motif.empty()) {
+            context_handler.set_context(params.motif, size_t(params.motif_offset));
+        }
         base_mod_params.emplace_back(runner->caller_params(caller_id));
+        m_num_states += params.base_mod_count;
     }
-    get_modbase_info_and_maybe_init(base_mod_params, this);
+
+    auto result = get_modbase_info(base_mod_params);
+    m_mod_base_info = std::make_shared<ModBaseInfo>(result.alphabet, result.long_names,
+                                                    context_handler.encode());
+
+    m_base_prob_offsets[0] = 0;
+    m_base_prob_offsets[1] = result.base_counts[0];
+    m_base_prob_offsets[2] = m_base_prob_offsets[1] + result.base_counts[1];
+    m_base_prob_offsets[3] = m_base_prob_offsets[2] + result.base_counts[2];
 }
 
 void ModBaseCallerNode::input_worker_thread() {
@@ -185,14 +155,14 @@ void ModBaseCallerNode::input_worker_thread() {
                 read->base_mod_probs.resize(read->seq.size() * m_num_states, 0);
                 for (size_t i = 0; i < read->seq.size(); ++i) {
                     // Initialize for what corresponds to 100% canonical base for each position.
-                    int base_id = RemoraUtils::BASE_IDS[read->seq[i]];
+                    int base_id = utils::BaseInfo::BASE_IDS[read->seq[i]];
                     if (base_id < 0) {
                         throw std::runtime_error("Invalid character in sequence.");
                     }
                     read->base_mod_probs[i * m_num_states + m_base_prob_offsets[base_id]] = 1.0f;
                 }
             }
-            read->base_mod_info = m_base_mod_info;
+            read->mod_base_info = m_mod_base_info;
 
             std::vector<int> sequence_ints = utils::sequence_to_ints(read->seq);
             std::vector<uint64_t> seq_to_sig_map = utils::moves_to_map(
@@ -214,8 +184,8 @@ void ModBaseCallerNode::input_worker_thread() {
                 auto& params = runner->caller_params(caller_id);
                 auto context_samples = (params.context_before + params.context_after);
                 // One-hot encodes the kmer at each signal step for input into the network
-                RemoraEncoder encoder(m_block_stride, context_samples, params.bases_before,
-                                      params.bases_after);
+                ModBaseEncoder encoder(m_block_stride, context_samples, params.bases_before,
+                                       params.bases_after);
                 encoder.init(sequence_ints, seq_to_sig_map);
 
                 auto context_hits = runner->get_motif_hits(caller_id, read->seq);
@@ -246,11 +216,12 @@ void ModBaseCallerNode::input_worker_thread() {
 
             if (read->num_modbase_chunks != 0) {
                 // Put the read in the working list
-                std::scoped_lock<std::mutex> working_reads_lock(m_working_reads_mutex);
-                m_working_reads.push_back(read);
+                std::lock_guard<std::mutex> working_reads_lock(m_working_reads_mutex);
+                m_working_reads.insert(std::move(read));
+                ++m_working_reads_size;
             } else {
                 // No modbases to call, pass directly to next node
-                send_message_to_sink(read);
+                send_message_to_sink(std::move(read));
                 ++m_num_non_mod_base_reads_pushed;
             }
             break;
@@ -295,7 +266,6 @@ void ModBaseCallerNode::modbasecall_worker_thread(size_t worker_id, size_t calle
         // We have just grabbed a number of chunks (0 in the case of timeout) from
         // the chunk queue and added them to batched_chunks.  Insert those chunks
         // into the model input tensors.
-        assert(!batched_chunks.empty());
         for (size_t chunk_idx = previous_chunk_count; chunk_idx < batched_chunks.size();
              ++chunk_idx) {
             assert(chunk_idx < m_batch_size);
@@ -370,34 +340,44 @@ void ModBaseCallerNode::output_worker_thread() {
            utils::AsyncQueueStatus::Success) {
         nvtx3::scoped_range range{"modbase_output_worker_thread"};
 
+        std::vector<std::shared_ptr<Read>> completed_reads;
+
         for (const auto& chunk : processed_chunks) {
             auto source_read = chunk->source_read.lock();
             int64_t result_pos = chunk->context_hit;
             int64_t offset =
-                    m_base_prob_offsets[RemoraUtils::BASE_IDS[source_read->seq[result_pos]]];
+                    m_base_prob_offsets[utils::BaseInfo::BASE_IDS[source_read->seq[result_pos]]];
             for (size_t i = 0; i < chunk->scores.size(); ++i) {
                 source_read->base_mod_probs[m_num_states * result_pos + offset + i] =
                         static_cast<uint8_t>(std::min(std::floor(chunk->scores[i] * 256), 255.0f));
             }
-            ++source_read->num_modbase_chunks_called;
+            // If all chunks for the read associated with this chunk have now been called,
+            // add it to the completed_reads vector for subsequent sending on to the sink.
+            auto num_chunks_called = ++source_read->num_modbase_chunks_called;
+            if (num_chunks_called == source_read->num_modbase_chunks) {
+                completed_reads.push_back(std::move(source_read));
+            }
         }
         processed_chunks.clear();
 
-        // Now move any completed reads to the output queue
-        std::vector<std::shared_ptr<Read>> completed_reads;
-        std::unique_lock<std::mutex> working_reads_lock(m_working_reads_mutex);
-        for (auto read_iter = m_working_reads.begin(); read_iter != m_working_reads.end();) {
-            if ((*read_iter)->num_modbase_chunks_called.load() ==
-                (*read_iter)->num_modbase_chunks) {
-                completed_reads.push_back(*read_iter);
-                read_iter = m_working_reads.erase(read_iter);
-            } else {
-                ++read_iter;
+        // Remove any completed reads from the working reads set while holding its mutex.
+        if (!completed_reads.empty()) {
+            std::lock_guard<std::mutex> working_reads_lock(m_working_reads_mutex);
+            for (auto& completed_read : completed_reads) {
+                auto read_iter = m_working_reads.find(completed_read);
+                if (read_iter != m_working_reads.end()) {
+                    m_working_reads.erase(*read_iter);
+                } else {
+                    throw std::runtime_error("Expected to find read id " + completed_read->read_id +
+                                             " in working reads set but it doesn't exist.");
+                }
             }
+            m_working_reads_size -= completed_reads.size();
         }
-        working_reads_lock.unlock();
-        for (auto& read : completed_reads) {
-            send_message_to_sink(read);
+
+        // Send completed reads on to the sink.
+        for (auto& completed_read : completed_reads) {
+            send_message_to_sink(std::move(completed_read));
             ++m_num_mod_base_reads_pushed;
         }
     }
@@ -417,6 +397,7 @@ std::unordered_map<std::string, double> ModBaseCallerNode::sample_stats() const 
     stats["mod_base_reads_pushed"] = m_num_mod_base_reads_pushed;
     stats["non_mod_base_reads_pushed"] = m_num_non_mod_base_reads_pushed;
     stats["chunk_generation_ms"] = m_chunk_generation_ms;
+    stats["working_reads_items"] = m_working_reads_size;
     return stats;
 }
 

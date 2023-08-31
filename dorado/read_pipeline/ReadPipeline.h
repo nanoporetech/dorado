@@ -93,8 +93,8 @@ public:
 
     std::string parent_read_id;  // Origin read ID for all its subreads. Empty for nonsplit reads.
 
-    std::shared_ptr<const BaseModInfo>
-            base_mod_info;  // Modified base settings of the models that ran on this read
+    std::shared_ptr<const ModBaseInfo>
+            mod_base_info;  // Modified base settings of the models that ran on this read
 
     uint64_t num_trimmed_samples;  // Number of samples which have been trimmed from the raw read.
 
@@ -181,8 +181,12 @@ public:
     }
 
     // Adds a message to the input queue.  This can block if the sink's queue is full.
-    // Pushed messages must be rvalues: the input queue takes ownership.
-    void push_message(Message&& message);
+    template <typename Msg>
+    void push_message(Msg&& msg) {
+        static_assert(!std::is_reference_v<Msg> && !std::is_const_v<Msg>,
+                      "Pushed messages must be rvalues: the sink takes ownership");
+        push_message_internal(Message(std::move(msg)));
+    }
 
     // Waits until work is finished and shuts down worker threads.
     // No work can be done by the node after this returns until
@@ -201,12 +205,16 @@ protected:
     void restart_input_queue() { m_work_queue.restart(); }
 
     // Sends message to the designated sink.
-    void send_message_to_sink(int sink_index, Message&& message);
+    template <typename Msg>
+    void send_message_to_sink(int sink_index, Msg&& message) {
+        m_sinks.at(sink_index).get().push_message(std::forward<Msg>(message));
+    }
 
     // Version for nodes with a single sink that is implicit.
-    void send_message_to_sink(Message&& message) {
+    template <typename Msg>
+    void send_message_to_sink(Msg&& message) {
         assert(m_sinks.size() == 1);
-        send_message_to_sink(0, std::move(message));
+        send_message_to_sink(0, std::forward<Msg>(message));
     }
 
     // Pops the next input message, returning true on success.
@@ -225,6 +233,8 @@ private:
 
     friend class Pipeline;
     void add_sink(MessageSink& sink);
+
+    void push_message_internal(Message&& message);
 };
 
 // Object from which a Pipeline is created.

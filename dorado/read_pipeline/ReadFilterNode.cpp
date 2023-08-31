@@ -34,14 +34,14 @@ void ReadFilterNode::worker_thread() {
             (m_read_ids_to_filter.find(read->read_id) != m_read_ids_to_filter.end())) {
             log_filtering();
         } else {
-            send_message_to_sink(read);
+            send_message_to_sink(std::move(read));
         }
     }
 }
 
 ReadFilterNode::ReadFilterNode(size_t min_qscore,
                                size_t min_read_length,
-                               const std::unordered_set<std::string>& read_ids_to_filter,
+                               std::unordered_set<std::string> read_ids_to_filter,
                                size_t num_worker_threads)
         : MessageSink(1000),
           m_num_worker_threads(num_worker_threads),

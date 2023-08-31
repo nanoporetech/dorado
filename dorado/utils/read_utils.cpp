@@ -27,7 +27,7 @@ std::shared_ptr<Read> shallow_copy_read(const Read& read) {
     copy->model_name = read.model_name;
 
     copy->base_mod_probs = read.base_mod_probs;
-    copy->base_mod_info = read.base_mod_info;
+    copy->mod_base_info = read.mod_base_info;
 
     copy->num_trimmed_samples = read.num_trimmed_samples;
 

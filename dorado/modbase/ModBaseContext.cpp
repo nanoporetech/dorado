@@ -1,18 +1,18 @@
-#include "base_mod_utils.h"
+#include "ModBaseContext.h"
 
-#include "sequence_utils.h"
+#include "utils/sequence_utils.h"
 
 #include <sstream>
 
 namespace dorado::utils {
 
-BaseModContext::BaseModContext() {}
+ModBaseContext::ModBaseContext() {}
 
-const std::string& BaseModContext::motif(char base) const { return m_motifs[base_to_int(base)]; }
+const std::string& ModBaseContext::motif(char base) const { return m_motifs[base_to_int(base)]; }
 
-size_t BaseModContext::motif_offset(char base) const { return m_offsets[base_to_int(base)]; }
+size_t ModBaseContext::motif_offset(char base) const { return m_offsets[base_to_int(base)]; }
 
-void BaseModContext::set_context(std::string motif, size_t offset) {
+void ModBaseContext::set_context(std::string motif, size_t offset) {
     if (motif.size() < 2) {
         // empty motif, or just the canonical base
         return;
@@ -23,7 +23,7 @@ void BaseModContext::set_context(std::string motif, size_t offset) {
     m_offsets[index] = offset;
 }
 
-bool BaseModContext::decode(const std::string& context_string) {
+bool ModBaseContext::decode(const std::string& context_string) {
     std::vector<std::string> tokens;
     std::istringstream context_stream(context_string);
     std::string token;
@@ -51,7 +51,7 @@ bool BaseModContext::decode(const std::string& context_string) {
     return true;
 }
 
-std::string BaseModContext::encode() const {
+std::string ModBaseContext::encode() const {
     std::ostringstream s;
     for (size_t i = 0; i < 4; ++i) {
         if (m_motifs[i].empty()) {
@@ -67,7 +67,7 @@ std::string BaseModContext::encode() const {
     return s.str();
 }
 
-std::vector<int> BaseModContext::get_sequence_mask(std::string_view sequence) const {
+std::vector<int> ModBaseContext::get_sequence_mask(std::string_view sequence) const {
     std::vector<int> mask(sequence.size(), 0);
     for (size_t p = 0; p < sequence.size(); ++p) {
         auto idx = base_to_int(sequence[p]);
@@ -82,7 +82,7 @@ std::vector<int> BaseModContext::get_sequence_mask(std::string_view sequence) co
     return mask;
 }
 
-void BaseModContext::update_mask(std::vector<int>& mask,
+void ModBaseContext::update_mask(std::vector<int>& mask,
                                  const std::string& sequence,
                                  const std::string& modbase_alphabet,
                                  const std::vector<uint8_t>& modbase_probs,

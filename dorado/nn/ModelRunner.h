@@ -1,7 +1,8 @@
 #pragma once
 
-#include "../decode/Decoder.h"
 #include "CRFModel.h"
+#include "CRFModelConfig.h"
+#include "decode/Decoder.h"
 #include "utils/stats.h"
 #include "utils/stitch.h"
 

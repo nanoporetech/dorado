@@ -63,6 +63,13 @@ public:
                 spdlog::info("> Basecalled @ Samples/s: {}", samples_sec.str());
             }
         }
+
+        if (m_num_barcodes_demuxed > 0) {
+            std::ostringstream rate_str;
+            rate_str << std::scientific << m_num_barcodes_demuxed / (duration / 1000.0);
+            spdlog::info("> {} reads demuxed @ classifications/s: {}", m_num_barcodes_demuxed,
+                         rate_str.str());
+        }
     }
 
     void update_progress_bar(const stats::NamedStats& stats) {
@@ -79,7 +86,8 @@ public:
             return 0.;
         };
 
-        m_num_simplex_reads_written = fetch_stat("HtsWriter.unique_simplex_reads_written");
+        m_num_simplex_reads_written = fetch_stat("HtsWriter.unique_simplex_reads_written") +
+                                      fetch_stat("BarcodeDemuxer.demuxed_reads_written");
 
         m_num_simplex_reads_filtered = fetch_stat("ReadFilterNode.simplex_reads_filtered");
         m_num_simplex_bases_filtered = fetch_stat("ReadFilterNode.simplex_bases_filtered");
@@ -94,6 +102,9 @@ public:
         m_num_duplex_reads_written = fetch_stat("HtsWriter.duplex_reads_written");
         m_num_duplex_reads_filtered = fetch_stat("ReadFilterNode.duplex_reads_filtered");
         m_num_duplex_bases_filtered = fetch_stat("ReadFilterNode.duplex_bases_filtered");
+
+        // Barcode demuxing stats.
+        m_num_barcodes_demuxed = fetch_stat("BarcoderNode.num_barcodes_demuxed");
 
         // don't output progress bar if stderr is not a tty
         if (!utils::is_fd_tty(stderr)) {
@@ -134,6 +145,7 @@ private:
     int m_num_duplex_reads_written{0};
     int m_num_duplex_reads_filtered{0};
     int m_num_duplex_bases_filtered{0};
+    int m_num_barcodes_demuxed{0};
 
     int m_num_reads_expected;
 

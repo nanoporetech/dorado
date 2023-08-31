@@ -22,14 +22,16 @@
 #include <unistd.h>
 #endif
 
+#include "dev_utils.h"
+
 namespace dorado {
 
 namespace utils {
 
 // Determine the thread allocation for writer and aligner threads
 // in dorado aligner.
-inline std::pair<int, int> aligner_writer_thread_allocation(int available_threads,
-                                                            float writer_thread_fraction) {
+inline std::pair<int, int> worker_vs_writer_thread_allocation(int available_threads,
+                                                              float writer_thread_fraction) {
     // clamping because we need at least 1 thread for alignment and for writing.
     int writer_threads =
             std::clamp(static_cast<int>(std::floor(writer_thread_fraction * available_threads)), 1,
@@ -83,8 +85,12 @@ inline argparse::ArgumentParser parse_internal_options(
     private_parser.add_argument("--dump_stats_filter")
             .help("Internal processing stats. name filter regex.")
             .default_value(std::string(""));
+    private_parser.add_argument("--devopts")
+            .help("Internal options for testing & debugging, 'key=value' pairs separated by ';'")
+            .default_value(std::string(""));
     args.insert(args.begin(), prog_name);
     private_parser.parse_args(args);
+    details::extract_dev_options(private_parser.get<std::string>("--devopts"));
 
     return private_parser;
 }

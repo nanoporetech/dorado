@@ -1,6 +1,6 @@
 #include "Version.h"
 #include "data_loader/DataLoader.h"
-#include "nn/CRFModel.h"
+#include "nn/CRFModelConfig.h"
 #include "nn/Runners.h"
 #include "read_pipeline/AlignerNode.h"
 #include "read_pipeline/BaseSpaceDuplexCallerNode.h"
@@ -78,7 +78,10 @@ int duplex(int argc, char* argv[]) {
                   "reads will be basecalled")
             .default_value(std::string(""));
 
-    parser.add_argument("--min-qscore").default_value(0).scan<'i', int>();
+    parser.add_argument("--min-qscore")
+            .help("Discard reads with mean Q-score below this threshold.")
+            .default_value(0)
+            .scan<'i', int>();
 
     parser.add_argument("--reference")
             .help("Path to reference for alignment.")
@@ -96,13 +99,6 @@ int duplex(int argc, char* argv[]) {
     parser.add_argument("-v", "--verbose").default_value(false).implicit_value(true);
 
     parser.add_argument("-I").help("minimap2 index batch size.").default_value(std::string("16G"));
-
-    parser.add_argument("--guard-gpus")
-            .default_value(false)
-            .implicit_value(true)
-            .help("In case of GPU OOM, use this option to be more defensive with GPU memory. May "
-                  "cause "
-                  "performance regression.");
 
     try {
         auto remaining_args = parser.parse_known_args(argc, argv);
@@ -247,7 +243,12 @@ int duplex(int argc, char* argv[]) {
 
             // Check sample rate of model vs data.
             auto data_sample_rate = DataLoader::get_sample_rate(reads, recursive_file_loading);
-            auto model_sample_rate = get_model_sample_rate(model_path);
+            auto model_sample_rate = model_config.sample_rate;
+            if (model_sample_rate < 0) {
+                // If unsuccessful, find sample rate by model name.
+                model_sample_rate = utils::get_sample_rate_by_model_name(
+                        utils::extract_model_from_model_path(model_path.string()));
+            }
             auto skip_model_compatibility_check =
                     internal_parser.get<bool>("--skip-model-compatibility-check");
             if (!skip_model_compatibility_check &&
@@ -316,9 +317,18 @@ int duplex(int argc, char* argv[]) {
                 pairing_parameters = std::move(template_complement_map);
             }
 
+            auto mean_qscore_start_pos = model_config.mean_qscore_start_pos;
+            if (mean_qscore_start_pos < 0) {
+                mean_qscore_start_pos =
+                        utils::get_mean_qscore_start_pos_by_model_name(stereo_model_name);
+                if (mean_qscore_start_pos < 0) {
+                    throw std::runtime_error("Mean q-score start position cannot be < 0");
+                }
+            }
             pipelines::create_stereo_duplex_pipeline(
                     pipeline_desc, std::move(runners), std::move(stereo_runners), overlap,
-                    num_devices * 2, num_devices, std::move(pairing_parameters), read_filter_node);
+                    mean_qscore_start_pos, num_devices * 2, num_devices,
+                    std::move(pairing_parameters), read_filter_node);
 
             std::vector<dorado::stats::StatsReporter> stats_reporters;
             pipeline = Pipeline::create(std::move(pipeline_desc), &stats_reporters);

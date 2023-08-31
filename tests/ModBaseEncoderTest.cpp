@@ -1,9 +1,9 @@
-#include "modbase/remora_encoder.h"
+#include "modbase/modbase_encoder.h"
 #include "utils/sequence_utils.h"
 
 #include <catch2/catch.hpp>
 
-#define TEST_GROUP "[remora_encoder]"
+#define TEST_GROUP "[modbase_encoder]"
 
 TEST_CASE("Encode sequence for modified basecalling", TEST_GROUP) {
     const size_t BLOCK_STRIDE = 2;
@@ -17,7 +17,7 @@ TEST_CASE("Encode sequence for modified basecalling", TEST_GROUP) {
     auto seq_to_sig_map =
             dorado::utils::moves_to_map(moves, BLOCK_STRIDE, moves.size() * BLOCK_STRIDE);
 
-    dorado::RemoraEncoder encoder(BLOCK_STRIDE, SLICE_BLOCKS * BLOCK_STRIDE, 1, 1);
+    dorado::ModBaseEncoder encoder(BLOCK_STRIDE, SLICE_BLOCKS * BLOCK_STRIDE, 1, 1);
     encoder.init(seq_ints, seq_to_sig_map);
 
     auto slice0 = encoder.get_context(0);  // The T in the NTA 3mer.

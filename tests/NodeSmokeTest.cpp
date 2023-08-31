@@ -1,9 +1,9 @@
 #include "MessageSinkUtils.h"
 #include "decode/CPUDecoder.h"
 #include "nn/CRFModel.h"
+#include "nn/ModBaseModel.h"
 #include "nn/ModBaseRunner.h"
 #include "nn/ModelRunner.h"
-#include "nn/RemoraModel.h"
 #include "read_pipeline/BasecallerNode.h"
 #include "read_pipeline/ModBaseCallerNode.h"
 #include "read_pipeline/ReadFilterNode.h"
@@ -156,7 +156,9 @@ TempDir download_model(std::string const& model) {
 
 DEFINE_TEST(NodeSmokeTestRead, "ScalerNode") {
     auto pipeline_restart = GENERATE(false, true);
+    auto is_rna = GENERATE(true, false);
     CAPTURE(pipeline_restart);
+    CAPTURE(is_rna);
 
     set_pipeline_restart(pipeline_restart);
 
@@ -170,7 +172,7 @@ DEFINE_TEST(NodeSmokeTestRead, "ScalerNode") {
     config.quantile_b = 0.9;
     config.shift_multiplier = 0.51;
     config.scale_multiplier = 0.53;
-    run_smoke_test<dorado::ScalerNode>(config, 2);
+    run_smoke_test<dorado::ScalerNode>(config, is_rna, 2);
 }
 
 DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {

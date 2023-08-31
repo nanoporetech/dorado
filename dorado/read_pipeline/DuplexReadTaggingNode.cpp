@@ -44,13 +44,13 @@ void DuplexReadTaggingNode::worker_thread() {
         // the ones whose duplex offsprings never came. They are retagged to not be
         // duplex parents and then sent downstream.
         if (!read->is_duplex && !read->is_duplex_parent) {
-            send_message_to_sink(read);
+            send_message_to_sink(std::move(read));
         } else if (read->is_duplex) {
             std::string template_read_id = read->read_id.substr(0, read->read_id.find(';'));
             std::string complement_read_id =
                     read->read_id.substr(read->read_id.find(';') + 1, read->read_id.length());
 
-            send_message_to_sink(read);
+            send_message_to_sink(std::move(read));
 
             for (auto& rid : {template_read_id, complement_read_id}) {
                 if (m_parents_processed.find(rid) != m_parents_processed.end()) {
@@ -61,7 +61,7 @@ void DuplexReadTaggingNode::worker_thread() {
                 if (find_parent != m_duplex_parents.end()) {
                     // Parent read has been seen. Process it and send it
                     // downstream.
-                    send_message_to_sink(find_parent->second);
+                    send_message_to_sink(std::move(find_parent->second));
                     m_parents_processed.insert(rid);
                     m_duplex_parents.erase(find_parent);
                 } else {
@@ -76,8 +76,8 @@ void DuplexReadTaggingNode::worker_thread() {
                 // If a read is in the parents wanted list, then sent it downstream
                 // and add it to the set of processed reads. It will also be removed
                 // from the parent reads being looked for.
-                send_message_to_sink(read);
                 m_parents_processed.insert(read->read_id);
+                send_message_to_sink(std::move(read));
                 m_parents_wanted.erase(find_read);
             } else {
                 // No duplex offspring is seen so far, so hold it and track
@@ -89,7 +89,7 @@ void DuplexReadTaggingNode::worker_thread() {
 
     for (auto& [k, v] : m_duplex_parents) {
         v->is_duplex_parent = false;
-        send_message_to_sink(v);
+        send_message_to_sink(std::move(v));
     }
 }
 

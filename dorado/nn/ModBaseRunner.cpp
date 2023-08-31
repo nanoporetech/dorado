@@ -1,9 +1,9 @@
 #include "ModBaseRunner.h"
 
-#include "RemoraModel.h"
-#include "modbase/remora_scaler.h"
-#include "modbase/remora_utils.h"
-#include "utils/base_mod_utils.h"
+#include "ModBaseModel.h"
+#include "ModBaseModelConfig.h"
+#include "modbase/modbase_scaler.h"
+#include "utils/sequence_utils.h"
 #include "utils/stats.h"
 #include "utils/tensor_utils.h"
 
@@ -23,54 +23,6 @@ using namespace std::chrono_literals;
 
 namespace dorado {
 
-void ModBaseParams::parse(std::filesystem::path const& model_path, bool all_members) {
-    auto config = toml::parse(model_path / "config.toml");
-    const auto& params = toml::find(config, "modbases");
-    motif = toml::find<std::string>(params, "motif");
-    motif_offset = toml::find<int>(params, "motif_offset");
-
-    mod_bases = toml::find<std::string>(params, "mod_bases");
-    for (size_t i = 0; i < mod_bases.size(); ++i) {
-        mod_long_names.push_back(
-                toml::find<std::string>(params, "mod_long_names_" + std::to_string(i)));
-    }
-
-    if (!all_members) {
-        return;
-    }
-
-    base_mod_count = mod_long_names.size();
-
-    context_before = toml::find<int>(params, "chunk_context_0");
-    context_after = toml::find<int>(params, "chunk_context_1");
-    bases_before = toml::find<int>(params, "kmer_context_bases_0");
-    bases_after = toml::find<int>(params, "kmer_context_bases_1");
-    offset = toml::find<int>(params, "offset");
-
-    if (config.contains("refinement")) {
-        // these may not exist if we convert older models
-        const auto& refinement_params = toml::find(config, "refinement");
-        refine_do_rough_rescale =
-                (toml::find<int>(refinement_params, "refine_do_rough_rescale") == 1);
-        if (refine_do_rough_rescale) {
-            refine_kmer_center_idx = toml::find<int>(refinement_params, "refine_kmer_center_idx");
-
-            auto kmer_levels_tensor =
-                    utils::load_tensors(model_path, {"refine_kmer_levels.tensor"})[0].contiguous();
-            std::copy(kmer_levels_tensor.data_ptr<float>(),
-                      kmer_levels_tensor.data_ptr<float>() + kmer_levels_tensor.numel(),
-                      std::back_inserter(refine_kmer_levels));
-            refine_kmer_len = static_cast<size_t>(
-                    std::round(std::log(refine_kmer_levels.size()) / std::log(4)));
-        }
-
-    } else {
-        // if the toml file doesn't contain any of the above parameters then
-        // the model doesn't support rescaling so turn it off
-        refine_do_rough_rescale = false;
-    }
-}
-
 class ModBaseCaller {
 public:
     struct ModBaseTask {
@@ -87,8 +39,8 @@ public:
 
     struct ModBaseData {
         torch::nn::ModuleHolder<torch::nn::AnyModule> module_holder{nullptr};
-        std::unique_ptr<RemoraScaler> scaler{nullptr};
-        ModBaseParams params{};
+        std::unique_ptr<ModBaseScaler> scaler{nullptr};
+        ModBaseModelConfig params{};
         std::deque<std::shared_ptr<ModBaseTask>> input_queue;
         std::mutex input_lock;
         std::condition_variable input_cv;
@@ -148,12 +100,12 @@ public:
             auto caller_data = std::make_unique<ModBaseData>();
 
             torch::InferenceMode guard;
-            caller_data->module_holder = load_remora_model(model_path, m_options);
-            caller_data->params.parse(model_path);
+            caller_data->module_holder = load_modbase_model(model_path, m_options);
+            caller_data->params = load_modbase_model_config(model_path);
             caller_data->batch_size = batch_size;
 
             if (caller_data->params.refine_do_rough_rescale) {
-                caller_data->scaler = std::make_unique<RemoraScaler>(
+                caller_data->scaler = std::make_unique<ModBaseScaler>(
                         caller_data->params.refine_kmer_levels, caller_data->params.refine_kmer_len,
                         caller_data->params.refine_kmer_center_idx);
             }
@@ -171,7 +123,7 @@ public:
                 // Warmup
                 auto input_sigs = torch::empty({batch_size, 1, sig_len}, m_options);
                 auto input_seqs = torch::empty(
-                        {batch_size, sig_len, RemoraUtils::NUM_BASES * kmer_len}, m_options);
+                        {batch_size, sig_len, utils::BaseInfo::NUM_BASES * kmer_len}, m_options);
                 caller_data->module_holder->forward(input_sigs, input_seqs);
                 torch::cuda::synchronize(m_options.device().index());
             }
@@ -336,9 +288,9 @@ ModBaseRunner::ModBaseRunner(std::shared_ptr<ModBaseCaller> caller) : m_caller(s
                                             caller_data->params.context_after);
         auto kmer_len = caller_data->params.bases_after + caller_data->params.bases_before + 1;
         m_input_sigs.push_back(torch::empty({caller_data->batch_size, 1, sig_len}, opts));
-        m_input_seqs.push_back(
-                torch::empty({caller_data->batch_size, sig_len, RemoraUtils::NUM_BASES * kmer_len},
-                             seq_input_options));
+        m_input_seqs.push_back(torch::empty(
+                {caller_data->batch_size, sig_len, utils::BaseInfo::NUM_BASES * kmer_len},
+                seq_input_options));
     }
 }
 
@@ -388,7 +340,7 @@ std::vector<size_t> ModBaseRunner::get_motif_hits(size_t caller_id, const std::s
     return m_caller->m_caller_data[caller_id]->get_motif_hits(seq);
 }
 
-ModBaseParams& ModBaseRunner::caller_params(size_t caller_id) const {
+ModBaseModelConfig const& ModBaseRunner::caller_params(size_t caller_id) const {
     return m_caller->m_caller_data[caller_id]->params;
 }
 
