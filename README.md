@@ -178,9 +178,9 @@ The following simplex models are also available (all for 4 kHz data):
 
 * rna002_70bps_fast@v3
 * rna002_70bps_hac@v3
-* rna004_130bps_fast@v3
-* rna004_130bps_hac@v3
-* rna004_130bps_sup@v3
+* rna004_130bps_fast@v3.0.1
+* rna004_130bps_hac@v3.0.1
+* rna004_130bps_sup@v3.0.1
 
 ### **Modified base models**
 
