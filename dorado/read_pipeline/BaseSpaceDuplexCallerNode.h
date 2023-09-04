@@ -30,6 +30,6 @@ private:
     size_t m_num_worker_threads{1};
     std::unique_ptr<std::thread> m_worker_thread;
     std::map<std::string, std::string> m_template_complement_map;
-    read_map m_reads;
+    read_map const m_reads;
 };
 }  // namespace dorado

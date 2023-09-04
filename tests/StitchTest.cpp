@@ -64,7 +64,7 @@ TEST_CASE("Test stitch_chunks", TEST_GROUP) {
         called_chunks.push_back(std::move(chunk));
     }
 
-    auto read = std::make_shared<dorado::Read>();
+    dorado::Read read;
     REQUIRE_NOTHROW(dorado::utils::stitch_chunks(read, called_chunks));
 
     const std::string expected_sequence = "ACGTCGCGTCGTCGTCCGT";
@@ -73,7 +73,7 @@ TEST_CASE("Test stitch_chunks", TEST_GROUP) {
                                                  1, 0, 1, 1, 0, 0, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0, 0,
                                                  1, 0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1, 0, 1};
 
-    REQUIRE(read->seq == expected_sequence);
-    REQUIRE(read->qstring == expected_qstring);
-    REQUIRE(read->moves == expected_moves);
+    REQUIRE(read.seq == expected_sequence);
+    REQUIRE(read.qstring == expected_qstring);
+    REQUIRE(read.moves == expected_moves);
 }

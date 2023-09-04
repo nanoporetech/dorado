@@ -23,7 +23,7 @@ class PairingNode : public MessageSink {
     using UniquePoreIdentifierKey = std::tuple<int, std::string, std::string>;
 
     struct ReadCache {
-        std::map<UniquePoreIdentifierKey, std::list<std::shared_ptr<Read>>> channel_read_map;
+        std::map<UniquePoreIdentifierKey, std::list<ReadPtr>> channel_read_map;
         std::deque<UniquePoreIdentifierKey> working_channel_keys;
     };
 
@@ -78,7 +78,7 @@ private:
 
     std::map<std::string, std::string> m_template_complement_map;
     std::map<std::string, std::string> m_complement_template_map;
-    std::map<std::string, std::shared_ptr<Read>> m_read_cache;
+    std::map<std::string, ReadPtr> m_read_cache;
 
     // Members for pair_generating method
 
@@ -104,12 +104,12 @@ private:
     size_t m_max_num_reads;
 
     using PairingResult = std::tuple<bool, uint32_t, uint32_t, uint32_t, uint32_t>;
-    PairingResult is_within_time_and_length_criteria(const std::shared_ptr<dorado::Read>& read1,
-                                                     const std::shared_ptr<dorado::Read>& read2,
+    PairingResult is_within_time_and_length_criteria(const dorado::Read& read1,
+                                                     const dorado::Read& read2,
                                                      int tid);
 
-    PairingResult is_within_alignment_criteria(const std::shared_ptr<dorado::Read>& temp,
-                                               const std::shared_ptr<dorado::Read>& comp,
+    PairingResult is_within_alignment_criteria(const dorado::Read& temp,
+                                               const dorado::Read& comp,
                                                int delta,
                                                bool allow_rejection,
                                                int tid);
@@ -119,8 +119,8 @@ private:
 
     // Track reads which need to be emptied from the cache but are still being
     // evaluated for pairs by other threads.
-    std::unordered_map<std::shared_ptr<Read>, std::atomic<int>> m_reads_in_flight_ctr;
-    std::unordered_set<std::shared_ptr<Read>> m_reads_to_clear;
+    std::unordered_map<Read const*, std::atomic<int>> m_reads_in_flight_ctr;
+    std::unordered_set<ReadPtr> m_reads_to_clear;
 
     // Stats tracking for pairing node.
     std::atomic<int> m_early_accepted_pairs{0};

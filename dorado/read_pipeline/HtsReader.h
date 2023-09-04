@@ -13,7 +13,7 @@
 
 namespace dorado {
 
-using read_map = std::unordered_map<std::string, std::shared_ptr<Read>>;
+using read_map = std::unordered_map<std::string, ReadPtr>;
 
 class Pipeline;
 

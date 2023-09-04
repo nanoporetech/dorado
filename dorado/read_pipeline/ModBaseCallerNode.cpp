@@ -38,7 +38,7 @@ struct ModBaseCallerNode::RemoraChunk {
 };
 
 struct ModBaseCallerNode::WorkingRead {
-    std::shared_ptr<Read> read;  // The read itself.
+    ReadPtr read;  // The read itself.
     size_t num_modbase_chunks;
     std::atomic_size_t
             num_modbase_chunks_called;  // Number of modbase chunks which have been scored
@@ -147,14 +147,14 @@ void ModBaseCallerNode::input_worker_thread() {
     Message message;
     while (get_input_message(message)) {
         // If this message isn't a read, just forward it to the sink.
-        if (!std::holds_alternative<std::shared_ptr<Read>>(message)) {
+        if (!std::holds_alternative<ReadPtr>(message)) {
             send_message_to_sink(std::move(message));
             continue;
         }
 
         nvtx3::scoped_range range{"modbase_input_worker_thread"};
         // If this message isn't a read, we'll get a bad_variant_access exception.
-        auto read = std::get<std::shared_ptr<Read>>(message);
+        auto read = std::get<ReadPtr>(std::move(message));
 
         while (true) {
             stats::Timer timer;

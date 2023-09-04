@@ -33,7 +33,7 @@ struct BasecallerNode::BasecallingChunk : utils::Chunk {
 };
 
 struct BasecallerNode::BasecallingRead {
-    std::shared_ptr<Read> read;                                // The read itself.
+    ReadPtr read;                                              // The read itself.
     std::vector<std::unique_ptr<utils::Chunk>> called_chunks;  // Vector of basecalled chunks.
     std::atomic_size_t num_chunks_called;  // Number of chunks which have been basecalled.
 };
@@ -44,13 +44,13 @@ void BasecallerNode::input_worker_thread() {
     Message message;
     while (get_input_message(message)) {
         // If this message isn't a read, just forward it to the sink.
-        if (!std::holds_alternative<std::shared_ptr<Read>>(message)) {
+        if (!std::holds_alternative<ReadPtr>(message)) {
             send_message_to_sink(std::move(message));
             continue;
         }
 
         // If this message isn't a read, we'll get a bad_variant_access exception.
-        auto read = std::get<std::shared_ptr<Read>>(message);
+        auto read = std::get<ReadPtr>(std::move(message));
         // If a read has already been basecalled, just send it to the sink without basecalling again
         // TODO: This is necessary because some reads (e.g failed Stereo Encoding) will be passed
         // to the basecaller node having already been called. This should be fixed in the future with
@@ -139,7 +139,7 @@ void BasecallerNode::working_reads_manager() {
         if (num_chunks_called == working_read->called_chunks.size()) {
             // Finalise the read.
             auto source_read = std::move(working_read->read);
-            utils::stitch_chunks(source_read, working_read->called_chunks);
+            utils::stitch_chunks(*source_read, working_read->called_chunks);
             source_read->model_name = m_model_name;
             source_read->mean_qscore_start_pos = m_mean_qscore_start_pos;
 
@@ -203,7 +203,7 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
         // FIXME -- it should not be possible to for this condition to be untrue.
         if (m_batched_chunks[worker_id].size() != batch_size) {
             // Copy the chunk into the input tensor
-            std::shared_ptr<Read> source_read = chunk->owning_read->read;
+            auto &source_read = chunk->owning_read->read;
 
             auto input_slice = source_read->raw_data.index(
                     {Ellipsis, Slice(chunk->input_offset, chunk->input_offset + m_chunk_size)});

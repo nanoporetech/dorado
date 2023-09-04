@@ -24,7 +24,7 @@ TEST_CASE("ReadFilterNode: Filter read based on qscore", TEST_GROUP) {
     {
         auto pipeline = make_filtered_pipeline(messages, 12, 0, {});
 
-        std::shared_ptr<dorado::Read> read_1(new dorado::Read());
+        auto read_1 = dorado::ReadPtr::make();
         read_1->raw_data = torch::empty(100);
         read_1->sample_rate = 4000;
         read_1->shift = 128.3842f;
@@ -39,7 +39,7 @@ TEST_CASE("ReadFilterNode: Filter read based on qscore", TEST_GROUP) {
         read_1->attributes.start_time = "2017-04-29T09:10:04Z";
         read_1->attributes.fast5_filename = "batch_0.fast5";
 
-        std::shared_ptr<dorado::Read> read_2(new dorado::Read());
+        auto read_2 = dorado::ReadPtr::make();
         read_2->raw_data = torch::empty(100);
         read_2->sample_rate = 4000;
         read_2->shift = 128.3842f;
@@ -58,7 +58,7 @@ TEST_CASE("ReadFilterNode: Filter read based on qscore", TEST_GROUP) {
         pipeline->push_message(std::move(read_2));
     }
 
-    auto reads = ConvertMessages<std::shared_ptr<dorado::Read>>(std::move(messages));
+    auto reads = ConvertMessages<dorado::ReadPtr>(std::move(messages));
     REQUIRE(reads.size() == 1);
     CHECK(reads[0]->read_id == "read_2");
 }
@@ -68,7 +68,7 @@ TEST_CASE("ReadFilterNode: Filter read based on read name", TEST_GROUP) {
     {
         auto pipeline = make_filtered_pipeline(messages, 0, 0, {"read_2"});
 
-        std::shared_ptr<dorado::Read> read_1(new dorado::Read());
+        auto read_1 = dorado::ReadPtr::make();
         read_1->raw_data = torch::empty(100);
         read_1->sample_rate = 4000;
         read_1->shift = 128.3842f;
@@ -83,7 +83,7 @@ TEST_CASE("ReadFilterNode: Filter read based on read name", TEST_GROUP) {
         read_1->attributes.start_time = "2017-04-29T09:10:04Z";
         read_1->attributes.fast5_filename = "batch_0.fast5";
 
-        std::shared_ptr<dorado::Read> read_2(new dorado::Read());
+        auto read_2 = dorado::ReadPtr::make();
         read_2->raw_data = torch::empty(100);
         read_2->sample_rate = 4000;
         read_2->shift = 128.3842f;
@@ -102,7 +102,7 @@ TEST_CASE("ReadFilterNode: Filter read based on read name", TEST_GROUP) {
         pipeline->push_message(std::move(read_2));
     }
 
-    auto reads = ConvertMessages<std::shared_ptr<dorado::Read>>(messages);
+    auto reads = ConvertMessages<dorado::ReadPtr>(std::move(messages));
     REQUIRE(reads.size() == 1);
     CHECK(reads[0]->read_id == "read_1");
 }
@@ -112,7 +112,7 @@ TEST_CASE("ReadFilterNode: Filter read based on read length", TEST_GROUP) {
     {
         auto pipeline = make_filtered_pipeline(messages, 0, 5, {});
 
-        std::shared_ptr<dorado::Read> read_1(new dorado::Read());
+        auto read_1 = dorado::ReadPtr::make();
         read_1->raw_data = torch::empty(100);
         read_1->sample_rate = 4000;
         read_1->shift = 128.3842f;
@@ -127,7 +127,7 @@ TEST_CASE("ReadFilterNode: Filter read based on read length", TEST_GROUP) {
         read_1->attributes.start_time = "2017-04-29T09:10:04Z";
         read_1->attributes.fast5_filename = "batch_0.fast5";
 
-        std::shared_ptr<dorado::Read> read_2(new dorado::Read());
+        auto read_2 = dorado::ReadPtr::make();
         read_2->raw_data = torch::empty(100);
         read_2->sample_rate = 4000;
         read_2->shift = 128.3842f;
@@ -146,7 +146,7 @@ TEST_CASE("ReadFilterNode: Filter read based on read length", TEST_GROUP) {
         pipeline->push_message(std::move(read_2));
     }
 
-    auto reads = ConvertMessages<std::shared_ptr<dorado::Read>>(messages);
+    auto reads = ConvertMessages<dorado::ReadPtr>(std::move(messages));
     REQUIRE(reads.size() == 1);
     CHECK(reads[0]->read_id == "read_1");
 }

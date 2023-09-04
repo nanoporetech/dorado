@@ -58,11 +58,11 @@ void string_reader(HighFive::Attribute& attribute, std::string& target_str) {
 
 namespace dorado {
 
-std::shared_ptr<dorado::Read> process_pod5_read(size_t row,
-                                                Pod5ReadRecordBatch* batch,
-                                                Pod5FileReader* file,
-                                                const std::string path,
-                                                std::string device) {
+ReadPtr process_pod5_read(size_t row,
+                          Pod5ReadRecordBatch* batch,
+                          Pod5FileReader* file,
+                          const std::string path,
+                          std::string device) {
     uint16_t read_table_version = 0;
     ReadBatchRowInfo_t read_data;
     if (pod5_get_read_batch_row_info_data(batch, row, READ_BATCH_ROW_INFO_VERSION, &read_data,
@@ -90,7 +90,7 @@ std::shared_ptr<dorado::Read> process_pod5_read(size_t row,
         spdlog::error("Failed to get read {} signal: {}", row, pod5_get_error_string());
     }
 
-    auto new_read = std::make_shared<dorado::Read>();
+    auto new_read = ReadPtr::make();
     new_read->raw_data = samples;
     new_read->sample_rate = run_sample_rate;
 
@@ -612,7 +612,7 @@ void DataLoader::load_pod5_reads_from_file_by_read_ids(const std::string& path,
             continue;
         }
 
-        std::vector<std::future<std::shared_ptr<Read>>> futures;
+        std::vector<std::future<ReadPtr>> futures;
         for (std::size_t row_idx = 0; row_idx < traversal_batch_counts[batch_index]; row_idx++) {
             uint32_t row = traversal_batch_rows[row_idx + row_offset];
 
@@ -670,7 +670,7 @@ void DataLoader::load_pod5_reads_from_file(const std::string& path) {
         }
         batch_row_count = std::min(batch_row_count, m_max_reads - m_loaded_read_count);
 
-        std::vector<std::future<std::shared_ptr<Read>>> futures;
+        std::vector<std::future<ReadPtr>> futures;
 
         for (std::size_t row = 0; row < batch_row_count; ++row) {
             // TODO - check the read ID here, for each one, only send the row if it is in the list of ones we care about
@@ -764,7 +764,7 @@ void DataLoader::load_fast5_reads_from_file(const std::string& path) {
         auto start_time_str = utils::adjust_time(exp_start_time,
                                                  static_cast<uint32_t>(start_time / sampling_rate));
 
-        auto new_read = std::make_shared<Read>();
+        auto new_read = ReadPtr::make();
         new_read->sample_rate = sampling_rate;
         new_read->raw_data = samples;
         new_read->digitisation = digitisation;
