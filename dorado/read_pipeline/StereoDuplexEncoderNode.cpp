@@ -277,15 +277,15 @@ void StereoDuplexEncoderNode::worker_thread() {
 
     Message message;
     while (get_input_message(message)) {
-        if (!std::holds_alternative<std::shared_ptr<ReadPair>>(message)) {
+        if (!std::holds_alternative<ReadPair>(message)) {
             send_message_to_sink(std::move(message));
             continue;
         }
 
-        auto read_pair = std::get<std::shared_ptr<ReadPair>>(message);
-        std::shared_ptr<Read> stereo_encoded_read = stereo_encode(
-                read_pair->read_1, read_pair->read_2, read_pair->read_1_start,
-                read_pair->read_1_end, read_pair->read_2_start, read_pair->read_2_end);
+        auto read_pair = std::get<ReadPair>(std::move(message));
+        auto stereo_encoded_read =
+                stereo_encode(read_pair.read_1, read_pair.read_2, read_pair.read_1_start,
+                              read_pair.read_1_end, read_pair.read_2_start, read_pair.read_2_end);
 
         send_message_to_sink(
                 std::move(stereo_encoded_read));  // Stereo-encoded read created, send it to sink

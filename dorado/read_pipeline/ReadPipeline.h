@@ -107,8 +107,8 @@ private:
 // A pair of reads for Duplex calling
 class ReadPair {
 public:
-    std::shared_ptr<Read> read_1;
-    std::shared_ptr<Read> read_2;
+    std::shared_ptr<const Read> read_1;
+    std::shared_ptr<const Read> read_2;
     uint64_t read_1_start;
     uint64_t read_1_end;
     uint64_t read_2_start;
@@ -124,10 +124,9 @@ public:
 // It is currently able to store:
 // - a std::shared_ptr<Read> object, which represents a single read
 // - a BamPtr object, which represents a raw BAM alignment record
-// - a std::shared_ptr<ReadPair> object, which represents a pair of reads for duplex calling
+// - a ReadPair object, which represents a pair of reads for duplex calling
 // To add more message types, simply add them to the list of types in the std::variant.
-using Message =
-        std::variant<std::shared_ptr<Read>, BamPtr, std::shared_ptr<ReadPair>, CacheFlushMessage>;
+using Message = std::variant<std::shared_ptr<Read>, BamPtr, ReadPair, CacheFlushMessage>;
 
 using NodeHandle = int;
 

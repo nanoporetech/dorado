@@ -216,7 +216,7 @@ void PairingNode::pair_list_worker_thread(int tid) {
 
                     ++template_read->num_duplex_candidate_pairs;
 
-                    send_message_to_sink(std::make_shared<ReadPair>(read_pair));
+                    send_message_to_sink(std::move(read_pair));
                 } else {
                     spdlog::debug("- rejected explicitly requested read pair: {} and {}",
                                   template_read->read_id, complement_read->read_id);
@@ -331,7 +331,7 @@ void PairingNode::pair_generating_worker_thread(int tid) {
                     read->is_duplex_parent = true;
                     later_read->is_duplex_parent = true;
                     ++read->num_duplex_candidate_pairs;
-                    send_message_to_sink(std::make_shared<ReadPair>(pair));
+                    send_message_to_sink(std::move(pair));
                     found_pair = true;
                 }
             }
@@ -344,7 +344,7 @@ void PairingNode::pair_generating_worker_thread(int tid) {
                     earlier_read->is_duplex_parent = true;
                     read->is_duplex_parent = true;
                     ++(earlier_read)->num_duplex_candidate_pairs;
-                    send_message_to_sink(std::make_shared<ReadPair>(pair));
+                    send_message_to_sink(std::move(pair));
                 }
             }
 
