@@ -41,45 +41,41 @@ void BasecallerNode::input_worker_thread() {
             continue;
         }
         // Now that we have acquired a read, wait until we can push to chunks_in
-        while (true) {
-            // Chunk up the read and put the chunks into the pending chunk list.
-            size_t raw_size =
-                    read->raw_data.sizes()[read->raw_data.sizes().size() - 1];  // Time dimension.
+        // Chunk up the read and put the chunks into the pending chunk list.
+        size_t raw_size =
+                read->raw_data.sizes()[read->raw_data.sizes().size() - 1];  // Time dimension.
 
-            size_t offset = 0;
-            size_t chunk_in_read_idx = 0;
-            size_t signal_chunk_step = m_chunk_size - m_overlap;
-            std::vector<std::unique_ptr<Chunk>> read_chunks;
+        size_t offset = 0;
+        size_t chunk_in_read_idx = 0;
+        size_t signal_chunk_step = m_chunk_size - m_overlap;
+        std::vector<std::unique_ptr<Chunk>> read_chunks;
+        read_chunks.push_back(
+                std::make_unique<Chunk>(read, offset, chunk_in_read_idx++, m_chunk_size));
+        read->num_chunks = 1;
+        auto last_chunk_offset = raw_size - m_chunk_size;
+        auto misalignment = last_chunk_offset % m_model_stride;
+        if (misalignment != 0) {
+            // move last chunk start to the next stride boundary. we'll zero pad any excess samples required.
+            last_chunk_offset += m_model_stride - misalignment;
+        }
+        while (offset + m_chunk_size < raw_size) {
+            offset = std::min(offset + signal_chunk_step, last_chunk_offset);
             read_chunks.push_back(
                     std::make_unique<Chunk>(read, offset, chunk_in_read_idx++, m_chunk_size));
-            read->num_chunks = 1;
-            auto last_chunk_offset = raw_size - m_chunk_size;
-            auto misalignment = last_chunk_offset % m_model_stride;
-            if (misalignment != 0) {
-                // move last chunk start to the next stride boundary. we'll zero pad any excess samples required.
-                last_chunk_offset += m_model_stride - misalignment;
-            }
-            while (offset + m_chunk_size < raw_size) {
-                offset = std::min(offset + signal_chunk_step, last_chunk_offset);
-                read_chunks.push_back(
-                        std::make_unique<Chunk>(read, offset, chunk_in_read_idx++, m_chunk_size));
-                read->num_chunks++;
-            }
-            read->called_chunks.resize(read->num_chunks);
-            read->num_chunks_called.store(0);
+            read->num_chunks++;
+        }
+        read->called_chunks.resize(read->num_chunks);
+        read->num_chunks_called.store(0);
 
-            // Put the read in the working list
-            {
-                std::lock_guard working_reads_lock(m_working_reads_mutex);
-                m_working_reads.insert(std::move(read));
-                ++m_working_reads_size;
-            }
+        // Put the read in the working list
+        {
+            std::lock_guard working_reads_lock(m_working_reads_mutex);
+            m_working_reads.insert(std::move(read));
+            ++m_working_reads_size;
+        }
 
-            for (auto &chunk : read_chunks) {
-                m_chunks_in.try_push(std::move(chunk));
-            }
-
-            break;  // Go back to watching the input reads
+        for (auto &chunk : read_chunks) {
+            m_chunks_in.try_push(std::move(chunk));
         }
     }
 
