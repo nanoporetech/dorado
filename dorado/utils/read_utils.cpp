@@ -14,8 +14,6 @@ std::shared_ptr<Read> shallow_copy_read(const Read& read) {
 
     copy->scaling = read.scaling;
 
-    copy->num_modbase_chunks = read.num_modbase_chunks;
-
     copy->model_stride = read.model_stride;
 
     copy->read_id = read.read_id;

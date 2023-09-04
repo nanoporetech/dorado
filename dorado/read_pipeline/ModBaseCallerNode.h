@@ -17,9 +17,11 @@
 namespace dorado {
 
 class ModBaseRunner;
-struct RemoraChunk;
 
 class ModBaseCallerNode : public MessageSink {
+    struct RemoraChunk;
+    struct WorkingRead;
+
 public:
     ModBaseCallerNode(std::vector<std::unique_ptr<ModBaseRunner>> model_runners,
                       size_t remora_threads,
@@ -66,7 +68,7 @@ private:
 
     std::mutex m_working_reads_mutex;
     // Reads removed from input queue and being modbasecalled.
-    std::unordered_set<std::shared_ptr<Read>> m_working_reads;
+    std::unordered_set<std::shared_ptr<WorkingRead>> m_working_reads;
 
     std::atomic<int> m_num_active_runner_workers{0};
     std::atomic<int> m_num_active_input_workers{0};

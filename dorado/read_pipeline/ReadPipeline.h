@@ -50,10 +50,6 @@ public:
 
     float scaling;  // Scale factor applied to convert raw integers from sequencer into pore current values
 
-    size_t num_modbase_chunks;
-    std::atomic_size_t
-            num_modbase_chunks_called;  // Number of modbase chunks which have been scored
-
     int model_stride;  // The down sampling factor of the model
 
     std::string read_id;                  // Unique read ID (UUID4)
