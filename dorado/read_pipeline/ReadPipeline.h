@@ -18,28 +18,6 @@
 
 namespace dorado {
 
-class Read;
-
-struct Chunk {
-    Chunk(std::shared_ptr<Read> const& read,
-          size_t offset,
-          size_t chunk_in_read_idx,
-          size_t chunk_size)
-            : source_read(read),
-              input_offset(offset),
-              idx_in_read(chunk_in_read_idx),
-              raw_chunk_size(chunk_size) {}
-
-    std::weak_ptr<Read> source_read;
-    size_t input_offset;    // Where does this chunk start in the input raw read data
-    size_t idx_in_read;     // Just for tracking that the chunks don't go out of order
-    size_t raw_chunk_size;  // Just for knowing the original chunk size
-
-    std::string seq;
-    std::string qstring;
-    std::vector<uint8_t> moves;  // For stitching.
-};
-
 // Class representing a read, including raw data
 class Read {
 public:
@@ -71,10 +49,6 @@ public:
     std::string scaling_method;  // To be set by scaler
 
     float scaling;  // Scale factor applied to convert raw integers from sequencer into pore current values
-
-    size_t num_chunks;  // Number of chunks in the read. Reads raw data is split into chunks for efficient basecalling.
-    std::vector<std::unique_ptr<Chunk>> called_chunks;  // Vector of basecalled chunks.
-    std::atomic_size_t num_chunks_called;  // Number of chunks which have been basecalled
 
     size_t num_modbase_chunks;
     std::atomic_size_t

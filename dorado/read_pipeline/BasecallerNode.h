@@ -12,6 +12,9 @@
 namespace dorado {
 
 class BasecallerNode : public MessageSink {
+    struct BasecallingRead;
+    struct BasecallingChunk;
+
 public:
     // Chunk size and overlap are in raw samples
     BasecallerNode(std::vector<Runner> model_runners,
@@ -22,7 +25,7 @@ public:
                    const std::string& node_name = "BasecallerNode",
                    bool in_duplex_pipeline = false,
                    uint32_t read_mean_qscore_start_pos = 0);
-    ~BasecallerNode() { terminate_impl(); }
+    ~BasecallerNode();
     std::string get_name() const override { return m_node_name; }
     stats::NamedStats sample_stats() const override;
     void terminate(const FlushOptions& flush_options) override { terminate_impl(); }
@@ -67,16 +70,16 @@ private:
     // Time when Basecaller Node terminates. Used for benchmarking and debugging
     std::chrono::time_point<std::chrono::system_clock> termination_time;
     // Async queue to keep track of basecalling chunks.
-    utils::AsyncQueue<std::unique_ptr<Chunk>> m_chunks_in;
+    utils::AsyncQueue<std::unique_ptr<BasecallingChunk>> m_chunks_in;
 
     std::mutex m_working_reads_mutex;
     // Reads removed from input queue and being basecalled.
-    std::unordered_set<std::shared_ptr<Read>> m_working_reads;
+    std::unordered_set<std::shared_ptr<BasecallingRead>> m_working_reads;
 
     // If we go multi-threaded, there will be one of these batches per thread
-    std::vector<std::deque<std::unique_ptr<Chunk>>> m_batched_chunks;
+    std::vector<std::deque<std::unique_ptr<BasecallingChunk>>> m_batched_chunks;
 
-    utils::AsyncQueue<std::unique_ptr<Chunk>> m_processed_chunks;
+    utils::AsyncQueue<std::unique_ptr<BasecallingChunk>> m_processed_chunks;
 
     // Class members are initialised in declaration order regardless of initialiser list order.
     // Class data members whose construction launches threads must therefore have their
