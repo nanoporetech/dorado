@@ -77,7 +77,7 @@ private:
     std::unordered_set<std::shared_ptr<BasecallingRead>> m_working_reads;
 
     // If we go multi-threaded, there will be one of these batches per thread
-    std::vector<std::deque<std::unique_ptr<BasecallingChunk>>> m_batched_chunks;
+    std::vector<std::vector<std::unique_ptr<BasecallingChunk>>> m_batched_chunks;
 
     utils::AsyncQueue<std::unique_ptr<BasecallingChunk>> m_processed_chunks;
 
