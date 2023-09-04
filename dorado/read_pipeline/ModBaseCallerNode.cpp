@@ -380,7 +380,7 @@ void ModBaseCallerNode::output_worker_thread() {
             for (auto& completed_read : completed_reads) {
                 auto read_iter = m_working_reads.find(completed_read);
                 if (read_iter != m_working_reads.end()) {
-                    m_working_reads.erase(*read_iter);
+                    m_working_reads.erase(read_iter);
                 } else {
                     throw std::runtime_error("Expected to find read id " +
                                              completed_read->read->read_id +
