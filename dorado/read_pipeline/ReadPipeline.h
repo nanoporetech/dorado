@@ -104,6 +104,40 @@ private:
     std::string generate_read_group() const;
 };
 
+// Intentionally uncopyable smart pointer that acts as a single mutable owner but
+// can also provide multiple immutable views that have strong ownership too.
+class ReadPtr {
+    std::shared_ptr<Read> m_read;
+
+    ReadPtr(const ReadPtr&) = delete;
+    ReadPtr& operator=(const ReadPtr&) = delete;
+
+public:
+    static ReadPtr make() {
+        ReadPtr ptr;
+        ptr.m_read = std::make_unique<Read>();
+        return ptr;
+    }
+
+    ReadPtr() = default;
+    ReadPtr(ReadPtr&&) = default;
+    ReadPtr& operator=(ReadPtr&&) = default;
+
+    Read& operator*() const { return *m_read; }
+    Read* operator->() const { return m_read.get(); }
+    Read* get() const { return m_read.get(); }
+
+    // Create a view of the data in the read.
+    std::shared_ptr<const torch::Tensor> data() const { return {m_read, &m_read->raw_data}; }
+    // Create a view of the entire read.
+    std::shared_ptr<const Read> view() const { return m_read; }
+    // Take an owning reference to keep the |Read| alive.
+    std::shared_ptr<void> owning_reference() const { return {m_read, nullptr}; }
+
+    bool operator==(ReadPtr const& o) const { return m_read == o.m_read; }
+    std::size_t hash() const { return std::hash<std::shared_ptr<Read>>{}(m_read); }
+};
+
 // A pair of reads for Duplex calling
 class ReadPair {
 public:
@@ -122,11 +156,11 @@ public:
 
 // The Message type is a std::variant that can hold different types of message objects.
 // It is currently able to store:
-// - a std::shared_ptr<Read> object, which represents a single read
+// - a ReadPtr object, which represents a single read
 // - a BamPtr object, which represents a raw BAM alignment record
 // - a ReadPair object, which represents a pair of reads for duplex calling
 // To add more message types, simply add them to the list of types in the std::variant.
-using Message = std::variant<std::shared_ptr<Read>, BamPtr, ReadPair, CacheFlushMessage>;
+using Message = std::variant<ReadPtr, BamPtr, ReadPair, CacheFlushMessage>;
 
 using NodeHandle = int;
 
@@ -309,3 +343,8 @@ private:
 };
 
 }  // namespace dorado
+
+template <>
+struct std::hash<dorado::ReadPtr> {
+    std::size_t operator()(dorado::ReadPtr const& key) const { return key.hash(); }
+};
