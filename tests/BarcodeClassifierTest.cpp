@@ -115,13 +115,14 @@ TEST_CASE("BarcodeClassifier: test double ended barcode with different variants"
     }
 }
 
-TEST_CASE("BarcodeClassifier: check both ends of a read have the same barcode", TEST_GROUP) {
+TEST_CASE("BarcodeClassifier: check barcodes on both ends - failing case", TEST_GROUP) {
     fs::path data_dir = fs::path(get_data_dir("barcode_demux/double_end_variant"));
 
     demux::BarcodeClassifier single_end_classifier({"EXP-PBC096"}, false);
     demux::BarcodeClassifier double_end_classifier({"EXP-PBC096"}, true);
 
-    auto bc_file = data_dir / "EXP-PBC096_barcode_both_ends.fastq";
+    // Check case where both ends don't match.
+    auto bc_file = data_dir / "EXP-PBC096_barcode_both_ends_fail.fastq";
     HtsReader reader(bc_file.string());
     while (reader.read()) {
         auto seqlen = reader.record->core.l_qseq;
@@ -131,5 +132,24 @@ TEST_CASE("BarcodeClassifier: check both ends of a read have the same barcode", 
         auto double_end_res = double_end_classifier.barcode(seq);
         CHECK(double_end_res.adapter_name == "unclassified");
         CHECK(single_end_res.adapter_name == "BC15");
+    }
+}
+
+TEST_CASE("BarcodeClassifier: check barcodes on both ends - passing case", TEST_GROUP) {
+    fs::path data_dir = fs::path(get_data_dir("barcode_demux/double_end_variant"));
+
+    demux::BarcodeClassifier single_end_classifier({"EXP-PBC096"}, false);
+    demux::BarcodeClassifier double_end_classifier({"EXP-PBC096"}, true);
+    // Check case where both ends do match.
+    auto bc_file = data_dir / "EXP-PBC096_barcode_both_ends_pass.fastq";
+    HtsReader reader(bc_file.string());
+    while (reader.read()) {
+        auto seqlen = reader.record->core.l_qseq;
+        auto bseq = bam_get_seq(reader.record);
+        std::string seq = utils::convert_nt16_to_str(bseq, seqlen);
+        auto single_end_res = single_end_classifier.barcode(seq);
+        auto double_end_res = double_end_classifier.barcode(seq);
+        CHECK(double_end_res.adapter_name == single_end_res.adapter_name);
+        CHECK(single_end_res.adapter_name == "BC01");
     }
 }
