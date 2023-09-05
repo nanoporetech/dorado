@@ -192,6 +192,61 @@ constexpr int count_trailing_chars(const std::string_view adapter, char c) {
     }
     return count;
 }
+
+std::tuple<bool, int, int> determine_base_anchor_and_strand_cdna(
+        const std::shared_ptr<dorado::Read>& read) {
+    const std::string SSP = "TTTCTGTTGGTGCTGATATTGCTTT";
+    const std::string SSP_rc = dorado::utils::reverse_complement(SSP);
+    const std::string VNP = "ACTTGCCTGTCGCTCTATCTTCAGAGGAGAGTCCGCCGCCCGCAAGTTTT";
+    const std::string VNP_rc = dorado::utils::reverse_complement(VNP);
+    int trailing_Ts = count_trailing_chars(VNP, 'T');
+
+    int window_size = 150;
+    std::string read_top = read->seq.substr(0, window_size);
+    auto bottom_start = std::max(0, (int)read->seq.length() - window_size);
+    std::string read_bottom = read->seq.substr(bottom_start, window_size);
+
+    EdlibAlignConfig align_config = edlibDefaultAlignConfig();
+    align_config.task = EDLIB_TASK_LOC;
+    align_config.mode = EDLIB_MODE_HW;
+
+    // Check for forward strand.
+    EdlibAlignResult top_v1 =
+            edlibAlign(SSP.data(), SSP.length(), read_top.data(), read_top.length(), align_config);
+    EdlibAlignResult bottom_v1 = edlibAlign(VNP_rc.data(), VNP_rc.length(), read_bottom.data(),
+                                            read_bottom.length(), align_config);
+
+    int dist_v1 = top_v1.editDistance + bottom_v1.editDistance;
+
+    // Check for reverse strand.
+    EdlibAlignResult top_v2 =
+            edlibAlign(VNP.data(), VNP.length(), read_top.data(), read_top.length(), align_config);
+    EdlibAlignResult bottom_v2 = edlibAlign(SSP_rc.data(), SSP_rc.length(), read_bottom.data(),
+                                            read_bottom.length(), align_config);
+
+    int dist_v2 = top_v2.editDistance + bottom_v2.editDistance;
+    spdlog::debug("v1 dist {}, v2 dist {}", dist_v1, dist_v2);
+
+    bool proceed = std::min(dist_v1, dist_v2) < 30;
+
+    if (proceed) {
+        bool fwd = true;
+        int start = 0, end = 0;
+        int base_anchor = 0;
+        if (dist_v2 < dist_v1) {
+            fwd = false;
+            base_anchor = top_v2.endLocations[0];
+        } else {
+            base_anchor = bottom_start + bottom_v1.startLocations[0];
+        }
+        return {fwd, base_anchor, trailing_Ts};
+    } else {
+        spdlog::warn("{} primer edit distance too high {}", read->read_id,
+                     std::min(dist_v1, dist_v2));
+        return {false, -1, trailing_Ts};
+    }
+}
+
 }  // namespace
 
 namespace dorado {
@@ -210,55 +265,14 @@ void PolyACalculator::worker_thread() {
         // If this message isn't a read, we'll get a bad_variant_access exception.
         auto read = std::get<ReadPtr>(std::move(message));
 
-        const std::string SSP = "TTTCTGTTGGTGCTGATATTGCTTT";
-        const std::string SSP_rc = utils::reverse_complement(SSP);
-        const std::string VNP = "ACTTGCCTGTCGCTCTATCTTCAGAGGAGAGTCCGCCGCCCGCAAGTTTT";
-        const std::string VNP_rc = utils::reverse_complement(VNP);
-        int trailing_Ts = count_trailing_chars(VNP, 'T');
+        auto [fwd, base_anchor, trailing_Ts] = determine_base_anchor_and_strand_cdna(read);
 
-        int window_size = 150;
-        std::string read_top = read->seq.substr(0, window_size);
-        auto bottom_start = std::max(0, (int)read->seq.length() - window_size);
-        std::string read_bottom = read->seq.substr(bottom_start, window_size);
-
-        EdlibAlignConfig align_config = edlibDefaultAlignConfig();
-        align_config.task = EDLIB_TASK_LOC;
-        align_config.mode = EDLIB_MODE_HW;
-
-        // Check for forward strand.
-        EdlibAlignResult top_v1 = edlibAlign(SSP.data(), SSP.length(), read_top.data(),
-                                             read_top.length(), align_config);
-        EdlibAlignResult bottom_v1 = edlibAlign(VNP_rc.data(), VNP_rc.length(), read_bottom.data(),
-                                                read_bottom.length(), align_config);
-
-        int dist_v1 = top_v1.editDistance + bottom_v1.editDistance;
-
-        // Check for reverse strand.
-        EdlibAlignResult top_v2 = edlibAlign(VNP.data(), VNP.length(), read_top.data(),
-                                             read_top.length(), align_config);
-        EdlibAlignResult bottom_v2 = edlibAlign(SSP_rc.data(), SSP_rc.length(), read_bottom.data(),
-                                                read_bottom.length(), align_config);
-
-        int dist_v2 = top_v2.editDistance + bottom_v2.editDistance;
-        spdlog::debug("v1 dist {}, v2 dist {}", dist_v1, dist_v2);
-
-        bool proceed = std::min(dist_v1, dist_v2) < 30;
-
-        if (proceed) {
-            bool fwd = true;
-            int start = 0, end = 0;
-            if (dist_v2 < dist_v1) {
-                fwd = false;
-                start = top_v2.endLocations[0];
-            } else {
-                end = bottom_start + bottom_v1.startLocations[0];
-            }
-
+        if (base_anchor >= 0) {
             const auto stride = read->model_stride;
             const auto seq_to_sig_map = utils::moves_to_map(
                     read->moves, stride, read->raw_data.size(0), read->seq.size() + 1);
 
-            int signal_anchor = fwd ? seq_to_sig_map[end] : seq_to_sig_map[start];
+            int signal_anchor = seq_to_sig_map[base_anchor];
             spdlog::debug(
                     "Strand {}; poly A/T signal anchor {}, shift/scale {} {}, samples trimmed {}",
                     fwd ? '+' : '-', signal_anchor, read->mshift, read->mscale,
@@ -280,8 +294,10 @@ void PolyACalculator::worker_thread() {
                         "primer {}, "
                         "samples/base {}",
                         read->read_id, num_bases, signal_anchor,
-                        read->seq.substr(fwd ? std::max(0, (end - num_bases)) : start, num_bases),
-                        signal_start, signal_end, fwd ? end : start, num_samples_per_base);
+                        read->seq.substr(fwd ? std::max(0, (base_anchor - num_bases)) : base_anchor,
+                                         num_bases),
+                        signal_start, signal_end, fwd ? base_anchor : base_anchor,
+                        num_samples_per_base);
                 polyA += num_bases;
                 read->rna_poly_tail_length = num_bases;
             } else {
@@ -289,12 +305,10 @@ void PolyACalculator::worker_thread() {
                         "{} PolyA bases {}, signal anchor {} Signal range is {} {} primer {}, "
                         "samples/base {}",
                         read->read_id, num_bases, signal_anchor, signal_start, signal_end,
-                        fwd ? end : start, num_samples_per_base);
+                        fwd ? base_anchor : base_anchor, num_samples_per_base);
                 not_called++;
             }
         } else {
-            spdlog::warn("{} primer edit distance too high {}", read->read_id,
-                         std::min(dist_v1, dist_v2));
             not_called++;
         }
 
