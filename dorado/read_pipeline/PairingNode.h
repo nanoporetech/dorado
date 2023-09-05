@@ -19,12 +19,12 @@ namespace dorado {
 
 class PairingNode : public MessageSink {
     // A key for a unique Pore, Duplex reads must have the same UniquePoreIdentifierKey
-    // The values are channel, mux, run_id, flowcell_id
-    using UniquePoreIdentifierKey = std::tuple<int, int, std::string, std::string>;
+    // The values are channel, run_id, flowcell_id
+    using UniquePoreIdentifierKey = std::tuple<int, std::string, std::string>;
 
     struct ReadCache {
-        std::map<UniquePoreIdentifierKey, std::list<std::shared_ptr<Read>>> channel_mux_read_map;
-        std::deque<UniquePoreIdentifierKey> working_channel_mux_keys;
+        std::map<UniquePoreIdentifierKey, std::list<std::shared_ptr<Read>>> channel_read_map;
+        std::deque<UniquePoreIdentifierKey> working_channel_keys;
     };
 
 public:

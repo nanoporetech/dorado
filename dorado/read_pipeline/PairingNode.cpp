@@ -241,7 +241,7 @@ void PairingNode::pair_generating_worker_thread(int tid) {
             std::unique_lock<std::mutex> lock(m_pairing_mtx);
             auto flush_message = std::get<CacheFlushMessage>(message);
             auto& read_cache = m_read_caches[flush_message.client_id];
-            for (auto& [key, reads_list] : read_cache.channel_mux_read_map) {
+            for (auto& [key, reads_list] : read_cache.channel_read_map) {
                 // kv is a std::pair<UniquePoreIdentifierKey, std::list<std::shared_ptr<Read>>>
                 for (auto& read_ptr : reads_list) {
                     // Push each read message
@@ -264,7 +264,6 @@ void PairingNode::pair_generating_worker_thread(int tid) {
         auto read = std::get<std::shared_ptr<Read>>(message);
 
         int channel = read->attributes.channel_number;
-        int mux = read->attributes.mux;
         std::string run_id = read->run_id;
         std::string flowcell_id = read->flowcell_id;
         int32_t client_id = read->client_id;
@@ -272,29 +271,29 @@ void PairingNode::pair_generating_worker_thread(int tid) {
         std::unique_lock<std::mutex> lock(m_pairing_mtx);
 
         auto& read_cache = m_read_caches[client_id];
-        UniquePoreIdentifierKey key = std::make_tuple(channel, mux, run_id, flowcell_id);
-        auto read_list_iter = read_cache.channel_mux_read_map.find(key);
+        UniquePoreIdentifierKey key = std::make_tuple(channel, run_id, flowcell_id);
+        auto read_list_iter = read_cache.channel_read_map.find(key);
         // Check if the key is already in the list
-        if (read_list_iter == read_cache.channel_mux_read_map.end()) {
+        if (read_list_iter == read_cache.channel_read_map.end()) {
             // Key is not in the dequeue
             // Add the new key to the end of the list
-            read_cache.working_channel_mux_keys.push_back(key);
-            read_cache.channel_mux_read_map.insert({key, {read}});
+            read_cache.working_channel_keys.push_back(key);
+            read_cache.channel_read_map.insert({key, {read}});
 
-            if (read_cache.working_channel_mux_keys.size() > m_max_num_keys) {
+            if (read_cache.working_channel_keys.size() > m_max_num_keys) {
                 // Remove the oldest key (front of the list)
-                auto oldest_key = read_cache.working_channel_mux_keys.front();
-                read_cache.working_channel_mux_keys.pop_front();
+                auto oldest_key = read_cache.working_channel_keys.front();
+                read_cache.working_channel_keys.pop_front();
 
-                auto oldest_key_it = read_cache.channel_mux_read_map.find(oldest_key);
+                auto oldest_key_it = read_cache.channel_read_map.find(oldest_key);
 
                 // Remove the oldest key from the map
                 for (auto read_ptr : oldest_key_it->second) {
                     m_reads_to_clear.insert(std::move(read_ptr));
                 }
-                read_cache.channel_mux_read_map.erase(oldest_key);
-                assert(read_cache.channel_mux_read_map.size() ==
-                       read_cache.working_channel_mux_keys.size());
+                read_cache.channel_read_map.erase(oldest_key);
+                assert(read_cache.channel_read_map.size() ==
+                       read_cache.working_channel_keys.size());
             }
         } else {
             auto& cached_read_list = read_list_iter->second;
@@ -389,10 +388,10 @@ void PairingNode::pair_generating_worker_thread(int tid) {
     if (--m_num_active_worker_threads == 0) {
         if (!m_preserve_cache_during_flush) {
             std::unique_lock<std::mutex> lock(m_pairing_mtx);
-            // There are still reads in channel_mux_read_map. Push them to the sink.
+            // There are still reads in channel_read_map. Push them to the sink.
             // Last thread alive is responsible for cleaning up the cache.
             for (auto& [client_id, read_cache] : m_read_caches) {
-                for (auto& kv : read_cache.channel_mux_read_map) {
+                for (auto& kv : read_cache.channel_read_map) {
                     // kv is a std::pair<UniquePoreIdentifierKey, std::list<std::shared_ptr<Read>>>
                     auto& reads_list = kv.second;
 
