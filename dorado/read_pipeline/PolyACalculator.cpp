@@ -13,7 +13,7 @@ namespace {
 
 int kMaxTailLength = 500;
 
-std::pair<int, int> determine_signal_bounds4(int signal_anchor,
+std::pair<int, int> determine_signal_bounds5(int signal_anchor,
                                              const c10::Half* signal,
                                              const std::vector<uint64_t>& seq_to_sig_map,
                                              bool fwd,
@@ -24,21 +24,6 @@ std::pair<int, int> determine_signal_bounds4(int signal_anchor,
     // Maximum gap between intervals that can be combined.
     const int kMaxSampleGap = num_samples_per_base * 3;
 
-    // Helper function to returned smoothed values from
-    // the signal.
-    auto smoother = [&](int i) -> float {
-        if (i == 0) {
-            return signal[i];
-        }
-        int s = std::max(0, i - 3);
-        int e = i;
-        float val = 0.f;
-        for (int i = s; i < e; i++) {
-            val += signal[i];
-        }
-        return val / (e - s);
-    };
-
     auto check_for_peak = [&](float ref_x, float thres, int start, int end) -> bool {
         float max = signal[start];
         for (int i = start + 1; i < end; i++) {
@@ -47,14 +32,27 @@ std::pair<int, int> determine_signal_bounds4(int signal_anchor,
         return (std::abs(ref_x - max) > thres);
     };
 
+    auto calc_stats = [&](int s, int e) -> std::pair<float, float> {
+        float avg = 0;
+        for (int i = s; i < e; i++) {
+            avg += signal[i];
+        }
+        avg = avg / (e - s);
+        float var = 0;
+        for (int i = s; i < e; i++) {
+            var += (signal[i] - avg) * (signal[i] - avg);
+        }
+        var = var / (e - s);
+        return {avg, std::sqrt(var)};
+    };
+
     std::vector<std::pair<int, int>> intervals;
+    std::vector<std::pair<float, float>> interval_stats;
     std::pair<int, int> last_interval{0, 0};
-    int last_interval_len = 0;
-    float last_x_last_interval = 0.f;
 
     // Maximum variance between consecutive values to be
     // considered part of the same interval.
-    const float kVar = 0.4f;
+    const float kVar = 0.35f;
 
     // Determine the outer boundary of the signal space to
     // consider based on the anchor. Go further in the direction
@@ -66,38 +64,39 @@ std::pair<int, int> determine_signal_bounds4(int signal_anchor,
     int right_end = (fwd ? std::min(signal_len, signal_anchor + kSpread / 10)
                          : std::min(signal_len, signal_anchor + kSpread));
 
-    float x_last = smoother(0);  // Compare new values against an average of last few values.
-    int signal_start = left_end, signal_end = signal_start;
-    for (int i = left_end; i < right_end; i++) {
-        float x = signal[i];
-        if (std::abs(x - x_last) < kVar) {
-            signal_end = i;
-        } else {
-            int range = signal_end - signal_start;
-            if (range > (num_samples_per_base * 3)) {
-                // Opportunistically merge consecutive intervals if they look like
-                // they could belong to the same run.
-                if (signal_start - last_interval.second < kMaxSampleGap &&
-                    std::abs(x_last - last_x_last_interval) < kVar &&
-                    check_for_peak(x_last, kVar, last_interval.second, signal_start)) {
-                    signal_start = last_interval.first;
-                    last_interval = {signal_start, signal_end};
-                    last_interval_len = signal_end - signal_start;
-                    spdlog::debug("Update range {} {}", last_interval.first, last_interval.second);
-                    auto last_ref = intervals.back();
-                    last_ref = last_interval;
-                } else if (range > last_interval_len) {
-                    last_interval = {signal_start, signal_end};
-                    last_interval_len = signal_end - signal_start;
-                    spdlog::debug("New range {} {}", last_interval.first, last_interval.second);
-                    last_x_last_interval = x_last;
-                    intervals.push_back(last_interval);
-                }
+    const int kNum = 25;
+    spdlog::debug("Bounds left {}, right {}", left_end, right_end);
+    for (int i = left_end; i < right_end; i += kNum) {
+        int s = i, e = std::min(i + kNum, right_end);
+        auto [avg, stdev] = calc_stats(s, e);
+        if (stdev < kVar) {
+            if (intervals.size() > 1 && intervals.back().second == i &&
+                std::abs(avg - interval_stats.back().first) < 0.2 &&
+                std::abs(stdev - interval_stats.back().second) < 0.1) {
+                auto& last = intervals.back();
+                last.second = e;
+                spdlog::debug("update interval {}-{}, stdev {}", last.first, last.second, stdev);
+            } else {
+                intervals.push_back({i, i + kNum});
+                spdlog::debug("new interval {}-{}, stdev {}", s, e, stdev);
             }
-            signal_start = i;
+            interval_stats.push_back({avg, stdev});
         }
-        x_last = smoother(i);
     }
+
+    //std::vector<std::pair<int, int>> merged_intervals;
+    //for(auto intvl : intervals) {
+    //    if (merged_intervals.empty()) {
+    //        merged_intervals.push_bacl(intvl);
+    //    } else {
+    //        auto& prev = merged_intervals.back();
+    //        if (intvl.first - prev.second < kMaxSampleGap) {
+    //            prev.second = intvl.second;
+    //        } else {
+    //            merged_intervals.push_back(intvl);
+    //        }
+    //    }
+    //}
 
     std::vector<std::pair<int, int>> filtered_intervals;
     // In forward strand, the poly A/T signal should end within 100bp of the
@@ -177,133 +176,21 @@ std::pair<int, int> determine_signal_bounds3(int signal_end,
     return {signal_start, signal_end};
 }
 
-std::pair<int, int> determine_signal_bounds(int signal_end,
-                                            const c10::Half* signal,
-                                            const std::vector<uint64_t>& seq_to_sig_map,
-                                            bool fwd,
-                                            const dorado::ReadPtr& read) {
-    std::array<float, 25> inputs;
-    auto smoother = [&inputs](float x) -> float {
-        const float factor = 0.4;
-        float val = 0;
-        for (int i = 0; i < inputs.size(); i++) {
-            val += inputs[i];
-        }
-        val /= inputs.size();
-        return factor * val + (1 - factor) * x;
-    };
-    float x_n = 0, x_n_1 = 0;
-    float v_n = 1, v_n_1 = 0;
-    int n = 0;
-    float stdev;
-    int signal_start = 0;
-    for (int i = signal_end; (fwd ? i > 0 : i < read->raw_data.size(0)); (fwd ? i-- : i++)) {
-        float x = signal[i];
-        float smooth_x = smoother(x);
-        x_n_1 = x_n;
-        v_n_1 = v_n;
-        if (n == 25) {
-            spdlog::debug("idx {} input {}, Mean {} stddev {}", i, x, x_n, stdev);
-        }
-        if (n > 25 and std::abs(smooth_x - x_n_1) > 2 * stdev) {
-            spdlog::debug("Reached end at {} for x {} (raw {})  at mean {} stdev {}", i, smooth_x,
-                          x, x_n, stdev);
-            break;
-        }
-        inputs[n % inputs.size()] = x;
-        n++;
-        x_n = x_n_1 + float(x - x_n_1) / (n + 1);
-        if (n < 30) {
-            v_n = v_n_1 + float((x - x_n_1) * (x - x_n) - v_n_1) / (n + 1);
-            stdev = std::sqrt(v_n);
-        }
-        signal_start = i;
-    }
-    spdlog::debug("Loop end at mean {} stdev {}", x_n, stdev);
-    if (!fwd) {
-        std::swap(signal_start, signal_end);
-    }
-    const int kSignalCorrection = 15;  // Approximate overshoot of signal detection algorithm.
-    return {signal_start, signal_end - kSignalCorrection};
-}
-
-std::pair<int, int> determine_signal_bounds2(int signal_end,
-                                             const c10::Half* signal,
-                                             const std::vector<uint64_t>& seq_to_sig_map,
-                                             bool fwd,
-                                             const std::shared_ptr<dorado::Read>& read) {
-    // Determine avg signal val for A or T.
-    float x_n = 0, x_n_1 = 0;
-    float v_n = 1, v_n_1 = 0;
-    int n = 0;
-    float stdev;
-    int signal_start;
-    for (int i = 0; i < read->seq.length(); i++) {
-        if (read->seq[i] == (fwd ? 'A' : 'T')) {
-            auto s = seq_to_sig_map[i];
-            auto e = seq_to_sig_map[i + 1];
-            for (int j = s; j < e; j++) {
-                n++;
-                x_n_1 = x_n;
-                v_n_1 = v_n;
-                float x = signal[j];
-                x_n = x_n_1 + float(x - x_n_1) / (n + 1);
-                v_n = v_n_1 + float((x - x_n_1) * (x - x_n) - v_n_1) / (n + 1);
-                stdev = std::sqrt(v_n);
-            }
-        }
-    }
-    spdlog::debug("Mean {}, stdev {}", x_n, stdev);
-    for (int i = signal_end; (fwd ? i > 0 : i < read->raw_data.size(0)); (fwd ? i-- : i++)) {
-        float x = signal[i];
-        if (std::abs(x - x_n) > 1 * stdev) {
-            spdlog::debug("Reached end at {}", i);
-            break;
-        }
-        signal_start = i;
-    }
-    if (!fwd) {
-        std::swap(signal_start, signal_end);
-    }
-    return {signal_start, signal_end};
-}
-
-int estimate_samples_per_base(const std::vector<uint64_t>& seq_to_sig_map,
-                              const std::string& seq,
-                              bool fwd,
-                              int signal_start,
-                              int signal_end) {
-    int c = 0;
-    int j = 0;
-    const char s = (fwd ? 'A' : 'T');
-    int s_i = -1, e_i = -1;
-    for (int i = 0; i < seq.length(); i++) {
-        char cur_char = seq[i];
-        int nt_signal_start = seq_to_sig_map[i];
-        int nt_signal_end = seq_to_sig_map[i + 1];
-        if (fwd && nt_signal_end >= signal_start) {
-            continue;
-        }
-        if (!fwd && nt_signal_start < signal_end) {
-            continue;
-        }
-        if (i < 10) {
-            continue;
-        }
-        if (s_i < 0)
-            s_i = i;
-        e_i = i;
-        c += seq_to_sig_map[i + 1] - seq_to_sig_map[i];
-        j++;
-    }
-    float num_samples_per_base = static_cast<float>(c) / j;
-    spdlog::debug("Using {} samples to estimate samples/base in range {} {}", j, s_i, e_i);
-    return static_cast<int>(num_samples_per_base);
-}
-
 int estimate_samples_per_base(const dorado::ReadPtr& read) {
     float num_samples_per_base = static_cast<float>(read->raw_data.size(0)) / read->seq.length();
     return static_cast<int>(num_samples_per_base);
+}
+
+constexpr int count_trailing_chars(const std::string_view adapter, char c) {
+    int count = 0;
+    for (int i = adapter.length() - 1; i >= 0; i--) {
+        if (adapter[i] == c) {
+            count++;
+        } else {
+            break;
+        }
+    }
+    return count;
 }
 }  // namespace
 
@@ -327,6 +214,7 @@ void PolyACalculator::worker_thread() {
         const std::string SSP_rc = utils::reverse_complement(SSP);
         const std::string VNP = "ACTTGCCTGTCGCTCTATCTTCAGAGGAGAGTCCGCCGCCCGCAAGTTTT";
         const std::string VNP_rc = utils::reverse_complement(VNP);
+        int trailing_Ts = count_trailing_chars(VNP, 'T');
 
         int window_size = 150;
         std::string read_top = read->seq.substr(0, window_size);
@@ -376,16 +264,16 @@ void PolyACalculator::worker_thread() {
                     fwd ? '+' : '-', signal_anchor, read->mshift, read->mscale,
                     read->num_trimmed_samples);
 
-            // Walk through signal
             const c10::Half* signal = static_cast<c10::Half*>(read->raw_data.data_ptr());
 
             auto num_samples_per_base = estimate_samples_per_base(read);
-            //auto num_samples_per_base = estimate_samples_per_base(seq_to_sig_map, read->seq, fwd, signal_start, signal_end);
 
-            auto [signal_start, signal_end] = determine_signal_bounds4(
+            // Walk through signal
+            auto [signal_start, signal_end] = determine_signal_bounds5(
                     signal_anchor, signal, seq_to_sig_map, fwd, read, num_samples_per_base);
 
-            int num_bases = static_cast<int>((signal_end - signal_start) / num_samples_per_base);
+            int num_bases = static_cast<int>((signal_end - signal_start) / num_samples_per_base) -
+                            trailing_Ts;
             if (num_bases >= 0 && num_bases < kMaxTailLength) {
                 spdlog::debug(
                         "{} PolyA bases {}, signal anchor {} region {} Signal range is {} {}, "
