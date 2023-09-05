@@ -92,7 +92,7 @@ float extract_mask_score(std::string_view adapter,
                          const char* debug_prefix) {
     auto result = edlibAlign(adapter.data(), adapter.length(), read.data(), read.length(), config);
     float score = 1.f - static_cast<float>(result.editDistance) / adapter.length();
-    spdlog::debug("top window v1 {}", result.editDistance);
+    spdlog::debug("{} {} score {}", debug_prefix, result.editDistance, score);
     spdlog::debug("\n{}", utils::alignment_to_str(adapter.data(), read.data(), result));
     edlibFreeAlignResult(result);
     return score;
@@ -105,7 +105,9 @@ namespace demux {
 const std::string UNCLASSIFIED_BARCODE = "unclassified";
 const int TRIM_LENGTH = 150;
 
-BarcodeClassifier::BarcodeClassifier(const std::vector<std::string>& kit_names) {
+BarcodeClassifier::BarcodeClassifier(const std::vector<std::string>& kit_names,
+                                     bool barcode_both_ends)
+        : m_barcode_both_ends(barcode_both_ends) {
     m_adapter_sequences = generate_adapter_sequence(kit_names);
 }
 
@@ -534,7 +536,29 @@ ScoreResults BarcodeClassifier::find_best_adapter(const std::string& read_seq,
         scores.insert(scores.end(), out.begin(), out.end());
     }
 
-    // Sore the scores windows by their adapter score.
+    if (m_barcode_both_ends && kit.double_ends) {
+        // For more stringest classification, ensure that both ends of a read
+        // have a barcode and they match. So this section checks if the scores list
+        // sorted by both top and bottom scores yield the same best barcode.
+        // If they don't, no point evaluating further. If they do, then continue
+        // onto evaluating against the score thresholds. Note that when checking the
+        // thresholds, we only look at the best score out of top and bottom.
+        // Heuristically if the best score of either meets the threshold and top and bottom
+        // are both the same barcode, the classification is pretty high confidence.
+        auto best_top_score = std::max_element(
+                scores.begin(), scores.end(),
+                [](const auto& l, const auto& r) { return l.top_score < r.top_score; });
+        auto best_bottom_score = std::max_element(
+                scores.begin(), scores.end(),
+                [](const auto& l, const auto& r) { return l.bottom_score < r.bottom_score; });
+        spdlog::debug("Check double ends: top bc {}, bottom bc {}", best_top_score->adapter_name,
+                      best_bottom_score->adapter_name);
+        if (best_top_score->adapter_name != best_bottom_score->adapter_name) {
+            return UNCLASSIFIED;
+        }
+    }
+
+    // Score the scores windows by their adapter score.
     std::sort(scores.begin(), scores.end(),
               [](const auto& l, const auto& r) { return l.score > r.score; });
     auto best_score = scores.begin();

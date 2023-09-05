@@ -87,7 +87,7 @@ public:
         };
 
         m_num_simplex_reads_written = fetch_stat("HtsWriter.unique_simplex_reads_written") +
-                                      fetch_stat("BarcodeDemuxer.demuxed_reads_written");
+                                      fetch_stat("BarcodeDemuxerNode.demuxed_reads_written");
 
         m_num_simplex_reads_filtered = fetch_stat("ReadFilterNode.simplex_reads_filtered");
         m_num_simplex_bases_filtered = fetch_stat("ReadFilterNode.simplex_bases_filtered");
@@ -104,7 +104,7 @@ public:
         m_num_duplex_bases_filtered = fetch_stat("ReadFilterNode.duplex_bases_filtered");
 
         // Barcode demuxing stats.
-        m_num_barcodes_demuxed = fetch_stat("BarcoderNode.num_barcodes_demuxed");
+        m_num_barcodes_demuxed = fetch_stat("BarcodeClassifierNode.num_barcodes_demuxed");
 
         // don't output progress bar if stderr is not a tty
         if (!utils::is_fd_tty(stderr)) {
