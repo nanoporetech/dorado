@@ -70,6 +70,7 @@ target_include_directories(${LIBNAME}
     ${DORADO_3RD_PARTY}/spdlog/include
     ${DORADO_3RD_PARTY}/NVTX/c/include
     ${DORADO_3RD_PARTY}/ont-minimap2/src/3rdparty/minimap2
+    ${DORADO_3RD_PARTY}/metal-cpp/metal-cpp
 )
 
 target_include_directories(${LIBNAME}
@@ -87,6 +88,7 @@ target_link_libraries(${LIBNAME}
     edlib
     minimap2
     date::date
+    OpenSSL::SSL
 )
 
 if(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")

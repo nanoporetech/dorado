@@ -239,7 +239,6 @@ target_include_directories(dorado_lib
         ${DORADO_3RD_PARTY}/HighFive/include
         ${DORADO_3RD_PARTY}/argparse
         ${DORADO_3RD_PARTY}/toml11
-        ${DORADO_3RD_PARTY}/metal-cpp/metal-cpp
         ${DORADO_3RD_PARTY}/hdf_plugins/vbz_plugin
         ${DORADO_3RD_PARTY}/cxxpool/src
         ${DORADO_3RD_PARTY}/NVTX/c/include
@@ -262,7 +261,6 @@ target_link_libraries(dorado_lib
     ${KOI_LIBRARIES}
     htslib
     vbz_hdf_plugin
-    OpenSSL::SSL
     edlib
     date::date
     dorado_utils
