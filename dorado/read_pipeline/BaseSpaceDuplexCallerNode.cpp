@@ -84,7 +84,7 @@ void BaseSpaceDuplexCallerNode::basespace(const std::string& template_read_id,
     align_config.task = EDLIB_TASK_PATH;
 
     std::string_view template_sequence;
-    Read const* template_read;
+    const Read* template_read;
     std::vector<uint8_t> template_quality_scores;
     auto template_read_it = m_reads.find(template_read_id);
     if (template_read_it == m_reads.end()) {
@@ -113,7 +113,7 @@ void BaseSpaceDuplexCallerNode::basespace(const std::string& template_read_id,
     }
 
     // We have both sequences and can perform the consensus
-    Read const* complement_read = complement_read_it->second.get();
+    const Read* complement_read = complement_read_it->second.get();
     auto complement_quality_scores_reverse =
             std::vector<uint8_t>(complement_read->qstring.begin(), complement_read->qstring.end());
     std::reverse(complement_quality_scores_reverse.begin(),

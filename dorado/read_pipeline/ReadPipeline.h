@@ -134,7 +134,7 @@ public:
     // Take an owning reference to keep the |Read| alive.
     std::shared_ptr<void> owning_reference() const { return {m_read, nullptr}; }
 
-    bool operator==(ReadPtr const& o) const { return m_read == o.m_read; }
+    bool operator==(const ReadPtr& o) const { return m_read == o.m_read; }
     std::size_t hash() const { return std::hash<std::shared_ptr<Read>>{}(m_read); }
 };
 
@@ -346,5 +346,5 @@ private:
 
 template <>
 struct std::hash<dorado::ReadPtr> {
-    std::size_t operator()(dorado::ReadPtr const& key) const { return key.hash(); }
+    std::size_t operator()(const dorado::ReadPtr& key) const { return key.hash(); }
 };

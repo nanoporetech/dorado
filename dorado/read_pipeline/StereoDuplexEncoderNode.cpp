@@ -12,8 +12,8 @@
 using namespace torch::indexing;
 
 namespace dorado {
-ReadPtr StereoDuplexEncoderNode::stereo_encode(Read const& template_read,
-                                               Read const& complement_read,
+ReadPtr StereoDuplexEncoderNode::stereo_encode(const Read& template_read,
+                                               const Read& complement_read,
                                                uint64_t temp_start,
                                                uint64_t temp_end,
                                                uint64_t comp_start,

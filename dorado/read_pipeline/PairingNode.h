@@ -119,7 +119,7 @@ private:
 
     // Track reads which need to be emptied from the cache but are still being
     // evaluated for pairs by other threads.
-    std::unordered_map<Read const*, std::atomic<int>> m_reads_in_flight_ctr;
+    std::unordered_map<const Read*, std::atomic<int>> m_reads_in_flight_ctr;
     std::unordered_set<ReadPtr> m_reads_to_clear;
 
     // Stats tracking for pairing node.

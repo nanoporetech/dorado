@@ -12,8 +12,8 @@ class StereoDuplexEncoderNode : public MessageSink {
 public:
     StereoDuplexEncoderNode(int input_signal_stride);
 
-    ReadPtr stereo_encode(Read const& template_read,
-                          Read const& complement_read,
+    ReadPtr stereo_encode(const Read& template_read,
+                          const Read& complement_read,
                           uint64_t temp_start,
                           uint64_t temp_end,
                           uint64_t comp_start,

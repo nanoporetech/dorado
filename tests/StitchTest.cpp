@@ -48,7 +48,7 @@ TEST_CASE("Test stitch_chunks", TEST_GROUP) {
     size_t signal_chunk_step = CHUNK_SIZE - OVERLAP;
     {
         auto chunk = std::make_unique<dorado::utils::Chunk>(offset, CHUNK_SIZE);
-        size_t const chunk_idx = called_chunks.size();
+        const size_t chunk_idx = called_chunks.size();
         chunk->qstring = QSTR[chunk_idx];
         chunk->seq = SEQS[chunk_idx];
         chunk->moves = MOVES[chunk_idx];
@@ -57,7 +57,7 @@ TEST_CASE("Test stitch_chunks", TEST_GROUP) {
     while (offset + CHUNK_SIZE < RAW_SIGNAL_SIZE) {
         offset = std::min(offset + signal_chunk_step, RAW_SIGNAL_SIZE - CHUNK_SIZE);
         auto chunk = std::make_unique<dorado::utils::Chunk>(offset, CHUNK_SIZE);
-        size_t const chunk_idx = called_chunks.size();
+        const size_t chunk_idx = called_chunks.size();
         chunk->qstring = QSTR[chunk_idx];
         chunk->seq = SEQS[chunk_idx];
         chunk->moves = MOVES[chunk_idx];

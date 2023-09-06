@@ -28,8 +28,8 @@ void SubreadTaggerNode::worker_thread() {
                     continue;
                 }
 
-                auto const read_tag = read->read_tag;
-                auto const split_count = read->split_count;
+                const auto read_tag = read->read_tag;
+                const auto split_count = read->split_count;
 
                 std::lock_guard subreads_lock(m_subread_groups_mutex);
                 auto& subreads = m_subread_groups[read_tag];
