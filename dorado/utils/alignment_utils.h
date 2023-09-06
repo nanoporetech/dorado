@@ -1,6 +1,6 @@
 #pragma once
 
-#include "edlib.h"
+#include <edlib.h>
 
 #include <string>
 

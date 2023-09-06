@@ -1,5 +1,5 @@
-#include "../read_pipeline/ReadPipeline.h"
-#include "math_utils.h"
+#include "ReadPipeline.h"
+#include "utils/math_utils.h"
 
 namespace dorado::utils {
 

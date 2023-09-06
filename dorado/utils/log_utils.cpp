@@ -1,6 +1,9 @@
-#include "spdlog/sinks/stdout_color_sinks.h"
-#include "spdlog/spdlog.h"
-#include "utils/cli_utils.h"
+#include "log_utils.h"
+
+#include "tty_utils.h"
+
+#include <spdlog/sinks/stdout_color_sinks.h>
+#include <spdlog/spdlog.h>
 
 #ifndef _WIN32
 #include <fcntl.h>

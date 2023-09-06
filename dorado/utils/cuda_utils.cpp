@@ -1,13 +1,6 @@
 #include "cuda_utils.h"
 
-#include "cxxpool.h"
 #include "math_utils.h"
-
-#include <torch/torch.h>
-
-extern "C" {
-#include "koi.h"
-}
 
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAGuard.h>
@@ -26,6 +19,7 @@ extern "C" {
 #include <string>
 #include <unordered_map>
 #include <vector>
+
 using namespace std::chrono;
 
 namespace dorado::utils {

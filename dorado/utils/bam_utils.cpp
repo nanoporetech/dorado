@@ -1,11 +1,11 @@
 #include "bam_utils.h"
 
-#include "htslib/sam.h"
-#include "read_pipeline/ReadPipeline.h"
+#include <htslib/sam.h>
 
 #include <cctype>
 #include <iostream>
 #include <map>
+#include <sstream>
 #include <string>
 
 namespace dorado::utils {

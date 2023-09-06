@@ -1,6 +1,6 @@
 #include "CRFModelConfig.h"
 
-#include "utils/models.h"
+#include "models/models.h"
 
 #include <spdlog/spdlog.h>
 #include <toml.hpp>

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "utils/cli_utils.h"
 #include "utils/stats.h"
+#include "utils/tty_utils.h"
 
 #ifdef WIN32
 #include <indicators/progress_bar.hpp>

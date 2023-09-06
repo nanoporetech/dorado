@@ -4,7 +4,6 @@
 #include "CRFModelConfig.h"
 #include "decode/Decoder.h"
 #include "utils/stats.h"
-#include "utils/stitch.h"
 
 #include <spdlog/spdlog.h>
 #include <toml.hpp>

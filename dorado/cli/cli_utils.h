@@ -2,6 +2,7 @@
 #pragma once
 
 #include "Version.h"
+#include "utils/dev_utils.h"
 
 #include <argparse.hpp>
 #include <htslib/sam.h>
@@ -15,18 +16,10 @@
 #include <string>
 #include <utility>
 #include <vector>
-#ifdef _WIN32
-#include <io.h>
-#else
-#include <sys/stat.h>
-#include <unistd.h>
-#endif
-
-#include "dev_utils.h"
 
 namespace dorado {
 
-namespace utils {
+namespace cli {
 
 // Determine the thread allocation for writer and aligner threads
 // in dorado aligner.
@@ -38,24 +31,6 @@ inline std::pair<int, int> worker_vs_writer_thread_allocation(int available_thre
                        available_threads - 1);
     int aligner_threads = std::clamp(available_threads - writer_threads, 1, available_threads - 1);
     return std::make_pair(aligner_threads, writer_threads);
-}
-
-inline bool is_fd_tty(FILE* fd) {
-#ifdef _WIN32
-    return _isatty(_fileno(fd));
-#else
-    return isatty(fileno(fd));
-#endif
-}
-
-inline bool is_fd_pipe(FILE* fd) {
-#ifdef _WIN32
-    return false;
-#else
-    struct stat buffer;
-    fstat(fileno(fd), &buffer);
-    return S_ISFIFO(buffer.st_mode);
-#endif
 }
 
 inline void add_pg_hdr(sam_hdr_t* hdr, const std::vector<std::string>& args) {
@@ -90,7 +65,7 @@ inline argparse::ArgumentParser parse_internal_options(
             .default_value(std::string(""));
     args.insert(args.begin(), prog_name);
     private_parser.parse_args(args);
-    details::extract_dev_options(private_parser.get<std::string>("--devopts"));
+    utils::details::extract_dev_options(private_parser.get<std::string>("--devopts"));
 
     return private_parser;
 }
@@ -156,6 +131,6 @@ inline std::vector<std::string> extract_token_from_cli(const std::string& cmd) {
     return tokens;
 }
 
-}  // namespace utils
+}  // namespace cli
 
 }  // namespace dorado

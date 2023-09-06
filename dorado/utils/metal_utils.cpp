@@ -9,7 +9,6 @@
 #include <spdlog/spdlog.h>
 #include <sys/sysctl.h>
 #include <sys/syslimits.h>
-#include <torch/torch.h>
 
 #include <cstdint>
 #include <filesystem>

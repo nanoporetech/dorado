@@ -1,5 +1,6 @@
 #include "MessageSinkUtils.h"
 #include "decode/CPUDecoder.h"
+#include "models/models.h"
 #include "nn/CRFModel.h"
 #include "nn/ModBaseModel.h"
 #include "nn/ModBaseRunner.h"
@@ -9,7 +10,6 @@
 #include "read_pipeline/ReadFilterNode.h"
 #include "read_pipeline/ReadToBamTypeNode.h"
 #include "read_pipeline/ScalerNode.h"
-#include "utils/models.h"
 #include "utils/parameters.h"
 
 #if DORADO_GPU_BUILD
