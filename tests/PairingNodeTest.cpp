@@ -49,17 +49,15 @@ TEST_CASE("Split read pairing", TEST_GROUP) {
     auto seq_rc = dorado::utils::reverse_complement(seq);
     seq_rc = seq_rc.substr(0, seq.length() * 0.8f);
 
-    // clang-format off
-    dorado::ReadPtr reads[] {
+    std::array reads{
             make_read(0, 1000),
             make_read(10, 1000),     // too early to pair with {0}
             make_read(10000, 6000),  // too late to pair with {1}
             make_read(12500, 5990),
-            make_read(18000, 100),   // too short to pair with {2}
-            make_read(25000, 0, seq),    
-            make_read(27500, 0, seq_rc) // truncated reverse complement of {5} 
+            make_read(18000, 100),  // too short to pair with {2}
+            make_read(25000, 0, seq),
+            make_read(27500, 0, seq_rc)  // truncated reverse complement of {5}
     };
-    // clang-format on
 
     dorado::PipelineDescriptor pipeline_desc;
     std::vector<dorado::Message> messages;
