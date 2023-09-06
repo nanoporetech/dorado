@@ -138,7 +138,7 @@ void setup(std::vector<std::string> args,
     auto read_converter = pipeline_desc.add_node<ReadToBamType>(
             {converted_reads_sink}, emit_moves, rna, thread_allocations.read_converter_threads,
             methylation_threshold_pct);
-    auto polya_calculator = pipeline_desc.add_node<PolyACalculator>({read_converter}, 1);
+    auto polya_calculator = pipeline_desc.add_node<PolyACalculator>({read_converter}, 1, rna);
     auto read_filter_node = pipeline_desc.add_node<ReadFilterNode>(
             {polya_calculator}, min_qscore, default_parameters.min_sequence_length,
             std::unordered_set<std::string>{}, thread_allocations.read_filter_threads);

@@ -13,6 +13,11 @@ namespace {
 
 int kMaxTailLength = 500;
 
+// This algorithm walks through the signal in windows. For each window
+// the avg and stdev of the signal is computed. If the stdev is below
+// an empirically determined threshold, and consecutive windows have
+// similar avg and stdev, then those windows are considered to be part
+// of the polyA tail.
 std::pair<int, int> determine_signal_bounds5(int signal_anchor,
                                              const c10::Half* signal,
                                              const std::vector<uint64_t>& seq_to_sig_map,
@@ -75,34 +80,21 @@ std::pair<int, int> determine_signal_bounds5(int signal_anchor,
                 std::abs(stdev - interval_stats.back().second) < 0.1) {
                 auto& last = intervals.back();
                 last.second = e;
-                spdlog::debug("update interval {}-{}, stdev {}", last.first, last.second, stdev);
+                spdlog::debug("update interval {}-{}, avg {} stdev {}", last.first, last.second,
+                              avg, stdev);
             } else {
                 intervals.push_back({i, i + kNum});
-                spdlog::debug("new interval {}-{}, stdev {}", s, e, stdev);
+                spdlog::debug("new interval {}-{}, avg {} stdev {}", s, e, avg, stdev);
             }
             interval_stats.push_back({avg, stdev});
         }
     }
 
-    //std::vector<std::pair<int, int>> merged_intervals;
-    //for(auto intvl : intervals) {
-    //    if (merged_intervals.empty()) {
-    //        merged_intervals.push_bacl(intvl);
-    //    } else {
-    //        auto& prev = merged_intervals.back();
-    //        if (intvl.first - prev.second < kMaxSampleGap) {
-    //            prev.second = intvl.second;
-    //        } else {
-    //            merged_intervals.push_back(intvl);
-    //        }
-    //    }
-    //}
-
     std::vector<std::pair<int, int>> filtered_intervals;
-    // In forward strand, the poly A/T signal should end within 100bp of the
-    // signal anchor, and in reverse strand it should start within 100bp of the
+    // In forward strand, the poly A/T signal should end within 50bp of the
+    // signal anchor, and in reverse strand it should start within 50bp of the
     // anchor.
-    int kAnchorProximity = 100 * num_samples_per_base;
+    int kAnchorProximity = 50 * num_samples_per_base;
     if (fwd) {
         std::copy_if(
                 intervals.begin(), intervals.end(), std::back_inserter(filtered_intervals),
@@ -117,6 +109,19 @@ std::pair<int, int> determine_signal_bounds5(int signal_anchor,
         return {0, 0};
     }
 
+    // Sort the remaining intervals by how close they are to the anchor.
+    if (fwd) {
+        std::sort(filtered_intervals.begin(), filtered_intervals.end(), [&](auto& l, auto& r) {
+            return std::abs(l.second - signal_anchor) < std::abs(r.second - signal_anchor);
+        });
+    } else {
+        std::sort(filtered_intervals.begin(), filtered_intervals.end(), [&](auto& l, auto& r) {
+            return std::abs(l.first - signal_anchor) < std::abs(r.first - signal_anchor);
+        });
+    }
+
+    // Choose the longest interval. This is a stable max, so if there's a tie the one closest
+    // to the anchor is chosen.
     auto best_interval = std::max_element(
             filtered_intervals.begin(), filtered_intervals.end(),
             [](auto& l, auto& r) { return (l.second - l.first) < (r.second - r.first); });
@@ -126,6 +131,12 @@ std::pair<int, int> determine_signal_bounds5(int signal_anchor,
     return *best_interval;
 }
 
+// An alternate approach to detecting the polyA tail. The approach here is to
+// walk the signal starting from the signal anchor and moving in the direction
+// of the polyA tail by computing a running mean/stdev of a sliding window
+// of N bases and comparing the next signal value against that mean/stdev. If
+// the value is within a threshold, the next position is tested and so on. This
+// is how the interval for the polyA signal is extended.
 std::pair<int, int> determine_signal_bounds3(int signal_end,
                                              const c10::Half* signal,
                                              const std::vector<uint64_t>& seq_to_sig_map,
@@ -176,30 +187,27 @@ std::pair<int, int> determine_signal_bounds3(int signal_end,
     return {signal_start, signal_end};
 }
 
+// Basic estimation of avg translocation speed by dividing number of samples by the
+// number of bases called.
 int estimate_samples_per_base(const dorado::ReadPtr& read) {
     float num_samples_per_base = static_cast<float>(read->raw_data.size(0)) / read->seq.length();
     return static_cast<int>(num_samples_per_base);
 }
 
-constexpr int count_trailing_chars(const std::string_view adapter, char c) {
-    int count = 0;
-    for (int i = adapter.length() - 1; i >= 0; i--) {
-        if (adapter[i] == c) {
-            count++;
-        } else {
-            break;
-        }
-    }
-    return count;
-}
-
+// In order to find the approximate location of the start/end (anchor) of the polyA
+// cDNA tail, the adapter ends are aligned to the reads to find the breakpoint
+// between the read and the adapter. Adapter alignment also helps determine
+// the strand direction. This function returns the straand direction,
+// the approximate anchor for the tail, and if there needs to be an adjustment
+// made to the final polyA tail count based on the adapter sequence (e.g. because
+// the adapter itself contains several As).
 std::tuple<bool, int, int> determine_base_anchor_and_strand_cdna(
-        const std::shared_ptr<dorado::Read>& read) {
+        const dorado::ReadPtr& read) {
     const std::string SSP = "TTTCTGTTGGTGCTGATATTGCTTT";
     const std::string SSP_rc = dorado::utils::reverse_complement(SSP);
     const std::string VNP = "ACTTGCCTGTCGCTCTATCTTCAGAGGAGAGTCCGCCGCCCGCAAGTTTT";
     const std::string VNP_rc = dorado::utils::reverse_complement(VNP);
-    int trailing_Ts = count_trailing_chars(VNP, 'T');
+    int trailing_Ts = dorado::utils::count_trailing_chars(VNP, 'T');
 
     int window_size = 150;
     std::string read_top = read->seq.substr(0, window_size);
@@ -247,6 +255,49 @@ std::tuple<bool, int, int> determine_base_anchor_and_strand_cdna(
     }
 }
 
+// The approach used for determining the approximate location of the polyA
+// tail in dRNA is different. Since dRNA is single stranded, we already know the
+// direction of ther ead. However, in dRNA, the adapter is DNA. But the model for
+// basecalling is trained on RNA data. So the basecall quality of the adapter is poor,
+// and alignment doesn't work well. Instead, the absecalled sequence is traversed to find
+// the first long chain of As and the start of that is used as the anchor point
+// for the tail.
+std::tuple<bool, int, int> determine_base_anchor_and_strand_rna(
+        const dorado::ReadPtr& read) {
+    std::vector<std::pair<int, int>> pos_and_run;
+    auto seq = read->seq;
+    int start_pos = 0;
+    bool in_run = false;
+    int run_length = 0;
+    const int kMinRunLength = 3;
+    for (int i = 0; i < seq.length(); i++) {
+        if (seq[i] == 'A') {
+            run_length++;
+            if (!in_run) {
+                in_run = true;
+                start_pos = i;
+            }
+        } else {
+            if (run_length > kMinRunLength) {
+                pos_and_run.push_back({start_pos, run_length});
+            }
+            run_length = 0;
+            in_run = false;
+        }
+    }
+    if (in_run) {
+        if (run_length > kMinRunLength) {
+            pos_and_run.push_back({start_pos, run_length});
+        }
+    }
+    std::string pos_len = "";
+    for (auto p : pos_and_run) {
+        pos_len += std::to_string(p.first) + " " + std::to_string(p.second) + ", ";
+    }
+    spdlog::debug("A runs: {}", pos_len);
+    return {false, pos_and_run.front().first, 0};
+}
+
 }  // namespace
 
 namespace dorado {
@@ -265,7 +316,11 @@ void PolyACalculator::worker_thread() {
         // If this message isn't a read, we'll get a bad_variant_access exception.
         auto read = std::get<ReadPtr>(std::move(message));
 
-        auto [fwd, base_anchor, trailing_Ts] = determine_base_anchor_and_strand_cdna(read);
+        // Determine the strand direction, approximate base space anchor for the tail, and whether
+        // the final length needs to be adjusted depending on the adapter sequence.
+        auto [fwd, base_anchor, trailing_Ts] =
+                m_is_rna ? determine_base_anchor_and_strand_rna(read)
+                         : determine_base_anchor_and_strand_cdna(read);
 
         if (base_anchor >= 0) {
             const auto stride = read->model_stride;
@@ -317,8 +372,8 @@ void PolyACalculator::worker_thread() {
     }
 }
 
-PolyACalculator::PolyACalculator(size_t num_worker_threads, size_t max_reads)
-        : MessageSink(max_reads), m_num_worker_threads(num_worker_threads) {
+PolyACalculator::PolyACalculator(size_t num_worker_threads, bool is_rna, size_t max_reads)
+        : MessageSink(max_reads), m_num_worker_threads(num_worker_threads), m_is_rna(is_rna) {
     start_threads();
 }
 

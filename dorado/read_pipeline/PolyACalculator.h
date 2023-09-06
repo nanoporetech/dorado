@@ -13,7 +13,7 @@ namespace dorado {
 
 class PolyACalculator : public MessageSink {
 public:
-    PolyACalculator(size_t num_worker_threads, size_t max_reads = 1000);
+    PolyACalculator(size_t num_worker_threads, bool is_rna, size_t max_reads = 1000);
     ~PolyACalculator() { terminate_impl(); }
     std::string get_name() const override { return "PolyACalculator"; }
     void terminate(const FlushOptions& flush_options) override { terminate_impl(); };
@@ -27,6 +27,7 @@ private:
     // Async worker for writing.
     std::vector<std::unique_ptr<std::thread>> m_workers;
     size_t m_num_worker_threads = 0;
+    const bool m_is_rna;
     std::atomic<int> polyA{0};
     std::atomic<int> num_reads{0};
     std::atomic<int> not_called{0};
