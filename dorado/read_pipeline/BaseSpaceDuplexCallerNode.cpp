@@ -180,7 +180,7 @@ void BaseSpaceDuplexCallerNode::basespace(const std::string& template_read_id,
 
 BaseSpaceDuplexCallerNode::BaseSpaceDuplexCallerNode(
         std::map<std::string, std::string> template_complement_map,
-        read_map reads,
+        ReadMap reads,
         size_t threads)
         : MessageSink(1000),
           m_template_complement_map(std::move(template_complement_map)),

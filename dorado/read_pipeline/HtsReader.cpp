@@ -65,10 +65,10 @@ void HtsReader::read(Pipeline& pipeline, int max_reads) {
     spdlog::debug("Total reads processed: {}", num_reads);
 }
 
-read_map read_bam(const std::string& filename, const std::unordered_set<std::string>& read_ids) {
+ReadMap read_bam(const std::string& filename, const std::unordered_set<std::string>& read_ids) {
     HtsReader reader(filename);
 
-    read_map reads;
+    ReadMap reads;
 
     while (reader.read()) {
         std::string read_id = bam_get_qname(reader.record);
