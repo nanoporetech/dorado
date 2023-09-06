@@ -66,6 +66,11 @@ TEST_CASE("BarcodeClassifier: test single ended barcode", TEST_GROUP) {
                 CHECK(bc == res.adapter_name);
             } else {
                 CHECK(bc == (res.kit + "_" + res.adapter_name));
+                CHECK(res.top_barcode_pos.second > res.top_barcode_pos.first);
+                CHECK(res.top_barcode_pos.first >= 0);
+                CHECK(res.top_barcode_pos.second < seqlen);
+                CHECK(res.bottom_barcode_pos.first == -1);
+                CHECK(res.bottom_barcode_pos.second == -1);
             }
         }
     }
@@ -89,6 +94,13 @@ TEST_CASE("BarcodeClassifier: test double ended barcode", TEST_GROUP) {
                 CHECK(bc == res.adapter_name);
             } else {
                 CHECK(bc == (res.kit + "_" + res.adapter_name));
+                CHECK(res.top_barcode_pos.second > res.top_barcode_pos.first);
+                CHECK(res.bottom_barcode_pos.second > res.bottom_barcode_pos.first);
+                CHECK(res.top_barcode_pos.first >= 0);
+                CHECK(res.top_barcode_pos.second < seqlen);
+                CHECK(res.bottom_barcode_pos.first >= 0);
+                CHECK(res.bottom_barcode_pos.second < seqlen);
+                CHECK(res.top_barcode_pos.second < res.bottom_barcode_pos.first);
             }
         }
     }
@@ -112,6 +124,13 @@ TEST_CASE("BarcodeClassifier: test double ended barcode with different variants"
                 CHECK(bc == res.adapter_name);
             } else {
                 CHECK(bc == (res.kit + "_" + res.adapter_name));
+                CHECK(res.top_barcode_pos.second > res.top_barcode_pos.first);
+                CHECK(res.bottom_barcode_pos.second > res.bottom_barcode_pos.first);
+                CHECK(res.top_barcode_pos.first >= 0);
+                CHECK(res.top_barcode_pos.second < seqlen);
+                CHECK(res.bottom_barcode_pos.first >= 0);
+                CHECK(res.bottom_barcode_pos.second < seqlen);
+                CHECK(res.top_barcode_pos.second < res.bottom_barcode_pos.first);
             }
         }
     }

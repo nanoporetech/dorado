@@ -266,6 +266,9 @@ std::vector<ScoreResults> BarcodeClassifier::calculate_adapter_score_different_d
         v1.bottom_flank_score = bottom_flank_score_v1;
         v1.flank_score = v1.use_top ? top_flank_score_v1 : bottom_flank_score_v1;
         v1.barcode_start = v1.use_top ? top_bc_loc_v1 : bottom_start + bottom_bc_loc_v1;
+        v1.top_barcode_pos = {top_result_v1.startLocations[0], top_result_v1.endLocations[0]};
+        v1.bottom_barcode_pos = {bottom_start + bottom_result_v1.startLocations[0],
+                                 bottom_start + bottom_result_v1.endLocations[0]};
 
         // Calculate barcode scores for v2.
         auto top_mask_result_score_v2 =
@@ -283,6 +286,9 @@ std::vector<ScoreResults> BarcodeClassifier::calculate_adapter_score_different_d
         v2.bottom_flank_score = bottom_flank_score_v2;
         v2.flank_score = v2.use_top ? top_flank_score_v2 : bottom_flank_score_v2;
         v2.barcode_start = v2.use_top ? top_bc_loc_v2 : bottom_start + bottom_bc_loc_v2;
+        v2.top_barcode_pos = {top_result_v2.startLocations[0], top_result_v2.endLocations[0]};
+        v2.bottom_barcode_pos = {bottom_start + bottom_result_v2.startLocations[0],
+                                 bottom_start + bottom_result_v2.endLocations[0]};
 
         // The best score is the higher score between the 2 variants.
         ScoreResults res = (v1.score > v2.score) ? v1 : v2;
@@ -360,6 +366,9 @@ std::vector<ScoreResults> BarcodeClassifier::calculate_adapter_score_double_ends
         res.bottom_flank_score = bottom_flank_score;
         res.flank_score = res.use_top ? res.top_flank_score : res.bottom_flank_score;
         res.barcode_start = res.use_top ? top_bc_loc : bottom_start + bottom_bc_loc;
+        res.top_barcode_pos = {top_result.startLocations[0], top_result.endLocations[0]};
+        res.bottom_barcode_pos = {bottom_start + bottom_result.startLocations[0],
+                                  bottom_start + bottom_result.endLocations[0]};
 
         results.push_back(res);
     }
@@ -413,6 +422,7 @@ std::vector<ScoreResults> BarcodeClassifier::calculate_adapter_score(std::string
         res.score = res.top_score;
         res.use_top = true;
         res.barcode_start = top_bc_loc;
+        res.top_barcode_pos = {top_result.startLocations[0], top_result.endLocations[0]};
 
         results.push_back(res);
     }
