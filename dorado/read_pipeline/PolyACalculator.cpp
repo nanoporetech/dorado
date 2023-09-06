@@ -355,6 +355,10 @@ void PolyACalculator::worker_thread() {
                         num_samples_per_base);
                 polyA += num_bases;
                 read->rna_poly_tail_length = num_bases;
+                {
+                    std::lock_guard<std::mutex> lock(m_mutex);
+                    poly_a_counts[num_bases]++;
+                }
             } else {
                 spdlog::warn(
                         "{} PolyA bases {}, signal anchor {} Signal range is {} {} primer {}, "
@@ -394,6 +398,9 @@ void PolyACalculator::terminate_impl() {
     m_workers.clear();
     spdlog::info("Total {}, not called {}, Avg polyA length {}", num_reads.load(),
                  not_called.load(), polyA.load() / num_reads.load());
+    for (auto [k, v] : poly_a_counts) {
+        spdlog::info("{} : {}", k, std::string(v, '*'));
+    }
 }
 
 void PolyACalculator::restart() {

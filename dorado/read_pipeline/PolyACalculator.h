@@ -5,7 +5,9 @@
 
 #include <atomic>
 #include <cstdint>
+#include <map>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -31,6 +33,9 @@ private:
     std::atomic<int> polyA{0};
     std::atomic<int> num_reads{0};
     std::atomic<int> not_called{0};
+
+    std::mutex m_mutex;
+    std::map<int, int> poly_a_counts;
 };
 
 }  // namespace dorado
