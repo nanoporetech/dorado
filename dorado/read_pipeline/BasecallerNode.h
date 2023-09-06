@@ -6,7 +6,9 @@
 #include "utils/stats.h"
 
 #include <atomic>
+#include <chrono>
 #include <cstdint>
+#include <memory>
 #include <unordered_set>
 #include <vector>
 

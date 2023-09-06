@@ -6,9 +6,7 @@
 
 #include <nvtx3/nvtx3.hpp>
 
-#include <chrono>
 #include <cstdlib>
-#include <memory>
 
 #if defined(__APPLE__) && !defined(__x86_64__)
 #include "utils/metal_utils.h"
