@@ -37,7 +37,7 @@ std::map<std::string, std::string> load_pairs_file(std::string pairs_file_path) 
 std::unordered_set<std::string> get_read_list_from_pairs(
         std::map<std::string, std::string> template_complement_map) {
     std::unordered_set<std::string> read_list;
-    for (auto const& x : template_complement_map) {
+    for (const auto& x : template_complement_map) {
         read_list.insert(x.first);
         read_list.insert(x.second);
     }

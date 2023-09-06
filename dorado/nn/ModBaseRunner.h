@@ -32,7 +32,7 @@ public:
                                const std::vector<int>& seq_ints,
                                const std::vector<uint64_t>& seq_to_sig_map) const;
     std::vector<size_t> get_motif_hits(size_t caller_id, const std::string& seq) const;
-    ModBaseModelConfig const& caller_params(size_t caller_id) const;
+    const ModBaseModelConfig& caller_params(size_t caller_id) const;
     size_t num_callers() const;
     size_t batch_size() const { return m_input_sigs[0].size(0); }
     void terminate();
