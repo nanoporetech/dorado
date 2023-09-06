@@ -2,6 +2,7 @@
 
 #include "ModBaseModel.h"
 #include "ModBaseModelConfig.h"
+#include "modbase/MotifMatcher.h"
 #include "modbase/modbase_scaler.h"
 #include "utils/sequence_utils.h"
 #include "utils/stats.h"
@@ -38,32 +39,50 @@ public:
     };
 
     struct ModBaseData {
-        torch::nn::ModuleHolder<torch::nn::AnyModule> module_holder{nullptr};
+        torch::nn::ModuleHolder<torch::nn::AnyModule> module_holder;
         std::unique_ptr<ModBaseScaler> scaler{nullptr};
-        ModBaseModelConfig params{};
+        const ModBaseModelConfig params;
+        const MotifMatcher matcher;
         std::deque<std::shared_ptr<ModBaseTask>> input_queue;
         std::mutex input_lock;
         std::condition_variable input_cv;
 #if DORADO_GPU_BUILD && !defined(__APPLE__)
         c10::optional<c10::Stream> stream;
 #endif
-        int batch_size = 0;
+        const int batch_size;
 
         std::vector<size_t> get_motif_hits(const std::string& seq) const {
-            NVTX3_FUNC_RANGE();
-            std::vector<size_t> context_hits;
-            const auto& motif = params.motif;
-            const auto motif_offset = params.motif_offset;
-            size_t kmer_len = motif.size();
-            size_t search_pos = 0;
-            while (search_pos < seq.size() - kmer_len + 1) {
-                search_pos = seq.find(motif, search_pos);
-                if (search_pos != std::string::npos) {
-                    context_hits.push_back(search_pos + motif_offset);
-                    ++search_pos;
-                }
+            return matcher.get_motif_hits(seq);
+        }
+
+        ModBaseData(const std::filesystem::path& model_path,
+                    torch::TensorOptions opts,
+                    int batch_size_)
+                : module_holder(load_modbase_model(model_path, opts)),
+                  params(load_modbase_model_config(model_path)),
+                  matcher(params),
+                  batch_size(batch_size_) {
+            if (params.refine_do_rough_rescale) {
+                scaler = std::make_unique<ModBaseScaler>(params.refine_kmer_levels,
+                                                         params.refine_kmer_len,
+                                                         params.refine_kmer_center_idx);
             }
-            return context_hits;
+
+#if DORADO_GPU_BUILD && !defined(__APPLE__)
+            if (opts.device().is_cuda()) {
+                stream = c10::cuda::getStreamFromPool(false, opts.device().index());
+
+                auto sig_len = static_cast<int64_t>(params.context_before + params.context_after);
+                auto kmer_len = params.bases_after + params.bases_before + 1;
+
+                // Warmup
+                auto input_sigs = torch::empty({batch_size, 1, sig_len}, opts);
+                auto input_seqs = torch::empty(
+                        {batch_size, sig_len, utils::BaseInfo::NUM_BASES * kmer_len}, opts);
+                module_holder->forward(input_sigs, input_seqs);
+                torch::cuda::synchronize(opts.device().index());
+            }
+#endif
         }
     };
 
@@ -97,37 +116,9 @@ public:
 
         for (size_t model_id = 0; model_id < m_num_models; ++model_id) {
             const auto& model_path = model_paths[model_id];
-            auto caller_data = std::make_unique<ModBaseData>();
 
             torch::InferenceMode guard;
-            caller_data->module_holder = load_modbase_model(model_path, m_options);
-            caller_data->params = load_modbase_model_config(model_path);
-            caller_data->batch_size = batch_size;
-
-            if (caller_data->params.refine_do_rough_rescale) {
-                caller_data->scaler = std::make_unique<ModBaseScaler>(
-                        caller_data->params.refine_kmer_levels, caller_data->params.refine_kmer_len,
-                        caller_data->params.refine_kmer_center_idx);
-            }
-
-#if DORADO_GPU_BUILD && !defined(__APPLE__)
-            if (m_options.device().is_cuda()) {
-                caller_data->stream =
-                        c10::cuda::getStreamFromPool(false, m_options.device().index());
-
-                auto sig_len = static_cast<int64_t>(caller_data->params.context_before +
-                                                    caller_data->params.context_after);
-                auto kmer_len =
-                        caller_data->params.bases_after + caller_data->params.bases_before + 1;
-
-                // Warmup
-                auto input_sigs = torch::empty({batch_size, 1, sig_len}, m_options);
-                auto input_seqs = torch::empty(
-                        {batch_size, sig_len, utils::BaseInfo::NUM_BASES * kmer_len}, m_options);
-                caller_data->module_holder->forward(input_sigs, input_seqs);
-                torch::cuda::synchronize(m_options.device().index());
-            }
-#endif
+            auto caller_data = std::make_unique<ModBaseData>(model_path, m_options, batch_size);
             m_caller_data.push_back(std::move(caller_data));
         }
 
