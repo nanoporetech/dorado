@@ -80,9 +80,6 @@ target_include_directories(${LIBNAME}
 )
 
 target_link_libraries(${LIBNAME}
-    ${APPLE_FWK_FOUNDATION}
-    ${APPLE_FWK_QUARTZ_CORE}
-    ${APPLE_FWK_METAL}
     ${TORCH_LIBRARIES}
     htslib
     edlib
@@ -91,12 +88,18 @@ target_link_libraries(${LIBNAME}
     OpenSSL::SSL
 )
 
-if(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
-    target_link_libraries(${LIBNAME} ${IOKIT})
-endif()
-
 if(APPLE AND DORADO_GPU_BUILD)
     add_dependencies(${LIBNAME} metal-lib)
+    target_link_libraries(
+        ${LIBNAME}
+        ${APPLE_FWK_FOUNDATION}
+        ${APPLE_FWK_QUARTZ_CORE}
+        ${APPLE_FWK_METAL}
+    )
+endif()
+
+if(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    target_link_libraries(${LIBNAME} ${IOKIT})
 endif()
 
 if(NOT WIN32)
