@@ -71,7 +71,7 @@ TEST_CASE(TEST_GROUP "Load data sorted by channel id.") {
     dorado::DataLoader loader(*pipeline, "cpu", 1, 0);
     loader.load_reads(data_path, true, dorado::ReadOrder::BY_CHANNEL);
     pipeline.reset();
-    auto reads = ConvertMessages<std::shared_ptr<dorado::Read>>(messages);
+    auto reads = ConvertMessages<dorado::ReadPtr>(std::move(messages));
 
     int start_channel_id = -1;
     for (auto &i : reads) {

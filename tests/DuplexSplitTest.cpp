@@ -21,8 +21,8 @@ std::filesystem::path DataPath(std::string_view filename) {
     return std::filesystem::path(get_split_data_dir()) / filename;
 }
 
-std::shared_ptr<dorado::Read> make_read() {
-    std::shared_ptr<dorado::Read> read = std::make_shared<dorado::Read>();
+auto make_read() {
+    auto read = dorado::ReadPtr::make();
     read->range = 0;
     read->sample_rate = 4000;
     read->offset = -287;
@@ -53,12 +53,12 @@ std::shared_ptr<dorado::Read> make_read() {
 }  // namespace
 
 TEST_CASE("4 subread splitting test", TEST_GROUP) {
-    const auto read = make_read();
+    auto read = make_read();
 
     dorado::DuplexSplitSettings splitter_settings;
     dorado::DuplexSplitNode splitter_node(splitter_settings, 1);
 
-    const auto split_res = splitter_node.split(read);
+    const auto split_res = splitter_node.split(std::move(read));
     REQUIRE(split_res.size() == 4);
     std::vector<int> split_sizes;
     for (auto &r : split_res) {
@@ -98,7 +98,7 @@ TEST_CASE("4 subread splitting test", TEST_GROUP) {
 }
 
 TEST_CASE("4 subread split tagging", TEST_GROUP) {
-    const auto read = make_read();
+    auto read = make_read();
 
     dorado::PipelineDescriptor pipeline_desc;
     std::vector<dorado::Message> messages;
@@ -112,10 +112,10 @@ TEST_CASE("4 subread split tagging", TEST_GROUP) {
             {pairing_node}, dorado::DuplexSplitSettings{}, 1);
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
 
-    pipeline->push_message(read);
+    pipeline->push_message(std::move(read));
     pipeline.reset();
 
-    auto reads = ConvertMessages<std::shared_ptr<dorado::Read>>(messages);
+    auto reads = ConvertMessages<dorado::ReadPtr>(std::move(messages));
 
     CHECK(reads.size() == 6);
 
@@ -136,7 +136,7 @@ TEST_CASE("4 subread split tagging", TEST_GROUP) {
 
 TEST_CASE("No split output read properties", TEST_GROUP) {
     const std::string init_read_id = "00a2dd45-f6a9-49ba-86ee-5d2a37b861cb";
-    std::shared_ptr<dorado::Read> read = std::make_shared<dorado::Read>();
+    auto read = dorado::ReadPtr::make();
     read->range = 0;
     read->sample_rate = 4000;
     read->offset = -287;
@@ -157,9 +157,7 @@ TEST_CASE("No split output read properties", TEST_GROUP) {
 
     read->seq = "AAAAAAAAAAAAAAAAAAAAAA";
     read->qstring = std::string(read->seq.length(), '!');
-    ;
     read->moves = std::vector<uint8_t>(read->seq.length(), 0);
-    ;
     read->raw_data = torch::zeros(read->seq.length() * 10).to(torch::kFloat16);
     read->read_tag = 42;
 
@@ -170,13 +168,13 @@ TEST_CASE("No split output read properties", TEST_GROUP) {
             {sink}, dorado::DuplexSplitSettings{}, 1);
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
 
-    pipeline->push_message(read);
+    pipeline->push_message(std::move(read));
     pipeline.reset();
 
-    auto reads = ConvertMessages<std::shared_ptr<dorado::Read>>(messages);
+    auto reads = ConvertMessages<dorado::ReadPtr>(std::move(messages));
     CHECK(reads.size() == 1);
 
-    // Since the original read itself is modified, use the same pointer.
+    read = std::move(reads.front());
     CHECK(read->read_id == init_read_id);
     CHECK(read->subread_id == 0);
     CHECK(read->split_count == 1);

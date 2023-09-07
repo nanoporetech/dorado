@@ -43,12 +43,12 @@ void ScalerNode::worker_thread() {
     Message message;
     while (get_input_message(message)) {
         // If this message isn't a read, just forward it to the sink.
-        if (!std::holds_alternative<std::shared_ptr<Read>>(message)) {
+        if (!std::holds_alternative<ReadPtr>(message)) {
             send_message_to_sink(std::move(message));
             continue;
         }
 
-        auto read = std::get<std::shared_ptr<Read>>(message);
+        auto read = std::get<ReadPtr>(std::move(message));
 
         assert(read->raw_data.dtype() == torch::kInt16);
         const auto [shift, scale] = m_scaling_params.quantile_scaling

@@ -63,14 +63,14 @@ public:
     void terminate(const FlushOptions& flush_options) override { terminate_impl(); }
     void restart() override;
 
-    std::vector<std::shared_ptr<Read>> split(std::shared_ptr<Read> init_read) const;
+    std::vector<ReadPtr> split(ReadPtr init_read) const;
 
 private:
     void start_threads();
     void terminate_impl();
     //TODO consider precomputing and reusing ranges with high signal
     struct ExtRead {
-        std::shared_ptr<Read> read;
+        ReadPtr read;
         torch::Tensor data_as_float32;
         std::vector<uint64_t> move_sums;
         PosRanges possible_pore_regions;
@@ -78,7 +78,7 @@ private:
 
     typedef std::function<PosRanges(const ExtRead&)> SplitFinderF;
 
-    ExtRead create_ext_read(std::shared_ptr<Read> r) const;
+    ExtRead create_ext_read(ReadPtr r) const;
     std::vector<PosRange> possible_pore_regions(const ExtRead& read) const;
     bool check_nearby_adapter(const Read& read, PosRange r, int adapter_edist) const;
     std::optional<std::pair<PosRange, PosRange>> check_flank_match(const Read& read,
@@ -87,8 +87,7 @@ private:
     std::optional<PosRange> identify_middle_adapter_split(const Read& read) const;
     std::optional<PosRange> identify_extra_middle_split(const Read& read) const;
 
-    std::vector<std::shared_ptr<Read>> subreads(std::shared_ptr<Read> read,
-                                                const PosRanges& spacers) const;
+    std::vector<ReadPtr> subreads(ReadPtr read, const PosRanges& spacers) const;
 
     std::vector<std::pair<std::string, SplitFinderF>> build_split_finders() const;
 

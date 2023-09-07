@@ -28,11 +28,11 @@ private:
     std::vector<std::unique_ptr<std::thread>> m_worker_threads;
 
     std::mutex m_subread_groups_mutex;
-    std::unordered_map<uint64_t, std::vector<std::shared_ptr<Read>>> m_subread_groups;
+    std::unordered_map<uint64_t, std::vector<ReadPtr>> m_subread_groups;
 
     std::mutex m_duplex_reads_mutex;
-    std::list<std::shared_ptr<Read>> m_duplex_reads;
-    std::list<std::vector<std::shared_ptr<Read>>> m_full_subread_groups;
+    std::list<ReadPtr> m_duplex_reads;
+    std::list<std::vector<ReadPtr>> m_full_subread_groups;
 };
 
 }  // namespace dorado

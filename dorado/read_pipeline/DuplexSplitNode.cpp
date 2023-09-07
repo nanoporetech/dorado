@@ -155,7 +155,7 @@ std::optional<PosRange> check_rc_match(const std::string& seq,
 //TODO end_reason access?
 //If read.parent_read_id is not empty then it will be used as parent_read_id of the subread
 //signal_range should already be 'adjusted' to stride (e.g. probably gotten from seq_range)
-std::shared_ptr<Read> subread(const Read& read, PosRange seq_range, PosRange signal_range) {
+ReadPtr subread(const Read& read, PosRange seq_range, PosRange signal_range) {
     //TODO support mods
     //NB: currently doesn't support mods
     //assert(read.mod_base_info == nullptr && read.base_mod_probs.empty());
@@ -207,13 +207,13 @@ std::shared_ptr<Read> subread(const Read& read, PosRange seq_range, PosRange sig
 
 namespace dorado {
 
-DuplexSplitNode::ExtRead DuplexSplitNode::create_ext_read(std::shared_ptr<Read> r) const {
+DuplexSplitNode::ExtRead DuplexSplitNode::create_ext_read(ReadPtr r) const {
     ExtRead ext_read;
-    ext_read.read = r;
-    ext_read.move_sums = utils::move_cum_sums(r->moves);
+    ext_read.read = std::move(r);
+    ext_read.move_sums = utils::move_cum_sums(ext_read.read->moves);
     assert(!ext_read.move_sums.empty());
-    assert(ext_read.move_sums.back() == r->seq.length());
-    ext_read.data_as_float32 = r->raw_data.to(torch::kFloat);
+    assert(ext_read.move_sums.back() == ext_read.read->seq.length());
+    ext_read.data_as_float32 = ext_read.read->raw_data.to(torch::kFloat);
     ext_read.possible_pore_regions = possible_pore_regions(ext_read);
     return ext_read;
 }
@@ -380,15 +380,15 @@ std::optional<DuplexSplitNode::PosRange> DuplexSplitNode::identify_extra_middle_
     return std::nullopt;
 }
 
-std::vector<std::shared_ptr<Read>> DuplexSplitNode::subreads(
-        std::shared_ptr<Read> read,
-        const std::vector<PosRange>& spacers) const {
-    if (spacers.empty()) {
-        return {read};
-    }
-
-    std::vector<std::shared_ptr<Read>> subreads;
+std::vector<ReadPtr> DuplexSplitNode::subreads(ReadPtr read,
+                                               const std::vector<PosRange>& spacers) const {
+    std::vector<ReadPtr> subreads;
     subreads.reserve(spacers.size() + 1);
+
+    if (spacers.empty()) {
+        subreads.push_back(std::move(read));
+        return subreads;
+    }
 
     const auto stride = read->model_stride;
     const auto seq_to_sig_map =
@@ -483,42 +483,46 @@ DuplexSplitNode::build_split_finders() const {
     return split_finders;
 }
 
-std::vector<std::shared_ptr<Read>> DuplexSplitNode::split(std::shared_ptr<Read> init_read) const {
+std::vector<ReadPtr> DuplexSplitNode::split(ReadPtr init_read) const {
     using namespace std::chrono;
 
     auto start_ts = high_resolution_clock::now();
-    spdlog::trace("Processing read {}; length {}", init_read->read_id, init_read->seq.size());
+    auto read_id = init_read->read_id;
+    spdlog::trace("Processing read {}; length {}", read_id, init_read->seq.size());
 
     //assert(!init_read->seq.empty() && !init_read->moves.empty());
     if (init_read->seq.empty() || init_read->moves.empty()) {
-        spdlog::trace("Empty read {}; length {}; moves {}", init_read->read_id,
-                      init_read->seq.size(), init_read->moves.size());
-        return std::vector<std::shared_ptr<Read>>{std::move(init_read)};
+        spdlog::trace("Empty read {}; length {}; moves {}", read_id, init_read->seq.size(),
+                      init_read->moves.size());
+        std::vector<ReadPtr> split_result;
+        split_result.push_back(std::move(init_read));
+        return split_result;
     }
 
-    std::vector<ExtRead> to_split{create_ext_read(init_read)};
+    std::vector<ExtRead> to_split;
+    to_split.push_back(create_ext_read(std::move(init_read)));
     for (const auto& [description, split_f] : m_split_finders) {
         spdlog::trace("Running {}", description);
         std::vector<ExtRead> split_round_result;
         for (auto& r : to_split) {
             auto spacers = split_f(r);
             spdlog::trace("DSN: {} strategy {} splits in read {}", description, spacers.size(),
-                          init_read->read_id);
+                          read_id);
 
             if (spacers.empty()) {
                 split_round_result.push_back(std::move(r));
             } else {
-                for (auto sr : subreads(r.read, spacers)) {
-                    split_round_result.push_back(create_ext_read(sr));
+                for (auto& sr : subreads(std::move(r.read), spacers)) {
+                    split_round_result.push_back(create_ext_read(std::move(sr)));
                 }
             }
         }
         to_split = std::move(split_round_result);
     }
 
-    std::vector<std::shared_ptr<Read>> split_result;
+    std::vector<ReadPtr> split_result;
     size_t subread_id = 0;
-    for (const auto& ext_read : to_split) {
+    for (auto& ext_read : to_split) {
         if (to_split.size() > 1) {
             ext_read.read->subread_id = subread_id++;
             ext_read.read->split_count = to_split.size();
@@ -530,11 +534,11 @@ std::vector<std::shared_ptr<Read>> DuplexSplitNode::split(std::shared_ptr<Read> 
         split_result.push_back(std::move(ext_read.read));
     }
 
-    spdlog::trace("Read {} split into {} subreads", init_read->read_id, split_result.size());
+    spdlog::trace("Read {} split into {} subreads", read_id, split_result.size());
 
     auto stop_ts = high_resolution_clock::now();
     spdlog::trace("READ duration: {} microseconds (ID: {})",
-                  duration_cast<microseconds>(stop_ts - start_ts).count(), init_read->read_id);
+                  duration_cast<microseconds>(stop_ts - start_ts).count(), read_id);
 
     return split_result;
 }
@@ -545,14 +549,14 @@ void DuplexSplitNode::worker_thread() {
     Message message;
     while (get_input_message(message)) {
         // If this message isn't a read, just forward it to the sink.
-        if (!m_settings.enabled || !std::holds_alternative<std::shared_ptr<Read>>(message)) {
+        if (!m_settings.enabled || !std::holds_alternative<ReadPtr>(message)) {
             send_message_to_sink(std::move(message));
             continue;
         }
 
         // If this message isn't a read, we'll get a bad_variant_access exception.
-        auto init_read = std::get<std::shared_ptr<Read>>(message);
-        for (auto& subread : split(init_read)) {
+        auto init_read = std::get<ReadPtr>(std::move(message));
+        for (auto& subread : split(std::move(init_read))) {
             //TODO correctly process end_reason when we have them
             send_message_to_sink(std::move(subread));
         }

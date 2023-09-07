@@ -12,12 +12,12 @@ class StereoDuplexEncoderNode : public MessageSink {
 public:
     StereoDuplexEncoderNode(int input_signal_stride);
 
-    std::shared_ptr<dorado::Read> stereo_encode(std::shared_ptr<dorado::Read> template_read,
-                                                std::shared_ptr<dorado::Read> complement_read,
-                                                uint64_t temp_start,
-                                                uint64_t temp_end,
-                                                uint64_t comp_start,
-                                                uint64_t comp_end);
+    ReadPtr stereo_encode(const Read& template_read,
+                          const Read& complement_read,
+                          uint64_t temp_start,
+                          uint64_t temp_end,
+                          uint64_t comp_start,
+                          uint64_t comp_end);
 
     ~StereoDuplexEncoderNode() { terminate_impl(); };
     std::string get_name() const override { return "StereoDuplexEncoderNode"; }

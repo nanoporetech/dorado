@@ -23,11 +23,11 @@ using namespace dorado;
 
 namespace {
 std::vector<BamPtr> create_bam_reader(const std::string& bc) {
-    auto read = std::make_shared<dorado::Read>();
-    read->seq = "AAAA";
-    read->qstring = "!!!!";
-    read->read_id = bc;
-    auto records = read->extract_sam_lines(false);
+    Read read;
+    read.seq = "AAAA";
+    read.qstring = "!!!!";
+    read.read_id = bc;
+    auto records = read.extract_sam_lines(false);
     for (auto& rec : records) {
         bam_aux_append(rec.get(), "BC", 'Z', bc.length() + 1, (uint8_t*)bc.c_str());
     }

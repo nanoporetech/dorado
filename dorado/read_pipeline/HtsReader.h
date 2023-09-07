@@ -13,7 +13,7 @@
 
 namespace dorado {
 
-using read_map = std::unordered_map<std::string, std::shared_ptr<Read>>;
+using ReadMap = std::unordered_map<std::string, ReadPtr>;
 
 class Pipeline;
 
@@ -73,7 +73,7 @@ T HtsReader::get_tag(std::string tagname) {
  * @note The caller is responsible for managing the memory of the returned map.
  * @note The input BAM file must be properly formatted and readable.
  */
-read_map read_bam(const std::string& filename, const std::unordered_set<std::string>& read_ids);
+ReadMap read_bam(const std::string& filename, const std::unordered_set<std::string>& read_ids);
 
 /**
  * @brief Reads an HTS file format (SAM/BAM/FASTX/etc) and returns a set of read ids.

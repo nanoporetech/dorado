@@ -21,20 +21,30 @@ if(NOT TARGET htslib) # lazy include guard
         endif()
         set(htslib_PREFIX ${CMAKE_BINARY_DIR}/3rdparty/htslib)
 
-        # We need cross-compilation mode for iOS builds.
+        # The Htslib build apparently requires BUILD_IN_SOURCE=1, which is a problem when
+        # switching between build targets because htscodecs object files aren't regenerated.
+        # To avoid this, copy the source tree to a build-specific directory and do the build there.
+        set(HTSLIB_BUILD ${CMAKE_BINARY_DIR}/htslib_build)
+        file(COPY ${HTSLIB_DIR} DESTINATION ${HTSLIB_BUILD})
+
         if (CMAKE_SYSTEM_NAME STREQUAL "iOS")
-            set(CONFIGURE_FLAGS "--host=aarch64-apple-darwin")
+            # We need cross-compilation mode for iOS builds.  Otherwise we end up trying to link a MacOS library
+            # into an iOS target.
+            set(CONFIGURE_FLAGS --host=aarch64-apple-darwin "CFLAGS=-isysroot ${CMAKE_OSX_SYSROOT}" "CC=${CMAKE_C_COMPILER}" "LDFLAGS=-isysroot ${CMAKE_OSX_SYSROOT}")
+            # By default the dylib install name will be some local path that won't work on the device.
+            set(INSTALL_NAME ${CMAKE_INSTALL_NAME_TOOL} -id "@executable_path/Frameworks/libhts.3.dylib" ${htslib_PREFIX}/lib/libhts.3.dylib)
         endif()
 
         include(ExternalProject)
         ExternalProject_Add(htslib_project
-                PREFIX ${htslib_PREFIX}
-                SOURCE_DIR ${HTSLIB_DIR}
+                PREFIX ${HTSLIB_BUILD}
+                SOURCE_DIR ${HTSLIB_BUILD}/htslib
                 BUILD_IN_SOURCE 1
                 CONFIGURE_COMMAND autoheader
                 COMMAND ${AUTOCONF_COMMAND}
                 COMMAND ./configure --disable-bz2 --disable-lzma --disable-libcurl --disable-s3 --disable-gcs ${CONFIGURE_FLAGS}
                 BUILD_COMMAND ${MAKE_COMMAND} install prefix=${htslib_PREFIX}
+                COMMAND ${INSTALL_NAME}
                 INSTALL_COMMAND ""
                 BUILD_BYPRODUCTS ${htslib_PREFIX}/lib/libhts.a
                 LOG_CONFIGURE 0

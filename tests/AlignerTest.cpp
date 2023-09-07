@@ -28,7 +28,7 @@ std::vector<dorado::BamPtr> RunAlignmentPipeline(dorado::HtsReader& reader, Args
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
     reader.read(*pipeline, 100);
     pipeline.reset();
-    return ConvertMessages<dorado::BamPtr>(messages);
+    return ConvertMessages<dorado::BamPtr>(std::move(messages));
 }
 
 }  // namespace
