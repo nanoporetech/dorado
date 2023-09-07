@@ -2,6 +2,33 @@
 
 #include <nvtx3/nvtx3.hpp>
 
+#include <regex>
+#include <sstream>
+#include <unordered_map>
+
+namespace {
+const std::unordered_map<char, std::string> IUPAC_CODES = {
+        // clang-format off
+        {'A', "A"},
+        {'C', "C"},
+        {'G', "G"},
+        {'T', "T"},
+        {'U', "T"},  // basecalls will have "T"s instead of "U"s
+        {'R', "[AG]"},
+        {'Y', "[CT]"}, 
+        {'S', "[GC]"}, 
+        {'W', "[AT]"},
+        {'K', "[GT]"}, 
+        {'M', "[AC]"}, 
+        {'B', "[CGT]"},
+        {'D', "[AGT]"},
+        {'H', "[ACT]"},
+        {'V', "[ACG]"},
+        {'N', "[ACGT]"},
+        // clang-format on
+};
+}
+
 namespace dorado {
 
 MotifMatcher::MotifMatcher(const ModBaseModelConfig& model_config) : m_config(model_config) {}
@@ -9,16 +36,23 @@ MotifMatcher::MotifMatcher(const ModBaseModelConfig& model_config) : m_config(mo
 std::vector<size_t> MotifMatcher::get_motif_hits(const std::string& seq) const {
     NVTX3_FUNC_RANGE();
     std::vector<size_t> context_hits;
-    const auto& motif = m_config.motif;
+    std::ostringstream motif_regex_ss;
+    motif_regex_ss << "(";
+    for (auto base : m_config.motif) {
+        motif_regex_ss << IUPAC_CODES.at(base);
+    }
+    motif_regex_ss << ")";
+    const auto motif = motif_regex_ss.str();
     const auto motif_offset = m_config.motif_offset;
-    size_t kmer_len = motif.size();
-    size_t search_pos = 0;
-    while (search_pos < seq.size() - kmer_len + 1) {
-        search_pos = seq.find(motif, search_pos);
-        if (search_pos != std::string::npos) {
-            context_hits.push_back(search_pos + motif_offset);
-            ++search_pos;
-        }
+
+    std::regex regex(motif);
+    std::smatch motif_match;
+    auto start = std::cbegin(seq);
+    auto end = std::cend(seq);
+    while (std::regex_search(start, end, motif_match, regex)) {
+        auto hit = std::distance(std::cbegin(seq), start) + motif_match.position(0) + motif_offset;
+        context_hits.push_back(hit);
+        start += motif_match.position(0) + 1;
     }
     return context_hits;
 }
