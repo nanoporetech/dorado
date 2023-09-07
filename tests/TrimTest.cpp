@@ -22,7 +22,7 @@ TEST_CASE("Test trim signal", TEST_GROUP) {
         signal[i] += 5;
     }
 
-    auto signal_tensor = torch::from_blob(const_cast<float*>(signal.data()), {signal_len});
+    auto signal_tensor = torch::from_blob(const_cast<float *>(signal.data()), {signal_len});
 
     SECTION("Default trim") {
         int pos = dorado::utils::trim(signal_tensor);

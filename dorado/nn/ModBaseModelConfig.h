@@ -25,10 +25,10 @@ struct ModBaseModelConfig {
     bool refine_do_rough_rescale;   ///< Whether to perform rough rescaling
 };
 
-ModBaseModelConfig load_modbase_model_config(std::filesystem::path const& model_path);
+ModBaseModelConfig load_modbase_model_config(const std::filesystem::path & model_path);
 
 // Determine the modbase alphabet from parameters and calculate offset positions for the results
 ModBaseInfo get_modbase_info(
-        std::vector<std::reference_wrapper<ModBaseModelConfig const>> const& base_mod_params);
+        const std::vector<std::reference_wrapper<const ModBaseModelConfig>> & base_mod_params);
 
 }  // namespace dorado

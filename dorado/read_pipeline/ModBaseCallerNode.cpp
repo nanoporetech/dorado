@@ -119,7 +119,7 @@ void ModBaseCallerNode::restart() {
 }
 
 void ModBaseCallerNode::init_modbase_info() {
-    std::vector<std::reference_wrapper<ModBaseModelConfig const>> base_mod_params;
+    std::vector<std::reference_wrapper<const ModBaseModelConfig>> base_mod_params;
     auto& runner = m_runners[0];
     utils::ModBaseContext context_handler;
     for (size_t caller_id = 0; caller_id < runner->num_callers(); ++caller_id) {
