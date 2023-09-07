@@ -1,5 +1,7 @@
 #include "modbase/MotifMatcher.h"
 
+#include "nn/ModBaseModelConfig.h"
+
 #include <catch2/catch.hpp>
 
 #define TEST_GROUP "[modbase_motif_matcher]"
