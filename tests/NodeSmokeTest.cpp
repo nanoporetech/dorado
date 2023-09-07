@@ -4,6 +4,7 @@
 #include "nn/ModBaseModel.h"
 #include "nn/ModBaseRunner.h"
 #include "nn/ModelRunner.h"
+#include "read_pipeline/BarcodeClassifierNode.h"
 #include "read_pipeline/BasecallerNode.h"
 #include "read_pipeline/ModBaseCallerNode.h"
 #include "read_pipeline/ReadFilterNode.h"
@@ -313,6 +314,19 @@ DEFINE_TEST(NodeSmokeTestBam, "ReadToBamType") {
 
     run_smoke_test<dorado::ReadToBamType>(emit_moves, rna, 2,
                                           dorado::utils::default_parameters.methylation_threshold);
+}
+
+DEFINE_TEST(NodeSmokeTestRead, "BarcodeClassifierNode") {
+    auto barcode_both_ends = GENERATE(true, false);
+    auto pipeline_restart = GENERATE(false, true);
+    CAPTURE(barcode_both_ends);
+    CAPTURE(pipeline_restart);
+
+    set_pipeline_restart(pipeline_restart);
+    set_read_mutator([](dorado::ReadPtr& read) { read->barcode = "test_barcode"; });
+
+    std::vector<std::string> kits = {"SQK-RPB004", "EXP-NBD196"};
+    run_smoke_test<dorado::BarcodeClassifierNode>(2, kits, barcode_both_ends);
 }
 
 }  // namespace

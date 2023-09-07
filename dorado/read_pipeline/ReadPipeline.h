@@ -97,6 +97,9 @@ public:
     // The id of the client to which this read belongs. -1 in standalone mode
     int32_t client_id{-1};
 
+    // Barcode.
+    std::string barcode{};
+
 private:
     void generate_duplex_read_tags(bam1_t*) const;
     void generate_read_tags(bam1_t* aln, bool emit_moves) const;
