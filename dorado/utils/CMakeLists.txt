@@ -1,6 +1,4 @@
-set(LIBNAME dorado_utils)
-
-set(UTILS_SOURCE_FILES
+add_library(dorado_utils
     alignment_utils.cpp
     alignment_utils.h
     AsyncQueue.h
@@ -38,32 +36,32 @@ set(UTILS_SOURCE_FILES
 
 if (DORADO_GPU_BUILD)
     if(APPLE)
-        list(APPEND UTILS_SOURCE_FILES
+        target_sources(dorado_utils
+            PRIVATE
             metal_utils.cpp
             metal_utils.h
         )
     else()
-        list(APPEND UTILS_SOURCE_FILES
+        target_sources(dorado_utils
+            PRIVATE
             cuda_utils.cpp
             cuda_utils.h
         )
     endif()
 endif()
 
-add_library(${LIBNAME} ${UTILS_SOURCE_FILES})
-
-target_compile_definitions(${LIBNAME}
+target_compile_definitions(dorado_utils
     PUBLIC
         DORADO_GPU_BUILD=$<BOOL:${DORADO_GPU_BUILD}>
 )
 
-target_precompile_headers(${LIBNAME}
+target_precompile_headers(dorado_utils
     PRIVATE
     <torch/torch.h>
 )
 
 # 3rdparty libs should be considered SYSTEM headers
-target_include_directories(${LIBNAME}
+target_include_directories(dorado_utils
     SYSTEM
     PUBLIC
     ${TORCH_INCLUDE_DIRS}
@@ -73,13 +71,13 @@ target_include_directories(${LIBNAME}
     ${DORADO_3RD_PARTY}/metal-cpp/metal-cpp
 )
 
-target_include_directories(${LIBNAME}
+target_include_directories(dorado_utils
     SYSTEM
     PRIVATE
     ${HTSLIB_DIR}
 )
 
-target_link_libraries(${LIBNAME}
+target_link_libraries(dorado_utils
     ${TORCH_LIBRARIES}
     htslib
     edlib
@@ -89,19 +87,19 @@ target_link_libraries(${LIBNAME}
 )
 
 if(APPLE AND DORADO_GPU_BUILD)
-    add_dependencies(${LIBNAME} metal-lib)
+    add_dependencies(dorado_utils metal-lib)
     target_link_libraries(
-        ${LIBNAME}
+        dorado_utils
         ${APPLE_FWK_FOUNDATION}
         ${APPLE_FWK_QUARTZ_CORE}
         ${APPLE_FWK_METAL}
-    )
+    )   
 endif()
 
 if(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
-    target_link_libraries(${LIBNAME} ${IOKIT})
+    target_link_libraries(dorado_utils ${IOKIT})
 endif()
 
 if(NOT WIN32)
-    add_dependencies(${LIBNAME} htslib_project)
+    add_dependencies(dorado_utils htslib_project)
 endif()
