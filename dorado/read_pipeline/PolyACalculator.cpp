@@ -23,7 +23,8 @@ std::pair<int, int> determine_signal_bounds5(int signal_anchor,
                                              const std::vector<uint64_t>& seq_to_sig_map,
                                              bool fwd,
                                              const dorado::ReadPtr& read,
-                                             int num_samples_per_base) {
+                                             int num_samples_per_base,
+                                             bool is_rna) {
     int signal_len = seq_to_sig_map[seq_to_sig_map.size() - 1];
 
     // Maximum gap between intervals that can be combined.
@@ -64,27 +65,28 @@ std::pair<int, int> determine_signal_bounds5(int signal_anchor,
     // the polyA/T tail is running, and less in the other, assuming
     // that the anchor provides a reasonable starting position.
     const int kSpread = num_samples_per_base * kMaxTailLength;
-    int left_end = (fwd ? std::max(0, signal_anchor - kSpread)
-                        : std::max(0, signal_anchor - kSpread / 10));
+    int left_end = is_rna ? std::max(0, signal_anchor - 50)
+                          : (fwd ? std::max(0, signal_anchor - kSpread)
+                                 : std::max(0, signal_anchor - kSpread / 10));
     int right_end = (fwd ? std::min(signal_len, signal_anchor + kSpread / 10)
                          : std::min(signal_len, signal_anchor + kSpread));
 
-    const int kNum = 25;
+    const int kStride = 3;
     spdlog::debug("Bounds left {}, right {}", left_end, right_end);
-    for (int i = left_end; i < right_end; i += kNum) {
-        int s = i, e = std::min(i + kNum, right_end);
+    for (int s = left_end; s < right_end; s += kStride) {
+        int e = std::min(s + kMaxSampleGap, right_end);
         auto [avg, stdev] = calc_stats(s, e);
         if (stdev < kVar) {
-            if (intervals.size() > 1 && intervals.back().second == i &&
+            if (intervals.size() > 1 && intervals.back().second >= s &&
                 std::abs(avg - interval_stats.back().first) < 0.2 &&
                 std::abs(stdev - interval_stats.back().second) < 0.1) {
                 auto& last = intervals.back();
                 last.second = e;
-                spdlog::debug("update interval {}-{}, avg {} stdev {}", last.first, last.second,
-                              avg, stdev);
+                //spdlog::debug("update interval {}-{}, avg {} stdev {}", last.first, last.second,
+                //              avg, stdev);
             } else {
-                intervals.push_back({i, i + kNum});
-                spdlog::debug("new interval {}-{}, avg {} stdev {}", s, e, avg, stdev);
+                intervals.push_back({s, e});
+                //spdlog::debug("new interval {}-{}, avg {} stdev {}", s, e, avg, stdev);
             }
             interval_stats.push_back({avg, stdev});
         }
@@ -295,7 +297,11 @@ std::tuple<bool, int, int> determine_base_anchor_and_strand_rna(
         pos_len += std::to_string(p.first) + " " + std::to_string(p.second) + ", ";
     }
     spdlog::debug("A runs: {}", pos_len);
-    return {false, pos_and_run.front().first, 0};
+    if (!pos_and_run.empty()) {
+        return {false, pos_and_run.front().first, 0};
+    } else {
+        return {false, -1, 0};
+    }
 }
 
 }  // namespace
@@ -328,43 +334,47 @@ void PolyACalculator::worker_thread() {
                     read->moves, stride, read->raw_data.size(0), read->seq.size() + 1);
 
             int signal_anchor = seq_to_sig_map[base_anchor];
-            spdlog::debug(
-                    "Strand {}; poly A/T signal anchor {}, shift/scale {} {}, samples trimmed {}",
-                    fwd ? '+' : '-', signal_anchor, read->mshift, read->mscale,
-                    read->num_trimmed_samples);
+            spdlog::debug("Strand {}; poly A/T signal anchor {}", fwd ? '+' : '-', signal_anchor);
 
             const c10::Half* signal = static_cast<c10::Half*>(read->raw_data.data_ptr());
 
             auto num_samples_per_base = estimate_samples_per_base(read);
 
             // Walk through signal
-            auto [signal_start, signal_end] = determine_signal_bounds5(
-                    signal_anchor, signal, seq_to_sig_map, fwd, read, num_samples_per_base);
+            auto [signal_start, signal_end] =
+                    determine_signal_bounds5(signal_anchor, signal, seq_to_sig_map, fwd, read,
+                                             num_samples_per_base, m_is_rna);
 
-            int num_bases = static_cast<int>((signal_end - signal_start) / num_samples_per_base) -
+            int num_bases = std::round(static_cast<float>(signal_end - signal_start) /
+                                       num_samples_per_base) -
                             trailing_Ts;
             if (num_bases >= 0 && num_bases < kMaxTailLength) {
                 spdlog::debug(
                         "{} PolyA bases {}, signal anchor {} region {} Signal range is {} {}, "
                         "primer {}, "
-                        "samples/base {}",
+                        "samples/base {} shift/scale/trim {} {} {}",
                         read->read_id, num_bases, signal_anchor,
                         read->seq.substr(fwd ? std::max(0, (base_anchor - num_bases)) : base_anchor,
                                          num_bases),
                         signal_start, signal_end, fwd ? base_anchor : base_anchor,
-                        num_samples_per_base);
+                        num_samples_per_base, read->mshift, read->mscale,
+                        read->num_trimmed_samples);
                 polyA += num_bases;
                 read->rna_poly_tail_length = num_bases;
                 {
                     std::lock_guard<std::mutex> lock(m_mutex);
                     poly_a_counts[num_bases]++;
                 }
+                if (num_bases == 44) {
+                    //spdlog::error("{}", read->read_id);
+                }
             } else {
                 spdlog::warn(
                         "{} PolyA bases {}, signal anchor {} Signal range is {} {} primer {}, "
-                        "samples/base {}",
+                        "samples/base {}, shift/scale/trim  {} {} {}",
                         read->read_id, num_bases, signal_anchor, signal_start, signal_end,
-                        fwd ? base_anchor : base_anchor, num_samples_per_base);
+                        fwd ? base_anchor : base_anchor, num_samples_per_base, read->mshift,
+                        read->mscale, read->num_trimmed_samples);
                 not_called++;
             }
         } else {
@@ -398,9 +408,13 @@ void PolyACalculator::terminate_impl() {
     m_workers.clear();
     spdlog::info("Total {}, not called {}, Avg polyA length {}", num_reads.load(),
                  not_called.load(), polyA.load() / num_reads.load());
-    for (auto [k, v] : poly_a_counts) {
-        spdlog::info("{} : {}", k, std::string(v, '*'));
-    }
+    //static bool done = false;
+    //if (!done && spdlog::get_level() != spdlog::level::debug) {
+    //    for (auto [k, v] : poly_a_counts) {
+    //        spdlog::info("{} : {}", k, std::string(v / 4, '*'));
+    //    }
+    //    done = true;
+    //}
 }
 
 void PolyACalculator::restart() {
