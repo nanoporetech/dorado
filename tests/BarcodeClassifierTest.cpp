@@ -3,6 +3,7 @@
 #include "MessageSinkUtils.h"
 #include "TestUtils.h"
 #include "htslib/sam.h"
+#include "read_pipeline/BarcodeClassifierNode.h"
 #include "read_pipeline/HtsReader.h"
 #include "utils/bam_utils.h"
 #include "utils/sequence_utils.h"
@@ -152,4 +153,30 @@ TEST_CASE("BarcodeClassifier: check barcodes on both ends - passing case", TEST_
         CHECK(double_end_res.adapter_name == single_end_res.adapter_name);
         CHECK(single_end_res.adapter_name == "BC01");
     }
+}
+
+TEST_CASE("BarcodeClassifierNode: check correct output files are created", TEST_GROUP) {
+    using Catch::Matchers::Contains;
+
+    dorado::PipelineDescriptor pipeline_desc;
+    std::vector<dorado::Message> messages;
+    auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
+    std::vector<std::string> kits = {"SQK-RPB004"};
+    auto demuxer = pipeline_desc.add_node<BarcodeClassifierNode>({sink}, 8, kits, false);
+
+    auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
+
+    auto read = std::make_shared<dorado::Read>();
+    read->seq = "AAAA";
+    read->qstring = "!!!!";
+    read->read_id = "read_id";
+    auto records = read->extract_sam_lines(false);
+    pipeline->push_message(std::move(read));
+    for (auto& rec : records) {
+        pipeline->push_message(std::move(rec));
+    }
+
+    pipeline->terminate(DefaultFlushOptions());
+
+    CHECK(messages.size() == 2);
 }
