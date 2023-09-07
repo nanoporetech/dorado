@@ -84,7 +84,7 @@ void BaseSpaceDuplexCallerNode::basespace(const std::string& template_read_id,
     align_config.task = EDLIB_TASK_PATH;
 
     std::string_view template_sequence;
-    std::shared_ptr<Read> template_read;
+    const Read* template_read;
     std::vector<uint8_t> template_quality_scores;
     auto template_read_it = m_reads.find(template_read_id);
     if (template_read_it == m_reads.end()) {
@@ -92,7 +92,7 @@ void BaseSpaceDuplexCallerNode::basespace(const std::string& template_read_id,
                       template_read_id);
         return;
     } else {
-        template_read = template_read_it->second;
+        template_read = template_read_it->second.get();
         template_sequence = template_read->seq;
         template_quality_scores =
                 std::vector<uint8_t>(template_read->qstring.begin(), template_read->qstring.end());
@@ -113,7 +113,7 @@ void BaseSpaceDuplexCallerNode::basespace(const std::string& template_read_id,
     }
 
     // We have both sequences and can perform the consensus
-    auto complement_read = complement_read_it->second;
+    const Read* complement_read = complement_read_it->second.get();
     auto complement_quality_scores_reverse =
             std::vector<uint8_t>(complement_read->qstring.begin(), complement_read->qstring.end());
     std::reverse(complement_quality_scores_reverse.begin(),
@@ -164,7 +164,7 @@ void BaseSpaceDuplexCallerNode::basespace(const std::string& template_read_id,
                 target_cursor, complement_quality_scores_reverse, query_cursor, template_sequence,
                 complement_sequence_reverse_complement, result.alignment);
 
-        auto duplex_read = std::make_shared<Read>();
+        auto duplex_read = ReadPtr::make();
         duplex_read->is_duplex = true;
         duplex_read->seq = std::string(consensus.begin(), consensus.end());
         duplex_read->qstring =
@@ -180,7 +180,7 @@ void BaseSpaceDuplexCallerNode::basespace(const std::string& template_read_id,
 
 BaseSpaceDuplexCallerNode::BaseSpaceDuplexCallerNode(
         std::map<std::string, std::string> template_complement_map,
-        read_map reads,
+        ReadMap reads,
         size_t threads)
         : MessageSink(1000),
           m_template_complement_map(std::move(template_complement_map)),

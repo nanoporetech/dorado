@@ -1,12 +1,14 @@
+#include "stitch.h"
+
 #include "../read_pipeline/ReadPipeline.h"
 #include "math_utils.h"
 
 namespace dorado::utils {
 
-void stitch_chunks(std::shared_ptr<Read> read) {
+void stitch_chunks(Read& read, const std::vector<std::unique_ptr<Chunk>>& called_chunks) {
     // Calculate the chunk down sampling, round to closest int.
-    read->model_stride = div_round_closest(read->called_chunks[0]->raw_chunk_size,
-                                           read->called_chunks[0]->moves.size());
+    read.model_stride =
+            div_round_closest(called_chunks[0]->raw_chunk_size, called_chunks[0]->moves.size());
 
     int start_pos = 0;
     int mid_point_front = 0;
@@ -14,13 +16,13 @@ void stitch_chunks(std::shared_ptr<Read> read) {
     std::vector<std::string> sequences;
     std::vector<std::string> qstrings;
 
-    for (int i = 0; i < read->num_chunks - 1; i++) {
-        auto current_chunk = read->called_chunks[i];
-        auto next_chunk = read->called_chunks[i + 1];
+    for (int i = 0; i < called_chunks.size() - 1; i++) {
+        auto& current_chunk = called_chunks[i];
+        auto& next_chunk = called_chunks[i + 1];
         int overlap_size = (current_chunk->raw_chunk_size + current_chunk->input_offset) -
                            (next_chunk->input_offset);
-        assert(overlap_size % read->model_stride == 0);
-        int overlap_down_sampled = overlap_size / read->model_stride;
+        assert(overlap_size % read.model_stride == 0);
+        int overlap_down_sampled = overlap_size / read.model_stride;
         int mid_point_rear = overlap_down_sampled / 2;
 
         int current_chunk_bases_to_trim =
@@ -44,13 +46,13 @@ void stitch_chunks(std::shared_ptr<Read> read) {
     }
 
     // Append the final chunk
-    auto& last_chunk = read->called_chunks[read->num_chunks - 1];
+    auto& last_chunk = called_chunks.back();
     moves.insert(moves.end(), std::next(last_chunk->moves.begin(), mid_point_front),
                  last_chunk->moves.end());
 
-    if (read->num_chunks == 1) {
+    if (called_chunks.size() == 1) {
         // shorten the sequence, qstring & moves where the read is shorter than chunksize
-        int last_index_in_moves_to_keep = read->raw_data.size(0) / read->model_stride;
+        int last_index_in_moves_to_keep = read.raw_data.size(0) / read.model_stride;
         moves = std::vector<uint8_t>(moves.begin(), moves.begin() + last_index_in_moves_to_keep);
         int end = std::accumulate(moves.begin(), moves.end(), 0);
         sequences.push_back(last_chunk->seq.substr(start_pos, end));
@@ -62,18 +64,18 @@ void stitch_chunks(std::shared_ptr<Read> read) {
     }
 
     // Set the read seq and qstring
-    read->seq = std::accumulate(sequences.begin(), sequences.end(), std::string(""));
-    read->qstring = std::accumulate(qstrings.begin(), qstrings.end(), std::string(""));
-    read->moves = std::move(moves);
+    read.seq = std::accumulate(sequences.begin(), sequences.end(), std::string(""));
+    read.qstring = std::accumulate(qstrings.begin(), qstrings.end(), std::string(""));
+    read.moves = std::move(moves);
 
     // remove partial stride overhang
-    if (read->moves.size() > static_cast<int>(read->raw_data.size(0) / read->model_stride)) {
-        if (read->moves.back() == 1) {
-            read->seq.pop_back();
-            read->qstring.pop_back();
+    if (read.moves.size() > static_cast<int>(read.raw_data.size(0) / read.model_stride)) {
+        if (read.moves.back() == 1) {
+            read.seq.pop_back();
+            read.qstring.pop_back();
         }
-        read->moves.pop_back();
-        assert(std::accumulate(read->moves.begin(), read->moves.end(), 0) == read->seq.size());
+        read.moves.pop_back();
+        assert(std::accumulate(read.moves.begin(), read.moves.end(), 0) == read.seq.size());
     }
 }
 

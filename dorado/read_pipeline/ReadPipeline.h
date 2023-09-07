@@ -18,28 +18,6 @@
 
 namespace dorado {
 
-class Read;
-
-struct Chunk {
-    Chunk(std::shared_ptr<Read> const& read,
-          size_t offset,
-          size_t chunk_in_read_idx,
-          size_t chunk_size)
-            : source_read(read),
-              input_offset(offset),
-              idx_in_read(chunk_in_read_idx),
-              raw_chunk_size(chunk_size) {}
-
-    std::weak_ptr<Read> source_read;
-    size_t input_offset;    // Where does this chunk start in the input raw read data
-    size_t idx_in_read;     // Just for tracking that the chunks don't go out of order
-    size_t raw_chunk_size;  // Just for knowing the original chunk size
-
-    std::string seq;
-    std::string qstring;
-    std::vector<uint8_t> moves;  // For stitching.
-};
-
 // Class representing a read, including raw data
 class Read {
 public:
@@ -64,21 +42,13 @@ public:
     uint64_t sample_rate;  // Loaded from source file
 
     uint64_t start_time_ms;
-    uint64_t get_end_time_ms();
+    uint64_t get_end_time_ms() const;
 
     float shift;                 // To be set by scaler
     float scale;                 // To be set by scaler
     std::string scaling_method;  // To be set by scaler
 
     float scaling;  // Scale factor applied to convert raw integers from sequencer into pore current values
-
-    size_t num_chunks;  // Number of chunks in the read. Reads raw data is split into chunks for efficient basecalling.
-    std::vector<std::shared_ptr<Chunk>> called_chunks;  // Vector of basecalled chunks.
-    std::atomic_size_t num_chunks_called;  // Number of chunks which have been basecalled
-
-    size_t num_modbase_chunks;
-    std::atomic_size_t
-            num_modbase_chunks_called;  // Number of modbase chunks which have been scored
 
     int model_stride;  // The down sampling factor of the model
 
@@ -134,11 +104,45 @@ private:
     std::string generate_read_group() const;
 };
 
+// Intentionally uncopyable smart pointer that acts as a single mutable owner but
+// can also provide multiple immutable views that have strong ownership too.
+class ReadPtr {
+    std::shared_ptr<Read> m_read;
+
+    ReadPtr(const ReadPtr&) = delete;
+    ReadPtr& operator=(const ReadPtr&) = delete;
+
+public:
+    static ReadPtr make() {
+        ReadPtr ptr;
+        ptr.m_read = std::make_unique<Read>();
+        return ptr;
+    }
+
+    ReadPtr() = default;
+    ReadPtr(ReadPtr&&) = default;
+    ReadPtr& operator=(ReadPtr&&) = default;
+
+    Read& operator*() const { return *m_read; }
+    Read* operator->() const { return m_read.get(); }
+    Read* get() const { return m_read.get(); }
+
+    // Create a view of the data in the read.
+    std::shared_ptr<const torch::Tensor> data() const { return {m_read, &m_read->raw_data}; }
+    // Create a view of the entire read.
+    std::shared_ptr<const Read> view() const { return m_read; }
+    // Take an owning reference to keep the |Read| alive.
+    std::shared_ptr<void> owning_reference() const { return {m_read, nullptr}; }
+
+    bool operator==(const ReadPtr& o) const { return m_read == o.m_read; }
+    std::size_t hash() const { return std::hash<std::shared_ptr<Read>>{}(m_read); }
+};
+
 // A pair of reads for Duplex calling
 class ReadPair {
 public:
-    std::shared_ptr<Read> read_1;
-    std::shared_ptr<Read> read_2;
+    std::shared_ptr<const Read> read_1;
+    std::shared_ptr<const Read> read_2;
     uint64_t read_1_start;
     uint64_t read_1_end;
     uint64_t read_2_start;
@@ -152,12 +156,11 @@ public:
 
 // The Message type is a std::variant that can hold different types of message objects.
 // It is currently able to store:
-// - a std::shared_ptr<Read> object, which represents a single read
+// - a ReadPtr object, which represents a single read
 // - a BamPtr object, which represents a raw BAM alignment record
-// - a std::shared_ptr<ReadPair> object, which represents a pair of reads for duplex calling
+// - a ReadPair object, which represents a pair of reads for duplex calling
 // To add more message types, simply add them to the list of types in the std::variant.
-using Message =
-        std::variant<std::shared_ptr<Read>, BamPtr, std::shared_ptr<ReadPair>, CacheFlushMessage>;
+using Message = std::variant<ReadPtr, BamPtr, ReadPair, CacheFlushMessage>;
 
 using NodeHandle = int;
 
@@ -340,3 +343,8 @@ private:
 };
 
 }  // namespace dorado
+
+template <>
+struct std::hash<dorado::ReadPtr> {
+    std::size_t operator()(const dorado::ReadPtr& key) const { return key.hash(); }
+};

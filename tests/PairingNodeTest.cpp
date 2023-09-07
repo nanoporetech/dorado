@@ -15,8 +15,8 @@ namespace {
 // Generate a read that is seq_len long with a specified start
 // time delay. If seq is defined, ignore the seq_len and use
 // the provided seq string directly.
-std::shared_ptr<dorado::Read> make_read(int delay_ms, size_t seq_len, const std::string& seq = "") {
-    std::shared_ptr<dorado::Read> read = std::make_shared<dorado::Read>();
+auto make_read(int delay_ms, size_t seq_len, const std::string& seq = "") {
+    auto read = dorado::ReadPtr::make();
     read->sample_rate = 4000;
     read->num_trimmed_samples = 10;
     read->attributes.channel_number = 664;
@@ -49,17 +49,15 @@ TEST_CASE("Split read pairing", TEST_GROUP) {
     auto seq_rc = dorado::utils::reverse_complement(seq);
     seq_rc = seq_rc.substr(0, seq.length() * 0.8f);
 
-    // clang-format off
-    std::vector<std::shared_ptr<dorado::Read>> reads = {
+    std::array reads{
             make_read(0, 1000),
             make_read(10, 1000),     // too early to pair with {0}
             make_read(10000, 6000),  // too late to pair with {1}
             make_read(12500, 5990),
-            make_read(18000, 100),   // too short to pair with {2}
-            make_read(25000, 0, seq),    
-            make_read(27500, 0, seq_rc) // truncated reverse complement of {5} 
+            make_read(18000, 100),  // too short to pair with {2}
+            make_read(25000, 0, seq),
+            make_read(27500, 0, seq_rc)  // truncated reverse complement of {5}
     };
-    // clang-format on
 
     dorado::PipelineDescriptor pipeline_desc;
     std::vector<dorado::Message> messages;
@@ -78,12 +76,12 @@ TEST_CASE("Split read pairing", TEST_GROUP) {
     CHECK(messages.size() == 9);
     auto num_reads =
             std::count_if(messages.begin(), messages.end(), [](const dorado::Message& message) {
-                return std::holds_alternative<std::shared_ptr<dorado::Read>>(message);
+                return std::holds_alternative<dorado::ReadPtr>(message);
             });
     CHECK(num_reads == 7);
     auto num_pairs =
             std::count_if(messages.begin(), messages.end(), [](const dorado::Message& message) {
-                return std::holds_alternative<std::shared_ptr<dorado::ReadPair>>(message);
+                return std::holds_alternative<dorado::ReadPair>(message);
             });
     CHECK(num_pairs == 2);
 }

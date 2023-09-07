@@ -13,50 +13,50 @@ TEST_CASE("DuplexReadTaggingNode", TEST_GROUP) {
     pipeline_desc.add_node<dorado::DuplexReadTaggingNode>({sink});
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
     {
-        auto read_12 = std::make_shared<dorado::Read>();
+        auto read_12 = dorado::ReadPtr::make();
         read_12->read_id = "1;2";
         read_12->is_duplex = true;
 
-        auto read_1 = std::make_shared<dorado::Read>();
+        auto read_1 = dorado::ReadPtr::make();
         read_1->read_id = "1";
         read_1->is_duplex_parent = true;
 
-        auto read_2 = std::make_shared<dorado::Read>();
+        auto read_2 = dorado::ReadPtr::make();
         read_2->read_id = "2";
         read_2->is_duplex_parent = true;
 
-        auto read_3 = std::make_shared<dorado::Read>();
+        auto read_3 = dorado::ReadPtr::make();
         read_3->read_id = "3";
         read_3->is_duplex_parent = true;
 
-        auto read_4 = std::make_shared<dorado::Read>();
+        auto read_4 = dorado::ReadPtr::make();
         read_4->read_id = "4";
         read_4->is_duplex_parent = true;
 
-        auto read_5 = std::make_shared<dorado::Read>();
+        auto read_5 = dorado::ReadPtr::make();
         read_5->read_id = "5";
         read_5->is_duplex_parent = true;
 
-        auto read_6 = std::make_shared<dorado::Read>();
+        auto read_6 = dorado::ReadPtr::make();
         read_6->read_id = "6";
         read_6->is_duplex_parent = true;
 
-        auto read_56 = std::make_shared<dorado::Read>();
+        auto read_56 = dorado::ReadPtr::make();
         read_6->read_id = "5;6";
         read_6->is_duplex = true;
 
-        pipeline->push_message(read_1);
-        pipeline->push_message(read_2);
-        pipeline->push_message(read_3);
-        pipeline->push_message(read_4);
-        pipeline->push_message(read_12);
-        pipeline->push_message(read_5);
-        pipeline->push_message(read_6);
-        pipeline->push_message(read_56);
+        pipeline->push_message(std::move(read_1));
+        pipeline->push_message(std::move(read_2));
+        pipeline->push_message(std::move(read_3));
+        pipeline->push_message(std::move(read_4));
+        pipeline->push_message(std::move(read_12));
+        pipeline->push_message(std::move(read_5));
+        pipeline->push_message(std::move(read_6));
+        pipeline->push_message(std::move(read_56));
     }
     pipeline.reset();
 
-    auto reads = ConvertMessages<std::shared_ptr<dorado::Read>>(messages);
+    auto reads = ConvertMessages<dorado::ReadPtr>(std::move(messages));
     for (auto& read : reads) {
         if (read->read_id == "1;2") {
             CHECK(read->is_duplex == true);

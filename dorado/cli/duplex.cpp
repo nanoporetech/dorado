@@ -214,7 +214,8 @@ int duplex(int argc, char* argv[]) {
             threads = threads == 0 ? std::thread::hardware_concurrency() : threads;
 
             auto duplex_caller_node = pipeline_desc.add_node<BaseSpaceDuplexCallerNode>(
-                    {read_filter_node}, template_complement_map, read_map, threads);
+                    {read_filter_node}, std::move(template_complement_map), std::move(read_map),
+                    threads);
 
             std::vector<dorado::stats::StatsReporter> stats_reporters;
             pipeline = Pipeline::create(std::move(pipeline_desc), &stats_reporters);
