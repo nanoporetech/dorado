@@ -156,7 +156,7 @@ TEST_CASE("BarcodeClassifier: check barcodes on both ends - passing case", TEST_
 }
 
 TEST_CASE("BarcodeClassifierNode: check correct output files are created", TEST_GROUP) {
-    using Catch::Matchers::Contains;
+    using Catch::Matchers::Equals;
 
     dorado::PipelineDescriptor pipeline_desc;
     std::vector<dorado::Message> messages;
@@ -171,12 +171,29 @@ TEST_CASE("BarcodeClassifierNode: check correct output files are created", TEST_
     read->qstring = "!!!!";
     read->read_id = "read_id";
     auto records = read->extract_sam_lines(false);
+
+    // Push a Read type.
     pipeline->push_message(std::move(read));
+    // Push BamPtr type.
     for (auto& rec : records) {
         pipeline->push_message(std::move(rec));
     }
+    auto dummy_read_pair = std::make_shared<dorado::ReadPair>();
+    // Push a type not used by the ClassifierNode.
+    pipeline->push_message(std::move(dummy_read_pair));
 
     pipeline->terminate(DefaultFlushOptions());
 
-    CHECK(messages.size() == 2);
+    CHECK(messages.size() == 3);
+
+    for (auto& message : messages) {
+        if (std::holds_alternative<BamPtr>(message)) {
+            auto read = std::get<BamPtr>(std::move(message));
+            bam1_t* rec = read.get();
+            CHECK_THAT(bam_aux2Z(bam_aux_get(rec, "BC")), Equals("unclassified"));
+        } else if (std::holds_alternative<std::shared_ptr<Read>>(message)) {
+            auto read = std::get<std::shared_ptr<Read>>(std::move(message));
+            CHECK(read->barcode == "unclassified");
+        }
+    }
 }

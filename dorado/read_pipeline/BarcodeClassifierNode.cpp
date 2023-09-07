@@ -73,7 +73,7 @@ void BarcodeClassifierNode::worker_thread(size_t tid) {
             barcode(read);
             send_message_to_sink(std::move(read));
         } else {
-            continue;
+            send_message_to_sink(std::move(message));
         }
     }
 }
