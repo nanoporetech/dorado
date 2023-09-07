@@ -56,7 +56,6 @@ include(cmake/OpenSSL.cmake)
 include(cmake/Htslib.cmake)
 if (DORADO_GPU_BUILD AND APPLE)
     include(cmake/Metal.cmake)
-    add_custom_target(metal-lib DEPENDS default.metallib)
 endif()
 
 # Add sanitizer options to compilation flags
