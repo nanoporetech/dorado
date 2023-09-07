@@ -33,7 +33,7 @@ private:
 
     void worker_thread(size_t tid);
     void barcode(bam1_t* irecord);
-    void barcode(std::shared_ptr<Read>);
+    void barcode(ReadPtr& read);
     void terminate_impl();
 };
 

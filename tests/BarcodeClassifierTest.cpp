@@ -166,7 +166,7 @@ TEST_CASE("BarcodeClassifierNode: check correct output files are created", TEST_
 
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
 
-    auto read = std::make_shared<dorado::Read>();
+    auto read = dorado::ReadPtr::make();
     read->seq = "AAAA";
     read->qstring = "!!!!";
     read->read_id = "read_id";
@@ -178,7 +178,7 @@ TEST_CASE("BarcodeClassifierNode: check correct output files are created", TEST_
     for (auto& rec : records) {
         pipeline->push_message(std::move(rec));
     }
-    auto dummy_read_pair = std::make_shared<dorado::ReadPair>();
+    dorado::ReadPair dummy_read_pair;
     // Push a type not used by the ClassifierNode.
     pipeline->push_message(std::move(dummy_read_pair));
 
@@ -191,8 +191,8 @@ TEST_CASE("BarcodeClassifierNode: check correct output files are created", TEST_
             auto read = std::get<BamPtr>(std::move(message));
             bam1_t* rec = read.get();
             CHECK_THAT(bam_aux2Z(bam_aux_get(rec, "BC")), Equals("unclassified"));
-        } else if (std::holds_alternative<std::shared_ptr<Read>>(message)) {
-            auto read = std::get<std::shared_ptr<Read>>(std::move(message));
+        } else if (std::holds_alternative<ReadPtr>(message)) {
+            auto read = std::get<ReadPtr>(std::move(message));
             CHECK(read->barcode == "unclassified");
         }
     }

@@ -68,8 +68,8 @@ void BarcodeClassifierNode::worker_thread(size_t tid) {
             auto read = std::get<BamPtr>(std::move(message));
             barcode(read.get());
             send_message_to_sink(std::move(read));
-        } else if (std::holds_alternative<std::shared_ptr<Read>>(message)) {
-            auto read = std::get<std::shared_ptr<Read>>(std::move(message));
+        } else if (std::holds_alternative<ReadPtr>(message)) {
+            auto read = std::get<ReadPtr>(std::move(message));
             barcode(read);
             send_message_to_sink(std::move(read));
         } else {
@@ -90,7 +90,7 @@ void BarcodeClassifierNode::barcode(bam1_t* irecord) {
     m_num_records++;
 }
 
-void BarcodeClassifierNode::barcode(std::shared_ptr<Read> read) {
+void BarcodeClassifierNode::barcode(ReadPtr& read) {
     // get the sequence to map from the record
     auto bc_res = m_barcoder.barcode(read->seq);
     auto bc = generate_barcode_string(bc_res);
