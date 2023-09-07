@@ -4,6 +4,8 @@ add_library(dorado_utils
     AsyncQueue.h
     bam_utils.cpp
     bam_utils.h
+    barcode_kits.cpp
+    barcode_kits.h
     basecaller_utils.cpp
     basecaller_utils.h
     compat_utils.cpp
