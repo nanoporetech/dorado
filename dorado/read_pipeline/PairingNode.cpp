@@ -299,14 +299,15 @@ void PairingNode::pair_generating_worker_thread(int tid) {
             }
         } else {
             auto& cached_read_list = read_list_iter->second;
-            // There's some complexity here when it comes to ownership. We need a mutable view of the reads
-            // since we're updating |is_duplex_parent|, but we can't take ownership of the read since that
-            // would remove it from the cache. Instead we have to keep an immutable copy of the read to ensure
-            // that it stays alive, and a raw pointer so we can update it if we find a pair.
-            // TODO: doesn't this mean we have a data race when assigning to/reading from |is_duplex_parent|?
-            std::shared_ptr<const Read> later_read_view, earlier_read_view;
+            // It's safe to take raw pointers of these reads since their ownership isn't released from this
+            // node until their counter in |m_reads_in_flight_ctr| hits 0.
             Read* later_read = nullptr;
             Read* earlier_read = nullptr;
+
+            // TODO: |ReadPair| still uses a complete |Read| object, however a duplex read message should be
+            // able to get rid of this.
+            std::shared_ptr<const Read> later_read_view, earlier_read_view;
+            auto read_view = read.view();
 
             auto later_read_iter = std::lower_bound(
                     cached_read_list.begin(), cached_read_list.end(), read, compare_reads_by_time);
@@ -323,7 +324,6 @@ void PairingNode::pair_generating_worker_thread(int tid) {
             }
 
             Read* const read_ptr = read.get();
-            auto read_view = read.view();
             cached_read_list.insert(later_read_iter, std::move(read));
             m_reads_in_flight_ctr[read_ptr]++;
 
@@ -339,9 +339,10 @@ void PairingNode::pair_generating_worker_thread(int tid) {
             bool found_pair = false;
             if (later_read) {
                 auto [is_pair, qs, qe, rs, re] =
-                        is_within_time_and_length_criteria(*read_view, *later_read_view, tid);
+                        is_within_time_and_length_criteria(*read_ptr, *later_read, tid);
                 if (is_pair) {
-                    ReadPair pair = {read_view, later_read_view, qs, qe, rs, re};
+                    ReadPair pair = {
+                            std::move(read_view), std::move(later_read_view), qs, qe, rs, re};
                     read_ptr->is_duplex_parent = true;
                     later_read->is_duplex_parent = true;
                     ++read_ptr->num_duplex_candidate_pairs;
@@ -352,9 +353,10 @@ void PairingNode::pair_generating_worker_thread(int tid) {
 
             if (!found_pair && earlier_read) {
                 auto [is_pair, qs, qe, rs, re] =
-                        is_within_time_and_length_criteria(*earlier_read_view, *read_view, tid);
+                        is_within_time_and_length_criteria(*earlier_read, *read_ptr, tid);
                 if (is_pair) {
-                    ReadPair pair = {earlier_read_view, read_view, qs, qe, rs, re};
+                    ReadPair pair = {
+                            std::move(earlier_read_view), std::move(read_view), qs, qe, rs, re};
                     earlier_read->is_duplex_parent = true;
                     read_ptr->is_duplex_parent = true;
                     ++earlier_read->num_duplex_candidate_pairs;
