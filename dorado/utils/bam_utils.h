@@ -21,7 +21,9 @@ struct AlignmentOps {
     size_t substitutions;
 };
 
-void add_rg_hdr(sam_hdr_t* hdr, const std::unordered_map<std::string, ReadGroup>& read_groups);
+void add_rg_hdr(sam_hdr_t* hdr,
+                const std::unordered_map<std::string, ReadGroup>& read_groups,
+                const std::vector<std::string>& barcode_kits);
 
 void add_sq_hdr(sam_hdr_t* hdr, const sq_t& seqs);
 

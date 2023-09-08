@@ -105,6 +105,7 @@ void setup(std::vector<std::string> args,
 
     auto read_groups = DataLoader::load_read_groups(data_path, model_name, recursive_file_loading);
     auto read_list = utils::load_read_list(read_list_file_path);
+    std::vector<std::string> barcode_kits;
 
     size_t num_reads = DataLoader::get_num_reads(
             data_path, read_list, {} /*reads_already_processed*/, recursive_file_loading);
@@ -117,7 +118,7 @@ void setup(std::vector<std::string> args,
 
     SamHdrPtr hdr(sam_hdr_init());
     cli::add_pg_hdr(hdr.get(), args);
-    utils::add_rg_hdr(hdr.get(), read_groups);
+    utils::add_rg_hdr(hdr.get(), read_groups, barcode_kits);
 
     PipelineDescriptor pipeline_desc;
     auto hts_writer = pipeline_desc.add_node<HtsWriter>(

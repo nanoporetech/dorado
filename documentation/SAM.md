@@ -11,7 +11,7 @@
 
 |    |    |                                                       |
 | -- | -- | ----------------------------------------------------- |
-| RG | ID | `<runid>_<basecalling_model>`                         |
+| RG | ID | `<runid>_<basecalling_model>_<barcode_arrangement>`   |
 |    | PU | `<flow_cell_id>`                                      |
 |    | PM | `<device_id>`                                         |
 |    | DT | `<exp_start_time>`                                    |
