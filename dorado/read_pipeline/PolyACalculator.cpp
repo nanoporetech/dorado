@@ -11,7 +11,7 @@
 
 namespace {
 
-int kMaxTailLength = 500;
+int kMaxTailLength = 750;
 
 // This algorithm walks through the signal in windows. For each window
 // the avg and stdev of the signal is computed. If the stdev is below
@@ -67,8 +67,8 @@ std::pair<int, int> determine_signal_bounds5(int signal_anchor,
     const int kSpread = num_samples_per_base * kMaxTailLength;
     int left_end = is_rna ? std::max(0, signal_anchor - 50)
                           : (fwd ? std::max(0, signal_anchor - kSpread)
-                                 : std::max(0, signal_anchor - kSpread / 10));
-    int right_end = (fwd ? std::min(signal_len, signal_anchor + kSpread / 10)
+                                 : std::max(0, signal_anchor - kSpread));
+    int right_end = (fwd ? std::min(signal_len, signal_anchor + kSpread)
                          : std::min(signal_len, signal_anchor + kSpread));
 
     const int kStride = 3;
@@ -78,33 +78,46 @@ std::pair<int, int> determine_signal_bounds5(int signal_anchor,
         auto [avg, stdev] = calc_stats(s, e);
         if (stdev < kVar) {
             if (intervals.size() > 1 && intervals.back().second >= s &&
-                std::abs(avg - interval_stats.back().first) < 0.2 &&
-                std::abs(stdev - interval_stats.back().second) < 0.1) {
+                std::abs(avg - interval_stats.back().first) < 0.2) {
                 auto& last = intervals.back();
                 last.second = e;
-                //spdlog::debug("update interval {}-{}, avg {} stdev {}", last.first, last.second,
-                //              avg, stdev);
             } else {
                 intervals.push_back({s, e});
-                //spdlog::debug("new interval {}-{}, avg {} stdev {}", s, e, avg, stdev);
             }
             interval_stats.push_back({avg, stdev});
         }
     }
 
+    std::string int_str = "";
+    for (auto in : intervals) {
+        int_str += std::to_string(in.first) + "-" + std::to_string(in.second) + ", ";
+    }
+    spdlog::debug("found intervals {}", int_str);
+
     std::vector<std::pair<int, int>> filtered_intervals;
     // In forward strand, the poly A/T signal should end within 50bp of the
     // signal anchor, and in reverse strand it should start within 50bp of the
     // anchor.
-    int kAnchorProximity = 50 * num_samples_per_base;
+    int kAnchorProximity = 25 * num_samples_per_base;
     if (fwd) {
-        std::copy_if(
-                intervals.begin(), intervals.end(), std::back_inserter(filtered_intervals),
-                [&](auto& i) { return std::abs(signal_anchor - i.second) < kAnchorProximity; });
+        std::copy_if(intervals.begin(), intervals.end(), std::back_inserter(filtered_intervals),
+                     [&](auto& i) {
+                         return std::abs(signal_anchor - i.second) < kAnchorProximity ||
+                                (i.first <= signal_anchor) && (signal_anchor <= i.second);
+                     });
     } else {
         std::copy_if(intervals.begin(), intervals.end(), std::back_inserter(filtered_intervals),
-                     [&](auto& i) { return std::abs(signal_anchor - i.first) < kAnchorProximity; });
+                     [&](auto& i) {
+                         return std::abs(signal_anchor - i.first) < kAnchorProximity ||
+                                (i.first <= signal_anchor) && (signal_anchor <= i.second);
+                     });
     }
+
+    int_str = "";
+    for (auto in : filtered_intervals) {
+        int_str += std::to_string(in.first) + "-" + std::to_string(in.second) + ", ";
+    }
+    spdlog::debug("filtered intervals {}", int_str);
 
     if (filtered_intervals.empty()) {
         spdlog::debug("Anchor {} No range within anchor proximity found", signal_anchor);
@@ -365,7 +378,7 @@ void PolyACalculator::worker_thread() {
                     std::lock_guard<std::mutex> lock(m_mutex);
                     poly_a_counts[num_bases]++;
                 }
-                if (num_bases == 44) {
+                if (num_bases == 49) {
                     //spdlog::error("{}", read->read_id);
                 }
             } else {
@@ -408,10 +421,15 @@ void PolyACalculator::terminate_impl() {
     m_workers.clear();
     spdlog::info("Total {}, not called {}, Avg polyA length {}", num_reads.load(),
                  not_called.load(), polyA.load() / num_reads.load());
-    //static bool done = false;
+    static bool done = false;
     //if (!done && spdlog::get_level() != spdlog::level::debug) {
+    //    int max_val = -1;
     //    for (auto [k, v] : poly_a_counts) {
-    //        spdlog::info("{} : {}", k, std::string(v / 4, '*'));
+    //        max_val = std::max(v, max_val);
+    //    }
+    //    int factor = std::max(1, 1 + max_val / 100);
+    //    for (auto [k, v] : poly_a_counts) {
+    //        spdlog::info("{} : {}", k, std::string(v / factor, '*'));
     //    }
     //    done = true;
     //}
