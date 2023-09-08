@@ -144,7 +144,7 @@ std::map<std::string, std::string> extract_pg_keys_from_hdr(const std::string fi
     if (!file) {
         throw std::runtime_error("Could not open file: " + filename);
     }
-    auto header = sam_hdr_read(file);
+    SamHdrPtr header(sam_hdr_read(file));
     if (!header) {
         throw std::runtime_error("Could not open header from file: " + filename);
     }
@@ -158,14 +158,13 @@ std::map<std::string, std::string> extract_pg_keys_from_hdr(const std::string fi
     // is attempted on it from dorado, there's cross-heap behavior and a segfault occurs.
     ks_resize(&val, 1e6);
     for (auto& k : keys) {
-        auto ret = sam_hdr_find_tag_id(header, "PG", NULL, NULL, k.c_str(), &val);
+        auto ret = sam_hdr_find_tag_id(header.get(), "PG", NULL, NULL, k.c_str(), &val);
         if (ret != 0) {
             throw std::runtime_error("Required key " + k + " not found in header of " + filename);
         }
         pg_keys[k] = std::string(val.s);
     }
     ks_free(&val);
-    sam_hdr_destroy(header);
     hts_close(file);
     return pg_keys;
 }

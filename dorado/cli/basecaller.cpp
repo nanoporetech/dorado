@@ -115,7 +115,7 @@ void setup(std::vector<std::string> args,
     const auto thread_allocations = utils::default_thread_allocations(
             num_devices, !remora_runners.empty() ? num_remora_threads : 0);
 
-    std::unique_ptr<sam_hdr_t, void (*)(sam_hdr_t*)> hdr(sam_hdr_init(), sam_hdr_destroy);
+    SamHdrPtr hdr(sam_hdr_init());
     cli::add_pg_hdr(hdr.get(), args);
     utils::add_rg_hdr(hdr.get(), read_groups);
 

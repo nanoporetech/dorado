@@ -162,7 +162,7 @@ int duplex(int argc, char* argv[]) {
                                                                          recursive_file_loading));
         spdlog::debug("> Reads to process: {}", num_reads);
 
-        std::unique_ptr<sam_hdr_t, void (*)(sam_hdr_t*)> hdr(sam_hdr_init(), sam_hdr_destroy);
+        SamHdrPtr hdr(sam_hdr_init());
         cli::add_pg_hdr(hdr.get(), args);
 
         PipelineDescriptor pipeline_desc;
