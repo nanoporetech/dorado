@@ -112,7 +112,7 @@ void setup(std::vector<std::string> args,
 
     bool rna = utils::is_rna_model(model_path), duplex = false;
 
-    auto const thread_allocations = utils::default_thread_allocations(
+    const auto thread_allocations = utils::default_thread_allocations(
             num_devices, !remora_runners.empty() ? num_remora_threads : 0);
 
     std::unique_ptr<sam_hdr_t, void (*)(sam_hdr_t*)> hdr(sam_hdr_init(), sam_hdr_destroy);

@@ -521,7 +521,7 @@ private:
             auto state_buf = torch::zeros({batch_size, layer_size}, in.options());
             {
                 if (int(device_weights.size()) == layer_idx) {
-                    auto const &params = rnn->named_parameters();
+                    const auto &params = rnn->named_parameters();
                     auto w_ih = params["weight_ih_l0"];
                     auto w_hh = params["weight_hh_l0"];
                     device_bias.push_back(params["bias_ih_l0"].to(in.options()));
@@ -585,7 +585,7 @@ private:
             int interleave = 0;  //(type_id == KOI_I8) ? 64 : 32;
 
             if (int(device_weights.size()) == layer_idx) {
-                auto const &params = rnn->named_parameters();
+                const auto &params = rnn->named_parameters();
                 auto w_ih = params["weight_ih_l0"].to(opts_f16);
                 auto w_hh = params["weight_hh_l0"].to(opts_f16);
                 auto weights_cpu = torch::cat({reverse ? w_hh : w_ih, reverse ? w_ih : w_hh}, 1);
@@ -698,7 +698,7 @@ private:
         // Quantise weights and move to GPU, if called for the first time
         if (device_w_hh.empty()) {
             for (auto &rnn : {rnn1, rnn2, rnn3, rnn4, rnn5}) {
-                auto const &params = rnn->named_parameters();
+                const auto &params = rnn->named_parameters();
                 rearrange_individual_weights(params["weight_hh_l0"]);
                 rearrange_individual_weights(params["weight_ih_l0"]);
                 rearrange_individual_weights(params["bias_ih_l0"]);

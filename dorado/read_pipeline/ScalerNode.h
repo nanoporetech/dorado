@@ -33,7 +33,7 @@ private:
     std::atomic<int> m_num_worker_threads;
 
     SignalNormalisationParams m_scaling_params;
-    bool const m_is_rna;
+    const bool m_is_rna;
 
     std::pair<float, float> med_mad(const torch::Tensor& x);
     std::pair<float, float> normalisation(const torch::Tensor& x);

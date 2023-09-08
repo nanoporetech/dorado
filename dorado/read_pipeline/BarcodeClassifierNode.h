@@ -32,7 +32,8 @@ private:
     demux::BarcodeClassifier m_barcoder;
 
     void worker_thread(size_t tid);
-    BamPtr barcode(bam1_t* irecord);
+    void barcode(bam1_t* irecord);
+    void barcode(ReadPtr& read);
     void terminate_impl();
 };
 

@@ -3,6 +3,7 @@
 #include "MessageSinkUtils.h"
 #include "TestUtils.h"
 #include "htslib/sam.h"
+#include "read_pipeline/BarcodeClassifierNode.h"
 #include "read_pipeline/HtsReader.h"
 #include "utils/bam_utils.h"
 #include "utils/sequence_utils.h"
@@ -151,5 +152,48 @@ TEST_CASE("BarcodeClassifier: check barcodes on both ends - passing case", TEST_
         auto double_end_res = double_end_classifier.barcode(seq);
         CHECK(double_end_res.adapter_name == single_end_res.adapter_name);
         CHECK(single_end_res.adapter_name == "BC01");
+    }
+}
+
+TEST_CASE("BarcodeClassifierNode: check correct output files are created", TEST_GROUP) {
+    using Catch::Matchers::Equals;
+
+    dorado::PipelineDescriptor pipeline_desc;
+    std::vector<dorado::Message> messages;
+    auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
+    std::vector<std::string> kits = {"SQK-RPB004"};
+    auto demuxer = pipeline_desc.add_node<BarcodeClassifierNode>({sink}, 8, kits, false);
+
+    auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
+
+    auto read = dorado::ReadPtr::make();
+    read->seq = "AAAA";
+    read->qstring = "!!!!";
+    read->read_id = "read_id";
+    auto records = read->extract_sam_lines(false);
+
+    // Push a Read type.
+    pipeline->push_message(std::move(read));
+    // Push BamPtr type.
+    for (auto& rec : records) {
+        pipeline->push_message(std::move(rec));
+    }
+    dorado::ReadPair dummy_read_pair;
+    // Push a type not used by the ClassifierNode.
+    pipeline->push_message(std::move(dummy_read_pair));
+
+    pipeline->terminate(DefaultFlushOptions());
+
+    CHECK(messages.size() == 3);
+
+    for (auto& message : messages) {
+        if (std::holds_alternative<BamPtr>(message)) {
+            auto read = std::get<BamPtr>(std::move(message));
+            bam1_t* rec = read.get();
+            CHECK_THAT(bam_aux2Z(bam_aux_get(rec, "BC")), Equals("unclassified"));
+        } else if (std::holds_alternative<ReadPtr>(message)) {
+            auto read = std::get<ReadPtr>(std::move(message));
+            CHECK(read->barcode == "unclassified");
+        }
     }
 }
