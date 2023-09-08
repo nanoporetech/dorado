@@ -20,28 +20,39 @@
 #include <optional>
 #include <vector>
 
-auto get_iterator_fn(const std::string& path, bool recursive) {
+/**
+ * @brief Fetches directory entries from a specified path.
+ *
+ * This function fetches all directory entries from the specified path. If the path is not a directory,
+ * it will return a vector containing a single entry representing the specified file.
+ * It can operate in two modes: recursive and non-recursive. In recursive mode, it fetches entries from
+ * all subdirectories recursively. In non-recursive mode, it only fetches entries from the top-level directory.
+ *
+ * @param path The path from which to fetch the directory entries. It can be a path to a file or a directory.
+ * @param recursive A boolean flag indicating whether to operate in recursive mode.
+ *                  True for recursive mode, false for non-recursive mode.
+ * @return A vector of directory entries fetched from the specified path.
+ */
+auto fetch_directory_entries(const std::string& path, bool recursive) {
     using DirEntry = std::filesystem::directory_entry;
 
-    return [path, recursive]() {
-        std::vector<DirEntry> entries;
+    std::vector<DirEntry> entries;
 
-        if (std::filesystem::is_directory(path)) {
-            if (recursive) {
-                for (const auto& entry : std::filesystem::recursive_directory_iterator(path)) {
-                    entries.push_back(entry);
-                }
-            } else {
-                for (const auto& entry : std::filesystem::directory_iterator(path)) {
-                    entries.push_back(entry);
-                }
+    if (std::filesystem::is_directory(path)) {
+        if (recursive) {
+            for (const auto& entry : std::filesystem::recursive_directory_iterator(path)) {
+                entries.push_back(entry);
             }
         } else {
-            entries.push_back(DirEntry(path));
+            for (const auto& entry : std::filesystem::directory_iterator(path)) {
+                entries.push_back(entry);
+            }
         }
+    } else {
+        entries.push_back(DirEntry(path));
+    }
 
-        return entries;
-    };
+    return entries;
 }
 
 namespace {
@@ -181,7 +192,7 @@ void DataLoader::load_reads(const std::string& path,
         return;
     }
 
-    auto iterate_directory = [&](const auto& iterator_fn) {
+    auto iterate_directory = [&](const auto& iterator) {
         switch (traversal_order) {
         case ReadOrder::BY_CHANNEL:
             // If traversal in channel order is required, the following algorithm
@@ -195,7 +206,7 @@ void DataLoader::load_reads(const std::string& path,
             // 3. for each channel, iterate through all files and in each iteration
             // only load the reads that correspond to that channel.
             for (int channel = 0; channel <= m_max_channel; channel++) {
-                for (const auto& entry : iterator_fn()) {
+                for (const auto& entry : iterator) {
                     if (m_loaded_read_count == m_max_reads) {
                         break;
                     }
@@ -219,7 +230,7 @@ void DataLoader::load_reads(const std::string& path,
             }
             break;
         case ReadOrder::UNRESTRICTED:
-            for (const auto& entry : iterator_fn()) {
+            for (const auto& entry : iterator) {
                 if (m_loaded_read_count == m_max_reads) {
                     break;
                 }
@@ -239,7 +250,7 @@ void DataLoader::load_reads(const std::string& path,
         }
     };
 
-    iterate_directory(get_iterator_fn(path, recursive_file_loading));
+    iterate_directory(fetch_directory_entries(path, recursive_file_loading));
 }
 
 int DataLoader::get_num_reads(std::string data_path,
@@ -248,8 +259,8 @@ int DataLoader::get_num_reads(std::string data_path,
                               bool recursive_file_loading) {
     size_t num_reads = 0;
 
-    auto iterate_directory = [&](const auto& iterator_fn) {
-        for (const auto& entry : iterator_fn()) {
+    auto iterate_directory = [&](const auto& iterator) {
+        for (const auto& entry : iterator) {
             std::string ext = std::filesystem::path(entry).extension().string();
             std::transform(ext.begin(), ext.end(), ext.begin(),
                            [](unsigned char c) { return std::tolower(c); });
@@ -278,7 +289,7 @@ int DataLoader::get_num_reads(std::string data_path,
         }
     };
 
-    iterate_directory(get_iterator_fn(data_path, recursive_file_loading));
+    iterate_directory(fetch_directory_entries(data_path, recursive_file_loading));
 
     // Remove the reads in the ignore list from the total dataset read count.
     num_reads -= ignore_read_list.size();
@@ -297,8 +308,8 @@ int DataLoader::get_num_reads(std::string data_path,
 }
 
 void DataLoader::load_read_channels(std::string data_path, bool recursive_file_loading) {
-    auto iterate_directory = [&](const auto& iterator_fn) {
-        for (const auto& entry : iterator_fn()) {
+    auto iterate_directory = [&](const auto& iterator) {
+        for (const auto& entry : iterator) {
             auto file_path = std::filesystem::path(entry);
             std::string ext = file_path.extension().string();
             std::transform(ext.begin(), ext.end(), ext.begin(),
@@ -369,7 +380,7 @@ void DataLoader::load_read_channels(std::string data_path, bool recursive_file_l
         }
     };
 
-    iterate_directory(get_iterator_fn(data_path, recursive_file_loading));
+    iterate_directory(fetch_directory_entries(data_path, recursive_file_loading));
 }
 
 std::unordered_map<std::string, ReadGroup> DataLoader::load_read_groups(
@@ -378,8 +389,8 @@ std::unordered_map<std::string, ReadGroup> DataLoader::load_read_groups(
         bool recursive_file_loading) {
     std::unordered_map<std::string, ReadGroup> read_groups;
 
-    auto iterate_directory = [&](const auto& iterator_fn) {
-        for (const auto& entry : iterator_fn()) {
+    auto iterate_directory = [&](const auto& iterator) {
+        for (const auto& entry : iterator) {
             std::string ext = std::filesystem::path(entry).extension().string();
             std::transform(ext.begin(), ext.end(), ext.begin(),
                            [](unsigned char c) { return std::tolower(c); });
@@ -427,14 +438,14 @@ std::unordered_map<std::string, ReadGroup> DataLoader::load_read_groups(
         }
     };
 
-    iterate_directory(get_iterator_fn(data_path, recursive_file_loading));
+    iterate_directory(fetch_directory_entries(data_path, recursive_file_loading));
 
     return read_groups;
 }
 
 bool DataLoader::is_read_data_present(std::string data_path, bool recursive_file_loading) {
-    auto check_directory = [&](const auto& iterator_fn) {
-        for (const auto& entry : iterator_fn()) {
+    auto check_directory = [&](const auto& iterator) {
+        for (const auto& entry : iterator) {
             std::string ext = std::filesystem::path(entry).extension().string();
             std::transform(ext.begin(), ext.end(), ext.begin(),
                            [](unsigned char c) { return std::tolower(c); });
@@ -445,14 +456,14 @@ bool DataLoader::is_read_data_present(std::string data_path, bool recursive_file
         return false;
     };
 
-    return check_directory(get_iterator_fn(data_path, recursive_file_loading));
+    return check_directory(fetch_directory_entries(data_path, recursive_file_loading));
 }
 
 uint16_t DataLoader::get_sample_rate(std::string data_path, bool recursive_file_loading) {
     std::optional<uint16_t> sample_rate = std::nullopt;
 
-    auto iterate_directory = [&](const auto& iterator_fn) {
-        for (const auto& entry : iterator_fn()) {
+    auto iterate_directory = [&](const auto& iterator) {
+        for (const auto& entry : iterator) {
             std::string ext = std::filesystem::path(entry).extension().string();
             std::transform(ext.begin(), ext.end(), ext.begin(),
                            [](unsigned char c) { return std::tolower(c); });
@@ -523,7 +534,7 @@ uint16_t DataLoader::get_sample_rate(std::string data_path, bool recursive_file_
         }
     };
 
-    iterate_directory(get_iterator_fn(data_path, recursive_file_loading));
+    iterate_directory(fetch_directory_entries(data_path, recursive_file_loading));
 
     if (sample_rate) {
         return *sample_rate;
