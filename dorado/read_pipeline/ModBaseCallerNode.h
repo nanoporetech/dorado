@@ -26,6 +26,7 @@ public:
     ModBaseCallerNode(std::vector<std::unique_ptr<ModBaseRunner>> model_runners,
                       size_t remora_threads,
                       size_t block_stride,
+                      float modbase_threshold_frac,
                       size_t max_reads = 1000);
     ~ModBaseCallerNode();
     std::string get_name() const override { return "ModBaseCallerNode"; }
@@ -58,6 +59,7 @@ private:
     size_t m_num_input_workers = 0;
     size_t m_block_stride;
     size_t m_batch_size;
+    uint8_t m_modbase_threshold;
 
     std::unique_ptr<std::thread> m_output_worker;
     std::vector<std::unique_ptr<std::thread>> m_runner_workers;

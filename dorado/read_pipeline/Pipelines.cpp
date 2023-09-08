@@ -22,6 +22,7 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
                              bool model_is_rna,
                              int scaler_node_threads,
                              int modbase_node_threads,
+                             float methylation_threshold_pct,
                              NodeHandle sink_node_handle,
                              NodeHandle source_node_handle) {
     const auto& model_config = runners.front()->config();
@@ -36,7 +37,8 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
     auto mod_base_caller_node = PipelineDescriptor::InvalidNodeHandle;
     if (!modbase_runners.empty()) {
         mod_base_caller_node = pipeline_desc.add_node<ModBaseCallerNode>(
-                {}, std::move(modbase_runners), modbase_node_threads, model_stride);
+                {}, std::move(modbase_runners), modbase_node_threads, model_stride,
+                methylation_threshold_pct);
     }
 
     const int kBatchTimeoutMS = 100;

@@ -70,7 +70,7 @@ public:
 
     Attributes attributes;
     std::vector<Mapping> mappings;
-    std::vector<BamPtr> extract_sam_lines(bool emit_moves, uint8_t modbase_threshold = 0) const;
+    std::vector<BamPtr> extract_sam_lines(bool emit_moves) const;
 
     float calculate_mean_qscore() const;
 
@@ -100,10 +100,14 @@ public:
     // Barcode.
     std::string barcode{};
 
+    void generate_modbase_string(uint8_t threshold = 0);
+    std::string modbase_bam_tag;
+    std::vector<int8_t> modbase_probs_bam_tag;
+
 private:
     void generate_duplex_read_tags(bam1_t*) const;
     void generate_read_tags(bam1_t* aln, bool emit_moves) const;
-    void generate_modbase_string(bam1_t* aln, uint8_t threshold = 0) const;
+    void generate_modbase_tags(bam1_t* aln) const;
     std::string generate_read_group() const;
 };
 

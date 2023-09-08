@@ -148,10 +148,11 @@ void setup(std::vector<std::string> args,
             throw std::runtime_error("Mean q-score start position cannot be < 0");
         }
     }
-    pipelines::create_simplex_pipeline(
-            pipeline_desc, std::move(runners), std::move(remora_runners), overlap,
-            mean_qscore_start_pos, rna, thread_allocations.scaler_node_threads,
-            thread_allocations.remora_threads * num_devices, read_filter_node);
+    pipelines::create_simplex_pipeline(pipeline_desc, std::move(runners), std::move(remora_runners),
+                                       overlap, mean_qscore_start_pos, rna,
+                                       thread_allocations.scaler_node_threads,
+                                       thread_allocations.remora_threads * num_devices,
+                                       methylation_threshold_pct, read_filter_node);
 
     // Create the Pipeline from our description.
     std::vector<dorado::stats::StatsReporter> stats_reporters;

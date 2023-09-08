@@ -30,6 +30,7 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
                              bool model_is_rna,
                              int scaler_node_threads,
                              int modbase_threads,
+                             float methylation_threshold_pct,
                              NodeHandle sink_node_handle = PipelineDescriptor::InvalidNodeHandle,
                              NodeHandle source_node_handle = PipelineDescriptor::InvalidNodeHandle);
 

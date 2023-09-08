@@ -47,11 +47,14 @@ struct ModBaseCallerNode::WorkingRead {
 ModBaseCallerNode::ModBaseCallerNode(std::vector<std::unique_ptr<ModBaseRunner>> model_runners,
                                      size_t remora_threads,
                                      size_t block_stride,
+                                     float modbase_threshold_frac,
                                      size_t max_reads)
         : MessageSink(max_reads),
           m_runners(std::move(model_runners)),
           m_num_input_workers(remora_threads),
           m_block_stride(block_stride),
+          m_modbase_threshold(
+                  static_cast<uint8_t>(std::min(modbase_threshold_frac * 256.0f, 255.0f))),
           m_batch_size(m_runners[0]->batch_size()),
           // TODO -- more principled calculation of output queue size
           m_processed_chunks(10 * max_reads) {
@@ -401,6 +404,7 @@ void ModBaseCallerNode::output_worker_thread() {
 
         // Send completed reads on to the sink.
         for (auto& completed_read : completed_reads) {
+            completed_read->read->generate_modbase_string(m_modbase_threshold);
             send_message_to_sink(std::move(completed_read->read));
             ++m_num_mod_base_reads_pushed;
         }

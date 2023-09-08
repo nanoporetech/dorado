@@ -1,6 +1,7 @@
 #include "BarcodeClassifierNode.h"
 
 #include "BarcodeClassifier.h"
+#include "utils/barcode_kits.h"
 #include "htslib/sam.h"
 #include "utils/sequence_utils.h"
 #include "utils/types.h"
@@ -121,11 +122,13 @@ std::vector<uint8_t> extract_move_table(bam1_t* input_record) {
     return move_vals;
 }
 
-std::vector<uint8_t> trim_move_table(const std::vector<uint8_t>& move_vals,
-                                     const std::pair<int, int> trim_interval) {
+std::tuple<size_t, std::vector<uint8_t>> trim_move_table(const std::vector<uint8_t>& move_vals,
+                                                         const std::pair<int, int> trim_interval) {
     std::vector<uint8_t> trimmed_moves;
+    size_t samples_trimmed = 0;
     if (!move_vals.empty()) {
-        trimmed_moves.push_back(move_vals[0]);
+        int stride = move_vals[0];
+        trimmed_moves.push_back(stride);
         int bases_seen = -1;
         for (int i = 1; i < move_vals.size(); i++) {
             if (bases_seen >= trim_interval.second) {
@@ -137,10 +140,12 @@ std::vector<uint8_t> trim_move_table(const std::vector<uint8_t>& move_vals,
             }
             if (bases_seen >= trim_interval.first) {
                 trimmed_moves.push_back(mv);
+            } else {
+                samples_trimmed += stride;
             }
         }
     }
-    return trimmed_moves;
+    return {samples_trimmed, trimmed_moves};
 }
 
 std::tuple<std::string, std::vector<int8_t>> extract_modbase_info(bam1_t* input_record) {
@@ -235,7 +240,8 @@ std::pair<int, int> determine_trim_interval(const demux::ScoreResults& res, int 
 
     // Use barcode flank positions to determine trim interval
     // only if the flanks were confidently found.
-    const demux::KitInfo& kit = demux::kit_info_map.at(res.kit);
+    auto kit_info_map = barcode_kits::get_kit_infos();
+    const barcode_kits::KitInfo& kit = kit_info_map.at(res.kit);
     if (kit.double_ends) {
         float top_flank_score = res.top_flank_score;
         if (top_flank_score > kFlankScoreThres) {
@@ -270,12 +276,15 @@ bam1_t* BarcodeClassifierNode::trim_barcode(bam1_t* input_record,
     std::string seq = utils::convert_nt16_to_str(bseq, seqlen);
     std::vector<uint8_t> qual = extract_quality(input_record, seqlen);
     std::vector<uint8_t> move_vals = extract_move_table(input_record);
+    int ts = bam_aux2i(bam_aux_get(input_record, "ts"));
     auto [modbase_str, modbase_probs] = extract_modbase_info(input_record);
 
     // Actually trim components.
     auto trimmed_seq = trim_sequence(seq, trim_interval);
     auto trimmed_qual = trim_quality(qual, trim_interval);
-    auto trimmed_moves = trim_move_table(move_vals, trim_interval);
+    auto [num_additional_samples_trimmed, trimmed_moves] =
+            trim_move_table(move_vals, trim_interval);
+    ts += num_additional_samples_trimmed;
     auto [trimmed_modbase_str, trimmed_modbase_probs] =
             trim_modbase_info(modbase_str, modbase_probs, trim_interval);
 
@@ -302,6 +311,8 @@ bam1_t* BarcodeClassifierNode::trim_barcode(bam1_t* input_record,
                              (uint8_t*)trimmed_modbase_probs.data());
     }
 
+    bam_aux_update_int(out_record, "ts", ts);
+
     return out_record;
 }
 
@@ -315,7 +326,13 @@ void BarcodeClassifierNode::trim_barcode(ReadPtr& read, const demux::ScoreResult
 
     read->seq = trim_sequence(read->seq, trim_interval);
     read->qstring = trim_sequence(read->qstring, trim_interval);
-    read->moves = trim_move_table(read->moves, trim_interval);
+    size_t num_additional_samples_trimmed;
+    std::tie(num_additional_samples_trimmed, read->moves) =
+            trim_move_table(read->moves, trim_interval);
+    read->num_trimmed_samples += num_additional_samples_trimmed;
+
+    std::tie(read->modbase_bam_tag, read->modbase_probs_bam_tag) =
+            trim_modbase_info(read->modbase_bam_tag, read->modbase_probs_bam_tag, trim_interval);
 }
 
 void BarcodeClassifierNode::barcode(BamPtr& read) {
