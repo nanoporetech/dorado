@@ -49,10 +49,16 @@ bool get_modbase_channel_name(std::string &channel_name, const std::string &mod_
 namespace dorado {
 
 std::string Read::generate_read_group() const {
-    if (!run_id.empty() && !model_name.empty()) {
-        return std::string(run_id + "_" + model_name);
+    std::string read_group;
+    if (!run_id.empty()) {
+        read_group = run_id + '_';
+        if (model_name.empty()) {
+            read_group += "unknown";
+        } else {
+            read_group += model_name;
+        }
     }
-    return "";
+    return read_group;
 }
 
 void Read::generate_read_tags(bam1_t *aln, bool emit_moves) const {

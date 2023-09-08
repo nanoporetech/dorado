@@ -28,37 +28,69 @@ TEST_CASE(TEST_GROUP ": Test tag generation", TEST_GROUP) {
     test_read.model_name = "test_model";
     test_read.is_duplex = false;
 
-    auto alignments = test_read.extract_sam_lines(false);
-    REQUIRE(alignments.size() == 1);
-    bam1_t* aln = alignments[0].get();
+    SECTION("Basic") {
+        auto alignments = test_read.extract_sam_lines(false);
+        REQUIRE(alignments.size() == 1);
+        bam1_t* aln = alignments[0].get();
 
-    CHECK(bam_aux2i(bam_aux_get(aln, "qs")) == 14);
-    CHECK(bam_aux2i(bam_aux_get(aln, "ns")) == 4132);
-    CHECK(bam_aux2i(bam_aux_get(aln, "ts")) == 132);
-    CHECK(bam_aux2i(bam_aux_get(aln, "mx")) == 2);
-    CHECK(bam_aux2i(bam_aux_get(aln, "ch")) == 5);
-    CHECK(bam_aux2i(bam_aux_get(aln, "rn")) == 18501);
-    CHECK(bam_aux2i(bam_aux_get(aln, "rn")) == 18501);
-    CHECK(bam_aux2i(bam_aux_get(aln, "dx")) == 0);
+        CHECK(bam_aux2i(bam_aux_get(aln, "qs")) == 14);
+        CHECK(bam_aux2i(bam_aux_get(aln, "ns")) == 4132);
+        CHECK(bam_aux2i(bam_aux_get(aln, "ts")) == 132);
+        CHECK(bam_aux2i(bam_aux_get(aln, "mx")) == 2);
+        CHECK(bam_aux2i(bam_aux_get(aln, "ch")) == 5);
+        CHECK(bam_aux2i(bam_aux_get(aln, "rn")) == 18501);
+        CHECK(bam_aux2i(bam_aux_get(aln, "rn")) == 18501);
+        CHECK(bam_aux2i(bam_aux_get(aln, "dx")) == 0);
 
-    CHECK(bam_aux2f(bam_aux_get(aln, "du")) == Approx(1.033).margin(1e-6));
-    CHECK(bam_aux2f(bam_aux_get(aln, "sm")) == 128.3842f);
-    CHECK(bam_aux2f(bam_aux_get(aln, "sd")) == 8.258f);
+        CHECK(bam_aux2f(bam_aux_get(aln, "du")) == Approx(1.033).margin(1e-6));
+        CHECK(bam_aux2f(bam_aux_get(aln, "sm")) == 128.3842f);
+        CHECK(bam_aux2f(bam_aux_get(aln, "sd")) == 8.258f);
 
-    CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "st")), Equals("2017-04-29T09:10:04Z"));
-    CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "fn")), Equals("batch_0.fast5"));
-    CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "sv")), Equals("quantile"));
-    CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "RG")), Equals("xyz_test_model"));
+        CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "st")), Equals("2017-04-29T09:10:04Z"));
+        CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "fn")), Equals("batch_0.fast5"));
+        CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "sv")), Equals("quantile"));
+        CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "RG")), Equals("xyz_test_model"));
+    }
 
-    // Update read to be duplex
-    test_read.is_duplex = true;
+    SECTION("Duplex") {
+        // Update read to be duplex
+        auto was_duplex = std::exchange(test_read.is_duplex, true);
 
-    alignments = test_read.extract_sam_lines(false);
-    REQUIRE(alignments.size() == 1);
-    aln = alignments[0].get();
+        auto alignments = test_read.extract_sam_lines(false);
+        REQUIRE(alignments.size() == 1);
+        auto* aln = alignments[0].get();
 
-    CHECK(bam_aux2i(bam_aux_get(aln, "dx")) == 1);
-    CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "RG")), Equals("xyz_test_model"));
+        CHECK(bam_aux2i(bam_aux_get(aln, "dx")) == 1);
+        CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "RG")), Equals("xyz_test_model"));
+
+        test_read.is_duplex = was_duplex;
+    }
+
+    SECTION("No model") {
+        auto old_model = std::exchange(test_read.model_name, "");
+
+        auto alignments = test_read.extract_sam_lines(false);
+        REQUIRE(alignments.size() == 1);
+        auto* aln = alignments[0].get();
+
+        CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "RG")), Equals("xyz_unknown"));
+
+        test_read.model_name = old_model;
+    }
+
+    SECTION("No model or run_id") {
+        auto old_model = std::exchange(test_read.model_name, "");
+        auto old_run_id = std::exchange(test_read.run_id, "");
+
+        auto alignments = test_read.extract_sam_lines(false);
+        REQUIRE(alignments.size() == 1);
+        auto* aln = alignments[0].get();
+
+        CHECK(bam_aux_get(aln, "RG") == nullptr);
+
+        test_read.model_name = old_model;
+        test_read.run_id = old_run_id;
+    }
 }
 
 TEST_CASE(TEST_GROUP ": Test sam record generation", TEST_GROUP) {
