@@ -1,6 +1,7 @@
 #include "bam_utils.h"
 
 #include "barcode_kits.h"
+#include "sequence_utils.h"
 
 #include <htslib/sam.h>
 
@@ -198,6 +199,56 @@ std::map<std::string, std::string> extract_pg_keys_from_hdr(const std::string fi
     ks_free(&val);
     hts_close(file);
     return pg_keys;
+}
+
+std::string extract_sequence(bam1_t* input_record, int seqlen) {
+    auto bseq = bam_get_seq(input_record);
+    std::string seq = utils::convert_nt16_to_str(bseq, seqlen);
+    return seq;
+}
+
+std::vector<uint8_t> extract_quality(bam1_t* input_record, int seqlen) {
+    auto qual_aln = bam_get_qual(input_record);
+    std::vector<uint8_t> qual;
+    if (qual_aln) {
+        qual = std::vector<uint8_t>(bam_get_qual(input_record),
+                                    bam_get_qual(input_record) + seqlen);
+    }
+    return qual;
+}
+
+std::vector<uint8_t> extract_move_table(bam1_t* input_record) {
+    auto move_vals_aux = bam_aux_get(input_record, "mv");
+    std::vector<uint8_t> move_vals;
+    if (move_vals_aux) {
+        int len = bam_auxB_len(move_vals_aux);
+        move_vals.resize(len);
+        for (int i = 0; i < len; i++) {
+            move_vals[i] = bam_auxB2i(move_vals_aux, i);
+        }
+        bam_aux_del(input_record, move_vals_aux);
+    }
+    return move_vals;
+}
+
+std::tuple<std::string, std::vector<int8_t>> extract_modbase_info(bam1_t* input_record) {
+    std::string modbase_str;
+    std::vector<int8_t> modbase_probs;
+    auto modbase_str_aux = bam_aux_get(input_record, "MM");
+    if (modbase_str_aux) {
+        modbase_str = std::string(bam_aux2Z(modbase_str_aux));
+        bam_aux_del(input_record, modbase_str_aux);
+
+        auto modbase_prob_aux = bam_aux_get(input_record, "ML");
+        int len = bam_auxB_len(modbase_prob_aux);
+        modbase_probs.resize(len);
+        for (int i = 0; i < len; i++) {
+            modbase_probs[i] = bam_auxB2i(modbase_prob_aux, i);
+        }
+        bam_aux_del(input_record, modbase_prob_aux);
+    }
+
+    return {modbase_str, modbase_probs};
 }
 
 }  // namespace dorado::utils
