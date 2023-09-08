@@ -190,6 +190,8 @@ set(LIB_SOURCE_FILES
     dorado/modbase/modbase_scaler.h
     dorado/modbase/ModBaseContext.cpp
     dorado/modbase/ModBaseContext.h
+    dorado/modbase/MotifMatcher.cpp
+    dorado/modbase/MotifMatcher.h
 )
 
 if (DORADO_GPU_BUILD)

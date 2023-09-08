@@ -1,38 +1,39 @@
 
 set(UNIT_TEST_SOURCE_FILES
     main.cpp
-    AsyncQueueTest.cpp
-    Fast5DataLoaderTest.cpp
-    Pod5DataLoaderTest.cpp
-    TensorUtilsTest.cpp
-    MathUtilsTest.cpp
-    ReadTest.cpp
-    ModBaseEncoderTest.cpp
-    SequenceUtilsTest.cpp
-    StitchTest.cpp
-    StereoDuplexTest.cpp
-    DuplexSplitTest.cpp
-    TrimTest.cpp
     AlignerTest.cpp
+    AsyncQueueTest.cpp
     BamReaderTest.cpp
     BamWriterTest.cpp
+    BamUtilsTest.cpp
+    BarcodeClassifierTest.cpp
+    BarcodeDemuxerNodeTest.cpp    
     CliUtilsTest.cpp
-    ReadFilterNodeTest.cpp
+    DuplexReadTaggingNodeTest.cpp
+    DuplexSplitTest.cpp
+    Fast5DataLoaderTest.cpp
+    MathUtilsTest.cpp
+    ModBaseEncoderTest.cpp
+    MotifMatcherTest.cpp
     ModelUtilsTest.cpp
     PairingNodeTest.cpp
     PipelineTest.cpp
-    BamUtilsTest.cpp
+    Pod5DataLoaderTest.cpp
+    ReadFilterNodeTest.cpp
+    ReadTest.cpp
     ResumeLoaderTest.cpp
+    SequenceUtilsTest.cpp
+    StereoDuplexTest.cpp
+    StitchTest.cpp
+    TensorUtilsTest.cpp
     TimeUtilsTest.cpp
-    DuplexReadTaggingNodeTest.cpp
-    BarcodeClassifierTest.cpp
-    BarcodeDemuxerNodeTest.cpp
+    TrimTest.cpp
 )
 
 if (DORADO_GPU_BUILD)
     if(APPLE)
         list(APPEND UNIT_TEST_SOURCE_FILES
-	    MetalLinearTest.cpp
+	        MetalLinearTest.cpp
         )
     else()
         list(APPEND UNIT_TEST_SOURCE_FILES
