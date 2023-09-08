@@ -31,4 +31,7 @@ add_custom_command(
     DEPENDS ${AIR_FILES}
     COMMENT "Creating metallib"
 )
+
+add_custom_target(metal-lib DEPENDS default.metallib)
+
 install(FILES ${CMAKE_BINARY_DIR}/lib/default.metallib DESTINATION lib)

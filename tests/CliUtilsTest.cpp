@@ -1,10 +1,10 @@
-#include "utils/cli_utils.h"
+#include "cli/cli_utils.h"
 
 #include <catch2/catch.hpp>
 
 #define TEST_GROUP "[cli_utils]"
 
-using namespace dorado::utils;
+using namespace dorado::cli;
 
 TEST_CASE("CliUtils: Check thread allocation", TEST_GROUP) {
     int aligner_threads, writer_threads;

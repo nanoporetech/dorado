@@ -1,8 +1,8 @@
 #include "Version.h"
 #include "cli/cli.h"
-#include "minimap.h"
-#include "spdlog/cfg/env.h"
-#include "utils/cli_utils.h"
+
+#include <minimap.h>
+#include <spdlog/cfg/env.h>
 
 #include <functional>
 #include <iostream>

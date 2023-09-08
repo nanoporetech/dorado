@@ -1,11 +1,11 @@
 #include "Version.h"
+#include "cli/cli_utils.h"
 #include "read_pipeline/BarcodeClassifier.h"
 #include "read_pipeline/BarcodeClassifierNode.h"
 #include "read_pipeline/BarcodeDemuxerNode.h"
 #include "read_pipeline/HtsReader.h"
 #include "read_pipeline/ProgressTracker.h"
 #include "utils/basecaller_utils.h"
-#include "utils/cli_utils.h"
 #include "utils/log_utils.h"
 #include "utils/stats.h"
 
@@ -91,7 +91,7 @@ int demuxer(int argc, char* argv[]) {
     // barcoding. Heuristically use 10% of threads for BAM generation and
     // rest for barcoding. Empirically this shows good perf.
     auto [demux_threads, demux_writer_threads] =
-            utils::worker_vs_writer_thread_allocation(threads, 0.1f);
+            cli::worker_vs_writer_thread_allocation(threads, 0.1f);
     spdlog::debug("> barcoding threads {}, writer threads {}", demux_threads, demux_writer_threads);
 
     auto read_list = utils::load_read_list(parser.get<std::string>("--read-ids"));

@@ -1,8 +1,8 @@
 #include "DuplexSplitNode.h"
 
+#include "read_utils.h"
 #include "utils/alignment_utils.h"
 #include "utils/duplex_utils.h"
-#include "utils/read_utils.h"
 #include "utils/sequence_utils.h"
 #include "utils/time_utils.h"
 #include "utils/uuid_utils.h"

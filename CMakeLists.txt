@@ -28,6 +28,13 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(DORADO_3RD_PARTY ${CMAKE_CURRENT_SOURCE_DIR}/dorado/3rdparty)
 
+# We don't support GPU builds on macOS/x64
+if (APPLE AND CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
+    set(DORADO_GPU_BUILD FALSE)
+else()
+    set(DORADO_GPU_BUILD TRUE)
+endif()
+
 find_package(CUDAToolkit QUIET)
 
 if(${CUDAToolkit_FOUND})
@@ -47,6 +54,9 @@ include(cmake/Pod5.cmake)
 include(cmake/Torch.cmake)
 include(cmake/OpenSSL.cmake)
 include(cmake/Htslib.cmake)
+if (DORADO_GPU_BUILD AND APPLE)
+    include(cmake/Metal.cmake)
+endif()
 
 # Add sanitizer options to compilation flags
 include(cmake/ECMEnableSanitizers.cmake)
@@ -65,13 +75,6 @@ if(DORADO_USING_OLD_CPP_ABI)
   # We need to force the use of the old ABI here, if we are building in an old ABI context, as otherwise elzip builds
   # with the libc++11 ABI and we can't link against it.
   add_compile_definitions(_GLIBCXX_USE_CXX11_ABI=0)
-endif()
-
-# We don't support GPU builds on macOS/x64
-if (APPLE AND CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
-    set(DORADO_GPU_BUILD FALSE)
-else()
-    set(DORADO_GPU_BUILD TRUE)
 endif()
 
 # Use ccache for C and C++ if it's available
@@ -101,6 +104,8 @@ set(BUILD_TESTING ON)
 add_subdirectory(${DORADO_3RD_PARTY}/date EXCLUDE_FROM_ALL)
 
 enable_testing()
+
+add_subdirectory(dorado/utils)
 
 if("${CUDA_VERSION}" STREQUAL "")
   set(CUDA_VERSION ${CUDAToolkit_VERSION})
@@ -165,6 +170,14 @@ set(LIB_SOURCE_FILES
     dorado/read_pipeline/BarcodeClassifierNode.h
     dorado/read_pipeline/BarcodeDemuxerNode.cpp
     dorado/read_pipeline/BarcodeDemuxerNode.h
+    dorado/read_pipeline/NullNode.h
+    dorado/read_pipeline/NullNode.cpp
+    dorado/read_pipeline/PairingNode.cpp
+    dorado/read_pipeline/PairingNode.h
+    dorado/read_pipeline/read_utils.cpp
+    dorado/read_pipeline/read_utils.h
+    dorado/read_pipeline/stitch.cpp
+    dorado/read_pipeline/stitch.h
     dorado/decode/beam_search.cpp
     dorado/decode/fast_hash.cpp
     dorado/decode/fast_hash.h
@@ -177,55 +190,13 @@ set(LIB_SOURCE_FILES
     dorado/modbase/modbase_scaler.h
     dorado/modbase/ModBaseContext.cpp
     dorado/modbase/ModBaseContext.h
-    dorado/utils/alignment_utils.cpp
-    dorado/utils/alignment_utils.h
-    dorado/utils/AsyncQueue.h
-    dorado/utils/compat_utils.cpp
-    dorado/utils/compat_utils.h
-    dorado/utils/dev_utils.cpp
-    dorado/utils/dev_utils.h
-    dorado/utils/log_utils.h
-    dorado/utils/log_utils.cpp
-    dorado/utils/math_utils.h
-    dorado/utils/memory_utils.cpp
-    dorado/utils/memory_utils.h
-    dorado/utils/module_utils.h
-    dorado/utils/parameters.h
-    dorado/utils/sequence_utils.cpp
-    dorado/utils/sequence_utils.h
-    dorado/utils/stitch.cpp
-    dorado/utils/stitch.h
-    dorado/utils/tensor_utils.cpp
-    dorado/utils/tensor_utils.h
-    dorado/utils/trim.cpp
-    dorado/utils/trim.h
-    dorado/utils/bam_utils.cpp
-    dorado/utils/bam_utils.h
-    dorado/utils/duplex_utils.h
-    dorado/utils/duplex_utils.cpp
-    dorado/utils/basecaller_utils.h
-    dorado/utils/basecaller_utils.cpp
-    dorado/utils/stats.h
-    dorado/utils/types.cpp
-    dorado/utils/types.h
-    dorado/read_pipeline/NullNode.h
-    dorado/read_pipeline/NullNode.cpp
-    dorado/read_pipeline/PairingNode.cpp
-    dorado/read_pipeline/PairingNode.h
-    dorado/utils/time_utils.h
-    dorado/utils/uuid_utils.cpp
-    dorado/utils/uuid_utils.h
-    dorado/utils/read_utils.h
-    dorado/utils/read_utils.cpp)
+)
 
 if (DORADO_GPU_BUILD)
     if(APPLE)
-        include(cmake/Metal.cmake)
         list(APPEND LIB_SOURCE_FILES
             dorado/nn/MetalCRFModel.h
             dorado/nn/MetalCRFModel.cpp
-            dorado/utils/metal_utils.cpp
-            dorado/utils/metal_utils.h
         )
     else()
         list(APPEND LIB_SOURCE_FILES
@@ -233,8 +204,6 @@ if (DORADO_GPU_BUILD)
             dorado/decode/GPUDecoder.h
             dorado/nn/CudaCRFModel.h
             dorado/nn/CudaCRFModel.cpp
-            dorado/utils/cuda_utils.cpp
-            dorado/utils/cuda_utils.h
         )
     endif()
 endif()
@@ -269,7 +238,6 @@ target_include_directories(dorado_lib
         ${DORADO_3RD_PARTY}/HighFive/include
         ${DORADO_3RD_PARTY}/argparse
         ${DORADO_3RD_PARTY}/toml11
-        ${DORADO_3RD_PARTY}/metal-cpp/metal-cpp
         ${DORADO_3RD_PARTY}/hdf_plugins/vbz_plugin
         ${DORADO_3RD_PARTY}/cxxpool/src
         ${DORADO_3RD_PARTY}/NVTX/c/include
@@ -285,35 +253,20 @@ if(NOT SKIP_HDF_PLUGINS)
   add_hdf_vbz_plugin()
 endif()
 
-target_precompile_headers(dorado_lib
-    PRIVATE
-    <torch/torch.h>
-)
+target_precompile_headers(dorado_lib REUSE_FROM dorado_utils)
 
 target_link_libraries(dorado_lib
-    ${APPLE_FWK_FOUNDATION}
-    ${APPLE_FWK_QUARTZ_CORE}
-    ${APPLE_FWK_METAL}
     ${TORCH_LIBRARIES}
     ${KOI_LIBRARIES}
     htslib
     vbz_hdf_plugin
-    OpenSSL::SSL
     edlib
     date::date
+    dorado_utils
 )
-
-if(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
-    target_link_libraries(dorado_lib ${IOKIT})
-endif()
 
 if(NOT WIN32)
     add_dependencies(dorado_lib htslib_project)
-endif()
-
-if(APPLE AND DORADO_GPU_BUILD)
-    add_custom_target(metal-lib DEPENDS default.metallib)
-    add_dependencies(dorado_lib metal-lib)
 endif()
 
 if(NOT DORADO_LIB_ONLY)
@@ -339,6 +292,7 @@ if(NOT DORADO_LIB_ONLY)
         dorado/cli/download.cpp
         dorado/cli/summary.cpp
         dorado/cli/cli.h
+        dorado/cli/cli_utils.h
     )
 
     set_target_properties(dorado
@@ -460,8 +414,8 @@ elseif(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
 endif()
 
 add_library(dorado_models_lib
-    dorado/utils/models.cpp
-    dorado/utils/models.h
+    dorado/models/models.cpp
+    dorado/models/models.h
 )
 
 target_link_libraries(dorado_models_lib
@@ -515,7 +469,7 @@ endif()
 if (GENERATE_TEST_COVERAGE)
     if (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" AND NOT DORADO_LIB_ONLY)
         include(cmake/CodeCoverage.cmake)
-        foreach(COVERAGE_TARGET dorado_tests dorado_lib dorado_io_lib dorado_models_lib)
+        foreach(COVERAGE_TARGET dorado_tests dorado_lib dorado_io_lib dorado_models_lib dorado_utils)
             append_coverage_compiler_flags_to_target(${COVERAGE_TARGET})
         endforeach()
         setup_target_for_coverage_gcovr_html(

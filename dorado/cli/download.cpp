@@ -1,6 +1,6 @@
 #include "Version.h"
+#include "models/models.h"
 #include "utils/log_utils.h"
-#include "utils/models.h"
 
 #include <argparse.hpp>
 #include <spdlog/spdlog.h>

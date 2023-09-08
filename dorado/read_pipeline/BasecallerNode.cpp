@@ -1,8 +1,8 @@
 #include "BasecallerNode.h"
 
-#include "../decode/CPUDecoder.h"
+#include "decode/CPUDecoder.h"
+#include "stitch.h"
 #include "utils/stats.h"
-#include "utils/stitch.h"
 
 #include <nvtx3/nvtx3.hpp>
 

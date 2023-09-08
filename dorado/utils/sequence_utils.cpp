@@ -1,8 +1,8 @@
 #include "sequence_utils.h"
 
-#include "htslib/sam.h"
 #include "simd.h"
 
+#include <htslib/sam.h>
 #include <nvtx3/nvtx3.hpp>
 
 #include <algorithm>
