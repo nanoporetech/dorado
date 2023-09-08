@@ -45,8 +45,10 @@ std::string expand_motif_regex(const std::string& motif) {
 namespace dorado {
 
 MotifMatcher::MotifMatcher(const ModBaseModelConfig& model_config)
-        : m_motif(expand_motif_regex(model_config.motif)),
-          m_motif_offset(model_config.motif_offset) {}
+        : MotifMatcher(model_config.motif, model_config.motif_offset) {}
+
+MotifMatcher::MotifMatcher(const std::string& motif, size_t offset)
+        : m_motif(expand_motif_regex(motif)), m_motif_offset(offset) {}
 
 std::vector<size_t> MotifMatcher::get_motif_hits(const std::string& seq) const {
     NVTX3_FUNC_RANGE();
@@ -56,13 +58,18 @@ std::vector<size_t> MotifMatcher::get_motif_hits(const std::string& seq) const {
     std::smatch motif_match;
     auto start = std::cbegin(seq);
     auto end = std::cend(seq);
-    while (std::regex_search(start, end, motif_match, regex)) {
-        auto hit =
-                std::distance(std::cbegin(seq), start) + motif_match.position(0) + m_motif_offset;
+    auto pos = start;
+    while (std::regex_search(pos, end, motif_match, regex)) {
+        auto hit = std::distance(start, pos) + motif_match.position(0) + m_motif_offset;
         context_hits.push_back(hit);
-        start += motif_match.position(0) + 1;
+        pos += motif_match.position(0) + 1;
     }
     return context_hits;
+}
+
+bool MotifMatcher::matches_motif(std::string_view seq) const {
+    std::regex regex(m_motif);
+    return std::regex_match(seq.begin(), seq.end(), regex);
 }
 
 }  // namespace dorado

@@ -1,5 +1,6 @@
 #include "ModBaseContext.h"
 
+#include "MotifMatcher.h"
 #include "utils/sequence_utils.h"
 
 #include <sstream>
@@ -74,7 +75,8 @@ std::vector<int> ModBaseContext::get_sequence_mask(std::string_view sequence) co
         if (!m_motifs[idx].empty() && p >= m_offsets[idx] &&
             p + m_motifs[idx].size() - m_offsets[idx] < sequence.size()) {
             size_t a = p - m_offsets[idx];
-            if (sequence.substr(a, m_motifs[idx].size()) == m_motifs[idx]) {
+            MotifMatcher matcher(m_motifs[idx], m_offsets[idx]);
+            if (matcher.matches_motif(sequence.substr(a, m_motifs[idx].size()))) {
                 mask[p] = 1;
             }
         }
