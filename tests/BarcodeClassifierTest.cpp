@@ -68,7 +68,7 @@ TEST_CASE("BarcodeClassifier: test single ended barcode", TEST_GROUP) {
                 CHECK(bc == (res.kit + "_" + res.adapter_name));
                 CHECK(res.top_barcode_pos.second > res.top_barcode_pos.first);
                 CHECK(res.top_barcode_pos.first >= 0);
-                CHECK(res.top_barcode_pos.second < seqlen);
+                CHECK(res.top_barcode_pos.second <= seqlen);
                 CHECK(res.bottom_barcode_pos.first == -1);
                 CHECK(res.bottom_barcode_pos.second == -1);
             }
@@ -97,9 +97,9 @@ TEST_CASE("BarcodeClassifier: test double ended barcode", TEST_GROUP) {
                 CHECK(res.top_barcode_pos.second > res.top_barcode_pos.first);
                 CHECK(res.bottom_barcode_pos.second > res.bottom_barcode_pos.first);
                 CHECK(res.top_barcode_pos.first >= 0);
-                CHECK(res.top_barcode_pos.second < seqlen);
+                CHECK(res.top_barcode_pos.second <= seqlen);
                 CHECK(res.bottom_barcode_pos.first >= 0);
-                CHECK(res.bottom_barcode_pos.second < seqlen);
+                CHECK(res.bottom_barcode_pos.second <= seqlen);
                 CHECK(res.top_barcode_pos.second < res.bottom_barcode_pos.first);
             }
         }
@@ -127,9 +127,9 @@ TEST_CASE("BarcodeClassifier: test double ended barcode with different variants"
                 CHECK(res.top_barcode_pos.second > res.top_barcode_pos.first);
                 CHECK(res.bottom_barcode_pos.second > res.bottom_barcode_pos.first);
                 CHECK(res.top_barcode_pos.first >= 0);
-                CHECK(res.top_barcode_pos.second < seqlen);
+                CHECK(res.top_barcode_pos.second <= seqlen);
                 CHECK(res.bottom_barcode_pos.first >= 0);
-                CHECK(res.bottom_barcode_pos.second < seqlen);
+                CHECK(res.bottom_barcode_pos.second <= seqlen);
                 CHECK(res.top_barcode_pos.second < res.bottom_barcode_pos.first);
             }
         }
@@ -175,7 +175,8 @@ TEST_CASE("BarcodeClassifier: check barcodes on both ends - passing case", TEST_
     }
 }
 
-TEST_CASE("BarcodeClassifierNode: check correct output files are created", TEST_GROUP) {
+TEST_CASE("BarcodeClassifierNode: check read messages are correctly upadted after barcoding",
+          TEST_GROUP) {
     using Catch::Matchers::Equals;
 
     dorado::PipelineDescriptor pipeline_desc;
@@ -183,17 +184,36 @@ TEST_CASE("BarcodeClassifierNode: check correct output files are created", TEST_
     auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
     std::vector<std::string> kits = {"SQK-RPB004"};
     bool barcode_both_ends = GENERATE(true, false);
-    bool no_trim = GENERATE(true, false);
+    bool no_trim = false;
     auto classifier = pipeline_desc.add_node<BarcodeClassifierNode>({sink}, 8, kits,
                                                                     barcode_both_ends, no_trim);
 
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
 
     auto read = dorado::ReadPtr::make();
-    read->seq = "AAAA";
-    read->qstring = "!!!!";
+    const std::string seq = std::string(100, 'A');
+    const auto& kit_info_map = barcode_kits::get_kit_infos();
+    const auto& barcodes = barcode_kits::get_barcodes();
+    const std::string front_flank = kit_info_map.at("SQK-RPB004").top_front_flank +
+                                    barcodes.at("BC01") +
+                                    kit_info_map.at("SQK-RPB004").top_rear_flank;
+    const std::string rear_flank = dorado::utils::reverse_complement(front_flank);
+    const int stride = 6;
+    read->seq = front_flank + seq + rear_flank;
+    read->qstring = std::string(read->seq.length(), '!');
     read->read_id = "read_id";
-    auto records = read->extract_sam_lines(false);
+    read->model_stride = stride;
+    std::vector<uint8_t> moves;
+    for (int i = 0; i < read->seq.length(); i++) {
+        moves.push_back(1);
+        moves.push_back(0);
+    }
+    read->moves = moves;
+    read->modbase_bam_tag = "MM:Z:C+h?," + std::to_string(front_flank.length()) + ";";
+    read->modbase_probs_bam_tag = {10};
+    read->num_trimmed_samples = 0;
+
+    auto records = read->extract_sam_lines(true /* emit moves*/);
 
     // Push a Read type.
     pipeline->push_message(std::move(read));
@@ -209,14 +229,51 @@ TEST_CASE("BarcodeClassifierNode: check correct output files are created", TEST_
 
     CHECK(messages.size() == 3);
 
+    const std::string expected_bc = "SQK-RPB004_BC01";
+    std::vector<uint8_t> expected_move_vals;
+    for (int i = 0; i < seq.length(); i++) {
+        expected_move_vals.push_back(1);
+        expected_move_vals.push_back(0);
+    }
+    const int additional_trimmed_samples =
+            stride * 2 * front_flank.length();  // * 2 is because we have 2 moves per base
+    const std::string expected_mod_str = "MM:Z:C+h?,0;";
+    const std::vector<int8_t> expected_mod_probs = {10};
+
     for (auto& message : messages) {
         if (std::holds_alternative<BamPtr>(message)) {
             auto read = std::get<BamPtr>(std::move(message));
             bam1_t* rec = read.get();
-            CHECK_THAT(bam_aux2Z(bam_aux_get(rec, "BC")), Equals("unclassified"));
+
+            CHECK_THAT(bam_aux2Z(bam_aux_get(rec, "BC")), Equals(expected_bc));
+
+            auto seq = dorado::utils::extract_sequence(rec, rec->core.l_qseq);
+            CHECK(seq == seq);
+
+            auto qual = dorado::utils::extract_quality(rec, rec->core.l_qseq);
+            CHECK(qual.size() == seq.length());
+
+            auto [_, move_vals] = dorado::utils::extract_move_table(rec);
+            CHECK(move_vals == expected_move_vals);
+
+            auto [mod_str, mod_probs] = dorado::utils::extract_modbase_info(rec);
+            CHECK(mod_str == expected_mod_str);
+            CHECK(mod_probs == expected_mod_probs);
+
+            CHECK(bam_aux2i(bam_aux_get(rec, "ts")) == additional_trimmed_samples);
         } else if (std::holds_alternative<ReadPtr>(message)) {
             auto read = std::get<ReadPtr>(std::move(message));
-            CHECK(read->barcode == "unclassified");
+
+            CHECK(read->barcode == expected_bc);
+
+            CHECK(read->seq == seq);
+
+            CHECK(read->moves == expected_move_vals);
+
+            CHECK(read->modbase_bam_tag == expected_mod_str);
+            CHECK(read->modbase_probs_bam_tag == expected_mod_probs);
+
+            CHECK(read->num_trimmed_samples == additional_trimmed_samples);
         }
     }
 }

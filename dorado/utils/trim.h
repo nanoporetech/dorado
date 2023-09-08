@@ -17,10 +17,10 @@ std::vector<uint8_t> trim_quality(const std::vector<uint8_t>& qual,
                                   const std::pair<int, int>& trim_interval);
 
 // Trim the move table. The interval defines the portion of the move table to keep.
-// Returns the trimmed move table, and the number of samples trimmed from the start
-// of the raw signal.
-std::tuple<size_t, std::vector<uint8_t>> trim_move_table(const std::vector<uint8_t>& move_vals,
-                                                         const std::pair<int, int>& trim_interval);
+// Returns the trimmed move table, and the number of moved trimmed from the start
+// of the sequence.
+std::tuple<int, std::vector<uint8_t>> trim_move_table(const std::vector<uint8_t>& move_vals,
+                                                      const std::pair<int, int>& trim_interval);
 
 // Trim the mod base info. The interval defines the portion of the read to keep.
 // Returns trimmed mod base bam tag string and the mod base probabilities vector.

@@ -97,9 +97,10 @@ std::vector<uint8_t> extract_quality(bam1_t* input_record, int seqlen);
  * Extract the move table from a record, if it exists.
  *
  * @param input_record Record to fetch move table from.
- * @return Vector with moves. First element of vector is model stride. Empty vector if no move table exists.
+ * @return Tuple where first element is the strice and second element is the vector with moves.
+ * An empty vector and stride = 0 are returned if move table doesn't exist.
  */
-std::vector<uint8_t> extract_move_table(bam1_t* input_record);
+std::tuple<int, std::vector<uint8_t>> extract_move_table(bam1_t* input_record);
 
 /*
  * Extract mod base tag information from a record.

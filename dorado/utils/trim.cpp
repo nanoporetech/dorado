@@ -58,30 +58,29 @@ std::vector<uint8_t> trim_quality(const std::vector<uint8_t>& qual,
     return {};
 }
 
-std::tuple<size_t, std::vector<uint8_t>> trim_move_table(const std::vector<uint8_t>& move_vals,
-                                                         const std::pair<int, int>& trim_interval) {
+std::tuple<int, std::vector<uint8_t>> trim_move_table(const std::vector<uint8_t>& move_vals,
+                                                      const std::pair<int, int>& trim_interval) {
     std::vector<uint8_t> trimmed_moves;
-    size_t samples_trimmed = 0;
-    if (!move_vals.empty()) {
-        int stride = move_vals[0];
-        trimmed_moves.push_back(stride);
-        int bases_seen = -1;
-        for (int i = 1; i < move_vals.size(); i++) {
-            if (bases_seen >= trim_interval.second) {
-                break;
-            }
+    int num_positions_trimmed = 0;
+    if (!move_vals.empty() && (trim_interval.second > trim_interval.first)) {
+        // Start with -1 because as soon as the first move_val==1 is encountered,
+        // we have moved to the first base.
+        int seq_base_pos = -1;
+        for (int i = 0; i < move_vals.size(); i++) {
             auto mv = move_vals[i];
             if (mv == 1) {
-                bases_seen++;
+                seq_base_pos++;
             }
-            if (bases_seen >= trim_interval.first) {
+            if (seq_base_pos >= trim_interval.second) {
+                break;
+            } else if (seq_base_pos >= trim_interval.first) {
                 trimmed_moves.push_back(mv);
             } else {
-                samples_trimmed += stride;
+                num_positions_trimmed++;
             }
         }
     }
-    return {samples_trimmed, trimmed_moves};
+    return {num_positions_trimmed, trimmed_moves};
 }
 
 std::tuple<std::string, std::vector<int8_t>> trim_modbase_info(
@@ -94,6 +93,9 @@ std::tuple<std::string, std::vector<int8_t>> trim_modbase_info(
     std::string trimmed_modbase_str;
     std::vector<int8_t> trimmed_modbase_probs;
     if (!modbase_str.empty()) {
+        // First extract all the sub strings in the mod string
+        // for each channel. e.g. C+m?,1;C+h?,2; will get split
+        // into 2 substrings.
         std::vector<std::pair<size_t, size_t>> delims;
         size_t pos = 0;
         while (pos < modbase_str.length()) {
@@ -101,7 +103,8 @@ std::tuple<std::string, std::vector<int8_t>> trim_modbase_info(
             delims.push_back({pos, delim_pos});
             pos = delim_pos + 1;
         }
-        size_t prob_pos = 0;
+        size_t prob_pos = 0;  // Track which probability values will be needed.
+        // Iterate over each substring, and fetch the count values.
         for (auto [a, b] : delims) {
             std::string prefix = "";
             std::string counts = "";
@@ -112,16 +115,21 @@ std::tuple<std::string, std::vector<int8_t>> trim_modbase_info(
             while (pos < b) {
                 auto comma_pos = std::min(modbase_str.find_first_of(',', pos), b);
                 auto substr_len = comma_pos - pos;
+                // Begining of each substring is the channel prefix. Counts only
+                // start after the first comma is seen.
                 if (!in_counts) {
                     in_counts = true;
                     prefix = modbase_str.substr(pos, substr_len);
                 } else {
                     int num_skips = std::stoi(modbase_str.substr(pos, substr_len));
-                    if (num_skips + bases_seen >= end) {
+                    bases_seen += num_skips;  // Add the intervening non-modified bases.
+                    if (bases_seen >= end) {
                         // Do nothing as these modbases are trimmed.
-                    } else if (num_skips + bases_seen >= start) {
+                    } else if (bases_seen >= start) {
+                        // Once we reach the trim start position, the first
+                        // skip count needs to be adjusted.
                         if (!found_start) {
-                            counts += "," + std::to_string(num_skips + bases_seen - start);
+                            counts += "," + std::to_string(bases_seen - start);
                             found_start = true;
                         } else {
                             counts += "," + std::to_string(num_skips);
@@ -131,7 +139,7 @@ std::tuple<std::string, std::vector<int8_t>> trim_modbase_info(
                         }
                     }
                     prob_pos++;
-                    bases_seen += num_skips + 1;
+                    bases_seen++;  // Add one more to account for the actual modified base.
                 }
                 pos = comma_pos + 1;
             }
