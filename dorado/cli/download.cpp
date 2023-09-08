@@ -1,6 +1,6 @@
 #include "Version.h"
+#include "models/models.h"
 #include "utils/log_utils.h"
-#include "utils/models.h"
 
 #include <argparse.hpp>
 #include <spdlog/spdlog.h>
@@ -77,7 +77,7 @@ int download(int argc, char* argv[]) {
     if (!fs::exists(directory)) {
         try {
             fs::create_directories(directory);
-        } catch (std::filesystem::filesystem_error const& e) {
+        } catch (const std::filesystem::filesystem_error& e) {
             spdlog::error("> error: {}", e.code().message());
             return 1;
         }
@@ -95,7 +95,7 @@ int download(int argc, char* argv[]) {
 
     try {
         fs::remove(directory / "tmp");
-    } catch (std::filesystem::filesystem_error const& e) {
+    } catch (const std::filesystem::filesystem_error& e) {
         std::cerr << "> error: " << e.code().message() << std::endl;
         return 1;
     }

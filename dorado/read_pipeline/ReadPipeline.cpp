@@ -14,6 +14,7 @@
 using namespace std::chrono_literals;
 
 namespace {
+
 bool get_modbase_channel_name(std::string &channel_name, const std::string &mod_abbreviation) {
     static const std::map<std::string, std::string> modbase_name_map = {// A
                                                                         {"6mA", "a"},
@@ -179,7 +180,7 @@ std::vector<BamPtr> Read::extract_sam_lines(bool emit_moves, uint8_t modbase_thr
     return alns;
 }
 
-uint64_t Read::get_end_time_ms() {
+uint64_t Read::get_end_time_ms() const {
     return start_time_ms +
            ((end_sample - start_sample) * 1000) / sample_rate;  //TODO get rid of the trimmed thing?
 }

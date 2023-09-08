@@ -1,4 +1,4 @@
-#include "utils/stitch.h"
+#include "read_pipeline/stitch.h"
 
 #include "read_pipeline/ReadPipeline.h"
 
@@ -42,29 +42,30 @@ TEST_CASE("Test stitch_chunks", TEST_GROUP) {
     constexpr size_t CHUNK_SIZE = 10;
     constexpr size_t OVERLAP = 3;
 
-    auto read = std::make_shared<dorado::Read>();
-    read->num_chunks = 0;
+    std::vector<std::unique_ptr<dorado::utils::Chunk>> called_chunks;
 
     size_t offset = 0;
-    size_t chunk_in_read_idx = 0;
     size_t signal_chunk_step = CHUNK_SIZE - OVERLAP;
-    auto chunk = std::make_shared<dorado::Chunk>(read, offset, chunk_in_read_idx++, CHUNK_SIZE);
-    chunk->qstring = QSTR[read->num_chunks];
-    chunk->seq = SEQS[read->num_chunks];
-    chunk->moves = MOVES[read->num_chunks];
-    read->called_chunks.push_back(chunk);
-    read->num_chunks++;
+    {
+        auto chunk = std::make_unique<dorado::utils::Chunk>(offset, CHUNK_SIZE);
+        const size_t chunk_idx = called_chunks.size();
+        chunk->qstring = QSTR[chunk_idx];
+        chunk->seq = SEQS[chunk_idx];
+        chunk->moves = MOVES[chunk_idx];
+        called_chunks.push_back(std::move(chunk));
+    }
     while (offset + CHUNK_SIZE < RAW_SIGNAL_SIZE) {
         offset = std::min(offset + signal_chunk_step, RAW_SIGNAL_SIZE - CHUNK_SIZE);
-        chunk = std::make_shared<dorado::Chunk>(read, offset, chunk_in_read_idx++, CHUNK_SIZE);
-        chunk->qstring = QSTR[read->num_chunks];
-        chunk->seq = SEQS[read->num_chunks];
-        chunk->moves = MOVES[read->num_chunks];
-        read->called_chunks.push_back(chunk);
-        read->num_chunks++;
+        auto chunk = std::make_unique<dorado::utils::Chunk>(offset, CHUNK_SIZE);
+        const size_t chunk_idx = called_chunks.size();
+        chunk->qstring = QSTR[chunk_idx];
+        chunk->seq = SEQS[chunk_idx];
+        chunk->moves = MOVES[chunk_idx];
+        called_chunks.push_back(std::move(chunk));
     }
 
-    REQUIRE_NOTHROW(dorado::utils::stitch_chunks(read));
+    dorado::Read read;
+    REQUIRE_NOTHROW(dorado::utils::stitch_chunks(read, called_chunks));
 
     const std::string expected_sequence = "ACGTCGCGTCGTCGTCCGT";
     const std::string expected_qstring = "!&.-&.&.-&.-&.-&&.-";
@@ -72,7 +73,7 @@ TEST_CASE("Test stitch_chunks", TEST_GROUP) {
                                                  1, 0, 1, 1, 0, 0, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0, 0,
                                                  1, 0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1, 0, 1};
 
-    REQUIRE(read->seq == expected_sequence);
-    REQUIRE(read->qstring == expected_qstring);
-    REQUIRE(read->moves == expected_moves);
+    REQUIRE(read.seq == expected_sequence);
+    REQUIRE(read.qstring == expected_qstring);
+    REQUIRE(read.moves == expected_moves);
 }

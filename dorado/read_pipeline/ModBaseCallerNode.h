@@ -17,15 +17,17 @@
 namespace dorado {
 
 class ModBaseRunner;
-struct RemoraChunk;
 
 class ModBaseCallerNode : public MessageSink {
+    struct RemoraChunk;
+    struct WorkingRead;
+
 public:
     ModBaseCallerNode(std::vector<std::unique_ptr<ModBaseRunner>> model_runners,
                       size_t remora_threads,
                       size_t block_stride,
                       size_t max_reads = 1000);
-    ~ModBaseCallerNode() { terminate_impl(); }
+    ~ModBaseCallerNode();
     std::string get_name() const override { return "ModBaseCallerNode"; }
     stats::NamedStats sample_stats() const override;
     void terminate(const FlushOptions& flush_options) override { terminate_impl(); }
@@ -47,7 +49,7 @@ private:
     // Called by modbasecall_worker_thread, calls the model and enqueues the results
     void call_current_batch(size_t worker_id,
                             size_t caller_id,
-                            std::vector<std::shared_ptr<RemoraChunk>>& batched_chunks);
+                            std::vector<std::unique_ptr<RemoraChunk>>& batched_chunks);
 
     // Worker thread, processes chunk results back into the reads
     void output_worker_thread();
@@ -61,12 +63,12 @@ private:
     std::vector<std::unique_ptr<std::thread>> m_runner_workers;
     std::vector<std::unique_ptr<std::thread>> m_input_workers;
 
-    utils::AsyncQueue<std::shared_ptr<RemoraChunk>> m_processed_chunks;
-    std::vector<std::unique_ptr<utils::AsyncQueue<std::shared_ptr<RemoraChunk>>>> m_chunk_queues;
+    utils::AsyncQueue<std::unique_ptr<RemoraChunk>> m_processed_chunks;
+    std::vector<std::unique_ptr<utils::AsyncQueue<std::unique_ptr<RemoraChunk>>>> m_chunk_queues;
 
     std::mutex m_working_reads_mutex;
     // Reads removed from input queue and being modbasecalled.
-    std::unordered_set<std::shared_ptr<Read>> m_working_reads;
+    std::unordered_set<std::shared_ptr<WorkingRead>> m_working_reads;
 
     std::atomic<int> m_num_active_runner_workers{0};
     std::atomic<int> m_num_active_input_workers{0};

@@ -7,7 +7,7 @@
 
 namespace dorado {
 
-ModBaseModelConfig load_modbase_model_config(std::filesystem::path const& model_path) {
+ModBaseModelConfig load_modbase_model_config(const std::filesystem::path& model_path) {
     ModBaseModelConfig config;
     auto config_toml = toml::parse(model_path / "config.toml");
     const auto& params = toml::find(config_toml, "modbases");
@@ -55,7 +55,7 @@ ModBaseModelConfig load_modbase_model_config(std::filesystem::path const& model_
 }
 
 ModBaseInfo get_modbase_info(
-        std::vector<std::reference_wrapper<ModBaseModelConfig const>> const& base_mod_params) {
+        const std::vector<std::reference_wrapper<const ModBaseModelConfig>>& base_mod_params) {
     struct ModelInfo {
         std::vector<std::string> long_names;
         std::string alphabet;

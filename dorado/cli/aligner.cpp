@@ -1,11 +1,11 @@
 #include "Version.h"
+#include "cli/cli_utils.h"
 #include "minimap.h"
 #include "read_pipeline/AlignerNode.h"
 #include "read_pipeline/HtsReader.h"
 #include "read_pipeline/HtsWriter.h"
 #include "read_pipeline/ProgressTracker.h"
 #include "utils/bam_utils.h"
-#include "utils/cli_utils.h"
 #include "utils/log_utils.h"
 #include "utils/stats.h"
 
@@ -75,7 +75,7 @@ int aligner(int argc, char* argv[]) {
     auto max_reads(parser.get<int>("max-reads"));
     auto kmer_size(parser.get<int>("k"));
     auto window_size(parser.get<int>("w"));
-    auto index_batch_size = utils::parse_string_to_size(parser.get<std::string>("I"));
+    auto index_batch_size = cli::parse_string_to_size(parser.get<std::string>("I"));
 
     threads = threads == 0 ? std::thread::hardware_concurrency() : threads;
     // The input thread is the total number of threads to use for dorado
@@ -83,7 +83,7 @@ int aligner(int argc, char* argv[]) {
     // rest for alignment. Empirically this shows good perf.
     int aligner_threads, writer_threads;
     std::tie(aligner_threads, writer_threads) =
-            utils::worker_vs_writer_thread_allocation(threads, 0.1f);
+            cli::worker_vs_writer_thread_allocation(threads, 0.1f);
     spdlog::debug("> aligner threads {}, writer threads {}", aligner_threads, writer_threads);
 
     if (reads.size() == 0) {

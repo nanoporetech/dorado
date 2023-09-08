@@ -1,5 +1,7 @@
 #include "Version.h"
+#include "cli/cli_utils.h"
 #include "data_loader/DataLoader.h"
+#include "models/models.h"
 #include "nn/CRFModelConfig.h"
 #include "nn/ModBaseRunner.h"
 #include "nn/Runners.h"
@@ -13,9 +15,7 @@
 #include "read_pipeline/ResumeLoaderNode.h"
 #include "utils/bam_utils.h"
 #include "utils/basecaller_utils.h"
-#include "utils/cli_utils.h"
 #include "utils/log_utils.h"
-#include "utils/models.h"
 #include "utils/parameters.h"
 #include "utils/stats.h"
 
@@ -112,11 +112,11 @@ void setup(std::vector<std::string> args,
 
     bool rna = utils::is_rna_model(model_path), duplex = false;
 
-    auto const thread_allocations = utils::default_thread_allocations(
+    const auto thread_allocations = utils::default_thread_allocations(
             num_devices, !remora_runners.empty() ? num_remora_threads : 0);
 
     std::unique_ptr<sam_hdr_t, void (*)(sam_hdr_t*)> hdr(sam_hdr_init(), sam_hdr_destroy);
-    utils::add_pg_hdr(hdr.get(), args);
+    cli::add_pg_hdr(hdr.get(), args);
     utils::add_rg_hdr(hdr.get(), read_groups);
 
     PipelineDescriptor pipeline_desc;
@@ -177,7 +177,7 @@ void setup(std::vector<std::string> args,
         auto pg_keys = utils::extract_pg_keys_from_hdr(resume_from_file, {"CL"});
         hts_set_log_level(initial_hts_log_level);
 
-        auto tokens = utils::extract_token_from_cli(pg_keys["CL"]);
+        auto tokens = cli::extract_token_from_cli(pg_keys["CL"]);
         // First token is the dorado binary name. Remove that because the
         // sub parser only knows about the `basecaller` command.
         tokens.erase(tokens.begin());
@@ -340,7 +340,7 @@ int basecaller(int argc, char* argv[]) {
 
     try {
         auto remaining_args = parser.parse_known_args(argc, argv);
-        internal_parser = utils::parse_internal_options(remaining_args);
+        internal_parser = cli::parse_internal_options(remaining_args);
     } catch (const std::exception& e) {
         std::ostringstream parser_stream;
         parser_stream << parser;
@@ -406,7 +406,7 @@ int basecaller(int argc, char* argv[]) {
               parser.get<bool>("--emit-moves"), parser.get<int>("--max-reads"),
               parser.get<int>("--min-qscore"), parser.get<std::string>("--read-ids"),
               parser.get<bool>("--recursive"), parser.get<int>("k"), parser.get<int>("w"),
-              utils::parse_string_to_size(parser.get<std::string>("I")),
+              cli::parse_string_to_size(parser.get<std::string>("I")),
               internal_parser.get<bool>("--skip-model-compatibility-check"),
               internal_parser.get<std::string>("--dump_stats_file"),
               internal_parser.get<std::string>("--dump_stats_filter"),

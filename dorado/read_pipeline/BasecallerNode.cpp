@@ -1,14 +1,12 @@
 #include "BasecallerNode.h"
 
-#include "../decode/CPUDecoder.h"
+#include "decode/CPUDecoder.h"
+#include "stitch.h"
 #include "utils/stats.h"
-#include "utils/stitch.h"
 
 #include <nvtx3/nvtx3.hpp>
 
-#include <chrono>
 #include <cstdlib>
-#include <memory>
 
 #if defined(__APPLE__) && !defined(__x86_64__)
 #include "utils/metal_utils.h"
@@ -19,19 +17,38 @@ using namespace torch::indexing;
 
 namespace dorado {
 
+struct BasecallerNode::BasecallingChunk : utils::Chunk {
+    BasecallingChunk(std::shared_ptr<BasecallingRead> owner,
+                     size_t offset,
+                     size_t chunk_in_read_idx,
+                     size_t chunk_size)
+            : Chunk(offset, chunk_size),
+              owning_read(std::move(owner)),
+              idx_in_read(chunk_in_read_idx) {}
+
+    std::shared_ptr<BasecallingRead> owning_read;  // The object that owns us.
+    size_t idx_in_read;  // Just for tracking that the chunks don't go out of order.
+};
+
+struct BasecallerNode::BasecallingRead {
+    ReadPtr read;                                              // The read itself.
+    std::vector<std::unique_ptr<utils::Chunk>> called_chunks;  // Vector of basecalled chunks.
+    std::atomic_size_t num_chunks_called;  // Number of chunks which have been basecalled.
+};
+
 void BasecallerNode::input_worker_thread() {
     torch::InferenceMode inference_mode_guard;
 
     Message message;
     while (get_input_message(message)) {
         // If this message isn't a read, just forward it to the sink.
-        if (!std::holds_alternative<std::shared_ptr<Read>>(message)) {
+        if (!std::holds_alternative<ReadPtr>(message)) {
             send_message_to_sink(std::move(message));
             continue;
         }
 
         // If this message isn't a read, we'll get a bad_variant_access exception.
-        auto read = std::get<std::shared_ptr<Read>>(message);
+        auto read = std::get<ReadPtr>(std::move(message));
         // If a read has already been basecalled, just send it to the sink without basecalling again
         // TODO: This is necessary because some reads (e.g failed Stereo Encoding) will be passed
         // to the basecaller node having already been called. This should be fixed in the future with
@@ -41,45 +58,43 @@ void BasecallerNode::input_worker_thread() {
             continue;
         }
         // Now that we have acquired a read, wait until we can push to chunks_in
-        while (true) {
-            // Chunk up the read and put the chunks into the pending chunk list.
-            size_t raw_size =
-                    read->raw_data.sizes()[read->raw_data.sizes().size() - 1];  // Time dimension.
+        // Chunk up the read and put the chunks into the pending chunk list.
+        size_t raw_size =
+                read->raw_data.sizes()[read->raw_data.sizes().size() - 1];  // Time dimension.
 
-            size_t offset = 0;
-            size_t chunk_in_read_idx = 0;
-            size_t signal_chunk_step = m_chunk_size - m_overlap;
-            std::vector<std::shared_ptr<Chunk>> read_chunks;
-            read_chunks.push_back(
-                    std::make_shared<Chunk>(read, offset, chunk_in_read_idx++, m_chunk_size));
-            read->num_chunks = 1;
-            auto last_chunk_offset = raw_size - m_chunk_size;
-            auto misalignment = last_chunk_offset % m_model_stride;
-            if (misalignment != 0) {
-                // move last chunk start to the next stride boundary. we'll zero pad any excess samples required.
-                last_chunk_offset += m_model_stride - misalignment;
-            }
-            while (offset + m_chunk_size < raw_size) {
-                offset = std::min(offset + signal_chunk_step, last_chunk_offset);
-                read_chunks.push_back(
-                        std::make_shared<Chunk>(read, offset, chunk_in_read_idx++, m_chunk_size));
-                read->num_chunks++;
-            }
-            read->called_chunks.resize(read->num_chunks);
-            read->num_chunks_called.store(0);
+        size_t offset = 0;
+        size_t chunk_in_read_idx = 0;
+        size_t signal_chunk_step = m_chunk_size - m_overlap;
+        auto working_read = std::make_shared<BasecallingRead>();
+        std::vector<std::unique_ptr<BasecallingChunk>> read_chunks;
+        read_chunks.emplace_back(std::make_unique<BasecallingChunk>(
+                working_read, offset, chunk_in_read_idx++, m_chunk_size));
+        size_t num_chunks = 1;
+        auto last_chunk_offset = raw_size - m_chunk_size;
+        auto misalignment = last_chunk_offset % m_model_stride;
+        if (misalignment != 0) {
+            // move last chunk start to the next stride boundary. we'll zero pad any excess samples required.
+            last_chunk_offset += m_model_stride - misalignment;
+        }
+        while (offset + m_chunk_size < raw_size) {
+            offset = std::min(offset + signal_chunk_step, last_chunk_offset);
+            read_chunks.push_back(std::make_unique<BasecallingChunk>(
+                    working_read, offset, chunk_in_read_idx++, m_chunk_size));
+            num_chunks++;
+        }
+        working_read->called_chunks.resize(num_chunks);
+        working_read->num_chunks_called.store(0);
+        working_read->read = std::move(read);
 
-            // Put the read in the working list
-            {
-                std::lock_guard working_reads_lock(m_working_reads_mutex);
-                m_working_reads.insert(std::move(read));
-                ++m_working_reads_size;
-            }
+        // Put the read in the working list
+        {
+            std::lock_guard working_reads_lock(m_working_reads_mutex);
+            m_working_reads.insert(std::move(working_read));
+            ++m_working_reads_size;
+        }
 
-            for (auto &chunk : read_chunks) {
-                m_chunks_in.try_push(std::move(chunk));
-            }
-
-            break;  // Go back to watching the input reads
+        for (auto &chunk : read_chunks) {
+            m_chunks_in.try_push(std::move(chunk));
         }
     }
 
@@ -111,27 +126,34 @@ void BasecallerNode::basecall_current_batch(int worker_id) {
 void BasecallerNode::working_reads_manager() {
     torch::InferenceMode inference_mode_guard;
 
-    std::shared_ptr<Chunk> chunk;
+    std::unique_ptr<BasecallingChunk> chunk;
     while (m_processed_chunks.try_pop(chunk) == utils::AsyncQueueStatus::Success) {
         nvtx3::scoped_range loop{"working_reads_manager"};
 
-        auto source_read = chunk->source_read.lock();
-        source_read->called_chunks[chunk->idx_in_read] = chunk;
-        auto num_chunks_called = ++source_read->num_chunks_called;
-        if (num_chunks_called == source_read->num_chunks) {
-            utils::stitch_chunks(source_read);
+        auto working_read = chunk->owning_read;
+        auto idx_in_read = chunk->idx_in_read;
+        working_read->called_chunks[idx_in_read] = std::move(chunk);
+        auto num_chunks_called = ++working_read->num_chunks_called;
+        if (num_chunks_called == working_read->called_chunks.size()) {
+            // Finalise the read.
+            auto source_read = std::move(working_read->read);
+            utils::stitch_chunks(*source_read, working_read->called_chunks);
+            source_read->model_name = m_model_name;
+            source_read->mean_qscore_start_pos = m_mean_qscore_start_pos;
+
+            // Update stats.
             ++m_called_reads_pushed;
             m_num_bases_processed += source_read->seq.length();
             m_num_samples_processed += source_read->raw_data.size(0);
 
-            std::shared_ptr<Read> found_read;
+            // Chunks have ownership of the working read, so destroy them to avoid a leak.
+            working_read->called_chunks.clear();
+
+            // Cleanup the working read.
             {
                 std::unique_lock<std::mutex> working_reads_lock(m_working_reads_mutex);
-                auto read_iter = m_working_reads.find(source_read);
+                auto read_iter = m_working_reads.find(working_read);
                 if (read_iter != m_working_reads.end()) {
-                    (*read_iter)->model_name = m_model_name;
-                    (*read_iter)->mean_qscore_start_pos = m_mean_qscore_start_pos;
-                    found_read = std::move(*read_iter);
                     m_working_reads.erase(read_iter);
                     --m_working_reads_size;
                 } else {
@@ -139,7 +161,9 @@ void BasecallerNode::working_reads_manager() {
                                              " in working reads cache but it doesn't exist.");
                 }
             }
-            send_message_to_sink(std::move(found_read));
+
+            // Send the read on its way.
+            send_message_to_sink(std::move(source_read));
         }
     }
 }
@@ -153,8 +177,8 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
 
     auto last_chunk_reserve_time = std::chrono::system_clock::now();
     int batch_size = m_model_runners[worker_id]->batch_size();
-    std::shared_ptr<Chunk> chunk;
     while (true) {
+        std::unique_ptr<BasecallingChunk> chunk;
         const auto pop_status = m_chunks_in.try_pop_until(
                 chunk, last_chunk_reserve_time + std::chrono::milliseconds(m_batch_timeout_ms));
 
@@ -177,7 +201,7 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
         // FIXME -- it should not be possible to for this condition to be untrue.
         if (m_batched_chunks[worker_id].size() != batch_size) {
             // Copy the chunk into the input tensor
-            std::shared_ptr<Read> source_read = chunk->source_read.lock();
+            auto &source_read = chunk->owning_read->read;
 
             auto input_slice = source_read->raw_data.index(
                     {Ellipsis, Slice(chunk->input_offset, chunk->input_offset + m_chunk_size)});
@@ -209,7 +233,7 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
             m_model_runners[worker_id]->accept_chunk(
                     static_cast<int>(m_batched_chunks[worker_id].size()), input_slice);
 
-            m_batched_chunks[worker_id].push_back(chunk);
+            m_batched_chunks[worker_id].push_back(std::move(chunk));
 
             last_chunk_reserve_time = std::chrono::system_clock::now();
         }
@@ -218,7 +242,6 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
             // Input tensor is full, let's get_scores.
             basecall_current_batch(worker_id);
         }
-        chunk.reset();
     }
 
     if (!m_batched_chunks[worker_id].empty()) {
@@ -283,6 +306,8 @@ BasecallerNode::BasecallerNode(std::vector<Runner> model_runners,
     // Spin up any workers last so that we're not mutating |this| underneath them
     start_threads();
 }
+
+BasecallerNode::~BasecallerNode() { terminate_impl(); }
 
 void BasecallerNode::start_threads() {
     m_input_worker = std::make_unique<std::thread>([this] { input_worker_thread(); });

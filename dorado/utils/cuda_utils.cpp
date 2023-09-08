@@ -1,13 +1,6 @@
 #include "cuda_utils.h"
 
-#include "cxxpool.h"
 #include "math_utils.h"
-
-#include <torch/torch.h>
-
-extern "C" {
-#include "koi.h"
-}
 
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAGuard.h>
@@ -26,6 +19,7 @@ extern "C" {
 #include <string>
 #include <unordered_map>
 #include <vector>
+
 using namespace std::chrono;
 
 namespace dorado::utils {
@@ -79,11 +73,11 @@ public:
 
 }  // namespace
 
-void matmul_f16(torch::Tensor const &A, torch::Tensor const &B, torch::Tensor &C) {
+void matmul_f16(const torch::Tensor &A, const torch::Tensor &B, torch::Tensor &C) {
     // torch::matmul() is a bit slower than cublasGemmEx() on A100 and half the speed on V100,
     // but an order of magnitude faster on our Windows CI machines (1080 Ti), so dynamically
     // pick which one we should use on first invocation.
-    static auto const fastest_mat_mul = [] {
+    static const auto fastest_mat_mul = [] {
         CUDATimer cuda_timer;
 
         // Arbitrary tensor lengths to benchmark against.
@@ -190,7 +184,7 @@ void handle_cuda_result(int cuda_result) {
 }
 
 namespace details {
-void matmul_f16_cublas(torch::Tensor const &A, torch::Tensor const &B, torch::Tensor &C) {
+void matmul_f16_cublas(const torch::Tensor &A, const torch::Tensor &B, torch::Tensor &C) {
     constexpr uint16_t HALF_ZERO = 0;      // 0.0 in __half format
     constexpr uint16_t HALF_ONE = 0x3C00;  // 1.0 in __half format
     assert(A.dtype() == torch::kF16 && B.dtype() == torch::kF16 && C.dtype() == torch::kF16);
@@ -209,7 +203,7 @@ void matmul_f16_cublas(torch::Tensor const &A, torch::Tensor const &B, torch::Te
     }
 }
 
-void matmul_f16_torch(torch::Tensor const &A, torch::Tensor const &B, torch::Tensor &C) {
+void matmul_f16_torch(const torch::Tensor &A, const torch::Tensor &B, torch::Tensor &C) {
     C.copy_(torch::matmul(A, B));
 }
 

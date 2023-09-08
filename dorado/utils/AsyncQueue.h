@@ -64,7 +64,7 @@ class AsyncQueue {
         assert(!m_items.empty());
         size_t num_to_pop = std::min(m_items.size(), max_count);
         for (size_t i = 0; i < num_to_pop; ++i) {
-            process_fn(m_items.front());
+            process_fn(std::move(m_items.front()));
             m_items.pop();
         }
         m_num_pops += num_to_pop;

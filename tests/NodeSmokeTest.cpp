@@ -1,15 +1,16 @@
 #include "MessageSinkUtils.h"
 #include "decode/CPUDecoder.h"
+#include "models/models.h"
 #include "nn/CRFModel.h"
 #include "nn/ModBaseModel.h"
 #include "nn/ModBaseRunner.h"
 #include "nn/ModelRunner.h"
+#include "read_pipeline/BarcodeClassifierNode.h"
 #include "read_pipeline/BasecallerNode.h"
 #include "read_pipeline/ModBaseCallerNode.h"
 #include "read_pipeline/ReadFilterNode.h"
 #include "read_pipeline/ReadToBamTypeNode.h"
 #include "read_pipeline/ScalerNode.h"
-#include "utils/models.h"
 #include "utils/parameters.h"
 
 #if DORADO_GPU_BUILD
@@ -43,7 +44,7 @@ protected:
     }
 
     auto make_test_read(std::string read_id) {
-        auto read = std::make_unique<dorado::Read>();
+        auto read = dorado::ReadPtr::make();
         read->raw_data = torch::rand(random_between(100, 200));
         read->sample_rate = 5000;
         read->shift = random_between(100, 200);
@@ -63,7 +64,7 @@ protected:
 private:
     std::size_t m_num_reads = 200;
     std::size_t m_num_messages = m_num_reads;
-    using ReadMutator = std::function<void(std::unique_ptr<dorado::Read>& read)>;
+    using ReadMutator = std::function<void(dorado::ReadPtr& read)>;
     ReadMutator m_read_mutator;
     bool m_pipeline_restart = false;
 
@@ -104,7 +105,7 @@ protected:
     }
 };
 
-using NodeSmokeTestRead = NodeSmokeTestBase<std::shared_ptr<dorado::Read>>;
+using NodeSmokeTestRead = NodeSmokeTestBase<dorado::ReadPtr>;
 using NodeSmokeTestBam = NodeSmokeTestBase<dorado::BamPtr>;
 
 #define DEFINE_TEST(base, name) TEST_CASE_METHOD(base, "SmokeTest: " name, "[SmokeTest]")
@@ -130,13 +131,13 @@ struct TempDir {
 };
 
 // Download a model to a temporary directory
-TempDir download_model(std::string const& model) {
+TempDir download_model(const std::string& model) {
     // Create a new directory to download the model to
 #ifdef _WIN32
     std::filesystem::path path;
     while (true) {
         char temp[L_tmpnam];
-        char const* name = std::tmpnam(temp);
+        const char* name = std::tmpnam(temp);
         if (std::filesystem::create_directories(name)) {
             path = std::filesystem::canonical(name);
             break;
@@ -145,7 +146,7 @@ TempDir download_model(std::string const& model) {
 #else
     // macOS (rightfully) complains about tmpnam() usage, so make use of mkdtemp() on platforms that support it
     std::string temp = (std::filesystem::temp_directory_path() / "model_XXXXXXXXXX").string();
-    char const* name = mkdtemp(temp.data());
+    const char* name = mkdtemp(temp.data());
     auto path = std::filesystem::canonical(name);
 #endif
 
@@ -163,9 +164,8 @@ DEFINE_TEST(NodeSmokeTestRead, "ScalerNode") {
     set_pipeline_restart(pipeline_restart);
 
     // Scaler node expects i16 input
-    set_read_mutator([](std::unique_ptr<dorado::Read>& read) {
-        read->raw_data = read->raw_data.to(torch::kI16);
-    });
+    set_read_mutator(
+            [](dorado::ReadPtr& read) { read->raw_data = read->raw_data.to(torch::kI16); });
 
     dorado::SignalNormalisationParams config;
     config.quantile_a = 0.2;
@@ -184,10 +184,10 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
     set_pipeline_restart(pipeline_restart);
 
     const int kBatchTimeoutMS = 100;
-    auto const& default_params = dorado::utils::default_parameters;
-    char const model_name[] = "dna_r10.4.1_e8.2_400bps_fast@v4.2.0";
-    auto const model_dir = download_model(model_name);
-    auto const model_path = (model_dir.m_path / model_name).string();
+    const auto& default_params = dorado::utils::default_parameters;
+    const char model_name[] = "dna_r10.4.1_e8.2_400bps_fast@v4.2.0";
+    const auto model_dir = download_model(model_name);
+    const auto model_path = (model_dir.m_path / model_name).string();
     auto model_config = dorado::load_crf_model_config(model_path);
 
     // Create runners
@@ -205,7 +205,7 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
         if (devices.empty()) {
             SKIP("No CUDA devices found");
         }
-        for (auto const& device : devices) {
+        for (const auto& device : devices) {
             auto caller = dorado::create_cuda_caller(model_config, default_params.chunksize,
                                                      default_params.batchsize, device);
             for (size_t i = 0; i < default_params.num_runners; i++) {
@@ -235,22 +235,22 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
 
     set_pipeline_restart(pipeline_restart);
 
-    auto const& default_params = dorado::utils::default_parameters;
-    char const remora_model_name[] = "dna_r10.4.1_e8.2_400bps_fast@v4.2.0_5mCG_5hmCG@v2";
-    auto const remora_model_dir = download_model(remora_model_name);
-    auto const remora_model = remora_model_dir.m_path / remora_model_name;
+    const auto& default_params = dorado::utils::default_parameters;
+    const char remora_model_name[] = "dna_r10.4.1_e8.2_400bps_fast@v4.2.0_5mCG_5hmCG@v2";
+    const auto remora_model_dir = download_model(remora_model_name);
+    const auto remora_model = remora_model_dir.m_path / remora_model_name;
 
     // Add a second model into the mix
-    char const remora_model_6mA_name[] = "dna_r10.4.1_e8.2_400bps_sup@v4.2.0_6mA@v2";
-    auto const remora_model_6mA_dir = download_model(remora_model_6mA_name);
-    auto const remora_model_6mA = remora_model_6mA_dir.m_path / remora_model_6mA_name;
+    const char remora_model_6mA_name[] = "dna_r10.4.1_e8.2_400bps_sup@v4.2.0_6mA@v2";
+    const auto remora_model_6mA_dir = download_model(remora_model_6mA_name);
+    const auto remora_model_6mA = remora_model_6mA_dir.m_path / remora_model_6mA_name;
 
     // The model stride for RemoraCaller isn't in its config so grab it separately.
     // Note: We only look at the stride of one of the models since it's not what we're
     // testing for. In theory we could hardcode the stride to any number here, but to
     // be somewhat realistic we'll use an actual one.
-    char const model_name[] = "dna_r10.4.1_e8.2_400bps_fast@v4.2.0";
-    auto const model_dir = download_model(model_name);
+    const char model_name[] = "dna_r10.4.1_e8.2_400bps_fast@v4.2.0";
+    const auto model_dir = download_model(model_name);
     std::size_t const model_stride =
             dorado::load_crf_model_config(model_dir.m_path / model_name).stride;
 
@@ -287,7 +287,7 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
     }
 
     // ModBase node expects half input and needs a move table
-    set_read_mutator([this, model_stride](std::unique_ptr<dorado::Read>& read) {
+    set_read_mutator([this, model_stride](dorado::ReadPtr& read) {
         read->raw_data = read->raw_data.to(torch::kHalf);
 
         read->model_stride = model_stride;
@@ -314,6 +314,19 @@ DEFINE_TEST(NodeSmokeTestBam, "ReadToBamType") {
 
     run_smoke_test<dorado::ReadToBamType>(emit_moves, rna, 2,
                                           dorado::utils::default_parameters.methylation_threshold);
+}
+
+DEFINE_TEST(NodeSmokeTestRead, "BarcodeClassifierNode") {
+    auto barcode_both_ends = GENERATE(true, false);
+    auto pipeline_restart = GENERATE(false, true);
+    CAPTURE(barcode_both_ends);
+    CAPTURE(pipeline_restart);
+
+    set_pipeline_restart(pipeline_restart);
+    set_read_mutator([](dorado::ReadPtr& read) { read->barcode = "test_barcode"; });
+
+    std::vector<std::string> kits = {"SQK-RPB004", "EXP-NBD196"};
+    run_smoke_test<dorado::BarcodeClassifierNode>(2, kits, barcode_both_ends);
 }
 
 }  // namespace

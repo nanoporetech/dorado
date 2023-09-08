@@ -20,21 +20,28 @@ namespace dorado {
 
 constexpr auto FORCE_TIMEOUT = 100ms;
 
-struct RemoraChunk {
-    RemoraChunk(std::shared_ptr<Read> read,
+struct ModBaseCallerNode::RemoraChunk {
+    RemoraChunk(std::shared_ptr<WorkingRead> read,
                 torch::Tensor input_signal,
                 std::vector<int8_t> kmer_data,
                 size_t position)
-            : source_read(read),
-              signal(input_signal),
+            : working_read(std::move(read)),
+              signal(std::move(input_signal)),
               encoded_kmers(std::move(kmer_data)),
               context_hit(position) {}
 
-    std::weak_ptr<Read> source_read;
+    std::shared_ptr<WorkingRead> working_read;
     torch::Tensor signal;
     std::vector<int8_t> encoded_kmers;
     size_t context_hit;
     std::vector<float> scores;
+};
+
+struct ModBaseCallerNode::WorkingRead {
+    ReadPtr read;  // The read itself.
+    size_t num_modbase_chunks;
+    std::atomic_size_t
+            num_modbase_chunks_called;  // Number of modbase chunks which have been scored
 };
 
 ModBaseCallerNode::ModBaseCallerNode(std::vector<std::unique_ptr<ModBaseRunner>> model_runners,
@@ -51,13 +58,15 @@ ModBaseCallerNode::ModBaseCallerNode(std::vector<std::unique_ptr<ModBaseRunner>>
     init_modbase_info();
     for (int i = 0; i < m_runners[0]->num_callers(); i++) {
         m_chunk_queues.emplace_back(
-                std::make_unique<utils::AsyncQueue<std::shared_ptr<RemoraChunk>>>(m_batch_size *
+                std::make_unique<utils::AsyncQueue<std::unique_ptr<RemoraChunk>>>(m_batch_size *
                                                                                   5));
     }
 
     // Spin up the processing threads:
     start_threads();
 }
+
+ModBaseCallerNode::~ModBaseCallerNode() { terminate_impl(); }
 
 void ModBaseCallerNode::start_threads() {
     m_output_worker = std::make_unique<std::thread>(&ModBaseCallerNode::output_worker_thread, this);
@@ -110,7 +119,7 @@ void ModBaseCallerNode::restart() {
 }
 
 void ModBaseCallerNode::init_modbase_info() {
-    std::vector<std::reference_wrapper<ModBaseModelConfig const>> base_mod_params;
+    std::vector<std::reference_wrapper<const ModBaseModelConfig>> base_mod_params;
     auto& runner = m_runners[0];
     utils::ModBaseContext context_handler;
     for (size_t caller_id = 0; caller_id < runner->num_callers(); ++caller_id) {
@@ -138,14 +147,14 @@ void ModBaseCallerNode::input_worker_thread() {
     Message message;
     while (get_input_message(message)) {
         // If this message isn't a read, just forward it to the sink.
-        if (!std::holds_alternative<std::shared_ptr<Read>>(message)) {
+        if (!std::holds_alternative<ReadPtr>(message)) {
             send_message_to_sink(std::move(message));
             continue;
         }
 
         nvtx3::scoped_range range{"modbase_input_worker_thread"};
         // If this message isn't a read, we'll get a bad_variant_access exception.
-        auto read = std::get<std::shared_ptr<Read>>(message);
+        auto read = std::get<ReadPtr>(std::move(message));
 
         while (true) {
             stats::Timer timer;
@@ -168,8 +177,9 @@ void ModBaseCallerNode::input_worker_thread() {
             std::vector<uint64_t> seq_to_sig_map = utils::moves_to_map(
                     read->moves, m_block_stride, read->raw_data.size(0), read->seq.size() + 1);
 
-            read->num_modbase_chunks = 0;
-            read->num_modbase_chunks_called = 0;
+            auto working_read = std::make_shared<WorkingRead>();
+            working_read->num_modbase_chunks = 0;
+            working_read->num_modbase_chunks_called = 0;
 
             // all runners have the same set of callers, so we only need to use the first one
             auto& runner = m_runners[0];
@@ -190,7 +200,7 @@ void ModBaseCallerNode::input_worker_thread() {
 
                 auto context_hits = runner->get_motif_hits(caller_id, read->seq);
                 m_num_context_hits += static_cast<int64_t>(context_hits.size());
-                std::vector<std::shared_ptr<RemoraChunk>> reads_to_enqueue;
+                std::vector<std::unique_ptr<RemoraChunk>> reads_to_enqueue;
                 reads_to_enqueue.reserve(context_hits.size());
                 for (auto context_hit : context_hits) {
                     nvtx3::scoped_range range{"create_chunk"};
@@ -203,10 +213,10 @@ void ModBaseCallerNode::input_worker_thread() {
                                                               {(int64_t)slice.lead_samples_needed,
                                                                (int64_t)slice.tail_samples_needed});
                     }
-                    reads_to_enqueue.push_back(std::make_shared<RemoraChunk>(
-                            read, input_signal, std::move(slice.data), context_hit));
+                    reads_to_enqueue.push_back(std::make_unique<RemoraChunk>(
+                            working_read, input_signal, std::move(slice.data), context_hit));
 
-                    ++read->num_modbase_chunks;
+                    ++working_read->num_modbase_chunks;
                 }
                 for (auto& chunk : reads_to_enqueue) {
                     chunk_queue->try_push(std::move(chunk));
@@ -214,10 +224,13 @@ void ModBaseCallerNode::input_worker_thread() {
             }
             m_chunk_generation_ms += timer.GetElapsedMS();
 
-            if (read->num_modbase_chunks != 0) {
+            if (working_read->num_modbase_chunks != 0) {
+                // Hand over our ownership to the working read
+                working_read->read = std::move(read);
+
                 // Put the read in the working list
                 std::lock_guard<std::mutex> working_reads_lock(m_working_reads_mutex);
-                m_working_reads.insert(std::move(read));
+                m_working_reads.insert(std::move(working_read));
                 ++m_working_reads_size;
             } else {
                 // No modbases to call, pass directly to next node
@@ -242,7 +255,7 @@ void ModBaseCallerNode::modbasecall_worker_thread(size_t worker_id, size_t calle
     auto& runner = m_runners[worker_id];
     auto& chunk_queue = m_chunk_queues[caller_id];
 
-    std::vector<std::shared_ptr<RemoraChunk>> batched_chunks;
+    std::vector<std::unique_ptr<RemoraChunk>> batched_chunks;
     auto last_chunk_reserve_time = std::chrono::system_clock::now();
 
     size_t previous_chunk_count = 0;
@@ -250,7 +263,7 @@ void ModBaseCallerNode::modbasecall_worker_thread(size_t worker_id, size_t calle
         nvtx3::scoped_range range{"modbasecall_worker_thread"};
         // Repeatedly attempt to complete the current batch with one acquisition of the
         // chunk queue mutex.
-        auto grab_chunk = [&batched_chunks](std::shared_ptr<RemoraChunk>& chunk) {
+        auto grab_chunk = [&batched_chunks](std::unique_ptr<RemoraChunk> chunk) {
             batched_chunks.push_back(std::move(chunk));
         };
         const auto status = chunk_queue->process_and_pop_n_with_timeout(
@@ -300,7 +313,7 @@ void ModBaseCallerNode::modbasecall_worker_thread(size_t worker_id, size_t calle
 void ModBaseCallerNode::call_current_batch(
         size_t worker_id,
         size_t caller_id,
-        std::vector<std::shared_ptr<RemoraChunk>>& batched_chunks) {
+        std::vector<std::unique_ptr<RemoraChunk>>& batched_chunks) {
     nvtx3::scoped_range loop{"call_current_batch"};
 
     dorado::stats::Timer timer;
@@ -332,18 +345,19 @@ void ModBaseCallerNode::output_worker_thread() {
 
     // The m_processed_chunks lock is sufficiently contended that it's worth taking all
     // chunks available once we obtain it.
-    std::vector<std::shared_ptr<RemoraChunk>> processed_chunks;
-    auto grab_chunk = [&processed_chunks](std::shared_ptr<RemoraChunk>& chunk) {
+    std::vector<std::unique_ptr<RemoraChunk>> processed_chunks;
+    auto grab_chunk = [&processed_chunks](std::unique_ptr<RemoraChunk> chunk) {
         processed_chunks.push_back(std::move(chunk));
     };
     while (m_processed_chunks.process_and_pop_n(grab_chunk, m_processed_chunks.capacity()) ==
            utils::AsyncQueueStatus::Success) {
         nvtx3::scoped_range range{"modbase_output_worker_thread"};
 
-        std::vector<std::shared_ptr<Read>> completed_reads;
+        std::vector<std::shared_ptr<WorkingRead>> completed_reads;
 
         for (const auto& chunk : processed_chunks) {
-            auto source_read = chunk->source_read.lock();
+            auto working_read = chunk->working_read;
+            auto& source_read = working_read->read;
             int64_t result_pos = chunk->context_hit;
             int64_t offset =
                     m_base_prob_offsets[utils::BaseInfo::BASE_IDS[source_read->seq[result_pos]]];
@@ -353,9 +367,9 @@ void ModBaseCallerNode::output_worker_thread() {
             }
             // If all chunks for the read associated with this chunk have now been called,
             // add it to the completed_reads vector for subsequent sending on to the sink.
-            auto num_chunks_called = ++source_read->num_modbase_chunks_called;
-            if (num_chunks_called == source_read->num_modbase_chunks) {
-                completed_reads.push_back(std::move(source_read));
+            auto num_chunks_called = ++working_read->num_modbase_chunks_called;
+            if (num_chunks_called == working_read->num_modbase_chunks) {
+                completed_reads.push_back(std::move(working_read));
             }
         }
         processed_chunks.clear();
@@ -366,9 +380,10 @@ void ModBaseCallerNode::output_worker_thread() {
             for (auto& completed_read : completed_reads) {
                 auto read_iter = m_working_reads.find(completed_read);
                 if (read_iter != m_working_reads.end()) {
-                    m_working_reads.erase(*read_iter);
+                    m_working_reads.erase(read_iter);
                 } else {
-                    throw std::runtime_error("Expected to find read id " + completed_read->read_id +
+                    throw std::runtime_error("Expected to find read id " +
+                                             completed_read->read->read_id +
                                              " in working reads set but it doesn't exist.");
                 }
             }
@@ -377,7 +392,7 @@ void ModBaseCallerNode::output_worker_thread() {
 
         // Send completed reads on to the sink.
         for (auto& completed_read : completed_reads) {
-            send_message_to_sink(std::move(completed_read));
+            send_message_to_sink(std::move(completed_read->read));
             ++m_num_mod_base_reads_pushed;
         }
     }

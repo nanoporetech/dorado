@@ -1,5 +1,7 @@
 #include "Version.h"
+#include "cli/cli_utils.h"
 #include "data_loader/DataLoader.h"
+#include "models/models.h"
 #include "nn/CRFModelConfig.h"
 #include "nn/Runners.h"
 #include "read_pipeline/AlignerNode.h"
@@ -11,17 +13,15 @@
 #include "read_pipeline/ReadFilterNode.h"
 #include "read_pipeline/ReadToBamTypeNode.h"
 #include "utils/bam_utils.h"
-#include "utils/cli_utils.h"
+#include "utils/basecaller_utils.h"
 #include "utils/duplex_utils.h"
 #include "utils/log_utils.h"
-#include "utils/models.h"
 #include "utils/parameters.h"
 #include "utils/types.h"
 
 #include <argparse.hpp>
 #include <htslib/sam.h>
 #include <spdlog/spdlog.h>
-#include <utils/basecaller_utils.h>
 
 #include <memory>
 #include <thread>
@@ -102,7 +102,7 @@ int duplex(int argc, char* argv[]) {
 
     try {
         auto remaining_args = parser.parse_known_args(argc, argv);
-        auto internal_parser = utils::parse_internal_options(remaining_args);
+        auto internal_parser = cli::parse_internal_options(remaining_args);
 
         auto device(parser.get<std::string>("-x"));
         auto model(parser.get<std::string>("model"));
@@ -163,7 +163,7 @@ int duplex(int argc, char* argv[]) {
         spdlog::debug("> Reads to process: {}", num_reads);
 
         std::unique_ptr<sam_hdr_t, void (*)(sam_hdr_t*)> hdr(sam_hdr_init(), sam_hdr_destroy);
-        utils::add_pg_hdr(hdr.get(), args);
+        cli::add_pg_hdr(hdr.get(), args);
 
         PipelineDescriptor pipeline_desc;
         auto hts_writer = PipelineDescriptor::InvalidNodeHandle;
@@ -175,7 +175,7 @@ int duplex(int argc, char* argv[]) {
         } else {
             aligner = pipeline_desc.add_node<Aligner>(
                     {}, ref, parser.get<int>("k"), parser.get<int>("w"),
-                    utils::parse_string_to_size(parser.get<std::string>("I")),
+                    cli::parse_string_to_size(parser.get<std::string>("I")),
                     std::thread::hardware_concurrency());
             hts_writer = pipeline_desc.add_node<HtsWriter>({}, "-", output_mode, 4, num_reads);
             pipeline_desc.add_node_sink(aligner, hts_writer);
@@ -214,7 +214,8 @@ int duplex(int argc, char* argv[]) {
             threads = threads == 0 ? std::thread::hardware_concurrency() : threads;
 
             auto duplex_caller_node = pipeline_desc.add_node<BaseSpaceDuplexCallerNode>(
-                    {read_filter_node}, template_complement_map, read_map, threads);
+                    {read_filter_node}, std::move(template_complement_map), std::move(read_map),
+                    threads);
 
             std::vector<dorado::stats::StatsReporter> stats_reporters;
             pipeline = Pipeline::create(std::move(pipeline_desc), &stats_reporters);

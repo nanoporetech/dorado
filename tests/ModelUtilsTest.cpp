@@ -1,4 +1,4 @@
-#include "utils/models.h"
+#include "models/models.h"
 
 #include <catch2/catch.hpp>
 

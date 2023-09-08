@@ -1,18 +1,18 @@
 #include "bam_utils.h"
 
-#include "htslib/sam.h"
-#include "read_pipeline/ReadPipeline.h"
+#include <htslib/sam.h>
 
 #include <cctype>
 #include <iostream>
 #include <map>
+#include <sstream>
 #include <string>
 
 namespace dorado::utils {
 
 void add_rg_hdr(sam_hdr_t* hdr, const std::unordered_map<std::string, ReadGroup>& read_groups) {
     // Add read groups
-    for (auto const& x : read_groups) {
+    for (const auto& x : read_groups) {
         // Lambda function to return "Unknown" if string is empty
         auto value_or_unknown = [](const std::string& s) { return s.empty() ? "unknown" : s; };
 

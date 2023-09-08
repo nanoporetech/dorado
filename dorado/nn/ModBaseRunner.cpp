@@ -331,7 +331,7 @@ std::vector<size_t> ModBaseRunner::get_motif_hits(size_t caller_id, const std::s
     return m_caller->m_caller_data[caller_id]->get_motif_hits(seq);
 }
 
-ModBaseModelConfig const& ModBaseRunner::caller_params(size_t caller_id) const {
+const ModBaseModelConfig& ModBaseRunner::caller_params(size_t caller_id) const {
     return m_caller->m_caller_data[caller_id]->params;
 }
 

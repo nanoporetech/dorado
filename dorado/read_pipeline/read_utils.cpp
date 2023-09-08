@@ -1,8 +1,8 @@
 #include "read_utils.h"
 
 namespace dorado::utils {
-std::shared_ptr<Read> shallow_copy_read(const Read& read) {
-    auto copy = std::make_shared<Read>();
+ReadPtr shallow_copy_read(const Read& read) {
+    auto copy = ReadPtr::make();
     copy->raw_data = read.raw_data;
     copy->digitisation = read.digitisation;
     copy->range = read.range;
@@ -13,9 +13,6 @@ std::shared_ptr<Read> shallow_copy_read(const Read& read) {
     copy->scale = read.scale;
 
     copy->scaling = read.scaling;
-
-    copy->num_chunks = read.num_chunks;
-    copy->num_modbase_chunks = read.num_modbase_chunks;
 
     copy->model_stride = read.model_stride;
 
