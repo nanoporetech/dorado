@@ -9,26 +9,31 @@
 
 TEST_CASE(TEST_GROUP "Test loading single-read POD5 files") {
     CHECK(CountSinkReads(get_pod5_data_dir(), "cpu", 1) == 1);
+    CHECK(CountSinkReads(get_single_pod5_file_path(), "cpu", 1) == 1);
 }
 
 TEST_CASE(TEST_GROUP "Test loading single-read POD5 file, empty read list") {
     auto read_list = std::unordered_set<std::string>();
     CHECK(CountSinkReads(get_pod5_data_dir(), "cpu", 1, 0, read_list) == 0);
+    CHECK(CountSinkReads(get_single_pod5_file_path(), "cpu", 1, 0, read_list) == 0);
 }
 
 TEST_CASE(TEST_GROUP "Test loading single-read POD5 file, no read list") {
     CHECK(CountSinkReads(get_pod5_data_dir(), "cpu", 1, 0, std::nullopt) == 1);
+    CHECK(CountSinkReads(get_single_pod5_file_path(), "cpu", 1, 0, std::nullopt) == 1);
 }
 
 TEST_CASE(TEST_GROUP "Test loading single-read POD5 file, mismatched read list") {
     auto read_list = std::unordered_set<std::string>{"read_1"};
     CHECK(CountSinkReads(get_pod5_data_dir(), "cpu", 1, 0, read_list) == 0);
+    CHECK(CountSinkReads(get_single_pod5_file_path(), "cpu", 1, 0, read_list) == 0);
 }
 
 TEST_CASE(TEST_GROUP "Test loading single-read POD5 file, matched read list") {
     // read present in POD5
     auto read_list = std::unordered_set<std::string>{"002bd127-db82-436f-b828-28567c3d505d"};
     CHECK(CountSinkReads(get_pod5_data_dir(), "cpu", 1, 0, read_list) == 1);
+    CHECK(CountSinkReads(get_single_pod5_file_path(), "cpu", 1, 0, read_list) == 1);
 }
 
 TEST_CASE(TEST_GROUP "Test calculating number of reads from pod5, read ids list.") {
@@ -52,12 +57,16 @@ TEST_CASE(TEST_GROUP "Test calculating number of reads from pod5, read ids list.
 
 TEST_CASE(TEST_GROUP "Find sample rate from pod5.") {
     std::string data_path(get_pod5_data_dir());
+    std::string single_read_path(get_pod5_data_dir());
     CHECK(dorado::DataLoader::get_sample_rate(data_path) == 4000);
+    CHECK(dorado::DataLoader::get_sample_rate(single_read_path) == 4000);
 }
 
 TEST_CASE(TEST_GROUP "Find sample rate from nested pod5.") {
     std::string data_path(get_nested_pod5_data_dir());
+    std::string single_read_path(get_pod5_data_dir());
     CHECK(dorado::DataLoader::get_sample_rate(data_path, true) == 4000);
+    CHECK(dorado::DataLoader::get_sample_rate(single_read_path, true) == 4000);
 }
 
 TEST_CASE(TEST_GROUP "Load data sorted by channel id.") {
