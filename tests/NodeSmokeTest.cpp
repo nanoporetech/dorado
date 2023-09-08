@@ -318,15 +318,17 @@ DEFINE_TEST(NodeSmokeTestBam, "ReadToBamType") {
 
 DEFINE_TEST(NodeSmokeTestRead, "BarcodeClassifierNode") {
     auto barcode_both_ends = GENERATE(true, false);
+    auto no_trim = GENERATE(true, false);
     auto pipeline_restart = GENERATE(false, true);
     CAPTURE(barcode_both_ends);
+    CAPTURE(no_trim);
     CAPTURE(pipeline_restart);
 
     set_pipeline_restart(pipeline_restart);
     set_read_mutator([](dorado::ReadPtr& read) { read->barcode = "test_barcode"; });
 
     std::vector<std::string> kits = {"SQK-RPB004", "EXP-NBD196"};
-    run_smoke_test<dorado::BarcodeClassifierNode>(2, kits, barcode_both_ends);
+    run_smoke_test<dorado::BarcodeClassifierNode>(2, kits, barcode_both_ends, no_trim);
 }
 
 }  // namespace

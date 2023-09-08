@@ -33,8 +33,12 @@ namespace dorado {
 // A Node which encapsulates running barcode classification on each read.
 BarcodeClassifierNode::BarcodeClassifierNode(int threads,
                                              const std::vector<std::string>& kit_names,
-                                             bool barcode_both_ends)
-        : MessageSink(10000), m_threads(threads), m_barcoder(kit_names, barcode_both_ends) {
+                                             bool barcode_both_ends,
+                                             bool no_trim)
+        : MessageSink(10000),
+          m_threads(threads),
+          m_barcoder(kit_names, barcode_both_ends),
+          m_trim_barcodes(!no_trim) {
     start_threads();
 }
 
@@ -66,8 +70,8 @@ void BarcodeClassifierNode::worker_thread(size_t tid) {
     while (get_input_message(message)) {
         if (std::holds_alternative<BamPtr>(message)) {
             auto read = std::get<BamPtr>(std::move(message));
-            auto barcoded_read = barcode(read);
-            send_message_to_sink(std::move(barcoded_read));
+            barcode(read);
+            send_message_to_sink(std::move(read));
         } else if (std::holds_alternative<ReadPtr>(message)) {
             auto read = std::get<ReadPtr>(std::move(message));
             barcode(read);
@@ -301,8 +305,7 @@ bam1_t* BarcodeClassifierNode::trim_barcode(bam1_t* input_record,
     return out_record;
 }
 
-void BarcodeClassifierNode::trim_barcode(ReadPtr& read,
-                                            const demux::ScoreResults& res) {
+void BarcodeClassifierNode::trim_barcode(ReadPtr& read, const demux::ScoreResults& res) {
     int seqlen = read->seq.length();
     auto trim_interval = determine_trim_interval(res, seqlen);
 
@@ -315,7 +318,7 @@ void BarcodeClassifierNode::trim_barcode(ReadPtr& read,
     read->moves = trim_move_table(read->moves, trim_interval);
 }
 
-BamPtr BarcodeClassifierNode::barcode(BamPtr& read) {
+void BarcodeClassifierNode::barcode(BamPtr& read) {
     bam1_t* irecord = read.get();
     // get the sequence to map from the record
     auto seqlen = irecord->core.l_qseq;
@@ -327,8 +330,9 @@ BamPtr BarcodeClassifierNode::barcode(BamPtr& read) {
     bam_aux_append(irecord, "BC", 'Z', bc.length() + 1, (uint8_t*)bc.c_str());
     m_num_records++;
 
-    bam1_t* out_record = trim_barcode(irecord, bc_res, seqlen);
-    return BamPtr(out_record);
+    if (m_trim_barcodes) {
+        read = BamPtr(trim_barcode(irecord, bc_res, seqlen));
+    }
 }
 
 void BarcodeClassifierNode::barcode(ReadPtr& read) {
@@ -338,7 +342,9 @@ void BarcodeClassifierNode::barcode(ReadPtr& read) {
     read->barcode = bc;
     m_num_records++;
 
-    trim_barcode(read, bc_res);
+    if (m_trim_barcodes) {
+        trim_barcode(read, bc_res);
+    }
 }
 
 stats::NamedStats BarcodeClassifierNode::sample_stats() const {

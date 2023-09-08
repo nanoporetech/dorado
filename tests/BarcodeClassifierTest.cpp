@@ -182,7 +182,10 @@ TEST_CASE("BarcodeClassifierNode: check correct output files are created", TEST_
     std::vector<dorado::Message> messages;
     auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
     std::vector<std::string> kits = {"SQK-RPB004"};
-    auto demuxer = pipeline_desc.add_node<BarcodeClassifierNode>({sink}, 8, kits, false);
+    bool barcode_both_ends = GENERATE(true, false);
+    bool no_trim = GENERATE(true, false);
+    auto classifier = pipeline_desc.add_node<BarcodeClassifierNode>({sink}, 8, kits,
+                                                                    barcode_both_ends, no_trim);
 
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
 
