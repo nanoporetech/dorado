@@ -57,6 +57,9 @@ std::string Read::generate_read_group() const {
         } else {
             read_group += model_name;
         }
+        if (!barcode.empty()) {
+            read_group += '_' + barcode;
+        }
     }
     return read_group;
 }

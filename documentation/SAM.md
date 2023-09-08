@@ -24,7 +24,7 @@
 
 |        |                                                            |
 | ------ | -----------------------------------------------------------|
-| RG:Z:  | `<runid>_<basecalling_model>`                              |
+| RG:Z:  | `<runid>_<basecalling_model>_<barcode_arrangement>`        |
 | qs:i:  | mean basecall qscore rounded to the nearest integer        |
 | ns:i:  | the number of samples in the signal prior to trimming      |
 | ts:i:  | the number of samples trimmed from the start of the signal |

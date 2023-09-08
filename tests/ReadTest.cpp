@@ -91,6 +91,18 @@ TEST_CASE(TEST_GROUP ": Test tag generation", TEST_GROUP) {
         test_read.model_name = old_model;
         test_read.run_id = old_run_id;
     }
+
+    SECTION("Barcode") {
+        auto old_barcode = std::exchange(test_read.barcode, "kit_barcode02");
+
+        auto alignments = test_read.extract_sam_lines(false);
+        REQUIRE(alignments.size() == 1);
+        auto* aln = alignments[0].get();
+
+        CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "RG")), Equals("xyz_test_model_kit_barcode02"));
+
+        test_read.barcode = old_barcode;
+    }
 }
 
 TEST_CASE(TEST_GROUP ": Test sam record generation", TEST_GROUP) {
