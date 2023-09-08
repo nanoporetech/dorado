@@ -57,7 +57,7 @@ std::string Read::generate_read_group() const {
         } else {
             read_group += model_name;
         }
-        if (!barcode.empty()) {
+        if (!barcode.empty() && barcode != "unclassified") {
             read_group += '_' + barcode;
         }
     }

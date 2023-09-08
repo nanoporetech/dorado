@@ -103,6 +103,18 @@ TEST_CASE(TEST_GROUP ": Test tag generation", TEST_GROUP) {
 
         test_read.barcode = old_barcode;
     }
+
+    SECTION("Barcode unclassified") {
+        auto old_barcode = std::exchange(test_read.barcode, "unclassified");
+
+        auto alignments = test_read.extract_sam_lines(false);
+        REQUIRE(alignments.size() == 1);
+        auto* aln = alignments[0].get();
+
+        CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "RG")), Equals("xyz_test_model"));
+
+        test_read.barcode = old_barcode;
+    }
 }
 
 TEST_CASE(TEST_GROUP ": Test sam record generation", TEST_GROUP) {
