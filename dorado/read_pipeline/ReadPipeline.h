@@ -78,7 +78,7 @@ public:
     uint64_t end_sample;
     uint64_t run_acquisition_start_time_ms;
     bool is_duplex{false};
-    bool is_duplex_parent{false};
+    std::atomic_bool is_duplex_parent{false};
     // Calculate mean Q-score from this position onwards if read is
     // a short read.
     uint32_t mean_qscore_start_pos = 0;
