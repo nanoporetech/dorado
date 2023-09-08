@@ -103,7 +103,6 @@ float extract_mask_score(std::string_view adapter,
 
 namespace demux {
 
-const std::string UNCLASSIFIED_BARCODE = "unclassified";
 const int TRIM_LENGTH = 150;
 
 BarcodeClassifier::BarcodeClassifier(const std::vector<std::string>& kit_names,
