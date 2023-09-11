@@ -4,7 +4,7 @@
 
 #include <catch2/catch.hpp>
 
-#define TEST_GROUP "ReadTest"
+#define TEST_GROUP "[ReadTest]"
 
 using Catch::Matchers::Equals;
 
@@ -263,6 +263,23 @@ TEST_CASE(TEST_GROUP ": Methylation tag generation", TEST_GROUP) {
         std::string context = "XC:_:_:_";
         const char* expected_methylation_tag_with_context = "A+a?,0,1,2;C+m.,1,0;";
         std::vector<int64_t> expected_methylation_tag_with_context_prob{20, 254, 0, 252, 252};
+
+        read.mod_base_info = std::make_shared<dorado::ModBaseInfo>(modbase_alphabet,
+                                                                   modbase_long_names, context);
+
+        auto lines = read.extract_sam_lines(false, 10);
+        REQUIRE(!lines.empty());
+        bam1_t* aln = lines[0].get();
+        CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "MM")),
+                   Equals(expected_methylation_tag_with_context));
+        require_sam_tag_B_int_matches(bam_aux_get(aln, "ML"),
+                                      expected_methylation_tag_with_context_prob);
+    }
+
+    SECTION("Test generation using DRACH context for A methylation") {
+        std::string context = "DRXCH:_:_:_";
+        const char* expected_methylation_tag_with_context = "A+a?,2,2;C+m.,1,0;";
+        std::vector<int64_t> expected_methylation_tag_with_context_prob{254, 0, 252, 252};
 
         read.mod_base_info = std::make_shared<dorado::ModBaseInfo>(modbase_alphabet,
                                                                    modbase_long_names, context);
