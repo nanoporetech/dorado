@@ -110,6 +110,6 @@ std::tuple<int, std::vector<uint8_t>> extract_move_table(bam1_t* input_record);
  * second is a vector with modbase probabilities. If no modbase information
  * is found, an empty string and vector are returned respectively.
  */
-std::tuple<std::string, std::vector<int8_t>> extract_modbase_info(bam1_t* input_record);
+std::tuple<std::string, std::vector<uint8_t>> extract_modbase_info(bam1_t* input_record);
 
 }  // namespace dorado::utils

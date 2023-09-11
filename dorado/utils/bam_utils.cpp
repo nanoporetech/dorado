@@ -233,9 +233,9 @@ std::tuple<int, std::vector<uint8_t>> extract_move_table(bam1_t* input_record) {
     return {stride, move_vals};
 }
 
-std::tuple<std::string, std::vector<int8_t>> extract_modbase_info(bam1_t* input_record) {
+std::tuple<std::string, std::vector<uint8_t>> extract_modbase_info(bam1_t* input_record) {
     std::string modbase_str;
-    std::vector<int8_t> modbase_probs;
+    std::vector<uint8_t> modbase_probs;
     auto modbase_str_aux = bam_aux_get(input_record, "MM");
     if (modbase_str_aux) {
         modbase_str = std::string(bam_aux2Z(modbase_str_aux));

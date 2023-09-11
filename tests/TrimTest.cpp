@@ -101,19 +101,20 @@ TEST_CASE("Test trim quality vector", TEST_GROUP) {
 }
 
 TEST_CASE("Test trim move table", TEST_GROUP) {
+    using Catch::Matchers::Equals;
     const std::vector<uint8_t> move = {1, 1, 0, 0, 0, 1, 1, 1, 0, 0, 1, 0, 1};
 
     SECTION("Trim nothing") {
         auto [ts, trimmed_table] = utils::trim_move_table(move, {0, move.size()});
         CHECK(ts == 0);
-        CHECK(trimmed_table == move);
+        CHECK_THAT(trimmed_table, Equals(move));
     }
 
     SECTION("Trim part of the sequence") {
         auto [ts, trimmed_table] = utils::trim_move_table(move, {3, 5});
         CHECK(ts == 6);
         const std::vector<uint8_t> expected = {1, 1, 0, 0};
-        CHECK(trimmed_table == expected);
+        CHECK_THAT(trimmed_table, Equals(expected));
     }
 
     SECTION("Trim whole sequence") {
@@ -124,28 +125,31 @@ TEST_CASE("Test trim move table", TEST_GROUP) {
 }
 
 TEST_CASE("Test trim mod base info", TEST_GROUP) {
-    const std::string modbase_str = "MM:Z:C+h?,4,1,6,1,0;C+m?,3,1,2,1;C+x?,1,17;";
-    const std::vector<int8_t> modbase_probs = {2, 3, 4, 5, 6, 10, 11, 12, 13, 20, 21};
+    using Catch::Matchers::Equals;
+    const std::string seq = "TAAACTTACGGTGCATCGACTG";
+    const std::string modbase_str = "A+a?,2,0,1;C+m?,4;T+x?,2,2;";
+    const std::vector<uint8_t> modbase_probs = {2, 3, 4, 10, 20, 21};
 
     SECTION("Trim nothing") {
-        auto [str, probs] = utils::trim_modbase_info(modbase_str, modbase_probs, {0, 200});
+        auto [str, probs] =
+                utils::trim_modbase_info(seq, modbase_str, modbase_probs, {0, seq.length()});
         CHECK(str == modbase_str);
-        CHECK(probs == modbase_probs);
+        CHECK_THAT(probs, Equals(modbase_probs));
     }
 
     SECTION("Trim part of the sequence") {
         // This position tests 3 cases together -
-        // in the first mod, trimming truncates skips from 6 to 5
-        // in the second mod, the trimmed seq start from a mod
-        // the third mod is eliminated
-        auto [str, probs] = utils::trim_modbase_info(modbase_str, modbase_probs, {8, 18});
-        CHECK(str == "MM:Z:C+h?,5,1,0;C+m?,0,1;");
-        const std::vector<int8_t> expected = {4, 5, 6, 12, 13};
-        CHECK(probs == expected);
+        // in the first mod, trimming truncates first 2 -> 0 and drops the last one
+        // the second mod is eliminated
+        // in the third mod, first base position changes and the last is dropped
+        auto [str, probs] = utils::trim_modbase_info(seq, modbase_str, modbase_probs, {3, 18});
+        CHECK(str == "A+a?,0,0;T+x?,1;");
+        const std::vector<uint8_t> expected = {2, 3, 20};
+        CHECK_THAT(probs, Equals(expected));
     }
 
     SECTION("Trim whole sequence") {
-        auto [str, probs] = utils::trim_modbase_info(modbase_str, modbase_probs, {8, 8});
+        auto [str, probs] = utils::trim_modbase_info(seq, modbase_str, modbase_probs, {8, 8});
         CHECK(str == "");
         CHECK(probs.size() == 0);
     }

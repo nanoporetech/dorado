@@ -142,7 +142,7 @@ void Read::generate_duplex_read_tags(bam1_t *aln) const {
     }
 }
 
-std::vector<BamPtr> Read::extract_sam_lines(bool emit_moves) const {
+std::vector<BamPtr> Read::extract_sam_lines(bool emit_moves, uint8_t modbase_threshold) const {
     if (read_id.empty()) {
         throw std::runtime_error("Empty read_name string provided");
     }
@@ -178,7 +178,7 @@ std::vector<BamPtr> Read::extract_sam_lines(bool emit_moves) const {
         } else {
             generate_read_tags(aln, emit_moves);
         }
-        generate_modbase_tags(aln);
+        generate_modbase_tags(aln, modbase_threshold);
         alns.push_back(BamPtr(aln));
     }
 
@@ -194,19 +194,7 @@ uint64_t Read::get_end_time_ms() const {
            ((end_sample - start_sample) * 1000) / sample_rate;  //TODO get rid of the trimmed thing?
 }
 
-void Read::generate_modbase_tags(bam1_t *aln) const {
-    if (!modbase_bam_tag.empty()) {
-        bam_aux_append(aln, "MM", 'Z', modbase_bam_tag.length() + 1,
-                       (uint8_t *)modbase_bam_tag.c_str());
-        bam_aux_update_array(aln, "ML", 'C', modbase_probs_bam_tag.size(),
-                             (uint8_t *)modbase_probs_bam_tag.data());
-    }
-}
-
-void Read::generate_modbase_string(uint8_t threshold) {
-    modbase_bam_tag = "";
-    modbase_probs_bam_tag.clear();
-
+void Read::generate_modbase_tags(bam1_t *aln, uint8_t threshold) const {
     if (!mod_base_info) {
         return;
     }
@@ -221,6 +209,8 @@ void Read::generate_modbase_string(uint8_t threshold) {
     }
 
     std::istringstream mod_name_stream(mod_base_info->long_names);
+    std::string modbase_string = "";
+    std::vector<uint8_t> modbase_prob;
 
     // Create a mask indicating which bases are modified.
     std::map<char, bool> base_has_context = {
@@ -256,15 +246,15 @@ void Read::generate_modbase_string(uint8_t threshold) {
             }
 
             // Write out the results we found
-            modbase_bam_tag += std::string(1, current_cardinal) + "+" + bam_name;
-            modbase_bam_tag += base_has_context[current_cardinal] ? "?" : ".";
+            modbase_string += std::string(1, current_cardinal) + "+" + bam_name;
+            modbase_string += base_has_context[current_cardinal] ? "?" : ".";
             int skipped_bases = 0;
             for (size_t base_idx = 0; base_idx < seq.size(); base_idx++) {
                 if (seq[base_idx] == current_cardinal) {
                     if (modbase_mask[base_idx]) {
-                        modbase_bam_tag += "," + std::to_string(skipped_bases);
+                        modbase_string += "," + std::to_string(skipped_bases);
                         skipped_bases = 0;
-                        modbase_probs_bam_tag.push_back(
+                        modbase_prob.push_back(
                                 base_mod_probs[base_idx * num_channels + channel_idx]);
                     } else {
                         // Skip this base
@@ -272,9 +262,12 @@ void Read::generate_modbase_string(uint8_t threshold) {
                     }
                 }
             }
-            modbase_bam_tag += ";";
+            modbase_string += ";";
         }
     }
+
+    bam_aux_append(aln, "MM", 'Z', modbase_string.length() + 1, (uint8_t *)modbase_string.c_str());
+    bam_aux_update_array(aln, "ML", 'C', modbase_prob.size(), (uint8_t *)modbase_prob.data());
 }
 
 float Read::calculate_mean_qscore() const {

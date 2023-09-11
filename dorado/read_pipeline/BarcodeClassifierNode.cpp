@@ -144,7 +144,7 @@ bam1_t* BarcodeClassifierNode::trim_barcode(bam1_t* input_record,
     auto [positions_trimmed, trimmed_moves] = utils::trim_move_table(move_vals, trim_interval);
     ts += positions_trimmed * stride;
     auto [trimmed_modbase_str, trimmed_modbase_probs] =
-            utils::trim_modbase_info(modbase_str, modbase_probs, trim_interval);
+            utils::trim_modbase_info(seq, modbase_str, modbase_probs, trim_interval);
 
     // Create a new bam record to hold the trimmed read.
     bam1_t* out_record = bam_init1();
@@ -195,8 +195,12 @@ void BarcodeClassifierNode::trim_barcode(ReadPtr& read, const demux::ScoreResult
             utils::trim_move_table(read->moves, trim_interval);
     read->num_trimmed_samples += read->model_stride * num_positions_trimmed;
 
-    std::tie(read->modbase_bam_tag, read->modbase_probs_bam_tag) = utils::trim_modbase_info(
-            read->modbase_bam_tag, read->modbase_probs_bam_tag, trim_interval);
+    int num_modbase_channels = read->mod_base_info->alphabet.size();
+    // The modbase probs table consists of the probability per channel per base. So when
+    // trimming, we just shift everything by skipped bases * number of channels.
+    std::pair<int, int> modbase_interval = {trim_interval.first * num_modbase_channels,
+                                            trim_interval.second * num_modbase_channels};
+    read->base_mod_probs = utils::trim_quality(read->base_mod_probs, modbase_interval);
 }
 
 void BarcodeClassifierNode::barcode(BamPtr& read) {

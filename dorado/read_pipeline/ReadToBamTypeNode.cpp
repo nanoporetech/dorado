@@ -26,18 +26,24 @@ void ReadToBamType::worker_thread() {
             std::reverse(read->qstring.begin(), read->qstring.end());
         }
 
-        auto alns = read->extract_sam_lines(m_emit_moves);
+        auto alns = read->extract_sam_lines(m_emit_moves, m_modbase_threshold);
         for (auto& aln : alns) {
             send_message_to_sink(std::move(aln));
         }
     }
 }
 
-ReadToBamType::ReadToBamType(bool emit_moves, bool rna, size_t num_worker_threads, size_t max_reads)
+ReadToBamType::ReadToBamType(bool emit_moves,
+                             bool rna,
+                             size_t num_worker_threads,
+                             float modbase_threshold_frac,
+                             size_t max_reads)
         : MessageSink(max_reads),
           m_num_worker_threads(num_worker_threads),
           m_emit_moves(emit_moves),
-          m_rna(rna) {
+          m_rna(rna),
+          m_modbase_threshold(
+                  static_cast<uint8_t>(std::min(modbase_threshold_frac * 256.0f, 255.0f))) {
     start_threads();
 }
 

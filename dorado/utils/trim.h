@@ -24,8 +24,9 @@ std::tuple<int, std::vector<uint8_t>> trim_move_table(const std::vector<uint8_t>
 
 // Trim the mod base info. The interval defines the portion of the read to keep.
 // Returns trimmed mod base bam tag string and the mod base probabilities vector.
-std::tuple<std::string, std::vector<int8_t>> trim_modbase_info(
+std::tuple<std::string, std::vector<uint8_t>> trim_modbase_info(
+        const std::string& seq,
         const std::string& modbase_str,
-        const std::vector<int8_t>& modbase_probs,
+        const std::vector<uint8_t>& modbase_probs,
         const std::pair<int, int>& trim_interval);
 }  // namespace dorado::utils

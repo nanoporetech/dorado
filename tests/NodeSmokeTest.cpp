@@ -299,7 +299,7 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
         std::shuffle(std::next(read->moves.begin()), read->moves.end(), m_rng);
     });
 
-    run_smoke_test<dorado::ModBaseCallerNode>(std::move(remora_runners), 2, model_stride, 0);
+    run_smoke_test<dorado::ModBaseCallerNode>(std::move(remora_runners), 2, model_stride);
 }
 
 DEFINE_TEST(NodeSmokeTestBam, "ReadToBamType") {

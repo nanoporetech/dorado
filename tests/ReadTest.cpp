@@ -217,8 +217,7 @@ TEST_CASE(TEST_GROUP ": Methylation tag generation", TEST_GROUP) {
         // Test generation
         const char* expected_methylation_tag_10_score = "A+a.,0,1;C+m.,1,0;";
         std::vector<int64_t> expected_methylation_tag_10_score_prob{20, 254, 252, 252};
-        read.generate_modbase_string(10);
-        auto lines = read.extract_sam_lines(false);
+        auto lines = read.extract_sam_lines(false, 10);
         REQUIRE(!lines.empty());
         bam1_t* aln = lines[0].get();
         CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "MM")), Equals(expected_methylation_tag_10_score));
@@ -228,8 +227,7 @@ TEST_CASE(TEST_GROUP ": Methylation tag generation", TEST_GROUP) {
         // Test generation at higher rate excludes the correct mods.
         const char* expected_methylation_tag_50_score = "A+a.,2;C+m.,1,0;";
         std::vector<int64_t> expected_methylation_tag_50_score_prob{254, 252, 252};
-        read.generate_modbase_string(50);
-        lines = read.extract_sam_lines(false);
+        lines = read.extract_sam_lines(false, 50);
         REQUIRE(!lines.empty());
         aln = lines[0].get();
         CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "MM")), Equals(expected_methylation_tag_50_score));
@@ -239,8 +237,7 @@ TEST_CASE(TEST_GROUP ": Methylation tag generation", TEST_GROUP) {
         // Test generation at max threshold rate excludes everything
         const char* expected_methylation_tag_255_score = "A+a.;C+m.;";
         std::vector<int64_t> expected_methylation_tag_255_score_prob{};
-        read.generate_modbase_string(255);
-        lines = read.extract_sam_lines(false);
+        lines = read.extract_sam_lines(false, 255);
         REQUIRE(!lines.empty());
         aln = lines[0].get();
         CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "MM")), Equals(expected_methylation_tag_255_score));
@@ -255,8 +252,7 @@ TEST_CASE(TEST_GROUP ": Methylation tag generation", TEST_GROUP) {
 
         read.mod_base_info = std::make_shared<dorado::ModBaseInfo>(modbase_alphabet,
                                                                    modbase_long_names_CHEBI, "");
-        read.generate_modbase_string(50);
-        auto lines = read.extract_sam_lines(false);
+        auto lines = read.extract_sam_lines(false, 50);
         REQUIRE(!lines.empty());
         bam1_t* aln = lines[0].get();
         CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "MM")), Equals(expected_methylation_tag_CHEBI));
@@ -271,8 +267,7 @@ TEST_CASE(TEST_GROUP ": Methylation tag generation", TEST_GROUP) {
         read.mod_base_info = std::make_shared<dorado::ModBaseInfo>(modbase_alphabet,
                                                                    modbase_long_names, context);
 
-        read.generate_modbase_string(10);
-        auto lines = read.extract_sam_lines(false);
+        auto lines = read.extract_sam_lines(false, 10);
         REQUIRE(!lines.empty());
         bam1_t* aln = lines[0].get();
         CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "MM")),
@@ -289,8 +284,7 @@ TEST_CASE(TEST_GROUP ": Methylation tag generation", TEST_GROUP) {
         read.mod_base_info = std::make_shared<dorado::ModBaseInfo>(modbase_alphabet,
                                                                    modbase_long_names, context);
 
-        read.generate_modbase_string(10);
-        auto lines = read.extract_sam_lines(false);
+        auto lines = read.extract_sam_lines(false, 10);
         REQUIRE(!lines.empty());
         bam1_t* aln = lines[0].get();
         CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "MM")),
@@ -304,8 +298,7 @@ TEST_CASE(TEST_GROUP ": Methylation tag generation", TEST_GROUP) {
 
         read.mod_base_info = std::make_shared<dorado::ModBaseInfo>(modbase_alphabet,
                                                                    modbase_long_names_unknown, "");
-        read.generate_modbase_string(50);
-        auto lines = read.extract_sam_lines(false);
+        auto lines = read.extract_sam_lines(false, 50);
         REQUIRE(!lines.empty());
         bam1_t* aln = lines[0].get();
         CHECK(bam_aux_get(aln, "MM") == NULL);

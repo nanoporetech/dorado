@@ -13,7 +13,11 @@ namespace dorado {
 
 class ReadToBamType : public MessageSink {
 public:
-    ReadToBamType(bool emit_moves, bool rna, size_t num_worker_threads, size_t max_reads = 1000);
+    ReadToBamType(bool emit_moves,
+                  bool rna,
+                  size_t num_worker_threads,
+                  float modbase_threshold_frac = 0,
+                  size_t max_reads = 1000);
     ~ReadToBamType() { terminate_impl(); }
     std::string get_name() const override { return "ReadToBamType"; }
     void terminate(const FlushOptions& flush_options) override { terminate_impl(); };
@@ -30,6 +34,7 @@ private:
 
     bool m_emit_moves;
     bool m_rna;
+    uint8_t m_modbase_threshold;
 };
 
 }  // namespace dorado

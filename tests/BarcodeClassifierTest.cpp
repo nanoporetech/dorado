@@ -190,6 +190,7 @@ TEST_CASE("BarcodeClassifierNode: check read messages are correctly upadted afte
 
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
 
+    // Create new read that is barcode - 100 As - barcode.
     auto read = dorado::ReadPtr::make();
     const std::string seq = std::string(100, 'A');
     const auto& kit_info_map = barcode_kits::get_kit_infos();
@@ -209,11 +210,34 @@ TEST_CASE("BarcodeClassifierNode: check read messages are correctly upadted afte
         moves.push_back(0);
     }
     read->moves = moves;
-    read->modbase_bam_tag = "MM:Z:C+h?," + std::to_string(front_flank.length()) + ";";
-    read->modbase_probs_bam_tag = {10};
+
+    // Generate mod prob table so only the first A after the front flank has a mod.
+    const std::string mod_alphabet = "AXCGT";
+    read->mod_base_info = std::make_shared<dorado::ModBaseInfo>(mod_alphabet, "6mA", "");
+    read->base_mod_probs = std::vector<uint8_t>(read->seq.length() * mod_alphabet.size(), 0);
+
+    for (int i = 0; i < read->seq.size(); i++) {
+        switch (read->seq[i]) {
+        case 'A':
+            read->base_mod_probs[i * mod_alphabet.size()] = 255;
+            break;
+        case 'C':
+            read->base_mod_probs[i * mod_alphabet.size() + 2] = 255;
+            break;
+        case 'G':
+            read->base_mod_probs[i * mod_alphabet.size() + 3] = 255;
+            break;
+        case 'T':
+            read->base_mod_probs[i * mod_alphabet.size() + 4] = 255;
+            break;
+        }
+    }
+    read->base_mod_probs[front_flank.length() * mod_alphabet.size()] = 20;         // A
+    read->base_mod_probs[(front_flank.length() * mod_alphabet.size()) + 1] = 235;  // 6mA
+
     read->num_trimmed_samples = 0;
 
-    auto records = read->extract_sam_lines(true /* emit moves*/);
+    auto records = read->extract_sam_lines(true /* emit moves*/, 10);
 
     // Push a Read type.
     pipeline->push_message(std::move(read));
@@ -237,11 +261,10 @@ TEST_CASE("BarcodeClassifierNode: check read messages are correctly upadted afte
     }
     const int additional_trimmed_samples =
             stride * 2 * front_flank.length();  // * 2 is because we have 2 moves per base
-    const std::string expected_mod_str = "MM:Z:C+h?,0;";
-    const std::vector<int8_t> expected_mod_probs = {10};
 
     for (auto& message : messages) {
         if (std::holds_alternative<BamPtr>(message)) {
+            // Check trimming on the bam1_t struct.
             auto read = std::get<BamPtr>(std::move(message));
             bam1_t* rec = read.get();
 
@@ -256,12 +279,16 @@ TEST_CASE("BarcodeClassifierNode: check read messages are correctly upadted afte
             auto [_, move_vals] = dorado::utils::extract_move_table(rec);
             CHECK(move_vals == expected_move_vals);
 
+            // The mod should now be at the very first base.
+            const std::string expected_mod_str = "A+a.,0;";
+            const std::vector<uint8_t> expected_mod_probs = {235};
             auto [mod_str, mod_probs] = dorado::utils::extract_modbase_info(rec);
             CHECK(mod_str == expected_mod_str);
-            CHECK(mod_probs == expected_mod_probs);
+            CHECK_THAT(mod_probs, Equals(std::vector<uint8_t>{235}));
 
             CHECK(bam_aux2i(bam_aux_get(rec, "ts")) == additional_trimmed_samples);
         } else if (std::holds_alternative<ReadPtr>(message)) {
+            // Check trimming on the Read type.
             auto read = std::get<ReadPtr>(std::move(message));
 
             CHECK(read->barcode == expected_bc);
@@ -270,10 +297,16 @@ TEST_CASE("BarcodeClassifierNode: check read messages are correctly upadted afte
 
             CHECK(read->moves == expected_move_vals);
 
-            CHECK(read->modbase_bam_tag == expected_mod_str);
-            CHECK(read->modbase_probs_bam_tag == expected_mod_probs);
+            // The mod probabilities table should not start mod at the first base.
+            CHECK(read->base_mod_probs.size() == read->seq.size() * mod_alphabet.size());
+            CHECK(read->base_mod_probs[0] == 20);
+            CHECK(read->base_mod_probs[1] == 235);
 
             CHECK(read->num_trimmed_samples == additional_trimmed_samples);
+
+            auto bams = read->extract_sam_lines(0, 10);
+            auto& rec = bams[0];
+            auto [mod_str, mod_probs] = dorado::utils::extract_modbase_info(rec.get());
         }
     }
 }
