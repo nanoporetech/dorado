@@ -14,6 +14,24 @@
 
 namespace fs = std::filesystem;
 
+namespace {
+class WrappedKString {
+    kstring_t m_str = KS_INITIALIZE;
+
+public:
+    WrappedKString() {
+        // On Windows |sam_hdr_find_tag_id| lives in a DLL and uses a different heap, but
+        // |ks_free| is inline so when we call it we crash trying to free unknown memory. To
+        // work around this we resize the kstring to a big value in our code so no resizing
+        // happens inside the htslib library.
+        ks_resize(&m_str, 1e6);
+    }
+    ~WrappedKString() { ks_free(&m_str); }
+
+    kstring_t *get() { return &m_str; }
+};
+}  // namespace
+
 TEST_CASE("BamUtilsTest: fetch keys from PG header", TEST_GROUP) {
     fs::path aligner_test_dir = fs::path(get_data_dir("aligner_test"));
     auto sam = aligner_test_dir / "basecall.sam";
@@ -30,13 +48,13 @@ TEST_CASE("BamUtilsTest: add_rg_hdr read group headers", TEST_GROUP) {
     auto has_read_group_header = [](sam_hdr_t *ptr, const char *id) {
         return sam_hdr_line_index(ptr, "RG", id) >= 0;
     };
-    auto get_barcode_tag = [](sam_hdr_t *ptr, const char *id) -> std::optional<std::string> {
-        kstring_t string = KS_INITIALIZE;
-        if (sam_hdr_find_tag_id(ptr, "RG", "ID", id, "BC", &string) != 0) {
+    WrappedKString barcode_kstring;
+    auto get_barcode_tag = [&barcode_kstring](sam_hdr_t *ptr,
+                                              const char *id) -> std::optional<std::string> {
+        if (sam_hdr_find_tag_id(ptr, "RG", "ID", id, "BC", barcode_kstring.get()) != 0) {
             return std::nullopt;
         }
-        std::string tag(ks_str(&string), ks_len(&string));
-        ks_free(&string);
+        std::string tag(ks_str(barcode_kstring.get()), ks_len(barcode_kstring.get()));
         return tag;
     };
 
