@@ -6,6 +6,7 @@
 #include "nn/ModBaseRunner.h"
 #include "nn/Runners.h"
 #include "read_pipeline/AlignerNode.h"
+#include "read_pipeline/BarcodeClassifierNode.h"
 #include "read_pipeline/HtsReader.h"
 #include "read_pipeline/HtsWriter.h"
 #include "read_pipeline/Pipelines.h"
@@ -15,6 +16,7 @@
 #include "read_pipeline/ReadToBamTypeNode.h"
 #include "read_pipeline/ResumeLoaderNode.h"
 #include "utils/bam_utils.h"
+#include "utils/barcode_kits.h"
 #include "utils/basecaller_utils.h"
 #include "utils/log_utils.h"
 #include "utils/parameters.h"
@@ -63,6 +65,8 @@ void setup(std::vector<std::string> args,
            const std::string& dump_stats_file,
            const std::string& dump_stats_filter,
            const std::string& resume_from_file,
+           const std::vector<std::string>& barcode_kits,
+           bool barcode_both_ends,
            argparse::ArgumentParser& resume_parser,
            bool estimate_poly_a) {
     auto model_config = load_crf_model_config(model_path);
@@ -107,7 +111,6 @@ void setup(std::vector<std::string> args,
 
     auto read_groups = DataLoader::load_read_groups(data_path, model_name, recursive_file_loading);
     auto read_list = utils::load_read_list(read_list_file_path);
-    std::vector<std::string> barcode_kits;
 
     size_t num_reads = DataLoader::get_num_reads(
             data_path, read_list, {} /*reads_already_processed*/, recursive_file_loading);
@@ -122,6 +125,15 @@ void setup(std::vector<std::string> args,
     cli::add_pg_hdr(hdr.get(), args);
     utils::add_rg_hdr(hdr.get(), read_groups, barcode_kits);
 
+    // Divide up work equally between the aligner and barcoder nodes if both are enabled,
+    // otherwise both get all the remaining threads.
+    int aligner_threads = thread_allocations.remaining_threads;
+    int barcoder_threads = thread_allocations.remaining_threads;
+    if (!ref.empty() && !barcode_kits.empty()) {
+        aligner_threads = std::min(1, aligner_threads / 2);
+        barcoder_threads = std::min(1, barcoder_threads / 2);
+    }
+
     PipelineDescriptor pipeline_desc;
     auto hts_writer = pipeline_desc.add_node<HtsWriter>(
             {}, "-", output_mode, thread_allocations.writer_threads, num_reads);
@@ -129,8 +141,7 @@ void setup(std::vector<std::string> args,
     auto current_sink_node = hts_writer;
     if (!ref.empty()) {
         aligner = pipeline_desc.add_node<Aligner>({current_sink_node}, ref, kmer_size, window_size,
-                                                  mm2_index_batch_size,
-                                                  thread_allocations.remaining_threads);
+                                                  mm2_index_batch_size, aligner_threads);
         current_sink_node = aligner;
     }
     current_sink_node = pipeline_desc.add_node<ReadToBamType>(
@@ -139,6 +150,10 @@ void setup(std::vector<std::string> args,
     if (estimate_poly_a) {
         current_sink_node = pipeline_desc.add_node<PolyACalculator>(
                 {current_sink_node}, std::thread::hardware_concurrency(), rna);
+    }
+    if (!barcode_kits.empty()) {
+        current_sink_node = pipeline_desc.add_node<BarcodeClassifierNode>(
+                {current_sink_node}, barcoder_threads, barcode_kits, barcode_both_ends);
     }
     current_sink_node = pipeline_desc.add_node<ReadFilterNode>(
             {current_sink_node}, min_qscore, default_parameters.min_sequence_length,
@@ -342,6 +357,16 @@ int basecaller(int argc, char* argv[]) {
             .default_value(false)
             .implicit_value(true);
 
+    parser.add_argument("--kit-name")
+            .help("Enable barcoding with the provided kit names. Choose from: " +
+                  dorado::barcode_kits::barcode_kits_list_str() +
+                  ". Multiple kits can be specified with additional '--kit-name' args.")
+            .append();
+    parser.add_argument("--barcode-both-ends")
+            .help("Require both ends of a read to be barcoded for a double ended barcode.")
+            .default_value(false)
+            .implicit_value(true);
+
     argparse::ArgumentParser internal_parser;
 
     // Create a copy of the parser to use if the resume feature is enabled. Needed
@@ -421,7 +446,9 @@ int basecaller(int argc, char* argv[]) {
               internal_parser.get<bool>("--skip-model-compatibility-check"),
               internal_parser.get<std::string>("--dump_stats_file"),
               internal_parser.get<std::string>("--dump_stats_filter"),
-              parser.get<std::string>("--resume-from"), resume_parser,
+              parser.get<std::string>("--resume-from"),
+              parser.get<std::vector<std::string>>("--kit-name"),
+              parser.get<bool>("--barcode-both-ends"), resume_parser,
               parser.get<bool>("--estimate-poly-a"));
     } catch (const std::exception& e) {
         spdlog::error("{}", e.what());
