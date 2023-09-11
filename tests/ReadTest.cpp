@@ -53,6 +53,8 @@ TEST_CASE(TEST_GROUP ": Test tag generation", TEST_GROUP) {
         CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "sv")), Equals("quantile"));
         CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "RG")), Equals("xyz_test_model"));
         CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "pi")), Equals("parent_read"));
+
+        CHECK(bam_aux_get(aln, "BC") == nullptr);
     }
 
     SECTION("Duplex") {
@@ -104,6 +106,7 @@ TEST_CASE(TEST_GROUP ": Test tag generation", TEST_GROUP) {
         auto* aln = alignments[0].get();
 
         CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "RG")), Equals("xyz_test_model_kit_barcode02"));
+        CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "BC")), Equals("kit_barcode02"));
 
         test_read.barcode = old_barcode;
     }
@@ -116,6 +119,7 @@ TEST_CASE(TEST_GROUP ": Test tag generation", TEST_GROUP) {
         auto* aln = alignments[0].get();
 
         CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "RG")), Equals("xyz_test_model"));
+        CHECK(bam_aux_get(aln, "BC") == nullptr);
 
         test_read.barcode = old_barcode;
     }
