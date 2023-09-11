@@ -76,7 +76,7 @@ void BarcodeClassifierNode::worker_thread(size_t tid) {
             send_message_to_sink(std::move(read));
         } else if (std::holds_alternative<ReadPtr>(message)) {
             auto read = std::get<ReadPtr>(std::move(message));
-            barcode(read);
+            barcode(*read);
             send_message_to_sink(std::move(read));
         } else {
             send_message_to_sink(std::move(message));
@@ -182,27 +182,26 @@ BamPtr BarcodeClassifierNode::trim_barcode(BamPtr input,
     return BamPtr(out_record);
 }
 
-void BarcodeClassifierNode::trim_barcode(ReadPtr& read, const demux::ScoreResults& res) {
-    int seqlen = read->seq.length();
+void BarcodeClassifierNode::trim_barcode(Read& read, const demux::ScoreResults& res) {
+    int seqlen = read.seq.length();
     auto trim_interval = determine_trim_interval(res, seqlen);
 
     if (trim_interval.second - trim_interval.first == seqlen) {
         return;
     }
 
-    read->seq = utils::trim_sequence(read->seq, trim_interval);
-    read->qstring = utils::trim_sequence(read->qstring, trim_interval);
+    read.seq = utils::trim_sequence(read.seq, trim_interval);
+    read.qstring = utils::trim_sequence(read.qstring, trim_interval);
     size_t num_positions_trimmed;
-    std::tie(num_positions_trimmed, read->moves) =
-            utils::trim_move_table(read->moves, trim_interval);
-    read->num_trimmed_samples += read->model_stride * num_positions_trimmed;
+    std::tie(num_positions_trimmed, read.moves) = utils::trim_move_table(read.moves, trim_interval);
+    read.num_trimmed_samples += read.model_stride * num_positions_trimmed;
 
-    int num_modbase_channels = read->mod_base_info->alphabet.size();
+    int num_modbase_channels = read.mod_base_info->alphabet.size();
     // The modbase probs table consists of the probability per channel per base. So when
     // trimming, we just shift everything by skipped bases * number of channels.
     std::pair<int, int> modbase_interval = {trim_interval.first * num_modbase_channels,
                                             trim_interval.second * num_modbase_channels};
-    read->base_mod_probs = utils::trim_quality(read->base_mod_probs, modbase_interval);
+    read.base_mod_probs = utils::trim_quality(read.base_mod_probs, modbase_interval);
 }
 
 void BarcodeClassifierNode::barcode(BamPtr& read) {
@@ -220,11 +219,10 @@ void BarcodeClassifierNode::barcode(BamPtr& read) {
     }
 }
 
-void BarcodeClassifierNode::barcode(ReadPtr& read) {
+void BarcodeClassifierNode::barcode(Read& read) {
     // get the sequence to map from the record
-    auto bc_res = m_barcoder.barcode(read->seq);
-    auto bc = generate_barcode_string(bc_res);
-    read->barcode = bc;
+    auto bc_res = m_barcoder.barcode(read.seq);
+    read.barcode = generate_barcode_string(bc_res);
     m_num_records++;
 
     if (m_trim_barcodes) {

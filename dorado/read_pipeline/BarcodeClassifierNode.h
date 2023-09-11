@@ -35,10 +35,10 @@ private:
 
     void worker_thread(size_t tid);
     void barcode(BamPtr& read);
-    void barcode(ReadPtr& read);
+    void barcode(Read& read);
 
     BamPtr trim_barcode(BamPtr irecord, const demux::ScoreResults& res, int seqlen);
-    void trim_barcode(ReadPtr& read, const demux::ScoreResults& res);
+    void trim_barcode(Read& read, const demux::ScoreResults& res);
     void terminate_impl();
 };
 
