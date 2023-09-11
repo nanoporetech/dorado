@@ -42,6 +42,8 @@ static std::vector<uint8_t> ReadFileIntoVector(const std::filesystem::path& path
 
 #define get_pod5_data_dir() get_data_dir("pod5")
 
+#define get_single_pod5_file_path() (get_data_dir("pod5") + "/single_na24385.pod5")
+
 #define get_nested_pod5_data_dir() get_data_dir("nested_pod5_folder")
 
 #define get_stereo_data_dir() get_data_dir("stereo")

@@ -7,28 +7,52 @@
 
 #define TEST_GROUP "Pod5DataLoaderTest: "
 
-TEST_CASE(TEST_GROUP "Test loading single-read POD5 files") {
+TEST_CASE(TEST_GROUP "Test loading single-read POD5 files from data dir") {
     CHECK(CountSinkReads(get_pod5_data_dir(), "cpu", 1) == 1);
 }
 
-TEST_CASE(TEST_GROUP "Test loading single-read POD5 file, empty read list") {
+TEST_CASE(TEST_GROUP "Test loading single-read POD5 files from single file path") {
+    CHECK(CountSinkReads(get_single_pod5_file_path(), "cpu", 1) == 1);
+}
+
+TEST_CASE(TEST_GROUP "Test loading single-read POD5 file from data dir, empty read list") {
     auto read_list = std::unordered_set<std::string>();
     CHECK(CountSinkReads(get_pod5_data_dir(), "cpu", 1, 0, read_list) == 0);
 }
 
-TEST_CASE(TEST_GROUP "Test loading single-read POD5 file, no read list") {
+TEST_CASE(TEST_GROUP "Test loading single-read POD5 file from single file path, empty read list") {
+    auto read_list = std::unordered_set<std::string>();
+    CHECK(CountSinkReads(get_single_pod5_file_path(), "cpu", 1, 0, read_list) == 0);
+}
+
+TEST_CASE(TEST_GROUP "Test loading single-read POD5 file from data dir, no read list") {
     CHECK(CountSinkReads(get_pod5_data_dir(), "cpu", 1, 0, std::nullopt) == 1);
 }
 
-TEST_CASE(TEST_GROUP "Test loading single-read POD5 file, mismatched read list") {
+TEST_CASE(TEST_GROUP "Test loading single-read POD5 file from single file path, no read list") {
+    CHECK(CountSinkReads(get_single_pod5_file_path(), "cpu", 1, 0, std::nullopt) == 1);
+}
+
+TEST_CASE(TEST_GROUP "Test loading single-read POD5 file from data dir, mismatched read list") {
     auto read_list = std::unordered_set<std::string>{"read_1"};
     CHECK(CountSinkReads(get_pod5_data_dir(), "cpu", 1, 0, read_list) == 0);
 }
 
-TEST_CASE(TEST_GROUP "Test loading single-read POD5 file, matched read list") {
-    // read present in POD5
+TEST_CASE(TEST_GROUP
+          "Test loading single-read POD5 file from single file path, mismatched read list") {
+    auto read_list = std::unordered_set<std::string>{"read_1"};
+    CHECK(CountSinkReads(get_single_pod5_file_path(), "cpu", 1, 0, read_list) == 0);
+}
+
+TEST_CASE(TEST_GROUP "Test loading single-read POD5 file from data dir, matched read list") {
     auto read_list = std::unordered_set<std::string>{"002bd127-db82-436f-b828-28567c3d505d"};
     CHECK(CountSinkReads(get_pod5_data_dir(), "cpu", 1, 0, read_list) == 1);
+}
+
+TEST_CASE(TEST_GROUP
+          "Test loading single-read POD5 file from single file path, matched read list") {
+    auto read_list = std::unordered_set<std::string>{"002bd127-db82-436f-b828-28567c3d505d"};
+    CHECK(CountSinkReads(get_single_pod5_file_path(), "cpu", 1, 0, read_list) == 1);
 }
 
 TEST_CASE(TEST_GROUP "Test calculating number of reads from pod5, read ids list.") {
@@ -50,7 +74,12 @@ TEST_CASE(TEST_GROUP "Test calculating number of reads from pod5, read ids list.
     }
 }
 
-TEST_CASE(TEST_GROUP "Find sample rate from pod5.") {
+TEST_CASE(TEST_GROUP "Find sample rate from single pod5.") {
+    std::string single_read_path(get_pod5_data_dir());
+    CHECK(dorado::DataLoader::get_sample_rate(single_read_path) == 4000);
+}
+
+TEST_CASE(TEST_GROUP "Find sample rate from pod5 dir.") {
     std::string data_path(get_pod5_data_dir());
     CHECK(dorado::DataLoader::get_sample_rate(data_path) == 4000);
 }

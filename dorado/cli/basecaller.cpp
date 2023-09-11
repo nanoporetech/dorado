@@ -236,7 +236,7 @@ int basecaller(int argc, char* argv[]) {
 
     parser.add_argument("model").help("the basecaller model to run.");
 
-    parser.add_argument("data").help("the data directory.");
+    parser.add_argument("data").help("the data directory or file (POD5/FAST5 format).");
 
     parser.add_argument("-v", "--verbose").default_value(false).implicit_value(true);
 

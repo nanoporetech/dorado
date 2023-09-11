@@ -38,7 +38,7 @@ int duplex(int argc, char* argv[]) {
 
     argparse::ArgumentParser parser("dorado", DORADO_VERSION, argparse::default_arguments::help);
     parser.add_argument("model").help("Model");
-    parser.add_argument("reads").help("Reads in Pod5 format or BAM/SAM format for basespace.");
+    parser.add_argument("reads").help("Reads in POD5 format or BAM/SAM format for basespace.");
     parser.add_argument("--pairs")
             .default_value(std::string(""))
             .help("Space-delimited csv containing read ID pairs. If not provided, pairing will be "
