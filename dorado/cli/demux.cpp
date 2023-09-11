@@ -44,8 +44,10 @@ int demuxer(int argc, char* argv[]) {
             .nargs(argparse::nargs_pattern::any);
     parser.add_argument("--output-dir").help("Output folder for demultiplexed reads.").required();
     parser.add_argument("--kit-name")
-            .help("Barcoding kit name. Choose from: " +
-                  dorado::barcode_kits::barcode_kits_list_str())
+            .help("Barcoding kit names. Choose from: " +
+                  dorado::barcode_kits::barcode_kits_list_str() +
+                  ". Multiple kits can be specified with additional '--kit-name' args.")
+            .append()
             .required();
     parser.add_argument("-t", "--threads")
             .help("Combined number of threads for barcoding and output generation. Default uses "
@@ -123,9 +125,9 @@ int demuxer(int argc, char* argv[]) {
     auto demux_writer = pipeline_desc.add_node<BarcodeDemuxerNode>(
             {}, output_dir, demux_writer_threads, 0, parser.get<bool>("--emit-fastq"));
     std::vector<std::string> kit_names;
-    if (parser.present("--kit-name")) {
-        kit_names.push_back(parser.get<std::string>("--kit-name"));
-    };
+    if (auto names = parser.present<std::vector<std::string>>("--kit-name")) {
+        kit_names = std::move(*names);
+    }
     auto demux = pipeline_desc.add_node<BarcodeClassifierNode>(
             {demux_writer}, demux_threads, kit_names, parser.get<bool>("--barcode-both-ends"),
             parser.get<bool>("--no-trim"));
