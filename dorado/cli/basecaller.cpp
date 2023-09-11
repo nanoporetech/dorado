@@ -126,30 +126,22 @@ void setup(std::vector<std::string> args,
     auto hts_writer = pipeline_desc.add_node<HtsWriter>(
             {}, "-", output_mode, thread_allocations.writer_threads, num_reads);
     auto aligner = PipelineDescriptor::InvalidNodeHandle;
-    auto converted_reads_sink = PipelineDescriptor::InvalidNodeHandle;
-    std::unordered_set<std::string> reads_already_processed;
-    if (ref.empty()) {
-        converted_reads_sink = hts_writer;
-    } else {
-        aligner = pipeline_desc.add_node<Aligner>({hts_writer}, ref, kmer_size, window_size,
+    auto current_sink_node = hts_writer;
+    if (!ref.empty()) {
+        aligner = pipeline_desc.add_node<Aligner>({current_sink_node}, ref, kmer_size, window_size,
                                                   mm2_index_batch_size,
                                                   thread_allocations.aligner_threads);
-        converted_reads_sink = aligner;
+        current_sink_node = aligner;
     }
-    auto read_converter = pipeline_desc.add_node<ReadToBamType>(
-            {converted_reads_sink}, emit_moves, rna, thread_allocations.read_converter_threads,
+    current_sink_node = pipeline_desc.add_node<ReadToBamType>(
+            {current_sink_node}, emit_moves, rna, thread_allocations.read_converter_threads,
             methylation_threshold_pct);
-
-    auto filtered_read_sink = PipelineDescriptor::InvalidNodeHandle;
     if (estimate_poly_a) {
-        auto polya_calculator = pipeline_desc.add_node<PolyACalculator>(
-                {read_converter}, std::thread::hardware_concurrency(), rna);
-        filtered_read_sink = polya_calculator;
-    } else {
-        filtered_read_sink = read_converter;
+        current_sink_node = pipeline_desc.add_node<PolyACalculator>(
+                {current_sink_node}, std::thread::hardware_concurrency(), rna);
     }
-    auto read_filter_node = pipeline_desc.add_node<ReadFilterNode>(
-            {filtered_read_sink}, min_qscore, default_parameters.min_sequence_length,
+    current_sink_node = pipeline_desc.add_node<ReadFilterNode>(
+            {current_sink_node}, min_qscore, default_parameters.min_sequence_length,
             std::unordered_set<std::string>{}, thread_allocations.read_filter_threads);
 
     auto mean_qscore_start_pos = model_config.mean_qscore_start_pos;
@@ -162,7 +154,7 @@ void setup(std::vector<std::string> args,
     pipelines::create_simplex_pipeline(
             pipeline_desc, std::move(runners), std::move(remora_runners), overlap,
             mean_qscore_start_pos, rna, thread_allocations.scaler_node_threads,
-            thread_allocations.remora_threads * num_devices, read_filter_node);
+            thread_allocations.remora_threads * num_devices, current_sink_node);
 
     // Create the Pipeline from our description.
     std::vector<dorado::stats::StatsReporter> stats_reporters;
@@ -181,6 +173,7 @@ void setup(std::vector<std::string> args,
     }
     hts_writer_ref.set_and_write_header(hdr.get());
 
+    std::unordered_set<std::string> reads_already_processed;
     if (!resume_from_file.empty()) {
         spdlog::info("> Inspecting resume file...");
         // Turn off warning logging as header info is fetched.
