@@ -33,12 +33,6 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
         overlap = adjusted_overlap;
     }
 
-    auto mod_base_caller_node = PipelineDescriptor::InvalidNodeHandle;
-    if (!modbase_runners.empty()) {
-        mod_base_caller_node = pipeline_desc.add_node<ModBaseCallerNode>(
-                {}, std::move(modbase_runners), modbase_node_threads, model_stride);
-    }
-
     const int kBatchTimeoutMS = 100;
     std::string model_name =
             std::filesystem::canonical(model_config.model_path).filename().string();
@@ -47,12 +41,12 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
             {}, std::move(runners), overlap, kBatchTimeoutMS, model_name, 1000, "BasecallerNode",
             false, mean_qscore_start_pos);
 
-    NodeHandle last_node_handle = PipelineDescriptor::InvalidNodeHandle;
-    if (mod_base_caller_node != PipelineDescriptor::InvalidNodeHandle) {
+    NodeHandle last_node_handle = basecaller_node;
+    if (!modbase_runners.empty()) {
+        auto mod_base_caller_node = pipeline_desc.add_node<ModBaseCallerNode>(
+                {}, std::move(modbase_runners), modbase_node_threads, model_stride);
         pipeline_desc.add_node_sink(basecaller_node, mod_base_caller_node);
         last_node_handle = mod_base_caller_node;
-    } else {
-        last_node_handle = basecaller_node;
     }
 
     auto scaler_node = pipeline_desc.add_node<ScalerNode>(
