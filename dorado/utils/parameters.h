@@ -44,8 +44,8 @@ struct ThreadAllocations {
         loader_threads = num_devices;
         int total_threads_used = (writer_threads + read_converter_threads + read_filter_threads +
                                   remora_threads + scaler_node_threads + loader_threads);
-        int remaining_threads = max_threads - total_threads_used;
-        aligner_threads = std::max(num_devices * 10, remaining_threads);
+        remaining_threads = max_threads - total_threads_used;
+        remaining_threads = std::max(num_devices * 10, remaining_threads);
     }
 
     int writer_threads{0};
@@ -54,7 +54,7 @@ struct ThreadAllocations {
     int remora_threads{0};
     int scaler_node_threads{0};
     int loader_threads{0};
-    int aligner_threads{0};
+    int remaining_threads{0};
 };
 
 inline ThreadAllocations default_thread_allocations(int num_devices,

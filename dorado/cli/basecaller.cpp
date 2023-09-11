@@ -130,7 +130,7 @@ void setup(std::vector<std::string> args,
     if (!ref.empty()) {
         aligner = pipeline_desc.add_node<Aligner>({current_sink_node}, ref, kmer_size, window_size,
                                                   mm2_index_batch_size,
-                                                  thread_allocations.aligner_threads);
+                                                  thread_allocations.remaining_threads);
         current_sink_node = aligner;
     }
     current_sink_node = pipeline_desc.add_node<ReadToBamType>(
