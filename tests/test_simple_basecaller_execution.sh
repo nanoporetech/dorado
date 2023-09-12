@@ -5,10 +5,16 @@
 set -ex
 set -o pipefail
 
+if [[ $# -lt 1 ]]; then
+    echo "Usage: $0 <dorado executable> [4k model] [batch size] [5k model]"
+    exit 1
+fi
+
 test_dir=$(dirname $0)
 dorado_bin=$(cd "$(dirname $1)"; pwd -P)/$(basename $1)
 model_name=${2:-dna_r10.4.1_e8.2_400bps_hac@v4.1.0}
 batch=${3:-384}
+model_name_5k=${4:-dna_r10.4.1_e8.2_400bps_hac@v4.2.0}
 data_dir=$test_dir/data
 output_dir_name=$(echo $RANDOM | head -c 10)
 output_dir=${test_dir}/${output_dir_name}
@@ -49,9 +55,8 @@ if ! uname -r | grep -q tegra; then
     $dorado_bin duplex basespace $data_dir/basespace/pairs.bam --threads 1 --pairs $data_dir/basespace/pairs.txt > $output_dir/calls.bam
 
     echo dorado in-line duplex test stage
-    duplex_model_name="dna_r10.4.1_e8.2_400bps_hac@v4.2.0"
-    $dorado_bin download --model ${duplex_model_name} --directory ${output_dir}
-    duplex_model=${output_dir}/${duplex_model_name}
+    $dorado_bin download --model ${model_name_5k} --directory ${output_dir}
+    duplex_model=${output_dir}/${model_name_5k}
     $dorado_bin duplex $duplex_model $data_dir/duplex/pod5 > $output_dir/duplex_calls.bam
     samtools quickcheck -u $output_dir/duplex_calls.bam
     num_duplex_reads=$(samtools view $output_dir/duplex_calls.bam | grep dx:i:1 | wc -l | awk '{print $1}')
