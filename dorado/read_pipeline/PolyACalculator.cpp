@@ -181,6 +181,8 @@ std::tuple<bool, int, int> determine_signal_anchor_and_strand_cdna(const dorado:
 
     bool proceed = std::min(dist_v1, dist_v2) < 30;
 
+    std::tuple<bool, int, int> result = {false, -1, trailing_Ts};
+
     if (proceed) {
         bool fwd = true;
         int start = 0, end = 0;
@@ -197,12 +199,18 @@ std::tuple<bool, int, int> determine_signal_anchor_and_strand_cdna(const dorado:
                 read->moves, stride, read->raw_data.size(0), read->seq.size() + 1);
         int signal_anchor = seq_to_sig_map[base_anchor];
 
-        return {fwd, signal_anchor, trailing_Ts};
+        result = {fwd, signal_anchor, trailing_Ts};
     } else {
         spdlog::debug("{} primer edit distance too high {}", read->read_id,
                       std::min(dist_v1, dist_v2));
-        return {false, -1, trailing_Ts};
     }
+
+    edlibFreeAlignResult(top_v1);
+    edlibFreeAlignResult(bottom_v1);
+    edlibFreeAlignResult(top_v2);
+    edlibFreeAlignResult(bottom_v2);
+
+    return result;
 }
 
 // The approach used for determining the approximate location of the polyA
