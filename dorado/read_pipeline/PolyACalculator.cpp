@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <limits>
 
 namespace {
 
@@ -274,44 +275,59 @@ std::tuple<bool, int, int> determine_base_anchor_and_strand_cdna(
 // tail in dRNA is different. Since dRNA is single stranded, we already know the
 // direction of ther ead. However, in dRNA, the adapter is DNA. But the model for
 // basecalling is trained on RNA data. So the basecall quality of the adapter is poor,
-// and alignment doesn't work well. Instead, the absecalled sequence is traversed to find
-// the first long chain of As and the start of that is used as the anchor point
-// for the tail.
+// and alignment doesn't work well. Instead, the raw is traversed to find a point
+// where there's a jump in the mean signal value, which is indicative of the
+// transition from the DNA adapter to the RNA signal. The polyA will start right
+// at the juncture.
 std::tuple<bool, int, int> determine_base_anchor_and_strand_rna(
         const dorado::ReadPtr& read) {
-    std::vector<std::pair<int, int>> pos_and_run;
-    auto seq = read->seq;
-    int start_pos = 0;
-    bool in_run = false;
-    int run_length = 0;
-    const int kMinRunLength = 3;
-    for (int i = 0; i < seq.length(); i++) {
-        if (seq[i] == 'A') {
-            run_length++;
-            if (!in_run) {
-                in_run = true;
-                start_pos = i;
-            }
-        } else {
-            if (run_length > kMinRunLength) {
-                pos_and_run.push_back({start_pos, run_length});
-            }
-            run_length = 0;
-            in_run = false;
+    const c10::Half* signal = static_cast<c10::Half*>(read->raw_data.data_ptr());
+    int signal_len = read->raw_data.size(0);
+    const int kWindow = 50;
+
+    // The algorithm is to keep track of the mean signal value over
+    // consecutive windows and find the point when there's a sharp
+    // increase in mean signal values. 5 previous mean values are
+    // considered with a window size of 50. This gives a rolling
+    // window view of ~250 bases.
+    std::array<float, 5> means;
+    auto check_var = [&means](int latest) -> float {
+        float max = std::numeric_limits<float>::min();
+        float min = std::numeric_limits<float>::max();
+
+        for (auto v : means) {
+            min = std::min(v, min);
+            max = std::max(v, max);
         }
-    }
-    if (in_run) {
-        if (run_length > kMinRunLength) {
-            pos_and_run.push_back({start_pos, run_length});
+        return (means[latest] - min);
+    };
+
+    int bp = -1;
+    int n = 0;
+    // Since the polyA will start after the adapter, and in RNA each
+    // base is at least 30 samples long (e.g. in RNA002), we can
+    // limit the search space to start from 30 bases from the beginning
+    // and up till about half the signal lengths. Note this is only to find
+    // the __start__ of the polyA signal.
+    for (int i = 3000; i < signal_len / 2; i += kWindow) {
+        float mean = 0;
+        int s = i, e = i + kWindow;
+        for (int j = s; j < e; j++) {
+            mean += signal[j];
         }
+        mean /= kWindow;
+        means[n] = mean;
+        auto var = check_var(n);
+        if (i >= means.size() && var > 2.2f) {
+            bp = i;
+            break;
+        }
+        n = (n + 1) % means.size();
     }
-    std::string pos_len = "";
-    for (auto p : pos_and_run) {
-        pos_len += std::to_string(p.first) + " " + std::to_string(p.second) + ", ";
-    }
-    spdlog::debug("A runs: {}", pos_len);
-    if (!pos_and_run.empty()) {
-        return {false, pos_and_run.front().first, 0};
+    spdlog::debug("Approx break point {}", bp);
+
+    if (bp > 0) {
+        return {false, bp, 0};
     } else {
         return {false, -1, 0};
     }
@@ -346,6 +362,14 @@ void PolyACalculator::worker_thread() {
             const auto seq_to_sig_map = utils::moves_to_map(
                     read->moves, stride, read->raw_data.size(0), read->seq.size() + 1);
 
+            if (m_is_rna) {
+                for (int i = 0; i < seq_to_sig_map.size(); i++) {
+                    if (base_anchor < seq_to_sig_map[i]) {
+                        base_anchor = i - 1;
+                        break;
+                    }
+                }
+            }
             int signal_anchor = seq_to_sig_map[base_anchor];
             spdlog::debug("Strand {}; poly A/T signal anchor {}", fwd ? '+' : '-', signal_anchor);
 
@@ -422,17 +446,17 @@ void PolyACalculator::terminate_impl() {
     spdlog::info("Total {}, not called {}, Avg polyA length {}", num_reads.load(),
                  not_called.load(), polyA.load() / num_reads.load());
     static bool done = false;
-    //if (!done && spdlog::get_level() != spdlog::level::debug) {
-    //    int max_val = -1;
-    //    for (auto [k, v] : poly_a_counts) {
-    //        max_val = std::max(v, max_val);
-    //    }
-    //    int factor = std::max(1, 1 + max_val / 100);
-    //    for (auto [k, v] : poly_a_counts) {
-    //        spdlog::info("{} : {}", k, std::string(v / factor, '*'));
-    //    }
-    //    done = true;
-    //}
+    if (!done && spdlog::get_level() != spdlog::level::debug) {
+        int max_val = -1;
+        for (auto [k, v] : poly_a_counts) {
+            max_val = std::max(v, max_val);
+        }
+        int factor = std::max(1, 1 + max_val / 100);
+        for (auto [k, v] : poly_a_counts) {
+            spdlog::info("{} : {}", k, std::string(v / factor, '*'));
+        }
+        done = true;
+    }
 }
 
 void PolyACalculator::restart() {
