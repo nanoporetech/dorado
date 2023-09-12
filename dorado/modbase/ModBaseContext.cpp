@@ -8,6 +8,7 @@
 namespace dorado::utils {
 
 ModBaseContext::ModBaseContext() {}
+ModBaseContext::~ModBaseContext() {}
 
 const std::string& ModBaseContext::motif(char base) const { return m_motifs[base_to_int(base)]; }
 
@@ -20,6 +21,7 @@ void ModBaseContext::set_context(std::string motif, size_t offset) {
     }
     char base = motif.at(offset);
     auto index = base_to_int(base);
+    m_motif_matchers[index] = std::make_unique<MotifMatcher>(motif, offset);
     m_motifs[index] = std::move(motif);
     m_offsets[index] = offset;
 }
@@ -75,8 +77,8 @@ std::vector<int> ModBaseContext::get_sequence_mask(std::string_view sequence) co
         if (!m_motifs[idx].empty() && p >= m_offsets[idx] &&
             p + m_motifs[idx].size() - m_offsets[idx] < sequence.size()) {
             size_t a = p - m_offsets[idx];
-            MotifMatcher matcher(m_motifs[idx], m_offsets[idx]);
-            if (matcher.matches_motif(sequence.substr(a, m_motifs[idx].size()))) {
+            auto& matcher = m_motif_matchers[idx];
+            if (matcher->matches_motif(sequence.substr(a, m_motifs[idx].size()))) {
                 mask[p] = 1;
             }
         }

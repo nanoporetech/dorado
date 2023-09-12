@@ -25,6 +25,7 @@
 
 namespace dorado {
 struct ModBaseModelConfig;
+class MotifMatcher;
 }  // namespace dorado
 
 namespace dorado::utils {
@@ -33,6 +34,7 @@ class ModBaseContext {
 public:
     /// Constructor.
     ModBaseContext();
+    ~ModBaseContext();
 
     /// Get the context set for the specified base (if any).
     const std::string& motif(char base) const;
@@ -89,6 +91,7 @@ public:
 private:
     std::array<std::string, 4> m_motifs;
     std::array<size_t, 4> m_offsets = {0, 0, 0, 0};
+    std::array<std::unique_ptr<MotifMatcher>, 4> m_motif_matchers;
 };
 
 }  // namespace dorado::utils
