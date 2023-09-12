@@ -5,6 +5,7 @@
 #include "read_pipeline/BarcodeDemuxerNode.h"
 #include "read_pipeline/HtsReader.h"
 #include "read_pipeline/ProgressTracker.h"
+#include "utils/barcode_kits.h"
 #include "utils/basecaller_utils.h"
 #include "utils/log_utils.h"
 #include "utils/stats.h"
@@ -43,7 +44,8 @@ int demuxer(int argc, char* argv[]) {
             .nargs(argparse::nargs_pattern::any);
     parser.add_argument("--output-dir").help("Output folder for demultiplexed reads.").required();
     parser.add_argument("--kit-name")
-            .help("Barcoding kit name. Choose from: " + dorado::demux::barcode_kits_list_str())
+            .help("Barcoding kit name. Choose from: " +
+                  dorado::barcode_kits::barcode_kits_list_str())
             .required();
     parser.add_argument("-t", "--threads")
             .help("Combined number of threads for barcoding and output generation. Default uses "

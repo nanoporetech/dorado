@@ -51,11 +51,11 @@ TEST_CASE("BarcodeDemuxerNode: check correct output files are created", TEST_GRO
 
         auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
 
-        auto hdr = sam_hdr_init();
-        sam_hdr_add_line(hdr, "SQ", "ID", "foo", "LN", "100", "SN", "ref", NULL);
+        SamHdrPtr hdr(sam_hdr_init());
+        sam_hdr_add_line(hdr.get(), "SQ", "ID", "foo", "LN", "100", "SN", "ref", NULL);
 
         auto& demux_writer_ref = dynamic_cast<BarcodeDemuxerNode&>(pipeline->get_node_ref(demuxer));
-        demux_writer_ref.set_header(hdr);
+        demux_writer_ref.set_header(hdr.get());
 
         for (auto bc : {"bc01", "bc02", "bc03"}) {
             auto records = create_bam_reader(bc);
@@ -71,8 +71,6 @@ TEST_CASE("BarcodeDemuxerNode: check correct output files are created", TEST_GRO
         for (const auto& entry : fs::directory_iterator(tmp_dir)) {
             CHECK(expected_files.find(entry.path().filename().string()) != expected_files.end());
         }
-
-        sam_hdr_destroy(hdr);
     }
 
     fs::remove_all(tmp_dir);

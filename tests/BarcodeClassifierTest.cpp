@@ -6,6 +6,7 @@
 #include "read_pipeline/BarcodeClassifierNode.h"
 #include "read_pipeline/HtsReader.h"
 #include "utils/bam_utils.h"
+#include "utils/barcode_kits.h"
 #include "utils/sequence_utils.h"
 
 #include <catch2/catch.hpp>
@@ -24,7 +25,7 @@ using namespace dorado;
 TEST_CASE("BarcodeClassifier: check instantiation for all kits", TEST_GROUP) {
     using Catch::Matchers::Contains;
 
-    auto barcoding_kits = demux::barcode_kits_list_str();
+    auto barcoding_kits = barcode_kits::barcode_kits_list_str();
 
     std::string s;
     std::stringstream ss(barcoding_kits);

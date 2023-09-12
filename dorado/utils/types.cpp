@@ -11,4 +11,6 @@ void BamDestructor::operator()(bam1_t* bam) { bam_destroy1(bam); }
 // provides a typedef for mm_tbuf_s to mm_tbuf_t.
 void MmTbufDestructor::operator()(mm_tbuf_t* tbuf) { mm_tbuf_destroy(tbuf); }
 
+void SamHdrDestructor::operator()(sam_hdr_t* bam) { sam_hdr_destroy(bam); }
+
 }  // namespace dorado

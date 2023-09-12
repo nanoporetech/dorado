@@ -3,6 +3,7 @@
 #include "3rdparty/edlib/edlib/include/edlib.h"
 #include "htslib/sam.h"
 #include "utils/alignment_utils.h"
+#include "utils/barcode_kits.h"
 #include "utils/sequence_utils.h"
 #include "utils/types.h"
 
@@ -102,7 +103,6 @@ float extract_mask_score(std::string_view adapter,
 
 namespace demux {
 
-const std::string UNCLASSIFIED_BARCODE = "unclassified";
 const int TRIM_LENGTH = 150;
 
 BarcodeClassifier::BarcodeClassifier(const std::vector<std::string>& kit_names,
@@ -125,7 +125,9 @@ ScoreResults BarcodeClassifier::barcode(const std::string& seq) {
 // input read sequence against.
 std::vector<AdapterSequence> BarcodeClassifier::generate_adapter_sequence(
         const std::vector<std::string>& kit_names) {
-    std::vector<AdapterSequence> adapters;
+    const auto& kit_info_map = barcode_kits::get_kit_infos();
+    const auto& barcodes = barcode_kits::get_barcodes();
+
     std::vector<std::string> final_kit_names;
     if (kit_names.empty()) {
         for (auto& [kit_name, _] : kit_info_map) {
@@ -136,6 +138,7 @@ std::vector<AdapterSequence> BarcodeClassifier::generate_adapter_sequence(
     }
     spdlog::debug("> Kits to evaluate: {}", final_kit_names.size());
 
+    std::vector<AdapterSequence> adapters;
     for (auto& kit_name : final_kit_names) {
         auto kit_iter = kit_info_map.find(kit_name);
         if (kit_iter == kit_info_map.end()) {
@@ -464,6 +467,7 @@ std::tuple<ScoreResults, int, bool> check_bc_with_longest_match(const ScoreResul
         return {best_run, best_run_start_pos};
     };
 
+    const auto& barcodes = barcode_kits::get_barcodes();
     const std::string& bc_a = barcodes.at(a.adapter_name);
     auto read_a = read.substr(a.barcode_start, bc_a.length());
     EdlibAlignResult result_a =
@@ -521,6 +525,7 @@ ScoreResults BarcodeClassifier::find_best_adapter(const std::string& read_seq,
     }
 
     // Then find the best barcode hit within that kit.
+    const auto& kit_info_map = barcode_kits::get_kit_infos();
     std::vector<ScoreResults> scores;
     auto& kit = kit_info_map.at(as->kit);
     if (kit.double_ends) {

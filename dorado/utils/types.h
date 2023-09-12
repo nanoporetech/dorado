@@ -6,6 +6,7 @@
 
 struct bam1_t;
 struct mm_tbuf_s;
+struct sam_hdr_t;
 
 namespace dorado {
 
@@ -27,6 +28,11 @@ struct MmTbufDestructor {
     void operator()(mm_tbuf_s *);
 };
 using MmTbufPtr = std::unique_ptr<mm_tbuf_s, MmTbufDestructor>;
+
+struct SamHdrDestructor {
+    void operator()(sam_hdr_t *);
+};
+using SamHdrPtr = std::unique_ptr<sam_hdr_t, SamHdrDestructor>;
 
 enum class ReadOrder { UNRESTRICTED, BY_CHANNEL, BY_TIME };
 

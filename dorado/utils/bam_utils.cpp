@@ -1,5 +1,7 @@
 #include "bam_utils.h"
 
+#include "barcode_kits.h"
+
 #include <htslib/sam.h>
 
 #include <cctype>
@@ -7,31 +9,60 @@
 #include <map>
 #include <sstream>
 #include <string>
+#include <string_view>
 
 namespace dorado::utils {
 
-void add_rg_hdr(sam_hdr_t* hdr, const std::unordered_map<std::string, ReadGroup>& read_groups) {
-    // Add read groups
-    for (const auto& x : read_groups) {
-        // Lambda function to return "Unknown" if string is empty
-        auto value_or_unknown = [](const std::string& s) { return s.empty() ? "unknown" : s; };
+void add_rg_hdr(sam_hdr_t* hdr,
+                const std::unordered_map<std::string, ReadGroup>& read_groups,
+                const std::vector<std::string>& barcode_kits) {
+    const auto& barcode_kit_infos = barcode_kits::get_kit_infos();
+    const auto& barcode_sequences = barcode_kits::get_barcodes();
 
-        std::stringstream rg;
-        rg << "@RG\t";
-        rg << "ID:" << x.first << "\t";
-        rg << "PU:" << value_or_unknown(x.second.flowcell_id) << "\t";
-        rg << "PM:" << value_or_unknown(x.second.device_id) << "\t";
-        rg << "DT:" << value_or_unknown(x.second.exp_start_time) << "\t";
-        rg << "PL:"
-           << "ONT"
-           << "\t";
-        rg << "DS:"
-           << "basecall_model=" << value_or_unknown(x.second.basecalling_model)
-           << " runid=" << value_or_unknown(x.second.run_id) << "\t";
-        rg << "LB:" << value_or_unknown(x.second.sample_id) << "\t";
-        rg << "SM:" << value_or_unknown(x.second.sample_id);
-        rg << std::endl;
-        sam_hdr_add_lines(hdr, rg.str().c_str(), 0);
+    // Convert a ReadGroup to a string
+    auto to_string = [](const ReadGroup& read_group) {
+        // Lambda function to return "unknown" if string is empty
+        auto value_or_unknown = [](std::string_view s) { return s.empty() ? "unknown" : s; };
+        std::ostringstream rg;
+        {
+            rg << "PU:" << value_or_unknown(read_group.flowcell_id) << "\t";
+            rg << "PM:" << value_or_unknown(read_group.device_id) << "\t";
+            rg << "DT:" << value_or_unknown(read_group.exp_start_time) << "\t";
+            rg << "PL:"
+               << "ONT"
+               << "\t";
+            rg << "DS:"
+               << "basecall_model=" << value_or_unknown(read_group.basecalling_model)
+               << " runid=" << value_or_unknown(read_group.run_id) << "\t";
+            rg << "LB:" << value_or_unknown(read_group.sample_id) << "\t";
+            rg << "SM:" << value_or_unknown(read_group.sample_id);
+        }
+        return std::move(rg).str();
+    };
+
+    auto emit_read_group = [hdr](const std::string& read_group_line, const std::string& id,
+                                 const std::string& additional_tags) {
+        auto line = "@RG\tID:" + id + '\t' + read_group_line + additional_tags + '\n';
+        sam_hdr_add_lines(hdr, line.c_str(), 0);
+    };
+
+    // Emit read group headers without a barcode arrangement.
+    for (const auto& read_group : read_groups) {
+        const std::string read_group_tags = to_string(read_group.second);
+        emit_read_group(read_group_tags, read_group.first, {});
+    }
+
+    // Emit read group headers for each barcode arrangement.
+    for (const auto& kit_name : barcode_kits) {
+        const auto& kit_info = barcode_kit_infos.at(kit_name);
+        for (const auto& barcode_name : kit_info.barcodes) {
+            const auto additional_tags = "\tBC:" + barcode_sequences.at(barcode_name);
+            for (const auto& read_group : read_groups) {
+                auto id = read_group.first + '_' + kit_name + '_' + barcode_name;
+                const std::string read_group_tags = to_string(read_group.second);
+                emit_read_group(read_group_tags, id, additional_tags);
+            }
+        }
     }
 }
 
@@ -144,7 +175,7 @@ std::map<std::string, std::string> extract_pg_keys_from_hdr(const std::string fi
     if (!file) {
         throw std::runtime_error("Could not open file: " + filename);
     }
-    auto header = sam_hdr_read(file);
+    SamHdrPtr header(sam_hdr_read(file));
     if (!header) {
         throw std::runtime_error("Could not open header from file: " + filename);
     }
@@ -158,14 +189,13 @@ std::map<std::string, std::string> extract_pg_keys_from_hdr(const std::string fi
     // is attempted on it from dorado, there's cross-heap behavior and a segfault occurs.
     ks_resize(&val, 1e6);
     for (auto& k : keys) {
-        auto ret = sam_hdr_find_tag_id(header, "PG", NULL, NULL, k.c_str(), &val);
+        auto ret = sam_hdr_find_tag_id(header.get(), "PG", NULL, NULL, k.c_str(), &val);
         if (ret != 0) {
             throw std::runtime_error("Required key " + k + " not found in header of " + filename);
         }
         pg_keys[k] = std::string(val.s);
     }
     ks_free(&val);
-    sam_hdr_destroy(header);
     hts_close(file);
     return pg_keys;
 }

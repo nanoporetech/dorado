@@ -162,7 +162,7 @@ int duplex(int argc, char* argv[]) {
                                                                          recursive_file_loading));
         spdlog::debug("> Reads to process: {}", num_reads);
 
-        std::unique_ptr<sam_hdr_t, void (*)(sam_hdr_t*)> hdr(sam_hdr_init(), sam_hdr_destroy);
+        SamHdrPtr hdr(sam_hdr_init());
         cli::add_pg_hdr(hdr.get(), args);
 
         PipelineDescriptor pipeline_desc;
@@ -273,7 +273,8 @@ int duplex(int argc, char* argv[]) {
             auto read_groups = DataLoader::load_read_groups(reads, model, recursive_file_loading);
             read_groups.merge(
                     DataLoader::load_read_groups(reads, duplex_rg_name, recursive_file_loading));
-            utils::add_rg_hdr(hdr.get(), read_groups);
+            std::vector<std::string> barcode_kits;
+            utils::add_rg_hdr(hdr.get(), read_groups, barcode_kits);
 
             int batch_size(parser.get<int>("-b"));
             int chunk_size(parser.get<int>("-c"));

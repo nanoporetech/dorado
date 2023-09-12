@@ -76,6 +76,19 @@ TEST_CASE("HtsReaderTest: Read SAM line by line", TEST_GROUP) {
     REQUIRE(read_count == 11);  // FASTA file has 11 reads.
 }
 
+TEST_CASE("HtsReaderTest: get_tag", TEST_GROUP) {
+    fs::path aligner_test_dir = fs::path(get_data_dir("bam_reader"));
+    auto sam = aligner_test_dir / "small.sam";
+
+    dorado::HtsReader reader(sam.string());
+    while (reader.read()) {
+        // All records in small.sam have this set to 0.
+        CHECK(reader.get_tag<int>("rl") == 0);
+        // Intentionally bad tag to test that missing tags don't return garbage.
+        CHECK(reader.get_tag<float>("##") == 0);
+    }
+}
+
 TEST_CASE("HtsReaderTest: read_bam API w/ SAM", TEST_GROUP) {
     fs::path aligner_test_dir = fs::path(get_data_dir("bam_reader"));
     auto sam = aligner_test_dir / "small.sam";
