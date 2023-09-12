@@ -532,6 +532,7 @@ ScoreResults BarcodeClassifier::find_best_adapter(const std::string& read_seq,
         as = &adapters[0];
     } else {
         // TODO: Implement finding best kit match.
+        throw std::runtime_error("Unimplemented: multiple barcoding kits");
     }
 
     // Then find the best barcode hit within that kit.
