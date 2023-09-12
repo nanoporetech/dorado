@@ -29,6 +29,7 @@ extern "C" {
 
 #include <algorithm>
 #include <cstdint>
+#include <cstdlib>
 #include <filesystem>
 #include <limits>
 #include <numeric>
@@ -75,6 +76,18 @@ using Slice = torch::indexing::Slice;
 enum class LstmMode { CUBLAS_TN2C, QUANTISED_NTC, CUTLASS_TNC_I8, CUTLASS_TNC_F16 };
 
 static LstmMode get_cuda_lstm_mode(int layer_idx, int layer_size) {
+    const char *env_lstm_mode = std::getenv("DORADO_LSTM_MODE");
+    if (env_lstm_mode != nullptr) {
+        std::string lstm_mode_str(env_lstm_mode);
+        if (lstm_mode_str == "CUBLAS_TN2C") {
+            return LstmMode::CUBLAS_TN2C;
+        } else if (lstm_mode_str == "CUTLASS_TNC_I8") {
+            return (layer_idx == 0) ? LstmMode::CUTLASS_TNC_F16 : LstmMode::CUTLASS_TNC_I8;
+        } else if (lstm_mode_str == "CUTLASS_TNC_F16") {
+            return LstmMode::CUTLASS_TNC_F16;
+        }
+    }
+
     cudaDeviceProp *prop = at::cuda::getCurrentDeviceProperties();
     bool is_TX2 = (prop->major == 6 && prop->minor == 2);
     bool is_A100_H100 = ((prop->major == 8 || prop->major == 9) && prop->minor == 0);
