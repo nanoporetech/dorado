@@ -146,8 +146,7 @@ int estimate_samples_per_base(const dorado::ReadPtr& read) {
 // the approximate anchor for the tail, and if there needs to be an adjustment
 // made to the final polyA tail count based on the adapter sequence (e.g. because
 // the adapter itself contains several As).
-std::tuple<bool, int, int> determine_signal_anchor_and_strand_cdna(
-        const dorado::ReadPtr& read) {
+std::tuple<bool, int, int> determine_signal_anchor_and_strand_cdna(const dorado::ReadPtr& read) {
     const std::string SSP = "TTTCTGTTGGTGCTGATATTGCTTT";
     const std::string SSP_rc = dorado::utils::reverse_complement(SSP);
     const std::string VNP = "ACTTGCCTGTCGCTCTATCTTCAGAGGAGAGTCCGCCGCCCGCAAGTTTT";
@@ -200,8 +199,8 @@ std::tuple<bool, int, int> determine_signal_anchor_and_strand_cdna(
 
         return {fwd, signal_anchor, trailing_Ts};
     } else {
-        spdlog::warn("{} primer edit distance too high {}", read->read_id,
-                     std::min(dist_v1, dist_v2));
+        spdlog::debug("{} primer edit distance too high {}", read->read_id,
+                      std::min(dist_v1, dist_v2));
         return {false, -1, trailing_Ts};
     }
 }
@@ -214,8 +213,7 @@ std::tuple<bool, int, int> determine_signal_anchor_and_strand_cdna(
 // where there's a jump in the mean signal value, which is indicative of the
 // transition from the DNA adapter to the RNA signal. The polyA will start right
 // at the juncture.
-std::tuple<bool, int, int> determine_signal_anchor_and_strand_drna(
-        const dorado::ReadPtr& read) {
+std::tuple<bool, int, int> determine_signal_anchor_and_strand_drna(const dorado::ReadPtr& read) {
     const c10::Half* signal = static_cast<c10::Half*>(read->raw_data.data_ptr());
     int signal_len = read->raw_data.size(0);
     const int kWindow = 50;

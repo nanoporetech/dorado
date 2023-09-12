@@ -10,6 +10,7 @@
 #include "read_pipeline/BasecallerNode.h"
 #include "read_pipeline/HtsReader.h"
 #include "read_pipeline/ModBaseCallerNode.h"
+#include "read_pipeline/PolyACalculator.h"
 #include "read_pipeline/ReadFilterNode.h"
 #include "read_pipeline/ReadToBamTypeNode.h"
 #include "read_pipeline/ScalerNode.h"
@@ -354,6 +355,17 @@ TEST_CASE("BarcodeClassifierNode: test simple pipeline with fastq and sam files"
         dorado::HtsReader reader(test_file.string());
         reader.read(*pipeline);
     }
+}
+
+DEFINE_TEST(NodeSmokeTestRead, "PolyACalculator") {
+    auto pipeline_restart = GENERATE(false, true);
+    auto is_rna = GENERATE(true, false);
+    CAPTURE(pipeline_restart);
+    CAPTURE(is_rna);
+
+    set_pipeline_restart(pipeline_restart);
+
+    run_smoke_test<dorado::PolyACalculator>(8, is_rna);
 }
 
 }  // namespace
