@@ -147,62 +147,6 @@ std::pair<int, int> determine_signal_bounds5(int signal_anchor,
     return *best_interval;
 }
 
-// An alternate approach to detecting the polyA tail. The approach here is to
-// walk the signal starting from the signal anchor and moving in the direction
-// of the polyA tail by computing a running mean/stdev of a sliding window
-// of N bases and comparing the next signal value against that mean/stdev. If
-// the value is within a threshold, the next position is tested and so on. This
-// is how the interval for the polyA signal is extended.
-std::pair<int, int> determine_signal_bounds3(int signal_end,
-                                             const c10::Half* signal,
-                                             const std::vector<uint64_t>& seq_to_sig_map,
-                                             bool fwd,
-                                             const std::shared_ptr<dorado::Read>& read) {
-    const int kNum = 50;
-    std::array<float, kNum> inputs;
-    auto stats = [&inputs]() -> std::pair<float, float> {
-        float avg = 0;
-        for (auto x : inputs) {
-            avg += x;
-        }
-        avg = avg / inputs.size();
-        float var = 0;
-        for (auto x : inputs) {
-            var += (x - avg) * (x - avg);
-        }
-        var = var / inputs.size();
-        return {avg, std::sqrt(var)};
-    };
-    auto smoother = [&inputs](int n, float x) -> float {
-        const float factor = 0.5;
-        float val = 0;
-        for (int i = 0; i < inputs.size(); i++) {
-            val += inputs[i];
-        }
-        val /= inputs.size();
-        return factor * val + (1 - factor) * x;
-    };
-    int signal_start = 0;
-    int n = 0;
-    for (int i = signal_end; (fwd ? i > 0 : i < read->raw_data.size(0)); (fwd ? i-- : i++)) {
-        float raw_x = signal[i];
-        float x = smoother(n, raw_x);
-        auto [avg, stdev] = stats();
-        spdlog::debug("idx {} x {}, avg {}, stdev {}", i, x, avg, stdev);
-        if (n > kNum && std::abs(x - avg) > 2 * stdev) {
-            spdlog::debug("Reached end at {} at mean {} stdev {}", i, avg, stdev);
-            break;
-        }
-        inputs[n % inputs.size()] = raw_x;
-        signal_start = i;
-        n++;
-    }
-    if (!fwd) {
-        std::swap(signal_start, signal_end);
-    }
-    return {signal_start, signal_end};
-}
-
 // Basic estimation of avg translocation speed by dividing number of samples by the
 // number of bases called.
 int estimate_samples_per_base(const dorado::ReadPtr& read) {
