@@ -142,7 +142,7 @@ int estimate_samples_per_base(const dorado::ReadPtr& read) {
 // In order to find the approximate location of the start/end (anchor) of the polyA
 // cDNA tail, the adapter ends are aligned to the reads to find the breakpoint
 // between the read and the adapter. Adapter alignment also helps determine
-// the strand direction. This function returns the straand direction,
+// the strand direction. This function returns the strand direction,
 // the approximate anchor for the tail, and if there needs to be an adjustment
 // made to the final polyA tail count based on the adapter sequence (e.g. because
 // the adapter itself contains several As).
@@ -207,12 +207,12 @@ std::tuple<bool, int, int> determine_signal_anchor_and_strand_cdna(const dorado:
 
 // The approach used for determining the approximate location of the polyA
 // tail in dRNA is different. Since dRNA is single stranded, we already know the
-// direction of ther ead. However, in dRNA, the adapter is DNA. But the model for
+// direction of the read. However, in dRNA, the adapter is DNA. But the model for
 // basecalling is trained on RNA data. So the basecall quality of the adapter is poor,
-// and alignment doesn't work well. Instead, the raw is traversed to find a point
+// and alignment doesn't work well. Instead, the raw signal is traversed to find a point
 // where there's a jump in the mean signal value, which is indicative of the
 // transition from the DNA adapter to the RNA signal. The polyA will start right
-// at the juncture.
+// at that juncture.
 std::tuple<bool, int, int> determine_signal_anchor_and_strand_drna(const dorado::ReadPtr& read) {
     const c10::Half* signal = static_cast<c10::Half*>(read->raw_data.data_ptr());
     int signal_len = read->raw_data.size(0);
@@ -356,20 +356,21 @@ void PolyACalculator::terminate_impl() {
         }
     }
     m_workers.clear();
-    spdlog::info("Total {}, not called {}, Avg polyA length {}", num_reads.load(),
-                 not_called.load(), polyA.load() / num_reads.load());
-    static bool done = false;
-    if (!done && spdlog::get_level() != spdlog::level::debug) {
-        int max_val = -1;
-        for (auto [k, v] : poly_a_counts) {
-            max_val = std::max(v, max_val);
-        }
-        int factor = std::max(1, 1 + max_val / 100);
-        for (auto [k, v] : poly_a_counts) {
-            spdlog::info("{} : {}", k, std::string(v / factor, '*'));
-        }
-        done = true;
-    }
+    // TODO: Remove. This is for debugging only.
+    //spdlog::info("Total {}, not called {}, Avg polyA length {}", num_reads.load(),
+    //             not_called.load(), polyA.load() / num_reads.load());
+    //static bool done = false;
+    //if (!done && spdlog::get_level() != spdlog::level::debug) {
+    //    int max_val = -1;
+    //    for (auto [k, v] : poly_a_counts) {
+    //        max_val = std::max(v, max_val);
+    //    }
+    //    int factor = std::max(1, 1 + max_val / 100);
+    //    for (auto [k, v] : poly_a_counts) {
+    //        spdlog::info("{} : {}", k, std::string(v / factor, '*'));
+    //    }
+    //    done = true;
+    //}
 }
 
 void PolyACalculator::restart() {
