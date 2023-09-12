@@ -132,7 +132,7 @@ TEST_CASE("BamUtilsTest: Test bam extraction helpers", TEST_GROUP) {
     auto sam = bam_utils_test_dir / "test.sam";
 
     HtsReader reader(sam.string());
-    reader.read();  // Parse first and only record.
+    REQUIRE(reader.read());  // Parse first and only record.
     auto record = reader.record.get();
     int seqlen = record->core.l_qseq;
 

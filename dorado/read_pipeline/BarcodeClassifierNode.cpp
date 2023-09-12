@@ -122,14 +122,16 @@ std::pair<int, int> determine_trim_interval(const demux::ScoreResults& res, int 
     return trim_interval;
 }
 
-bam1_t* BarcodeClassifierNode::trim_barcode(bam1_t* input_record,
-                                            const demux::ScoreResults& res,
-                                            int seqlen) {
+BamPtr BarcodeClassifierNode::trim_barcode(BamPtr input,
+                                           const demux::ScoreResults& res,
+                                           int seqlen) {
     auto trim_interval = determine_trim_interval(res, seqlen);
 
     if (trim_interval.second - trim_interval.first == seqlen) {
-        return bam_dup1(input_record);
+        return input;
     }
+
+    bam1_t* input_record = input.get();
 
     // Fetch components that need to be trimmed.
     std::string seq = utils::extract_sequence(input_record, seqlen);
@@ -177,7 +179,7 @@ bam1_t* BarcodeClassifierNode::trim_barcode(bam1_t* input_record,
 
     bam_aux_update_int(out_record, "ts", ts);
 
-    return out_record;
+    return BamPtr(out_record);
 }
 
 void BarcodeClassifierNode::trim_barcode(ReadPtr& read, const demux::ScoreResults& res) {
@@ -214,7 +216,7 @@ void BarcodeClassifierNode::barcode(BamPtr& read) {
     m_num_records++;
 
     if (m_trim_barcodes) {
-        read = BamPtr(trim_barcode(irecord, bc_res, seqlen));
+        read = BamPtr(trim_barcode(std::move(read), bc_res, seqlen));
     }
 }
 

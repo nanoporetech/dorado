@@ -194,7 +194,7 @@ TEST_CASE(
 
     // Create new read that is barcode - 100 As - barcode.
     auto read = dorado::ReadPtr::make();
-    const std::string seq = std::string(100, 'A');
+    const std::string nonbc_seq = std::string(100, 'A');
     const auto& kit_info_map = barcode_kits::get_kit_infos();
     const auto& barcodes = barcode_kits::get_barcodes();
     const std::string front_flank = kit_info_map.at("SQK-RPB004").top_front_flank +
@@ -202,7 +202,7 @@ TEST_CASE(
                                     kit_info_map.at("SQK-RPB004").top_rear_flank;
     const std::string rear_flank = dorado::utils::reverse_complement(front_flank);
     const int stride = 6;
-    read->seq = front_flank + seq + rear_flank;
+    read->seq = front_flank + nonbc_seq + rear_flank;
     read->qstring = std::string(read->seq.length(), '!');
     read->read_id = "read_id";
     read->model_stride = stride;
@@ -257,7 +257,7 @@ TEST_CASE(
 
     const std::string expected_bc = "SQK-RPB004_BC01";
     std::vector<uint8_t> expected_move_vals;
-    for (int i = 0; i < seq.length(); i++) {
+    for (int i = 0; i < nonbc_seq.length(); i++) {
         expected_move_vals.push_back(1);
         expected_move_vals.push_back(0);
     }
@@ -273,7 +273,7 @@ TEST_CASE(
             CHECK_THAT(bam_aux2Z(bam_aux_get(rec, "BC")), Equals(expected_bc));
 
             auto seq = dorado::utils::extract_sequence(rec, rec->core.l_qseq);
-            CHECK(seq == seq);
+            CHECK(nonbc_seq == seq);
 
             auto qual = dorado::utils::extract_quality(rec, rec->core.l_qseq);
             CHECK(qual.size() == seq.length());
@@ -295,7 +295,7 @@ TEST_CASE(
 
             CHECK(read->barcode == expected_bc);
 
-            CHECK(read->seq == seq);
+            CHECK(read->seq == nonbc_seq);
 
             CHECK(read->moves == expected_move_vals);
 

@@ -37,7 +37,7 @@ private:
     void barcode(BamPtr& read);
     void barcode(ReadPtr& read);
 
-    bam1_t* trim_barcode(bam1_t* irecord, const demux::ScoreResults& res, int seqlen);
+    BamPtr trim_barcode(BamPtr irecord, const demux::ScoreResults& res, int seqlen);
     void trim_barcode(ReadPtr& read, const demux::ScoreResults& res);
     void terminate_impl();
 };
