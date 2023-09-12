@@ -39,6 +39,7 @@ bool ModBaseContext::decode(const std::string& context_string) {
     auto canonical = "ACGT";
     for (size_t i = 0; i < 4; ++i) {
         if (tokens[i] == "_") {
+            m_motif_matchers[i].reset();
             m_motifs[i].clear();
             m_offsets[i] = 0;
         } else {
@@ -49,6 +50,7 @@ bool ModBaseContext::decode(const std::string& context_string) {
             m_motifs[i] = tokens[i];
             m_motifs[i][x] = canonical[i];
             m_offsets[i] = x;
+            m_motif_matchers[i] = std::make_unique<MotifMatcher>(m_motifs[i], m_offsets[i]);
         }
     }
     return true;
