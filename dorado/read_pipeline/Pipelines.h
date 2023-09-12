@@ -29,6 +29,7 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
                              uint32_t mean_qscore_start_pos,
                              bool model_is_rna,
                              int scaler_node_threads,
+                             int splitter_node_threads,
                              int modbase_threads,
                              NodeHandle sink_node_handle = PipelineDescriptor::InvalidNodeHandle,
                              NodeHandle source_node_handle = PipelineDescriptor::InvalidNodeHandle);

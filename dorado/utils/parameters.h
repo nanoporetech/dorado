@@ -41,6 +41,7 @@ struct ThreadAllocations {
         read_filter_threads = num_devices * 2;
         remora_threads = num_remora_threads;
         scaler_node_threads = num_devices * 4;
+        splitter_node_threads = num_devices;
         loader_threads = num_devices;
         int total_threads_used = (writer_threads + read_converter_threads + read_filter_threads +
                                   remora_threads + scaler_node_threads + loader_threads);
@@ -53,6 +54,7 @@ struct ThreadAllocations {
     int read_filter_threads{0};
     int remora_threads{0};
     int scaler_node_threads{0};
+    int splitter_node_threads{0};
     int loader_threads{0};
     int aligner_threads{0};
 };

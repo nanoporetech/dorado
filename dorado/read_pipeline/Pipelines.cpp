@@ -21,6 +21,7 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
                              uint32_t mean_qscore_start_pos,
                              bool model_is_rna,
                              int scaler_node_threads,
+                             int splitter_node_threads,
                              int modbase_node_threads,
                              NodeHandle sink_node_handle,
                              NodeHandle source_node_handle) {
@@ -43,16 +44,26 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
     std::string model_name =
             std::filesystem::canonical(model_config.model_path).filename().string();
 
+    // Create a split node with the given settings and number of devices.
+    // If splitter_settings.enabled is set to false, the splitter node will act
+    // as a passthrough, meaning it won't perform any splitting operations and
+    // will just pass data through.
+    DuplexSplitSettings splitter_settings;
+    splitter_settings.simplex_mode = true;
+    splitter_settings.enabled = !model_is_rna;
+    auto splitter_node =
+            pipeline_desc.add_node<DuplexSplitNode>({}, splitter_settings, splitter_node_threads);
+
     auto basecaller_node = pipeline_desc.add_node<BasecallerNode>(
-            {}, std::move(runners), overlap, kBatchTimeoutMS, model_name, 1000, "BasecallerNode",
-            false, mean_qscore_start_pos);
+            {splitter_node}, std::move(runners), overlap, kBatchTimeoutMS, model_name, 1000,
+            "BasecallerNode", false, mean_qscore_start_pos);
 
     NodeHandle last_node_handle = PipelineDescriptor::InvalidNodeHandle;
     if (mod_base_caller_node != PipelineDescriptor::InvalidNodeHandle) {
-        pipeline_desc.add_node_sink(basecaller_node, mod_base_caller_node);
+        pipeline_desc.add_node_sink(splitter_node, mod_base_caller_node);
         last_node_handle = mod_base_caller_node;
     } else {
-        last_node_handle = basecaller_node;
+        last_node_handle = splitter_node;
     }
 
     auto scaler_node = pipeline_desc.add_node<ScalerNode>(
