@@ -1,4 +1,5 @@
 #include "MessageSinkUtils.h"
+#include "TestUtils.h"
 #include "decode/CPUDecoder.h"
 #include "models/models.h"
 #include "nn/CRFModel.h"
@@ -7,6 +8,7 @@
 #include "nn/ModelRunner.h"
 #include "read_pipeline/BarcodeClassifierNode.h"
 #include "read_pipeline/BasecallerNode.h"
+#include "read_pipeline/HtsReader.h"
 #include "read_pipeline/ModBaseCallerNode.h"
 #include "read_pipeline/ReadFilterNode.h"
 #include "read_pipeline/ReadToBamTypeNode.h"
@@ -28,6 +30,8 @@
 #include <filesystem>
 #include <functional>
 #include <random>
+
+namespace fs = std::filesystem;
 
 namespace {
 
@@ -329,6 +333,27 @@ DEFINE_TEST(NodeSmokeTestRead, "BarcodeClassifierNode") {
 
     std::vector<std::string> kits = {"SQK-RPB004", "EXP-NBD196"};
     run_smoke_test<dorado::BarcodeClassifierNode>(2, kits, barcode_both_ends, no_trim);
+}
+
+TEST_CASE("BarcodeClassifierNode: test simple pipeline with fastq and sam files") {
+    dorado::PipelineDescriptor pipeline_desc;
+    std::vector<dorado::Message> messages;
+    auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
+    std::vector<std::string> kits = {"EXP-PBC096"};
+    bool barcode_both_ends = GENERATE(true, false);
+    bool no_trim = GENERATE(true, false);
+    auto classifier = pipeline_desc.add_node<dorado::BarcodeClassifierNode>(
+            {sink}, 8, kits, barcode_both_ends, no_trim);
+
+    auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
+
+    fs::path data1 = fs::path(get_data_dir("barcode_demux/double_end_variant")) /
+                     "EXP-PBC096_barcode_both_ends_pass.fastq";
+    fs::path data2 = fs::path(get_data_dir("bam_utils")) / "test.sam";
+    for (auto& test_file : {data1, data2}) {
+        dorado::HtsReader reader(test_file.string());
+        reader.read(*pipeline);
+    }
 }
 
 }  // namespace

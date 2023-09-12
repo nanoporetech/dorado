@@ -135,7 +135,7 @@ bam1_t* BarcodeClassifierNode::trim_barcode(bam1_t* input_record,
     std::string seq = utils::extract_sequence(input_record, seqlen);
     std::vector<uint8_t> qual = utils::extract_quality(input_record, seqlen);
     auto [stride, move_vals] = utils::extract_move_table(input_record);
-    int ts = bam_aux2i(bam_aux_get(input_record, "ts"));
+    int ts = bam_aux_get(input_record, "ts") ? bam_aux2i(bam_aux_get(input_record, "ts")) : 0;
     auto [modbase_str, modbase_probs] = utils::extract_modbase_info(input_record);
 
     // Actually trim components.

@@ -175,8 +175,10 @@ TEST_CASE("BarcodeClassifier: check barcodes on both ends - passing case", TEST_
     }
 }
 
-TEST_CASE("BarcodeClassifierNode: check read messages are correctly upadted after barcoding",
-          TEST_GROUP) {
+TEST_CASE(
+        "BarcodeClassifierNode: check read messages are correctly updated after classification and "
+        "trimming",
+        TEST_GROUP) {
     using Catch::Matchers::Equals;
 
     dorado::PipelineDescriptor pipeline_desc;
