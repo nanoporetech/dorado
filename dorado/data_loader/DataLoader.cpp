@@ -240,7 +240,6 @@ void DataLoader::load_reads(const std::string& path,
                 if (ext == ".fast5") {
                     load_fast5_reads_from_file(entry.path().string());
                 } else if (ext == ".pod5") {
-                    spdlog::info("Reading from {}", entry.path().string());
                     load_pod5_reads_from_file(entry.path().string());
                 }
             }
