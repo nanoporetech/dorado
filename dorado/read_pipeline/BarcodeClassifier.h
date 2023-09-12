@@ -12,21 +12,6 @@ namespace dorado {
 
 namespace demux {
 
-struct AdapterSequence {
-    std::vector<std::string> adapter;
-    std::vector<std::string> adapter_rev;
-    std::string top_primer;
-    std::string top_primer_rev;
-    std::string bottom_primer;
-    std::string bottom_primer_rev;
-    int top_primer_front_flank_len;
-    int top_primer_rear_flank_len;
-    int bottom_primer_front_flank_len;
-    int bottom_primer_rear_flank_len;
-    std::vector<std::string> adapter_name;
-    std::string kit;
-};
-
 struct ScoreResults {
     float score = -1.f;
     float top_score = -1.f;
@@ -45,15 +30,17 @@ struct ScoreResults {
 const ScoreResults UNCLASSIFIED{};
 
 class BarcodeClassifier {
+    struct AdapterSequence;
+
 public:
     BarcodeClassifier(const std::vector<std::string>& kit_names, bool barcode_both_ends);
-    ~BarcodeClassifier() = default;
+    ~BarcodeClassifier();
 
     ScoreResults barcode(const std::string& seq);
 
 private:
-    bool m_barcode_both_ends;
-    std::vector<AdapterSequence> m_adapter_sequences;
+    const bool m_barcode_both_ends;
+    const std::vector<AdapterSequence> m_adapter_sequences;
 
     std::vector<AdapterSequence> generate_adapter_sequence(
             const std::vector<std::string>& kit_names);
@@ -65,7 +52,7 @@ private:
     std::vector<ScoreResults> calculate_adapter_score(std::string_view read_seq,
                                                       const AdapterSequence& as);
     ScoreResults find_best_adapter(const std::string& read_seq,
-                                   std::vector<AdapterSequence>& adapter);
+                                   const std::vector<AdapterSequence>& adapter);
 };
 
 }  // namespace demux
