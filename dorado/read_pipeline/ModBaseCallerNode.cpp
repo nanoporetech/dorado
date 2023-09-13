@@ -183,9 +183,11 @@ void ModBaseCallerNode::input_worker_thread() {
 
             // all runners have the same set of callers, so we only need to use the first one
             auto& runner = m_runners[0];
+            std::vector<std::vector<std::unique_ptr<RemoraChunk>>> chunks_to_enqueue_by_caller(
+                    runner->num_callers());
             for (size_t caller_id = 0; caller_id < runner->num_callers(); ++caller_id) {
                 nvtx3::scoped_range range{"generate_chunks"};
-                auto& chunk_queue = m_chunk_queues.at(caller_id);
+                auto& chunks_to_enqueue = chunks_to_enqueue_by_caller.at(caller_id);
 
                 // scale signal based on model parameters
                 auto scaled_signal = runner->scale_signal(caller_id, read->raw_data, sequence_ints,
@@ -200,8 +202,7 @@ void ModBaseCallerNode::input_worker_thread() {
 
                 auto context_hits = runner->get_motif_hits(caller_id, read->seq);
                 m_num_context_hits += static_cast<int64_t>(context_hits.size());
-                std::vector<std::unique_ptr<RemoraChunk>> reads_to_enqueue;
-                reads_to_enqueue.reserve(context_hits.size());
+                chunks_to_enqueue.reserve(context_hits.size());
                 for (auto context_hit : context_hits) {
                     nvtx3::scoped_range range{"create_chunk"};
                     auto slice = encoder.get_context(context_hit);
@@ -213,13 +214,10 @@ void ModBaseCallerNode::input_worker_thread() {
                                                               {(int64_t)slice.lead_samples_needed,
                                                                (int64_t)slice.tail_samples_needed});
                     }
-                    reads_to_enqueue.push_back(std::make_unique<RemoraChunk>(
+                    chunks_to_enqueue.push_back(std::make_unique<RemoraChunk>(
                             working_read, input_signal, std::move(slice.data), context_hit));
 
                     ++working_read->num_modbase_chunks;
-                }
-                for (auto& chunk : reads_to_enqueue) {
-                    chunk_queue->try_push(std::move(chunk));
                 }
             }
             m_chunk_generation_ms += timer.GetElapsedMS();
@@ -232,6 +230,15 @@ void ModBaseCallerNode::input_worker_thread() {
                 std::lock_guard<std::mutex> working_reads_lock(m_working_reads_mutex);
                 m_working_reads.insert(std::move(working_read));
                 ++m_working_reads_size;
+
+                // push the chunks to the chunk queues
+                for (size_t caller_id = 0; caller_id < runner->num_callers(); ++caller_id) {
+                    auto& chunk_queue = m_chunk_queues.at(caller_id);
+                    auto& chunks_to_enqueue = chunks_to_enqueue_by_caller.at(caller_id);
+                    for (auto& chunk : chunks_to_enqueue) {
+                        chunk_queue->try_push(std::move(chunk));
+                    }
+                }
             } else {
                 // No modbases to call, pass directly to next node
                 send_message_to_sink(std::move(read));
