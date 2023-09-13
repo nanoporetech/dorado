@@ -74,7 +74,9 @@ TEST_CASE("Test trim signal", TEST_GROUP) {
 TEST_CASE("Test trim sequence", TEST_GROUP) {
     const std::string seq = "TEST_SEQ";
 
-    SECTION("Test empty sequence") { CHECK(utils::trim_sequence("", {0, 100}) == ""); }
+    SECTION("Test empty sequence") {
+        CHECK_THROWS_AS(utils::trim_sequence("", {10, 50}), std::invalid_argument);
+    }
 
     SECTION("Trim nothing") { CHECK(utils::trim_sequence(seq, {0, seq.length()}) == seq); }
 

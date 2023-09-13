@@ -46,9 +46,13 @@ int trim(const torch::Tensor& signal, float threshold, int window_size, int min_
 }
 
 std::string trim_sequence(const std::string& seq, const std::pair<int, int>& trim_interval) {
-    int start_pos = trim_interval.first;
-    int len = trim_interval.second - start_pos;
-    return seq.substr(start_pos, len);
+    if (trim_interval.first >= seq.length() || trim_interval.second > seq.length() ||
+        trim_interval.second < trim_interval.first) {
+        throw std::invalid_argument("Trim interval " + std::to_string(trim_interval.first) + "-" +
+                                    std::to_string(trim_interval.second) +
+                                    " is invalid for sequence " + seq);
+    }
+    return std::string(seq.begin() + trim_interval.first, seq.begin() + trim_interval.second);
 }
 
 std::vector<uint8_t> trim_quality(const std::vector<uint8_t>& qual,
@@ -117,7 +121,7 @@ std::tuple<std::string, std::vector<uint8_t>> trim_modbase_info(
     if (!modbase_str.empty()) {
         // First extract all the sub strings in the mod string
         // for each channel. e.g. A+a?,1,0;C+m.,0; will get split
-        // into 2 substrings.
+        // into 2 substrings A+a?,1,0 and C+m.,0 .
         std::vector<std::string_view> mods;
         std::string_view modbase_str_view = modbase_str;
         while (!modbase_str_view.empty()) {
@@ -125,7 +129,6 @@ std::tuple<std::string, std::vector<uint8_t>> trim_modbase_info(
             mods.push_back(modbase_str_view.substr(0, delim_pos));
             modbase_str_view.remove_prefix(delim_pos + 1);
         }
-        // For the 2 mods, the string position boundaries will be
         // Iterate over each substring, and fetch the count values per cardinal base.
         int prob_pos = 0;  // Track the probability values to keep from the original vector.
         for (auto mod : mods) {
@@ -140,7 +143,7 @@ std::tuple<std::string, std::vector<uint8_t>> trim_modbase_info(
                 if (comma_pos == std::string::npos) {
                     comma_pos = mod.length();
                 }
-                // Begining of each substring is the channel prefix. Counts only
+                // Beginning of each substring is the channel prefix. Counts only
                 // start after the first comma is seen.
                 if (!in_counts) {
                     in_counts = true;
@@ -169,7 +172,7 @@ std::tuple<std::string, std::vector<uint8_t>> trim_modbase_info(
                     prob_pos++;
                     cardinal_bases_seen++;  // Add one more to account for the actual modified base.
                 }
-                mod.remove_prefix(std::min(comma_pos + 1, mod.length()));  // No comma at the end
+                mod.remove_prefix(std::min(comma_pos + 1, mod.length()));  // No comma at the end.
             }
             if (!counts.str().empty()) {
                 trimmed_modbase_str << std::string(prefix) << counts.str() << ";";
