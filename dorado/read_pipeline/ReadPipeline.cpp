@@ -251,7 +251,7 @@ void Read::generate_modbase_string(bam1_t *aln, uint8_t threshold) const {
             int skipped_bases = 0;
             for (size_t base_idx = 0; base_idx < seq.size(); base_idx++) {
                 if (seq[base_idx] == current_cardinal) {
-                    if (modbase_mask[base_idx] == 1) {
+                    if (modbase_mask[base_idx]) {
                         modbase_string += "," + std::to_string(skipped_bases);
                         skipped_bases = 0;
                         modbase_prob.push_back(

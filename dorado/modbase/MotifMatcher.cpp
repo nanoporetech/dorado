@@ -4,8 +4,8 @@
 
 #include <nvtx3/nvtx3.hpp>
 
+#include <iterator>
 #include <regex>
-#include <sstream>
 #include <unordered_map>
 
 namespace {
@@ -31,13 +31,12 @@ const std::unordered_map<char, std::string> IUPAC_CODES = {
 };
 
 std::string expand_motif_regex(const std::string& motif) {
-    std::ostringstream motif_regex_ss;
-    motif_regex_ss << "(";
+    std::string motif_regex = "(";
     for (auto base : motif) {
-        motif_regex_ss << IUPAC_CODES.at(base);
+        motif_regex += IUPAC_CODES.at(base);
     }
-    motif_regex_ss << ")";
-    return motif_regex_ss.str();
+    motif_regex += ")";
+    return motif_regex;
 }
 
 }  // namespace

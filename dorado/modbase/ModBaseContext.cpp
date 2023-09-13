@@ -72,20 +72,20 @@ std::string ModBaseContext::encode() const {
     return s.str();
 }
 
-std::vector<int> ModBaseContext::get_sequence_mask(std::string_view sequence) const {
-    std::vector<int> mask(sequence.size(), 0);
+std::vector<bool> ModBaseContext::get_sequence_mask(std::string_view sequence) const {
+    std::vector<bool> mask(sequence.size(), false);
     for (auto& matcher : m_motif_matchers) {
         if (matcher) {
             auto hits = matcher->get_motif_hits(sequence);
             for (auto hit : hits) {
-                mask[hit] = 1;
+                mask[hit] = true;
             }
         }
     }
     return mask;
 }
 
-void ModBaseContext::update_mask(std::vector<int>& mask,
+void ModBaseContext::update_mask(std::vector<bool>& mask,
                                  const std::string& sequence,
                                  const std::string& modbase_alphabet,
                                  const std::vector<uint8_t>& modbase_probs,
@@ -107,7 +107,7 @@ void ModBaseContext::update_mask(std::vector<int>& mask,
             for (size_t base_idx = 0; base_idx < sequence.size(); base_idx++) {
                 if (sequence[base_idx] == current_cardinal) {
                     if (modbase_probs[base_idx * num_channels + channel_idx] >= threshold) {
-                        mask[base_idx] = 1;
+                        mask[base_idx] = true;
                     }
                 }
             }
