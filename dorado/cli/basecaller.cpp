@@ -344,7 +344,8 @@ int basecaller(int argc, char* argv[]) {
     parser.add_argument("-I").help("minimap2 index batch size.").default_value(std::string("16G"));
 
     parser.add_argument("--estimate-poly-a")
-            .help("Estimate poly-A/T tail lengths. Primarily meant for cDNA and dRNA use cases.")
+            .help("Estimate poly-A/T tail lengths (beta feature). Primarily meant for cDNA and "
+                  "dRNA use cases.")
             .default_value(false)
             .implicit_value(true);
 
