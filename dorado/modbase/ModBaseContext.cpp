@@ -74,14 +74,11 @@ std::string ModBaseContext::encode() const {
 
 std::vector<int> ModBaseContext::get_sequence_mask(std::string_view sequence) const {
     std::vector<int> mask(sequence.size(), 0);
-    for (size_t p = 0; p < sequence.size(); ++p) {
-        auto idx = base_to_int(sequence[p]);
-        if (!m_motifs[idx].empty() && p >= m_offsets[idx] &&
-            p + m_motifs[idx].size() - m_offsets[idx] < sequence.size()) {
-            size_t a = p - m_offsets[idx];
-            auto& matcher = m_motif_matchers[idx];
-            if (matcher->matches_motif(sequence.substr(a, m_motifs[idx].size()))) {
-                mask[p] = 1;
+    for (auto& matcher : m_motif_matchers) {
+        if (matcher) {
+            auto hits = matcher->get_motif_hits(sequence);
+            for (auto hit : hits) {
+                mask[hit] = 1;
             }
         }
     }

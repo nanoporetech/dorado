@@ -50,26 +50,23 @@ MotifMatcher::MotifMatcher(const ModBaseModelConfig& model_config)
 MotifMatcher::MotifMatcher(const std::string& motif, size_t offset)
         : m_motif(expand_motif_regex(motif)), m_motif_offset(offset) {}
 
-std::vector<size_t> MotifMatcher::get_motif_hits(const std::string& seq) const {
+std::vector<size_t> MotifMatcher::get_motif_hits(std::string_view seq) const {
     NVTX3_FUNC_RANGE();
     std::vector<size_t> context_hits;
 
     std::regex regex(m_motif);
-    std::smatch motif_match;
     auto start = std::cbegin(seq);
     auto end = std::cend(seq);
     auto pos = start;
+    // string_view on linux uses `const_iterator=const char*`,
+    // but on Windows it's a `std::_String_view_iterator<_Traits>`
+    std::match_results<decltype(pos)> motif_match;
     while (std::regex_search(pos, end, motif_match, regex)) {
         auto hit = std::distance(start, pos) + motif_match.position(0) + m_motif_offset;
         context_hits.push_back(hit);
         pos += motif_match.position(0) + 1;
     }
     return context_hits;
-}
-
-bool MotifMatcher::matches_motif(std::string_view seq) const {
-    std::regex regex(m_motif);
-    return std::regex_match(seq.begin(), seq.end(), regex);
 }
 
 }  // namespace dorado
