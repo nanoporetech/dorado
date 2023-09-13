@@ -100,7 +100,6 @@ public:
     // Barcode.
     std::string barcode{};
 
-    float mscale, mshift;
     int rna_poly_tail_length{-1};
 
 private:

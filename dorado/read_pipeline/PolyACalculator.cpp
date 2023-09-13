@@ -316,10 +316,9 @@ void PolyACalculator::worker_thread() {
             if (num_bases >= 0 && num_bases < kMaxTailLength) {
                 spdlog::debug(
                         "{} PolyA bases {}, signal anchor {} Signal range is {} {}, "
-                        "samples/base {} shift/scale/trim {} {} {}",
+                        "samples/base {} trim {}",
                         read->read_id, num_bases, signal_anchor, signal_start, signal_end,
-                        num_samples_per_base, read->mshift, read->mscale,
-                        read->num_trimmed_samples);
+                        num_samples_per_base, read->num_trimmed_samples);
                 polyA += num_bases;
                 read->rna_poly_tail_length = num_bases;
                 {
@@ -329,10 +328,9 @@ void PolyACalculator::worker_thread() {
             } else {
                 spdlog::warn(
                         "{} PolyA bases {}, signal anchor {} Signal range is {}, "
-                        "samples/base {}, shift/scale/trim  {} {} {}",
+                        "samples/base {}, trim  {}",
                         read->read_id, num_bases, signal_anchor, signal_start, signal_end,
-                        num_samples_per_base, read->mshift, read->mscale,
-                        read->num_trimmed_samples);
+                        num_samples_per_base, read->num_trimmed_samples);
                 not_called++;
             }
         } else {

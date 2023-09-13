@@ -59,8 +59,6 @@ void ScalerNode::worker_thread() {
         // raw_data comes from DataLoader with dtype int16.  We send it on as float16 after
         // shifting/scaling in float32 form.
         read->raw_data = ((read->raw_data.to(torch::kFloat) - shift) / scale).to(torch::kFloat16);
-        read->mscale = scale;
-        read->mshift = shift;
 
         // move the shift and scale into pA.
         read->scale = read->scaling * scale;
