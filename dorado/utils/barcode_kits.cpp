@@ -88,7 +88,14 @@ const std::vector<std::string> RBK_1_96 = {
         "BC78", "BC79", "BC80", "BC81",  "BC82",  "BC83",  "BC84",  "BC85", "BC86", "BC87",  "BC88",
         "BC89", "BC90", "BC91", "BC92",  "BC93",  "BC94",  "BC95",  "BC96"};
 
+const KitInfo kit_16S = {true,          true,         RAB_1st_FRONT, RAB_1st_REAR,
+                         RAB_2nd_FRONT, RAB_2nd_REAR, BC_1_24};
+
 const std::unordered_map<std::string, KitInfo> kit_info_map = {
+        // SQK-16S024 && SQK-16S114-24
+        {"SQK-16S024", kit_16S},
+        {"SQK-16S114-24", kit_16S},
+        //
         {"SQK-RBK004", {false, false, RBK4_FRONT, RBK4_REAR, "", "", BC_1_12}},
         {"SQK-RBK110-96", {false, false, RBK4_FRONT, RBK4_REAR, "", "", BC_1_96}},
         {"SQK-RBK114-24", {false, false, RBK4_FRONT, RBK4_REAR, "", "", BC_1_24}},
@@ -107,8 +114,6 @@ const std::unordered_map<std::string, KitInfo> kit_info_map = {
          {true, true, LWB_1st_FRONT, LWB_1st_REAR, LWB_2nd_FRONT, LWB_2nd_REAR, BC_1_12}},
         {"SQK-RAB204",
          {true, true, RAB_1st_FRONT, RAB_1st_REAR, RAB_2nd_FRONT, RAB_2nd_REAR, BC_1_12}},
-        {"SQK-16S024",
-         {true, true, RAB_1st_FRONT, RAB_1st_REAR, RAB_2nd_FRONT, RAB_2nd_REAR, BC_1_24}},
         {"SQK-PCB109",
          {
                  true,
