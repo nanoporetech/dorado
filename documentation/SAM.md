@@ -39,6 +39,7 @@
 | sv:Z:  | scaling version                                            |
 | mv:B:c | sequence to signal move table _(optional)_                 |
 | dx:i:  | bool to signify duplex read _(only in duplex mode)_        |
+| pi:Z:  | parent read id for a split read                            |
 
 #### Modified Base Tags
 
