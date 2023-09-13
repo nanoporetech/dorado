@@ -22,9 +22,11 @@ mkdir -p $output_dir
 
 test_output_file=$test_dir/${output_dir_name}_output.log
 
-echo dorado download model
+echo dorado download models
 $dorado_bin download --model ${model_name} --directory ${output_dir}
 model=${output_dir}/${model_name}
+$dorado_bin download --model ${model_name_5k} --directory ${output_dir}
+model_5k=${output_dir}/${model_name_5k}
 
 echo dorado basecaller test stage
 $dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --emit-fastq > $output_dir/ref.fq
@@ -55,9 +57,7 @@ if ! uname -r | grep -q tegra; then
     $dorado_bin duplex basespace $data_dir/basespace/pairs.bam --threads 1 --pairs $data_dir/basespace/pairs.txt > $output_dir/calls.bam
 
     echo dorado in-line duplex test stage
-    $dorado_bin download --model ${model_name_5k} --directory ${output_dir}
-    duplex_model=${output_dir}/${model_name_5k}
-    $dorado_bin duplex $duplex_model $data_dir/duplex/pod5 > $output_dir/duplex_calls.bam
+    $dorado_bin duplex $model_5k $data_dir/duplex/pod5 > $output_dir/duplex_calls.bam
     samtools quickcheck -u $output_dir/duplex_calls.bam
     num_duplex_reads=$(samtools view $output_dir/duplex_calls.bam | grep dx:i:1 | wc -l | awk '{print $1}')
     if [[ $num_duplex_reads -ne "2" ]]; then
@@ -66,7 +66,7 @@ if ! uname -r | grep -q tegra; then
     fi
 
     echo dorado pairs file based duplex test stage
-    $dorado_bin duplex $duplex_model $data_dir/duplex/pod5 --pairs $data_dir/duplex/pairs.txt > $output_dir/duplex_calls.bam
+    $dorado_bin duplex $model_5k $data_dir/duplex/pod5 --pairs $data_dir/duplex/pairs.txt > $output_dir/duplex_calls.bam
     samtools quickcheck -u $output_dir/duplex_calls.bam
     num_duplex_reads=$(samtools view $output_dir/duplex_calls.bam | grep dx:i:1 | wc -l | awk '{print $1}')
     if [[ $num_duplex_reads -ne "2" ]]; then
@@ -104,6 +104,39 @@ samtools quickcheck -u $output_dir/polya.bam
 num_estimated_reads=$(samtools view $output_dir/polya.bam | grep pt:i: | wc -l | awk '{print $1}')
 if [[ $num_estimated_reads -ne "2" ]]; then
     echo "2 poly(A) estimated reads expected. Found ${num_estimated_reads}"
+    exit 1
+fi
+
+echo dorado basecaller barcoding read groups
+$dorado_bin basecaller -b ${batch} --kit-name SQK-RBK114-96 ${model_5k} $data_dir/barcode_demux/read_group_test > $output_dir/read_group_test.bam
+samtools quickcheck -u $output_dir/read_group_test.bam
+mkdir $output_dir/read_group_test
+samtools split -u $output_dir/read_group_test/unknown.bam -f "$output_dir/read_group_test/rg_%!.bam" $output_dir/read_group_test.bam
+# There should be 4 reads with BC01, 3 with BC04, and 2 unclassified groups.
+expected_read_groups_BC01=4
+expected_read_groups_BC04=3
+expected_read_groups_unclassified=2
+for bam in $output_dir/read_group_test/rg_*.bam; do
+    if [[ $bam =~ "_SQK-RBK114-96_" ]]; then
+        # Arrangement is |<kit>_<barcode>|, so tim the kit from the prefix and the .bam from the suffix.
+        barcode=${bam#*_SQK-RBK114-96_}
+        barcode=${barcode%.bam*}
+    else
+        barcode="unclassified"
+    fi
+    # Lookup expected count, defaulting to 0 if not set.
+    expected=expected_read_groups_${barcode}
+    expected=${!expected:-0}
+    num_read_groups=$(samtools view -c ${bam})
+    if [[ $num_read_groups -ne $expected ]]; then
+        echo "Barcoding read group has incorrect number of reads. '${bam}': ${num_read_groups} != ${expected}"
+        exit 1
+    fi
+done
+# There shouldn't be any unknown groups.
+num_read_groups=$(samtools view -c $output_dir/read_group_test/unknown.bam)
+if [[ $num_read_groups -ne "0" ]]; then
+    echo "Reads with unknown read groups found."
     exit 1
 fi
 
