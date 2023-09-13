@@ -6,13 +6,26 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
-#include <chrono>
+#include <array>
 #include <cmath>
 #include <limits>
+#include <utility>
 
 namespace {
 
-int kMaxTailLength = 750;
+struct SignalAnchorInfo {
+    // Is the strand in forward or reverse direction.
+    bool is_fwd_strand = true;
+    // The start or end anchor for the polyA/T signal
+    // depending on whether the strand is forward or
+    // reverse.
+    int signal_anchor = -1;
+    // Number of additional A/T bases in the polyA
+    // stretch from the adapter.
+    int trailing_adapter_bases = 0;
+};
+
+const int kMaxTailLength = 750;
 
 // This algorithm walks through the signal in windows. For each window
 // the avg and stdev of the signal is computed. If the stdev is below
@@ -75,29 +88,22 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
     }
 
     std::string int_str = "";
-    for (auto in : intervals) {
+    for (const auto& in : intervals) {
         int_str += std::to_string(in.first) + "-" + std::to_string(in.second) + ", ";
     }
     spdlog::debug("found intervals {}", int_str);
 
     std::vector<std::pair<int, int>> filtered_intervals;
     // In forward strand, the poly A/T signal should end within 25bp of the
-    // signal anchor, and in reverse strand it should start within 50bp of the
+    // signal anchor, and in reverse strand it should start within 25bp of the
     // anchor. Or the signal anchor should be within the detected signal range.
-    int kAnchorProximity = 25 * num_samples_per_base;
-    if (fwd) {
-        std::copy_if(intervals.begin(), intervals.end(), std::back_inserter(filtered_intervals),
-                     [&](auto& i) {
-                         return std::abs(signal_anchor - i.second) < kAnchorProximity ||
-                                (i.first <= signal_anchor) && (signal_anchor <= i.second);
-                     });
-    } else {
-        std::copy_if(intervals.begin(), intervals.end(), std::back_inserter(filtered_intervals),
-                     [&](auto& i) {
-                         return std::abs(signal_anchor - i.first) < kAnchorProximity ||
-                                (i.first <= signal_anchor) && (signal_anchor <= i.second);
-                     });
-    }
+    const int kAnchorProximity = 25 * num_samples_per_base;
+    std::copy_if(intervals.begin(), intervals.end(), std::back_inserter(filtered_intervals),
+                 [&](auto& i) {
+                     return (fwd ? std::abs(signal_anchor - i.second) < kAnchorProximity
+                                 : std::abs(signal_anchor - i.first) < kAnchorProximity) ||
+                            (i.first <= signal_anchor) && (signal_anchor <= i.second);
+                 });
 
     int_str = "";
     for (auto in : filtered_intervals) {
@@ -110,22 +116,24 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
         return {0, 0};
     }
 
-    // Sort the remaining intervals by how close they are to the anchor.
-    if (fwd) {
-        std::sort(filtered_intervals.begin(), filtered_intervals.end(), [&](auto& l, auto& r) {
-            return std::abs(l.second - signal_anchor) < std::abs(r.second - signal_anchor);
-        });
-    } else {
-        std::sort(filtered_intervals.begin(), filtered_intervals.end(), [&](auto& l, auto& r) {
-            return std::abs(l.first - signal_anchor) < std::abs(r.first - signal_anchor);
-        });
-    }
-
-    // Choose the longest interval. This is a stable max, so if there's a tie the one closest
-    // to the anchor is chosen.
-    auto best_interval = std::max_element(
-            filtered_intervals.begin(), filtered_intervals.end(),
-            [](auto& l, auto& r) { return (l.second - l.first) < (r.second - r.first); });
+    // Choose the longest interval. If there is a tie for the longest interval,
+    // choose the one that is closest to the anchor.
+    auto best_interval = std::max_element(filtered_intervals.begin(), filtered_intervals.end(),
+                                          [&](auto& l, auto& r) {
+                                              auto l_size = l.second - l.first;
+                                              auto r_size = r.second - r.first;
+                                              if (l_size != r_size) {
+                                                  return l_size < r_size;
+                                              } else {
+                                                  if (fwd) {
+                                                      return std::abs(l.second - signal_anchor) <
+                                                             std::abs(r.second - signal_anchor);
+                                                  } else {
+                                                      return std::abs(l.first - signal_anchor) <
+                                                             std::abs(r.first - signal_anchor);
+                                                  }
+                                              }
+                                          });
 
     spdlog::debug("Anchor {} Range {} {}", signal_anchor, best_interval->first,
                   best_interval->second);
@@ -136,27 +144,29 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
 // number of bases called.
 int estimate_samples_per_base(const dorado::ReadPtr& read) {
     float num_samples_per_base = static_cast<float>(read->raw_data.size(0)) / read->seq.length();
-    return static_cast<int>(num_samples_per_base);
+    // The estimate is not rounded because this calculation generally overestimates
+    // the samples per base. Rounding down gives better results than rounding to nearest.
+    return std::floor(num_samples_per_base);
 }
 
 // In order to find the approximate location of the start/end (anchor) of the polyA
 // cDNA tail, the adapter ends are aligned to the reads to find the breakpoint
 // between the read and the adapter. Adapter alignment also helps determine
-// the strand direction. This function returns the strand direction,
+// the strand direction. This function returns a struct with the strand direction,
 // the approximate anchor for the tail, and if there needs to be an adjustment
 // made to the final polyA tail count based on the adapter sequence (e.g. because
 // the adapter itself contains several As).
-std::tuple<bool, int, int> determine_signal_anchor_and_strand_cdna(const dorado::ReadPtr& read) {
+SignalAnchorInfo determine_signal_anchor_and_strand_cdna(const dorado::ReadPtr& read) {
     const std::string SSP = "TTTCTGTTGGTGCTGATATTGCTTT";
     const std::string SSP_rc = dorado::utils::reverse_complement(SSP);
     const std::string VNP = "ACTTGCCTGTCGCTCTATCTTCAGAGGAGAGTCCGCCGCCCGCAAGTTTT";
     const std::string VNP_rc = dorado::utils::reverse_complement(VNP);
     int trailing_Ts = dorado::utils::count_trailing_chars(VNP, 'T');
 
-    int window_size = 150;
-    std::string read_top = read->seq.substr(0, window_size);
-    auto bottom_start = std::max(0, (int)read->seq.length() - window_size);
-    std::string read_bottom = read->seq.substr(bottom_start, window_size);
+    const int kWindowSize = 150;
+    std::string read_top = read->seq.substr(0, kWindowSize);
+    auto bottom_start = std::max(0, (int)read->seq.length() - kWindowSize);
+    std::string read_bottom = read->seq.substr(bottom_start, kWindowSize);
 
     EdlibAlignConfig align_config = edlibDefaultAlignConfig();
     align_config.task = EDLIB_TASK_LOC;
@@ -181,7 +191,7 @@ std::tuple<bool, int, int> determine_signal_anchor_and_strand_cdna(const dorado:
 
     bool proceed = std::min(dist_v1, dist_v2) < 30;
 
-    std::tuple<bool, int, int> result = {false, -1, trailing_Ts};
+    SignalAnchorInfo result = {false, -1, trailing_Ts};
 
     if (proceed) {
         bool fwd = true;
@@ -220,8 +230,10 @@ std::tuple<bool, int, int> determine_signal_anchor_and_strand_cdna(const dorado:
 // and alignment doesn't work well. Instead, the raw signal is traversed to find a point
 // where there's a jump in the mean signal value, which is indicative of the
 // transition from the DNA adapter to the RNA signal. The polyA will start right
-// at that juncture.
-std::tuple<bool, int, int> determine_signal_anchor_and_strand_drna(const dorado::ReadPtr& read) {
+// at that juncture. This function returns a struct with the strand
+// direction (which is always reverse for dRNA), the signal anchor and the number of bases
+// to omit from the tail length estimation due to any adapter effects.
+SignalAnchorInfo determine_signal_anchor_and_strand_drna(const dorado::ReadPtr& read) {
     const c10::Half* signal = static_cast<c10::Half*>(read->raw_data.data_ptr());
     int signal_len = read->raw_data.size(0);
     const int kWindow = 50;
@@ -233,14 +245,8 @@ std::tuple<bool, int, int> determine_signal_anchor_and_strand_drna(const dorado:
     // window view of ~250 bases.
     std::array<float, 5> means;
     auto check_var = [&means](int latest) -> float {
-        float max = std::numeric_limits<float>::min();
-        float min = std::numeric_limits<float>::max();
-
-        for (auto v : means) {
-            min = std::min(v, min);
-            max = std::max(v, max);
-        }
-        return (means[latest] - min);
+        auto min_elem = std::min_element(means.begin(), means.end());
+        return (means[latest] - *min_elem);
     };
 
     int bp = -1;
@@ -268,9 +274,9 @@ std::tuple<bool, int, int> determine_signal_anchor_and_strand_drna(const dorado:
     spdlog::debug("Approx break point {}", bp);
 
     if (bp > 0) {
-        return {false, bp, 0};
+        return SignalAnchorInfo{false, bp, 0};
     } else {
-        return {false, -1, 0};
+        return SignalAnchorInfo{false, -1, 0};
     }
 }
 
@@ -319,25 +325,29 @@ void PolyACalculator::worker_thread() {
                         "samples/base {} trim {}",
                         read->read_id, num_bases, signal_anchor, signal_start, signal_end,
                         num_samples_per_base, read->num_trimmed_samples);
-                polyA += num_bases;
+
+                // Set tail length property in the read.
                 read->rna_poly_tail_length = num_bases;
-                {
+
+                // Update debug stats.
+                total_tail_lengths_called += num_bases;
+                ++num_called;
+                if (spdlog::get_level() == spdlog::level::debug) {
                     std::lock_guard<std::mutex> lock(m_mutex);
-                    poly_a_counts[num_bases]++;
+                    tail_length_counts[num_bases]++;
                 }
             } else {
-                spdlog::warn(
+                spdlog::debug(
                         "{} PolyA bases {}, signal anchor {} Signal range is {}, "
                         "samples/base {}, trim  {}",
                         read->read_id, num_bases, signal_anchor, signal_start, signal_end,
                         num_samples_per_base, read->num_trimmed_samples);
-                not_called++;
+                num_not_called++;
             }
         } else {
-            not_called++;
+            num_not_called++;
         }
 
-        num_reads += 1;
         send_message_to_sink(std::move(read));
     }
 }
@@ -362,26 +372,37 @@ void PolyACalculator::terminate_impl() {
         }
     }
     m_workers.clear();
-    // TODO: Remove. This is for debugging only.
-    //spdlog::info("Total {}, not called {}, Avg polyA length {}", num_reads.load(),
-    //             not_called.load(), polyA.load() / num_reads.load());
-    //static bool done = false;
-    //if (!done && spdlog::get_level() != spdlog::level::debug) {
-    //    int max_val = -1;
-    //    for (auto [k, v] : poly_a_counts) {
-    //        max_val = std::max(v, max_val);
-    //    }
-    //    int factor = std::max(1, 1 + max_val / 100);
-    //    for (auto [k, v] : poly_a_counts) {
-    //        spdlog::info("{} : {}", k, std::string(v / factor, '*'));
-    //    }
-    //    done = true;
-    //}
+
+    spdlog::debug("Total called {}, not called {}, avg tail length {}", num_called.load(),
+                  num_not_called.load(), total_tail_lengths_called.load() / num_called.load());
+
+    // Visualize a distribution of the tail lengths called.
+    static bool done = false;
+    if (!done && spdlog::get_level() == spdlog::level::debug) {
+        int max_val = -1;
+        for (auto [k, v] : tail_length_counts) {
+            max_val = std::max(v, max_val);
+        }
+        int factor = std::max(1, 1 + max_val / 100);
+        for (auto [k, v] : tail_length_counts) {
+            spdlog::debug("{} : {}", k, std::string(v / factor, '*'));
+        }
+        done = true;
+    }
 }
 
 void PolyACalculator::restart() {
     restart_input_queue();
     start_threads();
+}
+
+stats::NamedStats PolyACalculator::sample_stats() const {
+    stats::NamedStats stats = stats::from_obj(m_work_queue);
+    stats["reads_not_estimated"] = num_not_called.load();
+    ;
+    stats["reads_estimated"] = num_called.load();
+    stats["average_tail_length"] = total_tail_lengths_called.load() / num_called.load();
+    return stats;
 }
 
 }  // namespace dorado
