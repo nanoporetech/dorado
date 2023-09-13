@@ -93,6 +93,9 @@ void BasecallerNode::input_worker_thread() {
             ++m_working_reads_size;
         }
 
+        // push the chunks to the chunk queue
+        // needs to be done after working_read->read is set as chunks could be processed
+        // before we set that value otherwise
         for (auto &chunk : read_chunks) {
             m_chunks_in.try_push(std::move(chunk));
         }

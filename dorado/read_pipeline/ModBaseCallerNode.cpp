@@ -232,6 +232,8 @@ void ModBaseCallerNode::input_worker_thread() {
                 ++m_working_reads_size;
 
                 // push the chunks to the chunk queues
+                // needs to be done after working_read->read is set as chunks could be processed
+                // before we set that value otherwise
                 for (size_t caller_id = 0; caller_id < runner->num_callers(); ++caller_id) {
                     auto& chunk_queue = m_chunk_queues.at(caller_id);
                     auto& chunks_to_enqueue = chunks_to_enqueue_by_caller.at(caller_id);
