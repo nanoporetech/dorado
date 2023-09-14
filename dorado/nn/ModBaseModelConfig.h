@@ -23,6 +23,7 @@ struct ModBaseModelConfig {
     size_t refine_kmer_len{};               ///< Length of the kmers for the specified kmer_levels
     size_t refine_kmer_center_idx{};      ///< The position in the kmer at which to check the levels
     bool refine_do_rough_rescale{false};  ///< Whether to perform rough rescaling
+    bool reverse_signal{false};           ///< Reverse model data before processing (rna model)
 };
 
 ModBaseModelConfig load_modbase_model_config(const std::filesystem::path & model_path);
