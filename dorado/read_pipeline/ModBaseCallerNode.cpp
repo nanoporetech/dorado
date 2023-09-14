@@ -173,10 +173,6 @@ void ModBaseCallerNode::input_worker_thread() {
             }
             read->mod_base_info = m_mod_base_info;
 
-            std::vector<int> sequence_ints = utils::sequence_to_ints(read->seq);
-            std::vector<uint64_t> seq_to_sig_map = utils::moves_to_map(
-                    read->moves, m_block_stride, read->raw_data.size(0), read->seq.size() + 1);
-
             auto working_read = std::make_shared<WorkingRead>();
             working_read->num_modbase_chunks = 0;
             working_read->num_modbase_chunks_called = 0;
@@ -187,6 +183,12 @@ void ModBaseCallerNode::input_worker_thread() {
                     runner->num_callers());
             for (size_t caller_id = 0; caller_id < runner->num_callers(); ++caller_id) {
                 nvtx3::scoped_range range{"generate_chunks"};
+
+                std::vector<int> sequence_ints = utils::sequence_to_ints(read->seq);
+                auto signal_len = read->raw_data.size(0);
+                std::vector<uint64_t> seq_to_sig_map = utils::moves_to_map(
+                        read->moves, m_block_stride, signal_len, read->seq.size() + 1);
+
                 auto& chunks_to_enqueue = chunks_to_enqueue_by_caller.at(caller_id);
 
                 // scale signal based on model parameters
@@ -195,6 +197,16 @@ void ModBaseCallerNode::input_worker_thread() {
 
                 auto& params = runner->caller_params(caller_id);
                 auto context_samples = (params.context_before + params.context_after);
+
+                if (params.reverse_signal) {
+                    scaled_signal = torch::flip(scaled_signal, 0);
+                    std::reverse(std::begin(seq_to_sig_map), std::end(seq_to_sig_map));
+                    std::transform(std::begin(seq_to_sig_map), std::end(seq_to_sig_map),
+                                   std::begin(seq_to_sig_map), [signal_len](auto signal_pos) {
+                                       return signal_len - signal_pos;
+                                   });
+                }
+
                 // One-hot encodes the kmer at each signal step for input into the network
                 ModBaseEncoder encoder(m_block_stride, context_samples, params.bases_before,
                                        params.bases_after);
