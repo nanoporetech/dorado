@@ -118,7 +118,7 @@ void setup(std::vector<std::string> args,
             data_path, read_list, {} /*reads_already_processed*/, recursive_file_loading);
     num_reads = max_reads == 0 ? num_reads : std::min(num_reads, max_reads);
 
-    bool rna = utils::is_rna_model(model_path), duplex = false;
+    bool rna = is_rna_model(model_config), duplex = false;
 
     const auto thread_allocations = utils::default_thread_allocations(
             num_devices, !remora_runners.empty() ? num_remora_threads : 0, enable_aligner,
@@ -144,7 +144,8 @@ void setup(std::vector<std::string> args,
             methylation_threshold_pct);
     if (estimate_poly_a) {
         current_sink_node = pipeline_desc.add_node<PolyACalculator>(
-                {current_sink_node}, std::thread::hardware_concurrency(), rna);
+                {current_sink_node}, std::thread::hardware_concurrency(),
+                is_rna_model(model_config));
     }
     if (!barcode_kits.empty()) {
         current_sink_node = pipeline_desc.add_node<BarcodeClassifierNode>(
