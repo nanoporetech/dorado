@@ -33,12 +33,13 @@ const int kMaxTailLength = 750;
 // similar avg and stdev, then those windows are considered to be part
 // of the polyA tail.
 std::pair<int, int> determine_signal_bounds(int signal_anchor,
-                                            const c10::Half* signal,
-                                            int signal_len,
                                             bool fwd,
-                                            const dorado::ReadPtr& read,
+                                            const dorado::Read& read,
                                             int num_samples_per_base,
                                             bool is_rna) {
+    const c10::Half* signal = static_cast<c10::Half*>(read.raw_data.data_ptr());
+    int signal_len = read.raw_data.size(0);
+
     auto calc_stats = [&](int s, int e) -> std::pair<float, float> {
         float avg = 0;
         for (int i = s; i < e; i++) {
@@ -142,8 +143,8 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
 
 // Basic estimation of avg translocation speed by dividing number of samples by the
 // number of bases called.
-int estimate_samples_per_base(const dorado::ReadPtr& read) {
-    float num_samples_per_base = static_cast<float>(read->raw_data.size(0)) / read->seq.length();
+int estimate_samples_per_base(const dorado::Read& read) {
+    float num_samples_per_base = static_cast<float>(read.raw_data.size(0)) / read.seq.length();
     // The estimate is not rounded because this calculation generally overestimates
     // the samples per base. Rounding down gives better results than rounding to nearest.
     return std::floor(num_samples_per_base);
@@ -156,7 +157,7 @@ int estimate_samples_per_base(const dorado::ReadPtr& read) {
 // the approximate anchor for the tail, and if there needs to be an adjustment
 // made to the final polyA tail count based on the adapter sequence (e.g. because
 // the adapter itself contains several As).
-SignalAnchorInfo determine_signal_anchor_and_strand_cdna(const dorado::ReadPtr& read) {
+SignalAnchorInfo determine_signal_anchor_and_strand_cdna(const dorado::Read& read) {
     const std::string SSP = "TTTCTGTTGGTGCTGATATTGCTTT";
     const std::string SSP_rc = dorado::utils::reverse_complement(SSP);
     const std::string VNP = "ACTTGCCTGTCGCTCTATCTTCAGAGGAGAGTCCGCCGCCCGCAAGTTTT";
@@ -164,9 +165,9 @@ SignalAnchorInfo determine_signal_anchor_and_strand_cdna(const dorado::ReadPtr& 
     int trailing_Ts = dorado::utils::count_trailing_chars(VNP, 'T');
 
     const int kWindowSize = 150;
-    std::string read_top = read->seq.substr(0, kWindowSize);
-    auto bottom_start = std::max(0, (int)read->seq.length() - kWindowSize);
-    std::string read_bottom = read->seq.substr(bottom_start, kWindowSize);
+    std::string read_top = read.seq.substr(0, kWindowSize);
+    auto bottom_start = std::max(0, (int)read.seq.length() - kWindowSize);
+    std::string read_bottom = read.seq.substr(bottom_start, kWindowSize);
 
     EdlibAlignConfig align_config = edlibDefaultAlignConfig();
     align_config.task = EDLIB_TASK_LOC;
@@ -204,14 +205,14 @@ SignalAnchorInfo determine_signal_anchor_and_strand_cdna(const dorado::ReadPtr& 
             base_anchor = bottom_start + bottom_v1.startLocations[0];
         }
 
-        const auto stride = read->model_stride;
+        const auto stride = read.model_stride;
         const auto seq_to_sig_map = dorado::utils::moves_to_map(
-                read->moves, stride, read->raw_data.size(0), read->seq.size() + 1);
+                read.moves, stride, read.raw_data.size(0), read.seq.size() + 1);
         int signal_anchor = seq_to_sig_map[base_anchor];
 
         result = {fwd, signal_anchor, trailing_Ts};
     } else {
-        spdlog::debug("{} primer edit distance too high {}", read->read_id,
+        spdlog::debug("{} primer edit distance too high {}", read.read_id,
                       std::min(dist_v1, dist_v2));
     }
 
@@ -233,9 +234,9 @@ SignalAnchorInfo determine_signal_anchor_and_strand_cdna(const dorado::ReadPtr& 
 // at that juncture. This function returns a struct with the strand
 // direction (which is always reverse for dRNA), the signal anchor and the number of bases
 // to omit from the tail length estimation due to any adapter effects.
-SignalAnchorInfo determine_signal_anchor_and_strand_drna(const dorado::ReadPtr& read) {
-    const c10::Half* signal = static_cast<c10::Half*>(read->raw_data.data_ptr());
-    int signal_len = read->raw_data.size(0);
+SignalAnchorInfo determine_signal_anchor_and_strand_drna(const dorado::Read& read) {
+    const c10::Half* signal = static_cast<c10::Half*>(read.raw_data.data_ptr());
+    int signal_len = read.raw_data.size(0);
     const int kWindow = 50;
 
     // The algorithm is to keep track of the mean signal value over
@@ -250,26 +251,25 @@ SignalAnchorInfo determine_signal_anchor_and_strand_drna(const dorado::ReadPtr& 
     };
 
     int bp = -1;
-    int n = 0;
     // Since the polyA will start after the adapter, and in RNA each
     // base is at least 30 samples long (e.g. in RNA002), we can
     // limit the search space to start from 30 bases from the beginning
     // and up till about half the signal lengths. Note this is only to find
     // the __start__ of the polyA signal.
-    for (int i = 3000; i < signal_len / 2; i += kWindow) {
+    for (int i = 3000, num_windows_seen = 0; i < signal_len / 2; i += kWindow, num_windows_seen++) {
         float mean = 0;
         int s = i, e = i + kWindow;
         for (int j = s; j < e; j++) {
             mean += signal[j];
         }
         mean /= kWindow;
-        means[n] = mean;
-        auto var = check_var(n);
-        if (i >= means.size() && var > 2.2f) {
+        int means_idx = num_windows_seen % means.size();
+        means[means_idx] = mean;
+        auto var = check_var(means_idx);
+        if (num_windows_seen >= means.size() && var > 2.2f) {
             bp = i;
             break;
         }
-        n = (n + 1) % means.size();
     }
     spdlog::debug("Approx break point {}", bp);
 
@@ -301,20 +301,17 @@ void PolyACalculator::worker_thread() {
         // Determine the strand direction, approximate base space anchor for the tail, and whether
         // the final length needs to be adjusted depending on the adapter sequence.
         auto [fwd, signal_anchor, trailing_Ts] =
-                m_is_rna ? determine_signal_anchor_and_strand_drna(read)
-                         : determine_signal_anchor_and_strand_cdna(read);
+                m_is_rna ? determine_signal_anchor_and_strand_drna(*read)
+                         : determine_signal_anchor_and_strand_cdna(*read);
 
         if (signal_anchor >= 0) {
             spdlog::debug("Strand {}; poly A/T signal anchor {}", fwd ? '+' : '-', signal_anchor);
 
-            const c10::Half* signal = static_cast<c10::Half*>(read->raw_data.data_ptr());
-
-            auto num_samples_per_base = estimate_samples_per_base(read);
+            auto num_samples_per_base = estimate_samples_per_base(*read);
 
             // Walk through signal
-            auto [signal_start, signal_end] =
-                    determine_signal_bounds(signal_anchor, signal, read->raw_data.size(0), fwd,
-                                            read, num_samples_per_base, m_is_rna);
+            auto [signal_start, signal_end] = determine_signal_bounds(
+                    signal_anchor, fwd, *read, num_samples_per_base, m_is_rna);
 
             int num_bases = std::round(static_cast<float>(signal_end - signal_start) /
                                        num_samples_per_base) -
