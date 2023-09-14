@@ -122,9 +122,16 @@ class NVMLAPI {
         return true;
     }
 
+    void clear_symbols() {
+#define CLEAR_SYMBOL(name, optional) m_##name = nullptr;
+        FOR_EACH_NVML_SYMBOL(CLEAR_SYMBOL)
+#undef CLEAR_SYMBOL
+    }
+
     void init() {
         if (!platform_open() || !load_symbols()) {
             spdlog::warn("Failed to load NVML");
+            clear_symbols();
             platform_close();
             return;
         }
@@ -134,6 +141,7 @@ class NVMLAPI {
         nvmlReturn_t result = do_init();
         if (result != NVML_SUCCESS) {
             spdlog::warn("Failed to initialize NVML: {}", m_ErrorString(result));
+            clear_symbols();
             platform_close();
         }
     }
