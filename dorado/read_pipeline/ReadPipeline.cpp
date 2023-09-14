@@ -109,6 +109,11 @@ void Read::generate_read_tags(bam1_t *aln, bool emit_moves) const {
         bam_aux_append(aln, "RG", 'Z', rg.length() + 1, (uint8_t *)rg.c_str());
     }
 
+    if (!parent_read_id.empty()) {
+        bam_aux_append(aln, "pi", 'Z', parent_read_id.size() + 1,
+                       (uint8_t *)parent_read_id.c_str());
+    }
+
     if (emit_moves) {
         std::vector<uint8_t> m(moves.size() + 1, 0);
         m[0] = model_stride;
@@ -139,6 +144,11 @@ void Read::generate_duplex_read_tags(bam1_t *aln) const {
     auto rg = generate_read_group();
     if (!rg.empty()) {
         bam_aux_append(aln, "RG", 'Z', rg.length() + 1, (uint8_t *)rg.c_str());
+    }
+
+    if (!parent_read_id.empty()) {
+        bam_aux_append(aln, "pi", 'Z', parent_read_id.size() + 1,
+                       (uint8_t *)parent_read_id.c_str());
     }
 }
 

@@ -27,6 +27,7 @@ TEST_CASE(TEST_GROUP ": Test tag generation", TEST_GROUP) {
     test_read.run_id = "xyz";
     test_read.model_name = "test_model";
     test_read.is_duplex = false;
+    test_read.parent_read_id = "parent_read";
 
     SECTION("Basic") {
         auto alignments = test_read.extract_sam_lines(false);
@@ -50,6 +51,7 @@ TEST_CASE(TEST_GROUP ": Test tag generation", TEST_GROUP) {
         CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "fn")), Equals("batch_0.fast5"));
         CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "sv")), Equals("quantile"));
         CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "RG")), Equals("xyz_test_model"));
+        CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "pi")), Equals("parent_read"));
     }
 
     SECTION("Duplex") {
@@ -62,6 +64,7 @@ TEST_CASE(TEST_GROUP ": Test tag generation", TEST_GROUP) {
 
         CHECK(bam_aux2i(bam_aux_get(aln, "dx")) == 1);
         CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "RG")), Equals("xyz_test_model"));
+        CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "pi")), Equals("parent_read"));
 
         test_read.is_duplex = was_duplex;
     }
