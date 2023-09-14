@@ -15,7 +15,8 @@ class BarcodeClassifierNode : public MessageSink {
 public:
     BarcodeClassifierNode(int threads,
                           const std::vector<std::string>& kit_name,
-                          bool barcode_both_ends);
+                          bool barcode_both_ends,
+                          bool no_trim);
     ~BarcodeClassifierNode();
     std::string get_name() const override { return "BarcodeClassifierNode"; }
     stats::NamedStats sample_stats() const override;
@@ -30,10 +31,14 @@ private:
     std::vector<std::unique_ptr<std::thread>> m_workers;
     std::atomic<int> m_num_records{0};
     demux::BarcodeClassifier m_barcoder;
+    bool m_trim_barcodes{true};
 
     void worker_thread(size_t tid);
-    void barcode(bam1_t* irecord);
+    void barcode(BamPtr& read);
     void barcode(ReadPtr& read);
+
+    BamPtr trim_barcode(BamPtr irecord, const demux::ScoreResults& res, int seqlen);
+    void trim_barcode(ReadPtr& read, const demux::ScoreResults& res);
     void terminate_impl();
 };
 

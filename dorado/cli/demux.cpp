@@ -69,6 +69,10 @@ int demuxer(int argc, char* argv[]) {
             .help("Require both ends of a read to be barcoded for a double ended barcode.")
             .default_value(false)
             .implicit_value(true);
+    parser.add_argument("--no-trim")
+            .help("Skip barcode trimming. If option is not chosen, trimming is enabled.")
+            .default_value(false)
+            .implicit_value(true);
 
     try {
         parser.parse_args(argc, argv);
@@ -123,7 +127,8 @@ int demuxer(int argc, char* argv[]) {
         kit_names.push_back(parser.get<std::string>("--kit-name"));
     };
     auto demux = pipeline_desc.add_node<BarcodeClassifierNode>(
-            {demux_writer}, demux_threads, kit_names, parser.get<bool>("--barcode-both-ends"));
+            {demux_writer}, demux_threads, kit_names, parser.get<bool>("--barcode-both-ends"),
+            parser.get<bool>("--no-trim"));
 
     // Create the Pipeline from our description.
     std::vector<dorado::stats::StatsReporter> stats_reporters;

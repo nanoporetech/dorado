@@ -178,7 +178,7 @@ std::vector<BamPtr> Read::extract_sam_lines(bool emit_moves, uint8_t modbase_thr
         } else {
             generate_read_tags(aln, emit_moves);
         }
-        generate_modbase_string(aln, modbase_threshold);
+        generate_modbase_tags(aln, modbase_threshold);
         alns.push_back(BamPtr(aln));
     }
 
@@ -194,7 +194,7 @@ uint64_t Read::get_end_time_ms() const {
            ((end_sample - start_sample) * 1000) / sample_rate;  //TODO get rid of the trimmed thing?
 }
 
-void Read::generate_modbase_string(bam1_t *aln, uint8_t threshold) const {
+void Read::generate_modbase_tags(bam1_t *aln, uint8_t threshold) const {
     if (!mod_base_info) {
         return;
     }
