@@ -360,10 +360,8 @@ int basecaller(int argc, char* argv[]) {
             .implicit_value(true);
 
     parser.add_argument("--kit-name")
-            .help("Enable barcoding with the provided kit names. Choose from: " +
-                  dorado::barcode_kits::barcode_kits_list_str() +
-                  ". Multiple kits can be specified with additional '--kit-name' args.")
-            .append();
+            .help("Enable barcoding with the provided kit name. Choose from: " +
+                  dorado::barcode_kits::barcode_kits_list_str() + ".");
     parser.add_argument("--barcode-both-ends")
             .help("Require both ends of a read to be barcoded for a double ended barcode.")
             .default_value(false)
