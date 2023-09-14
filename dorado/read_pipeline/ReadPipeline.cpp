@@ -18,6 +18,7 @@ namespace {
 bool get_modbase_channel_name(std::string &channel_name, const std::string &mod_abbreviation) {
     static const std::map<std::string, std::string> modbase_name_map = {// A
                                                                         {"6mA", "a"},
+                                                                        {"m6A", "a"},
                                                                         // C
                                                                         {"5mC", "m"},
                                                                         {"5hmC", "h"},
