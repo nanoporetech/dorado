@@ -118,7 +118,7 @@ expected_read_groups_BC04=3
 expected_read_groups_unclassified=2
 for bam in $output_dir/read_group_test/rg_*.bam; do
     if [[ $bam =~ "_SQK-RBK114-96_" ]]; then
-        # Arrangement is |<kit>_<barcode>|, so tim the kit from the prefix and the .bam from the suffix.
+        # Arrangement is |<kit>_<barcode>|, so trim the kit from the prefix and the .bam from the suffix.
         barcode=${bam#*_SQK-RBK114-96_}
         barcode=${barcode%.bam*}
     else
