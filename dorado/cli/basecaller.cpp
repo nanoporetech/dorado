@@ -67,6 +67,7 @@ void setup(std::vector<std::string> args,
            const std::string& resume_from_file,
            const std::vector<std::string>& barcode_kits,
            bool barcode_both_ends,
+           bool barcode_no_trim,
            argparse::ArgumentParser& resume_parser,
            bool estimate_poly_a) {
     auto model_config = load_crf_model_config(model_path);
@@ -153,7 +154,8 @@ void setup(std::vector<std::string> args,
     }
     if (!barcode_kits.empty()) {
         current_sink_node = pipeline_desc.add_node<BarcodeClassifierNode>(
-                {current_sink_node}, barcoder_threads, barcode_kits, barcode_both_ends);
+                {current_sink_node}, barcoder_threads, barcode_kits, barcode_both_ends,
+                barcode_no_trim);
     }
     current_sink_node = pipeline_desc.add_node<ReadFilterNode>(
             {current_sink_node}, min_qscore, default_parameters.min_sequence_length,
@@ -366,6 +368,10 @@ int basecaller(int argc, char* argv[]) {
             .help("Require both ends of a read to be barcoded for a double ended barcode.")
             .default_value(false)
             .implicit_value(true);
+    parser.add_argument("--no-trim")
+            .help("Skip barcode trimming. If option is not chosen, trimming is enabled.")
+            .default_value(false)
+            .implicit_value(true);
 
     argparse::ArgumentParser internal_parser;
 
@@ -448,7 +454,7 @@ int basecaller(int argc, char* argv[]) {
               internal_parser.get<std::string>("--dump_stats_filter"),
               parser.get<std::string>("--resume-from"),
               parser.get<std::vector<std::string>>("--kit-name"),
-              parser.get<bool>("--barcode-both-ends"), resume_parser,
+              parser.get<bool>("--barcode-both-ends"), parser.get<bool>("--no-trim"), resume_parser,
               parser.get<bool>("--estimate-poly-a"));
     } catch (const std::exception& e) {
         spdlog::error("{}", e.what());
