@@ -196,12 +196,14 @@ void BarcodeClassifierNode::trim_barcode(Read& read, const demux::ScoreResults& 
     std::tie(num_positions_trimmed, read.moves) = utils::trim_move_table(read.moves, trim_interval);
     read.num_trimmed_samples += read.model_stride * num_positions_trimmed;
 
-    int num_modbase_channels = read.mod_base_info->alphabet.size();
-    // The modbase probs table consists of the probability per channel per base. So when
-    // trimming, we just shift everything by skipped bases * number of channels.
-    std::pair<int, int> modbase_interval = {trim_interval.first * num_modbase_channels,
-                                            trim_interval.second * num_modbase_channels};
-    read.base_mod_probs = utils::trim_quality(read.base_mod_probs, modbase_interval);
+    if (read.mod_base_info) {
+        int num_modbase_channels = read.mod_base_info->alphabet.size();
+        // The modbase probs table consists of the probability per channel per base. So when
+        // trimming, we just shift everything by skipped bases * number of channels.
+        std::pair<int, int> modbase_interval = {trim_interval.first * num_modbase_channels,
+                                                trim_interval.second * num_modbase_channels};
+        read.base_mod_probs = utils::trim_quality(read.base_mod_probs, modbase_interval);
+    }
 }
 
 void BarcodeClassifierNode::barcode(BamPtr& read) {
