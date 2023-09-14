@@ -75,6 +75,11 @@ foreach(TEST_BIN dorado_tests dorado_smoke_tests)
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
         )
 
+    if(NOT MSVC)
+        # Add -Wno-trigraphs because one of the tests uses a qstring that has a trigraph sequence.
+        target_compile_options(${TEST_BIN} PRIVATE "-Wno-trigraphs")
+    endif()
+
     # The tests need to be able to find the libs in order to run.
     # We also want these libs to take priority over any installed on the system, so prepend them.
     if (MSVC)
