@@ -8,9 +8,16 @@
 
 #if HAS_NVML
 #include <nvml.h>
-#endif
+#if defined(_WIN32)
+#include <Windows.h>
+#else  // _WIN32
+#include <dlfcn.h>
+#endif  // _WIN32
+#endif  // HAS_NVML
 
 #include <spdlog/spdlog.h>
+
+#include <cstdlib>
 
 namespace dorado::utils {
 
@@ -18,35 +25,145 @@ namespace {
 
 #if HAS_NVML
 
-// Scoped wrapper around NVML API initialisation.
+// Prefixless versions of symbols we use
+// X(name, optional)
+#define FOR_EACH_NVML_SYMBOL(X)      \
+    X(Init, false)                   \
+    X(Init_v2, true)                 \
+    X(Shutdown, false)               \
+    X(SystemGetDriverVersion, false) \
+    X(ErrorString, false)            \
+    // line intentionally blank
+
+/**
+ * Handle to the NVML API.
+ * Also provides a scoped wrapper around NVML API initialisation.
+ */
 class NVMLAPI {
-    bool m_inited = false;
+    // Platform specific library handling.
+#ifdef _WIN32
+    HINSTANCE m_handle = nullptr;
+    bool platform_open() {
+        m_handle = LoadLibraryA("nvml.dll");
+        if (m_handle != nullptr) {
+            return true;
+        }
+
+        // Search in other places that the documentation and other resources mentions.
+        const char *win64_dir_env = getenv("ProgramW6432");
+        const std::string win64_dir = win64_dir_env ? win64_dir_env : "C:";
+        const std::string paths[] = {
+                win64_dir + "\\NVIDIA Corporation\\NVSMI\\nvml.dll",
+                win64_dir + "\\NVIDIA Corporation\\NVSMI\\nvml\\lib\\nvml.dll",
+                win64_dir + "\\NVIDIA Corporation\\GDK\\nvml.dll",
+                win64_dir + "\\NVIDIA Corporation\\GDK\\nvml\\lib\\nvml.dll",
+        };
+        for (const auto &path : paths) {
+            m_handle = LoadLibraryA(path.c_str());
+            if (m_handle != nullptr) {
+                return true;
+            }
+        }
+        return false;
+    }
+    void platform_close() {
+        if (m_handle != nullptr) {
+            FreeLibrary(m_handle);
+            m_handle = nullptr;
+        }
+    }
+    template <typename T>
+    bool platform_load_symbol(T *&func_ptr, const char *name, bool optional) {
+        func_ptr = reinterpret_cast<T *>(GetProcAddress(m_handle, name));
+        if (func_ptr == nullptr && !optional) {
+            spdlog::warn("Failed to load NVML symbol {}: {}", name, GetLastError());
+            return false;
+        }
+        return true;
+    }
+
+#else   // _WIN32
+    void *m_handle = nullptr;
+    bool platform_open() {
+        m_handle = dlopen("libnvidia-ml.so", RTLD_NOW);
+        return m_handle != nullptr;
+    }
+    void platform_close() {
+        if (m_handle != nullptr) {
+            dlclose(m_handle);
+            m_handle = nullptr;
+        }
+    }
+    template <typename T>
+    bool platform_load_symbol(T *&func_ptr, const char *name, bool optional) {
+        func_ptr = reinterpret_cast<T *>(dlsym(m_handle, name));
+        if (func_ptr == nullptr && !optional) {
+            spdlog::warn("Failed to load NVML symbol {}: {}", name, dlerror());
+            return false;
+        }
+        return true;
+    }
+#endif  // _WIN32
+
+    // Add members for each function pointer.
+#define GENERATE_MEMBER(name, optional)         \
+    using name##_ptr = decltype(&::nvml##name); \
+    name##_ptr m_##name = nullptr;
+    FOR_EACH_NVML_SYMBOL(GENERATE_MEMBER)
+#undef GENERATE_MEMBER
+
+    bool load_symbols() {
+#define LOAD_SYMBOL(name, optional)                                \
+    if (!platform_load_symbol(m_##name, "nvml" #name, optional)) { \
+        return false;                                              \
+    }
+        FOR_EACH_NVML_SYMBOL(LOAD_SYMBOL)
+#undef LOAD_SYMBOL
+        return true;
+    }
+
+    void init() {
+        if (!platform_open() || !load_symbols()) {
+            spdlog::warn("Failed to load NVML");
+            platform_close();
+            return;
+        }
+
+        // Fall back to the original nvmlInit() if _v2 doesn't exist.
+        auto *do_init = m_Init_v2 ? m_Init_v2 : m_Init;
+        nvmlReturn_t result = do_init();
+        if (result != NVML_SUCCESS) {
+            spdlog::warn("Failed to initialize NVML: {}", m_ErrorString(result));
+            platform_close();
+        }
+    }
+
+    void shutdown() {
+        if (m_Shutdown != nullptr) {
+            m_Shutdown();
+        }
+        platform_close();
+    }
+
+    NVMLAPI() { init(); }
+
+    ~NVMLAPI() { shutdown(); }
 
     NVMLAPI(const NVMLAPI &) = delete;
     NVMLAPI &operator=(const NVMLAPI &) = delete;
 
 public:
-    NVMLAPI() {
-        nvmlReturn_t result = nvmlInit();
-        if (result != NVML_SUCCESS) {
-            spdlog::warn("Failed to initialize NVML: {}", nvmlErrorString(result));
-        }
-        m_inited = result == NVML_SUCCESS;
+    static NVMLAPI *get() {
+        static NVMLAPI api;
+        return api.m_handle != nullptr ? &api : nullptr;
     }
 
-    ~NVMLAPI() {
-        if (m_inited) {
-            nvmlShutdown();
-        }
+    nvmlReturn_t SystemGetDriverVersion(char *version, unsigned int length) {
+        return m_SystemGetDriverVersion(version, length);
     }
 
-    bool is_inited() const { return m_inited; }
+    const char *ErrorString(nvmlReturn_t result) { return m_ErrorString(result); }
 };
-
-bool init_nvml() {
-    static NVMLAPI api;
-    return api.is_inited();
-}
 
 #endif  // HAS_NVML
 
@@ -54,16 +171,18 @@ bool init_nvml() {
 
 std::optional<std::string> get_nvidia_driver_version() {
 #if HAS_NVML
-    if (!init_nvml()) {
+    // See if we have access to the API.
+    auto *nvml_api = NVMLAPI::get();
+    if (nvml_api == nullptr) {
         return std::nullopt;
     }
 
     // Grab the driver version
     char version[NVML_SYSTEM_DRIVER_VERSION_BUFFER_SIZE + 1]{};
     nvmlReturn_t result =
-            nvmlSystemGetDriverVersion(version, NVML_SYSTEM_DRIVER_VERSION_BUFFER_SIZE);
+            nvml_api->SystemGetDriverVersion(version, NVML_SYSTEM_DRIVER_VERSION_BUFFER_SIZE);
     if (result != NVML_SUCCESS) {
-        spdlog::warn("Failed to query driver version: {}", nvmlErrorString(result));
+        spdlog::warn("Failed to query driver version: {}", nvml_api->ErrorString(result));
         return std::nullopt;
     }
 

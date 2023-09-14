@@ -107,18 +107,6 @@ if(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     target_link_libraries(dorado_utils ${IOKIT})
 endif()
 
-if(WIN32)
-	find_library(NVML_LIB
-		nvml.lib
-		PATHS ${CUDAToolkit_ROOT}
-		PATH_SUFFIXES lib lib/x64
-		REQUIRED
-	)
-    target_link_libraries(dorado_utils ${NVML_LIB})
-elseif(NOT APPLE)
-    target_link_libraries(dorado_utils nvidia-ml)
-endif()
-
 if(NOT WIN32)
     add_dependencies(dorado_utils htslib_project)
 endif()
