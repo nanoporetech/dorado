@@ -6,6 +6,7 @@
 
 #include <nvtx3/nvtx3.hpp>
 
+#include <algorithm>
 #include <cstdlib>
 
 #if defined(__APPLE__) && !defined(__x86_64__)
