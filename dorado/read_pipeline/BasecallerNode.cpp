@@ -144,6 +144,11 @@ void BasecallerNode::working_reads_manager() {
             source_read->model_name = m_model_name;
             source_read->mean_qscore_start_pos = m_mean_qscore_start_pos;
 
+            if (m_rna) {
+                std::reverse(source_read->seq.begin(), source_read->seq.end());
+                std::reverse(source_read->qstring.begin(), source_read->qstring.end());
+            }
+
             // Update stats.
             ++m_called_reads_pushed;
             m_num_bases_processed += source_read->seq.length();
@@ -292,6 +297,7 @@ BasecallerNode::BasecallerNode(std::vector<Runner> model_runners,
           m_chunk_size(m_model_runners.front()->chunk_size()),
           m_overlap(overlap),
           m_model_stride(m_model_runners.front()->model_stride()),
+          m_rna(is_rna_model(m_model_runners.front()->config())),
           m_batch_timeout_ms(batch_timeout_ms),
           m_model_name(std::move(model_name)),
           m_max_reads(max_reads),

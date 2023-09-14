@@ -185,12 +185,12 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
     CAPTURE(gpu);
     auto pipeline_restart = GENERATE(false, true);
     CAPTURE(pipeline_restart);
+    auto model_name = GENERATE("dna_r10.4.1_e8.2_400bps_fast@v4.2.0", "rna004_130bps_fast@v3.0.1");
 
     set_pipeline_restart(pipeline_restart);
 
     const int kBatchTimeoutMS = 100;
     const auto& default_params = dorado::utils::default_parameters;
-    const char model_name[] = "dna_r10.4.1_e8.2_400bps_fast@v4.2.0";
     const auto model_dir = download_model(model_name);
     const auto model_path = (model_dir.m_path / model_name).string();
     auto model_config = dorado::load_crf_model_config(model_path);
@@ -309,15 +309,13 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
 
 DEFINE_TEST(NodeSmokeTestBam, "ReadToBamType") {
     auto emit_moves = GENERATE(true, false);
-    auto rna = GENERATE(true, false);
     auto pipeline_restart = GENERATE(false, true);
     CAPTURE(emit_moves);
-    CAPTURE(rna);
     CAPTURE(pipeline_restart);
 
     set_pipeline_restart(pipeline_restart);
 
-    run_smoke_test<dorado::ReadToBamType>(emit_moves, rna, 2,
+    run_smoke_test<dorado::ReadToBamType>(emit_moves, 2,
                                           dorado::utils::default_parameters.methylation_threshold);
 }
 
