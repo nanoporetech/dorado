@@ -374,7 +374,8 @@ void PolyACalculator::terminate_impl() {
     m_workers.clear();
 
     spdlog::debug("Total called {}, not called {}, avg tail length {}", num_called.load(),
-                  num_not_called.load(), total_tail_lengths_called.load() / num_called.load());
+                  num_not_called.load(),
+                  num_called.load() > 0 ? total_tail_lengths_called.load() / num_called.load() : 0);
 
     // Visualize a distribution of the tail lengths called.
     static bool done = false;
@@ -401,7 +402,8 @@ stats::NamedStats PolyACalculator::sample_stats() const {
     stats["reads_not_estimated"] = num_not_called.load();
     ;
     stats["reads_estimated"] = num_called.load();
-    stats["average_tail_length"] = total_tail_lengths_called.load() / num_called.load();
+    stats["average_tail_length"] =
+            num_called.load() > 0 ? total_tail_lengths_called.load() / num_called.load() : 0;
     return stats;
 }
 
