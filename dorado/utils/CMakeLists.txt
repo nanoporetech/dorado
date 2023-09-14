@@ -12,6 +12,8 @@ add_library(dorado_utils
     compat_utils.h
     dev_utils.cpp
     dev_utils.h
+    driver_query.cpp
+    driver_query.h
     duplex_utils.cpp
     duplex_utils.h
     log_utils.cpp
@@ -103,6 +105,18 @@ endif()
 
 if(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     target_link_libraries(dorado_utils ${IOKIT})
+endif()
+
+if(WIN32)
+	find_library(NVML_LIB
+		nvml.lib
+		PATHS ${CUDAToolkit_ROOT}
+		PATH_SUFFIXES lib lib/x64
+		REQUIRED
+	)
+    target_link_libraries(dorado_utils ${NVML_LIB})
+elseif(NOT APPLE)
+    target_link_libraries(dorado_utils nvidia-ml)
 endif()
 
 if(NOT WIN32)
