@@ -157,14 +157,24 @@ public:
 };
 
 // A pair of reads for Duplex calling
-class ReadPair {
-public:
-    std::shared_ptr<const Read> read_1;
-    std::shared_ptr<const Read> read_2;
-    uint64_t read_1_start;
-    uint64_t read_1_end;
-    uint64_t read_2_start;
-    uint64_t read_2_end;
+struct ReadPair {
+    struct ReadData {
+        std::string seq;
+        uint64_t seq_start;
+        uint64_t seq_end;
+        std::string qstring;
+        std::vector<uint8_t> moves;
+        torch::Tensor raw_data;
+        std::string read_id;
+        std::string run_id;
+        details::Attributes attributes;
+        uint64_t start_time_ms;
+        uint64_t read_tag;
+        int32_t client_id;
+        static ReadData from_read(const Read& read, uint64_t seq_start, uint64_t seq_end);
+    };
+    ReadData template_read;
+    ReadData complement_read;
 };
 
 class CacheFlushMessage {

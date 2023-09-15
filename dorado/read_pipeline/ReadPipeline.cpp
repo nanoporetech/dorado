@@ -303,6 +303,25 @@ float Read::calculate_mean_qscore() const {
     return utils::mean_qscore_from_qstring(read_common.qstring, mean_qscore_start_pos);
 }
 
+ReadPair::ReadData ReadPair::ReadData::from_read(const Read &read,
+                                                 uint64_t seq_start,
+                                                 uint64_t seq_end) {
+    ReadData data;
+    data.seq = read.seq;
+    data.seq_start = seq_start;
+    data.seq_end = seq_end;
+    data.qstring = read.qstring;
+    data.moves = read.moves;
+    data.raw_data = read.raw_data;
+    data.read_id = read.read_id;
+    data.run_id = read.run_id;
+    data.attributes = read.attributes;
+    data.start_time_ms = read.start_time_ms;
+    data.read_tag = read.read_tag;
+    data.client_id = read.client_id;
+    return data;
+}
+
 MessageSink::MessageSink(size_t max_messages) : m_work_queue(max_messages) {}
 
 void MessageSink::push_message_internal(Message &&message) {
