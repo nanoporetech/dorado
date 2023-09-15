@@ -100,6 +100,8 @@ public:
     // Barcode.
     std::string barcode{};
 
+    int rna_poly_tail_length{-1};
+
 private:
     void generate_duplex_read_tags(bam1_t*) const;
     void generate_read_tags(bam1_t* aln, bool emit_moves) const;

@@ -19,6 +19,7 @@ set(UNIT_TEST_SOURCE_FILES
     PairingNodeTest.cpp
     PipelineTest.cpp
     Pod5DataLoaderTest.cpp
+    PolyACalculatorTest.cpp
     ReadFilterNodeTest.cpp
     ReadTest.cpp
     ResumeLoaderTest.cpp

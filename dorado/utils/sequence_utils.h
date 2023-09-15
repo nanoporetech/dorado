@@ -41,4 +41,6 @@ public:
     static const std::vector<int> BASE_IDS;
 };
 
+int count_trailing_chars(const std::string_view adapter, char c);
+
 }  // namespace dorado::utils

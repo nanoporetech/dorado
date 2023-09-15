@@ -124,6 +124,11 @@ void Read::generate_read_tags(bam1_t *aln, bool emit_moves) const {
 
         bam_aux_update_array(aln, "mv", 'c', m.size(), (uint8_t *)m.data());
     }
+
+    if (rna_poly_tail_length >= 0) {
+        bam_aux_append(aln, "pt", 'i', sizeof(rna_poly_tail_length),
+                       (uint8_t *)&rna_poly_tail_length);
+    }
 }
 
 void Read::generate_duplex_read_tags(bam1_t *aln) const {

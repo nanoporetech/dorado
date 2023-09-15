@@ -93,4 +93,13 @@ if [[ $num_demuxed_reads -ne "3" ]]; then
     exit 1
 fi
 
+echo "dorado test poly(A) tail estimation"
+$dorado_bin basecaller -b ${batch} ${model} $data_dir/poly_a/r10_cdna_pod5/ --estimate-poly-a > $output_dir/polya.bam
+samtools quickcheck -u $output_dir/polya.bam
+num_estimated_reads=$(samtools view $output_dir/polya.bam | grep pt:i: | wc -l | awk '{print $1}')
+if [[ $num_estimated_reads -ne "2" ]]; then
+    echo "2 poly(A) estimated reads expected. Found ${num_estimated_reads}"
+    exit 1
+fi
+
 rm -rf $output_dir

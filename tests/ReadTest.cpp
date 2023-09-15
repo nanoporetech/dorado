@@ -42,6 +42,7 @@ TEST_CASE(TEST_GROUP ": Test tag generation", TEST_GROUP) {
         CHECK(bam_aux2i(bam_aux_get(aln, "rn")) == 18501);
         CHECK(bam_aux2i(bam_aux_get(aln, "rn")) == 18501);
         CHECK(bam_aux2i(bam_aux_get(aln, "dx")) == 0);
+        CHECK(bam_aux_get(aln, "pt") == nullptr);
 
         CHECK(bam_aux2f(bam_aux_get(aln, "du")) == Approx(1.033).margin(1e-6));
         CHECK(bam_aux2f(bam_aux_get(aln, "sm")) == 128.3842f);
@@ -117,6 +118,18 @@ TEST_CASE(TEST_GROUP ": Test tag generation", TEST_GROUP) {
         CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "RG")), Equals("xyz_test_model"));
 
         test_read.barcode = old_barcode;
+    }
+
+    SECTION("PolyA tail length") {
+        auto old_tail_length = std::exchange(test_read.rna_poly_tail_length, 20);
+
+        auto alignments = test_read.extract_sam_lines(false);
+        REQUIRE(alignments.size() == 1);
+        auto* aln = alignments[0].get();
+
+        CHECK(bam_aux2i(bam_aux_get(aln, "pt")) == 20);
+
+        test_read.rna_poly_tail_length = old_tail_length;
     }
 }
 

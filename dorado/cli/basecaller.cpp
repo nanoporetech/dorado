@@ -9,6 +9,7 @@
 #include "read_pipeline/HtsReader.h"
 #include "read_pipeline/HtsWriter.h"
 #include "read_pipeline/Pipelines.h"
+#include "read_pipeline/PolyACalculator.h"
 #include "read_pipeline/ProgressTracker.h"
 #include "read_pipeline/ReadFilterNode.h"
 #include "read_pipeline/ReadToBamTypeNode.h"
@@ -62,7 +63,8 @@ void setup(std::vector<std::string> args,
            const std::string& dump_stats_file,
            const std::string& dump_stats_filter,
            const std::string& resume_from_file,
-           argparse::ArgumentParser& resume_parser) {
+           argparse::ArgumentParser& resume_parser,
+           bool estimate_poly_a) {
     auto model_config = load_crf_model_config(model_path);
     std::string model_name = utils::extract_model_from_model_path(model_path.string());
 
@@ -137,8 +139,17 @@ void setup(std::vector<std::string> args,
     auto read_converter = pipeline_desc.add_node<ReadToBamType>(
             {converted_reads_sink}, emit_moves, rna, thread_allocations.read_converter_threads,
             methylation_threshold_pct);
+
+    auto filtered_read_sink = PipelineDescriptor::InvalidNodeHandle;
+    if (estimate_poly_a) {
+        auto polya_calculator = pipeline_desc.add_node<PolyACalculator>(
+                {read_converter}, std::thread::hardware_concurrency(), rna);
+        filtered_read_sink = polya_calculator;
+    } else {
+        filtered_read_sink = read_converter;
+    }
     auto read_filter_node = pipeline_desc.add_node<ReadFilterNode>(
-            {read_converter}, min_qscore, default_parameters.min_sequence_length,
+            {filtered_read_sink}, min_qscore, default_parameters.min_sequence_length,
             std::unordered_set<std::string>{}, thread_allocations.read_filter_threads);
 
     auto mean_qscore_start_pos = model_config.mean_qscore_start_pos;
@@ -332,6 +343,12 @@ int basecaller(int argc, char* argv[]) {
             .scan<'i', int>();
     parser.add_argument("-I").help("minimap2 index batch size.").default_value(std::string("16G"));
 
+    parser.add_argument("--estimate-poly-a")
+            .help("Estimate poly-A/T tail lengths (beta feature). Primarily meant for cDNA and "
+                  "dRNA use cases.")
+            .default_value(false)
+            .implicit_value(true);
+
     argparse::ArgumentParser internal_parser;
 
     // Create a copy of the parser to use if the resume feature is enabled. Needed
@@ -411,7 +428,8 @@ int basecaller(int argc, char* argv[]) {
               internal_parser.get<bool>("--skip-model-compatibility-check"),
               internal_parser.get<std::string>("--dump_stats_file"),
               internal_parser.get<std::string>("--dump_stats_filter"),
-              parser.get<std::string>("--resume-from"), resume_parser);
+              parser.get<std::string>("--resume-from"), resume_parser,
+              parser.get<bool>("--estimate-poly-a"));
     } catch (const std::exception& e) {
         spdlog::error("{}", e.what());
         return 1;
