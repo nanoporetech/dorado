@@ -1,8 +1,8 @@
 #include "PolyACalculator.h"
 
-#include "3rdparty/edlib/edlib/include/edlib.h"
 #include "utils/sequence_utils.h"
 
+#include <edlib.h>
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
