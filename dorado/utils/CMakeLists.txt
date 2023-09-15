@@ -58,10 +58,12 @@ target_compile_definitions(dorado_utils
         DORADO_GPU_BUILD=$<BOOL:${DORADO_GPU_BUILD}>
 )
 
-target_precompile_headers(dorado_utils
-    PRIVATE
-    <torch/torch.h>
-)
+if (DORADO_ENABLE_PCH)
+    target_precompile_headers(dorado_utils
+        PRIVATE
+        <torch/torch.h>
+    )
+endif()
 
 # 3rdparty libs should be considered SYSTEM headers
 target_include_directories(dorado_utils

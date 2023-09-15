@@ -82,6 +82,10 @@ find_program(CCACHE_EXE ccache)
 if (CCACHE_EXE)
     set(CMAKE_C_COMPILER_LAUNCHER ${CCACHE_EXE})
     set(CMAKE_CXX_COMPILER_LAUNCHER ${CCACHE_EXE})
+    set(DORADO_ENABLE_PCH FALSE)
+else()
+    # Fallback to using a PCH if we don't have ccache support, since making them work together isn't simple.
+    set(DORADO_ENABLE_PCH TRUE)
 endif()
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
@@ -257,7 +261,9 @@ if(NOT SKIP_HDF_PLUGINS)
   add_hdf_vbz_plugin()
 endif()
 
-target_precompile_headers(dorado_lib REUSE_FROM dorado_utils)
+if (DORADO_ENABLE_PCH)
+    target_precompile_headers(dorado_lib REUSE_FROM dorado_utils)
+endif()
 
 target_link_libraries(dorado_lib
     ${TORCH_LIBRARIES}
@@ -308,7 +314,9 @@ if(NOT DORADO_LIB_ONLY)
         set_target_properties(dorado PROPERTIES LINK_OPTIONS "/ignore:4099")
     endif()
 
-    target_precompile_headers(dorado REUSE_FROM dorado_lib)
+    if (DORADO_ENABLE_PCH)
+        target_precompile_headers(dorado REUSE_FROM dorado_lib)
+    endif()
 
     target_link_libraries(dorado
         dorado_lib
