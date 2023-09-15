@@ -20,6 +20,7 @@ add_library(dorado_utils
     memory_utils.cpp
     memory_utils.h
     module_utils.h
+    parameters.cpp
     parameters.h
     sequence_utils.cpp
     sequence_utils.h
