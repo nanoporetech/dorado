@@ -10,13 +10,13 @@ set(UNIT_TEST_SOURCE_FILES
     BarcodeDemuxerNodeTest.cpp    
     CliUtilsTest.cpp
     DuplexReadTaggingNodeTest.cpp
-    #DuplexSplitTest.cpp
+    DuplexSplitTest.cpp
     Fast5DataLoaderTest.cpp
     MathUtilsTest.cpp
     ModBaseEncoderTest.cpp
     MotifMatcherTest.cpp
     ModelUtilsTest.cpp
-    #PairingNodeTest.cpp
+    PairingNodeTest.cpp
     PipelineTest.cpp
     Pod5DataLoaderTest.cpp
     ReadFilterNodeTest.cpp

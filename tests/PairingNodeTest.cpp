@@ -31,8 +31,10 @@ auto make_read(int delay_ms, size_t seq_len, const std::string& seq = "") {
             dorado::utils::get_string_timestamp_from_unix_time(read->start_time_ms);
     if (seq.empty()) {
         read->seq = std::string(seq_len, 'A');
+        read->qstring = std::string(seq_len, '~');
     } else {
         read->seq = seq;
+        read->qstring = std::string(seq.length(), '~');
     }
     return read;
 }
