@@ -49,7 +49,7 @@ protected:
     }
 
     auto make_test_read(std::string read_id) {
-        auto read = dorado::ReadPtr::make();
+        auto read = std::make_unique<dorado::Read>();
         read->read_common.raw_data = torch::rand(random_between(100, 200));
         read->sample_rate = 5000;
         read->shift = random_between(100, 200);

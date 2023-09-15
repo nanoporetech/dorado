@@ -2,7 +2,7 @@
 
 namespace dorado::utils {
 ReadPtr shallow_copy_read(const Read& read) {
-    auto copy = ReadPtr::make();
+    auto copy = std::make_unique<Read>();
     copy->read_common.raw_data = read.read_common.raw_data;
     copy->digitisation = read.digitisation;
     copy->range = read.range;

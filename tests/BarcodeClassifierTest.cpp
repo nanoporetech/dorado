@@ -193,7 +193,7 @@ TEST_CASE(
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
 
     // Create new read that is barcode - 100 As - barcode.
-    auto read = dorado::ReadPtr::make();
+    auto read = std::make_unique<Read>();
     const std::string nonbc_seq = std::string(100, 'A');
     const auto& kit_info_map = barcode_kits::get_kit_infos();
     const auto& barcodes = barcode_kits::get_barcodes();
