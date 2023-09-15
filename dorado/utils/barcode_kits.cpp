@@ -1,5 +1,7 @@
 #include "barcode_kits.h"
 
+#include <numeric>
+
 namespace dorado::barcode_kits {
 
 namespace {
