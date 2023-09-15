@@ -215,7 +215,7 @@ void PairingNode::pair_list_worker_thread(int tid) {
                     ReadPair read_pair;
                     read_pair.template_read = ReadPair::ReadData::from_read(*template_read, qs, qe);
                     read_pair.complement_read =
-                            ReadPair::ReadData::from_read(*template_read, rs, re);
+                            ReadPair::ReadData::from_read(*complement_read, rs, re);
 
                     template_read->is_duplex_parent = true;
                     complement_read->is_duplex_parent = true;
