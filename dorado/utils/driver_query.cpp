@@ -85,8 +85,14 @@ class NVMLAPI {
 #else   // _WIN32
     void *m_handle = nullptr;
     bool platform_open() {
-        m_handle = dlopen("libnvidia-ml.so", RTLD_NOW);
-        return m_handle != nullptr;
+        // Prioritise loading the versioned lib.
+        for (const char *path : {"libnvidia-ml.so.1", "libnvidia-ml.so"}) {
+            m_handle = dlopen(path, RTLD_NOW);
+            if (m_handle != nullptr) {
+                return true;
+            }
+        }
+        return false;
     }
     void platform_close() {
         if (m_handle != nullptr) {
