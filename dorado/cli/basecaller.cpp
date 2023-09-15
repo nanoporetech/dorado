@@ -95,7 +95,8 @@ void setup(std::vector<std::string> args,
         throw std::runtime_error(err.str());
     }
 
-    if (!ref.empty() && output_mode == HtsWriter::OutputMode::FASTQ) {
+    const bool enable_aligner = !ref.empty();
+    if (enable_aligner && output_mode == HtsWriter::OutputMode::FASTQ) {
         throw std::runtime_error("Alignment to reference cannot be used with FASTQ output.");
     }
 
@@ -120,29 +121,22 @@ void setup(std::vector<std::string> args,
     bool rna = utils::is_rna_model(model_path), duplex = false;
 
     const auto thread_allocations = utils::default_thread_allocations(
-            num_devices, !remora_runners.empty() ? num_remora_threads : 0);
+            num_devices, !remora_runners.empty() ? num_remora_threads : 0, enable_aligner,
+            !barcode_kits.empty());
 
     SamHdrPtr hdr(sam_hdr_init());
     cli::add_pg_hdr(hdr.get(), args);
     utils::add_rg_hdr(hdr.get(), read_groups, barcode_kits);
-
-    // Divide up work equally between the aligner and barcoder nodes if both are enabled,
-    // otherwise both get all the remaining threads.
-    int aligner_threads = thread_allocations.remaining_threads;
-    int barcoder_threads = thread_allocations.remaining_threads;
-    if (!ref.empty() && !barcode_kits.empty()) {
-        aligner_threads = std::min(1, aligner_threads / 2);
-        barcoder_threads = std::min(1, barcoder_threads / 2);
-    }
 
     PipelineDescriptor pipeline_desc;
     auto hts_writer = pipeline_desc.add_node<HtsWriter>(
             {}, "-", output_mode, thread_allocations.writer_threads, num_reads);
     auto aligner = PipelineDescriptor::InvalidNodeHandle;
     auto current_sink_node = hts_writer;
-    if (!ref.empty()) {
+    if (enable_aligner) {
         aligner = pipeline_desc.add_node<Aligner>({current_sink_node}, ref, kmer_size, window_size,
-                                                  mm2_index_batch_size, aligner_threads);
+                                                  mm2_index_batch_size,
+                                                  thread_allocations.aligner_threads);
         current_sink_node = aligner;
     }
     current_sink_node = pipeline_desc.add_node<ReadToBamType>(
@@ -154,8 +148,8 @@ void setup(std::vector<std::string> args,
     }
     if (!barcode_kits.empty()) {
         current_sink_node = pipeline_desc.add_node<BarcodeClassifierNode>(
-                {current_sink_node}, barcoder_threads, barcode_kits, barcode_both_ends,
-                barcode_no_trim);
+                {current_sink_node}, thread_allocations.barcoder_threads, barcode_kits,
+                barcode_both_ends, barcode_no_trim);
     }
     current_sink_node = pipeline_desc.add_node<ReadFilterNode>(
             {current_sink_node}, min_qscore, default_parameters.min_sequence_length,
@@ -184,7 +178,7 @@ void setup(std::vector<std::string> args,
     // At present, header output file header writing relies on direct node method calls
     // rather than the pipeline framework.
     auto& hts_writer_ref = dynamic_cast<HtsWriter&>(pipeline->get_node_ref(hts_writer));
-    if (!ref.empty()) {
+    if (enable_aligner) {
         const auto& aligner_ref = dynamic_cast<Aligner&>(pipeline->get_node_ref(aligner));
         utils::add_sq_hdr(hdr.get(), aligner_ref.get_sequence_records_for_header());
     }

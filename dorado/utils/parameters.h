@@ -38,11 +38,14 @@ struct ThreadAllocations {
     int remora_threads{0};
     int scaler_node_threads{0};
     int loader_threads{0};
-    int remaining_threads{0};
+    int aligner_threads{0};
+    int barcoder_threads{0};
 };
 
 ThreadAllocations default_thread_allocations(int num_devices,
                                              int num_remora_threads,
+                                             bool enable_aligner,
+                                             bool enable_barcoder,
                                              int max_threads = 0);
 
 }  // namespace dorado::utils
