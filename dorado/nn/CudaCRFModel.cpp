@@ -34,7 +34,7 @@ public:
         m_decoder_options = DecoderOptions();
         m_decoder_options.q_shift = model_config.qbias;
         m_decoder_options.q_scale = model_config.qscale;
-        m_decoder = std::make_unique<GPUDecoder>();
+        m_decoder = std::make_unique<GPUDecoder>(model_config.clamp ? 5.f : 0.f);
         m_num_input_features = model_config.num_features;
         // adjust chunk size to be a multiple of the stride
         m_out_chunk_size = chunk_size / model_config.stride;
