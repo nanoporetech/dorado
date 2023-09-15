@@ -188,6 +188,10 @@ std::vector<BamPtr> Read::extract_sam_lines(bool emit_moves, uint8_t modbase_thr
         bam_set1(aln, read_id.length(), read_id.c_str(), flags, -1, leftmost_pos, map_q, 0, nullptr,
                  -1, next_pos, 0, seq.length(), seq.c_str(), (char *)qscore.data(), 0);
 
+        if (!barcode.empty() && barcode != "unclassified") {
+            bam_aux_append(aln, "BC", 'Z', barcode.length() + 1, (uint8_t *)barcode.c_str());
+        }
+
         if (is_duplex) {
             generate_duplex_read_tags(aln);
         } else {

@@ -6,6 +6,7 @@
 #include "nn/ModBaseRunner.h"
 #include "nn/Runners.h"
 #include "read_pipeline/AlignerNode.h"
+#include "read_pipeline/BarcodeClassifierNode.h"
 #include "read_pipeline/HtsReader.h"
 #include "read_pipeline/HtsWriter.h"
 #include "read_pipeline/Pipelines.h"
@@ -15,6 +16,7 @@
 #include "read_pipeline/ReadToBamTypeNode.h"
 #include "read_pipeline/ResumeLoaderNode.h"
 #include "utils/bam_utils.h"
+#include "utils/barcode_kits.h"
 #include "utils/basecaller_utils.h"
 #include "utils/log_utils.h"
 #include "utils/parameters.h"
@@ -63,6 +65,9 @@ void setup(std::vector<std::string> args,
            const std::string& dump_stats_file,
            const std::string& dump_stats_filter,
            const std::string& resume_from_file,
+           const std::vector<std::string>& barcode_kits,
+           bool barcode_both_ends,
+           bool barcode_no_trim,
            argparse::ArgumentParser& resume_parser,
            bool estimate_poly_a) {
     auto model_config = load_crf_model_config(model_path);
@@ -90,7 +95,8 @@ void setup(std::vector<std::string> args,
         throw std::runtime_error(err.str());
     }
 
-    if (!ref.empty() && output_mode == HtsWriter::OutputMode::FASTQ) {
+    const bool enable_aligner = !ref.empty();
+    if (enable_aligner && output_mode == HtsWriter::OutputMode::FASTQ) {
         throw std::runtime_error("Alignment to reference cannot be used with FASTQ output.");
     }
 
@@ -107,7 +113,6 @@ void setup(std::vector<std::string> args,
 
     auto read_groups = DataLoader::load_read_groups(data_path, model_name, recursive_file_loading);
     auto read_list = utils::load_read_list(read_list_file_path);
-    std::vector<std::string> barcode_kits;
 
     size_t num_reads = DataLoader::get_num_reads(
             data_path, read_list, {} /*reads_already_processed*/, recursive_file_loading);
@@ -116,7 +121,8 @@ void setup(std::vector<std::string> args,
     bool rna = utils::is_rna_model(model_path), duplex = false;
 
     const auto thread_allocations = utils::default_thread_allocations(
-            num_devices, !remora_runners.empty() ? num_remora_threads : 0);
+            num_devices, !remora_runners.empty() ? num_remora_threads : 0, enable_aligner,
+            !barcode_kits.empty());
 
     SamHdrPtr hdr(sam_hdr_init());
     cli::add_pg_hdr(hdr.get(), args);
@@ -126,30 +132,27 @@ void setup(std::vector<std::string> args,
     auto hts_writer = pipeline_desc.add_node<HtsWriter>(
             {}, "-", output_mode, thread_allocations.writer_threads, num_reads);
     auto aligner = PipelineDescriptor::InvalidNodeHandle;
-    auto converted_reads_sink = PipelineDescriptor::InvalidNodeHandle;
-    std::unordered_set<std::string> reads_already_processed;
-    if (ref.empty()) {
-        converted_reads_sink = hts_writer;
-    } else {
-        aligner = pipeline_desc.add_node<Aligner>({hts_writer}, ref, kmer_size, window_size,
+    auto current_sink_node = hts_writer;
+    if (enable_aligner) {
+        aligner = pipeline_desc.add_node<Aligner>({current_sink_node}, ref, kmer_size, window_size,
                                                   mm2_index_batch_size,
                                                   thread_allocations.aligner_threads);
-        converted_reads_sink = aligner;
+        current_sink_node = aligner;
     }
-    auto read_converter = pipeline_desc.add_node<ReadToBamType>(
-            {converted_reads_sink}, emit_moves, rna, thread_allocations.read_converter_threads,
+    current_sink_node = pipeline_desc.add_node<ReadToBamType>(
+            {current_sink_node}, emit_moves, rna, thread_allocations.read_converter_threads,
             methylation_threshold_pct);
-
-    auto filtered_read_sink = PipelineDescriptor::InvalidNodeHandle;
     if (estimate_poly_a) {
-        auto polya_calculator = pipeline_desc.add_node<PolyACalculator>(
-                {read_converter}, std::thread::hardware_concurrency(), rna);
-        filtered_read_sink = polya_calculator;
-    } else {
-        filtered_read_sink = read_converter;
+        current_sink_node = pipeline_desc.add_node<PolyACalculator>(
+                {current_sink_node}, std::thread::hardware_concurrency(), rna);
     }
-    auto read_filter_node = pipeline_desc.add_node<ReadFilterNode>(
-            {filtered_read_sink}, min_qscore, default_parameters.min_sequence_length,
+    if (!barcode_kits.empty()) {
+        current_sink_node = pipeline_desc.add_node<BarcodeClassifierNode>(
+                {current_sink_node}, thread_allocations.barcoder_threads, barcode_kits,
+                barcode_both_ends, barcode_no_trim);
+    }
+    current_sink_node = pipeline_desc.add_node<ReadFilterNode>(
+            {current_sink_node}, min_qscore, default_parameters.min_sequence_length,
             std::unordered_set<std::string>{}, thread_allocations.read_filter_threads);
 
     auto mean_qscore_start_pos = model_config.mean_qscore_start_pos;
@@ -162,7 +165,7 @@ void setup(std::vector<std::string> args,
     pipelines::create_simplex_pipeline(
             pipeline_desc, std::move(runners), std::move(remora_runners), overlap,
             mean_qscore_start_pos, rna, thread_allocations.scaler_node_threads,
-            thread_allocations.remora_threads * num_devices, read_filter_node);
+            thread_allocations.remora_threads * num_devices, current_sink_node);
 
     // Create the Pipeline from our description.
     std::vector<dorado::stats::StatsReporter> stats_reporters;
@@ -175,12 +178,13 @@ void setup(std::vector<std::string> args,
     // At present, header output file header writing relies on direct node method calls
     // rather than the pipeline framework.
     auto& hts_writer_ref = dynamic_cast<HtsWriter&>(pipeline->get_node_ref(hts_writer));
-    if (!ref.empty()) {
+    if (enable_aligner) {
         const auto& aligner_ref = dynamic_cast<Aligner&>(pipeline->get_node_ref(aligner));
         utils::add_sq_hdr(hdr.get(), aligner_ref.get_sequence_records_for_header());
     }
     hts_writer_ref.set_and_write_header(hdr.get());
 
+    std::unordered_set<std::string> reads_already_processed;
     if (!resume_from_file.empty()) {
         spdlog::info("> Inspecting resume file...");
         // Turn off warning logging as header info is fetched.
@@ -349,6 +353,18 @@ int basecaller(int argc, char* argv[]) {
             .default_value(false)
             .implicit_value(true);
 
+    parser.add_argument("--kit-name")
+            .help("Enable barcoding with the provided kit name. Choose from: " +
+                  dorado::barcode_kits::barcode_kits_list_str() + ".");
+    parser.add_argument("--barcode-both-ends")
+            .help("Require both ends of a read to be barcoded for a double ended barcode.")
+            .default_value(false)
+            .implicit_value(true);
+    parser.add_argument("--no-trim")
+            .help("Skip barcode trimming. If option is not chosen, trimming is enabled.")
+            .default_value(false)
+            .implicit_value(true);
+
     argparse::ArgumentParser internal_parser;
 
     // Create a copy of the parser to use if the resume feature is enabled. Needed
@@ -428,7 +444,9 @@ int basecaller(int argc, char* argv[]) {
               internal_parser.get<bool>("--skip-model-compatibility-check"),
               internal_parser.get<std::string>("--dump_stats_file"),
               internal_parser.get<std::string>("--dump_stats_filter"),
-              parser.get<std::string>("--resume-from"), resume_parser,
+              parser.get<std::string>("--resume-from"),
+              parser.get<std::vector<std::string>>("--kit-name"),
+              parser.get<bool>("--barcode-both-ends"), parser.get<bool>("--no-trim"), resume_parser,
               parser.get<bool>("--estimate-poly-a"));
     } catch (const std::exception& e) {
         spdlog::error("{}", e.what());

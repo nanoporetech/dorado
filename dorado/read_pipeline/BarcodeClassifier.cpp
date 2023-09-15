@@ -105,11 +105,27 @@ namespace demux {
 
 const int TRIM_LENGTH = 150;
 
+struct BarcodeClassifier::AdapterSequence {
+    std::vector<std::string> adapter;
+    std::vector<std::string> adapter_rev;
+    std::string top_primer;
+    std::string top_primer_rev;
+    std::string bottom_primer;
+    std::string bottom_primer_rev;
+    int top_primer_front_flank_len;
+    int top_primer_rear_flank_len;
+    int bottom_primer_front_flank_len;
+    int bottom_primer_rear_flank_len;
+    std::vector<std::string> adapter_name;
+    std::string kit;
+};
+
 BarcodeClassifier::BarcodeClassifier(const std::vector<std::string>& kit_names,
                                      bool barcode_both_ends)
-        : m_barcode_both_ends(barcode_both_ends) {
-    m_adapter_sequences = generate_adapter_sequence(kit_names);
-}
+        : m_barcode_both_ends(barcode_both_ends),
+          m_adapter_sequences(generate_adapter_sequence(kit_names)) {}
+
+BarcodeClassifier::~BarcodeClassifier() = default;
 
 ScoreResults BarcodeClassifier::barcode(const std::string& seq) {
     auto best_adapter = find_best_adapter(seq, m_adapter_sequences);
@@ -123,7 +139,7 @@ ScoreResults BarcodeClassifier::barcode(const std::string& seq) {
 // etc.
 // Returns a vector all barcode adapter sequences to test the
 // input read sequence against.
-std::vector<AdapterSequence> BarcodeClassifier::generate_adapter_sequence(
+std::vector<BarcodeClassifier::AdapterSequence> BarcodeClassifier::generate_adapter_sequence(
         const std::vector<std::string>& kit_names) {
     const auto& kit_info_map = barcode_kits::get_kit_infos();
     const auto& barcodes = barcode_kits::get_barcodes();
@@ -520,18 +536,19 @@ std::tuple<ScoreResults, int, bool> check_bc_with_longest_match(const ScoreResul
 // Score every barcode against the input read and returns the best match,
 // or an unclassified match, based on certain heuristics.
 ScoreResults BarcodeClassifier::find_best_adapter(const std::string& read_seq,
-                                                  std::vector<AdapterSequence>& adapters) {
+                                                  const std::vector<AdapterSequence>& adapters) {
     if (read_seq.length() < TRIM_LENGTH) {
         return UNCLASSIFIED;
     }
     std::string fwd = read_seq;
 
     // First find best barcode kit.
-    AdapterSequence* as;
+    const AdapterSequence* as;
     if (adapters.size() == 1) {
         as = &adapters[0];
     } else {
         // TODO: Implement finding best kit match.
+        throw std::runtime_error("Unimplemented: multiple barcoding kits");
     }
 
     // Then find the best barcode hit within that kit.
