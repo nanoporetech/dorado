@@ -14,7 +14,7 @@ void FakeDataLoader::load_reads(const int num_reads) {
         auto fake_read = ReadPtr::make();
 
         constexpr int64_t read_size = 40000;
-        fake_read->raw_data = torch::randint(0, 10000, {read_size}, torch::kInt16);
+        fake_read->read_common.raw_data = torch::randint(0, 10000, {read_size}, torch::kInt16);
         fake_read->read_id = "Placeholder-read-id";
 
         m_pipeline.push_message(std::move(fake_read));

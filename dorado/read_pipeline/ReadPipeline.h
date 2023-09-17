@@ -18,6 +18,11 @@
 
 namespace dorado {
 
+class ReadCommon {
+public:
+    torch::Tensor raw_data;  // Loaded from source file
+};
+
 // Class representing a read, including raw data
 class Read {
 public:
@@ -34,10 +39,11 @@ public:
         // Dummy struct for future use to represent alignments
     };
 
-    torch::Tensor raw_data;  // Loaded from source file
-    float digitisation;      // Loaded from source file
-    float range;             // Loaded from source file
-    float offset;            // Loaded from source file
+    ReadCommon read_common;
+
+    float digitisation;  // Loaded from source file
+    float range;         // Loaded from source file
+    float offset;        // Loaded from source file
 
     uint64_t sample_rate;  // Loaded from source file
 
@@ -133,7 +139,9 @@ public:
     Read* get() const { return m_read.get(); }
 
     // Create a view of the data in the read.
-    std::shared_ptr<const torch::Tensor> data() const { return {m_read, &m_read->raw_data}; }
+    std::shared_ptr<const torch::Tensor> data() const {
+        return {m_read, &m_read->read_common.raw_data};
+    }
     // Create a view of the entire read.
     std::shared_ptr<const Read> view() const { return m_read; }
     // Take an owning reference to keep the |Read| alive.

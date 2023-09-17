@@ -174,8 +174,9 @@ void ModBaseCallerNode::input_worker_thread() {
             read->mod_base_info = m_mod_base_info;
 
             std::vector<int> sequence_ints = utils::sequence_to_ints(read->seq);
-            std::vector<uint64_t> seq_to_sig_map = utils::moves_to_map(
-                    read->moves, m_block_stride, read->raw_data.size(0), read->seq.size() + 1);
+            std::vector<uint64_t> seq_to_sig_map =
+                    utils::moves_to_map(read->moves, m_block_stride,
+                                        read->read_common.raw_data.size(0), read->seq.size() + 1);
 
             auto working_read = std::make_shared<WorkingRead>();
             working_read->num_modbase_chunks = 0;
@@ -190,8 +191,8 @@ void ModBaseCallerNode::input_worker_thread() {
                 auto& chunks_to_enqueue = chunks_to_enqueue_by_caller.at(caller_id);
 
                 // scale signal based on model parameters
-                auto scaled_signal = runner->scale_signal(caller_id, read->raw_data, sequence_ints,
-                                                          seq_to_sig_map);
+                auto scaled_signal = runner->scale_signal(caller_id, read->read_common.raw_data,
+                                                          sequence_ints, seq_to_sig_map);
 
                 auto& params = runner->caller_params(caller_id);
                 auto context_samples = (params.context_before + params.context_after);

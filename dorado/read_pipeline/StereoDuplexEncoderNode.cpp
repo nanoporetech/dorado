@@ -59,7 +59,8 @@ ReadPtr StereoDuplexEncoderNode::stereo_encode(const Read& template_read,
     static constexpr unsigned char kAlignMismatch = 3;
 
     // Move along the alignment, filling out the stereo-encoded tensor
-    const int max_size = template_read.raw_data.size(0) + complement_read.raw_data.size(0);
+    const int max_size = template_read.read_common.raw_data.size(0) +
+                         complement_read.read_common.raw_data.size(0);
     const auto opts = torch::TensorOptions().dtype(torch::kFloat16).device(torch::kCPU);
 
     static constexpr int kNumFeatures = 13;
@@ -84,7 +85,7 @@ ReadPtr StereoDuplexEncoderNode::stereo_encode(const Read& template_read,
         }
     }
 
-    int extra_padding = template_read.raw_data.size(0) - template_moves_expanded.size();
+    int extra_padding = template_read.read_common.raw_data.size(0) - template_moves_expanded.size();
     for (int i = 0; i < extra_padding; i++) {
         template_moves_expanded.push_back(0);
     }
@@ -103,7 +104,7 @@ ReadPtr StereoDuplexEncoderNode::stereo_encode(const Read& template_read,
         }
     }
 
-    extra_padding = complement_read.raw_data.size(0) - complement_moves_expanded.size();
+    extra_padding = complement_read.read_common.raw_data.size(0) - complement_moves_expanded.size();
     for (int i = 0; i < extra_padding; i++) {
         complement_moves_expanded.push_back(0);
     }
@@ -111,8 +112,8 @@ ReadPtr StereoDuplexEncoderNode::stereo_encode(const Read& template_read,
     std::reverse(complement_moves_expanded.begin(), complement_moves_expanded.end());
     complement_moves_expanded.pop_back();
 
-    auto complement_signal = complement_read.raw_data;
-    complement_signal = torch::flip(complement_read.raw_data, 0);
+    auto complement_signal = complement_read.read_common.raw_data;
+    complement_signal = torch::flip(complement_read.read_common.raw_data, 0);
 
     int complement_moves_seen = complement_read.moves[complement_signal_cursor];
     while (complement_moves_seen < query_cursor + 1) {
@@ -120,8 +121,9 @@ ReadPtr StereoDuplexEncoderNode::stereo_encode(const Read& template_read,
         complement_moves_seen += complement_moves_expanded[complement_signal_cursor];
     }
 
-    const float pad_value = 0.8 * std::min(torch::min(complement_signal).item<float>(),
-                                           torch::min(template_read.raw_data).item<float>());
+    const float pad_value =
+            0.8 * std::min(torch::min(complement_signal).item<float>(),
+                           torch::min(template_read.read_common.raw_data).item<float>());
 
     // Start with all signal feature entries equal to the padding value.
     tmp.index({torch::indexing::Slice(None, 2)}) = pad_value;
@@ -130,7 +132,7 @@ ReadPtr StereoDuplexEncoderNode::stereo_encode(const Read& template_read,
     // allocations/deallocations and object constructions/destructions, and so are
     // glacially slow.  We therefore work with raw pointers within the main loop.
     const auto* const template_raw_data_ptr =
-            static_cast<SampleType*>(template_read.raw_data.data_ptr());
+            static_cast<SampleType*>(template_read.read_common.raw_data.data_ptr());
     const auto* const flipped_complement_raw_data_ptr =
             static_cast<SampleType*>(complement_signal.data_ptr());
 
@@ -260,7 +262,7 @@ ReadPtr StereoDuplexEncoderNode::stereo_encode(const Read& template_read,
 
     read->read_tag = template_read.read_tag;
     read->client_id = template_read.client_id;
-    read->raw_data = tmp;  // use the encoded signal
+    read->read_common.raw_data = tmp;  // use the encoded signal
     read->is_duplex = true;
     read->run_id = template_read.run_id;
 

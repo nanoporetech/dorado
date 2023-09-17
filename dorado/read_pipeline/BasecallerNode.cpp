@@ -60,7 +60,8 @@ void BasecallerNode::input_worker_thread() {
         // Now that we have acquired a read, wait until we can push to chunks_in
         // Chunk up the read and put the chunks into the pending chunk list.
         size_t raw_size =
-                read->raw_data.sizes()[read->raw_data.sizes().size() - 1];  // Time dimension.
+                read->read_common.raw_data
+                        .sizes()[read->read_common.raw_data.sizes().size() - 1];  // Time dimension.
 
         size_t offset = 0;
         size_t chunk_in_read_idx = 0;
@@ -147,7 +148,7 @@ void BasecallerNode::working_reads_manager() {
             // Update stats.
             ++m_called_reads_pushed;
             m_num_bases_processed += source_read->seq.length();
-            m_num_samples_processed += source_read->raw_data.size(0);
+            m_num_samples_processed += source_read->read_common.raw_data.size(0);
 
             // Chunks have ownership of the working read, so destroy them to avoid a leak.
             working_read->called_chunks.clear();
@@ -206,7 +207,7 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
             // Copy the chunk into the input tensor
             auto &source_read = chunk->owning_read->read;
 
-            auto input_slice = source_read->raw_data.index(
+            auto input_slice = source_read->read_common.raw_data.index(
                     {Ellipsis, Slice(chunk->input_offset, chunk->input_offset + m_chunk_size)});
             size_t slice_size;
             if (input_slice.ndimension() == 1) {

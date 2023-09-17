@@ -37,8 +37,8 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
                                             const dorado::Read& read,
                                             int num_samples_per_base,
                                             bool is_rna) {
-    const c10::Half* signal = static_cast<c10::Half*>(read.raw_data.data_ptr());
-    int signal_len = read.raw_data.size(0);
+    const c10::Half* signal = static_cast<c10::Half*>(read.read_common.raw_data.data_ptr());
+    int signal_len = read.read_common.raw_data.size(0);
 
     auto calc_stats = [&](int s, int e) -> std::pair<float, float> {
         float avg = 0;
@@ -144,7 +144,8 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
 // Basic estimation of avg translocation speed by dividing number of samples by the
 // number of bases called.
 int estimate_samples_per_base(const dorado::Read& read) {
-    float num_samples_per_base = static_cast<float>(read.raw_data.size(0)) / read.seq.length();
+    float num_samples_per_base =
+            static_cast<float>(read.read_common.raw_data.size(0)) / read.seq.length();
     // The estimate is not rounded because this calculation generally overestimates
     // the samples per base. Rounding down gives better results than rounding to nearest.
     return std::floor(num_samples_per_base);
@@ -207,7 +208,7 @@ SignalAnchorInfo determine_signal_anchor_and_strand_cdna(const dorado::Read& rea
 
         const auto stride = read.model_stride;
         const auto seq_to_sig_map = dorado::utils::moves_to_map(
-                read.moves, stride, read.raw_data.size(0), read.seq.size() + 1);
+                read.moves, stride, read.read_common.raw_data.size(0), read.seq.size() + 1);
         int signal_anchor = seq_to_sig_map[base_anchor];
 
         result = {fwd, signal_anchor, trailing_Ts};
@@ -235,8 +236,8 @@ SignalAnchorInfo determine_signal_anchor_and_strand_cdna(const dorado::Read& rea
 // direction (which is always reverse for dRNA), the signal anchor and the number of bases
 // to omit from the tail length estimation due to any adapter effects.
 SignalAnchorInfo determine_signal_anchor_and_strand_drna(const dorado::Read& read) {
-    const c10::Half* signal = static_cast<c10::Half*>(read.raw_data.data_ptr());
-    int signal_len = read.raw_data.size(0);
+    const c10::Half* signal = static_cast<c10::Half*>(read.read_common.raw_data.data_ptr());
+    int signal_len = read.read_common.raw_data.size(0);
     const int kWindow = 50;
 
     // The algorithm is to keep track of the mean signal value over

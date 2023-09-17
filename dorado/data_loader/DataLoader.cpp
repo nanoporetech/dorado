@@ -127,7 +127,7 @@ ReadPtr process_pod5_read(size_t row,
     }
 
     auto new_read = ReadPtr::make();
-    new_read->raw_data = samples;
+    new_read->read_common.raw_data = samples;
     new_read->sample_rate = run_sample_rate;
 
     auto start_time_ms = run_acquisition_start_time_ms +
@@ -756,7 +756,7 @@ void DataLoader::load_fast5_reads_from_file(const std::string& path) {
 
         auto new_read = ReadPtr::make();
         new_read->sample_rate = sampling_rate;
-        new_read->raw_data = samples;
+        new_read->read_common.raw_data = samples;
         new_read->digitisation = digitisation;
         new_read->range = range;
         new_read->offset = offset;

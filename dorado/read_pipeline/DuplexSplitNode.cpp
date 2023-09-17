@@ -173,7 +173,7 @@ ReadPtr subread(const Read& read, PosRange seq_range, PosRange signal_range) {
     auto subread = utils::shallow_copy_read(read);
     subread->read_tag = read.read_tag;
     subread->client_id = read.client_id;
-    subread->raw_data = subread->raw_data.index(
+    subread->read_common.raw_data = subread->read_common.raw_data.index(
             {torch::indexing::Slice(signal_range.first, signal_range.second)});
     subread->attributes.read_number = -1;
 
@@ -213,7 +213,7 @@ DuplexSplitNode::ExtRead DuplexSplitNode::create_ext_read(ReadPtr r) const {
     ext_read.move_sums = utils::move_cum_sums(ext_read.read->moves);
     assert(!ext_read.move_sums.empty());
     assert(ext_read.move_sums.back() == ext_read.read->seq.length());
-    ext_read.data_as_float32 = ext_read.read->raw_data.to(torch::kFloat);
+    ext_read.data_as_float32 = ext_read.read->read_common.raw_data.to(torch::kFloat);
     ext_read.possible_pore_regions = possible_pore_regions(ext_read);
     return ext_read;
 }
@@ -391,8 +391,8 @@ std::vector<ReadPtr> DuplexSplitNode::subreads(ReadPtr read,
     }
 
     const auto stride = read->model_stride;
-    const auto seq_to_sig_map =
-            utils::moves_to_map(read->moves, stride, read->raw_data.size(0), read->seq.size() + 1);
+    const auto seq_to_sig_map = utils::moves_to_map(
+            read->moves, stride, read->read_common.raw_data.size(0), read->seq.size() + 1);
 
     //TODO maybe simplify by adding begin/end stubs?
     uint64_t start_pos = 0;
@@ -406,9 +406,10 @@ std::vector<ReadPtr> DuplexSplitNode::subreads(ReadPtr read,
         signal_start = seq_to_sig_map[r.second];
     }
     assert(read->raw_data.size(0) == seq_to_sig_map[read->seq.size()]);
-    if (start_pos < read->seq.size() && signal_start / stride < read->raw_data.size(0) / stride) {
+    if (start_pos < read->seq.size() &&
+        signal_start / stride < read->read_common.raw_data.size(0) / stride) {
         subreads.push_back(subread(*read, {start_pos, read->seq.size()},
-                                   {signal_start, read->raw_data.size(0)}));
+                                   {signal_start, read->read_common.raw_data.size(0)}));
     }
 
     return subreads;

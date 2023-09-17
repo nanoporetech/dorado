@@ -52,7 +52,7 @@ void stitch_chunks(Read& read, const std::vector<std::unique_ptr<Chunk>>& called
 
     if (called_chunks.size() == 1) {
         // shorten the sequence, qstring & moves where the read is shorter than chunksize
-        int last_index_in_moves_to_keep = read.raw_data.size(0) / read.model_stride;
+        int last_index_in_moves_to_keep = read.read_common.raw_data.size(0) / read.model_stride;
         moves = std::vector<uint8_t>(moves.begin(), moves.begin() + last_index_in_moves_to_keep);
         int end = std::accumulate(moves.begin(), moves.end(), 0);
         sequences.push_back(last_chunk->seq.substr(start_pos, end));
@@ -69,7 +69,8 @@ void stitch_chunks(Read& read, const std::vector<std::unique_ptr<Chunk>>& called
     read.moves = std::move(moves);
 
     // remove partial stride overhang
-    if (read.moves.size() > static_cast<int>(read.raw_data.size(0) / read.model_stride)) {
+    if (read.moves.size() >
+        static_cast<int>(read.read_common.raw_data.size(0) / read.model_stride)) {
         if (read.moves.back() == 1) {
             read.seq.pop_back();
             read.qstring.pop_back();
