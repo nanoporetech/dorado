@@ -21,7 +21,7 @@ void stitch_chunks(Read& read, const std::vector<std::unique_ptr<Chunk>>& called
         auto& next_chunk = called_chunks[i + 1];
         int overlap_size = (current_chunk->raw_chunk_size + current_chunk->input_offset) -
                            (next_chunk->input_offset);
-        assert(overlap_size % read.model_stride == 0);
+        assert(overlap_size % read.read_common.model_stride == 0);
         int overlap_down_sampled = overlap_size / read.read_common.model_stride;
         int mid_point_rear = overlap_down_sampled / 2;
 
@@ -77,7 +77,8 @@ void stitch_chunks(Read& read, const std::vector<std::unique_ptr<Chunk>>& called
             read.read_common.qstring.pop_back();
         }
         read.read_common.moves.pop_back();
-        assert(std::accumulate(read.moves.begin(), read.moves.end(), 0) == read.seq.size());
+        assert(std::accumulate(read.read_common.moves.begin(), read.read_common.moves.end(), 0) ==
+               read.read_common.seq.size());
     }
 }
 

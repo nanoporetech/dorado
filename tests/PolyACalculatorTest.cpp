@@ -41,12 +41,12 @@ TEST_CASE("PolyACalculator: Test polyT tail estimation", TEST_GROUP) {
     auto signal_file = data_dir / "signal.tensor";
     auto moves_file = data_dir / "moves.bin";
     auto read = dorado::ReadPtr::make();
-    read->seq = ReadFileIntoString(seq_file.string());
-    read->qstring = std::string(read->seq.length(), '~');
-    read->moves = ReadFileIntoVector(moves_file.string());
-    read->model_stride = 5;
-    torch::load(read->raw_data, signal_file.string());
-    read->read_id = "read_id";
+    read->read_common.seq = ReadFileIntoString(seq_file.string());
+    read->read_common.qstring = std::string(read->read_common.seq.length(), '~');
+    read->read_common.moves = ReadFileIntoVector(moves_file.string());
+    read->read_common.model_stride = 5;
+    torch::load(read->read_common.raw_data, signal_file.string());
+    read->read_common.read_id = "read_id";
     // Push a Read type.
     pipeline->push_message(std::move(read));
 

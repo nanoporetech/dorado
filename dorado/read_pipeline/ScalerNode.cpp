@@ -50,7 +50,7 @@ void ScalerNode::worker_thread() {
 
         auto read = std::get<ReadPtr>(std::move(message));
 
-        assert(read->raw_data.dtype() == torch::kInt16);
+        assert(read->read_common.raw_data.dtype() == torch::kInt16);
         const auto [shift, scale] = m_scaling_params.quantile_scaling
                                             ? normalisation(read->read_common.raw_data)
                                             : med_mad(read->read_common.raw_data);

@@ -104,8 +104,8 @@ TEST_CASE(TEST_GROUP "Load data sorted by channel id.") {
 
     int start_channel_id = -1;
     for (auto &i : reads) {
-        CHECK(i->attributes.channel_number >= start_channel_id);
-        start_channel_id = i->attributes.channel_number;
+        CHECK(i->read_common.attributes.channel_number >= start_channel_id);
+        start_channel_id = i->read_common.attributes.channel_number;
     }
 }
 

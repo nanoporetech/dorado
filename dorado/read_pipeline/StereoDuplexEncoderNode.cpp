@@ -20,12 +20,13 @@ ReadPtr StereoDuplexEncoderNode::stereo_encode(const Read& template_read,
                                                uint64_t comp_end) {
     // We rely on the incoming read raw data being of type float16 to allow direct memcpy
     // of tensor elements.
-    assert(template_read.raw_data.dtype() == torch::kFloat16);
-    assert(complement_read.raw_data.dtype() == torch::kFloat16);
+    assert(template_read.read_common.raw_data.dtype() == torch::kFloat16);
+    assert(complement_read.read_common.raw_data.dtype() == torch::kFloat16);
 
-    assert(complement_read.attributes.mux == template_read.attributes.mux);
-    assert(complement_read.attributes.channel_number == template_read.attributes.channel_number);
-    assert(complement_read.start_time_ms > template_read.start_time_ms);
+    assert(complement_read.read_common.attributes.mux == template_read.read_common.attributes.mux);
+    assert(complement_read.read_common.attributes.channel_number ==
+           template_read.read_common.attributes.channel_number);
+    assert(complement_read.read_common.start_time_ms > template_read.read_common.start_time_ms);
 
     using SampleType = c10::Half;
 

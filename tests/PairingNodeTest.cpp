@@ -19,20 +19,21 @@ auto make_read(int delay_ms, size_t seq_len, const std::string& seq = "") {
     auto read = dorado::ReadPtr::make();
     read->sample_rate = 4000;
     read->num_trimmed_samples = 10;
-    read->attributes.channel_number = 664;
-    read->attributes.mux = 3;
-    read->attributes.num_samples = 10000;
+    read->read_common.attributes.channel_number = 664;
+    read->read_common.attributes.mux = 3;
+    read->read_common.attributes.num_samples = 10000;
     read->start_sample = 29767426 + (delay_ms * read->sample_rate) / 1000;
-    read->end_sample = read->start_sample + read->attributes.num_samples;
+    read->end_sample = read->start_sample + read->read_common.attributes.num_samples;
     read->run_acquisition_start_time_ms = 1676976119670;
-    read->start_time_ms = read->run_acquisition_start_time_ms +
-                          uint64_t(std::round(read->start_sample * 1000. / read->sample_rate));
-    read->attributes.start_time =
-            dorado::utils::get_string_timestamp_from_unix_time(read->start_time_ms);
+    read->read_common.start_time_ms =
+            read->run_acquisition_start_time_ms +
+            uint64_t(std::round(read->start_sample * 1000. / read->sample_rate));
+    read->read_common.attributes.start_time =
+            dorado::utils::get_string_timestamp_from_unix_time(read->read_common.start_time_ms);
     if (seq.empty()) {
-        read->seq = std::string(seq_len, 'A');
+        read->read_common.seq = std::string(seq_len, 'A');
     } else {
-        read->seq = seq;
+        read->read_common.seq = seq;
     }
     return read;
 }

@@ -164,11 +164,12 @@ ReadPtr subread(const Read& read, PosRange seq_range, PosRange signal_range) {
     }
     const int stride = read.read_common.model_stride;
     assert(signal_range.first <= signal_range.second);
-    assert(signal_range.first / stride <= read.moves.size());
-    assert(signal_range.second / stride <= read.moves.size());
+    assert(signal_range.first / stride <= read.read_common.moves.size());
+    assert(signal_range.second / stride <= read.read_common.moves.size());
     assert(signal_range.first % stride == 0);
     assert(signal_range.second % stride == 0 ||
-           (signal_range.second == read.raw_data.size(0) && seq_range.second == read.seq.size()));
+           (signal_range.second == read.read_common.raw_data.size(0) &&
+            seq_range.second == read.read_common.seq.size()));
 
     auto subread = utils::shallow_copy_read(read);
     subread->read_common.read_tag = read.read_common.read_tag;
@@ -196,8 +197,8 @@ ReadPtr subread(const Read& read, PosRange seq_range, PosRange signal_range) {
     subread->read_common.moves =
             std::vector<uint8_t>(subread->read_common.moves.begin() + signal_range.first / stride,
                                  subread->read_common.moves.begin() + signal_range.second / stride);
-    assert(signal_range.second == read.raw_data.size(0) ||
-           subread->moves.size() * stride == subread->raw_data.size(0));
+    assert(signal_range.second == read.read_common.raw_data.size(0) ||
+           subread->read_common.moves.size() * stride == subread->read_common.raw_data.size(0));
 
     if (!read.parent_read_id.empty()) {
         subread->parent_read_id = read.parent_read_id;
@@ -216,7 +217,7 @@ DuplexSplitNode::ExtRead DuplexSplitNode::create_ext_read(ReadPtr r) const {
     ext_read.read = std::move(r);
     ext_read.move_sums = utils::move_cum_sums(ext_read.read->read_common.moves);
     assert(!ext_read.move_sums.empty());
-    assert(ext_read.move_sums.back() == ext_read.read->seq.length());
+    assert(ext_read.move_sums.back() == ext_read.read->read_common.seq.length());
     ext_read.data_as_float32 = ext_read.read->read_common.raw_data.to(torch::kFloat);
     ext_read.possible_pore_regions = possible_pore_regions(ext_read);
     return ext_read;
@@ -411,7 +412,7 @@ std::vector<ReadPtr> DuplexSplitNode::subreads(ReadPtr read,
         start_pos = r.second;
         signal_start = seq_to_sig_map[r.second];
     }
-    assert(read->raw_data.size(0) == seq_to_sig_map[read->seq.size()]);
+    assert(read->read_common.raw_data.size(0) == seq_to_sig_map[read->read_common.seq.size()]);
     if (start_pos < read->read_common.seq.size() &&
         signal_start / stride < read->read_common.raw_data.size(0) / stride) {
         subreads.push_back(subread(*read, {start_pos, read->read_common.seq.size()},

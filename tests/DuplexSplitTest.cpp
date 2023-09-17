@@ -29,24 +29,24 @@ auto make_read() {
     read->scaling = 0.14620706;
     read->shift = 94.717316;
     read->scale = 26.888939;
-    read->model_stride = 5;
-    read->read_id = "00a2dd45-f6a9-49ba-86ee-5d2a37b861cb";
+    read->read_common.model_stride = 5;
+    read->read_common.read_id = "00a2dd45-f6a9-49ba-86ee-5d2a37b861cb";
     read->num_trimmed_samples = 10;
-    read->attributes.read_number = 321;
-    read->attributes.channel_number = 664;
-    read->attributes.mux = 3;
-    read->attributes.start_time = "2023-02-21T12:46:01.526+00:00";
-    read->attributes.num_samples = 256790;
+    read->read_common.attributes.read_number = 321;
+    read->read_common.attributes.channel_number = 664;
+    read->read_common.attributes.mux = 3;
+    read->read_common.attributes.start_time = "2023-02-21T12:46:01.526+00:00";
+    read->read_common.attributes.num_samples = 256790;
     read->start_sample = 29767426;
     read->end_sample = 30024216;
     read->run_acquisition_start_time_ms = 1676976119670;
 
-    read->seq = ReadFileIntoString(DataPath("seq"));
-    read->qstring = ReadFileIntoString(DataPath("qstring"));
-    read->moves = ReadFileIntoVector(DataPath("moves"));
-    torch::load(read->raw_data, DataPath("raw.tensor").string());
-    read->raw_data = read->raw_data.to(torch::kFloat16);
-    read->read_tag = 42;
+    read->read_common.seq = ReadFileIntoString(DataPath("seq"));
+    read->read_common.qstring = ReadFileIntoString(DataPath("qstring"));
+    read->read_common.moves = ReadFileIntoVector(DataPath("moves"));
+    torch::load(read->read_common.raw_data, DataPath("raw.tensor").string());
+    read->read_common.raw_data = read->read_common.raw_data.to(torch::kFloat16);
+    read->read_common.read_tag = 42;
 
     return read;
 }
@@ -62,13 +62,13 @@ TEST_CASE("4 subread splitting test", TEST_GROUP) {
     REQUIRE(split_res.size() == 4);
     std::vector<int> split_sizes;
     for (auto &r : split_res) {
-        split_sizes.push_back(r->seq.size());
+        split_sizes.push_back(r->read_common.seq.size());
     }
     REQUIRE(split_sizes == std::vector<int>{6858, 7854, 5184, 5168});
 
     std::vector<std::string> start_times;
     for (auto &r : split_res) {
-        start_times.push_back(r->attributes.start_time);
+        start_times.push_back(r->read_common.attributes.start_time);
     }
     REQUIRE(start_times == std::vector<std::string>{"2023-02-21T12:46:01.529+00:00",
                                                     "2023-02-21T12:46:25.837+00:00",
@@ -77,24 +77,24 @@ TEST_CASE("4 subread splitting test", TEST_GROUP) {
 
     std::vector<uint64_t> start_time_mss;
     for (auto &r : split_res) {
-        start_time_mss.push_back(r->start_time_ms);
+        start_time_mss.push_back(r->read_common.start_time_ms);
     }
     REQUIRE(start_time_mss ==
             std::vector<uint64_t>{1676983561529, 1676983585837, 1676983599607, 1676983613105});
 
     std::vector<uint64_t> num_sampless;
     for (auto &r : split_res) {
-        num_sampless.push_back(r->attributes.num_samples);
+        num_sampless.push_back(r->read_common.attributes.num_samples);
     }
     REQUIRE(num_sampless == std::vector<uint64_t>{97125, 55055, 53940, 50475});
 
     std::set<std::string> names;
     for (auto &r : split_res) {
-        names.insert(r->read_id);
+        names.insert(r->read_common.read_id);
     }
     REQUIRE(names.size() == 4);
     REQUIRE(std::all_of(split_res.begin(), split_res.end(),
-                        [](const auto &r) { return r->read_tag == 42; }));
+                        [](const auto &r) { return r->read_common.read_tag == 42; }));
 }
 
 TEST_CASE("4 subread split tagging", TEST_GROUP) {
@@ -104,8 +104,8 @@ TEST_CASE("4 subread split tagging", TEST_GROUP) {
     std::vector<dorado::Message> messages;
     auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 3, messages);
     auto tag_node = pipeline_desc.add_node<dorado::SubreadTaggerNode>({sink});
-    auto stereo_node =
-            pipeline_desc.add_node<dorado::StereoDuplexEncoderNode>({tag_node}, read->model_stride);
+    auto stereo_node = pipeline_desc.add_node<dorado::StereoDuplexEncoderNode>(
+            {tag_node}, read->read_common.model_stride);
     auto pairing_node = pipeline_desc.add_node<dorado::PairingNode>({stereo_node},
                                                                     dorado::ReadOrder::BY_CHANNEL);
     auto splitter_node = pipeline_desc.add_node<dorado::DuplexSplitNode>(
@@ -131,7 +131,8 @@ TEST_CASE("4 subread split tagging", TEST_GROUP) {
                       [split_count = expected_subread_ids.size()](const auto &read) {
                           return read->split_count == split_count;
                       }));
-    CHECK(std::all_of(reads.begin(), reads.end(), [](const auto &r) { return r->read_tag == 42; }));
+    CHECK(std::all_of(reads.begin(), reads.end(),
+                      [](const auto &r) { return r->read_common.read_tag == 42; }));
 }
 
 TEST_CASE("No split output read properties", TEST_GROUP) {
@@ -143,23 +144,24 @@ TEST_CASE("No split output read properties", TEST_GROUP) {
     read->scaling = 0.14620706;
     read->shift = 94.717316;
     read->scale = 26.888939;
-    read->model_stride = 5;
-    read->read_id = init_read_id;
+    read->read_common.model_stride = 5;
+    read->read_common.read_id = init_read_id;
     read->num_trimmed_samples = 10;
-    read->attributes.read_number = 321;
-    read->attributes.channel_number = 664;
-    read->attributes.mux = 3;
-    read->attributes.start_time = "2023-02-21T12:46:01.526+00:00";
-    read->attributes.num_samples = 256790;
+    read->read_common.attributes.read_number = 321;
+    read->read_common.attributes.channel_number = 664;
+    read->read_common.attributes.mux = 3;
+    read->read_common.attributes.start_time = "2023-02-21T12:46:01.526+00:00";
+    read->read_common.attributes.num_samples = 256790;
     read->start_sample = 29767426;
     read->end_sample = 30024216;
     read->run_acquisition_start_time_ms = 1676976119670;
 
-    read->seq = "AAAAAAAAAAAAAAAAAAAAAA";
-    read->qstring = std::string(read->seq.length(), '!');
-    read->moves = std::vector<uint8_t>(read->seq.length(), 0);
-    read->raw_data = torch::zeros(read->seq.length() * 10).to(torch::kFloat16);
-    read->read_tag = 42;
+    read->read_common.seq = "AAAAAAAAAAAAAAAAAAAAAA";
+    read->read_common.qstring = std::string(read->read_common.seq.length(), '!');
+    read->read_common.moves = std::vector<uint8_t>(read->read_common.seq.length(), 0);
+    read->read_common.raw_data =
+            torch::zeros(read->read_common.seq.length() * 10).to(torch::kFloat16);
+    read->read_common.read_tag = 42;
 
     dorado::PipelineDescriptor pipeline_desc;
     std::vector<dorado::Message> messages;
@@ -175,7 +177,7 @@ TEST_CASE("No split output read properties", TEST_GROUP) {
     CHECK(reads.size() == 1);
 
     read = std::move(reads.front());
-    CHECK(read->read_id == init_read_id);
+    CHECK(read->read_common.read_id == init_read_id);
     CHECK(read->subread_id == 0);
     CHECK(read->split_count == 1);
 }
