@@ -53,7 +53,7 @@ void BasecallerNode::input_worker_thread() {
         // TODO: This is necessary because some reads (e.g failed Stereo Encoding) will be passed
         // to the basecaller node having already been called. This should be fixed in the future with
         // support for graphs of nodes rather than linear pipelines.
-        if (!read->seq.empty()) {
+        if (!read->read_common.seq.empty()) {
             send_message_to_sink(std::move(read));
             continue;
         }
@@ -142,12 +142,12 @@ void BasecallerNode::working_reads_manager() {
             // Finalise the read.
             auto source_read = std::move(working_read->read);
             utils::stitch_chunks(*source_read, working_read->called_chunks);
-            source_read->model_name = m_model_name;
+            source_read->read_common.model_name = m_model_name;
             source_read->mean_qscore_start_pos = m_mean_qscore_start_pos;
 
             // Update stats.
             ++m_called_reads_pushed;
-            m_num_bases_processed += source_read->seq.length();
+            m_num_bases_processed += source_read->read_common.seq.length();
             m_num_samples_processed += source_read->read_common.raw_data.size(0);
 
             // Chunks have ownership of the working read, so destroy them to avoid a leak.
@@ -161,7 +161,8 @@ void BasecallerNode::working_reads_manager() {
                     m_working_reads.erase(read_iter);
                     --m_working_reads_size;
                 } else {
-                    throw std::runtime_error("Expected to find read id " + source_read->read_id +
+                    throw std::runtime_error("Expected to find read id " +
+                                             source_read->read_common.read_id +
                                              " in working reads cache but it doesn't exist.");
                 }
             }

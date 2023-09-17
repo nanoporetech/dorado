@@ -159,10 +159,10 @@ ReadPtr subread(const Read& read, PosRange seq_range, PosRange signal_range) {
     //TODO support mods
     //NB: currently doesn't support mods
     //assert(read.mod_base_info == nullptr && read.base_mod_probs.empty());
-    if (read.mod_base_info != nullptr || !read.base_mod_probs.empty()) {
+    if (read.mod_base_info != nullptr || !read.read_common.base_mod_probs.empty()) {
         throw std::runtime_error(std::string("Read splitting doesn't support mods yet"));
     }
-    const int stride = read.model_stride;
+    const int stride = read.read_common.model_stride;
     assert(signal_range.first <= signal_range.second);
     assert(signal_range.first / stride <= read.moves.size());
     assert(signal_range.second / stride <= read.moves.size());
@@ -188,17 +188,20 @@ ReadPtr subread(const Read& read, PosRange seq_range, PosRange signal_range) {
     subread->attributes.start_time = utils::get_string_timestamp_from_unix_time(start_time_ms);
     subread->start_time_ms = start_time_ms;
 
-    subread->seq = subread->seq.substr(seq_range.first, seq_range.second - seq_range.first);
-    subread->qstring = subread->qstring.substr(seq_range.first, seq_range.second - seq_range.first);
-    subread->moves = std::vector<uint8_t>(subread->moves.begin() + signal_range.first / stride,
-                                          subread->moves.begin() + signal_range.second / stride);
+    subread->read_common.seq =
+            subread->read_common.seq.substr(seq_range.first, seq_range.second - seq_range.first);
+    subread->read_common.qstring = subread->read_common.qstring.substr(
+            seq_range.first, seq_range.second - seq_range.first);
+    subread->read_common.moves =
+            std::vector<uint8_t>(subread->read_common.moves.begin() + signal_range.first / stride,
+                                 subread->read_common.moves.begin() + signal_range.second / stride);
     assert(signal_range.second == read.raw_data.size(0) ||
            subread->moves.size() * stride == subread->raw_data.size(0));
 
     if (!read.parent_read_id.empty()) {
         subread->parent_read_id = read.parent_read_id;
     } else {
-        subread->parent_read_id = read.read_id;
+        subread->parent_read_id = read.read_common.read_id;
     }
     return subread;
 }
@@ -210,7 +213,7 @@ namespace dorado {
 DuplexSplitNode::ExtRead DuplexSplitNode::create_ext_read(ReadPtr r) const {
     ExtRead ext_read;
     ext_read.read = std::move(r);
-    ext_read.move_sums = utils::move_cum_sums(ext_read.read->moves);
+    ext_read.move_sums = utils::move_cum_sums(ext_read.read->read_common.moves);
     assert(!ext_read.move_sums.empty());
     assert(ext_read.move_sums.back() == ext_read.read->seq.length());
     ext_read.data_as_float32 = ext_read.read->read_common.raw_data.to(torch::kFloat);
@@ -219,7 +222,7 @@ DuplexSplitNode::ExtRead DuplexSplitNode::create_ext_read(ReadPtr r) const {
 }
 
 PosRanges DuplexSplitNode::possible_pore_regions(const DuplexSplitNode::ExtRead& read) const {
-    spdlog::trace("Analyzing signal in read {}", read.read->read_id);
+    spdlog::trace("Analyzing signal in read {}", read.read->read_common.read_id);
 
     auto pore_sample_ranges =
             detect_pore_signal(read.data_as_float32, m_settings.pore_thr, m_settings.pore_cl_dist,
@@ -227,8 +230,8 @@ PosRanges DuplexSplitNode::possible_pore_regions(const DuplexSplitNode::ExtRead&
 
     PosRanges pore_regions;
     for (auto pore_sample_range : pore_sample_ranges) {
-        auto move_start = pore_sample_range.first / read.read->model_stride;
-        auto move_end = pore_sample_range.second / read.read->model_stride;
+        auto move_start = pore_sample_range.first / read.read->read_common.model_stride;
+        auto move_end = pore_sample_range.second / read.read->read_common.model_stride;
         assert(move_end >= move_start);
         //NB move_start can get to move_sums.size(), because of the stride rounding?
         if (move_start >= read.move_sums.size() || move_end >= read.move_sums.size() ||
@@ -249,10 +252,10 @@ PosRanges DuplexSplitNode::possible_pore_regions(const DuplexSplitNode::ExtRead&
 }
 
 bool DuplexSplitNode::check_nearby_adapter(const Read& read, PosRange r, int adapter_edist) const {
-    return find_best_adapter_match(m_settings.adapter, read.seq, adapter_edist,
+    return find_best_adapter_match(m_settings.adapter, read.read_common.seq, adapter_edist,
                                    //including spacer region in search
                                    {r.first, std::min(r.second + m_settings.pore_adapter_range,
-                                                      (uint64_t)read.seq.size())})
+                                                      (uint64_t)read.read_common.seq.size())})
             .has_value();
 }
 
@@ -260,7 +263,7 @@ bool DuplexSplitNode::check_nearby_adapter(const Read& read, PosRange r, int ada
 //returns optional pair of matching ranges (first strictly to the left of spacer region)
 std::optional<std::pair<PosRange, PosRange>>
 DuplexSplitNode::check_flank_match(const Read& read, PosRange spacer, float err_thr) const {
-    const uint64_t rlen = read.seq.length();
+    const uint64_t rlen = read.read_common.seq.length();
     assert(spacer.first <= spacer.second && spacer.second <= rlen);
     if (spacer.first <= m_settings.strand_end_trim || spacer.second == rlen) {
         return std::nullopt;
@@ -284,7 +287,7 @@ DuplexSplitNode::check_flank_match(const Read& read, PosRange spacer, float err_
 
     const int dist_thr = std::round(err_thr * left_span);
     if (left_span >= m_settings.min_flank && right_span >= left_span) {
-        if (auto match = check_rc_match(read.seq, {left_start, left_end},
+        if (auto match = check_rc_match(read.read_common.seq, {left_start, left_end},
                                         //including spacer region in search
                                         {right_start, right_end}, dist_thr)) {
             return std::pair{PosRange{left_start, left_end}, *match};
@@ -296,7 +299,7 @@ DuplexSplitNode::check_flank_match(const Read& read, PosRange spacer, float err_
 std::optional<DuplexSplitNode::PosRange> DuplexSplitNode::identify_middle_adapter_split(
         const Read& read) const {
     assert(m_settings.strand_end_flank > m_settings.strand_end_trim + m_settings.min_flank);
-    const uint64_t r_l = read.seq.size();
+    const uint64_t r_l = read.read_common.seq.size();
     const uint64_t search_span =
             std::max(m_settings.middle_adapter_search_span,
                      uint64_t(std::round(m_settings.middle_adapter_search_frac * r_l)));
@@ -306,7 +309,7 @@ std::optional<DuplexSplitNode::PosRange> DuplexSplitNode::identify_middle_adapte
 
     spdlog::trace("Searching for adapter match");
     if (auto adapter_match = find_best_adapter_match(
-                m_settings.adapter, read.seq, m_settings.relaxed_adapter_edist,
+                m_settings.adapter, read.read_common.seq, m_settings.relaxed_adapter_edist,
                 {r_l / 2 - search_span / 2, r_l / 2 + search_span / 2})) {
         const uint64_t adapter_start = adapter_match->first;
         const uint64_t adapter_end = adapter_match->second;
@@ -326,7 +329,7 @@ std::optional<DuplexSplitNode::PosRange> DuplexSplitNode::identify_middle_adapte
 
             if (adapter_end + m_settings.strand_end_flank > r_l || template_span < query_span ||
                 check_rc_match(
-                        read.seq,
+                        read.read_common.seq,
                         {r_l - m_settings.strand_end_flank, r_l - m_settings.strand_end_trim},
                         {0, std::min(m_settings.strand_start_flank, r_l)}, dist_thr)) {
                 return PosRange{adapter_start - 1, adapter_start};
@@ -338,7 +341,7 @@ std::optional<DuplexSplitNode::PosRange> DuplexSplitNode::identify_middle_adapte
 
 std::optional<DuplexSplitNode::PosRange> DuplexSplitNode::identify_extra_middle_split(
         const Read& read) const {
-    const uint64_t r_l = read.seq.size();
+    const uint64_t r_l = read.read_common.seq.size();
     //TODO parameterize
     const float ext_start_frac = 0.1;
     //extend to tolerate some extra length difference
@@ -354,7 +357,8 @@ std::optional<DuplexSplitNode::PosRange> DuplexSplitNode::identify_extra_middle_
 
     spdlog::trace("Checking start/end match");
     if (auto templ_start_match = check_rc_match(
-                read.seq, {r_l - m_settings.strand_end_flank, r_l - m_settings.strand_end_trim},
+                read.read_common.seq,
+                {r_l - m_settings.strand_end_flank, r_l - m_settings.strand_end_trim},
                 {0, std::min(r_l, ext_start_flank)}, flank_edist)) {
         //check if matched region and query overlap
         if (templ_start_match->second + m_settings.strand_end_flank > r_l) {
@@ -390,9 +394,10 @@ std::vector<ReadPtr> DuplexSplitNode::subreads(ReadPtr read,
         return subreads;
     }
 
-    const auto stride = read->model_stride;
-    const auto seq_to_sig_map = utils::moves_to_map(
-            read->moves, stride, read->read_common.raw_data.size(0), read->seq.size() + 1);
+    const auto stride = read->read_common.model_stride;
+    const auto seq_to_sig_map =
+            utils::moves_to_map(read->read_common.moves, stride, read->read_common.raw_data.size(0),
+                                read->read_common.seq.size() + 1);
 
     //TODO maybe simplify by adding begin/end stubs?
     uint64_t start_pos = 0;
@@ -406,9 +411,9 @@ std::vector<ReadPtr> DuplexSplitNode::subreads(ReadPtr read,
         signal_start = seq_to_sig_map[r.second];
     }
     assert(read->raw_data.size(0) == seq_to_sig_map[read->seq.size()]);
-    if (start_pos < read->seq.size() &&
+    if (start_pos < read->read_common.seq.size() &&
         signal_start / stride < read->read_common.raw_data.size(0) / stride) {
-        subreads.push_back(subread(*read, {start_pos, read->seq.size()},
+        subreads.push_back(subread(*read, {start_pos, read->read_common.seq.size()},
                                    {signal_start, read->read_common.raw_data.size(0)}));
     }
 
@@ -454,14 +459,14 @@ DuplexSplitNode::build_split_finders() const {
 
         split_finders.push_back(
                 {"ADAPTER_FLANK", [&](const ExtRead& read) {
-                     return filter_ranges(find_adapter_matches(m_settings.adapter, read.read->seq,
-                                                               m_settings.adapter_edist,
-                                                               m_settings.expect_adapter_prefix),
-                                          [&](PosRange r) {
-                                              return check_flank_match(*read.read,
-                                                                       {r.first, r.first},
-                                                                       m_settings.flank_err);
-                                          });
+                     return filter_ranges(
+                             find_adapter_matches(m_settings.adapter, read.read->read_common.seq,
+                                                  m_settings.adapter_edist,
+                                                  m_settings.expect_adapter_prefix),
+                             [&](PosRange r) {
+                                 return check_flank_match(*read.read, {r.first, r.first},
+                                                          m_settings.flank_err);
+                             });
                  }});
 
         split_finders.push_back({"ADAPTER_MIDDLE", [&](const ExtRead& read) {
@@ -488,13 +493,13 @@ std::vector<ReadPtr> DuplexSplitNode::split(ReadPtr init_read) const {
     using namespace std::chrono;
 
     auto start_ts = high_resolution_clock::now();
-    auto read_id = init_read->read_id;
-    spdlog::trace("Processing read {}; length {}", read_id, init_read->seq.size());
+    auto read_id = init_read->read_common.read_id;
+    spdlog::trace("Processing read {}; length {}", read_id, init_read->read_common.seq.size());
 
     //assert(!init_read->seq.empty() && !init_read->moves.empty());
-    if (init_read->seq.empty() || init_read->moves.empty()) {
-        spdlog::trace("Empty read {}; length {}; moves {}", read_id, init_read->seq.size(),
-                      init_read->moves.size());
+    if (init_read->read_common.seq.empty() || init_read->read_common.moves.empty()) {
+        spdlog::trace("Empty read {}; length {}; moves {}", read_id,
+                      init_read->read_common.seq.size(), init_read->read_common.moves.size());
         std::vector<ReadPtr> split_result;
         split_result.push_back(std::move(init_read));
         return split_result;
@@ -529,7 +534,7 @@ std::vector<ReadPtr> DuplexSplitNode::split(ReadPtr init_read) const {
             ext_read.read->split_count = to_split.size();
             const auto subread_uuid = utils::derive_uuid(ext_read.read->parent_read_id,
                                                          std::to_string(ext_read.read->subread_id));
-            ext_read.read->read_id = subread_uuid;
+            ext_read.read->read_common.read_id = subread_uuid;
         }
 
         split_result.push_back(std::move(ext_read.read));

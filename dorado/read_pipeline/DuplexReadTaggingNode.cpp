@@ -46,9 +46,10 @@ void DuplexReadTaggingNode::worker_thread() {
         if (!read->is_duplex && !read->is_duplex_parent) {
             send_message_to_sink(std::move(read));
         } else if (read->is_duplex) {
-            std::string template_read_id = read->read_id.substr(0, read->read_id.find(';'));
-            std::string complement_read_id =
-                    read->read_id.substr(read->read_id.find(';') + 1, read->read_id.length());
+            std::string template_read_id =
+                    read->read_common.read_id.substr(0, read->read_common.read_id.find(';'));
+            std::string complement_read_id = read->read_common.read_id.substr(
+                    read->read_common.read_id.find(';') + 1, read->read_common.read_id.length());
 
             send_message_to_sink(std::move(read));
 
@@ -71,18 +72,18 @@ void DuplexReadTaggingNode::worker_thread() {
                 }
             }
         } else {
-            auto find_read = m_parents_wanted.find(read->read_id);
+            auto find_read = m_parents_wanted.find(read->read_common.read_id);
             if (find_read != m_parents_wanted.end()) {
                 // If a read is in the parents wanted list, then sent it downstream
                 // and add it to the set of processed reads. It will also be removed
                 // from the parent reads being looked for.
-                m_parents_processed.insert(read->read_id);
+                m_parents_processed.insert(read->read_common.read_id);
                 send_message_to_sink(std::move(read));
                 m_parents_wanted.erase(find_read);
             } else {
                 // No duplex offspring is seen so far, so hold it and track
                 // it as available parents.
-                m_duplex_parents[read->read_id] = std::move(read);
+                m_duplex_parents[read->read_common.read_id] = std::move(read);
             }
         }
     }

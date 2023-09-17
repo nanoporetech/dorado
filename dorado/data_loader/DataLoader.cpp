@@ -138,7 +138,7 @@ ReadPtr process_pod5_read(size_t row,
     new_read->start_time_ms = start_time_ms;
     new_read->scaling = read_data.calibration_scale;
     new_read->offset = read_data.calibration_offset;
-    new_read->read_id = std::move(read_id_str);
+    new_read->read_common.read_id = std::move(read_id_str);
     new_read->num_trimmed_samples = 0;
     new_read->attributes.read_number = read_data.read_number;
     new_read->attributes.fast5_filename = std::filesystem::path(path.c_str()).filename().string();
@@ -146,10 +146,10 @@ ReadPtr process_pod5_read(size_t row,
     new_read->attributes.num_samples = read_data.num_samples;
     new_read->attributes.channel_number = read_data.channel;
     new_read->attributes.start_time = start_time;
-    new_read->run_id = run_info_data->acquisition_id;
+    new_read->read_common.run_id = run_info_data->acquisition_id;
     new_read->start_sample = read_data.start_sample;
     new_read->end_sample = read_data.start_sample + read_data.num_samples;
-    new_read->flowcell_id = run_info_data->flow_cell_id;
+    new_read->read_common.flowcell_id = run_info_data->flow_cell_id;
     new_read->is_duplex = false;
 
     if (pod5_free_run_info(run_info_data) != POD5_OK) {
@@ -761,7 +761,7 @@ void DataLoader::load_fast5_reads_from_file(const std::string& path) {
         new_read->range = range;
         new_read->offset = offset;
         new_read->scaling = range / digitisation;
-        new_read->read_id = read_id;
+        new_read->read_common.read_id = read_id;
         new_read->num_trimmed_samples = 0;
         new_read->attributes.mux = mux;
         new_read->attributes.read_number = read_number;
@@ -770,8 +770,8 @@ void DataLoader::load_fast5_reads_from_file(const std::string& path) {
         new_read->attributes.fast5_filename = fast5_filename;
         new_read->is_duplex = false;
 
-        if (!m_allowed_read_ids ||
-            (m_allowed_read_ids->find(new_read->read_id) != m_allowed_read_ids->end())) {
+        if (!m_allowed_read_ids || (m_allowed_read_ids->find(new_read->read_common.read_id) !=
+                                    m_allowed_read_ids->end())) {
             m_pipeline.push_message(std::move(new_read));
             m_loaded_read_count++;
         }

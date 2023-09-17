@@ -70,13 +70,13 @@ void SubreadTaggerNode::worker_thread() {
                 for (auto duplex_read_iter = m_duplex_reads.begin();
                      duplex_read_iter != m_duplex_reads.end();) {
                     auto& duplex_read = *duplex_read_iter;
-                    std::string template_read_id =
-                            duplex_read->read_id.substr(0, duplex_read->read_id.find(';'));
+                    std::string template_read_id = duplex_read->read_common.read_id.substr(
+                            0, duplex_read->read_common.read_id.find(';'));
                     uint64_t read_tag = duplex_read->read_tag;
                     // do any of the subreads match the template read id for this duplex read?
                     if (std::any_of(subreads->begin(), subreads->end(),
                                     [template_read_id, read_tag](const ReadPtr& subread) {
-                                        return subread->read_id == template_read_id &&
+                                        return subread->read_common.read_id == template_read_id &&
                                                subread->read_tag == read_tag;
                                     })) {
                         duplex_read->subread_id = subreads->size();

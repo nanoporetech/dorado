@@ -145,7 +145,7 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
 // number of bases called.
 int estimate_samples_per_base(const dorado::Read& read) {
     float num_samples_per_base =
-            static_cast<float>(read.read_common.raw_data.size(0)) / read.seq.length();
+            static_cast<float>(read.read_common.raw_data.size(0)) / read.read_common.seq.length();
     // The estimate is not rounded because this calculation generally overestimates
     // the samples per base. Rounding down gives better results than rounding to nearest.
     return std::floor(num_samples_per_base);
@@ -166,9 +166,9 @@ SignalAnchorInfo determine_signal_anchor_and_strand_cdna(const dorado::Read& rea
     int trailing_Ts = dorado::utils::count_trailing_chars(VNP, 'T');
 
     const int kWindowSize = 150;
-    std::string read_top = read.seq.substr(0, kWindowSize);
-    auto bottom_start = std::max(0, (int)read.seq.length() - kWindowSize);
-    std::string read_bottom = read.seq.substr(bottom_start, kWindowSize);
+    std::string read_top = read.read_common.seq.substr(0, kWindowSize);
+    auto bottom_start = std::max(0, (int)read.read_common.seq.length() - kWindowSize);
+    std::string read_bottom = read.read_common.seq.substr(bottom_start, kWindowSize);
 
     EdlibAlignConfig align_config = edlibDefaultAlignConfig();
     align_config.task = EDLIB_TASK_LOC;
@@ -206,14 +206,15 @@ SignalAnchorInfo determine_signal_anchor_and_strand_cdna(const dorado::Read& rea
             base_anchor = bottom_start + bottom_v1.startLocations[0];
         }
 
-        const auto stride = read.model_stride;
-        const auto seq_to_sig_map = dorado::utils::moves_to_map(
-                read.moves, stride, read.read_common.raw_data.size(0), read.seq.size() + 1);
+        const auto stride = read.read_common.model_stride;
+        const auto seq_to_sig_map = dorado::utils::moves_to_map(read.read_common.moves, stride,
+                                                                read.read_common.raw_data.size(0),
+                                                                read.read_common.seq.size() + 1);
         int signal_anchor = seq_to_sig_map[base_anchor];
 
         result = {fwd, signal_anchor, trailing_Ts};
     } else {
-        spdlog::debug("{} primer edit distance too high {}", read.read_id,
+        spdlog::debug("{} primer edit distance too high {}", read.read_common.read_id,
                       std::min(dist_v1, dist_v2));
     }
 
@@ -321,8 +322,8 @@ void PolyACalculator::worker_thread() {
                 spdlog::debug(
                         "{} PolyA bases {}, signal anchor {} Signal range is {} {}, "
                         "samples/base {} trim {}",
-                        read->read_id, num_bases, signal_anchor, signal_start, signal_end,
-                        num_samples_per_base, read->num_trimmed_samples);
+                        read->read_common.read_id, num_bases, signal_anchor, signal_start,
+                        signal_end, num_samples_per_base, read->num_trimmed_samples);
 
                 // Set tail length property in the read.
                 read->rna_poly_tail_length = num_bases;
@@ -338,8 +339,8 @@ void PolyACalculator::worker_thread() {
                 spdlog::debug(
                         "{} PolyA bases {}, signal anchor {} Signal range is {}, "
                         "samples/base {}, trim  {}",
-                        read->read_id, num_bases, signal_anchor, signal_start, signal_end,
-                        num_samples_per_base, read->num_trimmed_samples);
+                        read->read_common.read_id, num_bases, signal_anchor, signal_start,
+                        signal_end, num_samples_per_base, read->num_trimmed_samples);
                 num_not_called++;
             }
         } else {

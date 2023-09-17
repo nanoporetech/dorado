@@ -91,9 +91,9 @@ ReadMap read_bam(const std::string& filename, const std::unordered_set<std::stri
         }
 
         auto tmp_read = ReadPtr::make();
-        tmp_read->read_id = read_id;
-        tmp_read->seq = std::string(nucleotides.begin(), nucleotides.end());
-        tmp_read->qstring = std::string(qualities.begin(), qualities.end());
+        tmp_read->read_common.read_id = read_id;
+        tmp_read->read_common.seq = std::string(nucleotides.begin(), nucleotides.end());
+        tmp_read->read_common.qstring = std::string(qualities.begin(), qualities.end());
         reads[read_id] = std::move(tmp_read);
     }
 

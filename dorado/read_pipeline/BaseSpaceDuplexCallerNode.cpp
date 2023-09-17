@@ -93,9 +93,9 @@ void BaseSpaceDuplexCallerNode::basespace(const std::string& template_read_id,
         return;
     } else {
         template_read = template_read_it->second.get();
-        template_sequence = template_read->seq;
-        template_quality_scores =
-                std::vector<uint8_t>(template_read->qstring.begin(), template_read->qstring.end());
+        template_sequence = template_read->read_common.seq;
+        template_quality_scores = std::vector<uint8_t>(template_read->read_common.qstring.begin(),
+                                                       template_read->read_common.qstring.end());
     }
 
     // For basespace, a q score filter is run over the quality scores.
@@ -115,7 +115,8 @@ void BaseSpaceDuplexCallerNode::basespace(const std::string& template_read_id,
     // We have both sequences and can perform the consensus
     const Read* complement_read = complement_read_it->second.get();
     auto complement_quality_scores_reverse =
-            std::vector<uint8_t>(complement_read->qstring.begin(), complement_read->qstring.end());
+            std::vector<uint8_t>(complement_read->read_common.qstring.begin(),
+                                 complement_read->read_common.qstring.end());
     std::reverse(complement_quality_scores_reverse.begin(),
                  complement_quality_scores_reverse.end());
 
@@ -124,7 +125,7 @@ void BaseSpaceDuplexCallerNode::basespace(const std::string& template_read_id,
 
     // Compute the RC
     auto complement_sequence_reverse_complement =
-            dorado::utils::reverse_complement(complement_read->seq);
+            dorado::utils::reverse_complement(complement_read->read_common.seq);
 
     EdlibAlignResult result =
             edlibAlign(template_sequence.data(), template_sequence.size(),
@@ -166,11 +167,12 @@ void BaseSpaceDuplexCallerNode::basespace(const std::string& template_read_id,
 
         auto duplex_read = ReadPtr::make();
         duplex_read->is_duplex = true;
-        duplex_read->seq = std::string(consensus.begin(), consensus.end());
-        duplex_read->qstring =
+        duplex_read->read_common.seq = std::string(consensus.begin(), consensus.end());
+        duplex_read->read_common.qstring =
                 std::string(quality_scores_phred.begin(), quality_scores_phred.end());
 
-        duplex_read->read_id = template_read->read_id + ";" + complement_read->read_id;
+        duplex_read->read_common.read_id =
+                template_read->read_common.read_id + ";" + complement_read->read_common.read_id;
         duplex_read->read_tag = template_read->read_tag;
 
         send_message_to_sink(std::move(duplex_read));

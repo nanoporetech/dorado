@@ -33,13 +33,13 @@ ReadPtr StereoDuplexEncoderNode::stereo_encode(const Read& template_read,
 
     // We align the reverse complement of the complement read to the template read.
     const auto complement_sequence_reverse_complement =
-            dorado::utils::reverse_complement(complement_read.seq);
+            dorado::utils::reverse_complement(complement_read.read_common.seq);
 
     // Align the two reads to one another and print out the score.
     EdlibAlignConfig align_config = edlibDefaultAlignConfig();
     align_config.task = EDLIB_TASK_PATH;
 
-    auto temp_strand = template_read.seq.substr(temp_start, temp_end - temp_start);
+    auto temp_strand = template_read.read_common.seq.substr(temp_start, temp_end - temp_start);
     auto comp_strand =
             complement_sequence_reverse_complement.substr(comp_start, comp_end - comp_start);
 
@@ -78,8 +78,8 @@ ReadPtr StereoDuplexEncoderNode::stereo_encode(const Read& template_read,
     int complement_signal_cursor = 0;
 
     std::vector<uint8_t> template_moves_expanded;
-    for (int i = 0; i < template_read.moves.size(); i++) {
-        template_moves_expanded.push_back(template_read.moves[i]);
+    for (int i = 0; i < template_read.read_common.moves.size(); i++) {
+        template_moves_expanded.push_back(template_read.read_common.moves[i]);
         for (int j = 0; j < m_input_signal_stride - 1; j++) {
             template_moves_expanded.push_back(0);
         }
@@ -97,8 +97,8 @@ ReadPtr StereoDuplexEncoderNode::stereo_encode(const Read& template_read,
     }
 
     std::vector<uint8_t> complement_moves_expanded;
-    for (int i = 0; i < complement_read.moves.size(); i++) {
-        complement_moves_expanded.push_back(complement_read.moves[i]);
+    for (int i = 0; i < complement_read.read_common.moves.size(); i++) {
+        complement_moves_expanded.push_back(complement_read.read_common.moves[i]);
         for (int j = 0; j < m_input_signal_stride - 1; j++) {
             complement_moves_expanded.push_back(0);
         }
@@ -115,7 +115,7 @@ ReadPtr StereoDuplexEncoderNode::stereo_encode(const Read& template_read,
     auto complement_signal = complement_read.read_common.raw_data;
     complement_signal = torch::flip(complement_read.read_common.raw_data, 0);
 
-    int complement_moves_seen = complement_read.moves[complement_signal_cursor];
+    int complement_moves_seen = complement_read.read_common.moves[complement_signal_cursor];
     while (complement_moves_seen < query_cursor + 1) {
         complement_signal_cursor++;
         complement_moves_seen += complement_moves_expanded[complement_signal_cursor];
@@ -216,13 +216,13 @@ ReadPtr StereoDuplexEncoderNode::stereo_encode(const Read& template_read,
 
         // Now, add the nucleotides and q scores
         if (result.alignment[i] != kAlignInsertionToQuery) {
-            const char nucleotide = template_read.seq[target_cursor];
+            const char nucleotide = template_read.read_common.seq[target_cursor];
             const auto nucleotide_feature_idx =
                     kFeatureTemplateFirstNucleotide + dorado::utils::base_to_int(nucleotide);
             std::fill_n(&feature_ptrs[nucleotide_feature_idx][start_ts], total_segment_length,
                         static_cast<SampleType>(1.0f));
             std::fill_n(&feature_ptrs[kFeatureTemplateQScore][start_ts], total_segment_length,
-                        convert_q_score(template_read.qstring[target_cursor]));
+                        convert_q_score(template_read.read_common.qstring[target_cursor]));
 
             // Anything but a query insertion causes the target cursor to advance.
             ++target_cursor;
@@ -236,8 +236,9 @@ ReadPtr StereoDuplexEncoderNode::stereo_encode(const Read& template_read,
 
             std::fill_n(&feature_ptrs[nucleotide_feature_idx][start_ts], total_segment_length,
                         static_cast<SampleType>(1.0f));
-            std::fill_n(&feature_ptrs[kFeatureComplementQScore][start_ts], total_segment_length,
-                        convert_q_score(complement_read.qstring.rbegin()[query_cursor]));
+            std::fill_n(
+                    &feature_ptrs[kFeatureComplementQScore][start_ts], total_segment_length,
+                    convert_q_score(complement_read.read_common.qstring.rbegin()[query_cursor]));
 
             // Anything but a target insertion causes the query cursor to advance.
             ++query_cursor;
@@ -253,7 +254,8 @@ ReadPtr StereoDuplexEncoderNode::stereo_encode(const Read& template_read,
     tmp = tmp.index(
             {torch::indexing::Slice(None), torch::indexing::Slice(None, stereo_global_cursor)});
 
-    read->read_id = template_read.read_id + ";" + complement_read.read_id;
+    read->read_common.read_id =
+            template_read.read_common.read_id + ";" + complement_read.read_common.read_id;
 
     read->attributes.mux = template_read.attributes.mux;
     read->attributes.channel_number = template_read.attributes.channel_number;
@@ -264,7 +266,7 @@ ReadPtr StereoDuplexEncoderNode::stereo_encode(const Read& template_read,
     read->client_id = template_read.client_id;
     read->read_common.raw_data = tmp;  // use the encoded signal
     read->is_duplex = true;
-    read->run_id = template_read.run_id;
+    read->read_common.run_id = template_read.read_common.run_id;
 
     edlibFreeAlignResult(result);
 

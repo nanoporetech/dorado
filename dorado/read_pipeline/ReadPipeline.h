@@ -21,6 +21,17 @@ namespace dorado {
 class ReadCommon {
 public:
     torch::Tensor raw_data;  // Loaded from source file
+
+    int model_stride;  // The down sampling factor of the model
+
+    std::string read_id;                  // Unique read ID (UUID4)
+    std::string seq;                      // Read basecall
+    std::string qstring;                  // Read Qstring (Phred)
+    std::vector<uint8_t> moves;           // Move table
+    std::vector<uint8_t> base_mod_probs;  // Modified base probabilities
+    std::string run_id;                   // Run ID - used in read group
+    std::string flowcell_id;              // Flowcell ID - used in read group
+    std::string model_name;               // Read group
 };
 
 // Class representing a read, including raw data
@@ -55,17 +66,6 @@ public:
     std::string scaling_method;  // To be set by scaler
 
     float scaling;  // Scale factor applied to convert raw integers from sequencer into pore current values
-
-    int model_stride;  // The down sampling factor of the model
-
-    std::string read_id;                  // Unique read ID (UUID4)
-    std::string seq;                      // Read basecall
-    std::string qstring;                  // Read Qstring (Phred)
-    std::vector<uint8_t> moves;           // Move table
-    std::vector<uint8_t> base_mod_probs;  // Modified base probabilities
-    std::string run_id;                   // Run ID - used in read group
-    std::string flowcell_id;              // Flowcell ID - used in read group
-    std::string model_name;               // Read group
 
     std::string parent_read_id;  // Origin read ID for all its subreads. Empty for nonsplit reads.
 

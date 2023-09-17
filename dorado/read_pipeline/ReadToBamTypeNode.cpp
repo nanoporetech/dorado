@@ -22,8 +22,8 @@ void ReadToBamType::worker_thread() {
         auto read = std::get<ReadPtr>(std::move(message));
 
         if (m_rna) {
-            std::reverse(read->seq.begin(), read->seq.end());
-            std::reverse(read->qstring.begin(), read->qstring.end());
+            std::reverse(read->read_common.seq.begin(), read->read_common.seq.end());
+            std::reverse(read->read_common.qstring.begin(), read->read_common.qstring.end());
         }
 
         auto alns = read->extract_sam_lines(m_emit_moves, m_modbase_threshold);
