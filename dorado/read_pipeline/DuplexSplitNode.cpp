@@ -171,22 +171,23 @@ ReadPtr subread(const Read& read, PosRange seq_range, PosRange signal_range) {
            (signal_range.second == read.raw_data.size(0) && seq_range.second == read.seq.size()));
 
     auto subread = utils::shallow_copy_read(read);
-    subread->read_tag = read.read_tag;
-    subread->client_id = read.client_id;
+    subread->read_common.read_tag = read.read_common.read_tag;
+    subread->read_common.client_id = read.read_common.client_id;
     subread->read_common.raw_data = subread->read_common.raw_data.index(
             {torch::indexing::Slice(signal_range.first, signal_range.second)});
-    subread->attributes.read_number = -1;
+    subread->read_common.attributes.read_number = -1;
 
     //we adjust for it in new start time
-    subread->attributes.num_samples = signal_range.second - signal_range.first;
+    subread->read_common.attributes.num_samples = signal_range.second - signal_range.first;
     subread->num_trimmed_samples = 0;
     subread->start_sample = read.start_sample + read.num_trimmed_samples + signal_range.first;
-    subread->end_sample = subread->start_sample + subread->attributes.num_samples;
+    subread->end_sample = subread->start_sample + subread->read_common.attributes.num_samples;
 
     auto start_time_ms = read.run_acquisition_start_time_ms +
                          uint64_t(std::round(subread->start_sample * 1000. / subread->sample_rate));
-    subread->attributes.start_time = utils::get_string_timestamp_from_unix_time(start_time_ms);
-    subread->start_time_ms = start_time_ms;
+    subread->read_common.attributes.start_time =
+            utils::get_string_timestamp_from_unix_time(start_time_ms);
+    subread->read_common.start_time_ms = start_time_ms;
 
     subread->read_common.seq =
             subread->read_common.seq.substr(seq_range.first, seq_range.second - seq_range.first);

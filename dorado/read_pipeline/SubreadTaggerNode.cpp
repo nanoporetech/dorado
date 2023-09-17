@@ -16,7 +16,7 @@ void SubreadTaggerNode::worker_thread() {
         if (std::holds_alternative<ReadPtr>(message)) {
             auto read = std::get<ReadPtr>(std::move(message));
 
-            if (read->is_duplex) {
+            if (read->read_common.is_duplex) {
                 std::unique_lock lock(m_duplex_reads_mutex);
                 m_duplex_reads.push_back(std::move(read));
                 lock.unlock();
@@ -28,7 +28,7 @@ void SubreadTaggerNode::worker_thread() {
                     continue;
                 }
 
-                const auto read_tag = read->read_tag;
+                const auto read_tag = read->read_common.read_tag;
                 const auto split_count = read->split_count;
 
                 std::lock_guard subreads_lock(m_subread_groups_mutex);
@@ -72,12 +72,12 @@ void SubreadTaggerNode::worker_thread() {
                     auto& duplex_read = *duplex_read_iter;
                     std::string template_read_id = duplex_read->read_common.read_id.substr(
                             0, duplex_read->read_common.read_id.find(';'));
-                    uint64_t read_tag = duplex_read->read_tag;
+                    uint64_t read_tag = duplex_read->read_common.read_tag;
                     // do any of the subreads match the template read id for this duplex read?
                     if (std::any_of(subreads->begin(), subreads->end(),
                                     [template_read_id, read_tag](const ReadPtr& subread) {
                                         return subread->read_common.read_id == template_read_id &&
-                                               subread->read_tag == read_tag;
+                                               subread->read_common.read_tag == read_tag;
                                     })) {
                         duplex_read->subread_id = subreads->size();
                         subreads->push_back(std::move(duplex_read));
@@ -93,9 +93,9 @@ void SubreadTaggerNode::worker_thread() {
                         [](const size_t& running_total, const ReadPtr& subread) {
                             return subread->num_duplex_candidate_pairs + running_total;
                         });
-                auto num_duplex =
-                        std::count_if(subreads->begin(), subreads->end(),
-                                      [](const ReadPtr& subread) { return subread->is_duplex; });
+                auto num_duplex = std::count_if(
+                        subreads->begin(), subreads->end(),
+                        [](const ReadPtr& subread) { return subread->read_common.is_duplex; });
                 if (num_duplex_candidates == num_duplex) {
                     for (auto& subread : (*subreads)) {
                         subread->split_count = subreads->size();

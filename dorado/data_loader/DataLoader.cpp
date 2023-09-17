@@ -135,22 +135,23 @@ ReadPtr process_pod5_read(size_t row,
                           (uint64_t)run_sample_rate);  // TODO check if this cast is needed
     auto start_time = utils::get_string_timestamp_from_unix_time(start_time_ms);
     new_read->run_acquisition_start_time_ms = run_acquisition_start_time_ms;
-    new_read->start_time_ms = start_time_ms;
+    new_read->read_common.start_time_ms = start_time_ms;
     new_read->scaling = read_data.calibration_scale;
     new_read->offset = read_data.calibration_offset;
     new_read->read_common.read_id = std::move(read_id_str);
     new_read->num_trimmed_samples = 0;
-    new_read->attributes.read_number = read_data.read_number;
-    new_read->attributes.fast5_filename = std::filesystem::path(path.c_str()).filename().string();
-    new_read->attributes.mux = read_data.well;
-    new_read->attributes.num_samples = read_data.num_samples;
-    new_read->attributes.channel_number = read_data.channel;
-    new_read->attributes.start_time = start_time;
+    new_read->read_common.attributes.read_number = read_data.read_number;
+    new_read->read_common.attributes.fast5_filename =
+            std::filesystem::path(path.c_str()).filename().string();
+    new_read->read_common.attributes.mux = read_data.well;
+    new_read->read_common.attributes.num_samples = read_data.num_samples;
+    new_read->read_common.attributes.channel_number = read_data.channel;
+    new_read->read_common.attributes.start_time = start_time;
     new_read->read_common.run_id = run_info_data->acquisition_id;
     new_read->start_sample = read_data.start_sample;
     new_read->end_sample = read_data.start_sample + read_data.num_samples;
     new_read->read_common.flowcell_id = run_info_data->flow_cell_id;
-    new_read->is_duplex = false;
+    new_read->read_common.is_duplex = false;
 
     if (pod5_free_run_info(run_info_data) != POD5_OK) {
         spdlog::error("Failed to free run info");
@@ -763,12 +764,12 @@ void DataLoader::load_fast5_reads_from_file(const std::string& path) {
         new_read->scaling = range / digitisation;
         new_read->read_common.read_id = read_id;
         new_read->num_trimmed_samples = 0;
-        new_read->attributes.mux = mux;
-        new_read->attributes.read_number = read_number;
-        new_read->attributes.channel_number = channel_number;
-        new_read->attributes.start_time = start_time_str;
-        new_read->attributes.fast5_filename = fast5_filename;
-        new_read->is_duplex = false;
+        new_read->read_common.attributes.mux = mux;
+        new_read->read_common.attributes.read_number = read_number;
+        new_read->read_common.attributes.channel_number = channel_number;
+        new_read->read_common.attributes.start_time = start_time_str;
+        new_read->read_common.attributes.fast5_filename = fast5_filename;
+        new_read->read_common.is_duplex = false;
 
         if (!m_allowed_read_ids || (m_allowed_read_ids->find(new_read->read_common.read_id) !=
                                     m_allowed_read_ids->end())) {

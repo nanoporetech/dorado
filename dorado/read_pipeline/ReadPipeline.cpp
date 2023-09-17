@@ -77,21 +77,21 @@ void Read::generate_read_tags(bam1_t *aln, bool emit_moves) const {
     int ts = num_trimmed_samples;
     bam_aux_append(aln, "ts", 'i', sizeof(ts), (uint8_t *)&ts);
 
-    int mx = attributes.mux;
+    int mx = read_common.attributes.mux;
     bam_aux_append(aln, "mx", 'i', sizeof(mx), (uint8_t *)&mx);
 
-    int ch = attributes.channel_number;
+    int ch = read_common.attributes.channel_number;
     bam_aux_append(aln, "ch", 'i', sizeof(ch), (uint8_t *)&ch);
 
-    bam_aux_append(aln, "st", 'Z', attributes.start_time.length() + 1,
-                   (uint8_t *)attributes.start_time.c_str());
+    bam_aux_append(aln, "st", 'Z', read_common.attributes.start_time.length() + 1,
+                   (uint8_t *)read_common.attributes.start_time.c_str());
 
     // For reads which are the result of read splitting, the read number will be set to -1
-    int rn = attributes.read_number;
+    int rn = read_common.attributes.read_number;
     bam_aux_append(aln, "rn", 'i', sizeof(rn), (uint8_t *)&rn);
 
-    bam_aux_append(aln, "fn", 'Z', attributes.fast5_filename.length() + 1,
-                   (uint8_t *)attributes.fast5_filename.c_str());
+    bam_aux_append(aln, "fn", 'Z', read_common.attributes.fast5_filename.length() + 1,
+                   (uint8_t *)read_common.attributes.fast5_filename.c_str());
 
     float sm = shift;
     bam_aux_append(aln, "sm", 'f', sizeof(sm), (uint8_t *)&sm);
@@ -137,14 +137,14 @@ void Read::generate_duplex_read_tags(bam1_t *aln) const {
     uint32_t duplex = 1;
     bam_aux_append(aln, "dx", 'i', sizeof(duplex), (uint8_t *)&duplex);
 
-    int mx = attributes.mux;
+    int mx = read_common.attributes.mux;
     bam_aux_append(aln, "mx", 'i', sizeof(mx), (uint8_t *)&mx);
 
-    int ch = attributes.channel_number;
+    int ch = read_common.attributes.channel_number;
     bam_aux_append(aln, "ch", 'i', sizeof(ch), (uint8_t *)&ch);
 
-    bam_aux_append(aln, "st", 'Z', attributes.start_time.length() + 1,
-                   (uint8_t *)attributes.start_time.c_str());
+    bam_aux_append(aln, "st", 'Z', read_common.attributes.start_time.length() + 1,
+                   (uint8_t *)read_common.attributes.start_time.c_str());
 
     auto rg = generate_read_group();
     if (!rg.empty()) {
@@ -195,7 +195,7 @@ std::vector<BamPtr> Read::extract_sam_lines(bool emit_moves, uint8_t modbase_thr
             bam_aux_append(aln, "BC", 'Z', barcode.length() + 1, (uint8_t *)barcode.c_str());
         }
 
-        if (is_duplex) {
+        if (read_common.is_duplex) {
             generate_duplex_read_tags(aln);
         } else {
             generate_read_tags(aln, emit_moves);
@@ -212,7 +212,7 @@ std::vector<BamPtr> Read::extract_sam_lines(bool emit_moves, uint8_t modbase_thr
 }
 
 uint64_t Read::get_end_time_ms() const {
-    return start_time_ms +
+    return read_common.start_time_ms +
            ((end_sample - start_sample) * 1000) / sample_rate;  //TODO get rid of the trimmed thing?
 }
 

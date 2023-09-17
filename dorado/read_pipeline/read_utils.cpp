@@ -28,12 +28,12 @@ ReadPtr shallow_copy_read(const Read& read) {
 
     copy->num_trimmed_samples = read.num_trimmed_samples;
 
-    copy->attributes = read.attributes;
+    copy->read_common.attributes = read.read_common.attributes;
 
     copy->start_sample = read.start_sample;
     copy->end_sample = read.end_sample;
     copy->run_acquisition_start_time_ms = read.run_acquisition_start_time_ms;
-    copy->is_duplex = read.is_duplex;
+    copy->read_common.is_duplex = read.read_common.is_duplex;
     return copy;
 }
 

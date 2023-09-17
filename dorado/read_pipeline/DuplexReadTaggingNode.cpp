@@ -43,9 +43,9 @@ void DuplexReadTaggingNode::worker_thread() {
         // Once all reads have been processed, any leftover parent simplex reads are
         // the ones whose duplex offsprings never came. They are retagged to not be
         // duplex parents and then sent downstream.
-        if (!read->is_duplex && !read->is_duplex_parent) {
+        if (!read->read_common.is_duplex && !read->is_duplex_parent) {
             send_message_to_sink(std::move(read));
-        } else if (read->is_duplex) {
+        } else if (read->read_common.is_duplex) {
             std::string template_read_id =
                     read->read_common.read_id.substr(0, read->read_common.read_id.find(';'));
             std::string complement_read_id = read->read_common.read_id.substr(

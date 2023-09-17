@@ -19,7 +19,7 @@ void ReadFilterNode::worker_thread() {
         auto read = std::get<ReadPtr>(std::move(message));
 
         auto log_filtering = [&]() {
-            if (read->is_duplex) {
+            if (read->read_common.is_duplex) {
                 ++m_num_duplex_reads_filtered;
                 m_num_duplex_bases_filtered += read->read_common.seq.length();
             } else {

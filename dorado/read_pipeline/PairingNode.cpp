@@ -33,7 +33,7 @@ namespace dorado {
 PairingNode::PairingResult PairingNode::is_within_time_and_length_criteria(const dorado::Read& temp,
                                                                            const dorado::Read& comp,
                                                                            int tid) {
-    int delta = comp.start_time_ms - temp.get_end_time_ms();
+    int delta = comp.read_common.start_time_ms - temp.get_end_time_ms();
     int seq_len1 = temp.read_common.seq.length();
     int seq_len2 = comp.read_common.seq.length();
     int min_seq_len = std::min(seq_len1, seq_len2);
@@ -207,7 +207,8 @@ void PairingNode::pair_list_worker_thread(int tid) {
                     template_read = std::move(partner_read);
                 }
 
-                int delta = complement_read->start_time_ms - template_read->get_end_time_ms();
+                int delta = complement_read->read_common.start_time_ms -
+                            template_read->get_end_time_ms();
                 auto [is_pair, qs, qe, rs, re] = is_within_alignment_criteria(
                         *template_read, *complement_read, delta, false, tid);
                 if (is_pair) {
@@ -233,7 +234,7 @@ void PairingNode::pair_generating_worker_thread(int tid) {
     torch::InferenceMode inference_mode_guard;
 
     auto compare_reads_by_time = [](const ReadPtr& read1, const ReadPtr& read2) {
-        return read1->start_time_ms < read2->start_time_ms;
+        return read1->read_common.start_time_ms < read2->read_common.start_time_ms;
     };
 
     Message message;
@@ -264,10 +265,10 @@ void PairingNode::pair_generating_worker_thread(int tid) {
         nvtx3::scoped_range loop{nvtx_id};
         auto read = std::get<ReadPtr>(std::move(message));
 
-        int channel = read->attributes.channel_number;
+        int channel = read->read_common.attributes.channel_number;
         std::string run_id = read->read_common.run_id;
         std::string flowcell_id = read->read_common.flowcell_id;
-        int32_t client_id = read->client_id;
+        int32_t client_id = read->read_common.client_id;
 
         std::unique_lock<std::mutex> lock(m_pairing_mtx);
 

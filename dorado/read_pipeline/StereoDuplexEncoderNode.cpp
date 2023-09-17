@@ -257,15 +257,16 @@ ReadPtr StereoDuplexEncoderNode::stereo_encode(const Read& template_read,
     read->read_common.read_id =
             template_read.read_common.read_id + ";" + complement_read.read_common.read_id;
 
-    read->attributes.mux = template_read.attributes.mux;
-    read->attributes.channel_number = template_read.attributes.channel_number;
-    read->attributes.start_time = template_read.attributes.start_time;
-    read->start_time_ms = template_read.start_time_ms;
+    read->read_common.attributes.mux = template_read.read_common.attributes.mux;
+    read->read_common.attributes.channel_number =
+            template_read.read_common.attributes.channel_number;
+    read->read_common.attributes.start_time = template_read.read_common.attributes.start_time;
+    read->read_common.start_time_ms = template_read.read_common.start_time_ms;
 
-    read->read_tag = template_read.read_tag;
-    read->client_id = template_read.client_id;
+    read->read_common.read_tag = template_read.read_common.read_tag;
+    read->read_common.client_id = template_read.read_common.client_id;
     read->read_common.raw_data = tmp;  // use the encoded signal
-    read->is_duplex = true;
+    read->read_common.is_duplex = true;
     read->read_common.run_id = template_read.read_common.run_id;
 
     edlibFreeAlignResult(result);
