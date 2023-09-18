@@ -124,18 +124,9 @@ using ReadPtr = std::unique_ptr<Read>;
 // A pair of reads for Duplex calling
 struct ReadPair {
     struct ReadData {
-        std::string seq;
+        ReadCommon read_common;
         uint64_t seq_start;
         uint64_t seq_end;
-        std::string qstring;
-        std::vector<uint8_t> moves;
-        torch::Tensor raw_data;
-        std::string read_id;
-        std::string run_id;
-        details::Attributes attributes;
-        uint64_t start_time_ms;
-        uint64_t read_tag;
-        int32_t client_id;
         static ReadData from_read(const Read& read, uint64_t seq_start, uint64_t seq_end);
     };
     ReadData template_read;

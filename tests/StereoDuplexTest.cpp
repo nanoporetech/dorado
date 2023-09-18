@@ -22,25 +22,28 @@ std::filesystem::path DataPath(std::string_view filename) {
 TEST_CASE(TEST_GROUP "Encoder", "[.]") {
     dorado::ReadPair::ReadData template_read{};
     {
-        template_read.seq = ReadFileIntoString(DataPath("template_seq"));
-        template_read.qstring = ReadFileIntoString(DataPath("template_qstring"));
-        template_read.moves = ReadFileIntoVector(DataPath("template_moves"));
-        torch::load(template_read.raw_data, DataPath("template_raw_data.tensor").string());
-        template_read.raw_data = template_read.raw_data.to(torch::kFloat16);
-        template_read.run_id = "test_run";
+        template_read.read_common.seq = ReadFileIntoString(DataPath("template_seq"));
+        template_read.read_common.qstring = ReadFileIntoString(DataPath("template_qstring"));
+        template_read.read_common.moves = ReadFileIntoVector(DataPath("template_moves"));
+        torch::load(template_read.read_common.raw_data,
+                    DataPath("template_raw_data.tensor").string());
+        template_read.read_common.raw_data = template_read.read_common.raw_data.to(torch::kFloat16);
+        template_read.read_common.run_id = "test_run";
         template_read.seq_start = 0;
-        template_read.seq_end = template_read.seq.length();
+        template_read.seq_end = template_read.read_common.seq.length();
     }
 
     dorado::ReadPair::ReadData complement_read{};
     {
-        complement_read.seq = ReadFileIntoString(DataPath("complement_seq"));
-        complement_read.qstring = ReadFileIntoString(DataPath("complement_qstring"));
-        complement_read.moves = ReadFileIntoVector(DataPath("complement_moves"));
-        torch::load(complement_read.raw_data, DataPath("complement_raw_data.tensor").string());
-        complement_read.raw_data = complement_read.raw_data.to(torch::kFloat16);
+        complement_read.read_common.seq = ReadFileIntoString(DataPath("complement_seq"));
+        complement_read.read_common.qstring = ReadFileIntoString(DataPath("complement_qstring"));
+        complement_read.read_common.moves = ReadFileIntoVector(DataPath("complement_moves"));
+        torch::load(complement_read.read_common.raw_data,
+                    DataPath("complement_raw_data.tensor").string());
+        complement_read.read_common.raw_data =
+                complement_read.read_common.raw_data.to(torch::kFloat16);
         complement_read.seq_start = 0;
-        complement_read.seq_end = complement_read.seq.length();
+        complement_read.seq_end = complement_read.read_common.seq.length();
     }
 
     torch::Tensor stereo_raw_data;
