@@ -11,11 +11,14 @@ const std::string RAB_1st_REAR = "AGAGTTTGATCATGGCTCAG";
 const std::string RAB_2nd_FRONT = "CCGTGAC";
 const std::string RAB_2nd_REAR = "CGGTTACCTTGTTACGACTT";
 
+const std::string RBK_FRONT = "TATTGCT";
+const std::string RBK_REAR = "GTTTTCGCATTTATCGTGAAACGCTTTCGCGTTTTTCGTGCGCCGCTTCA";
+
 const std::string RBK4_FRONT = "GCTTGGGTGTTTAACC";
 const std::string RBK4_REAR = "GTTTTCGCATTTATCGTGAAACGCTTTCGCGTTTTTCGTGCGCCGCTTCA";
 
-const std::string RBK_kit14_FRONT = "C";
-const std::string RBK_kit14_REAR = "GTTTTCGCATTTATCGTGAAACGCTTTCGCGTTTTTCGTGCGCCGCTTCA";
+const std::string RBK4_kit14_FRONT = "C";
+const std::string RBK4_kit14_REAR = "GTTTTCGCATTTATCGTGAAACGCTTTCGCGTTTTTCGTGCGCCGCTTCA";
 
 const std::string RLB_FRONT = "CCGTGAC";
 const std::string RLB_REAR = "CGTTTTTCGTGCGCCGCTTC";
@@ -77,6 +80,9 @@ const std::vector<std::string> NB_1_96 = {
         "NB78", "NB79", "NB80", "NB81", "NB82", "NB83", "NB84", "NB85", "NB86", "NB87", "NB88",
         "NB89", "NB90", "NB91", "NB92", "NB93", "NB94", "NB95", "NB96"};
 
+const std::vector<std::string> RBK_1_12 = {"BC01", "BC02", "BC03", "BC04", "BC05", "BC06",
+                                           "BC07", "BC08", "BC09", "BC10", "BC11", "BC12"};
+
 const std::vector<std::string> RBK_1_96 = {
         "BC01", "BC02", "BC03", "BC04",  "BC05",  "BC06",  "BC07",  "BC08", "BC09", "BC10",  "BC11",
         "BC12", "BC13", "BC14", "BC15",  "BC16",  "BC17",  "BC18",  "BC19", "BC20", "BC21",  "BC22",
@@ -91,79 +97,51 @@ const std::vector<std::string> RBK_1_96 = {
 const KitInfo kit_16S = {true,          true,         RAB_1st_FRONT, RAB_1st_REAR,
                          RAB_2nd_FRONT, RAB_2nd_REAR, BC_1_24};
 
+const KitInfo kit_lwb = {true,          true,         LWB_1st_FRONT, LWB_1st_REAR,
+                         LWB_2nd_FRONT, LWB_2nd_REAR, BC_1_12};
+;
+
+const KitInfo kit_lwb24 = {
+        true, true, LWB_1st_FRONT, LWB_1st_REAR, LWB_2nd_FRONT, LWB_2nd_REAR, BC_1_24,
+};
+
+const KitInfo kit_nb12 = {
+        true, true, NB_1st_FRONT, NB_1st_REAR, NB_2nd_FRONT, NB_2nd_REAR, NB_1_12,
+};
+
+const KitInfo kit_nb24 = {
+        true, true, NB_1st_FRONT, NB_1st_REAR, NB_2nd_FRONT, NB_2nd_REAR, NB_1_24,
+};
+
+const KitInfo kit_nb96 = {
+        true, true, NB_1st_FRONT, NB_1st_REAR, NB_2nd_FRONT, NB_2nd_REAR, NB_1_96,
+};
+
+const KitInfo kit_rab = {true,          true,         RAB_1st_FRONT, RAB_1st_REAR,
+                         RAB_2nd_FRONT, RAB_2nd_REAR, BC_1_12};
+
+const KitInfo kit_rbk96 = {false, false, RBK4_FRONT, RBK4_REAR, "", "", BC_1_96};
+
+const KitInfo kit_rbk4 = {false, false, RBK4_FRONT, RBK4_REAR, "", "", BC_1_12};
+
+const KitInfo kit_rlb = {true, false, RLB_FRONT, RLB_REAR, "", "", BC_1_12A};
+
 const std::unordered_map<std::string, KitInfo> kit_info_map = {
         // SQK-16S024 && SQK-16S114-24
         {"SQK-16S024", kit_16S},
         {"SQK-16S114-24", kit_16S},
-        //
-        {"SQK-RBK004", {false, false, RBK4_FRONT, RBK4_REAR, "", "", BC_1_12}},
-        {"SQK-RBK110-96", {false, false, RBK4_FRONT, RBK4_REAR, "", "", BC_1_96}},
-        {"SQK-RBK114-24", {false, false, RBK4_FRONT, RBK4_REAR, "", "", BC_1_24}},
-        {"SQK-RBK114-96",
-         {
-                 false,
-                 false,
-                 RBK_kit14_FRONT,
-                 RBK_kit14_REAR,
-                 "",
-                 "",
-                 RBK_1_96,
-         }},
-        {"SQK-RPB004", {true, false, RLB_FRONT, RLB_REAR, "", "", BC_1_12A}},
-        {"SQK-PBK004",
-         {true, true, LWB_1st_FRONT, LWB_1st_REAR, LWB_2nd_FRONT, LWB_2nd_REAR, BC_1_12}},
-        {"SQK-RAB204",
-         {true, true, RAB_1st_FRONT, RAB_1st_REAR, RAB_2nd_FRONT, RAB_2nd_REAR, BC_1_12}},
-        {"SQK-PCB109",
-         {
-                 true,
-                 true,
-                 LWB_1st_FRONT,
-                 LWB_1st_REAR,
-                 LWB_2nd_FRONT,
-                 LWB_2nd_REAR,
-                 BC_1_24,
-         }},
-        {"SQK-PCB111-24",
-         {
-                 true,
-                 true,
-                 LWB_1st_FRONT,
-                 LWB_1st_REAR,
-                 LWB_2nd_FRONT,
-                 LWB_2nd_REAR,
-                 BC_1_24,
-         }},
-        {"EXP-PBC096",
-         {
-                 true,
-                 true,
-                 BC_1st_FRONT,
-                 BC_1st_REAR,
-                 BC_2nd_FRONT,
-                 BC_2nd_REAR,
-                 BC_1_96,
-         }},
-        {"SQK-NBD114-24",
-         {
-                 true,
-                 true,
-                 NB_1st_FRONT,
-                 NB_1st_REAR,
-                 NB_2nd_FRONT,
-                 NB_2nd_REAR,
-                 NB_1_24,
-         }},
-        {"EXP-NBD104",
-         {
-                 true,
-                 true,
-                 NB_1st_FRONT,
-                 NB_1st_REAR,
-                 NB_2nd_FRONT,
-                 NB_2nd_REAR,
-                 NB_1_12,
-         }},
+        // LWB
+        {"SQK-PBK004", kit_lwb},
+        {"SQK-LWB001", kit_lwb},
+        {"SQK-PCB109", kit_lwb},
+        {"SQK-PCB110", kit_lwb},
+        // LWB24
+        {"SQK-PCB111-24", kit_lwb24},
+        {"SQK-PCB114-24", kit_lwb24},
+        // NB12
+        {"EXP-NBD103", kit_nb12},
+        {"EXP-NBD104", kit_nb12},
+        // NB13-24
         {"EXP-NBD114",
          {
                  true,
@@ -174,26 +152,81 @@ const std::unordered_map<std::string, KitInfo> kit_info_map = {
                  NB_2nd_REAR,
                  NB_13_24,
          }},
-        {"SQK-NBD114-96",
+        // NB24
+        {"SQK-NBD111-24", kit_nb24},
+        {"SQK-NBD114-24", kit_nb24},
+        // NB96
+        {"EXP-NBD196", kit_nb96},
+        {"SQK-MLK111-96-XL", kit_nb96},
+        {"SQK-NBD111-96", kit_nb96},
+        {"SQK-NBD114-96", kit_nb96},
+        {"SQK-MLK114-96-XL", kit_nb96},
+        // PCR12
+        {"EXP-PBC001",
          {
                  true,
                  true,
-                 NB_1st_FRONT,
-                 NB_1st_REAR,
-                 NB_2nd_FRONT,
-                 NB_2nd_REAR,
-                 NB_1_96,
+                 BC_1st_FRONT,
+                 BC_1st_REAR,
+                 BC_2nd_FRONT,
+                 BC_2nd_REAR,
+                 BC_1_12,
          }},
-        {"EXP-NBD196",
+        // PCR96
+        {"EXP-PBC096",
          {
                  true,
                  true,
-                 NB_1st_FRONT,
-                 NB_1st_REAR,
-                 NB_2nd_FRONT,
-                 NB_2nd_REAR,
-                 NB_1_96,
+                 BC_1st_FRONT,
+                 BC_1st_REAR,
+                 BC_2nd_FRONT,
+                 BC_2nd_REAR,
+                 BC_1_96,
          }},
+        // RAB
+        {"SQK-RAB204", kit_rab},
+        {"SQK-RAB201", kit_rab},
+        // RBK
+        {"SQK-RBK001", {false, false, RBK_FRONT, RBK_REAR, "", "", BC_1_12}},
+        // RBK096
+        {"SQK-RBK110-96", kit_rbk96},
+        {"SQK-RBK111-96", kit_rbk96},
+        // RBK096_kit14
+        {"SQK-RBK114-96",
+         {
+                 false,
+                 false,
+                 RBK4_kit14_FRONT,
+                 RBK4_kit14_REAR,
+                 "",
+                 "",
+                 RBK_1_96,
+         }},
+        // RBK24
+        {"SQK-RBK111-24", {false, false, RBK4_FRONT, RBK4_REAR, "", "", BC_1_24}},
+        // RBK24_kit14
+        {"SQK-RBK114-24", {false, false, RBK4_kit14_FRONT, RBK4_kit14_REAR, "", "", BC_1_24}},
+        //  RBK4
+        {"SQK-RBK004", kit_rbk4},
+        {"VSK-PTC001", kit_rbk4},
+        {"VSK-VPS001", kit_rbk4},
+        // RLB
+        {"SQK-RPB004", kit_rlb},
+        {"SQK-RLB001", kit_rlb},
+        // RPB24-Kit14
+        {"SQK-RPB114-24", {true, false, RLB_FRONT, RLB_REAR, "", "", BC_1_24}},
+        // VMK
+        {"VSK-VMK001",
+         {false, false, RBK_FRONT, RBK_REAR, "", "", {"BC01", "BC02", "BC03", "BC04"}}},
+        // VMK4
+        {"VSK-VMK004",
+         {false,
+          false,
+          RBK4_FRONT,
+          RBK4_REAR,
+          "",
+          "",
+          {"BC01", "BC02", "BC03", "BC04", "BC05", "BC06", "BC07", "BC08", "BC09", "BC10"}}},
 };
 
 const std::unordered_map<std::string, std::string> barcodes = {
