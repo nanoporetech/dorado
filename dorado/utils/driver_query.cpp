@@ -184,6 +184,7 @@ std::optional<std::string> read_version_from_nvml() {
     // See if we have access to the API.
     auto *nvml_api = NVMLAPI::get();
     if (nvml_api == nullptr) {
+        // NVMLAPI will have reported a warning if we get here.
         return std::nullopt;
     }
 
@@ -206,6 +207,7 @@ std::optional<std::string> read_version_from_proc() {
     std::ifstream version_file("/proc/driver/nvidia/version",
                                std::ios_base::in | std::ios_base::binary);
     if (!version_file.is_open()) {
+        spdlog::warn("No NVIDIA version file found in /proc");
         return std::nullopt;
     }
 
@@ -219,6 +221,7 @@ std::optional<std::string> read_version_from_proc() {
         }
     }
 
+    spdlog::warn("No version line found in /proc version file");
     return std::nullopt;
 }
 #endif
