@@ -28,6 +28,12 @@ ModBaseModelConfig load_modbase_model_config(const std::filesystem::path& model_
     config.bases_after = toml::find<int>(params, "kmer_context_bases_1");
     config.offset = toml::find<int>(params, "offset");
 
+    if (params.contains("reverse_signal")) {
+        config.reverse_signal = toml::find<bool>(params, "reverse_signal");
+    } else {
+        config.reverse_signal = false;
+    }
+
     if (config_toml.contains("refinement")) {
         // these may not exist if we convert older models
         const auto& refinement_params = toml::find(config_toml, "refinement");

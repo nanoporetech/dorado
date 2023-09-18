@@ -4,8 +4,8 @@
 
 #include <nvtx3/nvtx3.hpp>
 
+#include <iterator>
 #include <regex>
-#include <sstream>
 #include <unordered_map>
 
 namespace {
@@ -31,13 +31,12 @@ const std::unordered_map<char, std::string> IUPAC_CODES = {
 };
 
 std::string expand_motif_regex(const std::string& motif) {
-    std::ostringstream motif_regex_ss;
-    motif_regex_ss << "(";
+    std::string motif_regex = "(";
     for (auto base : motif) {
-        motif_regex_ss << IUPAC_CODES.at(base);
+        motif_regex += IUPAC_CODES.at(base);
     }
-    motif_regex_ss << ")";
-    return motif_regex_ss.str();
+    motif_regex += ")";
+    return motif_regex;
 }
 
 }  // namespace
@@ -45,22 +44,26 @@ std::string expand_motif_regex(const std::string& motif) {
 namespace dorado {
 
 MotifMatcher::MotifMatcher(const ModBaseModelConfig& model_config)
-        : m_motif(expand_motif_regex(model_config.motif)),
-          m_motif_offset(model_config.motif_offset) {}
+        : MotifMatcher(model_config.motif, model_config.motif_offset) {}
 
-std::vector<size_t> MotifMatcher::get_motif_hits(const std::string& seq) const {
+MotifMatcher::MotifMatcher(const std::string& motif, size_t offset)
+        : m_motif(expand_motif_regex(motif)), m_motif_offset(offset) {}
+
+std::vector<size_t> MotifMatcher::get_motif_hits(std::string_view seq) const {
     NVTX3_FUNC_RANGE();
     std::vector<size_t> context_hits;
 
     std::regex regex(m_motif);
-    std::smatch motif_match;
     auto start = std::cbegin(seq);
     auto end = std::cend(seq);
-    while (std::regex_search(start, end, motif_match, regex)) {
-        auto hit =
-                std::distance(std::cbegin(seq), start) + motif_match.position(0) + m_motif_offset;
+    auto pos = start;
+    // string_view on linux uses `const_iterator=const char*`,
+    // but on Windows it's a `std::_String_view_iterator<_Traits>`
+    std::match_results<decltype(pos)> motif_match;
+    while (std::regex_search(pos, end, motif_match, regex)) {
+        auto hit = std::distance(start, pos) + motif_match.position(0) + m_motif_offset;
         context_hits.push_back(hit);
-        start += motif_match.position(0) + 1;
+        pos += motif_match.position(0) + 1;
     }
     return context_hits;
 }

@@ -3,7 +3,7 @@
 namespace dorado::utils {
 ReadPtr shallow_copy_read(const Read& read) {
     auto copy = ReadPtr::make();
-    copy->raw_data = read.raw_data;
+    copy->read_common.raw_data = read.read_common.raw_data;
     copy->digitisation = read.digitisation;
     copy->range = read.range;
     copy->offset = read.offset;
@@ -14,26 +14,26 @@ ReadPtr shallow_copy_read(const Read& read) {
 
     copy->scaling = read.scaling;
 
-    copy->model_stride = read.model_stride;
+    copy->read_common.model_stride = read.read_common.model_stride;
 
-    copy->read_id = read.read_id;
-    copy->seq = read.seq;
-    copy->qstring = read.qstring;
-    copy->moves = read.moves;
-    copy->run_id = read.run_id;
-    copy->model_name = read.model_name;
+    copy->read_common.read_id = read.read_common.read_id;
+    copy->read_common.seq = read.read_common.seq;
+    copy->read_common.qstring = read.read_common.qstring;
+    copy->read_common.moves = read.read_common.moves;
+    copy->read_common.run_id = read.read_common.run_id;
+    copy->read_common.model_name = read.read_common.model_name;
 
-    copy->base_mod_probs = read.base_mod_probs;
+    copy->read_common.base_mod_probs = read.read_common.base_mod_probs;
     copy->mod_base_info = read.mod_base_info;
 
     copy->num_trimmed_samples = read.num_trimmed_samples;
 
-    copy->attributes = read.attributes;
+    copy->read_common.attributes = read.read_common.attributes;
 
     copy->start_sample = read.start_sample;
     copy->end_sample = read.end_sample;
     copy->run_acquisition_start_time_ms = read.run_acquisition_start_time_ms;
-    copy->is_duplex = read.is_duplex;
+    copy->read_common.is_duplex = read.read_common.is_duplex;
     return copy;
 }
 

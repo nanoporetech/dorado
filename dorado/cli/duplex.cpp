@@ -136,7 +136,7 @@ int duplex(int argc, char* argv[]) {
                     "> No duplex pairs file provided, pairing will be performed automatically");
         }
 
-        bool emit_moves = false, rna = false, duplex = true;
+        bool emit_moves = false, duplex = true;
 
         auto output_mode = HtsWriter::OutputMode::BAM;
 
@@ -182,7 +182,7 @@ int duplex(int argc, char* argv[]) {
             converted_reads_sink = aligner;
         }
         auto read_converter =
-                pipeline_desc.add_node<ReadToBamType>({converted_reads_sink}, emit_moves, rna, 2);
+                pipeline_desc.add_node<ReadToBamType>({converted_reads_sink}, emit_moves, 2);
         auto duplex_read_tagger = pipeline_desc.add_node<DuplexReadTaggingNode>({read_converter});
         // The minimum sequence length is set to 5 to avoid issues with duplex node printing very short sequences for mismatched pairs.
         std::unordered_set<std::string> read_ids_to_filter;

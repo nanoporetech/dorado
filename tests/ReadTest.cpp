@@ -4,29 +4,30 @@
 
 #include <catch2/catch.hpp>
 
-#define TEST_GROUP "ReadTest"
+#define TEST_GROUP "[ReadTest]"
 
 using Catch::Matchers::Equals;
 
 TEST_CASE(TEST_GROUP ": Test tag generation", TEST_GROUP) {
     dorado::Read test_read;
-    test_read.read_id = "read1";
-    test_read.raw_data = torch::empty(4000);
-    test_read.seq = "ACGT";
-    test_read.qstring = "////";
+    test_read.read_common.read_id = "read1";
+    test_read.read_common.raw_data = torch::empty(4000);
+    test_read.read_common.seq = "ACGT";
+    test_read.read_common.qstring = "////";
     test_read.sample_rate = 4000.0;
     test_read.shift = 128.3842f;
     test_read.scale = 8.258f;
     test_read.scaling_method = "quantile";
     test_read.num_trimmed_samples = 132;
-    test_read.attributes.mux = 2;
-    test_read.attributes.read_number = 18501;
-    test_read.attributes.channel_number = 5;
-    test_read.attributes.start_time = "2017-04-29T09:10:04Z";
-    test_read.attributes.fast5_filename = "batch_0.fast5";
-    test_read.run_id = "xyz";
-    test_read.model_name = "test_model";
-    test_read.is_duplex = false;
+    test_read.read_common.attributes.mux = 2;
+    test_read.read_common.attributes.read_number = 18501;
+    test_read.read_common.attributes.channel_number = 5;
+    test_read.read_common.attributes.start_time = "2017-04-29T09:10:04Z";
+    test_read.read_common.attributes.fast5_filename = "batch_0.fast5";
+    test_read.read_common.run_id = "xyz";
+    test_read.read_common.model_name = "test_model";
+    test_read.read_common.is_duplex = false;
+    test_read.parent_read_id = "parent_read";
 
     SECTION("Basic") {
         auto alignments = test_read.extract_sam_lines(false);
@@ -41,6 +42,7 @@ TEST_CASE(TEST_GROUP ": Test tag generation", TEST_GROUP) {
         CHECK(bam_aux2i(bam_aux_get(aln, "rn")) == 18501);
         CHECK(bam_aux2i(bam_aux_get(aln, "rn")) == 18501);
         CHECK(bam_aux2i(bam_aux_get(aln, "dx")) == 0);
+        CHECK(bam_aux_get(aln, "pt") == nullptr);
 
         CHECK(bam_aux2f(bam_aux_get(aln, "du")) == Approx(1.033).margin(1e-6));
         CHECK(bam_aux2f(bam_aux_get(aln, "sm")) == 128.3842f);
@@ -50,11 +52,14 @@ TEST_CASE(TEST_GROUP ": Test tag generation", TEST_GROUP) {
         CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "fn")), Equals("batch_0.fast5"));
         CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "sv")), Equals("quantile"));
         CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "RG")), Equals("xyz_test_model"));
+        CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "pi")), Equals("parent_read"));
+
+        CHECK(bam_aux_get(aln, "BC") == nullptr);
     }
 
     SECTION("Duplex") {
         // Update read to be duplex
-        auto was_duplex = std::exchange(test_read.is_duplex, true);
+        auto was_duplex = std::exchange(test_read.read_common.is_duplex, true);
 
         auto alignments = test_read.extract_sam_lines(false);
         REQUIRE(alignments.size() == 1);
@@ -62,12 +67,13 @@ TEST_CASE(TEST_GROUP ": Test tag generation", TEST_GROUP) {
 
         CHECK(bam_aux2i(bam_aux_get(aln, "dx")) == 1);
         CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "RG")), Equals("xyz_test_model"));
+        CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "pi")), Equals("parent_read"));
 
-        test_read.is_duplex = was_duplex;
+        test_read.read_common.is_duplex = was_duplex;
     }
 
     SECTION("No model") {
-        auto old_model = std::exchange(test_read.model_name, "");
+        auto old_model = std::exchange(test_read.read_common.model_name, "");
 
         auto alignments = test_read.extract_sam_lines(false);
         REQUIRE(alignments.size() == 1);
@@ -75,12 +81,12 @@ TEST_CASE(TEST_GROUP ": Test tag generation", TEST_GROUP) {
 
         CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "RG")), Equals("xyz_unknown"));
 
-        test_read.model_name = old_model;
+        test_read.read_common.model_name = old_model;
     }
 
     SECTION("No model or run_id") {
-        auto old_model = std::exchange(test_read.model_name, "");
-        auto old_run_id = std::exchange(test_read.run_id, "");
+        auto old_model = std::exchange(test_read.read_common.model_name, "");
+        auto old_run_id = std::exchange(test_read.read_common.run_id, "");
 
         auto alignments = test_read.extract_sam_lines(false);
         REQUIRE(alignments.size() == 1);
@@ -88,8 +94,8 @@ TEST_CASE(TEST_GROUP ": Test tag generation", TEST_GROUP) {
 
         CHECK(bam_aux_get(aln, "RG") == nullptr);
 
-        test_read.model_name = old_model;
-        test_read.run_id = old_run_id;
+        test_read.read_common.model_name = old_model;
+        test_read.read_common.run_id = old_run_id;
     }
 
     SECTION("Barcode") {
@@ -100,6 +106,7 @@ TEST_CASE(TEST_GROUP ": Test tag generation", TEST_GROUP) {
         auto* aln = alignments[0].get();
 
         CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "RG")), Equals("xyz_test_model_kit_barcode02"));
+        CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "BC")), Equals("kit_barcode02"));
 
         test_read.barcode = old_barcode;
     }
@@ -112,8 +119,21 @@ TEST_CASE(TEST_GROUP ": Test tag generation", TEST_GROUP) {
         auto* aln = alignments[0].get();
 
         CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "RG")), Equals("xyz_test_model"));
+        CHECK(bam_aux_get(aln, "BC") == nullptr);
 
         test_read.barcode = old_barcode;
+    }
+
+    SECTION("PolyA tail length") {
+        auto old_tail_length = std::exchange(test_read.rna_poly_tail_length, 20);
+
+        auto alignments = test_read.extract_sam_lines(false);
+        REQUIRE(alignments.size() == 1);
+        auto* aln = alignments[0].get();
+
+        CHECK(bam_aux2i(bam_aux_get(aln, "pt")) == 20);
+
+        test_read.rna_poly_tail_length = old_tail_length;
     }
 }
 
@@ -123,36 +143,36 @@ TEST_CASE(TEST_GROUP ": Test sam record generation", TEST_GROUP) {
         REQUIRE_THROWS(test_read.extract_sam_lines(false));
     }
     SECTION("Generating sam record for empty seq and qstring throws") {
-        test_read.read_id = "test_read";
+        test_read.read_common.read_id = "test_read";
         REQUIRE_THROWS(test_read.extract_sam_lines(false));
     }
     SECTION("Generating sam record for mismatched seq and qstring throws") {
-        test_read.read_id = "test_read";
-        test_read.seq = "ACGTACGT";
-        test_read.qstring = "!!!!";
+        test_read.read_common.read_id = "test_read";
+        test_read.read_common.seq = "ACGTACGT";
+        test_read.read_common.qstring = "!!!!";
         REQUIRE_THROWS(test_read.extract_sam_lines(false));
     }
     SECTION("Generating sam record for read with non-empty mappings throws") {
-        test_read.read_id = "test_read";
-        test_read.seq = "ACGTACGT";
-        test_read.qstring = "!!!!!!!!";
+        test_read.read_common.read_id = "test_read";
+        test_read.read_common.seq = "ACGTACGT";
+        test_read.read_common.qstring = "!!!!!!!!";
         test_read.mappings.resize(1);
         REQUIRE_THROWS(test_read.extract_sam_lines(false));
     }
     SECTION("Generated sam record for unaligned read is correct") {
-        test_read.raw_data = torch::empty(4000);
+        test_read.read_common.raw_data = torch::empty(4000);
         test_read.sample_rate = 4000.0;
         test_read.shift = 128.3842f;
         test_read.scale = 8.258f;
-        test_read.read_id = "test_read";
-        test_read.seq = "ACGTACGT";
-        test_read.qstring = "********";
+        test_read.read_common.read_id = "test_read";
+        test_read.read_common.seq = "ACGTACGT";
+        test_read.read_common.qstring = "********";
         test_read.num_trimmed_samples = 132;
-        test_read.attributes.mux = 2;
-        test_read.attributes.read_number = 18501;
-        test_read.attributes.channel_number = 5;
-        test_read.attributes.start_time = "2017-04-29T09:10:04Z";
-        test_read.attributes.fast5_filename = "batch_0.fast5";
+        test_read.read_common.attributes.mux = 2;
+        test_read.read_common.attributes.read_number = 18501;
+        test_read.read_common.attributes.channel_number = 5;
+        test_read.read_common.attributes.start_time = "2017-04-29T09:10:04Z";
+        test_read.read_common.attributes.fast5_filename = "batch_0.fast5";
 
         auto lines = test_read.extract_sam_lines(false);
         REQUIRE(!lines.empty());
@@ -168,7 +188,7 @@ TEST_CASE(TEST_GROUP ": Test sam record generation", TEST_GROUP) {
         for (auto i = 0; i < rec->core.l_qseq; i++) {
             qstring += static_cast<char>(bam_get_qual(rec)[i] + 33);
         }
-        CHECK(test_read.qstring == qstring);
+        CHECK(test_read.read_common.qstring == qstring);
         //Note; Tag generation is already tested in another test.
     }
 }
@@ -203,11 +223,11 @@ TEST_CASE(TEST_GROUP ": Methylation tag generation", TEST_GROUP) {
     };
 
     dorado::Read read;
-    read.read_id = "read";
-    read.seq = "ACAGTGACTAAACTC";
-    read.qstring = "***************";
-    read.base_mod_probs = modbase_probs;
-    read.is_duplex = false;
+    read.read_common.read_id = "read";
+    read.read_common.seq = "ACAGTGACTAAACTC";
+    read.read_common.qstring = "***************";
+    read.read_common.base_mod_probs = modbase_probs;
+    read.read_common.is_duplex = false;
 
     std::string methylation_tag;
     SECTION("Methylation threshold is correctly applied") {
@@ -276,6 +296,23 @@ TEST_CASE(TEST_GROUP ": Methylation tag generation", TEST_GROUP) {
                                       expected_methylation_tag_with_context_prob);
     }
 
+    SECTION("Test generation using DRACH context for A methylation") {
+        std::string context = "DRXCH:_:_:_";
+        const char* expected_methylation_tag_with_context = "A+a?,2,2;C+m.,1,0;";
+        std::vector<int64_t> expected_methylation_tag_with_context_prob{254, 0, 252, 252};
+
+        read.mod_base_info = std::make_shared<dorado::ModBaseInfo>(modbase_alphabet,
+                                                                   modbase_long_names, context);
+
+        auto lines = read.extract_sam_lines(false, 10);
+        REQUIRE(!lines.empty());
+        bam1_t* aln = lines[0].get();
+        CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "MM")),
+                   Equals(expected_methylation_tag_with_context));
+        require_sam_tag_B_int_matches(bam_aux_get(aln, "ML"),
+                                      expected_methylation_tag_with_context_prob);
+    }
+
     SECTION("Test handling of incorrect base names") {
         std::string modbase_long_names_unknown = "12mA 5mq";
 
@@ -291,22 +328,22 @@ TEST_CASE(TEST_GROUP ": Methylation tag generation", TEST_GROUP) {
 
 TEST_CASE(TEST_GROUP ": Test mean q-score generation", TEST_GROUP) {
     dorado::Read test_read;
-    test_read.read_id = "read1";
-    test_read.raw_data = torch::empty(4000);
-    test_read.seq = "AAAAAAAAAA";
-    test_read.qstring = "$$////////";
+    test_read.read_common.read_id = "read1";
+    test_read.read_common.raw_data = torch::empty(4000);
+    test_read.read_common.seq = "AAAAAAAAAA";
+    test_read.read_common.qstring = "$$////////";
     test_read.sample_rate = 4000.0;
     test_read.shift = 128.3842f;
     test_read.scale = 8.258f;
     test_read.num_trimmed_samples = 132;
-    test_read.attributes.mux = 2;
-    test_read.attributes.read_number = 18501;
-    test_read.attributes.channel_number = 5;
-    test_read.attributes.start_time = "2017-04-29T09:10:04Z";
-    test_read.attributes.fast5_filename = "batch_0.fast5";
-    test_read.run_id = "xyz";
-    test_read.model_name = "test_model";
-    test_read.is_duplex = false;
+    test_read.read_common.attributes.mux = 2;
+    test_read.read_common.attributes.read_number = 18501;
+    test_read.read_common.attributes.channel_number = 5;
+    test_read.read_common.attributes.start_time = "2017-04-29T09:10:04Z";
+    test_read.read_common.attributes.fast5_filename = "batch_0.fast5";
+    test_read.read_common.run_id = "xyz";
+    test_read.read_common.model_name = "test_model";
+    test_read.read_common.is_duplex = false;
 
     SECTION("Check with start pos = 0") {
         test_read.mean_qscore_start_pos = 0;
@@ -324,7 +361,7 @@ TEST_CASE(TEST_GROUP ": Test mean q-score generation", TEST_GROUP) {
     }
 
     SECTION("Check start pos = qstring length") {
-        test_read.mean_qscore_start_pos = test_read.qstring.length();
+        test_read.mean_qscore_start_pos = test_read.read_common.qstring.length();
         CHECK(test_read.calculate_mean_qscore() == Approx(8.79143f));
     }
 }

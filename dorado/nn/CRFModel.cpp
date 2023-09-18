@@ -40,7 +40,21 @@ using namespace torch::nn;
 namespace F = torch::nn::functional;
 using Slice = torch::indexing::Slice;
 
+enum class Activation { SWISH, SWISH_CLAMP, TANH };
+
 #if USE_KOI
+
+KoiActivation get_koi_activation(Activation act) {
+    if (act == Activation::SWISH) {
+        return KOI_SWISH;
+    } else if (act == Activation::SWISH_CLAMP) {
+        return KOI_SWISH_CLAMP;
+    } else if (act == Activation::TANH) {
+        return KOI_TANH;
+    } else {
+        throw std::logic_error("Unrecognised activation function id.");
+    }
+}
 
 // We have four different LSTM code paths. They affect operation of both the LSTM layers and the
 // last convolution layer. To avoid an extra transpose/copy, the last convolution writes output in
@@ -225,19 +239,23 @@ struct ConvolutionImpl : Module {
                     int outsize,
                     int k,
                     int stride_,
-                    bool clamp_,
-                    float max_value_,
+                    Activation activation_,
                     bool next_layer_is_lstm_)
             : in_size(size),
               out_size(outsize),
               window_size(k),
               stride(stride_),
-              clamp(clamp_),
-              max_value(clamp_ ? max_value_ : std::numeric_limits<float>::max()),
+              activation(activation_),
               next_layer_is_lstm(next_layer_is_lstm_) {
         conv = register_module(
                 "conv", Conv1d(Conv1dOptions(size, outsize, k).stride(stride).padding(k / 2)));
-        activation = register_module("activation", SiLU());
+        if (activation == Activation::SWISH_CLAMP || activation == Activation::SWISH) {
+            activation_op = register_module("activation", SiLU());
+        } else if (activation == Activation::TANH) {
+            activation_op = register_module("activation", Tanh());
+        } else {
+            throw std::logic_error("Unrecognised activation function id.");
+        }
     }
 
 #if USE_KOI
@@ -324,8 +342,9 @@ struct ConvolutionImpl : Module {
             }
 
             dorado::utils::matmul_f16(mm_in, w_device, mm_out);
-            host_bias_swish_f16_clamp(stream, mm_out.size(0), mm_out.size(1), mm_out.stride(0),
-                                      mm_out.data_ptr(), b_device.data_ptr(), max_value);
+            host_bias_activation_f16_inplace(stream, mm_out.size(0), mm_out.size(1),
+                                             mm_out.stride(0), mm_out.data_ptr(),
+                                             b_device.data_ptr(), get_koi_activation(activation));
 
             if (lstm_mode == LstmMode::CUTLASS_TNC_I8) {
                 auto conv_out = out.slice(0, 1, chunk_size_out + 1).view({-1, out_size});
@@ -345,10 +364,10 @@ struct ConvolutionImpl : Module {
         } else {
             // Output is [N, T_out, C_out], contiguous
             auto out = wm.next({batch_size, chunk_size_out, out_size}, torch::kF16);
-            if (host_convolution_swish_f16(stream, batch_size, in_size, out_size, chunk_size_in,
-                                           window_size, stride, window_size / 2, in.data_ptr(),
-                                           out.data_ptr(), w_device.data_ptr(), b_device.data_ptr(),
-                                           max_value) != 0) {
+            if (host_convolution_f16(stream, batch_size, in_size, out_size, chunk_size_in,
+                                     window_size, stride, window_size / 2, in.data_ptr(),
+                                     out.data_ptr(), w_device.data_ptr(), b_device.data_ptr(),
+                                     get_koi_activation(activation))) {
                 throw std::runtime_error(std::string("Koi convolution failed with in size ") +
                                          std::to_string(in_size));
             }
@@ -359,9 +378,9 @@ struct ConvolutionImpl : Module {
     torch::Tensor forward(torch::Tensor x) {
         // Input x is [N, C_in, T_in], contiguity optional
         utils::ScopedProfileRange spr("conv", 2);
-        x = activation(conv(x));
-        if (clamp) {
-            x.clamp_(c10::nullopt, max_value);
+        x = activation_op.forward(conv(x));
+        if (activation == Activation::SWISH_CLAMP) {
+            x.clamp_(c10::nullopt, 3.5f);
         }
         if (next_layer_is_lstm) {
             // Output is [N, T_out, C_out], non-contiguous
@@ -373,13 +392,12 @@ struct ConvolutionImpl : Module {
     }
 
     Conv1d conv{nullptr};
-    SiLU activation{nullptr};
+    AnyModule activation_op;
     int in_size;
     int out_size;
     int window_size;
     int stride;
-    const bool clamp;
-    const float max_value;
+    Activation activation;
     const bool next_layer_is_lstm;
 };
 
@@ -424,8 +442,8 @@ struct LinearCRFImpl : Module {
         dorado::utils::matmul_f16(in.view({-1, Cin}), wt, out_2D);
         if (activation) {
             auto stream = at::cuda::getCurrentCUDAStream().stream();
-            host_bias_tanh_scale_f16(stream, N * T, out_2D.size(1), scale, out_2D.data_ptr(),
-                                     linear->bias.data_ptr());
+            host_bias_activation_f16_inplace(stream, T * N, Cout, Cout, out_2D.data_ptr(),
+                                             linear->bias.data_ptr(), KOI_TANH_X5);
         } else if (bias) {
             out_2D += linear->bias;
         }
@@ -805,13 +823,12 @@ TORCH_MODULE(Clamp);
 
 struct CRFModelImpl : Module {
     explicit CRFModelImpl(const CRFModelConfig &config) {
-        constexpr float conv_max_value = 3.5f;
-        conv1 = register_module("conv1", Convolution(config.num_features, config.conv, 5, 1,
-                                                     config.clamp, conv_max_value, false));
-        conv2 = register_module(
-                "conv2", Convolution(config.conv, 16, 5, 1, config.clamp, conv_max_value, false));
-        conv3 = register_module("conv3", Convolution(16, config.insize, 19, config.stride,
-                                                     config.clamp, conv_max_value, true));
+        Activation activation = config.clamp ? Activation::SWISH_CLAMP : Activation::SWISH;
+        conv1 = register_module(
+                "conv1", Convolution(config.num_features, config.conv, 5, 1, activation, false));
+        conv2 = register_module("conv2", Convolution(config.conv, 16, 5, 1, activation, false));
+        conv3 = register_module(
+                "conv3", Convolution(16, config.insize, 19, config.stride, activation, true));
 
         rnns = register_module("rnns", LSTMStack(config.insize));
 
@@ -872,14 +889,12 @@ struct CRFModelImpl : Module {
             linear2->run_koi(wm);
         }
 
-        out = wm.current;
-        if (clamp1) {
-            // TODO: clamp is entirely memory bandwidth bound, and relatively expensive due to the
-            //  matrix size. Can we merge it into a custom linear kernel?
-            out = clamp1->forward(out);
-        }
+        // Clamping the scores to [-5, 5], if active (i.e. the role of `clamp1`), is performed by
+        // `GPUDecoder` on reading the scores. This eliminates the cost of a large matrix
+        // read-modify-write operation.
+
         // Output is [N, T, C], F16, contiguous
-        return out;
+        return wm.current;
     }
 #endif
 

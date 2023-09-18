@@ -5,6 +5,7 @@
 #include <random>
 
 using Slice = torch::indexing::Slice;
+using namespace dorado;
 
 #define TEST_GROUP "[utils][trim]"
 
@@ -25,7 +26,7 @@ TEST_CASE("Test trim signal", TEST_GROUP) {
     auto signal_tensor = torch::from_blob(const_cast<float *>(signal.data()), {signal_len});
 
     SECTION("Default trim") {
-        int pos = dorado::utils::trim(signal_tensor);
+        int pos = utils::trim(signal_tensor);
 
         // pos 55 is in the second window of 40 samples, after a min_trim of 10
         int expected_pos = 90;
@@ -37,14 +38,14 @@ TEST_CASE("Test trim signal", TEST_GROUP) {
     }
 
     SECTION("Reduced window size") {
-        int pos = dorado::utils::trim(signal_tensor, 2.4, 10);
+        int pos = utils::trim(signal_tensor, 2.4, 10);
 
         int expected_pos = 60;
         CHECK(pos == expected_pos);
     }
 
     SECTION("All signal below threshold") {
-        int pos = dorado::utils::trim(signal_tensor, 24);
+        int pos = utils::trim(signal_tensor, 24);
 
         int expected_pos = 10;  // minimum trim value
         CHECK(pos == expected_pos);
@@ -52,7 +53,7 @@ TEST_CASE("Test trim signal", TEST_GROUP) {
 
     SECTION("All signal above threshold") {
         std::fill(std::begin(signal), std::end(signal), 100.f);
-        int pos = dorado::utils::trim(signal_tensor, 24);
+        int pos = utils::trim(signal_tensor, 24);
 
         int expected_pos = 10;  // minimum trim value
         CHECK(pos == expected_pos);
@@ -63,9 +64,95 @@ TEST_CASE("Test trim signal", TEST_GROUP) {
             signal[i] += 50;
         }
 
-        int pos = dorado::utils::trim(signal_tensor.index({Slice(torch::indexing::None, 400)}), 24);
+        int pos = utils::trim(signal_tensor.index({Slice(torch::indexing::None, 400)}), 24);
 
         int expected_pos = 10;  // minimum trim value
         CHECK(pos == expected_pos);
+    }
+}
+
+TEST_CASE("Test trim sequence", TEST_GROUP) {
+    const std::string seq = "TEST_SEQ";
+
+    SECTION("Test empty sequence") {
+        CHECK_THROWS_AS(utils::trim_sequence("", {10, 50}), std::invalid_argument);
+    }
+
+    SECTION("Trim nothing") { CHECK(utils::trim_sequence(seq, {0, seq.length()}) == seq); }
+
+    SECTION("Trim part of the sequence") {
+        CHECK(utils::trim_sequence(seq, {5, seq.length()}) == "SEQ");
+    }
+
+    SECTION("Trim whole sequence") { CHECK(utils::trim_sequence(seq, {0, 0}) == ""); }
+}
+
+TEST_CASE("Test trim quality vector", TEST_GROUP) {
+    const std::vector<uint8_t> qual = {30, 30, 56, 60, 72, 10};
+
+    SECTION("Test empty sequence") { CHECK(utils::trim_quality({}, {0, 20}).size() == 0); }
+
+    SECTION("Trim nothing") { CHECK(utils::trim_quality(qual, {0, qual.size()}) == qual); }
+
+    SECTION("Trim part of the sequence") {
+        const std::vector<uint8_t> expected = {10};
+        CHECK(utils::trim_quality(qual, {5, qual.size()}) == expected);
+    }
+
+    SECTION("Trim whole sequence") { CHECK(utils::trim_quality(qual, {0, 0}).size() == 0); }
+}
+
+TEST_CASE("Test trim move table", TEST_GROUP) {
+    using Catch::Matchers::Equals;
+    const std::vector<uint8_t> move = {1, 1, 0, 0, 0, 1, 1, 1, 0, 0, 1, 0, 1};
+
+    SECTION("Trim nothing") {
+        auto [ts, trimmed_table] = utils::trim_move_table(move, {0, move.size()});
+        CHECK(ts == 0);
+        CHECK_THAT(trimmed_table, Equals(move));
+    }
+
+    SECTION("Trim part of the sequence") {
+        auto [ts, trimmed_table] = utils::trim_move_table(move, {3, 5});
+        CHECK(ts == 6);
+        const std::vector<uint8_t> expected = {1, 1, 0, 0};
+        CHECK_THAT(trimmed_table, Equals(expected));
+    }
+
+    SECTION("Trim whole sequence") {
+        auto [ts, trimmed_table] = utils::trim_move_table(move, {0, 0});
+        CHECK(ts == 0);
+        CHECK(trimmed_table.size() == 0);
+    }
+}
+
+TEST_CASE("Test trim mod base info", TEST_GROUP) {
+    using Catch::Matchers::Equals;
+    const std::string seq = "TAAACTTACGGTGCATCGACTG";
+    const std::string modbase_str = "A+a?,2,0,1;C+m?,4;T+x?,2,2;";
+    const std::vector<uint8_t> modbase_probs = {2, 3, 4, 10, 20, 21};
+
+    SECTION("Trim nothing") {
+        auto [str, probs] =
+                utils::trim_modbase_info(seq, modbase_str, modbase_probs, {0, seq.length()});
+        CHECK(str == modbase_str);
+        CHECK_THAT(probs, Equals(modbase_probs));
+    }
+
+    SECTION("Trim part of the sequence") {
+        // This position tests 3 cases together -
+        // in the first mod, trimming truncates first 2 -> 0 and drops the last one
+        // the second mod is eliminated
+        // in the third mod, first base position changes and the last is dropped
+        auto [str, probs] = utils::trim_modbase_info(seq, modbase_str, modbase_probs, {3, 18});
+        CHECK(str == "A+a?,0,0;T+x?,1;");
+        const std::vector<uint8_t> expected = {2, 3, 20};
+        CHECK_THAT(probs, Equals(expected));
+    }
+
+    SECTION("Trim whole sequence") {
+        auto [str, probs] = utils::trim_modbase_info(seq, modbase_str, modbase_probs, {8, 8});
+        CHECK(str == "");
+        CHECK(probs.size() == 0);
     }
 }

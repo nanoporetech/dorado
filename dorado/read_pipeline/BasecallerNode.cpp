@@ -6,6 +6,7 @@
 
 #include <nvtx3/nvtx3.hpp>
 
+#include <algorithm>
 #include <cstdlib>
 
 #if defined(__APPLE__) && !defined(__x86_64__)
@@ -53,14 +54,15 @@ void BasecallerNode::input_worker_thread() {
         // TODO: This is necessary because some reads (e.g failed Stereo Encoding) will be passed
         // to the basecaller node having already been called. This should be fixed in the future with
         // support for graphs of nodes rather than linear pipelines.
-        if (!read->seq.empty()) {
+        if (!read->read_common.seq.empty()) {
             send_message_to_sink(std::move(read));
             continue;
         }
         // Now that we have acquired a read, wait until we can push to chunks_in
         // Chunk up the read and put the chunks into the pending chunk list.
         size_t raw_size =
-                read->raw_data.sizes()[read->raw_data.sizes().size() - 1];  // Time dimension.
+                read->read_common.raw_data
+                        .sizes()[read->read_common.raw_data.sizes().size() - 1];  // Time dimension.
 
         size_t offset = 0;
         size_t chunk_in_read_idx = 0;
@@ -141,13 +143,20 @@ void BasecallerNode::working_reads_manager() {
             // Finalise the read.
             auto source_read = std::move(working_read->read);
             utils::stitch_chunks(*source_read, working_read->called_chunks);
-            source_read->model_name = m_model_name;
+            source_read->read_common.model_name = m_model_name;
             source_read->mean_qscore_start_pos = m_mean_qscore_start_pos;
+
+            if (m_rna) {
+                std::reverse(source_read->read_common.seq.begin(),
+                             source_read->read_common.seq.end());
+                std::reverse(source_read->read_common.qstring.begin(),
+                             source_read->read_common.qstring.end());
+            }
 
             // Update stats.
             ++m_called_reads_pushed;
-            m_num_bases_processed += source_read->seq.length();
-            m_num_samples_processed += source_read->raw_data.size(0);
+            m_num_bases_processed += source_read->read_common.seq.length();
+            m_num_samples_processed += source_read->read_common.raw_data.size(0);
 
             // Chunks have ownership of the working read, so destroy them to avoid a leak.
             working_read->called_chunks.clear();
@@ -160,7 +169,8 @@ void BasecallerNode::working_reads_manager() {
                     m_working_reads.erase(read_iter);
                     --m_working_reads_size;
                 } else {
-                    throw std::runtime_error("Expected to find read id " + source_read->read_id +
+                    throw std::runtime_error("Expected to find read id " +
+                                             source_read->read_common.read_id +
                                              " in working reads cache but it doesn't exist.");
                 }
             }
@@ -206,7 +216,7 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
             // Copy the chunk into the input tensor
             auto &source_read = chunk->owning_read->read;
 
-            auto input_slice = source_read->raw_data.index(
+            auto input_slice = source_read->read_common.raw_data.index(
                     {Ellipsis, Slice(chunk->input_offset, chunk->input_offset + m_chunk_size)});
             size_t slice_size;
             if (input_slice.ndimension() == 1) {
@@ -292,6 +302,7 @@ BasecallerNode::BasecallerNode(std::vector<Runner> model_runners,
           m_chunk_size(m_model_runners.front()->chunk_size()),
           m_overlap(overlap),
           m_model_stride(m_model_runners.front()->model_stride()),
+          m_rna(is_rna_model(m_model_runners.front()->config())),
           m_batch_timeout_ms(batch_timeout_ms),
           m_model_name(std::move(model_name)),
           m_max_reads(max_reads),

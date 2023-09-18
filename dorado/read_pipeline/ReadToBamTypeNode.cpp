@@ -20,12 +20,6 @@ void ReadToBamType::worker_thread() {
 
         // If this message isn't a read, we'll get a bad_variant_access exception.
         auto read = std::get<ReadPtr>(std::move(message));
-
-        if (m_rna) {
-            std::reverse(read->seq.begin(), read->seq.end());
-            std::reverse(read->qstring.begin(), read->qstring.end());
-        }
-
         auto alns = read->extract_sam_lines(m_emit_moves, m_modbase_threshold);
         for (auto& aln : alns) {
             send_message_to_sink(std::move(aln));
@@ -34,14 +28,12 @@ void ReadToBamType::worker_thread() {
 }
 
 ReadToBamType::ReadToBamType(bool emit_moves,
-                             bool rna,
                              size_t num_worker_threads,
                              float modbase_threshold_frac,
                              size_t max_reads)
         : MessageSink(max_reads),
           m_num_worker_threads(num_worker_threads),
           m_emit_moves(emit_moves),
-          m_rna(rna),
           m_modbase_threshold(
                   static_cast<uint8_t>(std::min(modbase_threshold_frac * 256.0f, 255.0f))) {
     start_threads();

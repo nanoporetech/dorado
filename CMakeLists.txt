@@ -174,6 +174,8 @@ set(LIB_SOURCE_FILES
     dorado/read_pipeline/NullNode.cpp
     dorado/read_pipeline/PairingNode.cpp
     dorado/read_pipeline/PairingNode.h
+    dorado/read_pipeline/PolyACalculator.cpp
+    dorado/read_pipeline/PolyACalculator.h
     dorado/read_pipeline/read_utils.cpp
     dorado/read_pipeline/read_utils.h
     dorado/read_pipeline/stitch.cpp

@@ -19,19 +19,19 @@ void ReadFilterNode::worker_thread() {
         auto read = std::get<ReadPtr>(std::move(message));
 
         auto log_filtering = [&]() {
-            if (read->is_duplex) {
+            if (read->read_common.is_duplex) {
                 ++m_num_duplex_reads_filtered;
-                m_num_duplex_bases_filtered += read->seq.length();
+                m_num_duplex_bases_filtered += read->read_common.seq.length();
             } else {
                 ++m_num_simplex_reads_filtered;
-                m_num_simplex_bases_filtered += read->seq.length();
+                m_num_simplex_bases_filtered += read->read_common.seq.length();
             }
         };
 
         // Filter based on qscore.
         if ((read->calculate_mean_qscore() < m_min_qscore) ||
-            read->seq.size() < m_min_read_length ||
-            (m_read_ids_to_filter.find(read->read_id) != m_read_ids_to_filter.end())) {
+            read->read_common.seq.size() < m_min_read_length ||
+            (m_read_ids_to_filter.find(read->read_common.read_id) != m_read_ids_to_filter.end())) {
             log_filtering();
         } else {
             send_message_to_sink(std::move(read));

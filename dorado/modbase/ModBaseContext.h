@@ -2,6 +2,7 @@
 
 #include <array>
 #include <map>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -25,6 +26,7 @@
 
 namespace dorado {
 struct ModBaseModelConfig;
+class MotifMatcher;
 }  // namespace dorado
 
 namespace dorado::utils {
@@ -33,6 +35,7 @@ class ModBaseContext {
 public:
     /// Constructor.
     ModBaseContext();
+    ~ModBaseContext();
 
     /// Get the context set for the specified base (if any).
     const std::string& motif(char base) const;
@@ -53,6 +56,8 @@ public:
      *  
      *  This will initialize the object based on a string representation of the context
      *  information.
+     * 
+     *  @return true if the context_string was successfully decoded, otherwise false.
      */
     bool decode(const std::string& context_string);
 
@@ -64,10 +69,10 @@ public:
      */
     std::string encode() const;
 
-    /** Return a vector of 0s and 1s indicating which bases have been checked for modification
+    /** Return a vector of bools indicating which bases have been checked for modification
      *  according to the context information.
      */
-    std::vector<int> get_sequence_mask(std::string_view sequence) const;
+    std::vector<bool> get_sequence_mask(std::string_view sequence) const;
 
     /** Update a mask provided by the get_sequence_mask function to flag bases for which
      *  the modification probability exceeds the specified threshold.
@@ -80,7 +85,7 @@ public:
      *  is satisfied for that position in the sequence. The threshold is thus ignored for those
      *  bases.
      */
-    void update_mask(std::vector<int>& mask,
+    void update_mask(std::vector<bool>& mask,
                      const std::string& sequence,
                      const std::string& modbase_alphabet,
                      const std::vector<uint8_t>& modbase_probs,
@@ -89,6 +94,7 @@ public:
 private:
     std::array<std::string, 4> m_motifs;
     std::array<size_t, 4> m_offsets = {0, 0, 0, 0};
+    std::array<std::unique_ptr<MotifMatcher>, 4> m_motif_matchers;
 };
 
 }  // namespace dorado::utils

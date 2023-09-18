@@ -1,4 +1,5 @@
 #include "TestUtils.h"
+#include "read_pipeline/HtsReader.h"
 #include "utils/bam_utils.h"
 #include "utils/barcode_kits.h"
 
@@ -6,6 +7,7 @@
 #include <htslib/sam.h>
 
 #include <filesystem>
+#include <numeric>
 #include <optional>
 #include <string>
 #include <vector>
@@ -13,6 +15,7 @@
 #define TEST_GROUP "[bam_utils]"
 
 namespace fs = std::filesystem;
+using namespace dorado;
 
 namespace {
 class WrappedKString {
@@ -36,7 +39,7 @@ TEST_CASE("BamUtilsTest: fetch keys from PG header", TEST_GROUP) {
     fs::path aligner_test_dir = fs::path(get_data_dir("aligner_test"));
     auto sam = aligner_test_dir / "basecall.sam";
 
-    auto keys = dorado::utils::extract_pg_keys_from_hdr(sam.string(), {"PN", "CL", "VN"});
+    auto keys = utils::extract_pg_keys_from_hdr(sam.string(), {"PN", "CL", "VN"});
     CHECK(keys["PN"] == "dorado");
     CHECK(keys["VN"] == "0.2.3+0f041c4+dirty");
     CHECK(keys["CL"] ==
@@ -120,6 +123,58 @@ TEST_CASE("BamUtilsTest: add_rg_hdr read group headers", TEST_GROUP) {
                     CHECK(get_barcode_tag(sam_header.get(), full_id.c_str()) == barcode_seq);
                 }
             }
+        }
+    }
+}
+
+TEST_CASE("BamUtilsTest: Test bam extraction helpers", TEST_GROUP) {
+    fs::path bam_utils_test_dir = fs::path(get_data_dir("bam_utils"));
+    auto sam = bam_utils_test_dir / "test.sam";
+
+    HtsReader reader(sam.string());
+    REQUIRE(reader.read());  // Parse first and only record.
+    auto record = reader.record.get();
+    int seqlen = record->core.l_qseq;
+
+    SECTION("Test sequence extraction") {
+        std::string seq = utils::extract_sequence(record, seqlen);
+        CHECK(seq ==
+              "AATAAACCGAAGACAATTTAGAAGCCAGCGAGGTATGTGCGTCTACTTCGTTCGGTTATGCGAAGCCGATATAACCTGCAGGAC"
+              "AACACAACATTTCCACTGTTTTCGTTCATTCGTAAACGCTTTCGCGTTCATCACACTCAACCATAGGCTTTAGCCAGAACGTTA"
+              "TGAACCCCAGCGACTTCCAGAACGGCGCGCGTGCCACCACCGGCGATGATACCGGTTCCTTCGGAAGCCGGCTGCATGAATACG"
+              "CGAGAACCCGTGTGAACACCTTTAACAGGGTGTTGCAGAGTGCCGTTGCTGCGGCACGATAGTTAAGTCGTATTGCTGAAGCGA"
+              "CACTGTCCATCGCTTTCTGGATGGCT");
+    }
+
+    SECTION("Test quality extraction") {
+        const std::string qual =
+                "%$%&%$####%'%%$&'(1/...022.+%%%%%%$$%%&%$%%%&&+)()./"
+                "0%$$'&'&'%$###$&&&'*(()()%%%%(%%'))(('''3222276<BAAABE:+''&)**%(/"
+                "''(:322**(*,,++&+++/1)(&&(006=B??@AKLK=<==HHHHHFFCBB@??>==943323/-.'56::71.//"
+                "0933))%&%&))*1739:666455116/"
+                "0,(%%&(*-55EBEB>@;??>>@BBDC?><<98-,,BGHEGFFGIIJFFDBB;6AJ>===KB:::<70/"
+                "..--,++,))+*)&&'*-,+*)))(%%&'&''%%%$&%$###$%%$$%'%%$$+1.--.7969....*)))";
+        auto qual_vector = utils::extract_quality(record, seqlen);
+        CHECK(qual_vector.size() == qual.length());
+        for (int i = 0; i < qual.length(); i++) {
+            CHECK(qual[i] == qual_vector[i] + 33);
+        }
+    }
+
+    SECTION("Test move table extraction") {
+        auto [stride, move_table] = utils::extract_move_table(record);
+        REQUIRE(!move_table.empty());
+        CHECK(stride == 6);
+        CHECK(seqlen == std::accumulate(move_table.begin(), move_table.end(), 0));
+    }
+
+    SECTION("Test mod base info extraction") {
+        auto [modbase_str, modbase_probs] = utils::extract_modbase_info(record);
+        const std::vector<int8_t> expected_modbase_probs = {5, 1};
+        CHECK(modbase_str == "C+h?,1;C+m?,1;");
+        CHECK(modbase_probs.size() == expected_modbase_probs.size());
+        for (int i = 0; i < expected_modbase_probs.size(); i++) {
+            CHECK(modbase_probs[i] == expected_modbase_probs[i]);
         }
     }
 }
