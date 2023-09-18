@@ -342,7 +342,7 @@ void PairingNode::pair_generating_worker_thread(int tid) {
                         is_within_time_and_length_criteria(*read_ptr, *later_read, tid);
                 if (is_pair) {
                     ReadPair pair;
-                    pair.template_read = ReadPair::ReadData::from_read(*read, qs, qe);
+                    pair.template_read = ReadPair::ReadData::from_read(*read_ptr, qs, qe);
                     pair.complement_read = ReadPair::ReadData::from_read(*later_read, rs, re);
 
                     read_ptr->is_duplex_parent = true;
