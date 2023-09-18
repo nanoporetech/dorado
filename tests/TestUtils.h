@@ -2,9 +2,12 @@
 
 #include <catch2/catch.hpp>
 
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <string>
+#include <vector>
 
 static std::string get_data_dir(const std::string& sub_dir) {
     const std::filesystem::path data_path = std::filesystem::path("./tests/data/") / sub_dir;

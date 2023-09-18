@@ -119,52 +119,18 @@ private:
     void generate_modbase_tags(bam1_t* aln, uint8_t threshold = 0) const;
     std::string generate_read_group() const;
 };
-
-// Intentionally uncopyable smart pointer that acts as a single mutable owner but
-// can also provide multiple immutable views that have strong ownership too.
-class ReadPtr {
-    std::shared_ptr<Read> m_read;
-
-    ReadPtr(const ReadPtr&) = delete;
-    ReadPtr& operator=(const ReadPtr&) = delete;
-
-public:
-    static ReadPtr make() {
-        ReadPtr ptr;
-        ptr.m_read = std::make_unique<Read>();
-        return ptr;
-    }
-
-    ReadPtr() = default;
-    ReadPtr(ReadPtr&&) = default;
-    ReadPtr& operator=(ReadPtr&&) = default;
-
-    Read& operator*() const { return *m_read; }
-    Read* operator->() const { return m_read.get(); }
-    Read* get() const { return m_read.get(); }
-
-    // Create a view of the data in the read.
-    std::shared_ptr<const torch::Tensor> data() const {
-        return {m_read, &m_read->read_common.raw_data};
-    }
-    // Create a view of the entire read.
-    std::shared_ptr<const Read> view() const { return m_read; }
-    // Take an owning reference to keep the |Read| alive.
-    std::shared_ptr<void> owning_reference() const { return {m_read, nullptr}; }
-
-    bool operator==(const ReadPtr& o) const { return m_read == o.m_read; }
-    std::size_t hash() const { return std::hash<std::shared_ptr<Read>>{}(m_read); }
-};
+using ReadPtr = std::unique_ptr<Read>;
 
 // A pair of reads for Duplex calling
-class ReadPair {
-public:
-    std::shared_ptr<const Read> read_1;
-    std::shared_ptr<const Read> read_2;
-    uint64_t read_1_start;
-    uint64_t read_1_end;
-    uint64_t read_2_start;
-    uint64_t read_2_end;
+struct ReadPair {
+    struct ReadData {
+        ReadCommon read_common;
+        uint64_t seq_start;
+        uint64_t seq_end;
+        static ReadData from_read(const Read& read, uint64_t seq_start, uint64_t seq_end);
+    };
+    ReadData template_read;
+    ReadData complement_read;
 };
 
 class CacheFlushMessage {
@@ -361,8 +327,3 @@ private:
 };
 
 }  // namespace dorado
-
-template <>
-struct std::hash<dorado::ReadPtr> {
-    std::size_t operator()(const dorado::ReadPtr& key) const { return key.hash(); }
-};

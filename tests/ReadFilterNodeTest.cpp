@@ -24,7 +24,7 @@ TEST_CASE("ReadFilterNode: Filter read based on qscore", TEST_GROUP) {
     {
         auto pipeline = make_filtered_pipeline(messages, 12, 0, {});
 
-        auto read_1 = dorado::ReadPtr::make();
+        auto read_1 = std::make_unique<dorado::Read>();
         read_1->read_common.raw_data = torch::empty(100);
         read_1->sample_rate = 4000;
         read_1->shift = 128.3842f;
@@ -39,7 +39,7 @@ TEST_CASE("ReadFilterNode: Filter read based on qscore", TEST_GROUP) {
         read_1->read_common.attributes.start_time = "2017-04-29T09:10:04Z";
         read_1->read_common.attributes.fast5_filename = "batch_0.fast5";
 
-        auto read_2 = dorado::ReadPtr::make();
+        auto read_2 = std::make_unique<dorado::Read>();
         read_2->read_common.raw_data = torch::empty(100);
         read_2->sample_rate = 4000;
         read_2->shift = 128.3842f;
@@ -68,7 +68,7 @@ TEST_CASE("ReadFilterNode: Filter read based on read name", TEST_GROUP) {
     {
         auto pipeline = make_filtered_pipeline(messages, 0, 0, {"read_2"});
 
-        auto read_1 = dorado::ReadPtr::make();
+        auto read_1 = std::make_unique<dorado::Read>();
         read_1->read_common.raw_data = torch::empty(100);
         read_1->sample_rate = 4000;
         read_1->shift = 128.3842f;
@@ -83,7 +83,7 @@ TEST_CASE("ReadFilterNode: Filter read based on read name", TEST_GROUP) {
         read_1->read_common.attributes.start_time = "2017-04-29T09:10:04Z";
         read_1->read_common.attributes.fast5_filename = "batch_0.fast5";
 
-        auto read_2 = dorado::ReadPtr::make();
+        auto read_2 = std::make_unique<dorado::Read>();
         read_2->read_common.raw_data = torch::empty(100);
         read_2->sample_rate = 4000;
         read_2->shift = 128.3842f;
@@ -112,7 +112,7 @@ TEST_CASE("ReadFilterNode: Filter read based on read length", TEST_GROUP) {
     {
         auto pipeline = make_filtered_pipeline(messages, 0, 5, {});
 
-        auto read_1 = dorado::ReadPtr::make();
+        auto read_1 = std::make_unique<dorado::Read>();
         read_1->read_common.raw_data = torch::empty(100);
         read_1->sample_rate = 4000;
         read_1->shift = 128.3842f;
@@ -127,7 +127,7 @@ TEST_CASE("ReadFilterNode: Filter read based on read length", TEST_GROUP) {
         read_1->read_common.attributes.start_time = "2017-04-29T09:10:04Z";
         read_1->read_common.attributes.fast5_filename = "batch_0.fast5";
 
-        auto read_2 = dorado::ReadPtr::make();
+        auto read_2 = std::make_unique<dorado::Read>();
         read_2->read_common.raw_data = torch::empty(100);
         read_2->sample_rate = 4000;
         read_2->shift = 128.3842f;

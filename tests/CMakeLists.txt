@@ -53,7 +53,9 @@ set(SMOKE_TEST_SOURCE_FILES
 add_executable(dorado_smoke_tests ${SMOKE_TEST_SOURCE_FILES})
 
 foreach(TEST_BIN dorado_tests dorado_smoke_tests)
-    target_precompile_headers(${TEST_BIN} REUSE_FROM dorado_lib)
+    if (DORADO_ENABLE_PCH)
+        target_precompile_headers(${TEST_BIN} REUSE_FROM dorado_lib)
+    endif()
 
     target_link_libraries(${TEST_BIN}
         dorado_lib
