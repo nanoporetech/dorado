@@ -11,4 +11,9 @@ namespace dorado::utils {
  */
 std::optional<std::string> get_nvidia_driver_version();
 
+/// Implementation details, exposed for testing.
+namespace detail {
+std::optional<std::string> parse_nvidia_version_line(std::string_view line);
+}  // namespace detail
+
 }  // namespace dorado::utils

@@ -42,4 +42,49 @@ DEFINE_TEST("No driver on Apple") {
 }
 #endif  // __APPLE__
 
+DEFINE_TEST("NVIDIA version line parsing") {
+    const struct {
+        std::string_view test_name;
+        std::string_view line;
+        bool valid;
+        std::string_view version;
+    } tests[]{
+            {
+                    "Valid version line",
+                    "NVRM version: NVIDIA UNIX x86_64 Kernel Module  520.61.05  Thu Sep 29 "
+                    "05:30:25 UTC 2022",
+                    true,
+                    "520.61.05",
+            },
+            {
+                    "Compiler line is ignored",
+                    "GCC version:  gcc version 9.4.0 (Ubuntu 9.4.0-1ubuntu1~20.04.1)",
+                    false,
+                    "",
+            },
+            {
+                    "Valid version line from a different machine",
+                    "NVRM version: NVIDIA UNIX Open Kernel Module for x86_64  378.13  Release "
+                    "Build  (builder)",
+                    true,
+                    "378.13",
+            },
+            {
+                    "Missing <info> and patch version",
+                    "NVRM version: module name  123.456",
+                    true,
+                    "123.456",
+            },
+    };
+
+    for (const auto &test : tests) {
+        CAPTURE(test.test_name);
+        auto version = dorado::utils::detail::parse_nvidia_version_line(test.line);
+        CHECK(version.has_value() == test.valid);
+        if (version.has_value() && test.valid) {
+            CHECK(version == test.version);
+        }
+    }
+}
+
 }  // namespace
