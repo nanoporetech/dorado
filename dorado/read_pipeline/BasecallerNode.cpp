@@ -143,12 +143,14 @@ void BasecallerNode::working_reads_manager() {
             // Finalise the read.
             auto source_read = std::move(working_read->read);
             utils::stitch_chunks(*source_read, working_read->called_chunks);
-            source_read->read_common.model_name = m_model_name;
+            `z source_read->read_common.model_name = m_model_name;
             source_read->mean_qscore_start_pos = m_mean_qscore_start_pos;
 
             if (m_rna) {
-                std::reverse(source_read->seq.begin(), source_read->seq.end());
-                std::reverse(source_read->qstring.begin(), source_read->qstring.end());
+                std::reverse(source_read->read_common.seq.begin(),
+                             source_read->read_common.seq.end());
+                std::reverse(source_read->read_common.qstring.begin(),
+                             source_read->read_common.qstring.end());
             }
 
             // Update stats.

@@ -179,7 +179,7 @@ void ModBaseCallerNode::input_worker_thread() {
             working_read->num_modbase_chunks = 0;
             working_read->num_modbase_chunks_called = 0;
 
-            std::vector<int> sequence_ints = utils::sequence_to_ints(read->seq);
+            std::vector<int> sequence_ints = utils::sequence_to_ints(read->read_common.seq);
 
             // all runners have the same set of callers, so we only need to use the first one
             auto& runner = m_runners[0];
