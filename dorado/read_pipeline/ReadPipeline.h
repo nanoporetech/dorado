@@ -18,7 +18,7 @@
 
 namespace dorado {
 
-namespace detail {
+namespace details {
 struct Attributes {
     uint32_t mux{std::numeric_limits<uint32_t>::max()};  // Channel mux
     int32_t read_number{-1};     // Per-channel number of each read as it was acquired by minknow
@@ -27,7 +27,7 @@ struct Attributes {
     std::string fast5_filename{};
     uint64_t num_samples;
 };
-}  // namespace detail
+}  // namespace details
 
 class ReadCommon {
 public:
@@ -44,7 +44,7 @@ public:
     std::string flowcell_id;              // Flowcell ID - used in read group
     std::string model_name;               // Read group
 
-    dorado::detail::Attributes attributes;
+    dorado::details::Attributes attributes;
 
     uint64_t start_time_ms;
 
