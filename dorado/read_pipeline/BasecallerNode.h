@@ -54,6 +54,8 @@ private:
     size_t m_overlap;
     // Stride of the model in the runners
     size_t m_model_stride;
+    // Whether the model is for rna
+    bool m_rna;
     // Time in milliseconds before partial batches are called.
     int m_batch_timeout_ms;
     // model_name

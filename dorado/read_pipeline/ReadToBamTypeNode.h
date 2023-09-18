@@ -14,7 +14,6 @@ namespace dorado {
 class ReadToBamType : public MessageSink {
 public:
     ReadToBamType(bool emit_moves,
-                  bool rna,
                   size_t num_worker_threads,
                   float modbase_threshold_frac = 0,
                   size_t max_reads = 1000);
@@ -33,7 +32,6 @@ private:
     size_t m_num_worker_threads = 0;
 
     bool m_emit_moves;
-    bool m_rna;
     uint8_t m_modbase_threshold;
 };
 

@@ -19,7 +19,6 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
                              std::vector<std::unique_ptr<dorado::ModBaseRunner>>&& modbase_runners,
                              size_t overlap,
                              uint32_t mean_qscore_start_pos,
-                             bool model_is_rna,
                              int scaler_node_threads,
                              int modbase_node_threads,
                              NodeHandle sink_node_handle,
@@ -49,8 +48,9 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
         last_node_handle = mod_base_caller_node;
     }
 
-    auto scaler_node = pipeline_desc.add_node<ScalerNode>(
-            {basecaller_node}, model_config.signal_norm_params, model_is_rna, scaler_node_threads);
+    auto scaler_node =
+            pipeline_desc.add_node<ScalerNode>({basecaller_node}, model_config.signal_norm_params,
+                                               is_rna_model(model_config), scaler_node_threads);
 
     // if we've been provided a source node, connect it to the start of our pipeline
     if (source_node_handle != PipelineDescriptor::InvalidNodeHandle) {
