@@ -98,8 +98,9 @@ PairingNode::PairingResult PairingNode::is_within_alignment_criteria(const dorad
         int32_t comp_end = 0;
         bool rev = false;
 
-        auto best_map = std::max_element(reg, reg + hits,
-                                         [](mm_reg1_t l, mm_reg1_t r) { return l.mapq < r.mapq; });
+        auto best_map = std::max_element(
+                reg, reg + hits,
+                [](const mm_reg1_t& l, const mm_reg1_t& r) { return l.mapq < r.mapq; });
         mapq = best_map->mapq;
         temp_start = best_map->rs;
         temp_end = best_map->re;
