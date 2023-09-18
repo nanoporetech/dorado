@@ -87,18 +87,9 @@ int duplex(int argc, char* argv[]) {
             .help("Path to reference for alignment.")
             .default_value(std::string(""));
 
-    parser.add_argument("-k")
-            .help("k-mer size for alignment with minimap2 (maximum 28).")
-            .default_value(15)
-            .scan<'i', int>();
-
-    parser.add_argument("-w")
-            .help("minimizer window size for alignment with minimap2.")
-            .default_value(10)
-            .scan<'i', int>();
     parser.add_argument("-v", "--verbose").default_value(false).implicit_value(true);
 
-    parser.add_argument("-I").help("minimap2 index batch size.").default_value(std::string("16G"));
+    cli::add_minimap2_arguments(parser, Aligner::dflt_options);
 
     try {
         auto remaining_args = parser.parse_known_args(argc, argv);
@@ -173,10 +164,9 @@ int duplex(int argc, char* argv[]) {
             hts_writer = pipeline_desc.add_node<HtsWriter>({}, "-", output_mode, 4, num_reads);
             converted_reads_sink = hts_writer;
         } else {
-            aligner = pipeline_desc.add_node<Aligner>(
-                    {}, ref, parser.get<int>("k"), parser.get<int>("w"),
-                    cli::parse_string_to_size(parser.get<std::string>("I")),
-                    std::thread::hardware_concurrency());
+            auto options = cli::parse_minimap2_arguments(parser, Aligner::dflt_options);
+            aligner = pipeline_desc.add_node<Aligner>({}, ref, options,
+                                                      std::thread::hardware_concurrency());
             hts_writer = pipeline_desc.add_node<HtsWriter>({}, "-", output_mode, 4, num_reads);
             pipeline_desc.add_node_sink(aligner, hts_writer);
             converted_reads_sink = aligner;

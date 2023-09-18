@@ -12,6 +12,7 @@
 #include <argparse.hpp>
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
 #include <chrono>
 #include <filesystem>
 #include <memory>
@@ -50,10 +51,8 @@ int aligner(int argc, char* argv[]) {
             .help("maximum number of reads to process (for debugging, 0=unlimited).")
             .default_value(0)
             .scan<'i', int>();
-    parser.add_argument("-k").help("k-mer size (maximum 28).").default_value(15).scan<'i', int>();
-    parser.add_argument("-w").help("minimizer window size.").default_value(10).scan<'i', int>();
-    parser.add_argument("-I").help("minimap2 index batch size.").default_value(std::string("16G"));
     parser.add_argument("-v", "--verbose").default_value(false).implicit_value(true);
+    cli::add_minimap2_arguments(parser, Aligner::dflt_options);
 
     try {
         parser.parse_args(argc, argv);
@@ -73,10 +72,7 @@ int aligner(int argc, char* argv[]) {
     auto reads(parser.get<std::vector<std::string>>("reads"));
     auto threads(parser.get<int>("threads"));
     auto max_reads(parser.get<int>("max-reads"));
-    auto kmer_size(parser.get<int>("k"));
-    auto window_size(parser.get<int>("w"));
-    auto index_batch_size = cli::parse_string_to_size(parser.get<std::string>("I"));
-
+    auto options = cli::parse_minimap2_arguments(parser, Aligner::dflt_options);
     threads = threads == 0 ? std::thread::hardware_concurrency() : threads;
     // The input thread is the total number of threads to use for dorado
     // alignment. Heuristically use 10% of threads for BAM generation and
@@ -109,8 +105,7 @@ int aligner(int argc, char* argv[]) {
     PipelineDescriptor pipeline_desc;
     auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, "-", HtsWriter::OutputMode::BAM,
                                                         writer_threads, 0);
-    auto aligner = pipeline_desc.add_node<Aligner>({hts_writer}, index, kmer_size, window_size,
-                                                   index_batch_size, aligner_threads);
+    auto aligner = pipeline_desc.add_node<Aligner>({hts_writer}, index, options, aligner_threads);
 
     // Create the Pipeline from our description.
     std::vector<dorado::stats::StatsReporter> stats_reporters;

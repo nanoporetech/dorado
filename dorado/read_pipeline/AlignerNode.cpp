@@ -16,7 +16,7 @@
 
 namespace dorado {
 
-Aligner::Aligner(const std::string& filename, int k, int w, uint64_t index_batch_size, int threads)
+Aligner::Aligner(const std::string& filename, const Minimap2Options& options, int threads)
         : MessageSink(10000), m_threads(threads) {
     // Check if reference file exists.
     if (!std::filesystem::exists(filename)) {
@@ -27,15 +27,27 @@ Aligner::Aligner(const std::string& filename, int k, int w, uint64_t index_batch
     // Setting options to map-ont default till relevant args are exposed.
     mm_set_opt("map-ont", &m_idx_opt, &m_map_opt);
 
-    m_idx_opt.k = k;
-    m_idx_opt.w = w;
+    m_idx_opt.k = options.kmer_size;
+    m_idx_opt.w = options.window_size;
     spdlog::info("> Index parameters input by user: kmer size={} and window size={}.", m_idx_opt.k,
                  m_idx_opt.w);
 
-    // Set batch sizes large enough to not require chunking since that's
-    // not supported yet.
-    m_idx_opt.batch_size = index_batch_size;
-    m_idx_opt.mini_batch_size = index_batch_size;
+    m_idx_opt.batch_size = options.index_batch_size;
+    m_idx_opt.mini_batch_size = options.mini_batch_size;
+    spdlog::info("> Index parameters input by user: batch size={} and mini batch size={}.",
+                 m_idx_opt.batch_size, m_idx_opt.mini_batch_size);
+
+    m_map_opt.bw = options.bandwidth;
+    m_map_opt.bw_long = options.bandwidth_long;
+    spdlog::info("> Map parameters input by user: bandwidth={} and mini bandwidth long={}.",
+                 m_map_opt.bw, m_map_opt.bw_long);
+
+    if (!options.print_secondary)
+        m_map_opt.flag |= MM_F_NO_PRINT_2ND;
+    m_map_opt.best_n = options.best_n_secondary;
+    spdlog::info(
+            "> Map parameters input by user: don't print secondary={} and best n secondary={}.",
+            m_map_opt.flag & MM_F_NO_PRINT_2ND, m_map_opt.best_n);
 
     // Force cigar generation.
     m_map_opt.flag |= MM_F_CIGAR;

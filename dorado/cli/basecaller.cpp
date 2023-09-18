@@ -58,9 +58,7 @@ void setup(std::vector<std::string> args,
            size_t min_qscore,
            std::string read_list_file_path,
            bool recursive_file_loading,
-           int kmer_size,
-           int window_size,
-           uint64_t mm2_index_batch_size,
+           const Aligner::Minimap2Options& aligner_options,
            bool skip_model_compatibility_check,
            const std::string& dump_stats_file,
            const std::string& dump_stats_filter,
@@ -134,8 +132,7 @@ void setup(std::vector<std::string> args,
     auto aligner = PipelineDescriptor::InvalidNodeHandle;
     auto current_sink_node = hts_writer;
     if (enable_aligner) {
-        aligner = pipeline_desc.add_node<Aligner>({current_sink_node}, ref, kmer_size, window_size,
-                                                  mm2_index_batch_size,
+        aligner = pipeline_desc.add_node<Aligner>({current_sink_node}, ref, aligner_options,
                                                   thread_allocations.aligner_threads);
         current_sink_node = aligner;
     }
@@ -440,8 +437,8 @@ int basecaller(int argc, char* argv[]) {
               default_parameters.remora_threads, methylation_threshold, output_mode,
               parser.get<bool>("--emit-moves"), parser.get<int>("--max-reads"),
               parser.get<int>("--min-qscore"), parser.get<std::string>("--read-ids"),
-              parser.get<bool>("--recursive"), parser.get<int>("k"), parser.get<int>("w"),
-              cli::parse_string_to_size(parser.get<std::string>("I")),
+              parser.get<bool>("--recursive"),
+              cli::parse_minimap2_arguments(parser, Aligner::dflt_options),
               internal_parser.get<bool>("--skip-model-compatibility-check"),
               internal_parser.get<std::string>("--dump_stats_file"),
               internal_parser.get<std::string>("--dump_stats_filter"),

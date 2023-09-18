@@ -91,30 +91,138 @@ inline std::tuple<int, int, int> parse_version_str(const std::string& version) {
     }
 }
 
-inline uint64_t parse_string_to_size(const std::string& num_str) {
-    // check if last character in K, M or G.
-    char last_char = num_str[num_str.length() - 1];
-    uint64_t multiplier = 1;
-    bool is_last_char_alpha = isalpha(last_char);
-    if (is_last_char_alpha) {
-        switch (last_char) {
-        case 'K':
-            multiplier = 1e3;
-            break;
-        case 'M':
-            multiplier = 1e6;
-            break;
-        case 'G':
-            multiplier = 1e9;
-            break;
-        default:
-            throw std::runtime_error("Unknown size " + std::to_string(last_char) +
-                                     " found. Please choose between K, M or G");
+template <class T = int64_t>
+inline std::vector<T> parse_string_to_sizes(const std::string& str,
+                                            std::optional<std::string> opt = std::nullopt) {
+    std::size_t pos;
+    std::vector<T> sizes;
+    const char* c_str = str.c_str();
+    char* p;
+    while (true) {
+        double x = strtod(c_str, &p);
+        if (p == c_str) {
+            auto msg = "Cannot parse size '" + str + "'.";
+            if (opt)
+                msg = "Error parsing option " + *opt + ": " + msg;
+            throw std::runtime_error(msg);
         }
+        if (*p == 'G' || *p == 'g') {
+            x *= 1e9, ++p;
+        } else if (*p == 'M' || *p == 'm') {
+            x *= 1e6, ++p;
+        } else if (*p == 'K' || *p == 'k') {
+            x *= 1e3, ++p;
+        }
+        sizes.emplace_back(x + .499);
+        if (*p == ',') {
+            c_str = ++p;
+            continue;
+        } else if (*p == 0) {
+            break;
+        }
+        auto msg = "Unknown suffix '" + std::string(p) + "'.";
+        if (opt)
+            msg = "Error parsing option " + *opt + ": " + msg;
+        throw std::runtime_error(msg);
     }
-    uint64_t size_num =
-            std::stoul(is_last_char_alpha ? num_str.substr(0, num_str.length() - 1) : num_str);
-    return size_num * multiplier;
+    while (*p != 0)
+        ;
+    std::cout << std::endl;
+    return sizes;
+}
+
+template <class T = int>
+inline T parse_string_to_size(const std::string& str,
+                              std::optional<std::string> opt = std::nullopt) {
+    return parse_string_to_sizes<T>(str, opt)[0];
+}
+
+inline bool parse_yes_or_no(const std::string& str, std::optional<std::string> opt = std::nullopt) {
+    if (str == "yes" || str == "y")
+        return true;
+    if (str == "no" || str == "n")
+        return false;
+    auto msg = "Unsupported value '" + str + "'; option  only accepts 'yes' or 'no'.";
+    if (opt)
+        msg = "Error parsing option " + *opt + ": " + msg;
+    throw std::runtime_error(msg);
+}
+
+inline std::string to_size(double value) {
+    if (value < 1e3)
+        return std::to_string(value);
+    if (value < 1e6)
+        return std::to_string(value / 1e3) + "K";
+    if (value < 1e9)
+        return std::to_string(value / 1e6) + "M";
+    return std::to_string(value / 1e9) + "G";
+}
+
+inline std::string to_yes_or_no(bool value) { return value ? "yes" : "no"; }
+
+template <class Options>
+inline void add_minimap2_arguments(argparse::ArgumentParser& parser, const Options& dflt) {
+    parser.add_argument("-k")
+            .help("minimap2 k-mer size for alignment (maximum 28).")
+            .template default_value<int>(dflt.kmer_size)
+            .template scan<'i', int>();
+
+    parser.add_argument("-w")
+            .help("minimap2 minimizer window size for alignment.")
+            .template default_value<int>(dflt.window_size)
+            .template scan<'i', int>();
+
+    parser.add_argument("-I")
+            .help("minimap2 index batch size.")
+            .default_value(to_size(dflt.index_batch_size));
+
+    parser.add_argument("-K", "--mb-size")
+            .help("minimap2 minibatch size for mapping")
+            .default_value(to_size(dflt.mini_batch_size));
+
+    parser.add_argument("--secondary")
+            .help("minimap2 outputs secondary alignments")
+            .default_value(to_yes_or_no(dflt.print_secondary));
+
+    parser.add_argument("-N")
+            .help("minimap2 retains at most INT secondary alignments")
+            .default_value(dflt.best_n_secondary)
+            .template scan<'i', int>();
+
+    parser.add_argument("-r")
+            .help("minimap2 chaining/alignment bandwidth and long-join bandwidth")
+            .default_value(to_size(dflt.bandwidth) + "," + to_size(dflt.bandwidth_long));
+}
+
+template <class Options>
+inline Options parse_minimap2_arguments(const argparse::ArgumentParser& parser,
+                                        const Options& dflt) {
+    Options res;
+    res.kmer_size = parser.template get<int>("k");
+    res.window_size = parser.template get<int>("w");
+    res.index_batch_size = cli::parse_string_to_size(parser.template get<std::string>("I"));
+    res.mini_batch_size = cli::parse_string_to_size(parser.template get<std::string>("K"));
+    res.print_secondary = cli::parse_yes_or_no(parser.template get<std::string>("secondary"));
+    res.best_n_secondary = parser.template get<int>("N");
+    if (res.best_n_secondary == 0) {
+        spdlog::warn("Changed '-N 0' to '-N {} --secondary=no'", dflt.best_n_secondary);
+        res.print_secondary = false;
+        res.best_n_secondary = dflt.best_n_secondary;
+    }
+    auto bandwidth = cli::parse_string_to_sizes(parser.template get<std::string>("r"));
+    switch (bandwidth.size()) {
+    case 1:
+        res.bandwidth = bandwidth[0];
+        res.bandwidth_long = dflt.bandwidth_long;
+        break;
+    case 2:
+        res.bandwidth = bandwidth[0];
+        res.bandwidth_long = bandwidth[1];
+        break;
+    default:
+        throw std::runtime_error("Wrong number of arguments for option '-r'.");
+    }
+    return res;
 }
 
 inline std::vector<std::string> extract_token_from_cli(const std::string& cmd) {
