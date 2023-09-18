@@ -9,7 +9,7 @@
 #include <algorithm>
 #include <cstdlib>
 
-#if defined(__APPLE__) && !defined(__x86_64__)
+#if defined(__APPLE__) && DORADO_GPU_BUILD
 #include "utils/metal_utils.h"
 #endif
 
@@ -182,7 +182,7 @@ void BasecallerNode::working_reads_manager() {
 }
 
 void BasecallerNode::basecall_worker_thread(int worker_id) {
-#if defined(__APPLE__) && !defined(__x86_64__)
+#if defined(__APPLE__) && DORADO_GPU_BUILD
     // Model execution creates GPU-related autorelease objects.
     utils::ScopedAutoReleasePool autorelease_pool;
 #endif
