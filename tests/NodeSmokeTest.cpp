@@ -50,19 +50,19 @@ protected:
 
     auto make_test_read(std::string read_id) {
         auto read = dorado::ReadPtr::make();
-        read->raw_data = torch::rand(random_between(100, 200));
+        read->read_common.raw_data = torch::rand(random_between(100, 200));
         read->sample_rate = 5000;
         read->shift = random_between(100, 200);
         read->scale = random_between(5, 10);
-        read->read_id = std::move(read_id);
-        read->seq = "ACGTACGT";
-        read->qstring = "********";
+        read->read_common.read_id = std::move(read_id);
+        read->read_common.seq = "ACGTACGT";
+        read->read_common.qstring = "********";
         read->num_trimmed_samples = random_between(10, 100);
-        read->attributes.mux = 2;
-        read->attributes.read_number = 12345;
-        read->attributes.channel_number = 5;
-        read->attributes.start_time = "2017-04-29T09:10:04Z";
-        read->attributes.fast5_filename = "test.fast5";
+        read->read_common.attributes.mux = 2;
+        read->read_common.attributes.read_number = 12345;
+        read->read_common.attributes.channel_number = 5;
+        read->read_common.attributes.start_time = "2017-04-29T09:10:04Z";
+        read->read_common.attributes.fast5_filename = "test.fast5";
         return read;
     }
 
@@ -169,8 +169,9 @@ DEFINE_TEST(NodeSmokeTestRead, "ScalerNode") {
     set_pipeline_restart(pipeline_restart);
 
     // Scaler node expects i16 input
-    set_read_mutator(
-            [](dorado::ReadPtr& read) { read->raw_data = read->raw_data.to(torch::kI16); });
+    set_read_mutator([](dorado::ReadPtr& read) {
+        read->read_common.raw_data = read->read_common.raw_data.to(torch::kI16);
+    });
 
     dorado::SignalNormalisationParams config;
     config.quantile_a = 0.2;
@@ -293,15 +294,17 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
 
     // ModBase node expects half input and needs a move table
     set_read_mutator([this, model_stride](dorado::ReadPtr& read) {
-        read->raw_data = read->raw_data.to(torch::kHalf);
+        read->read_common.raw_data = read->read_common.raw_data.to(torch::kHalf);
 
-        read->model_stride = model_stride;
+        read->read_common.model_stride = model_stride;
         // The move table size needs rounding up.
-        size_t const move_table_size = (read->raw_data.size(0) + model_stride - 1) / model_stride;
-        read->moves.resize(move_table_size);
-        std::fill_n(read->moves.begin(), read->seq.size(), 1);
+        size_t const move_table_size =
+                (read->read_common.raw_data.size(0) + model_stride - 1) / model_stride;
+        read->read_common.moves.resize(move_table_size);
+        std::fill_n(read->read_common.moves.begin(), read->read_common.seq.size(), 1);
         // First element must be 1, the rest can be shuffled
-        std::shuffle(std::next(read->moves.begin()), read->moves.end(), m_rng);
+        std::shuffle(std::next(read->read_common.moves.begin()), read->read_common.moves.end(),
+                     m_rng);
     });
 
     run_smoke_test<dorado::ModBaseCallerNode>(std::move(remora_runners), 2, model_stride);

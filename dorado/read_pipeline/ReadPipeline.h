@@ -18,37 +18,20 @@
 
 namespace dorado {
 
-// Class representing a read, including raw data
-class Read {
+namespace details {
+struct Attributes {
+    uint32_t mux{std::numeric_limits<uint32_t>::max()};  // Channel mux
+    int32_t read_number{-1};     // Per-channel number of each read as it was acquired by minknow
+    int32_t channel_number{-1};  //Channel ID
+    std::string start_time{};    //Read acquisition start time
+    std::string fast5_filename{};
+    uint64_t num_samples;
+};
+}  // namespace details
+
+class ReadCommon {
 public:
-    struct Attributes {
-        uint32_t mux{std::numeric_limits<uint32_t>::max()};  // Channel mux
-        int32_t read_number{-1};  // Per-channel number of each read as it was acquired by minknow
-        int32_t channel_number{-1};  //Channel ID
-        std::string start_time{};    //Read acquisition start time
-        std::string fast5_filename{};
-        uint64_t num_samples;
-    };
-
-    struct Mapping {
-        // Dummy struct for future use to represent alignments
-    };
-
     torch::Tensor raw_data;  // Loaded from source file
-    float digitisation;      // Loaded from source file
-    float range;             // Loaded from source file
-    float offset;            // Loaded from source file
-
-    uint64_t sample_rate;  // Loaded from source file
-
-    uint64_t start_time_ms;
-    uint64_t get_end_time_ms() const;
-
-    float shift;                 // To be set by scaler
-    float scale;                 // To be set by scaler
-    std::string scaling_method;  // To be set by scaler
-
-    float scaling;  // Scale factor applied to convert raw integers from sequencer into pore current values
 
     int model_stride;  // The down sampling factor of the model
 
@@ -61,6 +44,42 @@ public:
     std::string flowcell_id;              // Flowcell ID - used in read group
     std::string model_name;               // Read group
 
+    dorado::details::Attributes attributes;
+
+    uint64_t start_time_ms;
+
+    // A unique identifier for each input read
+    // Split (duplex) reads have the read_tag of the parent (template) and their own subread_id
+    uint64_t read_tag{0};
+    // The id of the client to which this read belongs. -1 in standalone mode
+    int32_t client_id{-1};
+
+    bool is_duplex{false};
+};
+
+// Class representing a read, including raw data
+class Read {
+public:
+    struct Mapping {
+        // Dummy struct for future use to represent alignments
+    };
+
+    ReadCommon read_common;
+
+    float digitisation;  // Loaded from source file
+    float range;         // Loaded from source file
+    float offset;        // Loaded from source file
+
+    uint64_t sample_rate;  // Loaded from source file
+
+    uint64_t get_end_time_ms() const;
+
+    float shift;                 // To be set by scaler
+    float scale;                 // To be set by scaler
+    std::string scaling_method;  // To be set by scaler
+
+    float scaling;  // Scale factor applied to convert raw integers from sequencer into pore current values
+
     std::string parent_read_id;  // Origin read ID for all its subreads. Empty for nonsplit reads.
 
     std::shared_ptr<const ModBaseInfo>
@@ -68,7 +87,6 @@ public:
 
     uint64_t num_trimmed_samples;  // Number of samples which have been trimmed from the raw read.
 
-    Attributes attributes;
     std::vector<Mapping> mappings;
     std::vector<BamPtr> extract_sam_lines(bool emit_moves, uint8_t modbase_threshold = 0) const;
 
@@ -77,7 +95,6 @@ public:
     uint64_t start_sample;
     uint64_t end_sample;
     uint64_t run_acquisition_start_time_ms;
-    bool is_duplex{false};
     std::atomic_bool is_duplex_parent{false};
     // Calculate mean Q-score from this position onwards if read is
     // a short read.
@@ -90,12 +107,6 @@ public:
     // (2) duplex pairs which share this read as the template read
     size_t subread_id{0};
     size_t split_count{1};
-
-    // A unique identifier for each input read
-    // Split (duplex) reads have the read_tag of the parent (template) and their own subread_id
-    uint64_t read_tag{0};
-    // The id of the client to which this read belongs. -1 in standalone mode
-    int32_t client_id{-1};
 
     // Barcode.
     std::string barcode{};
@@ -133,7 +144,9 @@ public:
     Read* get() const { return m_read.get(); }
 
     // Create a view of the data in the read.
-    std::shared_ptr<const torch::Tensor> data() const { return {m_read, &m_read->raw_data}; }
+    std::shared_ptr<const torch::Tensor> data() const {
+        return {m_read, &m_read->read_common.raw_data};
+    }
     // Create a view of the entire read.
     std::shared_ptr<const Read> view() const { return m_read; }
     // Take an owning reference to keep the |Read| alive.

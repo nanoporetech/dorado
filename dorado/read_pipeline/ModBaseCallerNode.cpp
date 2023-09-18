@@ -161,14 +161,16 @@ void ModBaseCallerNode::input_worker_thread() {
             {
                 nvtx3::scoped_range range{"base_mod_probs_init"};
                 // initialize base_mod_probs _before_ we start handing out chunks
-                read->base_mod_probs.resize(read->seq.size() * m_num_states, 0);
-                for (size_t i = 0; i < read->seq.size(); ++i) {
+                read->read_common.base_mod_probs.resize(read->read_common.seq.size() * m_num_states,
+                                                        0);
+                for (size_t i = 0; i < read->read_common.seq.size(); ++i) {
                     // Initialize for what corresponds to 100% canonical base for each position.
-                    int base_id = utils::BaseInfo::BASE_IDS[read->seq[i]];
+                    int base_id = utils::BaseInfo::BASE_IDS[read->read_common.seq[i]];
                     if (base_id < 0) {
                         throw std::runtime_error("Invalid character in sequence.");
                     }
-                    read->base_mod_probs[i * m_num_states + m_base_prob_offsets[base_id]] = 1.0f;
+                    read->read_common
+                            .base_mod_probs[i * m_num_states + m_base_prob_offsets[base_id]] = 1.0f;
                 }
             }
             read->mod_base_info = m_mod_base_info;
@@ -177,7 +179,7 @@ void ModBaseCallerNode::input_worker_thread() {
             working_read->num_modbase_chunks = 0;
             working_read->num_modbase_chunks_called = 0;
 
-            std::vector<int> sequence_ints = utils::sequence_to_ints(read->seq);
+            std::vector<int> sequence_ints = utils::sequence_to_ints(read->read_common.seq);
 
             // all runners have the same set of callers, so we only need to use the first one
             auto& runner = m_runners[0];
@@ -186,13 +188,14 @@ void ModBaseCallerNode::input_worker_thread() {
             for (size_t caller_id = 0; caller_id < runner->num_callers(); ++caller_id) {
                 nvtx3::scoped_range range{"generate_chunks"};
 
-                auto signal_len = read->raw_data.size(0);
-                std::vector<uint64_t> seq_to_sig_map = utils::moves_to_map(
-                        read->moves, m_block_stride, signal_len, read->seq.size() + 1);
+                auto signal_len = read->read_common.raw_data.size(0);
+                std::vector<uint64_t> seq_to_sig_map =
+                        utils::moves_to_map(read->read_common.moves, m_block_stride, signal_len,
+                                            read->read_common.seq.size() + 1);
 
                 auto& chunks_to_enqueue = chunks_to_enqueue_by_caller.at(caller_id);
                 auto& params = runner->caller_params(caller_id);
-                auto signal = read->raw_data;
+                auto signal = read->read_common.raw_data;
                 if (params.reverse_signal) {
                     signal = torch::flip(signal, 0);
                     std::reverse(std::begin(seq_to_sig_map), std::end(seq_to_sig_map));
@@ -213,7 +216,7 @@ void ModBaseCallerNode::input_worker_thread() {
                                        params.bases_after);
                 encoder.init(sequence_ints, seq_to_sig_map);
 
-                auto context_hits = runner->get_motif_hits(caller_id, read->seq);
+                auto context_hits = runner->get_motif_hits(caller_id, read->read_common.seq);
                 m_num_context_hits += static_cast<int64_t>(context_hits.size());
                 chunks_to_enqueue.reserve(context_hits.size());
                 for (auto context_hit : context_hits) {
@@ -381,10 +384,10 @@ void ModBaseCallerNode::output_worker_thread() {
             auto working_read = chunk->working_read;
             auto& source_read = working_read->read;
             int64_t result_pos = chunk->context_hit;
-            int64_t offset =
-                    m_base_prob_offsets[utils::BaseInfo::BASE_IDS[source_read->seq[result_pos]]];
+            int64_t offset = m_base_prob_offsets
+                    [utils::BaseInfo::BASE_IDS[source_read->read_common.seq[result_pos]]];
             for (size_t i = 0; i < chunk->scores.size(); ++i) {
-                source_read->base_mod_probs[m_num_states * result_pos + offset + i] =
+                source_read->read_common.base_mod_probs[m_num_states * result_pos + offset + i] =
                         static_cast<uint8_t>(std::min(std::floor(chunk->scores[i] * 256), 255.0f));
             }
             // If all chunks for the read associated with this chunk have now been called,
@@ -405,7 +408,7 @@ void ModBaseCallerNode::output_worker_thread() {
                     m_working_reads.erase(read_iter);
                 } else {
                     throw std::runtime_error("Expected to find read id " +
-                                             completed_read->read->read_id +
+                                             completed_read->read->read_common.read_id +
                                              " in working reads set but it doesn't exist.");
                 }
             }

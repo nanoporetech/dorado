@@ -183,18 +183,19 @@ BamPtr BarcodeClassifierNode::trim_barcode(BamPtr input,
 }
 
 void BarcodeClassifierNode::trim_barcode(Read& read, const demux::ScoreResults& res) {
-    int seqlen = read.seq.length();
+    int seqlen = read.read_common.seq.length();
     auto trim_interval = determine_trim_interval(res, seqlen);
 
     if (trim_interval.second - trim_interval.first == seqlen) {
         return;
     }
 
-    read.seq = utils::trim_sequence(read.seq, trim_interval);
-    read.qstring = utils::trim_sequence(read.qstring, trim_interval);
+    read.read_common.seq = utils::trim_sequence(read.read_common.seq, trim_interval);
+    read.read_common.qstring = utils::trim_sequence(read.read_common.qstring, trim_interval);
     size_t num_positions_trimmed;
-    std::tie(num_positions_trimmed, read.moves) = utils::trim_move_table(read.moves, trim_interval);
-    read.num_trimmed_samples += read.model_stride * num_positions_trimmed;
+    std::tie(num_positions_trimmed, read.read_common.moves) =
+            utils::trim_move_table(read.read_common.moves, trim_interval);
+    read.num_trimmed_samples += read.read_common.model_stride * num_positions_trimmed;
 
     if (read.mod_base_info) {
         int num_modbase_channels = read.mod_base_info->alphabet.size();
@@ -202,7 +203,8 @@ void BarcodeClassifierNode::trim_barcode(Read& read, const demux::ScoreResults& 
         // trimming, we just shift everything by skipped bases * number of channels.
         std::pair<int, int> modbase_interval = {trim_interval.first * num_modbase_channels,
                                                 trim_interval.second * num_modbase_channels};
-        read.base_mod_probs = utils::trim_quality(read.base_mod_probs, modbase_interval);
+        read.read_common.base_mod_probs =
+                utils::trim_quality(read.read_common.base_mod_probs, modbase_interval);
     }
 }
 
@@ -223,7 +225,7 @@ void BarcodeClassifierNode::barcode(BamPtr& read) {
 
 void BarcodeClassifierNode::barcode(Read& read) {
     // get the sequence to map from the record
-    auto bc_res = m_barcoder.barcode(read.seq);
+    auto bc_res = m_barcoder.barcode(read.read_common.seq);
     read.barcode = generate_barcode_string(bc_res);
     m_num_records++;
 

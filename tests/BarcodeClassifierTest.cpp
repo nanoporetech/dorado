@@ -202,40 +202,42 @@ TEST_CASE(
                                     kit_info_map.at("SQK-RPB004").top_rear_flank;
     const std::string rear_flank = dorado::utils::reverse_complement(front_flank);
     const int stride = 6;
-    read->seq = front_flank + nonbc_seq + rear_flank;
-    read->qstring = std::string(read->seq.length(), '!');
-    read->read_id = "read_id";
-    read->model_stride = stride;
+    read->read_common.seq = front_flank + nonbc_seq + rear_flank;
+    read->read_common.qstring = std::string(read->read_common.seq.length(), '!');
+    read->read_common.read_id = "read_id";
+    read->read_common.model_stride = stride;
     std::vector<uint8_t> moves;
-    for (int i = 0; i < read->seq.length(); i++) {
+    for (int i = 0; i < read->read_common.seq.length(); i++) {
         moves.push_back(1);
         moves.push_back(0);
     }
-    read->moves = moves;
+    read->read_common.moves = moves;
 
     // Generate mod prob table so only the first A after the front flank has a mod.
     const std::string mod_alphabet = "AXCGT";
     read->mod_base_info = std::make_shared<dorado::ModBaseInfo>(mod_alphabet, "6mA", "");
-    read->base_mod_probs = std::vector<uint8_t>(read->seq.length() * mod_alphabet.size(), 0);
+    read->read_common.base_mod_probs =
+            std::vector<uint8_t>(read->read_common.seq.length() * mod_alphabet.size(), 0);
 
-    for (int i = 0; i < read->seq.size(); i++) {
-        switch (read->seq[i]) {
+    for (int i = 0; i < read->read_common.seq.size(); i++) {
+        switch (read->read_common.seq[i]) {
         case 'A':
-            read->base_mod_probs[i * mod_alphabet.size()] = 255;
+            read->read_common.base_mod_probs[i * mod_alphabet.size()] = 255;
             break;
         case 'C':
-            read->base_mod_probs[i * mod_alphabet.size() + 2] = 255;
+            read->read_common.base_mod_probs[i * mod_alphabet.size() + 2] = 255;
             break;
         case 'G':
-            read->base_mod_probs[i * mod_alphabet.size() + 3] = 255;
+            read->read_common.base_mod_probs[i * mod_alphabet.size() + 3] = 255;
             break;
         case 'T':
-            read->base_mod_probs[i * mod_alphabet.size() + 4] = 255;
+            read->read_common.base_mod_probs[i * mod_alphabet.size() + 4] = 255;
             break;
         }
     }
-    read->base_mod_probs[front_flank.length() * mod_alphabet.size()] = 20;         // A
-    read->base_mod_probs[(front_flank.length() * mod_alphabet.size()) + 1] = 235;  // 6mA
+    read->read_common.base_mod_probs[front_flank.length() * mod_alphabet.size()] = 20;  // A
+    read->read_common.base_mod_probs[(front_flank.length() * mod_alphabet.size()) + 1] =
+            235;  // 6mA
 
     read->num_trimmed_samples = 0;
 
@@ -295,14 +297,15 @@ TEST_CASE(
 
             CHECK(read->barcode == expected_bc);
 
-            CHECK(read->seq == nonbc_seq);
+            CHECK(read->read_common.seq == nonbc_seq);
 
-            CHECK(read->moves == expected_move_vals);
+            CHECK(read->read_common.moves == expected_move_vals);
 
             // The mod probabilities table should not start mod at the first base.
-            CHECK(read->base_mod_probs.size() == read->seq.size() * mod_alphabet.size());
-            CHECK(read->base_mod_probs[0] == 20);
-            CHECK(read->base_mod_probs[1] == 235);
+            CHECK(read->read_common.base_mod_probs.size() ==
+                  read->read_common.seq.size() * mod_alphabet.size());
+            CHECK(read->read_common.base_mod_probs[0] == 20);
+            CHECK(read->read_common.base_mod_probs[1] == 235);
 
             CHECK(read->num_trimmed_samples == additional_trimmed_samples);
 

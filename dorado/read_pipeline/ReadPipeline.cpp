@@ -51,12 +51,12 @@ namespace dorado {
 
 std::string Read::generate_read_group() const {
     std::string read_group;
-    if (!run_id.empty()) {
-        read_group = run_id + '_';
-        if (model_name.empty()) {
+    if (!read_common.run_id.empty()) {
+        read_group = read_common.run_id + '_';
+        if (read_common.model_name.empty()) {
             read_group += "unknown";
         } else {
-            read_group += model_name;
+            read_group += read_common.model_name;
         }
         if (!barcode.empty() && barcode != "unclassified") {
             read_group += '_' + barcode;
@@ -69,30 +69,30 @@ void Read::generate_read_tags(bam1_t *aln, bool emit_moves) const {
     int qs = static_cast<int>(std::round(calculate_mean_qscore()));
     bam_aux_append(aln, "qs", 'i', sizeof(qs), (uint8_t *)&qs);
 
-    float du = (float)(raw_data.size(0) + num_trimmed_samples) / (float)sample_rate;
+    float du = (float)(read_common.raw_data.size(0) + num_trimmed_samples) / (float)sample_rate;
     bam_aux_append(aln, "du", 'f', sizeof(du), (uint8_t *)&du);
 
-    int ns = raw_data.size(0) + num_trimmed_samples;
+    int ns = read_common.raw_data.size(0) + num_trimmed_samples;
     bam_aux_append(aln, "ns", 'i', sizeof(ns), (uint8_t *)&ns);
 
     int ts = num_trimmed_samples;
     bam_aux_append(aln, "ts", 'i', sizeof(ts), (uint8_t *)&ts);
 
-    int mx = attributes.mux;
+    int mx = read_common.attributes.mux;
     bam_aux_append(aln, "mx", 'i', sizeof(mx), (uint8_t *)&mx);
 
-    int ch = attributes.channel_number;
+    int ch = read_common.attributes.channel_number;
     bam_aux_append(aln, "ch", 'i', sizeof(ch), (uint8_t *)&ch);
 
-    bam_aux_append(aln, "st", 'Z', attributes.start_time.length() + 1,
-                   (uint8_t *)attributes.start_time.c_str());
+    bam_aux_append(aln, "st", 'Z', read_common.attributes.start_time.length() + 1,
+                   (uint8_t *)read_common.attributes.start_time.c_str());
 
     // For reads which are the result of read splitting, the read number will be set to -1
-    int rn = attributes.read_number;
+    int rn = read_common.attributes.read_number;
     bam_aux_append(aln, "rn", 'i', sizeof(rn), (uint8_t *)&rn);
 
-    bam_aux_append(aln, "fn", 'Z', attributes.fast5_filename.length() + 1,
-                   (uint8_t *)attributes.fast5_filename.c_str());
+    bam_aux_append(aln, "fn", 'Z', read_common.attributes.fast5_filename.length() + 1,
+                   (uint8_t *)read_common.attributes.fast5_filename.c_str());
 
     float sm = shift;
     bam_aux_append(aln, "sm", 'f', sizeof(sm), (uint8_t *)&sm);
@@ -116,11 +116,11 @@ void Read::generate_read_tags(bam1_t *aln, bool emit_moves) const {
     }
 
     if (emit_moves) {
-        std::vector<uint8_t> m(moves.size() + 1, 0);
-        m[0] = model_stride;
+        std::vector<uint8_t> m(read_common.moves.size() + 1, 0);
+        m[0] = read_common.model_stride;
 
-        for (size_t idx = 0; idx < moves.size(); idx++) {
-            m[idx + 1] = static_cast<uint8_t>(moves[idx]);
+        for (size_t idx = 0; idx < read_common.moves.size(); idx++) {
+            m[idx + 1] = static_cast<uint8_t>(read_common.moves[idx]);
         }
 
         bam_aux_update_array(aln, "mv", 'c', m.size(), (uint8_t *)m.data());
@@ -138,14 +138,14 @@ void Read::generate_duplex_read_tags(bam1_t *aln) const {
     uint32_t duplex = 1;
     bam_aux_append(aln, "dx", 'i', sizeof(duplex), (uint8_t *)&duplex);
 
-    int mx = attributes.mux;
+    int mx = read_common.attributes.mux;
     bam_aux_append(aln, "mx", 'i', sizeof(mx), (uint8_t *)&mx);
 
-    int ch = attributes.channel_number;
+    int ch = read_common.attributes.channel_number;
     bam_aux_append(aln, "ch", 'i', sizeof(ch), (uint8_t *)&ch);
 
-    bam_aux_append(aln, "st", 'Z', attributes.start_time.length() + 1,
-                   (uint8_t *)attributes.start_time.c_str());
+    bam_aux_append(aln, "st", 'Z', read_common.attributes.start_time.length() + 1,
+                   (uint8_t *)read_common.attributes.start_time.c_str());
 
     auto rg = generate_read_group();
     if (!rg.empty()) {
@@ -159,14 +159,16 @@ void Read::generate_duplex_read_tags(bam1_t *aln) const {
 }
 
 std::vector<BamPtr> Read::extract_sam_lines(bool emit_moves, uint8_t modbase_threshold) const {
-    if (read_id.empty()) {
+    if (read_common.read_id.empty()) {
         throw std::runtime_error("Empty read_name string provided");
     }
-    if (seq.size() != qstring.size()) {
-        throw std::runtime_error("Sequence and qscore do not match size for read id " + read_id);
+    if (read_common.seq.size() != read_common.qstring.size()) {
+        throw std::runtime_error("Sequence and qscore do not match size for read id " +
+                                 read_common.read_id);
     }
-    if (seq.empty()) {
-        throw std::runtime_error("Empty sequence and qstring provided for read id " + read_id);
+    if (read_common.seq.empty()) {
+        throw std::runtime_error("Empty sequence and qstring provided for read id " +
+                                 read_common.read_id);
     }
 
     std::vector<BamPtr> alns;
@@ -179,21 +181,22 @@ std::vector<BamPtr> Read::extract_sam_lines(bool emit_moves, uint8_t modbase_thr
         std::string cigar_string = "*";  // UNMAPPED
         std::string r_next = "*";
         int next_pos = -1;  // UNMAPPED - will be written as 0
-        size_t template_length = seq.size();
+        size_t template_length = read_common.seq.size();
 
         // Convert string qscore to phred vector.
         std::vector<uint8_t> qscore;
-        std::transform(qstring.begin(), qstring.end(), std::back_inserter(qscore),
-                       [](char c) { return (uint8_t)(c)-33; });
+        std::transform(read_common.qstring.begin(), read_common.qstring.end(),
+                       std::back_inserter(qscore), [](char c) { return (uint8_t)(c)-33; });
 
-        bam_set1(aln, read_id.length(), read_id.c_str(), flags, -1, leftmost_pos, map_q, 0, nullptr,
-                 -1, next_pos, 0, seq.length(), seq.c_str(), (char *)qscore.data(), 0);
+        bam_set1(aln, read_common.read_id.length(), read_common.read_id.c_str(), flags, -1,
+                 leftmost_pos, map_q, 0, nullptr, -1, next_pos, 0, read_common.seq.length(),
+                 read_common.seq.c_str(), (char *)qscore.data(), 0);
 
         if (!barcode.empty() && barcode != "unclassified") {
             bam_aux_append(aln, "BC", 'Z', barcode.length() + 1, (uint8_t *)barcode.c_str());
         }
 
-        if (is_duplex) {
+        if (read_common.is_duplex) {
             generate_duplex_read_tags(aln);
         } else {
             generate_read_tags(aln, emit_moves);
@@ -210,7 +213,7 @@ std::vector<BamPtr> Read::extract_sam_lines(bool emit_moves, uint8_t modbase_thr
 }
 
 uint64_t Read::get_end_time_ms() const {
-    return start_time_ms +
+    return read_common.start_time_ms +
            ((end_sample - start_sample) * 1000) / sample_rate;  //TODO get rid of the trimmed thing?
 }
 
@@ -222,7 +225,7 @@ void Read::generate_modbase_tags(bam1_t *aln, uint8_t threshold) const {
     const size_t num_channels = mod_base_info->alphabet.size();
     const std::string cardinal_bases = "ACGT";
     char current_cardinal = 0;
-    if (seq.length() * num_channels != base_mod_probs.size()) {
+    if (read_common.seq.length() * num_channels != read_common.base_mod_probs.size()) {
         throw std::runtime_error(
                 "Mismatch between base_mod_probs size and sequence length * num channels in "
                 "modbase_alphabet!");
@@ -247,9 +250,9 @@ void Read::generate_modbase_tags(bam1_t *aln, uint8_t threshold) const {
             }
         }
     }
-    auto modbase_mask = context_handler.get_sequence_mask(seq);
-    context_handler.update_mask(modbase_mask, seq, mod_base_info->alphabet, base_mod_probs,
-                                threshold);
+    auto modbase_mask = context_handler.get_sequence_mask(read_common.seq);
+    context_handler.update_mask(modbase_mask, read_common.seq, mod_base_info->alphabet,
+                                read_common.base_mod_probs, threshold);
 
     // Iterate over the provided alphabet and find all the channels we need to write out
     for (size_t channel_idx = 0; channel_idx < num_channels; channel_idx++) {
@@ -269,13 +272,13 @@ void Read::generate_modbase_tags(bam1_t *aln, uint8_t threshold) const {
             modbase_string += std::string(1, current_cardinal) + "+" + bam_name;
             modbase_string += base_has_context[current_cardinal] ? "?" : ".";
             int skipped_bases = 0;
-            for (size_t base_idx = 0; base_idx < seq.size(); base_idx++) {
-                if (seq[base_idx] == current_cardinal) {
+            for (size_t base_idx = 0; base_idx < read_common.seq.size(); base_idx++) {
+                if (read_common.seq[base_idx] == current_cardinal) {
                     if (modbase_mask[base_idx]) {
                         modbase_string += "," + std::to_string(skipped_bases);
                         skipped_bases = 0;
                         modbase_prob.push_back(
-                                base_mod_probs[base_idx * num_channels + channel_idx]);
+                                read_common.base_mod_probs[base_idx * num_channels + channel_idx]);
                     } else {
                         // Skip this base
                         skipped_bases++;
@@ -294,10 +297,10 @@ float Read::calculate_mean_qscore() const {
     // If Q-score start position is greater than the
     // read length, then calculate mean Q-score from the
     // start of the read.
-    if (qstring.length() <= mean_qscore_start_pos) {
-        return utils::mean_qscore_from_qstring(qstring, 0);
+    if (read_common.qstring.length() <= mean_qscore_start_pos) {
+        return utils::mean_qscore_from_qstring(read_common.qstring, 0);
     }
-    return utils::mean_qscore_from_qstring(qstring, mean_qscore_start_pos);
+    return utils::mean_qscore_from_qstring(read_common.qstring, mean_qscore_start_pos);
 }
 
 MessageSink::MessageSink(size_t max_messages) : m_work_queue(max_messages) {}
