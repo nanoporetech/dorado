@@ -175,14 +175,11 @@ void ModBaseCallerNode::input_worker_thread() {
             }
             read->mod_base_info = m_mod_base_info;
 
-            std::vector<int> sequence_ints = utils::sequence_to_ints(read->read_common.seq);
-            std::vector<uint64_t> seq_to_sig_map = utils::moves_to_map(
-                    read->read_common.moves, m_block_stride, read->read_common.raw_data.size(0),
-                    read->read_common.seq.size() + 1);
-
             auto working_read = std::make_shared<WorkingRead>();
             working_read->num_modbase_chunks = 0;
             working_read->num_modbase_chunks_called = 0;
+
+            std::vector<int> sequence_ints = utils::sequence_to_ints(read->seq);
 
             // all runners have the same set of callers, so we only need to use the first one
             auto& runner = m_runners[0];
@@ -190,14 +187,30 @@ void ModBaseCallerNode::input_worker_thread() {
                     runner->num_callers());
             for (size_t caller_id = 0; caller_id < runner->num_callers(); ++caller_id) {
                 nvtx3::scoped_range range{"generate_chunks"};
+
+                auto signal_len = read->read_common.raw_data.size(0);
+                std::vector<uint64_t> seq_to_sig_map =
+                        utils::moves_to_map(read->read_common.moves, m_block_stride, signal_len,
+                                            read->read_common.seq.size() + 1);
+
                 auto& chunks_to_enqueue = chunks_to_enqueue_by_caller.at(caller_id);
+                auto& params = runner->caller_params(caller_id);
+                auto signal = read->read_common.raw_data;
+                if (params.reverse_signal) {
+                    signal = torch::flip(signal, 0);
+                    std::reverse(std::begin(seq_to_sig_map), std::end(seq_to_sig_map));
+                    std::transform(std::begin(seq_to_sig_map), std::end(seq_to_sig_map),
+                                   std::begin(seq_to_sig_map), [signal_len](auto signal_pos) {
+                                       return signal_len - signal_pos;
+                                   });
+                }
 
                 // scale signal based on model parameters
-                auto scaled_signal = runner->scale_signal(caller_id, read->read_common.raw_data,
-                                                          sequence_ints, seq_to_sig_map);
+                auto scaled_signal =
+                        runner->scale_signal(caller_id, signal, sequence_ints, seq_to_sig_map);
 
-                auto& params = runner->caller_params(caller_id);
                 auto context_samples = (params.context_before + params.context_after);
+
                 // One-hot encodes the kmer at each signal step for input into the network
                 ModBaseEncoder encoder(m_block_stride, context_samples, params.bases_before,
                                        params.bases_after);
