@@ -12,12 +12,10 @@
 using namespace torch::indexing;
 
 namespace dorado {
-ReadPtr StereoDuplexEncoderNode::stereo_encode(const Read& template_read,
-                                               const Read& complement_read,
-                                               uint64_t temp_start,
-                                               uint64_t temp_end,
-                                               uint64_t comp_start,
-                                               uint64_t comp_end) {
+ReadPtr StereoDuplexEncoderNode::stereo_encode(const ReadPair& read_pair) {
+    const ReadPair::ReadData& template_read = read_pair.template_read;
+    const ReadPair::ReadData& complement_read = read_pair.complement_read;
+
     // We rely on the incoming read raw data being of type float16 to allow direct memcpy
     // of tensor elements.
     assert(template_read.read_common.raw_data.dtype() == torch::kFloat16);
@@ -30,8 +28,6 @@ ReadPtr StereoDuplexEncoderNode::stereo_encode(const Read& template_read,
 
     using SampleType = c10::Half;
 
-    auto read = ReadPtr::make();  // Return read
-
     // We align the reverse complement of the complement read to the template read.
     const auto complement_sequence_reverse_complement =
             dorado::utils::reverse_complement(complement_read.read_common.seq);
@@ -40,15 +36,16 @@ ReadPtr StereoDuplexEncoderNode::stereo_encode(const Read& template_read,
     EdlibAlignConfig align_config = edlibDefaultAlignConfig();
     align_config.task = EDLIB_TASK_PATH;
 
-    auto temp_strand = template_read.read_common.seq.substr(temp_start, temp_end - temp_start);
-    auto comp_strand =
-            complement_sequence_reverse_complement.substr(comp_start, comp_end - comp_start);
+    auto temp_strand = template_read.read_common.seq.substr(
+            template_read.seq_start, template_read.seq_end - template_read.seq_start);
+    auto comp_strand = complement_sequence_reverse_complement.substr(
+            complement_read.seq_start, complement_read.seq_end - complement_read.seq_start);
 
     EdlibAlignResult result = edlibAlign(temp_strand.data(), temp_strand.length(),
                                          comp_strand.data(), comp_strand.length(), align_config);
 
-    int target_cursor = temp_start;
-    int query_cursor = comp_start;
+    int target_cursor = template_read.seq_start;
+    int query_cursor = complement_read.seq_start;
 
     int start_alignment_position = result.startLocations[0];
     int end_alignment_position = result.endLocations[0];
@@ -255,6 +252,7 @@ ReadPtr StereoDuplexEncoderNode::stereo_encode(const Read& template_read,
     tmp = tmp.index(
             {torch::indexing::Slice(None), torch::indexing::Slice(None, stereo_global_cursor)});
 
+    auto read = std::make_unique<Read>();  // Return read
     read->read_common.read_id =
             template_read.read_common.read_id + ";" + complement_read.read_common.read_id;
 
@@ -288,9 +286,7 @@ void StereoDuplexEncoderNode::worker_thread() {
         }
 
         auto read_pair = std::get<ReadPair>(std::move(message));
-        auto stereo_encoded_read =
-                stereo_encode(*read_pair.read_1, *read_pair.read_2, read_pair.read_1_start,
-                              read_pair.read_1_end, read_pair.read_2_start, read_pair.read_2_end);
+        auto stereo_encoded_read = stereo_encode(read_pair);
 
         send_message_to_sink(
                 std::move(stereo_encoded_read));  // Stereo-encoded read created, send it to sink

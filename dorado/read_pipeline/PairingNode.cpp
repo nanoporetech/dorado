@@ -212,8 +212,11 @@ void PairingNode::pair_list_worker_thread(int tid) {
                 auto [is_pair, qs, qe, rs, re] = is_within_alignment_criteria(
                         *template_read, *complement_read, delta, false, tid);
                 if (is_pair) {
-                    ReadPair read_pair = {
-                            template_read.view(), complement_read.view(), qs, qe, rs, re};
+                    ReadPair read_pair;
+                    read_pair.template_read = ReadPair::ReadData::from_read(*template_read, qs, qe);
+                    read_pair.complement_read =
+                            ReadPair::ReadData::from_read(*complement_read, rs, re);
+
                     template_read->is_duplex_parent = true;
                     complement_read->is_duplex_parent = true;
                     ++template_read->num_duplex_candidate_pairs;
@@ -308,22 +311,15 @@ void PairingNode::pair_generating_worker_thread(int tid) {
             Read* later_read = nullptr;
             Read* earlier_read = nullptr;
 
-            // TODO: |ReadPair| still uses a complete |Read| object, however a duplex read message should be
-            // able to get rid of this.
-            std::shared_ptr<const Read> later_read_view, earlier_read_view;
-            auto read_view = read.view();
-
             auto later_read_iter = std::lower_bound(
                     cached_read_list.begin(), cached_read_list.end(), read, compare_reads_by_time);
             if (later_read_iter != cached_read_list.end()) {
                 later_read = later_read_iter->get();
-                later_read_view = later_read_iter->view();
                 m_reads_in_flight_ctr[later_read]++;
             }
 
             if (later_read_iter != cached_read_list.begin()) {
                 earlier_read = std::prev(later_read_iter)->get();
-                earlier_read_view = std::prev(later_read_iter)->view();
                 m_reads_in_flight_ctr[earlier_read]++;
             }
 
@@ -345,8 +341,10 @@ void PairingNode::pair_generating_worker_thread(int tid) {
                 auto [is_pair, qs, qe, rs, re] =
                         is_within_time_and_length_criteria(*read_ptr, *later_read, tid);
                 if (is_pair) {
-                    ReadPair pair = {
-                            std::move(read_view), std::move(later_read_view), qs, qe, rs, re};
+                    ReadPair pair;
+                    pair.template_read = ReadPair::ReadData::from_read(*read_ptr, qs, qe);
+                    pair.complement_read = ReadPair::ReadData::from_read(*later_read, rs, re);
+
                     read_ptr->is_duplex_parent = true;
                     later_read->is_duplex_parent = true;
                     ++read_ptr->num_duplex_candidate_pairs;
@@ -359,8 +357,10 @@ void PairingNode::pair_generating_worker_thread(int tid) {
                 auto [is_pair, qs, qe, rs, re] =
                         is_within_time_and_length_criteria(*earlier_read, *read_ptr, tid);
                 if (is_pair) {
-                    ReadPair pair = {
-                            std::move(earlier_read_view), std::move(read_view), qs, qe, rs, re};
+                    ReadPair pair;
+                    pair.template_read = ReadPair::ReadData::from_read(*earlier_read, qs, qe);
+                    pair.complement_read = ReadPair::ReadData::from_read(*read_ptr, rs, re);
+
                     earlier_read->is_duplex_parent = true;
                     read_ptr->is_duplex_parent = true;
                     ++earlier_read->num_duplex_candidate_pairs;

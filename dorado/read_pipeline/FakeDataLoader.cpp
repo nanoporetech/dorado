@@ -11,7 +11,7 @@ namespace dorado {
 
 void FakeDataLoader::load_reads(const int num_reads) {
     for (int i = 0; i < num_reads; ++i) {
-        auto fake_read = ReadPtr::make();
+        auto fake_read = std::make_unique<Read>();
 
         constexpr int64_t read_size = 40000;
         fake_read->read_common.raw_data = torch::randint(0, 10000, {read_size}, torch::kInt16);

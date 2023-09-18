@@ -126,7 +126,7 @@ ReadPtr process_pod5_read(size_t row,
         spdlog::error("Failed to get read {} signal: {}", row, pod5_get_error_string());
     }
 
-    auto new_read = ReadPtr::make();
+    auto new_read = std::make_unique<Read>();
     new_read->read_common.raw_data = samples;
     new_read->sample_rate = run_sample_rate;
 
@@ -755,7 +755,7 @@ void DataLoader::load_fast5_reads_from_file(const std::string& path) {
         auto start_time_str = utils::adjust_time(exp_start_time,
                                                  static_cast<uint32_t>(start_time / sampling_rate));
 
-        auto new_read = ReadPtr::make();
+        auto new_read = std::make_unique<Read>();
         new_read->sample_rate = sampling_rate;
         new_read->read_common.raw_data = samples;
         new_read->digitisation = digitisation;
