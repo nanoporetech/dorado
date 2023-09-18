@@ -10,9 +10,10 @@
 #include <limits>
 
 namespace {
-const int kMaxTimeDeltaMs = 1000;
-const float kMinSeqLenRatio = 0.2f;
+const int kMaxTimeDeltaMs = 10000;
 const int kMinOverlapLength = 50;
+const int kMinSeqLength = 500;
+const float kMinSimplexQScore = 8.f;
 }  // namespace
 
 namespace dorado {
@@ -38,15 +39,16 @@ PairingNode::PairingResult PairingNode::is_within_time_and_length_criteria(const
     int seq_len2 = comp.read_common.seq.length();
     int min_seq_len = std::min(seq_len1, seq_len2);
     int max_seq_len = std::max(seq_len1, seq_len2);
-    float len_ratio = static_cast<float>(min_seq_len) / static_cast<float>(max_seq_len);
+    float min_qscore = std::min(temp.calculate_mean_qscore(), comp.calculate_mean_qscore());
 
-    if ((delta < 0) || (delta >= kMaxTimeDeltaMs) || (len_ratio <= kMinSeqLenRatio) ||
-        (min_seq_len <= kMinOverlapLength)) {
+    if ((delta < 0) || (delta >= kMaxTimeDeltaMs) || (min_seq_len < kMinSeqLength) ||
+        (min_qscore < kMinSimplexQScore)) {
         return {false, 0, 0, 0, 0};
     }
 
     const float kEarlyAcceptSeqLenRatio = 0.98;
     const int kEarlyAcceptTimeDeltaMs = 100;
+    float len_ratio = static_cast<float>(min_seq_len) / static_cast<float>(max_seq_len);
     if (delta <= kEarlyAcceptTimeDeltaMs && len_ratio >= kEarlyAcceptSeqLenRatio &&
         min_seq_len >= 5000) {
         spdlog::debug("Early acceptance: len frac {}, delta {} temp len {}, comp len {}, {} and {}",
@@ -88,8 +90,8 @@ PairingNode::PairingResult PairingNode::is_within_alignment_criteria(const dorad
 
     mm_idx_destroy(m_index);
 
-    // Multiple hits implies ambiguous mapping, so ignore those pairs.
-    if (hits == 1 || (!allow_rejection && hits > 0)) {
+    // When there are multiple hits, pick the primary alignment.
+    if (hits > 0) {
         uint8_t mapq = 0;
         int32_t temp_start = 0;
         int32_t temp_end = 0;
@@ -97,7 +99,9 @@ PairingNode::PairingResult PairingNode::is_within_alignment_criteria(const dorad
         int32_t comp_end = 0;
         bool rev = false;
 
-        auto best_map = &reg[0];
+        auto best_map = std::max_element(
+                reg, reg + hits,
+                [](const mm_reg1_t& l, const mm_reg1_t& r) { return l.mapq < r.mapq; });
         mapq = best_map->mapq;
         temp_start = best_map->rs;
         temp_end = best_map->re;
