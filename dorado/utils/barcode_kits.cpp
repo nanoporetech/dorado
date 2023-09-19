@@ -56,7 +56,7 @@ const std::vector<std::string> BC_1_24 = {"BC01", "BC02", "BC03", "BC04", "BC05"
 
 // BC2_1_24 is the same as BC_1_24 except it uses 12A instead of 12.
 const std::vector<std::string> BC2_1_24 = {"BC01", "BC02", "BC03", "BC04", "BC05", "BC06",
-                                           "BC07", "BC08", "BC09", "BC10", "BC11", "BC12A",
+                                           "BC07", "BC08", "BC09", "BC10", "BC11", "RLB12A",
                                            "BC13", "BC14", "BC15", "BC16", "BC17", "BC18",
                                            "BC19", "BC20", "BC21", "BC22", "BC23", "BC24"};
 
