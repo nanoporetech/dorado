@@ -1,5 +1,7 @@
 #include "utils/driver_query.h"
 
+#include <torch/torch.h>
+// Catch2 must come after torch since it defines CHECK()
 #include <catch2/catch.hpp>
 
 #include <algorithm>
