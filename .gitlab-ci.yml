@@ -1,6 +1,10 @@
 include:
   - local: .gitlab/sanitizers-ci.yml
 
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+
 stages:
   - pre-flight
   - build
