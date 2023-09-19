@@ -335,15 +335,7 @@ int basecaller(int argc, char* argv[]) {
     parser.add_argument("--reference")
             .help("Path to reference for alignment.")
             .default_value(std::string(""));
-    parser.add_argument("-k")
-            .help("k-mer size for alignment with minimap2 (maximum 28).")
-            .default_value(15)
-            .scan<'i', int>();
-    parser.add_argument("-w")
-            .help("minimizer window size for alignment with minimap2.")
-            .default_value(10)
-            .scan<'i', int>();
-    parser.add_argument("-I").help("minimap2 index batch size.").default_value(std::string("16G"));
+    cli::add_minimap2_arguments(parser, Aligner::dflt_options);
 
     parser.add_argument("--estimate-poly-a")
             .help("Estimate poly-A/T tail lengths (beta feature). Primarily meant for cDNA and "

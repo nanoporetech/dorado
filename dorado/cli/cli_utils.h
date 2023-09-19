@@ -149,13 +149,16 @@ inline bool parse_yes_or_no(const std::string& str, std::optional<std::string> o
 }
 
 inline std::string to_size(double value) {
+    std::stringstream res;
     if (value < 1e3)
-        return std::to_string(value);
-    if (value < 1e6)
-        return std::to_string(value / 1e3) + "K";
-    if (value < 1e9)
-        return std::to_string(value / 1e6) + "M";
-    return std::to_string(value / 1e9) + "G";
+        res << value;
+    else if (value < 1e6)
+        res << value / 1e3 << 'K';
+    else if (value < 1e9)
+        res << value / 1e6 << 'M';
+    else
+        res << value / 1e9 << 'G';
+    return res.str();
 }
 
 inline std::string to_yes_or_no(bool value) { return value ? "yes" : "no"; }
