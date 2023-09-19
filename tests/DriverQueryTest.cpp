@@ -75,6 +75,13 @@ DEFINE_TEST("NVIDIA version line parsing") {
                     true,
                     "123.456",
             },
+            {
+                    "TX2 line",
+                    "NVRM version: NVIDIA UNIX Kernel Module for aarch64  34.1.1  Release Build  "
+                    "(buildbrain@mobile-u64-5414-d7000)  Mon May 16 21:12:24 PDT 2022",
+                    true,
+                    "34.1.1",
+            },
     };
 
     for (const auto &test : tests) {
