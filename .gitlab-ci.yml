@@ -538,9 +538,8 @@ mlhub:dorado-integration-tests:
           "script_parameters": {
             "dorado_branch":"'${CI_COMMIT_SHA}'",
             "dorado_build_options":"",
-            "prompt_clean": true,
+            "prompt_clean_basecalls": true,
             "dorado_exe": "",
-            "common_cluster_options": "-V -cwd -P ml-ops",
             "config": "'${DORADO_INTEGRATION_TEST_MLHUB_CONFIG}'"
           }
       }' \
