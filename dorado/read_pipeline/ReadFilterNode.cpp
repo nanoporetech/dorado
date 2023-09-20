@@ -10,13 +10,13 @@ void ReadFilterNode::worker_thread() {
     Message message;
     while (get_input_message(message)) {
         // If this message isn't a read, just forward it to the sink.
-        if (!std::holds_alternative<ReadPtr>(message)) {
+        if (!std::holds_alternative<SimplexReadPtr>(message)) {
             send_message_to_sink(std::move(message));
             continue;
         }
 
         // If this message isn't a read, we'll get a bad_variant_access exception.
-        auto read = std::get<ReadPtr>(std::move(message));
+        auto read = std::get<SimplexReadPtr>(std::move(message));
 
         auto log_filtering = [&]() {
             if (read->read_common.is_duplex) {

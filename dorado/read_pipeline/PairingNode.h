@@ -23,7 +23,7 @@ class PairingNode : public MessageSink {
     using UniquePoreIdentifierKey = std::tuple<int, std::string, std::string>;
 
     struct ReadCache {
-        std::map<UniquePoreIdentifierKey, std::list<ReadPtr>> channel_read_map;
+        std::map<UniquePoreIdentifierKey, std::list<SimplexReadPtr>> channel_read_map;
         std::deque<UniquePoreIdentifierKey> working_channel_keys;
     };
 
@@ -78,7 +78,7 @@ private:
 
     std::map<std::string, std::string> m_template_complement_map;
     std::map<std::string, std::string> m_complement_template_map;
-    std::map<std::string, ReadPtr> m_read_cache;
+    std::map<std::string, SimplexReadPtr> m_read_cache;
 
     // Members for pair_generating method
 
@@ -120,7 +120,7 @@ private:
     // Track reads which need to be emptied from the cache but are still being
     // evaluated for pairs by other threads.
     std::unordered_map<const SimplexRead*, std::atomic<int>> m_reads_in_flight_ctr;
-    std::unordered_set<ReadPtr> m_reads_to_clear;
+    std::unordered_set<SimplexReadPtr> m_reads_to_clear;
 
     // Stats tracking for pairing node.
     std::atomic<int> m_early_accepted_pairs{0};

@@ -115,7 +115,7 @@ TEST_CASE("4 subread split tagging", TEST_GROUP) {
     pipeline->push_message(std::move(read));
     pipeline.reset();
 
-    auto reads = ConvertMessages<dorado::ReadPtr>(std::move(messages));
+    auto reads = ConvertMessages<dorado::SimplexReadPtr>(std::move(messages));
 
     CHECK(reads.size() == 6);
 
@@ -173,7 +173,7 @@ TEST_CASE("No split output read properties", TEST_GROUP) {
     pipeline->push_message(std::move(read));
     pipeline.reset();
 
-    auto reads = ConvertMessages<dorado::ReadPtr>(std::move(messages));
+    auto reads = ConvertMessages<dorado::SimplexReadPtr>(std::move(messages));
     CHECK(reads.size() == 1);
 
     read = std::move(reads.front());

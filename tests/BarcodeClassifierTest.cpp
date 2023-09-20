@@ -291,9 +291,9 @@ TEST_CASE(
             CHECK_THAT(mod_probs, Equals(std::vector<uint8_t>{235}));
 
             CHECK(bam_aux2i(bam_aux_get(rec, "ts")) == additional_trimmed_samples);
-        } else if (std::holds_alternative<ReadPtr>(message)) {
+        } else if (std::holds_alternative<SimplexReadPtr>(message)) {
             // Check trimming on the Read type.
-            auto read = std::get<ReadPtr>(std::move(message));
+            auto read = std::get<SimplexReadPtr>(std::move(message));
 
             CHECK(read->barcode == expected_bc);
 

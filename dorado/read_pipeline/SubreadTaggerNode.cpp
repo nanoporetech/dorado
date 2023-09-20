@@ -13,8 +13,8 @@ void SubreadTaggerNode::worker_thread() {
     while (get_input_message(message)) {
         bool check_complete_groups = false;
 
-        if (std::holds_alternative<ReadPtr>(message)) {
-            auto read = std::get<ReadPtr>(std::move(message));
+        if (std::holds_alternative<SimplexReadPtr>(message)) {
+            auto read = std::get<SimplexReadPtr>(std::move(message));
 
             if (read->read_common.is_duplex) {
                 std::unique_lock lock(m_duplex_reads_mutex);
@@ -38,7 +38,7 @@ void SubreadTaggerNode::worker_thread() {
                 if (subreads.size() == split_count) {
                     auto num_expected_duplex = std::accumulate(
                             subreads.begin(), subreads.end(), size_t(0),
-                            [](const size_t& running_total, const ReadPtr& subread) {
+                            [](const size_t& running_total, const SimplexReadPtr& subread) {
                                 return subread->num_duplex_candidate_pairs + running_total;
                             });
 
@@ -75,7 +75,7 @@ void SubreadTaggerNode::worker_thread() {
                     uint64_t read_tag = duplex_read->read_common.read_tag;
                     // do any of the subreads match the template read id for this duplex read?
                     if (std::any_of(subreads->begin(), subreads->end(),
-                                    [template_read_id, read_tag](const ReadPtr& subread) {
+                                    [template_read_id, read_tag](const SimplexReadPtr& subread) {
                                         return subread->read_common.read_id == template_read_id &&
                                                subread->read_common.read_tag == read_tag;
                                     })) {
@@ -90,12 +90,13 @@ void SubreadTaggerNode::worker_thread() {
                 // check that all candidate pairs have been evaluated and that we have received a duplex read for all accepted candidate pairs
                 auto num_duplex_candidates = std::accumulate(
                         subreads->begin(), subreads->end(), size_t(0),
-                        [](const size_t& running_total, const ReadPtr& subread) {
+                        [](const size_t& running_total, const SimplexReadPtr& subread) {
                             return subread->num_duplex_candidate_pairs + running_total;
                         });
-                auto num_duplex = std::count_if(
-                        subreads->begin(), subreads->end(),
-                        [](const ReadPtr& subread) { return subread->read_common.is_duplex; });
+                auto num_duplex = std::count_if(subreads->begin(), subreads->end(),
+                                                [](const SimplexReadPtr& subread) {
+                                                    return subread->read_common.is_duplex;
+                                                });
                 if (num_duplex_candidates == num_duplex) {
                     for (auto& subread : (*subreads)) {
                         subread->split_count = subreads->size();

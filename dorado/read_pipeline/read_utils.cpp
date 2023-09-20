@@ -1,7 +1,7 @@
 #include "read_utils.h"
 
 namespace dorado::utils {
-ReadPtr shallow_copy_read(const SimplexRead& read) {
+SimplexReadPtr shallow_copy_read(const SimplexRead& read) {
     auto copy = std::make_unique<SimplexRead>();
     copy->read_common.raw_data = read.read_common.raw_data;
     copy->digitisation = read.digitisation;

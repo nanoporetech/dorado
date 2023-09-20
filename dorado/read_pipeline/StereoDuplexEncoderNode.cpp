@@ -12,7 +12,7 @@
 using namespace torch::indexing;
 
 namespace dorado {
-ReadPtr StereoDuplexEncoderNode::stereo_encode(const ReadPair& read_pair) {
+DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(const ReadPair& read_pair) {
     const ReadPair::ReadData& template_read = read_pair.template_read;
     const ReadPair::ReadData& complement_read = read_pair.complement_read;
 
@@ -252,7 +252,7 @@ ReadPtr StereoDuplexEncoderNode::stereo_encode(const ReadPair& read_pair) {
     tmp = tmp.index(
             {torch::indexing::Slice(None), torch::indexing::Slice(None, stereo_global_cursor)});
 
-    auto read = std::make_unique<SimplexRead>();  // Return read
+    auto read = std::make_unique<DuplexRead>();  // Return read
     read->read_common.read_id =
             template_read.read_common.read_id + ";" + complement_read.read_common.read_id;
 

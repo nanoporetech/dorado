@@ -32,7 +32,7 @@ struct BasecallerNode::BasecallingChunk : utils::Chunk {
 };
 
 struct BasecallerNode::BasecallingRead {
-    ReadPtr read;                                              // The read itself.
+    SimplexReadPtr read;                                       // The read itself.
     std::vector<std::unique_ptr<utils::Chunk>> called_chunks;  // Vector of basecalled chunks.
     std::atomic_size_t num_chunks_called;  // Number of chunks which have been basecalled.
 };
@@ -43,13 +43,13 @@ void BasecallerNode::input_worker_thread() {
     Message message;
     while (get_input_message(message)) {
         // If this message isn't a read, just forward it to the sink.
-        if (!std::holds_alternative<ReadPtr>(message)) {
+        if (!std::holds_alternative<SimplexReadPtr>(message)) {
             send_message_to_sink(std::move(message));
             continue;
         }
 
         // If this message isn't a read, we'll get a bad_variant_access exception.
-        auto read = std::get<ReadPtr>(std::move(message));
+        auto read = std::get<SimplexReadPtr>(std::move(message));
         // If a read has already been basecalled, just send it to the sink without basecalling again
         // TODO: This is necessary because some reads (e.g failed Stereo Encoding) will be passed
         // to the basecaller node having already been called. This should be fixed in the future with

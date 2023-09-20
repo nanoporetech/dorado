@@ -57,7 +57,13 @@ public:
     bool is_duplex{false};
 };
 
-// Class representing a read, including raw data
+// Class representing a duplex read, including stereo-encoded raw data
+class DuplexRead {
+public:
+    ReadCommon read_common;
+};
+
+// Class representing a simplex read, including raw data
 class SimplexRead {
 public:
     struct Mapping {
@@ -119,7 +125,9 @@ private:
     void generate_modbase_tags(bam1_t* aln, uint8_t threshold = 0) const;
     std::string generate_read_group() const;
 };
-using ReadPtr = std::unique_ptr<SimplexRead>;
+
+using SimplexReadPtr = std::unique_ptr<SimplexRead>;
+using DuplexReadPtr = std::unique_ptr<DuplexRead>;
 
 // A pair of reads for Duplex calling
 struct ReadPair {
@@ -140,11 +148,11 @@ public:
 
 // The Message type is a std::variant that can hold different types of message objects.
 // It is currently able to store:
-// - a ReadPtr object, which represents a single read
+// - a SimplexReadPtr object, which represents a single read
 // - a BamPtr object, which represents a raw BAM alignment record
 // - a ReadPair object, which represents a pair of reads for duplex calling
 // To add more message types, simply add them to the list of types in the std::variant.
-using Message = std::variant<ReadPtr, BamPtr, ReadPair, CacheFlushMessage>;
+using Message = std::variant<SimplexReadPtr, BamPtr, ReadPair, CacheFlushMessage, DuplexReadPtr>;
 
 using NodeHandle = int;
 

@@ -74,8 +74,8 @@ void BarcodeClassifierNode::worker_thread(size_t tid) {
             auto read = std::get<BamPtr>(std::move(message));
             barcode(read);
             send_message_to_sink(std::move(read));
-        } else if (std::holds_alternative<ReadPtr>(message)) {
-            auto read = std::get<ReadPtr>(std::move(message));
+        } else if (std::holds_alternative<SimplexReadPtr>(message)) {
+            auto read = std::get<SimplexReadPtr>(std::move(message));
             barcode(*read);
             send_message_to_sink(std::move(read));
         } else {

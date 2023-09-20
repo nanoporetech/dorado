@@ -155,7 +155,7 @@ std::optional<PosRange> check_rc_match(const std::string& seq,
 //TODO end_reason access?
 //If read.parent_read_id is not empty then it will be used as parent_read_id of the subread
 //signal_range should already be 'adjusted' to stride (e.g. probably gotten from seq_range)
-ReadPtr subread(const SimplexRead& read, PosRange seq_range, PosRange signal_range) {
+SimplexReadPtr subread(const SimplexRead& read, PosRange seq_range, PosRange signal_range) {
     //TODO support mods
     //NB: currently doesn't support mods
     //assert(read.mod_base_info == nullptr && read.base_mod_probs.empty());
@@ -212,7 +212,7 @@ ReadPtr subread(const SimplexRead& read, PosRange seq_range, PosRange signal_ran
 
 namespace dorado {
 
-DuplexSplitNode::ExtRead DuplexSplitNode::create_ext_read(ReadPtr r) const {
+DuplexSplitNode::ExtRead DuplexSplitNode::create_ext_read(SimplexReadPtr r) const {
     ExtRead ext_read;
     ext_read.read = std::move(r);
     ext_read.move_sums = utils::move_cum_sums(ext_read.read->read_common.moves);
@@ -388,9 +388,9 @@ std::optional<DuplexSplitNode::PosRange> DuplexSplitNode::identify_extra_middle_
     return std::nullopt;
 }
 
-std::vector<ReadPtr> DuplexSplitNode::subreads(ReadPtr read,
-                                               const std::vector<PosRange>& spacers) const {
-    std::vector<ReadPtr> subreads;
+std::vector<SimplexReadPtr> DuplexSplitNode::subreads(SimplexReadPtr read,
+                                                      const std::vector<PosRange>& spacers) const {
+    std::vector<SimplexReadPtr> subreads;
     subreads.reserve(spacers.size() + 1);
 
     if (spacers.empty()) {
@@ -493,7 +493,7 @@ DuplexSplitNode::build_split_finders() const {
     return split_finders;
 }
 
-std::vector<ReadPtr> DuplexSplitNode::split(ReadPtr init_read) const {
+std::vector<SimplexReadPtr> DuplexSplitNode::split(SimplexReadPtr init_read) const {
     using namespace std::chrono;
 
     auto start_ts = high_resolution_clock::now();
@@ -504,7 +504,7 @@ std::vector<ReadPtr> DuplexSplitNode::split(ReadPtr init_read) const {
     if (init_read->read_common.seq.empty() || init_read->read_common.moves.empty()) {
         spdlog::trace("Empty read {}; length {}; moves {}", read_id,
                       init_read->read_common.seq.size(), init_read->read_common.moves.size());
-        std::vector<ReadPtr> split_result;
+        std::vector<SimplexReadPtr> split_result;
         split_result.push_back(std::move(init_read));
         return split_result;
     }
@@ -530,7 +530,7 @@ std::vector<ReadPtr> DuplexSplitNode::split(ReadPtr init_read) const {
         to_split = std::move(split_round_result);
     }
 
-    std::vector<ReadPtr> split_result;
+    std::vector<SimplexReadPtr> split_result;
     size_t subread_id = 0;
     for (auto& ext_read : to_split) {
         if (to_split.size() > 1) {
@@ -559,13 +559,13 @@ void DuplexSplitNode::worker_thread() {
     Message message;
     while (get_input_message(message)) {
         // If this message isn't a read, just forward it to the sink.
-        if (!m_settings.enabled || !std::holds_alternative<ReadPtr>(message)) {
+        if (!m_settings.enabled || !std::holds_alternative<SimplexReadPtr>(message)) {
             send_message_to_sink(std::move(message));
             continue;
         }
 
         // If this message isn't a read, we'll get a bad_variant_access exception.
-        auto init_read = std::get<ReadPtr>(std::move(message));
+        auto init_read = std::get<SimplexReadPtr>(std::move(message));
         for (auto& subread : split(std::move(init_read))) {
             //TODO correctly process end_reason when we have them
             send_message_to_sink(std::move(subread));

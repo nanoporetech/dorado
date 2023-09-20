@@ -58,7 +58,7 @@ TEST_CASE("ReadFilterNode: Filter read based on qscore", TEST_GROUP) {
         pipeline->push_message(std::move(read_2));
     }
 
-    auto reads = ConvertMessages<dorado::ReadPtr>(std::move(messages));
+    auto reads = ConvertMessages<dorado::SimplexReadPtr>(std::move(messages));
     REQUIRE(reads.size() == 1);
     CHECK(reads[0]->read_common.read_id == "read_2");
 }
@@ -102,7 +102,7 @@ TEST_CASE("ReadFilterNode: Filter read based on read name", TEST_GROUP) {
         pipeline->push_message(std::move(read_2));
     }
 
-    auto reads = ConvertMessages<dorado::ReadPtr>(std::move(messages));
+    auto reads = ConvertMessages<dorado::SimplexReadPtr>(std::move(messages));
     REQUIRE(reads.size() == 1);
     CHECK(reads[0]->read_common.read_id == "read_1");
 }
@@ -146,7 +146,7 @@ TEST_CASE("ReadFilterNode: Filter read based on read length", TEST_GROUP) {
         pipeline->push_message(std::move(read_2));
     }
 
-    auto reads = ConvertMessages<dorado::ReadPtr>(std::move(messages));
+    auto reads = ConvertMessages<dorado::SimplexReadPtr>(std::move(messages));
     REQUIRE(reads.size() == 1);
     CHECK(reads[0]->read_common.read_id == "read_1");
 }

@@ -156,13 +156,13 @@ void PairingNode::pair_list_worker_thread(int tid) {
     Message message;
     while (get_input_message(message)) {
         // If this message isn't a read, just forward it to the sink.
-        if (!std::holds_alternative<ReadPtr>(message)) {
+        if (!std::holds_alternative<SimplexReadPtr>(message)) {
             send_message_to_sink(std::move(message));
             continue;
         }
 
         // If this message isn't a read, we'll get a bad_variant_access exception.
-        auto read = std::get<ReadPtr>(std::move(message));
+        auto read = std::get<SimplexReadPtr>(std::move(message));
 
         bool read_is_template = false;
         bool partner_found = false;
@@ -202,8 +202,8 @@ void PairingNode::pair_list_worker_thread(int tid) {
                 m_read_cache.erase(partner_read_itr);
                 read_cache_lock.unlock();
 
-                ReadPtr template_read;
-                ReadPtr complement_read;
+                SimplexReadPtr template_read;
+                SimplexReadPtr complement_read;
 
                 if (read_is_template) {
                     template_read = std::move(read);
@@ -242,7 +242,7 @@ void PairingNode::pair_list_worker_thread(int tid) {
 void PairingNode::pair_generating_worker_thread(int tid) {
     torch::InferenceMode inference_mode_guard;
 
-    auto compare_reads_by_time = [](const ReadPtr& read1, const ReadPtr& read2) {
+    auto compare_reads_by_time = [](const SimplexReadPtr& read1, const SimplexReadPtr& read2) {
         return read1->read_common.start_time_ms < read2->read_common.start_time_ms;
     };
 
@@ -264,7 +264,7 @@ void PairingNode::pair_generating_worker_thread(int tid) {
         }
 
         // If this message isn't a read, just forward it to the sink.
-        if (!std::holds_alternative<ReadPtr>(message)) {
+        if (!std::holds_alternative<SimplexReadPtr>(message)) {
             send_message_to_sink(std::move(message));
             continue;
         }
@@ -272,7 +272,7 @@ void PairingNode::pair_generating_worker_thread(int tid) {
         // If this message isn't a read, we'll get a bad_variant_access exception.
         const std::string nvtx_id = "pairing_code_" + std::to_string(tid);
         nvtx3::scoped_range loop{nvtx_id};
-        auto read = std::get<ReadPtr>(std::move(message));
+        auto read = std::get<SimplexReadPtr>(std::move(message));
 
         int channel = read->read_common.attributes.channel_number;
         std::string run_id = read->read_common.run_id;
@@ -290,7 +290,7 @@ void PairingNode::pair_generating_worker_thread(int tid) {
             // Add the new key to the end of the list
             {
                 read_cache.working_channel_keys.push_back(key);
-                std::list<ReadPtr> reads;
+                std::list<SimplexReadPtr> reads;
                 reads.push_back(std::move(read));
                 read_cache.channel_read_map.emplace(key, std::move(reads));
             }

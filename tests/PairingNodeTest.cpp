@@ -79,7 +79,7 @@ TEST_CASE("Split read pairing", TEST_GROUP) {
     CHECK(messages.size() == 9);
     auto num_reads =
             std::count_if(messages.begin(), messages.end(), [](const dorado::Message& message) {
-                return std::holds_alternative<dorado::ReadPtr>(message);
+                return std::holds_alternative<dorado::SimplexReadPtr>(message);
             });
     CHECK(num_reads == 7);
     auto num_pairs =
