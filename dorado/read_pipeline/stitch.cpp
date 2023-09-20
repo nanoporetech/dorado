@@ -5,7 +5,7 @@
 
 namespace dorado::utils {
 
-void stitch_chunks(Read& read, const std::vector<std::unique_ptr<Chunk>>& called_chunks) {
+void stitch_chunks(SimplexRead& read, const std::vector<std::unique_ptr<Chunk>>& called_chunks) {
     // Calculate the chunk down sampling, round to closest int.
     read.read_common.model_stride =
             div_round_closest(called_chunks[0]->raw_chunk_size, called_chunks[0]->moves.size());

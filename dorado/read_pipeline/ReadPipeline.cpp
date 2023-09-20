@@ -49,7 +49,7 @@ bool get_modbase_channel_name(std::string &channel_name, const std::string &mod_
 
 namespace dorado {
 
-std::string Read::generate_read_group() const {
+std::string SimplexRead::generate_read_group() const {
     std::string read_group;
     if (!read_common.run_id.empty()) {
         read_group = read_common.run_id + '_';
@@ -65,7 +65,7 @@ std::string Read::generate_read_group() const {
     return read_group;
 }
 
-void Read::generate_read_tags(bam1_t *aln, bool emit_moves) const {
+void SimplexRead::generate_read_tags(bam1_t *aln, bool emit_moves) const {
     int qs = static_cast<int>(std::round(calculate_mean_qscore()));
     bam_aux_append(aln, "qs", 'i', sizeof(qs), (uint8_t *)&qs);
 
@@ -132,7 +132,7 @@ void Read::generate_read_tags(bam1_t *aln, bool emit_moves) const {
     }
 }
 
-void Read::generate_duplex_read_tags(bam1_t *aln) const {
+void SimplexRead::generate_duplex_read_tags(bam1_t *aln) const {
     int qs = static_cast<int>(std::round(calculate_mean_qscore()));
     bam_aux_append(aln, "qs", 'i', sizeof(qs), (uint8_t *)&qs);
     uint32_t duplex = 1;
@@ -158,7 +158,8 @@ void Read::generate_duplex_read_tags(bam1_t *aln) const {
     }
 }
 
-std::vector<BamPtr> Read::extract_sam_lines(bool emit_moves, uint8_t modbase_threshold) const {
+std::vector<BamPtr> SimplexRead::extract_sam_lines(bool emit_moves,
+                                                   uint8_t modbase_threshold) const {
     if (read_common.read_id.empty()) {
         throw std::runtime_error("Empty read_name string provided");
     }
@@ -212,12 +213,12 @@ std::vector<BamPtr> Read::extract_sam_lines(bool emit_moves, uint8_t modbase_thr
     return alns;
 }
 
-uint64_t Read::get_end_time_ms() const {
+uint64_t SimplexRead::get_end_time_ms() const {
     return read_common.start_time_ms +
            ((end_sample - start_sample) * 1000) / sample_rate;  //TODO get rid of the trimmed thing?
 }
 
-void Read::generate_modbase_tags(bam1_t *aln, uint8_t threshold) const {
+void SimplexRead::generate_modbase_tags(bam1_t *aln, uint8_t threshold) const {
     if (!mod_base_info) {
         return;
     }
@@ -293,7 +294,7 @@ void Read::generate_modbase_tags(bam1_t *aln, uint8_t threshold) const {
     bam_aux_update_array(aln, "ML", 'C', modbase_prob.size(), (uint8_t *)modbase_prob.data());
 }
 
-float Read::calculate_mean_qscore() const {
+float SimplexRead::calculate_mean_qscore() const {
     // If Q-score start position is greater than the
     // read length, then calculate mean Q-score from the
     // start of the read.
@@ -303,7 +304,7 @@ float Read::calculate_mean_qscore() const {
     return utils::mean_qscore_from_qstring(read_common.qstring, mean_qscore_start_pos);
 }
 
-ReadPair::ReadData ReadPair::ReadData::from_read(const Read &read,
+ReadPair::ReadData ReadPair::ReadData::from_read(const SimplexRead &read,
                                                  uint64_t seq_start,
                                                  uint64_t seq_end) {
     ReadData data;

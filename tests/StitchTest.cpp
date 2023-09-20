@@ -64,7 +64,7 @@ TEST_CASE("Test stitch_chunks", TEST_GROUP) {
         called_chunks.push_back(std::move(chunk));
     }
 
-    dorado::Read read;
+    dorado::SimplexRead read;
     REQUIRE_NOTHROW(dorado::utils::stitch_chunks(read, called_chunks));
 
     const std::string expected_sequence = "ACGTCGCGTCGTCGTCCGT";

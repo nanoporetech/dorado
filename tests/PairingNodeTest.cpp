@@ -16,7 +16,7 @@ namespace {
 // time delay. If seq is defined, ignore the seq_len and use
 // the provided seq string directly.
 auto make_read(int delay_ms, size_t seq_len, const std::string& seq = "") {
-    auto read = std::make_unique<dorado::Read>();
+    auto read = std::make_unique<dorado::SimplexRead>();
     read->sample_rate = 4000;
     read->num_trimmed_samples = 10;
     read->read_common.attributes.channel_number = 664;

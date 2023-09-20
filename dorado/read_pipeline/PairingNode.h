@@ -104,12 +104,12 @@ private:
     size_t m_max_num_reads;
 
     using PairingResult = std::tuple<bool, uint32_t, uint32_t, uint32_t, uint32_t>;
-    PairingResult is_within_time_and_length_criteria(const dorado::Read& read1,
-                                                     const dorado::Read& read2,
+    PairingResult is_within_time_and_length_criteria(const dorado::SimplexRead& read1,
+                                                     const dorado::SimplexRead& read2,
                                                      int tid);
 
-    PairingResult is_within_alignment_criteria(const dorado::Read& temp,
-                                               const dorado::Read& comp,
+    PairingResult is_within_alignment_criteria(const dorado::SimplexRead& temp,
+                                               const dorado::SimplexRead& comp,
                                                int delta,
                                                bool allow_rejection,
                                                int tid);
@@ -119,7 +119,7 @@ private:
 
     // Track reads which need to be emptied from the cache but are still being
     // evaluated for pairs by other threads.
-    std::unordered_map<const Read*, std::atomic<int>> m_reads_in_flight_ctr;
+    std::unordered_map<const SimplexRead*, std::atomic<int>> m_reads_in_flight_ctr;
     std::unordered_set<ReadPtr> m_reads_to_clear;
 
     // Stats tracking for pairing node.

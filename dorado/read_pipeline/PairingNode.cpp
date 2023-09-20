@@ -31,9 +31,10 @@ namespace dorado {
 //    one read maps to the reverse strand of the other, and the end
 //    of the template is mapped to the beginning
 //    of the complement read, then consider them a pair.
-PairingNode::PairingResult PairingNode::is_within_time_and_length_criteria(const dorado::Read& temp,
-                                                                           const dorado::Read& comp,
-                                                                           int tid) {
+PairingNode::PairingResult PairingNode::is_within_time_and_length_criteria(
+        const dorado::SimplexRead& temp,
+        const dorado::SimplexRead& comp,
+        int tid) {
     int delta = comp.read_common.start_time_ms - temp.get_end_time_ms();
     int seq_len1 = temp.read_common.seq.length();
     int seq_len2 = comp.read_common.seq.length();
@@ -62,11 +63,12 @@ PairingNode::PairingResult PairingNode::is_within_time_and_length_criteria(const
     return is_within_alignment_criteria(temp, comp, delta, true, tid);
 }
 
-PairingNode::PairingResult PairingNode::is_within_alignment_criteria(const dorado::Read& temp,
-                                                                     const dorado::Read& comp,
-                                                                     int delta,
-                                                                     bool allow_rejection,
-                                                                     int tid) {
+PairingNode::PairingResult PairingNode::is_within_alignment_criteria(
+        const dorado::SimplexRead& temp,
+        const dorado::SimplexRead& comp,
+        int delta,
+        bool allow_rejection,
+        int tid) {
     PairingResult pair_result = {false, 0, 0, 0, 0};
     const std::string nvtx_id = "pairing_map_" + std::to_string(tid);
     nvtx3::scoped_range loop{nvtx_id};
@@ -312,8 +314,8 @@ void PairingNode::pair_generating_worker_thread(int tid) {
             auto& cached_read_list = read_list_iter->second;
             // It's safe to take raw pointers of these reads since their ownership isn't released from this
             // node until their counter in |m_reads_in_flight_ctr| hits 0.
-            Read* later_read = nullptr;
-            Read* earlier_read = nullptr;
+            SimplexRead* later_read = nullptr;
+            SimplexRead* earlier_read = nullptr;
 
             auto later_read_iter = std::lower_bound(
                     cached_read_list.begin(), cached_read_list.end(), read, compare_reads_by_time);
@@ -327,7 +329,7 @@ void PairingNode::pair_generating_worker_thread(int tid) {
                 m_reads_in_flight_ctr[earlier_read]++;
             }
 
-            Read* const read_ptr = read.get();
+            SimplexRead* const read_ptr = read.get();
             cached_read_list.insert(later_read_iter, std::move(read));
             m_reads_in_flight_ctr[read_ptr]++;
 

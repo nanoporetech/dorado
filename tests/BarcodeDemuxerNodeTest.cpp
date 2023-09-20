@@ -23,7 +23,7 @@ using namespace dorado;
 
 namespace {
 std::vector<BamPtr> create_bam_reader(const std::string& bc) {
-    Read read;
+    SimplexRead read;
     read.read_common.seq = "AAAA";
     read.read_common.qstring = "!!!!";
     read.read_common.read_id = bc;

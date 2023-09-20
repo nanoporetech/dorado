@@ -80,12 +80,12 @@ private:
 
     ExtRead create_ext_read(ReadPtr r) const;
     std::vector<PosRange> possible_pore_regions(const ExtRead& read) const;
-    bool check_nearby_adapter(const Read& read, PosRange r, int adapter_edist) const;
-    std::optional<std::pair<PosRange, PosRange>> check_flank_match(const Read& read,
+    bool check_nearby_adapter(const SimplexRead& read, PosRange r, int adapter_edist) const;
+    std::optional<std::pair<PosRange, PosRange>> check_flank_match(const SimplexRead& read,
                                                                    PosRange r,
                                                                    float err_thr) const;
-    std::optional<PosRange> identify_middle_adapter_split(const Read& read) const;
-    std::optional<PosRange> identify_extra_middle_split(const Read& read) const;
+    std::optional<PosRange> identify_middle_adapter_split(const SimplexRead& read) const;
+    std::optional<PosRange> identify_extra_middle_split(const SimplexRead& read) const;
 
     std::vector<ReadPtr> subreads(ReadPtr read, const PosRanges& spacers) const;
 

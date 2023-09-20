@@ -58,7 +58,7 @@ public:
 };
 
 // Class representing a read, including raw data
-class Read {
+class SimplexRead {
 public:
     struct Mapping {
         // Dummy struct for future use to represent alignments
@@ -119,7 +119,7 @@ private:
     void generate_modbase_tags(bam1_t* aln, uint8_t threshold = 0) const;
     std::string generate_read_group() const;
 };
-using ReadPtr = std::unique_ptr<Read>;
+using ReadPtr = std::unique_ptr<SimplexRead>;
 
 // A pair of reads for Duplex calling
 struct ReadPair {
@@ -127,7 +127,7 @@ struct ReadPair {
         ReadCommon read_common;
         uint64_t seq_start;
         uint64_t seq_end;
-        static ReadData from_read(const Read& read, uint64_t seq_start, uint64_t seq_end);
+        static ReadData from_read(const SimplexRead& read, uint64_t seq_start, uint64_t seq_end);
     };
     ReadData template_read;
     ReadData complement_read;

@@ -84,7 +84,7 @@ void BaseSpaceDuplexCallerNode::basespace(const std::string& template_read_id,
     align_config.task = EDLIB_TASK_PATH;
 
     std::string_view template_sequence;
-    const Read* template_read;
+    const SimplexRead* template_read;
     std::vector<uint8_t> template_quality_scores;
     auto template_read_it = m_reads.find(template_read_id);
     if (template_read_it == m_reads.end()) {
@@ -113,7 +113,7 @@ void BaseSpaceDuplexCallerNode::basespace(const std::string& template_read_id,
     }
 
     // We have both sequences and can perform the consensus
-    const Read* complement_read = complement_read_it->second.get();
+    const SimplexRead* complement_read = complement_read_it->second.get();
     auto complement_quality_scores_reverse =
             std::vector<uint8_t>(complement_read->read_common.qstring.begin(),
                                  complement_read->read_common.qstring.end());
@@ -165,7 +165,7 @@ void BaseSpaceDuplexCallerNode::basespace(const std::string& template_read_id,
                 target_cursor, complement_quality_scores_reverse, query_cursor, template_sequence,
                 complement_sequence_reverse_complement, result.alignment);
 
-        auto duplex_read = std::make_unique<Read>();
+        auto duplex_read = std::make_unique<SimplexRead>();
         duplex_read->read_common.is_duplex = true;
         duplex_read->read_common.seq = std::string(consensus.begin(), consensus.end());
         duplex_read->read_common.qstring =

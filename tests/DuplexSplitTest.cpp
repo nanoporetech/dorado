@@ -22,7 +22,7 @@ std::filesystem::path DataPath(std::string_view filename) {
 }
 
 auto make_read() {
-    auto read = std::make_unique<dorado::Read>();
+    auto read = std::make_unique<dorado::SimplexRead>();
     read->range = 0;
     read->sample_rate = 4000;
     read->offset = -287;
@@ -137,7 +137,7 @@ TEST_CASE("4 subread split tagging", TEST_GROUP) {
 
 TEST_CASE("No split output read properties", TEST_GROUP) {
     const std::string init_read_id = "00a2dd45-f6a9-49ba-86ee-5d2a37b861cb";
-    auto read = std::make_unique<dorado::Read>();
+    auto read = std::make_unique<dorado::SimplexRead>();
     read->range = 0;
     read->sample_rate = 4000;
     read->offset = -287;

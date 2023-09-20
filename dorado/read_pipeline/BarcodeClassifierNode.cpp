@@ -182,7 +182,7 @@ BamPtr BarcodeClassifierNode::trim_barcode(BamPtr input,
     return BamPtr(out_record);
 }
 
-void BarcodeClassifierNode::trim_barcode(Read& read, const demux::ScoreResults& res) {
+void BarcodeClassifierNode::trim_barcode(SimplexRead& read, const demux::ScoreResults& res) {
     int seqlen = read.read_common.seq.length();
     auto trim_interval = determine_trim_interval(res, seqlen);
 
@@ -223,7 +223,7 @@ void BarcodeClassifierNode::barcode(BamPtr& read) {
     }
 }
 
-void BarcodeClassifierNode::barcode(Read& read) {
+void BarcodeClassifierNode::barcode(SimplexRead& read) {
     // get the sequence to map from the record
     auto bc_res = m_barcoder.barcode(read.read_common.seq);
     read.barcode = generate_barcode_string(bc_res);

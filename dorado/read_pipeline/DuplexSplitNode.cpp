@@ -155,7 +155,7 @@ std::optional<PosRange> check_rc_match(const std::string& seq,
 //TODO end_reason access?
 //If read.parent_read_id is not empty then it will be used as parent_read_id of the subread
 //signal_range should already be 'adjusted' to stride (e.g. probably gotten from seq_range)
-ReadPtr subread(const Read& read, PosRange seq_range, PosRange signal_range) {
+ReadPtr subread(const SimplexRead& read, PosRange seq_range, PosRange signal_range) {
     //TODO support mods
     //NB: currently doesn't support mods
     //assert(read.mod_base_info == nullptr && read.base_mod_probs.empty());
@@ -253,7 +253,9 @@ PosRanges DuplexSplitNode::possible_pore_regions(const DuplexSplitNode::ExtRead&
     return pore_regions;
 }
 
-bool DuplexSplitNode::check_nearby_adapter(const Read& read, PosRange r, int adapter_edist) const {
+bool DuplexSplitNode::check_nearby_adapter(const SimplexRead& read,
+                                           PosRange r,
+                                           int adapter_edist) const {
     return find_best_adapter_match(m_settings.adapter, read.read_common.seq, adapter_edist,
                                    //including spacer region in search
                                    {r.first, std::min(r.second + m_settings.pore_adapter_range,
@@ -264,7 +266,7 @@ bool DuplexSplitNode::check_nearby_adapter(const Read& read, PosRange r, int ada
 //'spacer' is region potentially containing templ/compl strand boundary
 //returns optional pair of matching ranges (first strictly to the left of spacer region)
 std::optional<std::pair<PosRange, PosRange>>
-DuplexSplitNode::check_flank_match(const Read& read, PosRange spacer, float err_thr) const {
+DuplexSplitNode::check_flank_match(const SimplexRead& read, PosRange spacer, float err_thr) const {
     const uint64_t rlen = read.read_common.seq.length();
     assert(spacer.first <= spacer.second && spacer.second <= rlen);
     if (spacer.first <= m_settings.strand_end_trim || spacer.second == rlen) {
@@ -299,7 +301,7 @@ DuplexSplitNode::check_flank_match(const Read& read, PosRange spacer, float err_
 }
 
 std::optional<DuplexSplitNode::PosRange> DuplexSplitNode::identify_middle_adapter_split(
-        const Read& read) const {
+        const SimplexRead& read) const {
     assert(m_settings.strand_end_flank > m_settings.strand_end_trim + m_settings.min_flank);
     const uint64_t r_l = read.read_common.seq.size();
     const uint64_t search_span =
@@ -342,7 +344,7 @@ std::optional<DuplexSplitNode::PosRange> DuplexSplitNode::identify_middle_adapte
 }
 
 std::optional<DuplexSplitNode::PosRange> DuplexSplitNode::identify_extra_middle_split(
-        const Read& read) const {
+        const SimplexRead& read) const {
     const uint64_t r_l = read.read_common.seq.size();
     //TODO parameterize
     const float ext_start_frac = 0.1;

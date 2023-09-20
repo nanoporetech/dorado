@@ -9,7 +9,7 @@
 using Catch::Matchers::Equals;
 
 TEST_CASE(TEST_GROUP ": Test tag generation", TEST_GROUP) {
-    dorado::Read test_read;
+    dorado::SimplexRead test_read;
     test_read.read_common.read_id = "read1";
     test_read.read_common.raw_data = torch::empty(4000);
     test_read.read_common.seq = "ACGT";
@@ -138,7 +138,7 @@ TEST_CASE(TEST_GROUP ": Test tag generation", TEST_GROUP) {
 }
 
 TEST_CASE(TEST_GROUP ": Test sam record generation", TEST_GROUP) {
-    dorado::Read test_read{};
+    dorado::SimplexRead test_read{};
     SECTION("Generating sam record for empty read throws") {
         REQUIRE_THROWS(test_read.extract_sam_lines(false));
     }
@@ -222,7 +222,7 @@ TEST_CASE(TEST_GROUP ": Methylation tag generation", TEST_GROUP) {
             0,   0,   255, 0,   0,   0,    // C
     };
 
-    dorado::Read read;
+    dorado::SimplexRead read;
     read.read_common.read_id = "read";
     read.read_common.seq = "ACAGTGACTAAACTC";
     read.read_common.qstring = "***************";
@@ -327,7 +327,7 @@ TEST_CASE(TEST_GROUP ": Methylation tag generation", TEST_GROUP) {
 }
 
 TEST_CASE(TEST_GROUP ": Test mean q-score generation", TEST_GROUP) {
-    dorado::Read test_read;
+    dorado::SimplexRead test_read;
     test_read.read_common.read_id = "read1";
     test_read.read_common.raw_data = torch::empty(4000);
     test_read.read_common.seq = "AAAAAAAAAA";
