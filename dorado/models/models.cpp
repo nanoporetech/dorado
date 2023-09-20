@@ -2,15 +2,176 @@
 
 #include <elzip/elzip.hpp>
 
-#include <algorithm>
-#include <filesystem>
 #define CPPHTTPLIB_OPENSSL_SUPPORT
 #include <httplib.h>
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
+#include <filesystem>
+#include <unordered_map>
+
 namespace fs = std::filesystem;
 
 namespace dorado::utils {
+
+namespace {
+
+namespace urls {
+
+const std::string URL_ROOT = "https://cdn.oxfordnanoportal.com";
+const std::string URL_PATH = "/software/analysis/dorado/";
+
+}  // namespace urls
+
+// Serialised, released models
+namespace simplex {
+
+const std::vector<std::string> models = {
+
+        // v3.{3,4,6}
+        "dna_r9.4.1_e8_fast@v3.4",
+        "dna_r9.4.1_e8_hac@v3.3",
+        "dna_r9.4.1_e8_sup@v3.3",
+        "dna_r9.4.1_e8_sup@v3.6",
+
+        // v3.5.2
+        "dna_r10.4.1_e8.2_260bps_fast@v3.5.2",
+        "dna_r10.4.1_e8.2_260bps_hac@v3.5.2",
+        "dna_r10.4.1_e8.2_260bps_sup@v3.5.2",
+
+        "dna_r10.4.1_e8.2_400bps_fast@v3.5.2",
+        "dna_r10.4.1_e8.2_400bps_hac@v3.5.2",
+        "dna_r10.4.1_e8.2_400bps_sup@v3.5.2",
+
+        // v4.0.0
+        "dna_r10.4.1_e8.2_260bps_fast@v4.0.0",
+        "dna_r10.4.1_e8.2_260bps_hac@v4.0.0",
+        "dna_r10.4.1_e8.2_260bps_sup@v4.0.0",
+
+        "dna_r10.4.1_e8.2_400bps_fast@v4.0.0",
+        "dna_r10.4.1_e8.2_400bps_hac@v4.0.0",
+        "dna_r10.4.1_e8.2_400bps_sup@v4.0.0",
+
+        // v4.1.0
+        "dna_r10.4.1_e8.2_260bps_fast@v4.1.0",
+        "dna_r10.4.1_e8.2_260bps_hac@v4.1.0",
+        "dna_r10.4.1_e8.2_260bps_sup@v4.1.0",
+
+        "dna_r10.4.1_e8.2_400bps_fast@v4.1.0",
+        "dna_r10.4.1_e8.2_400bps_hac@v4.1.0",
+        "dna_r10.4.1_e8.2_400bps_sup@v4.1.0",
+
+        // v4.2.0
+        "dna_r10.4.1_e8.2_400bps_fast@v4.2.0",
+        "dna_r10.4.1_e8.2_400bps_hac@v4.2.0",
+        "dna_r10.4.1_e8.2_400bps_sup@v4.2.0",
+
+        // RNA002
+        "rna002_70bps_fast@v3",
+        "rna002_70bps_hac@v3",
+
+        // RNA004
+        "rna004_130bps_fast@v3.0.1",
+        "rna004_130bps_hac@v3.0.1",
+        "rna004_130bps_sup@v3.0.1",
+};
+
+}  // namespace simplex
+
+namespace stereo {
+
+const std::vector<std::string> models = {
+        "dna_r10.4.1_e8.2_4khz_stereo@v1.1",
+        "dna_r10.4.1_e8.2_5khz_stereo@v1.1",
+};
+
+}  // namespace stereo
+
+namespace modified {
+
+const std::vector<std::string> mods = {
+        "5mCG",
+        "5mCG_5hmCG",
+        "5mC",
+        "6mA",
+};
+
+const std::vector<std::string> models = {
+
+        // v3.{3,4}
+        "dna_r9.4.1_e8_fast@v3.4_5mCG@v0.1",
+        "dna_r9.4.1_e8_hac@v3.3_5mCG@v0.1",
+        "dna_r9.4.1_e8_sup@v3.3_5mCG@v0.1",
+
+        "dna_r9.4.1_e8_fast@v3.4_5mCG_5hmCG@v0",
+        "dna_r9.4.1_e8_hac@v3.3_5mCG_5hmCG@v0",
+        "dna_r9.4.1_e8_sup@v3.3_5mCG_5hmCG@v0",
+
+        // v3.5.2
+        "dna_r10.4.1_e8.2_260bps_fast@v3.5.2_5mCG@v2",
+        "dna_r10.4.1_e8.2_260bps_hac@v3.5.2_5mCG@v2",
+        "dna_r10.4.1_e8.2_260bps_sup@v3.5.2_5mCG@v2",
+
+        "dna_r10.4.1_e8.2_400bps_fast@v3.5.2_5mCG@v2",
+        "dna_r10.4.1_e8.2_400bps_hac@v3.5.2_5mCG@v2",
+        "dna_r10.4.1_e8.2_400bps_sup@v3.5.2_5mCG@v2",
+
+        // v4.0.0
+        "dna_r10.4.1_e8.2_260bps_fast@v4.0.0_5mCG_5hmCG@v2",
+        "dna_r10.4.1_e8.2_260bps_hac@v4.0.0_5mCG_5hmCG@v2",
+        "dna_r10.4.1_e8.2_260bps_sup@v4.0.0_5mCG_5hmCG@v2",
+
+        "dna_r10.4.1_e8.2_400bps_fast@v4.0.0_5mCG_5hmCG@v2",
+        "dna_r10.4.1_e8.2_400bps_hac@v4.0.0_5mCG_5hmCG@v2",
+        "dna_r10.4.1_e8.2_400bps_sup@v4.0.0_5mCG_5hmCG@v2",
+
+        // v4.1.0
+        "dna_r10.4.1_e8.2_260bps_fast@v4.1.0_5mCG_5hmCG@v2",
+        "dna_r10.4.1_e8.2_260bps_hac@v4.1.0_5mCG_5hmCG@v2",
+        "dna_r10.4.1_e8.2_260bps_sup@v4.1.0_5mCG_5hmCG@v2",
+
+        "dna_r10.4.1_e8.2_400bps_fast@v4.1.0_5mCG_5hmCG@v2",
+        "dna_r10.4.1_e8.2_400bps_hac@v4.1.0_5mCG_5hmCG@v2",
+        "dna_r10.4.1_e8.2_400bps_sup@v4.1.0_5mCG_5hmCG@v2",
+
+        // v4.2.0
+        "dna_r10.4.1_e8.2_400bps_fast@v4.2.0_5mCG_5hmCG@v2",
+        "dna_r10.4.1_e8.2_400bps_hac@v4.2.0_5mCG_5hmCG@v2",
+        "dna_r10.4.1_e8.2_400bps_sup@v4.2.0_5mCG_5hmCG@v2",
+        "dna_r10.4.1_e8.2_400bps_sup@v4.2.0_5mC@v2",
+        "dna_r10.4.1_e8.2_400bps_sup@v4.2.0_6mA@v2",
+
+};
+
+}  // namespace modified
+
+const std::unordered_map<std::string, uint16_t> sample_rate_by_model = {
+
+        //------ simplex ---------//
+        // v4.2
+        {"dna_r10.4.1_e8.2_5khz_400bps_fast@v4.2.0", 5000},
+        {"dna_r10.4.1_e8.2_5khz_400bps_hac@v4.2.0", 5000},
+        {"dna_r10.4.1_e8.2_5khz_400bps_sup@v4.2.0", 5000},
+
+        //------ duplex ---------//
+        // v4.2
+        {"dna_r10.4.1_e8.2_5khz_stereo@v1.1", 5000},
+};
+
+const std::unordered_map<std::string, uint16_t> mean_qscore_start_pos_by_model = {
+
+        // To add model specific start positions for older models,
+        // create an entry keyed by model name with the value as
+        // the desired start position.
+        // e.g. {"dna_r10.4.1_e8.2_5khz_400bps_fast@v4.2.0", 10}
+};
+
+}  // namespace
+
+const std::vector<std::string>& simplex_models() { return simplex::models; }
+const std::vector<std::string>& stereo_models() { return stereo::models; }
+const std::vector<std::string>& modified_models() { return modified::models; }
+const std::vector<std::string>& modified_mods() { return modified::mods; }
 
 bool is_valid_model(const std::string& selected_model) {
     return selected_model == "all" ||

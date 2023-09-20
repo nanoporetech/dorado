@@ -302,14 +302,13 @@ int basecaller(int argc, char* argv[]) {
     parser.add_argument("--modified-bases")
             .nargs(argparse::nargs_pattern::at_least_one)
             .action([](const std::string& value) {
-                if (std::find(modified::mods.begin(), modified::mods.end(), value) ==
-                    modified::mods.end()) {
+                const auto& mods = utils::modified_mods();
+                if (std::find(mods.begin(), mods.end(), value) == mods.end()) {
                     spdlog::error(
                             "'{}' is not a supported modification please select from {}", value,
-                            std::accumulate(std::next(modified::mods.begin()), modified::mods.end(),
-                                            modified::mods[0], [](std::string a, std::string b) {
-                                                return a + ", " + b;
-                                            }));
+                            std::accumulate(
+                                    std::next(mods.begin()), mods.end(), mods[0],
+                                    [](std::string a, std::string b) { return a + ", " + b; }));
                     std::exit(EXIT_FAILURE);
                 }
                 return value;
