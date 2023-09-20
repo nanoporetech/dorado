@@ -12,6 +12,8 @@ add_library(dorado_utils
     compat_utils.h
     dev_utils.cpp
     dev_utils.h
+    driver_query.cpp
+    driver_query.h
     duplex_utils.cpp
     duplex_utils.h
     log_utils.cpp
