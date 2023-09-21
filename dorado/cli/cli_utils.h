@@ -18,6 +18,23 @@
 #include <utility>
 #include <vector>
 
+namespace {
+#ifdef WIN32
+// Need a simple wrapper for setenv, since windows doesn't have it.
+int setenv(const char* name, const char* value, int overwrite) {
+    int errcode = 0;
+    if (!overwrite) {
+        size_t envsize = 0;
+        errcode = getenv_s(&envsize, NULL, 0, name);
+        if (errcode || envsize) {
+            return errcode;
+        }
+    }
+    return _putenv_s(name, value);
+}
+#endif
+}  // namespace
+
 namespace dorado {
 
 namespace cli {
