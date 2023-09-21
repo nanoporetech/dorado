@@ -91,8 +91,8 @@ fi
 
 echo dorado demux test stage
 $dorado_bin demux $data_dir/barcode_demux/double_end_variant/EXP-PBC096_BC04.fastq --kit-name EXP-PBC096 --output-dir $output_dir/demux
-samtools quickcheck -u $output_dir/demux/EXP-PBC096_BC04.bam
-num_demuxed_reads=$(samtools view -c $output_dir/demux/EXP-PBC096_BC04.bam)
+samtools quickcheck -u $output_dir/demux/EXP-PBC096_barcode04.bam
+num_demuxed_reads=$(samtools view -c $output_dir/demux/EXP-PBC096_barcode04.bam)
 if [[ $num_demuxed_reads -ne "3" ]]; then
     echo "3 demuxed reads expected. Found ${num_demuxed_reads}"
     exit 1
@@ -113,8 +113,8 @@ samtools quickcheck -u $output_dir/read_group_test.bam
 mkdir $output_dir/read_group_test
 samtools split -u $output_dir/read_group_test/unknown.bam -f "$output_dir/read_group_test/rg_%!.bam" $output_dir/read_group_test.bam
 # There should be 4 reads with BC01, 3 with BC04, and 2 unclassified groups.
-expected_read_groups_BC01=4
-expected_read_groups_BC04=3
+expected_read_groups_barcode01=4
+expected_read_groups_barcode04=3
 expected_read_groups_unclassified=2
 for bam in $output_dir/read_group_test/rg_*.bam; do
     if [[ $bam =~ "_SQK-RBK114-96_" ]]; then

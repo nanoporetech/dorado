@@ -59,7 +59,8 @@ void add_rg_hdr(sam_hdr_t* hdr,
         for (const auto& barcode_name : kit_info.barcodes) {
             const auto additional_tags = "\tBC:" + barcode_sequences.at(barcode_name);
             for (const auto& read_group : read_groups) {
-                auto id = read_group.first + '_' + kit_name + '_' + barcode_name;
+                auto id = read_group.first + '_' +
+                          barcode_kits::generate_standard_barcode_name(kit_name, barcode_name);
                 const std::string read_group_tags = to_string(read_group.second);
                 emit_read_group(read_group_tags, id, additional_tags);
             }
