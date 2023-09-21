@@ -254,11 +254,10 @@ SignalAnchorInfo determine_signal_anchor_and_strand_drna(const dorado::SimplexRe
     //};
 
     std::array<float, 1000> vals;
-    float mean = 0.f;
+    float sig_sum = 0.f;
     // pre-fill means array
     for (int i = 0; i < vals.size(); i++) {
-        vals[i] = signal[i];
-        mean += signal[i];
+        sig_sum += signal[i];
     }
 
     std::array<float, 8000> means;
@@ -269,16 +268,42 @@ SignalAnchorInfo determine_signal_anchor_and_strand_drna(const dorado::SimplexRe
     // limit the search space to start from 30 bases from the beginning
     // and up till about half the signal lengths. Note this is only to find
     // the __start__ of the polyA signal.
+    //int n = 0;
+    //float mean_of_means = 0;
+    //float var_of_means = 0;
+    //float last_mean = 0;
+    //float stdev;
+
+    int start_point = -1;
+    float h = std::numeric_limits<float>::min();
+    float l = std::numeric_limits<float>::max();
     for (int j = 0; j < means.size(); j++) {
-        means[j] = mean / vals.size();
+        float mean = sig_sum / vals.size();
+        means[j] = mean;
         //spdlog::debug("mean {} : {}", j, means[j]);
         int signal_i = j + vals.size();
         float sig_val = signal[signal_i];
         // val to subtract
-        int idx_to_replace = j % vals.size();
-        float val_sub = vals[idx_to_replace];
-        vals[idx_to_replace] = sig_val;
-        mean = mean - val_sub + sig_val;
+        int idx_to_replace = j;
+        float val_sub = signal[idx_to_replace];
+        sig_sum = sig_sum - val_sub + sig_val;
+
+        h = std::max(h, mean);
+        l = std::min(l, mean);
+        //spdlog::debug("pos {} high {} low {} diff {}", j, h, l, (h - l));
+        if ((h - l) > 1.25f) {
+            start_point = j;
+            bp = j;
+            break;
+        }
+
+        //n++;
+        //float d = sig_val - mean_of_means;
+        //mean_of_means += d / n;
+        //float d2 = sig_val - mean_of_means;
+        //var_of_means += (d * d2);
+        //last_mean = sig_val;
+        //spdlog::debug("pos {} mean {} var {}", j, mean_of_means, std::sqrt(var_of_means / n));
     }
 
     //for (int i = 1000, num_windows_seen = 0; i < signal_len / 2; i += kWindow / 10, num_windows_seen++) {
@@ -297,32 +322,32 @@ SignalAnchorInfo determine_signal_anchor_and_strand_drna(const dorado::SimplexRe
     //        break;
     //    }
     //}
-    auto is_local_max = [&means](int idx) {
-        int kWinSize = 5;
-        int left = std::max(0, idx - kWinSize);
-        int right = std::min((int)means.size() - 1, idx + kWinSize);
-        if (means[left] < means[idx] && means[right] < means[idx]) {
-            return true;
-        }
-        return false;
-    };
-    auto find_max = [&means](int start, int end) -> float {
-        auto max = std::max_element(means.begin() + start, means.begin() + end);
-        return *max;
-    };
-    float v = means[0];  //std::numeric_limits<float>::min();
-    for (int i = 1; i < means.size(); i += 50) {
-        if (means[i] < -0.5) {
-            continue;
-        }
-        float m = find_max(i, i + 200);
-        if (m < v) {
-            bp = i;
-            break;
-        } else {
-            v = m;
-        }
-    }
+    //auto is_local_max = [&means](int idx) {
+    //    int kWinSize = 5;
+    //    int left = std::max(0, idx - kWinSize);
+    //    int right = std::min((int)means.size() - 1, idx + kWinSize);
+    //    if (means[left] < means[idx] && means[right] < means[idx]) {
+    //        return true;
+    //    }
+    //    return false;
+    //};
+    //auto find_max = [&means](int start, int end) -> float {
+    //    auto max = std::max_element(means.begin() + start, means.begin() + end);
+    //    return *max;
+    //};
+    //float v = means[0];  //std::numeric_limits<float>::min();
+    //for (int i = start_point; i < means.size(); i += 50) {
+    //    //if (means[i] < -0.5) {
+    //    //    continue;
+    //    //}
+    //    float m = find_max(i, i + 200);
+    //    if (m < v) {
+    //        bp = i;
+    //        break;
+    //    } else {
+    //        v = m;
+    //    }
+    //}
     spdlog::debug("Approx break point {}", bp);
 
     if (bp > 0) {

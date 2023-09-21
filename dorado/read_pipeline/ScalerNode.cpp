@@ -57,8 +57,7 @@ void ScalerNode::worker_thread() {
         read->read_common.scaling_method =
                 m_scaling_params.quantile_scaling ? "quantile" : "med_mad";
 
-        std::cerr << read->read_common.read_id << " " << shift << " " << scale << " " << 0
-                  << std::endl;
+        spdlog::debug("{} {} {} 0", read->read_common.read_id, shift, scale);
 
         // raw_data comes from DataLoader with dtype int16.  We send it on as float16 after
         // shifting/scaling in float32 form.
