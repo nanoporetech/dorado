@@ -71,7 +71,7 @@ std::vector<std::pair<uint64_t, uint64_t>> detect_pore_signal(const torch::Tenso
     if (cl_end != -1) {
         assert(cl_start != -1);
         assert(cl_start < pore_a.size(0) && cl_end <= pore_a.size(0));
-        ans.push_back(std::pair{cl_start, cl_end});
+        ans.push_back({cl_start, cl_end});
     }
 
     return ans;
