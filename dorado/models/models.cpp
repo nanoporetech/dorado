@@ -258,7 +258,6 @@ void download_models(const std::string& target_directory, const std::string& sel
     fs::path directory(target_directory);
 
     httplib::Client http(urls::URL_ROOT);
-    http.enable_server_certificate_verification(false);
     http.set_follow_location(true);
 
     const char* proxy_url = getenv("dorado_proxy");
