@@ -568,7 +568,6 @@ ScoreResults BarcodeClassifier::find_best_adapter(const std::string& read_seq,
         scores.insert(scores.end(), out.begin(), out.end());
     }
 
-    //if (m_barcode_both_ends && kit.double_ends) {
     if (kit.double_ends) {
         // For a double ended barcode, ensure that the best barcode according
         // to the top window and the best barcode according to the bottom window
@@ -611,7 +610,7 @@ ScoreResults BarcodeClassifier::find_best_adapter(const std::string& read_seq,
     }
 
     if (m_barcode_both_ends && kit.double_ends) {
-        // For more stringest classification, ensure that both ends of a read
+        // For more stringent classification, ensure that both ends of a read
         // have a high score for the same barcode. If not then consider it
         // unclassified.
         if (out.top_score < 0.6 || out.bottom_score < 0.6) {
