@@ -3,9 +3,7 @@
 #include <string>
 #include <vector>
 
-namespace dorado {
-
-namespace utils {
+namespace dorado::utils {
 
 const std::vector<std::string>& simplex_models();
 const std::vector<std::string>& stereo_models();
@@ -34,6 +32,4 @@ uint32_t get_mean_qscore_start_pos_by_model_name(const std::string& model_name);
 // Extract the model name from the model path.
 std::string extract_model_from_model_path(const std::string& model_path);
 
-}  // namespace utils
-
-}  // namespace dorado
+}  // namespace dorado::utils
