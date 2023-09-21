@@ -35,6 +35,8 @@ using namespace std::chrono_literals;
 int duplex(int argc, char* argv[]) {
     using dorado::utils::default_parameters;
     utils::InitLogging();
+    cli::make_torch_deterministic();
+    torch::set_num_threads(1);
 
     argparse::ArgumentParser parser("dorado", DORADO_VERSION, argparse::default_arguments::help);
     parser.add_argument("model").help("Model");
@@ -189,8 +191,6 @@ int duplex(int argc, char* argv[]) {
         auto read_filter_node = pipeline_desc.add_node<ReadFilterNode>(
                 {duplex_read_tagger}, min_qscore, default_parameters.min_sequence_length,
                 read_ids_to_filter, 5);
-
-        torch::set_num_threads(1);
 
         std::vector<dorado::stats::StatsCallable> stats_callables;
         ProgressTracker tracker(num_reads, duplex);

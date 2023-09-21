@@ -73,8 +73,6 @@ void setup(std::vector<std::string> args,
     auto model_config = load_crf_model_config(model_path);
     std::string model_name = utils::extract_model_from_model_path(model_path.string());
 
-    torch::set_num_threads(1);
-
     if (!DataLoader::is_read_data_present(data_path, recursive_file_loading)) {
         std::string err = "No POD5 or FAST5 data found in path: " + data_path;
         throw std::runtime_error(err);
@@ -248,6 +246,8 @@ void setup(std::vector<std::string> args,
 
 int basecaller(int argc, char* argv[]) {
     utils::InitLogging();
+    cli::make_torch_deterministic();
+    torch::set_num_threads(1);
 
     argparse::ArgumentParser parser("dorado", DORADO_VERSION, argparse::default_arguments::help);
 
