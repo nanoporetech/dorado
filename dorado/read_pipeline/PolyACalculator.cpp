@@ -246,11 +246,22 @@ SignalAnchorInfo determine_signal_anchor_and_strand_drna(const dorado::SimplexRe
     // increase in mean signal values. 5 previous mean values are
     // considered with a window size of 50. This gives a rolling
     // window view of ~250 bases.
-    std::array<float, 5> means;
-    auto check_var = [&means](int latest) -> float {
-        auto min_elem = std::min_element(means.begin(), means.end());
-        return (means[latest] - *min_elem);
-    };
+    //std::array<float, 5> means;
+    //auto check_var = [&means](int latest) -> float {
+    //    auto min_elem = std::min_element(means.begin(), means.end());
+    //    spdlog::debug("means {} {} {} {} {}", means[0], means[1], means[2], means[3], means[4]);
+    //    return (means[latest] - *min_elem);
+    //};
+
+    std::array<float, 1000> vals;
+    float mean = 0.f;
+    // pre-fill means array
+    for (int i = 0; i < vals.size(); i++) {
+        vals[i] = signal[i];
+        mean += signal[i];
+    }
+
+    std::array<float, 8000> means;
 
     int bp = -1;
     // Since the polyA will start after the adapter, and in RNA each
@@ -258,19 +269,58 @@ SignalAnchorInfo determine_signal_anchor_and_strand_drna(const dorado::SimplexRe
     // limit the search space to start from 30 bases from the beginning
     // and up till about half the signal lengths. Note this is only to find
     // the __start__ of the polyA signal.
-    for (int i = 3000, num_windows_seen = 0; i < signal_len / 2; i += kWindow, num_windows_seen++) {
-        float mean = 0;
-        int s = i, e = i + kWindow;
-        for (int j = s; j < e; j++) {
-            mean += signal[j];
+    for (int j = 0; j < means.size(); j++) {
+        means[j] = mean / vals.size();
+        //spdlog::debug("mean {} : {}", j, means[j]);
+        int signal_i = j + vals.size();
+        float sig_val = signal[signal_i];
+        // val to subtract
+        int idx_to_replace = j % vals.size();
+        float val_sub = vals[idx_to_replace];
+        vals[idx_to_replace] = sig_val;
+        mean = mean - val_sub + sig_val;
+    }
+
+    //for (int i = 1000, num_windows_seen = 0; i < signal_len / 2; i += kWindow / 10, num_windows_seen++) {
+    //    float mean = 0;
+    //    int s = i, e = i + kWindow;
+    //    for (int j = s; j < e; j++) {
+    //        mean += signal[j];
+    //    }
+    //    mean /= kWindow;
+    //    int means_idx = num_windows_seen % means.size();
+    //    means[means_idx] = mean;
+    //    auto var = check_var(means_idx);
+    //    spdlog::debug("window {}-{} var {} means idx {}", s, e, var, means_idx);
+    //    if (num_windows_seen >= means.size() && var > 2.2f) {
+    //        bp = i;
+    //        break;
+    //    }
+    //}
+    auto is_local_max = [&means](int idx) {
+        int kWinSize = 5;
+        int left = std::max(0, idx - kWinSize);
+        int right = std::min((int)means.size() - 1, idx + kWinSize);
+        if (means[left] < means[idx] && means[right] < means[idx]) {
+            return true;
         }
-        mean /= kWindow;
-        int means_idx = num_windows_seen % means.size();
-        means[means_idx] = mean;
-        auto var = check_var(means_idx);
-        if (num_windows_seen >= means.size() && var > 2.2f) {
+        return false;
+    };
+    auto find_max = [&means](int start, int end) -> float {
+        auto max = std::max_element(means.begin() + start, means.begin() + end);
+        return *max;
+    };
+    float v = means[0];  //std::numeric_limits<float>::min();
+    for (int i = 1; i < means.size(); i += 50) {
+        if (means[i] < -0.5) {
+            continue;
+        }
+        float m = find_max(i, i + 200);
+        if (m < v) {
             bp = i;
             break;
+        } else {
+            v = m;
         }
     }
     spdlog::debug("Approx break point {}", bp);
