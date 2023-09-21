@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <sstream>
 
 namespace fs = std::filesystem;
 
@@ -165,6 +166,21 @@ const std::unordered_map<std::string, uint16_t> mean_qscore_start_pos_by_model =
         // e.g. {"dna_r10.4.1_e8.2_5khz_400bps_fast@v4.2.0", 10}
 };
 
+std::string calculate_checksum(std::string_view data) {
+    // Hash the data.
+    std::array<unsigned char, SHA256_DIGEST_LENGTH> hash{};
+    SHA256(reinterpret_cast<const unsigned char*>(data.data()), data.size(), hash.data());
+
+    // Stringify it.
+    std::ostringstream checksum;
+    checksum << std::hex;
+    checksum.fill('0');
+    for (unsigned char byte : hash) {
+        checksum << std::setw(2) << static_cast<int>(byte);
+    }
+    return std::move(checksum).str();
+}
+
 }  // namespace
 
 const ModelMap& simplex_models() { return simplex::models; }
@@ -205,16 +221,26 @@ void download_models(const std::string& target_directory, const std::string& sel
                 auto url = urls::URL_ROOT + urls::URL_PATH + model_str + ".zip";
                 spdlog::info(" - downloading {}", model);
                 auto res = http.Get(url.c_str());
-                if (res != nullptr) {
-                    fs::path archive(directory / (model_str + ".zip"));
-                    std::ofstream ofs(archive.string(), std::ofstream::binary);
-                    ofs << res->body;
-                    ofs.close();
-                    elz::extractZip(archive, directory);
-                    fs::remove(archive);
-                } else {
+                if (res == nullptr) {
                     spdlog::error("Failed to download {}", model);
+                    continue;
                 }
+
+                // Check that this matches the hash we expect.
+                const auto checksum = calculate_checksum(res->body);
+                if (checksum != info.checksum) {
+                    spdlog::error("Model download failed checksum validation: {} - {} != {}", model,
+                                  checksum, info.checksum);
+                    continue;
+                }
+
+                // Save and extract it.
+                fs::path archive(directory / (model_str + ".zip"));
+                std::ofstream ofs(archive.string(), std::ofstream::binary);
+                ofs << res->body;
+                ofs.close();
+                elz::extractZip(archive, directory);
+                fs::remove(archive);
             }
         }
     };
