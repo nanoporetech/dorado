@@ -50,15 +50,15 @@ int download(int argc, char* argv[]) {
 
     auto print_models = [] {
         spdlog::info("> simplex models");
-        for (const auto& model : utils::simplex_models()) {
+        for (const auto& [model, info] : utils::simplex_models()) {
             spdlog::info(" - {}", model);
         }
         spdlog::info("> stereo models");
-        for (const auto& model : utils::stereo_models()) {
+        for (const auto& [model, info] : utils::stereo_models()) {
             spdlog::info(" - {}", model);
         }
         spdlog::info("> modification models");
-        for (const auto& model : utils::modified_models()) {
+        for (const auto& [model, info] : utils::modified_models()) {
             spdlog::info(" - {}", model);
         }
     };

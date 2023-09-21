@@ -8,7 +8,6 @@
 
 #include <algorithm>
 #include <filesystem>
-#include <unordered_map>
 
 namespace fs = std::filesystem;
 
@@ -26,63 +25,63 @@ const std::string URL_PATH = "/software/analysis/dorado/";
 // Serialised, released models
 namespace simplex {
 
-const std::vector<std::string> models = {
+const ModelMap models = {
 
         // v3.{3,4,6}
-        "dna_r9.4.1_e8_fast@v3.4",
-        "dna_r9.4.1_e8_hac@v3.3",
-        "dna_r9.4.1_e8_sup@v3.3",
-        "dna_r9.4.1_e8_sup@v3.6",
+        {"dna_r9.4.1_e8_fast@v3.4", {""}},
+        {"dna_r9.4.1_e8_hac@v3.3", {""}},
+        {"dna_r9.4.1_e8_sup@v3.3", {""}},
+        {"dna_r9.4.1_e8_sup@v3.6", {""}},
 
         // v3.5.2
-        "dna_r10.4.1_e8.2_260bps_fast@v3.5.2",
-        "dna_r10.4.1_e8.2_260bps_hac@v3.5.2",
-        "dna_r10.4.1_e8.2_260bps_sup@v3.5.2",
+        {"dna_r10.4.1_e8.2_260bps_fast@v3.5.2", {""}},
+        {"dna_r10.4.1_e8.2_260bps_hac@v3.5.2", {""}},
+        {"dna_r10.4.1_e8.2_260bps_sup@v3.5.2", {""}},
 
-        "dna_r10.4.1_e8.2_400bps_fast@v3.5.2",
-        "dna_r10.4.1_e8.2_400bps_hac@v3.5.2",
-        "dna_r10.4.1_e8.2_400bps_sup@v3.5.2",
+        {"dna_r10.4.1_e8.2_400bps_fast@v3.5.2", {""}},
+        {"dna_r10.4.1_e8.2_400bps_hac@v3.5.2", {""}},
+        {"dna_r10.4.1_e8.2_400bps_sup@v3.5.2", {""}},
 
         // v4.0.0
-        "dna_r10.4.1_e8.2_260bps_fast@v4.0.0",
-        "dna_r10.4.1_e8.2_260bps_hac@v4.0.0",
-        "dna_r10.4.1_e8.2_260bps_sup@v4.0.0",
+        {"dna_r10.4.1_e8.2_260bps_fast@v4.0.0", {""}},
+        {"dna_r10.4.1_e8.2_260bps_hac@v4.0.0", {""}},
+        {"dna_r10.4.1_e8.2_260bps_sup@v4.0.0", {""}},
 
-        "dna_r10.4.1_e8.2_400bps_fast@v4.0.0",
-        "dna_r10.4.1_e8.2_400bps_hac@v4.0.0",
-        "dna_r10.4.1_e8.2_400bps_sup@v4.0.0",
+        {"dna_r10.4.1_e8.2_400bps_fast@v4.0.0", {""}},
+        {"dna_r10.4.1_e8.2_400bps_hac@v4.0.0", {""}},
+        {"dna_r10.4.1_e8.2_400bps_sup@v4.0.0", {""}},
 
         // v4.1.0
-        "dna_r10.4.1_e8.2_260bps_fast@v4.1.0",
-        "dna_r10.4.1_e8.2_260bps_hac@v4.1.0",
-        "dna_r10.4.1_e8.2_260bps_sup@v4.1.0",
+        {"dna_r10.4.1_e8.2_260bps_fast@v4.1.0", {""}},
+        {"dna_r10.4.1_e8.2_260bps_hac@v4.1.0", {""}},
+        {"dna_r10.4.1_e8.2_260bps_sup@v4.1.0", {""}},
 
-        "dna_r10.4.1_e8.2_400bps_fast@v4.1.0",
-        "dna_r10.4.1_e8.2_400bps_hac@v4.1.0",
-        "dna_r10.4.1_e8.2_400bps_sup@v4.1.0",
+        {"dna_r10.4.1_e8.2_400bps_fast@v4.1.0", {""}},
+        {"dna_r10.4.1_e8.2_400bps_hac@v4.1.0", {""}},
+        {"dna_r10.4.1_e8.2_400bps_sup@v4.1.0", {""}},
 
         // v4.2.0
-        "dna_r10.4.1_e8.2_400bps_fast@v4.2.0",
-        "dna_r10.4.1_e8.2_400bps_hac@v4.2.0",
-        "dna_r10.4.1_e8.2_400bps_sup@v4.2.0",
+        {"dna_r10.4.1_e8.2_400bps_fast@v4.2.0", {""}},
+        {"dna_r10.4.1_e8.2_400bps_hac@v4.2.0", {""}},
+        {"dna_r10.4.1_e8.2_400bps_sup@v4.2.0", {""}},
 
         // RNA002
-        "rna002_70bps_fast@v3",
-        "rna002_70bps_hac@v3",
+        {"rna002_70bps_fast@v3", {""}},
+        {"rna002_70bps_hac@v3", {""}},
 
         // RNA004
-        "rna004_130bps_fast@v3.0.1",
-        "rna004_130bps_hac@v3.0.1",
-        "rna004_130bps_sup@v3.0.1",
+        {"rna004_130bps_fast@v3.0.1", {""}},
+        {"rna004_130bps_hac@v3.0.1", {""}},
+        {"rna004_130bps_sup@v3.0.1", {""}},
 };
 
 }  // namespace simplex
 
 namespace stereo {
 
-const std::vector<std::string> models = {
-        "dna_r10.4.1_e8.2_4khz_stereo@v1.1",
-        "dna_r10.4.1_e8.2_5khz_stereo@v1.1",
+const ModelMap models = {
+        {"dna_r10.4.1_e8.2_4khz_stereo@v1.1", {""}},
+        {"dna_r10.4.1_e8.2_5khz_stereo@v1.1", {""}},
 };
 
 }  // namespace stereo
@@ -96,50 +95,50 @@ const std::vector<std::string> mods = {
         "6mA",
 };
 
-const std::vector<std::string> models = {
+const ModelMap models = {
 
         // v3.{3,4}
-        "dna_r9.4.1_e8_fast@v3.4_5mCG@v0.1",
-        "dna_r9.4.1_e8_hac@v3.3_5mCG@v0.1",
-        "dna_r9.4.1_e8_sup@v3.3_5mCG@v0.1",
+        {"dna_r9.4.1_e8_fast@v3.4_5mCG@v0.1", {""}},
+        {"dna_r9.4.1_e8_hac@v3.3_5mCG@v0.1", {""}},
+        {"dna_r9.4.1_e8_sup@v3.3_5mCG@v0.1", {""}},
 
-        "dna_r9.4.1_e8_fast@v3.4_5mCG_5hmCG@v0",
-        "dna_r9.4.1_e8_hac@v3.3_5mCG_5hmCG@v0",
-        "dna_r9.4.1_e8_sup@v3.3_5mCG_5hmCG@v0",
+        {"dna_r9.4.1_e8_fast@v3.4_5mCG_5hmCG@v0", {""}},
+        {"dna_r9.4.1_e8_hac@v3.3_5mCG_5hmCG@v0", {""}},
+        {"dna_r9.4.1_e8_sup@v3.3_5mCG_5hmCG@v0", {""}},
 
         // v3.5.2
-        "dna_r10.4.1_e8.2_260bps_fast@v3.5.2_5mCG@v2",
-        "dna_r10.4.1_e8.2_260bps_hac@v3.5.2_5mCG@v2",
-        "dna_r10.4.1_e8.2_260bps_sup@v3.5.2_5mCG@v2",
+        {"dna_r10.4.1_e8.2_260bps_fast@v3.5.2_5mCG@v2", {""}},
+        {"dna_r10.4.1_e8.2_260bps_hac@v3.5.2_5mCG@v2", {""}},
+        {"dna_r10.4.1_e8.2_260bps_sup@v3.5.2_5mCG@v2", {""}},
 
-        "dna_r10.4.1_e8.2_400bps_fast@v3.5.2_5mCG@v2",
-        "dna_r10.4.1_e8.2_400bps_hac@v3.5.2_5mCG@v2",
-        "dna_r10.4.1_e8.2_400bps_sup@v3.5.2_5mCG@v2",
+        {"dna_r10.4.1_e8.2_400bps_fast@v3.5.2_5mCG@v2", {""}},
+        {"dna_r10.4.1_e8.2_400bps_hac@v3.5.2_5mCG@v2", {""}},
+        {"dna_r10.4.1_e8.2_400bps_sup@v3.5.2_5mCG@v2", {""}},
 
         // v4.0.0
-        "dna_r10.4.1_e8.2_260bps_fast@v4.0.0_5mCG_5hmCG@v2",
-        "dna_r10.4.1_e8.2_260bps_hac@v4.0.0_5mCG_5hmCG@v2",
-        "dna_r10.4.1_e8.2_260bps_sup@v4.0.0_5mCG_5hmCG@v2",
+        {"dna_r10.4.1_e8.2_260bps_fast@v4.0.0_5mCG_5hmCG@v2", {""}},
+        {"dna_r10.4.1_e8.2_260bps_hac@v4.0.0_5mCG_5hmCG@v2", {""}},
+        {"dna_r10.4.1_e8.2_260bps_sup@v4.0.0_5mCG_5hmCG@v2", {""}},
 
-        "dna_r10.4.1_e8.2_400bps_fast@v4.0.0_5mCG_5hmCG@v2",
-        "dna_r10.4.1_e8.2_400bps_hac@v4.0.0_5mCG_5hmCG@v2",
-        "dna_r10.4.1_e8.2_400bps_sup@v4.0.0_5mCG_5hmCG@v2",
+        {"dna_r10.4.1_e8.2_400bps_fast@v4.0.0_5mCG_5hmCG@v2", {""}},
+        {"dna_r10.4.1_e8.2_400bps_hac@v4.0.0_5mCG_5hmCG@v2", {""}},
+        {"dna_r10.4.1_e8.2_400bps_sup@v4.0.0_5mCG_5hmCG@v2", {""}},
 
         // v4.1.0
-        "dna_r10.4.1_e8.2_260bps_fast@v4.1.0_5mCG_5hmCG@v2",
-        "dna_r10.4.1_e8.2_260bps_hac@v4.1.0_5mCG_5hmCG@v2",
-        "dna_r10.4.1_e8.2_260bps_sup@v4.1.0_5mCG_5hmCG@v2",
+        {"dna_r10.4.1_e8.2_260bps_fast@v4.1.0_5mCG_5hmCG@v2", {""}},
+        {"dna_r10.4.1_e8.2_260bps_hac@v4.1.0_5mCG_5hmCG@v2", {""}},
+        {"dna_r10.4.1_e8.2_260bps_sup@v4.1.0_5mCG_5hmCG@v2", {""}},
 
-        "dna_r10.4.1_e8.2_400bps_fast@v4.1.0_5mCG_5hmCG@v2",
-        "dna_r10.4.1_e8.2_400bps_hac@v4.1.0_5mCG_5hmCG@v2",
-        "dna_r10.4.1_e8.2_400bps_sup@v4.1.0_5mCG_5hmCG@v2",
+        {"dna_r10.4.1_e8.2_400bps_fast@v4.1.0_5mCG_5hmCG@v2", {""}},
+        {"dna_r10.4.1_e8.2_400bps_hac@v4.1.0_5mCG_5hmCG@v2", {""}},
+        {"dna_r10.4.1_e8.2_400bps_sup@v4.1.0_5mCG_5hmCG@v2", {""}},
 
         // v4.2.0
-        "dna_r10.4.1_e8.2_400bps_fast@v4.2.0_5mCG_5hmCG@v2",
-        "dna_r10.4.1_e8.2_400bps_hac@v4.2.0_5mCG_5hmCG@v2",
-        "dna_r10.4.1_e8.2_400bps_sup@v4.2.0_5mCG_5hmCG@v2",
-        "dna_r10.4.1_e8.2_400bps_sup@v4.2.0_5mC@v2",
-        "dna_r10.4.1_e8.2_400bps_sup@v4.2.0_6mA@v2",
+        {"dna_r10.4.1_e8.2_400bps_fast@v4.2.0_5mCG_5hmCG@v2", {""}},
+        {"dna_r10.4.1_e8.2_400bps_hac@v4.2.0_5mCG_5hmCG@v2", {""}},
+        {"dna_r10.4.1_e8.2_400bps_sup@v4.2.0_5mCG_5hmCG@v2", {""}},
+        {"dna_r10.4.1_e8.2_400bps_sup@v4.2.0_5mC@v2", {""}},
+        {"dna_r10.4.1_e8.2_400bps_sup@v4.2.0_6mA@v2", {""}},
 
 };
 
@@ -168,19 +167,14 @@ const std::unordered_map<std::string, uint16_t> mean_qscore_start_pos_by_model =
 
 }  // namespace
 
-const std::vector<std::string>& simplex_models() { return simplex::models; }
-const std::vector<std::string>& stereo_models() { return stereo::models; }
-const std::vector<std::string>& modified_models() { return modified::models; }
+const ModelMap& simplex_models() { return simplex::models; }
+const ModelMap& stereo_models() { return stereo::models; }
+const ModelMap& modified_models() { return modified::models; }
 const std::vector<std::string>& modified_mods() { return modified::mods; }
 
 bool is_valid_model(const std::string& selected_model) {
-    return selected_model == "all" ||
-           std::find(simplex::models.begin(), simplex::models.end(), selected_model) !=
-                   simplex::models.end() ||
-           std::find(stereo::models.begin(), stereo::models.end(), selected_model) !=
-                   stereo::models.end() ||
-           std::find(modified::models.begin(), modified::models.end(), selected_model) !=
-                   modified::models.end();
+    return selected_model == "all" || simplex::models.count(selected_model) > 0 ||
+           stereo::models.count(selected_model) > 0 || modified::models.count(selected_model) > 0;
 }
 
 void download_models(const std::string& target_directory, const std::string& selected_model) {
@@ -203,14 +197,16 @@ void download_models(const std::string& target_directory, const std::string& sel
         http.set_proxy(proxy_url, proxy_port);
     }
 
-    auto download_model_set = [&](std::vector<std::string> models) {
-        for (const auto& model : models) {
+    auto download_model_set = [&](const ModelMap& models) {
+        for (const auto& [model, info] : models) {
             if (selected_model == "all" || selected_model == model) {
-                auto url = urls::URL_ROOT + urls::URL_PATH + model + ".zip";
+                // TIL operator+ doesn't exist for string and string_view -_-
+                const std::string model_str(model);
+                auto url = urls::URL_ROOT + urls::URL_PATH + model_str + ".zip";
                 spdlog::info(" - downloading {}", model);
                 auto res = http.Get(url.c_str());
                 if (res != nullptr) {
-                    fs::path archive(directory / (model + ".zip"));
+                    fs::path archive(directory / (model_str + ".zip"));
                     std::ofstream ofs(archive.string(), std::ofstream::binary);
                     ofs << res->body;
                     ofs.close();
@@ -243,7 +239,7 @@ std::string get_modification_model(const std::string& simplex_model,
 
     if (is_valid_model(simplex_name)) {
         std::string mods_prefix = simplex_name + "_" + modification + "@v";
-        for (const auto& model : modified::models) {
+        for (const auto& [model, info] : modified::models) {
             if (model.compare(0, mods_prefix.size(), mods_prefix) == 0) {
                 modification_model = model;
                 break;

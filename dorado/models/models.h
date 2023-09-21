@@ -1,13 +1,20 @@
 #pragma once
 
 #include <string>
+#include <string_view>
+#include <unordered_map>
 #include <vector>
 
 namespace dorado::utils {
 
-const std::vector<std::string>& simplex_models();
-const std::vector<std::string>& stereo_models();
-const std::vector<std::string>& modified_models();
+struct ModelInfo {
+    std::string_view checksum;
+};
+using ModelMap = std::unordered_map<std::string_view, ModelInfo>;
+
+const ModelMap& simplex_models();
+const ModelMap& stereo_models();
+const ModelMap& modified_models();
 const std::vector<std::string>& modified_mods();
 
 bool is_valid_model(const std::string& selected_model);
