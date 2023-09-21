@@ -5,6 +5,7 @@
 #include <argparse.hpp>
 #include <spdlog/spdlog.h>
 
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -100,9 +101,7 @@ int download(int argc, char* argv[]) {
         return 1;
     }
 
-    utils::download_models(directory.string(), selected_model);
-
-    return 0;
+    return utils::download_models(directory.string(), selected_model) ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
 }  // namespace dorado

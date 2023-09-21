@@ -254,7 +254,12 @@ bool is_valid_model(const std::string& selected_model) {
            stereo::models.count(selected_model) > 0 || modified::models.count(selected_model) > 0;
 }
 
-void download_models(const std::string& target_directory, const std::string& selected_model) {
+bool download_models(const std::string& target_directory, const std::string& selected_model) {
+    if (!is_valid_model(selected_model)) {
+        spdlog::error("Selected model doesn't exist: {}", selected_model);
+        return false;
+    }
+
     fs::path directory(target_directory);
 
     httplib::Client http(urls::URL_ROOT);
@@ -273,6 +278,7 @@ void download_models(const std::string& target_directory, const std::string& sel
         http.set_proxy(proxy_url, proxy_port);
     }
 
+    bool success = true;
     auto download_model_set = [&](const ModelMap& models) {
         for (const auto& [model, info] : models) {
             if (selected_model == "all" || selected_model == model) {
@@ -283,6 +289,7 @@ void download_models(const std::string& target_directory, const std::string& sel
                 auto res = http.Get(url.c_str());
                 if (res == nullptr) {
                     spdlog::error("Failed to download {}", model);
+                    success = false;
                     continue;
                 }
 
@@ -291,6 +298,7 @@ void download_models(const std::string& target_directory, const std::string& sel
                 if (checksum != info.checksum) {
                     spdlog::error("Model download failed checksum validation: {} - {} != {}", model,
                                   checksum, info.checksum);
+                    success = false;
                     continue;
                 }
 
@@ -308,6 +316,8 @@ void download_models(const std::string& target_directory, const std::string& sel
     download_model_set(simplex::models);
     download_model_set(stereo::models);
     download_model_set(modified::models);
+
+    return success;
 }
 
 std::string get_modification_model(const std::string& simplex_model,
