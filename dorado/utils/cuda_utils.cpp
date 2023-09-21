@@ -17,6 +17,7 @@
 #include <optional>
 #include <regex>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -77,16 +78,20 @@ enum class MatmulMode { TORCH, CUBLAS };
 MatmulMode get_cuda_matmul_fp16_mode() {
     const char *env_matmul_fp16_mode = std::getenv("DORADO_MATMUL_FP16_MODE");
     if (env_matmul_fp16_mode != nullptr) {
-        std::string matmul_fp16_mode_str(env_matmul_fp16_mode);
+        std::string_view matmul_fp16_mode_str(env_matmul_fp16_mode);
+        spdlog::debug("> Found DORADO_MATMUL_FP16_MODE={}", matmul_fp16_mode_str);
         if (matmul_fp16_mode_str == "TORCH") {
+            spdlog::debug(">   Using torch::matmul");
             return MatmulMode::TORCH;
         } else if (matmul_fp16_mode_str == "CUBLAS") {
+            spdlog::debug(">   Using cublasGemmEx");
             return MatmulMode::CUBLAS;
         }
+        spdlog::debug(">   Ignoring unrecognized option. Select from TORCH or CUBLAS.");
     }
 
     // torch::matmul() is a bit slower than cublasGemmEx() on A100 and V100, and 2x slower on TX2
-    // but an order of magnitude faster on our Windows CI machines (1080 Ti)
+    // but an order of magnitude faster on 1080 Ti (sm61)
     cudaDeviceProp *prop = at::cuda::getCurrentDeviceProperties();
     bool is_sm61 = (prop->major == 6 && prop->minor == 1);
     if (is_sm61) {
@@ -105,7 +110,7 @@ void matmul_f16(const torch::Tensor &A, const torch::Tensor &B, torch::Tensor &C
         case MatmulMode::CUBLAS:
             return details::matmul_f16_cublas;
         default:
-            throw std::logic_error("Unknown LSTM mode");
+            throw std::logic_error("Unknown MATMUL_FP16 mode");
         }
     }();
     selected_mat_mul(A, B, C);
