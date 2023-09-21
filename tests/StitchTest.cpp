@@ -73,7 +73,7 @@ TEST_CASE("Test stitch_chunks", TEST_GROUP) {
                                                  1, 0, 1, 1, 0, 0, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0, 0,
                                                  1, 0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1, 0, 1};
 
-    REQUIRE(read.seq == expected_sequence);
-    REQUIRE(read.qstring == expected_qstring);
-    REQUIRE(read.moves == expected_moves);
+    REQUIRE(read.read_common.seq == expected_sequence);
+    REQUIRE(read.read_common.qstring == expected_qstring);
+    REQUIRE(read.read_common.moves == expected_moves);
 }

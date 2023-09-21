@@ -1,5 +1,6 @@
 #include "ModBaseContext.h"
 
+#include "MotifMatcher.h"
 #include "utils/sequence_utils.h"
 
 #include <sstream>
@@ -7,6 +8,7 @@
 namespace dorado::utils {
 
 ModBaseContext::ModBaseContext() {}
+ModBaseContext::~ModBaseContext() {}
 
 const std::string& ModBaseContext::motif(char base) const { return m_motifs[base_to_int(base)]; }
 
@@ -19,6 +21,7 @@ void ModBaseContext::set_context(std::string motif, size_t offset) {
     }
     char base = motif.at(offset);
     auto index = base_to_int(base);
+    m_motif_matchers[index] = std::make_unique<MotifMatcher>(motif, offset);
     m_motifs[index] = std::move(motif);
     m_offsets[index] = offset;
 }
@@ -36,6 +39,7 @@ bool ModBaseContext::decode(const std::string& context_string) {
     auto canonical = "ACGT";
     for (size_t i = 0; i < 4; ++i) {
         if (tokens[i] == "_") {
+            m_motif_matchers[i].reset();
             m_motifs[i].clear();
             m_offsets[i] = 0;
         } else {
@@ -46,6 +50,7 @@ bool ModBaseContext::decode(const std::string& context_string) {
             m_motifs[i] = tokens[i];
             m_motifs[i][x] = canonical[i];
             m_offsets[i] = x;
+            m_motif_matchers[i] = std::make_unique<MotifMatcher>(m_motifs[i], m_offsets[i]);
         }
     }
     return true;
@@ -67,22 +72,20 @@ std::string ModBaseContext::encode() const {
     return s.str();
 }
 
-std::vector<int> ModBaseContext::get_sequence_mask(std::string_view sequence) const {
-    std::vector<int> mask(sequence.size(), 0);
-    for (size_t p = 0; p < sequence.size(); ++p) {
-        auto idx = base_to_int(sequence[p]);
-        if (!m_motifs[idx].empty() && p >= m_offsets[idx] &&
-            p + m_motifs[idx].size() - m_offsets[idx] < sequence.size()) {
-            size_t a = p - m_offsets[idx];
-            if (sequence.substr(a, m_motifs[idx].size()) == m_motifs[idx]) {
-                mask[p] = 1;
+std::vector<bool> ModBaseContext::get_sequence_mask(std::string_view sequence) const {
+    std::vector<bool> mask(sequence.size(), false);
+    for (auto& matcher : m_motif_matchers) {
+        if (matcher) {
+            auto hits = matcher->get_motif_hits(sequence);
+            for (auto hit : hits) {
+                mask[hit] = true;
             }
         }
     }
     return mask;
 }
 
-void ModBaseContext::update_mask(std::vector<int>& mask,
+void ModBaseContext::update_mask(std::vector<bool>& mask,
                                  const std::string& sequence,
                                  const std::string& modbase_alphabet,
                                  const std::vector<uint8_t>& modbase_probs,
@@ -104,7 +107,7 @@ void ModBaseContext::update_mask(std::vector<int>& mask,
             for (size_t base_idx = 0; base_idx < sequence.size(); base_idx++) {
                 if (sequence[base_idx] == current_cardinal) {
                     if (modbase_probs[base_idx * num_channels + channel_idx] >= threshold) {
-                        mask[base_idx] = 1;
+                        mask[base_idx] = true;
                     }
                 }
             }

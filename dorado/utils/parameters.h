@@ -1,8 +1,6 @@
 #pragma once
 
-#include <algorithm>
 #include <string>
-#include <thread>
 
 namespace dorado::utils {
 
@@ -34,21 +32,6 @@ struct DefaultParameters {
 static const DefaultParameters default_parameters{};
 
 struct ThreadAllocations {
-    ThreadAllocations(int num_devices, int num_remora_threads, int max_threads = 0) {
-        max_threads = max_threads == 0 ? std::thread::hardware_concurrency() : max_threads;
-        writer_threads = num_devices * 2;
-        read_converter_threads = num_devices * 2;
-        read_filter_threads = num_devices * 2;
-        remora_threads = num_remora_threads;
-        scaler_node_threads = num_devices * 4;
-        splitter_node_threads = num_devices;
-        loader_threads = num_devices;
-        int total_threads_used = (writer_threads + read_converter_threads + read_filter_threads +
-                                  remora_threads + scaler_node_threads + loader_threads);
-        int remaining_threads = max_threads - total_threads_used;
-        aligner_threads = std::max(num_devices * 10, remaining_threads);
-    }
-
     int writer_threads{0};
     int read_converter_threads{0};
     int read_filter_threads{0};
@@ -57,12 +40,13 @@ struct ThreadAllocations {
     int splitter_node_threads{0};
     int loader_threads{0};
     int aligner_threads{0};
+    int barcoder_threads{0};
 };
 
-inline ThreadAllocations default_thread_allocations(int num_devices,
-                                                    int num_remora_threads,
-                                                    int max_threads = 0) {
-    return ThreadAllocations(num_devices, num_remora_threads, max_threads);
-}
+ThreadAllocations default_thread_allocations(int num_devices,
+                                             int num_remora_threads,
+                                             bool enable_aligner,
+                                             bool enable_barcoder,
+                                             int max_threads = 0);
 
 }  // namespace dorado::utils

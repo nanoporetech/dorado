@@ -9,6 +9,7 @@ set(UNIT_TEST_SOURCE_FILES
     BarcodeClassifierTest.cpp
     BarcodeDemuxerNodeTest.cpp    
     CliUtilsTest.cpp
+    DriverQueryTest.cpp
     DuplexReadTaggingNodeTest.cpp
     DuplexSplitTest.cpp
     Fast5DataLoaderTest.cpp
@@ -19,6 +20,7 @@ set(UNIT_TEST_SOURCE_FILES
     PairingNodeTest.cpp
     PipelineTest.cpp
     Pod5DataLoaderTest.cpp
+    PolyACalculatorTest.cpp
     ReadFilterNodeTest.cpp
     ReadTest.cpp
     ResumeLoaderTest.cpp
@@ -52,7 +54,9 @@ set(SMOKE_TEST_SOURCE_FILES
 add_executable(dorado_smoke_tests ${SMOKE_TEST_SOURCE_FILES})
 
 foreach(TEST_BIN dorado_tests dorado_smoke_tests)
-    target_precompile_headers(${TEST_BIN} REUSE_FROM dorado_lib)
+    if (DORADO_ENABLE_PCH)
+        target_precompile_headers(${TEST_BIN} REUSE_FROM dorado_lib)
+    endif()
 
     target_link_libraries(${TEST_BIN}
         dorado_lib
@@ -75,6 +79,11 @@ foreach(TEST_BIN dorado_tests dorado_smoke_tests)
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
         )
 
+    if(NOT MSVC)
+        # Add -Wno-trigraphs because one of the tests uses a qstring that has a trigraph sequence.
+        target_compile_options(${TEST_BIN} PRIVATE "-Wno-trigraphs")
+    endif()
+
     # The tests need to be able to find the libs in order to run.
     # We also want these libs to take priority over any installed on the system, so prepend them.
     if (MSVC)
@@ -83,7 +92,7 @@ foreach(TEST_BIN dorado_tests dorado_smoke_tests)
     endif()
 
     # For some reason when TSan is enabled on x64/Linux we get a failure to load dependencies of torch, so add it explicitly to the path
-    if ((ECM_ENABLE_SANITIZERS MATCHES "thread") AND (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64") AND (CMAKE_SYSTEM_NAME STREQUAL "Linux"))
+    if (ECM_ENABLE_SANITIZERS AND (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64") AND (CMAKE_SYSTEM_NAME STREQUAL "Linux"))
         set_tests_properties(${TEST_BIN} PROPERTIES ENVIRONMENT_MODIFICATION "LD_LIBRARY_PATH=path_list_append:${TORCH_LIB}/lib")
     endif()
 endforeach()

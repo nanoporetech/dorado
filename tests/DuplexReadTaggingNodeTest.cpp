@@ -13,37 +13,37 @@ TEST_CASE("DuplexReadTaggingNode", TEST_GROUP) {
     pipeline_desc.add_node<dorado::DuplexReadTaggingNode>({sink});
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
     {
-        auto read_12 = dorado::ReadPtr::make();
-        read_12->read_id = "1;2";
-        read_12->is_duplex = true;
+        auto read_12 = std::make_unique<dorado::Read>();
+        read_12->read_common.read_id = "1;2";
+        read_12->read_common.is_duplex = true;
 
-        auto read_1 = dorado::ReadPtr::make();
-        read_1->read_id = "1";
+        auto read_1 = std::make_unique<dorado::Read>();
+        read_1->read_common.read_id = "1";
         read_1->is_duplex_parent = true;
 
-        auto read_2 = dorado::ReadPtr::make();
-        read_2->read_id = "2";
+        auto read_2 = std::make_unique<dorado::Read>();
+        read_2->read_common.read_id = "2";
         read_2->is_duplex_parent = true;
 
-        auto read_3 = dorado::ReadPtr::make();
-        read_3->read_id = "3";
+        auto read_3 = std::make_unique<dorado::Read>();
+        read_3->read_common.read_id = "3";
         read_3->is_duplex_parent = true;
 
-        auto read_4 = dorado::ReadPtr::make();
-        read_4->read_id = "4";
+        auto read_4 = std::make_unique<dorado::Read>();
+        read_4->read_common.read_id = "4";
         read_4->is_duplex_parent = true;
 
-        auto read_5 = dorado::ReadPtr::make();
-        read_5->read_id = "5";
+        auto read_5 = std::make_unique<dorado::Read>();
+        read_5->read_common.read_id = "5";
         read_5->is_duplex_parent = true;
 
-        auto read_6 = dorado::ReadPtr::make();
-        read_6->read_id = "6";
+        auto read_6 = std::make_unique<dorado::Read>();
+        read_6->read_common.read_id = "6";
         read_6->is_duplex_parent = true;
 
-        auto read_56 = dorado::ReadPtr::make();
-        read_6->read_id = "5;6";
-        read_6->is_duplex = true;
+        auto read_56 = std::make_unique<dorado::Read>();
+        read_6->read_common.read_id = "5;6";
+        read_6->read_common.is_duplex = true;
 
         pipeline->push_message(std::move(read_1));
         pipeline->push_message(std::move(read_2));
@@ -58,29 +58,29 @@ TEST_CASE("DuplexReadTaggingNode", TEST_GROUP) {
 
     auto reads = ConvertMessages<dorado::ReadPtr>(std::move(messages));
     for (auto& read : reads) {
-        if (read->read_id == "1;2") {
-            CHECK(read->is_duplex == true);
+        if (read->read_common.read_id == "1;2") {
+            CHECK(read->read_common.is_duplex == true);
         }
-        if (read->read_id == "1") {
+        if (read->read_common.read_id == "1") {
             CHECK(read->is_duplex_parent == true);
         }
-        if (read->read_id == "2") {
+        if (read->read_common.read_id == "2") {
             CHECK(read->is_duplex_parent == true);
         }
-        if (read->read_id == "3") {
+        if (read->read_common.read_id == "3") {
             CHECK(read->is_duplex_parent == false);
         }
-        if (read->read_id == "4") {
-            CHECK(read->is_duplex == false);
+        if (read->read_common.read_id == "4") {
+            CHECK(read->read_common.is_duplex == false);
         }
-        if (read->read_id == "5") {
+        if (read->read_common.read_id == "5") {
             CHECK(read->is_duplex_parent == true);
         }
-        if (read->read_id == "6") {
+        if (read->read_common.read_id == "6") {
             CHECK(read->is_duplex_parent == true);
         }
-        if (read->read_id == "5;6") {
-            CHECK(read->is_duplex == true);
+        if (read->read_common.read_id == "5;6") {
+            CHECK(read->read_common.is_duplex == true);
         }
     }
 }

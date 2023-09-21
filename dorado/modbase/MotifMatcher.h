@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace dorado {
@@ -9,7 +10,9 @@ struct ModBaseModelConfig;
 class MotifMatcher {
 public:
     MotifMatcher(const ModBaseModelConfig& model_config);
-    std::vector<size_t> get_motif_hits(const std::string& seq) const;
+    MotifMatcher(const std::string& motif, size_t offset);
+
+    std::vector<size_t> get_motif_hits(std::string_view seq) const;
 
 private:
     const std::string m_motif;

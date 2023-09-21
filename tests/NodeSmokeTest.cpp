@@ -1,4 +1,5 @@
 #include "MessageSinkUtils.h"
+#include "TestUtils.h"
 #include "decode/CPUDecoder.h"
 #include "models/models.h"
 #include "nn/CRFModel.h"
@@ -7,7 +8,9 @@
 #include "nn/ModelRunner.h"
 #include "read_pipeline/BarcodeClassifierNode.h"
 #include "read_pipeline/BasecallerNode.h"
+#include "read_pipeline/HtsReader.h"
 #include "read_pipeline/ModBaseCallerNode.h"
+#include "read_pipeline/PolyACalculator.h"
 #include "read_pipeline/ReadFilterNode.h"
 #include "read_pipeline/ReadToBamTypeNode.h"
 #include "read_pipeline/ScalerNode.h"
@@ -29,6 +32,8 @@
 #include <functional>
 #include <random>
 
+namespace fs = std::filesystem;
+
 namespace {
 
 // Fixture for smoke testing nodes
@@ -44,20 +49,20 @@ protected:
     }
 
     auto make_test_read(std::string read_id) {
-        auto read = dorado::ReadPtr::make();
-        read->raw_data = torch::rand(random_between(100, 200));
+        auto read = std::make_unique<dorado::Read>();
+        read->read_common.raw_data = torch::rand(random_between(100, 200));
         read->sample_rate = 5000;
         read->shift = random_between(100, 200);
         read->scale = random_between(5, 10);
-        read->read_id = std::move(read_id);
-        read->seq = "ACGTACGT";
-        read->qstring = "********";
+        read->read_common.read_id = std::move(read_id);
+        read->read_common.seq = "ACGTACGT";
+        read->read_common.qstring = "********";
         read->num_trimmed_samples = random_between(10, 100);
-        read->attributes.mux = 2;
-        read->attributes.read_number = 12345;
-        read->attributes.channel_number = 5;
-        read->attributes.start_time = "2017-04-29T09:10:04Z";
-        read->attributes.fast5_filename = "test.fast5";
+        read->read_common.attributes.mux = 2;
+        read->read_common.attributes.read_number = 12345;
+        read->read_common.attributes.channel_number = 5;
+        read->read_common.attributes.start_time = "2017-04-29T09:10:04Z";
+        read->read_common.attributes.fast5_filename = "test.fast5";
         return read;
     }
 
@@ -164,8 +169,9 @@ DEFINE_TEST(NodeSmokeTestRead, "ScalerNode") {
     set_pipeline_restart(pipeline_restart);
 
     // Scaler node expects i16 input
-    set_read_mutator(
-            [](dorado::ReadPtr& read) { read->raw_data = read->raw_data.to(torch::kI16); });
+    set_read_mutator([](dorado::ReadPtr& read) {
+        read->read_common.raw_data = read->read_common.raw_data.to(torch::kI16);
+    });
 
     dorado::SignalNormalisationParams config;
     config.quantile_a = 0.2;
@@ -180,12 +186,12 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
     CAPTURE(gpu);
     auto pipeline_restart = GENERATE(false, true);
     CAPTURE(pipeline_restart);
+    auto model_name = GENERATE("dna_r10.4.1_e8.2_400bps_fast@v4.2.0", "rna004_130bps_fast@v3.0.1");
 
     set_pipeline_restart(pipeline_restart);
 
     const int kBatchTimeoutMS = 100;
     const auto& default_params = dorado::utils::default_parameters;
-    const char model_name[] = "dna_r10.4.1_e8.2_400bps_fast@v4.2.0";
     const auto model_dir = download_model(model_name);
     const auto model_path = (model_dir.m_path / model_name).string();
     auto model_config = dorado::load_crf_model_config(model_path);
@@ -288,15 +294,17 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
 
     // ModBase node expects half input and needs a move table
     set_read_mutator([this, model_stride](dorado::ReadPtr& read) {
-        read->raw_data = read->raw_data.to(torch::kHalf);
+        read->read_common.raw_data = read->read_common.raw_data.to(torch::kHalf);
 
-        read->model_stride = model_stride;
+        read->read_common.model_stride = model_stride;
         // The move table size needs rounding up.
-        size_t const move_table_size = (read->raw_data.size(0) + model_stride - 1) / model_stride;
-        read->moves.resize(move_table_size);
-        std::fill_n(read->moves.begin(), read->seq.size(), 1);
+        size_t const move_table_size =
+                (read->read_common.raw_data.size(0) + model_stride - 1) / model_stride;
+        read->read_common.moves.resize(move_table_size);
+        std::fill_n(read->read_common.moves.begin(), read->read_common.seq.size(), 1);
         // First element must be 1, the rest can be shuffled
-        std::shuffle(std::next(read->moves.begin()), read->moves.end(), m_rng);
+        std::shuffle(std::next(read->read_common.moves.begin()), read->read_common.moves.end(),
+                     m_rng);
     });
 
     run_smoke_test<dorado::ModBaseCallerNode>(std::move(remora_runners), 2, model_stride);
@@ -304,29 +312,60 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
 
 DEFINE_TEST(NodeSmokeTestBam, "ReadToBamType") {
     auto emit_moves = GENERATE(true, false);
-    auto rna = GENERATE(true, false);
     auto pipeline_restart = GENERATE(false, true);
     CAPTURE(emit_moves);
-    CAPTURE(rna);
     CAPTURE(pipeline_restart);
 
     set_pipeline_restart(pipeline_restart);
 
-    run_smoke_test<dorado::ReadToBamType>(emit_moves, rna, 2,
+    run_smoke_test<dorado::ReadToBamType>(emit_moves, 2,
                                           dorado::utils::default_parameters.methylation_threshold);
 }
 
 DEFINE_TEST(NodeSmokeTestRead, "BarcodeClassifierNode") {
     auto barcode_both_ends = GENERATE(true, false);
+    auto no_trim = GENERATE(true, false);
     auto pipeline_restart = GENERATE(false, true);
     CAPTURE(barcode_both_ends);
+    CAPTURE(no_trim);
     CAPTURE(pipeline_restart);
 
     set_pipeline_restart(pipeline_restart);
-    set_read_mutator([](dorado::ReadPtr& read) { read->barcode = "test_barcode"; });
 
     std::vector<std::string> kits = {"SQK-RPB004", "EXP-NBD196"};
-    run_smoke_test<dorado::BarcodeClassifierNode>(2, kits, barcode_both_ends);
+    run_smoke_test<dorado::BarcodeClassifierNode>(2, kits, barcode_both_ends, no_trim);
+}
+
+TEST_CASE("BarcodeClassifierNode: test simple pipeline with fastq and sam files") {
+    dorado::PipelineDescriptor pipeline_desc;
+    std::vector<dorado::Message> messages;
+    auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
+    std::vector<std::string> kits = {"EXP-PBC096"};
+    bool barcode_both_ends = GENERATE(true, false);
+    bool no_trim = GENERATE(true, false);
+    auto classifier = pipeline_desc.add_node<dorado::BarcodeClassifierNode>(
+            {sink}, 8, kits, barcode_both_ends, no_trim);
+
+    auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
+
+    fs::path data1 = fs::path(get_data_dir("barcode_demux/double_end_variant")) /
+                     "EXP-PBC096_barcode_both_ends_pass.fastq";
+    fs::path data2 = fs::path(get_data_dir("bam_utils")) / "test.sam";
+    for (auto& test_file : {data1, data2}) {
+        dorado::HtsReader reader(test_file.string());
+        reader.read(*pipeline);
+    }
+}
+
+DEFINE_TEST(NodeSmokeTestRead, "PolyACalculator") {
+    auto pipeline_restart = GENERATE(false, true);
+    auto is_rna = GENERATE(true, false);
+    CAPTURE(pipeline_restart);
+    CAPTURE(is_rna);
+
+    set_pipeline_restart(pipeline_restart);
+
+    run_smoke_test<dorado::PolyACalculator>(8, is_rna);
 }
 
 }  // namespace

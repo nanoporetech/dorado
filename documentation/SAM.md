@@ -11,7 +11,7 @@
 
 |    |    |                                                       |
 | -- | -- | ----------------------------------------------------- |
-| RG | ID | `<runid>_<basecalling_model>`  	                  |
+| RG | ID | `<runid>_<basecalling_model>_<barcode_arrangement>`   |
 |    | PU | `<flow_cell_id>`                                      |
 |    | PM | `<device_id>`                                         |
 |    | DT | `<exp_start_time>`                                    |
@@ -24,21 +24,23 @@
 
 |        |                                                            |
 | ------ | -----------------------------------------------------------|
-| RG:Z:  | `<runid>_<basecalling_model>`                              |
+| RG:Z:  | `<runid>_<basecalling_model>_<barcode_arrangement>`        |
 | qs:i:  | mean basecall qscore rounded to the nearest integer        |
 | ns:i:  | the number of samples in the signal prior to trimming      |
 | ts:i:  | the number of samples trimmed from the start of the signal |
-| mx:i:	 | read mux                                                   |
+| mx:i:  | read mux                                                   |
 | ch:i:  | read channel                                               |
-| rn:i:	 | read number                                                |
-| st:Z:	 | read start time (in UTC)                                   |
-| du:f:	 | duration of the read (in seconds)                          |
-| fn:Z:	 | file name                                                  |
-| sm:f:	 | scaling midpoint/mean/median (pA to ~0-mean/1-sd)          |
-| sd:f:	 | scaling dispersion  (pA to ~0-mean/1-sd)                   |
-| sv:Z:	 | scaling version                                            |
+| rn:i:  | read number                                                |
+| st:Z:  | read start time (in UTC)                                   |
+| du:f:  | duration of the read (in seconds)                          |
+| fn:Z:  | file name                                                  |
+| sm:f:  | scaling midpoint/mean/median (pA to ~0-mean/1-sd)          |
+| sd:f:  | scaling dispersion  (pA to ~0-mean/1-sd)                   |
+| sv:Z:  | scaling version                                            |
 | mv:B:c | sequence to signal move table _(optional)_                 |
 | dx:i:  | bool to signify duplex read _(only in duplex mode)_        |
+| pi:Z:  | parent read id for a split read                            |
+| pt:i:  | estimated poly(A) tail length in cDNA and dRNA reads       |
 
 #### Modified Base Tags
 

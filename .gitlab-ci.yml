@@ -1,6 +1,12 @@
 include:
   - local: .gitlab/sanitizers-ci.yml
 
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+    - if: $CI_PIPELINE_SOURCE == 'schedule'
+    - if: $CI_PIPELINE_SOURCE == 'push'
+
 stages:
   - pre-flight
   - build
@@ -63,6 +69,7 @@ variables:
 .run_dorado_cmake_build: &run_dorado_cmake_build
   - cmake ${BUILD_OPTIONS} -S . -B ${BUILD_DIR}
   - cmake --build ${BUILD_DIR} --config Release --target ${BUILD_TARGET} -j 8
+  - ccache -s || true
 
 .run_dorado_cmake_ctest: &run_dorado_cmake_ctest
   - ctest -C Release --test-dir ${BUILD_DIR} --output-on-failure --verbose
@@ -519,6 +526,31 @@ mlhub:remora-validate:
       - DEVICE: 
         - "cuda:all"
         - "cpu"
+
+# MLHub - Dorado integration test
+mlhub:dorado-integration-tests:
+  <<: *mlhub
+  script:
+    - |
+      curl --header "Content-Type: application/json" \
+      --request POST \
+      --data '{
+          "key": "'${MLHUB_TRIGGER_KEY_DORADO_INTEGRATION_TEST}'",
+          "job_name": "dorado-integration-test : '${CI_COMMIT_REF_NAME}'",
+          "script_parameters": {
+            "dorado_branch":"'${CI_COMMIT_SHA}'",
+            "dorado_build_options":"",
+            "prompt_clean_basecalls": true,
+            "dorado_exe": "",
+            "config": "'${DORADO_INTEGRATION_TEST_MLHUB_CONFIG}'"
+          }
+      }' \
+      ${MLHUB_TRIGGER_URL}
+  rules:
+      - if: $CI_PIPELINE_SOURCE == "schedule"
+      - if: $CI_PIPELINE_SOURCE == "push"
+        when: manual
+        allow_failure: true
 
 # Deploy
 

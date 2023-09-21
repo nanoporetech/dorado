@@ -158,7 +158,6 @@ static const std::unordered_map<std::string, uint16_t> mean_qscore_start_pos_by_
         // e.g. {"dna_r10.4.1_e8.2_5khz_400bps_fast@v4.2.0", 10}
 };
 
-bool is_rna_model(const std::filesystem::path& model);
 bool is_valid_model(const std::string& selected_model);
 void download_models(const std::string& target_directory, const std::string& selected_model);
 

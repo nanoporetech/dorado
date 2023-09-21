@@ -136,7 +136,7 @@ int duplex(int argc, char* argv[]) {
                     "> No duplex pairs file provided, pairing will be performed automatically");
         }
 
-        bool emit_moves = false, rna = false, duplex = true;
+        bool emit_moves = false, duplex = true;
 
         auto output_mode = HtsWriter::OutputMode::BAM;
 
@@ -162,7 +162,7 @@ int duplex(int argc, char* argv[]) {
                                                                          recursive_file_loading));
         spdlog::debug("> Reads to process: {}", num_reads);
 
-        std::unique_ptr<sam_hdr_t, void (*)(sam_hdr_t*)> hdr(sam_hdr_init(), sam_hdr_destroy);
+        SamHdrPtr hdr(sam_hdr_init());
         cli::add_pg_hdr(hdr.get(), args);
 
         PipelineDescriptor pipeline_desc;
@@ -182,7 +182,7 @@ int duplex(int argc, char* argv[]) {
             converted_reads_sink = aligner;
         }
         auto read_converter =
-                pipeline_desc.add_node<ReadToBamType>({converted_reads_sink}, emit_moves, rna, 2);
+                pipeline_desc.add_node<ReadToBamType>({converted_reads_sink}, emit_moves, 2);
         auto duplex_read_tagger = pipeline_desc.add_node<DuplexReadTaggingNode>({read_converter});
         // The minimum sequence length is set to 5 to avoid issues with duplex node printing very short sequences for mismatched pairs.
         std::unordered_set<std::string> read_ids_to_filter;
@@ -273,7 +273,8 @@ int duplex(int argc, char* argv[]) {
             auto read_groups = DataLoader::load_read_groups(reads, model, recursive_file_loading);
             read_groups.merge(
                     DataLoader::load_read_groups(reads, duplex_rg_name, recursive_file_loading));
-            utils::add_rg_hdr(hdr.get(), read_groups);
+            std::vector<std::string> barcode_kits;
+            utils::add_rg_hdr(hdr.get(), read_groups, barcode_kits);
 
             int batch_size(parser.get<int>("-b"));
             int chunk_size(parser.get<int>("-c"));

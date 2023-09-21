@@ -4,12 +4,16 @@ add_library(dorado_utils
     AsyncQueue.h
     bam_utils.cpp
     bam_utils.h
+    barcode_kits.cpp
+    barcode_kits.h
     basecaller_utils.cpp
     basecaller_utils.h
     compat_utils.cpp
     compat_utils.h
     dev_utils.cpp
     dev_utils.h
+    driver_query.cpp
+    driver_query.h
     duplex_utils.cpp
     duplex_utils.h
     log_utils.cpp
@@ -18,6 +22,7 @@ add_library(dorado_utils
     memory_utils.cpp
     memory_utils.h
     module_utils.h
+    parameters.cpp
     parameters.h
     sequence_utils.cpp
     sequence_utils.h
@@ -55,10 +60,12 @@ target_compile_definitions(dorado_utils
         DORADO_GPU_BUILD=$<BOOL:${DORADO_GPU_BUILD}>
 )
 
-target_precompile_headers(dorado_utils
-    PRIVATE
-    <torch/torch.h>
-)
+if (DORADO_ENABLE_PCH)
+    target_precompile_headers(dorado_utils
+        PRIVATE
+        <torch/torch.h>
+    )
+endif()
 
 # 3rdparty libs should be considered SYSTEM headers
 target_include_directories(dorado_utils

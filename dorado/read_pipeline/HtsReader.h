@@ -41,7 +41,7 @@ private:
 
 template <typename T>
 T HtsReader::get_tag(std::string tagname) {
-    T tag_value;
+    T tag_value{};
     uint8_t* tag = bam_aux_get(record.get(), tagname.c_str());
 
     if (!tag) {

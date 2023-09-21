@@ -50,15 +50,17 @@ void ScalerNode::worker_thread() {
 
         auto read = std::get<ReadPtr>(std::move(message));
 
-        assert(read->raw_data.dtype() == torch::kInt16);
+        assert(read->read_common.raw_data.dtype() == torch::kInt16);
         const auto [shift, scale] = m_scaling_params.quantile_scaling
-                                            ? normalisation(read->raw_data)
-                                            : med_mad(read->raw_data);
+                                            ? normalisation(read->read_common.raw_data)
+                                            : med_mad(read->read_common.raw_data);
         read->scaling_method = m_scaling_params.quantile_scaling ? "quantile" : "med_mad";
 
         // raw_data comes from DataLoader with dtype int16.  We send it on as float16 after
         // shifting/scaling in float32 form.
-        read->raw_data = ((read->raw_data.to(torch::kFloat) - shift) / scale).to(torch::kFloat16);
+        read->read_common.raw_data =
+                ((read->read_common.raw_data.to(torch::kFloat) - shift) / scale)
+                        .to(torch::kFloat16);
 
         // move the shift and scale into pA.
         read->scale = read->scaling * scale;
@@ -68,12 +70,14 @@ void ScalerNode::worker_thread() {
         int trim_start = 0;
         if (!m_is_rna) {
             // 8000 value may be changed in future. Currently this is found to work well.
-            int max_samples = std::min(8000, static_cast<int>(read->raw_data.size(0) / 2));
-            trim_start =
-                    utils::trim(read->raw_data.index({Slice(torch::indexing::None, max_samples)}));
+            int max_samples =
+                    std::min(8000, static_cast<int>(read->read_common.raw_data.size(0) / 2));
+            trim_start = utils::trim(
+                    read->read_common.raw_data.index({Slice(torch::indexing::None, max_samples)}));
         }
 
-        read->raw_data = read->raw_data.index({Slice(trim_start, torch::indexing::None)});
+        read->read_common.raw_data =
+                read->read_common.raw_data.index({Slice(trim_start, torch::indexing::None)});
         read->num_trimmed_samples = trim_start;
 
         // Pass the read to the next node

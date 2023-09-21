@@ -42,8 +42,9 @@ sanitize:linux:x86:focal:
     # Setup sanitizers
     - !reference [.sanitizer_common, before_script]
     # We need to modify ASAN_OPTIONS for the following reasons:
+    #   protect_shadow_gap - CUDA maps the same memory region as ASAN, so tell it to move the shadow
     #   detect_leaks - LeakSanitizer errors out for some reason
-    - export ASAN_OPTIONS=${ASAN_OPTIONS}:detect_leaks=0
+    - export ASAN_OPTIONS=${ASAN_OPTIONS}:protect_shadow_gap=0:detect_leaks=0
 
 sanitize:linux:arm64:bionic:
   extends:

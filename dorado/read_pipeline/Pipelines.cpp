@@ -19,7 +19,6 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
                              std::vector<std::unique_ptr<dorado::ModBaseRunner>>&& modbase_runners,
                              size_t overlap,
                              uint32_t mean_qscore_start_pos,
-                             bool model_is_rna,
                              int scaler_node_threads,
                              int splitter_node_threads,
                              int modbase_node_threads,
@@ -34,12 +33,6 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
         overlap = adjusted_overlap;
     }
 
-    auto mod_base_caller_node = PipelineDescriptor::InvalidNodeHandle;
-    if (!modbase_runners.empty()) {
-        mod_base_caller_node = pipeline_desc.add_node<ModBaseCallerNode>(
-                {}, std::move(modbase_runners), modbase_node_threads, model_stride);
-    }
-
     const int kBatchTimeoutMS = 100;
     std::string model_name =
             std::filesystem::canonical(model_config.model_path).filename().string();
@@ -50,7 +43,7 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
     // will just pass data through.
     DuplexSplitSettings splitter_settings;
     splitter_settings.simplex_mode = true;
-    splitter_settings.enabled = !model_is_rna;
+    splitter_settings.enabled = !is_rna_model(model_config);
     auto splitter_node =
             pipeline_desc.add_node<DuplexSplitNode>({}, splitter_settings, splitter_node_threads);
 
@@ -58,16 +51,17 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
             {splitter_node}, std::move(runners), overlap, kBatchTimeoutMS, model_name, 1000,
             "BasecallerNode", false, mean_qscore_start_pos);
 
-    NodeHandle last_node_handle = PipelineDescriptor::InvalidNodeHandle;
-    if (mod_base_caller_node != PipelineDescriptor::InvalidNodeHandle) {
-        pipeline_desc.add_node_sink(splitter_node, mod_base_caller_node);
+    NodeHandle last_node_handle = splitter_node;
+    if (!modbase_runners.empty()) {
+        auto mod_base_caller_node = pipeline_desc.add_node<ModBaseCallerNode>(
+                {}, std::move(modbase_runners), modbase_node_threads, model_stride);
+        pipeline_desc.add_node_sink(basecaller_node, mod_base_caller_node);
         last_node_handle = mod_base_caller_node;
-    } else {
-        last_node_handle = splitter_node;
     }
 
-    auto scaler_node = pipeline_desc.add_node<ScalerNode>(
-            {basecaller_node}, model_config.signal_norm_params, model_is_rna, scaler_node_threads);
+    auto scaler_node =
+            pipeline_desc.add_node<ScalerNode>({basecaller_node}, model_config.signal_norm_params,
+                                               is_rna_model(model_config), scaler_node_threads);
 
     // if we've been provided a source node, connect it to the start of our pipeline
     if (source_node_handle != PipelineDescriptor::InvalidNodeHandle) {

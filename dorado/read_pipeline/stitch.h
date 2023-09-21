@@ -12,6 +12,7 @@ namespace dorado::utils {
 // A single chunk
 struct Chunk {
     Chunk(size_t offset, size_t chunk_size) : input_offset(offset), raw_chunk_size(chunk_size) {}
+    virtual ~Chunk() = default;
 
     size_t input_offset;    // Where does this chunk start in the input raw read data
     size_t raw_chunk_size;  // Just for knowing the original chunk size

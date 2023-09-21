@@ -90,10 +90,10 @@ ReadMap read_bam(const std::string& filename, const std::unordered_set<std::stri
             nucleotides[i] = seq_nt16_str[bam_seqi(sequence, i)];
         }
 
-        auto tmp_read = ReadPtr::make();
-        tmp_read->read_id = read_id;
-        tmp_read->seq = std::string(nucleotides.begin(), nucleotides.end());
-        tmp_read->qstring = std::string(qualities.begin(), qualities.end());
+        auto tmp_read = std::make_unique<Read>();
+        tmp_read->read_common.read_id = read_id;
+        tmp_read->read_common.seq = std::string(nucleotides.begin(), nucleotides.end());
+        tmp_read->read_common.qstring = std::string(qualities.begin(), qualities.end());
         reads[read_id] = std::move(tmp_read);
     }
 

@@ -225,4 +225,18 @@ const std::vector<int> BaseInfo::BASE_IDS = []() {
     return base_ids;
 }();
 
+// Utility function for counting number of trailing base sof a particular type
+// in a given read.
+int count_trailing_chars(const std::string_view adapter, char c) {
+    int count = 0;
+    for (int i = adapter.length() - 1; i >= 0; i--) {
+        if (adapter[i] == c) {
+            count++;
+        } else {
+            break;
+        }
+    }
+    return count;
+}
+
 }  // namespace dorado::utils

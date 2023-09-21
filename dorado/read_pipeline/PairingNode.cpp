@@ -10,9 +10,10 @@
 #include <limits>
 
 namespace {
-const int kMaxTimeDeltaMs = 1000;
-const float kMinSeqLenRatio = 0.2f;
+const int kMaxTimeDeltaMs = 10000;
 const int kMinOverlapLength = 50;
+const int kMinSeqLength = 500;
+const float kMinSimplexQScore = 8.f;
 }  // namespace
 
 namespace dorado {
@@ -33,27 +34,29 @@ namespace dorado {
 PairingNode::PairingResult PairingNode::is_within_time_and_length_criteria(const dorado::Read& temp,
                                                                            const dorado::Read& comp,
                                                                            int tid) {
-    int delta = comp.start_time_ms - temp.get_end_time_ms();
-    int seq_len1 = temp.seq.length();
-    int seq_len2 = comp.seq.length();
+    int delta = comp.read_common.start_time_ms - temp.get_end_time_ms();
+    int seq_len1 = temp.read_common.seq.length();
+    int seq_len2 = comp.read_common.seq.length();
     int min_seq_len = std::min(seq_len1, seq_len2);
     int max_seq_len = std::max(seq_len1, seq_len2);
-    float len_ratio = static_cast<float>(min_seq_len) / static_cast<float>(max_seq_len);
+    float min_qscore = std::min(temp.calculate_mean_qscore(), comp.calculate_mean_qscore());
 
-    if ((delta < 0) || (delta >= kMaxTimeDeltaMs) || (len_ratio <= kMinSeqLenRatio) ||
-        (min_seq_len <= kMinOverlapLength)) {
+    if ((delta < 0) || (delta >= kMaxTimeDeltaMs) || (min_seq_len < kMinSeqLength) ||
+        (min_qscore < kMinSimplexQScore)) {
         return {false, 0, 0, 0, 0};
     }
 
     const float kEarlyAcceptSeqLenRatio = 0.98;
     const int kEarlyAcceptTimeDeltaMs = 100;
+    float len_ratio = static_cast<float>(min_seq_len) / static_cast<float>(max_seq_len);
     if (delta <= kEarlyAcceptTimeDeltaMs && len_ratio >= kEarlyAcceptSeqLenRatio &&
         min_seq_len >= 5000) {
         spdlog::debug("Early acceptance: len frac {}, delta {} temp len {}, comp len {}, {} and {}",
-                      len_ratio, delta, temp.seq.length(), comp.seq.length(), temp.read_id,
-                      comp.read_id);
+                      len_ratio, delta, temp.read_common.seq.length(),
+                      comp.read_common.seq.length(), temp.read_common.read_id,
+                      comp.read_common.read_id);
         m_early_accepted_pairs++;
-        return {true, 0, temp.seq.length() - 1, 0, comp.seq.length() - 1};
+        return {true, 0, temp.read_common.seq.length() - 1, 0, comp.read_common.seq.length() - 1};
     }
 
     return is_within_alignment_criteria(temp, comp, delta, true, tid);
@@ -73,8 +76,8 @@ PairingNode::PairingResult PairingNode::is_within_alignment_criteria(const dorad
     mm_set_opt(0, &m_idx_opt, &m_map_opt);
     mm_set_opt("map-hifi", &m_idx_opt, &m_map_opt);
 
-    std::vector<const char*> seqs = {temp.seq.c_str()};
-    std::vector<const char*> names = {temp.read_id.c_str()};
+    std::vector<const char*> seqs = {temp.read_common.seq.c_str()};
+    std::vector<const char*> names = {temp.read_common.read_id.c_str()};
     mm_idx_t* m_index = mm_idx_str(m_idx_opt.w, m_idx_opt.k, 0, m_idx_opt.bucket_bits, 1,
                                    seqs.data(), names.data());
     mm_mapopt_update(&m_map_opt, m_index);
@@ -82,13 +85,13 @@ PairingNode::PairingResult PairingNode::is_within_alignment_criteria(const dorad
     mm_tbuf_t* tbuf = m_tbufs[tid].get();
 
     int hits = 0;
-    mm_reg1_t* reg = mm_map(m_index, comp.seq.length(), comp.seq.c_str(), &hits, tbuf, &m_map_opt,
-                            comp.read_id.c_str());
+    mm_reg1_t* reg = mm_map(m_index, comp.read_common.seq.length(), comp.read_common.seq.c_str(),
+                            &hits, tbuf, &m_map_opt, comp.read_common.read_id.c_str());
 
     mm_idx_destroy(m_index);
 
-    // Multiple hits implies ambiguous mapping, so ignore those pairs.
-    if (hits == 1 || (!allow_rejection && hits > 0)) {
+    // When there are multiple hits, pick the primary alignment.
+    if (hits > 0) {
         uint8_t mapq = 0;
         int32_t temp_start = 0;
         int32_t temp_end = 0;
@@ -96,7 +99,9 @@ PairingNode::PairingResult PairingNode::is_within_alignment_criteria(const dorad
         int32_t comp_end = 0;
         bool rev = false;
 
-        auto best_map = &reg[0];
+        auto best_map = std::max_element(
+                reg, reg + hits,
+                [](const mm_reg1_t& l, const mm_reg1_t& r) { return l.mapq < r.mapq; });
         mapq = best_map->mapq;
         temp_start = best_map->rs;
         temp_end = best_map->re;
@@ -111,12 +116,12 @@ PairingNode::PairingResult PairingNode::is_within_alignment_criteria(const dorad
         bool meets_mapq = (mapq >= kMinMapQ);
         // Require overlap to cover most of at least one of the reads.
         float overlap_frac =
-                std::max(static_cast<float>(temp_end - temp_start) / temp.seq.length(),
-                         static_cast<float>(comp_end - comp_start) / comp.seq.length());
+                std::max(static_cast<float>(temp_end - temp_start) / temp.read_common.seq.length(),
+                         static_cast<float>(comp_end - comp_start) / comp.read_common.seq.length());
         bool meets_length = overlap_frac > kMinOverlapFraction;
         // Require the start of the complement strand to map to end
         // of the template strand.
-        bool ends_anchored = (comp_start + (temp.seq.length() - temp_end)) <= 500;
+        bool ends_anchored = (comp_start + (temp.read_common.seq.length() - temp_end)) <= 500;
         int min_overlap_length = std::min(temp_end - temp_start, comp_end - comp_start);
         bool meets_min_overlap_length = min_overlap_length > kMinOverlapLength;
         bool cond =
@@ -126,9 +131,10 @@ PairingNode::PairingResult PairingNode::is_within_alignment_criteria(const dorad
                 "hits {}, mapq {}, overlap length {}, overlap frac {}, delta {}, read 1 {}, "
                 "read 2 {}, strand {}, pass {}, accepted {}, temp start {} temp end {}, "
                 "comp start {} comp end {}, {} and {}",
-                hits, mapq, temp_end - temp_start, overlap_frac, delta, temp.seq.length(),
-                comp.seq.length(), rev ? "-" : "+", cond, !allow_rejection, temp_start, temp_end,
-                comp_start, comp_end, temp.read_id, comp.read_id);
+                hits, mapq, temp_end - temp_start, overlap_frac, delta,
+                temp.read_common.seq.length(), comp.read_common.seq.length(), rev ? "-" : "+", cond,
+                !allow_rejection, temp_start, temp_end, comp_start, comp_end,
+                temp.read_common.read_id, comp.read_common.read_id);
 
         if (cond || !allow_rejection) {
             m_overlap_accepted_pairs++;
@@ -163,7 +169,7 @@ void PairingNode::pair_list_worker_thread(int tid) {
         // Check if read is a template with corresponding complement
         std::unique_lock<std::mutex> tc_lock(m_tc_map_mutex);
 
-        auto it = m_template_complement_map.find(read->read_id);
+        auto it = m_template_complement_map.find(read->read_common.read_id);
         if (it != m_template_complement_map.end()) {
             partner_id = it->second;
             tc_lock.unlock();
@@ -173,7 +179,7 @@ void PairingNode::pair_list_worker_thread(int tid) {
             {
                 tc_lock.unlock();
                 std::lock_guard<std::mutex> ct_lock(m_ct_map_mutex);
-                auto it = m_complement_template_map.find(read->read_id);
+                auto it = m_complement_template_map.find(read->read_common.read_id);
                 if (it != m_complement_template_map.end()) {
                     partner_id = it->second;
                     partner_found = true;
@@ -186,7 +192,7 @@ void PairingNode::pair_list_worker_thread(int tid) {
             auto partner_read_itr = m_read_cache.find(partner_id);
             if (partner_read_itr == m_read_cache.end()) {
                 // Partner is not in the read cache
-                auto read_id = read->read_id;
+                auto read_id = read->read_common.read_id;
                 m_read_cache[read_id] = std::move(read);
                 read_cache_lock.unlock();
             } else {
@@ -205,12 +211,16 @@ void PairingNode::pair_list_worker_thread(int tid) {
                     template_read = std::move(partner_read);
                 }
 
-                int delta = complement_read->start_time_ms - template_read->get_end_time_ms();
+                int delta = complement_read->read_common.start_time_ms -
+                            template_read->get_end_time_ms();
                 auto [is_pair, qs, qe, rs, re] = is_within_alignment_criteria(
                         *template_read, *complement_read, delta, false, tid);
                 if (is_pair) {
-                    ReadPair read_pair = {
-                            template_read.view(), complement_read.view(), qs, qe, rs, re};
+                    ReadPair read_pair;
+                    read_pair.template_read = ReadPair::ReadData::from_read(*template_read, qs, qe);
+                    read_pair.complement_read =
+                            ReadPair::ReadData::from_read(*complement_read, rs, re);
+
                     template_read->is_duplex_parent = true;
                     complement_read->is_duplex_parent = true;
                     ++template_read->num_duplex_candidate_pairs;
@@ -218,7 +228,8 @@ void PairingNode::pair_list_worker_thread(int tid) {
                     send_message_to_sink(std::move(read_pair));
                 } else {
                     spdlog::debug("- rejected explicitly requested read pair: {} and {}",
-                                  template_read->read_id, complement_read->read_id);
+                                  template_read->read_common.read_id,
+                                  complement_read->read_common.read_id);
                 }
             }
         }
@@ -230,7 +241,7 @@ void PairingNode::pair_generating_worker_thread(int tid) {
     torch::InferenceMode inference_mode_guard;
 
     auto compare_reads_by_time = [](const ReadPtr& read1, const ReadPtr& read2) {
-        return read1->start_time_ms < read2->start_time_ms;
+        return read1->read_common.start_time_ms < read2->read_common.start_time_ms;
     };
 
     Message message;
@@ -261,10 +272,10 @@ void PairingNode::pair_generating_worker_thread(int tid) {
         nvtx3::scoped_range loop{nvtx_id};
         auto read = std::get<ReadPtr>(std::move(message));
 
-        int channel = read->attributes.channel_number;
-        std::string run_id = read->run_id;
-        std::string flowcell_id = read->flowcell_id;
-        int32_t client_id = read->client_id;
+        int channel = read->read_common.attributes.channel_number;
+        std::string run_id = read->read_common.run_id;
+        std::string flowcell_id = read->read_common.flowcell_id;
+        int32_t client_id = read->read_common.client_id;
 
         std::unique_lock<std::mutex> lock(m_pairing_mtx);
 
@@ -304,22 +315,15 @@ void PairingNode::pair_generating_worker_thread(int tid) {
             Read* later_read = nullptr;
             Read* earlier_read = nullptr;
 
-            // TODO: |ReadPair| still uses a complete |Read| object, however a duplex read message should be
-            // able to get rid of this.
-            std::shared_ptr<const Read> later_read_view, earlier_read_view;
-            auto read_view = read.view();
-
             auto later_read_iter = std::lower_bound(
                     cached_read_list.begin(), cached_read_list.end(), read, compare_reads_by_time);
             if (later_read_iter != cached_read_list.end()) {
                 later_read = later_read_iter->get();
-                later_read_view = later_read_iter->view();
                 m_reads_in_flight_ctr[later_read]++;
             }
 
             if (later_read_iter != cached_read_list.begin()) {
                 earlier_read = std::prev(later_read_iter)->get();
-                earlier_read_view = std::prev(later_read_iter)->view();
                 m_reads_in_flight_ctr[earlier_read]++;
             }
 
@@ -341,8 +345,10 @@ void PairingNode::pair_generating_worker_thread(int tid) {
                 auto [is_pair, qs, qe, rs, re] =
                         is_within_time_and_length_criteria(*read_ptr, *later_read, tid);
                 if (is_pair) {
-                    ReadPair pair = {
-                            std::move(read_view), std::move(later_read_view), qs, qe, rs, re};
+                    ReadPair pair;
+                    pair.template_read = ReadPair::ReadData::from_read(*read_ptr, qs, qe);
+                    pair.complement_read = ReadPair::ReadData::from_read(*later_read, rs, re);
+
                     read_ptr->is_duplex_parent = true;
                     later_read->is_duplex_parent = true;
                     ++read_ptr->num_duplex_candidate_pairs;
@@ -355,8 +361,10 @@ void PairingNode::pair_generating_worker_thread(int tid) {
                 auto [is_pair, qs, qe, rs, re] =
                         is_within_time_and_length_criteria(*earlier_read, *read_ptr, tid);
                 if (is_pair) {
-                    ReadPair pair = {
-                            std::move(earlier_read_view), std::move(read_view), qs, qe, rs, re};
+                    ReadPair pair;
+                    pair.template_read = ReadPair::ReadData::from_read(*earlier_read, qs, qe);
+                    pair.complement_read = ReadPair::ReadData::from_read(*read_ptr, rs, re);
+
                     earlier_read->is_duplex_parent = true;
                     read_ptr->is_duplex_parent = true;
                     ++earlier_read->num_duplex_candidate_pairs;

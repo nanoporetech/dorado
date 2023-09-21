@@ -21,7 +21,9 @@ struct AlignmentOps {
     size_t substitutions;
 };
 
-void add_rg_hdr(sam_hdr_t* hdr, const std::unordered_map<std::string, ReadGroup>& read_groups);
+void add_rg_hdr(sam_hdr_t* hdr,
+                const std::unordered_map<std::string, ReadGroup>& read_groups,
+                const std::vector<std::string>& barcode_kits);
 
 void add_sq_hdr(sam_hdr_t* hdr, const sq_t& seqs);
 
@@ -72,5 +74,42 @@ AlignmentOps get_alignment_op_counts(bam1_t* record);
  */
 std::map<std::string, std::string> extract_pg_keys_from_hdr(const std::string filename,
                                                             const std::vector<std::string>& keys);
+
+/*
+ * Extract the sequence string.
+ *
+ * @param input_record Record to fetch sequence from..
+ * @param seqlen Sequence length.
+ * @return Vector of sequence quality.
+ */
+std::string extract_sequence(bam1_t* input_record, int seqlen);
+
+/*
+ * Extract the sequence quality information.
+ *
+ * @param input_record Record to fetch quality from.
+ * @param seqlen Sequence length.
+ * @return Vector of sequence quality.
+ */
+std::vector<uint8_t> extract_quality(bam1_t* input_record, int seqlen);
+
+/*
+ * Extract the move table from a record, if it exists.
+ *
+ * @param input_record Record to fetch move table from.
+ * @return Tuple where first element is the strice and second element is the vector with moves.
+ * An empty vector and stride = 0 are returned if move table doesn't exist.
+ */
+std::tuple<int, std::vector<uint8_t>> extract_move_table(bam1_t* input_record);
+
+/*
+ * Extract mod base tag information from a record.
+ *
+ * @param input_record Record to fetch mod base information from.
+ * @return A tuple where the first element is the modbase tag string, and the
+ * second is a vector with modbase probabilities. If no modbase information
+ * is found, an empty string and vector are returned respectively.
+ */
+std::tuple<std::string, std::vector<uint8_t>> extract_modbase_info(bam1_t* input_record);
 
 }  // namespace dorado::utils
