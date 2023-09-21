@@ -109,6 +109,7 @@ add_subdirectory(${DORADO_3RD_PARTY}/date EXCLUDE_FROM_ALL)
 
 enable_testing()
 
+add_subdirectory(dorado/models)
 add_subdirectory(dorado/utils)
 
 if("${CUDA_VERSION}" STREQUAL "")
@@ -424,23 +425,6 @@ elseif(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     file(GLOB TORCH_DLLS "${TORCH_LIB}/lib/*.dylib")
     install(FILES ${TORCH_DLLS} DESTINATION lib COMPONENT redist_libs)
 endif()
-
-add_library(dorado_models_lib
-    dorado/models/models.cpp
-    dorado/models/models.h
-)
-
-target_link_libraries(dorado_models_lib
-    OpenSSL::SSL
-    elzip
-)
-
-target_include_directories(dorado_models_lib
-    SYSTEM
-    PRIVATE
-        ${DORADO_3RD_PARTY}/cpp-httplib
-        ${DORADO_3RD_PARTY}/spdlog/include
-)
 
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     add_library(dorado_io_lib
