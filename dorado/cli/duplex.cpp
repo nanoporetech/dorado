@@ -17,6 +17,7 @@
 #include "utils/duplex_utils.h"
 #include "utils/log_utils.h"
 #include "utils/parameters.h"
+#include "utils/torch_utils.h"
 #include "utils/types.h"
 
 #include <argparse.hpp>
@@ -35,7 +36,7 @@ using namespace std::chrono_literals;
 int duplex(int argc, char* argv[]) {
     using dorado::utils::default_parameters;
     utils::InitLogging();
-    cli::make_torch_deterministic();
+    utils::make_torch_deterministic();
     torch::set_num_threads(1);
 
     argparse::ArgumentParser parser("dorado", DORADO_VERSION, argparse::default_arguments::help);

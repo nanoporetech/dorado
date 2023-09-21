@@ -21,6 +21,7 @@
 #include "utils/log_utils.h"
 #include "utils/parameters.h"
 #include "utils/stats.h"
+#include "utils/torch_utils.h"
 
 #include <argparse.hpp>
 #include <htslib/sam.h>
@@ -246,7 +247,7 @@ void setup(std::vector<std::string> args,
 
 int basecaller(int argc, char* argv[]) {
     utils::InitLogging();
-    cli::make_torch_deterministic();
+    utils::make_torch_deterministic();
     torch::set_num_threads(1);
 
     argparse::ArgumentParser parser("dorado", DORADO_VERSION, argparse::default_arguments::help);

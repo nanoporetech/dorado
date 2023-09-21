@@ -2,7 +2,6 @@
 #pragma once
 
 #include "Version.h"
-#include "utils/compat_utils.h"
 #include "utils/dev_utils.h"
 
 #include <argparse.hpp>
@@ -21,20 +20,6 @@
 namespace dorado {
 
 namespace cli {
-
-inline void make_torch_deterministic() {
-#if DORADO_GPU_BUILD && !defined __APPLE__
-    setenv("CUBLAS_WORKSPACE_CONFIG", ":4096:8", true);
-    torch::globalContext().setDeterministicCuDNN(true);
-    torch::globalContext().setBenchmarkCuDNN(false);
-#endif
-
-#if TORCH_VERSION_MAJOR > 1
-    torch::globalContext().setDeterministicAlgorithms(true, false);
-#else
-    torch::globalContext().setDeterministicAlgorithms(true);
-#endif
-}
 
 // Determine the thread allocation for writer and aligner threads
 // in dorado aligner.
