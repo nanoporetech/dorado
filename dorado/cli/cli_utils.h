@@ -107,11 +107,14 @@ inline std::vector<T> parse_string_to_sizes(const std::string& str,
             throw std::runtime_error(msg);
         }
         if (*p == 'G' || *p == 'g') {
-            x *= 1e9, ++p;
+            x *= 1e9;
+            ++p;
         } else if (*p == 'M' || *p == 'm') {
-            x *= 1e6, ++p;
+            x *= 1e6;
+            ++p;
         } else if (*p == 'K' || *p == 'k') {
-            x *= 1e3, ++p;
+            x *= 1e3;
+            ++p;
         }
         sizes.emplace_back(x + .499);
         if (*p == ',') {
@@ -139,7 +142,7 @@ inline bool parse_yes_or_no(const std::string& str, std::optional<std::string> o
         return true;
     if (str == "no" || str == "n")
         return false;
-    auto msg = "Unsupported value '" + str + "'; option  only accepts 'yes' or 'no'.";
+    auto msg = "Unsupported value '" + str + "'; option  only accepts '(y)es' or '(n)o'.";
     if (opt)
         msg = "Error parsing option " + *opt + ": " + msg;
     throw std::runtime_error(msg);
