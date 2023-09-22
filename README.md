@@ -8,11 +8,11 @@ Dorado is a high-performance, easy-to-use, open source basecaller for Oxford Nan
 * Runs on Apple silicon (M1/2 family) and Nvidia GPUs including multi-GPU with linear scaling (see [Platforms](#platforms)).
 * [Modified basecalling](#modified-basecalling).
 * [Duplex basecalling](#duplex) (watch the following video for an introduction to [Duplex](https://youtu.be/8DVMG7FEBys)).
+* Simplex [barcode classification](#barcode-classification).
 * Support for aligned read output in SAM/BAM.
 * [POD5](https://github.com/nanoporetech/pod5-file-format) support for highest basecalling performance.
 * Based on libtorch, the C++ API for pytorch.
 * Multiple custom optimisations in CUDA and Metal for maximising inference performance.
-* Simplex [barcode classification](#barcode-classification).
 
 If you encounter any problems building or running Dorado, please [report an issue](https://github.com/nanoporetech/dorado/issues).
 
@@ -141,16 +141,16 @@ Dorado supports barcode classification for existing basecalls as well as produci
 
 #### In-line with basecalling
 
-In this mode, reads are classified into their barcode groups during basecalling as part of the same command. To enable that, run
+In this mode, reads are classified into their barcode groups during basecalling as part of the same command. To enable this, run
 ```
 dorado basecaller <model> <reads> --kit-name <barcode-kit-name>
 ```
 
 This will result in a single output stream with classified reads. The classification will be reflected in the read group name as well as in the `BC` tag of the alignment record.
 
-By default `dorado` is setup to trim the barcode from the reads. To disable that, add `--no-trim` to the cmdline.
+By default `dorado` is set up to trim the barcode from the reads. To disable that, add `--no-trim` to the cmdline.
 
-The default heuristic for double-ended barcodes is to look for them on either end of the read. This results in a higher classification rate but can also result in a higher false positive count. To address this, `dorado` also provides a `--barcode-both-ends` option to force double-ended barcodes to be detected on both ends before classification. This will reduce false positive dramatically, but also lower overall classification rates.
+The default heuristic for double-ended barcodes is to look for them on either end of the read. This results in a higher classification rate but can also result in a higher false positive count. To address this, `dorado` also provides a `--barcode-both-ends` option to force double-ended barcodes to be detected on both ends before classification. This will reduce false positives dramatically, but also lower overall classification rates.
 
 The output from `dorado` can be demultiplexed into per-barcode BAMs using `samtools split`. e.g.
 
@@ -160,10 +160,12 @@ samtools split -u <basecalled-bam> -f <output-dir>/<prefix>_%!.bam
 
 #### Classifying existing datasets
 
-Existing basecalled datasets can be classified as well as demultiplxed into per-barcode BAMs using the standalone `demux` command in `dorado`. To use it, run
+Existing basecalled datasets can be classified as well as demultiplexed into per-barcode BAMs using the standalone `demux` command in `dorado`. To use this, run
 
 ```
-dorado demux --kit-name <kit-name> --output-dir <output-folder-for-demuxed-bams> <reads-in-hts-format>
+dorado demux --kit-name <kit-name> --output-dir <output-folder-for-demuxed-bams> <reads>
+
+# <reads> can either be an HTS format file (e.g. fastq, BAM, etc.) or a stream of an HTS format (e.g. the output of dorado basecalling).
 ```
 
 This results in multiple BAM files being generated in the output folder, one per barcode (formatted as `KITNAME_BARCODEXX.bam` and one for all unclassified reads. As with the in-line mode, `--no-trim` and `--barcode-both-ends` are also available as additional options.
