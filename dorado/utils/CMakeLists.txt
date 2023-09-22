@@ -30,6 +30,7 @@ add_library(dorado_utils
     tensor_utils.cpp
     tensor_utils.h
     time_utils.h
+    torch_utils.h
     trim.cpp
     trim.h
     tty_utils.h

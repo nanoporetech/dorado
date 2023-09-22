@@ -17,12 +17,14 @@
 #include <optional>
 #include <regex>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
 using namespace std::chrono;
 
 namespace dorado::utils {
+
 namespace {
 
 /**
@@ -71,45 +73,47 @@ public:
     }
 };
 
+enum class MatmulMode { TORCH, CUBLAS };
+
+MatmulMode get_cuda_matmul_fp16_mode() {
+    const char *env_matmul_fp16_mode = std::getenv("DORADO_MATMUL_FP16_MODE");
+    if (env_matmul_fp16_mode != nullptr) {
+        std::string_view matmul_fp16_mode_str(env_matmul_fp16_mode);
+        spdlog::debug("> Found DORADO_MATMUL_FP16_MODE={}", matmul_fp16_mode_str);
+        if (matmul_fp16_mode_str == "TORCH") {
+            spdlog::debug(">   Using torch::matmul");
+            return MatmulMode::TORCH;
+        } else if (matmul_fp16_mode_str == "CUBLAS") {
+            spdlog::debug(">   Using cublasGemmEx");
+            return MatmulMode::CUBLAS;
+        }
+        spdlog::debug(">   Ignoring unrecognized option. Select from TORCH or CUBLAS.");
+    }
+
+    // torch::matmul() is a bit slower than cublasGemmEx() on A100 and V100, and 2x slower on TX2
+    // but an order of magnitude faster on 1080 Ti (sm61)
+    cudaDeviceProp *prop = at::cuda::getCurrentDeviceProperties();
+    bool is_sm61 = (prop->major == 6 && prop->minor == 1);
+    if (is_sm61) {
+        return MatmulMode::TORCH;
+    }
+    return MatmulMode::CUBLAS;
+}
+
 }  // namespace
 
 void matmul_f16(const torch::Tensor &A, const torch::Tensor &B, torch::Tensor &C) {
-    // torch::matmul() is a bit slower than cublasGemmEx() on A100 and half the speed on V100,
-    // but an order of magnitude faster on our Windows CI machines (1080 Ti), so dynamically
-    // pick which one we should use on first invocation.
-    static const auto fastest_mat_mul = [] {
-        CUDATimer cuda_timer;
-
-        // Arbitrary tensor lengths to benchmark against.
-        // Note: even with sizes this small it still takes ~2s to benchmark cuBLAS on a 1080 Ti.
-        const int L = 2048;
-        const int M = 192;
-        const int N = 384;
-
-        auto options = torch::TensorOptions().dtype(torch::kFloat16).device(c10::kCUDA);
-        auto a = torch::empty({L, M}, options);
-        auto b = torch::empty({M, N}, options);
-        auto c = torch::empty({L, N}, options);
-
-        auto run_N_times = [&](auto matmul_impl) {
-            const size_t N = 1000;
-            // Warmup then profile
-            for (size_t i = 0; i < 10; i++) {
-                matmul_impl(a, b, c);
-            }
-            cuda_timer.start();
-            for (size_t i = 0; i < N; i++) {
-                matmul_impl(a, b, c);
-            }
-            cuda_timer.stop();
-            return cuda_timer.result_ms();
-        };
-
-        float const torch_time = run_N_times(details::matmul_f16_torch);
-        float const cublas_time = run_N_times(details::matmul_f16_cublas);
-        return cublas_time < torch_time ? details::matmul_f16_cublas : details::matmul_f16_torch;
+    static const auto selected_mat_mul = [] {
+        switch (get_cuda_matmul_fp16_mode()) {
+        case MatmulMode::TORCH:
+            return details::matmul_f16_torch;
+        case MatmulMode::CUBLAS:
+            return details::matmul_f16_cublas;
+        default:
+            throw std::logic_error("Unknown MATMUL_FP16 mode");
+        }
     }();
-    fastest_mat_mul(A, B, C);
+    selected_mat_mul(A, B, C);
 }
 
 std::vector<std::string> parse_cuda_device_string(std::string device_string) {
