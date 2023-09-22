@@ -24,9 +24,12 @@ public:
         int best_n_secondary;
         int bandwidth;
         int bandwidth_long;
+        bool soft_clipping;
+        bool secondary_seq;
+        bool print_aln_seq;
     };
-    static constexpr Minimap2Options dflt_options = {15, 10,  16000000000ull, 500000000ll, true,
-                                                     5,  500, 20000};
+    static constexpr Minimap2Options dflt_options{15,  10,    16000000000ull, 500000000ll, true, 5,
+                                                  500, 20000, false,          false,       false};
 
 public:
     // header_sequence_records is populated by the constructor.

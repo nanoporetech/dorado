@@ -52,6 +52,53 @@ $dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --modified-bases 5mCG
 samtools quickcheck -u $output_dir/calls.bam
 samtools view -h $output_dir/calls.bam > $output_dir/calls.sam
 
+echo dorado aligner options test stage
+
+# list of options and whether they affect the output
+options=(""    "-k 20" "-w 100" "-I 100K" "-K 10" "--secondary no" "-N 1" "-r 10,100" "-Y" "--secondary-seq" "--print-aln-seq")
+changes=(false true    true     false     false   true             true   true        true true              false            )
+
+ref=$data_dir/aligner_test/lambda_ecoli.fasta
+rds=$data_dir/aligner_test/aligner.fastq
+for ((i = 0; i < ${#options[@]}; i++)); do
+    opt=${options[$i]}
+    echo -n "$i: with options '$opt' ... "
+
+    # run dorado aligner
+    if ! $dorado_bin aligner $opt $ref $rds 2>/dev/null | samtools view -h 2>/dev/null > $output_dir/dorado-$i.sam; then
+        echo failed running dorado aligner
+        continue
+    fi
+
+    # check output integrity
+    if ! samtools quickcheck -u $output_dir/dorado-$i.sam; then
+        echo failed sam check
+        continue
+    fi
+
+    # sort and cut output for comparison
+    sort $output_dir/dorado-$i.sam | grep -v '^@PG' | cut -f-11> $output_dir/dorado-$i.ssam
+
+    # compare with minimap2 output
+    if minimap2 -a $opt $ref $rds 2>/dev/null > $output_dir/minimap2-$i.sam; then
+        sort $output_dir/minimap2-$i.sam | grep -v '^@PG' | cut -f-11 > $output_dir/minimap2-$i.ssam
+        if ! diff $output_dir/dorado-$i.ssam $output_dir/minimap2-$i.ssam > /dev/null; then
+            echo failed comparison with minimap2 output
+            continue
+        fi
+    fi
+
+    # check output changed
+    should_change=$(${case_changes[$i]})
+    does_change=$(diff $output_dir/dorado-$i.ssam $output_dir/dorado-0.ssam > /dev/null)
+    if [[ $should_change != $does_change ]]; then
+        $should_change && echo failed to change output || echo failed to preserve output
+        continue
+    fi
+
+    echo success
+done
+
 if ! uname -r | grep -q tegra; then
     echo dorado duplex basespace test stage
     $dorado_bin duplex basespace $data_dir/basespace/pairs.bam --threads 1 --pairs $data_dir/basespace/pairs.txt > $output_dir/calls.bam

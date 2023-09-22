@@ -125,13 +125,10 @@ inline std::vector<T> parse_string_to_sizes(const std::string& str,
             msg = "Error parsing option " + *opt + ": " + msg;
         throw std::runtime_error(msg);
     }
-    while (*p != 0)
-        ;
-    std::cout << std::endl;
     return sizes;
 }
 
-template <class T = int>
+template <class T = uint64_t>
 inline T parse_string_to_size(const std::string& str,
                               std::optional<std::string> opt = std::nullopt) {
     return parse_string_to_sizes<T>(str, opt)[0];
@@ -192,9 +189,24 @@ inline void add_minimap2_arguments(argparse::ArgumentParser& parser, const Optio
             .default_value(dflt.best_n_secondary)
             .template scan<'i', int>();
 
+    parser.add_argument("-Y")
+            .help("minimap2 uses soft clipping for supplementary alignments")
+            .default_value(false)
+            .implicit_value(true);
+
     parser.add_argument("-r")
             .help("minimap2 chaining/alignment bandwidth and long-join bandwidth")
             .default_value(to_size(dflt.bandwidth) + "," + to_size(dflt.bandwidth_long));
+
+    parser.add_argument("--secondary-seq")
+            .help("minimap2 output seq/qual for secondary and supplementary alignments")
+            .default_value(false)
+            .implicit_value(true);
+
+    parser.add_argument("--print-aln-seq")
+            .help("minimap2 debug print qname and aln_seq")
+            .default_value(false)
+            .implicit_value(true);
 }
 
 template <class Options>
@@ -225,6 +237,9 @@ inline Options parse_minimap2_arguments(const argparse::ArgumentParser& parser,
     default:
         throw std::runtime_error("Wrong number of arguments for option '-r'.");
     }
+    res.soft_clipping = parser.template get<bool>("Y");
+    res.secondary_seq = parser.template get<bool>("secondary-seq");
+    res.print_aln_seq = parser.template get<bool>("print-aln-seq");
     return res;
 }
 
