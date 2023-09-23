@@ -630,37 +630,41 @@ public:
 
         // Allocations beyond 4GB can fail, and the linear layer output buffer
         // hits this limit with batch sizes larger than 384 with typical
-        // chunk sizes.  At the same time, the LSTM layer performance benefits
+        // chunk sizes.  We also want to limit memory usage in general.
+        // At the same time, the LSTM layer performance benefits
         // from large batch sizes.
         // We therefore run the linear layer via 1 or more kernel runs, each
-        // with an output buffer with a size <= 4GB, with a reduced batch size.
-        // The linear layer kernel requires a batch size that is an integral
-        // multiple of 48.
+        // with an output buffer of limited size, aiming for <= kMaxBufferSize.
         // As things stand, we need an exactly even split of batch elements in
         // the linear layer output buffers (this could be relaxed).
-        // We therefore need the smallest divisor of batch_size that results in
-        // linear layer output buffers < 4GB, and a linear layer batch size
+        // We therefore want the smallest divisor of batch_size that results in
+        // linear layer output buffers <= kMaxBufferSize, and a linear layer batch size
         // that is an integral multiple of 48.  Since the LSTM batch size is
         // already constrained to be an integral multiple of 48, this means the
         // batch splitting factor must be an exact divisor of the batch_size / 48.
-        // On top of this, we want to restrict kernel run times, so we use a lower
-        // limit than 4 GB.
-        constexpr auto kMaxBufferSize = static_cast<int64_t>(1) << 28;
+
+        // If this target is smaller than the size required for 48 batch elements, then
+        // that size is the best we can do.  The size here is attainable for fast and hac
+        // models, but not sup.
+        constexpr auto kMaxBufferSize = static_cast<int64_t>(1) << 29;
         const auto complete_linear_out_size =
                 static_cast<int64_t>(m_out_chunk_size) * static_cast<int64_t>(m_batch_size) *
                 static_cast<int64_t>(model_config.outsize) * sizeof(float);
         const int num_batch_pieces = m_batch_size / MTL_CORE_BATCH_SIZE;
         for (m_out_split = 1; m_out_split < num_batch_pieces; ++m_out_split) {
             if (num_batch_pieces % m_out_split == 0 &&
-                complete_linear_out_size / m_out_split < kMaxBufferSize)
+                complete_linear_out_size / m_out_split <= kMaxBufferSize)
                 break;
+        }
+        auto piece_size = complete_linear_out_size / m_out_split;
+        if (piece_size > kMaxBufferSize) {
+            spdlog::debug("Did not hit linear layer target output size {} - got {}", kMaxBufferSize, piece_size);
         }
         spdlog::debug("Linear layer split {}", m_out_split);
         // If we exited the loop above without breaking, then m_out_split = num_batch_pieces,
         // which satisfies the divisor criterion, and should mean small enough linear layer
         // output buffers, given other reasonable parameters.
         assert(num_batch_pieces % m_out_split == 0);
-        assert(complete_linear_out_size / m_out_split < kMaxBufferSize);
         assert(m_batch_size % m_out_split == 0);
         m_out_batch_size = m_batch_size / m_out_split;
         assert(m_out_batch_size % MTL_CORE_BATCH_SIZE == 0);
@@ -875,6 +879,7 @@ public:
             decode_lock.unlock();
 
             // Model outputs are split across m_out_split buffers.
+            assert("An assert!");
             assert(m_scores_int8.size() == m_out_split);
             assert(m_bwd.size() == m_out_split);
             assert(m_posts.size() == m_out_split);
