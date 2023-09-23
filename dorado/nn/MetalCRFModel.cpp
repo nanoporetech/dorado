@@ -880,7 +880,6 @@ public:
             decode_lock.unlock();
 
             // Model outputs are split across m_out_split buffers.
-            assert("An assert!");
             assert(m_scores_int8.size() == m_out_split);
             assert(m_bwd.size() == m_out_split);
             assert(m_posts.size() == m_out_split);
