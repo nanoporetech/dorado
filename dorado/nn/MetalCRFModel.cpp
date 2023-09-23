@@ -658,7 +658,8 @@ public:
         }
         auto piece_size = complete_linear_out_size / m_out_split;
         if (piece_size > kMaxBufferSize) {
-            spdlog::debug("Did not hit linear layer target output size {} - got {}", kMaxBufferSize, piece_size);
+            spdlog::debug("Did not hit linear layer target output size {} - got {}", kMaxBufferSize,
+                          piece_size);
         }
         spdlog::debug("Linear layer split {}", m_out_split);
         // If we exited the loop above without breaking, then m_out_split = num_batch_pieces,
