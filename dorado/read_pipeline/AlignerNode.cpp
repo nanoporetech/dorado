@@ -340,14 +340,14 @@ std::vector<BamPtr> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
             flag |= BAM_FSUPPLEMENTARY;
         }
 
-        if (flag & BAM_FSECONDARY && m_map_opt.flag & MM_F_NO_PRINT_2ND)
+        if ((flag & BAM_FSECONDARY) && (m_map_opt.flag & MM_F_NO_PRINT_2ND))
             continue;
 
         const bool skip_seq_qual = !(m_map_opt.flag & MM_F_SOFTCLIP) && (flag & BAM_FSECONDARY) &&
                                    !(m_map_opt.flag & MM_F_SECONDARY_SEQ);
         const bool use_hard_clip =
                 !(m_map_opt.flag & MM_F_SOFTCLIP) &&
-                ((flag & BAM_FSECONDARY && m_map_opt.flag & MM_F_SECONDARY_SEQ) ||
+                (((flag & BAM_FSECONDARY) && (m_map_opt.flag & MM_F_SECONDARY_SEQ)) ||
                  (flag & BAM_FSUPPLEMENTARY));
         const auto BAM_CCLIP = use_hard_clip ? BAM_CHARD_CLIP : BAM_CSOFT_CLIP;
 
