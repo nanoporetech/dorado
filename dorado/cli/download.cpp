@@ -5,6 +5,7 @@
 #include <argparse.hpp>
 #include <spdlog/spdlog.h>
 
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -13,6 +14,33 @@
 namespace fs = std::filesystem;
 
 namespace dorado {
+
+namespace {
+
+void print_models(bool yaml = false) {
+    std::unordered_map<std::string_view, const models::ModelMap& (*)()> all_models;
+    all_models["simplex models"] = models::simplex_models;
+    all_models["stereo models"] = models::stereo_models;
+    all_models["modification models"] = models::modified_models;
+
+    if (yaml) {
+        for (const auto& [type, models] : all_models) {
+            std::cout << type << ":\n";
+            for (const auto& [model, info] : models()) {
+                std::cout << "  - \"" << model << "\"\n";
+            }
+        }
+    } else {
+        for (const auto& [type, models] : all_models) {
+            spdlog::info("> {}", type);
+            for (const auto& [model, info] : models()) {
+                spdlog::info(" - {}", model);
+            }
+        }
+    }
+}
+
+}  // namespace
 
 int download(int argc, char* argv[]) {
     utils::InitLogging();
@@ -29,6 +57,10 @@ int download(int argc, char* argv[]) {
 
     parser.add_argument("--list").default_value(false).implicit_value(true).help(
             "list the available models for download");
+    parser.add_argument("--list-yaml")
+            .help("list the available models for download, as yaml, to stdout")
+            .default_value(false)
+            .implicit_value(true);
 
     try {
         parser.parse_args(argc, argv);
@@ -44,31 +76,17 @@ int download(int argc, char* argv[]) {
     }
 
     auto list = parser.get<bool>("--list");
+    auto list_yaml = parser.get<bool>("--list-yaml");
     auto selected_model = parser.get<std::string>("--model");
     auto directory = fs::path(parser.get<std::string>("--directory"));
     auto permissions = fs::status(directory).permissions();
 
-    auto print_models = [] {
-        spdlog::info("> simplex models");
-        for (const auto& model : simplex::models) {
-            spdlog::info(" - {}", model);
-        }
-        spdlog::info("> stereo models");
-        for (const auto& model : stereo::models) {
-            spdlog::info(" - {}", model);
-        }
-        spdlog::info("> modification models");
-        for (const auto& model : modified::models) {
-            spdlog::info(" - {}", model);
-        }
-    };
-
-    if (list) {
-        print_models();
+    if (list || list_yaml) {
+        print_models(list_yaml);
         return 0;
     }
 
-    if (!utils::is_valid_model(selected_model)) {
+    if (!models::is_valid_model(selected_model)) {
         spdlog::error("> error: '{}' is not a valid model", selected_model);
         print_models();
         return 1;
@@ -100,9 +118,8 @@ int download(int argc, char* argv[]) {
         return 1;
     }
 
-    utils::download_models(directory.string(), selected_model);
-
-    return 0;
+    return models::download_models(directory.string(), selected_model) ? EXIT_SUCCESS
+                                                                       : EXIT_FAILURE;
 }
 
 }  // namespace dorado
