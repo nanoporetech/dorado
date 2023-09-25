@@ -1,4 +1,7 @@
 #define CATCH_CONFIG_RUNNER
+
+#include "utils/torch_utils.h"
+
 #include <catch2/catch.hpp>
 #include <nvtx3/nvtx3.hpp>
 #include <torch/torch.h>
@@ -6,6 +9,7 @@
 int main(int argc, char* argv[]) {
     // global setup...
 
+    dorado::utils::make_torch_deterministic();
     torch::set_num_threads(1);
 
     // Initialize NVTX first before any tests are run. This is
