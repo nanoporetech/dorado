@@ -156,7 +156,7 @@ TempDir download_model(const std::string& model) {
 #endif
 
     // Download it
-    dorado::utils::download_models(path.string(), model);
+    dorado::models::download_models(path.string(), model);
     return TempDir(std::move(path));
 }
 
@@ -257,7 +257,7 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
     // be somewhat realistic we'll use an actual one.
     const char model_name[] = "dna_r10.4.1_e8.2_400bps_fast@v4.2.0";
     const auto model_dir = download_model(model_name);
-    std::size_t const model_stride =
+    const std::size_t model_stride =
             dorado::load_crf_model_config(model_dir.m_path / model_name).stride;
 
     // Create runners

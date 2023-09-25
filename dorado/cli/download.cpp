@@ -18,10 +18,10 @@ namespace dorado {
 namespace {
 
 void print_models(bool yaml = false) {
-    std::unordered_map<std::string_view, const utils::ModelMap& (*)()> all_models;
-    all_models["simplex models"] = utils::simplex_models;
-    all_models["stereo models"] = utils::stereo_models;
-    all_models["modification models"] = utils::modified_models;
+    std::unordered_map<std::string_view, const models::ModelMap& (*)()> all_models;
+    all_models["simplex models"] = models::simplex_models;
+    all_models["stereo models"] = models::stereo_models;
+    all_models["modification models"] = models::modified_models;
 
     if (yaml) {
         for (const auto& [type, models] : all_models) {
@@ -86,7 +86,7 @@ int download(int argc, char* argv[]) {
         return 0;
     }
 
-    if (!utils::is_valid_model(selected_model)) {
+    if (!models::is_valid_model(selected_model)) {
         spdlog::error("> error: '{}' is not a valid model", selected_model);
         print_models();
         return 1;
@@ -118,7 +118,8 @@ int download(int argc, char* argv[]) {
         return 1;
     }
 
-    return utils::download_models(directory.string(), selected_model) ? EXIT_SUCCESS : EXIT_FAILURE;
+    return models::download_models(directory.string(), selected_model) ? EXIT_SUCCESS
+                                                                       : EXIT_FAILURE;
 }
 
 }  // namespace dorado

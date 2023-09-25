@@ -248,8 +248,8 @@ int duplex(int argc, char* argv[]) {
             auto model_sample_rate = model_config.sample_rate;
             if (model_sample_rate < 0) {
                 // If unsuccessful, find sample rate by model name.
-                model_sample_rate = utils::get_sample_rate_by_model_name(
-                        utils::extract_model_from_model_path(model_path.string()));
+                model_sample_rate = models::get_sample_rate_by_model_name(
+                        models::extract_model_from_model_path(model_path.string()));
             }
             auto skip_model_compatibility_check =
                     internal_parser.get<bool>("--skip-model-compatibility-check");
@@ -265,7 +265,7 @@ int duplex(int argc, char* argv[]) {
                     model_path.parent_path() / std::filesystem::path(stereo_model_name);
 
             if (!std::filesystem::exists(stereo_model_path)) {
-                utils::download_models(model_path.parent_path().u8string(), stereo_model_name);
+                models::download_models(model_path.parent_path().u8string(), stereo_model_name);
             }
             auto stereo_model_config = load_crf_model_config(stereo_model_path);
 
@@ -323,7 +323,7 @@ int duplex(int argc, char* argv[]) {
             auto mean_qscore_start_pos = model_config.mean_qscore_start_pos;
             if (mean_qscore_start_pos < 0) {
                 mean_qscore_start_pos =
-                        utils::get_mean_qscore_start_pos_by_model_name(stereo_model_name);
+                        models::get_mean_qscore_start_pos_by_model_name(stereo_model_name);
                 if (mean_qscore_start_pos < 0) {
                     throw std::runtime_error("Mean q-score start position cannot be < 0");
                 }

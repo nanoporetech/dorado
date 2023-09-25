@@ -5,7 +5,7 @@
 #include <unordered_map>
 #include <vector>
 
-namespace dorado::utils {
+namespace dorado::models {
 
 struct ModelInfo {
     std::string_view checksum;
@@ -39,4 +39,4 @@ uint32_t get_mean_qscore_start_pos_by_model_name(const std::string& model_name);
 // Extract the model name from the model path.
 std::string extract_model_from_model_path(const std::string& model_path);
 
-}  // namespace dorado::utils
+}  // namespace dorado::models

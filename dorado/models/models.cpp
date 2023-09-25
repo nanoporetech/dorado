@@ -12,7 +12,7 @@
 
 namespace fs = std::filesystem;
 
-namespace dorado::utils {
+namespace dorado::models {
 
 namespace {
 
@@ -384,4 +384,4 @@ std::string extract_model_from_model_path(const std::string& model_path) {
     return std::filesystem::canonical(path).filename().string();
 }
 
-}  // namespace dorado::utils
+}  // namespace dorado::models
