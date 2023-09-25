@@ -92,8 +92,8 @@ inline std::tuple<int, int, int> parse_version_str(const std::string& version) {
 }
 
 template <class T = int64_t>
-inline std::vector<T> parse_string_to_sizes(const std::string& str,
-                                            std::optional<std::string> opt = std::nullopt) {
+std::vector<T> parse_string_to_sizes(const std::string& str,
+                                     std::optional<std::string> opt = std::nullopt) {
     std::size_t pos;
     std::vector<T> sizes;
     const char* c_str = str.c_str();
@@ -116,7 +116,7 @@ inline std::vector<T> parse_string_to_sizes(const std::string& str,
             x *= 1e3;
             ++p;
         }
-        sizes.emplace_back(x + .499);
+        sizes.emplace_back(static_cast<T>(std::round(x)));
         if (*p == ',') {
             c_str = ++p;
             continue;
@@ -132,8 +132,7 @@ inline std::vector<T> parse_string_to_sizes(const std::string& str,
 }
 
 template <class T = uint64_t>
-inline T parse_string_to_size(const std::string& str,
-                              std::optional<std::string> opt = std::nullopt) {
+T parse_string_to_size(const std::string& str, std::optional<std::string> opt = std::nullopt) {
     return parse_string_to_sizes<T>(str, opt)[0];
 }
 
@@ -164,7 +163,7 @@ inline std::string to_size(double value) {
 inline std::string to_yes_or_no(bool value) { return value ? "yes" : "no"; }
 
 template <class Options>
-inline void add_minimap2_arguments(argparse::ArgumentParser& parser, const Options& dflt) {
+void add_minimap2_arguments(argparse::ArgumentParser& parser, const Options& dflt) {
     parser.add_argument("-k")
             .help("minimap2 k-mer size for alignment (maximum 28).")
             .template default_value<int>(dflt.kmer_size)
@@ -213,8 +212,7 @@ inline void add_minimap2_arguments(argparse::ArgumentParser& parser, const Optio
 }
 
 template <class Options>
-inline Options parse_minimap2_arguments(const argparse::ArgumentParser& parser,
-                                        const Options& dflt) {
+Options parse_minimap2_arguments(const argparse::ArgumentParser& parser, const Options& dflt) {
     Options res;
     res.kmer_size = parser.template get<int>("k");
     res.window_size = parser.template get<int>("w");
