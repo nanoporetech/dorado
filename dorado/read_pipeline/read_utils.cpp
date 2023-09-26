@@ -7,10 +7,10 @@ SimplexReadPtr shallow_copy_read(const SimplexRead& read) {
     copy->digitisation = read.digitisation;
     copy->range = read.range;
     copy->offset = read.offset;
-    copy->sample_rate = read.sample_rate;
+    copy->read_common.sample_rate = read.read_common.sample_rate;
 
-    copy->shift = read.shift;
-    copy->scale = read.scale;
+    copy->read_common.shift = read.read_common.shift;
+    copy->read_common.scale = read.read_common.scale;
 
     copy->scaling = read.scaling;
 
@@ -24,9 +24,9 @@ SimplexReadPtr shallow_copy_read(const SimplexRead& read) {
     copy->read_common.model_name = read.read_common.model_name;
 
     copy->read_common.base_mod_probs = read.read_common.base_mod_probs;
-    copy->mod_base_info = read.mod_base_info;
+    copy->read_common.mod_base_info = read.read_common.mod_base_info;
 
-    copy->num_trimmed_samples = read.num_trimmed_samples;
+    copy->read_common.num_trimmed_samples = read.read_common.num_trimmed_samples;
 
     copy->read_common.attributes = read.read_common.attributes;
 

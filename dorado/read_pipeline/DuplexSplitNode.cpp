@@ -159,7 +159,7 @@ SimplexReadPtr subread(const SimplexRead& read, PosRange seq_range, PosRange sig
     //TODO support mods
     //NB: currently doesn't support mods
     //assert(read.mod_base_info == nullptr && read.base_mod_probs.empty());
-    if (read.mod_base_info != nullptr || !read.read_common.base_mod_probs.empty()) {
+    if (read.read_common.mod_base_info != nullptr || !read.read_common.base_mod_probs.empty()) {
         throw std::runtime_error(std::string("Read splitting doesn't support mods yet"));
     }
     const int stride = read.read_common.model_stride;
@@ -180,12 +180,14 @@ SimplexReadPtr subread(const SimplexRead& read, PosRange seq_range, PosRange sig
 
     //we adjust for it in new start time
     subread->read_common.attributes.num_samples = signal_range.second - signal_range.first;
-    subread->num_trimmed_samples = 0;
-    subread->start_sample = read.start_sample + read.num_trimmed_samples + signal_range.first;
+    subread->read_common.num_trimmed_samples = 0;
+    subread->start_sample =
+            read.start_sample + read.read_common.num_trimmed_samples + signal_range.first;
     subread->end_sample = subread->start_sample + subread->read_common.attributes.num_samples;
 
-    auto start_time_ms = read.run_acquisition_start_time_ms +
-                         uint64_t(std::round(subread->start_sample * 1000. / subread->sample_rate));
+    auto start_time_ms =
+            read.run_acquisition_start_time_ms +
+            uint64_t(std::round(subread->start_sample * 1000. / subread->read_common.sample_rate));
     subread->read_common.attributes.start_time =
             utils::get_string_timestamp_from_unix_time(start_time_ms);
     subread->read_common.start_time_ms = start_time_ms;
@@ -200,10 +202,10 @@ SimplexReadPtr subread(const SimplexRead& read, PosRange seq_range, PosRange sig
     assert(signal_range.second == read.read_common.raw_data.size(0) ||
            subread->read_common.moves.size() * stride == subread->read_common.raw_data.size(0));
 
-    if (!read.parent_read_id.empty()) {
-        subread->parent_read_id = read.parent_read_id;
+    if (!read.read_common.parent_read_id.empty()) {
+        subread->read_common.parent_read_id = read.read_common.parent_read_id;
     } else {
-        subread->parent_read_id = read.read_common.read_id;
+        subread->read_common.parent_read_id = read.read_common.read_id;
     }
     return subread;
 }
@@ -536,7 +538,7 @@ std::vector<SimplexReadPtr> DuplexSplitNode::split(SimplexReadPtr init_read) con
         if (to_split.size() > 1) {
             ext_read.read->subread_id = subread_id++;
             ext_read.read->split_count = to_split.size();
-            const auto subread_uuid = utils::derive_uuid(ext_read.read->parent_read_id,
+            const auto subread_uuid = utils::derive_uuid(ext_read.read->read_common.parent_read_id,
                                                          std::to_string(ext_read.read->subread_id));
             ext_read.read->read_common.read_id = subread_uuid;
         }

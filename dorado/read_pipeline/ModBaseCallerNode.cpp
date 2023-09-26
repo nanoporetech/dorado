@@ -173,7 +173,7 @@ void ModBaseCallerNode::input_worker_thread() {
                             .base_mod_probs[i * m_num_states + m_base_prob_offsets[base_id]] = 1.0f;
                 }
             }
-            read->mod_base_info = m_mod_base_info;
+            read->read_common.mod_base_info = m_mod_base_info;
 
             auto working_read = std::make_shared<WorkingRead>();
             working_read->num_modbase_chunks = 0;

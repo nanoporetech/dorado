@@ -54,7 +54,8 @@ void ScalerNode::worker_thread() {
         const auto [shift, scale] = m_scaling_params.quantile_scaling
                                             ? normalisation(read->read_common.raw_data)
                                             : med_mad(read->read_common.raw_data);
-        read->scaling_method = m_scaling_params.quantile_scaling ? "quantile" : "med_mad";
+        read->read_common.scaling_method =
+                m_scaling_params.quantile_scaling ? "quantile" : "med_mad";
 
         // raw_data comes from DataLoader with dtype int16.  We send it on as float16 after
         // shifting/scaling in float32 form.
@@ -63,8 +64,8 @@ void ScalerNode::worker_thread() {
                         .to(torch::kFloat16);
 
         // move the shift and scale into pA.
-        read->scale = read->scaling * scale;
-        read->shift = read->scaling * (shift + read->offset);
+        read->read_common.scale = read->scaling * scale;
+        read->read_common.shift = read->scaling * (shift + read->offset);
 
         // Don't perform DNA trimming on RNA since it looks too different and we lose useful signal.
         int trim_start = 0;
@@ -78,7 +79,7 @@ void ScalerNode::worker_thread() {
 
         read->read_common.raw_data =
                 read->read_common.raw_data.index({Slice(trim_start, torch::indexing::None)});
-        read->num_trimmed_samples = trim_start;
+        read->read_common.num_trimmed_samples = trim_start;
 
         // Pass the read to the next node
         send_message_to_sink(std::move(read));

@@ -31,6 +31,9 @@ struct Attributes {
 
 class ReadCommon {
 public:
+    struct Mapping {
+        // Dummy struct for future use to represent alignments
+    };
     torch::Tensor raw_data;  // Loaded from source file
 
     int model_stride;  // The down sampling factor of the model
@@ -54,11 +57,40 @@ public:
     // The id of the client to which this read belongs. -1 in standalone mode
     int32_t client_id{-1};
 
-    bool is_duplex{false};
-
     uint32_t mean_qscore_start_pos = 0;
 
     float calculate_mean_qscore() const;
+
+    std::vector<BamPtr> extract_sam_lines(bool emit_moves, uint8_t modbase_threshold = 0) const;
+
+    // Barcode.
+    std::string barcode{};
+
+    std::vector<Mapping> mappings;
+
+    uint64_t sample_rate;  // Loaded from source file
+
+    float shift;                 // To be set by scaler
+    float scale;                 // To be set by scaler
+    std::string scaling_method;  // To be set by scaler
+    std::string parent_read_id;  // Origin read ID for all its subreads. Empty for nonsplit reads.
+
+    std::shared_ptr<const ModBaseInfo>
+            mod_base_info;  // Modified base settings of the models that ran on this read
+
+    uint64_t num_trimmed_samples;  // Number of samples which have been trimmed from the raw read.
+
+    bool is_duplex{false};
+
+    int rna_poly_tail_length{-1};
+
+    bool is_duplex_parent{false};  // TODO - should be atomic, and a simplex-only property
+
+private:
+    void generate_duplex_read_tags(bam1_t*) const;
+    void generate_read_tags(bam1_t* aln, bool emit_moves) const;
+    void generate_modbase_tags(bam1_t* aln, uint8_t threshold = 0) const;
+    std::string generate_read_group() const;
 };
 
 // Class representing a duplex read, including stereo-encoded raw data
@@ -70,40 +102,19 @@ public:
 // Class representing a simplex read, including raw data
 class SimplexRead {
 public:
-    struct Mapping {
-        // Dummy struct for future use to represent alignments
-    };
-
     ReadCommon read_common;
 
     float digitisation;  // Loaded from source file
     float range;         // Loaded from source file
     float offset;        // Loaded from source file
 
-    uint64_t sample_rate;  // Loaded from source file
-
     uint64_t get_end_time_ms() const;
 
-    float shift;                 // To be set by scaler
-    float scale;                 // To be set by scaler
-    std::string scaling_method;  // To be set by scaler
-
     float scaling;  // Scale factor applied to convert raw integers from sequencer into pore current values
-
-    std::string parent_read_id;  // Origin read ID for all its subreads. Empty for nonsplit reads.
-
-    std::shared_ptr<const ModBaseInfo>
-            mod_base_info;  // Modified base settings of the models that ran on this read
-
-    uint64_t num_trimmed_samples;  // Number of samples which have been trimmed from the raw read.
-
-    std::vector<Mapping> mappings;
-    std::vector<BamPtr> extract_sam_lines(bool emit_moves, uint8_t modbase_threshold = 0) const;
 
     uint64_t start_sample;
     uint64_t end_sample;
     uint64_t run_acquisition_start_time_ms;
-    std::atomic_bool is_duplex_parent{false};
     // Calculate mean Q-score from this position onwards if read is
     // a short read.
 
@@ -114,17 +125,6 @@ public:
     // (2) duplex pairs which share this read as the template read
     size_t subread_id{0};
     size_t split_count{1};
-
-    // Barcode.
-    std::string barcode{};
-
-    int rna_poly_tail_length{-1};
-
-private:
-    void generate_duplex_read_tags(bam1_t*) const;
-    void generate_read_tags(bam1_t* aln, bool emit_moves) const;
-    void generate_modbase_tags(bam1_t* aln, uint8_t threshold = 0) const;
-    std::string generate_read_group() const;
 };
 
 using SimplexReadPtr = std::unique_ptr<SimplexRead>;

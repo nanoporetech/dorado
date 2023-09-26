@@ -13,14 +13,17 @@ void ReadToBamType::worker_thread() {
     Message message;
     while (get_input_message(message)) {
         // If this message isn't a read, just forward it to the sink.
-        if (!std::holds_alternative<SimplexReadPtr>(message)) {
+        if (!is_read_message(message)) {
             send_message_to_sink(std::move(message));
             continue;
         }
 
         // If this message isn't a read, we'll get a bad_variant_access exception.
-        auto read = std::get<SimplexReadPtr>(std::move(message));
-        auto alns = read->extract_sam_lines(m_emit_moves, m_modbase_threshold);
+        //auto read = std::get<SimplexReadPtr>(std::move(message));
+
+        auto& read_common_data = get_read_common_data(message);
+
+        auto alns = read_common_data.extract_sam_lines(m_emit_moves, m_modbase_threshold);
         for (auto& aln : alns) {
             send_message_to_sink(std::move(aln));
         }
@@ -40,6 +43,7 @@ ReadToBamType::ReadToBamType(bool emit_moves,
 }
 
 void ReadToBamType::start_threads() {
+    m_num_worker_threads = 1;
     for (size_t i = 0; i < m_num_worker_threads; i++) {
         m_workers.push_back(
                 std::make_unique<std::thread>(std::thread(&ReadToBamType::worker_thread, this)));

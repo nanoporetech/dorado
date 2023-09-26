@@ -323,10 +323,10 @@ void PolyACalculator::worker_thread() {
                         "{} PolyA bases {}, signal anchor {} Signal range is {} {}, "
                         "samples/base {} trim {}",
                         read->read_common.read_id, num_bases, signal_anchor, signal_start,
-                        signal_end, num_samples_per_base, read->num_trimmed_samples);
+                        signal_end, num_samples_per_base, read->read_common.num_trimmed_samples);
 
                 // Set tail length property in the read.
-                read->rna_poly_tail_length = num_bases;
+                read->read_common.rna_poly_tail_length = num_bases;
 
                 // Update debug stats.
                 total_tail_lengths_called += num_bases;
@@ -340,7 +340,7 @@ void PolyACalculator::worker_thread() {
                         "{} PolyA bases {}, signal anchor {} Signal range is {}, "
                         "samples/base {}, trim  {}",
                         read->read_common.read_id, num_bases, signal_anchor, signal_start,
-                        signal_end, num_samples_per_base, read->num_trimmed_samples);
+                        signal_end, num_samples_per_base, read->read_common.num_trimmed_samples);
                 num_not_called++;
             }
         } else {

@@ -128,7 +128,7 @@ SimplexReadPtr process_pod5_read(size_t row,
 
     auto new_read = std::make_unique<SimplexRead>();
     new_read->read_common.raw_data = samples;
-    new_read->sample_rate = run_sample_rate;
+    new_read->read_common.sample_rate = run_sample_rate;
 
     auto start_time_ms = run_acquisition_start_time_ms +
                          ((read_data.start_sample * 1000) /
@@ -139,7 +139,7 @@ SimplexReadPtr process_pod5_read(size_t row,
     new_read->scaling = read_data.calibration_scale;
     new_read->offset = read_data.calibration_offset;
     new_read->read_common.read_id = std::move(read_id_str);
-    new_read->num_trimmed_samples = 0;
+    new_read->read_common.num_trimmed_samples = 0;
     new_read->read_common.attributes.read_number = read_data.read_number;
     new_read->read_common.attributes.fast5_filename =
             std::filesystem::path(path.c_str()).filename().string();
@@ -756,14 +756,14 @@ void DataLoader::load_fast5_reads_from_file(const std::string& path) {
                                                  static_cast<uint32_t>(start_time / sampling_rate));
 
         auto new_read = std::make_unique<SimplexRead>();
-        new_read->sample_rate = sampling_rate;
+        new_read->read_common.sample_rate = sampling_rate;
         new_read->read_common.raw_data = samples;
         new_read->digitisation = digitisation;
         new_read->range = range;
         new_read->offset = offset;
         new_read->scaling = range / digitisation;
         new_read->read_common.read_id = read_id;
-        new_read->num_trimmed_samples = 0;
+        new_read->read_common.num_trimmed_samples = 0;
         new_read->read_common.attributes.mux = mux;
         new_read->read_common.attributes.read_number = read_number;
         new_read->read_common.attributes.channel_number = channel_number;
