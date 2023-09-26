@@ -6,192 +6,241 @@ namespace dorado::barcode_kits {
 
 namespace {
 
+// Flank sequences per barcode kit.
+// There are 2 types of kits described here -
+// 1. Double ended kits that have a different flanking region for the top and bottom barcodes.
+// 2. Single or double ended kits where the flanking region is the same for top and/or bottom barcodes.
+const std::string RAB_1st_FRONT = "CCGTGAC";
+const std::string RAB_1st_REAR = "AGAGTTTGATCATGGCTCAG";
+const std::string RAB_2nd_FRONT = "CCGTGAC";
+const std::string RAB_2nd_REAR = "CGGTTACCTTGTTACGACTT";
+
+const std::string RBK_FRONT = "TATTGCT";
+const std::string RBK_REAR = "GTTTTCGCATTTATCGTGAAACGCTTTCGCGTTTTTCGTGCGCCGCTTCA";
+
+const std::string RBK4_FRONT = "GCTTGGGTGTTTAACC";
+const std::string RBK4_REAR = "GTTTTCGCATTTATCGTGAAACGCTTTCGCGTTTTTCGTGCGCCGCTTCA";
+
+const std::string RBK4_kit14_FRONT = "C";
+const std::string RBK4_kit14_REAR = "GTTTTCGCATTTATCGTGAAACGCTTTCGCGTTTTTCGTGCGCCGCTTCA";
+
+const std::string RLB_FRONT = "CCGTGAC";
+const std::string RLB_REAR = "CGTTTTTCGTGCGCCGCTTC";
+
+const std::string BC_1st_FRONT = "GGTGCTG";
+const std::string BC_1st_REAR = "TTAACCTTTCTGTTGGTGCTGATATTGC";
+const std::string BC_2nd_FRONT = "GGTGCTG";
+const std::string BC_2nd_REAR = "TTAACCTACTTGCCTGTCGCTCTATCTTC";
+
+const std::string NB_1st_FRONT = "AGGTTAA";
+const std::string NB_1st_REAR = "CAGCACCT";
+const std::string NB_2nd_FRONT = "ATTGCTAAGGTTAA";
+const std::string NB_2nd_REAR = "CAGCACC";
+
+const std::string LWB_1st_FRONT = "CCGTGAC";
+const std::string LWB_1st_REAR = "ACTTGCCTGTCGCTCTATCTTC";
+const std::string LWB_2nd_FRONT = "CCGTGAC";
+const std::string LWB_2nd_REAR = "TTTCTGTTGGTGCTGATATTGC";
+
+// Predefined collection of barcode sequences that are used by various kits.
+// Since some of the collections are used in multiple barcoding kits, it made
+// sense to pull them out separately.
+const std::vector<std::string> BC_1_12 = {"BC01", "BC02", "BC03", "BC04", "BC05", "BC06",
+                                          "BC07", "BC08", "BC09", "BC10", "BC11", "BC12"};
+const std::vector<std::string> BC_1_12A = {"BC01", "BC02", "BC03", "BC04", "BC05", "BC06",
+                                           "BC07", "BC08", "BC09", "BC10", "BC11", "RLB12A"};
+const std::vector<std::string> BC_1_24 = {"BC01", "BC02", "BC03", "BC04", "BC05", "BC06",
+                                          "BC07", "BC08", "BC09", "BC10", "BC11", "BC12",
+                                          "BC13", "BC14", "BC15", "BC16", "BC17", "BC18",
+                                          "BC19", "BC20", "BC21", "BC22", "BC23", "BC24"};
+
+// BC2_1_24 is the same as BC_1_24 except it uses 12A instead of 12.
+const std::vector<std::string> BC2_1_24 = {"BC01", "BC02", "BC03", "BC04", "BC05", "BC06",
+                                           "BC07", "BC08", "BC09", "BC10", "BC11", "RLB12A",
+                                           "BC13", "BC14", "BC15", "BC16", "BC17", "BC18",
+                                           "BC19", "BC20", "BC21", "BC22", "BC23", "BC24"};
+
+const std::vector<std::string> BC_1_96 = {
+        "BC01", "BC02", "BC03", "BC04", "BC05", "BC06", "BC07", "BC08", "BC09", "BC10", "BC11",
+        "BC12", "BC13", "BC14", "BC15", "BC16", "BC17", "BC18", "BC19", "BC20", "BC21", "BC22",
+        "BC23", "BC24", "BC25", "BC26", "BC27", "BC28", "BC29", "BC30", "BC31", "BC32", "BC33",
+        "BC34", "BC35", "BC36", "BC37", "BC38", "BC39", "BC40", "BC41", "BC42", "BC43", "BC44",
+        "BC45", "BC46", "BC47", "BC48", "BC49", "BC50", "BC51", "BC52", "BC53", "BC54", "BC55",
+        "BC56", "BC57", "BC58", "BC59", "BC60", "BC61", "BC62", "BC63", "BC64", "BC65", "BC66",
+        "BC67", "BC68", "BC69", "BC70", "BC71", "BC72", "BC73", "BC74", "BC75", "BC76", "BC77",
+        "BC78", "BC79", "BC80", "BC81", "BC82", "BC83", "BC84", "BC85", "BC86", "BC87", "BC88",
+        "BC89", "BC90", "BC91", "BC92", "BC93", "BC94", "BC95", "BC96"};
+
+const std::vector<std::string> NB_1_12 = {"NB01", "NB02", "NB03", "NB04", "NB05", "NB06",
+                                          "NB07", "NB08", "NB09", "NB10", "NB11", "NB12"};
+
+const std::vector<std::string> NB_13_24 = {"NB13", "NB14", "NB15", "NB16", "NB17", "NB18",
+                                           "NB19", "NB20", "NB21", "NB22", "NB23", "NB24"};
+
+const std::vector<std::string> NB_1_24 = {"NB01", "NB02", "NB03", "NB04", "NB05", "NB06",
+                                          "NB07", "NB08", "NB09", "NB10", "NB11", "NB12",
+                                          "NB13", "NB14", "NB15", "NB16", "NB17", "NB18",
+                                          "NB19", "NB20", "NB21", "NB22", "NB23", "NB24"};
+
+const std::vector<std::string> NB_1_96 = {
+        "NB01", "NB02", "NB03", "NB04", "NB05", "NB06", "NB07", "NB08", "NB09", "NB10", "NB11",
+        "NB12", "NB13", "NB14", "NB15", "NB16", "NB17", "NB18", "NB19", "NB20", "NB21", "NB22",
+        "NB23", "NB24", "NB25", "NB26", "NB27", "NB28", "NB29", "NB30", "NB31", "NB32", "NB33",
+        "NB34", "NB35", "NB36", "NB37", "NB38", "NB39", "NB40", "NB41", "NB42", "NB43", "NB44",
+        "NB45", "NB46", "NB47", "NB48", "NB49", "NB50", "NB51", "NB52", "NB53", "NB54", "NB55",
+        "NB56", "NB57", "NB58", "NB59", "NB60", "NB61", "NB62", "NB63", "NB64", "NB65", "NB66",
+        "NB67", "NB68", "NB69", "NB70", "NB71", "NB72", "NB73", "NB74", "NB75", "NB76", "NB77",
+        "NB78", "NB79", "NB80", "NB81", "NB82", "NB83", "NB84", "NB85", "NB86", "NB87", "NB88",
+        "NB89", "NB90", "NB91", "NB92", "NB93", "NB94", "NB95", "NB96"};
+
+// RBK_1_96 is the same as BC_1_96 except for 26, 39, 40, 58, 54 and 60.
+const std::vector<std::string> RBK_1_96 = {
+        "BC01", "BC02", "BC03", "BC04",  "BC05",  "BC06",  "BC07",  "BC08", "BC09", "BC10",  "BC11",
+        "BC12", "BC13", "BC14", "BC15",  "BC16",  "BC17",  "BC18",  "BC19", "BC20", "BC21",  "BC22",
+        "BC23", "BC24", "BC25", "RBK26", "BC27",  "BC28",  "BC29",  "BC30", "BC31", "BC32",  "BC33",
+        "BC34", "BC35", "BC36", "BC37",  "BC38",  "RBK39", "RBK40", "BC41", "BC42", "BC43",  "BC44",
+        "BC45", "BC46", "BC47", "RBK48", "BC49",  "BC50",  "BC51",  "BC52", "BC53", "RBK54", "BC55",
+        "BC56", "BC57", "BC58", "BC59",  "RBK60", "BC61",  "BC62",  "BC63", "BC64", "BC65",  "BC66",
+        "BC67", "BC68", "BC69", "BC70",  "BC71",  "BC72",  "BC73",  "BC74", "BC75", "BC76",  "BC77",
+        "BC78", "BC79", "BC80", "BC81",  "BC82",  "BC83",  "BC84",  "BC85", "BC86", "BC87",  "BC88",
+        "BC89", "BC90", "BC91", "BC92",  "BC93",  "BC94",  "BC95",  "BC96"};
+
+// Some arrangement names are just aliases of each other. This is because they were released
+// as part of different kits, but they map to the same underlying arrangement.
+const KitInfo kit_16S = {true,          true,         RAB_1st_FRONT, RAB_1st_REAR,
+                         RAB_2nd_FRONT, RAB_2nd_REAR, BC_1_24};
+
+const KitInfo kit_lwb = {true,          true,         LWB_1st_FRONT, LWB_1st_REAR,
+                         LWB_2nd_FRONT, LWB_2nd_REAR, BC_1_12};
+;
+
+const KitInfo kit_lwb24 = {
+        true, true, LWB_1st_FRONT, LWB_1st_REAR, LWB_2nd_FRONT, LWB_2nd_REAR, BC_1_24,
+};
+
+const KitInfo kit_nb12 = {
+        true, true, NB_1st_FRONT, NB_1st_REAR, NB_2nd_FRONT, NB_2nd_REAR, NB_1_12,
+};
+
+const KitInfo kit_nb24 = {
+        true, true, NB_1st_FRONT, NB_1st_REAR, NB_2nd_FRONT, NB_2nd_REAR, NB_1_24,
+};
+
+const KitInfo kit_nb96 = {
+        true, true, NB_1st_FRONT, NB_1st_REAR, NB_2nd_FRONT, NB_2nd_REAR, NB_1_96,
+};
+
+const KitInfo kit_rab = {true,          true,         RAB_1st_FRONT, RAB_1st_REAR,
+                         RAB_2nd_FRONT, RAB_2nd_REAR, BC_1_12};
+
+const KitInfo kit_rbk96 = {false, false, RBK4_FRONT, RBK4_REAR, "", "", RBK_1_96};
+
+const KitInfo kit_rbk4 = {false, false, RBK4_FRONT, RBK4_REAR, "", "", BC_1_12};
+
+const KitInfo kit_rlb = {true, false, RLB_FRONT, RLB_REAR, "", "", BC_1_12A};
+
+// Final map to go from kit name to actual barcode arrangement information.
 const std::unordered_map<std::string, KitInfo> kit_info_map = {
-        {"SQK-RBK004",
-         {false,
-          false,
-          "GCTTGGGTGTTTAACC",
-          "GTTTTCGCATTTATCGTGAAACGCTTTCGCGTTTTTCGTGCGCCGCTTCA",
-          "",
-          "",
-          {"BC01", "BC02", "BC03", "BC04", "BC05", "BC06", "BC07", "BC08", "BC09", "BC10", "BC11",
-           "BC12"}}},
-        {"SQK-RBK110-96",
-         {false,
-          false,
-          "GCTTGGGTGTTTAACC",
-          "GTTTTCGCATTTATCGTGAAACGCTTTCGCGTTTTTCGTGCGCCGCTTCA",
-          "",
-          "",
-          {"BC01", "BC02", "BC03", "BC04", "BC05", "BC06", "BC07", "BC08", "BC09", "BC10", "BC11",
-           "BC12", "BC13", "BC14", "BC15", "BC16", "BC17", "BC18", "BC19", "BC20", "BC21", "BC22",
-           "BC23", "BC24", "BC25", "BC26", "BC27", "BC28", "BC29", "BC30", "BC31", "BC32", "BC33",
-           "BC34", "BC35", "BC36", "BC37", "BC38", "BC39", "BC40", "BC41", "BC42", "BC43", "BC44",
-           "BC45", "BC46", "BC47", "BC48", "BC49", "BC50", "BC51", "BC52", "BC53", "BC54", "BC55",
-           "BC56", "BC57", "BC58", "BC59", "BC60", "BC61", "BC62", "BC63", "BC64", "BC65", "BC66",
-           "BC67", "BC68", "BC69", "BC70", "BC71", "BC72", "BC73", "BC74", "BC75", "BC76", "BC77",
-           "BC78", "BC79", "BC80", "BC81", "BC82", "BC83", "BC84", "BC85", "BC86", "BC87", "BC88",
-           "BC89", "BC90", "BC91", "BC92", "BC93", "BC94", "BC95", "BC96"}}},
-        {"SQK-RBK114-24",
-         {false,
-          false,
-          "C",
-          "GTTTTCGCATTTATCGTGAAACGCTTTCGCGTTTTTCGTGCGCCGCTTCA",
-          "",
-          "",
-          {"BC01", "BC02", "BC03", "BC04", "BC05", "BC06", "BC07", "BC08",
-           "BC09", "BC10", "BC11", "BC12", "BC13", "BC14", "BC15", "BC16",
-           "BC17", "BC18", "BC19", "BC20", "BC21", "BC22", "BC23", "BC24"}}},
-        {"SQK-RBK114-96",
-         {false,
-          false,
-          "C",
-          "GTTTTCGCATTTATCGTGAAACGCTTTCGCGTTTTTCGTGCGCCGCTTCA",
-          "",
-          "",
-          {"BC01", "BC02", "BC03", "BC04",  "BC05", "BC06",  "BC07", "BC08",  "BC09",  "BC10",
-           "BC11", "BC12", "BC13", "BC14",  "BC15", "BC16",  "BC17", "BC18",  "BC19",  "BC20",
-           "BC21", "BC22", "BC23", "BC24",  "BC25", "RBK26", "BC27", "BC28",  "BC29",  "BC30",
-           "BC31", "BC32", "BC33", "BC34",  "BC35", "BC36",  "BC37", "BC38",  "RBK39", "RBK40",
-           "BC41", "BC42", "BC43", "BC44",  "BC45", "BC46",  "BC47", "RBK48", "BC49",  "BC50",
-           "BC51", "BC52", "BC53", "RBK54", "BC55", "BC56",  "BC57", "BC58",  "BC59",  "RBK60",
-           "BC61", "BC62", "BC63", "BC64",  "BC65", "BC66",  "BC67", "BC68",  "BC69",  "BC70",
-           "BC71", "BC72", "BC73", "BC74",  "BC75", "BC76",  "BC77", "BC78",  "BC79",  "BC80",
-           "BC81", "BC82", "BC83", "BC84",  "BC85", "BC86",  "BC87", "BC88",  "BC89",  "BC90",
-           "BC91", "BC92", "BC93", "BC94",  "BC95", "BC96"}}},
-        {"SQK-RPB004",
-         {true,
-          false,
-          "CCGTGAC",
-          "CGTTTTTCGTGCGCCGCTTC",
-          "",
-          "",
-          {"BC01", "BC02", "BC03", "BC04", "BC05", "BC06", "BC07", "BC08", "BC09", "BC10", "BC11",
-           "RLB12A"}}},
-        {"SQK-PBK004",
-         {true,
-          true,
-          "ATCGCCTACCGTGAC",
-          "ACTTGCCTGTCGCTCTATCTTC",
-          "ATCGCCTACCGTGAC",
-          "TTTCTGTTGGTGCTGATATTGC",
-          {"BC01", "BC02", "BC03", "BC04", "BC05", "BC06", "BC07", "BC08", "BC09", "BC10", "BC11",
-           "BC12"}}},
-        {"SQK-RAB204",
-         {true,
-          true,
-          "ATCGCCTACCGTGAC",
-          "AGAGTTTGATCMTGGCTCAG",
-          "ATCGCCTACCGTGAC",
-          "CGGTTACCTTGTTACGACTT",
-          {"BC01", "BC02", "BC03", "BC04", "BC05", "BC06", "BC07", "BC08", "BC09", "BC10", "BC11",
-           "BC12"}}},
-        {"SQK-16S024",
-         {true,
-          true,
-          "ATCGCCTACCGTGAC",
-          "AGAGTTTGATCMTGGCTCAG",
-          "ATCGCCTACCGTGAC",
-          "CGGTTACCTTGTTACGACTT",
-          {"BC01", "BC02", "BC03", "BC04", "BC05", "BC06", "BC07", "BC08",
-           "BC09", "BC10", "BC11", "BC12", "BC13", "BC14", "BC15", "BC16",
-           "BC17", "BC18", "BC19", "BC20", "BC21", "BC22", "BC23", "BC24"}}},
-        {"SQK-PCB109",
-         {true,
-          true,
-          "ATCGCCTACCGTGAC",
-          "ACTTGCCTGTCGCTCTATCTTC",
-          "ATCGCCTACCGTGAC",
-          "TTTCTGTTGGTGCTGATATTGC",
-          {"BP01", "BP02", "BP03", "BP04", "BP05", "BP06", "BP07", "BP08",
-           "BP09", "BP10", "BP11", "BP12", "BP13", "BP14", "BP15", "BP16",
-           "BP17", "BP18", "BP19", "BP20", "BP21", "BP22", "BP23", "BP24"}}},
-        {"SQK-PCB111-24",
-         {true,
-          true,
-          "ATCGCCTACCGTGA",
-          "TTGCCTGTCGCTCTATCTTC",
-          "ATCGCCTACCGTGA",
-          "TCTGTTGGTGCTGATATTGC",
-          {"BP01", "BP02", "BP03", "BP04", "BP05", "BP06", "BP07", "BP08",
-           "BP09", "BP10", "BP11", "BP12", "BP13", "BP14", "BP15", "BP16",
-           "BP17", "BP18", "BP19", "BP20", "BP21", "BP22", "BP23", "BP24"}}},
-        {"EXP-PBC096",
-         {true,
-          true,
-          "GGTGCTG",
-          "TTAACCTTTCTGTTGGTGCTGATATTGC",
-          "GGTGCTG",
-          "TTAACCTACTTGCCTGTCGCTCTATCTTC",
-          {"BC01", "BC02", "BC03", "BC04", "BC05", "BC06", "BC07", "BC08", "BC09", "BC10", "BC11",
-           "BC12", "BC13", "BC14", "BC15", "BC16", "BC17", "BC18", "BC19", "BC20", "BC21", "BC22",
-           "BC23", "BC24", "BC25", "BC26", "BC27", "BC28", "BC29", "BC30", "BC31", "BC32", "BC33",
-           "BC34", "BC35", "BC36", "BC37", "BC38", "BC39", "BC40", "BC41", "BC42", "BC43", "BC44",
-           "BC45", "BC46", "BC47", "BC48", "BC49", "BC50", "BC51", "BC52", "BC53", "BC54", "BC55",
-           "BC56", "BC57", "BC58", "BC59", "BC60", "BC61", "BC62", "BC63", "BC64", "BC65", "BC66",
-           "BC67", "BC68", "BC69", "BC70", "BC71", "BC72", "BC73", "BC74", "BC75", "BC76", "BC77",
-           "BC78", "BC79", "BC80", "BC81", "BC82", "BC83", "BC84", "BC85", "BC86", "BC87", "BC88",
-           "BC89", "BC90", "BC91", "BC92", "BC93", "BC94", "BC95", "BC96"}}},
-        {"SQK-NBD114-24",
-         {true,
-          true,
-          "ATCGCCTACCGTGA",
-          "TTGCCTGTCGCTCTATCTTC",
-          "ATCGCCTACCGTGA",
-          "TCTGTTGGTGCTGATATTGC",
-          {"NB01", "NB02", "NB03", "NB04", "NB05", "NB06", "NB07", "NB08",
-           "NB09", "NB10", "NB11", "NB12", "NB13", "NB14", "NB15", "NB16",
-           "NB17", "NB18", "NB19", "NB20", "NB21", "NB22", "NB23", "NB24"}}},
-        {"EXP-NBD104",
-         {true,
-          true,
-          "AAGGTTAA",
-          "CAGCACCT",
-          "ATTGCTAAGGTTAA",
-          "CAGCACC",
-          {"NB01", "NB02", "NB03", "NB04", "NB05", "NB06", "NB07", "NB08", "NB09", "NB10", "NB11",
-           "NB12"}}},
+        // SQK-16S024 && SQK-16S114-24
+        {"SQK-16S024", kit_16S},
+        {"SQK-16S114-24", kit_16S},
+        // LWB
+        {"SQK-PBK004", kit_lwb},
+        {"SQK-LWB001", kit_lwb},
+        {"SQK-PCB109", kit_lwb},
+        {"SQK-PCB110", kit_lwb},
+        // LWB24
+        {"SQK-PCB111-24", kit_lwb24},
+        {"SQK-PCB114-24", kit_lwb24},
+        // NB12
+        {"EXP-NBD103", kit_nb12},
+        {"EXP-NBD104", kit_nb12},
+        // NB13-24
         {"EXP-NBD114",
-         {true,
-          true,
-          "AAGGTTAA",
-          "CAGCACCT",
-          "ATTGCTAAGGTTAA",
-          "CAGCACC",
-          {"NB13", "NB14", "NB15", "NB16", "NB17", "NB18", "NB19", "NB20", "NB21", "NB22", "NB23",
-           "NB24"}}},
-        {"SQK-NBD114-96",
-         {true,
-          true,
-          "AAGGTTAA",
-          "CAGCACCT",
-          "ATTGCTAAGGTTAA",
-          "CAGCACC",
-          {"NB01", "NB02", "NB03", "NB04", "NB05", "NB06", "NB07", "NB08", "NB09", "NB10", "NB11",
-           "NB12", "NB13", "NB14", "NB15", "NB16", "NB17", "NB18", "NB19", "NB20", "NB21", "NB22",
-           "NB23", "NB24", "NB25", "NB26", "NB27", "NB28", "NB29", "NB30", "NB31", "NB32", "NB33",
-           "NB34", "NB35", "NB36", "NB37", "NB38", "NB39", "NB40", "NB41", "NB42", "NB43", "NB44",
-           "NB45", "NB46", "NB47", "NB48", "NB49", "NB50", "NB51", "NB52", "NB53", "NB54", "NB55",
-           "NB56", "NB57", "NB58", "NB59", "NB60", "NB61", "NB62", "NB63", "NB64", "NB65", "NB66",
-           "NB67", "NB68", "NB69", "NB70", "NB71", "NB72", "NB73", "NB74", "NB75", "NB76", "NB77",
-           "NB78", "NB79", "NB80", "NB81", "NB82", "NB83", "NB84", "NB85", "NB86", "NB87", "NB88",
-           "NB89", "NB90", "NB91", "NB92", "NB93", "NB94", "NB95", "NB96"}}},
-        {"EXP-NBD196",
-         {true,
-          true,
-          "AAGGTTAA",
-          "CAGCACCT",
-          "ATTGCTAAGGTTAA",
-          "CAGCACC",
-          {"NB01", "NB02", "NB03", "NB04", "NB05", "NB06", "NB07", "NB08", "NB09", "NB10", "NB11",
-           "NB12", "NB13", "NB14", "NB15", "NB16", "NB17", "NB18", "NB19", "NB20", "NB21", "NB22",
-           "NB23", "NB24", "NB25", "NB26", "NB27", "NB28", "NB29", "NB30", "NB31", "NB32", "NB33",
-           "NB34", "NB35", "NB36", "NB37", "NB38", "NB39", "NB40", "NB41", "NB42", "NB43", "NB44",
-           "NB45", "NB46", "NB47", "NB48", "NB49", "NB50", "NB51", "NB52", "NB53", "NB54", "NB55",
-           "NB56", "NB57", "NB58", "NB59", "NB60", "NB61", "NB62", "NB63", "NB64", "NB65", "NB66",
-           "NB67", "NB68", "NB69", "NB70", "NB71", "NB72", "NB73", "NB74", "NB75", "NB76", "NB77",
-           "NB78", "NB79", "NB80", "NB81", "NB82", "NB83", "NB84", "NB85", "NB86", "NB87", "NB88",
-           "NB89", "NB90", "NB91", "NB92", "NB93", "NB94", "NB95", "NB96"}}},
+         {
+                 true,
+                 true,
+                 NB_1st_FRONT,
+                 NB_1st_REAR,
+                 NB_2nd_FRONT,
+                 NB_2nd_REAR,
+                 NB_13_24,
+         }},
+        // NB24
+        {"SQK-NBD111-24", kit_nb24},
+        {"SQK-NBD114-24", kit_nb24},
+        // NB96
+        {"EXP-NBD196", kit_nb96},
+        {"SQK-MLK111-96-XL", kit_nb96},
+        {"SQK-NBD111-96", kit_nb96},
+        {"SQK-NBD114-96", kit_nb96},
+        {"SQK-MLK114-96-XL", kit_nb96},
+        // PCR12
+        {"EXP-PBC001",
+         {
+                 true,
+                 true,
+                 BC_1st_FRONT,
+                 BC_1st_REAR,
+                 BC_2nd_FRONT,
+                 BC_2nd_REAR,
+                 BC_1_12,
+         }},
+        // PCR96
+        {"EXP-PBC096",
+         {
+                 true,
+                 true,
+                 BC_1st_FRONT,
+                 BC_1st_REAR,
+                 BC_2nd_FRONT,
+                 BC_2nd_REAR,
+                 BC_1_96,
+         }},
+        // RAB
+        {"SQK-RAB204", kit_rab},
+        {"SQK-RAB201", kit_rab},
+        // RBK
+        {"SQK-RBK001", {false, false, RBK_FRONT, RBK_REAR, "", "", BC_1_12}},
+        // RBK096
+        {"SQK-RBK110-96", kit_rbk96},
+        {"SQK-RBK111-96", kit_rbk96},
+        // RBK096_kit14
+        {"SQK-RBK114-96",
+         {
+                 false,
+                 false,
+                 RBK4_kit14_FRONT,
+                 RBK4_kit14_REAR,
+                 "",
+                 "",
+                 RBK_1_96,
+         }},
+        // RBK24
+        {"SQK-RBK111-24", {false, false, RBK4_FRONT, RBK4_REAR, "", "", BC_1_24}},
+        // RBK24_kit14
+        {"SQK-RBK114-24", {false, false, RBK4_kit14_FRONT, RBK4_kit14_REAR, "", "", BC_1_24}},
+        //  RBK4
+        {"SQK-RBK004", kit_rbk4},
+        {"VSK-PTC001", kit_rbk4},
+        {"VSK-VPS001", kit_rbk4},
+        // RLB
+        {"SQK-RPB004", kit_rlb},
+        {"SQK-RLB001", kit_rlb},
+        // RPB24-Kit14
+        {"SQK-RPB114-24", {true, false, RLB_FRONT, RLB_REAR, "", "", BC2_1_24}},
+        // VMK
+        {"VSK-VMK001",
+         {false, false, RBK_FRONT, RBK_REAR, "", "", {"BC01", "BC02", "BC03", "BC04"}}},
+        // VMK4
+        {"VSK-VMK004",
+         {false,
+          false,
+          RBK4_FRONT,
+          RBK4_REAR,
+          "",
+          "",
+          {"BC01", "BC02", "BC03", "BC04", "BC05", "BC06", "BC07", "BC08", "BC09", "BC10"}}},
 };
 
 const std::unordered_map<std::string, std::string> barcodes = {

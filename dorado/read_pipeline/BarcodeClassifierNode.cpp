@@ -112,6 +112,18 @@ std::pair<int, int> determine_trim_interval(const demux::ScoreResults& res, int 
         if (bottom_flank_score > kFlankScoreThres) {
             trim_interval.second = res.bottom_barcode_pos.first;
         }
+
+        // In some cases where the read length is very small, the front
+        // and rear windows could actually overlap. In that case find
+        // which window was used and just grab the interval for that
+        // window.
+        if (trim_interval.second <= trim_interval.first) {
+            if (res.use_top) {
+                return {res.top_barcode_pos.first, res.top_barcode_pos.second + 1};
+            } else {
+                return {res.bottom_barcode_pos.first, res.bottom_barcode_pos.second + 1};
+            }
+        }
     } else {
         float top_flank_score = res.top_flank_score;
         if (top_flank_score > kFlankScoreThres) {

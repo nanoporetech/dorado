@@ -431,6 +431,23 @@ test_archive:linux:arm64:20.04:
   needs:
     - build_archive:linux:arm64:focal
 
+# Test that models can be downloaded and run.
+test:model_download:linux:x86:focal:
+  image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.1
+  <<: *linux_dependencies
+  <<: *linux_runner
+  stage: test
+  needs:
+    - build:linux:x86:focal
+  script:
+    - ./tests/test_model_download.py --exe ./dist/bin/dorado --data ./tests/data
+  interruptible: true
+  rules:
+      - if: $CI_PIPELINE_SOURCE == "schedule"
+      - if: $CI_PIPELINE_SOURCE == "push"
+        when: manual
+
+
 # MLHub
 
 .mlhub: &mlhub
