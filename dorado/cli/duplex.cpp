@@ -39,84 +39,84 @@ int duplex(int argc, char* argv[]) {
     utils::make_torch_deterministic();
     torch::set_num_threads(1);
 
-    argparse::ArgumentParser parser("dorado", DORADO_VERSION, argparse::default_arguments::help);
-    parser.add_argument("model").help("Model");
-    parser.add_argument("reads").help("Reads in POD5 format or BAM/SAM format for basespace.");
-    parser.add_argument("--pairs")
+    cli::ArgParser parser("dorado");
+    parser.visible.add_argument("model").help("Model");
+    parser.visible.add_argument("reads").help(
+            "Reads in POD5 format or BAM/SAM format for basespace.");
+    parser.visible.add_argument("--pairs")
             .default_value(std::string(""))
             .help("Space-delimited csv containing read ID pairs. If not provided, pairing will be "
                   "performed automatically");
-    parser.add_argument("--emit-fastq").default_value(false).implicit_value(true);
-    parser.add_argument("--emit-sam")
+    parser.visible.add_argument("--emit-fastq").default_value(false).implicit_value(true);
+    parser.visible.add_argument("--emit-sam")
             .help("Output in SAM format.")
             .default_value(false)
             .implicit_value(true);
-    parser.add_argument("-t", "--threads").default_value(0).scan<'i', int>();
+    parser.visible.add_argument("-t", "--threads").default_value(0).scan<'i', int>();
 
-    parser.add_argument("-x", "--device")
+    parser.visible.add_argument("-x", "--device")
             .help("device string in format \"cuda:0,...,N\", \"cuda:all\", \"metal\" etc..")
             .default_value(utils::default_parameters.device);
 
-    parser.add_argument("-b", "--batchsize")
+    parser.visible.add_argument("-b", "--batchsize")
             .default_value(default_parameters.batchsize)
             .scan<'i', int>()
             .help("if 0 an optimal batchsize will be selected. batchsizes are rounded to the "
                   "closest multiple of 64.");
 
-    parser.add_argument("-c", "--chunksize")
+    parser.visible.add_argument("-c", "--chunksize")
             .default_value(default_parameters.chunksize)
             .scan<'i', int>();
 
-    parser.add_argument("-o", "--overlap")
+    parser.visible.add_argument("-o", "--overlap")
             .default_value(default_parameters.overlap)
             .scan<'i', int>();
 
-    parser.add_argument("-r", "--recursive")
+    parser.visible.add_argument("-r", "--recursive")
             .default_value(false)
             .implicit_value(true)
             .help("Recursively scan through directories to load FAST5 and POD5 files");
 
-    parser.add_argument("-l", "--read-ids")
+    parser.visible.add_argument("-l", "--read-ids")
             .help("A file with a newline-delimited list of reads to basecall. If not provided, all "
                   "reads will be basecalled")
             .default_value(std::string(""));
 
-    parser.add_argument("--min-qscore")
+    parser.visible.add_argument("--min-qscore")
             .help("Discard reads with mean Q-score below this threshold.")
             .default_value(0)
             .scan<'i', int>();
 
-    parser.add_argument("--reference")
+    parser.visible.add_argument("--reference")
             .help("Path to reference for alignment.")
             .default_value(std::string(""));
 
-    parser.add_argument("-v", "--verbose").default_value(false).implicit_value(true);
+    parser.visible.add_argument("-v", "--verbose").default_value(false).implicit_value(true);
 
     cli::add_minimap2_arguments(parser, Aligner::dflt_options);
 
     try {
-        auto remaining_args = parser.parse_known_args(argc, argv);
-        auto internal_parser = cli::parse_internal_options(remaining_args);
+        cli::parse(parser, argc, argv);
 
-        auto device(parser.get<std::string>("-x"));
-        auto model(parser.get<std::string>("model"));
+        auto device(parser.visible.get<std::string>("-x"));
+        auto model(parser.visible.get<std::string>("model"));
 
         if (model.find("fast") != std::string::npos) {
             spdlog::warn("Fast models are currently not recommended for duplex basecalling.");
         }
 
-        auto reads(parser.get<std::string>("reads"));
-        std::string pairs_file = parser.get<std::string>("--pairs");
-        auto threads = static_cast<size_t>(parser.get<int>("--threads"));
-        auto min_qscore(parser.get<int>("--min-qscore"));
-        auto ref = parser.get<std::string>("--reference");
+        auto reads(parser.visible.get<std::string>("reads"));
+        std::string pairs_file = parser.visible.get<std::string>("--pairs");
+        auto threads = static_cast<size_t>(parser.visible.get<int>("--threads"));
+        auto min_qscore(parser.visible.get<int>("--min-qscore"));
+        auto ref = parser.visible.get<std::string>("--reference");
         const bool basespace_duplex = (model.compare("basespace") == 0);
         std::vector<std::string> args(argv, argv + argc);
-        if (parser.get<bool>("--verbose")) {
+        if (parser.visible.get<bool>("--verbose")) {
             utils::SetDebugLogging();
         }
         std::map<std::string, std::string> template_complement_map;
-        auto read_list = utils::load_read_list(parser.get<std::string>("--read-ids"));
+        auto read_list = utils::load_read_list(parser.visible.get<std::string>("--read-ids"));
 
         std::unordered_set<std::string> read_list_from_pairs;
 
@@ -134,8 +134,8 @@ int duplex(int argc, char* argv[]) {
 
         auto output_mode = HtsWriter::OutputMode::BAM;
 
-        auto emit_fastq = parser.get<bool>("--emit-fastq");
-        auto emit_sam = parser.get<bool>("--emit-sam");
+        auto emit_fastq = parser.visible.get<bool>("--emit-fastq");
+        auto emit_sam = parser.visible.get<bool>("--emit-sam");
 
         if (emit_fastq && emit_sam) {
             throw std::runtime_error("Only one of --emit-{fastq, sam} can be set (or none).");
@@ -149,7 +149,7 @@ int duplex(int argc, char* argv[]) {
             output_mode = HtsWriter::OutputMode::UBAM;
         }
 
-        bool recursive_file_loading = parser.get<bool>("--recursive");
+        bool recursive_file_loading = parser.visible.get<bool>("--recursive");
 
         size_t num_reads = (basespace_duplex ? read_list_from_pairs.size()
                                              : DataLoader::get_num_reads(reads, read_list, {},
@@ -167,7 +167,7 @@ int duplex(int argc, char* argv[]) {
             hts_writer = pipeline_desc.add_node<HtsWriter>({}, "-", output_mode, 4, num_reads);
             converted_reads_sink = hts_writer;
         } else {
-            auto options = cli::parse_minimap2_arguments(parser, Aligner::dflt_options);
+            auto options = cli::process_minimap2_arguments(parser, Aligner::dflt_options);
             aligner = pipeline_desc.add_node<Aligner>({}, ref, options,
                                                       std::thread::hardware_concurrency());
             hts_writer = pipeline_desc.add_node<HtsWriter>({}, "-", output_mode, 4, num_reads);
@@ -242,7 +242,7 @@ int duplex(int argc, char* argv[]) {
                         utils::extract_model_from_model_path(model_path.string()));
             }
             auto skip_model_compatibility_check =
-                    internal_parser.get<bool>("--skip-model-compatibility-check");
+                    parser.hidden.get<bool>("--skip-model-compatibility-check");
             if (!skip_model_compatibility_check &&
                 !sample_rates_compatible(data_sample_rate, model_sample_rate)) {
                 std::stringstream err;
@@ -267,9 +267,9 @@ int duplex(int argc, char* argv[]) {
             std::vector<std::string> barcode_kits;
             utils::add_rg_hdr(hdr.get(), read_groups, barcode_kits);
 
-            int batch_size(parser.get<int>("-b"));
-            int chunk_size(parser.get<int>("-c"));
-            int overlap(parser.get<int>("-o"));
+            int batch_size(parser.visible.get<int>("-b"));
+            int chunk_size(parser.visible.get<int>("-c"));
+            int overlap(parser.visible.get<int>("-o"));
             const size_t num_runners = default_parameters.num_runners;
 
             int stereo_batch_size = 0;
@@ -345,7 +345,8 @@ int duplex(int argc, char* argv[]) {
                     kStatsPeriod, stats_reporters, stats_callables);
 
             // Run pipeline.
-            loader.load_reads(reads, parser.get<bool>("--recursive"), ReadOrder::BY_CHANNEL);
+            loader.load_reads(reads, parser.visible.get<bool>("--recursive"),
+                              ReadOrder::BY_CHANNEL);
         }
 
         // Wait for the pipeline to complete.  When it does, we collect

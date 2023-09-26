@@ -33,7 +33,7 @@ Aligner::Aligner(const std::string& filename, const Minimap2Options& options, in
                  m_idx_opt.w);
 
     m_idx_opt.batch_size = options.index_batch_size;
-    m_idx_opt.mini_batch_size = options.mini_batch_size;
+    m_idx_opt.mini_batch_size = options.index_batch_size;
     spdlog::info("> Index parameters input by user: batch size={} and mini batch size={}.",
                  m_idx_opt.batch_size, m_idx_opt.mini_batch_size);
 

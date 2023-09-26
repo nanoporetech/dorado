@@ -19,7 +19,6 @@ public:
         short kmer_size;
         short window_size;
         uint64_t index_batch_size;
-        int64_t mini_batch_size;
         bool print_secondary;
         int best_n_secondary;
         int bandwidth;
@@ -28,8 +27,8 @@ public:
         bool secondary_seq;
         bool print_aln_seq;
     };
-    static constexpr Minimap2Options dflt_options{15,  10,    16000000000ull, 500000000ll, true, 5,
-                                                  500, 20000, false,          false,       false};
+    static constexpr Minimap2Options dflt_options{15,  10,    16000000000ull, true,  5,
+                                                  500, 20000, false,          false, false};
 
 public:
     // header_sequence_records is populated by the constructor.

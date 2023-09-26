@@ -55,8 +55,8 @@ samtools view -h $output_dir/calls.bam > $output_dir/calls.sam
 echo dorado aligner options test stage
 
 # list of options and whether they affect the output
-options=(""    "-k 20" "-w 100" "-I 100K" "-K 10" "--secondary no" "-N 1" "-r 10,100" "-Y" "--secondary-seq" "--print-aln-seq")
-changes=(false true    true     false     false   true             true   true        true true              false            )
+options=(""    "-k 20" "-w 100" "-I 100K" "--secondary no" "-N 1" "-r 10,100" "-Y" "--secondary-seq" "--print-aln-seq")
+changes=(false true    true     false     true             true   true        true true              false            )
 
 ref=$data_dir/aligner_test/lambda_ecoli.fasta
 rds=$data_dir/aligner_test/aligner.fastq
