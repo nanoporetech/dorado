@@ -122,26 +122,30 @@ T parse_string_to_size(const std::string& str, std::optional<std::string> opt = 
 }
 
 inline bool parse_yes_or_no(const std::string& str, std::optional<std::string> opt = std::nullopt) {
-    if (str == "yes" || str == "y")
+    if (str == "yes" || str == "y") {
         return true;
-    if (str == "no" || str == "n")
+    }
+    if (str == "no" || str == "n") {
         return false;
+    }
     auto msg = "Unsupported value '" + str + "'; option  only accepts '(y)es' or '(n)o'.";
-    if (opt)
+    if (opt) {
         msg = "Error parsing option " + *opt + ": " + msg;
+    }
     throw std::runtime_error(msg);
 }
 
 inline std::string to_size(double value) {
     std::stringstream res;
-    if (value < 1e3)
+    if (value < 1e3) {
         res << value;
-    else if (value < 1e6)
+    } else if (value < 1e6) {
         res << value / 1e3 << 'K';
-    else if (value < 1e9)
+    } else if (value < 1e9) {
         res << value / 1e6 << 'M';
-    else
+    } else {
         res << value / 1e9 << 'G';
+    }
     return res.str();
 }
 
