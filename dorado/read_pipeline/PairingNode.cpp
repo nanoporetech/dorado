@@ -40,7 +40,8 @@ PairingNode::PairingResult PairingNode::is_within_time_and_length_criteria(
     int seq_len2 = comp.read_common.seq.length();
     int min_seq_len = std::min(seq_len1, seq_len2);
     int max_seq_len = std::max(seq_len1, seq_len2);
-    float min_qscore = std::min(temp.calculate_mean_qscore(), comp.calculate_mean_qscore());
+    float min_qscore = std::min(temp.read_common.calculate_mean_qscore(),
+                                comp.read_common.calculate_mean_qscore());
 
     if ((delta < 0) || (delta >= kMaxTimeDeltaMs) || (min_seq_len < kMinSeqLength) ||
         (min_qscore < kMinSimplexQScore)) {

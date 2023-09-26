@@ -66,7 +66,7 @@ std::string SimplexRead::generate_read_group() const {
 }
 
 void SimplexRead::generate_read_tags(bam1_t *aln, bool emit_moves) const {
-    int qs = static_cast<int>(std::round(calculate_mean_qscore()));
+    int qs = static_cast<int>(std::round(read_common.calculate_mean_qscore()));
     bam_aux_append(aln, "qs", 'i', sizeof(qs), (uint8_t *)&qs);
 
     float du = (float)(read_common.raw_data.size(0) + num_trimmed_samples) / (float)sample_rate;
@@ -133,7 +133,7 @@ void SimplexRead::generate_read_tags(bam1_t *aln, bool emit_moves) const {
 }
 
 void SimplexRead::generate_duplex_read_tags(bam1_t *aln) const {
-    int qs = static_cast<int>(std::round(calculate_mean_qscore()));
+    int qs = static_cast<int>(std::round(read_common.calculate_mean_qscore()));
     bam_aux_append(aln, "qs", 'i', sizeof(qs), (uint8_t *)&qs);
     uint32_t duplex = 1;
     bam_aux_append(aln, "dx", 'i', sizeof(duplex), (uint8_t *)&duplex);
@@ -294,14 +294,31 @@ void SimplexRead::generate_modbase_tags(bam1_t *aln, uint8_t threshold) const {
     bam_aux_update_array(aln, "ML", 'C', modbase_prob.size(), (uint8_t *)modbase_prob.data());
 }
 
-float SimplexRead::calculate_mean_qscore() const {
+float ReadCommon::calculate_mean_qscore() const {
     // If Q-score start position is greater than the
     // read length, then calculate mean Q-score from the
     // start of the read.
-    if (read_common.qstring.length() <= mean_qscore_start_pos) {
-        return utils::mean_qscore_from_qstring(read_common.qstring, 0);
+    if (qstring.length() <= mean_qscore_start_pos) {
+        return utils::mean_qscore_from_qstring(qstring, 0);
     }
-    return utils::mean_qscore_from_qstring(read_common.qstring, mean_qscore_start_pos);
+    return utils::mean_qscore_from_qstring(qstring, mean_qscore_start_pos);
+}
+
+bool is_read_message(const Message &message) {
+    return std::holds_alternative<SimplexReadPtr>(message) ||
+           std::holds_alternative<DuplexReadPtr>(message);
+}
+
+ReadCommon &get_read_common_data(const Message &message) {
+    if (!is_read_message(message)) {
+        throw std::runtime_error("Message is not a read");
+    } else {
+        if (std::holds_alternative<SimplexReadPtr>(message)) {
+            return std::get<SimplexReadPtr>(message)->read_common;
+        } else {
+            return std::get<DuplexReadPtr>(message)->read_common;
+        }
+    }
 }
 
 ReadPair::ReadData ReadPair::ReadData::from_read(const SimplexRead &read,

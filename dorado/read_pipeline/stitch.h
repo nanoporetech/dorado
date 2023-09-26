@@ -1,4 +1,6 @@
 #pragma once
+#include "ReadPipeline.h"
+
 #include <memory>
 #include <string>
 #include <vector>
@@ -24,6 +26,6 @@ struct Chunk {
 
 // Given a read and its unstitched chunks, stitch the chunks (accounting for overlap) and assign basecalled read and
 // qstring to Read
-void stitch_chunks(SimplexRead& read, const std::vector<std::unique_ptr<Chunk>>& called_chunks);
+void stitch_chunks(ReadCommon& read, const std::vector<std::unique_ptr<Chunk>>& called_chunks);
 
 }  // namespace dorado::utils

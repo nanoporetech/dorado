@@ -32,7 +32,7 @@ struct BasecallerNode::BasecallingChunk : utils::Chunk {
 };
 
 struct BasecallerNode::BasecallingRead {
-    SimplexReadPtr read;                                       // The read itself.
+    Message read;                                              // The read itself.
     std::vector<std::unique_ptr<utils::Chunk>> called_chunks;  // Vector of basecalled chunks.
     std::atomic_size_t num_chunks_called;  // Number of chunks which have been basecalled.
 };
@@ -43,26 +43,28 @@ void BasecallerNode::input_worker_thread() {
     Message message;
     while (get_input_message(message)) {
         // If this message isn't a read, just forward it to the sink.
-        if (!std::holds_alternative<SimplexReadPtr>(message)) {
+
+        if (!is_read_message(message)) {
             send_message_to_sink(std::move(message));
             continue;
         }
 
-        // If this message isn't a read, we'll get a bad_variant_access exception.
-        auto read = std::get<SimplexReadPtr>(std::move(message));
+        // Get the common read data.
+        ReadCommon read_common_data = get_read_common_data(message);
         // If a read has already been basecalled, just send it to the sink without basecalling again
         // TODO: This is necessary because some reads (e.g failed Stereo Encoding) will be passed
         // to the basecaller node having already been called. This should be fixed in the future with
         // support for graphs of nodes rather than linear pipelines.
-        if (!read->read_common.seq.empty()) {
-            send_message_to_sink(std::move(read));
+        if (!read_common_data.seq.empty()) {
+            send_message_to_sink(std::move(message));
             continue;
         }
+
         // Now that we have acquired a read, wait until we can push to chunks_in
         // Chunk up the read and put the chunks into the pending chunk list.
         size_t raw_size =
-                read->read_common.raw_data
-                        .sizes()[read->read_common.raw_data.sizes().size() - 1];  // Time dimension.
+                read_common_data.raw_data
+                        .sizes()[read_common_data.raw_data.sizes().size() - 1];  // Time dimension.
 
         size_t offset = 0;
         size_t chunk_in_read_idx = 0;
@@ -86,7 +88,7 @@ void BasecallerNode::input_worker_thread() {
         }
         working_read->called_chunks.resize(num_chunks);
         working_read->num_chunks_called.store(0);
-        working_read->read = std::move(read);
+        working_read->read = std::move(message);
 
         // Put the read in the working list
         {
@@ -142,21 +144,22 @@ void BasecallerNode::working_reads_manager() {
         if (num_chunks_called == working_read->called_chunks.size()) {
             // Finalise the read.
             auto source_read = std::move(working_read->read);
-            utils::stitch_chunks(*source_read, working_read->called_chunks);
-            source_read->read_common.model_name = m_model_name;
-            source_read->mean_qscore_start_pos = m_mean_qscore_start_pos;
+
+            ReadCommon &read_common_data = get_read_common_data(source_read);
+
+            utils::stitch_chunks(read_common_data, working_read->called_chunks);
+            read_common_data.model_name = m_model_name;
+            read_common_data.mean_qscore_start_pos = m_mean_qscore_start_pos;
 
             if (m_rna) {
-                std::reverse(source_read->read_common.seq.begin(),
-                             source_read->read_common.seq.end());
-                std::reverse(source_read->read_common.qstring.begin(),
-                             source_read->read_common.qstring.end());
+                std::reverse(read_common_data.seq.begin(), read_common_data.seq.end());
+                std::reverse(read_common_data.qstring.begin(), read_common_data.qstring.end());
             }
 
             // Update stats.
             ++m_called_reads_pushed;
-            m_num_bases_processed += source_read->read_common.seq.length();
-            m_num_samples_processed += source_read->read_common.raw_data.size(0);
+            m_num_bases_processed += read_common_data.seq.length();
+            m_num_samples_processed += read_common_data.raw_data.size(0);
 
             // Chunks have ownership of the working read, so destroy them to avoid a leak.
             working_read->called_chunks.clear();
@@ -170,7 +173,7 @@ void BasecallerNode::working_reads_manager() {
                     --m_working_reads_size;
                 } else {
                     throw std::runtime_error("Expected to find read id " +
-                                             source_read->read_common.read_id +
+                                             read_common_data.read_id +
                                              " in working reads cache but it doesn't exist.");
                 }
             }
@@ -216,7 +219,8 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
             // Copy the chunk into the input tensor
             auto &source_read = chunk->owning_read->read;
 
-            auto input_slice = source_read->read_common.raw_data.index(
+            auto read_common = get_read_common_data(source_read);
+            auto input_slice = read_common.raw_data.index(
                     {Ellipsis, Slice(chunk->input_offset, chunk->input_offset + m_chunk_size)});
             size_t slice_size;
             if (input_slice.ndimension() == 1) {

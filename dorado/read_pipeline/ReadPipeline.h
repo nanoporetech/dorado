@@ -55,6 +55,10 @@ public:
     int32_t client_id{-1};
 
     bool is_duplex{false};
+
+    uint32_t mean_qscore_start_pos = 0;
+
+    float calculate_mean_qscore() const;
 };
 
 // Class representing a duplex read, including stereo-encoded raw data
@@ -96,15 +100,12 @@ public:
     std::vector<Mapping> mappings;
     std::vector<BamPtr> extract_sam_lines(bool emit_moves, uint8_t modbase_threshold = 0) const;
 
-    float calculate_mean_qscore() const;
-
     uint64_t start_sample;
     uint64_t end_sample;
     uint64_t run_acquisition_start_time_ms;
     std::atomic_bool is_duplex_parent{false};
     // Calculate mean Q-score from this position onwards if read is
     // a short read.
-    uint32_t mean_qscore_start_pos = 0;
 
     std::atomic_size_t num_duplex_candidate_pairs{0};
 
@@ -153,6 +154,10 @@ public:
 // - a ReadPair object, which represents a pair of reads for duplex calling
 // To add more message types, simply add them to the list of types in the std::variant.
 using Message = std::variant<SimplexReadPtr, BamPtr, ReadPair, CacheFlushMessage, DuplexReadPtr>;
+
+bool is_read_message(const Message& message);
+
+ReadCommon& get_read_common_data(const Message& message);
 
 using NodeHandle = int;
 
