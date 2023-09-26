@@ -336,7 +336,6 @@ int basecaller(int argc, char* argv[]) {
     parser.visible.add_argument("--reference")
             .help("Path to reference for alignment.")
             .default_value(std::string(""));
-    cli::add_minimap2_arguments(parser, Aligner::dflt_options);
 
     parser.visible.add_argument("--estimate-poly-a")
             .help("Estimate poly-A/T tail lengths (beta feature). Primarily meant for cDNA and "
@@ -355,6 +354,9 @@ int basecaller(int argc, char* argv[]) {
             .help("Skip barcode trimming. If option is not chosen, trimming is enabled.")
             .default_value(false)
             .implicit_value(true);
+
+    cli::add_minimap2_arguments(parser, Aligner::dflt_options);
+    cli::add_internal_arguments(parser);
 
     // Create a copy of the parser to use if the resume feature is enabled. Needed
     // to parse the model used for the file being resumed from. Note that this copy

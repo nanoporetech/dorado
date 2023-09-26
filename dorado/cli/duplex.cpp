@@ -94,6 +94,7 @@ int duplex(int argc, char* argv[]) {
     parser.visible.add_argument("-v", "--verbose").default_value(false).implicit_value(true);
 
     cli::add_minimap2_arguments(parser, Aligner::dflt_options);
+    cli::add_internal_arguments(parser);
 
     try {
         cli::parse(parser, argc, argv);

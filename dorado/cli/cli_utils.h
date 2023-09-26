@@ -151,7 +151,7 @@ inline std::string to_size(double value) {
 
 inline std::string to_yes_or_no(bool value) { return value ? "yes" : "no"; }
 
-inline void add_internal_options(ArgParser& parser) {
+inline void add_internal_arguments(ArgParser& parser) {
     parser.hidden.add_argument("--skip-model-compatibility-check")
             .help("(WARNING: For expert users only) Skip model and data compatibility checks.")
             .default_value(false)
@@ -218,7 +218,7 @@ inline void parse(ArgParser& parser, int argc, const char* const argv[]) {
     parser.hidden.parse_args(remaining_args);
 }
 
-inline void process_internal_options(const ArgParser& parser) {
+inline void process_internal_arguments(const ArgParser& parser) {
     utils::details::extract_dev_options(parser.hidden.get<std::string>("--devopts"));
 }
 
