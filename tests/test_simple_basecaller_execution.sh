@@ -29,7 +29,7 @@ $dorado_bin download --model ${model_name_5k} --directory ${output_dir}
 model_5k=${output_dir}/${model_name_5k}
 
 echo dorado basecaller test stage
-$dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --emit-fastq > $output_dir/ref.fq
+$dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --emit-fastq > $output_dir/REF.fq
 $dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --modified-bases 5mCG_5hmCG --emit-moves > $output_dir/calls.bam
 if ! uname -r | grep -q tegra; then
     $dorado_bin basecaller ${model} $data_dir/pod5 -x cpu --modified-bases 5mCG_5hmCG > $output_dir/calls.bam
@@ -46,58 +46,78 @@ samtools quickcheck -u $output_dir/calls.bam
 samtools view $output_dir/calls.bam > $output_dir/calls.sam
 
 echo dorado aligner test stage
-$dorado_bin aligner $output_dir/ref.fq $output_dir/calls.sam > $output_dir/calls.bam
-$dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --modified-bases 5mCG_5hmCG | $dorado_bin aligner $output_dir/ref.fq > $output_dir/calls.bam
-$dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --modified-bases 5mCG_5hmCG --reference $output_dir/ref.fq > $output_dir/calls.bam
+$dorado_bin aligner $output_dir/REF.fq $output_dir/calls.sam > $output_dir/calls.bam
+$dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --modified-bases 5mCG_5hmCG | $dorado_bin aligner $output_dir/REF.fq > $output_dir/calls.bam
+$dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --modified-bases 5mCG_5hmCG --reference $output_dir/REF.fq > $output_dir/calls.bam
 samtools quickcheck -u $output_dir/calls.bam
 samtools view -h $output_dir/calls.bam > $output_dir/calls.sam
 
 echo dorado aligner options test stage
+dorado_aligner_options_test() (
+    set +e
+    set +x
+    which minimap2
+    minimap2 --version
 
-# list of options and whether they affect the output
-options=(""    "-k 20" "-w 100" "-I 100K" "--secondary no" "-N 1" "-r 10,100" "-Y" "--secondary-seq" "--print-aln-seq")
-changes=(false true    true     false     true             true   true        true true              false            )
+    # list of options and whether they affect the output
+    REF=$data_dir/aligner_test/lambda_ecoli.fasta
+    RDS=$data_dir/aligner_test/dataset.fastq
 
-ref=$data_dir/aligner_test/lambda_ecoli.fasta
-rds=$data_dir/aligner_test/aligner.fastq
-for ((i = 0; i < ${#options[@]}; i++)); do
-    opt=${options[$i]}
-    echo -n "$i: with options '$opt' ... "
+    RETURN=true
+    touch err
+    ERROR() { echo $*; RETURN=false; cat err; }
+    SKIP() { echo $*; cat err; }
 
-    # run dorado aligner
-    if ! $dorado_bin aligner $opt $ref $rds 2>/dev/null | samtools view -h 2>/dev/null > $output_dir/dorado-$i.sam; then
-        echo failed running dorado aligner
-        continue
-    fi
+    OPTIONS=(""    "-k 20" "-w 100" "-I 100K" "--secondary no" "-N 1" "-r 10,100" "-Y" "--secondary-seq" "--print-aln-seq")
+    CHANGES=(false true    true     false     true             true   true        true true              false            )
+    for ((i = 0; i < ${#OPTIONS[@]}; i++)); do
+        opt=${OPTIONS[$i]}
+        echo -n "$i: with options '$opt' ... "
 
-    # check output integrity
-    if ! samtools quickcheck -u $output_dir/dorado-$i.sam; then
-        echo failed sam check
-        continue
-    fi
-
-    # sort and cut output for comparison
-    sort $output_dir/dorado-$i.sam | grep -v '^@PG' | cut -f-11> $output_dir/dorado-$i.ssam
-
-    # compare with minimap2 output
-    if minimap2 -a $opt $ref $rds 2>/dev/null > $output_dir/minimap2-$i.sam; then
-        sort $output_dir/minimap2-$i.sam | grep -v '^@PG' | cut -f-11 > $output_dir/minimap2-$i.ssam
-        if ! diff $output_dir/dorado-$i.ssam $output_dir/minimap2-$i.ssam > /dev/null; then
-            echo failed comparison with minimap2 output
+        # run dorado aligner
+        if ! $dorado_bin aligner $opt $REF $RDS 2>err | samtools view -h 2>>err > $output_dir/dorado-$i.sam; then
+            ERROR failed running dorado aligner
             continue
         fi
-    fi
 
-    # check output changed
-    should_change=$(${case_changes[$i]})
-    does_change=$(diff $output_dir/dorado-$i.ssam $output_dir/dorado-0.ssam > /dev/null)
-    if [[ $should_change != $does_change ]]; then
-        $should_change && echo failed to change output || echo failed to preserve output
-        continue
-    fi
+        # check output integrity
+        if ! samtools quickcheck -u $output_dir/dorado-$i.sam 2>err; then
+            ERROR failed sam check
+            continue
+        fi
 
-    echo success
-done
+        # sort and cut output for comparison
+        sort $output_dir/dorado-$i.sam | grep -v '^@PG' | cut -f-11> $output_dir/dorado-$i.ssam
+
+        # compare with minimap2 output
+        if minimap2 -a $opt $REF $RDS 2>/dev/null > $output_dir/minimap2-$i.sam; then
+            sort $output_dir/minimap2-$i.sam | grep -v '^@PG' | cut -f-11 > $output_dir/minimap2-$i.ssam
+            if ! diff $output_dir/dorado-$i.ssam $output_dir/minimap2-$i.ssam > err; then
+                ERROR failed comparison with minimap2 output
+                continue
+            fi
+        else
+            SKIP error running minimap2
+            continue
+        fi
+
+        # check output changed
+        should_change=${CHANGES[$i]}
+        if diff $output_dir/dorado-$i.ssam $output_dir/dorado-0.ssam > err; then
+            does_change=false
+        else
+            does_change=true
+        fi
+        if [[ $should_change != $does_change ]]; then
+            $should_change && ERROR failed to change output || ERROR failed to preserve output
+            continue
+        fi
+
+        echo success
+    done
+    $RETURN
+)
+dorado_aligner_options_test
 
 if ! uname -r | grep -q tegra; then
     echo dorado duplex basespace test stage
