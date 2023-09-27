@@ -165,7 +165,7 @@ void BaseSpaceDuplexCallerNode::basespace(const std::string& template_read_id,
                 target_cursor, complement_quality_scores_reverse, query_cursor, template_sequence,
                 complement_sequence_reverse_complement, result.alignment);
 
-        auto duplex_read = std::make_unique<SimplexRead>();
+        auto duplex_read = std::make_unique<DuplexRead>();
         duplex_read->read_common.is_duplex = true;
         duplex_read->read_common.seq = std::string(consensus.begin(), consensus.end());
         duplex_read->read_common.qstring =
