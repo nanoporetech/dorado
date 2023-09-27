@@ -24,14 +24,14 @@ std::filesystem::path DataPath(std::string_view filename) {
 auto make_read() {
     auto read = std::make_unique<dorado::SimplexRead>();
     read->range = 0;
-    read->sample_rate = 4000;
+    read->read_common.sample_rate = 4000;
     read->offset = -287;
     read->scaling = 0.14620706;
-    read->shift = 94.717316;
-    read->scale = 26.888939;
+    read->read_common.shift = 94.717316;
+    read->read_common.scale = 26.888939;
     read->read_common.model_stride = 5;
     read->read_common.read_id = "00a2dd45-f6a9-49ba-86ee-5d2a37b861cb";
-    read->num_trimmed_samples = 10;
+    read->read_common.num_trimmed_samples = 10;
     read->read_common.attributes.read_number = 321;
     read->read_common.attributes.channel_number = 664;
     read->read_common.attributes.mux = 3;
@@ -139,14 +139,14 @@ TEST_CASE("No split output read properties", TEST_GROUP) {
     const std::string init_read_id = "00a2dd45-f6a9-49ba-86ee-5d2a37b861cb";
     auto read = std::make_unique<dorado::SimplexRead>();
     read->range = 0;
-    read->sample_rate = 4000;
+    read->read_common.sample_rate = 4000;
     read->offset = -287;
     read->scaling = 0.14620706;
-    read->shift = 94.717316;
-    read->scale = 26.888939;
+    read->read_common.shift = 94.717316;
+    read->read_common.scale = 26.888939;
     read->read_common.model_stride = 5;
     read->read_common.read_id = init_read_id;
-    read->num_trimmed_samples = 10;
+    read->read_common.num_trimmed_samples = 10;
     read->read_common.attributes.read_number = 321;
     read->read_common.attributes.channel_number = 664;
     read->read_common.attributes.mux = 3;

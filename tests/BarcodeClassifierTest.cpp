@@ -215,7 +215,8 @@ TEST_CASE(
 
     // Generate mod prob table so only the first A after the front flank has a mod.
     const std::string mod_alphabet = "AXCGT";
-    read->mod_base_info = std::make_shared<dorado::ModBaseInfo>(mod_alphabet, "6mA", "");
+    read->read_common.mod_base_info =
+            std::make_shared<dorado::ModBaseInfo>(mod_alphabet, "6mA", "");
     read->read_common.base_mod_probs =
             std::vector<uint8_t>(read->read_common.seq.length() * mod_alphabet.size(), 0);
 
@@ -239,9 +240,9 @@ TEST_CASE(
     read->read_common.base_mod_probs[(front_flank.length() * mod_alphabet.size()) + 1] =
             235;  // 6mA
 
-    read->num_trimmed_samples = 0;
+    read->read_common.num_trimmed_samples = 0;
 
-    auto records = read->extract_sam_lines(true /* emit moves*/, 10);
+    auto records = read->read_common.extract_sam_lines(true /* emit moves*/, 10);
 
     // Push a Read type.
     pipeline->push_message(std::move(read));
@@ -295,7 +296,7 @@ TEST_CASE(
             // Check trimming on the Read type.
             auto read = std::get<SimplexReadPtr>(std::move(message));
 
-            CHECK(read->barcode == expected_bc);
+            CHECK(read->read_common.barcode == expected_bc);
 
             CHECK(read->read_common.seq == nonbc_seq);
 
@@ -307,9 +308,9 @@ TEST_CASE(
             CHECK(read->read_common.base_mod_probs[0] == 20);
             CHECK(read->read_common.base_mod_probs[1] == 235);
 
-            CHECK(read->num_trimmed_samples == additional_trimmed_samples);
+            CHECK(read->read_common.num_trimmed_samples == additional_trimmed_samples);
 
-            auto bams = read->extract_sam_lines(0, 10);
+            auto bams = read->read_common.extract_sam_lines(0, 10);
             auto& rec = bams[0];
             auto [mod_str, mod_probs] = dorado::utils::extract_modbase_info(rec.get());
         }

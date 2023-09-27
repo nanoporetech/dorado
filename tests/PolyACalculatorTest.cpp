@@ -55,5 +55,5 @@ TEST_CASE("PolyACalculator: Test polyT tail estimation", TEST_GROUP) {
     CHECK(messages.size() == 1);
 
     auto out = std::get<SimplexReadPtr>(std::move(messages[0]));
-    CHECK(out->rna_poly_tail_length == gt);
+    CHECK(out->read_common.rna_poly_tail_length == gt);
 }

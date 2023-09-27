@@ -51,13 +51,13 @@ protected:
     auto make_test_read(std::string read_id) {
         auto read = std::make_unique<dorado::SimplexRead>();
         read->read_common.raw_data = torch::rand(random_between(100, 200));
-        read->sample_rate = 5000;
-        read->shift = random_between(100, 200);
-        read->scale = random_between(5, 10);
+        read->read_common.sample_rate = 5000;
+        read->read_common.shift = random_between(100, 200);
+        read->read_common.scale = random_between(5, 10);
         read->read_common.read_id = std::move(read_id);
         read->read_common.seq = "ACGTACGT";
         read->read_common.qstring = "********";
-        read->num_trimmed_samples = random_between(10, 100);
+        read->read_common.num_trimmed_samples = random_between(10, 100);
         read->read_common.attributes.mux = 2;
         read->read_common.attributes.read_number = 12345;
         read->read_common.attributes.channel_number = 5;
