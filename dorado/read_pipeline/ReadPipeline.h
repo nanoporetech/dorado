@@ -61,7 +61,9 @@ public:
 
     float calculate_mean_qscore() const;
 
-    std::vector<BamPtr> extract_sam_lines(bool emit_moves, uint8_t modbase_threshold = 0) const;
+    std::vector<BamPtr> extract_sam_lines(bool emit_moves,
+                                          uint8_t modbase_threshold = 0,
+                                          bool is_duplex_parent = false) const;
 
     // Barcode.
     std::string barcode{};
@@ -84,11 +86,9 @@ public:
 
     int rna_poly_tail_length{-1};
 
-    bool is_duplex_parent{false};  // TODO - should be atomic, and a simplex-only property
-
 private:
     void generate_duplex_read_tags(bam1_t*) const;
-    void generate_read_tags(bam1_t* aln, bool emit_moves) const;
+    void generate_read_tags(bam1_t* aln, bool emit_moves, bool is_duplex_parent = false) const;
     void generate_modbase_tags(bam1_t* aln, uint8_t threshold = 0) const;
     std::string generate_read_group() const;
 };
@@ -125,6 +125,8 @@ public:
     // (2) duplex pairs which share this read as the template read
     size_t subread_id{0};
     size_t split_count{1};
+
+    std::atomic_bool is_duplex_parent{false};
 };
 
 using SimplexReadPtr = std::unique_ptr<SimplexRead>;

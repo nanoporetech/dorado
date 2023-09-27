@@ -23,7 +23,12 @@ void ReadToBamType::worker_thread() {
 
         auto& read_common_data = get_read_common_data(message);
 
-        auto alns = read_common_data.extract_sam_lines(m_emit_moves, m_modbase_threshold);
+        bool is_duplex_parent = false;
+        if (!read_common_data.is_duplex) {
+            is_duplex_parent = std::get<SimplexReadPtr>(message)->is_duplex_parent;
+        }
+        auto alns = read_common_data.extract_sam_lines(m_emit_moves, m_modbase_threshold,
+                                                       is_duplex_parent);
         for (auto& aln : alns) {
             send_message_to_sink(std::move(aln));
         }

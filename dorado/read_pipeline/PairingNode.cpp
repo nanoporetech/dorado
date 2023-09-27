@@ -224,8 +224,8 @@ void PairingNode::pair_list_worker_thread(int tid) {
                     read_pair.complement_read =
                             ReadPair::ReadData::from_read(*complement_read, rs, re);
 
-                    template_read->read_common.is_duplex_parent = true;
-                    complement_read->read_common.is_duplex_parent = true;
+                    template_read->is_duplex_parent = true;
+                    complement_read->is_duplex_parent = true;
                     ++template_read->num_duplex_candidate_pairs;
 
                     send_message_to_sink(std::move(read_pair));
@@ -352,8 +352,8 @@ void PairingNode::pair_generating_worker_thread(int tid) {
                     pair.template_read = ReadPair::ReadData::from_read(*read_ptr, qs, qe);
                     pair.complement_read = ReadPair::ReadData::from_read(*later_read, rs, re);
 
-                    read_ptr->read_common.is_duplex_parent = true;
-                    later_read->read_common.is_duplex_parent = true;
+                    read_ptr->is_duplex_parent = true;
+                    later_read->is_duplex_parent = true;
                     ++read_ptr->num_duplex_candidate_pairs;
                     send_message_to_sink(std::move(pair));
                     found_pair = true;
@@ -368,8 +368,8 @@ void PairingNode::pair_generating_worker_thread(int tid) {
                     pair.template_read = ReadPair::ReadData::from_read(*earlier_read, qs, qe);
                     pair.complement_read = ReadPair::ReadData::from_read(*read_ptr, rs, re);
 
-                    earlier_read->read_common.is_duplex_parent = true;
-                    read_ptr->read_common.is_duplex_parent = true;
+                    earlier_read->is_duplex_parent = true;
+                    read_ptr->is_duplex_parent = true;
                     ++earlier_read->num_duplex_candidate_pairs;
                     send_message_to_sink(std::move(pair));
                 }

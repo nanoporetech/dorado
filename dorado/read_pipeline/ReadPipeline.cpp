@@ -65,7 +65,7 @@ std::string ReadCommon::generate_read_group() const {
     return read_group;
 }
 
-void ReadCommon::generate_read_tags(bam1_t *aln, bool emit_moves) const {
+void ReadCommon::generate_read_tags(bam1_t *aln, bool emit_moves, bool is_duplex_parent) const {
     int qs = static_cast<int>(std::round(calculate_mean_qscore()));
     bam_aux_append(aln, "qs", 'i', sizeof(qs), (uint8_t *)&qs);
 
@@ -256,7 +256,8 @@ bool is_read_message(const Message &message) {
 }
 
 std::vector<BamPtr> ReadCommon::extract_sam_lines(bool emit_moves,
-                                                  uint8_t modbase_threshold) const {
+                                                  uint8_t modbase_threshold,
+                                                  bool is_duplex_parent) const {
     if (read_id.empty()) {
         throw std::runtime_error("Empty read_name string provided");
     }
