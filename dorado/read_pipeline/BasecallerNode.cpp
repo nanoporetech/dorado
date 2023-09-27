@@ -219,7 +219,7 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
             // Copy the chunk into the input tensor
             auto &source_read = chunk->owning_read->read;
 
-            auto read_common = get_read_common_data(source_read);
+            auto &read_common = get_read_common_data(source_read);
             auto input_slice = read_common.raw_data.index(
                     {Ellipsis, Slice(chunk->input_offset, chunk->input_offset + m_chunk_size)});
             size_t slice_size;

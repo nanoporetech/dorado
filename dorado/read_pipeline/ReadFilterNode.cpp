@@ -15,7 +15,7 @@ void ReadFilterNode::worker_thread() {
             continue;
         }
 
-        ReadCommon read_common = get_read_common_data(message);
+        const auto& read_common = get_read_common_data(message);
 
         auto log_filtering = [&]() {
             if (read_common.is_duplex) {
