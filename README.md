@@ -100,7 +100,7 @@ This command will output both simplex and duplex reads. The `dx` tag in the outp
 * `dx:i:0` for simplex reads which don't have duplex offsprings.
 * `dx:i:-1` for simplex reads which have duplex offsprings.
 
-After running, Dorado will report a `Duplex rate` , this is calculated as the number of nucleotides in duplex basecalls multiplied by two and divided by the total number of nucleotides in simplex basecalls. This value is a close approximation for the proportion of nucleotides which participated in a duplex basecall.
+Dorado will report the duplex rate as the number of nucleotides in the duplex basecalls multiplied by two and divided by the total number of nucleotides in the simplex basecalls. This value is a close approximation for the proportion of nucleotides which participated in a duplex basecall.
 
 Dorado duplex previously required a separate tool to perform duplex pair detection and read splitting, but this is now integrated into Dorado.
 
