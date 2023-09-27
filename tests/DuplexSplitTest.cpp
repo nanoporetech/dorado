@@ -115,24 +115,28 @@ TEST_CASE("4 subread split tagging", TEST_GROUP) {
     pipeline->push_message(std::move(read));
     pipeline.reset();
 
-    auto reads = ConvertMessages<dorado::SimplexReadPtr>(std::move(messages));
-
-    CHECK(reads.size() == 6);
+    CHECK(messages.size() == 6);
+    REQUIRE(std::all_of(messages.begin(), messages.end(),
+                        [](const auto &message) { return is_read_message(message); }));
 
     std::vector<size_t> expected_subread_ids = {0, 1, 2, 3, 4, 5};
     std::vector<size_t> subread_ids;
-    for (const auto &subread : reads) {
-        subread_ids.push_back(subread->subread_id);
+    for (const auto &message : messages) {
+        const auto &read_common = get_read_common_data(message);
+        subread_ids.push_back(read_common.subread_id);
     }
 
     std::sort(std::begin(subread_ids), std::end(subread_ids));
     CHECK(subread_ids == expected_subread_ids);
-    CHECK(std::all_of(reads.begin(), reads.end(),
-                      [split_count = expected_subread_ids.size()](const auto &read) {
-                          return read->split_count == split_count;
+    CHECK(std::all_of(messages.begin(), messages.end(),
+                      [split_count = expected_subread_ids.size()](const auto &message) {
+                          const auto &read_common = get_read_common_data(message);
+                          return read_common.split_count == split_count;
                       }));
-    CHECK(std::all_of(reads.begin(), reads.end(),
-                      [](const auto &r) { return r->read_common.read_tag == 42; }));
+    CHECK(std::all_of(messages.begin(), messages.end(), [](const auto &message) {
+        const auto &read_common = get_read_common_data(message);
+        return read_common.read_tag == 42;
+    }));
 }
 
 TEST_CASE("No split output read properties", TEST_GROUP) {
@@ -158,7 +162,7 @@ TEST_CASE("No split output read properties", TEST_GROUP) {
 
     read->read_common.seq = "AAAAAAAAAAAAAAAAAAAAAA";
     read->read_common.qstring = std::string(read->read_common.seq.length(), '!');
-    read->read_common.moves = std::vector<uint8_t>(read->read_common.seq.length(), 0);
+    read->read_common.moves = std::vector<uint8_t>(read->read_common.seq.length(), 1);
     read->read_common.raw_data =
             torch::zeros(read->read_common.seq.length() * 10).to(torch::kFloat16);
     read->read_common.read_tag = 42;
@@ -178,6 +182,6 @@ TEST_CASE("No split output read properties", TEST_GROUP) {
 
     read = std::move(reads.front());
     CHECK(read->read_common.read_id == init_read_id);
-    CHECK(read->subread_id == 0);
-    CHECK(read->split_count == 1);
+    CHECK(read->read_common.subread_id == 0);
+    CHECK(read->read_common.split_count == 1);
 }

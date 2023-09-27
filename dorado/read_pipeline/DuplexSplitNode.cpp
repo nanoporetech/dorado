@@ -536,10 +536,11 @@ std::vector<SimplexReadPtr> DuplexSplitNode::split(SimplexReadPtr init_read) con
     size_t subread_id = 0;
     for (auto& ext_read : to_split) {
         if (to_split.size() > 1) {
-            ext_read.read->subread_id = subread_id++;
-            ext_read.read->split_count = to_split.size();
-            const auto subread_uuid = utils::derive_uuid(ext_read.read->read_common.parent_read_id,
-                                                         std::to_string(ext_read.read->subread_id));
+            ext_read.read->read_common.subread_id = subread_id++;
+            ext_read.read->read_common.split_count = to_split.size();
+            const auto subread_uuid =
+                    utils::derive_uuid(ext_read.read->read_common.parent_read_id,
+                                       std::to_string(ext_read.read->read_common.subread_id));
             ext_read.read->read_common.read_id = subread_uuid;
         }
 

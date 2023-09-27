@@ -86,6 +86,12 @@ public:
 
     int rna_poly_tail_length{-1};
 
+    // subread_id is used to track 2 types of offsprings of a read
+    // (1) read splits
+    // (2) duplex pairs which share this read as the template read
+    size_t subread_id{0};
+    size_t split_count{1};
+
 private:
     void generate_duplex_read_tags(bam1_t*) const;
     void generate_read_tags(bam1_t* aln, bool emit_moves, bool is_duplex_parent = false) const;
@@ -119,13 +125,6 @@ public:
     // a short read.
 
     std::atomic_size_t num_duplex_candidate_pairs{0};
-
-    // subread_id is used to track 2 types of offsprings of a read
-    // (1) read splits
-    // (2) duplex pairs which share this read as the template read
-    size_t subread_id{0};
-    size_t split_count{1};
-
     std::atomic_bool is_duplex_parent{false};
 };
 
