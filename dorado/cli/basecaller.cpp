@@ -70,7 +70,7 @@ void setup(std::vector<std::string> args,
            argparse::ArgumentParser& resume_parser,
            bool estimate_poly_a) {
     auto model_config = load_crf_model_config(model_path);
-    std::string model_name = utils::extract_model_from_model_path(model_path.string());
+    std::string model_name = models::extract_model_from_model_path(model_path.string());
 
     if (!DataLoader::is_read_data_present(data_path, recursive_file_loading)) {
         std::string err = "No POD5 or FAST5 data found in path: " + data_path;
@@ -82,7 +82,7 @@ void setup(std::vector<std::string> args,
     auto model_sample_rate = model_config.sample_rate;
     if (model_sample_rate < 0) {
         // If unsuccessful, find sample rate by model name.
-        model_sample_rate = utils::get_sample_rate_by_model_name(model_name);
+        model_sample_rate = models::get_sample_rate_by_model_name(model_name);
     }
     if (!skip_model_compatibility_check &&
         !sample_rates_compatible(data_sample_rate, model_sample_rate)) {
@@ -154,7 +154,7 @@ void setup(std::vector<std::string> args,
 
     auto mean_qscore_start_pos = model_config.mean_qscore_start_pos;
     if (mean_qscore_start_pos < 0) {
-        mean_qscore_start_pos = utils::get_mean_qscore_start_pos_by_model_name(model_name);
+        mean_qscore_start_pos = models::get_mean_qscore_start_pos_by_model_name(model_name);
         if (mean_qscore_start_pos < 0) {
             throw std::runtime_error("Mean q-score start position cannot be < 0");
         }
@@ -196,7 +196,7 @@ void setup(std::vector<std::string> args,
         tokens.erase(tokens.begin());
         resume_parser.parse_args(tokens);
         auto resume_model_name =
-                utils::extract_model_from_model_path(resume_parser.get<std::string>("model"));
+                models::extract_model_from_model_path(resume_parser.get<std::string>("model"));
         if (model_name != resume_model_name) {
             throw std::runtime_error(
                     "Resume only works if the same model is used. Resume model was " +
@@ -299,14 +299,13 @@ int basecaller(int argc, char* argv[]) {
     parser.visible.add_argument("--modified-bases")
             .nargs(argparse::nargs_pattern::at_least_one)
             .action([](const std::string& value) {
-                if (std::find(modified::mods.begin(), modified::mods.end(), value) ==
-                    modified::mods.end()) {
+                const auto& mods = models::modified_mods();
+                if (std::find(mods.begin(), mods.end(), value) == mods.end()) {
                     spdlog::error(
                             "'{}' is not a supported modification please select from {}", value,
-                            std::accumulate(std::next(modified::mods.begin()), modified::mods.end(),
-                                            modified::mods[0], [](std::string a, std::string b) {
-                                                return a + ", " + b;
-                                            }));
+                            std::accumulate(
+                                    std::next(mods.begin()), mods.end(), mods[0],
+                                    [](std::string a, std::string b) { return a + ", " + b; }));
                     std::exit(EXIT_FAILURE);
                 }
                 return value;
@@ -388,8 +387,9 @@ int basecaller(int argc, char* argv[]) {
         std::exit(EXIT_FAILURE);
     } else if (mod_bases.size()) {
         std::vector<std::string> m;
-        std::transform(mod_bases.begin(), mod_bases.end(), std::back_inserter(m),
-                       [&model](std::string m) { return utils::get_modification_model(model, m); });
+        std::transform(
+                mod_bases.begin(), mod_bases.end(), std::back_inserter(m),
+                [&model](std::string m) { return models::get_modification_model(model, m); });
 
         mod_bases_models =
                 std::accumulate(std::next(m.begin()), m.end(), m[0],
