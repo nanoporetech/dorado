@@ -42,7 +42,7 @@ void ScalerNode::worker_thread() {
 
     Message message;
     while (get_input_message(message)) {
-        // If this message isn't a read, just forward it to the sink.
+        // If this message isn't a Simplex read, just forward it to the sink.
         if (!std::holds_alternative<SimplexReadPtr>(message)) {
             send_message_to_sink(std::move(message));
             continue;

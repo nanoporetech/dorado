@@ -3,6 +3,8 @@
 #include "ReadPipeline.h"
 #include "utils/math_utils.h"
 
+#include <algorithm>
+
 namespace dorado::utils {
 
 void stitch_chunks(ReadCommon& read_common,
