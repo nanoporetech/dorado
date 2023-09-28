@@ -1,10 +1,11 @@
 #pragma once
+
 #include <memory>
 #include <string>
 #include <vector>
 
 namespace dorado {
-class Read;
+class ReadCommon;
 }  // namespace dorado
 
 namespace dorado::utils {
@@ -24,6 +25,6 @@ struct Chunk {
 
 // Given a read and its unstitched chunks, stitch the chunks (accounting for overlap) and assign basecalled read and
 // qstring to Read
-void stitch_chunks(Read& read, const std::vector<std::unique_ptr<Chunk>>& called_chunks);
+void stitch_chunks(ReadCommon& read, const std::vector<std::unique_ptr<Chunk>>& called_chunks);
 
 }  // namespace dorado::utils

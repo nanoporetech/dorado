@@ -12,7 +12,7 @@ class StereoDuplexEncoderNode : public MessageSink {
 public:
     StereoDuplexEncoderNode(int input_signal_stride);
 
-    ReadPtr stereo_encode(const ReadPair& pair);
+    DuplexReadPtr stereo_encode(const ReadPair& pair);
 
     ~StereoDuplexEncoderNode() { terminate_impl(); };
     std::string get_name() const override { return "StereoDuplexEncoderNode"; }

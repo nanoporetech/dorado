@@ -94,11 +94,11 @@ void string_reader(HighFive::Attribute& attribute, std::string& target_str) {
 
 namespace dorado {
 
-ReadPtr process_pod5_read(size_t row,
-                          Pod5ReadRecordBatch* batch,
-                          Pod5FileReader* file,
-                          const std::string path,
-                          std::string device) {
+SimplexReadPtr process_pod5_read(size_t row,
+                                 Pod5ReadRecordBatch* batch,
+                                 Pod5FileReader* file,
+                                 const std::string path,
+                                 std::string device) {
     uint16_t read_table_version = 0;
     ReadBatchRowInfo_t read_data;
     if (pod5_get_read_batch_row_info_data(batch, row, READ_BATCH_ROW_INFO_VERSION, &read_data,
@@ -126,9 +126,9 @@ ReadPtr process_pod5_read(size_t row,
         spdlog::error("Failed to get read {} signal: {}", row, pod5_get_error_string());
     }
 
-    auto new_read = std::make_unique<Read>();
+    auto new_read = std::make_unique<SimplexRead>();
     new_read->read_common.raw_data = samples;
-    new_read->sample_rate = run_sample_rate;
+    new_read->read_common.sample_rate = run_sample_rate;
 
     auto start_time_ms = run_acquisition_start_time_ms +
                          ((read_data.start_sample * 1000) /
@@ -139,7 +139,7 @@ ReadPtr process_pod5_read(size_t row,
     new_read->scaling = read_data.calibration_scale;
     new_read->offset = read_data.calibration_offset;
     new_read->read_common.read_id = std::move(read_id_str);
-    new_read->num_trimmed_samples = 0;
+    new_read->read_common.num_trimmed_samples = 0;
     new_read->read_common.attributes.read_number = read_data.read_number;
     new_read->read_common.attributes.fast5_filename =
             std::filesystem::path(path.c_str()).filename().string();
@@ -603,7 +603,7 @@ void DataLoader::load_pod5_reads_from_file_by_read_ids(const std::string& path,
             continue;
         }
 
-        std::vector<std::future<ReadPtr>> futures;
+        std::vector<std::future<SimplexReadPtr>> futures;
         for (std::size_t row_idx = 0; row_idx < traversal_batch_counts[batch_index]; row_idx++) {
             uint32_t row = traversal_batch_rows[row_idx + row_offset];
 
@@ -661,7 +661,7 @@ void DataLoader::load_pod5_reads_from_file(const std::string& path) {
         }
         batch_row_count = std::min(batch_row_count, m_max_reads - m_loaded_read_count);
 
-        std::vector<std::future<ReadPtr>> futures;
+        std::vector<std::future<SimplexReadPtr>> futures;
 
         for (std::size_t row = 0; row < batch_row_count; ++row) {
             // TODO - check the read ID here, for each one, only send the row if it is in the list of ones we care about
@@ -755,15 +755,15 @@ void DataLoader::load_fast5_reads_from_file(const std::string& path) {
         auto start_time_str = utils::adjust_time(exp_start_time,
                                                  static_cast<uint32_t>(start_time / sampling_rate));
 
-        auto new_read = std::make_unique<Read>();
-        new_read->sample_rate = sampling_rate;
+        auto new_read = std::make_unique<SimplexRead>();
+        new_read->read_common.sample_rate = sampling_rate;
         new_read->read_common.raw_data = samples;
         new_read->digitisation = digitisation;
         new_read->range = range;
         new_read->offset = offset;
         new_read->scaling = range / digitisation;
         new_read->read_common.read_id = read_id;
-        new_read->num_trimmed_samples = 0;
+        new_read->read_common.num_trimmed_samples = 0;
         new_read->read_common.attributes.mux = mux;
         new_read->read_common.attributes.read_number = read_number;
         new_read->read_common.attributes.channel_number = channel_number;

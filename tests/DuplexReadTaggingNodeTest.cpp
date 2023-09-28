@@ -13,35 +13,35 @@ TEST_CASE("DuplexReadTaggingNode", TEST_GROUP) {
     pipeline_desc.add_node<dorado::DuplexReadTaggingNode>({sink});
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
     {
-        auto read_12 = std::make_unique<dorado::Read>();
+        auto read_12 = std::make_unique<dorado::SimplexRead>();
         read_12->read_common.read_id = "1;2";
         read_12->read_common.is_duplex = true;
 
-        auto read_1 = std::make_unique<dorado::Read>();
+        auto read_1 = std::make_unique<dorado::SimplexRead>();
         read_1->read_common.read_id = "1";
         read_1->is_duplex_parent = true;
 
-        auto read_2 = std::make_unique<dorado::Read>();
+        auto read_2 = std::make_unique<dorado::SimplexRead>();
         read_2->read_common.read_id = "2";
         read_2->is_duplex_parent = true;
 
-        auto read_3 = std::make_unique<dorado::Read>();
+        auto read_3 = std::make_unique<dorado::SimplexRead>();
         read_3->read_common.read_id = "3";
         read_3->is_duplex_parent = true;
 
-        auto read_4 = std::make_unique<dorado::Read>();
+        auto read_4 = std::make_unique<dorado::SimplexRead>();
         read_4->read_common.read_id = "4";
         read_4->is_duplex_parent = true;
 
-        auto read_5 = std::make_unique<dorado::Read>();
+        auto read_5 = std::make_unique<dorado::SimplexRead>();
         read_5->read_common.read_id = "5";
         read_5->is_duplex_parent = true;
 
-        auto read_6 = std::make_unique<dorado::Read>();
+        auto read_6 = std::make_unique<dorado::SimplexRead>();
         read_6->read_common.read_id = "6";
         read_6->is_duplex_parent = true;
 
-        auto read_56 = std::make_unique<dorado::Read>();
+        auto read_56 = std::make_unique<dorado::SimplexRead>();
         read_6->read_common.read_id = "5;6";
         read_6->read_common.is_duplex = true;
 
@@ -56,7 +56,7 @@ TEST_CASE("DuplexReadTaggingNode", TEST_GROUP) {
     }
     pipeline.reset();
 
-    auto reads = ConvertMessages<dorado::ReadPtr>(std::move(messages));
+    auto reads = ConvertMessages<dorado::SimplexReadPtr>(std::move(messages));
     for (auto& read : reads) {
         if (read->read_common.read_id == "1;2") {
             CHECK(read->read_common.is_duplex == true);

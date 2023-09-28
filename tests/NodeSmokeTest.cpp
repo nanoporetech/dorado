@@ -49,15 +49,15 @@ protected:
     }
 
     auto make_test_read(std::string read_id) {
-        auto read = std::make_unique<dorado::Read>();
+        auto read = std::make_unique<dorado::SimplexRead>();
         read->read_common.raw_data = torch::rand(random_between(100, 200));
-        read->sample_rate = 5000;
-        read->shift = random_between(100, 200);
-        read->scale = random_between(5, 10);
+        read->read_common.sample_rate = 5000;
+        read->read_common.shift = random_between(100, 200);
+        read->read_common.scale = random_between(5, 10);
         read->read_common.read_id = std::move(read_id);
         read->read_common.seq = "ACGTACGT";
         read->read_common.qstring = "********";
-        read->num_trimmed_samples = random_between(10, 100);
+        read->read_common.num_trimmed_samples = random_between(10, 100);
         read->read_common.attributes.mux = 2;
         read->read_common.attributes.read_number = 12345;
         read->read_common.attributes.channel_number = 5;
@@ -69,7 +69,7 @@ protected:
 private:
     std::size_t m_num_reads = 200;
     std::size_t m_num_messages = m_num_reads;
-    using ReadMutator = std::function<void(dorado::ReadPtr& read)>;
+    using ReadMutator = std::function<void(dorado::SimplexReadPtr& read)>;
     ReadMutator m_read_mutator;
     bool m_pipeline_restart = false;
 
@@ -110,7 +110,7 @@ protected:
     }
 };
 
-using NodeSmokeTestRead = NodeSmokeTestBase<dorado::ReadPtr>;
+using NodeSmokeTestRead = NodeSmokeTestBase<dorado::SimplexReadPtr>;
 using NodeSmokeTestBam = NodeSmokeTestBase<dorado::BamPtr>;
 
 #define DEFINE_TEST(base, name) TEST_CASE_METHOD(base, "SmokeTest: " name, "[SmokeTest]")
@@ -169,7 +169,7 @@ DEFINE_TEST(NodeSmokeTestRead, "ScalerNode") {
     set_pipeline_restart(pipeline_restart);
 
     // Scaler node expects i16 input
-    set_read_mutator([](dorado::ReadPtr& read) {
+    set_read_mutator([](dorado::SimplexReadPtr& read) {
         read->read_common.raw_data = read->read_common.raw_data.to(torch::kI16);
     });
 
@@ -293,7 +293,7 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
     }
 
     // ModBase node expects half input and needs a move table
-    set_read_mutator([this, model_stride](dorado::ReadPtr& read) {
+    set_read_mutator([this, model_stride](dorado::SimplexReadPtr& read) {
         read->read_common.raw_data = read->read_common.raw_data.to(torch::kHalf);
 
         read->read_common.model_stride = model_stride;

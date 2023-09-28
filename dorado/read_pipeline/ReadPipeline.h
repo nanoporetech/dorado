@@ -54,32 +54,22 @@ public:
     // The id of the client to which this read belongs. -1 in standalone mode
     int32_t client_id{-1};
 
-    bool is_duplex{false};
-};
+    uint32_t mean_qscore_start_pos = 0;
 
-// Class representing a read, including raw data
-class Read {
-public:
-    struct Mapping {
-        // Dummy struct for future use to represent alignments
-    };
+    float calculate_mean_qscore() const;
 
-    ReadCommon read_common;
+    std::vector<BamPtr> extract_sam_lines(bool emit_moves,
+                                          uint8_t modbase_threshold = 0,
+                                          bool is_duplex_parent = false) const;
 
-    float digitisation;  // Loaded from source file
-    float range;         // Loaded from source file
-    float offset;        // Loaded from source file
+    // Barcode.
+    std::string barcode{};
 
     uint64_t sample_rate;  // Loaded from source file
-
-    uint64_t get_end_time_ms() const;
 
     float shift;                 // To be set by scaler
     float scale;                 // To be set by scaler
     std::string scaling_method;  // To be set by scaler
-
-    float scaling;  // Scale factor applied to convert raw integers from sequencer into pore current values
-
     std::string parent_read_id;  // Origin read ID for all its subreads. Empty for nonsplit reads.
 
     std::shared_ptr<const ModBaseInfo>
@@ -87,20 +77,9 @@ public:
 
     uint64_t num_trimmed_samples;  // Number of samples which have been trimmed from the raw read.
 
-    std::vector<Mapping> mappings;
-    std::vector<BamPtr> extract_sam_lines(bool emit_moves, uint8_t modbase_threshold = 0) const;
+    bool is_duplex{false};
 
-    float calculate_mean_qscore() const;
-
-    uint64_t start_sample;
-    uint64_t end_sample;
-    uint64_t run_acquisition_start_time_ms;
-    std::atomic_bool is_duplex_parent{false};
-    // Calculate mean Q-score from this position onwards if read is
-    // a short read.
-    uint32_t mean_qscore_start_pos = 0;
-
-    std::atomic_size_t num_duplex_candidate_pairs{0};
+    int rna_poly_tail_length{-1};
 
     // subread_id is used to track 2 types of offsprings of a read
     // (1) read splits
@@ -108,18 +87,47 @@ public:
     size_t subread_id{0};
     size_t split_count{1};
 
-    // Barcode.
-    std::string barcode{};
-
-    int rna_poly_tail_length{-1};
-
 private:
     void generate_duplex_read_tags(bam1_t*) const;
-    void generate_read_tags(bam1_t* aln, bool emit_moves) const;
+    void generate_read_tags(bam1_t* aln, bool emit_moves, bool is_duplex_parent = false) const;
     void generate_modbase_tags(bam1_t* aln, uint8_t threshold = 0) const;
     std::string generate_read_group() const;
 };
-using ReadPtr = std::unique_ptr<Read>;
+
+// Class representing a duplex read, including stereo-encoded raw data
+class DuplexRead {
+public:
+    ReadCommon read_common;
+};
+
+// Class representing a simplex read, including raw data
+class SimplexRead {
+public:
+    ReadCommon read_common;
+
+    float digitisation;  // Loaded from source file
+    float range;         // Loaded from source file
+    float offset;        // Loaded from source file
+
+    uint64_t get_end_time_ms() const;
+
+    float scaling;  // Scale factor applied to convert raw integers from sequencer into pore current values
+
+    uint64_t start_sample;
+    uint64_t end_sample;
+    uint64_t run_acquisition_start_time_ms;
+    // Calculate mean Q-score from this position onwards if read is
+    // a short read.
+
+    std::atomic_size_t num_duplex_candidate_pairs{0};
+
+    // This is atomic because multiple threads can write to it at the same time.
+    // For example, if a read (call it 2) is in the cache, and is selected as a potential pair match by two incoming reads (1 and 3) on two other threads, these threads can both update `is_duplex_parent` at the same time.
+    std::atomic_bool is_duplex_parent{false};
+};
+
+using SimplexReadPtr = std::unique_ptr<SimplexRead>;
+using DuplexReadPtr = std::unique_ptr<DuplexRead>;
 
 // A pair of reads for Duplex calling
 struct ReadPair {
@@ -127,7 +135,7 @@ struct ReadPair {
         ReadCommon read_common;
         uint64_t seq_start;
         uint64_t seq_end;
-        static ReadData from_read(const Read& read, uint64_t seq_start, uint64_t seq_end);
+        static ReadData from_read(const SimplexRead& read, uint64_t seq_start, uint64_t seq_end);
     };
     ReadData template_read;
     ReadData complement_read;
@@ -140,11 +148,16 @@ public:
 
 // The Message type is a std::variant that can hold different types of message objects.
 // It is currently able to store:
-// - a ReadPtr object, which represents a single read
+// - a SimplexReadPtr object, which represents a single Simplex read
+// - a DuplexReadPtr object, which represents a single Duplex read
 // - a BamPtr object, which represents a raw BAM alignment record
 // - a ReadPair object, which represents a pair of reads for duplex calling
 // To add more message types, simply add them to the list of types in the std::variant.
-using Message = std::variant<ReadPtr, BamPtr, ReadPair, CacheFlushMessage>;
+using Message = std::variant<SimplexReadPtr, BamPtr, ReadPair, CacheFlushMessage, DuplexReadPtr>;
+
+bool is_read_message(const Message& message);
+
+ReadCommon& get_read_common_data(const Message& message);
 
 using NodeHandle = int;
 

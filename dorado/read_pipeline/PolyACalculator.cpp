@@ -34,7 +34,7 @@ const int kMaxTailLength = 750;
 // of the polyA tail.
 std::pair<int, int> determine_signal_bounds(int signal_anchor,
                                             bool fwd,
-                                            const dorado::Read& read,
+                                            const dorado::SimplexRead& read,
                                             int num_samples_per_base,
                                             bool is_rna) {
     const c10::Half* signal = static_cast<c10::Half*>(read.read_common.raw_data.data_ptr());
@@ -143,7 +143,7 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
 
 // Basic estimation of avg translocation speed by dividing number of samples by the
 // number of bases called.
-int estimate_samples_per_base(const dorado::Read& read) {
+int estimate_samples_per_base(const dorado::SimplexRead& read) {
     float num_samples_per_base =
             static_cast<float>(read.read_common.raw_data.size(0)) / read.read_common.seq.length();
     // The estimate is not rounded because this calculation generally overestimates
@@ -158,7 +158,7 @@ int estimate_samples_per_base(const dorado::Read& read) {
 // the approximate anchor for the tail, and if there needs to be an adjustment
 // made to the final polyA tail count based on the adapter sequence (e.g. because
 // the adapter itself contains several As).
-SignalAnchorInfo determine_signal_anchor_and_strand_cdna(const dorado::Read& read) {
+SignalAnchorInfo determine_signal_anchor_and_strand_cdna(const dorado::SimplexRead& read) {
     const std::string SSP = "TTTCTGTTGGTGCTGATATTGCTTT";
     const std::string SSP_rc = dorado::utils::reverse_complement(SSP);
     const std::string VNP = "ACTTGCCTGTCGCTCTATCTTCAGAGGAGAGTCCGCCGCCCGCAAGTTTT";
@@ -236,7 +236,7 @@ SignalAnchorInfo determine_signal_anchor_and_strand_cdna(const dorado::Read& rea
 // at that juncture. This function returns a struct with the strand
 // direction (which is always reverse for dRNA), the signal anchor and the number of bases
 // to omit from the tail length estimation due to any adapter effects.
-SignalAnchorInfo determine_signal_anchor_and_strand_drna(const dorado::Read& read) {
+SignalAnchorInfo determine_signal_anchor_and_strand_drna(const dorado::SimplexRead& read) {
     const c10::Half* signal = static_cast<c10::Half*>(read.read_common.raw_data.data_ptr());
     int signal_len = read.read_common.raw_data.size(0);
     const int kWindow = 50;
@@ -292,13 +292,13 @@ void PolyACalculator::worker_thread() {
     Message message;
     while (get_input_message(message)) {
         // If this message isn't a read, just forward it to the sink.
-        if (!std::holds_alternative<ReadPtr>(message)) {
+        if (!std::holds_alternative<SimplexReadPtr>(message)) {
             send_message_to_sink(std::move(message));
             continue;
         }
 
         // If this message isn't a read, we'll get a bad_variant_access exception.
-        auto read = std::get<ReadPtr>(std::move(message));
+        auto read = std::get<SimplexReadPtr>(std::move(message));
 
         // Determine the strand direction, approximate base space anchor for the tail, and whether
         // the final length needs to be adjusted depending on the adapter sequence.
@@ -323,10 +323,10 @@ void PolyACalculator::worker_thread() {
                         "{} PolyA bases {}, signal anchor {} Signal range is {} {}, "
                         "samples/base {} trim {}",
                         read->read_common.read_id, num_bases, signal_anchor, signal_start,
-                        signal_end, num_samples_per_base, read->num_trimmed_samples);
+                        signal_end, num_samples_per_base, read->read_common.num_trimmed_samples);
 
                 // Set tail length property in the read.
-                read->rna_poly_tail_length = num_bases;
+                read->read_common.rna_poly_tail_length = num_bases;
 
                 // Update debug stats.
                 total_tail_lengths_called += num_bases;
@@ -340,7 +340,7 @@ void PolyACalculator::worker_thread() {
                         "{} PolyA bases {}, signal anchor {} Signal range is {}, "
                         "samples/base {}, trim  {}",
                         read->read_common.read_id, num_bases, signal_anchor, signal_start,
-                        signal_end, num_samples_per_base, read->num_trimmed_samples);
+                        signal_end, num_samples_per_base, read->read_common.num_trimmed_samples);
                 num_not_called++;
             }
         } else {
