@@ -150,7 +150,8 @@ public:
 
 // The Message type is a std::variant that can hold different types of message objects.
 // It is currently able to store:
-// - a SimplexReadPtr object, which represents a single read
+// - a SimplexReadPtr object, which represents a single Simplex read
+// - a DuplexReadPtr object, which represents a single Duplex read
 // - a BamPtr object, which represents a raw BAM alignment record
 // - a ReadPair object, which represents a pair of reads for duplex calling
 // To add more message types, simply add them to the list of types in the std::variant.
