@@ -50,7 +50,7 @@ void BasecallerNode::input_worker_thread() {
         }
 
         // Get the common read data.
-        ReadCommon read_common_data = get_read_common_data(message);
+        const ReadCommon &read_common_data = get_read_common_data(message);
         // If a read has already been basecalled, just send it to the sink without basecalling again
         // TODO: This is necessary because some reads (e.g failed Stereo Encoding) will be passed
         // to the basecaller node having already been called. This should be fixed in the future with
