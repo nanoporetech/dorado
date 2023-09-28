@@ -152,13 +152,7 @@ TEST_CASE(TEST_GROUP ": Test sam record generation", TEST_GROUP) {
         test_read.read_common.qstring = "!!!!";
         REQUIRE_THROWS(test_read.read_common.extract_sam_lines(false));
     }
-    SECTION("Generating sam record for read with non-empty mappings throws") {
-        test_read.read_common.read_id = "test_read";
-        test_read.read_common.seq = "ACGTACGT";
-        test_read.read_common.qstring = "!!!!!!!!";
-        test_read.read_common.mappings.resize(1);
-        REQUIRE_THROWS(test_read.read_common.extract_sam_lines(false));
-    }
+
     SECTION("Generated sam record for unaligned read is correct") {
         test_read.read_common.raw_data = torch::empty(4000);
         test_read.read_common.sample_rate = 4000.0;

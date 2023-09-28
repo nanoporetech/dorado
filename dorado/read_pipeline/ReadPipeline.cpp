@@ -271,41 +271,36 @@ std::vector<BamPtr> ReadCommon::extract_sam_lines(bool emit_moves,
     }
 
     std::vector<BamPtr> alns;
-    if (mappings.empty()) {
-        bam1_t *aln = bam_init1();
-        uint32_t flags = 4;              // 4 = UNMAPPED
-        std::string ref_seq = "*";       // UNMAPPED
-        int leftmost_pos = -1;           // UNMAPPED - will be written as 0
-        int map_q = 0;                   // UNMAPPED
-        std::string cigar_string = "*";  // UNMAPPED
-        std::string r_next = "*";
-        int next_pos = -1;  // UNMAPPED - will be written as 0
-        size_t template_length = seq.size();
 
-        // Convert string qscore to phred vector.
-        std::vector<uint8_t> qscore;
-        std::transform(qstring.begin(), qstring.end(), std::back_inserter(qscore),
-                       [](char c) { return (uint8_t)(c)-33; });
+    bam1_t *aln = bam_init1();
+    uint32_t flags = 4;              // 4 = UNMAPPED
+    std::string ref_seq = "*";       // UNMAPPED
+    int leftmost_pos = -1;           // UNMAPPED - will be written as 0
+    int map_q = 0;                   // UNMAPPED
+    std::string cigar_string = "*";  // UNMAPPED
+    std::string r_next = "*";
+    int next_pos = -1;  // UNMAPPED - will be written as 0
+    size_t template_length = seq.size();
 
-        bam_set1(aln, read_id.length(), read_id.c_str(), flags, -1, leftmost_pos, map_q, 0, nullptr,
-                 -1, next_pos, 0, seq.length(), seq.c_str(), (char *)qscore.data(), 0);
+    // Convert string qscore to phred vector.
+    std::vector<uint8_t> qscore;
+    std::transform(qstring.begin(), qstring.end(), std::back_inserter(qscore),
+                   [](char c) { return (uint8_t)(c)-33; });
 
-        if (!barcode.empty() && barcode != "unclassified") {
-            bam_aux_append(aln, "BC", 'Z', barcode.length() + 1, (uint8_t *)barcode.c_str());
-        }
+    bam_set1(aln, read_id.length(), read_id.c_str(), flags, -1, leftmost_pos, map_q, 0, nullptr, -1,
+             next_pos, 0, seq.length(), seq.c_str(), (char *)qscore.data(), 0);
 
-        if (is_duplex) {
-            generate_duplex_read_tags(aln);
-        } else {
-            generate_read_tags(aln, emit_moves);
-        }
-        generate_modbase_tags(aln, modbase_threshold);
-        alns.push_back(BamPtr(aln));
+    if (!barcode.empty() && barcode != "unclassified") {
+        bam_aux_append(aln, "BC", 'Z', barcode.length() + 1, (uint8_t *)barcode.c_str());
     }
 
-    for (const auto &mapping : mappings) {
-        throw std::runtime_error("Mapped alignments not yet implemented");
+    if (is_duplex) {
+        generate_duplex_read_tags(aln);
+    } else {
+        generate_read_tags(aln, emit_moves);
     }
+    generate_modbase_tags(aln, modbase_threshold);
+    alns.push_back(BamPtr(aln));
 
     return alns;
 }

@@ -65,8 +65,6 @@ public:
     // Barcode.
     std::string barcode{};
 
-    std::vector<Mapping> mappings;
-
     uint64_t sample_rate;  // Loaded from source file
 
     float shift;                 // To be set by scaler
