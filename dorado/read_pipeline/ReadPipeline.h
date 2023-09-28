@@ -31,9 +31,6 @@ struct Attributes {
 
 class ReadCommon {
 public:
-    struct Mapping {
-        // Dummy struct for future use to represent alignments
-    };
     torch::Tensor raw_data;  // Loaded from source file
 
     int model_stride;  // The down sampling factor of the model
