@@ -312,7 +312,7 @@ std::vector<BamPtr> ReadCommon::extract_sam_lines(bool emit_moves,
 
 ReadCommon &get_read_common_data(const Message &message) {
     if (!is_read_message(message)) {
-        throw std::runtime_error("Message is not a read");
+        throw std::invalid_argument("Message is not a read");
     } else {
         if (std::holds_alternative<SimplexReadPtr>(message)) {
             return std::get<SimplexReadPtr>(message)->read_common;
