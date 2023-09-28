@@ -29,7 +29,7 @@ $dorado_bin download --model ${model_name_5k} --directory ${output_dir}
 model_5k=${output_dir}/${model_name_5k}
 
 echo dorado basecaller test stage
-$dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --emit-fastq > $output_dir/REF.fq
+$dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --emit-fastq > $output_dir/ref.fq
 $dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --modified-bases 5mCG_5hmCG --emit-moves > $output_dir/calls.bam
 if ! uname -r | grep -q tegra; then
     $dorado_bin basecaller ${model} $data_dir/pod5 -x cpu --modified-bases 5mCG_5hmCG > $output_dir/calls.bam
@@ -46,9 +46,9 @@ samtools quickcheck -u $output_dir/calls.bam
 samtools view $output_dir/calls.bam > $output_dir/calls.sam
 
 echo dorado aligner test stage
-$dorado_bin aligner $output_dir/REF.fq $output_dir/calls.sam > $output_dir/calls.bam
-$dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --modified-bases 5mCG_5hmCG | $dorado_bin aligner $output_dir/REF.fq > $output_dir/calls.bam
-$dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --modified-bases 5mCG_5hmCG --reference $output_dir/REF.fq > $output_dir/calls.bam
+$dorado_bin aligner $output_dir/ref.fq $output_dir/calls.sam > $output_dir/calls.bam
+$dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --modified-bases 5mCG_5hmCG | $dorado_bin aligner $output_dir/ref.fq > $output_dir/calls.bam
+$dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --modified-bases 5mCG_5hmCG --reference $output_dir/ref.fq > $output_dir/calls.bam
 samtools quickcheck -u $output_dir/calls.bam
 samtools view -h $output_dir/calls.bam > $output_dir/calls.sam
 
@@ -56,8 +56,8 @@ echo dorado aligner options test stage
 dorado_aligner_options_test() (
     set +e
     set +x
-    which minimap2
-    minimap2 --version
+
+    echo -n "minimap2 version: "; minimap2 --version
 
     # list of options and whether they affect the output
     REF=$data_dir/aligner_test/lambda_ecoli.fasta
@@ -90,14 +90,14 @@ dorado_aligner_options_test() (
         sort $output_dir/dorado-$i.sam | grep -v '^@PG' | cut -f-11> $output_dir/dorado-$i.ssam
 
         # compare with minimap2 output
-        if minimap2 -a $opt $REF $RDS 2>/dev/null > $output_dir/minimap2-$i.sam; then
+        if minimap2 -a $opt $REF $RDS 2>err > $output_dir/minimap2-$i.sam; then
             sort $output_dir/minimap2-$i.sam | grep -v '^@PG' | cut -f-11 > $output_dir/minimap2-$i.ssam
             if ! diff $output_dir/dorado-$i.ssam $output_dir/minimap2-$i.ssam > err; then
                 ERROR failed comparison with minimap2 output
                 continue
             fi
         else
-            SKIP error running minimap2
+            SKIP skipped
             continue
         fi
 
