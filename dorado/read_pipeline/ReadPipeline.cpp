@@ -160,12 +160,6 @@ void ReadCommon::generate_duplex_read_tags(bam1_t *aln) const {
     }
 }
 
-uint64_t SimplexRead::get_end_time_ms() const {
-    return read_common.start_time_ms +
-           ((end_sample - start_sample) * 1000) /
-                   read_common.sample_rate;  //TODO get rid of the trimmed thing?
-}
-
 void ReadCommon::generate_modbase_tags(bam1_t *aln, uint8_t threshold) const {
     if (!mod_base_info) {
         return;
@@ -250,11 +244,6 @@ float ReadCommon::calculate_mean_qscore() const {
         return utils::mean_qscore_from_qstring(qstring, 0);
     }
     return utils::mean_qscore_from_qstring(qstring, mean_qscore_start_pos);
-}
-
-bool is_read_message(const Message &message) {
-    return std::holds_alternative<SimplexReadPtr>(message) ||
-           std::holds_alternative<DuplexReadPtr>(message);
 }
 
 std::vector<BamPtr> ReadCommon::extract_sam_lines(bool emit_moves,
@@ -461,6 +450,18 @@ Pipeline::~Pipeline() {
         auto &node = m_nodes.at(handle);
         node.reset();
     }
+}
+
+// Free functions
+bool is_read_message(const Message &message) {
+    return std::holds_alternative<SimplexReadPtr>(message) ||
+           std::holds_alternative<DuplexReadPtr>(message);
+}
+
+uint64_t SimplexRead::get_end_time_ms() const {
+    return read_common.start_time_ms +
+           ((end_sample - start_sample) * 1000) /
+                   read_common.sample_rate;  //TODO get rid of the trimmed thing?
 }
 
 }  // namespace dorado
