@@ -78,6 +78,7 @@ variables:
   stage: build
   script:
     - echo Dorado build stage
+    - echo "BUILD_OPTIONS '${BUILD_OPTIONS}'"
     - *run_dorado_cmake_build
     - *run_dorado_cmake_ctest
   artifacts:
