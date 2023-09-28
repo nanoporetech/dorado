@@ -67,7 +67,9 @@ variables:
     - pip install gcovr
 
 .run_dorado_cmake_build: &run_dorado_cmake_build
+  - if [[ $OSTYPE != 'darwin'* ]]; then
   - export CCACHE_DIR=/data/gitlab-ci-cache
+  - fi
   - ccache -s || true
   - cmake ${BUILD_OPTIONS} -S . -B ${BUILD_DIR}
   - cmake --build ${BUILD_DIR} --config Release --target ${BUILD_TARGET} -j 8
