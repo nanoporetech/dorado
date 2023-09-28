@@ -226,14 +226,14 @@ build:windows_koi_download:
     - echo BUILD_OPTIONS is ${BUILD_OPTIONS}
 
 build:macos:m1:
-  variables:
-    BUILD_OPTIONS: "-DONT_MM2_EXE=ON"
+  before_script:
+    - export BUILD_OPTIONS="-DONT_MM2_EXE=ON"
   <<: *macos_m1_runner
   <<: *build_dorado
 
 build:macos:x64:
-  variables:
-    BUILD_OPTIONS: "-DONT_MM2_EXE=ON"
+  before_script:
+    - export BUILD_OPTIONS="-DONT_MM2_EXE=ON"
   <<: *macos_x64_runner
   <<: *build_dorado
 

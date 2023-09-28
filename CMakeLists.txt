@@ -100,14 +100,16 @@ add_subdirectory(${DORADO_3RD_PARTY}/elzip)
 
 option(ONT_MM2_EXE "Build minimap2 exe" OFF)
 add_subdirectory(${DORADO_3RD_PARTY}/ont-minimap2 EXCLUDE_FROM_ALL)
-message("build minimap exe: ${ONT_MM2_EXE}")
-message("build minimap lib: ${ONT_MM2_LIB}")
+message(STATUS "build minimap2 exe: ${ONT_MM2_EXE}")
+message(STATUS "build minimap2 lib: ${ONT_MM2_LIB}")
+if (ONT_MM2_EXE)
+    install(TARGETS minimap2_exe)
+    add_custom_target(testing_deps ALL DEPENDS minimap2_exe)
+endif()
+
 set(BUILD_TESTING OFF)
 add_subdirectory(${DORADO_3RD_PARTY}/edlib EXCLUDE_FROM_ALL)
 set(BUILD_TESTING ON)
-if (ONT_MM2_EXE)
-    install(TARGETS minimap2-exe)
-endif()
 
 add_subdirectory(${DORADO_3RD_PARTY}/date EXCLUDE_FROM_ALL)
 
