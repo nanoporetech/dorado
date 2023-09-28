@@ -67,10 +67,10 @@ variables:
     - pip install gcovr
 
 .run_dorado_cmake_build: &run_dorado_cmake_build
-  - cmake ${BUILD_OPTIONS} -S . -B ${BUILD_DIR}
-  - cmake --build ${BUILD_DIR} --config Release --target ${BUILD_TARGET} -j 8
   - export CCACHE_DIR=/data/gitlab-ci-cache
   - ccache -s || true
+  - cmake ${BUILD_OPTIONS} -S . -B ${BUILD_DIR}
+  - cmake --build ${BUILD_DIR} --config Release --target ${BUILD_TARGET} -j 8
 
 .run_dorado_cmake_ctest: &run_dorado_cmake_ctest
   - ctest -C Release --test-dir ${BUILD_DIR} --output-on-failure --verbose
