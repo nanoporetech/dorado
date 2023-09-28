@@ -6,7 +6,7 @@
 #include <vector>
 
 namespace dorado {
-class SimplexRead;
+class ReadCommon;
 }  // namespace dorado
 
 namespace dorado::utils {
