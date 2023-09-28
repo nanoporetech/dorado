@@ -45,7 +45,6 @@ ReadToBamType::ReadToBamType(bool emit_moves,
 }
 
 void ReadToBamType::start_threads() {
-    m_num_worker_threads = 1;
     for (size_t i = 0; i < m_num_worker_threads; i++) {
         m_workers.push_back(
                 std::make_unique<std::thread>(std::thread(&ReadToBamType::worker_thread, this)));
