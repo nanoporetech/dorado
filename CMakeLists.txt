@@ -98,12 +98,16 @@ endif()
 set(ELZIP_DECOMPRESS_ONLY ON)
 add_subdirectory(${DORADO_3RD_PARTY}/elzip)
 
-set(ONT_MM2_EXE OFF)
-add_subdirectory(${DORADO_3RD_PARTY}/ont-minimap2)
-
+option(ONT_MM2_EXE "Build minimap2 exe" OFF)
+add_subdirectory(${DORADO_3RD_PARTY}/ont-minimap2 EXCLUDE_FROM_ALL)
+message("build minimap exe: ${ONT_MM2_EXE}")
+message("build minimap lib: ${ONT_MM2_LIB}")
 set(BUILD_TESTING OFF)
 add_subdirectory(${DORADO_3RD_PARTY}/edlib EXCLUDE_FROM_ALL)
 set(BUILD_TESTING ON)
+if (ONT_MM2_EXE)
+    install(TARGETS minimap2-exe)
+endif()
 
 add_subdirectory(${DORADO_3RD_PARTY}/date EXCLUDE_FROM_ALL)
 

@@ -57,7 +57,8 @@ dorado_aligner_options_test() (
     set +e
     set +x
 
-    echo -n "minimap2 version: "; minimap2 --version
+    MM2=$(dirname $dorado_bin)/minimap2
+    echo -n "minimap2 version: "; $MM2 --version
 
     # list of options and whether they affect the output
     REF=$data_dir/aligner_test/lambda_ecoli.fasta
@@ -90,7 +91,7 @@ dorado_aligner_options_test() (
         sort $output_dir/dorado-$i.sam | grep -v '^@PG' | cut -f-11> $output_dir/dorado-$i.ssam
 
         # compare with minimap2 output
-        if minimap2 -a $opt $REF $RDS 2>err > $output_dir/minimap2-$i.sam; then
+        if $MM2 -a $opt $REF $RDS 2>err > $output_dir/minimap2-$i.sam; then
             sort $output_dir/minimap2-$i.sam | grep -v '^@PG' | cut -f-11 > $output_dir/minimap2-$i.ssam
             if ! diff $output_dir/dorado-$i.ssam $output_dir/minimap2-$i.ssam > err; then
                 ERROR failed comparison with minimap2 output
