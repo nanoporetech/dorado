@@ -18,9 +18,6 @@ void ReadToBamType::worker_thread() {
             continue;
         }
 
-        // If this message isn't a read, we'll get a bad_variant_access exception.
-        //auto read = std::get<SimplexReadPtr>(std::move(message));
-
         auto& read_common_data = get_read_common_data(message);
 
         bool is_duplex_parent = false;

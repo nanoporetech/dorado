@@ -270,9 +270,9 @@ void PairingNode::pair_generating_worker_thread(int tid) {
             continue;
         }
 
-        // If this message isn't a read, we'll get a bad_variant_access exception.
         const std::string nvtx_id = "pairing_code_" + std::to_string(tid);
         nvtx3::scoped_range loop{nvtx_id};
+        // If this message isn't a read, we'll get a bad_variant_access exception.
         auto read = std::get<SimplexReadPtr>(std::move(message));
 
         int channel = read->read_common.attributes.channel_number;

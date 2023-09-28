@@ -16,7 +16,6 @@ void DuplexReadTaggingNode::worker_thread() {
             continue;
         }
 
-        // If this message isn't a read, we'll get a bad_variant_access exception.
         auto& read_common = get_read_common_data(message);
 
         // The algorithm is as follows -
