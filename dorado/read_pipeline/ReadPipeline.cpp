@@ -6,10 +6,12 @@
 
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
 #include <chrono>
 #include <iomanip>
 #include <sstream>
 #include <stack>
+#include <stdexcept>
 
 using namespace std::chrono_literals;
 
