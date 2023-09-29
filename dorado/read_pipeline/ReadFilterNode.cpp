@@ -10,31 +10,30 @@ void ReadFilterNode::worker_thread() {
     Message message;
     while (get_input_message(message)) {
         // If this message isn't a read, just forward it to the sink.
-        if (!std::holds_alternative<ReadPtr>(message)) {
+        if (!is_read_message(message)) {
             send_message_to_sink(std::move(message));
             continue;
         }
 
-        // If this message isn't a read, we'll get a bad_variant_access exception.
-        auto read = std::get<ReadPtr>(std::move(message));
+        const auto& read_common = get_read_common_data(message);
 
         auto log_filtering = [&]() {
-            if (read->read_common.is_duplex) {
+            if (read_common.is_duplex) {
                 ++m_num_duplex_reads_filtered;
-                m_num_duplex_bases_filtered += read->read_common.seq.length();
+                m_num_duplex_bases_filtered += read_common.seq.length();
             } else {
                 ++m_num_simplex_reads_filtered;
-                m_num_simplex_bases_filtered += read->read_common.seq.length();
+                m_num_simplex_bases_filtered += read_common.seq.length();
             }
         };
 
         // Filter based on qscore.
-        if ((read->calculate_mean_qscore() < m_min_qscore) ||
-            read->read_common.seq.size() < m_min_read_length ||
-            (m_read_ids_to_filter.find(read->read_common.read_id) != m_read_ids_to_filter.end())) {
+        if ((read_common.calculate_mean_qscore() < m_min_qscore) ||
+            read_common.seq.size() < m_min_read_length ||
+            (m_read_ids_to_filter.find(read_common.read_id) != m_read_ids_to_filter.end())) {
             log_filtering();
         } else {
-            send_message_to_sink(std::move(read));
+            send_message_to_sink(std::move(message));
         }
     }
 }

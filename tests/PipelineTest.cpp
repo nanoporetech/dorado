@@ -151,7 +151,7 @@ TEST_CASE("PipelineFlow", TEST_GROUP) {
         pipeline_desc.add_node<NullNode>({sink});
         auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
         REQUIRE(pipeline != nullptr);
-        pipeline->push_message(std::make_unique<dorado::Read>());
+        pipeline->push_message(std::make_unique<dorado::SimplexRead>());
         pipeline.reset();
         CHECK(messages.size() == 0);
     }
@@ -165,7 +165,7 @@ TEST_CASE("PipelineFlow", TEST_GROUP) {
         pipeline_desc.add_node_sink(null_node, sink);
         auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
         REQUIRE(pipeline != nullptr);
-        pipeline->push_message(std::make_unique<dorado::Read>());
+        pipeline->push_message(std::make_unique<dorado::SimplexRead>());
         pipeline.reset();
         CHECK(messages.size() == 0);
     }
@@ -178,13 +178,13 @@ TEST_CASE("TerminateRestart", TEST_GROUP) {
     auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
     REQUIRE(pipeline != nullptr);
-    pipeline->push_message(std::make_unique<dorado::Read>());
+    pipeline->push_message(std::make_unique<dorado::SimplexRead>());
     pipeline->terminate(dorado::DefaultFlushOptions());
     // Messages should get through as soon as we have terminated.
     CHECK(messages.size() == 1);
     // If we restart we should be able to get another message through.
     pipeline->restart();
-    pipeline->push_message(std::make_unique<dorado::Read>());
+    pipeline->push_message(std::make_unique<dorado::SimplexRead>());
     pipeline.reset();
     CHECK(messages.size() == 2);
 }

@@ -10,13 +10,13 @@ void DuplexReadTaggingNode::worker_thread() {
     Message message;
     while (get_input_message(message)) {
         // If this message isn't a read, just forward it to the sink.
-        if (!std::holds_alternative<ReadPtr>(message)) {
+
+        if (!is_read_message(message)) {
             send_message_to_sink(std::move(message));
             continue;
         }
 
-        // If this message isn't a read, we'll get a bad_variant_access exception.
-        auto read = std::get<ReadPtr>(std::move(message));
+        auto& read_common = get_read_common_data(message);
 
         // The algorithm is as follows -
         // There's no inherent ordering between when a duplex or its parent
@@ -43,15 +43,15 @@ void DuplexReadTaggingNode::worker_thread() {
         // Once all reads have been processed, any leftover parent simplex reads are
         // the ones whose duplex offsprings never came. They are retagged to not be
         // duplex parents and then sent downstream.
-        if (!read->read_common.is_duplex && !read->is_duplex_parent) {
-            send_message_to_sink(std::move(read));
-        } else if (read->read_common.is_duplex) {
+        if (!read_common.is_duplex && !std::get<SimplexReadPtr>(message)->is_duplex_parent) {
+            send_message_to_sink(std::move(message));
+        } else if (read_common.is_duplex) {
             std::string template_read_id =
-                    read->read_common.read_id.substr(0, read->read_common.read_id.find(';'));
-            std::string complement_read_id = read->read_common.read_id.substr(
-                    read->read_common.read_id.find(';') + 1, read->read_common.read_id.length());
+                    read_common.read_id.substr(0, read_common.read_id.find(';'));
+            std::string complement_read_id = read_common.read_id.substr(
+                    read_common.read_id.find(';') + 1, read_common.read_id.length());
 
-            send_message_to_sink(std::move(read));
+            send_message_to_sink(std::move(message));
 
             for (auto& rid : {template_read_id, complement_read_id}) {
                 if (m_parents_processed.find(rid) != m_parents_processed.end()) {
@@ -72,18 +72,19 @@ void DuplexReadTaggingNode::worker_thread() {
                 }
             }
         } else {
-            auto find_read = m_parents_wanted.find(read->read_common.read_id);
+            auto find_read = m_parents_wanted.find(read_common.read_id);
             if (find_read != m_parents_wanted.end()) {
                 // If a read is in the parents wanted list, then sent it downstream
                 // and add it to the set of processed reads. It will also be removed
                 // from the parent reads being looked for.
-                m_parents_processed.insert(read->read_common.read_id);
-                send_message_to_sink(std::move(read));
+                m_parents_processed.insert(read_common.read_id);
+                send_message_to_sink(std::move(message));
                 m_parents_wanted.erase(find_read);
             } else {
                 // No duplex offspring is seen so far, so hold it and track
                 // it as available parents.
-                m_duplex_parents[read->read_common.read_id] = std::move(read);
+                auto& read = std::get<SimplexReadPtr>(message);
+                m_duplex_parents[read_common.read_id] = std::move(read);
             }
         }
     }
