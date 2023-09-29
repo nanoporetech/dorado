@@ -168,7 +168,7 @@ SimplexReadPtr subread(const SimplexRead& read, PosRange seq_range, PosRange sig
     assert(signal_range.second / stride <= read.read_common.moves.size());
     assert(signal_range.first % stride == 0);
     assert(signal_range.second % stride == 0 ||
-           (signal_range.second == read.get_raw_data_samples() &&
+           (signal_range.second == read.read_common.get_raw_data_samples() &&
             seq_range.second == read.read_common.seq.size()));
 
     auto subread = utils::shallow_copy_read(read);
