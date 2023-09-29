@@ -67,7 +67,7 @@ variables:
     - pip install gcovr
 
 .run_dorado_cmake_build: &run_dorado_cmake_build
-  - if [[ $OSTYPE != 'darwin'* ]]; then
+  - if [[ $OSTYPE != 'darwin'* ]] && [[ $OSTYPE != 'msys' ]]; then
   - export CCACHE_DIR=/data/gitlab-ci-cache
   - fi
   - ccache -s || true
