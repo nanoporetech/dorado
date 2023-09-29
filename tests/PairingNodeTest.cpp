@@ -16,18 +16,18 @@ namespace {
 // time delay. If seq is defined, ignore the seq_len and use
 // the provided seq string directly.
 auto make_read(int delay_ms, size_t seq_len, const std::string& seq = "") {
-    auto read = std::make_unique<dorado::Read>();
-    read->sample_rate = 4000;
-    read->num_trimmed_samples = 10;
+    auto read = std::make_unique<dorado::SimplexRead>();
+    read->read_common.sample_rate = 4000;
+    read->read_common.num_trimmed_samples = 10;
     read->read_common.attributes.channel_number = 664;
     read->read_common.attributes.mux = 3;
     read->read_common.attributes.num_samples = 10000;
-    read->start_sample = 29767426 + (delay_ms * read->sample_rate) / 1000;
+    read->start_sample = 29767426 + (delay_ms * read->read_common.sample_rate) / 1000;
     read->end_sample = read->start_sample + read->read_common.attributes.num_samples;
     read->run_acquisition_start_time_ms = 1676976119670;
     read->read_common.start_time_ms =
             read->run_acquisition_start_time_ms +
-            uint64_t(std::round(read->start_sample * 1000. / read->sample_rate));
+            uint64_t(std::round(read->start_sample * 1000. / read->read_common.sample_rate));
     read->read_common.attributes.start_time =
             dorado::utils::get_string_timestamp_from_unix_time(read->read_common.start_time_ms);
     if (seq.empty()) {
@@ -79,7 +79,7 @@ TEST_CASE("Split read pairing", TEST_GROUP) {
     CHECK(messages.size() == 9);
     auto num_reads =
             std::count_if(messages.begin(), messages.end(), [](const dorado::Message& message) {
-                return std::holds_alternative<dorado::ReadPtr>(message);
+                return std::holds_alternative<dorado::SimplexReadPtr>(message);
             });
     CHECK(num_reads == 7);
     auto num_pairs =

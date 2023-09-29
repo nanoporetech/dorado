@@ -42,19 +42,20 @@ void ScalerNode::worker_thread() {
 
     Message message;
     while (get_input_message(message)) {
-        // If this message isn't a read, just forward it to the sink.
-        if (!std::holds_alternative<ReadPtr>(message)) {
+        // If this message isn't a Simplex read, just forward it to the sink.
+        if (!std::holds_alternative<SimplexReadPtr>(message)) {
             send_message_to_sink(std::move(message));
             continue;
         }
 
-        auto read = std::get<ReadPtr>(std::move(message));
+        auto read = std::get<SimplexReadPtr>(std::move(message));
 
         assert(read->read_common.raw_data.dtype() == torch::kInt16);
         const auto [shift, scale] = m_scaling_params.quantile_scaling
                                             ? normalisation(read->read_common.raw_data)
                                             : med_mad(read->read_common.raw_data);
-        read->scaling_method = m_scaling_params.quantile_scaling ? "quantile" : "med_mad";
+        read->read_common.scaling_method =
+                m_scaling_params.quantile_scaling ? "quantile" : "med_mad";
 
         // raw_data comes from DataLoader with dtype int16.  We send it on as float16 after
         // shifting/scaling in float32 form.
@@ -63,8 +64,8 @@ void ScalerNode::worker_thread() {
                         .to(torch::kFloat16);
 
         // move the shift and scale into pA.
-        read->scale = read->scaling * scale;
-        read->shift = read->scaling * (shift + read->offset);
+        read->read_common.scale = read->scaling * scale;
+        read->read_common.shift = read->scaling * (shift + read->offset);
 
         // Don't perform DNA trimming on RNA since it looks too different and we lose useful signal.
         int trim_start = 0;
@@ -78,7 +79,7 @@ void ScalerNode::worker_thread() {
 
         read->read_common.raw_data =
                 read->read_common.raw_data.index({Slice(trim_start, torch::indexing::None)});
-        read->num_trimmed_samples = trim_start;
+        read->read_common.num_trimmed_samples = trim_start;
 
         // Pass the read to the next node
         send_message_to_sink(std::move(read));

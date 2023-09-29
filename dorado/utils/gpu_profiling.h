@@ -1,10 +1,12 @@
 #pragma once
 
 // Set this to >0 to enable output of GPU profiling information to stderr
-#define CUDA_PROFILE_TO_CERR_LEVEL 0
+// or use `dorado [basecaller|duplex] ... --devopts cuda_profile_level=<X> ...`
+#define CUDA_PROFILE_LEVEL_DEFAULT 0
 
 #if DORADO_GPU_BUILD && !defined(__APPLE__)
 #include "cuda_utils.h"
+#include "dev_utils.h"
 
 #include <ATen/cuda/CUDAContext.h>
 #include <cuda_runtime.h>
@@ -20,7 +22,8 @@ public:
             : nvtx3::scoped_range(label),
               m_label(label),
               m_detail_level(detail_level),
-              m_active(m_detail_level <= CUDA_PROFILE_TO_CERR_LEVEL) {
+              m_active(m_detail_level <=
+                       get_dev_opt<int>("cuda_profile_level", CUDA_PROFILE_LEVEL_DEFAULT)) {
         if (m_active) {
             m_stream = at::cuda::getCurrentCUDAStream().stream();
             handle_cuda_result(cudaEventCreate(&m_start));

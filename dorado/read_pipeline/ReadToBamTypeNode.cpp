@@ -13,14 +13,19 @@ void ReadToBamType::worker_thread() {
     Message message;
     while (get_input_message(message)) {
         // If this message isn't a read, just forward it to the sink.
-        if (!std::holds_alternative<ReadPtr>(message)) {
+        if (!is_read_message(message)) {
             send_message_to_sink(std::move(message));
             continue;
         }
 
-        // If this message isn't a read, we'll get a bad_variant_access exception.
-        auto read = std::get<ReadPtr>(std::move(message));
-        auto alns = read->extract_sam_lines(m_emit_moves, m_modbase_threshold);
+        auto& read_common_data = get_read_common_data(message);
+
+        bool is_duplex_parent = false;
+        if (!read_common_data.is_duplex) {
+            is_duplex_parent = std::get<SimplexReadPtr>(message)->is_duplex_parent;
+        }
+        auto alns = read_common_data.extract_sam_lines(m_emit_moves, m_modbase_threshold,
+                                                       is_duplex_parent);
         for (auto& aln : alns) {
             send_message_to_sink(std::move(aln));
         }

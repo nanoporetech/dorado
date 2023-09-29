@@ -34,7 +34,7 @@ private:
 
     size_t m_min_qscore;
     size_t m_min_read_length;
-    std::unordered_map<std::string, ReadPtr> m_duplex_parents;
+    std::unordered_map<std::string, SimplexReadPtr> m_duplex_parents;
     std::unordered_set<std::string> m_parents_processed;
     std::unordered_set<std::string> m_parents_wanted;
 };

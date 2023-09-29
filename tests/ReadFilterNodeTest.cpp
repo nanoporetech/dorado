@@ -24,30 +24,30 @@ TEST_CASE("ReadFilterNode: Filter read based on qscore", TEST_GROUP) {
     {
         auto pipeline = make_filtered_pipeline(messages, 12, 0, {});
 
-        auto read_1 = std::make_unique<dorado::Read>();
+        auto read_1 = std::make_unique<dorado::SimplexRead>();
         read_1->read_common.raw_data = torch::empty(100);
-        read_1->sample_rate = 4000;
-        read_1->shift = 128.3842f;
-        read_1->scale = 8.258f;
+        read_1->read_common.sample_rate = 4000;
+        read_1->read_common.shift = 128.3842f;
+        read_1->read_common.scale = 8.258f;
         read_1->read_common.read_id = "read_1";
         read_1->read_common.seq = "ACGTACGT";
         read_1->read_common.qstring = "********";  // average q score 9
-        read_1->num_trimmed_samples = 132;
+        read_1->read_common.num_trimmed_samples = 132;
         read_1->read_common.attributes.mux = 2;
         read_1->read_common.attributes.read_number = 18501;
         read_1->read_common.attributes.channel_number = 5;
         read_1->read_common.attributes.start_time = "2017-04-29T09:10:04Z";
         read_1->read_common.attributes.fast5_filename = "batch_0.fast5";
 
-        auto read_2 = std::make_unique<dorado::Read>();
+        auto read_2 = std::make_unique<dorado::SimplexRead>();
         read_2->read_common.raw_data = torch::empty(100);
-        read_2->sample_rate = 4000;
-        read_2->shift = 128.3842f;
-        read_2->scale = 8.258f;
+        read_2->read_common.sample_rate = 4000;
+        read_2->read_common.shift = 128.3842f;
+        read_2->read_common.scale = 8.258f;
         read_2->read_common.read_id = "read_2";
         read_2->read_common.seq = "ACGTACGT";
         read_2->read_common.qstring = "////////";  // average q score 14
-        read_2->num_trimmed_samples = 132;
+        read_2->read_common.num_trimmed_samples = 132;
         read_2->read_common.attributes.mux = 2;
         read_2->read_common.attributes.read_number = 18501;
         read_2->read_common.attributes.channel_number = 5;
@@ -58,7 +58,7 @@ TEST_CASE("ReadFilterNode: Filter read based on qscore", TEST_GROUP) {
         pipeline->push_message(std::move(read_2));
     }
 
-    auto reads = ConvertMessages<dorado::ReadPtr>(std::move(messages));
+    auto reads = ConvertMessages<dorado::SimplexReadPtr>(std::move(messages));
     REQUIRE(reads.size() == 1);
     CHECK(reads[0]->read_common.read_id == "read_2");
 }
@@ -68,30 +68,30 @@ TEST_CASE("ReadFilterNode: Filter read based on read name", TEST_GROUP) {
     {
         auto pipeline = make_filtered_pipeline(messages, 0, 0, {"read_2"});
 
-        auto read_1 = std::make_unique<dorado::Read>();
+        auto read_1 = std::make_unique<dorado::SimplexRead>();
         read_1->read_common.raw_data = torch::empty(100);
-        read_1->sample_rate = 4000;
-        read_1->shift = 128.3842f;
-        read_1->scale = 8.258f;
+        read_1->read_common.sample_rate = 4000;
+        read_1->read_common.shift = 128.3842f;
+        read_1->read_common.scale = 8.258f;
         read_1->read_common.read_id = "read_1";
         read_1->read_common.seq = "ACGTACGT";
         read_1->read_common.qstring = "********";  // average q score 9
-        read_1->num_trimmed_samples = 132;
+        read_1->read_common.num_trimmed_samples = 132;
         read_1->read_common.attributes.mux = 2;
         read_1->read_common.attributes.read_number = 18501;
         read_1->read_common.attributes.channel_number = 5;
         read_1->read_common.attributes.start_time = "2017-04-29T09:10:04Z";
         read_1->read_common.attributes.fast5_filename = "batch_0.fast5";
 
-        auto read_2 = std::make_unique<dorado::Read>();
+        auto read_2 = std::make_unique<dorado::SimplexRead>();
         read_2->read_common.raw_data = torch::empty(100);
-        read_2->sample_rate = 4000;
-        read_2->shift = 128.3842f;
-        read_2->scale = 8.258f;
+        read_2->read_common.sample_rate = 4000;
+        read_2->read_common.shift = 128.3842f;
+        read_2->read_common.scale = 8.258f;
         read_2->read_common.read_id = "read_2";
         read_2->read_common.seq = "ACGTACGT";
         read_2->read_common.qstring = "////////";  // average q score 14
-        read_2->num_trimmed_samples = 132;
+        read_2->read_common.num_trimmed_samples = 132;
         read_2->read_common.attributes.mux = 2;
         read_2->read_common.attributes.read_number = 18501;
         read_2->read_common.attributes.channel_number = 5;
@@ -102,7 +102,7 @@ TEST_CASE("ReadFilterNode: Filter read based on read name", TEST_GROUP) {
         pipeline->push_message(std::move(read_2));
     }
 
-    auto reads = ConvertMessages<dorado::ReadPtr>(std::move(messages));
+    auto reads = ConvertMessages<dorado::SimplexReadPtr>(std::move(messages));
     REQUIRE(reads.size() == 1);
     CHECK(reads[0]->read_common.read_id == "read_1");
 }
@@ -112,30 +112,30 @@ TEST_CASE("ReadFilterNode: Filter read based on read length", TEST_GROUP) {
     {
         auto pipeline = make_filtered_pipeline(messages, 0, 5, {});
 
-        auto read_1 = std::make_unique<dorado::Read>();
+        auto read_1 = std::make_unique<dorado::SimplexRead>();
         read_1->read_common.raw_data = torch::empty(100);
-        read_1->sample_rate = 4000;
-        read_1->shift = 128.3842f;
-        read_1->scale = 8.258f;
+        read_1->read_common.sample_rate = 4000;
+        read_1->read_common.shift = 128.3842f;
+        read_1->read_common.scale = 8.258f;
         read_1->read_common.read_id = "read_1";
         read_1->read_common.seq = "ACGTACGT";
         read_1->read_common.qstring = "********";  // average q score 9
-        read_1->num_trimmed_samples = 132;
+        read_1->read_common.num_trimmed_samples = 132;
         read_1->read_common.attributes.mux = 2;
         read_1->read_common.attributes.read_number = 18501;
         read_1->read_common.attributes.channel_number = 5;
         read_1->read_common.attributes.start_time = "2017-04-29T09:10:04Z";
         read_1->read_common.attributes.fast5_filename = "batch_0.fast5";
 
-        auto read_2 = std::make_unique<dorado::Read>();
+        auto read_2 = std::make_unique<dorado::SimplexRead>();
         read_2->read_common.raw_data = torch::empty(100);
-        read_2->sample_rate = 4000;
-        read_2->shift = 128.3842f;
-        read_2->scale = 8.258f;
+        read_2->read_common.sample_rate = 4000;
+        read_2->read_common.shift = 128.3842f;
+        read_2->read_common.scale = 8.258f;
         read_2->read_common.read_id = "read_2";
         read_2->read_common.seq = "ACGT";
         read_2->read_common.qstring = "////";  // average q score 14
-        read_2->num_trimmed_samples = 132;
+        read_2->read_common.num_trimmed_samples = 132;
         read_2->read_common.attributes.mux = 2;
         read_2->read_common.attributes.read_number = 18501;
         read_2->read_common.attributes.channel_number = 5;
@@ -146,7 +146,7 @@ TEST_CASE("ReadFilterNode: Filter read based on read length", TEST_GROUP) {
         pipeline->push_message(std::move(read_2));
     }
 
-    auto reads = ConvertMessages<dorado::ReadPtr>(std::move(messages));
+    auto reads = ConvertMessages<dorado::SimplexReadPtr>(std::move(messages));
     REQUIRE(reads.size() == 1);
     CHECK(reads[0]->read_common.read_id == "read_1");
 }

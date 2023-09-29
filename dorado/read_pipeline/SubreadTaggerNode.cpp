@@ -13,23 +13,23 @@ void SubreadTaggerNode::worker_thread() {
     while (get_input_message(message)) {
         bool check_complete_groups = false;
 
-        if (std::holds_alternative<ReadPtr>(message)) {
-            auto read = std::get<ReadPtr>(std::move(message));
-
-            if (read->read_common.is_duplex) {
+        if (is_read_message(message)) {
+            auto& read_common = get_read_common_data(message);
+            if (read_common.is_duplex) {
                 std::unique_lock lock(m_duplex_reads_mutex);
-                m_duplex_reads.push_back(std::move(read));
+                m_duplex_reads.push_back(std::get<DuplexReadPtr>(std::move(message)));
                 lock.unlock();
                 check_complete_groups = true;
             } else {
-                if (read->split_count == 1 && read->num_duplex_candidate_pairs == 0) {
+                auto read = std::get<SimplexReadPtr>(std::move(message));
+                if (read_common.split_count == 1 && read->num_duplex_candidate_pairs == 0) {
                     // Unsplit, unpaired simplex read: pass directly to the next node
                     send_message_to_sink(std::move(read));
                     continue;
                 }
 
-                const auto read_tag = read->read_common.read_tag;
-                const auto split_count = read->split_count;
+                const auto read_tag = read_common.read_tag;
+                const auto split_count = read_common.split_count;
 
                 std::lock_guard subreads_lock(m_subread_groups_mutex);
                 auto& subreads = m_subread_groups[read_tag];
@@ -38,7 +38,7 @@ void SubreadTaggerNode::worker_thread() {
                 if (subreads.size() == split_count) {
                     auto num_expected_duplex = std::accumulate(
                             subreads.begin(), subreads.end(), size_t(0),
-                            [](const size_t& running_total, const ReadPtr& subread) {
+                            [](const size_t& running_total, const SimplexReadPtr& subread) {
                                 return subread->num_duplex_candidate_pairs + running_total;
                             });
 
@@ -49,7 +49,8 @@ void SubreadTaggerNode::worker_thread() {
                         }
                     } else {
                         std::unique_lock duplex_lock(m_duplex_reads_mutex);
-                        m_full_subread_groups.push_back(std::move(subreads));
+                        m_full_subread_groups.push_back(
+                                {std::move(subreads), std::vector<DuplexReadPtr>{}});
                         duplex_lock.unlock();
                         check_complete_groups = true;
                     }
@@ -74,13 +75,14 @@ void SubreadTaggerNode::worker_thread() {
                             0, duplex_read->read_common.read_id.find(';'));
                     uint64_t read_tag = duplex_read->read_common.read_tag;
                     // do any of the subreads match the template read id for this duplex read?
-                    if (std::any_of(subreads->begin(), subreads->end(),
-                                    [template_read_id, read_tag](const ReadPtr& subread) {
+                    if (std::any_of(subreads->first.begin(), subreads->first.end(),
+                                    [template_read_id, read_tag](const SimplexReadPtr& subread) {
                                         return subread->read_common.read_id == template_read_id &&
                                                subread->read_common.read_tag == read_tag;
                                     })) {
-                        duplex_read->subread_id = subreads->size();
-                        subreads->push_back(std::move(duplex_read));
+                        duplex_read->read_common.subread_id =
+                                subreads->first.size() + subreads->second.size();
+                        subreads->second.push_back(std::move(duplex_read));
                         duplex_read_iter = m_duplex_reads.erase(duplex_read_iter);
                     } else {
                         ++duplex_read_iter;
@@ -89,16 +91,19 @@ void SubreadTaggerNode::worker_thread() {
 
                 // check that all candidate pairs have been evaluated and that we have received a duplex read for all accepted candidate pairs
                 auto num_duplex_candidates = std::accumulate(
-                        subreads->begin(), subreads->end(), size_t(0),
-                        [](const size_t& running_total, const ReadPtr& subread) {
+                        subreads->first.begin(), subreads->first.end(), size_t(0),
+                        [](const size_t& running_total, const SimplexReadPtr& subread) {
                             return subread->num_duplex_candidate_pairs + running_total;
                         });
-                auto num_duplex = std::count_if(
-                        subreads->begin(), subreads->end(),
-                        [](const ReadPtr& subread) { return subread->read_common.is_duplex; });
+                auto num_duplex = subreads->second.size();
                 if (num_duplex_candidates == num_duplex) {
-                    for (auto& subread : (*subreads)) {
-                        subread->split_count = subreads->size();
+                    auto subread_count = subreads->first.size() + subreads->second.size();
+                    for (auto& subread : subreads->first) {
+                        subread->read_common.split_count = subread_count;
+                        send_message_to_sink(std::move(subread));
+                    }
+                    for (auto& subread : subreads->second) {
+                        subread->read_common.split_count = subread_count;
                         send_message_to_sink(std::move(subread));
                     }
                     subreads = m_full_subread_groups.erase(subreads);

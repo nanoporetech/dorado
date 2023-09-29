@@ -40,7 +40,7 @@ TEST_CASE("PolyACalculator: Test polyT tail estimation", TEST_GROUP) {
     auto seq_file = data_dir / "seq.txt";
     auto signal_file = data_dir / "signal.tensor";
     auto moves_file = data_dir / "moves.bin";
-    auto read = std::make_unique<Read>();
+    auto read = std::make_unique<SimplexRead>();
     read->read_common.seq = ReadFileIntoString(seq_file.string());
     read->read_common.qstring = std::string(read->read_common.seq.length(), '~');
     read->read_common.moves = ReadFileIntoVector(moves_file.string());
@@ -54,6 +54,6 @@ TEST_CASE("PolyACalculator: Test polyT tail estimation", TEST_GROUP) {
 
     CHECK(messages.size() == 1);
 
-    auto out = std::get<ReadPtr>(std::move(messages[0]));
-    CHECK(out->rna_poly_tail_length == gt);
+    auto out = std::get<SimplexReadPtr>(std::move(messages[0]));
+    CHECK(out->read_common.rna_poly_tail_length == gt);
 }
