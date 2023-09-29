@@ -1,8 +1,7 @@
 # Helper function to extract the specified URL to the given 3rd party folder if it doesn't already exist
 
 function(download_and_extract url name)
-
-    file(LOCK ${CMAKE_CURRENT_SOURCE_DIR} DIRECTORY)
+    file(LOCK ${DORADO_3RD_PARTY_DOWNLOAD} DIRECTORY GUARD FUNCTION)
 
     if(EXISTS ${DORADO_3RD_PARTY_DOWNLOAD}/${name})
         message(STATUS "Found ${name}")
@@ -20,7 +19,4 @@ function(download_and_extract url name)
         file(REMOVE ${DORADO_3RD_PARTY_DOWNLOAD}/${name}.zip)
         message(STATUS "Extracting ${name} - done")
     endif()
-
-    file(LOCK ${CMAKE_CURRENT_SOURCE_DIR} DIRECTORY RELEASE)
-
 endfunction()
