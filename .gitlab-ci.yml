@@ -95,6 +95,10 @@ variables:
 .build_dorado_archive: &build_dorado_archive
   stage: build
   script:
+    - if [[ -d '/data/gitlab-ci-cache' ]] && [[ $OSTYPE != 'darwin'* ]] && [[ $OSTYPE != 'msys' ]]; then
+    - export CCACHE_DIR=/data/gitlab-ci-cache
+    - fi
+    - ccache -s || true  
     - cmake ${BUILD_OPTIONS} -S . -B ${BUILD_DIR}
     - cmake --build ${BUILD_DIR} --config Release -j 8
     - cpack --config ${BUILD_DIR}/CPackConfig.cmake
