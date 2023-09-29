@@ -71,10 +71,10 @@ void ReadCommon::generate_read_tags(bam1_t *aln, bool emit_moves, bool is_duplex
     int qs = static_cast<int>(std::round(calculate_mean_qscore()));
     bam_aux_append(aln, "qs", 'i', sizeof(qs), (uint8_t *)&qs);
 
-    float du = (float)(raw_data.size(0) + num_trimmed_samples) / (float)sample_rate;
+    float du = (float)(get_raw_data_samples() + num_trimmed_samples) / (float)sample_rate;
     bam_aux_append(aln, "du", 'f', sizeof(du), (uint8_t *)&du);
 
-    int ns = raw_data.size(0) + num_trimmed_samples;
+    int ns = get_raw_data_samples() + num_trimmed_samples;
     bam_aux_append(aln, "ns", 'i', sizeof(ns), (uint8_t *)&ns);
 
     int ts = num_trimmed_samples;
