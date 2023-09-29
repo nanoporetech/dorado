@@ -87,8 +87,8 @@ std::pair<std::vector<dorado::Runner>, size_t> create_basecall_runners(
                 runners.push_back(std::make_shared<dorado::CudaModelRunner>(callers[j]));
             }
             if (runners.back()->batch_size() != batch_size) {
-                spdlog::debug("- set batch size for {} to {}", devices[j],
-                              runners.back()->batch_size());
+                spdlog::warn("- set batch size for {} to {}", devices[j],
+                             runners.back()->batch_size());
             }
         }
     }
