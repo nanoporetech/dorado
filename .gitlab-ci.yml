@@ -63,11 +63,11 @@ variables:
 .linux_dependencies: &linux_dependencies
   before_script:
     - echo Dorado dependency stage
-    - apt-get update && apt-get install -y --no-install-recommends samtools curl libhdf5-dev libssl-dev libzstd-dev libsz2
+    - apt-get update && apt-get install -y --no-install-recommends samtools curl libhdf5-dev libssl-dev libzstd-dev libsz2 ccache
     - pip install gcovr
 
 .run_dorado_cmake_build: &run_dorado_cmake_build
-  - if [[ $OSTYPE != 'darwin'* ]] && [[ $OSTYPE != 'msys' ]]; then
+  - if [[ -d '/data/gitlab-ci-cache' ]] && [[ $OSTYPE != 'darwin'* ]] && [[ $OSTYPE != 'msys' ]]; then
   - export CCACHE_DIR=/data/gitlab-ci-cache
   - fi
   - ccache -s || true
