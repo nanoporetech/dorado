@@ -451,7 +451,7 @@ test:model_download:linux:x86:focal:
   interruptible: true
   rules:
       - if: $CI_PIPELINE_SOURCE == "schedule"
-      - if: $CI_PIPELINE_SOURCE == "push"
+      - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH
         when: manual
 
 
