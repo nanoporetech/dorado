@@ -168,7 +168,7 @@ SimplexReadPtr subread(const SimplexRead& read, PosRange seq_range, PosRange sig
     assert(signal_range.second / stride <= read.read_common.moves.size());
     assert(signal_range.first % stride == 0);
     assert(signal_range.second % stride == 0 ||
-           (signal_range.second == read.read_common.raw_data.size(0) &&
+           (signal_range.second == read.get_raw_data_samples() &&
             seq_range.second == read.read_common.seq.size()));
 
     auto subread = utils::shallow_copy_read(read);
@@ -199,8 +199,9 @@ SimplexReadPtr subread(const SimplexRead& read, PosRange seq_range, PosRange sig
     subread->read_common.moves =
             std::vector<uint8_t>(subread->read_common.moves.begin() + signal_range.first / stride,
                                  subread->read_common.moves.begin() + signal_range.second / stride);
-    assert(signal_range.second == read.read_common.raw_data.size(0) ||
-           subread->read_common.moves.size() * stride == subread->read_common.raw_data.size(0));
+    assert(signal_range.second == read.read_common.get_raw_data_samples() ||
+           subread->read_common.moves.size() * stride ==
+                   subread->read_common.get_raw_data_samples());
 
     if (!read.read_common.parent_read_id.empty()) {
         subread->read_common.parent_read_id = read.read_common.parent_read_id;
@@ -401,9 +402,9 @@ std::vector<SimplexReadPtr> DuplexSplitNode::subreads(SimplexReadPtr read,
     }
 
     const auto stride = read->read_common.model_stride;
-    const auto seq_to_sig_map =
-            utils::moves_to_map(read->read_common.moves, stride, read->read_common.raw_data.size(0),
-                                read->read_common.seq.size() + 1);
+    const auto seq_to_sig_map = utils::moves_to_map(read->read_common.moves, stride,
+                                                    read->read_common.get_raw_data_samples(),
+                                                    read->read_common.seq.size() + 1);
 
     //TODO maybe simplify by adding begin/end stubs?
     uint64_t start_pos = 0;
@@ -416,11 +417,12 @@ std::vector<SimplexReadPtr> DuplexSplitNode::subreads(SimplexReadPtr read,
         start_pos = r.second;
         signal_start = seq_to_sig_map[r.second];
     }
-    assert(read->read_common.raw_data.size(0) == seq_to_sig_map[read->read_common.seq.size()]);
+    assert(read->read_common.get_raw_data_samples() ==
+           seq_to_sig_map[read->read_common.seq.size()]);
     if (start_pos < read->read_common.seq.size() &&
-        signal_start / stride < read->read_common.raw_data.size(0) / stride) {
+        signal_start / stride < read->read_common.get_raw_data_samples() / stride) {
         subreads.push_back(subread(*read, {start_pos, read->read_common.seq.size()},
-                                   {signal_start, read->read_common.raw_data.size(0)}));
+                                   {signal_start, read->read_common.get_raw_data_samples()}));
     }
 
     return subreads;

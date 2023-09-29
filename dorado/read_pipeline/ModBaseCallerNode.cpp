@@ -188,7 +188,7 @@ void ModBaseCallerNode::input_worker_thread() {
             for (size_t caller_id = 0; caller_id < runner->num_callers(); ++caller_id) {
                 nvtx3::scoped_range range{"generate_chunks"};
 
-                auto signal_len = read->read_common.raw_data.size(0);
+                auto signal_len = read->read_common.get_raw_data_samples();
                 std::vector<uint64_t> seq_to_sig_map =
                         utils::moves_to_map(read->read_common.moves, m_block_stride, signal_len,
                                             read->read_common.seq.size() + 1);

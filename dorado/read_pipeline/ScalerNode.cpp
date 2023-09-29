@@ -72,7 +72,7 @@ void ScalerNode::worker_thread() {
         if (!m_is_rna) {
             // 8000 value may be changed in future. Currently this is found to work well.
             int max_samples =
-                    std::min(8000, static_cast<int>(read->read_common.raw_data.size(0) / 2));
+                    std::min(8000, static_cast<int>(read->read_common.get_raw_data_samples() / 2));
             trim_start = utils::trim(
                     read->read_common.raw_data.index({Slice(torch::indexing::None, max_samples)}));
         }
