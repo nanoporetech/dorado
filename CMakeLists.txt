@@ -26,7 +26,9 @@ endif()
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_EXTENSIONS OFF)
-set(DORADO_3RD_PARTY ${CMAKE_CURRENT_SOURCE_DIR}/dorado/3rdparty)
+set(DORADO_3RD_PARTY_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/dorado/3rdparty)
+set(DORADO_3RD_PARTY_DOWNLOAD ${CMAKE_CURRENT_SOURCE_DIR}/dorado/3rdparty
+    CACHE PATH "Location to download 3rdparty libraries into")
 
 # We don't support GPU builds on macOS/x64
 if (APPLE AND CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
@@ -96,16 +98,16 @@ endif()
 
 # ELZIP_DECOMPRESS_ONLY stops minizip from adding OpenSSL as a target, preventing use of three dylibs on osx.
 set(ELZIP_DECOMPRESS_ONLY ON)
-add_subdirectory(${DORADO_3RD_PARTY}/elzip)
+add_subdirectory(${DORADO_3RD_PARTY_SOURCE}/elzip)
 
 set(ONT_MM2_EXE OFF)
-add_subdirectory(${DORADO_3RD_PARTY}/ont-minimap2)
+add_subdirectory(${DORADO_3RD_PARTY_SOURCE}/ont-minimap2)
 
 set(BUILD_TESTING OFF)
-add_subdirectory(${DORADO_3RD_PARTY}/edlib EXCLUDE_FROM_ALL)
+add_subdirectory(${DORADO_3RD_PARTY_SOURCE}/edlib EXCLUDE_FROM_ALL)
 set(BUILD_TESTING ON)
 
-add_subdirectory(${DORADO_3RD_PARTY}/date EXCLUDE_FROM_ALL)
+add_subdirectory(${DORADO_3RD_PARTY_SOURCE}/date EXCLUDE_FROM_ALL)
 
 enable_testing()
 
@@ -244,15 +246,15 @@ target_include_directories(dorado_lib
         ${TORCH_INCLUDE_DIRS}
         ${HDF5_INCLUDE_DIRS}
         ${HTSLIB_DIR}
-        ${DORADO_3RD_PARTY}/HighFive/include
-        ${DORADO_3RD_PARTY}/argparse
-        ${DORADO_3RD_PARTY}/toml11
-        ${DORADO_3RD_PARTY}/hdf_plugins/vbz_plugin
-        ${DORADO_3RD_PARTY}/cxxpool/src
-        ${DORADO_3RD_PARTY}/NVTX/c/include
-        ${DORADO_3RD_PARTY}/spdlog/include
-        ${DORADO_3RD_PARTY}/indicators/include
-        ${DORADO_3RD_PARTY}/ont-minimap2/src/3rdparty/minimap2
+        ${DORADO_3RD_PARTY_SOURCE}/HighFive/include
+        ${DORADO_3RD_PARTY_SOURCE}/argparse
+        ${DORADO_3RD_PARTY_SOURCE}/toml11
+        ${DORADO_3RD_PARTY_SOURCE}/hdf_plugins/vbz_plugin
+        ${DORADO_3RD_PARTY_SOURCE}/cxxpool/src
+        ${DORADO_3RD_PARTY_SOURCE}/NVTX/c/include
+        ${DORADO_3RD_PARTY_SOURCE}/spdlog/include
+        ${DORADO_3RD_PARTY_SOURCE}/indicators/include
+        ${DORADO_3RD_PARTY_SOURCE}/ont-minimap2/src/3rdparty/minimap2
 )
 
 enable_testing()
