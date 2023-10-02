@@ -1,7 +1,7 @@
 set(POD5_VERSION 0.2.2)
 set(POD5_DIR pod5-${POD5_VERSION}-${CMAKE_SYSTEM_NAME})
 set(POD5_REPO "https://github.com/nanoporetech/pod5-file-format")
-set(POD5_INCLUDE ${DORADO_3RD_PARTY}/${POD5_DIR}/include)
+set(POD5_INCLUDE ${DORADO_3RD_PARTY_DOWNLOAD}/${POD5_DIR}/include)
 
 # If we're building with ASAN enabled then we don't want to statically link to POD5 since that
 # also forces us to link to libarrow which causes issues with std::vector due to parts of the
@@ -27,12 +27,12 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     endif()
     if(POD5_STATIC)
       set(POD5_LIBRARIES
-        ${DORADO_3RD_PARTY}/${POD5_DIR}/${LIB_DIR}/libpod5_format.a
-        ${DORADO_3RD_PARTY}/${POD5_DIR}/${LIB_DIR}/libarrow.a
-        ${DORADO_3RD_PARTY}/${POD5_DIR}/${LIB_DIR}/libjemalloc_pic.a
+        ${DORADO_3RD_PARTY_DOWNLOAD}/${POD5_DIR}/${LIB_DIR}/libpod5_format.a
+        ${DORADO_3RD_PARTY_DOWNLOAD}/${POD5_DIR}/${LIB_DIR}/libarrow.a
+        ${DORADO_3RD_PARTY_DOWNLOAD}/${POD5_DIR}/${LIB_DIR}/libjemalloc_pic.a
       )
     else()
-      set(POD5_LIBRARIES ${DORADO_3RD_PARTY}/${POD5_DIR}/lib/libpod5_format.so)
+      set(POD5_LIBRARIES ${DORADO_3RD_PARTY_DOWNLOAD}/${POD5_DIR}/lib/libpod5_format.so)
     endif()
 elseif(APPLE)
     if(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
@@ -42,17 +42,17 @@ elseif(APPLE)
     endif()
     if(POD5_STATIC)
       set(POD5_LIBRARIES
-        ${DORADO_3RD_PARTY}/${POD5_DIR}/lib/libpod5_format.a
-        ${DORADO_3RD_PARTY}/${POD5_DIR}/lib/libarrow.a
+        ${DORADO_3RD_PARTY_DOWNLOAD}/${POD5_DIR}/lib/libpod5_format.a
+        ${DORADO_3RD_PARTY_DOWNLOAD}/${POD5_DIR}/lib/libarrow.a
       )
     else()
-      set(POD5_LIBRARIES ${DORADO_3RD_PARTY}/${POD5_DIR}/lib/libpod5_format.dylib)
+      set(POD5_LIBRARIES ${DORADO_3RD_PARTY_DOWNLOAD}/${POD5_DIR}/lib/libpod5_format.dylib)
     endif()
 elseif(WIN32)
     set(POD5_URL "${POD5_REPO}/releases/download/${POD5_VERSION}/lib_pod5-${POD5_VERSION}-win-x64.tar.gz")
     set(POD5_LIBRARIES
-      ${DORADO_3RD_PARTY}/${POD5_DIR}/lib/pod5_format.lib
-      ${DORADO_3RD_PARTY}/${POD5_DIR}/lib/arrow_static.lib
+      ${DORADO_3RD_PARTY_DOWNLOAD}/${POD5_DIR}/lib/pod5_format.lib
+      ${DORADO_3RD_PARTY_DOWNLOAD}/${POD5_DIR}/lib/arrow_static.lib
       bcrypt.lib
     )
 endif()

@@ -79,6 +79,8 @@ public:
 
     bool is_duplex{false};
 
+    size_t get_raw_data_samples() const { return is_duplex ? raw_data.size(1) : raw_data.size(0); }
+
     int rna_poly_tail_length{-1};
 
     // subread_id is used to track 2 types of offsprings of a read

@@ -63,13 +63,16 @@ variables:
 .linux_dependencies: &linux_dependencies
   before_script:
     - echo Dorado dependency stage
-    - apt-get update && apt-get install -y --no-install-recommends samtools curl libhdf5-dev libssl-dev libzstd-dev libsz2
+    - apt-get update && apt-get install -y --no-install-recommends samtools curl libhdf5-dev libssl-dev libzstd-dev libsz2 ccache
     - pip install gcovr
 
 .run_dorado_cmake_build: &run_dorado_cmake_build
+  - if [[ -d '/data/gitlab-ci-cache' ]] && [[ $OSTYPE != 'darwin'* ]] && [[ $OSTYPE != 'msys' ]]; then
+  - export CCACHE_DIR=/data/gitlab-ci-cache
+  - fi
+  - ccache -s || true
   - cmake ${BUILD_OPTIONS} -S . -B ${BUILD_DIR}
   - cmake --build ${BUILD_DIR} --config Release --target ${BUILD_TARGET} -j 8
-  - ccache -s || true
 
 .run_dorado_cmake_ctest: &run_dorado_cmake_ctest
   - ctest -C Release --test-dir ${BUILD_DIR} --output-on-failure --verbose
@@ -93,6 +96,10 @@ variables:
 .build_dorado_archive: &build_dorado_archive
   stage: build
   script:
+    - if [[ -d '/data/gitlab-ci-cache' ]] && [[ $OSTYPE != 'darwin'* ]] && [[ $OSTYPE != 'msys' ]]; then
+    - export CCACHE_DIR=/data/gitlab-ci-cache
+    - fi
+    - ccache -s || true  
     - cmake ${BUILD_OPTIONS} -S . -B ${BUILD_DIR}
     - cmake --build ${BUILD_DIR} --config Release -j 8
     - cpack --config ${BUILD_DIR}/CPackConfig.cmake
