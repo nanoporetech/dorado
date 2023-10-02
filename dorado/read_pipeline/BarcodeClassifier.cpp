@@ -568,15 +568,11 @@ ScoreResults BarcodeClassifier::find_best_adapter(const std::string& read_seq,
         scores.insert(scores.end(), out.begin(), out.end());
     }
 
-    if (m_barcode_both_ends && kit.double_ends) {
-        // For more stringest classification, ensure that both ends of a read
-        // have a barcode and they match. So this section checks if the scores list
-        // sorted by both top and bottom scores yield the same best barcode.
-        // If they don't, no point evaluating further. If they do, then continue
-        // onto evaluating against the score thresholds. Note that when checking the
-        // thresholds, we only look at the best score out of top and bottom.
-        // Heuristically if the best score of either meets the threshold and top and bottom
-        // are both the same barcode, the classification is pretty high confidence.
+    if (kit.double_ends) {
+        // For a double ended barcode, ensure that the best barcode according
+        // to the top window and the best barcode according to the bottom window
+        // are the same. If they suggest different barcodes confidently, then
+        // consider the read unclassified.
         auto best_top_score = std::max_element(
                 scores.begin(), scores.end(),
                 [](const auto& l, const auto& r) { return l.top_score < r.top_score; });
@@ -585,7 +581,8 @@ ScoreResults BarcodeClassifier::find_best_adapter(const std::string& read_seq,
                 [](const auto& l, const auto& r) { return l.bottom_score < r.bottom_score; });
         spdlog::debug("Check double ends: top bc {}, bottom bc {}", best_top_score->adapter_name,
                       best_bottom_score->adapter_name);
-        if (best_top_score->adapter_name != best_bottom_score->adapter_name) {
+        if ((best_top_score->score > 0.7) && (best_bottom_score->score > 0.7) &&
+            (best_top_score->adapter_name != best_bottom_score->adapter_name)) {
             return UNCLASSIFIED;
         }
     }
@@ -602,28 +599,27 @@ ScoreResults BarcodeClassifier::find_best_adapter(const std::string& read_seq,
     }
     spdlog::debug("Scores: {}", d.str());
     const float kMargin = 0.25f;
+    ScoreResults out = UNCLASSIFIED;
     if (best_score->score - second_best_score->score >= 0.1f) {
         if ((best_score->flank_score >= 0.7 && best_score->score >= 0.6) ||
             (best_score->score >= 0.7 && best_score->flank_score >= 0.6) ||
+            (best_score->top_score >= 0.6 && best_score->bottom_score >= 0.6) ||
             (best_score->score - second_best_score->score >= kMargin)) {
-            return *best_score;
+            out = *best_score;
         }
-    } else if (best_score->score > second_best_score->score) {
-        // Check the actual alignment to see which has a longer
-        // run of matches.
-        auto [best, matches, run_extends_close_to_read] =
-                check_bc_with_longest_match(*best_score, *second_best_score, read_seq);
-        // The heuristic here attempts to ensure that the longest running run of matches
-        // is at least 8 bases long and extends into the half of the barcode that is closer
-        // to the read. More details in the lambda function above.
-        if (matches >= 8 && run_extends_close_to_read &&
-            best.adapter_name == best_score->adapter_name) {
-            return best;
+    }
+
+    if (m_barcode_both_ends && kit.double_ends) {
+        // For more stringent classification, ensure that both ends of a read
+        // have a high score for the same barcode. If not then consider it
+        // unclassified.
+        if (out.top_score < 0.6 || out.bottom_score < 0.6) {
+            return UNCLASSIFIED;
         }
     }
 
     // If nothing is found, report as unclassified.
-    return UNCLASSIFIED;
+    return out;
 }
 
 }  // namespace demux

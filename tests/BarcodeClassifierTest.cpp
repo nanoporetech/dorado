@@ -258,7 +258,7 @@ TEST_CASE(
 
     CHECK(messages.size() == 3);
 
-    const std::string expected_bc = "SQK-RPB004_BC01";
+    const std::string expected_bc = "SQK-RPB004_barcode01";
     std::vector<uint8_t> expected_move_vals;
     for (int i = 0; i < nonbc_seq.length(); i++) {
         expected_move_vals.push_back(1);

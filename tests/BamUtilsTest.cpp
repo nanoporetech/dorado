@@ -117,7 +117,9 @@ TEST_CASE("BamUtilsTest: add_rg_hdr read group headers", TEST_GROUP) {
             for (const auto &kit_name : barcode_kits) {
                 const auto &kit_info = kit_infos.at(kit_name);
                 for (const auto &barcode_name : kit_info.barcodes) {
-                    const auto full_id = id + '_' + kit_name + '_' + barcode_name;
+                    const auto full_id = id + "_" +
+                                         dorado::barcode_kits::generate_standard_barcode_name(
+                                                 kit_name, barcode_name);
                     const auto &barcode_seq = barcode_seqs.at(barcode_name);
                     CHECK(has_read_group_header(sam_header.get(), full_id.c_str()));
                     CHECK(get_barcode_tag(sam_header.get(), full_id.c_str()) == barcode_seq);

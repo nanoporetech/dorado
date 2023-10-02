@@ -21,9 +21,12 @@ namespace {
 const std::string UNCLASSIFIED_BARCODE = "unclassified";
 
 std::string generate_barcode_string(dorado::demux::ScoreResults bc_res) {
-    auto bc = (bc_res.adapter_name == UNCLASSIFIED_BARCODE)
-                      ? UNCLASSIFIED_BARCODE
-                      : bc_res.kit + "_" + bc_res.adapter_name;
+    std::string bc;
+    if (bc_res.adapter_name != UNCLASSIFIED_BARCODE) {
+        bc = dorado::barcode_kits::generate_standard_barcode_name(bc_res.kit, bc_res.adapter_name);
+    } else {
+        bc = UNCLASSIFIED_BARCODE;
+    }
     spdlog::debug("BC: {}", bc);
     return bc;
 }

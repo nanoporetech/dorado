@@ -485,4 +485,15 @@ std::string barcode_kits_list_str() {
                            });
 }
 
+std::string generate_standard_barcode_name(const std::string& kit_name,
+                                           const std::string& barcode_name) {
+    std::string digits = "";
+    for (const auto& c : barcode_name) {
+        if (std::isdigit(c)) {
+            digits += c;
+        }
+    }
+    return kit_name + "_barcode" + digits;
+}
+
 }  // namespace dorado::barcode_kits
