@@ -199,13 +199,16 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
     const auto model_path = (model_dir.m_path / model_name).string();
     auto model_config = dorado::load_crf_model_config(model_path);
 
+    // Use a fixed batch size otherwise we slow down CI autobatchsizing.
+    std::size_t batch_size = 128;
+
     // Create runners
     std::vector<dorado::Runner> runners;
     if (gpu) {
 #if DORADO_GPU_BUILD
 #ifdef __APPLE__
-        auto caller = dorado::create_metal_caller(model_config, default_params.chunksize,
-                                                  default_params.batchsize);
+        auto caller =
+                dorado::create_metal_caller(model_config, default_params.chunksize, batch_size);
         for (size_t i = 0; i < default_params.num_runners; i++) {
             runners.push_back(std::make_shared<dorado::MetalModelRunner>(caller));
         }
@@ -216,7 +219,7 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
         }
         for (const auto& device : devices) {
             auto caller = dorado::create_cuda_caller(model_config, default_params.chunksize,
-                                                     default_params.batchsize, device);
+                                                     batch_size, device);
             for (size_t i = 0; i < default_params.num_runners; i++) {
                 runners.push_back(std::make_shared<dorado::CudaModelRunner>(caller));
             }
@@ -229,7 +232,7 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
         // CPU processing is very slow, so reduce the number of test reads we throw at it.
         set_num_reads(5);
         set_expected_messages(5);
-        const std::size_t batch_size = 8;
+        batch_size = 8;
         runners.push_back(std::make_shared<dorado::ModelRunner<dorado::CPUDecoder>>(
                 model_config, "cpu", default_params.chunksize, batch_size));
     }
