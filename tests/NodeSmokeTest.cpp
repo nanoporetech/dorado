@@ -190,6 +190,9 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
 
     set_pipeline_restart(pipeline_restart);
 
+    // BasecallerNode will skip reads that have already been basecalled.
+    set_read_mutator([](dorado::SimplexReadPtr& read) { read->read_common.seq.clear(); });
+
     const int kBatchTimeoutMS = 100;
     const auto& default_params = dorado::utils::default_parameters;
     const auto model_dir = download_model(model_name);
