@@ -453,6 +453,8 @@ test:model_download:linux:x86:focal:
       - if: $CI_PIPELINE_SOURCE == "schedule"
       - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH
         when: manual
+        # See https://forum.gitlab.com/t/specifying-a-pipeline-step-as-manual-causes-its-status-to-always-be-blocked/58333/3
+        allow_failure: true
 
 
 # MLHub
