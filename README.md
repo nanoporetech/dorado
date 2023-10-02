@@ -143,19 +143,19 @@ Dorado supports barcode classification for existing basecalls as well as produci
 
 In this mode, reads are classified into their barcode groups during basecalling as part of the same command. To enable this, run
 ```
-dorado basecaller <model> <reads> --kit-name <barcode-kit-name>
+$ dorado basecaller <model> <reads> --kit-name <barcode-kit-name>
 ```
 
-This will result in a single output stream with classified reads. The classification will be reflected in the read group name as well as in the `BC` tag of the alignment record.
+This will result in a single output stream with classified reads. The classification will be reflected in the read group name as well as in the `BC` tag of the output record.
 
-By default `dorado` is set up to trim the barcode from the reads. To disable that, add `--no-trim` to the cmdline.
+By default `dorado` is set up to trim the barcode from the reads. To disable trimming, add `--no-trim` to the cmdline.
 
 The default heuristic for double-ended barcodes is to look for them on either end of the read. This results in a higher classification rate but can also result in a higher false positive count. To address this, `dorado` also provides a `--barcode-both-ends` option to force double-ended barcodes to be detected on both ends before classification. This will reduce false positives dramatically, but also lower overall classification rates.
 
 The output from `dorado` can be demultiplexed into per-barcode BAMs using `samtools split`. e.g.
 
 ```
-samtools split -u <basecalled-bam> -f <output-dir>/<prefix>_%!.bam
+$ samtools split -u <basecalled-bam> -f <output-dir>/<prefix>_%!.bam
 ```
 
 #### Classifying existing datasets
@@ -163,12 +163,24 @@ samtools split -u <basecalled-bam> -f <output-dir>/<prefix>_%!.bam
 Existing basecalled datasets can be classified as well as demultiplexed into per-barcode BAMs using the standalone `demux` command in `dorado`. To use this, run
 
 ```
-dorado demux --kit-name <kit-name> --output-dir <output-folder-for-demuxed-bams> <reads>
-
-# <reads> can either be an HTS format file (e.g. fastq, BAM, etc.) or a stream of an HTS format (e.g. the output of dorado basecalling).
+$ dorado demux --kit-name <kit-name> --output-dir <output-folder-for-demuxed-bams> <reads>
 ```
 
+`<reads>` can either be an HTS format file (e.g. fastq, BAM, etc.) or a stream of an HTS format (e.g. the output of dorado basecalling).
+
 This results in multiple BAM files being generated in the output folder, one per barcode (formatted as `KITNAME_BARCODEXX.bam` and one for all unclassified reads. As with the in-line mode, `--no-trim` and `--barcode-both-ends` are also available as additional options.
+
+Here is an example output folder
+```
+$ dorado demux --kit-name SQK-RPB004 --output-dir /tmp/demux reads.fastq
+
+$ ls -1 /tmp/demux
+SQK-RPB004_barcode01.bam
+SQK-RPB004_barcode02.bam
+SQK-RPB004_barcode03.bam
+...
+unclassified.bam
+```
 
 ## Available basecalling models
 
