@@ -132,8 +132,8 @@ void ModBaseCallerNode::init_modbase_info() {
     }
 
     auto result = get_modbase_info(base_mod_params);
-    m_mod_base_info = std::make_shared<ModBaseInfo>(result.alphabet, result.long_names,
-                                                    context_handler.encode());
+    m_mod_base_info = std::make_shared<ModBaseInfo>(
+            std::move(result.alphabet), std::move(result.long_names), context_handler.encode());
 
     m_base_prob_offsets[0] = 0;
     m_base_prob_offsets[1] = result.base_counts[0];

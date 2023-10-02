@@ -196,22 +196,22 @@ void require_sam_tag_B_int_matches(const uint8_t* aux, const std::vector<int64_t
 }
 
 TEST_CASE(TEST_GROUP ": Methylation tag generation", TEST_GROUP) {
-    std::string modbase_alphabet = "AXCYGT";
+    std::vector<std::string> modbase_alphabet = {"A", "X", "C", "Y", "G", "T"};
     std::string modbase_long_names = "6mA 5mC";
     std::vector<uint8_t> modbase_probs = {
-            235, 20,  0,   0,   0,   0,    // A 6ma (weak call)
+            235, 20,  0,   0,   0,   0,    // A 6mA (weak call)
             0,   0,   255, 0,   0,   0,    // C
             255, 0,   0,   0,   0,   0,    // A
             0,   0,   0,   0,   255, 0,    // G
             0,   0,   0,   0,   0,   255,  // T
             0,   0,   0,   0,   255, 0,    // G
-            1,   254, 0,   0,   0,   0,    // A 6ma
-            0,   0,   3,   252, 0,   0,    // C 5ma
+            1,   254, 0,   0,   0,   0,    // A 6mA
+            0,   0,   3,   252, 0,   0,    // C 5mC
             0,   0,   0,   0,   0,   255,  // T
             255, 0,   0,   0,   0,   0,    // A
             255, 0,   0,   0,   0,   0,    // A
             255, 0,   0,   0,   0,   0,    // A
-            0,   0,   3,   252, 0,   0,    // C 6ma
+            0,   0,   3,   252, 0,   0,    // C 5mC
             0,   0,   0,   0,   0,   255,  // T
             0,   0,   255, 0,   0,   0,    // C
     };

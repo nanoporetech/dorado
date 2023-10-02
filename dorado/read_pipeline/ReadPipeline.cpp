@@ -201,7 +201,7 @@ void ReadCommon::generate_modbase_tags(bam1_t *aln, uint8_t threshold) const {
     for (size_t channel_idx = 0; channel_idx < num_channels; channel_idx++) {
         if (cardinal_bases.find(mod_base_info->alphabet[channel_idx]) != std::string::npos) {
             // A cardinal base
-            current_cardinal = mod_base_info->alphabet[channel_idx];
+            current_cardinal = mod_base_info->alphabet[channel_idx][0];
         } else {
             // A modification on the previous cardinal base
             std::string modbase_name;
