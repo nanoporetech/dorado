@@ -214,7 +214,7 @@ TEST_CASE(
     read->read_common.moves = moves;
 
     // Generate mod prob table so only the first A after the front flank has a mod.
-    const std::vector<std::string> mod_alphabet = {"A", "X", "C", "G", "T"};
+    const std::vector<std::string> mod_alphabet = {"A", "a", "C", "G", "T"};
     read->read_common.mod_base_info =
             std::make_shared<dorado::ModBaseInfo>(mod_alphabet, "6mA", "");
     read->read_common.base_mod_probs =
