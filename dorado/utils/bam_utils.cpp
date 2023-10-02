@@ -55,7 +55,13 @@ void add_rg_hdr(sam_hdr_t* hdr,
 
     // Emit read group headers for each barcode arrangement.
     for (const auto& kit_name : barcode_kits) {
-        const auto& kit_info = barcode_kit_infos.at(kit_name);
+        auto kit_iter = barcode_kit_infos.find(kit_name);
+        if (kit_iter == barcode_kit_infos.end()) {
+            throw std::runtime_error(kit_name +
+                                     " is not a valid barcode kit name. Please run the help "
+                                     "command to find out available barcode kits.");
+        }
+        const auto& kit_info = kit_iter->second;
         for (const auto& barcode_name : kit_info.barcodes) {
             const auto additional_tags = "\tBC:" + barcode_sequences.at(barcode_name);
             for (const auto& read_group : read_groups) {
