@@ -226,7 +226,10 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
         SKIP("Can't test GPU without DORADO_GPU_BUILD");
 #endif  // DORADO_GPU_BUILD
     } else {
-        const std::size_t batch_size = 128;
+        // CPU processing is very slow, so reduce the number of test reads we throw at it.
+        set_num_reads(5);
+        set_expected_messages(5);
+        const std::size_t batch_size = 8;
         runners.push_back(std::make_shared<dorado::ModelRunner<dorado::CPUDecoder>>(
                 model_config, "cpu", default_params.chunksize, batch_size));
     }
