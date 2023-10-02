@@ -42,24 +42,31 @@ Aligner::Aligner(const std::string& filename, const Minimap2Options& options, in
     spdlog::info("> Map parameters input by user: bandwidth={} and bandwidth long={}.",
                  m_map_opt.bw, m_map_opt.bw_long);
 
-    if (!options.print_secondary)
+    if (!options.print_secondary) {
         m_map_opt.flag |= MM_F_NO_PRINT_2ND;
+    }
     m_map_opt.best_n = options.best_n_secondary;
     spdlog::info(
             "> Map parameters input by user: don't print secondary={} and best n secondary={}.",
-            m_map_opt.flag & MM_F_NO_PRINT_2ND, m_map_opt.best_n);
+            static_cast<bool>(m_map_opt.flag & MM_F_NO_PRINT_2ND), m_map_opt.best_n);
 
-    if (options.soft_clipping)
+    if (options.soft_clipping) {
         m_map_opt.flag |= MM_F_SOFTCLIP;
-    if (options.secondary_seq)
+    }
+    if (options.secondary_seq) {
         m_map_opt.flag |= MM_F_SECONDARY_SEQ;
+    }
     spdlog::info("> Map parameters input by user: soft clipping={} and secondary seq={}.",
-                 bool(m_map_opt.flag & MM_F_SOFTCLIP), bool(m_map_opt.flag & MM_F_SECONDARY_SEQ));
+                 static_cast<bool>(m_map_opt.flag & MM_F_SOFTCLIP),
+                 static_cast<bool>(m_map_opt.flag & MM_F_SECONDARY_SEQ));
 
-    if (options.print_aln_seq)
-        mm_dbg_flag |= MM_DBG_PRINT_QNAME | MM_DBG_PRINT_ALN_SEQ, m_threads = 1;
-    spdlog::info("> Map parameters input by user: dbg print qname={} and aln seq={}.",
-                 bool(mm_dbg_flag & MM_DBG_PRINT_QNAME), bool(mm_dbg_flag & MM_DBG_PRINT_ALN_SEQ));
+    if (options.print_aln_seq) {
+        mm_dbg_flag |= MM_DBG_PRINT_QNAME | MM_DBG_PRINT_ALN_SEQ;
+        m_threads = 1;
+    }
+    spdlog::debug("> Map parameters input by user: dbg print qname={} and aln seq={}.",
+                  static_cast<bool>(mm_dbg_flag & MM_DBG_PRINT_QNAME),
+                  static_cast<bool>(mm_dbg_flag & MM_DBG_PRINT_ALN_SEQ));
 
     // Force cigar generation.
     m_map_opt.flag |= MM_F_CIGAR;

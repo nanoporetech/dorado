@@ -198,7 +198,8 @@ void add_minimap2_arguments(ArgParser& parser, const Options& dflt) {
             .implicit_value(true);
 
     parser.visible.add_argument("-r")
-            .help("minimap2 chaining/alignment bandwidth and long-join bandwidth")
+            .help("minimap2 chaining/alignment bandwidth and optionally long-join bandwidth "
+                  "specified as NUM,[NUM]")
             .default_value(to_size(dflt.bandwidth) + "," + to_size(dflt.bandwidth_long));
 
     parser.hidden.add_argument("--secondary-seq")
