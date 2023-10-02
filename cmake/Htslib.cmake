@@ -2,7 +2,7 @@ if(NOT TARGET htslib) # lazy include guard
     if(WIN32)
         message(STATUS "Fetching htslib")
         download_and_extract(https://cdn.oxfordnanoportal.com/software/analysis/htslib-win.tar.gz htslib-win)
-        set(HTSLIB_DIR ${DORADO_3RD_PARTY}/htslib-win CACHE STRING
+        set(HTSLIB_DIR ${DORADO_3RD_PARTY_DOWNLOAD}/htslib-win CACHE STRING
                     "Path to htslib repo")
         add_library(htslib SHARED IMPORTED)
         set_property(TARGET htslib APPEND PROPERTY IMPORTED_IMPLIB ${HTSLIB_DIR}/hts-3.lib)        
@@ -10,7 +10,7 @@ if(NOT TARGET htslib) # lazy include guard
         target_link_directories(htslib INTERFACE ${HTSLIB_DIR})
     else()
         message(STATUS "Building htslib")
-        set(HTSLIB_DIR ${DORADO_3RD_PARTY}/htslib CACHE STRING
+        set(HTSLIB_DIR ${DORADO_3RD_PARTY_SOURCE}/htslib CACHE STRING
                     "Path to htslib repo")
         set(MAKE_COMMAND make)
         set(AUTOCONF_COMMAND autoconf)

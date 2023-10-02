@@ -73,10 +73,10 @@ target_include_directories(dorado_utils
     SYSTEM
     PUBLIC
     ${TORCH_INCLUDE_DIRS}
-    ${DORADO_3RD_PARTY}/spdlog/include
-    ${DORADO_3RD_PARTY}/NVTX/c/include
-    ${DORADO_3RD_PARTY}/ont-minimap2/src/3rdparty/minimap2
-    ${DORADO_3RD_PARTY}/metal-cpp/metal-cpp
+    ${DORADO_3RD_PARTY_SOURCE}/spdlog/include
+    ${DORADO_3RD_PARTY_SOURCE}/NVTX/c/include
+    ${DORADO_3RD_PARTY_SOURCE}/ont-minimap2/src/3rdparty/minimap2
+    ${DORADO_3RD_PARTY_DOWNLOAD}/metal-cpp/metal-cpp
 )
 
 target_include_directories(dorado_utils

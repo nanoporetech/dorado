@@ -70,7 +70,7 @@ foreach(TEST_BIN dorado_tests dorado_smoke_tests)
     target_include_directories(${TEST_BIN}
         SYSTEM
         PRIVATE
-        ${DORADO_3RD_PARTY}/catch2
+        ${DORADO_3RD_PARTY_SOURCE}/catch2
         )
 
     add_test(
