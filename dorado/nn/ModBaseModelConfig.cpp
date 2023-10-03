@@ -15,7 +15,7 @@ ModBaseModelConfig load_modbase_model_config(const std::filesystem::path& model_
     config.motif = toml::find<std::string>(params, "motif");
     config.motif_offset = toml::find<int>(params, "motif_offset");
 
-    std::string canonical_bases = "ACGT";
+    const std::string canonical_bases = "ACGT";
     std::string motif_base = config.motif.substr(config.motif_offset, 1);
     if (canonical_bases.find(motif_base) == std::string::npos) {
         throw std::runtime_error("Invalid base for modification: " + motif_base);
