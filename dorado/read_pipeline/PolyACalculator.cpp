@@ -67,7 +67,7 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
     // Maximum gap between intervals that can be combined.
     const int kMaxSampleGap = num_samples_per_base * 3;
 
-    int left_end = is_rna ? std::max(0, signal_anchor - 50) : std::max(0, signal_anchor - kSpread);
+    int left_end = is_rna ? std::max(0, signal_anchor - 500) : std::max(0, signal_anchor - kSpread);
     int right_end = std::min(signal_len, signal_anchor + kSpread);
     spdlog::debug("Bounds left {}, right {}", left_end, right_end);
 
@@ -239,115 +239,37 @@ SignalAnchorInfo determine_signal_anchor_and_strand_cdna(const dorado::SimplexRe
 SignalAnchorInfo determine_signal_anchor_and_strand_drna(const dorado::SimplexRead& read) {
     const c10::Half* signal = static_cast<c10::Half*>(read.read_common.raw_data.data_ptr());
     int signal_len = read.read_common.get_raw_data_samples();
-    const int kWindow = 50;
-
-    // The algorithm is to keep track of the mean signal value over
-    // consecutive windows and find the point when there's a sharp
-    // increase in mean signal values. 5 previous mean values are
-    // considered with a window size of 50. This gives a rolling
-    // window view of ~250 bases.
-    //std::array<float, 5> means;
-    //auto check_var = [&means](int latest) -> float {
-    //    auto min_elem = std::min_element(means.begin(), means.end());
-    //    spdlog::debug("means {} {} {} {} {}", means[0], means[1], means[2], means[3], means[4]);
-    //    return (means[latest] - *min_elem);
-    //};
-
-    std::array<float, 1000> vals;
-    float sig_sum = 0.f;
-    // pre-fill means array
-    for (int i = 0; i < vals.size(); i++) {
-        sig_sum += signal[i];
-    }
-
-    std::array<float, 8000> means;
 
     int bp = -1;
-    // Since the polyA will start after the adapter, and in RNA each
-    // base is at least 30 samples long (e.g. in RNA002), we can
-    // limit the search space to start from 30 bases from the beginning
-    // and up till about half the signal lengths. Note this is only to find
-    // the __start__ of the polyA signal.
-    //int n = 0;
-    //float mean_of_means = 0;
-    //float var_of_means = 0;
-    //float last_mean = 0;
-    //float stdev;
+    const int kWindowSize = 500;
+    const float kAvgSignalThreshold = 0.f;
+    bool found_first_peak = false;
+    for (int i = 0; i < signal_len; i += kWindowSize) {
+        int s = i;
+        int e = std::min(i + kWindowSize, signal_len);
 
-    int start_point = -1;
-    float h = std::numeric_limits<float>::min();
-    float l = std::numeric_limits<float>::max();
-    for (int j = 0; j < means.size(); j++) {
-        float mean = sig_sum / vals.size();
-        means[j] = mean;
-        //spdlog::debug("mean {} : {}", j, means[j]);
-        int signal_i = j + vals.size();
-        float sig_val = signal[signal_i];
-        // val to subtract
-        int idx_to_replace = j;
-        float val_sub = signal[idx_to_replace];
-        sig_sum = sig_sum - val_sub + sig_val;
-
-        h = std::max(h, mean);
-        l = std::min(l, mean);
-        //spdlog::debug("pos {} high {} low {} diff {}", j, h, l, (h - l));
-        if ((h - l) > 1.25f) {
-            start_point = j;
-            bp = j;
-            break;
+        float sum = 0.f;
+        for (int j = s; j < e; j++) {
+            sum += signal[j];
         }
+        float avg = sum / (e - s);
 
-        //n++;
-        //float d = sig_val - mean_of_means;
-        //mean_of_means += d / n;
-        //float d2 = sig_val - mean_of_means;
-        //var_of_means += (d * d2);
-        //last_mean = sig_val;
-        //spdlog::debug("pos {} mean {} var {}", j, mean_of_means, std::sqrt(var_of_means / n));
+        if (avg > kAvgSignalThreshold) {
+            if (!found_first_peak) {
+                found_first_peak = true;
+                bp = s;
+            } else {
+                // 2 consecutive windows with average signal value
+                // aboe the threshold mark a signal level change to
+                // RNA.
+                break;
+            }
+        } else {
+            found_first_peak = false;
+            bp = -1;
+        }
     }
 
-    //for (int i = 1000, num_windows_seen = 0; i < signal_len / 2; i += kWindow / 10, num_windows_seen++) {
-    //    float mean = 0;
-    //    int s = i, e = i + kWindow;
-    //    for (int j = s; j < e; j++) {
-    //        mean += signal[j];
-    //    }
-    //    mean /= kWindow;
-    //    int means_idx = num_windows_seen % means.size();
-    //    means[means_idx] = mean;
-    //    auto var = check_var(means_idx);
-    //    spdlog::debug("window {}-{} var {} means idx {}", s, e, var, means_idx);
-    //    if (num_windows_seen >= means.size() && var > 2.2f) {
-    //        bp = i;
-    //        break;
-    //    }
-    //}
-    //auto is_local_max = [&means](int idx) {
-    //    int kWinSize = 5;
-    //    int left = std::max(0, idx - kWinSize);
-    //    int right = std::min((int)means.size() - 1, idx + kWinSize);
-    //    if (means[left] < means[idx] && means[right] < means[idx]) {
-    //        return true;
-    //    }
-    //    return false;
-    //};
-    //auto find_max = [&means](int start, int end) -> float {
-    //    auto max = std::max_element(means.begin() + start, means.begin() + end);
-    //    return *max;
-    //};
-    //float v = means[0];  //std::numeric_limits<float>::min();
-    //for (int i = start_point; i < means.size(); i += 50) {
-    //    //if (means[i] < -0.5) {
-    //    //    continue;
-    //    //}
-    //    float m = find_max(i, i + 200);
-    //    if (m < v) {
-    //        bp = i;
-    //        break;
-    //    } else {
-    //        v = m;
-    //    }
-    //}
     spdlog::debug("Approx break point {}", bp);
 
     if (bp > 0) {
@@ -474,7 +396,6 @@ void PolyACalculator::restart() {
 stats::NamedStats PolyACalculator::sample_stats() const {
     stats::NamedStats stats = stats::from_obj(m_work_queue);
     stats["reads_not_estimated"] = num_not_called.load();
-    ;
     stats["reads_estimated"] = num_called.load();
     stats["average_tail_length"] =
             num_called.load() > 0 ? total_tail_lengths_called.load() / num_called.load() : 0;
