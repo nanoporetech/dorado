@@ -336,12 +336,6 @@ int basecaller(int argc, char* argv[]) {
             .help("Path to reference for alignment.")
             .default_value(std::string(""));
 
-    parser.visible.add_argument("--estimate-poly-a")
-            .help("Estimate poly-A/T tail lengths (beta feature). Primarily meant for cDNA and "
-                  "dRNA use cases.")
-            .default_value(false)
-            .implicit_value(true);
-
     parser.visible.add_argument("--kit-name")
             .help("Enable barcoding with the provided kit name. Choose from: " +
                   dorado::barcode_kits::barcode_kits_list_str() + ".");
@@ -439,7 +433,7 @@ int basecaller(int argc, char* argv[]) {
               parser.visible.get<std::vector<std::string>>("--kit-name"),
               parser.visible.get<bool>("--barcode-both-ends"),
               parser.visible.get<bool>("--no-trim"), resume_parser,
-              parser.visible.get<bool>("--estimate-poly-a"));
+              parser.hidden.get<bool>("--estimate-poly-a"));
     } catch (const std::exception& e) {
         spdlog::error("{}", e.what());
         return 1;
