@@ -353,7 +353,9 @@ std::string get_modification_model(const std::string& simplex_model,
 
     auto modification_path = model_dir / fs::path{modification_model};
     if (!fs::exists(modification_path)) {
-        download_models(model_dir.u8string(), modification_model);
+        if (!download_models(model_dir.u8string(), modification_model)) {
+            throw std::runtime_error("Failed to download model: " + modification_model);
+        }
     }
 
     return modification_path.u8string();
