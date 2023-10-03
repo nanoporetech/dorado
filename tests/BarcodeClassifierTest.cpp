@@ -316,3 +316,39 @@ TEST_CASE(
         }
     }
 }
+
+TEST_CASE("BarcodeClassifierNode: test reads where trim length == read length", TEST_GROUP) {
+    using Catch::Matchers::Equals;
+
+    dorado::PipelineDescriptor pipeline_desc;
+    std::vector<dorado::Message> messages;
+    auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
+    std::vector<std::string> kits = {"SQK-RBK114-96"};
+    bool barcode_both_ends = false;
+    bool no_trim = false;
+    auto classifier = pipeline_desc.add_node<BarcodeClassifierNode>({sink}, 8, kits,
+                                                                    barcode_both_ends, no_trim);
+
+    auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
+    fs::path data_dir = fs::path(get_data_dir("barcode_demux"));
+    auto bc_file = data_dir / "no_trim_expected.fastq";
+
+    // Only one read in the file, so fetch that.
+    HtsReader reader(bc_file.string());
+    reader.read();
+
+    // Fetch the original read before barcode trimming.
+    auto orig_seq =
+            dorado::utils::extract_sequence(reader.record.get(), reader.record.get()->core.l_qseq);
+
+    pipeline->push_message(std::move(reader.record));
+    pipeline->terminate(DefaultFlushOptions());
+
+    CHECK(messages.size() == 1);
+
+    auto read = std::get<BamPtr>(std::move(messages[0]));
+    auto seq = dorado::utils::extract_sequence(read.get(), read.get()->core.l_qseq);
+
+    // We don't expect any trimming to happen, so the original and final sequence must match.
+    CHECK(seq == orig_seq);
+}

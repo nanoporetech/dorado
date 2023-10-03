@@ -137,7 +137,7 @@ std::pair<int, int> determine_trim_interval(const demux::ScoreResults& res, int 
     if (trim_interval.second <= trim_interval.first) {
         // This could happen if the read is very short and the barcoding
         // algorithm determines the barcode interval to be the entire read.
-        // In the case, skip trimming.
+        // In that case, skip trimming.
         trim_interval = {0, seqlen};
     }
 
