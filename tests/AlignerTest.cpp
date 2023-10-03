@@ -40,8 +40,11 @@ TEST_CASE("AlignerTest: Check standard alignment", TEST_GROUP) {
     auto ref = aligner_test_dir / "target.fq";
     auto query = aligner_test_dir / "target.fq";
 
+    auto options = dorado::Aligner::dflt_options;
+    options.kmer_size = options.window_size = 15;
+    options.index_batch_size = 1e9;
     dorado::HtsReader reader(query.string());
-    auto bam_records = RunAlignmentPipeline(reader, ref.string(), 15, 15, 1e9, 10);
+    auto bam_records = RunAlignmentPipeline(reader, ref.string(), options, 10);
     REQUIRE(bam_records.size() == 1);
 
     bam1_t* rec = bam_records[0].get();
@@ -75,8 +78,11 @@ TEST_CASE("AlignerTest: Check supplementary alignment", TEST_GROUP) {
     auto ref = aligner_test_dir / "supplementary_aln_target.fa";
     auto query = aligner_test_dir / "supplementary_aln_query.fa";
 
+    auto options = dorado::Aligner::dflt_options;
+    options.kmer_size = options.window_size = 15;
+    options.index_batch_size = 1e9;
     dorado::HtsReader reader(query.string());
-    auto bam_records = RunAlignmentPipeline(reader, ref.string(), 15, 15, 1e9, 10);
+    auto bam_records = RunAlignmentPipeline(reader, ref.string(), options, 10);
     REQUIRE(bam_records.size() == 2);
 
     // Check first alignment is primary.
@@ -109,8 +115,11 @@ TEST_CASE("AlignerTest: Check reverse complement alignment", TEST_GROUP) {
     auto ref = aligner_test_dir / "target.fq";
     auto query = aligner_test_dir / "rev_target.fq";
 
+    auto options = dorado::Aligner::dflt_options;
+    options.kmer_size = options.window_size = 15;
+    options.index_batch_size = 1e9;
     dorado::HtsReader reader(query.string());
-    auto bam_records = RunAlignmentPipeline(reader, ref.string(), 15, 15, 1e9, 10);
+    auto bam_records = RunAlignmentPipeline(reader, ref.string(), options, 10);
     REQUIRE(bam_records.size() == 1);
 
     bam1_t* rec = bam_records[0].get();
@@ -141,8 +150,11 @@ TEST_CASE("AlignerTest: Check dorado tags are retained", TEST_GROUP) {
     auto ref = aligner_test_dir / "basecall_target.fa";
     auto query = aligner_test_dir / "basecall.sam";
 
+    auto options = dorado::Aligner::dflt_options;
+    options.kmer_size = options.window_size = 15;
+    options.index_batch_size = 1e9;
     dorado::HtsReader reader(query.string());
-    auto bam_records = RunAlignmentPipeline(reader, ref.string(), 15, 15, 1e9, 10);
+    auto bam_records = RunAlignmentPipeline(reader, ref.string(), options, 10);
     REQUIRE(bam_records.size() == 1);
 
     bam1_t* rec = bam_records[0].get();
@@ -163,15 +175,21 @@ TEST_CASE("AlignerTest: Verify impact of updated aligner args", TEST_GROUP) {
 
     // Run alignment with one set of k/w.
     {
+        auto options = dorado::Aligner::dflt_options;
+        options.kmer_size = options.window_size = 28;
+        options.index_batch_size = 1e9;
         dorado::HtsReader reader(query.string());
-        auto bam_records = RunAlignmentPipeline(reader, ref.string(), 28, 28, 1e9, 2);
+        auto bam_records = RunAlignmentPipeline(reader, ref.string(), options, 2);
         CHECK(bam_records.size() == 2);  // Generates 2 alignments.
     }
 
     // Run alignment with another set of k/w.
     {
+        auto options = dorado::Aligner::dflt_options;
+        options.kmer_size = options.window_size = 5;
+        options.index_batch_size = 1e9;
         dorado::HtsReader reader(query.string());
-        auto bam_records = RunAlignmentPipeline(reader, ref.string(), 5, 5, 1e9, 2);
+        auto bam_records = RunAlignmentPipeline(reader, ref.string(), options, 2);
         CHECK(bam_records.size() == 1);  // Generates 1 alignment.
     }
 }
@@ -180,5 +198,8 @@ TEST_CASE("AlignerTest: Check Aligner crashes if multi index encountered", TEST_
     fs::path aligner_test_dir = fs::path(get_aligner_data_dir());
     auto ref = aligner_test_dir / "long_target.fa";
 
-    CHECK_THROWS(dorado::Aligner(ref.string(), 5, 5, 1e3, 1));
+    auto options = dorado::Aligner::dflt_options;
+    options.kmer_size = options.window_size = 5;
+    options.index_batch_size = 1e3;
+    CHECK_THROWS(dorado::Aligner(ref.string(), options, 1));
 }

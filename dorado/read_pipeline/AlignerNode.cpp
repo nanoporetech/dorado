@@ -16,7 +16,7 @@
 
 namespace dorado {
 
-Aligner::Aligner(const std::string& filename, int k, int w, uint64_t index_batch_size, int threads)
+Aligner::Aligner(const std::string& filename, const Minimap2Options& options, int threads)
         : MessageSink(10000), m_threads(threads) {
     // Check if reference file exists.
     if (!std::filesystem::exists(filename)) {
@@ -27,15 +27,46 @@ Aligner::Aligner(const std::string& filename, int k, int w, uint64_t index_batch
     // Setting options to map-ont default till relevant args are exposed.
     mm_set_opt("map-ont", &m_idx_opt, &m_map_opt);
 
-    m_idx_opt.k = k;
-    m_idx_opt.w = w;
+    m_idx_opt.k = options.kmer_size;
+    m_idx_opt.w = options.window_size;
     spdlog::info("> Index parameters input by user: kmer size={} and window size={}.", m_idx_opt.k,
                  m_idx_opt.w);
 
-    // Set batch sizes large enough to not require chunking since that's
-    // not supported yet.
-    m_idx_opt.batch_size = index_batch_size;
-    m_idx_opt.mini_batch_size = index_batch_size;
+    m_idx_opt.batch_size = options.index_batch_size;
+    m_idx_opt.mini_batch_size = options.index_batch_size;
+    spdlog::info("> Index parameters input by user: batch size={} and mini batch size={}.",
+                 m_idx_opt.batch_size, m_idx_opt.mini_batch_size);
+
+    m_map_opt.bw = options.bandwidth;
+    m_map_opt.bw_long = options.bandwidth_long;
+    spdlog::info("> Map parameters input by user: bandwidth={} and bandwidth long={}.",
+                 m_map_opt.bw, m_map_opt.bw_long);
+
+    if (!options.print_secondary) {
+        m_map_opt.flag |= MM_F_NO_PRINT_2ND;
+    }
+    m_map_opt.best_n = options.best_n_secondary;
+    spdlog::info(
+            "> Map parameters input by user: don't print secondary={} and best n secondary={}.",
+            static_cast<bool>(m_map_opt.flag & MM_F_NO_PRINT_2ND), m_map_opt.best_n);
+
+    if (options.soft_clipping) {
+        m_map_opt.flag |= MM_F_SOFTCLIP;
+    }
+    if (options.secondary_seq) {
+        m_map_opt.flag |= MM_F_SECONDARY_SEQ;
+    }
+    spdlog::info("> Map parameters input by user: soft clipping={} and secondary seq={}.",
+                 static_cast<bool>(m_map_opt.flag & MM_F_SOFTCLIP),
+                 static_cast<bool>(m_map_opt.flag & MM_F_SECONDARY_SEQ));
+
+    if (options.print_aln_seq) {
+        mm_dbg_flag |= MM_DBG_PRINT_QNAME | MM_DBG_PRINT_ALN_SEQ;
+        m_threads = 1;
+    }
+    spdlog::debug("> Map parameters input by user: dbg print qname={} and aln seq={}.",
+                  static_cast<bool>(mm_dbg_flag & MM_DBG_PRINT_QNAME),
+                  static_cast<bool>(mm_dbg_flag & MM_DBG_PRINT_ALN_SEQ));
 
     // Force cigar generation.
     m_map_opt.flag |= MM_F_CIGAR;
@@ -137,7 +168,9 @@ void add_sa_tag(bam1_t* record,
                 int32_t hits,
                 int32_t aln_idx,
                 int32_t l_seq,
-                const mm_idx_t* idx) {
+                const mm_idx_t* idx,
+                const bool use_hard_clip) {
+    const auto clip_char = use_hard_clip ? "H" : "S";
     std::stringstream ss;
     for (int i = 0; i < hits; i++) {
         if (i == aln_idx) {
@@ -167,7 +200,7 @@ void add_sa_tag(bam1_t* record,
         ss << r->rs + 1 << ",";
         ss << "+-"[r->rev] << ",";
         if (clip5) {
-            ss << clip5 << "S";
+            ss << clip5 << clip_char;
         }
         if (num_matches) {
             ss << num_matches << "M";
@@ -179,7 +212,7 @@ void add_sa_tag(bam1_t* record,
             ss << num_deletes << "D";
         }
         if (clip3) {
-            ss << clip3 << "S";
+            ss << clip3 << clip_char;
         }
         ss << "," << r->mapq << "," << (r->blen - r->mlen + r->p->n_ambi) << ";";
     }
@@ -299,9 +332,6 @@ std::vector<BamPtr> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
     }
 
     for (int j = 0; j < hits; j++) {
-        // new output record
-        bam1_t* record = bam_init1();
-
         // mapping region
         auto aln = &reg[j];
 
@@ -317,6 +347,17 @@ std::vector<BamPtr> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
             flag |= BAM_FSUPPLEMENTARY;
         }
 
+        if ((flag & BAM_FSECONDARY) && (m_map_opt.flag & MM_F_NO_PRINT_2ND))
+            continue;
+
+        const bool skip_seq_qual = !(m_map_opt.flag & MM_F_SOFTCLIP) && (flag & BAM_FSECONDARY) &&
+                                   !(m_map_opt.flag & MM_F_SECONDARY_SEQ);
+        const bool use_hard_clip =
+                !(m_map_opt.flag & MM_F_SOFTCLIP) &&
+                (((flag & BAM_FSECONDARY) && (m_map_opt.flag & MM_F_SECONDARY_SEQ)) ||
+                 (flag & BAM_FSUPPLEMENTARY));
+        const auto BAM_CCLIP = use_hard_clip ? BAM_CHARD_CLIP : BAM_CSOFT_CLIP;
+
         int32_t tid = aln->rid;
         hts_pos_t pos = aln->rs;
         uint8_t mapq = aln->mapq;
@@ -328,8 +369,8 @@ std::vector<BamPtr> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
         // exceeds 65535.
         size_t n_cigar = aln->p ? aln->p->n_cigar : 0;
         std::vector<uint32_t> cigar;
+        uint32_t clip_len[2] = {0};
         if (n_cigar != 0) {
-            uint32_t clip_len[2] = {0};
             clip_len[0] = aln->rev ? irecord->core.l_qseq - aln->qe : aln->qs;
             clip_len[1] = aln->rev ? aln->qs : irecord->core.l_qseq - aln->qe;
 
@@ -345,7 +386,7 @@ std::vector<BamPtr> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
 
             // write the left softclip
             if (clip_len[0]) {
-                auto clip = bam_cigar_gen(clip_len[0], BAM_CSOFT_CLIP);
+                auto clip = bam_cigar_gen(clip_len[0], BAM_CCLIP);
                 cigar[0] = clip;
             }
 
@@ -354,7 +395,7 @@ std::vector<BamPtr> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
 
             // write the right softclip
             if (clip_len[1]) {
-                auto clip = bam_cigar_gen(clip_len[1], BAM_CSOFT_CLIP);
+                auto clip = bam_cigar_gen(clip_len[1], BAM_CCLIP);
                 cigar[offset + aln->p->n_cigar] = clip;
             }
         }
@@ -363,10 +404,9 @@ std::vector<BamPtr> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
         size_t l_seq = 0;
         char* seq_tmp = nullptr;
         unsigned char* qual_tmp = nullptr;
-        if (flag & BAM_FSECONDARY) {
-            // To match minimap2 output behavior, don't emit sequence
-            // or quality info for secondary alignments.
-        } else {
+        // To match minimap2 output behavior, don't emit sequence
+        // or quality info for secondary alignments.
+        if (!skip_seq_qual) {
             l_seq = seq.size();
             if (aln->rev) {
                 seq_tmp = seq_rev.data();
@@ -376,6 +416,16 @@ std::vector<BamPtr> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
                 qual_tmp = qual.empty() ? nullptr : qual.data();
             }
         }
+        if (use_hard_clip) {
+            l_seq -= clip_len[0] + clip_len[1];
+            if (seq_tmp)
+                seq_tmp += clip_len[0];
+            if (qual_tmp)
+                qual_tmp += clip_len[0];
+        }
+
+        // new output record
+        bam1_t* record = bam_init1();
 
         // Set properties of the BAM record.
         // NOTE: Passing bam_get_qname(irecord) + l_qname into bam_set1
@@ -395,7 +445,7 @@ std::vector<BamPtr> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
 
         // Add new tags to match minimap2.
         add_tags(record, aln, seq, buf);
-        add_sa_tag(record, aln, reg, hits, j, l_seq, m_index);
+        add_sa_tag(record, aln, reg, hits, j, l_seq, m_index, use_hard_clip);
 
         results.push_back(BamPtr(record));
     }

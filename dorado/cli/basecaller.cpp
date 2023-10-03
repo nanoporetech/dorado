@@ -59,9 +59,7 @@ void setup(std::vector<std::string> args,
            size_t min_qscore,
            std::string read_list_file_path,
            bool recursive_file_loading,
-           int kmer_size,
-           int window_size,
-           uint64_t mm2_index_batch_size,
+           const Aligner::Minimap2Options& aligner_options,
            bool skip_model_compatibility_check,
            const std::string& dump_stats_file,
            const std::string& dump_stats_filter,
@@ -133,8 +131,7 @@ void setup(std::vector<std::string> args,
     auto aligner = PipelineDescriptor::InvalidNodeHandle;
     auto current_sink_node = hts_writer;
     if (enable_aligner) {
-        aligner = pipeline_desc.add_node<Aligner>({current_sink_node}, ref, kmer_size, window_size,
-                                                  mm2_index_batch_size,
+        aligner = pipeline_desc.add_node<Aligner>({current_sink_node}, ref, aligner_options,
                                                   thread_allocations.aligner_threads);
         current_sink_node = aligner;
     }
@@ -250,56 +247,56 @@ int basecaller(int argc, char* argv[]) {
     utils::make_torch_deterministic();
     torch::set_num_threads(1);
 
-    argparse::ArgumentParser parser("dorado", DORADO_VERSION, argparse::default_arguments::help);
+    cli::ArgParser parser("dorado");
 
-    parser.add_argument("model").help("the basecaller model to run.");
+    parser.visible.add_argument("model").help("the basecaller model to run.");
 
-    parser.add_argument("data").help("the data directory or file (POD5/FAST5 format).");
+    parser.visible.add_argument("data").help("the data directory or file (POD5/FAST5 format).");
 
-    parser.add_argument("-v", "--verbose").default_value(false).implicit_value(true);
+    parser.visible.add_argument("-v", "--verbose").default_value(false).implicit_value(true);
 
-    parser.add_argument("-x", "--device")
+    parser.visible.add_argument("-x", "--device")
             .help("device string in format \"cuda:0,...,N\", \"cuda:all\", \"metal\", \"cpu\" "
                   "etc..")
             .default_value(default_parameters.device);
 
-    parser.add_argument("-l", "--read-ids")
+    parser.visible.add_argument("-l", "--read-ids")
             .help("A file with a newline-delimited list of reads to basecall. If not provided, all "
                   "reads will be basecalled")
             .default_value(std::string(""));
 
-    parser.add_argument("--resume-from")
+    parser.visible.add_argument("--resume-from")
             .help("Resume basecalling from the given HTS file. Fully written read records are not "
                   "processed again.")
             .default_value(std::string(""));
 
-    parser.add_argument("-n", "--max-reads").default_value(0).scan<'i', int>();
+    parser.visible.add_argument("-n", "--max-reads").default_value(0).scan<'i', int>();
 
-    parser.add_argument("--min-qscore")
+    parser.visible.add_argument("--min-qscore")
             .help("Discard reads with mean Q-score below this threshold.")
             .default_value(0)
             .scan<'i', int>();
 
-    parser.add_argument("-b", "--batchsize")
+    parser.visible.add_argument("-b", "--batchsize")
             .default_value(default_parameters.batchsize)
             .scan<'i', int>()
             .help("if 0 an optimal batchsize will be selected. batchsizes are rounded to the "
                   "closest multiple of 64.");
 
-    parser.add_argument("-c", "--chunksize")
+    parser.visible.add_argument("-c", "--chunksize")
             .default_value(default_parameters.chunksize)
             .scan<'i', int>();
 
-    parser.add_argument("-o", "--overlap")
+    parser.visible.add_argument("-o", "--overlap")
             .default_value(default_parameters.overlap)
             .scan<'i', int>();
 
-    parser.add_argument("-r", "--recursive")
+    parser.visible.add_argument("-r", "--recursive")
             .default_value(false)
             .implicit_value(true)
             .help("Recursively scan through directories to load FAST5 and POD5 files");
 
-    parser.add_argument("--modified-bases")
+    parser.visible.add_argument("--modified-bases")
             .nargs(argparse::nargs_pattern::at_least_one)
             .action([](const std::string& value) {
                 const auto& mods = models::modified_mods();
@@ -314,84 +311,75 @@ int basecaller(int argc, char* argv[]) {
                 return value;
             });
 
-    parser.add_argument("--modified-bases-models")
+    parser.visible.add_argument("--modified-bases-models")
             .default_value(std::string())
             .help("a comma separated list of modified base models");
 
-    parser.add_argument("--modified-bases-threshold")
+    parser.visible.add_argument("--modified-bases-threshold")
             .default_value(default_parameters.methylation_threshold)
             .scan<'f', float>()
             .help("the minimum predicted methylation probability for a modified base to be emitted "
                   "in an all-context model, [0, 1]");
 
-    parser.add_argument("--emit-fastq")
+    parser.visible.add_argument("--emit-fastq")
             .help("Output in fastq format.")
             .default_value(false)
             .implicit_value(true);
-    parser.add_argument("--emit-sam")
+    parser.visible.add_argument("--emit-sam")
             .help("Output in SAM format.")
             .default_value(false)
             .implicit_value(true);
 
-    parser.add_argument("--emit-moves").default_value(false).implicit_value(true);
+    parser.visible.add_argument("--emit-moves").default_value(false).implicit_value(true);
 
-    parser.add_argument("--reference")
+    parser.visible.add_argument("--reference")
             .help("Path to reference for alignment.")
             .default_value(std::string(""));
-    parser.add_argument("-k")
-            .help("k-mer size for alignment with minimap2 (maximum 28).")
-            .default_value(15)
-            .scan<'i', int>();
-    parser.add_argument("-w")
-            .help("minimizer window size for alignment with minimap2.")
-            .default_value(10)
-            .scan<'i', int>();
-    parser.add_argument("-I").help("minimap2 index batch size.").default_value(std::string("16G"));
 
-    parser.add_argument("--estimate-poly-a")
+    parser.visible.add_argument("--estimate-poly-a")
             .help("Estimate poly-A/T tail lengths (beta feature). Primarily meant for cDNA and "
                   "dRNA use cases.")
             .default_value(false)
             .implicit_value(true);
 
-    parser.add_argument("--kit-name")
+    parser.visible.add_argument("--kit-name")
             .help("Enable barcoding with the provided kit name. Choose from: " +
                   dorado::barcode_kits::barcode_kits_list_str() + ".");
-    parser.add_argument("--barcode-both-ends")
+    parser.visible.add_argument("--barcode-both-ends")
             .help("Require both ends of a read to be barcoded for a double ended barcode.")
             .default_value(false)
             .implicit_value(true);
-    parser.add_argument("--no-trim")
+    parser.visible.add_argument("--no-trim")
             .help("Skip barcode trimming. If option is not chosen, trimming is enabled.")
             .default_value(false)
             .implicit_value(true);
 
-    argparse::ArgumentParser internal_parser;
+    cli::add_minimap2_arguments(parser, Aligner::dflt_options);
+    cli::add_internal_arguments(parser);
 
     // Create a copy of the parser to use if the resume feature is enabled. Needed
     // to parse the model used for the file being resumed from. Note that this copy
     // needs to be made __before__ the parser is used.
-    argparse::ArgumentParser resume_parser = parser;
+    auto resume_parser = parser.visible;
 
     try {
-        auto remaining_args = parser.parse_known_args(argc, argv);
-        internal_parser = cli::parse_internal_options(remaining_args);
+        cli::parse(parser, argc, argv);
     } catch (const std::exception& e) {
         std::ostringstream parser_stream;
-        parser_stream << parser;
+        parser_stream << parser.visible;
         spdlog::error("{}\n{}", e.what(), parser_stream.str());
         std::exit(1);
     }
 
     std::vector<std::string> args(argv, argv + argc);
 
-    if (parser.get<bool>("--verbose")) {
+    if (parser.visible.get<bool>("--verbose")) {
         utils::SetDebugLogging();
     }
 
-    auto model = parser.get<std::string>("model");
-    auto mod_bases = parser.get<std::vector<std::string>>("--modified-bases");
-    auto mod_bases_models = parser.get<std::string>("--modified-bases-models");
+    auto model = parser.visible.get<std::string>("model");
+    auto mod_bases = parser.visible.get<std::vector<std::string>>("--modified-bases");
+    auto mod_bases_models = parser.visible.get<std::string>("--modified-bases-models");
 
     if (mod_bases.size() && !mod_bases_models.empty()) {
         spdlog::error(
@@ -408,7 +396,7 @@ int basecaller(int argc, char* argv[]) {
                                 [](std::string a, std::string b) { return a + "," + b; });
     }
 
-    auto methylation_threshold = parser.get<float>("--modified-bases-threshold");
+    auto methylation_threshold = parser.visible.get<float>("--modified-bases-threshold");
     if (methylation_threshold < 0.f || methylation_threshold > 1.f) {
         spdlog::error("--modified-bases-threshold must be between 0 and 1.");
         std::exit(EXIT_FAILURE);
@@ -416,8 +404,8 @@ int basecaller(int argc, char* argv[]) {
 
     auto output_mode = HtsWriter::OutputMode::BAM;
 
-    auto emit_fastq = parser.get<bool>("--emit-fastq");
-    auto emit_sam = parser.get<bool>("--emit-sam");
+    auto emit_fastq = parser.visible.get<bool>("--emit-fastq");
+    auto emit_sam = parser.visible.get<bool>("--emit-sam");
 
     if (emit_fastq && emit_sam) {
         throw std::runtime_error("Only one of --emit-{fastq, sam} can be set (or none).");
@@ -434,22 +422,24 @@ int basecaller(int argc, char* argv[]) {
     spdlog::info("> Creating basecall pipeline");
 
     try {
-        setup(args, model, parser.get<std::string>("data"), mod_bases_models,
-              parser.get<std::string>("-x"), parser.get<std::string>("--reference"),
-              parser.get<int>("-c"), parser.get<int>("-o"), parser.get<int>("-b"),
-              default_parameters.num_runners, default_parameters.remora_batchsize,
-              default_parameters.remora_threads, methylation_threshold, output_mode,
-              parser.get<bool>("--emit-moves"), parser.get<int>("--max-reads"),
-              parser.get<int>("--min-qscore"), parser.get<std::string>("--read-ids"),
-              parser.get<bool>("--recursive"), parser.get<int>("k"), parser.get<int>("w"),
-              cli::parse_string_to_size(parser.get<std::string>("I")),
-              internal_parser.get<bool>("--skip-model-compatibility-check"),
-              internal_parser.get<std::string>("--dump_stats_file"),
-              internal_parser.get<std::string>("--dump_stats_filter"),
-              parser.get<std::string>("--resume-from"),
-              parser.get<std::vector<std::string>>("--kit-name"),
-              parser.get<bool>("--barcode-both-ends"), parser.get<bool>("--no-trim"), resume_parser,
-              parser.get<bool>("--estimate-poly-a"));
+        setup(args, model, parser.visible.get<std::string>("data"), mod_bases_models,
+              parser.visible.get<std::string>("-x"), parser.visible.get<std::string>("--reference"),
+              parser.visible.get<int>("-c"), parser.visible.get<int>("-o"),
+              parser.visible.get<int>("-b"), default_parameters.num_runners,
+              default_parameters.remora_batchsize, default_parameters.remora_threads,
+              methylation_threshold, output_mode, parser.visible.get<bool>("--emit-moves"),
+              parser.visible.get<int>("--max-reads"), parser.visible.get<int>("--min-qscore"),
+              parser.visible.get<std::string>("--read-ids"),
+              parser.visible.get<bool>("--recursive"),
+              cli::process_minimap2_arguments(parser, Aligner::dflt_options),
+              parser.hidden.get<bool>("--skip-model-compatibility-check"),
+              parser.hidden.get<std::string>("--dump_stats_file"),
+              parser.hidden.get<std::string>("--dump_stats_filter"),
+              parser.visible.get<std::string>("--resume-from"),
+              parser.visible.get<std::vector<std::string>>("--kit-name"),
+              parser.visible.get<bool>("--barcode-both-ends"),
+              parser.visible.get<bool>("--no-trim"), resume_parser,
+              parser.visible.get<bool>("--estimate-poly-a"));
     } catch (const std::exception& e) {
         spdlog::error("{}", e.what());
         return 1;
