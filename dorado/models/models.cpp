@@ -286,9 +286,9 @@ bool download_models(const std::string& target_directory, const std::string& sel
                 const std::string model_str(model);
                 auto url = urls::URL_ROOT + urls::URL_PATH + model_str + ".zip";
                 spdlog::info(" - downloading {}", model);
-                auto res = http.Get(url.c_str());
-                if (res == nullptr) {
-                    spdlog::error("Failed to download {}", model);
+                httplib::Result res = http.Get(url.c_str());
+                if (!res) {
+                    spdlog::error("Failed to download {}: {}", model, to_string(res.error()));
                     success = false;
                     continue;
                 }
