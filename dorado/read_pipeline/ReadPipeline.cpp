@@ -1,9 +1,10 @@
 #include "ReadPipeline.h"
 
-#include "htslib/sam.h"
 #include "modbase/ModBaseContext.h"
+#include "utils/bam_utils.h"
 #include "utils/sequence_utils.h"
 
+#include <htslib/sam.h>
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
@@ -16,25 +17,6 @@
 #include <unordered_map>
 
 using namespace std::chrono_literals;
-
-namespace {
-
-bool validate_bam_tag_code(const std::string &bam_name) {
-    // Check the supplied bam_name is a single character
-    if (bam_name.size() == 1 && std::isalpha(static_cast<unsigned char>(bam_name[0]))) {
-        return true;
-    }
-
-    // Check the supplied bam_name is a simple integer and if so, assume it's a CHEBI code.
-    if (std::all_of(bam_name.begin(), bam_name.end(),
-                    [](const char &c) { return std::isdigit(static_cast<unsigned char>(c)); })) {
-        return true;
-    }
-
-    spdlog::error("Invalid modified base code: {}", bam_name);
-    return false;
-}
-}  // namespace
 
 namespace dorado {
 
@@ -191,7 +173,7 @@ void ReadCommon::generate_modbase_tags(bam1_t *aln, uint8_t threshold) const {
         } else {
             // A modification on the previous cardinal base
             std::string bam_name = mod_base_info->alphabet[channel_idx];
-            if (!validate_bam_tag_code(bam_name)) {
+            if (!utils::validate_bam_tag_code(bam_name)) {
                 return;
             }
 

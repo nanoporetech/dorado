@@ -5,6 +5,7 @@
 
 #include <htslib/sam.h>
 
+#include <algorithm>
 #include <cctype>
 #include <iostream>
 #include <map>
@@ -249,6 +250,20 @@ std::tuple<std::string, std::vector<uint8_t>> extract_modbase_info(bam1_t* input
     }
 
     return {modbase_str, modbase_probs};
+}
+
+bool validate_bam_tag_code(const std::string& bam_name) {
+    // Check the supplied bam_name is a single character
+    if (bam_name.size() == 1 && std::isalpha(static_cast<unsigned char>(bam_name[0]))) {
+        return true;
+    }
+
+    // Check the supplied bam_name is a simple integer and if so, assume it's a CHEBI code.
+    if (std::all_of(bam_name.begin(), bam_name.end(),
+                    [](const char& c) { return std::isdigit(static_cast<unsigned char>(c)); })) {
+        return true;
+    }
+    return false;
 }
 
 }  // namespace dorado::utils

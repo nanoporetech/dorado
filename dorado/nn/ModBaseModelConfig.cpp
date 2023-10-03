@@ -1,5 +1,6 @@
 #include "ModBaseModelConfig.h"
 
+#include "utils/bam_utils.h"
 #include "utils/sequence_utils.h"
 #include "utils/tensor_utils.h"
 
@@ -25,6 +26,12 @@ ModBaseModelConfig load_modbase_model_config(const std::filesystem::path& model_
         for (const auto& mod_base : mod_base_array) {
             assert(mod_base.is_string());
             config.mod_bases.push_back(mod_base.as_string().str);
+        }
+    }
+
+    for (const auto& mod_base : config.mod_bases) {
+        if (!utils::validate_bam_tag_code(mod_base)) {
+            throw std::runtime_error("Invalid modified base code: " + mod_base);
         }
     }
 
