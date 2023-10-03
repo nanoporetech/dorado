@@ -115,7 +115,6 @@ void setup(std::vector<std::string> args,
 
     size_t num_reads = DataLoader::get_num_reads(
             data_path, read_list, {} /*reads_already_processed*/, recursive_file_loading);
-    spdlog::info("Number of reads {}", num_reads);
     num_reads = max_reads == 0 ? num_reads : std::min(num_reads, max_reads);
 
     bool duplex = false;
