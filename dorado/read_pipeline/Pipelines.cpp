@@ -20,6 +20,7 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
                              size_t overlap,
                              uint32_t mean_qscore_start_pos,
                              int scaler_node_threads,
+                             bool enable_read_splitter,
                              int splitter_node_threads,
                              int modbase_node_threads,
                              NodeHandle sink_node_handle,
@@ -43,7 +44,7 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
     // will just pass data through.
     DuplexSplitSettings splitter_settings;
     splitter_settings.simplex_mode = true;
-    splitter_settings.enabled = !is_rna_model(model_config);
+    splitter_settings.enabled = enable_read_splitter;
     auto splitter_node =
             pipeline_desc.add_node<DuplexSplitNode>({}, splitter_settings, splitter_node_threads);
 
