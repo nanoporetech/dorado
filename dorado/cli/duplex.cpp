@@ -256,7 +256,10 @@ int duplex(int argc, char* argv[]) {
                     model_path.parent_path() / std::filesystem::path(stereo_model_name);
 
             if (!std::filesystem::exists(stereo_model_path)) {
-                models::download_models(model_path.parent_path().u8string(), stereo_model_name);
+                if (!models::download_models(model_path.parent_path().u8string(),
+                                             stereo_model_name)) {
+                    throw std::runtime_error("Failed to download model: " + stereo_model_name);
+                }
             }
             auto stereo_model_config = load_crf_model_config(stereo_model_path);
 

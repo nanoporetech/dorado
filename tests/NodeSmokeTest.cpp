@@ -156,7 +156,7 @@ TempDir download_model(const std::string& model) {
 #endif
 
     // Download it
-    dorado::models::download_models(path.string(), model);
+    REQUIRE(dorado::models::download_models(path.string(), model));
     return TempDir(std::move(path));
 }
 
