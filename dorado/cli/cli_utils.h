@@ -165,11 +165,6 @@ inline void add_internal_arguments(ArgParser& parser) {
     parser.hidden.add_argument("--devopts")
             .help("Internal options for testing & debugging, 'key=value' pairs separated by ';'")
             .default_value(std::string(""));
-    parser.hidden.add_argument("--estimate-poly-a")
-            .help("Estimate poly-A/T tail lengths (beta feature). Primarily meant for cDNA and "
-                  "dRNA use cases.")
-            .default_value(false)
-            .implicit_value(true);
 }
 
 template <class Options>

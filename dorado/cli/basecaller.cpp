@@ -351,6 +351,13 @@ int basecaller(int argc, char* argv[]) {
     cli::add_minimap2_arguments(parser, Aligner::dflt_options);
     cli::add_internal_arguments(parser);
 
+    // Add hidden arguments that only apply to simplex calling.
+    parser.hidden.add_argument("--estimate-poly-a")
+            .help("Estimate poly-A/T tail lengths (beta feature). Primarily meant for cDNA and "
+                  "dRNA use cases.")
+            .default_value(false)
+            .implicit_value(true);
+
     // Create a copy of the parser to use if the resume feature is enabled. Needed
     // to parse the model used for the file being resumed from. Note that this copy
     // needs to be made __before__ the parser is used.
