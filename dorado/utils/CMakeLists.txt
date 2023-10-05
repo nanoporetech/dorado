@@ -100,8 +100,8 @@ target_link_libraries(dorado_utils
 if(APPLE AND DORADO_GPU_BUILD)
     add_dependencies(dorado_utils metal-lib)
     target_link_libraries(
-        PUBLIC
         dorado_utils
+        PUBLIC
         ${APPLE_FWK_FOUNDATION}
         ${APPLE_FWK_QUARTZ_CORE}
         ${APPLE_FWK_METAL}
