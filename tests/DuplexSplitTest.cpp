@@ -18,7 +18,7 @@
 
 namespace {
 std::filesystem::path DataPath(std::string_view filename) {
-    return std::filesystem::path(get_split_data_dir()) / filename;
+    return std::filesystem::path(get_data_dir("split")) / filename;
 }
 
 auto make_read() {
@@ -184,4 +184,49 @@ TEST_CASE("No split output read properties", TEST_GROUP) {
     CHECK(read->read_common.read_id == init_read_id);
     CHECK(read->read_common.subread_id == 0);
     CHECK(read->read_common.split_count == 1);
+}
+
+TEST_CASE("Test split where only one subread is generated", TEST_GROUP) {
+    auto data_dir = std::filesystem::path(get_data_dir("split")) / "one_subread_split";
+
+    auto read = std::make_unique<dorado::SimplexRead>();
+    read->range = 0;
+    read->read_common.sample_rate = 5000;
+    read->offset = -260;
+    read->scaling = 0.18707;
+    read->read_common.shift = 94.7565;
+    read->read_common.scale = 29.4467;
+    read->read_common.model_stride = 6;
+    read->read_common.read_id = "6571a1d9-5dff-44f4-a526-558584ccea82";
+    read->read_common.num_trimmed_samples = 4010;
+    read->read_common.attributes.read_number = 10577;
+    read->read_common.attributes.channel_number = 105;
+    read->read_common.attributes.mux = 4;
+    read->read_common.attributes.start_time = "2023-04-30T02:01:37.616+00:00";
+    read->read_common.attributes.num_samples = 332541;
+    read->start_sample = 178487546;
+    read->end_sample = 178820087;
+    read->run_acquisition_start_time_ms = 1682784400107;
+
+    read->read_common.seq = ReadFileIntoString(data_dir / "seq");
+    read->read_common.qstring = ReadFileIntoString(data_dir / "qstring");
+    read->read_common.moves = ReadFileIntoVector(data_dir / "moves");
+    torch::load(read->read_common.raw_data, (data_dir / "raw.tensor").string());
+    read->read_common.raw_data = read->read_common.raw_data.to(torch::kFloat16);
+    read->read_common.read_tag = 42;
+    dorado::PipelineDescriptor pipeline_desc;
+
+    std::vector<dorado::Message> messages;
+    auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 3, messages);
+    auto splitter_node = pipeline_desc.add_node<dorado::DuplexSplitNode>(
+            {sink}, dorado::DuplexSplitSettings{}, 1);
+    auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
+
+    pipeline->push_message(std::move(read));
+    pipeline.reset();
+
+    CHECK(messages.size() == 1);
+
+    const auto &read_common = get_read_common_data(messages[0]);
+    CHECK(read_common.parent_read_id != read_common.read_id);
 }
