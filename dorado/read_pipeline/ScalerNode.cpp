@@ -57,8 +57,6 @@ void ScalerNode::worker_thread() {
         read->read_common.scaling_method =
                 m_scaling_params.quantile_scaling ? "quantile" : "med_mad";
 
-        spdlog::debug("{} {} {} 0", read->read_common.read_id, shift, scale);
-
         // raw_data comes from DataLoader with dtype int16.  We send it on as float16 after
         // shifting/scaling in float32 form.
         read->read_common.raw_data =
@@ -78,6 +76,8 @@ void ScalerNode::worker_thread() {
             trim_start = utils::trim(
                     read->read_common.raw_data.index({Slice(torch::indexing::None, max_samples)}));
         }
+
+        spdlog::debug("{} {} {} {}", read->read_common.read_id, shift, scale, trim_start);
 
         read->read_common.raw_data =
                 read->read_common.raw_data.index({Slice(trim_start, torch::indexing::None)});

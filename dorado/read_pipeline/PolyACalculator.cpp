@@ -56,7 +56,6 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
 
     std::vector<std::pair<int, int>> intervals;
     std::pair<float, float> last_interval_stats;
-    std::vector<std::pair<float, float>> interval_stats;
 
     // Maximum variance between consecutive values to be
     // considered part of the same interval.
@@ -79,12 +78,25 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
             if (intervals.size() > 1 && intervals.back().second >= s &&
                 std::abs(avg - last_interval_stats.first) < 0.2) {
                 auto& last = intervals.back();
+                //spdlog::debug("Add {}-{} to {}-{} avg {} stdev {}", s, e, last.first, last.second, avg, stdev);
                 last.second = e;
             } else {
+                if (intervals.size() > 2) {
+                    auto& last = intervals.back();
+                    auto& second_last = intervals[intervals.size() - 2];
+                    if ((last.first - second_last.second < kMaxSampleGap) &&
+                        (last.second - last.first > 10 * num_samples_per_base) &&
+                        (second_last.second - second_last.first > 10 * num_samples_per_base)) {
+                        //spdlog::debug("Merging {}-{} to {}-{}", last.first, last.second, second_last.first, second_last.second);// avg, stdev);
+                        second_last.second = last.second;
+                        intervals.pop_back();
+                    }
+                }
+
                 intervals.push_back({s, e});
+                //spdlog::debug("New interval {}-{} avg {} stdev {}", s, e, avg, stdev);
             }
             last_interval_stats = {avg, stdev};
-            interval_stats.push_back({avg, stdev});
         }
     }
 
@@ -101,7 +113,8 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
     const int kAnchorProximity = 25 * num_samples_per_base;
     std::copy_if(intervals.begin(), intervals.end(), std::back_inserter(filtered_intervals),
                  [&](auto& i) {
-                     return (fwd ? std::abs(signal_anchor - i.second) < kAnchorProximity
+                     return true ||
+                            (fwd ? std::abs(signal_anchor - i.second) < kAnchorProximity
                                  : std::abs(signal_anchor - i.first) < kAnchorProximity) ||
                             (i.first <= signal_anchor) && (signal_anchor <= i.second);
                  });
@@ -191,19 +204,18 @@ SignalAnchorInfo determine_signal_anchor_and_strand_cdna(const dorado::SimplexRe
     int dist_v2 = top_v2.editDistance + bottom_v2.editDistance;
     spdlog::debug("v1 dist {}, v2 dist {}", dist_v1, dist_v2);
 
+    bool fwd = dist_v1 < dist_v2;
     bool proceed = std::min(dist_v1, dist_v2) < 30;
 
     SignalAnchorInfo result = {false, -1, trailing_Ts};
 
     if (proceed) {
-        bool fwd = true;
         int start = 0, end = 0;
         int base_anchor = 0;
-        if (dist_v2 < dist_v1) {
-            fwd = false;
-            base_anchor = top_v2.endLocations[0];
-        } else {
+        if (fwd) {
             base_anchor = bottom_start + bottom_v1.startLocations[0];
+        } else {
+            base_anchor = top_v2.endLocations[0];
         }
 
         const auto stride = read.read_common.model_stride;
