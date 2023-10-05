@@ -112,4 +112,12 @@ std::tuple<int, std::vector<uint8_t>> extract_move_table(bam1_t* input_record);
  */
 std::tuple<std::string, std::vector<uint8_t>> extract_modbase_info(bam1_t* input_record);
 
+/*
+ * Check that the modified base code supplied is suitable for use in the MM:Z bam tag.
+ *
+ * @param bam_name mod_bases alphabet entry  
+ * @return True if the entry is valid for use (i.e. is single letter or integer ChEBI code)
+ */
+bool validate_bam_tag_code(const std::string& bam_name);
+
 }  // namespace dorado::utils

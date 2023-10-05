@@ -52,6 +52,75 @@ $dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --modified-bases 5mCG
 samtools quickcheck -u $output_dir/calls.bam
 samtools view -h $output_dir/calls.bam > $output_dir/calls.sam
 
+echo dorado aligner options test stage
+dorado_aligner_options_test() (
+    set +e
+    set +x
+
+    MM2=$(dirname $dorado_bin)/minimap2
+    echo -n "minimap2 version: "; $MM2 --version
+
+    # list of options and whether they affect the output
+    REF=$data_dir/aligner_test/lambda_ecoli.fasta
+    RDS=$data_dir/aligner_test/dataset.fastq
+
+    RETURN=true
+    touch err
+    ERROR() { echo $*; RETURN=false; cat err; }
+    SKIP() { echo $*; cat err; }
+
+    OPTIONS=(""    "-k 20" "-w 100" "-I 100K" "--secondary no" "-N 1" "-r 10,100" "-Y" "--secondary-seq" "--print-aln-seq")
+    CHANGES=(false true    true     false     true             true   true        true true              false            )
+    for ((i = 0; i < ${#OPTIONS[@]}; i++)); do
+        opt=${OPTIONS[$i]}
+        echo -n "$i: with options '$opt' ... "
+
+        # run dorado aligner
+        if ! $dorado_bin aligner $opt $REF $RDS 2>err | samtools view -h 2>>err > $output_dir/dorado-$i.sam; then
+            ERROR failed running dorado aligner
+            continue
+        fi
+
+        # check output integrity
+        if ! samtools quickcheck -u $output_dir/dorado-$i.sam 2>err; then
+            ERROR failed sam check
+            continue
+        fi
+
+        # sort and cut output for comparison
+        filter_header="grep -ve ^@PG -e ^@HD"
+        sort $output_dir/dorado-$i.sam | $filter_header | cut -f-11> $output_dir/dorado-$i.ssam
+
+        # compare with minimap2 output
+        if $MM2 -a $opt $REF $RDS 2>err > $output_dir/minimap2-$i.sam; then
+            sort $output_dir/minimap2-$i.sam | $filter_header | cut -f-11 > $output_dir/minimap2-$i.ssam
+            if ! diff $output_dir/dorado-$i.ssam $output_dir/minimap2-$i.ssam > err; then
+                ERROR failed comparison with minimap2 output
+                continue
+            fi
+        else
+            SKIP skipped
+            continue
+        fi
+
+        # check output changed
+        should_change=${CHANGES[$i]}
+        if diff $output_dir/dorado-$i.ssam $output_dir/dorado-0.ssam > err; then
+            does_change=false
+        else
+            does_change=true
+        fi
+        if [[ $should_change != $does_change ]]; then
+            $should_change && ERROR failed to change output || ERROR failed to preserve output
+            continue
+        fi
+
+        echo success
+    done
+    $RETURN
+)
+dorado_aligner_options_test
+
 if ! uname -r | grep -q tegra; then
     echo dorado duplex basespace test stage
     $dorado_bin duplex basespace $data_dir/basespace/pairs.bam --threads 1 --pairs $data_dir/basespace/pairs.txt > $output_dir/calls.bam
@@ -91,8 +160,8 @@ fi
 
 echo dorado demux test stage
 $dorado_bin demux $data_dir/barcode_demux/double_end_variant/EXP-PBC096_BC04.fastq --kit-name EXP-PBC096 --output-dir $output_dir/demux
-samtools quickcheck -u $output_dir/demux/EXP-PBC096_BC04.bam
-num_demuxed_reads=$(samtools view -c $output_dir/demux/EXP-PBC096_BC04.bam)
+samtools quickcheck -u $output_dir/demux/EXP-PBC096_barcode04.bam
+num_demuxed_reads=$(samtools view -c $output_dir/demux/EXP-PBC096_barcode04.bam)
 if [[ $num_demuxed_reads -ne "3" ]]; then
     echo "3 demuxed reads expected. Found ${num_demuxed_reads}"
     exit 1
@@ -113,8 +182,8 @@ samtools quickcheck -u $output_dir/read_group_test.bam
 mkdir $output_dir/read_group_test
 samtools split -u $output_dir/read_group_test/unknown.bam -f "$output_dir/read_group_test/rg_%!.bam" $output_dir/read_group_test.bam
 # There should be 4 reads with BC01, 3 with BC04, and 2 unclassified groups.
-expected_read_groups_BC01=4
-expected_read_groups_BC04=3
+expected_read_groups_barcode01=4
+expected_read_groups_barcode04=3
 expected_read_groups_unclassified=2
 for bam in $output_dir/read_group_test/rg_*.bam; do
     if [[ $bam =~ "_SQK-RBK114-96_" ]]; then

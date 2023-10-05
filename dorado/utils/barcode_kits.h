@@ -20,4 +20,7 @@ const std::unordered_map<std::string, KitInfo>& get_kit_infos();
 const std::unordered_map<std::string, std::string>& get_barcodes();
 std::string barcode_kits_list_str();
 
+std::string generate_standard_barcode_name(const std::string& kit_name,
+                                           const std::string& barcode_name);
+
 }  // namespace dorado::barcode_kits

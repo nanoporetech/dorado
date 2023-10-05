@@ -159,7 +159,7 @@ void BasecallerNode::working_reads_manager() {
             // Update stats.
             ++m_called_reads_pushed;
             m_num_bases_processed += read_common_data.seq.length();
-            m_num_samples_processed += read_common_data.raw_data.size(0);
+            m_num_samples_processed += read_common_data.get_raw_data_samples();
 
             // Chunks have ownership of the working read, so destroy them to avoid a leak.
             working_read->called_chunks.clear();

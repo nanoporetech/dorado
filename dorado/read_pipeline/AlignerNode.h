@@ -15,8 +15,24 @@ namespace dorado {
 
 class Aligner : public MessageSink {
 public:
+    struct Minimap2Options {
+        short kmer_size;
+        short window_size;
+        uint64_t index_batch_size;
+        bool print_secondary;
+        int best_n_secondary;
+        int bandwidth;
+        int bandwidth_long;
+        bool soft_clipping;
+        bool secondary_seq;
+        bool print_aln_seq;
+    };
+    static constexpr Minimap2Options dflt_options{15,  10,    16000000000ull, true,  5,
+                                                  500, 20000, false,          false, false};
+
+public:
     // header_sequence_records is populated by the constructor.
-    Aligner(const std::string& filename, int k, int w, uint64_t index_batch_size, int threads);
+    Aligner(const std::string& filename, const Minimap2Options& options, int threads);
     ~Aligner();
     std::string get_name() const override { return "Aligner"; }
     stats::NamedStats sample_stats() const override;

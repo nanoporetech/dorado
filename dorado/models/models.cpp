@@ -263,6 +263,7 @@ bool download_models(const std::string& target_directory, const std::string& sel
     fs::path directory(target_directory);
 
     httplib::Client http(urls::URL_ROOT);
+    http.enable_server_certificate_verification(false);
     http.set_follow_location(true);
 
     const char* proxy_url = getenv("dorado_proxy");
@@ -286,9 +287,9 @@ bool download_models(const std::string& target_directory, const std::string& sel
                 const std::string model_str(model);
                 auto url = urls::URL_ROOT + urls::URL_PATH + model_str + ".zip";
                 spdlog::info(" - downloading {}", model);
-                auto res = http.Get(url.c_str());
-                if (res == nullptr) {
-                    spdlog::error("Failed to download {}", model);
+                httplib::Result res = http.Get(url.c_str());
+                if (!res) {
+                    spdlog::error("Failed to download {}: {}", model, to_string(res.error()));
                     success = false;
                     continue;
                 }
@@ -353,7 +354,9 @@ std::string get_modification_model(const std::string& simplex_model,
 
     auto modification_path = model_dir / fs::path{modification_model};
     if (!fs::exists(modification_path)) {
-        download_models(model_dir.u8string(), modification_model);
+        if (!download_models(model_dir.u8string(), modification_model)) {
+            throw std::runtime_error("Failed to download model: " + modification_model);
+        }
     }
 
     return modification_path.u8string();

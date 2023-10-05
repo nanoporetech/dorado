@@ -214,7 +214,7 @@ TEST_CASE(
     read->read_common.moves = moves;
 
     // Generate mod prob table so only the first A after the front flank has a mod.
-    const std::string mod_alphabet = "AXCGT";
+    const std::vector<std::string> mod_alphabet = {"A", "a", "C", "G", "T"};
     read->read_common.mod_base_info =
             std::make_shared<dorado::ModBaseInfo>(mod_alphabet, "6mA", "");
     read->read_common.base_mod_probs =
@@ -258,7 +258,7 @@ TEST_CASE(
 
     CHECK(messages.size() == 3);
 
-    const std::string expected_bc = "SQK-RPB004_BC01";
+    const std::string expected_bc = "SQK-RPB004_barcode01";
     std::vector<uint8_t> expected_move_vals;
     for (int i = 0; i < nonbc_seq.length(); i++) {
         expected_move_vals.push_back(1);
@@ -315,4 +315,40 @@ TEST_CASE(
             auto [mod_str, mod_probs] = dorado::utils::extract_modbase_info(rec.get());
         }
     }
+}
+
+TEST_CASE("BarcodeClassifierNode: test reads where trim length == read length", TEST_GROUP) {
+    using Catch::Matchers::Equals;
+
+    dorado::PipelineDescriptor pipeline_desc;
+    std::vector<dorado::Message> messages;
+    auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
+    std::vector<std::string> kits = {"SQK-RBK114-96"};
+    bool barcode_both_ends = false;
+    bool no_trim = false;
+    auto classifier = pipeline_desc.add_node<BarcodeClassifierNode>({sink}, 8, kits,
+                                                                    barcode_both_ends, no_trim);
+
+    auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
+    fs::path data_dir = fs::path(get_data_dir("barcode_demux"));
+    auto bc_file = data_dir / "no_trim_expected.fastq";
+
+    // Only one read in the file, so fetch that.
+    HtsReader reader(bc_file.string());
+    reader.read();
+
+    // Fetch the original read before barcode trimming.
+    auto orig_seq =
+            dorado::utils::extract_sequence(reader.record.get(), reader.record.get()->core.l_qseq);
+
+    pipeline->push_message(std::move(reader.record));
+    pipeline->terminate(DefaultFlushOptions());
+
+    CHECK(messages.size() == 1);
+
+    auto read = std::get<BamPtr>(std::move(messages[0]));
+    auto seq = dorado::utils::extract_sequence(read.get(), read.get()->core.l_qseq);
+
+    // We don't expect any trimming to happen, so the original and final sequence must match.
+    CHECK(seq == orig_seq);
 }

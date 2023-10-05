@@ -196,22 +196,22 @@ void require_sam_tag_B_int_matches(const uint8_t* aux, const std::vector<int64_t
 }
 
 TEST_CASE(TEST_GROUP ": Methylation tag generation", TEST_GROUP) {
-    std::string modbase_alphabet = "AXCYGT";
+    std::vector<std::string> modbase_alphabet = {"A", "a", "C", "m", "G", "T"};
     std::string modbase_long_names = "6mA 5mC";
     std::vector<uint8_t> modbase_probs = {
-            235, 20,  0,   0,   0,   0,    // A 6ma (weak call)
+            235, 20,  0,   0,   0,   0,    // A 6mA (weak call)
             0,   0,   255, 0,   0,   0,    // C
             255, 0,   0,   0,   0,   0,    // A
             0,   0,   0,   0,   255, 0,    // G
             0,   0,   0,   0,   0,   255,  // T
             0,   0,   0,   0,   255, 0,    // G
-            1,   254, 0,   0,   0,   0,    // A 6ma
-            0,   0,   3,   252, 0,   0,    // C 5ma
+            1,   254, 0,   0,   0,   0,    // A 6mA
+            0,   0,   3,   252, 0,   0,    // C 5mC
             0,   0,   0,   0,   0,   255,  // T
             255, 0,   0,   0,   0,   0,    // A
             255, 0,   0,   0,   0,   0,    // A
             255, 0,   0,   0,   0,   0,    // A
-            0,   0,   3,   252, 0,   0,    // C 6ma
+            0,   0,   3,   252, 0,   0,    // C 5mC
             0,   0,   0,   0,   0,   255,  // T
             0,   0,   255, 0,   0,   0,    // C
     };
@@ -260,12 +260,14 @@ TEST_CASE(TEST_GROUP ": Methylation tag generation", TEST_GROUP) {
     }
 
     SECTION("Test generation using CHEBI codes") {
-        std::string modbase_long_names_CHEBI = "55555 12345";
+        auto modbase_alphabet_CHEBI = modbase_alphabet;
+        modbase_alphabet_CHEBI[1] = "55555";
+        modbase_alphabet_CHEBI[3] = "12345";
         const char* expected_methylation_tag_CHEBI = "A+55555.,2;C+12345.,1,0;";
         std::vector<int64_t> expected_methylation_tag_CHEBI_prob{254, 252, 252};
 
-        read_common.mod_base_info = std::make_shared<dorado::ModBaseInfo>(
-                modbase_alphabet, modbase_long_names_CHEBI, "");
+        read_common.mod_base_info = std::make_shared<dorado::ModBaseInfo>(modbase_alphabet_CHEBI,
+                                                                          modbase_long_names, "");
         auto lines = read_common.extract_sam_lines(false, 50);
         REQUIRE(!lines.empty());
         bam1_t* aln = lines[0].get();
@@ -308,10 +310,12 @@ TEST_CASE(TEST_GROUP ": Methylation tag generation", TEST_GROUP) {
     }
 
     SECTION("Test handling of incorrect base names") {
-        std::string modbase_long_names_unknown = "12mA 5mq";
+        auto modbase_alphabet_unknown = modbase_alphabet;
+        modbase_alphabet_unknown[1] = "12mA";
+        modbase_alphabet_unknown[3] = "mq";
 
-        read_common.mod_base_info = std::make_shared<dorado::ModBaseInfo>(
-                modbase_alphabet, modbase_long_names_unknown, "");
+        read_common.mod_base_info = std::make_shared<dorado::ModBaseInfo>(modbase_alphabet_unknown,
+                                                                          modbase_long_names, "");
         auto lines = read_common.extract_sam_lines(false, 50);
         REQUIRE(!lines.empty());
         bam1_t* aln = lines[0].get();
