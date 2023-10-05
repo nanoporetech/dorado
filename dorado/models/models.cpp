@@ -242,6 +242,90 @@ std::string calculate_checksum(std::string_view data) {
     return std::move(checksum).str();
 }
 
+class ModelDownloader {
+    const std::string m_model;
+    const fs::path m_directory;
+    const fs::path m_archive;
+    const ModelInfo m_info;
+
+    std::string get_url() const { return urls::URL_ROOT + urls::URL_PATH + m_model + ".zip"; }
+
+    void extract() {
+        elz::extractZip(m_archive, m_directory);
+        fs::remove(m_archive);
+    }
+
+    bool download_httplib(httplib::Client& http) {
+        spdlog::info(" - downloading {} with httplib", m_model);
+        httplib::Result res = http.Get(get_url());
+        if (!res) {
+            spdlog::error("Failed to download {}: {}", m_model, to_string(res.error()));
+            return false;
+        }
+
+        // Check that this matches the hash we expect.
+        const auto checksum = calculate_checksum(res->body);
+        if (checksum != m_info.checksum) {
+            spdlog::error("Model download failed checksum validation: {} - {} != {}", m_model,
+                          checksum, m_info.checksum);
+            return false;
+        }
+
+        // Save it.
+        std::ofstream archive(m_archive.string(), std::ofstream::binary);
+        archive << res->body;
+        archive.close();
+        return true;
+    }
+
+    bool download_curl() {
+        spdlog::info(" - downloading {} with curl", m_model);
+
+        // Note: it's safe to call system() here since we're only going to be called with known models.
+        std::string args = "curl -L " + get_url() + " -o " + m_archive.string();
+        errno = 0;
+        int ret = system(args.c_str());
+        if (ret != 0) {
+            spdlog::error("Failed to download {}: ret={}, errno={}", m_model, ret, errno);
+            return false;
+        }
+
+        // Load it back in and checksum it.
+        // Note: there's TOCTOU issues here wrt the download above, and the file_size() call.
+        std::ifstream archive(m_archive.string(), std::ofstream::binary);
+        std::string buffer;
+        buffer.resize(fs::file_size(m_archive));
+        archive.read(buffer.data(), buffer.size());
+        archive.close();
+
+        const auto checksum = calculate_checksum(buffer);
+        if (checksum != m_info.checksum) {
+            spdlog::error("Model download failed checksum validation: {} - {} != {}", m_model,
+                          checksum, m_info.checksum);
+            return false;
+        }
+        return true;
+    }
+
+public:
+    ModelDownloader(std::string_view model, fs::path directory, ModelInfo info)
+            : m_model(model),
+              m_directory(std::move(directory)),
+              m_archive(m_directory / (m_model + ".zip")),
+              m_info(std::move(info)) {}
+
+    bool download(httplib::Client& http) {
+        // Try and download using httplib, falling back on curl.
+        if (!download_httplib(http) && !download_curl()) {
+            return false;
+        }
+
+        // Extract it.
+        extract();
+        return true;
+    }
+};
+
 }  // namespace
 
 const ModelMap& simplex_models() { return simplex::models; }
@@ -316,33 +400,10 @@ bool download_models(const std::string& target_directory, const std::string& sel
     auto download_model_set = [&](const ModelMap& models) {
         for (const auto& [model, info] : models) {
             if (selected_model == "all" || selected_model == model) {
-                // TIL operator+ doesn't exist for string and string_view -_-
-                const std::string model_str(model);
-                auto url = urls::URL_ROOT + urls::URL_PATH + model_str + ".zip";
-                spdlog::info(" - downloading {}", model);
-                httplib::Result res = http.Get(url.c_str());
-                if (!res) {
-                    spdlog::error("Failed to download {}: {}", model, to_string(res.error()));
+                ModelDownloader downloader(model, directory, info);
+                if (!downloader.download(http)) {
                     success = false;
-                    continue;
                 }
-
-                // Check that this matches the hash we expect.
-                const auto checksum = calculate_checksum(res->body);
-                if (checksum != info.checksum) {
-                    spdlog::error("Model download failed checksum validation: {} - {} != {}", model,
-                                  checksum, info.checksum);
-                    success = false;
-                    continue;
-                }
-
-                // Save and extract it.
-                fs::path archive(directory / (model_str + ".zip"));
-                std::ofstream ofs(archive.string(), std::ofstream::binary);
-                ofs << res->body;
-                ofs.close();
-                elz::extractZip(archive, directory);
-                fs::remove(archive);
             }
         }
     };
