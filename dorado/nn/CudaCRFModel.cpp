@@ -49,13 +49,13 @@ public:
         // Batch size will be rounded up to a multiple of batch_size_granularity, regardless of
         // user choice. This makes sure batch size is compatible with GPU kernels.
         if (batch_size == 0) {
-            m_batch_size = auto_batch_size(model_config, chunk_size, memory_limit_fraction);
+            m_batch_size = determine_batch_size(model_config, chunk_size, memory_limit_fraction);
         } else {
             int batch_size_granularity = get_batch_size_granularity(model_config, m_options);
             m_batch_size = utils::pad_to(batch_size, batch_size_granularity);
             // Make sure the requested batch size doesn't exceed the maximum for the memory available.
             auto max_batch_size =
-                    auto_batch_size(model_config, chunk_size, memory_limit_fraction, false);
+                    determine_batch_size(model_config, chunk_size, memory_limit_fraction, false);
             if (m_batch_size > max_batch_size) {
                 spdlog::warn(
                         "Specified batch size {} exceeds maximum batch size based on available "
@@ -94,10 +94,10 @@ public:
         return 64;
     }
 
-    int auto_batch_size(const dorado::CRFModelConfig &model_config,
-                        int chunk_size_in,
-                        float memory_limit_fraction,
-                        bool run_benchmark = true) {
+    int determine_batch_size(const dorado::CRFModelConfig &model_config,
+                             int chunk_size_in,
+                             float memory_limit_fraction,
+                             bool run_benchmark = true) {
 #ifdef DORADO_TX2
         return 256;
 #else
@@ -148,11 +148,9 @@ public:
         }
 
         int max_batch_size = available / (bytes_per_chunk_timestep * chunk_size_out);
-        if (max_batch_size < utils::pad_to(128, granularity) + granularity) {
-            spdlog::warn(
-                    "Auto batchsize detection failed. Maximum safe estimated batch size is only "
-                    "{}.",
-                    max_batch_size);
+        max_batch_size -= max_batch_size % granularity;
+        if (max_batch_size < granularity) {
+            spdlog::warn("Maximum safe estimated batch size is only {}.", max_batch_size);
             return granularity;
         }
 
@@ -197,9 +195,7 @@ public:
                 }
             }
         } else {
-            spdlog::debug(
-                    "Auto batch size: testing disabled. Maximum safe estimated batch size is {}",
-                    max_batch_size);
+            spdlog::debug("Maximum safe estimated batch size is {}", max_batch_size);
             best_batch_size = max_batch_size;
         }
 
