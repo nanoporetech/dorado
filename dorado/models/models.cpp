@@ -278,6 +278,40 @@ bool download_models(const std::string& target_directory, const std::string& sel
         http.set_proxy(proxy_url, proxy_port);
     }
 
+    const char* cert_file_path = getenv("dorado_cert_file_path");
+#ifdef __linux__
+    if (!cert_file_path) {
+        // We link to a static Ubuntu build of OpenSSL so it's expecting certs to be where Ubuntu puts them.
+        // For other distributions they may not be in the same place or have the same name.
+        if (fs::exists("/etc/os-release")) {
+            std::ifstream os_release("/etc/os-release");
+            std::string line;
+            while (std::getline(os_release, line)) {
+                if (line.rfind("ID=", 0) == 0) {
+                    if (line.find("ubuntu") != line.npos || line.find("debian") != line.npos) {
+                        // httplib will treat this as "use the default".
+                        cert_file_path = "";
+                    } else if (line.find("centos") != line.npos) {
+                        cert_file_path = "/etc/ssl/certs/ca-bundle.crt";
+                    }
+                    if (cert_file_path && cert_file_path[0] != '\0') {
+                        spdlog::info("Assuming cert location is {}", cert_file_path);
+                        break;
+                    }
+                }
+            }
+        }
+        if (!cert_file_path) {
+            spdlog::warn(
+                    "Unknown certs location for current distribution. If you hit download issues, "
+                    "use the envvar `dorado_cert_file_path` to specify the location manually.");
+        }
+    }
+#endif
+    if (cert_file_path) {
+        http.set_ca_cert_path(cert_file_path);
+    }
+
     bool success = true;
     auto download_model_set = [&](const ModelMap& models) {
         for (const auto& [model, info] : models) {
