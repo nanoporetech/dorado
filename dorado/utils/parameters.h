@@ -37,6 +37,7 @@ struct ThreadAllocations {
     int read_filter_threads{0};
     int remora_threads{0};
     int scaler_node_threads{0};
+    int splitter_node_threads{0};
     int loader_threads{0};
     int aligner_threads{0};
     int barcoder_threads{0};
