@@ -49,7 +49,8 @@ public:
         // Batch size will be rounded up to a multiple of batch_size_granularity, regardless of
         // user choice. This makes sure batch size is compatible with GPU kernels.
         if (batch_size == 0) {
-            m_batch_size = determine_batch_size(model_config, chunk_size, memory_limit_fraction);
+            m_batch_size =
+                    determine_batch_size(model_config, chunk_size, memory_limit_fraction, true);
         } else {
             int batch_size_granularity = get_batch_size_granularity(model_config, m_options);
             m_batch_size = utils::pad_to(batch_size, batch_size_granularity);
@@ -97,7 +98,7 @@ public:
     int determine_batch_size(const dorado::CRFModelConfig &model_config,
                              int chunk_size_in,
                              float memory_limit_fraction,
-                             bool run_benchmark = true) {
+                             bool run_benchmark) {
 #ifdef DORADO_TX2
         return 256;
 #else
