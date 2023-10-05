@@ -1,7 +1,6 @@
 #include "PairingNode.h"
 
-#include "minimap.h"
-
+#include <minimap.h>
 #include <nvtx3/nvtx3.hpp>
 #include <spdlog/spdlog.h>
 

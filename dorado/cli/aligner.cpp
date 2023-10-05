@@ -1,6 +1,5 @@
 #include "Version.h"
 #include "cli/cli_utils.h"
-#include "minimap.h"
 #include "read_pipeline/AlignerNode.h"
 #include "read_pipeline/HtsReader.h"
 #include "read_pipeline/HtsWriter.h"
@@ -10,6 +9,7 @@
 #include "utils/stats.h"
 
 #include <argparse.hpp>
+#include <minimap.h>
 #include <spdlog/spdlog.h>
 
 #include <algorithm>

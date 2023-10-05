@@ -2,10 +2,10 @@
 
 #include "htslib/bgzf.h"
 #include "htslib/kroundup.h"
-#include "htslib/sam.h"
 #include "read_pipeline/ReadPipeline.h"
 #include "utils/sequence_utils.h"
 
+#include <htslib/sam.h>
 #include <indicators/progress_bar.hpp>
 #include <spdlog/spdlog.h>
 
