@@ -54,5 +54,3 @@ static std::vector<uint8_t> ReadFileIntoVector(const std::filesystem::path& path
 #define get_split_data_dir() get_data_dir("split")
 
 #define get_aligner_data_dir() get_data_dir("aligner_test")
-
-#define get_beam_search_data_dir() get_data_dir("beam_search")

@@ -20,8 +20,8 @@ namespace {
 // 16 bit state supports 7-mers with 4 bases.
 typedef uint16_t state_t;
 
-constexpr int kNumBaseBits = 2;
-constexpr int kNumBases = 1 << kNumBaseBits;
+constexpr int NUM_BASE_BITS = 2;
+constexpr int NUM_BASES = 1 << NUM_BASE_BITS;
 
 // This is the data we need to retain for the whole beam
 struct BeamElement {
@@ -45,10 +45,10 @@ float log_sum_exp(float x, float y, float t) {
 }
 
 int get_num_states(size_t num_trans_states) {
-    if (num_trans_states % kNumBases != 0) {
+    if (num_trans_states % NUM_BASES != 0) {
         throw std::runtime_error("Unexpected number of transition states in beam search decode.");
     }
-    return int(num_trans_states / kNumBases);
+    return int(num_trans_states / NUM_BASES);
 }
 
 std::tuple<std::string, std::string> generate_sequence(const std::vector<uint8_t>& moves,
@@ -127,7 +127,7 @@ float beam_search(const T* const scores,
     }
 
     // Some values we need
-    constexpr uint64_t hash_seed = 0x880355f21e6d1965ULL;
+    constexpr uint64_t HASH_SEED = 0x880355f21e6d1965ULL;
     const float log_beam_cut =
             (beam_cut > 0.0f) ? (temperature * logf(beam_cut)) : std::numeric_limits<float>::max();
 
@@ -135,8 +135,8 @@ float beam_search(const T* const scores,
     std::vector<BeamElement> beam_vector(max_beam_width * (num_blocks + 1));
 
     // Create the previous and current beam fronts
-    // Each existing element can be extended by one of kNumBases, or be a stay.
-    size_t max_beam_candidates = (kNumBases + 1) * max_beam_width;
+    // Each existing element can be extended by one of NUM_BASES, or be a stay.
+    size_t max_beam_candidates = (NUM_BASES + 1) * max_beam_width;
 
     std::vector<BeamFrontElement> current_beam_front(max_beam_candidates);
     std::vector<BeamFrontElement> prev_beam_front(max_beam_candidates);
@@ -163,7 +163,7 @@ float beam_search(const T* const scores,
          state++) {
         if (back_guide[state] >= beam_init_threshold) {
             // Note that this first element has a prev_element_index of 0
-            prev_beam_front[beam_element] = {fasthash::chainfasthash64(hash_seed, state),
+            prev_beam_front[beam_element] = {fasthash::chainfasthash64(HASH_SEED, state),
                                              static_cast<state_t>(state), 0, false};
             prev_scores[beam_element] = 0.0f;
             ++beam_element;
@@ -208,9 +208,9 @@ float beam_search(const T* const scores,
         // Essentially a k=1 Bloom filter, indicating the presence of steps with particular
         // sequence hashes.  Avoids comparing stay hashes against all possible progenitor
         // states where none of them has the requisite sequence hash.
-        const uint64_t kHashPresentBits = 4096;
-        const uint64_t kHashPresentMask = kHashPresentBits - 1;
-        std::bitset<kHashPresentBits> step_hash_present;  // Default constructor zeros content.
+        const uint64_t HASH_PRESENT_BITS = 4096;
+        const uint64_t HASH_PRESENT_MASK = HASH_PRESENT_BITS - 1;
+        std::bitset<HASH_PRESENT_BITS> step_hash_present;  // Default constructor zeros content.
 
         // Generate list of candidate elements for this timestep (block).
         // As we do so, update the maximum score.
@@ -219,17 +219,17 @@ float beam_search(const T* const scores,
             const auto& previous_element = prev_beam_front[prev_elem_idx];
 
             // Expand all the possible steps
-            for (size_t new_base = 0; new_base < kNumBases; new_base++) {
+            for (size_t new_base = 0; new_base < NUM_BASES; new_base++) {
                 state_t new_state =
-                        (state_t((previous_element.state << kNumBaseBits) & states_mask) |
+                        (state_t((previous_element.state << NUM_BASE_BITS) & states_mask) |
                          new_base);
                 const auto move_idx = static_cast<state_t>(
-                        (new_state << kNumBaseBits) +
-                        (((previous_element.state << kNumBaseBits) >> num_state_bits)));
+                        (new_state << NUM_BASE_BITS) +
+                        (((previous_element.state << NUM_BASE_BITS) >> num_state_bits)));
                 float new_score = prev_scores[prev_elem_idx] + fetch_block_score(move_idx) +
                                   static_cast<float>(block_back_scores[new_state]);
                 uint64_t new_hash = fasthash::chainfasthash64(previous_element.hash, new_state);
-                step_hash_present[new_hash & kHashPresentMask] = true;
+                step_hash_present[new_hash & HASH_PRESENT_MASK] = true;
 
                 // Add new element to the candidate list
                 current_beam_front[new_elem_count] = {new_hash, new_state, (uint8_t)prev_elem_idx,
@@ -252,8 +252,8 @@ float beam_search(const T* const scores,
 
             // Determine whether the path including this stay duplicates another sequence ending in
             // a step.
-            if (step_hash_present[previous_element.hash & kHashPresentMask]) {
-                size_t stay_elem_idx = (current_beam_width << kNumBaseBits) + prev_elem_idx;
+            if (step_hash_present[previous_element.hash & HASH_PRESENT_MASK]) {
+                size_t stay_elem_idx = (current_beam_width << NUM_BASE_BITS) + prev_elem_idx;
                 // latest base is in smallest bits
                 int stay_latest_base = int(previous_element.state & 3);
 
@@ -261,7 +261,7 @@ float beam_search(const T* const scores,
                 // their hashes, merging if we find any.
                 for (size_t prev_elem_comp_idx = 0; prev_elem_comp_idx < current_beam_width;
                      prev_elem_comp_idx++) {
-                    size_t step_elem_idx = (prev_elem_comp_idx << kNumBaseBits) | stay_latest_base;
+                    size_t step_elem_idx = (prev_elem_comp_idx << NUM_BASE_BITS) | stay_latest_base;
                     if (current_beam_front[stay_elem_idx].hash ==
                         current_beam_front[step_elem_idx].hash) {
                         if (current_scores[stay_elem_idx] > current_scores[step_elem_idx]) {
@@ -299,8 +299,9 @@ float beam_search(const T* const scores,
             const float* score_ptr = current_scores.data();
 #if !ENABLE_NEON_IMPL
             for (int i = new_elem_count; i; --i) {
-                if (*score_ptr >= beam_cutoff_score)
+                if (*score_ptr >= beam_cutoff_score) {
                     ++elem_count;
+                }
                 ++score_ptr;
             }
 #else
@@ -327,8 +328,9 @@ float beam_search(const T* const scores,
             // Add together the result of 2 horizontal adds.
             elem_count = vaddvq_u32(counts_x4_a) + vaddvq_u32(counts_x4_b);
             for (int i = new_elem_count % kUnroll; i; --i) {
-                if (*score_ptr >= beam_cutoff_score)
+                if (*score_ptr >= beam_cutoff_score) {
                     ++elem_count;
+                }
                 ++score_ptr;
             }
 #endif
@@ -435,12 +437,12 @@ float beam_search(const T* const scores,
     }
     moves[0] = 1;  // Always step in the first event
 
-    int shifted_states[2 * kNumBases];
+    int shifted_states[2 * NUM_BASES];
 
     // Compute per-base qual data
     for (size_t block_idx = 0; block_idx < num_blocks; ++block_idx) {
         int state = states[block_idx];
-        states[block_idx] = states[block_idx] % kNumBases;
+        states[block_idx] = states[block_idx] % NUM_BASES;
         int base_to_emit = states[block_idx];
 
         // Compute a probability for this block, based on the path kmer. See the following explanation:
@@ -450,11 +452,11 @@ float beam_search(const T* const scores,
         float block_prob = float(timestep_posts[state]);
 
         // Get indices of left- and right-shifted kmers
-        int l_shift_idx = state >> kNumBaseBits;
-        int r_shift_idx = (state << kNumBaseBits) % num_states;
-        int msb = int(num_states) >> kNumBaseBits;
+        int l_shift_idx = state >> NUM_BASE_BITS;
+        int r_shift_idx = (state << NUM_BASE_BITS) % num_states;
+        int msb = int(num_states) >> NUM_BASE_BITS;
         int l_shift_state, r_shift_state;
-        for (int shift_base = 0; shift_base < kNumBases; ++shift_base) {
+        for (int shift_base = 0; shift_base < NUM_BASES; ++shift_base) {
             l_shift_state = l_shift_idx + msb * shift_base;
             shifted_states[2 * shift_base] = l_shift_state;
 
@@ -464,7 +466,7 @@ float beam_search(const T* const scores,
 
         // Add probabilities for unique states
         int candidate_state;
-        for (size_t state_idx = 0; state_idx < 2 * kNumBases; ++state_idx) {
+        for (size_t state_idx = 0; state_idx < 2 * NUM_BASES; ++state_idx) {
             candidate_state = shifted_states[state_idx];
             // don't double-count this shifted state if it matches the current state
             bool count_state = (candidate_state != state);
@@ -488,8 +490,8 @@ float beam_search(const T* const scores,
         // Calculate a placeholder qscore for the "wrong" bases
         float wrong_base_prob = (1.0f - block_prob) / 3.0f;
 
-        for (size_t base = 0; base < kNumBases; base++) {
-            qual_data[block_idx * kNumBases + base] =
+        for (size_t base = 0; base < NUM_BASES; base++) {
+            qual_data[block_idx * NUM_BASES + base] =
                     (int(base) == base_to_emit ? block_prob : wrong_base_prob);
         }
     }
@@ -530,7 +532,7 @@ std::tuple<std::string, std::string, std::vector<uint8_t>> beam_search_decode(
 
     std::vector<int32_t> states(num_blocks);
     std::vector<uint8_t> moves(num_blocks);
-    std::vector<float> qual_data(num_blocks * kNumBases);
+    std::vector<float> qual_data(num_blocks * NUM_BASES);
 
     const size_t scores_block_stride = scores_block_contig.stride(0);
     if (scores_t.dtype() == torch::kFloat32) {
