@@ -274,12 +274,18 @@ if (DORADO_ENABLE_PCH)
 endif()
 
 target_link_libraries(dorado_lib
-    ${TORCH_LIBRARIES}
+    PRIVATE
     ${KOI_LIBRARIES}
+)
+
+target_link_libraries(dorado_lib
+    PUBLIC
+    ${TORCH_LIBRARIES}
     htslib
     vbz_hdf_plugin
     edlib
     date::date
+    minimap2
     dorado_utils
 )
 
@@ -440,16 +446,22 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     )
 
     target_link_libraries(dorado_io_lib
-       ${POD5_LIBRARIES}
-       ${HDF5_C_LIBRARIES}
-       ${CMAKE_DL_LIBS}
-       date::date
-       dorado_lib
+        PRIVATE
+        ${POD5_LIBRARIES}
+        ${HDF5_C_LIBRARIES}
+        ${CMAKE_DL_LIBS}
+        date::date
+    )
+
+    target_link_libraries(dorado_io_lib
+        PUBLIC
+        dorado_lib
     )
 
     if(WIN32)
         target_link_libraries(dorado_io_lib
-           ${ZLIB_LIBRARIES}
+            PRIVATE
+            ${ZLIB_LIBRARIES}
         )
     endif()
 
@@ -482,6 +494,5 @@ if (GENERATE_TEST_COVERAGE)
             BASE_DIRECTORY "${PROJECT_SOURCE_DIR}"
             EXCLUDE "${PROJECT_SOURCE_DIR}/dorado/3rdparty/*" "${PROJECT_SOURCE_DIR}/tests/*"
             )
-        target_link_libraries(dorado_tests gcov)
     endif()
 endif()
