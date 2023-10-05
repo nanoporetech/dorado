@@ -3,6 +3,9 @@ include:
 
 workflow:
   rules:
+    # If a new commit is pushed to the branch but an MR is already opened, don't run a "push" pipeline because
+    # the merge request train setting will trigger a "merge_request_event" pipeline anyway.
+    # In all other cases, run the pipeline.
     - if: $CI_PIPELINE_SOURCE == 'push' && $CI_OPEN_MERGE_REQUESTS
       when: never
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
