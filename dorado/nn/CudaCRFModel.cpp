@@ -149,7 +149,7 @@ public:
 
         int max_batch_size = available / (bytes_per_chunk_timestep * chunk_size_out);
         max_batch_size -= max_batch_size % granularity;
-        if (max_batch_size < granularity) {
+        if (max_batch_size <= granularity) {
             spdlog::warn("Maximum safe estimated batch size is only {}.", max_batch_size);
             return granularity;
         }
