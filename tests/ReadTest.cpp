@@ -350,7 +350,7 @@ TEST_CASE(TEST_GROUP ": Test mean q-score generation", TEST_GROUP) {
 
     SECTION("Check with start pos > 0") {
         read_common.mean_qscore_start_pos = 2;
-        CHECK(read_common.calculate_mean_qscore() == Approx(14.9691f));
+        CHECK(read_common.calculate_mean_qscore() == Approx(14.0f));
     }
 
     SECTION("Check start pos > qstring length returns 0.f") {

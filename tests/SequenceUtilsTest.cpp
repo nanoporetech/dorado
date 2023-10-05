@@ -77,7 +77,7 @@ TEST_CASE(TEST_GROUP "mean_q_score from non-zero start position") {
     CHECK(dorado::utils::mean_qscore_from_qstring("") == 0.0f);
 
     auto [str, start_pos, score] = GENERATE(table<std::string, int, float>(
-            {make_tuple("####%%%%", 0, 2.88587f), make_tuple("####%%%%", 4, 7.0103f)}));
+            {make_tuple("####%%%%", 0, 2.88587f), make_tuple("####%%%%", 4, 4.0f)}));
     CHECK(dorado::utils::mean_qscore_from_qstring(str, start_pos) == Approx(score));
 
     CHECK_THROWS_AS(dorado::utils::mean_qscore_from_qstring("####", 10), std::runtime_error);

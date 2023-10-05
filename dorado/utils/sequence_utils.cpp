@@ -155,7 +155,7 @@ float mean_qscore_from_qstring(const std::string& qstring, int start_pos) {
     float total_error =
             std::accumulate(qstring.cbegin() + start_pos, qstring.cend(), 0.0f,
                             [](float sum, char qchar) { return sum + kCharToScoreTable[qchar]; });
-    float mean_error = total_error / static_cast<float>(qstring.size());
+    float mean_error = total_error / static_cast<float>(qstring.size() - start_pos);
     float mean_qscore = -10.0f * std::log10(mean_error);
     return std::clamp(mean_qscore, 1.0f, 50.0f);
 }
