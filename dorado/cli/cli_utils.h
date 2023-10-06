@@ -197,7 +197,7 @@ void add_minimap2_arguments(ArgParser& parser, const Options& dflt) {
             .default_value(false)
             .implicit_value(true);
 
-    parser.visible.add_argument("-r")
+    parser.visible.add_argument("--bandwidth")
             .help("minimap2 chaining/alignment bandwidth and optionally long-join bandwidth "
                   "specified as NUM,[NUM]")
             .default_value(to_size(dflt.bandwidth) + "," + to_size(dflt.bandwidth_long));
@@ -236,7 +236,7 @@ Options process_minimap2_arguments(const ArgParser& parser, const Options& dflt)
         res.print_secondary = false;
         res.best_n_secondary = dflt.best_n_secondary;
     }
-    auto bandwidth = cli::parse_string_to_sizes(parser.visible.get<std::string>("r"));
+    auto bandwidth = cli::parse_string_to_sizes(parser.visible.get<std::string>("--bandwidth"));
     switch (bandwidth.size()) {
     case 1:
         res.bandwidth = bandwidth[0];
