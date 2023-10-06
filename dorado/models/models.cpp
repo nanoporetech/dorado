@@ -326,6 +326,54 @@ public:
     }
 };
 
+void set_ssl_cert_file() {
+#ifndef _WIN32
+    // Allow the user to override this.
+    if (getenv("SSL_CERT_FILE") != nullptr) {
+        return;
+    }
+
+    // Try and find the cert location.
+    const char* ssl_cert_file = nullptr;
+#ifdef __linux__
+    // We link to a static Ubuntu build of OpenSSL so it's expecting certs to be where Ubuntu puts them.
+    // For other distributions they may not be in the same place or have the same name.
+    if (fs::exists("/etc/os-release")) {
+        std::ifstream os_release("/etc/os-release");
+        std::string line;
+        while (std::getline(os_release, line)) {
+            if (line.rfind("ID=", 0) == 0) {
+                if (line.find("ubuntu") != line.npos || line.find("debian") != line.npos) {
+                    // SSL will pick the right one.
+                    return;
+                } else if (line.find("centos") != line.npos) {
+                    ssl_cert_file = "/etc/ssl/certs/ca-bundle.crt";
+                }
+                break;
+            }
+        }
+    }
+    if (!ssl_cert_file) {
+        spdlog::warn(
+                "Unknown certs location for current distribution. If you hit download issues, "
+                "use the envvar `SSL_CERT_FILE` to specify the location manually.");
+    }
+
+#elif defined(__APPLE__)
+    // The homebrew built OpenSSL adds a dependency on having homebrew installed since it looks in there for certs.
+    // The default conan OpenSSL is also misconfigured to look for certs in the OpenSSL build folder.
+    // macOS provides certs at the following location, so use those in all cases.
+    ssl_cert_file = "/etc/ssl/cert.pem";
+#endif
+
+    // Update the envvar.
+    if (ssl_cert_file) {
+        spdlog::info("Assuming cert location is {}", ssl_cert_file);
+        setenv("SSL_CERT_FILE", ssl_cert_file, 1);
+    }
+#endif  // _WIN32
+}
+
 }  // namespace
 
 const ModelMap& simplex_models() { return simplex::models; }
@@ -346,6 +394,7 @@ bool download_models(const std::string& target_directory, const std::string& sel
 
     fs::path directory(target_directory);
 
+    set_ssl_cert_file();
     httplib::Client http(urls::URL_ROOT);
     http.set_follow_location(true);
 
@@ -360,47 +409,6 @@ bool download_models(const std::string& target_directory, const std::string& sel
     if (proxy_url) {
         spdlog::info("using proxy: {}:{}", proxy_url, proxy_port);
         http.set_proxy(proxy_url, proxy_port);
-    }
-
-    const char* cert_file_path = getenv("dorado_cert_file_path");
-#ifdef __linux__
-    if (!cert_file_path) {
-        // We link to a static Ubuntu build of OpenSSL so it's expecting certs to be where Ubuntu puts them.
-        // For other distributions they may not be in the same place or have the same name.
-        if (fs::exists("/etc/os-release")) {
-            std::ifstream os_release("/etc/os-release");
-            std::string line;
-            while (std::getline(os_release, line)) {
-                if (line.rfind("ID=", 0) == 0) {
-                    if (line.find("ubuntu") != line.npos || line.find("debian") != line.npos) {
-                        // httplib will treat this as "use the default".
-                        cert_file_path = "";
-                    } else if (line.find("centos") != line.npos) {
-                        cert_file_path = "/etc/ssl/certs/ca-bundle.crt";
-                    }
-                    if (cert_file_path && cert_file_path[0] != '\0') {
-                        spdlog::info("Assuming cert location is {}", cert_file_path);
-                        break;
-                    }
-                }
-            }
-        }
-        if (!cert_file_path) {
-            spdlog::warn(
-                    "Unknown certs location for current distribution. If you hit download issues, "
-                    "use the envvar `dorado_cert_file_path` to specify the location manually.");
-        }
-    }
-#elif defined(__APPLE__)
-    if (!cert_file_path) {
-        // The homebrew built OpenSSL adds a dependency on having homebrew installed since it looks in there for certs.
-        // The default conan OpenSSL is also misconfigured to look for certs in the OpenSSL build folder.
-        // macOS provides certs at the following location, so use those in all cases.
-        cert_file_path = "/etc/ssl/cert.pem";
-    }
-#endif
-    if (cert_file_path) {
-        http.set_ca_cert_path(cert_file_path);
     }
 
     bool success = true;
