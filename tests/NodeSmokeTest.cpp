@@ -256,7 +256,7 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
     const auto remora_model = remora_model_dir.m_path / remora_model_name;
 
     // Add a second model into the mix
-    const char remora_model_6mA_name[] = "dna_r10.4.1_e8.2_400bps_sup@v4.2.0_6mA@v2";
+    const char remora_model_6mA_name[] = "dna_r10.4.1_e8.2_400bps_sup@v4.2.0_6mA@v3";
     const auto remora_model_6mA_dir = download_model(remora_model_6mA_name);
     const auto remora_model_6mA = remora_model_6mA_dir.m_path / remora_model_6mA_name;
 
