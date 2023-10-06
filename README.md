@@ -262,6 +262,7 @@ The following simplex models are also available (all for 4 kHz data):
 * dna_r10.4.1_e8.2_400bps_sup@v4.2.0_5mCG_5hmCG@v2 (5 kHz)
 * dna_r10.4.1_e8.2_400bps_sup@v4.2.0_5mC@v2 (5 kHz)
 * dna_r10.4.1_e8.2_400bps_sup@v4.2.0_6mA@v2 (5 kHz)
+* dna_r10.4.1_e8.2_400bps_sup@v4.2.0_5mC_5hmC@v3 (5 kHz)
 
 ## Decoding Dorado model names
 
