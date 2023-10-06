@@ -1,8 +1,9 @@
 #include "BarcodeDemuxerNode.h"
 
-#include "htslib/bgzf.h"
-#include "htslib/sam.h"
 #include "read_pipeline/ReadPipeline.h"
+
+#include <htslib/bgzf.h>
+#include <htslib/sam.h>
 
 #include <cassert>
 #include <stdexcept>

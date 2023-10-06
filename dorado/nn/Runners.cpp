@@ -2,7 +2,6 @@
 
 #include "ModBaseRunner.h"
 #include "ModelRunner.h"
-#include "cxxpool.h"
 #include "decode/CPUDecoder.h"
 #include "nn/CRFModel.h"
 
@@ -14,6 +13,8 @@
 #include "utils/cuda_utils.h"
 #endif
 #endif  // DORADO_GPU_BUILD
+
+#include <cxxpool.h>
 
 #include <thread>
 

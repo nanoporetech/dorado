@@ -1,13 +1,13 @@
 #include "AlignerNode.h"
 
-#include "htslib/sam.h"
-#include "minimap.h"
-//todo: mmpriv.h is a private header from mm2 for the mm_event_identity function.
-//Ask lh3 t  make some of these funcs publicly available?
-#include "mmpriv.h"
 #include "utils/sequence_utils.h"
 #include "utils/types.h"
 
+#include <htslib/sam.h>
+#include <minimap.h>
+//todo: mmpriv.h is a private header from mm2 for the mm_event_identity function.
+//Ask lh3 t  make some of these funcs publicly available?
+#include <mmpriv.h>
 #include <spdlog/spdlog.h>
 
 #include <filesystem>

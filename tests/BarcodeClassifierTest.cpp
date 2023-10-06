@@ -2,7 +2,6 @@
 
 #include "MessageSinkUtils.h"
 #include "TestUtils.h"
-#include "htslib/sam.h"
 #include "read_pipeline/BarcodeClassifierNode.h"
 #include "read_pipeline/HtsReader.h"
 #include "utils/bam_utils.h"
@@ -10,6 +9,7 @@
 #include "utils/sequence_utils.h"
 
 #include <catch2/catch.hpp>
+#include <htslib/sam.h>
 
 #include <cstdint>
 #include <filesystem>
