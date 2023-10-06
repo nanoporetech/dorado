@@ -78,21 +78,15 @@ target_include_directories(dorado_utils
     ${DORADO_3RD_PARTY_DOWNLOAD}/metal-cpp/metal-cpp
 )
 
-target_include_directories(dorado_utils
-    SYSTEM    
-    PRIVATE
-    ${HTSLIB_DIR}
-)
-
 target_link_libraries(dorado_utils
     PUBLIC
         ${TORCH_LIBRARIES}
         edlib
         date::date
     PRIVATE
-        htslib
         minimap2
         OpenSSL::SSL
+        htslib
 )
 
 if(APPLE AND DORADO_GPU_BUILD)

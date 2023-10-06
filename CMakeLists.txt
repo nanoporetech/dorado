@@ -251,7 +251,6 @@ target_include_directories(dorado_lib
     PUBLIC
         ${TORCH_INCLUDE_DIRS}
         ${HDF5_INCLUDE_DIRS}
-        ${HTSLIB_DIR}
         ${DORADO_3RD_PARTY_SOURCE}/HighFive/include
         ${DORADO_3RD_PARTY_SOURCE}/argparse
         ${DORADO_3RD_PARTY_SOURCE}/toml11
