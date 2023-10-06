@@ -56,8 +56,12 @@ std::pair<std::vector<dorado::Runner>, size_t> create_basecall_runners(
         for (size_t i = 0; i < num_gpu_runners; i++) {
             runners.push_back(std::make_shared<dorado::MetalModelRunner>(caller));
         }
-        if (runners.back()->batch_size() != batch_size) {
-            spdlog::debug("- set batch size to {}", runners.back()->batch_size());
+        if (batch_size == 0) {
+            spdlog::info(" - set batch size to {}", runners.back()->batch_size());
+        } else {
+            if (runners.back()->batch_size() != batch_size) {
+                spdlog::warn("- set batch size to {}", runners.back()->batch_size());
+            }
         }
     } else {
         throw std::runtime_error(std::string("Unsupported device: ") + device);
@@ -87,9 +91,14 @@ std::pair<std::vector<dorado::Runner>, size_t> create_basecall_runners(
             for (size_t i = 0; i < num_gpu_runners; i++) {
                 runners.push_back(std::make_shared<dorado::CudaModelRunner>(callers[j]));
             }
-            if (runners.back()->batch_size() != batch_size) {
-                spdlog::debug("- set batch size for {} to {}", devices[j],
-                              runners.back()->batch_size());
+            if (batch_size == 0) {
+                spdlog::info(" - set batch size for {} to {}", devices[j],
+                             runners.back()->batch_size());
+            } else {
+                if (runners.back()->batch_size() != batch_size) {
+                    spdlog::warn("- set batch size for {} to {}", devices[j],
+                                 runners.back()->batch_size());
+                }
             }
         }
     }

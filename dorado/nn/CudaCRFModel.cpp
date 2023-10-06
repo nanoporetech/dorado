@@ -49,10 +49,21 @@ public:
         // Batch size will be rounded up to a multiple of batch_size_granularity, regardless of
         // user choice. This makes sure batch size is compatible with GPU kernels.
         if (batch_size == 0) {
-            m_batch_size = auto_batch_size(model_config, chunk_size, memory_limit_fraction);
+            m_batch_size =
+                    determine_batch_size(model_config, chunk_size, memory_limit_fraction, true);
         } else {
             int batch_size_granularity = get_batch_size_granularity(model_config, m_options);
             m_batch_size = utils::pad_to(batch_size, batch_size_granularity);
+            // Make sure the requested batch size doesn't exceed the maximum for the memory available.
+            auto max_batch_size =
+                    determine_batch_size(model_config, chunk_size, memory_limit_fraction, false);
+            if (m_batch_size > max_batch_size) {
+                spdlog::warn(
+                        "Specified batch size {} exceeds maximum batch size based on available "
+                        "memory. Using maximum safe batch size {}.",
+                        m_batch_size, max_batch_size);
+                m_batch_size = max_batch_size;
+            }
             // Warmup
             auto input =
                     torch::empty({m_batch_size, m_num_input_features, m_in_chunk_size}, m_options);
@@ -84,9 +95,10 @@ public:
         return 64;
     }
 
-    int auto_batch_size(const dorado::CRFModelConfig &model_config,
-                        int chunk_size_in,
-                        float memory_limit_fraction) {
+    int determine_batch_size(const dorado::CRFModelConfig &model_config,
+                             int chunk_size_in,
+                             float memory_limit_fraction,
+                             bool run_benchmark) {
 #ifdef DORADO_TX2
         return 256;
 #else
@@ -136,12 +148,10 @@ public:
             return granularity;
         }
 
-        const int64_t max_batch_size_limit = 10240;
-        const int max_batch_size = std::min(available / (bytes_per_chunk_timestep * chunk_size_out),
-                                            max_batch_size_limit);
-        if (max_batch_size < utils::pad_to(128, granularity) + granularity) {
-            spdlog::warn("Auto batchsize detection failed. Estimated max batch size only {}.",
-                         max_batch_size);
+        int max_batch_size = available / (bytes_per_chunk_timestep * chunk_size_out);
+        max_batch_size -= max_batch_size % granularity;
+        if (max_batch_size <= granularity) {
+            spdlog::warn("Maximum safe estimated batch size is only {}.", max_batch_size);
             return granularity;
         }
 
@@ -150,36 +160,44 @@ public:
         int best_batch_size = granularity;
         float best_time = std::numeric_limits<float>::max();
         const int chunk_size = std::min(chunk_size_in, model_config.stride * 300);
-        spdlog::debug("Auto batch size: testing up to {} in steps of {}", max_batch_size,
-                      granularity);
-        for (int batch_size = granularity; batch_size <= max_batch_size;
-             batch_size += granularity) {
-            auto input =
-                    torch::empty({batch_size, model_config.num_features, chunk_size}, m_options);
+        if (run_benchmark) {
+            // We limit the maximum when doing benchmarking to avoid excessive startup time.
+            const int max_batch_size_limit = 10240;
+            max_batch_size = std::min(max_batch_size, max_batch_size_limit);
+            spdlog::debug("Auto batch size: testing up to {} in steps of {}", max_batch_size,
+                          granularity);
+            for (int batch_size = granularity; batch_size <= max_batch_size;
+                 batch_size += granularity) {
+                auto input = torch::empty({batch_size, model_config.num_features, chunk_size},
+                                          m_options);
 
-            float time = std::numeric_limits<float>::max();
-            for (int i = 0; i < 2; ++i) {  // run twice to eliminate outliers
-                using utils::handle_cuda_result;
-                cudaEvent_t start, stop;
-                handle_cuda_result(cudaEventCreate(&start));
-                handle_cuda_result(cudaEventCreate(&stop));
-                handle_cuda_result(cudaEventRecord(start));
-                m_module->forward(input);
-                handle_cuda_result(cudaEventRecord(stop));
-                handle_cuda_result(cudaEventSynchronize(stop));
-                float ms = 0;
-                handle_cuda_result(cudaEventElapsedTime(&ms, start, stop));
-                time = std::min(time, ms / batch_size);
-                handle_cuda_result(cudaEventDestroy(start));
-                handle_cuda_result(cudaEventDestroy(stop));
-            }
+                float time = std::numeric_limits<float>::max();
+                for (int i = 0; i < 2; ++i) {  // run twice to eliminate outliers
+                    using utils::handle_cuda_result;
+                    cudaEvent_t start, stop;
+                    handle_cuda_result(cudaEventCreate(&start));
+                    handle_cuda_result(cudaEventCreate(&stop));
+                    handle_cuda_result(cudaEventRecord(start));
+                    m_module->forward(input);
+                    handle_cuda_result(cudaEventRecord(stop));
+                    handle_cuda_result(cudaEventSynchronize(stop));
+                    float ms = 0;
+                    handle_cuda_result(cudaEventElapsedTime(&ms, start, stop));
+                    time = std::min(time, ms / batch_size);
+                    handle_cuda_result(cudaEventDestroy(start));
+                    handle_cuda_result(cudaEventDestroy(stop));
+                }
 
-            spdlog::debug("Auto batchsize {}: {}, time per chunk {} ms", m_device, batch_size,
-                          time);
-            if (time < best_time) {
-                best_time = time;
-                best_batch_size = batch_size;
+                spdlog::debug("Auto batchsize {}: {}, time per chunk {} ms", m_device, batch_size,
+                              time);
+                if (time < best_time) {
+                    best_time = time;
+                    best_batch_size = batch_size;
+                }
             }
+        } else {
+            spdlog::debug("Maximum safe estimated batch size is {}", max_batch_size);
+            best_batch_size = max_batch_size;
         }
 
         spdlog::debug(
