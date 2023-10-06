@@ -79,22 +79,20 @@ target_include_directories(dorado_utils
 )
 
 target_include_directories(dorado_utils
+    SYSTEM    
     PRIVATE
     ${HTSLIB_DIR}
 )
 
 target_link_libraries(dorado_utils
-    PRIVATE
-    htslib
-    minimap2
-    OpenSSL::SSL
-)
-
-target_link_libraries(dorado_utils
     PUBLIC
-    ${TORCH_LIBRARIES}
-    edlib
-    date::date
+        ${TORCH_LIBRARIES}
+        edlib
+        date::date
+    PRIVATE
+        htslib
+        minimap2
+        OpenSSL::SSL
 )
 
 if(APPLE AND DORADO_GPU_BUILD)

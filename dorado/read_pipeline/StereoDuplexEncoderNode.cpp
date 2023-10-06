@@ -1,8 +1,9 @@
 #include "StereoDuplexEncoderNode.h"
 
-#include "3rdparty/edlib/edlib/include/edlib.h"
 #include "utils/duplex_utils.h"
 #include "utils/sequence_utils.h"
+
+#include <edlib.h>
 
 #include <algorithm>
 #include <array>

@@ -1,11 +1,11 @@
 #include "BarcodeClassifier.h"
 
-#include "3rdparty/edlib/edlib/include/edlib.h"
 #include "utils/alignment_utils.h"
 #include "utils/barcode_kits.h"
 #include "utils/sequence_utils.h"
 #include "utils/types.h"
 
+#include <edlib.h>
 #include <htslib/sam.h>
 #include <spdlog/spdlog.h>
 
