@@ -243,85 +243,106 @@ std::string calculate_checksum(std::string_view data) {
 }
 
 class ModelDownloader {
-    const std::string m_model;
+    httplib::Client m_client;
     const fs::path m_directory;
-    const fs::path m_archive;
-    const ModelInfo m_info;
 
-    std::string get_url() const { return urls::URL_ROOT + urls::URL_PATH + m_model + ".zip"; }
+    static httplib::Client create_client() {
+        httplib::Client http(urls::URL_ROOT);
+        http.set_follow_location(true);
 
-    void extract() {
-        elz::extractZip(m_archive, m_directory);
-        fs::remove(m_archive);
+        const char* proxy_url = getenv("dorado_proxy");
+        const char* ps = getenv("dorado_proxy_port");
+
+        int proxy_port = 3128;
+        if (ps) {
+            proxy_port = atoi(ps);
+        }
+
+        if (proxy_url) {
+            spdlog::info("using proxy: {}:{}", proxy_url, proxy_port);
+            http.set_proxy(proxy_url, proxy_port);
+        }
+
+        return http;
     }
 
-    bool download_httplib(httplib::Client& http) {
-        spdlog::info(" - downloading {} with httplib", m_model);
-        httplib::Result res = http.Get(get_url());
+    std::string get_url(const std::string& model) const {
+        return urls::URL_ROOT + urls::URL_PATH + model + ".zip";
+    }
+
+    void extract(const fs::path& archive) {
+        elz::extractZip(archive, m_directory);
+        fs::remove(archive);
+    }
+
+    bool download_httplib(const std::string& model,
+                          const ModelInfo& info,
+                          const fs::path& archive) {
+        spdlog::info(" - downloading {} with httplib", model);
+        httplib::Result res = m_client.Get(get_url(model));
         if (!res) {
-            spdlog::error("Failed to download {}: {}", m_model, to_string(res.error()));
+            spdlog::error("Failed to download {}: {}", model, to_string(res.error()));
             return false;
         }
 
         // Check that this matches the hash we expect.
         const auto checksum = calculate_checksum(res->body);
-        if (checksum != m_info.checksum) {
-            spdlog::error("Model download failed checksum validation: {} - {} != {}", m_model,
-                          checksum, m_info.checksum);
+        if (checksum != info.checksum) {
+            spdlog::error("Model download failed checksum validation: {} - {} != {}", model,
+                          checksum, info.checksum);
             return false;
         }
 
         // Save it.
-        std::ofstream archive(m_archive.string(), std::ofstream::binary);
-        archive << res->body;
-        archive.close();
+        std::ofstream output(archive.string(), std::ofstream::binary);
+        output << res->body;
+        output.close();
         return true;
     }
 
-    bool download_curl() {
-        spdlog::info(" - downloading {} with curl", m_model);
+    bool download_curl(const std::string& model, const ModelInfo& info, const fs::path& archive) {
+        spdlog::info(" - downloading {} with curl", model);
 
         // Note: it's safe to call system() here since we're only going to be called with known models.
-        std::string args = "curl -L " + get_url() + " -o " + m_archive.string();
+        std::string args = "curl -L " + get_url(model) + " -o " + archive.string();
         errno = 0;
         int ret = system(args.c_str());
         if (ret != 0) {
-            spdlog::error("Failed to download {}: ret={}, errno={}", m_model, ret, errno);
+            spdlog::error("Failed to download {}: ret={}, errno={}", model, ret, errno);
             return false;
         }
 
         // Load it back in and checksum it.
         // Note: there's TOCTOU issues here wrt the download above, and the file_size() call.
-        std::ifstream archive(m_archive.string(), std::ofstream::binary);
+        std::ifstream output(archive.string(), std::ofstream::binary);
         std::string buffer;
-        buffer.resize(fs::file_size(m_archive));
-        archive.read(buffer.data(), buffer.size());
-        archive.close();
+        buffer.resize(fs::file_size(archive));
+        output.read(buffer.data(), buffer.size());
+        output.close();
 
         const auto checksum = calculate_checksum(buffer);
-        if (checksum != m_info.checksum) {
-            spdlog::error("Model download failed checksum validation: {} - {} != {}", m_model,
-                          checksum, m_info.checksum);
+        if (checksum != info.checksum) {
+            spdlog::error("Model download failed checksum validation: {} - {} != {}", model,
+                          checksum, info.checksum);
             return false;
         }
         return true;
     }
 
 public:
-    ModelDownloader(std::string_view model, fs::path directory, ModelInfo info)
-            : m_model(model),
-              m_directory(std::move(directory)),
-              m_archive(m_directory / (m_model + ".zip")),
-              m_info(std::move(info)) {}
+    ModelDownloader(fs::path directory)
+            : m_client(create_client()), m_directory(std::move(directory)) {}
 
-    bool download(httplib::Client& http) {
+    bool download(const std::string& model, const ModelInfo& info) {
+        auto archive = m_directory / (model + ".zip");
+
         // Try and download using httplib, falling back on curl.
-        if (!download_httplib(http) && !download_curl()) {
+        if (!download_httplib(model, info, archive) && !download_curl(model, info, archive)) {
             return false;
         }
 
         // Extract it.
-        extract();
+        extract(archive);
         return true;
     }
 };
@@ -392,31 +413,14 @@ bool download_models(const std::string& target_directory, const std::string& sel
         return false;
     }
 
-    fs::path directory(target_directory);
-
     set_ssl_cert_file();
-    httplib::Client http(urls::URL_ROOT);
-    http.set_follow_location(true);
-
-    const char* proxy_url = getenv("dorado_proxy");
-    const char* ps = getenv("dorado_proxy_port");
-
-    int proxy_port = 3128;
-    if (ps) {
-        proxy_port = atoi(ps);
-    }
-
-    if (proxy_url) {
-        spdlog::info("using proxy: {}:{}", proxy_url, proxy_port);
-        http.set_proxy(proxy_url, proxy_port);
-    }
+    ModelDownloader downloader(target_directory);
 
     bool success = true;
     auto download_model_set = [&](const ModelMap& models) {
         for (const auto& [model, info] : models) {
             if (selected_model == "all" || selected_model == model) {
-                ModelDownloader downloader(model, directory, info);
-                if (!downloader.download(http)) {
+                if (!downloader.download(std::string(model), info)) {
                     success = false;
                 }
             }
