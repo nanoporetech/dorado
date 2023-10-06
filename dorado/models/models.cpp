@@ -391,6 +391,13 @@ bool download_models(const std::string& target_directory, const std::string& sel
                     "use the envvar `dorado_cert_file_path` to specify the location manually.");
         }
     }
+#elif defined(__APPLE__)
+    if (!cert_file_path) {
+        // The homebrew built OpenSSL adds a dependency on having homebrew installed since it looks in there for certs.
+        // The default conan OpenSSL is also misconfigured to look for certs in the OpenSSL build folder.
+        // macOS provides certs at the following location, so use those in all cases.
+        cert_file_path = "/etc/ssl/cert.pem";
+    }
 #endif
     if (cert_file_path) {
         http.set_ca_cert_path(cert_file_path);
