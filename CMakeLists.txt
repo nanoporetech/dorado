@@ -273,19 +273,16 @@ if (DORADO_ENABLE_PCH)
 endif()
 
 target_link_libraries(dorado_lib
-    PRIVATE
-    ${KOI_LIBRARIES}
-)
-
-target_link_libraries(dorado_lib
     PUBLIC
-    ${TORCH_LIBRARIES}
-    htslib
-    vbz_hdf_plugin
-    edlib
-    date::date
-    minimap2
-    dorado_utils
+        ${TORCH_LIBRARIES}
+        htslib
+        vbz_hdf_plugin
+        edlib
+        date::date
+        minimap2
+        dorado_utils
+    PRIVATE
+        ${KOI_LIBRARIES}    
 )
 
 if(NOT WIN32)
@@ -445,16 +442,13 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     )
 
     target_link_libraries(dorado_io_lib
-        PRIVATE
-        ${POD5_LIBRARIES}
-        ${HDF5_C_LIBRARIES}
-        ${CMAKE_DL_LIBS}
-        date::date
-    )
-
-    target_link_libraries(dorado_io_lib
         PUBLIC
-        dorado_lib
+            dorado_lib    
+        PRIVATE
+            ${POD5_LIBRARIES}
+            ${HDF5_C_LIBRARIES}
+            ${CMAKE_DL_LIBS}
+            date::date
     )
 
     if(WIN32)
