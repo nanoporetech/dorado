@@ -75,7 +75,7 @@ dorado_aligner_options_test() (
     for ((i = 0; i < ${#MM_OPTIONS[@]}; i++)); do
         mm2_opt=${MM2_OPTIONS[$i]}
         dor_opt=${DOR_OPTIONS[$i]}
-        echo -n "$i: with options '$opt' ... "
+        echo -n "$i: with mm2 option '$mm2_opt' and dorado option '$dor_opt' ... "
 
         # run dorado aligner
         if ! $dorado_bin aligner $dor_opt $REF $RDS 2>err | samtools view -h 2>>err > $output_dir/dorado-$i.sam; then
