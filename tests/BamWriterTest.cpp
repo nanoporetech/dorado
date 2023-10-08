@@ -1,10 +1,10 @@
 #include "TestUtils.h"
-#include "htslib/sam.h"
 #include "read_pipeline/HtsReader.h"
 #include "read_pipeline/HtsWriter.h"
 #include "utils/bam_utils.h"
 
 #include <catch2/catch.hpp>
+#include <htslib/sam.h>
 
 #include <filesystem>
 

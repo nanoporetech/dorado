@@ -78,25 +78,22 @@ target_include_directories(dorado_utils
     ${DORADO_3RD_PARTY_DOWNLOAD}/metal-cpp/metal-cpp
 )
 
-target_include_directories(dorado_utils
-    SYSTEM
-    PRIVATE
-    ${HTSLIB_DIR}
-)
-
 target_link_libraries(dorado_utils
-    ${TORCH_LIBRARIES}
-    htslib
-    edlib
-    minimap2
-    date::date
-    OpenSSL::SSL
+    PUBLIC
+        ${TORCH_LIBRARIES}
+        edlib
+        date::date
+    PRIVATE
+        minimap2
+        OpenSSL::SSL
+        htslib
 )
 
 if(APPLE AND DORADO_GPU_BUILD)
     add_dependencies(dorado_utils metal-lib)
     target_link_libraries(
         dorado_utils
+        PUBLIC
         ${APPLE_FWK_FOUNDATION}
         ${APPLE_FWK_QUARTZ_CORE}
         ${APPLE_FWK_METAL}
@@ -104,7 +101,7 @@ if(APPLE AND DORADO_GPU_BUILD)
 endif()
 
 if(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
-    target_link_libraries(dorado_utils ${IOKIT})
+    target_link_libraries(dorado_utils PUBLIC ${IOKIT})
 endif()
 
 if(NOT WIN32)

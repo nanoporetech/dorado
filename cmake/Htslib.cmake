@@ -5,8 +5,10 @@ if(NOT TARGET htslib) # lazy include guard
         set(HTSLIB_DIR ${DORADO_3RD_PARTY_DOWNLOAD}/htslib-win CACHE STRING
                     "Path to htslib repo")
         add_library(htslib SHARED IMPORTED)
-        set_property(TARGET htslib APPEND PROPERTY IMPORTED_IMPLIB ${HTSLIB_DIR}/hts-3.lib)        
-        set_property(TARGET htslib APPEND PROPERTY IMPORTED_LOCATION ${HTSLIB_DIR}/hts-3.dll)        
+        set_target_properties(htslib PROPERTIES 
+            "IMPORTED_IMPLIB" ${HTSLIB_DIR}/hts-3.lib
+            "IMPORTED_LOCATION" ${HTSLIB_DIR}/hts-3.dll
+            "INTERFACE_INCLUDE_DIRECTORIES" ${HTSLIB_DIR})
         target_link_directories(htslib INTERFACE ${HTSLIB_DIR})
     else()
         message(STATUS "Building htslib")
@@ -53,9 +55,13 @@ if(NOT TARGET htslib) # lazy include guard
                 LOG_INSTALL 0
                 )
 
-        include_directories(${htslib_PREFIX}/include/htslib)
         add_library(htslib STATIC IMPORTED)
-        set_property(TARGET htslib APPEND PROPERTY IMPORTED_LOCATION ${htslib_PREFIX}/lib/libhts.a)
+        # Need to ensure this directory exists before we can add it to INTERFACE_INCLUDE_DIRECTORIES
+        file(MAKE_DIRECTORY ${htslib_PREFIX}/include)
+        set_target_properties(htslib 
+            PROPERTIES 
+                "IMPORTED_LOCATION" ${htslib_PREFIX}/lib/libhts.a
+                "INTERFACE_INCLUDE_DIRECTORIES" ${htslib_PREFIX}/include)
         message(STATUS "Done Building htslib")
     endif()
 endif()

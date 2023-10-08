@@ -1,8 +1,8 @@
-#include "htslib/sam.h"
 #include "read_pipeline/ReadPipeline.h"
 #include "utils/types.h"
 
 #include <catch2/catch.hpp>
+#include <htslib/sam.h>
 
 #define TEST_GROUP "[ReadTest]"
 

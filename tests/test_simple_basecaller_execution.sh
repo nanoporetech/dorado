@@ -69,14 +69,16 @@ dorado_aligner_options_test() (
     ERROR() { echo $*; RETURN=false; cat err; }
     SKIP() { echo $*; cat err; }
 
-    OPTIONS=(""    "-k 20" "-w 100" "-I 100K" "--secondary no" "-N 1" "-r 10,100" "-Y" "--secondary-seq" "--print-aln-seq")
+    MM2_OPTIONS=(""    "-k 20" "-w 100" "-I 100K" "--secondary no" "-N 1" "-r 10,100" "-Y" "--secondary-seq" "--print-aln-seq")
+    DOR_OPTIONS=(""    "-k 20" "-w 100" "-I 100K" "--secondary no" "-N 1" "--bandwidth 10,100" "-Y" "--secondary-seq" "--print-aln-seq")
     CHANGES=(false true    true     false     true             true   true        true true              false            )
-    for ((i = 0; i < ${#OPTIONS[@]}; i++)); do
-        opt=${OPTIONS[$i]}
-        echo -n "$i: with options '$opt' ... "
+    for ((i = 0; i < ${#MM_OPTIONS[@]}; i++)); do
+        mm2_opt=${MM2_OPTIONS[$i]}
+        dor_opt=${DOR_OPTIONS[$i]}
+        echo -n "$i: with mm2 option '$mm2_opt' and dorado option '$dor_opt' ... "
 
         # run dorado aligner
-        if ! $dorado_bin aligner $opt $REF $RDS 2>err | samtools view -h 2>>err > $output_dir/dorado-$i.sam; then
+        if ! $dorado_bin aligner $dor_opt $REF $RDS 2>err | samtools view -h 2>>err > $output_dir/dorado-$i.sam; then
             ERROR failed running dorado aligner
             continue
         fi
@@ -92,7 +94,7 @@ dorado_aligner_options_test() (
         sort $output_dir/dorado-$i.sam | $filter_header | cut -f-11> $output_dir/dorado-$i.ssam
 
         # compare with minimap2 output
-        if $MM2 -a $opt $REF $RDS 2>err > $output_dir/minimap2-$i.sam; then
+        if $MM2 -a $mm2_opt $REF $RDS 2>err > $output_dir/minimap2-$i.sam; then
             sort $output_dir/minimap2-$i.sam | $filter_header | cut -f-11 > $output_dir/minimap2-$i.ssam
             if ! diff $output_dir/dorado-$i.ssam $output_dir/minimap2-$i.ssam > err; then
                 ERROR failed comparison with minimap2 output
