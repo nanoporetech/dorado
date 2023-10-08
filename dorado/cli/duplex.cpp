@@ -36,7 +36,25 @@ using namespace std::chrono_literals;
 int duplex(int argc, char* argv[]) {
     using dorado::utils::default_parameters;
     utils::InitLogging();
-    utils::make_torch_deterministic();
+    // TODO: Re-enable torch deterministic for duplex after OOM
+    // on smaller VRAM GPUs is fixed.
+    // The issue appears to be that enabling deterministic algorithms
+    // through torch requires a larger CUBLAS workspace to be configured.
+    // This larger CUBLAS workspace is causing memory fragmentation in
+    // the CUDACaching allocator since the workspace memory is always cached
+    // and there's no threadsafe way to clear the workspace memory for a
+    // specific CUBLAS handle/stream combination through public APIs.
+    // Details: When the first set of simplex basecalls
+    // happen, the caching allocator is able to allocate memory for
+    // inference + decode + CUBLAS workspace. Then when the stereo model
+    // is run the first time, the caching allocator finds enough memory for
+    // that model's inference + decode + CUBLAS workspace because the memory
+    // footprint for the stero model is much smaller. However, when the next
+    // simplex call is run on the same GPU, the allocator can't find enough
+    // contiguous unreserved memory for the simplex
+    // inference and decode step because of the fragmentation caused by the
+    // cached CUBLAS workspace from the stero model. This causes OOM.
+    //utils::make_torch_deterministic();
     torch::set_num_threads(1);
 
     cli::ArgParser parser("dorado");
