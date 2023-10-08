@@ -122,11 +122,7 @@ const ModelMap models = {
 namespace modified {
 
 const std::vector<std::string> mods = {
-        "5mC_5hmC",
-        "5mCG",
-        "5mCG_5hmCG",
-        "5mC",
-        "6mA",
+        "5mC_5hmC", "5mCG", "5mCG_5hmCG", "5mC", "6mA",
 };
 
 const ModelMap models = {
