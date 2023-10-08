@@ -243,9 +243,11 @@ void ModBaseCallerNode::input_worker_thread() {
                 working_read->read = std::move(read);
 
                 // Put the read in the working list
-                std::lock_guard<std::mutex> working_reads_lock(m_working_reads_mutex);
-                m_working_reads.insert(std::move(working_read));
-                ++m_working_reads_size;
+                {
+                    std::lock_guard<std::mutex> working_reads_lock(m_working_reads_mutex);
+                    m_working_reads.insert(std::move(working_read));
+                    ++m_working_reads_size;
+                }
 
                 // push the chunks to the chunk queues
                 // needs to be done after working_read->read is set as chunks could be processed
