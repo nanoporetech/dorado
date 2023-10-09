@@ -205,7 +205,7 @@ SignalAnchorInfo determine_signal_anchor_and_strand_cdna(const dorado::SimplexRe
     spdlog::debug("v1 dist {}, v2 dist {}", dist_v1, dist_v2);
 
     bool fwd = dist_v1 < dist_v2;
-    bool proceed = std::min(dist_v1, dist_v2) < 30;
+    bool proceed = std::min(dist_v1, dist_v2) < 30 && std::abs(dist_v1 - dist_v2) > 10;
 
     SignalAnchorInfo result = {false, -1, trailing_Ts};
 
