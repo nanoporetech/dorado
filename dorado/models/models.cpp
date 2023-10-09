@@ -454,9 +454,11 @@ std::string get_modification_model(const std::string& simplex_model,
     if (is_valid_model(simplex_name)) {
         std::string mods_prefix = simplex_name + "_" + modification + "@v";
         for (const auto& [model, info] : modified::models) {
+            // There is an assumption that models with multiple versions
+            // are named in a way that picking the last one after lexicographically
+            // sorting them finds the latest version.
             if (model.compare(0, mods_prefix.size(), mods_prefix) == 0) {
                 modification_model = model;
-                break;
             }
         }
     } else {
