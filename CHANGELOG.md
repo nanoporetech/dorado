@@ -2,6 +2,70 @@
 
 All notable changes to Dorado will be documented in this file.
 
+# [0.4.0] (9 Oct 2023)
+
+This release of Dorado introduces barcode demultiplexing, barcode trimming, simplex read splitting, and updated models for calling 6mA and 5mC/5hmC modified bases. Furthermore, it contains improvements to duplex pairing for increased yield, basecalling speed enhancements and reductions to memory consumption, bug fixes, and additional tests for enhanced stability.
+
+* e836fa46a452e0cff69f1ea0b2017878ff5b85b2 - New all-context and updated CpG-context 5mC/5hmC models
+* e4aca7696392fe5836da22d1df62c399c2bfd664 - Handle custom batch sizes that exceed maximum safe batch size
+* ad463ead384119b756d9f8a940919b1ab9cfe4fc - Updated all-context 6mA model
+* 21d25a3d00331027ba24227e95d9b5f353a882d2 - SSL host verification enabled and `dorado download` HTTPS proxy support improved
+* 8ae95e732310400016f34b8f9499f1fdb4a0dd41 - Enable simplex read splitting
+* 1210607cc0f647772053ed82dcae94b416a0b821 - Fix mean-qscore calculation with trimming
+* d27666eb02add2e9a991442d8ba4f2bc7f849df5 - Beam search optimisation
+* 46e68c1138ebc25e53818e185e967f5a156c1896 - Report the error we get back from httplib if a download fails
+* 89db1e197c68d6cf7209f1366372cb24dfe87ba2 - Support ChEBI codes for modified bases
+* 92097cade8f53effbc1610c2fcac679c19203cc6 - Add options to `dorado aligner`
+* 4cb986265ffcc0576752e20b5c20acb01ac635e7 - Fix Linux ccache usage
+* 692ecd3ed9dc16a94a86bf4ac563c0e618745bb3 - Fixed issues with internal representation of signal during duplex calling
+* 80efe8cc7116883ee5413efb223bc5189f893322 - Fix `std::logic_error` (issue #205)
+* d92547a49fb95210656fcef7e9486f228ab4cfeb - Make CUDA kernel profiling to stderr available via `--devopts`
+* 69bf701f2668c52d325375706821a00b72ea9b1c - Refactoring to support further duplex developments
+* 510e2e9e0b2e24d9b5c8bd1c13057c4b05d145a4 - Verify models when downloaded using `dorado download`
+* 12476ee058271b353ef1e2cfd4a159397ce9c824 - Improve memory usage diagnostics in Metal
+* 3172413657b9be0bf0b6c280cb8c03c7627f9784 - Fix non-determinism in selecting matrix multiplication sub-routine during basecalling
+* f14b418e8497fcb033d68f3e6561b5b9a91a07fb - Provide NVIDIA driver version in server API
+* 207871ee7f98d1e0cbefeb790ffdd02c1f6c929c - Use `DORADO_GPU_BUILD` rather than `!defined(__x86_64__)`
+* d16ccbea8d99c1d820d508ee3ce9175374293049 - Get tests that use CUDA working when ASAN is enabled
+* 41bfb99503372db84d218d5ccc0b8f2462d1bba9 - Update duplex pairing heuristics to improve duplex yield
+* 87c2c6ed947c7e36bd6bffada2dc2f1856f847a6 - Change `ReadPair` to take full ownership of its data, and drop `ReadPtr`
+* 88aa9f3f1ede6803b531bf6f9a719a2cc4f6f74c - Only use pre-compiled headers if ccache isn't available
+* c04c145afde62f0f7c1c739b69e5b6f98758dda5 - Bump Koi version to 0.3.9
+* 6b8064df59bce3de35b951480b56584484f6c317 - Separate out data shared by both Duplex and Simplex reads into `ReadCommon` class
+* 34e9b550b1dcbd40bd8df1ba726773881627ff90 - Flip RNA signal for modified basecalling
+* 636ac83e642bda153d6f44d0de979bdd37ccee98 - `CRFModel`: Update to use `KoiActivation` and corresponding Koi host functions
+* cd50a01a0b555a75f208bc827e6aaf34d4f00163 - Add parent ID tag (`pi:Z:parentid`) to split reads so that original read can be inferred
+* 2956bf6afef66e86b7abc0122ae19a2e37c96cc8 - Add support for barcode trimming
+* 92dee851d39ce48fb12b221ac0bfa7575ae7e182 - Fix segfault in modified basecalling
+* fe22d2158e4c5fb95b2e2875f3e10d3482035ed1 - Add support for read groups with barcoding
+* 2f69da6f659442e0b3caebbb94dfc9e84432e6d3 - Allow basecalling from single files rather than a directory
+* c22e46f5407c0863180b0e273551fc9fb5ebc145 - Support ambiguous motifs for modified basecalling
+* 882da60f3d2cd9a9633966fe8e5e8241310ffd87 - Refactor to create separate utils lib target
+* b792bba1b07986d8ec4dcd601ded55d7021eb4d0 - Enforce const-west style via clang-format
+* 611a4eaf2ae52041216c4c369d9f61d481275df1 - Skip code signing on x64 to prevent crashes
+* a6a1902efa462d25637be056c352502a2c262366 - Fix various deficiencies of the iOS htslib build
+* 5ff8034a0f9f6555223e2d12e53db8061ce718ef - Add barcode check for both ends
+* e42b8c8da47c97d7a9fd0844f9d87531e4f35afa - Remove mux from pairing cache key to reduce memory consumption by up to 4x
+* 93d052bce610797bf5fae169471635c32bd5bb8d - Setup signing of executables on macOS
+* a45b97ce2ded09baac3c06618e5d5b8f8ce9ad8e - Bump RNA004 models to V3.0.1 with corrected scaling
+* 7e152fd556401d2af3bc14423c048fadd02f744e - Reinstate `ReadFilterNode` tests
+* c3e412ea3a134f18ef4c5eb07e5b6ae46940260c - Add duplex commandline test
+* 3ba422b1678a61510900ef647eb501d1a18e736f - Don't perform adapter trimming on RNA signals
+* 066b815c4dd0e75a0629d5432199ab6a830637f5 - Add barcoding support to Dorado
+* 09cc44f12ff32e6606b192229e6a2e8fb14c892d - Add unit test coverage report generation
+* b2e54b8bb6348dc418b45722b96fe001a36a0497 - Fix typo for 5fC modification
+* 829dba39bf85250e8275456c3e87a2d6eec72f8e - Enforce that values passed to a sink are mutable rvalues
+* 8aa7722fea91abb780071dda7414d0a5bc20cf0a - Remove dependence of `dorado_lib` on `dorado_models_lib`
+* cd6d2bfbf547a555c5a7e649db700807ef6d17ea - Extend the lifetime of the `NNTasks` in the metal backend
+* abed8ee88e9648981a0996b7f9c0507eca018fb0 - Bug fixes for iOS build
+* 64b3ae33377972474a3ec2c4752c95d274f1c908 - Clarify `--min-qscore` option in help
+* 225a153e9defb873925e4a0e2e414a1fa1a5aeed - Further restrict Metal kernel run times to improve stability of basecalling on Apple silicon
+* 3ae95e40d61b8f383bd778a779aa4a54fe7abdcc - Refactor modified basecalling code
+* 8ec58f0153b39f9e60d0606da0a4cc24c6d83e59 - Option for `--guard-gpus` no longer used in duplex
+* 1f3cade20f6074880997833783ae1be645974557 - Add `CUDAGuard` before cache clear to reduce CUDA memory consumption
+* dae5e30531b3687145e15cfda7655cca267b0aa5 - Move `ModBaseCallerNode` to using an `unordered_set` for working reads, like `BasecallerNode`
+* b43adfab9571ab14ac8e41e9d5102fe5fa98f541 - Improvements to pipeline API
+
 # [0.3.4] (14 Aug 2023)
 
 This release of Dorado contains a few bug fixes and a hotfix for CUDA out of memory issues encountered during duplex runs with v0.3.3.
