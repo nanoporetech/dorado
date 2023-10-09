@@ -192,8 +192,6 @@ const ModelMap models = {
          {"a01761e709fd6c114b09ffc7100efb52c37faa38a3f8b281edf405904f04fefa"}},
         {"dna_r10.4.1_e8.2_400bps_hac@v4.2.0_5mCG_5hmCG@v2",
          {"2112aa355757906bfb815bf178fee260ad90cd353781ee45c121024c5caa7c6b"}},
-        {"dna_r10.4.1_e8.2_400bps_sup@v4.2.0_5mCG_5hmCG@v2",
-         {"6b3604799d85e81d06c97181af093b30483cec9ad02f54a631eca5806f7848ef"}},
         {"dna_r10.4.1_e8.2_400bps_sup@v4.2.0_5mCG_5hmCG@v3",
          {"9aad5395452ed49fb8442892a8b077afacb80664cf21cc442de76e820ed6e09c"}},
         {"dna_r10.4.1_e8.2_400bps_sup@v4.2.0_5mC@v2",
