@@ -29,15 +29,20 @@ Dorado is heavily-optimised for Nvidia A100 and H100 GPUs and will deliver maxim
 
 Dorado has been tested extensively and supported on the following systems:
 
-| Platform | GPU/CPU                      |
-| -------- |------------------------------|
-| Windows  | (G)V100, A100, H100          |
-| Apple    | M1, M1 Pro, M1 Max, M1 Ultra |
-| Linux    | (G)V100, A100, H100          |
+| Platform | GPU/CPU | Minimum Software Requirements |
+| --- |---------|--------------|
+| Linux x86_64  | (G)V100, A100 | CUDA Driver ≥450.80.02 |
+| | H100 | CUDA Driver ≥520 |
+| Linux arm64 | Jetson Orin | Linux for Tegra ≥34.1.1 |
+| Windows x86_64 | (G)V100, A100 | CUDA Driver ≥452.39 |
+| | H100 | CUDA Driver ≥520 |
+| Apple | Apple Silicon (M1/M2) | |
 
-Systems not listed above but which have Nvidia GPUs with ≥8 GB VRAM and architecture from Pascal onwards (except P100/GP100) have not been widely tested but are expected to work. If you encounter problems with running on your system, please [report an issue](https://github.com/nanoporetech/dorado/issues)
+Linux or Windows systems not listed above but which have Nvidia GPUs with ≥8 GB VRAM and architecture from Pascal onwards (except P100/GP100) have not been widely tested but are expected to work. When basecalling with Apple devices, we recommend systems with ≥16 GB of unified memory.
 
-AWS Benchmarks on NVIDIA GPUs are available [here](https://aws.amazon.com/blogs/hpc/benchmarking-the-oxford-nanopore-technologies-basecallers-on-aws/).
+If you encounter problems with running on your system, please [report an issue](https://github.com/nanoporetech/dorado/issues).
+
+AWS Benchmarks on NVIDIA GPUs for Dorado 0.3.0 are available [here](https://aws.amazon.com/blogs/hpc/benchmarking-the-oxford-nanopore-technologies-basecallers-on-aws/). Please note: Dorado's basecalling speed is continuously improving, so these benchmarks may not reflect performance with the latest release.
 
 ## Roadmap
 
@@ -60,12 +65,14 @@ To see all options and their defaults, run `dorado -h` and `dorado <subcommand> 
 
 ### Simplex basecalling
 
-To run Dorado basecalling, download a model and point it to POD5 files _(.fast5 files are supported but will not be as performant)_.
+To run Dorado basecalling, download a model and point it to either a directory of POD5 files or a single POD5 file _(.fast5 files are supported, but will not be as performant)_.
 
 ```
 $ dorado download --model dna_r10.4.1_e8.2_400bps_hac@v4.1.0
 $ dorado basecaller dna_r10.4.1_e8.2_400bps_hac@v4.1.0 pod5s/ > calls.bam
 ```
+
+To basecall a single file, simply replace the directory `pod5s/` with a path to your data file.
 
 If basecalling is interrupted, it is possible to resume basecalling from a BAM file. To do so, use the `--resume-from` flag to specify the path to the incomplete BAM file. For example:
 
@@ -78,6 +85,8 @@ $ dorado basecaller dna_r10.4.1_e8.2_400bps_hac@v4.1.0 pod5s --resume-from incom
 **Note: it is important to choose a different filename for the BAM file you are writing to when using `--resume-from`**. If you use the same filename, the interrupted BAM file will lose the existing basecalls and basecalling will restart from the beginning.
 
 ### Modified basecalling
+
+Beyond the traditional A, T, C, and G basecalling, Dorado can also detect modified bases such as 5-methylcytosine (5mC), 5-hydroxymethylcytosine (5hmC), and N<sup>6</sup>-methyladenosine (6mA). These modified bases play crucial roles in epigenetic regulation.
 
 To call modifications, add `--modified-bases` to the basecaller command:
 
@@ -148,11 +157,11 @@ $ dorado basecaller <model> <reads> --kit-name <barcode-kit-name>
 
 This will result in a single output stream with classified reads. The classification will be reflected in the read group name as well as in the `BC` tag of the output record.
 
-By default `dorado` is set up to trim the barcode from the reads. To disable trimming, add `--no-trim` to the cmdline.
+By default, Dorado is set up to trim the barcode from the reads. To disable trimming, add `--no-trim` to the cmdline.
 
-The default heuristic for double-ended barcodes is to look for them on either end of the read. This results in a higher classification rate but can also result in a higher false positive count. To address this, `dorado` also provides a `--barcode-both-ends` option to force double-ended barcodes to be detected on both ends before classification. This will reduce false positives dramatically, but also lower overall classification rates.
+The default heuristic for double-ended barcodes is to look for them on either end of the read. This results in a higher classification rate but can also result in a higher false positive count. To address this, `dorado basecaller` also provides a `--barcode-both-ends` option to force double-ended barcodes to be detected on both ends before classification. This will reduce false positives dramatically, but also lower overall classification rates.
 
-The output from `dorado` can be demultiplexed into per-barcode BAMs using `samtools split`. e.g.
+The output from `dorado basecaller` can be demultiplexed into per-barcode BAMs using `samtools split`. e.g.
 
 ```
 $ samtools split -u <basecalled-bam> -f <output-dir>/<prefix>_%!.bam
@@ -190,98 +199,67 @@ To download all available Dorado models, run:
 $ dorado download --model all
 ```
 
-### **Simplex models:**
-
-v4.2.0 models are recommended for our latest released condition (5 kHz).
-
-* dna_r10.4.1_e8.2_400bps_fast@v4.2.0
-* dna_r10.4.1_e8.2_400bps_hac@v4.2.0
-* dna_r10.4.1_e8.2_400bps_sup@v4.2.0
-
-The following simplex models are also available (all for 4 kHz data):
-
-* dna_r9.4.1_e8_fast@v3.4
-* dna_r9.4.1_e8_hac@v3.3
-* dna_r9.4.1_e8_sup@v3.3
-* dna_r9.4.1_e8_sup@v3.6
-* dna_r10.4.1_e8.2_260bps_fast@v3.5.2
-* dna_r10.4.1_e8.2_260bps_hac@v3.5.2
-* dna_r10.4.1_e8.2_260bps_sup@v3.5.2
-* dna_r10.4.1_e8.2_400bps_fast@v3.5.2
-* dna_r10.4.1_e8.2_400bps_hac@v3.5.2
-* dna_r10.4.1_e8.2_400bps_sup@v3.5.2
-* dna_r10.4.1_e8.2_260bps_fast@v4.0.0
-* dna_r10.4.1_e8.2_260bps_hac@v4.0.0
-* dna_r10.4.1_e8.2_260bps_sup@v4.0.0
-* dna_r10.4.1_e8.2_400bps_fast@v4.0.0
-* dna_r10.4.1_e8.2_400bps_hac@v4.0.0
-* dna_r10.4.1_e8.2_400bps_sup@v4.0.0
-* dna_r10.4.1_e8.2_260bps_fast@v4.1.0
-* dna_r10.4.1_e8.2_260bps_hac@v4.1.0
-* dna_r10.4.1_e8.2_260bps_sup@v4.1.0
-* dna_r10.4.1_e8.2_400bps_fast@v4.1.0
-* dna_r10.4.1_e8.2_400bps_hac@v4.1.0
-* dna_r10.4.1_e8.2_400bps_sup@v4.1.0
-
-### **RNA models:**
-
-* rna002_70bps_fast@v3
-* rna002_70bps_hac@v3
-* rna004_130bps_fast@v3.0.1
-* rna004_130bps_hac@v3.0.1
-* rna004_130bps_sup@v3.0.1
-
-### **Modified base models**
-
-* dna_r9.4.1_e8_fast@v3.4_5mCG@v0.1
-* dna_r9.4.1_e8_hac@v3.3_5mCG@v0.1
-* dna_r9.4.1_e8_sup@v3.3_5mCG@v0.1
-* dna_r9.4.1_e8_fast@v3.4_5mCG_5hmCG@v0
-* dna_r9.4.1_e8_hac@v3.3_5mCG_5hmCG@v0
-* dna_r9.4.1_e8_sup@v3.3_5mCG_5hmCG@v0
-* dna_r10.4.1_e8.2_260bps_fast@v3.5.2_5mCG@v2
-* dna_r10.4.1_e8.2_260bps_hac@v3.5.2_5mCG@v2
-* dna_r10.4.1_e8.2_260bps_sup@v3.5.2_5mCG@v2
-* dna_r10.4.1_e8.2_400bps_fast@v3.5.2_5mCG@v2
-* dna_r10.4.1_e8.2_400bps_hac@v3.5.2_5mCG@v2
-* dna_r10.4.1_e8.2_400bps_sup@v3.5.2_5mCG@v2
-* dna_r10.4.1_e8.2_260bps_fast@v4.0.0_5mCG_5hmCG@v2
-* dna_r10.4.1_e8.2_260bps_hac@v4.0.0_5mCG_5hmCG@v2
-* dna_r10.4.1_e8.2_260bps_sup@v4.0.0_5mCG_5hmCG@v2
-* dna_r10.4.1_e8.2_400bps_fast@v4.0.0_5mCG_5hmCG@v2
-* dna_r10.4.1_e8.2_400bps_hac@v4.0.0_5mCG_5hmCG@v2
-* dna_r10.4.1_e8.2_400bps_sup@v4.0.0_5mCG_5hmCG@v2
-* dna_r10.4.1_e8.2_260bps_fast@v4.1.0_5mCG_5hmCG@v2
-* dna_r10.4.1_e8.2_260bps_hac@v4.1.0_5mCG_5hmCG@v2
-* dna_r10.4.1_e8.2_260bps_sup@v4.1.0_5mCG_5hmCG@v2
-* dna_r10.4.1_e8.2_400bps_fast@v4.1.0_5mCG_5hmCG@v2
-* dna_r10.4.1_e8.2_400bps_hac@v4.1.0_5mCG_5hmCG@v2
-* dna_r10.4.1_e8.2_400bps_sup@v4.1.0_5mCG_5hmCG@v2
-* dna_r10.4.1_e8.2_400bps_fast@v4.2.0_5mCG_5hmCG@v2 (5 kHz)
-* dna_r10.4.1_e8.2_400bps_hac@v4.2.0_5mCG_5hmCG@v2 (5 kHz)
-* dna_r10.4.1_e8.2_400bps_sup@v4.2.0_5mCG_5hmCG@v2 (5 kHz)
-* dna_r10.4.1_e8.2_400bps_sup@v4.2.0_5mCG_5hmCG@v3 (5 kHz)
-* dna_r10.4.1_e8.2_400bps_sup@v4.2.0_5mC@v2 (5 kHz)
-* dna_r10.4.1_e8.2_400bps_sup@v4.2.0_6mA@v3 (5 kHz)
-* dna_r10.4.1_e8.2_400bps_sup@v4.2.0_5mC_5hmC@v1 (5 kHz)
-
-## Decoding Dorado model names
+### Decoding Dorado model names
 
 The names of Dorado models are systematically structured, each segment corresponding to a different aspect of the model, which include both chemistry and run settings. Below is a sample model name explained:
 
 `dna_r10.4.1_e8.2_400bps_hac@v4.2.0`
 
-- **Analyte Type (`dna`)**: This denotes the type of analyte being sequenced. For DNA sequencing, it is represented as `dna`. If you are using the Direct RNA Sequencing Kit, this will be `rna`.
+- **Analyte Type (`dna`)**: This denotes the type of analyte being sequenced. For DNA sequencing, it is represented as `dna`. If you are using a Direct RNA Sequencing Kit, this will be `rna002` or `rna004`, depending on the kit.
 
 - **Pore Type (`r10.4.1`)**: This section corresponds to the type of flow cell used. For instance, FLO-MIN114/FLO-FLG114 is indicated by `r10.4.1`, while FLO-MIN106D/FLO-FLG001 is signified by `r9.4.1`.
 
-- **Chemistry Type (`e.8.2`)**: This represents the chemistry type, which corresponds to the kit used for sequencing. For example, Kit 14 chemistry is denoted by `e.8.2`.
+- **Chemistry Type (`e8.2`)**: This represents the chemistry type, which corresponds to the kit used for sequencing. For example, Kit 14 chemistry is denoted by `e8.2`.
 
 - **Translocation Speed (`400bps`)**: This parameter, selected at the run setup in MinKNOW, refers to the speed of translocation. Prior to starting your run, a prompt will ask if you prefer to run at 260 bps or 400 bps. The former yields more accurate results but provides less data. As of MinKNOW version 23.04, the 260 bps option has been deprecated.
 
 - **Model Type (`hac`)**: This represents the size of the model, where larger models yield more accurate basecalls but take more time. The three types of models are `fast`, `hac`, and `sup`. The `fast` model is the quickest, `sup` is the most accurate, and `hac` provides a balance between speed and accuracy. For most users, the `hac` model is recommended.
 
 - **Model Version Number (`v4.2.0`)**: This denotes the version of the model. Model updates are regularly released, and higher version numbers typically signify greater accuracy.
+
+
+### **DNA models:**
+
+Below is a table of the available basecalling models and the modified basecalling models that can be used with them. The bolded models are for the latest released condition with 5 kHz data.
+
+| Basecalling Models | Compatible<br />Modifications | Modifications<br />Model<br />Version | Data<br />Sampling<br />Frequency |
+| :-------- | :------- | :--- | :--- |
+| **dna_r10.4.1_e8.2_400bps_fast@v4.2.0** | 5mCG_5hmCG | v2 | 5 kHz |
+| **dna_r10.4.1_e8.2_400bps_hac@v4.2.0** | 5mCG_5hmCG | v2 | 5 kHz |
+| **dna_r10.4.1_e8.2_400bps_sup@v4.2.0** | 5mCG_5hmCG<br />5mC_5hmC<br />5mC<br />6mA<br />| v3<br />v1<br />v2<br />v3| 5 kHz |
+| dna_r10.4.1_e8.2_400bps_fast@v4.1.0 | 5mCG_5hmCG | v2 | 4 kHz |
+| dna_r10.4.1_e8.2_400bps_hac@v4.1.0 | 5mCG_5hmCG | v2 | 4 kHz |
+| dna_r10.4.1_e8.2_400bps_sup@v4.1.0 | 5mCG_5hmCG | v2 | 4 kHz |
+| dna_r10.4.1_e8.2_260bps_fast@v4.1.0 | 5mCG_5hmCG | v2 | 4 kHz |
+| dna_r10.4.1_e8.2_260bps_hac@v4.1.0 | 5mCG_5hmCG | v2 | 4 kHz |
+| dna_r10.4.1_e8.2_260bps_sup@v4.1.0 | 5mCG_5hmCG | v2 | 4 kHz |
+| dna_r10.4.1_e8.2_400bps_fast@v4.0.0 | 5mCG_5hmCG | v2 | 4 kHz |
+| dna_r10.4.1_e8.2_400bps_hac@v4.0.0 | 5mCG_5hmCG | v2 | 4 kHz |
+| dna_r10.4.1_e8.2_400bps_sup@v4.0.0 | 5mCG_5hmCG | v2 | 4 kHz |
+| dna_r10.4.1_e8.2_260bps_fast@v4.0.0 | 5mCG_5hmCG | v2 | 4 kHz |
+| dna_r10.4.1_e8.2_260bps_hac@v4.0.0 | 5mCG_5hmCG | v2 | 4 kHz |
+| dna_r10.4.1_e8.2_260bps_sup@v4.0.0 | 5mCG_5hmCG | v2 | 4 kHz |
+| dna_r10.4.1_e8.2_260bps_fast@v3.5.2 | 5mCG | v2 | 4 kHz |
+| dna_r10.4.1_e8.2_260bps_hac@v3.5.2 | 5mCG | v2 | 4 kHz |
+| dna_r10.4.1_e8.2_260bps_sup@v3.5.2 | 5mCG | v2 | 4 kHz |
+| dna_r10.4.1_e8.2_400bps_fast@v3.5.2 | 5mCG | v2 | 4 kHz |
+| dna_r10.4.1_e8.2_400bps_hac@v3.5.2 | 5mCG | v2 | 4 kHz |
+| dna_r10.4.1_e8.2_400bps_sup@v3.5.2 | 5mCG | v2 | 4 kHz |
+| dna_r9.4.1_e8_sup@v3.6 |  |  | 4 kHz |
+| dna_r9.4.1_e8_fast@v3.4 | 5mCG_5hmCG<br />5mCG | v0<br />v0.1 | 4 kHz |
+| dna_r9.4.1_e8_hac@v3.3 | 5mCG_5hmCG<br />5mCG | v0<br />v0.1 |4 kHz |
+| dna_r9.4.1_e8_sup@v3.3 | 5mCG_5hmCG<br />5mCG | v0<br />v0.1 |4 kHz |
+
+### **RNA models:**
+
+| Basecalling Models |
+| :-------- |
+| rna004_130bps_fast@v3.0.1 |
+| rna004_130bps_hac@v3.0.1 |
+| rna004_130bps_sup@v3.0.1 |
+| rna002_70bps_fast@v3 |
+| rna002_70bps_hac@v3 |
+
 
 ## Developer quickstart
 
@@ -401,8 +379,6 @@ Dorado operates on a broad range of GPUs but it is primarily developed for Nvidi
 A potential solution to this issue could be setting a manual batch size using the following command:
 
 `dorado basecaller --batchsize 64 ...`
-
-To determine the batch size picked by `dorado`, run it in verbose mode by adding the `-v` option.
 
 **Note:** Reducing memory consumption by modifying the `chunksize` parameter is not recommended as it influences the basecalling results.
 
