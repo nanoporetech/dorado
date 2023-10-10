@@ -3,16 +3,17 @@
 #include "utils/stats.h"
 #include "utils/types.h"
 
-#include <htslib/sam.h>
-#include <minimap.h>
-
 #include <cstdint>
 #include <memory>
 #include <string>
 #include <utility>
 #include <vector>
 
+struct bam1_t;
+
 namespace dorado {
+
+class AlignerImpl;
 
 class Aligner : public MessageSink {
 public:
@@ -46,17 +47,10 @@ public:
 private:
     void start_threads();
     void terminate_impl();
+    void worker_thread();
     size_t m_threads{1};
-    std::vector<mm_tbuf_t*> m_tbufs;
-    std::vector<std::unique_ptr<std::thread>> m_workers;
-    void worker_thread(size_t tid);
-    void add_tags(bam1_t*, const mm_reg1_t*, const std::string&, const mm_tbuf_t*);
-    std::vector<BamPtr> align(bam1_t* record, mm_tbuf_t* buf);
-
-    mm_idxopt_t m_idx_opt;
-    mm_mapopt_t m_map_opt;
-    mm_idx_t* m_index{nullptr};
-    mm_idx_reader_t* m_index_reader{nullptr};
+    std::vector<std::thread> m_workers;
+    std::unique_ptr<AlignerImpl> m_aligner;
 };
 
 }  // namespace dorado
