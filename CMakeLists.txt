@@ -5,13 +5,26 @@ set(CMAKE_POLICY_DEFAULT_CMP0091 NEW)
 
 project(dorado)
 
+get_cmake_property(MULTI_CONFIG GENERATOR_IS_MULTI_CONFIG)
 if (NOT EXISTS ${CMAKE_BINARY_DIR}/CMakeCache.txt)
-  if (NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE "Release" CACHE STRING "" FORCE)
+  if (MULTI_CONFIG)
+    if (NOT CMAKE_CONFIGURATION_TYPES)
+        set(CMAKE_CONFIGURATION_TYPES "Release" CACHE STRING "" FORCE)
+    endif()
+  else()
+    if (NOT CMAKE_BUILD_TYPE)
+        set(CMAKE_BUILD_TYPE "Release" CACHE STRING "" FORCE)
+    endif()
   endif()
 endif()
 
-message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
+if (MULTI_CONFIG)
+    set(BUILD_TYPE ${CMAKE_CONFIGURATION_TYPES})
+else()
+    set(BUILD_TYPE ${CMAKE_BUILD_TYPE})
+endif()
+
+message(STATUS "Build type: " ${BUILD_TYPE})
 
 if(WIN32)
   # all third parties are release builds, so we must match the windows runtime
