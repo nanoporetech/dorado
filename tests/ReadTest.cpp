@@ -72,6 +72,15 @@ TEST_CASE(TEST_GROUP ": Test tag generation", TEST_GROUP) {
         read_common.is_duplex = was_duplex;
     }
 
+    SECTION("Duplex Parent") {
+        // Update read to be duplex parent
+        auto alignments = read_common.extract_sam_lines(false, 0, true);
+        REQUIRE(alignments.size() == 1);
+        auto* aln = alignments[0].get();
+
+        CHECK(bam_aux2i(bam_aux_get(aln, "dx")) == -1);
+    }
+
     SECTION("No model") {
         auto old_model = std::exchange(read_common.model_name, "");
 
