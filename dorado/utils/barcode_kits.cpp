@@ -331,6 +331,17 @@ const std::unordered_map<std::string, KitInfo> kit_info_map = {
                  },
                  {},
          }},
+        {"TWIST-PGX",
+         {"PGx",
+          true,
+          true,
+          "AATGATACGGCGACCACCGAGATCTACAC",
+          "ACACTCTTTCCCTACACGACGCTCTTCCGATCT",
+          "AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC",
+          "ATCTCGTATGCCGTCTTCTGCTTG",
+          {"A02_01", "B02_02", "C02_03", "D02_04", "E02_05", "F02_06", "G02_07", "H02_08"},
+          {"AA02_01", "BB02_02", "CC02_03", "DD02_04", "EE02_05", "FF02_06", "GG02_07",
+           "HH02_08"}}},
 };
 
 const std::unordered_map<std::string, std::string> barcodes = {
@@ -560,6 +571,23 @@ const std::unordered_map<std::string, std::string> barcodes = {
         {"NB94", "GATTGTCCTCAAACTGCCACCTAC"},
         {"NB95", "CCTGTCTGGAAGAAGAATGGACTT"},
         {"NB96", "CTGAACGGTCATAGAGTCCACCAT"},
+        // Twist barcodes
+        {"A02_01", "CCGACTTAGT"},
+        {"AA02_01", "AATAGCCTCA"},
+        {"B02_02", "TTCTGCATCG"},
+        {"BB02_02", "CTGCAATCGG"},
+        {"C02_03", "GGAAGTGCCA"},
+        {"CC02_03", "CCTGAGTTAT"},
+        {"D02_04", "AGATTCAACC"},
+        {"DD02_04", "GACGTCCAGA"},
+        {"E02_05", "TTCAGGAGAT"},
+        {"EE02_05", "GAATAATCGG"},
+        {"F02_06", "AAGGCGTCTG"},
+        {"FF02_06", "CGGAGTGTGT"},
+        {"G02_07", "ACGCTTGACA"},
+        {"GG02_07", "TTACCGACCG"},
+        {"H02_08", "CATGAAGTGA"},
+        {"HH02_08", "AGTGTTCGCC"},
 };
 
 }  // namespace
