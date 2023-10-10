@@ -252,7 +252,7 @@ std::vector<BamPtr> ReadCommon::extract_sam_lines(bool emit_moves,
     if (is_duplex) {
         generate_duplex_read_tags(aln);
     } else {
-        generate_read_tags(aln, emit_moves);
+        generate_read_tags(aln, emit_moves, is_duplex_parent);
     }
     generate_modbase_tags(aln, modbase_threshold);
     alns.push_back(BamPtr(aln));
