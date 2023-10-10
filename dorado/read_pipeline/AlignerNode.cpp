@@ -14,10 +14,95 @@
 #include <string>
 #include <vector>
 
+namespace {
+// If an alignment has secondary alignments, add that information
+// to each record. Follows minimap2 conventions.
+void add_sa_tag(bam1_t* record,
+                const mm_reg1_t* aln,
+                const mm_reg1_t* regs,
+                int32_t hits,
+                int32_t aln_idx,
+                int32_t l_seq,
+                const mm_idx_t* idx,
+                const bool use_hard_clip) {
+    const auto clip_char = use_hard_clip ? "H" : "S";
+    std::stringstream ss;
+    for (int i = 0; i < hits; i++) {
+        if (i == aln_idx) {
+            continue;
+        }
+        const mm_reg1_t* r = &regs[i];
+
+        if (r->parent != r->id || r->p == 0) {
+            continue;
+        }
+
+        int num_matches = 0, num_inserts = 0, num_deletes = 0;
+        int clip3 = 0, clip5 = 0;
+
+        if (r->qe - r->qs < r->re - r->rs) {
+            num_matches = r->qe - r->qs;
+            num_deletes = (r->re - r->rs) - num_matches;
+        } else {
+            num_matches = r->re - r->rs;
+            num_inserts = (r->qe - r->qs) - num_matches;
+        }
+
+        clip5 = r->rev ? l_seq - r->qe : r->qs;
+        clip3 = r->rev ? r->qs : l_seq - r->qe;
+
+        ss << std::string(idx->seq[r->rid].name) << ",";
+        ss << r->rs + 1 << ",";
+        ss << "+-"[r->rev] << ",";
+        if (clip5) {
+            ss << clip5 << clip_char;
+        }
+        if (num_matches) {
+            ss << num_matches << "M";
+        }
+        if (num_inserts) {
+            ss << num_inserts << "I";
+        }
+        if (num_deletes) {
+            ss << num_deletes << "D";
+        }
+        if (clip3) {
+            ss << clip3 << clip_char;
+        }
+        ss << "," << r->mapq << "," << (r->blen - r->mlen + r->p->n_ambi) << ";";
+    }
+    std::string sa = ss.str();
+    if (!sa.empty()) {
+        bam_aux_append(record, "SA", 'Z', sa.length() + 1, (uint8_t*)sa.c_str());
+    }
+}
+}  // namespace
+
 namespace dorado {
 
-Aligner::Aligner(const std::string& filename, const Minimap2Options& options, int threads)
-        : MessageSink(10000), m_threads(threads) {
+class AlignerImpl {
+public:
+    AlignerImpl(const std::string& filename,
+                const Aligner::Minimap2Options& options,
+                size_t threads);
+    ~AlignerImpl();
+
+    void add_tags(bam1_t*, const mm_reg1_t*, const std::string&, const mm_tbuf_t*);
+    std::vector<BamPtr> align(bam1_t* record, mm_tbuf_t* buf);
+    Aligner::bam_header_sq_t get_sequence_records_for_header() const;
+
+private:
+    size_t m_threads;
+    mm_idxopt_t m_idx_opt;
+    mm_mapopt_t m_map_opt;
+    mm_idx_t* m_index{nullptr};
+    mm_idx_reader_t* m_index_reader{nullptr};
+};
+
+AlignerImpl::AlignerImpl(const std::string& filename,
+                         const Aligner::Minimap2Options& options,
+                         size_t threads)
+        : m_threads(threads) {
     // Check if reference file exists.
     if (!std::filesystem::exists(filename)) {
         throw std::runtime_error("Aligner reference path does not exist: " + filename);
@@ -96,209 +181,14 @@ Aligner::Aligner(const std::string& filename, const Minimap2Options& options, in
     if (mm_verbose >= 3) {
         mm_idx_stat(m_index);
     }
-
-    for (int i = 0; i < m_threads; i++) {
-        m_tbufs.push_back(mm_tbuf_init());
-    }
-
-    start_threads();
 }
 
-void Aligner::start_threads() {
-    for (size_t i = 0; i < m_threads; i++) {
-        m_workers.push_back(
-                std::make_unique<std::thread>(std::thread(&Aligner::worker_thread, this, i)));
-    }
-}
-
-void Aligner::terminate_impl() {
-    terminate_input_queue();
-    for (auto& m : m_workers) {
-        if (m->joinable()) {
-            m->join();
-        }
-    }
-    m_workers.clear();
-}
-
-void Aligner::restart() {
-    restart_input_queue();
-    start_threads();
-}
-
-Aligner::~Aligner() {
-    terminate_impl();
-    for (int i = 0; i < m_threads; i++) {
-        mm_tbuf_destroy(m_tbufs[i]);
-    }
+AlignerImpl::~AlignerImpl() {
     mm_idx_reader_close(m_index_reader);
     mm_idx_destroy(m_index);
 }
 
-Aligner::bam_header_sq_t Aligner::get_sequence_records_for_header() const {
-    std::vector<std::pair<char*, uint32_t>> records;
-    for (int i = 0; i < m_index->n_seq; ++i) {
-        records.push_back(std::make_pair(m_index->seq[i].name, m_index->seq[i].len));
-    }
-    return records;
-}
-
-void Aligner::worker_thread(size_t tid) {
-    Message message;
-    while (get_input_message(message)) {
-        // If this message isn't a BamPtr, just forward it to the sink.
-        if (!std::holds_alternative<BamPtr>(message)) {
-            send_message_to_sink(std::move(message));
-            continue;
-        }
-
-        auto read = std::get<BamPtr>(std::move(message));
-        auto records = align(read.get(), m_tbufs[tid]);
-        for (auto& record : records) {
-            send_message_to_sink(std::move(record));
-        }
-    }
-}
-
-// If an alignment has secondary alignments, add that informatino
-// to each record. Follows minimap2 conventions.
-void add_sa_tag(bam1_t* record,
-                const mm_reg1_t* aln,
-                const mm_reg1_t* regs,
-                int32_t hits,
-                int32_t aln_idx,
-                int32_t l_seq,
-                const mm_idx_t* idx,
-                const bool use_hard_clip) {
-    const auto clip_char = use_hard_clip ? "H" : "S";
-    std::stringstream ss;
-    for (int i = 0; i < hits; i++) {
-        if (i == aln_idx) {
-            continue;
-        }
-        const mm_reg1_t* r = &regs[i];
-
-        if (r->parent != r->id || r->p == 0) {
-            continue;
-        }
-
-        int num_matches = 0, num_inserts = 0, num_deletes = 0;
-        int clip3 = 0, clip5 = 0;
-
-        if (r->qe - r->qs < r->re - r->rs) {
-            num_matches = r->qe - r->qs;
-            num_deletes = (r->re - r->rs) - num_matches;
-        } else {
-            num_matches = r->re - r->rs;
-            num_inserts = (r->qe - r->qs) - num_matches;
-        }
-
-        clip5 = r->rev ? l_seq - r->qe : r->qs;
-        clip3 = r->rev ? r->qs : l_seq - r->qe;
-
-        ss << std::string(idx->seq[r->rid].name) << ",";
-        ss << r->rs + 1 << ",";
-        ss << "+-"[r->rev] << ",";
-        if (clip5) {
-            ss << clip5 << clip_char;
-        }
-        if (num_matches) {
-            ss << num_matches << "M";
-        }
-        if (num_inserts) {
-            ss << num_inserts << "I";
-        }
-        if (num_deletes) {
-            ss << num_deletes << "D";
-        }
-        if (clip3) {
-            ss << clip3 << clip_char;
-        }
-        ss << "," << r->mapq << "," << (r->blen - r->mlen + r->p->n_ambi) << ";";
-    }
-    std::string sa = ss.str();
-    if (!sa.empty()) {
-        bam_aux_append(record, "SA", 'Z', sa.length() + 1, (uint8_t*)sa.c_str());
-    }
-}
-
-// Function to add auxiliary tags to the alignment record.
-// These are added to maintain parity with mm2.
-void Aligner::add_tags(bam1_t* record,
-                       const mm_reg1_t* aln,
-                       const std::string& seq,
-                       const mm_tbuf_t* buf) {
-    if (aln->p) {
-        // NM
-        int32_t nm = aln->blen - aln->mlen + aln->p->n_ambi;
-        bam_aux_append(record, "NM", 'i', sizeof(nm), (uint8_t*)&nm);
-
-        // ms
-        int32_t ms = aln->p->dp_max;
-        bam_aux_append(record, "ms", 'i', sizeof(nm), (uint8_t*)&ms);
-
-        // AS
-        int32_t as = aln->p->dp_score;
-        bam_aux_append(record, "AS", 'i', sizeof(nm), (uint8_t*)&as);
-
-        // nn
-        int32_t nn = aln->p->n_ambi;
-        bam_aux_append(record, "nn", 'i', sizeof(nm), (uint8_t*)&nn);
-
-        if (aln->p->trans_strand == 1 || aln->p->trans_strand == 2) {
-            bam_aux_append(record, "ts", 'A', 2, (uint8_t*)&("?+-?"[aln->p->trans_strand]));
-        }
-    }
-
-    // de / dv
-    if (aln->p) {
-        float div;
-        div = 1.0 - mm_event_identity(aln);
-        bam_aux_append(record, "de", 'f', sizeof(div), (uint8_t*)&div);
-    } else if (aln->div >= 0.0f && aln->div <= 1.0f) {
-        bam_aux_append(record, "dv", 'f', sizeof(aln->div), (uint8_t*)&aln->div);
-    }
-
-    // tp
-    char type;
-    if (aln->id == aln->parent) {
-        type = aln->inv ? 'I' : 'P';
-    } else {
-        type = aln->inv ? 'i' : 'S';
-    }
-    bam_aux_append(record, "tp", 'A', sizeof(type), (uint8_t*)&type);
-
-    // cm
-    bam_aux_append(record, "cm", 'i', sizeof(aln->cnt), (uint8_t*)&aln->cnt);
-
-    // s1
-    bam_aux_append(record, "s1", 'i', sizeof(aln->score), (uint8_t*)&aln->score);
-
-    // s2
-    if (aln->parent == aln->id) {
-        bam_aux_append(record, "s2", 'i', sizeof(aln->subsc), (uint8_t*)&aln->subsc);
-    }
-
-    // MD
-    char* md = NULL;
-    int max_len = 0;
-    int md_len = mm_gen_MD(NULL, &md, &max_len, m_index, aln, seq.c_str());
-    if (md_len > 0) {
-        bam_aux_append(record, "MD", 'Z', md_len + 1, (uint8_t*)md);
-    }
-    free(md);
-
-    // zd
-    if (aln->split) {
-        uint32_t split = uint32_t(aln->split);
-        bam_aux_append(record, "zd", 'i', sizeof(split), (uint8_t*)&split);
-    }
-
-    // rl
-    bam_aux_append(record, "rl", 'i', sizeof(buf->rep_len), (uint8_t*)&buf->rep_len);
-}
-
-std::vector<BamPtr> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
+std::vector<BamPtr> AlignerImpl::align(bam1_t* irecord, mm_tbuf_t* buf) {
     // some where for the hits
     std::vector<BamPtr> results;
 
@@ -456,6 +346,143 @@ std::vector<BamPtr> Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
     }
     free(reg);
     return results;
+}
+
+Aligner::bam_header_sq_t AlignerImpl::get_sequence_records_for_header() const {
+    std::vector<std::pair<char*, uint32_t>> records;
+    for (int i = 0; i < m_index->n_seq; ++i) {
+        records.push_back(std::make_pair(m_index->seq[i].name, m_index->seq[i].len));
+    }
+    return records;
+}
+
+// Function to add auxiliary tags to the alignment record.
+// These are added to maintain parity with mm2.
+void AlignerImpl::add_tags(bam1_t* record,
+                           const mm_reg1_t* aln,
+                           const std::string& seq,
+                           const mm_tbuf_t* buf) {
+    if (aln->p) {
+        // NM
+        int32_t nm = aln->blen - aln->mlen + aln->p->n_ambi;
+        bam_aux_append(record, "NM", 'i', sizeof(nm), (uint8_t*)&nm);
+
+        // ms
+        int32_t ms = aln->p->dp_max;
+        bam_aux_append(record, "ms", 'i', sizeof(nm), (uint8_t*)&ms);
+
+        // AS
+        int32_t as = aln->p->dp_score;
+        bam_aux_append(record, "AS", 'i', sizeof(nm), (uint8_t*)&as);
+
+        // nn
+        int32_t nn = aln->p->n_ambi;
+        bam_aux_append(record, "nn", 'i', sizeof(nm), (uint8_t*)&nn);
+
+        if (aln->p->trans_strand == 1 || aln->p->trans_strand == 2) {
+            bam_aux_append(record, "ts", 'A', 2, (uint8_t*)&("?+-?"[aln->p->trans_strand]));
+        }
+    }
+
+    // de / dv
+    if (aln->p) {
+        float div;
+        div = 1.0 - mm_event_identity(aln);
+        bam_aux_append(record, "de", 'f', sizeof(div), (uint8_t*)&div);
+    } else if (aln->div >= 0.0f && aln->div <= 1.0f) {
+        bam_aux_append(record, "dv", 'f', sizeof(aln->div), (uint8_t*)&aln->div);
+    }
+
+    // tp
+    char type;
+    if (aln->id == aln->parent) {
+        type = aln->inv ? 'I' : 'P';
+    } else {
+        type = aln->inv ? 'i' : 'S';
+    }
+    bam_aux_append(record, "tp", 'A', sizeof(type), (uint8_t*)&type);
+
+    // cm
+    bam_aux_append(record, "cm", 'i', sizeof(aln->cnt), (uint8_t*)&aln->cnt);
+
+    // s1
+    bam_aux_append(record, "s1", 'i', sizeof(aln->score), (uint8_t*)&aln->score);
+
+    // s2
+    if (aln->parent == aln->id) {
+        bam_aux_append(record, "s2", 'i', sizeof(aln->subsc), (uint8_t*)&aln->subsc);
+    }
+
+    // MD
+    char* md = NULL;
+    int max_len = 0;
+    int md_len = mm_gen_MD(NULL, &md, &max_len, m_index, aln, seq.c_str());
+    if (md_len > 0) {
+        bam_aux_append(record, "MD", 'Z', md_len + 1, (uint8_t*)md);
+    }
+    free(md);
+
+    // zd
+    if (aln->split) {
+        uint32_t split = uint32_t(aln->split);
+        bam_aux_append(record, "zd", 'i', sizeof(split), (uint8_t*)&split);
+    }
+
+    // rl
+    bam_aux_append(record, "rl", 'i', sizeof(buf->rep_len), (uint8_t*)&buf->rep_len);
+}
+
+Aligner::Aligner(const std::string& filename, const Minimap2Options& options, int threads)
+        : MessageSink(10000),
+          m_threads(threads),
+          m_aligner(std::make_unique<AlignerImpl>(filename, options, threads)) {
+    start_threads();
+}
+
+void Aligner::start_threads() {
+    for (size_t i = 0; i < m_threads; i++) {
+        m_workers.push_back(std::thread(&Aligner::worker_thread, this));
+    }
+}
+
+void Aligner::terminate_impl() {
+    terminate_input_queue();
+    for (auto& m : m_workers) {
+        if (m.joinable()) {
+            m.join();
+        }
+    }
+    m_workers.clear();
+}
+
+void Aligner::restart() {
+    restart_input_queue();
+    start_threads();
+}
+
+Aligner::~Aligner() { terminate_impl(); }
+
+Aligner::bam_header_sq_t Aligner::get_sequence_records_for_header() const {
+    return m_aligner->get_sequence_records_for_header();
+}
+
+void Aligner::worker_thread() {
+    Message message;
+    mm_tbuf_t* tbuf = mm_tbuf_init();
+    while (get_input_message(message)) {
+        // If this message isn't a BamPtr, just forward it to the sink.
+        if (!std::holds_alternative<BamPtr>(message)) {
+            send_message_to_sink(std::move(message));
+            continue;
+        }
+
+        auto read = std::get<BamPtr>(std::move(message));
+        auto records = m_aligner->align(read.get(), tbuf);
+        for (auto& record : records) {
+            send_message_to_sink(std::move(record));
+        }
+    }
+    mm_tbuf_destroy(tbuf);
 }
 
 stats::NamedStats Aligner::sample_stats() const { return stats::from_obj(m_work_queue); }

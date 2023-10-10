@@ -279,10 +279,10 @@ target_link_libraries(dorado_lib
         vbz_hdf_plugin
         edlib
         date::date
-        minimap2
         dorado_utils
     PRIVATE
         ${KOI_LIBRARIES}    
+        minimap2
 )
 
 if(NOT WIN32)
