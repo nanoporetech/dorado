@@ -19,6 +19,7 @@ stages:
   - deploy
 
 variables:
+  GET_SOURCES_ATTEMPTS: 5
   BUILD_DIR: build
   BUILD_TARGET: install
   GIT_SUBMODULE_STRATEGY: recursive
@@ -97,6 +98,10 @@ variables:
       - tests/data
     expire_in: 1 day
   interruptible: true
+  retry:
+    max: 1
+    when:
+    - job_execution_timeout
 
 .build_dorado_archive: &build_dorado_archive
   stage: build

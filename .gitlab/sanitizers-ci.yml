@@ -19,6 +19,11 @@
   # No need to keep the build around
   # Note that this requires .sanitizer_common to come last in the extends list
   artifacts: null
+  interruptible: true
+  retry:
+    max: 1
+    when:
+    - job_execution_timeout
 
 # On Linux we don't currently test TSan due to some issues with pod5/libarrow being
 # uninstrumented and lacking symbols, leading to suppression files failing to suppress
