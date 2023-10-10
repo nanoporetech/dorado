@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 set(CMAKE_POLICY_DEFAULT_CMP0063 NEW)
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
+set(CMAKE_POLICY_DEFAULT_CMP0091 NEW)
 
 project(dorado)
 
@@ -13,6 +14,8 @@ endif()
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
 if(WIN32)
+  # all third parties are release builds, so we must match the windows runtime
+  set(CMAKE_MSVC_RUNTIME_LIBRARY MultiThreadedDLL)
   message(STATUS "toolset: ${CMAKE_GENERATOR_TOOLSET}")
   message(STATUS "platform: ${CMAKE_GENERATOR_PLATFORM}")
   message(STATUS "vs platform: ${CMAKE_VS_PLATFORM_NAME}")
