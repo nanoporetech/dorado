@@ -164,7 +164,7 @@ The default heuristic for double-ended barcodes is to look for them on either en
 The output from `dorado basecaller` can be demultiplexed into per-barcode BAMs using `samtools split`. e.g.
 
 ```
-$ samtools split -u <basecalled-bam> -f <output-dir>/<prefix>_%!.bam
+$ samtools split -u <output-dir>/unclassified.bam -f "<output-dir>/<prefix>_%!.bam" <input-bam>
 ```
 
 #### Classifying existing datasets
