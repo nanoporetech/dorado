@@ -33,11 +33,11 @@ std::string generate_barcode_string(dorado::demux::ScoreResults bc_res) {
 
 dorado::BarcodingInfo create_barcoding_info(const std::string& kit_name,
                                             bool barcode_both_ends,
-                                            bool trim) {
+                                            bool trim_barcode) {
     dorado::BarcodingInfo result{};
     result.kit_name = kit_name;
     result.barcode_both_ends = barcode_both_ends;
-    result.trim = !trim;
+    result.trim = trim_barcode;
     return result;
 }
 
