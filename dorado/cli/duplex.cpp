@@ -3,6 +3,7 @@
 #include "data_loader/DataLoader.h"
 #include "models/models.h"
 #include "nn/CRFModelConfig.h"
+#include "nn/ModBaseRunner.h"
 #include "nn/Runners.h"
 #include "read_pipeline/AlignerNode.h"
 #include "read_pipeline/BaseSpaceDuplexCallerNode.h"
@@ -111,6 +112,31 @@ int duplex(int argc, char* argv[]) {
 
     parser.visible.add_argument("-v", "--verbose").default_value(false).implicit_value(true);
 
+    parser.visible.add_argument("--modified-bases")
+            .nargs(argparse::nargs_pattern::at_least_one)
+            .action([](const std::string& value) {
+                const auto& mods = models::modified_mods();
+                if (std::find(mods.begin(), mods.end(), value) == mods.end()) {
+                    spdlog::error(
+                            "'{}' is not a supported modification please select from {}", value,
+                            std::accumulate(
+                                    std::next(mods.begin()), mods.end(), mods[0],
+                                    [](std::string a, std::string b) { return a + ", " + b; }));
+                    std::exit(EXIT_FAILURE);
+                }
+                return value;
+            });
+
+    parser.visible.add_argument("--modified-bases-models")
+            .default_value(std::string())
+            .help("a comma separated list of modified base models");
+
+    parser.visible.add_argument("--modified-bases-threshold")
+            .default_value(default_parameters.methylation_threshold)
+            .scan<'f', float>()
+            .help("the minimum predicted methylation probability for a modified base to be emitted "
+                  "in an all-context model, [0, 1]");
+
     cli::add_minimap2_arguments(parser, Aligner::dflt_options);
     cli::add_internal_arguments(parser);
 
@@ -133,6 +159,24 @@ int duplex(int argc, char* argv[]) {
         std::vector<std::string> args(argv, argv + argc);
         if (parser.visible.get<bool>("--verbose")) {
             utils::SetDebugLogging();
+        }
+
+        auto mod_bases = parser.visible.get<std::vector<std::string>>("--modified-bases");
+        auto mod_bases_models = parser.visible.get<std::string>("--modified-bases-models");
+
+        if (mod_bases.size() && !mod_bases_models.empty()) {
+            spdlog::error(
+                    "only one of --modified-bases or --modified-bases-models should be specified.");
+            std::exit(EXIT_FAILURE);
+        } else if (mod_bases.size()) {
+            std::vector<std::string> m;
+            std::transform(
+                    mod_bases.begin(), mod_bases.end(), std::back_inserter(m),
+                    [&model](std::string m) { return models::get_modification_model(model, m); });
+
+            mod_bases_models =
+                    std::accumulate(std::next(m.begin()), m.end(), m[0],
+                                    [](std::string a, std::string b) { return a + "," + b; });
         }
         std::map<std::string, std::string> template_complement_map;
         auto read_list = utils::load_read_list(parser.visible.get<std::string>("--read-ids"));
@@ -281,6 +325,15 @@ int duplex(int argc, char* argv[]) {
             }
             auto stereo_model_config = load_crf_model_config(stereo_model_path);
 
+            // create modbase runners first so basecall runners can pick batch sizes based on available memory
+            auto mod_base_runners = create_modbase_runners(
+                    mod_bases_models, device, default_parameters.mod_base_runners_per_caller,
+                    default_parameters.remora_batchsize);
+
+            if (!mod_base_runners.empty() && output_mode == HtsWriter::OutputMode::FASTQ) {
+                throw std::runtime_error("Modified base models cannot be used with FASTQ output");
+            }
+
             // Write read group info to header.
             auto duplex_rg_name = std::string(model + "_" + stereo_model_name);
             auto read_groups = DataLoader::load_read_groups(reads, model, recursive_file_loading);
@@ -341,9 +394,9 @@ int duplex(int argc, char* argv[]) {
                 }
             }
             pipelines::create_stereo_duplex_pipeline(
-                    pipeline_desc, std::move(runners), std::move(stereo_runners), overlap,
-                    mean_qscore_start_pos, num_devices * 2, num_devices,
-                    std::move(pairing_parameters), read_filter_node);
+                    pipeline_desc, std::move(runners), std::move(stereo_runners),
+                    std::move(mod_base_runners), overlap, mean_qscore_start_pos, num_devices * 2,
+                    num_devices, std::move(pairing_parameters), read_filter_node);
 
             std::vector<dorado::stats::StatsReporter> stats_reporters;
             pipeline = Pipeline::create(std::move(pipeline_desc), &stats_reporters);

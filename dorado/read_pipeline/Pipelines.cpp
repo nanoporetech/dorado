@@ -75,16 +75,18 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
     }
 }
 
-void create_stereo_duplex_pipeline(PipelineDescriptor& pipeline_desc,
-                                   std::vector<dorado::Runner>&& runners,
-                                   std::vector<dorado::Runner>&& stereo_runners,
-                                   size_t overlap,
-                                   uint32_t mean_qscore_start_pos,
-                                   int scaler_node_threads,
-                                   int splitter_node_threads,
-                                   PairingParameters pairing_parameters,
-                                   NodeHandle sink_node_handle,
-                                   NodeHandle source_node_handle) {
+void create_stereo_duplex_pipeline(
+        PipelineDescriptor& pipeline_desc,
+        std::vector<dorado::Runner>&& runners,
+        std::vector<dorado::Runner>&& stereo_runners,
+        std::vector<std::unique_ptr<dorado::ModBaseRunner>>&& modbase_runners,
+        size_t overlap,
+        uint32_t mean_qscore_start_pos,
+        int scaler_node_threads,
+        int splitter_node_threads,
+        PairingParameters pairing_parameters,
+        NodeHandle sink_node_handle,
+        NodeHandle source_node_handle) {
     const auto& model_config = runners.front()->config();
     const auto& stereo_model_config = stereo_runners.front()->config();
     std::string model_name =

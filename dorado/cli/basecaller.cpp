@@ -98,8 +98,9 @@ void setup(std::vector<std::string> args,
     }
 
     // create modbase runners first so basecall runners can pick batch sizes based on available memory
-    auto remora_runners = create_modbase_runners(
-            remora_models, device, default_parameters.remora_runners_per_caller, remora_batch_size);
+    auto remora_runners = create_modbase_runners(remora_models, device,
+                                                 default_parameters.mod_base_runners_per_caller,
+                                                 remora_batch_size);
 
     if (!remora_runners.empty() && output_mode == HtsWriter::OutputMode::FASTQ) {
         throw std::runtime_error("Modified base models cannot be used with FASTQ output");
@@ -114,8 +115,6 @@ void setup(std::vector<std::string> args,
     size_t num_reads = DataLoader::get_num_reads(
             data_path, read_list, {} /*reads_already_processed*/, recursive_file_loading);
     num_reads = max_reads == 0 ? num_reads : std::min(num_reads, max_reads);
-
-    bool duplex = false;
 
     const auto thread_allocations = utils::default_thread_allocations(
             num_devices, !remora_runners.empty() ? num_remora_threads : 0, enable_aligner,
@@ -211,7 +210,7 @@ void setup(std::vector<std::string> args,
     }
 
     std::vector<dorado::stats::StatsCallable> stats_callables;
-    ProgressTracker tracker(num_reads, duplex);
+    ProgressTracker tracker(num_reads, false);
     stats_callables.push_back(
             [&tracker](const stats::NamedStats& stats) { tracker.update_progress_bar(stats); });
     constexpr auto kStatsPeriod = 100ms;

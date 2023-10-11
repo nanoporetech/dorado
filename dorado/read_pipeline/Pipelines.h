@@ -41,6 +41,7 @@ void create_stereo_duplex_pipeline(
         PipelineDescriptor& pipeline_desc,
         std::vector<dorado::Runner>&& runners,
         std::vector<dorado::Runner>&& stereo_runners,
+        std::vector<std::unique_ptr<dorado::ModBaseRunner>>&& modbase_runners,
         size_t overlap,
         uint32_t mean_qscore_start_pos,
         int scaler_node_threads,
