@@ -78,10 +78,12 @@ void print_pileup_data(std::ostream &os,
     }
 }
 
-std::vector<float> _get_weibull_scores(const bam_pileup1_t *p,
-                                       const int64_t indel,
-                                       const int64_t num_homop,
-                                       std::unordered_set<std::string> &bad_reads) {
+namespace {
+
+std::vector<float> get_weibull_scores(const bam_pileup1_t *p,
+                                      const int64_t indel,
+                                      const int64_t num_homop,
+                                      std::unordered_set<std::string> &bad_reads) {
     // Create homopolymer scores using Weibull shape and scale parameters.
     // If prerequisite sam tags are not present an array of zero counts is returned.
     std::vector<float> fraction_counts(num_homop);
@@ -118,6 +120,8 @@ std::vector<float> _get_weibull_scores(const bam_pileup1_t *p,
     }
     return fraction_counts;
 }
+
+}  // namespace
 
 PileupData calculate_pileup(BamFile &bam_file,
                             const std::string &chr_name,
@@ -291,7 +295,7 @@ PileupData calculate_pileup(BamFile &bam_file,
 
                     if (weibull_summation) {
                         const std::vector<float> fraction_counts =
-                                _get_weibull_scores(p, query_pos_offset, num_homop, no_rle_tags);
+                                get_weibull_scores(p, query_pos_offset, num_homop, no_rle_tags);
                         for (int64_t qstrat = 0; qstrat < num_homop; ++qstrat) {
                             static const int32_t scale = 10000;
                             pileup_matrix[partial_index + PILEUP_BASES_SIZE * qstrat] +=

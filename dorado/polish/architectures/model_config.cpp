@@ -8,6 +8,8 @@
 
 namespace dorado::polisher {
 
+namespace {
+
 void print_toml(std::ostream& os, const toml::value& val, int indent) {
     const std::string indent_str(indent, ' ');
 
@@ -60,6 +62,8 @@ std::unordered_map<std::string, std::string> parse_kwargs(const toml::value& tab
     return kwargs;
 }
 
+}  // namespace
+
 ModelConfig parse_model_config(const std::filesystem::path& config_path,
                                const std::string& model_file) {
     const toml::value config_toml = toml::parse(config_path.string());
@@ -75,6 +79,7 @@ ModelConfig parse_model_config(const std::filesystem::path& config_path,
     }
 
     // print_toml(config_toml, 0);
+    (void)print_toml;
 
     ModelConfig cfg;
 

@@ -6,6 +6,8 @@
 
 namespace dorado::polisher {
 
+namespace {
+
 enum class ActivationType {
     RELU,
 };
@@ -50,6 +52,8 @@ torch::nn::Sequential make_1d_conv_layers(const std::vector<int32_t>& kernel_siz
 
     return layers;
 }
+
+}  // namespace
 
 ReadLevelConvImpl::ReadLevelConvImpl(const int32_t num_in_features,
                                      const int32_t out_dim,

@@ -104,6 +104,8 @@ ModelGeneralParams::ModelGeneralParams(ModelType model_type_,
     }
 }
 
+namespace {
+
 ModelGeneralParams parse_general_params(const toml::value& config_toml) {
     const auto segment = toml::find(config_toml, "model_params");
 
@@ -120,6 +122,8 @@ ModelGeneralParams parse_general_params(const toml::value& config_toml) {
     };
     return params;
 }
+
+}  // namespace
 
 LinearParams::LinearParams(int in_, int out_) : in(in_), out(out_) {
     if (in < 1 || out < 1) {
@@ -178,6 +182,8 @@ char ModificationParams::get_canonical_base_name(const std::string& motif, size_
     return motif_base[0];
 }
 
+namespace {
+
 ModificationParams parse_modification_params(const toml::value& config_toml) {
     const auto& params = toml::find(config_toml, "modbases");
 
@@ -211,6 +217,8 @@ ModificationParams parse_modification_params(const toml::value& config_toml) {
 
     return ModificationParams{std::move(codes), std::move(long_names), motif, motif_offset};
 }
+
+}  // namespace
 
 ContextParams::ContextParams(int64_t samples_before_,
                              int64_t samples_after_,
@@ -248,6 +256,8 @@ int64_t ContextParams::normalise(const int64_t v, const int64_t stride) {
     return v + stride - remainder;
 }
 
+namespace {
+
 ContextParams parse_context_params(const toml::value& config_toml) {
     const auto& params = toml::find(config_toml, "modbases");
 
@@ -269,6 +279,8 @@ ContextParams parse_context_params(const toml::value& config_toml) {
                          reverse, base_start_justify);
 }
 
+}  // namespace
+
 ContextParams ContextParams::normalised(const int stride) const {
     const int64_t sb = normalise(samples_before, stride);
     const int64_t sa = normalise(samples_after, stride);
@@ -288,6 +300,8 @@ RefinementParams::RefinementParams(int center_idx_)
     }
 }
 
+namespace {
+
 RefinementParams parse_refinement_params(const toml::value& config_toml) {
     if (!config_toml.contains("refinement")) {
         return RefinementParams{};
@@ -303,6 +317,8 @@ RefinementParams parse_refinement_params(const toml::value& config_toml) {
     const int center_index = get_int_in_range(segment, "refine_kmer_center_idx", 0, 19, REQUIRED);
     return RefinementParams(center_index);
 }
+
+}  // namespace
 
 ModBaseModelConfig::ModBaseModelConfig(std::filesystem::path model_path_,
                                        ModelGeneralParams general_,

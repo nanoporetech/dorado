@@ -60,8 +60,8 @@ void force_reference(T Obj::* sym) {
 
 }  // namespace
 
-DORADO_EXPORT
-void reference_all_public_functions() {
+DORADO_EXPORT void reference_all_public_functions();
+DORADO_EXPORT void reference_all_public_functions() {
     // Reference a few functions in the public API so that we make sure that
     // their dependencies are also linked in. We'll get a linker error if we're
     // missing something in the dependency chain.

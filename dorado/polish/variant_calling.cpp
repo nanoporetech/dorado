@@ -21,6 +21,8 @@
 
 namespace dorado::polisher {
 
+namespace {
+
 /**
  * \brief Copy the draft sequence for a given sample, and expand it with '*' in places of gaps.
  */
@@ -762,6 +764,8 @@ std::vector<VariantCallingSample> trim_vc_samples(
 
     return trimmed_samples;
 }
+
+}  // namespace
 
 std::vector<Variant> call_variants(
         const dorado::polisher::Interval& region_batch,

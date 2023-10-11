@@ -551,6 +551,8 @@ CATCH_SCENARIO_METHOD(AlignerNodeTestFixture, "AlignerNode push SimplexRead", TE
     }
 }
 
+namespace {
+
 std::pair<std::string, std::string> get_read_id_and_sequence_from_fasta(
         const std::string& fasta_file) {
     std::ifstream query_input_stream(fasta_file);
@@ -572,6 +574,8 @@ std::pair<std::string, std::string> get_read_id_and_sequence_from_fasta(
 
     return {read_id, sequence};
 }
+
+}  // namespace
 
 CATCH_TEST_CASE_METHOD(AlignerNodeTestFixture,
                        "AlignerNode compare BamPtr and ReadCommon processing",

@@ -27,6 +27,8 @@ LabelSchemeType parse_label_scheme_type(const std::string& type) {
     throw std::runtime_error{"Unknown label scheme type: '" + type + "'!"};
 }
 
+namespace {
+
 std::vector<ConsensusResult> decode_bases_impl(const LabelSchemeType label_scheme_type,
                                                const dorado::Span<const float> logits,
                                                const size_t num_samples,
@@ -69,6 +71,8 @@ std::vector<ConsensusResult> decode_bases_impl(const LabelSchemeType label_schem
 
     return results;
 }
+
+}  // namespace
 
 std::vector<ConsensusResult> decode_bases_impl(const LabelSchemeType label_scheme_type,
                                                const at::Tensor& logits) {

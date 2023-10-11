@@ -8,6 +8,8 @@
 #include <catch2/catch_test_macros.hpp>
 #include <htslib/sam.h>
 
+namespace {
+
 using namespace dorado;
 
 BamPtr generate_bam_entry(const std::string& read_id,
@@ -22,6 +24,8 @@ BamPtr generate_bam_entry(const std::string& read_id,
              seq.length(), seq.c_str(), quals, 0);
     return rec;
 }
+
+}  // namespace
 
 CATCH_TEST_CASE("Check if a read can be loaded correctly from FASTA input.", "FastxRandomReader") {
     auto temp_dir = tests::make_temp_dir("fastx_random_reader_test");

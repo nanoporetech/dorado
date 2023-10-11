@@ -16,10 +16,11 @@
 #include <thread>
 #include <vector>
 
-using namespace torch::nn;
-
 namespace dorado::basecall {
 
+namespace {
+
+using namespace torch::nn;
 using namespace config;
 
 std::vector<at::Tensor> load_lstm_model_weights(const std::filesystem::path &dir,
@@ -120,6 +121,8 @@ std::vector<torch::Tensor> load_tx_model_weights(const BasecallModelConfig &cfg)
     return utils::load_tensors(cfg.model_path, tensors);
 }
 
+}  // namespace
+
 std::vector<at::Tensor> load_crf_model_weights(const BasecallModelConfig &model_config) {
     if (model_config.is_tx_model()) {
         return load_tx_model_weights(model_config);
@@ -127,6 +130,8 @@ std::vector<at::Tensor> load_crf_model_weights(const BasecallModelConfig &model_
     return load_lstm_model_weights(model_config.model_path, model_config.out_features.has_value(),
                                    model_config.bias);
 }
+
+namespace {
 
 ModuleHolder<AnyModule> load_lstm_model(const BasecallModelConfig &model_config,
                                         const at::TensorOptions &options) {
@@ -155,6 +160,8 @@ ModuleHolder<AnyModule> load_tx_model(const BasecallModelConfig &model_config,
     auto holder = ModuleHolder<AnyModule>(module);
     return holder;
 }
+
+}  // namespace
 
 ModuleHolder<AnyModule> load_crf_model(const BasecallModelConfig &model_config,
                                        const torch::TensorOptions &options) {

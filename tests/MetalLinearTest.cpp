@@ -6,6 +6,8 @@
 #include <cstdint>
 #include <vector>
 
+namespace {
+
 using namespace dorado::utils;
 
 // For convenient Slice syntax.
@@ -22,6 +24,8 @@ float MeanAbsDiff(const at::Tensor &a, const at::Tensor &b) {
 
 // 32 threads/SIMD group on Apple GPUs.  The kernels have this hardwired.
 constexpr int kSimdGroupSize = 32;
+
+}  // namespace
 
 CATCH_TEST_CASE(TEST_GROUP "Linear") {
     // Basic device setup.

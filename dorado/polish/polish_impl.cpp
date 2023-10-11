@@ -26,6 +26,8 @@
 
 namespace dorado::polisher {
 
+namespace {
+
 std::vector<DeviceInfo> init_devices(const std::string& devices_str) {
     std::vector<DeviceInfo> devices;
 
@@ -53,6 +55,8 @@ std::vector<DeviceInfo> init_devices(const std::string& devices_str) {
 
     return devices;
 }
+
+}  // namespace
 
 PolisherResources create_resources(const ModelConfig& model_config,
                                    const std::filesystem::path& in_aln_bam_fn,
@@ -350,6 +354,8 @@ std::vector<ConsensusResult> stitch_sequence(
     return ret;
 }
 
+namespace {
+
 /**
  * \brief If the input sample coordinates (positions_major) have gaps,
  *          this function splits the sample on those gaps and produces
@@ -488,6 +494,8 @@ std::vector<Sample> split_samples(std::vector<Sample> samples,
 
     return results;
 }
+
+}  // namespace
 
 std::pair<std::vector<Sample>, std::vector<TrimInfo>> merge_and_split_bam_regions_in_parallel(
         std::vector<Sample>& window_samples,
