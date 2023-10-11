@@ -185,7 +185,7 @@ TEST_CASE(
     auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
     std::vector<std::string> kits = {"SQK-RPB004"};
     bool barcode_both_ends = GENERATE(true, false);
-    bool no_trim = false;
+    constexpr bool no_trim = false;
     auto classifier = pipeline_desc.add_node<BarcodeClassifierNode>({sink}, 8, kits,
                                                                     barcode_both_ends, no_trim);
 
