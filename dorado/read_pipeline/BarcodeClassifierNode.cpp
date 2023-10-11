@@ -37,7 +37,7 @@ dorado::BarcodingInfo create_barcoding_info(const std::string& kit_name,
     dorado::BarcodingInfo result{};
     result.kit_name = kit_name;
     result.barcode_both_ends = barcode_both_ends;
-    result.trim = !trim;
+    result.trim = trim;
     return result;
 }
 

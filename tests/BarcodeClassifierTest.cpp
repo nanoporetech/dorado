@@ -38,20 +38,20 @@ TEST_CASE("BarcodeClassifier: check instantiation for all kits", TEST_GROUP) {
     CHECK(kit_names.size() > 0);
 
     for (auto& kit_name : kit_names) {
-        CHECK_NOTHROW(demux::BarcodeClassifier({kit_name}, false));
+        CHECK_NOTHROW(demux::BarcodeClassifier({kit_name}));
     }
 
-    CHECK_NOTHROW(demux::BarcodeClassifier(kit_names, false));
+    CHECK_NOTHROW(demux::BarcodeClassifier(kit_names));
 }
 
 TEST_CASE("BarcodeClassifier: instantiate barcode with unknown kit", TEST_GROUP) {
-    CHECK_THROWS(demux::BarcodeClassifier({"MY_RANDOM_KIT"}, false));
+    CHECK_THROWS(demux::BarcodeClassifier({"MY_RANDOM_KIT"}));
 }
 
 TEST_CASE("BarcodeClassifier: test single ended barcode", TEST_GROUP) {
     fs::path data_dir = fs::path(get_data_dir("barcode_demux/single_end"));
 
-    demux::BarcodeClassifier classifier({"SQK-RBK114-96"}, false);
+    demux::BarcodeClassifier classifier({"SQK-RBK114-96"});
 
     for (std::string bc :
          {"SQK-RBK114-96_BC01", "SQK-RBK114-96_RBK39", "SQK-RBK114-96_BC92", "unclassified"}) {
@@ -61,7 +61,7 @@ TEST_CASE("BarcodeClassifier: test single ended barcode", TEST_GROUP) {
             auto seqlen = reader.record->core.l_qseq;
             auto bseq = bam_get_seq(reader.record);
             std::string seq = utils::convert_nt16_to_str(bseq, seqlen);
-            auto res = classifier.barcode(seq);
+            auto res = classifier.barcode(seq, false);
             if (res.adapter_name == "unclassified") {
                 CHECK(bc == res.adapter_name);
             } else {
@@ -79,7 +79,7 @@ TEST_CASE("BarcodeClassifier: test single ended barcode", TEST_GROUP) {
 TEST_CASE("BarcodeClassifier: test double ended barcode", TEST_GROUP) {
     fs::path data_dir = fs::path(get_data_dir("barcode_demux/double_end"));
 
-    demux::BarcodeClassifier classifier({"SQK-RPB004"}, false);
+    demux::BarcodeClassifier classifier({"SQK-RPB004"});
 
     for (std::string bc :
          {"SQK-RPB004_BC01", "SQK-RPB004_BC05", "SQK-RPB004_BC11", "unclassified"}) {
@@ -89,7 +89,7 @@ TEST_CASE("BarcodeClassifier: test double ended barcode", TEST_GROUP) {
             auto seqlen = reader.record->core.l_qseq;
             auto bseq = bam_get_seq(reader.record);
             std::string seq = utils::convert_nt16_to_str(bseq, seqlen);
-            auto res = classifier.barcode(seq);
+            auto res = classifier.barcode(seq, false);
             if (res.adapter_name == "unclassified") {
                 CHECK(bc == res.adapter_name);
             } else {
@@ -109,7 +109,7 @@ TEST_CASE("BarcodeClassifier: test double ended barcode", TEST_GROUP) {
 TEST_CASE("BarcodeClassifier: test double ended barcode with different variants", TEST_GROUP) {
     fs::path data_dir = fs::path(get_data_dir("barcode_demux/double_end_variant"));
 
-    demux::BarcodeClassifier classifier({"EXP-PBC096"}, false);
+    demux::BarcodeClassifier classifier({"EXP-PBC096"});
 
     for (std::string bc :
          {"EXP-PBC096_BC04", "EXP-PBC096_BC37", "EXP-PBC096_BC83", "unclassified"}) {
@@ -119,7 +119,7 @@ TEST_CASE("BarcodeClassifier: test double ended barcode with different variants"
             auto seqlen = reader.record->core.l_qseq;
             auto bseq = bam_get_seq(reader.record);
             std::string seq = utils::convert_nt16_to_str(bseq, seqlen);
-            auto res = classifier.barcode(seq);
+            auto res = classifier.barcode(seq, false);
             if (res.adapter_name == "unclassified") {
                 CHECK(bc == res.adapter_name);
             } else {
@@ -139,8 +139,7 @@ TEST_CASE("BarcodeClassifier: test double ended barcode with different variants"
 TEST_CASE("BarcodeClassifier: check barcodes on both ends - failing case", TEST_GROUP) {
     fs::path data_dir = fs::path(get_data_dir("barcode_demux/double_end_variant"));
 
-    demux::BarcodeClassifier single_end_classifier({"EXP-PBC096"}, false);
-    demux::BarcodeClassifier double_end_classifier({"EXP-PBC096"}, true);
+    demux::BarcodeClassifier classifier({"EXP-PBC096"});
 
     // Check case where both ends don't match.
     auto bc_file = data_dir / "EXP-PBC096_barcode_both_ends_fail.fastq";
@@ -149,8 +148,8 @@ TEST_CASE("BarcodeClassifier: check barcodes on both ends - failing case", TEST_
         auto seqlen = reader.record->core.l_qseq;
         auto bseq = bam_get_seq(reader.record);
         std::string seq = utils::convert_nt16_to_str(bseq, seqlen);
-        auto single_end_res = single_end_classifier.barcode(seq);
-        auto double_end_res = double_end_classifier.barcode(seq);
+        auto single_end_res = classifier.barcode(seq, false);
+        auto double_end_res = classifier.barcode(seq, true);
         CHECK(double_end_res.adapter_name == "unclassified");
         CHECK(single_end_res.adapter_name == "BC15");
     }
@@ -159,8 +158,8 @@ TEST_CASE("BarcodeClassifier: check barcodes on both ends - failing case", TEST_
 TEST_CASE("BarcodeClassifier: check barcodes on both ends - passing case", TEST_GROUP) {
     fs::path data_dir = fs::path(get_data_dir("barcode_demux/double_end_variant"));
 
-    demux::BarcodeClassifier single_end_classifier({"EXP-PBC096"}, false);
-    demux::BarcodeClassifier double_end_classifier({"EXP-PBC096"}, true);
+    demux::BarcodeClassifier classifier({"EXP-PBC096"});
+
     // Check case where both ends do match.
     auto bc_file = data_dir / "EXP-PBC096_barcode_both_ends_pass.fastq";
     HtsReader reader(bc_file.string());
@@ -168,8 +167,8 @@ TEST_CASE("BarcodeClassifier: check barcodes on both ends - passing case", TEST_
         auto seqlen = reader.record->core.l_qseq;
         auto bseq = bam_get_seq(reader.record);
         std::string seq = utils::convert_nt16_to_str(bseq, seqlen);
-        auto single_end_res = single_end_classifier.barcode(seq);
-        auto double_end_res = double_end_classifier.barcode(seq);
+        auto single_end_res = classifier.barcode(seq, false);
+        auto double_end_res = classifier.barcode(seq, true);
         CHECK(double_end_res.adapter_name == single_end_res.adapter_name);
         CHECK(single_end_res.adapter_name == "BC01");
     }
