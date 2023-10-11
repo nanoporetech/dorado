@@ -32,10 +32,10 @@ private:
     std::atomic<size_t> m_active{0};
     std::vector<std::unique_ptr<std::thread>> m_workers;
     std::atomic<int> m_num_records{0};
-    BarcodingInfo m_default_barcoding_info{};
+    const BarcodingInfo m_default_barcoding_info{};
     demux::BarcodeClassifierSelector m_barcoder_selector{};
 
-    BarcodingInfo* get_barcoding_info(SimplexRead& read);
+    const BarcodingInfo* get_barcoding_info(SimplexRead& read);
 
     void worker_thread(size_t tid);
     void barcode(BamPtr& read);

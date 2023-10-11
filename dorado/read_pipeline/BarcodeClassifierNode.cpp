@@ -31,6 +31,16 @@ std::string generate_barcode_string(dorado::demux::ScoreResults bc_res) {
     return bc;
 }
 
+dorado::BarcodingInfo create_barcoding_info(const std::string& kit_name,
+                                            bool barcode_both_ends,
+                                            bool trim) {
+    dorado::BarcodingInfo result{};
+    result.kit_name = kit_name;
+    result.barcode_both_ends = barcode_both_ends;
+    result.trim = !trim;
+    return result;
+}
+
 }  // namespace
 
 namespace dorado {
@@ -40,12 +50,12 @@ BarcodeClassifierNode::BarcodeClassifierNode(int threads,
                                              const std::vector<std::string>& kit_names,
                                              bool barcode_both_ends,
                                              bool no_trim)
-        : MessageSink(10000), m_threads(threads) {
-    if (!kit_names.empty()) {
-        m_default_barcoding_info.kit_name = kit_names[0];
-        m_default_barcoding_info.barcode_both_ends = barcode_both_ends;
-        m_default_barcoding_info.trim = !no_trim;
-    }
+        : MessageSink(10000),
+          m_threads(threads),
+          m_default_barcoding_info(
+                  kit_names.empty()
+                          ? BarcodingInfo{}
+                          : create_barcoding_info(kit_names[0], barcode_both_ends, !no_trim)) {
     start_threads();
 }
 
@@ -236,7 +246,7 @@ void BarcodeClassifierNode::trim_barcode(SimplexRead& read, const demux::ScoreRe
     }
 }
 
-BarcodingInfo* BarcodeClassifierNode::get_barcoding_info(SimplexRead& read) {
+const BarcodingInfo* BarcodeClassifierNode::get_barcoding_info(SimplexRead& read) {
     if (!m_default_barcoding_info.kit_name.empty()) {
         return &m_default_barcoding_info;
     }
