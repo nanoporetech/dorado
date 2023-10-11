@@ -184,10 +184,20 @@ TEST_CASE(
     std::vector<dorado::Message> messages;
     auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
     std::vector<std::string> kits = {"SQK-RPB004"};
-    bool barcode_both_ends = GENERATE(true, false);
+    const bool barcode_both_ends = GENERATE(true, false);
+    const bool use_per_read_barcoding = GENERATE(true, false);
+    INFO("barcode_both_ends: " + std::string{barcode_both_ends ? "true" : "false"} +
+         " | use_per_read_barcoding: " + std::string{use_per_read_barcoding ? "true" : "false"});
     constexpr bool no_trim = false;
-    auto classifier = pipeline_desc.add_node<BarcodeClassifierNode>({sink}, 8, kits,
-                                                                    barcode_both_ends, no_trim);
+    dorado::BarcodingInfo barcoding_info{};
+    barcoding_info.kit_name = kits[0];
+    barcoding_info.barcode_both_ends = barcode_both_ends;
+    barcoding_info.trim = !no_trim;
+    if (use_per_read_barcoding) {
+        pipeline_desc.add_node<BarcodeClassifierNode>({sink}, 8);
+    } else {
+        pipeline_desc.add_node<BarcodeClassifierNode>({sink}, 8, kits, barcode_both_ends, no_trim);
+    }
 
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
 
@@ -205,6 +215,11 @@ TEST_CASE(
     read->read_common.qstring = std::string(read->read_common.seq.length(), '!');
     read->read_common.read_id = "read_id";
     read->read_common.model_stride = stride;
+
+    if (use_per_read_barcoding) {
+        read->read_common.barcoding_info = barcoding_info;
+    }
+
     std::vector<uint8_t> moves;
     for (int i = 0; i < read->read_common.seq.length(); i++) {
         moves.push_back(1);
@@ -246,8 +261,11 @@ TEST_CASE(
     // Push a Read type.
     pipeline->push_message(std::move(read));
     // Push BamPtr type.
-    for (auto& rec : records) {
-        pipeline->push_message(std::move(rec));
+    if (!use_per_read_barcoding) {
+        // The classifier node will only barcode Simplex reads so BamPtr is not relevant here
+        for (auto& rec : records) {
+            pipeline->push_message(std::move(rec));
+        }
     }
     dorado::ReadPair dummy_read_pair;
     // Push a type not used by the ClassifierNode.
@@ -255,7 +273,8 @@ TEST_CASE(
 
     pipeline->terminate(DefaultFlushOptions());
 
-    CHECK(messages.size() == 3);
+    const auto num_expected_messages = use_per_read_barcoding ? 2 : 3;
+    CHECK(messages.size() == num_expected_messages);
 
     const std::string expected_bc = "SQK-RPB004_barcode01";
     std::vector<uint8_t> expected_move_vals;
