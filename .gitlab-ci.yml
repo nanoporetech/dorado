@@ -19,7 +19,6 @@ stages:
   - deploy
 
 variables:
-  GET_SOURCES_ATTEMPTS: 5
   BUILD_DIR: build
   BUILD_TARGET: install
   GIT_SUBMODULE_STRATEGY: recursive
