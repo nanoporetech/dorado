@@ -107,15 +107,14 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
     spdlog::debug("found intervals {}", int_str);
 
     std::vector<std::pair<int, int>> filtered_intervals;
-    // In forward strand, the poly A/T signal should end within 25bp of the
-    // signal anchor, and in reverse strand it should start within 25bp of the
-    // anchor. Or the signal anchor should be within the detected signal range.
-    const int kAnchorProximity = 25 * num_samples_per_base;
     std::copy_if(intervals.begin(), intervals.end(), std::back_inserter(filtered_intervals),
                  [&](auto& i) {
-                     return true ||
-                            (fwd ? std::abs(signal_anchor - i.second) < kAnchorProximity
-                                 : std::abs(signal_anchor - i.first) < kAnchorProximity) ||
+                     int int_len = i.second - i.first;
+                     if (int_len < (num_samples_per_base * 5)) {
+                         return false;
+                     }
+                     return (fwd ? std::abs(signal_anchor - i.second) < int_len
+                                 : std::abs(signal_anchor - i.first) < int_len) ||
                             (i.first <= signal_anchor) && (signal_anchor <= i.second);
                  });
 
@@ -327,7 +326,7 @@ void PolyACalculator::worker_thread() {
             int num_bases = std::round(static_cast<float>(signal_end - signal_start) /
                                        num_samples_per_base) -
                             trailing_Ts;
-            if (num_bases >= 0 && num_bases < kMaxTailLength) {
+            if (num_bases > 0 && num_bases < kMaxTailLength) {
                 spdlog::debug(
                         "{} PolyA bases {}, signal anchor {} Signal range is {} {}, "
                         "samples/base {} trim {}",
