@@ -30,6 +30,7 @@ elseif(WIN32)
                 -B ${HDF5_ZLIB_BUILD_DIR}
                 -A x64
                 -D CMAKE_INSTALL_PREFIX=${HDF5_ZLIB_INSTALL_DIR}
+                -D CMAKE_CONFIGURATION_TYPES=Release
         )
         execute_process(COMMAND cmake --build ${HDF5_ZLIB_BUILD_DIR} --config Release --target install)
 
