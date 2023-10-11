@@ -105,30 +105,13 @@ namespace demux {
 
 const int TRIM_LENGTH = 150;
 
-struct BarcodeClassifier::AdapterSequence {
-    std::vector<std::string> adapter;
-    std::vector<std::string> adapter_rev;
-    std::string top_primer;
-    std::string top_primer_rev;
-    std::string bottom_primer;
-    std::string bottom_primer_rev;
-    int top_primer_front_flank_len;
-    int top_primer_rear_flank_len;
-    int bottom_primer_front_flank_len;
-    int bottom_primer_rear_flank_len;
-    std::vector<std::string> adapter_name;
-    std::string kit;
-};
-
-BarcodeClassifier::BarcodeClassifier(const std::vector<std::string>& kit_names,
-                                     bool barcode_both_ends)
-        : m_barcode_both_ends(barcode_both_ends),
-          m_adapter_sequences(generate_adapter_sequence(kit_names)) {}
+BarcodeClassifier::BarcodeClassifier(const std::vector<std::string>& kit_names)
+        : m_adapter_sequences(generate_adapter_sequence(kit_names)) {}
 
 BarcodeClassifier::~BarcodeClassifier() = default;
 
-ScoreResults BarcodeClassifier::barcode(const std::string& seq) {
-    auto best_adapter = find_best_adapter(seq, m_adapter_sequences);
+ScoreResults BarcodeClassifier::barcode(const std::string& seq, bool barcode_both_ends) {
+    auto best_adapter = find_best_adapter(seq, m_adapter_sequences, barcode_both_ends);
     return best_adapter;
 }
 
@@ -536,7 +519,8 @@ std::tuple<ScoreResults, int, bool> check_bc_with_longest_match(const ScoreResul
 // Score every barcode against the input read and returns the best match,
 // or an unclassified match, based on certain heuristics.
 ScoreResults BarcodeClassifier::find_best_adapter(const std::string& read_seq,
-                                                  const std::vector<AdapterSequence>& adapters) {
+                                                  const std::vector<AdapterSequence>& adapters,
+                                                  bool barcode_both_ends) {
     if (read_seq.length() < TRIM_LENGTH) {
         return UNCLASSIFIED;
     }
@@ -609,7 +593,7 @@ ScoreResults BarcodeClassifier::find_best_adapter(const std::string& read_seq,
         }
     }
 
-    if (m_barcode_both_ends && kit.double_ends) {
+    if (barcode_both_ends && kit.double_ends) {
         // For more stringent classification, ensure that both ends of a read
         // have a high score for the same barcode. If not then consider it
         // unclassified.
