@@ -1,8 +1,9 @@
 #include "StereoDuplexEncoderNode.h"
 
-#include "3rdparty/edlib/edlib/include/edlib.h"
 #include "utils/duplex_utils.h"
 #include "utils/sequence_utils.h"
+
+#include <edlib.h>
 
 #include <algorithm>
 #include <array>
@@ -57,8 +58,8 @@ DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(const ReadPair& read_pair) 
     static constexpr unsigned char kAlignMismatch = 3;
 
     // Move along the alignment, filling out the stereo-encoded tensor
-    const int max_size = template_read.read_common.raw_data.size(0) +
-                         complement_read.read_common.raw_data.size(0);
+    const int max_size = template_read.read_common.get_raw_data_samples() +
+                         complement_read.read_common.get_raw_data_samples();
     const auto opts = torch::TensorOptions().dtype(torch::kFloat16).device(torch::kCPU);
 
     static constexpr int kNumFeatures = 13;
@@ -83,7 +84,8 @@ DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(const ReadPair& read_pair) 
         }
     }
 
-    int extra_padding = template_read.read_common.raw_data.size(0) - template_moves_expanded.size();
+    int extra_padding =
+            template_read.read_common.get_raw_data_samples() - template_moves_expanded.size();
     for (int i = 0; i < extra_padding; i++) {
         template_moves_expanded.push_back(0);
     }
@@ -102,7 +104,8 @@ DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(const ReadPair& read_pair) 
         }
     }
 
-    extra_padding = complement_read.read_common.raw_data.size(0) - complement_moves_expanded.size();
+    extra_padding =
+            complement_read.read_common.get_raw_data_samples() - complement_moves_expanded.size();
     for (int i = 0; i < extra_padding; i++) {
         complement_moves_expanded.push_back(0);
     }

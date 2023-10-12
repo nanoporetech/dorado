@@ -1,8 +1,8 @@
 #pragma once
 
+#include <map>
 #include <string>
 #include <string_view>
-#include <unordered_map>
 #include <vector>
 
 namespace dorado::models {
@@ -10,7 +10,7 @@ namespace dorado::models {
 struct ModelInfo {
     std::string_view checksum;
 };
-using ModelMap = std::unordered_map<std::string_view, ModelInfo>;
+using ModelMap = std::map<std::string_view, ModelInfo>;
 
 const ModelMap& simplex_models();
 const ModelMap& stereo_models();

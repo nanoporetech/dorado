@@ -87,7 +87,7 @@ std::vector<bool> ModBaseContext::get_sequence_mask(std::string_view sequence) c
 
 void ModBaseContext::update_mask(std::vector<bool>& mask,
                                  const std::string& sequence,
-                                 const std::string& modbase_alphabet,
+                                 const std::vector<std::string>& modbase_alphabet,
                                  const std::vector<uint8_t>& modbase_probs,
                                  uint8_t threshold) const {
     // Iterate over the provided alphabet and find all the bases that may be modified.
@@ -97,7 +97,7 @@ void ModBaseContext::update_mask(std::vector<bool>& mask,
     for (size_t channel_idx = 0; channel_idx < num_channels; channel_idx++) {
         if (cardinal_bases.find(modbase_alphabet[channel_idx]) != std::string::npos) {
             // A cardinal base.
-            current_cardinal = modbase_alphabet[channel_idx];
+            current_cardinal = modbase_alphabet[channel_idx][0];
         } else {
             if (!m_motifs[base_to_int(current_cardinal)].empty()) {
                 // This cardinal base has a context associated with modifications, so the mask should

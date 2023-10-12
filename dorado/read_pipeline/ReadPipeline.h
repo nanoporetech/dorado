@@ -79,6 +79,8 @@ public:
 
     bool is_duplex{false};
 
+    size_t get_raw_data_samples() const { return is_duplex ? raw_data.size(1) : raw_data.size(0); }
+
     int rna_poly_tail_length{-1};
 
     // subread_id is used to track 2 types of offsprings of a read
@@ -89,7 +91,7 @@ public:
 
 private:
     void generate_duplex_read_tags(bam1_t*) const;
-    void generate_read_tags(bam1_t* aln, bool emit_moves, bool is_duplex_parent = false) const;
+    void generate_read_tags(bam1_t* aln, bool emit_moves, bool is_duplex_parent) const;
     void generate_modbase_tags(bam1_t* aln, uint8_t threshold = 0) const;
     std::string generate_read_group() const;
 };

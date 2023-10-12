@@ -8,16 +8,23 @@ function(add_hdf_vbz_plugin)
 
     if(WIN32)
         # On windows we need to build a static lib for zstd as there's no prebuilt distro
-        execute_process(COMMAND cmake -S ${DORADO_3RD_PARTY}/zstd/build/cmake -B ${DORADO_3RD_PARTY}/cmake-build-zstd -A x64)
-        execute_process(COMMAND cmake --build ${DORADO_3RD_PARTY}/cmake-build-zstd --config Release)
+        set(ZSTD_BUILD_DIR ${CMAKE_BINARY_DIR}/cmake-build-zstd)
+        execute_process(COMMAND
+            cmake
+                -S ${DORADO_3RD_PARTY_SOURCE}/zstd/build/cmake
+                -B ${ZSTD_BUILD_DIR}
+                -A x64
+                -D CMAKE_CONFIGURATION_TYPES=Release
+        )
+        execute_process(COMMAND cmake --build ${ZSTD_BUILD_DIR} --config Release)
 
         # On windows we need to tell hdf_plugins where we put the built zstd lib
-        set(CONAN_INCLUDE_DIRS_RELEASE ${DORADO_3RD_PARTY}/zstd/lib)
-        set(CONAN_INCLUDE_DIRS_DEBUG ${DORADO_3RD_PARTY}/zstd/lib)
-        set(CONAN_LIB_DIRS_RELEASE ${DORADO_3RD_PARTY}/cmake-build-zstd/lib/Release)
-        set(CONAN_LIB_DIRS_DEBUG ${DORADO_3RD_PARTY}/cmake-build-zstd/lib/Debug)
+        set(CONAN_INCLUDE_DIRS_RELEASE ${DORADO_3RD_PARTY_SOURCE}/zstd/lib)
+        set(CONAN_INCLUDE_DIRS_DEBUG ${DORADO_3RD_PARTY_SOURCE}/zstd/lib)
+        set(CONAN_LIB_DIRS_RELEASE ${ZSTD_BUILD_DIR}/lib/Release)
+        set(CONAN_LIB_DIRS_DEBUG ${ZSTD_BUILD_DIR}/lib/Debug)
 
-        install(FILES ${DORADO_3RD_PARTY}/cmake-build-zstd/lib/Release/zstd.dll DESTINATION bin)
+        install(FILES ${ZSTD_BUILD_DIR}/lib/Release/zstd.dll DESTINATION bin)
     endif()
    
     add_subdirectory(dorado/3rdparty/hdf_plugins EXCLUDE_FROM_ALL)

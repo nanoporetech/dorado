@@ -1,5 +1,6 @@
 #include "ModBaseModelConfig.h"
 
+#include "utils/bam_utils.h"
 #include "utils/sequence_utils.h"
 #include "utils/tensor_utils.h"
 
@@ -14,13 +15,38 @@ ModBaseModelConfig load_modbase_model_config(const std::filesystem::path& model_
     config.motif = toml::find<std::string>(params, "motif");
     config.motif_offset = toml::find<int>(params, "motif_offset");
 
-    config.mod_bases = toml::find<std::string>(params, "mod_bases");
+    const std::string canonical_bases = "ACGT";
+    std::string motif_base = config.motif.substr(config.motif_offset, 1);
+    if (canonical_bases.find(motif_base) == std::string::npos) {
+        throw std::runtime_error("Invalid base for modification: " + motif_base);
+    }
+
+    const auto& mod_bases = toml::find(params, "mod_bases");
+    if (mod_bases.is_string()) {
+        auto mod_base_string = mod_bases.as_string().str;
+        for (const auto& mod_base : mod_base_string) {
+            config.mod_bases.push_back(std::string(1, mod_base));
+        }
+    } else {
+        auto mod_base_array = mod_bases.as_array();
+        for (const auto& mod_base : mod_base_array) {
+            assert(mod_base.is_string());
+            config.mod_bases.push_back(mod_base.as_string().str);
+        }
+    }
+
+    for (const auto& mod_base : config.mod_bases) {
+        if (!utils::validate_bam_tag_code(mod_base)) {
+            throw std::runtime_error("Invalid modified base code: " + mod_base);
+        }
+    }
+
     for (size_t i = 0; i < config.mod_bases.size(); ++i) {
         config.mod_long_names.push_back(
                 toml::find<std::string>(params, "mod_long_names_" + std::to_string(i)));
     }
 
-    config.base_mod_count = config.mod_long_names.size();
+    config.base_mod_count = config.mod_bases.size();
 
     config.context_before = toml::find<int>(params, "chunk_context_0");
     config.context_after = toml::find<int>(params, "chunk_context_1");
@@ -64,7 +90,7 @@ ModBaseInfo get_modbase_info(
         const std::vector<std::reference_wrapper<const ModBaseModelConfig>>& base_mod_params) {
     struct ModelInfo {
         std::vector<std::string> long_names;
-        std::string alphabet;
+        std::vector<std::string> alphabet;
         std::string motif;
         int motif_offset;
         size_t base_counts = 1;
@@ -73,7 +99,7 @@ ModBaseInfo get_modbase_info(
     std::string const allowed_bases = "ACGT";
     std::array<ModelInfo, 4> model_info;
     for (int b = 0; b < 4; ++b) {
-        model_info[b].alphabet = allowed_bases[b];
+        model_info[b].alphabet.emplace_back(1, allowed_bases[b]);
     }
 
     for (const auto& params_ref : base_mod_params) {
@@ -84,7 +110,8 @@ ModBaseInfo get_modbase_info(
         }
         auto& map_entry = model_info[utils::BaseInfo::BASE_IDS[base]];
         map_entry.long_names = params.mod_long_names;
-        map_entry.alphabet += params.mod_bases;
+        map_entry.alphabet.insert(map_entry.alphabet.end(), params.mod_bases.begin(),
+                                  params.mod_bases.end());
         map_entry.base_counts = params.base_mod_count + 1;
     }
 
@@ -96,7 +123,7 @@ ModBaseInfo get_modbase_info(
                 result.long_names += ' ';
             result.long_names += name;
         }
-        result.alphabet += info.alphabet;
+        result.alphabet.insert(result.alphabet.end(), info.alphabet.begin(), info.alphabet.end());
         result.base_counts[index++] = info.base_counts;
     }
 

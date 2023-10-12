@@ -156,7 +156,7 @@ TempDir download_model(const std::string& model) {
 #endif
 
     // Download it
-    dorado::models::download_models(path.string(), model);
+    REQUIRE(dorado::models::download_models(path.string(), model));
     return TempDir(std::move(path));
 }
 
@@ -190,19 +190,25 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
 
     set_pipeline_restart(pipeline_restart);
 
+    // BasecallerNode will skip reads that have already been basecalled.
+    set_read_mutator([](dorado::SimplexReadPtr& read) { read->read_common.seq.clear(); });
+
     const int kBatchTimeoutMS = 100;
     const auto& default_params = dorado::utils::default_parameters;
     const auto model_dir = download_model(model_name);
     const auto model_path = (model_dir.m_path / model_name).string();
     auto model_config = dorado::load_crf_model_config(model_path);
 
+    // Use a fixed batch size otherwise we slow down CI autobatchsizing.
+    std::size_t batch_size = 128;
+
     // Create runners
     std::vector<dorado::Runner> runners;
     if (gpu) {
 #if DORADO_GPU_BUILD
 #ifdef __APPLE__
-        auto caller = dorado::create_metal_caller(model_config, default_params.chunksize,
-                                                  default_params.batchsize);
+        auto caller =
+                dorado::create_metal_caller(model_config, default_params.chunksize, batch_size);
         for (size_t i = 0; i < default_params.num_runners; i++) {
             runners.push_back(std::make_shared<dorado::MetalModelRunner>(caller));
         }
@@ -213,7 +219,7 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
         }
         for (const auto& device : devices) {
             auto caller = dorado::create_cuda_caller(model_config, default_params.chunksize,
-                                                     default_params.batchsize, device);
+                                                     batch_size, device);
             for (size_t i = 0; i < default_params.num_runners; i++) {
                 runners.push_back(std::make_shared<dorado::CudaModelRunner>(caller));
             }
@@ -223,7 +229,10 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
         SKIP("Can't test GPU without DORADO_GPU_BUILD");
 #endif  // DORADO_GPU_BUILD
     } else {
-        const std::size_t batch_size = 128;
+        // CPU processing is very slow, so reduce the number of test reads we throw at it.
+        set_num_reads(5);
+        set_expected_messages(5);
+        batch_size = 8;
         runners.push_back(std::make_shared<dorado::ModelRunner<dorado::CPUDecoder>>(
                 model_config, "cpu", default_params.chunksize, batch_size));
     }
@@ -247,7 +256,7 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
     const auto remora_model = remora_model_dir.m_path / remora_model_name;
 
     // Add a second model into the mix
-    const char remora_model_6mA_name[] = "dna_r10.4.1_e8.2_400bps_sup@v4.2.0_6mA@v2";
+    const char remora_model_6mA_name[] = "dna_r10.4.1_e8.2_400bps_sup@v4.2.0_6mA@v3";
     const auto remora_model_6mA_dir = download_model(remora_model_6mA_name);
     const auto remora_model_6mA = remora_model_6mA_dir.m_path / remora_model_6mA_name;
 
@@ -299,7 +308,7 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
         read->read_common.model_stride = model_stride;
         // The move table size needs rounding up.
         size_t const move_table_size =
-                (read->read_common.raw_data.size(0) + model_stride - 1) / model_stride;
+                (read->read_common.get_raw_data_samples() + model_stride - 1) / model_stride;
         read->read_common.moves.resize(move_table_size);
         std::fill_n(read->read_common.moves.begin(), read->read_common.seq.size(), 1);
         // First element must be 1, the rest can be shuffled

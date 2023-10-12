@@ -5,6 +5,7 @@
 
 #include <htslib/sam.h>
 
+#include <algorithm>
 #include <cctype>
 #include <iostream>
 #include <map>
@@ -55,11 +56,18 @@ void add_rg_hdr(sam_hdr_t* hdr,
 
     // Emit read group headers for each barcode arrangement.
     for (const auto& kit_name : barcode_kits) {
-        const auto& kit_info = barcode_kit_infos.at(kit_name);
+        auto kit_iter = barcode_kit_infos.find(kit_name);
+        if (kit_iter == barcode_kit_infos.end()) {
+            throw std::runtime_error(kit_name +
+                                     " is not a valid barcode kit name. Please run the help "
+                                     "command to find out available barcode kits.");
+        }
+        const auto& kit_info = kit_iter->second;
         for (const auto& barcode_name : kit_info.barcodes) {
             const auto additional_tags = "\tBC:" + barcode_sequences.at(barcode_name);
             for (const auto& read_group : read_groups) {
-                auto id = read_group.first + '_' + kit_name + '_' + barcode_name;
+                auto id = read_group.first + '_' +
+                          barcode_kits::generate_standard_barcode_name(kit_name, barcode_name);
                 const std::string read_group_tags = to_string(read_group.second);
                 emit_read_group(read_group_tags, id, additional_tags);
             }
@@ -249,6 +257,20 @@ std::tuple<std::string, std::vector<uint8_t>> extract_modbase_info(bam1_t* input
     }
 
     return {modbase_str, modbase_probs};
+}
+
+bool validate_bam_tag_code(const std::string& bam_name) {
+    // Check the supplied bam_name is a single character
+    if (bam_name.size() == 1 && std::isalpha(static_cast<unsigned char>(bam_name[0]))) {
+        return true;
+    }
+
+    // Check the supplied bam_name is a simple integer and if so, assume it's a CHEBI code.
+    if (std::all_of(bam_name.begin(), bam_name.end(),
+                    [](const char& c) { return std::isdigit(static_cast<unsigned char>(c)); })) {
+        return true;
+    }
+    return false;
 }
 
 }  // namespace dorado::utils

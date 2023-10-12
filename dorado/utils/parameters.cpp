@@ -17,10 +17,12 @@ ThreadAllocations default_thread_allocations(int num_devices,
     allocs.read_filter_threads = num_devices * 2;
     allocs.remora_threads = num_remora_threads;
     allocs.scaler_node_threads = num_devices * 4;
+    allocs.splitter_node_threads = num_devices;
     allocs.loader_threads = num_devices;
     int total_threads_used =
             (allocs.writer_threads + allocs.read_converter_threads + allocs.read_filter_threads +
-             allocs.remora_threads + allocs.scaler_node_threads + allocs.loader_threads);
+             allocs.remora_threads + allocs.scaler_node_threads + allocs.loader_threads +
+             allocs.splitter_node_threads);
     int remaining_threads = max_threads - total_threads_used;
     remaining_threads = std::max(num_devices * 10, remaining_threads);
     // Divide up work equally between the aligner and barcoder nodes if both are enabled,

@@ -38,8 +38,8 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32)
     find_package(Python3 COMPONENTS "Interpreter" REQUIRED)
     set(PYTHON_EXECUTABLE ${Python3_EXECUTABLE})
 
-    set(CUDNN_LIBRARY_PATH ${DORADO_3RD_PARTY}/fake_cudnn/libcudnn.a)
-    set(CUDNN_INCLUDE_PATH ${DORADO_3RD_PARTY}/fake_cudnn)
+    set(CUDNN_LIBRARY_PATH ${DORADO_3RD_PARTY_SOURCE}/fake_cudnn/libcudnn.a)
+    set(CUDNN_INCLUDE_PATH ${DORADO_3RD_PARTY_SOURCE}/fake_cudnn)
 
     set(CMAKE_CUDA_ARCHITECTURES 62 70 72 75)
     if(${CUDAToolkit_VERSION} VERSION_GREATER_EQUAL 11.3)
@@ -159,7 +159,7 @@ else()
     # Get libtorch (if we don't already have it)
     set(TORCH_LIB_DIR torch-${TORCH_VERSION}${TORCH_PATCH_SUFFIX}-${CMAKE_SYSTEM_NAME})
     download_and_extract(${TORCH_URL} ${TORCH_LIB_DIR})
-    set(TORCH_LIB "${DORADO_3RD_PARTY}/${TORCH_LIB_DIR}/${TORCH_LIB_SUFFIX}")
+    set(TORCH_LIB "${DORADO_3RD_PARTY_DOWNLOAD}/${TORCH_LIB_DIR}/${TORCH_LIB_SUFFIX}")
 endif()
 
 # Our libtorch should be chosen over any others on the system

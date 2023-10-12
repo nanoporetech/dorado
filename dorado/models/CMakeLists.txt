@@ -12,6 +12,6 @@ target_link_libraries(dorado_models_lib
 target_include_directories(dorado_models_lib
     SYSTEM
     PRIVATE
-        ${DORADO_3RD_PARTY}/cpp-httplib
-        ${DORADO_3RD_PARTY}/spdlog/include
+        ${DORADO_3RD_PARTY_SOURCE}/cpp-httplib
+        ${DORADO_3RD_PARTY_SOURCE}/spdlog/include
 )

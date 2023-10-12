@@ -132,8 +132,8 @@ void ModBaseCallerNode::init_modbase_info() {
     }
 
     auto result = get_modbase_info(base_mod_params);
-    m_mod_base_info = std::make_shared<ModBaseInfo>(result.alphabet, result.long_names,
-                                                    context_handler.encode());
+    m_mod_base_info = std::make_shared<ModBaseInfo>(
+            std::move(result.alphabet), std::move(result.long_names), context_handler.encode());
 
     m_base_prob_offsets[0] = 0;
     m_base_prob_offsets[1] = result.base_counts[0];
@@ -188,7 +188,7 @@ void ModBaseCallerNode::input_worker_thread() {
             for (size_t caller_id = 0; caller_id < runner->num_callers(); ++caller_id) {
                 nvtx3::scoped_range range{"generate_chunks"};
 
-                auto signal_len = read->read_common.raw_data.size(0);
+                auto signal_len = read->read_common.get_raw_data_samples();
                 std::vector<uint64_t> seq_to_sig_map =
                         utils::moves_to_map(read->read_common.moves, m_block_stride, signal_len,
                                             read->read_common.seq.size() + 1);
@@ -243,9 +243,11 @@ void ModBaseCallerNode::input_worker_thread() {
                 working_read->read = std::move(read);
 
                 // Put the read in the working list
-                std::lock_guard<std::mutex> working_reads_lock(m_working_reads_mutex);
-                m_working_reads.insert(std::move(working_read));
-                ++m_working_reads_size;
+                {
+                    std::lock_guard<std::mutex> working_reads_lock(m_working_reads_mutex);
+                    m_working_reads.insert(std::move(working_read));
+                    ++m_working_reads_size;
+                }
 
                 // push the chunks to the chunk queues
                 // needs to be done after working_read->read is set as chunks could be processed

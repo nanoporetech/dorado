@@ -1,9 +1,9 @@
 #include "HtsReader.h"
 
-#include "htslib/sam.h"
 #include "read_pipeline/ReadPipeline.h"
 #include "utils/types.h"
 
+#include <htslib/sam.h>
 #include <spdlog/spdlog.h>
 
 #include <filesystem>

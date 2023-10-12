@@ -59,6 +59,7 @@ foreach(TEST_BIN dorado_tests dorado_smoke_tests)
     endif()
 
     target_link_libraries(${TEST_BIN}
+        PRIVATE
         dorado_lib
         dorado_io_lib
         dorado_models_lib
@@ -70,7 +71,7 @@ foreach(TEST_BIN dorado_tests dorado_smoke_tests)
     target_include_directories(${TEST_BIN}
         SYSTEM
         PRIVATE
-        ${DORADO_3RD_PARTY}/catch2
+        ${DORADO_3RD_PARTY_SOURCE}/catch2
         )
 
     add_test(

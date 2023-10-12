@@ -1,18 +1,22 @@
 cmake_minimum_required(VERSION 3.20)
 set(CMAKE_POLICY_DEFAULT_CMP0063 NEW)
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
+set(CMAKE_POLICY_DEFAULT_CMP0091 NEW)
 
 project(dorado)
 
-if (NOT EXISTS ${CMAKE_BINARY_DIR}/CMakeCache.txt)
-  if (NOT CMAKE_BUILD_TYPE)
+get_cmake_property(MULTI_CONFIG GENERATOR_IS_MULTI_CONFIG)
+if (NOT MULTI_CONFIG)
+  if (NOT EXISTS ${CMAKE_BINARY_DIR}/CMakeCache.txt AND NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release" CACHE STRING "" FORCE)
   endif()
+message(STATUS "Build type: " ${CMAKE_BUILD_TYPE})
 endif()
 
-message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
 if(WIN32)
+  # all third parties are release builds, so we must match the windows runtime
+  set(CMAKE_MSVC_RUNTIME_LIBRARY MultiThreadedDLL)
   message(STATUS "toolset: ${CMAKE_GENERATOR_TOOLSET}")
   message(STATUS "platform: ${CMAKE_GENERATOR_PLATFORM}")
   message(STATUS "vs platform: ${CMAKE_VS_PLATFORM_NAME}")
@@ -26,7 +30,9 @@ endif()
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_EXTENSIONS OFF)
-set(DORADO_3RD_PARTY ${CMAKE_CURRENT_SOURCE_DIR}/dorado/3rdparty)
+set(DORADO_3RD_PARTY_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/dorado/3rdparty)
+set(DORADO_3RD_PARTY_DOWNLOAD ${CMAKE_CURRENT_SOURCE_DIR}/dorado/3rdparty
+    CACHE PATH "Location to download 3rdparty libraries into")
 
 # We don't support GPU builds on macOS/x64
 if (APPLE AND CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
@@ -96,16 +102,22 @@ endif()
 
 # ELZIP_DECOMPRESS_ONLY stops minizip from adding OpenSSL as a target, preventing use of three dylibs on osx.
 set(ELZIP_DECOMPRESS_ONLY ON)
-add_subdirectory(${DORADO_3RD_PARTY}/elzip)
+add_subdirectory(${DORADO_3RD_PARTY_SOURCE}/elzip)
 
-set(ONT_MM2_EXE OFF)
-add_subdirectory(${DORADO_3RD_PARTY}/ont-minimap2)
+option(ONT_MM2_EXE "Build minimap2 exe" OFF)
+add_subdirectory(${DORADO_3RD_PARTY_SOURCE}/ont-minimap2 EXCLUDE_FROM_ALL)
+message(STATUS "build minimap2 exe: ${ONT_MM2_EXE}")
+message(STATUS "build minimap2 lib: ${ONT_MM2_LIB}")
+if (ONT_MM2_EXE)
+    install(TARGETS minimap2_exe)
+    add_custom_target(testing_deps ALL DEPENDS minimap2_exe)
+endif()
 
 set(BUILD_TESTING OFF)
-add_subdirectory(${DORADO_3RD_PARTY}/edlib EXCLUDE_FROM_ALL)
+add_subdirectory(${DORADO_3RD_PARTY_SOURCE}/edlib EXCLUDE_FROM_ALL)
 set(BUILD_TESTING ON)
 
-add_subdirectory(${DORADO_3RD_PARTY}/date EXCLUDE_FROM_ALL)
+add_subdirectory(${DORADO_3RD_PARTY_SOURCE}/date EXCLUDE_FROM_ALL)
 
 enable_testing()
 
@@ -243,16 +255,14 @@ target_include_directories(dorado_lib
     PUBLIC
         ${TORCH_INCLUDE_DIRS}
         ${HDF5_INCLUDE_DIRS}
-        ${HTSLIB_DIR}
-        ${DORADO_3RD_PARTY}/HighFive/include
-        ${DORADO_3RD_PARTY}/argparse
-        ${DORADO_3RD_PARTY}/toml11
-        ${DORADO_3RD_PARTY}/hdf_plugins/vbz_plugin
-        ${DORADO_3RD_PARTY}/cxxpool/src
-        ${DORADO_3RD_PARTY}/NVTX/c/include
-        ${DORADO_3RD_PARTY}/spdlog/include
-        ${DORADO_3RD_PARTY}/indicators/include
-        ${DORADO_3RD_PARTY}/ont-minimap2/src/3rdparty/minimap2
+        ${DORADO_3RD_PARTY_SOURCE}/HighFive/include
+        ${DORADO_3RD_PARTY_SOURCE}/argparse
+        ${DORADO_3RD_PARTY_SOURCE}/toml11
+        ${DORADO_3RD_PARTY_SOURCE}/hdf_plugins/vbz_plugin
+        ${DORADO_3RD_PARTY_SOURCE}/cxxpool/src
+        ${DORADO_3RD_PARTY_SOURCE}/NVTX/c/include
+        ${DORADO_3RD_PARTY_SOURCE}/spdlog/include
+        ${DORADO_3RD_PARTY_SOURCE}/indicators/include
 )
 
 enable_testing()
@@ -267,13 +277,16 @@ if (DORADO_ENABLE_PCH)
 endif()
 
 target_link_libraries(dorado_lib
-    ${TORCH_LIBRARIES}
-    ${KOI_LIBRARIES}
-    htslib
-    vbz_hdf_plugin
-    edlib
-    date::date
-    dorado_utils
+    PUBLIC
+        ${TORCH_LIBRARIES}
+        htslib
+        vbz_hdf_plugin
+        edlib
+        date::date
+        dorado_utils
+    PRIVATE
+        ${KOI_LIBRARIES}    
+        minimap2
 )
 
 if(NOT WIN32)
@@ -433,16 +446,19 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     )
 
     target_link_libraries(dorado_io_lib
-       ${POD5_LIBRARIES}
-       ${HDF5_C_LIBRARIES}
-       ${CMAKE_DL_LIBS}
-       date::date
-       dorado_lib
+        PUBLIC
+            dorado_lib    
+        PRIVATE
+            ${POD5_LIBRARIES}
+            ${HDF5_C_LIBRARIES}
+            ${CMAKE_DL_LIBS}
+            date::date
     )
 
     if(WIN32)
         target_link_libraries(dorado_io_lib
-           ${ZLIB_LIBRARIES}
+            PRIVATE
+            ${ZLIB_LIBRARIES}
         )
     endif()
 
@@ -475,6 +491,5 @@ if (GENERATE_TEST_COVERAGE)
             BASE_DIRECTORY "${PROJECT_SOURCE_DIR}"
             EXCLUDE "${PROJECT_SOURCE_DIR}/dorado/3rdparty/*" "${PROJECT_SOURCE_DIR}/tests/*"
             )
-        target_link_libraries(dorado_tests gcov)
     endif()
 endif()
