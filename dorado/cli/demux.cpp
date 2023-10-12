@@ -44,9 +44,14 @@ int demuxer(int argc, char* argv[]) {
             .nargs(argparse::nargs_pattern::any);
     parser.add_argument("--output-dir").help("Output folder for demultiplexed reads.").required();
     parser.add_argument("--kit-name")
-            .help("Barcoding kit name. Choose from: " +
-                  dorado::barcode_kits::barcode_kits_list_str() + ".")
-            .required();
+            .help("Barcoding kit name. Needs to be mutually exclusive with --no-classify. Choose "
+                  "from: " +
+                  dorado::barcode_kits::barcode_kits_list_str() + ".");
+    parser.add_argument("--no-classify")
+            .help("Skip barcode classification. Only demux based on existing classification in "
+                  "reads. Needs to be mutually exclusive with --kit-name.")
+            .default_value(false)
+            .implicit_value(true);
     parser.add_argument("-t", "--threads")
             .help("Combined number of threads for barcoding and output generation. Default uses "
                   "all available threads.")
@@ -80,6 +85,12 @@ int demuxer(int argc, char* argv[]) {
         std::ostringstream parser_stream;
         parser_stream << parser;
         spdlog::error("{}\n{}", e.what(), parser_stream.str());
+        std::exit(1);
+    }
+
+    if ((parser.is_used("--no-classify") && parser.is_used("--kit-name")) ||
+        (!parser.is_used("--no-classify") && !parser.is_used("--kit-name"))) {
+        spdlog::error("Please specify either --no-classify or --kit-name to use the demux tool.");
         std::exit(1);
     }
 
@@ -122,13 +133,16 @@ int demuxer(int argc, char* argv[]) {
     PipelineDescriptor pipeline_desc;
     auto demux_writer = pipeline_desc.add_node<BarcodeDemuxerNode>(
             {}, output_dir, demux_writer_threads, 0, parser.get<bool>("--emit-fastq"));
-    std::vector<std::string> kit_names;
-    if (auto names = parser.present<std::vector<std::string>>("--kit-name")) {
-        kit_names = std::move(*names);
+
+    if (parser.is_used("--kit-name")) {
+        std::vector<std::string> kit_names;
+        if (auto names = parser.present<std::vector<std::string>>("--kit-name")) {
+            kit_names = std::move(*names);
+        }
+        auto demux = pipeline_desc.add_node<BarcodeClassifierNode>(
+                {demux_writer}, demux_threads, kit_names, parser.get<bool>("--barcode-both-ends"),
+                parser.get<bool>("--no-trim"));
     }
-    auto demux = pipeline_desc.add_node<BarcodeClassifierNode>(
-            {demux_writer}, demux_threads, kit_names, parser.get<bool>("--barcode-both-ends"),
-            parser.get<bool>("--no-trim"));
 
     // Create the Pipeline from our description.
     std::vector<dorado::stats::StatsReporter> stats_reporters;
@@ -154,7 +168,7 @@ int demuxer(int argc, char* argv[]) {
             kStatsPeriod, stats_reporters, stats_callables);
     // End stats counting setup.
 
-    spdlog::info("> starting barcoding");
+    spdlog::info("> starting barcode demuxing");
     reader.read(*pipeline, max_reads);
 
     // Wait for the pipeline to complete.  When it does, we collect
@@ -166,7 +180,7 @@ int demuxer(int argc, char* argv[]) {
     tracker.update_progress_bar(final_stats);
     tracker.summarize();
 
-    spdlog::info("> finished barcoding");
+    spdlog::info("> finished barcode demuxing");
 
     return 0;
 }
