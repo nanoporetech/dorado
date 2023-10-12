@@ -5,7 +5,6 @@
 #include "utils/types.h"
 
 #include <atomic>
-#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -35,7 +34,7 @@ private:
     const BarcodingInfo m_default_barcoding_info{};
     demux::BarcodeClassifierSelector m_barcoder_selector{};
 
-    const BarcodingInfo* get_barcoding_info(SimplexRead& read);
+    const BarcodingInfo* get_barcoding_info(const SimplexRead& read) const;
 
     void worker_thread(size_t tid);
     void barcode(BamPtr& read);

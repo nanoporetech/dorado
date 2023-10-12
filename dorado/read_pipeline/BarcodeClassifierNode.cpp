@@ -246,7 +246,7 @@ void BarcodeClassifierNode::trim_barcode(SimplexRead& read, const demux::ScoreRe
     }
 }
 
-const BarcodingInfo* BarcodeClassifierNode::get_barcoding_info(SimplexRead& read) {
+const BarcodingInfo* BarcodeClassifierNode::get_barcoding_info(const SimplexRead& read) const {
     if (!m_default_barcoding_info.kit_name.empty()) {
         return &m_default_barcoding_info;
     }
@@ -262,13 +262,13 @@ void BarcodeClassifierNode::barcode(BamPtr& read) {
     if (m_default_barcoding_info.kit_name.empty()) {
         return;
     }
-    auto barcoder = m_barcoder_selector.get_barcoder(m_default_barcoding_info.kit_name);
+    auto& barcoder = m_barcoder_selector.get_barcoder(m_default_barcoding_info.kit_name);
 
     bam1_t* irecord = read.get();
     int seqlen = irecord->core.l_qseq;
     std::string seq = utils::extract_sequence(irecord, seqlen);
 
-    auto bc_res = barcoder->barcode(seq, m_default_barcoding_info.barcode_both_ends);
+    auto bc_res = barcoder.barcode(seq, m_default_barcoding_info.barcode_both_ends);
     auto bc = generate_barcode_string(bc_res);
     bam_aux_append(irecord, "BC", 'Z', bc.length() + 1, (uint8_t*)bc.c_str());
     m_num_records++;
@@ -283,10 +283,10 @@ void BarcodeClassifierNode::barcode(SimplexRead& read) {
     if (!barcoding_info) {
         return;
     }
-    auto barcoder = m_barcoder_selector.get_barcoder(barcoding_info->kit_name);
+    auto& barcoder = m_barcoder_selector.get_barcoder(barcoding_info->kit_name);
 
     // get the sequence to map from the record
-    auto bc_res = barcoder->barcode(read.read_common.seq, barcoding_info->barcode_both_ends);
+    auto bc_res = barcoder.barcode(read.read_common.seq, barcoding_info->barcode_both_ends);
     read.read_common.barcode = generate_barcode_string(bc_res);
     m_num_records++;
     if (barcoding_info->trim) {

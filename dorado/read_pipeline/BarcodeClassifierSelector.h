@@ -11,7 +11,7 @@ class BarcodeClassifierSelector final {
     std::map<std::string, demux::BarcodeClassifier> m_barcoder_lut{};
 
 public:
-    BarcodeClassifier* get_barcoder(const std::string& barcode_kit);
+    const BarcodeClassifier& get_barcoder(const std::string& barcode_kit);
 };
 
 }  // namespace dorado::demux

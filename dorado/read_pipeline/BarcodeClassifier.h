@@ -49,7 +49,7 @@ public:
     BarcodeClassifier(const std::vector<std::string>& kit_names);
     ~BarcodeClassifier();
 
-    ScoreResults barcode(const std::string& seq, bool barcode_both_ends);
+    ScoreResults barcode(const std::string& seq, bool barcode_both_ends) const;
 
 private:
     const std::vector<AdapterSequence> m_adapter_sequences;
@@ -58,14 +58,14 @@ private:
             const std::vector<std::string>& kit_names);
     std::vector<ScoreResults> calculate_adapter_score_different_double_ends(
             std::string_view read_seq,
-            const AdapterSequence& as);
+            const AdapterSequence& as) const;
     std::vector<ScoreResults> calculate_adapter_score_double_ends(std::string_view read_seq,
-                                                                  const AdapterSequence& as);
+                                                                  const AdapterSequence& as) const;
     std::vector<ScoreResults> calculate_adapter_score(std::string_view read_seq,
-                                                      const AdapterSequence& as);
+                                                      const AdapterSequence& as) const;
     ScoreResults find_best_adapter(const std::string& read_seq,
                                    const std::vector<AdapterSequence>& adapter,
-                                   bool barcode_both_ends);
+                                   bool barcode_both_ends) const;
 };
 
 }  // namespace demux

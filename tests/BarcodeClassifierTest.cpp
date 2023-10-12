@@ -186,8 +186,8 @@ TEST_CASE(
     std::vector<std::string> kits = {"SQK-RPB004"};
     const bool barcode_both_ends = GENERATE(true, false);
     const bool use_per_read_barcoding = GENERATE(true, false);
-    INFO("barcode_both_ends: " + std::string{barcode_both_ends ? "true" : "false"} +
-         " | use_per_read_barcoding: " + std::string{use_per_read_barcoding ? "true" : "false"});
+    CAPTURE(barcode_both_ends);
+    CAPTURE(use_per_read_barcoding);
     constexpr bool no_trim = false;
     dorado::BarcodingInfo barcoding_info{};
     barcoding_info.kit_name = kits[0];
