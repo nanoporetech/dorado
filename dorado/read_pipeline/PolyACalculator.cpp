@@ -66,7 +66,7 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
     // Maximum gap between intervals that can be combined.
     const int kMaxSampleGap = num_samples_per_base * 3;
 
-    int left_end = is_rna ? std::max(0, signal_anchor - 500) : std::max(0, signal_anchor - kSpread);
+    int left_end = is_rna ? std::max(0, signal_anchor - 50) : std::max(0, signal_anchor - kSpread);
     int right_end = std::min(signal_len, signal_anchor + kSpread);
     spdlog::debug("Bounds left {}, right {}", left_end, right_end);
 
@@ -153,11 +153,22 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
     return *best_interval;
 }
 
-// Basic estimation of avg translocation speed by dividing number of samples by the
-// number of bases called.
-int estimate_samples_per_base(const dorado::SimplexRead& read) {
-    float num_samples_per_base = static_cast<float>(read.read_common.get_raw_data_samples()) /
-                                 read.read_common.seq.length();
+// Estimate the number of samples per base. For RNA, use the last 100 bases
+// to get a measure of samples/base. For DNA, just taking the average across
+// the whole read gives a decent estimate.
+int estimate_samples_per_base(const dorado::SimplexRead& read, bool is_rna) {
+    size_t num_bases = read.read_common.seq.length();
+    if (is_rna && num_bases > 250) {
+        const auto stride = read.read_common.model_stride;
+        const auto seq_to_sig_map =
+                dorado::utils::moves_to_map(read.read_common.moves, stride,
+                                            read.read_common.get_raw_data_samples(), num_bases + 1);
+        // Use last 100bp to estimate samples / base.
+        size_t signal_len = seq_to_sig_map[num_bases] - seq_to_sig_map[num_bases - 100];
+        return std::floor(static_cast<float>(signal_len) / 100);
+    }
+    float num_samples_per_base =
+            static_cast<float>(read.read_common.get_raw_data_samples()) / num_bases;
     // The estimate is not rounded because this calculation generally overestimates
     // the samples per base. Rounding down gives better results than rounding to nearest.
     return std::floor(num_samples_per_base);
@@ -237,47 +248,38 @@ SignalAnchorInfo determine_signal_anchor_and_strand_cdna(const dorado::SimplexRe
     return result;
 }
 
-// The approach used for determining the approximate location of the polyA
-// tail in dRNA is different. Since dRNA is single stranded, we already know the
-// direction of the read. However, in dRNA, the adapter is DNA. But the model for
-// basecalling is trained on RNA data. So the basecall quality of the adapter is poor,
-// and alignment doesn't work well. Instead, the raw signal is traversed to find a point
-// where there's a jump in the mean signal value, which is indicative of the
+// Since the adapter in RNA is still DNA, the basecall quality of the adapter is poor because we
+// infer with a model trained on RNA data. So finding a match of the adapter sequence in the RNA sequence
+// doesn't work well. Instead, the raw signal is traversed to find a point
+// where there's a jump in the median signal value, which is indicative of the
 // transition from the DNA adapter to the RNA signal. The polyA will start right
 // at that juncture. This function returns a struct with the strand
 // direction (which is always reverse for dRNA), the signal anchor and the number of bases
 // to omit from the tail length estimation due to any adapter effects.
 SignalAnchorInfo determine_signal_anchor_and_strand_drna(const dorado::SimplexRead& read) {
-    const c10::Half* signal = static_cast<c10::Half*>(read.read_common.raw_data.data_ptr());
     int signal_len = read.read_common.get_raw_data_samples();
 
     int bp = -1;
-    const int kWindowSize = 500;
-    const float kAvgSignalThreshold = 0.f;
-    bool found_first_peak = false;
-    for (int i = 0; i < signal_len; i += kWindowSize) {
-        int s = i;
-        int e = std::min(i + kWindowSize, signal_len);
+    float last_median = 0.f;
+    const int kWindowSize = 250;
+    const int kStride = 50;
+    const int kOffset = 1000;
+    const int kMaxSignalPos = 5000;
 
-        float sum = 0.f;
-        for (int j = s; j < e; j++) {
-            sum += signal[j];
-        }
-        float avg = sum / (e - s);
-
-        if (avg > kAvgSignalThreshold) {
-            if (!found_first_peak) {
-                found_first_peak = true;
-                bp = s;
-            } else {
-                // 2 consecutive windows with average signal value
-                // aboe the threshold mark a signal level change to
-                // RNA.
+    auto sig_fp32 = read.read_common.raw_data.to(torch::kFloat);
+    for (int i = kOffset; i < std::min(signal_len / 2, kMaxSignalPos); i += kStride) {
+        auto slice = sig_fp32.slice(0, std::max(0, i - kWindowSize / 2),
+                                    std::min(signal_len, i + kWindowSize / 2));
+        float median = slice.median().item<float>();
+        if (median > 0 && i > kOffset) {
+            float diff = median - last_median;
+            if (diff > 0.5) {
+                bp = i;
                 break;
             }
+            last_median = median;
         } else {
-            found_first_peak = false;
-            bp = -1;
+            last_median = median;
         }
     }
 
@@ -317,7 +319,7 @@ void PolyACalculator::worker_thread() {
         if (signal_anchor >= 0) {
             spdlog::debug("Strand {}; poly A/T signal anchor {}", fwd ? '+' : '-', signal_anchor);
 
-            auto num_samples_per_base = estimate_samples_per_base(*read);
+            auto num_samples_per_base = estimate_samples_per_base(*read, m_is_rna);
 
             // Walk through signal
             auto [signal_start, signal_end] = determine_signal_bounds(
