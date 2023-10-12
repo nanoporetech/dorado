@@ -44,12 +44,12 @@ int demuxer(int argc, char* argv[]) {
             .nargs(argparse::nargs_pattern::any);
     parser.add_argument("--output-dir").help("Output folder for demultiplexed reads.").required();
     parser.add_argument("--kit-name")
-            .help("Barcoding kit name. Mutually exclusive with --no-classify. Choose "
+            .help("Barcoding kit name. Cannot be used with --no-classify. Choose "
                   "from: " +
                   dorado::barcode_kits::barcode_kits_list_str() + ".");
     parser.add_argument("--no-classify")
             .help("Skip barcode classification. Only demux based on existing classification in "
-                  "reads. Mutually exclusive with --kit-name.")
+                  "reads. Cannot be used with --kit-name.")
             .default_value(false)
             .implicit_value(true);
     parser.add_argument("-t", "--threads")
