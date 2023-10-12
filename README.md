@@ -104,7 +104,9 @@ To run Duplex basecalling, run the command:
 $ dorado duplex dna_r10.4.1_e8.2_400bps_sup@v4.1.0 pod5s/ > duplex.bam
 ```
 
-This command will output both simplex and duplex reads. The `dx` tag in the output BAM can be used to distinguish between them:
+This command will output both simplex and duplex reads. This means in the output, genomic positions covered by a duplex read will have coverage from at least 3 reads - the simplex template strand, its complement strand and the duplex read generated from them.
+
+The `dx` tag in the BAM record for each read can be used to distinguish between simplex and duplex reads:
 * `dx:i:1` for duplex reads.
 * `dx:i:0` for simplex reads which don't have duplex offsprings.
 * `dx:i:-1` for simplex reads which have duplex offsprings.

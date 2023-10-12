@@ -2,6 +2,14 @@
 
 All notable changes to Dorado will be documented in this file.
 
+# [0.4.1] (12 Oct 2023)
+
+This release of Dorado fixes a bug with duplex tags and adds functionality to dorado demux.
+
+* 7fefd5d949d32decc3b347778afa80c90b9c6417 - Fix missing `dx:i:-1` tag for simplex reads with duplex offsprings
+* d532ef1517413b536714d47c01a998305890d922 - Enable dorado debug build in Visual Studio 22
+* TBD - Add option to demux barcoded data without classification to `dorado demux`
+
 # [0.4.0] (9 Oct 2023)
 
 This release of Dorado introduces barcode demultiplexing, barcode trimming, simplex read splitting, and updated models for calling 6mA and 5mC/5hmC modified bases. Furthermore, it contains improvements to duplex pairing for increased yield, basecalling speed enhancements and reductions to memory consumption, bug fixes, and additional tests for enhanced stability.
