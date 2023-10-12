@@ -30,20 +30,7 @@ struct ScoreResults {
 const ScoreResults UNCLASSIFIED{};
 
 class BarcodeClassifier {
-    struct AdapterSequence {
-        std::vector<std::string> adapter;
-        std::vector<std::string> adapter_rev;
-        std::string top_primer;
-        std::string top_primer_rev;
-        std::string bottom_primer;
-        std::string bottom_primer_rev;
-        int top_primer_front_flank_len;
-        int top_primer_rear_flank_len;
-        int bottom_primer_front_flank_len;
-        int bottom_primer_rear_flank_len;
-        std::vector<std::string> adapter_name;
-        std::string kit;
-    };
+    struct AdapterSequence;
 
 public:
     BarcodeClassifier(const std::vector<std::string>& kit_names);
