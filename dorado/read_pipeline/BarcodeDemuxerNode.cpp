@@ -62,7 +62,11 @@ void BarcodeDemuxerNode::worker_thread() {
 int BarcodeDemuxerNode::write(bam1_t* const record) {
     assert(m_header);
     // Fetch the barcode name.
-    std::string bc(bam_aux2Z(bam_aux_get(record, "BC")));
+    std::string bc = "unclassified";
+    auto bam_tag = bam_aux_get(record, "BC");
+    if (bam_tag) {
+        bc = std::string(bam_aux2Z(bam_tag));
+    }
     // Check of existence of file for that barcode.
     auto res = m_files.find(bc);
     htsFile* file = nullptr;
