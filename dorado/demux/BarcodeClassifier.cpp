@@ -27,7 +27,7 @@ EdlibAlignConfig init_edlib_config_for_flanks() {
     placement_config.mode = EDLIB_MODE_HW;
     placement_config.task = EDLIB_TASK_PATH;
     // The Ns are the barcode mask. The M is for the wobble base in the 16S barcode flanks.
-    static EdlibEqualityPair additionalEqualities[7] = {
+    static const EdlibEqualityPair additionalEqualities[7] = {
             {'N', 'A'}, {'N', 'T'}, {'N', 'C'}, {'N', 'G'}, {'N', 'U'}, {'M', 'A'}, {'M', 'C'}};
     placement_config.additionalEqualities = additionalEqualities;
     placement_config.additionalEqualitiesLength = 7;
@@ -174,10 +174,10 @@ std::vector<BarcodeClassifier::AdapterSequence> BarcodeClassifier::generate_adap
                                      " is not a valid barcode kit name. Please run the help "
                                      "command to find out available barcode kits.");
         }
-        auto kit_info = kit_iter->second;
+        const auto& kit_info = kit_iter->second;
         AdapterSequence as;
         as.kit = kit_name;
-        auto& ref_bc = barcodes.at(kit_info.barcodes[0]);
+        const auto& ref_bc = barcodes.at(kit_info.barcodes[0]);
 
         std::string bc_mask(ref_bc.length(), 'N');
         as.top_primer = kit_info.top_front_flank + bc_mask + kit_info.top_rear_flank;
@@ -187,16 +187,16 @@ std::vector<BarcodeClassifier::AdapterSequence> BarcodeClassifier::generate_adap
         as.bottom_primer_rev = utils::reverse_complement(kit_info.bottom_rear_flank) + bc_mask +
                                utils::reverse_complement(kit_info.bottom_front_flank);
 
-        for (auto& bc_name : kit_info.barcodes) {
-            auto adapter = barcodes.at(bc_name);
+        for (const auto& bc_name : kit_info.barcodes) {
+            const auto& adapter = barcodes.at(bc_name);
             auto adapter_rev = utils::reverse_complement(adapter);
 
             as.adapter.push_back(adapter);
-            as.adapter_rev.push_back(adapter_rev);
+            as.adapter_rev.push_back(std::move(adapter_rev));
 
             as.adapter_name.push_back(bc_name);
         }
-        adapters.push_back(as);
+        adapters.push_back(std::move(as));
     }
     return adapters;
 }
