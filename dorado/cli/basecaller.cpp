@@ -142,7 +142,7 @@ void setup(std::vector<std::string> args,
             methylation_threshold_pct);
     if (estimate_poly_a) {
         current_sink_node = pipeline_desc.add_node<PolyACalculator>(
-                {current_sink_node}, 1 /*std::thread::hardware_concurrency()*/,
+                {current_sink_node}, std::thread::hardware_concurrency(),
                 is_rna_model(model_config));
     }
     if (!barcode_kits.empty()) {
