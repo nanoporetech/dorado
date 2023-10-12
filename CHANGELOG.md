@@ -8,7 +8,7 @@ This release of Dorado fixes a bug with duplex tags and adds functionality to do
 
 * 7fefd5d949d32decc3b347778afa80c90b9c6417 - Fix missing `dx:i:-1` tag for simplex reads with duplex offsprings
 * d532ef1517413b536714d47c01a998305890d922 - Enable dorado debug build in Visual Studio 22
-* TBD - Add option to demux barcoded data without classification to `dorado demux`
+* eeef7575b6dabab8d5647cebed0f92ef793786ef - Add `dorado demux` option to demux pre-classified barcoded data
 
 # [0.4.0] (9 Oct 2023)
 
