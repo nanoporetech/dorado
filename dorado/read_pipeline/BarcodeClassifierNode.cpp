@@ -95,7 +95,7 @@ void BarcodeClassifierNode::worker_thread(size_t tid) {
     }
 }
 
-std::pair<int, int> determine_trim_interval(const demux::ScoreResults& res, int seqlen) {
+static std::pair<int, int> determine_trim_interval(const demux::ScoreResults& res, int seqlen) {
     // Initialize interval to be the whole read. Note that the interval
     // defines which portion of the read to retain.
     std::pair<int, int> trim_interval = {0, seqlen};
