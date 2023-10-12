@@ -6,6 +6,7 @@ set(UNIT_TEST_SOURCE_FILES
     BamReaderTest.cpp
     BamWriterTest.cpp
     BamUtilsTest.cpp
+    BarcodeClassifierSelectorTest.cpp
     BarcodeClassifierTest.cpp
     BarcodeDemuxerNodeTest.cpp    
     CliUtilsTest.cpp

@@ -120,15 +120,13 @@ struct BarcodeClassifier::AdapterSequence {
     std::string kit;
 };
 
-BarcodeClassifier::BarcodeClassifier(const std::vector<std::string>& kit_names,
-                                     bool barcode_both_ends)
-        : m_barcode_both_ends(barcode_both_ends),
-          m_adapter_sequences(generate_adapter_sequence(kit_names)) {}
+BarcodeClassifier::BarcodeClassifier(const std::vector<std::string>& kit_names)
+        : m_adapter_sequences(generate_adapter_sequence(kit_names)) {}
 
 BarcodeClassifier::~BarcodeClassifier() = default;
 
-ScoreResults BarcodeClassifier::barcode(const std::string& seq) {
-    auto best_adapter = find_best_adapter(seq, m_adapter_sequences);
+ScoreResults BarcodeClassifier::barcode(const std::string& seq, bool barcode_both_ends) const {
+    auto best_adapter = find_best_adapter(seq, m_adapter_sequences, barcode_both_ends);
     return best_adapter;
 }
 
@@ -205,7 +203,7 @@ std::vector<BarcodeClassifier::AdapterSequence> BarcodeClassifier::generate_adap
 // of that adapter sequence. This leads to 2 variants of the barcode arrangements.
 std::vector<ScoreResults> BarcodeClassifier::calculate_adapter_score_different_double_ends(
         std::string_view read_seq,
-        const AdapterSequence& as) {
+        const AdapterSequence& as) const {
     std::string_view read_top = read_seq.substr(0, TRIM_LENGTH);
     int bottom_start = std::max(0, (int)read_seq.length() - TRIM_LENGTH);
     std::string_view read_bottom = read_seq.substr(bottom_start, TRIM_LENGTH);
@@ -334,7 +332,7 @@ std::vector<ScoreResults> BarcodeClassifier::calculate_adapter_score_different_d
 // reverse complement sequence in the top/bottom windows.
 std::vector<ScoreResults> BarcodeClassifier::calculate_adapter_score_double_ends(
         std::string_view read_seq,
-        const AdapterSequence& as) {
+        const AdapterSequence& as) const {
     bool debug_mode = (spdlog::get_level() == spdlog::level::debug);
     std::string_view read_top = read_seq.substr(0, TRIM_LENGTH);
     int bottom_start = std::max(0, (int)read_seq.length() - TRIM_LENGTH);
@@ -400,8 +398,9 @@ std::vector<ScoreResults> BarcodeClassifier::calculate_adapter_score_double_ends
 // In this scenario, the barcode (and its flanks) only ligate to the 5' end
 // of the read. So we only look for adapter sequence in the top "window" (first
 // 150bp) of the read.
-std::vector<ScoreResults> BarcodeClassifier::calculate_adapter_score(std::string_view read_seq,
-                                                                     const AdapterSequence& as) {
+std::vector<ScoreResults> BarcodeClassifier::calculate_adapter_score(
+        std::string_view read_seq,
+        const AdapterSequence& as) const {
     bool debug_mode = (spdlog::get_level() == spdlog::level::debug);
     std::string_view read_top = read_seq.substr(0, TRIM_LENGTH);
 
@@ -536,7 +535,8 @@ std::tuple<ScoreResults, int, bool> check_bc_with_longest_match(const ScoreResul
 // Score every barcode against the input read and returns the best match,
 // or an unclassified match, based on certain heuristics.
 ScoreResults BarcodeClassifier::find_best_adapter(const std::string& read_seq,
-                                                  const std::vector<AdapterSequence>& adapters) {
+                                                  const std::vector<AdapterSequence>& adapters,
+                                                  bool barcode_both_ends) const {
     if (read_seq.length() < TRIM_LENGTH) {
         return UNCLASSIFIED;
     }
@@ -609,7 +609,7 @@ ScoreResults BarcodeClassifier::find_best_adapter(const std::string& read_seq,
         }
     }
 
-    if (m_barcode_both_ends && kit.double_ends) {
+    if (barcode_both_ends && kit.double_ends) {
         // For more stringent classification, ensure that both ends of a read
         // have a high score for the same barcode. If not then consider it
         // unclassified.
