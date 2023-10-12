@@ -21,7 +21,7 @@ namespace {
 
 const std::string UNCLASSIFIED_BARCODE = "unclassified";
 
-std::string generate_barcode_string(dorado::demux::ScoreResults bc_res) {
+std::string generate_barcode_string(dorado::BarcodeScoreResult bc_res) {
     std::string bc;
     if (bc_res.adapter_name != UNCLASSIFIED_BARCODE) {
         bc = dorado::barcode_kits::generate_standard_barcode_name(bc_res.kit, bc_res.adapter_name);
@@ -95,7 +95,7 @@ void BarcodeClassifierNode::worker_thread(size_t tid) {
     }
 }
 
-static std::pair<int, int> determine_trim_interval(const demux::ScoreResults& res, int seqlen) {
+static std::pair<int, int> determine_trim_interval(const BarcodeScoreResult& res, int seqlen) {
     // Initialize interval to be the whole read. Note that the interval
     // defines which portion of the read to retain.
     std::pair<int, int> trim_interval = {0, seqlen};
@@ -153,7 +153,7 @@ static std::pair<int, int> determine_trim_interval(const demux::ScoreResults& re
 }
 
 BamPtr BarcodeClassifierNode::trim_barcode(BamPtr input,
-                                           const demux::ScoreResults& res,
+                                           const BarcodeScoreResult& res,
                                            int seqlen) {
     auto trim_interval = determine_trim_interval(res, seqlen);
 
@@ -221,7 +221,7 @@ BamPtr BarcodeClassifierNode::trim_barcode(BamPtr input,
     return BamPtr(out_record);
 }
 
-void BarcodeClassifierNode::trim_barcode(SimplexRead& read, const demux::ScoreResults& res) {
+void BarcodeClassifierNode::trim_barcode(SimplexRead& read, const BarcodeScoreResult& res) {
     int seqlen = int(read.read_common.seq.length());
     auto trim_interval = determine_trim_interval(res, seqlen);
 

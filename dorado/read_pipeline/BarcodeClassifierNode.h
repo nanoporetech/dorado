@@ -12,10 +12,6 @@
 
 namespace dorado {
 
-namespace demux {
-struct ScoreResults;
-}
-
 class BarcodeClassifierNode : public MessageSink {
 public:
     BarcodeClassifierNode(int threads,
@@ -46,8 +42,8 @@ private:
     void barcode(BamPtr& read);
     void barcode(SimplexRead& read);
 
-    BamPtr trim_barcode(BamPtr irecord, const demux::ScoreResults& res, int seqlen);
-    void trim_barcode(SimplexRead& read, const demux::ScoreResults& res);
+    BamPtr trim_barcode(BamPtr irecord, const BarcodeScoreResult& res, int seqlen);
+    void trim_barcode(SimplexRead& read, const BarcodeScoreResult& res);
     void terminate_impl();
 };
 

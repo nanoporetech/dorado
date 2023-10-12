@@ -51,6 +51,7 @@ public:
     uint64_t start_time_ms;
 
     std::shared_ptr<const BarcodingInfo> barcoding_info;
+    std::shared_ptr<const BarcodeScoreResult> barcoding_result;
     std::string alignment_string{};
 
     // A unique identifier for each input read

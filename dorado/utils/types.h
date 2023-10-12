@@ -27,6 +27,21 @@ std::shared_ptr<const BarcodingInfo> create_barcoding_info(
         bool trim_barcode,
         BarcodingInfo::FilterSet allowed_barcodes);
 
+struct BarcodeScoreResult {
+    float score = -1.f;
+    float top_score = -1.f;
+    float bottom_score = -1.f;
+    float flank_score = -1.f;
+    float top_flank_score = -1.f;
+    float bottom_flank_score = -1.f;
+    bool use_top = false;
+    std::string adapter_name = "unclassified";
+    std::string kit = "unclassified";
+    int barcode_start = -1;
+    std::pair<int, int> top_barcode_pos = {-1, -1};
+    std::pair<int, int> bottom_barcode_pos = {-1, -1};
+};
+
 struct ReadGroup {
     std::string run_id;
     std::string basecalling_model;
