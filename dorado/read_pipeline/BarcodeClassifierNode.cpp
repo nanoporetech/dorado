@@ -292,9 +292,10 @@ void BarcodeClassifierNode::barcode(SimplexRead& read) {
     auto bc_res = barcoder->barcode(read.read_common.seq, barcoding_info->barcode_both_ends,
                                     barcoding_info->allowed_barcodes);
     read.read_common.barcode = generate_barcode_string(bc_res);
+    read.read_common.barcoding_result = std::make_shared<BarcodeScoreResult>(std::move(bc_res));
     m_num_records++;
     if (barcoding_info->trim) {
-        trim_barcode(read, bc_res);
+        trim_barcode(read, *read.read_common.barcoding_result);
     }
 }
 
