@@ -18,10 +18,10 @@ If you encounter any problems building or running Dorado, please [report an issu
 
 ## Installation
 
- - [dorado-0.4.0-linux-x64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.4.0-linux-x64.tar.gz)
- - [dorado-0.4.0-linux-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.4.0-linux-arm64.tar.gz)
- - [dorado-0.4.0-osx-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.4.0-osx-arm64.zip)
- - [dorado-0.4.0-win64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.4.0-win64.zip)
+ - [dorado-0.4.1-linux-x64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.4.1-linux-x64.tar.gz)
+ - [dorado-0.4.1-linux-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.4.1-linux-arm64.tar.gz)
+ - [dorado-0.4.1-osx-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.4.1-osx-arm64.zip)
+ - [dorado-0.4.1-win64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.4.1-win64.zip)
 
 ## Platforms
 
@@ -104,7 +104,9 @@ To run Duplex basecalling, run the command:
 $ dorado duplex dna_r10.4.1_e8.2_400bps_sup@v4.1.0 pod5s/ > duplex.bam
 ```
 
-This command will output both simplex and duplex reads. The `dx` tag in the output BAM can be used to distinguish between them:
+When using the `duplex` command, two types of DNA sequence results will be produced: 'simplex' and 'duplex'. Any specific position in the DNA which is in a duplex read is also seen in two simplex strands (the template and complement).  So, each DNA position which is duplex sequenced will be covered by a minimum of three separate readings in the output.
+
+The `dx` tag in the BAM record for each read can be used to distinguish between simplex and duplex reads:
 * `dx:i:1` for duplex reads.
 * `dx:i:0` for simplex reads which don't have duplex offsprings.
 * `dx:i:-1` for simplex reads which have duplex offsprings.
