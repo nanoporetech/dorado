@@ -1,15 +1,15 @@
 #include "DataLoader.h"
 
-#include "../utils/compat_utils.h"
-#include "../utils/types.h"
-#include "cxxpool.h"
-#include "pod5_format/c_api.h"
 #include "read_pipeline/ReadPipeline.h"
+#include "utils/compat_utils.h"
 #include "utils/time_utils.h"
+#include "utils/types.h"
 #include "vbz_plugin_user_utils.h"
 
+#include <cxxpool.h>
 #include <highfive/H5Easy.hpp>
 #include <highfive/H5File.hpp>
+#include <pod5_format/c_api.h>
 #include <spdlog/spdlog.h>
 
 #include <algorithm>

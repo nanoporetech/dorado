@@ -6,6 +6,7 @@ set(UNIT_TEST_SOURCE_FILES
     BamReaderTest.cpp
     BamWriterTest.cpp
     BamUtilsTest.cpp
+    BarcodeClassifierSelectorTest.cpp
     BarcodeClassifierTest.cpp
     BarcodeDemuxerNodeTest.cpp    
     CliUtilsTest.cpp
@@ -59,6 +60,7 @@ foreach(TEST_BIN dorado_tests dorado_smoke_tests)
     endif()
 
     target_link_libraries(${TEST_BIN}
+        PRIVATE
         dorado_lib
         dorado_io_lib
         dorado_models_lib

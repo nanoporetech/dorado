@@ -3,6 +3,7 @@
 #include <array>
 #include <memory>
 #include <string>
+#include <vector>
 
 struct bam1_t;
 struct mm_tbuf_s;
@@ -51,11 +52,11 @@ inline std::string to_string(ReadOrder read_order) {
 
 struct ModBaseInfo {
     ModBaseInfo() = default;
-    ModBaseInfo(std::string alphabet_, std::string long_names_, std::string context_)
+    ModBaseInfo(std::vector<std::string> alphabet_, std::string long_names_, std::string context_)
             : alphabet(std::move(alphabet_)),
               long_names(std::move(long_names_)),
               context(std::move(context_)) {}
-    std::string alphabet;
+    std::vector<std::string> alphabet;
     std::string long_names;
     std::string context;
     std::array<size_t, 4> base_counts{};

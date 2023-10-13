@@ -3,9 +3,15 @@ include:
 
 workflow:
   rules:
+    # If a new commit is pushed to the branch but an MR is already opened, don't run a "push" pipeline because
+    # the merge request train setting will trigger a "merge_request_event" pipeline anyway.
+    # In all other cases, run the pipeline.
+    - if: $CI_PIPELINE_SOURCE == 'push' && $CI_OPEN_MERGE_REQUESTS
+      when: never
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
     - if: $CI_PIPELINE_SOURCE == 'schedule'
     - if: $CI_PIPELINE_SOURCE == 'push'
+    - if: $CI_PIPELINE_SOURCE == 'web'
 
 stages:
   - pre-flight
@@ -82,6 +88,7 @@ variables:
   stage: build
   script:
     - echo Dorado build stage
+    - echo "BUILD_OPTIONS '${BUILD_OPTIONS}'"
     - *run_dorado_cmake_build
     - *run_dorado_cmake_ctest
   artifacts:
@@ -174,7 +181,7 @@ build:linux:x86:focal:install_deps:
 build:linux:x86:focal:
   image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.1
   variables:
-    BUILD_OPTIONS: "-DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN}"
+    BUILD_OPTIONS: "-DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN} -DONT_MM2_EXE=ON"
   extends:
     - .linux_runner
     - .build_dorado
@@ -204,11 +211,15 @@ build:linux:x86:focal_coverage:
 
 build:linux:arm64:bionic:
   image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r32.4.3-deps:1.1
+  variables:
+    BUILD_OPTIONS: "-DONT_MM2_EXE=ON"
   <<: *linux_arm64_runner
   <<: *build_dorado
 
 build:linux:arm64:focal:
   image: nvcr.io/nvidia/l4t-pytorch:r35.1.0-pth1.13-py3
+  variables:
+    BUILD_OPTIONS: "-DONT_MM2_EXE=ON"
   <<: *linux_dependencies
   <<: *linux_arm64_runner
   <<: *build_dorado
@@ -244,10 +255,14 @@ build:windows_koi_download:
     - echo BUILD_OPTIONS is ${BUILD_OPTIONS}
 
 build:macos:m1:
+  before_script:
+    - export BUILD_OPTIONS="-DONT_MM2_EXE=ON"
   <<: *macos_m1_runner
   <<: *build_dorado
 
 build:macos:x64:
+  before_script:
+    - export BUILD_OPTIONS="-DONT_MM2_EXE=ON"
   <<: *macos_x64_runner
   <<: *build_dorado
 
@@ -467,8 +482,10 @@ test:model_download:linux:x86:focal:
   interruptible: true
   rules:
       - if: $CI_PIPELINE_SOURCE == "schedule"
-      - if: $CI_PIPELINE_SOURCE == "push"
+      - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH
         when: manual
+        # See https://forum.gitlab.com/t/specifying-a-pipeline-step-as-manual-causes-its-status-to-always-be-blocked/58333/3
+        allow_failure: true
 
 
 # MLHub

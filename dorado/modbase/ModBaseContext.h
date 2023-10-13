@@ -87,7 +87,7 @@ public:
      */
     void update_mask(std::vector<bool>& mask,
                      const std::string& sequence,
-                     const std::string& modbase_alphabet,
+                     const std::vector<std::string>& modbase_alphabet,
                      const std::vector<uint8_t>& modbase_probs,
                      uint8_t threshold) const;
 

@@ -21,6 +21,16 @@ namespace dorado {
 
 namespace cli {
 
+static constexpr auto HIDDEN_PROGRAM_NAME = "internal_args";
+
+struct ArgParser {
+    ArgParser(std::string program_name)
+            : visible(program_name, DORADO_VERSION, argparse::default_arguments::help),
+              hidden(HIDDEN_PROGRAM_NAME){};
+    argparse::ArgumentParser visible;
+    argparse::ArgumentParser hidden;
+};
+
 // Determine the thread allocation for writer and aligner threads
 // in dorado aligner.
 inline std::pair<int, int> worker_vs_writer_thread_allocation(int available_threads,
@@ -45,31 +55,6 @@ inline void add_pg_hdr(sam_hdr_t* hdr, const std::vector<std::string>& args) {
     sam_hdr_add_lines(hdr, pg.str().c_str(), 0);
 }
 
-inline argparse::ArgumentParser parse_internal_options(
-        const std::vector<std::string>& unused_args) {
-    auto args = unused_args;
-    const std::string prog_name = std::string("internal_args");
-    argparse::ArgumentParser private_parser(prog_name);
-    private_parser.add_argument("--skip-model-compatibility-check")
-            .help("(WARNING: For expert users only) Skip model and data compatibility checks.")
-            .default_value(false)
-            .implicit_value(true);
-    private_parser.add_argument("--dump_stats_file")
-            .help("Internal processing stats. output filename.")
-            .default_value(std::string(""));
-    private_parser.add_argument("--dump_stats_filter")
-            .help("Internal processing stats. name filter regex.")
-            .default_value(std::string(""));
-    private_parser.add_argument("--devopts")
-            .help("Internal options for testing & debugging, 'key=value' pairs separated by ';'")
-            .default_value(std::string(""));
-    args.insert(args.begin(), prog_name);
-    private_parser.parse_args(args);
-    utils::details::extract_dev_options(private_parser.get<std::string>("--devopts"));
-
-    return private_parser;
-}
-
 inline std::tuple<int, int, int> parse_version_str(const std::string& version) {
     size_t first_pos = 0, pos = 0;
     std::vector<int> tokens;
@@ -91,30 +76,183 @@ inline std::tuple<int, int, int> parse_version_str(const std::string& version) {
     }
 }
 
-inline uint64_t parse_string_to_size(const std::string& num_str) {
-    // check if last character in K, M or G.
-    char last_char = num_str[num_str.length() - 1];
-    uint64_t multiplier = 1;
-    bool is_last_char_alpha = isalpha(last_char);
-    if (is_last_char_alpha) {
-        switch (last_char) {
-        case 'K':
-            multiplier = 1e3;
-            break;
-        case 'M':
-            multiplier = 1e6;
-            break;
-        case 'G':
-            multiplier = 1e9;
-            break;
-        default:
-            throw std::runtime_error("Unknown size " + std::to_string(last_char) +
-                                     " found. Please choose between K, M or G");
+template <class T = int64_t>
+std::vector<T> parse_string_to_sizes(const std::string& str,
+                                     std::optional<std::string> opt = std::nullopt) {
+    std::size_t pos;
+    std::vector<T> sizes;
+    const char* c_str = str.c_str();
+    char* p;
+    while (true) {
+        double x = strtod(c_str, &p);
+        if (p == c_str) {
+            auto msg = "Cannot parse size '" + str + "'.";
+            if (opt)
+                msg = "Error parsing option " + *opt + ": " + msg;
+            throw std::runtime_error(msg);
         }
+        if (*p == 'G' || *p == 'g') {
+            x *= 1e9;
+            ++p;
+        } else if (*p == 'M' || *p == 'm') {
+            x *= 1e6;
+            ++p;
+        } else if (*p == 'K' || *p == 'k') {
+            x *= 1e3;
+            ++p;
+        }
+        sizes.emplace_back(static_cast<T>(std::round(x)));
+        if (*p == ',') {
+            c_str = ++p;
+            continue;
+        } else if (*p == 0) {
+            break;
+        }
+        auto msg = "Unknown suffix '" + std::string(p) + "'.";
+        if (opt)
+            msg = "Error parsing option " + *opt + ": " + msg;
+        throw std::runtime_error(msg);
     }
-    uint64_t size_num =
-            std::stoul(is_last_char_alpha ? num_str.substr(0, num_str.length() - 1) : num_str);
-    return size_num * multiplier;
+    return sizes;
+}
+
+template <class T = uint64_t>
+T parse_string_to_size(const std::string& str, std::optional<std::string> opt = std::nullopt) {
+    return parse_string_to_sizes<T>(str, opt)[0];
+}
+
+inline bool parse_yes_or_no(const std::string& str, std::optional<std::string> opt = std::nullopt) {
+    if (str == "yes" || str == "y") {
+        return true;
+    }
+    if (str == "no" || str == "n") {
+        return false;
+    }
+    auto msg = "Unsupported value '" + str + "'; option  only accepts '(y)es' or '(n)o'.";
+    if (opt) {
+        msg = "Error parsing option " + *opt + ": " + msg;
+    }
+    throw std::runtime_error(msg);
+}
+
+inline std::string to_size(double value) {
+    std::stringstream res;
+    if (value < 1e3) {
+        res << value;
+    } else if (value < 1e6) {
+        res << value / 1e3 << 'K';
+    } else if (value < 1e9) {
+        res << value / 1e6 << 'M';
+    } else {
+        res << value / 1e9 << 'G';
+    }
+    return res.str();
+}
+
+inline std::string to_yes_or_no(bool value) { return value ? "yes" : "no"; }
+
+inline void add_internal_arguments(ArgParser& parser) {
+    parser.hidden.add_argument("--skip-model-compatibility-check")
+            .help("(WARNING: For expert users only) Skip model and data compatibility checks.")
+            .default_value(false)
+            .implicit_value(true);
+    parser.hidden.add_argument("--dump_stats_file")
+            .help("Internal processing stats. output filename.")
+            .default_value(std::string(""));
+    parser.hidden.add_argument("--dump_stats_filter")
+            .help("Internal processing stats. name filter regex.")
+            .default_value(std::string(""));
+    parser.hidden.add_argument("--devopts")
+            .help("Internal options for testing & debugging, 'key=value' pairs separated by ';'")
+            .default_value(std::string(""));
+}
+
+template <class Options>
+void add_minimap2_arguments(ArgParser& parser, const Options& dflt) {
+    parser.visible.add_argument("-k")
+            .help("minimap2 k-mer size for alignment (maximum 28).")
+            .template default_value<int>(dflt.kmer_size)
+            .template scan<'i', int>();
+
+    parser.visible.add_argument("-w")
+            .help("minimap2 minimizer window size for alignment.")
+            .template default_value<int>(dflt.window_size)
+            .template scan<'i', int>();
+
+    parser.visible.add_argument("-I")
+            .help("minimap2 index batch size.")
+            .default_value(to_size(dflt.index_batch_size));
+
+    parser.visible.add_argument("--secondary")
+            .help("minimap2 outputs secondary alignments")
+            .default_value(to_yes_or_no(dflt.print_secondary));
+
+    parser.visible.add_argument("-N")
+            .help("minimap2 retains at most INT secondary alignments")
+            .default_value(dflt.best_n_secondary)
+            .template scan<'i', int>();
+
+    parser.visible.add_argument("-Y")
+            .help("minimap2 uses soft clipping for supplementary alignments")
+            .default_value(false)
+            .implicit_value(true);
+
+    parser.visible.add_argument("--bandwidth")
+            .help("minimap2 chaining/alignment bandwidth and optionally long-join bandwidth "
+                  "specified as NUM,[NUM]")
+            .default_value(to_size(dflt.bandwidth) + "," + to_size(dflt.bandwidth_long));
+
+    parser.hidden.add_argument("--secondary-seq")
+            .help("minimap2 output seq/qual for secondary and supplementary alignments")
+            .default_value(false)
+            .implicit_value(true);
+
+    parser.hidden.add_argument("--print-aln-seq")
+            .help("minimap2 debug print qname and aln_seq")
+            .default_value(false)
+            .implicit_value(true);
+}
+
+inline void parse(ArgParser& parser, int argc, const char* const argv[]) {
+    auto remaining_args = parser.visible.parse_known_args(argc, argv);
+    remaining_args.insert(remaining_args.begin(), HIDDEN_PROGRAM_NAME);
+    parser.hidden.parse_args(remaining_args);
+}
+
+inline void process_internal_arguments(const ArgParser& parser) {
+    utils::details::extract_dev_options(parser.hidden.get<std::string>("--devopts"));
+}
+
+template <class Options>
+Options process_minimap2_arguments(const ArgParser& parser, const Options& dflt) {
+    Options res;
+    res.kmer_size = parser.visible.get<int>("k");
+    res.window_size = parser.visible.get<int>("w");
+    res.index_batch_size = cli::parse_string_to_size(parser.visible.get<std::string>("I"));
+    res.print_secondary = cli::parse_yes_or_no(parser.visible.get<std::string>("secondary"));
+    res.best_n_secondary = parser.visible.get<int>("N");
+    if (res.best_n_secondary == 0) {
+        spdlog::warn("Changed '-N 0' to '-N {} --secondary=no'", dflt.best_n_secondary);
+        res.print_secondary = false;
+        res.best_n_secondary = dflt.best_n_secondary;
+    }
+    auto bandwidth = cli::parse_string_to_sizes(parser.visible.get<std::string>("--bandwidth"));
+    switch (bandwidth.size()) {
+    case 1:
+        res.bandwidth = bandwidth[0];
+        res.bandwidth_long = dflt.bandwidth_long;
+        break;
+    case 2:
+        res.bandwidth = bandwidth[0];
+        res.bandwidth_long = bandwidth[1];
+        break;
+    default:
+        throw std::runtime_error("Wrong number of arguments for option '-r'.");
+    }
+    res.soft_clipping = parser.visible.get<bool>("Y");
+    res.secondary_seq = parser.hidden.get<bool>("secondary-seq");
+    res.print_aln_seq = parser.hidden.get<bool>("print-aln-seq");
+    return res;
 }
 
 inline std::vector<std::string> extract_token_from_cli(const std::string& cmd) {

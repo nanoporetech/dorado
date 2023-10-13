@@ -18,7 +18,7 @@ struct ModBaseModelConfig {
     int bases_before{};  ///< The number of bases before the primary base of a kmer.
     int bases_after{};   ///< The number of bases after the primary base of a kmer.
     int offset{};
-    std::string mod_bases;
+    std::vector<std::string> mod_bases;
     std::vector<float> refine_kmer_levels;  ///< Expected kmer levels for rough rescaling
     size_t refine_kmer_len{};               ///< Length of the kmers for the specified kmer_levels
     size_t refine_kmer_center_idx{};      ///< The position in the kmer at which to check the levels

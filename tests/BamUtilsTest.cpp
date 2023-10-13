@@ -127,6 +127,11 @@ TEST_CASE("BamUtilsTest: add_rg_hdr read group headers", TEST_GROUP) {
             }
         }
     }
+
+    SECTION("Read groups with unknown barcode kit") {
+        dorado::SamHdrPtr sam_header(sam_hdr_init());
+        CHECK_THROWS(dorado::utils::add_rg_hdr(sam_header.get(), read_groups, {"blah"}));
+    }
 }
 
 TEST_CASE("BamUtilsTest: Test bam extraction helpers", TEST_GROUP) {

@@ -1,53 +1,22 @@
 #include "ReadPipeline.h"
 
-#include "htslib/sam.h"
 #include "modbase/ModBaseContext.h"
+#include "utils/bam_utils.h"
 #include "utils/sequence_utils.h"
 
+#include <htslib/sam.h>
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <iomanip>
 #include <sstream>
 #include <stack>
 #include <stdexcept>
+#include <unordered_map>
 
 using namespace std::chrono_literals;
-
-namespace {
-
-bool get_modbase_channel_name(std::string &channel_name, const std::string &mod_abbreviation) {
-    static const std::map<std::string, std::string> modbase_name_map = {// A
-                                                                        {"6mA", "a"},
-                                                                        {"m6A", "a"},
-                                                                        // C
-                                                                        {"5mC", "m"},
-                                                                        {"5hmC", "h"},
-                                                                        {"5fC", "f"},
-                                                                        {"5caC", "c"},
-                                                                        // G
-                                                                        {"8oxoG", "o"},
-                                                                        // T
-                                                                        {"5hmU", "g"},
-                                                                        {"5fU", "e"},
-                                                                        {"5caU", "b"}};
-
-    if (modbase_name_map.find(mod_abbreviation) != modbase_name_map.end()) {
-        channel_name = modbase_name_map.at(mod_abbreviation);
-        return true;
-    }
-
-    // Check the supplied mod abbreviation is a simple integer and if so, assume it's a CHEBI code.
-    if (mod_abbreviation.find_first_not_of("0123456789") == std::string::npos) {
-        channel_name = mod_abbreviation;
-        return true;
-    }
-
-    spdlog::error("Unknown modified base abbreviation: {}", mod_abbreviation);
-    return false;
-}
-}  // namespace
 
 namespace dorado {
 
@@ -174,12 +143,11 @@ void ReadCommon::generate_modbase_tags(bam1_t *aln, uint8_t threshold) const {
                 "modbase_alphabet!");
     }
 
-    std::istringstream mod_name_stream(mod_base_info->long_names);
     std::string modbase_string = "";
     std::vector<uint8_t> modbase_prob;
 
     // Create a mask indicating which bases are modified.
-    std::map<char, bool> base_has_context = {
+    std::unordered_map<char, bool> base_has_context = {
             {'A', false}, {'C', false}, {'G', false}, {'T', false}};
     utils::ModBaseContext context_handler;
     if (!mod_base_info->context.empty()) {
@@ -201,13 +169,11 @@ void ReadCommon::generate_modbase_tags(bam1_t *aln, uint8_t threshold) const {
     for (size_t channel_idx = 0; channel_idx < num_channels; channel_idx++) {
         if (cardinal_bases.find(mod_base_info->alphabet[channel_idx]) != std::string::npos) {
             // A cardinal base
-            current_cardinal = mod_base_info->alphabet[channel_idx];
+            current_cardinal = mod_base_info->alphabet[channel_idx][0];
         } else {
             // A modification on the previous cardinal base
-            std::string modbase_name;
-            mod_name_stream >> modbase_name;
-            std::string bam_name;
-            if (!get_modbase_channel_name(bam_name, modbase_name)) {
+            std::string bam_name = mod_base_info->alphabet[channel_idx];
+            if (!utils::validate_bam_tag_code(bam_name)) {
                 return;
             }
 
@@ -286,7 +252,7 @@ std::vector<BamPtr> ReadCommon::extract_sam_lines(bool emit_moves,
     if (is_duplex) {
         generate_duplex_read_tags(aln);
     } else {
-        generate_read_tags(aln, emit_moves);
+        generate_read_tags(aln, emit_moves, is_duplex_parent);
     }
     generate_modbase_tags(aln, modbase_threshold);
     alns.push_back(BamPtr(aln));

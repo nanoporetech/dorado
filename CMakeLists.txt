@@ -1,18 +1,22 @@
 cmake_minimum_required(VERSION 3.20)
 set(CMAKE_POLICY_DEFAULT_CMP0063 NEW)
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
+set(CMAKE_POLICY_DEFAULT_CMP0091 NEW)
 
 project(dorado)
 
-if (NOT EXISTS ${CMAKE_BINARY_DIR}/CMakeCache.txt)
-  if (NOT CMAKE_BUILD_TYPE)
+get_cmake_property(MULTI_CONFIG GENERATOR_IS_MULTI_CONFIG)
+if (NOT MULTI_CONFIG)
+  if (NOT EXISTS ${CMAKE_BINARY_DIR}/CMakeCache.txt AND NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release" CACHE STRING "" FORCE)
   endif()
+message(STATUS "Build type: " ${CMAKE_BUILD_TYPE})
 endif()
 
-message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
 if(WIN32)
+  # all third parties are release builds, so we must match the windows runtime
+  set(CMAKE_MSVC_RUNTIME_LIBRARY MultiThreadedDLL)
   message(STATUS "toolset: ${CMAKE_GENERATOR_TOOLSET}")
   message(STATUS "platform: ${CMAKE_GENERATOR_PLATFORM}")
   message(STATUS "vs platform: ${CMAKE_VS_PLATFORM_NAME}")
@@ -100,8 +104,14 @@ endif()
 set(ELZIP_DECOMPRESS_ONLY ON)
 add_subdirectory(${DORADO_3RD_PARTY_SOURCE}/elzip)
 
-set(ONT_MM2_EXE OFF)
-add_subdirectory(${DORADO_3RD_PARTY_SOURCE}/ont-minimap2)
+option(ONT_MM2_EXE "Build minimap2 exe" OFF)
+add_subdirectory(${DORADO_3RD_PARTY_SOURCE}/ont-minimap2 EXCLUDE_FROM_ALL)
+message(STATUS "build minimap2 exe: ${ONT_MM2_EXE}")
+message(STATUS "build minimap2 lib: ${ONT_MM2_LIB}")
+if (ONT_MM2_EXE)
+    install(TARGETS minimap2_exe)
+    add_custom_target(testing_deps ALL DEPENDS minimap2_exe)
+endif()
 
 set(BUILD_TESTING OFF)
 add_subdirectory(${DORADO_3RD_PARTY_SOURCE}/edlib EXCLUDE_FROM_ALL)
@@ -173,6 +183,8 @@ set(LIB_SOURCE_FILES
     dorado/read_pipeline/DuplexReadTaggingNode.h
     dorado/read_pipeline/BarcodeClassifier.cpp
     dorado/read_pipeline/BarcodeClassifier.h
+    dorado/read_pipeline/BarcodeClassifierSelector.cpp
+    dorado/read_pipeline/BarcodeClassifierSelector.h
     dorado/read_pipeline/BarcodeClassifierNode.cpp
     dorado/read_pipeline/BarcodeClassifierNode.h
     dorado/read_pipeline/BarcodeDemuxerNode.cpp
@@ -245,7 +257,6 @@ target_include_directories(dorado_lib
     PUBLIC
         ${TORCH_INCLUDE_DIRS}
         ${HDF5_INCLUDE_DIRS}
-        ${HTSLIB_DIR}
         ${DORADO_3RD_PARTY_SOURCE}/HighFive/include
         ${DORADO_3RD_PARTY_SOURCE}/argparse
         ${DORADO_3RD_PARTY_SOURCE}/toml11
@@ -254,7 +265,6 @@ target_include_directories(dorado_lib
         ${DORADO_3RD_PARTY_SOURCE}/NVTX/c/include
         ${DORADO_3RD_PARTY_SOURCE}/spdlog/include
         ${DORADO_3RD_PARTY_SOURCE}/indicators/include
-        ${DORADO_3RD_PARTY_SOURCE}/ont-minimap2/src/3rdparty/minimap2
 )
 
 enable_testing()
@@ -269,13 +279,16 @@ if (DORADO_ENABLE_PCH)
 endif()
 
 target_link_libraries(dorado_lib
-    ${TORCH_LIBRARIES}
-    ${KOI_LIBRARIES}
-    htslib
-    vbz_hdf_plugin
-    edlib
-    date::date
-    dorado_utils
+    PUBLIC
+        ${TORCH_LIBRARIES}
+        htslib
+        vbz_hdf_plugin
+        edlib
+        date::date
+        dorado_utils
+    PRIVATE
+        ${KOI_LIBRARIES}    
+        minimap2
 )
 
 if(NOT WIN32)
@@ -435,16 +448,19 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     )
 
     target_link_libraries(dorado_io_lib
-       ${POD5_LIBRARIES}
-       ${HDF5_C_LIBRARIES}
-       ${CMAKE_DL_LIBS}
-       date::date
-       dorado_lib
+        PUBLIC
+            dorado_lib    
+        PRIVATE
+            ${POD5_LIBRARIES}
+            ${HDF5_C_LIBRARIES}
+            ${CMAKE_DL_LIBS}
+            date::date
     )
 
     if(WIN32)
         target_link_libraries(dorado_io_lib
-           ${ZLIB_LIBRARIES}
+            PRIVATE
+            ${ZLIB_LIBRARIES}
         )
     endif()
 
@@ -477,6 +493,5 @@ if (GENERATE_TEST_COVERAGE)
             BASE_DIRECTORY "${PROJECT_SOURCE_DIR}"
             EXCLUDE "${PROJECT_SOURCE_DIR}/dorado/3rdparty/*" "${PROJECT_SOURCE_DIR}/tests/*"
             )
-        target_link_libraries(dorado_tests gcov)
     endif()
 endif()

@@ -71,7 +71,7 @@ std::vector<std::pair<uint64_t, uint64_t>> detect_pore_signal(const torch::Tenso
     if (cl_end != -1) {
         assert(cl_start != -1);
         assert(cl_start < pore_a.size(0) && cl_end <= pore_a.size(0));
-        ans.push_back(std::pair{cl_start, cl_end});
+        ans.push_back({cl_start, cl_end});
     }
 
     return ans;
@@ -537,7 +537,7 @@ std::vector<SimplexReadPtr> DuplexSplitNode::split(SimplexReadPtr init_read) con
     std::vector<SimplexReadPtr> split_result;
     size_t subread_id = 0;
     for (auto& ext_read : to_split) {
-        if (to_split.size() > 1) {
+        if (!ext_read.read->read_common.parent_read_id.empty()) {
             ext_read.read->read_common.subread_id = subread_id++;
             ext_read.read->read_common.split_count = to_split.size();
             const auto subread_uuid =

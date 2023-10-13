@@ -28,6 +28,8 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
                              size_t overlap,
                              uint32_t mean_qscore_start_pos,
                              int scaler_node_threads,
+                             bool enable_read_splitter,
+                             int splitter_node_threads,
                              int modbase_threads,
                              NodeHandle sink_node_handle = PipelineDescriptor::InvalidNodeHandle,
                              NodeHandle source_node_handle = PipelineDescriptor::InvalidNodeHandle);

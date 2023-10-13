@@ -1,7 +1,8 @@
 #pragma once
-#include "htslib/sam.h"
 #include "read_pipeline/ReadPipeline.h"
 #include "utils/stats.h"
+
+#include <htslib/sam.h>
 
 #include <atomic>
 #include <cstdint>
