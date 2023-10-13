@@ -322,7 +322,9 @@ std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_adapter_score_diffe
                                  bottom_start + bottom_result_v2.endLocations[0]};
 
         // The best score is the higher score between the 2 variants.
-        BarcodeScoreResult res = (v1.score > v2.score) ? v1 : v2;
+        const bool var1_is_best = v1.score > v2.score;
+        BarcodeScoreResult res = var1_is_best ? v1 : v2;
+        res.variant = var1_is_best ? "var1" : "var2";
         res.adapter_name = adapter_name;
         res.kit = as.kit;
 
