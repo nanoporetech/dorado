@@ -1,4 +1,4 @@
-#include "read_pipeline/BarcodeClassifier.h"
+#include "demux/BarcodeClassifier.h"
 
 #include "MessageSinkUtils.h"
 #include "TestUtils.h"

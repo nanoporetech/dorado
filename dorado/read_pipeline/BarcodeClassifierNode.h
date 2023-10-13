@@ -1,5 +1,5 @@
 #pragma once
-#include "BarcodeClassifierSelector.h"
+#include "demux/BarcodeClassifierSelector.h"
 #include "read_pipeline/ReadPipeline.h"
 #include "utils/stats.h"
 #include "utils/types.h"

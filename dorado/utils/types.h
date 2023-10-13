@@ -11,6 +11,12 @@ struct sam_hdr_t;
 
 namespace dorado {
 
+struct BarcodingInfo {
+    std::string kit_name{};
+    bool barcode_both_ends{false};
+    bool trim{false};
+};
+
 struct ReadGroup {
     std::string run_id;
     std::string basecalling_model;

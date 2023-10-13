@@ -1,4 +1,4 @@
-#include "read_pipeline/BarcodeClassifierSelector.h"
+#include "demux/BarcodeClassifierSelector.h"
 
 #include <catch2/catch.hpp>
 

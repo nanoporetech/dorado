@@ -1,6 +1,6 @@
 #include "BarcodeClassifierNode.h"
 
-#include "BarcodeClassifier.h"
+#include "demux/BarcodeClassifier.h"
 #include "utils/bam_utils.h"
 #include "utils/barcode_kits.h"
 #include "utils/trim.h"

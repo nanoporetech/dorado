@@ -1,6 +1,5 @@
 #include "Version.h"
 #include "cli/cli_utils.h"
-#include "read_pipeline/BarcodeClassifier.h"
 #include "read_pipeline/BarcodeClassifierNode.h"
 #include "read_pipeline/BarcodeDemuxerNode.h"
 #include "read_pipeline/HtsReader.h"

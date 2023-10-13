@@ -181,10 +181,6 @@ set(LIB_SOURCE_FILES
     dorado/read_pipeline/ResumeLoaderNode.h
     dorado/read_pipeline/DuplexReadTaggingNode.cpp
     dorado/read_pipeline/DuplexReadTaggingNode.h
-    dorado/read_pipeline/BarcodeClassifier.cpp
-    dorado/read_pipeline/BarcodeClassifier.h
-    dorado/read_pipeline/BarcodeClassifierSelector.cpp
-    dorado/read_pipeline/BarcodeClassifierSelector.h
     dorado/read_pipeline/BarcodeClassifierNode.cpp
     dorado/read_pipeline/BarcodeClassifierNode.h
     dorado/read_pipeline/BarcodeDemuxerNode.cpp
@@ -199,6 +195,10 @@ set(LIB_SOURCE_FILES
     dorado/read_pipeline/read_utils.h
     dorado/read_pipeline/stitch.cpp
     dorado/read_pipeline/stitch.h
+    dorado/demux/BarcodeClassifier.cpp
+    dorado/demux/BarcodeClassifier.h
+    dorado/demux/BarcodeClassifierSelector.cpp
+    dorado/demux/BarcodeClassifierSelector.h
     dorado/decode/beam_search.cpp
     dorado/decode/fast_hash.cpp
     dorado/decode/fast_hash.h
