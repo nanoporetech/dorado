@@ -166,14 +166,14 @@ The default heuristic for double-ended barcodes is to look for them on either en
 The output from `dorado basecaller` can be demultiplexed into per-barcode BAMs using `dorado demux`. e.g.
 
 ```
-$ dorado demux -o <output-dir> --no-classify <input-bam>
+$ dorado demux --output-dir <output-dir> --no-classify <input-bam>
 ```
 This will output a BAM file per barcode in the `output-dir`.
 
 The barcode information is reflected in the BAM `RG` header too. Therefore demuxing is also possible through `samtools split`. e.g.
 ```
 $ samtools split -u <output-dir>/unclassified.bam -f "<output-dir>/<prefix>_%!.bam" <input-bam>
-``
+```
 However, `samtools split` uses the full `RG` string as the filename suffix, which can result in very long file names. We recommend using `dorado demux` to split barcoded BAMs.
 
 #### Classifying existing datasets
