@@ -102,6 +102,16 @@ void create_stereo_duplex_pipeline(
             {}, std::move(stereo_runners), adjusted_stereo_overlap, kStereoBatchTimeoutMS,
             duplex_rg_name, 1000, "StereoBasecallerNode", true, mean_qscore_start_pos);
 
+    NodeHandle last_node_handle = stereo_basecaller_node;
+    if (!modbase_runners.empty()) {
+        auto mod_base_caller_node = pipeline_desc.add_node<ModBaseCallerNode>(
+                {}, std::move(modbase_runners), 4,
+                runners.front()
+                        ->model_stride());  // TODO - 4 for both of these parameters is incorrect
+        pipeline_desc.add_node_sink(stereo_basecaller_node, mod_base_caller_node);
+        last_node_handle = mod_base_caller_node;
+    }
+
     auto simplex_model_stride = runners.front()->model_stride();
     auto stereo_node = pipeline_desc.add_node<StereoDuplexEncoderNode>({stereo_basecaller_node},
                                                                        simplex_model_stride);
@@ -140,7 +150,7 @@ void create_stereo_duplex_pipeline(
 
     // if we've been provided a sink node, connect it to the end of our pipeline
     if (sink_node_handle != PipelineDescriptor::InvalidNodeHandle) {
-        pipeline_desc.add_node_sink(stereo_basecaller_node, sink_node_handle);
+        pipeline_desc.add_node_sink(last_node_handle, sink_node_handle);
     }
 }
 
