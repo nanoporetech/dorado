@@ -26,20 +26,20 @@ TEST_CASE(TEST_GROUP " get_barcoder twice with same kit returns same barcoder in
           TEST_GROUP) {
     dorado::demux::BarcodeClassifierSelector cut{};
 
-    auto & barcoder_first = cut.get_barcoder("SQK-RAB201");
-    auto & barcoder_second = cut.get_barcoder("SQK-RAB201");
+    auto barcoder_first = cut.get_barcoder("SQK-RAB201");
+    auto barcoder_second = cut.get_barcoder("SQK-RAB201");
 
-    REQUIRE(&barcoder_first == &barcoder_second);
+    REQUIRE(barcoder_first == barcoder_second);
 }
 
 TEST_CASE(TEST_GROUP " get_barcoder twice with different kits returns different barcoder instances",
           TEST_GROUP) {
     dorado::demux::BarcodeClassifierSelector cut{};
 
-    auto & barcoder_first = cut.get_barcoder("SQK-RAB201");
-    auto & barcoder_second = cut.get_barcoder("SQK-LWB001");
+    auto barcoder_first = cut.get_barcoder("SQK-RAB201");
+    auto barcoder_second = cut.get_barcoder("SQK-LWB001");
 
-    REQUIRE(&barcoder_first != &barcoder_second);
+    REQUIRE(barcoder_first != barcoder_second);
 }
 
 }  // namespace

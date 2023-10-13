@@ -1,17 +1,20 @@
 #pragma once
-#include "BarcodeClassifier.h"
 
-#include <map>
+#include <memory>
 #include <mutex>
 #include <string>
+#include <unordered_map>
 
 namespace dorado::demux {
+
+class BarcodeClassifier;
+
 class BarcodeClassifierSelector final {
     std::mutex m_mutex{};
-    std::map<std::string, demux::BarcodeClassifier> m_barcoder_lut{};
+    std::unordered_map<std::string, std::shared_ptr<const BarcodeClassifier>> m_barcoder_lut{};
 
 public:
-    const BarcodeClassifier& get_barcoder(const std::string& barcode_kit);
+    std::shared_ptr<const BarcodeClassifier> get_barcoder(const std::string& barcode_kit);
 };
 
 }  // namespace dorado::demux

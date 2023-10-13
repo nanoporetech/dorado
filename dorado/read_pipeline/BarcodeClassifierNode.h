@@ -11,6 +11,10 @@
 
 namespace dorado {
 
+namespace demux {
+struct ScoreResults;
+}
+
 class BarcodeClassifierNode : public MessageSink {
 public:
     BarcodeClassifierNode(int threads,
