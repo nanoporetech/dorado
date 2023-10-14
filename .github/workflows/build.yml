@@ -7,9 +7,9 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [ubuntu-20.04, windows-2019]
+        os: [ubuntu-20.04, windows-2019-large]
         include:
-          - os: windows-2019
+          - os: windows-2019-large
             arch: "-A x64"
     runs-on: ${{ matrix.os }}
     steps:
@@ -25,28 +25,24 @@ jobs:
       id: cuda-toolkit
       with:
         cuda: '11.8.0'
-    - name: Cleanup CUDA cache
-      uses: JesseTG/rm@v1.0.3
-      with:
-        path: D:\a\dorado\dorado\cuda_installer-windows-10.0.17763-11.8.0
     - name: Install dependencies from apt
       if: matrix.os == 'ubuntu-20.04'
       run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libhdf5-dev libssl-dev libzstd-dev autoconf
     - name: Set up Windows path
       uses: myci-actions/export-env-var-powershell@1
-      if: matrix.os == 'windows-2019'
+      if: matrix.os == 'windows-2019-large'
       with:
         name: PATH
-        value: D:\a\dorado\dorado\dist\bin;$env:PATH
+        value: C:\a\dorado\dorado\dist\bin;$env:PATH
     - name: Build dorado
       run: |
         cmake -S . -B cmake-build ${{ matrix.arch }}
-        cmake --build cmake-build --config Release -j 4
+        cmake --build cmake-build --config Release -j 8
     - name: Cleanup torch
       uses: JesseTG/rm@v1.0.3
       with:
-        path: D:\a\dorado\dorado\3rdparty
+        path: C:\a\dorado\dorado\3rdparty
     - name: Test dorado
       run: |
-        cmake --build cmake-build --config Release --target install -j 4
-        ctest -C Release --test-dir cmake-build --output-on-failure
+        cmake --build cmake-build --config Release --target install -j 8
+        ctest -C Release --test-dir cmake-build --output-on-failure --verbose
