@@ -9,7 +9,7 @@ jobs:
       matrix:
         os: [ubuntu-20.04, windows-2019-large]
         include:
-          - os: windows-2019
+          - os: windows-2019-large
             arch: "-A x64"
     runs-on: ${{ matrix.os }}
     steps:
@@ -34,7 +34,7 @@ jobs:
       run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libhdf5-dev libssl-dev libzstd-dev autoconf
     - name: Set up Windows path
       uses: myci-actions/export-env-var-powershell@1
-      if: matrix.os == 'windows-2019'
+      if: matrix.os == 'windows-2019-large'
       with:
         name: PATH
         value: D:\a\dorado\dorado\dist\bin;$env:PATH
