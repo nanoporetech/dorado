@@ -25,10 +25,6 @@ jobs:
       id: cuda-toolkit
       with:
         cuda: '11.8.0'
-    - name: Cleanup CUDA cache
-      uses: JesseTG/rm@v1.0.3
-      with:
-        path: D:\a\dorado\dorado\cuda_installer-windows-10.0.17763-11.8.0
     - name: Install dependencies from apt
       if: matrix.os == 'ubuntu-20.04'
       run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libhdf5-dev libssl-dev libzstd-dev autoconf
