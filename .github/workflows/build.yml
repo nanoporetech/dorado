@@ -7,7 +7,7 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [ubuntu-20.04, windows-2019]
+        os: [ubuntu-20.04, windows-2019-large]
         include:
           - os: windows-2019
             arch: "-A x64"
@@ -49,4 +49,4 @@ jobs:
     - name: Test dorado
       run: |
         cmake --build cmake-build --config Release --target install -j 4
-        ctest -C Release --test-dir cmake-build --output-on-failure
+        ctest -C Release --test-dir cmake-build --output-on-failure --verbose
