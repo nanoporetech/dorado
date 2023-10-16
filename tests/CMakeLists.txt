@@ -28,6 +28,7 @@ set(UNIT_TEST_SOURCE_FILES
     SequenceUtilsTest.cpp
     StereoDuplexTest.cpp
     StitchTest.cpp
+    StringUtilsTest.cpp
     TensorUtilsTest.cpp
     TimeUtilsTest.cpp
     TrimTest.cpp
