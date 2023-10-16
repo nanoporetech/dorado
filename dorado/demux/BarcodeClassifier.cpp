@@ -591,6 +591,10 @@ ScoreResults BarcodeClassifier::find_best_adapter(
         scores.insert(scores.end(), out.begin(), out.end());
     }
 
+    if (scores.empty()) {
+        return UNCLASSIFIED;
+    }
+
     if (kit.double_ends) {
         // For a double ended barcode, ensure that the best barcode according
         // to the top window and the best barcode according to the bottom window
@@ -613,8 +617,6 @@ ScoreResults BarcodeClassifier::find_best_adapter(
     // Score the scores windows by their adapter score.
     std::sort(scores.begin(), scores.end(),
               [](const auto& l, const auto& r) { return l.score > r.score; });
-    auto best_score = scores.begin();
-    auto second_best_score = std::next(best_score);
 
     std::stringstream d;
     for (auto& s : scores) {
@@ -622,13 +624,25 @@ ScoreResults BarcodeClassifier::find_best_adapter(
     }
     spdlog::debug("Scores: {}", d.str());
     const float kMargin = 0.25f;
+    auto best_score = scores.begin();
+    auto are_scores_acceptable = [](const auto& score) {
+        return (score.flank_score >= 0.7 && score.score >= 0.6) ||
+               (score.score >= 0.7 && score.flank_score >= 0.6) ||
+               (score.top_score >= 0.6 && score.bottom_score >= 0.6);
+    };
+
     ScoreResults out = UNCLASSIFIED;
-    if (best_score->score - second_best_score->score >= 0.1f) {
-        if ((best_score->flank_score >= 0.7 && best_score->score >= 0.6) ||
-            (best_score->score >= 0.7 && best_score->flank_score >= 0.6) ||
-            (best_score->top_score >= 0.6 && best_score->bottom_score >= 0.6) ||
-            (best_score->score - second_best_score->score >= kMargin)) {
+    if (scores.size() == 1) {
+        if (are_scores_acceptable(*best_score)) {
             out = *best_score;
+        }
+    } else {
+        auto second_best_score = std::next(best_score);
+        if (best_score->score - second_best_score->score >= 0.1f) {
+            if (are_scores_acceptable(*best_score) ||
+                (best_score->score - second_best_score->score >= kMargin)) {
+                out = *best_score;
+            }
         }
     }
 
