@@ -258,7 +258,8 @@ void BarcodeClassifierNode::barcode(BamPtr& read) {
     int seqlen = irecord->core.l_qseq;
     std::string seq = utils::extract_sequence(irecord, seqlen);
 
-    auto bc_res = barcoder->barcode(seq, m_default_barcoding_info->barcode_both_ends);
+    auto bc_res = barcoder->barcode(seq, m_default_barcoding_info->barcode_both_ends,
+                                    m_default_barcoding_info->allowed_barcodes);
     auto bc = generate_barcode_string(bc_res);
     bam_aux_append(irecord, "BC", 'Z', bc.length() + 1, (uint8_t*)bc.c_str());
     m_num_records++;
@@ -276,7 +277,8 @@ void BarcodeClassifierNode::barcode(SimplexRead& read) {
     auto barcoder = m_barcoder_selector.get_barcoder(barcoding_info->kit_name);
 
     // get the sequence to map from the record
-    auto bc_res = barcoder->barcode(read.read_common.seq, barcoding_info->barcode_both_ends);
+    auto bc_res = barcoder->barcode(read.read_common.seq, barcoding_info->barcode_both_ends,
+                                    barcoding_info->allowed_barcodes);
     read.read_common.barcode = generate_barcode_string(bc_res);
     m_num_records++;
     if (barcoding_info->trim) {
