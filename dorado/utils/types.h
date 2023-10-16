@@ -2,7 +2,9 @@
 
 #include <array>
 #include <memory>
+#include <optional>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 struct bam1_t;
@@ -12,15 +14,18 @@ struct sam_hdr_t;
 namespace dorado {
 
 struct BarcodingInfo {
+    using FilterSet = std::optional<std::unordered_set<std::string>>;
     std::string kit_name{};
     bool barcode_both_ends{false};
     bool trim{false};
+    FilterSet allowed_barcodes;
 };
 
 std::shared_ptr<const BarcodingInfo> create_barcoding_info(
         const std::vector<std::string> &kit_names,
         bool barcode_both_ends,
-        bool trim_barcode);
+        bool trim_barcode,
+        const BarcodingInfo::FilterSet &allowed_barcodes);
 
 struct ReadGroup {
     std::string run_id;

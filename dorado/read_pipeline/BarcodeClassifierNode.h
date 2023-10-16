@@ -20,7 +20,8 @@ public:
     BarcodeClassifierNode(int threads,
                           const std::vector<std::string>& kit_name,
                           bool barcode_both_ends,
-                          bool no_trim);
+                          bool no_trim,
+                          const BarcodingInfo::FilterSet& allowed_barcodes);
     BarcodeClassifierNode(int threads);
     ~BarcodeClassifierNode();
     std::string get_name() const override { return "BarcodeClassifierNode"; }

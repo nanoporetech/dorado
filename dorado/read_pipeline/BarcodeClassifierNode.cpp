@@ -39,10 +39,12 @@ namespace dorado {
 BarcodeClassifierNode::BarcodeClassifierNode(int threads,
                                              const std::vector<std::string>& kit_names,
                                              bool barcode_both_ends,
-                                             bool no_trim)
+                                             bool no_trim,
+                                             const BarcodingInfo::FilterSet& allowed_barcodes)
         : MessageSink(10000),
           m_threads(threads),
-          m_default_barcoding_info(create_barcoding_info(kit_names, barcode_both_ends, !no_trim)) {
+          m_default_barcoding_info(
+                  create_barcoding_info(kit_names, barcode_both_ends, !no_trim, allowed_barcodes)) {
     start_threads();
 }
 

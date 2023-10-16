@@ -189,11 +189,13 @@ TEST_CASE(
     CAPTURE(barcode_both_ends);
     CAPTURE(use_per_read_barcoding);
     constexpr bool no_trim = false;
-    auto barcoding_info = dorado::create_barcoding_info(kits, barcode_both_ends, !no_trim);
+    auto barcoding_info =
+            dorado::create_barcoding_info(kits, barcode_both_ends, !no_trim, std::nullopt);
     if (use_per_read_barcoding) {
         pipeline_desc.add_node<BarcodeClassifierNode>({sink}, 8);
     } else {
-        pipeline_desc.add_node<BarcodeClassifierNode>({sink}, 8, kits, barcode_both_ends, no_trim);
+        pipeline_desc.add_node<BarcodeClassifierNode>({sink}, 8, kits, barcode_both_ends, no_trim,
+                                                      std::nullopt);
     }
 
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
@@ -341,8 +343,8 @@ TEST_CASE("BarcodeClassifierNode: test reads where trim length == read length", 
     std::vector<std::string> kits = {"SQK-RBK114-96"};
     bool barcode_both_ends = false;
     bool no_trim = false;
-    auto classifier = pipeline_desc.add_node<BarcodeClassifierNode>({sink}, 8, kits,
-                                                                    barcode_both_ends, no_trim);
+    auto classifier = pipeline_desc.add_node<BarcodeClassifierNode>(
+            {sink}, 8, kits, barcode_both_ends, no_trim, std::nullopt);
 
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
     fs::path data_dir = fs::path(get_data_dir("barcode_demux"));
