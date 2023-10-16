@@ -46,8 +46,13 @@ bool is_valid_mk_freetext(const std::string& input) {
 }
 
 bool is_alias_forbidden(const std::string& input) {
-    const auto& barcode_ids = dorado::barcode_kits::get_barcode_identifiers();
-    return barcode_ids.count(input) != 0;
+    // Single barcode
+    const std::regex barcode_regex("^barcode(\\d{2})$");
+    if (std::regex_match(input, barcode_regex)) {
+        return true;
+    }
+
+    return false;
 }
 
 bool get_line(std::istream& input,
