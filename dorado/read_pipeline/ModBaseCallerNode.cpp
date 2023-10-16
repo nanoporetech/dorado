@@ -38,7 +38,7 @@ struct ModBaseCallerNode::RemoraChunk {
 };
 
 struct ModBaseCallerNode::WorkingRead {
-    SimplexReadPtr read;  // The read itself.
+    Message read;  // The read itself.
     size_t num_modbase_chunks;
     std::atomic_size_t
             num_modbase_chunks_called;  // Number of modbase chunks which have been scored
@@ -147,16 +147,17 @@ void ModBaseCallerNode::input_worker_thread() {
     Message message;
     while (get_input_message(message)) {
         // If this message isn't a read, just forward it to the sink.
-        if (!std::holds_alternative<SimplexReadPtr>(message)) {
+        if (!is_read_message(message)) {
             send_message_to_sink(std::move(message));
             continue;
         }
 
         nvtx3::scoped_range range{"modbase_input_worker_thread"};
         // If this message isn't a read, we'll get a bad_variant_access exception.
-        auto read = std::get<SimplexReadPtr>(std::move(message));
 
-        while (true) {
+        auto& read_common = get_read_common_data(message);
+        if (!read_common.is_duplex) {
+            auto read = std::get<SimplexReadPtr>(std::move(message));
             stats::Timer timer;
             {
                 nvtx3::scoped_range range{"base_mod_probs_init"};
@@ -264,7 +265,34 @@ void ModBaseCallerNode::input_worker_thread() {
                 send_message_to_sink(std::move(read));
                 ++m_num_non_mod_base_reads_pushed;
             }
-            break;
+        } else {
+            // ----> DUPLEX HANDLED HERE (FOR NOW) <----.
+
+            // Step 1: prepare the base mod probs table - we are likely going to need two of these, one for each strand,
+            // We probably don't want them on read_common either
+            auto read = std::get<DuplexReadPtr>(std::move(message));
+            stats::Timer timer;
+            {
+                nvtx3::scoped_range range{"base_mod_probs_init"};
+                // initialize base_mod_probs _before_ we start handing out chunks
+                read->read_common.base_mod_probs.resize(read->read_common.seq.size() * m_num_states,
+                                                        0);
+                for (size_t i = 0; i < read->read_common.seq.size(); ++i) {
+                    // Initialize for what corresponds to 100% canonical base for each position.
+                    int base_id = utils::BaseInfo::BASE_IDS[read->read_common.seq[i]];
+                    if (base_id < 0) {
+                        throw std::runtime_error("Invalid character in sequence.");
+                    }
+                    read->read_common
+                            .base_mod_probs[i * m_num_states + m_base_prob_offsets[base_id]] = 1.0f;
+                }
+            }
+
+            // mod_base_info is the modified base settings of the models that ran on this read
+            read->read_common.mod_base_info = m_mod_base_info;
+
+            send_message_to_sink(std::move(read));
+            ++m_num_non_mod_base_reads_pushed;
         }
     }
 
@@ -385,11 +413,13 @@ void ModBaseCallerNode::output_worker_thread() {
         for (const auto& chunk : processed_chunks) {
             auto working_read = chunk->working_read;
             auto& source_read = working_read->read;
+            auto& source_read_common = get_read_common_data(source_read);
+
             int64_t result_pos = chunk->context_hit;
             int64_t offset = m_base_prob_offsets
-                    [utils::BaseInfo::BASE_IDS[source_read->read_common.seq[result_pos]]];
+                    [utils::BaseInfo::BASE_IDS[source_read_common.seq[result_pos]]];
             for (size_t i = 0; i < chunk->scores.size(); ++i) {
-                source_read->read_common.base_mod_probs[m_num_states * result_pos + offset + i] =
+                source_read_common.base_mod_probs[m_num_states * result_pos + offset + i] =
                         static_cast<uint8_t>(std::min(std::floor(chunk->scores[i] * 256), 255.0f));
             }
             // If all chunks for the read associated with this chunk have now been called,
@@ -409,8 +439,8 @@ void ModBaseCallerNode::output_worker_thread() {
                 if (read_iter != m_working_reads.end()) {
                     m_working_reads.erase(read_iter);
                 } else {
-                    throw std::runtime_error("Expected to find read id " +
-                                             completed_read->read->read_common.read_id +
+                    auto read_id = get_read_common_data(completed_read->read).read_id;
+                    throw std::runtime_error("Expected to find read id " + read_id +
                                              " in working reads set but it doesn't exist.");
                 }
             }
