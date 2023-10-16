@@ -15,6 +15,7 @@
 #include "read_pipeline/ReadFilterNode.h"
 #include "read_pipeline/ReadToBamTypeNode.h"
 #include "read_pipeline/ResumeLoaderNode.h"
+#include "utils/SampleSheet.h"
 #include "utils/bam_utils.h"
 #include "utils/barcode_kits.h"
 #include "utils/basecaller_utils.h"
@@ -67,6 +68,7 @@ void setup(std::vector<std::string> args,
            const std::vector<std::string>& barcode_kits,
            bool barcode_both_ends,
            bool barcode_no_trim,
+           const std::string& barcode_sample_sheet,
            argparse::ArgumentParser& resume_parser,
            bool estimate_poly_a) {
     auto model_config = load_crf_model_config(model_path);
@@ -144,9 +146,11 @@ void setup(std::vector<std::string> args,
                 is_rna_model(model_config));
     }
     if (!barcode_kits.empty()) {
+        utils::SampleSheet sample_sheet(barcode_sample_sheet);
+        BarcodingInfo::FilterSet allowed_barcodes = sample_sheet.get_barcode_values();
         current_sink_node = pipeline_desc.add_node<BarcodeClassifierNode>(
                 {current_sink_node}, thread_allocations.barcoder_threads, barcode_kits,
-                barcode_both_ends, barcode_no_trim, std::nullopt);
+                barcode_both_ends, barcode_no_trim, allowed_barcodes);
     }
     current_sink_node = pipeline_desc.add_node<ReadFilterNode>(
             {current_sink_node}, min_qscore, default_parameters.min_sequence_length,
@@ -349,6 +353,9 @@ int basecaller(int argc, char* argv[]) {
             .help("Skip barcode trimming. If option is not chosen, trimming is enabled.")
             .default_value(false)
             .implicit_value(true);
+    parser.visible.add_argument("--sample-sheet")
+            .help("Path to the sample sheet to use.")
+            .default_value(std::string(""));
 
     cli::add_minimap2_arguments(parser, Aligner::dflt_options);
     cli::add_internal_arguments(parser);
@@ -441,7 +448,8 @@ int basecaller(int argc, char* argv[]) {
               parser.visible.get<std::string>("--resume-from"),
               parser.visible.get<std::vector<std::string>>("--kit-name"),
               parser.visible.get<bool>("--barcode-both-ends"),
-              parser.visible.get<bool>("--no-trim"), resume_parser,
+              parser.visible.get<bool>("--no-trim"),
+              parser.visible.get<std::string>("--sample-sheet"), resume_parser,
               parser.hidden.get<bool>("--estimate-poly-a"));
     } catch (const std::exception& e) {
         spdlog::error("{}", e.what());

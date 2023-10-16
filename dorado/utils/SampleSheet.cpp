@@ -198,8 +198,8 @@ std::string SampleSheet::get_alias(const std::string& flow_cell_id,
     return "";
 }
 
-std::set<std::string> SampleSheet::get_barcode_values() const {
-    std::set<std::string> barcodes;
+BarcodingInfo::FilterSet SampleSheet::get_barcode_values() const {
+    std::unordered_set<std::string> barcodes;
 
     switch (m_type) {
     case Type::barcode: {
@@ -215,7 +215,7 @@ std::set<std::string> SampleSheet::get_barcode_values() const {
     case Type::none:
         [[fallthrough]];
     default:
-        break;
+        return std::nullopt;
     }
 
     return barcodes;

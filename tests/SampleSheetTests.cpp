@@ -193,9 +193,10 @@ TEST_CASE(CUT_TAG " barcode values", CUT_TAG) {
 
     // Grab the barcodes in the CSV
     const auto barcodes = sample_sheet.get_barcode_values();
+    REQUIRE(barcodes.has_value());
 
     // Check that they're equal
-    REQUIRE(barcodes.size() == num_rows);
+    REQUIRE(barcodes->size() == num_rows);
     REQUIRE(expected.size() == num_rows);
-    REQUIRE(std::is_permutation(barcodes.begin(), barcodes.end(), expected.begin()));
+    REQUIRE(std::is_permutation(barcodes->begin(), barcodes->end(), expected.begin()));
 }

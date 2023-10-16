@@ -1,5 +1,7 @@
 #pragma once
 
+#include "types.h"
+
 #include <bitset>
 #include <set>
 #include <string>
@@ -49,15 +51,15 @@ public:
 
     /**
      * Get all of the barcodes that are present in the sample sheet.
-     * @return All of the barcodes that are present, in normalised form.
+     * @return All of the barcodes that are present, or std::nullopt if the sample sheet is not loaded.
      */
-    std::set<std::string> get_barcode_values() const;
+    BarcodingInfo::FilterSet get_barcode_values() const;
 
 private:
     using Row = std::vector<std::string>;
     std::string m_filename;
-    Type m_type;
-    std::bitset<2> m_index;
+    Type m_type{Type::none};
+    std::bitset<2> m_index{};
     std::unordered_map<std::string, size_t> m_col_indices;
     std::vector<Row> m_rows;
     bool m_skip_index_matching;
