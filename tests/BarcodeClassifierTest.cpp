@@ -189,10 +189,7 @@ TEST_CASE(
     CAPTURE(barcode_both_ends);
     CAPTURE(use_per_read_barcoding);
     constexpr bool no_trim = false;
-    dorado::BarcodingInfo barcoding_info{};
-    barcoding_info.kit_name = kits[0];
-    barcoding_info.barcode_both_ends = barcode_both_ends;
-    barcoding_info.trim = !no_trim;
+    auto barcoding_info = dorado::create_barcoding_info(kits, barcode_both_ends, !no_trim);
     if (use_per_read_barcoding) {
         pipeline_desc.add_node<BarcodeClassifierNode>({sink}, 8);
     } else {

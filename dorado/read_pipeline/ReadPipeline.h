@@ -48,7 +48,7 @@ public:
 
     uint64_t start_time_ms;
 
-    BarcodingInfo barcoding_info{};
+    std::shared_ptr<const BarcodingInfo> barcoding_info;
 
     // A unique identifier for each input read
     // Split (duplex) reads have the read_tag of the parent (template) and their own subread_id

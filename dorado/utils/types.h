@@ -17,6 +17,11 @@ struct BarcodingInfo {
     bool trim{false};
 };
 
+std::shared_ptr<const BarcodingInfo> create_barcoding_info(
+        const std::vector<std::string> &kit_names,
+        bool barcode_both_ends,
+        bool trim_barcode);
+
 struct ReadGroup {
     std::string run_id;
     std::string basecalling_model;
