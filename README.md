@@ -18,10 +18,10 @@ If you encounter any problems building or running Dorado, please [report an issu
 
 ## Installation
 
- - [dorado-0.4.0-linux-x64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.4.0-linux-x64.tar.gz)
- - [dorado-0.4.0-linux-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.4.0-linux-arm64.tar.gz)
- - [dorado-0.4.0-osx-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.4.0-osx-arm64.zip)
- - [dorado-0.4.0-win64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.4.0-win64.zip)
+ - [dorado-0.4.1-linux-x64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.4.1-linux-x64.tar.gz)
+ - [dorado-0.4.1-linux-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.4.1-linux-arm64.tar.gz)
+ - [dorado-0.4.1-osx-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.4.1-osx-arm64.zip)
+ - [dorado-0.4.1-win64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.4.1-win64.zip)
 
 ## Platforms
 
@@ -104,7 +104,9 @@ To run Duplex basecalling, run the command:
 $ dorado duplex dna_r10.4.1_e8.2_400bps_sup@v4.1.0 pod5s/ > duplex.bam
 ```
 
-This command will output both simplex and duplex reads. The `dx` tag in the output BAM can be used to distinguish between them:
+When using the `duplex` command, two types of DNA sequence results will be produced: 'simplex' and 'duplex'. Any specific position in the DNA which is in a duplex read is also seen in two simplex strands (the template and complement).  So, each DNA position which is duplex sequenced will be covered by a minimum of three separate readings in the output.
+
+The `dx` tag in the BAM record for each read can be used to distinguish between simplex and duplex reads:
 * `dx:i:1` for duplex reads.
 * `dx:i:0` for simplex reads which don't have duplex offsprings.
 * `dx:i:-1` for simplex reads which have duplex offsprings.
@@ -161,11 +163,18 @@ By default, Dorado is set up to trim the barcode from the reads. To disable trim
 
 The default heuristic for double-ended barcodes is to look for them on either end of the read. This results in a higher classification rate but can also result in a higher false positive count. To address this, `dorado basecaller` also provides a `--barcode-both-ends` option to force double-ended barcodes to be detected on both ends before classification. This will reduce false positives dramatically, but also lower overall classification rates.
 
-The output from `dorado basecaller` can be demultiplexed into per-barcode BAMs using `samtools split`. e.g.
+The output from `dorado basecaller` can be demultiplexed into per-barcode BAMs using `dorado demux`. e.g.
 
+```
+$ dorado demux --output-dir <output-dir> --no-classify <input-bam>
+```
+This will output a BAM file per barcode in the `output-dir`.
+
+The barcode information is reflected in the BAM `RG` header too. Therefore demuxing is also possible through `samtools split`. e.g.
 ```
 $ samtools split -u <output-dir>/unclassified.bam -f "<output-dir>/<prefix>_%!.bam" <input-bam>
 ```
+However, `samtools split` uses the full `RG` string as the filename suffix, which can result in very long file names. We recommend using `dorado demux` to split barcoded BAMs.
 
 #### Classifying existing datasets
 

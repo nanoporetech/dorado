@@ -29,6 +29,12 @@ struct Attributes {
 };
 }  // namespace details
 
+struct BarcodingInfo {
+    std::string kit_name{};
+    bool barcode_both_ends{false};
+    bool trim{false};
+};
+
 class ReadCommon {
 public:
     torch::Tensor raw_data;  // Loaded from source file
@@ -47,6 +53,8 @@ public:
     dorado::details::Attributes attributes;
 
     uint64_t start_time_ms;
+
+    BarcodingInfo barcoding_info{};
 
     // A unique identifier for each input read
     // Split (duplex) reads have the read_tag of the parent (template) and their own subread_id

@@ -211,4 +211,14 @@ if [[ $num_read_groups -ne "0" ]]; then
     exit 1
 fi
 
+# Test demux only on a pre-classified BAM file
+$dorado_bin demux --no-classify --output-dir "$output_dir/demux_only_test/" $output_dir/read_group_test.bam
+for bam in $output_dir/demux_only_test/SQK-RBK114-96_barcode01.bam $output_dir/demux_only_test/SQK-RBK114-96_barcode04.bam $output_dir/demux_only_test/unclassified.bam ; do
+    if [ ! -f $bam ]; then
+        echo "Missing expected bam file $bam"
+        exit 1
+    fi
+done
+
+
 rm -rf $output_dir
