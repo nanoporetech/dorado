@@ -203,6 +203,8 @@ SimplexReadPtr subread(const SimplexRead& read, PosRange seq_range, PosRange sig
            subread->read_common.moves.size() * stride ==
                    subread->read_common.get_raw_data_samples());
 
+    subread->prev_read = read.prev_read;
+
     if (!read.read_common.parent_read_id.empty()) {
         subread->read_common.parent_read_id = read.read_common.parent_read_id;
     } else {
@@ -547,6 +549,13 @@ std::vector<SimplexReadPtr> DuplexSplitNode::split(SimplexReadPtr init_read) con
         }
 
         split_result.push_back(std::move(ext_read.read));
+    }
+
+    // Adjust prev and next read ids
+    if (split_result.size() > 1) {
+        for (int i = 1; i < split_result.size(); i++) {
+            split_result[i]->prev_read = split_result[i - 1]->read_common.read_id;
+        }
     }
 
     spdlog::trace("Read {} split into {} subreads", read_id, split_result.size());
