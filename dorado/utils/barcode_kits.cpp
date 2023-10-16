@@ -478,6 +478,17 @@ const std::unordered_map<std::string, KitInfo>& get_kit_infos() { return kit_inf
 
 const std::unordered_map<std::string, std::string>& get_barcodes() { return barcodes; }
 
+const std::unordered_set<std::string>& get_barcode_identifiers() {
+    static auto identifiers = []() {
+        std::unordered_set<std::string> ids;
+        for (auto& [identifier, _] : barcodes) {
+            ids.insert(identifier);
+        }
+        return ids;
+    }();
+    return identifiers;
+}
+
 std::string barcode_kits_list_str() {
     return std::accumulate(kit_info_map.begin(), kit_info_map.end(), std::string(),
                            [](std::string& a, auto& b) -> std::string {
