@@ -11,11 +11,11 @@
 
 struct bam1_t;
 
-namespace dorado {
+namespace dorado::alignment {
 
 class AlignerImpl;
 
-class Aligner : public MessageSink {
+class AlignerNode : public MessageSink {
 public:
     struct Minimap2Options {
         short kmer_size;
@@ -34,9 +34,9 @@ public:
 
 public:
     // header_sequence_records is populated by the constructor.
-    Aligner(const std::string& filename, const Minimap2Options& options, int threads);
-    ~Aligner();
-    std::string get_name() const override { return "Aligner"; }
+    AlignerNode(const std::string& filename, const Minimap2Options& options, int threads);
+    ~AlignerNode();
+    std::string get_name() const override { return "AlignerNode"; }
     stats::NamedStats sample_stats() const override;
     void terminate(const FlushOptions& flush_options) override { terminate_impl(); }
     void restart() override;
@@ -53,4 +53,4 @@ private:
     std::unique_ptr<AlignerImpl> m_aligner;
 };
 
-}  // namespace dorado
+}  // namespace dorado::alignment

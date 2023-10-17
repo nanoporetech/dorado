@@ -59,7 +59,7 @@ void setup(std::vector<std::string> args,
            size_t min_qscore,
            std::string read_list_file_path,
            bool recursive_file_loading,
-           const Aligner::Minimap2Options& aligner_options,
+           const alignment::AlignerNode::Minimap2Options& aligner_options,
            bool skip_model_compatibility_check,
            const std::string& dump_stats_file,
            const std::string& dump_stats_filter,
@@ -131,8 +131,8 @@ void setup(std::vector<std::string> args,
     auto aligner = PipelineDescriptor::InvalidNodeHandle;
     auto current_sink_node = hts_writer;
     if (enable_aligner) {
-        aligner = pipeline_desc.add_node<Aligner>({current_sink_node}, ref, aligner_options,
-                                                  thread_allocations.aligner_threads);
+        aligner = pipeline_desc.add_node<alignment::AlignerNode>(
+                {current_sink_node}, ref, aligner_options, thread_allocations.aligner_threads);
         current_sink_node = aligner;
     }
     current_sink_node = pipeline_desc.add_node<ReadToBamType>(
@@ -178,7 +178,8 @@ void setup(std::vector<std::string> args,
     // rather than the pipeline framework.
     auto& hts_writer_ref = dynamic_cast<HtsWriter&>(pipeline->get_node_ref(hts_writer));
     if (enable_aligner) {
-        const auto& aligner_ref = dynamic_cast<Aligner&>(pipeline->get_node_ref(aligner));
+        const auto& aligner_ref =
+                dynamic_cast<alignment::AlignerNode&>(pipeline->get_node_ref(aligner));
         utils::add_sq_hdr(hdr.get(), aligner_ref.get_sequence_records_for_header());
     }
     hts_writer_ref.set_and_write_header(hdr.get());
@@ -350,7 +351,7 @@ int basecaller(int argc, char* argv[]) {
             .default_value(false)
             .implicit_value(true);
 
-    cli::add_minimap2_arguments(parser, Aligner::dflt_options);
+    cli::add_minimap2_arguments(parser, alignment::AlignerNode::dflt_options);
     cli::add_internal_arguments(parser);
 
     // Add hidden arguments that only apply to simplex calling.
@@ -434,7 +435,7 @@ int basecaller(int argc, char* argv[]) {
               parser.visible.get<int>("--max-reads"), parser.visible.get<int>("--min-qscore"),
               parser.visible.get<std::string>("--read-ids"),
               parser.visible.get<bool>("--recursive"),
-              cli::process_minimap2_arguments(parser, Aligner::dflt_options),
+              cli::process_minimap2_arguments(parser, alignment::AlignerNode::dflt_options),
               parser.hidden.get<bool>("--skip-model-compatibility-check"),
               parser.hidden.get<std::string>("--dump_stats_file"),
               parser.hidden.get<std::string>("--dump_stats_filter"),

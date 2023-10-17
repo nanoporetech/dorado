@@ -78,18 +78,18 @@ void add_sa_tag(bam1_t* record,
 }
 }  // namespace
 
-namespace dorado {
+namespace dorado::alignment {
 
 class AlignerImpl {
 public:
     AlignerImpl(const std::string& filename,
-                const Aligner::Minimap2Options& options,
+                const AlignerNode::Minimap2Options& options,
                 size_t threads);
     ~AlignerImpl();
 
     void add_tags(bam1_t*, const mm_reg1_t*, const std::string&, const mm_tbuf_t*);
     std::vector<BamPtr> align(bam1_t* record, mm_tbuf_t* buf);
-    Aligner::bam_header_sq_t get_sequence_records_for_header() const;
+    AlignerNode::bam_header_sq_t get_sequence_records_for_header() const;
 
 private:
     size_t m_threads;
@@ -100,12 +100,12 @@ private:
 };
 
 AlignerImpl::AlignerImpl(const std::string& filename,
-                         const Aligner::Minimap2Options& options,
+                         const AlignerNode::Minimap2Options& options,
                          size_t threads)
         : m_threads(threads) {
     // Check if reference file exists.
     if (!std::filesystem::exists(filename)) {
-        throw std::runtime_error("Aligner reference path does not exist: " + filename);
+        throw std::runtime_error("AlignerNode reference path does not exist: " + filename);
     }
     // Initialize option structs.
     mm_set_opt(0, &m_idx_opt, &m_map_opt);
@@ -348,7 +348,7 @@ std::vector<BamPtr> AlignerImpl::align(bam1_t* irecord, mm_tbuf_t* buf) {
     return results;
 }
 
-Aligner::bam_header_sq_t AlignerImpl::get_sequence_records_for_header() const {
+AlignerNode::bam_header_sq_t AlignerImpl::get_sequence_records_for_header() const {
     std::vector<std::pair<char*, uint32_t>> records;
     for (int i = 0; i < m_index->n_seq; ++i) {
         records.push_back(std::make_pair(m_index->seq[i].name, m_index->seq[i].len));
@@ -432,20 +432,20 @@ void AlignerImpl::add_tags(bam1_t* record,
     bam_aux_append(record, "rl", 'i', sizeof(buf->rep_len), (uint8_t*)&buf->rep_len);
 }
 
-Aligner::Aligner(const std::string& filename, const Minimap2Options& options, int threads)
+AlignerNode::AlignerNode(const std::string& filename, const Minimap2Options& options, int threads)
         : MessageSink(10000),
           m_threads(threads),
           m_aligner(std::make_unique<AlignerImpl>(filename, options, threads)) {
     start_threads();
 }
 
-void Aligner::start_threads() {
+void AlignerNode::start_threads() {
     for (size_t i = 0; i < m_threads; i++) {
-        m_workers.push_back(std::thread(&Aligner::worker_thread, this));
+        m_workers.push_back(std::thread(&AlignerNode::worker_thread, this));
     }
 }
 
-void Aligner::terminate_impl() {
+void AlignerNode::terminate_impl() {
     terminate_input_queue();
     for (auto& m : m_workers) {
         if (m.joinable()) {
@@ -455,18 +455,18 @@ void Aligner::terminate_impl() {
     m_workers.clear();
 }
 
-void Aligner::restart() {
+void AlignerNode::restart() {
     restart_input_queue();
     start_threads();
 }
 
-Aligner::~Aligner() { terminate_impl(); }
+AlignerNode::~AlignerNode() { terminate_impl(); }
 
-Aligner::bam_header_sq_t Aligner::get_sequence_records_for_header() const {
+AlignerNode::bam_header_sq_t AlignerNode::get_sequence_records_for_header() const {
     return m_aligner->get_sequence_records_for_header();
 }
 
-void Aligner::worker_thread() {
+void AlignerNode::worker_thread() {
     Message message;
     mm_tbuf_t* tbuf = mm_tbuf_init();
     while (get_input_message(message)) {
@@ -485,6 +485,6 @@ void Aligner::worker_thread() {
     mm_tbuf_destroy(tbuf);
 }
 
-stats::NamedStats Aligner::sample_stats() const { return stats::from_obj(m_work_queue); }
+stats::NamedStats AlignerNode::sample_stats() const { return stats::from_obj(m_work_queue); }
 
-}  // namespace dorado
+}  // namespace dorado::alignment

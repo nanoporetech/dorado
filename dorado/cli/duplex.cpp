@@ -111,7 +111,7 @@ int duplex(int argc, char* argv[]) {
 
     parser.visible.add_argument("-v", "--verbose").default_value(false).implicit_value(true);
 
-    cli::add_minimap2_arguments(parser, Aligner::dflt_options);
+    cli::add_minimap2_arguments(parser, alignment::AlignerNode::dflt_options);
     cli::add_internal_arguments(parser);
 
     try {
@@ -186,9 +186,10 @@ int duplex(int argc, char* argv[]) {
             hts_writer = pipeline_desc.add_node<HtsWriter>({}, "-", output_mode, 4, num_reads);
             converted_reads_sink = hts_writer;
         } else {
-            auto options = cli::process_minimap2_arguments(parser, Aligner::dflt_options);
-            aligner = pipeline_desc.add_node<Aligner>({}, ref, options,
-                                                      std::thread::hardware_concurrency());
+            auto options =
+                    cli::process_minimap2_arguments(parser, alignment::AlignerNode::dflt_options);
+            aligner = pipeline_desc.add_node<alignment::AlignerNode>(
+                    {}, ref, options, std::thread::hardware_concurrency());
             hts_writer = pipeline_desc.add_node<HtsWriter>({}, "-", output_mode, 4, num_reads);
             pipeline_desc.add_node_sink(aligner, hts_writer);
             converted_reads_sink = aligner;
@@ -356,7 +357,8 @@ int duplex(int argc, char* argv[]) {
             // rather than the pipeline framework.
             auto& hts_writer_ref = dynamic_cast<HtsWriter&>(pipeline->get_node_ref(hts_writer));
             if (!ref.empty()) {
-                const auto& aligner_ref = dynamic_cast<Aligner&>(pipeline->get_node_ref(aligner));
+                const auto& aligner_ref =
+                        dynamic_cast<alignment::AlignerNode&>(pipeline->get_node_ref(aligner));
                 utils::add_sq_hdr(hdr.get(), aligner_ref.get_sequence_records_for_header());
             }
             hts_writer_ref.set_and_write_header(hdr.get());
