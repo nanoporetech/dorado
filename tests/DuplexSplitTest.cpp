@@ -48,6 +48,9 @@ auto make_read() {
     read->read_common.raw_data = read->read_common.raw_data.to(torch::kFloat16);
     read->read_common.read_tag = 42;
 
+    read->prev_read = "prev";
+    read->next_read = "next";
+
     return read;
 }
 }  // namespace
@@ -95,6 +98,21 @@ TEST_CASE("4 subread splitting test", TEST_GROUP) {
     REQUIRE(names.size() == 4);
     REQUIRE(std::all_of(split_res.begin(), split_res.end(),
                         [](const auto &r) { return r->read_common.read_tag == 42; }));
+
+    std::vector<std::string> prev_read_names;
+    std::vector<std::string> next_read_names;
+    for (auto &r : split_res) {
+        prev_read_names.push_back(r->prev_read);
+        next_read_names.push_back(r->next_read);
+    }
+    REQUIRE(prev_read_names == std::vector<std::string>{"prev",
+                                                        "e7e47439-5968-4883-96ff-7f2d2040dc43",
+                                                        "a62e28ab-c367-4a93-af9b-84130d3df58c",
+                                                        "f8e75422-3275-47f6-b45f-062aa00df368"});
+    REQUIRE(next_read_names == std::vector<std::string>{"a62e28ab-c367-4a93-af9b-84130d3df58c",
+                                                        "f8e75422-3275-47f6-b45f-062aa00df368",
+                                                        "c4219558-db6c-476e-a9e5-81f4694f263c",
+                                                        "next"});
 }
 
 TEST_CASE("4 subread split tagging", TEST_GROUP) {
