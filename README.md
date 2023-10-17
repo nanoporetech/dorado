@@ -94,7 +94,7 @@ To call modifications, add `--modified-bases` to the basecaller command:
 $ dorado basecaller dna_r10.4.1_e8.2_400bps_hac@v4.1.0 pod5s/ --modified-bases 5mCG_5hmCG > calls.bam
 ```
 
-Refer to the [modified base models](#modified-base-models) section to see available modifications.
+Refer to the [DNA models](#dna-models) table's _Compatible Modifications_ column to see available modifications that can be called with the `--modified-bases` option.
 
 ### Duplex
 
