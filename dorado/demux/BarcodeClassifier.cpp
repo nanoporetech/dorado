@@ -99,6 +99,16 @@ float extract_mask_score(std::string_view adapter,
     return score;
 }
 
+bool barcode_is_permitted(const BarcodingInfo::FilterSet& allowed_barcodes,
+                          const std::string& adapter_name) {
+    if (!allowed_barcodes.has_value()) {
+        return true;
+    }
+
+    auto normalized_barcode_name = barcode_kits::normalize_barcode_name(adapter_name);
+    return allowed_barcodes->count(normalized_barcode_name) != 0;
+}
+
 }  // namespace
 
 namespace demux {
@@ -267,7 +277,7 @@ std::vector<ScoreResults> BarcodeClassifier::calculate_adapter_score_different_d
         auto& adapter_rev = as.adapter_rev[i];
         auto& adapter_name = as.adapter_name[i];
 
-        if (allowed_barcodes.has_value() && allowed_barcodes->count(adapter_name) == 0) {
+        if (!barcode_is_permitted(allowed_barcodes, adapter_name)) {
             continue;
         }
 
@@ -373,7 +383,7 @@ std::vector<ScoreResults> BarcodeClassifier::calculate_adapter_score_double_ends
         auto& adapter_rev = as.adapter_rev[i];
         auto& adapter_name = as.adapter_name[i];
 
-        if (allowed_barcodes.has_value() && allowed_barcodes->count(adapter_name) == 0) {
+        if (!barcode_is_permitted(allowed_barcodes, adapter_name)) {
             continue;
         }
 
@@ -439,7 +449,7 @@ std::vector<ScoreResults> BarcodeClassifier::calculate_adapter_score(
         auto& adapter = as.adapter[i];
         auto& adapter_name = as.adapter_name[i];
 
-        if (allowed_barcodes.has_value() && allowed_barcodes->count(adapter_name) == 0) {
+        if (!barcode_is_permitted(allowed_barcodes, adapter_name)) {
             continue;
         }
 
