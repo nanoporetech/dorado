@@ -203,7 +203,10 @@ SimplexReadPtr subread(const SimplexRead& read, PosRange seq_range, PosRange sig
            subread->read_common.moves.size() * stride ==
                    subread->read_common.get_raw_data_samples());
 
+    // Initialize the subreads previous and next reads with the parent's ids.
+    // These are updated at the end when all subreads are available.
     subread->prev_read = read.prev_read;
+    subread->next_read = read.next_read;
 
     if (!read.read_common.parent_read_id.empty()) {
         subread->read_common.parent_read_id = read.read_common.parent_read_id;
@@ -551,10 +554,21 @@ std::vector<SimplexReadPtr> DuplexSplitNode::split(SimplexReadPtr init_read) con
         split_result.push_back(std::move(ext_read.read));
     }
 
-    // Adjust prev and next read ids
+    // Adjust prev and next read ids.
     if (split_result.size() > 1) {
-        for (int i = 1; i < split_result.size(); i++) {
-            split_result[i]->prev_read = split_result[i - 1]->read_common.read_id;
+        for (int i = 0; i < split_result.size(); i++) {
+            if (i == split_result.size() - 1) {
+                // For the last split read, the next read remains the same as the
+                // original read's next read.
+                split_result[i]->prev_read = split_result[i - 1]->read_common.read_id;
+            } else if (i == 0) {
+                // For the first split read, the previous read remains the same as the
+                // original read's previous read.
+                split_result[i]->next_read = split_result[i + 1]->read_common.read_id;
+            } else {
+                split_result[i]->prev_read = split_result[i - 1]->read_common.read_id;
+                split_result[i]->next_read = split_result[i + 1]->read_common.read_id;
+            }
         }
     }
 

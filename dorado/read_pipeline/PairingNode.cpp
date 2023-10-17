@@ -36,7 +36,7 @@ PairingNode::PairingResult PairingNode::is_within_time_and_length_criteria(
         int tid) {
     // A duplex pair can only occur for adjacent reads. Which means
     // that for the complement, the template read must be its predecessor.
-    if (temp.read_common.read_id != comp.prev_read) {
+    if (temp.read_common.read_id != comp.prev_read && temp.next_read != comp.read_common.read_id) {
         return {false, 0, 0, 0, 0};
     }
 

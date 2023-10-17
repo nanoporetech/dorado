@@ -167,6 +167,9 @@ SimplexReadPtr process_pod5_read(
         if (read_id_iter != v.begin()) {
             new_read->prev_read = std::prev(read_id_iter)->read_id;
         }
+        if (std::next(read_id_iter) != v.end()) {
+            new_read->next_read = std::next(read_id_iter)->read_id;
+        }
     }
 
     if (pod5_free_run_info(run_info_data) != POD5_OK) {
