@@ -191,7 +191,8 @@ build:linux:x86:focal:debug:
     BUILD_TYPE: "Debug"
   extends:
     - build:linux:x86:focal
-  when: manual
+  rules:
+    - if: $CI_MERGE_REQUEST_EVENT_TYPE == "merge_train"
 
 build:linux:x86:focal_coverage:
   stage: build
@@ -243,7 +244,8 @@ build:windows:debug:
     BUILD_TYPE: "Debug"
   extends:
     - build:windows
-  when: manual
+  rules:
+    - if: $CI_MERGE_REQUEST_EVENT_TYPE == "merge_train"
 
 build:windows_koi_download:
   <<: *windows_runner
