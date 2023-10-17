@@ -100,8 +100,8 @@ SimplexReadPtr process_pod5_read(
         Pod5FileReader* file,
         const std::string path,
         std::string device,
-        const std::unordered_map<int, std::vector<DataLoader::ReadSortInfo>>& reads_by_channel,
-        const std::unordered_map<std::string, size_t>& read_id_to_index) {
+        const std::unordered_map<int, std::vector<DataLoader::ReadSortInfo>>* reads_by_channel,
+        const std::unordered_map<std::string, size_t>* read_id_to_index) {
     uint16_t read_table_version = 0;
     ReadBatchRowInfo_t read_data;
     if (pod5_get_read_batch_row_info_data(batch, row, READ_BATCH_ROW_INFO_VERSION, &read_data,
@@ -159,10 +159,10 @@ SimplexReadPtr process_pod5_read(
     // Determine the time sorted predecessor of the read
     // if that information is available (primarily used for offline
     // duplex runs).
-    if (reads_by_channel.find(read_data.channel) != reads_by_channel.end()) {
+    if (reads_by_channel->find(read_data.channel) != reads_by_channel->end()) {
         auto& read_id = new_read->read_common.read_id;
-        const auto& v = reads_by_channel.at(read_data.channel);
-        auto read_id_iter = v.begin() + read_id_to_index.at(read_id);
+        const auto& v = reads_by_channel->at(read_data.channel);
+        auto read_id_iter = v.begin() + read_id_to_index->at(read_id);
 
         if (read_id_iter != v.begin()) {
             new_read->prev_read = std::prev(read_id_iter)->read_id;
@@ -414,9 +414,8 @@ void DataLoader::load_read_channels(std::string data_path, bool recursive_file_l
                     char read_id_tmp[POD5_READ_ID_LEN];
                     pod5_error_t err = pod5_format_read_id(read_data.read_id, read_id_tmp);
                     std::string rid(read_id_tmp);
-
-                    auto& v = m_reads_by_channel[channel];
-                    v.push_back({rid, read_data.well, read_data.read_number});
+                    m_reads_by_channel[channel].push_back(
+                            {rid, read_data.well, read_data.read_number});
                 }
 
                 if (pod5_free_read_batch(batch) != POD5_OK) {
@@ -657,7 +656,7 @@ void DataLoader::load_pod5_reads_from_file_by_read_ids(const std::string& path,
 
             if (can_process_pod5_row(batch, row, m_allowed_read_ids, m_ignored_read_ids)) {
                 futures.push_back(pool.push(process_pod5_read, row, batch, file, path, m_device,
-                                            m_reads_by_channel, m_read_id_to_index));
+                                            &m_reads_by_channel, &m_read_id_to_index));
             }
         }
 
@@ -717,7 +716,7 @@ void DataLoader::load_pod5_reads_from_file(const std::string& path) {
 
             if (can_process_pod5_row(batch, row, m_allowed_read_ids, m_ignored_read_ids)) {
                 futures.push_back(pool.push(process_pod5_read, row, batch, file, path, m_device,
-                                            m_reads_by_channel, m_read_id_to_index));
+                                            &m_reads_by_channel, &m_read_id_to_index));
             }
         }
 
