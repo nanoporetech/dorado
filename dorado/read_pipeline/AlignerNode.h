@@ -13,6 +13,26 @@ struct bam1_t;
 
 namespace dorado::alignment {
 
+//struct Minimap2IndexOptions {
+//    short kmer_size;
+//    short window_size;
+//    uint64_t index_batch_size;
+//};
+//
+//struct AlignmentIndex {
+//    mm_idxopt_t* idx_opt;
+//    mm_mapopt_t* map_opt;
+//    mm_idx_t* index;
+//};
+//
+//class AlignmentIndexAccess {
+//public:
+//    virtual ~AlignmentIndexAccess() = default;
+//
+//    // TODO - extend with mm_idxopt_t, mm_mapopt_t arguments.
+//    virtual std::shared_ptr<AlignmentIndex> get_index(const std::string& file) = 0;
+//};
+//
 class AlignerImpl;
 
 class AlignerNode : public MessageSink {

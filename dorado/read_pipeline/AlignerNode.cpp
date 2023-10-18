@@ -89,6 +89,8 @@ public:
 
     void add_tags(bam1_t*, const mm_reg1_t*, const std::string&, const mm_tbuf_t*);
     std::vector<BamPtr> align(bam1_t* record, mm_tbuf_t* buf);
+    void align(dorado::SimplexRead& simplex_read, mm_tbuf_t* buf);
+
     AlignerNode::bam_header_sq_t get_sequence_records_for_header() const;
 
 private:
@@ -99,93 +101,32 @@ private:
     mm_idx_reader_t* m_index_reader{nullptr};
 };
 
-AlignerImpl::AlignerImpl(const std::string& filename,
-                         const AlignerNode::Minimap2Options& options,
-                         size_t threads)
-        : m_threads(threads) {
-    // Check if reference file exists.
-    if (!std::filesystem::exists(filename)) {
-        throw std::runtime_error("AlignerNode reference path does not exist: " + filename);
+void AlignerImpl::align(dorado::SimplexRead& simplex_read, mm_tbuf_t* buffer) {
+    mm_bseq1_t query;
+    query.seq = const_cast<char*>(simplex_read.read_common.seq.c_str());
+    query.name = const_cast<char*>(simplex_read.read_common.read_id.c_str());
+    query.qual = nullptr;
+    query.l_seq = static_cast<int>(simplex_read.read_common.seq.length());
+
+    int n_regs{};
+    mm_reg1_t* regs = mm_map(m_index, query.l_seq, query.seq, &n_regs, buffer, &m_map_opt, nullptr);
+
+    std::string alignment_string{};
+    if (n_regs == 0) {
+        std::string empty_sam{"\t4\t*\t0\t0\t*\t*\t0\t0\n"};
+        alignment_string = simplex_read.read_common.read_id + empty_sam;
     }
-    // Initialize option structs.
-    mm_set_opt(0, &m_idx_opt, &m_map_opt);
-    // Setting options to map-ont default till relevant args are exposed.
-    mm_set_opt("map-ont", &m_idx_opt, &m_map_opt);
+    for (int reg_idx{0}; reg_idx < n_regs; ++reg_idx) {
+        kstring_t alignment_line{0, 0, nullptr};
+        mm_write_sam2(&alignment_line, m_index, &query, 0, reg_idx, 1, &n_regs, &regs, NULL,
+                      MM_F_OUT_MD);
+        alignment_string += std::string(alignment_line.s, alignment_line.l) + "\n";
 
-    m_idx_opt.k = options.kmer_size;
-    m_idx_opt.w = options.window_size;
-    spdlog::info("> Index parameters input by user: kmer size={} and window size={}.", m_idx_opt.k,
-                 m_idx_opt.w);
-
-    m_idx_opt.batch_size = options.index_batch_size;
-    m_idx_opt.mini_batch_size = options.index_batch_size;
-    spdlog::info("> Index parameters input by user: batch size={} and mini batch size={}.",
-                 m_idx_opt.batch_size, m_idx_opt.mini_batch_size);
-
-    m_map_opt.bw = options.bandwidth;
-    m_map_opt.bw_long = options.bandwidth_long;
-    spdlog::info("> Map parameters input by user: bandwidth={} and bandwidth long={}.",
-                 m_map_opt.bw, m_map_opt.bw_long);
-
-    if (!options.print_secondary) {
-        m_map_opt.flag |= MM_F_NO_PRINT_2ND;
+        free(alignment_line.s);
+        free(regs[reg_idx].p);
     }
-    m_map_opt.best_n = options.best_n_secondary;
-    spdlog::info(
-            "> Map parameters input by user: don't print secondary={} and best n secondary={}.",
-            static_cast<bool>(m_map_opt.flag & MM_F_NO_PRINT_2ND), m_map_opt.best_n);
-
-    if (options.soft_clipping) {
-        m_map_opt.flag |= MM_F_SOFTCLIP;
-    }
-    if (options.secondary_seq) {
-        m_map_opt.flag |= MM_F_SECONDARY_SEQ;
-    }
-    spdlog::info("> Map parameters input by user: soft clipping={} and secondary seq={}.",
-                 static_cast<bool>(m_map_opt.flag & MM_F_SOFTCLIP),
-                 static_cast<bool>(m_map_opt.flag & MM_F_SECONDARY_SEQ));
-
-    if (options.print_aln_seq) {
-        mm_dbg_flag |= MM_DBG_PRINT_QNAME | MM_DBG_PRINT_ALN_SEQ;
-        m_threads = 1;
-    }
-    spdlog::debug("> Map parameters input by user: dbg print qname={} and aln seq={}.",
-                  static_cast<bool>(mm_dbg_flag & MM_DBG_PRINT_QNAME),
-                  static_cast<bool>(mm_dbg_flag & MM_DBG_PRINT_ALN_SEQ));
-
-    // Force cigar generation.
-    m_map_opt.flag |= MM_F_CIGAR;
-
-    mm_check_opt(&m_idx_opt, &m_map_opt);
-
-    m_index_reader = mm_idx_reader_open(filename.c_str(), &m_idx_opt, 0);
-    m_index = mm_idx_reader_read(m_index_reader, m_threads);
-    auto* split_index = mm_idx_reader_read(m_index_reader, m_threads);
-    if (split_index != nullptr) {
-        mm_idx_destroy(m_index);
-        mm_idx_destroy(split_index);
-        mm_idx_reader_close(m_index_reader);
-        throw std::runtime_error(
-                "Dorado doesn't support split index for alignment. Please re-run with larger index "
-                "size.");
-    }
-    mm_mapopt_update(&m_map_opt, m_index);
-
-    if (m_index->k != m_idx_opt.k || m_index->w != m_idx_opt.w) {
-        spdlog::warn(
-                "Indexing parameters mismatch prebuilt index: using paramateres kmer "
-                "size={} and window size={} from prebuilt index.",
-                m_index->k, m_index->w);
-    }
-
-    if (mm_verbose >= 3) {
-        mm_idx_stat(m_index);
-    }
-}
-
-AlignerImpl::~AlignerImpl() {
-    mm_idx_reader_close(m_index_reader);
-    mm_idx_destroy(m_index);
+    free(regs);
+    simplex_read.read_common.alignment_string = alignment_string;
 }
 
 std::vector<BamPtr> AlignerImpl::align(bam1_t* irecord, mm_tbuf_t* buf) {
@@ -347,6 +288,94 @@ std::vector<BamPtr> AlignerImpl::align(bam1_t* irecord, mm_tbuf_t* buf) {
     free(reg);
     return results;
 }
+AlignerImpl::AlignerImpl(const std::string& filename,
+                         const AlignerNode::Minimap2Options& options,
+                         size_t threads)
+        : m_threads(threads) {
+    // Check if reference file exists.
+    if (!std::filesystem::exists(filename)) {
+        throw std::runtime_error("AlignerNode reference path does not exist: " + filename);
+    }
+    // Initialize option structs.
+    mm_set_opt(0, &m_idx_opt, &m_map_opt);
+    // Setting options to map-ont default till relevant args are exposed.
+    mm_set_opt("map-ont", &m_idx_opt, &m_map_opt);
+
+    m_idx_opt.k = options.kmer_size;
+    m_idx_opt.w = options.window_size;
+    spdlog::info("> Index parameters input by user: kmer size={} and window size={}.", m_idx_opt.k,
+                 m_idx_opt.w);
+
+    m_idx_opt.batch_size = options.index_batch_size;
+    m_idx_opt.mini_batch_size = options.index_batch_size;
+    spdlog::info("> Index parameters input by user: batch size={} and mini batch size={}.",
+                 m_idx_opt.batch_size, m_idx_opt.mini_batch_size);
+
+    m_map_opt.bw = options.bandwidth;
+    m_map_opt.bw_long = options.bandwidth_long;
+    spdlog::info("> Map parameters input by user: bandwidth={} and bandwidth long={}.",
+                 m_map_opt.bw, m_map_opt.bw_long);
+
+    if (!options.print_secondary) {
+        m_map_opt.flag |= MM_F_NO_PRINT_2ND;
+    }
+    m_map_opt.best_n = options.best_n_secondary;
+    spdlog::info(
+            "> Map parameters input by user: don't print secondary={} and best n secondary={}.",
+            static_cast<bool>(m_map_opt.flag & MM_F_NO_PRINT_2ND), m_map_opt.best_n);
+
+    if (options.soft_clipping) {
+        m_map_opt.flag |= MM_F_SOFTCLIP;
+    }
+    if (options.secondary_seq) {
+        m_map_opt.flag |= MM_F_SECONDARY_SEQ;
+    }
+    spdlog::info("> Map parameters input by user: soft clipping={} and secondary seq={}.",
+                 static_cast<bool>(m_map_opt.flag & MM_F_SOFTCLIP),
+                 static_cast<bool>(m_map_opt.flag & MM_F_SECONDARY_SEQ));
+
+    if (options.print_aln_seq) {
+        mm_dbg_flag |= MM_DBG_PRINT_QNAME | MM_DBG_PRINT_ALN_SEQ;
+        m_threads = 1;
+    }
+    spdlog::debug("> Map parameters input by user: dbg print qname={} and aln seq={}.",
+                  static_cast<bool>(mm_dbg_flag & MM_DBG_PRINT_QNAME),
+                  static_cast<bool>(mm_dbg_flag & MM_DBG_PRINT_ALN_SEQ));
+
+    // Force cigar generation.
+    m_map_opt.flag |= MM_F_CIGAR;
+
+    mm_check_opt(&m_idx_opt, &m_map_opt);
+
+    m_index_reader = mm_idx_reader_open(filename.c_str(), &m_idx_opt, 0);
+    m_index = mm_idx_reader_read(m_index_reader, m_threads);
+    auto* split_index = mm_idx_reader_read(m_index_reader, m_threads);
+    if (split_index != nullptr) {
+        mm_idx_destroy(m_index);
+        mm_idx_destroy(split_index);
+        mm_idx_reader_close(m_index_reader);
+        throw std::runtime_error(
+                "Dorado doesn't support split index for alignment. Please re-run with larger index "
+                "size.");
+    }
+    mm_mapopt_update(&m_map_opt, m_index);
+
+    if (m_index->k != m_idx_opt.k || m_index->w != m_idx_opt.w) {
+        spdlog::warn(
+                "Indexing parameters mismatch prebuilt index: using paramateres kmer "
+                "size={} and window size={} from prebuilt index.",
+                m_index->k, m_index->w);
+    }
+
+    if (mm_verbose >= 3) {
+        mm_idx_stat(m_index);
+    }
+}
+
+AlignerImpl::~AlignerImpl() {
+    mm_idx_reader_close(m_index_reader);
+    mm_idx_destroy(m_index);
+}
 
 AlignerNode::bam_header_sq_t AlignerImpl::get_sequence_records_for_header() const {
     std::vector<std::pair<char*, uint32_t>> records;
@@ -470,16 +499,19 @@ void AlignerNode::worker_thread() {
     Message message;
     mm_tbuf_t* tbuf = mm_tbuf_init();
     while (get_input_message(message)) {
-        // If this message isn't a BamPtr, just forward it to the sink.
-        if (!std::holds_alternative<BamPtr>(message)) {
+        if (std::holds_alternative<BamPtr>(message)) {
+            auto read = std::get<BamPtr>(std::move(message));
+            auto records = m_aligner->align(read.get(), tbuf);
+            for (auto& record : records) {
+                send_message_to_sink(std::move(record));
+            }
+        } else if (std::holds_alternative<SimplexReadPtr>(message)) {
+            auto read = std::get<SimplexReadPtr>(std::move(message));
+            m_aligner->align(*read, tbuf);
+            send_message_to_sink(std::move(read));
+        } else {
             send_message_to_sink(std::move(message));
             continue;
-        }
-
-        auto read = std::get<BamPtr>(std::move(message));
-        auto records = m_aligner->align(read.get(), tbuf);
-        for (auto& record : records) {
-            send_message_to_sink(std::move(record));
         }
     }
     mm_tbuf_destroy(tbuf);
