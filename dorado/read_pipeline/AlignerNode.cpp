@@ -102,10 +102,9 @@ private:
 };
 
 void AlignerImpl::align(dorado::SimplexRead& simplex_read, mm_tbuf_t* buffer) {
-    mm_bseq1_t query;
+    mm_bseq1_t query{};
     query.seq = const_cast<char*>(simplex_read.read_common.seq.c_str());
     query.name = const_cast<char*>(simplex_read.read_common.read_id.c_str());
-    query.qual = nullptr;
     query.l_seq = static_cast<int>(simplex_read.read_common.seq.length());
 
     int n_regs{};
@@ -121,10 +120,10 @@ void AlignerImpl::align(dorado::SimplexRead& simplex_read, mm_tbuf_t* buffer) {
         mm_write_sam2(&alignment_line, m_index, &query, 0, reg_idx, 1, &n_regs, &regs, NULL,
                       MM_F_OUT_MD);
         alignment_string += std::string(alignment_line.s, alignment_line.l) + "\n";
-
         free(alignment_line.s);
         free(regs[reg_idx].p);
     }
+    // TODO: free using RAII
     free(regs);
     simplex_read.read_common.alignment_string = alignment_string;
 }
