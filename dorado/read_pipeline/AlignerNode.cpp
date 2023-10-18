@@ -101,33 +101,6 @@ private:
     mm_idx_reader_t* m_index_reader{nullptr};
 };
 
-void AlignerImpl::align(dorado::SimplexRead& simplex_read, mm_tbuf_t* buffer) {
-    mm_bseq1_t query{};
-    query.seq = const_cast<char*>(simplex_read.read_common.seq.c_str());
-    query.name = const_cast<char*>(simplex_read.read_common.read_id.c_str());
-    query.l_seq = static_cast<int>(simplex_read.read_common.seq.length());
-
-    int n_regs{};
-    mm_reg1_t* regs = mm_map(m_index, query.l_seq, query.seq, &n_regs, buffer, &m_map_opt, nullptr);
-
-    std::string alignment_string{};
-    if (n_regs == 0) {
-        std::string empty_sam{"\t4\t*\t0\t0\t*\t*\t0\t0\n"};
-        alignment_string = simplex_read.read_common.read_id + empty_sam;
-    }
-    for (int reg_idx{0}; reg_idx < n_regs; ++reg_idx) {
-        kstring_t alignment_line{0, 0, nullptr};
-        mm_write_sam2(&alignment_line, m_index, &query, 0, reg_idx, 1, &n_regs, &regs, NULL,
-                      MM_F_OUT_MD);
-        alignment_string += std::string(alignment_line.s, alignment_line.l) + "\n";
-        free(alignment_line.s);
-        free(regs[reg_idx].p);
-    }
-    // TODO: free using RAII
-    free(regs);
-    simplex_read.read_common.alignment_string = alignment_string;
-}
-
 std::vector<BamPtr> AlignerImpl::align(bam1_t* irecord, mm_tbuf_t* buf) {
     // some where for the hits
     std::vector<BamPtr> results;
@@ -374,6 +347,33 @@ AlignerImpl::AlignerImpl(const std::string& filename,
 AlignerImpl::~AlignerImpl() {
     mm_idx_reader_close(m_index_reader);
     mm_idx_destroy(m_index);
+}
+
+void AlignerImpl::align(dorado::SimplexRead& simplex_read, mm_tbuf_t* buffer) {
+    mm_bseq1_t query{};
+    query.seq = const_cast<char*>(simplex_read.read_common.seq.c_str());
+    query.name = const_cast<char*>(simplex_read.read_common.read_id.c_str());
+    query.l_seq = static_cast<int>(simplex_read.read_common.seq.length());
+
+    int n_regs{};
+    mm_reg1_t* regs = mm_map(m_index, query.l_seq, query.seq, &n_regs, buffer, &m_map_opt, nullptr);
+
+    std::string alignment_string{};
+    if (n_regs == 0) {
+        std::string empty_sam{"\t4\t*\t0\t0\t*\t*\t0\t0\n"};
+        alignment_string = simplex_read.read_common.read_id + empty_sam;
+    }
+    for (int reg_idx{0}; reg_idx < n_regs; ++reg_idx) {
+        kstring_t alignment_line{0, 0, nullptr};
+        mm_write_sam2(&alignment_line, m_index, &query, 0, reg_idx, 1, &n_regs, &regs, NULL,
+                      MM_F_OUT_MD);
+        alignment_string += std::string(alignment_line.s, alignment_line.l) + "\n";
+        free(alignment_line.s);
+        free(regs[reg_idx].p);
+    }
+    // TODO: free using RAII
+    free(regs);
+    simplex_read.read_common.alignment_string = alignment_string;
 }
 
 AlignerNode::bam_header_sq_t AlignerImpl::get_sequence_records_for_header() const {
