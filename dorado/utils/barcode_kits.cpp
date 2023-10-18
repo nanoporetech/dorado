@@ -515,12 +515,6 @@ std::string normalize_barcode_name(const std::string& barcode_name) {
 
 std::string generate_standard_barcode_name(const std::string& kit_name,
                                            const std::string& barcode_name) {
-    std::string digits = "";
-    for (const auto& c : barcode_name) {
-        if (std::isdigit(static_cast<unsigned char>(c))) {
-            digits += c;
-        }
-    }
     return kit_name + "_" + normalize_barcode_name(barcode_name);
 }
 

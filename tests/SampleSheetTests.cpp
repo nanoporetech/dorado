@@ -17,6 +17,8 @@
 #include <string>
 #include <vector>
 
+#define get_sample_sheets_data_dir() std::filesystem::path(get_data_dir("sample_sheets"))
+
 #define CUT_TAG "[sample_sheets]"
 
 TEST_CASE(CUT_TAG " load valid no-barcode sample sheet", CUT_TAG) {

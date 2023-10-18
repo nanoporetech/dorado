@@ -633,7 +633,6 @@ ScoreResults BarcodeClassifier::find_best_adapter(
         d << s.score << " " << s.adapter_name << ", ";
     }
     spdlog::debug("Scores: {}", d.str());
-    const float kMargin = 0.25f;
     auto best_score = scores.begin();
     auto are_scores_acceptable = [](const auto& score) {
         return (score.flank_score >= 0.7 && score.score >= 0.6) ||
@@ -649,6 +648,7 @@ ScoreResults BarcodeClassifier::find_best_adapter(
     } else {
         auto second_best_score = std::next(best_score);
         if (best_score->score - second_best_score->score >= 0.1f) {
+            const float kMargin = 0.25f;
             if (are_scores_acceptable(*best_score) ||
                 (best_score->score - second_best_score->score >= kMargin)) {
                 out = *best_score;

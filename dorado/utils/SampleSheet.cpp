@@ -47,7 +47,7 @@ bool is_valid_mk_freetext(const std::string& input) {
 
 bool is_alias_forbidden(const std::string& input) {
     // Single barcode
-    const std::regex barcode_regex("^barcode(\\d{2})$");
+    constexpr std::regex barcode_regex("^barcode(\\d{2})$");
     if (std::regex_match(input, barcode_regex)) {
         return true;
     }
@@ -126,8 +126,7 @@ void SampleSheet::load(std::istream& file_stream, const std::string& filename) {
         experiment_id = row[m_col_indices["experiment_id"]];
         if (expected_experiment_id.empty()) {
             expected_experiment_id = experiment_id;
-        }
-        if (expected_experiment_id != experiment_id) {
+        } else if (expected_experiment_id != experiment_id) {
             throw std::runtime_error(std::string("Sample sheet file " + filename +
                                                  " contains more than one experiment_id"));
         }
