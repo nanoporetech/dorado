@@ -65,6 +65,8 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
     const int kSpread = num_samples_per_base * kMaxTailLength;
     // Maximum gap between intervals that can be combined.
     const int kMaxSampleGap = num_samples_per_base * 3;
+    // Minimum size of intervals considered for merge.
+    const int kMinIntervalSizeForMerge = 10 * num_samples_per_base;
     // Floor for average signal value of poly tail.
     const float kMinAvgVal = (is_rna ? 0.0 : -3.0);
 
@@ -77,26 +79,28 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
         int e = std::min(s + kMaxSampleGap, right_end);
         auto [avg, stdev] = calc_stats(s, e);
         if (stdev < kVar) {
+            // If a new interval overlaps with the previous interval, just extend
+            // the previous interval.
             if (intervals.size() > 1 && intervals.back().second >= s &&
                 std::abs(avg - last_interval_stats.first) < 0.2 && (avg > kMinAvgVal)) {
                 auto& last = intervals.back();
-                //spdlog::debug("Add {}-{} to {}-{} avg {} stdev {}", s, e, last.first, last.second, avg, stdev);
                 last.second = e;
             } else {
+                // Attempt to merge the most recent interval and the one before
+                // that if the gap between the intervals is small and both of the
+                // intervals are longer than some threshold.
                 if (intervals.size() > 2) {
                     auto& last = intervals.back();
                     auto& second_last = intervals[intervals.size() - 2];
                     if ((last.first - second_last.second < kMaxSampleGap) &&
-                        (last.second - last.first > 10 * num_samples_per_base) &&
-                        (second_last.second - second_last.first > 10 * num_samples_per_base)) {
-                        //spdlog::debug("Merging {}-{} to {}-{}", last.first, last.second, second_last.first, second_last.second);// avg, stdev);
+                        (last.second - last.first > kMinIntervalSizeForMerge) &&
+                        (second_last.second - second_last.first > kMinIntervalSizeForMerge)) {
                         second_last.second = last.second;
                         intervals.pop_back();
                     }
                 }
 
                 intervals.push_back({s, e});
-                //spdlog::debug("New interval {}-{} avg {} stdev {}", s, e, avg, stdev);
             }
             last_interval_stats = {avg, stdev};
         }
@@ -111,12 +115,14 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
     std::vector<std::pair<int, int>> filtered_intervals;
     std::copy_if(intervals.begin(), intervals.end(), std::back_inserter(filtered_intervals),
                  [&](auto& i) {
-                     int int_len = i.second - i.first;
-                     if (int_len < (num_samples_per_base * 5)) {
+                     int interval_size = i.second - i.first;
+                     // Filter out any small intervals.
+                     if (interval_size < (num_samples_per_base * 5)) {
                          return false;
                      }
-                     return (fwd ? std::abs(signal_anchor - i.second) < int_len
-                                 : std::abs(signal_anchor - i.first) < int_len) ||
+                     // Only keep intervals that are close-ish to the signal anchor.
+                     return (fwd ? std::abs(signal_anchor - i.second) < interval_size
+                                 : std::abs(signal_anchor - i.first) < interval_size) ||
                             (i.first <= signal_anchor) && (signal_anchor <= i.second);
                  });
 
@@ -273,6 +279,9 @@ SignalAnchorInfo determine_signal_anchor_and_strand_drna(
     const int kOffset = kOffsetMap.at(model_type);
     const int kMaxSignalPos = kMaxSignalPosMap.at(model_type);
 
+    const float kMinMedianForRNASignal = 0.f;
+    const float kMinMedianDiff = 1.f;
+
     int bp = -1;
     int signal_len = read.read_common.get_raw_data_samples();
     auto sig_fp32 = read.read_common.raw_data.to(torch::kFloat);
@@ -281,16 +290,14 @@ SignalAnchorInfo determine_signal_anchor_and_strand_drna(
         auto slice = sig_fp32.slice(0, std::max(0, i - kWindowSize / 2),
                                     std::min(signal_len, i + kWindowSize / 2));
         float median = slice.median().item<float>();
-        if (median > 0 && i > kOffset) {
+        if (median > kMinMedianForRNASignal) {
             float diff = median - last_median;
-            if (diff > 1) {
+            if (diff > kMinMedianDiff) {
                 bp = i;
                 break;
             }
-            last_median = median;
-        } else {
-            last_median = median;
         }
+        last_median = median;
     }
 
     spdlog::debug("Approx break point {}", bp);

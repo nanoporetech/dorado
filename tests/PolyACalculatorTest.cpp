@@ -26,10 +26,10 @@ struct TestCase {
 
 TEST_CASE("PolyACalculator: Test polyT tail estimation", TEST_GROUP) {
     auto [gt, data, model_type] =
-            GENERATE(TestCase{70, "poly_a/r9_rev_cdna", PolyACalculator::ModelType::DNA},
+            GENERATE(TestCase{92, "poly_a/r9_rev_cdna", PolyACalculator::ModelType::DNA},
                      TestCase{31, "poly_a/r10_fwd_cdna", PolyACalculator::ModelType::DNA},
-                     TestCase{22, "poly_a/rna002", PolyACalculator::ModelType::RNA002},
-                     TestCase{7, "poly_a/rna004", PolyACalculator::ModelType::RNA004});
+                     TestCase{28, "poly_a/rna002", PolyACalculator::ModelType::RNA002},
+                     TestCase{64, "poly_a/rna004", PolyACalculator::ModelType::RNA004});
 
     dorado::PipelineDescriptor pipeline_desc;
     std::vector<dorado::Message> messages;
