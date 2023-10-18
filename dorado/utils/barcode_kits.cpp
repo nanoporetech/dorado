@@ -1,5 +1,6 @@
 #include "barcode_kits.h"
 
+#include <algorithm>
 #include <numeric>
 
 namespace dorado::barcode_kits {
@@ -478,22 +479,43 @@ const std::unordered_map<std::string, KitInfo>& get_kit_infos() { return kit_inf
 
 const std::unordered_map<std::string, std::string>& get_barcodes() { return barcodes; }
 
+const std::unordered_set<std::string>& get_barcode_identifiers() {
+    static auto identifiers = []() {
+        std::unordered_set<std::string> ids;
+        for (auto& [identifier, _] : barcodes) {
+            ids.insert(identifier);
+        }
+        return ids;
+    }();
+    return identifiers;
+}
+
 std::string barcode_kits_list_str() {
-    return std::accumulate(kit_info_map.begin(), kit_info_map.end(), std::string(),
-                           [](std::string& a, auto& b) -> std::string {
-                               return a + (a.empty() ? "" : " ") + b.first;
+    std::vector<std::string> kit_names;
+    for (auto& [kit_name, _] : kit_info_map) {
+        kit_names.push_back(kit_name);
+    }
+    std::sort(kit_names.begin(), kit_names.end());
+    return std::accumulate(kit_names.begin(), kit_names.end(), std::string(),
+                           [](const auto& a, const auto& b) -> std::string {
+                               return a + (a.empty() ? "" : " ") + b;
                            });
+}
+
+std::string normalize_barcode_name(const std::string& barcode_name) {
+    std::string digits = "";
+    for (const auto& c : barcode_name) {
+        if (std::isdigit(static_cast<unsigned char>(c))) {
+            digits += c;
+        }
+    }
+
+    return "barcode" + digits;
 }
 
 std::string generate_standard_barcode_name(const std::string& kit_name,
                                            const std::string& barcode_name) {
-    std::string digits = "";
-    for (const auto& c : barcode_name) {
-        if (std::isdigit(c)) {
-            digits += c;
-        }
-    }
-    return kit_name + "_barcode" + digits;
+    return kit_name + "_" + normalize_barcode_name(barcode_name);
 }
 
 }  // namespace dorado::barcode_kits

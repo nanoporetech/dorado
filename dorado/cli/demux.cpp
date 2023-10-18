@@ -1,10 +1,10 @@
 #include "Version.h"
 #include "cli/cli_utils.h"
-#include "read_pipeline/BarcodeClassifier.h"
 #include "read_pipeline/BarcodeClassifierNode.h"
 #include "read_pipeline/BarcodeDemuxerNode.h"
 #include "read_pipeline/HtsReader.h"
 #include "read_pipeline/ProgressTracker.h"
+#include "utils/SampleSheet.h"
 #include "utils/barcode_kits.h"
 #include "utils/basecaller_utils.h"
 #include "utils/log_utils.h"
@@ -15,6 +15,7 @@
 
 #include <chrono>
 #include <memory>
+#include <optional>
 #include <string>
 #include <thread>
 #include <vector>
@@ -47,9 +48,12 @@ int demuxer(int argc, char* argv[]) {
             .help("Barcoding kit name. Cannot be used with --no-classify. Choose "
                   "from: " +
                   dorado::barcode_kits::barcode_kits_list_str() + ".");
+    parser.add_argument("--sample-sheet")
+            .help("Path to the sample sheet to use.")
+            .default_value(std::string(""));
     parser.add_argument("--no-classify")
             .help("Skip barcode classification. Only demux based on existing classification in "
-                  "reads. Cannot be used with --kit-name.")
+                  "reads. Cannot be used with --kit-name or --sample-sheet.")
             .default_value(false)
             .implicit_value(true);
     parser.add_argument("-t", "--threads")
@@ -139,9 +143,11 @@ int demuxer(int argc, char* argv[]) {
         if (auto names = parser.present<std::vector<std::string>>("--kit-name")) {
             kit_names = std::move(*names);
         }
+        utils::SampleSheet sample_sheet(parser.get<std::string>("--sample-sheet"));
+        BarcodingInfo::FilterSet allowed_barcodes = sample_sheet.get_barcode_values();
         auto demux = pipeline_desc.add_node<BarcodeClassifierNode>(
                 {demux_writer}, demux_threads, kit_names, parser.get<bool>("--barcode-both-ends"),
-                parser.get<bool>("--no-trim"));
+                parser.get<bool>("--no-trim"), allowed_barcodes);
     }
 
     // Create the Pipeline from our description.

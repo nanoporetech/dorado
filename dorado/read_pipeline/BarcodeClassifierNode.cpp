@@ -1,6 +1,6 @@
 #include "BarcodeClassifierNode.h"
 
-#include "BarcodeClassifier.h"
+#include "demux/BarcodeClassifier.h"
 #include "utils/bam_utils.h"
 #include "utils/barcode_kits.h"
 #include "utils/trim.h"
@@ -31,16 +31,6 @@ std::string generate_barcode_string(dorado::demux::ScoreResults bc_res) {
     return bc;
 }
 
-dorado::BarcodingInfo create_barcoding_info(const std::string& kit_name,
-                                            bool barcode_both_ends,
-                                            bool trim_barcode) {
-    dorado::BarcodingInfo result{};
-    result.kit_name = kit_name;
-    result.barcode_both_ends = barcode_both_ends;
-    result.trim = trim_barcode;
-    return result;
-}
-
 }  // namespace
 
 namespace dorado {
@@ -49,13 +39,12 @@ namespace dorado {
 BarcodeClassifierNode::BarcodeClassifierNode(int threads,
                                              const std::vector<std::string>& kit_names,
                                              bool barcode_both_ends,
-                                             bool no_trim)
+                                             bool no_trim,
+                                             const BarcodingInfo::FilterSet& allowed_barcodes)
         : MessageSink(10000),
           m_threads(threads),
           m_default_barcoding_info(
-                  kit_names.empty()
-                          ? BarcodingInfo{}
-                          : create_barcoding_info(kit_names[0], barcode_both_ends, !no_trim)) {
+                  create_barcoding_info(kit_names, barcode_both_ends, !no_trim, allowed_barcodes)) {
     start_threads();
 }
 
@@ -246,35 +235,37 @@ void BarcodeClassifierNode::trim_barcode(SimplexRead& read, const demux::ScoreRe
     }
 }
 
-const BarcodingInfo* BarcodeClassifierNode::get_barcoding_info(const SimplexRead& read) const {
-    if (!m_default_barcoding_info.kit_name.empty()) {
-        return &m_default_barcoding_info;
+std::shared_ptr<const BarcodingInfo> BarcodeClassifierNode::get_barcoding_info(
+        const SimplexRead& read) const {
+    if (m_default_barcoding_info && !m_default_barcoding_info->kit_name.empty()) {
+        return m_default_barcoding_info;
     }
 
-    if (!read.read_common.barcoding_info.kit_name.empty()) {
-        return &read.read_common.barcoding_info;
+    if (read.read_common.barcoding_info && !read.read_common.barcoding_info->kit_name.empty()) {
+        return read.read_common.barcoding_info;
     }
 
     return nullptr;
 }
 
 void BarcodeClassifierNode::barcode(BamPtr& read) {
-    if (m_default_barcoding_info.kit_name.empty()) {
+    if (!m_default_barcoding_info || m_default_barcoding_info->kit_name.empty()) {
         return;
     }
-    auto& barcoder = m_barcoder_selector.get_barcoder(m_default_barcoding_info.kit_name);
+    auto barcoder = m_barcoder_selector.get_barcoder(m_default_barcoding_info->kit_name);
 
     bam1_t* irecord = read.get();
     int seqlen = irecord->core.l_qseq;
     std::string seq = utils::extract_sequence(irecord, seqlen);
 
-    auto bc_res = barcoder.barcode(seq, m_default_barcoding_info.barcode_both_ends);
+    auto bc_res = barcoder->barcode(seq, m_default_barcoding_info->barcode_both_ends,
+                                    m_default_barcoding_info->allowed_barcodes);
     auto bc = generate_barcode_string(bc_res);
     bam_aux_append(irecord, "BC", 'Z', bc.length() + 1, (uint8_t*)bc.c_str());
     m_num_records++;
 
-    if (m_default_barcoding_info.trim) {
-        read = BamPtr(trim_barcode(std::move(read), bc_res, seqlen));
+    if (m_default_barcoding_info->trim) {
+        read = trim_barcode(std::move(read), bc_res, seqlen);
     }
 }
 
@@ -283,10 +274,11 @@ void BarcodeClassifierNode::barcode(SimplexRead& read) {
     if (!barcoding_info) {
         return;
     }
-    auto& barcoder = m_barcoder_selector.get_barcoder(barcoding_info->kit_name);
+    auto barcoder = m_barcoder_selector.get_barcoder(barcoding_info->kit_name);
 
     // get the sequence to map from the record
-    auto bc_res = barcoder.barcode(read.read_common.seq, barcoding_info->barcode_both_ends);
+    auto bc_res = barcoder->barcode(read.read_common.seq, barcoding_info->barcode_both_ends,
+                                    barcoding_info->allowed_barcodes);
     read.read_common.barcode = generate_barcode_string(bc_res);
     m_num_records++;
     if (barcoding_info->trim) {
