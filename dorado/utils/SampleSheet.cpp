@@ -47,7 +47,7 @@ bool is_valid_mk_freetext(const std::string& input) {
 
 bool is_alias_forbidden(const std::string& input) {
     // Single barcode
-    constexpr std::regex barcode_regex("^barcode(\\d{2})$");
+    const std::regex barcode_regex("^barcode(\\d{2})$");
     if (std::regex_match(input, barcode_regex)) {
         return true;
     }
