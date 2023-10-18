@@ -94,6 +94,9 @@ void string_reader(HighFive::Attribute& attribute, std::string& target_str) {
 
 namespace dorado {
 
+// TODO: Replace the const * to read_by_channel and read_id_to_index
+// with const &. Initial attempt led to a big performance drop
+// when doing so. This needs further investigation.
 SimplexReadPtr process_pod5_read(
         size_t row,
         Pod5ReadRecordBatch* batch,
