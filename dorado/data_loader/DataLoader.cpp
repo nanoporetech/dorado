@@ -98,8 +98,7 @@ SimplexReadPtr process_pod5_read(
         size_t row,
         Pod5ReadRecordBatch* batch,
         Pod5FileReader* file,
-        const std::string path,
-        std::string device,
+        const std::string& path,
         const std::unordered_map<int, std::vector<DataLoader::ReadSortInfo>>* reads_by_channel,
         const std::unordered_map<std::string, size_t>* read_id_to_index) {
     uint16_t read_table_version = 0;
@@ -655,7 +654,7 @@ void DataLoader::load_pod5_reads_from_file_by_read_ids(const std::string& path,
             uint32_t row = traversal_batch_rows[row_idx + row_offset];
 
             if (can_process_pod5_row(batch, row, m_allowed_read_ids, m_ignored_read_ids)) {
-                futures.push_back(pool.push(process_pod5_read, row, batch, file, path, m_device,
+                futures.push_back(pool.push(process_pod5_read, row, batch, file, path,
                                             &m_reads_by_channel, &m_read_id_to_index));
             }
         }
@@ -715,7 +714,7 @@ void DataLoader::load_pod5_reads_from_file(const std::string& path) {
             // TODO - check the read ID here, for each one, only send the row if it is in the list of ones we care about
 
             if (can_process_pod5_row(batch, row, m_allowed_read_ids, m_ignored_read_ids)) {
-                futures.push_back(pool.push(process_pod5_read, row, batch, file, path, m_device,
+                futures.push_back(pool.push(process_pod5_read, row, batch, file, path,
                                             &m_reads_by_channel, &m_read_id_to_index));
             }
         }
