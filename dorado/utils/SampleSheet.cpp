@@ -314,18 +314,43 @@ void SampleSheet::validate_alias(const Row& row, const std::string& key) const {
 
 bool SampleSheet::check_index(const std::string& flow_cell_id,
                               const std::string& position_id) const {
-    return m_skip_index_matching || ((m_index[FLOW_CELL_ID] == !flow_cell_id.empty()) &&
-                                     (m_index[POSITION_ID] == !position_id.empty()));
+    if (m_skip_index_matching) {
+        return true;
+    }
+
+    bool ok = false;
+    if (m_index[FLOW_CELL_ID]) {
+        // if we're expecting a flow cell id, we must provide one
+        ok |= !flow_cell_id.empty();
+    }
+    if (m_index[POSITION_ID]) {
+        // if we're expecting a position id, we must provide one
+        ok |= !position_id.empty();
+    }
+    return ok;
 }
 
 bool SampleSheet::match_index(const Row& row,
                               const std::string& flow_cell_id,
                               const std::string& position_id,
                               const std::string& experiment_id) const {
-    return m_skip_index_matching ||
-           ((!m_index[FLOW_CELL_ID] || get(row, "flow_cell_id") == flow_cell_id) &&
-            (!m_index[POSITION_ID] || get(row, "position_id") == position_id) &&
-            (get(row, "experiment_id") == experiment_id));
+    if (m_skip_index_matching) {
+        return true;
+    }
+
+    if (get(row, "experiment_id") != experiment_id) {
+        return false;
+    }
+
+    if (m_index[FLOW_CELL_ID] && (get(row, "flow_cell_id") != flow_cell_id)) {
+        return false;
+    }
+
+    if (m_index[POSITION_ID] && (get(row, "position_id") != position_id)) {
+        return false;
+    }
+
+    return true;
 }
 
 std::string SampleSheet::get(const Row& row, const std::string& key) const {
