@@ -44,6 +44,12 @@ struct CRFModelConfig {
     int32_t mean_qscore_start_pos = -1;
 };
 
+enum ModelType {
+    DNA,
+    RNA002,
+    RNA004,
+};
+
 CRFModelConfig load_crf_model_config(const std::filesystem::path& path);
 
 uint16_t get_model_sample_rate(const std::filesystem::path& model_path);
@@ -56,5 +62,7 @@ inline bool sample_rates_compatible(uint16_t data_sample_rate, uint16_t model_sa
 int32_t get_model_mean_qscore_start_pos(const CRFModelConfig& model_config);
 
 bool is_rna_model(const CRFModelConfig& model_config);
+
+ModelType get_model_type(const CRFModelConfig& model_config);
 
 }  // namespace dorado

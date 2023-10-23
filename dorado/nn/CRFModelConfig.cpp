@@ -129,4 +129,18 @@ bool is_rna_model(const CRFModelConfig &model_config) {
     return filename.u8string().rfind("rna", 0) == 0;
 }
 
+ModelType get_model_type(const CRFModelConfig &model_config) {
+    auto path = std::filesystem::canonical(model_config.model_path);
+    auto model_name = path.filename().string();
+    if (model_name.find("rna004") != std::string::npos) {
+        return ModelType::RNA004;
+    } else if (model_name.find("rna002") != std::string::npos) {
+        return ModelType::RNA002;
+    } else if (model_name.find("dna") != std::string::npos) {
+        return ModelType::DNA;
+    } else {
+        throw std::runtime_error("Could not determine model type for " + model_name);
+    }
+}
+
 }  // namespace dorado

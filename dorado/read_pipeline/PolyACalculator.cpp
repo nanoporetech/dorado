@@ -256,57 +256,11 @@ SignalAnchorInfo determine_signal_anchor_and_strand_cdna(const dorado::SimplexRe
     return result;
 }
 
-// Since the adapter in RNA is still DNA, the basecall quality of the adapter is poor because we
-// infer with a model trained on RNA data. So finding a match of the adapter sequence in the RNA sequence
-// doesn't work well. Instead, the raw signal is traversed to find a point
-// where there's a jump in the median signal value, which is indicative of the
-// transition from the DNA adapter to the RNA signal. The polyA will start right
-// at that juncture. This function returns a struct with the strand
-// direction (which is always reverse for dRNA), the signal anchor and the number of bases
-// to omit from the tail length estimation due to any adapter effects.
-SignalAnchorInfo determine_signal_anchor_and_strand_drna(
-        const dorado::SimplexRead& read,
-        dorado::PolyACalculator::ModelType model_type) {
-    static const std::unordered_map<dorado::PolyACalculator::ModelType, int> kOffsetMap = {
-            {dorado::PolyACalculator::ModelType::RNA002, 5000},
-            {dorado::PolyACalculator::ModelType::RNA004, 1000}};
-    static const std::unordered_map<dorado::PolyACalculator::ModelType, int> kMaxSignalPosMap = {
-            {dorado::PolyACalculator::ModelType::RNA002, 10000},
-            {dorado::PolyACalculator::ModelType::RNA004, 5000}};
-
-    const int kWindowSize = 250;
-    const int kStride = 50;
-    const int kOffset = kOffsetMap.at(model_type);
-    const int kMaxSignalPos = kMaxSignalPosMap.at(model_type);
-
-    const float kMinMedianForRNASignal = 0.f;
-    const float kMinMedianDiff = 1.f;
-
-    int bp = -1;
-    int signal_len = read.read_common.get_raw_data_samples();
-    auto sig_fp32 = read.read_common.raw_data.to(torch::kFloat);
-    float last_median = 0.f;
-    for (int i = kOffset; i < std::min(signal_len / 2, kMaxSignalPos); i += kStride) {
-        auto slice = sig_fp32.slice(0, std::max(0, i - kWindowSize / 2),
-                                    std::min(signal_len, i + kWindowSize / 2));
-        float median = slice.median().item<float>();
-        if (median > kMinMedianForRNASignal) {
-            float diff = median - last_median;
-            if (diff > kMinMedianDiff) {
-                bp = i;
-                break;
-            }
-        }
-        last_median = median;
-    }
-
-    spdlog::debug("Approx break point {}", bp);
-
-    if (bp > 0) {
-        return SignalAnchorInfo{false, bp, 0};
-    } else {
-        return SignalAnchorInfo{false, -1, 0};
-    }
+// RNA polyA appears at the beginning of the strand. Since the adapter
+// for RNA has been trimmed off already, the polyA search can begin
+// from the start of the signal.
+SignalAnchorInfo determine_signal_anchor_and_strand_drna(const dorado::SimplexRead& read) {
+    return SignalAnchorInfo{false, 0, 0};
 }
 
 }  // namespace
@@ -327,10 +281,27 @@ void PolyACalculator::worker_thread() {
         // If this message isn't a read, we'll get a bad_variant_access exception.
         auto read = std::get<SimplexReadPtr>(std::move(message));
 
+        // Save data
+        std::ofstream outputFile("moves.bin");
+
+        // Iterate through the vector and write its contents to the file
+        for (uint8_t element : read->read_common.moves) {
+            outputFile << element;
+        }
+
+        // Close the file
+        outputFile.close();
+
+        torch::save(read->read_common.raw_data, "signal.tensor");
+
+        std::ofstream seqFile("seq.txt");
+        seqFile << read->read_common.seq;
+        seqFile.close();
+
         // Determine the strand direction, approximate base space anchor for the tail, and whether
         // the final length needs to be adjusted depending on the adapter sequence.
         auto [fwd, signal_anchor, trailing_Ts] =
-                m_is_rna ? determine_signal_anchor_and_strand_drna(*read, m_model_type)
+                m_is_rna ? determine_signal_anchor_and_strand_drna(*read)
                          : determine_signal_anchor_and_strand_cdna(*read);
 
         if (signal_anchor >= 0) {
@@ -378,13 +349,8 @@ void PolyACalculator::worker_thread() {
     }
 }
 
-PolyACalculator::PolyACalculator(size_t num_worker_threads,
-                                 PolyACalculator::ModelType model_type,
-                                 size_t max_reads)
-        : MessageSink(max_reads),
-          m_num_worker_threads(num_worker_threads),
-          m_is_rna(model_type == ModelType::RNA004 || model_type == ModelType::RNA002),
-          m_model_type(model_type) {
+PolyACalculator::PolyACalculator(size_t num_worker_threads, bool is_rna, size_t max_reads)
+        : MessageSink(max_reads), m_num_worker_threads(num_worker_threads), m_is_rna(is_rna) {
     start_threads();
 }
 
@@ -417,7 +383,7 @@ void PolyACalculator::terminate_impl() {
         }
         int factor = std::max(1, 1 + max_val / 100);
         for (auto [k, v] : tail_length_counts) {
-            spdlog::debug("{} : {}", k, std::string(v / factor, '*'));
+            spdlog::debug("{:03d} : {}", k, std::string(v / factor, '*'));
         }
         done = true;
     }
@@ -435,18 +401,6 @@ stats::NamedStats PolyACalculator::sample_stats() const {
     stats["average_tail_length"] =
             num_called.load() > 0 ? total_tail_lengths_called.load() / num_called.load() : 0;
     return stats;
-}
-
-PolyACalculator::ModelType PolyACalculator::get_model_type(const std::string& model_name) {
-    if (model_name.find("rna004") != std::string::npos) {
-        return PolyACalculator::ModelType::RNA004;
-    } else if (model_name.find("rna002") != std::string::npos) {
-        return PolyACalculator::ModelType::RNA002;
-    } else if (model_name.find("dna") != std::string::npos) {
-        return PolyACalculator::ModelType::DNA;
-    } else {
-        throw std::runtime_error("Could not determine model type for " + model_name);
-    }
 }
 
 }  // namespace dorado
