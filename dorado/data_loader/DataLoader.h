@@ -58,6 +58,12 @@ public:
     std::string get_name() const { return "Dataloader"; }
     stats::NamedStats sample_stats() const;
 
+    struct ReadSortInfo {
+        std::string read_id;
+        int32_t mux;
+        uint32_t read_number;
+    };
+
 private:
     void load_fast5_reads_from_file(const std::string& path);
     void load_pod5_reads_from_file(const std::string& path);
@@ -73,6 +79,8 @@ private:
     std::unordered_set<std::string> m_ignored_read_ids;
 
     std::unordered_map<std::string, channel_to_read_id_t> m_file_channel_read_order_map;
+    std::unordered_map<int, std::vector<ReadSortInfo>> m_reads_by_channel;
+    std::unordered_map<std::string, size_t> m_read_id_to_index;
     int m_max_channel{0};
 };
 
