@@ -1,5 +1,6 @@
 #include "PolyACalculator.h"
 
+#include "utils/math_utils.h"
 #include "utils/sequence_utils.h"
 
 #include <edlib.h>
@@ -121,8 +122,8 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
                          return false;
                      }
                      // Only keep intervals that are close-ish to the signal anchor.
-                     return (fwd ? std::abs(signal_anchor - i.second) < interval_size
-                                 : std::abs(signal_anchor - i.first) < interval_size) ||
+                     return (std::abs(signal_anchor - i.second) < interval_size ||
+                             std::abs(signal_anchor - i.first) < interval_size) ||
                             (i.first <= signal_anchor) && (signal_anchor <= i.second);
                  });
 
@@ -165,21 +166,18 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
 // to get a measure of samples/base. For DNA, just taking the average across
 // the whole read gives a decent estimate.
 int estimate_samples_per_base(const dorado::SimplexRead& read, bool is_rna) {
-    size_t num_bases = read.read_common.seq.length();
-    if (is_rna && num_bases > 250) {
-        const auto stride = read.read_common.model_stride;
-        const auto seq_to_sig_map =
-                dorado::utils::moves_to_map(read.read_common.moves, stride,
-                                            read.read_common.get_raw_data_samples(), num_bases + 1);
-        // Use last 100bp to estimate samples / base.
-        size_t signal_len = seq_to_sig_map[num_bases] - seq_to_sig_map[num_bases - 100];
-        return std::floor(static_cast<float>(signal_len) / 100);
+    const size_t num_bases = read.read_common.seq.length();
+    const auto num_samples = read.read_common.get_raw_data_samples();
+    const auto stride = read.read_common.model_stride;
+    const auto seq_to_sig_map =
+            dorado::utils::moves_to_map(read.read_common.moves, stride, num_samples, num_bases + 1);
+    // Use last 100bp to estimate samples / base.
+    std::vector<float> sizes;
+    for (int i = 1; i < seq_to_sig_map.size(); i++) {
+        sizes.push_back(static_cast<float>(seq_to_sig_map[i] - seq_to_sig_map[i - 1]));
     }
-    float num_samples_per_base =
-            static_cast<float>(read.read_common.get_raw_data_samples()) / num_bases;
-    // The estimate is not rounded because this calculation generally overestimates
-    // the samples per base. Rounding down gives better results than rounding to nearest.
-    return std::floor(num_samples_per_base);
+    auto quantiles = dorado::utils::quantiles(sizes, {0.5});
+    return std::floor(static_cast<float>(quantiles[0]));
 }
 
 // In order to find the approximate location of the start/end (anchor) of the polyA
