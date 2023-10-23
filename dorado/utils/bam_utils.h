@@ -10,6 +10,8 @@ struct sam_hdr_t;
 
 namespace dorado::utils {
 
+class SampleSheet;
+
 using sq_t = std::vector<std::pair<char*, uint32_t>>;
 
 struct AlignmentOps {
@@ -23,7 +25,8 @@ struct AlignmentOps {
 
 void add_rg_hdr(sam_hdr_t* hdr,
                 const std::unordered_map<std::string, ReadGroup>& read_groups,
-                const std::vector<std::string>& barcode_kits);
+                const std::vector<std::string>& barcode_kits,
+                const std::shared_ptr<utils::SampleSheet>& sample_sheet);
 
 void add_sq_hdr(sam_hdr_t* hdr, const sq_t& seqs);
 

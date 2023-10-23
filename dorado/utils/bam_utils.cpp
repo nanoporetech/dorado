@@ -1,5 +1,6 @@
 #include "bam_utils.h"
 
+#include "SampleSheet.h"
 #include "barcode_kits.h"
 #include "sequence_utils.h"
 
@@ -17,7 +18,8 @@ namespace dorado::utils {
 
 void add_rg_hdr(sam_hdr_t* hdr,
                 const std::unordered_map<std::string, ReadGroup>& read_groups,
-                const std::vector<std::string>& barcode_kits) {
+                const std::vector<std::string>& barcode_kits,
+                const std::shared_ptr<utils::SampleSheet>& sample_sheet) {
     const auto& barcode_kit_infos = barcode_kits::get_kit_infos();
     const auto& barcode_sequences = barcode_kits::get_barcodes();
 
@@ -66,8 +68,22 @@ void add_rg_hdr(sam_hdr_t* hdr,
         for (const auto& barcode_name : kit_info.barcodes) {
             const auto additional_tags = "\tBC:" + barcode_sequences.at(barcode_name);
             for (const auto& read_group : read_groups) {
-                auto id = read_group.first + '_' +
-                          barcode_kits::generate_standard_barcode_name(kit_name, barcode_name);
+                std::string alias;
+                auto barcode = barcode_name;
+                auto id = read_group.first + '_';
+                if (sample_sheet) {
+                    if (!sample_sheet->barcode_is_permitted(barcode_name)) {
+                        continue;
+                    }
+                    alias = sample_sheet->get_alias(read_group.second.flowcell_id,
+                                                    read_group.second.position_id,
+                                                    read_group.second.run_id, barcode);
+                }
+                if (!alias.empty()) {
+                    id += kit_name + "_" + alias;
+                } else {
+                    id += barcode_kits::generate_standard_barcode_name(kit_name, barcode);
+                }
                 const std::string read_group_tags = to_string(read_group.second);
                 emit_read_group(read_group_tags, id, additional_tags);
             }

@@ -123,9 +123,14 @@ void setup(std::vector<std::string> args,
             num_devices, !remora_runners.empty() ? num_remora_threads : 0, enable_aligner,
             !barcode_kits.empty());
 
+    std::shared_ptr<utils::SampleSheet> sample_sheet;
+    if (!barcode_sample_sheet.empty()) {
+        sample_sheet = std::make_shared<utils::SampleSheet>(barcode_sample_sheet);
+    }
+
     SamHdrPtr hdr(sam_hdr_init());
     cli::add_pg_hdr(hdr.get(), args);
-    utils::add_rg_hdr(hdr.get(), read_groups, barcode_kits);
+    utils::add_rg_hdr(hdr.get(), read_groups, barcode_kits, sample_sheet);
 
     PipelineDescriptor pipeline_desc;
     auto hts_writer = pipeline_desc.add_node<HtsWriter>(
