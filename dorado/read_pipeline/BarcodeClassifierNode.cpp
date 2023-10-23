@@ -1,6 +1,7 @@
 #include "BarcodeClassifierNode.h"
 
 #include "demux/BarcodeClassifier.h"
+#include "utils/SampleSheet.h"
 #include "utils/bam_utils.h"
 #include "utils/barcode_kits.h"
 #include "utils/trim.h"
@@ -281,7 +282,17 @@ void BarcodeClassifierNode::barcode(SimplexRead& read) {
     // get the sequence to map from the record
     auto bc_res = barcoder->barcode(read.read_common.seq, barcoding_info->barcode_both_ends,
                                     barcoding_info->sample_sheet);
-    read.read_common.barcode = generate_barcode_string(bc_res);
+    std::string alias{};
+    if (barcoding_info->sample_sheet) {
+        alias = barcoding_info->sample_sheet->get_alias(
+                read.read_common.flowcell_id, read.read_common.position_id, read.read_common.run_id,
+                bc_res.adapter_name);
+    }
+    if (!alias.empty()) {
+        read.read_common.barcode = bc_res.kit + "_" + alias;
+    } else {
+        read.read_common.barcode = generate_barcode_string(bc_res);
+    }
     m_num_records++;
     if (barcoding_info->trim) {
         trim_barcode(read, bc_res);
