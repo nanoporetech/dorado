@@ -44,7 +44,7 @@ variables:
 
 .linux_runner: &linux_runner
   tags:
-    - linux
+    - ubuntu-20.04
     - nvidia-docker
 
 .linux_arm64_runner: &linux_arm64_runner
