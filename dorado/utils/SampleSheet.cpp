@@ -147,6 +147,28 @@ void SampleSheet::load(std::istream& file_stream, const std::string& filename) {
                 std::string("Unable to infer barcode aliases from sample sheet file: " + filename +
                             " does not contain a unique mapping of barcode ids."));
     }
+
+    m_allowed_barcodes = [this]() -> FilterSet {
+        std::unordered_set<std::string> barcodes;
+        switch (m_type) {
+        case Type::barcode: {
+            // Grab the barcode idx once so that we're not doing it repeatedly
+            const auto barcode_idx = m_col_indices.at("barcode");
+
+            // Grab the barcodes
+            for (const auto& row : m_rows) {
+                barcodes.emplace(row[barcode_idx]);
+            }
+            break;
+        }
+        case Type::none:
+            [[fallthrough]];
+        default:
+            return std::nullopt;
+        }
+
+        return barcodes;
+    }();
 }
 
 // check if we can generate a unique alias without the flowcell/position information
@@ -202,27 +224,15 @@ std::string SampleSheet::get_alias(const std::string& flow_cell_id,
     return "";
 }
 
-BarcodingInfo::FilterSet SampleSheet::get_barcode_values() const {
-    std::unordered_set<std::string> barcodes;
+SampleSheet::FilterSet SampleSheet::get_barcode_values() const { return m_allowed_barcodes; }
 
-    switch (m_type) {
-    case Type::barcode: {
-        // Grab the barcode idx once so that we're not doing it repeatedly
-        const auto barcode_idx = m_col_indices.at("barcode");
-
-        // Grab the barcodes
-        for (const auto& row : m_rows) {
-            barcodes.emplace(row[barcode_idx]);
-        }
-        break;
-    }
-    case Type::none:
-        [[fallthrough]];
-    default:
-        return std::nullopt;
+bool SampleSheet::barcode_is_permitted(const std::string& adapter_name) const {
+    if (!m_allowed_barcodes.has_value()) {
+        return true;
     }
 
-    return barcodes;
+    auto normalized_barcode_name = barcode_kits::normalize_barcode_name(adapter_name);
+    return m_allowed_barcodes->count(normalized_barcode_name) != 0;
 }
 
 void SampleSheet::validate_headers(const std::vector<std::string>& col_names,

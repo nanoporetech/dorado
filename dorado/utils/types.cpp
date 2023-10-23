@@ -9,12 +9,13 @@ std::shared_ptr<const BarcodingInfo> create_barcoding_info(
         const std::vector<std::string>& kit_names,
         bool barcode_both_ends,
         bool trim_barcode,
-        const BarcodingInfo::FilterSet& allowed_barcodes) {
+        std::shared_ptr<utils::SampleSheet> sample_sheet) {
     if (kit_names.empty()) {
         return {};
     }
 
-    auto result = BarcodingInfo{kit_names[0], barcode_both_ends, trim_barcode, allowed_barcodes};
+    auto result =
+            BarcodingInfo{kit_names[0], barcode_both_ends, trim_barcode, std::move(sample_sheet)};
     return std::make_shared<const dorado::BarcodingInfo>(std::move(result));
 }
 

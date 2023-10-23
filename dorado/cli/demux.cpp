@@ -143,11 +143,14 @@ int demuxer(int argc, char* argv[]) {
         if (auto names = parser.present<std::vector<std::string>>("--kit-name")) {
             kit_names = std::move(*names);
         }
-        utils::SampleSheet sample_sheet(parser.get<std::string>("--sample-sheet"));
-        BarcodingInfo::FilterSet allowed_barcodes = sample_sheet.get_barcode_values();
+        auto barcode_sample_sheet = parser.get<std::string>("--sample-sheet");
+        std::shared_ptr<utils::SampleSheet> sample_sheet;
+        if (!barcode_sample_sheet.empty()) {
+            sample_sheet = std::make_shared<utils::SampleSheet>(barcode_sample_sheet);
+        }
         auto demux = pipeline_desc.add_node<BarcodeClassifierNode>(
                 {demux_writer}, demux_threads, kit_names, parser.get<bool>("--barcode-both-ends"),
-                parser.get<bool>("--no-trim"), allowed_barcodes);
+                parser.get<bool>("--no-trim"), sample_sheet);
     }
 
     // Create the Pipeline from our description.

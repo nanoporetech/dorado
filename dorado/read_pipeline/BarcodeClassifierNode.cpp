@@ -40,11 +40,13 @@ BarcodeClassifierNode::BarcodeClassifierNode(int threads,
                                              const std::vector<std::string>& kit_names,
                                              bool barcode_both_ends,
                                              bool no_trim,
-                                             const BarcodingInfo::FilterSet& allowed_barcodes)
+                                             std::shared_ptr<utils::SampleSheet> sample_sheet)
         : MessageSink(10000),
           m_threads(threads),
-          m_default_barcoding_info(
-                  create_barcoding_info(kit_names, barcode_both_ends, !no_trim, allowed_barcodes)) {
+          m_default_barcoding_info(create_barcoding_info(kit_names,
+                                                         barcode_both_ends,
+                                                         !no_trim,
+                                                         std::move(sample_sheet))) {
     start_threads();
 }
 
@@ -259,7 +261,7 @@ void BarcodeClassifierNode::barcode(BamPtr& read) {
     std::string seq = utils::extract_sequence(irecord, seqlen);
 
     auto bc_res = barcoder->barcode(seq, m_default_barcoding_info->barcode_both_ends,
-                                    m_default_barcoding_info->allowed_barcodes);
+                                    m_default_barcoding_info->sample_sheet);
     auto bc = generate_barcode_string(bc_res);
     bam_aux_append(irecord, "BC", 'Z', bc.length() + 1, (uint8_t*)bc.c_str());
     m_num_records++;
@@ -278,7 +280,7 @@ void BarcodeClassifierNode::barcode(SimplexRead& read) {
 
     // get the sequence to map from the record
     auto bc_res = barcoder->barcode(read.read_common.seq, barcoding_info->barcode_both_ends,
-                                    barcoding_info->allowed_barcodes);
+                                    barcoding_info->sample_sheet);
     read.read_common.barcode = generate_barcode_string(bc_res);
     m_num_records++;
     if (barcoding_info->trim) {
