@@ -36,6 +36,7 @@ struct ReadGroup {
     std::string device_id;
     std::string exp_start_time;
     std::string sample_id;
+    std::string position_id;
 };
 
 struct BamDestructor {

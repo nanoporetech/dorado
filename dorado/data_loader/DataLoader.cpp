@@ -418,6 +418,7 @@ std::unordered_map<std::string, ReadGroup> DataLoader::load_read_groups(
                         std::string device_id = run_info_data->system_name;
                         std::string run_id = run_info_data->acquisition_id;
                         std::string sample_id = run_info_data->sample_id;
+                        std::string position_id = run_info_data->sequencer_position;
 
                         if (pod5_free_run_info(run_info_data) != POD5_OK) {
                             spdlog::error("Failed to free run info");
@@ -430,7 +431,8 @@ std::unordered_map<std::string, ReadGroup> DataLoader::load_read_groups(
                                 flowcell_id,
                                 device_id,
                                 utils::get_string_timestamp_from_unix_time(exp_start_time_ms),
-                                sample_id};
+                                sample_id,
+                                position_id};
                     }
                     if (pod5_close_and_free_reader(file) != POD5_OK) {
                         spdlog::error("Failed to close and free POD5 reader");
