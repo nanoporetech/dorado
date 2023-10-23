@@ -62,7 +62,7 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
 
     auto scaler_node =
             pipeline_desc.add_node<ScalerNode>({basecaller_node}, model_config.signal_norm_params,
-                                               get_model_type(model_config), scaler_node_threads);
+                                               model_config.sample_type, scaler_node_threads);
 
     // if we've been provided a source node, connect it to the start of our pipeline
     if (source_node_handle != PipelineDescriptor::InvalidNodeHandle) {
@@ -130,7 +130,7 @@ void create_stereo_duplex_pipeline(PipelineDescriptor& pipeline_desc,
 
     auto scaler_node =
             pipeline_desc.add_node<ScalerNode>({basecaller_node}, model_config.signal_norm_params,
-                                               ModelType::DNA, scaler_node_threads);
+                                               SampleType::DNA, scaler_node_threads);
 
     // if we've been provided a source node, connect it to the start of our pipeline
     if (source_node_handle != PipelineDescriptor::InvalidNodeHandle) {

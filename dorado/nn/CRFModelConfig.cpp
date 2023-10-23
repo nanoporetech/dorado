@@ -9,6 +9,18 @@
 
 namespace dorado {
 
+SampleType get_model_type(const std::string &model_name) {
+    if (model_name.find("rna004") != std::string::npos) {
+        return SampleType::RNA004;
+    } else if (model_name.find("rna002") != std::string::npos) {
+        return SampleType::RNA002;
+    } else if (model_name.find("dna") != std::string::npos) {
+        return SampleType::DNA;
+    } else {
+        throw std::runtime_error("Could not determine model type for " + model_name);
+    }
+}
+
 CRFModelConfig load_crf_model_config(const std::filesystem::path &path) {
     const auto config_toml = toml::parse(path / "config.toml");
 
@@ -96,6 +108,8 @@ CRFModelConfig load_crf_model_config(const std::filesystem::path &path) {
         config.signal_norm_params.quantile_scaling = false;
     }
 
+    config.sample_type = get_model_type(model_name);
+
     return config;
 }
 
@@ -124,23 +138,8 @@ int32_t get_model_mean_qscore_start_pos(const CRFModelConfig &model_config) {
 }
 
 bool is_rna_model(const CRFModelConfig &model_config) {
-    auto path = std::filesystem::canonical(model_config.model_path);
-    auto filename = path.filename();
-    return filename.u8string().rfind("rna", 0) == 0;
-}
-
-ModelType get_model_type(const CRFModelConfig &model_config) {
-    auto path = std::filesystem::canonical(model_config.model_path);
-    auto model_name = path.filename().string();
-    if (model_name.find("rna004") != std::string::npos) {
-        return ModelType::RNA004;
-    } else if (model_name.find("rna002") != std::string::npos) {
-        return ModelType::RNA002;
-    } else if (model_name.find("dna") != std::string::npos) {
-        return ModelType::DNA;
-    } else {
-        throw std::runtime_error("Could not determine model type for " + model_name);
-    }
+    return (model_config.sample_type == SampleType::RNA002 ||
+            model_config.sample_type == SampleType::RNA004);
 }
 
 }  // namespace dorado

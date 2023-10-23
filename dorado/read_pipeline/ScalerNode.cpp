@@ -42,13 +42,13 @@ std::pair<float, float> ScalerNode::med_mad(const torch::Tensor& x) {
 // at the median signal value of a sliding window over the raw signal.
 // RNA002 and RNA004 have different offsets and thresholds for the
 // sliding window heuristic.
-int determine_rna_adapter_pos(const dorado::SimplexRead& read, dorado::ModelType model_type) {
-    static const std::unordered_map<dorado::ModelType, int> kOffsetMap = {
-            {dorado::ModelType::RNA002, 5000}, {dorado::ModelType::RNA004, 1000}};
-    static const std::unordered_map<dorado::ModelType, int> kMaxSignalPosMap = {
-            {dorado::ModelType::RNA002, 15000}, {dorado::ModelType::RNA004, 5000}};
-    static const std::unordered_map<dorado::ModelType, int16_t> kAdapterCutoff = {
-            {dorado::ModelType::RNA002, 550}, {dorado::ModelType::RNA004, 825}};
+int determine_rna_adapter_pos(const dorado::SimplexRead& read, dorado::SampleType model_type) {
+    static const std::unordered_map<dorado::SampleType, int> kOffsetMap = {
+            {dorado::SampleType::RNA002, 5000}, {dorado::SampleType::RNA004, 1000}};
+    static const std::unordered_map<dorado::SampleType, int> kMaxSignalPosMap = {
+            {dorado::SampleType::RNA002, 15000}, {dorado::SampleType::RNA004, 5000}};
+    static const std::unordered_map<dorado::SampleType, int16_t> kAdapterCutoff = {
+            {dorado::SampleType::RNA002, 550}, {dorado::SampleType::RNA004, 825}};
 
     const int kWindowSize = 250;
     const int kStride = 50;
@@ -135,13 +135,13 @@ void ScalerNode::worker_thread() {
 }
 
 ScalerNode::ScalerNode(const SignalNormalisationParams& config,
-                       ModelType model_type,
+                       SampleType model_type,
                        int num_worker_threads,
                        size_t max_reads)
         : MessageSink(max_reads),
           m_scaling_params(config),
           m_num_worker_threads(num_worker_threads),
-          m_is_rna(model_type == ModelType::RNA002 || model_type == ModelType::RNA004),
+          m_is_rna(model_type == SampleType::RNA002 || model_type == SampleType::RNA004),
           m_model_type(model_type) {
     start_threads();
 }

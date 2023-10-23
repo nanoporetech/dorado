@@ -163,8 +163,8 @@ TempDir download_model(const std::string& model) {
 
 DEFINE_TEST(NodeSmokeTestRead, "ScalerNode") {
     auto pipeline_restart = GENERATE(false, true);
-    auto model_type =
-            GENERATE(dorado::ModelType::DNA, dorado::ModelType::RNA002, dorado::ModelType::RNA004);
+    auto model_type = GENERATE(dorado::SampleType::DNA, dorado::SampleType::RNA002,
+                               dorado::SampleType::RNA004);
     CAPTURE(pipeline_restart);
     CAPTURE(model_type);
 
@@ -371,7 +371,7 @@ TEST_CASE("BarcodeClassifierNode: test simple pipeline with fastq and sam files"
 
 DEFINE_TEST(NodeSmokeTestRead, "PolyACalculator") {
     auto pipeline_restart = GENERATE(false, true);
-    auto is_rna = GENERATE(dorado::ModelType::DNA, dorado::ModelType::RNA004);
+    auto is_rna = GENERATE(false, true);
     CAPTURE(pipeline_restart);
     CAPTURE(is_rna);
 

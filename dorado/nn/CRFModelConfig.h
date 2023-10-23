@@ -15,6 +15,12 @@ struct SignalNormalisationParams {
     bool quantile_scaling = true;
 };
 
+enum SampleType {
+    DNA,
+    RNA002,
+    RNA004,
+};
+
 // Values extracted from config.toml used in construction of the model module.
 struct CRFModelConfig {
     float qscale = 1.0f;
@@ -42,12 +48,8 @@ struct CRFModelConfig {
     // Start position for mean Q-score calculation for
     // short reads.
     int32_t mean_qscore_start_pos = -1;
-};
 
-enum ModelType {
-    DNA,
-    RNA002,
-    RNA004,
+    SampleType sample_type;
 };
 
 CRFModelConfig load_crf_model_config(const std::filesystem::path& path);
@@ -62,7 +64,5 @@ inline bool sample_rates_compatible(uint16_t data_sample_rate, uint16_t model_sa
 int32_t get_model_mean_qscore_start_pos(const CRFModelConfig& model_config);
 
 bool is_rna_model(const CRFModelConfig& model_config);
-
-ModelType get_model_type(const CRFModelConfig& model_config);
 
 }  // namespace dorado
