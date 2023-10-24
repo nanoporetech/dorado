@@ -25,8 +25,7 @@ public:
     // If skip_index_matching is true the lookup by flowcell/experiment id will be skipped when fetching an alias.
     // In this case, the constructor will throw if the sample sheet contains entries for more that one flow_cell_id,
     // position_id or experiment_id, or if any barcode is re-used.
-    explicit SampleSheet(const std::string& filename = std::string(),
-                         bool skip_index_matching = false);
+    explicit SampleSheet(const std::string& filename, bool skip_index_matching);
 
     // load a sample sheet from a file. Throws a std::runtime_error for any failure condition.
     void load(const std::string& filename);

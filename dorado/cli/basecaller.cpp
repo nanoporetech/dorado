@@ -125,7 +125,7 @@ void setup(std::vector<std::string> args,
 
     std::shared_ptr<utils::SampleSheet> sample_sheet;
     if (!barcode_sample_sheet.empty()) {
-        sample_sheet = std::make_shared<utils::SampleSheet>(barcode_sample_sheet);
+        sample_sheet = std::make_shared<utils::SampleSheet>(barcode_sample_sheet, false);
     }
 
     SamHdrPtr hdr(sam_hdr_init());

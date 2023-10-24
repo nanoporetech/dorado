@@ -146,7 +146,7 @@ int demuxer(int argc, char* argv[]) {
         auto barcode_sample_sheet = parser.get<std::string>("--sample-sheet");
         std::shared_ptr<utils::SampleSheet> sample_sheet;
         if (!barcode_sample_sheet.empty()) {
-            sample_sheet = std::make_shared<utils::SampleSheet>(barcode_sample_sheet);
+            sample_sheet = std::make_shared<utils::SampleSheet>(barcode_sample_sheet, true);
         }
         auto demux = pipeline_desc.add_node<BarcodeClassifierNode>(
                 {demux_writer}, demux_threads, kit_names, parser.get<bool>("--barcode-both-ends"),
