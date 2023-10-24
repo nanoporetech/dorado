@@ -63,7 +63,8 @@ int determine_rna_adapter_pos(const dorado::SimplexRead& read, dorado::SampleTyp
     int16_t last_median = 0;
     std::array<int16_t, 5> medians = {0, 0, 0};
     int array_pos = 0;
-    for (int i = kOffset; i < std::max(signal_len / 2, kMaxSignalPos); i += kStride) {
+    for (int i = kOffset; i < std::min(std::max(signal_len / 2, kMaxSignalPos), signal_len);
+         i += kStride) {
         auto slice = sig_fp32.slice(0, i, std::min(signal_len, i + kWindowSize));
         int16_t median = slice.median().item<int16_t>();
         medians[array_pos++ % medians.size()] = median;
@@ -99,6 +100,8 @@ void ScalerNode::worker_thread() {
         int trim_start = 0;
         if (m_is_rna) {
             trim_start = determine_rna_adapter_pos(*read, m_model_type);
+            spdlog::debug("{} samples {} trim start {}", read->read_common.read_id,
+                          read->read_common.get_raw_data_samples(), trim_start);
             read->read_common.raw_data =
                     read->read_common.raw_data.index({Slice(trim_start, torch::indexing::None)});
         }
