@@ -150,7 +150,7 @@ int demuxer(int argc, char* argv[]) {
         }
         auto demux = pipeline_desc.add_node<BarcodeClassifierNode>(
                 {demux_writer}, demux_threads, kit_names, parser.get<bool>("--barcode-both-ends"),
-                parser.get<bool>("--no-trim"), sample_sheet);
+                parser.get<bool>("--no-trim"), std::move(sample_sheet));
     }
 
     // Create the Pipeline from our description.
