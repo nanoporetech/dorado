@@ -130,6 +130,10 @@ public:
     // This is atomic because multiple threads can write to it at the same time.
     // For example, if a read (call it 2) is in the cache, and is selected as a potential pair match by two incoming reads (1 and 3) on two other threads, these threads can both update `is_duplex_parent` at the same time.
     std::atomic_bool is_duplex_parent{false};
+
+    // Track the previous/next read fom the same channel/mux.
+    std::string prev_read;
+    std::string next_read;
 };
 
 using SimplexReadPtr = std::unique_ptr<SimplexRead>;

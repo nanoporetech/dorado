@@ -34,6 +34,12 @@ PairingNode::PairingResult PairingNode::is_within_time_and_length_criteria(
         const dorado::SimplexRead& temp,
         const dorado::SimplexRead& comp,
         int tid) {
+    // A duplex pair can only occur for adjacent reads. Which means
+    // that for the complement, the template read must be its predecessor.
+    if (temp.read_common.read_id != comp.prev_read && temp.next_read != comp.read_common.read_id) {
+        return {false, 0, 0, 0, 0};
+    }
+
     int delta = comp.read_common.start_time_ms - temp.get_end_time_ms();
     int seq_len1 = temp.read_common.seq.length();
     int seq_len2 = comp.read_common.seq.length();

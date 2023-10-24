@@ -103,11 +103,16 @@ std::string get_string_attribute(const HighFive::Group& group, const std::string
 
 namespace dorado {
 
-SimplexReadPtr process_pod5_read(size_t row,
-                                 Pod5ReadRecordBatch* batch,
-                                 Pod5FileReader* file,
-                                 const std::string path,
-                                 std::string device) {
+// TODO: Replace the const * to read_by_channel and read_id_to_index
+// with const &. Initial attempt led to a big performance drop
+// when doing so. This needs further investigation.
+SimplexReadPtr process_pod5_read(
+        size_t row,
+        Pod5ReadRecordBatch* batch,
+        Pod5FileReader* file,
+        const std::string& path,
+        const std::unordered_map<int, std::vector<DataLoader::ReadSortInfo>>* reads_by_channel,
+        const std::unordered_map<std::string, size_t>* read_id_to_index) {
     uint16_t read_table_version = 0;
     ReadBatchRowInfo_t read_data;
     if (pod5_get_read_batch_row_info_data(batch, row, READ_BATCH_ROW_INFO_VERSION, &read_data,
@@ -164,6 +169,22 @@ SimplexReadPtr process_pod5_read(size_t row,
     new_read->read_common.experiment_id = run_info_data->experiment_name;
     new_read->read_common.is_duplex = false;
 
+    // Determine the time sorted predecessor of the read
+    // if that information is available (primarily used for offline
+    // duplex runs).
+    if (reads_by_channel->find(read_data.channel) != reads_by_channel->end()) {
+        auto& read_id = new_read->read_common.read_id;
+        const auto& v = reads_by_channel->at(read_data.channel);
+        auto read_id_iter = v.begin() + read_id_to_index->at(read_id);
+
+        if (read_id_iter != v.begin()) {
+            new_read->prev_read = std::prev(read_id_iter)->read_id;
+        }
+        if (std::next(read_id_iter) != v.end()) {
+            new_read->next_read = std::next(read_id_iter)->read_id;
+        }
+    }
+
     if (pod5_free_run_info(run_info_data) != POD5_OK) {
         spdlog::error("Failed to free run info");
     }
@@ -218,6 +239,26 @@ void DataLoader::load_reads(const std::string& path,
             // 3. for each channel, iterate through all files and in each iteration
             // only load the reads that correspond to that channel.
             for (int channel = 0; channel <= m_max_channel; channel++) {
+                if (m_reads_by_channel.find(channel) != m_reads_by_channel.end()) {
+                    // Sort the read ids within a channel by its mux
+                    // and start time.
+                    spdlog::debug("Sort channel {}", channel);
+                    auto& reads = m_reads_by_channel.at(channel);
+                    std::sort(reads.begin(), reads.end(), [](ReadSortInfo& a, ReadSortInfo& b) {
+                        if (a.mux != b.mux) {
+                            return a.mux < b.mux;
+                        } else {
+                            return a.read_number < b.read_number;
+                        }
+                    });
+                    // Once sorted, create a hash table from read id
+                    // to index in the sorted list to quickly fetch the
+                    // read location and its neighbors.
+                    for (size_t i = 0; i < reads.size(); i++) {
+                        m_read_id_to_index[reads[i].read_id] = i;
+                    }
+                    spdlog::debug("Sorted channel {}", channel);
+                }
                 for (const auto& entry : iterator) {
                     if (m_loaded_read_count == m_max_reads) {
                         break;
@@ -239,6 +280,8 @@ void DataLoader::load_reads(const std::string& path,
                         }
                     }
                 }
+                // Erase sorted list as it's not needed anymore.
+                m_reads_by_channel.erase(channel);
             }
             break;
         case ReadOrder::UNRESTRICTED:
@@ -380,6 +423,12 @@ void DataLoader::load_read_channels(std::string data_path, bool recursive_file_l
                     ReadID read_id;
                     std::memcpy(read_id.data(), read_data.read_id, POD5_READ_ID_SIZE);
                     channel_to_read_id[channel].push_back(std::move(read_id));
+
+                    char read_id_tmp[POD5_READ_ID_LEN];
+                    pod5_error_t err = pod5_format_read_id(read_data.read_id, read_id_tmp);
+                    std::string rid(read_id_tmp);
+                    m_reads_by_channel[channel].push_back(
+                            {rid, read_data.well, read_data.read_number});
                 }
 
                 if (pod5_free_read_batch(batch) != POD5_OK) {
@@ -621,7 +670,8 @@ void DataLoader::load_pod5_reads_from_file_by_read_ids(const std::string& path,
             uint32_t row = traversal_batch_rows[row_idx + row_offset];
 
             if (can_process_pod5_row(batch, row, m_allowed_read_ids, m_ignored_read_ids)) {
-                futures.push_back(pool.push(process_pod5_read, row, batch, file, path, m_device));
+                futures.push_back(pool.push(process_pod5_read, row, batch, file, path,
+                                            &m_reads_by_channel, &m_read_id_to_index));
             }
         }
 
@@ -680,7 +730,8 @@ void DataLoader::load_pod5_reads_from_file(const std::string& path) {
             // TODO - check the read ID here, for each one, only send the row if it is in the list of ones we care about
 
             if (can_process_pod5_row(batch, row, m_allowed_read_ids, m_ignored_read_ids)) {
-                futures.push_back(pool.push(process_pod5_read, row, batch, file, path, m_device));
+                futures.push_back(pool.push(process_pod5_read, row, batch, file, path,
+                                            &m_reads_by_channel, &m_read_id_to_index));
             }
         }
 

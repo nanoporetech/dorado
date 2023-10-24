@@ -148,7 +148,7 @@ void setup(std::vector<std::string> args,
     if (estimate_poly_a) {
         current_sink_node = pipeline_desc.add_node<PolyACalculator>(
                 {current_sink_node}, std::thread::hardware_concurrency(),
-                is_rna_model(model_config));
+                PolyACalculator::get_model_type(model_name));
     }
     if (!barcode_kits.empty()) {
         std::shared_ptr<utils::SampleSheet> sample_sheet;
