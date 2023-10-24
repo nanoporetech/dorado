@@ -21,6 +21,8 @@ public:
         POSITION_ID,
     };
 
+    SampleSheet();
+
     // Calls load on the passed filename, if it is not empty.
     // If skip_index_matching is true the lookup by flowcell/experiment id will be skipped when fetching an alias.
     // In this case, the constructor will throw if the sample sheet contains entries for more that one flow_cell_id,

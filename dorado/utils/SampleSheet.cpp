@@ -82,6 +82,8 @@ bool get_line(std::istream& input,
 
 namespace dorado::utils {
 
+SampleSheet::SampleSheet() : m_skip_index_matching(false) {}
+
 SampleSheet::SampleSheet(const std::string& filename, bool skip_index_matching)
         : m_filename(filename), m_skip_index_matching(skip_index_matching) {
     if (!filename.empty()) {
