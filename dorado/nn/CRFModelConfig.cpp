@@ -138,8 +138,9 @@ int32_t get_model_mean_qscore_start_pos(const CRFModelConfig &model_config) {
 }
 
 bool is_rna_model(const CRFModelConfig &model_config) {
-    return (model_config.sample_type == SampleType::RNA002 ||
-            model_config.sample_type == SampleType::RNA004);
+    auto path = std::filesystem::canonical(model_config.model_path);
+    auto filename = path.filename();
+    return filename.u8string().rfind("rna", 0) == 0;
 }
 
 }  // namespace dorado
