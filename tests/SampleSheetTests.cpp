@@ -29,9 +29,7 @@ TEST_CASE(CUT_TAG " load valid no-barcode sample sheet", CUT_TAG) {
 
     // Test that all the alias functions return empty strings
     std::string alias;
-    REQUIRE_NOTHROW(alias = sample_sheet.get_alias("PAO25751", "pos_id",
-                                                   "9bf5b3eb10d3b031970acc022aecad4ecc918865",
-                                                   "barcode10"));
+    REQUIRE_NOTHROW(alias = sample_sheet.get_alias("PAO25751", "pos_id", "", "barcode10"));
     CHECK(alias == "");
 }
 
@@ -43,33 +41,23 @@ TEST_CASE(CUT_TAG " load valid single barcode sample sheet", CUT_TAG) {
 
     // Test first entry loads correctly
     std::string alias;
-    REQUIRE_NOTHROW(alias = sample_sheet.get_alias("PAO25751", "",
-                                                   "9bf5b3eb10d3b031970acc022aecad4ecc918865",
-                                                   "barcode01"));
+    REQUIRE_NOTHROW(alias = sample_sheet.get_alias("PAO25751", "", "", "barcode01"));
     CHECK(alias == "patient_id_5");
 
     // Test last entry loads correctly
-    REQUIRE_NOTHROW(alias = sample_sheet.get_alias("PAO25751", "",
-                                                   "9bf5b3eb10d3b031970acc022aecad4ecc918865",
-                                                   "barcode08"));
+    REQUIRE_NOTHROW(alias = sample_sheet.get_alias("PAO25751", "", "", "barcode08"));
     CHECK(alias == "patient_id_4");
 
-    // TODO: is this what we want?
-    // Test that asking for position_id when it's not there stops you getting an alias
-    REQUIRE_NOTHROW(alias = sample_sheet.get_alias("PAO25751", "pos_id",
-                                                   "9bf5b3eb10d3b031970acc022aecad4ecc918865",
-                                                   "barcode01"));
-    CHECK(alias == "");
+    // Test that providing position_id when it's not in the sample sheet doesn't stop you getting an alias
+    REQUIRE_NOTHROW(alias = sample_sheet.get_alias("PAO25751", "pos_id", "", "barcode01"));
+    CHECK(alias == "patient_id_5");
 
     // Test that asking for neither position_id or flowcell_id stops you getting an alias
-    REQUIRE_NOTHROW(alias = sample_sheet.get_alias(
-                            "", "", "9bf5b3eb10d3b031970acc022aecad4ecc918865", "barcode01"));
+    REQUIRE_NOTHROW(alias = sample_sheet.get_alias("", "", "", "barcode01"));
     CHECK(alias == "");
 
     // Test non-existent entry
-    REQUIRE_NOTHROW(alias = sample_sheet.get_alias("PAO25751", "",
-                                                   "9bf5b3eb10d3b031970acc022aecad4ecc918865",
-                                                   "barcode10"));
+    REQUIRE_NOTHROW(alias = sample_sheet.get_alias("PAO25751", "", "", "barcode10"));
     CHECK(alias == "");
 }
 
@@ -108,7 +96,7 @@ TEST_CASE(CUT_TAG " load sample sheet cross platform (parameterised)", CUT_TAG) 
     CAPTURE(eol_chars);
     const std::string HEADER_LINE{"flow_cell_id,kit,sample_id,experiment_id,barcode,alias,type"};
     const std::string RECORD_LINE{
-            "PAO25751,SQK-RBK004,barcoding_run,9bf5b3eb10d3b031970acc022aecad4ecc918865,barcode01,"
+            "PAO25751,SQK-RBK004,barcoding_run,,barcode01,"
             "patient_id_5,test_"
             "sample"};
     dorado::utils::SampleSheet sample_sheet{};
@@ -119,9 +107,7 @@ TEST_CASE(CUT_TAG " load sample sheet cross platform (parameterised)", CUT_TAG) 
     REQUIRE(sample_sheet.get_type() == dorado::utils::SampleSheet::Type::barcode);
 
     std::string alias;
-    REQUIRE_NOTHROW(alias = sample_sheet.get_alias("PAO25751", "",
-                                                   "9bf5b3eb10d3b031970acc022aecad4ecc918865",
-                                                   "barcode01"));
+    REQUIRE_NOTHROW(alias = sample_sheet.get_alias("PAO25751", "", "", "barcode01"));
     CHECK(alias == "patient_id_5");
 }
 
