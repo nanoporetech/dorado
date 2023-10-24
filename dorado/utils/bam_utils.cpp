@@ -76,7 +76,7 @@ void add_rg_hdr(sam_hdr_t* hdr,
                     }
                     alias = sample_sheet->get_alias(read_group.second.flowcell_id,
                                                     read_group.second.position_id,
-                                                    read_group.second.run_id, barcode_name);
+                                                    read_group.second.experiment_id, barcode_name);
                 }
                 if (!alias.empty()) {
                     id += alias;
