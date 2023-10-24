@@ -61,18 +61,21 @@ int determine_rna_adapter_pos(const dorado::SimplexRead& read, dorado::SampleTyp
 
     int bp = 0;
     int signal_len = read.read_common.get_raw_data_samples();
-    auto sig_fp32 = read.read_common.raw_data.to(torch::kInt16);
+    const int16_t* signal = static_cast<int16_t*>(read.read_common.raw_data.data_ptr());
 
     // Check the median value change over 5 windows.
     std::array<int16_t, 5> medians = {0, 0, 0, 0, 0};
     int median_pos = 0;
     for (int i = kOffset; i < std::min(std::max(signal_len / 2, kMaxSignalPos), signal_len);
          i += kStride) {
-        auto slice = sig_fp32.slice(0, i, std::min(signal_len, i + kWindowSize));
+        auto slice = torch::from_blob(const_cast<int16_t*>(&signal[i]),
+                                      {static_cast<int>(std::min(kWindowSize, signal_len - i))},
+                                      torch::TensorOptions().dtype(torch::kInt16));
         int16_t median = slice.median().item<int16_t>();
         medians[median_pos++ % medians.size()] = median;
-        int16_t max_median = *std::max_element(medians.begin(), medians.end());
-        int16_t min_median = *std::min_element(medians.begin(), medians.end());
+        auto minmax = std::minmax_element(medians.begin(), medians.end());
+        int16_t min_median = *minmax.first;
+        int16_t max_median = *minmax.second;
         if (i > (kOffset + medians.size())) {
             if ((max_median > kMinMedianForRNASignal) && (max_median - min_median > kMedianDiff)) {
                 bp = i;
