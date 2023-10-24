@@ -52,6 +52,11 @@ bool is_alias_forbidden(const std::string& input) {
         return true;
     }
 
+    // Unclassified
+    if (input == "unclassified") {
+        return true;
+    }
+
     return false;
 }
 
