@@ -166,6 +166,7 @@ int demuxer(int argc, char* argv[]) {
     auto& demux_writer_ref =
             dynamic_cast<BarcodeDemuxerNode&>(pipeline->get_node_ref(demux_writer));
     demux_writer_ref.set_header(header);
+    sam_hdr_destroy(header);
 
     // Set up stats counting
     std::vector<dorado::stats::StatsCallable> stats_callables;
