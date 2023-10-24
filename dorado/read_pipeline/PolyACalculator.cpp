@@ -281,23 +281,6 @@ void PolyACalculator::worker_thread() {
         // If this message isn't a read, we'll get a bad_variant_access exception.
         auto read = std::get<SimplexReadPtr>(std::move(message));
 
-        // Save data
-        std::ofstream outputFile("moves.bin");
-
-        // Iterate through the vector and write its contents to the file
-        for (uint8_t element : read->read_common.moves) {
-            outputFile << element;
-        }
-
-        // Close the file
-        outputFile.close();
-
-        torch::save(read->read_common.raw_data, "signal.tensor");
-
-        std::ofstream seqFile("seq.txt");
-        seqFile << read->read_common.seq;
-        seqFile.close();
-
         // Determine the strand direction, approximate base space anchor for the tail, and whether
         // the final length needs to be adjusted depending on the adapter sequence.
         auto [fwd, signal_anchor, trailing_Ts] =

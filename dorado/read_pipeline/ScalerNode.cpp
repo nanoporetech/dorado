@@ -46,9 +46,9 @@ int determine_rna_adapter_pos(const dorado::SimplexRead& read, dorado::SampleTyp
     static const std::unordered_map<dorado::SampleType, int> kOffsetMap = {
             {dorado::SampleType::RNA002, 5000}, {dorado::SampleType::RNA004, 1000}};
     static const std::unordered_map<dorado::SampleType, int> kMaxSignalPosMap = {
-            {dorado::SampleType::RNA002, 15000}, {dorado::SampleType::RNA004, 5000}};
+            {dorado::SampleType::RNA002, 15000}, {dorado::SampleType::RNA004, 10000}};
     static const std::unordered_map<dorado::SampleType, int16_t> kAdapterCutoff = {
-            {dorado::SampleType::RNA002, 550}, {dorado::SampleType::RNA004, 825}};
+            {dorado::SampleType::RNA002, 600}, {dorado::SampleType::RNA004, 775}};
 
     const int kWindowSize = 250;
     const int kStride = 50;
@@ -61,10 +61,16 @@ int determine_rna_adapter_pos(const dorado::SimplexRead& read, dorado::SampleTyp
     int signal_len = read.read_common.get_raw_data_samples();
     auto sig_fp32 = read.read_common.raw_data.to(torch::kInt16);
     int16_t last_median = 0;
-    for (int i = kOffset; i < std::min(signal_len / 2, kMaxSignalPos); i += kStride) {
+    std::array<int16_t, 5> medians = {0, 0, 0};
+    int array_pos = 0;
+    for (int i = kOffset; i < std::max(signal_len / 2, kMaxSignalPos); i += kStride) {
         auto slice = sig_fp32.slice(0, i, std::min(signal_len, i + kWindowSize));
         int16_t median = slice.median().item<int16_t>();
-        if (i > kOffset && median > kMinMedianForRNASignal && (median - last_median > 75)) {
+        medians[array_pos++ % medians.size()] = median;
+        int16_t max = *std::max_element(medians.begin(), medians.end());
+        int16_t min = *std::min_element(medians.begin(), medians.end());
+        //spdlog::debug("pos {} max {} diff {}", i, max, (max - min));
+        if (i > (kOffset + medians.size()) && max > kMinMedianForRNASignal && (max - min > 100)) {
             bp = i;
             break;
         }
