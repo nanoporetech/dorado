@@ -151,10 +151,6 @@ void setup(std::vector<std::string> args,
                 PolyACalculator::get_model_type(model_name));
     }
     if (!barcode_kits.empty()) {
-        std::shared_ptr<utils::SampleSheet> sample_sheet;
-        if (!barcode_sample_sheet.empty()) {
-            sample_sheet = std::make_shared<utils::SampleSheet>(barcode_sample_sheet);
-        }
         current_sink_node = pipeline_desc.add_node<BarcodeClassifierNode>(
                 {current_sink_node}, thread_allocations.barcoder_threads, barcode_kits,
                 barcode_both_ends, barcode_no_trim, std::move(sample_sheet));
