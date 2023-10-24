@@ -89,7 +89,16 @@ void string_reader(HighFive::Attribute& attribute, std::string& target_str) {
     if (eol_pos < target_str.size()) {
         target_str.resize(eol_pos);
     }
-};
+}
+
+std::string get_string_attribute(const HighFive::Group& group, const std::string& attr_name) {
+    std::string attribute_string;
+    if (group.hasAttribute(attr_name)) {
+        HighFive::Attribute attribute = group.getAttribute(attr_name);
+        string_reader(attribute, attribute_string);
+    }
+    return attribute_string;
+}
 }  // namespace
 
 namespace dorado {
@@ -152,6 +161,7 @@ SimplexReadPtr process_pod5_read(size_t row,
     new_read->end_sample = read_data.start_sample + read_data.num_samples;
     new_read->read_common.flowcell_id = run_info_data->flow_cell_id;
     new_read->read_common.position_id = run_info_data->sequencer_position;
+    new_read->read_common.experiment_id = run_info_data->experiment_name;
     new_read->read_common.is_duplex = false;
 
     if (pod5_free_run_info(run_info_data) != POD5_OK) {
@@ -751,18 +761,11 @@ void DataLoader::load_fast5_reads_from_file(const std::string& path) {
         std::string fast5_filename = std::filesystem::path(path).filename().string();
 
         HighFive::Group tracking_id_group = read.getGroup("tracking_id");
-
-        HighFive::Attribute exp_start_time_attr = tracking_id_group.getAttribute("exp_start_time");
-        std::string exp_start_time;
-        string_reader(exp_start_time_attr, exp_start_time);
-
-        HighFive::Attribute flow_cell_id_attr = tracking_id_group.getAttribute("flow_cell_id");
-        std::string flow_cell_id;
-        string_reader(flow_cell_id_attr, flow_cell_id);
-
-        HighFive::Attribute device_id_attr = tracking_id_group.getAttribute("device_id");
-        std::string device_id;
-        string_reader(device_id_attr, device_id);
+        std::string exp_start_time = get_string_attribute(tracking_id_group, "exp_start_time");
+        std::string flow_cell_id = get_string_attribute(tracking_id_group, "flow_cell_id");
+        std::string device_id = get_string_attribute(tracking_id_group, "device_id");
+        std::string group_protocol_id =
+                get_string_attribute(tracking_id_group, "group_protocol_id");
 
         auto start_time_str = utils::adjust_time(exp_start_time,
                                                  static_cast<uint32_t>(start_time / sampling_rate));
@@ -783,7 +786,7 @@ void DataLoader::load_fast5_reads_from_file(const std::string& path) {
         new_read->read_common.attributes.fast5_filename = fast5_filename;
         new_read->read_common.flowcell_id = flow_cell_id;
         new_read->read_common.position_id = device_id;
-
+        new_read->read_common.experiment_id = group_protocol_id;
         new_read->read_common.is_duplex = false;
 
         if (!m_allowed_read_ids || (m_allowed_read_ids->find(new_read->read_common.read_id) !=

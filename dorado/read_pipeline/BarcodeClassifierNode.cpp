@@ -285,8 +285,8 @@ void BarcodeClassifierNode::barcode(SimplexRead& read) {
     std::string alias{};
     if (barcoding_info->sample_sheet) {
         alias = barcoding_info->sample_sheet->get_alias(
-                read.read_common.flowcell_id, read.read_common.position_id, read.read_common.run_id,
-                bc_res.adapter_name);
+                read.read_common.flowcell_id, read.read_common.position_id,
+                read.read_common.experiment_id, bc_res.adapter_name);
     }
     if (!alias.empty()) {
         read.read_common.barcode = bc_res.kit + "_" + alias;
