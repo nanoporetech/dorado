@@ -81,8 +81,6 @@ void ScalerNode::worker_thread() {
                 read->read_common.raw_data.index({Slice(trim_start, torch::indexing::None)});
         read->read_common.num_trimmed_samples = trim_start;
 
-        spdlog::debug("{} {} {} {}", read->read_common.read_id, shift, scale, trim_start);
-
         // Pass the read to the next node
         send_message_to_sink(std::move(read));
     }
