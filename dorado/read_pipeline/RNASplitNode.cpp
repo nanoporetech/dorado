@@ -150,7 +150,7 @@ PosRanges RNASplitNode::possible_pore_regions(const RNASplitNode::ExtRead& read)
         auto start_pos = pore_sample_range.first;
         auto end_pos = pore_sample_range.second;
         pore_regions.push_back({start_pos, end_pos});
-        spdlog::info("Pore range {}-{}", start_pos, end_pos);
+        spdlog::debug("Pore range {}-{} {}", start_pos, end_pos, read.read->read_common.read_id);
     }
 
     return pore_regions;
@@ -274,7 +274,6 @@ void RNASplitNode::worker_thread() {
 
         // If this message isn't a read, we'll get a bad_variant_access exception.
         auto init_read = std::get<SimplexReadPtr>(std::move(message));
-        spdlog::info("About to split");
         for (auto& subread : split(std::move(init_read))) {
             //TODO correctly process end_reason when we have them
             send_message_to_sink(std::move(subread));
@@ -288,7 +287,6 @@ RNASplitNode::RNASplitNode(RNASplitSettings settings, int num_worker_threads, si
           m_num_worker_threads(num_worker_threads) {
     m_split_finders = build_split_finders();
     start_threads();
-    spdlog::info("Create rna splitter");
 }
 
 void RNASplitNode::start_threads() {

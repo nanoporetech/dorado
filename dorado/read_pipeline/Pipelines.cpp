@@ -71,7 +71,6 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
         auto rna_split_node = pipeline_desc.add_node<RNASplitNode>(
                 {scaler_node}, rna_splitter_settings, splitter_node_threads);
         first_node_handle = rna_split_node;
-        spdlog::info("Added rna split node");
     }
 
     // if we've been provided a source node, connect it to the start of our pipeline
