@@ -454,7 +454,9 @@ PairingNode::PairingNode(std::map<std::string, std::string> template_complement_
     start_threads();
 }
 
-PairingNode::PairingNode(DynamicPairingParameters pairing_params, int num_worker_threads, size_t max_reads)
+PairingNode::PairingNode(DynamicPairingParameters pairing_params,
+                         int num_worker_threads,
+                         size_t max_reads)
         : MessageSink(max_reads),
           m_num_worker_threads(num_worker_threads),
           m_max_num_keys(std::numeric_limits<size_t>::max()),

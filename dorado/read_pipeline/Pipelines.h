@@ -15,7 +15,8 @@ class ModBaseRunner;
 class ModelRunnerBase;
 
 using Runner = std::shared_ptr<ModelRunnerBase>;
-using PairingParameters = std::variant<DynamicPairingParameters, std::map<std::string, std::string>>;
+using PairingParameters =
+        std::variant<DynamicPairingParameters, std::map<std::string, std::string>>;
 
 namespace pipelines {
 

@@ -327,7 +327,7 @@ int duplex(int argc, char* argv[]) {
 
             PairingParameters pairing_parameters;
             if (template_complement_map.empty()) {
-                pairing_parameters = DynamicPairingParameters { ReadOrder::BY_CHANNEL, 10 };
+                pairing_parameters = DynamicPairingParameters{ReadOrder::BY_CHANNEL, 10};
             } else {
                 pairing_parameters = std::move(template_complement_map);
             }

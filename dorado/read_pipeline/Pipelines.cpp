@@ -106,12 +106,14 @@ void create_stereo_duplex_pipeline(PipelineDescriptor& pipeline_desc,
 
     auto pairing_node =
             std::holds_alternative<DynamicPairingParameters>(pairing_parameters)
-                    ? pipeline_desc.add_node<PairingNode>({stereo_node},
-                                                          std::get<DynamicPairingParameters>(pairing_parameters),
-                                                          std::thread::hardware_concurrency(), 1000)
+                    ? pipeline_desc.add_node<PairingNode>(
+                              {stereo_node}, std::get<DynamicPairingParameters>(pairing_parameters),
+                              std::thread::hardware_concurrency(), 1000)
                     : pipeline_desc.add_node<PairingNode>(
-                              {stereo_node}, std::move(std::get<std::map<std::string, std::string>>(
-                                                     pairing_parameters)), 2, 1000);
+                              {stereo_node},
+                              std::move(std::get<std::map<std::string, std::string>>(
+                                      pairing_parameters)),
+                              2, 1000);
 
     // Create a duplex split node with the given settings and number of devices.
     // If splitter_settings.enabled is set to false, the splitter node will act
