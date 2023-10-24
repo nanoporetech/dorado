@@ -67,7 +67,7 @@ TEST_CASE("Split read pairing", TEST_GROUP) {
     auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 5, messages);
     // one thread, one read - force reads through in order
     auto pairing_node = pipeline_desc.add_node<dorado::PairingNode>(
-            {sink}, dorado::ReadOrder::BY_CHANNEL, 1, 1);
+        { sink }, dorado::DynamicPairingParameters{ dorado::ReadOrder::BY_CHANNEL, 10 }, 1, 1);
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
 
     for (auto& read : reads) {

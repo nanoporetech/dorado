@@ -53,6 +53,11 @@ using SamHdrPtr = std::unique_ptr<sam_hdr_t, SamHdrDestructor>;
 
 enum class ReadOrder { UNRESTRICTED, BY_CHANNEL, BY_TIME };
 
+struct DynamicPairingParameters {
+    ReadOrder read_order;
+    size_t cache_depth;
+};
+
 inline std::string to_string(ReadOrder read_order) {
     switch (read_order) {
     case ReadOrder::UNRESTRICTED:

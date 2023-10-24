@@ -30,11 +30,11 @@ class PairingNode : public MessageSink {
 public:
     // Template-complement map: uses the pair_list pairing method
     PairingNode(std::map<std::string, std::string> template_complement_map,
-                int num_worker_threads = 2,
-                size_t max_reads = 1000);
+                int num_worker_threads,
+                size_t max_reads);
 
     // No template-complement map: uses the pair_generation pairing method
-    PairingNode(ReadOrder read_order, int num_worker_threads = 2, size_t max_reads = 1000);
+    PairingNode(DynamicPairingParameters pairing_params, int num_worker_threads, size_t max_reads);
     ~PairingNode() { terminate_impl(); }
     std::string get_name() const override { return "PairingNode"; }
     stats::NamedStats sample_stats() const override;
