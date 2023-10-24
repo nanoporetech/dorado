@@ -193,6 +193,8 @@ set(LIB_SOURCE_FILES
     dorado/read_pipeline/PolyACalculator.h
     dorado/read_pipeline/read_utils.cpp
     dorado/read_pipeline/read_utils.h
+    dorado/read_pipeline/RNASplitNode.cpp
+    dorado/read_pipeline/RNASplitNode.h
     dorado/read_pipeline/stitch.cpp
     dorado/read_pipeline/stitch.h
     dorado/demux/BarcodeClassifier.cpp
