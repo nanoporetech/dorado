@@ -39,43 +39,46 @@ std::pair<float, float> ScalerNode::med_mad(const torch::Tensor& x) {
 
 // This function returns the approximate position where the DNA adapter
 // in a dRNA read ends. The adapter location is determined by looking
-// at the median signal value of a sliding window over the raw signal.
+// at the median signal value over a sliding window on the raw signal.
 // RNA002 and RNA004 have different offsets and thresholds for the
 // sliding window heuristic.
 int determine_rna_adapter_pos(const dorado::SimplexRead& read, dorado::SampleType model_type) {
+    assert(read.read_common.raw_data.dtype() == torch::kInt16);
     static const std::unordered_map<dorado::SampleType, int> kOffsetMap = {
             {dorado::SampleType::RNA002, 5000}, {dorado::SampleType::RNA004, 1000}};
     static const std::unordered_map<dorado::SampleType, int> kMaxSignalPosMap = {
-            {dorado::SampleType::RNA002, 15000}, {dorado::SampleType::RNA004, 10000}};
+            {dorado::SampleType::RNA002, 15000}, {dorado::SampleType::RNA004, 5000}};
     static const std::unordered_map<dorado::SampleType, int16_t> kAdapterCutoff = {
-            {dorado::SampleType::RNA002, 600}, {dorado::SampleType::RNA004, 775}};
+            {dorado::SampleType::RNA002, 600}, {dorado::SampleType::RNA004, 700}};
 
     const int kWindowSize = 250;
     const int kStride = 50;
+    const int16_t kMedianDiff = 125;
+
     const int kOffset = kOffsetMap.at(model_type);
     const int kMaxSignalPos = kMaxSignalPosMap.at(model_type);
-
     const int16_t kMinMedianForRNASignal = kAdapterCutoff.at(model_type);
 
     int bp = 0;
     int signal_len = read.read_common.get_raw_data_samples();
     auto sig_fp32 = read.read_common.raw_data.to(torch::kInt16);
-    int16_t last_median = 0;
-    std::array<int16_t, 5> medians = {0, 0, 0};
-    int array_pos = 0;
+
+    // Check the median value change over 5 windows.
+    std::array<int16_t, 5> medians = {0, 0, 0, 0, 0};
+    int median_pos = 0;
     for (int i = kOffset; i < std::min(std::max(signal_len / 2, kMaxSignalPos), signal_len);
          i += kStride) {
         auto slice = sig_fp32.slice(0, i, std::min(signal_len, i + kWindowSize));
         int16_t median = slice.median().item<int16_t>();
-        medians[array_pos++ % medians.size()] = median;
-        int16_t max = *std::max_element(medians.begin(), medians.end());
-        int16_t min = *std::min_element(medians.begin(), medians.end());
-        //spdlog::debug("pos {} max {} diff {}", i, max, (max - min));
-        if (i > (kOffset + medians.size()) && max > kMinMedianForRNASignal && (max - min > 100)) {
-            bp = i;
-            break;
+        medians[median_pos++ % medians.size()] = median;
+        int16_t max_median = *std::max_element(medians.begin(), medians.end());
+        int16_t min_median = *std::min_element(medians.begin(), medians.end());
+        if (i > (kOffset + medians.size())) {
+            if ((max_median > kMinMedianForRNASignal) && (max_median - min_median > kMedianDiff)) {
+                bp = i;
+                break;
+            }
         }
-        last_median = median;
     }
 
     spdlog::debug("Approx break point {}", bp);
@@ -100,8 +103,6 @@ void ScalerNode::worker_thread() {
         int trim_start = 0;
         if (m_is_rna) {
             trim_start = determine_rna_adapter_pos(*read, m_model_type);
-            spdlog::debug("{} samples {} trim start {}", read->read_common.read_id,
-                          read->read_common.get_raw_data_samples(), trim_start);
             read->read_common.raw_data =
                     read->read_common.raw_data.index({Slice(trim_start, torch::indexing::None)});
         }
