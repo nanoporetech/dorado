@@ -289,7 +289,7 @@ void BarcodeClassifierNode::barcode(SimplexRead& read) {
                 read.read_common.experiment_id, bc_res.adapter_name);
     }
     if (!alias.empty()) {
-        read.read_common.barcode = bc_res.kit + "_" + alias;
+        read.read_common.barcode = alias;
     } else {
         read.read_common.barcode = generate_barcode_string(bc_res);
     }

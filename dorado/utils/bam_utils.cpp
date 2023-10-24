@@ -69,7 +69,6 @@ void add_rg_hdr(sam_hdr_t* hdr,
             const auto additional_tags = "\tBC:" + barcode_sequences.at(barcode_name);
             for (const auto& read_group : read_groups) {
                 std::string alias;
-                auto barcode = barcode_name;
                 auto id = read_group.first + '_';
                 if (sample_sheet) {
                     if (!sample_sheet->barcode_is_permitted(barcode_name)) {
@@ -77,12 +76,12 @@ void add_rg_hdr(sam_hdr_t* hdr,
                     }
                     alias = sample_sheet->get_alias(read_group.second.flowcell_id,
                                                     read_group.second.position_id,
-                                                    read_group.second.run_id, barcode);
+                                                    read_group.second.run_id, barcode_name);
                 }
                 if (!alias.empty()) {
-                    id += kit_name + "_" + alias;
+                    id += alias;
                 } else {
-                    id += barcode_kits::generate_standard_barcode_name(kit_name, barcode);
+                    id += barcode_kits::generate_standard_barcode_name(kit_name, barcode_name);
                 }
                 const std::string read_group_tags = to_string(read_group.second);
                 emit_read_group(read_group_tags, id, additional_tags);
