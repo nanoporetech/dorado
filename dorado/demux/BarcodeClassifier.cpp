@@ -125,10 +125,9 @@ BarcodeClassifier::BarcodeClassifier(const std::vector<std::string>& kit_names)
 
 BarcodeClassifier::~BarcodeClassifier() = default;
 
-ScoreResults BarcodeClassifier::barcode(
-        const std::string& seq,
-        bool barcode_both_ends,
-        const std::shared_ptr<utils::SampleSheet>& sample_sheet) const {
+ScoreResults BarcodeClassifier::barcode(const std::string& seq,
+                                        bool barcode_both_ends,
+                                        const utils::SampleSheet* const sample_sheet) const {
     auto best_adapter =
             find_best_adapter(seq, m_adapter_sequences, barcode_both_ends, sample_sheet);
     return best_adapter;
@@ -208,7 +207,7 @@ std::vector<BarcodeClassifier::AdapterSequence> BarcodeClassifier::generate_adap
 std::vector<ScoreResults> BarcodeClassifier::calculate_adapter_score_different_double_ends(
         std::string_view read_seq,
         const AdapterSequence& as,
-        const std::shared_ptr<utils::SampleSheet>& sample_sheet) const {
+        const utils::SampleSheet* const sample_sheet) const {
     std::string_view read_top = read_seq.substr(0, TRIM_LENGTH);
     int bottom_start = std::max(0, (int)read_seq.length() - TRIM_LENGTH);
     std::string_view read_bottom = read_seq.substr(bottom_start, TRIM_LENGTH);
@@ -343,7 +342,7 @@ std::vector<ScoreResults> BarcodeClassifier::calculate_adapter_score_different_d
 std::vector<ScoreResults> BarcodeClassifier::calculate_adapter_score_double_ends(
         std::string_view read_seq,
         const AdapterSequence& as,
-        const std::shared_ptr<utils::SampleSheet>& sample_sheet) const {
+        const utils::SampleSheet* const sample_sheet) const {
     bool debug_mode = (spdlog::get_level() == spdlog::level::debug);
     std::string_view read_top = read_seq.substr(0, TRIM_LENGTH);
     int bottom_start = std::max(0, (int)read_seq.length() - TRIM_LENGTH);
@@ -416,7 +415,7 @@ std::vector<ScoreResults> BarcodeClassifier::calculate_adapter_score_double_ends
 std::vector<ScoreResults> BarcodeClassifier::calculate_adapter_score(
         std::string_view read_seq,
         const AdapterSequence& as,
-        const std::shared_ptr<utils::SampleSheet>& sample_sheet) const {
+        const utils::SampleSheet* const sample_sheet) const {
     bool debug_mode = (spdlog::get_level() == spdlog::level::debug);
     std::string_view read_top = read_seq.substr(0, TRIM_LENGTH);
 
@@ -559,7 +558,7 @@ ScoreResults BarcodeClassifier::find_best_adapter(
         const std::string& read_seq,
         const std::vector<AdapterSequence>& adapters,
         bool barcode_both_ends,
-        const std::shared_ptr<utils::SampleSheet>& sample_sheet) const {
+        const utils::SampleSheet* const sample_sheet) const {
     if (read_seq.length() < TRIM_LENGTH) {
         return UNCLASSIFIED;
     }

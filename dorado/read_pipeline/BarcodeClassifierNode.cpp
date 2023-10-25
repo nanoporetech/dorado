@@ -262,7 +262,7 @@ void BarcodeClassifierNode::barcode(BamPtr& read) {
     std::string seq = utils::extract_sequence(irecord, seqlen);
 
     auto bc_res = barcoder->barcode(seq, m_default_barcoding_info->barcode_both_ends,
-                                    m_default_barcoding_info->sample_sheet);
+                                    m_default_barcoding_info->sample_sheet.get());
     std::string alias{};
     if (m_default_barcoding_info->sample_sheet) {
         // experiment id and position id are not stored in the bam file, so we can't recover them to use here
@@ -286,7 +286,7 @@ void BarcodeClassifierNode::barcode(SimplexRead& read) {
 
     // get the sequence to map from the record
     auto bc_res = barcoder->barcode(read.read_common.seq, barcoding_info->barcode_both_ends,
-                                    barcoding_info->sample_sheet);
+                                    barcoding_info->sample_sheet.get());
     std::string alias{};
     if (barcoding_info->sample_sheet) {
         alias = barcoding_info->sample_sheet->get_alias(

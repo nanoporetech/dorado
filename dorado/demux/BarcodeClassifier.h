@@ -4,7 +4,6 @@
 #include "utils/types.h"
 
 #include <atomic>
-#include <memory>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -43,7 +42,7 @@ public:
 
     ScoreResults barcode(const std::string& seq,
                          bool barcode_both_ends,
-                         const std::shared_ptr<utils::SampleSheet>& sample_sheet) const;
+                         const utils::SampleSheet* const sample_sheet) const;
 
 private:
     const std::vector<AdapterSequence> m_adapter_sequences;
@@ -53,19 +52,19 @@ private:
     std::vector<ScoreResults> calculate_adapter_score_different_double_ends(
             std::string_view read_seq,
             const AdapterSequence& as,
-            const std::shared_ptr<utils::SampleSheet>& sample_sheet) const;
+            const utils::SampleSheet* const sample_sheet) const;
     std::vector<ScoreResults> calculate_adapter_score_double_ends(
             std::string_view read_seq,
             const AdapterSequence& as,
-            const std::shared_ptr<utils::SampleSheet>& sample_sheet) const;
+            const utils::SampleSheet* const sample_sheet) const;
     std::vector<ScoreResults> calculate_adapter_score(
             std::string_view read_seq,
             const AdapterSequence& as,
-            const std::shared_ptr<utils::SampleSheet>& sample_sheet) const;
+            const utils::SampleSheet* const sample_sheet) const;
     ScoreResults find_best_adapter(const std::string& read_seq,
                                    const std::vector<AdapterSequence>& adapter,
                                    bool barcode_both_ends,
-                                   const std::shared_ptr<utils::SampleSheet>& sample_sheet) const;
+                                   const utils::SampleSheet* const sample_sheet) const;
 };
 
 }  // namespace demux
