@@ -69,7 +69,7 @@ TEST_CASE("Split read pairing", TEST_GROUP) {
     auto pairing_node = pipeline_desc.add_node<dorado::PairingNode>(
             {sink},
             dorado::DuplexPairingParameters{dorado::ReadOrder::BY_CHANNEL,
-                                            DEFAULT_DUPLEX_CACHE_DEPTH},
+                                            dorado::DEFAULT_DUPLEX_CACHE_DEPTH},
             1, 1);
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
 

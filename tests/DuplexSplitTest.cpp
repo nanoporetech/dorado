@@ -126,7 +126,7 @@ TEST_CASE("4 subread split tagging", TEST_GROUP) {
     auto pairing_node = pipeline_desc.add_node<dorado::PairingNode>(
             {stereo_node},
             dorado::DuplexPairingParameters{dorado::ReadOrder::BY_CHANNEL,
-                                            DEFAULT_DUPLEX_CACHE_DEPTH},
+                                            dorado::DEFAULT_DUPLEX_CACHE_DEPTH},
             2, 1000);
     auto splitter_node = pipeline_desc.add_node<dorado::DuplexSplitNode>(
             {pairing_node}, dorado::DuplexSplitSettings{}, 1);
