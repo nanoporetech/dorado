@@ -26,7 +26,7 @@ public:
                           const std::vector<std::string>& kit_name,
                           bool barcode_both_ends,
                           bool no_trim,
-                          std::shared_ptr<utils::SampleSheet> sample_sheet);
+                          std::unique_ptr<const utils::SampleSheet> sample_sheet);
     BarcodeClassifierNode(int threads);
     ~BarcodeClassifierNode();
     std::string get_name() const override { return "BarcodeClassifierNode"; }

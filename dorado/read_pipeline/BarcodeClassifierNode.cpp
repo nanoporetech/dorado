@@ -41,7 +41,7 @@ BarcodeClassifierNode::BarcodeClassifierNode(int threads,
                                              const std::vector<std::string>& kit_names,
                                              bool barcode_both_ends,
                                              bool no_trim,
-                                             std::shared_ptr<utils::SampleSheet> sample_sheet)
+                                             std::unique_ptr<const utils::SampleSheet> sample_sheet)
         : MessageSink(10000),
           m_threads(threads),
           m_default_barcoding_info(create_barcoding_info(kit_names,

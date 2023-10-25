@@ -14,6 +14,7 @@
 #include "read_pipeline/ReadFilterNode.h"
 #include "read_pipeline/ReadToBamTypeNode.h"
 #include "read_pipeline/ScalerNode.h"
+#include "utils/SampleSheet.h"
 #include "utils/parameters.h"
 
 #if DORADO_GPU_BUILD

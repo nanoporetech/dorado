@@ -20,14 +20,14 @@ struct BarcodingInfo {
     std::string kit_name{};
     bool barcode_both_ends{false};
     bool trim{false};
-    std::shared_ptr<utils::SampleSheet> sample_sheet;
+    std::unique_ptr<const utils::SampleSheet> sample_sheet;
 };
 
 std::shared_ptr<const BarcodingInfo> create_barcoding_info(
         const std::vector<std::string> &kit_names,
         bool barcode_both_ends,
         bool trim_barcode,
-        std::shared_ptr<utils::SampleSheet> sample_sheet);
+        std::unique_ptr<const utils::SampleSheet> sample_sheet);
 
 struct ReadGroup {
     std::string run_id;

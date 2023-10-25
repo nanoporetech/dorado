@@ -19,7 +19,7 @@ namespace dorado::utils {
 void add_rg_hdr(sam_hdr_t* hdr,
                 const std::unordered_map<std::string, ReadGroup>& read_groups,
                 const std::vector<std::string>& barcode_kits,
-                const std::shared_ptr<utils::SampleSheet>& sample_sheet) {
+                const utils::SampleSheet* const sample_sheet) {
     const auto& barcode_kit_infos = barcode_kits::get_kit_infos();
     const auto& barcode_sequences = barcode_kits::get_barcodes();
 

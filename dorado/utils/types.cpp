@@ -1,5 +1,7 @@
 #include "types.h"
 
+#include "SampleSheet.h"
+
 #include <htslib/sam.h>
 #include <minimap.h>
 
@@ -9,7 +11,7 @@ std::shared_ptr<const BarcodingInfo> create_barcoding_info(
         const std::vector<std::string>& kit_names,
         bool barcode_both_ends,
         bool trim_barcode,
-        std::shared_ptr<utils::SampleSheet> sample_sheet) {
+        std::unique_ptr<const utils::SampleSheet> sample_sheet) {
     if (kit_names.empty()) {
         return {};
     }
