@@ -155,27 +155,16 @@ void SampleSheet::load(std::istream& file_stream, const std::string& filename) {
                             " does not contain a unique mapping of barcode ids."));
     }
 
-    m_allowed_barcodes = [this]() -> FilterSet {
+    if (m_type == Type::barcode) {
         std::unordered_set<std::string> barcodes;
-        switch (m_type) {
-        case Type::barcode: {
-            // Grab the barcode idx once so that we're not doing it repeatedly
-            const auto barcode_idx = m_col_indices.at("barcode");
-
-            // Grab the barcodes
-            for (const auto& row : m_rows) {
-                barcodes.emplace(row[barcode_idx]);
-            }
-            break;
+        // Grab the barcode idx once so that we're not doing it repeatedly
+        const auto barcode_idx = m_col_indices.at("barcode");
+        // Grab the barcodes
+        for (const auto& row : m_rows) {
+            barcodes.emplace(row[barcode_idx]);
         }
-        case Type::none:
-            [[fallthrough]];
-        default:
-            return std::nullopt;
-        }
-
-        return barcodes;
-    }();
+        m_allowed_barcodes = std::move(barcodes);
+    }
 }
 
 // check if we can generate a unique alias without the flowcell/position information
