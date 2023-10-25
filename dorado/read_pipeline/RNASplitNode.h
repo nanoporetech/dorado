@@ -1,5 +1,6 @@
 #pragma once
 #include "ReadPipeline.h"
+#include "splitter_utils.h"
 #include "utils/stats.h"
 #include "utils/types.h"
 
@@ -23,11 +24,10 @@ struct RNASplitSettings {
     uint64_t expect_pore_prefix = 2000;
 };
 
+using namespace splitter;
+
 class RNASplitNode : public MessageSink {
 public:
-    typedef std::pair<uint64_t, uint64_t> PosRange;
-    typedef std::vector<PosRange> PosRanges;
-
     RNASplitNode(RNASplitSettings settings, int num_worker_threads = 5, size_t max_reads = 1000);
     ~RNASplitNode() { terminate_impl(); }
     std::string get_name() const override { return "RNASplitNode"; }
@@ -43,7 +43,6 @@ private:
     //TODO consider precomputing and reusing ranges with high signal
     struct ExtRead {
         SimplexReadPtr read;
-        torch::Tensor data_as_int16;
         PosRanges possible_pore_regions;
     };
 

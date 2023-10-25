@@ -1,5 +1,6 @@
 #pragma once
 #include "ReadPipeline.h"
+#include "splitter_utils.h"
 #include "utils/stats.h"
 #include "utils/types.h"
 
@@ -49,11 +50,10 @@ struct DuplexSplitSettings {
     std::string adapter = "TACTTCGTTCAGTTACGTATTGCT";
 };
 
+using namespace splitter;
+
 class DuplexSplitNode : public MessageSink {
 public:
-    typedef std::pair<uint64_t, uint64_t> PosRange;
-    typedef std::vector<PosRange> PosRanges;
-
     DuplexSplitNode(DuplexSplitSettings settings,
                     int num_worker_threads = 5,
                     size_t max_reads = 1000);

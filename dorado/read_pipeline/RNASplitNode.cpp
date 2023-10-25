@@ -1,6 +1,7 @@
 #include "RNASplitNode.h"
 
 #include "read_utils.h"
+#include "splitter_utils.h"
 #include "utils/alignment_utils.h"
 #include "utils/duplex_utils.h"
 #include "utils/sequence_utils.h"
@@ -15,145 +16,19 @@
 #include <optional>
 #include <string>
 
-namespace {
-
-using namespace dorado;
-
-typedef RNASplitNode::PosRange PosRange;
-typedef RNASplitNode::PosRanges PosRanges;
-
-template <class FilterF>
-auto filter_ranges(const PosRanges& ranges, FilterF filter_f) {
-    PosRanges filtered;
-    std::copy_if(ranges.begin(), ranges.end(), std::back_inserter(filtered), filter_f);
-    return filtered;
-}
-
-//merges overlapping ranges and ranges separated by merge_dist or less
-//ranges supposed to be sorted by start coordinate
-PosRanges merge_ranges(const PosRanges& ranges, uint64_t merge_dist) {
-    PosRanges merged;
-    for (auto& r : ranges) {
-        assert(merged.empty() || r.first >= merged.back().first);
-        if (merged.empty() || r.first > merged.back().second + merge_dist) {
-            merged.push_back(r);
-        } else {
-            merged.back().second = r.second;
-        }
-    }
-    return merged;
-}
-
-std::vector<std::pair<uint64_t, uint64_t>> detect_pore_signal(const torch::Tensor& signal,
-                                                              float threshold,
-                                                              uint64_t cluster_dist,
-                                                              uint64_t ignore_prefix) {
-    std::vector<std::pair<uint64_t, uint64_t>> ans;
-    auto pore_a = signal.accessor<int16_t, 1>();
-    int64_t cl_start = -1;
-    int64_t cl_end = -1;
-
-    for (auto i = ignore_prefix; i < pore_a.size(0); i++) {
-        if (pore_a[i] > threshold) {
-            //check if we need to start new cluster
-            if (cl_end == -1 || i > cl_end + cluster_dist) {
-                //report previous cluster
-                if (cl_end != -1) {
-                    assert(cl_start != -1);
-                    ans.push_back({cl_start, cl_end});
-                }
-                cl_start = i;
-            }
-            cl_end = i + 1;
-        }
-    }
-    //report last cluster
-    if (cl_end != -1) {
-        assert(cl_start != -1);
-        assert(cl_start < pore_a.size(0) && cl_end <= pore_a.size(0));
-        ans.push_back({cl_start, cl_end});
-    }
-
-    return ans;
-}
-
-//If read.parent_read_id is not empty then it will be used as parent_read_id of the subread
-//signal_range should already be 'adjusted' to stride (e.g. probably gotten from seq_range)
-SimplexReadPtr subread(const SimplexRead& read, PosRange signal_range) {
-    //TODO support mods
-    //NB: currently doesn't support mods
-    const int stride = read.read_common.model_stride;
-    assert(signal_range.first <= signal_range.second);
-    assert(signal_range.first % stride == 0);
-    assert(signal_range.second % stride == 0 ||
-           (signal_range.second == read.read_common.get_raw_data_samples()));
-    assert(read.read_common.seq.empty());
-    assert(read.read_common.qstring.empty());
-
-    auto subread = utils::shallow_copy_read(read);
-    subread->read_common.read_tag = read.read_common.read_tag;
-    subread->read_common.client_id = read.read_common.client_id;
-    subread->read_common.raw_data = subread->read_common.raw_data.index(
-            {torch::indexing::Slice(signal_range.first, signal_range.second)});
-    subread->read_common.attributes.read_number = -1;
-
-    //we adjust for it in new start time
-    subread->read_common.attributes.num_samples = signal_range.second - signal_range.first;
-    subread->read_common.num_trimmed_samples = 0;
-    subread->start_sample =
-            read.start_sample + read.read_common.num_trimmed_samples + signal_range.first;
-    subread->end_sample = subread->start_sample + subread->read_common.attributes.num_samples;
-
-    auto start_time_ms = read.run_acquisition_start_time_ms +
-                         static_cast<uint64_t>(std::round(subread->start_sample * 1000. /
-                                                          subread->read_common.sample_rate));
-    subread->read_common.attributes.start_time =
-            utils::get_string_timestamp_from_unix_time(start_time_ms);
-    subread->read_common.start_time_ms = start_time_ms;
-
-    assert(signal_range.second == read.read_common.get_raw_data_samples());
-
-    // Initialize the subreads previous and next reads with the parent's ids.
-    // These are updated at the end when all subreads are available.
-    subread->prev_read = read.prev_read;
-    subread->next_read = read.next_read;
-
-    if (!read.read_common.parent_read_id.empty()) {
-        subread->read_common.parent_read_id = read.read_common.parent_read_id;
-    } else {
-        subread->read_common.parent_read_id = read.read_common.read_id;
-    }
-    return subread;
-}
-
-}  // namespace
-
 namespace dorado {
 
 RNASplitNode::ExtRead RNASplitNode::create_ext_read(SimplexReadPtr r) const {
     ExtRead ext_read;
     ext_read.read = std::move(r);
-    ext_read.data_as_int16 = ext_read.read->read_common.raw_data;
-    ext_read.possible_pore_regions = possible_pore_regions(ext_read);
-    return ext_read;
-}
-
-PosRanges RNASplitNode::possible_pore_regions(const RNASplitNode::ExtRead& read) const {
-    spdlog::trace("Analyzing signal in read {}", read.read->read_common.read_id);
-
-    auto pore_sample_ranges =
-            detect_pore_signal(read.data_as_int16, m_settings.pore_thr, m_settings.pore_cl_dist,
-                               m_settings.expect_pore_prefix);
-
-    PosRanges pore_regions;
-    for (auto pore_sample_range : pore_sample_ranges) {
-        auto start_pos = pore_sample_range.first;
-        auto end_pos = pore_sample_range.second;
-        pore_regions.push_back({start_pos, end_pos});
-        spdlog::debug("Pore range {}-{} {}", start_pos, end_pos, read.read->read_common.read_id);
+    ext_read.possible_pore_regions =
+            detect_pore_signal<int16_t>(ext_read.read->read_common.raw_data, m_settings.pore_thr,
+                                        m_settings.pore_cl_dist, m_settings.expect_pore_prefix);
+    for (auto range : ext_read.possible_pore_regions) {
+        spdlog::trace("Pore range {}-{} {}", range.first, range.second,
+                      ext_read.read->read_common.read_id);
     }
-
-    return pore_regions;
+    return ext_read;
 }
 
 std::vector<SimplexReadPtr> RNASplitNode::subreads(SimplexReadPtr read,
@@ -169,12 +44,13 @@ std::vector<SimplexReadPtr> RNASplitNode::subreads(SimplexReadPtr read,
     uint64_t start_pos = 0;
     for (auto r : spacers) {
         if (start_pos < r.first) {
-            subreads.push_back(subread(*read, {start_pos, r.first}));
+            subreads.push_back(subread(*read, std::nullopt, {start_pos, r.first}));
         }
         start_pos = r.second;
     }
     if (start_pos < read->read_common.get_raw_data_samples()) {
-        subreads.push_back(subread(*read, {start_pos, read->read_common.get_raw_data_samples()}));
+        subreads.push_back(subread(*read, std::nullopt,
+                                   {start_pos, read->read_common.get_raw_data_samples()}));
     }
 
     return subreads;
@@ -205,7 +81,7 @@ std::vector<SimplexReadPtr> RNASplitNode::split(SimplexReadPtr init_read) const 
         std::vector<ExtRead> split_round_result;
         for (auto& r : to_split) {
             auto spacers = split_f(r);
-            spdlog::trace("DSN: {} strategy {} splits in read {}", description, spacers.size(),
+            spdlog::trace("RSN: {} strategy {} splits in read {}", description, spacers.size(),
                           read_id);
 
             if (spacers.empty()) {
@@ -232,24 +108,6 @@ std::vector<SimplexReadPtr> RNASplitNode::split(SimplexReadPtr init_read) const 
         }
 
         split_result.push_back(std::move(ext_read.read));
-    }
-
-    // Adjust prev and next read ids.
-    if (split_result.size() > 1) {
-        for (int i = 0; i < split_result.size(); i++) {
-            if (i == split_result.size() - 1) {
-                // For the last split read, the next read remains the same as the
-                // original read's next read.
-                split_result[i]->prev_read = split_result[i - 1]->read_common.read_id;
-            } else if (i == 0) {
-                // For the first split read, the previous read remains the same as the
-                // original read's previous read.
-                split_result[i]->next_read = split_result[i + 1]->read_common.read_id;
-            } else {
-                split_result[i]->prev_read = split_result[i - 1]->read_common.read_id;
-                split_result[i]->next_read = split_result[i + 1]->read_common.read_id;
-            }
-        }
     }
 
     spdlog::trace("Read {} split into {} subreads", read_id, split_result.size());

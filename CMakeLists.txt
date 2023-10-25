@@ -197,6 +197,8 @@ set(LIB_SOURCE_FILES
     dorado/read_pipeline/RNASplitNode.h
     dorado/read_pipeline/stitch.cpp
     dorado/read_pipeline/stitch.h
+    dorado/read_pipeline/splitter_utils.cpp
+    dorado/read_pipeline/splitter_utils.h
     dorado/demux/BarcodeClassifier.cpp
     dorado/demux/BarcodeClassifier.h
     dorado/demux/BarcodeClassifierSelector.cpp

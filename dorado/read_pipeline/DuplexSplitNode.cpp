@@ -1,6 +1,7 @@
 #include "DuplexSplitNode.h"
 
 #include "read_utils.h"
+#include "splitter_utils.h"
 #include "utils/alignment_utils.h"
 #include "utils/duplex_utils.h"
 #include "utils/sequence_utils.h"
@@ -19,63 +20,8 @@ namespace {
 
 using namespace dorado;
 
-typedef DuplexSplitNode::PosRange PosRange;
-typedef DuplexSplitNode::PosRanges PosRanges;
-
-template <class FilterF>
-auto filter_ranges(const PosRanges& ranges, FilterF filter_f) {
-    PosRanges filtered;
-    std::copy_if(ranges.begin(), ranges.end(), std::back_inserter(filtered), filter_f);
-    return filtered;
-}
-
-//merges overlapping ranges and ranges separated by merge_dist or less
-//ranges supposed to be sorted by start coordinate
-PosRanges merge_ranges(const PosRanges& ranges, uint64_t merge_dist) {
-    PosRanges merged;
-    for (auto& r : ranges) {
-        assert(merged.empty() || r.first >= merged.back().first);
-        if (merged.empty() || r.first > merged.back().second + merge_dist) {
-            merged.push_back(r);
-        } else {
-            merged.back().second = r.second;
-        }
-    }
-    return merged;
-}
-
-std::vector<std::pair<uint64_t, uint64_t>> detect_pore_signal(const torch::Tensor& signal,
-                                                              float threshold,
-                                                              uint64_t cluster_dist,
-                                                              uint64_t ignore_prefix) {
-    std::vector<std::pair<uint64_t, uint64_t>> ans;
-    auto pore_a = signal.accessor<float, 1>();
-    int64_t cl_start = -1;
-    int64_t cl_end = -1;
-
-    for (auto i = ignore_prefix; i < pore_a.size(0); i++) {
-        if (pore_a[i] > threshold) {
-            //check if we need to start new cluster
-            if (cl_end == -1 || i > cl_end + cluster_dist) {
-                //report previous cluster
-                if (cl_end != -1) {
-                    assert(cl_start != -1);
-                    ans.push_back({cl_start, cl_end});
-                }
-                cl_start = i;
-            }
-            cl_end = i + 1;
-        }
-    }
-    //report last cluster
-    if (cl_end != -1) {
-        assert(cl_start != -1);
-        assert(cl_start < pore_a.size(0) && cl_end <= pore_a.size(0));
-        ans.push_back({cl_start, cl_end});
-    }
-
-    return ans;
-}
+typedef splitter::PosRange PosRange;
+typedef splitter::PosRanges PosRanges;
 
 //[start, end)
 std::optional<PosRange> find_best_adapter_match(const std::string& adapter,
@@ -152,70 +98,6 @@ std::optional<PosRange> check_rc_match(const std::string& seq,
     return res;
 }
 
-//TODO end_reason access?
-//If read.parent_read_id is not empty then it will be used as parent_read_id of the subread
-//signal_range should already be 'adjusted' to stride (e.g. probably gotten from seq_range)
-SimplexReadPtr subread(const SimplexRead& read, PosRange seq_range, PosRange signal_range) {
-    //TODO support mods
-    //NB: currently doesn't support mods
-    //assert(read.mod_base_info == nullptr && read.base_mod_probs.empty());
-    if (read.read_common.mod_base_info != nullptr || !read.read_common.base_mod_probs.empty()) {
-        throw std::runtime_error(std::string("Read splitting doesn't support mods yet"));
-    }
-    const int stride = read.read_common.model_stride;
-    assert(signal_range.first <= signal_range.second);
-    assert(signal_range.first / stride <= read.read_common.moves.size());
-    assert(signal_range.second / stride <= read.read_common.moves.size());
-    assert(signal_range.first % stride == 0);
-    assert(signal_range.second % stride == 0 ||
-           (signal_range.second == read.read_common.get_raw_data_samples() &&
-            seq_range.second == read.read_common.seq.size()));
-
-    auto subread = utils::shallow_copy_read(read);
-    subread->read_common.read_tag = read.read_common.read_tag;
-    subread->read_common.client_id = read.read_common.client_id;
-    subread->read_common.raw_data = subread->read_common.raw_data.index(
-            {torch::indexing::Slice(signal_range.first, signal_range.second)});
-    subread->read_common.attributes.read_number = -1;
-
-    //we adjust for it in new start time
-    subread->read_common.attributes.num_samples = signal_range.second - signal_range.first;
-    subread->read_common.num_trimmed_samples = 0;
-    subread->start_sample =
-            read.start_sample + read.read_common.num_trimmed_samples + signal_range.first;
-    subread->end_sample = subread->start_sample + subread->read_common.attributes.num_samples;
-
-    auto start_time_ms = read.run_acquisition_start_time_ms +
-                         static_cast<uint64_t>(std::round(subread->start_sample * 1000. /
-                                                          subread->read_common.sample_rate));
-    subread->read_common.attributes.start_time =
-            utils::get_string_timestamp_from_unix_time(start_time_ms);
-    subread->read_common.start_time_ms = start_time_ms;
-
-    subread->read_common.seq =
-            subread->read_common.seq.substr(seq_range.first, seq_range.second - seq_range.first);
-    subread->read_common.qstring = subread->read_common.qstring.substr(
-            seq_range.first, seq_range.second - seq_range.first);
-    subread->read_common.moves =
-            std::vector<uint8_t>(subread->read_common.moves.begin() + signal_range.first / stride,
-                                 subread->read_common.moves.begin() + signal_range.second / stride);
-    assert(signal_range.second == read.read_common.get_raw_data_samples() ||
-           subread->read_common.moves.size() * stride ==
-                   subread->read_common.get_raw_data_samples());
-
-    // Initialize the subreads previous and next reads with the parent's ids.
-    // These are updated at the end when all subreads are available.
-    subread->prev_read = read.prev_read;
-    subread->next_read = read.next_read;
-
-    if (!read.read_common.parent_read_id.empty()) {
-        subread->read_common.parent_read_id = read.read_common.parent_read_id;
-    } else {
-        subread->read_common.parent_read_id = read.read_common.read_id;
-    }
-    return subread;
-}
-
 }  // namespace
 
 namespace dorado {
@@ -235,8 +117,8 @@ PosRanges DuplexSplitNode::possible_pore_regions(const DuplexSplitNode::ExtRead&
     spdlog::trace("Analyzing signal in read {}", read.read->read_common.read_id);
 
     auto pore_sample_ranges =
-            detect_pore_signal(read.data_as_float32, m_settings.pore_thr, m_settings.pore_cl_dist,
-                               m_settings.expect_pore_prefix);
+            detect_pore_signal<float>(read.data_as_float32, m_settings.pore_thr,
+                                      m_settings.pore_cl_dist, m_settings.expect_pore_prefix);
 
     PosRanges pore_regions;
     for (auto pore_sample_range : pore_sample_ranges) {
@@ -308,7 +190,7 @@ DuplexSplitNode::check_flank_match(const SimplexRead& read, PosRange spacer, flo
     return std::nullopt;
 }
 
-std::optional<DuplexSplitNode::PosRange> DuplexSplitNode::identify_middle_adapter_split(
+std::optional<PosRange> DuplexSplitNode::identify_middle_adapter_split(
         const SimplexRead& read) const {
     assert(m_settings.strand_end_flank > m_settings.strand_end_trim + m_settings.min_flank);
     const uint64_t r_l = read.read_common.seq.size();
@@ -351,7 +233,7 @@ std::optional<DuplexSplitNode::PosRange> DuplexSplitNode::identify_middle_adapte
     return std::nullopt;
 }
 
-std::optional<DuplexSplitNode::PosRange> DuplexSplitNode::identify_extra_middle_split(
+std::optional<PosRange> DuplexSplitNode::identify_extra_middle_split(
         const SimplexRead& read) const {
     const uint64_t r_l = read.read_common.seq.size();
     //TODO parameterize
@@ -416,8 +298,8 @@ std::vector<SimplexReadPtr> DuplexSplitNode::subreads(SimplexReadPtr read,
     uint64_t signal_start = seq_to_sig_map[0];
     for (auto r : spacers) {
         if (start_pos < r.first && signal_start / stride < seq_to_sig_map[r.first] / stride) {
-            subreads.push_back(
-                    subread(*read, {start_pos, r.first}, {signal_start, seq_to_sig_map[r.first]}));
+            subreads.push_back(subread(*read, PosRange{start_pos, r.first},
+                                       PosRange{signal_start, seq_to_sig_map[r.first]}));
         }
         start_pos = r.second;
         signal_start = seq_to_sig_map[r.second];
@@ -426,8 +308,9 @@ std::vector<SimplexReadPtr> DuplexSplitNode::subreads(SimplexReadPtr read,
            seq_to_sig_map[read->read_common.seq.size()]);
     if (start_pos < read->read_common.seq.size() &&
         signal_start / stride < read->read_common.get_raw_data_samples() / stride) {
-        subreads.push_back(subread(*read, {start_pos, read->read_common.seq.size()},
-                                   {signal_start, read->read_common.get_raw_data_samples()}));
+        subreads.push_back(
+                subread(*read, PosRange{start_pos, read->read_common.seq.size()},
+                        PosRange{signal_start, read->read_common.get_raw_data_samples()}));
     }
 
     return subreads;
