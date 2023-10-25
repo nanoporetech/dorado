@@ -327,14 +327,14 @@ bool SampleSheet::check_index(const std::string& flow_cell_id,
         return true;
     }
 
-    bool ok = false;
+    bool ok = m_index.any();  // one of the indicies must be set
     if (m_index[FLOW_CELL_ID]) {
         // if we're expecting a flow cell id, we must provide one
-        ok |= !flow_cell_id.empty();
+        ok &= !flow_cell_id.empty();
     }
     if (m_index[POSITION_ID]) {
         // if we're expecting a position id, we must provide one
-        ok |= !position_id.empty();
+        ok &= !position_id.empty();
     }
     return ok;
 }
