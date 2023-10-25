@@ -84,8 +84,6 @@ int determine_rna_adapter_pos(const dorado::SimplexRead& read, dorado::SampleTyp
         }
     }
 
-    spdlog::debug("Approx break point {}", bp);
-
     return bp;
 }
 
@@ -102,9 +100,10 @@ void ScalerNode::worker_thread() {
 
         auto read = std::get<SimplexReadPtr>(std::move(message));
 
+        bool is_rna = (m_model_type == SampleType::RNA002 || m_model_type == SampleType::RNA004);
         // Trim adapter for RNA first before scaling.
         int trim_start = 0;
-        if (m_is_rna) {
+        if (is_rna) {
             trim_start = determine_rna_adapter_pos(*read, m_model_type);
             read->read_common.raw_data =
                     read->read_common.raw_data.index({Slice(trim_start, torch::indexing::None)});
@@ -128,7 +127,7 @@ void ScalerNode::worker_thread() {
         read->read_common.shift = read->scaling * (shift + read->offset);
 
         // Don't perform DNA trimming on RNA since it looks too different and we lose useful signal.
-        if (!m_is_rna) {
+        if (!is_rna) {
             // 8000 value may be changed in future. Currently this is found to work well.
             int max_samples =
                     std::min(8000, static_cast<int>(read->read_common.get_raw_data_samples() / 2));
@@ -140,7 +139,8 @@ void ScalerNode::worker_thread() {
 
         read->read_common.num_trimmed_samples = trim_start;
 
-        spdlog::debug("{} {} {} {}", read->read_common.read_id, shift, scale, trim_start);
+        spdlog::trace("ScalerNode: {} shift: {} scale: {} trim: {}", read->read_common.read_id,
+                      shift, scale, trim_start);
 
         // Pass the read to the next node
         send_message_to_sink(std::move(read));
@@ -154,7 +154,6 @@ ScalerNode::ScalerNode(const SignalNormalisationParams& config,
         : MessageSink(max_reads),
           m_scaling_params(config),
           m_num_worker_threads(num_worker_threads),
-          m_is_rna(model_type == SampleType::RNA002 || model_type == SampleType::RNA004),
           m_model_type(model_type) {
     start_threads();
 }
