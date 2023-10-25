@@ -259,7 +259,14 @@ int basecaller(int argc, char* argv[]) {
 
     parser.visible.add_argument("data").help("the data directory or file (POD5/FAST5 format).");
 
-    parser.visible.add_argument("-v", "--verbose").default_value(false).implicit_value(true);
+    int verbosity = 0;
+    parser.visible.add_argument("-v", "--verbose")
+            .default_value(false)
+            .implicit_value(true)
+            .nargs(0)
+            .action([&](const auto&) { ++verbosity; })
+            .append();
+    ;
 
     parser.visible.add_argument("-x", "--device")
             .help("device string in format \"cuda:0,...,N\", \"cuda:all\", \"metal\", \"cpu\" "
@@ -384,7 +391,7 @@ int basecaller(int argc, char* argv[]) {
     std::vector<std::string> args(argv, argv + argc);
 
     if (parser.visible.get<bool>("--verbose")) {
-        utils::SetDebugLogging();
+        utils::SetDebugLogging(static_cast<dorado::utils::DebugLogLevel>(verbosity));
     }
 
     auto model = parser.visible.get<std::string>("model");

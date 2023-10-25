@@ -5,6 +5,11 @@ namespace dorado::utils {
 // Initialises the default logger to point to stderr.
 void InitLogging();
 
-void SetDebugLogging();
+enum DebugLogLevel {
+    DEBUG = 0,
+    TRACE,
+};
+
+void SetDebugLogging(DebugLogLevel level = DEBUG);
 
 }  // namespace dorado::utils

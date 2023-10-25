@@ -73,9 +73,13 @@ void InitLogging() {
     }
 }
 
-void SetDebugLogging() {
+void SetDebugLogging(DebugLogLevel level) {
     if (is_safe_to_log()) {
-        spdlog::set_level(spdlog::level::debug);
+        if (level >= TRACE) {
+            spdlog::set_level(spdlog::level::trace);
+        } else if (level == DEBUG) {
+            spdlog::set_level(spdlog::level::debug);
+        }
     }
 }
 
