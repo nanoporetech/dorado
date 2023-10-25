@@ -454,7 +454,7 @@ PairingNode::PairingNode(std::map<std::string, std::string> template_complement_
     start_threads();
 }
 
-PairingNode::PairingNode(DynamicPairingParameters pairing_params,
+PairingNode::PairingNode(DuplexPairingParameters pairing_params,
                          int num_worker_threads,
                          size_t max_reads)
         : MessageSink(max_reads),

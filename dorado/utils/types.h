@@ -53,7 +53,7 @@ using SamHdrPtr = std::unique_ptr<sam_hdr_t, SamHdrDestructor>;
 
 enum class ReadOrder { UNRESTRICTED, BY_CHANNEL, BY_TIME };
 
-struct DynamicPairingParameters {
+struct DuplexPairingParameters {
     ReadOrder read_order;
     size_t cache_depth;
 };

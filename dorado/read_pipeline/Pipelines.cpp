@@ -105,9 +105,9 @@ void create_stereo_duplex_pipeline(PipelineDescriptor& pipeline_desc,
                                                                        simplex_model_stride);
 
     auto pairing_node =
-            std::holds_alternative<DynamicPairingParameters>(pairing_parameters)
+            std::holds_alternative<DuplexPairingParameters>(pairing_parameters)
                     ? pipeline_desc.add_node<PairingNode>(
-                              {stereo_node}, std::get<DynamicPairingParameters>(pairing_parameters),
+                              {stereo_node}, std::get<DuplexPairingParameters>(pairing_parameters),
                               std::thread::hardware_concurrency(), 1000)
                     : pipeline_desc.add_node<PairingNode>(
                               {stereo_node},

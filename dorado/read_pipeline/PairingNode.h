@@ -34,7 +34,7 @@ public:
                 size_t max_reads);
 
     // No template-complement map: uses the pair_generation pairing method
-    PairingNode(DynamicPairingParameters pairing_params, int num_worker_threads, size_t max_reads);
+    PairingNode(DuplexPairingParameters pairing_params, int num_worker_threads, size_t max_reads);
     ~PairingNode() { terminate_impl(); }
     std::string get_name() const override { return "PairingNode"; }
     stats::NamedStats sample_stats() const override;
