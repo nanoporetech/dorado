@@ -45,29 +45,27 @@ std::pair<float, float> ScalerNode::med_mad(const torch::Tensor& x) {
 int determine_rna_adapter_pos(const dorado::SimplexRead& read, dorado::SampleType model_type) {
     assert(read.read_common.raw_data.dtype() == torch::kInt16);
     static const std::unordered_map<dorado::SampleType, int> kOffsetMap = {
-            {dorado::SampleType::RNA002, 5000}, {dorado::SampleType::RNA004, 1000}};
-    static const std::unordered_map<dorado::SampleType, int> kMaxSignalPosMap = {
-            {dorado::SampleType::RNA002, 15000}, {dorado::SampleType::RNA004, 5000}};
+            {dorado::SampleType::RNA002, 4000}, {dorado::SampleType::RNA004, 1000}};
     static const std::unordered_map<dorado::SampleType, int16_t> kAdapterCutoff = {
-            {dorado::SampleType::RNA002, 600}, {dorado::SampleType::RNA004, 700}};
+            {dorado::SampleType::RNA002, 550}, {dorado::SampleType::RNA004, 700}};
 
     const int kWindowSize = 250;
     const int kStride = 50;
     const int16_t kMedianDiff = 125;
 
     const int kOffset = kOffsetMap.at(model_type);
-    const int kMaxSignalPos = kMaxSignalPosMap.at(model_type);
     const int16_t kMinMedianForRNASignal = kAdapterCutoff.at(model_type);
 
-    int bp = 0;
     int signal_len = read.read_common.get_raw_data_samples();
     const int16_t* signal = static_cast<int16_t*>(read.read_common.raw_data.data_ptr());
 
     // Check the median value change over 5 windows.
     std::array<int16_t, 5> medians = {0, 0, 0, 0, 0};
     int median_pos = 0;
-    for (int i = kOffset; i < std::min(std::max(signal_len / 2, kMaxSignalPos), signal_len);
-         i += kStride) {
+    int break_point = 0;
+    const int signal_start = kOffsetMap.at(model_type);
+    const int signal_end = static_cast<int>(3 * signal_len / 4);
+    for (int i = signal_start; i < signal_end; i += kStride) {
         auto slice = torch::from_blob(const_cast<int16_t*>(&signal[i]),
                                       {static_cast<int>(std::min(kWindowSize, signal_len - i))},
                                       torch::TensorOptions().dtype(torch::kInt16));
@@ -76,15 +74,15 @@ int determine_rna_adapter_pos(const dorado::SimplexRead& read, dorado::SampleTyp
         auto minmax = std::minmax_element(medians.begin(), medians.end());
         int16_t min_median = *minmax.first;
         int16_t max_median = *minmax.second;
-        if (i > (kOffset + medians.size())) {
+        if (median_pos > medians.size()) {
             if ((max_median > kMinMedianForRNASignal) && (max_median - min_median > kMedianDiff)) {
-                bp = i;
+                break_point = i;
                 break;
             }
         }
     }
 
-    return bp;
+    return break_point;
 }
 
 void ScalerNode::worker_thread() {
@@ -110,9 +108,9 @@ void ScalerNode::worker_thread() {
         }
 
         assert(read->read_common.raw_data.dtype() == torch::kInt16);
-        auto [shift, scale] = m_scaling_params.quantile_scaling
-                                      ? normalisation(read->read_common.raw_data)
-                                      : med_mad(read->read_common.raw_data);
+        const auto [shift, scale] = m_scaling_params.quantile_scaling
+                                            ? normalisation(read->read_common.raw_data)
+                                            : med_mad(read->read_common.raw_data);
         read->read_common.scaling_method =
                 m_scaling_params.quantile_scaling ? "quantile" : "med_mad";
 

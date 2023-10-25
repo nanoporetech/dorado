@@ -312,7 +312,7 @@ void PolyACalculator::worker_thread() {
                 // Update debug stats.
                 total_tail_lengths_called += num_bases;
                 ++num_called;
-                if (spdlog::get_level() == spdlog::level::debug) {
+                if (spdlog::get_level() <= spdlog::level::debug) {
                     std::lock_guard<std::mutex> lock(m_mutex);
                     tail_length_counts[num_bases]++;
                 }
@@ -359,7 +359,7 @@ void PolyACalculator::terminate_impl() {
 
     // Visualize a distribution of the tail lengths called.
     static bool done = false;
-    if (!done && spdlog::get_level() == spdlog::level::debug) {
+    if (!done && (spdlog::get_level() <= spdlog::level::debug)) {
         int max_val = -1;
         for (auto [k, v] : tail_length_counts) {
             max_val = std::max(v, max_val);
