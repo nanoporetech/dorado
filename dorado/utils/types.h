@@ -53,6 +53,13 @@ using SamHdrPtr = std::unique_ptr<sam_hdr_t, SamHdrDestructor>;
 
 enum class ReadOrder { UNRESTRICTED, BY_CHANNEL, BY_TIME };
 
+struct DuplexPairingParameters {
+    ReadOrder read_order;
+    size_t cache_depth;
+};
+/// Default cache depth to be used for the duplex pairing cache.
+constexpr static size_t DEFAULT_DUPLEX_CACHE_DEPTH = 10;
+
 inline std::string to_string(ReadOrder read_order) {
     switch (read_order) {
     case ReadOrder::UNRESTRICTED:
