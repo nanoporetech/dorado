@@ -464,9 +464,11 @@ PairingNode::PairingNode(DuplexPairingParameters pairing_params,
     switch (pairing_params.read_order) {
     case ReadOrder::BY_CHANNEL:
         m_max_num_keys = pairing_params.cache_depth;
+        spdlog::debug("Using dorado duplex channel count of {}", m_max_num_keys);
         break;
     case ReadOrder::BY_TIME:
         m_max_num_reads = pairing_params.cache_depth;
+        spdlog::debug("Using dorado duplex read-per-channel count of {}", m_max_num_reads);
         break;
     default:
         throw std::runtime_error("Unsupported read order detected: " +
