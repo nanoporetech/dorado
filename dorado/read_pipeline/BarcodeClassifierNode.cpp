@@ -263,12 +263,7 @@ void BarcodeClassifierNode::barcode(BamPtr& read) {
 
     auto bc_res = barcoder->barcode(seq, m_default_barcoding_info->barcode_both_ends,
                                     m_default_barcoding_info->sample_sheet.get());
-    std::string alias{};
-    if (m_default_barcoding_info->sample_sheet) {
-        // experiment id and position id are not stored in the bam file, so we can't recover them to use here
-        alias = m_default_barcoding_info->sample_sheet->get_alias("", "", "", bc_res.adapter_name);
-    }
-    auto bc = alias.empty() ? generate_barcode_string(bc_res) : alias;
+    auto bc = generate_barcode_string(bc_res);
     bam_aux_append(irecord, "BC", 'Z', bc.length() + 1, (uint8_t*)bc.c_str());
     m_num_records++;
 

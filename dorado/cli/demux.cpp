@@ -134,23 +134,29 @@ int demuxer(int argc, char* argv[]) {
     auto header = SamHdrPtr(sam_hdr_dup(reader.header));
     add_pg_hdr(header.get());
 
+    auto barcode_sample_sheet = parser.get<std::string>("--sample-sheet");
+    std::unique_ptr<const utils::SampleSheet> sample_sheet;
+    if (!barcode_sample_sheet.empty()) {
+        sample_sheet = std::make_unique<const utils::SampleSheet>(barcode_sample_sheet, true);
+    }
+
     PipelineDescriptor pipeline_desc;
     auto demux_writer = pipeline_desc.add_node<BarcodeDemuxerNode>(
-            {}, output_dir, demux_writer_threads, 0, parser.get<bool>("--emit-fastq"));
+            {}, output_dir, demux_writer_threads, 0, parser.get<bool>("--emit-fastq"),
+            std::move(sample_sheet));
 
     if (parser.is_used("--kit-name")) {
         std::vector<std::string> kit_names;
         if (auto names = parser.present<std::vector<std::string>>("--kit-name")) {
             kit_names = std::move(*names);
         }
-        auto barcode_sample_sheet = parser.get<std::string>("--sample-sheet");
-        std::unique_ptr<const utils::SampleSheet> sample_sheet;
+        std::unique_ptr<const utils::SampleSheet> sample_sheet_2;
         if (!barcode_sample_sheet.empty()) {
-            sample_sheet = std::make_unique<const utils::SampleSheet>(barcode_sample_sheet, true);
+            sample_sheet_2 = std::make_unique<const utils::SampleSheet>(barcode_sample_sheet, true);
         }
         auto demux = pipeline_desc.add_node<BarcodeClassifierNode>(
                 {demux_writer}, demux_threads, kit_names, parser.get<bool>("--barcode-both-ends"),
-                parser.get<bool>("--no-trim"), std::move(sample_sheet));
+                parser.get<bool>("--no-trim"), std::move(sample_sheet_2));
     }
 
     // Create the Pipeline from our description.
