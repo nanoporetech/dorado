@@ -26,6 +26,7 @@ SimplexReadPtr subread(const SimplexRead& read,
     subread->read_common.attributes.read_number = -1;
 
     //we adjust for it in new start time
+    subread->read_common.split_point = signal_range.first;
     subread->read_common.attributes.num_samples = signal_range.second - signal_range.first;
     subread->read_common.num_trimmed_samples = 0;
     subread->start_sample =

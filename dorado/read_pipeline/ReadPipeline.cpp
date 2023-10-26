@@ -101,6 +101,10 @@ void ReadCommon::generate_read_tags(bam1_t *aln, bool emit_moves, bool is_duplex
         bam_aux_append(aln, "pt", 'i', sizeof(rna_poly_tail_length),
                        (uint8_t *)&rna_poly_tail_length);
     }
+
+    if (split_point > 0) {
+        bam_aux_append(aln, "sp", 'i', sizeof(split_point), (uint8_t *)&split_point);
+    }
 }
 
 void ReadCommon::generate_duplex_read_tags(bam1_t *aln) const {
