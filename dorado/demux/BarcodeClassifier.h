@@ -10,10 +10,6 @@
 
 namespace dorado {
 
-namespace utils {
-class SampleSheet;
-}
-
 namespace demux {
 
 struct ScoreResults {
