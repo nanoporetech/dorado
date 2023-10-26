@@ -287,17 +287,7 @@ void BarcodeClassifierNode::barcode(SimplexRead& read) {
     // get the sequence to map from the record
     auto bc_res = barcoder->barcode(read.read_common.seq, barcoding_info->barcode_both_ends,
                                     barcoding_info->sample_sheet.get());
-    std::string alias{};
-    if (barcoding_info->sample_sheet) {
-        alias = barcoding_info->sample_sheet->get_alias(
-                read.read_common.flowcell_id, read.read_common.position_id,
-                read.read_common.experiment_id, bc_res.adapter_name);
-    }
-    if (!alias.empty()) {
-        read.read_common.barcode = alias;
-    } else {
-        read.read_common.barcode = generate_barcode_string(bc_res);
-    }
+    read.read_common.barcode = generate_barcode_string(bc_res);
     m_num_records++;
     if (barcoding_info->trim) {
         trim_barcode(read, bc_res);

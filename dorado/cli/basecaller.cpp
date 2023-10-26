@@ -144,16 +144,21 @@ void setup(std::vector<std::string> args,
     }
     current_sink_node = pipeline_desc.add_node<ReadToBamType>(
             {current_sink_node}, emit_moves, thread_allocations.read_converter_threads,
-            methylation_threshold_pct);
+            methylation_threshold_pct, std::move(sample_sheet), 1000);
     if (estimate_poly_a) {
         current_sink_node = pipeline_desc.add_node<PolyACalculator>(
                 {current_sink_node}, std::thread::hardware_concurrency(),
                 PolyACalculator::get_model_type(model_name));
     }
     if (!barcode_kits.empty()) {
+        std::unique_ptr<const utils::SampleSheet> sample_sheet_2;
+        if (!barcode_sample_sheet.empty()) {
+            sample_sheet_2 =
+                    std::make_unique<const utils::SampleSheet>(barcode_sample_sheet, false);
+        }
         current_sink_node = pipeline_desc.add_node<BarcodeClassifierNode>(
                 {current_sink_node}, thread_allocations.barcoder_threads, barcode_kits,
-                barcode_both_ends, barcode_no_trim, std::move(sample_sheet));
+                barcode_both_ends, barcode_no_trim, std::move(sample_sheet_2));
     }
     current_sink_node = pipeline_desc.add_node<ReadFilterNode>(
             {current_sink_node}, min_qscore, default_parameters.min_sequence_length,

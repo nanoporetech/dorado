@@ -11,13 +11,18 @@
 
 namespace dorado {
 
+namespace utils {
+class SampleSheet;
+}
+
 class ReadToBamType : public MessageSink {
 public:
     ReadToBamType(bool emit_moves,
                   size_t num_worker_threads,
-                  float modbase_threshold_frac = 0,
-                  size_t max_reads = 1000);
-    ~ReadToBamType() { terminate_impl(); }
+                  float modbase_threshold_frac,
+                  std::unique_ptr<const utils::SampleSheet> sample_sheet,
+                  size_t max_reads);
+    ~ReadToBamType();
     std::string get_name() const override { return "ReadToBamType"; }
     void terminate(const FlushOptions& flush_options) override { terminate_impl(); };
     void restart() override;
@@ -33,6 +38,7 @@ private:
 
     bool m_emit_moves;
     uint8_t m_modbase_threshold;
+    std::unique_ptr<const utils::SampleSheet> m_sample_sheet;
 };
 
 }  // namespace dorado

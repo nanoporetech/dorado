@@ -328,8 +328,8 @@ DEFINE_TEST(NodeSmokeTestBam, "ReadToBamType") {
 
     set_pipeline_restart(pipeline_restart);
 
-    run_smoke_test<dorado::ReadToBamType>(emit_moves, 2,
-                                          dorado::utils::default_parameters.methylation_threshold);
+    run_smoke_test<dorado::ReadToBamType>(
+            emit_moves, 2, dorado::utils::default_parameters.methylation_threshold, nullptr, 1000);
 }
 
 DEFINE_TEST(NodeSmokeTestRead, "BarcodeClassifierNode") {

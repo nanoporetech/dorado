@@ -74,9 +74,11 @@ void add_rg_hdr(sam_hdr_t* hdr,
                     if (!sample_sheet->barcode_is_permitted(barcode_name)) {
                         continue;
                     }
-                    alias = sample_sheet->get_alias(read_group.second.flowcell_id,
-                                                    read_group.second.position_id,
-                                                    read_group.second.experiment_id, barcode_name);
+
+                    alias = sample_sheet->get_alias(
+                            read_group.second.flowcell_id, read_group.second.position_id,
+                            read_group.second.experiment_id,
+                            barcode_kits::generate_standard_barcode_name(kit_name, barcode_name));
                 }
                 if (!alias.empty()) {
                     id += alias;

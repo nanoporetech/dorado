@@ -209,11 +209,10 @@ std::string SampleSheet::get_alias(const std::string& flow_cell_id,
         return "";
     }
 
-    auto normalized_barcode_name =
-            (barcode == "unclassified" ? barcode : barcode_kits::normalize_barcode_name(barcode));
     for (const auto& row : m_rows) {
+        auto standard_barcode_name = get(row, "kit") + "_" + get(row, "barcode");
         if (match_index(row, flow_cell_id, position_id, experiment_id) &&
-            get(row, "barcode") == normalized_barcode_name) {
+            barcode == standard_barcode_name) {
             return get(row, "alias");
         }
     }
