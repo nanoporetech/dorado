@@ -32,7 +32,7 @@ RNASplitNode::ExtRead RNASplitNode::create_ext_read(SimplexReadPtr r) const {
 }
 
 std::vector<SimplexReadPtr> RNASplitNode::subreads(SimplexReadPtr read,
-                                                   const std::vector<PosRange>& spacers) const {
+                                                   const PosRanges& spacers) const {
     std::vector<SimplexReadPtr> subreads;
     subreads.reserve(spacers.size() + 1);
 
@@ -132,6 +132,7 @@ void RNASplitNode::worker_thread() {
 
         // If this message isn't a read, we'll get a bad_variant_access exception.
         auto init_read = std::get<SimplexReadPtr>(std::move(message));
+
         for (auto& subread : split(std::move(init_read))) {
             //TODO correctly process end_reason when we have them
             send_message_to_sink(std::move(subread));

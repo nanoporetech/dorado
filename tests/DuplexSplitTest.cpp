@@ -1,7 +1,6 @@
 #include "MessageSinkUtils.h"
 #include "TestUtils.h"
 #include "read_pipeline/DuplexSplitNode.h"
-#include "read_pipeline/NullNode.h"
 #include "read_pipeline/PairingNode.h"
 #include "read_pipeline/ReadPipeline.h"
 #include "read_pipeline/StereoDuplexEncoderNode.h"
@@ -84,11 +83,17 @@ TEST_CASE("4 subread splitting test", TEST_GROUP) {
     CHECK(start_time_mss ==
           std::vector<uint64_t>{1676983561529, 1676983585837, 1676983599607, 1676983613105});
 
-    std::vector<uint64_t> num_sampless;
+    std::vector<uint64_t> num_samples;
     for (auto &r : split_res) {
-        num_sampless.push_back(r->read_common.attributes.num_samples);
+        num_samples.push_back(r->read_common.attributes.num_samples);
     }
-    CHECK(num_sampless == std::vector<uint64_t>{97125, 55055, 53940, 50475});
+    CHECK(num_samples == std::vector<uint64_t>{97125, 55055, 53940, 50475});
+
+    std::vector<uint32_t> split_points;
+    for (auto &r : split_res) {
+        split_points.push_back(r->read_common.split_point);
+    }
+    CHECK(split_points == std::vector<uint32_t>{0, 97230, 152310, 206305});
 
     std::set<std::string> names;
     for (auto &r : split_res) {

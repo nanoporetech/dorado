@@ -84,6 +84,9 @@ void ReadCommon::generate_read_tags(bam1_t *aln, bool emit_moves, bool is_duplex
     if (!parent_read_id.empty()) {
         bam_aux_append(aln, "pi", 'Z', parent_read_id.size() + 1,
                        (uint8_t *)parent_read_id.c_str());
+        // For split reads, also store the start coordinate of the new read
+        // in the original signal.
+        bam_aux_append(aln, "sp", 'i', sizeof(split_point), (uint8_t *)&split_point);
     }
 
     if (emit_moves) {
@@ -100,10 +103,6 @@ void ReadCommon::generate_read_tags(bam1_t *aln, bool emit_moves, bool is_duplex
     if (rna_poly_tail_length >= 0) {
         bam_aux_append(aln, "pt", 'i', sizeof(rna_poly_tail_length),
                        (uint8_t *)&rna_poly_tail_length);
-    }
-
-    if (split_point > 0) {
-        bam_aux_append(aln, "sp", 'i', sizeof(split_point), (uint8_t *)&split_point);
     }
 }
 

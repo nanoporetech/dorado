@@ -279,7 +279,7 @@ std::optional<PosRange> DuplexSplitNode::identify_extra_middle_split(
 }
 
 std::vector<SimplexReadPtr> DuplexSplitNode::subreads(SimplexReadPtr read,
-                                                      const std::vector<PosRange>& spacers) const {
+                                                      const PosRanges& spacers) const {
     std::vector<SimplexReadPtr> subreads;
     subreads.reserve(spacers.size() + 1);
 

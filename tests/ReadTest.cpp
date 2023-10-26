@@ -28,6 +28,7 @@ TEST_CASE(TEST_GROUP ": Test tag generation", TEST_GROUP) {
     read_common.model_name = "test_model";
     read_common.is_duplex = false;
     read_common.parent_read_id = "parent_read";
+    read_common.split_point = 0;
 
     SECTION("Basic") {
         auto alignments = read_common.extract_sam_lines(false);
@@ -42,6 +43,7 @@ TEST_CASE(TEST_GROUP ": Test tag generation", TEST_GROUP) {
         CHECK(bam_aux2i(bam_aux_get(aln, "rn")) == 18501);
         CHECK(bam_aux2i(bam_aux_get(aln, "rn")) == 18501);
         CHECK(bam_aux2i(bam_aux_get(aln, "dx")) == 0);
+        CHECK(bam_aux2i(bam_aux_get(aln, "sp")) == 0);
         CHECK(bam_aux_get(aln, "pt") == nullptr);
 
         CHECK(bam_aux2f(bam_aux_get(aln, "du")) == Approx(1.033).margin(1e-6));
