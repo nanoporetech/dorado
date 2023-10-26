@@ -131,8 +131,8 @@ int demuxer(int argc, char* argv[]) {
     }
 
     HtsReader reader(reads[0], read_list);
-    auto header = sam_hdr_dup(reader.header);
-    add_pg_hdr(header);
+    auto header = SamHdrPtr(sam_hdr_dup(reader.header));
+    add_pg_hdr(header.get());
 
     PipelineDescriptor pipeline_desc;
     auto demux_writer = pipeline_desc.add_node<BarcodeDemuxerNode>(
@@ -165,8 +165,7 @@ int demuxer(int argc, char* argv[]) {
     // rather than the pipeline framework.
     auto& demux_writer_ref =
             dynamic_cast<BarcodeDemuxerNode&>(pipeline->get_node_ref(demux_writer));
-    demux_writer_ref.set_header(header);
-    sam_hdr_destroy(header);
+    demux_writer_ref.set_header(header.get());
 
     // Set up stats counting
     std::vector<dorado::stats::StatsCallable> stats_callables;
