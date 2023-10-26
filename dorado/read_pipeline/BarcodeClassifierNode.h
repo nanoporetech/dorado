@@ -1,5 +1,5 @@
 #pragma once
-#include "BarcodeClassifierSelector.h"
+#include "demux/BarcodeClassifierSelector.h"
 #include "read_pipeline/ReadPipeline.h"
 #include "utils/stats.h"
 #include "utils/types.h"
@@ -11,12 +11,17 @@
 
 namespace dorado {
 
+namespace demux {
+struct ScoreResults;
+}
+
 class BarcodeClassifierNode : public MessageSink {
 public:
     BarcodeClassifierNode(int threads,
                           const std::vector<std::string>& kit_name,
                           bool barcode_both_ends,
-                          bool no_trim);
+                          bool no_trim,
+                          const BarcodingInfo::FilterSet& allowed_barcodes);
     BarcodeClassifierNode(int threads);
     ~BarcodeClassifierNode();
     std::string get_name() const override { return "BarcodeClassifierNode"; }
@@ -31,10 +36,10 @@ private:
     std::atomic<size_t> m_active{0};
     std::vector<std::unique_ptr<std::thread>> m_workers;
     std::atomic<int> m_num_records{0};
-    const BarcodingInfo m_default_barcoding_info{};
+    std::shared_ptr<const BarcodingInfo> m_default_barcoding_info;
     demux::BarcodeClassifierSelector m_barcoder_selector{};
 
-    const BarcodingInfo* get_barcoding_info(const SimplexRead& read) const;
+    std::shared_ptr<const BarcodingInfo> get_barcoding_info(const SimplexRead& read) const;
 
     void worker_thread(size_t tid);
     void barcode(BamPtr& read);

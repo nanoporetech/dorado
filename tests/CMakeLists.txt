@@ -25,9 +25,11 @@ set(UNIT_TEST_SOURCE_FILES
     ReadFilterNodeTest.cpp
     ReadTest.cpp
     ResumeLoaderTest.cpp
+    SampleSheetTests.cpp
     SequenceUtilsTest.cpp
     StereoDuplexTest.cpp
     StitchTest.cpp
+    StringUtilsTest.cpp
     TensorUtilsTest.cpp
     TimeUtilsTest.cpp
     TrimTest.cpp

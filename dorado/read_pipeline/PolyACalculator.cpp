@@ -56,7 +56,6 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
 
     std::vector<std::pair<int, int>> intervals;
     std::pair<float, float> last_interval_stats;
-    std::vector<std::pair<float, float>> interval_stats;
 
     // Maximum variance between consecutive values to be
     // considered part of the same interval.
@@ -66,6 +65,10 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
     const int kSpread = num_samples_per_base * kMaxTailLength;
     // Maximum gap between intervals that can be combined.
     const int kMaxSampleGap = num_samples_per_base * 3;
+    // Minimum size of intervals considered for merge.
+    const int kMinIntervalSizeForMerge = 10 * num_samples_per_base;
+    // Floor for average signal value of poly tail.
+    const float kMinAvgVal = (is_rna ? 0.0 : -3.0);
 
     int left_end = is_rna ? std::max(0, signal_anchor - 50) : std::max(0, signal_anchor - kSpread);
     int right_end = std::min(signal_len, signal_anchor + kSpread);
@@ -76,15 +79,30 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
         int e = std::min(s + kMaxSampleGap, right_end);
         auto [avg, stdev] = calc_stats(s, e);
         if (stdev < kVar) {
+            // If a new interval overlaps with the previous interval, just extend
+            // the previous interval.
             if (intervals.size() > 1 && intervals.back().second >= s &&
-                std::abs(avg - last_interval_stats.first) < 0.2) {
+                std::abs(avg - last_interval_stats.first) < 0.2 && (avg > kMinAvgVal)) {
                 auto& last = intervals.back();
                 last.second = e;
             } else {
+                // Attempt to merge the most recent interval and the one before
+                // that if the gap between the intervals is small and both of the
+                // intervals are longer than some threshold.
+                if (intervals.size() > 2) {
+                    auto& last = intervals.back();
+                    auto& second_last = intervals[intervals.size() - 2];
+                    if ((last.first - second_last.second < kMaxSampleGap) &&
+                        (last.second - last.first > kMinIntervalSizeForMerge) &&
+                        (second_last.second - second_last.first > kMinIntervalSizeForMerge)) {
+                        second_last.second = last.second;
+                        intervals.pop_back();
+                    }
+                }
+
                 intervals.push_back({s, e});
             }
             last_interval_stats = {avg, stdev};
-            interval_stats.push_back({avg, stdev});
         }
     }
 
@@ -95,14 +113,16 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
     spdlog::debug("found intervals {}", int_str);
 
     std::vector<std::pair<int, int>> filtered_intervals;
-    // In forward strand, the poly A/T signal should end within 25bp of the
-    // signal anchor, and in reverse strand it should start within 25bp of the
-    // anchor. Or the signal anchor should be within the detected signal range.
-    const int kAnchorProximity = 25 * num_samples_per_base;
     std::copy_if(intervals.begin(), intervals.end(), std::back_inserter(filtered_intervals),
                  [&](auto& i) {
-                     return (fwd ? std::abs(signal_anchor - i.second) < kAnchorProximity
-                                 : std::abs(signal_anchor - i.first) < kAnchorProximity) ||
+                     int interval_size = i.second - i.first;
+                     // Filter out any small intervals.
+                     if (interval_size < (num_samples_per_base * 5)) {
+                         return false;
+                     }
+                     // Only keep intervals that are close-ish to the signal anchor.
+                     return (fwd ? std::abs(signal_anchor - i.second) < interval_size
+                                 : std::abs(signal_anchor - i.first) < interval_size) ||
                             (i.first <= signal_anchor) && (signal_anchor <= i.second);
                  });
 
@@ -141,11 +161,22 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
     return *best_interval;
 }
 
-// Basic estimation of avg translocation speed by dividing number of samples by the
-// number of bases called.
-int estimate_samples_per_base(const dorado::SimplexRead& read) {
-    float num_samples_per_base = static_cast<float>(read.read_common.get_raw_data_samples()) /
-                                 read.read_common.seq.length();
+// Estimate the number of samples per base. For RNA, use the last 100 bases
+// to get a measure of samples/base. For DNA, just taking the average across
+// the whole read gives a decent estimate.
+int estimate_samples_per_base(const dorado::SimplexRead& read, bool is_rna) {
+    size_t num_bases = read.read_common.seq.length();
+    if (is_rna && num_bases > 250) {
+        const auto stride = read.read_common.model_stride;
+        const auto seq_to_sig_map =
+                dorado::utils::moves_to_map(read.read_common.moves, stride,
+                                            read.read_common.get_raw_data_samples(), num_bases + 1);
+        // Use last 100bp to estimate samples / base.
+        size_t signal_len = seq_to_sig_map[num_bases] - seq_to_sig_map[num_bases - 100];
+        return std::floor(static_cast<float>(signal_len) / 100);
+    }
+    float num_samples_per_base =
+            static_cast<float>(read.read_common.get_raw_data_samples()) / num_bases;
     // The estimate is not rounded because this calculation generally overestimates
     // the samples per base. Rounding down gives better results than rounding to nearest.
     return std::floor(num_samples_per_base);
@@ -191,19 +222,18 @@ SignalAnchorInfo determine_signal_anchor_and_strand_cdna(const dorado::SimplexRe
     int dist_v2 = top_v2.editDistance + bottom_v2.editDistance;
     spdlog::debug("v1 dist {}, v2 dist {}", dist_v1, dist_v2);
 
-    bool proceed = std::min(dist_v1, dist_v2) < 30;
+    bool fwd = dist_v1 < dist_v2;
+    bool proceed = std::min(dist_v1, dist_v2) < 30 && std::abs(dist_v1 - dist_v2) > 10;
 
     SignalAnchorInfo result = {false, -1, trailing_Ts};
 
     if (proceed) {
-        bool fwd = true;
         int start = 0, end = 0;
         int base_anchor = 0;
-        if (dist_v2 < dist_v1) {
-            fwd = false;
-            base_anchor = top_v2.endLocations[0];
-        } else {
+        if (fwd) {
             base_anchor = bottom_start + bottom_v1.startLocations[0];
+        } else {
+            base_anchor = top_v2.endLocations[0];
         }
 
         const auto stride = read.read_common.model_stride;
@@ -226,53 +256,50 @@ SignalAnchorInfo determine_signal_anchor_and_strand_cdna(const dorado::SimplexRe
     return result;
 }
 
-// The approach used for determining the approximate location of the polyA
-// tail in dRNA is different. Since dRNA is single stranded, we already know the
-// direction of the read. However, in dRNA, the adapter is DNA. But the model for
-// basecalling is trained on RNA data. So the basecall quality of the adapter is poor,
-// and alignment doesn't work well. Instead, the raw signal is traversed to find a point
-// where there's a jump in the mean signal value, which is indicative of the
+// Since the adapter in RNA is still DNA, the basecall quality of the adapter is poor because we
+// infer with a model trained on RNA data. So finding a match of the adapter sequence in the RNA sequence
+// doesn't work well. Instead, the raw signal is traversed to find a point
+// where there's a jump in the median signal value, which is indicative of the
 // transition from the DNA adapter to the RNA signal. The polyA will start right
 // at that juncture. This function returns a struct with the strand
 // direction (which is always reverse for dRNA), the signal anchor and the number of bases
 // to omit from the tail length estimation due to any adapter effects.
-SignalAnchorInfo determine_signal_anchor_and_strand_drna(const dorado::SimplexRead& read) {
-    const c10::Half* signal = static_cast<c10::Half*>(read.read_common.raw_data.data_ptr());
-    int signal_len = read.read_common.get_raw_data_samples();
-    const int kWindow = 50;
+SignalAnchorInfo determine_signal_anchor_and_strand_drna(
+        const dorado::SimplexRead& read,
+        dorado::PolyACalculator::ModelType model_type) {
+    static const std::unordered_map<dorado::PolyACalculator::ModelType, int> kOffsetMap = {
+            {dorado::PolyACalculator::ModelType::RNA002, 5000},
+            {dorado::PolyACalculator::ModelType::RNA004, 1000}};
+    static const std::unordered_map<dorado::PolyACalculator::ModelType, int> kMaxSignalPosMap = {
+            {dorado::PolyACalculator::ModelType::RNA002, 10000},
+            {dorado::PolyACalculator::ModelType::RNA004, 5000}};
 
-    // The algorithm is to keep track of the mean signal value over
-    // consecutive windows and find the point when there's a sharp
-    // increase in mean signal values. 5 previous mean values are
-    // considered with a window size of 50. This gives a rolling
-    // window view of ~250 bases.
-    std::array<float, 5> means;
-    auto check_var = [&means](int latest) -> float {
-        auto min_elem = std::min_element(means.begin(), means.end());
-        return (means[latest] - *min_elem);
-    };
+    const int kWindowSize = 250;
+    const int kStride = 50;
+    const int kOffset = kOffsetMap.at(model_type);
+    const int kMaxSignalPos = kMaxSignalPosMap.at(model_type);
+
+    const float kMinMedianForRNASignal = 0.f;
+    const float kMinMedianDiff = 1.f;
 
     int bp = -1;
-    // Since the polyA will start after the adapter, and in RNA each
-    // base is at least 30 samples long (e.g. in RNA002), we can
-    // limit the search space to start from 30 bases from the beginning
-    // and up till about half the signal lengths. Note this is only to find
-    // the __start__ of the polyA signal.
-    for (int i = 3000, num_windows_seen = 0; i < signal_len / 2; i += kWindow, num_windows_seen++) {
-        float mean = 0;
-        int s = i, e = i + kWindow;
-        for (int j = s; j < e; j++) {
-            mean += signal[j];
+    int signal_len = read.read_common.get_raw_data_samples();
+    auto sig_fp32 = read.read_common.raw_data.to(torch::kFloat);
+    float last_median = 0.f;
+    for (int i = kOffset; i < std::min(signal_len / 2, kMaxSignalPos); i += kStride) {
+        auto slice = sig_fp32.slice(0, std::max(0, i - kWindowSize / 2),
+                                    std::min(signal_len, i + kWindowSize / 2));
+        float median = slice.median().item<float>();
+        if (median > kMinMedianForRNASignal) {
+            float diff = median - last_median;
+            if (diff > kMinMedianDiff) {
+                bp = i;
+                break;
+            }
         }
-        mean /= kWindow;
-        int means_idx = num_windows_seen % means.size();
-        means[means_idx] = mean;
-        auto var = check_var(means_idx);
-        if (num_windows_seen >= means.size() && var > 2.2f) {
-            bp = i;
-            break;
-        }
+        last_median = median;
     }
+
     spdlog::debug("Approx break point {}", bp);
 
     if (bp > 0) {
@@ -303,13 +330,13 @@ void PolyACalculator::worker_thread() {
         // Determine the strand direction, approximate base space anchor for the tail, and whether
         // the final length needs to be adjusted depending on the adapter sequence.
         auto [fwd, signal_anchor, trailing_Ts] =
-                m_is_rna ? determine_signal_anchor_and_strand_drna(*read)
+                m_is_rna ? determine_signal_anchor_and_strand_drna(*read, m_model_type)
                          : determine_signal_anchor_and_strand_cdna(*read);
 
         if (signal_anchor >= 0) {
             spdlog::debug("Strand {}; poly A/T signal anchor {}", fwd ? '+' : '-', signal_anchor);
 
-            auto num_samples_per_base = estimate_samples_per_base(*read);
+            auto num_samples_per_base = estimate_samples_per_base(*read, m_is_rna);
 
             // Walk through signal
             auto [signal_start, signal_end] = determine_signal_bounds(
@@ -318,7 +345,7 @@ void PolyACalculator::worker_thread() {
             int num_bases = std::round(static_cast<float>(signal_end - signal_start) /
                                        num_samples_per_base) -
                             trailing_Ts;
-            if (num_bases >= 0 && num_bases < kMaxTailLength) {
+            if (num_bases > 0 && num_bases < kMaxTailLength) {
                 spdlog::debug(
                         "{} PolyA bases {}, signal anchor {} Signal range is {} {}, "
                         "samples/base {} trim {}",
@@ -351,8 +378,13 @@ void PolyACalculator::worker_thread() {
     }
 }
 
-PolyACalculator::PolyACalculator(size_t num_worker_threads, bool is_rna, size_t max_reads)
-        : MessageSink(max_reads), m_num_worker_threads(num_worker_threads), m_is_rna(is_rna) {
+PolyACalculator::PolyACalculator(size_t num_worker_threads,
+                                 PolyACalculator::ModelType model_type,
+                                 size_t max_reads)
+        : MessageSink(max_reads),
+          m_num_worker_threads(num_worker_threads),
+          m_is_rna(model_type == ModelType::RNA004 || model_type == ModelType::RNA002),
+          m_model_type(model_type) {
     start_threads();
 }
 
@@ -399,11 +431,22 @@ void PolyACalculator::restart() {
 stats::NamedStats PolyACalculator::sample_stats() const {
     stats::NamedStats stats = stats::from_obj(m_work_queue);
     stats["reads_not_estimated"] = num_not_called.load();
-    ;
     stats["reads_estimated"] = num_called.load();
     stats["average_tail_length"] =
             num_called.load() > 0 ? total_tail_lengths_called.load() / num_called.load() : 0;
     return stats;
+}
+
+PolyACalculator::ModelType PolyACalculator::get_model_type(const std::string& model_name) {
+    if (model_name.find("rna004") != std::string::npos) {
+        return PolyACalculator::ModelType::RNA004;
+    } else if (model_name.find("rna002") != std::string::npos) {
+        return PolyACalculator::ModelType::RNA002;
+    } else if (model_name.find("dna") != std::string::npos) {
+        return PolyACalculator::ModelType::DNA;
+    } else {
+        throw std::runtime_error("Could not determine model type for " + model_name);
+    }
 }
 
 }  // namespace dorado

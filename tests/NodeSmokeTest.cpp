@@ -342,7 +342,8 @@ DEFINE_TEST(NodeSmokeTestRead, "BarcodeClassifierNode") {
     set_pipeline_restart(pipeline_restart);
 
     std::vector<std::string> kits = {"SQK-RPB004", "EXP-NBD196"};
-    run_smoke_test<dorado::BarcodeClassifierNode>(2, kits, barcode_both_ends, no_trim);
+    run_smoke_test<dorado::BarcodeClassifierNode>(2, kits, barcode_both_ends, no_trim,
+                                                  std::nullopt);
 }
 
 TEST_CASE("BarcodeClassifierNode: test simple pipeline with fastq and sam files") {
@@ -353,7 +354,7 @@ TEST_CASE("BarcodeClassifierNode: test simple pipeline with fastq and sam files"
     bool barcode_both_ends = GENERATE(true, false);
     bool no_trim = GENERATE(true, false);
     auto classifier = pipeline_desc.add_node<dorado::BarcodeClassifierNode>(
-            {sink}, 8, kits, barcode_both_ends, no_trim);
+            {sink}, 8, kits, barcode_both_ends, no_trim, std::nullopt);
 
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
 
@@ -368,7 +369,8 @@ TEST_CASE("BarcodeClassifierNode: test simple pipeline with fastq and sam files"
 
 DEFINE_TEST(NodeSmokeTestRead, "PolyACalculator") {
     auto pipeline_restart = GENERATE(false, true);
-    auto is_rna = GENERATE(true, false);
+    auto is_rna = GENERATE(dorado::PolyACalculator::ModelType::DNA,
+                           dorado::PolyACalculator::ModelType::RNA004);
     CAPTURE(pipeline_restart);
     CAPTURE(is_rna);
 

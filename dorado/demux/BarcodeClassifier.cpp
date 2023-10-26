@@ -99,6 +99,16 @@ float extract_mask_score(std::string_view adapter,
     return score;
 }
 
+bool barcode_is_permitted(const BarcodingInfo::FilterSet& allowed_barcodes,
+                          const std::string& adapter_name) {
+    if (!allowed_barcodes.has_value()) {
+        return true;
+    }
+
+    auto normalized_barcode_name = barcode_kits::normalize_barcode_name(adapter_name);
+    return allowed_barcodes->count(normalized_barcode_name) != 0;
+}
+
 }  // namespace
 
 namespace demux {
@@ -125,8 +135,11 @@ BarcodeClassifier::BarcodeClassifier(const std::vector<std::string>& kit_names)
 
 BarcodeClassifier::~BarcodeClassifier() = default;
 
-ScoreResults BarcodeClassifier::barcode(const std::string& seq, bool barcode_both_ends) const {
-    auto best_adapter = find_best_adapter(seq, m_adapter_sequences, barcode_both_ends);
+ScoreResults BarcodeClassifier::barcode(const std::string& seq,
+                                        bool barcode_both_ends,
+                                        const BarcodingInfo::FilterSet& allowed_barcodes) const {
+    auto best_adapter =
+            find_best_adapter(seq, m_adapter_sequences, barcode_both_ends, allowed_barcodes);
     return best_adapter;
 }
 
@@ -203,7 +216,8 @@ std::vector<BarcodeClassifier::AdapterSequence> BarcodeClassifier::generate_adap
 // of that adapter sequence. This leads to 2 variants of the barcode arrangements.
 std::vector<ScoreResults> BarcodeClassifier::calculate_adapter_score_different_double_ends(
         std::string_view read_seq,
-        const AdapterSequence& as) const {
+        const AdapterSequence& as,
+        const BarcodingInfo::FilterSet& allowed_barcodes) const {
     std::string_view read_top = read_seq.substr(0, TRIM_LENGTH);
     int bottom_start = std::max(0, (int)read_seq.length() - TRIM_LENGTH);
     std::string_view read_bottom = read_seq.substr(bottom_start, TRIM_LENGTH);
@@ -262,6 +276,11 @@ std::vector<ScoreResults> BarcodeClassifier::calculate_adapter_score_different_d
         auto& adapter = as.adapter[i];
         auto& adapter_rev = as.adapter_rev[i];
         auto& adapter_name = as.adapter_name[i];
+
+        if (!barcode_is_permitted(allowed_barcodes, adapter_name)) {
+            continue;
+        }
+
         spdlog::debug("Checking barcode {}", adapter_name);
 
         // Calculate barcode scores for v1.
@@ -332,7 +351,8 @@ std::vector<ScoreResults> BarcodeClassifier::calculate_adapter_score_different_d
 // reverse complement sequence in the top/bottom windows.
 std::vector<ScoreResults> BarcodeClassifier::calculate_adapter_score_double_ends(
         std::string_view read_seq,
-        const AdapterSequence& as) const {
+        const AdapterSequence& as,
+        const BarcodingInfo::FilterSet& allowed_barcodes) const {
     bool debug_mode = (spdlog::get_level() == spdlog::level::debug);
     std::string_view read_top = read_seq.substr(0, TRIM_LENGTH);
     int bottom_start = std::max(0, (int)read_seq.length() - TRIM_LENGTH);
@@ -362,6 +382,11 @@ std::vector<ScoreResults> BarcodeClassifier::calculate_adapter_score_double_ends
         auto& adapter = as.adapter[i];
         auto& adapter_rev = as.adapter_rev[i];
         auto& adapter_name = as.adapter_name[i];
+
+        if (!barcode_is_permitted(allowed_barcodes, adapter_name)) {
+            continue;
+        }
+
         spdlog::debug("Checking barcode {}", adapter_name);
 
         auto top_mask_score = extract_mask_score(adapter, top_mask, mask_config, "top window");
@@ -400,7 +425,8 @@ std::vector<ScoreResults> BarcodeClassifier::calculate_adapter_score_double_ends
 // 150bp) of the read.
 std::vector<ScoreResults> BarcodeClassifier::calculate_adapter_score(
         std::string_view read_seq,
-        const AdapterSequence& as) const {
+        const AdapterSequence& as,
+        const BarcodingInfo::FilterSet& allowed_barcodes) const {
     bool debug_mode = (spdlog::get_level() == spdlog::level::debug);
     std::string_view read_top = read_seq.substr(0, TRIM_LENGTH);
 
@@ -422,6 +448,11 @@ std::vector<ScoreResults> BarcodeClassifier::calculate_adapter_score(
     for (int i = 0; i < as.adapter.size(); i++) {
         auto& adapter = as.adapter[i];
         auto& adapter_name = as.adapter_name[i];
+
+        if (!barcode_is_permitted(allowed_barcodes, adapter_name)) {
+            continue;
+        }
+
         spdlog::debug("Checking barcode {}", adapter_name);
 
         auto top_mask_score = extract_mask_score(adapter, top_mask, mask_config, "top window");
@@ -534,9 +565,11 @@ std::tuple<ScoreResults, int, bool> check_bc_with_longest_match(const ScoreResul
 
 // Score every barcode against the input read and returns the best match,
 // or an unclassified match, based on certain heuristics.
-ScoreResults BarcodeClassifier::find_best_adapter(const std::string& read_seq,
-                                                  const std::vector<AdapterSequence>& adapters,
-                                                  bool barcode_both_ends) const {
+ScoreResults BarcodeClassifier::find_best_adapter(
+        const std::string& read_seq,
+        const std::vector<AdapterSequence>& adapters,
+        bool barcode_both_ends,
+        const BarcodingInfo::FilterSet& allowed_barcodes) const {
     if (read_seq.length() < TRIM_LENGTH) {
         return UNCLASSIFIED;
     }
@@ -557,15 +590,19 @@ ScoreResults BarcodeClassifier::find_best_adapter(const std::string& read_seq,
     auto& kit = kit_info_map.at(as->kit);
     if (kit.double_ends) {
         if (kit.ends_different) {
-            auto out = calculate_adapter_score_different_double_ends(fwd, *as);
+            auto out = calculate_adapter_score_different_double_ends(fwd, *as, allowed_barcodes);
             scores.insert(scores.end(), out.begin(), out.end());
         } else {
-            auto out = calculate_adapter_score_double_ends(fwd, *as);
+            auto out = calculate_adapter_score_double_ends(fwd, *as, allowed_barcodes);
             scores.insert(scores.end(), out.begin(), out.end());
         }
     } else {
-        auto out = calculate_adapter_score(fwd, *as);
+        auto out = calculate_adapter_score(fwd, *as, allowed_barcodes);
         scores.insert(scores.end(), out.begin(), out.end());
+    }
+
+    if (scores.empty()) {
+        return UNCLASSIFIED;
     }
 
     if (kit.double_ends) {
@@ -590,22 +627,32 @@ ScoreResults BarcodeClassifier::find_best_adapter(const std::string& read_seq,
     // Score the scores windows by their adapter score.
     std::sort(scores.begin(), scores.end(),
               [](const auto& l, const auto& r) { return l.score > r.score; });
-    auto best_score = scores.begin();
-    auto second_best_score = std::next(best_score);
 
     std::stringstream d;
     for (auto& s : scores) {
         d << s.score << " " << s.adapter_name << ", ";
     }
     spdlog::debug("Scores: {}", d.str());
-    const float kMargin = 0.25f;
+    auto best_score = scores.begin();
+    auto are_scores_acceptable = [](const auto& score) {
+        return (score.flank_score >= 0.7 && score.score >= 0.6) ||
+               (score.score >= 0.7 && score.flank_score >= 0.6) ||
+               (score.top_score >= 0.6 && score.bottom_score >= 0.6);
+    };
+
     ScoreResults out = UNCLASSIFIED;
-    if (best_score->score - second_best_score->score >= 0.1f) {
-        if ((best_score->flank_score >= 0.7 && best_score->score >= 0.6) ||
-            (best_score->score >= 0.7 && best_score->flank_score >= 0.6) ||
-            (best_score->top_score >= 0.6 && best_score->bottom_score >= 0.6) ||
-            (best_score->score - second_best_score->score >= kMargin)) {
+    if (scores.size() == 1) {
+        if (are_scores_acceptable(*best_score)) {
             out = *best_score;
+        }
+    } else {
+        auto second_best_score = std::next(best_score);
+        if (best_score->score - second_best_score->score >= 0.1f) {
+            const float kMargin = 0.25f;
+            if (are_scores_acceptable(*best_score) ||
+                (best_score->score - second_best_score->score >= kMargin)) {
+                out = *best_score;
+            }
         }
     }
 

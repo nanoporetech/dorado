@@ -1,0 +1,6 @@
+experiment_id,flow_cell_id,kit,sample_id
+exp,1,a,b
+exp,2,a b,5
+exp,3,empty,
+exp,4,,empty
+exp,5,x,-_

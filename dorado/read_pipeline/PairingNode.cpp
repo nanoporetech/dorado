@@ -34,6 +34,12 @@ PairingNode::PairingResult PairingNode::is_within_time_and_length_criteria(
         const dorado::SimplexRead& temp,
         const dorado::SimplexRead& comp,
         int tid) {
+    // A duplex pair can only occur for adjacent reads. Which means
+    // that for the complement, the template read must be its predecessor.
+    if (temp.read_common.read_id != comp.prev_read && temp.next_read != comp.read_common.read_id) {
+        return {false, 0, 0, 0, 0};
+    }
+
     int delta = comp.read_common.start_time_ms - temp.get_end_time_ms();
     int seq_len1 = temp.read_common.seq.length();
     int seq_len2 = comp.read_common.seq.length();
@@ -448,21 +454,25 @@ PairingNode::PairingNode(std::map<std::string, std::string> template_complement_
     start_threads();
 }
 
-PairingNode::PairingNode(ReadOrder read_order, int num_worker_threads, size_t max_reads)
+PairingNode::PairingNode(DuplexPairingParameters pairing_params,
+                         int num_worker_threads,
+                         size_t max_reads)
         : MessageSink(max_reads),
           m_num_worker_threads(num_worker_threads),
           m_max_num_keys(std::numeric_limits<size_t>::max()),
           m_max_num_reads(std::numeric_limits<size_t>::max()) {
-    switch (read_order) {
+    switch (pairing_params.read_order) {
     case ReadOrder::BY_CHANNEL:
-        m_max_num_keys = 10;
+        m_max_num_keys = pairing_params.cache_depth;
+        spdlog::debug("Using dorado duplex channel count of {}", m_max_num_keys);
         break;
     case ReadOrder::BY_TIME:
-        m_max_num_reads = 10;
+        m_max_num_reads = pairing_params.cache_depth;
+        spdlog::debug("Using dorado duplex read-per-channel count of {}", m_max_num_reads);
         break;
     default:
         throw std::runtime_error("Unsupported read order detected: " +
-                                 dorado::to_string(read_order));
+                                 dorado::to_string(pairing_params.read_order));
     }
     m_pairing_func = &PairingNode::pair_generating_worker_thread;
     start_threads();

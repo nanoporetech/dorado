@@ -24,6 +24,9 @@ add_library(dorado_utils
     module_utils.h
     parameters.cpp
     parameters.h
+    PostCondition.h
+    SampleSheet.cpp
+    SampleSheet.h
     sequence_utils.cpp
     sequence_utils.h
     stats.h

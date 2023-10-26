@@ -29,12 +29,6 @@ struct Attributes {
 };
 }  // namespace details
 
-struct BarcodingInfo {
-    std::string kit_name{};
-    bool barcode_both_ends{false};
-    bool trim{false};
-};
-
 class ReadCommon {
 public:
     torch::Tensor raw_data;  // Loaded from source file
@@ -54,7 +48,7 @@ public:
 
     uint64_t start_time_ms;
 
-    BarcodingInfo barcoding_info{};
+    std::shared_ptr<const BarcodingInfo> barcoding_info;
     std::string alignment_string{};
 
     // A unique identifier for each input read
@@ -135,6 +129,10 @@ public:
     // This is atomic because multiple threads can write to it at the same time.
     // For example, if a read (call it 2) is in the cache, and is selected as a potential pair match by two incoming reads (1 and 3) on two other threads, these threads can both update `is_duplex_parent` at the same time.
     std::atomic_bool is_duplex_parent{false};
+
+    // Track the previous/next read fom the same channel/mux.
+    std::string prev_read;
+    std::string next_read;
 };
 
 using SimplexReadPtr = std::unique_ptr<SimplexRead>;

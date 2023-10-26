@@ -94,7 +94,7 @@ To call modifications, add `--modified-bases` to the basecaller command:
 $ dorado basecaller dna_r10.4.1_e8.2_400bps_hac@v4.1.0 pod5s/ --modified-bases 5mCG_5hmCG > calls.bam
 ```
 
-Refer to the [modified base models](#modified-base-models) section to see available modifications.
+Refer to the [DNA models](#dna-models) table's _Compatible Modifications_ column to see available modifications that can be called with the `--modified-bases` option.
 
 ### Duplex
 
@@ -218,7 +218,7 @@ The names of Dorado models are systematically structured, each segment correspon
 
 - **Pore Type (`r10.4.1`)**: This section corresponds to the type of flow cell used. For instance, FLO-MIN114/FLO-FLG114 is indicated by `r10.4.1`, while FLO-MIN106D/FLO-FLG001 is signified by `r9.4.1`.
 
-- **Chemistry Type (`e8.2`)**: This represents the chemistry type, which corresponds to the kit used for sequencing. For example, Kit 14 chemistry is denoted by `e8.2`.
+- **Chemistry Type (`e8.2`)**: This represents the chemistry type, which corresponds to the kit used for sequencing. For example, Kit 14 chemistry is denoted by `e8.2` and Kit 10 or Kit 9 are denoted by `e8`.
 
 - **Translocation Speed (`400bps`)**: This parameter, selected at the run setup in MinKNOW, refers to the speed of translocation. Prior to starting your run, a prompt will ask if you prefer to run at 260 bps or 400 bps. The former yields more accurate results but provides less data. As of MinKNOW version 23.04, the 260 bps option has been deprecated.
 

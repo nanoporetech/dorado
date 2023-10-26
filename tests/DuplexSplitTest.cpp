@@ -48,6 +48,9 @@ auto make_read() {
     read->read_common.raw_data = read->read_common.raw_data.to(torch::kFloat16);
     read->read_common.read_tag = 42;
 
+    read->prev_read = "prev";
+    read->next_read = "next";
+
     return read;
 }
 }  // namespace
@@ -59,42 +62,56 @@ TEST_CASE("4 subread splitting test", TEST_GROUP) {
     dorado::DuplexSplitNode splitter_node(splitter_settings, 1);
 
     const auto split_res = splitter_node.split(std::move(read));
-    REQUIRE(split_res.size() == 4);
+    CHECK(split_res.size() == 4);
     std::vector<int> split_sizes;
     for (auto &r : split_res) {
         split_sizes.push_back(r->read_common.seq.size());
     }
-    REQUIRE(split_sizes == std::vector<int>{6858, 7854, 5184, 5168});
+    CHECK(split_sizes == std::vector<int>{6858, 7854, 5184, 5168});
 
     std::vector<std::string> start_times;
     for (auto &r : split_res) {
         start_times.push_back(r->read_common.attributes.start_time);
     }
-    REQUIRE(start_times == std::vector<std::string>{"2023-02-21T12:46:01.529+00:00",
-                                                    "2023-02-21T12:46:25.837+00:00",
-                                                    "2023-02-21T12:46:39.607+00:00",
-                                                    "2023-02-21T12:46:53.105+00:00"});
+    CHECK(start_times == std::vector<std::string>{
+                                 "2023-02-21T12:46:01.529+00:00", "2023-02-21T12:46:25.837+00:00",
+                                 "2023-02-21T12:46:39.607+00:00", "2023-02-21T12:46:53.105+00:00"});
 
     std::vector<uint64_t> start_time_mss;
     for (auto &r : split_res) {
         start_time_mss.push_back(r->read_common.start_time_ms);
     }
-    REQUIRE(start_time_mss ==
-            std::vector<uint64_t>{1676983561529, 1676983585837, 1676983599607, 1676983613105});
+    CHECK(start_time_mss ==
+          std::vector<uint64_t>{1676983561529, 1676983585837, 1676983599607, 1676983613105});
 
     std::vector<uint64_t> num_sampless;
     for (auto &r : split_res) {
         num_sampless.push_back(r->read_common.attributes.num_samples);
     }
-    REQUIRE(num_sampless == std::vector<uint64_t>{97125, 55055, 53940, 50475});
+    CHECK(num_sampless == std::vector<uint64_t>{97125, 55055, 53940, 50475});
 
     std::set<std::string> names;
     for (auto &r : split_res) {
         names.insert(r->read_common.read_id);
     }
-    REQUIRE(names.size() == 4);
-    REQUIRE(std::all_of(split_res.begin(), split_res.end(),
-                        [](const auto &r) { return r->read_common.read_tag == 42; }));
+    CHECK(names.size() == 4);
+    CHECK(std::all_of(split_res.begin(), split_res.end(),
+                      [](const auto &r) { return r->read_common.read_tag == 42; }));
+
+    std::vector<std::string> prev_read_names;
+    std::vector<std::string> next_read_names;
+    for (auto &r : split_res) {
+        prev_read_names.push_back(r->prev_read);
+        next_read_names.push_back(r->next_read);
+    }
+    CHECK(prev_read_names == std::vector<std::string>{"prev",
+                                                      "e7e47439-5968-4883-96ff-7f2d2040dc43",
+                                                      "a62e28ab-c367-4a93-af9b-84130d3df58c",
+                                                      "f8e75422-3275-47f6-b45f-062aa00df368"});
+    CHECK(next_read_names == std::vector<std::string>{"a62e28ab-c367-4a93-af9b-84130d3df58c",
+                                                      "f8e75422-3275-47f6-b45f-062aa00df368",
+                                                      "c4219558-db6c-476e-a9e5-81f4694f263c",
+                                                      "next"});
 }
 
 TEST_CASE("4 subread split tagging", TEST_GROUP) {
@@ -106,8 +123,11 @@ TEST_CASE("4 subread split tagging", TEST_GROUP) {
     auto tag_node = pipeline_desc.add_node<dorado::SubreadTaggerNode>({sink});
     auto stereo_node = pipeline_desc.add_node<dorado::StereoDuplexEncoderNode>(
             {tag_node}, read->read_common.model_stride);
-    auto pairing_node = pipeline_desc.add_node<dorado::PairingNode>({stereo_node},
-                                                                    dorado::ReadOrder::BY_CHANNEL);
+    auto pairing_node = pipeline_desc.add_node<dorado::PairingNode>(
+            {stereo_node},
+            dorado::DuplexPairingParameters{dorado::ReadOrder::BY_CHANNEL,
+                                            dorado::DEFAULT_DUPLEX_CACHE_DEPTH},
+            2, 1000);
     auto splitter_node = pipeline_desc.add_node<dorado::DuplexSplitNode>(
             {pairing_node}, dorado::DuplexSplitSettings{}, 1);
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
