@@ -14,12 +14,16 @@
 
 namespace dorado {
 
+namespace utils {
+class SampleSheet;
+}
 class BarcodeDemuxerNode : public MessageSink {
 public:
     BarcodeDemuxerNode(const std::string& output_dir,
                        size_t htslib_threads,
                        size_t num_reads,
-                       bool write_fastq);
+                       bool write_fastq,
+                       std::unique_ptr<const utils::SampleSheet> sample_sheet);
     ~BarcodeDemuxerNode();
     std::string get_name() const override { return "BarcodeDemuxerNode"; }
     stats::NamedStats sample_stats() const override;
@@ -42,6 +46,7 @@ private:
     int write(bam1_t* record);
     size_t m_num_reads_expected;
     bool m_write_fastq{false};
+    std::unique_ptr<const utils::SampleSheet> m_sample_sheet;
 };
 
 }  // namespace dorado

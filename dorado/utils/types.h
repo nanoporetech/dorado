@@ -25,7 +25,7 @@ std::shared_ptr<const BarcodingInfo> create_barcoding_info(
         const std::vector<std::string> &kit_names,
         bool barcode_both_ends,
         bool trim_barcode,
-        const BarcodingInfo::FilterSet &allowed_barcodes);
+        BarcodingInfo::FilterSet allowed_barcodes);
 
 struct ReadGroup {
     std::string run_id;
@@ -34,6 +34,8 @@ struct ReadGroup {
     std::string device_id;
     std::string exp_start_time;
     std::string sample_id;
+    std::string position_id;
+    std::string experiment_id;
 };
 
 struct BamDestructor {

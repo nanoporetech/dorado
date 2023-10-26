@@ -3,6 +3,7 @@
 #include "MessageSinkUtils.h"
 #include "TestUtils.h"
 #include "read_pipeline/HtsReader.h"
+#include "utils/SampleSheet.h"
 #include "utils/bam_utils.h"
 #include "utils/sequence_utils.h"
 #include "utils/types.h"
@@ -46,8 +47,8 @@ TEST_CASE("BarcodeDemuxerNode: check correct output files are created", TEST_GRO
         // the pipeline object is closed. This needs to be looked at.
         // TODO: Address open file issue on windows.
         dorado::PipelineDescriptor pipeline_desc;
-        auto demuxer =
-                pipeline_desc.add_node<BarcodeDemuxerNode>({}, tmp_dir.string(), 8, 10, false);
+        auto demuxer = pipeline_desc.add_node<BarcodeDemuxerNode>({}, tmp_dir.string(), 8, 10,
+                                                                  false, nullptr);
 
         auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
 

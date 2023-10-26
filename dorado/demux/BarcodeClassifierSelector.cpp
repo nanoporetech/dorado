@@ -2,6 +2,8 @@
 
 #include "BarcodeClassifier.h"
 
+#include <cassert>
+
 namespace dorado::demux {
 
 std::shared_ptr<const BarcodeClassifier> BarcodeClassifierSelector::get_barcoder(

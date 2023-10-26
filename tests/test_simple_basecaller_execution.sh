@@ -180,22 +180,27 @@ fi
 
 echo dorado basecaller barcoding read groups
 test_barcoding_read_groups() (
-    expected_read_groups_barcode01=$1
-    expected_read_groups_barcode04=$2
-    expected_read_groups_unclassified=$3
-    sample_sheet=$4
+    while (( "$#" >= 2 )); do
+        barcode=$1
+        export expected_read_groups_${barcode}=$2
+        shift 2
+    done
+    sample_sheet=$1
     output_name=read_group_test${sample_sheet:+_sample_sheet}
     $dorado_bin basecaller -b ${batch} --kit-name SQK-RBK114-96 ${sample_sheet:+--sample-sheet ${sample_sheet}} ${model_5k} $data_dir/barcode_demux/read_group_test > $output_dir/${output_name}.bam
     samtools quickcheck -u $output_dir/${output_name}.bam
     split_dir=$output_dir/${output_name}
     mkdir $split_dir
     samtools split -u $split_dir/unknown.bam -f "$split_dir/rg_%!.bam" $output_dir/${output_name}.bam
-    # There should be 4 reads with BC01, 3 with BC04, and 2 unclassified groups.
 
     for bam in $split_dir/rg_*.bam; do
         if [[ $bam =~ "_SQK-RBK114-96_" ]]; then
             # Arrangement is |<kit>_<barcode>|, so trim the kit from the prefix and the .bam from the suffix.
             barcode=${bam#*_SQK-RBK114-96_}
+            barcode=${barcode%.bam*}
+        elif [[ $bam =~ "_${model_name_5k}_" ]]; then
+            # Arrangement is |<barcode_alias>|, so trim the model from the prefix and the .bam from the suffix.
+            barcode=${bam#*_${model_name_5k}_}
             barcode=${barcode%.bam*}
         else
             barcode="unclassified"
@@ -217,8 +222,10 @@ test_barcoding_read_groups() (
     fi
 )
 
-test_barcoding_read_groups 4 3 2
-test_barcoding_read_groups 4 0 5 $data_dir/barcode_demux/sample_sheet.csv
+# There should be 4 reads with BC01, 3 with BC04, and 2 unclassified groups.
+test_barcoding_read_groups barcode01 4 barcode04 3 unclassified 2
+# There should be 4 reads with BC01 aliased to patient_id_1, and 5 unclassified groups.
+test_barcoding_read_groups patient_id_1 4 unclassified 5 $data_dir/barcode_demux/sample_sheet.csv
 
 # Test demux only on a pre-classified BAM file
 $dorado_bin demux --no-classify --output-dir "$output_dir/demux_only_test/" $output_dir/read_group_test.bam
