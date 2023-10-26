@@ -10,6 +10,7 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <tuple>
