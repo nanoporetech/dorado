@@ -4,7 +4,6 @@
 #include "TestUtils.h"
 #include "read_pipeline/BarcodeClassifierNode.h"
 #include "read_pipeline/HtsReader.h"
-#include "utils/SampleSheet.h"
 #include "utils/bam_utils.h"
 #include "utils/barcode_kits.h"
 #include "utils/sequence_utils.h"
@@ -62,7 +61,7 @@ TEST_CASE("BarcodeClassifier: test single ended barcode", TEST_GROUP) {
             auto seqlen = reader.record->core.l_qseq;
             auto bseq = bam_get_seq(reader.record);
             std::string seq = utils::convert_nt16_to_str(bseq, seqlen);
-            auto res = classifier.barcode(seq, false, nullptr);
+            auto res = classifier.barcode(seq, false, std::nullopt);
             if (res.adapter_name == "unclassified") {
                 CHECK(bc == res.adapter_name);
             } else {
@@ -90,7 +89,7 @@ TEST_CASE("BarcodeClassifier: test double ended barcode", TEST_GROUP) {
             auto seqlen = reader.record->core.l_qseq;
             auto bseq = bam_get_seq(reader.record);
             std::string seq = utils::convert_nt16_to_str(bseq, seqlen);
-            auto res = classifier.barcode(seq, false, nullptr);
+            auto res = classifier.barcode(seq, false, std::nullopt);
             if (res.adapter_name == "unclassified") {
                 CHECK(bc == res.adapter_name);
             } else {
@@ -120,7 +119,7 @@ TEST_CASE("BarcodeClassifier: test double ended barcode with different variants"
             auto seqlen = reader.record->core.l_qseq;
             auto bseq = bam_get_seq(reader.record);
             std::string seq = utils::convert_nt16_to_str(bseq, seqlen);
-            auto res = classifier.barcode(seq, false, nullptr);
+            auto res = classifier.barcode(seq, false, std::nullopt);
             if (res.adapter_name == "unclassified") {
                 CHECK(bc == res.adapter_name);
             } else {
@@ -149,8 +148,8 @@ TEST_CASE("BarcodeClassifier: check barcodes on both ends - failing case", TEST_
         auto seqlen = reader.record->core.l_qseq;
         auto bseq = bam_get_seq(reader.record);
         std::string seq = utils::convert_nt16_to_str(bseq, seqlen);
-        auto single_end_res = classifier.barcode(seq, false, nullptr);
-        auto double_end_res = classifier.barcode(seq, true, nullptr);
+        auto single_end_res = classifier.barcode(seq, false, std::nullopt);
+        auto double_end_res = classifier.barcode(seq, true, std::nullopt);
         CHECK(double_end_res.adapter_name == "unclassified");
         CHECK(single_end_res.adapter_name == "BC15");
     }
@@ -168,8 +167,8 @@ TEST_CASE("BarcodeClassifier: check barcodes on both ends - passing case", TEST_
         auto seqlen = reader.record->core.l_qseq;
         auto bseq = bam_get_seq(reader.record);
         std::string seq = utils::convert_nt16_to_str(bseq, seqlen);
-        auto single_end_res = classifier.barcode(seq, false, nullptr);
-        auto double_end_res = classifier.barcode(seq, true, nullptr);
+        auto single_end_res = classifier.barcode(seq, false, std::nullopt);
+        auto double_end_res = classifier.barcode(seq, true, std::nullopt);
         CHECK(double_end_res.adapter_name == single_end_res.adapter_name);
         CHECK(single_end_res.adapter_name == "BC01");
     }
@@ -190,12 +189,13 @@ TEST_CASE(
     CAPTURE(barcode_both_ends);
     CAPTURE(use_per_read_barcoding);
     constexpr bool no_trim = false;
-    auto barcoding_info = dorado::create_barcoding_info(kits, barcode_both_ends, !no_trim, nullptr);
+    auto barcoding_info =
+            dorado::create_barcoding_info(kits, barcode_both_ends, !no_trim, std::nullopt);
     if (use_per_read_barcoding) {
         pipeline_desc.add_node<BarcodeClassifierNode>({sink}, 8);
     } else {
         pipeline_desc.add_node<BarcodeClassifierNode>({sink}, 8, kits, barcode_both_ends, no_trim,
-                                                      nullptr);
+                                                      std::nullopt);
     }
 
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
@@ -344,7 +344,7 @@ TEST_CASE("BarcodeClassifierNode: test reads where trim length == read length", 
     bool barcode_both_ends = false;
     bool no_trim = false;
     auto classifier = pipeline_desc.add_node<BarcodeClassifierNode>(
-            {sink}, 8, kits, barcode_both_ends, no_trim, nullptr);
+            {sink}, 8, kits, barcode_both_ends, no_trim, std::nullopt);
 
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
     fs::path data_dir = fs::path(get_data_dir("barcode_demux"));

@@ -343,7 +343,8 @@ DEFINE_TEST(NodeSmokeTestRead, "BarcodeClassifierNode") {
     set_pipeline_restart(pipeline_restart);
 
     std::vector<std::string> kits = {"SQK-RPB004", "EXP-NBD196"};
-    run_smoke_test<dorado::BarcodeClassifierNode>(2, kits, barcode_both_ends, no_trim, nullptr);
+    run_smoke_test<dorado::BarcodeClassifierNode>(2, kits, barcode_both_ends, no_trim,
+                                                  std::nullopt);
 }
 
 TEST_CASE("BarcodeClassifierNode: test simple pipeline with fastq and sam files") {
@@ -354,7 +355,7 @@ TEST_CASE("BarcodeClassifierNode: test simple pipeline with fastq and sam files"
     bool barcode_both_ends = GENERATE(true, false);
     bool no_trim = GENERATE(true, false);
     auto classifier = pipeline_desc.add_node<dorado::BarcodeClassifierNode>(
-            {sink}, 8, kits, barcode_both_ends, no_trim, nullptr);
+            {sink}, 8, kits, barcode_both_ends, no_trim, std::nullopt);
 
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
 

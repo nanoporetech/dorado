@@ -42,7 +42,7 @@ public:
 
     ScoreResults barcode(const std::string& seq,
                          bool barcode_both_ends,
-                         const utils::SampleSheet* const sample_sheet) const;
+                         const BarcodingInfo::FilterSet& allowed_barcodes) const;
 
 private:
     const std::vector<AdapterSequence> m_adapter_sequences;
@@ -52,19 +52,19 @@ private:
     std::vector<ScoreResults> calculate_adapter_score_different_double_ends(
             std::string_view read_seq,
             const AdapterSequence& as,
-            const utils::SampleSheet* const sample_sheet) const;
+            const BarcodingInfo::FilterSet& allowed_barcodes) const;
     std::vector<ScoreResults> calculate_adapter_score_double_ends(
             std::string_view read_seq,
             const AdapterSequence& as,
-            const utils::SampleSheet* const sample_sheet) const;
+            const BarcodingInfo::FilterSet& allowed_barcodes) const;
     std::vector<ScoreResults> calculate_adapter_score(
             std::string_view read_seq,
             const AdapterSequence& as,
-            const utils::SampleSheet* const sample_sheet) const;
+            const BarcodingInfo::FilterSet& allowed_barcodes) const;
     ScoreResults find_best_adapter(const std::string& read_seq,
                                    const std::vector<AdapterSequence>& adapter,
                                    bool barcode_both_ends,
-                                   const utils::SampleSheet* const sample_sheet) const;
+                                   const BarcodingInfo::FilterSet& allowed_barcodes) const;
 };
 
 }  // namespace demux

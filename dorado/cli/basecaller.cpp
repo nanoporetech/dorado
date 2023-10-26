@@ -124,8 +124,10 @@ void setup(std::vector<std::string> args,
             !barcode_kits.empty());
 
     std::unique_ptr<const utils::SampleSheet> sample_sheet;
+    BarcodingInfo::FilterSet allowed_barcodes;
     if (!barcode_sample_sheet.empty()) {
         sample_sheet = std::make_unique<const utils::SampleSheet>(barcode_sample_sheet, false);
+        allowed_barcodes = sample_sheet->get_barcode_values();
     }
 
     SamHdrPtr hdr(sam_hdr_init());
@@ -151,14 +153,9 @@ void setup(std::vector<std::string> args,
                 PolyACalculator::get_model_type(model_name));
     }
     if (!barcode_kits.empty()) {
-        std::unique_ptr<const utils::SampleSheet> sample_sheet_2;
-        if (!barcode_sample_sheet.empty()) {
-            sample_sheet_2 =
-                    std::make_unique<const utils::SampleSheet>(barcode_sample_sheet, false);
-        }
         current_sink_node = pipeline_desc.add_node<BarcodeClassifierNode>(
                 {current_sink_node}, thread_allocations.barcoder_threads, barcode_kits,
-                barcode_both_ends, barcode_no_trim, std::move(sample_sheet_2));
+                barcode_both_ends, barcode_no_trim, std::move(allowed_barcodes));
     }
     current_sink_node = pipeline_desc.add_node<ReadFilterNode>(
             {current_sink_node}, min_qscore, default_parameters.min_sequence_length,

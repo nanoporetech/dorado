@@ -136,8 +136,10 @@ int demuxer(int argc, char* argv[]) {
 
     auto barcode_sample_sheet = parser.get<std::string>("--sample-sheet");
     std::unique_ptr<const utils::SampleSheet> sample_sheet;
+    BarcodingInfo::FilterSet allowed_barcodes;
     if (!barcode_sample_sheet.empty()) {
         sample_sheet = std::make_unique<const utils::SampleSheet>(barcode_sample_sheet, true);
+        allowed_barcodes = sample_sheet->get_barcode_values();
     }
 
     PipelineDescriptor pipeline_desc;
@@ -150,13 +152,9 @@ int demuxer(int argc, char* argv[]) {
         if (auto names = parser.present<std::vector<std::string>>("--kit-name")) {
             kit_names = std::move(*names);
         }
-        std::unique_ptr<const utils::SampleSheet> sample_sheet_2;
-        if (!barcode_sample_sheet.empty()) {
-            sample_sheet_2 = std::make_unique<const utils::SampleSheet>(barcode_sample_sheet, true);
-        }
         auto demux = pipeline_desc.add_node<BarcodeClassifierNode>(
                 {demux_writer}, demux_threads, kit_names, parser.get<bool>("--barcode-both-ends"),
-                parser.get<bool>("--no-trim"), std::move(sample_sheet_2));
+                parser.get<bool>("--no-trim"), std::move(allowed_barcodes));
     }
 
     // Create the Pipeline from our description.

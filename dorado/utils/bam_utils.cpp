@@ -67,18 +67,18 @@ void add_rg_hdr(sam_hdr_t* hdr,
         const auto& kit_info = kit_iter->second;
         for (const auto& barcode_name : kit_info.barcodes) {
             const auto additional_tags = "\tBC:" + barcode_sequences.at(barcode_name);
+            const auto normalized_barcode_name = barcode_kits::normalize_barcode_name(barcode_name);
             for (const auto& read_group : read_groups) {
                 std::string alias;
                 auto id = read_group.first + '_';
                 if (sample_sheet) {
-                    if (!sample_sheet->barcode_is_permitted(barcode_name)) {
+                    if (!sample_sheet->barcode_is_permitted(normalized_barcode_name)) {
                         continue;
                     }
 
                     alias = sample_sheet->get_alias(
                             read_group.second.flowcell_id, read_group.second.position_id,
-                            read_group.second.experiment_id,
-                            barcode_kits::generate_standard_barcode_name(kit_name, barcode_name));
+                            read_group.second.experiment_id, normalized_barcode_name);
                 }
                 if (!alias.empty()) {
                     id += alias;

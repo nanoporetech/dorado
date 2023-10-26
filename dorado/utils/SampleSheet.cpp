@@ -209,10 +209,15 @@ std::string SampleSheet::get_alias(const std::string& flow_cell_id,
         return "";
     }
 
+    std::string_view barcode_only(barcode);
+    if (auto pos = barcode_only.find('_'); pos != std::string::npos) {
+        // trim off the kit name
+        barcode_only = barcode_only.substr(pos + 1);
+    }
+
     for (const auto& row : m_rows) {
-        auto standard_barcode_name = get(row, "kit") + "_" + get(row, "barcode");
         if (match_index(row, flow_cell_id, position_id, experiment_id) &&
-            barcode == standard_barcode_name) {
+            get(row, "barcode") == barcode_only) {
             return get(row, "alias");
         }
     }
@@ -221,15 +226,14 @@ std::string SampleSheet::get_alias(const std::string& flow_cell_id,
     return "";
 }
 
-SampleSheet::FilterSet SampleSheet::get_barcode_values() const { return m_allowed_barcodes; }
+BarcodingInfo::FilterSet SampleSheet::get_barcode_values() const { return m_allowed_barcodes; }
 
-bool SampleSheet::barcode_is_permitted(const std::string& adapter_name) const {
+bool SampleSheet::barcode_is_permitted(const std::string& barcode_name) const {
     if (!m_allowed_barcodes.has_value()) {
         return true;
     }
 
-    auto normalized_barcode_name = barcode_kits::normalize_barcode_name(adapter_name);
-    return m_allowed_barcodes->count(normalized_barcode_name) != 0;
+    return m_allowed_barcodes->count(barcode_name) != 0;
 }
 
 void SampleSheet::validate_headers(const std::vector<std::string>& col_names,

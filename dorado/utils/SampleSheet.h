@@ -13,8 +13,6 @@ namespace dorado::utils {
 
 class SampleSheet {
 public:
-    using FilterSet = std::optional<std::unordered_set<std::string>>;
-
     enum class Type { none, barcode };
     enum IndexBits {
         FLOW_CELL_ID = 0,
@@ -57,9 +55,12 @@ public:
      * Get all of the barcodes that are present in the sample sheet.
      * @return All of the barcodes that are present, or std::nullopt if the sample sheet is not loaded.
      */
-    FilterSet get_barcode_values() const;
+    BarcodingInfo::FilterSet get_barcode_values() const;
 
-    bool barcode_is_permitted(const std::string& adapter_name) const;
+    /**
+     * Check whether the a list of allowed barcodes is set and, if so, whether the provided barcode is in it.
+     */
+    bool barcode_is_permitted(const std::string& barcode_name) const;
 
 private:
     using Row = std::vector<std::string>;
@@ -69,7 +70,7 @@ private:
     std::unordered_map<std::string, size_t> m_col_indices;
     std::vector<Row> m_rows;
     bool m_skip_index_matching;
-    FilterSet m_allowed_barcodes;
+    BarcodingInfo::FilterSet m_allowed_barcodes;
 
     void validate_headers(const std::vector<std::string>& col_names, const std::string& filename);
     bool check_index(const std::string& flow_cell_id, const std::string& position_id) const;

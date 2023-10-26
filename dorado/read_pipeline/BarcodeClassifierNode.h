@@ -16,17 +16,13 @@ namespace demux {
 struct ScoreResults;
 }
 
-namespace utils {
-class SampleSheet;
-}
-
 class BarcodeClassifierNode : public MessageSink {
 public:
     BarcodeClassifierNode(int threads,
                           const std::vector<std::string>& kit_name,
                           bool barcode_both_ends,
                           bool no_trim,
-                          std::unique_ptr<const utils::SampleSheet> sample_sheet);
+                          BarcodingInfo::FilterSet allowed_barcodes);
     BarcodeClassifierNode(int threads);
     ~BarcodeClassifierNode();
     std::string get_name() const override { return "BarcodeClassifierNode"; }
