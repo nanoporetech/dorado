@@ -235,7 +235,7 @@ Below is a table of the available basecalling models and the modified basecallin
 | :-------- | :------- | :--- | :--- |
 | **dna_r10.4.1_e8.2_400bps_fast@v4.2.0** | 5mCG_5hmCG | v2 | 5 kHz |
 | **dna_r10.4.1_e8.2_400bps_hac@v4.2.0** | 5mCG_5hmCG | v2 | 5 kHz |
-| **dna_r10.4.1_e8.2_400bps_sup@v4.2.0** | 5mCG_5hmCG<br />5mC_5hmC<br />5mC<br />6mA<br />| v3<br />v1<br />v2<br />v3| 5 kHz |
+| **dna_r10.4.1_e8.2_400bps_sup@v4.2.0** | 5mCG_5hmCG<br />5mC_5hmC<br />5mC<br />6mA<br />| v3.1<br />v1<br />v2<br />v3| 5 kHz |
 | dna_r10.4.1_e8.2_400bps_fast@v4.1.0 | 5mCG_5hmCG | v2 | 4 kHz |
 | dna_r10.4.1_e8.2_400bps_hac@v4.1.0 | 5mCG_5hmCG | v2 | 4 kHz |
 | dna_r10.4.1_e8.2_400bps_sup@v4.1.0 | 5mCG_5hmCG | v2 | 4 kHz |
