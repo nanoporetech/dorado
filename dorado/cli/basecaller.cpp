@@ -166,8 +166,7 @@ void setup(std::vector<std::string> args,
     pipelines::create_simplex_pipeline(
             pipeline_desc, std::move(runners), std::move(remora_runners), overlap,
             mean_qscore_start_pos, thread_allocations.scaler_node_threads,
-            !is_rna_model(model_config) /*enable read splitting if data is DNA*/,
-            thread_allocations.splitter_node_threads,
+            true /* Enable read splitting */, thread_allocations.splitter_node_threads,
             thread_allocations.remora_threads * num_devices, current_sink_node);
 
     // Create the Pipeline from our description.
