@@ -18,10 +18,10 @@ If you encounter any problems building or running Dorado, please [report an issu
 
 ## Installation
 
- - [dorado-0.4.1-linux-x64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.4.1-linux-x64.tar.gz)
- - [dorado-0.4.1-linux-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.4.1-linux-arm64.tar.gz)
- - [dorado-0.4.1-osx-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.4.1-osx-arm64.zip)
- - [dorado-0.4.1-win64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.4.1-win64.zip)
+ - [dorado-0.4.2-linux-x64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.4.2-linux-x64.tar.gz)
+ - [dorado-0.4.2-linux-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.4.2-linux-arm64.tar.gz)
+ - [dorado-0.4.2-osx-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.4.2-osx-arm64.zip)
+ - [dorado-0.4.2-win64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.4.2-win64.zip)
 
 ## Platforms
 
@@ -42,7 +42,7 @@ Linux or Windows systems not listed above but which have Nvidia GPUs with ≥8 G
 
 If you encounter problems with running on your system, please [report an issue](https://github.com/nanoporetech/dorado/issues).
 
-AWS Benchmarks on NVIDIA GPUs for Dorado 0.3.0 are available [here](https://aws.amazon.com/blogs/hpc/benchmarking-the-oxford-nanopore-technologies-basecallers-on-aws/). Please note: Dorado's basecalling speed is continuously improving, so these benchmarks may not reflect performance with the latest release.
+AWS Benchmarks on Nvidia GPUs for Dorado 0.3.0 are available [here](https://aws.amazon.com/blogs/hpc/benchmarking-the-oxford-nanopore-technologies-basecallers-on-aws/). Please note: Dorado's basecalling speed is continuously improving, so these benchmarks may not reflect performance with the latest release.
 
 ## Roadmap
 
