@@ -2,13 +2,9 @@
 #include "ReadSplitter.h"
 #include "read_pipeline/ReadPipeline.h"
 #include "splitter/splitter_utils.h"
-#include "utils/stats.h"
 
-#include <cstdint>
 #include <functional>
-#include <memory>
 #include <string>
-#include <utility>
 #include <vector>
 
 namespace dorado::splitter {

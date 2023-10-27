@@ -2,15 +2,9 @@
 #include "ReadPipeline.h"
 #include "splitter/ReadSplitter.h"
 #include "utils/stats.h"
-#include "utils/types.h"
 
-#include <atomic>
-#include <cstdint>
-#include <functional>
 #include <memory>
-#include <optional>
 #include <string>
-#include <utility>
 #include <vector>
 
 namespace dorado {
