@@ -105,7 +105,7 @@ int demuxer(int argc, char* argv[]) {
     }
 
     if (parser.get<bool>("--verbose")) {
-        utils::SetDebugLogging(static_cast<dorado::utils::DebugLogLevel>(verbosity));
+        utils::SetVerboseLogging(static_cast<dorado::utils::VerboseLogLevel>(verbosity));
     }
 
     auto reads(parser.get<std::vector<std::string>>("reads"));

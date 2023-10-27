@@ -6,10 +6,13 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+#include <array>
+#include <cassert>
 #include <chrono>
+#include <cstdint>
 #include <utility>
 
-#define EPS 1e-9f
+static constexpr float EPS = 1e-9f;
 
 using namespace std::chrono_literals;
 using Slice = torch::indexing::Slice;
@@ -74,11 +77,10 @@ int determine_rna_adapter_pos(const dorado::SimplexRead& read, dorado::SampleTyp
         auto minmax = std::minmax_element(medians.begin(), medians.end());
         int16_t min_median = *minmax.first;
         int16_t max_median = *minmax.second;
-        if (median_pos > medians.size()) {
-            if ((max_median > kMinMedianForRNASignal) && (max_median - min_median > kMedianDiff)) {
-                break_point = i;
-                break;
-            }
+        if ((median_pos > medians.size()) && (max_median > kMinMedianForRNASignal) &&
+            (max_median - min_median > kMedianDiff)) {
+            break_point = i;
+            break;
         }
     }
 

@@ -74,7 +74,7 @@ int aligner(int argc, char* argv[]) {
 
     if (parser.visible.get<bool>("--verbose")) {
         mm_verbose = 3;
-        utils::SetDebugLogging(static_cast<dorado::utils::DebugLogLevel>(verbosity));
+        utils::SetVerboseLogging(static_cast<dorado::utils::VerboseLogLevel>(verbosity));
     }
 
     auto index(parser.visible.get<std::string>("index"));

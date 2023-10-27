@@ -390,7 +390,7 @@ int basecaller(int argc, char* argv[]) {
     std::vector<std::string> args(argv, argv + argc);
 
     if (parser.visible.get<bool>("--verbose")) {
-        utils::SetDebugLogging(static_cast<dorado::utils::DebugLogLevel>(verbosity));
+        utils::SetVerboseLogging(static_cast<dorado::utils::VerboseLogLevel>(verbosity));
     }
 
     auto model = parser.visible.get<std::string>("model");

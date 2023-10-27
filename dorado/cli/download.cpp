@@ -78,7 +78,7 @@ int download(int argc, char* argv[]) {
     }
 
     if (parser.get<bool>("--verbose")) {
-        utils::SetDebugLogging(static_cast<dorado::utils::DebugLogLevel>(verbosity));
+        utils::SetVerboseLogging(static_cast<dorado::utils::VerboseLogLevel>(verbosity));
     }
 
     auto list = parser.get<bool>("--list");
