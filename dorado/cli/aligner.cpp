@@ -60,7 +60,7 @@ int aligner(int argc, char* argv[]) {
             .nargs(0)
             .action([&](const auto&) { ++verbosity; })
             .append();
-    ;
+
     cli::add_minimap2_arguments(parser, Aligner::dflt_options);
 
     try {

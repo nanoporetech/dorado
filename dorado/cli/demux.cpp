@@ -76,7 +76,6 @@ int demuxer(int argc, char* argv[]) {
             .nargs(0)
             .action([&](const auto&) { ++verbosity; })
             .append();
-    ;
     parser.add_argument("--emit-fastq")
             .help("Output in fastq format. Default is BAM.")
             .default_value(false)
