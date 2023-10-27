@@ -123,9 +123,16 @@ void setup(std::vector<std::string> args,
             num_devices, !remora_runners.empty() ? num_remora_threads : 0, enable_aligner,
             !barcode_kits.empty());
 
+    std::unique_ptr<const utils::SampleSheet> sample_sheet;
+    BarcodingInfo::FilterSet allowed_barcodes;
+    if (!barcode_sample_sheet.empty()) {
+        sample_sheet = std::make_unique<const utils::SampleSheet>(barcode_sample_sheet, false);
+        allowed_barcodes = sample_sheet->get_barcode_values();
+    }
+
     SamHdrPtr hdr(sam_hdr_init());
     cli::add_pg_hdr(hdr.get(), args);
-    utils::add_rg_hdr(hdr.get(), read_groups, barcode_kits);
+    utils::add_rg_hdr(hdr.get(), read_groups, barcode_kits, sample_sheet.get());
 
     PipelineDescriptor pipeline_desc;
     auto hts_writer = pipeline_desc.add_node<HtsWriter>(
@@ -139,18 +146,16 @@ void setup(std::vector<std::string> args,
     }
     current_sink_node = pipeline_desc.add_node<ReadToBamType>(
             {current_sink_node}, emit_moves, thread_allocations.read_converter_threads,
-            methylation_threshold_pct);
+            methylation_threshold_pct, std::move(sample_sheet), 1000);
     if (estimate_poly_a) {
         current_sink_node = pipeline_desc.add_node<PolyACalculator>(
                 {current_sink_node}, std::thread::hardware_concurrency(),
                 PolyACalculator::get_model_type(model_name));
     }
     if (!barcode_kits.empty()) {
-        utils::SampleSheet sample_sheet(barcode_sample_sheet);
-        BarcodingInfo::FilterSet allowed_barcodes = sample_sheet.get_barcode_values();
         current_sink_node = pipeline_desc.add_node<BarcodeClassifierNode>(
                 {current_sink_node}, thread_allocations.barcoder_threads, barcode_kits,
-                barcode_both_ends, barcode_no_trim, allowed_barcodes);
+                barcode_both_ends, barcode_no_trim, std::move(allowed_barcodes));
     }
     current_sink_node = pipeline_desc.add_node<ReadFilterNode>(
             {current_sink_node}, min_qscore, default_parameters.min_sequence_length,

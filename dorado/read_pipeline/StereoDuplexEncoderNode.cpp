@@ -270,6 +270,9 @@ DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(const ReadPair& read_pair) 
     read->read_common.raw_data = tmp;  // use the encoded signal
     read->read_common.is_duplex = true;
     read->read_common.run_id = template_read.read_common.run_id;
+    read->read_common.flowcell_id = template_read.read_common.flowcell_id;
+    read->read_common.position_id = template_read.read_common.position_id;
+    read->read_common.experiment_id = template_read.read_common.experiment_id;
 
     edlibFreeAlignResult(result);
 

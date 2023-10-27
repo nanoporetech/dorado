@@ -18,10 +18,10 @@ If you encounter any problems building or running Dorado, please [report an issu
 
 ## Installation
 
- - [dorado-0.4.1-linux-x64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.4.1-linux-x64.tar.gz)
- - [dorado-0.4.1-linux-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.4.1-linux-arm64.tar.gz)
- - [dorado-0.4.1-osx-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.4.1-osx-arm64.zip)
- - [dorado-0.4.1-win64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.4.1-win64.zip)
+ - [dorado-0.4.2-linux-x64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.4.2-linux-x64.tar.gz)
+ - [dorado-0.4.2-linux-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.4.2-linux-arm64.tar.gz)
+ - [dorado-0.4.2-osx-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.4.2-osx-arm64.zip)
+ - [dorado-0.4.2-win64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.4.2-win64.zip)
 
 ## Platforms
 
@@ -42,7 +42,7 @@ Linux or Windows systems not listed above but which have Nvidia GPUs with ≥8 G
 
 If you encounter problems with running on your system, please [report an issue](https://github.com/nanoporetech/dorado/issues).
 
-AWS Benchmarks on NVIDIA GPUs for Dorado 0.3.0 are available [here](https://aws.amazon.com/blogs/hpc/benchmarking-the-oxford-nanopore-technologies-basecallers-on-aws/). Please note: Dorado's basecalling speed is continuously improving, so these benchmarks may not reflect performance with the latest release.
+AWS Benchmarks on Nvidia GPUs for Dorado 0.3.0 are available [here](https://aws.amazon.com/blogs/hpc/benchmarking-the-oxford-nanopore-technologies-basecallers-on-aws/). Please note: Dorado's basecalling speed is continuously improving, so these benchmarks may not reflect performance with the latest release.
 
 ## Roadmap
 
@@ -235,7 +235,7 @@ Below is a table of the available basecalling models and the modified basecallin
 | :-------- | :------- | :--- | :--- |
 | **dna_r10.4.1_e8.2_400bps_fast@v4.2.0** | 5mCG_5hmCG | v2 | 5 kHz |
 | **dna_r10.4.1_e8.2_400bps_hac@v4.2.0** | 5mCG_5hmCG | v2 | 5 kHz |
-| **dna_r10.4.1_e8.2_400bps_sup@v4.2.0** | 5mCG_5hmCG<br />5mC_5hmC<br />5mC<br />6mA<br />| v3<br />v1<br />v2<br />v3| 5 kHz |
+| **dna_r10.4.1_e8.2_400bps_sup@v4.2.0** | 5mCG_5hmCG<br />5mC_5hmC<br />5mC<br />6mA<br />| v3.1<br />v1<br />v2<br />v3| 5 kHz |
 | dna_r10.4.1_e8.2_400bps_fast@v4.1.0 | 5mCG_5hmCG | v2 | 4 kHz |
 | dna_r10.4.1_e8.2_400bps_hac@v4.1.0 | 5mCG_5hmCG | v2 | 4 kHz |
 | dna_r10.4.1_e8.2_400bps_sup@v4.1.0 | 5mCG_5hmCG | v2 | 4 kHz |

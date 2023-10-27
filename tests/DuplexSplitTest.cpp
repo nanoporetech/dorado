@@ -130,8 +130,11 @@ TEST_CASE("4 subread split tagging", TEST_GROUP) {
     auto tag_node = pipeline_desc.add_node<dorado::SubreadTaggerNode>({sink});
     auto stereo_node = pipeline_desc.add_node<dorado::StereoDuplexEncoderNode>(
             {tag_node}, read->read_common.model_stride);
-    auto pairing_node = pipeline_desc.add_node<dorado::PairingNode>({stereo_node},
-                                                                    dorado::ReadOrder::BY_CHANNEL);
+    auto pairing_node = pipeline_desc.add_node<dorado::PairingNode>(
+            {stereo_node},
+            dorado::DuplexPairingParameters{dorado::ReadOrder::BY_CHANNEL,
+                                            dorado::DEFAULT_DUPLEX_CACHE_DEPTH},
+            2, 1000);
     auto splitter_node = pipeline_desc.add_node<dorado::ReadSplitNode>(
             {pairing_node}, dorado::splitter::DuplexSplitSettings{}, 1);
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
