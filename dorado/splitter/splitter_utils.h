@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ReadPipeline.h"
+#include "read_pipeline/ReadPipeline.h"
 
 namespace dorado::splitter {
 

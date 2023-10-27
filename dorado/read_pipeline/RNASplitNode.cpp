@@ -1,6 +1,6 @@
 #include "RNASplitNode.h"
 
-#include "splitter_utils.h"
+#include "splitter/splitter_utils.h"
 #include "utils/uuid_utils.h"
 
 #include <spdlog/spdlog.h>
@@ -8,6 +8,8 @@
 #include <chrono>
 #include <cmath>
 #include <string>
+
+using namespace dorado::splitter;
 
 namespace dorado {
 

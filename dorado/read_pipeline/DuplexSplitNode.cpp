@@ -1,7 +1,7 @@
 #include "DuplexSplitNode.h"
 
 #include "read_utils.h"
-#include "splitter_utils.h"
+#include "splitter/splitter_utils.h"
 #include "utils/alignment_utils.h"
 #include "utils/duplex_utils.h"
 #include "utils/sequence_utils.h"
@@ -19,6 +19,7 @@
 namespace {
 
 using namespace dorado;
+using namespace dorado::splitter;
 
 typedef splitter::PosRange PosRange;
 typedef splitter::PosRanges PosRanges;

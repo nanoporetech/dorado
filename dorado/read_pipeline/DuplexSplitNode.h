@@ -1,6 +1,6 @@
 #pragma once
 #include "ReadPipeline.h"
-#include "splitter_utils.h"
+#include "splitter/splitter_utils.h"
 #include "utils/stats.h"
 #include "utils/types.h"
 
@@ -50,8 +50,6 @@ struct DuplexSplitSettings {
     std::string adapter = "TACTTCGTTCAGTTACGTATTGCT";
 };
 
-using namespace splitter;
-
 class DuplexSplitNode : public MessageSink {
 public:
     DuplexSplitNode(DuplexSplitSettings settings,
@@ -73,21 +71,23 @@ private:
         SimplexReadPtr read;
         torch::Tensor data_as_float32;
         std::vector<uint64_t> move_sums;
-        PosRanges possible_pore_regions;
+        splitter::PosRanges possible_pore_regions;
     };
 
-    typedef std::function<PosRanges(const ExtRead&)> SplitFinderF;
+    using SplitFinderF = std::function<splitter::PosRanges(const ExtRead&)>;
 
     ExtRead create_ext_read(SimplexReadPtr r) const;
-    std::vector<PosRange> possible_pore_regions(const ExtRead& read) const;
-    bool check_nearby_adapter(const SimplexRead& read, PosRange r, int adapter_edist) const;
-    std::optional<std::pair<PosRange, PosRange>> check_flank_match(const SimplexRead& read,
-                                                                   PosRange r,
-                                                                   float err_thr) const;
-    std::optional<PosRange> identify_middle_adapter_split(const SimplexRead& read) const;
-    std::optional<PosRange> identify_extra_middle_split(const SimplexRead& read) const;
+    std::vector<splitter::PosRange> possible_pore_regions(const ExtRead& read) const;
+    bool check_nearby_adapter(const SimplexRead& read,
+                              splitter::PosRange r,
+                              int adapter_edist) const;
+    std::optional<std::pair<splitter::PosRange, splitter::PosRange>>
+    check_flank_match(const SimplexRead& read, splitter::PosRange r, float err_thr) const;
+    std::optional<splitter::PosRange> identify_middle_adapter_split(const SimplexRead& read) const;
+    std::optional<splitter::PosRange> identify_extra_middle_split(const SimplexRead& read) const;
 
-    std::vector<SimplexReadPtr> subreads(SimplexReadPtr read, const PosRanges& spacers) const;
+    std::vector<SimplexReadPtr> subreads(SimplexReadPtr read,
+                                         const splitter::PosRanges& spacers) const;
 
     std::vector<std::pair<std::string, SplitFinderF>> build_split_finders() const;
 

@@ -1,6 +1,6 @@
 #pragma once
 #include "ReadPipeline.h"
-#include "splitter_utils.h"
+#include "splitter/splitter_utils.h"
 #include "utils/stats.h"
 
 #include <cstdint>
@@ -21,8 +21,6 @@ struct RNASplitSettings {
     uint64_t expect_pore_prefix = 2000;
 };
 
-using namespace splitter;
-
 class RNASplitNode : public MessageSink {
 public:
     RNASplitNode(RNASplitSettings settings, int num_worker_threads = 5, size_t max_reads = 1000);
@@ -40,15 +38,16 @@ private:
     //TODO consider precomputing and reusing ranges with high signal
     struct ExtRead {
         SimplexReadPtr read;
-        PosRanges possible_pore_regions;
+        splitter::PosRanges possible_pore_regions;
     };
 
-    typedef std::function<PosRanges(const ExtRead&)> SplitFinderF;
+    using SplitFinderF = std::function<splitter::PosRanges(const ExtRead&)>;
 
     ExtRead create_ext_read(SimplexReadPtr r) const;
-    std::vector<PosRange> possible_pore_regions(const ExtRead& read) const;
+    std::vector<splitter::PosRange> possible_pore_regions(const ExtRead& read) const;
 
-    std::vector<SimplexReadPtr> subreads(SimplexReadPtr read, const PosRanges& spacers) const;
+    std::vector<SimplexReadPtr> subreads(SimplexReadPtr read,
+                                         const splitter::PosRanges& spacers) const;
 
     std::vector<std::pair<std::string, SplitFinderF>> build_split_finders() const;
 
