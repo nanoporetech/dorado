@@ -47,8 +47,6 @@ int download(int argc, char* argv[]) {
 
     argparse::ArgumentParser parser("dorado", DORADO_VERSION, argparse::default_arguments::help);
 
-    parser.add_argument("-v", "--verbose").default_value(false).implicit_value(true);
-
     parser.add_argument("--model").default_value(std::string("all")).help("the model to download");
 
     parser.add_argument("--directory")
@@ -62,6 +60,14 @@ int download(int argc, char* argv[]) {
             .default_value(false)
             .implicit_value(true);
 
+    int verbosity = 0;
+    parser.add_argument("-v", "--verbose")
+            .default_value(false)
+            .implicit_value(true)
+            .nargs(0)
+            .action([&](const auto&) { ++verbosity; })
+            .append();
+
     try {
         parser.parse_args(argc, argv);
     } catch (const std::exception& e) {
@@ -72,7 +78,7 @@ int download(int argc, char* argv[]) {
     }
 
     if (parser.get<bool>("--verbose")) {
-        utils::SetDebugLogging();
+        utils::SetDebugLogging(static_cast<dorado::utils::DebugLogLevel>(verbosity));
     }
 
     auto list = parser.get<bool>("--list");

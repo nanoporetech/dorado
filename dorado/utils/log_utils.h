@@ -6,10 +6,10 @@ namespace dorado::utils {
 void InitLogging();
 
 enum DebugLogLevel {
-    DEBUG = 0,
-    TRACE,
+    DEBUG = 1,
+    TRACE = 2,
 };
 
-void SetDebugLogging(DebugLogLevel level = DEBUG);
+void SetDebugLogging(DebugLogLevel level);
 
 }  // namespace dorado::utils

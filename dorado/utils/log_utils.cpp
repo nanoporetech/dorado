@@ -77,7 +77,7 @@ void SetDebugLogging(DebugLogLevel level) {
     if (is_safe_to_log()) {
         if (level >= TRACE) {
             spdlog::set_level(spdlog::level::trace);
-        } else if (level == DEBUG) {
+        } else if (level <= DEBUG) {
             spdlog::set_level(spdlog::level::debug);
         }
     }
