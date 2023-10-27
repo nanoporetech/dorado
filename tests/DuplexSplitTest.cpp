@@ -1,10 +1,12 @@
 #include "MessageSinkUtils.h"
 #include "TestUtils.h"
-#include "read_pipeline/DuplexSplitNode.h"
 #include "read_pipeline/PairingNode.h"
 #include "read_pipeline/ReadPipeline.h"
+#include "read_pipeline/ReadSplitNode.h"
 #include "read_pipeline/StereoDuplexEncoderNode.h"
 #include "read_pipeline/SubreadTaggerNode.h"
+#include "splitter/DuplexSplitNode.h"
+#include "splitter/ReadSplitter.h"
 
 #include <catch2/catch.hpp>
 #include <torch/torch.h>
@@ -57,8 +59,8 @@ auto make_read() {
 TEST_CASE("4 subread splitting test", TEST_GROUP) {
     auto read = make_read();
 
-    dorado::DuplexSplitSettings splitter_settings;
-    dorado::DuplexSplitNode splitter_node(splitter_settings, 1);
+    dorado::splitter::DuplexSplitSettings splitter_settings;
+    dorado::splitter::DuplexSplitNode splitter_node(splitter_settings);
 
     const auto split_res = splitter_node.split(std::move(read));
     CHECK(split_res.size() == 4);
@@ -130,8 +132,8 @@ TEST_CASE("4 subread split tagging", TEST_GROUP) {
             {tag_node}, read->read_common.model_stride);
     auto pairing_node = pipeline_desc.add_node<dorado::PairingNode>({stereo_node},
                                                                     dorado::ReadOrder::BY_CHANNEL);
-    auto splitter_node = pipeline_desc.add_node<dorado::DuplexSplitNode>(
-            {pairing_node}, dorado::DuplexSplitSettings{}, 1);
+    auto splitter_node = pipeline_desc.add_node<dorado::ReadSplitNode>(
+            {pairing_node}, dorado::splitter::DuplexSplitSettings{}, 1);
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
 
     pipeline->push_message(std::move(read));
@@ -192,8 +194,8 @@ TEST_CASE("No split output read properties", TEST_GROUP) {
     dorado::PipelineDescriptor pipeline_desc;
     std::vector<dorado::Message> messages;
     auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 3, messages);
-    auto splitter_node = pipeline_desc.add_node<dorado::DuplexSplitNode>(
-            {sink}, dorado::DuplexSplitSettings{}, 1);
+    auto splitter_node = pipeline_desc.add_node<dorado::ReadSplitNode>(
+            {sink}, dorado::splitter::DuplexSplitSettings{}, 1);
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
 
     pipeline->push_message(std::move(read));
@@ -240,8 +242,8 @@ TEST_CASE("Test split where only one subread is generated", TEST_GROUP) {
 
     std::vector<dorado::Message> messages;
     auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 3, messages);
-    auto splitter_node = pipeline_desc.add_node<dorado::DuplexSplitNode>(
-            {sink}, dorado::DuplexSplitSettings{}, 1);
+    auto splitter_node = pipeline_desc.add_node<dorado::ReadSplitNode>(
+            {sink}, dorado::splitter::DuplexSplitSettings{}, 1);
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
 
     pipeline->push_message(std::move(read));

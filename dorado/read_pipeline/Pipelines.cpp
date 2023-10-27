@@ -1,15 +1,16 @@
 #include "Pipelines.h"
 
 #include "BasecallerNode.h"
-#include "DuplexSplitNode.h"
 #include "ModBaseCallerNode.h"
 #include "PairingNode.h"
-#include "RNASplitNode.h"
+#include "ReadSplitNode.h"
 #include "ScalerNode.h"
 #include "StereoDuplexEncoderNode.h"
 #include "nn/CRFModelConfig.h"
 #include "nn/ModBaseRunner.h"
 #include "nn/ModelRunner.h"
+#include "splitter/DuplexSplitNode.h"
+#include "splitter/RNASplitNode.h"
 
 #include <spdlog/spdlog.h>
 
@@ -43,11 +44,11 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
     // If splitter_settings.enabled is set to false, the splitter node will act
     // as a passthrough, meaning it won't perform any splitting operations and
     // will just pass data through.
-    DuplexSplitSettings splitter_settings;
+    splitter::DuplexSplitSettings splitter_settings;
     splitter_settings.simplex_mode = true;
     splitter_settings.enabled = enable_read_splitter;
     auto splitter_node =
-            pipeline_desc.add_node<DuplexSplitNode>({}, splitter_settings, splitter_node_threads);
+            pipeline_desc.add_node<ReadSplitNode>({}, splitter_settings, splitter_node_threads);
 
     auto basecaller_node = pipeline_desc.add_node<BasecallerNode>(
             {splitter_node}, std::move(runners), overlap, kBatchTimeoutMS, model_name, 1000,
@@ -67,8 +68,8 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
 
     NodeHandle first_node_handle = scaler_node;
     if (is_rna_model(model_config)) {
-        RNASplitSettings rna_splitter_settings;
-        auto rna_split_node = pipeline_desc.add_node<RNASplitNode>(
+        splitter::RNASplitSettings rna_splitter_settings;
+        auto rna_split_node = pipeline_desc.add_node<ReadSplitNode>(
                 {scaler_node}, rna_splitter_settings, splitter_node_threads);
         first_node_handle = rna_split_node;
     }
@@ -126,9 +127,9 @@ void create_stereo_duplex_pipeline(PipelineDescriptor& pipeline_desc,
     // If splitter_settings.enabled is set to false, the splitter node will act
     // as a passthrough, meaning it won't perform any splitting operations and
     // will just pass data through.
-    DuplexSplitSettings splitter_settings;
-    auto splitter_node = pipeline_desc.add_node<DuplexSplitNode>({pairing_node}, splitter_settings,
-                                                                 splitter_node_threads);
+    splitter::DuplexSplitSettings splitter_settings;
+    auto splitter_node = pipeline_desc.add_node<ReadSplitNode>({pairing_node}, splitter_settings,
+                                                               splitter_node_threads);
 
     auto adjusted_simplex_overlap = (overlap / simplex_model_stride) * simplex_model_stride;
 

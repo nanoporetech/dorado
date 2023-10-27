@@ -1,6 +1,6 @@
 #include "DuplexSplitNode.h"
 
-#include "read_utils.h"
+#include "read_pipeline/read_utils.h"
 #include "splitter/splitter_utils.h"
 #include "utils/alignment_utils.h"
 #include "utils/duplex_utils.h"
@@ -21,8 +21,8 @@ namespace {
 using namespace dorado;
 using namespace dorado::splitter;
 
-typedef splitter::PosRange PosRange;
-typedef splitter::PosRanges PosRanges;
+using PosRange = splitter::PosRange;
+using PosRanges = splitter::PosRanges;
 
 //[start, end)
 std::optional<PosRange> find_best_adapter_match(const std::string& adapter,
@@ -101,7 +101,7 @@ std::optional<PosRange> check_rc_match(const std::string& seq,
 
 }  // namespace
 
-namespace dorado {
+namespace dorado::splitter {
 
 DuplexSplitNode::ExtRead DuplexSplitNode::create_ext_read(SimplexReadPtr r) const {
     ExtRead ext_read;
@@ -465,60 +465,8 @@ std::vector<SimplexReadPtr> DuplexSplitNode::split(SimplexReadPtr init_read) con
     return split_result;
 }
 
-void DuplexSplitNode::worker_thread() {
-    torch::InferenceMode inference_mode_guard;
-
-    Message message;
-    while (get_input_message(message)) {
-        // If this message isn't a read, just forward it to the sink.
-        if (!m_settings.enabled || !std::holds_alternative<SimplexReadPtr>(message)) {
-            send_message_to_sink(std::move(message));
-            continue;
-        }
-
-        // If this message isn't a read, we'll get a bad_variant_access exception.
-        auto init_read = std::get<SimplexReadPtr>(std::move(message));
-        for (auto& subread : split(std::move(init_read))) {
-            //TODO correctly process end_reason when we have them
-            send_message_to_sink(std::move(subread));
-        }
-    }
-}
-
-DuplexSplitNode::DuplexSplitNode(DuplexSplitSettings settings,
-                                 int num_worker_threads,
-                                 size_t max_reads)
-        : MessageSink(max_reads),
-          m_settings(std::move(settings)),
-          m_num_worker_threads(num_worker_threads) {
+DuplexSplitNode::DuplexSplitNode(DuplexSplitSettings settings) : m_settings(std::move(settings)) {
     m_split_finders = build_split_finders();
-    start_threads();
 }
 
-void DuplexSplitNode::start_threads() {
-    for (int i = 0; i < m_num_worker_threads; ++i) {
-        m_worker_threads.push_back(
-                std::make_unique<std::thread>(&DuplexSplitNode::worker_thread, this));
-    }
-}
-
-void DuplexSplitNode::terminate_impl() {
-    terminate_input_queue();
-
-    // Wait for all the Node's worker threads to terminate
-    for (auto& t : m_worker_threads) {
-        if (t->joinable()) {
-            t->join();
-        }
-    }
-    m_worker_threads.clear();
-}
-
-void DuplexSplitNode::restart() {
-    restart_input_queue();
-    start_threads();
-}
-
-stats::NamedStats DuplexSplitNode::sample_stats() const { return stats::from_obj(m_work_queue); }
-
-}  // namespace dorado
+}  // namespace dorado::splitter

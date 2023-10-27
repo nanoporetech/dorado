@@ -11,7 +11,7 @@
 
 using namespace dorado::splitter;
 
-namespace dorado {
+namespace dorado::splitter {
 
 RNASplitNode::ExtRead RNASplitNode::create_ext_read(SimplexReadPtr r) const {
     ExtRead ext_read;
@@ -19,7 +19,7 @@ RNASplitNode::ExtRead RNASplitNode::create_ext_read(SimplexReadPtr r) const {
     ext_read.possible_pore_regions =
             detect_pore_signal<int16_t>(ext_read.read->read_common.raw_data, m_settings.pore_thr,
                                         m_settings.pore_cl_dist, m_settings.expect_pore_prefix);
-    for (auto range : ext_read.possible_pore_regions) {
+    for (const auto& range : ext_read.possible_pore_regions) {
         spdlog::trace("Pore range {}-{} {}", range.first, range.second,
                       ext_read.read->read_common.read_id);
     }
@@ -37,7 +37,7 @@ std::vector<SimplexReadPtr> RNASplitNode::subreads(SimplexReadPtr read,
     }
 
     uint64_t start_pos = 0;
-    for (auto r : spacers) {
+    for (const auto& r : spacers) {
         if (start_pos < r.first) {
             subreads.push_back(subread(*read, std::nullopt, {start_pos, r.first}));
         }
@@ -114,59 +114,8 @@ std::vector<SimplexReadPtr> RNASplitNode::split(SimplexReadPtr init_read) const 
     return split_result;
 }
 
-void RNASplitNode::worker_thread() {
-    torch::InferenceMode inference_mode_guard;
-
-    Message message;
-    while (get_input_message(message)) {
-        // If this message isn't a read, just forward it to the sink.
-        if (!std::holds_alternative<SimplexReadPtr>(message)) {
-            send_message_to_sink(std::move(message));
-            continue;
-        }
-
-        // If this message isn't a read, we'll get a bad_variant_access exception.
-        auto init_read = std::get<SimplexReadPtr>(std::move(message));
-
-        for (auto& subread : split(std::move(init_read))) {
-            //TODO correctly process end_reason when we have them
-            send_message_to_sink(std::move(subread));
-        }
-    }
-}
-
-RNASplitNode::RNASplitNode(RNASplitSettings settings, int num_worker_threads, size_t max_reads)
-        : MessageSink(max_reads),
-          m_settings(std::move(settings)),
-          m_num_worker_threads(num_worker_threads) {
+RNASplitNode::RNASplitNode(RNASplitSettings settings) : m_settings(std::move(settings)) {
     m_split_finders = build_split_finders();
-    start_threads();
 }
 
-void RNASplitNode::start_threads() {
-    for (int i = 0; i < m_num_worker_threads; ++i) {
-        m_worker_threads.push_back(
-                std::make_unique<std::thread>(&RNASplitNode::worker_thread, this));
-    }
-}
-
-void RNASplitNode::terminate_impl() {
-    terminate_input_queue();
-
-    // Wait for all the Node's worker threads to terminate
-    for (auto& t : m_worker_threads) {
-        if (t->joinable()) {
-            t->join();
-        }
-    }
-    m_worker_threads.clear();
-}
-
-void RNASplitNode::restart() {
-    restart_input_queue();
-    start_threads();
-}
-
-stats::NamedStats RNASplitNode::sample_stats() const { return stats::from_obj(m_work_queue); }
-
-}  // namespace dorado
+}  // namespace dorado::splitter

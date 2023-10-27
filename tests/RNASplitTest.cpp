@@ -1,6 +1,6 @@
 #include "TestUtils.h"
-#include "read_pipeline/RNASplitNode.h"
 #include "read_pipeline/ReadPipeline.h"
+#include "splitter/RNASplitNode.h"
 
 #include <catch2/catch.hpp>
 
@@ -25,8 +25,8 @@ TEST_CASE("2 subread split", TEST_GROUP) {
     torch::load(read->read_common.raw_data, signal_path.string());
     read->read_common.read_tag = 42;
 
-    dorado::RNASplitSettings splitter_settings;
-    dorado::RNASplitNode splitter_node(splitter_settings, 1);
+    dorado::splitter::RNASplitSettings splitter_settings;
+    dorado::splitter::RNASplitNode splitter_node(splitter_settings);
 
     const auto split_res = splitter_node.split(std::move(read));
     CHECK(split_res.size() == 2);
