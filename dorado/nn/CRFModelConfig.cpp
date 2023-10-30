@@ -9,6 +9,18 @@
 
 namespace dorado {
 
+SampleType get_model_type(const std::string &model_name) {
+    if (model_name.find("rna004") != std::string::npos) {
+        return SampleType::RNA004;
+    } else if (model_name.find("rna002") != std::string::npos) {
+        return SampleType::RNA002;
+    } else if (model_name.find("dna") != std::string::npos) {
+        return SampleType::DNA;
+    } else {
+        throw std::runtime_error("Could not determine model type for " + model_name);
+    }
+}
+
 CRFModelConfig load_crf_model_config(const std::filesystem::path &path) {
     const auto config_toml = toml::parse(path / "config.toml");
 
@@ -95,6 +107,8 @@ CRFModelConfig load_crf_model_config(const std::filesystem::path &path) {
     if (model_name.rfind("dna_r9.4.1", 0) == 0) {
         config.signal_norm_params.quantile_scaling = false;
     }
+
+    config.sample_type = get_model_type(model_name);
 
     return config;
 }

@@ -15,6 +15,12 @@ struct SignalNormalisationParams {
     bool quantile_scaling = true;
 };
 
+enum SampleType {
+    DNA,
+    RNA002,
+    RNA004,
+};
+
 // Values extracted from config.toml used in construction of the model module.
 struct CRFModelConfig {
     float qscale = 1.0f;
@@ -42,6 +48,8 @@ struct CRFModelConfig {
     // Start position for mean Q-score calculation for
     // short reads.
     int32_t mean_qscore_start_pos = -1;
+
+    SampleType sample_type;
 };
 
 CRFModelConfig load_crf_model_config(const std::filesystem::path& path);
