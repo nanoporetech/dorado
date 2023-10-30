@@ -78,7 +78,9 @@ void add_sa_tag(bam1_t* record,
 }
 }  // namespace
 
-namespace dorado::alignment {
+namespace dorado {
+
+namespace alignment {
 
 class AlignerImpl {
 public:
@@ -100,6 +102,95 @@ private:
     mm_idx_t* m_index{nullptr};
     mm_idx_reader_t* m_index_reader{nullptr};
 };
+
+AlignerImpl::AlignerImpl(const std::string& filename,
+                         const AlignerNode::Minimap2Options& options,
+                         size_t threads)
+        : m_threads(threads) {
+    // Check if reference file exists.
+    if (!std::filesystem::exists(filename)) {
+        throw std::runtime_error("AlignerNode reference path does not exist: " + filename);
+    }
+    // Initialize option structs.
+    mm_set_opt(0, &m_idx_opt, &m_map_opt);
+    // Setting options to map-ont default till relevant args are exposed.
+    mm_set_opt("map-ont", &m_idx_opt, &m_map_opt);
+
+    m_idx_opt.k = options.kmer_size;
+    m_idx_opt.w = options.window_size;
+    spdlog::info("> Index parameters input by user: kmer size={} and window size={}.", m_idx_opt.k,
+                 m_idx_opt.w);
+
+    m_idx_opt.batch_size = options.index_batch_size;
+    m_idx_opt.mini_batch_size = options.index_batch_size;
+    spdlog::info("> Index parameters input by user: batch size={} and mini batch size={}.",
+                 m_idx_opt.batch_size, m_idx_opt.mini_batch_size);
+
+    m_map_opt.bw = options.bandwidth;
+    m_map_opt.bw_long = options.bandwidth_long;
+    spdlog::info("> Map parameters input by user: bandwidth={} and bandwidth long={}.",
+                 m_map_opt.bw, m_map_opt.bw_long);
+
+    if (!options.print_secondary) {
+        m_map_opt.flag |= MM_F_NO_PRINT_2ND;
+    }
+    m_map_opt.best_n = options.best_n_secondary;
+    spdlog::info(
+            "> Map parameters input by user: don't print secondary={} and best n secondary={}.",
+            static_cast<bool>(m_map_opt.flag & MM_F_NO_PRINT_2ND), m_map_opt.best_n);
+
+    if (options.soft_clipping) {
+        m_map_opt.flag |= MM_F_SOFTCLIP;
+    }
+    if (options.secondary_seq) {
+        m_map_opt.flag |= MM_F_SECONDARY_SEQ;
+    }
+    spdlog::info("> Map parameters input by user: soft clipping={} and secondary seq={}.",
+                 static_cast<bool>(m_map_opt.flag & MM_F_SOFTCLIP),
+                 static_cast<bool>(m_map_opt.flag & MM_F_SECONDARY_SEQ));
+
+    if (options.print_aln_seq) {
+        mm_dbg_flag |= MM_DBG_PRINT_QNAME | MM_DBG_PRINT_ALN_SEQ;
+        m_threads = 1;
+    }
+    spdlog::debug("> Map parameters input by user: dbg print qname={} and aln seq={}.",
+                  static_cast<bool>(mm_dbg_flag & MM_DBG_PRINT_QNAME),
+                  static_cast<bool>(mm_dbg_flag & MM_DBG_PRINT_ALN_SEQ));
+
+    // Force cigar generation.
+    m_map_opt.flag |= MM_F_CIGAR;
+
+    mm_check_opt(&m_idx_opt, &m_map_opt);
+
+    m_index_reader = mm_idx_reader_open(filename.c_str(), &m_idx_opt, 0);
+    m_index = mm_idx_reader_read(m_index_reader, m_threads);
+    auto* split_index = mm_idx_reader_read(m_index_reader, m_threads);
+    if (split_index != nullptr) {
+        mm_idx_destroy(m_index);
+        mm_idx_destroy(split_index);
+        mm_idx_reader_close(m_index_reader);
+        throw std::runtime_error(
+                "Dorado doesn't support split index for alignment. Please re-run with larger index "
+                "size.");
+    }
+    mm_mapopt_update(&m_map_opt, m_index);
+
+    if (m_index->k != m_idx_opt.k || m_index->w != m_idx_opt.w) {
+        spdlog::warn(
+                "Indexing parameters mismatch prebuilt index: using paramateres kmer "
+                "size={} and window size={} from prebuilt index.",
+                m_index->k, m_index->w);
+    }
+
+    if (mm_verbose >= 3) {
+        mm_idx_stat(m_index);
+    }
+}
+
+AlignerImpl::~AlignerImpl() {
+    mm_idx_reader_close(m_index_reader);
+    mm_idx_destroy(m_index);
+}
 
 std::vector<BamPtr> AlignerImpl::align(bam1_t* irecord, mm_tbuf_t* buf) {
     // some where for the hits
@@ -260,94 +351,6 @@ std::vector<BamPtr> AlignerImpl::align(bam1_t* irecord, mm_tbuf_t* buf) {
     free(reg);
     return results;
 }
-AlignerImpl::AlignerImpl(const std::string& filename,
-                         const AlignerNode::Minimap2Options& options,
-                         size_t threads)
-        : m_threads(threads) {
-    // Check if reference file exists.
-    if (!std::filesystem::exists(filename)) {
-        throw std::runtime_error("AlignerNode reference path does not exist: " + filename);
-    }
-    // Initialize option structs.
-    mm_set_opt(0, &m_idx_opt, &m_map_opt);
-    // Setting options to map-ont default till relevant args are exposed.
-    mm_set_opt("map-ont", &m_idx_opt, &m_map_opt);
-
-    m_idx_opt.k = options.kmer_size;
-    m_idx_opt.w = options.window_size;
-    spdlog::info("> Index parameters input by user: kmer size={} and window size={}.", m_idx_opt.k,
-                 m_idx_opt.w);
-
-    m_idx_opt.batch_size = options.index_batch_size;
-    m_idx_opt.mini_batch_size = options.index_batch_size;
-    spdlog::info("> Index parameters input by user: batch size={} and mini batch size={}.",
-                 m_idx_opt.batch_size, m_idx_opt.mini_batch_size);
-
-    m_map_opt.bw = options.bandwidth;
-    m_map_opt.bw_long = options.bandwidth_long;
-    spdlog::info("> Map parameters input by user: bandwidth={} and bandwidth long={}.",
-                 m_map_opt.bw, m_map_opt.bw_long);
-
-    if (!options.print_secondary) {
-        m_map_opt.flag |= MM_F_NO_PRINT_2ND;
-    }
-    m_map_opt.best_n = options.best_n_secondary;
-    spdlog::info(
-            "> Map parameters input by user: don't print secondary={} and best n secondary={}.",
-            static_cast<bool>(m_map_opt.flag & MM_F_NO_PRINT_2ND), m_map_opt.best_n);
-
-    if (options.soft_clipping) {
-        m_map_opt.flag |= MM_F_SOFTCLIP;
-    }
-    if (options.secondary_seq) {
-        m_map_opt.flag |= MM_F_SECONDARY_SEQ;
-    }
-    spdlog::info("> Map parameters input by user: soft clipping={} and secondary seq={}.",
-                 static_cast<bool>(m_map_opt.flag & MM_F_SOFTCLIP),
-                 static_cast<bool>(m_map_opt.flag & MM_F_SECONDARY_SEQ));
-
-    if (options.print_aln_seq) {
-        mm_dbg_flag |= MM_DBG_PRINT_QNAME | MM_DBG_PRINT_ALN_SEQ;
-        m_threads = 1;
-    }
-    spdlog::debug("> Map parameters input by user: dbg print qname={} and aln seq={}.",
-                  static_cast<bool>(mm_dbg_flag & MM_DBG_PRINT_QNAME),
-                  static_cast<bool>(mm_dbg_flag & MM_DBG_PRINT_ALN_SEQ));
-
-    // Force cigar generation.
-    m_map_opt.flag |= MM_F_CIGAR;
-
-    mm_check_opt(&m_idx_opt, &m_map_opt);
-
-    m_index_reader = mm_idx_reader_open(filename.c_str(), &m_idx_opt, 0);
-    m_index = mm_idx_reader_read(m_index_reader, m_threads);
-    auto* split_index = mm_idx_reader_read(m_index_reader, m_threads);
-    if (split_index != nullptr) {
-        mm_idx_destroy(m_index);
-        mm_idx_destroy(split_index);
-        mm_idx_reader_close(m_index_reader);
-        throw std::runtime_error(
-                "Dorado doesn't support split index for alignment. Please re-run with larger index "
-                "size.");
-    }
-    mm_mapopt_update(&m_map_opt, m_index);
-
-    if (m_index->k != m_idx_opt.k || m_index->w != m_idx_opt.w) {
-        spdlog::warn(
-                "Indexing parameters mismatch prebuilt index: using paramateres kmer "
-                "size={} and window size={} from prebuilt index.",
-                m_index->k, m_index->w);
-    }
-
-    if (mm_verbose >= 3) {
-        mm_idx_stat(m_index);
-    }
-}
-
-AlignerImpl::~AlignerImpl() {
-    mm_idx_reader_close(m_index_reader);
-    mm_idx_destroy(m_index);
-}
 
 void AlignerImpl::align(dorado::SimplexRead& simplex_read, mm_tbuf_t* buffer) {
     mm_bseq1_t query{};
@@ -360,13 +363,13 @@ void AlignerImpl::align(dorado::SimplexRead& simplex_read, mm_tbuf_t* buffer) {
 
     std::string alignment_string{};
     if (n_regs == 0) {
-        std::string empty_sam{"\t4\t*\t0\t0\t*\t*\t0\t0\n"};
-        alignment_string = simplex_read.read_common.read_id + empty_sam;
+        const std::string EMPTY_SAM{"\t4\t*\t0\t0\t*\t*\t0\t0\n"};
+        alignment_string = simplex_read.read_common.read_id + EMPTY_SAM;
     }
     for (int reg_idx{0}; reg_idx < n_regs; ++reg_idx) {
         kstring_t alignment_line{0, 0, nullptr};
-        mm_write_sam2(&alignment_line, m_index, &query, 0, reg_idx, 1, &n_regs, &regs, NULL,
-                      MM_F_OUT_MD);
+        mm_write_sam3(&alignment_line, m_index, &query, 0, reg_idx, 1, &n_regs, &regs, NULL,
+                      MM_F_OUT_MD, -1);
         alignment_string += std::string(alignment_line.s, alignment_line.l) + "\n";
         free(alignment_line.s);
         free(regs[reg_idx].p);
@@ -460,10 +463,12 @@ void AlignerImpl::add_tags(bam1_t* record,
     bam_aux_append(record, "rl", 'i', sizeof(buf->rep_len), (uint8_t*)&buf->rep_len);
 }
 
+}  // namespace alignment
+
 AlignerNode::AlignerNode(const std::string& filename, const Minimap2Options& options, int threads)
         : MessageSink(10000),
           m_threads(threads),
-          m_aligner(std::make_unique<AlignerImpl>(filename, options, threads)) {
+          m_aligner(std::make_unique<alignment::AlignerImpl>(filename, options, threads)) {
     start_threads();
 }
 
@@ -518,4 +523,4 @@ void AlignerNode::worker_thread() {
 
 stats::NamedStats AlignerNode::sample_stats() const { return stats::from_obj(m_work_queue); }
 
-}  // namespace dorado::alignment
+}  // namespace dorado

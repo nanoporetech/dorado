@@ -11,9 +11,11 @@
 
 struct bam1_t;
 
-namespace dorado::alignment {
+namespace dorado {
 
+namespace alignment {
 class AlignerImpl;
+}
 
 class AlignerNode : public MessageSink {
 public:
@@ -50,7 +52,7 @@ private:
     void worker_thread();
     size_t m_threads{1};
     std::vector<std::thread> m_workers;
-    std::unique_ptr<AlignerImpl> m_aligner;
+    std::unique_ptr<alignment::AlignerImpl> m_aligner;
 };
 
-}  // namespace dorado::alignment
+}  // namespace dorado
