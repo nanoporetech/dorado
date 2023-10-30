@@ -891,7 +891,7 @@ public:
                     m_bwd.at(out_buf_idx)[buf_chunk_idx], m_posts.at(out_buf_idx)[buf_chunk_idx],
                     m_decoder_options.beam_width, m_decoder_options.beam_cut,
                     m_decoder_options.blank_score, m_decoder_options.q_shift,
-                    m_decoder_options.q_scale, m_decoder_options.temperature, score_scale);
+                    m_decoder_options.q_scale, score_scale);
 
             (*task->out_chunks)[chunk_idx] = DecodedChunk{sequence, qstring, moves};
 

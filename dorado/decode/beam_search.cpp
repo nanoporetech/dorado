@@ -1,6 +1,5 @@
 #include "beam_search.h"
 
-#include "fast_hash.h"
 #include "utils/simd.h"
 
 #include <math.h>
@@ -39,9 +38,9 @@ struct BeamFrontElement {
     bool stay;
 };
 
-float log_sum_exp(float x, float y, float t) {
-    float abs_diff = std::abs(x - y) / t;
-    return std::max(x, y) + ((abs_diff < 17.0f) ? (std::log1p(std::exp(-abs_diff)) * t) : 0.0f);
+float log_sum_exp(float x, float y) {
+    float abs_diff = std::abs(x - y);
+    return std::max(x, y) + ((abs_diff < 17.0f) ? (std::log1p(std::exp(-abs_diff))) : 0.0f);
 }
 
 int get_num_states(size_t num_trans_states) {
@@ -102,6 +101,22 @@ std::tuple<std::string, std::string> generate_sequence(const std::vector<uint8_t
     return make_tuple(sequence, qstring);
 }
 
+// Incorporates NUM_NEW_BITS into a Castagnoli CRC32, aka CRC32C
+// (not the same polynomial as CRC32 as used in zip/ethernet).
+template <int NUM_NEW_BITS>
+uint32_t crc32c(uint32_t crc, uint32_t new_bits) {
+    // Note that this is the reversed polynomial.
+    constexpr uint32_t POLYNOMIAL = 0x82f63b78u;
+    for (int i = 0; i < NUM_NEW_BITS; ++i) {
+        auto b = (new_bits ^ crc) & 1;
+        crc >>= 1;
+        if (b)
+            crc ^= POLYNOMIAL;
+        new_bits >>= 1;
+    }
+    return crc;
+}
+
 }  // anonymous namespace
 
 template <typename T>
@@ -117,7 +132,6 @@ float beam_search(const T* const scores,
                   std::vector<int32_t>& states,
                   std::vector<uint8_t>& moves,
                   std::vector<float>& qual_data,
-                  float temperature,
                   float score_scale) {
     const size_t num_states = 1 << num_state_bits;
     const auto states_mask = static_cast<state_t>(num_states - 1);
@@ -127,9 +141,9 @@ float beam_search(const T* const scores,
     }
 
     // Some values we need
-    constexpr uint64_t HASH_SEED = 0x880355f21e6d1965ULL;
+    constexpr uint32_t CRC_SEED = 0x12345678u;
     const float log_beam_cut =
-            (beam_cut > 0.0f) ? (temperature * logf(beam_cut)) : std::numeric_limits<float>::max();
+            (beam_cut > 0.0f) ? logf(beam_cut) : std::numeric_limits<float>::max();
 
     // Create the beam.  We need to keep beam_width elements for each block, plus the initial state
     std::vector<BeamElement> beam_vector(max_beam_width * (num_blocks + 1));
@@ -163,7 +177,7 @@ float beam_search(const T* const scores,
          state++) {
         if (back_guide[state] >= beam_init_threshold) {
             // Note that this first element has a prev_element_index of 0
-            prev_beam_front[beam_element] = {fasthash::chainfasthash64(HASH_SEED, state),
+            prev_beam_front[beam_element] = {crc32c<32>(CRC_SEED, state),
                                              static_cast<state_t>(state), 0, false};
             prev_scores[beam_element] = 0.0f;
             ++beam_element;
@@ -208,8 +222,8 @@ float beam_search(const T* const scores,
         // Essentially a k=1 Bloom filter, indicating the presence of steps with particular
         // sequence hashes.  Avoids comparing stay hashes against all possible progenitor
         // states where none of them has the requisite sequence hash.
-        const uint64_t HASH_PRESENT_BITS = 4096;
-        const uint64_t HASH_PRESENT_MASK = HASH_PRESENT_BITS - 1;
+        const uint32_t HASH_PRESENT_BITS = 4096;
+        const uint32_t HASH_PRESENT_MASK = HASH_PRESENT_BITS - 1;
         std::bitset<HASH_PRESENT_BITS> step_hash_present;  // Default constructor zeros content.
 
         // Generate list of candidate elements for this timestep (block).
@@ -219,7 +233,7 @@ float beam_search(const T* const scores,
             const auto& previous_element = prev_beam_front[prev_elem_idx];
 
             // Expand all the possible steps
-            for (size_t new_base = 0; new_base < NUM_BASES; new_base++) {
+            for (int new_base = 0; new_base < NUM_BASES; new_base++) {
                 state_t new_state =
                         (state_t((previous_element.state << NUM_BASE_BITS) & states_mask) |
                          new_base);
@@ -228,7 +242,8 @@ float beam_search(const T* const scores,
                         (((previous_element.state << NUM_BASE_BITS) >> num_state_bits)));
                 float new_score = prev_scores[prev_elem_idx] + fetch_block_score(move_idx) +
                                   static_cast<float>(block_back_scores[new_state]);
-                uint64_t new_hash = fasthash::chainfasthash64(previous_element.hash, new_state);
+                uint32_t new_hash = crc32c<2>(previous_element.hash, new_base);
+
                 step_hash_present[new_hash & HASH_PRESENT_MASK] = true;
 
                 // Add new element to the candidate list
@@ -266,18 +281,16 @@ float beam_search(const T* const scores,
                         current_beam_front[step_elem_idx].hash) {
                         if (current_scores[stay_elem_idx] > current_scores[step_elem_idx]) {
                             // Fold the step into the stay
-                            const float folded_score =
-                                    log_sum_exp(current_scores[stay_elem_idx],
-                                                current_scores[step_elem_idx], temperature);
+                            const float folded_score = log_sum_exp(current_scores[stay_elem_idx],
+                                                                   current_scores[step_elem_idx]);
                             current_scores[stay_elem_idx] = folded_score;
                             max_score = std::max(max_score, folded_score);
                             // The step element will end up last, sorted by score
                             current_scores[step_elem_idx] = std::numeric_limits<float>::lowest();
                         } else {
                             // Fold the stay into the step
-                            const float folded_score =
-                                    log_sum_exp(current_scores[stay_elem_idx],
-                                                current_scores[step_elem_idx], temperature);
+                            const float folded_score = log_sum_exp(current_scores[stay_elem_idx],
+                                                                   current_scores[step_elem_idx]);
                             current_scores[step_elem_idx] = folded_score;
                             max_score = std::max(max_score, folded_score);
                             // The stay element will end up last, sorted by score
@@ -508,7 +521,6 @@ std::tuple<std::string, std::string, std::vector<uint8_t>> beam_search_decode(
         float fixed_stay_score,
         float q_shift,
         float q_scale,
-        float temperature,
         float byte_score_scale) {
     const int num_blocks = int(scores_t.size(0));
     const int num_states = get_num_states(scores_t.size(1));
@@ -542,14 +554,14 @@ std::tuple<std::string, std::string, std::vector<uint8_t>> beam_search_decode(
 
         beam_search<float>(scores, scores_block_stride, back_guides, posts, num_state_bits,
                            num_blocks, max_beam_width, beam_cut, fixed_stay_score, states, moves,
-                           qual_data, temperature, 1.0f);
+                           qual_data, 1.0f);
     } else if (scores_t.dtype() == torch::kInt8) {
         const auto scores = scores_block_contig.data_ptr<int8_t>();
         const auto back_guides = back_guides_contig->data_ptr<float>();
         const auto posts = posts_contig->data_ptr<float>();
         beam_search<int8_t>(scores, scores_block_stride, back_guides, posts, num_state_bits,
                             num_blocks, max_beam_width, beam_cut, fixed_stay_score, states, moves,
-                            qual_data, temperature, byte_score_scale);
+                            qual_data, byte_score_scale);
     } else {
         throw std::runtime_error(std::string("beam_search_decode: unsupported tensor type ") +
                                  std::string(scores_t.dtype().name()));

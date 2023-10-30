@@ -200,8 +200,6 @@ set(LIB_SOURCE_FILES
     dorado/demux/BarcodeClassifierSelector.cpp
     dorado/demux/BarcodeClassifierSelector.h
     dorado/decode/beam_search.cpp
-    dorado/decode/fast_hash.cpp
-    dorado/decode/fast_hash.h
     dorado/decode/beam_search.h
     dorado/decode/CPUDecoder.cpp
     dorado/decode/CPUDecoder.h
