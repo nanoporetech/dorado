@@ -1,7 +1,11 @@
 #pragma once
-#include "read_pipeline/ReadPipeline.h"
 
-namespace dorado::splitter {
+namespace dorado {
+
+class SimplexRead;
+using SimplexReadPtr = std::unique_ptr<SimplexRead>;
+
+namespace splitter {
 
 struct RNASplitSettings {
     int16_t pore_thr = 1500;
@@ -55,4 +59,6 @@ public:
     virtual std::vector<SimplexReadPtr> split(SimplexReadPtr init_read) const = 0;
 };
 
-}  // namespace dorado::splitter
+}  // namespace splitter
+
+}  // namespace dorado
