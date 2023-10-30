@@ -1,4 +1,4 @@
-#include "RNASplitNode.h"
+#include "RNAReadSplitter.h"
 
 #include "splitter/splitter_utils.h"
 #include "utils/uuid_utils.h"
@@ -13,7 +13,7 @@ using namespace dorado::splitter;
 
 namespace dorado::splitter {
 
-RNASplitNode::ExtRead RNASplitNode::create_ext_read(SimplexReadPtr r) const {
+RNAReadSplitter::ExtRead RNAReadSplitter::create_ext_read(SimplexReadPtr r) const {
     ExtRead ext_read;
     ext_read.read = std::move(r);
     ext_read.possible_pore_regions =
@@ -26,8 +26,8 @@ RNASplitNode::ExtRead RNASplitNode::create_ext_read(SimplexReadPtr r) const {
     return ext_read;
 }
 
-std::vector<SimplexReadPtr> RNASplitNode::subreads(SimplexReadPtr read,
-                                                   const PosRanges& spacers) const {
+std::vector<SimplexReadPtr> RNAReadSplitter::subreads(SimplexReadPtr read,
+                                                      const PosRanges& spacers) const {
     std::vector<SimplexReadPtr> subreads;
     subreads.reserve(spacers.size() + 1);
 
@@ -51,8 +51,8 @@ std::vector<SimplexReadPtr> RNASplitNode::subreads(SimplexReadPtr read,
     return subreads;
 }
 
-std::vector<std::pair<std::string, RNASplitNode::SplitFinderF>> RNASplitNode::build_split_finders()
-        const {
+std::vector<std::pair<std::string, RNAReadSplitter::SplitFinderF>>
+RNAReadSplitter::build_split_finders() const {
     std::vector<std::pair<std::string, SplitFinderF>> split_finders;
     split_finders.push_back({"PORE_ADAPTER", [&](const ExtRead& read) {
                                  return filter_ranges(read.possible_pore_regions,
@@ -62,7 +62,7 @@ std::vector<std::pair<std::string, RNASplitNode::SplitFinderF>> RNASplitNode::bu
     return split_finders;
 }
 
-std::vector<SimplexReadPtr> RNASplitNode::split(SimplexReadPtr init_read) const {
+std::vector<SimplexReadPtr> RNAReadSplitter::split(SimplexReadPtr init_read) const {
     using namespace std::chrono;
 
     auto start_ts = high_resolution_clock::now();
@@ -114,7 +114,7 @@ std::vector<SimplexReadPtr> RNASplitNode::split(SimplexReadPtr init_read) const 
     return split_result;
 }
 
-RNASplitNode::RNASplitNode(RNASplitSettings settings) : m_settings(std::move(settings)) {
+RNAReadSplitter::RNAReadSplitter(RNASplitSettings settings) : m_settings(std::move(settings)) {
     m_split_finders = build_split_finders();
 }
 

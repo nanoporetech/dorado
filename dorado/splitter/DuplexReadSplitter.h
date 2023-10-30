@@ -12,10 +12,10 @@
 
 namespace dorado::splitter {
 
-class DuplexSplitNode : public ReadSplitter {
+class DuplexReadSplitter : public ReadSplitter {
 public:
-    DuplexSplitNode(DuplexSplitSettings settings);
-    ~DuplexSplitNode() {}
+    DuplexReadSplitter(DuplexSplitSettings settings);
+    ~DuplexReadSplitter() {}
 
     std::vector<SimplexReadPtr> split(SimplexReadPtr init_read) const override;
 

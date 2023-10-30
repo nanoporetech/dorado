@@ -9,9 +9,9 @@
 
 namespace dorado::splitter {
 
-class RNASplitNode : public ReadSplitter {
+class RNAReadSplitter : public ReadSplitter {
 public:
-    RNASplitNode(RNASplitSettings settings);
+    RNAReadSplitter(RNASplitSettings settings);
 
     std::vector<SimplexReadPtr> split(SimplexReadPtr init_read) const override;
 

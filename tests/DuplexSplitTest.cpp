@@ -5,7 +5,7 @@
 #include "read_pipeline/ReadSplitNode.h"
 #include "read_pipeline/StereoDuplexEncoderNode.h"
 #include "read_pipeline/SubreadTaggerNode.h"
-#include "splitter/DuplexSplitNode.h"
+#include "splitter/DuplexReadSplitter.h"
 #include "splitter/ReadSplitter.h"
 
 #include <catch2/catch.hpp>
@@ -60,7 +60,7 @@ TEST_CASE("4 subread splitting test", TEST_GROUP) {
     auto read = make_read();
 
     dorado::splitter::DuplexSplitSettings splitter_settings;
-    dorado::splitter::DuplexSplitNode splitter_node(splitter_settings);
+    dorado::splitter::DuplexReadSplitter splitter_node(splitter_settings);
 
     const auto split_res = splitter_node.split(std::move(read));
     CHECK(split_res.size() == 4);

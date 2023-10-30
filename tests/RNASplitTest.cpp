@@ -1,6 +1,6 @@
 #include "TestUtils.h"
 #include "read_pipeline/ReadPipeline.h"
-#include "splitter/RNASplitNode.h"
+#include "splitter/RNAReadSplitter.h"
 
 #include <catch2/catch.hpp>
 
@@ -26,7 +26,7 @@ TEST_CASE("2 subread split", TEST_GROUP) {
     read->read_common.read_tag = 42;
 
     dorado::splitter::RNASplitSettings splitter_settings;
-    dorado::splitter::RNASplitNode splitter_node(splitter_settings);
+    dorado::splitter::RNAReadSplitter splitter_node(splitter_settings);
 
     const auto split_res = splitter_node.split(std::move(read));
     CHECK(split_res.size() == 2);

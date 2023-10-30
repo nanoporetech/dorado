@@ -9,8 +9,8 @@
 #include "nn/CRFModelConfig.h"
 #include "nn/ModBaseRunner.h"
 #include "nn/ModelRunner.h"
-#include "splitter/DuplexSplitNode.h"
-#include "splitter/RNASplitNode.h"
+#include "splitter/DuplexReadSplitter.h"
+#include "splitter/RNAReadSplitter.h"
 
 #include <spdlog/spdlog.h>
 

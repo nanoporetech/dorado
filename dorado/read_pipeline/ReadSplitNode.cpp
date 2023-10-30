@@ -1,7 +1,7 @@
 #include "ReadSplitNode.h"
 
-#include "splitter/DuplexSplitNode.h"
-#include "splitter/RNASplitNode.h"
+#include "splitter/DuplexReadSplitter.h"
+#include "splitter/RNAReadSplitter.h"
 #include "splitter/ReadSplitter.h"
 
 using namespace dorado::splitter;
@@ -32,9 +32,9 @@ ReadSplitNode::ReadSplitNode(SplitterSettings settings, int num_worker_threads, 
         : MessageSink(max_reads), m_num_worker_threads(num_worker_threads) {
     if (std::holds_alternative<RNASplitSettings>(settings)) {
         m_splitter =
-                std::make_unique<RNASplitNode>(std::move(std::get<RNASplitSettings>(settings)));
+                std::make_unique<RNAReadSplitter>(std::move(std::get<RNASplitSettings>(settings)));
     } else if (std::holds_alternative<DuplexSplitSettings>(settings)) {
-        m_splitter = std::make_unique<DuplexSplitNode>(
+        m_splitter = std::make_unique<DuplexReadSplitter>(
                 std::move(std::get<DuplexSplitSettings>(settings)));
     }
 

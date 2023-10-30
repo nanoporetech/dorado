@@ -1,4 +1,4 @@
-#include "DuplexSplitNode.h"
+#include "DuplexReadSplitter.h"
 
 #include "read_pipeline/read_utils.h"
 #include "splitter/splitter_utils.h"
@@ -102,7 +102,7 @@ std::optional<PosRange> check_rc_match(const std::string& seq,
 
 namespace dorado::splitter {
 
-DuplexSplitNode::ExtRead DuplexSplitNode::create_ext_read(SimplexReadPtr r) const {
+DuplexReadSplitter::ExtRead DuplexReadSplitter::create_ext_read(SimplexReadPtr r) const {
     ExtRead ext_read;
     ext_read.read = std::move(r);
     ext_read.move_sums = utils::move_cum_sums(ext_read.read->read_common.moves);
@@ -113,7 +113,7 @@ DuplexSplitNode::ExtRead DuplexSplitNode::create_ext_read(SimplexReadPtr r) cons
     return ext_read;
 }
 
-PosRanges DuplexSplitNode::possible_pore_regions(const DuplexSplitNode::ExtRead& read) const {
+PosRanges DuplexReadSplitter::possible_pore_regions(const DuplexReadSplitter::ExtRead& read) const {
     spdlog::trace("Analyzing signal in read {}", read.read->read_common.read_id);
 
     auto pore_sample_ranges =
@@ -143,9 +143,9 @@ PosRanges DuplexSplitNode::possible_pore_regions(const DuplexSplitNode::ExtRead&
     return pore_regions;
 }
 
-bool DuplexSplitNode::check_nearby_adapter(const SimplexRead& read,
-                                           PosRange r,
-                                           int adapter_edist) const {
+bool DuplexReadSplitter::check_nearby_adapter(const SimplexRead& read,
+                                              PosRange r,
+                                              int adapter_edist) const {
     return find_best_adapter_match(m_settings.adapter, read.read_common.seq, adapter_edist,
                                    //including spacer region in search
                                    {r.first, std::min(r.second + m_settings.pore_adapter_range,
@@ -155,8 +155,10 @@ bool DuplexSplitNode::check_nearby_adapter(const SimplexRead& read,
 
 //'spacer' is region potentially containing templ/compl strand boundary
 //returns optional pair of matching ranges (first strictly to the left of spacer region)
-std::optional<std::pair<PosRange, PosRange>>
-DuplexSplitNode::check_flank_match(const SimplexRead& read, PosRange spacer, float err_thr) const {
+std::optional<std::pair<PosRange, PosRange>> DuplexReadSplitter::check_flank_match(
+        const SimplexRead& read,
+        PosRange spacer,
+        float err_thr) const {
     const uint64_t rlen = read.read_common.seq.length();
     assert(spacer.first <= spacer.second && spacer.second <= rlen);
     if (spacer.first <= m_settings.strand_end_trim || spacer.second == rlen) {
@@ -190,7 +192,7 @@ DuplexSplitNode::check_flank_match(const SimplexRead& read, PosRange spacer, flo
     return std::nullopt;
 }
 
-std::optional<PosRange> DuplexSplitNode::identify_middle_adapter_split(
+std::optional<PosRange> DuplexReadSplitter::identify_middle_adapter_split(
         const SimplexRead& read) const {
     assert(m_settings.strand_end_flank > m_settings.strand_end_trim + m_settings.min_flank);
     const uint64_t r_l = read.read_common.seq.size();
@@ -233,7 +235,7 @@ std::optional<PosRange> DuplexSplitNode::identify_middle_adapter_split(
     return std::nullopt;
 }
 
-std::optional<PosRange> DuplexSplitNode::identify_extra_middle_split(
+std::optional<PosRange> DuplexReadSplitter::identify_extra_middle_split(
         const SimplexRead& read) const {
     const uint64_t r_l = read.read_common.seq.size();
     //TODO parameterize
@@ -278,8 +280,8 @@ std::optional<PosRange> DuplexSplitNode::identify_extra_middle_split(
     return std::nullopt;
 }
 
-std::vector<SimplexReadPtr> DuplexSplitNode::subreads(SimplexReadPtr read,
-                                                      const PosRanges& spacers) const {
+std::vector<SimplexReadPtr> DuplexReadSplitter::subreads(SimplexReadPtr read,
+                                                         const PosRanges& spacers) const {
     std::vector<SimplexReadPtr> subreads;
     subreads.reserve(spacers.size() + 1);
 
@@ -316,8 +318,8 @@ std::vector<SimplexReadPtr> DuplexSplitNode::subreads(SimplexReadPtr read,
     return subreads;
 }
 
-std::vector<std::pair<std::string, DuplexSplitNode::SplitFinderF>>
-DuplexSplitNode::build_split_finders() const {
+std::vector<std::pair<std::string, DuplexReadSplitter::SplitFinderF>>
+DuplexReadSplitter::build_split_finders() const {
     std::vector<std::pair<std::string, SplitFinderF>> split_finders;
     split_finders.push_back({"PORE_ADAPTER", [&](const ExtRead& read) {
                                  return filter_ranges(read.possible_pore_regions, [&](PosRange r) {
@@ -385,7 +387,7 @@ DuplexSplitNode::build_split_finders() const {
     return split_finders;
 }
 
-std::vector<SimplexReadPtr> DuplexSplitNode::split(SimplexReadPtr init_read) const {
+std::vector<SimplexReadPtr> DuplexReadSplitter::split(SimplexReadPtr init_read) const {
     using namespace std::chrono;
 
     auto start_ts = high_resolution_clock::now();
@@ -464,7 +466,8 @@ std::vector<SimplexReadPtr> DuplexSplitNode::split(SimplexReadPtr init_read) con
     return split_result;
 }
 
-DuplexSplitNode::DuplexSplitNode(DuplexSplitSettings settings) : m_settings(std::move(settings)) {
+DuplexReadSplitter::DuplexReadSplitter(DuplexSplitSettings settings)
+        : m_settings(std::move(settings)) {
     m_split_finders = build_split_finders();
 }
 
