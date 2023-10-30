@@ -4,6 +4,7 @@
 
 #include <catch2/catch.hpp>
 
+#include <cstdint>
 #include <filesystem>
 #include <vector>
 

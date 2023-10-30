@@ -2,6 +2,13 @@
 
 #include "ReadSplitter.h"
 
+#include <torch/torch.h>
+
+#include <algorithm>
+#include <cstdint>
+#include <optional>
+#include <vector>
+
 namespace dorado::splitter {
 
 typedef std::pair<uint64_t, uint64_t> PosRange;

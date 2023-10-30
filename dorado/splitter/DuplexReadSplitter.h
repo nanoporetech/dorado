@@ -3,6 +3,8 @@
 #include "splitter/splitter_utils.h"
 #include "utils/types.h"
 
+#include <torch/torch.h>
+
 #include <cstdint>
 #include <functional>
 #include <optional>
