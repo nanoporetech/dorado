@@ -29,6 +29,7 @@ add_library(dorado_utils
     SampleSheet.h
     sequence_utils.cpp
     sequence_utils.h
+    stats.cpp
     stats.h
     tensor_utils.cpp
     tensor_utils.h
