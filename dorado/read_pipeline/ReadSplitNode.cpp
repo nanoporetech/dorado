@@ -39,8 +39,7 @@ ReadSplitNode::ReadSplitNode(std::unique_ptr<const ReadSplitter> splitter,
 
 void ReadSplitNode::start_threads() {
     for (int i = 0; i < m_num_worker_threads; ++i) {
-        m_worker_threads.push_back(
-                std::make_unique<std::thread>(&ReadSplitNode::worker_thread, this));
+        m_worker_threads.push_back(std::thread(&ReadSplitNode::worker_thread, this));
     }
 }
 
@@ -49,8 +48,8 @@ void ReadSplitNode::terminate_impl() {
 
     // Wait for all the Node's worker threads to terminate
     for (auto& t : m_worker_threads) {
-        if (t->joinable()) {
-            t->join();
+        if (t.joinable()) {
+            t.join();
         }
     }
     m_worker_threads.clear();

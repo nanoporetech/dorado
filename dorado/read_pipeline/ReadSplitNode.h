@@ -27,7 +27,7 @@ private:
     void worker_thread();  // Worker thread performs splitting asynchronously.
 
     const int m_num_worker_threads;
-    std::vector<std::unique_ptr<std::thread>> m_worker_threads;
+    std::vector<std::thread> m_worker_threads;
 
     std::unique_ptr<const splitter::ReadSplitter> m_splitter;
 };
