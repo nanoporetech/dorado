@@ -171,10 +171,9 @@ int estimate_samples_per_base(const dorado::SimplexRead& read, bool is_rna) {
     const auto stride = read.read_common.model_stride;
     const auto seq_to_sig_map =
             dorado::utils::moves_to_map(read.read_common.moves, stride, num_samples, num_bases + 1);
-    // Use last 100bp to estimate samples / base.
-    std::vector<float> sizes;
+    std::vector<float> sizes(seq_to_sig_map.size() - 1, 0.f);
     for (int i = 1; i < seq_to_sig_map.size(); i++) {
-        sizes.push_back(static_cast<float>(seq_to_sig_map[i] - seq_to_sig_map[i - 1]));
+        sizes[i - 1] = static_cast<float>(seq_to_sig_map[i] - seq_to_sig_map[i - 1]);
     }
     auto quantiles = dorado::utils::quantiles(sizes, {0.5});
     return std::floor(static_cast<float>(quantiles[0]));
