@@ -28,16 +28,12 @@ void ReadSplitNode::worker_thread() {
     }
 }
 
-ReadSplitNode::ReadSplitNode(SplitterSettings settings, int num_worker_threads, size_t max_reads)
-        : MessageSink(max_reads), m_num_worker_threads(num_worker_threads) {
-    if (std::holds_alternative<RNASplitSettings>(settings)) {
-        m_splitter =
-                std::make_unique<RNAReadSplitter>(std::move(std::get<RNASplitSettings>(settings)));
-    } else if (std::holds_alternative<DuplexSplitSettings>(settings)) {
-        m_splitter = std::make_unique<DuplexReadSplitter>(
-                std::move(std::get<DuplexSplitSettings>(settings)));
-    }
-
+ReadSplitNode::ReadSplitNode(std::unique_ptr<const ReadSplitter> splitter,
+                             int num_worker_threads,
+                             size_t max_reads)
+        : MessageSink(max_reads),
+          m_splitter(std::move(splitter)),
+          m_num_worker_threads(num_worker_threads) {
     start_threads();
 }
 

@@ -49,7 +49,7 @@ struct DuplexSplitSettings {
 
 class ReadSplitter {
 public:
-    ReadSplitter(){};
+    ReadSplitter() = default;
     virtual ~ReadSplitter() = default;
 
     virtual std::vector<SimplexReadPtr> split(SimplexReadPtr init_read) const = 0;

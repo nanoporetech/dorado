@@ -49,7 +49,9 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
     // For RNA model, read splitting happens first before any basecalling.
     if (enable_read_splitter && is_rna) {
         splitter::RNASplitSettings rna_splitter_settings;
-        auto rna_splitter_node = pipeline_desc.add_node<ReadSplitNode>({}, rna_splitter_settings,
+        auto rna_splitter =
+                std::make_unique<const splitter::RNAReadSplitter>(rna_splitter_settings);
+        auto rna_splitter_node = pipeline_desc.add_node<ReadSplitNode>({}, std::move(rna_splitter),
                                                                        splitter_node_threads);
         first_node_handle = rna_splitter_node;
         current_node_handle = rna_splitter_node;
@@ -75,8 +77,9 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
     if (enable_read_splitter && !is_rna) {
         splitter::DuplexSplitSettings splitter_settings;
         splitter_settings.simplex_mode = true;
-        auto dna_splitter_node =
-                pipeline_desc.add_node<ReadSplitNode>({}, splitter_settings, splitter_node_threads);
+        auto dna_splitter = std::make_unique<const splitter::DuplexReadSplitter>(splitter_settings);
+        auto dna_splitter_node = pipeline_desc.add_node<ReadSplitNode>({}, std::move(dna_splitter),
+                                                                       splitter_node_threads);
         pipeline_desc.add_node_sink(current_node_handle, dna_splitter_node);
         current_node_handle = dna_splitter_node;
         last_node_handle = dna_splitter_node;
@@ -146,8 +149,9 @@ void create_stereo_duplex_pipeline(PipelineDescriptor& pipeline_desc,
     // as a passthrough, meaning it won't perform any splitting operations and
     // will just pass data through.
     splitter::DuplexSplitSettings splitter_settings;
-    auto splitter_node = pipeline_desc.add_node<ReadSplitNode>({pairing_node}, splitter_settings,
-                                                               splitter_node_threads);
+    auto duplex_splitter = std::make_unique<const splitter::DuplexReadSplitter>(splitter_settings);
+    auto splitter_node = pipeline_desc.add_node<ReadSplitNode>(
+            {pairing_node}, std::move(duplex_splitter), splitter_node_threads);
 
     auto adjusted_simplex_overlap = (overlap / simplex_model_stride) * simplex_model_stride;
 
