@@ -32,7 +32,7 @@ struct BeamElement {
 // This is the data we need to retain for only the previous timestep (block) in the beam
 // (and what we construct for the new timestep)
 struct BeamFrontElement {
-    uint64_t hash;
+    uint32_t hash;
     state_t state;
     uint8_t prev_element_index;
     bool stay;
@@ -242,7 +242,7 @@ float beam_search(const T* const scores,
                         (((previous_element.state << NUM_BASE_BITS) >> num_state_bits)));
                 float new_score = prev_scores[prev_elem_idx] + fetch_block_score(move_idx) +
                                   static_cast<float>(block_back_scores[new_state]);
-                uint32_t new_hash = crc32c<2>(previous_element.hash, new_base);
+                uint32_t new_hash = crc32c<NUM_BASE_BITS>(previous_element.hash, new_base);
 
                 step_hash_present[new_hash & HASH_PRESENT_MASK] = true;
 
