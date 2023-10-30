@@ -26,6 +26,10 @@ using torch::indexing::Slice;
 static constexpr auto torch_dtype = torch::kF16;
 static const size_t dtype_bytes = torch::elementSize(torch_dtype);
 
+namespace MTL {
+auto format_as(CommandBufferStatus status) { return fmt::underlying(status); }
+}  // namespace MTL
+
 namespace {
 // SIMD tile size dictated by the Metal spec.
 constexpr int kTileSize = 8;
