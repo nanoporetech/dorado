@@ -3,6 +3,7 @@
 #include "utils/duplex_utils.h"
 #include "utils/sequence_utils.h"
 
+#include <ATen/ATen.h>
 #include <edlib.h>
 
 #include <algorithm>
@@ -10,7 +11,7 @@
 #include <cstring>
 #include <vector>
 
-using namespace torch::indexing;
+using namespace at::indexing;
 
 namespace dorado {
 DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(const ReadPair& read_pair) {
@@ -19,8 +20,8 @@ DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(const ReadPair& read_pair) 
 
     // We rely on the incoming read raw data being of type float16 to allow direct memcpy
     // of tensor elements.
-    assert(template_read.read_common.raw_data.dtype() == torch::kFloat16);
-    assert(complement_read.read_common.raw_data.dtype() == torch::kFloat16);
+    assert(template_read.read_common.raw_data.dtype() == at::kHalf);
+    assert(complement_read.read_common.raw_data.dtype() == at::kHalf);
 
     assert(complement_read.read_common.attributes.mux == template_read.read_common.attributes.mux);
     assert(complement_read.read_common.attributes.channel_number ==
@@ -60,7 +61,7 @@ DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(const ReadPair& read_pair) 
     // Move along the alignment, filling out the stereo-encoded tensor
     const int max_size = template_read.read_common.get_raw_data_samples() +
                          complement_read.read_common.get_raw_data_samples();
-    const auto opts = torch::TensorOptions().dtype(torch::kFloat16).device(torch::kCPU);
+    const auto opts = at::TensorOptions().dtype(at::ScalarType::Half).device(at::kCPU);
 
     static constexpr int kNumFeatures = 13;
     // Indices of features in the first dimension of the output tensor.
@@ -71,7 +72,7 @@ DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(const ReadPair& read_pair) 
     static constexpr int kFeatureMoveTable = 10;
     static constexpr int kFeatureTemplateQScore = 11;
     static constexpr int kFeatureComplementQScore = 12;
-    auto tmp = torch::zeros({kNumFeatures, max_size}, opts);
+    auto tmp = at::zeros({kNumFeatures, max_size}, opts);
 
     int template_signal_cursor = 0;
     int complement_signal_cursor = 0;
@@ -114,7 +115,7 @@ DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(const ReadPair& read_pair) 
     complement_moves_expanded.pop_back();
 
     auto complement_signal = complement_read.read_common.raw_data;
-    complement_signal = torch::flip(complement_read.read_common.raw_data, 0);
+    complement_signal = at::flip(complement_read.read_common.raw_data, 0);
 
     int complement_moves_seen = complement_read.read_common.moves[complement_signal_cursor];
     while (complement_moves_seen < query_cursor + 1) {
@@ -123,11 +124,11 @@ DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(const ReadPair& read_pair) 
     }
 
     const float pad_value =
-            0.8 * std::min(torch::min(complement_signal).item<float>(),
-                           torch::min(template_read.read_common.raw_data).item<float>());
+            0.8 * std::min(at::min(complement_signal).item<float>(),
+                           at::min(template_read.read_common.raw_data).item<float>());
 
     // Start with all signal feature entries equal to the padding value.
-    tmp.index({torch::indexing::Slice(None, 2)}) = pad_value;
+    tmp.index({at::indexing::Slice(None, 2)}) = pad_value;
 
     // libtorch indexing calls go on a carefree romp through various heap
     // allocations/deallocations and object constructions/destructions, and so are
@@ -252,8 +253,7 @@ DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(const ReadPair& read_pair) 
         stereo_global_cursor += total_segment_length;
     }
 
-    tmp = tmp.index(
-            {torch::indexing::Slice(None), torch::indexing::Slice(None, stereo_global_cursor)});
+    tmp = tmp.index({at::indexing::Slice(None), at::indexing::Slice(None, stereo_global_cursor)});
 
     auto read = std::make_unique<DuplexRead>();  // Return read
     read->read_common.read_id =
@@ -282,7 +282,7 @@ DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(const ReadPair& read_pair) 
 }
 
 void StereoDuplexEncoderNode::worker_thread() {
-    torch::InferenceMode inference_mode_guard;
+    at::InferenceMode inference_mode_guard;
 
     Message message;
     while (get_input_message(message)) {

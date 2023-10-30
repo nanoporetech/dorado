@@ -6,6 +6,7 @@
 #include "utils/types.h"
 #include "vbz_plugin_user_utils.h"
 
+#include <ATen/ATen.h>
 #include <cxxpool.h>
 #include <highfive/H5Easy.hpp>
 #include <highfive/H5File.hpp>
@@ -132,8 +133,8 @@ SimplexReadPtr process_pod5_read(
     pod5_error_t err = pod5_format_read_id(read_data.read_id, read_id_tmp);
     std::string read_id_str(read_id_tmp);
 
-    auto options = torch::TensorOptions().dtype(torch::kInt16);
-    auto samples = torch::empty(read_data.num_samples, options);
+    auto options = at::TensorOptions().dtype(at::kShort);
+    auto samples = at::empty(read_data.num_samples, options);
 
     if (pod5_get_read_complete_signal(file, batch, row, read_data.num_samples,
                                       samples.data_ptr<int16_t>()) != POD5_OK) {
@@ -795,8 +796,8 @@ void DataLoader::load_fast5_reads_from_file(const std::string& path) {
             throw std::runtime_error("Invalid FAST5 Signal data type of " +
                                      ds.getDataType().string());
 
-        auto options = torch::TensorOptions().dtype(torch::kInt16);
-        auto samples = torch::empty(ds.getElementCount(), options);
+        auto options = at::TensorOptions().dtype(at::kShort);
+        auto samples = at::empty(ds.getElementCount(), options);
         ds.read(samples.data_ptr<int16_t>());
 
         HighFive::Attribute mux_attr = raw.getAttribute("start_mux");

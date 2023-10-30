@@ -3,6 +3,7 @@
 #include "utils/tensor_utils.h"
 #include "utils/trim.h"
 
+#include <ATen/ATen.h>
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
@@ -15,14 +16,14 @@
 static constexpr float EPS = 1e-9f;
 
 using namespace std::chrono_literals;
-using Slice = torch::indexing::Slice;
+using Slice = at::indexing::Slice;
 
 namespace dorado {
 
-std::pair<float, float> ScalerNode::normalisation(const torch::Tensor& x) {
+std::pair<float, float> ScalerNode::normalisation(const at::Tensor& x) {
     // Calculate shift and scale factors for normalisation.
     auto quantiles = dorado::utils::quantile_counting(
-            x, torch::tensor({m_scaling_params.quantile_a, m_scaling_params.quantile_b}));
+            x, at::tensor({m_scaling_params.quantile_a, m_scaling_params.quantile_b}));
     float q_a = quantiles[0].item<float>();
     float q_b = quantiles[1].item<float>();
     float shift = std::max(10.0f, m_scaling_params.shift_multiplier * (q_a + q_b));
@@ -30,13 +31,13 @@ std::pair<float, float> ScalerNode::normalisation(const torch::Tensor& x) {
     return {shift, scale};
 }
 
-std::pair<float, float> ScalerNode::med_mad(const torch::Tensor& x) {
+std::pair<float, float> ScalerNode::med_mad(const at::Tensor& x) {
     // See https://en.wikipedia.org/wiki/Median_absolute_deviation
     //  (specifically the "Relation to standard deviation" section)
     constexpr float factor = 1.4826;
     //Calculate signal median and median absolute deviation
     auto med = x.median();
-    auto mad = torch::median(torch::abs(x - med)) * factor + EPS;
+    auto mad = at::median(at::abs(x - med)) * factor + EPS;
     return {med.item<float>(), mad.item<float>()};
 }
 
@@ -46,7 +47,7 @@ std::pair<float, float> ScalerNode::med_mad(const torch::Tensor& x) {
 // RNA002 and RNA004 have different offsets and thresholds for the
 // sliding window heuristic.
 int determine_rna_adapter_pos(const dorado::SimplexRead& read, dorado::SampleType model_type) {
-    assert(read.read_common.raw_data.dtype() == torch::kInt16);
+    assert(read.read_common.raw_data.dtype() == at::kShort);
     static const std::unordered_map<dorado::SampleType, int> kOffsetMap = {
             {dorado::SampleType::RNA002, 4000}, {dorado::SampleType::RNA004, 1000}};
     static const std::unordered_map<dorado::SampleType, int16_t> kAdapterCutoff = {
@@ -69,9 +70,9 @@ int determine_rna_adapter_pos(const dorado::SimplexRead& read, dorado::SampleTyp
     const int signal_start = kOffsetMap.at(model_type);
     const int signal_end = static_cast<int>(3 * signal_len / 4);
     for (int i = signal_start; i < signal_end; i += kStride) {
-        auto slice = torch::from_blob(const_cast<int16_t*>(&signal[i]),
-                                      {static_cast<int>(std::min(kWindowSize, signal_len - i))},
-                                      torch::TensorOptions().dtype(torch::kInt16));
+        auto slice = at::from_blob(const_cast<int16_t*>(&signal[i]),
+                                   {static_cast<int>(std::min(kWindowSize, signal_len - i))},
+                                   at::TensorOptions().dtype(at::kShort));
         int16_t median = slice.median().item<int16_t>();
         medians[median_pos++ % medians.size()] = median;
         auto minmax = std::minmax_element(medians.begin(), medians.end());
@@ -88,7 +89,7 @@ int determine_rna_adapter_pos(const dorado::SimplexRead& read, dorado::SampleTyp
 }
 
 void ScalerNode::worker_thread() {
-    torch::InferenceMode inference_mode_guard;
+    at::InferenceMode inference_mode_guard;
 
     Message message;
     while (get_input_message(message)) {
@@ -106,10 +107,10 @@ void ScalerNode::worker_thread() {
         if (is_rna) {
             trim_start = determine_rna_adapter_pos(*read, m_model_type);
             read->read_common.raw_data =
-                    read->read_common.raw_data.index({Slice(trim_start, torch::indexing::None)});
+                    read->read_common.raw_data.index({Slice(trim_start, at::indexing::None)});
         }
 
-        assert(read->read_common.raw_data.dtype() == torch::kInt16);
+        assert(read->read_common.raw_data.dtype() == at::kShort);
         const auto [shift, scale] = m_scaling_params.quantile_scaling
                                             ? normalisation(read->read_common.raw_data)
                                             : med_mad(read->read_common.raw_data);
@@ -118,9 +119,8 @@ void ScalerNode::worker_thread() {
 
         // raw_data comes from DataLoader with dtype int16.  We send it on as float16 after
         // shifting/scaling in float32 form.
-        read->read_common.raw_data =
-                ((read->read_common.raw_data.to(torch::kFloat) - shift) / scale)
-                        .to(torch::kFloat16);
+        read->read_common.raw_data = ((read->read_common.raw_data.to(at::kFloat) - shift) / scale)
+                                             .to(at::ScalarType::Half);
 
         // move the shift and scale into pA.
         read->read_common.scale = read->scaling * scale;
@@ -132,9 +132,9 @@ void ScalerNode::worker_thread() {
             int max_samples =
                     std::min(8000, static_cast<int>(read->read_common.get_raw_data_samples() / 2));
             trim_start = utils::trim(
-                    read->read_common.raw_data.index({Slice(torch::indexing::None, max_samples)}));
+                    read->read_common.raw_data.index({Slice(at::indexing::None, max_samples)}));
             read->read_common.raw_data =
-                    read->read_common.raw_data.index({Slice(trim_start, torch::indexing::None)});
+                    read->read_common.raw_data.index({Slice(trim_start, at::indexing::None)});
         }
 
         read->read_common.num_trimmed_samples = trim_start;

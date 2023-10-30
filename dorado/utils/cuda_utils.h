@@ -26,14 +26,14 @@ size_t available_memory(torch::Device device);
 // where Torch allocates GPU memory.
 void print_cuda_alloc_info(const std::string &label);
 
-void matmul_f16(const torch::Tensor &A, const torch::Tensor &B, torch::Tensor &C);
+void matmul_f16(const at::Tensor &A, const at::Tensor &B, at::Tensor &C);
 
 // Deal with a result from a cudaGetLastError call.  May raise an exception to provide information to the user.
 void handle_cuda_result(int cuda_result);
 
 namespace details {
-void matmul_f16_cublas(const torch::Tensor &A, const torch::Tensor &B, torch::Tensor &C);
-void matmul_f16_torch(const torch::Tensor &A, const torch::Tensor &B, torch::Tensor &C);
+void matmul_f16_cublas(const at::Tensor &A, const at::Tensor &B, at::Tensor &C);
+void matmul_f16_torch(const at::Tensor &A, const at::Tensor &B, at::Tensor &C);
 
 }  //  namespace details
 

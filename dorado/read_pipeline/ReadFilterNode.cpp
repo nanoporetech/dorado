@@ -5,7 +5,7 @@
 namespace dorado {
 
 void ReadFilterNode::worker_thread() {
-    torch::InferenceMode inference_mode_guard;
+    at::InferenceMode inference_mode_guard;
 
     Message message;
     while (get_input_message(message)) {

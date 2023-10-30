@@ -8,13 +8,13 @@
 
 namespace dorado::utils {
 
-int trim(const torch::Tensor& signal, float threshold, int window_size, int min_elements) {
+int trim(const at::Tensor& signal, float threshold, int window_size, int min_elements) {
     const int min_trim = 10;
     const int num_samples = static_cast<int>(signal.size(0)) - min_trim;
     const int num_windows = num_samples / window_size;
 
     // Access via raw pointers because of torch indexing overhead.
-    const auto signal_f32 = signal.to(torch::kFloat32);
+    const auto signal_f32 = signal.to(at::ScalarType::Float);
     assert(signal_f32.is_contiguous());
     const float* const signal_f32_ptr = signal_f32.data_ptr<float>();
 

@@ -268,7 +268,7 @@ SignalAnchorInfo determine_signal_anchor_and_strand_drna(const dorado::SimplexRe
 namespace dorado {
 
 void PolyACalculator::worker_thread() {
-    torch::InferenceMode inference_mode_guard;
+    at::InferenceMode inference_mode_guard;
 
     Message message;
     while (get_input_message(message)) {

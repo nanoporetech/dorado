@@ -15,7 +15,7 @@ namespace F = torch::nn::functional;
 
 #define TEST_GROUP "Metal: "
 
-float MeanAbsDiff(const torch::Tensor &a, const torch::Tensor &b) {
+float MeanAbsDiff(const at::Tensor &a, const at::Tensor &b) {
     REQUIRE(a.numel() == b.numel());
     return torch::sum(torch::abs(a - b)).item<float>() / a.numel();
 }
@@ -79,32 +79,32 @@ TEST_CASE(TEST_GROUP "Linear") {
 
     // The kernel takes weights and biases in a single tensor,
     // We want the fake weights to be symmetrically distributed, or the output will be saturated.
-    const torch::Tensor weights_biases_f32 =
+    const at::Tensor weights_biases_f32 =
             torch::rand({layer_size + 1, out_size}, torch::kFloat32) - 0.5f;
-    const torch::Tensor weights_f32 = weights_biases_f32.slice(0, 0, layer_size);
-    const torch::Tensor biases_f32 = weights_biases_f32[-1];
+    const at::Tensor weights_f32 = weights_biases_f32.slice(0, 0, layer_size);
+    const at::Tensor biases_f32 = weights_biases_f32[-1];
 
     // We combine the batch and chunk size dimensions into the leading dimension for input into torch::addmm.
-    const torch::Tensor in_f32 =
+    const at::Tensor in_f32 =
             torch::rand({lstm_chunk_size * in_batch_size, layer_size}, torch::kFloat32);
 
     // The kernel takes float16 weights, and works generally in float16.
-    const torch::Tensor weights_biases_f16 = weights_biases_f32.to(torch::kFloat16);
-    const torch::Tensor in_f16 = in_f32.to(torch::kFloat16);
+    const at::Tensor weights_biases_f16 = weights_biases_f32.to(torch::kFloat16);
+    const at::Tensor in_f16 = in_f32.to(torch::kFloat16);
 
     // Prepare the input buffer for the Linear kernel.
     // reorder_inputs transforms the input in 3 ways:
     // 1) Rearranges input tiles in a fairly complex manner.
     // 2) Adds one time step of padding before and after the chunk time extents.
     // 3) Converts from float32 to float16.
-    torch::Tensor in_f16_reordered =
+    at::Tensor in_f16_reordered =
             torch::zeros({lstm_chunk_size + 3, in_batch_size, layer_size}, torch::kFloat16);
     launch_kernel(reorder_input_cps.get(), command_queue.get(),
                   {args_reorder.get(), mtl_for_tensor(in_f32), mtl_for_tensor(in_f16_reordered)},
                   {}, kernel_thread_groups, threads_per_thread_group);
 
     // CPU comparison calculation.
-    const torch::Tensor out_cpu_f32 = torch::addmm(biases_f32, in_f32, weights_f32);
+    const at::Tensor out_cpu_f32 = torch::addmm(biases_f32, in_f32, weights_f32);
 
     const int32_t in_batch_tiles = in_batch_size / tile_size;
 

@@ -7,6 +7,7 @@
 #include "utils/time_utils.h"
 #include "utils/uuid_utils.h"
 
+#include <ATen/ATen.h>
 #include <spdlog/spdlog.h>
 
 #include <chrono>
@@ -44,7 +45,7 @@ PosRanges merge_ranges(const PosRanges& ranges, uint64_t merge_dist) {
     return merged;
 }
 
-std::vector<std::pair<uint64_t, uint64_t>> detect_pore_signal(const torch::Tensor& signal,
+std::vector<std::pair<uint64_t, uint64_t>> detect_pore_signal(const at::Tensor& signal,
                                                               float threshold,
                                                               uint64_t cluster_dist,
                                                               uint64_t ignore_prefix) {
@@ -175,7 +176,7 @@ SimplexReadPtr subread(const SimplexRead& read, PosRange seq_range, PosRange sig
     subread->read_common.read_tag = read.read_common.read_tag;
     subread->read_common.client_id = read.read_common.client_id;
     subread->read_common.raw_data = subread->read_common.raw_data.index(
-            {torch::indexing::Slice(signal_range.first, signal_range.second)});
+            {at::indexing::Slice(signal_range.first, signal_range.second)});
     subread->read_common.attributes.read_number = -1;
 
     //we adjust for it in new start time
@@ -226,7 +227,7 @@ DuplexSplitNode::ExtRead DuplexSplitNode::create_ext_read(SimplexReadPtr r) cons
     ext_read.move_sums = utils::move_cum_sums(ext_read.read->read_common.moves);
     assert(!ext_read.move_sums.empty());
     assert(ext_read.move_sums.back() == ext_read.read->read_common.seq.length());
-    ext_read.data_as_float32 = ext_read.read->read_common.raw_data.to(torch::kFloat);
+    ext_read.data_as_float32 = ext_read.read->read_common.raw_data.to(at::kFloat);
     ext_read.possible_pore_regions = possible_pore_regions(ext_read);
     return ext_read;
 }
@@ -582,7 +583,7 @@ std::vector<SimplexReadPtr> DuplexSplitNode::split(SimplexReadPtr init_read) con
 }
 
 void DuplexSplitNode::worker_thread() {
-    torch::InferenceMode inference_mode_guard;
+    at::InferenceMode inference_mode_guard;
 
     Message message;
     while (get_input_message(message)) {

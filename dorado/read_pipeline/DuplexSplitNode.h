@@ -71,7 +71,7 @@ private:
     //TODO consider precomputing and reusing ranges with high signal
     struct ExtRead {
         SimplexReadPtr read;
-        torch::Tensor data_as_float32;
+        at::Tensor data_as_float32;
         std::vector<uint64_t> move_sums;
         PosRanges possible_pore_regions;
     };

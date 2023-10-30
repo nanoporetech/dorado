@@ -3,8 +3,8 @@
 #include "utils/stats.h"
 #include "utils/types.h"
 
+#include <ATen/core/TensorBody.h>
 #include <spdlog/spdlog.h>
-#include <torch/torch.h>
 
 #include <cstdint>
 #include <limits>
@@ -31,7 +31,7 @@ struct Attributes {
 
 class ReadCommon {
 public:
-    torch::Tensor raw_data;  // Loaded from source file
+    at::Tensor raw_data;  // Loaded from source file
 
     int model_stride;  // The down sampling factor of the model
 
