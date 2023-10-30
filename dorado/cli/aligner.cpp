@@ -53,7 +53,14 @@ int aligner(int argc, char* argv[]) {
             .help("maximum number of reads to process (for debugging, 0=unlimited).")
             .default_value(0)
             .scan<'i', int>();
-    parser.visible.add_argument("-v", "--verbose").default_value(false).implicit_value(true);
+    int verbosity = 0;
+    parser.visible.add_argument("-v", "--verbose")
+            .default_value(false)
+            .implicit_value(true)
+            .nargs(0)
+            .action([&](const auto&) { ++verbosity; })
+            .append();
+
     cli::add_minimap2_arguments(parser, Aligner::dflt_options);
 
     try {
@@ -67,7 +74,7 @@ int aligner(int argc, char* argv[]) {
 
     if (parser.visible.get<bool>("--verbose")) {
         mm_verbose = 3;
-        utils::SetDebugLogging();
+        utils::SetVerboseLogging(static_cast<dorado::utils::VerboseLogLevel>(verbosity));
     }
 
     auto index(parser.visible.get<std::string>("index"));

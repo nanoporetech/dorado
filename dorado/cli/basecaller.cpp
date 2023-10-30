@@ -150,7 +150,7 @@ void setup(std::vector<std::string> args,
     if (estimate_poly_a) {
         current_sink_node = pipeline_desc.add_node<PolyACalculator>(
                 {current_sink_node}, std::thread::hardware_concurrency(),
-                PolyACalculator::get_model_type(model_name));
+                is_rna_model(model_config));
     }
     if (!barcode_kits.empty()) {
         current_sink_node = pipeline_desc.add_node<BarcodeClassifierNode>(
@@ -263,7 +263,13 @@ int basecaller(int argc, char* argv[]) {
 
     parser.visible.add_argument("data").help("the data directory or file (POD5/FAST5 format).");
 
-    parser.visible.add_argument("-v", "--verbose").default_value(false).implicit_value(true);
+    int verbosity = 0;
+    parser.visible.add_argument("-v", "--verbose")
+            .default_value(false)
+            .implicit_value(true)
+            .nargs(0)
+            .action([&](const auto&) { ++verbosity; })
+            .append();
 
     parser.visible.add_argument("-x", "--device")
             .help("device string in format \"cuda:0,...,N\", \"cuda:all\", \"metal\", \"cpu\" "
@@ -388,7 +394,7 @@ int basecaller(int argc, char* argv[]) {
     std::vector<std::string> args(argv, argv + argc);
 
     if (parser.visible.get<bool>("--verbose")) {
-        utils::SetDebugLogging();
+        utils::SetVerboseLogging(static_cast<dorado::utils::VerboseLogLevel>(verbosity));
     }
 
     auto model = parser.visible.get<std::string>("model");
