@@ -1,5 +1,6 @@
 #include "AlignerNode.h"
 
+#include "utils/PostCondition.h"
 #include "utils/sequence_utils.h"
 #include "utils/types.h"
 
@@ -360,6 +361,7 @@ void AlignerImpl::align(dorado::SimplexRead& simplex_read, mm_tbuf_t* buffer) {
 
     int n_regs{};
     mm_reg1_t* regs = mm_map(m_index, query.l_seq, query.seq, &n_regs, buffer, &m_map_opt, nullptr);
+    auto post_condition = utils::PostCondition([regs] { free(regs); });
 
     std::string alignment_string{};
     if (n_regs == 0) {
@@ -374,8 +376,6 @@ void AlignerImpl::align(dorado::SimplexRead& simplex_read, mm_tbuf_t* buffer) {
         free(alignment_line.s);
         free(regs[reg_idx].p);
     }
-    // TODO: free using RAII
-    free(regs);
     simplex_read.read_common.alignment_string = alignment_string;
 }
 
