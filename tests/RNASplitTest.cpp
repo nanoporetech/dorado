@@ -36,11 +36,11 @@ TEST_CASE("2 subread split", TEST_GROUP) {
     for (auto &r : split_res) {
         num_samples.push_back(r->read_common.attributes.num_samples);
     }
-    CHECK(num_samples == std::vector<uint64_t>{4833, 5657});
+    CHECK((num_samples == std::vector<uint64_t>{4833, 5657}));
 
     std::vector<uint32_t> split_points;
     for (auto &r : split_res) {
         split_points.push_back(r->read_common.split_point);
     }
-    CHECK(split_points == std::vector<uint32_t>{0, 4837});
+    CHECK((split_points == std::vector<uint32_t>{0, 4837}));
 }
