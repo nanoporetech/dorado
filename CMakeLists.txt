@@ -100,6 +100,9 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     endif()
 endif()
 
+# Bring in spdlog
+add_subdirectory(${DORADO_3RD_PARTY_SOURCE}/spdlog)
+
 # ELZIP_DECOMPRESS_ONLY stops minizip from adding OpenSSL as a target, preventing use of three dylibs on osx.
 set(ELZIP_DECOMPRESS_ONLY ON)
 add_subdirectory(${DORADO_3RD_PARTY_SOURCE}/elzip)
@@ -261,7 +264,6 @@ target_include_directories(dorado_lib
         ${DORADO_3RD_PARTY_SOURCE}/hdf_plugins/vbz_plugin
         ${DORADO_3RD_PARTY_SOURCE}/cxxpool/src
         ${DORADO_3RD_PARTY_SOURCE}/NVTX/c/include
-        ${DORADO_3RD_PARTY_SOURCE}/spdlog/include
         ${DORADO_3RD_PARTY_SOURCE}/indicators/include
 )
 

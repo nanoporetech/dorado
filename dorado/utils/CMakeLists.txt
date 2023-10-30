@@ -77,7 +77,6 @@ target_include_directories(dorado_utils
     SYSTEM
     PUBLIC
     ${TORCH_INCLUDE_DIRS}
-    ${DORADO_3RD_PARTY_SOURCE}/spdlog/include
     ${DORADO_3RD_PARTY_SOURCE}/NVTX/c/include
     ${DORADO_3RD_PARTY_DOWNLOAD}/metal-cpp/metal-cpp
 )
@@ -87,6 +86,7 @@ target_link_libraries(dorado_utils
         ${TORCH_LIBRARIES}
         edlib
         date::date
+        spdlog::spdlog
     PRIVATE
         minimap2
         OpenSSL::SSL
