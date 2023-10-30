@@ -10,7 +10,7 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
-#include <memory>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <tuple>
@@ -386,7 +386,6 @@ std::vector<ScoreResults> BarcodeClassifier::calculate_adapter_score_double_ends
         if (!barcode_is_permitted(allowed_barcodes, adapter_name)) {
             continue;
         }
-
         spdlog::debug("Checking barcode {}", adapter_name);
 
         auto top_mask_score = extract_mask_score(adapter, top_mask, mask_config, "top window");

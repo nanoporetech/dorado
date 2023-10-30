@@ -5,6 +5,7 @@
 #include "utils/types.h"
 
 #include <atomic>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -21,7 +22,7 @@ public:
                           const std::vector<std::string>& kit_name,
                           bool barcode_both_ends,
                           bool no_trim,
-                          const BarcodingInfo::FilterSet& allowed_barcodes);
+                          BarcodingInfo::FilterSet allowed_barcodes);
     BarcodeClassifierNode(int threads);
     ~BarcodeClassifierNode();
     std::string get_name() const override { return "BarcodeClassifierNode"; }

@@ -14,6 +14,7 @@
 #include "read_pipeline/ReadFilterNode.h"
 #include "read_pipeline/ReadToBamTypeNode.h"
 #include "read_pipeline/ScalerNode.h"
+#include "utils/SampleSheet.h"
 #include "utils/parameters.h"
 
 #if DORADO_GPU_BUILD
@@ -327,8 +328,8 @@ DEFINE_TEST(NodeSmokeTestBam, "ReadToBamType") {
 
     set_pipeline_restart(pipeline_restart);
 
-    run_smoke_test<dorado::ReadToBamType>(emit_moves, 2,
-                                          dorado::utils::default_parameters.methylation_threshold);
+    run_smoke_test<dorado::ReadToBamType>(
+            emit_moves, 2, dorado::utils::default_parameters.methylation_threshold, nullptr, 1000);
 }
 
 DEFINE_TEST(NodeSmokeTestRead, "BarcodeClassifierNode") {

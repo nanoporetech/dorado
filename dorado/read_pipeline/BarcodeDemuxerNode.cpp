@@ -1,6 +1,7 @@
 #include "BarcodeDemuxerNode.h"
 
 #include "read_pipeline/ReadPipeline.h"
+#include "utils/SampleSheet.h"
 
 #include <htslib/bgzf.h>
 #include <htslib/sam.h>
@@ -14,12 +15,14 @@ namespace dorado {
 BarcodeDemuxerNode::BarcodeDemuxerNode(const std::string& output_dir,
                                        size_t htslib_threads,
                                        size_t num_reads,
-                                       bool write_fastq)
+                                       bool write_fastq,
+                                       std::unique_ptr<const utils::SampleSheet> sample_sheet)
         : MessageSink(10000),
           m_output_dir(output_dir),
           m_htslib_threads(htslib_threads),
           m_num_reads_expected(num_reads),
-          m_write_fastq(write_fastq) {
+          m_write_fastq(write_fastq),
+          m_sample_sheet(std::move(sample_sheet)) {
     std::filesystem::create_directories(m_output_dir);
     start_threads();
 }
@@ -66,6 +69,15 @@ int BarcodeDemuxerNode::write(bam1_t* const record) {
     auto bam_tag = bam_aux_get(record, "BC");
     if (bam_tag) {
         bc = std::string(bam_aux2Z(bam_tag));
+    }
+
+    if (m_sample_sheet) {
+        // experiment id and position id are not stored in the bam record, so we can't recover them to use here
+        auto alias = m_sample_sheet->get_alias("", "", "", bc);
+        if (!alias.empty()) {
+            bc = alias;
+            bam_aux_update_str(record, "BC", bc.size() + 1, bc.c_str());
+        }
     }
     // Check of existence of file for that barcode.
     auto res = m_files.find(bc);
