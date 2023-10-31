@@ -68,7 +68,7 @@ target_compile_definitions(dorado_utils
 if (DORADO_ENABLE_PCH)
     target_precompile_headers(dorado_utils
         PRIVATE
-        <torch/torch.h>
+        <ATen/ATen.h>
     )
 endif()
 
