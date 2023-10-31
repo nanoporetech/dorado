@@ -69,7 +69,13 @@ int demuxer(int argc, char* argv[]) {
     parser.add_argument("-l", "--read-ids")
             .help("A file with a newline-delimited list of reads to demux.")
             .default_value(std::string(""));
-    parser.add_argument("-v", "--verbose").default_value(false).implicit_value(true);
+    int verbosity = 0;
+    parser.add_argument("-v", "--verbose")
+            .default_value(false)
+            .implicit_value(true)
+            .nargs(0)
+            .action([&](const auto&) { ++verbosity; })
+            .append();
     parser.add_argument("--emit-fastq")
             .help("Output in fastq format. Default is BAM.")
             .default_value(false)
@@ -99,7 +105,7 @@ int demuxer(int argc, char* argv[]) {
     }
 
     if (parser.get<bool>("--verbose")) {
-        utils::SetDebugLogging();
+        utils::SetVerboseLogging(static_cast<dorado::utils::VerboseLogLevel>(verbosity));
     }
 
     auto reads(parser.get<std::vector<std::string>>("reads"));

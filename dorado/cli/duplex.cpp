@@ -110,7 +110,13 @@ int duplex(int argc, char* argv[]) {
             .help("Path to reference for alignment.")
             .default_value(std::string(""));
 
-    parser.visible.add_argument("-v", "--verbose").default_value(false).implicit_value(true);
+    int verbosity = 0;
+    parser.visible.add_argument("-v", "--verbose")
+            .default_value(false)
+            .implicit_value(true)
+            .nargs(0)
+            .action([&](const auto&) { ++verbosity; })
+            .append();
 
     cli::add_minimap2_arguments(parser, AlignerNode::dflt_options);
     cli::add_internal_arguments(parser);
@@ -133,7 +139,7 @@ int duplex(int argc, char* argv[]) {
         const bool basespace_duplex = (model.compare("basespace") == 0);
         std::vector<std::string> args(argv, argv + argc);
         if (parser.visible.get<bool>("--verbose")) {
-            utils::SetDebugLogging();
+            utils::SetVerboseLogging(static_cast<dorado::utils::VerboseLogLevel>(verbosity));
         }
         std::map<std::string, std::string> template_complement_map;
         auto read_list = utils::load_read_list(parser.visible.get<std::string>("--read-ids"));

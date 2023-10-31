@@ -50,7 +50,13 @@ int summary(int argc, char *argv[]) {
     argparse::ArgumentParser parser("dorado", DORADO_VERSION, argparse::default_arguments::help);
     parser.add_argument("reads").help("SAM/BAM file produced by dorado basecaller.");
     parser.add_argument("-s", "--separator").default_value(std::string("\t"));
-    parser.add_argument("-v", "--verbose").default_value(false).implicit_value(true);
+    int verbosity = 0;
+    parser.add_argument("-v", "--verbose")
+            .default_value(false)
+            .implicit_value(true)
+            .nargs(0)
+            .action([&](const auto &) { ++verbosity; })
+            .append();
 
     try {
         parser.parse_args(argc, argv);
@@ -62,7 +68,7 @@ int summary(int argc, char *argv[]) {
     }
 
     if (parser.get<bool>("--verbose")) {
-        utils::SetDebugLogging();
+        utils::SetVerboseLogging(static_cast<dorado::utils::VerboseLogLevel>(verbosity));
     }
 
     std::vector<std::string> header = {

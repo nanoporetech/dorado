@@ -73,9 +73,13 @@ void InitLogging() {
     }
 }
 
-void SetDebugLogging() {
+void SetVerboseLogging(VerboseLogLevel level) {
     if (is_safe_to_log()) {
-        spdlog::set_level(spdlog::level::debug);
+        if (level >= VerboseLogLevel::TRACE) {
+            spdlog::set_level(spdlog::level::trace);
+        } else if (level <= VerboseLogLevel::DEBUG) {
+            spdlog::set_level(spdlog::level::debug);
+        }
     }
 }
 
