@@ -102,6 +102,11 @@ endif()
 
 # Bring in spdlog
 add_subdirectory(${DORADO_3RD_PARTY_SOURCE}/spdlog)
+# Avoid namespace clashes with static torch.
+target_compile_definitions(spdlog PUBLIC
+    "FMT_BEGIN_NAMESPACE=namespace fmt { inline namespace ont {"
+    "FMT_END_NAMESPACE=}}"
+)
 
 # ELZIP_DECOMPRESS_ONLY stops minizip from adding OpenSSL as a target, preventing use of three dylibs on osx.
 set(ELZIP_DECOMPRESS_ONLY ON)
