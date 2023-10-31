@@ -1,7 +1,5 @@
 #pragma once
 
-#include <catch2/catch.hpp>
-
 #include <cstring>
 #include <filesystem>
 #include <fstream>
