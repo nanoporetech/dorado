@@ -106,7 +106,7 @@ static LstmMode get_cuda_lstm_mode(int layer_idx, int layer_size) {
     bool is_TX2 = (prop->major == 6 && prop->minor == 2);
     bool is_A100_H100 = ((prop->major == 8 || prop->major == 9) && prop->minor == 0);
 
-    if (is_A100_H100 && layer_size <= 1024 && (layer_size % 128) == 0) {
+    if (is_A100_H100 && layer_size <= 1024 && layer_size > 128 && (layer_size % 128) == 0) {
         return (layer_idx == 0) ? LstmMode::CUTLASS_TNC_F16 : LstmMode::CUTLASS_TNC_I8;
     } else if (!is_TX2 && (layer_size == 96 || layer_size == 128)) {
         return LstmMode::QUANTISED_NTC;
