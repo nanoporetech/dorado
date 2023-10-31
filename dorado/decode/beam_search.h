@@ -17,5 +17,4 @@ std::tuple<std::string, std::string, std::vector<uint8_t>> beam_search_decode(
         float fixed_stay_score,
         float q_shift,
         float q_scale,
-        float temperature,
         float byte_score_scale);

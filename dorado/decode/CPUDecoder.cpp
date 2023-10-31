@@ -131,8 +131,7 @@ std::vector<DecodedChunk> CPUDecoder::beam_search(const torch::Tensor& scores,
                     for (int i = 0; i < t_num_chunks; i++) {
                         auto decode_result = beam_search_decode(
                                 t_scores[i], bwd[i], posts[i], options.beam_width, options.beam_cut,
-                                options.blank_score, options.q_shift, options.q_scale,
-                                options.temperature, 1.0f);
+                                options.blank_score, options.q_shift, options.q_scale, 1.0f);
                         chunk_results[t_first_chunk + i] = DecodedChunk{
                                 std::get<0>(decode_result),
                                 std::get<1>(decode_result),
