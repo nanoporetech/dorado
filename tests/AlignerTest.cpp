@@ -230,13 +230,13 @@ SCENARIO("AlignerNode push SimplexRead", TEST_GROUP) {
             pipeline.reset();
 
             THEN("Single simplex read is output") {
-                REQUIRE(messages.size() == 1);
-                REQUIRE(std::holds_alternative<dorado::SimplexReadPtr>(messages[0]));
+                REQUIRE((messages.size() == 1 &&
+                         std ::holds_alternative<dorado::SimplexReadPtr>(messages[0])));
             }
 
             THEN("Output simplex read has alignment_string populated") {
                 simplex_read = std::get<dorado::SimplexReadPtr>(std::move(messages[0]));
-                REQUIRE(!simplex_read->read_common.alignment_string.empty());
+                REQUIRE_FALSE(simplex_read->read_common.alignment_string.empty());
             }
 
             THEN("Output simplex read has alignment_string containing unmapped sam line") {
@@ -270,8 +270,8 @@ SCENARIO("AlignerNode push SimplexRead", TEST_GROUP) {
             }
 
             THEN("Output sam line contains sequence string") {
-                REQUIRE(simplex_read->read_common.alignment_string.find(sequence) !=
-                        std::string::npos);
+                REQUIRE_FALSE(simplex_read->read_common.alignment_string.find(sequence) ==
+                              std::string::npos);
             }
         }
     }
