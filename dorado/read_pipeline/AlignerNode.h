@@ -15,7 +15,10 @@ namespace dorado {
 
 namespace alignment {
 class AlignerImpl;
-}
+
+// Exposed for testability
+extern const std::string UNMAPPED_SAM_LINE_STRIPPED;
+}  // namespace alignment
 
 class AlignerNode : public MessageSink {
 public:

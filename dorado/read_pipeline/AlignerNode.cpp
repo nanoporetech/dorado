@@ -83,6 +83,9 @@ namespace dorado {
 
 namespace alignment {
 
+// Stripped of the prefix QNAME and postfix SEQ + \t + QUAL
+const std::string UNMAPPED_SAM_LINE_STRIPPED{"\t4\t*\t0\t0\t*\t*\t0\t0\n"};
+
 class AlignerImpl {
 public:
     AlignerImpl(const std::string& filename,
@@ -365,8 +368,7 @@ void AlignerImpl::align(dorado::SimplexRead& simplex_read, mm_tbuf_t* buffer) {
 
     std::string alignment_string{};
     if (n_regs == 0) {
-        const std::string EMPTY_SAM{"\t4\t*\t0\t0\t*\t*\t0\t0\n"};
-        alignment_string = simplex_read.read_common.read_id + EMPTY_SAM;
+        alignment_string = simplex_read.read_common.read_id + UNMAPPED_SAM_LINE_STRIPPED;
     }
     for (int reg_idx{0}; reg_idx < n_regs; ++reg_idx) {
         kstring_t alignment_line{0, 0, nullptr};
