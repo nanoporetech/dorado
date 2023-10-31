@@ -1,7 +1,5 @@
 #include "ReadSplitNode.h"
 
-#include "splitter/DuplexReadSplitter.h"
-#include "splitter/RNAReadSplitter.h"
 #include "splitter/ReadSplitter.h"
 
 using namespace dorado::splitter;

@@ -1,6 +1,5 @@
 #pragma once
 #include "ReadPipeline.h"
-#include "splitter/ReadSplitter.h"
 #include "utils/stats.h"
 
 #include <memory>
@@ -8,6 +7,10 @@
 #include <vector>
 
 namespace dorado {
+
+namespace splitter {
+class ReadSplitter;
+}
 
 class ReadSplitNode : public MessageSink {
 public:
