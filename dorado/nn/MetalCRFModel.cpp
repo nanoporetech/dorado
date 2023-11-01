@@ -26,6 +26,10 @@ using torch::indexing::Slice;
 static constexpr auto torch_dtype = torch::kF16;
 static const size_t dtype_bytes = torch::elementSize(torch_dtype);
 
+namespace MTL {
+auto format_as(CommandBufferStatus status) { return fmt::underlying(status); }
+}  // namespace MTL
+
 namespace {
 // SIMD tile size dictated by the Metal spec.
 constexpr int kTileSize = 8;
@@ -204,7 +208,7 @@ struct MetalConv1dImpl : Module {
         }
     }
 
-    torch::Tensor t_weights_bias;
+    at::Tensor t_weights_bias;
     std::vector<NS::SharedPtr<MTL::Buffer>> m_args;
     NS::SharedPtr<MTL::ComputePipelineState> conv_cps, weights_cps;
     int kernel_simd_groups, kernel_thread_groups;
@@ -231,7 +235,7 @@ struct MetalLSTMImpl : Module {
         t_weights_bias = torch::empty({layer_size * 3 + 1, layer_size, kLstmGates}, torch_dtype);
     }
 
-    torch::Tensor t_weights_bias;
+    at::Tensor t_weights_bias;
     bool reverse;
 };
 
@@ -469,11 +473,11 @@ struct MetalBlockImpl : Module {
     // Executes the model, with the linear layer held off by linear_hold_off, if non-NULL.
     // If CB submissions are successful, it returns the command buffer used for the linear layer
     // and scan kernels.  If either CB is unsuccessful, it returns nullptr.
-    MTL::CommandBuffer *forward_async(torch::Tensor &in,
+    MTL::CommandBuffer *forward_async(at::Tensor &in,
                                       MTL::SharedEvent *const linear_hold_off_event,
                                       uint64_t linear_hold_off_id,
                                       int try_count,
-                                      std::vector<torch::Tensor> &out) {
+                                      std::vector<at::Tensor> &out) {
         auto command_buffer = m_command_queue->commandBuffer();
 
         assert(in.dtype() == torch::kF16 || in.dtype() == torch::kF32);
@@ -577,16 +581,16 @@ struct MetalModelImpl : Module {
                                     MetalBlock(chunk_size, batch_size, config, out_split, device));
     }
 
-    void load_state_dict(const std::vector<torch::Tensor> &weights) {
+    void load_state_dict(const std::vector<at::Tensor> &weights) {
         utils::load_state_dict(*this, weights);
         mtl_block->load_weights();
     }
 
-    MTL::CommandBuffer *forward_async(torch::Tensor &in,
+    MTL::CommandBuffer *forward_async(at::Tensor &in,
                                       MTL::SharedEvent *const linear_hold_off_event,
                                       uint64_t linear_hold_off_id,
                                       int try_count,
-                                      std::vector<torch::Tensor> &out) {
+                                      std::vector<at::Tensor> &out) {
         return mtl_block->forward_async(in, linear_hold_off_event, linear_hold_off_id, try_count,
                                         out);
     }
@@ -727,10 +731,10 @@ public:
     }
 
     struct NNTask {
-        NNTask(torch::Tensor *input_, int num_chunks_, std::vector<DecodedChunk> *out_chunks_)
+        NNTask(at::Tensor *input_, int num_chunks_, std::vector<DecodedChunk> *out_chunks_)
                 : input(input_), out_chunks(out_chunks_), num_chunks(num_chunks_) {}
 
-        torch::Tensor *input;
+        at::Tensor *input;
         std::mutex mut;
         std::condition_variable cv;
         bool ready{false};
@@ -742,7 +746,7 @@ public:
         uint64_t decode_complete_event_id = static_cast<uint64_t>(0);
     };
 
-    void call_chunks(torch::Tensor &input, int num_chunks, std::vector<DecodedChunk> &out_chunks) {
+    void call_chunks(at::Tensor &input, int num_chunks, std::vector<DecodedChunk> &out_chunks) {
         if (num_chunks == 0) {
             return;
         }
@@ -761,7 +765,7 @@ public:
     }
 
     void metal_thread_fn() {
-        torch::InferenceMode inference_mode_guard;
+        at::InferenceMode inference_mode_guard;
         ScopedAutoReleasePool autorelease_pool;
 
         // Incrementing ID used to prevent the linear layer of run i+1 overwriting the scores of
@@ -861,7 +865,7 @@ public:
     }
 
     void decode_thread_fn(int thread_id) {
-        torch::InferenceMode inference_mode_guard;
+        at::InferenceMode inference_mode_guard;
         while (true) {
             std::unique_lock<std::mutex> decode_lock(m_decode_lock);
             while (m_decode_queue.empty() && !m_terminate_decode.load()) {
@@ -951,7 +955,7 @@ public:
     NS::SharedPtr<MTL::ComputePipelineState> m_bwd_scan_cps, m_fwd_scan_cps, m_add_softmax_cps;
     // Used to signal completion of an NNTask's decoding.
     NS::SharedPtr<MTL::SharedEvent> m_decode_complete_event;
-    std::vector<torch::Tensor> m_scores_int8, m_posts, m_bwd;
+    std::vector<at::Tensor> m_scores_int8, m_posts, m_bwd;
     int m_in_chunk_size, m_out_chunk_size, m_batch_size, m_states;
     // Number of pieces the linear output is split into, for reasons of
     // buffer size constraints.
@@ -979,7 +983,7 @@ MetalModelRunner::MetalModelRunner(std::shared_ptr<MetalCaller> caller) : m_call
             torch::kF16);
 }
 
-void MetalModelRunner::accept_chunk(int chunk_idx, const torch::Tensor &chunk) {
+void MetalModelRunner::accept_chunk(int chunk_idx, const at::Tensor &chunk) {
     if (chunk.dim() == 1) {
         // Input has single feature dimension.
         assert(m_caller->m_num_input_features == 1);

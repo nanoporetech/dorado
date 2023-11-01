@@ -1,8 +1,8 @@
 #include "../utils/tensor_utils.h"
 #include "Version.h"
 
+#include <ATen/ATen.h>
 #include <argparse.hpp>
-#include <torch/torch.h>
 
 #include <chrono>
 #include <iostream>
@@ -26,12 +26,12 @@ int benchmark(int argc, char* argv[]) {
         std::cerr << "samples : " << n << std::endl;
 
         // generate some input
-        auto x = torch::randint(0, 2047, n);
-        auto q = torch::tensor({0.2, 0.9}, {torch::kFloat32});
+        auto x = at::randint(0, 2047, n);
+        auto q = at::tensor({0.2, 0.9}, {at::ScalarType::Float});
 
         // torch::quantile
         auto start = std::chrono::system_clock::now();
-        auto res = torch::quantile(x, q);
+        auto res = at::quantile(x, q);
         auto end = std::chrono::system_clock::now();
 
         auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
@@ -51,7 +51,7 @@ int benchmark(int argc, char* argv[]) {
                   << " q20=" << res[0].item<int>() << " q90=" << res[1].item<int>() << " "
                   << duration << "us" << std::endl;
 
-        x = x.to(torch::kInt16);
+        x = x.to(at::ScalarType::Short);
 
         // counting
         start = std::chrono::system_clock::now();

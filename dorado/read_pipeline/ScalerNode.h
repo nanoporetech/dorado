@@ -3,7 +3,7 @@
 #include "nn/CRFModelConfig.h"
 #include "utils/stats.h"
 
-#include <torch/torch.h>
+#include <ATen/core/TensorBody.h>
 
 #include <atomic>
 #include <string>
@@ -35,8 +35,8 @@ private:
     SignalNormalisationParams m_scaling_params;
     const SampleType m_model_type;
 
-    std::pair<float, float> med_mad(const torch::Tensor& x);
-    std::pair<float, float> normalisation(const torch::Tensor& x);
+    std::pair<float, float> med_mad(const at::Tensor& x);
+    std::pair<float, float> normalisation(const at::Tensor& x);
 };
 
 }  // namespace dorado

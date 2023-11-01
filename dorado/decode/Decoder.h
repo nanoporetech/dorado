@@ -1,6 +1,6 @@
 #pragma once
 
-#include <torch/torch.h>
+#include <ATen/core/TensorBody.h>
 
 #include <string>
 #include <vector>
@@ -25,7 +25,7 @@ struct DecoderOptions {
 
 class Decoder {
 public:
-    virtual std::vector<DecodedChunk> beam_search(const torch::Tensor& scores,
+    virtual std::vector<DecodedChunk> beam_search(const at::Tensor& scores,
                                                   int num_chunks,
                                                   const DecoderOptions& options) = 0;
 };

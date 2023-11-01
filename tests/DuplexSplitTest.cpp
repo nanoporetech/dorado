@@ -45,7 +45,7 @@ auto make_read() {
     read->read_common.qstring = ReadFileIntoString(DataPath("qstring"));
     read->read_common.moves = ReadFileIntoVector(DataPath("moves"));
     torch::load(read->read_common.raw_data, DataPath("raw.tensor").string());
-    read->read_common.raw_data = read->read_common.raw_data.to(torch::kFloat16);
+    read->read_common.raw_data = read->read_common.raw_data.to(at::ScalarType::Half);
     read->read_common.read_tag = 42;
 
     read->prev_read = "prev";
@@ -184,7 +184,7 @@ TEST_CASE("No split output read properties", TEST_GROUP) {
     read->read_common.qstring = std::string(read->read_common.seq.length(), '!');
     read->read_common.moves = std::vector<uint8_t>(read->read_common.seq.length(), 1);
     read->read_common.raw_data =
-            torch::zeros(read->read_common.seq.length() * 10).to(torch::kFloat16);
+            at::zeros(read->read_common.seq.length() * 10).to(at::ScalarType::Half);
     read->read_common.read_tag = 42;
 
     dorado::PipelineDescriptor pipeline_desc;
@@ -232,7 +232,7 @@ TEST_CASE("Test split where only one subread is generated", TEST_GROUP) {
     read->read_common.qstring = ReadFileIntoString(data_dir / "qstring");
     read->read_common.moves = ReadFileIntoVector(data_dir / "moves");
     torch::load(read->read_common.raw_data, (data_dir / "raw.tensor").string());
-    read->read_common.raw_data = read->read_common.raw_data.to(torch::kFloat16);
+    read->read_common.raw_data = read->read_common.raw_data.to(at::ScalarType::Half);
     read->read_common.read_tag = 42;
     dorado::PipelineDescriptor pipeline_desc;
 

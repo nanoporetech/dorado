@@ -6,7 +6,6 @@
 
 #include <argparse.hpp>
 #include <htslib/sam.h>
-#include <torch/torch.h>
 
 #include <algorithm>
 #include <cctype>
