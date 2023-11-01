@@ -285,7 +285,7 @@ namespace {
 
 // Calculates the input queue size.
 size_t CalcMaxChunksIn(const std::vector<Runner> &model_runners) {
-    // Allow 5 batches per model runner on the chunks_in queue
+    // Allow 2 batches per model runner on the chunks_in queue
     size_t max_chunks_in = 0;
     // Allows optimal batch size to be used for every GPU
     for (auto &runner : model_runners) {
