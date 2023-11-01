@@ -3,6 +3,7 @@
 #include "splitter/RNAReadSplitter.h"
 
 #include <catch2/catch.hpp>
+#include <torch/serialize.h>
 
 #include <cstdint>
 #include <filesystem>

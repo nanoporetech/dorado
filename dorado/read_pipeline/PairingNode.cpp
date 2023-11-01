@@ -246,7 +246,7 @@ void PairingNode::pair_list_worker_thread(int tid) {
 }
 
 void PairingNode::pair_generating_worker_thread(int tid) {
-    torch::InferenceMode inference_mode_guard;
+    at::InferenceMode inference_mode_guard;
 
     auto compare_reads_by_time = [](const SimplexReadPtr& read1, const SimplexReadPtr& read2) {
         return read1->read_common.start_time_ms < read2->read_common.start_time_ms;

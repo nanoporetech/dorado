@@ -23,7 +23,7 @@ SimplexReadPtr subread(const SimplexRead& read,
     subread->read_common.read_tag = read.read_common.read_tag;
     subread->read_common.client_id = read.read_common.client_id;
     subread->read_common.raw_data = subread->read_common.raw_data.index(
-            {torch::indexing::Slice(signal_range.first, signal_range.second)});
+            {at::indexing::Slice(signal_range.first, signal_range.second)});
     subread->read_common.attributes.read_number = -1;
 
     //we adjust for it in new start time

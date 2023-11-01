@@ -2,7 +2,7 @@
 
 #include "ModelRunner.h"
 
-#include <torch/torch.h>
+#include <ATen/core/TensorBody.h>
 
 #include <atomic>
 #include <cstdint>
@@ -22,7 +22,7 @@ std::shared_ptr<MetalCaller> create_metal_caller(const CRFModelConfig& model_con
 class MetalModelRunner final : public ModelRunnerBase {
 public:
     explicit MetalModelRunner(std::shared_ptr<MetalCaller> caller);
-    void accept_chunk(int chunk_idx, const torch::Tensor& chunk) final;
+    void accept_chunk(int chunk_idx, const at::Tensor& chunk) final;
     std::vector<DecodedChunk> call_chunks(int num_chunks) final;
     const CRFModelConfig& config() const final;
     size_t model_stride() const final;
@@ -35,7 +35,7 @@ public:
 
 private:
     std::shared_ptr<MetalCaller> m_caller;
-    torch::Tensor m_input;
+    at::Tensor m_input;
 
     // Performance monitoring stats.
     std::atomic<int64_t> m_num_batches_called = 0;

@@ -1,10 +1,11 @@
 #include "utils/trim.h"
 
+#include <ATen/ATen.h>
 #include <catch2/catch.hpp>
 
 #include <random>
 
-using Slice = torch::indexing::Slice;
+using Slice = at::indexing::Slice;
 using namespace dorado;
 
 #define TEST_GROUP "[utils][trim]"
@@ -23,7 +24,7 @@ TEST_CASE("Test trim signal", TEST_GROUP) {
         signal[i] += 5;
     }
 
-    auto signal_tensor = torch::from_blob(const_cast<float *>(signal.data()), {signal_len});
+    auto signal_tensor = at::from_blob(const_cast<float *>(signal.data()), {signal_len});
 
     SECTION("Default trim") {
         int pos = utils::trim(signal_tensor);
@@ -64,7 +65,7 @@ TEST_CASE("Test trim signal", TEST_GROUP) {
             signal[i] += 50;
         }
 
-        int pos = utils::trim(signal_tensor.index({Slice(torch::indexing::None, 400)}), 24);
+        int pos = utils::trim(signal_tensor.index({Slice(at::indexing::None, 400)}), 24);
 
         int expected_pos = 10;  // minimum trim value
         CHECK(pos == expected_pos);

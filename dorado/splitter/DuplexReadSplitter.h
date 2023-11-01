@@ -3,7 +3,7 @@
 #include "splitter/splitter_utils.h"
 #include "utils/types.h"
 
-#include <torch/torch.h>
+#include <ATen/ATen.h>
 
 #include <cstdint>
 #include <functional>
@@ -24,7 +24,7 @@ private:
     //TODO consider precomputing and reusing ranges with high signal
     struct ExtRead {
         SimplexReadPtr read;
-        torch::Tensor data_as_float32;
+        at::Tensor data_as_float32;
         std::vector<uint64_t> move_sums;
         splitter::PosRanges possible_pore_regions;
     };

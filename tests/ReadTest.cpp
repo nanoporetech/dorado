@@ -1,6 +1,7 @@
 #include "read_pipeline/ReadPipeline.h"
 #include "utils/types.h"
 
+#include <ATen/ATen.h>
 #include <catch2/catch.hpp>
 #include <htslib/sam.h>
 
@@ -11,7 +12,7 @@ using Catch::Matchers::Equals;
 TEST_CASE(TEST_GROUP ": Test tag generation", TEST_GROUP) {
     dorado::ReadCommon read_common;
     read_common.read_id = "read1";
-    read_common.raw_data = torch::empty(4000);
+    read_common.raw_data = at::empty(4000);
     read_common.seq = "ACGT";
     read_common.qstring = "////";
     read_common.sample_rate = 4000.0;
@@ -165,7 +166,7 @@ TEST_CASE(TEST_GROUP ": Test sam record generation", TEST_GROUP) {
     }
 
     SECTION("Generated sam record for unaligned read is correct") {
-        test_read.read_common.raw_data = torch::empty(4000);
+        test_read.read_common.raw_data = at::empty(4000);
         test_read.read_common.sample_rate = 4000.0;
         test_read.read_common.shift = 128.3842f;
         test_read.read_common.scale = 8.258f;
@@ -338,7 +339,7 @@ TEST_CASE(TEST_GROUP ": Methylation tag generation", TEST_GROUP) {
 TEST_CASE(TEST_GROUP ": Test mean q-score generation", TEST_GROUP) {
     dorado::ReadCommon read_common;
     read_common.read_id = "read1";
-    read_common.raw_data = torch::empty(4000);
+    read_common.raw_data = at::empty(4000);
     read_common.seq = "AAAAAAAAAA";
     read_common.qstring = "$$////////";
     read_common.sample_rate = 4000.0;

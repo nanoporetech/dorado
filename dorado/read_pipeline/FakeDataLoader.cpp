@@ -2,7 +2,7 @@
 
 #include "read_pipeline/ReadPipeline.h"
 
-#include <torch/torch.h>
+#include <ATen/ATen.h>
 
 #include <cstdint>
 #include <memory>
@@ -14,7 +14,7 @@ void FakeDataLoader::load_reads(const int num_reads) {
         auto fake_read = std::make_unique<SimplexRead>();
 
         constexpr int64_t read_size = 40000;
-        fake_read->read_common.raw_data = torch::randint(0, 10000, {read_size}, torch::kInt16);
+        fake_read->read_common.raw_data = at::randint(0, 10000, {read_size}, at::kShort);
         fake_read->read_common.read_id = "Placeholder-read-id";
 
         m_pipeline.push_message(std::move(fake_read));

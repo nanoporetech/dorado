@@ -1,7 +1,5 @@
 #pragma once
 
-#include <torch/torch.h>
-
 #include <cstdint>
 #include <string>
 #include <vector>

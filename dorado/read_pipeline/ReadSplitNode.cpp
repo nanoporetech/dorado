@@ -2,12 +2,14 @@
 
 #include "splitter/ReadSplitter.h"
 
+#include <ATen/ATen.h>
+
 using namespace dorado::splitter;
 
 namespace dorado {
 
 void ReadSplitNode::worker_thread() {
-    torch::InferenceMode inference_mode_guard;
+    at::InferenceMode inference_mode_guard;
 
     Message message;
     while (get_input_message(message)) {

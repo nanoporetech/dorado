@@ -40,10 +40,10 @@ public:
         m_out_chunk_size = chunk_size / model_config.stride;
         m_in_chunk_size = m_out_chunk_size * model_config.stride;
 
-        m_options = torch::TensorOptions().dtype(GPUDecoder::dtype).device(device);
+        m_options = at::TensorOptions().dtype(GPUDecoder::dtype).device(device);
         assert(m_options.device().is_cuda());
 
-        torch::InferenceMode guard;
+        at::InferenceMode guard;
         m_module = load_crf_model(model_config, m_options);
 
         // Batch size will be rounded up to a multiple of batch_size_granularity, regardless of
@@ -90,7 +90,7 @@ public:
     }
 
     static int get_batch_size_granularity(const CRFModelConfig &model_config,
-                                          const torch::TensorOptions &options) {
+                                          const at::TensorOptions &options) {
         // TODO: we may want to use different numbers based on model type and GPU arch
         return 64;
     }
@@ -210,18 +210,18 @@ public:
     }
 
     struct NNTask {
-        NNTask(torch::Tensor input_, torch::Tensor &output_, int num_chunks_)
+        NNTask(at::Tensor input_, at::Tensor &output_, int num_chunks_)
                 : input(input_), out(output_), num_chunks(num_chunks_) {}
-        torch::Tensor input;
-        torch::Tensor &out;
+        at::Tensor input;
+        at::Tensor &out;
         std::mutex mut;
         std::condition_variable cv;
         bool done{false};
         int num_chunks;
     };
 
-    std::vector<DecodedChunk> call_chunks(torch::Tensor &input,
-                                          torch::Tensor &output,
+    std::vector<DecodedChunk> call_chunks(at::Tensor &input,
+                                          at::Tensor &output,
                                           int num_chunks,
                                           c10::cuda::CUDAStream stream) {
         NVTX3_FUNC_RANGE();
@@ -247,7 +247,7 @@ public:
     }
 
     void cuda_thread_fn() {
-        torch::InferenceMode guard;
+        at::InferenceMode guard;
         c10::cuda::CUDAGuard device_guard(m_options.device());
         auto stream = c10::cuda::getCurrentCUDAStream(m_options.device().index());
 
@@ -358,7 +358,7 @@ public:
 
     const CRFModelConfig m_config;
     std::string m_device;
-    torch::TensorOptions m_options;
+    at::TensorOptions m_options;
     std::unique_ptr<GPUDecoder> m_decoder;
     DecoderOptions m_decoder_options;
     torch::nn::ModuleHolder<torch::nn::AnyModule> m_module{nullptr};
@@ -389,7 +389,7 @@ std::shared_ptr<CudaCaller> create_cuda_caller(const CRFModelConfig &model_confi
 CudaModelRunner::CudaModelRunner(std::shared_ptr<CudaCaller> caller)
         : m_caller(caller),
           m_stream(c10::cuda::getStreamFromPool(false, m_caller->m_options.device().index())) {
-    auto opts = torch::TensorOptions().device(torch::kCPU).pinned_memory(true);
+    auto opts = at::TensorOptions().device(torch::kCPU).pinned_memory(true);
     m_input = torch::empty(
             {caller->m_batch_size, caller->m_num_input_features, caller->m_in_chunk_size},
             opts.dtype(m_caller->m_options.dtype()));
@@ -398,7 +398,7 @@ CudaModelRunner::CudaModelRunner(std::shared_ptr<CudaCaller> caller)
                             opts.dtype(torch::kInt8));
 }
 
-void CudaModelRunner::accept_chunk(int chunk_idx, const torch::Tensor &chunk) {
+void CudaModelRunner::accept_chunk(int chunk_idx, const at::Tensor &chunk) {
     m_input.index_put_({chunk_idx, torch::indexing::Ellipsis}, chunk);
 }
 

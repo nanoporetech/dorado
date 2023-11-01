@@ -2,7 +2,7 @@
 
 #include "ReadSplitter.h"
 
-#include <torch/torch.h>
+#include <ATen/ATen.h>
 
 #include <algorithm>
 #include <cstdint>
@@ -30,7 +30,7 @@ SimplexReadPtr subread(const SimplexRead& read,
                        PosRange signal_range);
 
 template <typename T>
-std::vector<std::pair<uint64_t, uint64_t>> detect_pore_signal(const torch::Tensor& signal,
+std::vector<std::pair<uint64_t, uint64_t>> detect_pore_signal(const at::Tensor& signal,
                                                               T threshold,
                                                               uint64_t cluster_dist,
                                                               uint64_t ignore_prefix) {

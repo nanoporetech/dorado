@@ -100,6 +100,14 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     endif()
 endif()
 
+# Bring in spdlog
+add_subdirectory(${DORADO_3RD_PARTY_SOURCE}/spdlog)
+# Avoid namespace clashes with static torch.
+target_compile_definitions(spdlog PUBLIC
+    "FMT_BEGIN_NAMESPACE=namespace fmt { inline namespace ont {"
+    "FMT_END_NAMESPACE=}}"
+)
+
 # ELZIP_DECOMPRESS_ONLY stops minizip from adding OpenSSL as a target, preventing use of three dylibs on osx.
 set(ELZIP_DECOMPRESS_ONLY ON)
 add_subdirectory(${DORADO_3RD_PARTY_SOURCE}/elzip)
@@ -206,8 +214,6 @@ set(LIB_SOURCE_FILES
     dorado/demux/BarcodeClassifierSelector.cpp
     dorado/demux/BarcodeClassifierSelector.h
     dorado/decode/beam_search.cpp
-    dorado/decode/fast_hash.cpp
-    dorado/decode/fast_hash.h
     dorado/decode/beam_search.h
     dorado/decode/CPUDecoder.cpp
     dorado/decode/CPUDecoder.h
@@ -269,7 +275,6 @@ target_include_directories(dorado_lib
         ${DORADO_3RD_PARTY_SOURCE}/hdf_plugins/vbz_plugin
         ${DORADO_3RD_PARTY_SOURCE}/cxxpool/src
         ${DORADO_3RD_PARTY_SOURCE}/NVTX/c/include
-        ${DORADO_3RD_PARTY_SOURCE}/spdlog/include
         ${DORADO_3RD_PARTY_SOURCE}/indicators/include
 )
 

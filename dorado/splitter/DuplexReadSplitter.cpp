@@ -6,6 +6,7 @@
 #include "utils/sequence_utils.h"
 #include "utils/uuid_utils.h"
 
+#include <ATen/ATen.h>
 #include <spdlog/spdlog.h>
 
 #include <chrono>
@@ -108,7 +109,7 @@ DuplexReadSplitter::ExtRead DuplexReadSplitter::create_ext_read(SimplexReadPtr r
     ext_read.move_sums = utils::move_cum_sums(ext_read.read->read_common.moves);
     assert(!ext_read.move_sums.empty());
     assert(ext_read.move_sums.back() == ext_read.read->read_common.seq.length());
-    ext_read.data_as_float32 = ext_read.read->read_common.raw_data.to(torch::kFloat);
+    ext_read.data_as_float32 = ext_read.read->read_common.raw_data.to(at::kFloat);
     ext_read.possible_pore_regions = possible_pore_regions(ext_read);
     return ext_read;
 }

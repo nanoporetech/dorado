@@ -15,7 +15,7 @@ namespace {
 template <class Model>
 ModuleHolder<AnyModule> populate_model(Model&& model,
                                        const std::filesystem::path& path,
-                                       torch::TensorOptions options) {
+                                       at::TensorOptions options) {
     auto state_dict = model->load_weights(path);
     model->load_state_dict(state_dict);
     model->to(options.dtype_opt().value().toScalarType());
@@ -38,7 +38,7 @@ struct UnpaddedConvolutionImpl : Module {
         activation = register_module("activation", SiLU());
     }
 
-    torch::Tensor forward(torch::Tensor x) { return activation(conv(x)); }
+    at::Tensor forward(at::Tensor x) { return activation(conv(x)); }
 
     Conv1d conv{nullptr};
     SiLU activation{nullptr};
@@ -64,7 +64,7 @@ struct ModBaseConvModelImpl : Module {
         linear = register_module("linear", Linear(size * 3, num_out));
     }
 
-    torch::Tensor forward(torch::Tensor sigs, torch::Tensor seqs) {
+    at::Tensor forward(at::Tensor sigs, at::Tensor seqs) {
         sigs = sig_conv1(sigs);
         sigs = sig_conv2(sigs);
         sigs = sig_conv3(sigs);
@@ -93,11 +93,11 @@ struct ModBaseConvModelImpl : Module {
         return z;
     }
 
-    void load_state_dict(const std::vector<torch::Tensor>& weights) {
+    void load_state_dict(const std::vector<at::Tensor>& weights) {
         utils::load_state_dict(*this, weights);
     }
 
-    std::vector<torch::Tensor> load_weights(const std::filesystem::path& dir) {
+    std::vector<at::Tensor> load_weights(const std::filesystem::path& dir) {
         return utils::load_tensors(dir, weight_tensors);
     }
 
@@ -152,7 +152,7 @@ struct ModBaseConvLSTMModelImpl : Module {
         activation = register_module("activation", SiLU());
     }
 
-    torch::Tensor forward(torch::Tensor sigs, torch::Tensor seqs) {
+    at::Tensor forward(at::Tensor sigs, at::Tensor seqs) {
         sigs = sig_conv1(sigs);
         sigs = sig_conv2(sigs);
         sigs = sig_conv3(sigs);
@@ -184,11 +184,11 @@ struct ModBaseConvLSTMModelImpl : Module {
         return z;
     }
 
-    void load_state_dict(std::vector<torch::Tensor> weights) {
+    void load_state_dict(std::vector<at::Tensor> weights) {
         utils::load_state_dict(*this, weights);
     }
 
-    std::vector<torch::Tensor> load_weights(const std::filesystem::path& dir) {
+    std::vector<at::Tensor> load_weights(const std::filesystem::path& dir) {
         return utils::load_tensors(dir, weight_tensors);
     }
 
@@ -233,7 +233,7 @@ TORCH_MODULE(ModBaseConvLSTMModel);
 }  // namespace nn
 
 ModuleHolder<AnyModule> load_modbase_model(const std::filesystem::path& model_path,
-                                           torch::TensorOptions options) {
+                                           at::TensorOptions options) {
     auto config = toml::parse(model_path / "config.toml");
 
     const auto& general_params = toml::find(config, "general");

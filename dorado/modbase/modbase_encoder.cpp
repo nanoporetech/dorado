@@ -6,6 +6,7 @@
 #include <nvtx3/nvtx3.hpp>
 
 #include <algorithm>
+#include <cstring>
 #include <stdexcept>
 
 namespace dorado {

@@ -2,6 +2,7 @@
 #include "read_pipeline/HtsReader.h"
 #include "read_pipeline/HtsWriter.h"
 #include "utils/bam_utils.h"
+#include "utils/stats.h"
 
 #include <catch2/catch.hpp>
 #include <htslib/sam.h>
@@ -35,8 +36,12 @@ protected:
         writer_ref.set_and_write_header(reader.header);
 
         reader.read(*pipeline, 1000);
+        pipeline->terminate(DefaultFlushOptions());
+        stats = writer_ref.sample_stats();
         pipeline.reset();
     }
+
+    stats::NamedStats stats;
 
 private:
     fs::path m_in_sam;
@@ -47,7 +52,7 @@ TEST_CASE_METHOD(HtsWriterTestsFixture, "HtsWriterTest: Write BAM", TEST_GROUP) 
     int num_threads = GENERATE(1, 10);
     HtsWriter::OutputMode emit_fastq = GENERATE(
             HtsWriter::OutputMode::SAM, HtsWriter::OutputMode::BAM, HtsWriter::OutputMode::FASTQ);
-    REQUIRE_NOTHROW(generate_bam(emit_fastq, num_threads));
+    CHECK_NOTHROW(generate_bam(emit_fastq, num_threads));
 }
 
 TEST_CASE("HtsWriterTest: Output mode conversion", TEST_GROUP) {
@@ -55,4 +60,11 @@ TEST_CASE("HtsWriterTest: Output mode conversion", TEST_GROUP) {
     CHECK(HtsWriter::get_output_mode("bam") == HtsWriter::OutputMode::BAM);
     CHECK(HtsWriter::get_output_mode("fastq") == HtsWriter::OutputMode::FASTQ);
     CHECK_THROWS_WITH(HtsWriter::get_output_mode("blah"), "Unknown output mode: blah");
+}
+
+TEST_CASE_METHOD(HtsWriterTestsFixture, "HtsWriter: Count reads written", TEST_GROUP) {
+    CHECK_NOTHROW(generate_bam(HtsWriter::OutputMode::BAM, 1));
+
+    CHECK(stats.at("unique_simplex_reads_written") == 6);
+    CHECK(stats.at("split_reads_written") == 2);
 }
