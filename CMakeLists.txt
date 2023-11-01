@@ -158,6 +158,7 @@ set(LIB_SOURCE_FILES
     dorado/read_pipeline/StereoDuplexEncoderNode.h
     dorado/read_pipeline/BasecallerNode.cpp
     dorado/read_pipeline/BasecallerNode.h
+    dorado/read_pipeline/IndexFileAccess.h
     dorado/read_pipeline/ModBaseCallerNode.cpp
     dorado/read_pipeline/ModBaseCallerNode.h
     dorado/read_pipeline/ReadFilterNode.cpp
