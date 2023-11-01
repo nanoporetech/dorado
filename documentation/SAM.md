@@ -40,6 +40,7 @@
 | mv:B:c | sequence to signal move table _(optional)_                 |
 | dx:i:  | bool to signify duplex read _(only in duplex mode)_        |
 | pi:Z:  | parent read id for a split read                            |
+| sp:i:  | start coordinate of split read in parent read signal       |
 | pt:i:  | estimated poly(A) tail length in cDNA and dRNA reads       |
 
 #### Modified Base Tags

@@ -176,8 +176,6 @@ set(LIB_SOURCE_FILES
     dorado/read_pipeline/SubreadTaggerNode.h
     dorado/read_pipeline/BaseSpaceDuplexCallerNode.cpp
     dorado/read_pipeline/BaseSpaceDuplexCallerNode.h
-    dorado/read_pipeline/DuplexSplitNode.cpp
-    dorado/read_pipeline/DuplexSplitNode.h
     dorado/read_pipeline/AlignerNode.cpp
     dorado/read_pipeline/AlignerNode.h
     dorado/read_pipeline/HtsReader.cpp
@@ -203,6 +201,14 @@ set(LIB_SOURCE_FILES
     dorado/read_pipeline/read_utils.h
     dorado/read_pipeline/stitch.cpp
     dorado/read_pipeline/stitch.h
+    dorado/read_pipeline/ReadSplitNode.cpp
+    dorado/read_pipeline/ReadSplitNode.h
+    dorado/splitter/DuplexReadSplitter.cpp
+    dorado/splitter/DuplexReadSplitter.h
+    dorado/splitter/RNAReadSplitter.cpp
+    dorado/splitter/RNAReadSplitter.h
+    dorado/splitter/splitter_utils.cpp
+    dorado/splitter/splitter_utils.h
     dorado/demux/BarcodeClassifier.cpp
     dorado/demux/BarcodeClassifier.h
     dorado/demux/BarcodeClassifierSelector.cpp
