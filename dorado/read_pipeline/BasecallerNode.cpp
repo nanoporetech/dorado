@@ -93,6 +93,8 @@ void BasecallerNode::input_worker_thread() {
         // Put the read in the working list
         {
             std::lock_guard working_reads_lock(m_working_reads_mutex);
+            m_working_reads_signal_bytes +=
+                    get_read_common_data(working_read->read).raw_data.nbytes();
             m_working_reads.insert(std::move(working_read));
             ++m_working_reads_size;
         }
@@ -169,6 +171,7 @@ void BasecallerNode::working_reads_manager() {
                 std::unique_lock<std::mutex> working_reads_lock(m_working_reads_mutex);
                 auto read_iter = m_working_reads.find(working_read);
                 if (read_iter != m_working_reads.end()) {
+                    m_working_reads_signal_bytes -= read_common_data.raw_data.nbytes();
                     m_working_reads.erase(read_iter);
                     --m_working_reads_size;
                 } else {
@@ -282,11 +285,11 @@ namespace {
 
 // Calculates the input queue size.
 size_t CalcMaxChunksIn(const std::vector<Runner> &model_runners) {
-    // Allow 5 batches per model runner on the chunks_in queue
+    // Allow 2 batches per model runner on the chunks_in queue
     size_t max_chunks_in = 0;
     // Allows optimal batch size to be used for every GPU
     for (auto &runner : model_runners) {
-        max_chunks_in += runner->batch_size() * 5;
+        max_chunks_in += runner->batch_size() * 2;
     }
     return max_chunks_in;
 }
@@ -383,6 +386,7 @@ stats::NamedStats BasecallerNode::sample_stats() const {
     stats["call_chunks_ms"] = m_call_chunks_ms;
     stats["called_reads_pushed"] = m_called_reads_pushed;
     stats["working_reads_items"] = m_working_reads_size;
+    stats["working_reads_signal_mb"] = m_working_reads_signal_bytes / (1024 * 1024);
     stats["bases_processed"] = m_num_bases_processed;
     stats["samples_processed"] = m_num_samples_processed;
     return stats;
