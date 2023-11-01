@@ -139,8 +139,8 @@ DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(const ReadPair& read_pair) 
     // 2. The mode with data copy that actually fills up the encoding tensor
     // with the right data needed for inference.
     auto generate_encoding = [&, target_cursor, query_cursor, template_signal_cursor,
-                              complement_signal_cursor](bool fill_data,
-                                                        std::optional<at::Tensor*> tmp) -> int {
+                              complement_signal_cursor](std::optional<at::Tensor*> tmp) -> int {
+        bool fill_data = tmp.has_value();
         // These cursors are captured by value so that variable updates within each invocation
         // of the lambda don't affect the initial state of the cursors across invocations.
         int local_target_cursor = target_cursor;
@@ -289,7 +289,7 @@ DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(const ReadPair& read_pair) 
 
     // Call the encoding lambda first without data copy to get an estimate
     // of the encoding size.
-    const auto encoding_tensor_size = generate_encoding(false, std::nullopt);
+    const auto encoding_tensor_size = generate_encoding(std::nullopt);
 
     const float pad_value =
             0.8 * std::min(at::min(complement_signal).item<float>(),
@@ -301,7 +301,7 @@ DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(const ReadPair& read_pair) 
 
     // Call the encoding lambda again, this time with the correctly sized tensor
     // allocated for the final data to be filled in.
-    generate_encoding(true, &tmp);
+    generate_encoding(&tmp);
 
     auto read = std::make_unique<DuplexRead>();  // Return read
     read->read_common.read_id =
