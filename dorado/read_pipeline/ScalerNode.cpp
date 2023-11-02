@@ -1,5 +1,6 @@
 #include "ScalerNode.h"
 
+#include "nn/CRFModelConfig.h"
 #include "utils/tensor_utils.h"
 #include "utils/trim.h"
 
@@ -111,20 +112,34 @@ void ScalerNode::worker_thread() {
         }
 
         assert(read->read_common.raw_data.dtype() == at::kShort);
-        const auto [shift, scale] = m_scaling_params.quantile_scaling
-                                            ? normalisation(read->read_common.raw_data)
-                                            : med_mad(read->read_common.raw_data);
-        read->read_common.scaling_method =
-                m_scaling_params.quantile_scaling ? "quantile" : "med_mad";
 
-        // raw_data comes from DataLoader with dtype int16.  We send it on as float16 after
-        // shifting/scaling in float32 form.
-        read->read_common.raw_data = ((read->read_common.raw_data.to(at::kFloat) - shift) / scale)
-                                             .to(at::ScalarType::Half);
+        float scale = 1.0f;
+        float shift = 0.0f;
 
-        // move the shift and scale into pA.
-        read->read_common.scale = read->scaling * scale;
-        read->read_common.shift = read->scaling * (shift + read->offset);
+        read->read_common.scaling_method = to_string(m_scaling_params.strategy);
+        if (m_scaling_params.strategy == ScalingStrategy::PA) {
+            scale = read->scaling;
+            shift = read->offset;
+            read->read_common.raw_data =
+                    ((read->read_common.raw_data.to(at::kFloat) + shift) * scale)
+                            .to(at::ScalarType::Half);
+
+            read->read_common.scale = read->scaling;
+            read->read_common.shift = read->offset;
+        } else {
+            std::tie(shift, scale) = m_scaling_params.strategy == ScalingStrategy::QUANTILE
+                                             ? normalisation(read->read_common.raw_data)
+                                             : med_mad(read->read_common.raw_data);
+
+            // raw_data comes from DataLoader with dtype int16.  We send it on as float16 after
+            // shifting/scaling in float32 form.
+            read->read_common.raw_data =
+                    ((read->read_common.raw_data.to(at::kFloat) - shift) / scale)
+                            .to(at::ScalarType::Half);
+            // move the shift and scale into pA.
+            read->read_common.scale = read->scaling * scale;
+            read->read_common.shift = read->scaling * (shift + read->offset);
+        }
 
         // Don't perform DNA trimming on RNA since it looks too different and we lose useful signal.
         if (!is_rna) {

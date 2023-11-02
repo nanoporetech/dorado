@@ -4,10 +4,121 @@
 
 #include <spdlog/spdlog.h>
 #include <toml.hpp>
+#include <toml/value.hpp>
 
+#include <set>
+#include <stdexcept>
 #include <string>
+#include <vector>
+
+enum SublayerType { CLAMP, CONVOLUTION, LINEAR, LINEAR_CRF_ENCODER, LSTM, PERMUTE, UNRECOGNISED };
+static const std::unordered_map<std::string, SublayerType> sublayer_map = {
+        {"clamp", SublayerType::CLAMP},   {"convolution", SublayerType::CONVOLUTION},
+        {"linear", SublayerType::LINEAR}, {"linearcrfencoder", SublayerType::LINEAR_CRF_ENCODER},
+        {"lstm", SublayerType::LSTM},     {"permute", SublayerType::PERMUTE},
+};
+
+// Parse encoder.sublayers.type attribute
+SublayerType sublayer_type(const toml::value &segment) {
+    const auto type = toml::find<std::string>(segment, "type");
+    auto mapping_iter = sublayer_map.find(type);
+    if (mapping_iter == sublayer_map.end()) {
+        return SublayerType::UNRECOGNISED;
+    }
+    return mapping_iter->second;
+}
 
 namespace dorado {
+
+// Parse the config to determine if there are any clamp layers
+bool has_clamp(const std::vector<toml::value> &sublayers) {
+    for (const auto &segment : sublayers) {
+        if (sublayer_type(segment) == SublayerType::CLAMP) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Parse sublayer extracting convolution parameters. This is for use on v4+ models only
+ConvParams parse_conv_params(const toml::value &segment, bool clamp) {
+    ConvParams params;
+    params.insize = toml::find<int>(segment, "insize");
+    params.size = toml::find<int>(segment, "size");
+    params.winlen = toml::find<int>(segment, "winlen");
+    params.stride = toml::find<int>(segment, "stride");
+
+    const auto &activation = toml::find<std::string>(segment, "activation");
+    if (activation == "swish") {
+        params.activation = clamp ? Activation::SWISH_CLAMP : Activation::SWISH;
+    } else if (activation == "tanh") {
+        params.activation = Activation::TANH;
+    } else {
+        throw std::runtime_error("Unknown activation: `" + activation +
+                                 "` in model config, expected `swish` or `tanh`");
+    }
+
+    return params;
+}
+
+// Parse sublayers extracting convolution parameters. This is for use on v4+ models only
+std::vector<ConvParams> parse_convs(const std::vector<toml::value> &sublayers, bool clamp) {
+    std::vector<ConvParams> convs;
+    for (const auto &segment : sublayers) {
+        if (sublayer_type(segment) == SublayerType::CONVOLUTION) {
+            ConvParams conv = parse_conv_params(segment, clamp);
+            convs.push_back(conv);
+        }
+    }
+    return convs;
+}
+
+// Parse a the config.toml to resolve the scaling parameters.
+SignalNormalisationParams parse_signal_normalisation_params(const toml::value &config_toml,
+                                                            const std::string &model_name) {
+    SignalNormalisationParams params;
+
+    // med_mad scaling set based on filename for r9.4.1 models (~v3)
+    if (model_name.rfind("dna_r9.4.1", 0) == 0) {
+        params.strategy = ScalingStrategy::MED_MAD;
+    }
+
+    // scaling.strategy introduced with v4.3 models
+    if (config_toml.contains("scaling")) {
+        const auto &scaling = toml::find(config_toml, "scaling");
+        params.strategy =
+                scaling_strategy_from_string(toml::find<std::string>(scaling, "strategy"));
+    }
+
+    if (config_toml.contains("normalisation")) {
+        const auto &norm = toml::find(config_toml, "normalisation");
+        params.quantile_a = toml::find<float>(norm, "quantile_a");
+        params.quantile_b = toml::find<float>(norm, "quantile_b");
+        params.shift_multiplier = toml::find<float>(norm, "shift_multiplier");
+        params.scale_multiplier = toml::find<float>(norm, "scale_multiplier");
+
+        if (params.strategy != ScalingStrategy::QUANTILE) {
+            spdlog::warn(
+                    "Normalisation parameters are only used when `scaling.strategy = quantile`");
+        }
+    }
+
+    return params;
+}
+
+// Check all encoder sublayers for unrecognised types and warn if any
+void warn_unrecognised_sublayers(const std::vector<toml::value> &sublayers) {
+    std::set<std::string> unique;
+    for (const auto &segment : sublayers) {
+        if (sublayer_type(segment) == SublayerType::UNRECOGNISED) {
+            const auto type = toml::find<std::string>(segment, "type");
+            if (unique.count(type) == 0) {
+                spdlog::warn("Unrecognised sublayer type: `{}`", type);
+                unique.insert(type);
+            }
+        }
+    }
+}
 
 SampleType get_model_type(const std::string &model_name) {
     if (model_name.find("rna004") != std::string::npos) {
@@ -22,7 +133,7 @@ SampleType get_model_type(const std::string &model_name) {
 }
 
 CRFModelConfig load_crf_model_config(const std::filesystem::path &path) {
-    const auto config_toml = toml::parse(path / "config.toml");
+    const toml::value config_toml = toml::parse(path / "config.toml");
 
     CRFModelConfig config;
     config.model_path = path;
@@ -43,36 +154,49 @@ CRFModelConfig load_crf_model_config(const std::filesystem::path &path) {
 
     const auto &encoder = toml::find(config_toml, "encoder");
     if (encoder.contains("type")) {
+        const std::vector<toml::value> sublayers =
+                toml::find(config_toml, "encoder", "sublayers").as_array();
+
+        warn_unrecognised_sublayers(sublayers);
+        config.bias = false;
+
         // v4-type model
-        for (const auto &segment : toml::find(config_toml, "encoder", "sublayers").as_array()) {
-            const auto type = toml::find<std::string>(segment, "type");
-            if (type.compare("convolution") == 0) {
-                // Overall stride is the product of all conv layers' strides.
-                config.stride *= toml::find<int>(segment, "stride");
-            } else if (type.compare("lstm") == 0) {
-                config.insize = toml::find<int>(segment, "size");
-            } else if (type.compare("linear") == 0) {
+        config.clamp = has_clamp(sublayers);
+        config.convs = parse_convs(sublayers, config.clamp);
+        // Overall stride is the product of all conv layers' strides.
+        for (const auto cv : config.convs) {
+            config.stride *= cv.stride;
+        }
+        config.lstm_size = config.convs.back().size;
+
+        for (const auto &segment : sublayers) {
+            const auto type = sublayer_type(segment);
+            if (type == SublayerType::LINEAR) {
                 // Specifying out_features implies a decomposition of the linear layer matrix
                 // multiply with a bottleneck before the final feature size.
                 config.out_features = toml::find<int>(segment, "out_features");
-            } else if (type.compare("clamp") == 0) {
-                config.clamp = true;
-            } else if (type.compare("linearcrfencoder") == 0) {
+                config.bias = config.lstm_size > 128;
+            } else if (type == SublayerType::LINEAR_CRF_ENCODER) {
                 config.blank_score = toml::find<float>(segment, "blank_score");
             }
         }
-        config.conv = 16;
-        config.bias = config.insize > 128;
     } else {
         // pre-v4 model
         config.stride = toml::find<int>(encoder, "stride");
-        config.insize = toml::find<int>(encoder, "features");
+        config.lstm_size = toml::find<int>(encoder, "features");
         config.blank_score = toml::find<float>(encoder, "blank_score");
         config.scale = toml::find<float>(encoder, "scale");
 
-        if (encoder.contains("first_conv_size")) {
-            config.conv = toml::find<int>(encoder, "first_conv_size");
-        }
+        const int first_conv = encoder.contains("first_conv_size")
+                                       ? toml::find<int>(encoder, "first_conv_size")
+                                       : 4;
+
+        // pre-v4 config.clamp = false so Activation::SWISH not Activation::SWISH_CLAMP
+        config.convs.push_back(
+                ConvParams{config.num_features, first_conv, 5, 1, Activation::SWISH});
+        config.convs.push_back(ConvParams{first_conv, 16, 5, 1, Activation::SWISH});
+        config.convs.push_back(
+                ConvParams{16, config.lstm_size, 19, config.stride, Activation::SWISH});
     }
 
     const auto &global_norm = toml::find(config_toml, "global_norm");
@@ -92,20 +216,18 @@ CRFModelConfig load_crf_model_config(const std::filesystem::path &path) {
         config.sample_rate = toml::find<int>(run_info, "sample_rate");
     }
 
-    // Fetch signal normalisation parameters.
-    // Use default values if normalisation section is not found.
-    if (config_toml.contains("normalisation")) {
-        const auto &norm = toml::find(config_toml, "normalisation");
-        config.signal_norm_params.quantile_a = toml::find<float>(norm, "quantile_a");
-        config.signal_norm_params.quantile_b = toml::find<float>(norm, "quantile_b");
-        config.signal_norm_params.shift_multiplier = toml::find<float>(norm, "shift_multiplier");
-        config.signal_norm_params.scale_multiplier = toml::find<float>(norm, "scale_multiplier");
-    }
-
-    // Set quantile scaling method based on the model filename
     std::string model_name = std::filesystem::canonical(config.model_path).filename().string();
-    if (model_name.rfind("dna_r9.4.1", 0) == 0) {
-        config.signal_norm_params.quantile_scaling = false;
+    config.signal_norm_params = parse_signal_normalisation_params(config_toml, model_name);
+
+    if (config.convs.size() != 3) {
+        throw std::runtime_error("Expected 3 convolution layers but found: " +
+                                 std::to_string(config.convs.size()));
+    }
+    if (config.convs[0].size != 4 && config.convs[0].size != 16) {
+        throw std::runtime_error(
+                "Invalid CRF model configuration - first convolution layer must be size 4 or 16. "
+                "Got: " +
+                std::to_string(config.convs[0].size));
     }
 
     config.sample_type = get_model_type(model_name);
@@ -141,6 +263,45 @@ bool is_rna_model(const CRFModelConfig &model_config) {
     auto path = std::filesystem::canonical(model_config.model_path);
     auto filename = path.filename();
     return filename.u8string().rfind("rna", 0) == 0;
+}
+
+std::string to_string(const Activation &activation) {
+    switch (activation) {
+    case Activation::SWISH:
+        return std::string("swish");
+    case Activation::SWISH_CLAMP:
+        return std::string("swish_clamp");
+    case Activation::TANH:
+        return std::string("tanh");
+    default:
+        return std::string("UNKNOWN");
+    };
+}
+
+std::string to_string(const ScalingStrategy &strategy) {
+    switch (strategy) {
+    case ScalingStrategy::MED_MAD:
+        return std::string("med_mad");
+    case ScalingStrategy::QUANTILE:
+        return std::string("quantile");
+    case ScalingStrategy::PA:
+        return std::string("pa");
+    default:
+        throw std::runtime_error("Unknown scaling strategy");
+    };
+}
+
+ScalingStrategy scaling_strategy_from_string(const std::string &strategy) {
+    if (strategy == "med_mad") {
+        return ScalingStrategy::MED_MAD;
+    }
+    if (strategy == "quantile") {
+        return ScalingStrategy::QUANTILE;
+    }
+    if (strategy == "pa") {
+        return ScalingStrategy::PA;
+    }
+    throw std::runtime_error("Unknown scaling strategy: `" + strategy + "`");
 }
 
 }  // namespace dorado

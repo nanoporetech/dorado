@@ -295,7 +295,7 @@ struct MetalBlockImpl : Module {
         args_linear2 = create_vec_buffer<int32_t>(
                 device, {out_batch_tiles, 0, out_batch_tiles, lstm_chunk_size});
 
-        switch (config.insize) {
+        switch (config.lstm_size) {
         case 128:
             kernel_simd_groups = 16;
             break;
@@ -322,12 +322,14 @@ struct MetalBlockImpl : Module {
         }
         kernel_thread_groups = get_mtl_device_core_count();
         const int lstm_threads = kernel_simd_groups * kSIMDGroupWidth;
-        lstm_cps[0] = make_cps(m_device, "lstm",
-                               {{"kLstmLayerSize", config.insize}, {"kLstmReversedInTime", false}},
-                               lstm_threads);
-        lstm_cps[1] = make_cps(m_device, "lstm",
-                               {{"kLstmLayerSize", config.insize}, {"kLstmReversedInTime", true}},
-                               lstm_threads);
+        lstm_cps[0] =
+                make_cps(m_device, "lstm",
+                         {{"kLstmLayerSize", config.lstm_size}, {"kLstmReversedInTime", false}},
+                         lstm_threads);
+        lstm_cps[1] =
+                make_cps(m_device, "lstm",
+                         {{"kLstmLayerSize", config.lstm_size}, {"kLstmReversedInTime", true}},
+                         lstm_threads);
         to_half_cps = make_cps(m_device, "float_to_half", {});
 
         // The temp buffer used for these purposes (number of elements of `torch_dtype` in []):
@@ -338,37 +340,38 @@ struct MetalBlockImpl : Module {
         //   [lstm_chunk_size * batch_size * decomposition / out_split_]
         constexpr int kMaxConv2OutChannels = 16;
         int mat_temp_elems =
-                batch_size * std::max(kMaxConv2OutChannels * in_chunk_size, config.insize);
+                batch_size * std::max(kMaxConv2OutChannels * in_chunk_size, config.lstm_size);
 
         conv1 = register_module("conv1",
-                                MetalConv1d(1, config.num_features, config.conv, 5, 1, config.clamp,
-                                            in_chunk_size, batch_size, device));
-        conv2 = register_module("conv2", MetalConv1d(2, config.conv, 16, 5, 1, config.clamp,
-                                                     in_chunk_size, batch_size, device));
-        conv3 = register_module("conv3",
-                                MetalConv1d(3, 16, config.insize, 19, config.stride, config.clamp,
-                                            in_chunk_size, batch_size, device));
-        rnn1 = register_module("rnn_1", MetalLSTM(config.insize, true, device));
-        rnn2 = register_module("rnn_2", MetalLSTM(config.insize, false, device));
-        rnn3 = register_module("rnn_3", MetalLSTM(config.insize, true, device));
-        rnn4 = register_module("rnn_4", MetalLSTM(config.insize, false, device));
-        rnn5 = register_module("rnn_5", MetalLSTM(config.insize, true, device));
+                                MetalConv1d(1, config.num_features, config.convs[0].size, 5, 1,
+                                            config.clamp, in_chunk_size, batch_size, device));
+        conv2 = register_module(
+                "conv2", MetalConv1d(2, config.convs[0].size, 16, 5, 1, config.clamp, in_chunk_size,
+                                     batch_size, device));
+        conv3 = register_module(
+                "conv3", MetalConv1d(3, 16, config.lstm_size, 19, config.stride, config.clamp,
+                                     in_chunk_size, batch_size, device));
+        rnn1 = register_module("rnn_1", MetalLSTM(config.lstm_size, true, device));
+        rnn2 = register_module("rnn_2", MetalLSTM(config.lstm_size, false, device));
+        rnn3 = register_module("rnn_3", MetalLSTM(config.lstm_size, true, device));
+        rnn4 = register_module("rnn_4", MetalLSTM(config.lstm_size, false, device));
+        rnn5 = register_module("rnn_5", MetalLSTM(config.lstm_size, true, device));
 
         const int linear_threads = kernel_simd_groups * kSIMDGroupWidth;
         // If the intermediate feature size between conv1 and conv2 is 16, then this is a v4
         // type model, where the linear layer output is clamped rather than run through tanh.
         // Otherwise the intermediate feature size is 4.
-        assert(config.conv == 4 || config.conv == 16);
+
         if (config.out_features.has_value()) {
             // The linear layer is decomposed into 2 matmuls.
             const int decomposition = config.out_features.value();
             linear1 = register_module("linear1",
-                                      MetalLinear(config.insize, decomposition, config.bias));
+                                      MetalLinear(config.lstm_size, decomposition, config.bias));
             const bool kSecondLayerBias = false;
             linear2 = register_module("linear2",
                                       MetalLinear(decomposition, config.outsize, kSecondLayerBias));
             const auto linear_constants1 = std::vector<std::tuple<std::string, MetalConstant>>(
-                    {{"kLinearInSize", config.insize},
+                    {{"kLinearInSize", config.lstm_size},
                      {"kLinearOutSize", decomposition},
                      {"kLinearOutputScale", 1.0f},
                      {"kLinearOutputClamp", false},
@@ -388,10 +391,10 @@ struct MetalBlockImpl : Module {
             mat_temp_elems = std::max(mat_temp_elems,
                                       decomposition * (batch_size / out_split_) * lstm_chunk_size);
         } else {
-            const bool is_v3_model = (config.num_features == 1 && config.conv == 4) ||
-                                     (config.num_features == 13 && config.conv == 16);
+            const bool is_v3_model = (config.num_features == 1 && config.convs[0].size == 4) ||
+                                     (config.num_features == 13 && config.convs[0].size == 16);
             const auto linear_constants = std::vector<std::tuple<std::string, MetalConstant>>(
-                    {{"kLinearInSize", config.insize},
+                    {{"kLinearInSize", config.lstm_size},
                      {"kLinearOutSize", config.outsize},
                      // If v4, rescale from clamped [-5.0, 5.0] range to byte range.
                      // If v3, rescale from tanh [-1.0, 1,0] range to byte range.
@@ -403,15 +406,15 @@ struct MetalBlockImpl : Module {
                     make_cps(m_device, "linear_from_rev_lstm", linear_constants, linear_threads);
             // Single matmul that may or may not have a bias.
             if (!config.out_features.has_value()) {
-                linear1 = register_module("linear1",
-                                          MetalLinear(config.insize, config.outsize, config.bias));
+                linear1 = register_module(
+                        "linear1", MetalLinear(config.lstm_size, config.outsize, config.bias));
             }
         }
 
         // This buffer is used for several layers of the model.
-        mat_working_mem = create_buffer(
-                m_device, size_t(lstm_chunk_size + 3) * batch_size * config.insize * dtype_bytes);
-        mat_state = create_buffer(m_device, batch_size * config.insize * dtype_bytes);
+        mat_working_mem = create_buffer(m_device, size_t(lstm_chunk_size + 3) * batch_size *
+                                                          config.lstm_size * dtype_bytes);
+        mat_state = create_buffer(m_device, batch_size * config.lstm_size * dtype_bytes);
         mat_temp = create_buffer(m_device, mat_temp_elems * dtype_bytes * 20 * config.num_features);
     }
 
@@ -433,9 +436,9 @@ struct MetalBlockImpl : Module {
             }
 
             // Reshape and combine matrices into one of size {kLstmGates, 3 * layer_size + 1, layer_size}
-            t_w = t_w.reshape({kLstmGates, config.insize, config.insize}).transpose(1, 2);
-            t_u = t_u.reshape({kLstmGates, config.insize, config.insize}).transpose(1, 2);
-            t_b = t_b.reshape({kLstmGates, 1, config.insize});
+            t_w = t_w.reshape({kLstmGates, config.lstm_size, config.lstm_size}).transpose(1, 2);
+            t_u = t_u.reshape({kLstmGates, config.lstm_size, config.lstm_size}).transpose(1, 2);
+            t_b = t_b.reshape({kLstmGates, 1, config.lstm_size});
             // For non-obvious reasons the LSTM kernel runs faster if the U and W (or _ih) matrices are
             // spaced such that there is room for one more matrix between them. t_w used twice does that.
             t_w = torch::concat({t_u, t_w, t_w, t_b}, 1);
