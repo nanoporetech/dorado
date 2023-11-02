@@ -65,9 +65,9 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
     // consider based on the anchor.
     const int kSpread = num_samples_per_base * kMaxTailLength;
     // Maximum gap between intervals that can be combined.
-    const int kMaxSampleGap = num_samples_per_base * 3;
+    const int kMaxSampleGap = num_samples_per_base * 5;
     // Minimum size of intervals considered for merge.
-    const int kMinIntervalSizeForMerge = 10 * num_samples_per_base;
+    const int kMinIntervalSizeForMerge = std::max(10 * num_samples_per_base, 200);
     // Floor for average signal value of poly tail.
     const float kMinAvgVal = (is_rna ? 0.0 : -3.0);
 
@@ -85,22 +85,28 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
             if (intervals.size() > 1 && intervals.back().second >= s &&
                 std::abs(avg - last_interval_stats.first) < 0.2 && (avg > kMinAvgVal)) {
                 auto& last = intervals.back();
+                spdlog::trace("extend interval {}-{} to {}-{} avg {} stdev {}", last.first,
+                              last.second, s, e, avg, stdev);
                 last.second = e;
             } else {
                 // Attempt to merge the most recent interval and the one before
                 // that if the gap between the intervals is small and both of the
                 // intervals are longer than some threshold.
-                if (intervals.size() > 2) {
+                if (intervals.size() >= 2) {
                     auto& last = intervals.back();
                     auto& second_last = intervals[intervals.size() - 2];
+                    spdlog::trace("Evaluate for merge {}-{} with {}-{}", second_last.first,
+                                  second_last.second, last.first, last.second);
                     if ((last.first - second_last.second < kMaxSampleGap) &&
                         (last.second - last.first > kMinIntervalSizeForMerge) &&
                         (second_last.second - second_last.first > kMinIntervalSizeForMerge)) {
+                        spdlog::trace("Merge interval {}-{} with {}-{}", second_last.first,
+                                      second_last.second, second_last.first, last.second);
                         second_last.second = last.second;
                         intervals.pop_back();
                     }
                 }
-
+                spdlog::trace("Add new interval {}-{} avg {} stdev {}", s, e, avg, stdev);
                 intervals.push_back({s, e});
             }
             last_interval_stats = {avg, stdev};
@@ -111,9 +117,10 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
     for (const auto& in : intervals) {
         int_str += std::to_string(in.first) + "-" + std::to_string(in.second) + ", ";
     }
-    spdlog::debug("found intervals {}", int_str);
+    spdlog::trace("found intervals {}", int_str);
 
     std::vector<std::pair<int, int>> filtered_intervals;
+    std::optional<std::pair<int, int>> signal_overlap_interval;
     std::copy_if(intervals.begin(), intervals.end(), std::back_inserter(filtered_intervals),
                  [&](auto& i) {
                      int interval_size = i.second - i.first;
@@ -121,17 +128,26 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
                      if (interval_size < (num_samples_per_base * 5)) {
                          return false;
                      }
+                     if ((i.first <= signal_anchor) && (signal_anchor <= i.second)) {
+                         signal_overlap_interval = i;
+                         return true;
+                     }
                      // Only keep intervals that are close-ish to the signal anchor.
                      return (std::abs(signal_anchor - i.second) < interval_size ||
-                             std::abs(signal_anchor - i.first) < interval_size) ||
-                            (i.first <= signal_anchor) && (signal_anchor <= i.second);
+                             std::abs(signal_anchor - i.first) < interval_size);
                  });
+
+    // If an interval is found that overlaps with the signal anchor,
+    // use that.
+    if (signal_overlap_interval.has_value()) {
+        return *signal_overlap_interval;
+    }
 
     int_str = "";
     for (auto in : filtered_intervals) {
         int_str += std::to_string(in.first) + "-" + std::to_string(in.second) + ", ";
     }
-    spdlog::debug("filtered intervals {}", int_str);
+    spdlog::trace("filtered intervals {}", int_str);
 
     if (filtered_intervals.empty()) {
         spdlog::debug("Anchor {} No range within anchor proximity found", signal_anchor);
@@ -240,6 +256,7 @@ SignalAnchorInfo determine_signal_anchor_and_strand_cdna(const dorado::SimplexRe
         int signal_anchor = seq_to_sig_map[base_anchor];
 
         result = {fwd, signal_anchor, trailing_Ts};
+        spdlog::debug("Base anchor {}", base_anchor);
     } else {
         spdlog::debug("{} primer edit distance too high {}", read.read_common.read_id,
                       std::min(dist_v1, dist_v2));
