@@ -86,7 +86,6 @@ TEST_CASE("BarcodeClassifier: test double ended barcode", TEST_GROUP) {
         HtsReader reader(bc_file.string());
         while (reader.read()) {
             auto seqlen = reader.record->core.l_qseq;
-            auto bseq = bam_get_seq(reader.record);
             std::string seq = utils::extract_sequence(reader.record.get(), seqlen);
             auto res = classifier.barcode(seq, false, std::nullopt);
             if (res.adapter_name == "unclassified") {
