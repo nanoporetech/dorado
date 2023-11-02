@@ -2,7 +2,7 @@
 
 #include "utils/stats.h"
 
-#include <torch/torch.h>
+#include <ATen/core/TensorBody.h>
 
 #include <atomic>
 #include <filesystem>
@@ -24,13 +24,13 @@ public:
     explicit ModBaseRunner(std::shared_ptr<ModBaseCaller> caller);
     void accept_chunk(int model_id,
                       int chunk_idx,
-                      const torch::Tensor& signal,
+                      const at::Tensor& signal,
                       const std::vector<int8_t>& kmers);
-    torch::Tensor call_chunks(int model_id, int num_chunks);
-    torch::Tensor scale_signal(size_t caller_id,
-                               torch::Tensor signal,
-                               const std::vector<int>& seq_ints,
-                               const std::vector<uint64_t>& seq_to_sig_map) const;
+    at::Tensor call_chunks(int model_id, int num_chunks);
+    at::Tensor scale_signal(size_t caller_id,
+                            at::Tensor signal,
+                            const std::vector<int>& seq_ints,
+                            const std::vector<uint64_t>& seq_to_sig_map) const;
     std::vector<size_t> get_motif_hits(size_t caller_id, const std::string& seq) const;
     const ModBaseModelConfig& caller_params(size_t caller_id) const;
     size_t num_callers() const;
@@ -42,8 +42,8 @@ public:
 
 private:
     std::shared_ptr<ModBaseCaller> m_caller;
-    std::vector<torch::Tensor> m_input_sigs;
-    std::vector<torch::Tensor> m_input_seqs;
+    std::vector<at::Tensor> m_input_sigs;
+    std::vector<at::Tensor> m_input_seqs;
 
     // Performance monitoring stats.
     std::atomic<int64_t> m_num_batches_called = 0;

@@ -2,6 +2,7 @@
 
 #include "MessageSinkUtils.h"
 
+#include <ATen/ATen.h>
 #include <catch2/catch.hpp>
 
 #define TEST_GROUP "[read_pipeline][ReadFilterNode]"
@@ -25,7 +26,7 @@ TEST_CASE("ReadFilterNode: Filter read based on qscore", TEST_GROUP) {
         auto pipeline = make_filtered_pipeline(messages, 12, 0, {});
 
         auto read_1 = std::make_unique<dorado::SimplexRead>();
-        read_1->read_common.raw_data = torch::empty(100);
+        read_1->read_common.raw_data = at::empty(100);
         read_1->read_common.sample_rate = 4000;
         read_1->read_common.shift = 128.3842f;
         read_1->read_common.scale = 8.258f;
@@ -40,7 +41,7 @@ TEST_CASE("ReadFilterNode: Filter read based on qscore", TEST_GROUP) {
         read_1->read_common.attributes.fast5_filename = "batch_0.fast5";
 
         auto read_2 = std::make_unique<dorado::SimplexRead>();
-        read_2->read_common.raw_data = torch::empty(100);
+        read_2->read_common.raw_data = at::empty(100);
         read_2->read_common.sample_rate = 4000;
         read_2->read_common.shift = 128.3842f;
         read_2->read_common.scale = 8.258f;
@@ -69,7 +70,7 @@ TEST_CASE("ReadFilterNode: Filter read based on read name", TEST_GROUP) {
         auto pipeline = make_filtered_pipeline(messages, 0, 0, {"read_2"});
 
         auto read_1 = std::make_unique<dorado::SimplexRead>();
-        read_1->read_common.raw_data = torch::empty(100);
+        read_1->read_common.raw_data = at::empty(100);
         read_1->read_common.sample_rate = 4000;
         read_1->read_common.shift = 128.3842f;
         read_1->read_common.scale = 8.258f;
@@ -84,7 +85,7 @@ TEST_CASE("ReadFilterNode: Filter read based on read name", TEST_GROUP) {
         read_1->read_common.attributes.fast5_filename = "batch_0.fast5";
 
         auto read_2 = std::make_unique<dorado::SimplexRead>();
-        read_2->read_common.raw_data = torch::empty(100);
+        read_2->read_common.raw_data = at::empty(100);
         read_2->read_common.sample_rate = 4000;
         read_2->read_common.shift = 128.3842f;
         read_2->read_common.scale = 8.258f;
@@ -113,7 +114,7 @@ TEST_CASE("ReadFilterNode: Filter read based on read length", TEST_GROUP) {
         auto pipeline = make_filtered_pipeline(messages, 0, 5, {});
 
         auto read_1 = std::make_unique<dorado::SimplexRead>();
-        read_1->read_common.raw_data = torch::empty(100);
+        read_1->read_common.raw_data = at::empty(100);
         read_1->read_common.sample_rate = 4000;
         read_1->read_common.shift = 128.3842f;
         read_1->read_common.scale = 8.258f;
@@ -128,7 +129,7 @@ TEST_CASE("ReadFilterNode: Filter read based on read length", TEST_GROUP) {
         read_1->read_common.attributes.fast5_filename = "batch_0.fast5";
 
         auto read_2 = std::make_unique<dorado::SimplexRead>();
-        read_2->read_common.raw_data = torch::empty(100);
+        read_2->read_common.raw_data = at::empty(100);
         read_2->read_common.sample_rate = 4000;
         read_2->read_common.shift = 128.3842f;
         read_2->read_common.scale = 8.258f;

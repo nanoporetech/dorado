@@ -102,7 +102,7 @@ MatmulMode get_cuda_matmul_fp16_mode() {
 
 }  // namespace
 
-void matmul_f16(const torch::Tensor &A, const torch::Tensor &B, torch::Tensor &C) {
+void matmul_f16(const at::Tensor &A, const at::Tensor &B, at::Tensor &C) {
     static const auto selected_mat_mul = [] {
         switch (get_cuda_matmul_fp16_mode()) {
         case MatmulMode::TORCH:
@@ -188,7 +188,7 @@ void handle_cuda_result(int cuda_result) {
 }
 
 namespace details {
-void matmul_f16_cublas(const torch::Tensor &A, const torch::Tensor &B, torch::Tensor &C) {
+void matmul_f16_cublas(const at::Tensor &A, const at::Tensor &B, at::Tensor &C) {
     constexpr uint16_t HALF_ZERO = 0;      // 0.0 in __half format
     constexpr uint16_t HALF_ONE = 0x3C00;  // 1.0 in __half format
     assert(A.dtype() == torch::kF16 && B.dtype() == torch::kF16 && C.dtype() == torch::kF16);
@@ -207,7 +207,7 @@ void matmul_f16_cublas(const torch::Tensor &A, const torch::Tensor &B, torch::Te
     }
 }
 
-void matmul_f16_torch(const torch::Tensor &A, const torch::Tensor &B, torch::Tensor &C) {
+void matmul_f16_torch(const at::Tensor &A, const at::Tensor &B, at::Tensor &C) {
     C.copy_(torch::matmul(A, B));
 }
 

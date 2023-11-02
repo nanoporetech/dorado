@@ -3,8 +3,8 @@
 #include "utils/stats.h"
 #include "utils/types.h"
 
+#include <ATen/core/TensorBody.h>
 #include <spdlog/spdlog.h>
-#include <torch/torch.h>
 
 #include <cstdint>
 #include <limits>
@@ -31,7 +31,7 @@ struct Attributes {
 
 class ReadCommon {
 public:
-    torch::Tensor raw_data;  // Loaded from source file
+    at::Tensor raw_data;  // Loaded from source file
 
     int model_stride;  // The down sampling factor of the model
 
@@ -41,8 +41,10 @@ public:
     std::vector<uint8_t> moves;           // Move table
     std::vector<uint8_t> base_mod_probs;  // Modified base probabilities
     std::string run_id;                   // Run ID - used in read group
-    std::string flowcell_id;              // Flowcell ID - used in read group
-    std::string model_name;               // Read group
+    std::string flowcell_id;    // Flowcell ID - used in read group and for sample sheet aliasing
+    std::string position_id;    // Position ID - used for sample sheet aliasing
+    std::string experiment_id;  // Experiment ID - used for sample sheet aliasing
+    std::string model_name;     // Read group
 
     dorado::details::Attributes attributes;
 
@@ -90,6 +92,7 @@ public:
     // (2) duplex pairs which share this read as the template read
     size_t subread_id{0};
     size_t split_count{1};
+    uint32_t split_point{0};
 
 private:
     void generate_duplex_read_tags(bam1_t*) const;

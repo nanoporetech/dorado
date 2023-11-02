@@ -26,7 +26,7 @@ DEFINE_TEST("matmul_f16") {
         return;
     }
 
-    auto options = torch::TensorOptions().dtype(torch::kFloat16).device(c10::kCUDA);
+    auto options = at::TensorOptions().dtype(torch::kFloat16).device(c10::kCUDA);
     auto A = torch::rand({L, M}, options);
     auto B = torch::rand({M, N}, options);
     auto C1 = torch::empty({L, N}, options);

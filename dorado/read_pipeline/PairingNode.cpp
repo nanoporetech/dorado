@@ -246,7 +246,7 @@ void PairingNode::pair_list_worker_thread(int tid) {
 }
 
 void PairingNode::pair_generating_worker_thread(int tid) {
-    torch::InferenceMode inference_mode_guard;
+    at::InferenceMode inference_mode_guard;
 
     auto compare_reads_by_time = [](const SimplexReadPtr& read1, const SimplexReadPtr& read2) {
         return read1->read_common.start_time_ms < read2->read_common.start_time_ms;
@@ -454,21 +454,25 @@ PairingNode::PairingNode(std::map<std::string, std::string> template_complement_
     start_threads();
 }
 
-PairingNode::PairingNode(ReadOrder read_order, int num_worker_threads, size_t max_reads)
+PairingNode::PairingNode(DuplexPairingParameters pairing_params,
+                         int num_worker_threads,
+                         size_t max_reads)
         : MessageSink(max_reads),
           m_num_worker_threads(num_worker_threads),
           m_max_num_keys(std::numeric_limits<size_t>::max()),
           m_max_num_reads(std::numeric_limits<size_t>::max()) {
-    switch (read_order) {
+    switch (pairing_params.read_order) {
     case ReadOrder::BY_CHANNEL:
-        m_max_num_keys = 10;
+        m_max_num_keys = pairing_params.cache_depth;
+        spdlog::debug("Using dorado duplex channel count of {}", m_max_num_keys);
         break;
     case ReadOrder::BY_TIME:
-        m_max_num_reads = 10;
+        m_max_num_reads = pairing_params.cache_depth;
+        spdlog::debug("Using dorado duplex read-per-channel count of {}", m_max_num_reads);
         break;
     default:
         throw std::runtime_error("Unsupported read order detected: " +
-                                 dorado::to_string(read_order));
+                                 dorado::to_string(pairing_params.read_order));
     }
     m_pairing_func = &PairingNode::pair_generating_worker_thread;
     start_threads();

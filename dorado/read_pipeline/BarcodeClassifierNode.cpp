@@ -1,6 +1,7 @@
 #include "BarcodeClassifierNode.h"
 
 #include "demux/BarcodeClassifier.h"
+#include "utils/SampleSheet.h"
 #include "utils/bam_utils.h"
 #include "utils/barcode_kits.h"
 #include "utils/trim.h"
@@ -40,11 +41,13 @@ BarcodeClassifierNode::BarcodeClassifierNode(int threads,
                                              const std::vector<std::string>& kit_names,
                                              bool barcode_both_ends,
                                              bool no_trim,
-                                             const BarcodingInfo::FilterSet& allowed_barcodes)
+                                             BarcodingInfo::FilterSet allowed_barcodes)
         : MessageSink(10000),
           m_threads(threads),
-          m_default_barcoding_info(
-                  create_barcoding_info(kit_names, barcode_both_ends, !no_trim, allowed_barcodes)) {
+          m_default_barcoding_info(create_barcoding_info(kit_names,
+                                                         barcode_both_ends,
+                                                         !no_trim,
+                                                         std::move(allowed_barcodes))) {
     start_threads();
 }
 

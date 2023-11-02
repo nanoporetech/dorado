@@ -2,6 +2,13 @@
 
 All notable changes to Dorado will be documented in this file.
 
+# [0.4.2] (30 Oct 2023)
+
+This release of Dorado fixes a bug with the CpG-context 5mC/5hmC model calling all contexts and adds beta support for using a barcode alias from a sample sheet.
+
+* 90a4d013938672af6dac399afbbafbd8bf7814ad - Fix motif for `5mCG_5hmCG` compatible with `dna_r10.4.1_e8.2_400bps_sup@v4.2.0`
+* 616b951e3ede257ae6359b6005f60e44a53dd2cf - Beta support for sample sheet aliasing
+
 # [0.4.1] (12 Oct 2023)
 
 This release of Dorado fixes a bug with duplex tags and adds functionality to dorado demux.

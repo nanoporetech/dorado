@@ -123,9 +123,16 @@ void setup(std::vector<std::string> args,
             num_devices, !remora_runners.empty() ? num_remora_threads : 0, enable_aligner,
             !barcode_kits.empty());
 
+    std::unique_ptr<const utils::SampleSheet> sample_sheet;
+    BarcodingInfo::FilterSet allowed_barcodes;
+    if (!barcode_sample_sheet.empty()) {
+        sample_sheet = std::make_unique<const utils::SampleSheet>(barcode_sample_sheet, false);
+        allowed_barcodes = sample_sheet->get_barcode_values();
+    }
+
     SamHdrPtr hdr(sam_hdr_init());
     cli::add_pg_hdr(hdr.get(), args);
-    utils::add_rg_hdr(hdr.get(), read_groups, barcode_kits);
+    utils::add_rg_hdr(hdr.get(), read_groups, barcode_kits, sample_sheet.get());
 
     PipelineDescriptor pipeline_desc;
     auto hts_writer = pipeline_desc.add_node<HtsWriter>(
@@ -139,18 +146,16 @@ void setup(std::vector<std::string> args,
     }
     current_sink_node = pipeline_desc.add_node<ReadToBamType>(
             {current_sink_node}, emit_moves, thread_allocations.read_converter_threads,
-            methylation_threshold_pct);
+            methylation_threshold_pct, std::move(sample_sheet), 1000);
     if (estimate_poly_a) {
         current_sink_node = pipeline_desc.add_node<PolyACalculator>(
                 {current_sink_node}, std::thread::hardware_concurrency(),
-                PolyACalculator::get_model_type(model_name));
+                is_rna_model(model_config));
     }
     if (!barcode_kits.empty()) {
-        utils::SampleSheet sample_sheet(barcode_sample_sheet);
-        BarcodingInfo::FilterSet allowed_barcodes = sample_sheet.get_barcode_values();
         current_sink_node = pipeline_desc.add_node<BarcodeClassifierNode>(
                 {current_sink_node}, thread_allocations.barcoder_threads, barcode_kits,
-                barcode_both_ends, barcode_no_trim, allowed_barcodes);
+                barcode_both_ends, barcode_no_trim, std::move(allowed_barcodes));
     }
     current_sink_node = pipeline_desc.add_node<ReadFilterNode>(
             {current_sink_node}, min_qscore, default_parameters.min_sequence_length,
@@ -166,8 +171,7 @@ void setup(std::vector<std::string> args,
     pipelines::create_simplex_pipeline(
             pipeline_desc, std::move(runners), std::move(remora_runners), overlap,
             mean_qscore_start_pos, thread_allocations.scaler_node_threads,
-            !is_rna_model(model_config) /*enable read splitting if data is DNA*/,
-            thread_allocations.splitter_node_threads,
+            true /* Enable read splitting */, thread_allocations.splitter_node_threads,
             thread_allocations.remora_threads * num_devices, current_sink_node);
 
     // Create the Pipeline from our description.
@@ -259,7 +263,13 @@ int basecaller(int argc, char* argv[]) {
 
     parser.visible.add_argument("data").help("the data directory or file (POD5/FAST5 format).");
 
-    parser.visible.add_argument("-v", "--verbose").default_value(false).implicit_value(true);
+    int verbosity = 0;
+    parser.visible.add_argument("-v", "--verbose")
+            .default_value(false)
+            .implicit_value(true)
+            .nargs(0)
+            .action([&](const auto&) { ++verbosity; })
+            .append();
 
     parser.visible.add_argument("-x", "--device")
             .help("device string in format \"cuda:0,...,N\", \"cuda:all\", \"metal\", \"cpu\" "
@@ -384,7 +394,7 @@ int basecaller(int argc, char* argv[]) {
     std::vector<std::string> args(argv, argv + argc);
 
     if (parser.visible.get<bool>("--verbose")) {
-        utils::SetDebugLogging();
+        utils::SetVerboseLogging(static_cast<dorado::utils::VerboseLogLevel>(verbosity));
     }
 
     auto model = parser.visible.get<std::string>("model");

@@ -350,7 +350,10 @@ if (USING_STATIC_TORCH_LIB)
             )
             target_link_libraries(dorado_torch_lib PRIVATE
                 ${TORCH_LIBRARIES}
-                ${ont_cuda_internal_linkage_libs}
+                # Some of the CUDA libs have inter-dependencies, so group them together
+                -Wl,--start-group
+                    ${ont_cuda_internal_linkage_libs}
+                -Wl,--end-group
             )
             target_include_directories(dorado_torch_lib PUBLIC
                 ${TORCH_INCLUDE_DIRS}

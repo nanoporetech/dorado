@@ -46,7 +46,7 @@ TEST_CASE(TEST_GROUP "Encoder", "[.]") {
         complement_read.seq_end = complement_read.read_common.seq.length();
     }
 
-    torch::Tensor stereo_raw_data;
+    at::Tensor stereo_raw_data;
     torch::load(stereo_raw_data, DataPath("stereo_raw_data.tensor").string());
     stereo_raw_data = stereo_raw_data.to(torch::kFloat16);
 

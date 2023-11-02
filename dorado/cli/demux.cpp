@@ -69,7 +69,13 @@ int demuxer(int argc, char* argv[]) {
     parser.add_argument("-l", "--read-ids")
             .help("A file with a newline-delimited list of reads to demux.")
             .default_value(std::string(""));
-    parser.add_argument("-v", "--verbose").default_value(false).implicit_value(true);
+    int verbosity = 0;
+    parser.add_argument("-v", "--verbose")
+            .default_value(false)
+            .implicit_value(true)
+            .nargs(0)
+            .action([&](const auto&) { ++verbosity; })
+            .append();
     parser.add_argument("--emit-fastq")
             .help("Output in fastq format. Default is BAM.")
             .default_value(false)
@@ -99,7 +105,7 @@ int demuxer(int argc, char* argv[]) {
     }
 
     if (parser.get<bool>("--verbose")) {
-        utils::SetDebugLogging();
+        utils::SetVerboseLogging(static_cast<dorado::utils::VerboseLogLevel>(verbosity));
     }
 
     auto reads(parser.get<std::vector<std::string>>("reads"));
@@ -131,23 +137,30 @@ int demuxer(int argc, char* argv[]) {
     }
 
     HtsReader reader(reads[0], read_list);
-    auto header = sam_hdr_dup(reader.header);
-    add_pg_hdr(header);
+    auto header = SamHdrPtr(sam_hdr_dup(reader.header));
+    add_pg_hdr(header.get());
+
+    auto barcode_sample_sheet = parser.get<std::string>("--sample-sheet");
+    std::unique_ptr<const utils::SampleSheet> sample_sheet;
+    BarcodingInfo::FilterSet allowed_barcodes;
+    if (!barcode_sample_sheet.empty()) {
+        sample_sheet = std::make_unique<const utils::SampleSheet>(barcode_sample_sheet, true);
+        allowed_barcodes = sample_sheet->get_barcode_values();
+    }
 
     PipelineDescriptor pipeline_desc;
     auto demux_writer = pipeline_desc.add_node<BarcodeDemuxerNode>(
-            {}, output_dir, demux_writer_threads, 0, parser.get<bool>("--emit-fastq"));
+            {}, output_dir, demux_writer_threads, 0, parser.get<bool>("--emit-fastq"),
+            std::move(sample_sheet));
 
     if (parser.is_used("--kit-name")) {
         std::vector<std::string> kit_names;
         if (auto names = parser.present<std::vector<std::string>>("--kit-name")) {
             kit_names = std::move(*names);
         }
-        utils::SampleSheet sample_sheet(parser.get<std::string>("--sample-sheet"));
-        BarcodingInfo::FilterSet allowed_barcodes = sample_sheet.get_barcode_values();
         auto demux = pipeline_desc.add_node<BarcodeClassifierNode>(
                 {demux_writer}, demux_threads, kit_names, parser.get<bool>("--barcode-both-ends"),
-                parser.get<bool>("--no-trim"), allowed_barcodes);
+                parser.get<bool>("--no-trim"), std::move(allowed_barcodes));
     }
 
     // Create the Pipeline from our description.
@@ -162,7 +175,7 @@ int demuxer(int argc, char* argv[]) {
     // rather than the pipeline framework.
     auto& demux_writer_ref =
             dynamic_cast<BarcodeDemuxerNode&>(pipeline->get_node_ref(demux_writer));
-    demux_writer_ref.set_header(header);
+    demux_writer_ref.set_header(header.get());
 
     // Set up stats counting
     std::vector<dorado::stats::StatsCallable> stats_callables;

@@ -3,6 +3,7 @@
 #include "decode/CPUDecoder.h"
 #include "models/models.h"
 #include "nn/CRFModel.h"
+#include "nn/CRFModelConfig.h"
 #include "nn/ModBaseModel.h"
 #include "nn/ModBaseRunner.h"
 #include "nn/ModelRunner.h"
@@ -14,6 +15,7 @@
 #include "read_pipeline/ReadFilterNode.h"
 #include "read_pipeline/ReadToBamTypeNode.h"
 #include "read_pipeline/ScalerNode.h"
+#include "utils/SampleSheet.h"
 #include "utils/parameters.h"
 
 #if DORADO_GPU_BUILD
@@ -162,9 +164,10 @@ TempDir download_model(const std::string& model) {
 
 DEFINE_TEST(NodeSmokeTestRead, "ScalerNode") {
     auto pipeline_restart = GENERATE(false, true);
-    auto is_rna = GENERATE(true, false);
+    auto model_type = GENERATE(dorado::SampleType::DNA, dorado::SampleType::RNA002,
+                               dorado::SampleType::RNA004);
     CAPTURE(pipeline_restart);
-    CAPTURE(is_rna);
+    CAPTURE(model_type);
 
     set_pipeline_restart(pipeline_restart);
 
@@ -178,7 +181,7 @@ DEFINE_TEST(NodeSmokeTestRead, "ScalerNode") {
     config.quantile_b = 0.9;
     config.shift_multiplier = 0.51;
     config.scale_multiplier = 0.53;
-    run_smoke_test<dorado::ScalerNode>(config, is_rna, 2);
+    run_smoke_test<dorado::ScalerNode>(config, model_type, 2);
 }
 
 DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
@@ -327,8 +330,8 @@ DEFINE_TEST(NodeSmokeTestBam, "ReadToBamType") {
 
     set_pipeline_restart(pipeline_restart);
 
-    run_smoke_test<dorado::ReadToBamType>(emit_moves, 2,
-                                          dorado::utils::default_parameters.methylation_threshold);
+    run_smoke_test<dorado::ReadToBamType>(
+            emit_moves, 2, dorado::utils::default_parameters.methylation_threshold, nullptr, 1000);
 }
 
 DEFINE_TEST(NodeSmokeTestRead, "BarcodeClassifierNode") {
@@ -369,8 +372,7 @@ TEST_CASE("BarcodeClassifierNode: test simple pipeline with fastq and sam files"
 
 DEFINE_TEST(NodeSmokeTestRead, "PolyACalculator") {
     auto pipeline_restart = GENERATE(false, true);
-    auto is_rna = GENERATE(dorado::PolyACalculator::ModelType::DNA,
-                           dorado::PolyACalculator::ModelType::RNA004);
+    auto is_rna = GENERATE(false, true);
     CAPTURE(pipeline_restart);
     CAPTURE(is_rna);
 

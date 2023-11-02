@@ -6,6 +6,7 @@
 #include "utils/types.h"
 #include "vbz_plugin_user_utils.h"
 
+#include <ATen/ATen.h>
 #include <cxxpool.h>
 #include <highfive/H5Easy.hpp>
 #include <highfive/H5File.hpp>
@@ -89,7 +90,16 @@ void string_reader(HighFive::Attribute& attribute, std::string& target_str) {
     if (eol_pos < target_str.size()) {
         target_str.resize(eol_pos);
     }
-};
+}
+
+std::string get_string_attribute(const HighFive::Group& group, const std::string& attr_name) {
+    std::string attribute_string;
+    if (group.hasAttribute(attr_name)) {
+        HighFive::Attribute attribute = group.getAttribute(attr_name);
+        string_reader(attribute, attribute_string);
+    }
+    return attribute_string;
+}
 }  // namespace
 
 namespace dorado {
@@ -123,8 +133,8 @@ SimplexReadPtr process_pod5_read(
     pod5_error_t err = pod5_format_read_id(read_data.read_id, read_id_tmp);
     std::string read_id_str(read_id_tmp);
 
-    auto options = torch::TensorOptions().dtype(torch::kInt16);
-    auto samples = torch::empty(read_data.num_samples, options);
+    auto options = at::TensorOptions().dtype(at::kShort);
+    auto samples = at::empty(read_data.num_samples, options);
 
     if (pod5_get_read_complete_signal(file, batch, row, read_data.num_samples,
                                       samples.data_ptr<int16_t>()) != POD5_OK) {
@@ -156,6 +166,8 @@ SimplexReadPtr process_pod5_read(
     new_read->start_sample = read_data.start_sample;
     new_read->end_sample = read_data.start_sample + read_data.num_samples;
     new_read->read_common.flowcell_id = run_info_data->flow_cell_id;
+    new_read->read_common.position_id = run_info_data->sequencer_position;
+    new_read->read_common.experiment_id = run_info_data->experiment_name;
     new_read->read_common.is_duplex = false;
 
     // Determine the time sorted predecessor of the read
@@ -466,6 +478,8 @@ std::unordered_map<std::string, ReadGroup> DataLoader::load_read_groups(
                         std::string device_id = run_info_data->system_name;
                         std::string run_id = run_info_data->acquisition_id;
                         std::string sample_id = run_info_data->sample_id;
+                        std::string position_id = run_info_data->sequencer_position;
+                        std::string experiment_id = run_info_data->experiment_name;
 
                         if (pod5_free_run_info(run_info_data) != POD5_OK) {
                             spdlog::error("Failed to free run info");
@@ -478,7 +492,9 @@ std::unordered_map<std::string, ReadGroup> DataLoader::load_read_groups(
                                 flowcell_id,
                                 device_id,
                                 utils::get_string_timestamp_from_unix_time(exp_start_time_ms),
-                                sample_id};
+                                sample_id,
+                                position_id,
+                                experiment_id};
                     }
                     if (pod5_close_and_free_reader(file) != POD5_OK) {
                         spdlog::error("Failed to close and free POD5 reader");
@@ -780,8 +796,8 @@ void DataLoader::load_fast5_reads_from_file(const std::string& path) {
             throw std::runtime_error("Invalid FAST5 Signal data type of " +
                                      ds.getDataType().string());
 
-        auto options = torch::TensorOptions().dtype(torch::kInt16);
-        auto samples = torch::empty(ds.getElementCount(), options);
+        auto options = at::TensorOptions().dtype(at::kShort);
+        auto samples = at::empty(ds.getElementCount(), options);
         ds.read(samples.data_ptr<int16_t>());
 
         HighFive::Attribute mux_attr = raw.getAttribute("start_mux");
@@ -799,9 +815,11 @@ void DataLoader::load_fast5_reads_from_file(const std::string& path) {
         std::string fast5_filename = std::filesystem::path(path).filename().string();
 
         HighFive::Group tracking_id_group = read.getGroup("tracking_id");
-        HighFive::Attribute exp_start_time_attr = tracking_id_group.getAttribute("exp_start_time");
-        std::string exp_start_time;
-        string_reader(exp_start_time_attr, exp_start_time);
+        std::string exp_start_time = get_string_attribute(tracking_id_group, "exp_start_time");
+        std::string flow_cell_id = get_string_attribute(tracking_id_group, "flow_cell_id");
+        std::string device_id = get_string_attribute(tracking_id_group, "device_id");
+        std::string group_protocol_id =
+                get_string_attribute(tracking_id_group, "group_protocol_id");
 
         auto start_time_str = utils::adjust_time(exp_start_time,
                                                  static_cast<uint32_t>(start_time / sampling_rate));
@@ -820,6 +838,9 @@ void DataLoader::load_fast5_reads_from_file(const std::string& path) {
         new_read->read_common.attributes.channel_number = channel_number;
         new_read->read_common.attributes.start_time = start_time_str;
         new_read->read_common.attributes.fast5_filename = fast5_filename;
+        new_read->read_common.flowcell_id = flow_cell_id;
+        new_read->read_common.position_id = device_id;
+        new_read->read_common.experiment_id = group_protocol_id;
         new_read->read_common.is_duplex = false;
 
         if (!m_allowed_read_ids || (m_allowed_read_ids->find(new_read->read_common.read_id) !=

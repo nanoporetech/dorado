@@ -12,6 +12,7 @@
 #include "read_pipeline/ProgressTracker.h"
 #include "read_pipeline/ReadFilterNode.h"
 #include "read_pipeline/ReadToBamTypeNode.h"
+#include "utils/SampleSheet.h"
 #include "utils/bam_utils.h"
 #include "utils/basecaller_utils.h"
 #include "utils/duplex_utils.h"
@@ -109,7 +110,13 @@ int duplex(int argc, char* argv[]) {
             .help("Path to reference for alignment.")
             .default_value(std::string(""));
 
-    parser.visible.add_argument("-v", "--verbose").default_value(false).implicit_value(true);
+    int verbosity = 0;
+    parser.visible.add_argument("-v", "--verbose")
+            .default_value(false)
+            .implicit_value(true)
+            .nargs(0)
+            .action([&](const auto&) { ++verbosity; })
+            .append();
 
     cli::add_minimap2_arguments(parser, Aligner::dflt_options);
     cli::add_internal_arguments(parser);
@@ -132,7 +139,7 @@ int duplex(int argc, char* argv[]) {
         const bool basespace_duplex = (model.compare("basespace") == 0);
         std::vector<std::string> args(argv, argv + argc);
         if (parser.visible.get<bool>("--verbose")) {
-            utils::SetDebugLogging();
+            utils::SetVerboseLogging(static_cast<dorado::utils::VerboseLogLevel>(verbosity));
         }
         std::map<std::string, std::string> template_complement_map;
         auto read_list = utils::load_read_list(parser.visible.get<std::string>("--read-ids"));
@@ -193,8 +200,8 @@ int duplex(int argc, char* argv[]) {
             pipeline_desc.add_node_sink(aligner, hts_writer);
             converted_reads_sink = aligner;
         }
-        auto read_converter =
-                pipeline_desc.add_node<ReadToBamType>({converted_reads_sink}, emit_moves, 2);
+        auto read_converter = pipeline_desc.add_node<ReadToBamType>(
+                {converted_reads_sink}, emit_moves, 2, 0, nullptr, 1000);
         auto duplex_read_tagger = pipeline_desc.add_node<DuplexReadTaggingNode>({read_converter});
         // The minimum sequence length is set to 5 to avoid issues with duplex node printing very short sequences for mismatched pairs.
         std::unordered_set<std::string> read_ids_to_filter;
@@ -287,7 +294,7 @@ int duplex(int argc, char* argv[]) {
             read_groups.merge(
                     DataLoader::load_read_groups(reads, duplex_rg_name, recursive_file_loading));
             std::vector<std::string> barcode_kits;
-            utils::add_rg_hdr(hdr.get(), read_groups, barcode_kits);
+            utils::add_rg_hdr(hdr.get(), read_groups, barcode_kits, nullptr);
 
             int batch_size(parser.visible.get<int>("-b"));
             int chunk_size(parser.visible.get<int>("-c"));
@@ -327,7 +334,8 @@ int duplex(int argc, char* argv[]) {
 
             PairingParameters pairing_parameters;
             if (template_complement_map.empty()) {
-                pairing_parameters = ReadOrder::BY_CHANNEL;
+                pairing_parameters =
+                        DuplexPairingParameters{ReadOrder::BY_CHANNEL, DEFAULT_DUPLEX_CACHE_DEPTH};
             } else {
                 pairing_parameters = std::move(template_complement_map);
             }

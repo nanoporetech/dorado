@@ -5,6 +5,7 @@
 #include "utils/sequence_utils.h"
 
 #include <catch2/catch.hpp>
+#include <spdlog/spdlog.h>
 #include <torch/torch.h>
 
 #include <cstdint>
@@ -21,20 +22,18 @@ using namespace dorado;
 struct TestCase {
     int estimated_bases = 0;
     std::string test_dir;
-    PolyACalculator::ModelType model_type;
+    bool is_rna;
 };
 
 TEST_CASE("PolyACalculator: Test polyT tail estimation", TEST_GROUP) {
-    auto [gt, data, model_type] =
-            GENERATE(TestCase{92, "poly_a/r9_rev_cdna", PolyACalculator::ModelType::DNA},
-                     TestCase{31, "poly_a/r10_fwd_cdna", PolyACalculator::ModelType::DNA},
-                     TestCase{29, "poly_a/rna002", PolyACalculator::ModelType::RNA002},
-                     TestCase{64, "poly_a/rna004", PolyACalculator::ModelType::RNA004});
+    auto [gt, data, is_rna] = GENERATE(
+            TestCase{92, "poly_a/r9_rev_cdna", false}, TestCase{31, "poly_a/r10_fwd_cdna", false},
+            TestCase{28, "poly_a/rna002", true}, TestCase{67, "poly_a/rna004", true});
 
     dorado::PipelineDescriptor pipeline_desc;
     std::vector<dorado::Message> messages;
     auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
-    auto estimator = pipeline_desc.add_node<PolyACalculator>({sink}, 2, model_type);
+    auto estimator = pipeline_desc.add_node<PolyACalculator>({sink}, 2, is_rna);
 
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
 

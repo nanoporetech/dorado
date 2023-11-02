@@ -64,7 +64,7 @@ TEST_CASE("BamUtilsTest: add_rg_hdr read group headers", TEST_GROUP) {
     SECTION("No read groups generate no headers") {
         dorado::SamHdrPtr sam_header(sam_hdr_init());
         CHECK(sam_hdr_count_lines(sam_header.get(), "RG") == 0);
-        dorado::utils::add_rg_hdr(sam_header.get(), {}, {});
+        dorado::utils::add_rg_hdr(sam_header.get(), {}, {}, nullptr);
         CHECK(sam_hdr_count_lines(sam_header.get(), "RG") == 0);
     }
 
@@ -77,7 +77,7 @@ TEST_CASE("BamUtilsTest: add_rg_hdr read group headers", TEST_GROUP) {
 
     SECTION("Read groups") {
         dorado::SamHdrPtr sam_header(sam_hdr_init());
-        dorado::utils::add_rg_hdr(sam_header.get(), read_groups, {});
+        dorado::utils::add_rg_hdr(sam_header.get(), read_groups, {}, nullptr);
 
         // Check the IDs of the groups are all there.
         CHECK(sam_hdr_count_lines(sam_header.get(), "RG") == read_groups.size());
@@ -97,7 +97,7 @@ TEST_CASE("BamUtilsTest: add_rg_hdr read group headers", TEST_GROUP) {
 
     SECTION("Read groups with barcodes") {
         dorado::SamHdrPtr sam_header(sam_hdr_init());
-        dorado::utils::add_rg_hdr(sam_header.get(), read_groups, barcode_kits);
+        dorado::utils::add_rg_hdr(sam_header.get(), read_groups, barcode_kits, nullptr);
 
         // Check the IDs of the groups are all there.
         size_t total_barcodes = 0;
@@ -130,7 +130,7 @@ TEST_CASE("BamUtilsTest: add_rg_hdr read group headers", TEST_GROUP) {
 
     SECTION("Read groups with unknown barcode kit") {
         dorado::SamHdrPtr sam_header(sam_hdr_init());
-        CHECK_THROWS(dorado::utils::add_rg_hdr(sam_header.get(), read_groups, {"blah"}));
+        CHECK_THROWS(dorado::utils::add_rg_hdr(sam_header.get(), read_groups, {"blah"}, nullptr));
     }
 }
 

@@ -52,6 +52,11 @@ bool is_alias_forbidden(const std::string& input) {
         return true;
     }
 
+    // Unclassified
+    if (input == "unclassified") {
+        return true;
+    }
+
     return false;
 }
 
@@ -76,6 +81,8 @@ bool get_line(std::istream& input,
 }  // anonymous namespace
 
 namespace dorado::utils {
+
+SampleSheet::SampleSheet() : m_skip_index_matching(false) {}
 
 SampleSheet::SampleSheet(const std::string& filename, bool skip_index_matching)
         : m_filename(filename), m_skip_index_matching(skip_index_matching) {
@@ -147,6 +154,17 @@ void SampleSheet::load(std::istream& file_stream, const std::string& filename) {
                 std::string("Unable to infer barcode aliases from sample sheet file: " + filename +
                             " does not contain a unique mapping of barcode ids."));
     }
+
+    if (m_type == Type::barcode) {
+        std::unordered_set<std::string> barcodes;
+        // Grab the barcode idx once so that we're not doing it repeatedly
+        const auto barcode_idx = m_col_indices.at("barcode");
+        // Grab the barcodes
+        for (const auto& row : m_rows) {
+            barcodes.emplace(row[barcode_idx]);
+        }
+        m_allowed_barcodes = std::move(barcodes);
+    }
 }
 
 // check if we can generate a unique alias without the flowcell/position information
@@ -191,9 +209,15 @@ std::string SampleSheet::get_alias(const std::string& flow_cell_id,
         return "";
     }
 
+    std::string_view barcode_only(barcode);
+    if (auto pos = barcode_only.find('_'); pos != std::string::npos) {
+        // trim off the kit name
+        barcode_only = barcode_only.substr(pos + 1);
+    }
+
     for (const auto& row : m_rows) {
         if (match_index(row, flow_cell_id, position_id, experiment_id) &&
-            get(row, "barcode") == barcode) {
+            get(row, "barcode") == barcode_only) {
             return get(row, "alias");
         }
     }
@@ -202,27 +226,14 @@ std::string SampleSheet::get_alias(const std::string& flow_cell_id,
     return "";
 }
 
-BarcodingInfo::FilterSet SampleSheet::get_barcode_values() const {
-    std::unordered_set<std::string> barcodes;
+BarcodingInfo::FilterSet SampleSheet::get_barcode_values() const { return m_allowed_barcodes; }
 
-    switch (m_type) {
-    case Type::barcode: {
-        // Grab the barcode idx once so that we're not doing it repeatedly
-        const auto barcode_idx = m_col_indices.at("barcode");
-
-        // Grab the barcodes
-        for (const auto& row : m_rows) {
-            barcodes.emplace(row[barcode_idx]);
-        }
-        break;
-    }
-    case Type::none:
-        [[fallthrough]];
-    default:
-        return std::nullopt;
+bool SampleSheet::barcode_is_permitted(const std::string& barcode_name) const {
+    if (!m_allowed_barcodes.has_value()) {
+        return true;
     }
 
-    return barcodes;
+    return m_allowed_barcodes->count(barcode_name) != 0;
 }
 
 void SampleSheet::validate_headers(const std::vector<std::string>& col_names,
@@ -304,18 +315,43 @@ void SampleSheet::validate_alias(const Row& row, const std::string& key) const {
 
 bool SampleSheet::check_index(const std::string& flow_cell_id,
                               const std::string& position_id) const {
-    return m_skip_index_matching || ((m_index[FLOW_CELL_ID] == !flow_cell_id.empty()) &&
-                                     (m_index[POSITION_ID] == !position_id.empty()));
+    if (m_skip_index_matching) {
+        return true;
+    }
+
+    bool ok = m_index.any();  // one of the indicies must be set
+    if (m_index[FLOW_CELL_ID]) {
+        // if we're expecting a flow cell id, we must provide one
+        ok &= !flow_cell_id.empty();
+    }
+    if (m_index[POSITION_ID]) {
+        // if we're expecting a position id, we must provide one
+        ok &= !position_id.empty();
+    }
+    return ok;
 }
 
 bool SampleSheet::match_index(const Row& row,
                               const std::string& flow_cell_id,
                               const std::string& position_id,
                               const std::string& experiment_id) const {
-    return m_skip_index_matching ||
-           ((!m_index[FLOW_CELL_ID] || get(row, "flow_cell_id") == flow_cell_id) &&
-            (!m_index[POSITION_ID] || get(row, "position_id") == position_id) &&
-            (get(row, "experiment_id") == experiment_id));
+    if (m_skip_index_matching) {
+        return true;
+    }
+
+    if (get(row, "experiment_id") != experiment_id) {
+        return false;
+    }
+
+    if (m_index[FLOW_CELL_ID] && (get(row, "flow_cell_id") != flow_cell_id)) {
+        return false;
+    }
+
+    if (m_index[POSITION_ID] && (get(row, "position_id") != position_id)) {
+        return false;
+    }
+
+    return true;
 }
 
 std::string SampleSheet::get(const Row& row, const std::string& key) const {
