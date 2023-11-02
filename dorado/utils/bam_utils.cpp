@@ -246,14 +246,16 @@ std::map<std::string, std::string> extract_pg_keys_from_hdr(const std::string fi
     return pg_keys;
 }
 
-std::string extract_sequence(bam1_t* input_record, int seqlen) {
+std::string extract_sequence(bam1_t* input_record) {
     auto bseq = bam_get_seq(input_record);
+    int seqlen = input_record->core.l_qseq;
     std::string seq = convert_nt16_to_str(bseq, seqlen);
     return seq;
 }
 
-std::vector<uint8_t> extract_quality(bam1_t* input_record, int seqlen) {
+std::vector<uint8_t> extract_quality(bam1_t* input_record) {
     auto qual_aln = bam_get_qual(input_record);
+    int seqlen = input_record->core.l_qseq;
     std::vector<uint8_t> qual;
     if (qual_aln) {
         qual = std::vector<uint8_t>(bam_get_qual(input_record),

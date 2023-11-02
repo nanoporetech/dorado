@@ -59,7 +59,7 @@ TEST_CASE("BarcodeClassifier: test single ended barcode", TEST_GROUP) {
         HtsReader reader(bc_file.string());
         while (reader.read()) {
             auto seqlen = reader.record->core.l_qseq;
-            std::string seq = utils::extract_sequence(reader.record.get(), seqlen);
+            std::string seq = utils::extract_sequence(reader.record.get());
             auto res = classifier.barcode(seq, false, std::nullopt);
             if (res.adapter_name == "unclassified") {
                 CHECK(bc == res.adapter_name);
@@ -86,7 +86,7 @@ TEST_CASE("BarcodeClassifier: test double ended barcode", TEST_GROUP) {
         HtsReader reader(bc_file.string());
         while (reader.read()) {
             auto seqlen = reader.record->core.l_qseq;
-            std::string seq = utils::extract_sequence(reader.record.get(), seqlen);
+            std::string seq = utils::extract_sequence(reader.record.get());
             auto res = classifier.barcode(seq, false, std::nullopt);
             if (res.adapter_name == "unclassified") {
                 CHECK(bc == res.adapter_name);
@@ -115,7 +115,7 @@ TEST_CASE("BarcodeClassifier: test double ended barcode with different variants"
         HtsReader reader(bc_file.string());
         while (reader.read()) {
             auto seqlen = reader.record->core.l_qseq;
-            std::string seq = utils::extract_sequence(reader.record.get(), seqlen);
+            std::string seq = utils::extract_sequence(reader.record.get());
             auto res = classifier.barcode(seq, false, std::nullopt);
             if (res.adapter_name == "unclassified") {
                 CHECK(bc == res.adapter_name);
@@ -143,7 +143,7 @@ TEST_CASE("BarcodeClassifier: check barcodes on both ends - failing case", TEST_
     HtsReader reader(bc_file.string());
     while (reader.read()) {
         auto seqlen = reader.record->core.l_qseq;
-        std::string seq = utils::extract_sequence(reader.record.get(), seqlen);
+        std::string seq = utils::extract_sequence(reader.record.get());
         auto single_end_res = classifier.barcode(seq, false, std::nullopt);
         auto double_end_res = classifier.barcode(seq, true, std::nullopt);
         CHECK(double_end_res.adapter_name == "unclassified");
@@ -161,7 +161,7 @@ TEST_CASE("BarcodeClassifier: check barcodes on both ends - passing case", TEST_
     HtsReader reader(bc_file.string());
     while (reader.read()) {
         auto seqlen = reader.record->core.l_qseq;
-        std::string seq = utils::extract_sequence(reader.record.get(), seqlen);
+        std::string seq = utils::extract_sequence(reader.record.get());
         auto single_end_res = classifier.barcode(seq, false, std::nullopt);
         auto double_end_res = classifier.barcode(seq, true, std::nullopt);
         CHECK(double_end_res.adapter_name == single_end_res.adapter_name);
@@ -287,10 +287,10 @@ TEST_CASE(
 
             CHECK_THAT(bam_aux2Z(bam_aux_get(rec, "BC")), Equals(expected_bc));
 
-            auto seq = dorado::utils::extract_sequence(rec, rec->core.l_qseq);
+            auto seq = dorado::utils::extract_sequence(rec);
             CHECK(nonbc_seq == seq);
 
-            auto qual = dorado::utils::extract_quality(rec, rec->core.l_qseq);
+            auto qual = dorado::utils::extract_quality(rec);
             CHECK(qual.size() == seq.length());
 
             auto [_, move_vals] = dorado::utils::extract_move_table(rec);
@@ -350,8 +350,7 @@ TEST_CASE("BarcodeClassifierNode: test reads where trim length == read length", 
     reader.read();
 
     // Fetch the original read before barcode trimming.
-    auto orig_seq =
-            dorado::utils::extract_sequence(reader.record.get(), reader.record.get()->core.l_qseq);
+    auto orig_seq = dorado::utils::extract_sequence(reader.record.get());
 
     pipeline->push_message(std::move(reader.record));
     pipeline->terminate(DefaultFlushOptions());
@@ -359,7 +358,7 @@ TEST_CASE("BarcodeClassifierNode: test reads where trim length == read length", 
     CHECK(messages.size() == 1);
 
     auto read = std::get<BamPtr>(std::move(messages[0]));
-    auto seq = dorado::utils::extract_sequence(read.get(), read.get()->core.l_qseq);
+    auto seq = dorado::utils::extract_sequence(read.get());
 
     // We don't expect any trimming to happen, so the original and final sequence must match.
     CHECK(seq == orig_seq);

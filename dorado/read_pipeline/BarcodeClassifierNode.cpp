@@ -164,8 +164,8 @@ BamPtr BarcodeClassifierNode::trim_barcode(BamPtr input,
     bam1_t* input_record = input.get();
 
     // Fetch components that need to be trimmed.
-    std::string seq = utils::extract_sequence(input_record, seqlen);
-    std::vector<uint8_t> qual = utils::extract_quality(input_record, seqlen);
+    std::string seq = utils::extract_sequence(input_record);
+    std::vector<uint8_t> qual = utils::extract_quality(input_record);
     auto [stride, move_vals] = utils::extract_move_table(input_record);
     int ts = bam_aux_get(input_record, "ts") ? bam_aux2i(bam_aux_get(input_record, "ts")) : 0;
     auto [modbase_str, modbase_probs] = utils::extract_modbase_info(input_record);
@@ -258,8 +258,7 @@ void BarcodeClassifierNode::barcode(BamPtr& read) {
     auto barcoder = m_barcoder_selector.get_barcoder(m_default_barcoding_info->kit_name);
 
     bam1_t* irecord = read.get();
-    int seqlen = irecord->core.l_qseq;
-    std::string seq = utils::extract_sequence(irecord, seqlen);
+    std::string seq = utils::extract_sequence(irecord);
 
     auto bc_res = barcoder->barcode(seq, m_default_barcoding_info->barcode_both_ends,
                                     m_default_barcoding_info->allowed_barcodes);
@@ -268,6 +267,7 @@ void BarcodeClassifierNode::barcode(BamPtr& read) {
     m_num_records++;
 
     if (m_default_barcoding_info->trim) {
+        int seqlen = irecord->core.l_qseq;
         read = trim_barcode(std::move(read), bc_res, seqlen);
     }
 }
