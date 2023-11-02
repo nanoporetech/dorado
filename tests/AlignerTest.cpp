@@ -51,10 +51,8 @@ TEST_CASE("AlignerTest: Check standard alignment", TEST_GROUP) {
     bam1_t* in_rec = reader.record.get();
 
     // Check input/output reads are matching.
-    std::string orig_read =
-            dorado::utils::convert_nt16_to_str(bam_get_seq(in_rec), in_rec->core.l_qseq);
-    std::string aligned_read =
-            dorado::utils::convert_nt16_to_str(bam_get_seq(rec), rec->core.l_qseq);
+    std::string orig_read = dorado::utils::extract_sequence(in_rec, in_rec->core.l_qseq);
+    std::string aligned_read = dorado::utils::extract_sequence(rec, rec->core.l_qseq);
 
     // Check quals are matching.
     std::vector<uint8_t> orig_qual(bam_get_qual(in_rec),
@@ -129,10 +127,8 @@ TEST_CASE("AlignerTest: Check reverse complement alignment", TEST_GROUP) {
     CHECK(rec->core.flag & 0x10);
 
     // Check read reverse complementing.
-    std::string orig_read =
-            dorado::utils::convert_nt16_to_str(bam_get_seq(in_rec), in_rec->core.l_qseq);
-    std::string aligned_read =
-            dorado::utils::convert_nt16_to_str(bam_get_seq(rec), rec->core.l_qseq);
+    std::string orig_read = dorado::utils::extract_sequence(in_rec, in_rec->core.l_qseq);
+    std::string aligned_read = dorado::utils::extract_sequence(rec, rec->core.l_qseq);
     CHECK(orig_read == dorado::utils::reverse_complement(aligned_read));
 
     // Check qual reversal.

@@ -59,8 +59,7 @@ TEST_CASE("BarcodeClassifier: test single ended barcode", TEST_GROUP) {
         HtsReader reader(bc_file.string());
         while (reader.read()) {
             auto seqlen = reader.record->core.l_qseq;
-            auto bseq = bam_get_seq(reader.record);
-            std::string seq = utils::convert_nt16_to_str(bseq, seqlen);
+            std::string seq = utils::extract_sequence(reader.record.get(), seqlen);
             auto res = classifier.barcode(seq, false, std::nullopt);
             if (res.adapter_name == "unclassified") {
                 CHECK(bc == res.adapter_name);
@@ -88,7 +87,7 @@ TEST_CASE("BarcodeClassifier: test double ended barcode", TEST_GROUP) {
         while (reader.read()) {
             auto seqlen = reader.record->core.l_qseq;
             auto bseq = bam_get_seq(reader.record);
-            std::string seq = utils::convert_nt16_to_str(bseq, seqlen);
+            std::string seq = utils::extract_sequence(reader.record.get(), seqlen);
             auto res = classifier.barcode(seq, false, std::nullopt);
             if (res.adapter_name == "unclassified") {
                 CHECK(bc == res.adapter_name);
@@ -117,8 +116,7 @@ TEST_CASE("BarcodeClassifier: test double ended barcode with different variants"
         HtsReader reader(bc_file.string());
         while (reader.read()) {
             auto seqlen = reader.record->core.l_qseq;
-            auto bseq = bam_get_seq(reader.record);
-            std::string seq = utils::convert_nt16_to_str(bseq, seqlen);
+            std::string seq = utils::extract_sequence(reader.record.get(), seqlen);
             auto res = classifier.barcode(seq, false, std::nullopt);
             if (res.adapter_name == "unclassified") {
                 CHECK(bc == res.adapter_name);
@@ -146,8 +144,7 @@ TEST_CASE("BarcodeClassifier: check barcodes on both ends - failing case", TEST_
     HtsReader reader(bc_file.string());
     while (reader.read()) {
         auto seqlen = reader.record->core.l_qseq;
-        auto bseq = bam_get_seq(reader.record);
-        std::string seq = utils::convert_nt16_to_str(bseq, seqlen);
+        std::string seq = utils::extract_sequence(reader.record.get(), seqlen);
         auto single_end_res = classifier.barcode(seq, false, std::nullopt);
         auto double_end_res = classifier.barcode(seq, true, std::nullopt);
         CHECK(double_end_res.adapter_name == "unclassified");
@@ -165,8 +162,7 @@ TEST_CASE("BarcodeClassifier: check barcodes on both ends - passing case", TEST_
     HtsReader reader(bc_file.string());
     while (reader.read()) {
         auto seqlen = reader.record->core.l_qseq;
-        auto bseq = bam_get_seq(reader.record);
-        std::string seq = utils::convert_nt16_to_str(bseq, seqlen);
+        std::string seq = utils::extract_sequence(reader.record.get(), seqlen);
         auto single_end_res = classifier.barcode(seq, false, std::nullopt);
         auto double_end_res = classifier.barcode(seq, true, std::nullopt);
         CHECK(double_end_res.adapter_name == single_end_res.adapter_name);

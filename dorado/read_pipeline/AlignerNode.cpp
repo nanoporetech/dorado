@@ -1,5 +1,6 @@
 #include "AlignerNode.h"
 
+#include "utils/bam_utils.h"
 #include "utils/sequence_utils.h"
 #include "utils/types.h"
 
@@ -198,8 +199,7 @@ std::vector<BamPtr> AlignerImpl::align(bam1_t* irecord, mm_tbuf_t* buf) {
     // get query name.
     std::string_view qname(bam_get_qname(irecord));
 
-    auto bseq = bam_get_seq(irecord);
-    std::string seq = utils::convert_nt16_to_str(bseq, seqlen);
+    std::string seq = utils::extract_sequence(irecord, seqlen);
     // Pre-generate reverse complement sequence.
     std::string seq_rev = utils::reverse_complement(seq);
 
