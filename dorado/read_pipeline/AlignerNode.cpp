@@ -203,7 +203,7 @@ std::vector<BamPtr> AlignerImpl::align(bam1_t* irecord, mm_tbuf_t* buf) {
 
     // Pre-generate reverse of quality string.
     std::vector<uint8_t> qual = utils::extract_quality(irecord);
-    std::vector<uint8_t> qual_rev = std::vector<uint8_t>(qual.rbegin(), qual.rend());
+    std::vector<uint8_t> qual_rev(qual.rbegin(), qual.rend());
 
     // do the mapping
     int hits = 0;

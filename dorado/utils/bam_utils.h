@@ -82,7 +82,7 @@ std::map<std::string, std::string> extract_pg_keys_from_hdr(const std::string fi
  * Extract the sequence string.
  *
  * @param input_record Record to fetch sequence from.
- * @return Vector of sequence quality.
+ * @return The sequence bases as a string.
  */
 std::string extract_sequence(bam1_t* input_record);
 

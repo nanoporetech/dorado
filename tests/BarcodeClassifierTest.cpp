@@ -142,7 +142,6 @@ TEST_CASE("BarcodeClassifier: check barcodes on both ends - failing case", TEST_
     auto bc_file = data_dir / "EXP-PBC096_barcode_both_ends_fail.fastq";
     HtsReader reader(bc_file.string());
     while (reader.read()) {
-        auto seqlen = reader.record->core.l_qseq;
         std::string seq = utils::extract_sequence(reader.record.get());
         auto single_end_res = classifier.barcode(seq, false, std::nullopt);
         auto double_end_res = classifier.barcode(seq, true, std::nullopt);
@@ -160,7 +159,6 @@ TEST_CASE("BarcodeClassifier: check barcodes on both ends - passing case", TEST_
     auto bc_file = data_dir / "EXP-PBC096_barcode_both_ends_pass.fastq";
     HtsReader reader(bc_file.string());
     while (reader.read()) {
-        auto seqlen = reader.record->core.l_qseq;
         std::string seq = utils::extract_sequence(reader.record.get());
         auto single_end_res = classifier.barcode(seq, false, std::nullopt);
         auto double_end_res = classifier.barcode(seq, true, std::nullopt);
