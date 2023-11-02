@@ -2,6 +2,15 @@
 
 #include <elzip/elzip.hpp>
 
+#ifndef _WIN32
+// Required for MSG_NOSIGNAL and SO_NOSIGPIPE
+#include <sys/socket.h>
+#include <sys/types.h>
+#endif
+
+#ifdef MSG_NOSIGNAL
+#define CPPHTTPLIB_SEND_FLAGS MSG_NOSIGNAL
+#endif
 #define CPPHTTPLIB_OPENSSL_SUPPORT
 #include <httplib.h>
 #include <spdlog/spdlog.h>
@@ -315,6 +324,15 @@ class ModelDownloader {
             spdlog::info("using proxy: {}:{}", proxy_url, proxy_port);
             http.set_proxy(proxy_url, proxy_port);
         }
+
+        http.set_socket_options([](socket_t sock) {
+#ifdef __APPLE__
+            // We'd rather an error than a SIGPIPE taking down the process.
+            int enabled = 1;
+            setsockopt(sock, SOL_SOCKET, SO_NOSIGPIPE, reinterpret_cast<char*>(&enabled),
+                       sizeof(enabled));
+#endif
+        });
 
         return http;
     }
