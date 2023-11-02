@@ -123,10 +123,10 @@ public:
         } else {
             std::unordered_map<int, int64_t> insize_map{
                     {96, 960}, {128, 1280}, {384, 2816}, {768, 9728}, {1024, 10240}};
-            crfmodel_bytes_per_chunk_timestep = insize_map[model_config.insize];
+            crfmodel_bytes_per_chunk_timestep = insize_map[model_config.lstm_size];
             if (crfmodel_bytes_per_chunk_timestep == 0) {
                 spdlog::warn("Auto batchsize detection failed. Unexpected model insize {}.",
-                             model_config.insize);
+                             model_config.lstm_size);
                 return granularity;
             }
         }
