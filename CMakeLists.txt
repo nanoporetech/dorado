@@ -295,7 +295,6 @@ target_link_libraries(dorado_lib
         htslib
         vbz_hdf_plugin
         edlib
-        date::date
         dorado_utils
     PRIVATE
         ${KOI_LIBRARIES}    
@@ -465,7 +464,6 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
             ${POD5_LIBRARIES}
             ${HDF5_C_LIBRARIES}
             ${CMAKE_DL_LIBS}
-            date::date
     )
 
     if(WIN32)

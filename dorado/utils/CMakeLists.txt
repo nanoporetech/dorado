@@ -33,6 +33,7 @@ add_library(dorado_utils
     stats.h
     tensor_utils.cpp
     tensor_utils.h
+    time_utils.cpp
     time_utils.h
     torch_utils.h
     trim.cpp
@@ -85,11 +86,11 @@ target_link_libraries(dorado_utils
     PUBLIC
         ${TORCH_LIBRARIES}
         edlib
-        date::date
         spdlog::spdlog
     PRIVATE
         minimap2
         OpenSSL::SSL
+        date::date
         htslib
 )
 
