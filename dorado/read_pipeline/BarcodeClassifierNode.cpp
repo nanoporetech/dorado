@@ -11,6 +11,7 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+#include <iostream>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -177,13 +178,22 @@ BamPtr BarcodeClassifierNode::trim_barcode(BamPtr input,
     ts += positions_trimmed * stride;
     auto [trimmed_modbase_str, trimmed_modbase_probs] =
             utils::trim_modbase_info(seq, modbase_str, modbase_probs, trim_interval);
+    auto n_cigar = input_record->core.n_cigar;
+    std::vector<uint32_t> ops;
+    if (n_cigar > 0) {
+        ops = utils::trim_cigar(n_cigar, bam_get_cigar(input_record), trim_interval);
+    }
+    uint32_t ref_pos_consumed =
+            ops.empty() ? 0
+                        : utils::ref_pos_consumed(n_cigar, bam_get_cigar(input_record),
+                                                  trim_interval.first);
 
     // Create a new bam record to hold the trimmed read.
     bam1_t* out_record = bam_init1();
     bam_set1(out_record, input_record->core.l_qname - input_record->core.l_extranul - 1,
              bam_get_qname(input_record), input_record->core.flag, input_record->core.tid,
-             input_record->core.pos, input_record->core.qual, input_record->core.n_cigar,
-             bam_get_cigar(input_record), input_record->core.mtid, input_record->core.mpos,
+             input_record->core.pos + ref_pos_consumed, input_record->core.qual, ops.size(),
+             !ops.empty() ? ops.data() : NULL, input_record->core.mtid, input_record->core.mpos,
              input_record->core.isize, trimmed_seq.size(), trimmed_seq.data(),
              trimmed_qual.empty() ? NULL : (char*)trimmed_qual.data(), bam_get_l_aux(input_record));
     memcpy(bam_get_aux(out_record), bam_get_aux(input_record), bam_get_l_aux(input_record));
