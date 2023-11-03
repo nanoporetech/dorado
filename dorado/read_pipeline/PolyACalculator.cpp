@@ -37,7 +37,8 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
                                             bool fwd,
                                             const dorado::SimplexRead& read,
                                             int num_samples_per_base,
-                                            bool is_rna) {
+                                            bool is_rna,
+                                            int min_base_count) {
     const c10::Half* signal = static_cast<c10::Half*>(read.read_common.raw_data.data_ptr());
     int signal_len = read.read_common.get_raw_data_samples();
 
@@ -120,32 +121,18 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
     spdlog::trace("found intervals {}", int_str);
 
     std::vector<std::pair<int, int>> filtered_intervals;
-    std::optional<std::pair<int, int>> signal_overlap_interval;
     std::copy_if(intervals.begin(), intervals.end(), std::back_inserter(filtered_intervals),
                  [&](auto& i) {
                      int interval_size = i.second - i.first;
                      // Filter out any small intervals.
-                     if (interval_size < (num_samples_per_base * 5)) {
+                     if (interval_size < (num_samples_per_base * min_base_count)) {
                          return false;
-                     }
-                     // In DNA if an interval is found which overlaps with the signal anchor that's a
-                     // very strong indication of the actual polyA signal.
-                     // For RNA this is not a good heuristic since we assume signal anchor is 0 so
-                     // the exact anchor location isn't high confidence.
-                     if (!is_rna && (i.first <= signal_anchor) && (signal_anchor <= i.second)) {
-                         signal_overlap_interval = i;
-                         return true;
                      }
                      // Only keep intervals that are close-ish to the signal anchor.
                      return (std::abs(signal_anchor - i.second) < interval_size ||
-                             std::abs(signal_anchor - i.first) < interval_size);
+                             std::abs(signal_anchor - i.first) < interval_size ||
+                             (i.first <= signal_anchor) && (signal_anchor <= i.second));
                  });
-
-    // If an interval is found that overlaps with the signal anchor,
-    // use that.
-    if (signal_overlap_interval.has_value()) {
-        return *signal_overlap_interval;
-    }
 
     int_str = "";
     for (auto in : filtered_intervals) {
@@ -321,18 +308,20 @@ void PolyACalculator::worker_thread() {
                          : determine_signal_anchor_and_strand_cdna(*read);
 
         if (signal_anchor >= 0) {
-            spdlog::debug("Strand {}; poly A/T signal anchor {}", fwd ? '+' : '-', signal_anchor);
+            spdlog::debug("{} Strand {}; poly A/T signal anchor {}", read->read_common.read_id,
+                          fwd ? '+' : '-', signal_anchor);
 
             auto num_samples_per_base = estimate_samples_per_base(*read, m_is_rna);
 
-            // Walk through signal
+            // Walk through signal. Require a minimum of length 5 poly-A since below that
+            // the current algorithm returns a lot of false intervals.
             auto [signal_start, signal_end] = determine_signal_bounds(
-                    signal_anchor, fwd, *read, num_samples_per_base, m_is_rna);
+                    signal_anchor, fwd, *read, num_samples_per_base, m_is_rna, trailing_Ts + 5);
 
             int num_bases = std::round(static_cast<float>(signal_end - signal_start) /
                                        num_samples_per_base) -
                             trailing_Ts;
-            if (num_bases > 0 && num_bases < kMaxTailLength) {
+            if (num_bases >= 0 && num_bases < kMaxTailLength) {
                 spdlog::debug(
                         "{} PolyA bases {}, signal anchor {} Signal range is {} {}, "
                         "samples/base {} trim {}",
