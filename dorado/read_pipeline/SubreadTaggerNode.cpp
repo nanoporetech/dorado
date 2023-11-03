@@ -120,6 +120,12 @@ SubreadTaggerNode::SubreadTaggerNode(int num_worker_threads, size_t max_reads)
     start_threads();
 }
 
+::dorado::stats::NamedStats SubreadTaggerNode::sample_stats() const {
+    ::dorado::stats::NamedStats stats = ::dorado::stats::from_obj(m_work_queue);
+
+    return stats;
+}
+
 void SubreadTaggerNode::start_threads() {
     for (int i = 0; i < m_num_worker_threads; ++i) {
         auto worker_thread = std::make_unique<std::thread>(&SubreadTaggerNode::worker_thread, this);
