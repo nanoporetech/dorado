@@ -223,8 +223,9 @@ void setup(std::vector<std::string> args,
     stats_callables.push_back(
             [&tracker](const stats::NamedStats& stats) { tracker.update_progress_bar(stats); });
     constexpr auto kStatsPeriod = 100ms;
+    const size_t max_stats_records = static_cast<size_t>(dump_stats_file.empty() ? 0 : 100000);
     auto stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
-            kStatsPeriod, stats_reporters, stats_callables);
+            kStatsPeriod, stats_reporters, stats_callables, max_stats_records);
 
     DataLoader loader(*pipeline, "cpu", thread_allocations.loader_threads, max_reads, read_list,
                       reads_already_processed);
