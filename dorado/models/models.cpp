@@ -327,7 +327,8 @@ class ModelDownloader {
 
         http.set_socket_options([](socket_t sock) {
 #ifdef __APPLE__
-            // We'd rather an error than a SIGPIPE taking down the process.
+            // Disable SIGPIPE signal generation since it takes down the entire process
+            // whereas we can more gracefully handle the EPIPE error.
             int enabled = 1;
             setsockopt(sock, SOL_SOCKET, SO_NOSIGPIPE, reinterpret_cast<char*>(&enabled),
                        sizeof(enabled));
