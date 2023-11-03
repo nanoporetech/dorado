@@ -46,7 +46,7 @@ TEST_CASE("AlignerTest: Check standard alignment", TEST_GROUP) {
     auto ref = aligner_test_dir / "target.fq";
     auto query = aligner_test_dir / "target.fq";
 
-    auto options = dorado::AlignerNode::dflt_options;
+    auto options = dorado::alignment::dflt_options;
     options.kmer_size = options.window_size = 15;
     options.index_batch_size = 1e9;
     dorado::HtsReader reader(query.string());
@@ -84,7 +84,7 @@ TEST_CASE("AlignerTest: Check supplementary alignment", TEST_GROUP) {
     auto ref = aligner_test_dir / "supplementary_aln_target.fa";
     auto query = aligner_test_dir / "supplementary_aln_query.fa";
 
-    auto options = dorado::AlignerNode::dflt_options;
+    auto options = dorado::alignment::dflt_options;
     options.kmer_size = options.window_size = 15;
     options.index_batch_size = 1e9;
     dorado::HtsReader reader(query.string());
@@ -121,7 +121,7 @@ TEST_CASE("AlignerTest: Check reverse complement alignment", TEST_GROUP) {
     auto ref = aligner_test_dir / "target.fq";
     auto query = aligner_test_dir / "rev_target.fq";
 
-    auto options = dorado::AlignerNode::dflt_options;
+    auto options = dorado::alignment::dflt_options;
     options.kmer_size = options.window_size = 15;
     options.index_batch_size = 1e9;
     dorado::HtsReader reader(query.string());
@@ -156,7 +156,7 @@ TEST_CASE("AlignerTest: Check dorado tags are retained", TEST_GROUP) {
     auto ref = aligner_test_dir / "basecall_target.fa";
     auto query = aligner_test_dir / "basecall.sam";
 
-    auto options = dorado::AlignerNode::dflt_options;
+    auto options = dorado::alignment::dflt_options;
     options.kmer_size = options.window_size = 15;
     options.index_batch_size = 1e9;
     dorado::HtsReader reader(query.string());
@@ -181,7 +181,7 @@ TEST_CASE("AlignerTest: Verify impact of updated aligner args", TEST_GROUP) {
 
     // Run alignment with one set of k/w.
     {
-        auto options = dorado::AlignerNode::dflt_options;
+        auto options = dorado::alignment::dflt_options;
         options.kmer_size = options.window_size = 28;
         options.index_batch_size = 1e9;
         dorado::HtsReader reader(query.string());
@@ -191,7 +191,7 @@ TEST_CASE("AlignerTest: Verify impact of updated aligner args", TEST_GROUP) {
 
     // Run alignment with another set of k/w.
     {
-        auto options = dorado::AlignerNode::dflt_options;
+        auto options = dorado::alignment::dflt_options;
         options.kmer_size = options.window_size = 5;
         options.index_batch_size = 1e9;
         dorado::HtsReader reader(query.string());
@@ -204,7 +204,7 @@ TEST_CASE("AlignerTest: Check AlignerNode crashes if multi index encountered", T
     fs::path aligner_test_dir = fs::path(get_aligner_data_dir());
     auto ref = aligner_test_dir / "long_target.fa";
 
-    auto options = dorado::AlignerNode::dflt_options;
+    auto options = dorado::alignment::dflt_options;
     options.kmer_size = options.window_size = 5;
     options.index_batch_size = 1e3;
     CHECK_THROWS(dorado::AlignerNode(ref.string(), options, 1));
@@ -217,8 +217,7 @@ SCENARIO("AlignerNode push SimplexRead", TEST_GROUP) {
         fs::path aligner_test_dir{get_aligner_data_dir()};
         auto ref = aligner_test_dir / "target.fq";
         std::vector<dorado::Message> messages;
-        auto pipeline =
-                create_pipeline(messages, ref.string(), dorado::AlignerNode::dflt_options, 2);
+        auto pipeline = create_pipeline(messages, ref.string(), dorado::alignment::dflt_options, 2);
 
         WHEN("push simplex read with no alignment matches to pipeline") {
             const std::string read_id{"aligner_node_test_simplex"};

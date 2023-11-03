@@ -60,7 +60,7 @@ void setup(std::vector<std::string> args,
            size_t min_qscore,
            std::string read_list_file_path,
            bool recursive_file_loading,
-           const AlignerNode::Minimap2Options& aligner_options,
+           const alignment::Minimap2Options& aligner_options,
            bool skip_model_compatibility_check,
            const std::string& dump_stats_file,
            const std::string& dump_stats_filter,
@@ -368,7 +368,7 @@ int basecaller(int argc, char* argv[]) {
             .help("Path to the sample sheet to use.")
             .default_value(std::string(""));
 
-    cli::add_minimap2_arguments(parser, AlignerNode::dflt_options);
+    cli::add_minimap2_arguments(parser, alignment::dflt_options);
     cli::add_internal_arguments(parser);
 
     // Add hidden arguments that only apply to simplex calling.
@@ -452,7 +452,7 @@ int basecaller(int argc, char* argv[]) {
               parser.visible.get<int>("--max-reads"), parser.visible.get<int>("--min-qscore"),
               parser.visible.get<std::string>("--read-ids"),
               parser.visible.get<bool>("--recursive"),
-              cli::process_minimap2_arguments(parser, AlignerNode::dflt_options),
+              cli::process_minimap2_arguments(parser, alignment::dflt_options),
               parser.hidden.get<bool>("--skip-model-compatibility-check"),
               parser.hidden.get<std::string>("--dump_stats_file"),
               parser.hidden.get<std::string>("--dump_stats_filter"),

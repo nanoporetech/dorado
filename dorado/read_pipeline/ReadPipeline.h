@@ -1,4 +1,5 @@
 #pragma once
+#include "ClientAccess.h"
 #include "utils/AsyncQueue.h"
 #include "utils/stats.h"
 #include "utils/types.h"
@@ -56,8 +57,10 @@ public:
     // A unique identifier for each input read
     // Split (duplex) reads have the read_tag of the parent (template) and their own subread_id
     uint64_t read_tag{0};
-    // The id of the client to which this read belongs. -1 in standalone mode
-    int32_t client_id{-1};
+
+    // Contains information about the client to which this read belongs, includes the client ID.
+    // By default it's a standalone implementation which has -1 as the id
+    std::shared_ptr<ClientAccess> client_access = std::make_shared<StandaloneClientAccess>();
 
     uint32_t mean_qscore_start_pos = 0;
 

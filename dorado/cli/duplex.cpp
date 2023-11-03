@@ -118,7 +118,7 @@ int duplex(int argc, char* argv[]) {
             .action([&](const auto&) { ++verbosity; })
             .append();
 
-    cli::add_minimap2_arguments(parser, AlignerNode::dflt_options);
+    cli::add_minimap2_arguments(parser, alignment::dflt_options);
     cli::add_internal_arguments(parser);
 
     try {
@@ -193,7 +193,7 @@ int duplex(int argc, char* argv[]) {
             hts_writer = pipeline_desc.add_node<HtsWriter>({}, "-", output_mode, 4, num_reads);
             converted_reads_sink = hts_writer;
         } else {
-            auto options = cli::process_minimap2_arguments(parser, AlignerNode::dflt_options);
+            auto options = cli::process_minimap2_arguments(parser, alignment::dflt_options);
             aligner = pipeline_desc.add_node<AlignerNode>({}, ref, options,
                                                           std::thread::hardware_concurrency());
             hts_writer = pipeline_desc.add_node<HtsWriter>({}, "-", output_mode, 4, num_reads);

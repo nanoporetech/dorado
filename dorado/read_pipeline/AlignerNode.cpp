@@ -1,5 +1,6 @@
 #include "AlignerNode.h"
 
+#include "Minimap2Index.h"
 #include "utils/PostCondition.h"
 #include "utils/sequence_utils.h"
 #include "utils/types.h"
@@ -88,10 +89,7 @@ const std::string UNMAPPED_SAM_LINE_STRIPPED{"\t4\t*\t0\t0\t*\t*\t0\t0\n"};
 
 class AlignerImpl {
 public:
-    AlignerImpl(const std::string& filename,
-                const AlignerNode::Minimap2Options& options,
-                size_t threads);
-    ~AlignerImpl();
+    AlignerImpl(const std::string& filename, const Minimap2Options& options, size_t threads);
 
     void add_tags(bam1_t*, const mm_reg1_t*, const std::string&, const mm_tbuf_t*);
     std::vector<BamPtr> align(bam1_t* record, mm_tbuf_t* buf);
@@ -100,100 +98,34 @@ public:
     AlignerNode::bam_header_sq_t get_sequence_records_for_header() const;
 
 private:
+    Minimap2Index m_minimap_index;
     size_t m_threads;
-    mm_idxopt_t m_idx_opt;
-    mm_mapopt_t m_map_opt;
-    mm_idx_t* m_index{nullptr};
-    mm_idx_reader_t* m_index_reader{nullptr};
 };
 
 AlignerImpl::AlignerImpl(const std::string& filename,
-                         const AlignerNode::Minimap2Options& options,
+                         const Minimap2Options& options,
                          size_t threads)
         : m_threads(threads) {
-    // Check if reference file exists.
-    if (!std::filesystem::exists(filename)) {
+    int num_index_construction_threads{options.print_aln_seq ? 1 : static_cast<int>(m_threads)};
+    switch (m_minimap_index.load(filename, options, num_index_construction_threads)) {
+    case IndexLoadResult::reference_file_not_found:
         throw std::runtime_error("AlignerNode reference path does not exist: " + filename);
+    case IndexLoadResult::validation_error:
+        throw std::runtime_error("AlignerNode validation error checking minimap options");
+    case IndexLoadResult::split_index_not_supported:
+        throw std::runtime_error(
+                "Dorado doesn't support split index for alignment. Please re-run with larger index "
+                "size.");
+    case IndexLoadResult::success:
+        break;
     }
-    // Initialize option structs.
-    mm_set_opt(0, &m_idx_opt, &m_map_opt);
-    // Setting options to map-ont default till relevant args are exposed.
-    mm_set_opt("map-ont", &m_idx_opt, &m_map_opt);
-
-    m_idx_opt.k = options.kmer_size;
-    m_idx_opt.w = options.window_size;
-    spdlog::info("> Index parameters input by user: kmer size={} and window size={}.", m_idx_opt.k,
-                 m_idx_opt.w);
-
-    m_idx_opt.batch_size = options.index_batch_size;
-    m_idx_opt.mini_batch_size = options.index_batch_size;
-    spdlog::info("> Index parameters input by user: batch size={} and mini batch size={}.",
-                 m_idx_opt.batch_size, m_idx_opt.mini_batch_size);
-
-    m_map_opt.bw = options.bandwidth;
-    m_map_opt.bw_long = options.bandwidth_long;
-    spdlog::info("> Map parameters input by user: bandwidth={} and bandwidth long={}.",
-                 m_map_opt.bw, m_map_opt.bw_long);
-
-    if (!options.print_secondary) {
-        m_map_opt.flag |= MM_F_NO_PRINT_2ND;
-    }
-    m_map_opt.best_n = options.best_n_secondary;
-    spdlog::info(
-            "> Map parameters input by user: don't print secondary={} and best n secondary={}.",
-            static_cast<bool>(m_map_opt.flag & MM_F_NO_PRINT_2ND), m_map_opt.best_n);
-
-    if (options.soft_clipping) {
-        m_map_opt.flag |= MM_F_SOFTCLIP;
-    }
-    if (options.secondary_seq) {
-        m_map_opt.flag |= MM_F_SECONDARY_SEQ;
-    }
-    spdlog::info("> Map parameters input by user: soft clipping={} and secondary seq={}.",
-                 static_cast<bool>(m_map_opt.flag & MM_F_SOFTCLIP),
-                 static_cast<bool>(m_map_opt.flag & MM_F_SECONDARY_SEQ));
 
     if (options.print_aln_seq) {
         mm_dbg_flag |= MM_DBG_PRINT_QNAME | MM_DBG_PRINT_ALN_SEQ;
-        m_threads = 1;
     }
     spdlog::debug("> Map parameters input by user: dbg print qname={} and aln seq={}.",
                   static_cast<bool>(mm_dbg_flag & MM_DBG_PRINT_QNAME),
                   static_cast<bool>(mm_dbg_flag & MM_DBG_PRINT_ALN_SEQ));
-
-    // Force cigar generation.
-    m_map_opt.flag |= MM_F_CIGAR;
-
-    mm_check_opt(&m_idx_opt, &m_map_opt);
-
-    m_index_reader = mm_idx_reader_open(filename.c_str(), &m_idx_opt, 0);
-    m_index = mm_idx_reader_read(m_index_reader, m_threads);
-    auto* split_index = mm_idx_reader_read(m_index_reader, m_threads);
-    if (split_index != nullptr) {
-        mm_idx_destroy(m_index);
-        mm_idx_destroy(split_index);
-        mm_idx_reader_close(m_index_reader);
-        throw std::runtime_error(
-                "Dorado doesn't support split index for alignment. Please re-run with larger index "
-                "size.");
-    }
-    mm_mapopt_update(&m_map_opt, m_index);
-
-    if (m_index->k != m_idx_opt.k || m_index->w != m_idx_opt.w) {
-        spdlog::warn(
-                "Indexing parameters mismatch prebuilt index: using paramateres kmer "
-                "size={} and window size={} from prebuilt index.",
-                m_index->k, m_index->w);
-    }
-
-    if (mm_verbose >= 3) {
-        mm_idx_stat(m_index);
-    }
-}
-
-AlignerImpl::~AlignerImpl() {
-    mm_idx_reader_close(m_index_reader);
-    mm_idx_destroy(m_index);
 }
 
 std::vector<BamPtr> AlignerImpl::align(bam1_t* irecord, mm_tbuf_t* buf) {
@@ -221,8 +153,10 @@ std::vector<BamPtr> AlignerImpl::align(bam1_t* irecord, mm_tbuf_t* buf) {
 
     // do the mapping
     int hits = 0;
+    auto mm_index = m_minimap_index.index();
+    const auto& mm_map_opts = m_minimap_index.mapping_options();
     mm_reg1_t* reg =
-            mm_map(m_index, seq.length(), seq.c_str(), &hits, buf, &m_map_opt, qname.data());
+            mm_map(mm_index, seq.length(), seq.c_str(), &hits, buf, &mm_map_opts, qname.data());
 
     // just return the input record
     if (hits == 0) {
@@ -245,14 +179,14 @@ std::vector<BamPtr> AlignerImpl::align(bam1_t* irecord, mm_tbuf_t* buf) {
             flag |= BAM_FSUPPLEMENTARY;
         }
 
-        if ((flag & BAM_FSECONDARY) && (m_map_opt.flag & MM_F_NO_PRINT_2ND))
+        if ((flag & BAM_FSECONDARY) && (mm_map_opts.flag & MM_F_NO_PRINT_2ND))
             continue;
 
-        const bool skip_seq_qual = !(m_map_opt.flag & MM_F_SOFTCLIP) && (flag & BAM_FSECONDARY) &&
-                                   !(m_map_opt.flag & MM_F_SECONDARY_SEQ);
+        const bool skip_seq_qual = !(mm_map_opts.flag & MM_F_SOFTCLIP) && (flag & BAM_FSECONDARY) &&
+                                   !(mm_map_opts.flag & MM_F_SECONDARY_SEQ);
         const bool use_hard_clip =
-                !(m_map_opt.flag & MM_F_SOFTCLIP) &&
-                (((flag & BAM_FSECONDARY) && (m_map_opt.flag & MM_F_SECONDARY_SEQ)) ||
+                !(mm_map_opts.flag & MM_F_SOFTCLIP) &&
+                (((flag & BAM_FSECONDARY) && (mm_map_opts.flag & MM_F_SECONDARY_SEQ)) ||
                  (flag & BAM_FSUPPLEMENTARY));
         const auto BAM_CCLIP = use_hard_clip ? BAM_CHARD_CLIP : BAM_CSOFT_CLIP;
 
@@ -343,7 +277,7 @@ std::vector<BamPtr> AlignerImpl::align(bam1_t* irecord, mm_tbuf_t* buf) {
 
         // Add new tags to match minimap2.
         add_tags(record, aln, seq, buf);
-        add_sa_tag(record, aln, reg, hits, j, l_seq, m_index, use_hard_clip);
+        add_sa_tag(record, aln, reg, hits, j, l_seq, mm_index, use_hard_clip);
 
         results.push_back(BamPtr(record));
     }
@@ -363,7 +297,8 @@ void AlignerImpl::align(dorado::SimplexRead& simplex_read, mm_tbuf_t* buffer) {
     query.l_seq = static_cast<int>(simplex_read.read_common.seq.length());
 
     int n_regs{};
-    mm_reg1_t* regs = mm_map(m_index, query.l_seq, query.seq, &n_regs, buffer, &m_map_opt, nullptr);
+    mm_reg1_t* regs = mm_map(m_minimap_index.index(), query.l_seq, query.seq, &n_regs, buffer,
+                             &m_minimap_index.mapping_options(), nullptr);
     auto post_condition = utils::PostCondition([regs] { free(regs); });
 
     std::string alignment_string{};
@@ -372,8 +307,8 @@ void AlignerImpl::align(dorado::SimplexRead& simplex_read, mm_tbuf_t* buffer) {
     }
     for (int reg_idx{0}; reg_idx < n_regs; ++reg_idx) {
         kstring_t alignment_line{0, 0, nullptr};
-        mm_write_sam3(&alignment_line, m_index, &query, 0, reg_idx, 1, &n_regs, &regs, NULL,
-                      MM_F_OUT_MD, -1);
+        mm_write_sam3(&alignment_line, m_minimap_index.index(), &query, 0, reg_idx, 1, &n_regs,
+                      &regs, NULL, MM_F_OUT_MD, -1);
         alignment_string += std::string(alignment_line.s, alignment_line.l) + "\n";
         free(alignment_line.s);
         free(regs[reg_idx].p);
@@ -383,8 +318,9 @@ void AlignerImpl::align(dorado::SimplexRead& simplex_read, mm_tbuf_t* buffer) {
 
 AlignerNode::bam_header_sq_t AlignerImpl::get_sequence_records_for_header() const {
     std::vector<std::pair<char*, uint32_t>> records;
-    for (int i = 0; i < m_index->n_seq; ++i) {
-        records.push_back(std::make_pair(m_index->seq[i].name, m_index->seq[i].len));
+    const auto mm_index = m_minimap_index.index();
+    for (int i = 0; i < mm_index->n_seq; ++i) {
+        records.push_back(std::make_pair(mm_index->seq[i].name, mm_index->seq[i].len));
     }
     return records;
 }
@@ -449,7 +385,7 @@ void AlignerImpl::add_tags(bam1_t* record,
     // MD
     char* md = NULL;
     int max_len = 0;
-    int md_len = mm_gen_MD(NULL, &md, &max_len, m_index, aln, seq.c_str());
+    int md_len = mm_gen_MD(NULL, &md, &max_len, m_minimap_index.index(), aln, seq.c_str());
     if (md_len > 0) {
         bam_aux_append(record, "MD", 'Z', md_len + 1, (uint8_t*)md);
     }
@@ -467,10 +403,19 @@ void AlignerImpl::add_tags(bam1_t* record,
 
 }  // namespace alignment
 
-AlignerNode::AlignerNode(const std::string& filename, const Minimap2Options& options, int threads)
+AlignerNode::AlignerNode(const std::string& filename,
+                         const alignment::Minimap2Options& options,
+                         int threads)
         : MessageSink(10000),
           m_threads(threads),
           m_aligner(std::make_unique<alignment::AlignerImpl>(filename, options, threads)) {
+    start_threads();
+}
+
+AlignerNode::AlignerNode(std::shared_ptr<alignment::IndexFileAccess> index_file_access, int threads)
+        : MessageSink(10000),
+          m_threads(threads),
+          m_index_file_access(std::move(index_file_access)) {
     start_threads();
 }
 

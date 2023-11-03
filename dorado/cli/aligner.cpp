@@ -61,7 +61,7 @@ int aligner(int argc, char* argv[]) {
             .action([&](const auto&) { ++verbosity; })
             .append();
 
-    cli::add_minimap2_arguments(parser, AlignerNode::dflt_options);
+    cli::add_minimap2_arguments(parser, alignment::dflt_options);
 
     try {
         cli::parse(parser, argc, argv);
@@ -81,7 +81,7 @@ int aligner(int argc, char* argv[]) {
     auto reads(parser.visible.get<std::vector<std::string>>("reads"));
     auto threads(parser.visible.get<int>("threads"));
     auto max_reads(parser.visible.get<int>("max-reads"));
-    auto options = cli::process_minimap2_arguments(parser, AlignerNode::dflt_options);
+    auto options = cli::process_minimap2_arguments(parser, alignment::dflt_options);
     threads = threads == 0 ? std::thread::hardware_concurrency() : threads;
     // The input thread is the total number of threads to use for dorado
     // alignment. Heuristically use 10% of threads for BAM generation and

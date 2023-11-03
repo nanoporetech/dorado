@@ -1,51 +1,31 @@
 #pragma once
 
+#include "Minimap2Index.h"
+#include "Minimap2Options.h"
 #include "ReadPipeline.h"
 
-#include <minimap.h>
-
+#include <map>
 #include <memory>
+#include <mutex>
 #include <string>
 
 namespace dorado::alignment {
 
-/// <summary>
-/// Index file loaded with specific index options
-/// </summary>
-class Aligner {
-    std::shared<mm_idx_t> m_index;
-    std::shared<mm_idxopt_t> m_index_options;
-    std::string m_reference_file;
+class IndexFileAccess {
+    std::mutex m_mutex{};
+    std::map<std::pair<std::string, Minimap2IndexOptions>, std::shared_ptr<Minimap2Index>>
+            m_index_lut{};
+
+    std::shared_ptr<Minimap2Index> get_index_impl(const std::string& file,
+                                                  const Minimap2IndexOptions& options);
 
 public:
-    align(BamPtr bam_ptr, const mm_mapopt_t* mapping_options);
-};
+    IndexLoadResult LoadIndex(const std::string& file,
+                              const Minimap2Options& options,
+                              int num_threads);
 
-struct Minimap2IndexOptions {
-    short kmer_size;
-    short window_size;
-    uint64_t index_batch_size;
-};
-
-class AbstractIndexLoader {
-public:
-    virtual bool load_index(const std::string& index_file,
-                            const Minimap2IndexOptions* index_options) = 0;
-    virtual void unload_index(const std::string& index_file,
-                              const Minimap2IndexOptions* index_options) = 0;
-};
-
-class Minimap2Aligner {
-public:
-    align(BamPtr bam_ptr, );
-};
-
-class IndexFileAccess : public AbstractIndexLoader {
-public:
-    bool load_index(const std::string& index_file,
-                    const Minimap2IndexOptions* index_options) override;
-    void unload_index(const std::string& index_file,
-                      const Minimap2IndexOptions* index_options) override;
+    std::shared_ptr<Minimap2Index> get_index(const std::string& file,
+                                             const Minimap2IndexOptions& options);
 };
 
 }  // namespace dorado::alignment
