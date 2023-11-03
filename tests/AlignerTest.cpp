@@ -245,12 +245,8 @@ SCENARIO("AlignerNode push SimplexRead", TEST_GROUP) {
 
             dorado::HtsReader reader(ref.string());
             reader.read();
-
-            auto bam_sequence = bam_get_seq(reader.record);
-            auto sequence_len = reader.record->core.l_qseq;
-            auto sequence = dorado::utils::convert_nt16_to_str(bam_sequence, sequence_len);
+            auto sequence = dorado::utils::extract_sequence(reader.record.get());
             simplex_read->read_common.seq = sequence;
-
             simplex_read->read_common.read_id = read_id;
 
             pipeline->push_message(std::move(simplex_read));
