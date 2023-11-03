@@ -73,7 +73,7 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
 
     int left_end = is_rna ? std::max(0, signal_anchor - 50) : std::max(0, signal_anchor - kSpread);
     int right_end = std::min(signal_len, signal_anchor + kSpread);
-    spdlog::debug("Bounds left {}, right {}", left_end, right_end);
+    spdlog::trace("Bounds left {}, right {}", left_end, right_end);
 
     const int kStride = 3;
     for (int s = left_end; s < right_end; s += kStride) {
@@ -128,7 +128,11 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
                      if (interval_size < (num_samples_per_base * 5)) {
                          return false;
                      }
-                     if ((i.first <= signal_anchor) && (signal_anchor <= i.second)) {
+                     // In DNA if an interval is found which overlaps with the signal anchor that's a
+                     // very strong indication of the actual polyA signal.
+                     // For RNA this is not a good heuristic since we assume signal anchor is 0 so
+                     // the exact anchor location isn't high confidence.
+                     if (!is_rna && (i.first <= signal_anchor) && (signal_anchor <= i.second)) {
                          signal_overlap_interval = i;
                          return true;
                      }
@@ -150,7 +154,7 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
     spdlog::trace("filtered intervals {}", int_str);
 
     if (filtered_intervals.empty()) {
-        spdlog::debug("Anchor {} No range within anchor proximity found", signal_anchor);
+        spdlog::trace("Anchor {} No range within anchor proximity found", signal_anchor);
         return {0, 0};
     }
 
@@ -173,26 +177,41 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
                                               }
                                           });
 
-    spdlog::debug("Anchor {} Range {} {}", signal_anchor, best_interval->first,
+    spdlog::trace("Anchor {} Range {} {}", signal_anchor, best_interval->first,
                   best_interval->second);
     return *best_interval;
 }
 
-// Estimate the number of samples per base. For RNA, use the last 100 bases
-// to get a measure of samples/base. For DNA, just taking the average across
-// the whole read gives a decent estimate.
+// Estimate the number of samples per base.
+// For RNA, use the mean of 10-90th percentile samples/base estimated from
+// the move table.
+// For DNA, just take the median samples/base estimated from the move table.
 int estimate_samples_per_base(const dorado::SimplexRead& read, bool is_rna) {
     const size_t num_bases = read.read_common.seq.length();
     const auto num_samples = read.read_common.get_raw_data_samples();
     const auto stride = read.read_common.model_stride;
     const auto seq_to_sig_map =
             dorado::utils::moves_to_map(read.read_common.moves, stride, num_samples, num_bases + 1);
+    // Store the samples per base in float to use the quantile calcuation function.
     std::vector<float> sizes(seq_to_sig_map.size() - 1, 0.f);
     for (int i = 1; i < seq_to_sig_map.size(); i++) {
         sizes[i - 1] = static_cast<float>(seq_to_sig_map[i] - seq_to_sig_map[i - 1]);
     }
-    auto quantiles = dorado::utils::quantiles(sizes, {0.5});
-    return std::floor(static_cast<float>(quantiles[0]));
+    if (is_rna) {
+        auto quantiles = dorado::utils::quantiles(sizes, {0.1, 0.9});
+        float sum = 0.f;
+        int count = 0;
+        for (auto s : sizes) {
+            if (s >= quantiles[0] && s <= quantiles[1]) {
+                sum += s;
+                count++;
+            }
+        }
+        return std::round(sum / count);
+    } else {
+        auto quantiles = dorado::utils::quantiles(sizes, {0.5});
+        return std::floor(static_cast<float>(quantiles[0]));
+    }
 }
 
 // In order to find the approximate location of the start/end (anchor) of the polyA
@@ -233,7 +252,7 @@ SignalAnchorInfo determine_signal_anchor_and_strand_cdna(const dorado::SimplexRe
                                             read_bottom.length(), align_config);
 
     int dist_v2 = top_v2.editDistance + bottom_v2.editDistance;
-    spdlog::debug("v1 dist {}, v2 dist {}", dist_v1, dist_v2);
+    spdlog::trace("v1 dist {}, v2 dist {}", dist_v1, dist_v2);
 
     bool fwd = dist_v1 < dist_v2;
     bool proceed = std::min(dist_v1, dist_v2) < 30 && std::abs(dist_v1 - dist_v2) > 10;
@@ -256,7 +275,7 @@ SignalAnchorInfo determine_signal_anchor_and_strand_cdna(const dorado::SimplexRe
         int signal_anchor = seq_to_sig_map[base_anchor];
 
         result = {fwd, signal_anchor, trailing_Ts};
-        spdlog::debug("Base anchor {}", base_anchor);
+        spdlog::trace("Base anchor {}", base_anchor);
     } else {
         spdlog::debug("{} primer edit distance too high {}", read.read_common.read_id,
                       std::min(dist_v1, dist_v2));

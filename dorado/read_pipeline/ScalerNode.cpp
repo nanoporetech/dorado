@@ -50,7 +50,7 @@ std::pair<float, float> ScalerNode::med_mad(const at::Tensor& x) {
 int determine_rna_adapter_pos(const dorado::SimplexRead& read, dorado::SampleType model_type) {
     assert(read.read_common.raw_data.dtype() == at::kShort);
     static const std::unordered_map<dorado::SampleType, int> kOffsetMap = {
-            {dorado::SampleType::RNA002, 4000}, {dorado::SampleType::RNA004, 1000}};
+            {dorado::SampleType::RNA002, 3500}, {dorado::SampleType::RNA004, 1000}};
     static const std::unordered_map<dorado::SampleType, int16_t> kAdapterCutoff = {
             {dorado::SampleType::RNA002, 550}, {dorado::SampleType::RNA004, 700}};
 
@@ -66,6 +66,7 @@ int determine_rna_adapter_pos(const dorado::SimplexRead& read, dorado::SampleTyp
 
     // Check the median value change over 5 windows.
     std::array<int16_t, 5> medians = {0, 0, 0, 0, 0};
+    std::array<int32_t, 5> window_pos = {0, 0, 0, 0, 0};
     int median_pos = 0;
     int break_point = 0;
     const int signal_start = kOffsetMap.at(model_type);
@@ -75,15 +76,24 @@ int determine_rna_adapter_pos(const dorado::SimplexRead& read, dorado::SampleTyp
                                    {static_cast<int>(std::min(kWindowSize, signal_len - i))},
                                    at::TensorOptions().dtype(at::kShort));
         int16_t median = slice.median().item<int16_t>();
-        medians[median_pos++ % medians.size()] = median;
+        medians[median_pos % medians.size()] = median;
+        // Since the medians are stored in a circular buffer, we need
+        // to store the actual window positions for the median values
+        // as well to check that maximum median value came from a window
+        // after that of the minimum median value.
+        window_pos[median_pos % window_pos.size()] = median_pos;
         auto minmax = std::minmax_element(medians.begin(), medians.end());
         int16_t min_median = *minmax.first;
         int16_t max_median = *minmax.second;
-        if ((median_pos > medians.size()) && (max_median > kMinMedianForRNASignal) &&
-            (max_median - min_median > kMedianDiff)) {
+        auto min_pos = std::distance(medians.begin(), minmax.first);
+        auto max_pos = std::distance(medians.begin(), minmax.second);
+        if ((median_pos >= medians.size()) && (max_median > kMinMedianForRNASignal) &&
+            (max_median - min_median > kMedianDiff) &&
+            (window_pos[max_pos] > window_pos[min_pos])) {
             break_point = i;
             break;
         }
+        ++median_pos;
     }
 
     return break_point;
