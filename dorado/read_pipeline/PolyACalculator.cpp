@@ -321,7 +321,7 @@ void PolyACalculator::worker_thread() {
             int num_bases = std::round(static_cast<float>(signal_end - signal_start) /
                                        num_samples_per_base) -
                             trailing_Ts;
-            if (num_bases >= 0 && num_bases < kMaxTailLength) {
+            if (num_bases > 0 && num_bases < kMaxTailLength) {
                 spdlog::debug(
                         "{} PolyA bases {}, signal anchor {} Signal range is {} {}, "
                         "samples/base {} trim {}",
