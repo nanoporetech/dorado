@@ -1,0 +1,29 @@
+[global_norm]
+state_len = 4
+
+[input]
+features = 1
+
+[labels]
+labels = [ "N", "A", "C", "G", "T",]
+
+[qscore]
+scale = 0.9356
+bias = -0.1721
+
+[model]
+package = "bonito.crf"
+
+[encoder]
+scale = 5.0
+rnn_type = "lstm"
+winlen = 19
+features = 384
+activation = "swish"
+stride = 5
+blank_score = 2.0
+
+[basecaller]
+batchsize = 512
+chunksize = 10000
+overlap = 500

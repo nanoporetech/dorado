@@ -106,6 +106,7 @@ private:
     std::atomic<int64_t> m_working_reads_size = 0;
     std::atomic<int64_t> m_num_bases_processed = 0;
     std::atomic<int64_t> m_num_samples_processed = 0;
+    std::atomic<int64_t> m_working_reads_signal_bytes = 0;
 };
 
 }  // namespace dorado

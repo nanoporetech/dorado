@@ -9,6 +9,7 @@
 #include "utils/stats.h"
 #include "utils/tensor_utils.h"
 
+#include <ATen/ATen.h>
 #include <nvtx3/nvtx3.hpp>
 #include <spdlog/spdlog.h>
 
@@ -22,7 +23,7 @@ constexpr auto FORCE_TIMEOUT = 100ms;
 
 struct ModBaseCallerNode::RemoraChunk {
     RemoraChunk(std::shared_ptr<WorkingRead> read,
-                torch::Tensor input_signal,
+                at::Tensor input_signal,
                 std::vector<int8_t> kmer_data,
                 size_t position)
             : working_read(std::move(read)),
@@ -31,7 +32,7 @@ struct ModBaseCallerNode::RemoraChunk {
               context_hit(position) {}
 
     std::shared_ptr<WorkingRead> working_read;
-    torch::Tensor signal;
+    at::Tensor signal;
     std::vector<int8_t> encoded_kmers;
     size_t context_hit;
     std::vector<float> scores;
@@ -142,7 +143,7 @@ void ModBaseCallerNode::init_modbase_info() {
 }
 
 void ModBaseCallerNode::input_worker_thread() {
-    torch::InferenceMode inference_mode_guard;
+    at::InferenceMode inference_mode_guard;
 
     Message message;
     while (get_input_message(message)) {
@@ -197,7 +198,7 @@ void ModBaseCallerNode::input_worker_thread() {
                 auto& params = runner->caller_params(caller_id);
                 auto signal = read->read_common.raw_data;
                 if (params.reverse_signal) {
-                    signal = torch::flip(signal, 0);
+                    signal = at::flip(signal, 0);
                     std::reverse(std::begin(seq_to_sig_map), std::end(seq_to_sig_map));
                     std::transform(std::begin(seq_to_sig_map), std::end(seq_to_sig_map),
                                    std::begin(seq_to_sig_map), [signal_len](auto signal_pos) {
@@ -223,12 +224,12 @@ void ModBaseCallerNode::input_worker_thread() {
                     nvtx3::scoped_range range{"create_chunk"};
                     auto slice = encoder.get_context(context_hit);
                     // signal
-                    auto input_signal = scaled_signal.index({torch::indexing::Slice(
+                    auto input_signal = scaled_signal.index({at::indexing::Slice(
                             slice.first_sample, slice.first_sample + slice.num_samples)});
                     if (slice.lead_samples_needed != 0 || slice.tail_samples_needed != 0) {
-                        input_signal = torch::constant_pad_nd(input_signal,
-                                                              {(int64_t)slice.lead_samples_needed,
-                                                               (int64_t)slice.tail_samples_needed});
+                        input_signal = at::constant_pad_nd(input_signal,
+                                                           {(int64_t)slice.lead_samples_needed,
+                                                            (int64_t)slice.tail_samples_needed});
                     }
                     chunks_to_enqueue.push_back(std::make_unique<RemoraChunk>(
                             working_read, input_signal, std::move(slice.data), context_hit));
@@ -277,7 +278,7 @@ void ModBaseCallerNode::input_worker_thread() {
 }
 
 void ModBaseCallerNode::modbasecall_worker_thread(size_t worker_id, size_t caller_id) {
-    torch::InferenceMode inference_mode_guard;
+    at::InferenceMode inference_mode_guard;
 
     auto& runner = m_runners[worker_id];
     auto& chunk_queue = m_chunk_queues[caller_id];
@@ -349,7 +350,7 @@ void ModBaseCallerNode::call_current_batch(
 
     // Convert results to float32 with one call and address via a raw pointer,
     // to avoid huge libtorch indexing overhead.
-    auto results_f32 = results.to(torch::kFloat32);
+    auto results_f32 = results.to(at::ScalarType::Float);
     assert(results_f32.is_contiguous());
     const auto* const results_f32_ptr = results_f32.data_ptr<float>();
 
@@ -368,7 +369,7 @@ void ModBaseCallerNode::call_current_batch(
 }
 
 void ModBaseCallerNode::output_worker_thread() {
-    torch::InferenceMode inference_mode_guard;
+    at::InferenceMode inference_mode_guard;
 
     // The m_processed_chunks lock is sufficiently contended that it's worth taking all
     // chunks available once we obtain it.

@@ -4,7 +4,6 @@
 
 #include <math.h>
 #include <spdlog/spdlog.h>
-#include <torch/torch.h>
 
 #include <algorithm>
 #include <array>
@@ -513,9 +512,9 @@ float beam_search(const T* const scores,
 }
 
 std::tuple<std::string, std::string, std::vector<uint8_t>> beam_search_decode(
-        const torch::Tensor& scores_t,
-        const torch::Tensor& back_guides_t,
-        const torch::Tensor& posts_t,
+        const at::Tensor& scores_t,
+        const at::Tensor& back_guides_t,
+        const at::Tensor& posts_t,
         size_t max_beam_width,
         float beam_cut,
         float fixed_stay_score,
@@ -530,7 +529,8 @@ std::tuple<std::string, std::string, std::vector<uint8_t>> beam_search_decode(
     }
 
     // Posterior probabilities and back guides must be floats regardless of scores type.
-    if (posts_t.dtype() != torch::kFloat32 || back_guides_t.dtype() != torch::kFloat32) {
+    if (posts_t.dtype() != at::ScalarType::Float ||
+        back_guides_t.dtype() != at::ScalarType::Float) {
         throw std::runtime_error(
                 "beam_search_decode: mismatched tensor types provided for posts and "
                 "guides");
@@ -547,7 +547,7 @@ std::tuple<std::string, std::string, std::vector<uint8_t>> beam_search_decode(
     std::vector<float> qual_data(num_blocks * NUM_BASES);
 
     const size_t scores_block_stride = scores_block_contig.stride(0);
-    if (scores_t.dtype() == torch::kFloat32) {
+    if (scores_t.dtype() == at::ScalarType::Float) {
         const auto scores = scores_block_contig.data_ptr<float>();
         const auto back_guides = back_guides_contig->data_ptr<float>();
         const auto posts = posts_contig->data_ptr<float>();
@@ -555,7 +555,7 @@ std::tuple<std::string, std::string, std::vector<uint8_t>> beam_search_decode(
         beam_search<float>(scores, scores_block_stride, back_guides, posts, num_state_bits,
                            num_blocks, max_beam_width, beam_cut, fixed_stay_score, states, moves,
                            qual_data, 1.0f);
-    } else if (scores_t.dtype() == torch::kInt8) {
+    } else if (scores_t.dtype() == at::kChar) {
         const auto scores = scores_block_contig.data_ptr<int8_t>();
         const auto back_guides = back_guides_contig->data_ptr<float>();
         const auto posts = posts_contig->data_ptr<float>();

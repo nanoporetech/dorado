@@ -1,6 +1,7 @@
 #include "AlignerNode.h"
 
 #include "utils/PostCondition.h"
+#include "utils/bam_utils.h"
 #include "utils/sequence_utils.h"
 #include "utils/types.h"
 
@@ -200,24 +201,17 @@ std::vector<BamPtr> AlignerImpl::align(bam1_t* irecord, mm_tbuf_t* buf) {
     // some where for the hits
     std::vector<BamPtr> results;
 
-    // get the sequence to map from the record
-    auto seqlen = irecord->core.l_qseq;
-
     // get query name.
     std::string_view qname(bam_get_qname(irecord));
 
-    auto bseq = bam_get_seq(irecord);
-    std::string seq = utils::convert_nt16_to_str(bseq, seqlen);
+    // get the sequence to map from the record
+    std::string seq = utils::extract_sequence(irecord);
     // Pre-generate reverse complement sequence.
     std::string seq_rev = utils::reverse_complement(seq);
 
     // Pre-generate reverse of quality string.
-    std::vector<uint8_t> qual;
-    std::vector<uint8_t> qual_rev;
-    if (bam_get_qual(irecord)) {
-        qual = std::vector<uint8_t>(bam_get_qual(irecord), bam_get_qual(irecord) + seqlen);
-        qual_rev = std::vector<uint8_t>(qual.rbegin(), qual.rend());
-    }
+    std::vector<uint8_t> qual = utils::extract_quality(irecord);
+    std::vector<uint8_t> qual_rev(qual.rbegin(), qual.rend());
 
     // do the mapping
     int hits = 0;

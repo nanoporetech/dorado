@@ -2,10 +2,9 @@
 #include "read_pipeline/HtsReader.h"
 #include "utils/bam_utils.h"
 #include "utils/log_utils.h"
+#include "utils/time_utils.h"
 
 #include <argparse.hpp>
-#include <date/date.h>
-#include <date/tz.h>
 #include <spdlog/spdlog.h>
 
 #include <cctype>
@@ -15,34 +14,6 @@
 namespace dorado {
 
 volatile sig_atomic_t interrupt = 0;
-
-// todo: move to time_utils after !273
-double time_difference_seconds(const std::string &timestamp1, const std::string &timestamp2) {
-    using namespace date;
-    using namespace std::chrono;
-    try {
-        std::istringstream ss1(timestamp1);
-        std::istringstream ss2(timestamp2);
-        sys_time<microseconds> time1, time2;
-        ss1 >> parse("%FT%T%Ez", time1);
-        ss2 >> parse("%FT%T%Ez", time2);
-        // If parsing with timezone offset failed, try parsing with 'Z' format
-        if (ss1.fail()) {
-            ss1.clear();
-            ss1.str(timestamp1);
-            ss1 >> parse("%FT%TZ", time1);
-        }
-        if (ss2.fail()) {
-            ss2.clear();
-            ss2.str(timestamp2);
-            ss2 >> parse("%FT%TZ", time2);
-        }
-        duration<double> diff = time1 - time2;
-        return diff.count();
-    } catch (const std::exception &e) {
-        throw std::runtime_error("Failed to parse timestamps");
-    }
-}
 
 int summary(int argc, char *argv[]) {
     utils::InitLogging();
@@ -154,7 +125,7 @@ int summary(int argc, char *argv[]) {
         float sample_rate = num_samples / duration;
         float template_duration = (num_samples - trim_samples) / sample_rate;
         auto exp_start_dt = read_group_exp_start_time.at(rg_value);
-        auto start_time = time_difference_seconds(start_time_dt, exp_start_dt);
+        auto start_time = utils::time_difference_seconds(start_time_dt, exp_start_dt);
         auto template_start_time = start_time + (duration - template_duration);
 
         std::cout << filename << separator << read_id << separator << run_id << separator << channel

@@ -1,11 +1,12 @@
 #include "MessageSinkUtils.h"
 #include "TestUtils.h"
-#include "read_pipeline/DuplexSplitNode.h"
-#include "read_pipeline/NullNode.h"
 #include "read_pipeline/PairingNode.h"
 #include "read_pipeline/ReadPipeline.h"
+#include "read_pipeline/ReadSplitNode.h"
 #include "read_pipeline/StereoDuplexEncoderNode.h"
 #include "read_pipeline/SubreadTaggerNode.h"
+#include "splitter/DuplexReadSplitter.h"
+#include "splitter/ReadSplitter.h"
 
 #include <catch2/catch.hpp>
 #include <torch/torch.h>
@@ -45,7 +46,7 @@ auto make_read() {
     read->read_common.qstring = ReadFileIntoString(DataPath("qstring"));
     read->read_common.moves = ReadFileIntoVector(DataPath("moves"));
     torch::load(read->read_common.raw_data, DataPath("raw.tensor").string());
-    read->read_common.raw_data = read->read_common.raw_data.to(torch::kFloat16);
+    read->read_common.raw_data = read->read_common.raw_data.to(at::ScalarType::Half);
     read->read_common.read_tag = 42;
 
     read->prev_read = "prev";
@@ -58,8 +59,8 @@ auto make_read() {
 TEST_CASE("4 subread splitting test", TEST_GROUP) {
     auto read = make_read();
 
-    dorado::DuplexSplitSettings splitter_settings;
-    dorado::DuplexSplitNode splitter_node(splitter_settings, 1);
+    dorado::splitter::DuplexSplitSettings splitter_settings;
+    dorado::splitter::DuplexReadSplitter splitter_node(splitter_settings);
 
     const auto split_res = splitter_node.split(std::move(read));
     CHECK(split_res.size() == 4);
@@ -84,11 +85,17 @@ TEST_CASE("4 subread splitting test", TEST_GROUP) {
     CHECK(start_time_mss ==
           std::vector<uint64_t>{1676983561529, 1676983585837, 1676983599607, 1676983613105});
 
-    std::vector<uint64_t> num_sampless;
+    std::vector<uint64_t> num_samples;
     for (auto &r : split_res) {
-        num_sampless.push_back(r->read_common.attributes.num_samples);
+        num_samples.push_back(r->read_common.attributes.num_samples);
     }
-    CHECK(num_sampless == std::vector<uint64_t>{97125, 55055, 53940, 50475});
+    CHECK(num_samples == std::vector<uint64_t>{97125, 55055, 53940, 50475});
+
+    std::vector<uint32_t> split_points;
+    for (auto &r : split_res) {
+        split_points.push_back(r->read_common.split_point);
+    }
+    CHECK(split_points == std::vector<uint32_t>{0, 97230, 152310, 206305});
 
     std::set<std::string> names;
     for (auto &r : split_res) {
@@ -128,8 +135,10 @@ TEST_CASE("4 subread split tagging", TEST_GROUP) {
             dorado::DuplexPairingParameters{dorado::ReadOrder::BY_CHANNEL,
                                             dorado::DEFAULT_DUPLEX_CACHE_DEPTH},
             2, 1000);
-    auto splitter_node = pipeline_desc.add_node<dorado::DuplexSplitNode>(
-            {pairing_node}, dorado::DuplexSplitSettings{}, 1);
+    auto splitter = std::make_unique<const dorado::splitter::DuplexReadSplitter>(
+            dorado::splitter::DuplexSplitSettings{});
+    auto splitter_node =
+            pipeline_desc.add_node<dorado::ReadSplitNode>({pairing_node}, std::move(splitter), 1);
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
 
     pipeline->push_message(std::move(read));
@@ -184,14 +193,16 @@ TEST_CASE("No split output read properties", TEST_GROUP) {
     read->read_common.qstring = std::string(read->read_common.seq.length(), '!');
     read->read_common.moves = std::vector<uint8_t>(read->read_common.seq.length(), 1);
     read->read_common.raw_data =
-            torch::zeros(read->read_common.seq.length() * 10).to(torch::kFloat16);
+            at::zeros(read->read_common.seq.length() * 10).to(at::ScalarType::Half);
     read->read_common.read_tag = 42;
 
     dorado::PipelineDescriptor pipeline_desc;
     std::vector<dorado::Message> messages;
     auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 3, messages);
-    auto splitter_node = pipeline_desc.add_node<dorado::DuplexSplitNode>(
-            {sink}, dorado::DuplexSplitSettings{}, 1);
+    auto splitter = std::make_unique<dorado::splitter::DuplexReadSplitter>(
+            dorado::splitter::DuplexSplitSettings{});
+    auto splitter_node =
+            pipeline_desc.add_node<dorado::ReadSplitNode>({sink}, std::move(splitter), 1);
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
 
     pipeline->push_message(std::move(read));
@@ -232,14 +243,16 @@ TEST_CASE("Test split where only one subread is generated", TEST_GROUP) {
     read->read_common.qstring = ReadFileIntoString(data_dir / "qstring");
     read->read_common.moves = ReadFileIntoVector(data_dir / "moves");
     torch::load(read->read_common.raw_data, (data_dir / "raw.tensor").string());
-    read->read_common.raw_data = read->read_common.raw_data.to(torch::kFloat16);
+    read->read_common.raw_data = read->read_common.raw_data.to(at::ScalarType::Half);
     read->read_common.read_tag = 42;
     dorado::PipelineDescriptor pipeline_desc;
 
     std::vector<dorado::Message> messages;
     auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 3, messages);
-    auto splitter_node = pipeline_desc.add_node<dorado::DuplexSplitNode>(
-            {sink}, dorado::DuplexSplitSettings{}, 1);
+    auto splitter = std::make_unique<dorado::splitter::DuplexReadSplitter>(
+            dorado::splitter::DuplexSplitSettings{});
+    auto splitter_node =
+            pipeline_desc.add_node<dorado::ReadSplitNode>({sink}, std::move(splitter), 1);
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
 
     pipeline->push_message(std::move(read));

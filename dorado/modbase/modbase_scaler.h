@@ -1,6 +1,6 @@
 #pragma once
 
-#include <torch/torch.h>
+#include <ATen/core/TensorBody.h>
 
 #include <cstdint>
 #include <string>
@@ -38,7 +38,7 @@ private:
      *
      *  @return The new offset and scale values
      */
-    std::pair<float, float> calc_offset_scale(const torch::Tensor& samples,
+    std::pair<float, float> calc_offset_scale(const at::Tensor& samples,
                                               const std::vector<uint64_t>& seq_to_sig_map,
                                               const std::vector<float>& levels,
                                               size_t clip_bases = 10,
@@ -52,9 +52,9 @@ public:
      * @param seq_to_sig_map The indices of the samples corresponding to moves in the move table
      * @return The rescaled input signal
     */
-    torch::Tensor scale_signal(const torch::Tensor& signal,
-                               const std::vector<int>& seq_ints,
-                               const std::vector<uint64_t>& seq_to_sig_map) const;
+    at::Tensor scale_signal(const at::Tensor& signal,
+                            const std::vector<int>& seq_ints,
+                            const std::vector<uint64_t>& seq_to_sig_map) const;
 
     /** Scale calculator for v1 Remora-style modified base detection.
      *  @param kmer_levels A vector of expected signal levels per kmer.
