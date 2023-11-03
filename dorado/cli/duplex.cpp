@@ -177,6 +177,10 @@ int duplex(int argc, char* argv[]) {
 
         bool recursive_file_loading = parser.visible.get<bool>("--recursive");
 
+        const std::string dump_stats_file = parser.hidden.get<std::string>("--dump_stats_file");
+        const std::string dump_stats_filter = parser.hidden.get<std::string>("--dump_stats_filter");
+        const size_t max_stats_records = static_cast<size_t>(dump_stats_file.empty() ? 0 : 100000);
+
         size_t num_reads = (basespace_duplex ? read_list_from_pairs.size()
                                              : DataLoader::get_num_reads(reads, read_list, {},
                                                                          recursive_file_loading));
@@ -247,7 +251,7 @@ int duplex(int argc, char* argv[]) {
 
             constexpr auto kStatsPeriod = 100ms;
             stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
-                    kStatsPeriod, stats_reporters, stats_callables);
+                    kStatsPeriod, stats_reporters, stats_callables, max_stats_records);
         } else {  // Execute a Stereo Duplex pipeline.
 
             const auto model_path = std::filesystem::canonical(std::filesystem::path(model));
@@ -372,7 +376,7 @@ int duplex(int argc, char* argv[]) {
             DataLoader loader(*pipeline, "cpu", num_devices, 0, std::move(read_list));
 
             stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
-                    kStatsPeriod, stats_reporters, stats_callables);
+                    kStatsPeriod, stats_reporters, stats_callables, max_stats_records);
 
             // Run pipeline.
             loader.load_reads(reads, parser.visible.get<bool>("--recursive"),
@@ -388,6 +392,13 @@ int duplex(int argc, char* argv[]) {
 
         tracker.update_progress_bar(final_stats);
         tracker.summarize();
+        if (!dump_stats_file.empty()) {
+            std::ofstream stats_file(dump_stats_file);
+            stats_sampler->dump_stats(stats_file,
+                                      dump_stats_filter.empty()
+                                              ? std::nullopt
+                                              : std::optional<std::regex>(dump_stats_filter));
+        }
     } catch (const std::exception& e) {
         spdlog::error(e.what());
         return 1;
