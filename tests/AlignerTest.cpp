@@ -57,15 +57,12 @@ TEST_CASE("AlignerTest: Check standard alignment", TEST_GROUP) {
     bam1_t* in_rec = reader.record.get();
 
     // Check input/output reads are matching.
-    std::string orig_read =
-            dorado::utils::convert_nt16_to_str(bam_get_seq(in_rec), in_rec->core.l_qseq);
-    std::string aligned_read =
-            dorado::utils::convert_nt16_to_str(bam_get_seq(rec), rec->core.l_qseq);
+    std::string orig_read = dorado::utils::extract_sequence(in_rec);
+    std::string aligned_read = dorado::utils::extract_sequence(rec);
 
     // Check quals are matching.
-    std::vector<uint8_t> orig_qual(bam_get_qual(in_rec),
-                                   bam_get_qual(in_rec) + in_rec->core.l_qseq);
-    std::vector<uint8_t> aligned_qual(bam_get_qual(rec), bam_get_qual(rec) + rec->core.l_qseq);
+    std::vector<uint8_t> orig_qual = dorado::utils::extract_quality(in_rec);
+    std::vector<uint8_t> aligned_qual = dorado::utils::extract_quality(rec);
     CHECK(orig_qual == aligned_qual);
 
     // Check aux tags.
@@ -135,16 +132,13 @@ TEST_CASE("AlignerTest: Check reverse complement alignment", TEST_GROUP) {
     CHECK(rec->core.flag & 0x10);
 
     // Check read reverse complementing.
-    std::string orig_read =
-            dorado::utils::convert_nt16_to_str(bam_get_seq(in_rec), in_rec->core.l_qseq);
-    std::string aligned_read =
-            dorado::utils::convert_nt16_to_str(bam_get_seq(rec), rec->core.l_qseq);
+    std::string orig_read = dorado::utils::extract_sequence(in_rec);
+    std::string aligned_read = dorado::utils::extract_sequence(rec);
     CHECK(orig_read == dorado::utils::reverse_complement(aligned_read));
 
     // Check qual reversal.
-    std::vector<uint8_t> orig_qual(bam_get_qual(in_rec),
-                                   bam_get_qual(in_rec) + in_rec->core.l_qseq);
-    std::vector<uint8_t> aligned_qual(bam_get_qual(rec), bam_get_qual(rec) + rec->core.l_qseq);
+    std::vector<uint8_t> orig_qual = dorado::utils::extract_quality(in_rec);
+    std::vector<uint8_t> aligned_qual = dorado::utils::extract_quality(rec);
     std::reverse(aligned_qual.begin(), aligned_qual.end());
     CHECK(orig_qual == aligned_qual);
 }

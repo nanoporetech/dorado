@@ -4,8 +4,8 @@
 #include "utils/stats.h"
 #include "utils/types.h"
 
+#include <ATen/core/TensorBody.h>
 #include <spdlog/spdlog.h>
-#include <torch/torch.h>
 
 #include <cstdint>
 #include <limits>
@@ -32,7 +32,7 @@ struct Attributes {
 
 class ReadCommon {
 public:
-    torch::Tensor raw_data;  // Loaded from source file
+    at::Tensor raw_data;  // Loaded from source file
 
     int model_stride;  // The down sampling factor of the model
 
@@ -96,6 +96,7 @@ public:
     // (2) duplex pairs which share this read as the template read
     size_t subread_id{0};
     size_t split_count{1};
+    uint32_t split_point{0};
 
 private:
     void generate_duplex_read_tags(bam1_t*) const;

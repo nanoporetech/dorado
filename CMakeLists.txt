@@ -100,6 +100,14 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     endif()
 endif()
 
+# Bring in spdlog
+add_subdirectory(${DORADO_3RD_PARTY_SOURCE}/spdlog)
+# Avoid namespace clashes with static torch.
+target_compile_definitions(spdlog PUBLIC
+    "FMT_BEGIN_NAMESPACE=namespace fmt { inline namespace ont {"
+    "FMT_END_NAMESPACE=}}"
+)
+
 # ELZIP_DECOMPRESS_ONLY stops minizip from adding OpenSSL as a target, preventing use of three dylibs on osx.
 set(ELZIP_DECOMPRESS_ONLY ON)
 add_subdirectory(${DORADO_3RD_PARTY_SOURCE}/elzip)
@@ -169,8 +177,6 @@ set(LIB_SOURCE_FILES
     dorado/read_pipeline/SubreadTaggerNode.h
     dorado/read_pipeline/BaseSpaceDuplexCallerNode.cpp
     dorado/read_pipeline/BaseSpaceDuplexCallerNode.h
-    dorado/read_pipeline/DuplexSplitNode.cpp
-    dorado/read_pipeline/DuplexSplitNode.h
     dorado/read_pipeline/AlignerNode.cpp
     dorado/read_pipeline/AlignerNode.h
     dorado/read_pipeline/IndexFileAccess.cpp    
@@ -201,6 +207,14 @@ set(LIB_SOURCE_FILES
     dorado/read_pipeline/read_utils.h
     dorado/read_pipeline/stitch.cpp
     dorado/read_pipeline/stitch.h
+    dorado/read_pipeline/ReadSplitNode.cpp
+    dorado/read_pipeline/ReadSplitNode.h
+    dorado/splitter/DuplexReadSplitter.cpp
+    dorado/splitter/DuplexReadSplitter.h
+    dorado/splitter/RNAReadSplitter.cpp
+    dorado/splitter/RNAReadSplitter.h
+    dorado/splitter/splitter_utils.cpp
+    dorado/splitter/splitter_utils.h
     dorado/demux/BarcodeClassifier.cpp
     dorado/demux/BarcodeClassifier.h
     dorado/demux/BarcodeClassifierSelector.cpp
@@ -267,7 +281,6 @@ target_include_directories(dorado_lib
         ${DORADO_3RD_PARTY_SOURCE}/hdf_plugins/vbz_plugin
         ${DORADO_3RD_PARTY_SOURCE}/cxxpool/src
         ${DORADO_3RD_PARTY_SOURCE}/NVTX/c/include
-        ${DORADO_3RD_PARTY_SOURCE}/spdlog/include
         ${DORADO_3RD_PARTY_SOURCE}/indicators/include
 )
 
@@ -288,7 +301,6 @@ target_link_libraries(dorado_lib
         htslib
         vbz_hdf_plugin
         edlib
-        date::date
         dorado_utils
     PRIVATE
         ${KOI_LIBRARIES}    
@@ -458,7 +470,6 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
             ${POD5_LIBRARIES}
             ${HDF5_C_LIBRARIES}
             ${CMAKE_DL_LIBS}
-            date::date
     )
 
     if(WIN32)

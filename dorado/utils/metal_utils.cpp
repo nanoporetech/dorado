@@ -217,17 +217,17 @@ void launch_kernel_no_wait(ComputePipelineState *const pipeline,
 
 static NS::SharedPtr<MTL::Device> mtl_device;
 
-struct MTLAllocator : torch::Allocator {
+struct MTLAllocator : at::Allocator {
     virtual ~MTLAllocator() = default;
 
-    virtual torch::DataPtr allocate(size_t n) const {
+    virtual at::DataPtr allocate(size_t n) const {
         if (n == 0) {
-            return torch::DataPtr(nullptr, torch::DeviceType::CPU);
+            return at::DataPtr(nullptr, at::DeviceType::CPU);
         } else if (n >= (size_t(1) << 32)) {
-            return torch::DataPtr(new char[n], torch::DeviceType::CPU);
+            return at::DataPtr(new char[n], at::DeviceType::CPU);
         }
         auto buffer = mtl_device->newBuffer(n, MTL::ResourceStorageModeShared);
-        return torch::DataPtr(buffer->contents(), buffer, &deleter, torch::DeviceType::CPU);
+        return at::DataPtr(buffer->contents(), buffer, &deleter, at::DeviceType::CPU);
     }
 
     static void deleter(void *ptr) { ((MTL::Buffer *)ptr)->release(); }
@@ -237,7 +237,7 @@ static MTLAllocator mtl_allocator;
 NS::SharedPtr<MTL::Device> get_mtl_device() {
     if (!mtl_device) {
         mtl_device = NS::TransferPtr(MTL::CreateSystemDefaultDevice());
-        torch::SetAllocator(torch::DeviceType::CPU, &mtl_allocator);
+        at::SetAllocator(at::DeviceType::CPU, &mtl_allocator);
     }
     return mtl_device;
 }
@@ -309,7 +309,7 @@ int get_apple_cpu_perf_core_count() {
     return cpu_perf_core_count;
 }
 
-MTL::Buffer *mtl_for_tensor(const torch::Tensor &x) {
+MTL::Buffer *mtl_for_tensor(const at::Tensor &x) {
     // Metal kernels assume contiguity.
     if (!x.is_contiguous())
         throw std::runtime_error("Tensor is not contiguous");
@@ -318,7 +318,7 @@ MTL::Buffer *mtl_for_tensor(const torch::Tensor &x) {
     return ptr;
 }
 
-NS::SharedPtr<MTL::Buffer> extract_mtl_from_tensor(torch::Tensor &&x) {
+NS::SharedPtr<MTL::Buffer> extract_mtl_from_tensor(at::Tensor &&x) {
     auto bfr = NS::RetainPtr(mtl_for_tensor(x));
     x.reset();
     return bfr;

@@ -177,6 +177,7 @@ DEFINE_TEST(NodeSmokeTestRead, "ScalerNode") {
     });
 
     dorado::SignalNormalisationParams config;
+    config.strategy = dorado::ScalingStrategy::QUANTILE;
     config.quantile_a = 0.2;
     config.quantile_b = 0.9;
     config.shift_multiplier = 0.51;

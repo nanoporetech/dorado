@@ -1,0 +1,34 @@
+[model]
+package = "bonito.crf"
+
+[labels]
+labels = [ "N", "A", "C", "G", "T",]
+
+[input]
+features = 1
+
+[run_info]
+sample_rate = 3000
+
+[global_norm]
+state_len = 3
+
+[encoder]
+activation = "swish"
+stride = 5
+rnn_type = "lstm"
+features = 96
+scale = 5.0
+winlen = 19
+blank_score = 2.0
+
+[normalisation]
+quantile_a = 0.2
+quantile_b = 0.8
+shift_multiplier = 0.48
+scale_multiplier = 0.59
+
+
+[qscore]
+scale = 1.0
+bias = -1.6

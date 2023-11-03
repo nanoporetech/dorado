@@ -81,20 +81,18 @@ std::map<std::string, std::string> extract_pg_keys_from_hdr(const std::string fi
 /*
  * Extract the sequence string.
  *
- * @param input_record Record to fetch sequence from..
- * @param seqlen Sequence length.
- * @return Vector of sequence quality.
+ * @param input_record Record to fetch sequence from.
+ * @return The sequence bases as a string.
  */
-std::string extract_sequence(bam1_t* input_record, int seqlen);
+std::string extract_sequence(bam1_t* input_record);
 
 /*
  * Extract the sequence quality information.
  *
  * @param input_record Record to fetch quality from.
- * @param seqlen Sequence length.
  * @return Vector of sequence quality.
  */
-std::vector<uint8_t> extract_quality(bam1_t* input_record, int seqlen);
+std::vector<uint8_t> extract_quality(bam1_t* input_record);
 
 /*
  * Extract the move table from a record, if it exists.

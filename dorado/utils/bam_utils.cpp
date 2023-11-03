@@ -14,6 +14,26 @@
 #include <string>
 #include <string_view>
 
+#ifdef _WIN32
+// seq_nt16_str is referred to in the hts-3.lib stub on windows, but has not been declared dllimport for
+//  client code, so it comes up as an undefined reference when linking the stub.
+const char seq_nt16_str[] = "=ACMGRSVTWYHKDBN";
+#endif  // _WIN32
+
+namespace {
+
+// Convert the 4bit encoded sequence in a bam1_t structure
+// into a string.
+std::string convert_nt16_to_str(uint8_t* bseq, size_t slen) {
+    std::string seq(slen, '*');
+    for (int i = 0; i < slen; i++) {
+        seq[i] = seq_nt16_str[bam_seqi(bseq, i)];
+    }
+    return seq;
+}
+
+}  // namespace
+
 namespace dorado::utils {
 
 void add_rg_hdr(sam_hdr_t* hdr,
@@ -226,14 +246,16 @@ std::map<std::string, std::string> extract_pg_keys_from_hdr(const std::string fi
     return pg_keys;
 }
 
-std::string extract_sequence(bam1_t* input_record, int seqlen) {
+std::string extract_sequence(bam1_t* input_record) {
     auto bseq = bam_get_seq(input_record);
-    std::string seq = utils::convert_nt16_to_str(bseq, seqlen);
+    int seqlen = input_record->core.l_qseq;
+    std::string seq = convert_nt16_to_str(bseq, seqlen);
     return seq;
 }
 
-std::vector<uint8_t> extract_quality(bam1_t* input_record, int seqlen) {
+std::vector<uint8_t> extract_quality(bam1_t* input_record) {
     auto qual_aln = bam_get_qual(input_record);
+    int seqlen = input_record->core.l_qseq;
     std::vector<uint8_t> qual;
     if (qual_aln) {
         qual = std::vector<uint8_t>(bam_get_qual(input_record),

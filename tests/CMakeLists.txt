@@ -10,6 +10,7 @@ set(UNIT_TEST_SOURCE_FILES
     BarcodeClassifierTest.cpp
     BarcodeDemuxerNodeTest.cpp    
     CliUtilsTest.cpp
+    CRFModelConfigTest.cpp
     DriverQueryTest.cpp
     DuplexReadTaggingNodeTest.cpp
     DuplexSplitTest.cpp
@@ -24,6 +25,7 @@ set(UNIT_TEST_SOURCE_FILES
     PolyACalculatorTest.cpp
     ReadFilterNodeTest.cpp
     ReadTest.cpp
+    RNASplitTest.cpp
     ResumeLoaderTest.cpp
     SampleSheetTests.cpp
     SequenceUtilsTest.cpp
