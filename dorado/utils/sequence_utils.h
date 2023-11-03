@@ -31,10 +31,6 @@ std::vector<uint64_t> move_cum_sums(const std::vector<uint8_t>& moves);
 // Undefined output if characters other than A, C, G, T appear.
 std::string reverse_complement(const std::string& sequence);
 
-// Convert the 4bit encoded sequence in a bam1_t structure
-// into a string.
-std::string convert_nt16_to_str(uint8_t* bseq, size_t slen);
-
 class BaseInfo {
 public:
     static constexpr int NUM_BASES = 4;

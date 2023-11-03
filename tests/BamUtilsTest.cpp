@@ -141,10 +141,9 @@ TEST_CASE("BamUtilsTest: Test bam extraction helpers", TEST_GROUP) {
     HtsReader reader(sam.string());
     REQUIRE(reader.read());  // Parse first and only record.
     auto record = reader.record.get();
-    int seqlen = record->core.l_qseq;
 
     SECTION("Test sequence extraction") {
-        std::string seq = utils::extract_sequence(record, seqlen);
+        std::string seq = utils::extract_sequence(record);
         CHECK(seq ==
               "AATAAACCGAAGACAATTTAGAAGCCAGCGAGGTATGTGCGTCTACTTCGTTCGGTTATGCGAAGCCGATATAACCTGCAGGAC"
               "AACACAACATTTCCACTGTTTTCGTTCATTCGTAAACGCTTTCGCGTTCATCACACTCAACCATAGGCTTTAGCCAGAACGTTA"
@@ -161,7 +160,7 @@ TEST_CASE("BamUtilsTest: Test bam extraction helpers", TEST_GROUP) {
                 "0933))%&%&))*1739:666455116/"
                 "0,(%%&(*-55EBEB>@;??>>@BBDC?><<98-,,BGHEGFFGIIJFFDBB;6AJ>===KB:::<70/"
                 "..--,++,))+*)&&'*-,+*)))(%%&'&''%%%$&%$###$%%$$%'%%$$+1.--.7969....*)))";
-        auto qual_vector = utils::extract_quality(record, seqlen);
+        auto qual_vector = utils::extract_quality(record);
         CHECK(qual_vector.size() == qual.length());
         for (int i = 0; i < qual.length(); i++) {
             CHECK(qual[i] == qual_vector[i] + 33);
@@ -170,6 +169,7 @@ TEST_CASE("BamUtilsTest: Test bam extraction helpers", TEST_GROUP) {
 
     SECTION("Test move table extraction") {
         auto [stride, move_table] = utils::extract_move_table(record);
+        int seqlen = record->core.l_qseq;
         REQUIRE(!move_table.empty());
         CHECK(stride == 6);
         CHECK(seqlen == std::accumulate(move_table.begin(), move_table.end(), 0));

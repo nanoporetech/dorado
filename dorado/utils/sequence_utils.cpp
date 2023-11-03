@@ -2,7 +2,6 @@
 
 #include "simd.h"
 
-#include <htslib/sam.h>
 #include <nvtx3/nvtx3.hpp>
 
 #include <algorithm>
@@ -11,12 +10,6 @@
 #include <iterator>
 #include <numeric>
 #include <vector>
-
-#ifdef _WIN32
-// seq_nt16_str is referred to in the hts-3.lib stub on windows, but has not been declared dllimport for
-//  client code, so it comes up as an undefined reference when linking the stub.
-const char seq_nt16_str[] = "=ACMGRSVTWYHKDBN";
-#endif  // _WIN32
 
 namespace {
 
@@ -206,14 +199,6 @@ std::vector<uint64_t> move_cum_sums(const std::vector<uint8_t>& moves) {
 std::string reverse_complement(const std::string& sequence) {
     NVTX3_FUNC_RANGE();
     return reverse_complement_impl(sequence);
-}
-
-std::string convert_nt16_to_str(uint8_t* bseq, size_t slen) {
-    std::string seq(slen, '*');
-    for (int i = 0; i < slen; i++) {
-        seq[i] = seq_nt16_str[bam_seqi(bseq, i)];
-    }
-    return seq;
 }
 
 const std::vector<int> BaseInfo::BASE_IDS = []() {
