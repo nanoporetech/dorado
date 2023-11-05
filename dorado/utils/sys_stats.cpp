@@ -6,7 +6,7 @@
 namespace dorado {
 namespace stats {
 
-std::tuple<std::string, NamedStats> sys_stats_report() {
+ReportedStats sys_stats_report() {
     stats::NamedStats named_stats;
 #ifdef __linux__
     rusage usage;
