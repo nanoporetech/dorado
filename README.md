@@ -261,13 +261,13 @@ Below is a table of the available basecalling models and the modified basecallin
 
 ### **RNA models:**
 
-| Basecalling Models |
-| :-------- |
-| rna004_130bps_fast@v3.0.1 |
-| rna004_130bps_hac@v3.0.1 |
-| rna004_130bps_sup@v3.0.1 |
-| rna002_70bps_fast@v3 |
-| rna002_70bps_hac@v3 |
+| Basecalling Models | Compatible<br />Modifications | Modifications<br />Model<br />Version | Data<br />Sampling<br />Frequency |
+| :-------- | :------- | :--- | :--- |
+| **rna004_130bps_fast@v3.0.1** | 6mA_DRACH | v1 | 4 kHz |
+| **rna004_130bps_hac@v3.0.1** | | | |
+| **rna004_130bps_sup@v3.0.1** | | | |
+| rna002_70bps_fast@v3 | | | |
+| rna002_70bps_hac@v3 | | | |
 
 
 ## Developer quickstart
