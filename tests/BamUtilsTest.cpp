@@ -252,7 +252,7 @@ TEST_CASE("BamUtilsTest: Test trim CIGAR", TEST_GROUP) {
         CHECK(converted_str == "296M2D21M1D3M2D10M1I320M");
     }
 
-    free(a_cigar);
+    hts_free(a_cigar);
 }
 
 TEST_CASE("BamUtilsTest: Ref positions consumed", TEST_GROUP) {
