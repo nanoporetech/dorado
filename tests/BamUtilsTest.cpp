@@ -190,17 +190,21 @@ TEST_CASE("BamUtilsTest: cigar2str utility", TEST_GROUP) {
     const std::string cigar = "12S17M1D296M2D21M1D3M2D10M1I320M1D2237M41S";
     size_t m = 0;
     uint32_t *a_cigar = NULL;
-    char *end;
+    char *end = NULL;
     int n_cigar = sam_parse_cigar(cigar.c_str(), &end, &a_cigar, &m);
     std::string converted_str = utils::cigar2str(n_cigar, a_cigar);
     CHECK(cigar == converted_str);
+
+    if (a_cigar) {
+        hts_free(a_cigar);
+    }
 }
 
 TEST_CASE("BamUtilsTest: Test trim CIGAR", TEST_GROUP) {
     const std::string cigar = "12S17M1D296M2D21M1D3M2D10M1I320M1D2237M41S";
     size_t m = 0;
     uint32_t *a_cigar = NULL;
-    char *end;
+    char *end = NULL;
     int n_cigar = sam_parse_cigar(cigar.c_str(), &end, &a_cigar, &m);
     const uint32_t qlen = bam_cigar2qlen(n_cigar, a_cigar);
 
@@ -252,14 +256,16 @@ TEST_CASE("BamUtilsTest: Test trim CIGAR", TEST_GROUP) {
         CHECK(converted_str == "296M2D21M1D3M2D10M1I320M");
     }
 
-    hts_free(a_cigar);
+    if (a_cigar) {
+        hts_free(a_cigar);
+    }
 }
 
 TEST_CASE("BamUtilsTest: Ref positions consumed", TEST_GROUP) {
     const std::string cigar = "12S17M1D296M2D21M1D3M2D10M1I320M1D2237M41S";
     size_t m = 0;
     uint32_t *a_cigar = NULL;
-    char *end;
+    char *end = NULL;
     int n_cigar = sam_parse_cigar(cigar.c_str(), &end, &a_cigar, &m);
     const uint32_t qlen = bam_cigar2qlen(n_cigar, a_cigar);
 
@@ -281,5 +287,9 @@ TEST_CASE("BamUtilsTest: Ref positions consumed", TEST_GROUP) {
     SECTION("Match and delete positions consumed") {
         auto pos_consumed = utils::ref_pos_consumed(n_cigar, a_cigar, 29);
         CHECK(pos_consumed == 18);
+    }
+
+    if (a_cigar) {
+        hts_free(a_cigar);
     }
 }
