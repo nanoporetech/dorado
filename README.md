@@ -264,10 +264,10 @@ Below is a table of the available basecalling models and the modified basecallin
 | Basecalling Models | Compatible<br />Modifications | Modifications<br />Model<br />Version | Data<br />Sampling<br />Frequency |
 | :-------- | :------- | :--- | :--- |
 | **rna004_130bps_fast@v3.0.1** | 6mA_DRACH | v1 | 4 kHz |
-| **rna004_130bps_hac@v3.0.1** | | | |
-| **rna004_130bps_sup@v3.0.1** | | | |
-| rna002_70bps_fast@v3 | | | |
-| rna002_70bps_hac@v3 | | | |
+| **rna004_130bps_hac@v3.0.1** | N/A | N/A | 4 kHz |
+| **rna004_130bps_sup@v3.0.1** | N/A | N/A | 4 kHz |
+| rna002_70bps_fast@v3 | N/A | N/A | 3 kHz |
+| rna002_70bps_hac@v3 | N/A | N/A | 3 kHz |
 
 
 ## Developer quickstart
