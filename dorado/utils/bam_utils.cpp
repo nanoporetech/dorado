@@ -330,6 +330,8 @@ std::vector<uint32_t> trim_cigar(uint32_t n_cigar,
     for (int i = 0; i < n_cigar; i++) {
         const uint32_t op = bam_cigar_op(cigar[i]);
         const uint32_t oplen = bam_cigar_oplen(cigar[i]);
+        // According to htslib docs, bit 1 represents "consumes
+        // query" and bit 2 represents "consumes reference"
         auto type = std::bitset<2>(bam_cigar_type(op));
         if (type[0]) {
             // consumes query positions
@@ -376,7 +378,9 @@ std::vector<uint32_t> trim_cigar(uint32_t n_cigar,
     // need to be cleaned up.
     int last_pos = ops.size() - 1;
     for (; last_pos > 0; last_pos--) {
-        if (bam_cigar_type(ops[last_pos]) & 0b1) {
+        const uint32_t op = bam_cigar_op(ops[last_pos]);
+        auto type = std::bitset<2>(bam_cigar_type(op));
+        if (type[0]) {
             break;
         }
     }
