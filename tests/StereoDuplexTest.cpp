@@ -19,7 +19,7 @@ std::filesystem::path DataPath(std::string_view filename) {
 }  // namespace
 
 // Tests stereo encoder output for a real sample signal against known good output.
-TEST_CASE(TEST_GROUP "Encoder", "[.]") {
+TEST_CASE(TEST_GROUP "Encoder") {
     dorado::ReadPair::ReadData template_read{};
     {
         template_read.read_common.seq = ReadFileIntoString(DataPath("template_seq"));
