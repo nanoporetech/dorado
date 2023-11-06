@@ -18,6 +18,8 @@
 #include "utils/duplex_utils.h"
 #include "utils/log_utils.h"
 #include "utils/parameters.h"
+#include "utils/stats.h"
+#include "utils/sys_stats.h"
 #include "utils/torch_utils.h"
 #include "utils/types.h"
 
@@ -219,6 +221,8 @@ int duplex(int argc, char* argv[]) {
                 [&tracker](const stats::NamedStats& stats) { tracker.update_progress_bar(stats); });
         stats::NamedStats final_stats;
         std::unique_ptr<dorado::stats::StatsSampler> stats_sampler;
+        std::vector<dorado::stats::StatsReporter> stats_reporters{dorado::stats::sys_stats_report};
+
         std::unique_ptr<dorado::Pipeline> pipeline;
         constexpr auto kStatsPeriod = 100ms;
 
@@ -238,7 +242,6 @@ int duplex(int argc, char* argv[]) {
                     {read_filter_node}, std::move(template_complement_map), std::move(read_map),
                     threads);
 
-            std::vector<dorado::stats::StatsReporter> stats_reporters;
             pipeline = Pipeline::create(std::move(pipeline_desc), &stats_reporters);
             if (pipeline == nullptr) {
                 spdlog::error("Failed to create pipeline");
@@ -357,7 +360,6 @@ int duplex(int argc, char* argv[]) {
                     mean_qscore_start_pos, num_devices * 2, num_devices,
                     std::move(pairing_parameters), read_filter_node);
 
-            std::vector<dorado::stats::StatsReporter> stats_reporters;
             pipeline = Pipeline::create(std::move(pipeline_desc), &stats_reporters);
             if (pipeline == nullptr) {
                 spdlog::error("Failed to create pipeline");

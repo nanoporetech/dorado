@@ -16,7 +16,8 @@ namespace dorado {
 namespace stats {
 
 using NamedStats = std::unordered_map<std::string, double>;
-using StatsReporter = std::function<std::tuple<std::string, NamedStats>()>;
+using ReportedStats = std::tuple<std::string, NamedStats>;
+using StatsReporter = std::function<ReportedStats()>;
 using StatsCallable = std::function<void(const NamedStats&)>;
 
 class StatsSampler {
