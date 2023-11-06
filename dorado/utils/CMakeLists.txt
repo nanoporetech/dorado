@@ -87,12 +87,12 @@ target_include_directories(dorado_utils
 target_link_libraries(dorado_utils
     PUBLIC
         ${TORCH_LIBRARIES}
+        date::date
         edlib
         spdlog::spdlog
     PRIVATE
         minimap2
         OpenSSL::SSL
-        date::date
         htslib
 )
 
