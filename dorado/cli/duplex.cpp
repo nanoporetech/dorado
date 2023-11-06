@@ -18,6 +18,8 @@
 #include "utils/duplex_utils.h"
 #include "utils/log_utils.h"
 #include "utils/parameters.h"
+#include "utils/stats.h"
+#include "utils/sys_stats.h"
 #include "utils/torch_utils.h"
 #include "utils/types.h"
 
@@ -177,6 +179,10 @@ int duplex(int argc, char* argv[]) {
 
         bool recursive_file_loading = parser.visible.get<bool>("--recursive");
 
+        const std::string dump_stats_file = parser.hidden.get<std::string>("--dump_stats_file");
+        const std::string dump_stats_filter = parser.hidden.get<std::string>("--dump_stats_filter");
+        const size_t max_stats_records = static_cast<size_t>(dump_stats_file.empty() ? 0 : 100000);
+
         size_t num_reads = (basespace_duplex ? read_list_from_pairs.size()
                                              : DataLoader::get_num_reads(reads, read_list, {},
                                                                          recursive_file_loading));
@@ -216,6 +222,8 @@ int duplex(int argc, char* argv[]) {
                 [&tracker](const stats::NamedStats& stats) { tracker.update_progress_bar(stats); });
         stats::NamedStats final_stats;
         std::unique_ptr<dorado::stats::StatsSampler> stats_sampler;
+        std::vector<dorado::stats::StatsReporter> stats_reporters{dorado::stats::sys_stats_report};
+
         std::unique_ptr<dorado::Pipeline> pipeline;
         constexpr auto kStatsPeriod = 100ms;
 
@@ -235,7 +243,6 @@ int duplex(int argc, char* argv[]) {
                     {read_filter_node}, std::move(template_complement_map), std::move(read_map),
                     threads);
 
-            std::vector<dorado::stats::StatsReporter> stats_reporters;
             pipeline = Pipeline::create(std::move(pipeline_desc), &stats_reporters);
             if (pipeline == nullptr) {
                 spdlog::error("Failed to create pipeline");
@@ -248,7 +255,7 @@ int duplex(int argc, char* argv[]) {
 
             constexpr auto kStatsPeriod = 100ms;
             stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
-                    kStatsPeriod, stats_reporters, stats_callables);
+                    kStatsPeriod, stats_reporters, stats_callables, max_stats_records);
         } else {  // Execute a Stereo Duplex pipeline.
 
             const auto model_path = std::filesystem::canonical(std::filesystem::path(model));
@@ -354,7 +361,6 @@ int duplex(int argc, char* argv[]) {
                     mean_qscore_start_pos, num_devices * 2, num_devices,
                     std::move(pairing_parameters), read_filter_node);
 
-            std::vector<dorado::stats::StatsReporter> stats_reporters;
             pipeline = Pipeline::create(std::move(pipeline_desc), &stats_reporters);
             if (pipeline == nullptr) {
                 spdlog::error("Failed to create pipeline");
@@ -374,7 +380,7 @@ int duplex(int argc, char* argv[]) {
             DataLoader loader(*pipeline, "cpu", num_devices, 0, std::move(read_list));
 
             stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
-                    kStatsPeriod, stats_reporters, stats_callables);
+                    kStatsPeriod, stats_reporters, stats_callables, max_stats_records);
 
             // Run pipeline.
             loader.load_reads(reads, parser.visible.get<bool>("--recursive"),
@@ -390,6 +396,13 @@ int duplex(int argc, char* argv[]) {
 
         tracker.update_progress_bar(final_stats);
         tracker.summarize();
+        if (!dump_stats_file.empty()) {
+            std::ofstream stats_file(dump_stats_file);
+            stats_sampler->dump_stats(stats_file,
+                                      dump_stats_filter.empty()
+                                              ? std::nullopt
+                                              : std::optional<std::regex>(dump_stats_filter));
+        }
     } catch (const std::exception& e) {
         spdlog::error(e.what());
         return 1;

@@ -16,19 +16,23 @@ namespace dorado {
 namespace stats {
 
 using NamedStats = std::unordered_map<std::string, double>;
-using StatsReporter = std::function<std::tuple<std::string, NamedStats>()>;
+using ReportedStats = std::tuple<std::string, NamedStats>;
+using StatsReporter = std::function<ReportedStats()>;
 using StatsCallable = std::function<void(const NamedStats&)>;
 
 class StatsSampler {
 public:
-    // Takes 2 arguments
-    // - a vector of callable objects that will be periodically queried
-    //   to retrive stats. State to which they refer must outlive this object.
-    // - a vector of callable objects that are given the queried stats at
-    //   the same period. Useful for analysis or post processing of stats.
+    // sampling_period: time between instances of querying/informing/recording of stats.
+    // stats_reporters: a vector of callable objects that will be periodically queried
+    // to retrieve stats.  State to which they refer must outlive this object.
+    // stats_callables: a vector of callable objects that are given the queried stats at
+    // the same period.  Useful for analysis or post processing of stats.
+    // max_records: limits the number of sample records kept in memory that would be output
+    // via dump_stats.  Can be 0.
     StatsSampler(std::chrono::system_clock::duration sampling_period,
                  std::vector<StatsReporter> stats_reporters,
-                 std::vector<StatsCallable> stats_callables);
+                 std::vector<StatsCallable> stats_callables,
+                 size_t max_records);
 
     ~StatsSampler();
 
@@ -41,6 +45,7 @@ public:
 private:
     std::vector<StatsReporter> m_stats_reporters;  // Entities we monitor
     std::vector<StatsCallable> m_stats_callables;
+    size_t m_max_records = static_cast<size_t>(0);
     std::atomic<bool> m_should_terminate{false};
     std::chrono::system_clock::duration m_sampling_period;
     std::chrono::time_point<std::chrono::system_clock> m_start_time;

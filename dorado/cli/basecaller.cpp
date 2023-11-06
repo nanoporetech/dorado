@@ -22,6 +22,7 @@
 #include "utils/log_utils.h"
 #include "utils/parameters.h"
 #include "utils/stats.h"
+#include "utils/sys_stats.h"
 #include "utils/torch_utils.h"
 
 #include <argparse.hpp>
@@ -177,7 +178,7 @@ void setup(std::vector<std::string> args,
             thread_allocations.remora_threads * num_devices, current_sink_node);
 
     // Create the Pipeline from our description.
-    std::vector<dorado::stats::StatsReporter> stats_reporters;
+    std::vector<dorado::stats::StatsReporter> stats_reporters{dorado::stats::sys_stats_report};
     auto pipeline = Pipeline::create(std::move(pipeline_desc), &stats_reporters);
     if (pipeline == nullptr) {
         spdlog::error("Failed to create pipeline");
@@ -225,8 +226,9 @@ void setup(std::vector<std::string> args,
     stats_callables.push_back(
             [&tracker](const stats::NamedStats& stats) { tracker.update_progress_bar(stats); });
     constexpr auto kStatsPeriod = 100ms;
+    const size_t max_stats_records = static_cast<size_t>(dump_stats_file.empty() ? 0 : 100000);
     auto stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
-            kStatsPeriod, stats_reporters, stats_callables);
+            kStatsPeriod, stats_reporters, stats_callables, max_stats_records);
 
     DataLoader loader(*pipeline, "cpu", thread_allocations.loader_threads, max_reads, read_list,
                       reads_already_processed);
