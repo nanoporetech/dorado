@@ -2,18 +2,11 @@
 
 #include "alignment/Minimap2Aligner.h"
 #include "alignment/Minimap2Index.h"
-#include "utils/PostCondition.h"
-#include "utils/bam_utils.h"
-#include "utils/sequence_utils.h"
-#include "utils/types.h"
 
-#include <htslib/sam.h>
 #include <minimap.h>
-//todo: mmpriv.h is a private header from mm2 for the mm_event_identity function.
-//Ask lh3 t  make some of these funcs publicly available?
-#include <mmpriv.h>
 #include <spdlog/spdlog.h>
 
+#include <cassert>
 #include <filesystem>
 #include <string>
 #include <vector>
