@@ -23,18 +23,7 @@ struct SignalNormalisationParams {
     float scale_multiplier = 0.53f;
     ScalingStrategy strategy = ScalingStrategy::QUANTILE;
 
-    std::string to_string() const {
-        std::string str = "SignalNormalisationParams {";
-        str += " strategy:" + dorado::to_string(strategy);
-        if (strategy == ScalingStrategy::QUANTILE) {
-            str += " quantile_a:" + std::to_string(quantile_a);
-            str += " quantile_b:" + std::to_string(quantile_b);
-            str += " shift_multiplier:" + std::to_string(shift_multiplier);
-            str += " scale_multiplier:" + std::to_string(scale_multiplier);
-        }
-        str += "}";
-        return str;
-    }
+    std::string to_string() const;
 };
 
 struct ConvParams {
@@ -44,16 +33,7 @@ struct ConvParams {
     int stride = 1;
     Activation activation;
 
-    std::string to_string() const {
-        std::string str = "ConvParams {";
-        str += " insize:" + std::to_string(insize);
-        str += " size:" + std::to_string(size);
-        str += " winlen:" + std::to_string(winlen);
-        str += " stride:" + std::to_string(stride);
-        str += " activation:" + dorado::to_string(activation);
-        str += "}";
-        return str;
-    };
+    std::string to_string() const;
 };
 
 enum SampleType {
