@@ -13,9 +13,14 @@ struct bam1_t;
 
 namespace dorado {
 
+namespace alignment {
 class AlignerImpl;
 
-class Aligner : public MessageSink {
+// Exposed for testability
+extern const std::string UNMAPPED_SAM_LINE_STRIPPED;
+}  // namespace alignment
+
+class AlignerNode : public MessageSink {
 public:
     struct Minimap2Options {
         short kmer_size;
@@ -34,9 +39,9 @@ public:
 
 public:
     // header_sequence_records is populated by the constructor.
-    Aligner(const std::string& filename, const Minimap2Options& options, int threads);
-    ~Aligner();
-    std::string get_name() const override { return "Aligner"; }
+    AlignerNode(const std::string& filename, const Minimap2Options& options, int threads);
+    ~AlignerNode();
+    std::string get_name() const override { return "AlignerNode"; }
     stats::NamedStats sample_stats() const override;
     void terminate(const FlushOptions& flush_options) override { terminate_impl(); }
     void restart() override;
@@ -50,7 +55,7 @@ private:
     void worker_thread();
     size_t m_threads{1};
     std::vector<std::thread> m_workers;
-    std::unique_ptr<AlignerImpl> m_aligner;
+    std::unique_ptr<alignment::AlignerImpl> m_aligner;
 };
 
 }  // namespace dorado

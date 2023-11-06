@@ -1,5 +1,6 @@
 #include "AlignerNode.h"
 
+#include "utils/PostCondition.h"
 #include "utils/bam_utils.h"
 #include "utils/sequence_utils.h"
 #include "utils/types.h"
@@ -81,16 +82,23 @@ void add_sa_tag(bam1_t* record,
 
 namespace dorado {
 
+namespace alignment {
+
+// Stripped of the prefix QNAME and postfix SEQ + \t + QUAL
+const std::string UNMAPPED_SAM_LINE_STRIPPED{"\t4\t*\t0\t0\t*\t*\t0\t0\n"};
+
 class AlignerImpl {
 public:
     AlignerImpl(const std::string& filename,
-                const Aligner::Minimap2Options& options,
+                const AlignerNode::Minimap2Options& options,
                 size_t threads);
     ~AlignerImpl();
 
     void add_tags(bam1_t*, const mm_reg1_t*, const std::string&, const mm_tbuf_t*);
     std::vector<BamPtr> align(bam1_t* record, mm_tbuf_t* buf);
-    Aligner::bam_header_sq_t get_sequence_records_for_header() const;
+    void align(dorado::SimplexRead& simplex_read, mm_tbuf_t* buf);
+
+    AlignerNode::bam_header_sq_t get_sequence_records_for_header() const;
 
 private:
     size_t m_threads;
@@ -101,12 +109,12 @@ private:
 };
 
 AlignerImpl::AlignerImpl(const std::string& filename,
-                         const Aligner::Minimap2Options& options,
+                         const AlignerNode::Minimap2Options& options,
                          size_t threads)
         : m_threads(threads) {
     // Check if reference file exists.
     if (!std::filesystem::exists(filename)) {
-        throw std::runtime_error("Aligner reference path does not exist: " + filename);
+        throw std::runtime_error("AlignerNode reference path does not exist: " + filename);
     }
     // Initialize option structs.
     mm_set_opt(0, &m_idx_opt, &m_map_opt);
@@ -342,7 +350,32 @@ std::vector<BamPtr> AlignerImpl::align(bam1_t* irecord, mm_tbuf_t* buf) {
     return results;
 }
 
-Aligner::bam_header_sq_t AlignerImpl::get_sequence_records_for_header() const {
+void AlignerImpl::align(dorado::SimplexRead& simplex_read, mm_tbuf_t* buffer) {
+    mm_bseq1_t query{};
+    query.seq = const_cast<char*>(simplex_read.read_common.seq.c_str());
+    query.name = const_cast<char*>(simplex_read.read_common.read_id.c_str());
+    query.l_seq = static_cast<int>(simplex_read.read_common.seq.length());
+
+    int n_regs{};
+    mm_reg1_t* regs = mm_map(m_index, query.l_seq, query.seq, &n_regs, buffer, &m_map_opt, nullptr);
+    auto post_condition = utils::PostCondition([regs] { free(regs); });
+
+    std::string alignment_string{};
+    if (n_regs == 0) {
+        alignment_string = simplex_read.read_common.read_id + UNMAPPED_SAM_LINE_STRIPPED;
+    }
+    for (int reg_idx{0}; reg_idx < n_regs; ++reg_idx) {
+        kstring_t alignment_line{0, 0, nullptr};
+        mm_write_sam3(&alignment_line, m_index, &query, 0, reg_idx, 1, &n_regs, &regs, NULL,
+                      MM_F_OUT_MD, -1);
+        alignment_string += std::string(alignment_line.s, alignment_line.l) + "\n";
+        free(alignment_line.s);
+        free(regs[reg_idx].p);
+    }
+    simplex_read.read_common.alignment_string = alignment_string;
+}
+
+AlignerNode::bam_header_sq_t AlignerImpl::get_sequence_records_for_header() const {
     std::vector<std::pair<char*, uint32_t>> records;
     for (int i = 0; i < m_index->n_seq; ++i) {
         records.push_back(std::make_pair(m_index->seq[i].name, m_index->seq[i].len));
@@ -426,20 +459,22 @@ void AlignerImpl::add_tags(bam1_t* record,
     bam_aux_append(record, "rl", 'i', sizeof(buf->rep_len), (uint8_t*)&buf->rep_len);
 }
 
-Aligner::Aligner(const std::string& filename, const Minimap2Options& options, int threads)
+}  // namespace alignment
+
+AlignerNode::AlignerNode(const std::string& filename, const Minimap2Options& options, int threads)
         : MessageSink(10000),
           m_threads(threads),
-          m_aligner(std::make_unique<AlignerImpl>(filename, options, threads)) {
+          m_aligner(std::make_unique<alignment::AlignerImpl>(filename, options, threads)) {
     start_threads();
 }
 
-void Aligner::start_threads() {
+void AlignerNode::start_threads() {
     for (size_t i = 0; i < m_threads; i++) {
-        m_workers.push_back(std::thread(&Aligner::worker_thread, this));
+        m_workers.push_back(std::thread(&AlignerNode::worker_thread, this));
     }
 }
 
-void Aligner::terminate_impl() {
+void AlignerNode::terminate_impl() {
     terminate_input_queue();
     for (auto& m : m_workers) {
         if (m.joinable()) {
@@ -449,36 +484,39 @@ void Aligner::terminate_impl() {
     m_workers.clear();
 }
 
-void Aligner::restart() {
+void AlignerNode::restart() {
     restart_input_queue();
     start_threads();
 }
 
-Aligner::~Aligner() { terminate_impl(); }
+AlignerNode::~AlignerNode() { terminate_impl(); }
 
-Aligner::bam_header_sq_t Aligner::get_sequence_records_for_header() const {
+AlignerNode::bam_header_sq_t AlignerNode::get_sequence_records_for_header() const {
     return m_aligner->get_sequence_records_for_header();
 }
 
-void Aligner::worker_thread() {
+void AlignerNode::worker_thread() {
     Message message;
     mm_tbuf_t* tbuf = mm_tbuf_init();
     while (get_input_message(message)) {
-        // If this message isn't a BamPtr, just forward it to the sink.
-        if (!std::holds_alternative<BamPtr>(message)) {
+        if (std::holds_alternative<BamPtr>(message)) {
+            auto read = std::get<BamPtr>(std::move(message));
+            auto records = m_aligner->align(read.get(), tbuf);
+            for (auto& record : records) {
+                send_message_to_sink(std::move(record));
+            }
+        } else if (std::holds_alternative<SimplexReadPtr>(message)) {
+            auto read = std::get<SimplexReadPtr>(std::move(message));
+            m_aligner->align(*read, tbuf);
+            send_message_to_sink(std::move(read));
+        } else {
             send_message_to_sink(std::move(message));
             continue;
-        }
-
-        auto read = std::get<BamPtr>(std::move(message));
-        auto records = m_aligner->align(read.get(), tbuf);
-        for (auto& record : records) {
-            send_message_to_sink(std::move(record));
         }
     }
     mm_tbuf_destroy(tbuf);
 }
 
-stats::NamedStats Aligner::sample_stats() const { return stats::from_obj(m_work_queue); }
+stats::NamedStats AlignerNode::sample_stats() const { return stats::from_obj(m_work_queue); }
 
 }  // namespace dorado
