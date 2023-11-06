@@ -1,5 +1,8 @@
 #pragma once
 
+#include <cstdint>
+#include <tuple>
+
 namespace dorado::alignment {
 
 struct Minimap2IndexOptions {
