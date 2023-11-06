@@ -483,7 +483,7 @@ BarcodeScoreResult BarcodeClassifier::find_best_adapter(
     if (read_seq.length() < TRIM_LENGTH) {
         return UNCLASSIFIED;
     }
-    std::string fwd = read_seq;
+    const std::string_view fwd = read_seq;
 
     // First find best barcode kit.
     const AdapterSequence* as;
