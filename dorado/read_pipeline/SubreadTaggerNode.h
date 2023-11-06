@@ -17,6 +17,8 @@ class SubreadTaggerNode : public MessageSink {
 public:
     SubreadTaggerNode(int num_worker_threads = 1, size_t max_reads = 1000);
     ~SubreadTaggerNode() { terminate_impl(); }
+    std::string get_name() const override { return "SubreadTaggerNode"; }
+    ::dorado::stats::NamedStats sample_stats() const override;
     void terminate(const FlushOptions& flush_options) override { terminate_impl(); }
     void restart() override;
 
