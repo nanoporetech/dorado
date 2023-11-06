@@ -140,7 +140,9 @@ void setup(std::vector<std::string> args,
     auto aligner = PipelineDescriptor::InvalidNodeHandle;
     auto current_sink_node = hts_writer;
     if (enable_aligner) {
-        aligner = pipeline_desc.add_node<AlignerNode>({current_sink_node}, ref, aligner_options,
+        auto index_file_access = std::make_shared<alignment::IndexFileAccess>();
+        aligner = pipeline_desc.add_node<AlignerNode>({current_sink_node}, index_file_access, ref,
+                                                      aligner_options,
                                                       thread_allocations.aligner_threads);
         current_sink_node = aligner;
     }

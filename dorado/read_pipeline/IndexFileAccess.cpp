@@ -6,13 +6,12 @@ std::shared_ptr<Minimap2Index> IndexFileAccess::get_index_impl(
         const std::string& file,
         const Minimap2IndexOptions& options) {
     std::lock_guard<std::mutex> lock(m_mutex);
-    auto search = m_index_lut.find({file, options});
-    return search->second;
+    return m_index_lut[{file, options}];  // allow the creation of a null instance
 }
 
-IndexLoadResult IndexFileAccess::LoadIndex(const std::string& file,
-                                           const Minimap2Options& options,
-                                           int num_threads) {
+IndexLoadResult IndexFileAccess::load_index(const std::string& file,
+                                            const Minimap2Options& options,
+                                            int num_threads) {
     auto index = get_index_impl(file, options);
     if (index) {
         return IndexLoadResult::success;

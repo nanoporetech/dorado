@@ -20,9 +20,9 @@ class IndexFileAccess {
                                                   const Minimap2IndexOptions& options);
 
 public:
-    IndexLoadResult LoadIndex(const std::string& file,
-                              const Minimap2Options& options,
-                              int num_threads);
+    IndexLoadResult load_index(const std::string& file,
+                               const Minimap2Options& options,
+                               int num_threads);
 
     std::shared_ptr<Minimap2Index> get_index(const std::string& file,
                                              const Minimap2IndexOptions& options);

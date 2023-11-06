@@ -24,7 +24,8 @@ std::unique_ptr<dorado::Pipeline> create_pipeline(std::vector<dorado::Message>& 
                                                   Args&&... args) {
     dorado::PipelineDescriptor pipeline_desc;
     auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 100, output_messages);
-    auto aligner = pipeline_desc.add_node<dorado::AlignerNode>({sink}, args...);
+    auto index_file_access = std::make_shared<dorado::alignment::IndexFileAccess>();
+    auto aligner = pipeline_desc.add_node<dorado::AlignerNode>({sink}, index_file_access, args...);
     return dorado::Pipeline::create(std::move(pipeline_desc));
 }
 
@@ -201,7 +202,8 @@ TEST_CASE("AlignerTest: Check AlignerNode crashes if multi index encountered", T
     auto options = dorado::alignment::dflt_options;
     options.kmer_size = options.window_size = 5;
     options.index_batch_size = 1e3;
-    CHECK_THROWS(dorado::AlignerNode(ref.string(), options, 1));
+    auto index_file_access = std::make_shared<dorado::alignment::IndexFileAccess>();
+    CHECK_THROWS(dorado::AlignerNode(index_file_access, ref.string(), options, 1));
 }
 
 SCENARIO("AlignerNode push SimplexRead", TEST_GROUP) {

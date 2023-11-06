@@ -90,7 +90,8 @@ const std::string UNMAPPED_SAM_LINE_STRIPPED{"\t4\t*\t0\t0\t*\t*\t0\t0\n"};
 
 class AlignerImpl {
 public:
-    AlignerImpl(const std::string& filename, const Minimap2Options& options, size_t threads);
+    AlignerImpl(std::shared_ptr<Minimap2Index> minimap_index)
+            : m_minimap_index(std::move(minimap_index)) {}
 
     void add_tags(bam1_t*, const mm_reg1_t*, const std::string&, const mm_tbuf_t*);
     std::vector<BamPtr> align(bam1_t* record, mm_tbuf_t* buf);
@@ -99,35 +100,8 @@ public:
     AlignerNode::bam_header_sq_t get_sequence_records_for_header() const;
 
 private:
-    Minimap2Index m_minimap_index;
-    size_t m_threads;
+    std::shared_ptr<Minimap2Index> m_minimap_index;
 };
-
-AlignerImpl::AlignerImpl(const std::string& filename,
-                         const Minimap2Options& options,
-                         size_t threads)
-        : m_threads(threads) {
-    int num_index_construction_threads{options.print_aln_seq ? 1 : static_cast<int>(m_threads)};
-    switch (m_minimap_index.load(filename, options, num_index_construction_threads)) {
-    case IndexLoadResult::reference_file_not_found:
-        throw std::runtime_error("AlignerNode reference path does not exist: " + filename);
-    case IndexLoadResult::validation_error:
-        throw std::runtime_error("AlignerNode validation error checking minimap options");
-    case IndexLoadResult::split_index_not_supported:
-        throw std::runtime_error(
-                "Dorado doesn't support split index for alignment. Please re-run with larger index "
-                "size.");
-    case IndexLoadResult::success:
-        break;
-    }
-
-    if (options.print_aln_seq) {
-        mm_dbg_flag |= MM_DBG_PRINT_QNAME | MM_DBG_PRINT_ALN_SEQ;
-    }
-    spdlog::debug("> Map parameters input by user: dbg print qname={} and aln seq={}.",
-                  static_cast<bool>(mm_dbg_flag & MM_DBG_PRINT_QNAME),
-                  static_cast<bool>(mm_dbg_flag & MM_DBG_PRINT_ALN_SEQ));
-}
 
 std::vector<BamPtr> AlignerImpl::align(bam1_t* irecord, mm_tbuf_t* buf) {
     // some where for the hits
@@ -147,8 +121,8 @@ std::vector<BamPtr> AlignerImpl::align(bam1_t* irecord, mm_tbuf_t* buf) {
 
     // do the mapping
     int hits = 0;
-    auto mm_index = m_minimap_index.index();
-    const auto& mm_map_opts = m_minimap_index.mapping_options();
+    auto mm_index = m_minimap_index->index();
+    const auto& mm_map_opts = m_minimap_index->mapping_options();
     mm_reg1_t* reg =
             mm_map(mm_index, seq.length(), seq.c_str(), &hits, buf, &mm_map_opts, qname.data());
 
@@ -291,8 +265,8 @@ void AlignerImpl::align(dorado::SimplexRead& simplex_read, mm_tbuf_t* buffer) {
     query.l_seq = static_cast<int>(simplex_read.read_common.seq.length());
 
     int n_regs{};
-    mm_reg1_t* regs = mm_map(m_minimap_index.index(), query.l_seq, query.seq, &n_regs, buffer,
-                             &m_minimap_index.mapping_options(), nullptr);
+    mm_reg1_t* regs = mm_map(m_minimap_index->index(), query.l_seq, query.seq, &n_regs, buffer,
+                             &m_minimap_index->mapping_options(), nullptr);
     auto post_condition = utils::PostCondition([regs] { free(regs); });
 
     std::string alignment_string{};
@@ -301,7 +275,7 @@ void AlignerImpl::align(dorado::SimplexRead& simplex_read, mm_tbuf_t* buffer) {
     }
     for (int reg_idx{0}; reg_idx < n_regs; ++reg_idx) {
         kstring_t alignment_line{0, 0, nullptr};
-        mm_write_sam3(&alignment_line, m_minimap_index.index(), &query, 0, reg_idx, 1, &n_regs,
+        mm_write_sam3(&alignment_line, m_minimap_index->index(), &query, 0, reg_idx, 1, &n_regs,
                       &regs, NULL, MM_F_OUT_MD, -1);
         alignment_string += std::string(alignment_line.s, alignment_line.l) + "\n";
         free(alignment_line.s);
@@ -312,7 +286,7 @@ void AlignerImpl::align(dorado::SimplexRead& simplex_read, mm_tbuf_t* buffer) {
 
 AlignerNode::bam_header_sq_t AlignerImpl::get_sequence_records_for_header() const {
     std::vector<std::pair<char*, uint32_t>> records;
-    const auto mm_index = m_minimap_index.index();
+    const auto mm_index = m_minimap_index->index();
     for (int i = 0; i < mm_index->n_seq; ++i) {
         records.push_back(std::make_pair(mm_index->seq[i].name, mm_index->seq[i].len));
     }
@@ -379,7 +353,7 @@ void AlignerImpl::add_tags(bam1_t* record,
     // MD
     char* md = NULL;
     int max_len = 0;
-    int md_len = mm_gen_MD(NULL, &md, &max_len, m_minimap_index.index(), aln, seq.c_str());
+    int md_len = mm_gen_MD(NULL, &md, &max_len, m_minimap_index->index(), aln, seq.c_str());
     if (md_len > 0) {
         bam_aux_append(record, "MD", 'Z', md_len + 1, (uint8_t*)md);
     }
@@ -397,12 +371,14 @@ void AlignerImpl::add_tags(bam1_t* record,
 
 }  // namespace alignment
 
-AlignerNode::AlignerNode(const std::string& filename,
+AlignerNode::AlignerNode(std::shared_ptr<alignment::IndexFileAccess> index_file_access,
+                         const std::string& filename,
                          const alignment::Minimap2Options& options,
                          int threads)
         : MessageSink(10000),
           m_threads(threads),
-          m_aligner(std::make_unique<alignment::AlignerImpl>(filename, options, threads)) {
+          m_index_file_access(std::move(index_file_access)) {
+    set_bam_aligner(filename, options, threads);
     start_threads();
 }
 
@@ -411,6 +387,26 @@ AlignerNode::AlignerNode(std::shared_ptr<alignment::IndexFileAccess> index_file_
           m_threads(threads),
           m_index_file_access(std::move(index_file_access)) {
     start_threads();
+}
+
+void AlignerNode::set_bam_aligner(const std::string& filename,
+                                  const alignment::Minimap2Options& options,
+                                  int threads) {
+    int num_index_construction_threads{options.print_aln_seq ? 1 : static_cast<int>(m_threads)};
+    switch (m_index_file_access->load_index(filename, options, num_index_construction_threads)) {
+    case alignment::IndexLoadResult::reference_file_not_found:
+        throw std::runtime_error("AlignerNode reference path does not exist: " + filename);
+    case alignment::IndexLoadResult::validation_error:
+        throw std::runtime_error("AlignerNode validation error checking minimap options");
+    case alignment::IndexLoadResult::split_index_not_supported:
+        throw std::runtime_error(
+                "Dorado doesn't support split index for alignment. Please re-run with larger index "
+                "size.");
+    case alignment::IndexLoadResult::success:
+        break;
+    }
+    m_aligner = std::make_unique<alignment::AlignerImpl>(
+            m_index_file_access->get_index(filename, options));
 }
 
 void AlignerNode::start_threads() {

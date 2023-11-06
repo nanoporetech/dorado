@@ -3,6 +3,7 @@
 #include "read_pipeline/AlignerNode.h"
 #include "read_pipeline/HtsReader.h"
 #include "read_pipeline/HtsWriter.h"
+#include "read_pipeline/IndexFileAccess.h"
 #include "read_pipeline/ProgressTracker.h"
 #include "utils/bam_utils.h"
 #include "utils/log_utils.h"
@@ -114,8 +115,9 @@ int aligner(int argc, char* argv[]) {
     PipelineDescriptor pipeline_desc;
     auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, "-", HtsWriter::OutputMode::BAM,
                                                         writer_threads, 0);
-    auto aligner =
-            pipeline_desc.add_node<AlignerNode>({hts_writer}, index, options, aligner_threads);
+    auto index_file_access = std::make_shared<alignment::IndexFileAccess>();
+    auto aligner = pipeline_desc.add_node<AlignerNode>({hts_writer}, index_file_access, index,
+                                                       options, aligner_threads);
 
     // Create the Pipeline from our description.
     std::vector<dorado::stats::StatsReporter> stats_reporters;

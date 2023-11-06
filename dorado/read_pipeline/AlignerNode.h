@@ -25,8 +25,8 @@ extern const std::string UNMAPPED_SAM_LINE_STRIPPED;
 
 class AlignerNode : public MessageSink {
 public:
-    // header_sequence_records is populated by the constructor.
-    AlignerNode(const std::string& filename,
+    AlignerNode(std::shared_ptr<alignment::IndexFileAccess> index_file_access,
+                const std::string& filename,
                 const alignment::Minimap2Options& options,
                 int threads);
     AlignerNode(std::shared_ptr<alignment::IndexFileAccess> index_file_access, int threads);
@@ -43,6 +43,10 @@ private:
     void start_threads();
     void terminate_impl();
     void worker_thread();
+    void set_bam_aligner(const std::string& filename,
+                         const alignment::Minimap2Options& options,
+                         int threads);
+
     size_t m_threads;
     std::vector<std::thread> m_workers;
     std::unique_ptr<alignment::AlignerImpl> m_aligner{};

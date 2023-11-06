@@ -113,6 +113,13 @@ IndexLoadResult Minimap2Index::load(const std::string& index_file,
 
     mm_mapopt_update(&m_mapping_options, m_index.get());
 
+    if (options.print_aln_seq) {
+        mm_dbg_flag |= MM_DBG_PRINT_QNAME | MM_DBG_PRINT_ALN_SEQ;
+    }
+    spdlog::debug("> Map parameters input by user: dbg print qname={} and aln seq={}.",
+                  static_cast<bool>(mm_dbg_flag & MM_DBG_PRINT_QNAME),
+                  static_cast<bool>(mm_dbg_flag & MM_DBG_PRINT_ALN_SEQ));
+
     return IndexLoadResult::success;
 }
 }  // namespace dorado::alignment
