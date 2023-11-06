@@ -103,7 +103,7 @@ IndexLoadResult Minimap2Index::load(const std::string& index_file,
     set_index_options(options);
     set_mapping_options(options);
 
-    if (mm_check_opt(&m_index_options, &m_mapping_options) << 0) {
+    if (mm_check_opt(&m_index_options, &m_mapping_options) < 0) {
         return IndexLoadResult::validation_error;
     }
 
