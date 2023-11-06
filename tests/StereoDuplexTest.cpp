@@ -6,6 +6,7 @@
 #include <catch2/catch.hpp>
 #include <torch/torch.h>
 
+#include <algorithm>
 #include <filesystem>
 #include <vector>
 
