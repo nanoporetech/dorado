@@ -1,7 +1,7 @@
 #pragma once
-#include "IndexFileAccess.h"
-#include "Minimap2Options.h"
 #include "ReadPipeline.h"
+#include "alignment/IndexFileAccess.h"
+#include "alignment/Minimap2Options.h"
 #include "utils/stats.h"
 #include "utils/types.h"
 
@@ -16,11 +16,7 @@ struct bam1_t;
 namespace dorado {
 
 namespace alignment {
-class AlignerImpl;
-
-// Exposed for testability
-extern const std::string UNMAPPED_SAM_LINE_STRIPPED;
-
+class Minimap2Index;
 }  // namespace alignment
 
 class AlignerNode : public MessageSink {
@@ -36,20 +32,20 @@ public:
     void terminate(const FlushOptions& flush_options) override { terminate_impl(); }
     void restart() override;
 
-    using bam_header_sq_t = std::vector<std::pair<char*, uint32_t>>;
-    bam_header_sq_t get_sequence_records_for_header() const;
+    alignment::HeaderSquenceRecords get_sequence_records_for_header() const;
 
 private:
     void start_threads();
     void terminate_impl();
     void worker_thread();
-    void set_bam_aligner(const std::string& filename,
-                         const alignment::Minimap2Options& options,
-                         int threads);
+    void set_bam_index(const std::string& filename,
+                       const alignment::Minimap2Options& options,
+                       int threads);
+    std::shared_ptr<alignment::Minimap2Index> get_index(const ReadCommon& read_common);
 
     size_t m_threads;
     std::vector<std::thread> m_workers;
-    std::unique_ptr<alignment::AlignerImpl> m_aligner{};
+    std::shared_ptr<alignment::Minimap2Index> m_bam_index{};
     std::shared_ptr<alignment::IndexFileAccess> m_index_file_access{};
 };
 

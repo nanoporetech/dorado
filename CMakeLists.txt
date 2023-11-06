@@ -141,6 +141,13 @@ endif()
 configure_file(dorado/Version.h.in dorado/Version.h)
 
 set(LIB_SOURCE_FILES
+    dorado/alignment/IndexFileAccess.cpp
+    dorado/alignment/IndexFileAccess.h
+    dorado/alignment/Minimap2Aligner.cpp
+    dorado/alignment/Minimap2Aligner.h
+    dorado/alignment/Minimap2Index.cpp
+    dorado/alignment/Minimap2Index.h
+    dorado/alignment/Minimap2Options.h
     dorado/nn/CRFModel.h
     dorado/nn/CRFModel.cpp
     dorado/nn/CRFModelConfig.h
@@ -179,11 +186,6 @@ set(LIB_SOURCE_FILES
     dorado/read_pipeline/BaseSpaceDuplexCallerNode.h
     dorado/read_pipeline/AlignerNode.cpp
     dorado/read_pipeline/AlignerNode.h
-    dorado/read_pipeline/IndexFileAccess.cpp    
-    dorado/read_pipeline/IndexFileAccess.h    
-    dorado/read_pipeline/Minimap2Index.cpp
-    dorado/read_pipeline/Minimap2Index.h
-    dorado/read_pipeline/Minimap2Options.h
     dorado/read_pipeline/HtsReader.cpp
     dorado/read_pipeline/HtsReader.h
     dorado/read_pipeline/HtsWriter.cpp

@@ -4,8 +4,11 @@
 
 #include <minimap.h>
 
+#include <cstdint>
 #include <memory>
 #include <string>
+#include <utility>
+#include <vector>
 
 namespace dorado::alignment {
 
@@ -15,6 +18,8 @@ enum class IndexLoadResult {
     validation_error,
     success,
 };
+
+using HeaderSquenceRecords = std::vector<std::pair<char*, uint32_t>>;
 
 class Minimap2Index {
     struct IndexDeleter {
@@ -40,6 +45,8 @@ public:
     const mm_idx_t* index() const { return m_index.get(); }
     const mm_idxopt_t& index_options() const { return m_index_options; }
     const mm_mapopt_t& mapping_options() const { return m_mapping_options; }
+
+    HeaderSquenceRecords get_sequence_records_for_header() const;
 };
 
 }  // namespace dorado::alignment

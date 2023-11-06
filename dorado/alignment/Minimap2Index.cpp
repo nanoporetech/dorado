@@ -122,4 +122,13 @@ IndexLoadResult Minimap2Index::load(const std::string& index_file,
 
     return IndexLoadResult::success;
 }
+
+HeaderSquenceRecords Minimap2Index::get_sequence_records_for_header() const {
+    std::vector<std::pair<char*, uint32_t>> records;
+    for (int i = 0; i < m_index->n_seq; ++i) {
+        records.push_back(std::make_pair(m_index->seq[i].name, m_index->seq[i].len));
+    }
+    return records;
+}
+
 }  // namespace dorado::alignment

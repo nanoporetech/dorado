@@ -2,7 +2,6 @@
 
 #include "Minimap2Index.h"
 #include "Minimap2Options.h"
-#include "ReadPipeline.h"
 
 #include <map>
 #include <memory>

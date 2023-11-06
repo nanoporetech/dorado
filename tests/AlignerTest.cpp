@@ -1,6 +1,8 @@
 #include "MessageSinkUtils.h"
 #include "TestUtils.h"
+#include "alignment/Minimap2Aligner.h"
 #include "read_pipeline/AlignerNode.h"
+#include "read_pipeline/ClientAccess.h"
 #include "read_pipeline/HtsReader.h"
 #include "utils/bam_utils.h"
 #include "utils/sequence_utils.h"
@@ -19,20 +21,31 @@ namespace fs = std::filesystem;
 
 namespace {
 
+class TestClientAccess : public dorado::ClientAccess {
+    const dorado::AlignmentInfo m_align_info;
+
+public:
+    TestClientAccess(dorado::AlignmentInfo align_info) : m_align_info(std::move(align_info)) {}
+
+    uint32_t client_id() const override { return 1; }
+
+    const dorado::AlignmentInfo& alignment_info() const override { return m_align_info; }
+};
+
 template <class... Args>
 std::unique_ptr<dorado::Pipeline> create_pipeline(std::vector<dorado::Message>& output_messages,
                                                   Args&&... args) {
     dorado::PipelineDescriptor pipeline_desc;
     auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 100, output_messages);
-    auto index_file_access = std::make_shared<dorado::alignment::IndexFileAccess>();
-    auto aligner = pipeline_desc.add_node<dorado::AlignerNode>({sink}, index_file_access, args...);
+    auto aligner = pipeline_desc.add_node<dorado::AlignerNode>({sink}, args...);
     return dorado::Pipeline::create(std::move(pipeline_desc));
 }
 
 template <class... Args>
 std::vector<dorado::BamPtr> RunAlignmentPipeline(dorado::HtsReader& reader, Args&&... args) {
     std::vector<dorado::Message> messages;
-    auto pipeline = create_pipeline(messages, args...);
+    auto index_file_access = std::make_shared<dorado::alignment::IndexFileAccess>();
+    auto pipeline = create_pipeline(messages, index_file_access, args...);
     reader.read(*pipeline, 100);
     pipeline.reset();
     return ConvertMessages<dorado::BamPtr>(std::move(messages));
@@ -207,62 +220,98 @@ TEST_CASE("AlignerTest: Check AlignerNode crashes if multi index encountered", T
 }
 
 SCENARIO("AlignerNode push SimplexRead", TEST_GROUP) {
-    GIVEN("AlgnerNode constructed with reference index file") {
+    GIVEN("AlgnerNode constructed with populated index file collection") {
         const std::string read_id{"aligner_node_test_simplex"};
-
         fs::path aligner_test_dir{get_aligner_data_dir()};
         auto ref = aligner_test_dir / "target.fq";
-        std::vector<dorado::Message> messages;
-        auto pipeline = create_pipeline(messages, ref.string(), dorado::alignment::dflt_options, 2);
 
-        WHEN("push simplex read with no alignment matches to pipeline") {
+        dorado::AlignmentInfo align_info{};
+        align_info.minimap_options = dorado::alignment::dflt_options;
+        align_info.reference_file = ref.string();
+        auto index_file_access = std::make_shared<dorado::alignment::IndexFileAccess>();
+        CHECK(index_file_access->load_index(align_info.reference_file, align_info.minimap_options,
+                                            2) == dorado::alignment::IndexLoadResult::success);
+        std::vector<dorado::Message> messages;
+        auto pipeline = create_pipeline(messages, index_file_access, 2);
+
+        AND_GIVEN("client with no alignment requirements") {
             const std::string read_id{"aligner_node_test_simplex"};
             auto simplex_read = std::make_unique<dorado::SimplexRead>();
             simplex_read->read_common.read_id = read_id;
-            simplex_read->read_common.seq = "ACGTACGTACGTACGT";
+            auto client_without_align = std::make_shared<TestClientAccess>(dorado::AlignmentInfo{});
+            simplex_read->read_common.client_access = client_without_align;
 
-            pipeline->push_message(std::move(simplex_read));
-            pipeline.reset();
+            WHEN("push simplex read to pipeline") {
+                const std::string read_id{"aligner_node_test_simplex"};
+                simplex_read->read_common.seq = "ACGTACGTACGTACGT";
 
-            THEN("Single simplex read is output") {
-                REQUIRE((messages.size() == 1 &&
-                         std ::holds_alternative<dorado::SimplexReadPtr>(messages[0])));
-            }
+                pipeline->push_message(std::move(simplex_read));
+                pipeline.reset();
 
-            THEN("Output simplex read has alignment_string populated") {
-                simplex_read = std::get<dorado::SimplexReadPtr>(std::move(messages[0]));
-                REQUIRE_FALSE(simplex_read->read_common.alignment_string.empty());
-            }
+                THEN("Single simplex read is output") {
+                    REQUIRE((messages.size() == 1 &&
+                             std::holds_alternative<dorado::SimplexReadPtr>(messages[0])));
+                }
 
-            THEN("Output simplex read has alignment_string containing unmapped sam line") {
-                simplex_read = std::get<dorado::SimplexReadPtr>(std::move(messages[0]));
-                const std::string expected{read_id + dorado::alignment::UNMAPPED_SAM_LINE_STRIPPED};
-                REQUIRE(simplex_read->read_common.alignment_string == expected);
+                THEN("Output simplex read has empty alignment_string") {
+                    simplex_read = std::get<dorado::SimplexReadPtr>(std::move(messages[0]));
+                    REQUIRE(simplex_read->read_common.alignment_string.empty());
+                }
             }
         }
 
-        WHEN("push simplex read with alignment matches to pipeline") {
+        AND_GIVEN("client requiring alignment") {
+            const std::string read_id{"aligner_node_test_simplex"};
             auto simplex_read = std::make_unique<dorado::SimplexRead>();
-
-            dorado::HtsReader reader(ref.string());
-            reader.read();
-            auto sequence = dorado::utils::extract_sequence(reader.record.get());
-            simplex_read->read_common.seq = sequence;
             simplex_read->read_common.read_id = read_id;
+            auto client_requiring_alignment = std::make_shared<TestClientAccess>(align_info);
+            simplex_read->read_common.client_access = client_requiring_alignment;
 
-            pipeline->push_message(std::move(simplex_read));
-            pipeline.reset();
+            WHEN("push simplex read with no alignment matches to pipeline") {
+                simplex_read->read_common.seq = "ACGTACGTACGTACGT";
 
-            simplex_read = std::get<dorado::SimplexReadPtr>(std::move(messages[0]));
-            THEN("Output sam line has read_id as QNAME") {
-                const std::string expected{read_id + dorado::alignment::UNMAPPED_SAM_LINE_STRIPPED};
-                REQUIRE(simplex_read->read_common.alignment_string.substr(0, read_id.size()) ==
-                        read_id);
+                pipeline->push_message(std::move(simplex_read));
+                pipeline.reset();
+
+                THEN("Single simplex read is output") {
+                    REQUIRE((messages.size() == 1 &&
+                             std::holds_alternative<dorado::SimplexReadPtr>(messages[0])));
+                }
+
+                THEN("Output simplex read has alignment_string populated") {
+                    simplex_read = std::get<dorado::SimplexReadPtr>(std::move(messages[0]));
+                    REQUIRE_FALSE(simplex_read->read_common.alignment_string.empty());
+                }
+
+                THEN("Output simplex read has alignment_string containing unmapped sam line") {
+                    simplex_read = std::get<dorado::SimplexReadPtr>(std::move(messages[0]));
+                    const std::string expected{read_id +
+                                               dorado::alignment::UNMAPPED_SAM_LINE_STRIPPED};
+                    REQUIRE(simplex_read->read_common.alignment_string == expected);
+                }
             }
 
-            THEN("Output sam line contains sequence string") {
-                REQUIRE_FALSE(simplex_read->read_common.alignment_string.find(sequence) ==
-                              std::string::npos);
+            WHEN("push simplex read with alignment matches to pipeline") {
+                dorado::HtsReader reader(ref.string());
+                reader.read();
+                auto sequence = dorado::utils::extract_sequence(reader.record.get());
+                simplex_read->read_common.seq = sequence;
+
+                pipeline->push_message(std::move(simplex_read));
+                pipeline.reset();
+
+                simplex_read = std::get<dorado::SimplexReadPtr>(std::move(messages[0]));
+                THEN("Output sam line has read_id as QNAME") {
+                    const std::string expected{read_id +
+                                               dorado::alignment::UNMAPPED_SAM_LINE_STRIPPED};
+                    REQUIRE(simplex_read->read_common.alignment_string.substr(0, read_id.size()) ==
+                            read_id);
+                }
+
+                THEN("Output sam line contains sequence string") {
+                    REQUIRE_FALSE(simplex_read->read_common.alignment_string.find(sequence) ==
+                                  std::string::npos);
+                }
             }
         }
     }
