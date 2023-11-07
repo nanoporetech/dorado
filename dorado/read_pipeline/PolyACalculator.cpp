@@ -36,7 +36,7 @@ const int kMaxTailLength = 750;
 std::pair<int, int> determine_signal_bounds(int signal_anchor,
                                             bool fwd,
                                             const dorado::SimplexRead& read,
-                                            int num_samples_per_base,
+                                            float num_samples_per_base,
                                             bool is_rna,
                                             int min_base_count) {
     const c10::Half* signal = static_cast<c10::Half*>(read.read_common.raw_data.data_ptr());
@@ -64,11 +64,12 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
     const float kVar = 0.35f;
     // Determine the outer boundary of the signal space to
     // consider based on the anchor.
-    const int kSpread = num_samples_per_base * kMaxTailLength;
+    const int kSpread = std::round(num_samples_per_base * kMaxTailLength);
     // Maximum gap between intervals that can be combined.
-    const int kMaxSampleGap = num_samples_per_base * 5;
+    const int kMaxSampleGap = std::round(num_samples_per_base * 5);
     // Minimum size of intervals considered for merge.
-    const int kMinIntervalSizeForMerge = std::max(10 * num_samples_per_base, 200);
+    const int kMinIntervalSizeForMerge =
+            std::max(static_cast<int>(std::round(10 * num_samples_per_base)), 200);
     // Floor for average signal value of poly tail.
     const float kMinAvgVal = (is_rna ? 0.0 : -3.0);
 
@@ -125,7 +126,7 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
                  [&](auto& i) {
                      int interval_size = i.second - i.first;
                      // Filter out any small intervals.
-                     if (interval_size < (num_samples_per_base * min_base_count)) {
+                     if (interval_size < (std::round(num_samples_per_base * min_base_count))) {
                          return false;
                      }
                      // Only keep intervals that are close-ish to the signal anchor.
@@ -173,7 +174,7 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
 // For RNA, use the mean of 10-90th percentile samples/base estimated from
 // the move table.
 // For DNA, just take the median samples/base estimated from the move table.
-int estimate_samples_per_base(const dorado::SimplexRead& read, bool is_rna) {
+float estimate_samples_per_base(const dorado::SimplexRead& read, bool is_rna) {
     const size_t num_bases = read.read_common.seq.length();
     const auto num_samples = read.read_common.get_raw_data_samples();
     const auto stride = read.read_common.model_stride;
@@ -194,10 +195,10 @@ int estimate_samples_per_base(const dorado::SimplexRead& read, bool is_rna) {
                 count++;
             }
         }
-        return std::round(sum / count);
+        return (count > 0 ? std::round(sum / count) : 0.f);
     } else {
         auto quantiles = dorado::utils::quantiles(sizes, {0.5});
-        return std::floor(static_cast<float>(quantiles[0]));
+        return static_cast<float>(quantiles[0]);
     }
 }
 
