@@ -1,5 +1,8 @@
 #pragma once
 
+#include <cstdint>
+#include <vector>
+
 namespace dorado::alignment {
 
 /// <summary>
