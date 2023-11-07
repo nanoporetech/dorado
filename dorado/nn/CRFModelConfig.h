@@ -23,18 +23,7 @@ struct SignalNormalisationParams {
     float scale_multiplier = 0.53f;
     ScalingStrategy strategy = ScalingStrategy::QUANTILE;
 
-    std::string to_string() const {
-        std::string str = "SignalNormalisationParams {";
-        str += " strategy:" + dorado::to_string(strategy);
-        if (strategy == ScalingStrategy::QUANTILE) {
-            str += " quantile_a:" + std::to_string(quantile_a);
-            str += " quantile_b:" + std::to_string(quantile_b);
-            str += " shift_multiplier:" + std::to_string(shift_multiplier);
-            str += " scale_multiplier:" + std::to_string(scale_multiplier);
-        }
-        str += "}";
-        return str;
-    }
+    std::string to_string() const;
 };
 
 struct ConvParams {
@@ -44,16 +33,7 @@ struct ConvParams {
     int stride = 1;
     Activation activation;
 
-    std::string to_string() const {
-        std::string str = "ConvParams {";
-        str += " insize:" + std::to_string(insize);
-        str += " size:" + std::to_string(size);
-        str += " winlen:" + std::to_string(winlen);
-        str += " stride:" + std::to_string(stride);
-        str += " activation:" + dorado::to_string(activation);
-        str += "}";
-        return str;
-    };
+    std::string to_string() const;
 };
 
 enum SampleType {
@@ -94,29 +74,7 @@ struct CRFModelConfig {
     // convolution layer params
     std::vector<ConvParams> convs;
 
-    std::string to_string() const {
-        std::string str = "CRFModelConfig {";
-        str += " qscale:" + std::to_string(qscale);
-        str += " qbias:" + std::to_string(qbias);
-        str += " stride:" + std::to_string(stride);
-        str += " bias:" + std::to_string(bias);
-        str += " clamp:" + std::to_string(clamp);
-        str += " out_features:" + std::to_string(out_features.value_or(-1));
-        str += " state_len:" + std::to_string(state_len);
-        str += " outsize:" + std::to_string(outsize);
-        str += " blank_score:" + std::to_string(blank_score);
-        str += " scale:" + std::to_string(scale);
-        str += " num_features:" + std::to_string(num_features);
-        str += " sample_rate:" + std::to_string(sample_rate);
-        str += " mean_qscore_start_pos:" + std::to_string(mean_qscore_start_pos);
-        str += " signal_norm_params:" + signal_norm_params.to_string();
-        str += " convs: {";
-        for (int c = 0; c < convs.size(); c++) {
-            str += " " + std::to_string(c) + ": " + convs[c].to_string();
-        }
-        str += "}";
-        return str;
-    };
+    std::string to_string() const;
 };
 
 CRFModelConfig load_crf_model_config(const std::filesystem::path& path);
