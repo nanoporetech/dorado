@@ -21,9 +21,11 @@ public:
 };
 
 class StandaloneClientAccess : public ClientAccess {
+    inline static const AlignmentInfo empty_alignment_info{};
+
 public:
     uint32_t client_id() const override { return -1; }
-    const AlignmentInfo& alignment_info() const override { return {}; }
+    const AlignmentInfo& alignment_info() const override { return empty_alignment_info; }
 };
 
 }  // namespace dorado

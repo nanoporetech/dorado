@@ -57,7 +57,7 @@ std::shared_ptr<alignment::Minimap2Index> AlignerNode::get_index(const ReadCommo
     }
     auto index =
             m_index_file_access->get_index(align_info.reference_file, align_info.minimap_options);
-    assert(index != nullptr, "Expect an index file to be loaded for a specifieic reference");
+    assert(index != nullptr && "Expects an index file to be loaded for a specifieic reference");
     return index;
 }
 
