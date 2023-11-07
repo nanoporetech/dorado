@@ -4,7 +4,7 @@
 #include "read_pipeline/read_utils.h"
 #include "utils/time_utils.h"
 
-#include <optional>
+#include <ATen/TensorIndexing.h>
 
 namespace dorado::splitter {
 namespace {

@@ -3,8 +3,6 @@
 #include "splitter/splitter_utils.h"
 #include "utils/types.h"
 
-#include <ATen/ATen.h>
-
 #include <cstdint>
 #include <functional>
 #include <optional>
@@ -16,19 +14,12 @@ namespace dorado::splitter {
 class DuplexReadSplitter : public ReadSplitter {
 public:
     DuplexReadSplitter(DuplexSplitSettings settings);
-    ~DuplexReadSplitter() {}
+    ~DuplexReadSplitter();
 
     std::vector<SimplexReadPtr> split(SimplexReadPtr init_read) const override;
 
 private:
-    //TODO consider precomputing and reusing ranges with high signal
-    struct ExtRead {
-        SimplexReadPtr read;
-        at::Tensor data_as_float32;
-        std::vector<uint64_t> move_sums;
-        splitter::PosRanges possible_pore_regions;
-    };
-
+    struct ExtRead;
     using SplitFinderF = std::function<splitter::PosRanges(const ExtRead&)>;
 
     ExtRead create_ext_read(SimplexReadPtr r) const;
