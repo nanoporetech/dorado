@@ -87,6 +87,8 @@ int determine_rna_adapter_pos(const dorado::SimplexRead& read, dorado::SampleTyp
         int16_t max_median = *minmax.second;
         auto min_pos = std::distance(medians.begin(), minmax.first);
         auto max_pos = std::distance(medians.begin(), minmax.second);
+        spdlog::trace("window {}-{} min {} max {} diff {}", i, i + kWindowSize, min_median,
+                      max_median, (max_median - min_median));
         if ((median_pos >= medians.size()) && (max_median > kMinMedianForRNASignal) &&
             (max_median - min_median > kMedianDiff) &&
             (window_pos[max_pos] > window_pos[min_pos])) {
