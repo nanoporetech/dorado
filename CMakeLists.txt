@@ -147,6 +147,7 @@ set(LIB_SOURCE_FILES
     dorado/alignment/Minimap2Aligner.h
     dorado/alignment/Minimap2Index.cpp
     dorado/alignment/Minimap2Index.h
+    dorado/alignment/Minimap2IndexSupportTypes.h
     dorado/alignment/Minimap2Options.h
     dorado/nn/CRFModel.h
     dorado/nn/CRFModel.cpp
@@ -233,7 +234,7 @@ set(LIB_SOURCE_FILES
     dorado/modbase/ModBaseContext.h
     dorado/modbase/MotifMatcher.cpp
     dorado/modbase/MotifMatcher.h
-)
+ )
 
 if (DORADO_GPU_BUILD)
     if(APPLE)

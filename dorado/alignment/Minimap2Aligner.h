@@ -22,7 +22,7 @@ public:
     std::vector<BamPtr> align(bam1_t* record, mm_tbuf_t* buf);
     void align(dorado::SimplexRead& simplex_read, mm_tbuf_t* buf);
 
-    HeaderSquenceRecords get_sequence_records_for_header() const;
+    HeaderSequenceRecords get_sequence_records_for_header() const;
 
 private:
     std::shared_ptr<Minimap2Index> m_minimap_index;

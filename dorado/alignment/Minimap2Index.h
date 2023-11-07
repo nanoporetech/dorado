@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Minimap2IndexSupportTypes.h"
 #include "Minimap2Options.h"
 
 #include <minimap.h>
@@ -11,15 +12,6 @@
 #include <vector>
 
 namespace dorado::alignment {
-
-enum class IndexLoadResult {
-    reference_file_not_found,
-    split_index_not_supported,
-    validation_error,
-    success,
-};
-
-using HeaderSquenceRecords = std::vector<std::pair<char*, uint32_t>>;
 
 class Minimap2Index {
     struct IndexDeleter {
@@ -46,7 +38,7 @@ public:
     const mm_idxopt_t& index_options() const { return m_index_options; }
     const mm_mapopt_t& mapping_options() const { return m_mapping_options; }
 
-    HeaderSquenceRecords get_sequence_records_for_header() const;
+    HeaderSequenceRecords get_sequence_records_for_header() const;
 };
 
 }  // namespace dorado::alignment

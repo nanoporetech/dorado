@@ -1,18 +1,13 @@
 #include "IndexFileAccess.h"
 
-namespace dorado::alignment {
+#include "Minimap2Index.h"
 
-std::shared_ptr<Minimap2Index> IndexFileAccess::get_index_impl(
-        const std::string& file,
-        const Minimap2IndexOptions& options) {
-    std::lock_guard<std::mutex> lock(m_mutex);
-    return m_index_lut[{file, options}];  // allow the creation of a null instance
-}
+namespace dorado::alignment {
 
 IndexLoadResult IndexFileAccess::load_index(const std::string& file,
                                             const Minimap2Options& options,
                                             int num_threads) {
-    auto index = get_index_impl(file, options);
+    auto index = get_index(file, options);
     if (index) {
         return IndexLoadResult::success;
     }
@@ -30,7 +25,8 @@ IndexLoadResult IndexFileAccess::load_index(const std::string& file,
 
 std::shared_ptr<Minimap2Index> IndexFileAccess::get_index(const std::string& file,
                                                           const Minimap2IndexOptions& options) {
-    return get_index_impl(file, options);
+    std::lock_guard<std::mutex> lock(m_mutex);
+    return m_index_lut[{file, options}];  // allow the creation of a null instance
 }
 
 }  // namespace dorado::alignment

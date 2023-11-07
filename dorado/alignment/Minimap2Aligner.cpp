@@ -260,7 +260,7 @@ void Minimap2Aligner::align(dorado::SimplexRead& simplex_read, mm_tbuf_t* buffer
     simplex_read.read_common.alignment_string = alignment_string;
 }
 
-HeaderSquenceRecords Minimap2Aligner::get_sequence_records_for_header() const {
+HeaderSequenceRecords Minimap2Aligner::get_sequence_records_for_header() const {
     return m_minimap_index->get_sequence_records_for_header();
 }
 

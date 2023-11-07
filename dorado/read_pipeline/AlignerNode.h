@@ -32,7 +32,7 @@ public:
     void terminate(const FlushOptions& flush_options) override { terminate_impl(); }
     void restart() override;
 
-    alignment::HeaderSquenceRecords get_sequence_records_for_header() const;
+    alignment::HeaderSequenceRecords get_sequence_records_for_header() const;
 
 private:
     void start_threads();
@@ -45,7 +45,7 @@ private:
 
     size_t m_threads;
     std::vector<std::thread> m_workers;
-    std::shared_ptr<alignment::Minimap2Index> m_bam_index{};
+    std::shared_ptr<alignment::Minimap2Index> m_index_for_bam_messages{};
     std::shared_ptr<alignment::IndexFileAccess> m_index_file_access{};
 };
 
