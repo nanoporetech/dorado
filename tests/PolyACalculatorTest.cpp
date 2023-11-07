@@ -27,8 +27,8 @@ struct TestCase {
 
 TEST_CASE("PolyACalculator: Test polyT tail estimation", TEST_GROUP) {
     auto [gt, data, is_rna] = GENERATE(
-            TestCase{92, "poly_a/r9_rev_cdna", false}, TestCase{31, "poly_a/r10_fwd_cdna", false},
-            TestCase{28, "poly_a/rna002", true}, TestCase{67, "poly_a/rna004", true});
+            TestCase{143, "poly_a/r9_rev_cdna", false}, TestCase{35, "poly_a/r10_fwd_cdna", false},
+            TestCase{39, "poly_a/rna002", true}, TestCase{73, "poly_a/rna004", true});
 
     dorado::PipelineDescriptor pipeline_desc;
     std::vector<dorado::Message> messages;
