@@ -131,7 +131,7 @@ const ModelMap models = {
 namespace modified {
 
 const std::vector<std::string> mods = {
-        "5mC_5hmC", "5mCG", "5mCG_5hmCG", "5mC", "6mA",
+        "5mC_5hmC", "5mCG", "5mCG_5hmCG", "5mC", "6mA", "m6A_DRACH",
 };
 
 const ModelMap models = {
@@ -212,9 +212,11 @@ const ModelMap models = {
         {"dna_r10.4.1_e8.2_400bps_sup@v4.2.0_6mA@v3",
          {"903fb89e7c8929a3a66abf60eb6f1e1a7ab7b7e4a0c40f646dc0b13d5588174c"}},
         {"dna_r10.4.1_e8.2_400bps_sup@v4.2.0_5mC_5hmC@v1",
-         {"28d82762af14e18dd36fb1d9f044b1df96fead8183d3d1ef47a5e92048a2be27"}}
+         {"28d82762af14e18dd36fb1d9f044b1df96fead8183d3d1ef47a5e92048a2be27"}},
 
-};
+        // RNA004 v3.0.1
+        {"rna004_130bps_sup@v3.0.1_m6A_DRACH@v1",
+         {"356b3eed19916d83d59cbfd24bb9f33823d6f738891f3ac8fe77319ae5cbde7f"}}};
 
 }  // namespace modified
 
