@@ -119,6 +119,13 @@ alignment::HeaderSequenceRecords AlignerNode::get_sequence_records_for_header() 
 void AlignerNode::worker_thread() {
     Message message;
     mm_tbuf_t* tbuf = mm_tbuf_init();
+    auto align_read = [this, tbuf](auto&& read) {
+        auto index = get_index(read->read_common);
+        if (index) {
+            alignment::Minimap2Aligner(index).align(read->read_common, tbuf);
+        }
+        send_message_to_sink(std::move(read));
+    };
     while (get_input_message(message)) {
         if (std::holds_alternative<BamPtr>(message)) {
             auto read = std::get<BamPtr>(std::move(message));
@@ -128,12 +135,9 @@ void AlignerNode::worker_thread() {
                 send_message_to_sink(std::move(record));
             }
         } else if (std::holds_alternative<SimplexReadPtr>(message)) {
-            auto read = std::get<SimplexReadPtr>(std::move(message));
-            auto index = get_index(read->read_common);
-            if (index) {
-                alignment::Minimap2Aligner(index).align(*read, tbuf);
-            }
-            send_message_to_sink(std::move(read));
+            align_read(std::get<SimplexReadPtr>(std::move(message)));
+        } else if (std::holds_alternative<DuplexReadPtr>(message)) {
+            align_read(std::get<DuplexReadPtr>(std::move(message)));
         } else {
             send_message_to_sink(std::move(message));
             continue;

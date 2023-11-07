@@ -234,11 +234,11 @@ std::vector<BamPtr> Minimap2Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
     return results;
 }
 
-void Minimap2Aligner::align(dorado::SimplexRead& simplex_read, mm_tbuf_t* buffer) {
+void Minimap2Aligner::align(dorado::ReadCommon& read_common, mm_tbuf_t* buffer) {
     mm_bseq1_t query{};
-    query.seq = const_cast<char*>(simplex_read.read_common.seq.c_str());
-    query.name = const_cast<char*>(simplex_read.read_common.read_id.c_str());
-    query.l_seq = static_cast<int>(simplex_read.read_common.seq.length());
+    query.seq = const_cast<char*>(read_common.seq.c_str());
+    query.name = const_cast<char*>(read_common.read_id.c_str());
+    query.l_seq = static_cast<int>(read_common.seq.length());
 
     int n_regs{};
     mm_reg1_t* regs = mm_map(m_minimap_index->index(), query.l_seq, query.seq, &n_regs, buffer,
@@ -247,7 +247,7 @@ void Minimap2Aligner::align(dorado::SimplexRead& simplex_read, mm_tbuf_t* buffer
 
     std::string alignment_string{};
     if (n_regs == 0) {
-        alignment_string = simplex_read.read_common.read_id + UNMAPPED_SAM_LINE_STRIPPED;
+        alignment_string = read_common.read_id + UNMAPPED_SAM_LINE_STRIPPED;
     }
     for (int reg_idx{0}; reg_idx < n_regs; ++reg_idx) {
         kstring_t alignment_line{0, 0, nullptr};
@@ -257,7 +257,7 @@ void Minimap2Aligner::align(dorado::SimplexRead& simplex_read, mm_tbuf_t* buffer
         free(alignment_line.s);
         free(regs[reg_idx].p);
     }
-    simplex_read.read_common.alignment_string = alignment_string;
+    read_common.alignment_string = alignment_string;
 }
 
 HeaderSequenceRecords Minimap2Aligner::get_sequence_records_for_header() const {
