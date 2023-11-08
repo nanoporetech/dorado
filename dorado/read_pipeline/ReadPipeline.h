@@ -108,6 +108,17 @@ public:
     class StereoFeatureInputs {
     public:
         std::vector<unsigned char> alignment;
+        uint64_t template_seq_start = ~0;
+        uint64_t complement_seq_start = ~0;
+        std::string template_seq;
+        std::string complement_seq;
+        std::string template_qstring;
+        std::string complement_qstring;
+        std::vector<uint8_t> template_moves;
+        std::vector<uint8_t> complement_moves;
+        at::Tensor template_signal;
+        at::Tensor complement_signal;
+        int signal_stride = -1;
     };
     StereoFeatureInputs stereo_feature_inputs;
 
