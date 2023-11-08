@@ -265,7 +265,6 @@ SignalAnchorInfo determine_signal_anchor_and_strand_cdna(const dorado::SimplexRe
         int signal_anchor = seq_to_sig_map[base_anchor];
 
         result = {fwd, signal_anchor, trailing_Ts};
-        spdlog::trace("Base anchor {}", base_anchor);
     } else {
         spdlog::debug("{} primer edit distance too high {}", read.read_common.read_id,
                       std::min(dist_v1, dist_v2));
@@ -318,9 +317,8 @@ void PolyACalculator::worker_thread() {
 
             // Walk through signal. Require a minimum of length 10 poly-A since below that
             // the current algorithm returns a lot of false intervals.
-            auto [signal_start, signal_end] =
-                    determine_signal_bounds(signal_anchor, fwd, *read, num_samples_per_base,
-                                            m_is_rna, 10 /*trailing_Ts + 5*/);
+            auto [signal_start, signal_end] = determine_signal_bounds(
+                    signal_anchor, fwd, *read, num_samples_per_base, m_is_rna, 10);
             auto signal_len = signal_end - signal_start;
 
             // Create an offset for dRNA data. There is a tendency to overestimate the length of dRNA
@@ -329,7 +327,7 @@ void PolyACalculator::worker_thread() {
             // TODO: In order to improve this, perhaps another pass over the tail interval is needed
             // to get a more refined boundary estimation.
             if (m_is_rna) {
-                signal_len -= 100;
+                signal_len = std::max(0, signal_len - 100);
             }
 
             int num_bases =
@@ -398,15 +396,13 @@ void PolyACalculator::terminate_impl() {
     // Visualize a distribution of the tail lengths called.
     static bool done = false;
     if (!done && (spdlog::get_level() <= spdlog::level::debug)) {
-        {
-            int max_val = -1;
-            for (auto [k, v] : tail_length_counts) {
-                max_val = std::max(v, max_val);
-            }
-            int factor = std::max(1, 1 + max_val / 100);
-            for (auto [k, v] : tail_length_counts) {
-                spdlog::debug("{:03d} : {}", k, std::string(v / factor, '*'));
-            }
+        int max_val = -1;
+        for (auto [k, v] : tail_length_counts) {
+            max_val = std::max(v, max_val);
+        }
+        int factor = std::max(1, 1 + max_val / 100);
+        for (auto [k, v] : tail_length_counts) {
+            spdlog::debug("{:03d} : {}", k, std::string(v / factor, '*'));
         }
         done = true;
     }
