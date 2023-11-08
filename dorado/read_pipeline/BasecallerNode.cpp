@@ -84,7 +84,7 @@ void BasecallerNode::input_worker_thread() {
             offset = std::min(offset + signal_chunk_step, last_chunk_offset);
             read_chunks.push_back(std::make_unique<BasecallingChunk>(
                     working_read, offset, chunk_in_read_idx++, m_chunk_size));
-            num_chunks++;
+            ++num_chunks;
         }
         working_read->called_chunks.resize(num_chunks);
         working_read->num_chunks_called.store(0);

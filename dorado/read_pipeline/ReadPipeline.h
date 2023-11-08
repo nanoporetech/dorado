@@ -105,6 +105,12 @@ private:
 // Class representing a duplex read, including stereo-encoded raw data
 class DuplexRead {
 public:
+    class StereoFeatureInputs {
+    public:
+        std::vector<unsigned char> alignment;
+    };
+    StereoFeatureInputs stereo_feature_inputs;
+
     ReadCommon read_common;
 };
 

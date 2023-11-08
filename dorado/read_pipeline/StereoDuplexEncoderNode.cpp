@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cstdint>
 #include <cstring>
 #include <vector>
 
@@ -28,8 +29,6 @@ DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(const ReadPair& read_pair) 
            template_read.read_common.attributes.channel_number);
     assert(complement_read.read_common.start_time_ms > template_read.read_common.start_time_ms);
 
-    using SampleType = c10::Half;
-
     // We align the reverse complement of the complement read to the template read.
     const auto complement_sequence_reverse_complement =
             dorado::utils::reverse_complement(complement_read.read_common.seq);
@@ -43,14 +42,25 @@ DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(const ReadPair& read_pair) 
     auto comp_strand = complement_sequence_reverse_complement.substr(
             complement_read.seq_start, complement_read.seq_end - complement_read.seq_start);
 
-    EdlibAlignResult result = edlibAlign(temp_strand.data(), temp_strand.length(),
-                                         comp_strand.data(), comp_strand.length(), align_config);
+    EdlibAlignResult edlib_result =
+            edlibAlign(temp_strand.data(), temp_strand.length(), comp_strand.data(),
+                       comp_strand.length(), align_config);
+
+    DuplexRead::StereoFeatureInputs stereo_feature_inputs;
+    const auto alignment_size =
+            static_cast<size_t>(edlib_result.endLocations[0] - edlib_result.startLocations[0]);
+    stereo_feature_inputs.alignment.resize(alignment_size);
+    std::memcpy(stereo_feature_inputs.alignment.data(), edlib_result.alignment, alignment_size);
 
     int target_cursor = template_read.seq_start;
     int query_cursor = complement_read.seq_start;
 
-    int start_alignment_position = result.startLocations[0];
-    int end_alignment_position = result.endLocations[0];
+    int start_alignment_position = edlib_result.startLocations[0];
+    int end_alignment_position = edlib_result.endLocations[0];
+    spdlog::error("{} {} {}", start_alignment_position, end_alignment_position,
+                  edlib_result.alignmentLength);
+
+    edlibFreeAlignResult(edlib_result);
 
     // Edlib doesn't provide named constants for alignment array entries, so do it here.
     static constexpr unsigned char kAlignMatch = 0;
@@ -59,8 +69,7 @@ DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(const ReadPair& read_pair) 
     static constexpr unsigned char kAlignMismatch = 3;
 
     // Move along the alignment, filling out the stereo-encoded tensor
-    const int max_size = template_read.read_common.get_raw_data_samples() +
-                         complement_read.read_common.get_raw_data_samples();
+
     const auto opts = at::TensorOptions().dtype(at::ScalarType::Half).device(at::kCPU);
 
     static constexpr int kNumFeatures = 13;
@@ -73,9 +82,6 @@ DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(const ReadPair& read_pair) 
     static constexpr int kFeatureTemplateQScore = 11;
     static constexpr int kFeatureComplementQScore = 12;
 
-    int template_signal_cursor = 0;
-    int complement_signal_cursor = 0;
-
     std::vector<uint8_t> template_moves_expanded;
     for (int i = 0; i < template_read.read_common.moves.size(); i++) {
         template_moves_expanded.push_back(template_read.read_common.moves[i]);
@@ -86,14 +92,9 @@ DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(const ReadPair& read_pair) 
 
     int extra_padding =
             template_read.read_common.get_raw_data_samples() - template_moves_expanded.size();
+    spdlog::error("extra_padding {}", extra_padding);
     for (int i = 0; i < extra_padding; i++) {
         template_moves_expanded.push_back(0);
-    }
-
-    int template_moves_seen = template_moves_expanded[template_signal_cursor];
-    while (template_moves_seen < target_cursor + 1) {
-        template_signal_cursor++;
-        template_moves_seen += template_moves_expanded[template_signal_cursor];
     }
 
     std::vector<uint8_t> complement_moves_expanded;
@@ -113,22 +114,22 @@ DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(const ReadPair& read_pair) 
     std::reverse(complement_moves_expanded.begin(), complement_moves_expanded.end());
     complement_moves_expanded.pop_back();
 
-    auto complement_signal = complement_read.read_common.raw_data;
-    complement_signal = at::flip(complement_read.read_common.raw_data, 0);
-
-    int complement_moves_seen = complement_read.read_common.moves[complement_signal_cursor];
+    int complement_signal_cursor = 0;
+    int complement_moves_seen = complement_read.read_common.moves[0];
     while (complement_moves_seen < query_cursor + 1) {
-        complement_signal_cursor++;
+        ++complement_signal_cursor;
         complement_moves_seen += complement_moves_expanded[complement_signal_cursor];
     }
+
+    using SampleType = c10::Half;
 
     // libtorch indexing calls go on a carefree romp through various heap
     // allocations/deallocations and object constructions/destructions, and so are
     // glacially slow.  We therefore work with raw pointers within the main loop.
     const auto* const template_raw_data_ptr =
-            static_cast<SampleType*>(template_read.read_common.raw_data.data_ptr());
-    const auto* const flipped_complement_raw_data_ptr =
-            static_cast<SampleType*>(complement_signal.data_ptr());
+            template_read.read_common.raw_data.data_ptr<SampleType>();
+    const auto complement_signal = at::flip(complement_read.read_common.raw_data, 0);
+    const auto* const flipped_complement_raw_data_ptr = complement_signal.data_ptr<SampleType>();
 
     // Package the encoding generation function into a lambda so it can be called
     // in two modes -
@@ -138,69 +139,54 @@ DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(const ReadPair& read_pair) 
     // the buffer which helps bring down overall memory footprint.
     // 2. The mode with data copy that actually fills up the encoding tensor
     // with the right data needed for inference.
-    auto generate_encoding = [&](std::optional<at::Tensor*> tmp, int target_cursor,
-                                 int query_cursor, int template_signal_cursor,
+    auto generate_encoding = [&](std::optional<at::Tensor> tmp, int target_cursor, int query_cursor,
                                  int complement_signal_cursor) -> int {
-        bool fill_data = tmp.has_value();
+        int template_signal_cursor = 0;
 
         int stereo_global_cursor = 0;  // Index into the stereo-encoded signal
         std::array<SampleType*, kNumFeatures> feature_ptrs;
-        if (fill_data) {
+        if (tmp) {
             for (int feature_idx = 0; feature_idx < kNumFeatures; ++feature_idx) {
-                auto& feature_ptr = feature_ptrs[feature_idx];
-                feature_ptr = static_cast<SampleType*>((*tmp.value())[feature_idx].data_ptr());
+                feature_ptrs[feature_idx] = (tmp.value())[feature_idx].data_ptr<SampleType>();
             }
         }
-        for (int i = start_alignment_position; i < end_alignment_position; i++) {
+        for (auto alignment_entry : stereo_feature_inputs.alignment) {
             // We move along every alignment position. For every position we need to add signal and padding.
-            // Let us add the respective nucleotides and q-scores
-            int template_segment_length = 0;    // index into this segment in signal-space
-            int complement_segment_length = 0;  // index into this segment in signal-space
 
             // If there is *not* an insertion to the query, add the nucleotide from the target cursor
-            if (result.alignment[i] != kAlignInsertionToQuery) {
-                // TODO -- these memcpys could be merged
-                if (fill_data) {
-                    std::memcpy(&feature_ptrs[kFeatureTemplateSignal]
-                                             [stereo_global_cursor + template_segment_length],
-                                &template_raw_data_ptr[template_signal_cursor], sizeof(SampleType));
-                }
-                template_segment_length++;
-                template_signal_cursor++;
-                auto max_signal_length = template_moves_expanded.size();
-
-                // We are relying on strings of 0s ended in a 1.  It would be more efficient
-                // in any case to store run length data above.
-                // We're also assuming uint8_t is an alias for char (not guaranteed in principle).
-                const auto* const start_ptr = &template_moves_expanded[template_signal_cursor];
+            int template_segment_length = 0;  // index into this segment in signal-space
+            if (alignment_entry != kAlignInsertionToQuery) {
+                const auto max_signal_length = complement_moves_expanded.size();
+                const auto* const start_ptr = &template_moves_expanded[template_signal_cursor + 1];
                 auto* const next_move_ptr =
                         static_cast<const uint8_t*>(std::memchr(start_ptr, 1, max_signal_length));
                 const size_t sample_count =
                         next_move_ptr ? (next_move_ptr - start_ptr) : max_signal_length;
 
-                // Assumes contiguity of successive elements.
-                if (fill_data) {
+                if (tmp) {
+                    // Assumes contiguity of successive elements.
                     std::memcpy(&feature_ptrs[kFeatureTemplateSignal]
                                              [stereo_global_cursor + template_segment_length],
                                 &template_raw_data_ptr[template_signal_cursor],
-                                sample_count * sizeof(SampleType));
+                                (sample_count + 1) * sizeof(SampleType));
                 }
 
-                template_signal_cursor += sample_count;
-                template_segment_length += sample_count;
+                template_signal_cursor += sample_count + 1;
+                template_segment_length += sample_count + 1;
             }
 
             // If there is *not* an insertion to the target, add the nucleotide from the query cursor
-            if (result.alignment[i] != kAlignInsertionToTarget) {
-                if (fill_data) {
+            int complement_segment_length = 0;  // index into this segment in signal-space
+            if (alignment_entry != kAlignInsertionToTarget) {
+                if (tmp) {
                     std::memcpy(&feature_ptrs[kFeatureComplementSignal]
                                              [stereo_global_cursor + complement_segment_length],
                                 &flipped_complement_raw_data_ptr[complement_signal_cursor],
                                 sizeof(SampleType));
                 }
 
-                complement_segment_length++;
-                complement_signal_cursor++;
+                ++complement_segment_length;
+                ++complement_signal_cursor;
                 auto max_signal_length = complement_moves_expanded.size();
 
                 // See comments above.
@@ -210,7 +196,7 @@ DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(const ReadPair& read_pair) 
                 const size_t sample_count =
                         next_move_ptr ? (next_move_ptr - start_ptr) : max_signal_length;
 
-                if (fill_data) {
+                if (tmp) {
                     std::memcpy(&feature_ptrs[kFeatureComplementSignal]
                                              [stereo_global_cursor + complement_segment_length],
                                 &flipped_complement_raw_data_ptr[complement_signal_cursor],
@@ -231,8 +217,8 @@ DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(const ReadPair& read_pair) 
             };
 
             // Now, add the nucleotides and q scores
-            if (result.alignment[i] != kAlignInsertionToQuery) {
-                if (fill_data) {
+            if (alignment_entry != kAlignInsertionToQuery) {
+                if (tmp) {
                     const char nucleotide = template_read.read_common.seq[target_cursor];
                     const auto nucleotide_feature_idx = kFeatureTemplateFirstNucleotide +
                                                         dorado::utils::base_to_int(nucleotide);
@@ -248,9 +234,9 @@ DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(const ReadPair& read_pair) 
             }
 
             // Now, add the nucleotides and q scores
-            if (result.alignment[i] != kAlignInsertionToTarget) {
-                if (fill_data) {
-                    const char nucleotide = complement_sequence_reverse_complement.at(query_cursor);
+            if (alignment_entry != kAlignInsertionToTarget) {
+                if (tmp) {
+                    const char nucleotide = complement_sequence_reverse_complement[query_cursor];
                     const auto nucleotide_feature_idx = kFeatureComplementFirstNucleotide +
                                                         dorado::utils::base_to_int(nucleotide);
 
@@ -266,7 +252,7 @@ DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(const ReadPair& read_pair) 
                 ++query_cursor;
             }
 
-            if (fill_data) {
+            if (tmp) {
                 feature_ptrs[kFeatureMoveTable][stereo_global_cursor] =
                         static_cast<SampleType>(1);  // set the move table
             }
@@ -280,8 +266,7 @@ DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(const ReadPair& read_pair) 
     // Call the encoding lambda first without data copy to get an estimate
     // of the encoding size.
     const auto encoding_tensor_size =
-            generate_encoding(std::nullopt, target_cursor, query_cursor, template_signal_cursor,
-                              complement_signal_cursor);
+            generate_encoding(std::nullopt, target_cursor, query_cursor, complement_signal_cursor);
 
     const float pad_value =
             0.8 * std::min(at::min(complement_signal).item<float>(),
@@ -293,8 +278,7 @@ DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(const ReadPair& read_pair) 
 
     // Call the encoding lambda again, this time with the correctly sized tensor
     // allocated for the final data to be filled in.
-    generate_encoding(&tmp, target_cursor, query_cursor, template_signal_cursor,
-                      complement_signal_cursor);
+    generate_encoding(tmp, target_cursor, query_cursor, complement_signal_cursor);
 
     auto read = std::make_unique<DuplexRead>();  // Return read
     read->read_common.read_id =
@@ -315,7 +299,7 @@ DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(const ReadPair& read_pair) 
     read->read_common.position_id = template_read.read_common.position_id;
     read->read_common.experiment_id = template_read.read_common.experiment_id;
 
-    edlibFreeAlignResult(result);
+    //auto& stereo_feature_inputs = read->stereo_feature_inputs;
 
     m_num_encoded_pairs++;
 
