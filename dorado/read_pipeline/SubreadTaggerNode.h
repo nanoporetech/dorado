@@ -3,7 +3,6 @@
 
 #include <atomic>
 #include <cstdint>
-#include <list>
 #include <memory>
 #include <mutex>
 #include <thread>
@@ -41,8 +40,8 @@ private:
     std::mutex m_duplex_reads_mutex;
     std::condition_variable m_check_duplex_cv;
     std::unordered_set<uint64_t> m_updated_read_tags;
-    std::unordered_map<uint64_t, std::list<DuplexReadPtr>> m_duplex_reads;
-    std::unordered_map<uint64_t, std::pair<std::vector<SimplexReadPtr>, std::vector<DuplexReadPtr>>>
+    std::unordered_map<uint64_t, std::vector<DuplexReadPtr>> m_duplex_reads;
+    std::unordered_map<uint64_t, std::pair<std::vector<SimplexReadPtr>, size_t>>
             m_full_subread_groups;
 
     std::atomic_bool m_terminate{false};

@@ -21,20 +21,11 @@ void SubreadTaggerNode::worker_thread() {
         const auto read_tag = read_common.read_tag;
         const auto split_count = read_common.split_count;
         if (read_common.is_duplex) {
-            {
-                std::lock_guard lock(m_duplex_reads_mutex);
-                m_duplex_reads[read_tag].push_back(std::get<DuplexReadPtr>(std::move(message)));
-                m_updated_read_tags.insert(read_tag);
-            }
-            m_check_duplex_cv.notify_one();
+            std::lock_guard lock(m_duplex_reads_mutex);
+            m_duplex_reads[read_tag].push_back(std::get<DuplexReadPtr>(std::move(message)));
+            m_updated_read_tags.insert(read_tag);
         } else {
             auto read = std::get<SimplexReadPtr>(std::move(message));
-            if (split_count == 1 && read->num_duplex_candidate_pairs == 0) {
-                // Unsplit, unpaired simplex read: pass directly to the next node
-                send_message_to_sink(std::move(read));
-                continue;
-            }
-
             std::unique_lock subreads_lock(m_subread_groups_mutex);
             auto& subreads = m_subread_groups[read_tag];
             subreads.push_back(std::move(read));
@@ -54,20 +45,19 @@ void SubreadTaggerNode::worker_thread() {
                                     });
 
             if (num_expected_duplex == 0) {
-                // Got all subreads, no duplex to add
                 for (auto& subread : extracted_subreads) {
                     send_message_to_sink(std::move(subread));
                 }
-            } else {
-                {
-                    std::lock_guard duplex_lock(m_duplex_reads_mutex);
-                    m_full_subread_groups[read_tag] = {std::move(extracted_subreads),
-                                                       std::vector<DuplexReadPtr>{}};
-                    m_updated_read_tags.insert(read_tag);
-                }
-                m_check_duplex_cv.notify_one();
+                continue;
             }
+
+            std::lock_guard duplex_lock(m_duplex_reads_mutex);
+            m_full_subread_groups[read_tag] = {std::move(extracted_subreads), num_expected_duplex};
+            m_updated_read_tags.insert(read_tag);
         }
+        // if we've got this far then we either added a duplex read or filled a group of split reads
+        // so we need to check if we've received everything for that read_tag
+        m_check_duplex_cv.notify_one();
     }
 }
 
@@ -89,41 +79,33 @@ void SubreadTaggerNode::check_duplex_thread() {
             continue;
         }
 
-        auto& subreads = subreads_it->second;
-        auto& duplex_reads = m_duplex_reads[read_tag];
-        for (auto duplex_read_iter = duplex_reads.begin();
-             duplex_read_iter != duplex_reads.end();) {
-            auto& duplex_read = *duplex_read_iter;
-            duplex_read->read_common.subread_id = subreads.first.size() + subreads.second.size();
-            subreads.second.push_back(std::move(duplex_read));
-            duplex_read_iter = duplex_reads.erase(duplex_read_iter);
-        }
-
+        auto& [subreads, num_expected_duplex] = subreads_it->second;
         // check that all candidate pairs have been evaluated and that we have received a duplex read for all accepted candidate pairs
-        auto num_duplex_candidates =
-                std::accumulate(subreads.first.begin(), subreads.first.end(), size_t(0),
-                                [](const size_t& running_total, const SimplexReadPtr& subread) {
-                                    return subread->num_duplex_candidate_pairs + running_total;
-                                });
-        auto num_duplex = subreads.second.size();
-        if (num_duplex_candidates != num_duplex) {
+        auto& duplex_reads = m_duplex_reads[read_tag];
+        if (duplex_reads.size() != num_expected_duplex) {
             continue;
         }
 
-        // read group has received all of its expected duplex reads, push everything to the next node
+        // received all of expected duplex reads for read group, push everything to the next node
         auto extracted_subreads = std::move(subreads);
+        auto extracted_duplex_reads = std::move(duplex_reads);
         m_full_subread_groups.erase(read_tag);
         m_duplex_reads.erase(read_tag);
         lock.unlock();
 
-        auto subread_count = extracted_subreads.first.size() + extracted_subreads.second.size();
-        for (auto& subread : extracted_subreads.first) {
+        for (size_t index = 0; index < num_expected_duplex; ++index) {
+            auto& duplex_read = extracted_duplex_reads[index];
+            duplex_read->read_common.subread_id = extracted_subreads.size() + index;
+        }
+
+        auto subread_count = extracted_subreads.size() + extracted_duplex_reads.size();
+        for (auto& subread : extracted_subreads) {
             subread->read_common.split_count = subread_count;
             send_message_to_sink(std::move(subread));
         }
-        for (auto& subread : extracted_subreads.second) {
-            subread->read_common.split_count = subread_count;
-            send_message_to_sink(std::move(subread));
+        for (auto& duplex_read : extracted_duplex_reads) {
+            duplex_read->read_common.split_count = subread_count;
+            send_message_to_sink(std::move(duplex_read));
         }
     }
 }
