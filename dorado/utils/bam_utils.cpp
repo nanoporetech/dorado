@@ -312,4 +312,127 @@ bool validate_bam_tag_code(const std::string& bam_name) {
     return false;
 }
 
+std::vector<uint32_t> trim_cigar(uint32_t n_cigar,
+                                 const uint32_t* cigar,
+                                 const std::pair<int, int>& trim_interval) {
+    std::vector<uint32_t> ops;
+    ops.reserve(n_cigar);
+
+    auto trim_s = trim_interval.first;
+    auto trim_e = trim_interval.second;
+    auto trim_len = trim_e - trim_s;
+
+    int cursor = 0;
+    // The in_interval flag tracks where in the sequence
+    // the ops lie, i.e. either outside the interval or
+    // inside the interval.
+    bool in_interval = false;
+    for (int i = 0; i < n_cigar; i++) {
+        const uint32_t op = bam_cigar_op(cigar[i]);
+        const uint32_t oplen = bam_cigar_oplen(cigar[i]);
+        // According to htslib docs, bit 1 represents "consumes
+        // query" and bit 2 represents "consumes reference"
+        auto type = std::bitset<2>(bam_cigar_type(op));
+        if (type[0]) {
+            // consumes query positions
+            cursor += oplen;
+        }
+        if (cursor > trim_e) {
+            uint32_t new_len;
+            // In case the trim interval completely consumed
+            // by a CIGAR op, the state machine never enters
+            // the in_interval state. In that scenario, the
+            // final CIGAR string is the last CIGAR op but
+            // with the length of the interval.
+            // Otherwise the last op length is only the portion
+            // of the interval that overlaps with CIGAR op.
+            if (!in_interval) {
+                new_len = trim_len;
+            } else {
+                new_len = trim_e - (cursor - oplen);
+            }
+            // If the overlap of the last op and the remianing
+            // interval is 0 (i.e. the interval was covered with the
+            // previos op), don't add anything.
+            if (new_len > 0) {
+                ops.push_back(new_len << BAM_CIGAR_SHIFT | op);
+            }
+            break;
+        } else if (cursor > trim_s && !in_interval) {
+            // If the op straddles the start boundary of the interval,
+            // retain the overlap portion and switch state machine to
+            // being in_interval.
+            in_interval = true;
+            uint32_t new_len = cursor - trim_s;
+            ops.push_back((cursor - trim_s) << BAM_CIGAR_SHIFT | op);
+        } else if (in_interval) {
+            // If the op is inside the interval and not at boundaries,
+            // retain the op.
+            ops.push_back(cigar[i]);
+        }
+    }
+
+    // Remove any ops from the end that don't move the query cursor.
+    // Because the cursor isn't updated for ops that affect the
+    // reference only, ops such as DELETE can be left around which
+    // need to be cleaned up.
+    int last_pos = ops.size() - 1;
+    for (; last_pos > 0; last_pos--) {
+        const uint32_t op = bam_cigar_op(ops[last_pos]);
+        auto type = std::bitset<2>(bam_cigar_type(op));
+        if (type[0]) {
+            break;
+        }
+    }
+    ops.erase(ops.begin() + last_pos + 1, ops.end());
+
+    return ops;
+}
+
+uint32_t ref_pos_consumed(uint32_t n_cigar, const uint32_t* cigar, uint32_t query_pos) {
+    // In this algorithm the reference and query cursor are both
+    // consumed based on the type of op encountered in the CIGAR
+    // string. Once the query cursor reached the desired
+    // query position, the reference cursor position at that point
+    // is returned.
+    uint32_t query_cursor = 0;
+    uint32_t ref_cursor = 0;
+    for (int i = 0; i < n_cigar; i++) {
+        const uint32_t op = bam_cigar_op(cigar[i]);
+        const uint32_t oplen = bam_cigar_oplen(cigar[i]);
+        auto type = std::bitset<2>(bam_cigar_type(op));
+
+        if (type[0] && !type[1]) {
+            // Ops that consume query only.
+            query_cursor += oplen;
+            if (query_cursor >= query_pos) {
+                break;
+            }
+        } else if (!type[0] && type[1]) {
+            // Ops that consume reference only.
+            ref_cursor += oplen;
+        } else if (type[0] && type[1]) {
+            // Ops that consume query & reference.
+            if (query_cursor + oplen > query_pos) {
+                ref_cursor += (query_pos - query_cursor);
+                break;
+            } else {
+                ref_cursor += oplen;
+                query_cursor += oplen;
+            }
+        }
+    }
+    return ref_cursor;
+}
+
+std::string cigar2str(uint32_t n_cigar, const uint32_t* cigar) {
+    std::string cigar_str = "";
+    for (int i = 0; i < n_cigar; i++) {
+        auto oplen = bam_cigar_oplen(cigar[i]);
+        auto opchr = bam_cigar_opchr(cigar[i]);
+        cigar_str += std::to_string(oplen) + std::string(1, opchr);
+    }
+    return cigar_str;
+}
+
 }  // namespace dorado::utils
