@@ -139,24 +139,28 @@ DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(const ReadPair& read_pair) 
     // the buffer which helps bring down overall memory footprint.
     // 2. The mode with data copy that actually fills up the encoding tensor
     // with the right data needed for inference.
-    auto generate_encoding = [&](std::optional<at::Tensor> tmp, int target_cursor, int query_cursor,
-                                 int complement_signal_cursor) -> int {
+    auto generate_encoding = [&](std::optional<at::Tensor> stereo_features, int target_cursor,
+                                 int query_cursor, int complement_signal_cursor) -> int {
         int template_signal_cursor = 0;
 
         int stereo_global_cursor = 0;  // Index into the stereo-encoded signal
         std::array<SampleType*, kNumFeatures> feature_ptrs;
-        if (tmp) {
+        if (stereo_features) {
             for (int feature_idx = 0; feature_idx < kNumFeatures; ++feature_idx) {
-                feature_ptrs[feature_idx] = (tmp.value())[feature_idx].data_ptr<SampleType>();
+                feature_ptrs[feature_idx] =
+                        (stereo_features.value())[feature_idx].data_ptr<SampleType>();
             }
         }
         for (auto alignment_entry : stereo_feature_inputs.alignment) {
             // We move along every alignment position. For every position we need to add signal and padding.
             int total_segment_length = 0;
 
-            auto AddSignal = [&total_segment_length, stereo_global_cursor, &tmp, feature_ptrs](
-                                     const std::vector<uint8_t>& moves_expanded, int& signal_cursor,
-                                     int feature_index, const SampleType* const raw_data_ptr) {
+            // Adds the segment of the signal associated with the current base, updating
+            // total_segment_length to reflect the maximum across successive invocations.
+            auto AddSignal = [&total_segment_length, stereo_global_cursor, &stereo_features,
+                              feature_ptrs](const std::vector<uint8_t>& moves_expanded,
+                                            int& signal_cursor, int feature_index,
+                                            const SampleType* const raw_data_ptr) {
                 const auto max_signal_length = moves_expanded.size();
                 const auto* const start_ptr = &moves_expanded[signal_cursor + 1];
                 const auto* const next_move_ptr =
@@ -164,7 +168,7 @@ DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(const ReadPair& read_pair) 
                 const size_t sample_count =
                         next_move_ptr ? (next_move_ptr - start_ptr) : max_signal_length;
 
-                if (tmp) {
+                if (stereo_features) {
                     // Assumes contiguity of successive elements.
                     std::memcpy(&feature_ptrs[feature_index][stereo_global_cursor],
                                 &raw_data_ptr[signal_cursor],
@@ -188,24 +192,33 @@ DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(const ReadPair& read_pair) 
                           kFeatureComplementSignal, flipped_complement_raw_data_ptr);
             }
 
-            const int start_ts = stereo_global_cursor;
-
             // Converts Q scores from char to SampleType, with appropriate scale/offset.
             const auto convert_q_score = [](char q_in) {
                 return static_cast<SampleType>(static_cast<float>(q_in - 33) / 90.0f);
             };
 
-            // Now, add the nucleotides and q scores
+            // Now, add the nucleotides and q scores.  We need to do this after determining
+            // total_segment_length.
+            auto add_nucleotide_and_q =
+                    [total_segment_length, stereo_global_cursor, &stereo_features, feature_ptrs](
+                            const char nucleotide, const char q_score,
+                            const int first_nucleotide_feature_index, const int q_feature_index) {
+                        const auto convert_q_score = [](char q_in) {
+                            return static_cast<SampleType>(static_cast<float>(q_in - 33) / 90.0f);
+                        };
+                        const auto nucleotide_feature_idx = first_nucleotide_feature_index +
+                                                            dorado::utils::base_to_int(nucleotide);
+                        std::fill_n(&feature_ptrs[nucleotide_feature_idx][stereo_global_cursor],
+                                    total_segment_length, static_cast<SampleType>(1.0f));
+                        std::fill_n(&feature_ptrs[q_feature_index][stereo_global_cursor],
+                                    total_segment_length, convert_q_score(q_score));
+                    };
+
             if (alignment_entry != kAlignInsertionToQuery) {
-                if (tmp) {
-                    const char nucleotide = template_read.read_common.seq[target_cursor];
-                    const auto nucleotide_feature_idx = kFeatureTemplateFirstNucleotide +
-                                                        dorado::utils::base_to_int(nucleotide);
-                    std::fill_n(&feature_ptrs[nucleotide_feature_idx][start_ts],
-                                total_segment_length, static_cast<SampleType>(1.0f));
-                    std::fill_n(&feature_ptrs[kFeatureTemplateQScore][start_ts],
-                                total_segment_length,
-                                convert_q_score(template_read.read_common.qstring[target_cursor]));
+                if (stereo_features) {
+                    add_nucleotide_and_q(template_read.read_common.seq[target_cursor],
+                                         template_read.read_common.qstring[target_cursor],
+                                         kFeatureTemplateFirstNucleotide, kFeatureTemplateQScore);
                 }
 
                 // Anything but a query insertion causes the target cursor to advance.
@@ -214,24 +227,18 @@ DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(const ReadPair& read_pair) 
 
             // Now, add the nucleotides and q scores
             if (alignment_entry != kAlignInsertionToTarget) {
-                if (tmp) {
-                    const char nucleotide = complement_sequence_reverse_complement[query_cursor];
-                    const auto nucleotide_feature_idx = kFeatureComplementFirstNucleotide +
-                                                        dorado::utils::base_to_int(nucleotide);
-
-                    std::fill_n(&feature_ptrs[nucleotide_feature_idx][start_ts],
-                                total_segment_length, static_cast<SampleType>(1.0f));
-                    std::fill_n(
-                            &feature_ptrs[kFeatureComplementQScore][start_ts], total_segment_length,
-                            convert_q_score(
-                                    complement_read.read_common.qstring.rbegin()[query_cursor]));
+                if (stereo_features) {
+                    add_nucleotide_and_q(complement_sequence_reverse_complement[query_cursor],
+                                         complement_read.read_common.qstring.rbegin()[query_cursor],
+                                         kFeatureComplementFirstNucleotide,
+                                         kFeatureComplementQScore);
                 }
 
                 // Anything but a target insertion causes the query cursor to advance.
                 ++query_cursor;
             }
 
-            if (tmp) {
+            if (stereo_features) {
                 feature_ptrs[kFeatureMoveTable][stereo_global_cursor] =
                         static_cast<SampleType>(1);  // set the move table
             }
