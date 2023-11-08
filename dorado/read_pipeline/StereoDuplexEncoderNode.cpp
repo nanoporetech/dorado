@@ -152,51 +152,42 @@ DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(const ReadPair& read_pair) 
         }
         for (auto alignment_entry : stereo_feature_inputs.alignment) {
             // We move along every alignment position. For every position we need to add signal and padding.
+            int total_segment_length = 0;
 
-            // If there is *not* an insertion to the query, add the nucleotide from the target cursor
-            int template_segment_length = 0;  // index into this segment in signal-space
-            if (alignment_entry != kAlignInsertionToQuery) {
-                const auto max_signal_length = complement_moves_expanded.size();
-                const auto* const start_ptr = &template_moves_expanded[template_signal_cursor + 1];
-                auto* const next_move_ptr =
+            auto AddSignal = [&total_segment_length, stereo_global_cursor, &tmp, feature_ptrs](
+                                     const std::vector<uint8_t>& moves_expanded, int& signal_cursor,
+                                     int feature_index, const SampleType* const raw_data_ptr) {
+                const auto max_signal_length = moves_expanded.size();
+                const auto* const start_ptr = &moves_expanded[signal_cursor + 1];
+                const auto* const next_move_ptr =
                         static_cast<const uint8_t*>(std::memchr(start_ptr, 1, max_signal_length));
                 const size_t sample_count =
                         next_move_ptr ? (next_move_ptr - start_ptr) : max_signal_length;
 
                 if (tmp) {
                     // Assumes contiguity of successive elements.
-                    std::memcpy(&feature_ptrs[kFeatureTemplateSignal][stereo_global_cursor],
-                                &template_raw_data_ptr[template_signal_cursor],
+                    std::memcpy(&feature_ptrs[feature_index][stereo_global_cursor],
+                                &raw_data_ptr[signal_cursor],
                                 (sample_count + 1) * sizeof(SampleType));
                 }
 
-                template_segment_length = sample_count + 1;
-                template_signal_cursor += template_segment_length;
+                const int segment_length = sample_count + 1;
+                total_segment_length = std::max(total_segment_length, segment_length);
+                signal_cursor += segment_length;
+            };
+
+            // If there is *not* an insertion to the query, add the nucleotide from the target cursor.
+            if (alignment_entry != kAlignInsertionToQuery) {
+                AddSignal(template_moves_expanded, template_signal_cursor, kFeatureTemplateSignal,
+                          template_raw_data_ptr);
             }
 
             // If there is *not* an insertion to the target, add the nucleotide from the query cursor
-            int complement_segment_length = 0;  // index into this segment in signal-space
             if (alignment_entry != kAlignInsertionToTarget) {
-                const auto max_signal_length = complement_moves_expanded.size();
-                const auto* const start_ptr =
-                        &complement_moves_expanded[complement_signal_cursor + 1];
-                auto* const next_move_ptr =
-                        static_cast<const uint8_t*>(std::memchr(start_ptr, 1, max_signal_length));
-                const size_t sample_count =
-                        next_move_ptr ? (next_move_ptr - start_ptr) : max_signal_length;
-
-                if (tmp) {
-                    std::memcpy(&feature_ptrs[kFeatureComplementSignal][stereo_global_cursor],
-                                &flipped_complement_raw_data_ptr[complement_signal_cursor],
-                                (sample_count + 1) * sizeof(SampleType));
-                }
-
-                complement_segment_length = sample_count + 1;
-                complement_signal_cursor += complement_segment_length;
+                AddSignal(complement_moves_expanded, complement_signal_cursor,
+                          kFeatureComplementSignal, flipped_complement_raw_data_ptr);
             }
 
-            const int total_segment_length =
-                    std::max(template_segment_length, complement_segment_length);
             const int start_ts = stereo_global_cursor;
 
             // Converts Q scores from char to SampleType, with appropriate scale/offset.
