@@ -10,6 +10,7 @@
 #include <array>
 #include <cstdint>
 #include <cstring>
+#include <optional>
 #include <vector>
 
 using namespace at::indexing;
@@ -139,8 +140,8 @@ DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(const ReadPair& read_pair) 
     // the buffer which helps bring down overall memory footprint.
     // 2. The mode with data copy that actually fills up the encoding tensor
     // with the right data needed for inference.
-    auto generate_encoding = [&](std::optional<at::Tensor> stereo_features, int target_cursor,
-                                 int query_cursor, int complement_signal_cursor) -> int {
+    auto determine_encoding = [&](std::optional<at::Tensor> stereo_features, int target_cursor,
+                                  int query_cursor, int complement_signal_cursor) -> int {
         int template_signal_cursor = 0;
 
         int stereo_global_cursor = 0;  // Index into the stereo-encoded signal
@@ -252,19 +253,19 @@ DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(const ReadPair& read_pair) 
     // Call the encoding lambda first without data copy to get an estimate
     // of the encoding size.
     const auto encoding_tensor_size =
-            generate_encoding(std::nullopt, target_cursor, query_cursor, complement_signal_cursor);
+            determine_encoding(std::nullopt, target_cursor, query_cursor, complement_signal_cursor);
 
     const float pad_value =
             0.8 * std::min(at::min(complement_signal).item<float>(),
                            at::min(template_read.read_common.raw_data).item<float>());
-    auto tmp = at::zeros({kNumFeatures, encoding_tensor_size}, opts);
+    auto stereo_features = at::zeros({kNumFeatures, encoding_tensor_size}, opts);
 
     // Start with all signal feature entries equal to the padding value.
-    tmp.index({at::indexing::Slice(None, 2)}) = pad_value;
+    stereo_features.index({at::indexing::Slice(None, 2)}) = pad_value;
 
     // Call the encoding lambda again, this time with the correctly sized tensor
     // allocated for the final data to be filled in.
-    generate_encoding(tmp, target_cursor, query_cursor, complement_signal_cursor);
+    determine_encoding(stereo_features, target_cursor, query_cursor, complement_signal_cursor);
 
     auto read = std::make_unique<DuplexRead>();  // Return read
     read->read_common.read_id =
@@ -278,7 +279,7 @@ DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(const ReadPair& read_pair) 
 
     read->read_common.read_tag = template_read.read_common.read_tag;
     read->read_common.client_id = template_read.read_common.client_id;
-    read->read_common.raw_data = tmp;  // use the encoded signal
+    read->read_common.raw_data = stereo_features;  // use the encoded signal
     read->read_common.is_duplex = true;
     read->read_common.run_id = template_read.read_common.run_id;
     read->read_common.flowcell_id = template_read.read_common.flowcell_id;
