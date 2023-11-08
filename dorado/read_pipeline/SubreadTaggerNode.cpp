@@ -93,18 +93,18 @@ void SubreadTaggerNode::check_duplex_thread() {
         m_duplex_reads.erase(read_tag);
         lock.unlock();
 
-        for (size_t index = 0; index < num_expected_duplex; ++index) {
-            auto& duplex_read = extracted_duplex_reads[index];
-            duplex_read->read_common.subread_id = extracted_subreads.size() + index;
-        }
+        auto base = extracted_subreads.size();
+        auto subread_count = base + extracted_duplex_reads.size();
 
-        auto subread_count = extracted_subreads.size() + extracted_duplex_reads.size();
         for (auto& subread : extracted_subreads) {
             subread->read_common.split_count = subread_count;
             send_message_to_sink(std::move(subread));
         }
+
+        size_t index = 0;
         for (auto& duplex_read : extracted_duplex_reads) {
             duplex_read->read_common.split_count = subread_count;
+            duplex_read->read_common.subread_id = base + index++;
             send_message_to_sink(std::move(duplex_read));
         }
     }
