@@ -199,6 +199,8 @@ set(LIB_SOURCE_FILES
     dorado/read_pipeline/PolyACalculator.h
     dorado/read_pipeline/read_utils.cpp
     dorado/read_pipeline/read_utils.h
+    dorado/read_pipeline/stereo_features.cpp
+    dorado/read_pipeline/stereo_features.h
     dorado/read_pipeline/stitch.cpp
     dorado/read_pipeline/stitch.h
     dorado/read_pipeline/ReadSplitNode.cpp
