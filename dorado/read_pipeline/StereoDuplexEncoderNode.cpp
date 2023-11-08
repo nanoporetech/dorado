@@ -165,46 +165,34 @@ DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(const ReadPair& read_pair) 
 
                 if (tmp) {
                     // Assumes contiguity of successive elements.
-                    std::memcpy(&feature_ptrs[kFeatureTemplateSignal]
-                                             [stereo_global_cursor + template_segment_length],
+                    std::memcpy(&feature_ptrs[kFeatureTemplateSignal][stereo_global_cursor],
                                 &template_raw_data_ptr[template_signal_cursor],
                                 (sample_count + 1) * sizeof(SampleType));
                 }
 
-                template_signal_cursor += sample_count + 1;
-                template_segment_length += sample_count + 1;
+                template_segment_length = sample_count + 1;
+                template_signal_cursor += template_segment_length;
             }
 
             // If there is *not* an insertion to the target, add the nucleotide from the query cursor
             int complement_segment_length = 0;  // index into this segment in signal-space
             if (alignment_entry != kAlignInsertionToTarget) {
-                if (tmp) {
-                    std::memcpy(&feature_ptrs[kFeatureComplementSignal]
-                                             [stereo_global_cursor + complement_segment_length],
-                                &flipped_complement_raw_data_ptr[complement_signal_cursor],
-                                sizeof(SampleType));
-                }
-
-                ++complement_segment_length;
-                ++complement_signal_cursor;
-                auto max_signal_length = complement_moves_expanded.size();
-
-                // See comments above.
-                const auto* const start_ptr = &complement_moves_expanded[complement_signal_cursor];
+                const auto max_signal_length = complement_moves_expanded.size();
+                const auto* const start_ptr =
+                        &complement_moves_expanded[complement_signal_cursor + 1];
                 auto* const next_move_ptr =
                         static_cast<const uint8_t*>(std::memchr(start_ptr, 1, max_signal_length));
                 const size_t sample_count =
                         next_move_ptr ? (next_move_ptr - start_ptr) : max_signal_length;
 
                 if (tmp) {
-                    std::memcpy(&feature_ptrs[kFeatureComplementSignal]
-                                             [stereo_global_cursor + complement_segment_length],
+                    std::memcpy(&feature_ptrs[kFeatureComplementSignal][stereo_global_cursor],
                                 &flipped_complement_raw_data_ptr[complement_signal_cursor],
-                                sample_count * sizeof(SampleType));
+                                (sample_count + 1) * sizeof(SampleType));
                 }
 
-                complement_signal_cursor += sample_count;
-                complement_segment_length += sample_count;
+                complement_segment_length = sample_count + 1;
+                complement_signal_cursor += complement_segment_length;
             }
 
             const int total_segment_length =
