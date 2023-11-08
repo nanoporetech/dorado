@@ -20,7 +20,7 @@ public:
     virtual ~ClientAccess() = default;
 
     virtual const AlignmentInfo& alignment_info() const = 0;
-    virtual uint32_t client_id() const = 0;
+    virtual int32_t client_id() const = 0;
     virtual bool is_disconnected() const = 0;
 };
 
@@ -29,7 +29,7 @@ class StandaloneClientAccess final : public ClientAccess {
 
 public:
     const AlignmentInfo& alignment_info() const override { return empty_alignment_info; }
-    uint32_t client_id() const override { return -1; }
+    int32_t client_id() const override { return -1; }
     bool is_disconnected() const override { return false; }
 };
 

@@ -27,7 +27,7 @@ class TestClientAccess : public dorado::ClientAccess {
 public:
     TestClientAccess(dorado::AlignmentInfo align_info) : m_align_info(std::move(align_info)) {}
 
-    uint32_t client_id() const override { return 1; }
+    int32_t client_id() const override { return 1; }
 
     const dorado::AlignmentInfo& alignment_info() const override { return m_align_info; }
 
