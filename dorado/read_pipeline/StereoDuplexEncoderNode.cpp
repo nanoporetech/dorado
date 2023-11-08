@@ -41,6 +41,9 @@ at::Tensor GenerateStereoFeatures(const DuplexRead::StereoFeatureInputs& feature
     static constexpr int kFeatureTemplateQScore = 11;
     static constexpr int kFeatureComplementQScore = 12;
 
+    int template_signal_cursor = 0;
+    int complement_signal_cursor = 0;
+
     std::vector<uint8_t> template_moves_expanded;
     for (int i = 0; i < feature_inputs.template_moves.size(); i++) {
         template_moves_expanded.push_back(feature_inputs.template_moves[i]);
@@ -52,6 +55,12 @@ at::Tensor GenerateStereoFeatures(const DuplexRead::StereoFeatureInputs& feature
     int extra_padding = feature_inputs.template_signal.size(0) - template_moves_expanded.size();
     for (int i = 0; i < extra_padding; i++) {
         template_moves_expanded.push_back(0);
+    }
+
+    int template_moves_seen = template_moves_expanded[template_signal_cursor];
+    while (template_moves_seen < target_cursor + 1) {
+        template_signal_cursor++;
+        template_moves_seen += template_moves_expanded[template_signal_cursor];
     }
 
     std::vector<uint8_t> complement_moves_expanded;
@@ -70,8 +79,7 @@ at::Tensor GenerateStereoFeatures(const DuplexRead::StereoFeatureInputs& feature
     std::reverse(complement_moves_expanded.begin(), complement_moves_expanded.end());
     complement_moves_expanded.pop_back();
 
-    int complement_signal_cursor = 0;
-    int complement_moves_seen = feature_inputs.complement_moves[0];
+    int complement_moves_seen = feature_inputs.complement_moves[complement_signal_cursor];
     while (complement_moves_seen < query_cursor + 1) {
         ++complement_signal_cursor;
         complement_moves_seen += complement_moves_expanded[complement_signal_cursor];
@@ -94,16 +102,15 @@ at::Tensor GenerateStereoFeatures(const DuplexRead::StereoFeatureInputs& feature
     // the buffer which helps bring down overall memory footprint.
     // 2. The mode with data copy that actually fills up the encoding tensor
     // with the right data needed for inference.
-    auto determine_encoding = [&](std::optional<at::Tensor> stereo_features, int target_cursor,
-                                  int query_cursor, int complement_signal_cursor) -> int {
-        int template_signal_cursor = 0;
-
+    auto determine_encoding = [&](std::optional<at::Tensor*> stereo_features, int target_cursor,
+                                  int query_cursor, int template_signal_cursor,
+                                  int complement_signal_cursor) -> int {
         int stereo_global_cursor = 0;  // Index into the stereo-encoded signal
         std::array<SampleType*, kNumFeatures> feature_ptrs;
         if (stereo_features) {
             for (int feature_idx = 0; feature_idx < kNumFeatures; ++feature_idx) {
                 feature_ptrs[feature_idx] =
-                        (stereo_features.value())[feature_idx].data_ptr<SampleType>();
+                        (*stereo_features.value())[feature_idx].data_ptr<SampleType>();
             }
         }
         for (auto alignment_entry : feature_inputs.alignment) {
@@ -207,7 +214,7 @@ at::Tensor GenerateStereoFeatures(const DuplexRead::StereoFeatureInputs& feature
     // Call the encoding lambda first without data copy to get an estimate
     // of the encoding size.
     const auto encoding_tensor_size =
-            determine_encoding(std::nullopt, target_cursor, query_cursor, complement_signal_cursor);
+            determine_encoding(std::nullopt, target_cursor, query_cursor, template_signal_cursor, complement_signal_cursor);
 
     const float pad_value = 0.8 * std::min(at::min(feature_inputs.complement_signal).item<float>(),
                                            at::min(feature_inputs.template_signal).item<float>());
@@ -218,7 +225,7 @@ at::Tensor GenerateStereoFeatures(const DuplexRead::StereoFeatureInputs& feature
 
     // Call the encoding lambda again, this time with the correctly sized tensor
     // allocated for the final data to be filled in.
-    determine_encoding(stereo_features, target_cursor, query_cursor, complement_signal_cursor);
+    determine_encoding(&stereo_features, target_cursor, query_cursor, template_signal_cursor, complement_signal_cursor);
 
     return stereo_features;
 }
@@ -262,7 +269,7 @@ DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(const ReadPair& read_pair) 
     const auto alignment_size =
             static_cast<size_t>(edlib_result.endLocations[0] - edlib_result.startLocations[0]);
     stereo_feature_inputs.alignment.resize(alignment_size);
-    std::memcpy(stereo_feature_inputs.alignment.data(), edlib_result.alignment, alignment_size);
+    std::memcpy(stereo_feature_inputs.alignment.data(), &edlib_result.alignment[edlib_result.startLocations[0]], alignment_size);
     edlibFreeAlignResult(edlib_result);
 
     // TODO -- std::move these
