@@ -2,6 +2,7 @@
 
 #include "alignment/Minimap2Options.h"
 
+#include <cstdint>
 #include <string>
 
 namespace dorado {
@@ -16,16 +17,20 @@ struct AlignmentInfo {
 
 class ClientAccess {
 public:
-    virtual uint32_t client_id() const = 0;
+    virtual ~ClientAccess() = default;
+
     virtual const AlignmentInfo& alignment_info() const = 0;
+    virtual uint32_t client_id() const = 0;
+    virtual bool is_disconnected() const = 0;
 };
 
-class StandaloneClientAccess : public ClientAccess {
+class StandaloneClientAccess final : public ClientAccess {
     inline static const AlignmentInfo empty_alignment_info{};
 
 public:
-    uint32_t client_id() const override { return -1; }
     const AlignmentInfo& alignment_info() const override { return empty_alignment_info; }
+    uint32_t client_id() const override { return -1; }
+    bool is_disconnected() const override { return false; }
 };
 
 }  // namespace dorado

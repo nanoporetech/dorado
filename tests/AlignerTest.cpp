@@ -30,6 +30,8 @@ public:
     uint32_t client_id() const override { return 1; }
 
     const dorado::AlignmentInfo& alignment_info() const override { return m_align_info; }
+
+    bool is_disconnected() const override { return false; }
 };
 
 template <class... Args>
