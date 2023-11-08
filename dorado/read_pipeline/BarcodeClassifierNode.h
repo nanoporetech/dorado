@@ -43,7 +43,7 @@ private:
     void barcode(SimplexRead& read);
 
     BamPtr trim_barcode(BamPtr irecord, const BarcodeScoreResult& res, int seqlen);
-    void trim_barcode(SimplexRead& read, const BarcodeScoreResult& res);
+    std::pair<int, int> trim_barcode(SimplexRead& read, const BarcodeScoreResult& res);
     void terminate_impl();
 };
 
