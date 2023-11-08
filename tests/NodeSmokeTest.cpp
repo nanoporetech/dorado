@@ -379,6 +379,10 @@ DEFINE_TEST(NodeSmokeTestRead, "PolyACalculator") {
 
     set_pipeline_restart(pipeline_restart);
 
+    set_read_mutator([](dorado::SimplexReadPtr& read) {
+        read->read_common.moves = {1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1};
+    });
+
     run_smoke_test<dorado::PolyACalculator>(8, is_rna);
 }
 
