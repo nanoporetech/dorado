@@ -154,7 +154,7 @@ static std::pair<int, int> determine_trim_interval(const BarcodeScoreResult& res
 
 BamPtr BarcodeClassifierNode::trim_barcode(BamPtr input,
                                            const BarcodeScoreResult& res,
-                                           int seqlen) {
+                                           int seqlen) const {
     auto trim_interval = determine_trim_interval(res, seqlen);
 
     if (trim_interval.second - trim_interval.first == seqlen) {
@@ -222,7 +222,7 @@ BamPtr BarcodeClassifierNode::trim_barcode(BamPtr input,
 }
 
 std::pair<int, int> BarcodeClassifierNode::trim_barcode(SimplexRead& read,
-                                                        const BarcodeScoreResult& res) {
+                                                        const BarcodeScoreResult& res) const {
     int seqlen = int(read.read_common.seq.length());
     auto trim_interval = determine_trim_interval(res, seqlen);
 
