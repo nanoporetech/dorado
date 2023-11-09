@@ -1,6 +1,5 @@
 #include "StereoDuplexEncoderNode.h"
 
-#include "stereo_features.h"
 #include "utils/duplex_utils.h"
 #include "utils/sequence_utils.h"
 

@@ -1,7 +1,6 @@
 #include "BasecallerNode.h"
 
 #include "decode/CPUDecoder.h"
-#include "stereo_features.h"
 #include "stitch.h"
 #include "utils/stats.h"
 

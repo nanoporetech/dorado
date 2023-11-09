@@ -105,6 +105,7 @@ private:
 // Class representing a duplex read, including stereo-encoded raw data
 class DuplexRead {
 public:
+    // Data used to generate the stereo features in read_common.raw_data.
     class StereoFeatureInputs {
     public:
         std::vector<unsigned char> alignment;
@@ -188,7 +189,7 @@ bool is_read_message(const Message& message);
 
 ReadCommon& get_read_common_data(const Message& message);
 
-// Ensures the raw_data field is present, which it won't necessarily be for DuplexRead.
+// Ensures the raw_data field is non-empty, which it won't necessarily be for DuplexRead.
 void materialise_read_raw_data(Message& message);
 
 using NodeHandle = int;
