@@ -16,9 +16,9 @@ namespace dorado {
 at::Tensor GPUDecoder::gpu_part(at::Tensor scores, int num_chunks, DecoderOptions options) {
     c10::cuda::CUDAGuard device_guard(scores.device());
     utils::ScopedProfileRange loop{"gpu_decode", 1};
-    long int N = int(scores.sizes()[0]);
-    long int T = int(scores.sizes()[1]);
-    long int C = int(scores.sizes()[2]);
+    long int N = (long int)(scores.sizes()[0]);
+    long int T = (long int)(scores.sizes()[1]);
+    long int C = (long int)(scores.sizes()[2]);
 
     auto tensor_options_int32 =
             at::TensorOptions().dtype(at::kInt).device(scores.device()).requires_grad(false);

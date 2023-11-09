@@ -171,8 +171,7 @@ void ModBaseCallerNode::input_worker_thread() {
                         throw std::runtime_error("Invalid character in sequence.");
                     }
                     read->read_common
-                            .base_mod_probs[i * m_num_states + m_base_prob_offsets[base_id]] =
-                            uint8_t(1.0f);
+                            .base_mod_probs[i * m_num_states + m_base_prob_offsets[base_id]] = 1;
                 }
             }
             read->read_common.mod_base_info = m_mod_base_info;
