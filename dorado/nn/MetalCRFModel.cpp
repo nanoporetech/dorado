@@ -691,8 +691,6 @@ public:
         int C = model_config.outsize;
         int Cs = m_states;
 
-        int y = pow(n_base, model_config.state_len);
-
         for (int i = 0; i < m_out_split; ++i) {
             m_scores_int8.push_back(torch::empty({T, m_out_batch_size, C}, torch::kInt8));
             m_posts.push_back(torch::empty({m_out_batch_size, T + 1, Cs}));
