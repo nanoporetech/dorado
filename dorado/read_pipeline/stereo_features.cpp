@@ -39,34 +39,34 @@ at::Tensor GenerateStereoFeatures(const DuplexRead::StereoFeatureInputs& feature
     int complement_signal_cursor = 0;
 
     std::vector<uint8_t> template_moves_expanded;
-    for (int i = 0; i < feature_inputs.template_moves.size(); i++) {
+    for (int i = 0; i < feature_inputs.template_moves.size(); ++i) {
         template_moves_expanded.push_back(feature_inputs.template_moves[i]);
-        for (int j = 0; j < feature_inputs.signal_stride - 1; j++) {
+        for (int j = 0; j < feature_inputs.signal_stride - 1; ++j) {
             template_moves_expanded.push_back(0);
         }
     }
 
     int extra_padding = feature_inputs.template_signal.size(0) - template_moves_expanded.size();
-    for (int i = 0; i < extra_padding; i++) {
+    for (int i = 0; i < extra_padding; ++i) {
         template_moves_expanded.push_back(0);
     }
 
     int template_moves_seen = template_moves_expanded[template_signal_cursor];
     while (template_moves_seen < target_cursor + 1) {
-        template_signal_cursor++;
+        ++template_signal_cursor;
         template_moves_seen += template_moves_expanded[template_signal_cursor];
     }
 
     std::vector<uint8_t> complement_moves_expanded;
-    for (int i = 0; i < feature_inputs.complement_moves.size(); i++) {
+    for (int i = 0; i < feature_inputs.complement_moves.size(); ++i) {
         complement_moves_expanded.push_back(feature_inputs.complement_moves[i]);
-        for (int j = 0; j < feature_inputs.signal_stride - 1; j++) {
+        for (int j = 0; j < feature_inputs.signal_stride - 1; ++j) {
             complement_moves_expanded.push_back(0);
         }
     }
 
     extra_padding = feature_inputs.complement_signal.size(0) - complement_moves_expanded.size();
-    for (int i = 0; i < extra_padding; i++) {
+    for (int i = 0; i < extra_padding; ++i) {
         complement_moves_expanded.push_back(0);
     }
     complement_moves_expanded.push_back(1);
