@@ -143,7 +143,7 @@ public:
         auto bytes_per_chunk_timestep =
                 decode_bytes_per_chunk_timestep + crfmodel_bytes_per_chunk_timestep;
         int64_t chunk_size_out = chunk_size_in / model_config.stride;
-        available = available - int64_t(1.0e9f);  // Allow 1GB for model weights, etc.
+        available = available - 1'000'000'000ll;  // Allow 1GB for model weights, etc.
         if (available < 0) {
             spdlog::warn("Auto batchsize detection failed. Less than 1GB GPU memory available.");
             return granularity;

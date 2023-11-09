@@ -17,7 +17,7 @@ __attribute__((target("default")))
 #endif
 void convert_f32_to_f16_impl(c10::Half* const dest, const float* const src, std::size_t count) {
     // TODO -- handle large counts properly.
-    assert(count <= std::numeric_limits<int>::max());
+    assert(int(count) <= std::numeric_limits<int>::max());
     auto src_tensor_f32 = at::from_blob(const_cast<float*>(src), {static_cast<int>(count)});
     auto src_tensor_f16 = src_tensor_f32.to(at::ScalarType::Half);
     std::memcpy(dest, src_tensor_f16.data_ptr(), count * sizeof(c10::Half));
@@ -150,8 +150,8 @@ void copy_tensor_elems(at::Tensor& dest_tensor,
                        std::size_t count) {
     assert(dest_tensor.is_contiguous());
     assert(src_tensor.is_contiguous());
-    assert(dest_offset + count <= dest_tensor.numel());
-    assert(src_offset + count <= src_tensor.numel());
+    assert(dest_offset + count <= size_t(dest_tensor.numel()));
+    assert(src_offset + count <= size_t(src_tensor.numel()));
 
     if (dest_tensor.dtype() == src_tensor.dtype()) {
         // No conversion.

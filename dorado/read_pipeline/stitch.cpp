@@ -80,7 +80,7 @@ void stitch_chunks(ReadCommon& read_common,
             read_common.qstring.pop_back();
         }
         read_common.moves.pop_back();
-        assert(std::accumulate(read_common.moves.begin(), read_common.moves.end(), 0) ==
+        assert(size_t(std::accumulate(read_common.moves.begin(), read_common.moves.end(), 0)) ==
                read_common.seq.size());
     }
 }

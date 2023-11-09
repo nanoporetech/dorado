@@ -106,6 +106,9 @@ std::pair<std::vector<dorado::Runner>, size_t> create_basecall_runners(
 #endif  // __APPLE__
 #endif  // DORADO_GPU_BUILD
 
+#ifndef NDEBUG
+    auto model_stride = runners.front()->model_stride();
+#endif
     auto adjusted_chunk_size = runners.front()->chunk_size();
     assert(std::all_of(runners.begin(), runners.end(), [&](auto runner) {
         return runner->model_stride() == model_stride &&

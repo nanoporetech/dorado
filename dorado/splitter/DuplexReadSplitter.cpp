@@ -89,8 +89,9 @@ std::optional<PosRange> check_rc_match(const std::string& seq,
     std::optional<PosRange> res = std::nullopt;
     if (match) {
         assert(edlib_result.editDistance <= dist_thr);
-        assert(edlib_result.numLocations > 0 && edlib_result.endLocations[0] < compl_r.second &&
-               edlib_result.startLocations[0] < compl_r.second);
+        assert(edlib_result.numLocations > 0 &&
+               edlib_result.endLocations[0] < int(compl_r.second) &&
+               edlib_result.startLocations[0] < int(compl_r.second));
         res = PosRange(compl_r.second - edlib_result.endLocations[0],
                        compl_r.second - edlib_result.startLocations[0]);
     }

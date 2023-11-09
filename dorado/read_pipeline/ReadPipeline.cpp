@@ -289,8 +289,10 @@ ReadPair::ReadData ReadPair::ReadData::from_read(const SimplexRead &read,
 MessageSink::MessageSink(size_t max_messages) : m_work_queue(max_messages) {}
 
 void MessageSink::push_message_internal(Message &&message) {
-    const auto status = m_work_queue.try_push(std::move(message));
-    (void)status;
+#ifndef NDEBUG
+    const auto status =
+#endif
+            m_work_queue.try_push(std::move(message));
     // try_push will fail if the sink has been told to terminate.
     // We do not expect to be pushing reads from this source if that is the case.
     assert(status == utils::AsyncQueueStatus::Success);
