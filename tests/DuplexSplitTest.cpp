@@ -27,9 +27,9 @@ auto make_read() {
     read->range = 0;
     read->read_common.sample_rate = 4000;
     read->offset = -287;
-    read->scaling = 0.14620706;
-    read->read_common.shift = 94.717316;
-    read->read_common.scale = 26.888939;
+    read->scaling = 0.14620706f;
+    read->read_common.shift = 94.717316f;
+    read->read_common.scale = 26.888939f;
     read->read_common.model_stride = 5;
     read->read_common.read_id = "00a2dd45-f6a9-49ba-86ee-5d2a37b861cb";
     read->read_common.num_trimmed_samples = 10;
@@ -66,7 +66,7 @@ TEST_CASE("4 subread splitting test", TEST_GROUP) {
     CHECK(split_res.size() == 4);
     std::vector<int> split_sizes;
     for (auto &r : split_res) {
-        split_sizes.push_back(r->read_common.seq.size());
+        split_sizes.push_back(int(r->read_common.seq.size()));
     }
     CHECK(split_sizes == std::vector<int>{6858, 7854, 5184, 5168});
 
@@ -174,9 +174,9 @@ TEST_CASE("No split output read properties", TEST_GROUP) {
     read->range = 0;
     read->read_common.sample_rate = 4000;
     read->offset = -287;
-    read->scaling = 0.14620706;
-    read->read_common.shift = 94.717316;
-    read->read_common.scale = 26.888939;
+    read->scaling = 0.14620706f;
+    read->read_common.shift = 94.717316f;
+    read->read_common.scale = 26.888939f;
     read->read_common.model_stride = 5;
     read->read_common.read_id = init_read_id;
     read->read_common.num_trimmed_samples = 10;
@@ -224,9 +224,9 @@ TEST_CASE("Test split where only one subread is generated", TEST_GROUP) {
     read->range = 0;
     read->read_common.sample_rate = 5000;
     read->offset = -260;
-    read->scaling = 0.18707;
-    read->read_common.shift = 94.7565;
-    read->read_common.scale = 29.4467;
+    read->scaling = 0.18707f;
+    read->read_common.shift = 94.7565f;
+    read->read_common.scale = 29.4467f;
     read->read_common.model_stride = 6;
     read->read_common.read_id = "6571a1d9-5dff-44f4-a526-558584ccea82";
     read->read_common.num_trimmed_samples = 4010;

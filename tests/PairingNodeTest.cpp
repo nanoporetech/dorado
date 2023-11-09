@@ -50,7 +50,7 @@ TEST_CASE("Split read pairing", TEST_GROUP) {
     const std::string seq =
             ReadFileIntoString(std::filesystem::path(get_aligner_data_dir()) / "long_target.fa");
     auto seq_rc = dorado::utils::reverse_complement(seq);
-    seq_rc = seq_rc.substr(0, seq.length() * 0.8f);
+    seq_rc = seq_rc.substr(0, size_t(seq.length() * 0.8f));
 
     std::array reads{
             make_read(0, 1000),

@@ -85,7 +85,7 @@ ReadMap read_bam(const std::string& filename, const std::unordered_set<std::stri
         std::vector<char> nucleotides(seqlen);
 
         // Todo - there is a better way to do this.
-        for (int i = 0; i < seqlen; i++) {
+        for (uint32_t i = 0; i < seqlen; i++) {
             qualities[i] = qstring[i] + 33;
             nucleotides[i] = seq_nt16_str[bam_seqi(sequence, i)];
         }
@@ -118,7 +118,7 @@ std::unordered_set<std::string> fetch_read_ids(const std::string& filename) {
             std::string read_id = bam_get_qname(reader.record);
             read_ids.insert(read_id);
         }
-    } catch (std::exception& e) {
+    } catch (std::exception&) {
         // Do nothing.
     }
 

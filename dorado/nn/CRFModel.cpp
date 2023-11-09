@@ -303,8 +303,8 @@ struct ConvolutionImpl : Module {
         utils::ScopedProfileRange spr("conv", 2);
 
         auto in = wm.current;
-        int batch_size = in.size(0);
-        int chunk_size_in = in.size(1);
+        int batch_size = int(in.size(0));
+        int chunk_size_in = int(in.size(1));
         int chunk_size_out = chunk_size_in / stride;
 
         // TODO: make device weights permanent?
@@ -327,7 +327,7 @@ struct ConvolutionImpl : Module {
                 ntwc_mat = tnwc_mat.transpose(0, 1);
             }
             host_window_ntwc_f16(stream, batch_size, chunk_size_in, in_size, window_size, stride,
-                                 ntwc_mat.stride(0), ntwc_mat.stride(1), in.data_ptr(),
+                                 int(ntwc_mat.stride(0)), int(ntwc_mat.stride(1)), in.data_ptr(),
                                  ntwc_mat.data_ptr());
 
             auto mm_in = wm.current.view({-1, window_size * in_size});
@@ -352,15 +352,16 @@ struct ConvolutionImpl : Module {
             }
 
             dorado::utils::matmul_f16(mm_in, w_device, mm_out);
-            host_bias_activation_f16_inplace(stream, mm_out.size(0), mm_out.size(1),
-                                             mm_out.stride(0), mm_out.data_ptr(),
+            host_bias_activation_f16_inplace(stream, int(mm_out.size(0)), int(mm_out.size(1)),
+                                             int(mm_out.stride(0)), mm_out.data_ptr(),
                                              b_device.data_ptr(), get_koi_activation(activation));
 
             if (lstm_mode == LstmMode::CUTLASS_TNC_I8) {
                 auto conv_out = out.slice(0, 1, chunk_size_out + 1).view({-1, out_size});
-                host_convert(stream, mm_out.data_ptr(), 0, mm_out.stride(0), mm_out.stride(1),
-                             KOI_F16, conv_out.data_ptr(), 0, conv_out.stride(0),
-                             conv_out.stride(1), KOI_I8, 1, conv_out.size(0), conv_out.size(1));
+                host_convert(stream, mm_out.data_ptr(), 0, int(mm_out.stride(0)),
+                             int(mm_out.stride(1)), KOI_F16, conv_out.data_ptr(), 0,
+                             int(conv_out.stride(0)), int(conv_out.stride(1)), KOI_I8, 1,
+                             int(conv_out.size(0)), int(conv_out.size(1)));
             }
 
             if (lstm_mode == LstmMode::CUBLAS_TN2C) {
@@ -452,8 +453,9 @@ struct LinearCRFImpl : Module {
         dorado::utils::matmul_f16(in.view({-1, Cin}), wt, out_2D);
         if (activation) {
             auto stream = at::cuda::getCurrentCUDAStream().stream();
-            host_bias_activation_f16_inplace(stream, T * N, Cout, Cout, out_2D.data_ptr(),
-                                             linear->bias.data_ptr(), KOI_TANH_X5);
+            host_bias_activation_f16_inplace(stream, int(T * N), int(Cout), int(Cout),
+                                             out_2D.data_ptr(), linear->bias.data_ptr(),
+                                             KOI_TANH_X5);
         } else if (bias) {
             out_2D += linear->bias;
         }
@@ -534,9 +536,9 @@ private:
         auto stream = at::cuda::getCurrentCUDAStream().stream();
 
         auto in = wm.current;
-        const int chunk_size = in.size(0) - 1;
-        const int batch_size = in.size(1);
-        assert(layer_size == in.size(3));
+        const int chunk_size = int(in.size(0) - 1);
+        const int batch_size = int(in.size(1));
+        assert(layer_size == int(in.size(3)));
         assert(in.dim() == 4 && in.size(2) == 2);
         assert(in.dtype() == torch::kF16);
 
@@ -586,8 +588,9 @@ private:
         auto out = wm.next({batch_size, chunk_size, layer_size}, torch::kF16);
         in = inout_left;
         utils::ScopedProfileRange spr_convert("transpose_tn2c_to_ntc", 3);
-        host_transpose_f16(stream, in.data_ptr(), in.size(0), in.size(1), in.size(2), in.stride(0),
-                           in.stride(1), in.stride(2), out.stride(1), out.stride(0), out.stride(2),
+        host_transpose_f16(stream, in.data_ptr(), int(in.size(0)), int(in.size(1)), int(in.size(2)),
+                           int(in.stride(0)), int(in.stride(1)), int(in.stride(2)),
+                           int(out.stride(1)), int(out.stride(0)), int(out.stride(2)),
                            out.data_ptr());
     }
 
@@ -599,9 +602,9 @@ private:
         auto stream = at::cuda::getCurrentCUDAStream().stream();
 
         auto in = wm.current;
-        const int chunk_size = in.size(0) - 3;
-        const int batch_size = in.size(1);
-        assert(layer_size == in.size(2));
+        const int chunk_size = int(in.size(0) - 3);
+        const int batch_size = int(in.size(1));
+        assert(layer_size == int(in.size(2)));
         assert(in.dim() == 3);
         assert(in.dtype() == torch::kF16 || in.dtype() == torch::kInt8);
         auto opts_f16 = in.options().dtype(torch::kF16);
@@ -663,7 +666,7 @@ private:
 
             auto in = wm.current;
             host_cutlass_lstm(stream, type_id, layer_idx, batch_size, layer_size, chunk_size,
-                              reverse ? -1 : 1, in.stride(1), in.data_ptr(),
+                              reverse ? -1 : 1, int(in.stride(1)), in.data_ptr(),
                               device_weights[layer_idx].data_ptr(),
                               device_bias[layer_idx].data_ptr(), device_scale[layer_idx].data_ptr(),
                               state_buf.data_ptr(), workspace_buf.data_ptr(), interleave, 0);
@@ -671,9 +674,10 @@ private:
             if (layer_idx == 0 && convert_to_i8) {
                 utils::ScopedProfileRange spr_convert("f16_to_int8", 4);
                 auto out = wm.next(in.sizes(), torch::kI8);
-                host_convert(stream, in.data_ptr(), in.stride(0), in.stride(1), in.stride(2),
-                             KOI_F16, out.data_ptr(), out.stride(0), out.stride(1), out.stride(2),
-                             KOI_I8, in.size(0), in.size(1), in.size(2));
+                host_convert(stream, in.data_ptr(), int(in.stride(0)), int(in.stride(1)),
+                             int(in.stride(2)), KOI_F16, out.data_ptr(), int(out.stride(0)),
+                             int(out.stride(1)), int(out.stride(2)), KOI_I8, int(in.size(0)),
+                             int(in.size(1)), int(in.size(2)));
                 type_id = KOI_I8;
             }
 
@@ -685,14 +689,16 @@ private:
         auto out = wm.next({batch_size, chunk_size, layer_size}, torch::kF16);
         if (type_id == KOI_I8) {
             utils::ScopedProfileRange spr_convert("int8_tnc_to_f16_ntc", 3);
-            host_convert(stream, in.data_ptr(), in.stride(0), in.stride(1), in.stride(2), KOI_I8,
-                         out.data_ptr(), out.stride(1), out.stride(0), out.stride(2), KOI_F16,
-                         in.size(0), in.size(1), in.size(2));
+            host_convert(stream, in.data_ptr(), int(in.stride(0)), int(in.stride(1)),
+                         int(in.stride(2)), KOI_I8, out.data_ptr(), int(out.stride(1)),
+                         int(out.stride(0)), int(out.stride(2)), KOI_F16, int(in.size(0)),
+                         int(in.size(1)), int(in.size(2)));
         } else {
             utils::ScopedProfileRange spr_convert("transpose_tnc_to_ntc", 3);
-            host_transpose_f16(stream, in.data_ptr(), in.size(0), in.size(1), in.size(2),
-                               in.stride(0), in.stride(1), in.stride(2), out.stride(1),
-                               out.stride(0), out.stride(2), out.data_ptr());
+            host_transpose_f16(stream, in.data_ptr(), int(in.size(0)), int(in.size(1)),
+                               int(in.size(2)), int(in.stride(0)), int(in.stride(1)),
+                               int(in.stride(2)), int(out.stride(1)), int(out.stride(0)),
+                               int(out.stride(2)), out.data_ptr());
         }
 
 #endif  // ifdef DORADO_TX2 else
@@ -733,8 +739,8 @@ private:
     void forward_quantized(WorkingMemory &wm) {
         // Input and output in the same buffer [N, T, C], F16
         auto inout = wm.current;
-        int batch_size = inout.size(0);
-        int chunk_size = inout.size(1);
+        int batch_size = int(inout.size(0));
+        int chunk_size = int(inout.size(1));
 
         // Quantise weights and move to GPU, if called for the first time
         if (device_w_hh.empty()) {
@@ -891,8 +897,9 @@ struct CRFModelImpl : Module {
 
         auto stream = at::cuda::getCurrentCUDAStream().stream();
         auto out = wm.next(in.transpose(1, 2).sizes(), torch::kF16);
-        host_transpose_f16(stream, in.data_ptr(), in.size(0), in.size(1), in.size(2), in.stride(0),
-                           in.stride(1), in.stride(2), out.stride(0), out.stride(2), out.stride(1),
+        host_transpose_f16(stream, in.data_ptr(), int(in.size(0)), int(in.size(1)), int(in.size(2)),
+                           int(in.stride(0)), int(in.stride(1)), int(in.stride(2)),
+                           int(out.stride(0)), int(out.stride(2)), int(out.stride(1)),
                            out.data_ptr());
 
         conv1->run_koi(wm);

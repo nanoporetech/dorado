@@ -233,7 +233,7 @@ std::map<std::string, std::string> extract_pg_keys_from_hdr(const std::string fi
     // also get inlined into dorado code when invoked directly. As a result, it's possible
     // that an htslib APIs resizes a string using the DLL code. But when a ks_free
     // is attempted on it from dorado, there's cross-heap behavior and a segfault occurs.
-    ks_resize(&val, 1e6);
+    ks_resize(&val, size_t(1e6));
     for (auto& k : keys) {
         auto ret = sam_hdr_find_tag_id(header.get(), "PG", NULL, NULL, k.c_str(), &val);
         if (ret != 0) {
@@ -271,10 +271,10 @@ std::tuple<int, std::vector<uint8_t>> extract_move_table(bam1_t* input_record) {
     if (move_vals_aux) {
         int len = bam_auxB_len(move_vals_aux);
         // First element for move table array is the stride.
-        stride = bam_auxB2i(move_vals_aux, 0);
+        stride = int(bam_auxB2i(move_vals_aux, 0));
         move_vals.resize(len - 1);
         for (int i = 1; i < len; i++) {
-            move_vals[i - 1] = bam_auxB2i(move_vals_aux, i);
+            move_vals[i - 1] = uint8_t(bam_auxB2i(move_vals_aux, i));
         }
     }
     return {stride, move_vals};
@@ -291,7 +291,7 @@ std::tuple<std::string, std::vector<uint8_t>> extract_modbase_info(bam1_t* input
         int len = bam_auxB_len(modbase_prob_aux);
         modbase_probs.resize(len);
         for (int i = 0; i < len; i++) {
-            modbase_probs[i] = bam_auxB2i(modbase_prob_aux, i);
+            modbase_probs[i] = uint8_t(bam_auxB2i(modbase_prob_aux, i));
         }
     }
 
@@ -327,7 +327,7 @@ std::vector<uint32_t> trim_cigar(uint32_t n_cigar,
     // the ops lie, i.e. either outside the interval or
     // inside the interval.
     bool in_interval = false;
-    for (int i = 0; i < n_cigar; i++) {
+    for (uint32_t i = 0; i < n_cigar; i++) {
         const uint32_t op = bam_cigar_op(cigar[i]);
         const uint32_t oplen = bam_cigar_oplen(cigar[i]);
         // According to htslib docs, bit 1 represents "consumes
@@ -376,7 +376,7 @@ std::vector<uint32_t> trim_cigar(uint32_t n_cigar,
     // Because the cursor isn't updated for ops that affect the
     // reference only, ops such as DELETE can be left around which
     // need to be cleaned up.
-    int last_pos = ops.size() - 1;
+    int last_pos = int(ops.size() - 1);
     for (; last_pos > 0; last_pos--) {
         const uint32_t op = bam_cigar_op(ops[last_pos]);
         auto type = std::bitset<2>(bam_cigar_type(op));
@@ -397,7 +397,7 @@ uint32_t ref_pos_consumed(uint32_t n_cigar, const uint32_t* cigar, uint32_t quer
     // is returned.
     uint32_t query_cursor = 0;
     uint32_t ref_cursor = 0;
-    for (int i = 0; i < n_cigar; i++) {
+    for (uint32_t i = 0; i < n_cigar; i++) {
         const uint32_t op = bam_cigar_op(cigar[i]);
         const uint32_t oplen = bam_cigar_oplen(cigar[i]);
         auto type = std::bitset<2>(bam_cigar_type(op));
@@ -427,7 +427,7 @@ uint32_t ref_pos_consumed(uint32_t n_cigar, const uint32_t* cigar, uint32_t quer
 
 std::string cigar2str(uint32_t n_cigar, const uint32_t* cigar) {
     std::string cigar_str = "";
-    for (int i = 0; i < n_cigar; i++) {
+    for (uint32_t i = 0; i < n_cigar; i++) {
         auto oplen = bam_cigar_oplen(cigar[i]);
         auto opchr = bam_cigar_opchr(cigar[i]);
         cigar_str += std::to_string(oplen) + std::string(1, opchr);

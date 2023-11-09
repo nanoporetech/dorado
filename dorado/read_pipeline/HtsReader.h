@@ -49,11 +49,11 @@ T HtsReader::get_tag(std::string tagname) {
         return tag_value;
     }
     if constexpr (std::is_integral_v<T>) {
-        tag_value = bam_aux2i(tag);
+        tag_value = static_cast<T>(bam_aux2i(tag));
     } else if constexpr (std::is_floating_point_v<T>) {
-        tag_value = bam_aux2f(tag);
+        tag_value = static_cast<T>(bam_aux2f(tag));
     } else {
-        tag_value = bam_aux2Z(tag);
+        tag_value = static_cast<T>(bam_aux2Z(tag));
     }
 
     return tag_value;

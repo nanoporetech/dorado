@@ -38,7 +38,7 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
                                             int num_samples_per_base,
                                             bool is_rna) {
     const c10::Half* signal = static_cast<c10::Half*>(read.read_common.raw_data.data_ptr());
-    int signal_len = read.read_common.get_raw_data_samples();
+    int signal_len = int(read.read_common.get_raw_data_samples());
 
     auto calc_stats = [&](int s, int e) -> std::pair<float, float> {
         float avg = 0;
@@ -68,7 +68,7 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
     // Minimum size of intervals considered for merge.
     const int kMinIntervalSizeForMerge = 10 * num_samples_per_base;
     // Floor for average signal value of poly tail.
-    const float kMinAvgVal = (is_rna ? 0.0 : -3.0);
+    const float kMinAvgVal = (is_rna ? 0.0f : -3.0f);
 
     int left_end = is_rna ? std::max(0, signal_anchor - 50) : std::max(0, signal_anchor - kSpread);
     int right_end = std::min(signal_len, signal_anchor + kSpread);
@@ -173,13 +173,13 @@ int estimate_samples_per_base(const dorado::SimplexRead& read, bool is_rna) {
                                             read.read_common.get_raw_data_samples(), num_bases + 1);
         // Use last 100bp to estimate samples / base.
         size_t signal_len = seq_to_sig_map[num_bases] - seq_to_sig_map[num_bases - 100];
-        return std::floor(static_cast<float>(signal_len) / 100);
+        return int(std::floor(static_cast<float>(signal_len) / 100));
     }
     float num_samples_per_base =
             static_cast<float>(read.read_common.get_raw_data_samples()) / num_bases;
     // The estimate is not rounded because this calculation generally overestimates
     // the samples per base. Rounding down gives better results than rounding to nearest.
-    return std::floor(num_samples_per_base);
+    return int(std::floor(num_samples_per_base));
 }
 
 // In order to find the approximate location of the start/end (anchor) of the polyA
@@ -206,18 +206,18 @@ SignalAnchorInfo determine_signal_anchor_and_strand_cdna(const dorado::SimplexRe
     align_config.mode = EDLIB_MODE_HW;
 
     // Check for forward strand.
-    EdlibAlignResult top_v1 =
-            edlibAlign(SSP.data(), SSP.length(), read_top.data(), read_top.length(), align_config);
-    EdlibAlignResult bottom_v1 = edlibAlign(VNP_rc.data(), VNP_rc.length(), read_bottom.data(),
-                                            read_bottom.length(), align_config);
+    EdlibAlignResult top_v1 = edlibAlign(SSP.data(), int(SSP.length()), read_top.data(),
+                                         int(read_top.length()), align_config);
+    EdlibAlignResult bottom_v1 = edlibAlign(VNP_rc.data(), int(VNP_rc.length()), read_bottom.data(),
+                                            int(read_bottom.length()), align_config);
 
     int dist_v1 = top_v1.editDistance + bottom_v1.editDistance;
 
     // Check for reverse strand.
-    EdlibAlignResult top_v2 =
-            edlibAlign(VNP.data(), VNP.length(), read_top.data(), read_top.length(), align_config);
-    EdlibAlignResult bottom_v2 = edlibAlign(SSP_rc.data(), SSP_rc.length(), read_bottom.data(),
-                                            read_bottom.length(), align_config);
+    EdlibAlignResult top_v2 = edlibAlign(VNP.data(), int(VNP.length()), read_top.data(),
+                                         int(read_top.length()), align_config);
+    EdlibAlignResult bottom_v2 = edlibAlign(SSP_rc.data(), int(SSP_rc.length()), read_bottom.data(),
+                                            int(read_bottom.length()), align_config);
 
     int dist_v2 = top_v2.editDistance + bottom_v2.editDistance;
     spdlog::debug("v1 dist {}, v2 dist {}", dist_v1, dist_v2);
@@ -240,7 +240,7 @@ SignalAnchorInfo determine_signal_anchor_and_strand_cdna(const dorado::SimplexRe
         const auto seq_to_sig_map = dorado::utils::moves_to_map(
                 read.read_common.moves, stride, read.read_common.get_raw_data_samples(),
                 read.read_common.seq.size() + 1);
-        int signal_anchor = seq_to_sig_map[base_anchor];
+        int signal_anchor = int(seq_to_sig_map[base_anchor]);
 
         result = {fwd, signal_anchor, trailing_Ts};
     } else {
@@ -296,9 +296,9 @@ void PolyACalculator::worker_thread() {
             auto [signal_start, signal_end] = determine_signal_bounds(
                     signal_anchor, fwd, *read, num_samples_per_base, m_is_rna);
 
-            int num_bases = std::round(static_cast<float>(signal_end - signal_start) /
-                                       num_samples_per_base) -
-                            trailing_Ts;
+            int num_bases = int(std::round(static_cast<float>(signal_end - signal_start) /
+                                           num_samples_per_base) -
+                                trailing_Ts);
             if (num_bases > 0 && num_bases < kMaxTailLength) {
                 spdlog::debug(
                         "{} PolyA bases {}, signal anchor {} Signal range is {} {}, "
@@ -381,8 +381,8 @@ stats::NamedStats PolyACalculator::sample_stats() const {
     stats::NamedStats stats = stats::from_obj(m_work_queue);
     stats["reads_not_estimated"] = num_not_called.load();
     stats["reads_estimated"] = num_called.load();
-    stats["average_tail_length"] =
-            num_called.load() > 0 ? total_tail_lengths_called.load() / num_called.load() : 0;
+    stats["average_tail_length"] = double(
+            num_called.load() > 0 ? total_tail_lengths_called.load() / num_called.load() : 0);
     return stats;
 }
 

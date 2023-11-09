@@ -78,7 +78,7 @@ std::pair<float, float> ModBaseScaler::calc_offset_scale(
         SignalType* samples_ptr = samples.data_ptr<SignalType>();
         // get the mid-point of the base
         for (size_t i = 0; i < n; i++) {
-            int pos = (seq_to_sig_map[i] + seq_to_sig_map[i + 1]) / 2;
+            int pos = int((seq_to_sig_map[i] + seq_to_sig_map[i + 1]) / 2);
             optim_dacs[i] = static_cast<float>(samples_ptr[pos]);
             new_levels[i] = levels[i];
         }

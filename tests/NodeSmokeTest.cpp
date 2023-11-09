@@ -47,19 +47,19 @@ protected:
 
     float random_between(float min, float max) {
         typename decltype(m_dist)::param_type range(min, max);
-        return m_dist(m_rng, range);
+        return float(m_dist(m_rng, range));
     }
 
     auto make_test_read(std::string read_id) {
         auto read = std::make_unique<dorado::SimplexRead>();
-        read->read_common.raw_data = torch::rand(random_between(100, 200));
+        read->read_common.raw_data = torch::rand(size_t(random_between(100, 200)));
         read->read_common.sample_rate = 5000;
         read->read_common.shift = random_between(100, 200);
         read->read_common.scale = random_between(5, 10);
         read->read_common.read_id = std::move(read_id);
         read->read_common.seq = "ACGTACGT";
         read->read_common.qstring = "********";
-        read->read_common.num_trimmed_samples = random_between(10, 100);
+        read->read_common.num_trimmed_samples = size_t(random_between(10, 100));
         read->read_common.attributes.mux = 2;
         read->read_common.attributes.read_number = 12345;
         read->read_common.attributes.channel_number = 5;
@@ -178,10 +178,10 @@ DEFINE_TEST(NodeSmokeTestRead, "ScalerNode") {
 
     dorado::SignalNormalisationParams config;
     config.strategy = dorado::ScalingStrategy::QUANTILE;
-    config.quantile_a = 0.2;
-    config.quantile_b = 0.9;
-    config.shift_multiplier = 0.51;
-    config.scale_multiplier = 0.53;
+    config.quantile_a = 0.2f;
+    config.quantile_b = 0.9f;
+    config.shift_multiplier = 0.51f;
+    config.scale_multiplier = 0.53f;
     run_smoke_test<dorado::ScalerNode>(config, model_type, 2);
 }
 
@@ -223,7 +223,7 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
         }
         for (const auto& device : devices) {
             auto caller = dorado::create_cuda_caller(model_config, default_params.chunksize,
-                                                     batch_size, device);
+                                                     int(batch_size), device);
             for (size_t i = 0; i < default_params.num_runners; i++) {
                 runners.push_back(std::make_shared<dorado::CudaModelRunner>(caller));
             }
@@ -238,7 +238,7 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
         set_expected_messages(5);
         batch_size = 8;
         runners.push_back(std::make_shared<dorado::ModelRunner<dorado::CPUDecoder>>(
-                model_config, "cpu", default_params.chunksize, batch_size));
+                model_config, "cpu", default_params.chunksize, int(batch_size)));
     }
 
     run_smoke_test<dorado::BasecallerNode>(std::move(runners),
@@ -309,7 +309,7 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
     set_read_mutator([this, model_stride](dorado::SimplexReadPtr& read) {
         read->read_common.raw_data = read->read_common.raw_data.to(torch::kHalf);
 
-        read->read_common.model_stride = model_stride;
+        read->read_common.model_stride = int(model_stride);
         // The move table size needs rounding up.
         size_t const move_table_size =
                 (read->read_common.get_raw_data_samples() + model_stride - 1) / model_stride;

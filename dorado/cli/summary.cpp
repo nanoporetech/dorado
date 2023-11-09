@@ -157,20 +157,21 @@ int summary(int argc, char *argv[]) {
                 alignment_mapq = static_cast<int>(reader.record->core.qual);
                 alignment_genome = reader.header->target_name[reader.record->core.tid];
 
-                alignment_genome_start = reader.record->core.pos;
-                alignment_genome_end = bam_endpos(reader.record.get());
+                alignment_genome_start = int32_t(reader.record->core.pos);
+                alignment_genome_end = int32_t(bam_endpos(reader.record.get()));
                 alignment_direction = bam_is_rev(reader.record) ? "-" : "+";
 
                 auto alignment_counts = utils::get_alignment_op_counts(reader.record.get());
-                alignment_num_aligned = alignment_counts.matches;
-                alignment_num_correct = alignment_counts.matches - alignment_counts.substitutions;
-                alignment_num_insertions = alignment_counts.insertions;
-                alignment_num_deletions = alignment_counts.deletions;
-                alignment_num_substitutions = alignment_counts.substitutions;
-                alignment_length = alignment_counts.matches + alignment_counts.insertions +
-                                   alignment_counts.deletions;
-                alignment_strand_start = alignment_counts.softclip_start;
-                alignment_strand_end = seqlen - alignment_counts.softclip_end;
+                alignment_num_aligned = int(alignment_counts.matches);
+                alignment_num_correct =
+                        int(alignment_counts.matches - alignment_counts.substitutions);
+                alignment_num_insertions = int(alignment_counts.insertions);
+                alignment_num_deletions = int(alignment_counts.deletions);
+                alignment_num_substitutions = int(alignment_counts.substitutions);
+                alignment_length = int(alignment_counts.matches + alignment_counts.insertions +
+                                       alignment_counts.deletions);
+                alignment_strand_start = int(alignment_counts.softclip_start);
+                alignment_strand_end = int(seqlen - alignment_counts.softclip_end);
 
                 strand_coverage = (alignment_strand_end - alignment_strand_start) /
                                   static_cast<float>(seqlen);

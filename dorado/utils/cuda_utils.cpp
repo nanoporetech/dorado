@@ -196,11 +196,11 @@ void matmul_f16_cublas(const at::Tensor &A, const at::Tensor &B, at::Tensor &C) 
     assert(A.size(0) == C.size(0));  // M
     assert(B.size(1) == C.size(1));  // N
     assert(A.size(1) == B.size(0));  // K
-    auto res =
-            cublasGemmEx(at::cuda::getCurrentCUDABlasHandle(), CUBLAS_OP_N, CUBLAS_OP_N, B.size(1),
-                         A.size(0), A.size(1), &HALF_ONE, B.data_ptr(), CUDA_R_16F, B.stride(0),
-                         A.data_ptr(), CUDA_R_16F, A.stride(0), &HALF_ZERO, C.data_ptr(),
-                         CUDA_R_16F, C.stride(0), CUDA_R_16F, CUBLAS_GEMM_DEFAULT_TENSOR_OP);
+    auto res = cublasGemmEx(at::cuda::getCurrentCUDABlasHandle(), CUBLAS_OP_N, CUBLAS_OP_N,
+                            int(B.size(1)), int(A.size(0)), int(A.size(1)), &HALF_ONE, B.data_ptr(),
+                            CUDA_R_16F, int(B.stride(0)), A.data_ptr(), CUDA_R_16F,
+                            int(A.stride(0)), &HALF_ZERO, C.data_ptr(), CUDA_R_16F,
+                            int(C.stride(0)), CUDA_R_16F, CUBLAS_GEMM_DEFAULT_TENSOR_OP);
     if (res != CUBLAS_STATUS_SUCCESS) {
         spdlog::error("CuBLAS error {}", int(res));
         exit(EXIT_FAILURE);

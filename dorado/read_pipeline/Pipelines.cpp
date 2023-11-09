@@ -131,7 +131,7 @@ void create_stereo_duplex_pipeline(PipelineDescriptor& pipeline_desc,
 
     auto simplex_model_stride = runners.front()->model_stride();
     auto stereo_node = pipeline_desc.add_node<StereoDuplexEncoderNode>({stereo_basecaller_node},
-                                                                       simplex_model_stride);
+                                                                       int(simplex_model_stride));
 
     auto pairing_node =
             std::holds_alternative<DuplexPairingParameters>(pairing_parameters)

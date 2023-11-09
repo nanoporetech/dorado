@@ -40,9 +40,9 @@ PairingNode::PairingResult PairingNode::is_within_time_and_length_criteria(
         return {false, 0, 0, 0, 0};
     }
 
-    int delta = comp.read_common.start_time_ms - temp.get_end_time_ms();
-    int seq_len1 = temp.read_common.seq.length();
-    int seq_len2 = comp.read_common.seq.length();
+    int delta = int(comp.read_common.start_time_ms - temp.get_end_time_ms());
+    int seq_len1 = int(temp.read_common.seq.length());
+    int seq_len2 = int(comp.read_common.seq.length());
     int min_seq_len = std::min(seq_len1, seq_len2);
     int max_seq_len = std::max(seq_len1, seq_len2);
     float min_qscore = std::min(temp.read_common.calculate_mean_qscore(),
@@ -53,7 +53,7 @@ PairingNode::PairingResult PairingNode::is_within_time_and_length_criteria(
         return {false, 0, 0, 0, 0};
     }
 
-    const float kEarlyAcceptSeqLenRatio = 0.98;
+    const float kEarlyAcceptSeqLenRatio = 0.98f;
     const int kEarlyAcceptTimeDeltaMs = 100;
     float len_ratio = static_cast<float>(min_seq_len) / static_cast<float>(max_seq_len);
     if (delta <= kEarlyAcceptTimeDeltaMs && len_ratio >= kEarlyAcceptSeqLenRatio &&
@@ -63,7 +63,8 @@ PairingNode::PairingResult PairingNode::is_within_time_and_length_criteria(
                       comp.read_common.seq.length(), temp.read_common.read_id,
                       comp.read_common.read_id);
         m_early_accepted_pairs++;
-        return {true, 0, temp.read_common.seq.length() - 1, 0, comp.read_common.seq.length() - 1};
+        return {true, 0, int(temp.read_common.seq.length() - 1), 0,
+                int(comp.read_common.seq.length() - 1)};
     }
 
     return is_within_alignment_criteria(temp, comp, delta, true, tid);
@@ -93,8 +94,9 @@ PairingNode::PairingResult PairingNode::is_within_alignment_criteria(
     mm_tbuf_t* tbuf = m_tbufs[tid].get();
 
     int hits = 0;
-    mm_reg1_t* reg = mm_map(m_index, comp.read_common.seq.length(), comp.read_common.seq.c_str(),
-                            &hits, tbuf, &m_map_opt, comp.read_common.read_id.c_str());
+    mm_reg1_t* reg =
+            mm_map(m_index, int(comp.read_common.seq.length()), comp.read_common.seq.c_str(), &hits,
+                   tbuf, &m_map_opt, comp.read_common.read_id.c_str());
 
     mm_idx_destroy(m_index);
 
@@ -219,8 +221,8 @@ void PairingNode::pair_list_worker_thread(int tid) {
                     template_read = std::move(partner_read);
                 }
 
-                int delta = complement_read->read_common.start_time_ms -
-                            template_read->get_end_time_ms();
+                int delta = int(complement_read->read_common.start_time_ms -
+                                template_read->get_end_time_ms());
                 auto [is_pair, qs, qe, rs, re] = is_within_alignment_criteria(
                         *template_read, *complement_read, delta, false, tid);
                 if (is_pair) {
@@ -482,7 +484,8 @@ void PairingNode::start_threads() {
     m_tbufs.reserve(m_num_worker_threads);
     for (size_t i = 0; i < m_num_worker_threads; i++) {
         m_tbufs.push_back(MmTbufPtr(mm_tbuf_init()));
-        m_workers.push_back(std::make_unique<std::thread>(std::thread(m_pairing_func, this, i)));
+        m_workers.push_back(
+                std::make_unique<std::thread>(std::thread(m_pairing_func, this, int(i))));
         ++m_num_active_worker_threads;
     }
 }

@@ -132,7 +132,7 @@ float beam_search(const T* const scores,
                   std::vector<uint8_t>& moves,
                   std::vector<float>& qual_data,
                   float score_scale) {
-    const size_t num_states = 1 << num_state_bits;
+    const size_t num_states = size_t(1) << num_state_bits;
     const auto states_mask = static_cast<state_t>(num_states - 1);
 
     if (max_beam_width > 256) {
@@ -176,7 +176,7 @@ float beam_search(const T* const scores,
          state++) {
         if (back_guide[state] >= beam_init_threshold) {
             // Note that this first element has a prev_element_index of 0
-            prev_beam_front[beam_element] = {crc32c<32>(CRC_SEED, state),
+            prev_beam_front[beam_element] = {crc32c<32>(CRC_SEED, uint32_t(state)),
                                              static_cast<state_t>(state), 0, false};
             prev_scores[beam_element] = 0.0f;
             ++beam_element;
@@ -310,7 +310,7 @@ float beam_search(const T* const scores,
             size_t elem_count = 0;
             const float* score_ptr = current_scores.data();
 #if !ENABLE_NEON_IMPL
-            for (int i = new_elem_count; i; --i) {
+            for (int i = int(new_elem_count); i; --i) {
                 if (*score_ptr >= beam_cutoff_score) {
                     ++elem_count;
                 }

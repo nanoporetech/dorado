@@ -214,7 +214,7 @@ const std::vector<int> BaseInfo::BASE_IDS = []() {
 // in a given read.
 int count_trailing_chars(const std::string_view adapter, char c) {
     int count = 0;
-    for (int i = adapter.length() - 1; i >= 0; i--) {
+    for (size_t i = adapter.length() - 1; i >= 0; i--) {
         if (adapter[i] == c) {
             count++;
         } else {

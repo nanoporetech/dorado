@@ -43,10 +43,10 @@ void ReadCommon::generate_read_tags(bam1_t *aln, bool emit_moves, bool is_duplex
     float du = (float)(get_raw_data_samples() + num_trimmed_samples) / (float)sample_rate;
     bam_aux_append(aln, "du", 'f', sizeof(du), (uint8_t *)&du);
 
-    int ns = get_raw_data_samples() + num_trimmed_samples;
+    int ns = int(get_raw_data_samples() + num_trimmed_samples);
     bam_aux_append(aln, "ns", 'i', sizeof(ns), (uint8_t *)&ns);
 
-    int ts = num_trimmed_samples;
+    int ts = int(num_trimmed_samples);
     bam_aux_append(aln, "ts", 'i', sizeof(ts), (uint8_t *)&ts);
 
     int mx = attributes.mux;
@@ -55,14 +55,14 @@ void ReadCommon::generate_read_tags(bam1_t *aln, bool emit_moves, bool is_duplex
     int ch = attributes.channel_number;
     bam_aux_append(aln, "ch", 'i', sizeof(ch), (uint8_t *)&ch);
 
-    bam_aux_append(aln, "st", 'Z', attributes.start_time.length() + 1,
+    bam_aux_append(aln, "st", 'Z', int(attributes.start_time.length() + 1),
                    (uint8_t *)attributes.start_time.c_str());
 
     // For reads which are the result of read splitting, the read number will be set to -1
     int rn = attributes.read_number;
     bam_aux_append(aln, "rn", 'i', sizeof(rn), (uint8_t *)&rn);
 
-    bam_aux_append(aln, "fn", 'Z', attributes.fast5_filename.length() + 1,
+    bam_aux_append(aln, "fn", 'Z', int(attributes.fast5_filename.length() + 1),
                    (uint8_t *)attributes.fast5_filename.c_str());
 
     float sm = shift;
@@ -71,18 +71,19 @@ void ReadCommon::generate_read_tags(bam1_t *aln, bool emit_moves, bool is_duplex
     float sd = scale;
     bam_aux_append(aln, "sd", 'f', sizeof(sd), (uint8_t *)&sd);
 
-    bam_aux_append(aln, "sv", 'Z', scaling_method.size() + 1, (uint8_t *)scaling_method.c_str());
+    bam_aux_append(aln, "sv", 'Z', int(scaling_method.size() + 1),
+                   (uint8_t *)scaling_method.c_str());
 
     int32_t dx = (is_duplex_parent ? -1 : 0);
     bam_aux_append(aln, "dx", 'i', sizeof(dx), (uint8_t *)&dx);
 
     auto rg = generate_read_group();
     if (!rg.empty()) {
-        bam_aux_append(aln, "RG", 'Z', rg.length() + 1, (uint8_t *)rg.c_str());
+        bam_aux_append(aln, "RG", 'Z', int(rg.length() + 1), (uint8_t *)rg.c_str());
     }
 
     if (!parent_read_id.empty()) {
-        bam_aux_append(aln, "pi", 'Z', parent_read_id.size() + 1,
+        bam_aux_append(aln, "pi", 'Z', int(parent_read_id.size() + 1),
                        (uint8_t *)parent_read_id.c_str());
         // For split reads, also store the start coordinate of the new read
         // in the original signal.
@@ -97,7 +98,7 @@ void ReadCommon::generate_read_tags(bam1_t *aln, bool emit_moves, bool is_duplex
             m[idx + 1] = static_cast<uint8_t>(moves[idx]);
         }
 
-        bam_aux_update_array(aln, "mv", 'c', m.size(), (uint8_t *)m.data());
+        bam_aux_update_array(aln, "mv", 'c', int(m.size()), (uint8_t *)m.data());
     }
 
     if (rna_poly_tail_length >= 0) {
@@ -118,16 +119,16 @@ void ReadCommon::generate_duplex_read_tags(bam1_t *aln) const {
     int ch = attributes.channel_number;
     bam_aux_append(aln, "ch", 'i', sizeof(ch), (uint8_t *)&ch);
 
-    bam_aux_append(aln, "st", 'Z', attributes.start_time.length() + 1,
+    bam_aux_append(aln, "st", 'Z', int(attributes.start_time.length() + 1),
                    (uint8_t *)attributes.start_time.c_str());
 
     auto rg = generate_read_group();
     if (!rg.empty()) {
-        bam_aux_append(aln, "RG", 'Z', rg.length() + 1, (uint8_t *)rg.c_str());
+        bam_aux_append(aln, "RG", 'Z', int(rg.length() + 1), (uint8_t *)rg.c_str());
     }
 
     if (!parent_read_id.empty()) {
-        bam_aux_append(aln, "pi", 'Z', parent_read_id.size() + 1,
+        bam_aux_append(aln, "pi", 'Z', int(parent_read_id.size() + 1),
                        (uint8_t *)parent_read_id.c_str());
     }
 }
@@ -201,8 +202,9 @@ void ReadCommon::generate_modbase_tags(bam1_t *aln, uint8_t threshold) const {
         }
     }
 
-    bam_aux_append(aln, "MM", 'Z', modbase_string.length() + 1, (uint8_t *)modbase_string.c_str());
-    bam_aux_update_array(aln, "ML", 'C', modbase_prob.size(), (uint8_t *)modbase_prob.data());
+    bam_aux_append(aln, "MM", 'Z', int(modbase_string.length() + 1),
+                   (uint8_t *)modbase_string.c_str());
+    bam_aux_update_array(aln, "ML", 'C', int(modbase_prob.size()), (uint8_t *)modbase_prob.data());
 }
 
 float ReadCommon::calculate_mean_qscore() const {
@@ -249,7 +251,7 @@ std::vector<BamPtr> ReadCommon::extract_sam_lines(bool emit_moves,
              next_pos, 0, seq.length(), seq.c_str(), (char *)qscore.data(), 0);
 
     if (!barcode.empty() && barcode != "unclassified") {
-        bam_aux_append(aln, "BC", 'Z', barcode.length() + 1, (uint8_t *)barcode.c_str());
+        bam_aux_append(aln, "BC", 'Z', int(barcode.length() + 1), (uint8_t *)barcode.c_str());
     }
 
     if (is_duplex) {
@@ -340,7 +342,7 @@ std::unique_ptr<Pipeline> Pipeline::create(
         return nullptr;
     }
     auto source_it = std::find(is_sink.cbegin(), is_sink.cend(), false);
-    auto source_node = std::distance(is_sink.cbegin(), source_it);
+    NodeHandle source_node = static_cast<NodeHandle>(std::distance(is_sink.cbegin(), source_it));
 
     // Perform a depth first search from the source to determine the
     // source-to-sink destruction order.  At the same time, cycles are detected.

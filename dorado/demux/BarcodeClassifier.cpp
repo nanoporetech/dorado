@@ -76,8 +76,8 @@ std::tuple<EdlibAlignResult, float, int> extract_flank_fit(std::string_view stra
                                                            int adapter_len,
                                                            const EdlibAlignConfig& placement_config,
                                                            const char* debug_prefix) {
-    EdlibAlignResult result = edlibAlign(strand.data(), strand.length(), read.data(), read.length(),
-                                         placement_config);
+    EdlibAlignResult result = edlibAlign(strand.data(), int(strand.length()), read.data(),
+                                         int(read.length()), placement_config);
     float score = 1.f - static_cast<float>(result.editDistance) / (strand.length() - adapter_len);
     spdlog::debug("{} {} score {}", debug_prefix, result.editDistance, score);
     spdlog::debug("\n{}", utils::alignment_to_str(strand.data(), read.data(), result));
@@ -91,7 +91,8 @@ float extract_mask_score(std::string_view adapter,
                          std::string_view read,
                          const EdlibAlignConfig& config,
                          const char* debug_prefix) {
-    auto result = edlibAlign(adapter.data(), adapter.length(), read.data(), read.length(), config);
+    auto result = edlibAlign(adapter.data(), int(adapter.length()), read.data(), int(read.length()),
+                             config);
     float score = 1.f - static_cast<float>(result.editDistance) / adapter.length();
     spdlog::debug("{} {} score {}", debug_prefix, result.editDistance, score);
     spdlog::debug("\n{}", utils::alignment_to_str(adapter.data(), read.data(), result));
@@ -231,7 +232,7 @@ std::vector<ScoreResults> BarcodeClassifier::calculate_adapter_score_different_d
     std::string_view bottom_strand_v1 = as.bottom_primer_rev;
     std::string_view top_strand_v2 = as.bottom_primer;
     std::string_view bottom_strand_v2 = as.top_primer_rev;
-    int adapter_len = as.adapter[0].length();
+    int adapter_len = int(as.adapter[0].length());
 
     // Fetch barcode mask locations for variant 1
     auto [top_result_v1, top_flank_score_v1, top_bc_loc_v1] = extract_flank_fit(
@@ -367,7 +368,7 @@ std::vector<ScoreResults> BarcodeClassifier::calculate_adapter_score_double_ends
     std::string_view bottom_strand;
     top_strand = as.top_primer;
     bottom_strand = as.top_primer_rev;
-    int adapter_len = as.adapter[0].length();
+    int adapter_len = int(as.adapter[0].length());
 
     auto [top_result, top_flank_score, top_bc_loc] =
             extract_flank_fit(top_strand, read_top, adapter_len, placement_config, "top score");
@@ -436,7 +437,7 @@ std::vector<ScoreResults> BarcodeClassifier::calculate_adapter_score(
 
     std::string_view top_strand;
     top_strand = as.top_primer;
-    int adapter_len = as.adapter[0].length();
+    int adapter_len = int(as.adapter[0].length());
 
     auto [top_result, top_flank_score, top_bc_loc] =
             extract_flank_fit(top_strand, read_top, adapter_len, placement_config, "top score");
@@ -525,8 +526,8 @@ std::tuple<ScoreResults, int, bool> check_bc_with_longest_match(const ScoreResul
     const auto& barcodes = barcode_kits::get_barcodes();
     const std::string& bc_a = barcodes.at(a.adapter_name);
     auto read_a = read.substr(a.barcode_start, bc_a.length());
-    EdlibAlignResult result_a =
-            edlibAlign(bc_a.data(), bc_a.length(), read_a.data(), read_a.length(), mask_config);
+    EdlibAlignResult result_a = edlibAlign(bc_a.data(), int(bc_a.length()), read_a.data(),
+                                           int(read_a.length()), mask_config);
     auto [run_length_a, run_start_a] = find_best_length(result_a);
     // This bool checks if the longest run extends into the half of the barcode
     // that is closer to the read. e.g. in the case where the top strand of a double ended
@@ -542,8 +543,8 @@ std::tuple<ScoreResults, int, bool> check_bc_with_longest_match(const ScoreResul
 
     const std::string& bc_b = barcodes.at(b.adapter_name);
     auto read_b = read.substr(b.barcode_start, bc_b.length());
-    EdlibAlignResult result_b =
-            edlibAlign(bc_b.data(), bc_b.length(), read_b.data(), read_b.length(), mask_config);
+    EdlibAlignResult result_b = edlibAlign(bc_b.data(), int(bc_b.length()), read_b.data(),
+                                           int(read_b.length()), mask_config);
     auto [run_length_b, run_start_b] = find_best_length(result_b);
     bool run_b_extends_close_to_read = b.use_top ? (run_start_b + run_length_b > bc_b.length() / 2)
                                                  : (run_start_b < bc_b.length() / 2);

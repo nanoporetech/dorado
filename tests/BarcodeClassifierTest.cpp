@@ -275,7 +275,7 @@ TEST_CASE(
         expected_move_vals.push_back(0);
     }
     const int additional_trimmed_samples =
-            stride * 2 * front_flank.length();  // * 2 is because we have 2 moves per base
+            int(stride * 2 * front_flank.length());  // * 2 is because we have 2 moves per base
 
     for (auto& message : messages) {
         if (std::holds_alternative<BamPtr>(message)) {

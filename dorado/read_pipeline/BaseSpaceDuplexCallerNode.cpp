@@ -128,9 +128,9 @@ void BaseSpaceDuplexCallerNode::basespace(const std::string& template_read_id,
             dorado::utils::reverse_complement(complement_read->read_common.seq);
 
     EdlibAlignResult result =
-            edlibAlign(template_sequence.data(), template_sequence.size(),
+            edlibAlign(template_sequence.data(), int(template_sequence.size()),
                        complement_sequence_reverse_complement.data(),
-                       complement_sequence_reverse_complement.size(), align_config);
+                       int(complement_sequence_reverse_complement.size()), align_config);
 
     // Now - we have to do the actual basespace alignment itself
     int query_cursor = 0;

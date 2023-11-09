@@ -39,7 +39,7 @@ TEST_CASE("Test trim signal", TEST_GROUP) {
     }
 
     SECTION("Reduced window size") {
-        int pos = utils::trim(signal_tensor, 2.4, 10);
+        int pos = utils::trim(signal_tensor, 2.4f, 10);
 
         int expected_pos = 60;
         CHECK(pos == expected_pos);
@@ -79,10 +79,10 @@ TEST_CASE("Test trim sequence", TEST_GROUP) {
         CHECK_THROWS_AS(utils::trim_sequence("", {10, 50}), std::invalid_argument);
     }
 
-    SECTION("Trim nothing") { CHECK(utils::trim_sequence(seq, {0, seq.length()}) == seq); }
+    SECTION("Trim nothing") { CHECK(utils::trim_sequence(seq, {0, int(seq.length())}) == seq); }
 
     SECTION("Trim part of the sequence") {
-        CHECK(utils::trim_sequence(seq, {5, seq.length()}) == "SEQ");
+        CHECK(utils::trim_sequence(seq, {5, int(seq.length())}) == "SEQ");
     }
 
     SECTION("Trim whole sequence") { CHECK(utils::trim_sequence(seq, {0, 0}) == ""); }
@@ -93,11 +93,11 @@ TEST_CASE("Test trim quality vector", TEST_GROUP) {
 
     SECTION("Test empty sequence") { CHECK(utils::trim_quality({}, {0, 20}).size() == 0); }
 
-    SECTION("Trim nothing") { CHECK(utils::trim_quality(qual, {0, qual.size()}) == qual); }
+    SECTION("Trim nothing") { CHECK(utils::trim_quality(qual, {0, int(qual.size())}) == qual); }
 
     SECTION("Trim part of the sequence") {
         const std::vector<uint8_t> expected = {10};
-        CHECK(utils::trim_quality(qual, {5, qual.size()}) == expected);
+        CHECK(utils::trim_quality(qual, {5, int(qual.size())}) == expected);
     }
 
     SECTION("Trim whole sequence") { CHECK(utils::trim_quality(qual, {0, 0}).size() == 0); }
@@ -108,7 +108,7 @@ TEST_CASE("Test trim move table", TEST_GROUP) {
     const std::vector<uint8_t> move = {1, 1, 0, 0, 0, 1, 1, 1, 0, 0, 1, 0, 1};
 
     SECTION("Trim nothing") {
-        auto [ts, trimmed_table] = utils::trim_move_table(move, {0, move.size()});
+        auto [ts, trimmed_table] = utils::trim_move_table(move, {0, int(move.size())});
         CHECK(ts == 0);
         CHECK_THAT(trimmed_table, Equals(move));
     }
@@ -135,7 +135,7 @@ TEST_CASE("Test trim mod base info", TEST_GROUP) {
 
     SECTION("Trim nothing") {
         auto [str, probs] =
-                utils::trim_modbase_info(seq, modbase_str, modbase_probs, {0, seq.length()});
+                utils::trim_modbase_info(seq, modbase_str, modbase_probs, {0, int(seq.length())});
         CHECK(str == modbase_str);
         CHECK_THAT(probs, Equals(modbase_probs));
     }

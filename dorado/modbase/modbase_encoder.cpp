@@ -27,10 +27,13 @@ void ModBaseEncoder::init(const std::vector<int>& sequence_ints,
                           const std::vector<uint64_t>& seq_to_sig_map) {
     // gcc9 doesn't support <ranges>, which would be useful here
     m_sequence_ints = sequence_ints;
-    m_sample_offsets = {std::begin(seq_to_sig_map), std::end(seq_to_sig_map)};
+    m_sample_offsets.resize(seq_to_sig_map.size());
+    for (size_t i = 0; i < seq_to_sig_map.size(); i++) {
+        m_sample_offsets[i] = int(seq_to_sig_map[i]);
+    }
 
     // last entry is the signal length
-    m_signal_len = seq_to_sig_map.back();
+    m_signal_len = int(seq_to_sig_map.back());
 
     // cache sequence length
     m_seq_len = int(sequence_ints.size());
@@ -85,7 +88,7 @@ ModBaseEncoder::Context ModBaseEncoder::get_context(size_t seq_pos) const {
         auto chunk_seq_st = seq_start - m_bases_before;
         auto chunk_seq_en = seq_end + m_bases_after;
         if (seq_start < m_bases_before) {
-            fill_st = m_bases_before - seq_start;
+            fill_st = m_bases_before - int(seq_start);
             chunk_seq_st = 0;
         }
         if (seq_end + m_bases_after > static_cast<int>(m_sequence_ints.size())) {
@@ -100,7 +103,7 @@ ModBaseEncoder::Context ModBaseEncoder::get_context(size_t seq_pos) const {
     std::transform(
             chunk_seq_to_sig.begin(), chunk_seq_to_sig.end(), chunk_seq_to_sig.begin(),
             [sig_start = context.first_sample, seq_to_sig_offset = context.lead_samples_needed](
-                    auto val) { return val -= sig_start - seq_to_sig_offset; });
+                    auto val) { return val -= int(sig_start - seq_to_sig_offset); });
     chunk_seq_to_sig.front() = 0;
     chunk_seq_to_sig.back() = m_context_samples;
 
@@ -121,7 +124,7 @@ int ModBaseEncoder::compute_sample_pos(int base_pos) const {
         }
         return sig_len + m_block_stride * (base_offset - m_seq_len);
     }
-    return m_sample_offsets[base_offset];
+    return int(m_sample_offsets[base_offset]);
 }
 
 namespace {

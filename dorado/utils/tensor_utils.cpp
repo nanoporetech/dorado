@@ -113,18 +113,18 @@ at::Tensor quantile_counting(const at::Tensor t, const at::Tensor q) {
     auto range_min = t.min().item<int16_t>();
     auto range_max = t.max().item<int16_t>();
 
-    int size = t.size(0);
+    size_t size = t.size(0);
 
     std::vector<int> counts(range_max - range_min + 1, 0);
-    for (int i = 0; i < size; ++i) {
+    for (size_t i = 0; i < size; ++i) {
         counts[p[i] - range_min]++;
     }
     std::partial_sum(counts.begin(), counts.end(), counts.begin());
 
     auto res = at::empty_like(q);
 
-    for (size_t idx = 0; idx < q.numel(); idx++) {
-        int threshold = q[idx].item<float>() * (size - 1);
+    for (size_t idx = 0; idx < size_t(q.numel()); idx++) {
+        int threshold = int(q[idx].item<float>() * (size - 1));
         for (int i = 0; i < counts.size(); ++i) {
             if (counts[i] > threshold) {
                 res[idx] = i + range_min;

@@ -171,7 +171,8 @@ void ModBaseCallerNode::input_worker_thread() {
                         throw std::runtime_error("Invalid character in sequence.");
                     }
                     read->read_common
-                            .base_mod_probs[i * m_num_states + m_base_prob_offsets[base_id]] = 1.0f;
+                            .base_mod_probs[i * m_num_states + m_base_prob_offsets[base_id]] =
+                            uint8_t(1.0f);
                 }
             }
             read->read_common.mod_base_info = m_mod_base_info;
@@ -311,7 +312,8 @@ void ModBaseCallerNode::modbasecall_worker_thread(size_t worker_id, size_t calle
              ++chunk_idx) {
             assert(chunk_idx < m_batch_size);
             const auto& chunk = batched_chunks[chunk_idx];
-            runner->accept_chunk(caller_id, chunk_idx, chunk->signal, chunk->encoded_kmers);
+            runner->accept_chunk(int(caller_id), int(chunk_idx), chunk->signal,
+                                 chunk->encoded_kmers);
         }
 
         // If we have a complete batch, or we have a partial batch and timed out,
@@ -345,7 +347,7 @@ void ModBaseCallerNode::call_current_batch(
     nvtx3::scoped_range loop{"call_current_batch"};
 
     dorado::stats::Timer timer;
-    auto results = m_runners[worker_id]->call_chunks(caller_id, batched_chunks.size());
+    auto results = m_runners[worker_id]->call_chunks(int(caller_id), int(batched_chunks.size()));
     m_call_chunks_ms += timer.GetElapsedMS();
 
     // Convert results to float32 with one call and address via a raw pointer,
@@ -432,15 +434,15 @@ std::unordered_map<std::string, double> ModBaseCallerNode::sample_stats() const 
         const auto runner_stats = stats::from_obj(*runner);
         stats.insert(runner_stats.begin(), runner_stats.end());
     }
-    stats["batches_called"] = m_num_batches_called;
-    stats["partial_batches_called"] = m_num_partial_batches_called;
-    stats["input_chunks_sleeps"] = m_num_input_chunks_sleeps;
-    stats["call_chunks_ms"] = m_call_chunks_ms;
-    stats["context_hits"] = m_num_context_hits;
-    stats["mod_base_reads_pushed"] = m_num_mod_base_reads_pushed;
-    stats["non_mod_base_reads_pushed"] = m_num_non_mod_base_reads_pushed;
-    stats["chunk_generation_ms"] = m_chunk_generation_ms;
-    stats["working_reads_items"] = m_working_reads_size;
+    stats["batches_called"] = double(m_num_batches_called);
+    stats["partial_batches_called"] = double(m_num_partial_batches_called);
+    stats["input_chunks_sleeps"] = double(m_num_input_chunks_sleeps);
+    stats["call_chunks_ms"] = double(m_call_chunks_ms);
+    stats["context_hits"] = double(m_num_context_hits);
+    stats["mod_base_reads_pushed"] = double(m_num_mod_base_reads_pushed);
+    stats["non_mod_base_reads_pushed"] = double(m_num_non_mod_base_reads_pushed);
+    stats["chunk_generation_ms"] = double(m_chunk_generation_ms);
+    stats["working_reads_items"] = double(m_working_reads_size);
     return stats;
 }
 
