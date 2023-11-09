@@ -144,7 +144,7 @@ void SubreadTaggerNode::terminate_impl() {
     m_terminate.store(true);
     m_check_duplex_cv.notify_one();
 
-    if (m_duplex_thread->joinable()) {
+    if (m_duplex_thread && m_duplex_thread->joinable()) {
         m_duplex_thread->join();
     }
     m_duplex_thread.reset();
