@@ -278,6 +278,8 @@ ReadCommon &get_read_common_data(const Message &message) {
 
 void materialise_read_raw_data(Message &message) {
     if (std::holds_alternative<DuplexReadPtr>(message)) {
+        // Note: we could deallocate stereo_feature_inputs fields,
+        // but this made a negligible difference to overall memory usage.
         auto &duplex_read = *std::get<DuplexReadPtr>(message);
         duplex_read.read_common.raw_data =
                 GenerateStereoFeatures(duplex_read.stereo_feature_inputs);
