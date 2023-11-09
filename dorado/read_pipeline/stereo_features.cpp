@@ -1,4 +1,5 @@
 #include "stereo_features.h"
+
 #include "utils/sequence_utils.h"
 
 #include <algorithm>
@@ -9,7 +10,6 @@
 using namespace at::indexing;
 
 namespace dorado {
-
 
 at::Tensor GenerateStereoFeatures(const DuplexRead::StereoFeatureInputs& feature_inputs) {
     int target_cursor = feature_inputs.template_seq_start;
@@ -208,7 +208,8 @@ at::Tensor GenerateStereoFeatures(const DuplexRead::StereoFeatureInputs& feature
     // Call the encoding lambda first without data copy to get an estimate
     // of the encoding size.
     const auto encoding_tensor_size =
-            determine_encoding(std::nullopt, target_cursor, query_cursor, template_signal_cursor, complement_signal_cursor);
+            determine_encoding(std::nullopt, target_cursor, query_cursor, template_signal_cursor,
+                               complement_signal_cursor);
 
     const float pad_value = 0.8 * std::min(at::min(feature_inputs.complement_signal).item<float>(),
                                            at::min(feature_inputs.template_signal).item<float>());
@@ -219,7 +220,8 @@ at::Tensor GenerateStereoFeatures(const DuplexRead::StereoFeatureInputs& feature
 
     // Call the encoding lambda again, this time with the correctly sized tensor
     // allocated for the final data to be filled in.
-    determine_encoding(&stereo_features, target_cursor, query_cursor, template_signal_cursor, complement_signal_cursor);
+    determine_encoding(&stereo_features, target_cursor, query_cursor, template_signal_cursor,
+                       complement_signal_cursor);
 
     return stereo_features;
 }

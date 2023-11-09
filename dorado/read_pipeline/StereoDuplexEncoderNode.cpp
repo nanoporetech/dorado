@@ -53,7 +53,8 @@ DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(const ReadPair& read_pair) 
     const auto alignment_size =
             static_cast<size_t>(edlib_result.endLocations[0] - edlib_result.startLocations[0]);
     stereo_feature_inputs.alignment.resize(alignment_size);
-    std::memcpy(stereo_feature_inputs.alignment.data(), &edlib_result.alignment[edlib_result.startLocations[0]], alignment_size);
+    std::memcpy(stereo_feature_inputs.alignment.data(),
+                &edlib_result.alignment[edlib_result.startLocations[0]], alignment_size);
     edlibFreeAlignResult(edlib_result);
 
     stereo_feature_inputs.template_seq_start = std::move(template_read.seq_start);

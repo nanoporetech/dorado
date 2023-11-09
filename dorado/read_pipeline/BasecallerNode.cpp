@@ -1,7 +1,7 @@
 #include "BasecallerNode.h"
 
-#include "stereo_features.h"
 #include "decode/CPUDecoder.h"
+#include "stereo_features.h"
 #include "stitch.h"
 #include "utils/stats.h"
 
@@ -62,7 +62,7 @@ void BasecallerNode::input_worker_thread() {
         }
 
         if (std::holds_alternative<DuplexReadPtr>(message)) {
-            auto& stereo_feature_inputs = std::get<DuplexReadPtr>(message)->stereo_feature_inputs;
+            auto &stereo_feature_inputs = std::get<DuplexReadPtr>(message)->stereo_feature_inputs;
             read_common_data.raw_data = GenerateStereoFeatures(stereo_feature_inputs);
             // TODO -- range for, or groupt his under a unique_ptr
             stereo_feature_inputs.template_signal = torch::empty({0});
