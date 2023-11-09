@@ -46,7 +46,8 @@ DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(const ReadPair& read_pair) 
 
     // Store the alignment result, along with other inputs necessary for generating the stereo input
     // features, in DuplexRead.
-    DuplexRead::StereoFeatureInputs stereo_feature_inputs;
+    auto read = std::make_unique<DuplexRead>();
+    DuplexRead::StereoFeatureInputs& stereo_feature_inputs = read->stereo_feature_inputs;
     stereo_feature_inputs.signal_stride = m_input_signal_stride;
 
     const auto alignment_size =
@@ -55,22 +56,20 @@ DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(const ReadPair& read_pair) 
     std::memcpy(stereo_feature_inputs.alignment.data(), &edlib_result.alignment[edlib_result.startLocations[0]], alignment_size);
     edlibFreeAlignResult(edlib_result);
 
-    // TODO -- std::move these
-    stereo_feature_inputs.template_seq_start = template_read.seq_start;
-    stereo_feature_inputs.template_seq = template_read.read_common.seq;
-    stereo_feature_inputs.template_qstring = template_read.read_common.qstring;
-    stereo_feature_inputs.template_moves = template_read.read_common.moves;
-    stereo_feature_inputs.template_signal = template_read.read_common.raw_data;
+    stereo_feature_inputs.template_seq_start = std::move(template_read.seq_start);
+    stereo_feature_inputs.template_seq = std::move(template_read.read_common.seq);
+    stereo_feature_inputs.template_qstring = std::move(template_read.read_common.qstring);
+    stereo_feature_inputs.template_moves = std::move(template_read.read_common.moves);
+    stereo_feature_inputs.template_signal = std::move(template_read.read_common.raw_data);
 
-    stereo_feature_inputs.complement_seq_start = complement_read.seq_start;
-    stereo_feature_inputs.complement_seq = complement_sequence_reverse_complement;
-    stereo_feature_inputs.complement_qstring = complement_read.read_common.qstring;
-    stereo_feature_inputs.complement_moves = complement_read.read_common.moves;
+    stereo_feature_inputs.complement_seq_start = std::move(complement_read.seq_start);
+    stereo_feature_inputs.complement_seq = std::move(complement_sequence_reverse_complement);
+    stereo_feature_inputs.complement_qstring = std::move(complement_read.read_common.qstring);
+    stereo_feature_inputs.complement_moves = std::move(complement_read.read_common.moves);
     stereo_feature_inputs.complement_signal = at::flip(complement_read.read_common.raw_data, 0);
 
-    auto stereo_features = GenerateStereoFeatures(stereo_feature_inputs);
+    //auto stereo_features = GenerateStereoFeatures(stereo_feature_inputs);
 
-    auto read = std::make_unique<DuplexRead>();  // Return read
     read->read_common.read_id =
             template_read.read_common.read_id + ";" + complement_read.read_common.read_id;
 
@@ -82,7 +81,7 @@ DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(const ReadPair& read_pair) 
 
     read->read_common.read_tag = template_read.read_common.read_tag;
     read->read_common.client_id = template_read.read_common.client_id;
-    read->read_common.raw_data = stereo_features;  // use the encoded signal
+    //read->read_common.raw_data = stereo_features;  // use the encoded signal
     read->read_common.is_duplex = true;
     read->read_common.run_id = template_read.read_common.run_id;
     read->read_common.flowcell_id = template_read.read_common.flowcell_id;

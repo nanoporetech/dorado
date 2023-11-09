@@ -1,5 +1,6 @@
 #include "BasecallerNode.h"
 
+#include "stereo_features.h"
 #include "decode/CPUDecoder.h"
 #include "stitch.h"
 #include "utils/stats.h"
@@ -50,7 +51,7 @@ void BasecallerNode::input_worker_thread() {
         }
 
         // Get the common read data.
-        const ReadCommon &read_common_data = get_read_common_data(message);
+        ReadCommon &read_common_data = get_read_common_data(message);
         // If a read has already been basecalled, just send it to the sink without basecalling again
         // TODO: This is necessary because some reads (e.g failed Stereo Encoding) will be passed
         // to the basecaller node having already been called. This should be fixed in the future with
@@ -58,6 +59,21 @@ void BasecallerNode::input_worker_thread() {
         if (!read_common_data.seq.empty()) {
             send_message_to_sink(std::move(message));
             continue;
+        }
+
+        if (std::holds_alternative<DuplexReadPtr>(message)) {
+            auto& stereo_feature_inputs = std::get<DuplexReadPtr>(message)->stereo_feature_inputs;
+            read_common_data.raw_data = GenerateStereoFeatures(stereo_feature_inputs);
+            // TODO -- range for, or groupt his under a unique_ptr
+            stereo_feature_inputs.template_signal = torch::empty({0});
+            stereo_feature_inputs.complement_signal = torch::empty({0});
+            stereo_feature_inputs.alignment.clear();
+            stereo_feature_inputs.template_seq.clear();
+            stereo_feature_inputs.complement_seq.clear();
+            stereo_feature_inputs.template_qstring.clear();
+            stereo_feature_inputs.complement_qstring.clear();
+            stereo_feature_inputs.template_moves.clear();
+            stereo_feature_inputs.complement_moves.clear();
         }
 
         // Now that we have acquired a read, wait until we can push to chunks_in
