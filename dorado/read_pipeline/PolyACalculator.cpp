@@ -323,11 +323,12 @@ void PolyACalculator::worker_thread() {
 
             // Create an offset for dRNA data. There is a tendency to overestimate the length of dRNA
             // tails, especially shorter ones. This correction factor appears to fix the bias
-            // for most dRNA data.
+            // for most dRNA data. This exponential fit was done based on the standards data.
             // TODO: In order to improve this, perhaps another pass over the tail interval is needed
-            // to get a more refined boundary estimation.
+            // to get a more refined boundary estimation?
             if (m_is_rna) {
-                signal_len = std::max(0, signal_len - 100);
+                signal_len -= std::round(std::min(
+                        100.f, std::exp(5.6838f - 0.0021f * static_cast<float>(signal_len))));
             }
 
             int num_bases =
