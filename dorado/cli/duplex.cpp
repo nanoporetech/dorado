@@ -215,6 +215,7 @@ int duplex(int argc, char* argv[]) {
                 {duplex_read_tagger}, min_qscore, default_parameters.min_sequence_length,
                 read_ids_to_filter, 5);
 
+        std::unique_ptr<dorado::Pipeline> pipeline;
         std::vector<dorado::stats::StatsCallable> stats_callables;
         ProgressTracker tracker(num_reads, duplex);
         stats_callables.push_back(
@@ -223,7 +224,6 @@ int duplex(int argc, char* argv[]) {
         std::unique_ptr<dorado::stats::StatsSampler> stats_sampler;
         std::vector<dorado::stats::StatsReporter> stats_reporters{dorado::stats::sys_stats_report};
 
-        std::unique_ptr<dorado::Pipeline> pipeline;
         constexpr auto kStatsPeriod = 100ms;
 
         if (basespace_duplex) {  // Execute a Basespace duplex pipeline.
