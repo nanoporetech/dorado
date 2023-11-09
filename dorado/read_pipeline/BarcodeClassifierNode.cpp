@@ -221,13 +221,10 @@ BamPtr BarcodeClassifierNode::trim_barcode(BamPtr input,
     return BamPtr(out_record);
 }
 
-std::pair<int, int> BarcodeClassifierNode::trim_barcode(SimplexRead& read,
-                                                        const BarcodeScoreResult& res) const {
-    int seqlen = int(read.read_common.seq.length());
-    auto trim_interval = determine_trim_interval(res, seqlen);
-
-    if (trim_interval.second - trim_interval.first == seqlen) {
-        return trim_interval;
+void BarcodeClassifierNode::trim_barcode(SimplexRead& read,
+                                         std::pair<int, int> trim_interval) const {
+    if (trim_interval.second - trim_interval.first == read.read_common.seq.length()) {
+        return;
     }
 
     read.read_common.seq = utils::trim_sequence(read.read_common.seq, trim_interval);
@@ -246,8 +243,6 @@ std::pair<int, int> BarcodeClassifierNode::trim_barcode(SimplexRead& read,
         read.read_common.base_mod_probs =
                 utils::trim_quality(read.read_common.base_mod_probs, modbase_interval);
     }
-
-    return trim_interval;
 }
 
 std::shared_ptr<const BarcodingInfo> BarcodeClassifierNode::get_barcoding_info(
@@ -298,8 +293,9 @@ void BarcodeClassifierNode::barcode(SimplexRead& read) {
     read.read_common.barcoding_result = std::make_shared<BarcodeScoreResult>(std::move(bc_res));
     read.read_common.pre_trim_seq_length = read.read_common.seq.length();
     if (barcoding_info->trim) {
-        read.read_common.barcode_trim_interval =
-                trim_barcode(read, *read.read_common.barcoding_result);
+        read.read_common.barcode_trim_interval = determine_trim_interval(
+                *read.read_common.barcoding_result, read.read_common.seq.length());
+        trim_barcode(read, read.read_common.barcode_trim_interval);
     }
 
     m_num_records++;
