@@ -69,8 +69,6 @@ DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(const ReadPair& read_pair) 
     stereo_feature_inputs.complement_moves = std::move(complement_read.read_common.moves);
     stereo_feature_inputs.complement_signal = at::flip(complement_read.read_common.raw_data, 0);
 
-    //auto stereo_features = GenerateStereoFeatures(stereo_feature_inputs);
-
     read->read_common.read_id =
             template_read.read_common.read_id + ";" + complement_read.read_common.read_id;
 
@@ -82,7 +80,6 @@ DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(const ReadPair& read_pair) 
 
     read->read_common.read_tag = template_read.read_common.read_tag;
     read->read_common.client_id = template_read.read_common.client_id;
-    //read->read_common.raw_data = stereo_features;  // use the encoded signal
     read->read_common.is_duplex = true;
     read->read_common.run_id = template_read.read_common.run_id;
     read->read_common.flowcell_id = template_read.read_common.flowcell_id;
