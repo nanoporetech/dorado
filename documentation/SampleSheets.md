@@ -40,6 +40,10 @@ A sample sheet may only contain the column names below:
 
 At a minimum a sample sheet must contain `kit`, `experiment_id` and one of `position_id` or `flow_cell_id`. All rows in a sample sheet must contain the same `experiment_id`.
 
+More information about the format of the sample sheet can be found [here](https://community.nanoporetech.com/docs/prepare/library_prep_protocols/experiment-companion-minknow/v/mke_1013_v1_revcy_11apr2016/sample-sheet-upload).
+
+Note that `dorado` does not currently support dual barcodes.
+
 #### Barcode filtering
 
 If a sample sheet is present and barcoding is requested, `dorado` will only attempt to find matches to the barcode identifiers listed in the `barcode` column (if present).
@@ -49,8 +53,3 @@ If a sample sheet is present and barcoding is requested, `dorado` will only atte
 If a sample sheet contains an `alias` column, this will be used to replace the `barcode` identifer for reads matching the `flow_cell_id`/`position_id` and `experiment_id`. This will be reflected in the read group ID `@RG ID` in the file header, and in the `BC` and `RG` tags of the classified reads. Values in the `alias` column must not be valid barcode identifiers (e.g. `barcode##` or `unclassified`).
 
 Note that if both `flow_cell_id` and `position_id` are present, both must match the read data for an alias to be applied.
-
-#### More information
-More information about the format of the sample sheet can be found [here](https://community.nanoporetech.com/docs/prepare/library_prep_protocols/experiment-companion-minknow/v/mke_1013_v1_revcy_11apr2016/sample-sheet-upload).
-
-Note that `dorado` does not currently support dual barcodes.
