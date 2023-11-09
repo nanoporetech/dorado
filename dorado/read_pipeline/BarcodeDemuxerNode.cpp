@@ -33,7 +33,7 @@ void BarcodeDemuxerNode::start_threads() {
 
 void BarcodeDemuxerNode::terminate_impl() {
     terminate_input_queue();
-    if (m_worker->joinable()) {
+    if (m_worker && m_worker->joinable()) {
         m_worker->join();
     }
 }
