@@ -11,7 +11,7 @@ using namespace at::indexing;
 
 namespace dorado {
 
-at::Tensor GenerateStereoFeatures(const DuplexRead::StereoFeatureInputs& feature_inputs) {
+at::Tensor generate_stereo_features(const DuplexRead::StereoFeatureInputs& feature_inputs) {
     int target_cursor = feature_inputs.template_seq_start;
     int query_cursor = feature_inputs.complement_seq_start;
 

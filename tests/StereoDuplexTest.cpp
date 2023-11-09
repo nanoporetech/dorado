@@ -17,6 +17,15 @@ std::filesystem::path DataPath(std::string_view filename) {
     return std::filesystem::path(get_stereo_data_dir()) / filename;
 }
 
+// materialise_read_raw_data takes a Message reference for the convenience of generic use.
+// Here we have DuplexReadPtr, so this converts back and forth to get raw_data in the given
+// DuplexReadPtr.
+void generate_raw_data(dorado::DuplexReadPtr& duplex_read_ptr) {
+    dorado::Message message = std::move(duplex_read_ptr);
+    materialise_read_raw_data(message);
+    duplex_read_ptr = std::move(std::get<dorado::DuplexReadPtr>(message));
+}
+
 }  // namespace
 
 // Tests stereo encoder output for a real sample signal against known good output.
@@ -58,7 +67,8 @@ TEST_CASE(TEST_GROUP "Encoder") {
     dorado::ReadPair read_pair;
     read_pair.template_read = template_read;
     read_pair.complement_read = complement_read;
-    const auto stereo_read = stereo_node.stereo_encode(read_pair);
+    auto stereo_read = stereo_node.stereo_encode(read_pair);
+    generate_raw_data(stereo_read);
     REQUIRE(torch::equal(stereo_raw_data, stereo_read->read_common.raw_data));
 
     // Check that the duplex tag and run id is set correctly.
@@ -70,7 +80,9 @@ TEST_CASE(TEST_GROUP "Encoder") {
     std::swap(read_pair.template_read.read_common.start_time_ms,
               read_pair.complement_read.read_common.start_time_ms);
 
-    const auto swapped_stereo_read = stereo_node.stereo_encode(read_pair);
+    auto swapped_stereo_read = stereo_node.stereo_encode(read_pair);
+    generate_raw_data(swapped_stereo_read);
+
     // Check if the encoded signal is NOT equal to the expected stereo_raw_data
     REQUIRE(!torch::equal(stereo_raw_data, swapped_stereo_read->read_common.raw_data));
 }

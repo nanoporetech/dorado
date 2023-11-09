@@ -282,7 +282,7 @@ void materialise_read_raw_data(Message &message) {
         // but this made a negligible difference to overall memory usage.
         auto &duplex_read = *std::get<DuplexReadPtr>(message);
         duplex_read.read_common.raw_data =
-                GenerateStereoFeatures(duplex_read.stereo_feature_inputs);
+                generate_stereo_features(duplex_read.stereo_feature_inputs);
     }
 }
 
