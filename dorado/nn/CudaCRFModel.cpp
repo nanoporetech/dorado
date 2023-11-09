@@ -137,8 +137,8 @@ public:
         // where num_states = 4^(state_len+1)
         // See `dorado::GPUDecoder::gpu_part()`, block beginning with `if (!initialized) {`
         // for more details.
-        int64_t decode_bytes_per_chunk_timestep = 10 + m_decoder_options.beam_width * 4 +
-                                                  (size_t(1) << (model_config.state_len * 2 + 2));
+        int64_t decode_bytes_per_chunk_timestep =
+                10 + m_decoder_options.beam_width * 4 + (1ull << (model_config.state_len * 2 + 2));
 
         auto bytes_per_chunk_timestep =
                 decode_bytes_per_chunk_timestep + crfmodel_bytes_per_chunk_timestep;

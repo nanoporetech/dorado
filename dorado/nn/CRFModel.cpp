@@ -1016,8 +1016,7 @@ size_t auto_calculate_num_runners(const CRFModelConfig &model_config,
 
     auto free_ram_GB = utils::available_host_memory_GB() * memory_fraction;
     auto num_runners = static_cast<size_t>(free_ram_GB / required_ram_per_runner_GB);
-    return std::clamp(num_runners, std::size_t(1),
-                      std::size_t(std::thread::hardware_concurrency()));
+    return std::clamp(num_runners, 1ull, std::size_t(std::thread::hardware_concurrency()));
 }
 
 }  // namespace dorado

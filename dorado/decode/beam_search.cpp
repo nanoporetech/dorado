@@ -132,7 +132,7 @@ float beam_search(const T* const scores,
                   std::vector<uint8_t>& moves,
                   std::vector<float>& qual_data,
                   float score_scale) {
-    const size_t num_states = size_t(1) << num_state_bits;
+    const size_t num_states = 1ull << num_state_bits;
     const auto states_mask = static_cast<state_t>(num_states - 1);
 
     if (max_beam_width > 256) {

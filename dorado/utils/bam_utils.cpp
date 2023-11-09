@@ -233,7 +233,7 @@ std::map<std::string, std::string> extract_pg_keys_from_hdr(const std::string fi
     // also get inlined into dorado code when invoked directly. As a result, it's possible
     // that an htslib APIs resizes a string using the DLL code. But when a ks_free
     // is attempted on it from dorado, there's cross-heap behavior and a segfault occurs.
-    ks_resize(&val, size_t(1e6));
+    ks_resize(&val, 1'000'000);
     for (auto& k : keys) {
         auto ret = sam_hdr_find_tag_id(header.get(), "PG", NULL, NULL, k.c_str(), &val);
         if (ret != 0) {

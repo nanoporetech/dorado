@@ -27,7 +27,7 @@ public:
         // |ks_free| is inline so when we call it we crash trying to free unknown memory. To
         // work around this we resize the kstring to a big value in our code so no resizing
         // happens inside the htslib library.
-        ks_resize(&m_str, size_t(1e6));
+        ks_resize(&m_str, 1'000'000);
     }
     ~WrappedKString() { ks_free(&m_str); }
 
