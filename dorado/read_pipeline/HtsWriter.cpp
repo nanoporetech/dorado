@@ -16,7 +16,7 @@
 namespace dorado {
 
 HtsWriter::HtsWriter(const std::string& filename, OutputMode mode, size_t threads, size_t num_reads)
-        : MessageSink(10000), m_num_reads_expected(num_reads) {
+        : MessageSink(10000) {
     switch (mode) {
     case OutputMode::FASTQ:
         m_file = hts_open(filename.c_str(), "wf");

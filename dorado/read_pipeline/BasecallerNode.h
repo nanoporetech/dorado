@@ -60,10 +60,6 @@ private:
     int m_batch_timeout_ms;
     // model_name
     std::string m_model_name;
-    // max reads
-    size_t m_max_reads;
-    // is this node part of a duplex pipeline?
-    bool m_in_duplex_pipeline;
     // Mean Q-score start position from model properties.
     uint32_t m_mean_qscore_start_pos;
 

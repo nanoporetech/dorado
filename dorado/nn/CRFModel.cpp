@@ -236,9 +236,6 @@ namespace dorado {
 
 namespace nn {
 
-static constexpr float SWISH_LOWER_BOUND = -0.278464543f;  // global minimum of `x * sigmoid(x)`
-static constexpr float I8_RANGE = 127.f;
-
 struct ConvolutionImpl : Module {
     ConvolutionImpl(int size,
                     int outsize,

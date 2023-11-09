@@ -276,8 +276,9 @@ DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(const ReadPair& read_pair) 
 
     // Call the encoding lambda first without data copy to get an estimate
     // of the encoding size.
+    std::optional<at::Tensor*> null_tensor = std::nullopt;
     const auto encoding_tensor_size =
-            generate_encoding(std::nullopt, target_cursor, query_cursor, template_signal_cursor,
+            generate_encoding(null_tensor, target_cursor, query_cursor, template_signal_cursor,
                               complement_signal_cursor);
 
     const float pad_value =
