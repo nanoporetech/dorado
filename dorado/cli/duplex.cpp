@@ -216,8 +216,8 @@ int duplex(int argc, char* argv[]) {
                 read_ids_to_filter, 5);
 
         std::unique_ptr<dorado::Pipeline> pipeline;
-        std::vector<dorado::stats::StatsCallable> stats_callables;
         ProgressTracker tracker(num_reads, duplex);
+        std::vector<dorado::stats::StatsCallable> stats_callables;
         stats_callables.push_back(
                 [&tracker](const stats::NamedStats& stats) { tracker.update_progress_bar(stats); });
         stats::NamedStats final_stats;
