@@ -506,3 +506,8 @@ if (GENERATE_TEST_COVERAGE)
             )
     endif()
 endif()
+
+# GCC 8 ICEs trying to compile this file with ASAN+optimisations enabled, so knock down the optimisation to try and help it out.
+if (ECM_ENABLE_SANITIZERS AND (CMAKE_CXX_COMPILER_ID MATCHES "GNU") AND (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9.0))
+    set_source_files_properties(dorado/read_pipeline/stereo_features.cpp PROPERTIES COMPILE_OPTIONS "-O0")
+endif()
