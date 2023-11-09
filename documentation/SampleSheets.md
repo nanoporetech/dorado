@@ -40,7 +40,7 @@ A sample sheet may only contain the column names below:
 
 At a minimum a sample sheet must contain `kit`, `experiment_id` and one of `position_id` or `flow_cell_id`. All rows in a sample sheet must contain the same `experiment_id`.
 
-More information about the format of the sample sheet can be found [here](https://community.nanoporetech.com/docs/prepare/library_prep_protocols/experiment-companion-minknow/v/mke_1013_v1_revcy_11apr2016/sample-sheet-upload).
+For a full description of the format of the sample sheet, see [the MinKNOW Sample Sheet documentation](https://community.nanoporetech.com/docs/prepare/library_prep_protocols/experiment-companion-minknow/v/mke_1013_v1_revcy_11apr2016/sample-sheet-upload).
 
 Note that `dorado` does not currently support dual barcodes.
 
