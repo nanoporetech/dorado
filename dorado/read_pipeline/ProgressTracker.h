@@ -140,7 +140,6 @@ private:
     int64_t m_num_samples_processed{0};
     int64_t m_num_simplex_bases_processed{0};
     int64_t m_num_duplex_bases_processed{0};
-    int m_num_reads_processed{0};
     int m_num_simplex_reads_written{0};
     int m_num_simplex_reads_filtered{0};
     int m_num_simplex_bases_filtered{0};
