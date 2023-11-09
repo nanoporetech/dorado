@@ -200,7 +200,7 @@ TEST_CASE("AlignerTest: Check AlignerNode crashes if multi index encountered", T
 
     auto options = dorado::AlignerNode::dflt_options;
     options.kmer_size = options.window_size = 5;
-    options.index_batch_size = uint64_t(1e3);
+    options.index_batch_size = 1000ull;
     CHECK_THROWS(dorado::AlignerNode(ref.string(), options, 1));
 }
 
