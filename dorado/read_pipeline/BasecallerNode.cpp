@@ -218,7 +218,7 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
 
         // There's chunks to get_scores, so let's add them to our input tensor
         // FIXME -- it should not be possible to for this condition to be untrue.
-        if (m_batched_chunks[worker_id].size() != batch_size) {
+        if (m_batched_chunks[worker_id].size() != size_t(batch_size)) {
             // Copy the chunk into the input tensor
             auto &source_read = chunk->owning_read->read;
 
@@ -258,7 +258,7 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
             last_chunk_reserve_time = std::chrono::system_clock::now();
         }
 
-        if (m_batched_chunks[worker_id].size() == batch_size) {
+        if (m_batched_chunks[worker_id].size() == size_t(batch_size)) {
             // Input tensor is full, let's get_scores.
             basecall_current_batch(worker_id);
         }
@@ -334,7 +334,7 @@ void BasecallerNode::start_threads() {
     m_input_worker = std::make_unique<std::thread>([this] { input_worker_thread(); });
     const size_t num_workers = m_model_runners.size();
     m_working_reads_managers.resize(std::max(size_t{1}, num_workers / 2));
-    for (int i = 0; i < m_working_reads_managers.size(); i++) {
+    for (size_t i = 0; i < m_working_reads_managers.size(); i++) {
         m_working_reads_managers[i] = std::thread([this] { working_reads_manager(); });
     }
     m_basecall_workers.resize(num_workers);

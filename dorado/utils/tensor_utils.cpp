@@ -125,7 +125,7 @@ at::Tensor quantile_counting(const at::Tensor t, const at::Tensor q) {
 
     for (size_t idx = 0; idx < size_t(q.numel()); idx++) {
         int threshold = int(q[idx].item<float>() * (size - 1));
-        for (int i = 0; i < counts.size(); ++i) {
+        for (int i = 0; i < int(counts.size()); ++i) {
             if (counts[i] > threshold) {
                 res[idx] = i + range_min;
                 break;

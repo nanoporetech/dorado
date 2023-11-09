@@ -58,7 +58,6 @@ int determine_rna_adapter_pos(const dorado::SimplexRead& read, dorado::SampleTyp
     const int kStride = 50;
     const int16_t kMedianDiff = 125;
 
-    const int kOffset = kOffsetMap.at(model_type);
     const int16_t kMinMedianForRNASignal = kAdapterCutoff.at(model_type);
 
     int signal_len = int(read.read_common.get_raw_data_samples());
@@ -79,7 +78,7 @@ int determine_rna_adapter_pos(const dorado::SimplexRead& read, dorado::SampleTyp
         auto minmax = std::minmax_element(medians.begin(), medians.end());
         int16_t min_median = *minmax.first;
         int16_t max_median = *minmax.second;
-        if ((median_pos > medians.size()) && (max_median > kMinMedianForRNASignal) &&
+        if ((median_pos > int(medians.size())) && (max_median > kMinMedianForRNASignal) &&
             (max_median - min_median > kMedianDiff)) {
             break_point = i;
             break;
@@ -167,8 +166,8 @@ ScalerNode::ScalerNode(const SignalNormalisationParams& config,
                        int num_worker_threads,
                        size_t max_reads)
         : MessageSink(max_reads),
-          m_scaling_params(config),
           m_num_worker_threads(num_worker_threads),
+          m_scaling_params(config),
           m_model_type(model_type) {
     start_threads();
 }

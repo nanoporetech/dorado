@@ -442,7 +442,7 @@ std::vector<SimplexReadPtr> DuplexReadSplitter::split(SimplexReadPtr init_read) 
 
     // Adjust prev and next read ids.
     if (split_result.size() > 1) {
-        for (int i = 0; i < split_result.size(); i++) {
+        for (size_t i = 0; i < split_result.size(); i++) {
             if (i == split_result.size() - 1) {
                 // For the last split read, the next read remains the same as the
                 // original read's next read.

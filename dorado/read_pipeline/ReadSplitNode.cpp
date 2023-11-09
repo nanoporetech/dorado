@@ -32,8 +32,8 @@ ReadSplitNode::ReadSplitNode(std::unique_ptr<const ReadSplitter> splitter,
                              int num_worker_threads,
                              size_t max_reads)
         : MessageSink(max_reads),
-          m_splitter(std::move(splitter)),
-          m_num_worker_threads(num_worker_threads) {
+          m_num_worker_threads(num_worker_threads),
+          m_splitter(std::move(splitter)) {
     start_threads();
 }
 

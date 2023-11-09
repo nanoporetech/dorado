@@ -163,7 +163,7 @@ public:
     at::Tensor next(torch::IntArrayRef sizes, torch::Dtype dtype, bool make_current = true) {
         auto new_bytes = tensor_bytes(sizes, dtype);
         if ((current_bytes + new_bytes > reservation_bytes) ||
-            backing_tensor.defined() && backing_tensor.nbytes() != reservation_bytes) {
+            (backing_tensor.defined() && backing_tensor.nbytes() != size_t(reservation_bytes))) {
             throw std::runtime_error("WorkingMemory: overlap detected.");
         }
 
@@ -495,7 +495,7 @@ struct LSTMStackImpl : Module {
 #if USE_KOI
     void reserve_working_memory(WorkingMemory &wm) {
         auto in_sizes = wm.current_sizes;
-        switch (auto mode = get_cuda_lstm_mode(0, layer_size, activation)) {
+        switch (get_cuda_lstm_mode(0, layer_size, activation)) {
         case LstmMode::CUTLASS_TNC_F16:
             if (get_cuda_lstm_mode(1, layer_size, activation) == LstmMode::CUTLASS_TNC_I8) {
                 wm.reserve(in_sizes, torch::kI8);
@@ -819,7 +819,7 @@ private:
 };
 
 struct ClampImpl : Module {
-    ClampImpl(float _min, float _max, bool _active) : min(_min), max(_max), active(_active){};
+    ClampImpl(float _min, float _max, bool _active) : active(_active), min(_min), max(_max){};
 
     at::Tensor forward(at::Tensor x) {
         if (active) {

@@ -201,7 +201,7 @@ TEST_CASE(TEST_GROUP ": Test sam record generation", TEST_GROUP) {
 
 void require_sam_tag_B_int_matches(const uint8_t* aux, const std::vector<int64_t>& expected) {
     int len = bam_auxB_len(aux);
-    REQUIRE(len == expected.size());
+    REQUIRE(size_t(len) == expected.size());
     for (int i = 0; i < len; i++) {
         REQUIRE(expected[i] == bam_auxB2i(aux, i));
     }

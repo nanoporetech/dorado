@@ -238,9 +238,9 @@ int duplex(int argc, char* argv[]) {
             spdlog::info("> Starting Basespace Duplex Pipeline");
             threads = threads == 0 ? std::thread::hardware_concurrency() : threads;
 
-            auto duplex_caller_node = pipeline_desc.add_node<BaseSpaceDuplexCallerNode>(
-                    {read_filter_node}, std::move(template_complement_map), std::move(read_map),
-                    threads);
+            pipeline_desc.add_node<BaseSpaceDuplexCallerNode>({read_filter_node},
+                                                              std::move(template_complement_map),
+                                                              std::move(read_map), threads);
 
             pipeline = Pipeline::create(std::move(pipeline_desc), &stats_reporters);
             if (pipeline == nullptr) {

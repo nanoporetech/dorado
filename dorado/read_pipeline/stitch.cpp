@@ -19,7 +19,7 @@ void stitch_chunks(ReadCommon& read_common,
     std::vector<std::string> sequences;
     std::vector<std::string> qstrings;
 
-    for (int i = 0; i < called_chunks.size() - 1; i++) {
+    for (int i = 0; i < int(called_chunks.size() - 1); i++) {
         auto& current_chunk = called_chunks[i];
         auto& next_chunk = called_chunks[i + 1];
         int overlap_size = int((current_chunk->raw_chunk_size + current_chunk->input_offset) -
@@ -43,8 +43,8 @@ void stitch_chunks(ReadCommon& read_common,
         mid_point_front = overlap_down_sampled - mid_point_rear;
 
         start_pos = 0;
-        for (int i = 0; i < mid_point_front; i++) {
-            start_pos += (int)next_chunk->moves[i];
+        for (int j = 0; j < mid_point_front; j++) {
+            start_pos += (int)next_chunk->moves[j];
         }
     }
 
@@ -73,7 +73,7 @@ void stitch_chunks(ReadCommon& read_common,
     read_common.moves = std::move(moves);
 
     // remove partial stride overhang
-    if (read_common.moves.size() >
+    if (static_cast<int>(read_common.moves.size()) >
         static_cast<int>(read_common.get_raw_data_samples() / read_common.model_stride)) {
         if (read_common.moves.back() == 1) {
             read_common.seq.pop_back();

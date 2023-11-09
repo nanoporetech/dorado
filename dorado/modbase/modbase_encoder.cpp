@@ -45,7 +45,6 @@ ModBaseEncoder::Context ModBaseEncoder::get_context(size_t seq_pos) const {
         throw std::out_of_range("Sequence position out of range.");
     }
 
-    auto encoded_kmer_len = m_kmer_len * utils::BaseInfo::NUM_BASES;
     Context context{};
     int base_sample_pos =
             (compute_sample_pos(int(seq_pos)) + compute_sample_pos(int(seq_pos) + 1)) / 2;
@@ -145,7 +144,7 @@ inline std::vector<int8_t> encode_kmer_generic(const std::vector<int>& seq,
         auto base_en = seq_mappings[seq_pos + 1];
 
         for (int i = base_st; i < base_en; ++i) {
-            for (size_t kmer_pos = 0; kmer_pos < kmer_len; ++kmer_pos) {
+            for (size_t kmer_pos = 0; kmer_pos < size_t(kmer_len); ++kmer_pos) {
                 auto base = seq[seq_pos + kmer_pos];
                 uint32_t base_oh = (base == -1) ? 0ul : (1ul << (base << 3));
                 // memcpy will be translated to a single 32 bit write.

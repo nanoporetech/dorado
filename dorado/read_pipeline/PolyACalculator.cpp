@@ -123,7 +123,7 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
                      // Only keep intervals that are close-ish to the signal anchor.
                      return (fwd ? std::abs(signal_anchor - i.second) < interval_size
                                  : std::abs(signal_anchor - i.first) < interval_size) ||
-                            (i.first <= signal_anchor) && (signal_anchor <= i.second);
+                            ((i.first <= signal_anchor) && (signal_anchor <= i.second));
                  });
 
     int_str = "";
@@ -228,7 +228,6 @@ SignalAnchorInfo determine_signal_anchor_and_strand_cdna(const dorado::SimplexRe
     SignalAnchorInfo result = {false, -1, trailing_Ts};
 
     if (proceed) {
-        int start = 0, end = 0;
         int base_anchor = 0;
         if (fwd) {
             base_anchor = bottom_start + bottom_v1.startLocations[0];

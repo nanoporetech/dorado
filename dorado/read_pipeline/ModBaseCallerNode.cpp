@@ -57,7 +57,7 @@ ModBaseCallerNode::ModBaseCallerNode(std::vector<std::unique_ptr<ModBaseRunner>>
           // TODO -- more principled calculation of output queue size
           m_processed_chunks(10 * max_reads) {
     init_modbase_info();
-    for (int i = 0; i < m_runners[0]->num_callers(); i++) {
+    for (size_t i = 0; i < m_runners[0]->num_callers(); i++) {
         m_chunk_queues.emplace_back(
                 std::make_unique<utils::AsyncQueue<std::unique_ptr<RemoraChunk>>>(m_batch_size *
                                                                                   5));

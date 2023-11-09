@@ -24,7 +24,7 @@ std::unique_ptr<dorado::Pipeline> create_pipeline(std::vector<dorado::Message>& 
                                                   Args&&... args) {
     dorado::PipelineDescriptor pipeline_desc;
     auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 100, output_messages);
-    auto aligner = pipeline_desc.add_node<dorado::AlignerNode>({sink}, args...);
+    pipeline_desc.add_node<dorado::AlignerNode>({sink}, args...);
     return dorado::Pipeline::create(std::move(pipeline_desc));
 }
 

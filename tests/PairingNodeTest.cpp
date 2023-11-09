@@ -66,7 +66,7 @@ TEST_CASE("Split read pairing", TEST_GROUP) {
     std::vector<dorado::Message> messages;
     auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 5, messages);
     // one thread, one read - force reads through in order
-    auto pairing_node = pipeline_desc.add_node<dorado::PairingNode>(
+    pipeline_desc.add_node<dorado::PairingNode>(
             {sink},
             dorado::DuplexPairingParameters{dorado::ReadOrder::BY_CHANNEL,
                                             dorado::DEFAULT_DUPLEX_CACHE_DEPTH},

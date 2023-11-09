@@ -26,7 +26,7 @@ namespace {
 // into a string.
 std::string convert_nt16_to_str(uint8_t* bseq, size_t slen) {
     std::string seq(slen, '*');
-    for (int i = 0; i < slen; i++) {
+    for (size_t i = 0; i < slen; i++) {
         seq[i] = seq_nt16_str[bam_seqi(bseq, i)];
     }
     return seq;
@@ -363,7 +363,6 @@ std::vector<uint32_t> trim_cigar(uint32_t n_cigar,
             // retain the overlap portion and switch state machine to
             // being in_interval.
             in_interval = true;
-            uint32_t new_len = cursor - trim_s;
             ops.push_back((cursor - trim_s) << BAM_CIGAR_SHIFT | op);
         } else if (in_interval) {
             // If the op is inside the interval and not at boundaries,

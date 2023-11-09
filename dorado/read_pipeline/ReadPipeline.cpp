@@ -240,7 +240,6 @@ std::vector<BamPtr> ReadCommon::extract_sam_lines(bool emit_moves,
     std::string cigar_string = "*";  // UNMAPPED
     std::string r_next = "*";
     int next_pos = -1;  // UNMAPPED - will be written as 0
-    size_t template_length = seq.size();
 
     // Convert string qscore to phred vector.
     std::vector<uint8_t> qscore;
@@ -291,6 +290,7 @@ MessageSink::MessageSink(size_t max_messages) : m_work_queue(max_messages) {}
 
 void MessageSink::push_message_internal(Message &&message) {
     const auto status = m_work_queue.try_push(std::move(message));
+    (void)status;
     // try_push will fail if the sink has been told to terminate.
     // We do not expect to be pushing reads from this source if that is the case.
     assert(status == utils::AsyncQueueStatus::Success);

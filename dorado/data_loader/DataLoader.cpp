@@ -130,7 +130,9 @@ SimplexReadPtr process_pod5_read(
     auto run_sample_rate = run_info_data->sample_rate;
 
     char read_id_tmp[POD5_READ_ID_LEN];
-    pod5_error_t err = pod5_format_read_id(read_data.read_id, read_id_tmp);
+    if (pod5_format_read_id(read_data.read_id, read_id_tmp) != POD5_OK) {
+        spdlog::error("Failed to format read id");
+    }
     std::string read_id_str(read_id_tmp);
 
     auto options = at::TensorOptions().dtype(at::kShort);
@@ -205,7 +207,10 @@ bool can_process_pod5_row(Pod5ReadRecordBatch_t* batch,
     }
 
     char read_id_tmp[POD5_READ_ID_LEN];
-    pod5_error_t err = pod5_format_read_id(read_data.read_id, read_id_tmp);
+    if (pod5_format_read_id(read_data.read_id, read_id_tmp) != POD5_OK) {
+        spdlog::error("Failed to format read id");
+    }
+
     std::string read_id_str(read_id_tmp);
     bool read_in_ignore_list = ignored_read_ids.find(read_id_str) != ignored_read_ids.end();
     bool read_in_read_list =
@@ -426,7 +431,9 @@ void DataLoader::load_read_channels(std::string data_path, bool recursive_file_l
                     channel_to_read_id[channel].push_back(std::move(read_id));
 
                     char read_id_tmp[POD5_READ_ID_LEN];
-                    pod5_error_t err = pod5_format_read_id(read_data.read_id, read_id_tmp);
+                    if (pod5_format_read_id(read_data.read_id, read_id_tmp) != POD5_OK) {
+                        spdlog::error("Failed to format read id");
+                    }
                     std::string rid(read_id_tmp);
                     m_reads_by_channel[channel].push_back(
                             {rid, read_data.well, read_data.read_number});
@@ -627,7 +634,7 @@ void DataLoader::load_pod5_reads_from_file_by_read_ids(const std::string& path,
     }
 
     std::vector<uint8_t> read_id_array(POD5_READ_ID_SIZE * read_ids.size());
-    for (int i = 0; i < read_ids.size(); i++) {
+    for (size_t i = 0; i < read_ids.size(); i++) {
         std::memcpy(read_id_array.data() + POD5_READ_ID_SIZE * i, read_ids[i].data(),
                     POD5_READ_ID_SIZE);
     }

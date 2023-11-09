@@ -80,7 +80,7 @@ TEST_CASE("BamUtilsTest: add_rg_hdr read group headers", TEST_GROUP) {
         dorado::utils::add_rg_hdr(sam_header.get(), read_groups, {}, nullptr);
 
         // Check the IDs of the groups are all there.
-        CHECK(sam_hdr_count_lines(sam_header.get(), "RG") == read_groups.size());
+        CHECK(sam_hdr_count_lines(sam_header.get(), "RG") == int(read_groups.size()));
         for (auto &&[id, read_group] : read_groups) {
             CHECK(has_read_group_header(sam_header.get(), id.c_str()));
             // None of the read groups should have a barcode.
@@ -105,7 +105,7 @@ TEST_CASE("BamUtilsTest: add_rg_hdr read group headers", TEST_GROUP) {
             total_barcodes += kit_infos.at(kit_name).barcodes.size();
         }
         const size_t total_groups = read_groups.size() * (total_barcodes + 1);
-        CHECK(sam_hdr_count_lines(sam_header.get(), "RG") == total_groups);
+        CHECK(sam_hdr_count_lines(sam_header.get(), "RG") == int(total_groups));
 
         // Check that the IDs match the expected format.
         const auto &barcode_seqs = dorado::barcode_kits::get_barcodes();
@@ -162,7 +162,7 @@ TEST_CASE("BamUtilsTest: Test bam extraction helpers", TEST_GROUP) {
                 "..--,++,))+*)&&'*-,+*)))(%%&'&''%%%$&%$###$%%$$%'%%$$+1.--.7969....*)))";
         auto qual_vector = utils::extract_quality(record);
         CHECK(qual_vector.size() == qual.length());
-        for (int i = 0; i < qual.length(); i++) {
+        for (size_t i = 0; i < qual.length(); i++) {
             CHECK(qual[i] == qual_vector[i] + 33);
         }
     }
@@ -180,7 +180,7 @@ TEST_CASE("BamUtilsTest: Test bam extraction helpers", TEST_GROUP) {
         const std::vector<int8_t> expected_modbase_probs = {5, 1};
         CHECK(modbase_str == "C+h?,1;C+m?,1;");
         CHECK(modbase_probs.size() == expected_modbase_probs.size());
-        for (int i = 0; i < expected_modbase_probs.size(); i++) {
+        for (size_t i = 0; i < expected_modbase_probs.size(); i++) {
             CHECK(modbase_probs[i] == expected_modbase_probs[i]);
         }
     }
@@ -267,7 +267,6 @@ TEST_CASE("BamUtilsTest: Ref positions consumed", TEST_GROUP) {
     uint32_t *a_cigar = NULL;
     char *end = NULL;
     int n_cigar = int(sam_parse_cigar(cigar.c_str(), &end, &a_cigar, &m));
-    const uint32_t qlen = uint32_t(bam_cigar2qlen(n_cigar, a_cigar));
 
     SECTION("No positions consumed") {
         auto pos_consumed = utils::ref_pos_consumed(n_cigar, a_cigar, 0);

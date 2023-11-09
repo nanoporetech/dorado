@@ -257,23 +257,18 @@ std::vector<ScoreResults> BarcodeClassifier::calculate_adapter_score_different_d
     int total_v2_score = top_result_v2.editDistance + bottom_result_v2.editDistance;
 
     std::string_view top_mask, bottom_mask;
-    float top_flank_score, bottom_flank_score;
     if (total_v1_score < total_v2_score) {
         top_mask = top_mask_v1;
         bottom_mask = bottom_mask_v1;
-        top_flank_score = top_flank_score_v1;
-        bottom_flank_score = bottom_flank_score_v1;
         spdlog::debug("best variant v1");
     } else {
         top_mask = top_mask_v2;
         bottom_mask = bottom_mask_v2;
-        top_flank_score = top_flank_score_v2;
-        bottom_flank_score = bottom_flank_score_v2;
         spdlog::debug("best variant v2");
     }
 
     std::vector<ScoreResults> results;
-    for (int i = 0; i < as.adapter.size(); i++) {
+    for (size_t i = 0; i < as.adapter.size(); i++) {
         auto& adapter = as.adapter[i];
         auto& adapter_rev = as.adapter_rev[i];
         auto& adapter_name = as.adapter_name[i];
@@ -354,7 +349,6 @@ std::vector<ScoreResults> BarcodeClassifier::calculate_adapter_score_double_ends
         std::string_view read_seq,
         const AdapterSequence& as,
         const BarcodingInfo::FilterSet& allowed_barcodes) const {
-    bool debug_mode = (spdlog::get_level() == spdlog::level::debug);
     std::string_view read_top = read_seq.substr(0, TRIM_LENGTH);
     int bottom_start = std::max(0, (int)read_seq.length() - TRIM_LENGTH);
     std::string_view read_bottom = read_seq.substr(bottom_start, TRIM_LENGTH);
@@ -379,7 +373,7 @@ std::vector<ScoreResults> BarcodeClassifier::calculate_adapter_score_double_ends
     std::string_view bottom_mask = read_bottom.substr(bottom_bc_loc, adapter_len);
 
     std::vector<ScoreResults> results;
-    for (int i = 0; i < as.adapter.size(); i++) {
+    for (size_t i = 0; i < as.adapter.size(); i++) {
         auto& adapter = as.adapter[i];
         auto& adapter_rev = as.adapter_rev[i];
         auto& adapter_name = as.adapter_name[i];
@@ -427,7 +421,6 @@ std::vector<ScoreResults> BarcodeClassifier::calculate_adapter_score(
         std::string_view read_seq,
         const AdapterSequence& as,
         const BarcodingInfo::FilterSet& allowed_barcodes) const {
-    bool debug_mode = (spdlog::get_level() == spdlog::level::debug);
     std::string_view read_top = read_seq.substr(0, TRIM_LENGTH);
 
     // Try to find the location of the barcode + flanks in the top and bottom windows.
@@ -445,7 +438,7 @@ std::vector<ScoreResults> BarcodeClassifier::calculate_adapter_score(
     spdlog::debug("BC location {}", top_bc_loc);
 
     std::vector<ScoreResults> results;
-    for (int i = 0; i < as.adapter.size(); i++) {
+    for (size_t i = 0; i < as.adapter.size(); i++) {
         auto& adapter = as.adapter[i];
         auto& adapter_name = as.adapter_name[i];
 
@@ -534,8 +527,9 @@ std::tuple<ScoreResults, int, bool> check_bc_with_longest_match(const ScoreResul
     // barcode is being checked, the longest run should extend into the latter half of the barcode.
     // Whereas if the bottom strand is being checked, then the run should start from the
     // first half of the barcode.
-    bool run_a_extends_close_to_read = a.use_top ? (run_start_a + run_length_a > bc_a.length() / 2)
-                                                 : (run_start_a < bc_a.length() / 2);
+    bool run_a_extends_close_to_read =
+            a.use_top ? (size_t(run_start_a + run_length_a) > bc_a.length() / 2)
+                      : (size_t(run_start_a) < bc_a.length() / 2);
     spdlog::debug(
             "Barcode {} longest run {} from position {} in {} strand, extends close to read {}",
             a.adapter_name, run_length_a, run_start_a, a.use_top ? "top" : "bottom",
@@ -546,8 +540,9 @@ std::tuple<ScoreResults, int, bool> check_bc_with_longest_match(const ScoreResul
     EdlibAlignResult result_b = edlibAlign(bc_b.data(), int(bc_b.length()), read_b.data(),
                                            int(read_b.length()), mask_config);
     auto [run_length_b, run_start_b] = find_best_length(result_b);
-    bool run_b_extends_close_to_read = b.use_top ? (run_start_b + run_length_b > bc_b.length() / 2)
-                                                 : (run_start_b < bc_b.length() / 2);
+    bool run_b_extends_close_to_read =
+            b.use_top ? (size_t(run_start_b + run_length_b) > bc_b.length() / 2)
+                      : (size_t(run_start_b) < bc_b.length() / 2);
     spdlog::debug(
             "Barcode {} longest run {} from position {} in {} strand, extends close to read {}",
             b.adapter_name, run_length_b, run_start_b, b.use_top ? "top" : "bottom",

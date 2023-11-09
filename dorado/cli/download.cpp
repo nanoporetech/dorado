@@ -85,7 +85,6 @@ int download(int argc, char* argv[]) {
     auto list_yaml = parser.get<bool>("--list-yaml");
     auto selected_model = parser.get<std::string>("--model");
     auto directory = fs::path(parser.get<std::string>("--directory"));
-    auto permissions = fs::status(directory).permissions();
 
     if (list || list_yaml) {
         print_models(list_yaml);

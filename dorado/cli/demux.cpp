@@ -158,7 +158,7 @@ int demuxer(int argc, char* argv[]) {
         if (auto names = parser.present<std::vector<std::string>>("--kit-name")) {
             kit_names = std::move(*names);
         }
-        auto demux = pipeline_desc.add_node<BarcodeClassifierNode>(
+        pipeline_desc.add_node<BarcodeClassifierNode>(
                 {demux_writer}, demux_threads, kit_names, parser.get<bool>("--barcode-both-ends"),
                 parser.get<bool>("--no-trim"), std::move(allowed_barcodes));
     }

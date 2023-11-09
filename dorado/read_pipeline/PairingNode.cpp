@@ -482,10 +482,9 @@ PairingNode::PairingNode(DuplexPairingParameters pairing_params,
 
 void PairingNode::start_threads() {
     m_tbufs.reserve(m_num_worker_threads);
-    for (size_t i = 0; i < m_num_worker_threads; i++) {
+    for (int i = 0; i < m_num_worker_threads; i++) {
         m_tbufs.push_back(MmTbufPtr(mm_tbuf_init()));
-        m_workers.push_back(
-                std::make_unique<std::thread>(std::thread(m_pairing_func, this, int(i))));
+        m_workers.push_back(std::make_unique<std::thread>(std::thread(m_pairing_func, this, i)));
         ++m_num_active_worker_threads;
     }
 }

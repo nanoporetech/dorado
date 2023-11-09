@@ -125,7 +125,7 @@ std::vector<std::string> parse_cuda_device_string(std::string device_string) {
         return devices;  // empty vector;
     } else if (device_string == "cuda:all" || device_string == "cuda:auto") {
         auto num_devices = torch::cuda::device_count();
-        for (int i = 0; i < num_devices; i++) {
+        for (size_t i = 0; i < num_devices; i++) {
             devices.push_back("cuda:" + std::to_string(i));
         }
     } else {

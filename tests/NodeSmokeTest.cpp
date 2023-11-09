@@ -224,7 +224,7 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
         for (const auto& device : devices) {
             auto caller = dorado::create_cuda_caller(model_config, default_params.chunksize,
                                                      int(batch_size), device);
-            for (size_t i = 0; i < default_params.num_runners; i++) {
+            for (int i = 0; i < default_params.num_runners; i++) {
                 runners.push_back(std::make_shared<dorado::CudaModelRunner>(caller));
             }
         }
@@ -300,7 +300,7 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
     for (const auto& device_string : modbase_devices) {
         auto caller = dorado::create_modbase_caller({remora_model, remora_model_6mA}, batch_size,
                                                     device_string);
-        for (size_t i = 0; i < default_params.remora_runners_per_caller; i++) {
+        for (int i = 0; i < default_params.remora_runners_per_caller; i++) {
             remora_runners.push_back(std::make_unique<dorado::ModBaseRunner>(caller));
         }
     }
@@ -357,8 +357,8 @@ TEST_CASE("BarcodeClassifierNode: test simple pipeline with fastq and sam files"
     std::vector<std::string> kits = {"EXP-PBC096"};
     bool barcode_both_ends = GENERATE(true, false);
     bool no_trim = GENERATE(true, false);
-    auto classifier = pipeline_desc.add_node<dorado::BarcodeClassifierNode>(
-            {sink}, 8, kits, barcode_both_ends, no_trim, std::nullopt);
+    pipeline_desc.add_node<dorado::BarcodeClassifierNode>({sink}, 8, kits, barcode_both_ends,
+                                                          no_trim, std::nullopt);
 
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
 

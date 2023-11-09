@@ -77,13 +77,13 @@ int summary(int argc, char *argv[]) {
 #endif
     std::signal(SIGINT, [](int signum) { interrupt = 1; });
 
-    for (int col = 0; col < header.size() - 1; col++) {
+    for (size_t col = 0; col < header.size() - 1; col++) {
         std::cout << header[col] << separator;
     }
     std::cout << header[header.size() - 1];
 
     if (reader.is_aligned) {
-        for (int col = 0; col < aligned_header.size() - 1; col++) {
+        for (size_t col = 0; col < aligned_header.size() - 1; col++) {
             std::cout << separator << aligned_header[col];
         }
         std::cout << separator << aligned_header[aligned_header.size() - 1];
@@ -134,8 +134,6 @@ int summary(int argc, char *argv[]) {
                   << seqlen << separator << mean_qscore;
 
         if (reader.is_aligned) {
-            int32_t query_start = 0;
-            int32_t query_end = 0;
             std::string alignment_genome = "*";
             int32_t alignment_genome_start = -1;
             int32_t alignment_genome_end = -1;

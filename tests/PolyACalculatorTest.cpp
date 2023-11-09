@@ -33,7 +33,7 @@ TEST_CASE("PolyACalculator: Test polyT tail estimation", TEST_GROUP) {
     dorado::PipelineDescriptor pipeline_desc;
     std::vector<dorado::Message> messages;
     auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
-    auto estimator = pipeline_desc.add_node<PolyACalculator>({sink}, 2, is_rna);
+    pipeline_desc.add_node<PolyACalculator>({sink}, 2, is_rna);
 
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
 
