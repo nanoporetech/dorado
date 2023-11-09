@@ -1,5 +1,6 @@
 #include "PolyACalculator.h"
 
+#include "utils/math_utils.h"
 #include "utils/sequence_utils.h"
 
 #include <edlib.h>
@@ -35,8 +36,9 @@ const int kMaxTailLength = 750;
 std::pair<int, int> determine_signal_bounds(int signal_anchor,
                                             bool fwd,
                                             const dorado::SimplexRead& read,
-                                            int num_samples_per_base,
-                                            bool is_rna) {
+                                            float num_samples_per_base,
+                                            bool is_rna,
+                                            int min_base_count) {
     const c10::Half* signal = static_cast<c10::Half*>(read.read_common.raw_data.data_ptr());
     int signal_len = read.read_common.get_raw_data_samples();
 
@@ -62,17 +64,18 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
     const float kVar = 0.35f;
     // Determine the outer boundary of the signal space to
     // consider based on the anchor.
-    const int kSpread = num_samples_per_base * kMaxTailLength;
+    const int kSpread = std::round(num_samples_per_base * kMaxTailLength);
     // Maximum gap between intervals that can be combined.
-    const int kMaxSampleGap = num_samples_per_base * 3;
+    const int kMaxSampleGap = std::round(num_samples_per_base * 5);
     // Minimum size of intervals considered for merge.
-    const int kMinIntervalSizeForMerge = 10 * num_samples_per_base;
+    const int kMinIntervalSizeForMerge =
+            std::max(static_cast<int>(std::round(10 * num_samples_per_base)), 200);
     // Floor for average signal value of poly tail.
     const float kMinAvgVal = (is_rna ? 0.0 : -3.0);
 
     int left_end = is_rna ? std::max(0, signal_anchor - 50) : std::max(0, signal_anchor - kSpread);
     int right_end = std::min(signal_len, signal_anchor + kSpread);
-    spdlog::debug("Bounds left {}, right {}", left_end, right_end);
+    spdlog::trace("Bounds left {}, right {}", left_end, right_end);
 
     const int kStride = 3;
     for (int s = left_end; s < right_end; s += kStride) {
@@ -84,22 +87,28 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
             if (intervals.size() > 1 && intervals.back().second >= s &&
                 std::abs(avg - last_interval_stats.first) < 0.2 && (avg > kMinAvgVal)) {
                 auto& last = intervals.back();
+                spdlog::trace("extend interval {}-{} to {}-{} avg {} stdev {}", last.first,
+                              last.second, s, e, avg, stdev);
                 last.second = e;
             } else {
                 // Attempt to merge the most recent interval and the one before
                 // that if the gap between the intervals is small and both of the
                 // intervals are longer than some threshold.
-                if (intervals.size() > 2) {
+                if (intervals.size() >= 2) {
                     auto& last = intervals.back();
                     auto& second_last = intervals[intervals.size() - 2];
+                    spdlog::trace("Evaluate for merge {}-{} with {}-{}", second_last.first,
+                                  second_last.second, last.first, last.second);
                     if ((last.first - second_last.second < kMaxSampleGap) &&
                         (last.second - last.first > kMinIntervalSizeForMerge) &&
                         (second_last.second - second_last.first > kMinIntervalSizeForMerge)) {
+                        spdlog::trace("Merge interval {}-{} with {}-{}", second_last.first,
+                                      second_last.second, second_last.first, last.second);
                         second_last.second = last.second;
                         intervals.pop_back();
                     }
                 }
-
+                spdlog::trace("Add new interval {}-{} avg {} stdev {}", s, e, avg, stdev);
                 intervals.push_back({s, e});
             }
             last_interval_stats = {avg, stdev};
@@ -110,30 +119,30 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
     for (const auto& in : intervals) {
         int_str += std::to_string(in.first) + "-" + std::to_string(in.second) + ", ";
     }
-    spdlog::debug("found intervals {}", int_str);
+    spdlog::trace("found intervals {}", int_str);
 
     std::vector<std::pair<int, int>> filtered_intervals;
     std::copy_if(intervals.begin(), intervals.end(), std::back_inserter(filtered_intervals),
                  [&](auto& i) {
                      int interval_size = i.second - i.first;
                      // Filter out any small intervals.
-                     if (interval_size < (num_samples_per_base * 5)) {
+                     if (interval_size < (std::round(num_samples_per_base * min_base_count))) {
                          return false;
                      }
                      // Only keep intervals that are close-ish to the signal anchor.
-                     return (fwd ? std::abs(signal_anchor - i.second) < interval_size
-                                 : std::abs(signal_anchor - i.first) < interval_size) ||
-                            (i.first <= signal_anchor) && (signal_anchor <= i.second);
+                     return (std::abs(signal_anchor - i.second) < interval_size ||
+                             std::abs(signal_anchor - i.first) < interval_size ||
+                             (i.first <= signal_anchor) && (signal_anchor <= i.second));
                  });
 
     int_str = "";
     for (auto in : filtered_intervals) {
         int_str += std::to_string(in.first) + "-" + std::to_string(in.second) + ", ";
     }
-    spdlog::debug("filtered intervals {}", int_str);
+    spdlog::trace("filtered intervals {}", int_str);
 
     if (filtered_intervals.empty()) {
-        spdlog::debug("Anchor {} No range within anchor proximity found", signal_anchor);
+        spdlog::trace("Anchor {} No range within anchor proximity found", signal_anchor);
         return {0, 0};
     }
 
@@ -156,30 +165,43 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
                                               }
                                           });
 
-    spdlog::debug("Anchor {} Range {} {}", signal_anchor, best_interval->first,
+    spdlog::trace("Anchor {} Range {} {}", signal_anchor, best_interval->first,
                   best_interval->second);
+
     return *best_interval;
 }
 
-// Estimate the number of samples per base. For RNA, use the last 100 bases
-// to get a measure of samples/base. For DNA, just taking the average across
-// the whole read gives a decent estimate.
-int estimate_samples_per_base(const dorado::SimplexRead& read, bool is_rna) {
-    size_t num_bases = read.read_common.seq.length();
-    if (is_rna && num_bases > 250) {
-        const auto stride = read.read_common.model_stride;
-        const auto seq_to_sig_map =
-                dorado::utils::moves_to_map(read.read_common.moves, stride,
-                                            read.read_common.get_raw_data_samples(), num_bases + 1);
-        // Use last 100bp to estimate samples / base.
-        size_t signal_len = seq_to_sig_map[num_bases] - seq_to_sig_map[num_bases - 100];
-        return std::floor(static_cast<float>(signal_len) / 100);
+// Estimate the number of samples per base.
+// For RNA, use the mean of 10-90th percentile samples/base estimated from
+// the move table.
+// For DNA, just take the median samples/base estimated from the move table.
+float estimate_samples_per_base(const dorado::SimplexRead& read, bool is_rna) {
+    const size_t num_bases = read.read_common.seq.length();
+    const auto num_samples = read.read_common.get_raw_data_samples();
+    const auto stride = read.read_common.model_stride;
+    const auto seq_to_sig_map =
+            dorado::utils::moves_to_map(read.read_common.moves, stride, num_samples, num_bases + 1);
+    // Store the samples per base in float to use the quantile calcuation function.
+    std::vector<float> sizes(seq_to_sig_map.size() - 1, 0.f);
+    for (int i = 1; i < seq_to_sig_map.size(); i++) {
+        sizes[i - 1] = static_cast<float>(seq_to_sig_map[i] - seq_to_sig_map[i - 1]);
     }
-    float num_samples_per_base =
-            static_cast<float>(read.read_common.get_raw_data_samples()) / num_bases;
-    // The estimate is not rounded because this calculation generally overestimates
-    // the samples per base. Rounding down gives better results than rounding to nearest.
-    return std::floor(num_samples_per_base);
+
+    if (is_rna) {
+        auto quantiles = dorado::utils::quantiles(sizes, {0.1f, 0.9f});
+        float sum = 0.f;
+        int count = 0;
+        for (auto s : sizes) {
+            if (s >= quantiles[0] && s <= quantiles[1]) {
+                sum += s;
+                count++;
+            }
+        }
+        return (count > 0 ? (sum / count) : 0.f);
+    } else {
+        auto quantiles = dorado::utils::quantiles(sizes, {0.5});
+        return static_cast<float>(quantiles[0]);
+    }
 }
 
 // In order to find the approximate location of the start/end (anchor) of the polyA
@@ -220,7 +242,7 @@ SignalAnchorInfo determine_signal_anchor_and_strand_cdna(const dorado::SimplexRe
                                             read_bottom.length(), align_config);
 
     int dist_v2 = top_v2.editDistance + bottom_v2.editDistance;
-    spdlog::debug("v1 dist {}, v2 dist {}", dist_v1, dist_v2);
+    spdlog::trace("v1 dist {}, v2 dist {}", dist_v1, dist_v2);
 
     bool fwd = dist_v1 < dist_v2;
     bool proceed = std::min(dist_v1, dist_v2) < 30 && std::abs(dist_v1 - dist_v2) > 10;
@@ -288,23 +310,38 @@ void PolyACalculator::worker_thread() {
                          : determine_signal_anchor_and_strand_cdna(*read);
 
         if (signal_anchor >= 0) {
-            spdlog::debug("Strand {}; poly A/T signal anchor {}", fwd ? '+' : '-', signal_anchor);
+            spdlog::debug("{} Strand {}; poly A/T signal anchor {}", read->read_common.read_id,
+                          fwd ? '+' : '-', signal_anchor);
 
             auto num_samples_per_base = estimate_samples_per_base(*read, m_is_rna);
 
-            // Walk through signal
+            // Walk through signal. Require a minimum of length 10 poly-A since below that
+            // the current algorithm returns a lot of false intervals.
             auto [signal_start, signal_end] = determine_signal_bounds(
-                    signal_anchor, fwd, *read, num_samples_per_base, m_is_rna);
+                    signal_anchor, fwd, *read, num_samples_per_base, m_is_rna, 10);
+            auto signal_len = signal_end - signal_start;
 
-            int num_bases = std::round(static_cast<float>(signal_end - signal_start) /
-                                       num_samples_per_base) -
-                            trailing_Ts;
+            // Create an offset for dRNA data. There is a tendency to overestimate the length of dRNA
+            // tails, especially shorter ones. This correction factor appears to fix the bias
+            // for most dRNA data. This exponential fit was done based on the standards data.
+            // TODO: In order to improve this, perhaps another pass over the tail interval is needed
+            // to get a more refined boundary estimation?
+            if (m_is_rna) {
+                signal_len -= std::round(std::min(
+                        100.f, std::exp(5.6838f - 0.0021f * static_cast<float>(signal_len))));
+            }
+
+            int num_bases =
+                    std::round(static_cast<float>(signal_len) / num_samples_per_base) - trailing_Ts;
+
             if (num_bases > 0 && num_bases < kMaxTailLength) {
                 spdlog::debug(
-                        "{} PolyA bases {}, signal anchor {} Signal range is {} {}, "
-                        "samples/base {} trim {}",
+                        "{} PolyA bases {}, signal anchor {} Signal range is {} {} Signal length "
+                        "{}, "
+                        "samples/base {} trim {} read len {}",
                         read->read_common.read_id, num_bases, signal_anchor, signal_start,
-                        signal_end, num_samples_per_base, read->read_common.num_trimmed_samples);
+                        signal_end, signal_len, num_samples_per_base,
+                        read->read_common.num_trimmed_samples, read->read_common.seq.length());
 
                 // Set tail length property in the read.
                 read->read_common.rna_poly_tail_length = num_bases;
