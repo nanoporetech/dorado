@@ -186,7 +186,7 @@ $ dorado demux --kit-name <kit-name> --output-dir <output-folder-for-demuxed-bam
 
 `<reads>` can either be an HTS format file (e.g. fastq, BAM, etc.) or a stream of an HTS format (e.g. the output of dorado basecalling).
 
-This results in multiple BAM files being generated in the output folder, one per barcode (formatted as `KITNAME_BARCODEXX.bam` and one for all unclassified reads. As with the in-line mode, `--no-trim` and `--barcode-both-ends` are also available as additional options.
+This results in multiple BAM files being generated in the output folder, one per barcode (formatted as `KITNAME_BARCODEXX.bam`) and one for all unclassified reads. As with the in-line mode, `--no-trim` and `--barcode-both-ends` are also available as additional options.
 
 Here is an example output folder
 ```
@@ -199,6 +199,9 @@ SQK-RPB004_barcode03.bam
 ...
 unclassified.bam
 ```
+
+#### Using a Sample Sheet
+`dorado` is able to use a sample sheet to restrict the barcode classifications to only those present, and to apply aliases to the detected classifications. This is enabled by passing the path to a sample sheet to the `--sample-sheet` argument when using the `basecaller` or `demux` commands. See [here](documentation/SampleSheets.md) for more information.
 
 ## Available basecalling models
 
