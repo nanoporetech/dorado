@@ -1,6 +1,7 @@
 #include "ReadPipeline.h"
 
 #include "modbase/ModBaseContext.h"
+#include "stereo_features.h"
 #include "utils/bam_utils.h"
 #include "utils/sequence_utils.h"
 
@@ -272,6 +273,14 @@ ReadCommon &get_read_common_data(const Message &message) {
         } else {
             return std::get<DuplexReadPtr>(message)->read_common;
         }
+    }
+}
+
+void materialise_read_raw_data(Message &message) {
+    if (std::holds_alternative<DuplexReadPtr>(message)) {
+        auto &duplex_read = *std::get<DuplexReadPtr>(message);
+        duplex_read.read_common.raw_data =
+                GenerateStereoFeatures(duplex_read.stereo_feature_inputs);
     }
 }
 

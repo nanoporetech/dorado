@@ -61,20 +61,8 @@ void BasecallerNode::input_worker_thread() {
             continue;
         }
 
-        if (std::holds_alternative<DuplexReadPtr>(message)) {
-            auto &stereo_feature_inputs = std::get<DuplexReadPtr>(message)->stereo_feature_inputs;
-            read_common_data.raw_data = GenerateStereoFeatures(stereo_feature_inputs);
-            // TODO -- range for, or groupt his under a unique_ptr
-            stereo_feature_inputs.template_signal = torch::empty({0});
-            stereo_feature_inputs.complement_signal = torch::empty({0});
-            stereo_feature_inputs.alignment.clear();
-            stereo_feature_inputs.template_seq.clear();
-            stereo_feature_inputs.complement_seq.clear();
-            stereo_feature_inputs.template_qstring.clear();
-            stereo_feature_inputs.complement_qstring.clear();
-            stereo_feature_inputs.template_moves.clear();
-            stereo_feature_inputs.complement_moves.clear();
-        }
+        // If this is a duplex read, raw_data won't have been generated yet.
+        materialise_read_raw_data(message);
 
         // Now that we have acquired a read, wait until we can push to chunks_in
         // Chunk up the read and put the chunks into the pending chunk list.

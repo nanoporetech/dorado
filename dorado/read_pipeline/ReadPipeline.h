@@ -188,6 +188,9 @@ bool is_read_message(const Message& message);
 
 ReadCommon& get_read_common_data(const Message& message);
 
+// Ensures the raw_data field is present, which it won't necessarily be for DuplexRead.
+void materialise_read_raw_data(Message& message);
+
 using NodeHandle = int;
 
 struct FlushOptions {
