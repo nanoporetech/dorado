@@ -145,7 +145,7 @@ const KitInfo kit_rbk4 = {
 };
 
 const KitInfo kit_rlb = {
-        "RBL", true, false, RLB_FRONT, RLB_REAR, "", "", BC_1_12A,
+        "RLB", true, false, RLB_FRONT, RLB_REAR, "", "", BC_1_12A,
 };
 
 // Final map to go from kit name to actual barcode arrangement information.
