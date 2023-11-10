@@ -104,6 +104,14 @@ std::optional<PosRange> check_rc_match(const std::string& seq,
 
 namespace dorado::splitter {
 
+//TODO consider precomputing and reusing ranges with high signal
+struct DuplexReadSplitter::ExtRead {
+    SimplexReadPtr read;
+    at::Tensor data_as_float32;
+    std::vector<uint64_t> move_sums;
+    splitter::PosRanges possible_pore_regions;
+};
+
 DuplexReadSplitter::ExtRead DuplexReadSplitter::create_ext_read(SimplexReadPtr r) const {
     ExtRead ext_read;
     ext_read.read = std::move(r);
@@ -472,5 +480,7 @@ DuplexReadSplitter::DuplexReadSplitter(DuplexSplitSettings settings)
         : m_settings(std::move(settings)) {
     m_split_finders = build_split_finders();
 }
+
+DuplexReadSplitter::~DuplexReadSplitter() {}
 
 }  // namespace dorado::splitter

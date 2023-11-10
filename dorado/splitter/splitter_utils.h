@@ -2,7 +2,7 @@
 
 #include "ReadSplitter.h"
 
-#include <ATen/ATen.h>
+#include <ATen/core/TensorBody.h>
 
 #include <algorithm>
 #include <cstdint>

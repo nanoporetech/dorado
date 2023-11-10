@@ -21,7 +21,7 @@ namespace {
 
 const std::string UNCLASSIFIED_BARCODE = "unclassified";
 
-std::string generate_barcode_string(dorado::demux::ScoreResults bc_res) {
+std::string generate_barcode_string(dorado::BarcodeScoreResult bc_res) {
     std::string bc;
     if (bc_res.adapter_name != UNCLASSIFIED_BARCODE) {
         bc = dorado::barcode_kits::generate_standard_barcode_name(bc_res.kit, bc_res.adapter_name);
@@ -95,7 +95,7 @@ void BarcodeClassifierNode::worker_thread(size_t tid) {
     }
 }
 
-std::pair<int, int> determine_trim_interval(const demux::ScoreResults& res, int seqlen) {
+static std::pair<int, int> determine_trim_interval(const BarcodeScoreResult& res, int seqlen) {
     // Initialize interval to be the whole read. Note that the interval
     // defines which portion of the read to retain.
     std::pair<int, int> trim_interval = {0, seqlen};
@@ -153,8 +153,8 @@ std::pair<int, int> determine_trim_interval(const demux::ScoreResults& res, int 
 }
 
 BamPtr BarcodeClassifierNode::trim_barcode(BamPtr input,
-                                           const demux::ScoreResults& res,
-                                           int seqlen) {
+                                           const BarcodeScoreResult& res,
+                                           int seqlen) const {
     auto trim_interval = determine_trim_interval(res, seqlen);
 
     if (trim_interval.second - trim_interval.first == seqlen) {
@@ -221,11 +221,9 @@ BamPtr BarcodeClassifierNode::trim_barcode(BamPtr input,
     return BamPtr(out_record);
 }
 
-void BarcodeClassifierNode::trim_barcode(SimplexRead& read, const demux::ScoreResults& res) {
-    int seqlen = int(read.read_common.seq.length());
-    auto trim_interval = determine_trim_interval(res, seqlen);
-
-    if (trim_interval.second - trim_interval.first == seqlen) {
+void BarcodeClassifierNode::trim_barcode(SimplexRead& read,
+                                         std::pair<int, int> trim_interval) const {
+    if (trim_interval.second - trim_interval.first == int(read.read_common.seq.length())) {
         return;
     }
 
@@ -292,10 +290,15 @@ void BarcodeClassifierNode::barcode(SimplexRead& read) {
     auto bc_res = barcoder->barcode(read.read_common.seq, barcoding_info->barcode_both_ends,
                                     barcoding_info->allowed_barcodes);
     read.read_common.barcode = generate_barcode_string(bc_res);
-    m_num_records++;
+    read.read_common.barcoding_result = std::make_shared<BarcodeScoreResult>(std::move(bc_res));
+    read.read_common.pre_trim_seq_length = read.read_common.seq.length();
     if (barcoding_info->trim) {
-        trim_barcode(read, bc_res);
+        read.read_common.barcode_trim_interval = determine_trim_interval(
+                *read.read_common.barcoding_result, int(read.read_common.seq.length()));
+        trim_barcode(read, read.read_common.barcode_trim_interval);
     }
+
+    m_num_records++;
 }
 
 stats::NamedStats BarcodeClassifierNode::sample_stats() const {

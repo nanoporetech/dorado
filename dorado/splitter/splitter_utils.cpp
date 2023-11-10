@@ -4,9 +4,26 @@
 #include "read_pipeline/read_utils.h"
 #include "utils/time_utils.h"
 
-#include <optional>
+#include <ATen/TensorIndexing.h>
 
 namespace dorado::splitter {
+namespace {
+// This part of subread() is split out into its own unoptimised function since not doing so
+// causes binaries built by GCC8 with ASAN enabled to crash during static init.
+// Note that the cause of the crash doesn't appear to be specific to this bit of code, since
+// removing other parts from subread() also "fixes" the issue, but this is the smallest
+// snippet that works around the issue without potentially incurring performance issues.
+#if defined(__GNUC__) && defined(__SANITIZE_ADDRESS__)
+__attribute__((optimize("O0")))
+#endif
+ void assign_subread_parent_id(const SimplexRead& read, SimplexReadPtr & subread) {
+    if (!read.read_common.parent_read_id.empty()) {
+        subread->read_common.parent_read_id = read.read_common.parent_read_id;
+    } else {
+        subread->read_common.parent_read_id = read.read_common.read_id;
+    }
+}
+}  // namespace
 
 SimplexReadPtr subread(const SimplexRead& read,
                        std::optional<PosRange> seq_range,
@@ -68,11 +85,7 @@ SimplexReadPtr subread(const SimplexRead& read,
     subread->prev_read = read.prev_read;
     subread->next_read = read.next_read;
 
-    if (!read.read_common.parent_read_id.empty()) {
-        subread->read_common.parent_read_id = read.read_common.parent_read_id;
-    } else {
-        subread->read_common.parent_read_id = read.read_common.read_id;
-    }
+    assign_subread_parent_id(read, subread);
     return subread;
 }
 
