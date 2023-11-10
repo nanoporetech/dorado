@@ -215,15 +215,15 @@ int duplex(int argc, char* argv[]) {
                 {duplex_read_tagger}, min_qscore, default_parameters.min_sequence_length,
                 read_ids_to_filter, 5);
 
-        std::vector<dorado::stats::StatsCallable> stats_callables;
+        std::unique_ptr<dorado::Pipeline> pipeline;
         ProgressTracker tracker(int(num_reads), duplex);
+        std::vector<dorado::stats::StatsCallable> stats_callables;
         stats_callables.push_back(
                 [&tracker](const stats::NamedStats& stats) { tracker.update_progress_bar(stats); });
         stats::NamedStats final_stats;
         std::unique_ptr<dorado::stats::StatsSampler> stats_sampler;
         std::vector<dorado::stats::StatsReporter> stats_reporters{dorado::stats::sys_stats_report};
 
-        std::unique_ptr<dorado::Pipeline> pipeline;
         constexpr auto kStatsPeriod = 100ms;
 
         if (basespace_duplex) {  // Execute a Basespace duplex pipeline.
