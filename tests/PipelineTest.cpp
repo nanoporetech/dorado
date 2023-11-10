@@ -41,7 +41,7 @@ TEST_CASE("Creation", TEST_GROUP) {
         // 2 connected nodes, with 1 a source is allowed.
         PipelineDescriptor pipeline_desc;
         auto sink = pipeline_desc.add_node<NullNode>({});
-        auto source = pipeline_desc.add_node<NullNode>({sink});
+        pipeline_desc.add_node<NullNode>({sink});
         auto pipeline = Pipeline::create(std::move(pipeline_desc));
         CHECK(pipeline != nullptr);
     }
@@ -62,7 +62,7 @@ TEST_CASE("Creation", TEST_GROUP) {
         auto a = pipeline_desc.add_node<NullNode>({});
         auto b = pipeline_desc.add_node<NullNode>({a});
         pipeline_desc.add_node_sink(a, b);
-        auto source = pipeline_desc.add_node<NullNode>({a});
+        pipeline_desc.add_node<NullNode>({a});
         auto pipeline = Pipeline::create(std::move(pipeline_desc));
         CHECK(pipeline == nullptr);
     }
@@ -72,7 +72,7 @@ TEST_CASE("Creation", TEST_GROUP) {
         PipelineDescriptor pipeline_desc;
         auto sink_a = pipeline_desc.add_node<NullNode>({});
         auto sink_b = pipeline_desc.add_node<NullNode>({});
-        auto source = pipeline_desc.add_node<NullNode>({sink_a, sink_b});
+        pipeline_desc.add_node<NullNode>({sink_a, sink_b});
         auto pipeline = Pipeline::create(std::move(pipeline_desc));
         CHECK(pipeline != nullptr);
     }
@@ -83,7 +83,7 @@ TEST_CASE("Creation", TEST_GROUP) {
         auto sink_c = pipeline_desc.add_node<NullNode>({});
         auto sink_a = pipeline_desc.add_node<NullNode>({sink_c});
         auto sink_b = pipeline_desc.add_node<NullNode>({sink_c});
-        auto source = pipeline_desc.add_node<NullNode>({sink_a, sink_b});
+        pipeline_desc.add_node<NullNode>({sink_a, sink_b});
         auto pipeline = Pipeline::create(std::move(pipeline_desc));
         CHECK(pipeline != nullptr);
     }
@@ -175,7 +175,7 @@ TEST_CASE("PipelineFlow", TEST_GROUP) {
 TEST_CASE("TerminateRestart", TEST_GROUP) {
     PipelineDescriptor pipeline_desc;
     std::vector<dorado::Message> messages;
-    auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
+    pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
     REQUIRE(pipeline != nullptr);
     pipeline->push_message(std::make_unique<dorado::SimplexRead>());

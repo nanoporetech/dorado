@@ -39,7 +39,7 @@ std::vector<std::pair<uint64_t, uint64_t>> detect_pore_signal(const at::Tensor& 
     int64_t cl_start = -1;
     int64_t cl_end = -1;
 
-    for (auto i = ignore_prefix; i < pore_a.size(0); i++) {
+    for (auto i = ignore_prefix; i < uint64_t(pore_a.size(0)); i++) {
         if (pore_a[i] > threshold) {
             //check if we need to start new cluster
             if (cl_end == -1 || i > cl_end + cluster_dist) {

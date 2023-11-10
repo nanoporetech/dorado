@@ -38,8 +38,8 @@ std::optional<PosRange> find_best_adapter_match(const std::string& adapter,
 
     auto edlib_cfg = edlibNewAlignConfig(dist_thr, EDLIB_MODE_HW, EDLIB_TASK_LOC, NULL, 0);
 
-    auto edlib_result =
-            edlibAlign(adapter.c_str(), adapter.size(), seq.c_str() + shift, span, edlib_cfg);
+    auto edlib_result = edlibAlign(adapter.c_str(), int(adapter.size()), seq.c_str() + shift,
+                                   int(span), edlib_cfg);
     assert(edlib_result.status == EDLIB_STATUS_OK);
     std::optional<PosRange> res = std::nullopt;
     if (edlib_result.status == EDLIB_STATUS_OK && edlib_result.editDistance != -1) {
@@ -81,16 +81,17 @@ std::optional<PosRange> check_rc_match(const std::string& seq,
 
     auto edlib_cfg = edlibNewAlignConfig(dist_thr, EDLIB_MODE_HW, EDLIB_TASK_LOC, NULL, 0);
 
-    auto edlib_result = edlibAlign(seq.c_str() + templ_r.first, templ_r.second - templ_r.first,
-                                   rc_compl.c_str(), rc_compl.size(), edlib_cfg);
+    auto edlib_result = edlibAlign(seq.c_str() + templ_r.first, int(templ_r.second - templ_r.first),
+                                   rc_compl.c_str(), int(rc_compl.size()), edlib_cfg);
     assert(edlib_result.status == EDLIB_STATUS_OK);
 
     bool match = (edlib_result.status == EDLIB_STATUS_OK) && (edlib_result.editDistance != -1);
     std::optional<PosRange> res = std::nullopt;
     if (match) {
         assert(edlib_result.editDistance <= dist_thr);
-        assert(edlib_result.numLocations > 0 && edlib_result.endLocations[0] < compl_r.second &&
-               edlib_result.startLocations[0] < compl_r.second);
+        assert(edlib_result.numLocations > 0 &&
+               edlib_result.endLocations[0] < int(compl_r.second) &&
+               edlib_result.startLocations[0] < int(compl_r.second));
         res = PosRange(compl_r.second - edlib_result.endLocations[0],
                        compl_r.second - edlib_result.startLocations[0]);
     }
@@ -182,7 +183,7 @@ std::optional<std::pair<PosRange, PosRange>> DuplexReadSplitter::check_flank_mat
     assert(right_start < right_end);
     const uint64_t right_span = right_end - right_start;
 
-    const int dist_thr = std::round(err_thr * left_span);
+    const int dist_thr = int(std::round(err_thr * left_span));
     if (left_span >= m_settings.min_flank && right_span >= left_span) {
         if (auto match = check_rc_match(read.read_common.seq, {left_start, left_end},
                                         //including spacer region in search
@@ -218,7 +219,7 @@ std::optional<PosRange> DuplexReadSplitter::identify_middle_adapter_split(
             const uint64_t query_start = r_l - m_settings.strand_end_flank;
             const uint64_t query_end = r_l - m_settings.strand_end_trim;
             const uint64_t query_span = query_end - query_start;
-            const int dist_thr = std::round(m_settings.flank_err * query_span);
+            const int dist_thr = int(std::round(m_settings.flank_err * query_span));
 
             const uint64_t template_start = 0;
             const uint64_t template_end = std::min(m_settings.strand_start_flank, adapter_start);
@@ -240,7 +241,7 @@ std::optional<PosRange> DuplexReadSplitter::identify_extra_middle_split(
         const SimplexRead& read) const {
     const uint64_t r_l = read.read_common.seq.size();
     //TODO parameterize
-    const float ext_start_frac = 0.1;
+    const float ext_start_frac = 0.1f;
     //extend to tolerate some extra length difference
     const uint64_t ext_start_flank =
             std::max(uint64_t(ext_start_frac * r_l), m_settings.strand_start_flank);
@@ -249,8 +250,8 @@ std::optional<PosRange> DuplexReadSplitter::identify_extra_middle_split(
         return std::nullopt;
     }
 
-    int flank_edist = std::round(m_settings.flank_err *
-                                 (m_settings.strand_end_flank - m_settings.strand_end_trim));
+    int flank_edist = int(std::round(m_settings.flank_err *
+                                     (m_settings.strand_end_flank - m_settings.strand_end_trim)));
 
     spdlog::trace("Checking start/end match");
     if (auto templ_start_match = check_rc_match(
@@ -265,7 +266,7 @@ std::optional<PosRange> DuplexReadSplitter::identify_extra_middle_split(
         spdlog::trace("Middle estimate {}", est_middle);
         //TODO parameterize
         const int min_split_margin = 100;
-        const float split_margin_frac = 0.05;
+        const float split_margin_frac = 0.05f;
         const auto split_margin = std::max(min_split_margin, int(split_margin_frac * r_l));
 
         spdlog::trace("Checking approx middle match");
@@ -442,7 +443,7 @@ std::vector<SimplexReadPtr> DuplexReadSplitter::split(SimplexReadPtr init_read) 
 
     // Adjust prev and next read ids.
     if (split_result.size() > 1) {
-        for (int i = 0; i < split_result.size(); i++) {
+        for (size_t i = 0; i < split_result.size(); i++) {
             if (i == split_result.size() - 1) {
                 // For the last split read, the next read remains the same as the
                 // original read's next read.

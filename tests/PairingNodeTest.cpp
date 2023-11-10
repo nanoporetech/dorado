@@ -50,7 +50,7 @@ TEST_CASE("Split read pairing", TEST_GROUP) {
     const std::string seq =
             ReadFileIntoString(std::filesystem::path(get_aligner_data_dir()) / "long_target.fa");
     auto seq_rc = dorado::utils::reverse_complement(seq);
-    seq_rc = seq_rc.substr(0, seq.length() * 0.8f);
+    seq_rc = seq_rc.substr(0, size_t(seq.length() * 0.8f));
 
     std::array reads{
             make_read(0, 1000),
@@ -66,7 +66,7 @@ TEST_CASE("Split read pairing", TEST_GROUP) {
     std::vector<dorado::Message> messages;
     auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 5, messages);
     // one thread, one read - force reads through in order
-    auto pairing_node = pipeline_desc.add_node<dorado::PairingNode>(
+    pipeline_desc.add_node<dorado::PairingNode>(
             {sink},
             dorado::DuplexPairingParameters{dorado::ReadOrder::BY_CHANNEL,
                                             dorado::DEFAULT_DUPLEX_CACHE_DEPTH},

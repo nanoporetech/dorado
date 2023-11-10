@@ -213,7 +213,7 @@ TEST_CASE(
     }
 
     std::vector<uint8_t> moves;
-    for (int i = 0; i < read->read_common.seq.length(); i++) {
+    for (size_t i = 0; i < read->read_common.seq.length(); i++) {
         moves.push_back(1);
         moves.push_back(0);
     }
@@ -226,7 +226,7 @@ TEST_CASE(
     read->read_common.base_mod_probs =
             std::vector<uint8_t>(read->read_common.seq.length() * mod_alphabet.size(), 0);
 
-    for (int i = 0; i < read->read_common.seq.size(); i++) {
+    for (size_t i = 0; i < read->read_common.seq.size(); i++) {
         switch (read->read_common.seq[i]) {
         case 'A':
             read->read_common.base_mod_probs[i * mod_alphabet.size()] = 255;
@@ -265,17 +265,17 @@ TEST_CASE(
 
     pipeline->terminate(DefaultFlushOptions());
 
-    const auto num_expected_messages = use_per_read_barcoding ? 2 : 3;
+    const size_t num_expected_messages = use_per_read_barcoding ? 2 : 3;
     CHECK(messages.size() == num_expected_messages);
 
     const std::string expected_bc = "SQK-RPB004_barcode01";
     std::vector<uint8_t> expected_move_vals;
-    for (int i = 0; i < nonbc_seq.length(); i++) {
+    for (size_t i = 0; i < nonbc_seq.length(); i++) {
         expected_move_vals.push_back(1);
         expected_move_vals.push_back(0);
     }
     const int additional_trimmed_samples =
-            stride * 2 * front_flank.length();  // * 2 is because we have 2 moves per base
+            int(stride * 2 * front_flank.length());  // * 2 is because we have 2 moves per base
 
     for (auto& message : messages) {
         if (std::holds_alternative<BamPtr>(message)) {
@@ -318,7 +318,7 @@ TEST_CASE(
             CHECK(read->read_common.base_mod_probs[0] == 20);
             CHECK(read->read_common.base_mod_probs[1] == 235);
 
-            CHECK(read->read_common.num_trimmed_samples == additional_trimmed_samples);
+            CHECK(read->read_common.num_trimmed_samples == uint64_t(additional_trimmed_samples));
 
             auto bams = read->read_common.extract_sam_lines(0, 10);
             auto& rec = bams[0];
@@ -336,8 +336,8 @@ TEST_CASE("BarcodeClassifierNode: test reads where trim length == read length", 
     std::vector<std::string> kits = {"SQK-RBK114-96"};
     bool barcode_both_ends = false;
     bool no_trim = false;
-    auto classifier = pipeline_desc.add_node<BarcodeClassifierNode>(
-            {sink}, 8, kits, barcode_both_ends, no_trim, std::nullopt);
+    pipeline_desc.add_node<BarcodeClassifierNode>({sink}, 8, kits, barcode_both_ends, no_trim,
+                                                  std::nullopt);
 
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
     fs::path data_dir = fs::path(get_data_dir("barcode_demux"));

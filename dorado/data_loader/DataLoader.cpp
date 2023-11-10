@@ -130,7 +130,9 @@ SimplexReadPtr process_pod5_read(
     auto run_sample_rate = run_info_data->sample_rate;
 
     char read_id_tmp[POD5_READ_ID_LEN];
-    pod5_error_t err = pod5_format_read_id(read_data.read_id, read_id_tmp);
+    if (pod5_format_read_id(read_data.read_id, read_id_tmp) != POD5_OK) {
+        spdlog::error("Failed to format read id");
+    }
     std::string read_id_str(read_id_tmp);
 
     auto options = at::TensorOptions().dtype(at::kShort);
@@ -205,7 +207,10 @@ bool can_process_pod5_row(Pod5ReadRecordBatch_t* batch,
     }
 
     char read_id_tmp[POD5_READ_ID_LEN];
-    pod5_error_t err = pod5_format_read_id(read_data.read_id, read_id_tmp);
+    if (pod5_format_read_id(read_data.read_id, read_id_tmp) != POD5_OK) {
+        spdlog::error("Failed to format read id");
+    }
+
     std::string read_id_str(read_id_tmp);
     bool read_in_ignore_list = ignored_read_ids.find(read_id_str) != ignored_read_ids.end();
     bool read_in_read_list =
@@ -360,7 +365,7 @@ int DataLoader::get_num_reads(std::string data_path,
         num_reads = std::min(num_reads, final_read_list.size());
     }
 
-    return num_reads;
+    return int(num_reads);
 }
 
 void DataLoader::load_read_channels(std::string data_path, bool recursive_file_loading) {
@@ -426,7 +431,9 @@ void DataLoader::load_read_channels(std::string data_path, bool recursive_file_l
                     channel_to_read_id[channel].push_back(std::move(read_id));
 
                     char read_id_tmp[POD5_READ_ID_LEN];
-                    pod5_error_t err = pod5_format_read_id(read_data.read_id, read_id_tmp);
+                    if (pod5_format_read_id(read_data.read_id, read_id_tmp) != POD5_OK) {
+                        spdlog::error("Failed to format read id");
+                    }
                     std::string rid(read_id_tmp);
                     m_reads_by_channel[channel].push_back(
                             {rid, read_data.well, read_data.read_number});
@@ -577,7 +584,7 @@ uint16_t DataLoader::get_sample_rate(std::string data_path, bool recursive_file_
             } else if (ext == ".fast5") {
                 H5Easy::File file(entry.path().string(), H5Easy::File::ReadOnly);
                 HighFive::Group reads = file.getGroup("/");
-                int num_reads = reads.getNumberObjects();
+                int num_reads = int(reads.getNumberObjects());
 
                 if (num_reads > 0) {
                     auto read_id = reads.getObjectName(0);
@@ -627,7 +634,7 @@ void DataLoader::load_pod5_reads_from_file_by_read_ids(const std::string& path,
     }
 
     std::vector<uint8_t> read_id_array(POD5_READ_ID_SIZE * read_ids.size());
-    for (int i = 0; i < read_ids.size(); i++) {
+    for (size_t i = 0; i < read_ids.size(); i++) {
         std::memcpy(read_id_array.data() + POD5_READ_ID_SIZE * i, read_ids[i].data(),
                     POD5_READ_ID_SIZE);
     }
@@ -732,7 +739,7 @@ void DataLoader::load_pod5_reads_from_file(const std::string& path) {
         for (std::size_t row = 0; row < batch_row_count; ++row) {
             // TODO - check the read ID here, for each one, only send the row if it is in the list of ones we care about
 
-            if (can_process_pod5_row(batch, row, m_allowed_read_ids, m_ignored_read_ids)) {
+            if (can_process_pod5_row(batch, int(row), m_allowed_read_ids, m_ignored_read_ids)) {
                 futures.push_back(pool.push(process_pod5_read, row, batch, file, path,
                                             &m_reads_by_channel, &m_read_id_to_index));
             }
@@ -757,7 +764,7 @@ void DataLoader::load_fast5_reads_from_file(const std::string& path) {
     // Read the file into a vector of torch tensors
     H5Easy::File file(path, H5Easy::File::ReadOnly);
     HighFive::Group reads = file.getGroup("/");
-    int num_reads = reads.getNumberObjects();
+    int num_reads = int(reads.getNumberObjects());
 
     for (int i = 0; i < num_reads && m_loaded_read_count < m_max_reads; i++) {
         auto read_id = reads.getObjectName(i);
@@ -825,7 +832,7 @@ void DataLoader::load_fast5_reads_from_file(const std::string& path) {
                                                  static_cast<uint32_t>(start_time / sampling_rate));
 
         auto new_read = std::make_unique<SimplexRead>();
-        new_read->read_common.sample_rate = sampling_rate;
+        new_read->read_common.sample_rate = uint64_t(sampling_rate);
         new_read->read_common.raw_data = samples;
         new_read->digitisation = digitisation;
         new_read->range = range;

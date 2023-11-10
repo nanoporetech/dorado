@@ -237,9 +237,9 @@ public:
 
     stats::NamedStats sample_stats() const {
         stats::NamedStats stats;
-        stats["batches_called"] = m_num_batches_called;
+        stats["batches_called"] = double(m_num_batches_called);
 #if DORADO_GPU_BUILD && !defined(__APPLE__)
-        stats["model_ms"] = m_model_ms;
+        stats["model_ms"] = double(m_model_ms);
 #endif
         return stats;
     }
@@ -351,7 +351,7 @@ stats::NamedStats ModBaseRunner::sample_stats() const {
     // Each runner will retrieve stats from the caller.
     // Only the last retrieved version will appear, but they should be very similar.
     stats::NamedStats stats = stats::from_obj(*m_caller);
-    stats["batches_called"] = m_num_batches_called;
+    stats["batches_called"] = double(m_num_batches_called);
     return stats;
 }
 

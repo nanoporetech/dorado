@@ -51,24 +51,6 @@ auto get_library_location() {
     return NS::String::string(fspath.c_str(), NS::ASCIIStringEncoding);
 }
 
-// Returns an ASCII std::string associated with the given CFStringRef.
-std::string cfstringref_to_string(const CFStringRef cfstringref) {
-    // There does exist an API to directly return a char* pointer, but this is documented as
-    // failing on an arbitrary basis, and did fail empirically.
-    const auto utf16_len = CFStringGetLength(cfstringref);
-    // We must leave room the for zero terminator, or CFStringGetCString will fail.
-    const auto max_ascii_len =
-            CFStringGetMaximumSizeForEncoding(utf16_len, kCFStringEncodingASCII) + 1;
-    // CFStringGetCString wants to supply its own zero terminator, so write to an intermediate
-    // buffer used for constructing the final std::string.
-    std::vector<char> buffer(max_ascii_len);
-    if (CFStringGetCString(cfstringref, &buffer[0], buffer.size(), kCFStringEncodingASCII)) {
-        return std::string(buffer.data());
-    }
-
-    return std::string("");
-}
-
 #if !TARGET_OS_IPHONE
 
 // Retrieves a single int64_t property associated with the given class/name.

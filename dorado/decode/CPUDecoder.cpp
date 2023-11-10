@@ -14,9 +14,9 @@ at::Tensor scan(const at::Tensor& Ms,
                 const float fixed_stay_score,
                 const at::Tensor& idx,
                 const at::Tensor& v0) {
-    const int T = Ms.size(0);
-    const int N = Ms.size(1);
-    const int C = Ms.size(2);
+    const int T = int(Ms.size(0));
+    const int N = int(Ms.size(1));
+    const int C = int(Ms.size(2));
 
     at::Tensor alpha = Ms.new_full({T + 1, N, C}, -1E38);
     alpha[0] = v0;
@@ -34,19 +34,19 @@ at::Tensor scan(const at::Tensor& Ms,
 }
 
 at::Tensor forward_scores(const at::Tensor& scores, const float fixed_stay_score) {
-    const int T = scores.size(0);  // Signal len
-    const int N = scores.size(1);  // Num batches
-    const int C = scores.size(2);  // 4^state_len * 4 = 4^(state_len + 1)
+    const int T = int(scores.size(0));  // Signal len
+    const int N = int(scores.size(1));  // Num batches
+    const int C = int(scores.size(2));  // 4^state_len * 4 = 4^(state_len + 1)
 
     const int n_base = 4;
-    const int state_len = std::log(C) / std::log(n_base) - 1;
+    const int state_len = int(std::log(C) / std::log(n_base) - 1);
 
     // Transition scores reshaped so that the 4 scores for each predecessor state are arranged along the
     // innermost dimension.
     const at::Tensor Ms = scores.reshape({T, N, -1, n_base});
 
     // Number of states per timestep.
-    const int num_states = pow(n_base, state_len);
+    const int num_states = int(pow(n_base, state_len));
 
     // Guide values at first timestep.
     const auto v0 = Ms.new_full({{N, num_states}}, 0.0f);
@@ -59,15 +59,15 @@ at::Tensor forward_scores(const at::Tensor& scores, const float fixed_stay_score
 }
 
 at::Tensor backward_scores(const at::Tensor& scores, const float fixed_stay_score) {
-    const int N = scores.size(1);  // Num batches
-    const int C = scores.size(2);  // 4^state_len * 4 = 4^(state_len + 1)
+    const int N = int(scores.size(1));  // Num batches
+    const int C = int(scores.size(2));  // 4^state_len * 4 = 4^(state_len + 1)
 
     const int n_base = 4;
 
-    const int state_len = std::log(C) / std::log(n_base) - 1;
+    const int state_len = int(std::log(C) / std::log(n_base) - 1);
 
     // Number of states per timestep.
-    const int num_states = pow(n_base, state_len);
+    const int num_states = int(pow(n_base, state_len));
 
     // Guide values at last timestep.
     const at::Tensor vT = scores.new_full({N, num_states}, 0.0f);

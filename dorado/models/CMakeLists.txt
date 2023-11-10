@@ -15,3 +15,5 @@ target_include_directories(dorado_models_lib
     PRIVATE
         ${DORADO_3RD_PARTY_SOURCE}/cpp-httplib
 )
+
+enable_warnings_as_errors(dorado_models_lib)

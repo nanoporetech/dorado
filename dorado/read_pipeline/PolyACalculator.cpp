@@ -40,7 +40,7 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
                                             bool is_rna,
                                             int min_base_count) {
     const c10::Half* signal = static_cast<c10::Half*>(read.read_common.raw_data.data_ptr());
-    int signal_len = read.read_common.get_raw_data_samples();
+    int signal_len = int(read.read_common.get_raw_data_samples());
 
     auto calc_stats = [&](int s, int e) -> std::pair<float, float> {
         float avg = 0;
@@ -64,14 +64,14 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
     const float kVar = 0.35f;
     // Determine the outer boundary of the signal space to
     // consider based on the anchor.
-    const int kSpread = std::round(num_samples_per_base * kMaxTailLength);
+    const int kSpread = int(std::round(num_samples_per_base * kMaxTailLength));
     // Maximum gap between intervals that can be combined.
-    const int kMaxSampleGap = std::round(num_samples_per_base * 5);
+    const int kMaxSampleGap = int(std::round(num_samples_per_base * 5));
     // Minimum size of intervals considered for merge.
     const int kMinIntervalSizeForMerge =
             std::max(static_cast<int>(std::round(10 * num_samples_per_base)), 200);
     // Floor for average signal value of poly tail.
-    const float kMinAvgVal = (is_rna ? 0.0 : -3.0);
+    const float kMinAvgVal = (is_rna ? 0.0f : -3.0f);
 
     int left_end = is_rna ? std::max(0, signal_anchor - 50) : std::max(0, signal_anchor - kSpread);
     int right_end = std::min(signal_len, signal_anchor + kSpread);
@@ -132,7 +132,7 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
                      // Only keep intervals that are close-ish to the signal anchor.
                      return (std::abs(signal_anchor - i.second) < interval_size ||
                              std::abs(signal_anchor - i.first) < interval_size ||
-                             (i.first <= signal_anchor) && (signal_anchor <= i.second));
+                             ((i.first <= signal_anchor) && (signal_anchor <= i.second)));
                  });
 
     int_str = "";
@@ -183,7 +183,7 @@ float estimate_samples_per_base(const dorado::SimplexRead& read, bool is_rna) {
             dorado::utils::moves_to_map(read.read_common.moves, stride, num_samples, num_bases + 1);
     // Store the samples per base in float to use the quantile calcuation function.
     std::vector<float> sizes(seq_to_sig_map.size() - 1, 0.f);
-    for (int i = 1; i < seq_to_sig_map.size(); i++) {
+    for (int i = 1; i < int(seq_to_sig_map.size()); i++) {
         sizes[i - 1] = static_cast<float>(seq_to_sig_map[i] - seq_to_sig_map[i - 1]);
     }
 
@@ -228,18 +228,18 @@ SignalAnchorInfo determine_signal_anchor_and_strand_cdna(const dorado::SimplexRe
     align_config.mode = EDLIB_MODE_HW;
 
     // Check for forward strand.
-    EdlibAlignResult top_v1 =
-            edlibAlign(SSP.data(), SSP.length(), read_top.data(), read_top.length(), align_config);
-    EdlibAlignResult bottom_v1 = edlibAlign(VNP_rc.data(), VNP_rc.length(), read_bottom.data(),
-                                            read_bottom.length(), align_config);
+    EdlibAlignResult top_v1 = edlibAlign(SSP.data(), int(SSP.length()), read_top.data(),
+                                         int(read_top.length()), align_config);
+    EdlibAlignResult bottom_v1 = edlibAlign(VNP_rc.data(), int(VNP_rc.length()), read_bottom.data(),
+                                            int(read_bottom.length()), align_config);
 
     int dist_v1 = top_v1.editDistance + bottom_v1.editDistance;
 
     // Check for reverse strand.
-    EdlibAlignResult top_v2 =
-            edlibAlign(VNP.data(), VNP.length(), read_top.data(), read_top.length(), align_config);
-    EdlibAlignResult bottom_v2 = edlibAlign(SSP_rc.data(), SSP_rc.length(), read_bottom.data(),
-                                            read_bottom.length(), align_config);
+    EdlibAlignResult top_v2 = edlibAlign(VNP.data(), int(VNP.length()), read_top.data(),
+                                         int(read_top.length()), align_config);
+    EdlibAlignResult bottom_v2 = edlibAlign(SSP_rc.data(), int(SSP_rc.length()), read_bottom.data(),
+                                            int(read_bottom.length()), align_config);
 
     int dist_v2 = top_v2.editDistance + bottom_v2.editDistance;
     spdlog::trace("v1 dist {}, v2 dist {}", dist_v1, dist_v2);
@@ -250,7 +250,6 @@ SignalAnchorInfo determine_signal_anchor_and_strand_cdna(const dorado::SimplexRe
     SignalAnchorInfo result = {false, -1, trailing_Ts};
 
     if (proceed) {
-        int start = 0, end = 0;
         int base_anchor = 0;
         if (fwd) {
             base_anchor = bottom_start + bottom_v1.startLocations[0];
@@ -262,7 +261,7 @@ SignalAnchorInfo determine_signal_anchor_and_strand_cdna(const dorado::SimplexRe
         const auto seq_to_sig_map = dorado::utils::moves_to_map(
                 read.read_common.moves, stride, read.read_common.get_raw_data_samples(),
                 read.read_common.seq.size() + 1);
-        int signal_anchor = seq_to_sig_map[base_anchor];
+        int signal_anchor = int(seq_to_sig_map[base_anchor]);
 
         result = {fwd, signal_anchor, trailing_Ts};
     } else {
@@ -327,12 +326,12 @@ void PolyACalculator::worker_thread() {
             // TODO: In order to improve this, perhaps another pass over the tail interval is needed
             // to get a more refined boundary estimation?
             if (m_is_rna) {
-                signal_len -= std::round(std::min(
-                        100.f, std::exp(5.6838f - 0.0021f * static_cast<float>(signal_len))));
+                signal_len -= int(std::round(std::min(
+                        100.f, std::exp(5.6838f - 0.0021f * static_cast<float>(signal_len)))));
             }
 
-            int num_bases =
-                    std::round(static_cast<float>(signal_len) / num_samples_per_base) - trailing_Ts;
+            int num_bases = int(std::round(static_cast<float>(signal_len) / num_samples_per_base)) -
+                            trailing_Ts;
 
             if (num_bases > 0 && num_bases < kMaxTailLength) {
                 spdlog::debug(
@@ -418,8 +417,8 @@ stats::NamedStats PolyACalculator::sample_stats() const {
     stats::NamedStats stats = stats::from_obj(m_work_queue);
     stats["reads_not_estimated"] = num_not_called.load();
     stats["reads_estimated"] = num_called.load();
-    stats["average_tail_length"] =
-            num_called.load() > 0 ? total_tail_lengths_called.load() / num_called.load() : 0;
+    stats["average_tail_length"] = double(
+            num_called.load() > 0 ? total_tail_lengths_called.load() / num_called.load() : 0);
     return stats;
 }
 

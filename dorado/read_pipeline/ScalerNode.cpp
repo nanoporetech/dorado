@@ -35,7 +35,7 @@ std::pair<float, float> ScalerNode::normalisation(const at::Tensor& x) {
 std::pair<float, float> ScalerNode::med_mad(const at::Tensor& x) {
     // See https://en.wikipedia.org/wiki/Median_absolute_deviation
     //  (specifically the "Relation to standard deviation" section)
-    constexpr float factor = 1.4826;
+    constexpr float factor = 1.4826f;
     //Calculate signal median and median absolute deviation
     auto med = x.median();
     auto mad = at::median(at::abs(x - med)) * factor + EPS;
@@ -58,10 +58,9 @@ int determine_rna_adapter_pos(const dorado::SimplexRead& read, dorado::SampleTyp
     const int kStride = 50;
     const int16_t kMedianDiff = 125;
 
-    const int kOffset = kOffsetMap.at(model_type);
     const int16_t kMinMedianForRNASignal = kAdapterCutoff.at(model_type);
 
-    int signal_len = read.read_common.get_raw_data_samples();
+    int signal_len = int(read.read_common.get_raw_data_samples());
     const int16_t* signal = static_cast<int16_t*>(read.read_common.raw_data.data_ptr());
 
     // Check the median value change over 5 windows.
@@ -89,7 +88,7 @@ int determine_rna_adapter_pos(const dorado::SimplexRead& read, dorado::SampleTyp
         auto max_pos = std::distance(medians.begin(), minmax.second);
         spdlog::trace("window {}-{} min {} max {} diff {}", i, i + kWindowSize, min_median,
                       max_median, (max_median - min_median));
-        if ((median_pos >= medians.size()) && (max_median > kMinMedianForRNASignal) &&
+        if ((median_pos >= int(medians.size())) && (max_median > kMinMedianForRNASignal) &&
             (max_median - min_median > kMedianDiff) &&
             (window_pos[max_pos] > window_pos[min_pos])) {
             break_point = i;
@@ -179,8 +178,8 @@ ScalerNode::ScalerNode(const SignalNormalisationParams& config,
                        int num_worker_threads,
                        size_t max_reads)
         : MessageSink(max_reads),
-          m_scaling_params(config),
           m_num_worker_threads(num_worker_threads),
+          m_scaling_params(config),
           m_model_type(model_type) {
     start_threads();
 }

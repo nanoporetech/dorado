@@ -19,8 +19,7 @@ BarcodeDemuxerNode::BarcodeDemuxerNode(const std::string& output_dir,
                                        std::unique_ptr<const utils::SampleSheet> sample_sheet)
         : MessageSink(10000),
           m_output_dir(output_dir),
-          m_htslib_threads(htslib_threads),
-          m_num_reads_expected(num_reads),
+          m_htslib_threads(int(htslib_threads)),
           m_write_fastq(write_fastq),
           m_sample_sheet(std::move(sample_sheet)) {
     std::filesystem::create_directories(m_output_dir);
@@ -76,7 +75,7 @@ int BarcodeDemuxerNode::write(bam1_t* const record) {
         auto alias = m_sample_sheet->get_alias("", "", "", bc);
         if (!alias.empty()) {
             bc = alias;
-            bam_aux_update_str(record, "BC", bc.size() + 1, bc.c_str());
+            bam_aux_update_str(record, "BC", int(bc.size() + 1), bc.c_str());
         }
     }
     // Check of existence of file for that barcode.

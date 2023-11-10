@@ -43,7 +43,7 @@ void ResumeLoaderNode::copy_completed_reads() {
                 bar.tick();
             }
         }
-    } catch (std::exception& e) {
+    } catch (std::exception&) {
         // Exception implies the reader could not read
         // the last record. We take this to be the end of
         // properly formatted records.

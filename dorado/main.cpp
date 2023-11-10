@@ -38,7 +38,7 @@ void usage(const std::vector<std::string> commands) {
     std::cerr << "Usage: dorado [options] subcommand\n\n"
               << "Positional arguments:" << std::endl;
 
-    for (const auto command : commands) {
+    for (const auto& command : commands) {
         std::cerr << command << std::endl;
     }
 

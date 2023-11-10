@@ -167,7 +167,7 @@ BamPtr BarcodeClassifierNode::trim_barcode(BamPtr input,
     std::string seq = utils::extract_sequence(input_record);
     std::vector<uint8_t> qual = utils::extract_quality(input_record);
     auto [stride, move_vals] = utils::extract_move_table(input_record);
-    int ts = bam_aux_get(input_record, "ts") ? bam_aux2i(bam_aux_get(input_record, "ts")) : 0;
+    int ts = bam_aux_get(input_record, "ts") ? int(bam_aux2i(bam_aux_get(input_record, "ts"))) : 0;
     auto [modbase_str, modbase_probs] = utils::extract_modbase_info(input_record);
 
     // Actually trim components.
@@ -203,16 +203,16 @@ BamPtr BarcodeClassifierNode::trim_barcode(BamPtr input,
         bam_aux_del(out_record, bam_aux_get(out_record, "mv"));
         // Move table format is stride followed by moves.
         trimmed_moves.insert(trimmed_moves.begin(), stride);
-        bam_aux_update_array(out_record, "mv", 'c', trimmed_moves.size(),
+        bam_aux_update_array(out_record, "mv", 'c', int(trimmed_moves.size()),
                              (uint8_t*)trimmed_moves.data());
     }
 
     if (!trimmed_modbase_str.empty()) {
         bam_aux_del(out_record, bam_aux_get(out_record, "MM"));
-        bam_aux_append(out_record, "MM", 'Z', trimmed_modbase_str.length() + 1,
+        bam_aux_append(out_record, "MM", 'Z', int(trimmed_modbase_str.length() + 1),
                        (uint8_t*)trimmed_modbase_str.c_str());
         bam_aux_del(out_record, bam_aux_get(out_record, "ML"));
-        bam_aux_update_array(out_record, "ML", 'C', trimmed_modbase_probs.size(),
+        bam_aux_update_array(out_record, "ML", 'C', int(trimmed_modbase_probs.size()),
                              (uint8_t*)trimmed_modbase_probs.data());
     }
 
@@ -222,7 +222,7 @@ BamPtr BarcodeClassifierNode::trim_barcode(BamPtr input,
 }
 
 void BarcodeClassifierNode::trim_barcode(SimplexRead& read, const demux::ScoreResults& res) {
-    int seqlen = read.read_common.seq.length();
+    int seqlen = int(read.read_common.seq.length());
     auto trim_interval = determine_trim_interval(res, seqlen);
 
     if (trim_interval.second - trim_interval.first == seqlen) {
@@ -237,7 +237,7 @@ void BarcodeClassifierNode::trim_barcode(SimplexRead& read, const demux::ScoreRe
     read.read_common.num_trimmed_samples += read.read_common.model_stride * num_positions_trimmed;
 
     if (read.read_common.mod_base_info) {
-        int num_modbase_channels = read.read_common.mod_base_info->alphabet.size();
+        int num_modbase_channels = int(read.read_common.mod_base_info->alphabet.size());
         // The modbase probs table consists of the probability per channel per base. So when
         // trimming, we just shift everything by skipped bases * number of channels.
         std::pair<int, int> modbase_interval = {trim_interval.first * num_modbase_channels,
@@ -272,7 +272,7 @@ void BarcodeClassifierNode::barcode(BamPtr& read) {
     auto bc_res = barcoder->barcode(seq, m_default_barcoding_info->barcode_both_ends,
                                     m_default_barcoding_info->allowed_barcodes);
     auto bc = generate_barcode_string(bc_res);
-    bam_aux_append(irecord, "BC", 'Z', bc.length() + 1, (uint8_t*)bc.c_str());
+    bam_aux_append(irecord, "BC", 'Z', int(bc.length() + 1), (uint8_t*)bc.c_str());
     m_num_records++;
 
     if (m_default_barcoding_info->trim) {

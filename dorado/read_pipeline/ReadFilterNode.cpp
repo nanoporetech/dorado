@@ -76,8 +76,8 @@ void ReadFilterNode::restart() {
 
 stats::NamedStats ReadFilterNode::sample_stats() const {
     stats::NamedStats stats = stats::from_obj(m_work_queue);
-    stats["simplex_reads_filtered"] = m_num_simplex_reads_filtered;
-    stats["duplex_reads_filtered"] = m_num_duplex_reads_filtered;
+    stats["simplex_reads_filtered"] = double(m_num_simplex_reads_filtered);
+    stats["duplex_reads_filtered"] = double(m_num_duplex_reads_filtered);
     return stats;
 }
 
