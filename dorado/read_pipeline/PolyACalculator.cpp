@@ -132,7 +132,7 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
                      // Only keep intervals that are close-ish to the signal anchor.
                      return (std::abs(signal_anchor - i.second) < interval_size ||
                              std::abs(signal_anchor - i.first) < interval_size ||
-                             (i.first <= signal_anchor) && (signal_anchor <= i.second));
+                             ((i.first <= signal_anchor) && (signal_anchor <= i.second)));
                  });
 
     int_str = "";
@@ -183,7 +183,7 @@ float estimate_samples_per_base(const dorado::SimplexRead& read, bool is_rna) {
             dorado::utils::moves_to_map(read.read_common.moves, stride, num_samples, num_bases + 1);
     // Store the samples per base in float to use the quantile calcuation function.
     std::vector<float> sizes(seq_to_sig_map.size() - 1, 0.f);
-    for (int i = 1; i < seq_to_sig_map.size(); i++) {
+    for (int i = 1; i < int(seq_to_sig_map.size()); i++) {
         sizes[i - 1] = static_cast<float>(seq_to_sig_map[i] - seq_to_sig_map[i - 1]);
     }
 

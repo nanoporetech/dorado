@@ -212,7 +212,7 @@ CRFModelConfig load_crf_model_config(const std::filesystem::path &path) {
         config.clamp = has_clamp(sublayers);
         config.convs = parse_convs(sublayers, config.clamp);
         // Overall stride is the product of all conv layers' strides.
-        for (const auto cv : config.convs) {
+        for (const auto &cv : config.convs) {
             config.stride *= cv.stride;
         }
         config.lstm_size = config.convs.back().size;
