@@ -18,6 +18,33 @@ size_t read_signal_bytes(const dorado::SimplexRead& read) {
     return read.read_common.raw_data.nbytes();
 }
 
+// There are 4 different cases to consider when checking for adjacent reads -
+// 1 Both reads are unsplit - in this case the next and prev ids determined
+//     from the pod5 are unchanged and consistent.
+//     i.e. temp.next == comp AND comp.prev == temp
+// 2 Both reads are split from the same parent - in this case the splitter
+//     adjusts the prev/next ids after splitting. The new next/prev ids
+//     are also consistent within the same parent read id.
+//     i.e. temp.next == comp AND comp.prev == temp
+// 3 One read is split, the other is unsplit - if the split read is the template,
+//     then only the template's next id will be correctly updated to the complement's id.
+//     Similarly if the complement read is split, then only the complement's prev
+//     id will have the template's id. So in this case only one of the pair connections
+//     is correct (because during splitting only the subread's properties can be adjusted).
+//     i.e. temp.next == comp OR comp.prev == temp
+// 4 Both reads are split from different parents - in this case, the template read's
+//     next read will point to the complement read's parent id. And vice versa for the
+//     complement read's prev id.
+//     i.e. temp.next == comp.parent AND comp.prev == temp.parent
+bool are_reads_adjacent(const dorado::SimplexRead& temp, const dorado::SimplexRead& comp) {
+    if (temp.read_common.read_id == comp.prev_read || temp.next_read == comp.read_common.read_id ||
+        (temp.read_common.parent_read_id == comp.prev_read &&
+         temp.next_read == comp.read_common.parent_read_id)) {
+        return true;
+    }
+    return false;
+}
+
 }  // namespace
 
 namespace dorado {
@@ -39,9 +66,7 @@ PairingNode::PairingResult PairingNode::is_within_time_and_length_criteria(
         const dorado::SimplexRead& temp,
         const dorado::SimplexRead& comp,
         int tid) {
-    // A duplex pair can only occur for adjacent reads. Which means
-    // that for the complement, the template read must be its predecessor.
-    if (temp.read_common.read_id != comp.prev_read && temp.next_read != comp.read_common.read_id) {
+    if (!are_reads_adjacent(temp, comp)) {
         return {false, 0, 0, 0, 0};
     }
 
@@ -360,7 +385,6 @@ void PairingNode::pair_generating_worker_thread(int tid) {
             // Release mutex around read cache to run pair evaluations.
             lock.unlock();
 
-            bool found_pair = false;
             if (later_read) {
                 auto [is_pair, qs, qe, rs, re] =
                         is_within_time_and_length_criteria(*read_ptr, *later_read, tid);
@@ -373,11 +397,10 @@ void PairingNode::pair_generating_worker_thread(int tid) {
                     later_read->is_duplex_parent = true;
                     ++read_ptr->num_duplex_candidate_pairs;
                     send_message_to_sink(std::move(pair));
-                    found_pair = true;
                 }
             }
 
-            if (!found_pair && earlier_read) {
+            if (earlier_read) {
                 auto [is_pair, qs, qe, rs, re] =
                         is_within_time_and_length_criteria(*earlier_read, *read_ptr, tid);
                 if (is_pair) {
