@@ -223,7 +223,7 @@ BamPtr BarcodeClassifierNode::trim_barcode(BamPtr input,
 
 void BarcodeClassifierNode::trim_barcode(SimplexRead& read,
                                          std::pair<int, int> trim_interval) const {
-    if (trim_interval.second - trim_interval.first == read.read_common.seq.length()) {
+    if (trim_interval.second - trim_interval.first == int(read.read_common.seq.length())) {
         return;
     }
 
@@ -294,7 +294,7 @@ void BarcodeClassifierNode::barcode(SimplexRead& read) {
     read.read_common.pre_trim_seq_length = read.read_common.seq.length();
     if (barcoding_info->trim) {
         read.read_common.barcode_trim_interval = determine_trim_interval(
-                *read.read_common.barcoding_result, read.read_common.seq.length());
+                *read.read_common.barcoding_result, int(read.read_common.seq.length()));
         trim_barcode(read, read.read_common.barcode_trim_interval);
     }
 
