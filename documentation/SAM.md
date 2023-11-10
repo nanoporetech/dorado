@@ -57,7 +57,6 @@ For aligned outputs, visualization of these tags is available in popular genome 
 When `dorado` is run with alignment enabled, additional tags from minimap2 are added to each SAM record. Details of those tags
 are available on the [minimap2 manpage](https://lh3.github.io/minimap2/minimap2.html#10).
 
-
 ### Split Read Tags
 
 Read splitting generates multiple subreads from a single input read. `dorado` performs this operation by default for both DNA and RNA.
