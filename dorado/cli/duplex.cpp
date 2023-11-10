@@ -177,7 +177,7 @@ int duplex(int argc, char* argv[]) {
                 std::exit(EXIT_FAILURE);
             }
             spdlog::info(
-                    " - Note: fastq output is not recommended as not all data can be preserved.");
+                    " - Note: FASTQ output is not recommended as not all data can be preserved.");
             output_mode = HtsWriter::OutputMode::FASTQ;
         } else if (emit_sam || utils::is_fd_tty(stdout)) {
             output_mode = HtsWriter::OutputMode::SAM;

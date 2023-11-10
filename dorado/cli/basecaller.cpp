@@ -96,17 +96,10 @@ void setup(std::vector<std::string> args,
     }
 
     const bool enable_aligner = !ref.empty();
-    if (enable_aligner && output_mode == HtsWriter::OutputMode::FASTQ) {
-        throw std::runtime_error("Alignment to reference cannot be used with FASTQ output.");
-    }
 
     // create modbase runners first so basecall runners can pick batch sizes based on available memory
     auto remora_runners = create_modbase_runners(
             remora_models, device, default_parameters.remora_runners_per_caller, remora_batch_size);
-
-    if (!remora_runners.empty() && output_mode == HtsWriter::OutputMode::FASTQ) {
-        throw std::runtime_error("Modified base models cannot be used with FASTQ output");
-    }
 
     auto [runners, num_devices] =
             create_basecall_runners(model_config, device, num_runners, 0, batch_size, chunk_size);
@@ -446,7 +439,7 @@ int basecaller(int argc, char* argv[]) {
                     "results.");
             std::exit(EXIT_FAILURE);
         }
-        spdlog::info(" - Note: fastq output is not recommended as not all data can be preserved.");
+        spdlog::info(" - Note: FASTQ output is not recommended as not all data can be preserved.");
         output_mode = HtsWriter::OutputMode::FASTQ;
     } else if (emit_sam || utils::is_fd_tty(stdout)) {
         output_mode = HtsWriter::OutputMode::SAM;
