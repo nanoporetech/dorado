@@ -52,11 +52,8 @@ T HtsReader::get_tag(std::string tagname) {
         tag_value = static_cast<T>(bam_aux2i(tag));
     } else if constexpr (std::is_floating_point_v<T>) {
         tag_value = static_cast<T>(bam_aux2f(tag));
-    } else if constexpr (std::is_constructible_v<T, char*>) {
-        tag_value = static_cast<T>(bam_aux2Z(tag));
     } else {
-        throw std::runtime_error(std::string("Cannot get_tag for type ") +
-                                 std::string(typeid(T).name()));
+        tag_value = static_cast<T>(bam_aux2Z(tag));
     }
 
     return tag_value;
