@@ -99,7 +99,7 @@ at::Tensor generate_stereo_features(const DuplexRead::StereoFeatureInputs& featu
     auto determine_encoding = [&](std::optional<at::Tensor*> stereo_features, int target_cursor,
                                   int query_cursor, int template_signal_cursor,
                                   int complement_signal_cursor) -> int {
-        int stereo_global_cursor = 0;  // Index into the stereo-encoded signal
+        size_t stereo_global_cursor = 0;  // Index into the stereo-encoded signal
         std::array<SampleType*, kNumFeatures> feature_ptrs;
         if (stereo_features) {
             for (int feature_idx = 0; feature_idx < kNumFeatures; ++feature_idx) {
