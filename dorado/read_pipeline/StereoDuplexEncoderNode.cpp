@@ -40,8 +40,8 @@ DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(const ReadPair& read_pair) 
             complement_read.seq_start, complement_read.seq_end - complement_read.seq_start);
 
     EdlibAlignResult edlib_result =
-            edlibAlign(temp_strand.data(), temp_strand.length(), comp_strand.data(),
-                       comp_strand.length(), align_config);
+            edlibAlign(temp_strand.data(), static_cast<int>(temp_strand.length()),
+                       comp_strand.data(), static_cast<int>(comp_strand.length()), align_config);
 
     // Store the alignment result, along with other inputs necessary for generating the stereo input
     // features, in DuplexRead.
