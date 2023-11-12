@@ -12,8 +12,8 @@ using namespace at::indexing;
 namespace dorado {
 
 at::Tensor generate_stereo_features(const DuplexRead::StereoFeatureInputs& feature_inputs) {
-    int target_cursor = feature_inputs.template_seq_start;
-    int query_cursor = feature_inputs.complement_seq_start;
+    int target_cursor = static_cast<int>(feature_inputs.template_seq_start);
+    int query_cursor = static_cast<int>(feature_inputs.complement_seq_start);
 
     // Edlib doesn't provide named constants for alignment array entries, so do it here.
     // static constexpr unsigned char kAlignMatch = 0;
@@ -47,7 +47,7 @@ at::Tensor generate_stereo_features(const DuplexRead::StereoFeatureInputs& featu
     }
 
     int extra_padding = feature_inputs.template_signal.size(0) - template_moves_expanded.size();
-    for (int i = 0; i < extra_padding; ++i) {
+    for (size_t i = 0; i < extra_padding; ++i) {
         template_moves_expanded.push_back(0);
     }
 
@@ -66,7 +66,7 @@ at::Tensor generate_stereo_features(const DuplexRead::StereoFeatureInputs& featu
     }
 
     extra_padding = feature_inputs.complement_signal.size(0) - complement_moves_expanded.size();
-    for (int i = 0; i < extra_padding; ++i) {
+    for (size_t i = 0; i < extra_padding; ++i) {
         complement_moves_expanded.push_back(0);
     }
     complement_moves_expanded.push_back(1);
@@ -109,7 +109,7 @@ at::Tensor generate_stereo_features(const DuplexRead::StereoFeatureInputs& featu
         }
         for (auto alignment_entry : feature_inputs.alignment) {
             // We move along every alignment position. For every position we need to add signal and padding.
-            int total_segment_length = 0;
+            size_t total_segment_length = 0;
 
             // Adds the segment of the signal associated with the current base, updating
             // total_segment_length to reflect the maximum across successive invocations.
@@ -131,9 +131,9 @@ at::Tensor generate_stereo_features(const DuplexRead::StereoFeatureInputs& featu
                                 (sample_count + 1) * sizeof(SampleType));
                 }
 
-                const int segment_length = sample_count + 1;
+                const size_t segment_length = sample_count + 1;
                 total_segment_length = std::max(total_segment_length, segment_length);
-                signal_cursor += segment_length;
+                signal_cursor += static_cast<int>(segment_length);
             };
 
             // If there is *not* an insertion to the query, add the nucleotide from the target cursor.
@@ -150,21 +150,21 @@ at::Tensor generate_stereo_features(const DuplexRead::StereoFeatureInputs& featu
 
             // Now, add the nucleotides and q scores.  We need to do this after determining
             // total_segment_length.
-            auto add_nucleotide_and_q =
-                    [total_segment_length, stereo_global_cursor, &stereo_features, feature_ptrs](
-                            const char nucleotide, const char q_score,
-                            const int first_nucleotide_feature_index, const int q_feature_index) {
-                        const auto nucleotide_feature_idx = first_nucleotide_feature_index +
-                                                            dorado::utils::base_to_int(nucleotide);
-                        std::fill_n(&feature_ptrs[nucleotide_feature_idx][stereo_global_cursor],
-                                    total_segment_length, static_cast<SampleType>(1.0f));
+            auto add_nucleotide_and_q = [total_segment_length, stereo_global_cursor, feature_ptrs](
+                                                const char nucleotide, const char q_score,
+                                                const int first_nucleotide_feature_index,
+                                                const int q_feature_index) {
+                const auto nucleotide_feature_idx =
+                        first_nucleotide_feature_index + dorado::utils::base_to_int(nucleotide);
+                std::fill_n(&feature_ptrs[nucleotide_feature_idx][stereo_global_cursor],
+                            total_segment_length, static_cast<SampleType>(1.0f));
 
-                        // Convert Q scores from char to SampleType, with appropriate scale/offset.
-                        const auto q_score_sample_type =
-                                static_cast<SampleType>(static_cast<float>(q_score - 33) / 90.0f);
-                        std::fill_n(&feature_ptrs[q_feature_index][stereo_global_cursor],
-                                    total_segment_length, q_score_sample_type);
-                    };
+                // Convert Q scores from char to SampleType, with appropriate scale/offset.
+                const auto q_score_sample_type =
+                        static_cast<SampleType>(static_cast<float>(q_score - 33) / 90.0f);
+                std::fill_n(&feature_ptrs[q_feature_index][stereo_global_cursor],
+                            total_segment_length, q_score_sample_type);
+            };
 
             if (alignment_entry != kAlignInsertionToQuery) {
                 if (stereo_features) {
@@ -207,8 +207,8 @@ at::Tensor generate_stereo_features(const DuplexRead::StereoFeatureInputs& featu
             determine_encoding(std::nullopt, target_cursor, query_cursor, template_signal_cursor,
                                complement_signal_cursor);
 
-    const float pad_value = 0.8 * std::min(at::min(feature_inputs.complement_signal).item<float>(),
-                                           at::min(feature_inputs.template_signal).item<float>());
+    const float pad_value = 0.8f * std::min(at::min(feature_inputs.complement_signal).item<float>(),
+                                            at::min(feature_inputs.template_signal).item<float>());
     auto stereo_features = at::zeros({kNumFeatures, encoding_tensor_size}, opts);
 
     // Start with all signal feature entries equal to the padding value.
