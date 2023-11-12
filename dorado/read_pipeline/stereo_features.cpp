@@ -46,7 +46,7 @@ at::Tensor generate_stereo_features(const DuplexRead::StereoFeatureInputs& featu
         }
     }
 
-    int extra_padding = feature_inputs.template_signal.size(0) - template_moves_expanded.size();
+    size_t extra_padding = feature_inputs.template_signal.size(0) - template_moves_expanded.size();
     for (size_t i = 0; i < extra_padding; ++i) {
         template_moves_expanded.push_back(0);
     }
