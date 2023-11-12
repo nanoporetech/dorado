@@ -6,7 +6,6 @@
 #include "utils/time_utils.h"
 
 #include <ATen/core/TensorBody.h>
-
 #include <catch2/catch.hpp>
 
 #include <filesystem>
