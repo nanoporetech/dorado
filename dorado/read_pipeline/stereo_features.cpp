@@ -198,7 +198,7 @@ at::Tensor generate_stereo_features(const DuplexRead::StereoFeatureInputs& featu
             // Update the global cursor
             stereo_global_cursor += total_segment_length;
         }
-        return stereo_global_cursor;
+        return static_cast<int>(stereo_global_cursor);
     };
 
     // Call the encoding lambda first without data copy to get an estimate
