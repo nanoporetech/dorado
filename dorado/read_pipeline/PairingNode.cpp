@@ -527,7 +527,8 @@ stats::NamedStats PairingNode::sample_stats() const {
     stats::NamedStats stats = m_work_queue.sample_stats();
     stats["early_accepted_pairs"] = m_early_accepted_pairs.load();
     stats["overlap_accepted_pairs"] = m_overlap_accepted_pairs.load();
-    stats["cached_signal_mb"] = static_cast<double>(m_cache_signal_bytes / (1024 * 1024));
+    stats["cached_signal_mb"] =
+            static_cast<double>(m_cache_signal_bytes) / static_cast<double>(1024 * 1024);
     return stats;
 }
 
