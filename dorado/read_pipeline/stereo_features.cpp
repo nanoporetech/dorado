@@ -16,10 +16,10 @@ at::Tensor generate_stereo_features(const DuplexRead::StereoFeatureInputs& featu
     int query_cursor = feature_inputs.complement_seq_start;
 
     // Edlib doesn't provide named constants for alignment array entries, so do it here.
-    static constexpr unsigned char kAlignMatch = 0;
+    // static constexpr unsigned char kAlignMatch = 0;
     static constexpr unsigned char kAlignInsertionToTarget = 1;
     static constexpr unsigned char kAlignInsertionToQuery = 2;
-    static constexpr unsigned char kAlignMismatch = 3;
+    // static constexpr unsigned char kAlignMismatch = 3;
 
     // Move along the alignment, filling out the stereo-encoded tensor
 
@@ -39,7 +39,7 @@ at::Tensor generate_stereo_features(const DuplexRead::StereoFeatureInputs& featu
     int complement_signal_cursor = 0;
 
     std::vector<uint8_t> template_moves_expanded;
-    for (int i = 0; i < feature_inputs.template_moves.size(); ++i) {
+    for (size_t i = 0; i < feature_inputs.template_moves.size(); ++i) {
         template_moves_expanded.push_back(feature_inputs.template_moves[i]);
         for (int j = 0; j < feature_inputs.signal_stride - 1; ++j) {
             template_moves_expanded.push_back(0);
@@ -58,7 +58,7 @@ at::Tensor generate_stereo_features(const DuplexRead::StereoFeatureInputs& featu
     }
 
     std::vector<uint8_t> complement_moves_expanded;
-    for (int i = 0; i < feature_inputs.complement_moves.size(); ++i) {
+    for (size_t i = 0; i < feature_inputs.complement_moves.size(); ++i) {
         complement_moves_expanded.push_back(feature_inputs.complement_moves[i]);
         for (int j = 0; j < feature_inputs.signal_stride - 1; ++j) {
             complement_moves_expanded.push_back(0);
@@ -148,26 +148,22 @@ at::Tensor generate_stereo_features(const DuplexRead::StereoFeatureInputs& featu
                            kFeatureComplementSignal, flipped_complement_raw_data_ptr);
             }
 
-            // Converts Q scores from char to SampleType, with appropriate scale/offset.
-            const auto convert_q_score = [](char q_in) {
-                return static_cast<SampleType>(static_cast<float>(q_in - 33) / 90.0f);
-            };
-
             // Now, add the nucleotides and q scores.  We need to do this after determining
             // total_segment_length.
             auto add_nucleotide_and_q =
                     [total_segment_length, stereo_global_cursor, &stereo_features, feature_ptrs](
                             const char nucleotide, const char q_score,
                             const int first_nucleotide_feature_index, const int q_feature_index) {
-                        const auto convert_q_score = [](char q_in) {
-                            return static_cast<SampleType>(static_cast<float>(q_in - 33) / 90.0f);
-                        };
                         const auto nucleotide_feature_idx = first_nucleotide_feature_index +
                                                             dorado::utils::base_to_int(nucleotide);
                         std::fill_n(&feature_ptrs[nucleotide_feature_idx][stereo_global_cursor],
                                     total_segment_length, static_cast<SampleType>(1.0f));
+
+                        // Convert Q scores from char to SampleType, with appropriate scale/offset.
+                        const auto q_score_sample_type =
+                                static_cast<SampleType>(static_cast<float>(q_score - 33) / 90.0f);
                         std::fill_n(&feature_ptrs[q_feature_index][stereo_global_cursor],
-                                    total_segment_length, convert_q_score(q_score));
+                                    total_segment_length, q_score_sample_type);
                     };
 
             if (alignment_entry != kAlignInsertionToQuery) {
