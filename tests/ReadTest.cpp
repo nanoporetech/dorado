@@ -15,7 +15,7 @@ TEST_CASE(TEST_GROUP ": Test tag generation", TEST_GROUP) {
     read_common.raw_data = at::empty(4000);
     read_common.seq = "ACGT";
     read_common.qstring = "////";
-    read_common.sample_rate = 4000.0;
+    read_common.sample_rate = 4000;
     read_common.shift = 128.3842f;
     read_common.scale = 8.258f;
     read_common.scaling_method = "quantile";
@@ -167,7 +167,7 @@ TEST_CASE(TEST_GROUP ": Test sam record generation", TEST_GROUP) {
 
     SECTION("Generated sam record for unaligned read is correct") {
         test_read.read_common.raw_data = at::empty(4000);
-        test_read.read_common.sample_rate = 4000.0;
+        test_read.read_common.sample_rate = 4000;
         test_read.read_common.shift = 128.3842f;
         test_read.read_common.scale = 8.258f;
         test_read.read_common.read_id = "test_read";
@@ -201,7 +201,7 @@ TEST_CASE(TEST_GROUP ": Test sam record generation", TEST_GROUP) {
 
 void require_sam_tag_B_int_matches(const uint8_t* aux, const std::vector<int64_t>& expected) {
     int len = bam_auxB_len(aux);
-    REQUIRE(len == expected.size());
+    REQUIRE(size_t(len) == expected.size());
     for (int i = 0; i < len; i++) {
         REQUIRE(expected[i] == bam_auxB2i(aux, i));
     }
@@ -342,7 +342,7 @@ TEST_CASE(TEST_GROUP ": Test mean q-score generation", TEST_GROUP) {
     read_common.raw_data = at::empty(4000);
     read_common.seq = "AAAAAAAAAA";
     read_common.qstring = "$$////////";
-    read_common.sample_rate = 4000.0;
+    read_common.sample_rate = 4000;
     read_common.shift = 128.3842f;
     read_common.scale = 8.258f;
     read_common.num_trimmed_samples = 132;
@@ -371,7 +371,7 @@ TEST_CASE(TEST_GROUP ": Test mean q-score generation", TEST_GROUP) {
     }
 
     SECTION("Check start pos = qstring length") {
-        read_common.mean_qscore_start_pos = read_common.qstring.length();
+        read_common.mean_qscore_start_pos = int(read_common.qstring.length());
         CHECK(read_common.calculate_mean_qscore() == Approx(8.79143f));
     }
 }

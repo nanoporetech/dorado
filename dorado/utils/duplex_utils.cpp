@@ -17,7 +17,6 @@ std::map<std::string, std::string> load_pairs_file(std::string pairs_file_path) 
         throw std::runtime_error("Pairs file does not exist.");
     }
     std::string cell;
-    int line = 0;
 
     std::getline(dataFile, cell);
     while (!dataFile.eof()) {
@@ -28,7 +27,6 @@ std::map<std::string, std::string> load_pairs_file(std::string pairs_file_path) 
         std::string c = cell.substr(delim_pos + 1, delim_pos * 2 - 1);
         template_complement_map[t] = c;
 
-        line++;
         std::getline(dataFile, cell);
     }
     return template_complement_map;

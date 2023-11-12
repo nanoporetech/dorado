@@ -139,7 +139,7 @@ void StereoDuplexEncoderNode::restart() {
 
 stats::NamedStats StereoDuplexEncoderNode::sample_stats() const {
     stats::NamedStats stats = m_work_queue.sample_stats();
-    stats["encoded_pairs"] = m_num_encoded_pairs;
+    stats["encoded_pairs"] = double(m_num_encoded_pairs);
     return stats;
 }
 

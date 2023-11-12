@@ -104,7 +104,7 @@ void DuplexReadTaggingNode::start_threads() {
 
 void DuplexReadTaggingNode::terminate_impl() {
     terminate_input_queue();
-    if (m_worker->joinable()) {
+    if (m_worker && m_worker->joinable()) {
         m_worker->join();
     }
 }

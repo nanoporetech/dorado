@@ -121,7 +121,7 @@ void setup(std::vector<std::string> args,
     bool duplex = false;
 
     const auto thread_allocations = utils::default_thread_allocations(
-            num_devices, !remora_runners.empty() ? num_remora_threads : 0, enable_aligner,
+            int(num_devices), !remora_runners.empty() ? int(num_remora_threads) : 0, enable_aligner,
             !barcode_kits.empty());
 
     std::unique_ptr<const utils::SampleSheet> sample_sheet;
@@ -173,7 +173,7 @@ void setup(std::vector<std::string> args,
             pipeline_desc, std::move(runners), std::move(remora_runners), overlap,
             mean_qscore_start_pos, thread_allocations.scaler_node_threads,
             true /* Enable read splitting */, thread_allocations.splitter_node_threads,
-            thread_allocations.remora_threads * num_devices, current_sink_node);
+            int(thread_allocations.remora_threads * num_devices), current_sink_node);
 
     // Create the Pipeline from our description.
     std::vector<dorado::stats::StatsReporter> stats_reporters{dorado::stats::sys_stats_report};
@@ -220,7 +220,7 @@ void setup(std::vector<std::string> args,
     }
 
     std::vector<dorado::stats::StatsCallable> stats_callables;
-    ProgressTracker tracker(num_reads, duplex);
+    ProgressTracker tracker(int(num_reads), duplex);
     stats_callables.push_back(
             [&tracker](const stats::NamedStats& stats) { tracker.update_progress_bar(stats); });
     constexpr auto kStatsPeriod = 100ms;

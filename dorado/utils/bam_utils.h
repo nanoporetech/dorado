@@ -121,4 +121,37 @@ std::tuple<std::string, std::vector<uint8_t>> extract_modbase_info(bam1_t* input
  */
 bool validate_bam_tag_code(const std::string& bam_name);
 
+/*
+ * Trim CIGAR string based on position interval for the query sequence.
+ *
+ * @param n_cigar Number of CIGAR entries
+ * @param cigar uint32_t array with CIGAR entries
+ * @param interval Position interval to keep after trim
+ * @return A vector with uint32_t encoding for CIGAR ops.
+ */
+std::vector<uint32_t> trim_cigar(uint32_t n_cigar,
+                                 const uint32_t* cigar,
+                                 const std::pair<int, int>& trim_interval);
+
+/*
+ * Calculate how many reference positions are consumed
+ * till a specific position on the query based on teh CIGAR
+ * string.
+ *
+ * @param n_cigar Number of CIGAR entries
+ * @param cigar uint32_t array of CIGAR entries
+ * @param query_pos Query position
+ * @return Number of positions consumed in reference
+ */
+uint32_t ref_pos_consumed(uint32_t n_cigar, const uint32_t* cigar, uint32_t query_pos);
+
+/*
+ * Convert a CIGAR uint32_t array to canonical string format.
+ *
+ * @param n_cigar Number of cigar entries.
+ * @param cigar uint32_t array with CIGAR entries
+ * @return CIGAR string
+ */
+std::string cigar2str(uint32_t n_cigar, const uint32_t* cigar);
+
 }  // namespace dorado::utils

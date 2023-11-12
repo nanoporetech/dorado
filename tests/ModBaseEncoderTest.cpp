@@ -7,9 +7,7 @@
 
 TEST_CASE("Encode sequence for modified basecalling", TEST_GROUP) {
     const size_t BLOCK_STRIDE = 2;
-    const size_t KMER_LEN = 3;
     const size_t SLICE_BLOCKS = 6;
-    const size_t PADDING = SLICE_BLOCKS / 2;
     std::string sequence{"TATTCAGTAC"};
     auto seq_ints = dorado::utils::sequence_to_ints(sequence);
     //                         T  A     T        T  C     A     G        T     A  C

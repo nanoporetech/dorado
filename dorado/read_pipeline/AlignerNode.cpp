@@ -75,7 +75,7 @@ void add_sa_tag(bam1_t* record,
     }
     std::string sa = ss.str();
     if (!sa.empty()) {
-        bam_aux_append(record, "SA", 'Z', sa.length() + 1, (uint8_t*)sa.c_str());
+        bam_aux_append(record, "SA", 'Z', int(sa.length() + 1), (uint8_t*)sa.c_str());
     }
 }
 }  // namespace
@@ -168,8 +168,8 @@ AlignerImpl::AlignerImpl(const std::string& filename,
     mm_check_opt(&m_idx_opt, &m_map_opt);
 
     m_index_reader = mm_idx_reader_open(filename.c_str(), &m_idx_opt, 0);
-    m_index = mm_idx_reader_read(m_index_reader, m_threads);
-    auto* split_index = mm_idx_reader_read(m_index_reader, m_threads);
+    m_index = mm_idx_reader_read(m_index_reader, int(m_threads));
+    auto* split_index = mm_idx_reader_read(m_index_reader, int(m_threads));
     if (split_index != nullptr) {
         mm_idx_destroy(m_index);
         mm_idx_destroy(split_index);
@@ -216,7 +216,7 @@ std::vector<BamPtr> AlignerImpl::align(bam1_t* irecord, mm_tbuf_t* buf) {
     // do the mapping
     int hits = 0;
     mm_reg1_t* reg =
-            mm_map(m_index, seq.length(), seq.c_str(), &hits, buf, &m_map_opt, qname.data());
+            mm_map(m_index, int(seq.length()), seq.c_str(), &hits, buf, &m_map_opt, qname.data());
 
     // just return the input record
     if (hits == 0) {
@@ -337,7 +337,7 @@ std::vector<BamPtr> AlignerImpl::align(bam1_t* irecord, mm_tbuf_t* buf) {
 
         // Add new tags to match minimap2.
         add_tags(record, aln, seq, buf);
-        add_sa_tag(record, aln, reg, hits, j, l_seq, m_index, use_hard_clip);
+        add_sa_tag(record, aln, reg, hits, j, int(l_seq), m_index, use_hard_clip);
 
         results.push_back(BamPtr(record));
     }
@@ -377,7 +377,7 @@ void AlignerImpl::align(dorado::SimplexRead& simplex_read, mm_tbuf_t* buffer) {
 
 AlignerNode::bam_header_sq_t AlignerImpl::get_sequence_records_for_header() const {
     std::vector<std::pair<char*, uint32_t>> records;
-    for (int i = 0; i < m_index->n_seq; ++i) {
+    for (uint32_t i = 0; i < m_index->n_seq; ++i) {
         records.push_back(std::make_pair(m_index->seq[i].name, m_index->seq[i].len));
     }
     return records;
@@ -414,7 +414,7 @@ void AlignerImpl::add_tags(bam1_t* record,
     // de / dv
     if (aln->p) {
         float div;
-        div = 1.0 - mm_event_identity(aln);
+        div = float(1.0 - mm_event_identity(aln));
         bam_aux_append(record, "de", 'f', sizeof(div), (uint8_t*)&div);
     } else if (aln->div >= 0.0f && aln->div <= 1.0f) {
         bam_aux_append(record, "dv", 'f', sizeof(aln->div), (uint8_t*)&aln->div);
