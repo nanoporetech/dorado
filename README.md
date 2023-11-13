@@ -10,7 +10,7 @@ Dorado is a high-performance, easy-to-use, open source basecaller for Oxford Nan
 * [Duplex basecalling](#duplex) (watch the following video for an introduction to [Duplex](https://youtu.be/8DVMG7FEBys)).
 * Simplex [barcode classification](#barcode-classification).
 * Support for aligned read output in SAM/BAM.
-* Experimental support for [poly(A) tail estimation](#polya-tail-estimation).
+* Initial support for [poly(A) tail estimation](#polya-tail-estimation).
 * [POD5](https://github.com/nanoporetech/pod5-file-format) support for highest basecalling performance.
 * Based on libtorch, the C++ API for pytorch.
 * Multiple custom optimisations in CUDA and Metal for maximising inference performance.
@@ -206,7 +206,7 @@ unclassified.bam
 
 ### Poly(A) tail estimation
 
-Dorado has experimental support for estimating poly(A) tail lengths for DNA and RNA. Note that Oxford Nanopore cDNA reads sequence in two different orientations and transcript poly(A) length estimation handles both (A and T homopolymers). This feature can be enabled by passing `--estimate-poly-a` to the `basecaller` command. It is disabled by default. The estimated tail length is stored in the `pt:i` tag of the output record. Reads for which the tail length could not be estimated will not have the `pt:i` tag.
+Dorado has initial support for estimating poly(A) tail lengths for DNA and RNA. Note that Oxford Nanopore cDNA reads sequence in two different orientations and transcript poly(A) length estimation handles both (A and T homopolymers). This feature can be enabled by passing `--estimate-poly-a` to the `basecaller` command. It is disabled by default. The estimated tail length is stored in the `pt:i` tag of the output record. Reads for which the tail length could not be estimated will not have the `pt:i` tag.
 
 ## Available basecalling models
 
