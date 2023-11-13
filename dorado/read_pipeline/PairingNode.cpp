@@ -13,6 +13,11 @@ const int kMaxTimeDeltaMs = 10000;
 const int kMinOverlapLength = 50;
 const int kMinSeqLength = 500;
 const float kMinSimplexQScore = 8.f;
+
+size_t read_signal_bytes(const dorado::SimplexRead& read) {
+    return read.read_common.raw_data.nbytes();
+}
+
 }  // namespace
 
 namespace dorado {
@@ -264,6 +269,7 @@ void PairingNode::pair_generating_worker_thread(int tid) {
                 // kv is a std::pair<UniquePoreIdentifierKey, std::list<std::shared_ptr<Read>>>
                 for (auto& read_ptr : reads_list) {
                     // Push each read message
+                    m_cache_signal_bytes -= read_signal_bytes(*read_ptr);
                     send_message_to_sink(std::move(read_ptr));
                 }
             }
@@ -299,6 +305,7 @@ void PairingNode::pair_generating_worker_thread(int tid) {
             {
                 read_cache.working_channel_keys.push_back(key);
                 std::list<SimplexReadPtr> reads;
+                m_cache_signal_bytes += read_signal_bytes(*read);
                 reads.push_back(std::move(read));
                 read_cache.channel_read_map.emplace(key, std::move(reads));
             }
@@ -312,6 +319,7 @@ void PairingNode::pair_generating_worker_thread(int tid) {
 
                 // Remove the oldest key from the map
                 for (auto& read_ptr : oldest_key_it->second) {
+                    m_cache_signal_bytes -= read_signal_bytes(*read_ptr);
                     m_reads_to_clear.insert(std::move(read_ptr));
                 }
                 read_cache.channel_read_map.erase(oldest_key);
@@ -338,10 +346,12 @@ void PairingNode::pair_generating_worker_thread(int tid) {
             }
 
             SimplexRead* const read_ptr = read.get();
+            m_cache_signal_bytes += read_signal_bytes(*read);
             cached_read_list.insert(later_read_iter, std::move(read));
             m_reads_in_flight_ctr[read_ptr]++;
 
             while (cached_read_list.size() > m_max_num_reads) {
+                m_cache_signal_bytes -= read_signal_bytes(*cached_read_list.front());
                 auto cached_read = std::move(cached_read_list.front());
                 cached_read_list.pop_front();
                 m_reads_to_clear.insert(std::move(cached_read));
@@ -430,6 +440,7 @@ void PairingNode::pair_generating_worker_thread(int tid) {
                     auto& reads_list = kv.second;
 
                     for (auto& read_ptr : reads_list) {
+                        m_cache_signal_bytes -= read_signal_bytes(*read_ptr);
                         // Push each read message
                         send_message_to_sink(std::move(read_ptr));
                     }
@@ -516,6 +527,8 @@ stats::NamedStats PairingNode::sample_stats() const {
     stats::NamedStats stats = m_work_queue.sample_stats();
     stats["early_accepted_pairs"] = m_early_accepted_pairs.load();
     stats["overlap_accepted_pairs"] = m_overlap_accepted_pairs.load();
+    stats["cached_signal_mb"] =
+            static_cast<double>(m_cache_signal_bytes) / static_cast<double>(1024 * 1024);
     return stats;
 }
 

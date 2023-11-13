@@ -229,6 +229,8 @@ set(LIB_SOURCE_FILES
     dorado/read_pipeline/PolyACalculator.h
     dorado/read_pipeline/read_utils.cpp
     dorado/read_pipeline/read_utils.h
+    dorado/read_pipeline/stereo_features.cpp
+    dorado/read_pipeline/stereo_features.h
     dorado/read_pipeline/stitch.cpp
     dorado/read_pipeline/stitch.h
     dorado/read_pipeline/ReadSplitNode.cpp
@@ -539,4 +541,9 @@ if (GENERATE_TEST_COVERAGE)
             EXCLUDE "${PROJECT_SOURCE_DIR}/dorado/3rdparty/*" "${PROJECT_SOURCE_DIR}/tests/*"
             )
     endif()
+endif()
+
+# GCC 8 ICEs trying to compile this file with ASAN+optimisations enabled, so knock down the optimisation to try and help it out.
+if (ECM_ENABLE_SANITIZERS AND (CMAKE_CXX_COMPILER_ID MATCHES "GNU") AND (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9.0))
+    set_source_files_properties(dorado/read_pipeline/stereo_features.cpp PROPERTIES COMPILE_OPTIONS "-O0")
 endif()

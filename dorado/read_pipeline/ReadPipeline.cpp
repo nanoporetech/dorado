@@ -1,6 +1,7 @@
 #include "ReadPipeline.h"
 
 #include "modbase/ModBaseContext.h"
+#include "stereo_features.h"
 #include "utils/bam_utils.h"
 #include "utils/sequence_utils.h"
 
@@ -273,6 +274,16 @@ ReadCommon &get_read_common_data(const Message &message) {
         } else {
             return std::get<DuplexReadPtr>(message)->read_common;
         }
+    }
+}
+
+void materialise_read_raw_data(Message &message) {
+    if (std::holds_alternative<DuplexReadPtr>(message)) {
+        // Note: we could deallocate stereo_feature_inputs fields,
+        // but this made a negligible difference to overall memory usage.
+        auto &duplex_read = *std::get<DuplexReadPtr>(message);
+        duplex_read.read_common.raw_data =
+                generate_stereo_features(duplex_read.stereo_feature_inputs);
     }
 }
 

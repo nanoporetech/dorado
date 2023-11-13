@@ -41,7 +41,7 @@
 | dx:i:  | bool to signify duplex read _(only in duplex mode)_        |
 | pi:Z:  | parent read id for a split read                            |
 | sp:i:  | start coordinate of split read in parent read signal       |
-| pt:i:  | estimated poly(A) tail length in cDNA and dRNA reads       |
+| pt:i:  | estimated poly(A/T) tail length in cDNA and dRNA reads     |
 
 #### Modified Base Tags
 
@@ -51,3 +51,17 @@ Briefly, these tags represent the relative positions and probability that partic
 
 These tags in the SAM/BAM/CRAM formats can be parsed by the [`modkit`](https://github.com/nanoporetech/modkit) software for downstream analysis.
 For aligned outputs, visualization of these tags is available in popular genome browsers, including IGV and JBrowse.
+
+#### Minimap2 Alignment Tags
+
+When `dorado` is run with alignment enabled, additional tags from minimap2 are added to each SAM record. Details of those tags
+are available on the [minimap2 manpage](https://lh3.github.io/minimap2/minimap2.html#10).
+
+### Split Read Tags
+
+When a single input read contains multiple concatenated reads, `dorado basecaller` will split the original input read into separate subreads. This operation is performed by default for both DNA and RNA. Each subread has a new read id that is assigned by `dorado`. The following tags can be used to associate a subread to its parent:
+
+* `pi:Z` contains the parent read id the subread was generated from.
+* `sp:i` maps the start of the subread's signal data to the corresponding location in the parent read's signal data.
+* `ns:i` is the number of samples corresponding to the subread after splitting.
+* `ts:i` is the number samples trimmed from the start of subread's signal after splitting.

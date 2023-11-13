@@ -50,7 +50,7 @@ void BasecallerNode::input_worker_thread() {
         }
 
         // Get the common read data.
-        const ReadCommon &read_common_data = get_read_common_data(message);
+        ReadCommon &read_common_data = get_read_common_data(message);
         // If a read has already been basecalled, just send it to the sink without basecalling again
         // TODO: This is necessary because some reads (e.g failed Stereo Encoding) will be passed
         // to the basecaller node having already been called. This should be fixed in the future with
@@ -59,6 +59,9 @@ void BasecallerNode::input_worker_thread() {
             send_message_to_sink(std::move(message));
             continue;
         }
+
+        // If this is a duplex read, raw_data won't have been generated yet.
+        materialise_read_raw_data(message);
 
         // Now that we have acquired a read, wait until we can push to chunks_in
         // Chunk up the read and put the chunks into the pending chunk list.
@@ -84,7 +87,7 @@ void BasecallerNode::input_worker_thread() {
             offset = std::min(offset + signal_chunk_step, last_chunk_offset);
             read_chunks.push_back(std::make_unique<BasecallingChunk>(
                     working_read, offset, chunk_in_read_idx++, m_chunk_size));
-            num_chunks++;
+            ++num_chunks;
         }
         working_read->called_chunks.resize(num_chunks);
         working_read->num_chunks_called.store(0);

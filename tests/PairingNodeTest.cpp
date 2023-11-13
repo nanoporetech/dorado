@@ -5,6 +5,7 @@
 #include "utils/sequence_utils.h"
 #include "utils/time_utils.h"
 
+#include <ATen/ATen.h>
 #include <catch2/catch.hpp>
 
 #include <filesystem>
@@ -17,6 +18,7 @@ namespace {
 // the provided seq string directly.
 auto make_read(int delay_ms, size_t seq_len, const std::string& seq = "") {
     auto read = std::make_unique<dorado::SimplexRead>();
+    read->read_common.raw_data = at::zeros({10});
     read->read_common.sample_rate = 4000;
     read->read_common.num_trimmed_samples = 10;
     read->read_common.attributes.channel_number = 664;

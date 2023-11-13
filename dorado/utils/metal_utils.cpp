@@ -62,8 +62,11 @@ std::optional<int64_t> retrieve_ioreg_prop(const std::string &service_class,
     if (!matching_dict) {
         return std::nullopt;
     }
-    // Note: kIOMainPortDefault was introduced on MacOS 12.  If support for earlier versions
-    // is needed an alternate constant will be needed.
+
+#if MAC_OS_X_VERSION_MIN_REQUIRED < 120000 /* MAC_OS_VERSION_12_0 */
+    // These are the same variable, just renamed in macOS 12+.
+    const mach_port_t kIOMainPortDefault = kIOMasterPortDefault;
+#endif
     // IOServiceGetMatchingService consumes a reference to matching_dict, so we don't need
     // to release it ourselves.
     io_service_t service = IOServiceGetMatchingService(kIOMainPortDefault, matching_dict);
