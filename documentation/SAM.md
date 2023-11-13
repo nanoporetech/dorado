@@ -59,10 +59,9 @@ are available on the [minimap2 manpage](https://lh3.github.io/minimap2/minimap2.
 
 ### Split Read Tags
 
-Read splitting generates multiple subreads from a single input read. `dorado` performs this operation by default for both DNA and RNA.
-Each subread has a new read id that is assigned by `dorado`. The following tags can be used to associate a subread to its parent:
+When a single input read contains multiple concatenated reads, `dorado basecaller` will split the original input read into separate subreads. This operation is performed by default for both DNA and RNA. Each subread has a new read id that is assigned by `dorado`. The following tags can be used to associate a subread to its parent:
 
-* `pi:Z` contains the read id of the original read the subread was generated from.
+* `pi:Z` contains the parent read id the subread was generated from.
 * `sp:i` maps the start of the subread's signal data to the corresponding location in the parent read's signal data.
 * `ns:i` is the number of samples corresponding to the subread after splitting.
 * `ts:i` is the number samples trimmed from the start of subread's signal after splitting.
