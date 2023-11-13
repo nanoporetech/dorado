@@ -14,6 +14,7 @@ constant float kLinearOutputScale [[function_constant(5)]];
 constant bool kLinearOutputClamp [[function_constant(6)]];
 constant bool kLinearOutputTanh [[function_constant(7)]];
 constant bool kLinearOutputAsByte [[function_constant(8)]];
+constant bool kConvTanhActivation [[function_constant(9)]];
 
 namespace {
 
@@ -26,8 +27,8 @@ inline float tanh_fast(float x) {
 }
 
 inline float conv_activation(float x) {
-    // SiLU / swish activation.
-    const float y = x * sigmoid(x);
+    // tanh or SiLU / swish activation.
+    const float y = kConvTanhActivation ? tanh_fast(x) : x * sigmoid(x);
     if (kConvOutputClamp) {
         // Note: the lower bound is inoperative, since SiLU(x) has a min. of ~-0.28.
         // Needs to updated anyway, once clamp range is nailed down.

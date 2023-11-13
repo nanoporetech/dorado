@@ -83,7 +83,7 @@ struct MetalConv1dImpl : Module {
                     int out_size_,
                     int win_size_,
                     int stride_,
-                    bool clamp,
+                    Activation activation,
                     int chunk_size_,
                     int batch_size_,
                     MTL::Device *const device)
@@ -163,7 +163,8 @@ struct MetalConv1dImpl : Module {
         kernel_thread_groups = get_mtl_device_core_count() * 4;
 
         std::vector<std::tuple<std::string, MetalConstant>> metal_constants = {
-                {"kConvOutputClamp", clamp}};
+                {"kConvOutputClamp", activation == Activation::SWISH_CLAMP},
+                {"kConvTanhActivation", activation == Activation::TANH}};
         const int kernel_threads = kSIMDGroupWidth * kernel_simd_groups;
         std::string kernel_name = "conv" + std::to_string(layer);
         // Layer 1 and 2 conv kernels are tailored to specific feature sizes.
@@ -342,15 +343,15 @@ struct MetalBlockImpl : Module {
         int mat_temp_elems =
                 batch_size * std::max(kMaxConv2OutChannels * in_chunk_size, config.lstm_size);
 
-        conv1 = register_module("conv1",
-                                MetalConv1d(1, config.num_features, config.convs[0].size, 5, 1,
-                                            config.clamp, in_chunk_size, batch_size, device));
+        conv1 = register_module("conv1", MetalConv1d(1, config.num_features, config.convs[0].size,
+                                                     5, 1, config.convs[0].activation,
+                                                     in_chunk_size, batch_size, device));
         conv2 = register_module(
-                "conv2", MetalConv1d(2, config.convs[0].size, 16, 5, 1, config.clamp, in_chunk_size,
-                                     batch_size, device));
-        conv3 = register_module(
-                "conv3", MetalConv1d(3, 16, config.lstm_size, 19, config.stride, config.clamp,
+                "conv2", MetalConv1d(2, config.convs[0].size, 16, 5, 1, config.convs[1].activation,
                                      in_chunk_size, batch_size, device));
+        conv3 = register_module("conv3", MetalConv1d(3, 16, config.lstm_size, 19, config.stride,
+                                                     config.convs[2].activation, in_chunk_size,
+                                                     batch_size, device));
         rnn1 = register_module("rnn_1", MetalLSTM(config.lstm_size, true, device));
         rnn2 = register_module("rnn_2", MetalLSTM(config.lstm_size, false, device));
         rnn3 = register_module("rnn_3", MetalLSTM(config.lstm_size, true, device));
