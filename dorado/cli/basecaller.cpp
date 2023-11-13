@@ -96,17 +96,10 @@ void setup(std::vector<std::string> args,
     }
 
     const bool enable_aligner = !ref.empty();
-    if (enable_aligner && output_mode == HtsWriter::OutputMode::FASTQ) {
-        throw std::runtime_error("Alignment to reference cannot be used with FASTQ output.");
-    }
 
     // create modbase runners first so basecall runners can pick batch sizes based on available memory
     auto remora_runners = create_modbase_runners(
             remora_models, device, default_parameters.remora_runners_per_caller, remora_batch_size);
-
-    if (!remora_runners.empty() && output_mode == HtsWriter::OutputMode::FASTQ) {
-        throw std::runtime_error("Modified base models cannot be used with FASTQ output");
-    }
 
     auto [runners, num_devices] =
             create_basecall_runners(model_config, device, num_runners, 0, batch_size, chunk_size);
@@ -401,7 +394,7 @@ int basecaller(int argc, char* argv[]) {
     auto mod_bases = parser.visible.get<std::vector<std::string>>("--modified-bases");
     auto mod_bases_models = parser.visible.get<std::string>("--modified-bases-models");
 
-    if (mod_bases.size() && !mod_bases_models.empty()) {
+    if (!mod_bases.empty() && !mod_bases_models.empty()) {
         spdlog::error(
                 "only one of --modified-bases or --modified-bases-models should be specified.");
         std::exit(EXIT_FAILURE);
@@ -432,6 +425,19 @@ int basecaller(int argc, char* argv[]) {
     }
 
     if (emit_fastq) {
+        if (!mod_bases.empty() || !mod_bases_models.empty()) {
+            spdlog::error(
+                    "--emit-fastq cannot be used with modbase models as FASTQ cannot store modbase "
+                    "results.");
+            std::exit(EXIT_FAILURE);
+        }
+        if (!parser.visible.get<std::string>("--reference").empty()) {
+            spdlog::error(
+                    "--emit-fastq cannot be used with --reference as FASTQ cannot store alignment "
+                    "results.");
+            std::exit(EXIT_FAILURE);
+        }
+        spdlog::info(" - Note: FASTQ output is not recommended as not all data can be preserved.");
         output_mode = HtsWriter::OutputMode::FASTQ;
     } else if (emit_sam || utils::is_fd_tty(stdout)) {
         output_mode = HtsWriter::OutputMode::SAM;
