@@ -41,7 +41,7 @@
 | dx:i:  | bool to signify duplex read _(only in duplex mode)_        |
 | pi:Z:  | parent read id for a split read                            |
 | sp:i:  | start coordinate of split read in parent read signal       |
-| pt:i:  | estimated poly(A) tail length in cDNA and dRNA reads       |
+| pt:i:  | estimated poly(A/T) tail length in cDNA and dRNA reads     |
 
 #### Modified Base Tags
 
