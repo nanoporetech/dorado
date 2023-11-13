@@ -396,7 +396,7 @@ int basecaller(int argc, char* argv[]) {
     auto mod_bases = parser.visible.get<std::vector<std::string>>("--modified-bases");
     auto mod_bases_models = parser.visible.get<std::string>("--modified-bases-models");
 
-    if (mod_bases.size() && !mod_bases_models.empty()) {
+    if (!mod_bases.empty() && !mod_bases_models.empty()) {
         spdlog::error(
                 "only one of --modified-bases or --modified-bases-models should be specified.");
         std::exit(EXIT_FAILURE);
