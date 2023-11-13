@@ -37,6 +37,17 @@ fi
 samtools quickcheck -u $output_dir/calls.bam
 samtools view $output_dir/calls.bam > $output_dir/calls.sam
 
+set +e
+if $dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --emit-fastq --reference $output_dir/ref.fq > $output_dir/error_condition.fq; then
+    echo "Error: dorado basecaller should fail with combination of emit-fastq and reference!"
+    exit 1
+fi
+if $dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --emit-fastq --modified-bases 5mCG > $output_dir/error_condition.fq; then
+    echo  "Error: dorado basecaller should fail with combination of emit-fastq and modbase!"
+    exit 1
+fi
+set -e
+
 echo dorado summary test stage
 $dorado_bin summary $output_dir/calls.bam
 
