@@ -427,7 +427,7 @@ int basecaller(int argc, char* argv[]) {
     }
 
     if (emit_fastq) {
-        if (mod_bases.size() || !mod_bases_models.empty()) {
+        if (!mod_bases.empty() || !mod_bases_models.empty()) {
             spdlog::error(
                     "--emit-fastq cannot be used with modbase models as FASTQ cannot store modbase "
                     "results.");
