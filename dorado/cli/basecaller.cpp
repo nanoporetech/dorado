@@ -460,7 +460,7 @@ int basecaller(int argc, char* argv[]) {
               parser.visible.get<bool>("--barcode-both-ends"),
               parser.visible.get<bool>("--no-trim"),
               parser.visible.get<std::string>("--sample-sheet"), resume_parser,
-              parser.hidden.get<bool>("--estimate-poly-a"));
+              parser.visible.get<bool>("--estimate-poly-a"));
     } catch (const std::exception& e) {
         spdlog::error("{}", e.what());
         return 1;
