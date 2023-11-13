@@ -101,6 +101,14 @@ public:
                              float memory_limit_fraction,
                              bool run_benchmark) {
         c10::cuda::CUDAGuard device_guard(m_options.device());
+        constexpr float GB = 1.0e9f;
+        int64_t available = utils::available_memory(m_options.device());
+        spdlog::debug("{} memory available: {:.2f}GB", m_device, available / GB);
+
+#ifdef DORADO_TX2
+        return 256;
+#endif
+
         const int granularity = get_batch_size_granularity(model_config, m_options);
 
         // If running on a Jetson device with unified memory for CPU and GPU we can't use all
@@ -113,16 +121,13 @@ public:
                                         (prop->major == 8 && prop->minor == 7);    // Orin
         memory_limit_fraction *= is_unified_memory_device ? 0.5f : 1.f;
 
-        constexpr float GB = 1.0e9f;
-        int64_t available = utils::available_memory(m_options.device());
         // Apply limit fraction, and allow 1GB for model weights, etc.
         int64_t gpu_mem_limit = int64_t(available * memory_limit_fraction - GB);
         if (gpu_mem_limit < 0) {
             spdlog::warn("Auto batchsize detection failed. Less than 1GB GPU memory available.");
             return granularity;
         }
-        spdlog::debug("Auto batch size: GPU memory available: {:.2f}GB, limit to {:.2f}GB",
-                      available / GB, gpu_mem_limit / GB);
+        spdlog::debug("Auto batchsize {}: memory limit {:.2f}GB", m_device, gpu_mem_limit / GB);
 
         // Determine size of working memory for CRFModel divided by (batch_size * chunk_size)
         // These values have been determined by running dorado with different models and
@@ -174,8 +179,8 @@ public:
             // We limit the maximum when doing benchmarking to avoid excessive startup time.
             const int max_batch_size_limit = 10240;
             max_batch_size = std::min(max_batch_size, max_batch_size_limit);
-            spdlog::debug("Auto batch size: testing up to {} in steps of {}", max_batch_size,
-                          granularity);
+            spdlog::debug("Auto batchsize {}: testing up to {} in steps of {}", m_device,
+                          max_batch_size, granularity);
             for (int batch_size = granularity; batch_size <= max_batch_size;
                  batch_size += granularity) {
                 auto input = torch::empty({batch_size, model_config.num_features, chunk_size},
@@ -206,7 +211,7 @@ public:
                 }
             }
         } else {
-            spdlog::debug("Maximum safe estimated batch size is {}", max_batch_size);
+            spdlog::debug("Maximum safe estimated batch size for {}: {}", m_device, max_batch_size);
             best_batch_size = max_batch_size;
         }
 
