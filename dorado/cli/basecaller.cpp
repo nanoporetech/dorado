@@ -368,16 +368,14 @@ int basecaller(int argc, char* argv[]) {
     parser.visible.add_argument("--sample-sheet")
             .help("Path to the sample sheet to use.")
             .default_value(std::string(""));
-
-    cli::add_minimap2_arguments(parser, AlignerNode::dflt_options);
-    cli::add_internal_arguments(parser);
-
-    // Add hidden arguments that only apply to simplex calling.
-    parser.hidden.add_argument("--estimate-poly-a")
+    parser.visible.add_argument("--estimate-poly-a")
             .help("Estimate poly-A/T tail lengths (beta feature). Primarily meant for cDNA and "
                   "dRNA use cases.")
             .default_value(false)
             .implicit_value(true);
+
+    cli::add_minimap2_arguments(parser, AlignerNode::dflt_options);
+    cli::add_internal_arguments(parser);
 
     // Create a copy of the parser to use if the resume feature is enabled. Needed
     // to parse the model used for the file being resumed from. Note that this copy

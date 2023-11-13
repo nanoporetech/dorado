@@ -10,6 +10,7 @@ Dorado is a high-performance, easy-to-use, open source basecaller for Oxford Nan
 * [Duplex basecalling](#duplex) (watch the following video for an introduction to [Duplex](https://youtu.be/8DVMG7FEBys)).
 * Simplex [barcode classification](#barcode-classification).
 * Support for aligned read output in SAM/BAM.
+* Experimental support for [poly(A) tail estimation](#polyA-tail-estimation).
 * [POD5](https://github.com/nanoporetech/pod5-file-format) support for highest basecalling performance.
 * Based on libtorch, the C++ API for pytorch.
 * Multiple custom optimisations in CUDA and Metal for maximising inference performance.
@@ -202,6 +203,10 @@ unclassified.bam
 
 #### Using a Sample Sheet
 `dorado` is able to use a sample sheet to restrict the barcode classifications to only those present, and to apply aliases to the detected classifications. This is enabled by passing the path to a sample sheet to the `--sample-sheet` argument when using the `basecaller` or `demux` commands. See [here](documentation/SampleSheets.md) for more information.
+
+### poly(A) tail estimation
+
+Dorado has experimental support for estimating poly(A) tails for both DNA and RNA. This feature can be enabled by passing `--estimate-poly-a` to the `basecaller` command. It is disabled by default. The estimated tail length is stored in the `pt:i` tag of the output record. Reads for which the tail length could not be estimated will not have the `pt:i` tag.
 
 ## Available basecalling models
 
