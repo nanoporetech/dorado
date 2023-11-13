@@ -5,7 +5,7 @@
 #include "utils/sequence_utils.h"
 #include "utils/time_utils.h"
 
-#include <ATen/core/TensorBody.h>
+#include <ATen/ATen.h>
 #include <catch2/catch.hpp>
 
 #include <filesystem>
