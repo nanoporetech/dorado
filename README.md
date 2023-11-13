@@ -204,9 +204,9 @@ unclassified.bam
 #### Using a Sample Sheet
 `dorado` is able to use a sample sheet to restrict the barcode classifications to only those present, and to apply aliases to the detected classifications. This is enabled by passing the path to a sample sheet to the `--sample-sheet` argument when using the `basecaller` or `demux` commands. See [here](documentation/SampleSheets.md) for more information.
 
-### poly(A) tail estimation
+### Poly(A) tail estimation
 
-Dorado has experimental support for estimating poly(A) tails for both DNA and RNA. This feature can be enabled by passing `--estimate-poly-a` to the `basecaller` command. It is disabled by default. The estimated tail length is stored in the `pt:i` tag of the output record. Reads for which the tail length could not be estimated will not have the `pt:i` tag.
+Dorado has experimental support for estimating poly(A) tail lengths for DNA and RNA. Note that Oxford Nanopore cDNA reads sequence in two different orientations and transcript poly(A) length estimation handles both (A and T homopolymers). This feature can be enabled by passing `--estimate-poly-a` to the `basecaller` command. It is disabled by default. The estimated tail length is stored in the `pt:i` tag of the output record. Reads for which the tail length could not be estimated will not have the `pt:i` tag.
 
 ## Available basecalling models
 
