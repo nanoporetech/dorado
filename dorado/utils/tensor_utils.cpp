@@ -17,7 +17,7 @@ __attribute__((target("default")))
 #endif
 void convert_f32_to_f16_impl(c10::Half* const dest, const float* const src, std::size_t count) {
     // TODO -- handle large counts properly.
-    assert(count <= std::numeric_limits<int>::max());
+    assert(int(count) <= std::numeric_limits<int>::max());
     auto src_tensor_f32 = at::from_blob(const_cast<float*>(src), {static_cast<int>(count)});
     auto src_tensor_f16 = src_tensor_f32.to(at::ScalarType::Half);
     std::memcpy(dest, src_tensor_f16.data_ptr(), count * sizeof(c10::Half));
@@ -113,19 +113,19 @@ at::Tensor quantile_counting(const at::Tensor t, const at::Tensor q) {
     auto range_min = t.min().item<int16_t>();
     auto range_max = t.max().item<int16_t>();
 
-    int size = t.size(0);
+    size_t size = t.size(0);
 
     std::vector<int> counts(range_max - range_min + 1, 0);
-    for (int i = 0; i < size; ++i) {
+    for (size_t i = 0; i < size; ++i) {
         counts[p[i] - range_min]++;
     }
     std::partial_sum(counts.begin(), counts.end(), counts.begin());
 
     auto res = at::empty_like(q);
 
-    for (size_t idx = 0; idx < q.numel(); idx++) {
-        int threshold = q[idx].item<float>() * (size - 1);
-        for (int i = 0; i < counts.size(); ++i) {
+    for (size_t idx = 0; idx < size_t(q.numel()); idx++) {
+        int threshold = int(q[idx].item<float>() * (size - 1));
+        for (int i = 0; i < int(counts.size()); ++i) {
             if (counts[i] > threshold) {
                 res[idx] = i + range_min;
                 break;
@@ -150,8 +150,8 @@ void copy_tensor_elems(at::Tensor& dest_tensor,
                        std::size_t count) {
     assert(dest_tensor.is_contiguous());
     assert(src_tensor.is_contiguous());
-    assert(dest_offset + count <= dest_tensor.numel());
-    assert(src_offset + count <= src_tensor.numel());
+    assert(dest_offset + count <= size_t(dest_tensor.numel()));
+    assert(src_offset + count <= size_t(src_tensor.numel()));
 
     if (dest_tensor.dtype() == src_tensor.dtype()) {
         // No conversion.

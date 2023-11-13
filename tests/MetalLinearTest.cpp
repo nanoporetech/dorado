@@ -106,8 +106,6 @@ TEST_CASE(TEST_GROUP "Linear") {
     // CPU comparison calculation.
     const at::Tensor out_cpu_f32 = torch::addmm(biases_f32, in_f32, weights_f32);
 
-    const int32_t in_batch_tiles = in_batch_size / tile_size;
-
     for (bool output_clamp : {false, true}) {
         const auto out_cpu_clamp_f32 = output_clamp ? out_cpu_f32.clamp(-5.f, 5.f) : out_cpu_f32;
         for (bool output_tanh : {false, true}) {

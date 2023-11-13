@@ -21,7 +21,7 @@ namespace {
 
 const std::string UNCLASSIFIED_BARCODE = "unclassified";
 
-std::string generate_barcode_string(dorado::demux::ScoreResults bc_res) {
+std::string generate_barcode_string(dorado::BarcodeScoreResult bc_res) {
     std::string bc;
     if (bc_res.adapter_name != UNCLASSIFIED_BARCODE) {
         bc = dorado::barcode_kits::generate_standard_barcode_name(bc_res.kit, bc_res.adapter_name);
@@ -95,7 +95,7 @@ void BarcodeClassifierNode::worker_thread(size_t tid) {
     }
 }
 
-std::pair<int, int> determine_trim_interval(const demux::ScoreResults& res, int seqlen) {
+static std::pair<int, int> determine_trim_interval(const BarcodeScoreResult& res, int seqlen) {
     // Initialize interval to be the whole read. Note that the interval
     // defines which portion of the read to retain.
     std::pair<int, int> trim_interval = {0, seqlen};
@@ -153,8 +153,8 @@ std::pair<int, int> determine_trim_interval(const demux::ScoreResults& res, int 
 }
 
 BamPtr BarcodeClassifierNode::trim_barcode(BamPtr input,
-                                           const demux::ScoreResults& res,
-                                           int seqlen) {
+                                           const BarcodeScoreResult& res,
+                                           int seqlen) const {
     auto trim_interval = determine_trim_interval(res, seqlen);
 
     if (trim_interval.second - trim_interval.first == seqlen) {
@@ -164,10 +164,10 @@ BamPtr BarcodeClassifierNode::trim_barcode(BamPtr input,
     bam1_t* input_record = input.get();
 
     // Fetch components that need to be trimmed.
-    std::string seq = utils::extract_sequence(input_record, seqlen);
-    std::vector<uint8_t> qual = utils::extract_quality(input_record, seqlen);
+    std::string seq = utils::extract_sequence(input_record);
+    std::vector<uint8_t> qual = utils::extract_quality(input_record);
     auto [stride, move_vals] = utils::extract_move_table(input_record);
-    int ts = bam_aux_get(input_record, "ts") ? bam_aux2i(bam_aux_get(input_record, "ts")) : 0;
+    int ts = bam_aux_get(input_record, "ts") ? int(bam_aux2i(bam_aux_get(input_record, "ts"))) : 0;
     auto [modbase_str, modbase_probs] = utils::extract_modbase_info(input_record);
 
     // Actually trim components.
@@ -177,13 +177,22 @@ BamPtr BarcodeClassifierNode::trim_barcode(BamPtr input,
     ts += positions_trimmed * stride;
     auto [trimmed_modbase_str, trimmed_modbase_probs] =
             utils::trim_modbase_info(seq, modbase_str, modbase_probs, trim_interval);
+    auto n_cigar = input_record->core.n_cigar;
+    std::vector<uint32_t> ops;
+    uint32_t ref_pos_consumed = 0;
+    if (n_cigar > 0) {
+        auto cigar_arr = bam_get_cigar(input_record);
+        ops = utils::trim_cigar(n_cigar, cigar_arr, trim_interval);
+        ref_pos_consumed =
+                ops.empty() ? 0 : utils::ref_pos_consumed(n_cigar, cigar_arr, trim_interval.first);
+    }
 
     // Create a new bam record to hold the trimmed read.
     bam1_t* out_record = bam_init1();
     bam_set1(out_record, input_record->core.l_qname - input_record->core.l_extranul - 1,
              bam_get_qname(input_record), input_record->core.flag, input_record->core.tid,
-             input_record->core.pos, input_record->core.qual, input_record->core.n_cigar,
-             bam_get_cigar(input_record), input_record->core.mtid, input_record->core.mpos,
+             input_record->core.pos + ref_pos_consumed, input_record->core.qual, ops.size(),
+             ops.empty() ? NULL : ops.data(), input_record->core.mtid, input_record->core.mpos,
              input_record->core.isize, trimmed_seq.size(), trimmed_seq.data(),
              trimmed_qual.empty() ? NULL : (char*)trimmed_qual.data(), bam_get_l_aux(input_record));
     memcpy(bam_get_aux(out_record), bam_get_aux(input_record), bam_get_l_aux(input_record));
@@ -194,16 +203,16 @@ BamPtr BarcodeClassifierNode::trim_barcode(BamPtr input,
         bam_aux_del(out_record, bam_aux_get(out_record, "mv"));
         // Move table format is stride followed by moves.
         trimmed_moves.insert(trimmed_moves.begin(), stride);
-        bam_aux_update_array(out_record, "mv", 'c', trimmed_moves.size(),
+        bam_aux_update_array(out_record, "mv", 'c', int(trimmed_moves.size()),
                              (uint8_t*)trimmed_moves.data());
     }
 
     if (!trimmed_modbase_str.empty()) {
         bam_aux_del(out_record, bam_aux_get(out_record, "MM"));
-        bam_aux_append(out_record, "MM", 'Z', trimmed_modbase_str.length() + 1,
+        bam_aux_append(out_record, "MM", 'Z', int(trimmed_modbase_str.length() + 1),
                        (uint8_t*)trimmed_modbase_str.c_str());
         bam_aux_del(out_record, bam_aux_get(out_record, "ML"));
-        bam_aux_update_array(out_record, "ML", 'C', trimmed_modbase_probs.size(),
+        bam_aux_update_array(out_record, "ML", 'C', int(trimmed_modbase_probs.size()),
                              (uint8_t*)trimmed_modbase_probs.data());
     }
 
@@ -212,11 +221,9 @@ BamPtr BarcodeClassifierNode::trim_barcode(BamPtr input,
     return BamPtr(out_record);
 }
 
-void BarcodeClassifierNode::trim_barcode(SimplexRead& read, const demux::ScoreResults& res) {
-    int seqlen = read.read_common.seq.length();
-    auto trim_interval = determine_trim_interval(res, seqlen);
-
-    if (trim_interval.second - trim_interval.first == seqlen) {
+void BarcodeClassifierNode::trim_barcode(SimplexRead& read,
+                                         std::pair<int, int> trim_interval) const {
+    if (trim_interval.second - trim_interval.first == int(read.read_common.seq.length())) {
         return;
     }
 
@@ -228,7 +235,7 @@ void BarcodeClassifierNode::trim_barcode(SimplexRead& read, const demux::ScoreRe
     read.read_common.num_trimmed_samples += read.read_common.model_stride * num_positions_trimmed;
 
     if (read.read_common.mod_base_info) {
-        int num_modbase_channels = read.read_common.mod_base_info->alphabet.size();
+        int num_modbase_channels = int(read.read_common.mod_base_info->alphabet.size());
         // The modbase probs table consists of the probability per channel per base. So when
         // trimming, we just shift everything by skipped bases * number of channels.
         std::pair<int, int> modbase_interval = {trim_interval.first * num_modbase_channels,
@@ -258,16 +265,16 @@ void BarcodeClassifierNode::barcode(BamPtr& read) {
     auto barcoder = m_barcoder_selector.get_barcoder(m_default_barcoding_info->kit_name);
 
     bam1_t* irecord = read.get();
-    int seqlen = irecord->core.l_qseq;
-    std::string seq = utils::extract_sequence(irecord, seqlen);
+    std::string seq = utils::extract_sequence(irecord);
 
     auto bc_res = barcoder->barcode(seq, m_default_barcoding_info->barcode_both_ends,
                                     m_default_barcoding_info->allowed_barcodes);
     auto bc = generate_barcode_string(bc_res);
-    bam_aux_append(irecord, "BC", 'Z', bc.length() + 1, (uint8_t*)bc.c_str());
+    bam_aux_append(irecord, "BC", 'Z', int(bc.length() + 1), (uint8_t*)bc.c_str());
     m_num_records++;
 
     if (m_default_barcoding_info->trim) {
+        int seqlen = irecord->core.l_qseq;
         read = trim_barcode(std::move(read), bc_res, seqlen);
     }
 }
@@ -283,10 +290,15 @@ void BarcodeClassifierNode::barcode(SimplexRead& read) {
     auto bc_res = barcoder->barcode(read.read_common.seq, barcoding_info->barcode_both_ends,
                                     barcoding_info->allowed_barcodes);
     read.read_common.barcode = generate_barcode_string(bc_res);
-    m_num_records++;
+    read.read_common.barcoding_result = std::make_shared<BarcodeScoreResult>(std::move(bc_res));
+    read.read_common.pre_trim_seq_length = read.read_common.seq.length();
     if (barcoding_info->trim) {
-        trim_barcode(read, bc_res);
+        read.read_common.barcode_trim_interval = determine_trim_interval(
+                *read.read_common.barcoding_result, int(read.read_common.seq.length()));
+        trim_barcode(read, read.read_common.barcode_trim_interval);
     }
+
+    m_num_records++;
 }
 
 stats::NamedStats BarcodeClassifierNode::sample_stats() const {

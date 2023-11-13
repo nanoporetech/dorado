@@ -46,7 +46,7 @@ std::pair<std::vector<dorado::Runner>, size_t> create_basecall_runners(
 
         for (size_t i = 0; i < num_cpu_runners; i++) {
             runners.push_back(std::make_shared<dorado::ModelRunner<dorado::CPUDecoder>>(
-                    model_config, device, chunk_size, batch_size));
+                    model_config, device, int(chunk_size), int(batch_size)));
         }
     }
 #if DORADO_GPU_BUILD
@@ -79,8 +79,9 @@ std::pair<std::vector<dorado::Runner>, size_t> create_basecall_runners(
         std::vector<std::future<std::shared_ptr<dorado::CudaCaller>>> futures;
 
         for (auto device_string : devices) {
-            futures.push_back(pool.push(dorado::create_cuda_caller, model_config, chunk_size,
-                                        batch_size, device_string, memory_fraction, guard_gpus));
+            futures.push_back(pool.push(dorado::create_cuda_caller, model_config, int(chunk_size),
+                                        int(batch_size), device_string, memory_fraction,
+                                        guard_gpus));
         }
 
         for (auto& caller : futures) {
@@ -105,7 +106,9 @@ std::pair<std::vector<dorado::Runner>, size_t> create_basecall_runners(
 #endif  // __APPLE__
 #endif  // DORADO_GPU_BUILD
 
+#ifndef NDEBUG
     auto model_stride = runners.front()->model_stride();
+#endif
     auto adjusted_chunk_size = runners.front()->chunk_size();
     assert(std::all_of(runners.begin(), runners.end(), [&](auto runner) {
         return runner->model_stride() == model_stride &&
@@ -161,7 +164,7 @@ std::vector<std::unique_ptr<dorado::ModBaseRunner>> create_modbase_runners(
 #endif  // DORADO_GPU_BUILD
     for (const auto& device_string : modbase_devices) {
         for (int i = 0; i < remora_callers; ++i) {
-            auto caller = dorado::create_modbase_caller(remora_model_list, remora_batch_size,
+            auto caller = dorado::create_modbase_caller(remora_model_list, int(remora_batch_size),
                                                         device_string);
             for (size_t i = 0; i < remora_runners_per_caller; i++) {
                 remora_runners.push_back(std::make_unique<dorado::ModBaseRunner>(caller));

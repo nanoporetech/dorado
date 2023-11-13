@@ -44,7 +44,6 @@ private:
     std::unique_ptr<std::thread> m_worker;
     void worker_thread();
     int write(bam1_t* record);
-    size_t m_num_reads_expected;
     bool m_write_fastq{false};
     std::unique_ptr<const utils::SampleSheet> m_sample_sheet;
 };

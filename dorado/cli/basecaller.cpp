@@ -22,6 +22,7 @@
 #include "utils/log_utils.h"
 #include "utils/parameters.h"
 #include "utils/stats.h"
+#include "utils/sys_stats.h"
 #include "utils/torch_utils.h"
 
 #include <argparse.hpp>
@@ -60,7 +61,7 @@ void setup(std::vector<std::string> args,
            size_t min_qscore,
            std::string read_list_file_path,
            bool recursive_file_loading,
-           const Aligner::Minimap2Options& aligner_options,
+           const AlignerNode::Minimap2Options& aligner_options,
            bool skip_model_compatibility_check,
            const std::string& dump_stats_file,
            const std::string& dump_stats_filter,
@@ -120,7 +121,7 @@ void setup(std::vector<std::string> args,
     bool duplex = false;
 
     const auto thread_allocations = utils::default_thread_allocations(
-            num_devices, !remora_runners.empty() ? num_remora_threads : 0, enable_aligner,
+            int(num_devices), !remora_runners.empty() ? int(num_remora_threads) : 0, enable_aligner,
             !barcode_kits.empty());
 
     std::unique_ptr<const utils::SampleSheet> sample_sheet;
@@ -140,8 +141,8 @@ void setup(std::vector<std::string> args,
     auto aligner = PipelineDescriptor::InvalidNodeHandle;
     auto current_sink_node = hts_writer;
     if (enable_aligner) {
-        aligner = pipeline_desc.add_node<Aligner>({current_sink_node}, ref, aligner_options,
-                                                  thread_allocations.aligner_threads);
+        aligner = pipeline_desc.add_node<AlignerNode>({current_sink_node}, ref, aligner_options,
+                                                      thread_allocations.aligner_threads);
         current_sink_node = aligner;
     }
     current_sink_node = pipeline_desc.add_node<ReadToBamType>(
@@ -172,10 +173,10 @@ void setup(std::vector<std::string> args,
             pipeline_desc, std::move(runners), std::move(remora_runners), overlap,
             mean_qscore_start_pos, thread_allocations.scaler_node_threads,
             true /* Enable read splitting */, thread_allocations.splitter_node_threads,
-            thread_allocations.remora_threads * num_devices, current_sink_node);
+            int(thread_allocations.remora_threads * num_devices), current_sink_node);
 
     // Create the Pipeline from our description.
-    std::vector<dorado::stats::StatsReporter> stats_reporters;
+    std::vector<dorado::stats::StatsReporter> stats_reporters{dorado::stats::sys_stats_report};
     auto pipeline = Pipeline::create(std::move(pipeline_desc), &stats_reporters);
     if (pipeline == nullptr) {
         spdlog::error("Failed to create pipeline");
@@ -186,7 +187,7 @@ void setup(std::vector<std::string> args,
     // rather than the pipeline framework.
     auto& hts_writer_ref = dynamic_cast<HtsWriter&>(pipeline->get_node_ref(hts_writer));
     if (enable_aligner) {
-        const auto& aligner_ref = dynamic_cast<Aligner&>(pipeline->get_node_ref(aligner));
+        const auto& aligner_ref = dynamic_cast<AlignerNode&>(pipeline->get_node_ref(aligner));
         utils::add_sq_hdr(hdr.get(), aligner_ref.get_sequence_records_for_header());
     }
     hts_writer_ref.set_and_write_header(hdr.get());
@@ -219,12 +220,13 @@ void setup(std::vector<std::string> args,
     }
 
     std::vector<dorado::stats::StatsCallable> stats_callables;
-    ProgressTracker tracker(num_reads, duplex);
+    ProgressTracker tracker(int(num_reads), duplex);
     stats_callables.push_back(
             [&tracker](const stats::NamedStats& stats) { tracker.update_progress_bar(stats); });
     constexpr auto kStatsPeriod = 100ms;
+    const size_t max_stats_records = static_cast<size_t>(dump_stats_file.empty() ? 0 : 100000);
     auto stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
-            kStatsPeriod, stats_reporters, stats_callables);
+            kStatsPeriod, stats_reporters, stats_callables, max_stats_records);
 
     DataLoader loader(*pipeline, "cpu", thread_allocations.loader_threads, max_reads, read_list,
                       reads_already_processed);
@@ -367,7 +369,7 @@ int basecaller(int argc, char* argv[]) {
             .help("Path to the sample sheet to use.")
             .default_value(std::string(""));
 
-    cli::add_minimap2_arguments(parser, Aligner::dflt_options);
+    cli::add_minimap2_arguments(parser, AlignerNode::dflt_options);
     cli::add_internal_arguments(parser);
 
     // Add hidden arguments that only apply to simplex calling.
@@ -451,7 +453,7 @@ int basecaller(int argc, char* argv[]) {
               parser.visible.get<int>("--max-reads"), parser.visible.get<int>("--min-qscore"),
               parser.visible.get<std::string>("--read-ids"),
               parser.visible.get<bool>("--recursive"),
-              cli::process_minimap2_arguments(parser, Aligner::dflt_options),
+              cli::process_minimap2_arguments(parser, AlignerNode::dflt_options),
               parser.hidden.get<bool>("--skip-model-compatibility-check"),
               parser.hidden.get<std::string>("--dump_stats_file"),
               parser.hidden.get<std::string>("--dump_stats_filter"),

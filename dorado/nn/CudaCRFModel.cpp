@@ -115,8 +115,8 @@ public:
 
         constexpr float GB = 1.0e9f;
         int64_t available = utils::available_memory(m_options.device());
-        // Allow 1GB for model weights, etc.
-        int64_t gpu_mem_limit = available * memory_limit_fraction - GB;
+        // Apply limit fraction, and allow 1GB for model weights, etc.
+        int64_t gpu_mem_limit = int64_t(available * memory_limit_fraction - GB);
         if (gpu_mem_limit < 0) {
             spdlog::warn("Auto batchsize detection failed. Less than 1GB GPU memory available.");
             return granularity;
@@ -140,10 +140,10 @@ public:
         } else {
             std::unordered_map<int, int64_t> insize_map{
                     {96, 960}, {128, 1280}, {384, 2816}, {768, 9728}, {1024, 10240}};
-            crfmodel_bytes_per_chunk_timestep = insize_map[model_config.insize];
+            crfmodel_bytes_per_chunk_timestep = insize_map[model_config.lstm_size];
             if (crfmodel_bytes_per_chunk_timestep == 0) {
                 spdlog::warn("Auto batchsize detection failed. Unexpected model insize {}.",
-                             model_config.insize);
+                             model_config.lstm_size);
                 return granularity;
             }
         }
@@ -154,13 +154,13 @@ public:
         // See `dorado::GPUDecoder::gpu_part()`, block beginning with `if (!initialized) {`
         // for more details.
         int64_t decode_bytes_per_chunk_timestep =
-                10 + m_decoder_options.beam_width * 4 + (1 << (model_config.state_len * 2 + 2));
+                10 + m_decoder_options.beam_width * 4 + (1ull << (model_config.state_len * 2 + 2));
 
         auto bytes_per_chunk_timestep =
                 decode_bytes_per_chunk_timestep + crfmodel_bytes_per_chunk_timestep;
         int64_t chunk_size_out = chunk_size_in / model_config.stride;
 
-        int max_batch_size = gpu_mem_limit / (bytes_per_chunk_timestep * chunk_size_out);
+        int max_batch_size = int(gpu_mem_limit / (bytes_per_chunk_timestep * chunk_size_out));
         max_batch_size -= max_batch_size % granularity;
         if (max_batch_size <= granularity) {
             spdlog::warn("Maximum safe estimated batch size is only {}.", max_batch_size);
@@ -358,9 +358,9 @@ public:
 
     stats::NamedStats sample_stats() const {
         stats::NamedStats stats;
-        stats["batches_called"] = m_num_batches_called;
-        stats["model_ms"] = m_model_ms;
-        stats["decode_ms"] = m_decode_ms;
+        stats["batches_called"] = double(m_num_batches_called);
+        stats["model_ms"] = double(m_model_ms);
+        stats["decode_ms"] = double(m_decode_ms);
         return stats;
     }
 
@@ -438,7 +438,7 @@ stats::NamedStats CudaModelRunner::sample_stats() const {
     // Each runner will retrieve stats from the caller.
     // Only the last retrieved version will appear, but they should be very similar.
     stats::NamedStats stats = stats::from_obj(*m_caller);
-    stats["batches_called"] = m_num_batches_called;
+    stats["batches_called"] = double(m_num_batches_called);
     return stats;
 }
 

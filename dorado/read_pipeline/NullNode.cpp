@@ -15,7 +15,7 @@ void NullNode::worker_thread() {
 NullNode::NullNode() : MessageSink(1000) { start_threads(); }
 
 void NullNode::start_threads() {
-    int num_worker_threads = 4;
+    size_t num_worker_threads = 4;
     for (size_t i = 0; i < num_worker_threads; i++) {
         m_workers.push_back(
                 std::make_unique<std::thread>(std::thread(&NullNode::worker_thread, this)));

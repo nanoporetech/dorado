@@ -86,25 +86,27 @@ public:
             return 0.;
         };
 
-        m_num_simplex_reads_written = fetch_stat("HtsWriter.unique_simplex_reads_written") +
-                                      fetch_stat("BarcodeDemuxerNode.demuxed_reads_written");
+        m_num_simplex_reads_written = int(fetch_stat("HtsWriter.unique_simplex_reads_written") +
+                                          fetch_stat("BarcodeDemuxerNode.demuxed_reads_written"));
 
-        m_num_simplex_reads_filtered = fetch_stat("ReadFilterNode.simplex_reads_filtered");
-        m_num_simplex_bases_filtered = fetch_stat("ReadFilterNode.simplex_bases_filtered");
-        m_num_simplex_bases_processed = fetch_stat("BasecallerNode.bases_processed");
+        m_num_simplex_reads_filtered = int(fetch_stat("ReadFilterNode.simplex_reads_filtered"));
+        m_num_simplex_bases_filtered = int(fetch_stat("ReadFilterNode.simplex_bases_filtered"));
+        m_num_simplex_bases_processed = int64_t(fetch_stat("BasecallerNode.bases_processed"));
         m_num_bases_processed = m_num_simplex_bases_processed;
-        m_num_samples_processed = fetch_stat("BasecallerNode.samples_processed");
+        m_num_samples_processed = int64_t(fetch_stat("BasecallerNode.samples_processed"));
         if (m_duplex) {
-            m_num_duplex_bases_processed = fetch_stat("StereoBasecallerNode.bases_processed");
+            m_num_duplex_bases_processed =
+                    int64_t(fetch_stat("StereoBasecallerNode.bases_processed"));
             m_num_bases_processed += m_num_duplex_bases_processed;
-            m_num_samples_processed += fetch_stat("StereoBasecallerNode.samples_processed");
+            m_num_samples_processed +=
+                    int64_t(fetch_stat("StereoBasecallerNode.samples_processed"));
         }
-        m_num_duplex_reads_written = fetch_stat("HtsWriter.duplex_reads_written");
-        m_num_duplex_reads_filtered = fetch_stat("ReadFilterNode.duplex_reads_filtered");
-        m_num_duplex_bases_filtered = fetch_stat("ReadFilterNode.duplex_bases_filtered");
+        m_num_duplex_reads_written = int(fetch_stat("HtsWriter.duplex_reads_written"));
+        m_num_duplex_reads_filtered = int(fetch_stat("ReadFilterNode.duplex_reads_filtered"));
+        m_num_duplex_bases_filtered = int(fetch_stat("ReadFilterNode.duplex_bases_filtered"));
 
         // Barcode demuxing stats.
-        m_num_barcodes_demuxed = fetch_stat("BarcodeClassifierNode.num_barcodes_demuxed");
+        m_num_barcodes_demuxed = int(fetch_stat("BarcodeClassifierNode.num_barcodes_demuxed"));
 
         // don't output progress bar if stderr is not a tty
         if (!utils::is_fd_tty(stderr)) {
@@ -120,7 +122,7 @@ public:
                                                                m_num_simplex_reads_filtered) /
                                             m_num_reads_expected);
             if (progress > 0 && progress > m_last_progress_written) {
-                m_progress_bar.set_progress(progress);
+                m_progress_bar.set_progress(size_t(progress));
 #ifndef WIN32
                 std::cerr << "\033[K";
 #endif  // WIN32
@@ -138,7 +140,6 @@ private:
     int64_t m_num_samples_processed{0};
     int64_t m_num_simplex_bases_processed{0};
     int64_t m_num_duplex_bases_processed{0};
-    int m_num_reads_processed{0};
     int m_num_simplex_reads_written{0};
     int m_num_simplex_reads_filtered{0};
     int m_num_simplex_bases_filtered{0};

@@ -8,6 +8,7 @@
 namespace dorado::barcode_kits {
 
 struct KitInfo {
+    std::string name;
     bool double_ends;
     bool ends_different;
     std::string top_front_flank;

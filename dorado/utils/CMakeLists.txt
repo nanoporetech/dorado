@@ -31,8 +31,11 @@ add_library(dorado_utils
     sequence_utils.h
     stats.cpp
     stats.h
+    sys_stats.cpp
+    sys_stats.h
     tensor_utils.cpp
     tensor_utils.h
+    time_utils.cpp
     time_utils.h
     torch_utils.h
     trim.cpp
@@ -84,8 +87,8 @@ target_include_directories(dorado_utils
 target_link_libraries(dorado_utils
     PUBLIC
         ${TORCH_LIBRARIES}
-        edlib
         date::date
+        edlib
         spdlog::spdlog
     PRIVATE
         minimap2
@@ -116,3 +119,5 @@ endif()
 if (ECM_ENABLE_SANITIZERS AND (CMAKE_CXX_COMPILER_ID MATCHES "GNU") AND (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9.0))
     set_source_files_properties(duplex_utils.cpp PROPERTIES COMPILE_OPTIONS "-O0")
 endif()
+
+enable_warnings_as_errors(dorado_utils)

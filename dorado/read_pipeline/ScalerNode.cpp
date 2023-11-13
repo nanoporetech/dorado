@@ -1,5 +1,6 @@
 #include "ScalerNode.h"
 
+#include "nn/CRFModelConfig.h"
 #include "utils/tensor_utils.h"
 #include "utils/trim.h"
 
@@ -34,7 +35,7 @@ std::pair<float, float> ScalerNode::normalisation(const at::Tensor& x) {
 std::pair<float, float> ScalerNode::med_mad(const at::Tensor& x) {
     // See https://en.wikipedia.org/wiki/Median_absolute_deviation
     //  (specifically the "Relation to standard deviation" section)
-    constexpr float factor = 1.4826;
+    constexpr float factor = 1.4826f;
     //Calculate signal median and median absolute deviation
     auto med = x.median();
     auto mad = at::median(at::abs(x - med)) * factor + EPS;
@@ -49,7 +50,7 @@ std::pair<float, float> ScalerNode::med_mad(const at::Tensor& x) {
 int determine_rna_adapter_pos(const dorado::SimplexRead& read, dorado::SampleType model_type) {
     assert(read.read_common.raw_data.dtype() == at::kShort);
     static const std::unordered_map<dorado::SampleType, int> kOffsetMap = {
-            {dorado::SampleType::RNA002, 4000}, {dorado::SampleType::RNA004, 1000}};
+            {dorado::SampleType::RNA002, 3500}, {dorado::SampleType::RNA004, 1000}};
     static const std::unordered_map<dorado::SampleType, int16_t> kAdapterCutoff = {
             {dorado::SampleType::RNA002, 550}, {dorado::SampleType::RNA004, 700}};
 
@@ -57,14 +58,14 @@ int determine_rna_adapter_pos(const dorado::SimplexRead& read, dorado::SampleTyp
     const int kStride = 50;
     const int16_t kMedianDiff = 125;
 
-    const int kOffset = kOffsetMap.at(model_type);
     const int16_t kMinMedianForRNASignal = kAdapterCutoff.at(model_type);
 
-    int signal_len = read.read_common.get_raw_data_samples();
+    int signal_len = int(read.read_common.get_raw_data_samples());
     const int16_t* signal = static_cast<int16_t*>(read.read_common.raw_data.data_ptr());
 
     // Check the median value change over 5 windows.
     std::array<int16_t, 5> medians = {0, 0, 0, 0, 0};
+    std::array<int32_t, 5> window_pos = {0, 0, 0, 0, 0};
     int median_pos = 0;
     int break_point = 0;
     const int signal_start = kOffsetMap.at(model_type);
@@ -74,15 +75,26 @@ int determine_rna_adapter_pos(const dorado::SimplexRead& read, dorado::SampleTyp
                                    {static_cast<int>(std::min(kWindowSize, signal_len - i))},
                                    at::TensorOptions().dtype(at::kShort));
         int16_t median = slice.median().item<int16_t>();
-        medians[median_pos++ % medians.size()] = median;
+        medians[median_pos % medians.size()] = median;
+        // Since the medians are stored in a circular buffer, we need
+        // to store the actual window positions for the median values
+        // as well to check that maximum median value came from a window
+        // after that of the minimum median value.
+        window_pos[median_pos % window_pos.size()] = median_pos;
         auto minmax = std::minmax_element(medians.begin(), medians.end());
         int16_t min_median = *minmax.first;
         int16_t max_median = *minmax.second;
-        if ((median_pos > medians.size()) && (max_median > kMinMedianForRNASignal) &&
-            (max_median - min_median > kMedianDiff)) {
+        auto min_pos = std::distance(medians.begin(), minmax.first);
+        auto max_pos = std::distance(medians.begin(), minmax.second);
+        spdlog::trace("window {}-{} min {} max {} diff {}", i, i + kWindowSize, min_median,
+                      max_median, (max_median - min_median));
+        if ((median_pos >= int(medians.size())) && (max_median > kMinMedianForRNASignal) &&
+            (max_median - min_median > kMedianDiff) &&
+            (window_pos[max_pos] > window_pos[min_pos])) {
             break_point = i;
             break;
         }
+        ++median_pos;
     }
 
     return break_point;
@@ -111,20 +123,34 @@ void ScalerNode::worker_thread() {
         }
 
         assert(read->read_common.raw_data.dtype() == at::kShort);
-        const auto [shift, scale] = m_scaling_params.quantile_scaling
-                                            ? normalisation(read->read_common.raw_data)
-                                            : med_mad(read->read_common.raw_data);
-        read->read_common.scaling_method =
-                m_scaling_params.quantile_scaling ? "quantile" : "med_mad";
 
-        // raw_data comes from DataLoader with dtype int16.  We send it on as float16 after
-        // shifting/scaling in float32 form.
-        read->read_common.raw_data = ((read->read_common.raw_data.to(at::kFloat) - shift) / scale)
-                                             .to(at::ScalarType::Half);
+        float scale = 1.0f;
+        float shift = 0.0f;
 
-        // move the shift and scale into pA.
-        read->read_common.scale = read->scaling * scale;
-        read->read_common.shift = read->scaling * (shift + read->offset);
+        read->read_common.scaling_method = to_string(m_scaling_params.strategy);
+        if (m_scaling_params.strategy == ScalingStrategy::PA) {
+            scale = read->scaling;
+            shift = read->offset;
+            read->read_common.raw_data =
+                    ((read->read_common.raw_data.to(at::kFloat) + shift) * scale)
+                            .to(at::ScalarType::Half);
+
+            read->read_common.scale = read->scaling;
+            read->read_common.shift = read->offset;
+        } else {
+            std::tie(shift, scale) = m_scaling_params.strategy == ScalingStrategy::QUANTILE
+                                             ? normalisation(read->read_common.raw_data)
+                                             : med_mad(read->read_common.raw_data);
+
+            // raw_data comes from DataLoader with dtype int16.  We send it on as float16 after
+            // shifting/scaling in float32 form.
+            read->read_common.raw_data =
+                    ((read->read_common.raw_data.to(at::kFloat) - shift) / scale)
+                            .to(at::ScalarType::Half);
+            // move the shift and scale into pA.
+            read->read_common.scale = read->scaling * scale;
+            read->read_common.shift = read->scaling * (shift + read->offset);
+        }
 
         // Don't perform DNA trimming on RNA since it looks too different and we lose useful signal.
         if (!is_rna) {
@@ -152,8 +178,8 @@ ScalerNode::ScalerNode(const SignalNormalisationParams& config,
                        int num_worker_threads,
                        size_t max_reads)
         : MessageSink(max_reads),
-          m_scaling_params(config),
           m_num_worker_threads(num_worker_threads),
+          m_scaling_params(config),
           m_model_type(model_type) {
     start_threads();
 }

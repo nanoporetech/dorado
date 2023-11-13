@@ -10,6 +10,7 @@ set(UNIT_TEST_SOURCE_FILES
     BarcodeClassifierTest.cpp
     BarcodeDemuxerNodeTest.cpp    
     CliUtilsTest.cpp
+    CRFModelConfigTest.cpp
     DriverQueryTest.cpp
     DuplexReadTaggingNodeTest.cpp
     DuplexSplitTest.cpp
@@ -77,6 +78,8 @@ foreach(TEST_BIN dorado_tests dorado_smoke_tests)
         PRIVATE
         ${DORADO_3RD_PARTY_SOURCE}/catch2
         )
+    
+    enable_warnings_as_errors(${TEST_BIN})
 
     add_test(
         NAME ${TEST_BIN}

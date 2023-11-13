@@ -4,15 +4,36 @@
 
 #include <filesystem>
 #include <optional>
+#include <string>
+#include <vector>
 
 namespace dorado {
+
+enum class Activation { SWISH, SWISH_CLAMP, TANH };
+std::string to_string(const Activation& activation);
+
+enum class ScalingStrategy { MED_MAD, QUANTILE, PA };
+std::string to_string(const ScalingStrategy& strategy);
+ScalingStrategy scaling_strategy_from_string(const std::string& strategy);
 
 struct SignalNormalisationParams {
     float quantile_a = 0.2f;
     float quantile_b = 0.9f;
     float shift_multiplier = 0.51f;
     float scale_multiplier = 0.53f;
-    bool quantile_scaling = true;
+    ScalingStrategy strategy = ScalingStrategy::QUANTILE;
+
+    std::string to_string() const;
+};
+
+struct ConvParams {
+    int insize;
+    int size;
+    int winlen;
+    int stride = 1;
+    Activation activation;
+
+    std::string to_string() const;
 };
 
 enum SampleType {
@@ -25,8 +46,7 @@ enum SampleType {
 struct CRFModelConfig {
     float qscale = 1.0f;
     float qbias = 0.0f;
-    int conv = 4;
-    int insize = 0;
+    int lstm_size = 0;
     int stride = 1;
     bool bias = true;
     bool clamp = false;
@@ -50,6 +70,11 @@ struct CRFModelConfig {
     int32_t mean_qscore_start_pos = -1;
 
     SampleType sample_type;
+
+    // convolution layer params
+    std::vector<ConvParams> convs;
+
+    std::string to_string() const;
 };
 
 CRFModelConfig load_crf_model_config(const std::filesystem::path& path);

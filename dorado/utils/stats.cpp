@@ -12,9 +12,11 @@ struct StatsSampler::StatsRecord {
 
 StatsSampler::StatsSampler(std::chrono::system_clock::duration sampling_period,
                            std::vector<StatsReporter> stats_reporters,
-                           std::vector<StatsCallable> stats_callables)
+                           std::vector<StatsCallable> stats_callables,
+                           size_t max_records)
         : m_stats_reporters(std::move(stats_reporters)),
           m_stats_callables(std::move(stats_callables)),
+          m_max_records(max_records),
           m_sampling_period(sampling_period),
           m_sampling_thread(&StatsSampler::sampling_thread_fn, this) {}
 
@@ -87,10 +89,14 @@ void StatsSampler::sampling_thread_fn() {
                 stats_record.stats[obj_name + "." + name] = value;
         }
 
-        m_records.push_back(stats_record);
-
+        // Inform all callables of these stats.
         for (auto& c : m_stats_callables) {
             c(stats_record.stats);
+        }
+
+        // Record the stats, provided we haven't exceeded our limit.
+        if (m_records.size() < m_max_records) {
+            m_records.push_back(std::move(stats_record));
         }
     }
 }
