@@ -19,10 +19,10 @@ If you encounter any problems building or running Dorado, please [report an issu
 
 ## Installation
 
- - [dorado-0.4.2-linux-x64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.4.2-linux-x64.tar.gz)
- - [dorado-0.4.2-linux-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.4.2-linux-arm64.tar.gz)
- - [dorado-0.4.2-osx-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.4.2-osx-arm64.zip)
- - [dorado-0.4.2-win64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.4.2-win64.zip)
+ - [dorado-0.4.3-linux-x64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.4.3-linux-x64.tar.gz)
+ - [dorado-0.4.3-linux-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.4.3-linux-arm64.tar.gz)
+ - [dorado-0.4.3-osx-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.4.3-osx-arm64.zip)
+ - [dorado-0.4.3-win64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.4.3-win64.zip)
 
 ## Platforms
 
@@ -201,12 +201,12 @@ SQK-RPB004_barcode03.bam
 unclassified.bam
 ```
 
-#### Using a Sample Sheet
-`dorado` is able to use a sample sheet to restrict the barcode classifications to only those present, and to apply aliases to the detected classifications. This is enabled by passing the path to a sample sheet to the `--sample-sheet` argument when using the `basecaller` or `demux` commands. See [here](documentation/SampleSheets.md) for more information.
+#### Using a sample sheet
+Dorado is able to use a sample sheet to restrict the barcode classifications to only those present, and to apply aliases to the detected classifications. This is enabled by passing the path to a sample sheet to the `--sample-sheet` argument when using the `basecaller` or `demux` commands. See [here](documentation/SampleSheets.md) for more information.
 
 ### Poly(A) tail estimation
 
-Dorado has initial support for estimating poly(A) tail lengths for DNA and RNA. Note that Oxford Nanopore cDNA reads sequence in two different orientations and transcript poly(A) length estimation handles both (A and T homopolymers). This feature can be enabled by passing `--estimate-poly-a` to the `basecaller` command. It is disabled by default. The estimated tail length is stored in the `pt:i` tag of the output record. Reads for which the tail length could not be estimated will not have the `pt:i` tag.
+Dorado has initial support for estimating poly(A) tail lengths for cDNA and RNA. Note that Oxford Nanopore cDNA reads are sequenced in two different orientations and Dorado poly(A) tail length estimation handles both (A and T homopolymers). This feature can be enabled by passing `--estimate-poly-a` to the `basecaller` command. It is disabled by default. The estimated tail length is stored in the `pt:i` tag of the output record. Reads for which the tail length could not be estimated will not have the `pt:i` tag.
 
 ## Available basecalling models
 
@@ -273,7 +273,7 @@ Below is a table of the available basecalling models and the modified basecallin
 | :-------- | :------- | :--- | :--- |
 | **rna004_130bps_fast@v3.0.1** | N/A | N/A | 4 kHz |
 | **rna004_130bps_hac@v3.0.1** | N/A | N/A | 4 kHz |
-| **rna004_130bps_sup@v3.0.1** | 6mA_DRACH | v1 | 4 kHz |
+| **rna004_130bps_sup@v3.0.1** | m6A_DRACH | v1 | 4 kHz |
 | rna002_70bps_fast@v3 | N/A | N/A | 3 kHz |
 | rna002_70bps_hac@v3 | N/A | N/A | 3 kHz |
 
