@@ -23,12 +23,13 @@ namespace dorado {
 
 std::pair<float, float> ScalerNode::normalisation(const at::Tensor& x) {
     // Calculate shift and scale factors for normalisation.
-    auto quantiles = dorado::utils::quantile_counting(
-            x, at::tensor({m_scaling_params.quantile_a, m_scaling_params.quantile_b}));
+    const auto& params = m_scaling_params.quantile;
+    auto quantiles =
+            dorado::utils::quantile_counting(x, at::tensor({params.quantile_a, params.quantile_b}));
     float q_a = quantiles[0].item<float>();
     float q_b = quantiles[1].item<float>();
-    float shift = std::max(10.0f, m_scaling_params.shift_multiplier * (q_a + q_b));
-    float scale = std::max(1.0f, m_scaling_params.scale_multiplier * (q_b - q_a));
+    float shift = std::max(10.0f, params.shift_multiplier * (q_a + q_b));
+    float scale = std::max(1.0f, params.scale_multiplier * (q_b - q_a));
     return {shift, scale};
 }
 
@@ -129,14 +130,26 @@ void ScalerNode::worker_thread() {
 
         read->read_common.scaling_method = to_string(m_scaling_params.strategy);
         if (m_scaling_params.strategy == ScalingStrategy::PA) {
-            scale = read->scaling;
-            shift = read->offset;
+            const auto& stdn = m_scaling_params.standarisation;
+            if (stdn.standardise) {
+                // Standardise from scaled pa
+                // 1. x_pa  = (Scale)*(x + Offset)
+                // 2. x_std = (1 / Stdev)*(x_pa - Mean)
+                // => x_std = (Scale / Stdev)*(x + (Offset - (Mean / Scale)))
+                //            ---- scale ---        ------- shift --------
+                scale = read->scaling / stdn.stdev;
+                shift = read->offset - (stdn.mean / read->scaling);
+            } else {
+                scale = read->scaling;
+                shift = read->offset;
+            }
+
             read->read_common.raw_data =
                     ((read->read_common.raw_data.to(at::kFloat) + shift) * scale)
                             .to(at::ScalarType::Half);
 
-            read->read_common.scale = read->scaling;
-            read->read_common.shift = read->offset;
+            read->read_common.scale = scale;
+            read->read_common.shift = shift;
         } else {
             std::tie(shift, scale) = m_scaling_params.strategy == ScalingStrategy::QUANTILE
                                              ? normalisation(read->read_common.raw_data)

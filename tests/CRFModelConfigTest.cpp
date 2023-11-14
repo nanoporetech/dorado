@@ -40,10 +40,18 @@ TEST_CASE(CUT_TAG ": test dna_r9.4.1 hac@v3.3 model load", CUT_TAG) {
     // r9.4.1 model does not use quantile scaling
     sig.strategy = ScalingStrategy::MED_MAD;
     CHECK(config.signal_norm_params.strategy == sig.strategy);
-    CHECK(config.signal_norm_params.quantile_a == sig.quantile_a);
-    CHECK(config.signal_norm_params.quantile_b == sig.quantile_b);
-    CHECK(config.signal_norm_params.scale_multiplier == sig.scale_multiplier);
-    CHECK(config.signal_norm_params.shift_multiplier == sig.shift_multiplier);
+
+    const QuantileScalingParams &qsp = config.signal_norm_params.quantile;
+    CHECK(qsp.quantile_a == sig.quantile.quantile_a);
+    CHECK(qsp.quantile_b == sig.quantile.quantile_b);
+    CHECK(qsp.scale_multiplier == sig.quantile.scale_multiplier);
+    CHECK(qsp.shift_multiplier == sig.quantile.shift_multiplier);
+
+    const StandardisationScalingParams &ssp = config.signal_norm_params.standarisation;
+    CHECK(ssp.standardise == false);
+    CHECK(ssp.standardise == sig.standarisation.standardise);
+    CHECK(ssp.mean == sig.standarisation.mean);
+    CHECK(ssp.stdev == sig.standarisation.stdev);
 
     ConvParams conv1 = config.convs[0];
     CHECK(conv1.activation == Activation::SWISH);
@@ -93,10 +101,18 @@ TEST_CASE(CUT_TAG ": test dna_r10.4.1 fast@v4.0.0 model load", CUT_TAG) {
     // r9.4.1 model does not use quantile scaling
     sig.strategy = ScalingStrategy::QUANTILE;
     CHECK(config.signal_norm_params.strategy == sig.strategy);
-    CHECK(config.signal_norm_params.quantile_a == sig.quantile_a);
-    CHECK(config.signal_norm_params.quantile_b == sig.quantile_b);
-    CHECK(config.signal_norm_params.scale_multiplier == sig.scale_multiplier);
-    CHECK(config.signal_norm_params.shift_multiplier == sig.shift_multiplier);
+
+    const QuantileScalingParams &qsp = config.signal_norm_params.quantile;
+    CHECK(qsp.quantile_a == sig.quantile.quantile_a);
+    CHECK(qsp.quantile_b == sig.quantile.quantile_b);
+    CHECK(qsp.scale_multiplier == sig.quantile.scale_multiplier);
+    CHECK(qsp.shift_multiplier == sig.quantile.shift_multiplier);
+
+    const StandardisationScalingParams &ssp = config.signal_norm_params.standarisation;
+    CHECK(ssp.standardise == false);
+    CHECK(ssp.standardise == sig.standarisation.standardise);
+    CHECK(ssp.mean == sig.standarisation.mean);
+    CHECK(ssp.stdev == sig.standarisation.stdev);
 
     ConvParams conv1 = config.convs[0];
     CHECK(conv1.activation == Activation::SWISH);
@@ -146,10 +162,18 @@ TEST_CASE(CUT_TAG ": test dna_r10.4.1 hac@v4.2.0 model load", CUT_TAG) {
     SignalNormalisationParams sig;
     sig.strategy = ScalingStrategy::QUANTILE;
     CHECK(config.signal_norm_params.strategy == sig.strategy);
-    CHECK(config.signal_norm_params.quantile_a == sig.quantile_a);
-    CHECK(config.signal_norm_params.quantile_b == sig.quantile_b);
-    CHECK(config.signal_norm_params.scale_multiplier == sig.scale_multiplier);
-    CHECK(config.signal_norm_params.shift_multiplier == sig.shift_multiplier);
+
+    const QuantileScalingParams &qsp = config.signal_norm_params.quantile;
+    CHECK(qsp.quantile_a == sig.quantile.quantile_a);
+    CHECK(qsp.quantile_b == sig.quantile.quantile_b);
+    CHECK(qsp.scale_multiplier == sig.quantile.scale_multiplier);
+    CHECK(qsp.shift_multiplier == sig.quantile.shift_multiplier);
+
+    const StandardisationScalingParams &ssp = config.signal_norm_params.standarisation;
+    CHECK(ssp.standardise == false);
+    CHECK(ssp.standardise == sig.standarisation.standardise);
+    CHECK(ssp.mean == sig.standarisation.mean);
+    CHECK(ssp.stdev == sig.standarisation.stdev);
 
     ConvParams conv1 = config.convs[0];
     CHECK(conv1.activation == Activation::SWISH_CLAMP);
@@ -191,27 +215,34 @@ TEST_CASE(CUT_TAG ": test dna_r10.4.1 hac@v4.3.0 pa model load", CUT_TAG) {
     CHECK(config.out_features.has_value() == false);
     CHECK(config.sample_type == SampleType::DNA);
 
-    CHECK(config.qbias == 0.0f);
-    CHECK(config.qscale == 1.0f);
-    CHECK(config.sample_rate == -1);
+    CHECK(config.qbias == -1.1f);
+    CHECK(config.qscale == 1.1f);
+    CHECK(config.sample_rate == 5000);
 
     SignalNormalisationParams sig;
     sig.strategy = ScalingStrategy::PA;
     CHECK(config.signal_norm_params.strategy == sig.strategy);
-    CHECK(config.signal_norm_params.quantile_a == sig.quantile_a);
-    CHECK(config.signal_norm_params.quantile_b == sig.quantile_b);
-    CHECK(config.signal_norm_params.scale_multiplier == sig.scale_multiplier);
-    CHECK(config.signal_norm_params.shift_multiplier == sig.shift_multiplier);
+
+    const QuantileScalingParams &qsp = config.signal_norm_params.quantile;
+    CHECK(qsp.quantile_a == sig.quantile.quantile_a);
+    CHECK(qsp.quantile_b == sig.quantile.quantile_b);
+    CHECK(qsp.scale_multiplier == sig.quantile.scale_multiplier);
+    CHECK(qsp.shift_multiplier == sig.quantile.shift_multiplier);
+
+    const StandardisationScalingParams &ssp = config.signal_norm_params.standarisation;
+    CHECK(ssp.standardise == true);
+    CHECK(ssp.mean == 91.88f);
+    CHECK(ssp.stdev == 22.65f);
 
     ConvParams conv1 = config.convs[0];
-    CHECK(conv1.activation == Activation::SWISH_CLAMP);
+    CHECK(conv1.activation == Activation::SWISH);
     CHECK(conv1.insize == 1);
     CHECK(conv1.size == 16);
     CHECK(conv1.stride == 1);
     CHECK(conv1.winlen == 5);
 
     ConvParams conv2 = config.convs[1];
-    CHECK(conv2.activation == Activation::SWISH_CLAMP);
+    CHECK(conv2.activation == Activation::SWISH);
     CHECK(conv2.insize == 16);
     CHECK(conv2.size == 16);
     CHECK(conv2.stride == 1);
@@ -250,20 +281,28 @@ TEST_CASE(CUT_TAG ": test dna_r10.4.1 hac@v4.3.0 quantile model load", CUT_TAG) 
     SignalNormalisationParams sig;
     sig.strategy = ScalingStrategy::QUANTILE;
     CHECK(config.signal_norm_params.strategy == sig.strategy);
-    CHECK(config.signal_norm_params.quantile_a == sig.quantile_a);
-    CHECK(config.signal_norm_params.quantile_b == sig.quantile_b);
-    CHECK(config.signal_norm_params.scale_multiplier == sig.scale_multiplier);
-    CHECK(config.signal_norm_params.shift_multiplier == sig.shift_multiplier);
+
+    const QuantileScalingParams &qsp = config.signal_norm_params.quantile;
+    CHECK(qsp.quantile_a == sig.quantile.quantile_a);
+    CHECK(qsp.quantile_b == sig.quantile.quantile_b);
+    CHECK(qsp.scale_multiplier == sig.quantile.scale_multiplier);
+    CHECK(qsp.shift_multiplier == sig.quantile.shift_multiplier);
+
+    const StandardisationScalingParams &ssp = config.signal_norm_params.standarisation;
+    CHECK(ssp.standardise == false);
+    CHECK(ssp.standardise == sig.standarisation.standardise);
+    CHECK(ssp.mean == sig.standarisation.mean);
+    CHECK(ssp.stdev == sig.standarisation.stdev);
 
     ConvParams conv1 = config.convs[0];
-    CHECK(conv1.activation == Activation::SWISH_CLAMP);
+    CHECK(conv1.activation == Activation::SWISH);
     CHECK(conv1.insize == 1);
     CHECK(conv1.size == 16);
     CHECK(conv1.stride == 1);
     CHECK(conv1.winlen == 5);
 
     ConvParams conv2 = config.convs[1];
-    CHECK(conv2.activation == Activation::SWISH_CLAMP);
+    CHECK(conv2.activation == Activation::SWISH);
     CHECK(conv2.insize == 16);
     CHECK(conv2.size == 16);
     CHECK(conv2.stride == 1);
@@ -301,10 +340,18 @@ TEST_CASE(CUT_TAG ": test rna002 fast@v3 model load", CUT_TAG) {
     SignalNormalisationParams sig;
     sig.strategy = ScalingStrategy::QUANTILE;
     CHECK(config.signal_norm_params.strategy == sig.strategy);
-    CHECK(config.signal_norm_params.quantile_a == 0.2f);
-    CHECK(config.signal_norm_params.quantile_b == 0.8f);
-    CHECK(config.signal_norm_params.scale_multiplier == 0.59f);
-    CHECK(config.signal_norm_params.shift_multiplier == 0.48f);
+
+    const QuantileScalingParams &qsp = config.signal_norm_params.quantile;
+    CHECK(qsp.quantile_a == 0.2f);
+    CHECK(qsp.quantile_b == 0.8f);
+    CHECK(qsp.scale_multiplier == 0.59f);
+    CHECK(qsp.shift_multiplier == 0.48f);
+
+    const StandardisationScalingParams &ssp = config.signal_norm_params.standarisation;
+    CHECK(ssp.standardise == false);
+    CHECK(ssp.standardise == sig.standarisation.standardise);
+    CHECK(ssp.mean == sig.standarisation.mean);
+    CHECK(ssp.stdev == sig.standarisation.stdev);
 
     ConvParams conv1 = config.convs[0];
     CHECK(conv1.activation == Activation::SWISH);
@@ -353,10 +400,18 @@ TEST_CASE(CUT_TAG ": test rna004 sup@v3.0.1 model load", CUT_TAG) {
     sig.strategy = ScalingStrategy::QUANTILE;
     CHECK(config.signal_norm_params.strategy == ScalingStrategy::QUANTILE);
     // Intentionally edited values from default values to test parser
-    CHECK(config.signal_norm_params.quantile_a == 0.22f);
-    CHECK(config.signal_norm_params.quantile_b == 0.88f);
-    CHECK(config.signal_norm_params.scale_multiplier == 0.595f);
-    CHECK(config.signal_norm_params.shift_multiplier == 0.485f);
+
+    const QuantileScalingParams &qsp = config.signal_norm_params.quantile;
+    CHECK(qsp.quantile_a == 0.22f);
+    CHECK(qsp.quantile_b == 0.88f);
+    CHECK(qsp.scale_multiplier == 0.595f);
+    CHECK(qsp.shift_multiplier == 0.485f);
+
+    const StandardisationScalingParams &ssp = config.signal_norm_params.standarisation;
+    CHECK(ssp.standardise == false);
+    CHECK(ssp.standardise == sig.standarisation.standardise);
+    CHECK(ssp.mean == sig.standarisation.mean);
+    CHECK(ssp.stdev == sig.standarisation.stdev);
 
     ConvParams conv1 = config.convs[0];
     CHECK(conv1.activation == Activation::SWISH);

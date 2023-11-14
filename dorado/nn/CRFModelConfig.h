@@ -16,12 +16,43 @@ enum class ScalingStrategy { MED_MAD, QUANTILE, PA };
 std::string to_string(const ScalingStrategy& strategy);
 ScalingStrategy scaling_strategy_from_string(const std::string& strategy);
 
-struct SignalNormalisationParams {
+struct StandardisationScalingParams {
+    bool standardise = false;
+    float mean = 0.0f;
+    float stdev = 1.0f;
+
+    std::string to_string() const {
+        std::string str = "StandardisationScalingParams {";
+        str += " standardise:" + std::to_string(standardise);
+        str += " mean:" + std::to_string(mean);
+        str += " stdev:" + std::to_string(stdev);
+        str += "}";
+        return str;
+    };
+};
+
+struct QuantileScalingParams {
     float quantile_a = 0.2f;
     float quantile_b = 0.9f;
     float shift_multiplier = 0.51f;
     float scale_multiplier = 0.53f;
+
+    std::string to_string() const {
+        std::string str = "QuantileScalingParams {";
+        str += " quantile_a:" + std::to_string(quantile_a);
+        str += " quantile_b:" + std::to_string(quantile_b);
+        str += " shift_multiplier:" + std::to_string(shift_multiplier);
+        str += " scale_multiplier:" + std::to_string(scale_multiplier);
+        str += "}";
+        return str;
+    };
+};
+
+struct SignalNormalisationParams {
     ScalingStrategy strategy = ScalingStrategy::QUANTILE;
+
+    QuantileScalingParams quantile;
+    StandardisationScalingParams standarisation;
 
     std::string to_string() const;
 };
