@@ -1,4 +1,4 @@
-# Sample Sheet specification
+# Sample sheet specification
 
 `dorado` can make use of a MinKNOW-compatible sample sheet containing data used to identify a particular classification of read. To apply a sample sheet, provide the path to the appropriate CSV file using the `--sample-sheet` argument:
 
@@ -20,7 +20,7 @@ Note that `dorado` currently uses the sample sheet only for barcode filtering an
 
 In the case of `demux`, the sample sheet must contain a 1-to-1 mapping of `barcode` identifiers to `flow_cell_id`/`position_id` - i.e. all entries in the `barcode` column must be unique.
 
-#### Column Headers
+#### Column headers
 
 A sample sheet may only contain the column names below:
 |           |                          |                                   |  
