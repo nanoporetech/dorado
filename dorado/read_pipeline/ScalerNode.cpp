@@ -167,11 +167,20 @@ void ScalerNode::worker_thread() {
 
         // Don't perform DNA trimming on RNA since it looks too different and we lose useful signal.
         if (!is_rna) {
-            // 8000 value may be changed in future. Currently this is found to work well.
-            int max_samples =
-                    std::min(8000, static_cast<int>(read->read_common.get_raw_data_samples() / 2));
-            trim_start = utils::trim(
-                    read->read_common.raw_data.index({Slice(at::indexing::None, max_samples)}));
+            if (m_scaling_params.standarisation.standardise) {
+                // Constant trimming level for standardised scaling
+                // In most cases kit14 trim algorithm returns 10, so bypassing the heuristic
+                // and applying 10 for pA scaled data.
+                // TODO: may need refinement in the future
+                trim_start = 10;
+            } else {
+                // 8000 value may be changed in future. Currently this is found to work well.
+                int max_samples = std::min(
+                        8000, static_cast<int>(read->read_common.get_raw_data_samples() / 2));
+                trim_start = utils::trim(
+                        read->read_common.raw_data.index({Slice(at::indexing::None, max_samples)}));
+            }
+
             read->read_common.raw_data =
                     read->read_common.raw_data.index({Slice(trim_start, at::indexing::None)});
         }
