@@ -5,6 +5,7 @@
 #include "utils/cuda_utils.h"
 #include "utils/math_utils.h"
 
+#include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAGuard.h>
 #include <c10/cuda/CUDAStream.h>
 #include <nvtx3/nvtx3.hpp>
@@ -99,14 +100,34 @@ public:
                              int chunk_size_in,
                              float memory_limit_fraction,
                              bool run_benchmark) {
+        c10::cuda::CUDAGuard device_guard(m_options.device());
+        constexpr float GB = 1.0e9f;
+        int64_t available = utils::available_memory(m_options.device());
+        spdlog::debug("{} memory available: {:.2f}GB", m_device, available / GB);
+
 #ifdef DORADO_TX2
         return 256;
-#else
-        int64_t available =
-                int64_t(utils::available_memory(m_options.device()) * memory_limit_fraction);
-        spdlog::debug("Auto batch size: GPU memory available: {}GB", available / 1.0e9f);
+#endif
 
-        int granularity = get_batch_size_granularity(model_config, m_options);
+        const int granularity = get_batch_size_granularity(model_config, m_options);
+
+        // If running on a Jetson device with unified memory for CPU and GPU we can't use all
+        // the available memory for GPU tasks. This way we leave at least half for the CPU,
+        // though it's not clear what the ideal split would be.
+        cudaDeviceProp *prop = at::cuda::getCurrentDeviceProperties();
+        bool is_unified_memory_device = (prop->major == 5 && prop->minor == 3) ||  // TX1
+                                        (prop->major == 6 && prop->minor == 2) ||  // TX2
+                                        (prop->major == 7 && prop->minor == 2) ||  // Xavier
+                                        (prop->major == 8 && prop->minor == 7);    // Orin
+        memory_limit_fraction *= is_unified_memory_device ? 0.5f : 1.f;
+
+        // Apply limit fraction, and allow 1GB for model weights, etc.
+        int64_t gpu_mem_limit = int64_t(available * memory_limit_fraction - GB);
+        if (gpu_mem_limit < 0) {
+            spdlog::warn("Auto batchsize detection failed. Less than 1GB GPU memory available.");
+            return granularity;
+        }
+        spdlog::debug("Auto batchsize {}: memory limit {:.2f}GB", m_device, gpu_mem_limit / GB);
 
         // Determine size of working memory for CRFModel divided by (batch_size * chunk_size)
         // These values have been determined by running dorado with different models and
@@ -143,20 +164,13 @@ public:
         auto bytes_per_chunk_timestep =
                 decode_bytes_per_chunk_timestep + crfmodel_bytes_per_chunk_timestep;
         int64_t chunk_size_out = chunk_size_in / model_config.stride;
-        available = available - 1'000'000'000ll;  // Allow 1GB for model weights, etc.
-        if (available < 0) {
-            spdlog::warn("Auto batchsize detection failed. Less than 1GB GPU memory available.");
-            return granularity;
-        }
 
-        int max_batch_size = int(available / (bytes_per_chunk_timestep * chunk_size_out));
+        int max_batch_size = int(gpu_mem_limit / (bytes_per_chunk_timestep * chunk_size_out));
         max_batch_size -= max_batch_size % granularity;
         if (max_batch_size <= granularity) {
             spdlog::warn("Maximum safe estimated batch size is only {}.", max_batch_size);
             return granularity;
         }
-
-        c10::cuda::CUDAGuard device_guard(m_options.device());
 
         int best_batch_size = granularity;
         float best_time = std::numeric_limits<float>::max();
@@ -165,8 +179,8 @@ public:
             // We limit the maximum when doing benchmarking to avoid excessive startup time.
             const int max_batch_size_limit = 10240;
             max_batch_size = std::min(max_batch_size, max_batch_size_limit);
-            spdlog::debug("Auto batch size: testing up to {} in steps of {}", max_batch_size,
-                          granularity);
+            spdlog::debug("Auto batchsize {}: testing up to {} in steps of {}", m_device,
+                          max_batch_size, granularity);
             for (int batch_size = granularity; batch_size <= max_batch_size;
                  batch_size += granularity) {
                 auto input = torch::empty({batch_size, model_config.num_features, chunk_size},
@@ -189,25 +203,23 @@ public:
                     handle_cuda_result(cudaEventDestroy(stop));
                 }
 
-                spdlog::debug("Auto batchsize {}: {}, time per chunk {} ms", m_device, batch_size,
-                              time);
+                spdlog::debug("Auto batchsize {}: {}, time per chunk {:8f} ms", m_device,
+                              batch_size, time);
                 if (time < best_time) {
                     best_time = time;
                     best_batch_size = batch_size;
                 }
             }
         } else {
-            spdlog::debug("Maximum safe estimated batch size is {}", max_batch_size);
+            spdlog::debug("Maximum safe estimated batch size for {}: {}", m_device, max_batch_size);
             best_batch_size = max_batch_size;
         }
 
-        spdlog::debug(
-                "Device {} Model memory {}", m_device,
-                (crfmodel_bytes_per_chunk_timestep * chunk_size_out * best_batch_size) / 1e9f);
-        spdlog::debug("Device {} Decode memory {}", m_device,
-                      (decode_bytes_per_chunk_timestep * chunk_size_out * best_batch_size) / 1e9f);
+        spdlog::debug("Device {} Model memory {:.2f}GB", m_device,
+                      (crfmodel_bytes_per_chunk_timestep * chunk_size_out * best_batch_size) / GB);
+        spdlog::debug("Device {} Decode memory {:.2f}GB", m_device,
+                      (decode_bytes_per_chunk_timestep * chunk_size_out * best_batch_size) / GB);
         return best_batch_size;
-#endif
     }
 
     struct NNTask {
