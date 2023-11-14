@@ -112,8 +112,8 @@ public:
     class StereoFeatureInputs {
     public:
         std::vector<unsigned char> alignment;
-        uint64_t template_seq_start = ~0;
-        uint64_t complement_seq_start = ~0;
+        uint64_t template_seq_start = std::numeric_limits<uint64_t>::max();
+        uint64_t complement_seq_start = std::numeric_limits<uint64_t>::max();
         std::string template_seq;
         std::string complement_seq;
         std::string template_qstring;
