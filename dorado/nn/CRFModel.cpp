@@ -7,6 +7,8 @@
 #include "utils/module_utils.h"
 #include "utils/tensor_utils.h"
 
+#include <stdexcept>
+
 #if DORADO_GPU_BUILD && !defined(__APPLE__)
 #define USE_KOI 1
 
@@ -40,16 +42,14 @@ using namespace torch::nn;
 namespace F = torch::nn::functional;
 using Slice = torch::indexing::Slice;
 
-enum class Activation { SWISH, SWISH_CLAMP, TANH };
-
 #if USE_KOI
 
-KoiActivation get_koi_activation(Activation act) {
-    if (act == Activation::SWISH) {
+KoiActivation get_koi_activation(dorado::Activation act) {
+    if (act == dorado::Activation::SWISH) {
         return KOI_SWISH;
-    } else if (act == Activation::SWISH_CLAMP) {
+    } else if (act == dorado::Activation::SWISH_CLAMP) {
         return KOI_SWISH_CLAMP;
-    } else if (act == Activation::TANH) {
+    } else if (act == dorado::Activation::TANH) {
         return KOI_TANH;
     } else {
         throw std::logic_error("Unrecognised activation function id.");
@@ -89,14 +89,16 @@ KoiActivation get_koi_activation(Activation act) {
 
 enum class LstmMode { CUBLAS_TN2C, QUANTISED_NTC, CUTLASS_TNC_I8, CUTLASS_TNC_F16 };
 
-static LstmMode get_cuda_lstm_mode(int layer_idx, int layer_size) {
+static LstmMode get_cuda_lstm_mode(int layer_idx, int layer_size, dorado::Activation activation) {
     const char *env_lstm_mode = std::getenv("DORADO_LSTM_MODE");
     if (env_lstm_mode != nullptr) {
         std::string lstm_mode_str(env_lstm_mode);
         if (lstm_mode_str == "CUBLAS_TN2C") {
             return LstmMode::CUBLAS_TN2C;
         } else if (lstm_mode_str == "CUTLASS_TNC_I8") {
-            return (layer_idx == 0) ? LstmMode::CUTLASS_TNC_F16 : LstmMode::CUTLASS_TNC_I8;
+            return (layer_idx == 0 && activation != dorado::Activation::TANH)
+                           ? LstmMode::CUTLASS_TNC_F16
+                           : LstmMode::CUTLASS_TNC_I8;
         } else if (lstm_mode_str == "CUTLASS_TNC_F16") {
             return LstmMode::CUTLASS_TNC_F16;
         }
@@ -106,8 +108,11 @@ static LstmMode get_cuda_lstm_mode(int layer_idx, int layer_size) {
     bool is_TX2 = (prop->major == 6 && prop->minor == 2);
     bool is_A100_H100 = ((prop->major == 8 || prop->major == 9) && prop->minor == 0);
 
-    if (is_A100_H100 && layer_size <= 1024 && (layer_size % 128) == 0) {
-        return (layer_idx == 0) ? LstmMode::CUTLASS_TNC_F16 : LstmMode::CUTLASS_TNC_I8;
+    if (is_A100_H100 && layer_size <= 1024 && layer_size > 128 && (layer_size % 128) == 0) {
+        // Zeroth LSTM can be quantised if the preceeding activation is TANH
+        return (layer_idx == 0 && activation != dorado::Activation::TANH)
+                       ? LstmMode::CUTLASS_TNC_F16
+                       : LstmMode::CUTLASS_TNC_I8;
     } else if (!is_TX2 && (layer_size == 96 || layer_size == 128)) {
         return LstmMode::QUANTISED_NTC;
     }
@@ -155,10 +160,10 @@ class WorkingMemory {
     }
 
 public:
-    torch::Tensor next(torch::IntArrayRef sizes, torch::Dtype dtype, bool make_current = true) {
+    at::Tensor next(torch::IntArrayRef sizes, torch::Dtype dtype, bool make_current = true) {
         auto new_bytes = tensor_bytes(sizes, dtype);
         if ((current_bytes + new_bytes > reservation_bytes) ||
-            backing_tensor.defined() && backing_tensor.nbytes() != reservation_bytes) {
+            (backing_tensor.defined() && backing_tensor.nbytes() != size_t(reservation_bytes))) {
             throw std::runtime_error("WorkingMemory: overlap detected.");
         }
 
@@ -194,7 +199,7 @@ public:
         // Using kF16 here because the libtorch version on TX2 doesn't support `Tensor::view()`
         // with a dtype of a different size, and all buffers are kF16 on TX2.
         backing_tensor = torch::empty({reservation_bytes / 2},
-                                      torch::TensorOptions().device(dev).dtype(torch::kF16));
+                                      at::TensorOptions().device(dev).dtype(torch::kF16));
         current_sizes.clear();
         current_bytes = 0;
     }
@@ -202,8 +207,8 @@ public:
     int64_t reservation_bytes{0};
     int64_t current_bytes{0};
     std::vector<int64_t> current_sizes;
-    torch::Tensor backing_tensor;
-    torch::Tensor current;  // The last tensor view created with `next(_, _, true)`
+    at::Tensor backing_tensor;
+    at::Tensor current;  // The last tensor view created with `next(_, _, true)`
 };
 
 #endif  // if USE_KOI
@@ -212,7 +217,7 @@ namespace {
 template <class Model>
 ModuleHolder<AnyModule> populate_model(Model &&model,
                                        const std::filesystem::path &path,
-                                       const torch::TensorOptions &options,
+                                       const at::TensorOptions &options,
                                        bool decomposition,
                                        bool linear_layer_bias) {
     auto state_dict = dorado::load_crf_model_weights(path, decomposition, linear_layer_bias);
@@ -230,9 +235,6 @@ ModuleHolder<AnyModule> populate_model(Model &&model,
 namespace dorado {
 
 namespace nn {
-
-static constexpr float SWISH_LOWER_BOUND = -0.278464543f;  // global minimum of `x * sigmoid(x)`
-static constexpr float I8_RANGE = 127.f;
 
 struct ConvolutionImpl : Module {
     ConvolutionImpl(int size,
@@ -265,8 +267,8 @@ struct ConvolutionImpl : Module {
         int64_t chunk_size_out = chunk_size_in / stride;
         if (next_layer_is_lstm || in_size > 16) {
             // For conv2 with in_size > 16 we can use the same codepath as QUANTISED_NTC
-            LstmMode lstm_mode =
-                    next_layer_is_lstm ? get_cuda_lstm_mode(0, out_size) : LstmMode::QUANTISED_NTC;
+            LstmMode lstm_mode = next_layer_is_lstm ? get_cuda_lstm_mode(0, out_size, activation)
+                                                    : LstmMode::QUANTISED_NTC;
             switch (lstm_mode) {
             case LstmMode::CUTLASS_TNC_I8:
                 wm.reserve({chunk_size_out, batch_size, window_size, in_size}, torch::kF16);
@@ -298,8 +300,8 @@ struct ConvolutionImpl : Module {
         utils::ScopedProfileRange spr("conv", 2);
 
         auto in = wm.current;
-        int batch_size = in.size(0);
-        int chunk_size_in = in.size(1);
+        int batch_size = int(in.size(0));
+        int chunk_size_in = int(in.size(1));
         int chunk_size_out = chunk_size_in / stride;
 
         // TODO: make device weights permanent?
@@ -312,9 +314,9 @@ struct ConvolutionImpl : Module {
 
         if (next_layer_is_lstm || in_size > 16) {
             // For conv2 with in_size > 16 we can use the same codepath as QUANTISED_NTC
-            LstmMode lstm_mode =
-                    next_layer_is_lstm ? get_cuda_lstm_mode(0, out_size) : LstmMode::QUANTISED_NTC;
-            torch::Tensor ntwc_mat, tnwc_mat;
+            LstmMode lstm_mode = next_layer_is_lstm ? get_cuda_lstm_mode(0, out_size, activation)
+                                                    : LstmMode::QUANTISED_NTC;
+            at::Tensor ntwc_mat, tnwc_mat;
             if (lstm_mode == LstmMode::QUANTISED_NTC) {
                 ntwc_mat = wm.next({batch_size, chunk_size_out, in_size, window_size}, torch::kF16);
             } else {
@@ -322,11 +324,11 @@ struct ConvolutionImpl : Module {
                 ntwc_mat = tnwc_mat.transpose(0, 1);
             }
             host_window_ntwc_f16(stream, batch_size, chunk_size_in, in_size, window_size, stride,
-                                 ntwc_mat.stride(0), ntwc_mat.stride(1), in.data_ptr(),
+                                 int(ntwc_mat.stride(0)), int(ntwc_mat.stride(1)), in.data_ptr(),
                                  ntwc_mat.data_ptr());
 
             auto mm_in = wm.current.view({-1, window_size * in_size});
-            torch::Tensor mm_out, out;
+            at::Tensor mm_out, out;
             if (lstm_mode == LstmMode::QUANTISED_NTC) {
                 // Output is [N, T_out, C_out], F16
                 out = wm.next({batch_size, chunk_size_out, out_size}, torch::kF16);
@@ -347,15 +349,16 @@ struct ConvolutionImpl : Module {
             }
 
             dorado::utils::matmul_f16(mm_in, w_device, mm_out);
-            host_bias_activation_f16_inplace(stream, mm_out.size(0), mm_out.size(1),
-                                             mm_out.stride(0), mm_out.data_ptr(),
+            host_bias_activation_f16_inplace(stream, int(mm_out.size(0)), int(mm_out.size(1)),
+                                             int(mm_out.stride(0)), mm_out.data_ptr(),
                                              b_device.data_ptr(), get_koi_activation(activation));
 
             if (lstm_mode == LstmMode::CUTLASS_TNC_I8) {
                 auto conv_out = out.slice(0, 1, chunk_size_out + 1).view({-1, out_size});
-                host_convert(stream, mm_out.data_ptr(), 0, mm_out.stride(0), mm_out.stride(1),
-                             KOI_F16, conv_out.data_ptr(), 0, conv_out.stride(0),
-                             conv_out.stride(1), KOI_I8, 1, conv_out.size(0), conv_out.size(1));
+                host_convert(stream, mm_out.data_ptr(), 0, int(mm_out.stride(0)),
+                             int(mm_out.stride(1)), KOI_F16, conv_out.data_ptr(), 0,
+                             int(conv_out.stride(0)), int(conv_out.stride(1)), KOI_I8, 1,
+                             int(conv_out.size(0)), int(conv_out.size(1)));
             }
 
             if (lstm_mode == LstmMode::CUBLAS_TN2C) {
@@ -380,7 +383,7 @@ struct ConvolutionImpl : Module {
     }
 #endif
 
-    torch::Tensor forward(torch::Tensor x) {
+    at::Tensor forward(at::Tensor x) {
         // Input x is [N, C_in, T_in], contiguity optional
         utils::ScopedProfileRange spr("conv", 2);
         x = activation_op.forward(conv(x));
@@ -414,7 +417,7 @@ struct LinearCRFImpl : Module {
         }
     };
 
-    torch::Tensor forward(torch::Tensor x) {
+    at::Tensor forward(at::Tensor x) {
         utils::ScopedProfileRange spr("linear", 2);
         // Input x is [N, T, C], contiguity optional
         auto scores = linear(x);
@@ -447,14 +450,15 @@ struct LinearCRFImpl : Module {
         dorado::utils::matmul_f16(in.view({-1, Cin}), wt, out_2D);
         if (activation) {
             auto stream = at::cuda::getCurrentCUDAStream().stream();
-            host_bias_activation_f16_inplace(stream, T * N, Cout, Cout, out_2D.data_ptr(),
-                                             linear->bias.data_ptr(), KOI_TANH_X5);
+            host_bias_activation_f16_inplace(stream, int(T * N), int(Cout), int(Cout),
+                                             out_2D.data_ptr(), linear->bias.data_ptr(),
+                                             KOI_TANH_X5);
         } else if (bias) {
             out_2D += linear->bias;
         }
     }
 
-    torch::Tensor wt;
+    at::Tensor wt;
 #endif  // if USE_KOI
     bool bias;
     static constexpr int scale = 5;
@@ -463,7 +467,7 @@ struct LinearCRFImpl : Module {
 };
 
 struct LSTMStackImpl : Module {
-    LSTMStackImpl(int size) : layer_size(size) {
+    LSTMStackImpl(int size, Activation act) : layer_size(size), activation(act) {
         // torch::nn::LSTM expects/produces [N, T, C] with batch_first == true
         rnn1 = register_module("rnn1", LSTM(LSTMOptions(size, size).batch_first(true)));
         rnn2 = register_module("rnn2", LSTM(LSTMOptions(size, size).batch_first(true)));
@@ -472,7 +476,7 @@ struct LSTMStackImpl : Module {
         rnn5 = register_module("rnn5", LSTM(LSTMOptions(size, size).batch_first(true)));
     };
 
-    torch::Tensor forward(torch::Tensor x) {
+    at::Tensor forward(at::Tensor x) {
         // Input is [N, T, C], contiguity optional
 
         auto [y1, h1] = rnn1(x.flip(1));
@@ -488,9 +492,9 @@ struct LSTMStackImpl : Module {
 #if USE_KOI
     void reserve_working_memory(WorkingMemory &wm) {
         auto in_sizes = wm.current_sizes;
-        switch (auto mode = get_cuda_lstm_mode(0, layer_size)) {
+        switch (get_cuda_lstm_mode(0, layer_size, activation)) {
         case LstmMode::CUTLASS_TNC_F16:
-            if (get_cuda_lstm_mode(1, layer_size) == LstmMode::CUTLASS_TNC_I8) {
+            if (get_cuda_lstm_mode(1, layer_size, activation) == LstmMode::CUTLASS_TNC_I8) {
                 wm.reserve(in_sizes, torch::kI8);
             }
             // fall-through
@@ -512,7 +516,7 @@ struct LSTMStackImpl : Module {
     void run_koi(WorkingMemory &wm) {
         utils::ScopedProfileRange spr("lstm_stack", 2);
 
-        auto mode = get_cuda_lstm_mode(0, layer_size);
+        auto mode = get_cuda_lstm_mode(0, layer_size, activation);
         if (mode == LstmMode::QUANTISED_NTC) {
             return forward_quantized(wm);
         } else if (mode == LstmMode::CUBLAS_TN2C) {
@@ -529,9 +533,9 @@ private:
         auto stream = at::cuda::getCurrentCUDAStream().stream();
 
         auto in = wm.current;
-        const int chunk_size = in.size(0) - 1;
-        const int batch_size = in.size(1);
-        assert(layer_size == in.size(3));
+        const int chunk_size = int(in.size(0) - 1);
+        const int batch_size = int(in.size(1));
+        assert(layer_size == int(in.size(3)));
         assert(in.dim() == 4 && in.size(2) == 2);
         assert(in.dtype() == torch::kF16);
 
@@ -581,8 +585,9 @@ private:
         auto out = wm.next({batch_size, chunk_size, layer_size}, torch::kF16);
         in = inout_left;
         utils::ScopedProfileRange spr_convert("transpose_tn2c_to_ntc", 3);
-        host_transpose_f16(stream, in.data_ptr(), in.size(0), in.size(1), in.size(2), in.stride(0),
-                           in.stride(1), in.stride(2), out.stride(1), out.stride(0), out.stride(2),
+        host_transpose_f16(stream, in.data_ptr(), int(in.size(0)), int(in.size(1)), int(in.size(2)),
+                           int(in.stride(0)), int(in.stride(1)), int(in.stride(2)),
+                           int(out.stride(1)), int(out.stride(0)), int(out.stride(2)),
                            out.data_ptr());
     }
 
@@ -594,9 +599,9 @@ private:
         auto stream = at::cuda::getCurrentCUDAStream().stream();
 
         auto in = wm.current;
-        const int chunk_size = in.size(0) - 3;
-        const int batch_size = in.size(1);
-        assert(layer_size == in.size(2));
+        const int chunk_size = int(in.size(0) - 3);
+        const int batch_size = int(in.size(1));
+        assert(layer_size == int(in.size(2)));
         assert(in.dim() == 3);
         assert(in.dtype() == torch::kF16 || in.dtype() == torch::kInt8);
         auto opts_f16 = in.options().dtype(torch::kF16);
@@ -609,8 +614,9 @@ private:
         // LSTM state h(-1) in either direction.
 
         auto type_id = (in.dtype() == torch::kF16) ? KOI_F16 : KOI_I8;
-        bool convert_to_i8 = (type_id == KOI_F16) &&
-                             (get_cuda_lstm_mode(1, layer_size) == LstmMode::CUTLASS_TNC_I8);
+        bool convert_to_i8 =
+                (type_id == KOI_F16) &&
+                (get_cuda_lstm_mode(1, layer_size, activation) == LstmMode::CUTLASS_TNC_I8);
 
         int layer_idx = 0;
         for (auto &rnn : {rnn1, rnn2, rnn3, rnn4, rnn5}) {
@@ -657,7 +663,7 @@ private:
 
             auto in = wm.current;
             host_cutlass_lstm(stream, type_id, layer_idx, batch_size, layer_size, chunk_size,
-                              reverse ? -1 : 1, in.stride(1), in.data_ptr(),
+                              reverse ? -1 : 1, int(in.stride(1)), in.data_ptr(),
                               device_weights[layer_idx].data_ptr(),
                               device_bias[layer_idx].data_ptr(), device_scale[layer_idx].data_ptr(),
                               state_buf.data_ptr(), workspace_buf.data_ptr(), interleave, 0);
@@ -665,9 +671,10 @@ private:
             if (layer_idx == 0 && convert_to_i8) {
                 utils::ScopedProfileRange spr_convert("f16_to_int8", 4);
                 auto out = wm.next(in.sizes(), torch::kI8);
-                host_convert(stream, in.data_ptr(), in.stride(0), in.stride(1), in.stride(2),
-                             KOI_F16, out.data_ptr(), out.stride(0), out.stride(1), out.stride(2),
-                             KOI_I8, in.size(0), in.size(1), in.size(2));
+                host_convert(stream, in.data_ptr(), int(in.stride(0)), int(in.stride(1)),
+                             int(in.stride(2)), KOI_F16, out.data_ptr(), int(out.stride(0)),
+                             int(out.stride(1)), int(out.stride(2)), KOI_I8, int(in.size(0)),
+                             int(in.size(1)), int(in.size(2)));
                 type_id = KOI_I8;
             }
 
@@ -679,28 +686,29 @@ private:
         auto out = wm.next({batch_size, chunk_size, layer_size}, torch::kF16);
         if (type_id == KOI_I8) {
             utils::ScopedProfileRange spr_convert("int8_tnc_to_f16_ntc", 3);
-            host_convert(stream, in.data_ptr(), in.stride(0), in.stride(1), in.stride(2), KOI_I8,
-                         out.data_ptr(), out.stride(1), out.stride(0), out.stride(2), KOI_F16,
-                         in.size(0), in.size(1), in.size(2));
+            host_convert(stream, in.data_ptr(), int(in.stride(0)), int(in.stride(1)),
+                         int(in.stride(2)), KOI_I8, out.data_ptr(), int(out.stride(1)),
+                         int(out.stride(0)), int(out.stride(2)), KOI_F16, int(in.size(0)),
+                         int(in.size(1)), int(in.size(2)));
         } else {
             utils::ScopedProfileRange spr_convert("transpose_tnc_to_ntc", 3);
-            host_transpose_f16(stream, in.data_ptr(), in.size(0), in.size(1), in.size(2),
-                               in.stride(0), in.stride(1), in.stride(2), out.stride(1),
-                               out.stride(0), out.stride(2), out.data_ptr());
+            host_transpose_f16(stream, in.data_ptr(), int(in.size(0)), int(in.size(1)),
+                               int(in.size(2)), int(in.stride(0)), int(in.stride(1)),
+                               int(in.stride(2)), int(out.stride(1)), int(out.stride(0)),
+                               int(out.stride(2)), out.data_ptr());
         }
 
 #endif  // ifdef DORADO_TX2 else
     }
 
-    void rearrange_individual_weights(torch::Tensor buffer) {
+    void rearrange_individual_weights(at::Tensor buffer) {
         //Mapping of LSTM gate weights from IFGO to GIFO order.
         auto tmp = buffer.view({4, -1});
         tmp = torch::cat({tmp[2], tmp[0], tmp[1], tmp[3]});
         buffer.index({torch::indexing::Slice()}) = tmp.view(buffer.sizes());
     }
 
-    std::pair<torch::Tensor, torch::Tensor> quantize_tensor(torch::Tensor tensor,
-                                                            int levels = 256) {
+    std::pair<at::Tensor, at::Tensor> quantize_tensor(at::Tensor tensor, int levels = 256) {
         //Quantize a tensor to int8, returning per-channel scales and the quantized tensor
         //if weights have not been quantized we get some scaling
         auto fp_max = torch::abs(std::get<0>(torch::max(tensor, 0)));
@@ -728,8 +736,8 @@ private:
     void forward_quantized(WorkingMemory &wm) {
         // Input and output in the same buffer [N, T, C], F16
         auto inout = wm.current;
-        int batch_size = inout.size(0);
-        int chunk_size = inout.size(1);
+        int batch_size = int(inout.size(0));
+        int chunk_size = int(inout.size(1));
 
         // Quantise weights and move to GPU, if called for the first time
         if (device_w_hh.empty()) {
@@ -796,20 +804,21 @@ private:
                                   inout.data_ptr(), batch_size));
     }
 
-    std::vector<torch::Tensor> device_weights;
-    std::vector<torch::Tensor> device_w_ih;
-    std::vector<torch::Tensor> device_w_hh;
-    std::vector<torch::Tensor> device_bias;
-    std::vector<torch::Tensor> device_scale;
+    std::vector<at::Tensor> device_weights;
+    std::vector<at::Tensor> device_w_ih;
+    std::vector<at::Tensor> device_w_hh;
+    std::vector<at::Tensor> device_bias;
+    std::vector<at::Tensor> device_scale;
 #endif  // if USE_KOI
     int layer_size;
+    Activation activation;
     LSTM rnn1{nullptr}, rnn2{nullptr}, rnn3{nullptr}, rnn4{nullptr}, rnn5{nullptr};
 };
 
 struct ClampImpl : Module {
-    ClampImpl(float _min, float _max, bool _active) : min(_min), max(_max), active(_active){};
+    ClampImpl(float _min, float _max, bool _active) : active(_active), min(_min), max(_max){};
 
-    torch::Tensor forward(torch::Tensor x) {
+    at::Tensor forward(at::Tensor x) {
         if (active) {
             utils::ScopedProfileRange spr("clamp", 2);
             x.clamp_(min, max);
@@ -828,39 +837,43 @@ TORCH_MODULE(Clamp);
 
 struct CRFModelImpl : Module {
     explicit CRFModelImpl(const CRFModelConfig &config) {
-        Activation activation = config.clamp ? Activation::SWISH_CLAMP : Activation::SWISH;
-        conv1 = register_module(
-                "conv1", Convolution(config.num_features, config.conv, 5, 1, activation, false));
-        conv2 = register_module("conv2", Convolution(config.conv, 16, 5, 1, activation, false));
-        conv3 = register_module(
-                "conv3", Convolution(16, config.insize, 19, config.stride, activation, true));
+        const auto cv = config.convs;
+        const auto lstm_insize = cv[2].size;
+        conv1 = register_module("conv1", Convolution(cv[0].insize, cv[0].size, cv[0].winlen,
+                                                     cv[0].stride, cv[0].activation, false));
+        conv2 = register_module("conv2", Convolution(cv[1].insize, cv[1].size, cv[1].winlen,
+                                                     cv[1].stride, cv[1].activation, false));
+        conv3 = register_module("conv3", Convolution(cv[2].insize, lstm_insize, cv[2].winlen,
+                                                     cv[2].stride, cv[2].activation, true));
 
-        rnns = register_module("rnns", LSTMStack(config.insize));
+        rnns = register_module("rnns", LSTMStack(lstm_insize, cv[2].activation));
 
         if (config.out_features.has_value()) {
             // The linear layer is decomposed into 2 matmuls.
             const int decomposition = config.out_features.value();
-            linear1 = register_module("linear1", LinearCRF(config.insize, decomposition, true));
+            linear1 = register_module("linear1", LinearCRF(lstm_insize, decomposition, true));
             linear2 = register_module("linear2", LinearCRF(decomposition, config.outsize, false));
             clamp1 = Clamp(-5.0, 5.0, config.clamp);
             encoder = Sequential(conv1, conv2, conv3, rnns, linear1, linear2, clamp1);
-        } else if ((config.conv == 16) && (config.num_features == 1)) {
-            linear1 = register_module("linear1", LinearCRF(config.insize, config.outsize, false));
+        } else if ((config.convs[0].size > 4) && (config.num_features == 1)) {
+            // v4.x model without linear decomposition
+            linear1 = register_module("linear1", LinearCRF(lstm_insize, config.outsize, false));
             clamp1 = Clamp(-5.0, 5.0, config.clamp);
             encoder = Sequential(conv1, conv2, conv3, rnns, linear1, clamp1);
         } else {
-            linear1 = register_module("linear1",
-                                      LinearCRF(config.insize, config.outsize, true, true));
+            // Pre v4 model
+            linear1 =
+                    register_module("linear1", LinearCRF(lstm_insize, config.outsize, true, true));
             encoder = Sequential(conv1, conv2, conv3, rnns, linear1);
         }
     }
 
-    void load_state_dict(const std::vector<torch::Tensor> &weights) {
+    void load_state_dict(const std::vector<at::Tensor> &weights) {
         utils::load_state_dict(*this, weights);
     }
 
 #if USE_KOI
-    torch::Tensor run_koi(torch::Tensor in) {
+    at::Tensor run_koi(at::Tensor in) {
         // Input is [N, C, T] -- TODO: change to [N, C, T] on the input buffer side?
         c10::cuda::CUDAGuard device_guard(in.device());
 
@@ -870,6 +883,7 @@ struct CRFModelImpl : Module {
         conv1->reserve_working_memory(wm);
         conv2->reserve_working_memory(wm);
         conv3->reserve_working_memory(wm);
+
         rnns->reserve_working_memory(wm);
         linear1->reserve_working_memory(wm);
         if (linear2) {
@@ -880,15 +894,15 @@ struct CRFModelImpl : Module {
 
         auto stream = at::cuda::getCurrentCUDAStream().stream();
         auto out = wm.next(in.transpose(1, 2).sizes(), torch::kF16);
-        host_transpose_f16(stream, in.data_ptr(), in.size(0), in.size(1), in.size(2), in.stride(0),
-                           in.stride(1), in.stride(2), out.stride(0), out.stride(2), out.stride(1),
+        host_transpose_f16(stream, in.data_ptr(), int(in.size(0)), int(in.size(1)), int(in.size(2)),
+                           int(in.stride(0)), int(in.stride(1)), int(in.stride(2)),
+                           int(out.stride(0)), int(out.stride(2)), int(out.stride(1)),
                            out.data_ptr());
 
         conv1->run_koi(wm);
         conv2->run_koi(wm);
         conv3->run_koi(wm);
         rnns->run_koi(wm);
-
         linear1->run_koi(wm);
         if (linear2) {
             linear2->run_koi(wm);
@@ -903,7 +917,7 @@ struct CRFModelImpl : Module {
     }
 #endif
 
-    torch::Tensor forward(torch::Tensor x) {
+    at::Tensor forward(at::Tensor x) {
         utils::ScopedProfileRange spr("nn_forward", 1);
         if (x.device() == torch::kCPU) {
             // Output is [T, N, C], which CPU decoding requires.
@@ -930,9 +944,9 @@ TORCH_MODULE(CRFModel);
 
 }  // namespace nn
 
-std::vector<torch::Tensor> load_crf_model_weights(const std::filesystem::path &dir,
-                                                  bool decomposition,
-                                                  bool linear_layer_bias) {
+std::vector<at::Tensor> load_crf_model_weights(const std::filesystem::path &dir,
+                                               bool decomposition,
+                                               bool linear_layer_bias) {
     auto tensors = std::vector<std::string>{
 
             "0.conv.weight.tensor",      "0.conv.bias.tensor",
@@ -970,7 +984,7 @@ std::vector<torch::Tensor> load_crf_model_weights(const std::filesystem::path &d
 }
 
 ModuleHolder<AnyModule> load_crf_model(const CRFModelConfig &model_config,
-                                       const torch::TensorOptions &options) {
+                                       const at::TensorOptions &options) {
     auto model = nn::CRFModel(model_config);
     return populate_model(model, model_config.model_path, options,
                           model_config.out_features.has_value(), model_config.bias);
@@ -999,8 +1013,7 @@ size_t auto_calculate_num_runners(const CRFModelConfig &model_config,
 
     auto free_ram_GB = utils::available_host_memory_GB() * memory_fraction;
     auto num_runners = static_cast<size_t>(free_ram_GB / required_ram_per_runner_GB);
-    return std::clamp(num_runners, std::size_t(1),
-                      std::size_t(std::thread::hardware_concurrency()));
+    return std::clamp(num_runners, size_t(1), std::size_t(std::thread::hardware_concurrency()));
 }
 
 }  // namespace dorado

@@ -27,13 +27,13 @@ namespace dorado {
 class ModBaseCaller {
 public:
     struct ModBaseTask {
-        ModBaseTask(torch::Tensor input_sigs_, torch::Tensor input_seqs_, int num_chunks_)
+        ModBaseTask(at::Tensor input_sigs_, at::Tensor input_seqs_, int num_chunks_)
                 : input_sigs(input_sigs_), input_seqs(input_seqs_), num_chunks(num_chunks_) {}
-        torch::Tensor input_sigs;
-        torch::Tensor input_seqs;
+        at::Tensor input_sigs;
+        at::Tensor input_seqs;
         std::mutex mut;
         std::condition_variable cv;
-        torch::Tensor out;
+        at::Tensor out;
         bool done{false};
         int num_chunks;
     };
@@ -56,7 +56,7 @@ public:
         }
 
         ModBaseData(const std::filesystem::path& model_path,
-                    torch::TensorOptions opts,
+                    at::TensorOptions opts,
                     int batch_size_)
                 : module_holder(load_modbase_model(model_path, opts)),
                   params(load_modbase_model_config(model_path)),
@@ -92,7 +92,7 @@ public:
             : m_num_models(model_paths.size()) {
         if (device == "cpu") {
             // no slow_conv2d_cpu for type Half, need to use float32
-            m_options = torch::TensorOptions().device(torch::kCPU).dtype(torch::kFloat32);
+            m_options = at::TensorOptions().device(torch::kCPU).dtype(torch::kFloat32);
         } else if (device == "metal") {
 #if TORCH_VERSION_MAJOR < 2
             // no metal implementation yet, force to cpu
@@ -104,9 +104,9 @@ public:
             auto torchMetalBackend = torch::kMPS;
             auto torchMetalDtype = torch::kFloat16;
 #endif
-            m_options = torch::TensorOptions().device(torchMetalBackend).dtype(torchMetalDtype);
+            m_options = at::TensorOptions().device(torchMetalBackend).dtype(torchMetalDtype);
         } else {
-            m_options = torch::TensorOptions().device(device).dtype(torch::kFloat16);
+            m_options = at::TensorOptions().device(device).dtype(torch::kFloat16);
         }
 
         // Allocate enough elements up-front so that m_caller_data.push_back() doesn't reallocate while
@@ -117,7 +117,7 @@ public:
         for (size_t model_id = 0; model_id < m_num_models; ++model_id) {
             const auto& model_path = model_paths[model_id];
 
-            torch::InferenceMode guard;
+            at::InferenceMode guard;
             auto caller_data = std::make_unique<ModBaseData>(model_path, m_options, batch_size);
             m_caller_data.push_back(std::move(caller_data));
         }
@@ -143,10 +143,10 @@ public:
         }
     }
 
-    torch::Tensor call_chunks(size_t model_id,
-                              torch::Tensor& input_sigs,
-                              torch::Tensor& input_seqs,
-                              int num_chunks) {
+    at::Tensor call_chunks(size_t model_id,
+                           at::Tensor& input_sigs,
+                           at::Tensor& input_seqs,
+                           int num_chunks) {
         NVTX3_FUNC_RANGE();
         auto& caller_data = m_caller_data[model_id];
 
@@ -176,7 +176,7 @@ public:
 #endif
         while (true) {
             nvtx3::scoped_range loop{"modbase_task_thread_fn"};
-            torch::InferenceMode guard;
+            at::InferenceMode guard;
 #if DORADO_GPU_BUILD && !defined(__APPLE__)
             // If caller_data->stream is set, sets the current stream to caller_data->stream, and the current device to
             // the device associated with the stream. Resets both to their prior state on destruction
@@ -237,16 +237,16 @@ public:
 
     stats::NamedStats sample_stats() const {
         stats::NamedStats stats;
-        stats["batches_called"] = m_num_batches_called;
+        stats["batches_called"] = double(m_num_batches_called);
 #if DORADO_GPU_BUILD && !defined(__APPLE__)
-        stats["model_ms"] = m_model_ms;
+        stats["model_ms"] = double(m_model_ms);
 #endif
         return stats;
     }
 
     size_t m_num_models = 0;
 
-    torch::TensorOptions m_options;
+    at::TensorOptions m_options;
     std::atomic<bool> m_terminate{false};
     std::vector<std::unique_ptr<ModBaseData>> m_caller_data;
     std::vector<std::unique_ptr<std::thread>> m_task_threads;
@@ -264,12 +264,12 @@ std::shared_ptr<ModBaseCaller> create_modbase_caller(
 }
 
 ModBaseRunner::ModBaseRunner(std::shared_ptr<ModBaseCaller> caller) : m_caller(std::move(caller)) {
-    auto opts = torch::TensorOptions()
+    auto opts = at::TensorOptions()
                         .device(torch::kCPU)
                         .pinned_memory(m_caller->m_options.device().is_cuda())
                         .dtype(m_caller->m_options.dtype());
 
-    auto seq_input_options = torch::TensorOptions()
+    auto seq_input_options = at::TensorOptions()
                                      .device(torch::kCPU)
                                      .pinned_memory(m_caller->m_options.device().is_cuda())
                                      .dtype(torch::kInt8);
@@ -287,7 +287,7 @@ ModBaseRunner::ModBaseRunner(std::shared_ptr<ModBaseCaller> caller) : m_caller(s
 
 void ModBaseRunner::accept_chunk(int model_id,
                                  int chunk_idx,
-                                 const torch::Tensor& signal,
+                                 const at::Tensor& signal,
                                  const std::vector<int8_t>& kmers) {
     // As usual, avoid torch indexing because it is glacially slow.
     // GPU base calling uses float16 signals and input tensors.
@@ -311,15 +311,15 @@ void ModBaseRunner::accept_chunk(int model_id,
                 kmer_elem_count * sizeof(SeqInputType));
 }
 
-torch::Tensor ModBaseRunner::call_chunks(int model_id, int num_chunks) {
+at::Tensor ModBaseRunner::call_chunks(int model_id, int num_chunks) {
     return m_caller->call_chunks(model_id, m_input_sigs[model_id], m_input_seqs[model_id],
                                  num_chunks);
 }
 
-torch::Tensor ModBaseRunner::scale_signal(size_t caller_id,
-                                          torch::Tensor signal,
-                                          const std::vector<int>& seq_ints,
-                                          const std::vector<uint64_t>& seq_to_sig_map) const {
+at::Tensor ModBaseRunner::scale_signal(size_t caller_id,
+                                       at::Tensor signal,
+                                       const std::vector<int>& seq_ints,
+                                       const std::vector<uint64_t>& seq_to_sig_map) const {
     auto& scaler = m_caller->m_caller_data[caller_id]->scaler;
     if (scaler) {
         return scaler->scale_signal(signal, seq_ints, seq_to_sig_map);
@@ -351,7 +351,7 @@ stats::NamedStats ModBaseRunner::sample_stats() const {
     // Each runner will retrieve stats from the caller.
     // Only the last retrieved version will appear, but they should be very similar.
     stats::NamedStats stats = stats::from_obj(*m_caller);
-    stats["batches_called"] = m_num_batches_called;
+    stats["batches_called"] = double(m_num_batches_called);
     return stats;
 }
 

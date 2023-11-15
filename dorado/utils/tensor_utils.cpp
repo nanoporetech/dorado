@@ -3,6 +3,7 @@
 #include "simd.h"
 
 #include <torch/csrc/jit/serialization/pickle.h>
+#include <torch/torch.h>
 
 #include <cstddef>
 #include <cstring>
@@ -16,9 +17,9 @@ __attribute__((target("default")))
 #endif
 void convert_f32_to_f16_impl(c10::Half* const dest, const float* const src, std::size_t count) {
     // TODO -- handle large counts properly.
-    assert(count <= std::numeric_limits<int>::max());
-    auto src_tensor_f32 = torch::from_blob(const_cast<float*>(src), {static_cast<int>(count)});
-    auto src_tensor_f16 = src_tensor_f32.to(torch::kFloat16);
+    assert(int(count) <= std::numeric_limits<int>::max());
+    auto src_tensor_f32 = at::from_blob(const_cast<float*>(src), {static_cast<int>(count)});
+    auto src_tensor_f16 = src_tensor_f32.to(at::ScalarType::Half);
     std::memcpy(dest, src_tensor_f16.data_ptr(), count * sizeof(c10::Half));
 }
 
@@ -66,16 +67,16 @@ __attribute__((target("avx2,f16c"))) void convert_f32_to_f16_impl(c10::Half* con
 
 namespace dorado::utils {
 
-void serialise_tensor(torch::Tensor t, const std::string& path) {
+void serialise_tensor(at::Tensor t, const std::string& path) {
     auto bytes = torch::jit::pickle_save(t);
     std::ofstream fout(path);
     fout.write(bytes.data(), bytes.size());
     fout.close();
 }
 
-std::vector<torch::Tensor> load_tensors(const std::filesystem::path& dir,
-                                        const std::vector<std::string>& tensors) {
-    auto weights = std::vector<torch::Tensor>();
+std::vector<at::Tensor> load_tensors(const std::filesystem::path& dir,
+                                     const std::vector<std::string>& tensors) {
+    auto weights = std::vector<at::Tensor>();
     for (auto tensor : tensors) {
         auto path = dir / tensor;
         torch::load(weights, path.string());
@@ -84,12 +85,12 @@ std::vector<torch::Tensor> load_tensors(const std::filesystem::path& dir,
     return weights;
 }
 
-torch::Tensor quantile(const torch::Tensor t, const torch::Tensor q) {
-    assert(q.dtype() == torch::kF32);
+at::Tensor quantile(const at::Tensor t, const at::Tensor q) {
+    assert(q.dtype() == at::ScalarType::Float);
 
     auto tmp = t.clone();
     auto [qval, qidx] = q.sort();
-    auto res = torch::empty_like(q);
+    auto res = at::empty_like(q);
 
     auto start = tmp.data_ptr<float>();
     auto end = tmp.data_ptr<float>() + tmp.size(0);
@@ -105,26 +106,26 @@ torch::Tensor quantile(const torch::Tensor t, const torch::Tensor q) {
     return res;
 }
 
-torch::Tensor quantile_counting(const torch::Tensor t, const torch::Tensor q) {
-    assert(q.dtype() == torch::kF32);
+at::Tensor quantile_counting(const at::Tensor t, const at::Tensor q) {
+    assert(q.dtype() == at::ScalarType::Float);
 
     auto p = t.data_ptr<int16_t>();
     auto range_min = t.min().item<int16_t>();
     auto range_max = t.max().item<int16_t>();
 
-    int size = t.size(0);
+    size_t size = t.size(0);
 
     std::vector<int> counts(range_max - range_min + 1, 0);
-    for (int i = 0; i < size; ++i) {
+    for (size_t i = 0; i < size; ++i) {
         counts[p[i] - range_min]++;
     }
     std::partial_sum(counts.begin(), counts.end(), counts.begin());
 
-    auto res = torch::empty_like(q);
+    auto res = at::empty_like(q);
 
-    for (size_t idx = 0; idx < q.numel(); idx++) {
-        int threshold = q[idx].item<float>() * (size - 1);
-        for (int i = 0; i < counts.size(); ++i) {
+    for (size_t idx = 0; idx < size_t(q.numel()); idx++) {
+        int threshold = int(q[idx].item<float>() * (size - 1));
+        for (int i = 0; i < int(counts.size()); ++i) {
             if (counts[i] > threshold) {
                 res[idx] = i + range_min;
                 break;
@@ -142,15 +143,15 @@ void convert_f32_to_f16(c10::Half* const dest, const float* const src, std::size
     return convert_f32_to_f16_impl(dest, src, count);
 }
 
-void copy_tensor_elems(torch::Tensor& dest_tensor,
+void copy_tensor_elems(at::Tensor& dest_tensor,
                        std::size_t dest_offset,
-                       const torch::Tensor& src_tensor,
+                       const at::Tensor& src_tensor,
                        std::size_t src_offset,
                        std::size_t count) {
     assert(dest_tensor.is_contiguous());
     assert(src_tensor.is_contiguous());
-    assert(dest_offset + count <= dest_tensor.numel());
-    assert(src_offset + count <= src_tensor.numel());
+    assert(dest_offset + count <= size_t(dest_tensor.numel()));
+    assert(src_offset + count <= size_t(src_tensor.numel()));
 
     if (dest_tensor.dtype() == src_tensor.dtype()) {
         // No conversion.
@@ -159,14 +160,15 @@ void copy_tensor_elems(torch::Tensor& dest_tensor,
         const size_t elem_size = dest_tensor.element_size();
         std::memcpy(&dest_ptr[dest_offset * elem_size], &src_ptr[src_offset * elem_size],
                     count * elem_size);
-    } else if (dest_tensor.dtype() == torch::kFloat16 && src_tensor.dtype() == torch::kFloat32) {
+    } else if (dest_tensor.dtype() == at::ScalarType::Half &&
+               src_tensor.dtype() == at::ScalarType::Float) {
         // float32 -> float16 conversion.
         auto* const dest_ptr = dest_tensor.data_ptr<c10::Half>();
         const auto* const src_ptr = src_tensor.data_ptr<float>();
         convert_f32_to_f16_impl(&dest_ptr[dest_offset], &src_ptr[src_offset], count);
     } else {
         // Slow fallback path for other conversions.
-        using torch::indexing::Slice;
+        using at::indexing::Slice;
         dest_tensor.flatten().index_put_(
                 {Slice(dest_offset, dest_offset + count)},
                 src_tensor.flatten().index({Slice(src_offset, src_offset + count)}));

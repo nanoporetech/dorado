@@ -2,6 +2,7 @@
 
 #include "utils/math_utils.h"
 
+#include <ATen/ATen.h>
 #include <nvtx3/nvtx3.hpp>
 
 #include <algorithm>
@@ -14,7 +15,7 @@ ModBaseScaler::ModBaseScaler(const std::vector<float>& kmer_levels,
                              size_t centre_index)
         : m_kmer_levels(kmer_levels), m_kmer_len(kmer_len), m_centre_index(centre_index) {
     // ensure that the levels were the length we expected
-    assert(m_kmer_levels.size() == static_cast<size_t>(1 << (2 * m_kmer_len)));
+    assert(m_kmer_levels.size() == static_cast<size_t>(1ull << (2 * m_kmer_len)));
 }
 
 size_t ModBaseScaler::index_from_int_kmer(const int* int_kmer_start, size_t kmer_len) {
@@ -25,9 +26,9 @@ size_t ModBaseScaler::index_from_int_kmer(const int* int_kmer_start, size_t kmer
     return index;
 }
 
-torch::Tensor ModBaseScaler::scale_signal(const torch::Tensor& signal,
-                                          const std::vector<int>& seq_ints,
-                                          const std::vector<uint64_t>& seq_to_sig_map) const {
+at::Tensor ModBaseScaler::scale_signal(const at::Tensor& signal,
+                                       const std::vector<int>& seq_ints,
+                                       const std::vector<uint64_t>& seq_to_sig_map) const {
     NVTX3_FUNC_RANGE();
     auto levels = extract_levels(seq_ints);
 
@@ -54,7 +55,7 @@ std::vector<float> ModBaseScaler::extract_levels(const std::vector<int>& int_seq
 }
 
 std::pair<float, float> ModBaseScaler::calc_offset_scale(
-        const torch::Tensor& samples,
+        const at::Tensor& samples,
         const std::vector<uint64_t>& seq_to_sig_map,
         const std::vector<float>& levels,
         size_t clip_bases,
@@ -72,12 +73,12 @@ std::pair<float, float> ModBaseScaler::calc_offset_scale(
     {
         nvtx3::scoped_range loop{"initialize_vectors"};
         assert(samples.is_contiguous());
-        assert(samples.dtype() == torch::kFloat16);
+        assert(samples.dtype() == at::kHalf);
         using SignalType = c10::Half;
         SignalType* samples_ptr = samples.data_ptr<SignalType>();
         // get the mid-point of the base
         for (size_t i = 0; i < n; i++) {
-            int pos = (seq_to_sig_map[i] + seq_to_sig_map[i + 1]) / 2;
+            int pos = int((seq_to_sig_map[i] + seq_to_sig_map[i + 1]) / 2);
             optim_dacs[i] = static_cast<float>(samples_ptr[pos]);
             new_levels[i] = levels[i];
         }

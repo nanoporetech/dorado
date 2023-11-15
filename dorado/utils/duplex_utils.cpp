@@ -1,6 +1,6 @@
 #include "duplex_utils.h"
 
-#include <torch/torch.h>
+#include <ATen/ATen.h>
 
 #include <algorithm>
 #include <fstream>
@@ -17,7 +17,6 @@ std::map<std::string, std::string> load_pairs_file(std::string pairs_file_path) 
         throw std::runtime_error("Pairs file does not exist.");
     }
     std::string cell;
-    int line = 0;
 
     std::getline(dataFile, cell);
     while (!dataFile.eof()) {
@@ -28,7 +27,6 @@ std::map<std::string, std::string> load_pairs_file(std::string pairs_file_path) 
         std::string c = cell.substr(delim_pos + 1, delim_pos * 2 - 1);
         template_complement_map[t] = c;
 
-        line++;
         std::getline(dataFile, cell);
     }
     return template_complement_map;
@@ -108,12 +106,10 @@ std::pair<std::pair<int, int>, std::pair<int, int>> get_trimmed_alignment(
 // Applies a min pool filter to q scores for basespace-duplex algorithm
 void preprocess_quality_scores(std::vector<uint8_t>& quality_scores, int pool_window) {
     // Apply a min-pool window to the quality scores
-    auto opts = torch::TensorOptions().dtype(torch::kInt8);
-    torch::Tensor t =
-            torch::from_blob(quality_scores.data(), {1, (int)quality_scores.size()}, opts);
-    auto t_float = t.to(torch::kFloat32);
-    t.index({torch::indexing::Slice()}) =
-            -torch::max_pool1d(-t_float, pool_window, 1, pool_window / 2);
+    auto opts = at::TensorOptions().dtype(at::kChar);
+    at::Tensor t = at::from_blob(quality_scores.data(), {1, (int)quality_scores.size()}, opts);
+    auto t_float = t.to(at::kFloat);
+    t.index({at::indexing::Slice()}) = -at::max_pool1d(-t_float, pool_window, 1, pool_window / 2);
 }
 
 const std::string get_stereo_model_name(const std::string& simplex_model_name,

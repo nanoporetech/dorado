@@ -10,6 +10,7 @@ Dorado is a high-performance, easy-to-use, open source basecaller for Oxford Nan
 * [Duplex basecalling](#duplex) (watch the following video for an introduction to [Duplex](https://youtu.be/8DVMG7FEBys)).
 * Simplex [barcode classification](#barcode-classification).
 * Support for aligned read output in SAM/BAM.
+* Initial support for [poly(A) tail estimation](#polya-tail-estimation).
 * [POD5](https://github.com/nanoporetech/pod5-file-format) support for highest basecalling performance.
 * Based on libtorch, the C++ API for pytorch.
 * Multiple custom optimisations in CUDA and Metal for maximising inference performance.
@@ -18,10 +19,10 @@ If you encounter any problems building or running Dorado, please [report an issu
 
 ## Installation
 
- - [dorado-0.4.1-linux-x64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.4.1-linux-x64.tar.gz)
- - [dorado-0.4.1-linux-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.4.1-linux-arm64.tar.gz)
- - [dorado-0.4.1-osx-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.4.1-osx-arm64.zip)
- - [dorado-0.4.1-win64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.4.1-win64.zip)
+ - [dorado-0.4.3-linux-x64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.4.3-linux-x64.tar.gz)
+ - [dorado-0.4.3-linux-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.4.3-linux-arm64.tar.gz)
+ - [dorado-0.4.3-osx-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.4.3-osx-arm64.zip)
+ - [dorado-0.4.3-win64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.4.3-win64.zip)
 
 ## Platforms
 
@@ -42,7 +43,7 @@ Linux or Windows systems not listed above but which have Nvidia GPUs with ≥8 G
 
 If you encounter problems with running on your system, please [report an issue](https://github.com/nanoporetech/dorado/issues).
 
-AWS Benchmarks on NVIDIA GPUs for Dorado 0.3.0 are available [here](https://aws.amazon.com/blogs/hpc/benchmarking-the-oxford-nanopore-technologies-basecallers-on-aws/). Please note: Dorado's basecalling speed is continuously improving, so these benchmarks may not reflect performance with the latest release.
+AWS Benchmarks on Nvidia GPUs for Dorado 0.3.0 are available [here](https://aws.amazon.com/blogs/hpc/benchmarking-the-oxford-nanopore-technologies-basecallers-on-aws/). Please note: Dorado's basecalling speed is continuously improving, so these benchmarks may not reflect performance with the latest release.
 
 ## Roadmap
 
@@ -94,7 +95,7 @@ To call modifications, add `--modified-bases` to the basecaller command:
 $ dorado basecaller dna_r10.4.1_e8.2_400bps_hac@v4.1.0 pod5s/ --modified-bases 5mCG_5hmCG > calls.bam
 ```
 
-Refer to the [modified base models](#modified-base-models) section to see available modifications.
+Refer to the [DNA models](#dna-models) table's _Compatible Modifications_ column to see available modifications that can be called with the `--modified-bases` option.
 
 ### Duplex
 
@@ -186,7 +187,7 @@ $ dorado demux --kit-name <kit-name> --output-dir <output-folder-for-demuxed-bam
 
 `<reads>` can either be an HTS format file (e.g. fastq, BAM, etc.) or a stream of an HTS format (e.g. the output of dorado basecalling).
 
-This results in multiple BAM files being generated in the output folder, one per barcode (formatted as `KITNAME_BARCODEXX.bam` and one for all unclassified reads. As with the in-line mode, `--no-trim` and `--barcode-both-ends` are also available as additional options.
+This results in multiple BAM files being generated in the output folder, one per barcode (formatted as `KITNAME_BARCODEXX.bam`) and one for all unclassified reads. As with the in-line mode, `--no-trim` and `--barcode-both-ends` are also available as additional options.
 
 Here is an example output folder
 ```
@@ -199,6 +200,13 @@ SQK-RPB004_barcode03.bam
 ...
 unclassified.bam
 ```
+
+#### Using a sample sheet
+Dorado is able to use a sample sheet to restrict the barcode classifications to only those present, and to apply aliases to the detected classifications. This is enabled by passing the path to a sample sheet to the `--sample-sheet` argument when using the `basecaller` or `demux` commands. See [here](documentation/SampleSheets.md) for more information.
+
+### Poly(A) tail estimation
+
+Dorado has initial support for estimating poly(A) tail lengths for cDNA and RNA. Note that Oxford Nanopore cDNA reads are sequenced in two different orientations and Dorado poly(A) tail length estimation handles both (A and T homopolymers). This feature can be enabled by passing `--estimate-poly-a` to the `basecaller` command. It is disabled by default. The estimated tail length is stored in the `pt:i` tag of the output record. Reads for which the tail length could not be estimated will not have the `pt:i` tag.
 
 ## Available basecalling models
 
@@ -218,7 +226,7 @@ The names of Dorado models are systematically structured, each segment correspon
 
 - **Pore Type (`r10.4.1`)**: This section corresponds to the type of flow cell used. For instance, FLO-MIN114/FLO-FLG114 is indicated by `r10.4.1`, while FLO-MIN106D/FLO-FLG001 is signified by `r9.4.1`.
 
-- **Chemistry Type (`e8.2`)**: This represents the chemistry type, which corresponds to the kit used for sequencing. For example, Kit 14 chemistry is denoted by `e8.2`.
+- **Chemistry Type (`e8.2`)**: This represents the chemistry type, which corresponds to the kit used for sequencing. For example, Kit 14 chemistry is denoted by `e8.2` and Kit 10 or Kit 9 are denoted by `e8`.
 
 - **Translocation Speed (`400bps`)**: This parameter, selected at the run setup in MinKNOW, refers to the speed of translocation. Prior to starting your run, a prompt will ask if you prefer to run at 260 bps or 400 bps. The former yields more accurate results but provides less data. As of MinKNOW version 23.04, the 260 bps option has been deprecated.
 
@@ -235,7 +243,7 @@ Below is a table of the available basecalling models and the modified basecallin
 | :-------- | :------- | :--- | :--- |
 | **dna_r10.4.1_e8.2_400bps_fast@v4.2.0** | 5mCG_5hmCG | v2 | 5 kHz |
 | **dna_r10.4.1_e8.2_400bps_hac@v4.2.0** | 5mCG_5hmCG | v2 | 5 kHz |
-| **dna_r10.4.1_e8.2_400bps_sup@v4.2.0** | 5mCG_5hmCG<br />5mC_5hmC<br />5mC<br />6mA<br />| v3<br />v1<br />v2<br />v3| 5 kHz |
+| **dna_r10.4.1_e8.2_400bps_sup@v4.2.0** | 5mCG_5hmCG<br />5mC_5hmC<br />5mC<br />6mA<br />| v3.1<br />v1<br />v2<br />v3| 5 kHz |
 | dna_r10.4.1_e8.2_400bps_fast@v4.1.0 | 5mCG_5hmCG | v2 | 4 kHz |
 | dna_r10.4.1_e8.2_400bps_hac@v4.1.0 | 5mCG_5hmCG | v2 | 4 kHz |
 | dna_r10.4.1_e8.2_400bps_sup@v4.1.0 | 5mCG_5hmCG | v2 | 4 kHz |
@@ -261,13 +269,13 @@ Below is a table of the available basecalling models and the modified basecallin
 
 ### **RNA models:**
 
-| Basecalling Models |
-| :-------- |
-| rna004_130bps_fast@v3.0.1 |
-| rna004_130bps_hac@v3.0.1 |
-| rna004_130bps_sup@v3.0.1 |
-| rna002_70bps_fast@v3 |
-| rna002_70bps_hac@v3 |
+| Basecalling Models | Compatible<br />Modifications | Modifications<br />Model<br />Version | Data<br />Sampling<br />Frequency |
+| :-------- | :------- | :--- | :--- |
+| **rna004_130bps_fast@v3.0.1** | N/A | N/A | 4 kHz |
+| **rna004_130bps_hac@v3.0.1** | N/A | N/A | 4 kHz |
+| **rna004_130bps_sup@v3.0.1** | m6A_DRACH | v1 | 4 kHz |
+| rna002_70bps_fast@v3 | N/A | N/A | 3 kHz |
+| rna002_70bps_hac@v3 | N/A | N/A | 3 kHz |
 
 
 ## Developer quickstart

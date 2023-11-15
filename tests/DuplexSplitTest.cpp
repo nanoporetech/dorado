@@ -1,11 +1,12 @@
 #include "MessageSinkUtils.h"
 #include "TestUtils.h"
-#include "read_pipeline/DuplexSplitNode.h"
-#include "read_pipeline/NullNode.h"
 #include "read_pipeline/PairingNode.h"
 #include "read_pipeline/ReadPipeline.h"
+#include "read_pipeline/ReadSplitNode.h"
 #include "read_pipeline/StereoDuplexEncoderNode.h"
 #include "read_pipeline/SubreadTaggerNode.h"
+#include "splitter/DuplexReadSplitter.h"
+#include "splitter/ReadSplitter.h"
 
 #include <catch2/catch.hpp>
 #include <torch/torch.h>
@@ -26,9 +27,9 @@ auto make_read() {
     read->range = 0;
     read->read_common.sample_rate = 4000;
     read->offset = -287;
-    read->scaling = 0.14620706;
-    read->read_common.shift = 94.717316;
-    read->read_common.scale = 26.888939;
+    read->scaling = 0.14620706f;
+    read->read_common.shift = 94.717316f;
+    read->read_common.scale = 26.888939f;
     read->read_common.model_stride = 5;
     read->read_common.read_id = "00a2dd45-f6a9-49ba-86ee-5d2a37b861cb";
     read->read_common.num_trimmed_samples = 10;
@@ -45,8 +46,11 @@ auto make_read() {
     read->read_common.qstring = ReadFileIntoString(DataPath("qstring"));
     read->read_common.moves = ReadFileIntoVector(DataPath("moves"));
     torch::load(read->read_common.raw_data, DataPath("raw.tensor").string());
-    read->read_common.raw_data = read->read_common.raw_data.to(torch::kFloat16);
+    read->read_common.raw_data = read->read_common.raw_data.to(at::ScalarType::Half);
     read->read_common.read_tag = 42;
+
+    read->prev_read = "prev";
+    read->next_read = "next";
 
     return read;
 }
@@ -55,46 +59,66 @@ auto make_read() {
 TEST_CASE("4 subread splitting test", TEST_GROUP) {
     auto read = make_read();
 
-    dorado::DuplexSplitSettings splitter_settings;
-    dorado::DuplexSplitNode splitter_node(splitter_settings, 1);
+    dorado::splitter::DuplexSplitSettings splitter_settings;
+    dorado::splitter::DuplexReadSplitter splitter_node(splitter_settings);
 
     const auto split_res = splitter_node.split(std::move(read));
-    REQUIRE(split_res.size() == 4);
+    CHECK(split_res.size() == 4);
     std::vector<int> split_sizes;
     for (auto &r : split_res) {
-        split_sizes.push_back(r->read_common.seq.size());
+        split_sizes.push_back(int(r->read_common.seq.size()));
     }
-    REQUIRE(split_sizes == std::vector<int>{6858, 7854, 5184, 5168});
+    CHECK(split_sizes == std::vector<int>{6858, 7854, 5184, 5168});
 
     std::vector<std::string> start_times;
     for (auto &r : split_res) {
         start_times.push_back(r->read_common.attributes.start_time);
     }
-    REQUIRE(start_times == std::vector<std::string>{"2023-02-21T12:46:01.529+00:00",
-                                                    "2023-02-21T12:46:25.837+00:00",
-                                                    "2023-02-21T12:46:39.607+00:00",
-                                                    "2023-02-21T12:46:53.105+00:00"});
+    CHECK(start_times == std::vector<std::string>{
+                                 "2023-02-21T12:46:01.529+00:00", "2023-02-21T12:46:25.837+00:00",
+                                 "2023-02-21T12:46:39.607+00:00", "2023-02-21T12:46:53.105+00:00"});
 
     std::vector<uint64_t> start_time_mss;
     for (auto &r : split_res) {
         start_time_mss.push_back(r->read_common.start_time_ms);
     }
-    REQUIRE(start_time_mss ==
-            std::vector<uint64_t>{1676983561529, 1676983585837, 1676983599607, 1676983613105});
+    CHECK(start_time_mss ==
+          std::vector<uint64_t>{1676983561529, 1676983585837, 1676983599607, 1676983613105});
 
-    std::vector<uint64_t> num_sampless;
+    std::vector<uint64_t> num_samples;
     for (auto &r : split_res) {
-        num_sampless.push_back(r->read_common.attributes.num_samples);
+        num_samples.push_back(r->read_common.attributes.num_samples);
     }
-    REQUIRE(num_sampless == std::vector<uint64_t>{97125, 55055, 53940, 50475});
+    CHECK(num_samples == std::vector<uint64_t>{97125, 55055, 53940, 50475});
+
+    std::vector<uint32_t> split_points;
+    for (auto &r : split_res) {
+        split_points.push_back(r->read_common.split_point);
+    }
+    CHECK(split_points == std::vector<uint32_t>{0, 97230, 152310, 206305});
 
     std::set<std::string> names;
     for (auto &r : split_res) {
         names.insert(r->read_common.read_id);
     }
-    REQUIRE(names.size() == 4);
-    REQUIRE(std::all_of(split_res.begin(), split_res.end(),
-                        [](const auto &r) { return r->read_common.read_tag == 42; }));
+    CHECK(names.size() == 4);
+    CHECK(std::all_of(split_res.begin(), split_res.end(),
+                      [](const auto &r) { return r->read_common.read_tag == 42; }));
+
+    std::vector<std::string> prev_read_names;
+    std::vector<std::string> next_read_names;
+    for (auto &r : split_res) {
+        prev_read_names.push_back(r->prev_read);
+        next_read_names.push_back(r->next_read);
+    }
+    CHECK(prev_read_names == std::vector<std::string>{"prev",
+                                                      "e7e47439-5968-4883-96ff-7f2d2040dc43",
+                                                      "a62e28ab-c367-4a93-af9b-84130d3df58c",
+                                                      "f8e75422-3275-47f6-b45f-062aa00df368"});
+    CHECK(next_read_names == std::vector<std::string>{"a62e28ab-c367-4a93-af9b-84130d3df58c",
+                                                      "f8e75422-3275-47f6-b45f-062aa00df368",
+                                                      "c4219558-db6c-476e-a9e5-81f4694f263c",
+                                                      "next"});
 }
 
 TEST_CASE("4 subread split tagging", TEST_GROUP) {
@@ -106,10 +130,14 @@ TEST_CASE("4 subread split tagging", TEST_GROUP) {
     auto tag_node = pipeline_desc.add_node<dorado::SubreadTaggerNode>({sink});
     auto stereo_node = pipeline_desc.add_node<dorado::StereoDuplexEncoderNode>(
             {tag_node}, read->read_common.model_stride);
-    auto pairing_node = pipeline_desc.add_node<dorado::PairingNode>({stereo_node},
-                                                                    dorado::ReadOrder::BY_CHANNEL);
-    auto splitter_node = pipeline_desc.add_node<dorado::DuplexSplitNode>(
-            {pairing_node}, dorado::DuplexSplitSettings{}, 1);
+    auto pairing_node = pipeline_desc.add_node<dorado::PairingNode>(
+            {stereo_node},
+            dorado::DuplexPairingParameters{dorado::ReadOrder::BY_CHANNEL,
+                                            dorado::DEFAULT_DUPLEX_CACHE_DEPTH},
+            2, 1000);
+    auto splitter = std::make_unique<const dorado::splitter::DuplexReadSplitter>(
+            dorado::splitter::DuplexSplitSettings{});
+    pipeline_desc.add_node<dorado::ReadSplitNode>({pairing_node}, std::move(splitter), 1);
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
 
     pipeline->push_message(std::move(read));
@@ -145,9 +173,9 @@ TEST_CASE("No split output read properties", TEST_GROUP) {
     read->range = 0;
     read->read_common.sample_rate = 4000;
     read->offset = -287;
-    read->scaling = 0.14620706;
-    read->read_common.shift = 94.717316;
-    read->read_common.scale = 26.888939;
+    read->scaling = 0.14620706f;
+    read->read_common.shift = 94.717316f;
+    read->read_common.scale = 26.888939f;
     read->read_common.model_stride = 5;
     read->read_common.read_id = init_read_id;
     read->read_common.num_trimmed_samples = 10;
@@ -164,14 +192,15 @@ TEST_CASE("No split output read properties", TEST_GROUP) {
     read->read_common.qstring = std::string(read->read_common.seq.length(), '!');
     read->read_common.moves = std::vector<uint8_t>(read->read_common.seq.length(), 1);
     read->read_common.raw_data =
-            torch::zeros(read->read_common.seq.length() * 10).to(torch::kFloat16);
+            at::zeros(read->read_common.seq.length() * 10).to(at::ScalarType::Half);
     read->read_common.read_tag = 42;
 
     dorado::PipelineDescriptor pipeline_desc;
     std::vector<dorado::Message> messages;
     auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 3, messages);
-    auto splitter_node = pipeline_desc.add_node<dorado::DuplexSplitNode>(
-            {sink}, dorado::DuplexSplitSettings{}, 1);
+    auto splitter = std::make_unique<dorado::splitter::DuplexReadSplitter>(
+            dorado::splitter::DuplexSplitSettings{});
+    pipeline_desc.add_node<dorado::ReadSplitNode>({sink}, std::move(splitter), 1);
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
 
     pipeline->push_message(std::move(read));
@@ -193,9 +222,9 @@ TEST_CASE("Test split where only one subread is generated", TEST_GROUP) {
     read->range = 0;
     read->read_common.sample_rate = 5000;
     read->offset = -260;
-    read->scaling = 0.18707;
-    read->read_common.shift = 94.7565;
-    read->read_common.scale = 29.4467;
+    read->scaling = 0.18707f;
+    read->read_common.shift = 94.7565f;
+    read->read_common.scale = 29.4467f;
     read->read_common.model_stride = 6;
     read->read_common.read_id = "6571a1d9-5dff-44f4-a526-558584ccea82";
     read->read_common.num_trimmed_samples = 4010;
@@ -212,14 +241,15 @@ TEST_CASE("Test split where only one subread is generated", TEST_GROUP) {
     read->read_common.qstring = ReadFileIntoString(data_dir / "qstring");
     read->read_common.moves = ReadFileIntoVector(data_dir / "moves");
     torch::load(read->read_common.raw_data, (data_dir / "raw.tensor").string());
-    read->read_common.raw_data = read->read_common.raw_data.to(torch::kFloat16);
+    read->read_common.raw_data = read->read_common.raw_data.to(at::ScalarType::Half);
     read->read_common.read_tag = 42;
     dorado::PipelineDescriptor pipeline_desc;
 
     std::vector<dorado::Message> messages;
     auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 3, messages);
-    auto splitter_node = pipeline_desc.add_node<dorado::DuplexSplitNode>(
-            {sink}, dorado::DuplexSplitSettings{}, 1);
+    auto splitter = std::make_unique<dorado::splitter::DuplexReadSplitter>(
+            dorado::splitter::DuplexSplitSettings{});
+    pipeline_desc.add_node<dorado::ReadSplitNode>({sink}, std::move(splitter), 1);
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
 
     pipeline->push_message(std::move(read));

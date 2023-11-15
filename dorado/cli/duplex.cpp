@@ -13,11 +13,14 @@
 #include "read_pipeline/ProgressTracker.h"
 #include "read_pipeline/ReadFilterNode.h"
 #include "read_pipeline/ReadToBamTypeNode.h"
+#include "utils/SampleSheet.h"
 #include "utils/bam_utils.h"
 #include "utils/basecaller_utils.h"
 #include "utils/duplex_utils.h"
 #include "utils/log_utils.h"
 #include "utils/parameters.h"
+#include "utils/stats.h"
+#include "utils/sys_stats.h"
 #include "utils/torch_utils.h"
 #include "utils/types.h"
 
@@ -110,7 +113,13 @@ int duplex(int argc, char* argv[]) {
             .help("Path to reference for alignment.")
             .default_value(std::string(""));
 
-    parser.visible.add_argument("-v", "--verbose").default_value(false).implicit_value(true);
+    int verbosity = 0;
+    parser.visible.add_argument("-v", "--verbose")
+            .default_value(false)
+            .implicit_value(true)
+            .nargs(0)
+            .action([&](const auto&) { ++verbosity; })
+            .append();
 
     parser.visible.add_argument("--modified-bases")
             .nargs(argparse::nargs_pattern::at_least_one)
@@ -137,7 +146,7 @@ int duplex(int argc, char* argv[]) {
             .help("the minimum predicted methylation probability for a modified base to be emitted "
                   "in an all-context model, [0, 1]");
 
-    cli::add_minimap2_arguments(parser, Aligner::dflt_options);
+    cli::add_minimap2_arguments(parser, AlignerNode::dflt_options);
     cli::add_internal_arguments(parser);
 
     try {
@@ -158,7 +167,7 @@ int duplex(int argc, char* argv[]) {
         const bool basespace_duplex = (model.compare("basespace") == 0);
         std::vector<std::string> args(argv, argv + argc);
         if (parser.visible.get<bool>("--verbose")) {
-            utils::SetDebugLogging();
+            utils::SetVerboseLogging(static_cast<dorado::utils::VerboseLogLevel>(verbosity));
         }
 
         auto mod_bases = parser.visible.get<std::vector<std::string>>("--modified-bases");
@@ -205,6 +214,14 @@ int duplex(int argc, char* argv[]) {
         }
 
         if (emit_fastq) {
+            if (!parser.visible.get<std::string>("--reference").empty()) {
+                spdlog::error(
+                        "--emit-fastq cannot be used with --reference as FASTQ cannot store "
+                        "alignment results.");
+                std::exit(EXIT_FAILURE);
+            }
+            spdlog::info(
+                    " - Note: FASTQ output is not recommended as not all data can be preserved.");
             output_mode = HtsWriter::OutputMode::FASTQ;
         } else if (emit_sam || utils::is_fd_tty(stdout)) {
             output_mode = HtsWriter::OutputMode::SAM;
@@ -213,6 +230,10 @@ int duplex(int argc, char* argv[]) {
         }
 
         bool recursive_file_loading = parser.visible.get<bool>("--recursive");
+
+        const std::string dump_stats_file = parser.hidden.get<std::string>("--dump_stats_file");
+        const std::string dump_stats_filter = parser.hidden.get<std::string>("--dump_stats_filter");
+        const size_t max_stats_records = static_cast<size_t>(dump_stats_file.empty() ? 0 : 100000);
 
         size_t num_reads = (basespace_duplex ? read_list_from_pairs.size()
                                              : DataLoader::get_num_reads(reads, read_list, {},
@@ -230,15 +251,15 @@ int duplex(int argc, char* argv[]) {
             hts_writer = pipeline_desc.add_node<HtsWriter>({}, "-", output_mode, 4, num_reads);
             converted_reads_sink = hts_writer;
         } else {
-            auto options = cli::process_minimap2_arguments(parser, Aligner::dflt_options);
-            aligner = pipeline_desc.add_node<Aligner>({}, ref, options,
-                                                      std::thread::hardware_concurrency());
+            auto options = cli::process_minimap2_arguments(parser, AlignerNode::dflt_options);
+            aligner = pipeline_desc.add_node<AlignerNode>({}, ref, options,
+                                                          std::thread::hardware_concurrency());
             hts_writer = pipeline_desc.add_node<HtsWriter>({}, "-", output_mode, 4, num_reads);
             pipeline_desc.add_node_sink(aligner, hts_writer);
             converted_reads_sink = aligner;
         }
-        auto read_converter =
-                pipeline_desc.add_node<ReadToBamType>({converted_reads_sink}, emit_moves, 2);
+        auto read_converter = pipeline_desc.add_node<ReadToBamType>(
+                {converted_reads_sink}, emit_moves, 2, 0.0f, nullptr, 1000);
         auto duplex_read_tagger = pipeline_desc.add_node<DuplexReadTaggingNode>({read_converter});
         // The minimum sequence length is set to 5 to avoid issues with duplex node printing very short sequences for mismatched pairs.
         std::unordered_set<std::string> read_ids_to_filter;
@@ -246,13 +267,15 @@ int duplex(int argc, char* argv[]) {
                 {duplex_read_tagger}, min_qscore, default_parameters.min_sequence_length,
                 read_ids_to_filter, 5);
 
+        std::unique_ptr<dorado::Pipeline> pipeline;
+        ProgressTracker tracker(int(num_reads), duplex);
         std::vector<dorado::stats::StatsCallable> stats_callables;
-        ProgressTracker tracker(num_reads, duplex);
         stats_callables.push_back(
                 [&tracker](const stats::NamedStats& stats) { tracker.update_progress_bar(stats); });
         stats::NamedStats final_stats;
         std::unique_ptr<dorado::stats::StatsSampler> stats_sampler;
-        std::unique_ptr<dorado::Pipeline> pipeline;
+        std::vector<dorado::stats::StatsReporter> stats_reporters{dorado::stats::sys_stats_report};
+
         constexpr auto kStatsPeriod = 100ms;
 
         if (basespace_duplex) {  // Execute a Basespace duplex pipeline.
@@ -267,11 +290,10 @@ int duplex(int argc, char* argv[]) {
             spdlog::info("> Starting Basespace Duplex Pipeline");
             threads = threads == 0 ? std::thread::hardware_concurrency() : threads;
 
-            auto duplex_caller_node = pipeline_desc.add_node<BaseSpaceDuplexCallerNode>(
-                    {read_filter_node}, std::move(template_complement_map), std::move(read_map),
-                    threads);
+            pipeline_desc.add_node<BaseSpaceDuplexCallerNode>({read_filter_node},
+                                                              std::move(template_complement_map),
+                                                              std::move(read_map), threads);
 
-            std::vector<dorado::stats::StatsReporter> stats_reporters;
             pipeline = Pipeline::create(std::move(pipeline_desc), &stats_reporters);
             if (pipeline == nullptr) {
                 spdlog::error("Failed to create pipeline");
@@ -284,7 +306,7 @@ int duplex(int argc, char* argv[]) {
 
             constexpr auto kStatsPeriod = 100ms;
             stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
-                    kStatsPeriod, stats_reporters, stats_callables);
+                    kStatsPeriod, stats_reporters, stats_callables, max_stats_records);
         } else {  // Execute a Stereo Duplex pipeline.
 
             const auto model_path = std::filesystem::canonical(std::filesystem::path(model));
@@ -340,7 +362,7 @@ int duplex(int argc, char* argv[]) {
             read_groups.merge(
                     DataLoader::load_read_groups(reads, duplex_rg_name, recursive_file_loading));
             std::vector<std::string> barcode_kits;
-            utils::add_rg_hdr(hdr.get(), read_groups, barcode_kits);
+            utils::add_rg_hdr(hdr.get(), read_groups, barcode_kits, nullptr);
 
             int batch_size(parser.visible.get<int>("-b"));
             int chunk_size(parser.visible.get<int>("-c"));
@@ -380,7 +402,8 @@ int duplex(int argc, char* argv[]) {
 
             PairingParameters pairing_parameters;
             if (template_complement_map.empty()) {
-                pairing_parameters = ReadOrder::BY_CHANNEL;
+                pairing_parameters =
+                        DuplexPairingParameters{ReadOrder::BY_CHANNEL, DEFAULT_DUPLEX_CACHE_DEPTH};
             } else {
                 pairing_parameters = std::move(template_complement_map);
             }
@@ -394,11 +417,12 @@ int duplex(int argc, char* argv[]) {
                 }
             }
             pipelines::create_stereo_duplex_pipeline(
-                    pipeline_desc, std::move(runners), std::move(stereo_runners),
-                    std::move(mod_base_runners), overlap, mean_qscore_start_pos, num_devices * 2,
-                    num_devices, std::move(pairing_parameters), read_filter_node);
 
-            std::vector<dorado::stats::StatsReporter> stats_reporters;
+                    pipeline_desc, std::move(runners), std::move(stereo_runners),
+                    std::move(mod_base_runners), overlap, mean_qscore_start_pos,
+                    int(num_devices * 2), int(num_devices), std::move(pairing_parameters),
+                    read_filter_node);
+
             pipeline = Pipeline::create(std::move(pipeline_desc), &stats_reporters);
             if (pipeline == nullptr) {
                 spdlog::error("Failed to create pipeline");
@@ -409,7 +433,8 @@ int duplex(int argc, char* argv[]) {
             // rather than the pipeline framework.
             auto& hts_writer_ref = dynamic_cast<HtsWriter&>(pipeline->get_node_ref(hts_writer));
             if (!ref.empty()) {
-                const auto& aligner_ref = dynamic_cast<Aligner&>(pipeline->get_node_ref(aligner));
+                const auto& aligner_ref =
+                        dynamic_cast<AlignerNode&>(pipeline->get_node_ref(aligner));
                 utils::add_sq_hdr(hdr.get(), aligner_ref.get_sequence_records_for_header());
             }
             hts_writer_ref.set_and_write_header(hdr.get());
@@ -417,7 +442,7 @@ int duplex(int argc, char* argv[]) {
             DataLoader loader(*pipeline, "cpu", num_devices, 0, std::move(read_list));
 
             stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
-                    kStatsPeriod, stats_reporters, stats_callables);
+                    kStatsPeriod, stats_reporters, stats_callables, max_stats_records);
 
             // Run pipeline.
             loader.load_reads(reads, parser.visible.get<bool>("--recursive"),
@@ -433,6 +458,13 @@ int duplex(int argc, char* argv[]) {
 
         tracker.update_progress_bar(final_stats);
         tracker.summarize();
+        if (!dump_stats_file.empty()) {
+            std::ofstream stats_file(dump_stats_file);
+            stats_sampler->dump_stats(stats_file,
+                                      dump_stats_filter.empty()
+                                              ? std::nullopt
+                                              : std::optional<std::regex>(dump_stats_filter));
+        }
     } catch (const std::exception& e) {
         spdlog::error(e.what());
         return 1;

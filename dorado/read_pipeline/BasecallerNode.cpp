@@ -38,7 +38,7 @@ struct BasecallerNode::BasecallingRead {
 };
 
 void BasecallerNode::input_worker_thread() {
-    torch::InferenceMode inference_mode_guard;
+    at::InferenceMode inference_mode_guard;
 
     Message message;
     while (get_input_message(message)) {
@@ -50,7 +50,7 @@ void BasecallerNode::input_worker_thread() {
         }
 
         // Get the common read data.
-        const ReadCommon &read_common_data = get_read_common_data(message);
+        ReadCommon &read_common_data = get_read_common_data(message);
         // If a read has already been basecalled, just send it to the sink without basecalling again
         // TODO: This is necessary because some reads (e.g failed Stereo Encoding) will be passed
         // to the basecaller node having already been called. This should be fixed in the future with
@@ -59,6 +59,9 @@ void BasecallerNode::input_worker_thread() {
             send_message_to_sink(std::move(message));
             continue;
         }
+
+        // If this is a duplex read, raw_data won't have been generated yet.
+        materialise_read_raw_data(message);
 
         // Now that we have acquired a read, wait until we can push to chunks_in
         // Chunk up the read and put the chunks into the pending chunk list.
@@ -84,7 +87,7 @@ void BasecallerNode::input_worker_thread() {
             offset = std::min(offset + signal_chunk_step, last_chunk_offset);
             read_chunks.push_back(std::make_unique<BasecallingChunk>(
                     working_read, offset, chunk_in_read_idx++, m_chunk_size));
-            num_chunks++;
+            ++num_chunks;
         }
         working_read->called_chunks.resize(num_chunks);
         working_read->num_chunks_called.store(0);
@@ -93,6 +96,8 @@ void BasecallerNode::input_worker_thread() {
         // Put the read in the working list
         {
             std::lock_guard working_reads_lock(m_working_reads_mutex);
+            m_working_reads_signal_bytes +=
+                    get_read_common_data(working_read->read).raw_data.nbytes();
             m_working_reads.insert(std::move(working_read));
             ++m_working_reads_size;
         }
@@ -113,7 +118,7 @@ void BasecallerNode::basecall_current_batch(int worker_id) {
     NVTX3_FUNC_RANGE();
     auto model_runner = m_model_runners[worker_id];
     dorado::stats::Timer timer;
-    auto decode_results = model_runner->call_chunks(m_batched_chunks[worker_id].size());
+    auto decode_results = model_runner->call_chunks(int(m_batched_chunks[worker_id].size()));
     m_call_chunks_ms += timer.GetElapsedMS();
 
     for (size_t i = 0; i < m_batched_chunks[worker_id].size(); i++) {
@@ -131,7 +136,7 @@ void BasecallerNode::basecall_current_batch(int worker_id) {
 }
 
 void BasecallerNode::working_reads_manager() {
-    torch::InferenceMode inference_mode_guard;
+    at::InferenceMode inference_mode_guard;
 
     std::unique_ptr<BasecallingChunk> chunk;
     while (m_processed_chunks.try_pop(chunk) == utils::AsyncQueueStatus::Success) {
@@ -169,6 +174,7 @@ void BasecallerNode::working_reads_manager() {
                 std::unique_lock<std::mutex> working_reads_lock(m_working_reads_mutex);
                 auto read_iter = m_working_reads.find(working_read);
                 if (read_iter != m_working_reads.end()) {
+                    m_working_reads_signal_bytes -= read_common_data.raw_data.nbytes();
                     m_working_reads.erase(read_iter);
                     --m_working_reads_size;
                 } else {
@@ -189,10 +195,10 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
     // Model execution creates GPU-related autorelease objects.
     utils::ScopedAutoReleasePool autorelease_pool;
 #endif
-    torch::InferenceMode inference_mode_guard;
+    at::InferenceMode inference_mode_guard;
 
     auto last_chunk_reserve_time = std::chrono::system_clock::now();
-    int batch_size = m_model_runners[worker_id]->batch_size();
+    int batch_size = int(m_model_runners[worker_id]->batch_size());
     while (true) {
         std::unique_ptr<BasecallingChunk> chunk;
         const auto pop_status = m_chunks_in.try_pop_until(
@@ -215,7 +221,7 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
 
         // There's chunks to get_scores, so let's add them to our input tensor
         // FIXME -- it should not be possible to for this condition to be untrue.
-        if (m_batched_chunks[worker_id].size() != batch_size) {
+        if (m_batched_chunks[worker_id].size() != size_t(batch_size)) {
             // Copy the chunk into the input tensor
             auto &source_read = chunk->owning_read->read;
 
@@ -255,7 +261,7 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
             last_chunk_reserve_time = std::chrono::system_clock::now();
         }
 
-        if (m_batched_chunks[worker_id].size() == batch_size) {
+        if (m_batched_chunks[worker_id].size() == size_t(batch_size)) {
             // Input tensor is full, let's get_scores.
             basecall_current_batch(worker_id);
         }
@@ -282,11 +288,11 @@ namespace {
 
 // Calculates the input queue size.
 size_t CalcMaxChunksIn(const std::vector<Runner> &model_runners) {
-    // Allow 5 batches per model runner on the chunks_in queue
+    // Allow 2 batches per model runner on the chunks_in queue
     size_t max_chunks_in = 0;
     // Allows optimal batch size to be used for every GPU
     for (auto &runner : model_runners) {
-        max_chunks_in += runner->batch_size() * 5;
+        max_chunks_in += runner->batch_size() * 2;
     }
     return max_chunks_in;
 }
@@ -309,8 +315,6 @@ BasecallerNode::BasecallerNode(std::vector<Runner> model_runners,
           m_rna(is_rna_model(m_model_runners.front()->config())),
           m_batch_timeout_ms(batch_timeout_ms),
           m_model_name(std::move(model_name)),
-          m_max_reads(max_reads),
-          m_in_duplex_pipeline(in_duplex_pipeline),
           m_mean_qscore_start_pos(read_mean_qscore_start_pos),
           m_chunks_in(CalcMaxChunksIn(m_model_runners)),
           m_processed_chunks(CalcMaxChunksIn(m_model_runners)),
@@ -331,14 +335,14 @@ void BasecallerNode::start_threads() {
     m_input_worker = std::make_unique<std::thread>([this] { input_worker_thread(); });
     const size_t num_workers = m_model_runners.size();
     m_working_reads_managers.resize(std::max(size_t{1}, num_workers / 2));
-    for (int i = 0; i < m_working_reads_managers.size(); i++) {
+    for (size_t i = 0; i < m_working_reads_managers.size(); i++) {
         m_working_reads_managers[i] = std::thread([this] { working_reads_manager(); });
     }
     m_basecall_workers.resize(num_workers);
     for (int i = 0; i < static_cast<int>(num_workers); i++) {
         m_basecall_workers[i] = std::thread([this, i] { basecall_worker_thread(i); });
     }
-    m_num_active_model_runners = num_workers;
+    m_num_active_model_runners = int(num_workers);
 }
 
 void BasecallerNode::terminate_impl() {
@@ -378,13 +382,14 @@ stats::NamedStats BasecallerNode::sample_stats() const {
         const auto runner_stats = stats::from_obj(*runner);
         stats.insert(runner_stats.begin(), runner_stats.end());
     }
-    stats["batches_called"] = m_num_batches_called;
-    stats["partial_batches_called"] = m_num_partial_batches_called;
-    stats["call_chunks_ms"] = m_call_chunks_ms;
-    stats["called_reads_pushed"] = m_called_reads_pushed;
-    stats["working_reads_items"] = m_working_reads_size;
-    stats["bases_processed"] = m_num_bases_processed;
-    stats["samples_processed"] = m_num_samples_processed;
+    stats["batches_called"] = double(m_num_batches_called);
+    stats["partial_batches_called"] = double(m_num_partial_batches_called);
+    stats["call_chunks_ms"] = double(m_call_chunks_ms);
+    stats["called_reads_pushed"] = double(m_called_reads_pushed);
+    stats["working_reads_items"] = double(m_working_reads_size);
+    stats["working_reads_signal_mb"] = double(m_working_reads_signal_bytes) / double((1024 * 1024));
+    stats["bases_processed"] = double(m_num_bases_processed);
+    stats["samples_processed"] = double(m_num_samples_processed);
     return stats;
 }
 

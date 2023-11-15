@@ -94,7 +94,7 @@ TEST_CASE(TEST_GROUP "Load data sorted by channel id.") {
 
     dorado::PipelineDescriptor pipeline_desc;
     std::vector<dorado::Message> messages;
-    auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
+    pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
 
     dorado::DataLoader loader(*pipeline, "cpu", 1, 0);
@@ -103,7 +103,7 @@ TEST_CASE(TEST_GROUP "Load data sorted by channel id.") {
     auto reads = ConvertMessages<dorado::SimplexReadPtr>(std::move(messages));
 
     int start_channel_id = -1;
-    for (auto &i : reads) {
+    for (auto & i : reads) {
         CHECK(i->read_common.attributes.channel_number >= start_channel_id);
         start_channel_id = i->read_common.attributes.channel_number;
     }
@@ -128,5 +128,34 @@ TEST_CASE(TEST_GROUP "Test loading POD5 file with read ignore list") {
 
         CHECK(dorado::DataLoader::get_num_reads(data_path, read_list, read_ignore_list) == 0);
         CHECK(CountSinkReads(data_path, "cpu", 1, 0, read_list, read_ignore_list) == 0);
+    }
+}
+
+TEST_CASE(TEST_GROUP "Test correct previous and next read ids when loaded by channel order.") {
+    std::string data_path(get_data_dir("single_channel_multi_read_pod5"));
+
+    dorado::PipelineDescriptor pipeline_desc;
+    std::vector<dorado::Message> messages;
+    pipeline_desc.add_node<MessageSinkToVector>({}, 10, messages);
+    auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
+
+    dorado::DataLoader loader(*pipeline, "cpu", 1, 0);
+    loader.load_reads(data_path, true, dorado::ReadOrder::BY_CHANNEL);
+    pipeline.reset();
+    auto reads = ConvertMessages<dorado::SimplexReadPtr>(std::move(messages));
+    std::sort(reads.begin(), reads.end(), [](auto & a, auto & b) {
+        return a->read_common.start_time_ms < b->read_common.start_time_ms;
+    });
+
+    std::string prev_read_id = "";
+    for (auto & i : reads) {
+        CHECK(prev_read_id == i->prev_read);
+        prev_read_id = i->read_common.read_id;
+    }
+
+    std::string next_read_id = "";
+    for (auto i = reads.rbegin(); i != reads.rend(); i++) {
+        CHECK(next_read_id == (*i)->next_read);
+        next_read_id = (*i)->read_common.read_id;
     }
 }

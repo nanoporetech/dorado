@@ -5,6 +5,7 @@
 #include "utils/sequence_utils.h"
 
 #include <catch2/catch.hpp>
+#include <spdlog/spdlog.h>
 #include <torch/torch.h>
 
 #include <cstdint>
@@ -21,18 +22,18 @@ using namespace dorado;
 struct TestCase {
     int estimated_bases = 0;
     std::string test_dir;
-    bool is_rna = false;
+    bool is_rna;
 };
 
 TEST_CASE("PolyACalculator: Test polyT tail estimation", TEST_GROUP) {
     auto [gt, data, is_rna] = GENERATE(
-            TestCase{70, "poly_a/r9_rev_cdna", false}, TestCase{31, "poly_a/r10_fwd_cdna", false},
-            TestCase{22, "poly_a/rna002", true}, TestCase{7, "poly_a/rna004", true});
+            TestCase{143, "poly_a/r9_rev_cdna", false}, TestCase{35, "poly_a/r10_fwd_cdna", false},
+            TestCase{37, "poly_a/rna002", true}, TestCase{73, "poly_a/rna004", true});
 
     dorado::PipelineDescriptor pipeline_desc;
     std::vector<dorado::Message> messages;
     auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
-    auto estimator = pipeline_desc.add_node<PolyACalculator>({sink}, 2, is_rna);
+    pipeline_desc.add_node<PolyACalculator>({sink}, 2, is_rna);
 
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
 

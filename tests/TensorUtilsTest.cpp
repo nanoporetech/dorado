@@ -111,9 +111,9 @@ TEST_CASE(CUT_TAG ": copy_tensor_elems", CUT_TAG) {
         for (auto dest_dtype : {torch::kFloat16, torch::kFloat32}) {
             for (int i = 0; i < 10; ++i) {
                 const int src_size = rand() % 1000;
-                const torch::Tensor src_tensor = torch::rand({src_size}, src_dtype);
+                const at::Tensor src_tensor = torch::rand({src_size}, src_dtype);
                 const int dest_size = src_size + rand() % 1000;
-                const torch::Tensor orig_dest_tensor = torch::rand({dest_size}, dest_dtype);
+                const at::Tensor orig_dest_tensor = torch::rand({dest_size}, dest_dtype);
 
                 const int dest_offset = rand() % dest_size;
                 const int src_offset = rand() % src_size;

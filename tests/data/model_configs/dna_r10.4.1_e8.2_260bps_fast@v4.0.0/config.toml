@@ -1,0 +1,97 @@
+[model]
+package = "bonito.crf"
+
+[labels]
+labels = [ "N", "A", "C", "G", "T",]
+
+[input]
+features = 1
+
+[global_norm]
+state_len = 3
+
+[encoder]
+type = "serial"
+[[encoder.sublayers]]
+type = "convolution"
+insize = 1
+size = 16
+bias = true
+winlen = 5
+stride = 1
+padding = 2
+activation = "swish"
+norm = "batchnorm"
+
+[[encoder.sublayers]]
+type = "convolution"
+insize = 16
+size = 16
+bias = true
+winlen = 5
+stride = 1
+padding = 2
+activation = "swish"
+norm = "batchnorm"
+
+[[encoder.sublayers]]
+type = "convolution"
+insize = 16
+size = 96
+bias = true
+winlen = 19
+stride = 5
+padding = 9
+activation = "swish"
+norm = "batchnorm"
+
+[[encoder.sublayers]]
+type = "permute"
+dims = [ 2, 0, 1,]
+
+[[encoder.sublayers]]
+type = "lstm"
+size = 96
+insize = 96
+bias = true
+reverse = 1
+
+[[encoder.sublayers]]
+type = "lstm"
+size = 96
+insize = 96
+bias = true
+reverse = 0
+
+[[encoder.sublayers]]
+type = "lstm"
+size = 96
+insize = 96
+bias = true
+reverse = 1
+
+[[encoder.sublayers]]
+type = "lstm"
+size = 96
+insize = 96
+bias = true
+reverse = 0
+
+[[encoder.sublayers]]
+type = "lstm"
+size = 96
+insize = 96
+bias = true
+reverse = 1
+
+[[encoder.sublayers]]
+type = "linearcrfencoder"
+insize = 96
+n_base = 4
+state_len = 3
+bias = false
+blank_score = 2.0
+
+[qscore]
+bias = -3.0
+scale = 1.04

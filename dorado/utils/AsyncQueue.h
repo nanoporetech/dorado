@@ -263,9 +263,9 @@ public:
     std::unordered_map<std::string, double> sample_stats() const {
         std::unordered_map<std::string, double> stats;
         std::lock_guard<std::mutex> lock(m_mutex);
-        stats["items"] = m_items.size();
-        stats["pushes"] = m_num_pushes;
-        stats["pops"] = m_num_pops;
+        stats["items"] = double(m_items.size());
+        stats["pushes"] = double(m_num_pushes);
+        stats["pops"] = double(m_num_pops);
         return stats;
     }
 };

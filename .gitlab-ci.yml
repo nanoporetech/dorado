@@ -22,6 +22,7 @@ stages:
 variables:
   BUILD_DIR: build
   BUILD_TARGET: install
+  BUILD_TYPE: Release
   GIT_SUBMODULE_STRATEGY: recursive
   CUDA: "11.8"
   WIN_CUDA_TOOLKIT: "/c/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v${CUDA}"
@@ -43,7 +44,7 @@ variables:
 
 .linux_runner: &linux_runner
   tags:
-    - linux
+    - ubuntu-20.04
     - nvidia-docker
 
 .linux_arm64_runner: &linux_arm64_runner
@@ -77,11 +78,11 @@ variables:
   - export CCACHE_DIR=/data/gitlab-ci-cache
   - fi
   - ccache -s || true
-  - cmake ${BUILD_OPTIONS} -S . -B ${BUILD_DIR}
-  - cmake --build ${BUILD_DIR} --config Release --target ${BUILD_TARGET} -j 8
+  - cmake ${BUILD_OPTIONS} -S . -B ${BUILD_DIR} -DCMAKE_BUILD_TYPE=${BUILD_TYPE}
+  - cmake --build ${BUILD_DIR} --config ${BUILD_TYPE} --target ${BUILD_TARGET} -j 8
 
 .run_dorado_cmake_ctest: &run_dorado_cmake_ctest
-  - ctest -C Release --test-dir ${BUILD_DIR} --output-on-failure --verbose
+  - ctest -C ${BUILD_TYPE} --test-dir ${BUILD_DIR} --output-on-failure --verbose
 
 .build_dorado: &build_dorado
   stage: build
@@ -181,8 +182,17 @@ build:linux:x86:focal:
   image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.1
   variables:
     BUILD_OPTIONS: "-DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN} -DONT_MM2_EXE=ON"
-  <<: *linux_runner
-  <<: *build_dorado
+  extends:
+    - .linux_runner
+    - .build_dorado
+
+build:linux:x86:focal:debug:
+  variables:
+    BUILD_TYPE: "Debug"
+  extends:
+    - build:linux:x86:focal
+  rules:
+    - if: $CI_MERGE_REQUEST_EVENT_TYPE == "merged_result"
 
 build:linux:x86:focal_coverage:
   stage: build
@@ -228,6 +238,14 @@ build:windows:
     - export CUDA_TOOLKIT=$(cygpath -u $(cygpath -d "${WIN_CUDA_TOOLKIT}"))
     - export BUILD_OPTIONS="-A x64 -T cuda=${CUDA} -DCUDAToolkit_ROOT=${CUDA_TOOLKIT} -DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN}"
     - echo BUILD_OPTIONS is ${BUILD_OPTIONS}
+
+build:windows:debug:
+  variables:
+    BUILD_TYPE: "Debug"
+  extends:
+    - build:windows
+  rules:
+    - if: $CI_MERGE_REQUEST_EVENT_TYPE == "merged_result"
 
 build:windows_koi_download:
   <<: *windows_runner
@@ -567,6 +585,23 @@ mlhub:remora-validate:
       - DEVICE: 
         - "cuda:all"
         - "cpu"
+
+# MLHub - Dorado integration test
+mlhub:sweeper:
+  <<: *mlhub
+  script:
+    - |
+      curl --header "Content-Type: application/json" \
+      --request POST \
+      --data '{
+          "key": "'${MLHUB_TRIGGER_KEY_SWEEPER}'",
+          "job_name": "dorado-sweeper : '${CI_COMMIT_REF_NAME}' - '${CI_COMMIT_SHORT_SHA}'",
+          "script_parameters": {
+            "dorado_branch": "'${CI_COMMIT_SHA}'",
+            "dorado_exe": ""
+          }
+      }' \
+      ${MLHUB_TRIGGER_URL}
 
 # MLHub - Dorado integration test
 mlhub:dorado-integration-tests:

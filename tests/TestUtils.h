@@ -1,7 +1,5 @@
 #pragma once
 
-#include <catch2/catch.hpp>
-
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -9,7 +7,7 @@
 #include <string>
 #include <vector>
 
-static std::string get_data_dir(const std::string& sub_dir) {
+inline std::string get_data_dir(const std::string& sub_dir) {
     const std::filesystem::path data_path = std::filesystem::path("./tests/data/") / sub_dir;
 
     if (!std::filesystem::exists(data_path)) {
@@ -23,7 +21,7 @@ static std::string get_data_dir(const std::string& sub_dir) {
 }
 
 // Reads into a string.
-static std::string ReadFileIntoString(const std::filesystem::path& path) {
+inline std::string ReadFileIntoString(const std::filesystem::path& path) {
     const auto num_bytes = std::filesystem::file_size(path);
     std::string content;
     content.resize(num_bytes);
@@ -33,7 +31,7 @@ static std::string ReadFileIntoString(const std::filesystem::path& path) {
 }
 
 // Reads into a vector<uint8_t>.
-static std::vector<uint8_t> ReadFileIntoVector(const std::filesystem::path& path) {
+inline std::vector<uint8_t> ReadFileIntoVector(const std::filesystem::path& path) {
     const std::string str = ReadFileIntoString(path);
     std::vector<uint8_t> vec;
     vec.resize(str.size());

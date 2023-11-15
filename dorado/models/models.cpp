@@ -2,6 +2,15 @@
 
 #include <elzip/elzip.hpp>
 
+#ifndef _WIN32
+// Required for MSG_NOSIGNAL and SO_NOSIGPIPE
+#include <sys/socket.h>
+#include <sys/types.h>
+#endif
+
+#ifdef MSG_NOSIGNAL
+#define CPPHTTPLIB_SEND_FLAGS MSG_NOSIGNAL
+#endif
 #define CPPHTTPLIB_OPENSSL_SUPPORT
 #include <httplib.h>
 #include <spdlog/spdlog.h>
@@ -122,7 +131,7 @@ const ModelMap models = {
 namespace modified {
 
 const std::vector<std::string> mods = {
-        "5mC_5hmC", "5mCG", "5mCG_5hmCG", "5mC", "6mA",
+        "5mC_5hmC", "5mCG", "5mCG_5hmCG", "5mC", "6mA", "m6A_DRACH",
 };
 
 const ModelMap models = {
@@ -194,8 +203,8 @@ const ModelMap models = {
          {"2112aa355757906bfb815bf178fee260ad90cd353781ee45c121024c5caa7c6b"}},
         {"dna_r10.4.1_e8.2_400bps_sup@v4.2.0_5mCG_5hmCG@v2",
          {"6b3604799d85e81d06c97181af093b30483cec9ad02f54a631eca5806f7848ef"}},
-        {"dna_r10.4.1_e8.2_400bps_sup@v4.2.0_5mCG_5hmCG@v3",
-         {"9aad5395452ed49fb8442892a8b077afacb80664cf21cc442de76e820ed6e09c"}},
+        {"dna_r10.4.1_e8.2_400bps_sup@v4.2.0_5mCG_5hmCG@v3.1",
+         {"5f8016f1b47e3c31825233e1eac8b7074bd61705cb5dfeca9e588d5077b18b66"}},
         {"dna_r10.4.1_e8.2_400bps_sup@v4.2.0_5mC@v2",
          {"61ecdba6292637942bc9f143180054084f268d4f8a7e1c7a454413519d5458a7"}},
         {"dna_r10.4.1_e8.2_400bps_sup@v4.2.0_6mA@v2",
@@ -203,9 +212,11 @@ const ModelMap models = {
         {"dna_r10.4.1_e8.2_400bps_sup@v4.2.0_6mA@v3",
          {"903fb89e7c8929a3a66abf60eb6f1e1a7ab7b7e4a0c40f646dc0b13d5588174c"}},
         {"dna_r10.4.1_e8.2_400bps_sup@v4.2.0_5mC_5hmC@v1",
-         {"28d82762af14e18dd36fb1d9f044b1df96fead8183d3d1ef47a5e92048a2be27"}}
+         {"28d82762af14e18dd36fb1d9f044b1df96fead8183d3d1ef47a5e92048a2be27"}},
 
-};
+        // RNA004 v3.0.1
+        {"rna004_130bps_sup@v3.0.1_m6A_DRACH@v1",
+         {"356b3eed19916d83d59cbfd24bb9f33823d6f738891f3ac8fe77319ae5cbde7f"}}};
 
 }  // namespace modified
 
@@ -315,6 +326,16 @@ class ModelDownloader {
             spdlog::info("using proxy: {}:{}", proxy_url, proxy_port);
             http.set_proxy(proxy_url, proxy_port);
         }
+
+        http.set_socket_options([](socket_t sock) {
+#ifdef __APPLE__
+            // Disable SIGPIPE signal generation since it takes down the entire process
+            // whereas we can more gracefully handle the EPIPE error.
+            int enabled = 1;
+            setsockopt(sock, SOL_SOCKET, SO_NOSIGPIPE, reinterpret_cast<char*>(&enabled),
+                       sizeof(enabled));
+#endif
+        });
 
         return http;
     }

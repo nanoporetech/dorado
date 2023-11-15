@@ -2,7 +2,6 @@
 
 #include "simd.h"
 
-#include <htslib/sam.h>
 #include <nvtx3/nvtx3.hpp>
 
 #include <algorithm>
@@ -11,12 +10,6 @@
 #include <iterator>
 #include <numeric>
 #include <vector>
-
-#ifdef _WIN32
-// seq_nt16_str is referred to in the hts-3.lib stub on windows, but has not been declared dllimport for
-//  client code, so it comes up as an undefined reference when linking the stub.
-const char seq_nt16_str[] = "=ACMGRSVTWYHKDBN";
-#endif  // _WIN32
 
 namespace {
 
@@ -135,7 +128,7 @@ float mean_qscore_from_qstring(const std::string& qstring, int start_pos) {
         return 0.0f;
     }
 
-    if (start_pos >= qstring.length()) {
+    if (start_pos >= int(qstring.length())) {
         throw std::runtime_error("Mean q-score start position (" + std::to_string(start_pos) +
                                  ") is >= length of qstring (" + std::to_string(qstring.length()) +
                                  ")");
@@ -208,14 +201,6 @@ std::string reverse_complement(const std::string& sequence) {
     return reverse_complement_impl(sequence);
 }
 
-std::string convert_nt16_to_str(uint8_t* bseq, size_t slen) {
-    std::string seq(slen, '*');
-    for (int i = 0; i < slen; i++) {
-        seq[i] = seq_nt16_str[bam_seqi(bseq, i)];
-    }
-    return seq;
-}
-
 const std::vector<int> BaseInfo::BASE_IDS = []() {
     std::vector<int> base_ids(256, -1);
     base_ids['A'] = 0;
@@ -229,7 +214,7 @@ const std::vector<int> BaseInfo::BASE_IDS = []() {
 // in a given read.
 int count_trailing_chars(const std::string_view adapter, char c) {
     int count = 0;
-    for (int i = adapter.length() - 1; i >= 0; i--) {
+    for (size_t i = adapter.length() - 1; i >= 0; i--) {
         if (adapter[i] == c) {
             count++;
         } else {

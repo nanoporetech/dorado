@@ -15,12 +15,14 @@
 #include "read_pipeline/ReadFilterNode.h"
 #include "read_pipeline/ReadToBamTypeNode.h"
 #include "read_pipeline/ResumeLoaderNode.h"
+#include "utils/SampleSheet.h"
 #include "utils/bam_utils.h"
 #include "utils/barcode_kits.h"
 #include "utils/basecaller_utils.h"
 #include "utils/log_utils.h"
 #include "utils/parameters.h"
 #include "utils/stats.h"
+#include "utils/sys_stats.h"
 #include "utils/torch_utils.h"
 
 #include <argparse.hpp>
@@ -59,7 +61,7 @@ void setup(std::vector<std::string> args,
            size_t min_qscore,
            std::string read_list_file_path,
            bool recursive_file_loading,
-           const Aligner::Minimap2Options& aligner_options,
+           const AlignerNode::Minimap2Options& aligner_options,
            bool skip_model_compatibility_check,
            const std::string& dump_stats_file,
            const std::string& dump_stats_filter,
@@ -67,6 +69,7 @@ void setup(std::vector<std::string> args,
            const std::vector<std::string>& barcode_kits,
            bool barcode_both_ends,
            bool barcode_no_trim,
+           const std::string& barcode_sample_sheet,
            argparse::ArgumentParser& resume_parser,
            bool estimate_poly_a) {
     auto model_config = load_crf_model_config(model_path);
@@ -93,18 +96,11 @@ void setup(std::vector<std::string> args,
     }
 
     const bool enable_aligner = !ref.empty();
-    if (enable_aligner && output_mode == HtsWriter::OutputMode::FASTQ) {
-        throw std::runtime_error("Alignment to reference cannot be used with FASTQ output.");
-    }
 
     // create modbase runners first so basecall runners can pick batch sizes based on available memory
     auto remora_runners = create_modbase_runners(remora_models, device,
                                                  default_parameters.mod_base_runners_per_caller,
                                                  remora_batch_size);
-
-    if (!remora_runners.empty() && output_mode == HtsWriter::OutputMode::FASTQ) {
-        throw std::runtime_error("Modified base models cannot be used with FASTQ output");
-    }
 
     auto [runners, num_devices] =
             create_basecall_runners(model_config, device, num_runners, 0, batch_size, chunk_size);
@@ -117,12 +113,19 @@ void setup(std::vector<std::string> args,
     num_reads = max_reads == 0 ? num_reads : std::min(num_reads, max_reads);
 
     const auto thread_allocations = utils::default_thread_allocations(
-            num_devices, !remora_runners.empty() ? num_remora_threads : 0, enable_aligner,
+            int(num_devices), !remora_runners.empty() ? int(num_remora_threads) : 0, enable_aligner,
             !barcode_kits.empty());
+
+    std::unique_ptr<const utils::SampleSheet> sample_sheet;
+    BarcodingInfo::FilterSet allowed_barcodes;
+    if (!barcode_sample_sheet.empty()) {
+        sample_sheet = std::make_unique<const utils::SampleSheet>(barcode_sample_sheet, false);
+        allowed_barcodes = sample_sheet->get_barcode_values();
+    }
 
     SamHdrPtr hdr(sam_hdr_init());
     cli::add_pg_hdr(hdr.get(), args);
-    utils::add_rg_hdr(hdr.get(), read_groups, barcode_kits);
+    utils::add_rg_hdr(hdr.get(), read_groups, barcode_kits, sample_sheet.get());
 
     PipelineDescriptor pipeline_desc;
     auto hts_writer = pipeline_desc.add_node<HtsWriter>(
@@ -130,13 +133,13 @@ void setup(std::vector<std::string> args,
     auto aligner = PipelineDescriptor::InvalidNodeHandle;
     auto current_sink_node = hts_writer;
     if (enable_aligner) {
-        aligner = pipeline_desc.add_node<Aligner>({current_sink_node}, ref, aligner_options,
-                                                  thread_allocations.aligner_threads);
+        aligner = pipeline_desc.add_node<AlignerNode>({current_sink_node}, ref, aligner_options,
+                                                      thread_allocations.aligner_threads);
         current_sink_node = aligner;
     }
     current_sink_node = pipeline_desc.add_node<ReadToBamType>(
             {current_sink_node}, emit_moves, thread_allocations.read_converter_threads,
-            methylation_threshold_pct);
+            methylation_threshold_pct, std::move(sample_sheet), 1000);
     if (estimate_poly_a) {
         current_sink_node = pipeline_desc.add_node<PolyACalculator>(
                 {current_sink_node}, std::thread::hardware_concurrency(),
@@ -145,7 +148,7 @@ void setup(std::vector<std::string> args,
     if (!barcode_kits.empty()) {
         current_sink_node = pipeline_desc.add_node<BarcodeClassifierNode>(
                 {current_sink_node}, thread_allocations.barcoder_threads, barcode_kits,
-                barcode_both_ends, barcode_no_trim);
+                barcode_both_ends, barcode_no_trim, std::move(allowed_barcodes));
     }
     current_sink_node = pipeline_desc.add_node<ReadFilterNode>(
             {current_sink_node}, min_qscore, default_parameters.min_sequence_length,
@@ -161,12 +164,11 @@ void setup(std::vector<std::string> args,
     pipelines::create_simplex_pipeline(
             pipeline_desc, std::move(runners), std::move(remora_runners), overlap,
             mean_qscore_start_pos, thread_allocations.scaler_node_threads,
-            !is_rna_model(model_config) /*enable read splitting if data is DNA*/,
-            thread_allocations.splitter_node_threads,
-            thread_allocations.remora_threads * num_devices, current_sink_node);
+            true /* Enable read splitting */, thread_allocations.splitter_node_threads,
+            int(thread_allocations.remora_threads * num_devices), current_sink_node);
 
     // Create the Pipeline from our description.
-    std::vector<dorado::stats::StatsReporter> stats_reporters;
+    std::vector<dorado::stats::StatsReporter> stats_reporters{dorado::stats::sys_stats_report};
     auto pipeline = Pipeline::create(std::move(pipeline_desc), &stats_reporters);
     if (pipeline == nullptr) {
         spdlog::error("Failed to create pipeline");
@@ -177,7 +179,7 @@ void setup(std::vector<std::string> args,
     // rather than the pipeline framework.
     auto& hts_writer_ref = dynamic_cast<HtsWriter&>(pipeline->get_node_ref(hts_writer));
     if (enable_aligner) {
-        const auto& aligner_ref = dynamic_cast<Aligner&>(pipeline->get_node_ref(aligner));
+        const auto& aligner_ref = dynamic_cast<AlignerNode&>(pipeline->get_node_ref(aligner));
         utils::add_sq_hdr(hdr.get(), aligner_ref.get_sequence_records_for_header());
     }
     hts_writer_ref.set_and_write_header(hdr.get());
@@ -210,12 +212,13 @@ void setup(std::vector<std::string> args,
     }
 
     std::vector<dorado::stats::StatsCallable> stats_callables;
-    ProgressTracker tracker(num_reads, false);
+    ProgressTracker tracker(int(num_reads), false);
     stats_callables.push_back(
             [&tracker](const stats::NamedStats& stats) { tracker.update_progress_bar(stats); });
     constexpr auto kStatsPeriod = 100ms;
+    const size_t max_stats_records = static_cast<size_t>(dump_stats_file.empty() ? 0 : 100000);
     auto stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
-            kStatsPeriod, stats_reporters, stats_callables);
+            kStatsPeriod, stats_reporters, stats_callables, max_stats_records);
 
     DataLoader loader(*pipeline, "cpu", thread_allocations.loader_threads, max_reads, read_list,
                       reads_already_processed);
@@ -254,7 +257,13 @@ int basecaller(int argc, char* argv[]) {
 
     parser.visible.add_argument("data").help("the data directory or file (POD5/FAST5 format).");
 
-    parser.visible.add_argument("-v", "--verbose").default_value(false).implicit_value(true);
+    int verbosity = 0;
+    parser.visible.add_argument("-v", "--verbose")
+            .default_value(false)
+            .implicit_value(true)
+            .nargs(0)
+            .action([&](const auto&) { ++verbosity; })
+            .append();
 
     parser.visible.add_argument("-x", "--device")
             .help("device string in format \"cuda:0,...,N\", \"cuda:all\", \"metal\", \"cpu\" "
@@ -348,16 +357,17 @@ int basecaller(int argc, char* argv[]) {
             .help("Skip barcode trimming. If option is not chosen, trimming is enabled.")
             .default_value(false)
             .implicit_value(true);
-
-    cli::add_minimap2_arguments(parser, Aligner::dflt_options);
-    cli::add_internal_arguments(parser);
-
-    // Add hidden arguments that only apply to simplex calling.
-    parser.hidden.add_argument("--estimate-poly-a")
+    parser.visible.add_argument("--sample-sheet")
+            .help("Path to the sample sheet to use.")
+            .default_value(std::string(""));
+    parser.visible.add_argument("--estimate-poly-a")
             .help("Estimate poly-A/T tail lengths (beta feature). Primarily meant for cDNA and "
                   "dRNA use cases.")
             .default_value(false)
             .implicit_value(true);
+
+    cli::add_minimap2_arguments(parser, AlignerNode::dflt_options);
+    cli::add_internal_arguments(parser);
 
     // Create a copy of the parser to use if the resume feature is enabled. Needed
     // to parse the model used for the file being resumed from. Note that this copy
@@ -376,14 +386,14 @@ int basecaller(int argc, char* argv[]) {
     std::vector<std::string> args(argv, argv + argc);
 
     if (parser.visible.get<bool>("--verbose")) {
-        utils::SetDebugLogging();
+        utils::SetVerboseLogging(static_cast<dorado::utils::VerboseLogLevel>(verbosity));
     }
 
     auto model = parser.visible.get<std::string>("model");
     auto mod_bases = parser.visible.get<std::vector<std::string>>("--modified-bases");
     auto mod_bases_models = parser.visible.get<std::string>("--modified-bases-models");
 
-    if (mod_bases.size() && !mod_bases_models.empty()) {
+    if (!mod_bases.empty() && !mod_bases_models.empty()) {
         spdlog::error(
                 "only one of --modified-bases or --modified-bases-models should be specified.");
         std::exit(EXIT_FAILURE);
@@ -414,6 +424,19 @@ int basecaller(int argc, char* argv[]) {
     }
 
     if (emit_fastq) {
+        if (!mod_bases.empty() || !mod_bases_models.empty()) {
+            spdlog::error(
+                    "--emit-fastq cannot be used with modbase models as FASTQ cannot store modbase "
+                    "results.");
+            std::exit(EXIT_FAILURE);
+        }
+        if (!parser.visible.get<std::string>("--reference").empty()) {
+            spdlog::error(
+                    "--emit-fastq cannot be used with --reference as FASTQ cannot store alignment "
+                    "results.");
+            std::exit(EXIT_FAILURE);
+        }
+        spdlog::info(" - Note: FASTQ output is not recommended as not all data can be preserved.");
         output_mode = HtsWriter::OutputMode::FASTQ;
     } else if (emit_sam || utils::is_fd_tty(stdout)) {
         output_mode = HtsWriter::OutputMode::SAM;
@@ -433,15 +456,16 @@ int basecaller(int argc, char* argv[]) {
               parser.visible.get<int>("--max-reads"), parser.visible.get<int>("--min-qscore"),
               parser.visible.get<std::string>("--read-ids"),
               parser.visible.get<bool>("--recursive"),
-              cli::process_minimap2_arguments(parser, Aligner::dflt_options),
+              cli::process_minimap2_arguments(parser, AlignerNode::dflt_options),
               parser.hidden.get<bool>("--skip-model-compatibility-check"),
               parser.hidden.get<std::string>("--dump_stats_file"),
               parser.hidden.get<std::string>("--dump_stats_filter"),
               parser.visible.get<std::string>("--resume-from"),
               parser.visible.get<std::vector<std::string>>("--kit-name"),
               parser.visible.get<bool>("--barcode-both-ends"),
-              parser.visible.get<bool>("--no-trim"), resume_parser,
-              parser.hidden.get<bool>("--estimate-poly-a"));
+              parser.visible.get<bool>("--no-trim"),
+              parser.visible.get<std::string>("--sample-sheet"), resume_parser,
+              parser.visible.get<bool>("--estimate-poly-a"));
     } catch (const std::exception& e) {
         spdlog::error("{}", e.what());
         return 1;

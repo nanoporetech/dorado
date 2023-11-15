@@ -6,7 +6,6 @@
 
 #include <argparse.hpp>
 #include <htslib/sam.h>
-#include <torch/torch.h>
 
 #include <algorithm>
 #include <cctype>
@@ -79,7 +78,6 @@ inline std::tuple<int, int, int> parse_version_str(const std::string& version) {
 template <class T = int64_t>
 std::vector<T> parse_string_to_sizes(const std::string& str,
                                      std::optional<std::string> opt = std::nullopt) {
-    std::size_t pos;
     std::vector<T> sizes;
     const char* c_str = str.c_str();
     char* p;
@@ -181,7 +179,7 @@ void add_minimap2_arguments(ArgParser& parser, const Options& dflt) {
 
     parser.visible.add_argument("-I")
             .help("minimap2 index batch size.")
-            .default_value(to_size(dflt.index_batch_size));
+            .default_value(to_size(double(dflt.index_batch_size)));
 
     parser.visible.add_argument("--secondary")
             .help("minimap2 outputs secondary alignments")
@@ -239,12 +237,12 @@ Options process_minimap2_arguments(const ArgParser& parser, const Options& dflt)
     auto bandwidth = cli::parse_string_to_sizes(parser.visible.get<std::string>("--bandwidth"));
     switch (bandwidth.size()) {
     case 1:
-        res.bandwidth = bandwidth[0];
+        res.bandwidth = int(bandwidth[0]);
         res.bandwidth_long = dflt.bandwidth_long;
         break;
     case 2:
-        res.bandwidth = bandwidth[0];
-        res.bandwidth_long = bandwidth[1];
+        res.bandwidth = int(bandwidth[0]);
+        res.bandwidth_long = int(bandwidth[1]);
         break;
     default:
         throw std::runtime_error("Wrong number of arguments for option '-r'.");

@@ -8,13 +8,13 @@
 
 namespace dorado::utils {
 
-int trim(const torch::Tensor& signal, float threshold, int window_size, int min_elements) {
+int trim(const at::Tensor& signal, float threshold, int window_size, int min_elements) {
     const int min_trim = 10;
     const int num_samples = static_cast<int>(signal.size(0)) - min_trim;
     const int num_windows = num_samples / window_size;
 
     // Access via raw pointers because of torch indexing overhead.
-    const auto signal_f32 = signal.to(torch::kFloat32);
+    const auto signal_f32 = signal.to(at::ScalarType::Float);
     assert(signal_f32.is_contiguous());
     const float* const signal_f32_ptr = signal_f32.data_ptr<float>();
 
@@ -46,7 +46,7 @@ int trim(const torch::Tensor& signal, float threshold, int window_size, int min_
 }
 
 std::string trim_sequence(const std::string& seq, const std::pair<int, int>& trim_interval) {
-    if (trim_interval.first >= seq.length() || trim_interval.second > seq.length() ||
+    if (trim_interval.first >= int(seq.length()) || trim_interval.second > int(seq.length()) ||
         trim_interval.second < trim_interval.first) {
         throw std::invalid_argument("Trim interval " + std::to_string(trim_interval.first) + "-" +
                                     std::to_string(trim_interval.second) +
@@ -72,7 +72,7 @@ std::tuple<int, std::vector<uint8_t>> trim_move_table(const std::vector<uint8_t>
         // Start with -1 because as soon as the first move_val==1 is encountered,
         // we have moved to the first base.
         int seq_base_pos = -1;
-        for (int i = 0; i < move_vals.size(); i++) {
+        for (int i = 0; i < int(move_vals.size()); i++) {
             auto mv = move_vals[i];
             if (mv == 1) {
                 seq_base_pos++;

@@ -5,6 +5,7 @@
 #include "utils/cuda_utils.h"
 #include "utils/math_utils.h"
 
+#include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAGuard.h>
 #include <c10/cuda/CUDAStream.h>
 #include <nvtx3/nvtx3.hpp>
@@ -40,10 +41,10 @@ public:
         m_out_chunk_size = chunk_size / model_config.stride;
         m_in_chunk_size = m_out_chunk_size * model_config.stride;
 
-        m_options = torch::TensorOptions().dtype(GPUDecoder::dtype).device(device);
+        m_options = at::TensorOptions().dtype(GPUDecoder::dtype).device(device);
         assert(m_options.device().is_cuda());
 
-        torch::InferenceMode guard;
+        at::InferenceMode guard;
         m_module = load_crf_model(model_config, m_options);
 
         // Batch size will be rounded up to a multiple of batch_size_granularity, regardless of
@@ -90,7 +91,7 @@ public:
     }
 
     static int get_batch_size_granularity(const CRFModelConfig &model_config,
-                                          const torch::TensorOptions &options) {
+                                          const at::TensorOptions &options) {
         // TODO: we may want to use different numbers based on model type and GPU arch
         return 64;
     }
@@ -99,16 +100,37 @@ public:
                              int chunk_size_in,
                              float memory_limit_fraction,
                              bool run_benchmark) {
+        c10::cuda::CUDAGuard device_guard(m_options.device());
+        constexpr float GB = 1.0e9f;
+        int64_t available = utils::available_memory(m_options.device());
+        spdlog::debug("{} memory available: {:.2f}GB", m_device, available / GB);
+
 #ifdef DORADO_TX2
         return 256;
-#else
-        int64_t available = utils::available_memory(m_options.device()) * memory_limit_fraction;
-        spdlog::debug("Auto batch size: GPU memory available: {}GB", available / 1.0e9f);
+#endif
 
-        int granularity = get_batch_size_granularity(model_config, m_options);
+        const int granularity = get_batch_size_granularity(model_config, m_options);
+
+        // If running on a Jetson device with unified memory for CPU and GPU we can't use all
+        // the available memory for GPU tasks. This way we leave at least half for the CPU,
+        // though it's not clear what the ideal split would be.
+        cudaDeviceProp *prop = at::cuda::getCurrentDeviceProperties();
+        bool is_unified_memory_device = (prop->major == 5 && prop->minor == 3) ||  // TX1
+                                        (prop->major == 6 && prop->minor == 2) ||  // TX2
+                                        (prop->major == 7 && prop->minor == 2) ||  // Xavier
+                                        (prop->major == 8 && prop->minor == 7);    // Orin
+        memory_limit_fraction *= is_unified_memory_device ? 0.5f : 1.f;
+
+        // Apply limit fraction, and allow 1GB for model weights, etc.
+        int64_t gpu_mem_limit = int64_t(available * memory_limit_fraction - GB);
+        if (gpu_mem_limit < 0) {
+            spdlog::warn("Auto batchsize detection failed. Less than 1GB GPU memory available.");
+            return granularity;
+        }
+        spdlog::debug("Auto batchsize {}: memory limit {:.2f}GB", m_device, gpu_mem_limit / GB);
 
         // Determine size of working memory for CRFModel divided by (batch_size * chunk_size)
-        // These values have been derermined by running dorado with different models and
+        // These values have been determined by running dorado with different models and
         // reporting the actual allocation size per chunk-timestep.
         int64_t crfmodel_bytes_per_chunk_timestep;
         if (model_config.out_features.has_value()) {
@@ -123,10 +145,10 @@ public:
         } else {
             std::unordered_map<int, int64_t> insize_map{
                     {96, 960}, {128, 1280}, {384, 2816}, {768, 9728}, {1024, 10240}};
-            crfmodel_bytes_per_chunk_timestep = insize_map[model_config.insize];
+            crfmodel_bytes_per_chunk_timestep = insize_map[model_config.lstm_size];
             if (crfmodel_bytes_per_chunk_timestep == 0) {
                 spdlog::warn("Auto batchsize detection failed. Unexpected model insize {}.",
-                             model_config.insize);
+                             model_config.lstm_size);
                 return granularity;
             }
         }
@@ -137,25 +159,18 @@ public:
         // See `dorado::GPUDecoder::gpu_part()`, block beginning with `if (!initialized) {`
         // for more details.
         int64_t decode_bytes_per_chunk_timestep =
-                10 + m_decoder_options.beam_width * 4 + (1 << (model_config.state_len * 2 + 2));
+                10 + m_decoder_options.beam_width * 4 + (1ull << (model_config.state_len * 2 + 2));
 
         auto bytes_per_chunk_timestep =
                 decode_bytes_per_chunk_timestep + crfmodel_bytes_per_chunk_timestep;
         int64_t chunk_size_out = chunk_size_in / model_config.stride;
-        available = available - 1.0e9f;  // Allow 1GB for model weights, etc.
-        if (available < 0) {
-            spdlog::warn("Auto batchsize detection failed. Less than 1GB GPU memory available.");
-            return granularity;
-        }
 
-        int max_batch_size = available / (bytes_per_chunk_timestep * chunk_size_out);
+        int max_batch_size = int(gpu_mem_limit / (bytes_per_chunk_timestep * chunk_size_out));
         max_batch_size -= max_batch_size % granularity;
         if (max_batch_size <= granularity) {
             spdlog::warn("Maximum safe estimated batch size is only {}.", max_batch_size);
             return granularity;
         }
-
-        c10::cuda::CUDAGuard device_guard(m_options.device());
 
         int best_batch_size = granularity;
         float best_time = std::numeric_limits<float>::max();
@@ -164,8 +179,8 @@ public:
             // We limit the maximum when doing benchmarking to avoid excessive startup time.
             const int max_batch_size_limit = 10240;
             max_batch_size = std::min(max_batch_size, max_batch_size_limit);
-            spdlog::debug("Auto batch size: testing up to {} in steps of {}", max_batch_size,
-                          granularity);
+            spdlog::debug("Auto batchsize {}: testing up to {} in steps of {}", m_device,
+                          max_batch_size, granularity);
             for (int batch_size = granularity; batch_size <= max_batch_size;
                  batch_size += granularity) {
                 auto input = torch::empty({batch_size, model_config.num_features, chunk_size},
@@ -188,40 +203,38 @@ public:
                     handle_cuda_result(cudaEventDestroy(stop));
                 }
 
-                spdlog::debug("Auto batchsize {}: {}, time per chunk {} ms", m_device, batch_size,
-                              time);
+                spdlog::debug("Auto batchsize {}: {}, time per chunk {:8f} ms", m_device,
+                              batch_size, time);
                 if (time < best_time) {
                     best_time = time;
                     best_batch_size = batch_size;
                 }
             }
         } else {
-            spdlog::debug("Maximum safe estimated batch size is {}", max_batch_size);
+            spdlog::debug("Maximum safe estimated batch size for {}: {}", m_device, max_batch_size);
             best_batch_size = max_batch_size;
         }
 
-        spdlog::debug(
-                "Device {} Model memory {}", m_device,
-                (crfmodel_bytes_per_chunk_timestep * chunk_size_out * best_batch_size) / 1e9f);
-        spdlog::debug("Device {} Decode memory {}", m_device,
-                      (decode_bytes_per_chunk_timestep * chunk_size_out * best_batch_size) / 1e9f);
+        spdlog::debug("Device {} Model memory {:.2f}GB", m_device,
+                      (crfmodel_bytes_per_chunk_timestep * chunk_size_out * best_batch_size) / GB);
+        spdlog::debug("Device {} Decode memory {:.2f}GB", m_device,
+                      (decode_bytes_per_chunk_timestep * chunk_size_out * best_batch_size) / GB);
         return best_batch_size;
-#endif
     }
 
     struct NNTask {
-        NNTask(torch::Tensor input_, torch::Tensor &output_, int num_chunks_)
+        NNTask(at::Tensor input_, at::Tensor &output_, int num_chunks_)
                 : input(input_), out(output_), num_chunks(num_chunks_) {}
-        torch::Tensor input;
-        torch::Tensor &out;
+        at::Tensor input;
+        at::Tensor &out;
         std::mutex mut;
         std::condition_variable cv;
         bool done{false};
         int num_chunks;
     };
 
-    std::vector<DecodedChunk> call_chunks(torch::Tensor &input,
-                                          torch::Tensor &output,
+    std::vector<DecodedChunk> call_chunks(at::Tensor &input,
+                                          at::Tensor &output,
                                           int num_chunks,
                                           c10::cuda::CUDAStream stream) {
         NVTX3_FUNC_RANGE();
@@ -247,7 +260,7 @@ public:
     }
 
     void cuda_thread_fn() {
-        torch::InferenceMode guard;
+        at::InferenceMode guard;
         c10::cuda::CUDAGuard device_guard(m_options.device());
         auto stream = c10::cuda::getCurrentCUDAStream(m_options.device().index());
 
@@ -350,15 +363,15 @@ public:
 
     stats::NamedStats sample_stats() const {
         stats::NamedStats stats;
-        stats["batches_called"] = m_num_batches_called;
-        stats["model_ms"] = m_model_ms;
-        stats["decode_ms"] = m_decode_ms;
+        stats["batches_called"] = double(m_num_batches_called);
+        stats["model_ms"] = double(m_model_ms);
+        stats["decode_ms"] = double(m_decode_ms);
         return stats;
     }
 
     const CRFModelConfig m_config;
     std::string m_device;
-    torch::TensorOptions m_options;
+    at::TensorOptions m_options;
     std::unique_ptr<GPUDecoder> m_decoder;
     DecoderOptions m_decoder_options;
     torch::nn::ModuleHolder<torch::nn::AnyModule> m_module{nullptr};
@@ -389,7 +402,7 @@ std::shared_ptr<CudaCaller> create_cuda_caller(const CRFModelConfig &model_confi
 CudaModelRunner::CudaModelRunner(std::shared_ptr<CudaCaller> caller)
         : m_caller(caller),
           m_stream(c10::cuda::getStreamFromPool(false, m_caller->m_options.device().index())) {
-    auto opts = torch::TensorOptions().device(torch::kCPU).pinned_memory(true);
+    auto opts = at::TensorOptions().device(torch::kCPU).pinned_memory(true);
     m_input = torch::empty(
             {caller->m_batch_size, caller->m_num_input_features, caller->m_in_chunk_size},
             opts.dtype(m_caller->m_options.dtype()));
@@ -398,7 +411,7 @@ CudaModelRunner::CudaModelRunner(std::shared_ptr<CudaCaller> caller)
                             opts.dtype(torch::kInt8));
 }
 
-void CudaModelRunner::accept_chunk(int chunk_idx, const torch::Tensor &chunk) {
+void CudaModelRunner::accept_chunk(int chunk_idx, const at::Tensor &chunk) {
     m_input.index_put_({chunk_idx, torch::indexing::Ellipsis}, chunk);
 }
 
@@ -430,7 +443,7 @@ stats::NamedStats CudaModelRunner::sample_stats() const {
     // Each runner will retrieve stats from the caller.
     // Only the last retrieved version will appear, but they should be very similar.
     stats::NamedStats stats = stats::from_obj(*m_caller);
-    stats["batches_called"] = m_num_batches_called;
+    stats["batches_called"] = double(m_num_batches_called);
     return stats;
 }
 

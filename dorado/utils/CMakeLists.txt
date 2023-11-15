@@ -24,11 +24,18 @@ add_library(dorado_utils
     module_utils.h
     parameters.cpp
     parameters.h
+    PostCondition.h
+    SampleSheet.cpp
+    SampleSheet.h
     sequence_utils.cpp
     sequence_utils.h
+    stats.cpp
     stats.h
+    sys_stats.cpp
+    sys_stats.h
     tensor_utils.cpp
     tensor_utils.h
+    time_utils.cpp
     time_utils.h
     torch_utils.h
     trim.cpp
@@ -64,7 +71,7 @@ target_compile_definitions(dorado_utils
 if (DORADO_ENABLE_PCH)
     target_precompile_headers(dorado_utils
         PRIVATE
-        <torch/torch.h>
+        <ATen/ATen.h>
     )
 endif()
 
@@ -73,7 +80,6 @@ target_include_directories(dorado_utils
     SYSTEM
     PUBLIC
     ${TORCH_INCLUDE_DIRS}
-    ${DORADO_3RD_PARTY_SOURCE}/spdlog/include
     ${DORADO_3RD_PARTY_SOURCE}/NVTX/c/include
     ${DORADO_3RD_PARTY_DOWNLOAD}/metal-cpp/metal-cpp
 )
@@ -81,8 +87,9 @@ target_include_directories(dorado_utils
 target_link_libraries(dorado_utils
     PUBLIC
         ${TORCH_LIBRARIES}
-        edlib
         date::date
+        edlib
+        spdlog::spdlog
     PRIVATE
         minimap2
         OpenSSL::SSL
@@ -107,3 +114,10 @@ endif()
 if(NOT WIN32)
     add_dependencies(dorado_utils htslib_project)
 endif()
+
+# GCC 8 ICEs trying to compile this file with ASAN+optimisations enabled, so knock down the optimisation to try and help it out.
+if (ECM_ENABLE_SANITIZERS AND (CMAKE_CXX_COMPILER_ID MATCHES "GNU") AND (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9.0))
+    set_source_files_properties(duplex_utils.cpp PROPERTIES COMPILE_OPTIONS "-O0")
+endif()
+
+enable_warnings_as_errors(dorado_utils)

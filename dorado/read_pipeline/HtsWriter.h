@@ -49,9 +49,9 @@ private:
     std::unique_ptr<std::thread> m_worker;
     void worker_thread();
     int write(bam1_t* record);
-    size_t m_num_reads_expected;
     std::unordered_set<std::string> m_processed_read_ids;
     std::atomic<int> m_duplex_reads_written{0};
+    std::atomic<int> m_split_reads_written{0};
 };
 
 }  // namespace dorado

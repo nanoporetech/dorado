@@ -1,5 +1,6 @@
 #include "barcode_kits.h"
 
+#include <algorithm>
 #include <numeric>
 
 namespace dorado::barcode_kits {
@@ -107,37 +108,45 @@ const std::vector<std::string> RBK_1_96 = {
 
 // Some arrangement names are just aliases of each other. This is because they were released
 // as part of different kits, but they map to the same underlying arrangement.
-const KitInfo kit_16S = {true,          true,         RAB_1st_FRONT, RAB_1st_REAR,
-                         RAB_2nd_FRONT, RAB_2nd_REAR, BC_1_24};
+const KitInfo kit_16S = {
+        "16S", true, true, RAB_1st_FRONT, RAB_1st_REAR, RAB_2nd_FRONT, RAB_2nd_REAR, BC_1_24,
+};
 
-const KitInfo kit_lwb = {true,          true,         LWB_1st_FRONT, LWB_1st_REAR,
-                         LWB_2nd_FRONT, LWB_2nd_REAR, BC_1_12};
-;
+const KitInfo kit_lwb = {
+        "LWB", true, true, LWB_1st_FRONT, LWB_1st_REAR, LWB_2nd_FRONT, LWB_2nd_REAR, BC_1_12,
+};
 
 const KitInfo kit_lwb24 = {
-        true, true, LWB_1st_FRONT, LWB_1st_REAR, LWB_2nd_FRONT, LWB_2nd_REAR, BC_1_24,
+        "LWB24", true, true, LWB_1st_FRONT, LWB_1st_REAR, LWB_2nd_FRONT, LWB_2nd_REAR, BC_1_24,
 };
 
 const KitInfo kit_nb12 = {
-        true, true, NB_1st_FRONT, NB_1st_REAR, NB_2nd_FRONT, NB_2nd_REAR, NB_1_12,
+        "NB12", true, true, NB_1st_FRONT, NB_1st_REAR, NB_2nd_FRONT, NB_2nd_REAR, NB_1_12,
 };
 
 const KitInfo kit_nb24 = {
-        true, true, NB_1st_FRONT, NB_1st_REAR, NB_2nd_FRONT, NB_2nd_REAR, NB_1_24,
+        "NB24", true, true, NB_1st_FRONT, NB_1st_REAR, NB_2nd_FRONT, NB_2nd_REAR, NB_1_24,
 };
 
 const KitInfo kit_nb96 = {
-        true, true, NB_1st_FRONT, NB_1st_REAR, NB_2nd_FRONT, NB_2nd_REAR, NB_1_96,
+        "NB96", true, true, NB_1st_FRONT, NB_1st_REAR, NB_2nd_FRONT, NB_2nd_REAR, NB_1_96,
 };
 
-const KitInfo kit_rab = {true,          true,         RAB_1st_FRONT, RAB_1st_REAR,
-                         RAB_2nd_FRONT, RAB_2nd_REAR, BC_1_12};
+const KitInfo kit_rab = {
+        "RAB", true, true, RAB_1st_FRONT, RAB_1st_REAR, RAB_2nd_FRONT, RAB_2nd_REAR, BC_1_12,
+};
 
-const KitInfo kit_rbk96 = {false, false, RBK4_FRONT, RBK4_REAR, "", "", RBK_1_96};
+const KitInfo kit_rbk96 = {
+        "RBK96", false, false, RBK4_FRONT, RBK4_REAR, "", "", RBK_1_96,
+};
 
-const KitInfo kit_rbk4 = {false, false, RBK4_FRONT, RBK4_REAR, "", "", BC_1_12};
+const KitInfo kit_rbk4 = {
+        "RBK4", false, false, RBK4_FRONT, RBK4_REAR, "", "", BC_1_12,
+};
 
-const KitInfo kit_rlb = {true, false, RLB_FRONT, RLB_REAR, "", "", BC_1_12A};
+const KitInfo kit_rlb = {
+        "RLB", true, false, RLB_FRONT, RLB_REAR, "", "", BC_1_12A,
+};
 
 // Final map to go from kit name to actual barcode arrangement information.
 const std::unordered_map<std::string, KitInfo> kit_info_map = {
@@ -158,6 +167,7 @@ const std::unordered_map<std::string, KitInfo> kit_info_map = {
         // NB13-24
         {"EXP-NBD114",
          {
+                 "NB13-24",
                  true,
                  true,
                  NB_1st_FRONT,
@@ -178,6 +188,7 @@ const std::unordered_map<std::string, KitInfo> kit_info_map = {
         // PCR12
         {"EXP-PBC001",
          {
+                 "PCR12",
                  true,
                  true,
                  BC_1st_FRONT,
@@ -189,6 +200,7 @@ const std::unordered_map<std::string, KitInfo> kit_info_map = {
         // PCR96
         {"EXP-PBC096",
          {
+                 "PCR96",
                  true,
                  true,
                  BC_1st_FRONT,
@@ -201,13 +213,24 @@ const std::unordered_map<std::string, KitInfo> kit_info_map = {
         {"SQK-RAB204", kit_rab},
         {"SQK-RAB201", kit_rab},
         // RBK
-        {"SQK-RBK001", {false, false, RBK_FRONT, RBK_REAR, "", "", BC_1_12}},
+        {"SQK-RBK001",
+         {
+                 "RBK",
+                 false,
+                 false,
+                 RBK_FRONT,
+                 RBK_REAR,
+                 "",
+                 "",
+                 BC_1_12,
+         }},
         // RBK096
         {"SQK-RBK110-96", kit_rbk96},
         {"SQK-RBK111-96", kit_rbk96},
         // RBK096_kit14
         {"SQK-RBK114-96",
          {
+                 "RBK096_kit14",
                  false,
                  false,
                  RBK4_kit14_FRONT,
@@ -217,9 +240,29 @@ const std::unordered_map<std::string, KitInfo> kit_info_map = {
                  RBK_1_96,
          }},
         // RBK24
-        {"SQK-RBK111-24", {false, false, RBK4_FRONT, RBK4_REAR, "", "", BC_1_24}},
+        {"SQK-RBK111-24",
+         {
+                 "RBK24",
+                 false,
+                 false,
+                 RBK4_FRONT,
+                 RBK4_REAR,
+                 "",
+                 "",
+                 BC_1_24,
+         }},
         // RBK24_kit14
-        {"SQK-RBK114-24", {false, false, RBK4_kit14_FRONT, RBK4_kit14_REAR, "", "", BC_1_24}},
+        {"SQK-RBK114-24",
+         {
+                 "RBK24_kit14",
+                 false,
+                 false,
+                 RBK4_kit14_FRONT,
+                 RBK4_kit14_REAR,
+                 "",
+                 "",
+                 BC_1_24,
+         }},
         //  RBK4
         {"SQK-RBK004", kit_rbk4},
         {"VSK-PTC001", kit_rbk4},
@@ -228,19 +271,52 @@ const std::unordered_map<std::string, KitInfo> kit_info_map = {
         {"SQK-RPB004", kit_rlb},
         {"SQK-RLB001", kit_rlb},
         // RPB24-Kit14
-        {"SQK-RPB114-24", {true, false, RLB_FRONT, RLB_REAR, "", "", BC2_1_24}},
+        {"SQK-RPB114-24",
+         {
+                 "RPB24-Kit14",
+                 true,
+                 false,
+                 RLB_FRONT,
+                 RLB_REAR,
+                 "",
+                 "",
+                 BC2_1_24,
+         }},
         // VMK
         {"VSK-VMK001",
-         {false, false, RBK_FRONT, RBK_REAR, "", "", {"BC01", "BC02", "BC03", "BC04"}}},
+         {
+                 "VMK",
+                 false,
+                 false,
+                 RBK_FRONT,
+                 RBK_REAR,
+                 "",
+                 "",
+                 {"BC01", "BC02", "BC03", "BC04"},
+         }},
         // VMK4
         {"VSK-VMK004",
-         {false,
-          false,
-          RBK4_FRONT,
-          RBK4_REAR,
-          "",
-          "",
-          {"BC01", "BC02", "BC03", "BC04", "BC05", "BC06", "BC07", "BC08", "BC09", "BC10"}}},
+         {
+                 "VMK4",
+                 false,
+                 false,
+                 RBK4_FRONT,
+                 RBK4_REAR,
+                 "",
+                 "",
+                 {
+                         "BC01",
+                         "BC02",
+                         "BC03",
+                         "BC04",
+                         "BC05",
+                         "BC06",
+                         "BC07",
+                         "BC08",
+                         "BC09",
+                         "BC10",
+                 },
+         }},
 };
 
 const std::unordered_map<std::string, std::string> barcodes = {
@@ -478,22 +554,43 @@ const std::unordered_map<std::string, KitInfo>& get_kit_infos() { return kit_inf
 
 const std::unordered_map<std::string, std::string>& get_barcodes() { return barcodes; }
 
+const std::unordered_set<std::string>& get_barcode_identifiers() {
+    static auto identifiers = []() {
+        std::unordered_set<std::string> ids;
+        for (auto& [identifier, _] : barcodes) {
+            ids.insert(identifier);
+        }
+        return ids;
+    }();
+    return identifiers;
+}
+
 std::string barcode_kits_list_str() {
-    return std::accumulate(kit_info_map.begin(), kit_info_map.end(), std::string(),
-                           [](std::string& a, auto& b) -> std::string {
-                               return a + (a.empty() ? "" : " ") + b.first;
+    std::vector<std::string> kit_names;
+    for (auto& [kit_name, _] : kit_info_map) {
+        kit_names.push_back(kit_name);
+    }
+    std::sort(kit_names.begin(), kit_names.end());
+    return std::accumulate(kit_names.begin(), kit_names.end(), std::string(),
+                           [](const auto& a, const auto& b) -> std::string {
+                               return a + (a.empty() ? "" : " ") + b;
                            });
+}
+
+std::string normalize_barcode_name(const std::string& barcode_name) {
+    std::string digits = "";
+    for (const auto& c : barcode_name) {
+        if (std::isdigit(static_cast<unsigned char>(c))) {
+            digits += c;
+        }
+    }
+
+    return "barcode" + digits;
 }
 
 std::string generate_standard_barcode_name(const std::string& kit_name,
                                            const std::string& barcode_name) {
-    std::string digits = "";
-    for (const auto& c : barcode_name) {
-        if (std::isdigit(c)) {
-            digits += c;
-        }
-    }
-    return kit_name + "_barcode" + digits;
+    return kit_name + "_" + normalize_barcode_name(barcode_name);
 }
 
 }  // namespace dorado::barcode_kits

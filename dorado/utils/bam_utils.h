@@ -10,6 +10,8 @@ struct sam_hdr_t;
 
 namespace dorado::utils {
 
+class SampleSheet;
+
 using sq_t = std::vector<std::pair<char*, uint32_t>>;
 
 struct AlignmentOps {
@@ -23,7 +25,8 @@ struct AlignmentOps {
 
 void add_rg_hdr(sam_hdr_t* hdr,
                 const std::unordered_map<std::string, ReadGroup>& read_groups,
-                const std::vector<std::string>& barcode_kits);
+                const std::vector<std::string>& barcode_kits,
+                const utils::SampleSheet* const sample_sheet);
 
 void add_sq_hdr(sam_hdr_t* hdr, const sq_t& seqs);
 
@@ -78,20 +81,18 @@ std::map<std::string, std::string> extract_pg_keys_from_hdr(const std::string fi
 /*
  * Extract the sequence string.
  *
- * @param input_record Record to fetch sequence from..
- * @param seqlen Sequence length.
- * @return Vector of sequence quality.
+ * @param input_record Record to fetch sequence from.
+ * @return The sequence bases as a string.
  */
-std::string extract_sequence(bam1_t* input_record, int seqlen);
+std::string extract_sequence(bam1_t* input_record);
 
 /*
  * Extract the sequence quality information.
  *
  * @param input_record Record to fetch quality from.
- * @param seqlen Sequence length.
  * @return Vector of sequence quality.
  */
-std::vector<uint8_t> extract_quality(bam1_t* input_record, int seqlen);
+std::vector<uint8_t> extract_quality(bam1_t* input_record);
 
 /*
  * Extract the move table from a record, if it exists.
@@ -119,5 +120,38 @@ std::tuple<std::string, std::vector<uint8_t>> extract_modbase_info(bam1_t* input
  * @return True if the entry is valid for use (i.e. is single letter or integer ChEBI code)
  */
 bool validate_bam_tag_code(const std::string& bam_name);
+
+/*
+ * Trim CIGAR string based on position interval for the query sequence.
+ *
+ * @param n_cigar Number of CIGAR entries
+ * @param cigar uint32_t array with CIGAR entries
+ * @param interval Position interval to keep after trim
+ * @return A vector with uint32_t encoding for CIGAR ops.
+ */
+std::vector<uint32_t> trim_cigar(uint32_t n_cigar,
+                                 const uint32_t* cigar,
+                                 const std::pair<int, int>& trim_interval);
+
+/*
+ * Calculate how many reference positions are consumed
+ * till a specific position on the query based on teh CIGAR
+ * string.
+ *
+ * @param n_cigar Number of CIGAR entries
+ * @param cigar uint32_t array of CIGAR entries
+ * @param query_pos Query position
+ * @return Number of positions consumed in reference
+ */
+uint32_t ref_pos_consumed(uint32_t n_cigar, const uint32_t* cigar, uint32_t query_pos);
+
+/*
+ * Convert a CIGAR uint32_t array to canonical string format.
+ *
+ * @param n_cigar Number of cigar entries.
+ * @param cigar uint32_t array with CIGAR entries
+ * @return CIGAR string
+ */
+std::string cigar2str(uint32_t n_cigar, const uint32_t* cigar);
 
 }  // namespace dorado::utils

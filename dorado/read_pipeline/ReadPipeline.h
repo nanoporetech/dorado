@@ -3,8 +3,8 @@
 #include "utils/stats.h"
 #include "utils/types.h"
 
+#include <ATen/core/TensorBody.h>
 #include <spdlog/spdlog.h>
-#include <torch/torch.h>
 
 #include <cstdint>
 #include <limits>
@@ -29,15 +29,9 @@ struct Attributes {
 };
 }  // namespace details
 
-struct BarcodingInfo {
-    std::string kit_name{};
-    bool barcode_both_ends{false};
-    bool trim{false};
-};
-
 class ReadCommon {
 public:
-    torch::Tensor raw_data;  // Loaded from source file
+    at::Tensor raw_data;  // Loaded from source file
 
     int model_stride;  // The down sampling factor of the model
 
@@ -47,14 +41,20 @@ public:
     std::vector<uint8_t> moves;           // Move table
     std::vector<uint8_t> base_mod_probs;  // Modified base probabilities
     std::string run_id;                   // Run ID - used in read group
-    std::string flowcell_id;              // Flowcell ID - used in read group
-    std::string model_name;               // Read group
+    std::string flowcell_id;    // Flowcell ID - used in read group and for sample sheet aliasing
+    std::string position_id;    // Position ID - used for sample sheet aliasing
+    std::string experiment_id;  // Experiment ID - used for sample sheet aliasing
+    std::string model_name;     // Read group
 
     dorado::details::Attributes attributes;
 
     uint64_t start_time_ms;
 
-    BarcodingInfo barcoding_info{};
+    std::shared_ptr<const BarcodingInfo> barcoding_info;
+    std::shared_ptr<const BarcodeScoreResult> barcoding_result;
+    std::size_t pre_trim_seq_length{};
+    std::pair<int, int> barcode_trim_interval{};
+    std::string alignment_string{};
 
     // A unique identifier for each input read
     // Split (duplex) reads have the read_tag of the parent (template) and their own subread_id
@@ -96,6 +96,7 @@ public:
     // (2) duplex pairs which share this read as the template read
     size_t subread_id{0};
     size_t split_count{1};
+    uint32_t split_point{0};
 
 private:
     void generate_duplex_read_tags(bam1_t*) const;
@@ -107,6 +108,24 @@ private:
 // Class representing a duplex read, including stereo-encoded raw data
 class DuplexRead {
 public:
+    // Data used to generate the stereo features in read_common.raw_data.
+    class StereoFeatureInputs {
+    public:
+        std::vector<unsigned char> alignment;
+        uint64_t template_seq_start = std::numeric_limits<uint64_t>::max();
+        uint64_t complement_seq_start = std::numeric_limits<uint64_t>::max();
+        std::string template_seq;
+        std::string complement_seq;
+        std::string template_qstring;
+        std::string complement_qstring;
+        std::vector<uint8_t> template_moves;
+        std::vector<uint8_t> complement_moves;
+        at::Tensor template_signal;
+        at::Tensor complement_signal;
+        int signal_stride = -1;
+    };
+    StereoFeatureInputs stereo_feature_inputs;
+
     ReadCommon read_common;
 };
 
@@ -134,6 +153,10 @@ public:
     // This is atomic because multiple threads can write to it at the same time.
     // For example, if a read (call it 2) is in the cache, and is selected as a potential pair match by two incoming reads (1 and 3) on two other threads, these threads can both update `is_duplex_parent` at the same time.
     std::atomic_bool is_duplex_parent{false};
+
+    // Track the previous/next read fom the same channel/mux.
+    std::string prev_read;
+    std::string next_read;
 };
 
 using SimplexReadPtr = std::unique_ptr<SimplexRead>;
@@ -168,6 +191,9 @@ using Message = std::variant<SimplexReadPtr, BamPtr, ReadPair, CacheFlushMessage
 bool is_read_message(const Message& message);
 
 ReadCommon& get_read_common_data(const Message& message);
+
+// Ensures the raw_data field is non-empty, which it won't necessarily be for DuplexRead.
+void materialise_read_raw_data(Message& message);
 
 using NodeHandle = int;
 

@@ -16,7 +16,7 @@
 namespace dorado {
 
 HtsWriter::HtsWriter(const std::string& filename, OutputMode mode, size_t threads, size_t num_reads)
-        : MessageSink(10000), m_num_reads_expected(num_reads) {
+        : MessageSink(10000) {
     switch (mode) {
     case OutputMode::FASTQ:
         m_file = hts_open(filename.c_str(), "wf");
@@ -38,7 +38,7 @@ HtsWriter::HtsWriter(const std::string& filename, OutputMode mode, size_t thread
         throw std::runtime_error("Could not open file: " + filename);
     }
     if (m_file->format.compression == bgzf) {
-        auto res = bgzf_mt(m_file->fp.bgzf, threads, 128);
+        auto res = bgzf_mt(m_file->fp.bgzf, int(threads), 128);
         if (res < 0) {
             throw std::runtime_error("Could not enable multi threading for BAM generation.");
         }
@@ -90,20 +90,33 @@ void HtsWriter::worker_thread() {
 
         auto aln = std::move(std::get<BamPtr>(message));
         write(aln.get());
-        std::string read_id = bam_get_qname(aln.get());
+
+        // For the purpose of estimating write count, we ignore duplex reads
         int64_t dx_tag = 0;
         auto tag_str = bam_aux_get(aln.get(), "dx");
         if (tag_str) {
             dx_tag = bam_aux2i(tag_str);
         }
 
-        // For the purpose of estimating write count, we ignore duplex reads
         bool ignore_read_id = dx_tag == 1;
 
         if (ignore_read_id) {
             // Read is a duplex read.
             m_duplex_reads_written++;
         } else {
+            std::string read_id;
+
+            // If read is a split read, use the parent read id
+            // to track write count since we don't know a priori
+            // how many split reads will be generated.
+            auto pid_tag = bam_aux_get(aln.get(), "pi");
+            if (pid_tag) {
+                read_id = std::string(bam_aux2Z(pid_tag));
+                m_split_reads_written++;
+            } else {
+                read_id = bam_get_qname(aln.get());
+            }
+
             m_processed_read_ids.insert(std::move(read_id));
         }
     }
@@ -148,8 +161,9 @@ int HtsWriter::set_and_write_header(const sam_hdr_t* const header) {
 
 stats::NamedStats HtsWriter::sample_stats() const {
     auto stats = stats::from_obj(m_work_queue);
-    stats["unique_simplex_reads_written"] = m_processed_read_ids.size();
+    stats["unique_simplex_reads_written"] = double(m_processed_read_ids.size());
     stats["duplex_reads_written"] = m_duplex_reads_written.load();
+    stats["split_reads_written"] = m_split_reads_written.load();
     return stats;
 }
 

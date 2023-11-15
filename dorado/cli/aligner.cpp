@@ -53,8 +53,15 @@ int aligner(int argc, char* argv[]) {
             .help("maximum number of reads to process (for debugging, 0=unlimited).")
             .default_value(0)
             .scan<'i', int>();
-    parser.visible.add_argument("-v", "--verbose").default_value(false).implicit_value(true);
-    cli::add_minimap2_arguments(parser, Aligner::dflt_options);
+    int verbosity = 0;
+    parser.visible.add_argument("-v", "--verbose")
+            .default_value(false)
+            .implicit_value(true)
+            .nargs(0)
+            .action([&](const auto&) { ++verbosity; })
+            .append();
+
+    cli::add_minimap2_arguments(parser, AlignerNode::dflt_options);
 
     try {
         cli::parse(parser, argc, argv);
@@ -67,14 +74,14 @@ int aligner(int argc, char* argv[]) {
 
     if (parser.visible.get<bool>("--verbose")) {
         mm_verbose = 3;
-        utils::SetDebugLogging();
+        utils::SetVerboseLogging(static_cast<dorado::utils::VerboseLogLevel>(verbosity));
     }
 
     auto index(parser.visible.get<std::string>("index"));
     auto reads(parser.visible.get<std::vector<std::string>>("reads"));
     auto threads(parser.visible.get<int>("threads"));
     auto max_reads(parser.visible.get<int>("max-reads"));
-    auto options = cli::process_minimap2_arguments(parser, Aligner::dflt_options);
+    auto options = cli::process_minimap2_arguments(parser, AlignerNode::dflt_options);
     threads = threads == 0 ? std::thread::hardware_concurrency() : threads;
     // The input thread is the total number of threads to use for dorado
     // alignment. Heuristically use 10% of threads for BAM generation and
@@ -107,7 +114,8 @@ int aligner(int argc, char* argv[]) {
     PipelineDescriptor pipeline_desc;
     auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, "-", HtsWriter::OutputMode::BAM,
                                                         writer_threads, 0);
-    auto aligner = pipeline_desc.add_node<Aligner>({hts_writer}, index, options, aligner_threads);
+    auto aligner =
+            pipeline_desc.add_node<AlignerNode>({hts_writer}, index, options, aligner_threads);
 
     // Create the Pipeline from our description.
     std::vector<dorado::stats::StatsReporter> stats_reporters;
@@ -119,7 +127,7 @@ int aligner(int argc, char* argv[]) {
 
     // At present, header output file header writing relies on direct node method calls
     // rather than the pipeline framework.
-    const auto& aligner_ref = dynamic_cast<Aligner&>(pipeline->get_node_ref(aligner));
+    const auto& aligner_ref = dynamic_cast<AlignerNode&>(pipeline->get_node_ref(aligner));
     utils::add_sq_hdr(header, aligner_ref.get_sequence_records_for_header());
     auto& hts_writer_ref = dynamic_cast<HtsWriter&>(pipeline->get_node_ref(hts_writer));
     hts_writer_ref.set_and_write_header(header);
@@ -131,7 +139,7 @@ int aligner(int argc, char* argv[]) {
             [&tracker](const stats::NamedStats& stats) { tracker.update_progress_bar(stats); });
     constexpr auto kStatsPeriod = 100ms;
     auto stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
-            kStatsPeriod, stats_reporters, stats_callables);
+            kStatsPeriod, stats_reporters, stats_callables, static_cast<size_t>(0));
 
     spdlog::info("> starting alignment");
     reader.read(*pipeline, max_reads);

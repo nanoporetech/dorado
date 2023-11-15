@@ -1,6 +1,7 @@
 #include "read_pipeline/ReadPipeline.h"
 #include "utils/types.h"
 
+#include <ATen/ATen.h>
 #include <catch2/catch.hpp>
 #include <htslib/sam.h>
 
@@ -11,10 +12,10 @@ using Catch::Matchers::Equals;
 TEST_CASE(TEST_GROUP ": Test tag generation", TEST_GROUP) {
     dorado::ReadCommon read_common;
     read_common.read_id = "read1";
-    read_common.raw_data = torch::empty(4000);
+    read_common.raw_data = at::empty(4000);
     read_common.seq = "ACGT";
     read_common.qstring = "////";
-    read_common.sample_rate = 4000.0;
+    read_common.sample_rate = 4000;
     read_common.shift = 128.3842f;
     read_common.scale = 8.258f;
     read_common.scaling_method = "quantile";
@@ -28,6 +29,7 @@ TEST_CASE(TEST_GROUP ": Test tag generation", TEST_GROUP) {
     read_common.model_name = "test_model";
     read_common.is_duplex = false;
     read_common.parent_read_id = "parent_read";
+    read_common.split_point = 0;
 
     SECTION("Basic") {
         auto alignments = read_common.extract_sam_lines(false);
@@ -42,6 +44,7 @@ TEST_CASE(TEST_GROUP ": Test tag generation", TEST_GROUP) {
         CHECK(bam_aux2i(bam_aux_get(aln, "rn")) == 18501);
         CHECK(bam_aux2i(bam_aux_get(aln, "rn")) == 18501);
         CHECK(bam_aux2i(bam_aux_get(aln, "dx")) == 0);
+        CHECK(bam_aux2i(bam_aux_get(aln, "sp")) == 0);
         CHECK(bam_aux_get(aln, "pt") == nullptr);
 
         CHECK(bam_aux2f(bam_aux_get(aln, "du")) == Approx(1.033).margin(1e-6));
@@ -163,8 +166,8 @@ TEST_CASE(TEST_GROUP ": Test sam record generation", TEST_GROUP) {
     }
 
     SECTION("Generated sam record for unaligned read is correct") {
-        test_read.read_common.raw_data = torch::empty(4000);
-        test_read.read_common.sample_rate = 4000.0;
+        test_read.read_common.raw_data = at::empty(4000);
+        test_read.read_common.sample_rate = 4000;
         test_read.read_common.shift = 128.3842f;
         test_read.read_common.scale = 8.258f;
         test_read.read_common.read_id = "test_read";
@@ -198,7 +201,7 @@ TEST_CASE(TEST_GROUP ": Test sam record generation", TEST_GROUP) {
 
 void require_sam_tag_B_int_matches(const uint8_t* aux, const std::vector<int64_t>& expected) {
     int len = bam_auxB_len(aux);
-    REQUIRE(len == expected.size());
+    REQUIRE(size_t(len) == expected.size());
     for (int i = 0; i < len; i++) {
         REQUIRE(expected[i] == bam_auxB2i(aux, i));
     }
@@ -336,10 +339,10 @@ TEST_CASE(TEST_GROUP ": Methylation tag generation", TEST_GROUP) {
 TEST_CASE(TEST_GROUP ": Test mean q-score generation", TEST_GROUP) {
     dorado::ReadCommon read_common;
     read_common.read_id = "read1";
-    read_common.raw_data = torch::empty(4000);
+    read_common.raw_data = at::empty(4000);
     read_common.seq = "AAAAAAAAAA";
     read_common.qstring = "$$////////";
-    read_common.sample_rate = 4000.0;
+    read_common.sample_rate = 4000;
     read_common.shift = 128.3842f;
     read_common.scale = 8.258f;
     read_common.num_trimmed_samples = 132;
@@ -368,7 +371,7 @@ TEST_CASE(TEST_GROUP ": Test mean q-score generation", TEST_GROUP) {
     }
 
     SECTION("Check start pos = qstring length") {
-        read_common.mean_qscore_start_pos = read_common.qstring.length();
+        read_common.mean_qscore_start_pos = int(read_common.qstring.length());
         CHECK(read_common.calculate_mean_qscore() == Approx(8.79143f));
     }
 }

@@ -3,6 +3,7 @@
 #include "decode/CPUDecoder.h"
 #include "models/models.h"
 #include "nn/CRFModel.h"
+#include "nn/CRFModelConfig.h"
 #include "nn/ModBaseModel.h"
 #include "nn/ModBaseRunner.h"
 #include "nn/ModelRunner.h"
@@ -14,6 +15,7 @@
 #include "read_pipeline/ReadFilterNode.h"
 #include "read_pipeline/ReadToBamTypeNode.h"
 #include "read_pipeline/ScalerNode.h"
+#include "utils/SampleSheet.h"
 #include "utils/parameters.h"
 
 #if DORADO_GPU_BUILD
@@ -45,19 +47,19 @@ protected:
 
     float random_between(float min, float max) {
         typename decltype(m_dist)::param_type range(min, max);
-        return m_dist(m_rng, range);
+        return float(m_dist(m_rng, range));
     }
 
     auto make_test_read(std::string read_id) {
         auto read = std::make_unique<dorado::SimplexRead>();
-        read->read_common.raw_data = torch::rand(random_between(100, 200));
+        read->read_common.raw_data = torch::rand(size_t(random_between(100, 200)));
         read->read_common.sample_rate = 5000;
         read->read_common.shift = random_between(100, 200);
         read->read_common.scale = random_between(5, 10);
         read->read_common.read_id = std::move(read_id);
         read->read_common.seq = "ACGTACGT";
         read->read_common.qstring = "********";
-        read->read_common.num_trimmed_samples = random_between(10, 100);
+        read->read_common.num_trimmed_samples = size_t(random_between(10, 100));
         read->read_common.attributes.mux = 2;
         read->read_common.attributes.read_number = 12345;
         read->read_common.attributes.channel_number = 5;
@@ -162,9 +164,10 @@ TempDir download_model(const std::string& model) {
 
 DEFINE_TEST(NodeSmokeTestRead, "ScalerNode") {
     auto pipeline_restart = GENERATE(false, true);
-    auto is_rna = GENERATE(true, false);
+    auto model_type = GENERATE(dorado::SampleType::DNA, dorado::SampleType::RNA002,
+                               dorado::SampleType::RNA004);
     CAPTURE(pipeline_restart);
-    CAPTURE(is_rna);
+    CAPTURE(model_type);
 
     set_pipeline_restart(pipeline_restart);
 
@@ -174,11 +177,12 @@ DEFINE_TEST(NodeSmokeTestRead, "ScalerNode") {
     });
 
     dorado::SignalNormalisationParams config;
-    config.quantile_a = 0.2;
-    config.quantile_b = 0.9;
-    config.shift_multiplier = 0.51;
-    config.scale_multiplier = 0.53;
-    run_smoke_test<dorado::ScalerNode>(config, is_rna, 2);
+    config.strategy = dorado::ScalingStrategy::QUANTILE;
+    config.quantile.quantile_a = 0.2f;
+    config.quantile.quantile_b = 0.9f;
+    config.quantile.shift_multiplier = 0.51f;
+    config.quantile.scale_multiplier = 0.53f;
+    run_smoke_test<dorado::ScalerNode>(config, model_type, 2);
 }
 
 DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
@@ -219,8 +223,8 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
         }
         for (const auto& device : devices) {
             auto caller = dorado::create_cuda_caller(model_config, default_params.chunksize,
-                                                     batch_size, device);
-            for (size_t i = 0; i < default_params.num_runners; i++) {
+                                                     int(batch_size), device);
+            for (int i = 0; i < default_params.num_runners; i++) {
                 runners.push_back(std::make_shared<dorado::CudaModelRunner>(caller));
             }
         }
@@ -234,7 +238,7 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
         set_expected_messages(5);
         batch_size = 8;
         runners.push_back(std::make_shared<dorado::ModelRunner<dorado::CPUDecoder>>(
-                model_config, "cpu", default_params.chunksize, batch_size));
+                model_config, "cpu", default_params.chunksize, int(batch_size)));
     }
 
     run_smoke_test<dorado::BasecallerNode>(std::move(runners),
@@ -296,7 +300,7 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
     for (const auto& device_string : modbase_devices) {
         auto caller = dorado::create_modbase_caller({remora_model, remora_model_6mA}, batch_size,
                                                     device_string);
-        for (size_t i = 0; i < default_params.mod_base_runners_per_caller; i++) {
+        for (int i = 0; i < default_params.mod_base_runners_per_caller; i++) {
             remora_runners.push_back(std::make_unique<dorado::ModBaseRunner>(caller));
         }
     }
@@ -305,7 +309,7 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
     set_read_mutator([this, model_stride](dorado::SimplexReadPtr& read) {
         read->read_common.raw_data = read->read_common.raw_data.to(torch::kHalf);
 
-        read->read_common.model_stride = model_stride;
+        read->read_common.model_stride = int(model_stride);
         // The move table size needs rounding up.
         size_t const move_table_size =
                 (read->read_common.get_raw_data_samples() + model_stride - 1) / model_stride;
@@ -327,8 +331,8 @@ DEFINE_TEST(NodeSmokeTestBam, "ReadToBamType") {
 
     set_pipeline_restart(pipeline_restart);
 
-    run_smoke_test<dorado::ReadToBamType>(emit_moves, 2,
-                                          dorado::utils::default_parameters.methylation_threshold);
+    run_smoke_test<dorado::ReadToBamType>(
+            emit_moves, 2, dorado::utils::default_parameters.methylation_threshold, nullptr, 1000);
 }
 
 DEFINE_TEST(NodeSmokeTestRead, "BarcodeClassifierNode") {
@@ -342,7 +346,8 @@ DEFINE_TEST(NodeSmokeTestRead, "BarcodeClassifierNode") {
     set_pipeline_restart(pipeline_restart);
 
     std::vector<std::string> kits = {"SQK-RPB004", "EXP-NBD196"};
-    run_smoke_test<dorado::BarcodeClassifierNode>(2, kits, barcode_both_ends, no_trim);
+    run_smoke_test<dorado::BarcodeClassifierNode>(2, kits, barcode_both_ends, no_trim,
+                                                  std::nullopt);
 }
 
 TEST_CASE("BarcodeClassifierNode: test simple pipeline with fastq and sam files") {
@@ -352,8 +357,8 @@ TEST_CASE("BarcodeClassifierNode: test simple pipeline with fastq and sam files"
     std::vector<std::string> kits = {"EXP-PBC096"};
     bool barcode_both_ends = GENERATE(true, false);
     bool no_trim = GENERATE(true, false);
-    auto classifier = pipeline_desc.add_node<dorado::BarcodeClassifierNode>(
-            {sink}, 8, kits, barcode_both_ends, no_trim);
+    pipeline_desc.add_node<dorado::BarcodeClassifierNode>({sink}, 8, kits, barcode_both_ends,
+                                                          no_trim, std::nullopt);
 
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
 
@@ -368,11 +373,17 @@ TEST_CASE("BarcodeClassifierNode: test simple pipeline with fastq and sam files"
 
 DEFINE_TEST(NodeSmokeTestRead, "PolyACalculator") {
     auto pipeline_restart = GENERATE(false, true);
-    auto is_rna = GENERATE(true, false);
+    auto is_rna = GENERATE(false, true);
     CAPTURE(pipeline_restart);
     CAPTURE(is_rna);
 
     set_pipeline_restart(pipeline_restart);
+
+    set_read_mutator([](dorado::SimplexReadPtr& read) {
+        read->read_common.model_stride = 2;
+        read->read_common.moves = {1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0,
+                                   0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 1, 1};
+    });
 
     run_smoke_test<dorado::PolyACalculator>(8, is_rna);
 }

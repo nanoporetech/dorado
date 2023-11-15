@@ -30,6 +30,32 @@ endif()
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_EXTENSIONS OFF)
+
+function(enable_warnings_as_errors TARGET_NAME)
+    if(WIN32)
+        # W3 - warning level 3.
+        # WX - warnings as errors.
+        # external:anglebrackets - treat <header> includes as external.
+        # external:W0 - disable warnings for external code.
+        target_compile_options(${TARGET_NAME} PRIVATE
+          $<$<NOT:$<COMPILE_LANGUAGE:CUDA>>:/W3 /WX /external:anglebrackets /external:W0>
+        )
+        target_compile_definitions(${TARGET_NAME} PRIVATE
+            _CRT_SECURE_NO_WARNINGS
+        )
+    else()
+        target_compile_options(${TARGET_NAME} PRIVATE -Wall -Werror)
+    endif()
+endfunction()
+
+function(disable_warnings TARGET_NAME)
+    if(WIN32)
+        target_compile_options(${TARGET_NAME} PRIVATE
+            $<$<NOT:$<COMPILE_LANGUAGE:CUDA>>:/W0>
+        )
+    endif()
+endfunction()
+
 set(DORADO_3RD_PARTY_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/dorado/3rdparty)
 set(DORADO_3RD_PARTY_DOWNLOAD ${CMAKE_CURRENT_SOURCE_DIR}/dorado/3rdparty
     CACHE PATH "Location to download 3rdparty libraries into")
@@ -100,6 +126,14 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     endif()
 endif()
 
+# Bring in spdlog
+add_subdirectory(${DORADO_3RD_PARTY_SOURCE}/spdlog)
+# Avoid namespace clashes with static torch.
+target_compile_definitions(spdlog PUBLIC
+    "FMT_BEGIN_NAMESPACE=namespace fmt { inline namespace ont {"
+    "FMT_END_NAMESPACE=}}"
+)
+
 # ELZIP_DECOMPRESS_ONLY stops minizip from adding OpenSSL as a target, preventing use of three dylibs on osx.
 set(ELZIP_DECOMPRESS_ONLY ON)
 add_subdirectory(${DORADO_3RD_PARTY_SOURCE}/elzip)
@@ -112,9 +146,13 @@ if (ONT_MM2_EXE)
     install(TARGETS minimap2_exe)
     add_custom_target(testing_deps ALL DEPENDS minimap2_exe)
 endif()
+# Disable warnings from minimap source
+disable_warnings(minimap2)
 
 set(BUILD_TESTING OFF)
 add_subdirectory(${DORADO_3RD_PARTY_SOURCE}/edlib EXCLUDE_FROM_ALL)
+# Disable warnings from edlib source
+disable_warnings(edlib)
 set(BUILD_TESTING ON)
 
 add_subdirectory(${DORADO_3RD_PARTY_SOURCE}/date EXCLUDE_FROM_ALL)
@@ -168,8 +206,6 @@ set(LIB_SOURCE_FILES
     dorado/read_pipeline/SubreadTaggerNode.h
     dorado/read_pipeline/BaseSpaceDuplexCallerNode.cpp
     dorado/read_pipeline/BaseSpaceDuplexCallerNode.h
-    dorado/read_pipeline/DuplexSplitNode.cpp
-    dorado/read_pipeline/DuplexSplitNode.h
     dorado/read_pipeline/AlignerNode.cpp
     dorado/read_pipeline/AlignerNode.h
     dorado/read_pipeline/HtsReader.cpp
@@ -181,10 +217,6 @@ set(LIB_SOURCE_FILES
     dorado/read_pipeline/ResumeLoaderNode.h
     dorado/read_pipeline/DuplexReadTaggingNode.cpp
     dorado/read_pipeline/DuplexReadTaggingNode.h
-    dorado/read_pipeline/BarcodeClassifier.cpp
-    dorado/read_pipeline/BarcodeClassifier.h
-    dorado/read_pipeline/BarcodeClassifierSelector.cpp
-    dorado/read_pipeline/BarcodeClassifierSelector.h
     dorado/read_pipeline/BarcodeClassifierNode.cpp
     dorado/read_pipeline/BarcodeClassifierNode.h
     dorado/read_pipeline/BarcodeDemuxerNode.cpp
@@ -197,11 +229,23 @@ set(LIB_SOURCE_FILES
     dorado/read_pipeline/PolyACalculator.h
     dorado/read_pipeline/read_utils.cpp
     dorado/read_pipeline/read_utils.h
+    dorado/read_pipeline/stereo_features.cpp
+    dorado/read_pipeline/stereo_features.h
     dorado/read_pipeline/stitch.cpp
     dorado/read_pipeline/stitch.h
+    dorado/read_pipeline/ReadSplitNode.cpp
+    dorado/read_pipeline/ReadSplitNode.h
+    dorado/splitter/DuplexReadSplitter.cpp
+    dorado/splitter/DuplexReadSplitter.h
+    dorado/splitter/RNAReadSplitter.cpp
+    dorado/splitter/RNAReadSplitter.h
+    dorado/splitter/splitter_utils.cpp
+    dorado/splitter/splitter_utils.h
+    dorado/demux/BarcodeClassifier.cpp
+    dorado/demux/BarcodeClassifier.h
+    dorado/demux/BarcodeClassifierSelector.cpp
+    dorado/demux/BarcodeClassifierSelector.h
     dorado/decode/beam_search.cpp
-    dorado/decode/fast_hash.cpp
-    dorado/decode/fast_hash.h
     dorado/decode/beam_search.h
     dorado/decode/CPUDecoder.cpp
     dorado/decode/CPUDecoder.h
@@ -233,6 +277,8 @@ endif()
 
 add_library(dorado_lib ${LIB_SOURCE_FILES})
 
+enable_warnings_as_errors(dorado_lib)
+
 set_target_properties(dorado_lib
     PROPERTIES
     LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
@@ -263,7 +309,6 @@ target_include_directories(dorado_lib
         ${DORADO_3RD_PARTY_SOURCE}/hdf_plugins/vbz_plugin
         ${DORADO_3RD_PARTY_SOURCE}/cxxpool/src
         ${DORADO_3RD_PARTY_SOURCE}/NVTX/c/include
-        ${DORADO_3RD_PARTY_SOURCE}/spdlog/include
         ${DORADO_3RD_PARTY_SOURCE}/indicators/include
 )
 
@@ -284,7 +329,6 @@ target_link_libraries(dorado_lib
         htslib
         vbz_hdf_plugin
         edlib
-        date::date
         dorado_utils
     PRIVATE
         ${KOI_LIBRARIES}    
@@ -329,6 +373,8 @@ if(NOT DORADO_LIB_ONLY)
     if(MSVC)
         set_target_properties(dorado PROPERTIES LINK_OPTIONS "/ignore:4099")
     endif()
+
+    enable_warnings_as_errors(dorado)
 
     if (DORADO_ENABLE_PCH)
         target_precompile_headers(dorado REUSE_FROM dorado_lib)
@@ -454,7 +500,6 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
             ${POD5_LIBRARIES}
             ${HDF5_C_LIBRARIES}
             ${CMAKE_DL_LIBS}
-            date::date
     )
 
     if(WIN32)
@@ -469,6 +514,8 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
         LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
         ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
     )
+    
+    enable_warnings_as_errors(dorado_io_lib)
 
     if (NOT DORADO_LIB_ONLY)
         add_subdirectory(tests)
@@ -494,4 +541,9 @@ if (GENERATE_TEST_COVERAGE)
             EXCLUDE "${PROJECT_SOURCE_DIR}/dorado/3rdparty/*" "${PROJECT_SOURCE_DIR}/tests/*"
             )
     endif()
+endif()
+
+# GCC 8 ICEs trying to compile this file with ASAN+optimisations enabled, so knock down the optimisation to try and help it out.
+if (ECM_ENABLE_SANITIZERS AND (CMAKE_CXX_COMPILER_ID MATCHES "GNU") AND (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9.0))
+    set_source_files_properties(dorado/read_pipeline/stereo_features.cpp PROPERTIES COMPILE_OPTIONS "-O0")
 endif()
