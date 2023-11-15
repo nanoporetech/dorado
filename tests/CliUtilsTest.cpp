@@ -55,7 +55,7 @@ TEST_CASE("CliUtils: Extract tokens from dorado cmdline", TEST_GROUP) {
                                                 "dataset", "--option1",  "blah"};
     auto tokens = extract_token_from_cli(cmdline);
     CHECK(tokens.size() == 6);
-    for (int i = 0; i < tokens.size(); i++) {
+    for (size_t i = 0; i < tokens.size(); i++) {
         CHECK(tokens[i] == expected_tokens[i]);
     }
 }

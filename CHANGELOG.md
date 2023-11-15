@@ -2,6 +2,30 @@
 
 All notable changes to Dorado will be documented in this file.
 
+# [0.4.3] (14 Nov 2023)
+
+This release of Dorado introduces a new RNA m6A modified base model and initial support for poly(A)/poly(T) tail length estimation. It also introduces duplex performance enhancements and bug fixes to improve the stability of Dorado.
+
+* 803e3a7ce2590b1c95b4754117185983ac2ad560 - Add RNA m6A DRACH-context model
+* 0f282cde507a36bf91863270bd0323564235c15b - Add poly(A)/poly(T) tail length estimation support for RNA and cDNA
+* 54e14ca01e7391c8857989da7db086a4591375a1 - Add RNA read splitting
+* 2dc1f039cac7f3e6cd082b77a5b020fed5488e2f - Enable RNA adapter trimming
+* 80114c08c45bc902843a2e18b5949ebf5cfefdf2 - Correctly update CIGAR and POS entries when trimming barcodes
+* 4b2025c57fd3b87b2ce6cd52be07adfd9ae5acf9 - Add documentation for sample sheet support
+* 641cb08b457d727c3da682185c6fe491df49dab2 - Reduce host memory footprint for duplex basecalling
+* 7c1c0f04d93113d4dd2c632bdcd242304b54d270 - Reduce working reads size, in particular for duplex.
+* 831f0a91f0100c2586720f6026450fdbae1a8d21 - Fix pairing check for split reads in duplex basecalling
+* b63056743be6e5442f2f5af65a36c592bbf96184 - Account for split reads during progress tracking
+* 383fe0226bfa7956705376ac5e4a32096ff80c45 - Update to Koi v0.4.1
+* 873c6b11e0113735b21305afce5057138558388d - Fix warnings about `ONLY_C_LOCAL` mismatches in PCH builds
+* 52cbabff83de3c9fb6f1a0db9194828b92418855 - Encapsulate `date` dependency
+* 8fb8a4df567ba22df6a298f4e30277a0d47ceaa4 - Disable Cutlass LSTM codepath for 128-wide LSTM layers because this kernel does not work
+* 6a9dad907af8dd2b4e556d49a329a8a0fbc5c32c - Enable warnings as errors at build time
+* 5aaef312027836ffbd6e2b944e6cd3ba4a259267 - Address auto batchsize issues on unified memory Linux systems
+* 92b5a6792fca4d2bb2b76727ec486efe8bdfae97 - Reduce compilation times
+* 062e3fd53f58380070efff660303b71c03cd02c0 - Minor speed improvements to CPU beam search
+
+
 # [0.4.2] (30 Oct 2023)
 
 This release of Dorado fixes a bug with the CpG-context 5mC/5hmC model calling all contexts and adds beta support for using a barcode alias from a sample sheet.

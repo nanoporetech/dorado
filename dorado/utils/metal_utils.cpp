@@ -51,24 +51,6 @@ auto get_library_location() {
     return NS::String::string(fspath.c_str(), NS::ASCIIStringEncoding);
 }
 
-// Returns an ASCII std::string associated with the given CFStringRef.
-std::string cfstringref_to_string(const CFStringRef cfstringref) {
-    // There does exist an API to directly return a char* pointer, but this is documented as
-    // failing on an arbitrary basis, and did fail empirically.
-    const auto utf16_len = CFStringGetLength(cfstringref);
-    // We must leave room the for zero terminator, or CFStringGetCString will fail.
-    const auto max_ascii_len =
-            CFStringGetMaximumSizeForEncoding(utf16_len, kCFStringEncodingASCII) + 1;
-    // CFStringGetCString wants to supply its own zero terminator, so write to an intermediate
-    // buffer used for constructing the final std::string.
-    std::vector<char> buffer(max_ascii_len);
-    if (CFStringGetCString(cfstringref, &buffer[0], buffer.size(), kCFStringEncodingASCII)) {
-        return std::string(buffer.data());
-    }
-
-    return std::string("");
-}
-
 #if !TARGET_OS_IPHONE
 
 // Retrieves a single int64_t property associated with the given class/name.
@@ -80,8 +62,11 @@ std::optional<int64_t> retrieve_ioreg_prop(const std::string &service_class,
     if (!matching_dict) {
         return std::nullopt;
     }
-    // Note: kIOMainPortDefault was introduced on MacOS 12.  If support for earlier versions
-    // is needed an alternate constant will be needed.
+
+#if MAC_OS_X_VERSION_MIN_REQUIRED < 120000 /* MAC_OS_VERSION_12_0 */
+    // These are the same variable, just renamed in macOS 12+.
+    const mach_port_t kIOMainPortDefault = kIOMasterPortDefault;
+#endif
     // IOServiceGetMatchingService consumes a reference to matching_dict, so we don't need
     // to release it ourselves.
     io_service_t service = IOServiceGetMatchingService(kIOMainPortDefault, matching_dict);

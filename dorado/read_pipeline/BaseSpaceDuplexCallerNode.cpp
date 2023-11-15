@@ -31,8 +31,8 @@ std::pair<std::vector<char>, std::vector<char>> compute_basespace_consensus(
 
     // Loop over each alignment position, within given alignment boundaries
     for (int i = alignment_start_position;
-         i < alignment_end_position && target_cursor < target_quality_scores.size() &&
-         query_cursor < query_quality_scores.size();
+         i < alignment_end_position && target_cursor < int(target_quality_scores.size()) &&
+         query_cursor < int(query_quality_scores.size());
          i++) {
         //Comparison between q-scores is done in Phred space which is offset by 33
         if (target_quality_scores.at(target_cursor) >=
@@ -128,9 +128,9 @@ void BaseSpaceDuplexCallerNode::basespace(const std::string& template_read_id,
             dorado::utils::reverse_complement(complement_read->read_common.seq);
 
     EdlibAlignResult result =
-            edlibAlign(template_sequence.data(), template_sequence.size(),
+            edlibAlign(template_sequence.data(), int(template_sequence.size()),
                        complement_sequence_reverse_complement.data(),
-                       complement_sequence_reverse_complement.size(), align_config);
+                       int(complement_sequence_reverse_complement.size()), align_config);
 
     // Now - we have to do the actual basespace alignment itself
     int query_cursor = 0;
@@ -185,9 +185,9 @@ BaseSpaceDuplexCallerNode::BaseSpaceDuplexCallerNode(
         ReadMap reads,
         size_t threads)
         : MessageSink(1000),
+          m_num_worker_threads(threads),
           m_template_complement_map(std::move(template_complement_map)),
-          m_reads(std::move(reads)),
-          m_num_worker_threads(threads) {
+          m_reads(std::move(reads)) {
     start_threads();
 }
 

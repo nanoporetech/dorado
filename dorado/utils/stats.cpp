@@ -16,8 +16,8 @@ StatsSampler::StatsSampler(std::chrono::system_clock::duration sampling_period,
                            size_t max_records)
         : m_stats_reporters(std::move(stats_reporters)),
           m_stats_callables(std::move(stats_callables)),
-          m_sampling_period(sampling_period),
           m_max_records(max_records),
+          m_sampling_period(sampling_period),
           m_sampling_thread(&StatsSampler::sampling_thread_fn, this) {}
 
 StatsSampler::~StatsSampler() {

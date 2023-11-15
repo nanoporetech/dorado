@@ -52,6 +52,9 @@ public:
     uint64_t start_time_ms;
 
     std::shared_ptr<const BarcodingInfo> barcoding_info;
+    std::shared_ptr<const BarcodeScoreResult> barcoding_result;
+    std::size_t pre_trim_seq_length{};
+    std::pair<int, int> barcode_trim_interval{};
     std::string alignment_string{};
 
     // A unique identifier for each input read
@@ -108,6 +111,24 @@ private:
 // Class representing a duplex read, including stereo-encoded raw data
 class DuplexRead {
 public:
+    // Data used to generate the stereo features in read_common.raw_data.
+    class StereoFeatureInputs {
+    public:
+        std::vector<unsigned char> alignment;
+        uint64_t template_seq_start = std::numeric_limits<uint64_t>::max();
+        uint64_t complement_seq_start = std::numeric_limits<uint64_t>::max();
+        std::string template_seq;
+        std::string complement_seq;
+        std::string template_qstring;
+        std::string complement_qstring;
+        std::vector<uint8_t> template_moves;
+        std::vector<uint8_t> complement_moves;
+        at::Tensor template_signal;
+        at::Tensor complement_signal;
+        int signal_stride = -1;
+    };
+    StereoFeatureInputs stereo_feature_inputs;
+
     ReadCommon read_common;
 };
 
@@ -173,6 +194,9 @@ using Message = std::variant<SimplexReadPtr, BamPtr, ReadPair, CacheFlushMessage
 bool is_read_message(const Message& message);
 
 ReadCommon& get_read_common_data(const Message& message);
+
+// Ensures the raw_data field is non-empty, which it won't necessarily be for DuplexRead.
+void materialise_read_raw_data(Message& message);
 
 using NodeHandle = int;
 

@@ -96,17 +96,10 @@ void setup(std::vector<std::string> args,
     }
 
     const bool enable_aligner = !ref.empty();
-    if (enable_aligner && output_mode == HtsWriter::OutputMode::FASTQ) {
-        throw std::runtime_error("Alignment to reference cannot be used with FASTQ output.");
-    }
 
     // create modbase runners first so basecall runners can pick batch sizes based on available memory
     auto remora_runners = create_modbase_runners(
             remora_models, device, default_parameters.remora_runners_per_caller, remora_batch_size);
-
-    if (!remora_runners.empty() && output_mode == HtsWriter::OutputMode::FASTQ) {
-        throw std::runtime_error("Modified base models cannot be used with FASTQ output");
-    }
 
     auto [runners, num_devices] =
             create_basecall_runners(model_config, device, num_runners, 0, batch_size, chunk_size);
@@ -121,7 +114,7 @@ void setup(std::vector<std::string> args,
     bool duplex = false;
 
     const auto thread_allocations = utils::default_thread_allocations(
-            num_devices, !remora_runners.empty() ? num_remora_threads : 0, enable_aligner,
+            int(num_devices), !remora_runners.empty() ? int(num_remora_threads) : 0, enable_aligner,
             !barcode_kits.empty());
 
     std::unique_ptr<const utils::SampleSheet> sample_sheet;
@@ -175,7 +168,7 @@ void setup(std::vector<std::string> args,
             pipeline_desc, std::move(runners), std::move(remora_runners), overlap,
             mean_qscore_start_pos, thread_allocations.scaler_node_threads,
             true /* Enable read splitting */, thread_allocations.splitter_node_threads,
-            thread_allocations.remora_threads * num_devices, current_sink_node);
+            int(thread_allocations.remora_threads * num_devices), current_sink_node);
 
     // Create the Pipeline from our description.
     std::vector<dorado::stats::StatsReporter> stats_reporters{dorado::stats::sys_stats_report};
@@ -222,7 +215,7 @@ void setup(std::vector<std::string> args,
     }
 
     std::vector<dorado::stats::StatsCallable> stats_callables;
-    ProgressTracker tracker(num_reads, duplex);
+    ProgressTracker tracker(int(num_reads), duplex);
     stats_callables.push_back(
             [&tracker](const stats::NamedStats& stats) { tracker.update_progress_bar(stats); });
     constexpr auto kStatsPeriod = 100ms;
@@ -370,16 +363,15 @@ int basecaller(int argc, char* argv[]) {
     parser.visible.add_argument("--sample-sheet")
             .help("Path to the sample sheet to use.")
             .default_value(std::string(""));
-
-    cli::add_minimap2_arguments(parser, alignment::dflt_options);
-    cli::add_internal_arguments(parser);
-
-    // Add hidden arguments that only apply to simplex calling.
-    parser.hidden.add_argument("--estimate-poly-a")
-            .help("Estimate poly-A/T tail lengths (beta feature). Primarily meant for cDNA and "
+    parser.visible.add_argument("--estimate-poly-a")
+            .help("Estimate poly-A/T tail lengths (beta feature). Primarily meant "
+                  "for cDNA and "
                   "dRNA use cases.")
             .default_value(false)
             .implicit_value(true);
+
+    cli::add_minimap2_arguments(parser, alignment::dflt_options);
+    cli::add_internal_arguments(parser);
 
     // Create a copy of the parser to use if the resume feature is enabled. Needed
     // to parse the model used for the file being resumed from. Note that this copy
@@ -405,7 +397,7 @@ int basecaller(int argc, char* argv[]) {
     auto mod_bases = parser.visible.get<std::vector<std::string>>("--modified-bases");
     auto mod_bases_models = parser.visible.get<std::string>("--modified-bases-models");
 
-    if (mod_bases.size() && !mod_bases_models.empty()) {
+    if (!mod_bases.empty() && !mod_bases_models.empty()) {
         spdlog::error(
                 "only one of --modified-bases or --modified-bases-models should be specified.");
         std::exit(EXIT_FAILURE);
@@ -436,6 +428,19 @@ int basecaller(int argc, char* argv[]) {
     }
 
     if (emit_fastq) {
+        if (!mod_bases.empty() || !mod_bases_models.empty()) {
+            spdlog::error(
+                    "--emit-fastq cannot be used with modbase models as FASTQ cannot store modbase "
+                    "results.");
+            std::exit(EXIT_FAILURE);
+        }
+        if (!parser.visible.get<std::string>("--reference").empty()) {
+            spdlog::error(
+                    "--emit-fastq cannot be used with --reference as FASTQ cannot store alignment "
+                    "results.");
+            std::exit(EXIT_FAILURE);
+        }
+        spdlog::info(" - Note: FASTQ output is not recommended as not all data can be preserved.");
         output_mode = HtsWriter::OutputMode::FASTQ;
     } else if (emit_sam || utils::is_fd_tty(stdout)) {
         output_mode = HtsWriter::OutputMode::SAM;
@@ -464,7 +469,7 @@ int basecaller(int argc, char* argv[]) {
               parser.visible.get<bool>("--barcode-both-ends"),
               parser.visible.get<bool>("--no-trim"),
               parser.visible.get<std::string>("--sample-sheet"), resume_parser,
-              parser.hidden.get<bool>("--estimate-poly-a"));
+              parser.visible.get<bool>("--estimate-poly-a"));
     } catch (const std::exception& e) {
         spdlog::error("{}", e.what());
         return 1;

@@ -23,19 +23,20 @@ namespace dorado {
 
 std::pair<float, float> ScalerNode::normalisation(const at::Tensor& x) {
     // Calculate shift and scale factors for normalisation.
-    auto quantiles = dorado::utils::quantile_counting(
-            x, at::tensor({m_scaling_params.quantile_a, m_scaling_params.quantile_b}));
+    const auto& params = m_scaling_params.quantile;
+    auto quantiles =
+            dorado::utils::quantile_counting(x, at::tensor({params.quantile_a, params.quantile_b}));
     float q_a = quantiles[0].item<float>();
     float q_b = quantiles[1].item<float>();
-    float shift = std::max(10.0f, m_scaling_params.shift_multiplier * (q_a + q_b));
-    float scale = std::max(1.0f, m_scaling_params.scale_multiplier * (q_b - q_a));
+    float shift = std::max(10.0f, params.shift_multiplier * (q_a + q_b));
+    float scale = std::max(1.0f, params.scale_multiplier * (q_b - q_a));
     return {shift, scale};
 }
 
 std::pair<float, float> ScalerNode::med_mad(const at::Tensor& x) {
     // See https://en.wikipedia.org/wiki/Median_absolute_deviation
     //  (specifically the "Relation to standard deviation" section)
-    constexpr float factor = 1.4826;
+    constexpr float factor = 1.4826f;
     //Calculate signal median and median absolute deviation
     auto med = x.median();
     auto mad = at::median(at::abs(x - med)) * factor + EPS;
@@ -50,7 +51,7 @@ std::pair<float, float> ScalerNode::med_mad(const at::Tensor& x) {
 int determine_rna_adapter_pos(const dorado::SimplexRead& read, dorado::SampleType model_type) {
     assert(read.read_common.raw_data.dtype() == at::kShort);
     static const std::unordered_map<dorado::SampleType, int> kOffsetMap = {
-            {dorado::SampleType::RNA002, 4000}, {dorado::SampleType::RNA004, 1000}};
+            {dorado::SampleType::RNA002, 3500}, {dorado::SampleType::RNA004, 1000}};
     static const std::unordered_map<dorado::SampleType, int16_t> kAdapterCutoff = {
             {dorado::SampleType::RNA002, 550}, {dorado::SampleType::RNA004, 700}};
 
@@ -58,14 +59,14 @@ int determine_rna_adapter_pos(const dorado::SimplexRead& read, dorado::SampleTyp
     const int kStride = 50;
     const int16_t kMedianDiff = 125;
 
-    const int kOffset = kOffsetMap.at(model_type);
     const int16_t kMinMedianForRNASignal = kAdapterCutoff.at(model_type);
 
-    int signal_len = read.read_common.get_raw_data_samples();
+    int signal_len = int(read.read_common.get_raw_data_samples());
     const int16_t* signal = static_cast<int16_t*>(read.read_common.raw_data.data_ptr());
 
     // Check the median value change over 5 windows.
     std::array<int16_t, 5> medians = {0, 0, 0, 0, 0};
+    std::array<int32_t, 5> window_pos = {0, 0, 0, 0, 0};
     int median_pos = 0;
     int break_point = 0;
     const int signal_start = kOffsetMap.at(model_type);
@@ -75,15 +76,26 @@ int determine_rna_adapter_pos(const dorado::SimplexRead& read, dorado::SampleTyp
                                    {static_cast<int>(std::min(kWindowSize, signal_len - i))},
                                    at::TensorOptions().dtype(at::kShort));
         int16_t median = slice.median().item<int16_t>();
-        medians[median_pos++ % medians.size()] = median;
+        medians[median_pos % medians.size()] = median;
+        // Since the medians are stored in a circular buffer, we need
+        // to store the actual window positions for the median values
+        // as well to check that maximum median value came from a window
+        // after that of the minimum median value.
+        window_pos[median_pos % window_pos.size()] = median_pos;
         auto minmax = std::minmax_element(medians.begin(), medians.end());
         int16_t min_median = *minmax.first;
         int16_t max_median = *minmax.second;
-        if ((median_pos > medians.size()) && (max_median > kMinMedianForRNASignal) &&
-            (max_median - min_median > kMedianDiff)) {
+        auto min_pos = std::distance(medians.begin(), minmax.first);
+        auto max_pos = std::distance(medians.begin(), minmax.second);
+        spdlog::trace("window {}-{} min {} max {} diff {}", i, i + kWindowSize, min_median,
+                      max_median, (max_median - min_median));
+        if ((median_pos >= int(medians.size())) && (max_median > kMinMedianForRNASignal) &&
+            (max_median - min_median > kMedianDiff) &&
+            (window_pos[max_pos] > window_pos[min_pos])) {
             break_point = i;
             break;
         }
+        ++median_pos;
     }
 
     return break_point;
@@ -118,14 +130,26 @@ void ScalerNode::worker_thread() {
 
         read->read_common.scaling_method = to_string(m_scaling_params.strategy);
         if (m_scaling_params.strategy == ScalingStrategy::PA) {
-            scale = read->scaling;
-            shift = read->offset;
+            const auto& stdn = m_scaling_params.standarisation;
+            if (stdn.standardise) {
+                // Standardise from scaled pa
+                // 1. x_pa  = (Scale)*(x + Offset)
+                // 2. x_std = (1 / Stdev)*(x_pa - Mean)
+                // => x_std = (Scale / Stdev)*(x + (Offset - (Mean / Scale)))
+                //            ---- scale ---        ------- shift --------
+                scale = read->scaling / stdn.stdev;
+                shift = read->offset - (stdn.mean / read->scaling);
+            } else {
+                scale = read->scaling;
+                shift = read->offset;
+            }
+
             read->read_common.raw_data =
                     ((read->read_common.raw_data.to(at::kFloat) + shift) * scale)
                             .to(at::ScalarType::Half);
 
-            read->read_common.scale = read->scaling;
-            read->read_common.shift = read->offset;
+            read->read_common.scale = scale;
+            read->read_common.shift = shift;
         } else {
             std::tie(shift, scale) = m_scaling_params.strategy == ScalingStrategy::QUANTILE
                                              ? normalisation(read->read_common.raw_data)
@@ -143,11 +167,20 @@ void ScalerNode::worker_thread() {
 
         // Don't perform DNA trimming on RNA since it looks too different and we lose useful signal.
         if (!is_rna) {
-            // 8000 value may be changed in future. Currently this is found to work well.
-            int max_samples =
-                    std::min(8000, static_cast<int>(read->read_common.get_raw_data_samples() / 2));
-            trim_start = utils::trim(
-                    read->read_common.raw_data.index({Slice(at::indexing::None, max_samples)}));
+            if (m_scaling_params.standarisation.standardise) {
+                // Constant trimming level for standardised scaling
+                // In most cases kit14 trim algorithm returns 10, so bypassing the heuristic
+                // and applying 10 for pA scaled data.
+                // TODO: may need refinement in the future
+                trim_start = 10;
+            } else {
+                // 8000 value may be changed in future. Currently this is found to work well.
+                int max_samples = std::min(
+                        8000, static_cast<int>(read->read_common.get_raw_data_samples() / 2));
+                trim_start = utils::trim(
+                        read->read_common.raw_data.index({Slice(at::indexing::None, max_samples)}));
+            }
+
             read->read_common.raw_data =
                     read->read_common.raw_data.index({Slice(trim_start, at::indexing::None)});
         }
@@ -167,8 +200,8 @@ ScalerNode::ScalerNode(const SignalNormalisationParams& config,
                        int num_worker_threads,
                        size_t max_reads)
         : MessageSink(max_reads),
-          m_scaling_params(config),
           m_num_worker_threads(num_worker_threads),
+          m_scaling_params(config),
           m_model_type(model_type) {
     start_threads();
 }

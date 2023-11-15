@@ -84,7 +84,7 @@ double time_difference_seconds(const std::string & timestamp1, const std::string
         duration<double> diff = time1 - time2;
         return diff.count();
     } catch (const std::exception & e) {
-        throw std::runtime_error("Failed to parse timestamps");
+        throw std::runtime_error(std::string("Failed to parse timestamps: ") + e.what());
     }
 }
 

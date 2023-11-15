@@ -170,6 +170,14 @@ int duplex(int argc, char* argv[]) {
         }
 
         if (emit_fastq) {
+            if (!parser.visible.get<std::string>("--reference").empty()) {
+                spdlog::error(
+                        "--emit-fastq cannot be used with --reference as FASTQ cannot store "
+                        "alignment results.");
+                std::exit(EXIT_FAILURE);
+            }
+            spdlog::info(
+                    " - Note: FASTQ output is not recommended as not all data can be preserved.");
             output_mode = HtsWriter::OutputMode::FASTQ;
         } else if (emit_sam || utils::is_fd_tty(stdout)) {
             output_mode = HtsWriter::OutputMode::SAM;
@@ -208,7 +216,7 @@ int duplex(int argc, char* argv[]) {
             converted_reads_sink = aligner;
         }
         auto read_converter = pipeline_desc.add_node<ReadToBamType>(
-                {converted_reads_sink}, emit_moves, 2, 0, nullptr, 1000);
+                {converted_reads_sink}, emit_moves, 2, 0.0f, nullptr, 1000);
         auto duplex_read_tagger = pipeline_desc.add_node<DuplexReadTaggingNode>({read_converter});
         // The minimum sequence length is set to 5 to avoid issues with duplex node printing very short sequences for mismatched pairs.
         std::unordered_set<std::string> read_ids_to_filter;
@@ -216,15 +224,15 @@ int duplex(int argc, char* argv[]) {
                 {duplex_read_tagger}, min_qscore, default_parameters.min_sequence_length,
                 read_ids_to_filter, 5);
 
+        std::unique_ptr<dorado::Pipeline> pipeline;
+        ProgressTracker tracker(int(num_reads), duplex);
         std::vector<dorado::stats::StatsCallable> stats_callables;
-        ProgressTracker tracker(num_reads, duplex);
         stats_callables.push_back(
                 [&tracker](const stats::NamedStats& stats) { tracker.update_progress_bar(stats); });
         stats::NamedStats final_stats;
         std::unique_ptr<dorado::stats::StatsSampler> stats_sampler;
         std::vector<dorado::stats::StatsReporter> stats_reporters{dorado::stats::sys_stats_report};
 
-        std::unique_ptr<dorado::Pipeline> pipeline;
         constexpr auto kStatsPeriod = 100ms;
 
         if (basespace_duplex) {  // Execute a Basespace duplex pipeline.
@@ -239,9 +247,9 @@ int duplex(int argc, char* argv[]) {
             spdlog::info("> Starting Basespace Duplex Pipeline");
             threads = threads == 0 ? std::thread::hardware_concurrency() : threads;
 
-            auto duplex_caller_node = pipeline_desc.add_node<BaseSpaceDuplexCallerNode>(
-                    {read_filter_node}, std::move(template_complement_map), std::move(read_map),
-                    threads);
+            pipeline_desc.add_node<BaseSpaceDuplexCallerNode>({read_filter_node},
+                                                              std::move(template_complement_map),
+                                                              std::move(read_map), threads);
 
             pipeline = Pipeline::create(std::move(pipeline_desc), &stats_reporters);
             if (pipeline == nullptr) {
@@ -358,7 +366,7 @@ int duplex(int argc, char* argv[]) {
             }
             pipelines::create_stereo_duplex_pipeline(
                     pipeline_desc, std::move(runners), std::move(stereo_runners), overlap,
-                    mean_qscore_start_pos, num_devices * 2, num_devices,
+                    mean_qscore_start_pos, int(num_devices * 2), int(num_devices),
                     std::move(pairing_parameters), read_filter_node);
 
             pipeline = Pipeline::create(std::move(pipeline_desc), &stats_reporters);

@@ -6,6 +6,7 @@
 #include <toml.hpp>
 #include <toml/value.hpp>
 
+#include <cstddef>
 #include <set>
 #include <stdexcept>
 #include <string>
@@ -62,11 +63,15 @@ ConvParams parse_conv_params(const toml::value &segment, bool clamp) {
 }
 
 // Parse sublayers extracting convolution parameters. This is for use on v4+ models only
-std::vector<ConvParams> parse_convs(const std::vector<toml::value> &sublayers, bool clamp) {
+std::vector<ConvParams> parse_convs(const std::vector<toml::value> &sublayers) {
     std::vector<ConvParams> convs;
-    for (const auto &segment : sublayers) {
-        if (sublayer_type(segment) == SublayerType::CONVOLUTION) {
-            ConvParams conv = parse_conv_params(segment, clamp);
+    for (size_t i = 0; i < sublayers.size(); ++i) {
+        // If the sublayer after a convolution is a clamp, the activation function may have
+        // a fused implementation
+        if (sublayer_type(sublayers.at(i)) == SublayerType::CONVOLUTION) {
+            const bool has_clamp_next = ((i + 1) < sublayers.size()) &&
+                                        sublayer_type(sublayers.at(i + 1)) == SublayerType::CLAMP;
+            ConvParams conv = parse_conv_params(sublayers.at(i), has_clamp_next);
             convs.push_back(conv);
         }
     }
@@ -92,14 +97,32 @@ SignalNormalisationParams parse_signal_normalisation_params(const toml::value &c
 
     if (config_toml.contains("normalisation")) {
         const auto &norm = toml::find(config_toml, "normalisation");
-        params.quantile_a = toml::find<float>(norm, "quantile_a");
-        params.quantile_b = toml::find<float>(norm, "quantile_b");
-        params.shift_multiplier = toml::find<float>(norm, "shift_multiplier");
-        params.scale_multiplier = toml::find<float>(norm, "scale_multiplier");
+        params.quantile.quantile_a = toml::find<float>(norm, "quantile_a");
+        params.quantile.quantile_b = toml::find<float>(norm, "quantile_b");
+        params.quantile.shift_multiplier = toml::find<float>(norm, "shift_multiplier");
+        params.quantile.scale_multiplier = toml::find<float>(norm, "scale_multiplier");
 
         if (params.strategy != ScalingStrategy::QUANTILE) {
             spdlog::warn(
                     "Normalisation parameters are only used when `scaling.strategy = quantile`");
+        }
+    }
+
+    if (config_toml.contains("standardisation")) {
+        const auto &norm = toml::find(config_toml, "standardisation");
+        params.standarisation.standardise = toml::find<int>(norm, "standardise") > 0;
+        params.standarisation.mean = toml::find<float>(norm, "mean");
+        params.standarisation.stdev = toml::find<float>(norm, "stdev");
+
+        if (params.standarisation.standardise && params.strategy != ScalingStrategy::PA) {
+            throw std::runtime_error(
+                    "Signal standardisation is implemented only for `scaling.strategy = pa`");
+        }
+
+        if (params.standarisation.stdev <= 0.0f) {
+            throw std::runtime_error(
+                    "Config error: `standardisation.stdev` must be greater than 0, got: " +
+                    std::to_string(params.standarisation.stdev));
         }
     }
 
@@ -136,10 +159,9 @@ std::string SignalNormalisationParams::to_string() const {
     std::string str = "SignalNormalisationParams {";
     str += " strategy:" + dorado::to_string(strategy);
     if (strategy == ScalingStrategy::QUANTILE) {
-        str += " quantile_a:" + std::to_string(quantile_a);
-        str += " quantile_b:" + std::to_string(quantile_b);
-        str += " shift_multiplier:" + std::to_string(shift_multiplier);
-        str += " scale_multiplier:" + std::to_string(scale_multiplier);
+        str += quantile.to_string();
+    } else if (strategy == ScalingStrategy::PA && standarisation.standardise) {
+        str += standarisation.to_string();
     }
     str += "}";
     return str;
@@ -210,9 +232,9 @@ CRFModelConfig load_crf_model_config(const std::filesystem::path &path) {
 
         // v4-type model
         config.clamp = has_clamp(sublayers);
-        config.convs = parse_convs(sublayers, config.clamp);
+        config.convs = parse_convs(sublayers);
         // Overall stride is the product of all conv layers' strides.
-        for (const auto cv : config.convs) {
+        for (const auto &cv : config.convs) {
             config.stride *= cv.stride;
         }
         config.lstm_size = config.convs.back().size;
@@ -239,7 +261,6 @@ CRFModelConfig load_crf_model_config(const std::filesystem::path &path) {
                                        ? toml::find<int>(encoder, "first_conv_size")
                                        : 4;
 
-        // pre-v4 config.clamp = false so Activation::SWISH not Activation::SWISH_CLAMP
         config.convs.push_back(
                 ConvParams{config.num_features, first_conv, 5, 1, Activation::SWISH});
         config.convs.push_back(ConvParams{first_conv, 16, 5, 1, Activation::SWISH});

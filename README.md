@@ -10,6 +10,7 @@ Dorado is a high-performance, easy-to-use, open source basecaller for Oxford Nan
 * [Duplex basecalling](#duplex) (watch the following video for an introduction to [Duplex](https://youtu.be/8DVMG7FEBys)).
 * Simplex [barcode classification](#barcode-classification).
 * Support for aligned read output in SAM/BAM.
+* Initial support for [poly(A) tail estimation](#polya-tail-estimation).
 * [POD5](https://github.com/nanoporetech/pod5-file-format) support for highest basecalling performance.
 * Based on libtorch, the C++ API for pytorch.
 * Multiple custom optimisations in CUDA and Metal for maximising inference performance.
@@ -18,10 +19,10 @@ If you encounter any problems building or running Dorado, please [report an issu
 
 ## Installation
 
- - [dorado-0.4.2-linux-x64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.4.2-linux-x64.tar.gz)
- - [dorado-0.4.2-linux-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.4.2-linux-arm64.tar.gz)
- - [dorado-0.4.2-osx-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.4.2-osx-arm64.zip)
- - [dorado-0.4.2-win64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.4.2-win64.zip)
+ - [dorado-0.4.3-linux-x64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.4.3-linux-x64.tar.gz)
+ - [dorado-0.4.3-linux-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.4.3-linux-arm64.tar.gz)
+ - [dorado-0.4.3-osx-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.4.3-osx-arm64.zip)
+ - [dorado-0.4.3-win64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.4.3-win64.zip)
 
 ## Platforms
 
@@ -186,7 +187,7 @@ $ dorado demux --kit-name <kit-name> --output-dir <output-folder-for-demuxed-bam
 
 `<reads>` can either be an HTS format file (e.g. fastq, BAM, etc.) or a stream of an HTS format (e.g. the output of dorado basecalling).
 
-This results in multiple BAM files being generated in the output folder, one per barcode (formatted as `KITNAME_BARCODEXX.bam` and one for all unclassified reads. As with the in-line mode, `--no-trim` and `--barcode-both-ends` are also available as additional options.
+This results in multiple BAM files being generated in the output folder, one per barcode (formatted as `KITNAME_BARCODEXX.bam`) and one for all unclassified reads. As with the in-line mode, `--no-trim` and `--barcode-both-ends` are also available as additional options.
 
 Here is an example output folder
 ```
@@ -199,6 +200,13 @@ SQK-RPB004_barcode03.bam
 ...
 unclassified.bam
 ```
+
+#### Using a sample sheet
+Dorado is able to use a sample sheet to restrict the barcode classifications to only those present, and to apply aliases to the detected classifications. This is enabled by passing the path to a sample sheet to the `--sample-sheet` argument when using the `basecaller` or `demux` commands. See [here](documentation/SampleSheets.md) for more information.
+
+### Poly(A) tail estimation
+
+Dorado has initial support for estimating poly(A) tail lengths for cDNA and RNA. Note that Oxford Nanopore cDNA reads are sequenced in two different orientations and Dorado poly(A) tail length estimation handles both (A and T homopolymers). This feature can be enabled by passing `--estimate-poly-a` to the `basecaller` command. It is disabled by default. The estimated tail length is stored in the `pt:i` tag of the output record. Reads for which the tail length could not be estimated will not have the `pt:i` tag.
 
 ## Available basecalling models
 
@@ -265,7 +273,7 @@ Below is a table of the available basecalling models and the modified basecallin
 | :-------- | :------- | :--- | :--- |
 | **rna004_130bps_fast@v3.0.1** | N/A | N/A | 4 kHz |
 | **rna004_130bps_hac@v3.0.1** | N/A | N/A | 4 kHz |
-| **rna004_130bps_sup@v3.0.1** | 6mA_DRACH | v1 | 4 kHz |
+| **rna004_130bps_sup@v3.0.1** | m6A_DRACH | v1 | 4 kHz |
 | rna002_70bps_fast@v3 | N/A | N/A | 3 kHz |
 | rna002_70bps_hac@v3 | N/A | N/A | 3 kHz |
 

@@ -69,7 +69,7 @@ void add_sa_tag(bam1_t* record,
     }
     std::string sa = ss.str();
     if (!sa.empty()) {
-        bam_aux_append(record, "SA", 'Z', sa.length() + 1, (uint8_t*)sa.c_str());
+        bam_aux_append(record, "SA", 'Z', int(sa.length() + 1), (uint8_t*)sa.c_str());
     }
 }
 }  // namespace
@@ -99,8 +99,8 @@ std::vector<BamPtr> Minimap2Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
     int hits = 0;
     auto mm_index = m_minimap_index->index();
     const auto& mm_map_opts = m_minimap_index->mapping_options();
-    mm_reg1_t* reg =
-            mm_map(mm_index, seq.length(), seq.c_str(), &hits, buf, &mm_map_opts, qname.data());
+    mm_reg1_t* reg = mm_map(mm_index, static_cast<int>(seq.length()), seq.c_str(), &hits, buf,
+                            &mm_map_opts, qname.data());
 
     // just return the input record
     if (hits == 0) {
@@ -221,7 +221,7 @@ std::vector<BamPtr> Minimap2Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
 
         // Add new tags to match minimap2.
         add_tags(record, aln, seq, buf);
-        add_sa_tag(record, aln, reg, hits, j, l_seq, mm_index, use_hard_clip);
+        add_sa_tag(record, aln, reg, hits, j, static_cast<int>(l_seq), mm_index, use_hard_clip);
 
         results.push_back(BamPtr(record));
     }
@@ -295,7 +295,7 @@ void Minimap2Aligner::add_tags(bam1_t* record,
     // de / dv
     if (aln->p) {
         float div;
-        div = 1.0 - mm_event_identity(aln);
+        div = static_cast<float>(1.0 - mm_event_identity(aln));
         bam_aux_append(record, "de", 'f', sizeof(div), (uint8_t*)&div);
     } else if (aln->div >= 0.0f && aln->div <= 1.0f) {
         bam_aux_append(record, "dv", 'f', sizeof(aln->div), (uint8_t*)&aln->div);

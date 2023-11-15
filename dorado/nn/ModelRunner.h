@@ -105,9 +105,9 @@ void ModelRunner<T>::accept_chunk(int chunk_idx, const at::Tensor &chunk) {
 template <typename T>
 stats::NamedStats ModelRunner<T>::sample_stats() const {
     stats::NamedStats stats;
-    stats["batches_called"] = m_num_batches_called;
-    stats["model_ms"] = m_model_ms;
-    stats["decode_ms"] = m_decode_ms;
+    stats["batches_called"] = double(m_num_batches_called);
+    stats["model_ms"] = double(m_model_ms);
+    stats["decode_ms"] = double(m_decode_ms);
     return stats;
 }
 

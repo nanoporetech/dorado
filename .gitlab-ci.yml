@@ -587,6 +587,23 @@ mlhub:remora-validate:
         - "cpu"
 
 # MLHub - Dorado integration test
+mlhub:sweeper:
+  <<: *mlhub
+  script:
+    - |
+      curl --header "Content-Type: application/json" \
+      --request POST \
+      --data '{
+          "key": "'${MLHUB_TRIGGER_KEY_SWEEPER}'",
+          "job_name": "dorado-sweeper : '${CI_COMMIT_REF_NAME}' - '${CI_COMMIT_SHORT_SHA}'",
+          "script_parameters": {
+            "dorado_branch": "'${CI_COMMIT_SHA}'",
+            "dorado_exe": ""
+          }
+      }' \
+      ${MLHUB_TRIGGER_URL}
+
+# MLHub - Dorado integration test
 mlhub:dorado-integration-tests:
   <<: *mlhub
   script:

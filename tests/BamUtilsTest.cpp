@@ -27,7 +27,7 @@ public:
         // |ks_free| is inline so when we call it we crash trying to free unknown memory. To
         // work around this we resize the kstring to a big value in our code so no resizing
         // happens inside the htslib library.
-        ks_resize(&m_str, 1e6);
+        ks_resize(&m_str, 1'000'000);
     }
     ~WrappedKString() { ks_free(&m_str); }
 
@@ -80,7 +80,7 @@ TEST_CASE("BamUtilsTest: add_rg_hdr read group headers", TEST_GROUP) {
         dorado::utils::add_rg_hdr(sam_header.get(), read_groups, {}, nullptr);
 
         // Check the IDs of the groups are all there.
-        CHECK(sam_hdr_count_lines(sam_header.get(), "RG") == read_groups.size());
+        CHECK(sam_hdr_count_lines(sam_header.get(), "RG") == int(read_groups.size()));
         for (auto &&[id, read_group] : read_groups) {
             CHECK(has_read_group_header(sam_header.get(), id.c_str()));
             // None of the read groups should have a barcode.
@@ -105,7 +105,7 @@ TEST_CASE("BamUtilsTest: add_rg_hdr read group headers", TEST_GROUP) {
             total_barcodes += kit_infos.at(kit_name).barcodes.size();
         }
         const size_t total_groups = read_groups.size() * (total_barcodes + 1);
-        CHECK(sam_hdr_count_lines(sam_header.get(), "RG") == total_groups);
+        CHECK(sam_hdr_count_lines(sam_header.get(), "RG") == int(total_groups));
 
         // Check that the IDs match the expected format.
         const auto &barcode_seqs = dorado::barcode_kits::get_barcodes();
@@ -162,7 +162,7 @@ TEST_CASE("BamUtilsTest: Test bam extraction helpers", TEST_GROUP) {
                 "..--,++,))+*)&&'*-,+*)))(%%&'&''%%%$&%$###$%%$$%'%%$$+1.--.7969....*)))";
         auto qual_vector = utils::extract_quality(record);
         CHECK(qual_vector.size() == qual.length());
-        for (int i = 0; i < qual.length(); i++) {
+        for (size_t i = 0; i < qual.length(); i++) {
             CHECK(qual[i] == qual_vector[i] + 33);
         }
     }
@@ -180,8 +180,115 @@ TEST_CASE("BamUtilsTest: Test bam extraction helpers", TEST_GROUP) {
         const std::vector<int8_t> expected_modbase_probs = {5, 1};
         CHECK(modbase_str == "C+h?,1;C+m?,1;");
         CHECK(modbase_probs.size() == expected_modbase_probs.size());
-        for (int i = 0; i < expected_modbase_probs.size(); i++) {
+        for (size_t i = 0; i < expected_modbase_probs.size(); i++) {
             CHECK(modbase_probs[i] == expected_modbase_probs[i]);
         }
+    }
+}
+
+TEST_CASE("BamUtilsTest: cigar2str utility", TEST_GROUP) {
+    const std::string cigar = "12S17M1D296M2D21M1D3M2D10M1I320M1D2237M41S";
+    size_t m = 0;
+    uint32_t *a_cigar = NULL;
+    char *end = NULL;
+    int n_cigar = int(sam_parse_cigar(cigar.c_str(), &end, &a_cigar, &m));
+    std::string converted_str = utils::cigar2str(n_cigar, a_cigar);
+    CHECK(cigar == converted_str);
+
+    if (a_cigar) {
+        hts_free(a_cigar);
+    }
+}
+
+TEST_CASE("BamUtilsTest: Test trim CIGAR", TEST_GROUP) {
+    const std::string cigar = "12S17M1D296M2D21M1D3M2D10M1I320M1D2237M41S";
+    size_t m = 0;
+    uint32_t *a_cigar = NULL;
+    char *end = NULL;
+    int n_cigar = int(sam_parse_cigar(cigar.c_str(), &end, &a_cigar, &m));
+    const uint32_t qlen = uint32_t(bam_cigar2qlen(n_cigar, a_cigar));
+
+    SECTION("Trim nothing") {
+        auto ops = utils::trim_cigar(n_cigar, a_cigar, {0, qlen});
+        std::string converted_str = utils::cigar2str(uint32_t(ops.size()), ops.data());
+        CHECK(converted_str == "12S17M1D296M2D21M1D3M2D10M1I320M1D2237M41S");
+    }
+
+    SECTION("Trim from first op") {
+        auto ops = utils::trim_cigar(n_cigar, a_cigar, {1, qlen});
+        std::string converted_str = utils::cigar2str(uint32_t(ops.size()), ops.data());
+        CHECK(converted_str == "11S17M1D296M2D21M1D3M2D10M1I320M1D2237M41S");
+    }
+
+    SECTION("Trim entire first op") {
+        auto ops = utils::trim_cigar(n_cigar, a_cigar, {12, qlen});
+        std::string converted_str = utils::cigar2str(uint32_t(ops.size()), ops.data());
+        CHECK(converted_str == "17M1D296M2D21M1D3M2D10M1I320M1D2237M41S");
+    }
+
+    SECTION("Trim several ops from the front") {
+        auto ops = utils::trim_cigar(n_cigar, a_cigar, {29, qlen});
+        std::string converted_str = utils::cigar2str(uint32_t(ops.size()), ops.data());
+        CHECK(converted_str == "296M2D21M1D3M2D10M1I320M1D2237M41S");
+    }
+
+    SECTION("Trim from last op") {
+        auto ops = utils::trim_cigar(n_cigar, a_cigar, {0, qlen - 20});
+        std::string converted_str = utils::cigar2str(uint32_t(ops.size()), ops.data());
+        CHECK(converted_str == "12S17M1D296M2D21M1D3M2D10M1I320M1D2237M21S");
+    }
+
+    SECTION("Trim entire last op") {
+        auto ops = utils::trim_cigar(n_cigar, a_cigar, {0, qlen - 41});
+        std::string converted_str = utils::cigar2str(uint32_t(ops.size()), ops.data());
+        CHECK(converted_str == "12S17M1D296M2D21M1D3M2D10M1I320M1D2237M");
+    }
+
+    SECTION("Trim several ops from the end") {
+        auto ops = utils::trim_cigar(n_cigar, a_cigar, {0, qlen - 2278});
+        std::string converted_str = utils::cigar2str(uint32_t(ops.size()), ops.data());
+        CHECK(converted_str == "12S17M1D296M2D21M1D3M2D10M1I320M");
+    }
+
+    SECTION("Trim from the middle") {
+        auto ops = utils::trim_cigar(n_cigar, a_cigar, {29, qlen - 2278});
+        std::string converted_str = utils::cigar2str(uint32_t(ops.size()), ops.data());
+        CHECK(converted_str == "296M2D21M1D3M2D10M1I320M");
+    }
+
+    if (a_cigar) {
+        hts_free(a_cigar);
+    }
+}
+
+TEST_CASE("BamUtilsTest: Ref positions consumed", TEST_GROUP) {
+    const std::string cigar = "12S17M1D296M2D21M1D3M2D10M1I320M1D2237M41S";
+    size_t m = 0;
+    uint32_t *a_cigar = NULL;
+    char *end = NULL;
+    int n_cigar = int(sam_parse_cigar(cigar.c_str(), &end, &a_cigar, &m));
+
+    SECTION("No positions consumed") {
+        auto pos_consumed = utils::ref_pos_consumed(n_cigar, a_cigar, 0);
+        CHECK(pos_consumed == 0);
+    }
+
+    SECTION("No positions consumed with soft clipping") {
+        auto pos_consumed = utils::ref_pos_consumed(n_cigar, a_cigar, 12);
+        CHECK(pos_consumed == 0);
+    }
+
+    SECTION("Match positions consumed") {
+        auto pos_consumed = utils::ref_pos_consumed(n_cigar, a_cigar, 25);
+        CHECK(pos_consumed == 13);
+    }
+
+    SECTION("Match and delete positions consumed") {
+        auto pos_consumed = utils::ref_pos_consumed(n_cigar, a_cigar, 29);
+        CHECK(pos_consumed == 18);
+    }
+
+    if (a_cigar) {
+        hts_free(a_cigar);
     }
 }

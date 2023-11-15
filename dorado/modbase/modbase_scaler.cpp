@@ -15,7 +15,7 @@ ModBaseScaler::ModBaseScaler(const std::vector<float>& kmer_levels,
                              size_t centre_index)
         : m_kmer_levels(kmer_levels), m_kmer_len(kmer_len), m_centre_index(centre_index) {
     // ensure that the levels were the length we expected
-    assert(m_kmer_levels.size() == static_cast<size_t>(1 << (2 * m_kmer_len)));
+    assert(m_kmer_levels.size() == static_cast<size_t>(1ull << (2 * m_kmer_len)));
 }
 
 size_t ModBaseScaler::index_from_int_kmer(const int* int_kmer_start, size_t kmer_len) {
@@ -78,7 +78,7 @@ std::pair<float, float> ModBaseScaler::calc_offset_scale(
         SignalType* samples_ptr = samples.data_ptr<SignalType>();
         // get the mid-point of the base
         for (size_t i = 0; i < n; i++) {
-            int pos = (seq_to_sig_map[i] + seq_to_sig_map[i + 1]) / 2;
+            int pos = int((seq_to_sig_map[i] + seq_to_sig_map[i + 1]) / 2);
             optim_dacs[i] = static_cast<float>(samples_ptr[pos]);
             new_levels[i] = levels[i];
         }

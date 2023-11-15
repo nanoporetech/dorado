@@ -30,6 +30,32 @@ endif()
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_EXTENSIONS OFF)
+
+function(enable_warnings_as_errors TARGET_NAME)
+    if(WIN32)
+        # W3 - warning level 3.
+        # WX - warnings as errors.
+        # external:anglebrackets - treat <header> includes as external.
+        # external:W0 - disable warnings for external code.
+        target_compile_options(${TARGET_NAME} PRIVATE
+          $<$<NOT:$<COMPILE_LANGUAGE:CUDA>>:/W3 /WX /external:anglebrackets /external:W0>
+        )
+        target_compile_definitions(${TARGET_NAME} PRIVATE
+            _CRT_SECURE_NO_WARNINGS
+        )
+    else()
+        target_compile_options(${TARGET_NAME} PRIVATE -Wall -Werror)
+    endif()
+endfunction()
+
+function(disable_warnings TARGET_NAME)
+    if(WIN32)
+        target_compile_options(${TARGET_NAME} PRIVATE
+            $<$<NOT:$<COMPILE_LANGUAGE:CUDA>>:/W0>
+        )
+    endif()
+endfunction()
+
 set(DORADO_3RD_PARTY_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/dorado/3rdparty)
 set(DORADO_3RD_PARTY_DOWNLOAD ${CMAKE_CURRENT_SOURCE_DIR}/dorado/3rdparty
     CACHE PATH "Location to download 3rdparty libraries into")
@@ -120,9 +146,13 @@ if (ONT_MM2_EXE)
     install(TARGETS minimap2_exe)
     add_custom_target(testing_deps ALL DEPENDS minimap2_exe)
 endif()
+# Disable warnings from minimap source
+disable_warnings(minimap2)
 
 set(BUILD_TESTING OFF)
 add_subdirectory(${DORADO_3RD_PARTY_SOURCE}/edlib EXCLUDE_FROM_ALL)
+# Disable warnings from edlib source
+disable_warnings(edlib)
 set(BUILD_TESTING ON)
 
 add_subdirectory(${DORADO_3RD_PARTY_SOURCE}/date EXCLUDE_FROM_ALL)
@@ -208,6 +238,8 @@ set(LIB_SOURCE_FILES
     dorado/read_pipeline/PolyACalculator.h
     dorado/read_pipeline/read_utils.cpp
     dorado/read_pipeline/read_utils.h
+    dorado/read_pipeline/stereo_features.cpp
+    dorado/read_pipeline/stereo_features.h
     dorado/read_pipeline/stitch.cpp
     dorado/read_pipeline/stitch.h
     dorado/read_pipeline/ReadSplitNode.cpp
@@ -253,6 +285,8 @@ if (DORADO_GPU_BUILD)
 endif()
 
 add_library(dorado_lib ${LIB_SOURCE_FILES})
+
+enable_warnings_as_errors(dorado_lib)
 
 set_target_properties(dorado_lib
     PROPERTIES
@@ -348,6 +382,8 @@ if(NOT DORADO_LIB_ONLY)
     if(MSVC)
         set_target_properties(dorado PROPERTIES LINK_OPTIONS "/ignore:4099")
     endif()
+
+    enable_warnings_as_errors(dorado)
 
     if (DORADO_ENABLE_PCH)
         target_precompile_headers(dorado REUSE_FROM dorado_lib)
@@ -487,6 +523,8 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
         LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
         ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
     )
+    
+    enable_warnings_as_errors(dorado_io_lib)
 
     if (NOT DORADO_LIB_ONLY)
         add_subdirectory(tests)
@@ -512,4 +550,9 @@ if (GENERATE_TEST_COVERAGE)
             EXCLUDE "${PROJECT_SOURCE_DIR}/dorado/3rdparty/*" "${PROJECT_SOURCE_DIR}/tests/*"
             )
     endif()
+endif()
+
+# GCC 8 ICEs trying to compile this file with ASAN+optimisations enabled, so knock down the optimisation to try and help it out.
+if (ECM_ENABLE_SANITIZERS AND (CMAKE_CXX_COMPILER_ID MATCHES "GNU") AND (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9.0))
+    set_source_files_properties(dorado/read_pipeline/stereo_features.cpp PROPERTIES COMPILE_OPTIONS "-O0")
 endif()
