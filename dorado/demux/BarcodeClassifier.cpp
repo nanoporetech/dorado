@@ -213,7 +213,7 @@ std::vector<BarcodeClassifier::BarcodeCandidates> BarcodeClassifier::generate_ca
 //    RC(BCXX_1)             BCXX_2
 //
 // In this scenario, the barcode (and its flanks) ligate to both ends
-// of the read. The flank sequence is also different for top and bottom strands.
+// of the read. The flank sequence is also different for top and bottom contexts.
 // So we need to check both ends of the read. Since the barcodes always ligate to
 // 5' end of the read, the 3' end of the other strand has the reverse complement
 // of that barcode sequence. This leads to 2 variants of the barcode arrangements.
@@ -230,15 +230,15 @@ std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score_diffe
 
     EdlibAlignConfig mask_config = init_edlib_config_for_mask();
 
-    std::string_view top_strand_v1 = as.top_context;
+    std::string_view top_context_v1 = as.top_context;
     std::string_view bottom_strand_v1 = as.bottom_context_rev;
-    std::string_view top_strand_v2 = as.bottom_context;
+    std::string_view top_context_v2 = as.bottom_context;
     std::string_view bottom_strand_v2 = as.top_context_rev;
     int barcode_len = int(as.barcodes[0].length());
 
     // Fetch barcode mask locations for variant 1
     auto [top_result_v1, top_flank_score_v1, top_bc_loc_v1] = extract_flank_fit(
-            top_strand_v1, read_top, barcode_len, placement_config, "top score v1");
+            top_context_v1, read_top, barcode_len, placement_config, "top score v1");
     std::string_view top_mask_v1 = read_top.substr(top_bc_loc_v1, barcode_len);
 
     auto [bottom_result_v1, bottom_flank_score_v1, bottom_bc_loc_v1] = extract_flank_fit(
@@ -247,7 +247,7 @@ std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score_diffe
 
     // Fetch barcode mask locations for variant 2
     auto [top_result_v2, top_flank_score_v2, top_bc_loc_v2] = extract_flank_fit(
-            top_strand_v2, read_top, barcode_len, placement_config, "top score v2");
+            top_context_v2, read_top, barcode_len, placement_config, "top score v2");
     std::string_view top_mask_v2 = read_top.substr(top_bc_loc_v2, barcode_len);
 
     auto [bottom_result_v2, bottom_flank_score_v2, bottom_bc_loc_v2] = extract_flank_fit(
@@ -345,7 +345,7 @@ std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score_diffe
 // In this scenario, the barcode (and its flanks) potentially ligate to both ends
 // of the read. But the barcode sequence is the same for both top and bottom strands.
 // So we need to check bottom ends of the read. However since barcode sequence is the
-// same for top and bottom strands, we simply need to look for the barcode and its
+// same for top and bottom contexts, we simply need to look for the barcode and its
 // reverse complement sequence in the top/bottom windows.
 std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score_double_ends(
         std::string_view read_seq,
@@ -360,14 +360,12 @@ std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score_doubl
 
     EdlibAlignConfig mask_config = init_edlib_config_for_mask();
 
-    std::string_view top_strand;
-    std::string_view bottom_strand;
-    top_strand = as.top_context;
-    bottom_strand = as.top_context_rev;
+    std::string_view top_context = as.top_context;
+    std::string_view bottom_strand = as.top_context_rev;
     int barcode_len = int(as.barcodes[0].length());
 
     auto [top_result, top_flank_score, top_bc_loc] =
-            extract_flank_fit(top_strand, read_top, barcode_len, placement_config, "top score");
+            extract_flank_fit(top_context, read_top, barcode_len, placement_config, "top score");
     std::string_view top_mask = read_top.substr(top_bc_loc, barcode_len);
 
     auto [bottom_result, bottom_flank_score, bottom_bc_loc] = extract_flank_fit(
@@ -429,12 +427,11 @@ std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score(
 
     EdlibAlignConfig mask_config = init_edlib_config_for_mask();
 
-    std::string_view top_strand;
-    top_strand = as.top_context;
+    std::string_view top_context = as.top_context;
     int barcode_len = int(as.barcodes[0].length());
 
     auto [top_result, top_flank_score, top_bc_loc] =
-            extract_flank_fit(top_strand, read_top, barcode_len, placement_config, "top score");
+            extract_flank_fit(top_context, read_top, barcode_len, placement_config, "top score");
     std::string_view top_mask = read_top.substr(top_bc_loc, barcode_len);
     spdlog::debug("BC location {}", top_bc_loc);
 
