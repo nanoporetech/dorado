@@ -12,7 +12,7 @@ namespace dorado {
 namespace demux {
 
 class BarcodeClassifier {
-    struct AdapterSequence;
+    struct BarcodeCandidates;
 
 public:
     BarcodeClassifier(const std::vector<std::string>& kit_names);
@@ -23,24 +23,23 @@ public:
                                const BarcodingInfo::FilterSet& allowed_barcodes) const;
 
 private:
-    const std::vector<AdapterSequence> m_adapter_sequences;
+    const std::vector<BarcodeCandidates> m_barcode_candidates;
 
-    std::vector<AdapterSequence> generate_adapter_sequence(
-            const std::vector<std::string>& kit_names);
-    std::vector<BarcodeScoreResult> calculate_adapter_score_different_double_ends(
+    std::vector<BarcodeCandidates> generate_candidates(const std::vector<std::string>& kit_names);
+    std::vector<BarcodeScoreResult> calculate_barcode_score_different_double_ends(
             std::string_view read_seq,
-            const AdapterSequence& as,
+            const BarcodeCandidates& as,
             const BarcodingInfo::FilterSet& allowed_barcodes) const;
-    std::vector<BarcodeScoreResult> calculate_adapter_score_double_ends(
+    std::vector<BarcodeScoreResult> calculate_barcode_score_double_ends(
             std::string_view read_seq,
-            const AdapterSequence& as,
+            const BarcodeCandidates& as,
             const BarcodingInfo::FilterSet& allowed_barcodes) const;
-    std::vector<BarcodeScoreResult> calculate_adapter_score(
+    std::vector<BarcodeScoreResult> calculate_barcode_score(
             std::string_view read_seq,
-            const AdapterSequence& as,
+            const BarcodeCandidates& as,
             const BarcodingInfo::FilterSet& allowed_barcodes) const;
-    BarcodeScoreResult find_best_adapter(const std::string& read_seq,
-                                         const std::vector<AdapterSequence>& adapter,
+    BarcodeScoreResult find_best_barcode(const std::string& read_seq,
+                                         const std::vector<BarcodeCandidates>& adapter,
                                          bool barcode_both_ends,
                                          const BarcodingInfo::FilterSet& allowed_barcodes) const;
 };

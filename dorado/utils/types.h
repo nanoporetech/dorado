@@ -35,7 +35,7 @@ struct BarcodeScoreResult {
     float top_flank_score = -1.f;
     float bottom_flank_score = -1.f;
     bool use_top = false;
-    std::string adapter_name = "unclassified";
+    std::string barcode_name = "unclassified";
     std::string kit = "unclassified";
     std::string variant = "n/a";
     std::pair<int, int> top_barcode_pos = {-1, -1};
