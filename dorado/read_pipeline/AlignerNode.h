@@ -41,11 +41,11 @@ private:
     void set_bam_index(const std::string& filename,
                        const alignment::Minimap2Options& options,
                        int threads);
-    std::shared_ptr<alignment::Minimap2Index> get_index(const ReadCommon& read_common);
+    std::shared_ptr<const alignment::Minimap2Index> get_index(const ReadCommon& read_common);
 
     size_t m_threads;
     std::vector<std::thread> m_workers;
-    std::shared_ptr<alignment::Minimap2Index> m_index_for_bam_messages{};
+    std::shared_ptr<const alignment::Minimap2Index> m_index_for_bam_messages{};
     std::shared_ptr<alignment::IndexFileAccess> m_index_file_access{};
 };
 

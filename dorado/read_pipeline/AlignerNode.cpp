@@ -13,7 +13,7 @@
 
 namespace {
 
-std::shared_ptr<dorado::alignment::Minimap2Index> load_and_get_index(
+std::shared_ptr<const dorado::alignment::Minimap2Index> load_and_get_index(
         const std::shared_ptr<dorado::alignment::IndexFileAccess> index_file_access,
         const std::string& filename,
         const dorado::alignment::Minimap2Options& options,
@@ -76,7 +76,8 @@ void AlignerNode::set_bam_index(const std::string& filename,
     m_index_for_bam_messages = m_index_file_access->get_index(filename, options);
 }
 
-std::shared_ptr<alignment::Minimap2Index> AlignerNode::get_index(const ReadCommon& read_common) {
+std::shared_ptr<const alignment::Minimap2Index> AlignerNode::get_index(
+        const ReadCommon& read_common) {
     auto& align_info = read_common.client_access->alignment_info();
     if (align_info.reference_file.empty()) {
         return {};

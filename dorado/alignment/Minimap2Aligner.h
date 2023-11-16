@@ -15,7 +15,7 @@ extern const std::string UNMAPPED_SAM_LINE_STRIPPED;
 
 class Minimap2Aligner {
 public:
-    Minimap2Aligner(std::shared_ptr<Minimap2Index> minimap_index)
+    Minimap2Aligner(std::shared_ptr<const Minimap2Index> minimap_index)
             : m_minimap_index(std::move(minimap_index)) {}
 
     void add_tags(bam1_t*, const mm_reg1_t*, const std::string&, const mm_tbuf_t*);
@@ -25,7 +25,7 @@ public:
     HeaderSequenceRecords get_sequence_records_for_header() const;
 
 private:
-    std::shared_ptr<Minimap2Index> m_minimap_index;
+    std::shared_ptr<const Minimap2Index> m_minimap_index;
 };
 
 }  // namespace dorado::alignment

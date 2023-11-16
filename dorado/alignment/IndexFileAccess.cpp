@@ -4,10 +4,17 @@
 
 namespace dorado::alignment {
 
+std::shared_ptr<Minimap2Index> IndexFileAccess::get_index_impl(
+        const std::string& file,
+        const Minimap2IndexOptions& options) {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    return m_index_lut[{file, options}];  // allow the creation of a null instance
+}
+
 IndexLoadResult IndexFileAccess::load_index(const std::string& file,
                                             const Minimap2Options& options,
                                             int num_threads) {
-    auto index = get_index(file, options);
+    auto index = get_index_impl(file, options);
     if (index) {
         return IndexLoadResult::success;
     }
@@ -19,14 +26,16 @@ IndexLoadResult IndexFileAccess::load_index(const std::string& file,
     }
 
     std::lock_guard<std::mutex> lock(m_mutex);
-    m_index_lut[{file, options}] = index;
+    m_index_lut[{file, options}] = std::move(index);
     return IndexLoadResult::success;
 }
 
-std::shared_ptr<Minimap2Index> IndexFileAccess::get_index(const std::string& file,
-                                                          const Minimap2IndexOptions& options) {
-    std::lock_guard<std::mutex> lock(m_mutex);
-    return m_index_lut[{file, options}];  // allow the creation of a null instance
+std::shared_ptr<const Minimap2Index> IndexFileAccess::get_index(
+        const std::string& file,
+        const Minimap2IndexOptions& options) {
+    auto index = get_index_impl(file, options);
+    assert(index && "get_index expects a the index file to have been loaded");
+    return index;
 }
 
 }  // namespace dorado::alignment
