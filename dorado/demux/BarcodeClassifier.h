@@ -12,7 +12,7 @@ namespace dorado {
 namespace demux {
 
 class BarcodeClassifier {
-    struct BarcodeCandidates;
+    struct BarcodeCandidateKit;
 
 public:
     BarcodeClassifier(const std::vector<std::string>& kit_names);
@@ -23,23 +23,23 @@ public:
                                const BarcodingInfo::FilterSet& allowed_barcodes) const;
 
 private:
-    const std::vector<BarcodeCandidates> m_barcode_candidates;
+    const std::vector<BarcodeCandidateKit> m_barcode_candidates;
 
-    std::vector<BarcodeCandidates> generate_candidates(const std::vector<std::string>& kit_names);
+    std::vector<BarcodeCandidateKit> generate_candidates(const std::vector<std::string>& kit_names);
     std::vector<BarcodeScoreResult> calculate_barcode_score_different_double_ends(
             std::string_view read_seq,
-            const BarcodeCandidates& as,
+            const BarcodeCandidateKit& as,
             const BarcodingInfo::FilterSet& allowed_barcodes) const;
     std::vector<BarcodeScoreResult> calculate_barcode_score_double_ends(
             std::string_view read_seq,
-            const BarcodeCandidates& as,
+            const BarcodeCandidateKit& as,
             const BarcodingInfo::FilterSet& allowed_barcodes) const;
     std::vector<BarcodeScoreResult> calculate_barcode_score(
             std::string_view read_seq,
-            const BarcodeCandidates& as,
+            const BarcodeCandidateKit& as,
             const BarcodingInfo::FilterSet& allowed_barcodes) const;
     BarcodeScoreResult find_best_barcode(const std::string& read_seq,
-                                         const std::vector<BarcodeCandidates>& adapter,
+                                         const std::vector<BarcodeCandidateKit>& adapter,
                                          bool barcode_both_ends,
                                          const BarcodingInfo::FilterSet& allowed_barcodes) const;
 };
