@@ -175,4 +175,13 @@ void copy_tensor_elems(at::Tensor& dest_tensor,
     }
 }
 
+std::pair<at::Tensor, at::Tensor> quantize_tensor(at::Tensor tensor) {
+    auto fp_range = tensor.abs().amax(0);
+    constexpr int levels = 256;
+    auto quant_scale = (levels / 2) / fp_range;
+    auto quant_max = (levels / 2) - 1;
+    auto tensor_quantized = (tensor * quant_scale).round().clip(-quant_max, quant_max);
+    return {quant_scale.to(at::ScalarType::Float), tensor_quantized.to(at::ScalarType::Char)};
+}
+
 }  // namespace dorado::utils

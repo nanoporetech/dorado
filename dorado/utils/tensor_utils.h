@@ -37,4 +37,10 @@ void copy_tensor_elems(at::Tensor& dest_tensor,
                        std::size_t src_offset,
                        std::size_t count);
 
+// Quantize a tensor to int8, returning a pair of tensors `{scales, quantized_tensor}`, where:
+// `scales` is the same size as `tensor` with dimension 0 dropped, dtype float
+// `quantized_tensor` is the same size as `tensor`, dtype int8
+// such that `quantized_tensor / scales ~= tensor`
+std::pair<at::Tensor, at::Tensor> quantize_tensor(at::Tensor tensor);
+
 }  // namespace dorado::utils

@@ -215,9 +215,6 @@ inline void parse(ArgParser& parser, int argc, const char* const argv[]) {
     auto remaining_args = parser.visible.parse_known_args(argc, argv);
     remaining_args.insert(remaining_args.begin(), HIDDEN_PROGRAM_NAME);
     parser.hidden.parse_args(remaining_args);
-}
-
-inline void process_internal_arguments(const ArgParser& parser) {
     utils::details::extract_dev_options(parser.hidden.get<std::string>("--devopts"));
 }
 
