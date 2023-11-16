@@ -28,15 +28,15 @@ private:
     std::vector<BarcodeCandidateKit> generate_candidates(const std::vector<std::string>& kit_names);
     std::vector<BarcodeScoreResult> calculate_barcode_score_different_double_ends(
             std::string_view read_seq,
-            const BarcodeCandidateKit& as,
+            const BarcodeCandidateKit& candidate,
             const BarcodingInfo::FilterSet& allowed_barcodes) const;
     std::vector<BarcodeScoreResult> calculate_barcode_score_double_ends(
             std::string_view read_seq,
-            const BarcodeCandidateKit& as,
+            const BarcodeCandidateKit& candidate,
             const BarcodingInfo::FilterSet& allowed_barcodes) const;
     std::vector<BarcodeScoreResult> calculate_barcode_score(
             std::string_view read_seq,
-            const BarcodeCandidateKit& as,
+            const BarcodeCandidateKit& candidate,
             const BarcodingInfo::FilterSet& allowed_barcodes) const;
     BarcodeScoreResult find_best_barcode(const std::string& read_seq,
                                          const std::vector<BarcodeCandidateKit>& adapter,
