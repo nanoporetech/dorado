@@ -269,6 +269,8 @@ Below is a table of the available basecalling models and the modified basecallin
 
 ### **RNA models:**
 
+**Note:** The BAM format does not support `U` bases. Therefore, when Dorado is performing RNA basecalling, the resulting output files will include `T` instead of `U`. This is consistent across output file types.
+
 | Basecalling Models | Compatible<br />Modifications | Modifications<br />Model<br />Version | Data<br />Sampling<br />Frequency |
 | :-------- | :------- | :--- | :--- |
 | **rna004_130bps_fast@v3.0.1** | N/A | N/A | 4 kHz |

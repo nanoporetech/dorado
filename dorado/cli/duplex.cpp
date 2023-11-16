@@ -185,15 +185,22 @@ int duplex(int argc, char* argv[]) {
             output_mode = HtsWriter::OutputMode::UBAM;
         }
 
-        bool recursive_file_loading = parser.visible.get<bool>("--recursive");
-
         const std::string dump_stats_file = parser.hidden.get<std::string>("--dump_stats_file");
         const std::string dump_stats_filter = parser.hidden.get<std::string>("--dump_stats_filter");
         const size_t max_stats_records = static_cast<size_t>(dump_stats_file.empty() ? 0 : 100000);
 
-        size_t num_reads = (basespace_duplex ? read_list_from_pairs.size()
-                                             : DataLoader::get_num_reads(reads, read_list, {},
-                                                                         recursive_file_loading));
+        bool recursive_file_loading = parser.visible.get<bool>("--recursive");
+
+        size_t num_reads = 0;
+        if (basespace_duplex) {
+            num_reads = read_list_from_pairs.size();
+        } else {
+            num_reads = DataLoader::get_num_reads(reads, read_list, {}, recursive_file_loading);
+            if (num_reads == 0) {
+                spdlog::error("No POD5 or FAST5 reads found in path: " + reads);
+                std::exit(EXIT_FAILURE);
+            }
+        }
         spdlog::debug("> Reads to process: {}", num_reads);
 
         SamHdrPtr hdr(sam_hdr_init());

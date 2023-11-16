@@ -80,6 +80,15 @@ void setup(std::vector<std::string> args,
         throw std::runtime_error(err);
     }
 
+    auto read_list = utils::load_read_list(read_list_file_path);
+    size_t num_reads = DataLoader::get_num_reads(
+            data_path, read_list, {} /*reads_already_processed*/, recursive_file_loading);
+    if (num_reads == 0) {
+        spdlog::error("No POD5 or FAST5 reads found in path: " + data_path);
+        std::exit(EXIT_FAILURE);
+    }
+    num_reads = max_reads == 0 ? num_reads : std::min(num_reads, max_reads);
+
     // Check sample rate of model vs data.
     auto data_sample_rate = DataLoader::get_sample_rate(data_path, recursive_file_loading);
     auto model_sample_rate = model_config.sample_rate;
@@ -105,11 +114,6 @@ void setup(std::vector<std::string> args,
             create_basecall_runners(model_config, device, num_runners, 0, batch_size, chunk_size);
 
     auto read_groups = DataLoader::load_read_groups(data_path, model_name, recursive_file_loading);
-    auto read_list = utils::load_read_list(read_list_file_path);
-
-    size_t num_reads = DataLoader::get_num_reads(
-            data_path, read_list, {} /*reads_already_processed*/, recursive_file_loading);
-    num_reads = max_reads == 0 ? num_reads : std::min(num_reads, max_reads);
 
     bool duplex = false;
 
