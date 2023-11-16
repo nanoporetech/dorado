@@ -162,7 +162,8 @@ void setup(std::vector<std::string> args,
     if (!barcode_kits.empty()) {
         current_sink_node = pipeline_desc.add_node<BarcodeClassifierNode>(
                 {current_sink_node}, thread_allocations.barcoder_threads, barcode_kits,
-                barcode_both_ends, barcode_no_trim, std::move(allowed_barcodes));
+                barcode_both_ends, barcode_no_trim, std::move(allowed_barcodes), std::nullopt,
+                std::nullopt);
     }
     current_sink_node = pipeline_desc.add_node<ReadFilterNode>(
             {current_sink_node}, min_qscore, default_parameters.min_sequence_length,

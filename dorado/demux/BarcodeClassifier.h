@@ -3,6 +3,7 @@
 #include "utils/types.h"
 
 #include <atomic>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -15,7 +16,9 @@ class BarcodeClassifier {
     struct BarcodeCandidateKit;
 
 public:
-    BarcodeClassifier(const std::vector<std::string>& kit_names);
+    BarcodeClassifier(const std::vector<std::string>& kit_names,
+                      std::optional<std::string> custom_kit,
+                      std::optional<std::string> custom_sequences);
     ~BarcodeClassifier();
 
     BarcodeScoreResult barcode(const std::string& seq,
@@ -25,7 +28,10 @@ public:
 private:
     const std::vector<BarcodeCandidateKit> m_barcode_candidates;
 
-    std::vector<BarcodeCandidateKit> generate_candidates(const std::vector<std::string>& kit_names);
+    std::vector<BarcodeCandidateKit> generate_candidates(
+            const std::vector<std::string>& kit_names,
+            std::optional<std::string> custom_kit,
+            std::optional<std::string> custom_sequences);
     std::vector<BarcodeScoreResult> calculate_barcode_score_different_double_ends(
             std::string_view read_seq,
             const BarcodeCandidateKit& candidate,

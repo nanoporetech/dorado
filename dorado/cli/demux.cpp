@@ -87,6 +87,8 @@ int demuxer(int argc, char* argv[]) {
             .help("Skip barcode trimming. If option is not chosen, trimming is enabled.")
             .default_value(false)
             .implicit_value(true);
+    parser.add_argument("--barcode-arrangement").help("Custom barcode arrangement. Path to file.");
+    parser.add_argument("--barcode-sequences").help("Custom barcode sequences. Path to file.");
 
     try {
         parser.parse_args(argc, argv);
@@ -98,7 +100,8 @@ int demuxer(int argc, char* argv[]) {
     }
 
     if ((parser.is_used("--no-classify") && parser.is_used("--kit-name")) ||
-        (!parser.is_used("--no-classify") && !parser.is_used("--kit-name"))) {
+        (!parser.is_used("--no-classify") && !parser.is_used("--kit-name") &&
+         !parser.is_used("--barcode-arrangement"))) {
         spdlog::error("Please specify either --no-classify or --kit-name to use the demux tool.");
         std::exit(1);
     }
@@ -119,6 +122,16 @@ int demuxer(int argc, char* argv[]) {
     auto [demux_threads, demux_writer_threads] =
             cli::worker_vs_writer_thread_allocation(threads, 0.1f);
     spdlog::debug("> barcoding threads {}, writer threads {}", demux_threads, demux_writer_threads);
+
+    std::optional<std::string> custom_kit = std::nullopt;
+    if (parser.is_used("--barcode-arrangement")) {
+        custom_kit = parser.get<std::string>("--barcode-arrangement");
+    }
+
+    std::optional<std::string> custom_seqs = std::nullopt;
+    if (parser.is_used("--barcode-sequences")) {
+        custom_seqs = parser.get<std::string>("--barcode-sequences");
+    }
 
     auto read_list = utils::load_read_list(parser.get<std::string>("--read-ids"));
 
@@ -159,7 +172,8 @@ int demuxer(int argc, char* argv[]) {
         }
         pipeline_desc.add_node<BarcodeClassifierNode>(
                 {demux_writer}, demux_threads, kit_names, parser.get<bool>("--barcode-both-ends"),
-                parser.get<bool>("--no-trim"), std::move(allowed_barcodes));
+                parser.get<bool>("--no-trim"), std::move(allowed_barcodes), std::move(custom_kit),
+                std::move(custom_seqs));
     }
 
     // Create the Pipeline from our description.

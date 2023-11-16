@@ -42,13 +42,17 @@ BarcodeClassifierNode::BarcodeClassifierNode(int threads,
                                              const std::vector<std::string>& kit_names,
                                              bool barcode_both_ends,
                                              bool no_trim,
-                                             BarcodingInfo::FilterSet allowed_barcodes)
+                                             BarcodingInfo::FilterSet allowed_barcodes,
+                                             std::optional<std::string> custom_kit,
+                                             std::optional<std::string> custom_seqs)
         : MessageSink(10000),
           m_threads(threads),
           m_default_barcoding_info(create_barcoding_info(kit_names,
                                                          barcode_both_ends,
                                                          !no_trim,
-                                                         std::move(allowed_barcodes))) {
+                                                         std::move(allowed_barcodes),
+                                                         custom_kit,
+                                                         custom_seqs)) {
     start_threads();
 }
 
@@ -114,7 +118,7 @@ void BarcodeClassifierNode::barcode(BamPtr& read) {
     if (!m_default_barcoding_info || m_default_barcoding_info->kit_name.empty()) {
         return;
     }
-    auto barcoder = m_barcoder_selector.get_barcoder(m_default_barcoding_info->kit_name);
+    auto barcoder = m_barcoder_selector.get_barcoder(*m_default_barcoding_info);
 
     bam1_t* irecord = read.get();
     std::string seq = utils::extract_sequence(irecord);
@@ -140,7 +144,7 @@ void BarcodeClassifierNode::barcode(SimplexRead& read) {
     if (!barcoding_info) {
         return;
     }
-    auto barcoder = m_barcoder_selector.get_barcoder(barcoding_info->kit_name);
+    auto barcoder = m_barcoder_selector.get_barcoder(*barcoding_info);
 
     // get the sequence to map from the record
     auto bc_res = barcoder->barcode(read.read_common.seq, barcoding_info->barcode_both_ends,
