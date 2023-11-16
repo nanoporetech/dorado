@@ -61,10 +61,10 @@ TEST_CASE("BarcodeClassifier: test single ended barcode", TEST_GROUP) {
             auto seqlen = reader.record->core.l_qseq;
             std::string seq = utils::extract_sequence(reader.record.get());
             auto res = classifier.barcode(seq, false, std::nullopt);
-            if (res.adapter_name == "unclassified") {
-                CHECK(bc == res.adapter_name);
+            if (res.barcode_name == "unclassified") {
+                CHECK(bc == res.barcode_name);
             } else {
-                CHECK(bc == (res.kit + "_" + res.adapter_name));
+                CHECK(bc == (res.kit + "_" + res.barcode_name));
                 CHECK(res.top_barcode_pos.second > res.top_barcode_pos.first);
                 CHECK(res.top_barcode_pos.first >= 0);
                 CHECK(res.top_barcode_pos.second <= seqlen);
@@ -88,10 +88,10 @@ TEST_CASE("BarcodeClassifier: test double ended barcode", TEST_GROUP) {
             auto seqlen = reader.record->core.l_qseq;
             std::string seq = utils::extract_sequence(reader.record.get());
             auto res = classifier.barcode(seq, false, std::nullopt);
-            if (res.adapter_name == "unclassified") {
-                CHECK(bc == res.adapter_name);
+            if (res.barcode_name == "unclassified") {
+                CHECK(bc == res.barcode_name);
             } else {
-                CHECK(bc == (res.kit + "_" + res.adapter_name));
+                CHECK(bc == (res.kit + "_" + res.barcode_name));
                 CHECK(res.top_barcode_pos.second > res.top_barcode_pos.first);
                 CHECK(res.bottom_barcode_pos.second > res.bottom_barcode_pos.first);
                 CHECK(res.top_barcode_pos.first >= 0);
@@ -117,10 +117,10 @@ TEST_CASE("BarcodeClassifier: test double ended barcode with different variants"
             auto seqlen = reader.record->core.l_qseq;
             std::string seq = utils::extract_sequence(reader.record.get());
             auto res = classifier.barcode(seq, false, std::nullopt);
-            if (res.adapter_name == "unclassified") {
-                CHECK(bc == res.adapter_name);
+            if (res.barcode_name == "unclassified") {
+                CHECK(bc == res.barcode_name);
             } else {
-                CHECK(bc == (res.kit + "_" + res.adapter_name));
+                CHECK(bc == (res.kit + "_" + res.barcode_name));
                 CHECK(res.top_barcode_pos.second > res.top_barcode_pos.first);
                 CHECK(res.bottom_barcode_pos.second > res.bottom_barcode_pos.first);
                 CHECK(res.top_barcode_pos.first >= 0);
@@ -145,8 +145,8 @@ TEST_CASE("BarcodeClassifier: check barcodes on both ends - failing case", TEST_
         std::string seq = utils::extract_sequence(reader.record.get());
         auto single_end_res = classifier.barcode(seq, false, std::nullopt);
         auto double_end_res = classifier.barcode(seq, true, std::nullopt);
-        CHECK(double_end_res.adapter_name == "unclassified");
-        CHECK(single_end_res.adapter_name == "BC15");
+        CHECK(double_end_res.barcode_name == "unclassified");
+        CHECK(single_end_res.barcode_name == "BC15");
     }
 }
 
@@ -162,8 +162,8 @@ TEST_CASE("BarcodeClassifier: check barcodes on both ends - passing case", TEST_
         std::string seq = utils::extract_sequence(reader.record.get());
         auto single_end_res = classifier.barcode(seq, false, std::nullopt);
         auto double_end_res = classifier.barcode(seq, true, std::nullopt);
-        CHECK(double_end_res.adapter_name == single_end_res.adapter_name);
-        CHECK(single_end_res.adapter_name == "BC01");
+        CHECK(double_end_res.barcode_name == single_end_res.barcode_name);
+        CHECK(single_end_res.barcode_name == "BC01");
     }
 }
 
