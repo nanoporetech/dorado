@@ -10,7 +10,6 @@
 #include "utils/log_utils.h"
 #include "utils/stats.h"
 
-#include <argparse.hpp>
 #include <spdlog/spdlog.h>
 
 #include <chrono>

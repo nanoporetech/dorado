@@ -8,7 +8,6 @@
 #include "utils/log_utils.h"
 #include "utils/stats.h"
 
-#include <argparse.hpp>
 #include <minimap.h>
 #include <spdlog/spdlog.h>
 
