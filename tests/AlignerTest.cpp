@@ -215,7 +215,6 @@ SCENARIO("AlignerNode push SimplexRead", TEST_GROUP) {
                 create_pipeline(messages, ref.string(), dorado::AlignerNode::dflt_options, 2);
 
         WHEN("push simplex read with no alignment matches to pipeline") {
-            const std::string read_id{"aligner_node_test_simplex"};
             auto simplex_read = std::make_unique<dorado::SimplexRead>();
             simplex_read->read_common.read_id = read_id;
             simplex_read->read_common.seq = "ACGTACGTACGTACGT";

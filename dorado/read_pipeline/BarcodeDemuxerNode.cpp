@@ -14,7 +14,6 @@ namespace dorado {
 
 BarcodeDemuxerNode::BarcodeDemuxerNode(const std::string& output_dir,
                                        size_t htslib_threads,
-                                       size_t num_reads,
                                        bool write_fastq,
                                        std::unique_ptr<const utils::SampleSheet> sample_sheet)
         : MessageSink(10000),
@@ -93,8 +92,8 @@ int BarcodeDemuxerNode::write(bam1_t* const record) {
             throw std::runtime_error("Failed to open new HTS output file at " + filepath.string());
         }
         if (file->format.compression == bgzf) {
-            auto res = bgzf_mt(file->fp.bgzf, m_htslib_threads, 128);
-            if (res < 0) {
+            auto bgz_res = bgzf_mt(file->fp.bgzf, m_htslib_threads, 128);
+            if (bgz_res < 0) {
                 throw std::runtime_error("Could not enable multi threading for BAM generation.");
             }
         }

@@ -112,8 +112,8 @@ int aligner(int argc, char* argv[]) {
     add_pg_hdr(header);
 
     PipelineDescriptor pipeline_desc;
-    auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, "-", HtsWriter::OutputMode::BAM,
-                                                        writer_threads, 0);
+    auto hts_writer =
+            pipeline_desc.add_node<HtsWriter>({}, "-", HtsWriter::OutputMode::BAM, writer_threads);
     auto aligner =
             pipeline_desc.add_node<AlignerNode>({hts_writer}, index, options, aligner_threads);
 

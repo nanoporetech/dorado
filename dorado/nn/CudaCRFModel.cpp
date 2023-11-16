@@ -53,7 +53,7 @@ public:
             m_batch_size =
                     determine_batch_size(model_config, chunk_size, memory_limit_fraction, true);
         } else {
-            int batch_size_granularity = get_batch_size_granularity(model_config, m_options);
+            int batch_size_granularity = get_batch_size_granularity();
             m_batch_size = utils::pad_to(batch_size, batch_size_granularity);
             // Make sure the requested batch size doesn't exceed the maximum for the memory available.
             auto max_batch_size =
@@ -90,8 +90,7 @@ public:
         }
     }
 
-    static int get_batch_size_granularity(const CRFModelConfig &model_config,
-                                          const at::TensorOptions &options) {
+    static int get_batch_size_granularity() {
         // TODO: we may want to use different numbers based on model type and GPU arch
         return 64;
     }
@@ -109,7 +108,7 @@ public:
         return 256;
 #endif
 
-        const int granularity = get_batch_size_granularity(model_config, m_options);
+        const int granularity = get_batch_size_granularity();
 
         // If running on a Jetson device with unified memory for CPU and GPU we can't use all
         // the available memory for GPU tasks. This way we leave at least half for the CPU,

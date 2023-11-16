@@ -150,7 +150,7 @@ int demuxer(int argc, char* argv[]) {
 
     PipelineDescriptor pipeline_desc;
     auto demux_writer = pipeline_desc.add_node<BarcodeDemuxerNode>(
-            {}, output_dir, demux_writer_threads, 0, parser.get<bool>("--emit-fastq"),
+            {}, output_dir, demux_writer_threads, parser.get<bool>("--emit-fastq"),
             std::move(sample_sheet));
 
     if (parser.is_used("--kit-name")) {

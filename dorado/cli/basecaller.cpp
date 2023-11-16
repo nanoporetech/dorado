@@ -88,7 +88,7 @@ void setup(std::vector<std::string> args,
         model_sample_rate = models::get_sample_rate_by_model_name(model_name);
     }
     if (!skip_model_compatibility_check &&
-        !sample_rates_compatible(data_sample_rate, model_sample_rate)) {
+        !sample_rates_compatible(data_sample_rate, uint16_t(model_sample_rate))) {
         std::stringstream err;
         err << "Sample rate for model (" << model_sample_rate << ") and data (" << data_sample_rate
             << ") are not compatible.";
@@ -129,8 +129,8 @@ void setup(std::vector<std::string> args,
     utils::add_rg_hdr(hdr.get(), read_groups, barcode_kits, sample_sheet.get());
 
     PipelineDescriptor pipeline_desc;
-    auto hts_writer = pipeline_desc.add_node<HtsWriter>(
-            {}, "-", output_mode, thread_allocations.writer_threads, num_reads);
+    auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, "-", output_mode,
+                                                        thread_allocations.writer_threads);
     auto aligner = PipelineDescriptor::InvalidNodeHandle;
     auto current_sink_node = hts_writer;
     if (enable_aligner) {

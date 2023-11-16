@@ -13,7 +13,7 @@ extern "C" {
 
 namespace dorado {
 
-at::Tensor GPUDecoder::gpu_part(at::Tensor scores, int num_chunks, DecoderOptions options) {
+at::Tensor GPUDecoder::gpu_part(at::Tensor scores, int, DecoderOptions options) {
     c10::cuda::CUDAGuard device_guard(scores.device());
     utils::ScopedProfileRange loop{"gpu_decode", 1};
     long int N = (long int)(scores.sizes()[0]);

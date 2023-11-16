@@ -204,13 +204,13 @@ int duplex(int argc, char* argv[]) {
         auto aligner = PipelineDescriptor::InvalidNodeHandle;
         auto converted_reads_sink = PipelineDescriptor::InvalidNodeHandle;
         if (ref.empty()) {
-            hts_writer = pipeline_desc.add_node<HtsWriter>({}, "-", output_mode, 4, num_reads);
+            hts_writer = pipeline_desc.add_node<HtsWriter>({}, "-", output_mode, 4);
             converted_reads_sink = hts_writer;
         } else {
             auto options = cli::process_minimap2_arguments(parser, AlignerNode::dflt_options);
             aligner = pipeline_desc.add_node<AlignerNode>({}, ref, options,
                                                           std::thread::hardware_concurrency());
-            hts_writer = pipeline_desc.add_node<HtsWriter>({}, "-", output_mode, 4, num_reads);
+            hts_writer = pipeline_desc.add_node<HtsWriter>({}, "-", output_mode, 4);
             pipeline_desc.add_node_sink(aligner, hts_writer);
             converted_reads_sink = aligner;
         }
@@ -260,7 +260,6 @@ int duplex(int argc, char* argv[]) {
             auto& hts_writer_ref = dynamic_cast<HtsWriter&>(pipeline->get_node_ref(hts_writer));
             hts_writer_ref.set_and_write_header(hdr.get());
 
-            constexpr auto kStatsPeriod = 100ms;
             stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
                     kStatsPeriod, stats_reporters, stats_callables, max_stats_records);
         } else {  // Execute a Stereo Duplex pipeline.
@@ -285,7 +284,7 @@ int duplex(int argc, char* argv[]) {
             auto skip_model_compatibility_check =
                     parser.hidden.get<bool>("--skip-model-compatibility-check");
             if (!skip_model_compatibility_check &&
-                !sample_rates_compatible(data_sample_rate, model_sample_rate)) {
+                !sample_rates_compatible(data_sample_rate, uint16_t(model_sample_rate))) {
                 std::stringstream err;
                 err << "Sample rate for model (" << model_sample_rate << ") and data ("
                     << data_sample_rate << ") are not compatible.";

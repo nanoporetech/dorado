@@ -280,8 +280,8 @@ TEST_CASE(
     for (auto& message : messages) {
         if (std::holds_alternative<BamPtr>(message)) {
             // Check trimming on the bam1_t struct.
-            auto read = std::get<BamPtr>(std::move(message));
-            bam1_t* rec = read.get();
+            auto msg_read = std::get<BamPtr>(std::move(message));
+            bam1_t* rec = msg_read.get();
 
             CHECK_THAT(bam_aux2Z(bam_aux_get(rec, "BC")), Equals(expected_bc));
 
@@ -304,23 +304,24 @@ TEST_CASE(
             CHECK(bam_aux2i(bam_aux_get(rec, "ts")) == additional_trimmed_samples);
         } else if (std::holds_alternative<SimplexReadPtr>(message)) {
             // Check trimming on the Read type.
-            auto read = std::get<SimplexReadPtr>(std::move(message));
+            auto msg_read = std::get<SimplexReadPtr>(std::move(message));
+            const ReadCommon& read_common = msg_read->read_common;
 
-            CHECK(read->read_common.barcode == expected_bc);
+            CHECK(read_common.barcode == expected_bc);
 
-            CHECK(read->read_common.seq == nonbc_seq);
+            CHECK(read_common.seq == nonbc_seq);
 
-            CHECK(read->read_common.moves == expected_move_vals);
+            CHECK(read_common.moves == expected_move_vals);
 
             // The mod probabilities table should not start mod at the first base.
-            CHECK(read->read_common.base_mod_probs.size() ==
-                  read->read_common.seq.size() * mod_alphabet.size());
-            CHECK(read->read_common.base_mod_probs[0] == 20);
-            CHECK(read->read_common.base_mod_probs[1] == 235);
+            CHECK(read_common.base_mod_probs.size() ==
+                  read_common.seq.size() * mod_alphabet.size());
+            CHECK(read_common.base_mod_probs[0] == 20);
+            CHECK(read_common.base_mod_probs[1] == 235);
 
-            CHECK(read->read_common.num_trimmed_samples == uint64_t(additional_trimmed_samples));
+            CHECK(read_common.num_trimmed_samples == uint64_t(additional_trimmed_samples));
 
-            auto bams = read->read_common.extract_sam_lines(0, 10);
+            auto bams = read_common.extract_sam_lines(0, 10);
             auto& rec = bams[0];
             auto [mod_str, mod_probs] = dorado::utils::extract_modbase_info(rec.get());
         }
