@@ -23,15 +23,15 @@ inline bool is_fd_tty(FILE* fd) {
 #endif
 }
 
-inline bool is_fd_pipe(FILE* fd) {
 #ifdef _WIN32
-    return false;
+inline bool is_fd_pipe(FILE*) { return false; }
 #else
+inline bool is_fd_pipe(FILE* fd) {
     struct stat buffer;
     fstat(fileno(fd), &buffer);
     return S_ISFIFO(buffer.st_mode);
-#endif
 }
+#endif
 
 }  // namespace utils
 
