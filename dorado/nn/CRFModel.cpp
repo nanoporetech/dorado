@@ -593,6 +593,7 @@ private:
 
     void forward_cutlass(WorkingMemory &wm) {
 #ifdef DORADO_TX2  // Koi for TX2 does not have Cutlass kernels
+        (void)wm;
         throw std::logic_error("No Cutlass kernels in Jetson TX2 build.");
 #else
         // input is [T+3, N, C] (see below)
