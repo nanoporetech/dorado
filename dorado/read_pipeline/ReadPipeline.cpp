@@ -1,5 +1,6 @@
 #include "ReadPipeline.h"
 
+#include "DefaultClientInfo.h"
 #include "modbase/ModBaseContext.h"
 #include "stereo_features.h"
 #include "utils/bam_utils.h"
@@ -20,6 +21,8 @@
 using namespace std::chrono_literals;
 
 namespace dorado {
+
+ReadCommon::ReadCommon() : client_info(std::make_shared<DefaultClientInfo>()) {}
 
 std::string ReadCommon::generate_read_group() const {
     std::string read_group;

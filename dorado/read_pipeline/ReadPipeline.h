@@ -1,5 +1,4 @@
 #pragma once
-#include "ClientAccess.h"
 #include "utils/AsyncQueue.h"
 #include "utils/stats.h"
 #include "utils/types.h"
@@ -30,8 +29,12 @@ struct Attributes {
 };
 }  // namespace details
 
+class ClientInfo;
+
 class ReadCommon {
 public:
+    ReadCommon();
+
     at::Tensor raw_data;  // Loaded from source file
 
     int model_stride;  // The down sampling factor of the model
@@ -61,9 +64,9 @@ public:
     // Split (duplex) reads have the read_tag of the parent (template) and their own subread_id
     uint64_t read_tag{0};
 
-    // Contains information about the client to which this read belongs, includes the client ID.
+    // Contains information about the client to which this read belongs, e.g includes the client ID.
     // By default it's a standalone implementation which has -1 as the id
-    std::shared_ptr<ClientAccess> client_access = std::make_shared<StandaloneClientAccess>();
+    std::shared_ptr<ClientInfo> client_info;
 
     uint32_t mean_qscore_start_pos = 0;
 

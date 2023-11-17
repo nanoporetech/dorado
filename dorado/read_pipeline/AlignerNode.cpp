@@ -1,5 +1,6 @@
 #include "AlignerNode.h"
 
+#include "ClientInfo.h"
 #include "alignment/Minimap2Aligner.h"
 #include "alignment/Minimap2Index.h"
 
@@ -78,7 +79,7 @@ void AlignerNode::set_bam_index(const std::string& filename,
 
 std::shared_ptr<const alignment::Minimap2Index> AlignerNode::get_index(
         const ReadCommon& read_common) {
-    auto& align_info = read_common.client_access->alignment_info();
+    auto& align_info = read_common.client_info->alignment_info();
     if (align_info.reference_file.empty()) {
         return {};
     }

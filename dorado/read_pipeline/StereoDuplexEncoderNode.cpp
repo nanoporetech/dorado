@@ -78,7 +78,7 @@ DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(const ReadPair& read_pair) 
     read->read_common.start_time_ms = template_read.read_common.start_time_ms;
 
     read->read_common.read_tag = template_read.read_common.read_tag;
-    read->read_common.client_access = template_read.read_common.client_access;
+    read->read_common.client_info = template_read.read_common.client_info;
     read->read_common.is_duplex = true;
     read->read_common.run_id = template_read.read_common.run_id;
     read->read_common.flowcell_id = template_read.read_common.flowcell_id;
