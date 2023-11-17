@@ -495,7 +495,6 @@ struct LinearCRFImpl : Module {
         auto out_2D = out.view({-1, C_out});
         dorado::utils::matmul_f16(in.view({-1, C_in}), w_device, out_2D);
         if (activation) {
-            auto stream = at::cuda::getCurrentCUDAStream().stream();
             host_bias_activation_f16_inplace(stream, wm.T * wm.N, C_out, C_out, out_2D.data_ptr(),
                                              linear->bias.data_ptr(), KOI_TANH_X5);
         } else if (bias) {
@@ -614,22 +613,23 @@ private:
         // forward LSTM layers (odd index) use [2:-1] as input and [1:-2] as output.
         // Note that both inout[0] and inout[-1] remain all zeroes, representing the initial
         // LSTM state h(-1) in either direction.
-        auto in = wm.current;
-        in[0] = 0;
-        in[-1] = 0;
+        wm.current[0] = 0;
+        wm.current[-1] = 0;
 
         auto stream = at::cuda::getCurrentCUDAStream().stream();
-        auto opts_f16 = in.options().dtype(torch::kF16);
-        auto opts_i32 = in.options().dtype(torch::kI32);
-        auto type_id = (in.dtype() == torch::kF16) ? KOI_F16 : KOI_I8;
+        auto opts_f16 = wm.current.options().dtype(torch::kF16);
+        auto opts_i32 = opts_f16.dtype(torch::kI32);
 
         for (size_t layer_idx = 0; layer_idx < rnns.size(); ++layer_idx) {
-            bool reverse = !(layer_idx & 1);
             utils::ScopedProfileRange spr_lstm("lstm_layer", 3);
+            bool reverse = !(layer_idx & 1);
+            auto in = wm.current;
+            auto type_id = (wm.layout == TensorLayout::CUTLASS_TNC_F16) ? KOI_F16 : KOI_I8;
             auto state_buf = torch::zeros({wm.N, layer_size}, opts_f16);
             auto workspace_buf = torch::empty({1024}, opts_i32);
-            int interleave = 0;  //(type_id == KOI_I8) ? 64 : 32;
+            constexpr int interleave = 0;
 
+            // Move weights to GPU if called for the first time
             if (device_weights.size() == layer_idx) {
                 const auto &params = rnns[layer_idx]->named_parameters();
                 // Both weight tensors are tensors of size  [4 * out_size, in_size],
@@ -662,7 +662,6 @@ private:
                 device_weights.push_back(weights_cpu_cutlass.contiguous().to(in.device()));
             }
 
-            auto in = wm.current;
             host_cutlass_lstm(stream, type_id, int(layer_idx), wm.N, layer_size, wm.T,
                               reverse ? -1 : 1, int(in.stride(1)), in.data_ptr(),
                               device_weights[layer_idx].data_ptr(),
@@ -676,7 +675,6 @@ private:
                              int(in.stride(2)), KOI_F16, out.data_ptr(), int(out.stride(0)),
                              int(out.stride(1)), int(out.stride(2)), KOI_I8, int(in.size(0)),
                              int(in.size(1)), int(in.size(2)));
-                type_id = KOI_I8;
             }
 
             wm.is_input_to_rev_lstm = !reverse;
