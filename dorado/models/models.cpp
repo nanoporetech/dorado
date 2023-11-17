@@ -327,15 +327,17 @@ class ModelDownloader {
             http.set_proxy(proxy_url, proxy_port);
         }
 
-#ifdef __APPLE__
         http.set_socket_options([](socket_t sock) {
+#ifdef __APPLE__
             // Disable SIGPIPE signal generation since it takes down the entire process
             // whereas we can more gracefully handle the EPIPE error.
             int enabled = 1;
             setsockopt(sock, SOL_SOCKET, SO_NOSIGPIPE, reinterpret_cast<char*>(&enabled),
                        sizeof(enabled));
-        });
+#else
+            (void)sock;
 #endif
+        });
 
         return http;
     }

@@ -320,7 +320,7 @@ public:
                 stats::Timer timer;
                 auto scores = m_module->forward(task->input.to(m_options.device(), true));
                 const auto forward_ms = timer.GetElapsedMS();
-                task->out.copy_(m_decoder->gpu_part(scores, task->num_chunks, m_decoder_options));
+                task->out.copy_(m_decoder->gpu_part(scores, m_decoder_options));
                 stream.synchronize();
                 const auto forward_plus_decode_ms = timer.GetElapsedMS();
                 m_model_ms += forward_ms;
