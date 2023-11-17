@@ -29,6 +29,10 @@ std::pair<std::vector<dorado::Runner>, size_t> create_basecall_runners(
         size_t chunk_size,
         float memory_fraction,
         bool guard_gpus) {
+#ifdef __APPLE__
+    (void)guard_gpus;
+#endif
+
     std::vector<dorado::Runner> runners;
 
     // Default is 1 device.  CUDA path may alter this.
