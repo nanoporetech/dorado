@@ -32,6 +32,8 @@ public:
     stats::NamedStats sample_stats() const override;
     void terminate(const FlushOptions& flush_options) override { terminate_impl(); }
     void restart() override;
+    void simplex_mod_call(Message message);
+    void duplex_mod_call(Message message);
 
 private:
     void start_threads();

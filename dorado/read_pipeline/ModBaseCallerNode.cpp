@@ -142,6 +142,117 @@ void ModBaseCallerNode::init_modbase_info() {
     m_base_prob_offsets[3] = m_base_prob_offsets[2] + result.base_counts[2];
 }
 
+void ModBaseCallerNode::duplex_mod_call(Message message) {
+    send_message_to_sink(std::move(message));
+}
+
+void ModBaseCallerNode::simplex_mod_call(Message message) {
+    auto read = std::get<SimplexReadPtr>(std::move(message));
+    stats::Timer timer;
+    {
+        nvtx3::scoped_range range{"base_mod_probs_init"};
+        // initialize base_mod_probs _before_ we start handing out chunks
+        read->read_common.base_mod_probs.resize(read->read_common.seq.size() * m_num_states, 0);
+        for (size_t i = 0; i < read->read_common.seq.size(); ++i) {
+            // Initialize for what corresponds to 100% canonical base for each position.
+            int base_id = utils::BaseInfo::BASE_IDS[read->read_common.seq[i]];
+            if (base_id < 0) {
+                throw std::runtime_error("Invalid character in sequence.");
+            }
+            read->read_common.base_mod_probs[i * m_num_states + m_base_prob_offsets[base_id]] = 1;
+        }
+    }
+    read->read_common.mod_base_info = m_mod_base_info;
+
+    auto working_read = std::make_shared<WorkingRead>();
+    working_read->num_modbase_chunks = 0;
+    working_read->num_modbase_chunks_called = 0;
+
+    std::vector<int> sequence_ints = utils::sequence_to_ints(read->read_common.seq);
+
+    // all runners have the same set of callers, so we only need to use the first one
+    auto& runner = m_runners[0];
+    std::vector<std::vector<std::unique_ptr<RemoraChunk>>> chunks_to_enqueue_by_caller(
+            runner->num_callers());
+    for (size_t caller_id = 0; caller_id < runner->num_callers(); ++caller_id) {
+        nvtx3::scoped_range range{"generate_chunks"};
+
+        auto signal_len = read->read_common.get_raw_data_samples();
+        std::vector<uint64_t> seq_to_sig_map =
+                utils::moves_to_map(read->read_common.moves, m_block_stride, signal_len,
+                                    read->read_common.seq.size() + 1);
+
+        auto& chunks_to_enqueue = chunks_to_enqueue_by_caller.at(caller_id);
+        auto& params = runner->caller_params(caller_id);
+        auto signal = read->read_common.raw_data;
+        if (params.reverse_signal) {
+            signal = at::flip(signal, 0);
+            std::reverse(std::begin(seq_to_sig_map), std::end(seq_to_sig_map));
+            std::transform(std::begin(seq_to_sig_map), std::end(seq_to_sig_map),
+                           std::begin(seq_to_sig_map),
+                           [signal_len](auto signal_pos) { return signal_len - signal_pos; });
+        }
+
+        // scale signal based on model parameters
+        auto scaled_signal = runner->scale_signal(caller_id, signal, sequence_ints, seq_to_sig_map);
+
+        auto context_samples = (params.context_before + params.context_after);
+
+        // One-hot encodes the kmer at each signal step for input into the network
+        ModBaseEncoder encoder(m_block_stride, context_samples, params.bases_before,
+                               params.bases_after);
+        encoder.init(sequence_ints, seq_to_sig_map);
+
+        auto context_hits = runner->get_motif_hits(caller_id, read->read_common.seq);
+        m_num_context_hits += static_cast<int64_t>(context_hits.size());
+        chunks_to_enqueue.reserve(context_hits.size());
+        for (auto context_hit : context_hits) {
+            nvtx3::scoped_range range{"create_chunk"};
+            auto slice = encoder.get_context(context_hit);
+            // signal
+            auto input_signal = scaled_signal.index({at::indexing::Slice(
+                    slice.first_sample, slice.first_sample + slice.num_samples)});
+            if (slice.lead_samples_needed != 0 || slice.tail_samples_needed != 0) {
+                input_signal = at::constant_pad_nd(
+                        input_signal,
+                        {(int64_t)slice.lead_samples_needed, (int64_t)slice.tail_samples_needed});
+            }
+            chunks_to_enqueue.push_back(std::make_unique<RemoraChunk>(
+                    working_read, input_signal, std::move(slice.data), context_hit));
+
+            ++working_read->num_modbase_chunks;
+        }
+    }
+    m_chunk_generation_ms += timer.GetElapsedMS();
+
+    if (working_read->num_modbase_chunks != 0) {
+        // Hand over our ownership to the working read
+        working_read->read = std::move(read);
+
+        // Put the read in the working list
+        {
+            std::lock_guard<std::mutex> working_reads_lock(m_working_reads_mutex);
+            m_working_reads.insert(std::move(working_read));
+            ++m_working_reads_size;
+        }
+
+        // push the chunks to the chunk queues
+        // needs to be done after working_read->read is set as chunks could be processed
+        // before we set that value otherwise
+        for (size_t caller_id = 0; caller_id < runner->num_callers(); ++caller_id) {
+            auto& chunk_queue = m_chunk_queues.at(caller_id);
+            auto& chunks_to_enqueue = chunks_to_enqueue_by_caller.at(caller_id);
+            for (auto& chunk : chunks_to_enqueue) {
+                chunk_queue->try_push(std::move(chunk));
+            }
+        }
+    } else {
+        // No modbases to call, pass directly to next node
+        send_message_to_sink(std::move(read));
+        ++m_num_non_mod_base_reads_pushed;
+    }
+}
+
 void ModBaseCallerNode::input_worker_thread() {
     at::InferenceMode inference_mode_guard;
 
@@ -150,150 +261,10 @@ void ModBaseCallerNode::input_worker_thread() {
         // If this message isn't a read, just forward it to the sink.
         if (!is_read_message(message)) {
             send_message_to_sink(std::move(message));
-            continue;
-        }
-
-        nvtx3::scoped_range range{"modbase_input_worker_thread"};
-        // If this message isn't a read, we'll get a bad_variant_access exception.
-
-        auto& read_common = get_read_common_data(message);
-        if (!read_common.is_duplex) {
-            auto read = std::get<SimplexReadPtr>(std::move(message));
-            stats::Timer timer;
-            {
-                nvtx3::scoped_range range{"base_mod_probs_init"};
-                // initialize base_mod_probs _before_ we start handing out chunks
-                read->read_common.base_mod_probs.resize(read->read_common.seq.size() * m_num_states,
-                                                        0);
-                for (size_t i = 0; i < read->read_common.seq.size(); ++i) {
-                    // Initialize for what corresponds to 100% canonical base for each position.
-                    int base_id = utils::BaseInfo::BASE_IDS[read->read_common.seq[i]];
-                    if (base_id < 0) {
-                        throw std::runtime_error("Invalid character in sequence.");
-                    }
-                    read->read_common
-                            .base_mod_probs[i * m_num_states + m_base_prob_offsets[base_id]] = 1;
-                }
-            }
-            read->read_common.mod_base_info = m_mod_base_info;
-
-            auto working_read = std::make_shared<WorkingRead>();
-            working_read->num_modbase_chunks = 0;
-            working_read->num_modbase_chunks_called = 0;
-
-            std::vector<int> sequence_ints = utils::sequence_to_ints(read->read_common.seq);
-
-            // all runners have the same set of callers, so we only need to use the first one
-            auto& runner = m_runners[0];
-            std::vector<std::vector<std::unique_ptr<RemoraChunk>>> chunks_to_enqueue_by_caller(
-                    runner->num_callers());
-            for (size_t caller_id = 0; caller_id < runner->num_callers(); ++caller_id) {
-                nvtx3::scoped_range range{"generate_chunks"};
-
-                auto signal_len = read->read_common.get_raw_data_samples();
-                std::vector<uint64_t> seq_to_sig_map =
-                        utils::moves_to_map(read->read_common.moves, m_block_stride, signal_len,
-                                            read->read_common.seq.size() + 1);
-
-                auto& chunks_to_enqueue = chunks_to_enqueue_by_caller.at(caller_id);
-                auto& params = runner->caller_params(caller_id);
-                auto signal = read->read_common.raw_data;
-                if (params.reverse_signal) {
-                    signal = at::flip(signal, 0);
-                    std::reverse(std::begin(seq_to_sig_map), std::end(seq_to_sig_map));
-                    std::transform(std::begin(seq_to_sig_map), std::end(seq_to_sig_map),
-                                   std::begin(seq_to_sig_map), [signal_len](auto signal_pos) {
-                                       return signal_len - signal_pos;
-                                   });
-                }
-
-                // scale signal based on model parameters
-                auto scaled_signal =
-                        runner->scale_signal(caller_id, signal, sequence_ints, seq_to_sig_map);
-
-                auto context_samples = (params.context_before + params.context_after);
-
-                // One-hot encodes the kmer at each signal step for input into the network
-                ModBaseEncoder encoder(m_block_stride, context_samples, params.bases_before,
-                                       params.bases_after);
-                encoder.init(sequence_ints, seq_to_sig_map);
-
-                auto context_hits = runner->get_motif_hits(caller_id, read->read_common.seq);
-                m_num_context_hits += static_cast<int64_t>(context_hits.size());
-                chunks_to_enqueue.reserve(context_hits.size());
-                for (auto context_hit : context_hits) {
-                    nvtx3::scoped_range range{"create_chunk"};
-                    auto slice = encoder.get_context(context_hit);
-                    // signal
-                    auto input_signal = scaled_signal.index({at::indexing::Slice(
-                            slice.first_sample, slice.first_sample + slice.num_samples)});
-                    if (slice.lead_samples_needed != 0 || slice.tail_samples_needed != 0) {
-                        input_signal = at::constant_pad_nd(input_signal,
-                                                           {(int64_t)slice.lead_samples_needed,
-                                                            (int64_t)slice.tail_samples_needed});
-                    }
-                    chunks_to_enqueue.push_back(std::make_unique<RemoraChunk>(
-                            working_read, input_signal, std::move(slice.data), context_hit));
-
-                    ++working_read->num_modbase_chunks;
-                }
-            }
-            m_chunk_generation_ms += timer.GetElapsedMS();
-
-            if (working_read->num_modbase_chunks != 0) {
-                // Hand over our ownership to the working read
-                working_read->read = std::move(read);
-
-                // Put the read in the working list
-                {
-                    std::lock_guard<std::mutex> working_reads_lock(m_working_reads_mutex);
-                    m_working_reads.insert(std::move(working_read));
-                    ++m_working_reads_size;
-                }
-
-                // push the chunks to the chunk queues
-                // needs to be done after working_read->read is set as chunks could be processed
-                // before we set that value otherwise
-                for (size_t caller_id = 0; caller_id < runner->num_callers(); ++caller_id) {
-                    auto& chunk_queue = m_chunk_queues.at(caller_id);
-                    auto& chunks_to_enqueue = chunks_to_enqueue_by_caller.at(caller_id);
-                    for (auto& chunk : chunks_to_enqueue) {
-                        chunk_queue->try_push(std::move(chunk));
-                    }
-                }
-            } else {
-                // No modbases to call, pass directly to next node
-                send_message_to_sink(std::move(read));
-                ++m_num_non_mod_base_reads_pushed;
-            }
-        } else {
-            // ----> DUPLEX HANDLED HERE (FOR NOW) <----.
-
-            // Step 1: prepare the base mod probs table - we are likely going to need two of these, one for each strand,
-            // We probably don't want them on read_common either
-            auto read = std::get<DuplexReadPtr>(std::move(message));
-            stats::Timer timer;
-            {
-                nvtx3::scoped_range range{"base_mod_probs_init"};
-                // initialize base_mod_probs _before_ we start handing out chunks
-                read->read_common.base_mod_probs.resize(read->read_common.seq.size() * m_num_states,
-                                                        0);
-                for (size_t i = 0; i < read->read_common.seq.size(); ++i) {
-                    // Initialize for what corresponds to 100% canonical base for each position.
-                    int base_id = utils::BaseInfo::BASE_IDS[read->read_common.seq[i]];
-                    if (base_id < 0) {
-                        throw std::runtime_error("Invalid character in sequence.");
-                    }
-                    read->read_common
-                            .base_mod_probs[i * m_num_states + m_base_prob_offsets[base_id]] = 1.0f;
-                }
-            }
-
-            // mod_base_info is the modified base settings of the models that ran on this read
-            read->read_common.mod_base_info = m_mod_base_info;
-
-            send_message_to_sink(std::move(read));
-            ++m_num_non_mod_base_reads_pushed;
+        } else if (std::holds_alternative<SimplexReadPtr>(message)) {
+            simplex_mod_call(std::move(message));
+        } else if (std::holds_alternative<DuplexReadPtr>(message)) {
+            duplex_mod_call(std::move(message));
         }
     }
 
