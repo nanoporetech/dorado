@@ -148,8 +148,11 @@ struct BarcodeClassifier::BarcodeCandidateKit {
 BarcodeClassifier::BarcodeClassifier(const std::vector<std::string>& kit_names,
                                      std::optional<std::string> custom_kit,
                                      std::optional<std::string> custom_barcodes)
-        : m_custom_kits(add_kit_to_map(std::move(custom_kit))),
-          m_custom_seqs(parse_custom_barcode_sequences(*custom_barcodes)),
+        : m_custom_kits(add_kit_to_map(custom_kit)),
+          m_custom_seqs(custom_barcodes ? parse_custom_barcode_sequences(*custom_barcodes)
+                                        : std::unordered_map<std::string, std::string>{}),
+          m_scoring_params(custom_kit ? parse_scoring_params(*custom_kit)
+                                      : BarcodeKitScoringParams{}),
           m_barcode_candidates(generate_candidates(kit_names)) {}
 
 BarcodeClassifier::~BarcodeClassifier() = default;
@@ -218,6 +221,12 @@ std::vector<BarcodeClassifier::BarcodeCandidateKit> BarcodeClassifier::generate_
     for (auto& kit_name : final_kit_names) {
         const auto& kit_info = get_kit_info(kit_name);
 
+        if (!kit_info.barcodes2.empty() && kit_info.barcodes.size() != kit_info.barcodes2.size()) {
+            throw std::runtime_error(
+                    "If a kit has front and rear barcodes, there should be "
+                    "an equal number of them");
+        }
+
         BarcodeCandidateKit candidate;
         candidate.kit = kit_name;
         const auto& ref_bc_name = kit_info.barcodes[0];
@@ -227,20 +236,20 @@ std::vector<BarcodeClassifier::BarcodeCandidateKit> BarcodeClassifier::generate_
         candidate.top_context = kit_info.top_front_flank + bc_mask + kit_info.top_rear_flank;
         candidate.top_context_rev = utils::reverse_complement(kit_info.top_rear_flank) + bc_mask +
                                     utils::reverse_complement(kit_info.top_front_flank);
-        candidate.bottom_context =
-                kit_info.bottom_front_flank + bc_mask + kit_info.bottom_rear_flank;
-        candidate.bottom_context_rev = utils::reverse_complement(kit_info.bottom_rear_flank) +
-                                       bc_mask +
-                                       utils::reverse_complement(kit_info.bottom_front_flank);
 
-        if (!kit_info.barcodes2.empty() && kit_info.barcodes.size() != kit_info.barcodes2.size()) {
-            throw std::runtime_error(
-                    "If a kit has front and rear barcodes, there should be "
-                    "an equal number of them");
+        if (!kit_info.barcodes2.empty()) {
+            const auto& ref_bc2_name = kit_info.barcodes2[0];
+            const auto& ref_bc2 = get_barcode_sequence(ref_bc2_name);
+
+            std::string bc2_mask(ref_bc2.length(), 'N');
+            candidate.bottom_context =
+                    kit_info.bottom_front_flank + bc2_mask + kit_info.bottom_rear_flank;
+            candidate.bottom_context_rev = utils::reverse_complement(kit_info.bottom_rear_flank) +
+                                           bc2_mask +
+                                           utils::reverse_complement(kit_info.bottom_front_flank);
         }
 
         for (int idx = 0; idx < kit_info.barcodes.size(); idx++) {
-            //for (const auto& bc_name : kit_info.barcodes) {
             const auto& bc_name = kit_info.barcodes[idx];
             const auto& barcode1 = get_barcode_sequence(bc_name);
             auto barcode1_rev = utils::reverse_complement(barcode1);
@@ -586,7 +595,8 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
                 [](const auto& l, const auto& r) { return l.bottom_score < r.bottom_score; });
         spdlog::debug("Check double ends: top bc {}, bottom bc {}", best_top_score->barcode_name,
                       best_bottom_score->barcode_name);
-        if ((best_top_score->score > 0.7) && (best_bottom_score->score > 0.7) &&
+        if ((best_top_score->score > m_scoring_params.min_soft_barcode_threshold) &&
+            (best_bottom_score->score > m_scoring_params.min_soft_barcode_threshold) &&
             (best_top_score->barcode_name != best_bottom_score->barcode_name)) {
             return UNCLASSIFIED;
         }
@@ -602,10 +612,13 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
     }
     spdlog::debug("Scores: {}", d.str());
     auto best_score = scores.begin();
-    auto are_scores_acceptable = [](const auto& score) {
-        return (score.flank_score >= 0.7 && score.score >= 0.6) ||
-               (score.score >= 0.7 && score.flank_score >= 0.6) ||
-               (score.top_score >= 0.6 && score.bottom_score >= 0.6);
+    auto are_scores_acceptable = [this](const auto& score) {
+        return (score.flank_score >= m_scoring_params.min_soft_flank_threshold &&
+                score.score >= m_scoring_params.min_hard_barcode_threshold) ||
+               (score.score >= m_scoring_params.min_soft_barcode_threshold &&
+                score.flank_score >= m_scoring_params.min_hard_flank_threshold) ||
+               (score.top_score >= m_scoring_params.min_hard_barcode_threshold &&
+                score.bottom_score >= m_scoring_params.min_hard_barcode_threshold);
     };
 
     BarcodeScoreResult out = UNCLASSIFIED;
@@ -616,7 +629,7 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
     } else {
         auto second_best_score = std::next(best_score);
         if (best_score->score - second_best_score->score >= 0.1f) {
-            const float kMargin = 0.25f;
+            const float kMargin = m_scoring_params.min_barcode_score_dist;
             if (are_scores_acceptable(*best_score) ||
                 (best_score->score - second_best_score->score >= kMargin)) {
                 out = *best_score;

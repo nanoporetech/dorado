@@ -1,4 +1,5 @@
 #pragma once
+#include "parse_custom_kit.h"
 #include "utils/barcode_kits.h"
 #include "utils/stats.h"
 #include "utils/types.h"
@@ -29,6 +30,7 @@ public:
 private:
     const std::unordered_map<std::string, dorado::barcode_kits::KitInfo> m_custom_kits;
     const std::unordered_map<std::string, std::string> m_custom_seqs;
+    const BarcodeKitScoringParams m_scoring_params;
     const std::vector<BarcodeCandidateKit> m_barcode_candidates;
 
     std::vector<BarcodeCandidateKit> generate_candidates(const std::vector<std::string>& kit_names);
