@@ -2,6 +2,8 @@
 
 #include "Minimap2Index.h"
 
+#include <cassert>
+
 namespace dorado::alignment {
 
 std::shared_ptr<Minimap2Index> IndexFileAccess::get_index_impl(
@@ -34,7 +36,7 @@ std::shared_ptr<const Minimap2Index> IndexFileAccess::get_index(
         const std::string& file,
         const Minimap2IndexOptions& options) {
     auto index = get_index_impl(file, options);
-    assert(index && "get_index expects a the index file to have been loaded");
+    assert(index && "get_index expects the index to have been loaded");
     return index;
 }
 

@@ -84,7 +84,6 @@ std::shared_ptr<const alignment::Minimap2Index> AlignerNode::get_index(
     }
     auto index =
             m_index_file_access->get_index(align_info.reference_file, align_info.minimap_options);
-    assert(index != nullptr && "Expects an index file to be loaded for a specific reference");
     return index;
 }
 
