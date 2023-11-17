@@ -24,8 +24,8 @@ const std::string UNCLASSIFIED_BARCODE = "unclassified";
 
 std::string generate_barcode_string(dorado::BarcodeScoreResult bc_res) {
     std::string bc;
-    if (bc_res.adapter_name != UNCLASSIFIED_BARCODE) {
-        bc = dorado::barcode_kits::generate_standard_barcode_name(bc_res.kit, bc_res.adapter_name);
+    if (bc_res.barcode_name != UNCLASSIFIED_BARCODE) {
+        bc = dorado::barcode_kits::generate_standard_barcode_name(bc_res.kit, bc_res.barcode_name);
     } else {
         bc = UNCLASSIFIED_BARCODE;
     }
@@ -59,7 +59,7 @@ BarcodeClassifierNode::BarcodeClassifierNode(int threads) : MessageSink(10000), 
 void BarcodeClassifierNode::start_threads() {
     for (size_t i = 0; i < m_threads; i++) {
         m_workers.push_back(std::make_unique<std::thread>(
-                std::thread(&BarcodeClassifierNode::worker_thread, this, i)));
+                std::thread(&BarcodeClassifierNode::worker_thread, this)));
     }
 }
 
@@ -79,7 +79,7 @@ void BarcodeClassifierNode::restart() {
 
 BarcodeClassifierNode::~BarcodeClassifierNode() { terminate_impl(); }
 
-void BarcodeClassifierNode::worker_thread(size_t tid) {
+void BarcodeClassifierNode::worker_thread() {
     Message message;
     while (get_input_message(message)) {
         if (std::holds_alternative<BamPtr>(message)) {

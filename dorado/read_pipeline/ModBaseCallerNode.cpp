@@ -160,7 +160,7 @@ void ModBaseCallerNode::input_worker_thread() {
         while (true) {
             stats::Timer timer;
             {
-                nvtx3::scoped_range range{"base_mod_probs_init"};
+                nvtx3::scoped_range range_init{"base_mod_probs_init"};
                 // initialize base_mod_probs _before_ we start handing out chunks
                 read->read_common.base_mod_probs.resize(read->read_common.seq.size() * m_num_states,
                                                         0);
@@ -187,7 +187,7 @@ void ModBaseCallerNode::input_worker_thread() {
             std::vector<std::vector<std::unique_ptr<RemoraChunk>>> chunks_to_enqueue_by_caller(
                     runner->num_callers());
             for (size_t caller_id = 0; caller_id < runner->num_callers(); ++caller_id) {
-                nvtx3::scoped_range range{"generate_chunks"};
+                nvtx3::scoped_range range_gen_chunks{"generate_chunks"};
 
                 auto signal_len = read->read_common.get_raw_data_samples();
                 std::vector<uint64_t> seq_to_sig_map =
@@ -221,7 +221,7 @@ void ModBaseCallerNode::input_worker_thread() {
                 m_num_context_hits += static_cast<int64_t>(context_hits.size());
                 chunks_to_enqueue.reserve(context_hits.size());
                 for (auto context_hit : context_hits) {
-                    nvtx3::scoped_range range{"create_chunk"};
+                    nvtx3::scoped_range range_create_chunk{"create_chunk"};
                     auto slice = encoder.get_context(context_hit);
                     // signal
                     auto input_signal = scaled_signal.index({at::indexing::Slice(

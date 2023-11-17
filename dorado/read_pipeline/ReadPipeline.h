@@ -338,8 +338,7 @@ public:
     // Returns the resulting pipeline, or a null unique_ptr on error.
     static std::unique_ptr<Pipeline> create(
             PipelineDescriptor&& descriptor,
-            std::vector<stats::StatsReporter>* stats_reporters = nullptr,
-            stats::NamedStats* final_stats = nullptr);
+            std::vector<stats::StatsReporter>* stats_reporters = nullptr);
 
     // Routes the given message to the pipeline source node.
     void push_message(Message&& message);

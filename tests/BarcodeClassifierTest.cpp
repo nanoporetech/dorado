@@ -61,10 +61,10 @@ TEST_CASE("BarcodeClassifier: test single ended barcode", TEST_GROUP) {
             auto seqlen = reader.record->core.l_qseq;
             std::string seq = utils::extract_sequence(reader.record.get());
             auto res = classifier.barcode(seq, false, std::nullopt);
-            if (res.adapter_name == "unclassified") {
-                CHECK(bc == res.adapter_name);
+            if (res.barcode_name == "unclassified") {
+                CHECK(bc == res.barcode_name);
             } else {
-                CHECK(bc == (res.kit + "_" + res.adapter_name));
+                CHECK(bc == (res.kit + "_" + res.barcode_name));
                 CHECK(res.top_barcode_pos.second > res.top_barcode_pos.first);
                 CHECK(res.top_barcode_pos.first >= 0);
                 CHECK(res.top_barcode_pos.second <= seqlen);
@@ -88,10 +88,10 @@ TEST_CASE("BarcodeClassifier: test double ended barcode", TEST_GROUP) {
             auto seqlen = reader.record->core.l_qseq;
             std::string seq = utils::extract_sequence(reader.record.get());
             auto res = classifier.barcode(seq, false, std::nullopt);
-            if (res.adapter_name == "unclassified") {
-                CHECK(bc == res.adapter_name);
+            if (res.barcode_name == "unclassified") {
+                CHECK(bc == res.barcode_name);
             } else {
-                CHECK(bc == (res.kit + "_" + res.adapter_name));
+                CHECK(bc == (res.kit + "_" + res.barcode_name));
                 CHECK(res.top_barcode_pos.second > res.top_barcode_pos.first);
                 CHECK(res.bottom_barcode_pos.second > res.bottom_barcode_pos.first);
                 CHECK(res.top_barcode_pos.first >= 0);
@@ -117,10 +117,10 @@ TEST_CASE("BarcodeClassifier: test double ended barcode with different variants"
             auto seqlen = reader.record->core.l_qseq;
             std::string seq = utils::extract_sequence(reader.record.get());
             auto res = classifier.barcode(seq, false, std::nullopt);
-            if (res.adapter_name == "unclassified") {
-                CHECK(bc == res.adapter_name);
+            if (res.barcode_name == "unclassified") {
+                CHECK(bc == res.barcode_name);
             } else {
-                CHECK(bc == (res.kit + "_" + res.adapter_name));
+                CHECK(bc == (res.kit + "_" + res.barcode_name));
                 CHECK(res.top_barcode_pos.second > res.top_barcode_pos.first);
                 CHECK(res.bottom_barcode_pos.second > res.bottom_barcode_pos.first);
                 CHECK(res.top_barcode_pos.first >= 0);
@@ -145,8 +145,8 @@ TEST_CASE("BarcodeClassifier: check barcodes on both ends - failing case", TEST_
         std::string seq = utils::extract_sequence(reader.record.get());
         auto single_end_res = classifier.barcode(seq, false, std::nullopt);
         auto double_end_res = classifier.barcode(seq, true, std::nullopt);
-        CHECK(double_end_res.adapter_name == "unclassified");
-        CHECK(single_end_res.adapter_name == "BC15");
+        CHECK(double_end_res.barcode_name == "unclassified");
+        CHECK(single_end_res.barcode_name == "BC15");
     }
 }
 
@@ -162,8 +162,8 @@ TEST_CASE("BarcodeClassifier: check barcodes on both ends - passing case", TEST_
         std::string seq = utils::extract_sequence(reader.record.get());
         auto single_end_res = classifier.barcode(seq, false, std::nullopt);
         auto double_end_res = classifier.barcode(seq, true, std::nullopt);
-        CHECK(double_end_res.adapter_name == single_end_res.adapter_name);
-        CHECK(single_end_res.adapter_name == "BC01");
+        CHECK(double_end_res.barcode_name == single_end_res.barcode_name);
+        CHECK(single_end_res.barcode_name == "BC01");
     }
 }
 
@@ -280,8 +280,8 @@ TEST_CASE(
     for (auto& message : messages) {
         if (std::holds_alternative<BamPtr>(message)) {
             // Check trimming on the bam1_t struct.
-            auto read = std::get<BamPtr>(std::move(message));
-            bam1_t* rec = read.get();
+            auto msg_read = std::get<BamPtr>(std::move(message));
+            bam1_t* rec = msg_read.get();
 
             CHECK_THAT(bam_aux2Z(bam_aux_get(rec, "BC")), Equals(expected_bc));
 
@@ -304,23 +304,24 @@ TEST_CASE(
             CHECK(bam_aux2i(bam_aux_get(rec, "ts")) == additional_trimmed_samples);
         } else if (std::holds_alternative<SimplexReadPtr>(message)) {
             // Check trimming on the Read type.
-            auto read = std::get<SimplexReadPtr>(std::move(message));
+            auto msg_read = std::get<SimplexReadPtr>(std::move(message));
+            const ReadCommon& read_common = msg_read->read_common;
 
-            CHECK(read->read_common.barcode == expected_bc);
+            CHECK(read_common.barcode == expected_bc);
 
-            CHECK(read->read_common.seq == nonbc_seq);
+            CHECK(read_common.seq == nonbc_seq);
 
-            CHECK(read->read_common.moves == expected_move_vals);
+            CHECK(read_common.moves == expected_move_vals);
 
             // The mod probabilities table should not start mod at the first base.
-            CHECK(read->read_common.base_mod_probs.size() ==
-                  read->read_common.seq.size() * mod_alphabet.size());
-            CHECK(read->read_common.base_mod_probs[0] == 20);
-            CHECK(read->read_common.base_mod_probs[1] == 235);
+            CHECK(read_common.base_mod_probs.size() ==
+                  read_common.seq.size() * mod_alphabet.size());
+            CHECK(read_common.base_mod_probs[0] == 20);
+            CHECK(read_common.base_mod_probs[1] == 235);
 
-            CHECK(read->read_common.num_trimmed_samples == uint64_t(additional_trimmed_samples));
+            CHECK(read_common.num_trimmed_samples == uint64_t(additional_trimmed_samples));
 
-            auto bams = read->read_common.extract_sam_lines(0, 10);
+            auto bams = read_common.extract_sam_lines(0, 10);
             auto& rec = bams[0];
             auto [mod_str, mod_probs] = dorado::utils::extract_modbase_info(rec.get());
         }

@@ -25,7 +25,6 @@
 #include "utils/sys_stats.h"
 #include "utils/torch_utils.h"
 
-#include <argparse.hpp>
 #include <htslib/sam.h>
 #include <spdlog/spdlog.h>
 
@@ -80,6 +79,15 @@ void setup(std::vector<std::string> args,
         throw std::runtime_error(err);
     }
 
+    auto read_list = utils::load_read_list(read_list_file_path);
+    size_t num_reads = DataLoader::get_num_reads(
+            data_path, read_list, {} /*reads_already_processed*/, recursive_file_loading);
+    if (num_reads == 0) {
+        spdlog::error("No POD5 or FAST5 reads found in path: " + data_path);
+        std::exit(EXIT_FAILURE);
+    }
+    num_reads = max_reads == 0 ? num_reads : std::min(num_reads, max_reads);
+
     // Check sample rate of model vs data.
     auto data_sample_rate = DataLoader::get_sample_rate(data_path, recursive_file_loading);
     auto model_sample_rate = model_config.sample_rate;
@@ -88,7 +96,7 @@ void setup(std::vector<std::string> args,
         model_sample_rate = models::get_sample_rate_by_model_name(model_name);
     }
     if (!skip_model_compatibility_check &&
-        !sample_rates_compatible(data_sample_rate, model_sample_rate)) {
+        !sample_rates_compatible(data_sample_rate, uint16_t(model_sample_rate))) {
         std::stringstream err;
         err << "Sample rate for model (" << model_sample_rate << ") and data (" << data_sample_rate
             << ") are not compatible.";
@@ -105,11 +113,6 @@ void setup(std::vector<std::string> args,
             create_basecall_runners(model_config, device, num_runners, 0, batch_size, chunk_size);
 
     auto read_groups = DataLoader::load_read_groups(data_path, model_name, recursive_file_loading);
-    auto read_list = utils::load_read_list(read_list_file_path);
-
-    size_t num_reads = DataLoader::get_num_reads(
-            data_path, read_list, {} /*reads_already_processed*/, recursive_file_loading);
-    num_reads = max_reads == 0 ? num_reads : std::min(num_reads, max_reads);
 
     bool duplex = false;
 
@@ -129,8 +132,8 @@ void setup(std::vector<std::string> args,
     utils::add_rg_hdr(hdr.get(), read_groups, barcode_kits, sample_sheet.get());
 
     PipelineDescriptor pipeline_desc;
-    auto hts_writer = pipeline_desc.add_node<HtsWriter>(
-            {}, "-", output_mode, thread_allocations.writer_threads, num_reads);
+    auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, "-", output_mode,
+                                                        thread_allocations.writer_threads);
     auto aligner = PipelineDescriptor::InvalidNodeHandle;
     auto current_sink_node = hts_writer;
     if (enable_aligner) {

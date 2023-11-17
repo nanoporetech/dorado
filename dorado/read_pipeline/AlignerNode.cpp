@@ -20,7 +20,6 @@ namespace {
 // If an alignment has secondary alignments, add that information
 // to each record. Follows minimap2 conventions.
 void add_sa_tag(bam1_t* record,
-                const mm_reg1_t* aln,
                 const mm_reg1_t* regs,
                 int32_t hits,
                 int32_t aln_idx,
@@ -337,7 +336,7 @@ std::vector<BamPtr> AlignerImpl::align(bam1_t* irecord, mm_tbuf_t* buf) {
 
         // Add new tags to match minimap2.
         add_tags(record, aln, seq, buf);
-        add_sa_tag(record, aln, reg, hits, j, int(l_seq), m_index, use_hard_clip);
+        add_sa_tag(record, reg, hits, j, int(l_seq), m_index, use_hard_clip);
 
         results.push_back(BamPtr(record));
     }

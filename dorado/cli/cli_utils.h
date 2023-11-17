@@ -4,7 +4,17 @@
 #include "Version.h"
 #include "utils/dev_utils.h"
 
+#ifdef _WIN32
+// Unreachable code warnings are emitted from argparse, even though they should be disabled by the
+// MSVC /external:W0 setting.  This is a limitation of /external: for some C47XX backend warnings.  See:
+// https://learn.microsoft.com/en-us/cpp/build/reference/external-external-headers-diagnostics?view=msvc-170#limitations
+#pragma warning(push)
+#pragma warning(disable : 4702)
+#endif  // _WIN32
 #include <argparse.hpp>
+#ifdef _WIN32
+#pragma warning(pop)
+#endif  // _WIN32
 #include <htslib/sam.h>
 
 #include <algorithm>
@@ -224,8 +234,8 @@ inline void process_internal_arguments(const ArgParser& parser) {
 template <class Options>
 Options process_minimap2_arguments(const ArgParser& parser, const Options& dflt) {
     Options res;
-    res.kmer_size = parser.visible.get<int>("k");
-    res.window_size = parser.visible.get<int>("w");
+    res.kmer_size = short(parser.visible.get<int>("k"));
+    res.window_size = short(parser.visible.get<int>("w"));
     res.index_batch_size = cli::parse_string_to_size(parser.visible.get<std::string>("I"));
     res.print_secondary = cli::parse_yes_or_no(parser.visible.get<std::string>("secondary"));
     res.best_n_secondary = parser.visible.get<int>("N");

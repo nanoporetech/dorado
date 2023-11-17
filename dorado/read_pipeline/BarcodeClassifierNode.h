@@ -23,7 +23,7 @@ public:
     ~BarcodeClassifierNode();
     std::string get_name() const override { return "BarcodeClassifierNode"; }
     stats::NamedStats sample_stats() const override;
-    void terminate(const FlushOptions& flush_options) override { terminate_impl(); }
+    void terminate(const FlushOptions&) override { terminate_impl(); }
     void restart() override;
 
 private:
@@ -38,7 +38,7 @@ private:
 
     std::shared_ptr<const BarcodingInfo> get_barcoding_info(const SimplexRead& read) const;
 
-    void worker_thread(size_t tid);
+    void worker_thread();
     void barcode(BamPtr& read);
     void barcode(SimplexRead& read);
 
