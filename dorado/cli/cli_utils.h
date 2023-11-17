@@ -12,9 +12,9 @@
 #pragma warning(disable : 4702)
 #endif  // _WIN32
 #include <argparse.hpp>
-//#ifdef _WIN32
-//#pragma warning(pop)
-//#endif  // _WIN32
+#ifdef _WIN32
+#pragma warning(pop)
+#endif  // _WIN32
 #include <htslib/sam.h>
 
 #include <algorithm>
