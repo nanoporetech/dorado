@@ -663,8 +663,8 @@ private:
             }
 
             auto in = wm.current;
-            host_cutlass_lstm(stream, type_id, layer_idx, wm.N, layer_size, wm.T, reverse ? -1 : 1,
-                              int(in.stride(1)), in.data_ptr(),
+            host_cutlass_lstm(stream, type_id, int(layer_idx), wm.N, layer_size, wm.T,
+                              reverse ? -1 : 1, int(in.stride(1)), in.data_ptr(),
                               device_weights[layer_idx].data_ptr(),
                               device_bias[layer_idx].data_ptr(), device_scale[layer_idx].data_ptr(),
                               state_buf.data_ptr(), workspace_buf.data_ptr(), interleave, 0);
