@@ -18,8 +18,8 @@ class Minimap2Index {
     using IndexPtr = std::unique_ptr<mm_idx_t, IndexDeleter>;
 
     IndexPtr m_index;
-    mm_idxopt_t m_index_options;
-    mm_mapopt_t m_mapping_options;
+    mm_idxopt_t m_index_options{};
+    mm_mapopt_t m_mapping_options{};
 
     void set_index_options(const Minimap2IndexOptions& index_options);
     void set_mapping_options(const Minimap2MappingOptions& mapping_options);
@@ -28,6 +28,7 @@ class Minimap2Index {
     bool load_index_unless_split(const std::string& index_file, int num_threads);
 
 public:
+    bool initialise(const Minimap2Options& options);
     IndexLoadResult load(const std::string& index_file,
                          const Minimap2Options& options,
                          int num_threads);

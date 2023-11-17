@@ -16,6 +16,7 @@ set(UNIT_TEST_SOURCE_FILES
     DuplexSplitTest.cpp
     Fast5DataLoaderTest.cpp
     MathUtilsTest.cpp
+    Minimap2IndexTest.cpp
     ModBaseEncoderTest.cpp
     MotifMatcherTest.cpp
     ModelUtilsTest.cpp

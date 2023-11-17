@@ -89,6 +89,23 @@ bool Minimap2Index::load_index_unless_split(const std::string& index_file, int n
     return true;
 }
 
+bool Minimap2Index::initialise(const Minimap2Options& options) {
+    mm_set_opt(0, &m_index_options, &m_mapping_options);
+    // Setting options to map-ont default till relevant args are exposed.
+    mm_set_opt("map-ont", &m_index_options, &m_mapping_options);
+
+    set_index_options(options);
+    set_mapping_options(options);
+
+    if (mm_check_opt(&m_index_options, &m_mapping_options) < 0) {
+        m_index_options = {};
+        m_mapping_options = {};
+        return false;
+    }
+
+    return true;
+}
+
 IndexLoadResult Minimap2Index::load(const std::string& index_file,
                                     const Minimap2Options& options,
                                     int num_threads) {
