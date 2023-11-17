@@ -69,7 +69,7 @@ int extract_mask_location(EdlibAlignResult aln, std::string_view query) {
 }
 
 // Helper function to locally align the flanks with barcode mask
-// against a subsequence of the read (either front or read window)
+// against a subsequence of the read (either front or rear window)
 // and return the alignment, score & barcode position.
 std::tuple<EdlibAlignResult, float, int> extract_flank_fit(std::string_view strand,
                                                            std::string_view read,
