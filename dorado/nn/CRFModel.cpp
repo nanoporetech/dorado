@@ -297,14 +297,12 @@ struct ConvStackImpl : Module {
                                 .padding(layer.params.winlen / 2);
             layer.conv = register_module(std::string("conv") + std::to_string(i + 1), Conv1d(opts));
         }
-#if USE_KOI
-        auto &last = layers.back();
-        last.output_layout = get_koi_lstm_input_layout(last.params.size, last.params.activation);
-#endif  // if USE_KOI
     }
 
 #if USE_KOI
     void reserve_working_memory(WorkingMemory &wm) {
+        auto &last = layers.back();
+        last.output_layout = get_koi_lstm_input_layout(last.params.size, last.params.activation);
         for (auto &layer : layers) {
             layer.reserve_working_memory(wm);
         }
