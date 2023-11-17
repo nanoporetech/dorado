@@ -170,9 +170,6 @@ inline void add_internal_arguments(ArgParser& parser) {
     parser.hidden.add_argument("--dump_stats_filter")
             .help("Internal processing stats. name filter regex.")
             .default_value(std::string(""));
-    parser.hidden.add_argument("--devopts")
-            .help("Internal options for testing & debugging, 'key=value' pairs separated by ';'")
-            .default_value(std::string(""));
 }
 
 template <class Options>
@@ -222,6 +219,9 @@ void add_minimap2_arguments(ArgParser& parser, const Options& dflt) {
 }
 
 inline void parse(ArgParser& parser, int argc, const char* const argv[]) {
+    parser.hidden.add_argument("--devopts")
+            .help("Internal options for testing & debugging, 'key=value' pairs separated by ';'")
+            .default_value(std::string(""));
     auto remaining_args = parser.visible.parse_known_args(argc, argv);
     remaining_args.insert(remaining_args.begin(), HIDDEN_PROGRAM_NAME);
     parser.hidden.parse_args(remaining_args);
