@@ -1,4 +1,5 @@
 #pragma once
+#include "utils/barcode_kits.h"
 #include "utils/stats.h"
 #include "utils/types.h"
 
@@ -26,12 +27,11 @@ public:
                                const BarcodingInfo::FilterSet& allowed_barcodes) const;
 
 private:
+    const std::unordered_map<std::string, dorado::barcode_kits::KitInfo> m_custom_kits;
+    const std::unordered_map<std::string, std::string> m_custom_seqs;
     const std::vector<BarcodeCandidateKit> m_barcode_candidates;
 
-    std::vector<BarcodeCandidateKit> generate_candidates(
-            const std::vector<std::string>& kit_names,
-            std::optional<std::string> custom_kit,
-            std::optional<std::string> custom_sequences);
+    std::vector<BarcodeCandidateKit> generate_candidates(const std::vector<std::string>& kit_names);
     std::vector<BarcodeScoreResult> calculate_barcode_score_different_double_ends(
             std::string_view read_seq,
             const BarcodeCandidateKit& candidate,
@@ -48,6 +48,9 @@ private:
                                          const std::vector<BarcodeCandidateKit>& adapter,
                                          bool barcode_both_ends,
                                          const BarcodingInfo::FilterSet& allowed_barcodes) const;
+
+    const dorado::barcode_kits::KitInfo& get_kit_info(const std::string& kit_name) const;
+    const std::string& get_barcode_sequence(const std::string& barcode_name) const;
 };
 
 }  // namespace demux

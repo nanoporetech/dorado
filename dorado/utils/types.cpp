@@ -2,6 +2,7 @@
 
 #include <htslib/sam.h>
 #include <minimap.h>
+#include <spdlog/spdlog.h>
 
 namespace dorado {
 
@@ -12,13 +13,15 @@ std::shared_ptr<const BarcodingInfo> create_barcoding_info(
         BarcodingInfo::FilterSet allowed_barcodes,
         std::optional<std::string> custom_kit,
         std::optional<std::string> custom_seqs) {
-    if (kit_names.empty()) {
+    if (kit_names.empty() && !custom_kit) {
         return {};
     }
 
-    auto result = BarcodingInfo{kit_names[0],          barcode_both_ends,
-                                trim_barcode,          std::move(allowed_barcodes),
-                                std::move(custom_kit), std::move(custom_seqs)};
+    spdlog::info("creating new info");
+    auto result = BarcodingInfo{
+            kit_names.empty() ? "" : kit_names[0], barcode_both_ends,     trim_barcode,
+            std::move(allowed_barcodes),           std::move(custom_kit), std::move(custom_seqs)};
+    spdlog::info("created new info");
     return std::make_shared<const dorado::BarcodingInfo>(std::move(result));
 }
 

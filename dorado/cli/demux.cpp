@@ -165,15 +165,17 @@ int demuxer(int argc, char* argv[]) {
             {}, output_dir, demux_writer_threads, parser.get<bool>("--emit-fastq"),
             std::move(sample_sheet));
 
-    if (parser.is_used("--kit-name")) {
+    if (parser.is_used("--kit-name") || parser.is_used("--barcode-arrangement")) {
         std::vector<std::string> kit_names;
         if (auto names = parser.present<std::vector<std::string>>("--kit-name")) {
             kit_names = std::move(*names);
         }
+        spdlog::info("adding barcode classified node");
         pipeline_desc.add_node<BarcodeClassifierNode>(
                 {demux_writer}, demux_threads, kit_names, parser.get<bool>("--barcode-both-ends"),
                 parser.get<bool>("--no-trim"), std::move(allowed_barcodes), std::move(custom_kit),
                 std::move(custom_seqs));
+        spdlog::info("added barcode classified node");
     }
 
     // Create the Pipeline from our description.

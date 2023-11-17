@@ -3,6 +3,8 @@
 #include "BarcodeClassifier.h"
 #include "utils/types.h"
 
+#include <spdlog/spdlog.h>
+
 #include <cassert>
 
 namespace dorado::demux {

@@ -4,7 +4,6 @@
 #include "demux/Trimmer.h"
 #include "utils/SampleSheet.h"
 #include "utils/bam_utils.h"
-#include "utils/barcode_kits.h"
 #include "utils/trim.h"
 #include "utils/types.h"
 
@@ -51,8 +50,13 @@ BarcodeClassifierNode::BarcodeClassifierNode(int threads,
                                                          barcode_both_ends,
                                                          !no_trim,
                                                          std::move(allowed_barcodes),
-                                                         custom_kit,
-                                                         custom_seqs)) {
+                                                         std::move(custom_kit),
+                                                         std::move(custom_seqs))) {
+    if (m_default_barcoding_info->kit_name.empty()) {
+        spdlog::info("barcode with new kit from {}", *m_default_barcoding_info->custom_kit);
+    } else {
+        spdlog::info("barcode for {}", m_default_barcoding_info->kit_name);
+    }
     start_threads();
 }
 
@@ -115,7 +119,8 @@ std::shared_ptr<const BarcodingInfo> BarcodeClassifierNode::get_barcoding_info(
 }
 
 void BarcodeClassifierNode::barcode(BamPtr& read) {
-    if (!m_default_barcoding_info || m_default_barcoding_info->kit_name.empty()) {
+    if (!m_default_barcoding_info ||
+        (m_default_barcoding_info->kit_name.empty() && !m_default_barcoding_info->custom_kit)) {
         return;
     }
     auto barcoder = m_barcoder_selector.get_barcoder(*m_default_barcoding_info);
