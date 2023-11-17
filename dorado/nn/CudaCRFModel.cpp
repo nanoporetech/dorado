@@ -222,14 +222,12 @@ public:
     }
 
     struct NNTask {
-        NNTask(at::Tensor input_, at::Tensor &output_, int num_chunks_)
-                : input(input_), out(output_), num_chunks(num_chunks_) {}
+        NNTask(at::Tensor input_, at::Tensor &output_) : input(input_), out(output_) {}
         at::Tensor input;
         at::Tensor &out;
         std::mutex mut;
         std::condition_variable cv;
         bool done{false};
-        int num_chunks;
     };
 
     std::vector<DecodedChunk> call_chunks(at::Tensor &input,
@@ -243,7 +241,7 @@ public:
             return std::vector<DecodedChunk>();
         }
 
-        auto task = std::make_shared<NNTask>(input, output, num_chunks);
+        auto task = std::make_shared<NNTask>(input, output);
         {
             std::lock_guard<std::mutex> lock(m_input_lock);
             m_input_queue.push_front(task);
