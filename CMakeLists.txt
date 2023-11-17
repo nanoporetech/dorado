@@ -198,7 +198,8 @@ set(LIB_SOURCE_FILES
     dorado/read_pipeline/FakeDataLoader.h
     dorado/read_pipeline/ReadPipeline.cpp
     dorado/read_pipeline/ReadPipeline.h
-    dorado/read_pipeline/ClientAccess.h
+    dorado/read_pipeline/ClientInfo.h
+    dorado/read_pipeline/DefaultClientInfo.h
     dorado/read_pipeline/ScalerNode.cpp
     dorado/read_pipeline/ScalerNode.h
     dorado/read_pipeline/StereoDuplexEncoderNode.cpp

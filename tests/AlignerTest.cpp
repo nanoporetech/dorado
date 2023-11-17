@@ -2,7 +2,7 @@
 #include "TestUtils.h"
 #include "alignment/Minimap2Aligner.h"
 #include "read_pipeline/AlignerNode.h"
-#include "read_pipeline/ClientAccess.h"
+#include "read_pipeline/ClientInfo.h"
 #include "read_pipeline/HtsReader.h"
 #include "utils/bam_utils.h"
 #include "utils/sequence_utils.h"
@@ -21,11 +21,11 @@ namespace fs = std::filesystem;
 
 namespace {
 
-class TestClientAccess : public dorado::ClientAccess {
+class TestClientInfo : public dorado::ClientInfo {
     const dorado::AlignmentInfo m_align_info;
 
 public:
-    TestClientAccess(dorado::AlignmentInfo align_info) : m_align_info(std::move(align_info)) {}
+    TestClientInfo(dorado::AlignmentInfo align_info) : m_align_info(std::move(align_info)) {}
 
     int32_t client_id() const override { return 1; }
 
@@ -242,8 +242,8 @@ SCENARIO("AlignerNode push SimplexRead", TEST_GROUP) {
 
         AND_GIVEN("client with no alignment requirements") {
             const std::string read_id{"aligner_node_test_simplex"};
-            auto client_without_align = std::make_shared<TestClientAccess>(dorado::AlignmentInfo{});
-            read_common.client_access = client_without_align;
+            auto client_without_align = std::make_shared<TestClientInfo>(dorado::AlignmentInfo{});
+            read_common.client_info = client_without_align;
 
             WHEN("push simplex read to pipeline") {
                 read_common.seq = "ACGTACGTACGTACGT";
@@ -286,8 +286,8 @@ SCENARIO("AlignerNode push SimplexRead", TEST_GROUP) {
         }
 
         AND_GIVEN("client requiring alignment") {
-            auto client_requiring_alignment = std::make_shared<TestClientAccess>(loaded_align_info);
-            read_common.client_access = client_requiring_alignment;
+            auto client_requiring_alignment = std::make_shared<TestClientInfo>(loaded_align_info);
+            read_common.client_info = client_requiring_alignment;
 
             WHEN("push simplex read with no alignment matches to pipeline") {
                 read_common.seq = "ACGTACGTACGTACGT";
