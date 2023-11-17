@@ -459,7 +459,7 @@ struct LinearCRFImpl : Module {
         if (wm.layout != TensorLayout::NTC) {
             wm.next_TC(wm.T, wm.C, TensorLayout::NTC);
         }
-        wm.next_TC(wm.T, linear->weight.size(0), TensorLayout::NTC);
+        wm.next_TC(wm.T, int(linear->weight.size(0)), TensorLayout::NTC);
     }
     void run_koi(WorkingMemory &wm) {
         utils::ScopedProfileRange spr("linear", 2);
@@ -470,14 +470,16 @@ struct LinearCRFImpl : Module {
             auto out = wm.next_TC(wm.T, wm.C, TensorLayout::NTC);
             if (in.dtype() == torch::kI8) {
                 utils::ScopedProfileRange spr_convert("convert_to_f16_ntc", 3);
-                host_convert(stream, in.data_ptr(), in.stride(0), in.stride(1), in.stride(2),
-                             KOI_I8, out.data_ptr(), out.stride(0), out.stride(1), out.stride(2),
-                             KOI_F16, in.size(0), in.size(1), in.size(2));
+                host_convert(stream, in.data_ptr(), int(in.stride(0)), int(in.stride(1)),
+                             int(in.stride(2)), KOI_I8, out.data_ptr(), int(out.stride(0)),
+                             int(out.stride(1)), int(out.stride(2)), KOI_F16, int(in.size(0)),
+                             int(in.size(1)), int(in.size(2)));
             } else {
                 utils::ScopedProfileRange spr_convert("transpose_to_ntc", 3);
-                host_transpose_f16(stream, in.data_ptr(), in.size(0), in.size(1), in.size(2),
-                                   in.stride(0), in.stride(1), in.stride(2), out.stride(0),
-                                   out.stride(1), out.stride(2), out.data_ptr());
+                host_transpose_f16(stream, in.data_ptr(), int(in.size(0)), int(in.size(1)),
+                                   int(in.size(2)), int(in.stride(0)), int(in.stride(1)),
+                                   int(in.stride(2)), int(out.stride(0)), int(out.stride(1)),
+                                   int(out.stride(2)), out.data_ptr());
             }
         }
 
@@ -798,7 +800,7 @@ struct CRFModelImpl : Module {
         c10::cuda::CUDAGuard device_guard(in.device());
 
         // Determine working memory size
-        WorkingMemory wm(in.size(0));
+        WorkingMemory wm(int(in.size(0)));
         wm.next_TC(int(in.size(2)), int(in.size(1)), TensorLayout::NTC);
         convs->reserve_working_memory(wm);
         rnns->reserve_working_memory(wm);
