@@ -166,7 +166,7 @@ std::vector<std::unique_ptr<dorado::ModBaseRunner>> create_modbase_runners(
         for (int i = 0; i < remora_callers; ++i) {
             auto caller = dorado::create_modbase_caller(remora_model_list, int(remora_batch_size),
                                                         device_string);
-            for (size_t i = 0; i < remora_runners_per_caller; i++) {
+            for (size_t j = 0; j < remora_runners_per_caller; j++) {
                 remora_runners.push_back(std::make_unique<dorado::ModBaseRunner>(caller));
             }
         }

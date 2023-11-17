@@ -661,7 +661,6 @@ private:
                 device_weights.push_back(weights_cpu_cutlass.contiguous().to(in.device()));
             }
 
-            auto in = wm.current;
             host_cutlass_lstm(stream, type_id, layer_idx, batch_size, layer_size, chunk_size,
                               reverse ? -1 : 1, int(in.stride(1)), in.data_ptr(),
                               device_weights[layer_idx].data_ptr(),

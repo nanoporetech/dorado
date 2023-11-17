@@ -305,7 +305,6 @@ BasecallerNode::BasecallerNode(std::vector<Runner> model_runners,
                                std::string model_name,
                                size_t max_reads,
                                const std::string &node_name,
-                               bool in_duplex_pipeline,
                                uint32_t read_mean_qscore_start_pos)
         : MessageSink(max_reads),
           m_model_runners(std::move(model_runners)),

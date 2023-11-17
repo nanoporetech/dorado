@@ -26,12 +26,11 @@ public:
                    std::string model_name = "",
                    size_t max_reads = 1000,
                    const std::string& node_name = "BasecallerNode",
-                   bool in_duplex_pipeline = false,
                    uint32_t read_mean_qscore_start_pos = 0);
     ~BasecallerNode();
     std::string get_name() const override { return m_node_name; }
     stats::NamedStats sample_stats() const override;
-    void terminate(const FlushOptions& flush_options) override { terminate_impl(); }
+    void terminate(const FlushOptions&) override { terminate_impl(); }
     void restart() override;
 
 private:

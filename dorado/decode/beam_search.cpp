@@ -235,7 +235,7 @@ float beam_search(const T* const scores,
             for (int new_base = 0; new_base < NUM_BASES; new_base++) {
                 state_t new_state =
                         (state_t((previous_element.state << NUM_BASE_BITS) & states_mask) |
-                         new_base);
+                         state_t(new_base));
                 const auto move_idx = static_cast<state_t>(
                         (new_state << NUM_BASE_BITS) +
                         (((previous_element.state << NUM_BASE_BITS) >> num_state_bits)));

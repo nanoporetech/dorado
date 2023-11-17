@@ -15,7 +15,7 @@
 
 namespace dorado {
 
-HtsWriter::HtsWriter(const std::string& filename, OutputMode mode, size_t threads, size_t num_reads)
+HtsWriter::HtsWriter(const std::string& filename, OutputMode mode, size_t threads)
         : MessageSink(10000) {
     switch (mode) {
     case OutputMode::FASTQ:

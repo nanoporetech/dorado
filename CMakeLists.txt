@@ -33,12 +33,12 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 function(enable_warnings_as_errors TARGET_NAME)
     if(WIN32)
-        # W3 - warning level 3.
+        # W4 - warning level 4.
         # WX - warnings as errors.
         # external:anglebrackets - treat <header> includes as external.
         # external:W0 - disable warnings for external code.
         target_compile_options(${TARGET_NAME} PRIVATE
-          $<$<NOT:$<COMPILE_LANGUAGE:CUDA>>:/W3 /WX /external:anglebrackets /external:W0>
+          $<$<NOT:$<COMPILE_LANGUAGE:CUDA>>:/W4 /WX /external:anglebrackets /external:W0>
         )
         target_compile_definitions(${TARGET_NAME} PRIVATE
             _CRT_SECURE_NO_WARNINGS
