@@ -292,14 +292,14 @@ struct ConvStackImpl : Module {
     explicit ConvStackImpl(const std::vector<ConvParams> &layer_params) {
         for (size_t i = 0; i < layer_params.size(); ++i) {
             auto &layer = layers.emplace_back(layer_params[i]);
-            auto opts = Conv1dOptions(layer.insize, layer.size, layer.winlen)
-                                .stride(layer.stride)
-                                .padding(layer.winlen / 2);
+            auto opts = Conv1dOptions(layer.params.insize, layer.params.size, layer.params.winlen)
+                                .stride(layer.params.stride)
+                                .padding(layer.params.winlen / 2);
             layer.conv = register_module(std::string("conv") + std::to_string(i + 1), Conv1d(opts));
         }
 #if USE_KOI
         auto &last = layers.back();
-        last.output_layout = get_koi_lstm_input_layout(last.size, last.activation);
+        last.output_layout = get_koi_lstm_input_layout(last.params.size, last.params.activation);
 #endif  // if USE_KOI
     }
 
@@ -322,11 +322,11 @@ struct ConvStackImpl : Module {
         for (auto &layer : layers) {
             utils::ScopedProfileRange spr("conv", 2);
             x = layer.conv(x);
-            if (layer.activation == Activation::SWISH) {
+            if (layer.params.activation == Activation::SWISH) {
                 torch::silu_(x);
-            } else if (layer.activation == Activation::SWISH_CLAMP) {
+            } else if (layer.params.activation == Activation::SWISH_CLAMP) {
                 torch::silu_(x).clamp_(c10::nullopt, 3.5f);
-            } else if (layer.activation == Activation::TANH) {
+            } else if (layer.params.activation == Activation::TANH) {
                 x.tanh_();
             } else {
                 throw std::logic_error("Unrecognised activation function id.");
@@ -336,9 +336,9 @@ struct ConvStackImpl : Module {
         return x.transpose(1, 2);
     }
 
-    struct ConvLayer : public ConvParams {
-        ConvLayer(const ConvParams &params) : ConvParams(params) {}
-
+    struct ConvLayer {
+        explicit ConvLayer(const ConvParams &params) : params(params) {}
+        const ConvParams params;
         Conv1d conv{nullptr};
 #if USE_KOI
         TensorLayout output_layout{TensorLayout::NTC};
@@ -348,16 +348,18 @@ struct ConvStackImpl : Module {
         void reserve_working_memory(WorkingMemory &wm) {
             assert(wm.layout == TensorLayout::NTC);
             const int T_in = wm.T;
-            const int T_out = T_in / stride;
-            if (output_layout == TensorLayout::NTC && size > 16) {
-                wm.next_TC(T_out, winlen * insize, TensorLayout::NTC);
+            const int T_out = T_in / params.stride;
+            const int C_in = wm.C;
+            const int C_out = params.size;
+            if (output_layout == TensorLayout::NTC && C_out > 16) {
+                wm.next_TC(T_out, params.winlen * C_in, TensorLayout::NTC);
             } else if (output_layout != TensorLayout::NTC) {
-                wm.next_TC(T_out, winlen * insize, TensorLayout::TNC);
+                wm.next_TC(T_out, params.winlen * C_in, TensorLayout::TNC);
                 if (output_layout == TensorLayout::CUTLASS_TNC_I8) {
-                    wm.next_TC(T_out, size, TensorLayout::TNC);
+                    wm.next_TC(T_out, C_out, TensorLayout::TNC);
                 }
             }
-            wm.next_TC(T_out, size, output_layout);
+            wm.next_TC(T_out, C_out, output_layout);
         }
 
         void run_koi(WorkingMemory &wm) {
@@ -366,57 +368,59 @@ struct ConvStackImpl : Module {
 
             auto in = wm.current;
             assert(wm.layout == TensorLayout::NTC);
-            int T_in = wm.T;
-            int T_out = T_in / stride;
+            const int T_in = wm.T;
+            const int T_out = T_in / params.stride;
+            const int C_in = wm.C;
+            const int C_out = params.size;
 
             if (!w_device.defined()) {
+                auto opts = in.options().dtype(torch::kF16);
                 // conv->weight is [C_out, C_in, W], we want [W, C_in, C_out]
-                w_device = conv->weight.permute({2, 1, 0})
-                                   .contiguous()
-                                   .to(in.options())
-                                   .view({winlen * insize, size});
-                b_device = conv->bias.to(in.options());
+                w_device = conv->weight.permute({2, 1, 0}).contiguous().flatten(0, 1).to(opts);
+                b_device = conv->bias.to(opts);
             }
 
-            if (output_layout == TensorLayout::NTC && size <= 16) {
-                auto out = wm.next_TC(T_out, size, output_layout);
-                if (host_convolution_f16(stream, wm.N, insize, size, T_in, winlen, stride,
-                                         winlen / 2, in.data_ptr(), out.data_ptr(),
-                                         w_device.data_ptr(), b_device.data_ptr(),
-                                         get_koi_activation(activation))) {
+            if (output_layout == TensorLayout::NTC && C_out <= 16) {
+                auto out = wm.next_TC(T_out, C_out, output_layout);
+                if (host_convolution_f16(stream, wm.N, C_in, C_out, T_in, params.winlen,
+                                         params.stride, params.winlen / 2, in.data_ptr(),
+                                         out.data_ptr(), w_device.data_ptr(), b_device.data_ptr(),
+                                         get_koi_activation(params.activation))) {
                     throw std::runtime_error(std::string("Koi convolution failed with in size ") +
-                                             std::to_string(insize));
+                                             std::to_string(params.insize));
                 }
             } else {
                 // The window tensor is either NTC or TNC, depending on whether the first two
                 // dimensions of the output layout are NT or TN.
                 bool is_NT = (output_layout == TensorLayout::NTC);
-                wm.next_TC(T_out, winlen * insize, is_NT ? TensorLayout::NTC : TensorLayout::TNC);
+                wm.next_TC(T_out, params.winlen * C_in,
+                           is_NT ? TensorLayout::NTC : TensorLayout::TNC);
                 auto window_mat = wm.get_current_NTC_view();
-                host_window_ntwc_f16(stream, wm.N, T_in, insize, winlen, stride,
+                host_window_ntwc_f16(stream, wm.N, T_in, C_in, params.winlen, params.stride,
                                      int(window_mat.stride(0)), int(window_mat.stride(1)),
                                      in.data_ptr(), window_mat.data_ptr());
 
                 auto mm_in = wm.current.flatten(0, 1);
                 at::Tensor mm_out;
                 if (output_layout == TensorLayout::NTC) {
-                    mm_out = wm.next_TC(T_out, size, output_layout);
+                    mm_out = wm.next_TC(T_out, C_out, output_layout);
                 } else if (output_layout == TensorLayout::CUTLASS_TNC_I8) {
-                    mm_out = wm.next_TC(T_out, size, TensorLayout::TNC);
+                    mm_out = wm.next_TC(T_out, C_out, TensorLayout::TNC);
                 } else {
-                    wm.next_TC(T_out, size, output_layout);
+                    wm.next_TC(T_out, C_out, output_layout);
                     mm_out = wm.get_current_NTC_view().transpose(0, 1);
                 }
 
-                mm_out = mm_out.view({-1, size});
+                mm_out = mm_out.view({-1, C_out});
                 dorado::utils::matmul_f16(mm_in, w_device, mm_out);
-                host_bias_activation_f16_inplace(
-                        stream, int(mm_out.size(0)), int(mm_out.size(1)), int(mm_out.stride(0)),
-                        mm_out.data_ptr(), b_device.data_ptr(), get_koi_activation(activation));
+                host_bias_activation_f16_inplace(stream, int(mm_out.size(0)), int(mm_out.size(1)),
+                                                 int(mm_out.stride(0)), mm_out.data_ptr(),
+                                                 b_device.data_ptr(),
+                                                 get_koi_activation(params.activation));
 
                 if (output_layout == TensorLayout::CUTLASS_TNC_I8) {
-                    wm.next_TC(T_out, size, output_layout);
-                    auto conv_out = wm.get_current_NTC_view().transpose(0, 1).view({-1, size});
+                    wm.next_TC(T_out, C_out, output_layout);
+                    auto conv_out = wm.get_current_NTC_view().transpose(0, 1).view({-1, C_out});
                     host_convert(stream, mm_out.data_ptr(), 0, int(mm_out.stride(0)),
                                  int(mm_out.stride(1)), KOI_F16, conv_out.data_ptr(), 0,
                                  int(conv_out.stride(0)), int(conv_out.stride(1)), KOI_I8, 1,
