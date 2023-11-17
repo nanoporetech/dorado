@@ -175,7 +175,7 @@ void copy_tensor_elems(at::Tensor& dest_tensor,
     }
 }
 
-std::pair<at::Tensor, at::Tensor> quantize_tensor(at::Tensor tensor) {
+std::pair<at::Tensor, at::Tensor> quantize_tensor(const at::Tensor& tensor) {
     auto fp_range = tensor.abs().amax(0);
     constexpr int levels = 256;
     auto quant_scale = (levels / 2) / fp_range;

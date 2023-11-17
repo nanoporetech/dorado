@@ -41,6 +41,6 @@ void copy_tensor_elems(at::Tensor& dest_tensor,
 // `scales` is the same size as `tensor` with dimension 0 dropped, dtype float
 // `quantized_tensor` is the same size as `tensor`, dtype int8
 // such that `quantized_tensor / scales ~= tensor`
-std::pair<at::Tensor, at::Tensor> quantize_tensor(at::Tensor tensor);
+std::pair<at::Tensor, at::Tensor> quantize_tensor(const at::Tensor& tensor);
 
 }  // namespace dorado::utils
