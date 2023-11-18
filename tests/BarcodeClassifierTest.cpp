@@ -362,3 +362,33 @@ TEST_CASE("BarcodeClassifierNode: test reads where trim length == read length", 
     // We don't expect any trimming to happen, so the original and final sequence must match.
     CHECK(seq == orig_seq);
 }
+
+TEST_CASE("BarcodeClassifier: test custom kit with double ended barcode", TEST_GROUP) {
+    fs::path data_dir = fs::path(get_data_dir("barcode_demux/double_end"));
+    fs::path kit_file = fs::path(get_data_dir("barcode_demux/custom_barcodes")) / "RPB004.toml";
+
+    demux::BarcodeClassifier classifier({}, kit_file.string(), std::nullopt);
+
+    for (std::string bc :
+         {"SQK-RPB004_BC01", "SQK-RPB004_BC05", "SQK-RPB004_BC11", "unclassified"}) {
+        auto bc_file = data_dir / (bc + ".fastq");
+        HtsReader reader(bc_file.string());
+        while (reader.read()) {
+            auto seqlen = reader.record->core.l_qseq;
+            std::string seq = utils::extract_sequence(reader.record.get());
+            auto res = classifier.barcode(seq, false, std::nullopt);
+            if (res.barcode_name == "unclassified") {
+                CHECK(bc == res.barcode_name);
+            } else {
+                CHECK(bc == (res.kit + "_" + res.barcode_name));
+                CHECK(res.top_barcode_pos.second > res.top_barcode_pos.first);
+                CHECK(res.bottom_barcode_pos.second > res.bottom_barcode_pos.first);
+                CHECK(res.top_barcode_pos.first >= 0);
+                CHECK(res.top_barcode_pos.second <= seqlen);
+                CHECK(res.bottom_barcode_pos.first >= 0);
+                CHECK(res.bottom_barcode_pos.second <= seqlen);
+                CHECK(res.top_barcode_pos.second < res.bottom_barcode_pos.first);
+            }
+        }
+    }
+}

@@ -17,11 +17,9 @@ std::shared_ptr<const BarcodingInfo> create_barcoding_info(
         return {};
     }
 
-    spdlog::info("creating new info");
     auto result = BarcodingInfo{
             kit_names.empty() ? "" : kit_names[0], barcode_both_ends,     trim_barcode,
             std::move(allowed_barcodes),           std::move(custom_kit), std::move(custom_seqs)};
-    spdlog::info("created new info");
     return std::make_shared<const dorado::BarcodingInfo>(std::move(result));
 }
 

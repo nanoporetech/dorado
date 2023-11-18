@@ -53,9 +53,9 @@ BarcodeClassifierNode::BarcodeClassifierNode(int threads,
                                                          std::move(custom_kit),
                                                          std::move(custom_seqs))) {
     if (m_default_barcoding_info->kit_name.empty()) {
-        spdlog::info("barcode with new kit from {}", *m_default_barcoding_info->custom_kit);
+        spdlog::debug("Barcode with new kit from {}", *m_default_barcoding_info->custom_kit);
     } else {
-        spdlog::info("barcode for {}", m_default_barcoding_info->kit_name);
+        spdlog::info("Barcode for {}", m_default_barcoding_info->kit_name);
     }
     start_threads();
 }

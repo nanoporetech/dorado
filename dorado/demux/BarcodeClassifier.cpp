@@ -199,8 +199,6 @@ const std::string& BarcodeClassifier::get_barcode_sequence(const std::string& ba
 // input read sequence against.
 std::vector<BarcodeClassifier::BarcodeCandidateKit> BarcodeClassifier::generate_candidates(
         const std::vector<std::string>& kit_names) {
-    spdlog::info("Start barcoding");
-
     std::vector<BarcodeCandidateKit> candidates_list;
 
     const auto& kit_info_map = barcode_kits::get_kit_infos();
@@ -249,7 +247,7 @@ std::vector<BarcodeClassifier::BarcodeCandidateKit> BarcodeClassifier::generate_
                                            utils::reverse_complement(kit_info.bottom_front_flank);
         }
 
-        for (int idx = 0; idx < kit_info.barcodes.size(); idx++) {
+        for (size_t idx = 0; idx < kit_info.barcodes.size(); idx++) {
             const auto& bc_name = kit_info.barcodes[idx];
             const auto& barcode1 = get_barcode_sequence(bc_name);
             auto barcode1_rev = utils::reverse_complement(barcode1);
