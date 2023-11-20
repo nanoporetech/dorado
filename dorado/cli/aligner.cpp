@@ -110,9 +110,15 @@ int aligner(int argc, char* argv[]) {
     auto header = sam_hdr_dup(reader.header);
     add_pg_hdr(header);
 
+    auto output_mode = HtsWriter::OutputMode::BAM;
+    if (utils::is_fd_tty(stdout)) {
+        output_mode = HtsWriter::OutputMode::SAM;
+    } else if (utils::is_fd_pipe(stdout)) {
+        output_mode = HtsWriter::OutputMode::UBAM;
+    }
+
     PipelineDescriptor pipeline_desc;
-    auto hts_writer =
-            pipeline_desc.add_node<HtsWriter>({}, "-", HtsWriter::OutputMode::BAM, writer_threads);
+    auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, "-", output_mode, writer_threads);
     auto aligner =
             pipeline_desc.add_node<AlignerNode>({hts_writer}, index, options, aligner_threads);
 
