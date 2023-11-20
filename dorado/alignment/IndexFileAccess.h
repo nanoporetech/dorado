@@ -21,9 +21,14 @@ class IndexFileAccess {
                                                   const Minimap2IndexOptions& options);
 
 public:
+    bool validate_options(const Minimap2Options& options);
+
     IndexLoadResult load_index(const std::string& file,
                                const Minimap2Options& options,
                                int num_threads);
+
+    // Testability. Method needed to support utests
+    bool is_index_loaded(const std::string& file, const Minimap2Options& options);
 
     // N.B. By contract load_index must be called prior to calling get_index.
     // i.e. will not return nullptr, there will be an assertion failure if load_index

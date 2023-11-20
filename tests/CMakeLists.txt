@@ -15,6 +15,7 @@ set(UNIT_TEST_SOURCE_FILES
     DuplexReadTaggingNodeTest.cpp
     DuplexSplitTest.cpp
     Fast5DataLoaderTest.cpp
+    IndexFileAccessTest.cpp
     MathUtilsTest.cpp
     Minimap2IndexTest.cpp
     ModBaseEncoderTest.cpp
