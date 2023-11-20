@@ -108,6 +108,8 @@ std::pair<std::vector<dorado::Runner>, size_t> create_basecall_runners(
         }
     }
 #endif  // __APPLE__
+#else   // DORADO_GPU_BUILD
+    (void)num_gpu_runners;
 #endif  // DORADO_GPU_BUILD
 
 #ifndef NDEBUG
