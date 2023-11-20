@@ -497,7 +497,6 @@ struct LinearCRFImpl : Module {
             }
             dorado::utils::matmul_f16(in.view({-1, C_in}), w_device, out_2D);
             if (activation) {
-                auto stream = at::cuda::getCurrentCUDAStream().stream();
                 host_bias_activation_f16_inplace(stream, wm.T * wm.N, C_out, C_out,
                                                  out_2D.data_ptr(), linear->bias.data_ptr(),
                                                  KOI_TANH_X5);
@@ -513,9 +512,9 @@ struct LinearCRFImpl : Module {
                     w_device = linear->weight.contiguous().to(in_ntc.options());
                     weight_scale = torch::ones_like(linear->bias);
                 } else {
-                    auto [scale, quantized] = dorado::utils::quantize_tensor(linear->weight.t());
-                    weight_scale = scale.to(torch::kF16).to(in_ntc.device());
-                    w_device = quantized.t().contiguous().to(in_ntc.device());
+                    auto [quant_scale, quant] = dorado::utils::quantize_tensor(linear->weight.t());
+                    weight_scale = quant_scale.to(torch::kF16).to(in_ntc.device());
+                    w_device = quant.t().contiguous().to(in_ntc.device());
                 }
             }
             host_linear_ntc(stream, type_id, activation ? KOI_TANH_X5 : KOI_IDENTITY, KOI_F16, wm.N,
