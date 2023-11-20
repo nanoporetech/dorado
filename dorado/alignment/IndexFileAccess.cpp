@@ -48,7 +48,7 @@ bool IndexFileAccess::is_index_loaded(const std::string& file, const Minimap2Opt
     return get_index_impl(file, options) != nullptr;
 }
 
-bool IndexFileAccess::validate_options(const Minimap2Options& options) {
+bool validate_options(const Minimap2Options& options) {
     Minimap2Index index{};
     return index.initialise(options);
 }

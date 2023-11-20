@@ -21,8 +21,6 @@ class IndexFileAccess {
                                                   const Minimap2IndexOptions& options);
 
 public:
-    bool validate_options(const Minimap2Options& options);
-
     IndexLoadResult load_index(const std::string& file,
                                const Minimap2Options& options,
                                int num_threads);
@@ -36,5 +34,7 @@ public:
     std::shared_ptr<const Minimap2Index> get_index(const std::string& file,
                                                    const Minimap2IndexOptions& options);
 };
+
+bool validate_options(const Minimap2Options& options);
 
 }  // namespace dorado::alignment

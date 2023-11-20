@@ -100,15 +100,11 @@ SCENARIO(TEST_GROUP " Load and retrieve index files", TEST_GROUP) {
 }
 
 TEST_CASE(TEST_GROUP " validate_options with invalid options returns false", TEST_GROUP) {
-    IndexFileAccess cut{};
-
-    REQUIRE_FALSE(cut.validate_options(invalid_options()));
+    REQUIRE_FALSE(validate_options(invalid_options()));
 }
 
 TEST_CASE(TEST_GROUP " validate_options with default options returns true", TEST_GROUP) {
-    IndexFileAccess cut{};
-
-    REQUIRE(cut.validate_options(dflt_options));
+    REQUIRE(validate_options(dflt_options));
 }
 
 }  // namespace dorado::alignment::index_file_access
