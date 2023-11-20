@@ -26,6 +26,11 @@ std::vector<uint64_t> moves_to_map(const std::vector<uint8_t>& moves,
 // Compute cumulative sums of the move table
 std::vector<uint64_t> move_cum_sums(const std::vector<uint8_t>& moves);
 
+// Result of overlapping two reads
+using OverlapResult = std::tuple<bool, uint32_t, uint32_t, uint32_t, uint32_t>;
+
+OverlapResult compute_overlap(std::string query_seq, std::string target_seq);
+
 // Compute reverse complement of a nucleotide sequence.
 // Bases are specified as capital letters.
 // Undefined output if characters other than A, C, G, T appear.
@@ -39,4 +44,7 @@ public:
 
 int count_trailing_chars(const std::string_view adapter, char c);
 
+std::vector<uint8_t> realign_moves(std::string query_sequence,
+                                   std::string target_sequence,
+                                   std::vector<uint8_t> moves);
 }  // namespace dorado::utils

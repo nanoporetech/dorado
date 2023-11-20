@@ -1,12 +1,16 @@
 #include "sequence_utils.h"
 
 #include "simd.h"
+#include "types.h"
 
+#include <edlib.h>
+#include <minimap.h>
 #include <nvtx3/nvtx3.hpp>
 
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <iostream>
 #include <iterator>
 #include <numeric>
 #include <vector>
@@ -180,6 +184,94 @@ std::vector<uint64_t> moves_to_map(const std::vector<uint8_t>& moves,
     }
     seq_to_sig_map.push_back(signal_len);
     return seq_to_sig_map;
+}
+
+OverlapResult compute_overlap(std::string query_seq, std::string target_seq) {
+    OverlapResult overlap_result = {false, 0, 0, 0, 0};
+
+    // Add mm2 based overlap check.
+    mm_idxopt_t m_idx_opt;
+    mm_mapopt_t m_map_opt;
+    mm_set_opt(0, &m_idx_opt, &m_map_opt);
+    mm_set_opt("map-hifi", &m_idx_opt, &m_map_opt);
+
+    std::vector<const char*> seqs = {query_seq.c_str()};
+    std::vector<const char*> names = {"query"};
+    mm_idx_t* m_index = mm_idx_str(m_idx_opt.w, m_idx_opt.k, 0, m_idx_opt.bucket_bits, 1,
+                                   seqs.data(), names.data());
+    mm_mapopt_update(&m_map_opt, m_index);
+
+    MmTbufPtr mbuf = MmTbufPtr(mm_tbuf_init());
+
+    int hits = 0;
+    mm_reg1_t* reg = mm_map(m_index, int(target_seq.length()), target_seq.c_str(), &hits,
+                            mbuf.get(), &m_map_opt, "target");
+
+    mm_idx_destroy(m_index);
+
+    if (hits > 0) {
+        int32_t target_start = 0;
+        int32_t target_end = 0;
+        int32_t query_start = 0;
+        int32_t query_end = 0;
+
+        auto best_map = std::max_element(
+                reg, reg + hits,
+                [](const mm_reg1_t& l, const mm_reg1_t& r) { return l.mapq < r.mapq; });
+        target_start = best_map->rs;
+        target_end = best_map->re;
+        query_start = best_map->qs;
+        query_end = best_map->qe;
+
+        overlap_result = {true, target_start, target_end, query_start, query_end};
+    }
+
+    for (int i = 0; i < hits; ++i) {
+        free(reg[i].p);
+    }
+    free(reg);
+
+    return overlap_result;
+}
+
+std::vector<uint8_t> realign_moves(std::string query_sequence,
+                                   std::string target_sequence,
+                                   std::vector<uint8_t> moves) {
+    //Initially let's just spread the moves evenly, we can come back to this later
+    std::vector<uint8_t> new_moves;
+    int num_moves = std::accumulate(moves.begin(), moves.end(), 0);
+    int input_seq_size = query_sequence.size();
+    int target_seq_size = target_sequence.size();
+    std::cerr << num_moves;
+    std::cerr << input_seq_size;
+    std::cerr << target_seq_size;
+
+    auto [is_overlap, query_start, query_end, target_start, target_end] = compute_overlap(
+            query_sequence,
+            target_sequence);  // We are going to compute the overlap between the two reads
+
+    // Now let's perform an alignmnet:
+
+    EdlibAlignConfig align_config = edlibDefaultAlignConfig();
+    align_config.task = EDLIB_TASK_PATH;
+
+    auto target_sequence_component =
+            target_sequence.substr(target_start, target_end - target_start);
+    auto query_sequence_component = query_sequence.substr(query_start, query_end - query_start);
+
+    EdlibAlignResult edlib_result = edlibAlign(
+            target_sequence_component.data(), static_cast<int>(target_sequence_component.length()),
+            query_sequence_component.data(), static_cast<int>(query_sequence_component.length()),
+            align_config);
+
+    std::cerr << "TSC:" << target_sequence_component << std::endl;
+    std::cerr << "QSC:" << query_sequence_component << std::endl;
+
+    // Now that we have the alignment, we need to compute the new move table, by walking along the alignment
+
+    edlibFreeAlignResult(edlib_result);
+
+    return new_moves;
 }
 
 std::vector<uint64_t> move_cum_sums(const std::vector<uint8_t>& moves) {

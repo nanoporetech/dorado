@@ -143,7 +143,51 @@ void ModBaseCallerNode::init_modbase_info() {
 }
 
 void ModBaseCallerNode::duplex_mod_call(Message message) {
-    send_message_to_sink(std::move(message));
+    // Let's do this only for the template strand for now.
+
+    auto read = std::get<DuplexReadPtr>(std::move(message));
+    stats::Timer timer;
+
+    {
+        nvtx3::scoped_range range{"base_mod_probs_init"};
+        // initialize base_mod_probs _before_ we start handing out chunks
+        read->read_common.base_mod_probs.resize(read->read_common.seq.size() * m_num_states, 0);
+        for (size_t i = 0; i < read->read_common.seq.size(); ++i) {
+            // Initialize for what corresponds to 100% canonical base for each position.
+            int base_id = utils::BaseInfo::BASE_IDS[read->read_common.seq[i]];
+            if (base_id < 0) {
+                throw std::runtime_error("Invalid character in sequence.");
+            }
+            read->read_common.base_mod_probs[i * m_num_states + m_base_prob_offsets[base_id]] = 1;
+        }
+    }
+
+    read->read_common.mod_base_info = m_mod_base_info;
+
+    auto working_read = std::make_shared<WorkingRead>();
+    working_read->num_modbase_chunks = 0;
+    working_read->num_modbase_chunks_called = 0;
+
+    std::vector<int> sequence_ints = utils::sequence_to_ints(read->read_common.seq);
+
+    // all runners have the same set of callers, so we only need to use the first one
+    auto& runner = m_runners[0];
+    std::vector<std::vector<std::unique_ptr<RemoraChunk>>> chunks_to_enqueue_by_caller(
+            runner->num_callers());
+
+    for (size_t caller_id = 0; caller_id < runner->num_callers(); ++caller_id) {
+        nvtx3::scoped_range range{"generate_chunks"};
+
+        //auto signal_len = read->stereo_feature_inputs.template_signal.size(0);
+
+        std::vector<uint8_t> template_moves = utils::realign_moves(
+                read->stereo_feature_inputs.template_seq, read->read_common.seq,
+                read->stereo_feature_inputs.template_moves);
+        // Next - build the sig to seq map.
+        // What we need first is a new moves table for the template to the duplex read.
+    }
+
+    send_message_to_sink(std::move(read));
 }
 
 void ModBaseCallerNode::simplex_mod_call(Message message) {
