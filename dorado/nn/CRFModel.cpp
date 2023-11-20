@@ -474,6 +474,7 @@ struct LinearCRFImpl : Module {
         auto type_id = (wm.layout == TensorLayout::CUTLASS_TNC_I8) ? KOI_I8 : KOI_F16;
         int C_in = wm.C;
         int C_out = int(linear->weight.size(0));
+        void *bias_ptr = bias ? linear->bias.data_ptr() : nullptr;
 
         bool use_torch = utils::get_dev_opt<bool>("torch_linear", false) || !koi_can_use_cutlass();
         if (use_torch || (wm.layout == TensorLayout::NTC && !activation)) {
@@ -498,8 +499,7 @@ struct LinearCRFImpl : Module {
             dorado::utils::matmul_f16(in.view({-1, C_in}), w_device, out_2D);
             if (activation) {
                 host_bias_activation_f16_inplace(stream, wm.T * wm.N, C_out, C_out,
-                                                 out_2D.data_ptr(), linear->bias.data_ptr(),
-                                                 KOI_TANH_X5);
+                                                 out_2D.data_ptr(), bias_ptr, KOI_TANH_X5);
             } else if (bias) {
                 out_2D += linear->bias;
             }
@@ -510,7 +510,6 @@ struct LinearCRFImpl : Module {
             if (!w_device.defined()) {
                 if (type_id == KOI_F16) {
                     w_device = linear->weight.contiguous().to(in_ntc.options());
-                    weight_scale = torch::ones_like(linear->bias);
                 } else {
                     auto [quant_scale, quant] = dorado::utils::quantize_tensor(linear->weight.t());
                     weight_scale = quant_scale.to(torch::kF16).to(in_ntc.device());
@@ -520,7 +519,7 @@ struct LinearCRFImpl : Module {
             host_linear_ntc(stream, type_id, activation ? KOI_TANH_X5 : KOI_IDENTITY, KOI_F16, wm.N,
                             wm.T, C_in, C_out, int(in_ntc.stride(0)), int(in_ntc.stride(1)),
                             in_ntc.data_ptr(), w_device.data_ptr(), out.data_ptr(),
-                            weight_scale.data_ptr(), linear->bias.data_ptr());
+                            weight_scale.defined() ? weight_scale.data_ptr() : nullptr, bias_ptr);
         }
     }
 
