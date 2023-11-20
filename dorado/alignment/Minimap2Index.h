@@ -6,6 +6,7 @@
 #include <minimap.h>
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 
@@ -18,8 +19,8 @@ class Minimap2Index {
     using IndexPtr = std::unique_ptr<mm_idx_t, IndexDeleter>;
 
     IndexPtr m_index;
-    mm_idxopt_t m_index_options{};
-    mm_mapopt_t m_mapping_options{};
+    std::optional<mm_idxopt_t> m_index_options{};
+    std::optional<mm_mapopt_t> m_mapping_options{};
 
     void set_index_options(const Minimap2IndexOptions& index_options);
     void set_mapping_options(const Minimap2MappingOptions& mapping_options);
@@ -29,13 +30,11 @@ class Minimap2Index {
 
 public:
     bool initialise(const Minimap2Options& options);
-    IndexLoadResult load(const std::string& index_file,
-                         const Minimap2Options& options,
-                         int num_threads);
+    IndexLoadResult load(const std::string& index_file, int num_threads);
 
     const mm_idx_t* index() const { return m_index.get(); }
-    const mm_idxopt_t& index_options() const { return m_index_options; }
-    const mm_mapopt_t& mapping_options() const { return m_mapping_options; }
+    const mm_idxopt_t& index_options() const;
+    const mm_mapopt_t& mapping_options() const;
 
     HeaderSequenceRecords get_sequence_records_for_header() const;
 };

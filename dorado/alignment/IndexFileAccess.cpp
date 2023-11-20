@@ -22,7 +22,11 @@ IndexLoadResult IndexFileAccess::load_index(const std::string& file,
     }
 
     index = std::make_shared<Minimap2Index>();
-    auto load_result = index->load(file, options, num_threads);
+    if (!index->initialise(options)) {
+        return IndexLoadResult::validation_error;
+    }
+
+    auto load_result = index->load(file, num_threads);
     if (load_result != IndexLoadResult::success) {
         return load_result;
     }
