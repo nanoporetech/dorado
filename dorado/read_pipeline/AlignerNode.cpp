@@ -58,25 +58,6 @@ AlignerNode::AlignerNode(std::shared_ptr<alignment::IndexFileAccess> index_file_
     start_threads();
 }
 
-void AlignerNode::set_bam_index(const std::string& filename,
-                                const alignment::Minimap2Options& options,
-                                int threads) {
-    int num_index_construction_threads{options.print_aln_seq ? 1 : static_cast<int>(m_threads)};
-    switch (m_index_file_access->load_index(filename, options, num_index_construction_threads)) {
-    case alignment::IndexLoadResult::reference_file_not_found:
-        throw std::runtime_error("AlignerNode reference path does not exist: " + filename);
-    case alignment::IndexLoadResult::validation_error:
-        throw std::runtime_error("AlignerNode validation error checking minimap options");
-    case alignment::IndexLoadResult::split_index_not_supported:
-        throw std::runtime_error(
-                "Dorado doesn't support split index for alignment. Please re-run with larger index "
-                "size.");
-    case alignment::IndexLoadResult::success:
-        break;
-    }
-    m_index_for_bam_messages = m_index_file_access->get_index(filename, options);
-}
-
 std::shared_ptr<const alignment::Minimap2Index> AlignerNode::get_index(
         const ReadCommon& read_common) {
     auto& align_info = read_common.client_info->alignment_info();

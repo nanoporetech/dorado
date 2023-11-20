@@ -21,13 +21,12 @@ class BarcodeDemuxerNode : public MessageSink {
 public:
     BarcodeDemuxerNode(const std::string& output_dir,
                        size_t htslib_threads,
-                       size_t num_reads,
                        bool write_fastq,
                        std::unique_ptr<const utils::SampleSheet> sample_sheet);
     ~BarcodeDemuxerNode();
     std::string get_name() const override { return "BarcodeDemuxerNode"; }
     stats::NamedStats sample_stats() const override;
-    void terminate(const FlushOptions& flush_options) override { terminate_impl(); }
+    void terminate(const FlushOptions&) override { terminate_impl(); }
     void restart() override;
 
     void set_header(const sam_hdr_t* header);

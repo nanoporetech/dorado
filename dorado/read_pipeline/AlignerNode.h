@@ -29,7 +29,7 @@ public:
     ~AlignerNode();
     std::string get_name() const override { return "AlignerNode"; }
     stats::NamedStats sample_stats() const override;
-    void terminate(const FlushOptions& flush_options) override { terminate_impl(); }
+    void terminate(const FlushOptions&) override { terminate_impl(); }
     void restart() override;
 
     alignment::HeaderSequenceRecords get_sequence_records_for_header() const;
@@ -38,9 +38,6 @@ private:
     void start_threads();
     void terminate_impl();
     void worker_thread();
-    void set_bam_index(const std::string& filename,
-                       const alignment::Minimap2Options& options,
-                       int threads);
     std::shared_ptr<const alignment::Minimap2Index> get_index(const ReadCommon& read_common);
 
     size_t m_threads;

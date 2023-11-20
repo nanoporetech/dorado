@@ -241,7 +241,6 @@ SCENARIO("AlignerNode push SimplexRead", TEST_GROUP) {
         read_common.read_id = read_id;
 
         AND_GIVEN("client with no alignment requirements") {
-            const std::string read_id{"aligner_node_test_simplex"};
             auto client_without_align = std::make_shared<TestClientInfo>(dorado::AlignmentInfo{});
             read_common.client_info = client_without_align;
 

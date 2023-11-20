@@ -58,7 +58,7 @@ BarcodeClassifierNode::BarcodeClassifierNode(int threads) : MessageSink(10000), 
 void BarcodeClassifierNode::start_threads() {
     for (size_t i = 0; i < m_threads; i++) {
         m_workers.push_back(std::make_unique<std::thread>(
-                std::thread(&BarcodeClassifierNode::worker_thread, this, i)));
+                std::thread(&BarcodeClassifierNode::worker_thread, this)));
     }
 }
 
@@ -78,7 +78,7 @@ void BarcodeClassifierNode::restart() {
 
 BarcodeClassifierNode::~BarcodeClassifierNode() { terminate_impl(); }
 
-void BarcodeClassifierNode::worker_thread(size_t tid) {
+void BarcodeClassifierNode::worker_thread() {
     Message message;
     while (get_input_message(message)) {
         if (std::holds_alternative<BamPtr>(message)) {
@@ -202,7 +202,7 @@ BamPtr BarcodeClassifierNode::trim_barcode(BamPtr input,
     if (!trimmed_moves.empty()) {
         bam_aux_del(out_record, bam_aux_get(out_record, "mv"));
         // Move table format is stride followed by moves.
-        trimmed_moves.insert(trimmed_moves.begin(), stride);
+        trimmed_moves.insert(trimmed_moves.begin(), uint8_t(stride));
         bam_aux_update_array(out_record, "mv", 'c', int(trimmed_moves.size()),
                              (uint8_t*)trimmed_moves.data());
     }

@@ -20,7 +20,7 @@ public:
     ~ReadSplitNode() { terminate_impl(); }
     std::string get_name() const override { return "ReadSplitNode"; }
     stats::NamedStats sample_stats() const override;
-    void terminate(const FlushOptions& flush_options) override { terminate_impl(); }
+    void terminate(const FlushOptions &) override { terminate_impl(); }
     void restart() override;
 
 private:
