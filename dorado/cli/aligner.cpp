@@ -1,4 +1,5 @@
 #include "Version.h"
+#include "alignment/IndexFileAccess.h"
 #include "cli/cli_utils.h"
 #include "read_pipeline/AlignerNode.h"
 #include "read_pipeline/HtsReader.h"
@@ -60,7 +61,7 @@ int aligner(int argc, char* argv[]) {
             .action([&](const auto&) { ++verbosity; })
             .append();
 
-    cli::add_minimap2_arguments(parser, AlignerNode::dflt_options);
+    cli::add_minimap2_arguments(parser, alignment::dflt_options);
 
     try {
         cli::parse(parser, argc, argv);
@@ -80,7 +81,7 @@ int aligner(int argc, char* argv[]) {
     auto reads(parser.visible.get<std::vector<std::string>>("reads"));
     auto threads(parser.visible.get<int>("threads"));
     auto max_reads(parser.visible.get<int>("max-reads"));
-    auto options = cli::process_minimap2_arguments(parser, AlignerNode::dflt_options);
+    auto options = cli::process_minimap2_arguments(parser, alignment::dflt_options);
     threads = threads == 0 ? std::thread::hardware_concurrency() : threads;
     // The input thread is the total number of threads to use for dorado
     // alignment. Heuristically use 10% of threads for BAM generation and
@@ -119,8 +120,9 @@ int aligner(int argc, char* argv[]) {
 
     PipelineDescriptor pipeline_desc;
     auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, "-", output_mode, writer_threads);
-    auto aligner =
-            pipeline_desc.add_node<AlignerNode>({hts_writer}, index, options, aligner_threads);
+    auto index_file_access = std::make_shared<alignment::IndexFileAccess>();
+    auto aligner = pipeline_desc.add_node<AlignerNode>({hts_writer}, index_file_access, index,
+                                                       options, aligner_threads);
 
     // Create the Pipeline from our description.
     std::vector<dorado::stats::StatsReporter> stats_reporters;
