@@ -25,6 +25,7 @@ namespace dorado::utils {
  * @param fd The file descriptor for which to retrieve the file path
  * @return A string containing the file path, or an empty string if the file path could not be retrieved
  */
+#ifndef _WIN32
 std::string get_file_path(int fd) {
 #ifdef __APPLE__
     char filePath[1024];
@@ -46,6 +47,7 @@ std::string get_file_path(int fd) {
 #endif
     return "";
 }
+#endif  // _WIN32
 
 bool is_safe_to_log() {
 #ifdef _WIN32

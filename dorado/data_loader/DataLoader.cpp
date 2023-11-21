@@ -269,20 +269,21 @@ void DataLoader::load_reads(const std::string& path,
                     if (m_loaded_read_count == m_max_reads) {
                         break;
                     }
-                    auto path = std::filesystem::path(entry);
-                    std::string ext = path.extension().string();
+                    auto entry_path = std::filesystem::path(entry);
+                    std::string ext = entry_path.extension().string();
                     std::transform(ext.begin(), ext.end(), ext.begin(),
                                    [](unsigned char c) { return std::tolower(c); });
                     if (ext == ".fast5") {
                         throw std::runtime_error(
                                 "Traversing reads by channel is only available for POD5. "
                                 "Encountered FAST5 at " +
-                                path.string());
+                                entry_path.string());
                     } else if (ext == ".pod5") {
-                        auto& channel_to_read_ids = m_file_channel_read_order_map.at(path.string());
+                        auto& channel_to_read_ids =
+                                m_file_channel_read_order_map.at(entry_path.string());
                         auto& read_ids = channel_to_read_ids[channel];
                         if (!read_ids.empty()) {
-                            load_pod5_reads_from_file_by_read_ids(path.string(), read_ids);
+                            load_pod5_reads_from_file_by_read_ids(entry_path.string(), read_ids);
                         }
                     }
                 }

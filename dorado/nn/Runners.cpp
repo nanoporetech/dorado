@@ -29,6 +29,10 @@ std::pair<std::vector<dorado::Runner>, size_t> create_basecall_runners(
         size_t chunk_size,
         float memory_fraction,
         bool guard_gpus) {
+#ifdef __APPLE__
+    (void)guard_gpus;
+#endif
+
     std::vector<dorado::Runner> runners;
 
     // Default is 1 device.  CUDA path may alter this.
@@ -104,6 +108,8 @@ std::pair<std::vector<dorado::Runner>, size_t> create_basecall_runners(
         }
     }
 #endif  // __APPLE__
+#else   // DORADO_GPU_BUILD
+    (void)num_gpu_runners;
 #endif  // DORADO_GPU_BUILD
 
 #ifndef NDEBUG
@@ -166,7 +172,7 @@ std::vector<std::unique_ptr<dorado::ModBaseRunner>> create_modbase_runners(
         for (int i = 0; i < remora_callers; ++i) {
             auto caller = dorado::create_modbase_caller(remora_model_list, int(remora_batch_size),
                                                         device_string);
-            for (size_t i = 0; i < remora_runners_per_caller; i++) {
+            for (size_t j = 0; j < remora_runners_per_caller; j++) {
                 remora_runners.push_back(std::make_unique<dorado::ModBaseRunner>(caller));
             }
         }

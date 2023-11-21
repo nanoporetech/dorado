@@ -73,9 +73,9 @@ int summary(int argc, char *argv[]) {
 
     spdlog::debug("> input fmt: {} aligned: {}", reader.format, reader.is_aligned);
 #ifndef _WIN32
-    std::signal(SIGPIPE, [](int signum) { interrupt = 1; });
+    std::signal(SIGPIPE, [](int) { interrupt = 1; });
 #endif
-    std::signal(SIGINT, [](int signum) { interrupt = 1; });
+    std::signal(SIGINT, [](int) { interrupt = 1; });
 
     for (size_t col = 0; col < header.size() - 1; col++) {
         std::cout << header[col] << separator;

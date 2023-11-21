@@ -190,7 +190,7 @@ void launch_kernel_no_wait(ComputePipelineState *const pipeline,
     }
 
     // Set lengths of threadgroup memory buffers.
-    for (int i = 0; i < tg_buffer_lens.size(); ++i) {
+    for (int i = 0; i < (int)tg_buffer_lens.size(); ++i) {
         compute_encoder->setThreadgroupMemoryLength(tg_buffer_lens.at(i), i);
     }
 

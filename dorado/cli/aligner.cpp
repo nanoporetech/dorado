@@ -9,7 +9,6 @@
 #include "utils/log_utils.h"
 #include "utils/stats.h"
 
-#include <argparse.hpp>
 #include <minimap.h>
 #include <spdlog/spdlog.h>
 
@@ -112,9 +111,15 @@ int aligner(int argc, char* argv[]) {
     auto header = sam_hdr_dup(reader.header);
     add_pg_hdr(header);
 
+    auto output_mode = HtsWriter::OutputMode::BAM;
+    if (utils::is_fd_tty(stdout)) {
+        output_mode = HtsWriter::OutputMode::SAM;
+    } else if (utils::is_fd_pipe(stdout)) {
+        output_mode = HtsWriter::OutputMode::UBAM;
+    }
+
     PipelineDescriptor pipeline_desc;
-    auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, "-", HtsWriter::OutputMode::BAM,
-                                                        writer_threads, 0);
+    auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, "-", output_mode, writer_threads);
     auto index_file_access = std::make_shared<alignment::IndexFileAccess>();
     auto aligner = pipeline_desc.add_node<AlignerNode>({hts_writer}, index_file_access, index,
                                                        options, aligner_threads);

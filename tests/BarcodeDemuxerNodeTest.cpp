@@ -47,8 +47,8 @@ TEST_CASE("BarcodeDemuxerNode: check correct output files are created", TEST_GRO
         // the pipeline object is closed. This needs to be looked at.
         // TODO: Address open file issue on windows.
         dorado::PipelineDescriptor pipeline_desc;
-        auto demuxer = pipeline_desc.add_node<BarcodeDemuxerNode>({}, tmp_dir.string(), 8, 10,
-                                                                  false, nullptr);
+        auto demuxer =
+                pipeline_desc.add_node<BarcodeDemuxerNode>({}, tmp_dir.string(), 8, false, nullptr);
 
         auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
 

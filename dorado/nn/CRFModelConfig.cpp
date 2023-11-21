@@ -312,7 +312,7 @@ uint16_t get_model_sample_rate(const std::filesystem::path &model_path) {
         // If unsuccessful, find sample rate by model name.
         model_sample_rate = models::get_sample_rate_by_model_name(model_name);
     }
-    return model_sample_rate;
+    return uint16_t(model_sample_rate);
 }
 
 int32_t get_model_mean_qscore_start_pos(const CRFModelConfig &model_config) {

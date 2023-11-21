@@ -334,6 +334,8 @@ class ModelDownloader {
             int enabled = 1;
             setsockopt(sock, SOL_SOCKET, SO_NOSIGPIPE, reinterpret_cast<char*>(&enabled),
                        sizeof(enabled));
+#else
+            (void)sock;
 #endif
         });
 

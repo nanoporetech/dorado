@@ -68,7 +68,7 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
 
     auto basecaller_node = pipeline_desc.add_node<BasecallerNode>(
             {}, std::move(runners), overlap, kBatchTimeoutMS, model_name, 1000, "BasecallerNode",
-            false, mean_qscore_start_pos);
+            mean_qscore_start_pos);
     pipeline_desc.add_node_sink(current_node_handle, basecaller_node);
     current_node_handle = basecaller_node;
     last_node_handle = basecaller_node;
@@ -127,7 +127,7 @@ void create_stereo_duplex_pipeline(PipelineDescriptor& pipeline_desc,
 
     auto stereo_basecaller_node = pipeline_desc.add_node<BasecallerNode>(
             {}, std::move(stereo_runners), adjusted_stereo_overlap, kStereoBatchTimeoutMS,
-            duplex_rg_name, 1000, "StereoBasecallerNode", true, mean_qscore_start_pos);
+            duplex_rg_name, 1000, "StereoBasecallerNode", mean_qscore_start_pos);
 
     auto simplex_model_stride = runners.front()->model_stride();
     auto stereo_node = pipeline_desc.add_node<StereoDuplexEncoderNode>({stereo_basecaller_node},
@@ -158,7 +158,7 @@ void create_stereo_duplex_pipeline(PipelineDescriptor& pipeline_desc,
     const int kSimplexBatchTimeoutMS = 100;
     auto basecaller_node = pipeline_desc.add_node<BasecallerNode>(
             {splitter_node}, std::move(runners), adjusted_simplex_overlap, kSimplexBatchTimeoutMS,
-            model_name, 1000, "BasecallerNode", true, mean_qscore_start_pos);
+            model_name, 1000, "BasecallerNode", mean_qscore_start_pos);
 
     auto scaler_node =
             pipeline_desc.add_node<ScalerNode>({basecaller_node}, model_config.signal_norm_params,
