@@ -1,5 +1,7 @@
 #include "PairingNode.h"
 
+#include "ClientInfo.h"
+
 #include <minimap.h>
 #include <nvtx3/nvtx3.hpp>
 #include <spdlog/spdlog.h>
@@ -314,7 +316,7 @@ void PairingNode::pair_generating_worker_thread(int tid) {
         int channel = read->read_common.attributes.channel_number;
         std::string run_id = read->read_common.run_id;
         std::string flowcell_id = read->read_common.flowcell_id;
-        int32_t client_id = read->read_common.client_id;
+        int32_t client_id = read->read_common.client_info->client_id();
 
         std::unique_lock<std::mutex> lock(m_pairing_mtx);
 

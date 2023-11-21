@@ -220,7 +220,7 @@ TORCH_MODULE(MetalConv1d);
 
 static constexpr int kLstmGates = 4;
 struct MetalLSTMImpl : Module {
-    MetalLSTMImpl(int layer_size, bool reverse_, MTL::Device *device) : reverse(reverse_) {
+    MetalLSTMImpl(int layer_size, bool reverse_, MTL::Device *) : reverse(reverse_) {
         auto weight_ih = torch::empty({layer_size * kLstmGates, layer_size});
         auto weight_hh = torch::empty({layer_size * kLstmGates, layer_size});
         auto bias_ih = torch::empty({layer_size * kLstmGates});
@@ -533,7 +533,7 @@ struct MetalBlockImpl : Module {
 
         // The output of the linear layer is split into multiple buffers, each generated
         // by a separate kernel launch.
-        for (int i = 0; i < out.size(); ++i) {
+        for (size_t i = 0; i < out.size(); ++i) {
             MTL::Buffer *const args_buffer = args_linear.at(i).get();
             MTL::Buffer *const out_buffer = mtl_for_tensor(out.at(i));
             if (config.out_features.has_value()) {
@@ -715,7 +715,7 @@ public:
         int num_decode_threads = std::max(1, get_apple_cpu_perf_core_count() - 1);
         m_decode_threads.reserve(num_decode_threads);
         for (int i = 0; i < num_decode_threads; ++i) {
-            m_decode_threads.emplace_back(new std::thread(&MetalCaller::decode_thread_fn, this, i));
+            m_decode_threads.emplace_back(new std::thread(&MetalCaller::decode_thread_fn, this));
         }
     }
 
@@ -866,7 +866,7 @@ public:
         }
     }
 
-    void decode_thread_fn(int thread_id) {
+    void decode_thread_fn() {
         at::InferenceMode inference_mode_guard;
         while (true) {
             std::unique_lock<std::mutex> decode_lock(m_decode_lock);

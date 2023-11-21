@@ -213,7 +213,7 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
 #ifdef __APPLE__
         auto caller =
                 dorado::create_metal_caller(model_config, default_params.chunksize, batch_size);
-        for (size_t i = 0; i < default_params.num_runners; i++) {
+        for (int i = 0; i < default_params.num_runners; i++) {
             runners.push_back(std::make_shared<dorado::MetalModelRunner>(caller));
         }
 #else   // __APPLE__
