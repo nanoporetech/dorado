@@ -257,7 +257,7 @@ void ModBaseCallerNode::duplex_mod_call(Message message) {
         ++m_num_non_mod_base_reads_pushed;
     }
 
-    send_message_to_sink(std::move(read));
+    //send_message_to_sink(std::move(read));
 }
 
 void ModBaseCallerNode::simplex_mod_call(Message message) {
