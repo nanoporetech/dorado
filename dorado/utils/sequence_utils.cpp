@@ -234,17 +234,11 @@ OverlapResult compute_overlap(std::string query_seq, std::string target_seq) {
     return overlap_result;
 }
 
-std::vector<uint8_t> realign_moves(std::string query_sequence,
-                                   std::string target_sequence,
-                                   std::vector<uint8_t> moves) {
-    //Initially let's just spread the moves evenly, we can come back to this later
-    int num_moves = std::accumulate(moves.begin(), moves.end(), 0);
-    int input_seq_size = query_sequence.size();
-    int target_seq_size = target_sequence.size();
-    //std::cerr << num_moves;
-    //std::cerr << input_seq_size;
-    //std::cerr << target_seq_size;
-
+// Query is the read that the moves table is associated with. A new moves table will be generated
+// Which is aligned to the target sequence.
+std::tuple<int, int, std::vector<uint8_t>> realign_moves(std::string query_sequence,
+                                                         std::string target_sequence,
+                                                         std::vector<uint8_t> moves) {
     auto [is_overlap, query_start, query_end, target_start, target_end] = compute_overlap(
             query_sequence,
             target_sequence);  // We are going to compute the overlap between the two reads
@@ -263,9 +257,6 @@ std::vector<uint8_t> realign_moves(std::string query_sequence,
             query_sequence_component.data(), static_cast<int>(query_sequence_component.length()),
             align_config);
 
-    //std::cerr << "TSC:" << target_sequence_component << std::endl;
-    //std::cerr << "QSC:" << query_sequence_component << std::endl;
-
     // Now that we have the alignment, we need to compute the new move table, by walking along the alignment
 
     const auto alignment_size =
@@ -280,7 +271,7 @@ std::vector<uint8_t> realign_moves(std::string query_sequence,
     // Let's keep two cursor positions - one for the new move table and one for the old:
     int new_move_cursor = 0;
     int old_move_cursor =
-            0;  // Need to update to be the query start. // QUESTION do we need to worry about the start and end locations.
+            0;  // Need to update to be the query start. // TODO do we need to worry about the start and end locations.
     // Let's keep two cursor positions - one for the query sequence and one for the target:
     int query_seq_cursor = query_start;
     int target_seq_cursor = target_start;
@@ -296,18 +287,10 @@ std::vector<uint8_t> realign_moves(std::string query_sequence,
     --old_move_cursor;  // We have gone one too far.
     int old_moves_offset = old_move_cursor;
 
-    //    static constexpr unsigned char kAlignMatch = 0;
-    //    static constexpr unsigned char kAlignInsertionToTarget = 1;
-    //    static constexpr unsigned char kAlignInsertionToQuery = 2;
-
     // First thing to do - let's just print out the alignment line by line so we know it's working.
     for (auto alignment_entry : alignment) {
         if (alignment_entry ==
             0) {  //Match, need to update the new move table and move the cursor of the old move table.
-            std::cerr << query_sequence[query_seq_cursor] << "/"
-                      << target_sequence[target_seq_cursor] << std::endl;
-            int a = moves[old_move_cursor];
-            std::cerr << a;
             new_moves.push_back(1);  // We have a match so we need a 1
             new_move_cursor++;
             old_move_cursor++;
@@ -328,7 +311,6 @@ std::vector<uint8_t> realign_moves(std::string query_sequence,
             target_seq_cursor++;
         }
         if (alignment_entry == 1) {  //Insertion to target
-            //std::cerr << "-" << "/" << target_sequence[target_seq_cursor] << std::endl;
             // If we have an insertion in the target, we need to add a 1 to the new move table, and increment the new move table cursor. the old move table cursor and new are now out of sync and need fixing.
             new_moves.push_back(1);
             new_move_cursor++;
@@ -357,7 +339,7 @@ std::vector<uint8_t> realign_moves(std::string query_sequence,
     // 3. Moves end
     // 3. Target sequence end
 
-    return new_moves;
+    return {old_moves_offset, target_start, new_moves};
 }
 
 std::vector<uint64_t> move_cum_sums(const std::vector<uint8_t>& moves) {
