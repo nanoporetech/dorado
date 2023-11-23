@@ -42,6 +42,7 @@
 | pi:Z:  | parent read id for a split read                            |
 | sp:i:  | start coordinate of split read in parent read signal       |
 | pt:i:  | estimated poly(A/T) tail length in cDNA and dRNA reads     |
+| MN:i:  | Length of sequence at the time MM and ML were produced     |
 
 #### Modified Base Tags
 
