@@ -12,10 +12,12 @@
 #include <ATen/ATen.h>
 #include <nvtx3/nvtx3.hpp>
 #include <spdlog/spdlog.h>
+#include <torch/torch.h>
 
 #include <chrono>
 #include <cstring>
 #include <iostream>
+
 using namespace std::chrono_literals;
 
 namespace dorado {
@@ -143,12 +145,28 @@ void ModBaseCallerNode::init_modbase_info() {
     m_base_prob_offsets[3] = m_base_prob_offsets[2] + result.base_counts[2];
 }
 
+void serializeVector(const std::vector<unsigned char>& vec, const std::string& filename) {
+    // Open a file in binary mode
+    std::ofstream file(filename, std::ios::binary);
+
+    // Write the size of the vector (number of elements)
+    long size = vec.size();
+    file.write(reinterpret_cast<char*>(&size), sizeof(long));
+
+    // Write the vector data
+    file.write(reinterpret_cast<const char*>(vec.data()), size * sizeof(unsigned char));
+
+    // Close the file
+    file.close();
+}
+
 void ModBaseCallerNode::duplex_mod_call(Message message) {
     // Let's do this only for the template strand for now.
 
     auto read = std::get<DuplexReadPtr>(std::move(message));
     stats::Timer timer;
 
+    // TODO: Does `base_mod_probs` need to be the same size as `new_seq`?
     {
         nvtx3::scoped_range range{"base_mod_probs_init"};
         // initialize base_mod_probs _before_ we start handing out chunks
@@ -177,24 +195,55 @@ void ModBaseCallerNode::duplex_mod_call(Message message) {
     for (size_t caller_id = 0; caller_id < runner->num_callers(); ++caller_id) {
         nvtx3::scoped_range range{"generate_chunks"};
 
+        // Next - build the sig to seq map.
+        // What we need first is a new moves table for the template to the duplex read.
         auto [moves_offset, target_start, new_move_table] = utils::realign_moves(
                 read->stereo_feature_inputs.template_seq, read->read_common.seq,
                 read->stereo_feature_inputs.template_moves);
-        // Next - build the sig to seq map.
-        // What we need first is a new moves table for the template to the duplex read.
 
         auto signal_len = new_move_table.size() * m_block_stride;
         auto num_moves = std::accumulate(new_move_table.begin(), new_move_table.end(), 0);
-        auto new_seq = read->read_common.seq.substr(target_start, num_moves);
+        auto new_seq = read->read_common.seq.substr(
+                target_start, num_moves);  // temporary- change 0 back to target_start?
         std::vector<int> sequence_ints = utils::sequence_to_ints(new_seq);
 
         std::vector<uint64_t> seq_to_sig_map =
                 utils::moves_to_map(new_move_table, m_block_stride, signal_len, num_moves + 1);
         auto& chunks_to_enqueue = chunks_to_enqueue_by_caller.at(caller_id);
         auto& params = runner->caller_params(caller_id);
-        auto signal = read->stereo_feature_inputs.template_signal.slice(0, moves_offset,
-                                                                        moves_offset + signal_len);
+        auto signal = read->stereo_feature_inputs.template_signal.slice(
+                0, moves_offset * m_block_stride, moves_offset * m_block_stride + signal_len);
 
+        if (read->read_common.read_id ==
+            "fa3d4195-5ee1-4ab7-b048-9ce004292b62;dae07e1e-d2a9-44eb-8e8c-282491a977a9") {
+            serializeVector(new_move_table, "duplex_move_table.bin");
+            torch::save(signal, "duplex_signal.pt");
+            // Open a file in write mode
+            std::ofstream file("duplex_seq.txt");
+
+            // Write the string to the file
+            file << new_seq;
+            // Close the file
+            file.close();
+
+            serializeVector(read->stereo_feature_inputs.template_moves, "simplex_move_table.bin");
+            torch::save(read->stereo_feature_inputs.template_signal, "simplex_signal.pt");
+            // Open a file in write mode
+            std::ofstream sfile("simplex_seq.txt");
+
+            // Write the string to the file
+            sfile << read->stereo_feature_inputs
+                             .template_seq;  // TODO understnad why this is necessary
+            // Close the file
+            sfile.close();
+
+            std::cerr << "Found and serialised read of interest" << std::endl;
+
+            std::cerr << std::endl;
+            std::cerr << new_seq.substr(0, 100) << std::endl;
+            std::cerr << read->read_common.seq.substr(0, 100) << std::endl;
+            std::cerr << "Found and serialised read of interest" << std::endl;
+        }
         // scale signal based on model parameters
         auto scaled_signal = runner->scale_signal(caller_id, signal, sequence_ints, seq_to_sig_map);
 
@@ -256,8 +305,6 @@ void ModBaseCallerNode::duplex_mod_call(Message message) {
         send_message_to_sink(std::move(read));
         ++m_num_non_mod_base_reads_pushed;
     }
-
-    //send_message_to_sink(std::move(read));
 }
 
 void ModBaseCallerNode::simplex_mod_call(Message message) {
