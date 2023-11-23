@@ -52,7 +52,7 @@ if $dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --emit-fastq --ref
     echo "Error: dorado basecaller should fail with combination of emit-fastq and reference!"
     exit 1
 fi
-if $dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --emit-fastq --modified-bases 5mCG > $output_dir/error_condition.fq; then
+if $dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --emit-fastq --modified-bases 5mCG_5hmCG > $output_dir/error_condition.fq; then
     echo  "Error: dorado basecaller should fail with combination of emit-fastq and modbase!"
     exit 1
 fi
