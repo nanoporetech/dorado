@@ -11,8 +11,6 @@ namespace dorado {
 
 namespace demux {
 
-
-
 class AdapterDetector {
 public:
     AdapterDetector();
@@ -31,10 +29,7 @@ public:
     const std::vector<Query> get_primer_sequences() const;
 
 private:
-    enum QueryType {
-        ADAPTER,
-        PRIMER
-    };
+    enum QueryType { ADAPTER, PRIMER };
 
     std::vector<Query> m_adapter_sequences;
     std::vector<Query> m_primer_sequences;

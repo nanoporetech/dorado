@@ -45,9 +45,11 @@ TEST_CASE("AdapterDetector: test adapter detection", TEST_GROUP) {
         auto res2 = detector.find_adapters(new_sequence2);
         CHECK(res2.front.score < 0.7f);
         CHECK(res2.rear.name == adapters[i].name + "_REV");
-        CHECK(res2.rear.position == std::make_pair(int(seq.size()), int(seq.size() + adapters[i].sequence_rev.length()) - 1));
+        CHECK(res2.rear.position ==
+              std::make_pair(int(seq.size()),
+                             int(seq.size() + adapters[i].sequence_rev.length()) - 1));
         CHECK(res2.rear.score == 1.0f);
-        
+
         // Now put them both in.
         auto new_sequence3 = "TGCA" + adapters[i].sequence + seq + adapters[i].sequence_rev + "GTA";
         auto res3 = detector.find_adapters(new_sequence3);
@@ -55,7 +57,11 @@ TEST_CASE("AdapterDetector: test adapter detection", TEST_GROUP) {
         CHECK(res3.front.position == std::make_pair(4, int(adapters[i].sequence.length()) + 3));
         CHECK(res3.front.score == 1.0f);
         CHECK(res3.rear.name == adapters[i].name + "_REV");
-        CHECK(res3.rear.position == std::make_pair(int(adapters[i].sequence.size() + seq.size()) + 4, int(adapters[i].sequence.size() + seq.size() + adapters[i].sequence_rev.length()) + 3));
+        CHECK(res3.rear.position ==
+              std::make_pair(int(adapters[i].sequence.size() + seq.size()) + 4,
+                             int(adapters[i].sequence.size() + seq.size() +
+                                 adapters[i].sequence_rev.length()) +
+                                     3));
         CHECK(res2.rear.score == 1.0f);
     }
 }
@@ -78,7 +84,11 @@ TEST_CASE("AdapterDetector: test primer detection", TEST_GROUP) {
         CHECK(res1.front.position == std::make_pair(6, int(primers[i].sequence.length()) + 5));
         CHECK(res1.front.score == 1.0f);
         CHECK(res1.rear.name == primers[i].name + "_REV");
-        CHECK(res1.rear.position == std::make_pair(int(primers[i].sequence.length() + seq.length()) + 6, int(primers[i].sequence.length() + seq.length() + primers[i].sequence_rev.length()) + 5));
+        CHECK(res1.rear.position ==
+              std::make_pair(int(primers[i].sequence.length() + seq.length()) + 6,
+                             int(primers[i].sequence.length() + seq.length() +
+                                 primers[i].sequence_rev.length()) +
+                                     5));
         CHECK(res1.rear.score == 1.0f);
 
         // Now put the reverse primers at the beginning, and the forward ones at the end.
@@ -88,13 +98,18 @@ TEST_CASE("AdapterDetector: test primer detection", TEST_GROUP) {
         CHECK(res2.front.position == std::make_pair(6, int(primers[i].sequence_rev.length()) + 5));
         CHECK(res2.front.score == 1.0f);
         CHECK(res2.rear.name == primers[i].name + "_FWD");
-        CHECK(res2.rear.position == std::make_pair(int(primers[i].sequence_rev.length() + seq.length()) + 6, int(primers[i].sequence_rev.length() + seq.length() + primers[i].sequence.length()) + 5));
+        CHECK(res2.rear.position ==
+              std::make_pair(int(primers[i].sequence_rev.length() + seq.length()) + 6,
+                             int(primers[i].sequence_rev.length() + seq.length() +
+                                 primers[i].sequence.length()) +
+                                     5));
         CHECK(res2.rear.score == 1.0f);
     }
 }
 
 TEST_CASE(
-        "AdapterDetectorNode: check read messages are correctly updated after adapter/primer detection and trimming",
+        "AdapterDetectorNode: check read messages are correctly updated after adapter/primer "
+        "detection and trimming",
         TEST_GROUP) {
     using Catch::Matchers::Equals;
 
@@ -152,7 +167,7 @@ TEST_CASE(
         }
     }
     auto flank_size = front_adapter.length() + front_primer.length();
-    read->read_common.base_mod_probs[flank_size * mod_alphabet.size()] = 20;  // A
+    read->read_common.base_mod_probs[flank_size * mod_alphabet.size()] = 20;         // A
     read->read_common.base_mod_probs[(flank_size * mod_alphabet.size()) + 1] = 235;  // 6mA
     read->read_common.num_trimmed_samples = 0;
 

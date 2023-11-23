@@ -2,7 +2,6 @@
 #include "read_pipeline/ReadPipeline.h"
 #include "utils/types.h"
 
-
 namespace dorado {
 
 class Trimmer {

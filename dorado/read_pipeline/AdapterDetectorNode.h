@@ -14,9 +14,7 @@ namespace dorado {
 
 class AdapterDetectorNode : public MessageSink {
 public:
-    AdapterDetectorNode(int threads,
-                        bool trim_adapters,
-                        bool trim_primers);
+    AdapterDetectorNode(int threads, bool trim_adapters, bool trim_primers);
     AdapterDetectorNode(int threads);
     ~AdapterDetectorNode() override;
     std::string get_name() const override { return "AdapterDetectorNode"; }

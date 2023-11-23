@@ -80,14 +80,12 @@ std::pair<int, int> Trimmer::determine_trim_interval(const AdapterScoreResult& r
 
     if (res.front.name == "unclassified" || res.front.score < score_thres) {
         trim_interval.first = 0;
-    }
-    else {
+    } else {
         trim_interval.first = res.front.position.second + 1;
     }
     if (res.rear.name == "unclassified" || res.rear.score < score_thres) {
         trim_interval.second = seqlen;
-    }
-    else {
+    } else {
         trim_interval.second = res.rear.position.first;
     }
 
@@ -184,6 +182,5 @@ void Trimmer::trim_sequence(SimplexRead& read, std::pair<int, int> trim_interval
                 utils::trim_quality(read.read_common.base_mod_probs, modbase_interval);
     }
 }
-
 
 }  // namespace dorado

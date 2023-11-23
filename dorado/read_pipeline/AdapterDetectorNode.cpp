@@ -16,13 +16,10 @@
 #include <tuple>
 #include <vector>
 
-
 namespace dorado {
 
 // A Node which encapsulates running adapter and primer detection on each read.
-AdapterDetectorNode::AdapterDetectorNode(int threads,
-                                         bool trim_adapters,
-                                         bool trim_primers)
+AdapterDetectorNode::AdapterDetectorNode(int threads, bool trim_adapters, bool trim_primers)
         : MessageSink(10000),
           m_threads(threads),
           m_trim_adapters(trim_adapters),
@@ -31,10 +28,7 @@ AdapterDetectorNode::AdapterDetectorNode(int threads,
 }
 
 AdapterDetectorNode::AdapterDetectorNode(int threads)
-        : MessageSink(10000),
-          m_threads(threads),
-          m_trim_adapters(true),
-          m_trim_primers(true) {
+        : MessageSink(10000), m_threads(threads), m_trim_adapters(true), m_trim_primers(true) {
     start_threads();
 }
 
