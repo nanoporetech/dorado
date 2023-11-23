@@ -529,4 +529,18 @@ std::string extract_model_from_model_path(const std::string& model_path) {
     return std::filesystem::canonical(path).filename().string();
 }
 
+std::string extract_model_from_model_paths(const std::string& model_paths) {
+    std::string model_names;
+
+    std::istringstream stream{model_paths};
+    std::string model_path;
+    while (std::getline(stream, model_path, ',')) {
+        if (!model_names.empty()) {
+            model_names += ",";
+        }
+        model_names += models::extract_model_from_model_path(model_path);
+    }
+    return model_names;
+}
+
 }  // namespace dorado::models

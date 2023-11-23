@@ -35,7 +35,17 @@ if ! uname -r | grep -q tegra; then
     $dorado_bin basecaller ${model} $data_dir/pod5 -x cpu --modified-bases 5mCG_5hmCG > $output_dir/calls.bam
 fi
 samtools quickcheck -u $output_dir/calls.bam
-samtools view $output_dir/calls.bam > $output_dir/calls.sam
+samtools view -h $output_dir/calls.bam > $output_dir/calls.sam
+
+# Check that the read group has the required model info in it's header
+if ! grep -q "basecall_model=${model_name}" $output_dir/calls.sam; then
+    echo "Output SAM file does not contain basecall model name in header!"
+    exit 1
+fi
+if ! grep -q "modbase_models=${model_name}_5mCG_5hmCG" $output_dir/calls.sam; then
+    echo "Output SAM file does not contain modbase model name in header!"
+    exit 1
+fi
 
 set +e
 if $dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --emit-fastq --reference $output_dir/ref.fq > $output_dir/error_condition.fq; then

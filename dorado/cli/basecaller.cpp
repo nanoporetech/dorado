@@ -73,6 +73,7 @@ void setup(std::vector<std::string> args,
            bool estimate_poly_a) {
     auto model_config = load_crf_model_config(model_path);
     std::string model_name = models::extract_model_from_model_path(model_path.string());
+    std::string modbase_model_names = models::extract_model_from_model_paths(remora_models);
 
     if (!DataLoader::is_read_data_present(data_path, recursive_file_loading)) {
         std::string err = "No POD5 or FAST5 data found in path: " + data_path;
@@ -112,7 +113,8 @@ void setup(std::vector<std::string> args,
     auto [runners, num_devices] =
             create_basecall_runners(model_config, device, num_runners, 0, batch_size, chunk_size);
 
-    auto read_groups = DataLoader::load_read_groups(data_path, model_name, recursive_file_loading);
+    auto read_groups = DataLoader::load_read_groups(data_path, model_name, modbase_model_names,
+                                                    recursive_file_loading);
 
     bool duplex = false;
 

@@ -456,6 +456,7 @@ void DataLoader::load_read_channels(std::string data_path, bool recursive_file_l
 std::unordered_map<std::string, ReadGroup> DataLoader::load_read_groups(
         std::string data_path,
         std::string model_path,
+        std::string modbase_model_names,
         bool recursive_file_loading) {
     std::unordered_map<std::string, ReadGroup> read_groups;
 
@@ -497,6 +498,7 @@ std::unordered_map<std::string, ReadGroup> DataLoader::load_read_groups(
                         read_groups[id] = ReadGroup{
                                 run_id,
                                 model_path,
+                                modbase_model_names,
                                 flowcell_id,
                                 device_id,
                                 utils::get_string_timestamp_from_unix_time(exp_start_time_ms),

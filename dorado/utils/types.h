@@ -45,6 +45,7 @@ struct BarcodeScoreResult {
 struct ReadGroup {
     std::string run_id;
     std::string basecalling_model;
+    std::string modbase_models;
     std::string flowcell_id;
     std::string device_id;
     std::string exp_start_time;
