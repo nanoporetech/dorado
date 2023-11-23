@@ -27,6 +27,9 @@ public:
         std::string sequence_rev;
     };
 
+    const std::vector<Query> get_adapter_sequences() const;
+    const std::vector<Query> get_primer_sequences() const;
+
 private:
     enum QueryType {
         ADAPTER,

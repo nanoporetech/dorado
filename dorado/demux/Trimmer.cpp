@@ -71,14 +71,37 @@ std::pair<int, int> Trimmer::determine_trim_interval(const BarcodeScoreResult& r
     return trim_interval;
 }
 
-BamPtr Trimmer::trim_barcode(BamPtr input, const BarcodeScoreResult& res,
-                             int seqlen) {
-    auto trim_interval = determine_trim_interval(res, seqlen);
+std::pair<int, int> Trimmer::determine_trim_interval(const AdapterScoreResult& res, int seqlen) {
+    // Initialize interval to be the whole read. Note that the interval
+    // defines which portion of the read to retain.
+    std::pair<int, int> trim_interval = {0, seqlen};
 
-    if (trim_interval.second - trim_interval.first == seqlen) {
-        return input;
+    const float score_thres = 0.7f;
+
+    if (res.front.name == "unclassified" || res.front.score < score_thres) {
+        trim_interval.first = 0;
+    }
+    else {
+        trim_interval.first = res.front.position.second + 1;
+    }
+    if (res.rear.name == "unclassified" || res.rear.score < score_thres) {
+        trim_interval.second = seqlen;
+    }
+    else {
+        trim_interval.second = res.rear.position.first;
     }
 
+    if (trim_interval.second <= trim_interval.first) {
+        // This could happen if the read is very short and the barcoding
+        // algorithm determines the barcode interval to be the entire read.
+        // In that case, skip trimming.
+        trim_interval = {0, seqlen};
+    }
+
+    return trim_interval;
+}
+
+BamPtr Trimmer::trim_sequence(BamPtr input, std::pair<int, int> trim_interval) {
     bam1_t* input_record = input.get();
 
     // Fetch components that need to be trimmed.
@@ -139,7 +162,7 @@ BamPtr Trimmer::trim_barcode(BamPtr input, const BarcodeScoreResult& res,
     return BamPtr(out_record);
 }
 
-void Trimmer::trim_barcode(SimplexRead& read, std::pair<int, int> trim_interval) {
+void Trimmer::trim_sequence(SimplexRead& read, std::pair<int, int> trim_interval) {
     if (trim_interval.second - trim_interval.first == int(read.read_common.seq.length())) {
         return;
     }

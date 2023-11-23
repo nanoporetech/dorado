@@ -126,7 +126,11 @@ void BarcodeClassifierNode::barcode(BamPtr& read) {
 
     if (m_default_barcoding_info->trim) {
         int seqlen = irecord->core.l_qseq;
-        read = Trimmer::trim_barcode(std::move(read), bc_res, seqlen);
+        auto trim_interval = Trimmer::determine_trim_interval(bc_res, seqlen);
+
+        if (trim_interval.second - trim_interval.first < seqlen) {
+            read = Trimmer::trim_sequence(std::move(read), trim_interval);
+        }
     }
 }
 
@@ -146,7 +150,7 @@ void BarcodeClassifierNode::barcode(SimplexRead& read) {
     if (barcoding_info->trim) {
         read.read_common.barcode_trim_interval = Trimmer::determine_trim_interval(
                 *read.read_common.barcoding_result, int(read.read_common.seq.length()));
-        Trimmer::trim_barcode(read, read.read_common.barcode_trim_interval);
+        Trimmer::trim_sequence(read, read.read_common.barcode_trim_interval);
     }
 
     m_num_records++;

@@ -231,6 +231,8 @@ set(LIB_SOURCE_FILES
     dorado/read_pipeline/BarcodeClassifierNode.h
     dorado/read_pipeline/BarcodeDemuxerNode.cpp
     dorado/read_pipeline/BarcodeDemuxerNode.h
+    dorado/read_pipeline/AdapterDetectorNode.cpp
+    dorado/read_pipeline/AdapterDetectorNode.h
     dorado/read_pipeline/NullNode.h
     dorado/read_pipeline/NullNode.cpp
     dorado/read_pipeline/PairingNode.cpp
