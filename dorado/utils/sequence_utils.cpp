@@ -243,6 +243,7 @@ std::tuple<int, int, std::vector<uint8_t>> realign_moves(std::string query_seque
             query_sequence,
             target_sequence);  // We are going to compute the overlap between the two reads
 
+    // TODO sanity check if and why this is needed
     // Now let's perform an alignmnet:
 
     EdlibAlignConfig align_config = edlibDefaultAlignConfig();
@@ -297,14 +298,13 @@ std::tuple<int, int, std::vector<uint8_t>> realign_moves(std::string query_seque
 
             while (moves[old_move_cursor] == 0) {
                 if (old_move_cursor < (new_move_cursor + old_moves_offset)) {
-                    new_moves.push_back(1);
                     old_move_cursor++;
                 } else {
                     new_moves.push_back(0);
+                    new_move_cursor++;
+                    old_move_cursor++;
                 }
                 // Unless there's a new/old mismatch - in which case we need to catch up by adding 1s. TODO this later.
-                new_move_cursor++;
-                old_move_cursor++;
             }
             // Update the Query and target seq cursors
             query_seq_cursor++;
@@ -339,7 +339,7 @@ std::tuple<int, int, std::vector<uint8_t>> realign_moves(std::string query_seque
     // 3. Moves end
     // 3. Target sequence end
 
-    return {old_moves_offset, target_start, new_moves};
+    return {old_moves_offset, target_start - 1, new_moves};
 }
 
 std::vector<uint64_t> move_cum_sums(const std::vector<uint8_t>& moves) {

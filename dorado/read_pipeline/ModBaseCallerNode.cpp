@@ -270,7 +270,8 @@ void ModBaseCallerNode::duplex_mod_call(Message message) {
                         {(int64_t)slice.lead_samples_needed, (int64_t)slice.tail_samples_needed});
             }
             chunks_to_enqueue.push_back(std::make_unique<RemoraChunk>(
-                    working_read, input_signal, std::move(slice.data), context_hit));
+                    working_read, input_signal, std::move(slice.data),
+                    context_hit + target_start));  // TODO do we need to update the context hit here
 
             ++working_read->num_modbase_chunks;
         }
