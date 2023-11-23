@@ -141,7 +141,7 @@ BamPtr Trimmer::trim_sequence(BamPtr input, std::pair<int, int> trim_interval) {
     if (!trimmed_moves.empty()) {
         bam_aux_del(out_record, bam_aux_get(out_record, "mv"));
         // Move table format is stride followed by moves.
-        trimmed_moves.insert(trimmed_moves.begin(), stride);
+        trimmed_moves.insert(trimmed_moves.begin(), uint8_t(stride));
         bam_aux_update_array(out_record, "mv", 'c', int(trimmed_moves.size()),
                              (uint8_t*)trimmed_moves.data());
     }
