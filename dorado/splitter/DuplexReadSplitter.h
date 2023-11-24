@@ -23,8 +23,7 @@ private:
     using SplitFinderF = std::function<splitter::PosRanges(const ExtRead&)>;
 
     ExtRead create_ext_read(SimplexReadPtr r) const;
-    std::vector<splitter::PosRange> possible_pore_regions(const ExtRead& read,
-                                                          bool report_argmax = true) const;
+    std::vector<splitter::PosRange> possible_pore_regions(const ExtRead& read) const;
     bool check_nearby_adapter(const SimplexRead& read,
                               splitter::PosRange r,
                               int adapter_edist) const;

@@ -100,6 +100,18 @@ std::optional<PosRange> check_rc_match(const std::string& seq,
     return res;
 }
 
+float qscore_mean(const std::string& qstring, splitter::PosRange r) {
+    uint64_t len = (int64_t)qstring.size();
+    uint64_t start = r.first;
+    uint64_t end = std::min(r.second, len);
+    assert(start < end);
+    int64_t sum = 0;
+    for (size_t i = start; i < end; ++i) {
+        sum += qstring[i] - 33;
+    }
+    return float(sum / (end - start));
+}
+
 }  // namespace
 
 namespace dorado::splitter {
@@ -123,8 +135,7 @@ DuplexReadSplitter::ExtRead DuplexReadSplitter::create_ext_read(SimplexReadPtr r
     return ext_read;
 }
 
-PosRanges DuplexReadSplitter::possible_pore_regions(const DuplexReadSplitter::ExtRead& read,
-                                                    bool report_argmax) const {
+PosRanges DuplexReadSplitter::possible_pore_regions(const DuplexReadSplitter::ExtRead& read) const {
     spdlog::trace("Analyzing signal in read {}", read.read->read_common.read_id);
 
     auto pore_sample_ranges =
@@ -136,26 +147,36 @@ PosRanges DuplexReadSplitter::possible_pore_regions(const DuplexReadSplitter::Ex
         auto move_start = pore_sample_range.start_sample / read.read->read_common.model_stride;
         auto move_end = pore_sample_range.end_sample / read.read->read_common.model_stride;
         auto move_argmax = pore_sample_range.argmax_sample / read.read->read_common.model_stride;
-        assert(move_end >= move_start);
-        //NB move_start can get to move_sums.size(), because of the stride rounding?
-        if (move_start >= read.move_sums.size() || move_end >= read.move_sums.size() ||
-            read.move_sums[move_start] == 0) {
+        assert(move_end >= move_argmax && move_argmax >= move_start);
+        if (move_end >= read.move_sums.size() || read.move_sums[move_start] == 0) {
             //either at very end of the signal or basecalls have not started yet
             continue;
         }
         auto start_pos = read.move_sums[move_start] - 1;
+        //TODO check (- 1)
         auto argmax_pos = read.move_sums[move_argmax] - 1;
         auto end_pos = read.move_sums[move_end];
-        assert(end_pos > start_pos);
-        if (end_pos <= start_pos + m_settings.max_pore_region) {
-            if (report_argmax) {
-                pore_regions.push_back({argmax_pos, argmax_pos + 1});
-            } else {
-                pore_regions.push_back({start_pos, end_pos});
-            }
+        //check that detected cluster corresponds to not too many bases
+        if (end_pos > start_pos + m_settings.max_pore_region) {
+            continue;
         }
-    }
 
+        assert(end_pos > argmax_pos && argmax_pos >= start_pos);
+        if (m_settings.use_argmax) {
+            //switch to position of max sample
+            start_pos = argmax_pos;
+            end_pos = argmax_pos + 1;
+        }
+
+        //check that mean qscore near pore is low
+        if (m_settings.qscore_check_span > 0 &&
+            qscore_mean(read.read->read_common.qstring,
+                        {start_pos, start_pos + m_settings.qscore_check_span}) >
+                    m_settings.mean_qscore_thr - 0.01) {
+            continue;
+        }
+        pore_regions.push_back({start_pos, end_pos});
+    }
     return pore_regions;
 }
 
