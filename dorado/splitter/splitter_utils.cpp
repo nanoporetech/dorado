@@ -27,7 +27,7 @@ __attribute__((optimize("O0")))
 
 SimplexReadPtr subread(const SimplexRead& read,
                        std::optional<PosRange> seq_range,
-                       PosRange signal_range) {
+                       std::pair<uint64_t, uint64_t> signal_range) {
     //TODO support mods
     //NB: currently doesn't support mods
     //assert(read.mod_base_info == nullptr && read.base_mod_probs.empty());

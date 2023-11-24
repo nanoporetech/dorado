@@ -21,14 +21,14 @@ RNAReadSplitter::ExtRead RNAReadSplitter::create_ext_read(SimplexReadPtr r) cons
             detect_pore_signal<int16_t>(ext_read.read->read_common.raw_data, m_settings.pore_thr,
                                         m_settings.pore_cl_dist, m_settings.expect_pore_prefix);
     for (const auto& range : ext_read.possible_pore_regions) {
-        spdlog::trace("Pore range {}-{} {}", range.first, range.second,
+        spdlog::trace("Pore range {}-{} {}", range.start_sample, range.end_sample,
                       ext_read.read->read_common.read_id);
     }
     return ext_read;
 }
 
 std::vector<SimplexReadPtr> RNAReadSplitter::subreads(SimplexReadPtr read,
-                                                      const PosRanges& spacers) const {
+                                                      const SignalRanges& spacers) const {
     std::vector<SimplexReadPtr> subreads;
     subreads.reserve(spacers.size() + 1);
 
@@ -37,16 +37,16 @@ std::vector<SimplexReadPtr> RNAReadSplitter::subreads(SimplexReadPtr read,
         return subreads;
     }
 
-    uint64_t start_pos = 0;
+    uint64_t start_sample = 0;
     for (const auto& r : spacers) {
-        if (start_pos < r.first) {
-            subreads.push_back(subread(*read, std::nullopt, {start_pos, r.first}));
+        if (start_sample < r.start_sample) {
+            subreads.push_back(subread(*read, std::nullopt, {start_sample, r.start_sample}));
         }
-        start_pos = r.second;
+        start_sample = r.end_sample;
     }
-    if (start_pos < read->read_common.get_raw_data_samples()) {
+    if (start_sample < read->read_common.get_raw_data_samples()) {
         subreads.push_back(subread(*read, std::nullopt,
-                                   {start_pos, read->read_common.get_raw_data_samples()}));
+                                   {start_sample, read->read_common.get_raw_data_samples()}));
     }
 
     return subreads;
@@ -55,10 +55,8 @@ std::vector<SimplexReadPtr> RNAReadSplitter::subreads(SimplexReadPtr read,
 std::vector<std::pair<std::string, RNAReadSplitter::SplitFinderF>>
 RNAReadSplitter::build_split_finders() const {
     std::vector<std::pair<std::string, SplitFinderF>> split_finders;
-    split_finders.push_back({"PORE_ADAPTER", [&](const ExtRead& read) {
-                                 return filter_ranges(read.possible_pore_regions,
-                                                      [&](PosRange) { return true; });
-                             }});
+    split_finders.push_back(
+            {"PORE_ADAPTER", [&](const ExtRead& read) { return read.possible_pore_regions; }});
 
     return split_finders;
 }

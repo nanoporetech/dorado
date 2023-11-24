@@ -18,16 +18,16 @@ private:
     //TODO consider precomputing and reusing ranges with high signal
     struct ExtRead {
         SimplexReadPtr read;
-        splitter::PosRanges possible_pore_regions;
+        splitter::SignalRanges possible_pore_regions;
     };
 
-    using SplitFinderF = std::function<splitter::PosRanges(const ExtRead&)>;
+    using SplitFinderF = std::function<splitter::SignalRanges(const ExtRead&)>;
 
     ExtRead create_ext_read(SimplexReadPtr r) const;
-    std::vector<splitter::PosRange> possible_pore_regions(const ExtRead& read) const;
+    SignalRanges possible_pore_regions(const ExtRead& read) const;
 
     std::vector<SimplexReadPtr> subreads(SimplexReadPtr read,
-                                         const splitter::PosRanges& spacers) const;
+                                         const splitter::SignalRanges& spacers) const;
 
     std::vector<std::pair<std::string, SplitFinderF>> build_split_finders() const;
 

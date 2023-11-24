@@ -132,8 +132,8 @@ PosRanges DuplexReadSplitter::possible_pore_regions(const DuplexReadSplitter::Ex
 
     PosRanges pore_regions;
     for (auto pore_sample_range : pore_sample_ranges) {
-        auto move_start = pore_sample_range.first / read.read->read_common.model_stride;
-        auto move_end = pore_sample_range.second / read.read->read_common.model_stride;
+        auto move_start = pore_sample_range.start_sample / read.read->read_common.model_stride;
+        auto move_end = pore_sample_range.end_sample / read.read->read_common.model_stride;
         assert(move_end >= move_start);
         //NB move_start can get to move_sums.size(), because of the stride rounding?
         if (move_start >= read.move_sums.size() || move_end >= read.move_sums.size() ||
