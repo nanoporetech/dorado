@@ -7,6 +7,7 @@
 #include "nn/ModBaseModel.h"
 #include "nn/ModBaseRunner.h"
 #include "nn/ModelRunner.h"
+#include "read_pipeline/AdapterDetectorNode.h"
 #include "read_pipeline/BarcodeClassifierNode.h"
 #include "read_pipeline/BasecallerNode.h"
 #include "read_pipeline/HtsReader.h"
@@ -348,6 +349,18 @@ DEFINE_TEST(NodeSmokeTestRead, "BarcodeClassifierNode") {
     std::vector<std::string> kits = {"SQK-RPB004", "EXP-NBD196"};
     run_smoke_test<dorado::BarcodeClassifierNode>(2, kits, barcode_both_ends, no_trim,
                                                   std::nullopt);
+}
+
+DEFINE_TEST(NodeSmokeTestRead, "AdapterDetectorNode") {
+    auto trim_adapters = GENERATE(false, true);
+    auto trim_primers = GENERATE(false, true);
+    auto pipeline_restart = GENERATE(false, true);
+    CAPTURE(trim_adapters);
+    CAPTURE(trim_primers);
+    CAPTURE(pipeline_restart);
+
+    set_pipeline_restart(pipeline_restart);
+    run_smoke_test<dorado::AdapterDetectorNode>(2, trim_adapters, trim_primers);
 }
 
 TEST_CASE("BarcodeClassifierNode: test simple pipeline with fastq and sam files") {
