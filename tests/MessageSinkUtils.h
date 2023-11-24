@@ -54,15 +54,20 @@ std::vector<T> ConvertMessages(std::vector<dorado::Message>&& messages) {
     return converted_messages;
 }
 
-template <class... Args>
-size_t CountSinkReads(const std::string& data_path, Args&&... args) {
+inline size_t CountSinkReads(const std::string& data_path,
+                             const std::string& device,
+                             size_t num_worker_threads,
+                             size_t max_reads,
+                             std::optional<std::unordered_set<std::string>> read_list,
+                             std::unordered_set<std::string> read_ignore_list) {
     dorado::PipelineDescriptor pipeline_desc;
     std::vector<dorado::Message> messages;
     pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
 
-    dorado::DataLoader loader(*pipeline, args...);
-    loader.load_reads(data_path, false);
+    dorado::DataLoader loader(*pipeline, device, num_worker_threads, max_reads,
+                              std::move(read_list), std::move(read_ignore_list));
+    loader.load_reads(data_path, false, dorado::ReadOrder::UNRESTRICTED);
     pipeline.reset();
     return messages.size();
 }

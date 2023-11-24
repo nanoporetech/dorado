@@ -239,7 +239,7 @@ void setup(std::vector<std::string> args,
                       reads_already_processed);
 
     // Run pipeline.
-    loader.load_reads(data_path, recursive_file_loading);
+    loader.load_reads(data_path, recursive_file_loading, ReadOrder::UNRESTRICTED);
 
     // Wait for the pipeline to complete.  When it does, we collect
     // final stats to allow accurate summarisation.

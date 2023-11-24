@@ -393,7 +393,7 @@ int duplex(int argc, char* argv[]) {
             }
             hts_writer_ref.set_and_write_header(hdr.get());
 
-            DataLoader loader(*pipeline, "cpu", num_devices, 0, std::move(read_list));
+            DataLoader loader(*pipeline, "cpu", num_devices, 0, std::move(read_list), {});
 
             stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
                     kStatsPeriod, stats_reporters, stats_callables, max_stats_records);
