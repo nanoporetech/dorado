@@ -290,8 +290,9 @@ std::tuple<int, int, std::vector<uint8_t>> realign_moves(std::string query_seque
 
     // First thing to do - let's just print out the alignment line by line so we know it's working.
     for (auto alignment_entry : alignment) {
-        if (alignment_entry ==
-            0) {  //Match, need to update the new move table and move the cursor of the old move table.
+        if ((alignment_entry == 0) ||
+            (alignment_entry ==
+             3)) {  //Match or mismatch, need to update the new move table and move the cursor of the old move table.
             new_moves.push_back(1);  // We have a match so we need a 1
             new_move_cursor++;
             old_move_cursor++;
@@ -309,14 +310,12 @@ std::tuple<int, int, std::vector<uint8_t>> realign_moves(std::string query_seque
             // Update the Query and target seq cursors
             query_seq_cursor++;
             target_seq_cursor++;
-        }
-        if (alignment_entry == 1) {  //Insertion to target
+        } else if (alignment_entry == 1) {  //Insertion to target
             // If we have an insertion in the target, we need to add a 1 to the new move table, and increment the new move table cursor. the old move table cursor and new are now out of sync and need fixing.
             new_moves.push_back(1);
             new_move_cursor++;
             target_seq_cursor++;
-        }
-        if (alignment_entry == 2) {  //Insertion to Query
+        } else if (alignment_entry == 2) {  //Insertion to Query
             // We have a query insertion, all we need to do is add zeros to the new move table to make it up, the signal can be assigned to the leftmost nucleotide in the sequence.
             new_moves.push_back(0);
             new_move_cursor++;
