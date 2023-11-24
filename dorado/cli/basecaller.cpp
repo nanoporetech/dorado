@@ -116,8 +116,8 @@ void setup(std::vector<std::string> args,
     auto remora_runners = create_modbase_runners(
             remora_models, device, default_parameters.remora_runners_per_caller, remora_batch_size);
 
-    auto [runners, num_devices] =
-            create_basecall_runners(model_config, device, num_runners, 0, batch_size, chunk_size);
+    auto [runners, num_devices] = create_basecall_runners(model_config, device, num_runners, 0,
+                                                          batch_size, chunk_size, 1.f, false);
 
     auto read_groups = DataLoader::load_read_groups(data_path, model_name, modbase_model_names,
                                                     recursive_file_loading);
