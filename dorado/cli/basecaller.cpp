@@ -157,7 +157,7 @@ void setup(std::vector<std::string> args,
     if (estimate_poly_a) {
         current_sink_node = pipeline_desc.add_node<PolyACalculator>(
                 {current_sink_node}, std::thread::hardware_concurrency(),
-                is_rna_model(model_config));
+                is_rna_model(model_config), 1000);
     }
     if (!barcode_kits.empty()) {
         current_sink_node = pipeline_desc.add_node<BarcodeClassifierNode>(

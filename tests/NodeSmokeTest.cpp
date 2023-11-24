@@ -398,7 +398,7 @@ DEFINE_TEST(NodeSmokeTestRead, "PolyACalculator") {
                                    0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 1, 1};
     });
 
-    run_smoke_test<dorado::PolyACalculator>(8, is_rna);
+    run_smoke_test<dorado::PolyACalculator>(8, is_rna, 1000);
 }
 
 }  // namespace
