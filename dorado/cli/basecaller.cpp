@@ -179,7 +179,8 @@ void setup(std::vector<std::string> args,
             pipeline_desc, std::move(runners), std::move(remora_runners), overlap,
             mean_qscore_start_pos, thread_allocations.scaler_node_threads,
             true /* Enable read splitting */, thread_allocations.splitter_node_threads,
-            int(thread_allocations.remora_threads * num_devices), current_sink_node);
+            int(thread_allocations.remora_threads * num_devices), current_sink_node,
+            PipelineDescriptor::InvalidNodeHandle);
 
     // Create the Pipeline from our description.
     std::vector<dorado::stats::StatsReporter> stats_reporters{dorado::stats::sys_stats_report};
