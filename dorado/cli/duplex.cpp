@@ -119,7 +119,7 @@ int duplex(int argc, char* argv[]) {
             .action([&](const auto&) { ++verbosity; })
             .append();
 
-    cli::add_minimap2_arguments(parser, AlignerNode::dflt_options);
+    cli::add_minimap2_arguments(parser, alignment::dflt_options);
     cli::add_internal_arguments(parser);
 
     try {
@@ -213,8 +213,9 @@ int duplex(int argc, char* argv[]) {
             hts_writer = pipeline_desc.add_node<HtsWriter>({}, "-", output_mode, 4);
             converted_reads_sink = hts_writer;
         } else {
-            auto options = cli::process_minimap2_arguments(parser, AlignerNode::dflt_options);
-            aligner = pipeline_desc.add_node<AlignerNode>({}, ref, options,
+            auto options = cli::process_minimap2_arguments(parser, alignment::dflt_options);
+            auto index_file_access = std::make_shared<alignment::IndexFileAccess>();
+            aligner = pipeline_desc.add_node<AlignerNode>({}, index_file_access, ref, options,
                                                           std::thread::hardware_concurrency());
             hts_writer = pipeline_desc.add_node<HtsWriter>({}, "-", output_mode, 4);
             pipeline_desc.add_node_sink(aligner, hts_writer);
@@ -310,9 +311,11 @@ int duplex(int argc, char* argv[]) {
 
             // Write read group info to header.
             auto duplex_rg_name = std::string(model + "_" + stereo_model_name);
-            auto read_groups = DataLoader::load_read_groups(reads, model, recursive_file_loading);
-            read_groups.merge(
-                    DataLoader::load_read_groups(reads, duplex_rg_name, recursive_file_loading));
+            // TODO: supply modbase model names once duplex modbase is complete
+            auto read_groups =
+                    DataLoader::load_read_groups(reads, model, "", recursive_file_loading);
+            read_groups.merge(DataLoader::load_read_groups(reads, duplex_rg_name, "",
+                                                           recursive_file_loading));
             std::vector<std::string> barcode_kits;
             utils::add_rg_hdr(hdr.get(), read_groups, barcode_kits, nullptr);
 

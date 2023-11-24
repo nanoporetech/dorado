@@ -1,5 +1,6 @@
 #include "ReadPipeline.h"
 
+#include "DefaultClientInfo.h"
 #include "modbase/ModBaseContext.h"
 #include "stereo_features.h"
 #include "utils/bam_utils.h"
@@ -20,6 +21,8 @@
 using namespace std::chrono_literals;
 
 namespace dorado {
+
+ReadCommon::ReadCommon() : client_info(std::make_shared<DefaultClientInfo>()) {}
 
 std::string ReadCommon::generate_read_group() const {
     std::string read_group;
@@ -202,6 +205,9 @@ void ReadCommon::generate_modbase_tags(bam1_t *aln, uint8_t threshold) const {
             modbase_string += ";";
         }
     }
+
+    int seq_len = int(seq.length());
+    bam_aux_append(aln, "MN", 'i', sizeof(seq_len), (uint8_t *)&seq_len);
 
     bam_aux_append(aln, "MM", 'Z', int(modbase_string.length() + 1),
                    (uint8_t *)modbase_string.c_str());

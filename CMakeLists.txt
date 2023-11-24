@@ -44,7 +44,7 @@ function(enable_warnings_as_errors TARGET_NAME)
             _CRT_SECURE_NO_WARNINGS
         )
     else()
-        target_compile_options(${TARGET_NAME} PRIVATE -Wall -Werror)
+        target_compile_options(${TARGET_NAME} PRIVATE -Wall -Werror -Wextra)
     endif()
 endfunction()
 
@@ -171,6 +171,14 @@ endif()
 configure_file(dorado/Version.h.in dorado/Version.h)
 
 set(LIB_SOURCE_FILES
+    dorado/alignment/IndexFileAccess.cpp
+    dorado/alignment/IndexFileAccess.h
+    dorado/alignment/Minimap2Aligner.cpp
+    dorado/alignment/Minimap2Aligner.h
+    dorado/alignment/Minimap2Index.cpp
+    dorado/alignment/Minimap2Index.h
+    dorado/alignment/Minimap2IndexSupportTypes.h
+    dorado/alignment/Minimap2Options.h
     dorado/nn/CRFModel.h
     dorado/nn/CRFModel.cpp
     dorado/nn/CRFModelConfig.h
@@ -190,6 +198,8 @@ set(LIB_SOURCE_FILES
     dorado/read_pipeline/FakeDataLoader.h
     dorado/read_pipeline/ReadPipeline.cpp
     dorado/read_pipeline/ReadPipeline.h
+    dorado/read_pipeline/ClientInfo.h
+    dorado/read_pipeline/DefaultClientInfo.h
     dorado/read_pipeline/ScalerNode.cpp
     dorado/read_pipeline/ScalerNode.h
     dorado/read_pipeline/StereoDuplexEncoderNode.cpp
@@ -221,6 +231,8 @@ set(LIB_SOURCE_FILES
     dorado/read_pipeline/BarcodeClassifierNode.h
     dorado/read_pipeline/BarcodeDemuxerNode.cpp
     dorado/read_pipeline/BarcodeDemuxerNode.h
+    dorado/read_pipeline/AdapterDetectorNode.cpp
+    dorado/read_pipeline/AdapterDetectorNode.h
     dorado/read_pipeline/NullNode.h
     dorado/read_pipeline/NullNode.cpp
     dorado/read_pipeline/PairingNode.cpp
@@ -241,10 +253,14 @@ set(LIB_SOURCE_FILES
     dorado/splitter/RNAReadSplitter.h
     dorado/splitter/splitter_utils.cpp
     dorado/splitter/splitter_utils.h
+    dorado/demux/AdapterDetector.cpp
+    dorado/demux/AdapterDetector.h
     dorado/demux/BarcodeClassifier.cpp
     dorado/demux/BarcodeClassifier.h
     dorado/demux/BarcodeClassifierSelector.cpp
     dorado/demux/BarcodeClassifierSelector.h
+    dorado/demux/Trimmer.cpp
+    dorado/demux/Trimmer.h
     dorado/decode/beam_search.cpp
     dorado/decode/beam_search.h
     dorado/decode/CPUDecoder.cpp
@@ -257,7 +273,7 @@ set(LIB_SOURCE_FILES
     dorado/modbase/ModBaseContext.h
     dorado/modbase/MotifMatcher.cpp
     dorado/modbase/MotifMatcher.h
-)
+ )
 
 if (DORADO_GPU_BUILD)
     if(APPLE)
