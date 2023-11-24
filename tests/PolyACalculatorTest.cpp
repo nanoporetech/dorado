@@ -35,7 +35,7 @@ TEST_CASE("PolyACalculator: Test polyT tail estimation", TEST_GROUP) {
     auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
     pipeline_desc.add_node<PolyACalculator>({sink}, 2, is_rna, 1000);
 
-    auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
+    auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
 
     fs::path data_dir = fs::path(get_data_dir(data));
     auto seq_file = data_dir / "seq.txt";

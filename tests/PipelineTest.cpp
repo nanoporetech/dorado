@@ -16,7 +16,7 @@ TEST_CASE("Creation", TEST_GROUP) {
     {
         // Empty pipelines are not allowed.
         PipelineDescriptor pipeline_desc;
-        auto pipeline = Pipeline::create(std::move(pipeline_desc));
+        auto pipeline = Pipeline::create(std::move(pipeline_desc), nullptr);
         CHECK(pipeline == nullptr);
     }
 
@@ -24,7 +24,7 @@ TEST_CASE("Creation", TEST_GROUP) {
         // A single node is allowed
         PipelineDescriptor pipeline_desc;
         pipeline_desc.add_node<NullNode>({});
-        auto pipeline = Pipeline::create(std::move(pipeline_desc));
+        auto pipeline = Pipeline::create(std::move(pipeline_desc), nullptr);
         CHECK(pipeline != nullptr);
     }
 
@@ -33,7 +33,7 @@ TEST_CASE("Creation", TEST_GROUP) {
         PipelineDescriptor pipeline_desc;
         pipeline_desc.add_node<NullNode>({});
         pipeline_desc.add_node<NullNode>({});
-        auto pipeline = Pipeline::create(std::move(pipeline_desc));
+        auto pipeline = Pipeline::create(std::move(pipeline_desc), nullptr);
         CHECK(pipeline == nullptr);
     }
 
@@ -42,7 +42,7 @@ TEST_CASE("Creation", TEST_GROUP) {
         PipelineDescriptor pipeline_desc;
         auto sink = pipeline_desc.add_node<NullNode>({});
         pipeline_desc.add_node<NullNode>({sink});
-        auto pipeline = Pipeline::create(std::move(pipeline_desc));
+        auto pipeline = Pipeline::create(std::move(pipeline_desc), nullptr);
         CHECK(pipeline != nullptr);
     }
 
@@ -52,7 +52,7 @@ TEST_CASE("Creation", TEST_GROUP) {
         auto sink = pipeline_desc.add_node<NullNode>({});
         auto source = pipeline_desc.add_node<NullNode>({});
         pipeline_desc.add_node_sink(source, sink);
-        auto pipeline = Pipeline::create(std::move(pipeline_desc));
+        auto pipeline = Pipeline::create(std::move(pipeline_desc), nullptr);
         CHECK(pipeline != nullptr);
     }
 
@@ -63,7 +63,7 @@ TEST_CASE("Creation", TEST_GROUP) {
         auto b = pipeline_desc.add_node<NullNode>({a});
         pipeline_desc.add_node_sink(a, b);
         pipeline_desc.add_node<NullNode>({a});
-        auto pipeline = Pipeline::create(std::move(pipeline_desc));
+        auto pipeline = Pipeline::create(std::move(pipeline_desc), nullptr);
         CHECK(pipeline == nullptr);
     }
 
@@ -73,7 +73,7 @@ TEST_CASE("Creation", TEST_GROUP) {
         auto sink_a = pipeline_desc.add_node<NullNode>({});
         auto sink_b = pipeline_desc.add_node<NullNode>({});
         pipeline_desc.add_node<NullNode>({sink_a, sink_b});
-        auto pipeline = Pipeline::create(std::move(pipeline_desc));
+        auto pipeline = Pipeline::create(std::move(pipeline_desc), nullptr);
         CHECK(pipeline != nullptr);
     }
 
@@ -84,7 +84,7 @@ TEST_CASE("Creation", TEST_GROUP) {
         auto sink_a = pipeline_desc.add_node<NullNode>({sink_c});
         auto sink_b = pipeline_desc.add_node<NullNode>({sink_c});
         pipeline_desc.add_node<NullNode>({sink_a, sink_b});
-        auto pipeline = Pipeline::create(std::move(pipeline_desc));
+        auto pipeline = Pipeline::create(std::move(pipeline_desc), nullptr);
         CHECK(pipeline != nullptr);
     }
 }
@@ -132,7 +132,7 @@ TEST_CASE("LinearDestructionOrder", TEST_GROUP) {
     }
 
     // Create and destroy a pipeline in our specified order.
-    auto pipeline = Pipeline::create(std::move(pipeline_desc));
+    auto pipeline = Pipeline::create(std::move(pipeline_desc), nullptr);
     pipeline.reset();
 
     // Verify that nodes were destroyed in source-to-sink order.
@@ -149,7 +149,7 @@ TEST_CASE("PipelineFlow", TEST_GROUP) {
         std::vector<dorado::Message> messages;
         auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
         pipeline_desc.add_node<NullNode>({sink});
-        auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
+        auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
         REQUIRE(pipeline != nullptr);
         pipeline->push_message(std::make_unique<dorado::SimplexRead>());
         pipeline.reset();
@@ -163,7 +163,7 @@ TEST_CASE("PipelineFlow", TEST_GROUP) {
         auto null_node = pipeline_desc.add_node<NullNode>({});
         auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
         pipeline_desc.add_node_sink(null_node, sink);
-        auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
+        auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
         REQUIRE(pipeline != nullptr);
         pipeline->push_message(std::make_unique<dorado::SimplexRead>());
         pipeline.reset();
@@ -176,7 +176,7 @@ TEST_CASE("TerminateRestart", TEST_GROUP) {
     PipelineDescriptor pipeline_desc;
     std::vector<dorado::Message> messages;
     pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
-    auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
+    auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
     REQUIRE(pipeline != nullptr);
     pipeline->push_message(std::make_unique<dorado::SimplexRead>());
     pipeline->terminate(dorado::DefaultFlushOptions());

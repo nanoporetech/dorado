@@ -138,7 +138,7 @@ TEST_CASE("4 subread split tagging", TEST_GROUP) {
     auto splitter = std::make_unique<const dorado::splitter::DuplexReadSplitter>(
             dorado::splitter::DuplexSplitSettings{});
     pipeline_desc.add_node<dorado::ReadSplitNode>({pairing_node}, std::move(splitter), 1, 1000);
-    auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
+    auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
 
     pipeline->push_message(std::move(read));
     pipeline.reset();
@@ -201,7 +201,7 @@ TEST_CASE("No split output read properties", TEST_GROUP) {
     auto splitter = std::make_unique<dorado::splitter::DuplexReadSplitter>(
             dorado::splitter::DuplexSplitSettings{});
     pipeline_desc.add_node<dorado::ReadSplitNode>({sink}, std::move(splitter), 1, 1000);
-    auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
+    auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
 
     pipeline->push_message(std::move(read));
     pipeline.reset();
@@ -250,7 +250,7 @@ TEST_CASE("Test split where only one subread is generated", TEST_GROUP) {
     auto splitter = std::make_unique<dorado::splitter::DuplexReadSplitter>(
             dorado::splitter::DuplexSplitSettings{});
     pipeline_desc.add_node<dorado::ReadSplitNode>({sink}, std::move(splitter), 1, 1000);
-    auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
+    auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
 
     pipeline->push_message(std::move(read));
     pipeline.reset();

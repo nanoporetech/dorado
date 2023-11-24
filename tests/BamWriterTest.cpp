@@ -29,7 +29,7 @@ protected:
         HtsReader reader(m_in_sam.string(), std::nullopt);
         PipelineDescriptor pipeline_desc;
         auto writer = pipeline_desc.add_node<HtsWriter>({}, m_out_bam.string(), mode, num_threads);
-        auto pipeline = Pipeline::create(std::move(pipeline_desc));
+        auto pipeline = Pipeline::create(std::move(pipeline_desc), nullptr);
 
         auto& writer_ref = dynamic_cast<HtsWriter&>(pipeline->get_node_ref(writer));
         writer_ref.set_and_write_header(reader.header);

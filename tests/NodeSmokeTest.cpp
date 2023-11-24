@@ -88,7 +88,7 @@ protected:
         std::vector<dorado::Message> messages;
         auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
         pipeline_desc.add_node<NodeType>({sink}, std::forward<Args>(args)...);
-        auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
+        auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
         if (m_pipeline_restart) {
             pipeline->terminate(dorado::DefaultFlushOptions());
             pipeline->restart();
@@ -373,7 +373,7 @@ TEST_CASE("BarcodeClassifierNode: test simple pipeline with fastq and sam files"
     pipeline_desc.add_node<dorado::BarcodeClassifierNode>({sink}, 8, kits, barcode_both_ends,
                                                           no_trim, std::nullopt);
 
-    auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
+    auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
 
     fs::path data1 = fs::path(get_data_dir("barcode_demux/double_end_variant")) /
                      "EXP-PBC096_barcode_both_ends_pass.fastq";

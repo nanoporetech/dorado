@@ -59,7 +59,7 @@ size_t CountSinkReads(const std::string& data_path, Args&&... args) {
     dorado::PipelineDescriptor pipeline_desc;
     std::vector<dorado::Message> messages;
     pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
-    auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
+    auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
 
     dorado::DataLoader loader(*pipeline, args...);
     loader.load_reads(data_path, false);

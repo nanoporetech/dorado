@@ -95,7 +95,7 @@ TEST_CASE(TEST_GROUP "Load data sorted by channel id.") {
     dorado::PipelineDescriptor pipeline_desc;
     std::vector<dorado::Message> messages;
     pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
-    auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
+    auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
 
     dorado::DataLoader loader(*pipeline, "cpu", 1, 0);
     loader.load_reads(data_path, true, dorado::ReadOrder::BY_CHANNEL);
@@ -137,7 +137,7 @@ TEST_CASE(TEST_GROUP "Test correct previous and next read ids when loaded by cha
     dorado::PipelineDescriptor pipeline_desc;
     std::vector<dorado::Message> messages;
     pipeline_desc.add_node<MessageSinkToVector>({}, 10, messages);
-    auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
+    auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
 
     dorado::DataLoader loader(*pipeline, "cpu", 1, 0);
     loader.load_reads(data_path, true, dorado::ReadOrder::BY_CHANNEL);

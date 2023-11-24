@@ -191,7 +191,7 @@ TEST_CASE(
                                                       std::nullopt);
     }
 
-    auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
+    auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
 
     // Create new read that is barcode - 100 As - barcode.
     auto read = std::make_unique<SimplexRead>();
@@ -340,7 +340,7 @@ TEST_CASE("BarcodeClassifierNode: test reads where trim length == read length", 
     pipeline_desc.add_node<BarcodeClassifierNode>({sink}, 8, kits, barcode_both_ends, no_trim,
                                                   std::nullopt);
 
-    auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
+    auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
     fs::path data_dir = fs::path(get_data_dir("barcode_demux"));
     auto bc_file = data_dir / "no_trim_expected.fastq";
 

@@ -342,9 +342,8 @@ public:
     // consumed during creation.
     // If non-null, stats_reporters has node stats reporters added to it.
     // Returns the resulting pipeline, or a null unique_ptr on error.
-    static std::unique_ptr<Pipeline> create(
-            PipelineDescriptor&& descriptor,
-            std::vector<stats::StatsReporter>* stats_reporters = nullptr);
+    static std::unique_ptr<Pipeline> create(PipelineDescriptor&& descriptor,
+                                            std::vector<stats::StatsReporter>* stats_reporters);
 
     // Routes the given message to the pipeline source node.
     void push_message(Message&& message);

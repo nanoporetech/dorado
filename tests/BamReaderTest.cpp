@@ -20,7 +20,7 @@ TEST_CASE("HtsReaderTest: Read fasta to sink", TEST_GROUP) {
     dorado::PipelineDescriptor pipeline_desc;
     std::vector<dorado::Message> bam_records;
     pipeline_desc.add_node<MessageSinkToVector>({}, 100, bam_records);
-    auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
+    auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
 
     dorado::HtsReader reader(fasta.string(), std::nullopt);
     reader.read(*pipeline, 100);
@@ -56,7 +56,7 @@ TEST_CASE("HtsReaderTest: Read SAM to sink", TEST_GROUP) {
     dorado::PipelineDescriptor pipeline_desc;
     std::vector<dorado::Message> bam_records;
     pipeline_desc.add_node<MessageSinkToVector>({}, 100, bam_records);
-    auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
+    auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
 
     dorado::HtsReader reader(sam.string(), std::nullopt);
     reader.read(*pipeline, 100);
