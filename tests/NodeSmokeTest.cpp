@@ -183,7 +183,7 @@ DEFINE_TEST(NodeSmokeTestRead, "ScalerNode") {
     config.quantile.quantile_b = 0.9f;
     config.quantile.shift_multiplier = 0.51f;
     config.quantile.scale_multiplier = 0.53f;
-    run_smoke_test<dorado::ScalerNode>(config, model_type, 2);
+    run_smoke_test<dorado::ScalerNode>(config, model_type, 2, 1000);
 }
 
 DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {

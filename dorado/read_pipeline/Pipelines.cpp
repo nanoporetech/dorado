@@ -57,8 +57,9 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
         current_node_handle = rna_splitter_node;
     }
 
-    auto scaler_node = pipeline_desc.add_node<ScalerNode>(
-            {}, model_config.signal_norm_params, model_config.sample_type, scaler_node_threads);
+    auto scaler_node =
+            pipeline_desc.add_node<ScalerNode>({}, model_config.signal_norm_params,
+                                               model_config.sample_type, scaler_node_threads, 1000);
     if (current_node_handle != PipelineDescriptor::InvalidNodeHandle) {
         pipeline_desc.add_node_sink(current_node_handle, scaler_node);
     } else {
@@ -162,7 +163,7 @@ void create_stereo_duplex_pipeline(PipelineDescriptor& pipeline_desc,
 
     auto scaler_node =
             pipeline_desc.add_node<ScalerNode>({basecaller_node}, model_config.signal_norm_params,
-                                               SampleType::DNA, scaler_node_threads);
+                                               SampleType::DNA, scaler_node_threads, 1000);
 
     // if we've been provided a source node, connect it to the start of our pipeline
     if (source_node_handle != PipelineDescriptor::InvalidNodeHandle) {
