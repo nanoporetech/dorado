@@ -13,10 +13,9 @@
 #define TEST_GROUP "[PairingNodeTest]"
 
 namespace {
-// Generate a read that is seq_len long with a specified start
-// time delay. If seq is defined, ignore the seq_len and use
-// the provided seq string directly.
-auto make_read(int delay_ms, size_t seq_len, const std::string& seq = "") {
+
+// Generate a read with a specified start time delay.
+auto make_read(int delay_ms, std::string seq) {
     auto read = std::make_unique<dorado::SimplexRead>();
     read->read_common.raw_data = at::zeros({10});
     read->read_common.sample_rate = 4000;
@@ -32,15 +31,17 @@ auto make_read(int delay_ms, size_t seq_len, const std::string& seq = "") {
             uint64_t(std::round(read->start_sample * 1000. / read->read_common.sample_rate));
     read->read_common.attributes.start_time =
             dorado::utils::get_string_timestamp_from_unix_time(read->read_common.start_time_ms);
-    if (seq.empty()) {
-        read->read_common.seq = std::string(seq_len, 'A');
-        read->read_common.qstring = std::string(seq_len, '~');
-    } else {
-        read->read_common.seq = seq;
-        read->read_common.qstring = std::string(seq.length(), '~');
-    }
+    read->read_common.qstring = std::string(seq.length(), '~');
+    read->read_common.seq = std::move(seq);
     return read;
 }
+
+// Generate a read that is seq_len long with a specified start
+// time delay.
+auto make_read(int delay_ms, size_t seq_len) {
+    return make_read(delay_ms, std::string(seq_len, 'A'));
+}
+
 }  // namespace
 
 TEST_CASE("Split read pairing", TEST_GROUP) {
@@ -55,13 +56,13 @@ TEST_CASE("Split read pairing", TEST_GROUP) {
     seq_rc = seq_rc.substr(0, size_t(seq.length() * 0.8f));
 
     std::array reads{
-            make_read(0, 1000),
-            make_read(10, 1000),     // too early to pair with {0}
-            make_read(10000, 6000),  // too late to pair with {1}
-            make_read(12500, 5990),
-            make_read(18000, 100),  // too short to pair with {2}
-            make_read(25000, 0, seq),
-            make_read(27500, 0, seq_rc)  // truncated reverse complement of {5}
+            make_read(0, 1000),       //
+            make_read(10, 1000),      // too early to pair with {0}
+            make_read(10000, 6000),   // too late to pair with {1}
+            make_read(12500, 5990),   //
+            make_read(18000, 100),    // too short to pair with {2}
+            make_read(25000, seq),    //
+            make_read(27500, seq_rc)  // truncated reverse complement of {5}
     };
 
     dorado::PipelineDescriptor pipeline_desc;
