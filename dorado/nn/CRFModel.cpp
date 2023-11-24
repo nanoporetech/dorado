@@ -790,7 +790,7 @@ struct CRFModelImpl : Module {
     }
 
     void load_state_dict(const std::vector<at::Tensor> &weights) {
-        utils::load_state_dict(*this, weights);
+        utils::load_state_dict(*this, weights, {});
     }
 
 #if USE_KOI
