@@ -206,6 +206,9 @@ void ReadCommon::generate_modbase_tags(bam1_t *aln, uint8_t threshold) const {
         }
     }
 
+    int seq_len = int(seq.length());
+    bam_aux_append(aln, "MN", 'i', sizeof(seq_len), (uint8_t *)&seq_len);
+
     bam_aux_append(aln, "MM", 'Z', int(modbase_string.length() + 1),
                    (uint8_t *)modbase_string.c_str());
     bam_aux_update_array(aln, "ML", 'C', int(modbase_prob.size()), (uint8_t *)modbase_prob.data());
