@@ -248,7 +248,7 @@ TEST_CASE(
 
     read->read_common.num_trimmed_samples = 0;
 
-    auto records = read->read_common.extract_sam_lines(true /* emit moves*/, 10);
+    auto records = read->read_common.extract_sam_lines(true /* emit moves*/, 10, false);
 
     // Push a Read type.
     pipeline->push_message(std::move(read));
@@ -321,7 +321,7 @@ TEST_CASE(
 
             CHECK(read_common.num_trimmed_samples == uint64_t(additional_trimmed_samples));
 
-            auto bams = read_common.extract_sam_lines(0, 10);
+            auto bams = read_common.extract_sam_lines(0, 10, false);
             auto& rec = bams[0];
             auto [mod_str, mod_probs] = dorado::utils::extract_modbase_info(rec.get());
         }
