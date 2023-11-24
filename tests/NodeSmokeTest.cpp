@@ -244,7 +244,7 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
 
     run_smoke_test<dorado::BasecallerNode>(std::move(runners),
                                            dorado::utils::default_parameters.overlap,
-                                           kBatchTimeoutMS, model_name);
+                                           kBatchTimeoutMS, model_name, 1000, "BasecallerNode", 0);
 }
 
 DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
