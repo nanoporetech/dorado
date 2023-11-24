@@ -87,7 +87,7 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
 
     if (!modbase_runners.empty()) {
         auto mod_base_caller_node = pipeline_desc.add_node<ModBaseCallerNode>(
-                {}, std::move(modbase_runners), modbase_node_threads, model_stride);
+                {}, std::move(modbase_runners), modbase_node_threads, model_stride, 1000);
         pipeline_desc.add_node_sink(current_node_handle, mod_base_caller_node);
         current_node_handle = mod_base_caller_node;
         last_node_handle = mod_base_caller_node;

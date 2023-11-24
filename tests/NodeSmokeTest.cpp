@@ -321,7 +321,7 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
                      m_rng);
     });
 
-    run_smoke_test<dorado::ModBaseCallerNode>(std::move(remora_runners), 2, model_stride);
+    run_smoke_test<dorado::ModBaseCallerNode>(std::move(remora_runners), 2, model_stride, 1000);
 }
 
 DEFINE_TEST(NodeSmokeTestBam, "ReadToBamType") {
