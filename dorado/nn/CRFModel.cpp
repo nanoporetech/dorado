@@ -433,7 +433,7 @@ struct ConvStackImpl : Module {
 };
 
 struct LinearCRFImpl : Module {
-    LinearCRFImpl(int insize, int outsize, bool bias_, bool tanh_and_scale = false) : bias(bias_) {
+    LinearCRFImpl(int insize, int outsize, bool bias_, bool tanh_and_scale) : bias(bias_) {
         linear = register_module("linear", Linear(LinearOptions(insize, outsize).bias(bias)));
         if (tanh_and_scale) {
             activation = register_module("activation", Tanh());
@@ -771,13 +771,15 @@ struct CRFModelImpl : Module {
         if (config.out_features.has_value()) {
             // The linear layer is decomposed into 2 matmuls.
             const int decomposition = config.out_features.value();
-            linear1 = register_module("linear1", LinearCRF(lstm_size, decomposition, true));
-            linear2 = register_module("linear2", LinearCRF(decomposition, config.outsize, false));
+            linear1 = register_module("linear1", LinearCRF(lstm_size, decomposition, true, false));
+            linear2 = register_module("linear2",
+                                      LinearCRF(decomposition, config.outsize, false, false));
             clamp1 = Clamp(-5.0, 5.0, config.clamp);
             encoder = Sequential(convs, rnns, linear1, linear2, clamp1);
         } else if ((config.convs[0].size > 4) && (config.num_features == 1)) {
             // v4.x model without linear decomposition
-            linear1 = register_module("linear1", LinearCRF(lstm_size, config.outsize, false));
+            linear1 =
+                    register_module("linear1", LinearCRF(lstm_size, config.outsize, false, false));
             clamp1 = Clamp(-5.0, 5.0, config.clamp);
             encoder = Sequential(convs, rnns, linear1, clamp1);
         } else {
