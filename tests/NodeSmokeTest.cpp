@@ -360,8 +360,6 @@ DEFINE_TEST(NodeSmokeTestRead, "AdapterDetectorNode") {
     CAPTURE(pipeline_restart);
 
     set_pipeline_restart(pipeline_restart);
-
-    std::vector<std::string> kits = {"SQK-RPB004", "EXP-NBD196"};
     run_smoke_test<dorado::AdapterDetectorNode>(2, trim_adapters, trim_primers);
 }
 
