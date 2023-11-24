@@ -56,7 +56,7 @@ TEST_CASE("BarcodeClassifier: test single ended barcode", TEST_GROUP) {
     for (std::string bc :
          {"SQK-RBK114-96_BC01", "SQK-RBK114-96_RBK39", "SQK-RBK114-96_BC92", "unclassified"}) {
         auto bc_file = data_dir / (bc + ".fastq");
-        HtsReader reader(bc_file.string());
+        HtsReader reader(bc_file.string(), std::nullopt);
         while (reader.read()) {
             auto seqlen = reader.record->core.l_qseq;
             std::string seq = utils::extract_sequence(reader.record.get());
@@ -83,7 +83,7 @@ TEST_CASE("BarcodeClassifier: test double ended barcode", TEST_GROUP) {
     for (std::string bc :
          {"SQK-RPB004_BC01", "SQK-RPB004_BC05", "SQK-RPB004_BC11", "unclassified"}) {
         auto bc_file = data_dir / (bc + ".fastq");
-        HtsReader reader(bc_file.string());
+        HtsReader reader(bc_file.string(), std::nullopt);
         while (reader.read()) {
             auto seqlen = reader.record->core.l_qseq;
             std::string seq = utils::extract_sequence(reader.record.get());
@@ -112,7 +112,7 @@ TEST_CASE("BarcodeClassifier: test double ended barcode with different variants"
     for (std::string bc :
          {"EXP-PBC096_BC04", "EXP-PBC096_BC37", "EXP-PBC096_BC83", "unclassified"}) {
         auto bc_file = data_dir / (bc + ".fastq");
-        HtsReader reader(bc_file.string());
+        HtsReader reader(bc_file.string(), std::nullopt);
         while (reader.read()) {
             auto seqlen = reader.record->core.l_qseq;
             std::string seq = utils::extract_sequence(reader.record.get());
@@ -140,7 +140,7 @@ TEST_CASE("BarcodeClassifier: check barcodes on both ends - failing case", TEST_
 
     // Check case where both ends don't match.
     auto bc_file = data_dir / "EXP-PBC096_barcode_both_ends_fail.fastq";
-    HtsReader reader(bc_file.string());
+    HtsReader reader(bc_file.string(), std::nullopt);
     while (reader.read()) {
         std::string seq = utils::extract_sequence(reader.record.get());
         auto single_end_res = classifier.barcode(seq, false, std::nullopt);
@@ -157,7 +157,7 @@ TEST_CASE("BarcodeClassifier: check barcodes on both ends - passing case", TEST_
 
     // Check case where both ends do match.
     auto bc_file = data_dir / "EXP-PBC096_barcode_both_ends_pass.fastq";
-    HtsReader reader(bc_file.string());
+    HtsReader reader(bc_file.string(), std::nullopt);
     while (reader.read()) {
         std::string seq = utils::extract_sequence(reader.record.get());
         auto single_end_res = classifier.barcode(seq, false, std::nullopt);
@@ -345,7 +345,7 @@ TEST_CASE("BarcodeClassifierNode: test reads where trim length == read length", 
     auto bc_file = data_dir / "no_trim_expected.fastq";
 
     // Only one read in the file, so fetch that.
-    HtsReader reader(bc_file.string());
+    HtsReader reader(bc_file.string(), std::nullopt);
     reader.read();
 
     // Fetch the original read before barcode trimming.

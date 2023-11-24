@@ -67,7 +67,7 @@ int summary(int argc, char *argv[]) {
     auto reads(parser.get<std::string>("reads"));
     auto separator(parser.get<std::string>("separator"));
 
-    HtsReader reader(reads);
+    HtsReader reader(reads, std::nullopt);
 
     auto read_group_exp_start_time = utils::get_read_group_info(reader.header, "DT");
 

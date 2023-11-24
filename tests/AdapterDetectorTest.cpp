@@ -28,7 +28,7 @@ TEST_CASE("AdapterDetector: test adapter detection", TEST_GROUP) {
     const auto& adapters = detector.get_adapter_sequences();
 
     auto test_file = data_dir / "SQK-RBK114-96_BC01.fastq";
-    HtsReader reader(test_file.string());
+    HtsReader reader(test_file.string(), std::nullopt);
     reader.read();
     std::string seq = utils::extract_sequence(reader.record.get());
     for (size_t i = 0; i < adapters.size(); ++i) {
@@ -73,7 +73,7 @@ TEST_CASE("AdapterDetector: test primer detection", TEST_GROUP) {
     const auto& primers = detector.get_primer_sequences();
 
     auto test_file = data_dir / "SQK-RBK114-96_BC01.fastq";
-    HtsReader reader(test_file.string());
+    HtsReader reader(test_file.string(), std::nullopt);
     reader.read();
     std::string seq = utils::extract_sequence(reader.record.get());
     for (size_t i = 0; i < primers.size(); ++i) {

@@ -379,8 +379,8 @@ TEST_CASE("BarcodeClassifierNode: test simple pipeline with fastq and sam files"
                      "EXP-PBC096_barcode_both_ends_pass.fastq";
     fs::path data2 = fs::path(get_data_dir("bam_utils")) / "test.sam";
     for (auto& test_file : {data1, data2}) {
-        dorado::HtsReader reader(test_file.string());
-        reader.read(*pipeline);
+        dorado::HtsReader reader(test_file.string(), std::nullopt);
+        reader.read(*pipeline, -1);
     }
 }
 

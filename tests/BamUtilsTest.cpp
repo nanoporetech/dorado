@@ -140,7 +140,7 @@ TEST_CASE("BamUtilsTest: Test bam extraction helpers", TEST_GROUP) {
     fs::path bam_utils_test_dir = fs::path(get_data_dir("bam_utils"));
     auto sam = bam_utils_test_dir / "test.sam";
 
-    HtsReader reader(sam.string());
+    HtsReader reader(sam.string(), std::nullopt);
     REQUIRE(reader.read());  // Parse first and only record.
     auto record = reader.record.get();
 

@@ -31,7 +31,7 @@ void ResumeLoaderNode::copy_completed_reads() {
     auto initial_hts_log_level = hts_get_log_level();
     hts_set_log_level(HTS_LOG_OFF);
 
-    auto reader = std::make_unique<HtsReader>(m_resume_file);
+    auto reader = std::make_unique<HtsReader>(m_resume_file, std::nullopt);
 
     // Iterate over all reads and write to sink.
     try {

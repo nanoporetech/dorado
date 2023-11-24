@@ -65,7 +65,7 @@ TEST_CASE("AlignerTest: Check standard alignment", TEST_GROUP) {
     auto options = dorado::alignment::dflt_options;
     options.kmer_size = options.window_size = 15;
     options.index_batch_size = 1'000'000'000ull;
-    dorado::HtsReader reader(query.string());
+    dorado::HtsReader reader(query.string(), std::nullopt);
     auto bam_records = RunAlignmentPipeline(reader, ref.string(), options, 10);
     REQUIRE(bam_records.size() == 1);
 
@@ -100,7 +100,7 @@ TEST_CASE("AlignerTest: Check supplementary alignment", TEST_GROUP) {
     auto options = dorado::alignment::dflt_options;
     options.kmer_size = options.window_size = 15;
     options.index_batch_size = 1'000'000'000ull;
-    dorado::HtsReader reader(query.string());
+    dorado::HtsReader reader(query.string(), std::nullopt);
     auto bam_records = RunAlignmentPipeline(reader, ref.string(), options, 10);
     REQUIRE(bam_records.size() == 2);
 
@@ -137,7 +137,7 @@ TEST_CASE("AlignerTest: Check reverse complement alignment", TEST_GROUP) {
     auto options = dorado::alignment::dflt_options;
     options.kmer_size = options.window_size = 15;
     options.index_batch_size = 1'000'000'000ull;
-    dorado::HtsReader reader(query.string());
+    dorado::HtsReader reader(query.string(), std::nullopt);
     auto bam_records = RunAlignmentPipeline(reader, ref.string(), options, 10);
     REQUIRE(bam_records.size() == 1);
 
@@ -169,7 +169,7 @@ TEST_CASE("AlignerTest: Check dorado tags are retained", TEST_GROUP) {
     auto options = dorado::alignment::dflt_options;
     options.kmer_size = options.window_size = 15;
     options.index_batch_size = 1'000'000'000ull;
-    dorado::HtsReader reader(query.string());
+    dorado::HtsReader reader(query.string(), std::nullopt);
     auto bam_records = RunAlignmentPipeline(reader, ref.string(), options, 10);
     REQUIRE(bam_records.size() == 1);
 
@@ -194,7 +194,7 @@ TEST_CASE("AlignerTest: Verify impact of updated aligner args", TEST_GROUP) {
         auto options = dorado::alignment::dflt_options;
         options.kmer_size = options.window_size = 28;
         options.index_batch_size = 1'000'000'000ull;
-        dorado::HtsReader reader(query.string());
+        dorado::HtsReader reader(query.string(), std::nullopt);
         auto bam_records = RunAlignmentPipeline(reader, ref.string(), options, 2);
         CHECK(bam_records.size() == 2);  // Generates 2 alignments.
     }
@@ -204,7 +204,7 @@ TEST_CASE("AlignerTest: Verify impact of updated aligner args", TEST_GROUP) {
         auto options = dorado::alignment::dflt_options;
         options.kmer_size = options.window_size = 5;
         options.index_batch_size = 1'000'000'000ull;
-        dorado::HtsReader reader(query.string());
+        dorado::HtsReader reader(query.string(), std::nullopt);
         auto bam_records = RunAlignmentPipeline(reader, ref.string(), options, 2);
         CHECK(bam_records.size() == 1);  // Generates 1 alignment.
     }
@@ -341,7 +341,7 @@ SCENARIO("AlignerNode push SimplexRead", TEST_GROUP) {
             }
 
             AND_GIVEN("read with alignment matches") {
-                dorado::HtsReader reader(ref.string());
+                dorado::HtsReader reader(ref.string(), std::nullopt);
                 reader.read();
                 auto sequence = dorado::utils::extract_sequence(reader.record.get());
                 read_common.seq = dorado::utils::extract_sequence(reader.record.get());

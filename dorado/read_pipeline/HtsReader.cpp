@@ -66,7 +66,7 @@ void HtsReader::read(Pipeline& pipeline, int max_reads) {
 }
 
 ReadMap read_bam(const std::string& filename, const std::unordered_set<std::string>& read_ids) {
-    HtsReader reader(filename);
+    HtsReader reader(filename, std::nullopt);
 
     ReadMap reads;
 
@@ -112,7 +112,7 @@ std::unordered_set<std::string> fetch_read_ids(const std::string& filename) {
     hts_set_log_level(HTS_LOG_OFF);
 
     std::unordered_set<std::string> read_ids;
-    HtsReader reader(filename);
+    HtsReader reader(filename, std::nullopt);
     try {
         while (reader.read()) {
             std::string read_id = bam_get_qname(reader.record);
