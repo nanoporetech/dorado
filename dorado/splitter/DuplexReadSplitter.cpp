@@ -164,7 +164,7 @@ bool DuplexReadSplitter::check_nearby_adapter(const SimplexRead& read,
                                               int adapter_edist) const {
     return find_best_adapter_match(m_settings.adapter, read.read_common.seq, adapter_edist,
                                    //including spacer region in search
-                                   {r.first, std::min(r.second + m_settings.pore_adapter_range,
+                                   {r.first, std::min(r.second + m_settings.pore_adapter_span,
                                                       (uint64_t)read.read_common.seq.size())})
             .has_value();
 }
