@@ -46,6 +46,7 @@ void AdapterDetectorNode::terminate_impl() {
             m->join();
         }
     }
+    m_workers.clear();
 }
 
 void AdapterDetectorNode::restart() {

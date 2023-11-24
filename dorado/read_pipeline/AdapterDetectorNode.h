@@ -28,7 +28,6 @@ private:
     size_t m_threads{1};
     bool m_trim_adapters;
     bool m_trim_primers;
-    std::atomic<size_t> m_active{0};
     std::vector<std::unique_ptr<std::thread>> m_workers;
     std::atomic<int> m_num_records{0};
     demux::AdapterDetector m_detector;

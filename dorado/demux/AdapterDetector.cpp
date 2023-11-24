@@ -92,11 +92,11 @@ AdapterScoreResult AdapterDetector::find_primers(const std::string& seq) {
     return detect(seq, m_primer_sequences, PRIMER);
 }
 
-const std::vector<AdapterDetector::Query> AdapterDetector::get_adapter_sequences() const {
+const std::vector<AdapterDetector::Query>& AdapterDetector::get_adapter_sequences() const {
     return m_adapter_sequences;
 }
 
-const std::vector<AdapterDetector::Query> AdapterDetector::get_primer_sequences() const {
+const std::vector<AdapterDetector::Query>& AdapterDetector::get_primer_sequences() const {
     return m_primer_sequences;
 }
 

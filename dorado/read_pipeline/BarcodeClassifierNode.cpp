@@ -70,6 +70,7 @@ void BarcodeClassifierNode::terminate_impl() {
             m->join();
         }
     }
+    m_workers.clear();
 }
 
 void BarcodeClassifierNode::restart() {
