@@ -9,16 +9,16 @@
 
 #### Read Group Header
 
-|    |    |                                                       |
-| -- | -- | ----------------------------------------------------- |
-| RG | ID | `<runid>_<basecalling_model>_<barcode_arrangement>`   |
-|    | PU | `<flow_cell_id>`                                      |
-|    | PM | `<device_id>`                                         |
-|    | DT | `<exp_start_time>`                                    |
-|    | PL | `ONT`                                                 |
-|    | DS | `basecall_model=<basecall_model_name> runid=<run_id>` |
-|    | LB | `<sample_id>`                                         |
-|    | SM | `<sample_id>`                                         |
+|    |    |                                                                                            |
+| -- | -- | ------------------------------------------------------------------------------------------ |
+| RG | ID | `<runid>_<basecalling_model>_<barcode_arrangement>`                                        |
+|    | PU | `<flow_cell_id>`                                                                           |
+|    | PM | `<device_id>`                                                                              |
+|    | DT | `<exp_start_time>`                                                                         |
+|    | PL | `ONT`                                                                                      |
+|    | DS | `basecall_model=<basecall_model_name> modbase_models=<modbase_model_names> runid=<run_id>` |
+|    | LB | `<sample_id>`                                                                              |
+|    | SM | `<sample_id>`                                                                              |
 
 #### Read Tags
 

@@ -43,6 +43,7 @@ public:
     static std::unordered_map<std::string, ReadGroup> load_read_groups(
             std::string data_path,
             std::string model_path,
+            std::string modbase_model_names,
             bool recursive_file_loading = false);
 
     static int get_num_reads(

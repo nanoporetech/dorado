@@ -57,6 +57,9 @@ void add_rg_hdr(sam_hdr_t* hdr,
                << "\t";
             rg << "DS:"
                << "basecall_model=" << value_or_unknown(read_group.basecalling_model)
+               << (read_group.modbase_models.empty()
+                           ? ""
+                           : (" modbase_models=" + read_group.modbase_models))
                << " runid=" << value_or_unknown(read_group.run_id) << "\t";
             rg << "LB:" << value_or_unknown(read_group.sample_id) << "\t";
             rg << "SM:" << value_or_unknown(read_group.sample_id);
