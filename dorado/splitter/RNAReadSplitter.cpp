@@ -28,7 +28,7 @@ RNAReadSplitter::ExtRead RNAReadSplitter::create_ext_read(SimplexReadPtr r) cons
 }
 
 std::vector<SimplexReadPtr> RNAReadSplitter::subreads(SimplexReadPtr read,
-                                                      const SignalRanges& spacers) const {
+                                                      const SampleRanges& spacers) const {
     std::vector<SimplexReadPtr> subreads;
     subreads.reserve(spacers.size() + 1);
 

@@ -123,7 +123,8 @@ DuplexReadSplitter::ExtRead DuplexReadSplitter::create_ext_read(SimplexReadPtr r
     return ext_read;
 }
 
-PosRanges DuplexReadSplitter::possible_pore_regions(const DuplexReadSplitter::ExtRead& read) const {
+PosRanges DuplexReadSplitter::possible_pore_regions(const DuplexReadSplitter::ExtRead& read,
+                                                    bool report_argmax) const {
     spdlog::trace("Analyzing signal in read {}", read.read->read_common.read_id);
 
     auto pore_sample_ranges =
@@ -134,6 +135,7 @@ PosRanges DuplexReadSplitter::possible_pore_regions(const DuplexReadSplitter::Ex
     for (auto pore_sample_range : pore_sample_ranges) {
         auto move_start = pore_sample_range.start_sample / read.read->read_common.model_stride;
         auto move_end = pore_sample_range.end_sample / read.read->read_common.model_stride;
+        auto move_argmax = pore_sample_range.argmax_sample / read.read->read_common.model_stride;
         assert(move_end >= move_start);
         //NB move_start can get to move_sums.size(), because of the stride rounding?
         if (move_start >= read.move_sums.size() || move_end >= read.move_sums.size() ||
@@ -142,11 +144,15 @@ PosRanges DuplexReadSplitter::possible_pore_regions(const DuplexReadSplitter::Ex
             continue;
         }
         auto start_pos = read.move_sums[move_start] - 1;
-        //NB. adding adapter length
+        auto argmax_pos = read.move_sums[move_argmax] - 1;
         auto end_pos = read.move_sums[move_end];
         assert(end_pos > start_pos);
         if (end_pos <= start_pos + m_settings.max_pore_region) {
-            pore_regions.push_back({start_pos, end_pos});
+            if (report_argmax) {
+                pore_regions.push_back({argmax_pos, argmax_pos + 1});
+            } else {
+                pore_regions.push_back({start_pos, end_pos});
+            }
         }
     }
 
