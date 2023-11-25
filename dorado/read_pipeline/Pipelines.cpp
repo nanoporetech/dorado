@@ -76,10 +76,10 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
     // For DNA, read splitting happens after basecall.
     if (enable_read_splitter && !is_rna) {
         splitter::DuplexSplitSettings splitter_settings;
-        splitter_settings.simplex_mode = true;
+        splitter_settings.simplex_mode = false;
         auto dna_splitter = std::make_unique<const splitter::DuplexReadSplitter>(splitter_settings);
-        auto dna_splitter_node = pipeline_desc.add_node<ReadSplitNode>({}, std::move(dna_splitter),
-                                                                       splitter_node_threads);
+        auto dna_splitter_node =
+                pipeline_desc.add_node<ReadSplitNode>({}, std::move(dna_splitter), 1);
         pipeline_desc.add_node_sink(current_node_handle, dna_splitter_node);
         current_node_handle = dna_splitter_node;
         last_node_handle = dna_splitter_node;
