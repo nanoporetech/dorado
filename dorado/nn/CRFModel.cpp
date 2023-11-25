@@ -368,7 +368,6 @@ struct ConvStackImpl : Module {
             if (output_layout == TensorLayout::NTC && C_out > 16) {
                 wm.next_TC(T_out, params.winlen * C_in, TensorLayout::NTC);
             } else if (cutlass_conv) {
-                wm.next_TC(T_in + (params.winlen / 2) * 2, C_in, TensorLayout::NTC);
             } else if (output_layout != TensorLayout::NTC) {
                 wm.next_TC(T_out, params.winlen * C_in, TensorLayout::TNC);
                 if (output_layout == TensorLayout::CUTLASS_TNC_I8) {
@@ -412,7 +411,7 @@ struct ConvStackImpl : Module {
                                              std::to_string(params.insize));
                 }
             } else if (cutlass_conv) {
-                utils::ScopedProfileRange spr("koi linear conv", 3);
+                utils::ScopedProfileRange spr("linear conv", 3);
                 auto out_type = (output_layout == TensorLayout::CUTLASS_TNC_I8) ? KOI_I8 : KOI_F16;
                 in.slice(1, 0, padding) = 0;
                 in.slice(1, -padding, torch::indexing::None) = 0;
@@ -427,7 +426,7 @@ struct ConvStackImpl : Module {
                                              std::to_string(params.insize));
                 }
             } else {
-                utils::ScopedProfileRange spr("koi window conv", 3);
+                utils::ScopedProfileRange spr("window conv", 3);
                 // The window tensor is either NTC or TNC, depending on whether the first two
                 // dimensions of the output layout are NT or TN.
                 bool is_NT = (output_layout == TensorLayout::NTC);
