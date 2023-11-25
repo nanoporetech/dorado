@@ -311,6 +311,12 @@ struct ConvStackImpl : Module {
     void reserve_working_memory(WorkingMemory &wm) {
         auto &last = layers.back();
         last.output_layout = get_koi_lstm_input_layout(last.params.size, last.params.activation);
+        last.cutlass_conv = utils::get_dev_opt<bool>("cutlass_conv", true) &&
+                            (last.output_layout == TensorLayout::CUTLASS_TNC_I8 ||
+                             last.output_layout == TensorLayout::CUTLASS_TNC_F16);
+        if (last.cutlass_conv) {
+            layers[layers.size() - 2].output_T_padding = last.params.winlen / 2;
+        }
         for (auto &layer : layers) {
             layer.reserve_working_memory(wm);
         }
@@ -348,6 +354,8 @@ struct ConvStackImpl : Module {
         Conv1d conv{nullptr};
 #if USE_KOI
         TensorLayout output_layout{TensorLayout::NTC};
+        bool cutlass_conv{false};
+        int output_T_padding{0};
         at::Tensor w_device;
         at::Tensor b_device;
 
@@ -359,13 +367,15 @@ struct ConvStackImpl : Module {
             const int C_out = params.size;
             if (output_layout == TensorLayout::NTC && C_out > 16) {
                 wm.next_TC(T_out, params.winlen * C_in, TensorLayout::NTC);
+            } else if (cutlass_conv) {
+                wm.next_TC(T_in + (params.winlen / 2) * 2, C_in, TensorLayout::NTC);
             } else if (output_layout != TensorLayout::NTC) {
                 wm.next_TC(T_out, params.winlen * C_in, TensorLayout::TNC);
                 if (output_layout == TensorLayout::CUTLASS_TNC_I8) {
                     wm.next_TC(T_out, C_out, TensorLayout::TNC);
                 }
             }
-            wm.next_TC(T_out, C_out, output_layout);
+            wm.next_TC(T_out + 2 * output_T_padding, C_out, output_layout);
         }
 
         void run_koi(WorkingMemory &wm) {
@@ -374,7 +384,8 @@ struct ConvStackImpl : Module {
 
             auto in = wm.current;
             assert(wm.layout == TensorLayout::NTC);
-            const int T_in = wm.T;
+            const int padding = (params.winlen / 2);
+            const int T_in = cutlass_conv ? wm.T - 2 * padding : wm.T;
             const int T_out = T_in / params.stride;
             const int C_in = wm.C;
             const int C_out = params.size;
@@ -383,11 +394,16 @@ struct ConvStackImpl : Module {
                 auto opts = in.options().dtype(torch::kF16);
                 // conv->weight is [C_out, C_in, W], we want [W, C_in, C_out]
                 w_device = conv->weight.permute({2, 1, 0}).contiguous().flatten(0, 1).to(opts);
+                if (cutlass_conv) {
+                    w_device = w_device.transpose(0, 1).contiguous();
+                }
                 b_device = conv->bias.to(opts);
             }
 
             if (output_layout == TensorLayout::NTC && C_out <= 16) {
-                auto out = wm.next_TC(T_out, C_out, output_layout);
+                utils::ScopedProfileRange spr("small conv", 3);
+                auto out = wm.next_TC(T_out + 2 * output_T_padding, C_out, output_layout);
+                out = out.narrow(1, output_T_padding, T_out);
                 if (host_convolution_f16(stream, wm.N, C_in, C_out, T_in, params.winlen,
                                          params.stride, params.winlen / 2, in.data_ptr(),
                                          out.data_ptr(), w_device.data_ptr(), b_device.data_ptr(),
@@ -395,7 +411,23 @@ struct ConvStackImpl : Module {
                     throw std::runtime_error(std::string("Koi convolution failed with in size ") +
                                              std::to_string(params.insize));
                 }
+            } else if (cutlass_conv) {
+                utils::ScopedProfileRange spr("koi linear conv", 3);
+                auto out_type = (output_layout == TensorLayout::CUTLASS_TNC_I8) ? KOI_I8 : KOI_F16;
+                in.slice(1, 0, padding) = 0;
+                in.slice(1, -padding, torch::indexing::None) = 0;
+                wm.next_TC(T_out, C_out, output_layout);
+                auto out_ntc = wm.get_current_NTC_view();
+                if (host_linear(stream, KOI_F16, get_koi_activation(params.activation), out_type,
+                                wm.N, T_out, C_in * params.winlen, C_out, in.stride(0),
+                                params.stride * C_in, out_ntc.stride(0), out_ntc.stride(1),
+                                in.data_ptr(), w_device.data_ptr(), out_ntc.data_ptr(), nullptr,
+                                b_device.data_ptr()) != KOI_SUCCESS) {
+                    throw std::runtime_error(std::string("Koi convolution failed with in size ") +
+                                             std::to_string(params.insize));
+                }
             } else {
+                utils::ScopedProfileRange spr("koi window conv", 3);
                 // The window tensor is either NTC or TNC, depending on whether the first two
                 // dimensions of the output layout are NT or TN.
                 bool is_NT = (output_layout == TensorLayout::NTC);
@@ -516,10 +548,11 @@ struct LinearCRFImpl : Module {
                     w_device = quant.t().contiguous().to(in_ntc.device());
                 }
             }
-            host_linear_ntc(stream, type_id, activation ? KOI_TANH_X5 : KOI_IDENTITY, KOI_F16, wm.N,
-                            wm.T, C_in, C_out, int(in_ntc.stride(0)), int(in_ntc.stride(1)),
-                            in_ntc.data_ptr(), w_device.data_ptr(), out.data_ptr(),
-                            weight_scale.defined() ? weight_scale.data_ptr() : nullptr, bias_ptr);
+            host_linear(stream, type_id, activation ? KOI_TANH_X5 : KOI_IDENTITY, KOI_F16, wm.N,
+                        wm.T, C_in, C_out, int(in_ntc.stride(0)), int(in_ntc.stride(1)),
+                        int(out.stride(0)), int(out.stride(1)), in_ntc.data_ptr(),
+                        w_device.data_ptr(), out.data_ptr(),
+                        weight_scale.defined() ? weight_scale.data_ptr() : nullptr, bias_ptr);
         }
     }
 
