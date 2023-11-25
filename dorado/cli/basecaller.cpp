@@ -104,6 +104,12 @@ void setup(std::vector<std::string> args,
         throw std::runtime_error(err.str());
     }
 
+    if (is_rna_model(model_config)) {
+        spdlog::info(
+                " - BAM format does not support `U`, so RNA output files will include `T` instead "
+                "of `U` for all file types.");
+    }
+
     const bool enable_aligner = !ref.empty();
 
     // create modbase runners first so basecall runners can pick batch sizes based on available memory
