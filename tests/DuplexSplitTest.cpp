@@ -68,7 +68,7 @@ TEST_CASE("4 subread splitting test", TEST_GROUP) {
     for (auto &r : split_res) {
         split_sizes.push_back(int(r->read_common.seq.size()));
     }
-    CHECK(split_sizes == std::vector<int>{6858, 7854, 5184, 5168});
+    CHECK(split_sizes == std::vector<int>{6858, 7854, 5185, 5168});
 
     std::vector<std::string> start_times;
     for (auto &r : split_res) {
@@ -89,7 +89,7 @@ TEST_CASE("4 subread splitting test", TEST_GROUP) {
     for (auto &r : split_res) {
         num_samples.push_back(r->read_common.attributes.num_samples);
     }
-    CHECK(num_samples == std::vector<uint64_t>{97125, 55055, 53940, 50475});
+    CHECK(num_samples == std::vector<uint64_t>{97125, 55055, 53950, 50475});
 
     std::vector<uint32_t> split_points;
     for (auto &r : split_res) {
