@@ -46,7 +46,7 @@ struct DuplexSplitSettings {
     float flank_err = 0.15f;
     float relaxed_flank_err = 0.275f;
     int adapter_edist = 4;
-    int relaxed_adapter_edist = 6;
+    int relaxed_adapter_edist = 8;
     //bp from end of tentative pore to end of adapter
     //(~ max pore-adapter dist + adapter length)
     uint64_t pore_adapter_span = 50;
