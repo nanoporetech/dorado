@@ -177,6 +177,8 @@ PosRanges DuplexReadSplitter::possible_pore_regions(const DuplexReadSplitter::Ex
         }
         pore_regions.push_back({start_pos, end_pos});
     }
+    spdlog::info("Detected {} potential pore regions in read {}", pore_regions.size(),
+                 read.read->read_common.read_id);
     return pore_regions;
 }
 
