@@ -96,7 +96,7 @@ PosRanges merge_ranges(const PosRanges& ranges, uint64_t merge_dist) {
         if (merged.empty() || r.first > merged.back().second + merge_dist) {
             merged.push_back(r);
         } else {
-            merged.back().second = r.second;
+            merged.back().second = std::max(r.second, merged.back().second);
         }
     }
     return merged;
