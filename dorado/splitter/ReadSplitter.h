@@ -25,9 +25,7 @@ struct DuplexSplitSettings {
     bool enabled = true;
     bool simplex_mode = false;
     float pore_thr = 2.4f;
-    //FIXME lower further?
-    uint64_t pore_cl_dist = 500;  // TODO maybe use frequency * 0.1sec here?
-    //FIXME think about this threshold now that use argmax position
+    uint64_t pore_cl_dist = 500;  // in samples
     //maximal 'open pore' region to consider (bp)
     uint64_t max_pore_region = 500;
     //only use position with signal maximal as a tentative open pore

@@ -56,7 +56,6 @@ std::vector<std::pair<std::string, RNAReadSplitter::SplitFinderF>>
 RNAReadSplitter::build_split_finders() const {
     std::vector<std::pair<std::string, SplitFinderF>> split_finders;
     split_finders.push_back(
-            //FIXME Talk to Joyjit about names
             {"PORE_ADAPTER", [&](const ExtRead& read) { return read.possible_pore_regions; }});
 
     return split_finders;

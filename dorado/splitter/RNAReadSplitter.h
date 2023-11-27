@@ -24,7 +24,6 @@ private:
     using SplitFinderF = std::function<splitter::SampleRanges<int16_t>(const ExtRead&)>;
 
     ExtRead create_ext_read(SimplexReadPtr r) const;
-    //SampleRanges<int16_t> possible_pore_regions(const ExtRead& read) const;
 
     std::vector<SimplexReadPtr> subreads(SimplexReadPtr read,
                                          const splitter::SampleRanges<int16_t>& spacers) const;
