@@ -29,25 +29,28 @@ SimplexReadPtr subread(const SimplexRead& read,
                        std::optional<PosRange> seq_range,
                        PosRange signal_range);
 
+template <typename T>
 struct SampleRange {
     //inclusive
     uint64_t start_sample;
     //exclusive
     uint64_t end_sample;
     uint64_t argmax_sample;
+    T max_val;
 
-    SampleRange(uint64_t start, uint64_t end, uint64_t argmax)
-            : start_sample(start), end_sample(end), argmax_sample(argmax) {}
+    SampleRange(uint64_t start, uint64_t end, uint64_t argmax, T max)
+            : start_sample(start), end_sample(end), argmax_sample(argmax), max_val(max) {}
 };
 
-typedef std::vector<SampleRange> SampleRanges;
+template <typename T>
+using SampleRanges = std::vector<SampleRange<T>>;
 
 template <typename T>
-SampleRanges detect_pore_signal(const at::Tensor& signal,
-                                T threshold,
-                                uint64_t cluster_dist,
-                                uint64_t ignore_prefix) {
-    SampleRanges ans;
+SampleRanges<T> detect_pore_signal(const at::Tensor& signal,
+                                   T threshold,
+                                   uint64_t cluster_dist,
+                                   uint64_t ignore_prefix) {
+    SampleRanges<T> ans;
     auto pore_a = signal.accessor<T, 1>();
     int64_t cl_start = -1;
     int64_t cl_end = -1;
@@ -61,7 +64,7 @@ SampleRanges detect_pore_signal(const at::Tensor& signal,
                 //report previous cluster
                 if (cl_end != -1) {
                     assert(cl_start != -1);
-                    ans.push_back(SampleRange(cl_start, cl_end, cl_argmax));
+                    ans.push_back(SampleRange(cl_start, cl_end, cl_argmax, cl_max));
                 }
                 cl_start = i;
                 cl_max = std::numeric_limits<T>::min();
@@ -77,7 +80,7 @@ SampleRanges detect_pore_signal(const at::Tensor& signal,
     if (cl_end != -1) {
         assert(cl_start != -1);
         assert(cl_start < pore_a.size(0) && cl_end <= pore_a.size(0));
-        ans.push_back(SampleRange(cl_start, cl_end, cl_argmax));
+        ans.push_back(SampleRange(cl_start, cl_end, cl_argmax, cl_max));
     }
 
     return ans;

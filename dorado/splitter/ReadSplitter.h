@@ -25,15 +25,17 @@ struct DuplexSplitSettings {
     bool enabled = true;
     bool simplex_mode = false;
     float pore_thr = 2.5f;
-    //TODO consider lowering!
+    //FIXME lower further?
     uint64_t pore_cl_dist = 500;  // TODO maybe use frequency * 0.1sec here?
-    //TODO think about this threshold now that use argmax position
+    //FIXME think about this threshold now that use argmax position
     //maximal 'open pore' region to consider (bp)
     uint64_t max_pore_region = 500;
     //only use position with signal maximal as a tentative open pore
     bool use_argmax = true;
     //number of bases to check quality (starting with pore region start)
     int qscore_check_span = 5;
+    //only take fixed number of candidates with maximal signal
+    int top_candidates = 3;
     //filter tentative open pore regions with mean qscore higher than threshold
     float mean_qscore_thr = 10.;
     //usually template read region to the left of potential spacer region

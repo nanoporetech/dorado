@@ -78,8 +78,8 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
         splitter::DuplexSplitSettings splitter_settings;
         splitter_settings.simplex_mode = false;
         auto dna_splitter = std::make_unique<const splitter::DuplexReadSplitter>(splitter_settings);
-        auto dna_splitter_node =
-                pipeline_desc.add_node<ReadSplitNode>({}, std::move(dna_splitter), 1);
+        auto dna_splitter_node = pipeline_desc.add_node<ReadSplitNode>({}, std::move(dna_splitter),
+                                                                       1);
         pipeline_desc.add_node_sink(current_node_handle, dna_splitter_node);
         current_node_handle = dna_splitter_node;
         last_node_handle = dna_splitter_node;

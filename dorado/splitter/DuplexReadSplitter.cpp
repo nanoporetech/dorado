@@ -142,7 +142,7 @@ PosRanges DuplexReadSplitter::possible_pore_regions(const DuplexReadSplitter::Ex
             detect_pore_signal<float>(read.data_as_float32, m_settings.pore_thr,
                                       m_settings.pore_cl_dist, m_settings.expect_pore_prefix);
 
-    PosRanges pore_regions;
+    std::vector<std::pair<float, PosRange>> candidate_regions;
     for (auto pore_sample_range : pore_sample_ranges) {
         auto move_start = pore_sample_range.start_sample / read.read->read_common.model_stride;
         auto move_end = pore_sample_range.end_sample / read.read->read_common.model_stride;
@@ -175,9 +175,21 @@ PosRanges DuplexReadSplitter::possible_pore_regions(const DuplexReadSplitter::Ex
                     m_settings.mean_qscore_thr - 0.01) {
             continue;
         }
-        pore_regions.push_back({start_pos, end_pos});
+        candidate_regions.push_back({pore_sample_range.max_val, {start_pos, end_pos}});
     }
-    pore_regions = merge_ranges(pore_regions, 1);
+
+    //sorting by max signal value within the cluster
+    std::sort(candidate_regions.begin(), candidate_regions.end());
+    //take top candidates
+    PosRanges pore_regions;
+    for (size_t i = std::max(int64_t(candidate_regions.size()) - m_settings.top_candidates,
+                             int64_t(0));
+         i < candidate_regions.size(); ++i) {
+        pore_regions.push_back(candidate_regions[i].second);
+    }
+    //sorting by first coordinate again
+    std::sort(pore_regions.begin(), pore_regions.end());
+
     spdlog::info("Detected {} potential pore regions in read {}", pore_regions.size(),
                  read.read->read_common.read_id);
     return pore_regions;

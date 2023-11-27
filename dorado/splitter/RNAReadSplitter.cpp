@@ -28,7 +28,7 @@ RNAReadSplitter::ExtRead RNAReadSplitter::create_ext_read(SimplexReadPtr r) cons
 }
 
 std::vector<SimplexReadPtr> RNAReadSplitter::subreads(SimplexReadPtr read,
-                                                      const SampleRanges& spacers) const {
+                                                      const SampleRanges<int16_t>& spacers) const {
     std::vector<SimplexReadPtr> subreads;
     subreads.reserve(spacers.size() + 1);
 
@@ -56,6 +56,7 @@ std::vector<std::pair<std::string, RNAReadSplitter::SplitFinderF>>
 RNAReadSplitter::build_split_finders() const {
     std::vector<std::pair<std::string, SplitFinderF>> split_finders;
     split_finders.push_back(
+            //FIXME Talk to Joyjit about names
             {"PORE_ADAPTER", [&](const ExtRead& read) { return read.possible_pore_regions; }});
 
     return split_finders;
