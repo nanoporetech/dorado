@@ -5,8 +5,6 @@
 #include <mach/mach_init.h>
 #include <mach/task.h>
 #include <sys/sysctl.h>
-#include <sys/types.h>
-#include <unistd.h>
 #endif
 
 namespace dorado {
