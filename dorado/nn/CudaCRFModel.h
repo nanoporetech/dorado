@@ -22,7 +22,7 @@ std::shared_ptr<CudaCaller> create_cuda_caller(const CRFModelConfig& model_confi
                                                float memory_limit_fraction,
                                                bool exclusive_gpu_access);
 
-class CudaModelRunner : public ModelRunnerBase {
+class CudaModelRunner final : public ModelRunnerBase {
 public:
     explicit CudaModelRunner(std::shared_ptr<CudaCaller> caller);
     void accept_chunk(int chunk_idx, const at::Tensor& chunk) final;
