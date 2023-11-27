@@ -331,7 +331,7 @@ struct MetalBlockImpl : Module {
                 make_cps(m_device, "lstm",
                          {{"kLstmLayerSize", config.lstm_size}, {"kLstmReversedInTime", true}},
                          lstm_threads);
-        to_half_cps = make_cps(m_device, "float_to_half", {});
+        to_half_cps = make_cps(m_device, "float_to_half", {}, std::nullopt);
 
         // The temp buffer used for these purposes (number of elements of `torch_dtype` in []):
         // - Store inputs converted to F16 (if torch_dtype == kF16) [in_chunk_size * batch_size]
@@ -684,9 +684,9 @@ public:
         m_model->eval();
 
         m_decode_complete_event = NS::TransferPtr(m_device->newSharedEvent());
-        m_bwd_scan_cps = make_cps(m_device.get(), "backward_scan", {});
-        m_fwd_scan_cps = make_cps(m_device.get(), "forward_scan", {});
-        m_add_softmax_cps = make_cps(m_device.get(), "add_softmax", {});
+        m_bwd_scan_cps = make_cps(m_device.get(), "backward_scan", {}, std::nullopt);
+        m_fwd_scan_cps = make_cps(m_device.get(), "forward_scan", {}, std::nullopt);
+        m_add_softmax_cps = make_cps(m_device.get(), "add_softmax", {}, std::nullopt);
 
         int T = m_out_chunk_size;
         int C = model_config.outsize;

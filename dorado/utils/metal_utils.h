@@ -10,6 +10,7 @@
 
 #include <ATen/core/TensorBody.h>
 
+#include <optional>
 #include <string>
 #include <tuple>
 #include <variant>
@@ -36,7 +37,7 @@ NS::SharedPtr<MTL::ComputePipelineState> make_cps(
         MTL::Device *device,
         const std::string &name,
         const std::vector<std::tuple<std::string, MetalConstant>> &named_constants,
-        const int max_total_threads_per_tg = -1);
+        const std::optional<int> max_total_threads_per_tg);
 
 void launch_kernel(MTL::ComputePipelineState *cps,
                    MTL::CommandQueue *cq,
