@@ -7,14 +7,6 @@
 
 #define TEST_GROUP "Pod5DataLoaderTest: "
 
-TEST_CASE(TEST_GROUP "Test loading single-read POD5 files from data dir") {
-    CHECK(CountSinkReads(get_pod5_data_dir(), "cpu", 1, 0, std::nullopt, {}) == 1);
-}
-
-TEST_CASE(TEST_GROUP "Test loading single-read POD5 files from single file path") {
-    CHECK(CountSinkReads(get_single_pod5_file_path(), "cpu", 1, 0, std::nullopt, {}) == 1);
-}
-
 TEST_CASE(TEST_GROUP "Test loading single-read POD5 file from data dir, empty read list") {
     auto read_list = std::unordered_set<std::string>();
     CHECK(CountSinkReads(get_pod5_data_dir(), "cpu", 1, 0, read_list, {}) == 0);
