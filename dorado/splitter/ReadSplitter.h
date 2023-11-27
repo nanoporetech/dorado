@@ -26,7 +26,7 @@ struct DuplexSplitSettings {
     bool simplex_mode = false;
     float pore_thr = 2.5f;
     //TODO consider lowering!
-    uint64_t pore_cl_dist = 4000;  // TODO maybe use frequency * 1sec here?
+    uint64_t pore_cl_dist = 500;  // TODO maybe use frequency * 0.1sec here?
     //TODO think about this threshold now that use argmax position
     //maximal 'open pore' region to consider (bp)
     uint64_t max_pore_region = 500;
