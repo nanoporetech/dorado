@@ -66,6 +66,12 @@ struct DuplexSplitSettings {
     //Sequence below corresponds to the current 'head' adapter 'AATGTACTTCGTTCAGTTACGTATTGCT'
     // with 4bp clipped from the beginning (24bp left)
     std::string adapter = "TACTTCGTTCAGTTACGTATTGCT";
+
+    explicit DuplexSplitSettings(bool pA_scaling) {
+        if (pA_scaling) {
+            pore_thr = 2.8f;
+        }
+    }
 };
 
 class ReadSplitter {
