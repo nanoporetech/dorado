@@ -4,7 +4,7 @@
 namespace dorado::utils {
 
 // Default trim settings.
-constexpr float DEFAULT_TRIM_THRESHOLD = 2.4;
+constexpr float DEFAULT_TRIM_THRESHOLD = 2.4f;
 constexpr int DEFAULT_TRIM_WINDOW_SIZE = 40;
 constexpr int DEFAULT_TRIM_MIN_ELEMENTS = 3;
 
