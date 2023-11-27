@@ -220,7 +220,7 @@ TORCH_MODULE(MetalConv1d);
 
 static constexpr int kLstmGates = 4;
 struct MetalLSTMImpl : Module {
-    MetalLSTMImpl(int layer_size, bool reverse_, MTL::Device *) : reverse(reverse_) {
+    MetalLSTMImpl(int layer_size, bool reverse_) : reverse(reverse_) {
         auto weight_ih = torch::empty({layer_size * kLstmGates, layer_size});
         auto weight_hh = torch::empty({layer_size * kLstmGates, layer_size});
         auto bias_ih = torch::empty({layer_size * kLstmGates});
@@ -352,11 +352,11 @@ struct MetalBlockImpl : Module {
         conv3 = register_module("conv3", MetalConv1d(3, 16, config.lstm_size, 19, config.stride,
                                                      config.convs[2].activation, in_chunk_size,
                                                      batch_size, device));
-        rnn1 = register_module("rnn_1", MetalLSTM(config.lstm_size, true, device));
-        rnn2 = register_module("rnn_2", MetalLSTM(config.lstm_size, false, device));
-        rnn3 = register_module("rnn_3", MetalLSTM(config.lstm_size, true, device));
-        rnn4 = register_module("rnn_4", MetalLSTM(config.lstm_size, false, device));
-        rnn5 = register_module("rnn_5", MetalLSTM(config.lstm_size, true, device));
+        rnn1 = register_module("rnn_1", MetalLSTM(config.lstm_size, true));
+        rnn2 = register_module("rnn_2", MetalLSTM(config.lstm_size, false));
+        rnn3 = register_module("rnn_3", MetalLSTM(config.lstm_size, true));
+        rnn4 = register_module("rnn_4", MetalLSTM(config.lstm_size, false));
+        rnn5 = register_module("rnn_5", MetalLSTM(config.lstm_size, true));
 
         const int linear_threads = kernel_simd_groups * kSIMDGroupWidth;
         // If the intermediate feature size between conv1 and conv2 is 16, then this is a v4
