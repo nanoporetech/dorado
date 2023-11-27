@@ -2,12 +2,13 @@
 
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace dorado::utils {
 
 // Calculate a mean qscore from a per-base Q string.
-float mean_qscore_from_qstring(const std::string& qstring, int start_pos = 0);
+float mean_qscore_from_qstring(std::string_view qstring);
 
 // Convert a canonical base character (ACGT) to an integer representation (0123).
 // No checking is performed on the input.
