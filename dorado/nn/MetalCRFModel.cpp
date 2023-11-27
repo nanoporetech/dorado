@@ -886,9 +886,9 @@ public:
             decode_lock.unlock();
 
             // Model outputs are split across m_out_split buffers.
-            //assert(m_scores_int8.size() == m_out_split);
-            //assert(m_bwd.size() == m_out_split);
-            //assert(m_posts.size() == m_out_split);
+            assert(m_scores_int8.size() == m_out_split);
+            assert(m_bwd.size() == m_out_split);
+            assert(m_posts.size() == m_out_split);
             const int out_buf_idx = chunk_idx / m_out_batch_size;
             const int buf_chunk_idx = chunk_idx % m_out_batch_size;
 
