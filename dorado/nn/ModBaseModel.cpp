@@ -33,7 +33,7 @@ namespace dorado {
 namespace nn {
 
 struct UnpaddedConvolutionImpl : Module {
-    UnpaddedConvolutionImpl(int size = 1, int outsize = 1, int k = 1, int stride = 1) {
+    UnpaddedConvolutionImpl(int size, int outsize, int k, int stride) {
         conv = register_module("conv", Conv1d(Conv1dOptions(size, outsize, k).stride(stride)));
         activation = register_module("activation", SiLU());
     }
@@ -94,7 +94,7 @@ struct ModBaseConvModelImpl : Module {
     }
 
     void load_state_dict(const std::vector<at::Tensor>& weights) {
-        utils::load_state_dict(*this, weights);
+        utils::load_state_dict(*this, weights, {});
     }
 
     std::vector<at::Tensor> load_weights(const std::filesystem::path& dir) {
@@ -185,7 +185,7 @@ struct ModBaseConvLSTMModelImpl : Module {
     }
 
     void load_state_dict(std::vector<at::Tensor> weights) {
-        utils::load_state_dict(*this, weights);
+        utils::load_state_dict(*this, weights, {});
     }
 
     std::vector<at::Tensor> load_weights(const std::filesystem::path& dir) {

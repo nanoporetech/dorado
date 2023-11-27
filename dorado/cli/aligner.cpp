@@ -106,7 +106,7 @@ int aligner(int argc, char* argv[]) {
 
     spdlog::info("> loading index {}", index);
 
-    HtsReader reader(reads[0]);
+    HtsReader reader(reads[0], std::nullopt);
     spdlog::debug("> input fmt: {} aligned: {}", reader.format, reader.is_aligned);
     auto header = sam_hdr_dup(reader.header);
     add_pg_hdr(header);

@@ -116,8 +116,8 @@ void setup(std::vector<std::string> args,
     auto remora_runners = create_modbase_runners(
             remora_models, device, default_parameters.remora_runners_per_caller, remora_batch_size);
 
-    auto [runners, num_devices] =
-            create_basecall_runners(model_config, device, num_runners, 0, batch_size, chunk_size);
+    auto [runners, num_devices] = create_basecall_runners(model_config, device, num_runners, 0,
+                                                          batch_size, chunk_size, 1.f, false);
 
     auto read_groups = DataLoader::load_read_groups(data_path, model_name, modbase_model_names,
                                                     recursive_file_loading);
@@ -157,7 +157,7 @@ void setup(std::vector<std::string> args,
     if (estimate_poly_a) {
         current_sink_node = pipeline_desc.add_node<PolyACalculator>(
                 {current_sink_node}, std::thread::hardware_concurrency(),
-                is_rna_model(model_config));
+                is_rna_model(model_config), 1000);
     }
     if (!barcode_kits.empty()) {
         current_sink_node = pipeline_desc.add_node<BarcodeClassifierNode>(
@@ -179,7 +179,8 @@ void setup(std::vector<std::string> args,
             pipeline_desc, std::move(runners), std::move(remora_runners), overlap,
             mean_qscore_start_pos, thread_allocations.scaler_node_threads,
             true /* Enable read splitting */, thread_allocations.splitter_node_threads,
-            int(thread_allocations.remora_threads * num_devices), current_sink_node);
+            int(thread_allocations.remora_threads * num_devices), current_sink_node,
+            PipelineDescriptor::InvalidNodeHandle);
 
     // Create the Pipeline from our description.
     std::vector<dorado::stats::StatsReporter> stats_reporters{dorado::stats::sys_stats_report};
@@ -238,7 +239,7 @@ void setup(std::vector<std::string> args,
                       reads_already_processed);
 
     // Run pipeline.
-    loader.load_reads(data_path, recursive_file_loading);
+    loader.load_reads(data_path, recursive_file_loading, ReadOrder::UNRESTRICTED);
 
     // Wait for the pipeline to complete.  When it does, we collect
     // final stats to allow accurate summarisation.

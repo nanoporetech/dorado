@@ -20,9 +20,9 @@ TEST_CASE("HtsReaderTest: Read fasta to sink", TEST_GROUP) {
     dorado::PipelineDescriptor pipeline_desc;
     std::vector<dorado::Message> bam_records;
     pipeline_desc.add_node<MessageSinkToVector>({}, 100, bam_records);
-    auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
+    auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
 
-    dorado::HtsReader reader(fasta.string());
+    dorado::HtsReader reader(fasta.string(), std::nullopt);
     reader.read(*pipeline, 100);
     pipeline.reset();
     REQUIRE(bam_records.size() == 10);  // FASTA file has 10 reads.
@@ -32,7 +32,7 @@ TEST_CASE("HtsReaderTest: Read fasta line by line", TEST_GROUP) {
     fs::path aligner_test_dir = fs::path(get_data_dir("bam_reader"));
     auto fasta = aligner_test_dir / "input.fa";
 
-    dorado::HtsReader reader(fasta.string());
+    dorado::HtsReader reader(fasta.string(), std::nullopt);
     uint32_t read_count = 0;
     while (reader.read()) {
         read_count++;
@@ -56,9 +56,9 @@ TEST_CASE("HtsReaderTest: Read SAM to sink", TEST_GROUP) {
     dorado::PipelineDescriptor pipeline_desc;
     std::vector<dorado::Message> bam_records;
     pipeline_desc.add_node<MessageSinkToVector>({}, 100, bam_records);
-    auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
+    auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
 
-    dorado::HtsReader reader(sam.string());
+    dorado::HtsReader reader(sam.string(), std::nullopt);
     reader.read(*pipeline, 100);
     pipeline.reset();
     REQUIRE(bam_records.size() == 11);  // SAM file has 11 reads.
@@ -68,7 +68,7 @@ TEST_CASE("HtsReaderTest: Read SAM line by line", TEST_GROUP) {
     fs::path aligner_test_dir = fs::path(get_data_dir("bam_reader"));
     auto sam = aligner_test_dir / "small.sam";
 
-    dorado::HtsReader reader(sam.string());
+    dorado::HtsReader reader(sam.string(), std::nullopt);
     uint32_t read_count = 0;
     while (reader.read()) {
         read_count++;
@@ -80,7 +80,7 @@ TEST_CASE("HtsReaderTest: get_tag", TEST_GROUP) {
     fs::path aligner_test_dir = fs::path(get_data_dir("bam_reader"));
     auto sam = aligner_test_dir / "small.sam";
 
-    dorado::HtsReader reader(sam.string());
+    dorado::HtsReader reader(sam.string(), std::nullopt);
     while (reader.read()) {
         // All records in small.sam have this set to 0.
         CHECK(reader.get_tag<int>("rl") == 0);
