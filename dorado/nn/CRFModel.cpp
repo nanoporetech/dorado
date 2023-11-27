@@ -404,8 +404,9 @@ struct ConvStackImpl : Module {
                 auto out = wm.next_TC(T_out + 2 * output_T_padding, C_out, output_layout);
                 out = out.narrow(1, output_T_padding, T_out);
                 if (host_convolution_f16(stream, wm.N, C_in, C_out, T_in, params.winlen,
-                                         params.stride, params.winlen / 2, in.data_ptr(),
-                                         out.data_ptr(), w_device.data_ptr(), b_device.data_ptr(),
+                                         params.stride, params.winlen / 2, int(out.stride(0)),
+                                         in.data_ptr(), out.data_ptr(), w_device.data_ptr(),
+                                         b_device.data_ptr(),
                                          get_koi_activation(params.activation))) {
                     throw std::runtime_error(std::string("Koi convolution failed with in size ") +
                                              std::to_string(params.insize));
