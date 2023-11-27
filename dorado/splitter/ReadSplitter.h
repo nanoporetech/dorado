@@ -35,7 +35,7 @@ struct DuplexSplitSettings {
     //number of bases to check quality (starting with pore region start)
     int qscore_check_span = 5;
     //only take fixed number of candidates with maximal signal
-    int top_candidates = 3;
+    int top_candidates = 10;
     //filter tentative open pore regions with mean qscore higher than threshold
     float mean_qscore_thr = 10.;
     //usually template read region to the left of potential spacer region
