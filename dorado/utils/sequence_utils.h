@@ -21,7 +21,7 @@ std::vector<int> sequence_to_ints(const std::string& sequence);
 std::vector<uint64_t> moves_to_map(const std::vector<uint8_t>& moves,
                                    size_t block_stride,
                                    size_t signal_len,
-                                   std::optional<size_t> reserve_size = std::nullopt);
+                                   std::optional<size_t> reserve_size);
 
 // Compute cumulative sums of the move table
 std::vector<uint64_t> move_cum_sums(const std::vector<uint8_t>& moves);
