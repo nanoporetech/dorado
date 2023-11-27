@@ -26,10 +26,14 @@ while getopts j:B:f opt; do
 done
 
 # Check that we can actually find clang-tidy.
-if ! command -v clang-tidy || ! command -v run-clang-tidy ; then
-  echo "Cannot find clang-tidy or run-clang-tidy"
+if ! command -v clang-tidy || ! command -v run-clang-tidy || ! command -v clang || ! command -v clang++ ; then
+  echo "Cannot find clang, clang-tidy, or run-clang-tidy"
   exit 1
 fi
+
+# Use clang as the compiler so that vbz doesn't trip up clang-tidy.
+export CC=clang
+export CXX=clang++
 
 # Assuming the current script is in /scripts.
 source_dir=$(dirname $(dirname $0))

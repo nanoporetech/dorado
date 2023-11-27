@@ -215,7 +215,7 @@ build:linux:x86:focal:clang_tidy:
   extends:
     - .linux_runner
   script:
-    - apt update && apt install clang-tidy
+    - apt update && apt install clang clang-tidy
     - ./scripts/run_clang_tidy.sh -j $(( $(nproc) / 4 ))
 
 build:linux:arm64:bionic:
