@@ -31,14 +31,14 @@ void ResumeLoaderNode::copy_completed_reads() {
     auto initial_hts_log_level = hts_get_log_level();
     hts_set_log_level(HTS_LOG_OFF);
 
-    auto reader = std::make_unique<HtsReader>(m_resume_file, std::nullopt);
+    HtsReader reader(m_resume_file, std::nullopt);
 
     // Iterate over all reads and write to sink.
     try {
-        while (reader->read()) {
-            std::string read_id = bam_get_qname(reader->record);
+        while (reader.read()) {
+            std::string read_id = bam_get_qname(reader.record);
             m_processed_read_ids.insert(read_id);
-            m_sink.push_message(BamPtr(bam_dup1(reader->record.get())));
+            m_sink.push_message(BamPtr(bam_dup1(reader.record.get())));
             if (m_processed_read_ids.size() % 100 == 0) {
                 bar.tick();
             }
