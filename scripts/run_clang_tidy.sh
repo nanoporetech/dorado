@@ -31,14 +31,6 @@ if ! command -v clang-tidy || ! command -v run-clang-tidy ; then
   exit 1
 fi
 
-# clang-tidy's regex doesn't support negative lookahead, so we have to list all the places to
-# check rather than "not 3rdparty" -_-
-tidy_header_filter="dorado/(alignment|cli|data_loader|decode|demux|modbase|models|nn|read_pipeline|splitter|utils)"
-
-# Which checks to look for.
-tidy_checks="-*" # Disable all checks
-tidy_checks+=",fuchsia-default-arguments-declarations" # No default args
-
 # Assuming the current script is in /scripts.
 source_dir=$(dirname $(dirname $0))
 
@@ -60,7 +52,5 @@ cmake \
 # Note that we use run-clang-tidy to avoid the overhead of having to a full build too.
 run-clang-tidy \
   -p ${build_dir} \
-  -header-filter="${tidy_header_filter}" \
-  -checks="${tidy_checks}" \
   -j ${num_jobs} \
   ${apply_fixits}
