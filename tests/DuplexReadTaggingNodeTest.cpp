@@ -11,7 +11,7 @@ TEST_CASE("DuplexReadTaggingNode", TEST_GROUP) {
     std::vector<dorado::Message> messages;
     auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
     pipeline_desc.add_node<dorado::DuplexReadTaggingNode>({sink});
-    auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
+    auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
     {
         auto read_12 = std::make_unique<dorado::SimplexRead>();
         read_12->read_common.read_id = "1;2";

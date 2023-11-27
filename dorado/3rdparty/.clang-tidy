@@ -1,0 +1,4 @@
+# Don't check for issues in 3rdparty code.
+# Unfortunately we can't disable all warnings otherwise clang-tidy complains that
+# there's nothing to do, so enable one that's unlikely to trigger an issue.
+Checks: '-*,cppcoreguidelines-slicing'

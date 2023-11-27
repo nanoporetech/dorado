@@ -56,7 +56,7 @@ TEST_CASE("BarcodeClassifier: test single ended barcode", TEST_GROUP) {
     for (std::string bc :
          {"SQK-RBK114-96_BC01", "SQK-RBK114-96_RBK39", "SQK-RBK114-96_BC92", "unclassified"}) {
         auto bc_file = data_dir / (bc + ".fastq");
-        HtsReader reader(bc_file.string());
+        HtsReader reader(bc_file.string(), std::nullopt);
         while (reader.read()) {
             auto seqlen = reader.record->core.l_qseq;
             std::string seq = utils::extract_sequence(reader.record.get());
@@ -83,7 +83,7 @@ TEST_CASE("BarcodeClassifier: test double ended barcode", TEST_GROUP) {
     for (std::string bc :
          {"SQK-RPB004_BC01", "SQK-RPB004_BC05", "SQK-RPB004_BC11", "unclassified"}) {
         auto bc_file = data_dir / (bc + ".fastq");
-        HtsReader reader(bc_file.string());
+        HtsReader reader(bc_file.string(), std::nullopt);
         while (reader.read()) {
             auto seqlen = reader.record->core.l_qseq;
             std::string seq = utils::extract_sequence(reader.record.get());
@@ -112,7 +112,7 @@ TEST_CASE("BarcodeClassifier: test double ended barcode with different variants"
     for (std::string bc :
          {"EXP-PBC096_BC04", "EXP-PBC096_BC37", "EXP-PBC096_BC83", "unclassified"}) {
         auto bc_file = data_dir / (bc + ".fastq");
-        HtsReader reader(bc_file.string());
+        HtsReader reader(bc_file.string(), std::nullopt);
         while (reader.read()) {
             auto seqlen = reader.record->core.l_qseq;
             std::string seq = utils::extract_sequence(reader.record.get());
@@ -140,7 +140,7 @@ TEST_CASE("BarcodeClassifier: check barcodes on both ends - failing case", TEST_
 
     // Check case where both ends don't match.
     auto bc_file = data_dir / "EXP-PBC096_barcode_both_ends_fail.fastq";
-    HtsReader reader(bc_file.string());
+    HtsReader reader(bc_file.string(), std::nullopt);
     while (reader.read()) {
         std::string seq = utils::extract_sequence(reader.record.get());
         auto single_end_res = classifier.barcode(seq, false, std::nullopt);
@@ -157,7 +157,7 @@ TEST_CASE("BarcodeClassifier: check barcodes on both ends - passing case", TEST_
 
     // Check case where both ends do match.
     auto bc_file = data_dir / "EXP-PBC096_barcode_both_ends_pass.fastq";
-    HtsReader reader(bc_file.string());
+    HtsReader reader(bc_file.string(), std::nullopt);
     while (reader.read()) {
         std::string seq = utils::extract_sequence(reader.record.get());
         auto single_end_res = classifier.barcode(seq, false, std::nullopt);
@@ -191,7 +191,7 @@ TEST_CASE(
                                                       std::nullopt);
     }
 
-    auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
+    auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
 
     // Create new read that is barcode - 100 As - barcode.
     auto read = std::make_unique<SimplexRead>();
@@ -248,7 +248,7 @@ TEST_CASE(
 
     read->read_common.num_trimmed_samples = 0;
 
-    auto records = read->read_common.extract_sam_lines(true /* emit moves*/, 10);
+    auto records = read->read_common.extract_sam_lines(true /* emit moves*/, 10, false);
 
     // Push a Read type.
     pipeline->push_message(std::move(read));
@@ -321,7 +321,7 @@ TEST_CASE(
 
             CHECK(read_common.num_trimmed_samples == uint64_t(additional_trimmed_samples));
 
-            auto bams = read_common.extract_sam_lines(0, 10);
+            auto bams = read_common.extract_sam_lines(0, 10, false);
             auto& rec = bams[0];
             auto [mod_str, mod_probs] = dorado::utils::extract_modbase_info(rec.get());
         }
@@ -340,12 +340,12 @@ TEST_CASE("BarcodeClassifierNode: test reads where trim length == read length", 
     pipeline_desc.add_node<BarcodeClassifierNode>({sink}, 8, kits, barcode_both_ends, no_trim,
                                                   std::nullopt);
 
-    auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
+    auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
     fs::path data_dir = fs::path(get_data_dir("barcode_demux"));
     auto bc_file = data_dir / "no_trim_expected.fastq";
 
     // Only one read in the file, so fetch that.
-    HtsReader reader(bc_file.string());
+    HtsReader reader(bc_file.string(), std::nullopt);
     reader.read();
 
     // Fetch the original read before barcode trimming.

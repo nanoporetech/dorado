@@ -28,7 +28,7 @@ TEST_CASE("AdapterDetector: test adapter detection", TEST_GROUP) {
     const auto& adapters = detector.get_adapter_sequences();
 
     auto test_file = data_dir / "SQK-RBK114-96_BC01.fastq";
-    HtsReader reader(test_file.string());
+    HtsReader reader(test_file.string(), std::nullopt);
     reader.read();
     std::string seq = utils::extract_sequence(reader.record.get());
     for (size_t i = 0; i < adapters.size(); ++i) {
@@ -73,7 +73,7 @@ TEST_CASE("AdapterDetector: test primer detection", TEST_GROUP) {
     const auto& primers = detector.get_primer_sequences();
 
     auto test_file = data_dir / "SQK-RBK114-96_BC01.fastq";
-    HtsReader reader(test_file.string());
+    HtsReader reader(test_file.string(), std::nullopt);
     reader.read();
     std::string seq = utils::extract_sequence(reader.record.get());
     for (size_t i = 0; i < primers.size(); ++i) {
@@ -118,7 +118,7 @@ TEST_CASE(
     auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
     pipeline_desc.add_node<AdapterDetectorNode>({sink}, 8, true, true);
 
-    auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
+    auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
 
     // Create new read that is [LSK110_FWD] - [cDNA_VNP_FWD] - 200 As - [cDNA_VNP_REV] [LSK110_REV].
     auto read = std::make_unique<SimplexRead>();
@@ -171,7 +171,7 @@ TEST_CASE(
     read->read_common.base_mod_probs[(flank_size * mod_alphabet.size()) + 1] = 235;  // 6mA
     read->read_common.num_trimmed_samples = 0;
 
-    auto records = read->read_common.extract_sam_lines(true /* emit moves */, 10);
+    auto records = read->read_common.extract_sam_lines(true /* emit moves */, 10, false);
 
     // Push a Read type.
     pipeline->push_message(std::move(read));
@@ -232,7 +232,7 @@ TEST_CASE(
 
             CHECK(read_common.num_trimmed_samples == uint64_t(additional_trimmed_samples));
 
-            auto bams = read_common.extract_sam_lines(0, 10);
+            auto bams = read_common.extract_sam_lines(0, 10, false);
             auto& rec = bams[0];
             auto [mod_str, mod_probs] = dorado::utils::extract_modbase_info(rec.get());
         }

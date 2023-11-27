@@ -63,8 +63,9 @@ TEST_CASE(TEST_GROUP "Linear") {
     const std::vector<int> tg_buffer_lens{kOutBufSize, kOutBufF32Size};
 
     // Create a ComputePipelineState for the input reordering kernel.
-    const NS::SharedPtr<MTL::ComputePipelineState> reorder_input_cps = make_cps(
-            device.get(), "reorder_input_to_rev_lstm_output", {{"kLstmLayerSize", layer_size}});
+    const NS::SharedPtr<MTL::ComputePipelineState> reorder_input_cps =
+            make_cps(device.get(), "reorder_input_to_rev_lstm_output",
+                     {{"kLstmLayerSize", layer_size}}, std::nullopt);
     REQUIRE(reorder_input_cps);
 
     // Order in LstmArgs struct (which is also used by reorder_input):
