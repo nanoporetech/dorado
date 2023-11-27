@@ -65,7 +65,6 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
         first_node_handle = scaler_node;
     }
     current_node_handle = scaler_node;
-
     auto basecaller_node = pipeline_desc.add_node<BasecallerNode>(
             {}, std::move(runners), overlap, kBatchTimeoutMS, model_name, 1000, "BasecallerNode",
             mean_qscore_start_pos);
@@ -77,9 +76,12 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
     if (enable_read_splitter && !is_rna) {
         splitter::DuplexSplitSettings splitter_settings;
         splitter_settings.simplex_mode = false;
+        if (model_config.signal_norm_params.strategy == ScalingStrategy::PA) {
+            splitter_settings.pore_thr = 2.8f;
+        }
         auto dna_splitter = std::make_unique<const splitter::DuplexReadSplitter>(splitter_settings);
-        auto dna_splitter_node = pipeline_desc.add_node<ReadSplitNode>({}, std::move(dna_splitter),
-                                                                       1);
+        auto dna_splitter_node =
+                pipeline_desc.add_node<ReadSplitNode>({}, std::move(dna_splitter), 1);
         pipeline_desc.add_node_sink(current_node_handle, dna_splitter_node);
         current_node_handle = dna_splitter_node;
         last_node_handle = dna_splitter_node;

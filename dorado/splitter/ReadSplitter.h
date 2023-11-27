@@ -24,7 +24,7 @@ struct RNASplitSettings {
 struct DuplexSplitSettings {
     bool enabled = true;
     bool simplex_mode = false;
-    float pore_thr = 2.5f;
+    float pore_thr = 2.4f;
     //FIXME lower further?
     uint64_t pore_cl_dist = 500;  // TODO maybe use frequency * 0.1sec here?
     //FIXME think about this threshold now that use argmax position
