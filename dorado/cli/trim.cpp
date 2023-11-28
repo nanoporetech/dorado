@@ -2,6 +2,7 @@
 #include "cli/cli_utils.h"
 #include "read_pipeline/AdapterDetectorNode.h"
 #include "read_pipeline/HtsReader.h"
+#include "read_pipeline/HtsWriter.h"
 #include "read_pipeline/ProgressTracker.h"
 #include "utils/basecaller_utils.h"
 #include "utils/log_utils.h"
@@ -89,6 +90,13 @@ int trimmer(int argc, char* argv[]) {
     auto max_reads(parser.get<int>("max-reads"));
 
     threads = threads == 0 ? std::thread::hardware_concurrency() : threads;
+    // The input thread is the total number of threads to use for dorado
+    // adapter/primer trimming. Heuristically use 10% of threads for BAM
+    // generation and rest for trimming.
+    auto [trim_threads, trim_writer_threads] =
+            cli::worker_vs_writer_thread_allocation(threads, 0.1f);
+    spdlog::debug("> adapter/primer trimming threads {}, writer threads {}", trim_threads,
+                  trim_writer_threads);
 
     auto read_list = utils::load_read_list(parser.get<std::string>("--read-ids"));
 
@@ -109,9 +117,24 @@ int trimmer(int argc, char* argv[]) {
     auto header = SamHdrPtr(sam_hdr_dup(reader.header));
     add_pg_hdr(header.get());
 
-    PipelineDescriptor pipeline_desc;
+    auto output_mode = HtsWriter::OutputMode::BAM;
 
-    pipeline_desc.add_node<AdapterDetectorNode>({}, threads, true,
+    auto emit_fastq = parser.get<bool>("--emit-fastq");
+    auto emit_sam = !emit_fastq;
+
+    if (emit_fastq) {
+        spdlog::info(" - Note: FASTQ output is not recommended as not all data can be preserved.");
+        output_mode = HtsWriter::OutputMode::FASTQ;
+    } else if (emit_sam || utils::is_fd_tty(stdout)) {
+        output_mode = HtsWriter::OutputMode::SAM;
+    } else if (utils::is_fd_pipe(stdout)) {
+        output_mode = HtsWriter::OutputMode::UBAM;
+    }
+
+    PipelineDescriptor pipeline_desc;
+    auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, "-", output_mode, trim_writer_threads);
+
+    pipeline_desc.add_node<AdapterDetectorNode>({hts_writer}, trim_threads, true,
                                                 parser.get<bool>("--no-trim-primers"));
 
     // Create the Pipeline from our description.
@@ -124,9 +147,8 @@ int trimmer(int argc, char* argv[]) {
 
     // At present, header output file header writing relies on direct node method calls
     // rather than the pipeline framework.
-    auto& demux_writer_ref =
-            dynamic_cast<BarcodeDemuxerNode&>(pipeline->get_node_ref(demux_writer));
-    demux_writer_ref.set_header(header.get());
+    auto& hts_writer_ref = dynamic_cast<HtsWriter&>(pipeline->get_node_ref(hts_writer));
+    hts_writer_ref.set_and_write_header(header.get());
 
     // Set up stats counting
     std::vector<dorado::stats::StatsCallable> stats_callables;
