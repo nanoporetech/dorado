@@ -21,8 +21,8 @@ TEST_CASE("Parse custom single ended barcode arrangement", "[barcode_demux]") {
     CHECK(kit_info.bottom_rear_flank.empty());
     CHECK(kit_info.barcodes2.empty());
 
-    CHECK(kit_info.double_ends == false);
-    CHECK(kit_info.ends_different == false);
+    CHECK(!kit_info.double_ends);
+    CHECK(!kit_info.ends_different);
 }
 
 TEST_CASE("Parse double ended barcode arrangement", "[barcode_demux]") {
@@ -41,8 +41,8 @@ TEST_CASE("Parse double ended barcode arrangement", "[barcode_demux]") {
     CHECK(kit_info.bottom_front_flank == "CCCC");
     CHECK(kit_info.bottom_rear_flank == "GTTTTCG");
 
-    CHECK(kit_info.double_ends == true);
-    CHECK(kit_info.ends_different == false);
+    CHECK(kit_info.double_ends);
+    CHECK(!kit_info.ends_different);
 }
 
 TEST_CASE("Parse double ended barcode arrangement with different flanks", "[barcode_demux]") {
@@ -61,8 +61,8 @@ TEST_CASE("Parse double ended barcode arrangement with different flanks", "[barc
     CHECK(kit_info.bottom_front_flank == "CCCC");
     CHECK(kit_info.bottom_rear_flank == "GGGG");
 
-    CHECK(kit_info.double_ends == true);
-    CHECK(kit_info.ends_different == true);
+    CHECK(kit_info.double_ends);
+    CHECK(kit_info.ends_different);
 }
 
 TEST_CASE("Parse double ended barcode arrangement with different barcodes", "[barcode_demux]") {
@@ -81,8 +81,8 @@ TEST_CASE("Parse double ended barcode arrangement with different barcodes", "[ba
     CHECK(kit_info.bottom_front_flank == "C");
     CHECK(kit_info.bottom_rear_flank == "G");
 
-    CHECK(kit_info.double_ends == true);
-    CHECK(kit_info.ends_different == true);
+    CHECK(kit_info.double_ends);
+    CHECK(kit_info.ends_different);
 }
 
 TEST_CASE("Parse kit with bad indices", "[barcode_demux]") {
