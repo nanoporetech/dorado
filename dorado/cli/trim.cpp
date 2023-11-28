@@ -32,7 +32,7 @@ void add_pg_hdr(sam_hdr_t* hdr) {
 
 }  // anonymous namespace
 
-int trimmer(int argc, char* argv[]) {
+int trim(int argc, char* argv[]) {
     utils::InitLogging();
 
     argparse::ArgumentParser parser("dorado", DORADO_VERSION, argparse::default_arguments::help);
@@ -40,7 +40,6 @@ int trimmer(int argc, char* argv[]) {
     parser.add_argument("reads")
             .help("Path to a file with reads to trim. Can be in any HTS format.")
             .nargs(argparse::nargs_pattern::any);
-    parser.add_argument("--output-dir").help("Output folder for trimmed reads.").required();
     parser.add_argument("-t", "--threads")
             .help("Combined number of threads for barcoding and output generation. Default uses "
                   "all available threads.")
@@ -85,7 +84,6 @@ int trimmer(int argc, char* argv[]) {
     }
 
     auto reads(parser.get<std::vector<std::string>>("reads"));
-    auto output_dir(parser.get<std::string>("output-dir"));
     auto threads(parser.get<int>("threads"));
     auto max_reads(parser.get<int>("max-reads"));
 
@@ -172,7 +170,7 @@ int trimmer(int argc, char* argv[]) {
     tracker.update_progress_bar(final_stats);
     tracker.summarize();
 
-    spdlog::info("> finished barcode demuxing");
+    spdlog::info("> finished adapter/primer trimming");
 
     return 0;
 }
