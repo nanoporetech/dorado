@@ -370,7 +370,6 @@ struct CustomDoubleEndedKitInput {
 
 TEST_CASE("BarcodeClassifier: test custom kit with double ended barcode", TEST_GROUP) {
     fs::path data_dir = fs::path(get_data_dir("barcode_demux/double_end"));
-    //fs::path kit_file = fs::path(get_data_dir("barcode_demux/custom_barcodes")) / "RPB004.toml";
     auto [kit_file, seqs_file] = GENERATE(
             CustomDoubleEndedKitInput{
                     fs::path(get_data_dir("barcode_demux/custom_barcodes")) / "RPB004.toml",
@@ -386,7 +385,7 @@ TEST_CASE("BarcodeClassifier: test custom kit with double ended barcode", TEST_G
     for (std::string bc :
          {"SQK-RPB004_BC01", "SQK-RPB004_BC05", "SQK-RPB004_BC11", "unclassified"}) {
         auto bc_file = data_dir / (bc + ".fastq");
-        HtsReader reader(bc_file.string());
+        HtsReader reader(bc_file.string(), std::nullopt);
         while (reader.read()) {
             auto seqlen = reader.record->core.l_qseq;
             std::string seq = utils::extract_sequence(reader.record.get());
