@@ -34,7 +34,7 @@ at::Tensor ModBaseScaler::scale_signal(const at::Tensor& signal,
 
     // generate the signal values at the centre of each base, create the nx5% quantiles (sorted)
     // and perform a linear regression against the expected kmer levels to generate a new shift and scale
-    auto [offset, scale] = calc_offset_scale(signal, seq_to_sig_map, levels);
+    auto [offset, scale] = calc_offset_scale(signal, seq_to_sig_map, levels, 10, 1000);
     auto scaled_signal = signal * scale + offset;
     return scaled_signal;
 }

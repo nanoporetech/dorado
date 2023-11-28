@@ -311,9 +311,11 @@ int duplex(int argc, char* argv[]) {
 
             // Write read group info to header.
             auto duplex_rg_name = std::string(model + "_" + stereo_model_name);
-            auto read_groups = DataLoader::load_read_groups(reads, model, recursive_file_loading);
-            read_groups.merge(
-                    DataLoader::load_read_groups(reads, duplex_rg_name, recursive_file_loading));
+            // TODO: supply modbase model names once duplex modbase is complete
+            auto read_groups =
+                    DataLoader::load_read_groups(reads, model, "", recursive_file_loading);
+            read_groups.merge(DataLoader::load_read_groups(reads, duplex_rg_name, "",
+                                                           recursive_file_loading));
             std::vector<std::string> barcode_kits;
             utils::add_rg_hdr(hdr.get(), read_groups, barcode_kits, nullptr);
 
@@ -372,7 +374,8 @@ int duplex(int argc, char* argv[]) {
             pipelines::create_stereo_duplex_pipeline(
                     pipeline_desc, std::move(runners), std::move(stereo_runners), overlap,
                     mean_qscore_start_pos, int(num_devices * 2), int(num_devices),
-                    std::move(pairing_parameters), read_filter_node);
+                    std::move(pairing_parameters), read_filter_node,
+                    PipelineDescriptor::InvalidNodeHandle);
 
             pipeline = Pipeline::create(std::move(pipeline_desc), &stats_reporters);
             if (pipeline == nullptr) {
@@ -390,7 +393,7 @@ int duplex(int argc, char* argv[]) {
             }
             hts_writer_ref.set_and_write_header(hdr.get());
 
-            DataLoader loader(*pipeline, "cpu", num_devices, 0, std::move(read_list));
+            DataLoader loader(*pipeline, "cpu", num_devices, 0, std::move(read_list), {});
 
             stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
                     kStatsPeriod, stats_reporters, stats_callables, max_stats_records);

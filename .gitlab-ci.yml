@@ -210,6 +210,15 @@ build:linux:x86:focal_coverage:
     paths:
       - build/dorado_test_coverage/*
 
+build:linux:x86:focal:clang_tidy:
+  stage: build
+  image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.1
+  extends:
+    - .linux_runner
+  script:
+    - apt update && apt install -y clang clang-tidy
+    - ./scripts/run_clang_tidy.sh -j $(( $(nproc) / 4 ))
+
 build:linux:arm64:bionic:
   image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r32.4.3-deps:1.1
   variables:

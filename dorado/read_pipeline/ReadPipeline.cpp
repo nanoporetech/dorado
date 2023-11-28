@@ -206,6 +206,9 @@ void ReadCommon::generate_modbase_tags(bam1_t *aln, uint8_t threshold) const {
         }
     }
 
+    int seq_len = int(seq.length());
+    bam_aux_append(aln, "MN", 'i', sizeof(seq_len), (uint8_t *)&seq_len);
+
     bam_aux_append(aln, "MM", 'Z', int(modbase_string.length() + 1),
                    (uint8_t *)modbase_string.c_str());
     bam_aux_update_array(aln, "ML", 'C', int(modbase_prob.size()), (uint8_t *)modbase_prob.data());
@@ -216,9 +219,9 @@ float ReadCommon::calculate_mean_qscore() const {
     // read length, then calculate mean Q-score from the
     // start of the read.
     if (qstring.length() <= mean_qscore_start_pos) {
-        return utils::mean_qscore_from_qstring(qstring, 0);
+        return utils::mean_qscore_from_qstring(qstring);
     }
-    return utils::mean_qscore_from_qstring(qstring, mean_qscore_start_pos);
+    return utils::mean_qscore_from_qstring(std::string_view{qstring}.substr(mean_qscore_start_pos));
 }
 
 std::vector<BamPtr> ReadCommon::extract_sam_lines(bool emit_moves,

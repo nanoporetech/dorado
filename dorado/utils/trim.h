@@ -3,11 +3,13 @@
 
 namespace dorado::utils {
 
+// Default trim settings.
+constexpr float DEFAULT_TRIM_THRESHOLD = 2.4f;
+constexpr int DEFAULT_TRIM_WINDOW_SIZE = 40;
+constexpr int DEFAULT_TRIM_MIN_ELEMENTS = 3;
+
 // Read Trimming method (removes some initial part of the raw read).
-int trim(const at::Tensor& signal,
-         float threshold = 2.4,
-         int window_size = 40,
-         int min_elements = 3);
+int trim(const at::Tensor& signal, float threshold, int window_size, int min_elements);
 
 // Trim a sequence. The interval defines the portion of the read to keep.
 std::string trim_sequence(const std::string& seq, const std::pair<int, int>& trim_interval);

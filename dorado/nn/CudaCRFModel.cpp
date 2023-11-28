@@ -222,9 +222,9 @@ public:
     }
 
     struct NNTask {
-        NNTask(at::Tensor input_, at::Tensor &output_) : input(input_), out(output_) {}
+        NNTask(at::Tensor input_) : input(input_) {}
         at::Tensor input;
-        at::Tensor &out;
+        at::Tensor out;
         std::mutex mut;
         std::condition_variable cv;
         bool done{false};
@@ -241,7 +241,7 @@ public:
             return std::vector<DecodedChunk>();
         }
 
-        auto task = std::make_shared<NNTask>(input, output);
+        auto task = std::make_shared<NNTask>(input.to(m_options.device()));
         {
             std::lock_guard<std::mutex> lock(m_input_lock);
             m_input_queue.push_front(task);
@@ -253,6 +253,7 @@ public:
             task->cv.wait(lock);
         }
 
+        output.copy_(task->out);
         return m_decoder->cpu_part(output);
     }
 
@@ -316,9 +317,9 @@ public:
 #endif  // #ifndef DORADO_TX2
             auto run_basecalling = [&]() {
                 stats::Timer timer;
-                auto scores = m_module->forward(task->input.to(m_options.device(), true));
+                auto scores = m_module->forward(task->input);
                 const auto forward_ms = timer.GetElapsedMS();
-                task->out.copy_(m_decoder->gpu_part(scores, m_decoder_options));
+                task->out = m_decoder->gpu_part(scores, m_decoder_options);
                 stream.synchronize();
                 const auto forward_plus_decode_ms = timer.GetElapsedMS();
                 m_model_ms += forward_ms;

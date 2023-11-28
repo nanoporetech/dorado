@@ -166,7 +166,7 @@ public:
             task->cv.wait(lock);
         }
 
-        return task->out;
+        return task->out.to(torch::kCPU);
     }
 
     void modbase_task_thread_fn(size_t model_id) {
@@ -197,8 +197,7 @@ public:
 
             std::unique_lock<std::mutex> task_lock(task->mut);
             stats::Timer timer;
-            auto scores = caller_data->module_holder->forward(task->input_sigs, task->input_seqs);
-            task->out = scores.to(torch::kCPU);
+            task->out = caller_data->module_holder->forward(task->input_sigs, task->input_seqs);
 #if DORADO_GPU_BUILD && !defined(__APPLE__)
             if (has_stream) {
                 caller_data->stream->synchronize();

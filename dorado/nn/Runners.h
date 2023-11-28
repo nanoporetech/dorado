@@ -20,8 +20,8 @@ std::pair<std::vector<dorado::Runner>, size_t> create_basecall_runners(
         size_t num_cpu_runners,
         size_t batch_size,
         size_t chunk_size,
-        float memory_fraction = 1.f,
-        bool guard_gpus = false);
+        float memory_fraction,
+        bool guard_gpus);
 
 std::vector<std::unique_ptr<dorado::ModBaseRunner>> create_modbase_runners(
         const std::string& remora_models,

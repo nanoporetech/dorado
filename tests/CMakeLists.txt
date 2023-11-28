@@ -1,6 +1,7 @@
 
 set(UNIT_TEST_SOURCE_FILES
     main.cpp
+    AdapterDetectorTest.cpp
     AlignerTest.cpp
     AsyncQueueTest.cpp
     BamReaderTest.cpp

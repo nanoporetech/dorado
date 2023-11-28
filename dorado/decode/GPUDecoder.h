@@ -6,9 +6,9 @@
 
 namespace dorado {
 
-class GPUDecoder : Decoder {
+class GPUDecoder final : Decoder {
 public:
-    explicit GPUDecoder(float score_clamp_val = 0) : m_score_clamp_val(score_clamp_val) {}
+    explicit GPUDecoder(float score_clamp_val) : m_score_clamp_val(score_clamp_val) {}
 
     std::vector<DecodedChunk> beam_search(const at::Tensor& scores,
                                           int num_chunks,

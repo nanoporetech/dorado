@@ -73,8 +73,8 @@ public:
     float calculate_mean_qscore() const;
 
     std::vector<BamPtr> extract_sam_lines(bool emit_moves,
-                                          uint8_t modbase_threshold = 0,
-                                          bool is_duplex_parent = false) const;
+                                          uint8_t modbase_threshold,
+                                          bool is_duplex_parent) const;
 
     // Barcode.
     std::string barcode{};
@@ -107,7 +107,7 @@ public:
 private:
     void generate_duplex_read_tags(bam1_t*) const;
     void generate_read_tags(bam1_t* aln, bool emit_moves, bool is_duplex_parent) const;
-    void generate_modbase_tags(bam1_t* aln, uint8_t threshold = 0) const;
+    void generate_modbase_tags(bam1_t* aln, uint8_t threshold) const;
     std::string generate_read_group() const;
 };
 
@@ -342,9 +342,8 @@ public:
     // consumed during creation.
     // If non-null, stats_reporters has node stats reporters added to it.
     // Returns the resulting pipeline, or a null unique_ptr on error.
-    static std::unique_ptr<Pipeline> create(
-            PipelineDescriptor&& descriptor,
-            std::vector<stats::StatsReporter>* stats_reporters = nullptr);
+    static std::unique_ptr<Pipeline> create(PipelineDescriptor&& descriptor,
+                                            std::vector<stats::StatsReporter>* stats_reporters);
 
     // Routes the given message to the pipeline source node.
     void push_message(Message&& message);
