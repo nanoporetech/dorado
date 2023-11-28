@@ -363,11 +363,25 @@ TEST_CASE("BarcodeClassifierNode: test reads where trim length == read length", 
     CHECK(seq == orig_seq);
 }
 
+struct CustomDoubleEndedKitInput {
+    fs::path kit_file;
+    std::optional<fs::path> seqs_file;
+};
+
 TEST_CASE("BarcodeClassifier: test custom kit with double ended barcode", TEST_GROUP) {
     fs::path data_dir = fs::path(get_data_dir("barcode_demux/double_end"));
-    fs::path kit_file = fs::path(get_data_dir("barcode_demux/custom_barcodes")) / "RPB004.toml";
+    //fs::path kit_file = fs::path(get_data_dir("barcode_demux/custom_barcodes")) / "RPB004.toml";
+    auto [kit_file, seqs_file] = GENERATE(
+            CustomDoubleEndedKitInput{
+                    fs::path(get_data_dir("barcode_demux/custom_barcodes")) / "RPB004.toml",
+                    std::nullopt},
+            CustomDoubleEndedKitInput{
+                    fs::path(get_data_dir("barcode_demux/custom_barcodes")) / "RPB004.toml",
+                    fs::path(get_data_dir("barcode_demux/custom_barcodes")) /
+                            "RPB004_sequences.fasta"});
 
-    demux::BarcodeClassifier classifier({}, kit_file.string(), std::nullopt);
+    demux::BarcodeClassifier classifier({}, kit_file.string(),
+                                        seqs_file ? seqs_file->string() : seqs_file);
 
     for (std::string bc :
          {"SQK-RPB004_BC01", "SQK-RPB004_BC05", "SQK-RPB004_BC11", "unclassified"}) {

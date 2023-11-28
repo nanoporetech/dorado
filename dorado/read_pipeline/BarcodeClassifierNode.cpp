@@ -107,11 +107,14 @@ void BarcodeClassifierNode::worker_thread() {
 
 std::shared_ptr<const BarcodingInfo> BarcodeClassifierNode::get_barcoding_info(
         const SimplexRead& read) const {
-    if (m_default_barcoding_info && !m_default_barcoding_info->kit_name.empty()) {
+    if (m_default_barcoding_info && (!m_default_barcoding_info->kit_name.empty() ||
+                                     m_default_barcoding_info->custom_kit.has_value())) {
         return m_default_barcoding_info;
     }
 
-    if (read.read_common.barcoding_info && !read.read_common.barcoding_info->kit_name.empty()) {
+    if (read.read_common.barcoding_info &&
+        (!read.read_common.barcoding_info->kit_name.empty() ||
+         read.read_common.barcoding_info->custom_kit.has_value())) {
         return read.read_common.barcoding_info;
     }
 

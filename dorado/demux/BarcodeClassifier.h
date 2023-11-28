@@ -28,7 +28,7 @@ public:
                                const BarcodingInfo::FilterSet& allowed_barcodes) const;
 
 private:
-    const std::unordered_map<std::string, dorado::barcode_kits::KitInfo> m_custom_kits;
+    const std::unordered_map<std::string, dorado::barcode_kits::KitInfo> m_custom_kit;
     const std::unordered_map<std::string, std::string> m_custom_seqs;
     const BarcodeKitScoringParams m_scoring_params;
     const std::vector<BarcodeCandidateKit> m_barcode_candidates;

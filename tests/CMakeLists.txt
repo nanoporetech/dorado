@@ -1,55 +1,55 @@
 
 set(UNIT_TEST_SOURCE_FILES
     main.cpp
-    #AdapterDetectorTest.cpp
+    AdapterDetectorTest.cpp
     CustomBarcodeParserTest.cpp
-    #AlignerTest.cpp
-    #AsyncQueueTest.cpp
-    #BamReaderTest.cpp
-    #BamWriterTest.cpp
-    #BamUtilsTest.cpp
+    AlignerTest.cpp
+    AsyncQueueTest.cpp
+    BamReaderTest.cpp
+    BamWriterTest.cpp
+    BamUtilsTest.cpp
     BarcodeClassifierSelectorTest.cpp
     BarcodeClassifierTest.cpp
     BarcodeDemuxerNodeTest.cpp    
-    #CliUtilsTest.cpp
-    #CRFModelConfigTest.cpp
-    #DriverQueryTest.cpp
-    #DuplexReadTaggingNodeTest.cpp
-    #DuplexSplitTest.cpp
-    #Fast5DataLoaderTest.cpp
-    #MathUtilsTest.cpp
-    #ModBaseEncoderTest.cpp
-    #MotifMatcherTest.cpp
-    #ModelUtilsTest.cpp
-    #PairingNodeTest.cpp
-    #PipelineTest.cpp
-    #Pod5DataLoaderTest.cpp
-    #PolyACalculatorTest.cpp
-    #ReadFilterNodeTest.cpp
-    #ReadTest.cpp
-    #RNASplitTest.cpp
-    #ResumeLoaderTest.cpp
-    #SampleSheetTests.cpp
-    #SequenceUtilsTest.cpp
-    #StereoDuplexTest.cpp
-    #StitchTest.cpp
-    #StringUtilsTest.cpp
-    #TensorUtilsTest.cpp
-    #TimeUtilsTest.cpp
-    #TrimTest.cpp
+    CliUtilsTest.cpp
+    CRFModelConfigTest.cpp
+    DriverQueryTest.cpp
+    DuplexReadTaggingNodeTest.cpp
+    DuplexSplitTest.cpp
+    Fast5DataLoaderTest.cpp
+    MathUtilsTest.cpp
+    ModBaseEncoderTest.cpp
+    MotifMatcherTest.cpp
+    ModelUtilsTest.cpp
+    PairingNodeTest.cpp
+    PipelineTest.cpp
+    Pod5DataLoaderTest.cpp
+    PolyACalculatorTest.cpp
+    ReadFilterNodeTest.cpp
+    ReadTest.cpp
+    RNASplitTest.cpp
+    ResumeLoaderTest.cpp
+    SampleSheetTests.cpp
+    SequenceUtilsTest.cpp
+    StereoDuplexTest.cpp
+    StitchTest.cpp
+    StringUtilsTest.cpp
+    TensorUtilsTest.cpp
+    TimeUtilsTest.cpp
+    TrimTest.cpp
 )
 
-#if (DORADO_GPU_BUILD)
-#    if(APPLE)
-#        list(APPEND UNIT_TEST_SOURCE_FILES
-#	        MetalLinearTest.cpp
-#        )
-#    else()
-#        list(APPEND UNIT_TEST_SOURCE_FILES
-#            cuda_utils_test.cpp
-#        )
-#    endif()
-#endif()
+if (DORADO_GPU_BUILD)
+    if(APPLE)
+        list(APPEND UNIT_TEST_SOURCE_FILES
+	        MetalLinearTest.cpp
+        )
+    else()
+        list(APPEND UNIT_TEST_SOURCE_FILES
+            cuda_utils_test.cpp
+        )
+    endif()
+endif()
 
 add_executable(dorado_tests ${UNIT_TEST_SOURCE_FILES})
 
