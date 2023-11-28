@@ -102,15 +102,16 @@ std::optional<PosRange> check_rc_match(const std::string& seq,
 
 // NB: Computes literal mean of the qscore values, not generally applicabile
 float qscore_mean(const std::string& qstring, splitter::PosRange r) {
-    uint64_t len = (int64_t)qstring.size();
+    uint64_t len = qstring.size();
     uint64_t start = r.first;
     uint64_t end = std::min(r.second, len);
     assert(start < end);
-    int64_t sum = 0;
+    uint64_t sum = 0;
     for (size_t i = start; i < end; ++i) {
+        assert(qstring[i] > 33);
         sum += qstring[i] - 33;
     }
-    return float(sum / (end - start));
+    return float(1. * sum / (end - start));
 }
 
 }  // namespace
