@@ -5,8 +5,11 @@
 #include <ATen/core/TensorBody.h>
 
 #include <algorithm>
+#include <cassert>
 #include <cstdint>
+#include <limits>
 #include <optional>
+#include <utility>
 #include <vector>
 
 namespace dorado::splitter {

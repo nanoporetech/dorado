@@ -9,6 +9,8 @@
 #include <ATen/ATen.h>
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
+#include <cassert>
 #include <chrono>
 #include <cmath>
 #include <iomanip>
