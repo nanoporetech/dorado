@@ -59,8 +59,7 @@ auto make_read() {
 TEST_CASE("4 subread splitting test", TEST_GROUP) {
     auto read = make_read();
 
-    dorado::splitter::DuplexSplitSettings splitter_settings;
-    dorado::splitter::DuplexReadSplitter splitter_node(splitter_settings);
+    dorado::splitter::DuplexReadSplitter splitter_node(dorado::splitter::DuplexSplitSettings(false));
 
     const auto split_res = splitter_node.split(std::move(read));
     CHECK(split_res.size() == 4);
@@ -136,7 +135,7 @@ TEST_CASE("4 subread split tagging", TEST_GROUP) {
                                             dorado::DEFAULT_DUPLEX_CACHE_DEPTH},
             2, 1000);
     auto splitter = std::make_unique<const dorado::splitter::DuplexReadSplitter>(
-            dorado::splitter::DuplexSplitSettings{});
+            dorado::splitter::DuplexSplitSettings(false));
     pipeline_desc.add_node<dorado::ReadSplitNode>({pairing_node}, std::move(splitter), 1);
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
 
@@ -199,7 +198,7 @@ TEST_CASE("No split output read properties", TEST_GROUP) {
     std::vector<dorado::Message> messages;
     auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 3, messages);
     auto splitter = std::make_unique<dorado::splitter::DuplexReadSplitter>(
-            dorado::splitter::DuplexSplitSettings{});
+            dorado::splitter::DuplexSplitSettings(false));
     pipeline_desc.add_node<dorado::ReadSplitNode>({sink}, std::move(splitter), 1);
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
 
@@ -248,7 +247,7 @@ TEST_CASE("Test split where only one subread is generated", TEST_GROUP) {
     std::vector<dorado::Message> messages;
     auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 3, messages);
     auto splitter = std::make_unique<dorado::splitter::DuplexReadSplitter>(
-            dorado::splitter::DuplexSplitSettings{});
+            dorado::splitter::DuplexSplitSettings(false));
     pipeline_desc.add_node<dorado::ReadSplitNode>({sink}, std::move(splitter), 1);
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
 
