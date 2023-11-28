@@ -10,6 +10,12 @@
 #include <filesystem>
 
 namespace {
+
+struct IndexDeleter {
+    void operator()(mm_idx_t* index) { mm_idx_destroy(index); }
+};
+using IndexUniquePtr = std::unique_ptr<mm_idx_t, IndexDeleter>;
+
 struct IndexReaderDeleter {
     void operator()(mm_idx_reader_t* index_reader) { mm_idx_reader_close(index_reader); }
 };
@@ -29,26 +35,26 @@ namespace dorado::alignment {
 void Minimap2Index::set_index_options(const Minimap2IndexOptions& index_options) {
     m_index_options->k = index_options.kmer_size;
     m_index_options->w = index_options.window_size;
-    spdlog::info("> Index parameters input by user: kmer size={} and window size={}.",
-                 m_index_options->k, m_index_options->w);
+    spdlog::trace("> Index parameters input by user: kmer size={} and window size={}.",
+                  m_index_options->k, m_index_options->w);
 
     m_index_options->batch_size = index_options.index_batch_size;
     m_index_options->mini_batch_size = index_options.index_batch_size;
-    spdlog::info("> Index parameters input by user: batch size={} and mini batch size={}.",
-                 m_index_options->batch_size, m_index_options->mini_batch_size);
+    spdlog::trace("> Index parameters input by user: batch size={} and mini batch size={}.",
+                  m_index_options->batch_size, m_index_options->mini_batch_size);
 }
 
 void Minimap2Index::set_mapping_options(const Minimap2MappingOptions& mapping_options) {
     m_mapping_options->bw = mapping_options.bandwidth;
     m_mapping_options->bw_long = mapping_options.bandwidth_long;
-    spdlog::info("> Map parameters input by user: bandwidth={} and bandwidth long={}.",
-                 m_mapping_options->bw, m_mapping_options->bw_long);
+    spdlog::trace("> Map parameters input by user: bandwidth={} and bandwidth long={}.",
+                  m_mapping_options->bw, m_mapping_options->bw_long);
 
     if (!mapping_options.print_secondary) {
         m_mapping_options->flag |= MM_F_NO_PRINT_2ND;
     }
     m_mapping_options->best_n = mapping_options.best_n_secondary;
-    spdlog::info(
+    spdlog::trace(
             "> Map parameters input by user: don't print secondary={} and best n secondary={}.",
             static_cast<bool>(m_mapping_options->flag & MM_F_NO_PRINT_2ND),
             m_mapping_options->best_n);
@@ -59,9 +65,9 @@ void Minimap2Index::set_mapping_options(const Minimap2MappingOptions& mapping_op
     if (mapping_options.secondary_seq) {
         m_mapping_options->flag |= MM_F_SECONDARY_SEQ;
     }
-    spdlog::info("> Map parameters input by user: soft clipping={} and secondary seq={}.",
-                 static_cast<bool>(m_mapping_options->flag & MM_F_SOFTCLIP),
-                 static_cast<bool>(m_mapping_options->flag & MM_F_SECONDARY_SEQ));
+    spdlog::trace("> Map parameters input by user: soft clipping={} and secondary seq={}.",
+                  static_cast<bool>(m_mapping_options->flag & MM_F_SOFTCLIP),
+                  static_cast<bool>(m_mapping_options->flag & MM_F_SECONDARY_SEQ));
 
     // Force cigar generation.
     m_mapping_options->flag |= MM_F_CIGAR;
@@ -69,8 +75,8 @@ void Minimap2Index::set_mapping_options(const Minimap2MappingOptions& mapping_op
 
 bool Minimap2Index::load_index_unless_split(const std::string& index_file, int num_threads) {
     auto index_reader = create_index_reader(index_file, *m_index_options);
-    m_index.reset(mm_idx_reader_read(index_reader.get(), num_threads));
-    IndexPtr split_index{};
+    m_index.reset(mm_idx_reader_read(index_reader.get(), num_threads), IndexDeleter());
+    IndexUniquePtr split_index{};
     split_index.reset(mm_idx_reader_read(index_reader.get(), num_threads));
     if (split_index != nullptr) {
         return false;
@@ -90,7 +96,7 @@ bool Minimap2Index::load_index_unless_split(const std::string& index_file, int n
     return true;
 }
 
-bool Minimap2Index::initialise(const Minimap2Options& options) {
+bool Minimap2Index::initialise(Minimap2Options options) {
     m_index_options = std::make_optional<mm_idxopt_t>();
     m_mapping_options = std::make_optional<mm_mapopt_t>();
 
@@ -114,12 +120,14 @@ bool Minimap2Index::initialise(const Minimap2Options& options) {
                   static_cast<bool>(mm_dbg_flag & MM_DBG_PRINT_QNAME),
                   static_cast<bool>(mm_dbg_flag & MM_DBG_PRINT_ALN_SEQ));
 
+    m_options = std::move(options);
     return true;
 }
 
 IndexLoadResult Minimap2Index::load(const std::string& index_file, int num_threads) {
     assert(m_index_options && m_mapping_options &&
            "Loading an index requires options have been initialised.");
+    assert(!m_index && "Loading an index requires it is not already loaded.");
 
     // Check if reference file exists.
     if (!std::filesystem::exists(index_file)) {
@@ -133,6 +141,23 @@ IndexLoadResult Minimap2Index::load(const std::string& index_file, int num_threa
     mm_mapopt_update(&m_mapping_options.value(), m_index.get());
 
     return IndexLoadResult::success;
+}
+
+std::shared_ptr<Minimap2Index> Minimap2Index::create_compatible_index(
+        const Minimap2Options& options) const {
+    assert(static_cast<Minimap2IndexOptions>(m_options) ==
+                   static_cast<Minimap2IndexOptions>(options) &&
+           " create_compatible_index expects compatible indexing options");
+    assert(m_index && " create_compatible_index expects the index has been loaded.");
+
+    auto compatible = std::make_shared<Minimap2Index>();
+    if (!compatible->initialise(options)) {
+        return {};
+    }
+    compatible->m_index = m_index;
+    mm_mapopt_update(&compatible->m_mapping_options.value(), m_index.get());
+
+    return compatible;
 }
 
 HeaderSequenceRecords Minimap2Index::get_sequence_records_for_header() const {

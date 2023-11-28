@@ -84,4 +84,42 @@ TEST_CASE_METHOD(Minimap2IndexTestFixture,
     REQUIRE(cut.load(reference_file, 1) == IndexLoadResult::success);
 }
 
+TEST_CASE_METHOD(Minimap2IndexTestFixture,
+                 TEST_GROUP " create_compatible_index() with valid options returns non-null",
+                 TEST_GROUP) {
+    cut.load(reference_file, 1);
+    Minimap2Options compatible_options{dflt_options};
+    ++compatible_options.best_n_secondary;
+
+    REQUIRE(cut.create_compatible_index(compatible_options) != nullptr);
+}
+
+TEST_CASE_METHOD(Minimap2IndexTestFixture,
+                 TEST_GROUP
+                 " create_compatible_index() with valid options returns Minimap2Index with same "
+                 "underlying index",
+                 TEST_GROUP) {
+    cut.load(reference_file, 1);
+    Minimap2Options compatible_options{dflt_options};
+    ++compatible_options.best_n_secondary;
+
+    auto compatible_index = cut.create_compatible_index(compatible_options);
+
+    REQUIRE(compatible_index->index() == cut.index());
+}
+
+TEST_CASE_METHOD(Minimap2IndexTestFixture,
+                 TEST_GROUP
+                 " create_compatible_index() with valid options returns Minimap2Index with mapping "
+                 "options updated",
+                 TEST_GROUP) {
+    cut.load(reference_file, 1);
+    Minimap2Options compatible_options{dflt_options};
+    ++compatible_options.best_n_secondary;
+
+    auto compatible_index = cut.create_compatible_index(compatible_options);
+
+    REQUIRE(compatible_index->mapping_options().best_n == dflt_options.best_n_secondary + 1);
+}
+
 }  // namespace dorado::alignment::test

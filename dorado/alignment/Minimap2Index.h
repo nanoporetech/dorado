@@ -13,12 +13,8 @@
 namespace dorado::alignment {
 
 class Minimap2Index {
-    struct IndexDeleter {
-        void operator()(mm_idx_t* index) { mm_idx_destroy(index); }
-    };
-    using IndexPtr = std::unique_ptr<mm_idx_t, IndexDeleter>;
-
-    IndexPtr m_index;
+    Minimap2Options m_options;
+    std::shared_ptr<mm_idx_t> m_index;
     std::optional<mm_idxopt_t> m_index_options{};
     std::optional<mm_mapopt_t> m_mapping_options{};
 
@@ -29,8 +25,14 @@ class Minimap2Index {
     bool load_index_unless_split(const std::string& index_file, int num_threads);
 
 public:
-    bool initialise(const Minimap2Options& options);
+    bool initialise(Minimap2Options options);
     IndexLoadResult load(const std::string& index_file, int num_threads);
+
+    // Returns a shallow copy of this MinimapIndex with the give mapping options applied.
+    // By contract the given indexing options must be identical to those held in this instance
+    // and the underlying index must be loaded.
+    // If the given mapping options are invalid/incompatible a nullptr will be returned.
+    std::shared_ptr<Minimap2Index> create_compatible_index(const Minimap2Options& options) const;
 
     const mm_idx_t* index() const { return m_index.get(); }
     const mm_idxopt_t& index_options() const;
