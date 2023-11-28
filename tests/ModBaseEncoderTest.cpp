@@ -12,8 +12,8 @@ TEST_CASE("Encode sequence for modified basecalling", TEST_GROUP) {
     auto seq_ints = dorado::utils::sequence_to_ints(sequence);
     //                         T  A     T        T  C     A     G        T     A  C
     std::vector<uint8_t> moves{1, 1, 0, 1, 0, 0, 1, 1, 0, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 0};
-    auto seq_to_sig_map =
-            dorado::utils::moves_to_map(moves, BLOCK_STRIDE, moves.size() * BLOCK_STRIDE);
+    auto seq_to_sig_map = dorado::utils::moves_to_map(moves, BLOCK_STRIDE,
+                                                      moves.size() * BLOCK_STRIDE, std::nullopt);
 
     dorado::ModBaseEncoder encoder(BLOCK_STRIDE, SLICE_BLOCKS * BLOCK_STRIDE, 1, 1);
     encoder.init(seq_ints, seq_to_sig_map);

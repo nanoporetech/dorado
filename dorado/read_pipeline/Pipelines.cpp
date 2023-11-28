@@ -52,13 +52,14 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
         auto rna_splitter =
                 std::make_unique<const splitter::RNAReadSplitter>(rna_splitter_settings);
         auto rna_splitter_node = pipeline_desc.add_node<ReadSplitNode>({}, std::move(rna_splitter),
-                                                                       splitter_node_threads);
+                                                                       splitter_node_threads, 1000);
         first_node_handle = rna_splitter_node;
         current_node_handle = rna_splitter_node;
     }
 
-    auto scaler_node = pipeline_desc.add_node<ScalerNode>(
-            {}, model_config.signal_norm_params, model_config.sample_type, scaler_node_threads);
+    auto scaler_node =
+            pipeline_desc.add_node<ScalerNode>({}, model_config.signal_norm_params,
+                                               model_config.sample_type, scaler_node_threads, 1000);
     if (current_node_handle != PipelineDescriptor::InvalidNodeHandle) {
         pipeline_desc.add_node_sink(current_node_handle, scaler_node);
     } else {
@@ -79,7 +80,7 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
         splitter_settings.simplex_mode = true;
         auto dna_splitter = std::make_unique<const splitter::DuplexReadSplitter>(splitter_settings);
         auto dna_splitter_node = pipeline_desc.add_node<ReadSplitNode>({}, std::move(dna_splitter),
-                                                                       splitter_node_threads);
+                                                                       splitter_node_threads, 1000);
         pipeline_desc.add_node_sink(current_node_handle, dna_splitter_node);
         current_node_handle = dna_splitter_node;
         last_node_handle = dna_splitter_node;
@@ -87,7 +88,7 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
 
     if (!modbase_runners.empty()) {
         auto mod_base_caller_node = pipeline_desc.add_node<ModBaseCallerNode>(
-                {}, std::move(modbase_runners), modbase_node_threads, model_stride);
+                {}, std::move(modbase_runners), modbase_node_threads, model_stride, 1000);
         pipeline_desc.add_node_sink(current_node_handle, mod_base_caller_node);
         current_node_handle = mod_base_caller_node;
         last_node_handle = mod_base_caller_node;
@@ -152,7 +153,7 @@ void create_stereo_duplex_pipeline(PipelineDescriptor& pipeline_desc,
                                                     ScalingStrategy::PA);
     auto duplex_splitter = std::make_unique<const splitter::DuplexReadSplitter>(splitter_settings);
     auto splitter_node = pipeline_desc.add_node<ReadSplitNode>(
-            {pairing_node}, std::move(duplex_splitter), splitter_node_threads);
+            {pairing_node}, std::move(duplex_splitter), splitter_node_threads, 1000);
 
     auto adjusted_simplex_overlap = (overlap / simplex_model_stride) * simplex_model_stride;
 
@@ -163,7 +164,7 @@ void create_stereo_duplex_pipeline(PipelineDescriptor& pipeline_desc,
 
     auto scaler_node =
             pipeline_desc.add_node<ScalerNode>({basecaller_node}, model_config.signal_norm_params,
-                                               SampleType::DNA, scaler_node_threads);
+                                               SampleType::DNA, scaler_node_threads, 1000);
 
     // if we've been provided a source node, connect it to the start of our pipeline
     if (source_node_handle != PipelineDescriptor::InvalidNodeHandle) {

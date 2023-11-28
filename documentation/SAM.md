@@ -9,16 +9,16 @@
 
 #### Read Group Header
 
-|    |    |                                                       |
-| -- | -- | ----------------------------------------------------- |
-| RG | ID | `<runid>_<basecalling_model>_<barcode_arrangement>`   |
-|    | PU | `<flow_cell_id>`                                      |
-|    | PM | `<device_id>`                                         |
-|    | DT | `<exp_start_time>`                                    |
-|    | PL | `ONT`                                                 |
-|    | DS | `basecall_model=<basecall_model_name> runid=<run_id>` |
-|    | LB | `<sample_id>`                                         |
-|    | SM | `<sample_id>`                                         |
+|    |    |                                                                                            |
+| -- | -- | ------------------------------------------------------------------------------------------ |
+| RG | ID | `<runid>_<basecalling_model>_<barcode_arrangement>`                                        |
+|    | PU | `<flow_cell_id>`                                                                           |
+|    | PM | `<device_id>`                                                                              |
+|    | DT | `<exp_start_time>`                                                                         |
+|    | PL | `ONT`                                                                                      |
+|    | DS | `basecall_model=<basecall_model_name> modbase_models=<modbase_model_names> runid=<run_id>` |
+|    | LB | `<sample_id>`                                                                              |
+|    | SM | `<sample_id>`                                                                              |
 
 #### Read Tags
 
@@ -42,6 +42,7 @@
 | pi:Z:  | parent read id for a split read                            |
 | sp:i:  | start coordinate of split read in parent read signal       |
 | pt:i:  | estimated poly(A/T) tail length in cDNA and dRNA reads     |
+| MN:i:  | Length of sequence at the time MM and ML were produced     |
 
 #### Modified Base Tags
 

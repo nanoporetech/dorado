@@ -104,8 +104,9 @@ std::pair<std::pair<int, int>, std::pair<int, int>> get_trimmed_alignment(
 }
 
 // Applies a min pool filter to q scores for basespace-duplex algorithm
-void preprocess_quality_scores(std::vector<uint8_t>& quality_scores, int pool_window) {
+void preprocess_quality_scores(std::vector<uint8_t>& quality_scores) {
     // Apply a min-pool window to the quality scores
+    const int pool_window = 5;
     auto opts = at::TensorOptions().dtype(at::kChar);
     at::Tensor t = at::from_blob(quality_scores.data(), {1, (int)quality_scores.size()}, opts);
     auto t_float = t.to(at::kFloat);

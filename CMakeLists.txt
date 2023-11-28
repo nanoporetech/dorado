@@ -231,6 +231,8 @@ set(LIB_SOURCE_FILES
     dorado/read_pipeline/BarcodeClassifierNode.h
     dorado/read_pipeline/BarcodeDemuxerNode.cpp
     dorado/read_pipeline/BarcodeDemuxerNode.h
+    dorado/read_pipeline/AdapterDetectorNode.cpp
+    dorado/read_pipeline/AdapterDetectorNode.h
     dorado/read_pipeline/NullNode.h
     dorado/read_pipeline/NullNode.cpp
     dorado/read_pipeline/PairingNode.cpp
@@ -251,10 +253,14 @@ set(LIB_SOURCE_FILES
     dorado/splitter/RNAReadSplitter.h
     dorado/splitter/splitter_utils.cpp
     dorado/splitter/splitter_utils.h
+    dorado/demux/AdapterDetector.cpp
+    dorado/demux/AdapterDetector.h
     dorado/demux/BarcodeClassifier.cpp
     dorado/demux/BarcodeClassifier.h
     dorado/demux/BarcodeClassifierSelector.cpp
     dorado/demux/BarcodeClassifierSelector.h
+    dorado/demux/Trimmer.cpp
+    dorado/demux/Trimmer.h
     dorado/decode/beam_search.cpp
     dorado/decode/beam_search.h
     dorado/decode/CPUDecoder.cpp

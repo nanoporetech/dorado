@@ -1,0 +1,240 @@
+#include "demux/AdapterDetector.h"
+
+#include "MessageSinkUtils.h"
+#include "TestUtils.h"
+#include "read_pipeline/AdapterDetectorNode.h"
+#include "read_pipeline/HtsReader.h"
+#include "utils/bam_utils.h"
+#include "utils/sequence_utils.h"
+
+#include <catch2/catch.hpp>
+#include <htslib/sam.h>
+
+#include <cstdint>
+#include <filesystem>
+#include <string>
+#include <vector>
+
+#define TEST_GROUP "[adapter_detect]"
+
+namespace fs = std::filesystem;
+
+using namespace dorado;
+
+TEST_CASE("AdapterDetector: test adapter detection", TEST_GROUP) {
+    fs::path data_dir = fs::path(get_data_dir("barcode_demux/single_end"));
+
+    demux::AdapterDetector detector;
+    const auto& adapters = detector.get_adapter_sequences();
+
+    auto test_file = data_dir / "SQK-RBK114-96_BC01.fastq";
+    HtsReader reader(test_file.string(), std::nullopt);
+    reader.read();
+    std::string seq = utils::extract_sequence(reader.record.get());
+    for (size_t i = 0; i < adapters.size(); ++i) {
+        // First put the front adapter only at the beginning, with 6 bases in front of it.
+        auto new_sequence1 = "ACGTAC" + adapters[i].sequence + seq;
+        auto res1 = detector.find_adapters(new_sequence1);
+        CHECK(res1.front.name == adapters[i].name + "_FWD");
+        CHECK(res1.front.position == std::make_pair(6, int(adapters[i].sequence.length()) + 5));
+        CHECK(res1.front.score == 1.0f);
+        CHECK(res1.rear.score < 0.7f);
+
+        // Now put the rear adapter at the end, with 3 bases after it.
+        auto new_sequence2 = seq + adapters[i].sequence_rev + "TTT";
+        auto res2 = detector.find_adapters(new_sequence2);
+        CHECK(res2.front.score < 0.7f);
+        CHECK(res2.rear.name == adapters[i].name + "_REV");
+        CHECK(res2.rear.position ==
+              std::make_pair(int(seq.size()),
+                             int(seq.size() + adapters[i].sequence_rev.length()) - 1));
+        CHECK(res2.rear.score == 1.0f);
+
+        // Now put them both in.
+        auto new_sequence3 = "TGCA" + adapters[i].sequence + seq + adapters[i].sequence_rev + "GTA";
+        auto res3 = detector.find_adapters(new_sequence3);
+        CHECK(res3.front.name == adapters[i].name + "_FWD");
+        CHECK(res3.front.position == std::make_pair(4, int(adapters[i].sequence.length()) + 3));
+        CHECK(res3.front.score == 1.0f);
+        CHECK(res3.rear.name == adapters[i].name + "_REV");
+        CHECK(res3.rear.position ==
+              std::make_pair(int(adapters[i].sequence.size() + seq.size()) + 4,
+                             int(adapters[i].sequence.size() + seq.size() +
+                                 adapters[i].sequence_rev.length()) +
+                                     3));
+        CHECK(res2.rear.score == 1.0f);
+    }
+}
+
+TEST_CASE("AdapterDetector: test primer detection", TEST_GROUP) {
+    fs::path data_dir = fs::path(get_data_dir("barcode_demux/single_end"));
+
+    demux::AdapterDetector detector;
+    const auto& primers = detector.get_primer_sequences();
+
+    auto test_file = data_dir / "SQK-RBK114-96_BC01.fastq";
+    HtsReader reader(test_file.string(), std::nullopt);
+    reader.read();
+    std::string seq = utils::extract_sequence(reader.record.get());
+    for (size_t i = 0; i < primers.size(); ++i) {
+        // First put the primer at the beginning, and its reverse at the end.
+        auto new_sequence1 = "ACGTAC" + primers[i].sequence + seq + primers[i].sequence_rev + "TTT";
+        auto res1 = detector.find_primers(new_sequence1);
+        CHECK(res1.front.name == primers[i].name + "_FWD");
+        CHECK(res1.front.position == std::make_pair(6, int(primers[i].sequence.length()) + 5));
+        CHECK(res1.front.score == 1.0f);
+        CHECK(res1.rear.name == primers[i].name + "_REV");
+        CHECK(res1.rear.position ==
+              std::make_pair(int(primers[i].sequence.length() + seq.length()) + 6,
+                             int(primers[i].sequence.length() + seq.length() +
+                                 primers[i].sequence_rev.length()) +
+                                     5));
+        CHECK(res1.rear.score == 1.0f);
+
+        // Now put the reverse primers at the beginning, and the forward ones at the end.
+        auto new_sequence2 = "ACGTAC" + primers[i].sequence_rev + seq + primers[i].sequence + "TTT";
+        auto res2 = detector.find_primers(new_sequence2);
+        CHECK(res2.front.name == primers[i].name + "_REV");
+        CHECK(res2.front.position == std::make_pair(6, int(primers[i].sequence_rev.length()) + 5));
+        CHECK(res2.front.score == 1.0f);
+        CHECK(res2.rear.name == primers[i].name + "_FWD");
+        CHECK(res2.rear.position ==
+              std::make_pair(int(primers[i].sequence_rev.length() + seq.length()) + 6,
+                             int(primers[i].sequence_rev.length() + seq.length() +
+                                 primers[i].sequence.length()) +
+                                     5));
+        CHECK(res2.rear.score == 1.0f);
+    }
+}
+
+TEST_CASE(
+        "AdapterDetectorNode: check read messages are correctly updated after adapter/primer "
+        "detection and trimming",
+        TEST_GROUP) {
+    using Catch::Matchers::Equals;
+
+    dorado::PipelineDescriptor pipeline_desc;
+    std::vector<dorado::Message> messages;
+    auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
+    pipeline_desc.add_node<AdapterDetectorNode>({sink}, 8, true, true);
+
+    auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
+
+    // Create new read that is [LSK110_FWD] - [cDNA_VNP_FWD] - 200 As - [cDNA_VNP_REV] [LSK110_REV].
+    auto read = std::make_unique<SimplexRead>();
+    const std::string nonbc_seq = std::string(200, 'A');
+    demux::AdapterDetector detector;
+    const auto& adapters = detector.get_adapter_sequences();
+    const auto& primers = detector.get_primer_sequences();
+    const auto& front_adapter = adapters[1].sequence;
+    const auto& front_primer = primers[2].sequence;
+    const auto& rear_adapter = adapters[1].sequence_rev;
+    const auto& rear_primer = primers[2].sequence_rev;
+    const int stride = 6;
+    read->read_common.seq = front_adapter + front_primer + nonbc_seq + rear_primer + rear_adapter;
+    read->read_common.qstring = std::string(read->read_common.seq.length(), '!');
+    read->read_common.read_id = "read_id";
+    read->read_common.model_stride = stride;
+
+    std::vector<uint8_t> moves;
+    for (size_t i = 0; i < read->read_common.seq.length(); i++) {
+        moves.push_back(1);
+        moves.push_back(0);
+    }
+    read->read_common.moves = moves;
+
+    // Generate mod prob table so only the first A after the front flank has a mod.
+    const std::vector<std::string> mod_alphabet = {"A", "a", "C", "G", "T"};
+    read->read_common.mod_base_info =
+            std::make_shared<dorado::ModBaseInfo>(mod_alphabet, "6mA", "");
+    read->read_common.base_mod_probs =
+            std::vector<uint8_t>(read->read_common.seq.length() * mod_alphabet.size(), 0);
+
+    for (size_t i = 0; i < read->read_common.seq.size(); i++) {
+        switch (read->read_common.seq[i]) {
+        case 'A':
+            read->read_common.base_mod_probs[i * mod_alphabet.size()] = 255;
+            break;
+        case 'C':
+            read->read_common.base_mod_probs[i * mod_alphabet.size() + 2] = 255;
+            break;
+        case 'G':
+            read->read_common.base_mod_probs[i * mod_alphabet.size() + 3] = 255;
+            break;
+        case 'T':
+            read->read_common.base_mod_probs[i * mod_alphabet.size() + 4] = 255;
+            break;
+        }
+    }
+    auto flank_size = front_adapter.length() + front_primer.length();
+    read->read_common.base_mod_probs[flank_size * mod_alphabet.size()] = 20;         // A
+    read->read_common.base_mod_probs[(flank_size * mod_alphabet.size()) + 1] = 235;  // 6mA
+    read->read_common.num_trimmed_samples = 0;
+
+    auto records = read->read_common.extract_sam_lines(true /* emit moves */, 10, false);
+
+    // Push a Read type.
+    pipeline->push_message(std::move(read));
+    dorado::ReadPair dummy_read_pair;
+    // Push a type not used by the ClassifierNode.
+    pipeline->push_message(std::move(dummy_read_pair));
+
+    pipeline->terminate(DefaultFlushOptions());
+
+    const size_t num_expected_messages = 2;
+    CHECK(messages.size() == num_expected_messages);
+
+    std::vector<uint8_t> expected_move_vals;
+    for (size_t i = 0; i < nonbc_seq.length(); i++) {
+        expected_move_vals.push_back(1);
+        expected_move_vals.push_back(0);
+    }
+    const int additional_trimmed_samples =
+            int(stride * 2 * flank_size);  // * 2 is because we have 2 moves per base
+
+    for (auto& message : messages) {
+        if (std::holds_alternative<BamPtr>(message)) {
+            // Check trimming on the bam1_t struct.
+            auto msg_read = std::get<BamPtr>(std::move(message));
+            bam1_t* rec = msg_read.get();
+
+            auto seq = dorado::utils::extract_sequence(rec);
+            CHECK(nonbc_seq == seq);
+
+            auto qual = dorado::utils::extract_quality(rec);
+            CHECK(qual.size() == seq.length());
+
+            auto [_, move_vals] = dorado::utils::extract_move_table(rec);
+            CHECK(move_vals == expected_move_vals);
+
+            // The mod should now be at the very first base.
+            const std::string expected_mod_str = "A+a.,0;";
+            const std::vector<uint8_t> expected_mod_probs = {235};
+            auto [mod_str, mod_probs] = dorado::utils::extract_modbase_info(rec);
+            CHECK(mod_str == expected_mod_str);
+            CHECK_THAT(mod_probs, Equals(std::vector<uint8_t>{235}));
+
+            CHECK(bam_aux2i(bam_aux_get(rec, "ts")) == additional_trimmed_samples);
+        } else if (std::holds_alternative<SimplexReadPtr>(message)) {
+            // Check trimming on the Read type.
+            auto msg_read = std::get<SimplexReadPtr>(std::move(message));
+            const ReadCommon& read_common = msg_read->read_common;
+
+            CHECK(read_common.seq == nonbc_seq);
+
+            CHECK(read_common.moves == expected_move_vals);
+
+            // The mod probabilities table should now start mod at the first base.
+            CHECK(read_common.base_mod_probs.size() ==
+                  read_common.seq.size() * mod_alphabet.size());
+            CHECK(read_common.base_mod_probs[0] == 20);
+            CHECK(read_common.base_mod_probs[1] == 235);
+
+            CHECK(read_common.num_trimmed_samples == uint64_t(additional_trimmed_samples));
+
+            auto bams = read_common.extract_sam_lines(0, 10, false);
+            auto& rec = bams[0];
+            auto [mod_str, mod_probs] = dorado::utils::extract_modbase_info(rec.get());
+        }
+    }
+}

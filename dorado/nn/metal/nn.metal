@@ -266,19 +266,6 @@ kernel void conv(
 }
 */
 
-
-// Just type conversion
-kernel void float_to_half(
-    device const int* const num_elems,
-    device const float* const in,
-    device half* const out,
-    KERNEL_INDEX_INPUTS)
-{
-    for (int elem = gid * threads + tid; elem < *num_elems; elem += threadgroups * threads) {
-        out[elem] = in[elem];
-    }
-}
-
 struct RowMajor {
     static int inner(int r, int c) { return c; }
     static int outer(int r, int c) { return r; }

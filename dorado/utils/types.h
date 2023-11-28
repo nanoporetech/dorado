@@ -42,9 +42,21 @@ struct BarcodeScoreResult {
     std::pair<int, int> bottom_barcode_pos = {-1, -1};
 };
 
+struct SingleEndResult {
+    float score = -1.f;
+    std::string name = "unclassified";
+    std::pair<int, int> position = {-1, -1};
+};
+
+struct AdapterScoreResult {
+    SingleEndResult front;
+    SingleEndResult rear;
+};
+
 struct ReadGroup {
     std::string run_id;
     std::string basecalling_model;
+    std::string modbase_models;
     std::string flowcell_id;
     std::string device_id;
     std::string exp_start_time;

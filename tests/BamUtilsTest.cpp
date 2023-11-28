@@ -70,11 +70,11 @@ TEST_CASE("BamUtilsTest: add_rg_hdr read group headers", TEST_GROUP) {
 
     const std::unordered_map<std::string, dorado::ReadGroup> read_groups{
             {"id_0",
-             {"run_0", "basecalling_mod_0", "flowcell_0", "device_0", "exp_start_0", "sample_0", "",
-              ""}},
+             {"run_0", "basecalling_model_0", "modbase_model_0", "flowcell_0", "device_0",
+              "exp_start_0", "sample_0", "", ""}},
             {"id_1",
-             {"run_1", "basecalling_mod_1", "flowcell_1", "device_1", "exp_start_1", "sample_1", "",
-              ""}},
+             {"run_1", "basecalling_model_1", "modbase_model_1", "flowcell_1", "device_1",
+              "exp_start_1", "sample_1", "", ""}},
     };
 
     SECTION("Read groups") {
@@ -140,7 +140,7 @@ TEST_CASE("BamUtilsTest: Test bam extraction helpers", TEST_GROUP) {
     fs::path bam_utils_test_dir = fs::path(get_data_dir("bam_utils"));
     auto sam = bam_utils_test_dir / "test.sam";
 
-    HtsReader reader(sam.string());
+    HtsReader reader(sam.string(), std::nullopt);
     REQUIRE(reader.read());  // Parse first and only record.
     auto record = reader.record.get();
 
