@@ -44,7 +44,7 @@ public:
 
 int count_trailing_chars(const std::string_view adapter, char c);
 
-std::tuple<int, int, std::vector<uint8_t>> realign_moves(std::string query_sequence,
-                                                         std::string target_sequence,
-                                                         std::vector<uint8_t> moves);
+std::tuple<int, int, std::vector<uint8_t>, int> realign_moves(std::string query_sequence,
+                                                              std::string target_sequence,
+                                                              std::vector<uint8_t> moves);
 }  // namespace dorado::utils

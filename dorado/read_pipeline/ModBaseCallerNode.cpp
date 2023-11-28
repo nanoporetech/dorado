@@ -203,20 +203,31 @@ void ModBaseCallerNode::duplex_mod_call(Message message) {
                                               ? read->stereo_feature_inputs.template_moves
                                               : read->stereo_feature_inputs.complement_moves;
 
-                auto& simplex_signal = (strcmp(strand_type, "template") == 0)
-                                               ? read->stereo_feature_inputs.template_signal
-                                               : read->stereo_feature_inputs.complement_signal;
+                auto simplex_signal =
+                        (strcmp(strand_type, "template") == 0)
+                                ? read->stereo_feature_inputs.template_signal
+                                : at::flip(read->stereo_feature_inputs.complement_signal, 0);
+                ;
 
-                auto& simplex_seq = (strcmp(strand_type, "template") == 0)
-                                            ? read->stereo_feature_inputs.template_seq
-                                            : read->stereo_feature_inputs.complement_seq;
+                auto simplex_seq = (strcmp(strand_type, "template") == 0)
+                                           ? read->stereo_feature_inputs.template_seq
+                                           : utils::reverse_complement(
+                                                     read->stereo_feature_inputs.complement_seq);
 
                 auto duplex_seq = (strcmp(strand_type, "template") == 0)
                                           ? read->read_common.seq
                                           : utils::reverse_complement(read->read_common.seq);
 
-                auto [moves_offset, target_start, new_move_table] =
-                        utils::realign_moves(simplex_seq, duplex_seq, simplex_moves);
+                auto [moves_offset, target_start, new_move_table, query_start] =
+                        utils::realign_moves(simplex_seq, duplex_seq,
+                                             simplex_moves);  // TODO: Check that this is OK
+
+                std::cerr << std::endl;
+                std::cerr << "Read ID: " << read->read_common.read_id << std::endl;
+                std::cerr << "Target Start: " << target_start << std::endl;
+                std::cerr << "Query Start: " << query_start << std::endl;
+                std::cerr << "Duplex Seq: " << duplex_seq << std::endl;
+                std::cerr << "Simplx Seq: " << simplex_seq << std::endl;
 
                 auto signal_len = new_move_table.size() * m_block_stride;
                 auto num_moves = std::accumulate(new_move_table.begin(), new_move_table.end(), 0);
@@ -229,6 +240,37 @@ void ModBaseCallerNode::duplex_mod_call(Message message) {
                 auto& params = runner->caller_params(caller_id);
                 auto signal = simplex_signal.slice(0, moves_offset * m_block_stride,
                                                    moves_offset * m_block_stride + signal_len);
+
+                // Serialise some stuff for debugging
+                if (read->read_common.read_id ==
+                    "fa3d4195-5ee1-4ab7-b048-9ce004292b62;dae07e1e-d2a9-44eb-8e8c-282491a977a9") {
+                    serializeVector(new_move_table, "duplex_move_table.bin");
+                    torch::save(signal, "duplex_signal.pt");
+                    // Open a file in write mode
+                    std::ofstream file("duplex_seq.txt");
+
+                    // Write the string to the file
+                    file << new_seq;
+                    // Close the file
+                    file.close();
+
+                    serializeVector(simplex_moves, "simplex_move_table.bin");
+                    torch::save(simplex_signal, "simplex_signal.pt");
+                    // Open a file in write mode
+                    std::ofstream sfile("simplex_seq.txt");
+
+                    // Write the string to the file
+                    sfile << simplex_seq;  // TODO understnad why this is necessary
+                    // Close the file
+                    sfile.close();
+
+                    std::cerr << "Found and serialised read of interest" << std::endl;
+
+                    std::cerr << std::endl;
+                    std::cerr << new_seq.substr(0, 100) << std::endl;
+                    std::cerr << read->read_common.seq.substr(0, 100) << std::endl;
+                    std::cerr << "Found and serialised read of interest" << std::endl;
+                }
 
                 // scale signal based on model parameters
                 auto scaled_signal =
@@ -329,6 +371,11 @@ void ModBaseCallerNode::simplex_mod_call(Message message) {
         }
     }
     read->read_common.mod_base_info = m_mod_base_info;
+
+    if (read->read_common.read_id == "dab67b24-8c0e-4f62-af16-9a946fd3f682") {
+        std::cerr << "Original seq:" << read->read_common.seq << std::endl;
+        std::cerr << std::endl;
+    }
 
     auto working_read = std::make_shared<WorkingRead>();
     working_read->num_modbase_chunks = 0;
@@ -555,9 +602,15 @@ void ModBaseCallerNode::output_worker_thread() {
             auto& source_read_common = get_read_common_data(source_read);
 
             int64_t result_pos = chunk->context_hit;
+            //TODO - this is just an experiment, roll it back
+            /*
             int64_t offset = m_base_prob_offsets
                     [utils::BaseInfo::BASE_IDS[source_read_common.seq[result_pos]]];
-            for (size_t i = 0; i < chunk->scores.size(); ++i) {
+*/
+            int64_t offset = m_base_prob_offsets[utils::BaseInfo::BASE_IDS['C']];
+
+            auto num_chunk_scores = chunk->scores.size();
+            for (size_t i = 0; i < num_chunk_scores; ++i) {
                 source_read_common.base_mod_probs[m_num_states * result_pos + offset + i] =
                         static_cast<uint8_t>(std::min(std::floor(chunk->scores[i] * 256), 255.0f));
             }

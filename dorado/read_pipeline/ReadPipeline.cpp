@@ -236,8 +236,10 @@ void ReadCommon::generate_modbase_tags(bam1_t *aln, uint8_t threshold) const {
                             if (true) {              // Not sure this one is right
                                 modbase_string += "," + std::to_string(skipped_bases);
                                 skipped_bases = 0;
-                                modbase_prob.push_back(base_mod_probs[base_idx * num_channels +
-                                                                      4]);  // Channel index 4 for G
+                                modbase_prob.push_back(
+                                        base_mod_probs[base_idx * num_channels + channel_idx]);
+                                //modbase_prob.push_back(base_mod_probs[base_idx * num_channels +
+                                //                                      4]);  // Channel index 4 for G
                             } else {
                                 // Skip this base
                                 skipped_bases++;
