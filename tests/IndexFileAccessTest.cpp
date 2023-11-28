@@ -1,6 +1,7 @@
 #include "alignment/IndexFileAccess.h"
 
 #include "TestUtils.h"
+#include "alignment/Minimap2Index.h"
 
 #include <catch2/catch.hpp>
 
@@ -73,6 +74,10 @@ SCENARIO(TEST_GROUP " Load and retrieve index files", TEST_GROUP) {
     }
 
     GIVEN("load_index called with valid file and default options") {
+        Minimap2Options compatible_options{dflt_options};
+        auto compatible_best_n = dflt_options.best_n_secondary + 1;
+        compatible_options.best_n_secondary = compatible_best_n;
+
         cut.load_index(valid_reference_file(), dflt_options, 1);
         THEN("is_index_loaded returns true") {
             REQUIRE(cut.is_index_loaded(valid_reference_file(), dflt_options));
@@ -80,7 +85,10 @@ SCENARIO(TEST_GROUP " Load and retrieve index files", TEST_GROUP) {
         THEN("get_index returns non null index") {
             REQUIRE(cut.get_index(valid_reference_file(), dflt_options) != nullptr);
         }
-        AND_GIVEN("load_index called with same file and other valid options") {
+        THEN("is_index_loaded with compatible mapping options returns false") {
+            REQUIRE_FALSE(cut.is_index_loaded(valid_reference_file(), compatible_options));
+        }
+        AND_GIVEN("load_index called with same file and other valid indexing options") {
             Minimap2Options other_options{dflt_options};
             other_options.kmer_size = other_options.kmer_size + 1;
             cut.load_index(valid_reference_file(), other_options, 1);
@@ -94,6 +102,61 @@ SCENARIO(TEST_GROUP " Load and retrieve index files", TEST_GROUP) {
                 auto default_options_index = cut.get_index(valid_reference_file(), dflt_options);
                 REQUIRE(cut.get_index(valid_reference_file(), other_options) !=
                         default_options_index);
+            }
+            AND_GIVEN("unload_index called with original options") {
+                cut.unload_index(valid_reference_file(), dflt_options);
+                THEN("is_index_loaded with other options returns true") {
+                    REQUIRE(cut.is_index_loaded(valid_reference_file(), other_options));
+                }
+                THEN("is_index_loaded with original options returns false") {
+                    REQUIRE_FALSE(cut.is_index_loaded(valid_reference_file(), dflt_options));
+                }
+            }
+        }
+
+        AND_GIVEN("load_index called with same file and compatible mapping options") {
+            CHECK(cut.load_index(valid_reference_file(), compatible_options, 1) ==
+                  IndexLoadResult::success);
+            THEN("get_index with compatible options returns a non-null index") {
+                REQUIRE(cut.get_index(valid_reference_file(), compatible_options) != nullptr);
+            }
+            THEN("is_index_loaded with compatible options returns true") {
+                REQUIRE(cut.is_index_loaded(valid_reference_file(), compatible_options));
+            }
+            THEN("is_index_loaded with original options returns true") {
+                REQUIRE(cut.is_index_loaded(valid_reference_file(), dflt_options));
+            }
+            THEN("get_index with compatible options returns a Minimap2Index with updated mapping "
+                 "options") {
+                auto compatible_index = cut.get_index(valid_reference_file(), compatible_options);
+                CHECK(compatible_index);
+
+                REQUIRE(compatible_index->mapping_options().best_n == compatible_best_n);
+            }
+            THEN("get_index with original options returns a Minimap2Index with original mapping "
+                 "options") {
+                auto original_index = cut.get_index(valid_reference_file(), dflt_options);
+                CHECK(original_index);
+
+                REQUIRE(original_index->mapping_options().best_n == dflt_options.best_n_secondary);
+            }
+            THEN("get_index with compatible options returns a Minimap2Index with the same "
+                 "underlying minimap index") {
+                auto original_index = cut.get_index(valid_reference_file(), dflt_options);
+                CHECK(original_index);
+                auto compatible_index = cut.get_index(valid_reference_file(), compatible_options);
+                CHECK(compatible_index);
+
+                REQUIRE(compatible_index->index() == original_index->index());
+            }
+            AND_GIVEN("unload_index called with original options") {
+                cut.unload_index(valid_reference_file(), dflt_options);
+                THEN("is_index_loaded with compatible options returns false") {
+                    REQUIRE_FALSE(cut.is_index_loaded(valid_reference_file(), compatible_options));
+                }
+                THEN("is_index_loaded with original options returns false") {
+                    REQUIRE_FALSE(cut.is_index_loaded(valid_reference_file(), dflt_options));
+                }
             }
         }
     }

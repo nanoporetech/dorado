@@ -85,6 +85,17 @@ TEST_CASE_METHOD(Minimap2IndexTestFixture,
 }
 
 TEST_CASE_METHOD(Minimap2IndexTestFixture,
+                 TEST_GROUP
+                 " create_compatible_index() with invalid mapping options returns non-null",
+                 TEST_GROUP) {
+    cut.load(reference_file, 1);
+    Minimap2Options invalid_compatible_options{dflt_options};
+    invalid_compatible_options.bandwidth = invalid_compatible_options.bandwidth_long + 1;
+
+    REQUIRE(cut.create_compatible_index(invalid_compatible_options) == nullptr);
+}
+
+TEST_CASE_METHOD(Minimap2IndexTestFixture,
                  TEST_GROUP " create_compatible_index() with valid options returns non-null",
                  TEST_GROUP) {
     cut.load(reference_file, 1);
