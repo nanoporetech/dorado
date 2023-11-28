@@ -26,7 +26,7 @@ public:
     ModBaseCallerNode(std::vector<std::unique_ptr<ModBaseRunner>> model_runners,
                       size_t remora_threads,
                       size_t block_stride,
-                      size_t max_reads = 1000);
+                      size_t max_reads);
     ~ModBaseCallerNode();
     std::string get_name() const override { return "ModBaseCallerNode"; }
     stats::NamedStats sample_stats() const override;

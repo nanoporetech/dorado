@@ -17,7 +17,7 @@ namespace dorado {
 
 namespace {
 
-void print_models(bool yaml = false) {
+void print_models(bool yaml) {
     std::unordered_map<std::string_view, const models::ModelMap& (*)()> all_models;
     all_models["simplex models"] = models::simplex_models;
     all_models["stereo models"] = models::stereo_models;
@@ -93,7 +93,7 @@ int download(int argc, char* argv[]) {
 
     if (!models::is_valid_model(selected_model)) {
         spdlog::error("> error: '{}' is not a valid model", selected_model);
-        print_models();
+        print_models(false);
         return 1;
     }
 

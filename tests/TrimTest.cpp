@@ -27,7 +27,8 @@ TEST_CASE("Test trim signal", TEST_GROUP) {
     auto signal_tensor = at::from_blob(const_cast<float *>(signal.data()), {signal_len});
 
     SECTION("Default trim") {
-        int pos = utils::trim(signal_tensor);
+        int pos = utils::trim(signal_tensor, utils::DEFAULT_TRIM_THRESHOLD,
+                              utils::DEFAULT_TRIM_WINDOW_SIZE, utils::DEFAULT_TRIM_MIN_ELEMENTS);
 
         // pos 55 is in the second window of 40 samples, after a min_trim of 10
         int expected_pos = 90;
@@ -39,14 +40,15 @@ TEST_CASE("Test trim signal", TEST_GROUP) {
     }
 
     SECTION("Reduced window size") {
-        int pos = utils::trim(signal_tensor, 2.4f, 10);
+        int pos = utils::trim(signal_tensor, 2.4f, 10, utils::DEFAULT_TRIM_MIN_ELEMENTS);
 
         int expected_pos = 60;
         CHECK(pos == expected_pos);
     }
 
     SECTION("All signal below threshold") {
-        int pos = utils::trim(signal_tensor, 24);
+        int pos = utils::trim(signal_tensor, 24, utils::DEFAULT_TRIM_WINDOW_SIZE,
+                              utils::DEFAULT_TRIM_MIN_ELEMENTS);
 
         int expected_pos = 10;  // minimum trim value
         CHECK(pos == expected_pos);
@@ -54,7 +56,8 @@ TEST_CASE("Test trim signal", TEST_GROUP) {
 
     SECTION("All signal above threshold") {
         std::fill(std::begin(signal), std::end(signal), 100.f);
-        int pos = utils::trim(signal_tensor, 24);
+        int pos = utils::trim(signal_tensor, 24, utils::DEFAULT_TRIM_WINDOW_SIZE,
+                              utils::DEFAULT_TRIM_MIN_ELEMENTS);
 
         int expected_pos = 10;  // minimum trim value
         CHECK(pos == expected_pos);
@@ -65,7 +68,8 @@ TEST_CASE("Test trim signal", TEST_GROUP) {
             signal[i] += 50;
         }
 
-        int pos = utils::trim(signal_tensor.index({Slice(at::indexing::None, 400)}), 24);
+        int pos = utils::trim(signal_tensor.index({Slice(at::indexing::None, 400)}), 24,
+                              utils::DEFAULT_TRIM_WINDOW_SIZE, utils::DEFAULT_TRIM_MIN_ELEMENTS);
 
         int expected_pos = 10;  // minimum trim value
         CHECK(pos == expected_pos);

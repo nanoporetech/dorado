@@ -41,8 +41,8 @@ private:
     std::pair<float, float> calc_offset_scale(const at::Tensor& samples,
                                               const std::vector<uint64_t>& seq_to_sig_map,
                                               const std::vector<float>& levels,
-                                              size_t clip_bases = 10,
-                                              size_t max_bases = 1000) const;
+                                              size_t clip_bases,
+                                              size_t max_bases) const;
 
 public:
     /**
