@@ -100,6 +100,7 @@ std::optional<PosRange> check_rc_match(const std::string& seq,
     return res;
 }
 
+// NB: Computes literal mean of the qscore values, not generally applicabile
 float qscore_mean(const std::string& qstring, splitter::PosRange r) {
     uint64_t len = (int64_t)qstring.size();
     uint64_t start = r.first;
@@ -116,7 +117,6 @@ float qscore_mean(const std::string& qstring, splitter::PosRange r) {
 
 namespace dorado::splitter {
 
-//TODO consider precomputing and reusing ranges with high signal
 struct DuplexReadSplitter::ExtRead {
     SimplexReadPtr read;
     at::Tensor data_as_float32;
@@ -172,7 +172,7 @@ PosRanges DuplexReadSplitter::possible_pore_regions(const DuplexReadSplitter::Ex
         if (m_settings.qscore_check_span > 0 &&
             qscore_mean(read.read->read_common.qstring,
                         {start_pos, start_pos + m_settings.qscore_check_span}) >
-                    m_settings.mean_qscore_thr - 0.01) {
+                    m_settings.mean_qscore_thr - std::numeric_limits<float>::epsilon()) {
             continue;
         }
         candidate_regions.push_back({pore_sample_range.max_val, {start_pos, end_pos}});
