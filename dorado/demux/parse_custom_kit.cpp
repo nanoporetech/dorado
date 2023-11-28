@@ -4,7 +4,6 @@
 #include "utils/barcode_kits.h"
 
 #include <htslib/sam.h>
-#include <spdlog/spdlog.h>
 #include <toml.hpp>
 #include <toml/value.hpp>
 

@@ -19,9 +19,6 @@ struct KitInfo {
     std::vector<std::string> barcodes2;
 };
 
-void add_new_kit_info(const std::string& kit_name, const KitInfo& kit_info);
-void add_new_barcodes(const std::vector<std::pair<std::string, std::string>> new_barcodes);
-
 const std::unordered_map<std::string, KitInfo>& get_kit_infos();
 const std::unordered_map<std::string, std::string>& get_barcodes();
 const std::unordered_set<std::string>& get_barcode_identifiers();

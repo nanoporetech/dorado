@@ -1,14 +1,9 @@
 #include "barcode_kits.h"
 
-#include <spdlog/spdlog.h>
-
 #include <algorithm>
-#include <mutex>
 #include <numeric>
 
 namespace dorado::barcode_kits {
-
-static std::mutex barcodes_mutex;
 
 namespace {
 
@@ -158,7 +153,7 @@ const KitInfo kit_rlb = {
 };
 
 // Final map to go from kit name to actual barcode arrangement information.
-static std::unordered_map<std::string, KitInfo> kit_info_map = {
+const std::unordered_map<std::string, KitInfo> kit_info_map = {
         // SQK-16S024 && SQK-16S114-24
         {"SQK-16S024", kit_16S},
         {"SQK-16S114-24", kit_16S},
@@ -338,7 +333,7 @@ static std::unordered_map<std::string, KitInfo> kit_info_map = {
          }},
 };
 
-static std::unordered_map<std::string, std::string> barcodes = {
+const std::unordered_map<std::string, std::string> barcodes = {
         // BC** barcodes.
         {"BC01", "AAGAAAGTTGTCGGTGTCTTTGTG"},
         {"BC02", "TCGATTCCGTTTGTAGTCGTCTGT"},
@@ -610,28 +605,6 @@ std::string normalize_barcode_name(const std::string& barcode_name) {
 std::string generate_standard_barcode_name(const std::string& kit_name,
                                            const std::string& barcode_name) {
     return kit_name + "_" + normalize_barcode_name(barcode_name);
-}
-
-void add_new_kit_info(const std::string& kit_name, const KitInfo& kit_info) {
-    std::lock_guard<std::mutex> lock(barcodes_mutex);
-    auto map_iter = kit_info_map.find(kit_name);
-    if (map_iter != kit_info_map.end()) {
-        spdlog::warn("Kit with name {} already exists. Overwriting with new kit info.", kit_name);
-    }
-    kit_info_map[kit_name] = kit_info;
-}
-
-void add_new_barcodes(const std::vector<std::pair<std::string, std::string>> new_barcodes) {
-    std::lock_guard<std::mutex> lock(barcodes_mutex);
-    for (auto& [bc_name, bc_seq] : new_barcodes) {
-        auto barcodes_iter = barcodes.find(bc_name);
-        if (barcodes_iter != barcodes.end()) {
-            spdlog::warn(
-                    "Barcode with name {} already exists. Overwriting with new barcode sequence.",
-                    bc_name);
-        }
-        barcodes[bc_name] = bc_seq;
-    }
 }
 
 }  // namespace dorado::barcode_kits
