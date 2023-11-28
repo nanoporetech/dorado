@@ -59,7 +59,8 @@ auto make_read() {
 TEST_CASE("4 subread splitting test", TEST_GROUP) {
     auto read = make_read();
 
-    dorado::splitter::DuplexReadSplitter splitter_node(dorado::splitter::DuplexSplitSettings(false));
+    dorado::splitter::DuplexReadSplitter splitter_node(
+            dorado::splitter::DuplexSplitSettings(false));
 
     const auto split_res = splitter_node.split(std::move(read));
     CHECK(split_res.size() == 4);
