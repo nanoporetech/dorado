@@ -38,12 +38,12 @@ inline bool operator!=(const Minimap2IndexOptions& l, const Minimap2IndexOptions
 }
 
 struct Minimap2MappingOptions {
-    bool print_secondary;
     int best_n_secondary;
     int bandwidth;
     int bandwidth_long;
     bool soft_clipping;
     bool secondary_seq;
+    bool print_secondary;
 };
 
 struct Minimap2Options : public Minimap2IndexOptions, public Minimap2MappingOptions {
