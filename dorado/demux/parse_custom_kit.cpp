@@ -23,6 +23,8 @@ std::pair<std::string, barcode_kits::KitInfo> parse_custom_arrangement(
     }
 
     barcode_kits::KitInfo new_kit;
+    new_kit.double_ends = false;
+    new_kit.ends_different = false;
 
     const auto& config = toml::find(config_toml, "arrangement");
     std::string kit_name = toml::find<std::string>(config, "name");

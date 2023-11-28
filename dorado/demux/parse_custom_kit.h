@@ -8,11 +8,11 @@
 namespace dorado::demux {
 
 struct BarcodeKitScoringParams {
-    float min_soft_barcode_threshold = 0.7;
-    float min_hard_barcode_threshold = 0.6;
-    float min_soft_flank_threshold = 0.7;
-    float min_hard_flank_threshold = 0.6;
-    float min_barcode_score_dist = 0.25;
+    float min_soft_barcode_threshold = 0.7f;
+    float min_hard_barcode_threshold = 0.6f;
+    float min_soft_flank_threshold = 0.7f;
+    float min_hard_flank_threshold = 0.6f;
+    float min_barcode_score_dist = 0.25f;
 };
 
 std::pair<std::string, barcode_kits::KitInfo> parse_custom_arrangement(
