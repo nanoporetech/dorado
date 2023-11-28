@@ -12,6 +12,7 @@
 #include <cctype>
 #include <chrono>
 #include <iomanip>
+#include <iostream>
 #include <sstream>
 #include <stack>
 #include <stdexcept>
@@ -139,6 +140,9 @@ void ReadCommon::generate_modbase_tags(bam1_t *aln, uint8_t threshold) const {
         return;
     }
 
+    //if(read_id == "fed86c0e-8ace-4e78-8f35-b525233de130;b2958b74-31c8-4aa4-91e1-db81d64e40e3") { // Temporary measuure - only mod call this read
+    std::cerr << "Found it" << std::endl;
+
     const size_t num_channels = mod_base_info->alphabet.size();
     const std::string cardinal_bases = "ACGT";
     char current_cardinal = 0;
@@ -171,13 +175,15 @@ void ReadCommon::generate_modbase_tags(bam1_t *aln, uint8_t threshold) const {
                                 threshold);
 
     // Iterate over the provided alphabet and find all the channels we need to write out
-    for (size_t channel_idx = 0; channel_idx < num_channels; channel_idx++) {
+    for (size_t channel_idx = 0; channel_idx < num_channels;
+         channel_idx++) {  // Loop over each channel. Writing out the
         if (cardinal_bases.find(mod_base_info->alphabet[channel_idx]) != std::string::npos) {
             // A cardinal base
             current_cardinal = mod_base_info->alphabet[channel_idx][0];
         } else {
             // A modification on the previous cardinal base
             std::string bam_name = mod_base_info->alphabet[channel_idx];
+            std::cerr << bam_name << std::endl;
             if (!utils::validate_bam_tag_code(bam_name)) {
                 return;
             }
@@ -200,6 +206,47 @@ void ReadCommon::generate_modbase_tags(bam1_t *aln, uint8_t threshold) const {
                 }
             }
             modbase_string += ";";
+        }
+    }
+
+    if (read_id ==
+        "fed86c0e-8ace-4e78-8f35-b525233de130;b2958b74-31c8-4aa4-91e1-"
+        "db81d64e40e3") {  //temporary debug thing
+        // Now let's do the complement
+        for (size_t channel_idx = 0; channel_idx < num_channels;
+             channel_idx++) {  // Loop over each channel. Writing out the
+            if (cardinal_bases.find(mod_base_info->alphabet[channel_idx]) != std::string::npos) {
+                // A cardinal base
+                current_cardinal = mod_base_info->alphabet[channel_idx][0];
+            } else {
+                if (current_cardinal == 'C') {
+                    // A modification on the previous cardinal base
+                    std::string bam_name = mod_base_info->alphabet[channel_idx];
+                    std::cerr << bam_name << std::endl;
+                    if (!utils::validate_bam_tag_code(bam_name)) {
+                        return;
+                    }
+
+                    // Write out the results we found
+                    modbase_string += std::string(1, 'G') + "-" + bam_name;  //TODO need to RC
+                    modbase_string += base_has_context[current_cardinal] ? "?" : ".";
+                    int skipped_bases = 0;
+                    for (size_t base_idx = 0; base_idx < seq.size(); base_idx++) {
+                        if (seq[base_idx] == 'G') {  // complement
+                            if (true) {              // Not sure this one is right
+                                modbase_string += "," + std::to_string(skipped_bases);
+                                skipped_bases = 0;
+                                modbase_prob.push_back(base_mod_probs[base_idx * num_channels +
+                                                                      4]);  // Channel index 4 for G
+                            } else {
+                                // Skip this base
+                                skipped_bases++;
+                            }
+                        }
+                    }
+                    modbase_string += ";";
+                }
+            }
         }
     }
 

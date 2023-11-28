@@ -263,19 +263,14 @@ void ModBaseCallerNode::duplex_mod_call(Message message) {
                         context_hit_in_duplex_space = context_hit + target_start;
                     } else {
                         //std::cerr<< strand_type << std::endl;
-                        context_hit_in_duplex_space =
-                                read->read_common.seq.size() -
-                                (context_hit + target_start +
-                                 1);  // Sanity check: Need to check the plus 1, does it need to go somewhere else?
-                        /*                        std:: cerr<< read->read_common.seq.size() << std::endl;
-                        std::cerr << context_hit << std::endl;
-                        std::cerr << target_start << std::endl;
-                        std::cerr << "Checkpoint" << std::endl;*/
+                        context_hit_in_duplex_space = read->read_common.seq.size() -
+                                                      (context_hit + target_start +
+                                                       1);  // TODO: Do I need a plus one here? Why?
                     }
 
                     chunks_to_enqueue.push_back(std::make_unique<RemoraChunk>(
                             working_read, input_signal, std::move(slice.data),
-                            context_hit_in_duplex_space));  // TODO do we need to update the context hit here
+                            context_hit_in_duplex_space));
 
                     all_context_hits.push_back(context_hit_in_duplex_space);
                     ++working_read->num_modbase_chunks;
