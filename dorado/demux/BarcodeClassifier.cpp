@@ -111,6 +111,9 @@ bool barcode_is_permitted(const BarcodingInfo::FilterSet& allowed_barcodes,
     return allowed_barcodes->count(normalized_barcode_name) != 0;
 }
 
+// Helper function to convert the parsed custom kit tuple
+// into an unordered_map to simplify searching for kit info during
+// barcoding.
 std::unordered_map<std::string, dorado::barcode_kits::KitInfo> process_custom_kit(
         std::optional<std::string> custom_kit) {
     std::unordered_map<std::string, dorado::barcode_kits::KitInfo> kit_map;

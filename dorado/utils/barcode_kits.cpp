@@ -297,7 +297,7 @@ static std::unordered_map<std::string, KitInfo> kit_info_map = {
                  "",
                  "",
                  BC2_1_24,
-                 BC2_1_24,
+                 {},
          }},
         // VMK
         {"VSK-VMK001",
