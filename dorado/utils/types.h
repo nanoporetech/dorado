@@ -28,8 +28,8 @@ std::shared_ptr<const BarcodingInfo> create_barcoding_info(
         bool barcode_both_ends,
         bool trim_barcode,
         BarcodingInfo::FilterSet allowed_barcodes,
-        std::optional<std::string>,
-        std::optional<std::string>);
+        const std::optional<std::string> &,
+        const std::optional<std::string> &);
 
 struct BarcodeScoreResult {
     float score = -1.f;

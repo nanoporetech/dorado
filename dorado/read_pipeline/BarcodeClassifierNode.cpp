@@ -42,16 +42,16 @@ BarcodeClassifierNode::BarcodeClassifierNode(int threads,
                                              bool barcode_both_ends,
                                              bool no_trim,
                                              BarcodingInfo::FilterSet allowed_barcodes,
-                                             std::optional<std::string> custom_kit,
-                                             std::optional<std::string> custom_seqs)
+                                             const std::optional<std::string>& custom_kit,
+                                             const std::optional<std::string>& custom_seqs)
         : MessageSink(10000),
           m_threads(threads),
           m_default_barcoding_info(create_barcoding_info(kit_names,
                                                          barcode_both_ends,
                                                          !no_trim,
                                                          std::move(allowed_barcodes),
-                                                         std::move(custom_kit),
-                                                         std::move(custom_seqs))) {
+                                                         custom_kit,
+                                                         custom_seqs)) {
     if (m_default_barcoding_info->kit_name.empty()) {
         spdlog::debug("Barcode with new kit from {}", *m_default_barcoding_info->custom_kit);
     } else {

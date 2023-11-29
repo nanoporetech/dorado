@@ -69,8 +69,8 @@ void setup(std::vector<std::string> args,
            bool barcode_both_ends,
            bool barcode_no_trim,
            const std::string& barcode_sample_sheet,
-           std::optional<std::string> custom_kit,
-           std::optional<std::string> custom_seqs,
+           const std::optional<std::string>& custom_kit,
+           const std::optional<std::string>& custom_seqs,
            argparse::ArgumentParser& resume_parser,
            bool estimate_poly_a) {
     auto model_config = load_crf_model_config(model_path);

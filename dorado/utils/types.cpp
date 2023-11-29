@@ -11,8 +11,8 @@ std::shared_ptr<const BarcodingInfo> create_barcoding_info(
         bool barcode_both_ends,
         bool trim_barcode,
         BarcodingInfo::FilterSet allowed_barcodes,
-        std::optional<std::string> custom_kit,
-        std::optional<std::string> custom_seqs) {
+        const std::optional<std::string>& custom_kit,
+        const std::optional<std::string>& custom_seqs) {
     if (kit_names.empty() && !custom_kit) {
         return {};
     }
@@ -29,12 +29,9 @@ std::shared_ptr<const BarcodingInfo> create_barcoding_info(
                 "Neither kit name nor custom kit path was specified for BarcodeingInfo creation.");
     }
     spdlog::debug("Creating barcoding info for kit: {}", kit_name);
-    auto result = BarcodingInfo{kit_name,
-                                barcode_both_ends,
-                                trim_barcode,
-                                std::move(allowed_barcodes),
-                                std::move(custom_kit),
-                                std::move(custom_seqs)};
+    auto result =
+            BarcodingInfo{kit_name,   barcode_both_ends, trim_barcode, std::move(allowed_barcodes),
+                          custom_kit, custom_seqs};
     return std::make_shared<const dorado::BarcodingInfo>(std::move(result));
 }
 

@@ -115,7 +115,7 @@ bool barcode_is_permitted(const BarcodingInfo::FilterSet& allowed_barcodes,
 // into an unordered_map to simplify searching for kit info during
 // barcoding.
 std::unordered_map<std::string, dorado::barcode_kits::KitInfo> process_custom_kit(
-        std::optional<std::string> custom_kit) {
+        const std::optional<std::string>& custom_kit) {
     std::unordered_map<std::string, dorado::barcode_kits::KitInfo> kit_map;
     if (custom_kit) {
         auto [kit_name, kit_info] = demux::parse_custom_arrangement(*custom_kit);
@@ -149,8 +149,8 @@ struct BarcodeClassifier::BarcodeCandidateKit {
 };
 
 BarcodeClassifier::BarcodeClassifier(const std::vector<std::string>& kit_names,
-                                     std::optional<std::string> custom_kit,
-                                     std::optional<std::string> custom_barcodes)
+                                     const std::optional<std::string>& custom_kit,
+                                     const std::optional<std::string>& custom_barcodes)
         : m_custom_kit(process_custom_kit(custom_kit)),
           m_custom_seqs(custom_barcodes ? parse_custom_barcode_sequences(*custom_barcodes)
                                         : std::unordered_map<std::string, std::string>{}),

@@ -19,8 +19,8 @@ class BarcodeClassifier {
 
 public:
     BarcodeClassifier(const std::vector<std::string>& kit_names,
-                      std::optional<std::string> custom_kit,
-                      std::optional<std::string> custom_sequences);
+                      const std::optional<std::string>& custom_kit,
+                      const std::optional<std::string>& custom_sequences);
     ~BarcodeClassifier();
 
     BarcodeScoreResult barcode(const std::string& seq,
