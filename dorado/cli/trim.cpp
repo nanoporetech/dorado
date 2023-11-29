@@ -41,7 +41,8 @@ int trim(int argc, char* argv[]) {
             .help("Path to a file with reads to trim. Can be in any HTS format.")
             .nargs(argparse::nargs_pattern::any);
     parser.add_argument("-t", "--threads")
-            .help("Combined number of threads for barcoding and output generation. Default uses "
+            .help("Combined number of threads for adapter/primer detection and output generation. "
+                  "Default uses "
                   "all available threads.")
             .default_value(0)
             .scan<'i', int>();
@@ -65,8 +66,7 @@ int trim(int argc, char* argv[]) {
             .default_value(false)
             .implicit_value(true);
     parser.add_argument("--no-trim-primers")
-            .help("Skip primer detection and trimming trimming. Only adapters will be detected and "
-                  "trimmed.")
+            .help("Skip primer detection and trimming. Only adapters will be detected and trimmed.")
             .default_value(false)
             .implicit_value(true);
 
@@ -76,7 +76,7 @@ int trim(int argc, char* argv[]) {
         std::ostringstream parser_stream;
         parser_stream << parser;
         spdlog::error("{}\n{}", e.what(), parser_stream.str());
-        std::exit(1);
+        std::exit(EXIT_FAILURE);
     }
 
     if (parser.get<bool>("--verbose")) {
@@ -102,13 +102,13 @@ int trim(int argc, char* argv[]) {
 #ifndef _WIN32
         if (isatty(fileno(stdin))) {
             std::cout << parser << std::endl;
-            return 1;
+            std::exit(EXIT_FAILURE);
         }
 #endif
         reads.push_back("-");
     } else if (reads.size() > 1) {
         spdlog::error("> multi file input not yet handled");
-        return 1;
+        std::exit(EXIT_FAILURE);
     }
 
     HtsReader reader(reads[0], read_list);
