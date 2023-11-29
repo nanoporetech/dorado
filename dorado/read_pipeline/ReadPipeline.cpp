@@ -209,49 +209,44 @@ void ReadCommon::generate_modbase_tags(bam1_t *aln, uint8_t threshold) const {
         }
     }
 
-    if (read_id ==
-        "fed86c0e-8ace-4e78-8f35-b525233de130;b2958b74-31c8-4aa4-91e1-"
-        "db81d64e40e3") {  //temporary debug thing
-        // Now let's do the complement
-        for (size_t channel_idx = 0; channel_idx < num_channels;
-             channel_idx++) {  // Loop over each channel. Writing out the
-            if (cardinal_bases.find(mod_base_info->alphabet[channel_idx]) != std::string::npos) {
-                // A cardinal base
-                current_cardinal = mod_base_info->alphabet[channel_idx][0];
-            } else {
-                if (current_cardinal == 'C') {
-                    // A modification on the previous cardinal base
-                    std::string bam_name = mod_base_info->alphabet[channel_idx];
-                    std::cerr << bam_name << std::endl;
-                    if (!utils::validate_bam_tag_code(bam_name)) {
-                        return;
-                    }
+    // Now let's do the complement
+    for (size_t channel_idx = 0; channel_idx < num_channels;
+         channel_idx++) {  // Loop over each channel. Writing out the
+        if (cardinal_bases.find(mod_base_info->alphabet[channel_idx]) != std::string::npos) {
+            // A cardinal base
+            current_cardinal = mod_base_info->alphabet[channel_idx][0];
+        } else {
+            if (current_cardinal == 'C') {
+                // A modification on the previous cardinal base
+                std::string bam_name = mod_base_info->alphabet[channel_idx];
+                std::cerr << bam_name << std::endl;
+                if (!utils::validate_bam_tag_code(bam_name)) {
+                    return;
+                }
 
-                    // Write out the results we found
-                    modbase_string += std::string(1, 'G') + "-" + bam_name;  //TODO need to RC
-                    modbase_string += base_has_context[current_cardinal] ? "?" : ".";
-                    int skipped_bases = 0;
-                    for (size_t base_idx = 0; base_idx < seq.size(); base_idx++) {
-                        if (seq[base_idx] == 'G') {  // complement
-                            if (true) {              // Not sure this one is right
-                                modbase_string += "," + std::to_string(skipped_bases);
-                                skipped_bases = 0;
-                                modbase_prob.push_back(
-                                        base_mod_probs[base_idx * num_channels + channel_idx]);
-                                //modbase_prob.push_back(base_mod_probs[base_idx * num_channels +
-                                //                                      4]);  // Channel index 4 for G
-                            } else {
-                                // Skip this base
-                                skipped_bases++;
-                            }
+                // Write out the results we found
+                modbase_string += std::string(1, 'G') + "-" + bam_name;  //TODO need to RC
+                modbase_string += base_has_context[current_cardinal] ? "?" : ".";
+                int skipped_bases = 0;
+                for (size_t base_idx = 0; base_idx < seq.size(); base_idx++) {
+                    if (seq[base_idx] == 'G') {  // complement
+                        if (true) {              // Not sure this one is right
+                            modbase_string += "," + std::to_string(skipped_bases);
+                            skipped_bases = 0;
+                            modbase_prob.push_back(
+                                    base_mod_probs[base_idx * num_channels + channel_idx]);
+                            //modbase_prob.push_back(base_mod_probs[base_idx * num_channels +
+                            //                                      4]);  // Channel index 4 for G
+                        } else {
+                            // Skip this base
+                            skipped_bases++;
                         }
                     }
-                    modbase_string += ";";
                 }
+                modbase_string += ";";
             }
         }
     }
-
     bam_aux_append(aln, "MM", 'Z', int(modbase_string.length() + 1),
                    (uint8_t *)modbase_string.c_str());
     bam_aux_update_array(aln, "ML", 'C', int(modbase_prob.size()), (uint8_t *)modbase_prob.data());
