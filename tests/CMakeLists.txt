@@ -21,6 +21,9 @@ set(UNIT_TEST_SOURCE_FILES
     Minimap2IndexTest.cpp
     ModBaseEncoderTest.cpp
     MotifMatcherTest.cpp
+    ModelFinderTest.cpp
+    ModelKitsTest.cpp
+    ModelMetadataTest.cpp
     ModelUtilsTest.cpp
     PairingNodeTest.cpp
     PipelineTest.cpp

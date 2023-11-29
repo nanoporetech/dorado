@@ -159,8 +159,8 @@ add_subdirectory(${DORADO_3RD_PARTY_SOURCE}/date EXCLUDE_FROM_ALL)
 
 enable_testing()
 
-add_subdirectory(dorado/models)
 add_subdirectory(dorado/utils)
+add_subdirectory(dorado/models)
 
 if("${CUDA_VERSION}" STREQUAL "")
   set(CUDA_VERSION ${CUDAToolkit_VERSION})
@@ -508,11 +508,14 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     add_library(dorado_io_lib
         dorado/data_loader/DataLoader.cpp
         dorado/data_loader/DataLoader.h
+        dorado/data_loader/ModelFinder.cpp
+        dorado/data_loader/ModelFinder.h
     )
 
     target_link_libraries(dorado_io_lib
         PUBLIC
-            dorado_lib    
+            dorado_lib
+            dorado_models_lib
         PRIVATE
             ${POD5_LIBRARIES}
             ${HDF5_C_LIBRARIES}

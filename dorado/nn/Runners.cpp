@@ -131,18 +131,11 @@ std::pair<std::vector<dorado::Runner>, size_t> create_basecall_runners(
 }
 
 std::vector<std::unique_ptr<dorado::ModBaseRunner>> create_modbase_runners(
-        const std::string& remora_models,
+        const std::vector<std::filesystem::path>& remora_models,
         const std::string& device,
         size_t remora_runners_per_caller,
         size_t remora_batch_size) {
-    std::vector<std::filesystem::path> remora_model_list;
-    std::istringstream stream{remora_models};
-    std::string model;
-    while (std::getline(stream, model, ',')) {
-        remora_model_list.push_back(model);
-    }
-
-    if (remora_model_list.empty()) {
+    if (remora_models.empty()) {
         return {};
     }
 
@@ -170,7 +163,7 @@ std::vector<std::unique_ptr<dorado::ModBaseRunner>> create_modbase_runners(
 #endif  // DORADO_GPU_BUILD
     for (const auto& device_string : modbase_devices) {
         for (int i = 0; i < remora_callers; ++i) {
-            auto caller = dorado::create_modbase_caller(remora_model_list, int(remora_batch_size),
+            auto caller = dorado::create_modbase_caller(remora_models, int(remora_batch_size),
                                                         device_string);
             for (size_t j = 0; j < remora_runners_per_caller; j++) {
                 remora_runners.push_back(std::make_unique<dorado::ModBaseRunner>(caller));

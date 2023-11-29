@@ -1,4 +1,5 @@
 #pragma once
+#include "models/models.h"
 #include "utils/stats.h"
 #include "utils/types.h"
 
@@ -54,6 +55,9 @@ public:
     static bool is_read_data_present(std::string data_path, bool recursive_file_loading);
 
     static uint16_t get_sample_rate(std::string data_path, bool recursive_file_loading);
+
+    static std::vector<models::ChemistryKey> get_sequencing_chemistry(std::string data_path,
+                                                                      bool recursive_file_loading);
 
     std::string get_name() const { return "Dataloader"; }
     stats::NamedStats sample_stats() const;
