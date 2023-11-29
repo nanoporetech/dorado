@@ -102,7 +102,7 @@ std::optional<PosRange> check_rc_match(const std::string& seq,
     return res;
 }
 
-// NB: Computes literal mean of the qscore values, not generally applicabile
+// NB: Computes literal mean of the qscore values, not generally applicable
 float qscore_mean(const std::string& qstring, splitter::PosRange r) {
     uint64_t len = qstring.size();
     uint64_t start = r.first;
