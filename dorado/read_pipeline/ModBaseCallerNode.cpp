@@ -166,7 +166,6 @@ void ModBaseCallerNode::duplex_mod_call(Message message) {
     auto read = std::get<DuplexReadPtr>(std::move(message));
     stats::Timer timer;
 
-    // TODO: Does `base_mod_probs` need to be the same size as `new_seq`?
     {
         nvtx3::scoped_range range{"base_mod_probs_init"};
         // initialize base_mod_probs _before_ we start handing out chunks
@@ -221,13 +220,6 @@ void ModBaseCallerNode::duplex_mod_call(Message message) {
                 auto [moves_offset, target_start, new_move_table, query_start] =
                         utils::realign_moves(simplex_seq, duplex_seq,
                                              simplex_moves);  // TODO: Check that this is OK
-
-                std::cerr << std::endl;
-                std::cerr << "Read ID: " << read->read_common.read_id << std::endl;
-                std::cerr << "Target Start: " << target_start << std::endl;
-                std::cerr << "Query Start: " << query_start << std::endl;
-                std::cerr << "Duplex Seq: " << duplex_seq << std::endl;
-                std::cerr << "Simplx Seq: " << simplex_seq << std::endl;
 
                 auto signal_len = new_move_table.size() * m_block_stride;
                 auto num_moves = std::accumulate(new_move_table.begin(), new_move_table.end(), 0);

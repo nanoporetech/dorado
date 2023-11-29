@@ -232,7 +232,8 @@ void ReadCommon::generate_modbase_tags(bam1_t *aln, uint8_t threshold) const {
     }
 
     if (is_duplex) {
-        // Now let's do the complement
+        // Having done the strand in the forward direction, if the read is duplex we need to also process its complement
+        // There is some code repetition here, but it makes it more readable.
         for (size_t channel_idx = 0; channel_idx < num_channels;
              channel_idx++) {  // Loop over each channel. Writing out the
             if (cardinal_bases.find(mod_base_info->alphabet[channel_idx]) != std::string::npos) {
@@ -246,9 +247,7 @@ void ReadCommon::generate_modbase_tags(bam1_t *aln, uint8_t threshold) const {
                     return;
                 }
 
-                // Write out the results we found
-                modbase_string +=
-                        std::string(1, cardinal_complement) + "-" + bam_name;  //TODO need to RC
+                modbase_string += std::string(1, cardinal_complement) + "-" + bam_name;
                 modbase_string += base_has_context[current_cardinal] ? "?" : ".";
                 int skipped_bases = 0;
                 for (size_t base_idx = 0; base_idx < seq.size(); base_idx++) {
@@ -268,6 +267,7 @@ void ReadCommon::generate_modbase_tags(bam1_t *aln, uint8_t threshold) const {
             }
         }
     }
+
     bam_aux_append(aln, "MM", 'Z', int(modbase_string.length() + 1),
                    (uint8_t *)modbase_string.c_str());
     bam_aux_update_array(aln, "ML", 'C', int(modbase_prob.size()), (uint8_t *)modbase_prob.data());
