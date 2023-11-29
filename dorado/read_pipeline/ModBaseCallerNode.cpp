@@ -560,23 +560,12 @@ void ModBaseCallerNode::output_worker_thread() {
             int64_t result_pos = chunk->context_hit;
 
             int64_t offset;
+            const auto& baseIds = utils::BaseInfo::BASE_IDS;
+            const auto& seq = source_read_common.seq[result_pos];
 
-            if (chunk->is_template_direction) {
-                offset = m_base_prob_offsets
-                        [utils::BaseInfo::BASE_IDS[source_read_common.seq[result_pos]]];
-            } else {
-                //Offset into mod base probabilties is based on the complement of the base
-                offset = m_base_prob_offsets
-                        [utils::BaseInfo::BASE_IDS[dorado::utils::complement_table
-                                                           [source_read_common.seq[result_pos]]]];
-            }
-
-            //TODO - this is just an experiment, roll it back
-            /*
-            int64_t offset = m_base_prob_offsets
-                    [utils::BaseInfo::BASE_IDS[source_read_common.seq[result_pos]]];
-*/
-            //int64_t offset = m_base_prob_offsets[utils::BaseInfo::BASE_IDS['C']];
+            offset = chunk->is_template_direction
+                             ? m_base_prob_offsets[baseIds[seq]]
+                             : m_base_prob_offsets[baseIds[dorado::utils::complement_table[seq]]];
 
             auto num_chunk_scores = chunk->scores.size();
             for (size_t i = 0; i < num_chunk_scores; ++i) {
