@@ -28,7 +28,7 @@ public:
     bool initialise(Minimap2Options options);
     IndexLoadResult load(const std::string& index_file, int num_threads);
 
-    // Returns a shallow copy of this MinimapIndex with the give mapping options applied.
+    // Returns a shallow copy of this MinimapIndex with the given mapping options applied.
     // By contract the given indexing options must be identical to those held in this instance
     // and the underlying index must be loaded.
     // If the given mapping options are invalid/incompatible a nullptr will be returned.

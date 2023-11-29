@@ -47,9 +47,9 @@ TEST_CASE(TEST_GROUP " initialise() with default options sets indexing options",
 
     cut.initialise(dflt_options);
 
-    REQUIRE(cut.index_options().k == dflt_options.kmer_size);
-    REQUIRE(cut.index_options().w == dflt_options.window_size);
-    REQUIRE(cut.index_options().batch_size == dflt_options.index_batch_size);
+    CHECK(cut.index_options().k == dflt_options.kmer_size);
+    CHECK(cut.index_options().w == dflt_options.window_size);
+    CHECK(cut.index_options().batch_size == dflt_options.index_batch_size);
 }
 
 TEST_CASE(TEST_GROUP " initialise() with default options sets mapping options", TEST_GROUP) {
@@ -57,10 +57,10 @@ TEST_CASE(TEST_GROUP " initialise() with default options sets mapping options", 
 
     cut.initialise(dflt_options);
 
-    REQUIRE(cut.mapping_options().bw == dflt_options.bandwidth);
-    REQUIRE(cut.mapping_options().bw_long == dflt_options.bandwidth_long);
-    REQUIRE(cut.mapping_options().best_n == dflt_options.best_n_secondary);
-    REQUIRE(cut.mapping_options().flag > 0);  // Just checking it's been updated.
+    CHECK(cut.mapping_options().bw == dflt_options.bandwidth);
+    CHECK(cut.mapping_options().bw_long == dflt_options.bandwidth_long);
+    CHECK(cut.mapping_options().best_n == dflt_options.best_n_secondary);
+    CHECK(cut.mapping_options().flag > 0);  // Just checking it's been updated.
 }
 
 TEST_CASE(TEST_GROUP " initialise() with invalid options returns false", TEST_GROUP) {

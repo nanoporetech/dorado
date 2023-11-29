@@ -27,13 +27,15 @@ class IndexFileAccess {
     // one is already loaded and return true.
     bool try_load_compatible_index(const std::string& file, const Minimap2Options& options);
 
-    // following methods require the mutex to be locked before calling
+    // Requires the mutex to be locked before calling.
     const Minimap2Index* get_compatible_index(const std::string& file,
                                               const Minimap2IndexOptions& indexing_options);
 
+    // Requires the mutex to be locked before calling.
     std::shared_ptr<Minimap2Index> get_exact_index(const std::string& file,
                                                    const Minimap2Options& options);
 
+    // Requires the mutex to be locked before calling.
     bool is_index_loaded_impl(const std::string& file, const Minimap2Options& options) const;
 
 public:

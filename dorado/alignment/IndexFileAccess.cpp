@@ -27,11 +27,11 @@ std::shared_ptr<Minimap2Index> IndexFileAccess::get_exact_index(const std::strin
 
 bool IndexFileAccess::is_index_loaded_impl(const std::string& file,
                                            const Minimap2Options& options) const {
-    if (m_index_lut.count({file, options}) == 0) {
+    const auto compatible_indices = m_index_lut.find({file, options});
+    if (compatible_indices == m_index_lut.end()) {
         return false;
     }
-    auto& compatible_indices = m_index_lut.at({file, options});
-    return compatible_indices.count(options) > 0;
+    return compatible_indices->second.count(options) > 0;
 }
 
 bool IndexFileAccess::try_load_compatible_index(const std::string& file,
