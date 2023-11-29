@@ -30,23 +30,12 @@ reverse_complement_impl(const std::string& sequence) {
     std::string rev_comp_sequence;
     rev_comp_sequence.resize(num_bases);
 
-    // Compile-time constant lookup table.
-    static constexpr auto kComplementTable = [] {
-        std::array<char, 256> a{};
-        // Valid input will only touch the entries set here.
-        a['A'] = 'T';
-        a['T'] = 'A';
-        a['C'] = 'G';
-        a['G'] = 'C';
-        return a;
-    }();
-
     // Run every template base through the table, reading in reverse order.
     const char* template_ptr = &sequence[num_bases - 1];
     char* complement_ptr = &rev_comp_sequence[0];
     for (size_t i = 0; i < num_bases; ++i) {
         const auto template_base = *template_ptr--;
-        *complement_ptr++ = kComplementTable[template_base];
+        *complement_ptr++ = dorado::utils::complement_table[template_base];
     }
     return rev_comp_sequence;
 }

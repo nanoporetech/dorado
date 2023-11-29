@@ -47,4 +47,20 @@ int count_trailing_chars(const std::string_view adapter, char c);
 std::tuple<int, int, std::vector<uint8_t>, int> realign_moves(std::string query_sequence,
                                                               std::string target_sequence,
                                                               std::vector<uint8_t> moves);
+
+// Compile-time constant lookup table.
+static constexpr auto complement_table = [] {
+    std::array<char, 256> a{};
+    // Valid input will only touch the entries set here.
+    a['A'] = 'T';
+    a['T'] = 'A';
+    a['C'] = 'G';
+    a['G'] = 'C';
+    a['a'] = 't';
+    a['t'] = 'a';
+    a['c'] = 'g';
+    a['g'] = 'c';
+    return a;
+}();
+
 }  // namespace dorado::utils

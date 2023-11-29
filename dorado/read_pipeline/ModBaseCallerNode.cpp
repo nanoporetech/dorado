@@ -28,17 +28,20 @@ struct ModBaseCallerNode::RemoraChunk {
     RemoraChunk(std::shared_ptr<WorkingRead> read,
                 at::Tensor input_signal,
                 std::vector<int8_t> kmer_data,
-                size_t position)
+                size_t position,
+                bool is_template_direction)
             : working_read(std::move(read)),
               signal(std::move(input_signal)),
               encoded_kmers(std::move(kmer_data)),
-              context_hit(position) {}
+              context_hit(position),
+              is_template_direction(is_template_direction) {}
 
     std::shared_ptr<WorkingRead> working_read;
     at::Tensor signal;
     std::vector<int8_t> encoded_kmers;
     size_t context_hit;
     std::vector<float> scores;
+    bool is_template_direction;
 };
 
 struct ModBaseCallerNode::WorkingRead {
@@ -198,22 +201,23 @@ void ModBaseCallerNode::duplex_mod_call(Message message) {
             for (const auto& strand_type : {"template", "complement"}) {
                 nvtx3::scoped_range range{"generate_chunks"};
 
-                auto& simplex_moves = (strcmp(strand_type, "template") == 0)
+                bool is_template_direction = (strcmp(strand_type, "template") == 0);
+                auto& simplex_moves = is_template_direction
                                               ? read->stereo_feature_inputs.template_moves
                                               : read->stereo_feature_inputs.complement_moves;
 
                 auto simplex_signal =
-                        (strcmp(strand_type, "template") == 0)
+                        is_template_direction
                                 ? read->stereo_feature_inputs.template_signal
                                 : at::flip(read->stereo_feature_inputs.complement_signal, 0);
                 ;
 
-                auto simplex_seq = (strcmp(strand_type, "template") == 0)
+                auto simplex_seq = is_template_direction
                                            ? read->stereo_feature_inputs.template_seq
                                            : utils::reverse_complement(
                                                      read->stereo_feature_inputs.complement_seq);
 
-                auto duplex_seq = (strcmp(strand_type, "template") == 0)
+                auto duplex_seq = is_template_direction
                                           ? read->read_common.seq
                                           : utils::reverse_complement(read->read_common.seq);
 
@@ -262,7 +266,7 @@ void ModBaseCallerNode::duplex_mod_call(Message message) {
 
                     // Update the context hit into the duplex reference context
                     unsigned long context_hit_in_duplex_space;
-                    if (std::strcmp(strand_type, "template") == 0) {
+                    if (is_template_direction) {
                         context_hit_in_duplex_space = context_hit + target_start;
                     } else {
                         context_hit_in_duplex_space = read->read_common.seq.size() -
@@ -272,7 +276,7 @@ void ModBaseCallerNode::duplex_mod_call(Message message) {
 
                     chunks_to_enqueue.push_back(std::make_unique<RemoraChunk>(
                             working_read, input_signal, std::move(slice.data),
-                            context_hit_in_duplex_space));
+                            context_hit_in_duplex_space, is_template_direction));
 
                     all_context_hits.push_back(context_hit_in_duplex_space);
                     ++working_read->num_modbase_chunks;
@@ -383,7 +387,7 @@ void ModBaseCallerNode::simplex_mod_call(Message message) {
                         {(int64_t)slice.lead_samples_needed, (int64_t)slice.tail_samples_needed});
             }
             chunks_to_enqueue.push_back(std::make_unique<RemoraChunk>(
-                    working_read, input_signal, std::move(slice.data), context_hit));
+                    working_read, input_signal, std::move(slice.data), context_hit, true));
 
             ++working_read->num_modbase_chunks;
         }
@@ -554,12 +558,25 @@ void ModBaseCallerNode::output_worker_thread() {
             auto& source_read_common = get_read_common_data(source_read);
 
             int64_t result_pos = chunk->context_hit;
+
+            int64_t offset;
+
+            if (chunk->is_template_direction) {
+                offset = m_base_prob_offsets
+                        [utils::BaseInfo::BASE_IDS[source_read_common.seq[result_pos]]];
+            } else {
+                //Offset into mod base probabilties is based on the complement of the base
+                offset = m_base_prob_offsets
+                        [utils::BaseInfo::BASE_IDS[dorado::utils::complement_table
+                                                           [source_read_common.seq[result_pos]]]];
+            }
+
             //TODO - this is just an experiment, roll it back
             /*
             int64_t offset = m_base_prob_offsets
                     [utils::BaseInfo::BASE_IDS[source_read_common.seq[result_pos]]];
 */
-            int64_t offset = m_base_prob_offsets[utils::BaseInfo::BASE_IDS['C']];
+            //int64_t offset = m_base_prob_offsets[utils::BaseInfo::BASE_IDS['C']];
 
             auto num_chunk_scores = chunk->scores.size();
             for (size_t i = 0; i < num_chunk_scores; ++i) {
