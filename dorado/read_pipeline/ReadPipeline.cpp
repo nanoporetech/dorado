@@ -140,9 +140,6 @@ void ReadCommon::generate_modbase_tags(bam1_t *aln, uint8_t threshold) const {
         return;
     }
 
-    //if(read_id == "fed86c0e-8ace-4e78-8f35-b525233de130;b2958b74-31c8-4aa4-91e1-db81d64e40e3") { // Temporary measuure - only mod call this read
-    std::cerr << "Found it" << std::endl;
-
     const size_t num_channels = mod_base_info->alphabet.size();
     const std::string cardinal_bases = "ACGT";
     char current_cardinal = 0;
@@ -159,7 +156,6 @@ void ReadCommon::generate_modbase_tags(bam1_t *aln, uint8_t threshold) const {
     std::unordered_map<char, bool> base_has_context = {
             {'A', false}, {'C', false}, {'G', false}, {'T', false}};
     utils::ModBaseContext context_handler;
-    std::cerr << mod_base_info->context << std::endl;
     if (!mod_base_info->context.empty()) {
         if (!context_handler.decode(mod_base_info->context)) {
             throw std::runtime_error("Invalid base modification context string.");
@@ -210,7 +206,6 @@ void ReadCommon::generate_modbase_tags(bam1_t *aln, uint8_t threshold) const {
         } else {
             // A modification on the previous cardinal base
             std::string bam_name = mod_base_info->alphabet[channel_idx];
-            std::cerr << bam_name << std::endl;
             if (!utils::validate_bam_tag_code(bam_name)) {
                 return;
             }
@@ -247,7 +242,6 @@ void ReadCommon::generate_modbase_tags(bam1_t *aln, uint8_t threshold) const {
                 auto cardinal_complement = nucleotide_complements[current_cardinal];
                 // A modification on the previous cardinal base
                 std::string bam_name = mod_base_info->alphabet[channel_idx];
-                std::cerr << bam_name << std::endl;
                 if (!utils::validate_bam_tag_code(bam_name)) {
                     return;
                 }

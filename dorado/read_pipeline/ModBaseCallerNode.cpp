@@ -241,37 +241,6 @@ void ModBaseCallerNode::duplex_mod_call(Message message) {
                 auto signal = simplex_signal.slice(0, moves_offset * m_block_stride,
                                                    moves_offset * m_block_stride + signal_len);
 
-                // Serialise some stuff for debugging
-                if (read->read_common.read_id ==
-                    "fa3d4195-5ee1-4ab7-b048-9ce004292b62;dae07e1e-d2a9-44eb-8e8c-282491a977a9") {
-                    serializeVector(new_move_table, "duplex_move_table.bin");
-                    torch::save(signal, "duplex_signal.pt");
-                    // Open a file in write mode
-                    std::ofstream file("duplex_seq.txt");
-
-                    // Write the string to the file
-                    file << new_seq;
-                    // Close the file
-                    file.close();
-
-                    serializeVector(simplex_moves, "simplex_move_table.bin");
-                    torch::save(simplex_signal, "simplex_signal.pt");
-                    // Open a file in write mode
-                    std::ofstream sfile("simplex_seq.txt");
-
-                    // Write the string to the file
-                    sfile << simplex_seq;  // TODO understnad why this is necessary
-                    // Close the file
-                    sfile.close();
-
-                    std::cerr << "Found and serialised read of interest" << std::endl;
-
-                    std::cerr << std::endl;
-                    std::cerr << new_seq.substr(0, 100) << std::endl;
-                    std::cerr << read->read_common.seq.substr(0, 100) << std::endl;
-                    std::cerr << "Found and serialised read of interest" << std::endl;
-                }
-
                 // scale signal based on model parameters
                 auto scaled_signal =
                         runner->scale_signal(caller_id, signal, sequence_ints, seq_to_sig_map);
@@ -304,7 +273,6 @@ void ModBaseCallerNode::duplex_mod_call(Message message) {
                     if (std::strcmp(strand_type, "template") == 0) {
                         context_hit_in_duplex_space = context_hit + target_start;
                     } else {
-                        //std::cerr<< strand_type << std::endl;
                         context_hit_in_duplex_space = read->read_common.seq.size() -
                                                       (context_hit + target_start +
                                                        1);  // TODO: Do I need a plus one here? Why?
@@ -317,9 +285,6 @@ void ModBaseCallerNode::duplex_mod_call(Message message) {
                     all_context_hits.push_back(context_hit_in_duplex_space);
                     ++working_read->num_modbase_chunks;
                 }
-                //std::cerr << "CH: " << all_context_hits << std::endl;
-                //std::cerr << "Read ID " << read->read_common.read_id << std::endl;
-                //std::cerr << "Context hits done! "<< std::endl;
             }
         }
 
@@ -371,11 +336,6 @@ void ModBaseCallerNode::simplex_mod_call(Message message) {
         }
     }
     read->read_common.mod_base_info = m_mod_base_info;
-
-    if (read->read_common.read_id == "dab67b24-8c0e-4f62-af16-9a946fd3f682") {
-        std::cerr << "Original seq:" << read->read_common.seq << std::endl;
-        std::cerr << std::endl;
-    }
 
     auto working_read = std::make_shared<WorkingRead>();
     working_read->num_modbase_chunks = 0;
