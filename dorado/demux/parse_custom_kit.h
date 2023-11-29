@@ -23,4 +23,6 @@ std::unordered_map<std::string, std::string> parse_custom_barcode_sequences(
 
 BarcodeKitScoringParams parse_scoring_params(const std::string& arrangement_file);
 
+bool check_normalized_id_pattern(const std::string& pattern);
+
 }  // namespace dorado::demux

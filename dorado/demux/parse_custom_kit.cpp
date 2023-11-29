@@ -13,6 +13,29 @@
 
 namespace dorado::demux {
 
+bool check_normalized_id_pattern(const std::string& pattern) {
+    auto modulo_pos = pattern.find_first_of("%");
+    // Check for the presence of the % specifier.
+    if (modulo_pos == std::string::npos) {
+        return false;
+    }
+    auto i_pos = pattern.find_first_of('i', modulo_pos);
+    // Check for the presence of 'i' since only integers are allowed
+    // and also ensure that's at the end of the string.
+    if (i_pos == std::string::npos) {
+        return false;
+    }
+    if (i_pos != pattern.length() - 1) {
+        return false;
+    }
+    // Validate that all characters between % and i are digits.
+    if (std::any_of(pattern.begin() + modulo_pos + 1, pattern.begin() + i_pos,
+                    [](unsigned char c) { return !std::isdigit(c); })) {
+        return false;
+    }
+    return true;
+}
+
 std::pair<std::string, barcode_kits::KitInfo> parse_custom_arrangement(
         const std::string& arrangement_file) {
     const toml::value config_toml = toml::parse(arrangement_file);
@@ -41,6 +64,10 @@ std::pair<std::string, barcode_kits::KitInfo> parse_custom_arrangement(
 
     auto fill_bc_sequences = [bc_start_idx, bc_end_idx](const std::string& pattern,
                                                         std::vector<std::string>& bc_names) {
+        if (!check_normalized_id_pattern(pattern)) {
+            throw std::runtime_error("Barcode pattern must be prefix%\\d+i, e.g. BC%02i");
+        }
+
         auto modulo_pos = pattern.find_first_of("%");
         auto seq_name_prefix = pattern.substr(0, modulo_pos);
         auto format_str = pattern.substr(modulo_pos);

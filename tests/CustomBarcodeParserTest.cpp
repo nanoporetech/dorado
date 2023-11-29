@@ -145,3 +145,16 @@ TEST_CASE("Parse default scoring params", "[barcode_demux]") {
           Approx(default_params.min_hard_flank_threshold));
     CHECK(scoring_params.min_barcode_score_dist == Approx(default_params.min_barcode_score_dist));
 }
+
+TEST_CASE("Check for normalized id pattern", "[barcode_demux]") {
+    CHECK(dorado::demux::check_normalized_id_pattern("BC%02i"));
+    CHECK(dorado::demux::check_normalized_id_pattern("abcd%25i"));
+    CHECK(dorado::demux::check_normalized_id_pattern("%2i"));
+
+    CHECK_FALSE(dorado::demux::check_normalized_id_pattern("ab"));
+    CHECK_FALSE(dorado::demux::check_normalized_id_pattern("ab%"));
+    CHECK_FALSE(dorado::demux::check_normalized_id_pattern("ab%d"));
+    CHECK_FALSE(dorado::demux::check_normalized_id_pattern("ab%02"));
+    CHECK_FALSE(dorado::demux::check_normalized_id_pattern("ab%02f"));
+    CHECK_FALSE(dorado::demux::check_normalized_id_pattern("ab%02iab"));
+}
