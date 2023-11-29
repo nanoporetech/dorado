@@ -373,6 +373,7 @@ if(NOT DORADO_LIB_ONLY)
         dorado/cli/aligner.cpp
         dorado/cli/demux.cpp
         dorado/cli/duplex.cpp
+        dorado/cli/trim.cpp
         dorado/cli/basecaller.cpp
         dorado/cli/benchmark.cpp
         dorado/cli/download.cpp

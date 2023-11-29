@@ -190,6 +190,15 @@ if [[ $num_demuxed_reads -ne "3" ]]; then
     exit 1
 fi
 
+echo dorado trim test stage
+file1=$data_dir/adapter_trim/lsk109_single_read.fastq
+file2=$output_dir/lsk109_single_read_trimmed.fastq
+$dorado_bin trim --emit-fastq $file1 > $file2
+if cmp --silent -- "$file1" "$file2"; then
+  echo "Adapter was not trimmed. Input and output reads are identical."
+  exit 1
+fi
+
 echo "dorado test poly(A) tail estimation"
 $dorado_bin basecaller -b ${batch} ${model} $data_dir/poly_a/r10_cdna_pod5/ --estimate-poly-a > $output_dir/polya.bam
 samtools quickcheck -u $output_dir/polya.bam
@@ -256,6 +265,5 @@ for bam in $output_dir/demux_only_test/SQK-RBK114-96_barcode01.bam $output_dir/d
         exit 1
     fi
 done
-
 
 rm -rf $output_dir
