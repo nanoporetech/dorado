@@ -16,6 +16,8 @@ add_library(dorado_utils
     driver_query.h
     duplex_utils.cpp
     duplex_utils.h
+    fs_utils.cpp
+    fs_utils.h
     log_utils.cpp
     log_utils.h
     math_utils.h
@@ -74,6 +76,11 @@ if (DORADO_ENABLE_PCH)
         "precompiled.h"
     )
 endif()
+
+target_include_directories(dorado_utils
+    INTERFACE
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
 
 # 3rdparty libs should be considered SYSTEM headers
 target_include_directories(dorado_utils

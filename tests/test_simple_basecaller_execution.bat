@@ -1,5 +1,6 @@
 set dorado_bin=%1
 set model=dna_r9.4.1_e8_hac@v3.3
+set model_speed=hac
 set batch=384
 
 echo dorado basecaller test stage
@@ -18,3 +19,12 @@ echo dorado duplex basespace test stage
 
 echo dorado demux test stage
 %dorado_bin% demux tests/data/barcode_demux/double_end_variant/EXP-PBC096_BC83.fastq --threads 1 --kit-name EXP-PBC096 --output-dir ./demux
+
+echo dorado auto model basecaller test stage
+%dorado_bin% basecaller %model_speed% tests/data/pod5/dna_r9.4.1_e8/ -b %batch% --emit-fastq > ref.fq
+%dorado_bin% basecaller %model_speed%,5mCG tests/data/pod5/dna_r9.4.1_e8/ -b %batch% --emit-moves --reference ref.fq --emit-sam > calls.sam
+
+echo dorado auto summary test stage
+%dorado_bin% summary calls.sam
+
+echo finished
