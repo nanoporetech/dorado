@@ -159,6 +159,7 @@ void ReadCommon::generate_modbase_tags(bam1_t *aln, uint8_t threshold) const {
     std::unordered_map<char, bool> base_has_context = {
             {'A', false}, {'C', false}, {'G', false}, {'T', false}};
     utils::ModBaseContext context_handler;
+    std::cerr << mod_base_info->context << std::endl;
     if (!mod_base_info->context.empty()) {
         if (!context_handler.decode(mod_base_info->context)) {
             throw std::runtime_error("Invalid base modification context string.");
@@ -173,6 +174,32 @@ void ReadCommon::generate_modbase_tags(bam1_t *aln, uint8_t threshold) const {
     auto modbase_mask = context_handler.get_sequence_mask(seq);
     context_handler.update_mask(modbase_mask, seq, mod_base_info->alphabet, base_mod_probs,
                                 threshold);
+
+    if (is_duplex) {
+        auto reverse_complemented_seq = utils::reverse_complement(seq);
+
+        // Compute the reverse complement mask
+        auto modbase_mask_rc = context_handler.get_sequence_mask(reverse_complemented_seq);
+
+        // Update the context mask using the reversed sequence
+        context_handler.update_mask(modbase_mask_rc, reverse_complemented_seq,
+                                    mod_base_info->alphabet, base_mod_probs,
+                                    0);  // TODO: Setting threshold to zero as a temporary measure
+
+        // Reverse the mask in-place
+        std::reverse(modbase_mask_rc.begin(), modbase_mask_rc.end());
+
+        // Combine the original and reverse complement masks
+        // Using std::transform for better readability and potential efficiency
+        std::transform(modbase_mask.begin(), modbase_mask.end(), modbase_mask_rc.begin(),
+                       modbase_mask.begin(), std::plus<>());
+    }
+
+    std::map<char, char> nucleotide_complements;
+    nucleotide_complements['A'] = 'T';
+    nucleotide_complements['T'] = 'A';
+    nucleotide_complements['C'] = 'G';
+    nucleotide_complements['G'] = 'C';
 
     // Iterate over the provided alphabet and find all the channels we need to write out
     for (size_t channel_idx = 0; channel_idx < num_channels;
@@ -209,14 +236,15 @@ void ReadCommon::generate_modbase_tags(bam1_t *aln, uint8_t threshold) const {
         }
     }
 
-    // Now let's do the complement
-    for (size_t channel_idx = 0; channel_idx < num_channels;
-         channel_idx++) {  // Loop over each channel. Writing out the
-        if (cardinal_bases.find(mod_base_info->alphabet[channel_idx]) != std::string::npos) {
-            // A cardinal base
-            current_cardinal = mod_base_info->alphabet[channel_idx][0];
-        } else {
-            if (current_cardinal == 'C') {
+    if (is_duplex) {
+        // Now let's do the complement
+        for (size_t channel_idx = 0; channel_idx < num_channels;
+             channel_idx++) {  // Loop over each channel. Writing out the
+            if (cardinal_bases.find(mod_base_info->alphabet[channel_idx]) != std::string::npos) {
+                // A cardinal base
+                current_cardinal = mod_base_info->alphabet[channel_idx][0];
+            } else {
+                auto cardinal_complement = nucleotide_complements[current_cardinal];
                 // A modification on the previous cardinal base
                 std::string bam_name = mod_base_info->alphabet[channel_idx];
                 std::cerr << bam_name << std::endl;
@@ -225,18 +253,17 @@ void ReadCommon::generate_modbase_tags(bam1_t *aln, uint8_t threshold) const {
                 }
 
                 // Write out the results we found
-                modbase_string += std::string(1, 'G') + "-" + bam_name;  //TODO need to RC
+                modbase_string +=
+                        std::string(1, cardinal_complement) + "-" + bam_name;  //TODO need to RC
                 modbase_string += base_has_context[current_cardinal] ? "?" : ".";
                 int skipped_bases = 0;
                 for (size_t base_idx = 0; base_idx < seq.size(); base_idx++) {
-                    if (seq[base_idx] == 'G') {  // complement
-                        if (true) {              // Not sure this one is right
+                    if (seq[base_idx] == cardinal_complement) {  // complement
+                        if (modbase_mask[base_idx]) {            // Not sure this one is right
                             modbase_string += "," + std::to_string(skipped_bases);
                             skipped_bases = 0;
                             modbase_prob.push_back(
                                     base_mod_probs[base_idx * num_channels + channel_idx]);
-                            //modbase_prob.push_back(base_mod_probs[base_idx * num_channels +
-                            //                                      4]);  // Channel index 4 for G
                         } else {
                             // Skip this base
                             skipped_bases++;
