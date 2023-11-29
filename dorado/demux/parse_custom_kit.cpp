@@ -43,7 +43,7 @@ std::pair<std::string, barcode_kits::KitInfo> parse_custom_arrangement(
                                                         std::vector<std::string>& bc_names) {
         auto modulo_pos = pattern.find_first_of("%");
         auto seq_name_prefix = pattern.substr(0, modulo_pos);
-        auto format_str = pattern.substr(modulo_pos, pattern.length() - modulo_pos);
+        auto format_str = pattern.substr(modulo_pos);
 
         for (int i = bc_start_idx; i <= bc_end_idx; i++) {
             char num[256];
@@ -122,7 +122,12 @@ std::unordered_map<std::string, std::string> parse_custom_barcode_sequences(
 
     std::unordered_map<std::string, std::string> sequences;
 
-    while (sam_read1(file, nullptr, record.get()) >= 0) {
+    int sam_ret_val = 0;
+    while ((sam_ret_val = sam_read1(file, nullptr, record.get())) != -1) {
+        if (sam_ret_val < -1) {
+            throw std::runtime_error("Failed to parse custom barcode sequence file " +
+                                     sequences_file);
+        }
         std::string qname = bam_get_qname(record.get());
         std::string seq = utils::extract_sequence(record.get());
         sequences[qname] = seq;

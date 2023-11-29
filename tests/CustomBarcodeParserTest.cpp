@@ -96,7 +96,9 @@ TEST_CASE("Parse kit with incomplete double ended settings", "[barcode_demux]") 
     fs::path data_dir = fs::path(get_data_dir("barcode_demux/custom_barcodes"));
     const auto test_file = data_dir / "bad_double_ended_kit_not_all_params_set.toml";
 
-    CHECK_THROWS(dorado::demux::parse_custom_arrangement(test_file.string()));
+    CHECK_THROWS_WITH(dorado::demux::parse_custom_arrangement(test_file.string()),
+                      Catch::Matchers::Contains(
+                              "mask2_front mask2_rear and barcode2_pattern must all be set"));
 }
 
 TEST_CASE("Parse custom barcode sequences", "[barcode_demux]") {

@@ -28,7 +28,7 @@ std::string generate_barcode_string(dorado::BarcodeScoreResult bc_res) {
     } else {
         bc = UNCLASSIFIED_BARCODE;
     }
-    spdlog::debug("BC: {}", bc);
+    spdlog::trace("BC: {}", bc);
     return bc;
 }
 
