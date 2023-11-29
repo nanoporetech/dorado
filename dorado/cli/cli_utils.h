@@ -4,7 +4,17 @@
 #include "Version.h"
 #include "utils/dev_utils.h"
 
+#ifdef _WIN32
+// Unreachable code warnings are emitted from argparse, even though they should be disabled by the
+// MSVC /external:W0 setting.  This is a limitation of /external: for some C47XX backend warnings.  See:
+// https://learn.microsoft.com/en-us/cpp/build/reference/external-external-headers-diagnostics?view=msvc-170#limitations
+#pragma warning(push)
+#pragma warning(disable : 4702)
+#endif  // _WIN32
 #include <argparse.hpp>
+#ifdef _WIN32
+#pragma warning(pop)
+#endif  // _WIN32
 #include <htslib/sam.h>
 
 #include <algorithm>
@@ -76,18 +86,14 @@ inline std::tuple<int, int, int> parse_version_str(const std::string& version) {
 }
 
 template <class T = int64_t>
-std::vector<T> parse_string_to_sizes(const std::string& str,
-                                     std::optional<std::string> opt = std::nullopt) {
+std::vector<T> parse_string_to_sizes(const std::string& str) {
     std::vector<T> sizes;
     const char* c_str = str.c_str();
     char* p;
     while (true) {
         double x = strtod(c_str, &p);
         if (p == c_str) {
-            auto msg = "Cannot parse size '" + str + "'.";
-            if (opt)
-                msg = "Error parsing option " + *opt + ": " + msg;
-            throw std::runtime_error(msg);
+            throw std::runtime_error("Cannot parse size '" + str + "'.");
         }
         if (*p == 'G' || *p == 'g') {
             x *= 1e9;
@@ -106,30 +112,24 @@ std::vector<T> parse_string_to_sizes(const std::string& str,
         } else if (*p == 0) {
             break;
         }
-        auto msg = "Unknown suffix '" + std::string(p) + "'.";
-        if (opt)
-            msg = "Error parsing option " + *opt + ": " + msg;
-        throw std::runtime_error(msg);
+        throw std::runtime_error("Unknown suffix '" + std::string(p) + "'.");
     }
     return sizes;
 }
 
 template <class T = uint64_t>
-T parse_string_to_size(const std::string& str, std::optional<std::string> opt = std::nullopt) {
-    return parse_string_to_sizes<T>(str, opt)[0];
+T parse_string_to_size(const std::string& str) {
+    return parse_string_to_sizes<T>(str)[0];
 }
 
-inline bool parse_yes_or_no(const std::string& str, std::optional<std::string> opt = std::nullopt) {
+inline bool parse_yes_or_no(const std::string& str) {
     if (str == "yes" || str == "y") {
         return true;
     }
     if (str == "no" || str == "n") {
         return false;
     }
-    auto msg = "Unsupported value '" + str + "'; option  only accepts '(y)es' or '(n)o'.";
-    if (opt) {
-        msg = "Error parsing option " + *opt + ": " + msg;
-    }
+    auto msg = "Unsupported value '" + str + "'; option only accepts '(y)es' or '(n)o'.";
     throw std::runtime_error(msg);
 }
 
@@ -159,9 +159,6 @@ inline void add_internal_arguments(ArgParser& parser) {
             .default_value(std::string(""));
     parser.hidden.add_argument("--dump_stats_filter")
             .help("Internal processing stats. name filter regex.")
-            .default_value(std::string(""));
-    parser.hidden.add_argument("--devopts")
-            .help("Internal options for testing & debugging, 'key=value' pairs separated by ';'")
             .default_value(std::string(""));
 }
 
@@ -212,20 +209,20 @@ void add_minimap2_arguments(ArgParser& parser, const Options& dflt) {
 }
 
 inline void parse(ArgParser& parser, int argc, const char* const argv[]) {
+    parser.hidden.add_argument("--devopts")
+            .help("Internal options for testing & debugging, 'key=value' pairs separated by ';'")
+            .default_value(std::string(""));
     auto remaining_args = parser.visible.parse_known_args(argc, argv);
     remaining_args.insert(remaining_args.begin(), HIDDEN_PROGRAM_NAME);
     parser.hidden.parse_args(remaining_args);
-}
-
-inline void process_internal_arguments(const ArgParser& parser) {
     utils::details::extract_dev_options(parser.hidden.get<std::string>("--devopts"));
 }
 
 template <class Options>
 Options process_minimap2_arguments(const ArgParser& parser, const Options& dflt) {
     Options res;
-    res.kmer_size = parser.visible.get<int>("k");
-    res.window_size = parser.visible.get<int>("w");
+    res.kmer_size = short(parser.visible.get<int>("k"));
+    res.window_size = short(parser.visible.get<int>("w"));
     res.index_batch_size = cli::parse_string_to_size(parser.visible.get<std::string>("I"));
     res.print_secondary = cli::parse_yes_or_no(parser.visible.get<std::string>("secondary"));
     res.best_n_secondary = parser.visible.get<int>("N");

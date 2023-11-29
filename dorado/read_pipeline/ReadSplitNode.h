@@ -15,12 +15,12 @@ class ReadSplitter;
 class ReadSplitNode : public MessageSink {
 public:
     ReadSplitNode(std::unique_ptr<const splitter::ReadSplitter> splitter,
-                  int num_worker_threads = 5,
-                  size_t max_reads = 1000);
+                  int num_worker_threads,
+                  size_t max_reads);
     ~ReadSplitNode() { terminate_impl(); }
     std::string get_name() const override { return "ReadSplitNode"; }
     stats::NamedStats sample_stats() const override;
-    void terminate(const FlushOptions& flush_options) override { terminate_impl(); }
+    void terminate(const FlushOptions &) override { terminate_impl(); }
     void restart() override;
 
 private:

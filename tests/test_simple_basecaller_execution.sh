@@ -35,14 +35,24 @@ if ! uname -r | grep -q tegra; then
     $dorado_bin basecaller ${model} $data_dir/pod5 -x cpu --modified-bases 5mCG_5hmCG > $output_dir/calls.bam
 fi
 samtools quickcheck -u $output_dir/calls.bam
-samtools view $output_dir/calls.bam > $output_dir/calls.sam
+samtools view -h $output_dir/calls.bam > $output_dir/calls.sam
+
+# Check that the read group has the required model info in it's header
+if ! grep -q "basecall_model=${model_name}" $output_dir/calls.sam; then
+    echo "Output SAM file does not contain basecall model name in header!"
+    exit 1
+fi
+if ! grep -q "modbase_models=${model_name}_5mCG_5hmCG" $output_dir/calls.sam; then
+    echo "Output SAM file does not contain modbase model name in header!"
+    exit 1
+fi
 
 set +e
 if $dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --emit-fastq --reference $output_dir/ref.fq > $output_dir/error_condition.fq; then
     echo "Error: dorado basecaller should fail with combination of emit-fastq and reference!"
     exit 1
 fi
-if $dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --emit-fastq --modified-bases 5mCG > $output_dir/error_condition.fq; then
+if $dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --emit-fastq --modified-bases 5mCG_5hmCG > $output_dir/error_condition.fq; then
     echo  "Error: dorado basecaller should fail with combination of emit-fastq and modbase!"
     exit 1
 fi
@@ -180,6 +190,15 @@ if [[ $num_demuxed_reads -ne "3" ]]; then
     exit 1
 fi
 
+echo dorado trim test stage
+file1=$data_dir/adapter_trim/lsk109_single_read.fastq
+file2=$output_dir/lsk109_single_read_trimmed.fastq
+$dorado_bin trim --emit-fastq $file1 > $file2
+if cmp --silent -- "$file1" "$file2"; then
+  echo "Adapter was not trimmed. Input and output reads are identical."
+  exit 1
+fi
+
 echo "dorado test poly(A) tail estimation"
 $dorado_bin basecaller -b ${batch} ${model} $data_dir/poly_a/r10_cdna_pod5/ --estimate-poly-a > $output_dir/polya.bam
 samtools quickcheck -u $output_dir/polya.bam
@@ -246,6 +265,5 @@ for bam in $output_dir/demux_only_test/SQK-RBK114-96_barcode01.bam $output_dir/d
         exit 1
     fi
 done
-
 
 rm -rf $output_dir

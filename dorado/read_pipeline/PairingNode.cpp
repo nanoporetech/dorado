@@ -1,5 +1,7 @@
 #include "PairingNode.h"
 
+#include "ClientInfo.h"
+
 #include <minimap.h>
 #include <nvtx3/nvtx3.hpp>
 #include <spdlog/spdlog.h>
@@ -88,7 +90,7 @@ PairingNode::PairingResult PairingNode::is_within_time_and_length_criteria(
     float len_ratio = static_cast<float>(min_seq_len) / static_cast<float>(max_seq_len);
     if (delta <= kEarlyAcceptTimeDeltaMs && len_ratio >= kEarlyAcceptSeqLenRatio &&
         min_seq_len >= 5000) {
-        spdlog::debug("Early acceptance: len frac {}, delta {} temp len {}, comp len {}, {} and {}",
+        spdlog::trace("Early acceptance: len frac {}, delta {} temp len {}, comp len {}, {} and {}",
                       len_ratio, delta, temp.read_common.seq.length(),
                       comp.read_common.seq.length(), temp.read_common.read_id,
                       comp.read_common.read_id);
@@ -167,7 +169,7 @@ PairingNode::PairingResult PairingNode::is_within_alignment_criteria(
         bool cond =
                 (meets_mapq && meets_length && rev && ends_anchored && meets_min_overlap_length);
 
-        spdlog::debug(
+        spdlog::trace(
                 "hits {}, mapq {}, overlap length {}, overlap frac {}, delta {}, read 1 {}, "
                 "read 2 {}, strand {}, pass {}, accepted {}, temp start {} temp end {}, "
                 "comp start {} comp end {}, {} and {}",
@@ -216,14 +218,12 @@ void PairingNode::pair_list_worker_thread(int tid) {
             read_is_template = true;
             partner_found = true;
         } else {
-            {
-                tc_lock.unlock();
-                std::lock_guard<std::mutex> ct_lock(m_ct_map_mutex);
-                auto it = m_complement_template_map.find(read->read_common.read_id);
-                if (it != m_complement_template_map.end()) {
-                    partner_id = it->second;
-                    partner_found = true;
-                }
+            tc_lock.unlock();
+            std::lock_guard<std::mutex> ct_lock(m_ct_map_mutex);
+            it = m_complement_template_map.find(read->read_common.read_id);
+            if (it != m_complement_template_map.end()) {
+                partner_id = it->second;
+                partner_found = true;
             }
         }
 
@@ -316,7 +316,7 @@ void PairingNode::pair_generating_worker_thread(int tid) {
         int channel = read->read_common.attributes.channel_number;
         std::string run_id = read->read_common.run_id;
         std::string flowcell_id = read->read_common.flowcell_id;
-        int32_t client_id = read->read_common.client_id;
+        int32_t client_id = read->read_common.client_info->client_id();
 
         std::unique_lock<std::mutex> lock(m_pairing_mtx);
 

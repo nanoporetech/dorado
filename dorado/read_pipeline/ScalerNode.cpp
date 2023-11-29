@@ -178,7 +178,9 @@ void ScalerNode::worker_thread() {
                 int max_samples = std::min(
                         8000, static_cast<int>(read->read_common.get_raw_data_samples() / 2));
                 trim_start = utils::trim(
-                        read->read_common.raw_data.index({Slice(at::indexing::None, max_samples)}));
+                        read->read_common.raw_data.index({Slice(at::indexing::None, max_samples)}),
+                        utils::DEFAULT_TRIM_THRESHOLD, utils::DEFAULT_TRIM_WINDOW_SIZE,
+                        utils::DEFAULT_TRIM_MIN_ELEMENTS);
             }
 
             read->read_common.raw_data =

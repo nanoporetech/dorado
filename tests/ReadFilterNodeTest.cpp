@@ -16,7 +16,7 @@ auto make_filtered_pipeline(std::vector<dorado::Message>& messages,
     auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
     pipeline_desc.add_node<dorado::ReadFilterNode>({sink}, min_qscore, min_read_length,
                                                    std::move(reads_to_filter), 2 /*threads*/);
-    return dorado::Pipeline::create(std::move(pipeline_desc));
+    return dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
 }
 }  // namespace
 

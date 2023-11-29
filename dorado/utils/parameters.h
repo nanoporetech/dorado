@@ -46,7 +46,6 @@ struct ThreadAllocations {
 ThreadAllocations default_thread_allocations(int num_devices,
                                              int num_remora_threads,
                                              bool enable_aligner,
-                                             bool enable_barcoder,
-                                             int max_threads = 0);
+                                             bool enable_barcoder);
 
 }  // namespace dorado::utils

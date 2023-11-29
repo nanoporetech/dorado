@@ -1,5 +1,6 @@
 #include "ReadPipeline.h"
 
+#include "DefaultClientInfo.h"
 #include "modbase/ModBaseContext.h"
 #include "stereo_features.h"
 #include "utils/bam_utils.h"
@@ -21,6 +22,8 @@
 using namespace std::chrono_literals;
 
 namespace dorado {
+
+ReadCommon::ReadCommon() : client_info(std::make_shared<DefaultClientInfo>()) {}
 
 std::string ReadCommon::generate_read_group() const {
     std::string read_group;
@@ -94,7 +97,7 @@ void ReadCommon::generate_read_tags(bam1_t *aln, bool emit_moves, bool is_duplex
 
     if (emit_moves) {
         std::vector<uint8_t> m(moves.size() + 1, 0);
-        m[0] = model_stride;
+        m[0] = uint8_t(model_stride);
 
         for (size_t idx = 0; idx < moves.size(); idx++) {
             m[idx + 1] = static_cast<uint8_t>(moves[idx]);
@@ -268,6 +271,8 @@ void ReadCommon::generate_modbase_tags(bam1_t *aln, uint8_t threshold) const {
         }
     }
 
+    int seq_len = int(seq.length());
+    bam_aux_append(aln, "MN", 'i', sizeof(seq_len), (uint8_t *)&seq_len);
     bam_aux_append(aln, "MM", 'Z', int(modbase_string.length() + 1),
                    (uint8_t *)modbase_string.c_str());
     bam_aux_update_array(aln, "ML", 'C', int(modbase_prob.size()), (uint8_t *)modbase_prob.data());
@@ -278,9 +283,9 @@ float ReadCommon::calculate_mean_qscore() const {
     // read length, then calculate mean Q-score from the
     // start of the read.
     if (qstring.length() <= mean_qscore_start_pos) {
-        return utils::mean_qscore_from_qstring(qstring, 0);
+        return utils::mean_qscore_from_qstring(qstring);
     }
-    return utils::mean_qscore_from_qstring(qstring, mean_qscore_start_pos);
+    return utils::mean_qscore_from_qstring(std::string_view{qstring}.substr(mean_qscore_start_pos));
 }
 
 std::vector<BamPtr> ReadCommon::extract_sam_lines(bool emit_moves,
@@ -312,8 +317,9 @@ std::vector<BamPtr> ReadCommon::extract_sam_lines(bool emit_moves,
     std::transform(qstring.begin(), qstring.end(), std::back_inserter(qscore),
                    [](char c) { return (uint8_t)(c)-33; });
 
-    bam_set1(aln, read_id.length(), read_id.c_str(), flags, -1, leftmost_pos, map_q, 0, nullptr, -1,
-             next_pos, 0, seq.length(), seq.c_str(), (char *)qscore.data(), 0);
+    bam_set1(aln, read_id.length(), read_id.c_str(), uint16_t(flags), -1, leftmost_pos,
+             uint8_t(map_q), 0, nullptr, -1, next_pos, 0, seq.length(), seq.c_str(),
+             (char *)qscore.data(), 0);
 
     if (!barcode.empty() && barcode != "unclassified") {
         bam_aux_append(aln, "BC", 'Z', int(barcode.length() + 1), (uint8_t *)barcode.c_str());
@@ -403,8 +409,7 @@ bool Pipeline::DFS(const std::vector<PipelineDescriptor::NodeDescriptor> &node_d
 
 std::unique_ptr<Pipeline> Pipeline::create(
         PipelineDescriptor &&descriptor,
-        std::vector<dorado::stats::StatsReporter> *const stats_reporters,
-        stats::NamedStats *const final_stats) {
+        std::vector<dorado::stats::StatsReporter> *const stats_reporters) {
     // Find a source node, i.e. one that is not the sink of any other node.
     // There should be exactly 1 one for a valid pipeline.
     const auto node_count = descriptor.m_node_descriptors.size();

@@ -39,4 +39,7 @@ uint32_t get_mean_qscore_start_pos_by_model_name(const std::string& model_name);
 // Extract the model name from the model path.
 std::string extract_model_from_model_path(const std::string& model_path);
 
+// Extract the model names as a comma seperated list from a comma seperated list of model paths.
+std::string extract_model_from_model_paths(const std::string& model_paths);
+
 }  // namespace dorado::models

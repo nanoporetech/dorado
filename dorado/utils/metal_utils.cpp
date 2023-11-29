@@ -110,7 +110,7 @@ NS::SharedPtr<MTL::ComputePipelineState> make_cps(
         MTL::Device *const device,
         const std::string &name,
         const std::vector<std::tuple<std::string, MetalConstant>> &named_constants,
-        const int max_total_threads_per_tg) {
+        const std::optional<int> max_total_threads_per_tg) {
     NS::Error *error;
     auto default_library = NS::TransferPtr(device->newDefaultLibrary());
 
@@ -146,8 +146,9 @@ NS::SharedPtr<MTL::ComputePipelineState> make_cps(
 
     auto cp_descriptor = NS::TransferPtr(MTL::ComputePipelineDescriptor::alloc()->init());
     cp_descriptor->setComputeFunction(kernel.get());
-    if (max_total_threads_per_tg != -1)
-        cp_descriptor->setMaxTotalThreadsPerThreadgroup(max_total_threads_per_tg);
+    if (max_total_threads_per_tg) {
+        cp_descriptor->setMaxTotalThreadsPerThreadgroup(*max_total_threads_per_tg);
+    }
 
     auto cps = NS::TransferPtr(device->newComputePipelineState(
             cp_descriptor.get(), MTL::PipelineOptionNone, nullptr, &error));
@@ -190,7 +191,7 @@ void launch_kernel_no_wait(ComputePipelineState *const pipeline,
     }
 
     // Set lengths of threadgroup memory buffers.
-    for (int i = 0; i < tg_buffer_lens.size(); ++i) {
+    for (int i = 0; i < (int)tg_buffer_lens.size(); ++i) {
         compute_encoder->setThreadgroupMemoryLength(tg_buffer_lens.at(i), i);
     }
 

@@ -35,16 +35,28 @@ struct BarcodeScoreResult {
     float top_flank_score = -1.f;
     float bottom_flank_score = -1.f;
     bool use_top = false;
-    std::string adapter_name = "unclassified";
+    std::string barcode_name = "unclassified";
     std::string kit = "unclassified";
     std::string variant = "n/a";
     std::pair<int, int> top_barcode_pos = {-1, -1};
     std::pair<int, int> bottom_barcode_pos = {-1, -1};
 };
 
+struct SingleEndResult {
+    float score = -1.f;
+    std::string name = "unclassified";
+    std::pair<int, int> position = {-1, -1};
+};
+
+struct AdapterScoreResult {
+    SingleEndResult front;
+    SingleEndResult rear;
+};
+
 struct ReadGroup {
     std::string run_id;
     std::string basecalling_model;
+    std::string modbase_models;
     std::string flowcell_id;
     std::string device_id;
     std::string exp_start_time;

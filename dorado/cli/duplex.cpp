@@ -24,7 +24,6 @@
 #include "utils/torch_utils.h"
 #include "utils/types.h"
 
-#include <argparse.hpp>
 #include <htslib/sam.h>
 #include <spdlog/spdlog.h>
 
@@ -146,7 +145,7 @@ int duplex(int argc, char* argv[]) {
             .help("the minimum predicted methylation probability for a modified base to be emitted "
                   "in an all-context model, [0, 1]");
 
-    cli::add_minimap2_arguments(parser, AlignerNode::dflt_options);
+    cli::add_minimap2_arguments(parser, alignment::dflt_options);
     cli::add_internal_arguments(parser);
 
     try {
@@ -229,15 +228,22 @@ int duplex(int argc, char* argv[]) {
             output_mode = HtsWriter::OutputMode::UBAM;
         }
 
-        bool recursive_file_loading = parser.visible.get<bool>("--recursive");
-
         const std::string dump_stats_file = parser.hidden.get<std::string>("--dump_stats_file");
         const std::string dump_stats_filter = parser.hidden.get<std::string>("--dump_stats_filter");
         const size_t max_stats_records = static_cast<size_t>(dump_stats_file.empty() ? 0 : 100000);
 
-        size_t num_reads = (basespace_duplex ? read_list_from_pairs.size()
-                                             : DataLoader::get_num_reads(reads, read_list, {},
-                                                                         recursive_file_loading));
+        bool recursive_file_loading = parser.visible.get<bool>("--recursive");
+
+        size_t num_reads = 0;
+        if (basespace_duplex) {
+            num_reads = read_list_from_pairs.size();
+        } else {
+            num_reads = DataLoader::get_num_reads(reads, read_list, {}, recursive_file_loading);
+            if (num_reads == 0) {
+                spdlog::error("No POD5 or FAST5 reads found in path: " + reads);
+                std::exit(EXIT_FAILURE);
+            }
+        }
         spdlog::debug("> Reads to process: {}", num_reads);
 
         SamHdrPtr hdr(sam_hdr_init());
@@ -248,13 +254,14 @@ int duplex(int argc, char* argv[]) {
         auto aligner = PipelineDescriptor::InvalidNodeHandle;
         auto converted_reads_sink = PipelineDescriptor::InvalidNodeHandle;
         if (ref.empty()) {
-            hts_writer = pipeline_desc.add_node<HtsWriter>({}, "-", output_mode, 4, num_reads);
+            hts_writer = pipeline_desc.add_node<HtsWriter>({}, "-", output_mode, 4);
             converted_reads_sink = hts_writer;
         } else {
-            auto options = cli::process_minimap2_arguments(parser, AlignerNode::dflt_options);
-            aligner = pipeline_desc.add_node<AlignerNode>({}, ref, options,
+            auto options = cli::process_minimap2_arguments(parser, alignment::dflt_options);
+            auto index_file_access = std::make_shared<alignment::IndexFileAccess>();
+            aligner = pipeline_desc.add_node<AlignerNode>({}, index_file_access, ref, options,
                                                           std::thread::hardware_concurrency());
-            hts_writer = pipeline_desc.add_node<HtsWriter>({}, "-", output_mode, 4, num_reads);
+            hts_writer = pipeline_desc.add_node<HtsWriter>({}, "-", output_mode, 4);
             pipeline_desc.add_node_sink(aligner, hts_writer);
             converted_reads_sink = aligner;
         }
@@ -304,7 +311,6 @@ int duplex(int argc, char* argv[]) {
             auto& hts_writer_ref = dynamic_cast<HtsWriter&>(pipeline->get_node_ref(hts_writer));
             hts_writer_ref.set_and_write_header(hdr.get());
 
-            constexpr auto kStatsPeriod = 100ms;
             stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
                     kStatsPeriod, stats_reporters, stats_callables, max_stats_records);
         } else {  // Execute a Stereo Duplex pipeline.
@@ -329,7 +335,7 @@ int duplex(int argc, char* argv[]) {
             auto skip_model_compatibility_check =
                     parser.hidden.get<bool>("--skip-model-compatibility-check");
             if (!skip_model_compatibility_check &&
-                !sample_rates_compatible(data_sample_rate, model_sample_rate)) {
+                !sample_rates_compatible(data_sample_rate, uint16_t(model_sample_rate))) {
                 std::stringstream err;
                 err << "Sample rate for model (" << model_sample_rate << ") and data ("
                     << data_sample_rate << ") are not compatible.";
@@ -358,9 +364,11 @@ int duplex(int argc, char* argv[]) {
 
             // Write read group info to header.
             auto duplex_rg_name = std::string(model + "_" + stereo_model_name);
-            auto read_groups = DataLoader::load_read_groups(reads, model, recursive_file_loading);
-            read_groups.merge(
-                    DataLoader::load_read_groups(reads, duplex_rg_name, recursive_file_loading));
+            // TODO: supply modbase model names once duplex modbase is complete
+            auto read_groups =
+                    DataLoader::load_read_groups(reads, model, "", recursive_file_loading);
+            read_groups.merge(DataLoader::load_read_groups(reads, duplex_rg_name, "",
+                                                           recursive_file_loading));
             std::vector<std::string> barcode_kits;
             utils::add_rg_hdr(hdr.get(), read_groups, barcode_kits, nullptr);
 
@@ -421,7 +429,7 @@ int duplex(int argc, char* argv[]) {
                     pipeline_desc, std::move(runners), std::move(stereo_runners),
                     std::move(mod_base_runners), overlap, mean_qscore_start_pos,
                     int(num_devices * 2), int(num_devices), std::move(pairing_parameters),
-                    read_filter_node);
+                    read_filter_node, PipelineDescriptor::InvalidNodeHandle);
 
             pipeline = Pipeline::create(std::move(pipeline_desc), &stats_reporters);
             if (pipeline == nullptr) {
@@ -439,7 +447,7 @@ int duplex(int argc, char* argv[]) {
             }
             hts_writer_ref.set_and_write_header(hdr.get());
 
-            DataLoader loader(*pipeline, "cpu", num_devices, 0, std::move(read_list));
+            DataLoader loader(*pipeline, "cpu", num_devices, 0, std::move(read_list), {});
 
             stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
                     kStatsPeriod, stats_reporters, stats_callables, max_stats_records);

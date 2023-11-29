@@ -25,7 +25,6 @@
 #include "utils/sys_stats.h"
 #include "utils/torch_utils.h"
 
-#include <argparse.hpp>
 #include <htslib/sam.h>
 #include <spdlog/spdlog.h>
 
@@ -61,7 +60,7 @@ void setup(std::vector<std::string> args,
            size_t min_qscore,
            std::string read_list_file_path,
            bool recursive_file_loading,
-           const AlignerNode::Minimap2Options& aligner_options,
+           const alignment::Minimap2Options& aligner_options,
            bool skip_model_compatibility_check,
            const std::string& dump_stats_file,
            const std::string& dump_stats_filter,
@@ -74,11 +73,21 @@ void setup(std::vector<std::string> args,
            bool estimate_poly_a) {
     auto model_config = load_crf_model_config(model_path);
     std::string model_name = models::extract_model_from_model_path(model_path.string());
+    std::string modbase_model_names = models::extract_model_from_model_paths(remora_models);
 
     if (!DataLoader::is_read_data_present(data_path, recursive_file_loading)) {
         std::string err = "No POD5 or FAST5 data found in path: " + data_path;
         throw std::runtime_error(err);
     }
+
+    auto read_list = utils::load_read_list(read_list_file_path);
+    size_t num_reads = DataLoader::get_num_reads(
+            data_path, read_list, {} /*reads_already_processed*/, recursive_file_loading);
+    if (num_reads == 0) {
+        spdlog::error("No POD5 or FAST5 reads found in path: " + data_path);
+        std::exit(EXIT_FAILURE);
+    }
+    num_reads = max_reads == 0 ? num_reads : std::min(num_reads, max_reads);
 
     // Check sample rate of model vs data.
     auto data_sample_rate = DataLoader::get_sample_rate(data_path, recursive_file_loading);
@@ -88,11 +97,17 @@ void setup(std::vector<std::string> args,
         model_sample_rate = models::get_sample_rate_by_model_name(model_name);
     }
     if (!skip_model_compatibility_check &&
-        !sample_rates_compatible(data_sample_rate, model_sample_rate)) {
+        !sample_rates_compatible(data_sample_rate, uint16_t(model_sample_rate))) {
         std::stringstream err;
         err << "Sample rate for model (" << model_sample_rate << ") and data (" << data_sample_rate
             << ") are not compatible.";
         throw std::runtime_error(err.str());
+    }
+
+    if (is_rna_model(model_config)) {
+        spdlog::info(
+                " - BAM format does not support `U`, so RNA output files will include `T` instead "
+                "of `U` for all file types.");
     }
 
     const bool enable_aligner = !ref.empty();
@@ -102,15 +117,11 @@ void setup(std::vector<std::string> args,
                                                  default_parameters.mod_base_runners_per_caller,
                                                  remora_batch_size);
 
-    auto [runners, num_devices] =
-            create_basecall_runners(model_config, device, num_runners, 0, batch_size, chunk_size);
+    auto [runners, num_devices] = create_basecall_runners(model_config, device, num_runners, 0,
+                                                          batch_size, chunk_size, 1.f, false);
 
-    auto read_groups = DataLoader::load_read_groups(data_path, model_name, recursive_file_loading);
-    auto read_list = utils::load_read_list(read_list_file_path);
-
-    size_t num_reads = DataLoader::get_num_reads(
-            data_path, read_list, {} /*reads_already_processed*/, recursive_file_loading);
-    num_reads = max_reads == 0 ? num_reads : std::min(num_reads, max_reads);
+    auto read_groups = DataLoader::load_read_groups(data_path, model_name, modbase_model_names,
+                                                    recursive_file_loading);
 
     const auto thread_allocations = utils::default_thread_allocations(
             int(num_devices), !remora_runners.empty() ? int(num_remora_threads) : 0, enable_aligner,
@@ -128,12 +139,14 @@ void setup(std::vector<std::string> args,
     utils::add_rg_hdr(hdr.get(), read_groups, barcode_kits, sample_sheet.get());
 
     PipelineDescriptor pipeline_desc;
-    auto hts_writer = pipeline_desc.add_node<HtsWriter>(
-            {}, "-", output_mode, thread_allocations.writer_threads, num_reads);
+    auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, "-", output_mode,
+                                                        thread_allocations.writer_threads);
     auto aligner = PipelineDescriptor::InvalidNodeHandle;
     auto current_sink_node = hts_writer;
     if (enable_aligner) {
-        aligner = pipeline_desc.add_node<AlignerNode>({current_sink_node}, ref, aligner_options,
+        auto index_file_access = std::make_shared<alignment::IndexFileAccess>();
+        aligner = pipeline_desc.add_node<AlignerNode>({current_sink_node}, index_file_access, ref,
+                                                      aligner_options,
                                                       thread_allocations.aligner_threads);
         current_sink_node = aligner;
     }
@@ -143,7 +156,7 @@ void setup(std::vector<std::string> args,
     if (estimate_poly_a) {
         current_sink_node = pipeline_desc.add_node<PolyACalculator>(
                 {current_sink_node}, std::thread::hardware_concurrency(),
-                is_rna_model(model_config));
+                is_rna_model(model_config), 1000);
     }
     if (!barcode_kits.empty()) {
         current_sink_node = pipeline_desc.add_node<BarcodeClassifierNode>(
@@ -165,7 +178,8 @@ void setup(std::vector<std::string> args,
             pipeline_desc, std::move(runners), std::move(remora_runners), overlap,
             mean_qscore_start_pos, thread_allocations.scaler_node_threads,
             true /* Enable read splitting */, thread_allocations.splitter_node_threads,
-            int(thread_allocations.remora_threads * num_devices), current_sink_node);
+            int(thread_allocations.remora_threads * num_devices), current_sink_node,
+            PipelineDescriptor::InvalidNodeHandle);
 
     // Create the Pipeline from our description.
     std::vector<dorado::stats::StatsReporter> stats_reporters{dorado::stats::sys_stats_report};
@@ -224,7 +238,7 @@ void setup(std::vector<std::string> args,
                       reads_already_processed);
 
     // Run pipeline.
-    loader.load_reads(data_path, recursive_file_loading);
+    loader.load_reads(data_path, recursive_file_loading, ReadOrder::UNRESTRICTED);
 
     // Wait for the pipeline to complete.  When it does, we collect
     // final stats to allow accurate summarisation.
@@ -361,12 +375,13 @@ int basecaller(int argc, char* argv[]) {
             .help("Path to the sample sheet to use.")
             .default_value(std::string(""));
     parser.visible.add_argument("--estimate-poly-a")
-            .help("Estimate poly-A/T tail lengths (beta feature). Primarily meant for cDNA and "
+            .help("Estimate poly-A/T tail lengths (beta feature). Primarily meant "
+                  "for cDNA and "
                   "dRNA use cases.")
             .default_value(false)
             .implicit_value(true);
 
-    cli::add_minimap2_arguments(parser, AlignerNode::dflt_options);
+    cli::add_minimap2_arguments(parser, alignment::dflt_options);
     cli::add_internal_arguments(parser);
 
     // Create a copy of the parser to use if the resume feature is enabled. Needed
@@ -456,7 +471,7 @@ int basecaller(int argc, char* argv[]) {
               parser.visible.get<int>("--max-reads"), parser.visible.get<int>("--min-qscore"),
               parser.visible.get<std::string>("--read-ids"),
               parser.visible.get<bool>("--recursive"),
-              cli::process_minimap2_arguments(parser, AlignerNode::dflt_options),
+              cli::process_minimap2_arguments(parser, alignment::dflt_options),
               parser.hidden.get<bool>("--skip-model-compatibility-check"),
               parser.hidden.get<std::string>("--dump_stats_file"),
               parser.hidden.get<std::string>("--dump_stats_filter"),

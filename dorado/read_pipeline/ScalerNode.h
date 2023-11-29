@@ -17,12 +17,12 @@ class ScalerNode : public MessageSink {
 public:
     ScalerNode(const SignalNormalisationParams& config,
                SampleType model_type,
-               int num_worker_threads = 5,
-               size_t max_reads = 1000);
+               int num_worker_threads,
+               size_t max_reads);
     ~ScalerNode() { terminate_impl(); }
     std::string get_name() const override { return "ScalerNode"; }
     stats::NamedStats sample_stats() const override;
-    void terminate(const FlushOptions& flush_options) override { terminate_impl(); }
+    void terminate(const FlushOptions&) override { terminate_impl(); }
     void restart() override;
 
 private:

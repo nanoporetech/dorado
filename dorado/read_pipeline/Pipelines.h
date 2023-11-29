@@ -31,8 +31,8 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
                              bool enable_read_splitter,
                              int splitter_node_threads,
                              int modbase_threads,
-                             NodeHandle sink_node_handle = PipelineDescriptor::InvalidNodeHandle,
-                             NodeHandle source_node_handle = PipelineDescriptor::InvalidNodeHandle);
+                             NodeHandle sink_node_handle,
+                             NodeHandle source_node_handle);
 
 /// Create a duplex basecall pipeline description
 /// If source_node_handle is valid, set this to be the source of the simplex pipeline
@@ -47,8 +47,8 @@ void create_stereo_duplex_pipeline(
         int scaler_node_threads,
         int splitter_node_threads,
         PairingParameters pairing_parameters,
-        NodeHandle sink_node_handle = PipelineDescriptor::InvalidNodeHandle,
-        NodeHandle source_node_handle = PipelineDescriptor::InvalidNodeHandle);
+        NodeHandle sink_node_handle,
+        NodeHandle source_node_handle);
 
 }  // namespace pipelines
 

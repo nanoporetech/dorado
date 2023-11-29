@@ -56,15 +56,15 @@ TEST_CASE("BarcodeClassifier: test single ended barcode", TEST_GROUP) {
     for (std::string bc :
          {"SQK-RBK114-96_BC01", "SQK-RBK114-96_RBK39", "SQK-RBK114-96_BC92", "unclassified"}) {
         auto bc_file = data_dir / (bc + ".fastq");
-        HtsReader reader(bc_file.string());
+        HtsReader reader(bc_file.string(), std::nullopt);
         while (reader.read()) {
             auto seqlen = reader.record->core.l_qseq;
             std::string seq = utils::extract_sequence(reader.record.get());
             auto res = classifier.barcode(seq, false, std::nullopt);
-            if (res.adapter_name == "unclassified") {
-                CHECK(bc == res.adapter_name);
+            if (res.barcode_name == "unclassified") {
+                CHECK(bc == res.barcode_name);
             } else {
-                CHECK(bc == (res.kit + "_" + res.adapter_name));
+                CHECK(bc == (res.kit + "_" + res.barcode_name));
                 CHECK(res.top_barcode_pos.second > res.top_barcode_pos.first);
                 CHECK(res.top_barcode_pos.first >= 0);
                 CHECK(res.top_barcode_pos.second <= seqlen);
@@ -83,15 +83,15 @@ TEST_CASE("BarcodeClassifier: test double ended barcode", TEST_GROUP) {
     for (std::string bc :
          {"SQK-RPB004_BC01", "SQK-RPB004_BC05", "SQK-RPB004_BC11", "unclassified"}) {
         auto bc_file = data_dir / (bc + ".fastq");
-        HtsReader reader(bc_file.string());
+        HtsReader reader(bc_file.string(), std::nullopt);
         while (reader.read()) {
             auto seqlen = reader.record->core.l_qseq;
             std::string seq = utils::extract_sequence(reader.record.get());
             auto res = classifier.barcode(seq, false, std::nullopt);
-            if (res.adapter_name == "unclassified") {
-                CHECK(bc == res.adapter_name);
+            if (res.barcode_name == "unclassified") {
+                CHECK(bc == res.barcode_name);
             } else {
-                CHECK(bc == (res.kit + "_" + res.adapter_name));
+                CHECK(bc == (res.kit + "_" + res.barcode_name));
                 CHECK(res.top_barcode_pos.second > res.top_barcode_pos.first);
                 CHECK(res.bottom_barcode_pos.second > res.bottom_barcode_pos.first);
                 CHECK(res.top_barcode_pos.first >= 0);
@@ -112,15 +112,15 @@ TEST_CASE("BarcodeClassifier: test double ended barcode with different variants"
     for (std::string bc :
          {"EXP-PBC096_BC04", "EXP-PBC096_BC37", "EXP-PBC096_BC83", "unclassified"}) {
         auto bc_file = data_dir / (bc + ".fastq");
-        HtsReader reader(bc_file.string());
+        HtsReader reader(bc_file.string(), std::nullopt);
         while (reader.read()) {
             auto seqlen = reader.record->core.l_qseq;
             std::string seq = utils::extract_sequence(reader.record.get());
             auto res = classifier.barcode(seq, false, std::nullopt);
-            if (res.adapter_name == "unclassified") {
-                CHECK(bc == res.adapter_name);
+            if (res.barcode_name == "unclassified") {
+                CHECK(bc == res.barcode_name);
             } else {
-                CHECK(bc == (res.kit + "_" + res.adapter_name));
+                CHECK(bc == (res.kit + "_" + res.barcode_name));
                 CHECK(res.top_barcode_pos.second > res.top_barcode_pos.first);
                 CHECK(res.bottom_barcode_pos.second > res.bottom_barcode_pos.first);
                 CHECK(res.top_barcode_pos.first >= 0);
@@ -140,13 +140,13 @@ TEST_CASE("BarcodeClassifier: check barcodes on both ends - failing case", TEST_
 
     // Check case where both ends don't match.
     auto bc_file = data_dir / "EXP-PBC096_barcode_both_ends_fail.fastq";
-    HtsReader reader(bc_file.string());
+    HtsReader reader(bc_file.string(), std::nullopt);
     while (reader.read()) {
         std::string seq = utils::extract_sequence(reader.record.get());
         auto single_end_res = classifier.barcode(seq, false, std::nullopt);
         auto double_end_res = classifier.barcode(seq, true, std::nullopt);
-        CHECK(double_end_res.adapter_name == "unclassified");
-        CHECK(single_end_res.adapter_name == "BC15");
+        CHECK(double_end_res.barcode_name == "unclassified");
+        CHECK(single_end_res.barcode_name == "BC15");
     }
 }
 
@@ -157,13 +157,13 @@ TEST_CASE("BarcodeClassifier: check barcodes on both ends - passing case", TEST_
 
     // Check case where both ends do match.
     auto bc_file = data_dir / "EXP-PBC096_barcode_both_ends_pass.fastq";
-    HtsReader reader(bc_file.string());
+    HtsReader reader(bc_file.string(), std::nullopt);
     while (reader.read()) {
         std::string seq = utils::extract_sequence(reader.record.get());
         auto single_end_res = classifier.barcode(seq, false, std::nullopt);
         auto double_end_res = classifier.barcode(seq, true, std::nullopt);
-        CHECK(double_end_res.adapter_name == single_end_res.adapter_name);
-        CHECK(single_end_res.adapter_name == "BC01");
+        CHECK(double_end_res.barcode_name == single_end_res.barcode_name);
+        CHECK(single_end_res.barcode_name == "BC01");
     }
 }
 
@@ -191,7 +191,7 @@ TEST_CASE(
                                                       std::nullopt);
     }
 
-    auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
+    auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
 
     // Create new read that is barcode - 100 As - barcode.
     auto read = std::make_unique<SimplexRead>();
@@ -248,7 +248,7 @@ TEST_CASE(
 
     read->read_common.num_trimmed_samples = 0;
 
-    auto records = read->read_common.extract_sam_lines(true /* emit moves*/, 10);
+    auto records = read->read_common.extract_sam_lines(true /* emit moves*/, 10, false);
 
     // Push a Read type.
     pipeline->push_message(std::move(read));
@@ -280,8 +280,8 @@ TEST_CASE(
     for (auto& message : messages) {
         if (std::holds_alternative<BamPtr>(message)) {
             // Check trimming on the bam1_t struct.
-            auto read = std::get<BamPtr>(std::move(message));
-            bam1_t* rec = read.get();
+            auto msg_read = std::get<BamPtr>(std::move(message));
+            bam1_t* rec = msg_read.get();
 
             CHECK_THAT(bam_aux2Z(bam_aux_get(rec, "BC")), Equals(expected_bc));
 
@@ -304,23 +304,24 @@ TEST_CASE(
             CHECK(bam_aux2i(bam_aux_get(rec, "ts")) == additional_trimmed_samples);
         } else if (std::holds_alternative<SimplexReadPtr>(message)) {
             // Check trimming on the Read type.
-            auto read = std::get<SimplexReadPtr>(std::move(message));
+            auto msg_read = std::get<SimplexReadPtr>(std::move(message));
+            const ReadCommon& read_common = msg_read->read_common;
 
-            CHECK(read->read_common.barcode == expected_bc);
+            CHECK(read_common.barcode == expected_bc);
 
-            CHECK(read->read_common.seq == nonbc_seq);
+            CHECK(read_common.seq == nonbc_seq);
 
-            CHECK(read->read_common.moves == expected_move_vals);
+            CHECK(read_common.moves == expected_move_vals);
 
             // The mod probabilities table should not start mod at the first base.
-            CHECK(read->read_common.base_mod_probs.size() ==
-                  read->read_common.seq.size() * mod_alphabet.size());
-            CHECK(read->read_common.base_mod_probs[0] == 20);
-            CHECK(read->read_common.base_mod_probs[1] == 235);
+            CHECK(read_common.base_mod_probs.size() ==
+                  read_common.seq.size() * mod_alphabet.size());
+            CHECK(read_common.base_mod_probs[0] == 20);
+            CHECK(read_common.base_mod_probs[1] == 235);
 
-            CHECK(read->read_common.num_trimmed_samples == uint64_t(additional_trimmed_samples));
+            CHECK(read_common.num_trimmed_samples == uint64_t(additional_trimmed_samples));
 
-            auto bams = read->read_common.extract_sam_lines(0, 10);
+            auto bams = read_common.extract_sam_lines(0, 10, false);
             auto& rec = bams[0];
             auto [mod_str, mod_probs] = dorado::utils::extract_modbase_info(rec.get());
         }
@@ -339,12 +340,12 @@ TEST_CASE("BarcodeClassifierNode: test reads where trim length == read length", 
     pipeline_desc.add_node<BarcodeClassifierNode>({sink}, 8, kits, barcode_both_ends, no_trim,
                                                   std::nullopt);
 
-    auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
+    auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
     fs::path data_dir = fs::path(get_data_dir("barcode_demux"));
     auto bc_file = data_dir / "no_trim_expected.fastq";
 
     // Only one read in the file, so fetch that.
-    HtsReader reader(bc_file.string());
+    HtsReader reader(bc_file.string(), std::nullopt);
     reader.read();
 
     // Fetch the original read before barcode trimming.

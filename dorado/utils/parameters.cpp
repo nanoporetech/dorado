@@ -8,10 +8,9 @@ namespace dorado::utils {
 ThreadAllocations default_thread_allocations(int num_devices,
                                              int num_remora_threads,
                                              bool enable_aligner,
-                                             bool enable_barcoder,
-                                             int max_threads) {
+                                             bool enable_barcoder) {
+    const int max_threads = std::thread::hardware_concurrency();
     ThreadAllocations allocs;
-    max_threads = max_threads == 0 ? std::thread::hardware_concurrency() : max_threads;
     allocs.writer_threads = num_devices * 2;
     allocs.read_converter_threads = num_devices * 2;
     allocs.read_filter_threads = num_devices * 2;

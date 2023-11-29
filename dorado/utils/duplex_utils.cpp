@@ -104,16 +104,16 @@ std::pair<std::pair<int, int>, std::pair<int, int>> get_trimmed_alignment(
 }
 
 // Applies a min pool filter to q scores for basespace-duplex algorithm
-void preprocess_quality_scores(std::vector<uint8_t>& quality_scores, int pool_window) {
+void preprocess_quality_scores(std::vector<uint8_t>& quality_scores) {
     // Apply a min-pool window to the quality scores
+    const int pool_window = 5;
     auto opts = at::TensorOptions().dtype(at::kChar);
     at::Tensor t = at::from_blob(quality_scores.data(), {1, (int)quality_scores.size()}, opts);
     auto t_float = t.to(at::kFloat);
     t.index({at::indexing::Slice()}) = -at::max_pool1d(-t_float, pool_window, 1, pool_window / 2);
 }
 
-const std::string get_stereo_model_name(const std::string& simplex_model_name,
-                                        uint16_t data_sample_rate) {
+const std::string get_stereo_model_name(const std::string&, uint16_t data_sample_rate) {
     if (data_sample_rate == 5000) {
         return "dna_r10.4.1_e8.2_5khz_stereo@v1.1";
     } else {

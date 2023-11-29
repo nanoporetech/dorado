@@ -253,7 +253,7 @@ void ModBaseCallerNode::duplex_mod_call(Message message) {
                 chunks_to_enqueue.reserve(context_hits.size());
 
                 for (auto context_hit : context_hits) {
-                    nvtx3::scoped_range range{"create_chunk"};
+                    nvtx3::scoped_range range_create_chunk{"create_chunk"};
                     auto slice = encoder.get_context(context_hit);
                     // signal
                     auto input_signal = scaled_signal.index({at::indexing::Slice(

@@ -2,12 +2,13 @@
 
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace dorado::utils {
 
 // Calculate a mean qscore from a per-base Q string.
-float mean_qscore_from_qstring(const std::string& qstring, int start_pos = 0);
+float mean_qscore_from_qstring(std::string_view qstring);
 
 // Convert a canonical base character (ACGT) to an integer representation (0123).
 // No checking is performed on the input.
@@ -21,7 +22,7 @@ std::vector<int> sequence_to_ints(const std::string& sequence);
 std::vector<uint64_t> moves_to_map(const std::vector<uint8_t>& moves,
                                    size_t block_stride,
                                    size_t signal_len,
-                                   std::optional<size_t> reserve_size = std::nullopt);
+                                   std::optional<size_t> reserve_size);
 
 // Compute cumulative sums of the move table
 std::vector<uint64_t> move_cum_sums(const std::vector<uint8_t>& moves);

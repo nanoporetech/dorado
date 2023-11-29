@@ -116,15 +116,9 @@ __attribute__((target("avx2"))) std::string reverse_complement_impl(const std::s
 
 namespace dorado::utils {
 
-float mean_qscore_from_qstring(const std::string& qstring, int start_pos) {
+float mean_qscore_from_qstring(std::string_view qstring) {
     if (qstring.empty()) {
         return 0.0f;
-    }
-
-    if (start_pos >= int(qstring.length())) {
-        throw std::runtime_error("Mean q-score start position (" + std::to_string(start_pos) +
-                                 ") is >= length of qstring (" + std::to_string(qstring.length()) +
-                                 ")");
     }
 
     // Lookup table avoids repeated invocation of std::pow, which
@@ -139,9 +133,9 @@ float mean_qscore_from_qstring(const std::string& qstring, int start_pos) {
         return a;
     }();
     float total_error =
-            std::accumulate(qstring.cbegin() + start_pos, qstring.cend(), 0.0f,
+            std::accumulate(qstring.cbegin(), qstring.cend(), 0.0f,
                             [](float sum, char qchar) { return sum + kCharToScoreTable[qchar]; });
-    float mean_error = total_error / static_cast<float>(qstring.size() - start_pos);
+    float mean_error = total_error / static_cast<float>(qstring.size());
     float mean_qscore = -10.0f * std::log10(mean_error);
     return std::clamp(mean_qscore, 1.0f, 50.0f);
 }
@@ -264,7 +258,7 @@ std::tuple<int, int, std::vector<uint8_t>, int> realign_moves(std::string query_
 
     int moves_found = 0;
 
-    while (moves_found < moves.size() && moves_found < query_start) {
+    while (moves_found < int(moves.size()) && moves_found < int(query_start)) {
         moves_found += moves[old_move_cursor];
         ++old_move_cursor;
     }
@@ -340,11 +334,11 @@ const std::vector<int> BaseInfo::BASE_IDS = []() {
     return base_ids;
 }();
 
-// Utility function for counting number of trailing base sof a particular type
+// Utility function for counting number of trailing bases of a particular type
 // in a given read.
 int count_trailing_chars(const std::string_view adapter, char c) {
     int count = 0;
-    for (size_t i = adapter.length() - 1; i >= 0; i--) {
+    for (int64_t i = int64_t(adapter.length()) - 1; i >= 0; i--) {
         if (adapter[i] == c) {
             count++;
         } else {

@@ -13,7 +13,7 @@ extern "C" {
 
 namespace dorado {
 
-at::Tensor GPUDecoder::gpu_part(at::Tensor scores, int num_chunks, DecoderOptions options) {
+at::Tensor GPUDecoder::gpu_part(at::Tensor scores, DecoderOptions options) {
     c10::cuda::CUDAGuard device_guard(scores.device());
     utils::ScopedProfileRange loop{"gpu_decode", 1};
     long int N = (long int)(scores.sizes()[0]);
@@ -108,9 +108,9 @@ std::vector<DecodedChunk> GPUDecoder::cpu_part(at::Tensor moves_sequence_qstring
 }
 
 std::vector<DecodedChunk> GPUDecoder::beam_search(const at::Tensor &scores,
-                                                  int num_chunks,
+                                                  int,
                                                   const DecoderOptions &options) {
-    return cpu_part(gpu_part(scores, num_chunks, options));
+    return cpu_part(gpu_part(scores, options));
 }
 
 }  // namespace dorado

@@ -53,7 +53,7 @@ public:
             m_batch_size =
                     determine_batch_size(model_config, chunk_size, memory_limit_fraction, true);
         } else {
-            int batch_size_granularity = get_batch_size_granularity(model_config, m_options);
+            int batch_size_granularity = get_batch_size_granularity();
             m_batch_size = utils::pad_to(batch_size, batch_size_granularity);
             // Make sure the requested batch size doesn't exceed the maximum for the memory available.
             auto max_batch_size =
@@ -90,8 +90,7 @@ public:
         }
     }
 
-    static int get_batch_size_granularity(const CRFModelConfig &model_config,
-                                          const at::TensorOptions &options) {
+    static int get_batch_size_granularity() {
         // TODO: we may want to use different numbers based on model type and GPU arch
         return 64;
     }
@@ -109,7 +108,7 @@ public:
         return 256;
 #endif
 
-        const int granularity = get_batch_size_granularity(model_config, m_options);
+        const int granularity = get_batch_size_granularity();
 
         // If running on a Jetson device with unified memory for CPU and GPU we can't use all
         // the available memory for GPU tasks. This way we leave at least half for the CPU,
@@ -223,14 +222,12 @@ public:
     }
 
     struct NNTask {
-        NNTask(at::Tensor input_, at::Tensor &output_, int num_chunks_)
-                : input(input_), out(output_), num_chunks(num_chunks_) {}
+        NNTask(at::Tensor input_) : input(input_) {}
         at::Tensor input;
-        at::Tensor &out;
+        at::Tensor out;
         std::mutex mut;
         std::condition_variable cv;
         bool done{false};
-        int num_chunks;
     };
 
     std::vector<DecodedChunk> call_chunks(at::Tensor &input,
@@ -244,7 +241,7 @@ public:
             return std::vector<DecodedChunk>();
         }
 
-        auto task = std::make_shared<NNTask>(input, output, num_chunks);
+        auto task = std::make_shared<NNTask>(input.to(m_options.device()));
         {
             std::lock_guard<std::mutex> lock(m_input_lock);
             m_input_queue.push_front(task);
@@ -256,6 +253,7 @@ public:
             task->cv.wait(lock);
         }
 
+        output.copy_(task->out);
         return m_decoder->cpu_part(output);
     }
 
@@ -319,9 +317,9 @@ public:
 #endif  // #ifndef DORADO_TX2
             auto run_basecalling = [&]() {
                 stats::Timer timer;
-                auto scores = m_module->forward(task->input.to(m_options.device(), true));
+                auto scores = m_module->forward(task->input);
                 const auto forward_ms = timer.GetElapsedMS();
-                task->out.copy_(m_decoder->gpu_part(scores, task->num_chunks, m_decoder_options));
+                task->out = m_decoder->gpu_part(scores, m_decoder_options);
                 stream.synchronize();
                 const auto forward_plus_decode_ms = timer.GetElapsedMS();
                 m_model_ms += forward_ms;

@@ -54,6 +54,7 @@ int summary(int argc, char *argv[]) {
             "template_duration",
             "sequence_length_template",
             "mean_qscore_template",
+            "barcode",
     };
 
     std::vector<std::string> aligned_header = {
@@ -67,15 +68,15 @@ int summary(int argc, char *argv[]) {
     auto reads(parser.get<std::string>("reads"));
     auto separator(parser.get<std::string>("separator"));
 
-    HtsReader reader(reads);
+    HtsReader reader(reads, std::nullopt);
 
     auto read_group_exp_start_time = utils::get_read_group_info(reader.header, "DT");
 
     spdlog::debug("> input fmt: {} aligned: {}", reader.format, reader.is_aligned);
 #ifndef _WIN32
-    std::signal(SIGPIPE, [](int signum) { interrupt = 1; });
+    std::signal(SIGPIPE, [](int) { interrupt = 1; });
 #endif
-    std::signal(SIGINT, [](int signum) { interrupt = 1; });
+    std::signal(SIGINT, [](int) { interrupt = 1; });
 
     for (size_t col = 0; col < header.size() - 1; col++) {
         std::cout << header[col] << separator;
@@ -122,6 +123,11 @@ int summary(int argc, char *argv[]) {
         auto num_samples = reader.get_tag<int>("ns");
         auto trim_samples = reader.get_tag<int>("ts");
 
+        auto barcode = reader.get_tag<std::string>("BC");
+        if (barcode.empty()) {
+            barcode = "unclassified";
+        }
+
         float sample_rate = num_samples / duration;
         float template_duration = (num_samples - trim_samples) / sample_rate;
         auto exp_start_dt = read_group_exp_start_time.at(rg_value);
@@ -131,7 +137,7 @@ int summary(int argc, char *argv[]) {
         std::cout << filename << separator << read_id << separator << run_id << separator << channel
                   << separator << mux << separator << start_time << separator << duration
                   << separator << template_start_time << separator << template_duration << separator
-                  << seqlen << separator << mean_qscore;
+                  << seqlen << separator << mean_qscore << separator << barcode;
 
         if (reader.is_aligned) {
             std::string alignment_genome = "*";
