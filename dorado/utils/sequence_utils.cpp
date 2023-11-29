@@ -260,17 +260,11 @@ std::tuple<int, int, std::vector<uint8_t>, int> realign_moves(std::string query_
 
     // Let's keep two cursor positions - one for the new move table and one for the old:
     int new_move_cursor = 0;
-    int old_move_cursor =
-            0;  // Need to update to be the query start. // TODO do we need to worry about the start and end locations.
-    // Let's keep two cursor positions - one for the query sequence and one for the target:
-    int query_seq_cursor = query_start;
-    int target_seq_cursor = target_start;
+    int old_move_cursor = 0;
 
     int moves_found = 0;
 
-    while (moves_found < moves.size() &&
-           moves_found <
-                   query_start) {  // TODO - is "query start" zero indexed? need to think about that
+    while (moves_found < moves.size() && moves_found < query_start) {
         moves_found += moves[old_move_cursor];
         ++old_move_cursor;
     }
@@ -282,7 +276,7 @@ std::tuple<int, int, std::vector<uint8_t>, int> realign_moves(std::string query_
         if ((alignment_entry == 0) ||
             (alignment_entry ==
              3)) {  //Match or mismatch, need to update the new move table and move the cursor of the old move table.
-            new_moves.push_back(1);  // We have a match so we need a 1
+            new_moves.push_back(1);  // We have a match so we need a 1 (move)
             new_move_cursor++;
             old_move_cursor++;
 
@@ -294,16 +288,12 @@ std::tuple<int, int, std::vector<uint8_t>, int> realign_moves(std::string query_
                     new_move_cursor++;
                     old_move_cursor++;
                 }
-                // Unless there's a new/old mismatch - in which case we need to catch up by adding 1s. TODO this later.
             }
             // Update the Query and target seq cursors
-            query_seq_cursor++;
-            target_seq_cursor++;
         } else if (alignment_entry == 1) {  //Insertion to target
             // If we have an insertion in the target, we need to add a 1 to the new move table, and increment the new move table cursor. the old move table cursor and new are now out of sync and need fixing.
             new_moves.push_back(1);
             new_move_cursor++;
-            target_seq_cursor++;
         } else if (alignment_entry == 2) {  //Insertion to Query
             // We have a query insertion, all we need to do is add zeros to the new move table to make it up, the signal can be assigned to the leftmost nucleotide in the sequence.
             new_moves.push_back(0);
@@ -314,18 +304,10 @@ std::tuple<int, int, std::vector<uint8_t>, int> realign_moves(std::string query_
                 old_move_cursor++;
                 new_move_cursor++;
             }
-            // Update the Query and target seq cursors
-            query_seq_cursor++;
         }
     }
 
     edlibFreeAlignResult(edlib_result);
-
-    // Need to return:
-    // 1. Moves start
-    // 2. Target sequence Start
-    // 3. Moves end
-    // 3. Target sequence end
 
     return {old_moves_offset, target_start - 1, new_moves, query_start};
 }

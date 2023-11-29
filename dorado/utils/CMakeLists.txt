@@ -120,4 +120,4 @@ if (ECM_ENABLE_SANITIZERS AND (CMAKE_CXX_COMPILER_ID MATCHES "GNU") AND (CMAKE_C
     set_source_files_properties(duplex_utils.cpp PROPERTIES COMPILE_OPTIONS "-O0")
 endif()
 
-#enable_warnings_as_errors(dorado_utils)
+enable_warnings_as_errors(dorado_utils)

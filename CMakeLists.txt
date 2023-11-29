@@ -277,7 +277,7 @@ endif()
 
 add_library(dorado_lib ${LIB_SOURCE_FILES})
 
-#enable_warnings_as_errors(dorado_lib)
+enable_warnings_as_errors(dorado_lib)
 
 set_target_properties(dorado_lib
     PROPERTIES
@@ -374,7 +374,7 @@ if(NOT DORADO_LIB_ONLY)
         set_target_properties(dorado PROPERTIES LINK_OPTIONS "/ignore:4099")
     endif()
 
-    #enable_warnings_as_errors(dorado)
+    enable_warnings_as_errors(dorado)
 
     if (DORADO_ENABLE_PCH)
         target_precompile_headers(dorado REUSE_FROM dorado_lib)
@@ -515,7 +515,7 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
         ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
     )
     
-    #enable_warnings_as_errors(dorado_io_lib)
+    enable_warnings_as_errors(dorado_io_lib)
 
     if (NOT DORADO_LIB_ONLY)
         add_subdirectory(tests)
