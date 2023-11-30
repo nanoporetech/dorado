@@ -197,10 +197,9 @@ void ReadCommon::generate_modbase_tags(bam1_t *aln, uint8_t threshold) const {
 
         int num_states = static_cast<int>(base_mod_probs.size()) / static_cast<int>(seq.size());
         // Update the context mask using the reversed sequence
-        context_handler.update_mask(
-                modbase_mask_rc, reverse_complemented_seq, mod_base_info->alphabet,
-                reverseMatrix(base_mod_probs, num_states),
-                threshold);  // TODO: Setting threshold to zero as a temporary measure
+        context_handler.update_mask(modbase_mask_rc, reverse_complemented_seq,
+                                    mod_base_info->alphabet,
+                                    reverseMatrix(base_mod_probs, num_states), threshold);
 
         // Reverse the mask in-place
         std::reverse(modbase_mask_rc.begin(), modbase_mask_rc.end());
