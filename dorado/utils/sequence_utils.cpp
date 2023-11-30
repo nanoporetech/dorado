@@ -241,17 +241,6 @@ std::tuple<int, int, std::vector<uint8_t>, int> realign_moves(const std::string&
             query_sequence_component.data(), static_cast<int>(query_sequence_component.length()),
             align_config);
 
-    // Now that we have the alignment, we need to compute the new move table, by walking along the alignment
-
-    const auto alignment_size =
-            static_cast<size_t>(edlib_result.endLocations[0] - edlib_result.startLocations[0]);
-    std::vector<unsigned char> alignment;
-    alignment.resize(alignment_size);
-    std::memcpy(alignment.data(), &edlib_result.alignment[edlib_result.startLocations[0]],
-                alignment_size);
-
-    std::vector<uint8_t> new_moves;
-
     // Let's keep two cursor positions - one for the new move table and one for the old:
     int new_move_cursor = 0;
     int old_move_cursor = 0;
@@ -265,8 +254,12 @@ std::tuple<int, int, std::vector<uint8_t>, int> realign_moves(const std::string&
     --old_move_cursor;  // We have gone one too far.
     int old_moves_offset = old_move_cursor;
 
-    // First thing to do - let's just print out the alignment line by line so we know it's working.
-    for (auto alignment_entry : alignment) {
+    const auto alignment_size =
+            static_cast<size_t>(edlib_result.endLocations[0] - edlib_result.startLocations[0]);
+    // Now that we have the alignment, we need to compute the new move table, by walking along the alignment
+    std::vector<uint8_t> new_moves;
+    for (size_t i = 0; i < alignment_size; i++) {
+        auto alignment_entry = edlib_result.alignment[i];
         if ((alignment_entry == 0) ||
             (alignment_entry ==
              3)) {  //Match or mismatch, need to update the new move table and move the cursor of the old move table.
