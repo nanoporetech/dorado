@@ -181,40 +181,42 @@ void ModBaseCallerNode::duplex_mod_call(Message&& message) {
 
         std::vector<unsigned long> all_context_hits;
 
-        for (size_t caller_id = 0; caller_id < runner->num_callers(); ++caller_id) {
-            for (const auto& strand_type : {"template", "complement"}) {
+        for (const bool is_template_direction : {true, false}) {
+            auto simplex_signal =
+                    is_template_direction
+                            ? read->stereo_feature_inputs.template_signal
+                            : at::flip(read->stereo_feature_inputs.complement_signal, 0);
+
+            // const-ref extends lifetime of temporary
+            const auto& simplex_moves = is_template_direction
+                                                ? read->stereo_feature_inputs.template_moves
+                                                : read->stereo_feature_inputs.complement_moves;
+
+            // const-ref extends lifetime of temporary
+            const auto& simplex_seq =
+                    is_template_direction
+                            ? read->stereo_feature_inputs.template_seq
+                            : utils::reverse_complement(read->stereo_feature_inputs.complement_seq);
+
+            // const-ref extends lifetime of temporary
+            const auto& duplex_seq = is_template_direction
+                                             ? read->read_common.seq
+                                             : utils::reverse_complement(read->read_common.seq);
+
+            auto [moves_offset, target_start, new_move_table, query_start] =
+                    utils::realign_moves(simplex_seq, duplex_seq, simplex_moves);
+
+            auto signal_len = new_move_table.size() * m_block_stride;
+            auto num_moves = std::accumulate(new_move_table.begin(), new_move_table.end(), 0);
+            auto new_seq = duplex_seq.substr(target_start, num_moves);
+            std::vector<int> sequence_ints = utils::sequence_to_ints(new_seq);
+
+            // no reverse_signal in duplex, so we can do this once for all callers
+            std::vector<uint64_t> seq_to_sig_map =
+                    utils::moves_to_map(new_move_table, m_block_stride, signal_len, num_moves + 1);
+
+            for (size_t caller_id = 0; caller_id < runner->num_callers(); ++caller_id) {
                 nvtx3::scoped_range range{"generate_chunks"};
-
-                bool is_template_direction = (strcmp(strand_type, "template") == 0);
-                auto& simplex_moves = is_template_direction
-                                              ? read->stereo_feature_inputs.template_moves
-                                              : read->stereo_feature_inputs.complement_moves;
-
-                auto simplex_signal =
-                        is_template_direction
-                                ? read->stereo_feature_inputs.template_signal
-                                : at::flip(read->stereo_feature_inputs.complement_signal, 0);
-                ;
-
-                auto simplex_seq = is_template_direction
-                                           ? read->stereo_feature_inputs.template_seq
-                                           : utils::reverse_complement(
-                                                     read->stereo_feature_inputs.complement_seq);
-
-                auto duplex_seq = is_template_direction
-                                          ? read->read_common.seq
-                                          : utils::reverse_complement(read->read_common.seq);
-
-                auto [moves_offset, target_start, new_move_table, query_start] =
-                        utils::realign_moves(simplex_seq, duplex_seq, simplex_moves);
-
-                auto signal_len = new_move_table.size() * m_block_stride;
-                auto num_moves = std::accumulate(new_move_table.begin(), new_move_table.end(), 0);
-                auto new_seq = duplex_seq.substr(target_start, num_moves);
-                std::vector<int> sequence_ints = utils::sequence_to_ints(new_seq);
-
-                std::vector<uint64_t> seq_to_sig_map = utils::moves_to_map(
-                        new_move_table, m_block_stride, signal_len, num_moves + 1);
                 auto& chunks_to_enqueue = chunks_to_enqueue_by_caller.at(caller_id);
                 auto& params = runner->caller_params(caller_id);
                 auto signal = simplex_signal.slice(0, moves_offset * m_block_stride,
