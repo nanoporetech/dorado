@@ -212,8 +212,7 @@ void ReadCommon::generate_modbase_tags(bam1_t *aln, uint8_t threshold) const {
     }
 
     // Iterate over the provided alphabet and find all the channels we need to write out
-    for (size_t channel_idx = 0; channel_idx < num_channels;
-         channel_idx++) {  // Loop over each channel. Writing out the
+    for (size_t channel_idx = 0; channel_idx < num_channels; channel_idx++) {
         if (cardinal_bases.find(mod_base_info->alphabet[channel_idx]) != std::string::npos) {
             // A cardinal base
             current_cardinal = mod_base_info->alphabet[channel_idx][0];
