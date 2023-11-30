@@ -9,6 +9,8 @@
 
 #define TEST_GROUP "[alignment::Minimap2Index]"
 
+using namespace ont::test_utils::streams;
+
 namespace {
 
 class Minimap2IndexTestFixture {
@@ -69,9 +71,9 @@ TEST_CASE(TEST_GROUP " initialise() with invalid options returns false", TEST_GR
     auto invalid_options{dflt_options};
     invalid_options.bandwidth = invalid_options.bandwidth_long + 1;
 
-    auto fd = ont::test_utils::streams::suppress_stderr();
-    auto result = cut.initialise(invalid_options);
-    ont::test_utils::streams::restore_stderr(fd);
+    bool result{};
+    SuppressStderr::invoke(
+            [&result, &invalid_options, &cut] { result = cut.initialise(invalid_options); });
 
     REQUIRE_FALSE(result);
 }
@@ -95,9 +97,11 @@ TEST_CASE_METHOD(Minimap2IndexTestFixture,
     Minimap2Options invalid_compatible_options{dflt_options};
     invalid_compatible_options.bandwidth = invalid_compatible_options.bandwidth_long + 1;
 
-    auto fd = ont::test_utils::streams::suppress_stderr();
-    auto compatible_index = cut.create_compatible_index(invalid_compatible_options);
-    ont::test_utils::streams::restore_stderr(fd);
+    std::shared_ptr<Minimap2Index> compatible_index{};
+    {
+        SuppressStderr suppressed{};
+        compatible_index = cut.create_compatible_index(invalid_compatible_options);
+    }
 
     REQUIRE(compatible_index == nullptr);
 }

@@ -10,6 +10,8 @@
 
 #define TEST_GROUP "[alignment::IndexFileAccess]"
 
+using namespace ont::test_utils::streams;
+
 namespace {
 
 const std::string& valid_reference_file() {
@@ -35,10 +37,8 @@ dorado::alignment::IndexLoadResult load_index_no_stderr(
         dorado::alignment::IndexFileAccess& cut,
         const std::string& file,
         const dorado::alignment::Minimap2Options& options) {
-    auto fd = ont::test_utils::streams::suppress_stderr();
-    auto load_result = cut.load_index(file, options, 1);
-    ont::test_utils::streams::restore_stderr(fd);
-    return load_result;
+    SuppressStderr no_stderr{};
+    return cut.load_index(file, options, 1);
 }
 
 }  // namespace
@@ -175,11 +175,10 @@ SCENARIO(TEST_GROUP " Load and retrieve index files", TEST_GROUP) {
 }
 
 TEST_CASE(TEST_GROUP " validate_options with invalid options returns false", TEST_GROUP) {
-    auto fd = ont::test_utils::streams::suppress_stderr();
-    auto validation_result = validate_options(invalid_options());
-    ont::test_utils::streams::restore_stderr(fd);
+    bool result{};
+    SuppressStderr::invoke([&result] { result = validate_options(invalid_options()); });
 
-    REQUIRE_FALSE(validation_result);
+    REQUIRE_FALSE(result);
 }
 
 TEST_CASE(TEST_GROUP " validate_options with default options returns true", TEST_GROUP) {

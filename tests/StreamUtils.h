@@ -16,6 +16,8 @@
 
 #include <stdio.h>
 
+#include <functional>
+
 namespace ont::test_utils::streams {
 
 namespace details {
@@ -33,7 +35,8 @@ inline int suppress_stderr() {
 
 inline void restore_stderr(int fd) {
     fflush(stderr);
-    Dup2(fd, Fileno(stderr));
+    auto dup_result = Dup2(fd, Fileno(stderr));
+    details::ignore(dup_result);
     Close(fd);
 }
 
@@ -47,8 +50,28 @@ inline int suppress_stdout() {
 
 inline void restore_stdout(int fd) {
     fflush(stdout);
-    Dup2(fd, Fileno(stdout));
+    auto dup_result = Dup2(fd, Fileno(stdout));
+    details::ignore(dup_result);
     Close(fd);
 }
+
+/// <summary>
+/// RAII helper to provide scoped stderr suppression
+/// </summary>
+class [[nodiscard]] SuppressStderr final {
+    const int m_fd;
+
+public:
+    SuppressStderr() : m_fd(suppress_stderr()) {}
+    ~SuppressStderr() { restore_stderr(m_fd); }
+
+    /// <summary>
+    /// Invoke a function with stderr suppressed
+    /// </summary>
+    static void invoke(std::function<void()> func) {
+        SuppressStderr suppression{};
+        func();
+    }
+};
 
 }  // namespace ont::test_utils::streams
