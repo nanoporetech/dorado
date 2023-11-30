@@ -18,10 +18,16 @@
 
 namespace ont::test_utils::streams {
 
+namespace details {
+template <class T>
+void ignore(const T &) {}
+}  // namespace details
+
 inline int suppress_stderr() {
     fflush(stderr);
     int fd = Dup(Fileno(stderr));
-    freopen(NULL_DEVICE, "w", stderr);
+    auto old_stream = freopen(NULL_DEVICE, "w", stderr);
+    details::ignore(old_stream);
     return fd;
 }
 
@@ -34,7 +40,8 @@ inline void restore_stderr(int fd) {
 inline int suppress_stdout() {
     fflush(stdout);
     int fd = Dup(Fileno(stdout));
-    freopen(NULL_DEVICE, "w", stdout);
+    auto old_stream = freopen(NULL_DEVICE, "w", stdout);
+    details::ignore(old_stream);
     return fd;
 }
 
