@@ -12,7 +12,6 @@
 #include <ATen/ATen.h>
 #include <nvtx3/nvtx3.hpp>
 #include <spdlog/spdlog.h>
-#include <torch/torch.h>
 
 #include <chrono>
 #include <cstring>
