@@ -222,8 +222,7 @@ void ModBaseCallerNode::duplex_mod_call(Message message) {
                                           : utils::reverse_complement(read->read_common.seq);
 
                 auto [moves_offset, target_start, new_move_table, query_start] =
-                        utils::realign_moves(simplex_seq, duplex_seq,
-                                             simplex_moves);  // TODO: Check that this is OK
+                        utils::realign_moves(simplex_seq, duplex_seq, simplex_moves);
 
                 auto signal_len = new_move_table.size() * m_block_stride;
                 auto num_moves = std::accumulate(new_move_table.begin(), new_move_table.end(), 0);
