@@ -126,55 +126,6 @@ kernel void backward_scan(
     }
 }
 
-kernel void forward_scan(
-    device const ScanArgs* const args,
-    device const int8_t* const scores_in,
-    device ftype_out* const out,
-    KERNEL_INDEX_INPUTS)
-{
-    constexpr int kNumBases = 4;
-    constexpr int kNumTransitions = kNumBases + 1;
-    constexpr float kFixedStayScore = 2.0f;
-
-    const int T = args->T;
-    const int N = args->N;
-    const int num_states = args->C;
-    const int ts_states = num_states * kNumBases;
-    const int kMsb = num_states / kNumBases;
-    const int chunk = gid;
-
-    device const int8_t* const chunk_in = scores_in + chunk * ts_states;
-    device ftype_out* const chunk_out = out + chunk * (T+1) * num_states;
-    device ftype_out* const alpha_init = chunk_out;
-    for (int c = tid; c < num_states; c += threads) {
-        alpha_init[c] = 0.0f;
-    }
-    for (int ts = 0; ts < T; ++ts) {
-        threadgroup_barrier(mem_flags::mem_device);
-        device const auto* const ts_in = chunk_in + N * ts_states * ts;
-        device ftype_out* const ts_alpha_in = alpha_init + num_states * ts;
-        device ftype_out* const ts_alpha_out = ts_alpha_in + num_states;
-
-        const int state = tid;
-        const int stay_state_idx = state;
-        const int step_state_idx_a = state / kNumBases;
-        const int step_trans_idx_a = state * kNumBases;
-
-        float vals[kNumTransitions];
-        float max_val = vals[0] = ts_alpha_in[stay_state_idx] + kFixedStayScore;
-        for (int base = 0; base < kNumBases; ++base) {
-            vals[base + 1] = ts_alpha_in[step_state_idx_a + base * kMsb] +
-                ScaleByteScore(ts_in[step_trans_idx_a + base]);
-            max_val = max(max_val, vals[base + 1]);
-        }
-        float sum = 0.0f;
-        for (int i = 0; i < kNumTransitions; ++i) {
-            sum += exp(vals[i] - max_val);
-        }
-        ts_alpha_out[tid] = max_val + log(sum);
-    }
-}
-
 // Performs the forward scan, writing out posterior probabilities as it goes.
 // Forward scan results exist only transiently in threadgroup memory.
 kernel void forward_scan_add_softmax(
