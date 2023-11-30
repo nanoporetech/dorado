@@ -32,22 +32,15 @@ std::string convert_nt16_to_str(uint8_t* bseq, size_t slen) {
     return seq;
 }
 
+}  // namespace
+
+namespace dorado::utils {
+
 kstring_t allocate_kstring() {
-    // The kstring is pre-allocated with 1MB of space to work around a Windows DLL
-    // cross-heap segmentation fault. The ks_resize/ks_free functions from htslib
-    // are inline functions. When htslib is shipped as a DLL, some of these functions
-    // are inlined into the DLL code through other htslib APIs. But those same functions
-    // also get inlined into dorado code when invoked directly. As a result, it's possible
-    // that an htslib APIs resizes a string using the DLL code. But when a ks_free
-    // is attempted on it from dorado, there's cross-heap behavior and a segfault occurs.
     kstring_t str = {0, 0, NULL};
     ks_resize(&str, 1'000'000);
     return str;
 }
-
-}  // namespace
-
-namespace dorado::utils {
 
 void add_rg_hdr(sam_hdr_t* hdr,
                 const std::unordered_map<std::string, ReadGroup>& read_groups,
