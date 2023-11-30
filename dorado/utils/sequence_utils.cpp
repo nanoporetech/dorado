@@ -219,9 +219,9 @@ OverlapResult compute_overlap(const std::string& query_seq, const std::string& t
 
 // Query is the read that the moves table is associated with. A new moves table will be generated
 // Which is aligned to the target sequence.
-std::tuple<int, int, std::vector<uint8_t>, int> realign_moves(std::string query_sequence,
-                                                              std::string target_sequence,
-                                                              std::vector<uint8_t> moves) {
+std::tuple<int, int, std::vector<uint8_t>, int> realign_moves(const std::string& query_sequence,
+                                                              const std::string& target_sequence,
+                                                              const std::vector<uint8_t>& moves) {
     auto [is_overlap, query_start, query_end, target_start, target_end] = compute_overlap(
             query_sequence,
             target_sequence);  // We are going to compute the overlap between the two reads
