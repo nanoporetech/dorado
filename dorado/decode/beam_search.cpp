@@ -87,23 +87,14 @@ std::tuple<std::string, std::string> generate_sequence(const std::vector<uint8_t
         }
     }
 
-    /*std::stringstream dbg;
-    dbg << "qual_data:\n";
-    for (int i = 0; i < 100; ++i) {
-        dbg << qual_data[i] << ", ";
-    }
-    dbg << "\n\nqscores:\n";*/
     for (size_t i = 0; i < seqLen; ++i) {
         sequence[i] = alphabet[int(sequence[i])];
         baseProbs[i] = 1.0f - (baseProbs[i] / totalProbs[i]);
         baseProbs[i] = -10.0f * std::log10(baseProbs[i]);
         float qscore = baseProbs[i] * scale + shift;
         qscore = std::clamp(qscore, 1.0f, 50.0f);
-        //dbg << qscore << ", ";
         qstring[i] = static_cast<char>(33.5f + qscore);
     }
-    //dbg << "\n\nsequence: " << sequence;
-    //spdlog::error("{}", dbg.str());
 
     return make_tuple(sequence, qstring);
 }
