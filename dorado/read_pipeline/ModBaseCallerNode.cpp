@@ -148,21 +148,6 @@ void ModBaseCallerNode::init_modbase_info() {
     m_base_prob_offsets[3] = m_base_prob_offsets[2] + result.base_counts[2];
 }
 
-void serializeVector(const std::vector<unsigned char>& vec, const std::string& filename) {
-    // Open a file in binary mode
-    std::ofstream file(filename, std::ios::binary);
-
-    // Write the size of the vector (number of elements)
-    long size = vec.size();
-    file.write(reinterpret_cast<char*>(&size), sizeof(long));
-
-    // Write the vector data
-    file.write(reinterpret_cast<const char*>(vec.data()), size * sizeof(unsigned char));
-
-    // Close the file
-    file.close();
-}
-
 void ModBaseCallerNode::duplex_mod_call(Message message) {
     // Let's do this only for the template strand for now.
 
@@ -266,11 +251,11 @@ void ModBaseCallerNode::duplex_mod_call(Message message) {
                     // Update the context hit into the duplex reference context
                     unsigned long context_hit_in_duplex_space;
                     if (is_template_direction) {
-                        context_hit_in_duplex_space = context_hit + target_start;
+                        context_hit_in_duplex_space =
+                                static_cast<unsigned long>(context_hit + target_start);
                     } else {
-                        context_hit_in_duplex_space = read->read_common.seq.size() -
-                                                      (context_hit + target_start +
-                                                       1);  // TODO: Do I need a plus one here? Why?
+                        context_hit_in_duplex_space = static_cast<unsigned long>(
+                                read->read_common.seq.size() - (context_hit + target_start + 1));
                     }
 
                     chunks_to_enqueue.push_back(std::make_unique<RemoraChunk>(
@@ -375,7 +360,7 @@ void ModBaseCallerNode::simplex_mod_call(Message message) {
         m_num_context_hits += static_cast<int64_t>(context_hits.size());
         chunks_to_enqueue.reserve(context_hits.size());
         for (auto context_hit : context_hits) {
-            nvtx3::scoped_range range{"create_chunk"};
+            nvtx3::scoped_range nvtxrange{"create_chunk"};
             auto slice = encoder.get_context(context_hit);
             // signal
             auto input_signal = scaled_signal.index({at::indexing::Slice(
