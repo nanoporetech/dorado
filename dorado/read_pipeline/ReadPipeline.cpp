@@ -175,15 +175,32 @@ void ReadCommon::generate_modbase_tags(bam1_t *aln, uint8_t threshold) const {
                                 threshold);
 
     if (is_duplex) {
+        // If this is a duplex read, we need to compute the reverse complement mask and combine it
         auto reverse_complemented_seq = utils::reverse_complement(seq);
 
         // Compute the reverse complement mask
         auto modbase_mask_rc = context_handler.get_sequence_mask(reverse_complemented_seq);
 
+        auto reverseMatrix = [](const std::vector<uint8_t> &matrix, int m_num_states) {
+            int numRows = matrix.size() / m_num_states;
+            std::vector<uint8_t> reversedMatrix(matrix.size());
+
+            for (int i = 0; i < numRows; ++i) {
+                for (int j = 0; j < m_num_states; ++j) {
+                    reversedMatrix[i * m_num_states + j] =
+                            matrix[(numRows - 1 - i) * m_num_states + j];
+                }
+            }
+
+            return reversedMatrix;
+        };
+
+        int num_states = base_mod_probs.size() / seq.size();
         // Update the context mask using the reversed sequence
-        context_handler.update_mask(modbase_mask_rc, reverse_complemented_seq,
-                                    mod_base_info->alphabet, base_mod_probs,
-                                    0);  // TODO: Setting threshold to zero as a temporary measure
+        context_handler.update_mask(
+                modbase_mask_rc, reverse_complemented_seq, mod_base_info->alphabet,
+                reverseMatrix(base_mod_probs, num_states),
+                threshold);  // TODO: Setting threshold to zero as a temporary measure
 
         // Reverse the mask in-place
         std::reverse(modbase_mask_rc.begin(), modbase_mask_rc.end());
@@ -193,12 +210,6 @@ void ReadCommon::generate_modbase_tags(bam1_t *aln, uint8_t threshold) const {
         std::transform(modbase_mask.begin(), modbase_mask.end(), modbase_mask_rc.begin(),
                        modbase_mask.begin(), std::plus<>());
     }
-
-    std::map<char, char> nucleotide_complements;
-    nucleotide_complements['A'] = 'T';
-    nucleotide_complements['T'] = 'A';
-    nucleotide_complements['C'] = 'G';
-    nucleotide_complements['G'] = 'C';
 
     // Iterate over the provided alphabet and find all the channels we need to write out
     for (size_t channel_idx = 0; channel_idx < num_channels;
@@ -243,7 +254,7 @@ void ReadCommon::generate_modbase_tags(bam1_t *aln, uint8_t threshold) const {
                 // A cardinal base
                 current_cardinal = mod_base_info->alphabet[channel_idx][0];
             } else {
-                auto cardinal_complement = nucleotide_complements[current_cardinal];
+                auto cardinal_complement = utils::complement_table[current_cardinal];
                 // A modification on the previous cardinal base
                 std::string bam_name = mod_base_info->alphabet[channel_idx];
                 if (!utils::validate_bam_tag_code(bam_name)) {
