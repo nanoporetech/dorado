@@ -77,6 +77,8 @@ void setup(std::vector<std::string> args,
            bool barcode_both_ends,
            bool barcode_no_trim,
            const std::string& barcode_sample_sheet,
+           const std::optional<std::string>& custom_kit,
+           const std::optional<std::string>& custom_seqs,
            argparse::ArgumentParser& resume_parser,
            bool estimate_poly_a,
            const ModelSelection& model_selection) {
@@ -171,7 +173,8 @@ void setup(std::vector<std::string> args,
     if (!barcode_kits.empty()) {
         current_sink_node = pipeline_desc.add_node<BarcodeClassifierNode>(
                 {current_sink_node}, thread_allocations.barcoder_threads, barcode_kits,
-                barcode_both_ends, barcode_no_trim, std::move(allowed_barcodes));
+                barcode_both_ends, barcode_no_trim, std::move(allowed_barcodes),
+                std::move(custom_kit), std::move(custom_seqs));
     }
     current_sink_node = pipeline_desc.add_node<ReadFilterNode>(
             {current_sink_node}, min_qscore, default_parameters.min_sequence_length,
@@ -398,6 +401,12 @@ int basecaller(int argc, char* argv[]) {
     parser.visible.add_argument("--sample-sheet")
             .help("Path to the sample sheet to use.")
             .default_value(std::string(""));
+    parser.visible.add_argument("--barcode-arrangement")
+            .help("Path to file with custom barcode arrangement.")
+            .default_value(std::nullopt);
+    parser.visible.add_argument("--barcode-sequences")
+            .help("Path to file with custom barcode sequences.")
+            .default_value(std::nullopt);
     parser.visible.add_argument("--estimate-poly-a")
             .help("Estimate poly-A/T tail lengths (beta feature). Primarily meant "
                   "for cDNA and "
@@ -482,6 +491,23 @@ int basecaller(int argc, char* argv[]) {
         output_mode = HtsWriter::OutputMode::UBAM;
     }
 
+    if (parser.visible.is_used("--kit-name") && parser.visible.is_used("--barcode-arrangement")) {
+        spdlog::error(
+                "--kit-name and --barcode-arrangement cannot be used together. Please provide only "
+                "one.");
+        std::exit(EXIT_FAILURE);
+    }
+
+    std::optional<std::string> custom_kit = std::nullopt;
+    if (parser.visible.is_used("--barcode-arrangement")) {
+        custom_kit = parser.visible.get<std::string>("--barcode-arrangement");
+    }
+
+    std::optional<std::string> custom_seqs = std::nullopt;
+    if (parser.visible.is_used("--barcode-sequences")) {
+        custom_seqs = parser.visible.get<std::string>("--barcode-sequences");
+    }
+
     fs::path model_path;
     std::vector<fs::path> mods_model_paths;
     std::set<fs::path> temp_download_paths;
@@ -533,8 +559,9 @@ int basecaller(int argc, char* argv[]) {
               parser.visible.get<std::vector<std::string>>("--kit-name"),
               parser.visible.get<bool>("--barcode-both-ends"),
               parser.visible.get<bool>("--no-trim"),
-              parser.visible.get<std::string>("--sample-sheet"), resume_parser,
-              parser.visible.get<bool>("--estimate-poly-a"), model_selection);
+              parser.visible.get<std::string>("--sample-sheet"), std::move(custom_kit),
+              std::move(custom_seqs), resume_parser, parser.visible.get<bool>("--estimate-poly-a"),
+              model_selection);
     } catch (const std::exception& e) {
         spdlog::error("{}", e.what());
         return 1;

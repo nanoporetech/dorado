@@ -261,6 +261,8 @@ set(LIB_SOURCE_FILES
     dorado/demux/BarcodeClassifierSelector.h
     dorado/demux/Trimmer.cpp
     dorado/demux/Trimmer.h
+    dorado/demux/parse_custom_kit.cpp
+    dorado/demux/parse_custom_kit.h
     dorado/decode/beam_search.cpp
     dorado/decode/beam_search.h
     dorado/decode/CPUDecoder.cpp

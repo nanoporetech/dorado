@@ -2,6 +2,7 @@
 set(UNIT_TEST_SOURCE_FILES
     main.cpp
     AdapterDetectorTest.cpp
+    CustomBarcodeParserTest.cpp
     AlignerTest.cpp
     AsyncQueueTest.cpp
     BamReaderTest.cpp

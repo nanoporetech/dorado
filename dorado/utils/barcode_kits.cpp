@@ -109,43 +109,47 @@ const std::vector<std::string> RBK_1_96 = {
 // Some arrangement names are just aliases of each other. This is because they were released
 // as part of different kits, but they map to the same underlying arrangement.
 const KitInfo kit_16S = {
-        "16S", true, true, RAB_1st_FRONT, RAB_1st_REAR, RAB_2nd_FRONT, RAB_2nd_REAR, BC_1_24,
+        "16S",         true,         true,    RAB_1st_FRONT, RAB_1st_REAR,
+        RAB_2nd_FRONT, RAB_2nd_REAR, BC_1_24, BC_1_24,
 };
 
 const KitInfo kit_lwb = {
-        "LWB", true, true, LWB_1st_FRONT, LWB_1st_REAR, LWB_2nd_FRONT, LWB_2nd_REAR, BC_1_12,
+        "LWB",         true,         true,    LWB_1st_FRONT, LWB_1st_REAR,
+        LWB_2nd_FRONT, LWB_2nd_REAR, BC_1_12, BC_1_12,
 };
 
 const KitInfo kit_lwb24 = {
-        "LWB24", true, true, LWB_1st_FRONT, LWB_1st_REAR, LWB_2nd_FRONT, LWB_2nd_REAR, BC_1_24,
+        "LWB24",       true,         true,    LWB_1st_FRONT, LWB_1st_REAR,
+        LWB_2nd_FRONT, LWB_2nd_REAR, BC_1_24, BC_1_24,
 };
 
 const KitInfo kit_nb12 = {
-        "NB12", true, true, NB_1st_FRONT, NB_1st_REAR, NB_2nd_FRONT, NB_2nd_REAR, NB_1_12,
+        "NB12", true, true, NB_1st_FRONT, NB_1st_REAR, NB_2nd_FRONT, NB_2nd_REAR, NB_1_12, NB_1_12,
 };
 
 const KitInfo kit_nb24 = {
-        "NB24", true, true, NB_1st_FRONT, NB_1st_REAR, NB_2nd_FRONT, NB_2nd_REAR, NB_1_24,
+        "NB24", true, true, NB_1st_FRONT, NB_1st_REAR, NB_2nd_FRONT, NB_2nd_REAR, NB_1_24, NB_1_24,
 };
 
 const KitInfo kit_nb96 = {
-        "NB96", true, true, NB_1st_FRONT, NB_1st_REAR, NB_2nd_FRONT, NB_2nd_REAR, NB_1_96,
+        "NB96", true, true, NB_1st_FRONT, NB_1st_REAR, NB_2nd_FRONT, NB_2nd_REAR, NB_1_96, NB_1_96,
 };
 
 const KitInfo kit_rab = {
-        "RAB", true, true, RAB_1st_FRONT, RAB_1st_REAR, RAB_2nd_FRONT, RAB_2nd_REAR, BC_1_12,
+        "RAB",         true,         true,    RAB_1st_FRONT, RAB_1st_REAR,
+        RAB_2nd_FRONT, RAB_2nd_REAR, BC_1_12, BC_1_12,
 };
 
 const KitInfo kit_rbk96 = {
-        "RBK96", false, false, RBK4_FRONT, RBK4_REAR, "", "", RBK_1_96,
+        "RBK96", false, false, RBK4_FRONT, RBK4_REAR, "", "", RBK_1_96, {},
 };
 
 const KitInfo kit_rbk4 = {
-        "RBK4", false, false, RBK4_FRONT, RBK4_REAR, "", "", BC_1_12,
+        "RBK4", false, false, RBK4_FRONT, RBK4_REAR, "", "", BC_1_12, {},
 };
 
 const KitInfo kit_rlb = {
-        "RLB", true, false, RLB_FRONT, RLB_REAR, "", "", BC_1_12A,
+        "RLB", true, false, RLB_FRONT, RLB_REAR, "", "", BC_1_12A, {},
 };
 
 // Final map to go from kit name to actual barcode arrangement information.
@@ -175,6 +179,7 @@ const std::unordered_map<std::string, KitInfo> kit_info_map = {
                  NB_2nd_FRONT,
                  NB_2nd_REAR,
                  NB_13_24,
+                 NB_13_24,
          }},
         // NB24
         {"SQK-NBD111-24", kit_nb24},
@@ -196,6 +201,7 @@ const std::unordered_map<std::string, KitInfo> kit_info_map = {
                  BC_2nd_FRONT,
                  BC_2nd_REAR,
                  BC_1_12,
+                 BC_1_12,
          }},
         // PCR96
         {"EXP-PBC096",
@@ -207,6 +213,7 @@ const std::unordered_map<std::string, KitInfo> kit_info_map = {
                  BC_1st_REAR,
                  BC_2nd_FRONT,
                  BC_2nd_REAR,
+                 BC_1_96,
                  BC_1_96,
          }},
         // RAB
@@ -223,6 +230,7 @@ const std::unordered_map<std::string, KitInfo> kit_info_map = {
                  "",
                  "",
                  BC_1_12,
+                 {},
          }},
         // RBK096
         {"SQK-RBK110-96", kit_rbk96},
@@ -238,6 +246,7 @@ const std::unordered_map<std::string, KitInfo> kit_info_map = {
                  "",
                  "",
                  RBK_1_96,
+                 {},
          }},
         // RBK24
         {"SQK-RBK111-24",
@@ -250,6 +259,7 @@ const std::unordered_map<std::string, KitInfo> kit_info_map = {
                  "",
                  "",
                  BC_1_24,
+                 {},
          }},
         // RBK24_kit14
         {"SQK-RBK114-24",
@@ -262,6 +272,7 @@ const std::unordered_map<std::string, KitInfo> kit_info_map = {
                  "",
                  "",
                  BC_1_24,
+                 {},
          }},
         //  RBK4
         {"SQK-RBK004", kit_rbk4},
@@ -281,6 +292,7 @@ const std::unordered_map<std::string, KitInfo> kit_info_map = {
                  "",
                  "",
                  BC2_1_24,
+                 {},
          }},
         // VMK
         {"VSK-VMK001",
@@ -293,6 +305,7 @@ const std::unordered_map<std::string, KitInfo> kit_info_map = {
                  "",
                  "",
                  {"BC01", "BC02", "BC03", "BC04"},
+                 {},
          }},
         // VMK4
         {"VSK-VMK004",
@@ -316,6 +329,7 @@ const std::unordered_map<std::string, KitInfo> kit_info_map = {
                          "BC09",
                          "BC10",
                  },
+                 {},
          }},
 };
 
