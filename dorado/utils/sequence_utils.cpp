@@ -169,7 +169,7 @@ std::vector<uint64_t> moves_to_map(const std::vector<uint8_t>& moves,
     return seq_to_sig_map;
 }
 
-OverlapResult compute_overlap(std::string query_seq, std::string target_seq) {
+OverlapResult compute_overlap(const std::string& query_seq, const std::string& target_seq) {
     OverlapResult overlap_result = {false, 0, 0, 0, 0};
 
     // Add mm2 based overlap check.
