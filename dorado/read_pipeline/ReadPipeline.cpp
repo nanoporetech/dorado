@@ -182,7 +182,7 @@ void ReadCommon::generate_modbase_tags(bam1_t *aln, uint8_t threshold) const {
         auto modbase_mask_rc = context_handler.get_sequence_mask(reverse_complemented_seq);
 
         auto reverseMatrix = [](const std::vector<uint8_t> &matrix, int m_num_states) {
-            int numRows = matrix.size() / m_num_states;
+            int numRows = static_cast<int>(matrix.size()) / static_cast<int>(m_num_states);
             std::vector<uint8_t> reversedMatrix(matrix.size());
 
             for (int i = 0; i < numRows; ++i) {
@@ -195,7 +195,7 @@ void ReadCommon::generate_modbase_tags(bam1_t *aln, uint8_t threshold) const {
             return reversedMatrix;
         };
 
-        int num_states = base_mod_probs.size() / seq.size();
+        int num_states = static_cast<int>(base_mod_probs.size()) / static_cast<int>(seq.size());
         // Update the context mask using the reversed sequence
         context_handler.update_mask(
                 modbase_mask_rc, reverse_complemented_seq, mod_base_info->alphabet,
