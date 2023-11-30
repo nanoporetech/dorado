@@ -46,6 +46,7 @@ void create_stereo_duplex_pipeline(
         uint32_t mean_qscore_start_pos,
         int scaler_node_threads,
         int splitter_node_threads,
+        int modbase_node_threads,
         PairingParameters pairing_parameters,
         NodeHandle sink_node_handle,
         NodeHandle source_node_handle);

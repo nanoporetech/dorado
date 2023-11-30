@@ -495,11 +495,14 @@ int duplex(int argc, char* argv[]) {
                     throw std::runtime_error("Mean q-score start position cannot be < 0");
                 }
             }
+
             pipelines::create_stereo_duplex_pipeline(
                     pipeline_desc, std::move(runners), std::move(stereo_runners),
                     std::move(mod_base_runners), overlap, mean_qscore_start_pos,
-                    int(num_devices * 2), int(num_devices), std::move(pairing_parameters),
-                    read_filter_node, PipelineDescriptor::InvalidNodeHandle);
+                    int(num_devices * 2), int(num_devices),
+                    int(default_parameters.remora_threads * num_devices),
+                    std::move(pairing_parameters), read_filter_node,
+                    PipelineDescriptor::InvalidNodeHandle);
 
             pipeline = Pipeline::create(std::move(pipeline_desc), &stats_reporters);
             if (pipeline == nullptr) {

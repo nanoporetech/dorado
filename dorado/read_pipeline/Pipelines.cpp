@@ -114,6 +114,7 @@ void create_stereo_duplex_pipeline(
         uint32_t mean_qscore_start_pos,
         int scaler_node_threads,
         int splitter_node_threads,
+        int modbase_node_threads,
         PairingParameters pairing_parameters,
         NodeHandle sink_node_handle,
         NodeHandle source_node_handle) {
@@ -135,8 +136,7 @@ void create_stereo_duplex_pipeline(
     NodeHandle last_node_handle = stereo_basecaller_node;
     if (!modbase_runners.empty()) {
         auto mod_base_caller_node = pipeline_desc.add_node<ModBaseCallerNode>(
-                {}, std::move(modbase_runners),
-                size_t(4),  // TODO - what shold this be?
+                {}, std::move(modbase_runners), modbase_node_threads,
                 size_t(runners.front()->model_stride()), 1000);
         pipeline_desc.add_node_sink(stereo_basecaller_node, mod_base_caller_node);
         last_node_handle = mod_base_caller_node;
