@@ -1,5 +1,6 @@
 #include "DataLoader.h"
 
+#include "models/models.h"
 #include "read_pipeline/ReadPipeline.h"
 #include "utils/compat_utils.h"
 #include "utils/time_utils.h"
@@ -19,6 +20,7 @@
 #include <filesystem>
 #include <mutex>
 #include <optional>
+#include <stdexcept>
 #include <vector>
 
 /**
@@ -616,6 +618,94 @@ uint16_t DataLoader::get_sample_rate(std::string data_path, bool recursive_file_
         return *sample_rate;
     } else {
         throw std::runtime_error("Unable to determine sample rate for data.");
+    }
+}
+
+std::vector<models::ChemistryKey> DataLoader::get_sequencing_chemistry(
+        std::string data_path,
+        bool recursive_file_loading) {
+    std::vector<models::ChemistryKey> chemistries = {};
+
+    auto iterate_directory = [&](const auto& iterator) {
+        for (const auto& entry : iterator) {
+            std::string ext = std::filesystem::path(entry).extension().string();
+            std::transform(ext.begin(), ext.end(), ext.begin(),
+                           [](unsigned char c) { return std::tolower(c); });
+            auto file_path = entry.path().string();
+            if (ext == ".fast5") {
+                throw std::runtime_error("Cannot automate model selection using fast5 files");
+                return;
+            }
+
+            if (ext != ".pod5") {
+                continue;
+            }
+
+            pod5_init();
+            // Open the file ready for walking:
+            Pod5FileReader_t* file = pod5_open_file(file_path.c_str());
+
+            if (!file) {
+                spdlog::error("Failed to open file {}: {}", file_path.c_str(),
+                              pod5_get_error_string());
+            } else {
+                // First get the run info count
+                run_info_index_t run_info_count;
+                if (pod5_get_file_run_info_count(file, &run_info_count) != POD5_OK) {
+                    spdlog::error("Failed to fetch POD5 run info count for file {} : {}",
+                                  file_path.c_str(), pod5_get_error_string());
+
+                    if (pod5_close_and_free_reader(file) != POD5_OK) {
+                        spdlog::error("Failed to close and free POD5 reader for file {}",
+                                      file_path.c_str());
+                    }
+                    continue;
+                }
+
+                for (run_info_index_t ri_idx = 0; ri_idx < run_info_count; ri_idx++) {
+                    RunInfoDictData_t* run_info_data;
+                    if (pod5_get_file_run_info(file, ri_idx, &run_info_data) != POD5_OK) {
+                        spdlog::error(
+                                "Failed to fetch POD5 run info dict for file {} and run info "
+                                "index {}: {}",
+                                file_path.c_str(), ri_idx, pod5_get_error_string());
+                    } else {
+                        const auto fpc = std::string(run_info_data->flow_cell_product_code);
+                        const auto sk = std::string(run_info_data->sequencing_kit);
+                        const auto sr = run_info_data->sample_rate;
+                        spdlog::trace(
+                                "POD5: {} flowcell_product_code: '{}' sequencing_kit: '{}' "
+                                "sample_rate: {}",
+                                file_path.c_str(), fpc, sk, sr);
+
+                        const auto fc = models::flowcell_code(fpc);
+                        const auto kit = models::kit_code(sk);
+
+                        chemistries.push_back(models::ChemistryKey(fc, kit, sr));
+                    }
+                    if (pod5_free_run_info(run_info_data) != POD5_OK) {
+                        spdlog::error(
+                                "Failed to free POD5 run info for file {} and run info index: "
+                                "{}",
+                                file_path.c_str(), ri_idx);
+                    }
+                }
+                if (pod5_close_and_free_reader(file) != POD5_OK) {
+                    spdlog::error("Failed to close and free POD5 reader for file {}",
+                                  file_path.c_str());
+                }
+            };
+        }
+    };
+
+    iterate_directory(fetch_directory_entries(data_path, recursive_file_loading));
+
+    if (chemistries.empty()) {
+        throw std::runtime_error(
+                "Failed to determine sequencing chemistry from data. "
+                "Please select a model by path");
+    } else {
+        return chemistries;
     }
 }
 

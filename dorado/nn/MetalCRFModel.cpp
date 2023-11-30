@@ -44,8 +44,9 @@ bool finishCommandBuffer(const char *label, MTL::CommandBuffer *cb, int try_coun
     auto status = cb->status();
     bool success = (status == MTL::CommandBufferStatusCompleted);
     if (success) {
-        spdlog::debug("Metal command buffer {}: {} ms succeeded (try {})", label,
-                      1000.f * float(cb->GPUEndTime() - cb->GPUStartTime()), try_count);
+        spdlog::debug("Metal command buffer {}: {} GPU ms {} CPU ms succeeded (try {})", label,
+                      1000.f * float(cb->GPUEndTime() - cb->GPUStartTime()),
+                      1000.f * float(cb->kernelEndTime() - cb->kernelStartTime()), try_count);
     } else {
         spdlog::warn("Metal command buffer {} failed: status {} (try {})", label, status,
                      try_count);

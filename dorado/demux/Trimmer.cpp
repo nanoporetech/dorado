@@ -73,7 +73,7 @@ std::pair<int, int> Trimmer::determine_trim_interval(const AdapterScoreResult& r
     // defines which portion of the read to retain.
     std::pair<int, int> trim_interval = {0, seqlen};
 
-    const float score_thres = 0.7f;
+    const float score_thres = 0.8f;
 
     if (res.front.name == "unclassified" || res.front.score < score_thres) {
         trim_interval.first = 0;

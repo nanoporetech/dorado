@@ -1,6 +1,7 @@
 #include "Version.h"
 #include "cli/cli_utils.h"
 #include "data_loader/DataLoader.h"
+#include "data_loader/ModelFinder.h"
 #include "models/models.h"
 #include "nn/CRFModelConfig.h"
 #include "nn/Runners.h"
@@ -16,6 +17,7 @@
 #include "utils/bam_utils.h"
 #include "utils/basecaller_utils.h"
 #include "utils/duplex_utils.h"
+#include "utils/fs_utils.h"
 #include "utils/log_utils.h"
 #include "utils/parameters.h"
 #include "utils/stats.h"
@@ -26,11 +28,91 @@
 #include <htslib/sam.h>
 #include <spdlog/spdlog.h>
 
+#include <cstdlib>
 #include <memory>
 #include <thread>
 #include <unordered_set>
 
 namespace dorado {
+
+namespace {
+struct DuplexModels {
+    std::filesystem::path model_path;
+    std::string model_name;
+    CRFModelConfig model_config;
+
+    std::filesystem::path stereo_model;
+    CRFModelConfig stereo_model_config;
+    std::string stereo_model_name;
+
+    std::set<std::filesystem::path> temp_paths{};
+};
+
+DuplexModels load_models(const std::string& model_arg,
+                         const std::string& reads,
+                         const bool recursive_file_loading,
+                         const bool skip_model_compatibility_check) {
+    const ModelSelection model_selection = cli::parse_model_argument(model_arg);
+
+    if (model_selection.is_path()) {
+        const auto model_path = std::filesystem::canonical(std::filesystem::path(model_arg));
+        const auto model_name = model_path.filename().string();
+        const auto model_config = load_crf_model_config(model_path);
+
+        // Check sample rate of model vs data.
+        auto data_sample_rate = DataLoader::get_sample_rate(reads, recursive_file_loading);
+        auto model_sample_rate = model_config.sample_rate;
+        if (model_sample_rate < 0) {
+            // If unsuccessful, find sample rate by model name.
+            model_sample_rate = models::get_sample_rate_by_model_name(
+                    models::extract_model_name_from_path(model_path));
+        }
+        if (!skip_model_compatibility_check &&
+            !sample_rates_compatible(data_sample_rate, uint16_t(model_sample_rate))) {
+            std::stringstream err;
+            err << "Sample rate for model (" << model_sample_rate << ") and data ("
+                << data_sample_rate << ") are not compatible.";
+            throw std::runtime_error(err.str());
+        }
+        const auto stereo_model_name = utils::get_stereo_model_name(model_arg, data_sample_rate);
+        const auto stereo_model_path =
+                model_path.parent_path() / std::filesystem::path(stereo_model_name);
+
+        if (!std::filesystem::exists(stereo_model_path)) {
+            if (!models::download_models(model_path.parent_path().u8string(), stereo_model_name)) {
+                throw std::runtime_error("Failed to download model: " + stereo_model_name);
+            }
+        }
+        const auto stereo_model_config = load_crf_model_config(stereo_model_path);
+
+        return DuplexModels{model_path,        model_name,          model_config,
+                            stereo_model_path, stereo_model_config, stereo_model_name};
+    }
+
+    if (model_selection.has_mods_variant()) {
+        spdlog::error("Modified bases models are not supported for duplex");
+        std::exit(EXIT_FAILURE);
+    }
+
+    auto model_finder = cli::model_finder(model_selection, reads, recursive_file_loading, true);
+
+    const auto model_path = model_finder.fetch_simplex_model();
+    const auto model_name = model_path.filename().string();
+    const auto model_config = load_crf_model_config(model_path);
+
+    const auto stereo_model_path = model_finder.fetch_stereo_model();
+    const auto stereo_model_name = stereo_model_path.filename().string();
+    const auto stereo_model_config = load_crf_model_config(stereo_model_path);
+
+    return DuplexModels{model_path,
+                        model_name,
+                        model_config,
+                        stereo_model_path,
+                        stereo_model_config,
+                        stereo_model_name,
+                        model_finder.downloaded_models()};
+}
+}  // namespace
 
 using dorado::utils::default_parameters;
 using namespace std::chrono_literals;
@@ -60,7 +142,9 @@ int duplex(int argc, char* argv[]) {
     torch::set_num_threads(1);
 
     cli::ArgParser parser("dorado");
-    parser.visible.add_argument("model").help("Model");
+    parser.visible.add_argument("model").help(
+            "model selection {fast,hac,sup}@v{version} for automatic model selection including "
+            "modbases, or path to existing model directory");
     parser.visible.add_argument("reads").help(
             "Reads in POD5 format or BAM/SAM format for basespace.");
     parser.visible.add_argument("--pairs")
@@ -271,49 +355,22 @@ int duplex(int argc, char* argv[]) {
                     kStatsPeriod, stats_reporters, stats_callables, max_stats_records);
         } else {  // Execute a Stereo Duplex pipeline.
 
-            const auto model_path = std::filesystem::canonical(std::filesystem::path(model));
-            model = model_path.filename().string();
-            auto model_config = load_crf_model_config(model_path);
+            const bool skip_model_compatibility_check =
+                    parser.hidden.get<bool>("--skip-model-compatibility-check");
+
+            const DuplexModels models = load_models(model, reads, recursive_file_loading,
+                                                    skip_model_compatibility_check);
 
             if (!DataLoader::is_read_data_present(reads, recursive_file_loading)) {
                 std::string err = "No POD5 or FAST5 data found in path: " + reads;
                 throw std::runtime_error(err);
             }
 
-            // Check sample rate of model vs data.
-            auto data_sample_rate = DataLoader::get_sample_rate(reads, recursive_file_loading);
-            auto model_sample_rate = model_config.sample_rate;
-            if (model_sample_rate < 0) {
-                // If unsuccessful, find sample rate by model name.
-                model_sample_rate = models::get_sample_rate_by_model_name(
-                        models::extract_model_from_model_path(model_path.string()));
-            }
-            auto skip_model_compatibility_check =
-                    parser.hidden.get<bool>("--skip-model-compatibility-check");
-            if (!skip_model_compatibility_check &&
-                !sample_rates_compatible(data_sample_rate, uint16_t(model_sample_rate))) {
-                std::stringstream err;
-                err << "Sample rate for model (" << model_sample_rate << ") and data ("
-                    << data_sample_rate << ") are not compatible.";
-                throw std::runtime_error(err.str());
-            }
-            auto stereo_model_name = utils::get_stereo_model_name(model, data_sample_rate);
-            const auto stereo_model_path =
-                    model_path.parent_path() / std::filesystem::path(stereo_model_name);
-
-            if (!std::filesystem::exists(stereo_model_path)) {
-                if (!models::download_models(model_path.parent_path().u8string(),
-                                             stereo_model_name)) {
-                    throw std::runtime_error("Failed to download model: " + stereo_model_name);
-                }
-            }
-            auto stereo_model_config = load_crf_model_config(stereo_model_path);
-
             // Write read group info to header.
-            auto duplex_rg_name = std::string(model + "_" + stereo_model_name);
+            auto duplex_rg_name = std::string(models.model_name + "_" + models.stereo_model_name);
             // TODO: supply modbase model names once duplex modbase is complete
-            auto read_groups =
-                    DataLoader::load_read_groups(reads, model, "", recursive_file_loading);
+            auto read_groups = DataLoader::load_read_groups(reads, models.model_name, "",
+                                                            recursive_file_loading);
             read_groups.merge(DataLoader::load_read_groups(reads, duplex_rg_name, "",
                                                            recursive_file_loading));
             std::vector<std::string> barcode_kits;
@@ -336,8 +393,9 @@ int duplex(int argc, char* argv[]) {
             // Note: The memory assignment between simplex and duplex callers have been
             // performed based on empirical results considering a SUP model for simplex
             // calling.
-            auto [runners, num_devices] = create_basecall_runners(
-                    model_config, device, num_runners, 0, batch_size, chunk_size, 0.9f, true);
+            auto [runners, num_devices] =
+                    create_basecall_runners(models.model_config, device, num_runners, 0, batch_size,
+                                            chunk_size, 0.9f, true);
 
             std::vector<Runner> stereo_runners;
             // The fraction argument for GPU memory allocates the fraction of the
@@ -350,7 +408,7 @@ int duplex(int argc, char* argv[]) {
             // chances for the stereo model to use the cached allocations from the simplex
             // model.
             std::tie(stereo_runners, std::ignore) =
-                    create_basecall_runners(stereo_model_config, device, num_runners, 0,
+                    create_basecall_runners(models.stereo_model_config, device, num_runners, 0,
                                             stereo_batch_size, chunk_size, 0.5f, true);
 
             spdlog::info("> Starting Stereo Duplex pipeline");
@@ -363,10 +421,10 @@ int duplex(int argc, char* argv[]) {
                 pairing_parameters = std::move(template_complement_map);
             }
 
-            auto mean_qscore_start_pos = model_config.mean_qscore_start_pos;
+            auto mean_qscore_start_pos = models.model_config.mean_qscore_start_pos;
             if (mean_qscore_start_pos < 0) {
                 mean_qscore_start_pos =
-                        models::get_mean_qscore_start_pos_by_model_name(stereo_model_name);
+                        models::get_mean_qscore_start_pos_by_model_name(models.stereo_model_name);
                 if (mean_qscore_start_pos < 0) {
                     throw std::runtime_error("Mean q-score start position cannot be < 0");
                 }
@@ -401,6 +459,8 @@ int duplex(int argc, char* argv[]) {
             // Run pipeline.
             loader.load_reads(reads, parser.visible.get<bool>("--recursive"),
                               ReadOrder::BY_CHANNEL);
+
+            utils::clean_temporary_models(models.temp_paths);
         }
 
         // Wait for the pipeline to complete.  When it does, we collect

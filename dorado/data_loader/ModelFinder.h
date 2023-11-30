@@ -1,0 +1,93 @@
+#pragma once
+
+#include "models/kits.h"
+#include "models/models.h"
+
+#include <filesystem>
+#include <optional>
+#include <string>
+#include <vector>
+
+namespace dorado {
+
+struct ModelSelection {
+    std::string raw;
+    models::ModelVariantPair model =
+            models::ModelVariantPair{models::ModelVariant::NONE, models::ModelVersion::NONE};
+    std::vector<models::ModsVariantPair> mods = {};
+
+    // Returns true of the model argument was a command option (e.g. auto / fast / hac / sup)
+    bool has_model_variant() const { return model.variant != models::ModelVariant::NONE; }
+    // Returns true if the model argument appears to be a path
+    bool is_path() const { return !has_model_variant(); }
+    // Returns true if mods models were specified in the model command
+    bool has_mods_variant() const { return mods.size() > 0; }
+
+    bool operator==(const ModelSelection& other) const { return raw == other.raw; }
+    bool operator!=(const ModelSelection& other) const { return !(*this == other); }
+};
+
+class ModelComplexParser {
+public:
+    // Parse the model argument (e.g. hac,5mC@v2) -> (hac, latest), (hac@5mC, v2.0.0)
+    static ModelSelection parse(const std::string& arg);
+
+    // Given a potentially truncated version string, returns a well-formatted version
+    // string like "v0.0.0" ensuring that there are 3 values, all values are integers,
+    // and not empty
+    static std::string parse_version(const std::string& version);
+
+    // Parse a single model argument part (e,g, fast@v4.2.0) -> (fast, v4.2.0)
+    static std::pair<std::string, models::ModelVersion> parse_model_arg_part(
+            const std::string& part);
+};
+
+class ModelFinder {
+public:
+    ModelFinder(const models::Chemistry& chemsitry,
+                const ModelSelection& selection,
+                bool suggestions);
+
+    //Find a simplex model which matches the user's command and chemistry
+    std::string get_simplex_model_name() const;
+    //Find a stereo model which matches the chemistry
+    std::string get_stereo_model_name() const;
+    // Find modification models which match the user's mods selections and chemistry
+    std::vector<std::string> get_mods_model_names() const;
+    // Find modification models which matches the simplex model and chemistry
+    std::vector<std::string> get_mods_for_simplex_model() const;
+
+    // Get the simplex model (auto-download) and return the path
+    std::filesystem::path fetch_simplex_model();
+    // Get the stereo model (auto-download) and return the path
+    std::filesystem::path fetch_stereo_model();
+    // Get the mods models (auto-download) and return the paths
+    std::vector<std::filesystem::path> fetch_mods_models();
+
+    std::set<std::filesystem::path> downloaded_models() const { return m_downloaded_models; };
+
+    // Inspects the sequencing data metadata to determine the sequencing chemistry used. Will error if
+    // the data is inhomogeneous
+    static models::Chemistry get_chemistry(const std::string& data, bool recursive_file_loading);
+
+private:
+    // If a ModelVariant was set, the chemistry (e.g. R10.4.1 / RNA004) is deduced from the
+    // sequencing data otherwise it is meaningless
+    const models::Chemistry m_chemistry;
+    const ModelSelection m_selection;
+    // If true, show suggestions if no models were found given some settings.
+    const bool m_suggestions;
+    // Store the result of the simplex model call to resolve mods when ModelVariant::AUTO is used
+    const models::ModelInfo m_simplex_model_info;
+    // Returns the model path after possibly downloading the model if it wasn't found
+    // in the expected locations
+    std::filesystem::path fetch_model(const std::string& model_name,
+                                      const std::string& description);
+
+    models::ModelInfo get_simplex_model_info() const;
+
+    // Set of downloaded models which we want to clean up on shutdown.
+    std::set<std::filesystem::path> m_downloaded_models;
+};
+
+}  // namespace dorado
