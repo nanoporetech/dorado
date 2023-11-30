@@ -2,6 +2,7 @@
 set(UNIT_TEST_SOURCE_FILES
     main.cpp
     AdapterDetectorTest.cpp
+    CustomBarcodeParserTest.cpp
     AlignerTest.cpp
     AsyncQueueTest.cpp
     BamReaderTest.cpp
@@ -21,6 +22,9 @@ set(UNIT_TEST_SOURCE_FILES
     Minimap2IndexTest.cpp
     ModBaseEncoderTest.cpp
     MotifMatcherTest.cpp
+    ModelFinderTest.cpp
+    ModelKitsTest.cpp
+    ModelMetadataTest.cpp
     ModelUtilsTest.cpp
     PairingNodeTest.cpp
     PipelineTest.cpp

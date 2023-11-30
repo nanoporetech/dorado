@@ -87,6 +87,9 @@ int demuxer(int argc, char* argv[]) {
             .help("Skip barcode trimming. If option is not chosen, trimming is enabled.")
             .default_value(false)
             .implicit_value(true);
+    parser.add_argument("--barcode-arrangement")
+            .help("Path to file with custom barcode arrangement.");
+    parser.add_argument("--barcode-sequences").help("Path to file with custom barcode sequences.");
 
     try {
         parser.parse_args(argc, argv);
@@ -98,8 +101,11 @@ int demuxer(int argc, char* argv[]) {
     }
 
     if ((parser.is_used("--no-classify") && parser.is_used("--kit-name")) ||
-        (!parser.is_used("--no-classify") && !parser.is_used("--kit-name"))) {
-        spdlog::error("Please specify either --no-classify or --kit-name to use the demux tool.");
+        (!parser.is_used("--no-classify") && !parser.is_used("--kit-name") &&
+         !parser.is_used("--barcode-arrangement"))) {
+        spdlog::error(
+                "Please specify either --no-classify or --kit-name or pass a custom barcode "
+                "arrangement with --barcode-arrangement to use the demux tool.");
         std::exit(1);
     }
 
@@ -119,6 +125,16 @@ int demuxer(int argc, char* argv[]) {
     auto [demux_threads, demux_writer_threads] =
             cli::worker_vs_writer_thread_allocation(threads, 0.1f);
     spdlog::debug("> barcoding threads {}, writer threads {}", demux_threads, demux_writer_threads);
+
+    std::optional<std::string> custom_kit = std::nullopt;
+    if (parser.is_used("--barcode-arrangement")) {
+        custom_kit = parser.get<std::string>("--barcode-arrangement");
+    }
+
+    std::optional<std::string> custom_seqs = std::nullopt;
+    if (parser.is_used("--barcode-sequences")) {
+        custom_seqs = parser.get<std::string>("--barcode-sequences");
+    }
 
     auto read_list = utils::load_read_list(parser.get<std::string>("--read-ids"));
 
@@ -152,14 +168,15 @@ int demuxer(int argc, char* argv[]) {
             {}, output_dir, demux_writer_threads, parser.get<bool>("--emit-fastq"),
             std::move(sample_sheet));
 
-    if (parser.is_used("--kit-name")) {
+    if (parser.is_used("--kit-name") || parser.is_used("--barcode-arrangement")) {
         std::vector<std::string> kit_names;
         if (auto names = parser.present<std::vector<std::string>>("--kit-name")) {
             kit_names = std::move(*names);
         }
         pipeline_desc.add_node<BarcodeClassifierNode>(
                 {demux_writer}, demux_threads, kit_names, parser.get<bool>("--barcode-both-ends"),
-                parser.get<bool>("--no-trim"), std::move(allowed_barcodes));
+                parser.get<bool>("--no-trim"), std::move(allowed_barcodes), std::move(custom_kit),
+                std::move(custom_seqs));
     }
 
     // Create the Pipeline from our description.

@@ -1,10 +1,15 @@
 add_library(dorado_models_lib STATIC
+    kits.h
+    kits.cpp
+    metadata.h
+    metadata.cpp
     models.cpp
     models.h
 )
 
 target_link_libraries(dorado_models_lib
     PRIVATE
+        dorado_utils
         OpenSSL::SSL
         elzip
         spdlog::spdlog
