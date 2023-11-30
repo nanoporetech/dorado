@@ -147,7 +147,7 @@ void ModBaseCallerNode::init_modbase_info() {
     m_base_prob_offsets[3] = m_base_prob_offsets[2] + result.base_counts[2];
 }
 
-void ModBaseCallerNode::duplex_mod_call(Message message) {
+void ModBaseCallerNode::duplex_mod_call(Message&& message) {
     // Let's do this only for the template strand for now.
 
     auto read = std::get<DuplexReadPtr>(std::move(message));
@@ -298,7 +298,7 @@ void ModBaseCallerNode::duplex_mod_call(Message message) {
     }
 }
 
-void ModBaseCallerNode::simplex_mod_call(Message message) {
+void ModBaseCallerNode::simplex_mod_call(Message&& message) {
     auto read = std::get<SimplexReadPtr>(std::move(message));
     stats::Timer timer;
     {
