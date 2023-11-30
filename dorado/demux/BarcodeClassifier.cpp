@@ -171,23 +171,27 @@ BarcodeScoreResult BarcodeClassifier::barcode(
 
 const dorado::barcode_kits::KitInfo& BarcodeClassifier::get_kit_info(
         const std::string& kit_name) const {
-    if (m_custom_kit.find(kit_name) != m_custom_kit.end()) {
-        return m_custom_kit.at(kit_name);
+    auto custom_kit_iter = m_custom_kit.find(kit_name);
+    if (custom_kit_iter != m_custom_kit.end()) {
+        return custom_kit_iter->second;
     }
     const auto& kit_info_map = barcode_kits::get_kit_infos();
-    if (kit_info_map.find(kit_name) != kit_info_map.end()) {
-        return kit_info_map.at(kit_name);
+    auto prebuilt_kit_iter = kit_info_map.find(kit_name);
+    if (prebuilt_kit_iter != kit_info_map.end()) {
+        return prebuilt_kit_iter->second;
     }
     throw std::runtime_error("Could not find " + kit_name + " in pre-built or custom kits");
 }
 
 const std::string& BarcodeClassifier::get_barcode_sequence(const std::string& barcode_name) const {
-    if (m_custom_seqs.find(barcode_name) != m_custom_seqs.end()) {
-        return m_custom_seqs.at(barcode_name);
+    auto custom_seqs_iter = m_custom_seqs.find(barcode_name);
+    if (custom_seqs_iter != m_custom_seqs.end()) {
+        return custom_seqs_iter->second;
     }
     const auto& barcodes = barcode_kits::get_barcodes();
-    if (barcodes.find(barcode_name) != barcodes.end()) {
-        return barcodes.at(barcode_name);
+    auto prebuilt_seqs_iter = barcodes.find(barcode_name);
+    if (prebuilt_seqs_iter != barcodes.end()) {
+        return prebuilt_seqs_iter->second;
     }
     throw std::runtime_error("Could not find " + barcode_name +
                              " in pre-built or custom barcode sequences");
