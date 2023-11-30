@@ -16,6 +16,8 @@ echo dorado aligner test stage
 
 echo dorado duplex basespace test stage
 %dorado_bin% duplex basespace tests/data/basespace/pairs.bam --threads 1 --pairs tests/data/basespace/pairs.txt > calls.bam
+%dorado_bin% duplex hac tests/data/duplex/pod5 --threads 1  > $output_dir/duplex_calls.bam
+%dorado_bin% duplex hac,5mCG_5hmCG tests/data/duplex/pod5 --threads 1 > $output_dir/duplex_calls_mods.bam
 
 echo dorado demux test stage
 %dorado_bin% demux tests/data/barcode_demux/double_end_variant/EXP-PBC096_BC83.fastq --threads 1 --kit-name EXP-PBC096 --output-dir ./demux
