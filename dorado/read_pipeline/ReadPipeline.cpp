@@ -248,8 +248,7 @@ void ReadCommon::generate_modbase_tags(bam1_t *aln, uint8_t threshold) const {
     if (is_duplex) {
         // Having done the strand in the forward direction, if the read is duplex we need to also process its complement
         // There is some code repetition here, but it makes it more readable.
-        for (size_t channel_idx = 0; channel_idx < num_channels;
-             channel_idx++) {  // Loop over each channel. Writing out the
+        for (size_t channel_idx = 0; channel_idx < num_channels; channel_idx++) {
             if (cardinal_bases.find(mod_base_info->alphabet[channel_idx]) != std::string::npos) {
                 // A cardinal base
                 current_cardinal = mod_base_info->alphabet[channel_idx][0];
