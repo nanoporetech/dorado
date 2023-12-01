@@ -28,7 +28,7 @@ class IndexFileAccess {
 
     // Requires the mutex to be locked before calling.
     std::shared_ptr<Minimap2Index> get_exact_index(const std::string& file,
-                                                   const Minimap2Options& options);
+                                                   const Minimap2Options& options) const;
 
     // Requires the mutex to be locked before calling.
     bool is_index_loaded_impl(const std::string& file, const Minimap2Options& options) const;
@@ -41,6 +41,11 @@ public:
     IndexLoadResult load_index(const std::string& file,
                                const Minimap2Options& options,
                                int num_threads);
+
+    // Check whether the index has the MM_I_NO_SEQ flag set.
+    // This is to support server usecases checking whether full alignment requested by
+    // the client is supported.
+    bool index_is_no_seq(const std::string& file, const Minimap2Options& options) const;
 
     // Testability. Method needed to support utests
     bool is_index_loaded(const std::string& file, const Minimap2Options& options) const;

@@ -16,13 +16,15 @@ const Minimap2Index* IndexFileAccess::get_compatible_index(
     return compatible_indices.begin()->second.get();
 }
 
-std::shared_ptr<Minimap2Index> IndexFileAccess::get_exact_index(const std::string& file,
-                                                                const Minimap2Options& options) {
-    auto& compatible_indices = m_index_lut[{file, options}];
-    if (compatible_indices.count(options) == 0) {
+std::shared_ptr<Minimap2Index> IndexFileAccess::get_exact_index(
+        const std::string& file,
+        const Minimap2Options& options) const {
+    auto compatible_indices = m_index_lut.find({file, options});
+    if (compatible_indices == m_index_lut.end()) {
         return nullptr;
     }
-    return compatible_indices.at(options);
+    auto exact_index = compatible_indices->second.find(options);
+    return exact_index == compatible_indices->second.end() ? nullptr : exact_index->second;
 }
 
 bool IndexFileAccess::is_index_loaded_impl(const std::string& file,
@@ -95,6 +97,14 @@ bool IndexFileAccess::is_index_loaded(const std::string& file,
                                       const Minimap2Options& options) const {
     std::lock_guard<std::mutex> lock(m_mutex);
     return is_index_loaded_impl(file, options);
+}
+
+bool IndexFileAccess::index_is_no_seq(const std::string& file,
+                                      const Minimap2Options& options) const {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    auto loaded_index = get_exact_index(file, options);
+    assert(loaded_index && "Index must be loaded to check flags");
+    return loaded_index->index()->flag & MM_I_NO_SEQ;
 }
 
 void IndexFileAccess::unload_index(const std::string& file,

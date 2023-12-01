@@ -196,4 +196,14 @@ TEST_CASE(
     REQUIRE(index->get_options() == compatible_options);
 }
 
+TEST_CASE(TEST_GROUP
+          " index_is_no_seq with index for valid test data reference file and default options "
+          "returns false",
+          TEST_GROUP) {
+    IndexFileAccess cut{};
+    cut.load_index(valid_reference_file(), dflt_options, 1);
+
+    REQUIRE_FALSE(cut.index_is_no_seq(valid_reference_file(), dflt_options));
+}
+
 }  // namespace dorado::alignment::index_file_access
