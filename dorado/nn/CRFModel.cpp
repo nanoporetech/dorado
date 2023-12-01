@@ -421,11 +421,12 @@ struct ConvStackImpl : Module {
                 in.slice(1, -padding, torch::indexing::None) = 0;
                 wm.next_TC(T_out, C_out, output_layout);
                 auto out_ntc = wm.get_current_NTC_view();
-                if (host_linear(stream, KOI_F16, get_koi_activation(params.activation), out_type,
-                                wm.N, T_out, C_in * params.winlen, C_out, int(in.stride(0)),
-                                params.stride * C_in, int(out_ntc.stride(0)),
-                                int(out_ntc.stride(1)), in.data_ptr(), w_device.data_ptr(),
-                                out_ntc.data_ptr(), nullptr, b_device.data_ptr()) != KOI_SUCCESS) {
+                auto res = host_linear(
+                        stream, KOI_F16, get_koi_activation(params.activation), out_type, wm.N,
+                        T_out, C_in * params.winlen, C_out, int(in.stride(0)), params.stride * C_in,
+                        int(out_ntc.stride(0)), int(out_ntc.stride(1)), in.data_ptr(),
+                        w_device.data_ptr(), out_ntc.data_ptr(), nullptr, b_device.data_ptr());
+                if (res != KOI_SUCCESS) {
                     throw std::runtime_error(std::string("Koi convolution failed with in size ") +
                                              std::to_string(params.insize));
                 }
@@ -555,11 +556,14 @@ struct LinearCRFImpl : Module {
                     w_device = quant.t().contiguous().to(in_ntc.device());
                 }
             }
-            host_linear(stream, type_id, activation ? KOI_TANH_X5 : KOI_IDENTITY, KOI_F16, wm.N,
-                        wm.T, C_in, C_out, int(in_ntc.stride(0)), int(in_ntc.stride(1)),
-                        int(out.stride(0)), int(out.stride(1)), in_ntc.data_ptr(),
-                        w_device.data_ptr(), out.data_ptr(),
-                        weight_scale.defined() ? weight_scale.data_ptr() : nullptr, bias_ptr);
+            auto res = host_linear(
+                    stream, type_id, activation ? KOI_TANH_X5 : KOI_IDENTITY, KOI_F16, wm.N, wm.T,
+                    C_in, C_out, int(in_ntc.stride(0)), int(in_ntc.stride(1)), int(out.stride(0)),
+                    int(out.stride(1)), in_ntc.data_ptr(), w_device.data_ptr(), out.data_ptr(),
+                    weight_scale.defined() ? weight_scale.data_ptr() : nullptr, bias_ptr);
+            if (res != KOI_SUCCESS) {
+                throw std::runtime_error(std::string("Linear layer error:") + std::to_string(res));
+            }
 #endif  // ifdef DORADO_TX2 else
         }
     }
