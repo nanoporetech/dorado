@@ -82,6 +82,7 @@ variables:
     else
       export PARALLEL_JOBS=8
     fi
+  - echo "PARALLEL_JOBS '${PARALLEL_JOBS}'"
 
 .run_dorado_cmake_build: &run_dorado_cmake_build
   - if [[ -d '/data/gitlab-ci-cache' ]] && [[ $OSTYPE != 'darwin'* ]] && [[ $OSTYPE != 'msys' ]]; then
