@@ -90,15 +90,23 @@ KoiActivation get_koi_activation(dorado::Activation act) {
 
 enum class TensorLayout { NTC, TNC, CUTLASS_TNC_F16, CUTLASS_TNC_I8, CUBLAS_TN2C };
 
-static TensorLayout get_koi_lstm_input_layout(int layer_size, dorado::Activation activation) {
+// TODO: These should really be part of Koi
+static bool koi_can_use_cutlass() {
     cudaDeviceProp *prop = at::cuda::getCurrentDeviceProperties();
-    bool is_TX2 = (prop->major == 6 && prop->minor == 2);
-    bool is_A100_H100 = ((prop->major == 8 || prop->major == 9) && prop->minor == 0);
+    return ((prop->major == 8 || prop->major == 9) && prop->minor == 0);
+}
+static bool koi_can_use_quantised_lstm() {
+    cudaDeviceProp *prop = at::cuda::getCurrentDeviceProperties();
+    // DP4A is supported on Pascal and later, except for TX2 (sm_62).
+    return (prop->major > 6) || (prop->major == 6 && prop->minor != 2);
+}
 
+static TensorLayout get_koi_lstm_input_layout(int layer_size, dorado::Activation activation) {
     TensorLayout layout = TensorLayout::CUBLAS_TN2C;
-    if (!is_TX2 && (layer_size == 96 || layer_size == 128)) {
+    if (koi_can_use_quantised_lstm() && (layer_size == 96 || layer_size == 128)) {
         layout = TensorLayout::NTC;
-    } else if (is_A100_H100 && layer_size <= 1024 && layer_size > 128 && (layer_size % 128) == 0) {
+    } else if (koi_can_use_cutlass() && layer_size <= 1024 && layer_size > 128 &&
+               (layer_size % 128) == 0) {
         layout = (activation == dorado::Activation::TANH) ? TensorLayout::CUTLASS_TNC_I8
                                                           : TensorLayout::CUTLASS_TNC_F16;
     }
@@ -303,6 +311,12 @@ struct ConvStackImpl : Module {
     void reserve_working_memory(WorkingMemory &wm) {
         auto &last = layers.back();
         last.output_layout = get_koi_lstm_input_layout(last.params.size, last.params.activation);
+        last.cutlass_conv = utils::get_dev_opt<bool>("cutlass_conv", true) &&
+                            (last.output_layout == TensorLayout::CUTLASS_TNC_I8 ||
+                             last.output_layout == TensorLayout::CUTLASS_TNC_F16);
+        if (last.cutlass_conv) {
+            layers[layers.size() - 2].output_T_padding = last.params.winlen / 2;
+        }
         for (auto &layer : layers) {
             layer.reserve_working_memory(wm);
         }
@@ -340,6 +354,8 @@ struct ConvStackImpl : Module {
         Conv1d conv{nullptr};
 #if USE_KOI
         TensorLayout output_layout{TensorLayout::NTC};
+        bool cutlass_conv{false};
+        int output_T_padding{0};
         at::Tensor w_device;
         at::Tensor b_device;
 
@@ -351,13 +367,14 @@ struct ConvStackImpl : Module {
             const int C_out = params.size;
             if (output_layout == TensorLayout::NTC && C_out > 16) {
                 wm.next_TC(T_out, params.winlen * C_in, TensorLayout::NTC);
+            } else if (cutlass_conv) {
             } else if (output_layout != TensorLayout::NTC) {
                 wm.next_TC(T_out, params.winlen * C_in, TensorLayout::TNC);
                 if (output_layout == TensorLayout::CUTLASS_TNC_I8) {
                     wm.next_TC(T_out, C_out, TensorLayout::TNC);
                 }
             }
-            wm.next_TC(T_out, C_out, output_layout);
+            wm.next_TC(T_out + 2 * output_T_padding, C_out, output_layout);
         }
 
         void run_koi(WorkingMemory &wm) {
@@ -366,7 +383,8 @@ struct ConvStackImpl : Module {
 
             auto in = wm.current;
             assert(wm.layout == TensorLayout::NTC);
-            const int T_in = wm.T;
+            const int padding = (params.winlen / 2);
+            const int T_in = cutlass_conv ? wm.T - 2 * padding : wm.T;
             const int T_out = T_in / params.stride;
             const int C_in = wm.C;
             const int C_out = params.size;
@@ -375,19 +393,46 @@ struct ConvStackImpl : Module {
                 auto opts = in.options().dtype(torch::kF16);
                 // conv->weight is [C_out, C_in, W], we want [W, C_in, C_out]
                 w_device = conv->weight.permute({2, 1, 0}).contiguous().flatten(0, 1).to(opts);
+                if (cutlass_conv) {
+                    w_device = w_device.transpose(0, 1).contiguous();
+                }
                 b_device = conv->bias.to(opts);
             }
 
             if (output_layout == TensorLayout::NTC && C_out <= 16) {
-                auto out = wm.next_TC(T_out, C_out, output_layout);
+                utils::ScopedProfileRange spr2("small conv", 3);
+                auto out = wm.next_TC(T_out + 2 * output_T_padding, C_out, output_layout);
+                out = out.narrow(1, output_T_padding, T_out);
                 if (host_convolution_f16(stream, wm.N, C_in, C_out, T_in, params.winlen,
-                                         params.stride, params.winlen / 2, in.data_ptr(),
-                                         out.data_ptr(), w_device.data_ptr(), b_device.data_ptr(),
+                                         params.stride, params.winlen / 2, int(out.stride(0)),
+                                         in.data_ptr(), out.data_ptr(), w_device.data_ptr(),
+                                         b_device.data_ptr(),
                                          get_koi_activation(params.activation))) {
                     throw std::runtime_error(std::string("Koi convolution failed with in size ") +
                                              std::to_string(params.insize));
                 }
+            } else if (cutlass_conv) {
+#ifdef DORADO_TX2  // Koi for TX2 does not have Cutlass kernels
+                throw std::logic_error("No Cutlass kernels in Jetson TX2 build.");
+#else
+                utils::ScopedProfileRange spr2("linear conv", 3);
+                auto out_type = (output_layout == TensorLayout::CUTLASS_TNC_I8) ? KOI_I8 : KOI_F16;
+                in.slice(1, 0, padding) = 0;
+                in.slice(1, -padding, torch::indexing::None) = 0;
+                wm.next_TC(T_out, C_out, output_layout);
+                auto out_ntc = wm.get_current_NTC_view();
+                auto res = host_linear(
+                        stream, KOI_F16, get_koi_activation(params.activation), out_type, wm.N,
+                        T_out, C_in * params.winlen, C_out, int(in.stride(0)), params.stride * C_in,
+                        int(out_ntc.stride(0)), int(out_ntc.stride(1)), in.data_ptr(),
+                        w_device.data_ptr(), out_ntc.data_ptr(), nullptr, b_device.data_ptr());
+                if (res != KOI_SUCCESS) {
+                    throw std::runtime_error(std::string("Koi convolution failed with in size ") +
+                                             std::to_string(params.insize));
+                }
+#endif  // ifdef DORADO_TX2 else
             } else {
+                utils::ScopedProfileRange spr2("window conv", 3);
                 // The window tensor is either NTC or TNC, depending on whether the first two
                 // dimensions of the output layout are NT or TN.
                 bool is_NT = (output_layout == TensorLayout::NTC);
@@ -454,53 +499,77 @@ struct LinearCRFImpl : Module {
 
 #if USE_KOI
     void reserve_working_memory(WorkingMemory &wm) {
-        if (wm.layout != TensorLayout::NTC) {
+        bool use_torch = utils::get_dev_opt<bool>("torch_linear", false) || !koi_can_use_cutlass();
+        if (use_torch && wm.layout != TensorLayout::NTC) {
             wm.next_TC(wm.T, wm.C, TensorLayout::NTC);
         }
         wm.next_TC(wm.T, int(linear->weight.size(0)), TensorLayout::NTC);
     }
     void run_koi(WorkingMemory &wm) {
-        utils::ScopedProfileRange spr("linear", 2);
         auto stream = at::cuda::getCurrentCUDAStream().stream();
-        if (wm.layout != TensorLayout::NTC) {
-            // Convert/transpose input layout to NTC, F16 if necessary
-            auto in = wm.get_current_NTC_view();
-            auto out = wm.next_TC(wm.T, wm.C, TensorLayout::NTC);
-            if (in.dtype() == torch::kI8) {
-                utils::ScopedProfileRange spr_convert("convert_to_f16_ntc", 3);
-                host_convert(stream, in.data_ptr(), int(in.stride(0)), int(in.stride(1)),
-                             int(in.stride(2)), KOI_I8, out.data_ptr(), int(out.stride(0)),
-                             int(out.stride(1)), int(out.stride(2)), KOI_F16, int(in.size(0)),
-                             int(in.size(1)), int(in.size(2)));
-            } else {
-                utils::ScopedProfileRange spr_convert("transpose_to_ntc", 3);
-                host_transpose_f16(stream, in.data_ptr(), int(in.size(0)), int(in.size(1)),
-                                   int(in.size(2)), int(in.stride(0)), int(in.stride(1)),
-                                   int(in.stride(2)), int(out.stride(0)), int(out.stride(1)),
-                                   int(out.stride(2)), out.data_ptr());
-            }
-        }
 
-        auto in = wm.current;
+        auto type_id = (wm.layout == TensorLayout::CUTLASS_TNC_I8) ? KOI_I8 : KOI_F16;
         int C_in = wm.C;
         int C_out = int(linear->weight.size(0));
+        void *bias_ptr = bias ? linear->bias.data_ptr() : nullptr;
 
-        if (!w_device.defined()) {
-            w_device = linear->weight.t().contiguous().to(in.device());
-        }
+        bool use_torch = utils::get_dev_opt<bool>("torch_linear", false) || !koi_can_use_cutlass();
+        if (use_torch || (wm.layout == TensorLayout::NTC && !activation)) {
+            utils::ScopedProfileRange spr("linear", 2);
+            if (wm.layout != TensorLayout::NTC) {
+                // Convert/transpose input layout to NTC, F16 if necessary
+                utils::ScopedProfileRange spr_convert("convert_to_f16_ntc", 3);
+                auto in = wm.get_current_NTC_view();
+                auto out = wm.next_TC(wm.T, wm.C, TensorLayout::NTC);
+                host_convert(stream, in.data_ptr(), int(in.stride(0)), int(in.stride(1)),
+                             int(in.stride(2)), type_id, out.data_ptr(), int(out.stride(0)),
+                             int(out.stride(1)), int(out.stride(2)), KOI_F16, int(in.size(0)),
+                             int(in.size(1)), int(in.size(2)));
+            }
 
-        auto out = wm.next_TC(wm.T, C_out, TensorLayout::NTC);
-        auto out_2D = out.view({-1, C_out});
-        dorado::utils::matmul_f16(in.view({-1, C_in}), w_device, out_2D);
-        if (activation) {
-            host_bias_activation_f16_inplace(stream, wm.T * wm.N, C_out, C_out, out_2D.data_ptr(),
-                                             linear->bias.data_ptr(), KOI_TANH_X5);
-        } else if (bias) {
-            out_2D += linear->bias;
+            auto in = wm.current;
+            auto out = wm.next_TC(wm.T, C_out, TensorLayout::NTC);
+            auto out_2D = out.view({-1, C_out});
+            if (!w_device.defined()) {
+                w_device = linear->weight.t().contiguous().to(in.device());
+            }
+            dorado::utils::matmul_f16(in.view({-1, C_in}), w_device, out_2D);
+            if (activation) {
+                host_bias_activation_f16_inplace(stream, wm.T * wm.N, C_out, C_out,
+                                                 out_2D.data_ptr(), bias_ptr, KOI_TANH_X5);
+            } else if (bias) {
+                out_2D += linear->bias;
+            }
+        } else {
+#ifdef DORADO_TX2  // Koi for TX2 does not have Cutlass kernels
+            throw std::logic_error("No Cutlass kernels in Jetson TX2 build.");
+#else
+            utils::ScopedProfileRange spr("koi_linear", 2);
+            auto in_ntc = wm.get_current_NTC_view();
+            auto out = wm.next_TC(wm.T, C_out, TensorLayout::NTC);
+            if (!w_device.defined()) {
+                if (type_id == KOI_F16) {
+                    w_device = linear->weight.contiguous().to(in_ntc.options());
+                } else {
+                    auto [quant_scale, quant] = dorado::utils::quantize_tensor(linear->weight.t());
+                    weight_scale = quant_scale.to(torch::kF16).to(in_ntc.device());
+                    w_device = quant.t().contiguous().to(in_ntc.device());
+                }
+            }
+            auto res = host_linear(
+                    stream, type_id, activation ? KOI_TANH_X5 : KOI_IDENTITY, KOI_F16, wm.N, wm.T,
+                    C_in, C_out, int(in_ntc.stride(0)), int(in_ntc.stride(1)), int(out.stride(0)),
+                    int(out.stride(1)), in_ntc.data_ptr(), w_device.data_ptr(), out.data_ptr(),
+                    weight_scale.defined() ? weight_scale.data_ptr() : nullptr, bias_ptr);
+            if (res != KOI_SUCCESS) {
+                throw std::runtime_error(std::string("Linear layer error:") + std::to_string(res));
+            }
+#endif  // ifdef DORADO_TX2 else
         }
     }
 
     at::Tensor w_device;
+    at::Tensor weight_scale;
 #endif  // if USE_KOI
     bool bias;
     static constexpr int scale = 5;
@@ -546,8 +615,11 @@ struct LSTMStackImpl : Module {
             return forward_quantized(wm);
         } else if (wm.layout == TensorLayout::CUBLAS_TN2C) {
             return forward_cublas(wm);
-        } else {
+        } else if (wm.layout == TensorLayout::CUTLASS_TNC_F16 ||
+                   wm.layout == TensorLayout::CUTLASS_TNC_I8) {
             return forward_cutlass(wm);
+        } else {
+            throw std::runtime_error("Unhandled TensorLayout in LSTMStack.");
         }
     }
 
@@ -681,13 +753,6 @@ private:
 #endif  // ifdef DORADO_TX2 else
     }
 
-    void rearrange_individual_weights(at::Tensor buffer) {
-        //Mapping of LSTM gate weights from IFGO to GIFO order.
-        auto tmp = buffer.view({4, -1});
-        tmp = torch::cat({tmp[2], tmp[0], tmp[1], tmp[3]});
-        buffer.index({Slice()}) = tmp.view(buffer.sizes());
-    }
-
     void forward_quantized(WorkingMemory &wm) {
         // Input and output in the same buffer, TensorLayout::NTC
         auto inout = wm.current;
@@ -696,9 +761,6 @@ private:
         if (device_w_hh.empty()) {
             for (auto &rnn : rnns) {
                 const auto &params = rnn->named_parameters();
-                rearrange_individual_weights(params["weight_hh_l0"]);
-                rearrange_individual_weights(params["weight_ih_l0"]);
-                rearrange_individual_weights(params["bias_ih_l0"]);
                 auto [scale, quant] = dorado::utils::quantize_tensor(params["weight_hh_l0"].t());
                 device_w_ih.push_back(params["weight_ih_l0"].transpose(0, 1).contiguous());
                 device_w_hh.push_back(quant.contiguous());
@@ -707,27 +769,13 @@ private:
             }
         }
 
-        // TODO: get rid of chunks buffer, as chunk size is fixed in Dorado
-        auto chunks = torch::empty({wm.N, 4}, torch::kInt32);
-        chunks.index({Slice(), 0}) = torch::arange(0, wm.T * wm.N, wm.T);
-        chunks.index({Slice(), 1}) = wm.T;
-        chunks.index({Slice(), 2}) = torch::arange(0, wm.T * wm.N, wm.T);
-        chunks.index({Slice(), 3}) = 0;
-        chunks = chunks.to(inout.device());
-
-        bool is_96 = (layer_size == 96);
-        auto rev = is_96 ? host_run_lstm_reverse_quantized96 : host_run_lstm_reverse_quantized128;
-        auto fwd = is_96 ? host_run_lstm_fwd_quantized96 : host_run_lstm_fwd_quantized128;
-        decltype(rev) lstm_fns[2] = {rev, fwd};
-
         auto mm_out = wm.temp({wm.N * wm.T, 4 * layer_size}, torch::kF16);
-
         for (size_t i = 0; i < rnns.size(); ++i) {
-            int dir_idx = i & 1;
+            int dir = (i & 1) ? 1 : -1;
             dorado::utils::matmul_f16(inout.view({-1, layer_size}), device_w_ih[i], mm_out);
-            dorado::utils::handle_cuda_result(lstm_fns[dir_idx](
-                    chunks.data_ptr(), mm_out.data_ptr(), device_w_hh[i].data_ptr(),
-                    device_bias[i].data_ptr(), device_scale[i].data_ptr(), inout.data_ptr(), wm.N));
+            dorado::utils::handle_cuda_result(host_small_lstm(
+                    wm.N, wm.T, layer_size, dir, mm_out.data_ptr(), device_w_hh[i].data_ptr(),
+                    device_bias[i].data_ptr(), device_scale[i].data_ptr(), inout.data_ptr()));
         }
     }
 
