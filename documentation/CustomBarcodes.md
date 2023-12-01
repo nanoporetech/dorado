@@ -65,6 +65,8 @@ The table below describes the arrangement options in more detail.
 | first_index | (Required) Start index for range of barcode sequences to use in the arrangement. Used in combination with the `last_index`. |
 | last_index | (Required) End index for range of barcode sequences to use in the arrangement. Used in combination with the `first_index`. |
 
+The pre-built barcode sequence in Dorado can be found in this [file](../dorado/utils/barcode_kits.cpp) under the `barcodes` map.
+
 #### Scoring Options
 
 Dorado maintains a default set of parameters for scoring each barcode to determine the best classification. These paramters have been tuned based barcoding kits from Oxford Nanopore. However, the default parameters may not be optimal for new arrangements and kits.
