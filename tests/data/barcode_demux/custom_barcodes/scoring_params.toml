@@ -1,4 +1,4 @@
-[arrangement]
+[scoring]
 
 min_soft_barcode_threshold = 0.1
 min_hard_barcode_threshold = 0.2
