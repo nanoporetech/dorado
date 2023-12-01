@@ -76,12 +76,13 @@ variables:
 .set_parallel_jobs: &set_parallel_jobs
   - |
     if [[ $OSTYPE == 'darwin'* ]]; then
-      export PARALLEL_JOBS=$(( $(sysctl -n hw.physicalcpu) / 2 ))
+      PARALLEL_JOBS=$(( $(sysctl -n hw.physicalcpu) / 2 ))
     elif [[ $(arch) != 'aarch64' ]]; then
-      export PARALLEL_JOBS=$(( $(nproc) / 4 ))
+      PARALLEL_JOBS=$(( $(nproc) / 4 ))
     else
-      export PARALLEL_JOBS=8
+      PARALLEL_JOBS=8
     fi
+    PARALLEL_JOBS=$(( 8 > PARALLEL_JOBS ? 8 : PARALLEL_JOBS ))
   - echo "PARALLEL_JOBS '${PARALLEL_JOBS}'"
 
 .run_dorado_cmake_build: &run_dorado_cmake_build
