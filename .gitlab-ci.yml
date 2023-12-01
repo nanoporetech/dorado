@@ -23,6 +23,7 @@ variables:
   BUILD_DIR: build
   BUILD_TARGET: install
   BUILD_TYPE: Release
+  PARALLEL_JOBS: "8"
   GIT_SUBMODULE_STRATEGY: recursive
   CUDA: "11.8"
   WIN_CUDA_TOOLKIT: "/c/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v${CUDA}"
@@ -35,17 +36,21 @@ variables:
     - m1
   variables:
     MACOSX_DEPLOYMENT_TARGET: "12.3"
+    PARALLEL_JOBS: "$(( $(sysctl -n hw.physicalcpu) / 2 ))"
 
 .macos_x64_runner: &macos_x64_runner
   tags:
     - osx_x86
   variables:
     MACOSX_DEPLOYMENT_TARGET: "10.15"
+    PARALLEL_JOBS: "$(( $(sysctl -n hw.physicalcpu) / 2 ))"
 
 .linux_runner: &linux_runner
   tags:
     - ubuntu-20.04
     - nvidia-docker
+  variables:
+    PARALLEL_JOBS: "$(( $(nproc) / 4 ))"
 
 .linux_arm64_runner: &linux_arm64_runner
   tags:
@@ -66,6 +71,8 @@ variables:
     - windows-10
     - VS2019
     - cuda-${CUDA}
+  variables:
+    PARALLEL_JOBS: "$(( $(nproc) / 4 ))"    
 
 .linux_dependencies: &linux_dependencies
   before_script:
@@ -79,10 +86,13 @@ variables:
   - fi
   - ccache -s || true
   - cmake ${BUILD_OPTIONS} -S . -B ${BUILD_DIR} -DCMAKE_BUILD_TYPE=${BUILD_TYPE}
-  - cmake --build ${BUILD_DIR} --config ${BUILD_TYPE} --target ${BUILD_TARGET} -j 8
+  - cmake --build ${BUILD_DIR} --config ${BUILD_TYPE} --target ${BUILD_TARGET} -j ${PARALLEL_JOBS}
 
 .run_dorado_cmake_ctest: &run_dorado_cmake_ctest
   - ctest -C ${BUILD_TYPE} --test-dir ${BUILD_DIR} --output-on-failure --verbose
+
+.run_dorado_cmake_cpack: &run_dorado_cmake_cpack
+  - cpack --config ${BUILD_DIR}/CPackConfig.cmake
 
 .build_dorado: &build_dorado
   stage: build
@@ -103,24 +113,14 @@ variables:
 .build_dorado_archive: &build_dorado_archive
   stage: build
   script:
-    - if [[ -d '/data/gitlab-ci-cache' ]] && [[ $OSTYPE != 'darwin'* ]] && [[ $OSTYPE != 'msys' ]]; then
-    - export CCACHE_DIR=/data/gitlab-ci-cache
-    - fi
-    - ccache -s || true  
-    - cmake ${BUILD_OPTIONS} -S . -B ${BUILD_DIR}
-    - cmake --build ${BUILD_DIR} --config Release -j 8
-    - cpack --config ${BUILD_DIR}/CPackConfig.cmake
+    - echo Dorado build stage
+    - echo "BUILD_OPTIONS '${BUILD_OPTIONS}'"  
+    - *run_dorado_cmake_build
+    - *run_dorado_cmake_cpack
   artifacts:
     paths:
       - archive
     expire_in: 1 day
-  interruptible: true
-
-.build_dorado_lib_only: &build_dorado_lib_only
-  stage: build
-  script:
-    - cmake ${BUILD_OPTIONS} -S . -B ${BUILD_DIR} -DDORADO_LIB_ONLY=1
-    - cmake --build ${BUILD_DIR} -j 8
   interruptible: true
 
 .sign_dorado:macos:
@@ -173,9 +173,10 @@ pre-commit:
 
 build:linux:x86:focal:install_deps:
   image: ${DORADO_DOCKER_ROOT}/dorado-no-deps-20.04-cuda-${CUDA}.0:1.0
-  <<: *linux_dependencies
-  <<: *linux_runner
-  <<: *build_dorado
+  extends:
+    - .linux_dependencies
+    - .linux_runner
+    - .build_dorado
   when: manual
 
 build:linux:x86:focal:
@@ -200,8 +201,9 @@ build:linux:x86:focal_coverage:
   variables:
     BUILD_OPTIONS: "-DGITLAB_CI_TOKEN=${CI_JOB_TOKEN} -DGENERATE_TEST_COVERAGE=1"
     BUILD_TARGET: "dorado_test_coverage"
-  <<: *linux_dependencies
-  <<: *linux_runner
+  extends:
+    - .linux_dependencies
+    - .linux_runner
   script:
     - *run_dorado_cmake_build
   rules:
@@ -217,36 +219,38 @@ build:linux:x86:focal:clang_tidy:
     - .linux_runner
   script:
     - apt update && apt install -y clang clang-tidy
-    - ./scripts/run_clang_tidy.sh -j $(( $(nproc) / 4 ))
+    - ./scripts/run_clang_tidy.sh -j ${PARALLEL_JOBS}
 
 build:linux:arm64:bionic:
   image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r32.4.3-deps:1.1
   variables:
     BUILD_OPTIONS: "-DONT_MM2_EXE=ON"
-  <<: *linux_arm64_runner
-  <<: *build_dorado
+  extends:
+    - .linux_arm64_runner
+    - .build_dorado
 
 build:linux:arm64:focal:
   image: nvcr.io/nvidia/l4t-pytorch:r35.1.0-pth1.13-py3
   variables:
     BUILD_OPTIONS: "-DONT_MM2_EXE=ON"
-  <<: *linux_dependencies
-  <<: *linux_arm64_runner
-  <<: *build_dorado
+  extends:
+    - .linux_dependencies
+    - .linux_arm64_runner
+    - .build_dorado
 
 build:linux:x86:focal_koi_download:
   image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.1
-  <<: *linux_runner
-  <<: *build_dorado
+  extends:
+    - .linux_runner
+    - .build_dorado
 
 build:windows:
-  <<: *windows_runner
-  <<: *build_dorado
+  extends:
+    - .windows_runner
+    - .build_dorado
   before_script:
-    - export PATH=${PATH}:${PWD}/dist/bin
     - export CUDA_TOOLKIT=$(cygpath -u $(cygpath -d "${WIN_CUDA_TOOLKIT}"))
     - export BUILD_OPTIONS="-A x64 -T cuda=${CUDA} -DCUDAToolkit_ROOT=${CUDA_TOOLKIT} -DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN}"
-    - echo BUILD_OPTIONS is ${BUILD_OPTIONS}
 
 build:windows:debug:
   variables:
@@ -257,77 +261,85 @@ build:windows:debug:
     - if: $CI_MERGE_REQUEST_EVENT_TYPE == "merged_result"
 
 build:windows_koi_download:
-  <<: *windows_runner
-  <<: *build_dorado
+  extends:
+    - .windows_runner
+    - .build_dorado
   before_script:
-    - export PATH=${PATH}:${PWD}/dist/bin
     - export CUDA_TOOLKIT=$(cygpath -u $(cygpath -d "${WIN_CUDA_TOOLKIT}"))
     - export BUILD_OPTIONS="-A x64 -T cuda=${CUDA} -DCUDAToolkit_ROOT=${CUDA_TOOLKIT}"
-    - echo BUILD_OPTIONS is ${BUILD_OPTIONS}
 
 build:macos:m1:
-  before_script:
-    - export BUILD_OPTIONS="-DONT_MM2_EXE=ON"
-  <<: *macos_m1_runner
-  <<: *build_dorado
+  variables:
+    BUILD_OPTIONS: "-DONT_MM2_EXE=ON"
+  extends:
+    - .macos_m1_runner
+    - .build_dorado
 
 build:macos:x64:
-  before_script:
-    - export BUILD_OPTIONS="-DONT_MM2_EXE=ON"
-  <<: *macos_x64_runner
-  <<: *build_dorado
+  variables:
+    BUILD_OPTIONS: "-DONT_MM2_EXE=ON"
+  extends:
+    - .macos_x64_runner
+    - .build_dorado
 
 build:ios:m1:
   variables:
-    BUILD_OPTIONS: "-DCMAKE_TOOLCHAIN_FILE=cmake/ios-cmake/ios.toolchain.cmake -DPLATFORM=OS64 -DSKIP_HDF_PLUGINS=1 -DDEPLOYMENT_TARGET=16.0"
-  <<: *macos_m1_runner
-  <<: *build_dorado_lib_only
+    BUILD_OPTIONS: "-DDORADO_LIB_ONLY=1 -DCMAKE_TOOLCHAIN_FILE=cmake/ios-cmake/ios.toolchain.cmake -DPLATFORM=OS64 -DSKIP_HDF_PLUGINS=1 -DDEPLOYMENT_TARGET=16.0"
+    BUILD_TARGET: "all"
+  extends:
+    - .macos_m1_runner
+    - .build_dorado
 
 build_archive:linux:x86:focal:
   image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.1
   variables:
     BUILD_OPTIONS: "-DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN}"
-  <<: *linux_runner
-  <<: *build_dorado_archive
+  extends:
+    - .linux_runner
+    - .build_dorado_archive
   when: manual
 
 build_archive:linux:x86:cuda12:
   image: nvcr.io/nvidia/pytorch:23.01-py3
   variables:
     BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/lib/python3.8/dist-packages/torch"
-  <<: *linux_dependencies
-  <<: *linux_runner
-  <<: *build_dorado_archive
+  extends:
+    - .linux_dependencies
+    - .linux_runner
+    - .build_dorado_archive
   when: manual
 
 build_archive:linux:arm64:bionic:
   image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r32.4.3-deps:1.1
-  <<: *linux_arm64_runner
-  <<: *build_dorado_archive
+  extends:
+    - .linux_arm64_runner
+    - .build_dorado_archive
   when: manual
 
 build_archive:linux:arm64:focal:
   image: nvcr.io/nvidia/l4t-pytorch:r35.1.0-pth1.13-py3
-  <<: *linux_dependencies
-  <<: *linux_arm64_runner
-  <<: *build_dorado_archive
+  extends:
+    - .linux_dependencies
+    - .linux_arm64_runner
+    - .build_dorado_archive
   when: manual
 
 build_archive:linux:x86:centos7:
   image: ${DORADO_DOCKER_ROOT}/dorado-deps-centos7-cuda-${CUDA}.0:1.1
   variables:
     BUILD_OPTIONS: "-DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN} -DDORADO_USING_OLD_CPP_ABI=ON -DDYNAMIC_HDF=ON"
-  <<: *linux_runner
-  <<: *build_dorado_archive
+  extends:
+    - .linux_runner
+    - .build_dorado_archive
   when: manual
 
 build_archive:windows:
   before_script:
     - export CUDA_TOOLKIT=$(cygpath -u $(cygpath -d "${WIN_CUDA_TOOLKIT}"))
     - export BUILD_OPTIONS="-A x64 -T cuda=${CUDA} -DCUDAToolkit_ROOT=${CUDA_TOOLKIT} -DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN}"
-    - echo BUILD_OPTIONS is ${BUILD_OPTIONS}
-  <<: *windows_runner
-  <<: *build_dorado_archive
+  extends:
+    - .windows_runner
+    - .build_dorado_archive
   when: manual
 
 build_archive:macos:m1:
@@ -389,16 +401,18 @@ build_archive:macos:x64:
 # Test stages
 
 test:windows:
-  <<: *windows_runner
-  <<: *test_dorado_windows
+  extends:
+    - .windows_runner
+    - .test_dorado_windows
   needs:
     - build:windows
 
 test:linux:x86:focal:
   image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.1
-  <<: *linux_dependencies
-  <<: *linux_runner
-  <<: *test_dorado
+  extends:
+    - .linux_dependencies
+    - .linux_runner
+    - .test_dorado
   needs:
     - build:linux:x86:focal
   artifacts:
@@ -409,9 +423,10 @@ test:linux:x86:focal:
 
 test:linux:arm64:bionic:
   image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r32.4.3-deps:1.1
-  <<: *linux_dependencies
-  <<: *linux_tegra_runner
-  <<: *test_dorado
+  extends:
+    - .linux_dependencies
+    - .linux_tegra_runner
+    - .test_dorado
   variables:
     GIT_STRATEGY: none
     MODEL: dna_r10.4.1_e8.2_400bps_hac@v4.1.0
@@ -423,21 +438,24 @@ test:linux:arm64:bionic:
 
 test:linux:arm64:focal:
   image: nvcr.io/nvidia/l4t-pytorch:r35.1.0-pth1.13-py3
-  <<: *linux_dependencies
-  <<: *linux_orin_runner
-  <<: *test_dorado
+  extends:
+    - .linux_dependencies
+    - .linux_orin_runner
+    - .test_dorado  
   needs:
     - build:linux:arm64:focal
 
 test:macos:m1:
-  <<: *macos_m1_runner
-  <<: *test_dorado
+  extends:
+    - .macos_m1_runner
+    - .test_dorado
   needs:
     - build:macos:m1
 
 test:macos:x64:
-  <<: *macos_x64_runner
-  <<: *test_dorado
+  extends:
+    - .macos_x64_runner
+    - .test_dorado
   needs:
     - build:macos:x64
   variables:
@@ -450,48 +468,54 @@ test:macos:x64:
 # Test that you can run dorado in a clean cuda 20.04 environment
 test_archive:linux:x86:20.04_nvidia:
   image: nvidia/cuda:${CUDA}.0-devel-ubuntu20.04
-  <<: *linux_runner
-  <<: *test_archive
+  extends:
+    - .linux_runner
+    - .test_archive
   needs:
     - build_archive:linux:x86:centos7
 
 # Test that you can run dorado in a clean cpu 18.04 environment
 test_archive:linux:x86:18.04:
   image: ${DORADO_DOCKER_EXT}/ubuntu:18.04
-  <<: *linux_runner
-  <<: *test_archive
+  extends:
+    - .linux_runner
+    - .test_archive
   needs:
     - build_archive:linux:x86:centos7
 
 # Test that you can run dorado in a clean cpu 20.04 environment
 test_archive:linux:x86:20.04:
   image: ${DORADO_DOCKER_EXT}/ubuntu:20.04
-  <<: *linux_runner
-  <<: *test_archive
+  extends:
+    - .linux_runner
+    - .test_archive
   needs:
     - build_archive:linux:x86:centos7
 
 # Test that you can run dorado in a clean l4t environment
 test_archive:linux:arm64:18.04:
   image: nvcr.io/nvidia/l4t-base:r32.4.3
-  <<: *linux_tegra_runner
-  <<: *test_archive
+  extends:
+    - .linux_tegra_runner
+    - .test_archive
   needs:
     - build_archive:linux:arm64:bionic
 
 test_archive:linux:arm64:20.04:
   image: nvcr.io/nvidia/l4t-pytorch:r35.1.0-pth1.13-py3
-  <<: *linux_dependencies
-  <<: *linux_orin_runner
-  <<: *test_archive
+  extends:
+    - .linux_dependencies
+    - .linux_orin_runner
+    - .test_archive
   needs:
     - build_archive:linux:arm64:focal
 
 # Test that models can be downloaded and run.
 test:model_download:linux:x86:focal:
   image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.1
-  <<: *linux_dependencies
-  <<: *linux_runner
+  extends:
+    - .linux_dependencies
+    - .linux_runner
   stage: test
   needs:
     - build:linux:x86:focal
@@ -519,7 +543,8 @@ test:model_download:linux:x86:focal:
 
 # MLHub - Single read eval
 .mlhub_sre:
-  <<: *mlhub
+  extends:
+    - .mlhub
   script:
     - echo ${MODELS}
     - |
@@ -577,7 +602,8 @@ mlhub:sre_5k_400bps_duplex:
 
 # MLHub - Remora
 mlhub:remora-validate:
-  <<: *mlhub
+  extends:
+    - .mlhub
   script:
     - |
       curl --header "Content-Type: application/json" \
@@ -604,7 +630,8 @@ mlhub:remora-validate:
 
 # MLHub - Dorado integration test
 mlhub:sweeper:
-  <<: *mlhub
+  extends:
+    - .mlhub
   script:
     - |
       curl --header "Content-Type: application/json" \
@@ -621,7 +648,8 @@ mlhub:sweeper:
 
 # MLHub - Dorado integration test
 mlhub:dorado-integration-tests:
-  <<: *mlhub
+  extends:
+    - .mlhub
   script:
     - |
       curl --header "Content-Type: application/json" \
