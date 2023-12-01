@@ -5,6 +5,7 @@
 #include "nn/CRFModelConfig.h"
 #include "nn/ModBaseRunner.h"
 #include "nn/Runners.h"
+#include "read_pipeline/AdapterDetectorNode.h"
 #include "read_pipeline/AlignerNode.h"
 #include "read_pipeline/BarcodeClassifierNode.h"
 #include "read_pipeline/HtsReader.h"
@@ -68,6 +69,8 @@ void setup(std::vector<std::string> args,
            const std::vector<std::string>& barcode_kits,
            bool barcode_both_ends,
            bool barcode_no_trim,
+           bool adapter_no_trim,
+           bool primer_no_trim,
            const std::string& barcode_sample_sheet,
            argparse::ArgumentParser& resume_parser,
            bool estimate_poly_a) {
@@ -124,9 +127,10 @@ void setup(std::vector<std::string> args,
 
     bool duplex = false;
 
+    bool adapter_trimming_disabled = (adapter_no_trim && primer_no_trim);
     const auto thread_allocations = utils::default_thread_allocations(
             int(num_devices), !remora_runners.empty() ? int(num_remora_threads) : 0, enable_aligner,
-            !barcode_kits.empty());
+            !barcode_kits.empty(), !adapter_trimming_disabled);
 
     std::unique_ptr<const utils::SampleSheet> sample_sheet;
     BarcodingInfo::FilterSet allowed_barcodes;
@@ -163,6 +167,11 @@ void setup(std::vector<std::string> args,
         current_sink_node = pipeline_desc.add_node<BarcodeClassifierNode>(
                 {current_sink_node}, thread_allocations.barcoder_threads, barcode_kits,
                 barcode_both_ends, barcode_no_trim, std::move(allowed_barcodes));
+    }
+    if (!adapter_trimming_disabled) {
+        current_sink_node = pipeline_desc.add_node<AdapterDetectorNode>(
+                {current_sink_node}, thread_allocations.adapter_threads, !adapter_no_trim,
+                !primer_no_trim);
     }
     current_sink_node = pipeline_desc.add_node<ReadFilterNode>(
             {current_sink_node}, min_qscore, default_parameters.min_sequence_length,
@@ -369,9 +378,19 @@ int basecaller(int argc, char* argv[]) {
             .default_value(false)
             .implicit_value(true);
     parser.visible.add_argument("--no-trim")
-            .help("Skip barcode trimming. If option is not chosen, trimming is enabled.")
+            .help("Skip trimming of barcodes, adapters, and primers. If option is not chosen, "
+                  "trimming of all three is enabled.")
             .default_value(false)
             .implicit_value(true);
+    parser.visible.add_argument("--trim")
+            .help("Specify what to trim. Options are 'none', 'all', 'adapters', and 'primers'. "
+                  "Default behavior is to trim all detected adapters, primers, or barcodes. "
+                  "Choose 'adapters' to just trim adapters. The 'primers' choice will trim "
+                  "adapters and "
+                  "primers, but not barcodes. The 'none' choice is equivelent to using --no-trim. "
+                  "Note that "
+                  "this only applies to DNA. RNA adapters are always trimmed.")
+            .default_value(std::string(""));
     parser.visible.add_argument("--sample-sheet")
             .help("Path to the sample sheet to use.")
             .default_value(std::string(""));
@@ -460,6 +479,26 @@ int basecaller(int argc, char* argv[]) {
         output_mode = HtsWriter::OutputMode::UBAM;
     }
 
+    bool no_trim_barcodes = false, no_trim_primers = false, no_trim_adapters = false;
+    auto trim_options = parser.visible.get<std::string>("--trim");
+    if (parser.visible.get<bool>("--no-trim")) {
+        if (!trim_options.empty()) {
+            spdlog::error("Only one of --no-trim and --trim can be used.");
+            std::exit(EXIT_FAILURE);
+        }
+        no_trim_barcodes = no_trim_primers = no_trim_adapters = true;
+    }
+    if (trim_options == "none") {
+        no_trim_barcodes = no_trim_primers = no_trim_adapters = true;
+    } else if (trim_options == "primers") {
+        no_trim_barcodes = true;
+    } else if (trim_options == "adapters") {
+        no_trim_barcodes = no_trim_primers = true;
+    } else if (!trim_options.empty() && trim_options != "all") {
+        spdlog::error("Unsupported --trim value '{}'.", trim_options);
+        std::exit(EXIT_FAILURE);
+    }
+
     spdlog::info("> Creating basecall pipeline");
 
     try {
@@ -478,9 +517,8 @@ int basecaller(int argc, char* argv[]) {
               parser.hidden.get<std::string>("--dump_stats_filter"),
               parser.visible.get<std::string>("--resume-from"),
               parser.visible.get<std::vector<std::string>>("--kit-name"),
-              parser.visible.get<bool>("--barcode-both-ends"),
-              parser.visible.get<bool>("--no-trim"),
-              parser.visible.get<std::string>("--sample-sheet"), resume_parser,
+              parser.visible.get<bool>("--barcode-both-ends"), no_trim_barcodes, no_trim_adapters,
+              no_trim_primers, parser.visible.get<std::string>("--sample-sheet"), resume_parser,
               parser.visible.get<bool>("--estimate-poly-a"));
     } catch (const std::exception& e) {
         spdlog::error("{}", e.what());
