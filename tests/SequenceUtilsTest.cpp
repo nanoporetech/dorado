@@ -42,7 +42,6 @@ TEST_CASE(TEST_GROUP "reverse_complement") {
         for (int j = 0; j < len; ++j) {
             const int base_index = std::rand() % 4;
             char temp_base = bases.at(base_index);
-            ;
             char rev_comp_base = bases.at(3 - base_index);
             // Randomly switch to lower case.
             if (rand() & 1) {
