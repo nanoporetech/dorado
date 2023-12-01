@@ -23,7 +23,6 @@ variables:
   BUILD_DIR: build
   BUILD_TARGET: install
   BUILD_TYPE: Release
-  PARALLEL_JOBS: "8"
   GIT_SUBMODULE_STRATEGY: recursive
   CUDA: "11.8"
   WIN_CUDA_TOOLKIT: "/c/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v${CUDA}"
@@ -47,8 +46,6 @@ variables:
   tags:
     - ubuntu-20.04
     - nvidia-docker
-  variables:
-    PARALLEL_JOBS: "$(($(nproc)/4))"
 
 .linux_arm64_runner: &linux_arm64_runner
   tags:
@@ -69,8 +66,6 @@ variables:
     - windows-10
     - VS2019
     - cuda-${CUDA}
-  variables:
-    PARALLEL_JOBS: "$(($(nproc)/4))"    
 
 .linux_dependencies: &linux_dependencies
   before_script:
@@ -78,11 +73,22 @@ variables:
     - apt-get update && apt-get install -y --no-install-recommends samtools curl libhdf5-dev libssl-dev libzstd-dev libsz2 ccache
     - pip install gcovr
 
+.set_parallel_jobs: &set_parallel_jobs
+  - |
+    if [[ $OSTYPE == 'darwin'* ]]; then
+      export PARALLEL_JOBS=$(( $(sysctl -n hw.physicalcpu) / 2 ))
+    elif [[ $(arch) != 'aarch64' ]]; then
+      export PARALLEL_JOBS=$(( $(nproc) / 4 ))
+    else
+      export PARALLEL_JOBS=8
+    fi
+
 .run_dorado_cmake_build: &run_dorado_cmake_build
   - if [[ -d '/data/gitlab-ci-cache' ]] && [[ $OSTYPE != 'darwin'* ]] && [[ $OSTYPE != 'msys' ]]; then
   - export CCACHE_DIR=/data/gitlab-ci-cache
   - fi
   - ccache -s || true
+  - *set_parallel_jobs
   - cmake ${BUILD_OPTIONS} -S . -B ${BUILD_DIR} -DCMAKE_BUILD_TYPE=${BUILD_TYPE}
   - cmake --build ${BUILD_DIR} --config ${BUILD_TYPE} --target ${BUILD_TARGET} -j ${PARALLEL_JOBS}
 
