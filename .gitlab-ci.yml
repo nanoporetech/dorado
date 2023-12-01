@@ -300,9 +300,8 @@ build:ios:m1:
   variables:
     BUILD_OPTIONS: "-DCMAKE_TOOLCHAIN_FILE=cmake/ios-cmake/ios.toolchain.cmake -DPLATFORM=OS64 -DSKIP_HDF_PLUGINS=1 -DDEPLOYMENT_TARGET=16.0"
     BUILD_TARGET: "all"
-  extends:
-    - .macos_m1_runner
-    - .build_dorado_lib_only
+  <<: *macos_m1_runner
+  <<: *build_dorado_lib_only
 
 build_archive:linux:x86:focal:
   image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.1
