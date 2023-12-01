@@ -412,6 +412,9 @@ struct ConvStackImpl : Module {
                                              std::to_string(params.insize));
                 }
             } else if (cutlass_conv) {
+#ifdef DORADO_TX2  // Koi for TX2 does not have Cutlass kernels
+                throw std::logic_error("No Cutlass kernels in Jetson TX2 build.");
+#else
                 utils::ScopedProfileRange spr2("linear conv", 3);
                 auto out_type = (output_layout == TensorLayout::CUTLASS_TNC_I8) ? KOI_I8 : KOI_F16;
                 in.slice(1, 0, padding) = 0;
@@ -426,6 +429,7 @@ struct ConvStackImpl : Module {
                     throw std::runtime_error(std::string("Koi convolution failed with in size ") +
                                              std::to_string(params.insize));
                 }
+#endif  // ifdef DORADO_TX2 else
             } else {
                 utils::ScopedProfileRange spr2("window conv", 3);
                 // The window tensor is either NTC or TNC, depending on whether the first two
@@ -536,6 +540,9 @@ struct LinearCRFImpl : Module {
                 out_2D += linear->bias;
             }
         } else {
+#ifdef DORADO_TX2  // Koi for TX2 does not have Cutlass kernels
+            throw std::logic_error("No Cutlass kernels in Jetson TX2 build.");
+#else
             utils::ScopedProfileRange spr("koi_linear", 2);
             auto in_ntc = wm.get_current_NTC_view();
             auto out = wm.next_TC(wm.T, C_out, TensorLayout::NTC);
@@ -553,6 +560,7 @@ struct LinearCRFImpl : Module {
                         int(out.stride(0)), int(out.stride(1)), in_ntc.data_ptr(),
                         w_device.data_ptr(), out.data_ptr(),
                         weight_scale.defined() ? weight_scale.data_ptr() : nullptr, bias_ptr);
+#endif  // ifdef DORADO_TX2 else
         }
     }
 
