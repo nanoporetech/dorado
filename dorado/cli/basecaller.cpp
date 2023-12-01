@@ -124,16 +124,15 @@ void setup(std::vector<std::string> args,
     const bool enable_aligner = !ref.empty();
 
     // create modbase runners first so basecall runners can pick batch sizes based on available memory
-    auto remora_runners = create_modbase_runners(
-            remora_models, device, default_parameters.remora_runners_per_caller, remora_batch_size);
+    auto remora_runners = create_modbase_runners(remora_models, device,
+                                                 default_parameters.mod_base_runners_per_caller,
+                                                 remora_batch_size);
 
     auto [runners, num_devices] = create_basecall_runners(model_config, device, num_runners, 0,
                                                           batch_size, chunk_size, 1.f, false);
 
     auto read_groups = DataLoader::load_read_groups(data_path, model_name, modbase_model_names,
                                                     recursive_file_loading);
-
-    bool duplex = false;
 
     const auto thread_allocations = utils::default_thread_allocations(
             int(num_devices), !remora_runners.empty() ? int(num_remora_threads) : 0, enable_aligner,
@@ -251,7 +250,7 @@ void setup(std::vector<std::string> args,
     }
 
     std::vector<dorado::stats::StatsCallable> stats_callables;
-    ProgressTracker tracker(int(num_reads), duplex);
+    ProgressTracker tracker(int(num_reads), false);
     stats_callables.push_back(
             [&tracker](const stats::NamedStats& stats) { tracker.update_progress_bar(stats); });
     constexpr auto kStatsPeriod = 100ms;

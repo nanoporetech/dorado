@@ -105,16 +105,19 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
     }
 }
 
-void create_stereo_duplex_pipeline(PipelineDescriptor& pipeline_desc,
-                                   std::vector<dorado::Runner>&& runners,
-                                   std::vector<dorado::Runner>&& stereo_runners,
-                                   size_t overlap,
-                                   uint32_t mean_qscore_start_pos,
-                                   int scaler_node_threads,
-                                   int splitter_node_threads,
-                                   PairingParameters pairing_parameters,
-                                   NodeHandle sink_node_handle,
-                                   NodeHandle source_node_handle) {
+void create_stereo_duplex_pipeline(
+        PipelineDescriptor& pipeline_desc,
+        std::vector<dorado::Runner>&& runners,
+        std::vector<dorado::Runner>&& stereo_runners,
+        std::vector<std::unique_ptr<dorado::ModBaseRunner>>&& modbase_runners,
+        size_t overlap,
+        uint32_t mean_qscore_start_pos,
+        int scaler_node_threads,
+        int splitter_node_threads,
+        int modbase_node_threads,
+        PairingParameters pairing_parameters,
+        NodeHandle sink_node_handle,
+        NodeHandle source_node_handle) {
     const auto& model_config = runners.front()->config();
     const auto& stereo_model_config = stereo_runners.front()->config();
     std::string model_name =
@@ -129,6 +132,15 @@ void create_stereo_duplex_pipeline(PipelineDescriptor& pipeline_desc,
     auto stereo_basecaller_node = pipeline_desc.add_node<BasecallerNode>(
             {}, std::move(stereo_runners), adjusted_stereo_overlap, kStereoBatchTimeoutMS,
             duplex_rg_name, 1000, "StereoBasecallerNode", mean_qscore_start_pos);
+
+    NodeHandle last_node_handle = stereo_basecaller_node;
+    if (!modbase_runners.empty()) {
+        auto mod_base_caller_node = pipeline_desc.add_node<ModBaseCallerNode>(
+                {}, std::move(modbase_runners), modbase_node_threads,
+                size_t(runners.front()->model_stride()), 1000);
+        pipeline_desc.add_node_sink(stereo_basecaller_node, mod_base_caller_node);
+        last_node_handle = mod_base_caller_node;
+    }
 
     auto simplex_model_stride = runners.front()->model_stride();
     auto stereo_node = pipeline_desc.add_node<StereoDuplexEncoderNode>({stereo_basecaller_node},
@@ -172,7 +184,7 @@ void create_stereo_duplex_pipeline(PipelineDescriptor& pipeline_desc,
 
     // if we've been provided a sink node, connect it to the end of our pipeline
     if (sink_node_handle != PipelineDescriptor::InvalidNodeHandle) {
-        pipeline_desc.add_node_sink(stereo_basecaller_node, sink_node_handle);
+        pipeline_desc.add_node_sink(last_node_handle, sink_node_handle);
     }
 }
 
