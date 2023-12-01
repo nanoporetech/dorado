@@ -22,7 +22,7 @@ struct DefaultParameters {
     int remora_batchsize{1024};
 #endif
     int remora_threads{4};
-    int remora_runners_per_caller{2};
+    int mod_base_runners_per_caller{2};
     float methylation_threshold{0.05f};
 
     // Minimum length for a sequence to be outputted.

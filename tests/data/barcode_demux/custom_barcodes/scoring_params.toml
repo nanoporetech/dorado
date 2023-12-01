@@ -1,0 +1,7 @@
+[scoring]
+
+min_soft_barcode_threshold = 0.1
+min_hard_barcode_threshold = 0.2
+min_soft_flank_threshold = 0.3
+min_hard_flank_threshold = 0.4
+min_barcode_score_dist = 0.5

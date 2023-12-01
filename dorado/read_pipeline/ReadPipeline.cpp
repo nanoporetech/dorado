@@ -13,6 +13,7 @@
 #include <cctype>
 #include <chrono>
 #include <iomanip>
+#include <iostream>
 #include <sstream>
 #include <stack>
 #include <stdexcept>
@@ -173,6 +174,42 @@ void ReadCommon::generate_modbase_tags(bam1_t *aln, uint8_t threshold) const {
     context_handler.update_mask(modbase_mask, seq, mod_base_info->alphabet, base_mod_probs,
                                 threshold);
 
+    if (is_duplex) {
+        // If this is a duplex read, we need to compute the reverse complement mask and combine it
+        auto reverse_complemented_seq = utils::reverse_complement(seq);
+
+        // Compute the reverse complement mask
+        auto modbase_mask_rc = context_handler.get_sequence_mask(reverse_complemented_seq);
+
+        auto reverseMatrix = [](const std::vector<uint8_t> &matrix, int m_num_states) {
+            int numRows = static_cast<int>(matrix.size()) / static_cast<int>(m_num_states);
+            std::vector<uint8_t> reversedMatrix(matrix.size());
+
+            for (int i = 0; i < numRows; ++i) {
+                for (int j = 0; j < m_num_states; ++j) {
+                    reversedMatrix[i * m_num_states + j] =
+                            matrix[(numRows - 1 - i) * m_num_states + j];
+                }
+            }
+
+            return reversedMatrix;
+        };
+
+        int num_states = static_cast<int>(base_mod_probs.size()) / static_cast<int>(seq.size());
+        // Update the context mask using the reversed sequence
+        context_handler.update_mask(modbase_mask_rc, reverse_complemented_seq,
+                                    mod_base_info->alphabet,
+                                    reverseMatrix(base_mod_probs, num_states), threshold);
+
+        // Reverse the mask in-place
+        std::reverse(modbase_mask_rc.begin(), modbase_mask_rc.end());
+
+        // Combine the original and reverse complement masks
+        // Using std::transform for better readability and potential efficiency
+        std::transform(modbase_mask.begin(), modbase_mask.end(), modbase_mask_rc.begin(),
+                       modbase_mask.begin(), std::plus<>());
+    }
+
     // Iterate over the provided alphabet and find all the channels we need to write out
     for (size_t channel_idx = 0; channel_idx < num_channels; channel_idx++) {
         if (cardinal_bases.find(mod_base_info->alphabet[channel_idx]) != std::string::npos) {
@@ -206,9 +243,44 @@ void ReadCommon::generate_modbase_tags(bam1_t *aln, uint8_t threshold) const {
         }
     }
 
+    if (is_duplex) {
+        // Having done the strand in the forward direction, if the read is duplex we need to also process its complement
+        // There is some code repetition here, but it makes it more readable.
+        for (size_t channel_idx = 0; channel_idx < num_channels; channel_idx++) {
+            if (cardinal_bases.find(mod_base_info->alphabet[channel_idx]) != std::string::npos) {
+                // A cardinal base
+                current_cardinal = mod_base_info->alphabet[channel_idx][0];
+            } else {
+                auto cardinal_complement = utils::complement_table[current_cardinal];
+                // A modification on the previous cardinal base
+                std::string bam_name = mod_base_info->alphabet[channel_idx];
+                if (!utils::validate_bam_tag_code(bam_name)) {
+                    return;
+                }
+
+                modbase_string += std::string(1, cardinal_complement) + "-" + bam_name;
+                modbase_string += base_has_context[current_cardinal] ? "?" : ".";
+                int skipped_bases = 0;
+                for (size_t base_idx = 0; base_idx < seq.size(); base_idx++) {
+                    if (seq[base_idx] == cardinal_complement) {  // complement
+                        if (modbase_mask[base_idx]) {            // Not sure this one is right
+                            modbase_string += "," + std::to_string(skipped_bases);
+                            skipped_bases = 0;
+                            modbase_prob.push_back(
+                                    base_mod_probs[base_idx * num_channels + channel_idx]);
+                        } else {
+                            // Skip this base
+                            skipped_bases++;
+                        }
+                    }
+                }
+                modbase_string += ";";
+            }
+        }
+    }
+
     int seq_len = int(seq.length());
     bam_aux_append(aln, "MN", 'i', sizeof(seq_len), (uint8_t *)&seq_len);
-
     bam_aux_append(aln, "MM", 'Z', int(modbase_string.length() + 1),
                    (uint8_t *)modbase_string.c_str());
     bam_aux_update_array(aln, "ML", 'C', int(modbase_prob.size()), (uint8_t *)modbase_prob.data());

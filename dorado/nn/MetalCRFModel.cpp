@@ -673,8 +673,8 @@ public:
 
         m_decode_complete_event = NS::TransferPtr(m_device->newSharedEvent());
         m_bwd_scan_cps = make_cps(m_device.get(), "backward_scan", {}, std::nullopt);
-        m_fwd_scan_cps = make_cps(m_device.get(), "forward_scan", {}, std::nullopt);
-        m_add_softmax_cps = make_cps(m_device.get(), "add_softmax", {}, std::nullopt);
+        m_fwd_scan_add_softmax_cps =
+                make_cps(m_device.get(), "forward_scan_add_softmax", {}, std::nullopt);
 
         int T = m_out_chunk_size;
         int C = model_config.outsize;
@@ -682,7 +682,9 @@ public:
 
         for (int i = 0; i < m_out_split; ++i) {
             m_scores_int8.push_back(torch::empty({T, m_out_batch_size, C}, torch::kInt8));
-            m_posts.push_back(torch::empty({m_out_batch_size, T + 1, Cs}));
+            // Unfortunately torch doesn't have Uint16, or we would use it.  We could offset,
+            // or rely on undefined overflow behaviour, but for now we waste the sign bit.
+            m_posts_int16.push_back(torch::empty({m_out_batch_size, T + 1, Cs}, torch::kInt16));
             m_bwd.push_back(torch::empty({m_out_batch_size, T + 1, Cs}));
         }
 
@@ -806,9 +808,6 @@ public:
                     continue;
                 }
 
-                // The same buffer is used for the forward scan results and the output of
-                // m_add_softmax_cps.
-                auto &fwd = m_posts;
                 // This stage is operating on the split outputs of the linear layer, so
                 // the effective batch size is m_out_batch_size.
                 std::vector<int32_t> scan_args_{m_out_chunk_size, m_out_batch_size, m_states};
@@ -816,20 +815,16 @@ public:
 
                 for (int i = 0; i < m_out_split; ++i) {
                     // TODO: optimise grid size
-                    launch_kernel_no_wait(m_fwd_scan_cps.get(), cb,
-                                          {scan_args.get(), mtl_for_tensor(m_scores_int8.at(i)),
-                                           mtl_for_tensor(fwd.at(i))},
-                                          {}, m_out_batch_size, m_states);
-
                     launch_kernel_no_wait(m_bwd_scan_cps.get(), cb,
                                           {scan_args.get(), mtl_for_tensor(m_scores_int8.at(i)),
                                            mtl_for_tensor(m_bwd.at(i))},
                                           {}, m_out_batch_size, m_states);
 
-                    launch_kernel_no_wait(m_add_softmax_cps.get(), cb,
-                                          {scan_args.get(), mtl_for_tensor(fwd.at(i)),
-                                           mtl_for_tensor(m_bwd.at(i))},
-                                          {}, m_out_batch_size, m_states);
+                    launch_kernel_no_wait(
+                            m_fwd_scan_add_softmax_cps.get(), cb,
+                            {scan_args.get(), mtl_for_tensor(m_scores_int8.at(i)),
+                             mtl_for_tensor(m_bwd.at(i)), mtl_for_tensor(m_posts_int16.at(i))},
+                            {}, m_out_batch_size, m_states);
                 }
                 if (finishCommandBuffer("linear/scan/softmax", cb, try_count)) {
                     cb_success = true;
@@ -876,16 +871,16 @@ public:
             // Model outputs are split across m_out_split buffers.
             assert(m_scores_int8.size() == static_cast<size_t>(m_out_split));
             assert(m_bwd.size() == static_cast<size_t>(m_out_split));
-            assert(m_posts.size() == static_cast<size_t>(m_out_split));
+            assert(m_posts_int16.size() == static_cast<size_t>(m_out_split));
             const int out_buf_idx = chunk_idx / m_out_batch_size;
             const int buf_chunk_idx = chunk_idx % m_out_batch_size;
 
             auto [sequence, qstring, moves] = beam_search_decode(
                     m_scores_int8.at(out_buf_idx).index({Slice(), buf_chunk_idx}),
-                    m_bwd.at(out_buf_idx)[buf_chunk_idx], m_posts.at(out_buf_idx)[buf_chunk_idx],
-                    m_decoder_options.beam_width, m_decoder_options.beam_cut,
-                    m_decoder_options.blank_score, m_decoder_options.q_shift,
-                    m_decoder_options.q_scale, score_scale);
+                    m_bwd.at(out_buf_idx)[buf_chunk_idx],
+                    m_posts_int16.at(out_buf_idx)[buf_chunk_idx], m_decoder_options.beam_width,
+                    m_decoder_options.beam_cut, m_decoder_options.blank_score,
+                    m_decoder_options.q_shift, m_decoder_options.q_scale, score_scale);
 
             (*task->out_chunks)[chunk_idx] = DecodedChunk{sequence, qstring, moves};
 
@@ -942,10 +937,10 @@ public:
     DecoderOptions m_decoder_options;
     nn::MetalModel m_model{nullptr};
     NS::SharedPtr<MTL::Device> m_device;
-    NS::SharedPtr<MTL::ComputePipelineState> m_bwd_scan_cps, m_fwd_scan_cps, m_add_softmax_cps;
+    NS::SharedPtr<MTL::ComputePipelineState> m_bwd_scan_cps, m_fwd_scan_add_softmax_cps;
     // Used to signal completion of an NNTask's decoding.
     NS::SharedPtr<MTL::SharedEvent> m_decode_complete_event;
-    std::vector<at::Tensor> m_scores_int8, m_posts, m_bwd;
+    std::vector<at::Tensor> m_scores_int8, m_posts_int16, m_bwd;
     int m_in_chunk_size, m_out_chunk_size, m_batch_size, m_states;
     // Number of pieces the linear output is split into, for reasons of
     // buffer size constraints.

@@ -1,8 +1,10 @@
 #pragma once
 
+#include <array>
 #include <optional>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <vector>
 
 namespace dorado::utils {
@@ -27,6 +29,11 @@ std::vector<uint64_t> moves_to_map(const std::vector<uint8_t>& moves,
 // Compute cumulative sums of the move table
 std::vector<uint64_t> move_cum_sums(const std::vector<uint8_t>& moves);
 
+// Result of overlapping two reads
+using OverlapResult = std::tuple<bool, uint32_t, uint32_t, uint32_t, uint32_t>;
+
+OverlapResult compute_overlap(const std::string& query_seq, const std::string& target_seq);
+
 // Compute reverse complement of a nucleotide sequence.
 // Bases are specified as capital letters.
 // Undefined output if characters other than A, C, G, T appear.
@@ -39,5 +46,24 @@ public:
 };
 
 int count_trailing_chars(const std::string_view adapter, char c);
+
+std::tuple<int, int, std::vector<uint8_t>, int> realign_moves(const std::string& query_sequence,
+                                                              const std::string& target_sequence,
+                                                              const std::vector<uint8_t>& moves);
+
+// Compile-time constant lookup table.
+static constexpr auto complement_table = [] {
+    std::array<char, 256> a{};
+    // Valid input will only touch the entries set here.
+    a['A'] = 'T';
+    a['T'] = 'A';
+    a['C'] = 'G';
+    a['G'] = 'C';
+    a['a'] = 't';
+    a['t'] = 'a';
+    a['c'] = 'g';
+    a['g'] = 'c';
+    return a;
+}();
 
 }  // namespace dorado::utils

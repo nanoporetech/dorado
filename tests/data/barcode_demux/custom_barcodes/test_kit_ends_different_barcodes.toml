@@ -1,0 +1,11 @@
+[arrangement]
+name = "test_kit_ends_different_barcodes"
+first_index = 1
+last_index = 12
+kit = "BC"
+mask1_front = "C"
+mask1_rear = "G"
+mask2_front = "C"
+mask2_rear = "G"
+barcode1_pattern = "BCA%02i"
+barcode2_pattern = "BCB%02i"

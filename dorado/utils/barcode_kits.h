@@ -16,6 +16,7 @@ struct KitInfo {
     std::string bottom_front_flank;
     std::string bottom_rear_flank;
     std::vector<std::string> barcodes;
+    std::vector<std::string> barcodes2;
 };
 
 const std::unordered_map<std::string, KitInfo>& get_kit_infos();

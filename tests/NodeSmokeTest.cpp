@@ -301,7 +301,7 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
     for (const auto& device_string : modbase_devices) {
         auto caller = dorado::create_modbase_caller({remora_model, remora_model_6mA}, batch_size,
                                                     device_string);
-        for (int i = 0; i < default_params.remora_runners_per_caller; i++) {
+        for (int i = 0; i < default_params.mod_base_runners_per_caller; i++) {
             remora_runners.push_back(std::make_unique<dorado::ModBaseRunner>(caller));
         }
     }
@@ -336,19 +336,40 @@ DEFINE_TEST(NodeSmokeTestBam, "ReadToBamType") {
             emit_moves, 2, dorado::utils::default_parameters.methylation_threshold, nullptr, 1000);
 }
 
+struct BarcodeKitInputs {
+    std::vector<std::string> kit_names;
+    std::optional<std::string> custom_kit;
+    std::optional<std::string> custom_sequences;
+};
+
 DEFINE_TEST(NodeSmokeTestRead, "BarcodeClassifierNode") {
     auto barcode_both_ends = GENERATE(true, false);
     auto no_trim = GENERATE(true, false);
     auto pipeline_restart = GENERATE(false, true);
+    auto kit_inputs =
+            GENERATE(BarcodeKitInputs{{"SQK-RPB004", "EXP-NBD196"}, std::nullopt, std::nullopt},
+                     BarcodeKitInputs{{},
+                                      (fs::path(get_data_dir("barcode_demux/custom_barcodes")) /
+                                       "test_kit_single_ended.toml")
+                                              .string(),
+                                      std::nullopt},
+                     BarcodeKitInputs{{},
+                                      (fs::path(get_data_dir("barcode_demux/custom_barcodes")) /
+                                       "test_kit_single_ended.toml")
+                                              .string(),
+                                      (fs::path(get_data_dir("barcode_demux/custom_barcodes")) /
+                                       "test_sequences.fasta")
+                                              .string()});
     CAPTURE(barcode_both_ends);
     CAPTURE(no_trim);
+    CAPTURE(kit_inputs);
     CAPTURE(pipeline_restart);
 
     set_pipeline_restart(pipeline_restart);
 
-    std::vector<std::string> kits = {"SQK-RPB004", "EXP-NBD196"};
-    run_smoke_test<dorado::BarcodeClassifierNode>(2, kits, barcode_both_ends, no_trim,
-                                                  std::nullopt);
+    run_smoke_test<dorado::BarcodeClassifierNode>(2, kit_inputs.kit_names, barcode_both_ends,
+                                                  no_trim, std::nullopt, kit_inputs.custom_kit,
+                                                  kit_inputs.custom_sequences);
 }
 
 DEFINE_TEST(NodeSmokeTestRead, "AdapterDetectorNode") {
@@ -370,8 +391,8 @@ TEST_CASE("BarcodeClassifierNode: test simple pipeline with fastq and sam files"
     std::vector<std::string> kits = {"EXP-PBC096"};
     bool barcode_both_ends = GENERATE(true, false);
     bool no_trim = GENERATE(true, false);
-    pipeline_desc.add_node<dorado::BarcodeClassifierNode>({sink}, 8, kits, barcode_both_ends,
-                                                          no_trim, std::nullopt);
+    pipeline_desc.add_node<dorado::BarcodeClassifierNode>(
+            {sink}, 8, kits, barcode_both_ends, no_trim, std::nullopt, std::nullopt, std::nullopt);
 
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
 

@@ -6,6 +6,7 @@
 
 #include <atomic>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -18,7 +19,9 @@ public:
                           const std::vector<std::string>& kit_name,
                           bool barcode_both_ends,
                           bool no_trim,
-                          BarcodingInfo::FilterSet allowed_barcodes);
+                          BarcodingInfo::FilterSet allowed_barcodes,
+                          const std::optional<std::string>& custom_kit,
+                          const std::optional<std::string>& custom_seqs);
     BarcodeClassifierNode(int threads);
     ~BarcodeClassifierNode();
     std::string get_name() const override { return "BarcodeClassifierNode"; }

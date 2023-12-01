@@ -45,14 +45,6 @@ If you encounter problems with running on your system, please [report an issue](
 
 AWS Benchmarks on Nvidia GPUs for Dorado 0.3.0 are available [here](https://aws.amazon.com/blogs/hpc/benchmarking-the-oxford-nanopore-technologies-basecallers-on-aws/). Please note: Dorado's basecalling speed is continuously improving, so these benchmarks may not reflect performance with the latest release.
 
-## Roadmap
-
-Dorado is Oxford Nanopore's recommended basecaller for offline basecalling. We are working on a number of features which we expect to release soon:
-
-1. Adapter trimming
-2. Custom barcode support
-3. Python API
-
 ## Performance tips
 
 1. For optimal performance, Dorado requires POD5 file input. Please [convert your .fast5 files](https://github.com/nanoporetech/pod5-file-format) before basecalling.
@@ -64,13 +56,20 @@ Dorado is Oxford Nanopore's recommended basecaller for offline basecalling. We a
 The following are helpful commands for getting started with Dorado.
 To see all options and their defaults, run `dorado -h` and `dorado <subcommand> -h`.
 
+### Model selection foreword
+
+Dorado can automatically select a basecalling model using a selection of model speed (`fast`, `hac`, `sup`) and the pod5 data. This feature is **not** supported for fast5 data. If the model does not exist locally, dorado will automatically downloaded the model and delete it when finished. To re-use downloaded models, manually download models using `dorado download`.
+
+Dorado continues to support model paths.
+
+For details read [Automatic model selection complex](#automatic-model-selection-complex).
+
 ### Simplex basecalling
 
-To run Dorado basecalling, download a model and point it to either a directory of POD5 files or a single POD5 file _(.fast5 files are supported, but will not be as performant)_.
+To run Dorado basecalling, using the automatically downloaded `hac` model on a directory of POD5 files or a single POD5 file _(.fast5 files are supported, but will not be as performant)_.
 
 ```
-$ dorado download --model dna_r10.4.1_e8.2_400bps_hac@v4.1.0
-$ dorado basecaller dna_r10.4.1_e8.2_400bps_hac@v4.1.0 pod5s/ > calls.bam
+$ dorado basecaller hac pod5s/ > calls.bam
 ```
 
 To basecall a single file, simply replace the directory `pod5s/` with a path to your data file.
@@ -78,7 +77,7 @@ To basecall a single file, simply replace the directory `pod5s/` with a path to 
 If basecalling is interrupted, it is possible to resume basecalling from a BAM file. To do so, use the `--resume-from` flag to specify the path to the incomplete BAM file. For example:
 
 ```
-$ dorado basecaller dna_r10.4.1_e8.2_400bps_hac@v4.1.0 pod5s --resume-from incomplete.bam > calls.bam
+$ dorado basecaller hac pod5s --resume-from incomplete.bam > calls.bam
 ```
 
 `calls.bam` will contain all of the reads from `incomplete.bam` plus the new basecalls *(`incomplete.bam` can be discarded after basecalling is complete)*.
@@ -89,10 +88,10 @@ $ dorado basecaller dna_r10.4.1_e8.2_400bps_hac@v4.1.0 pod5s --resume-from incom
 
 Beyond the traditional A, T, C, and G basecalling, Dorado can also detect modified bases such as 5-methylcytosine (5mC), 5-hydroxymethylcytosine (5hmC), and N<sup>6</sup>-methyladenosine (6mA). These modified bases play crucial roles in epigenetic regulation.
 
-To call modifications, add `--modified-bases` to the basecaller command:
+To call modifications, extend the models argument with a comma-separated list of modifications:
 
 ```
-$ dorado basecaller dna_r10.4.1_e8.2_400bps_hac@v4.1.0 pod5s/ --modified-bases 5mCG_5hmCG > calls.bam
+$ dorado basecaller hac,5mCG_5hmCG pod5s/ > calls.bam
 ```
 
 Refer to the [DNA models](#dna-models) table's _Compatible Modifications_ column to see available modifications that can be called with the `--modified-bases` option.
@@ -102,7 +101,7 @@ Refer to the [DNA models](#dna-models) table's _Compatible Modifications_ column
 To run Duplex basecalling, run the command:
 
 ```
-$ dorado duplex dna_r10.4.1_e8.2_400bps_sup@v4.1.0 pod5s/ > duplex.bam
+$ dorado duplex sup pod5s/ > duplex.bam
 ```
 
 When using the `duplex` command, two types of DNA sequence results will be produced: 'simplex' and 'duplex'. Any specific position in the DNA which is in a duplex read is also seen in two simplex strands (the template and complement).  So, each DNA position which is duplex sequenced will be covered by a minimum of three separate readings in the output.
@@ -204,6 +203,10 @@ unclassified.bam
 #### Using a sample sheet
 Dorado is able to use a sample sheet to restrict the barcode classifications to only those present, and to apply aliases to the detected classifications. This is enabled by passing the path to a sample sheet to the `--sample-sheet` argument when using the `basecaller` or `demux` commands. See [here](documentation/SampleSheets.md) for more information.
 
+### Custom barcodes
+
+In addition to supporting the standard barcode kits from Oxford Nanopore, Dorado also supports specifying custom barcode kit arrangements and sequences. This is done by passing a barcode arrangement file via the `--barcode-arrangement` argument (either to `dorado demux` or `dorado basecaller`). Custom barcode sequences can optionally be specified via the `--barcode-sequences` option. See [here](documentation/CustomBarcodes.md) for more details.
+
 ### Poly(A) tail estimation
 
 Dorado has initial support for estimating poly(A) tail lengths for cDNA and RNA. Note that Oxford Nanopore cDNA reads are sequenced in two different orientations and Dorado poly(A) tail length estimation handles both (A and T homopolymers). This feature can be enabled by passing `--estimate-poly-a` to the `basecaller` command. It is disabled by default. The estimated tail length is stored in the `pt:i` tag of the output record. Reads for which the tail length could not be estimated will not have the `pt:i` tag.
@@ -279,6 +282,35 @@ Below is a table of the available basecalling models and the modified basecallin
 | rna002_70bps_fast@v3 | N/A | N/A | 3 kHz |
 | rna002_70bps_hac@v3 | N/A | N/A | 3 kHz |
 
+
+## Automatic model selection complex
+
+The `model` argument in dorado can specify either a model path or a model **_complex_**. A model complex must start with the **simplex model speed**, and follows this syntax:
+
+```
+(fast|hac|sup)[@(version|latest)][,modification[@(version|latest)]][,...]
+```
+
+Here are a few examples of model complexes:
+
+| Model Complex | Description |
+| :------------ | :---------- |
+| fast  | Latest compatible **fast** model |
+| hac  | Latest compatible **hac** model |
+| sup  | Latest compatible **sup** model |
+| hac@latest | Latest compatible **hac** model |
+| hac@v4.2.0  | Compatible **hac** model with version `v4.2.0`  |
+| hac@v3.5 | Compatible **hac** model with version `v3.5.0`  |
+| hac,5mCG_5hmCG  | Latest compatible **hac** model and latest **5mCG_5hmCG** modifications model |
+| hac,5mCG_5hmCG@v2  | Latest compatible **hac** model and **5mCG_5hmCG** modifications model with version `v2.0.0`  |
+| sup,5mCG_5hmCG,6mA  | Latest compatible **sup** model and both **5mCG_5hmCG** and **6mA** latest modifications models  |
+
+Automatically selected modification models will always match the base simplex model version selected. Noting the highlighted version changes, for example:
+
+| Model Complex | Description | Models |
+| :------------ | :---------- | :---------- |
+| sup,5mCG_5hmCG  | Latest compatible **sup** model and latest **5mCG_5hmCG** modifications model (`v3.1.0`) | dna_r10.4.1_e8.2_400bps_sup@v4.2.0 <br /> dna_r10.4.1_e8.2_400bps_sup@v4.2.0_5mCG_5hmCG@v3.1   |
+| sup@v4.1,5mCG_5hmCG  | Compatible **sup** model with version `v4.1.0` and latest **5mCG_5hmCG** modifications model (`v2.0.0`) |  dna_r10.4.1_e8.2_400bps_sup@`v4.1.0`<br />dna_r10.4.1_e8.2_400bps_sup@`v4.1.0`_5mCG_5hmCG@`v2`   |
 
 ## Developer quickstart
 

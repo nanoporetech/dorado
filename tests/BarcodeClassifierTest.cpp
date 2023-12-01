@@ -38,20 +38,20 @@ TEST_CASE("BarcodeClassifier: check instantiation for all kits", TEST_GROUP) {
     CHECK(kit_names.size() > 0);
 
     for (auto& kit_name : kit_names) {
-        CHECK_NOTHROW(demux::BarcodeClassifier({kit_name}));
+        CHECK_NOTHROW(demux::BarcodeClassifier({kit_name}, std::nullopt, std::nullopt));
     }
 
-    CHECK_NOTHROW(demux::BarcodeClassifier(kit_names));
+    CHECK_NOTHROW(demux::BarcodeClassifier(kit_names, std::nullopt, std::nullopt));
 }
 
 TEST_CASE("BarcodeClassifier: instantiate barcode with unknown kit", TEST_GROUP) {
-    CHECK_THROWS(demux::BarcodeClassifier({"MY_RANDOM_KIT"}));
+    CHECK_THROWS(demux::BarcodeClassifier({"MY_RANDOM_KIT"}, std::nullopt, std::nullopt));
 }
 
 TEST_CASE("BarcodeClassifier: test single ended barcode", TEST_GROUP) {
     fs::path data_dir = fs::path(get_data_dir("barcode_demux/single_end"));
 
-    demux::BarcodeClassifier classifier({"SQK-RBK114-96"});
+    demux::BarcodeClassifier classifier({"SQK-RBK114-96"}, std::nullopt, std::nullopt);
 
     for (std::string bc :
          {"SQK-RBK114-96_BC01", "SQK-RBK114-96_RBK39", "SQK-RBK114-96_BC92", "unclassified"}) {
@@ -78,7 +78,7 @@ TEST_CASE("BarcodeClassifier: test single ended barcode", TEST_GROUP) {
 TEST_CASE("BarcodeClassifier: test double ended barcode", TEST_GROUP) {
     fs::path data_dir = fs::path(get_data_dir("barcode_demux/double_end"));
 
-    demux::BarcodeClassifier classifier({"SQK-RPB004"});
+    demux::BarcodeClassifier classifier({"SQK-RPB004"}, std::nullopt, std::nullopt);
 
     for (std::string bc :
          {"SQK-RPB004_BC01", "SQK-RPB004_BC05", "SQK-RPB004_BC11", "unclassified"}) {
@@ -107,7 +107,7 @@ TEST_CASE("BarcodeClassifier: test double ended barcode", TEST_GROUP) {
 TEST_CASE("BarcodeClassifier: test double ended barcode with different variants", TEST_GROUP) {
     fs::path data_dir = fs::path(get_data_dir("barcode_demux/double_end_variant"));
 
-    demux::BarcodeClassifier classifier({"EXP-PBC096"});
+    demux::BarcodeClassifier classifier({"EXP-PBC096"}, std::nullopt, std::nullopt);
 
     for (std::string bc :
          {"EXP-PBC096_BC04", "EXP-PBC096_BC37", "EXP-PBC096_BC83", "unclassified"}) {
@@ -136,7 +136,7 @@ TEST_CASE("BarcodeClassifier: test double ended barcode with different variants"
 TEST_CASE("BarcodeClassifier: check barcodes on both ends - failing case", TEST_GROUP) {
     fs::path data_dir = fs::path(get_data_dir("barcode_demux/double_end_variant"));
 
-    demux::BarcodeClassifier classifier({"EXP-PBC096"});
+    demux::BarcodeClassifier classifier({"EXP-PBC096"}, std::nullopt, std::nullopt);
 
     // Check case where both ends don't match.
     auto bc_file = data_dir / "EXP-PBC096_barcode_both_ends_fail.fastq";
@@ -153,7 +153,7 @@ TEST_CASE("BarcodeClassifier: check barcodes on both ends - failing case", TEST_
 TEST_CASE("BarcodeClassifier: check barcodes on both ends - passing case", TEST_GROUP) {
     fs::path data_dir = fs::path(get_data_dir("barcode_demux/double_end_variant"));
 
-    demux::BarcodeClassifier classifier({"EXP-PBC096"});
+    demux::BarcodeClassifier classifier({"EXP-PBC096"}, std::nullopt, std::nullopt);
 
     // Check case where both ends do match.
     auto bc_file = data_dir / "EXP-PBC096_barcode_both_ends_pass.fastq";
@@ -182,13 +182,13 @@ TEST_CASE(
     CAPTURE(barcode_both_ends);
     CAPTURE(use_per_read_barcoding);
     constexpr bool no_trim = false;
-    auto barcoding_info =
-            dorado::create_barcoding_info(kits, barcode_both_ends, !no_trim, std::nullopt);
+    auto barcoding_info = dorado::create_barcoding_info(kits, barcode_both_ends, !no_trim,
+                                                        std::nullopt, std::nullopt, std::nullopt);
     if (use_per_read_barcoding) {
         pipeline_desc.add_node<BarcodeClassifierNode>({sink}, 8);
     } else {
         pipeline_desc.add_node<BarcodeClassifierNode>({sink}, 8, kits, barcode_both_ends, no_trim,
-                                                      std::nullopt);
+                                                      std::nullopt, std::nullopt, std::nullopt);
     }
 
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
@@ -338,7 +338,7 @@ TEST_CASE("BarcodeClassifierNode: test reads where trim length == read length", 
     bool barcode_both_ends = false;
     bool no_trim = false;
     pipeline_desc.add_node<BarcodeClassifierNode>({sink}, 8, kits, barcode_both_ends, no_trim,
-                                                  std::nullopt);
+                                                  std::nullopt, std::nullopt, std::nullopt);
 
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
     fs::path data_dir = fs::path(get_data_dir("barcode_demux"));
@@ -361,4 +361,49 @@ TEST_CASE("BarcodeClassifierNode: test reads where trim length == read length", 
 
     // We don't expect any trimming to happen, so the original and final sequence must match.
     CHECK(seq == orig_seq);
+}
+
+struct CustomDoubleEndedKitInput {
+    std::string kit_file;
+    std::optional<std::string> seqs_file;
+};
+
+TEST_CASE("BarcodeClassifier: test custom kit with double ended barcode", TEST_GROUP) {
+    fs::path data_dir = fs::path(get_data_dir("barcode_demux/double_end"));
+    auto [kit_file, seqs_file] = GENERATE(
+            CustomDoubleEndedKitInput{
+                    (fs::path(get_data_dir("barcode_demux/custom_barcodes")) / "RPB004.toml")
+                            .string(),
+                    std::nullopt},
+            CustomDoubleEndedKitInput{
+                    (fs::path(get_data_dir("barcode_demux/custom_barcodes")) / "RPB004.toml")
+                            .string(),
+                    (fs::path(get_data_dir("barcode_demux/custom_barcodes")) /
+                     "RPB004_sequences.fasta")
+                            .string()});
+
+    demux::BarcodeClassifier classifier({}, kit_file, seqs_file);
+
+    for (std::string bc :
+         {"SQK-RPB004_BC01", "SQK-RPB004_BC05", "SQK-RPB004_BC11", "unclassified"}) {
+        auto bc_file = data_dir / (bc + ".fastq");
+        HtsReader reader(bc_file.string(), std::nullopt);
+        while (reader.read()) {
+            auto seqlen = reader.record->core.l_qseq;
+            std::string seq = utils::extract_sequence(reader.record.get());
+            auto res = classifier.barcode(seq, false, std::nullopt);
+            if (res.barcode_name == "unclassified") {
+                CHECK(bc == res.barcode_name);
+            } else {
+                CHECK(bc == (res.kit + "_" + res.barcode_name));
+                CHECK(res.top_barcode_pos.second > res.top_barcode_pos.first);
+                CHECK(res.bottom_barcode_pos.second > res.bottom_barcode_pos.first);
+                CHECK(res.top_barcode_pos.first >= 0);
+                CHECK(res.top_barcode_pos.second <= seqlen);
+                CHECK(res.bottom_barcode_pos.first >= 0);
+                CHECK(res.bottom_barcode_pos.second <= seqlen);
+                CHECK(res.top_barcode_pos.second < res.bottom_barcode_pos.first);
+            }
+        }
+    }
 }

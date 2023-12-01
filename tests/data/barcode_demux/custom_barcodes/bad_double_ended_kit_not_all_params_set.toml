@@ -1,0 +1,11 @@
+[arrangement]
+
+name = "bad_kit_not_all_params"
+kit = "BK"
+first_index = 1
+last_index = 2
+barcode1_pattern = "AB%02i"
+mask1_front = "AA"
+mask1_rear = "TT"
+mask2_front = "CC"
+

@@ -20,7 +20,7 @@ endfunction()
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32)
 
-    set(KOI_VERSION 0.4.1)
+    set(KOI_VERSION 0.4.3)
     if(BUILD_KOI_FROM_SOURCE)
         message(STATUS "Building Koi from source")
         set(KOI_DIR "${DORADO_3RD_PARTY_DOWNLOAD}/koi")

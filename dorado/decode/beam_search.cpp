@@ -90,11 +90,10 @@ std::tuple<std::string, std::string> generate_sequence(const std::vector<uint8_t
     for (size_t i = 0; i < seqLen; ++i) {
         sequence[i] = alphabet[int(sequence[i])];
         baseProbs[i] = 1.0f - (baseProbs[i] / totalProbs[i]);
-        baseProbs[i] = -10.0f * log10f(baseProbs[i]);
+        baseProbs[i] = -10.0f * std::log10(baseProbs[i]);
         float qscore = baseProbs[i] * scale + shift;
-        qscore = std::min(50.0f, qscore);
-        qscore = std::max(1.0f, qscore);
-        qstring[i] = char(33.5f + qscore);
+        qscore = std::clamp(qscore, 1.0f, 50.0f);
+        qstring[i] = static_cast<char>(33.5f + qscore);
     }
 
     return make_tuple(sequence, qstring);
@@ -118,11 +117,11 @@ uint32_t crc32c(uint32_t crc, uint32_t new_bits) {
 
 }  // anonymous namespace
 
-template <typename T>
+template <typename T, typename U>
 float beam_search(const T* const scores,
                   size_t scores_block_stride,
                   const float* const back_guide,
-                  const float* const posts,
+                  const U* const posts,
                   int num_state_bits,
                   size_t num_blocks,
                   size_t max_beam_width,
@@ -131,7 +130,8 @@ float beam_search(const T* const scores,
                   std::vector<int32_t>& states,
                   std::vector<uint8_t>& moves,
                   std::vector<float>& qual_data,
-                  float score_scale) {
+                  float score_scale,
+                  float posts_scale) {
     const size_t num_states = 1ull << num_state_bits;
     const auto states_mask = static_cast<state_t>(num_states - 1);
 
@@ -459,9 +459,12 @@ float beam_search(const T* const scores,
 
         // Compute a probability for this block, based on the path kmer. See the following explanation:
         // https://git.oxfordnanolabs.local/machine-learning/notebooks/-/blob/master/bonito-basecaller-qscores.ipynb
-        const float* timestep_posts = posts + ((block_idx + 1) << num_state_bits);
+        const U* const timestep_posts = posts + ((block_idx + 1) << num_state_bits);
+        const auto fetch_post = [timestep_posts, posts_scale](size_t idx) {
+            return static_cast<float>(timestep_posts[idx]) * posts_scale;
+        };
 
-        float block_prob = float(timestep_posts[state]);
+        float block_prob = fetch_post(state);
 
         // Get indices of left- and right-shifted kmers
         int l_shift_idx = state >> NUM_BASE_BITS;
@@ -492,7 +495,7 @@ float beam_search(const T* const scores,
                 }
             }
             if (count_state) {
-                block_prob += float(timestep_posts[candidate_state]);
+                block_prob += fetch_post(candidate_state);
             }
         }
 
@@ -500,7 +503,7 @@ float beam_search(const T* const scores,
         block_prob = std::pow(block_prob, 0.4f);  // Power fudge factor
 
         // Calculate a placeholder qscore for the "wrong" bases
-        float wrong_base_prob = (1.0f - block_prob) / 3.0f;
+        const float wrong_base_prob = (1.0f - block_prob) / 3.0f;
 
         for (size_t base = 0; base < NUM_BASES; base++) {
             qual_data[block_idx * NUM_BASES + base] =
@@ -528,12 +531,9 @@ std::tuple<std::string, std::string, std::vector<uint8_t>> beam_search_decode(
         throw std::runtime_error("num_states must be an integral power of 2");
     }
 
-    // Posterior probabilities and back guides must be floats regardless of scores type.
-    if (posts_t.dtype() != at::ScalarType::Float ||
-        back_guides_t.dtype() != at::ScalarType::Float) {
-        throw std::runtime_error(
-                "beam_search_decode: mismatched tensor types provided for posts and "
-                "guides");
+    // Back guides must be floats regardless of scores type.
+    if (back_guides_t.dtype() != at::ScalarType::Float) {
+        throw std::runtime_error("beam_search_decode: back guides type must be float");
     }
 
     // back guides and posts should be contiguous
@@ -548,20 +548,35 @@ std::tuple<std::string, std::string, std::vector<uint8_t>> beam_search_decode(
 
     const size_t scores_block_stride = scores_block_contig.stride(0);
     if (scores_t.dtype() == at::ScalarType::Float) {
+        // If the scores are floats, so must the other tensors.
+        if (posts_t.dtype() != at::ScalarType::Float) {
+            throw std::runtime_error(
+                    "beam_search_decode: only float posts are supported for float scores");
+        }
+
         const auto scores = scores_block_contig.data_ptr<float>();
         const auto back_guides = back_guides_contig->data_ptr<float>();
         const auto posts = posts_contig->data_ptr<float>();
 
-        beam_search<float>(scores, scores_block_stride, back_guides, posts, num_state_bits,
-                           num_blocks, max_beam_width, beam_cut, fixed_stay_score, states, moves,
-                           qual_data, 1.0f);
+        beam_search<float, float>(scores, scores_block_stride, back_guides, posts, num_state_bits,
+                                  num_blocks, max_beam_width, beam_cut, fixed_stay_score, states,
+                                  moves, qual_data, 1.0f, 1.0f);
     } else if (scores_t.dtype() == at::kChar) {
+        // If the scores are 8 bit, the posterior probabilities must be 16 bit (Apple path).
+        if (posts_t.dtype() != at::ScalarType::Short) {
+            throw std::runtime_error(
+                    "beam_search_decode: only int16 posts are supported for int8 scores");
+        }
+
         const auto scores = scores_block_contig.data_ptr<int8_t>();
         const auto back_guides = back_guides_contig->data_ptr<float>();
-        const auto posts = posts_contig->data_ptr<float>();
-        beam_search<int8_t>(scores, scores_block_stride, back_guides, posts, num_state_bits,
-                            num_blocks, max_beam_width, beam_cut, fixed_stay_score, states, moves,
-                            qual_data, byte_score_scale);
+        const auto posts = posts_contig->data_ptr<int16_t>();
+        const float posts_scale = static_cast<float>(1.0 / 32767.0);
+        beam_search<int8_t, int16_t>(scores, scores_block_stride, back_guides, posts,
+                                     num_state_bits, num_blocks, max_beam_width, beam_cut,
+                                     fixed_stay_score, states, moves, qual_data, byte_score_scale,
+                                     posts_scale);
+
     } else {
         throw std::runtime_error(std::string("beam_search_decode: unsupported tensor type ") +
                                  std::string(scores_t.dtype().name()));

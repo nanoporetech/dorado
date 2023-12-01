@@ -1,6 +1,7 @@
 #include "Version.h"
 #include "cli/cli_utils.h"
 #include "data_loader/DataLoader.h"
+#include "data_loader/ModelFinder.h"
 #include "models/models.h"
 #include "nn/CRFModelConfig.h"
 #include "nn/ModBaseRunner.h"
@@ -20,9 +21,11 @@
 #include "utils/bam_utils.h"
 #include "utils/barcode_kits.h"
 #include "utils/basecaller_utils.h"
+#include "utils/fs_utils.h"
 #include "utils/log_utils.h"
 #include "utils/parameters.h"
 #include "utils/stats.h"
+#include "utils/string_utils.h"
 #include "utils/sys_stats.h"
 #include "utils/torch_utils.h"
 
@@ -30,10 +33,13 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+#include <cstdlib>
+#include <exception>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <memory>
+#include <optional>
 #include <sstream>
 #include <thread>
 
@@ -41,11 +47,13 @@ namespace dorado {
 
 using dorado::utils::default_parameters;
 using namespace std::chrono_literals;
+using namespace dorado::models;
+namespace fs = std::filesystem;
 
 void setup(std::vector<std::string> args,
-           const std::filesystem::path& model_path,
+           const fs::path& model_path,
            const std::string& data_path,
-           const std::string& remora_models,
+           const std::vector<fs::path>& remora_models,
            const std::string& device,
            const std::string& ref,
            size_t chunk_size,
@@ -72,11 +80,14 @@ void setup(std::vector<std::string> args,
            bool adapter_no_trim,
            bool primer_no_trim,
            const std::string& barcode_sample_sheet,
+           const std::optional<std::string>& custom_kit,
+           const std::optional<std::string>& custom_seqs,
            argparse::ArgumentParser& resume_parser,
-           bool estimate_poly_a) {
-    auto model_config = load_crf_model_config(model_path);
-    std::string model_name = models::extract_model_from_model_path(model_path.string());
-    std::string modbase_model_names = models::extract_model_from_model_paths(remora_models);
+           bool estimate_poly_a,
+           const ModelSelection& model_selection) {
+    const auto model_config = load_crf_model_config(model_path);
+    const std::string model_name = models::extract_model_name_from_path(model_path);
+    const std::string modbase_model_names = models::extract_model_names_from_paths(remora_models);
 
     if (!DataLoader::is_read_data_present(data_path, recursive_file_loading)) {
         std::string err = "No POD5 or FAST5 data found in path: " + data_path;
@@ -116,16 +127,15 @@ void setup(std::vector<std::string> args,
     const bool enable_aligner = !ref.empty();
 
     // create modbase runners first so basecall runners can pick batch sizes based on available memory
-    auto remora_runners = create_modbase_runners(
-            remora_models, device, default_parameters.remora_runners_per_caller, remora_batch_size);
+    auto remora_runners = create_modbase_runners(remora_models, device,
+                                                 default_parameters.mod_base_runners_per_caller,
+                                                 remora_batch_size);
 
     auto [runners, num_devices] = create_basecall_runners(model_config, device, num_runners, 0,
                                                           batch_size, chunk_size, 1.f, false);
 
     auto read_groups = DataLoader::load_read_groups(data_path, model_name, modbase_model_names,
                                                     recursive_file_loading);
-
-    bool duplex = false;
 
     bool adapter_trimming_disabled = (adapter_no_trim && primer_no_trim);
     const auto thread_allocations = utils::default_thread_allocations(
@@ -166,7 +176,8 @@ void setup(std::vector<std::string> args,
     if (!barcode_kits.empty()) {
         current_sink_node = pipeline_desc.add_node<BarcodeClassifierNode>(
                 {current_sink_node}, thread_allocations.barcoder_threads, barcode_kits,
-                barcode_both_ends, barcode_no_trim, std::move(allowed_barcodes));
+                barcode_both_ends, barcode_no_trim, std::move(allowed_barcodes),
+                std::move(custom_kit), std::move(custom_seqs));
     }
     if (!adapter_trimming_disabled) {
         current_sink_node = pipeline_desc.add_node<AdapterDetectorNode>(
@@ -222,13 +233,25 @@ void setup(std::vector<std::string> args,
         // sub parser only knows about the `basecaller` command.
         tokens.erase(tokens.begin());
         resume_parser.parse_args(tokens);
-        auto resume_model_name =
-                models::extract_model_from_model_path(resume_parser.get<std::string>("model"));
-        if (model_name != resume_model_name) {
+
+        const std::string model_arg = resume_parser.get<std::string>("model");
+        const ModelSelection resume_selection = ModelComplexParser::parse(model_arg);
+
+        if (resume_selection.is_path()) {
+            // If the model selection is a path, check it exists and matches
+            const auto resume_model_name =
+                    models::extract_model_name_from_path(fs::path(model_arg));
+            if (model_name != resume_model_name) {
+                throw std::runtime_error(
+                        "Resume only works if the same model is used. Resume model was " +
+                        resume_model_name + " and current model is " + model_name);
+            }
+        } else if (resume_selection != model_selection) {
             throw std::runtime_error(
-                    "Resume only works if the same model is used. Resume model was " +
-                    resume_model_name + " and current model is " + model_name);
+                    "Resume only works if the same model is used. Resume model complex was " +
+                    resume_selection.raw + " and current model is " + model_selection.raw);
         }
+
         // Resume functionality injects reads directly into the writer node.
         ResumeLoaderNode resume_loader(hts_writer_ref, resume_from_file);
         resume_loader.copy_completed_reads();
@@ -236,7 +259,7 @@ void setup(std::vector<std::string> args,
     }
 
     std::vector<dorado::stats::StatsCallable> stats_callables;
-    ProgressTracker tracker(int(num_reads), duplex);
+    ProgressTracker tracker(int(num_reads), false);
     stats_callables.push_back(
             [&tracker](const stats::NamedStats& stats) { tracker.update_progress_bar(stats); });
     constexpr auto kStatsPeriod = 100ms;
@@ -277,7 +300,9 @@ int basecaller(int argc, char* argv[]) {
 
     cli::ArgParser parser("dorado");
 
-    parser.visible.add_argument("model").help("the basecaller model to run.");
+    parser.visible.add_argument("model").help(
+            "model selection {fast,hac,sup}@v{version} for automatic model selection including "
+            "modbases, or path to existing model directory");
 
     parser.visible.add_argument("data").help("the data directory or file (POD5/FAST5 format).");
 
@@ -333,7 +358,7 @@ int basecaller(int argc, char* argv[]) {
     parser.visible.add_argument("--modified-bases")
             .nargs(argparse::nargs_pattern::at_least_one)
             .action([](const std::string& value) {
-                const auto& mods = models::modified_mods();
+                const auto& mods = models::modified_model_variants();
                 if (std::find(mods.begin(), mods.end(), value) == mods.end()) {
                     spdlog::error(
                             "'{}' is not a supported modification please select from {}", value,
@@ -394,6 +419,12 @@ int basecaller(int argc, char* argv[]) {
     parser.visible.add_argument("--sample-sheet")
             .help("Path to the sample sheet to use.")
             .default_value(std::string(""));
+    parser.visible.add_argument("--barcode-arrangement")
+            .help("Path to file with custom barcode arrangement.")
+            .default_value(std::nullopt);
+    parser.visible.add_argument("--barcode-sequences")
+            .help("Path to file with custom barcode sequences.")
+            .default_value(std::nullopt);
     parser.visible.add_argument("--estimate-poly-a")
             .help("Estimate poly-A/T tail lengths (beta feature). Primarily meant "
                   "for cDNA and "
@@ -424,24 +455,22 @@ int basecaller(int argc, char* argv[]) {
         utils::SetVerboseLogging(static_cast<dorado::utils::VerboseLogLevel>(verbosity));
     }
 
-    auto model = parser.visible.get<std::string>("model");
-    auto mod_bases = parser.visible.get<std::vector<std::string>>("--modified-bases");
-    auto mod_bases_models = parser.visible.get<std::string>("--modified-bases-models");
+    const auto model_arg = parser.visible.get<std::string>("model");
+    const auto data = parser.visible.get<std::string>("data");
+    const auto recursive = parser.visible.get<bool>("--recursive");
+    const auto mod_bases = parser.visible.get<std::vector<std::string>>("--modified-bases");
+    const auto mod_bases_models = parser.visible.get<std::string>("--modified-bases-models");
 
-    if (!mod_bases.empty() && !mod_bases_models.empty()) {
+    const ModelSelection model_selection = cli::parse_model_argument(model_arg);
+
+    auto ways = {model_selection.has_mods_variant(), !mod_bases.empty(), !mod_bases_models.empty()};
+    if (std::count(ways.begin(), ways.end(), true) > 1) {
         spdlog::error(
-                "only one of --modified-bases or --modified-bases-models should be specified.");
+                "only one of --modified-bases, --modified-bases-models, or modified models set "
+                "via models argument can be used at once",
+                model_arg);
         std::exit(EXIT_FAILURE);
-    } else if (mod_bases.size()) {
-        std::vector<std::string> m;
-        std::transform(
-                mod_bases.begin(), mod_bases.end(), std::back_inserter(m),
-                [&model](std::string m) { return models::get_modification_model(model, m); });
-
-        mod_bases_models =
-                std::accumulate(std::next(m.begin()), m.end(), m[0],
-                                [](std::string a, std::string b) { return a + "," + b; });
-    }
+    };
 
     auto methylation_threshold = parser.visible.get<float>("--modified-bases-threshold");
     if (methylation_threshold < 0.f || methylation_threshold > 1.f) {
@@ -455,11 +484,12 @@ int basecaller(int argc, char* argv[]) {
     auto emit_sam = parser.visible.get<bool>("--emit-sam");
 
     if (emit_fastq && emit_sam) {
-        throw std::runtime_error("Only one of --emit-{fastq, sam} can be set (or none).");
+        spdlog::error("Only one of --emit-{fastq, sam} can be set (or none).");
+        std::exit(EXIT_FAILURE);
     }
 
     if (emit_fastq) {
-        if (!mod_bases.empty() || !mod_bases_models.empty()) {
+        if (model_selection.has_mods_variant() || !mod_bases.empty() || !mod_bases_models.empty()) {
             spdlog::error(
                     "--emit-fastq cannot be used with modbase models as FASTQ cannot store modbase "
                     "results.");
@@ -499,18 +529,66 @@ int basecaller(int argc, char* argv[]) {
         std::exit(EXIT_FAILURE);
     }
 
+    if (parser.visible.is_used("--kit-name") && parser.visible.is_used("--barcode-arrangement")) {
+        spdlog::error(
+                "--kit-name and --barcode-arrangement cannot be used together. Please provide only "
+                "one.");
+        std::exit(EXIT_FAILURE);
+    }
+
+    std::optional<std::string> custom_kit = std::nullopt;
+    if (parser.visible.is_used("--barcode-arrangement")) {
+        custom_kit = parser.visible.get<std::string>("--barcode-arrangement");
+    }
+
+    std::optional<std::string> custom_seqs = std::nullopt;
+    if (parser.visible.is_used("--barcode-sequences")) {
+        custom_seqs = parser.visible.get<std::string>("--barcode-sequences");
+    }
+
+    fs::path model_path;
+    std::vector<fs::path> mods_model_paths;
+    std::set<fs::path> temp_download_paths;
+
+    if (model_selection.is_path()) {
+        model_path = fs::path(model_arg);
+
+        if (mod_bases.size() > 0) {
+            std::transform(mod_bases.begin(), mod_bases.end(), std::back_inserter(mods_model_paths),
+                           [&model_arg](std::string m) {
+                               return fs::path(models::get_modification_model(model_arg, m));
+                           });
+        } else if (mod_bases_models.size() > 0) {
+            const auto split = utils::split(mod_bases_models, ',');
+            std::transform(split.begin(), split.end(), std::back_inserter(mods_model_paths),
+                           [&](std::string m) { return fs::path(m); });
+        }
+
+    } else {
+        auto model_finder = cli::model_finder(model_selection, data, recursive, true);
+        try {
+            model_path = model_finder.fetch_simplex_model();
+            if (model_selection.has_mods_variant()) {
+                mods_model_paths = model_finder.fetch_mods_models();
+            }
+            temp_download_paths = model_finder.downloaded_models();
+        } catch (std::exception& e) {
+            spdlog::error(e.what());
+            std::exit(EXIT_FAILURE);
+        }
+    }
+
     spdlog::info("> Creating basecall pipeline");
 
     try {
-        setup(args, model, parser.visible.get<std::string>("data"), mod_bases_models,
-              parser.visible.get<std::string>("-x"), parser.visible.get<std::string>("--reference"),
-              parser.visible.get<int>("-c"), parser.visible.get<int>("-o"),
-              parser.visible.get<int>("-b"), default_parameters.num_runners,
-              default_parameters.remora_batchsize, default_parameters.remora_threads,
-              methylation_threshold, output_mode, parser.visible.get<bool>("--emit-moves"),
-              parser.visible.get<int>("--max-reads"), parser.visible.get<int>("--min-qscore"),
-              parser.visible.get<std::string>("--read-ids"),
-              parser.visible.get<bool>("--recursive"),
+        setup(args, model_path, data, mods_model_paths, parser.visible.get<std::string>("-x"),
+              parser.visible.get<std::string>("--reference"), parser.visible.get<int>("-c"),
+              parser.visible.get<int>("-o"), parser.visible.get<int>("-b"),
+              default_parameters.num_runners, default_parameters.remora_batchsize,
+              default_parameters.remora_threads, methylation_threshold, output_mode,
+              parser.visible.get<bool>("--emit-moves"), parser.visible.get<int>("--max-reads"),
+              parser.visible.get<int>("--min-qscore"),
+              parser.visible.get<std::string>("--read-ids"), recursive,
               cli::process_minimap2_arguments(parser, alignment::dflt_options),
               parser.hidden.get<bool>("--skip-model-compatibility-check"),
               parser.hidden.get<std::string>("--dump_stats_file"),
@@ -518,13 +596,15 @@ int basecaller(int argc, char* argv[]) {
               parser.visible.get<std::string>("--resume-from"),
               parser.visible.get<std::vector<std::string>>("--kit-name"),
               parser.visible.get<bool>("--barcode-both-ends"), no_trim_barcodes, no_trim_adapters,
-              no_trim_primers, parser.visible.get<std::string>("--sample-sheet"), resume_parser,
-              parser.visible.get<bool>("--estimate-poly-a"));
+              no_trim_primers, parser.visible.get<std::string>("--sample-sheet"),
+              std::move(custom_kit), std::move(custom_seqs), resume_parser,
+              parser.visible.get<bool>("--estimate-poly-a"), model_selection);
     } catch (const std::exception& e) {
         spdlog::error("{}", e.what());
         return 1;
     }
 
+    utils::clean_temporary_models(temp_download_paths);
     spdlog::info("> Finished");
     return 0;
 }

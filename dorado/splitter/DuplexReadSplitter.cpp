@@ -9,6 +9,8 @@
 #include <ATen/ATen.h>
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
+#include <cassert>
 #include <chrono>
 #include <cmath>
 #include <iomanip>
@@ -100,11 +102,24 @@ std::optional<PosRange> check_rc_match(const std::string& seq,
     return res;
 }
 
+// NB: Computes literal mean of the qscore values, not generally applicable
+float qscore_mean(const std::string& qstring, splitter::PosRange r) {
+    uint64_t len = qstring.size();
+    uint64_t start = r.first;
+    uint64_t end = std::min(r.second, len);
+    assert(start < end);
+    uint64_t sum = 0;
+    for (size_t i = start; i < end; ++i) {
+        assert(qstring[i] > 33);
+        sum += qstring[i] - 33;
+    }
+    return float(1. * sum / (end - start));
+}
+
 }  // namespace
 
 namespace dorado::splitter {
 
-//TODO consider precomputing and reusing ranges with high signal
 struct DuplexReadSplitter::ExtRead {
     SimplexReadPtr read;
     at::Tensor data_as_float32;
@@ -130,26 +145,56 @@ PosRanges DuplexReadSplitter::possible_pore_regions(const DuplexReadSplitter::Ex
             detect_pore_signal<float>(read.data_as_float32, m_settings.pore_thr,
                                       m_settings.pore_cl_dist, m_settings.expect_pore_prefix);
 
-    PosRanges pore_regions;
+    std::vector<std::pair<float, PosRange>> candidate_regions;
     for (auto pore_sample_range : pore_sample_ranges) {
-        auto move_start = pore_sample_range.first / read.read->read_common.model_stride;
-        auto move_end = pore_sample_range.second / read.read->read_common.model_stride;
-        assert(move_end >= move_start);
-        //NB move_start can get to move_sums.size(), because of the stride rounding?
-        if (move_start >= read.move_sums.size() || move_end >= read.move_sums.size() ||
-            read.move_sums[move_start] == 0) {
+        auto move_start = pore_sample_range.start_sample / read.read->read_common.model_stride;
+        auto move_end = pore_sample_range.end_sample / read.read->read_common.model_stride;
+        auto move_argmax = pore_sample_range.argmax_sample / read.read->read_common.model_stride;
+        assert(move_end >= move_argmax && move_argmax >= move_start);
+        if (move_end >= read.move_sums.size() || read.move_sums[move_start] == 0) {
             //either at very end of the signal or basecalls have not started yet
             continue;
         }
         auto start_pos = read.move_sums[move_start] - 1;
-        //NB. adding adapter length
+        //TODO check (- 1)
+        auto argmax_pos = read.move_sums[move_argmax] - 1;
         auto end_pos = read.move_sums[move_end];
-        assert(end_pos > start_pos);
-        if (end_pos <= start_pos + m_settings.max_pore_region) {
-            pore_regions.push_back({start_pos, end_pos});
+        //check that detected cluster corresponds to not too many bases
+        if (end_pos > start_pos + m_settings.max_pore_region) {
+            continue;
         }
+
+        assert(end_pos > argmax_pos && argmax_pos >= start_pos);
+        if (m_settings.use_argmax) {
+            //switch to position of max sample
+            start_pos = argmax_pos;
+            end_pos = argmax_pos + 1;
+        }
+
+        //check that mean qscore near pore is low
+        if (m_settings.qscore_check_span > 0 &&
+            qscore_mean(read.read->read_common.qstring,
+                        {start_pos, start_pos + m_settings.qscore_check_span}) >
+                    m_settings.mean_qscore_thr - std::numeric_limits<float>::epsilon()) {
+            continue;
+        }
+        candidate_regions.push_back({pore_sample_range.max_val, {start_pos, end_pos}});
     }
 
+    //sorting by max signal value within the cluster
+    std::sort(candidate_regions.begin(), candidate_regions.end());
+    //take top candidates
+    PosRanges pore_regions;
+    for (size_t i = std::max(int64_t(candidate_regions.size()) - m_settings.top_candidates,
+                             int64_t(0));
+         i < candidate_regions.size(); ++i) {
+        pore_regions.push_back(candidate_regions[i].second);
+    }
+    //sorting by first coordinate again
+    std::sort(pore_regions.begin(), pore_regions.end());
+
+    spdlog::trace("Detected {} potential pore regions in read {}", pore_regions.size(),
+                  read.read->read_common.read_id);
     return pore_regions;
 }
 
@@ -158,7 +203,7 @@ bool DuplexReadSplitter::check_nearby_adapter(const SimplexRead& read,
                                               int adapter_edist) const {
     return find_best_adapter_match(m_settings.adapter, read.read_common.seq, adapter_edist,
                                    //including spacer region in search
-                                   {r.first, std::min(r.second + m_settings.pore_adapter_range,
+                                   {r.first, std::min(r.second + m_settings.pore_adapter_span,
                                                       (uint64_t)read.read_common.seq.size())})
             .has_value();
 }
