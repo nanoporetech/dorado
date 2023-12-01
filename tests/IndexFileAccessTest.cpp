@@ -1,5 +1,6 @@
 #include "alignment/IndexFileAccess.h"
 
+#include "StreamUtils.h"
 #include "TestUtils.h"
 #include "alignment/Minimap2Index.h"
 
@@ -8,6 +9,8 @@
 #include <filesystem>
 
 #define TEST_GROUP "[alignment::IndexFileAccess]"
+
+using namespace ont::test_utils::streams;
 
 namespace {
 
@@ -29,6 +32,15 @@ const dorado::alignment::Minimap2Options& invalid_options() {
     }();
     return result;
 }
+
+dorado::alignment::IndexLoadResult load_index_no_stderr(
+        dorado::alignment::IndexFileAccess& cut,
+        const std::string& file,
+        const dorado::alignment::Minimap2Options& options) {
+    SuppressStderr no_stderr{};
+    return cut.load_index(file, options, 1);
+}
+
 }  // namespace
 
 namespace dorado::alignment::index_file_access {
@@ -47,7 +59,7 @@ TEST_CASE(TEST_GROUP " load_index with invalid file return reference_file_not_fo
 TEST_CASE(TEST_GROUP " load_index with invalid options returns validation_error", TEST_GROUP) {
     IndexFileAccess cut{};
 
-    REQUIRE(cut.load_index(valid_reference_file(), invalid_options(), 1) ==
+    REQUIRE(load_index_no_stderr(cut, valid_reference_file(), invalid_options()) ==
             IndexLoadResult::validation_error);
 }
 
@@ -67,7 +79,7 @@ SCENARIO(TEST_GROUP " Load and retrieve index files", TEST_GROUP) {
     }
 
     GIVEN("load_index called with valid file but invalid options") {
-        cut.load_index(valid_reference_file(), invalid_options(), 1);
+        load_index_no_stderr(cut, valid_reference_file(), invalid_options());
         THEN("is_index_loaded returns false") {
             REQUIRE_FALSE(cut.is_index_loaded(valid_reference_file(), invalid_options()));
         }
@@ -163,7 +175,10 @@ SCENARIO(TEST_GROUP " Load and retrieve index files", TEST_GROUP) {
 }
 
 TEST_CASE(TEST_GROUP " validate_options with invalid options returns false", TEST_GROUP) {
-    REQUIRE_FALSE(validate_options(invalid_options()));
+    bool result{};
+    SuppressStderr::invoke([&result] { result = validate_options(invalid_options()); });
+
+    REQUIRE_FALSE(result);
 }
 
 TEST_CASE(TEST_GROUP " validate_options with default options returns true", TEST_GROUP) {

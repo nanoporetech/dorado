@@ -1,5 +1,6 @@
 #include "alignment/Minimap2Index.h"
 
+#include "StreamUtils.h"
 #include "TestUtils.h"
 
 #include <catch2/catch.hpp>
@@ -7,6 +8,8 @@
 #include <filesystem>
 
 #define TEST_GROUP "[alignment::Minimap2Index]"
+
+using namespace ont::test_utils::streams;
 
 namespace {
 
@@ -68,12 +71,15 @@ TEST_CASE(TEST_GROUP " initialise() with invalid options returns false", TEST_GR
     auto invalid_options{dflt_options};
     invalid_options.bandwidth = invalid_options.bandwidth_long + 1;
 
-    REQUIRE_FALSE(cut.initialise(invalid_options));
+    bool result{};
+    SuppressStderr::invoke(
+            [&result, &invalid_options, &cut] { result = cut.initialise(invalid_options); });
+
+    REQUIRE_FALSE(result);
 }
 
 TEST_CASE_METHOD(Minimap2IndexTestFixture,
-                 TEST_GROUP
-                 " load() without invalid reference file returns reference_file_not_found",
+                 TEST_GROUP " load() with invalid reference file returns reference_file_not_found",
                  TEST_GROUP) {
     REQUIRE(cut.load("some_reference_file", 1) == IndexLoadResult::reference_file_not_found);
 }
@@ -85,14 +91,19 @@ TEST_CASE_METHOD(Minimap2IndexTestFixture,
 }
 
 TEST_CASE_METHOD(Minimap2IndexTestFixture,
-                 TEST_GROUP
-                 " create_compatible_index() with invalid mapping options returns non-null",
+                 TEST_GROUP " create_compatible_index() with invalid mapping options returns null",
                  TEST_GROUP) {
     cut.load(reference_file, 1);
     Minimap2Options invalid_compatible_options{dflt_options};
     invalid_compatible_options.bandwidth = invalid_compatible_options.bandwidth_long + 1;
 
-    REQUIRE(cut.create_compatible_index(invalid_compatible_options) == nullptr);
+    std::shared_ptr<Minimap2Index> compatible_index{};
+    {
+        SuppressStderr suppressed{};
+        compatible_index = cut.create_compatible_index(invalid_compatible_options);
+    }
+
+    REQUIRE(compatible_index == nullptr);
 }
 
 TEST_CASE_METHOD(Minimap2IndexTestFixture,
