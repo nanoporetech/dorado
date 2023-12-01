@@ -159,11 +159,12 @@ kernel void forward_scan_add_softmax(
 
     // The forward guide input for the first step is 0.
     ts_fwd[0][tid] = 0.0f;
+    threadgroup_barrier(mem_flags::mem_threadgroup);
 
     for (int ts = 0; ts < T; ++ts) {
         // We read forward guide values written to TG memory in the previous step as
-        // inputs to this step.
-        threadgroup_barrier(mem_flags::mem_threadgroup);
+        // inputs to this step.  However, there has already been a TG barrier since
+        // they were written.
 
         // This time step's scores.
         device const auto* const ts_scores = chunk_scores + N * ts_states * ts;
