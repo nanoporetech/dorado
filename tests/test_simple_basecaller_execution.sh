@@ -153,7 +153,7 @@ if ! uname -r | grep -q tegra; then
     samtools quickcheck -u $output_dir/duplex_calls.bam
     num_duplex_reads=$(samtools view $output_dir/duplex_calls.bam | grep dx:i:1 | wc -l | awk '{print $1}')
     if [[ $num_duplex_reads -ne "2" ]]; then
-        echo "Duplex basecalling missing reads."
+        echo "Duplex basecalling missing reads - in-line"
         exit 1
     fi
 
@@ -162,7 +162,25 @@ if ! uname -r | grep -q tegra; then
     samtools quickcheck -u $output_dir/duplex_calls.bam
     num_duplex_reads=$(samtools view $output_dir/duplex_calls.bam | grep dx:i:1 | wc -l | awk '{print $1}')
     if [[ $num_duplex_reads -ne "2" ]]; then
-        echo "Duplex basecalling missing reads."
+        echo "Duplex basecalling missing reads - pairs file"
+        exit 1
+    fi
+
+    echo dorado in-line duplex from model complex
+    $dorado_bin duplex hac@v4.2.0 $data_dir/duplex/pod5 > $output_dir/duplex_calls_complex.bam
+    samtools quickcheck -u $output_dir/duplex_calls_complex.bam
+    num_duplex_reads=$(samtools view $output_dir/duplex_calls_complex.bam | grep dx:i:1 | wc -l | awk '{print $1}')
+    if [[ $num_duplex_reads -ne "2" ]]; then
+        echo "Duplex basecalling missing reads - model complex"
+        exit 1
+    fi
+
+    echo dorado in-line modbase duplex from model complex
+    $dorado_bin duplex hac,5mCG_5hmCG $data_dir/duplex/pod5 > $output_dir/duplex_calls_mods.bam
+    samtools quickcheck -u $output_dir/duplex_calls_mods.bam
+    num_duplex_reads=$(samtools view $output_dir/duplex_calls_mods.bam | grep dx:i:1 | wc -l | awk '{print $1}')
+    if [[ $num_duplex_reads -ne "2" ]]; then
+        echo "Duplex basecalling missing reads - mods"
         exit 1
     fi
 fi
