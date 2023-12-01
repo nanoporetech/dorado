@@ -174,6 +174,11 @@ void launch_kernel(ComputePipelineState *const pipeline,
 
     command_buffer->commit();
     command_buffer->waitUntilCompleted();
+
+    auto status = command_buffer->status();
+    if (status != MTL::CommandBufferStatusCompleted) {
+        spdlog::warn("Synchronous metal command buffer failed: {}", fmt::underlying(status));
+    }
 }
 
 void launch_kernel_no_wait(ComputePipelineState *const pipeline,
