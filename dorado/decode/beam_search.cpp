@@ -533,7 +533,7 @@ std::tuple<std::string, std::string, std::vector<uint8_t>> beam_search_decode(
 
     // Back guides must be floats regardless of scores type.
     if (back_guides_t.dtype() != at::ScalarType::Float) {
-        throw std::runtime_error("beam_search_decode: back guides type msut be float");
+        throw std::runtime_error("beam_search_decode: back guides type must be float");
     }
 
     // back guides and posts should be contiguous
