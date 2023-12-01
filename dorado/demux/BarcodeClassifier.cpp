@@ -259,6 +259,13 @@ std::vector<BarcodeClassifier::BarcodeCandidateKit> BarcodeClassifier::generate_
             const auto& barcode1 = get_barcode_sequence(bc_name);
             auto barcode1_rev = utils::reverse_complement(barcode1);
 
+            if (!candidate.barcodes1.empty() &&
+                barcode1.length() != candidate.barcodes1.back().length()) {
+                throw std::runtime_error(
+                        "All front window barcodes must be the same length. Length for " + bc_name +
+                        " is different.");
+            }
+
             candidate.barcodes1.push_back(barcode1);
             candidate.barcodes1_rev.push_back(std::move(barcode1_rev));
 
@@ -266,6 +273,13 @@ std::vector<BarcodeClassifier::BarcodeCandidateKit> BarcodeClassifier::generate_
                 const auto& bc2_name = kit_info.barcodes2[idx];
                 const auto& barcode2 = get_barcode_sequence(bc2_name);
                 auto barcode2_rev = utils::reverse_complement(barcode2);
+
+                if (!candidate.barcodes2.empty() &&
+                    barcode2.length() != candidate.barcodes2.back().length()) {
+                    throw std::runtime_error(
+                            "All front window barcodes must be the same length. Length for " +
+                            bc2_name + " is different.");
+                }
 
                 candidate.barcodes2.push_back(barcode2);
                 candidate.barcodes2_rev.push_back(std::move(barcode2_rev));

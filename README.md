@@ -45,14 +45,6 @@ If you encounter problems with running on your system, please [report an issue](
 
 AWS Benchmarks on Nvidia GPUs for Dorado 0.3.0 are available [here](https://aws.amazon.com/blogs/hpc/benchmarking-the-oxford-nanopore-technologies-basecallers-on-aws/). Please note: Dorado's basecalling speed is continuously improving, so these benchmarks may not reflect performance with the latest release.
 
-## Roadmap
-
-Dorado is Oxford Nanopore's recommended basecaller for offline basecalling. We are working on a number of features which we expect to release soon:
-
-1. Adapter trimming
-2. Custom barcode support
-3. Python API
-
 ## Performance tips
 
 1. For optimal performance, Dorado requires POD5 file input. Please [convert your .fast5 files](https://github.com/nanoporetech/pod5-file-format) before basecalling.
@@ -210,6 +202,10 @@ unclassified.bam
 
 #### Using a sample sheet
 Dorado is able to use a sample sheet to restrict the barcode classifications to only those present, and to apply aliases to the detected classifications. This is enabled by passing the path to a sample sheet to the `--sample-sheet` argument when using the `basecaller` or `demux` commands. See [here](documentation/SampleSheets.md) for more information.
+
+### Custom barcodes
+
+In addition to supporting the standard barcode kits from Oxford Nanopore, Dorado also supports specifying custom barcode kit arrangements and sequences. This is done by passing a barcode arrangement file via the `--barcode-arrangement` argument (either to `dorado demux` or `dorado basecaller`). Custom barcode sequences can optionally be specified via the `--barcode-sequences` option.
 
 ### Poly(A) tail estimation
 

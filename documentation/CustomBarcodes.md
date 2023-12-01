@@ -48,6 +48,8 @@ min_hard_barcode_threshold = 0.3
 min_barcode_score_dist = 0.1
 ```
 
+#### Arrangement Options
+
 The table below describes the arrangement options in more detail.
 
 | Option | Description |
@@ -63,7 +65,7 @@ The table below describes the arrangement options in more detail.
 | first_index | (Required) Start index for range of barcode sequences to use in the arrangement. Used in combination with the `last_index`. |
 | last_index | (Required) End index for range of barcode sequences to use in the arrangement. Used in combination with the `first_index`. |
 
-### Scoring
+#### Scoring Options
 
 Dorado maintains a default set of parameters for scoring each barcode to determine the best classification. These paramters have been tuned based barcoding kits from Oxford Nanopore. However, the default parameters may not be optimal for new arrangements and kits.
 
@@ -87,3 +89,22 @@ if that score is greater than `min_barcode_score_dist`, the best candidate is co
 | min_soft_flank_threshold | If flank score meets this threshold and barcode score meets its hard threshold, consider a hit. Soft score is higher than hard score. |
 | min_hard_barcode_threshold | Minimum score threshold a flank must meet. |
 | min_barcode_score_dist | Minimum distance between barcode scores of best and second best hits. |
+
+### Custom Sequences File 
+
+In addition to specifying a custom barcode arrangement, new barcode sequences can also be specified in a FASTQ format. There are only 2 requirements -
+* The sequence names to follow the `prefix%\d+i` format (e.g. `BC%02i` for barcodes needing 2 digit indexing, or `NB%04i` for barcodes with 4 digit indexing, etc.).
+* All barcode sequence lengths must match.
+
+This is an example sequences file.
+
+```
+>BC01
+TTTT
+>BC02
+AAAA
+>BC03
+GGGG
+>BC04
+CCCC
+```
