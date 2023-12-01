@@ -58,3 +58,7 @@ elseif(WIN32)
 endif()
 
 download_and_extract(${POD5_URL} ${POD5_DIR})
+
+# pod5 makes use of threads, so make sure to link to them.
+find_package(Threads REQUIRED)
+list(APPEND POD5_LIBRARIES Threads::Threads)
