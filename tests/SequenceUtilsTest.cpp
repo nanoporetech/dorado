@@ -41,8 +41,16 @@ TEST_CASE(TEST_GROUP "reverse_complement") {
         std::string rev_comp(len, ' ');
         for (int j = 0; j < len; ++j) {
             const int base_index = std::rand() % 4;
-            temp.at(j) = bases.at(base_index);
-            rev_comp.at(len - 1 - j) = bases.at(3 - base_index);
+            char temp_base = bases.at(base_index);
+            ;
+            char rev_comp_base = bases.at(3 - base_index);
+            // Randomly switch to lower case.
+            if (rand() & 1) {
+                temp_base = std::tolower(temp_base);
+                rev_comp_base = std::tolower(rev_comp_base);
+            }
+            temp.at(j) = temp_base;
+            rev_comp.at(len - 1 - j) = rev_comp_base;
         }
         CHECK(dorado::utils::reverse_complement(temp) == rev_comp);
     }
