@@ -17,7 +17,17 @@ mkdir -p $output_dir
 test_output_file=$test_dir/output.log
 
 # Setup
-$dorado_bin download --model ${model} > /dev/null
+$dorado_bin download --model ${model} --directory . > /dev/null
+ret_val=$?
+if [ $ret_val -ne 0 ]; then
+    echo "Error: Failed to download model"
+    exit $ret_val
+fi
+
+if [[ ! -e "${model}" ]]; then 
+    echo "Error: Model does not exist"
+    exit 1
+fi
 
 # Test commands
 $dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} > $output_dir/output.bam 2>$test_output_file

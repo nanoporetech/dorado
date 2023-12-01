@@ -219,9 +219,9 @@ float ReadCommon::calculate_mean_qscore() const {
     // read length, then calculate mean Q-score from the
     // start of the read.
     if (qstring.length() <= mean_qscore_start_pos) {
-        return utils::mean_qscore_from_qstring(qstring, 0);
+        return utils::mean_qscore_from_qstring(qstring);
     }
-    return utils::mean_qscore_from_qstring(qstring, mean_qscore_start_pos);
+    return utils::mean_qscore_from_qstring(std::string_view{qstring}.substr(mean_qscore_start_pos));
 }
 
 std::vector<BamPtr> ReadCommon::extract_sam_lines(bool emit_moves,

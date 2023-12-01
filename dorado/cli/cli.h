@@ -6,5 +6,6 @@ int download(int argc, char *argv[]);
 int aligner(int argc, char *argv[]);
 int demuxer(int argc, char *argv[]);
 int summary(int argc, char *argv[]);
+int trim(int argc, char *argv[]);
 
 }  // namespace dorado

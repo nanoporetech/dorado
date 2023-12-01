@@ -1,0 +1,11 @@
+[arrangement]
+name = "test_kit_ends_different_flanks"
+first_index = 1
+last_index = 96
+kit = "NB"
+mask1_front = "AAAA"
+mask1_rear = "TTTTT"
+mask2_front = "CCCC"
+mask2_rear = "GGGG"
+barcode1_pattern = "NB%02i"
+barcode2_pattern = "NB%02i"

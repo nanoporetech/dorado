@@ -22,13 +22,7 @@ class WrappedKString {
     kstring_t m_str = KS_INITIALIZE;
 
 public:
-    WrappedKString() {
-        // On Windows |sam_hdr_find_tag_id| lives in a DLL and uses a different heap, but
-        // |ks_free| is inline so when we call it we crash trying to free unknown memory. To
-        // work around this we resize the kstring to a big value in our code so no resizing
-        // happens inside the htslib library.
-        ks_resize(&m_str, 1'000'000);
-    }
+    WrappedKString() { m_str = utils::allocate_kstring(); }
     ~WrappedKString() { ks_free(&m_str); }
 
     kstring_t *get() { return &m_str; }
@@ -140,7 +134,7 @@ TEST_CASE("BamUtilsTest: Test bam extraction helpers", TEST_GROUP) {
     fs::path bam_utils_test_dir = fs::path(get_data_dir("bam_utils"));
     auto sam = bam_utils_test_dir / "test.sam";
 
-    HtsReader reader(sam.string());
+    HtsReader reader(sam.string(), std::nullopt);
     REQUIRE(reader.read());  // Parse first and only record.
     auto record = reader.record.get();
 

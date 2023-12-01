@@ -18,4 +18,26 @@ inline std::vector<std::string> split(std::string_view input, char delimiter) {
     return result;
 }
 
+inline std::string join(const std::vector<std::string>& inputs, const std::string& separator) {
+    std::string result;
+    for (const auto& item : inputs) {
+        if (!result.empty()) {
+            result += separator;
+        }
+        result += item;
+    }
+    return result;
+}
+
+inline bool starts_with(std::string_view str, std::string_view prefix) {
+    return str.rfind(prefix, 0) != std::string::npos;
+}
+
+inline bool ends_with(std::string_view str, std::string_view suffix) {
+    if (str.length() < suffix.length()) {
+        return false;
+    }
+    return str.substr(str.length() - suffix.length()) == suffix;
+}
+
 }  // namespace dorado::utils

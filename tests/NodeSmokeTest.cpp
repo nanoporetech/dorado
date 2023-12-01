@@ -88,7 +88,7 @@ protected:
         std::vector<dorado::Message> messages;
         auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
         pipeline_desc.add_node<NodeType>({sink}, std::forward<Args>(args)...);
-        auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
+        auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
         if (m_pipeline_restart) {
             pipeline->terminate(dorado::DefaultFlushOptions());
             pipeline->restart();
@@ -183,7 +183,7 @@ DEFINE_TEST(NodeSmokeTestRead, "ScalerNode") {
     config.quantile.quantile_b = 0.9f;
     config.quantile.shift_multiplier = 0.51f;
     config.quantile.scale_multiplier = 0.53f;
-    run_smoke_test<dorado::ScalerNode>(config, model_type, 2);
+    run_smoke_test<dorado::ScalerNode>(config, model_type, 2, 1000);
 }
 
 DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
@@ -224,7 +224,7 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
         }
         for (const auto& device : devices) {
             auto caller = dorado::create_cuda_caller(model_config, default_params.chunksize,
-                                                     int(batch_size), device);
+                                                     int(batch_size), device, 1.f, true);
             for (int i = 0; i < default_params.num_runners; i++) {
                 runners.push_back(std::make_shared<dorado::CudaModelRunner>(caller));
             }
@@ -244,7 +244,7 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
 
     run_smoke_test<dorado::BasecallerNode>(std::move(runners),
                                            dorado::utils::default_parameters.overlap,
-                                           kBatchTimeoutMS, model_name);
+                                           kBatchTimeoutMS, model_name, 1000, "BasecallerNode", 0);
 }
 
 DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
@@ -321,7 +321,7 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
                      m_rng);
     });
 
-    run_smoke_test<dorado::ModBaseCallerNode>(std::move(remora_runners), 2, model_stride);
+    run_smoke_test<dorado::ModBaseCallerNode>(std::move(remora_runners), 2, model_stride, 1000);
 }
 
 DEFINE_TEST(NodeSmokeTestBam, "ReadToBamType") {
@@ -336,19 +336,40 @@ DEFINE_TEST(NodeSmokeTestBam, "ReadToBamType") {
             emit_moves, 2, dorado::utils::default_parameters.methylation_threshold, nullptr, 1000);
 }
 
+struct BarcodeKitInputs {
+    std::vector<std::string> kit_names;
+    std::optional<std::string> custom_kit;
+    std::optional<std::string> custom_sequences;
+};
+
 DEFINE_TEST(NodeSmokeTestRead, "BarcodeClassifierNode") {
     auto barcode_both_ends = GENERATE(true, false);
     auto no_trim = GENERATE(true, false);
     auto pipeline_restart = GENERATE(false, true);
+    auto kit_inputs =
+            GENERATE(BarcodeKitInputs{{"SQK-RPB004", "EXP-NBD196"}, std::nullopt, std::nullopt},
+                     BarcodeKitInputs{{},
+                                      (fs::path(get_data_dir("barcode_demux/custom_barcodes")) /
+                                       "test_kit_single_ended.toml")
+                                              .string(),
+                                      std::nullopt},
+                     BarcodeKitInputs{{},
+                                      (fs::path(get_data_dir("barcode_demux/custom_barcodes")) /
+                                       "test_kit_single_ended.toml")
+                                              .string(),
+                                      (fs::path(get_data_dir("barcode_demux/custom_barcodes")) /
+                                       "test_sequences.fasta")
+                                              .string()});
     CAPTURE(barcode_both_ends);
     CAPTURE(no_trim);
+    CAPTURE(kit_inputs);
     CAPTURE(pipeline_restart);
 
     set_pipeline_restart(pipeline_restart);
 
-    std::vector<std::string> kits = {"SQK-RPB004", "EXP-NBD196"};
-    run_smoke_test<dorado::BarcodeClassifierNode>(2, kits, barcode_both_ends, no_trim,
-                                                  std::nullopt);
+    run_smoke_test<dorado::BarcodeClassifierNode>(2, kit_inputs.kit_names, barcode_both_ends,
+                                                  no_trim, std::nullopt, kit_inputs.custom_kit,
+                                                  kit_inputs.custom_sequences);
 }
 
 DEFINE_TEST(NodeSmokeTestRead, "AdapterDetectorNode") {
@@ -370,17 +391,17 @@ TEST_CASE("BarcodeClassifierNode: test simple pipeline with fastq and sam files"
     std::vector<std::string> kits = {"EXP-PBC096"};
     bool barcode_both_ends = GENERATE(true, false);
     bool no_trim = GENERATE(true, false);
-    pipeline_desc.add_node<dorado::BarcodeClassifierNode>({sink}, 8, kits, barcode_both_ends,
-                                                          no_trim, std::nullopt);
+    pipeline_desc.add_node<dorado::BarcodeClassifierNode>(
+            {sink}, 8, kits, barcode_both_ends, no_trim, std::nullopt, std::nullopt, std::nullopt);
 
-    auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
+    auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
 
     fs::path data1 = fs::path(get_data_dir("barcode_demux/double_end_variant")) /
                      "EXP-PBC096_barcode_both_ends_pass.fastq";
     fs::path data2 = fs::path(get_data_dir("bam_utils")) / "test.sam";
     for (auto& test_file : {data1, data2}) {
-        dorado::HtsReader reader(test_file.string());
-        reader.read(*pipeline);
+        dorado::HtsReader reader(test_file.string(), std::nullopt);
+        reader.read(*pipeline, -1);
     }
 }
 
@@ -398,7 +419,7 @@ DEFINE_TEST(NodeSmokeTestRead, "PolyACalculator") {
                                    0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 1, 1};
     });
 
-    run_smoke_test<dorado::PolyACalculator>(8, is_rna);
+    run_smoke_test<dorado::PolyACalculator>(8, is_rna, 1000);
 }
 
 }  // namespace

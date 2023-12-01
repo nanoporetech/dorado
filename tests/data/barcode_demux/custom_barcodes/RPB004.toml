@@ -1,0 +1,12 @@
+[arrangement]
+
+name = "SQK-RPB004"
+kit = "BC"
+first_index = 1
+last_index = 12
+barcode1_pattern = "BC%02i"
+barcode2_pattern = "BC%02i"
+mask1_front = "CCGTGAC"
+mask1_rear = "CGTTTTTCGTGCGCCGCTTC"
+mask2_front = "CCGTGAC"
+mask2_rear = "CGTTTTTCGTGCGCCGCTTC"

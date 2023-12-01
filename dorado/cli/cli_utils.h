@@ -2,7 +2,11 @@
 #pragma once
 
 #include "Version.h"
+#include "models/kits.h"
 #include "utils/dev_utils.h"
+
+#include <optional>
+#include <stdexcept>
 
 #ifdef _WIN32
 // Unreachable code warnings are emitted from argparse, even though they should be disabled by the
@@ -15,6 +19,8 @@
 #ifdef _WIN32
 #pragma warning(pop)
 #endif  // _WIN32
+#include "data_loader/ModelFinder.h"
+
 #include <htslib/sam.h>
 
 #include <algorithm>
@@ -86,18 +92,14 @@ inline std::tuple<int, int, int> parse_version_str(const std::string& version) {
 }
 
 template <class T = int64_t>
-std::vector<T> parse_string_to_sizes(const std::string& str,
-                                     std::optional<std::string> opt = std::nullopt) {
+std::vector<T> parse_string_to_sizes(const std::string& str) {
     std::vector<T> sizes;
     const char* c_str = str.c_str();
     char* p;
     while (true) {
         double x = strtod(c_str, &p);
         if (p == c_str) {
-            auto msg = "Cannot parse size '" + str + "'.";
-            if (opt)
-                msg = "Error parsing option " + *opt + ": " + msg;
-            throw std::runtime_error(msg);
+            throw std::runtime_error("Cannot parse size '" + str + "'.");
         }
         if (*p == 'G' || *p == 'g') {
             x *= 1e9;
@@ -116,30 +118,24 @@ std::vector<T> parse_string_to_sizes(const std::string& str,
         } else if (*p == 0) {
             break;
         }
-        auto msg = "Unknown suffix '" + std::string(p) + "'.";
-        if (opt)
-            msg = "Error parsing option " + *opt + ": " + msg;
-        throw std::runtime_error(msg);
+        throw std::runtime_error("Unknown suffix '" + std::string(p) + "'.");
     }
     return sizes;
 }
 
 template <class T = uint64_t>
-T parse_string_to_size(const std::string& str, std::optional<std::string> opt = std::nullopt) {
-    return parse_string_to_sizes<T>(str, opt)[0];
+T parse_string_to_size(const std::string& str) {
+    return parse_string_to_sizes<T>(str)[0];
 }
 
-inline bool parse_yes_or_no(const std::string& str, std::optional<std::string> opt = std::nullopt) {
+inline bool parse_yes_or_no(const std::string& str) {
     if (str == "yes" || str == "y") {
         return true;
     }
     if (str == "no" || str == "n") {
         return false;
     }
-    auto msg = "Unsupported value '" + str + "'; option  only accepts '(y)es' or '(n)o'.";
-    if (opt) {
-        msg = "Error parsing option " + *opt + ": " + msg;
-    }
+    auto msg = "Unsupported value '" + str + "'; option only accepts '(y)es' or '(n)o'.";
     throw std::runtime_error(msg);
 }
 
@@ -272,6 +268,28 @@ inline std::vector<std::string> extract_token_from_cli(const std::string& cmd) {
                 "Cmdline requires at least 4 tokens including binary name, found: " + cmd);
     }
     return tokens;
+}
+
+inline ModelSelection parse_model_argument(const std::string& model_arg) {
+    try {
+        return ModelComplexParser::parse(model_arg);
+    } catch (std::exception& e) {
+        spdlog::error("Failed to parse model argument. {}", e.what());
+        std::exit(EXIT_FAILURE);
+    }
+}
+
+inline ModelFinder model_finder(const ModelSelection& model_selection,
+                                const std::filesystem::path& data,
+                                bool recursive,
+                                bool suggestions) {
+    try {
+        return ModelFinder(ModelFinder::get_chemistry(data.u8string(), recursive), model_selection,
+                           suggestions);
+    } catch (std::exception& e) {
+        spdlog::error(e.what());
+        std::exit(EXIT_FAILURE);
+    }
 }
 
 }  // namespace cli

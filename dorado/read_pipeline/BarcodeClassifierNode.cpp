@@ -4,7 +4,6 @@
 #include "demux/Trimmer.h"
 #include "utils/SampleSheet.h"
 #include "utils/bam_utils.h"
-#include "utils/barcode_kits.h"
 #include "utils/trim.h"
 #include "utils/types.h"
 
@@ -29,7 +28,7 @@ std::string generate_barcode_string(dorado::BarcodeScoreResult bc_res) {
     } else {
         bc = UNCLASSIFIED_BARCODE;
     }
-    spdlog::debug("BC: {}", bc);
+    spdlog::trace("BC: {}", bc);
     return bc;
 }
 
@@ -42,13 +41,22 @@ BarcodeClassifierNode::BarcodeClassifierNode(int threads,
                                              const std::vector<std::string>& kit_names,
                                              bool barcode_both_ends,
                                              bool no_trim,
-                                             BarcodingInfo::FilterSet allowed_barcodes)
+                                             BarcodingInfo::FilterSet allowed_barcodes,
+                                             const std::optional<std::string>& custom_kit,
+                                             const std::optional<std::string>& custom_seqs)
         : MessageSink(10000),
           m_threads(threads),
           m_default_barcoding_info(create_barcoding_info(kit_names,
                                                          barcode_both_ends,
                                                          !no_trim,
-                                                         std::move(allowed_barcodes))) {
+                                                         std::move(allowed_barcodes),
+                                                         custom_kit,
+                                                         custom_seqs)) {
+    if (m_default_barcoding_info->kit_name.empty()) {
+        spdlog::debug("Barcode with new kit from {}", *m_default_barcoding_info->custom_kit);
+    } else {
+        spdlog::info("Barcode for {}", m_default_barcoding_info->kit_name);
+    }
     start_threads();
 }
 
@@ -99,11 +107,14 @@ void BarcodeClassifierNode::worker_thread() {
 
 std::shared_ptr<const BarcodingInfo> BarcodeClassifierNode::get_barcoding_info(
         const SimplexRead& read) const {
-    if (m_default_barcoding_info && !m_default_barcoding_info->kit_name.empty()) {
+    if (m_default_barcoding_info && (!m_default_barcoding_info->kit_name.empty() ||
+                                     m_default_barcoding_info->custom_kit.has_value())) {
         return m_default_barcoding_info;
     }
 
-    if (read.read_common.barcoding_info && !read.read_common.barcoding_info->kit_name.empty()) {
+    if (read.read_common.barcoding_info &&
+        (!read.read_common.barcoding_info->kit_name.empty() ||
+         read.read_common.barcoding_info->custom_kit.has_value())) {
         return read.read_common.barcoding_info;
     }
 
@@ -111,10 +122,11 @@ std::shared_ptr<const BarcodingInfo> BarcodeClassifierNode::get_barcoding_info(
 }
 
 void BarcodeClassifierNode::barcode(BamPtr& read) {
-    if (!m_default_barcoding_info || m_default_barcoding_info->kit_name.empty()) {
+    if (!m_default_barcoding_info ||
+        (m_default_barcoding_info->kit_name.empty() && !m_default_barcoding_info->custom_kit)) {
         return;
     }
-    auto barcoder = m_barcoder_selector.get_barcoder(m_default_barcoding_info->kit_name);
+    auto barcoder = m_barcoder_selector.get_barcoder(*m_default_barcoding_info);
 
     bam1_t* irecord = read.get();
     std::string seq = utils::extract_sequence(irecord);
@@ -140,7 +152,7 @@ void BarcodeClassifierNode::barcode(SimplexRead& read) {
     if (!barcoding_info) {
         return;
     }
-    auto barcoder = m_barcoder_selector.get_barcoder(barcoding_info->kit_name);
+    auto barcoder = m_barcoder_selector.get_barcoder(*barcoding_info);
 
     // get the sequence to map from the record
     auto bc_res = barcoder->barcode(read.read_common.seq, barcoding_info->barcode_both_ends,

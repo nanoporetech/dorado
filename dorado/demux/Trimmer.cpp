@@ -1,7 +1,6 @@
 #include "Trimmer.h"
 
 #include "utils/bam_utils.h"
-#include "utils/barcode_kits.h"
 #include "utils/trim.h"
 
 #include <htslib/sam.h>
@@ -30,9 +29,7 @@ std::pair<int, int> Trimmer::determine_trim_interval(const BarcodeScoreResult& r
     // the end of top barcode end value because that's the position
     // in the sequence where the barcode ends. So the actual sequence
     // because from one after that.
-    auto kit_info_map = barcode_kits::get_kit_infos();
-    const barcode_kits::KitInfo& kit = kit_info_map.at(res.kit);
-    if (kit.double_ends) {
+    if (res.top_score >= 0 && res.bottom_score >= 0) {
         float top_flank_score = res.top_flank_score;
         if (top_flank_score > kFlankScoreThres) {
             trim_interval.first = res.top_barcode_pos.second + 1;
@@ -76,7 +73,7 @@ std::pair<int, int> Trimmer::determine_trim_interval(const AdapterScoreResult& r
     // defines which portion of the read to retain.
     std::pair<int, int> trim_interval = {0, seqlen};
 
-    const float score_thres = 0.7f;
+    const float score_thres = 0.8f;
 
     if (res.front.name == "unclassified" || res.front.score < score_thres) {
         trim_interval.first = 0;

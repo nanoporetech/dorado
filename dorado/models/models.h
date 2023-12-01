@@ -1,21 +1,48 @@
 #pragma once
 
-#include <map>
-#include <string>
-#include <string_view>
-#include <vector>
+#include "kits.h"
+#include "metadata.h"
+
+#include <filesystem>
+#include <optional>
 
 namespace dorado::models {
 
+// Model info identifies models and associates additional metadata for searching for
+// automatic model selection.
 struct ModelInfo {
-    std::string_view checksum;
+    std::string name;
+    std::string checksum;
+    Chemistry chemistry;
+    ModelVariantPair simplex{};
+    ModsVariantPair mods{};
 };
-using ModelMap = std::map<std::string_view, ModelInfo>;
 
-const ModelMap& simplex_models();
-const ModelMap& stereo_models();
-const ModelMap& modified_models();
-const std::vector<std::string>& modified_mods();
+// Search for a model which is configured for use with the given chemistry and other
+// optional params.
+ModelInfo find_model(const std::vector<ModelInfo>& models,
+                     const std::string& description,
+                     const Chemistry& chemistry,
+                     const ModelVariantPair& model,
+                     const ModsVariantPair& mods,
+                     bool suggestions);
+
+// Search for models which match the given chemistry and filters. Returns all matches
+// in ascending version order
+std::vector<ModelInfo> find_models(const std::vector<ModelInfo>& models,
+                                   const Chemistry& chemistry,
+                                   const ModelVariantPair& model,
+                                   const ModsVariantPair& mods);
+
+using ModelList = std::vector<ModelInfo>;
+const ModelList& simplex_models();
+const ModelList& stereo_models();
+const ModelList& modified_models();
+
+std::vector<std::string> simplex_model_names();
+std::vector<std::string> stereo_model_names();
+std::vector<std::string> modified_model_names();
+std::vector<std::string> modified_model_variants();
 
 bool is_valid_model(const std::string& selected_model);
 bool download_models(const std::string& target_directory, const std::string& selected_model);
@@ -37,9 +64,9 @@ uint16_t get_sample_rate_by_model_name(const std::string& model_name);
 uint32_t get_mean_qscore_start_pos_by_model_name(const std::string& model_name);
 
 // Extract the model name from the model path.
-std::string extract_model_from_model_path(const std::string& model_path);
+std::string extract_model_name_from_path(const std::filesystem::path& model_path);
 
-// Extract the model names as a comma seperated list from a comma seperated list of model paths.
-std::string extract_model_from_model_paths(const std::string& model_paths);
+// Extract the model names as a comma seperated list from a vetor of model paths.
+std::string extract_model_names_from_paths(const std::vector<std::filesystem::path>& model_paths);
 
 }  // namespace dorado::models

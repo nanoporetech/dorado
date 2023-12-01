@@ -15,7 +15,7 @@ namespace dorado {
 
 class PolyACalculator : public MessageSink {
 public:
-    PolyACalculator(size_t num_worker_threads, bool is_rna, size_t max_reads = 1000);
+    PolyACalculator(size_t num_worker_threads, bool is_rna, size_t max_reads);
     ~PolyACalculator() { terminate_impl(); }
     std::string get_name() const override { return "PolyACalculator"; }
     stats::NamedStats sample_stats() const override;

@@ -44,8 +44,9 @@ bool finishCommandBuffer(const char *label, MTL::CommandBuffer *cb, int try_coun
     auto status = cb->status();
     bool success = (status == MTL::CommandBufferStatusCompleted);
     if (success) {
-        spdlog::debug("Metal command buffer {}: {} ms succeeded (try {})", label,
-                      1000.f * float(cb->GPUEndTime() - cb->GPUStartTime()), try_count);
+        spdlog::debug("Metal command buffer {}: {} GPU ms {} CPU ms succeeded (try {})", label,
+                      1000.f * float(cb->GPUEndTime() - cb->GPUStartTime()),
+                      1000.f * float(cb->kernelEndTime() - cb->kernelStartTime()), try_count);
     } else {
         spdlog::warn("Metal command buffer {} failed: status {} (try {})", label, status,
                      try_count);
@@ -220,7 +221,7 @@ TORCH_MODULE(MetalConv1d);
 
 static constexpr int kLstmGates = 4;
 struct MetalLSTMImpl : Module {
-    MetalLSTMImpl(int layer_size, bool reverse_, MTL::Device *) : reverse(reverse_) {
+    MetalLSTMImpl(int layer_size, bool reverse_) : reverse(reverse_) {
         auto weight_ih = torch::empty({layer_size * kLstmGates, layer_size});
         auto weight_hh = torch::empty({layer_size * kLstmGates, layer_size});
         auto bias_ih = torch::empty({layer_size * kLstmGates});
@@ -275,13 +276,6 @@ struct MetalBlockImpl : Module {
                           num_pieces);
         }
 
-        // args for conversion to half
-        {
-            const std::vector<int32_t> args_to_half_{in_chunk_size * batch_size *
-                                                     config.num_features};
-            args_to_half = create_vec_buffer(m_device, args_to_half_);
-        }
-
         // args for final (possibly only) linear layer kernel.
         // Each output buffer requires a distinct input offset, so we must have a separate args buffer.
         args_linear.resize(out_split_);
@@ -331,17 +325,15 @@ struct MetalBlockImpl : Module {
                 make_cps(m_device, "lstm",
                          {{"kLstmLayerSize", config.lstm_size}, {"kLstmReversedInTime", true}},
                          lstm_threads);
-        to_half_cps = make_cps(m_device, "float_to_half", {});
 
         // The temp buffer used for these purposes (number of elements of `torch_dtype` in []):
-        // - Store inputs converted to F16 (if torch_dtype == kF16) [in_chunk_size * batch_size]
         // - Store output of second conv layer [in_chunk_size * batch_size * kMaxConv2OutChannels]
-        // - Store temp output of lstm layers [batch_size * layer_size]
         // - Store output of first linear layer if there are two
         //   [lstm_chunk_size * batch_size * decomposition / out_split_]
+        // We size mat_temp here for conv2 output, potentially increasing it below in the case of a
+        // linear decomposition model.
         constexpr int kMaxConv2OutChannels = 16;
-        int mat_temp_elems =
-                batch_size * std::max(kMaxConv2OutChannels * in_chunk_size, config.lstm_size);
+        int mat_temp_elems = batch_size * kMaxConv2OutChannels * in_chunk_size;
 
         conv1 = register_module("conv1", MetalConv1d(1, config.num_features, config.convs[0].size,
                                                      5, 1, config.convs[0].activation,
@@ -352,11 +344,11 @@ struct MetalBlockImpl : Module {
         conv3 = register_module("conv3", MetalConv1d(3, 16, config.lstm_size, 19, config.stride,
                                                      config.convs[2].activation, in_chunk_size,
                                                      batch_size, device));
-        rnn1 = register_module("rnn_1", MetalLSTM(config.lstm_size, true, device));
-        rnn2 = register_module("rnn_2", MetalLSTM(config.lstm_size, false, device));
-        rnn3 = register_module("rnn_3", MetalLSTM(config.lstm_size, true, device));
-        rnn4 = register_module("rnn_4", MetalLSTM(config.lstm_size, false, device));
-        rnn5 = register_module("rnn_5", MetalLSTM(config.lstm_size, true, device));
+        rnn1 = register_module("rnn_1", MetalLSTM(config.lstm_size, true));
+        rnn2 = register_module("rnn_2", MetalLSTM(config.lstm_size, false));
+        rnn3 = register_module("rnn_3", MetalLSTM(config.lstm_size, true));
+        rnn4 = register_module("rnn_4", MetalLSTM(config.lstm_size, false));
+        rnn5 = register_module("rnn_5", MetalLSTM(config.lstm_size, true));
 
         const int linear_threads = kernel_simd_groups * kSIMDGroupWidth;
         // If the intermediate feature size between conv1 and conv2 is 16, then this is a v4
@@ -389,6 +381,8 @@ struct MetalBlockImpl : Module {
                      {"kLinearOutputTanh", false},
                      {"kLinearOutputAsByte", true}});
             linear_cps[1] = make_cps(m_device, "linear", linear_constants2, linear_threads);
+            // We use mat_temp for the output of the first linear layer, so ensure it is large
+            // enough for that purpose.
             mat_temp_elems = std::max(mat_temp_elems,
                                       decomposition * (batch_size / out_split_) * lstm_chunk_size);
         } else {
@@ -416,7 +410,7 @@ struct MetalBlockImpl : Module {
         mat_working_mem = create_buffer(m_device, size_t(lstm_chunk_size + 3) * batch_size *
                                                           config.lstm_size * dtype_bytes);
         mat_state = create_buffer(m_device, batch_size * config.lstm_size * dtype_bytes);
-        mat_temp = create_buffer(m_device, mat_temp_elems * dtype_bytes * 20 * config.num_features);
+        mat_temp = create_buffer(m_device, mat_temp_elems * dtype_bytes);
     }
 
     void load_weights() {
@@ -484,16 +478,10 @@ struct MetalBlockImpl : Module {
                                       std::vector<at::Tensor> &out) {
         auto command_buffer = m_command_queue->commandBuffer();
 
-        assert(in.dtype() == torch::kF16 || in.dtype() == torch::kF32);
-        if (in.dtype() == torch::kF32 && torch_dtype == torch::kF16) {
-            // Convert input activations from float32 to float16.
-            launch_kernel_no_wait(to_half_cps.get(), command_buffer,
-                                  {args_to_half.get(), mtl_for_tensor(in), mat_temp.get()}, {},
-                                  kernel_thread_groups, 256);
-            conv1->run(command_buffer, mat_temp.get(), mat_working_mem.get());
-        } else {
-            conv1->run(command_buffer, mtl_for_tensor(in), mat_working_mem.get());
+        if (in.dtype() != torch::kF16) {
+            throw std::runtime_error("Input tensor must be float16.");
         }
+        conv1->run(command_buffer, mtl_for_tensor(in), mat_working_mem.get());
         conv2->run(command_buffer, mat_working_mem.get(), mat_temp.get());
         conv3->run(command_buffer, mat_temp.get(), mat_working_mem.get());
         if (!finishCommandBuffer("convolutions", command_buffer, try_count)) {
@@ -560,9 +548,9 @@ struct MetalBlockImpl : Module {
 
     MTL::Device *m_device;
     NS::SharedPtr<MTL::CommandQueue> m_command_queue;
-    NS::SharedPtr<MTL::ComputePipelineState> lstm_cps[2], to_half_cps, linear_cps[2];
-    NS::SharedPtr<MTL::Buffer> mat_working_mem, mat_state, mat_temp, args_to_half,
-            linear_weights[2], args_linear2;
+    NS::SharedPtr<MTL::ComputePipelineState> lstm_cps[2], linear_cps[2];
+    NS::SharedPtr<MTL::Buffer> mat_working_mem, mat_state, mat_temp, linear_weights[2],
+            args_linear2;
     // Each args buffer corresponds to a different time span of the LSTM layer.
     std::vector<NS::SharedPtr<MTL::Buffer>> m_args_lstm;
     std::vector<NS::SharedPtr<MTL::Buffer>> args_linear;
@@ -586,7 +574,7 @@ struct MetalModelImpl : Module {
     }
 
     void load_state_dict(const std::vector<at::Tensor> &weights) {
-        utils::load_state_dict(*this, weights);
+        utils::load_state_dict(*this, weights, {});
         mtl_block->load_weights();
     }
 
@@ -684,9 +672,9 @@ public:
         m_model->eval();
 
         m_decode_complete_event = NS::TransferPtr(m_device->newSharedEvent());
-        m_bwd_scan_cps = make_cps(m_device.get(), "backward_scan", {});
-        m_fwd_scan_cps = make_cps(m_device.get(), "forward_scan", {});
-        m_add_softmax_cps = make_cps(m_device.get(), "add_softmax", {});
+        m_bwd_scan_cps = make_cps(m_device.get(), "backward_scan", {}, std::nullopt);
+        m_fwd_scan_cps = make_cps(m_device.get(), "forward_scan", {}, std::nullopt);
+        m_add_softmax_cps = make_cps(m_device.get(), "add_softmax", {}, std::nullopt);
 
         int T = m_out_chunk_size;
         int C = model_config.outsize;

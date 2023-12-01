@@ -28,7 +28,7 @@ std::vector<BamPtr> create_bam_reader(const std::string& bc) {
     read_common.seq = "AAAA";
     read_common.qstring = "!!!!";
     read_common.read_id = bc;
-    auto records = read_common.extract_sam_lines(false);
+    auto records = read_common.extract_sam_lines(false, 0, false);
     for (auto& rec : records) {
         bam_aux_append(rec.get(), "BC", 'Z', int(bc.length() + 1), (uint8_t*)bc.c_str());
     }
@@ -50,7 +50,7 @@ TEST_CASE("BarcodeDemuxerNode: check correct output files are created", TEST_GRO
         auto demuxer =
                 pipeline_desc.add_node<BarcodeDemuxerNode>({}, tmp_dir.string(), 8, false, nullptr);
 
-        auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc));
+        auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
 
         SamHdrPtr hdr(sam_hdr_init());
         sam_hdr_add_line(hdr.get(), "SQ", "ID", "foo", "LN", "100", "SN", "ref", NULL);
