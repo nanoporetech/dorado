@@ -36,21 +36,21 @@ variables:
     - m1
   variables:
     MACOSX_DEPLOYMENT_TARGET: "12.3"
-    PARALLEL_JOBS: "$(( $(sysctl -n hw.physicalcpu) / 2 ))"
+    PARALLEL_JOBS: "\"$(( $(sysctl -n hw.physicalcpu) / 2 ))\""
 
 .macos_x64_runner: &macos_x64_runner
   tags:
     - osx_x86
   variables:
     MACOSX_DEPLOYMENT_TARGET: "10.15"
-    PARALLEL_JOBS: "$(( $(sysctl -n hw.physicalcpu) / 2 ))"
+    PARALLEL_JOBS: "\"$(( $(sysctl -n hw.physicalcpu) / 2 ))\""
 
 .linux_runner: &linux_runner
   tags:
     - ubuntu-20.04
     - nvidia-docker
   variables:
-    PARALLEL_JOBS: "$(( $(nproc) / 4 ))"
+    PARALLEL_JOBS: "\"$(( $(nproc) / 4 ))\""
 
 .linux_arm64_runner: &linux_arm64_runner
   tags:
