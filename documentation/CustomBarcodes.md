@@ -69,17 +69,17 @@ The pre-built barcode sequence in Dorado can be found in this [file](../dorado/u
 
 #### Scoring Options
 
-Dorado maintains a default set of parameters for scoring each barcode to determine the best classification. These paramters have been tuned based barcoding kits from Oxford Nanopore. However, the default parameters may not be optimal for new arrangements and kits.
+Dorado maintains a default set of parameters for scoring each barcode to determine the best classification. These parameters have been tuned based on barcoding kits from Oxford Nanopore. However, the default parameters may not be optimal for new arrangements and kits.
 
 The classification heuristic applied by Dorado is the following -
 1. Dorado calculates a separate score for the barcode flanks and the barcode sequence itself. The score is roughly `1.0f - edit_distance / length(target_seq)`, where the `target_seq` is either the reference flank or reference barcode sequence.
-2. Four double ended barcodes, the __best__ window (either front or rear) for is chosen based on the flank scores.
+2. For double ended barcodes, the __best__ window (either front or rear) is chosen based on the flank scores.
 3. After choosing the best window for an arrangement, each barcode candidate within the arrangement is sorted by the barcode score.
 
 Once barcodes are sorted by barcode score, the top candidate is checked against the following rules -
 1. If the flank score is above `min_soft_flank_threshold` and the barcode score is above `min_hard_barcode_threshold`, then the barcode is kept as a candidate.
-2. If the barcode score is above `min_soft_barcode_threshold` and the flank score is above `min_hard_flank_threshold`, then the barcode is kept as a candidate..
-3. If the arrangement is double ended, then if both the top and bottom barcode sequence scores are above `min_hard_barcode_threshold`, then the barcode kept as a candidate.
+2. If the barcode score is above `min_soft_barcode_threshold` and the flank score is above `min_hard_flank_threshold`, then the barcode is kept as a candidate.
+3. If the arrangement is double ended, if both the top and bottom barcode sequence scores are above `min_hard_barcode_threshold`, then the barcode is kept as a candidate.
 
 If a candidate still remains and there are at least 2 scores candidates in the sorted list, the difference between the best and second best candidate is computed. Only
 if that score is greater than `min_barcode_score_dist`, the best candidate is considered a hit. Otherwise the read is considered as `unclassified`.
