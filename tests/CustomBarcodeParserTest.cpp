@@ -109,8 +109,8 @@ TEST_CASE("Parse custom barcode sequences", "[barcode_demux]") {
 
     CHECK(barcode_sequences.size() == 4);
     CHECK(barcode_sequences["BC01"] == "AAAAAA");
-    CHECK(barcode_sequences["BC02"] == "CCCCC");
-    CHECK(barcode_sequences["BC03"] == "TTTTT");
+    CHECK(barcode_sequences["BC02"] == "CCCCCC");
+    CHECK(barcode_sequences["BC03"] == "TTTTTT");
     CHECK(barcode_sequences["BC04"] == "GGGGGG");
 }
 
