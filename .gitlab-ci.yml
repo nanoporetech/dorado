@@ -223,6 +223,7 @@ build:linux:x86:focal:clang_tidy:
     - .linux_runner
   script:
     - apt update && apt install -y clang clang-tidy
+    - *set_parallel_jobs
     - ./scripts/run_clang_tidy.sh -j ${PARALLEL_JOBS}
 
 build:linux:arm64:bionic:
