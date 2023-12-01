@@ -66,7 +66,6 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
         first_node_handle = scaler_node;
     }
     current_node_handle = scaler_node;
-
     auto basecaller_node = pipeline_desc.add_node<BasecallerNode>(
             {}, std::move(runners), overlap, kBatchTimeoutMS, model_name, 1000, "BasecallerNode",
             mean_qscore_start_pos);
@@ -76,7 +75,8 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
 
     // For DNA, read splitting happens after basecall.
     if (enable_read_splitter && !is_rna) {
-        splitter::DuplexSplitSettings splitter_settings;
+        splitter::DuplexSplitSettings splitter_settings(model_config.signal_norm_params.strategy ==
+                                                        ScalingStrategy::PA);
         splitter_settings.simplex_mode = true;
         auto dna_splitter = std::make_unique<const splitter::DuplexReadSplitter>(splitter_settings);
         auto dna_splitter_node = pipeline_desc.add_node<ReadSplitNode>({}, std::move(dna_splitter),
@@ -161,7 +161,8 @@ void create_stereo_duplex_pipeline(
     // If splitter_settings.enabled is set to false, the splitter node will act
     // as a passthrough, meaning it won't perform any splitting operations and
     // will just pass data through.
-    splitter::DuplexSplitSettings splitter_settings;
+    splitter::DuplexSplitSettings splitter_settings(model_config.signal_norm_params.strategy ==
+                                                    ScalingStrategy::PA);
     auto duplex_splitter = std::make_unique<const splitter::DuplexReadSplitter>(splitter_settings);
     auto splitter_node = pipeline_desc.add_node<ReadSplitNode>(
             {pairing_node}, std::move(duplex_splitter), splitter_node_threads, 1000);

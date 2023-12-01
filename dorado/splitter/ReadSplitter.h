@@ -24,10 +24,18 @@ struct RNASplitSettings {
 struct DuplexSplitSettings {
     bool enabled = true;
     bool simplex_mode = false;
-    float pore_thr = 2.2f;
-    uint64_t pore_cl_dist = 4000;  // TODO maybe use frequency * 1sec here?
+    float pore_thr = 2.4f;
+    uint64_t pore_cl_dist = 500;  // in samples
     //maximal 'open pore' region to consider (bp)
     uint64_t max_pore_region = 500;
+    //only use position with signal maximal as a tentative open pore
+    bool use_argmax = true;
+    //number of bases to check quality (starting with pore region start)
+    int qscore_check_span = 5;
+    //only take fixed number of candidates with maximal signal
+    int top_candidates = 10;
+    //filter tentative open pore regions with mean qscore higher than threshold
+    float mean_qscore_thr = 10.;
     //usually template read region to the left of potential spacer region
     uint64_t strand_end_flank = 1200;
     //trim potentially erroneous (and/or PCR adapter) bases at end of query
@@ -40,7 +48,9 @@ struct DuplexSplitSettings {
     float relaxed_flank_err = 0.275f;
     int adapter_edist = 4;
     int relaxed_adapter_edist = 8;
-    uint64_t pore_adapter_range = 100;  //bp
+    //bp from end of tentative pore to end of adapter
+    //(~ max pore-adapter dist + adapter length)
+    uint64_t pore_adapter_span = 50;
     //in bases
     uint64_t expect_adapter_prefix = 200;
     //in samples
@@ -54,6 +64,12 @@ struct DuplexSplitSettings {
     //Sequence below corresponds to the current 'head' adapter 'AATGTACTTCGTTCAGTTACGTATTGCT'
     // with 4bp clipped from the beginning (24bp left)
     std::string adapter = "TACTTCGTTCAGTTACGTATTGCT";
+
+    explicit DuplexSplitSettings(bool pA_scaling) {
+        if (pA_scaling) {
+            pore_thr = 2.8f;
+        }
+    }
 };
 
 class ReadSplitter {
