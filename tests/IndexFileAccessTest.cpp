@@ -170,4 +170,30 @@ TEST_CASE(TEST_GROUP " validate_options with default options returns true", TEST
     REQUIRE(validate_options(dflt_options));
 }
 
+TEST_CASE(TEST_GROUP " get_index called with compatible index returns non-null Minimap2Index",
+          TEST_GROUP) {
+    IndexFileAccess cut{};
+    cut.load_index(valid_reference_file(), dflt_options, 1);
+    Minimap2Options compatible_options{dflt_options};
+    auto compatible_best_n = dflt_options.best_n_secondary + 1;
+    compatible_options.best_n_secondary = compatible_best_n;
+
+    REQUIRE(cut.get_index(valid_reference_file(), compatible_options) != nullptr);
+}
+
+TEST_CASE(
+        TEST_GROUP
+        " get_index called with compatible index returns index with the compatible mapping options",
+        TEST_GROUP) {
+    IndexFileAccess cut{};
+    cut.load_index(valid_reference_file(), dflt_options, 1);
+    Minimap2Options compatible_options{dflt_options};
+    auto compatible_best_n = dflt_options.best_n_secondary + 1;
+    compatible_options.best_n_secondary = compatible_best_n;
+
+    auto index = cut.get_index(valid_reference_file(), compatible_options);
+
+    REQUIRE(index->get_options() == compatible_options);
+}
+
 }  // namespace dorado::alignment::index_file_access

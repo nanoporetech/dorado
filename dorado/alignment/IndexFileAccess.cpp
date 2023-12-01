@@ -34,24 +34,31 @@ bool IndexFileAccess::is_index_loaded_impl(const std::string& file,
     return compatible_indices->second.count(options) > 0;
 }
 
-bool IndexFileAccess::try_load_compatible_index(const std::string& file,
-                                                const Minimap2Options& options) {
-    std::lock_guard<std::mutex> lock(m_mutex);
-    if (is_index_loaded_impl(file, options)) {
-        return true;
+std::shared_ptr<Minimap2Index> IndexFileAccess::get_or_load_compatible_index(
+        const std::string& file,
+        const Minimap2Options& options) {
+    auto index = get_exact_index(file, options);
+    if (index) {
+        return index;
     }
-
     auto compatible_index = get_compatible_index(file, options);
     if (!compatible_index) {
-        return false;
+        return nullptr;
     }
 
     auto new_index = compatible_index->create_compatible_index(options);
     if (!new_index) {
         return false;
     }
-    m_index_lut[{file, options}][options] = std::move(new_index);
-    return true;
+    m_index_lut[{file, options}][options] = new_index;
+    return new_index;
+}
+
+bool IndexFileAccess::try_load_compatible_index(const std::string& file,
+                                                const Minimap2Options& options) {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    auto index = get_or_load_compatible_index(file, options);
+    return index != nullptr;
 }
 
 IndexLoadResult IndexFileAccess::load_index(const std::string& file,
@@ -79,8 +86,8 @@ IndexLoadResult IndexFileAccess::load_index(const std::string& file,
 std::shared_ptr<const Minimap2Index> IndexFileAccess::get_index(const std::string& file,
                                                                 const Minimap2Options& options) {
     std::lock_guard<std::mutex> lock(m_mutex);
-    auto index = get_exact_index(file, options);
-    assert(index && "get_index expects the index to have been loaded");
+    auto index = get_or_load_compatible_index(file, options);
+    assert(index && "get_index expects a compatible index to have been loaded");
     return index;
 }
 
