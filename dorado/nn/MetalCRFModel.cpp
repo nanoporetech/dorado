@@ -14,6 +14,8 @@
 #include <spdlog/spdlog.h>
 #include <torch/torch.h>
 
+#include <chrono>
+#include <set>
 #include <vector>
 
 using namespace dorado::utils;
@@ -173,6 +175,8 @@ struct MetalConv1dImpl : Module {
             kernel_name += "_in" + std::to_string(in_size) + "_out" + std::to_string(out_size);
         }
 
+        //spdlog::error("kernel_thread_groups = {}", kernel_thread_groups);
+        //spdlog::error("Conv kernel {} has {} SIMD groups", kernel_name, kernel_simd_groups);
         conv_cps = make_cps(device, kernel_name + "_simd", metal_constants, kernel_threads);
     }
 
@@ -189,6 +193,7 @@ struct MetalConv1dImpl : Module {
         for (const auto &args : m_args) {
             std::vector<MTL::Buffer *> buffers{args.get(), mat_in, mtl_for_tensor(t_weights_bias),
                                                mat_out};
+            //spdlog::error("Launching conv with {} TGs {} threads per TG", kernel_thread_groups, kernel_simd_groups * kSIMDGroupWidth);
             launch_kernel_no_wait(conv_cps.get(), command_buffer, buffers, {}, kernel_thread_groups,
                                   kernel_simd_groups * kSIMDGroupWidth);
         }
@@ -511,7 +516,9 @@ struct MetalBlockImpl : Module {
         // can be overwritten by subsequent batches as soon as they have been consumed by
         // the linear layer.  The output of the linear layer must be protected until
         // it has been decoded.
-        command_buffer->encodeWait(linear_hold_off_event, linear_hold_off_id);
+        if (linear_hold_off_event) {
+            command_buffer->encodeWait(linear_hold_off_event, linear_hold_off_id);
+        }
 
         // For now the same SIMD group count, and therefore threadgroup memory buffer size, is
         // used for all linear layer kernel invocations.
@@ -595,6 +602,8 @@ TORCH_MODULE(MetalModel);
 }  // namespace nn
 
 class MetalCaller {
+    static constexpr int MTL_CORE_BATCH_SIZE = 48;
+
 public:
     MetalCaller(const CRFModelConfig &model_config, int chunk_size, int batch_size)
             : m_config(model_config) {
@@ -612,9 +621,97 @@ public:
         constexpr int n_base = 4;
         m_states = pow(n_base, model_config.state_len);
 
-        constexpr int MTL_CORE_BATCH_SIZE = 48;
-        m_batch_size = (batch_size == 0) ? MTL_CORE_BATCH_SIZE * get_mtl_device_core_count()
-                                         : utils::pad_to(batch_size, MTL_CORE_BATCH_SIZE);
+        // v3 scores come from a tanh activation whose [-1, 1] range is packed into bytes.
+        // The linear kernel scales to [-127, 127] byte range, after which beam search
+        // rescales to the expected [-5, 5].
+        // v4 scores come from a clamped [-5, 5] range that is rescaled by the kernel to
+        // fit into bytes.
+        // In both cases beam search applies the same 5/127 factor to scores.
+        score_scale = static_cast<float>(5.0 / 127.0);
+
+        if (batch_size == 0) {
+            // Returns approximate decode buffer size for a given batch size.
+            auto decode_buffer_size = [this, chunk_size, &model_config](size_t batch_size) {
+                const auto out_chunk_size = static_cast<size_t>(chunk_size / model_config.stride);
+                const auto scores_bytes =
+                        out_chunk_size * static_cast<size_t>(model_config.outsize);
+                const auto posts_bytes = out_chunk_size * m_states * sizeof(int16_t);
+                const auto backguide_bytes = out_chunk_size * m_states * sizeof(float);
+                return (scores_bytes + posts_bytes + backguide_bytes) * batch_size;
+            };
+
+            const size_t physical_memory = get_apple_physical_memory_bytes();
+            spdlog::debug("Physical memory available {} GB", physical_memory / (size_t{1} << 30));
+
+            // Determine the range of plausible batch sizes, starting by assuming we can use all
+            // GPU cores and curtailing the search when decode buffers take more than half of system
+            // memory.  This generally only kicks in when running sup models on systems
+            // with a large GPU core to system memory ratio.
+            const int min_batch_size = MTL_CORE_BATCH_SIZE;
+            int max_batch_size = min_batch_size;
+            while (max_batch_size < MTL_CORE_BATCH_SIZE * get_mtl_device_core_count() &&
+                   decode_buffer_size(max_batch_size) < physical_memory / 2) {
+                spdlog::debug("decode buffer footprint for batch size {}: {}", max_batch_size,
+                              decode_buffer_size(static_cast<size_t>(max_batch_size)));
+                max_batch_size += MTL_CORE_BATCH_SIZE;
+            }
+
+            // Always try natural batch sizes for 1 GPU core and maximum we think is viable,
+            // which absent memory limits will be the full GPU core count.
+            std::set<int> test_batch_sizes{MTL_CORE_BATCH_SIZE, max_batch_size};
+
+            // Add some batch sizes evenly distributed in between.
+            const int kNumIntermediateSizes = 4;
+            const float test_size_increment = static_cast<float>(max_batch_size - min_batch_size) /
+                                              static_cast<float>(kNumIntermediateSizes + 1);
+            spdlog::error("test_size_increment {}", test_size_increment);
+            for (int i = 0; i < kNumIntermediateSizes; ++i) {
+                const int test_batch_size = utils::pad_to(
+                        static_cast<int>(static_cast<float>(i + 1) * test_size_increment),
+                        MTL_CORE_BATCH_SIZE);
+                spdlog::error("unpadded test batch size {} padded test batch size {}",
+                              static_cast<int>(static_cast<float>(i + 1) * test_size_increment),
+                              test_batch_size);
+                test_batch_sizes.insert(test_batch_size);
+            }
+
+            // Iterate through batch size candidates to find the most efficient one.
+            int best_batch_size = -1;
+            int best_us_per_batch_element = std::numeric_limits<int>::max();
+            for (int batch_size : test_batch_sizes) {
+                spdlog::debug("Trying batch size {}", batch_size);
+                set_batch_size(model_config, chunk_size, batch_size);
+                auto dummy_input =
+                        torch::empty({batch_size, chunk_size, m_num_input_features}, torch::kF16);
+                const auto start_time = std::chrono::system_clock::now();
+                auto *cb = m_model->forward_async(dummy_input, nullptr, 0, 0, m_scores_int8);
+                run_scan_kernels(cb, 0);
+                const auto end_time = std::chrono::system_clock::now();
+                const auto elapsed_us =
+                        std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time)
+                                .count();
+                const auto us_per_batch_element = elapsed_us / batch_size;
+                spdlog::debug("Batch {} us Batch element {} us", elapsed_us, us_per_batch_element);
+                if (us_per_batch_element < best_us_per_batch_element) {
+                    best_us_per_batch_element = us_per_batch_element;
+                    best_batch_size = batch_size;
+                }
+            }
+            assert(best_batch_size >= MTL_CORE_BATCH_SIZE);
+            assert(best_batch_size % MTL_CORE_BATCH_SIZE == 0);
+            spdlog::error("Auto batch size {}", best_batch_size);
+            set_batch_size(model_config, chunk_size, best_batch_size);
+        } else {
+            // Use the user-supplied batch size padded to the nearest reasonable value.
+            set_batch_size(model_config, chunk_size,
+                           utils::pad_to(batch_size, MTL_CORE_BATCH_SIZE));
+        }
+
+        start_threads();
+    }
+
+    void set_batch_size(const CRFModelConfig &model_config, int chunk_size, int batch_size) {
+        m_batch_size = batch_size;
 
         // Chunk size after decimation via convolution stride.
         m_out_chunk_size = chunk_size / model_config.stride;
@@ -680,6 +777,9 @@ public:
         int C = model_config.outsize;
         int Cs = m_states;
 
+        m_scores_int8.clear();
+        m_posts_int16.clear();
+        m_bwd.clear();
         for (int i = 0; i < m_out_split; ++i) {
             m_scores_int8.push_back(torch::empty({T, m_out_batch_size, C}, torch::kInt8));
             // Unfortunately torch doesn't have Uint16, or we would use it.  We could offset,
@@ -687,16 +787,6 @@ public:
             m_posts_int16.push_back(torch::empty({m_out_batch_size, T + 1, Cs}, torch::kInt16));
             m_bwd.push_back(torch::empty({m_out_batch_size, T + 1, Cs}));
         }
-
-        // v3 scores come from a tanh activation whose [-1, 1] range is packed into bytes.
-        // The linear kernel scales to [-127, 127] byte range, after which beam search
-        // rescales to the expected [-5, 5].
-        // v4 scores come from a clamped [-5, 5] range that is rescaled by the kernel to
-        // fit into bytes.
-        // In both cases beam search applies the same 5/127 factor to scores.
-        score_scale = static_cast<float>(5.0 / 127.0);
-
-        start_threads();
     }
 
     void start_threads() {
@@ -756,6 +846,28 @@ public:
         }
     }
 
+    bool run_scan_kernels(MTL::CommandBuffer *const cb, int try_count) {
+        // This stage is operating on the split outputs of the linear layer, so
+        // the effective batch size is m_out_batch_size.
+        std::vector<int32_t> scan_args_{m_out_chunk_size, m_out_batch_size, m_states};
+        auto scan_args = create_vec_buffer(m_device.get(), scan_args_);
+
+        for (int i = 0; i < m_out_split; ++i) {
+            // TODO: optimise grid size
+            launch_kernel_no_wait(m_bwd_scan_cps.get(), cb,
+                                  {scan_args.get(), mtl_for_tensor(m_scores_int8.at(i)),
+                                   mtl_for_tensor(m_bwd.at(i))},
+                                  {}, m_out_batch_size, m_states);
+
+            launch_kernel_no_wait(
+                    m_fwd_scan_add_softmax_cps.get(), cb,
+                    {scan_args.get(), mtl_for_tensor(m_scores_int8.at(i)),
+                     mtl_for_tensor(m_bwd.at(i)), mtl_for_tensor(m_posts_int16.at(i))},
+                    {}, m_out_batch_size, m_states);
+        }
+        return finishCommandBuffer("linear/scan/softmax", cb, try_count);
+    }
+
     void metal_thread_fn() {
         at::InferenceMode inference_mode_guard;
         ScopedAutoReleasePool autorelease_pool;
@@ -808,25 +920,7 @@ public:
                     continue;
                 }
 
-                // This stage is operating on the split outputs of the linear layer, so
-                // the effective batch size is m_out_batch_size.
-                std::vector<int32_t> scan_args_{m_out_chunk_size, m_out_batch_size, m_states};
-                auto scan_args = create_vec_buffer(m_device.get(), scan_args_);
-
-                for (int i = 0; i < m_out_split; ++i) {
-                    // TODO: optimise grid size
-                    launch_kernel_no_wait(m_bwd_scan_cps.get(), cb,
-                                          {scan_args.get(), mtl_for_tensor(m_scores_int8.at(i)),
-                                           mtl_for_tensor(m_bwd.at(i))},
-                                          {}, m_out_batch_size, m_states);
-
-                    launch_kernel_no_wait(
-                            m_fwd_scan_add_softmax_cps.get(), cb,
-                            {scan_args.get(), mtl_for_tensor(m_scores_int8.at(i)),
-                             mtl_for_tensor(m_bwd.at(i)), mtl_for_tensor(m_posts_int16.at(i))},
-                            {}, m_out_batch_size, m_states);
-                }
-                if (finishCommandBuffer("linear/scan/softmax", cb, try_count)) {
+                if (run_scan_kernels(cb, try_count)) {
                     cb_success = true;
                     break;
                 }

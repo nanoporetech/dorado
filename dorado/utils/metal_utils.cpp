@@ -324,4 +324,14 @@ ScopedAutoReleasePool::~ScopedAutoReleasePool() {
     ((void (*)(id, SEL))objc_msgSend)(m_autorelease_pool, sel_registerName("drain"));
 }
 
+size_t get_apple_physical_memory_bytes() {
+    size_t mem_size;
+    size_t size = sizeof(mem_size);
+    if (sysctlbyname("hw.memsize", &mem_size, &size, nullptr, 0) == -1) {
+        mem_size = size_t{8} << 30;
+        spdlog::warn("Failed to retrieve physical memory size: defaulting to {} bytes", mem_size);
+    }
+    return mem_size;
+}
+
 }  // namespace dorado::utils
