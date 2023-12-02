@@ -239,8 +239,13 @@ std::tuple<int, int, std::vector<uint8_t>, int> realign_moves(const std::string&
             query_sequence,
             target_sequence);  // We are going to compute the overlap between the two reads
 
-    // TODO sanity check if and why this is needed
-    // Now let's perform an alignmnet:
+    // Advance the query and target position.
+    ++query_start;
+    ++target_start;
+    while (query_sequence[query_start] != target_sequence[target_start]) {
+        ++query_start;
+        ++target_start;
+    }
 
     EdlibAlignConfig align_config = edlibDefaultAlignConfig();
     align_config.task = EDLIB_TASK_PATH;
