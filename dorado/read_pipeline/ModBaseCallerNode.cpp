@@ -169,7 +169,7 @@ void ModBaseCallerNode::duplex_mod_call(Message&& message) {
 
     read->read_common.mod_base_info = m_mod_base_info;
 
-    {
+    try {
         auto working_read = std::make_shared<WorkingRead>();
         working_read->num_modbase_chunks = 0;
         working_read->num_modbase_chunks_called = 0;
@@ -297,6 +297,8 @@ void ModBaseCallerNode::duplex_mod_call(Message&& message) {
             send_message_to_sink(std::move(read));
             ++m_num_non_mod_base_reads_pushed;
         }
+    } catch (const std::exception& e) {
+        spdlog::error("{}", e.what());
     }
 }
 
