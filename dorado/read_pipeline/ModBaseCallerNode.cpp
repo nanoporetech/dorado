@@ -203,7 +203,7 @@ void ModBaseCallerNode::duplex_mod_call(Message&& message) {
                                              ? read->read_common.seq
                                              : utils::reverse_complement(read->read_common.seq);
 
-            auto [moves_offset, target_start, new_move_table, query_start] =
+            auto [moves_offset, target_start, new_move_table] =
                     utils::realign_moves(simplex_seq, duplex_seq, simplex_moves);
 
             auto signal_len = new_move_table.size() * m_block_stride;
