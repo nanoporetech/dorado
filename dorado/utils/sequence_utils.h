@@ -47,9 +47,9 @@ public:
 
 int count_trailing_chars(const std::string_view adapter, char c);
 
-std::tuple<int, int, std::vector<uint8_t>, int> realign_moves(const std::string& query_sequence,
-                                                              const std::string& target_sequence,
-                                                              const std::vector<uint8_t>& moves);
+std::tuple<int, int, std::vector<uint8_t>> realign_moves(const std::string& query_sequence,
+                                                         const std::string& target_sequence,
+                                                         const std::vector<uint8_t>& moves);
 
 // Compile-time constant lookup table.
 static constexpr auto complement_table = [] {
