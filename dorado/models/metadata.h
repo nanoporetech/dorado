@@ -35,6 +35,7 @@ enum class ModelVersion : uint8_t {
     v0_1_0,
     v1_0_0,
     v1_1_0,
+    v1_2_0,
     v2_0_0,
     v3_0_0,
     v3_0_1,
@@ -47,6 +48,7 @@ enum class ModelVersion : uint8_t {
     v4_0_0,
     v4_1_0,
     v4_2_0,
+    v4_3_0,
     NONE  // NONE must be last
 };
 
