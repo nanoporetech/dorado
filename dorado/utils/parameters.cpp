@@ -8,7 +8,8 @@ namespace dorado::utils {
 ThreadAllocations default_thread_allocations(int num_devices,
                                              int num_remora_threads,
                                              bool enable_aligner,
-                                             bool enable_barcoder) {
+                                             bool enable_barcoder,
+                                             bool adapter_trimming) {
     const int max_threads = std::thread::hardware_concurrency();
     ThreadAllocations allocs;
     allocs.writer_threads = num_devices * 2;
@@ -24,13 +25,13 @@ ThreadAllocations default_thread_allocations(int num_devices,
              allocs.splitter_node_threads);
     int remaining_threads = max_threads - total_threads_used;
     remaining_threads = std::max(num_devices * 10, remaining_threads);
-    // Divide up work equally between the aligner and barcoder nodes if both are enabled,
-    // otherwise both get all the remaining threads.
-    if (enable_aligner || enable_barcoder) {
-        allocs.aligner_threads =
-                remaining_threads * enable_aligner / (enable_aligner + enable_barcoder);
-        allocs.barcoder_threads =
-                remaining_threads * enable_barcoder / (enable_aligner + enable_barcoder);
+    // Divide up work equally between the aligner, barcoder, and adapter-trimming nodes, or whatever
+    // subset of them are enabled.
+    if (enable_aligner || enable_barcoder || adapter_trimming) {
+        int number_enabled = int(enable_aligner) + int(enable_barcoder) + int(adapter_trimming);
+        allocs.aligner_threads = remaining_threads * int(enable_aligner) / number_enabled;
+        allocs.barcoder_threads = remaining_threads * int(enable_barcoder) / number_enabled;
+        allocs.adapter_threads = remaining_threads * int(adapter_trimming) / number_enabled;
     }
     return allocs;
 };

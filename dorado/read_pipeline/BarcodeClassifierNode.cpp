@@ -159,7 +159,6 @@ void BarcodeClassifierNode::barcode(SimplexRead& read) {
                                     barcoding_info->allowed_barcodes);
     read.read_common.barcode = generate_barcode_string(bc_res);
     read.read_common.barcoding_result = std::make_shared<BarcodeScoreResult>(std::move(bc_res));
-    read.read_common.pre_trim_seq_length = read.read_common.seq.length();
     if (barcoding_info->trim) {
         read.read_common.barcode_trim_interval = Trimmer::determine_trim_interval(
                 *read.read_common.barcoding_result, int(read.read_common.seq.length()));

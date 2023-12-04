@@ -112,7 +112,6 @@ void AdapterDetectorNode::process_read(SimplexRead& read) {
         auto primer_res = m_detector.find_primers(read.read_common.seq);
         primer_trim_interval = Trimmer::determine_trim_interval(primer_res, seqlen);
     }
-    read.read_common.pre_trim_seq_length = read.read_common.seq.length();
     if (m_trim_adapters || m_trim_primers) {
         std::pair<int, int> trim_interval = adapter_trim_interval;
         trim_interval.first = std::max(trim_interval.first, primer_trim_interval.first);

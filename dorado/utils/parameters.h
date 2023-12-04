@@ -41,11 +41,13 @@ struct ThreadAllocations {
     int loader_threads{0};
     int aligner_threads{0};
     int barcoder_threads{0};
+    int adapter_threads{0};
 };
 
 ThreadAllocations default_thread_allocations(int num_devices,
                                              int num_remora_threads,
                                              bool enable_aligner,
-                                             bool enable_barcoder);
+                                             bool enable_barcoder,
+                                             bool adapter_trimming);
 
 }  // namespace dorado::utils
