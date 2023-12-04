@@ -60,7 +60,7 @@ std::shared_ptr<Minimap2Index> IndexFileAccess::get_or_load_compatible_index(
 
     auto new_index = compatible_index->create_compatible_index(options);
     if (!new_index) {
-        return false;
+        return nullptr;
     }
     m_index_lut[{file, options}][options] = new_index;
     return new_index;
