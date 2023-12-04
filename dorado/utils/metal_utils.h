@@ -56,6 +56,7 @@ void launch_kernel_no_wait(MTL::ComputePipelineState *cps,
 NS::SharedPtr<MTL::Device> get_mtl_device();
 int get_mtl_device_core_count();
 int get_apple_cpu_perf_core_count();
+size_t get_apple_physical_memory_bytes();
 MTL::Buffer *mtl_for_tensor(const at::Tensor &t);
 NS::SharedPtr<MTL::Buffer> extract_mtl_from_tensor(at::Tensor &&t);
 
