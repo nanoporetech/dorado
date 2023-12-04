@@ -250,7 +250,8 @@ TEST_CASE(TEST_GROUP
 }
 
 TEST_CASE(TEST_GROUP
-          " generate_sequence_records_header with single reference index returns expected header",
+          " generate_sequence_records_header with single read reference index returns expected "
+          "header",
           TEST_GROUP) {
     IndexFileAccess cut{};
     cut.load_index(valid_reference_file(), dflt_options, 1);
@@ -261,7 +262,7 @@ TEST_CASE(TEST_GROUP
 }
 
 TEST_CASE(TEST_GROUP
-          " generate_sequence_records_header with two reference index returns expected header",
+          " generate_sequence_records_header with two read reference index returns expected header",
           TEST_GROUP) {
     IndexFileAccess cut{};
     cut.load_index(valid_2read_reference_file(), dflt_options, 1);

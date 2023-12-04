@@ -49,7 +49,7 @@ public:
     // Returns the index if already loaded, if not loaded will create an index from an
     // existing compatible one.
     // By contract there must be a loaded index for the file with matching indexing
-    // options, if not there will be an assertsion failure.
+    // options, if not there will be an assertion failure.
     std::shared_ptr<const Minimap2Index> get_index(const std::string& file,
                                                    const Minimap2Options& options);
 
