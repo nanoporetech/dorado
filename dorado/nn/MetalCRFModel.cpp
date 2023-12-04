@@ -626,48 +626,38 @@ public:
         // In both cases beam search applies the same 5/127 factor to scores.
         score_scale = static_cast<float>(5.0 / 127.0);
 
-        // Chunk size after decimation via convolution stride.
-        m_out_chunk_size = chunk_size / model_config.stride;
-        // round chunk size down to a multiple of the stride
-        m_in_chunk_size = m_out_chunk_size * model_config.stride;
-
         auto state_dict = load_crf_model_weights(
                 model_config.model_path, model_config.out_features.has_value(), model_config.bias);
 
         if (batch_size == 0) {
-            // Returns approximate decode buffer size for a given batch size.
-            auto decode_buffer_size = [this, chunk_size, &model_config](size_t batch_size) {
-                const auto out_chunk_size = static_cast<size_t>(chunk_size / model_config.stride);
-                const auto scores_bytes =
-                        out_chunk_size * static_cast<size_t>(model_config.outsize);
-                const auto posts_bytes = out_chunk_size * m_states * sizeof(int16_t);
-                const auto backguide_bytes = out_chunk_size * m_states * sizeof(float);
-                return (scores_bytes + posts_bytes + backguide_bytes) * batch_size;
-            };
-
             const size_t physical_memory = get_apple_physical_memory_bytes();
             spdlog::debug("Physical memory available {} GB", physical_memory / (size_t{1} << 30));
 
-            // Determine the max. plausible batch size, starting by assuming we can use all
-            // GPU cores, and curtailing the range when decode buffers take more than half of system
-            // memory.  This generally only kicks in when running sup models on systems
-            // with a large GPU core to system memory ratio.  Neural network GPU buffers and CPU buffers
-            // are assumed to occupy a subset of the remaining memory.
-            const int min_batch_size = MTL_CORE_BATCH_SIZE;
-            int max_batch_size = min_batch_size;
-            while (max_batch_size < MTL_CORE_BATCH_SIZE * get_mtl_device_core_count() &&
-                   decode_buffer_size(max_batch_size) < physical_memory / 2) {
-                max_batch_size += MTL_CORE_BATCH_SIZE;
-            }
-            spdlog::debug("Decode buffer footprint for max_batch_size {}: {}", max_batch_size,
-                          decode_buffer_size(static_cast<size_t>(max_batch_size)));
+            // Constrain the maximum batch size to use about half physical memory for decode buffers,
+            // with neural network GPU buffers and CPU buffers are assumed to occupy a subset of the
+            // remaining memory.  This generally constrains the batch size to use fewer than
+            // the maximum GPU cores when running sup models on systems with a large GPU core
+            // to system memory ratio.
+            const auto out_chunk_size = static_cast<size_t>(chunk_size / model_config.stride);
+            const auto decode_buffer_size_per_elem =
+                    static_cast<size_t>(out_chunk_size) *
+                    (static_cast<size_t>(model_config.outsize) +        // Scores
+                     static_cast<size_t>(m_states) * sizeof(int16_t) +  // Posts
+                     static_cast<size_t>(m_states) * sizeof(float));    // Back guides.
+            spdlog::debug("decode_buffer_size_per_elem {}", decode_buffer_size_per_elem);
+            const int max_batch_size = std::min(
+                    utils::pad_to(physical_memory / (2 * decode_buffer_size_per_elem),
+                                  static_cast<size_t>(MTL_CORE_BATCH_SIZE)),
+                    static_cast<size_t>(MTL_CORE_BATCH_SIZE * get_mtl_device_core_count()));
+            spdlog::debug("max_batch_size {}", max_batch_size);
 
             // Always try natural batch sizes for 1 GPU core and maximum we think is viable,
             // which absent memory limits will be the full GPU core count.
-            std::set<int> test_batch_sizes{MTL_CORE_BATCH_SIZE, max_batch_size};
+            const int min_batch_size = MTL_CORE_BATCH_SIZE;
+            std::set<int> test_batch_sizes{min_batch_size, max_batch_size};
 
             // Add some batch sizes evenly distributed in between.
-            const int kNumIntermediateSizes = 4;
+            const int kNumIntermediateSizes = 8;
             const float test_size_increment = static_cast<float>(max_batch_size - min_batch_size) /
                                               static_cast<float>(kNumIntermediateSizes + 1);
             for (int i = 0; i < kNumIntermediateSizes; ++i) {
@@ -677,14 +667,20 @@ public:
                 test_batch_sizes.insert(test_batch_size);
             }
 
+            // To speed up test runs, use a smaller chunk size.  This means we will not see
+            // the true effect of memory thrashing, so we are relying on the memory limit
+            // above to avoid that scenario.
+            const int benchmark_chunk_size = std::min(chunk_size - chunk_size % model_config.stride,
+                                                      model_config.stride * 300);
+
             // Iterate through batch size candidates to find the most efficient one.
             int best_batch_size = -1;
             int best_us_per_batch_element = std::numeric_limits<int>::max();
             for (int batch_size : test_batch_sizes) {
                 spdlog::debug("Trying batch size {}", batch_size);
-                set_batch_size(model_config, state_dict, batch_size);
-                auto dummy_input =
-                        torch::empty({batch_size, chunk_size, m_num_input_features}, torch::kF16);
+                set_chunk_batch_size(model_config, state_dict, benchmark_chunk_size, batch_size);
+                auto dummy_input = torch::empty(
+                        {batch_size, benchmark_chunk_size, m_num_input_features}, torch::kF16);
                 const auto start_time = std::chrono::system_clock::now();
                 auto *cb = m_model->forward_async(dummy_input, nullptr, 0, 0, m_scores_int8);
                 run_scan_kernels(cb, 0);
@@ -701,20 +697,25 @@ public:
             }
             assert(best_batch_size >= MTL_CORE_BATCH_SIZE);
             assert(best_batch_size % MTL_CORE_BATCH_SIZE == 0);
-            spdlog::debug("Auto batch size {}", best_batch_size);
-            set_batch_size(model_config, state_dict, best_batch_size);
+            set_chunk_batch_size(model_config, state_dict, chunk_size, best_batch_size);
         } else {
             // Use the user-supplied batch size padded to the nearest reasonable value.
-            set_batch_size(model_config, state_dict,
-                           utils::pad_to(batch_size, MTL_CORE_BATCH_SIZE));
+            set_chunk_batch_size(model_config, state_dict, chunk_size,
+                                 utils::pad_to(batch_size, MTL_CORE_BATCH_SIZE));
         }
 
         start_threads();
     }
 
-    void set_batch_size(const CRFModelConfig &model_config,
-                        const std::vector<at::Tensor> &state_dict,
-                        int batch_size) {
+    void set_chunk_batch_size(const CRFModelConfig &model_config,
+                              const std::vector<at::Tensor> &state_dict,
+                              int chunk_size,
+                              int batch_size) {
+        // Chunk size after decimation via convolution stride.
+        m_out_chunk_size = chunk_size / model_config.stride;
+        // round chunk size down to a multiple of the stride
+        m_in_chunk_size = m_out_chunk_size * model_config.stride;
+
         m_batch_size = batch_size;
 
         // Allocations beyond 4GB can fail, and the linear layer output buffer
