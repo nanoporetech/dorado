@@ -66,7 +66,6 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
         first_node_handle = scaler_node;
     }
     current_node_handle = scaler_node;
-
     auto basecaller_node = pipeline_desc.add_node<BasecallerNode>(
             {}, std::move(runners), overlap, kBatchTimeoutMS, model_name, 1000, "BasecallerNode",
             mean_qscore_start_pos);
@@ -76,7 +75,8 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
 
     // For DNA, read splitting happens after basecall.
     if (enable_read_splitter && !is_rna) {
-        splitter::DuplexSplitSettings splitter_settings;
+        splitter::DuplexSplitSettings splitter_settings(model_config.signal_norm_params.strategy ==
+                                                        ScalingStrategy::PA);
         splitter_settings.simplex_mode = true;
         auto dna_splitter = std::make_unique<const splitter::DuplexReadSplitter>(splitter_settings);
         auto dna_splitter_node = pipeline_desc.add_node<ReadSplitNode>({}, std::move(dna_splitter),
@@ -105,16 +105,19 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
     }
 }
 
-void create_stereo_duplex_pipeline(PipelineDescriptor& pipeline_desc,
-                                   std::vector<dorado::Runner>&& runners,
-                                   std::vector<dorado::Runner>&& stereo_runners,
-                                   size_t overlap,
-                                   uint32_t mean_qscore_start_pos,
-                                   int scaler_node_threads,
-                                   int splitter_node_threads,
-                                   PairingParameters pairing_parameters,
-                                   NodeHandle sink_node_handle,
-                                   NodeHandle source_node_handle) {
+void create_stereo_duplex_pipeline(
+        PipelineDescriptor& pipeline_desc,
+        std::vector<dorado::Runner>&& runners,
+        std::vector<dorado::Runner>&& stereo_runners,
+        std::vector<std::unique_ptr<dorado::ModBaseRunner>>&& modbase_runners,
+        size_t overlap,
+        uint32_t mean_qscore_start_pos,
+        int scaler_node_threads,
+        int splitter_node_threads,
+        int modbase_node_threads,
+        PairingParameters pairing_parameters,
+        NodeHandle sink_node_handle,
+        NodeHandle source_node_handle) {
     const auto& model_config = runners.front()->config();
     const auto& stereo_model_config = stereo_runners.front()->config();
     std::string model_name =
@@ -129,6 +132,15 @@ void create_stereo_duplex_pipeline(PipelineDescriptor& pipeline_desc,
     auto stereo_basecaller_node = pipeline_desc.add_node<BasecallerNode>(
             {}, std::move(stereo_runners), adjusted_stereo_overlap, kStereoBatchTimeoutMS,
             duplex_rg_name, 1000, "StereoBasecallerNode", mean_qscore_start_pos);
+
+    NodeHandle last_node_handle = stereo_basecaller_node;
+    if (!modbase_runners.empty()) {
+        auto mod_base_caller_node = pipeline_desc.add_node<ModBaseCallerNode>(
+                {}, std::move(modbase_runners), modbase_node_threads,
+                size_t(runners.front()->model_stride()), 1000);
+        pipeline_desc.add_node_sink(stereo_basecaller_node, mod_base_caller_node);
+        last_node_handle = mod_base_caller_node;
+    }
 
     auto simplex_model_stride = runners.front()->model_stride();
     auto stereo_node = pipeline_desc.add_node<StereoDuplexEncoderNode>({stereo_basecaller_node},
@@ -149,7 +161,8 @@ void create_stereo_duplex_pipeline(PipelineDescriptor& pipeline_desc,
     // If splitter_settings.enabled is set to false, the splitter node will act
     // as a passthrough, meaning it won't perform any splitting operations and
     // will just pass data through.
-    splitter::DuplexSplitSettings splitter_settings;
+    splitter::DuplexSplitSettings splitter_settings(model_config.signal_norm_params.strategy ==
+                                                    ScalingStrategy::PA);
     auto duplex_splitter = std::make_unique<const splitter::DuplexReadSplitter>(splitter_settings);
     auto splitter_node = pipeline_desc.add_node<ReadSplitNode>(
             {pairing_node}, std::move(duplex_splitter), splitter_node_threads, 1000);
@@ -172,7 +185,7 @@ void create_stereo_duplex_pipeline(PipelineDescriptor& pipeline_desc,
 
     // if we've been provided a sink node, connect it to the end of our pipeline
     if (sink_node_handle != PipelineDescriptor::InvalidNodeHandle) {
-        pipeline_desc.add_node_sink(stereo_basecaller_node, sink_node_handle);
+        pipeline_desc.add_node_sink(last_node_handle, sink_node_handle);
     }
 }
 

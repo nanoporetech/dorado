@@ -114,14 +114,12 @@ std::pair<std::string, barcode_kits::KitInfo> parse_custom_arrangement(
 BarcodeKitScoringParams parse_scoring_params(const std::string& arrangement_file) {
     const toml::value config_toml = toml::parse(arrangement_file);
 
-    if (!config_toml.contains("arrangement")) {
-        throw std::runtime_error(
-                "Custom barcode arrangement file must have [arrangement] section.");
+    BarcodeKitScoringParams params{};
+    if (!config_toml.contains("scoring")) {
+        return params;
     }
 
-    const auto& config = toml::find(config_toml, "arrangement");
-
-    BarcodeKitScoringParams params{};
+    const auto& config = toml::find(config_toml, "scoring");
     if (config.contains("min_soft_barcode_threshold")) {
         params.min_soft_barcode_threshold = toml::find<float>(config, "min_soft_barcode_threshold");
     }

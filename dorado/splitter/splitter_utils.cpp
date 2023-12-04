@@ -27,7 +27,7 @@ __attribute__((optimize("O0")))
 
 SimplexReadPtr subread(const SimplexRead& read,
                        std::optional<PosRange> seq_range,
-                       PosRange signal_range) {
+                       std::pair<uint64_t, uint64_t> signal_range) {
     //TODO support mods
     //NB: currently doesn't support mods
     //assert(read.mod_base_info == nullptr && read.base_mod_probs.empty());
@@ -96,7 +96,7 @@ PosRanges merge_ranges(const PosRanges& ranges, uint64_t merge_dist) {
         if (merged.empty() || r.first > merged.back().second + merge_dist) {
             merged.push_back(r);
         } else {
-            merged.back().second = r.second;
+            merged.back().second = std::max(r.second, merged.back().second);
         }
     }
     return merged;
