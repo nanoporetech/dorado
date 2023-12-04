@@ -232,15 +232,20 @@ OverlapResult compute_overlap(const std::string& query_seq, const std::string& t
 
 // Query is the read that the moves table is associated with. A new moves table will be generated
 // Which is aligned to the target sequence.
-std::tuple<int, int, std::vector<uint8_t>, int> realign_moves(const std::string& query_sequence,
-                                                              const std::string& target_sequence,
-                                                              const std::vector<uint8_t>& moves) {
+std::tuple<int, int, std::vector<uint8_t>> realign_moves(const std::string& query_sequence,
+                                                         const std::string& target_sequence,
+                                                         const std::vector<uint8_t>& moves) {
     auto [is_overlap, query_start, query_end, target_start, target_end] = compute_overlap(
             query_sequence,
             target_sequence);  // We are going to compute the overlap between the two reads
 
-    // TODO sanity check if and why this is needed
-    // Now let's perform an alignmnet:
+    // Advance the query and target position.
+    ++query_start;
+    ++target_start;
+    while (query_sequence[query_start] != target_sequence[target_start]) {
+        ++query_start;
+        ++target_start;
+    }
 
     EdlibAlignConfig align_config = edlibDefaultAlignConfig();
     align_config.task = EDLIB_TASK_PATH;
@@ -309,7 +314,7 @@ std::tuple<int, int, std::vector<uint8_t>, int> realign_moves(const std::string&
 
     edlibFreeAlignResult(edlib_result);
 
-    return {old_moves_offset, target_start - 1, new_moves, query_start};
+    return {old_moves_offset, target_start - 1, new_moves};
 }
 
 std::vector<uint64_t> move_cum_sums(const std::vector<uint8_t>& moves) {
