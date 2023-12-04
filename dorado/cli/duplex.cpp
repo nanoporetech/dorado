@@ -2,6 +2,8 @@
 #include "cli/cli_utils.h"
 #include "data_loader/DataLoader.h"
 #include "data_loader/ModelFinder.h"
+#include "models/kits.h"
+#include "models/metadata.h"
 #include "models/models.h"
 #include "nn/CRFModelConfig.h"
 #include "nn/ModBaseRunner.h"
@@ -31,9 +33,12 @@
 #include <spdlog/spdlog.h>
 
 #include <cstdlib>
+#include <exception>
+#include <filesystem>
 #include <memory>
 #include <thread>
 #include <unordered_set>
+#include <vector>
 
 namespace fs = std::filesystem;
 
@@ -49,10 +54,41 @@ struct DuplexModels {
     CRFModelConfig stereo_model_config;
     std::string stereo_model_name;
 
-    std::vector<fs::path> mods_model_paths;
+    std::vector<std::filesystem::path> mods_model_paths;
 
     std::set<std::filesystem::path> temp_paths{};
 };
+
+// If given a model path, create a ModelFinder by looking up the model info by name and extracting
+// the chemistry, sampling rate etc that way. Otherwise, the user passed a model complex which
+// is parsed and the data is inspected to find the conditions.
+ModelFinder get_model_finder(const std::string& model_arg,
+                             const std::string& reads,
+                             const bool recursive_file_loading) {
+    const ModelSelection model_selection = cli::parse_model_argument(model_arg);
+    if (model_selection.is_path()) {
+        // Get the model name
+        const auto model_path = std::filesystem::canonical(std::filesystem::path(model_arg));
+        const auto model_name = model_path.filename().string();
+        try {
+            // Try to find the model
+            const auto model_info = ModelFinder::get_simplex_model_info(model_name);
+
+            // Pass the model's ModelVariant (e.g. HAC) in here so everything matches
+            const auto inferred_selection = ModelSelection{
+                    models::to_string(model_info.simplex.variant), model_info.simplex, {}};
+
+            // Return the ModelFinder which hasn't needed to inspect any data
+            return ModelFinder{model_info.chemistry, inferred_selection, false};
+        } catch (const std::exception& e) {
+            spdlog::error(e.what());
+            std::exit(EXIT_FAILURE);
+        }
+    }
+
+    // Model complex given, inspect data to find chemistry.
+    return cli::model_finder(model_selection, reads, recursive_file_loading, true);
+}
 
 DuplexModels load_models(const std::string& model_arg,
                          const std::vector<std::string>& mod_bases,
@@ -60,9 +96,13 @@ DuplexModels load_models(const std::string& model_arg,
                          const std::string& reads,
                          const bool recursive_file_loading,
                          const bool skip_model_compatibility_check) {
-    const ModelSelection model_selection = cli::parse_model_argument(model_arg);
+    using namespace dorado::models;
 
-    auto ways = {model_selection.has_mods_variant(), !mod_bases.empty(), !mod_bases_models.empty()};
+    ModelFinder model_finder = get_model_finder(model_arg, reads, recursive_file_loading);
+    const ModelSelection inferred_selection = model_finder.get_selection();
+
+    auto ways = {inferred_selection.has_mods_variant(), !mod_bases.empty(),
+                 !mod_bases_models.empty()};
     if (std::count(ways.begin(), ways.end(), true) > 1) {
         spdlog::error(
                 "only one of --modified-bases, --modified-bases-models, or modified models set "
@@ -71,66 +111,53 @@ DuplexModels load_models(const std::string& model_arg,
         std::exit(EXIT_FAILURE);
     };
 
-    if (model_selection.is_path()) {
-        const auto model_path = fs::canonical(fs::path(model_arg));
-        const auto model_name = model_path.filename().string();
-        const auto model_config = load_crf_model_config(model_path);
+    if (inferred_selection.model.variant == ModelVariant::FAST) {
+        spdlog::warn("Duplex is not supported for fast models.");
+    }
 
-        // Check sample rate of model vs data.
-        auto data_sample_rate = DataLoader::get_sample_rate(reads, recursive_file_loading);
-        auto model_sample_rate = model_config.sample_rate;
-        if (model_sample_rate < 0) {
-            // If unsuccessful, find sample rate by model name.
-            model_sample_rate = models::get_sample_rate_by_model_name(
-                    models::extract_model_name_from_path(model_path));
-        }
-        if (!skip_model_compatibility_check &&
-            !sample_rates_compatible(data_sample_rate, uint16_t(model_sample_rate))) {
-            std::stringstream err;
-            err << "Sample rate for model (" << model_sample_rate << ") and data ("
-                << data_sample_rate << ") are not compatible.";
-            throw std::runtime_error(err.str());
-        }
-        const auto stereo_model_name = utils::get_stereo_model_name(model_arg, data_sample_rate);
-        const auto stereo_model_path = model_path.parent_path() / fs::path(stereo_model_name);
+    std::filesystem::path model_path;
+    std::filesystem::path stereo_model_path;
+    std::vector<std::filesystem::path> mods_model_paths;
 
-        if (!fs::exists(stereo_model_path)) {
-            if (!models::download_models(model_path.parent_path().u8string(), stereo_model_name)) {
-                throw std::runtime_error("Failed to download model: " + stereo_model_name);
-            }
+    // Cannot use inferred_selection as it has the ModelVariant set differently.
+    if (ModelComplexParser::parse(model_arg).is_path()) {
+        model_path = std::filesystem::canonical(std::filesystem::path(model_arg));
+        stereo_model_path = model_path.parent_path() / model_finder.get_stereo_model_name();
+        if (!std::filesystem::exists(stereo_model_path)) {
+            stereo_model_path = model_finder.fetch_stereo_model();
         }
-        const auto stereo_model_config = load_crf_model_config(stereo_model_path);
 
-        std::vector<fs::path> mods_model_paths;
+        if (!skip_model_compatibility_check) {
+            const auto model_config = load_crf_model_config(model_path);
+            const auto model_name = model_path.filename().string();
+            check_sampling_rates_compatible(model_name, reads, model_config.sample_rate,
+                                            recursive_file_loading);
+        }
         if (!mod_bases.empty()) {
-            std::transform(mod_bases.begin(), mod_bases.end(), std::back_inserter(mods_model_paths),
-                           [&model_arg](std::string m) {
-                               return fs::path(models::get_modification_model(model_arg, m));
-                           });
+            std::transform(
+                    mod_bases.begin(), mod_bases.end(), std::back_inserter(mods_model_paths),
+                    [&model_arg](std::string m) {
+                        return std::filesystem::path(models::get_modification_model(model_arg, m));
+                    });
         } else if (!mod_bases_models.empty()) {
             const auto split = utils::split(mod_bases_models, ',');
             std::transform(split.begin(), split.end(), std::back_inserter(mods_model_paths),
-                           [&](std::string m) { return fs::path(m); });
+                           [&](std::string m) { return std::filesystem::path(m); });
         }
 
-        return DuplexModels{model_path,        model_name,          model_config,
-                            stereo_model_path, stereo_model_config, stereo_model_name,
-                            mods_model_paths};
+    } else {
+        model_path = model_finder.fetch_simplex_model();
+        stereo_model_path = model_finder.fetch_stereo_model();
+        mods_model_paths = inferred_selection.has_mods_variant()
+                                   ? model_finder.fetch_mods_models()
+                                   : std::vector<std::filesystem::path>{};
     }
 
-    auto model_finder = cli::model_finder(model_selection, reads, recursive_file_loading, true);
-
-    const auto model_path = model_finder.fetch_simplex_model();
-    const auto model_name = model_path.filename().string();
+    const auto model_name = model_finder.get_simplex_model_name();
     const auto model_config = load_crf_model_config(model_path);
 
-    const auto stereo_model_path = model_finder.fetch_stereo_model();
     const auto stereo_model_name = stereo_model_path.filename().string();
     const auto stereo_model_config = load_crf_model_config(stereo_model_path);
-
-    const std::vector<fs::path> mods_model_paths = model_selection.has_mods_variant()
-                                                           ? model_finder.fetch_mods_models()
-                                                           : std::vector<fs::path>{};
 
     return DuplexModels{model_path,          model_name,
                         model_config,        stereo_model_path,

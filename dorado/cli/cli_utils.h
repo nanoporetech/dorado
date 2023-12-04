@@ -284,8 +284,8 @@ inline ModelFinder model_finder(const ModelSelection& model_selection,
                                 bool recursive,
                                 bool suggestions) {
     try {
-        return ModelFinder(ModelFinder::get_chemistry(data.u8string(), recursive), model_selection,
-                           suggestions);
+        return ModelFinder(ModelFinder::inspect_chemistry(data.u8string(), recursive),
+                           model_selection, suggestions);
     } catch (std::exception& e) {
         spdlog::error(e.what());
         std::exit(EXIT_FAILURE);

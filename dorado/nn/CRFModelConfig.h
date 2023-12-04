@@ -110,13 +110,6 @@ struct CRFModelConfig {
 
 CRFModelConfig load_crf_model_config(const std::filesystem::path& path);
 
-uint16_t get_model_sample_rate(const std::filesystem::path& model_path);
-
-inline bool sample_rates_compatible(uint16_t data_sample_rate, uint16_t model_sample_rate) {
-    return utils::eq_with_tolerance(data_sample_rate, model_sample_rate,
-                                    static_cast<uint16_t>(100));
-}
-
 int32_t get_model_mean_qscore_start_pos(const CRFModelConfig& model_config);
 
 bool is_rna_model(const CRFModelConfig& model_config);

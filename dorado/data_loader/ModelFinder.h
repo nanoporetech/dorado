@@ -48,6 +48,11 @@ public:
                 const ModelSelection& selection,
                 bool suggestions);
 
+    // Return the selection
+    ModelSelection get_selection() { return m_selection; }
+    // Return the chemistry found
+    models::Chemistry get_chemistry() { return m_chemistry; }
+
     //Find a simplex model which matches the user's command and chemistry
     std::string get_simplex_model_name() const;
     //Find a stereo model which matches the chemistry
@@ -68,7 +73,11 @@ public:
 
     // Inspects the sequencing data metadata to determine the sequencing chemistry used. Will error if
     // the data is inhomogeneous
-    static models::Chemistry get_chemistry(const std::string& data, bool recursive_file_loading);
+    static models::Chemistry inspect_chemistry(const std::string& data,
+                                               bool recursive_file_loading);
+
+    // Search simpex models by name, throws exceptions if not found
+    static models::ModelInfo get_simplex_model_info(const std::string& model_name);
 
 private:
     // If a ModelVariant was set, the chemistry (e.g. R10.4.1 / RNA004) is deduced from the
@@ -89,5 +98,12 @@ private:
     // Set of downloaded models which we want to clean up on shutdown.
     std::set<std::filesystem::path> m_downloaded_models;
 };
+
+// Attempts to assert that the model sampling rate and data sampling rate are compatible.
+// Warns if testing fails. Throws an exception if sampling rates are known to be incompatible.
+void check_sampling_rates_compatible(const std::string& model_name,
+                                     const std::string& data_path,
+                                     const int config_sample_rate,
+                                     const bool recursive_file_loading);
 
 }  // namespace dorado

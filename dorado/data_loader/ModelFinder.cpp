@@ -6,6 +6,7 @@
 #include "models/metadata.h"
 #include "models/models.h"
 #include "utils/fs_utils.h"
+#include "utils/math_utils.h"
 #include "utils/string_utils.h"
 
 #include <spdlog/spdlog.h>
@@ -14,6 +15,8 @@
 #include <cstdlib>
 #include <filesystem>
 #include <optional>
+#include <stdexcept>
+#include <string>
 
 namespace dorado {
 
@@ -62,11 +65,11 @@ std::pair<std::string, ModelVersion> ModelComplexParser::parse_model_arg_part(
         const std::string& part) {
     std::vector<std::string> sub_parts = utils::split(part, '@');
 
-    if (sub_parts.empty() || sub_parts.size() > 2) {
+    if (sub_parts.empty()) {
         throw std::runtime_error("Failed to parse model selection part: '" + part + "'");
     }
-    if (sub_parts.size() == 1) {
-        return std::pair(sub_parts.at(0), ModelVersion::NONE);
+    if (sub_parts.size() != 2) {
+        return std::pair(part, ModelVersion::NONE);
     }
 
     // If it's neither a ModelVariant or ModsVariant, it's a path
@@ -200,8 +203,8 @@ std::vector<std::string> ModelFinder::get_mods_model_names() const {
 
 std::string ModelFinder::get_stereo_model_name() const {
     const ModelList& models = stereo_models();
-    const auto model_info = find_model(models, "stereo duplex", m_chemistry, ModelVariantPair(),
-                                       ModsVariantPair(), false);
+    const auto model_info = find_model(models, "stereo duplex", m_chemistry,
+                                       m_simplex_model_info.simplex, ModsVariantPair(), false);
     return model_info.name;
 }
 
@@ -216,7 +219,7 @@ std::vector<std::string> ModelFinder::get_mods_for_simplex_model() const {
     return model_names;
 }
 
-Chemistry ModelFinder::get_chemistry(const std::string& data, bool recursive_file_loading) {
+Chemistry ModelFinder::inspect_chemistry(const std::string& data, bool recursive_file_loading) {
     const ChemistryMap& kit_map = models::chemistry_map();
     std::vector<ChemistryKey> data_chemistries =
             DataLoader::get_sequencing_chemistry(data, recursive_file_loading);
@@ -243,6 +246,38 @@ Chemistry ModelFinder::get_chemistry(const std::string& data, bool recursive_fil
         throw std::runtime_error("Could not uniquely resolve chemistry from inhomogeneous data");
     }
     return *std::begin(found);
+}
+
+models::ModelInfo ModelFinder::get_simplex_model_info(const std::string& model_name) {
+    return models::get_simplex_model_info(model_name);
+}
+
+void check_sampling_rates_compatible(const std::string& model_name,
+                                     const std::string& data_path,
+                                     const int config_sample_rate,
+                                     const bool recursive_file_loading) {
+    SamplingRate sample_rate;
+    SamplingRate data_sample_rate;
+
+    try {
+        // Check sample rate of model vs data.
+        sample_rate = config_sample_rate < 0 ? get_sample_rate_by_model_name(model_name)
+                                             : static_cast<SamplingRate>(config_sample_rate);
+        data_sample_rate = DataLoader::get_sample_rate(data_path, recursive_file_loading);
+    } catch (const std::exception& e) {
+        // Failed the check - warn the user
+        spdlog::warn(
+                "Could not check that model sampling rate and data sampling rate match. "
+                "Proceed with caution. Reason: {}",
+                e.what());
+        return;
+    }
+
+    if (!utils::eq_with_tolerance(data_sample_rate, sample_rate, static_cast<uint16_t>(100))) {
+        std::string err = "Sample rate for model (" + std::to_string(sample_rate) + ") and data (" +
+                          std::to_string(data_sample_rate) + ") are not compatible.";
+        throw std::runtime_error(err);
+    }
 }
 
 }  // namespace dorado
