@@ -420,7 +420,7 @@ int basecaller(int argc, char* argv[]) {
     parser.visible.add_argument("--estimate-poly-a")
             .help("Estimate poly-A/T tail lengths (beta feature). Primarily meant for cDNA and "
                   "dRNA use cases. Note that if this flag is set, then adapter/primer detection "
-                  "be disabled.")
+                  "will be disabled.")
             .default_value(false)
             .implicit_value(true);
 
@@ -528,6 +528,9 @@ int basecaller(int argc, char* argv[]) {
             std::exit(EXIT_FAILURE);
         }
         no_trim_primers = no_trim_adapters = true;
+        spdlog::info(
+                "Estimation of poly-a has been requested, so adapter/primer trimming has been "
+                "disabled.");
     }
 
     if (parser.visible.is_used("--kit-name") && parser.visible.is_used("--barcode-arrangement")) {
