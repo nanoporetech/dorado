@@ -14,11 +14,30 @@ using namespace ont::test_utils::streams;
 
 namespace {
 
+// Format of each line is @SQ\tSN:{sequence_name}\tLN:{sequence_len}
+// where read_id is used as the sequence name
+// @read_0 1898
+const std::string_view EXPECTED_REF_FILE_HEADER{"@SQ\tSN:read_0\tLN:1898"};
+// >read_0 1000
+// >read_1 1000
+const std::string_view EXPECTED_2READ_REF_FILE_HEADER{
+        "@SQ\tSN:read_0\tLN:1000\n@SQ\tSN:read_1\tLN:1000"};
+
 const std::string& valid_reference_file() {
     static const std::string reference_file = []() {
         const std::string read_id{"aligner_node_test"};
         std::filesystem::path aligner_test_dir{get_aligner_data_dir()};
         auto ref = aligner_test_dir / "target.fq";
+        return ref.string();
+    }();
+    return reference_file;
+}
+
+const std::string& valid_2read_reference_file() {
+    static const std::string reference_file = []() {
+        const std::string read_id{"aligner_node_test"};
+        std::filesystem::path aligner_test_dir{get_aligner_data_dir()};
+        auto ref = aligner_test_dir / "supplementary_aln_target.fa";
         return ref.string();
     }();
     return reference_file;
@@ -219,6 +238,37 @@ TEST_CASE(TEST_GROUP
     cut.load_index(valid_reference_file(), dflt_options, 1);
 
     REQUIRE_FALSE(cut.index_is_no_seq(valid_reference_file(), dflt_options));
+}
+
+TEST_CASE(TEST_GROUP
+          " generate_sequence_records_header with index for loaded index returns non-empty string",
+          TEST_GROUP) {
+    IndexFileAccess cut{};
+    cut.load_index(valid_reference_file(), dflt_options, 1);
+    auto header = cut.generate_sequence_records_header(valid_reference_file(), dflt_options);
+    REQUIRE(!header.empty());
+}
+
+TEST_CASE(TEST_GROUP
+          " generate_sequence_records_header with single reference index returns expected header",
+          TEST_GROUP) {
+    IndexFileAccess cut{};
+    cut.load_index(valid_reference_file(), dflt_options, 1);
+
+    auto header = cut.generate_sequence_records_header(valid_reference_file(), dflt_options);
+
+    REQUIRE(header == EXPECTED_REF_FILE_HEADER);
+}
+
+TEST_CASE(TEST_GROUP
+          " generate_sequence_records_header with two reference index returns expected header",
+          TEST_GROUP) {
+    IndexFileAccess cut{};
+    cut.load_index(valid_2read_reference_file(), dflt_options, 1);
+
+    auto header = cut.generate_sequence_records_header(valid_2read_reference_file(), dflt_options);
+
+    REQUIRE(header == EXPECTED_2READ_REF_FILE_HEADER);
 }
 
 }  // namespace dorado::alignment::index_file_access

@@ -22,13 +22,17 @@ class IndexFileAccess {
     // one is already loaded and return true.
     bool try_load_compatible_index(const std::string& file, const Minimap2Options& options);
 
+    // By contract the index must be loaded (else assertion failure)
+    std::shared_ptr<Minimap2Index> get_exact_index(const std::string& file,
+                                                   const Minimap2Options& options) const;
+
     // Requires the mutex to be locked before calling.
     const Minimap2Index* get_compatible_index(const std::string& file,
                                               const Minimap2IndexOptions& indexing_options);
 
     // Requires the mutex to be locked before calling.
-    std::shared_ptr<Minimap2Index> get_exact_index(const std::string& file,
-                                                   const Minimap2Options& options) const;
+    std::shared_ptr<Minimap2Index> get_exact_index_impl(const std::string& file,
+                                                        const Minimap2Options& options) const;
 
     // Requires the mutex to be locked before calling.
     bool is_index_loaded_impl(const std::string& file, const Minimap2Options& options) const;
@@ -42,14 +46,6 @@ public:
                                const Minimap2Options& options,
                                int num_threads);
 
-    // Check whether the index has the MM_I_NO_SEQ flag set.
-    // This is to support server usecases checking whether full alignment requested by
-    // the client is supported.
-    bool index_is_no_seq(const std::string& file, const Minimap2Options& options) const;
-
-    // Testability. Method needed to support utests
-    bool is_index_loaded(const std::string& file, const Minimap2Options& options) const;
-
     // Returns the index if already loaded, if not loaded will create an index from an
     // existing compatible one.
     // By contract there must be a loaded index for the file with matching indexing
@@ -60,6 +56,18 @@ public:
     // Unloads all compatible indices for the given file and indexing options.
     // The underlying minimap index will be deallocated.
     void unload_index(const std::string& file, const Minimap2IndexOptions& index_options);
+
+    // Check whether the index has the MM_I_NO_SEQ flag set.
+    // This is to support server usecases checking whether full alignment requested by
+    // the client is available.
+    bool index_is_no_seq(const std::string& file, const Minimap2Options& options) const;
+
+    // returns a string containing the sequence records for the requested index
+    std::string generate_sequence_records_header(const std::string& file,
+                                                 const Minimap2Options& options) const;
+
+    // Testability. Method needed to support utests
+    bool is_index_loaded(const std::string& file, const Minimap2Options& options) const;
 };
 
 bool validate_options(const Minimap2Options& options);
