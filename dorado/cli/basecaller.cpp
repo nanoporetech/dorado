@@ -137,10 +137,10 @@ void setup(std::vector<std::string> args,
     auto read_groups = DataLoader::load_read_groups(data_path, model_name, modbase_model_names,
                                                     recursive_file_loading);
 
-    bool adapter_trimming_disabled = (adapter_no_trim && primer_no_trim);
+    bool adapter_trimming_enabled = (!adapter_no_trim || !primer_no_trim);
     const auto thread_allocations = utils::default_thread_allocations(
             int(num_devices), !remora_runners.empty() ? int(num_remora_threads) : 0, enable_aligner,
-            !barcode_kits.empty(), !adapter_trimming_disabled);
+            !barcode_kits.empty(), adapter_trimming_enabled);
 
     std::unique_ptr<const utils::SampleSheet> sample_sheet;
     BarcodingInfo::FilterSet allowed_barcodes;
@@ -179,7 +179,7 @@ void setup(std::vector<std::string> args,
                 barcode_both_ends, barcode_no_trim, std::move(allowed_barcodes),
                 std::move(custom_kit), std::move(custom_seqs));
     }
-    if (!adapter_trimming_disabled) {
+    if (adapter_trimming_enabled) {
         current_sink_node = pipeline_desc.add_node<AdapterDetectorNode>(
                 {current_sink_node}, thread_allocations.adapter_threads, !adapter_no_trim,
                 !primer_no_trim);
@@ -426,9 +426,9 @@ int basecaller(int argc, char* argv[]) {
             .help("Path to file with custom barcode sequences.")
             .default_value(std::nullopt);
     parser.visible.add_argument("--estimate-poly-a")
-            .help("Estimate poly-A/T tail lengths (beta feature). Primarily meant "
-                  "for cDNA and "
-                  "dRNA use cases.")
+            .help("Estimate poly-A/T tail lengths (beta feature). Primarily meant for cDNA and "
+                  "dRNA use cases. Note that if this flag is set, then adapter/primer detection "
+                  "be disabled.")
             .default_value(false)
             .implicit_value(true);
 
@@ -527,6 +527,15 @@ int basecaller(int argc, char* argv[]) {
     } else if (!trim_options.empty() && trim_options != "all") {
         spdlog::error("Unsupported --trim value '{}'.", trim_options);
         std::exit(EXIT_FAILURE);
+    }
+    if (parser.visible.get<bool>("--estimate-poly-a")) {
+        if (trim_options == "primers" || trim_options == "adapters" || trim_options == "all") {
+            spdlog::error(
+                    "--trim cannot be used with options 'primers', 'adapters', or 'all', "
+                    "if you are also using --estimate-poly-a.");
+            std::exit(EXIT_FAILURE);
+        }
+        no_trim_primers = no_trim_adapters = true;
     }
 
     if (parser.visible.is_used("--kit-name") && parser.visible.is_used("--barcode-arrangement")) {
