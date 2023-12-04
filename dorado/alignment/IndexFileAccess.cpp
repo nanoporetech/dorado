@@ -3,6 +3,7 @@
 #include "Minimap2Index.h"
 
 #include <cassert>
+#include <sstream>
 
 namespace dorado::alignment {
 
@@ -16,13 +17,24 @@ const Minimap2Index* IndexFileAccess::get_compatible_index(
     return compatible_indices.begin()->second.get();
 }
 
-std::shared_ptr<Minimap2Index> IndexFileAccess::get_exact_index(const std::string& file,
-                                                                const Minimap2Options& options) {
-    auto& compatible_indices = m_index_lut[{file, options}];
-    if (compatible_indices.count(options) == 0) {
+std::shared_ptr<Minimap2Index> IndexFileAccess::get_exact_index_impl(
+        const std::string& file,
+        const Minimap2Options& options) const {
+    auto compatible_indices = m_index_lut.find({file, options});
+    if (compatible_indices == m_index_lut.end()) {
         return nullptr;
     }
-    return compatible_indices.at(options);
+    auto exact_index = compatible_indices->second.find(options);
+    return exact_index == compatible_indices->second.end() ? nullptr : exact_index->second;
+}
+
+std::shared_ptr<Minimap2Index> IndexFileAccess::get_exact_index(
+        const std::string& file,
+        const Minimap2Options& options) const {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    auto exact_index = get_exact_index_impl(file, options);
+    assert(exact_index && "Cannot access an index which has not been loaded");
+    return exact_index;
 }
 
 bool IndexFileAccess::is_index_loaded_impl(const std::string& file,
@@ -34,24 +46,31 @@ bool IndexFileAccess::is_index_loaded_impl(const std::string& file,
     return compatible_indices->second.count(options) > 0;
 }
 
-bool IndexFileAccess::try_load_compatible_index(const std::string& file,
-                                                const Minimap2Options& options) {
-    std::lock_guard<std::mutex> lock(m_mutex);
-    if (is_index_loaded_impl(file, options)) {
-        return true;
+std::shared_ptr<Minimap2Index> IndexFileAccess::get_or_load_compatible_index(
+        const std::string& file,
+        const Minimap2Options& options) {
+    auto index = get_exact_index_impl(file, options);
+    if (index) {
+        return index;
     }
-
     auto compatible_index = get_compatible_index(file, options);
     if (!compatible_index) {
-        return false;
+        return nullptr;
     }
 
     auto new_index = compatible_index->create_compatible_index(options);
     if (!new_index) {
-        return false;
+        return nullptr;
     }
-    m_index_lut[{file, options}][options] = std::move(new_index);
-    return true;
+    m_index_lut[{file, options}][options] = new_index;
+    return new_index;
+}
+
+bool IndexFileAccess::try_load_compatible_index(const std::string& file,
+                                                const Minimap2Options& options) {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    auto index = get_or_load_compatible_index(file, options);
+    return index != nullptr;
 }
 
 IndexLoadResult IndexFileAccess::load_index(const std::string& file,
@@ -79,8 +98,8 @@ IndexLoadResult IndexFileAccess::load_index(const std::string& file,
 std::shared_ptr<const Minimap2Index> IndexFileAccess::get_index(const std::string& file,
                                                                 const Minimap2Options& options) {
     std::lock_guard<std::mutex> lock(m_mutex);
-    auto index = get_exact_index(file, options);
-    assert(index && "get_index expects the index to have been loaded");
+    auto index = get_or_load_compatible_index(file, options);
+    assert(index && "get_index expects a compatible index to have been loaded");
     return index;
 }
 
@@ -88,6 +107,33 @@ bool IndexFileAccess::is_index_loaded(const std::string& file,
                                       const Minimap2Options& options) const {
     std::lock_guard<std::mutex> lock(m_mutex);
     return is_index_loaded_impl(file, options);
+}
+
+bool IndexFileAccess::index_is_no_seq(const std::string& file,
+                                      const Minimap2Options& options) const {
+    auto loaded_index = get_exact_index(file, options);
+    return loaded_index->index()->flag & MM_I_NO_SEQ;
+}
+
+std::string IndexFileAccess::generate_sequence_records_header(
+        const std::string& file,
+        const Minimap2Options& options) const {
+    auto loaded_index = get_exact_index(file, options);
+    assert(loaded_index && "Index must be loaded to generate header records");
+    auto sequence_records = loaded_index->get_sequence_records_for_header();
+
+    std::ostringstream header_stream{};
+    bool first_record{true};
+    for (const auto& sequence_record : sequence_records) {
+        if (!first_record) {
+            header_stream << '\n';
+        } else {
+            first_record = false;
+        }
+        header_stream << "@SQ\tSN:" << sequence_record.first << "\tLN:" << sequence_record.second;
+    }
+
+    return header_stream.str();
 }
 
 void IndexFileAccess::unload_index(const std::string& file,
