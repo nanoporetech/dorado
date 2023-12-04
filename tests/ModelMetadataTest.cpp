@@ -114,6 +114,7 @@ TEST_CASE(TEST_TAG "  ModelVersion enumeration", TEST_TAG) {
         CHECK(to_string(ModelVersion::v0_1_0) == "v0.1.0");
         CHECK(to_string(ModelVersion::v1_0_0) == "v1.0.0");
         CHECK(to_string(ModelVersion::v1_1_0) == "v1.1.0");
+        CHECK(to_string(ModelVersion::v1_2_0) == "v1.2.0");
         CHECK(to_string(ModelVersion::v2_0_0) == "v2.0.0");
         CHECK(to_string(ModelVersion::v3_0_0) == "v3.0.0");
         CHECK(to_string(ModelVersion::v3_0_1) == "v3.0.1");
@@ -126,8 +127,9 @@ TEST_CASE(TEST_TAG "  ModelVersion enumeration", TEST_TAG) {
         CHECK(to_string(ModelVersion::v4_0_0) == "v4.0.0");
         CHECK(to_string(ModelVersion::v4_1_0) == "v4.1.0");
         CHECK(to_string(ModelVersion::v4_2_0) == "v4.2.0");
+        CHECK(to_string(ModelVersion::v4_3_0) == "v4.3.0");
         CHECK(to_string(ModelVersion::NONE) == "latest");
-        CHECK(vers.size() == 16);
+        CHECK(vers.size() == 18);
     }
 
     SECTION("ModelVersion no duplicates") {

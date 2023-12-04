@@ -2,6 +2,7 @@
 #include "cli/cli_utils.h"
 #include "data_loader/DataLoader.h"
 #include "data_loader/ModelFinder.h"
+#include "models/kits.h"
 #include "models/models.h"
 #include "nn/CRFModelConfig.h"
 #include "nn/ModBaseRunner.h"
@@ -103,19 +104,10 @@ void setup(std::vector<std::string> args,
     }
     num_reads = max_reads == 0 ? num_reads : std::min(num_reads, max_reads);
 
-    // Check sample rate of model vs data.
-    auto data_sample_rate = DataLoader::get_sample_rate(data_path, recursive_file_loading);
-    auto model_sample_rate = model_config.sample_rate;
-    if (model_sample_rate < 0) {
-        // If unsuccessful, find sample rate by model name.
-        model_sample_rate = models::get_sample_rate_by_model_name(model_name);
-    }
-    if (!skip_model_compatibility_check &&
-        !sample_rates_compatible(data_sample_rate, uint16_t(model_sample_rate))) {
-        std::stringstream err;
-        err << "Sample rate for model (" << model_sample_rate << ") and data (" << data_sample_rate
-            << ") are not compatible.";
-        throw std::runtime_error(err.str());
+    // Sampling rate is checked by ModelFinder when a complex is given, only test for a path
+    if (model_selection.is_path() && !skip_model_compatibility_check) {
+        check_sampling_rates_compatible(model_name, data_path, model_config.sample_rate,
+                                        recursive_file_loading);
     }
 
     if (is_rna_model(model_config)) {

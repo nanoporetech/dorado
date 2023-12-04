@@ -1,10 +1,13 @@
 #include "models.h"
 
+#include "data_loader/ModelFinder.h"
 #include "kits.h"
 #include "metadata.h"
 
 #include <elzip/elzip.hpp>
 
+#include <cstdint>
+#include <exception>
 #include <stdexcept>
 
 #ifndef _WIN32
@@ -41,21 +44,22 @@ bool model_info_is_similar(const ModelInfo& info,
     }
 
     const bool is_auto_variant_match = model.variant == ModelVariant::AUTO && info.simplex.is_auto;
-    if (model.has_variant() && info.simplex.variant != model.variant && !is_auto_variant_match) {
+    if (model.has_variant() && info.simplex.has_variant() &&
+        info.simplex.variant != model.variant && !is_auto_variant_match) {
         spdlog::trace("Reject {} on model type: {}", info.name, to_string(model.variant));
         return false;
     }
-    if (model.has_ver() && model.ver != info.simplex.ver) {
+    if (model.has_ver() && info.simplex.has_ver() && model.ver != info.simplex.ver) {
         spdlog::trace("Reject {} on versions: {}, {}", info.name, to_string(info.simplex.ver),
                       to_string(model.ver));
         return false;
     }
-    if (mods.has_variant() && mods.variant != info.mods.variant) {
+    if (mods.has_variant() && info.mods.has_variant() && mods.variant != info.mods.variant) {
         spdlog::trace("Reject {} on mods: {}, {}", info.name, to_string(info.mods.variant),
                       to_string(mods.variant));
         return false;
     }
-    if (mods.has_ver() && mods.ver != info.mods.ver) {
+    if (mods.has_ver() && info.mods.has_ver() && mods.ver != info.mods.ver) {
         spdlog::trace("Reject {} on mods versions: {}, {}", info.name, to_string(info.mods.ver),
                       to_string(mods.ver));
         return false;
@@ -374,6 +378,26 @@ const std::vector<ModelInfo> models = {
                 ModelVariantPair{ModelVariant::SUP, VV::v4_2_0},
         },
 
+        // v4.3.0
+        ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_fast@v4.3.0",
+                "3c38af7258071171976967eaff3a1713fba0ac09740388288a4a04a9eaf82075",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelVariantPair{ModelVariant::FAST, VV::v4_3_0},
+        },
+        ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_hac@v4.3.0",
+                "83e2292dd577b094e41e6399a7fe0d45e29eee478bf8cfbccaff7f2e19180e95",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelVariantPair{ModelVariant::HAC, VV::v4_3_0, true},
+        },
+        ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_sup@v4.3.0",
+                "ee9515ca1c8aba1ad5c53f66ba9a560e5995cfd8eead76d208a877fc5dcf1901",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelVariantPair{ModelVariant::SUP, VV::v4_3_0},
+        },
+
         // RNA002
         ModelInfo{
                 "rna002_70bps_fast@v3",
@@ -414,17 +438,24 @@ const std::vector<ModelInfo> models = {
 namespace stereo {
 
 const std::vector<ModelInfo> models = {
+        // Only 4kHz stereo model - matches all simplex models for this condition
         ModelInfo{
                 "dna_r10.4.1_e8.2_4khz_stereo@v1.1",
                 "d434525cbe1fd00adbd7f8a5f0e7f0bf09b77a9e67cd90f037c5ab52013e7974",
                 CC::DNA_R10_4_1_E8_2_400BPS_4KHZ,
-                ModelVariantPair{ModelVariant::NONE, VV::v1_1_0},
+                ModelVariantPair{ModelVariant::NONE, VV::NONE},
         },
         ModelInfo{
                 "dna_r10.4.1_e8.2_5khz_stereo@v1.1",
                 "6c16e3917a12ec297a6f5d1dc83c205fc0ac74282fffaf76b765995033e5f3d4",
                 CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
-                ModelVariantPair{ModelVariant::NONE, VV::v1_1_0},
+                ModelVariantPair{ModelVariant::NONE, VV::v4_2_0},
+        },
+        ModelInfo{
+                "dna_r10.4.1_e8.2_5khz_stereo@v1.2",
+                "2631423b8843a82f69c8d4ab07fa554b7356a29f25c03424c26e7096d0e01418",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelVariantPair{ModelVariant::NONE, VV::v4_3_0},
         },
 };
 
@@ -671,6 +702,50 @@ const std::vector<ModelInfo> models = {
                 ModsVariantPair{ModsVariant::M_5mC_5hmC, VV::v1_0_0},
         },
 
+        // V4.3.0
+        ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_hac@v4.3.0_5mC_5hmC@v1",
+                "03523262df93d75fc26e10fb05e3cd6459b233ec7545859c0f7fd3d4665768c1",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelVariantPair{ModelVariant::HAC, VV::v4_3_0},
+                ModsVariantPair{ModsVariant::M_5mC_5hmC, VV::v1_0_0},
+        },
+        ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_sup@v4.3.0_5mC_5hmC@v1",
+                "11ccf924cd0c28aff7e99e8f2acc88cd45f39e03496c61848f2ec0ede35ee547",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelVariantPair{ModelVariant::SUP, VV::v4_3_0},
+                ModsVariantPair{ModsVariant::M_5mC_5hmC, VV::v1_0_0},
+        },
+        ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_hac@v4.3.0_6mA@v1",
+                "68a5395f2773f755d2b25df89c3aa32a759e8909d1549967665f902b82588891",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelVariantPair{ModelVariant::HAC, VV::v4_3_0},
+                ModsVariantPair{ModsVariant::M_6mA, VV::v1_0_0},
+        },
+        ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_sup@v4.3.0_6mA@v1",
+                "a1703971ec0b35af178180d1f23908f8587888c3bc3b727b230e6cd3eb575422",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelVariantPair{ModelVariant::SUP, VV::v4_3_0},
+                ModsVariantPair{ModsVariant::M_6mA, VV::v1_0_0},
+        },
+        ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_hac@v4.3.0_5mCG_5hmCG@v1",
+                "49b1f6e1ae353bf0991c0001a47bdb9d2c01e097b60229ec6f576ff1d02bf604",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelVariantPair{ModelVariant::HAC, VV::v4_3_0},
+                ModsVariantPair{ModsVariant::M_5mCG_5hmCG, VV::v1_0_0},
+        },
+        ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_sup@v4.3.0_5mCG_5hmCG@v1",
+                "14af8002f5dfdce0c19e17a72620a29e58a988008e0aa9f8172e2fa2b2fedb5d",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelVariantPair{ModelVariant::SUP, VV::v4_3_0},
+                ModsVariantPair{ModsVariant::M_5mCG_5hmCG, VV::v1_0_0},
+        },
+
         // RNA004 v3.0.1
         ModelInfo{
                 "rna004_130bps_sup@v3.0.1_m6A_DRACH@v1",
@@ -682,19 +757,6 @@ const std::vector<ModelInfo> models = {
 };
 
 }  // namespace modified
-
-const std::unordered_map<std::string, uint16_t> sample_rate_by_model = {
-
-        //------ simplex ---------//
-        // v4.2
-        {"dna_r10.4.1_e8.2_5khz_400bps_fast@v4.2.0", 5000},
-        {"dna_r10.4.1_e8.2_5khz_400bps_hac@v4.2.0", 5000},
-        {"dna_r10.4.1_e8.2_5khz_400bps_sup@v4.2.0", 5000},
-
-        //------ duplex ---------//
-        // v4.2
-        {"dna_r10.4.1_e8.2_5khz_stereo@v1.1", 5000},
-};
 
 const std::unordered_map<std::string, uint16_t> mean_qscore_start_pos_by_model = {
 
@@ -949,6 +1011,21 @@ bool download_models(const std::string& target_directory, const std::string& sel
     return success;
 }
 
+ModelInfo get_simplex_model_info(const std::string& model_name) {
+    const auto simplex_model_infos = simplex_models();
+    auto is_name_match = [&model_name](const ModelInfo& info) { return info.name == model_name; };
+    std::vector<ModelInfo> matches;
+    std::copy_if(simplex_model_infos.begin(), simplex_model_infos.end(),
+                 std::back_inserter(matches), is_name_match);
+
+    if (matches.empty()) {
+        throw std::runtime_error("Could not find information on simplex model: " + model_name);
+    } else if (matches.size() > 1) {
+        throw std::logic_error("Found multiple simplex models with name: " + model_name);
+    }
+    return matches.back();
+}
+
 std::string get_modification_model(const std::string& simplex_model,
                                    const std::string& modification) {
     std::string modification_model{""};
@@ -992,13 +1069,15 @@ std::string get_modification_model(const std::string& simplex_model,
     return modification_path.u8string();
 }
 
-uint16_t get_sample_rate_by_model_name(const std::string& model_name) {
-    auto iter = sample_rate_by_model.find(model_name);
-    if (iter != sample_rate_by_model.end()) {
-        return iter->second;
+SamplingRate get_sample_rate_by_model_name(const std::string& model_name) {
+    const auto chemistries = chemistry_kits();
+    const ModelInfo model_info = get_simplex_model_info(model_name);
+    auto iter = chemistries.find(model_info.chemistry);
+    if (iter != chemistries.end()) {
+        return iter->second.sampling_rate;
     } else {
-        // Assume any model not found in the list has sample rate 4000.
-        return 4000;
+        // This can only happen if a model_info.chemistry not in chemistries which should be impossible.
+        throw std::logic_error("Couldn't find chemsitry: " + to_string(model_info.chemistry));
     }
 }
 

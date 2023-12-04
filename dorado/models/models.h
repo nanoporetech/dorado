@@ -47,15 +47,17 @@ std::vector<std::string> modified_model_variants();
 bool is_valid_model(const std::string& selected_model);
 bool download_models(const std::string& target_directory, const std::string& selected_model);
 
+// Search for a simplex model by name and return the ModelInfo
+ModelInfo get_simplex_model_info(const std::string& model_name);
+
 // finds the matching modification model for a given modification i.e. 5mCG and a simplex model
 // is the matching modification model is not found in the same model directory as the simplex
 // model then it is downloaded.
 std::string get_modification_model(const std::string& simplex_model,
                                    const std::string& modification);
 
-// fetch the sampling rate that the model is compatible with. for models not
-// present in the mapping, assume a sampling rate of 4000.
-uint16_t get_sample_rate_by_model_name(const std::string& model_name);
+// get the sampling rate that the model is compatible with
+SamplingRate get_sample_rate_by_model_name(const std::string& model_name);
 
 // the mean Q-score of short reads are artificially lowered because of
 // some lower quality bases at the beginning of the read. to correct for

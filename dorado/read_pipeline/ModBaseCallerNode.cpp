@@ -169,7 +169,7 @@ void ModBaseCallerNode::duplex_mod_call(Message&& message) {
 
     read->read_common.mod_base_info = m_mod_base_info;
 
-    {
+    try {
         auto working_read = std::make_shared<WorkingRead>();
         working_read->num_modbase_chunks = 0;
         working_read->num_modbase_chunks_called = 0;
@@ -203,7 +203,7 @@ void ModBaseCallerNode::duplex_mod_call(Message&& message) {
                                              ? read->read_common.seq
                                              : utils::reverse_complement(read->read_common.seq);
 
-            auto [moves_offset, target_start, new_move_table, query_start] =
+            auto [moves_offset, target_start, new_move_table] =
                     utils::realign_moves(simplex_seq, duplex_seq, simplex_moves);
 
             auto signal_len = new_move_table.size() * m_block_stride;
@@ -297,6 +297,8 @@ void ModBaseCallerNode::duplex_mod_call(Message&& message) {
             send_message_to_sink(std::move(read));
             ++m_num_non_mod_base_reads_pushed;
         }
+    } catch (const std::exception& e) {
+        spdlog::error("{}", e.what());
     }
 }
 

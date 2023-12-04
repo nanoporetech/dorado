@@ -176,7 +176,7 @@ if ! uname -r | grep -q tegra; then
     fi
 
     echo dorado in-line modbase duplex from model complex
-    $dorado_bin duplex hac,5mCG_5hmCG $data_dir/duplex/pod5 > $output_dir/duplex_calls_mods.bam
+    $dorado_bin duplex hac@v4.2.0,5mCG_5hmCG $data_dir/duplex/pod5 > $output_dir/duplex_calls_mods.bam
     samtools quickcheck -u $output_dir/duplex_calls_mods.bam
     num_duplex_reads=$(samtools view $output_dir/duplex_calls_mods.bam | grep dx:i:1 | wc -l | awk '{print $1}')
     if [[ $num_duplex_reads -ne "2" ]]; then
