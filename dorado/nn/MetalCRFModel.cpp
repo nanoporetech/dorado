@@ -657,7 +657,7 @@ public:
             std::set<int> test_batch_sizes{min_batch_size, max_batch_size};
 
             // Add some batch sizes evenly distributed in between.
-            const int kNumIntermediateSizes = 8;
+            const int kNumIntermediateSizes = 16;
             const float test_size_increment = static_cast<float>(max_batch_size - min_batch_size) /
                                               static_cast<float>(kNumIntermediateSizes + 1);
             for (int i = 0; i < kNumIntermediateSizes; ++i) {
