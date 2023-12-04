@@ -304,17 +304,6 @@ CRFModelConfig load_crf_model_config(const std::filesystem::path &path) {
     return config;
 }
 
-uint16_t get_model_sample_rate(const std::filesystem::path &model_path) {
-    std::string model_name = std::filesystem::canonical(model_path).filename().string();
-    // Find the sample rate from model config.
-    int model_sample_rate = load_crf_model_config(model_path).sample_rate;
-    if (model_sample_rate < 0) {
-        // If unsuccessful, find sample rate by model name.
-        model_sample_rate = models::get_sample_rate_by_model_name(model_name);
-    }
-    return uint16_t(model_sample_rate);
-}
-
 int32_t get_model_mean_qscore_start_pos(const CRFModelConfig &model_config) {
     int32_t mean_qscore_start_pos = model_config.mean_qscore_start_pos;
     if (mean_qscore_start_pos < 0) {

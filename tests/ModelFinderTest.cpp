@@ -15,19 +15,6 @@
 #define TEST_TAG "[ModelFinder]"
 
 using namespace dorado::models;
-
-// FLO-PRO112
-// sample_rate: 4000
-// sequencing_kit: sqk-lsk112
-// const auto pod5_path = get_single_pod5_file_path();
-
-// dna_r10.4.1_e8.2_260bps
-// dna_r10.4.1_e8.2_400bps_4khz
-// dna_r10.4.1_e8.2_400bps_5khz
-// dna_r9.4.1_e8
-// rna002_70bps
-// rna004_130bps
-
 namespace fs = std::filesystem;
 
 using MS = dorado::ModelSelection;
@@ -53,13 +40,13 @@ TEST_CASE(TEST_TAG "  ModelFinder get_chemistry", TEST_TAG) {
         CAPTURE(condition);
         auto data = fs::path(get_data_dir("pod5")) / condition;
         CHECK(fs::exists(data));
-        auto result = MF::get_chemistry(data.u8string(), false);
+        auto result = MF::inspect_chemistry(data.u8string(), false);
         CHECK(result == expected);
     }
 
     SECTION("get_chemistry throws with inhomogeneous") {
         auto data = fs::path(get_data_dir("pod5")) / "mixed";
-        CHECK_THROWS(MF::get_chemistry(data.u8string(), true),
+        CHECK_THROWS(MF::inspect_chemistry(data.u8string(), true),
                      Catch::Matchers::Contains(
                              "Could not uniquely resolve chemistry from inhomogeneous data"));
     }
@@ -113,6 +100,52 @@ TEST_CASE(TEST_TAG "  ModelFinder get_simplex_model_name", TEST_TAG) {
         const auto mf = MF{chemistry, MS{complex, mvp}, false};
         CAPTURE(complex);
         CHECK(mf.get_simplex_model_name() == expected);
+    }
+}
+
+TEST_CASE(TEST_TAG "  ModelFinder get_stereo_model_name", TEST_TAG) {
+    SECTION("get_stereo_model_name all") {
+        // Check given the model definitions the same model can be found
+        auto [chemistry, mvp, expected_simplex, expected_stereo] =
+                GENERATE(table<CC, MVP, std::string, std::string>({
+                        // 4kHz
+                        std::make_tuple(CC::DNA_R10_4_1_E8_2_400BPS_4KHZ, MVP{MV::HAC, VV::v4_0_0},
+                                        "dna_r10.4.1_e8.2_400bps_hac@v4.0.0",
+                                        "dna_r10.4.1_e8.2_4khz_stereo@v1.1"),
+                        std::make_tuple(CC::DNA_R10_4_1_E8_2_400BPS_4KHZ, MVP{MV::SUP, VV::v4_0_0},
+                                        "dna_r10.4.1_e8.2_400bps_sup@v4.0.0",
+                                        "dna_r10.4.1_e8.2_4khz_stereo@v1.1"),
+                        std::make_tuple(CC::DNA_R10_4_1_E8_2_400BPS_4KHZ, MVP{MV::HAC, VV::v4_1_0},
+                                        "dna_r10.4.1_e8.2_400bps_hac@v4.1.0",
+                                        "dna_r10.4.1_e8.2_4khz_stereo@v1.1"),
+                        std::make_tuple(CC::DNA_R10_4_1_E8_2_400BPS_4KHZ, MVP{MV::SUP, VV::v4_1_0},
+                                        "dna_r10.4.1_e8.2_400bps_sup@v4.1.0",
+                                        "dna_r10.4.1_e8.2_4khz_stereo@v1.1"),
+                        // 5kHz
+                        std::make_tuple(CC::DNA_R10_4_1_E8_2_400BPS_5KHZ, MVP{MV::HAC, VV::v4_2_0},
+                                        "dna_r10.4.1_e8.2_400bps_hac@v4.2.0",
+                                        "dna_r10.4.1_e8.2_5khz_stereo@v1.1"),
+                        std::make_tuple(CC::DNA_R10_4_1_E8_2_400BPS_5KHZ, MVP{MV::SUP, VV::v4_2_0},
+                                        "dna_r10.4.1_e8.2_400bps_sup@v4.2.0",
+                                        "dna_r10.4.1_e8.2_5khz_stereo@v1.1"),
+                        std::make_tuple(CC::DNA_R10_4_1_E8_2_400BPS_5KHZ, MVP{MV::HAC, VV::v4_3_0},
+                                        "dna_r10.4.1_e8.2_400bps_hac@v4.3.0",
+                                        "dna_r10.4.1_e8.2_5khz_stereo@v1.2"),
+                        std::make_tuple(CC::DNA_R10_4_1_E8_2_400BPS_5KHZ, MVP{MV::SUP, VV::v4_3_0},
+                                        "dna_r10.4.1_e8.2_400bps_sup@v4.3.0",
+                                        "dna_r10.4.1_e8.2_5khz_stereo@v1.2"),
+                }));
+
+        CAPTURE(expected_simplex);
+        CAPTURE(expected_stereo);
+        CAPTURE(to_string(chemistry));
+        const auto variant = to_string(mvp.variant);
+        const auto ver = to_string(mvp.ver);
+        const auto complex = variant + "@" + ver;
+        const auto mf = MF{chemistry, MS{complex, mvp}, false};
+        CAPTURE(complex);
+        CHECK(mf.get_simplex_model_name() == expected_simplex);
+        CHECK(mf.get_stereo_model_name() == expected_stereo);
     }
 }
 
@@ -170,7 +203,6 @@ TEST_CASE(TEST_TAG "  ModelFinder ModelComplexParser ", TEST_TAG) {
                                    MVP{MV::FAST},
                                    {ModsVP{ModsV::M_m6A_DRACH, VV::v1_0_0},
                                     ModsVP{ModsV::M_5mC_5hmC, VV::v4_0_0}}}),
-
         }));
 
         CAPTURE(input);
@@ -200,6 +232,9 @@ TEST_CASE(TEST_TAG "  ModelFinder ModelComplexParser ", TEST_TAG) {
                 // No version
                 std::make_tuple("dna_r10.4.1_e8.2_260bps@4.2.0"),
                 std::make_tuple("dna_r10.4.1_e8.2_400bps_4khz@4.2.0"),
+                std::make_tuple("dna_r10.4.1_e8.2_260bps_sup@v4.1.0_5mCG_5hmCG@v2"),
+                std::make_tuple("dna_r10.4.1_e8.2_400bps_sup@v4.2.0_5mC_5hmC@v1"),
+                std::make_tuple("rna004_130bps_sup@v3.0.1_m6A_DRACH@v1"),
                 std::make_tuple("hac/dna_r10.4.1_e8.2_400bps_5khz@4.2.0"),
                 std::make_tuple("../auto/fast/dna_r9.4.1_e8@3.5.0"),
                 std::make_tuple("~/sup/rna002_70bps@4.1.0"),
@@ -262,5 +297,33 @@ TEST_CASE(TEST_TAG "  ModelFinder ModelComplexParser ", TEST_TAG) {
         }));
         CAPTURE(input);
         CHECK_THROWS_AS(dorado::ModelComplexParser::parse_version(input), std::runtime_error);
+    }
+}
+
+TEST_CASE(TEST_TAG "  ModelFinder check_sampling_rates_compatible ", TEST_TAG) {
+    SECTION(" check_sampling_rates_compatible") {
+        auto [model_name, data_path, config_sample_rate] =
+                GENERATE(table<std::string, std::string, SamplingRate>({
+                        std::make_tuple("dna_r9.4.1_e8_sup@v3.6", "pod5/dna_r9.4.1_e8", 4000),
+                        std::make_tuple("dna_r10.4.1_e8.2_400bps_fast@v4.0.0",
+                                        "pod5/dna_r10.4.1_e8.2_400bps_4khz", 4000),
+                        std::make_tuple("dna_r10.4.1_e8.2_400bps_hac@v4.1.0",
+                                        "pod5/dna_r10.4.1_e8.2_400bps_4khz", 4000),
+                        std::make_tuple("dna_r10.4.1_e8.2_400bps_sup@v4.1.0",
+                                        "pod5/dna_r10.4.1_e8.2_400bps_4khz", 4000),
+                        std::make_tuple("dna_r10.4.1_e8.2_400bps_hac@v4.2.0",
+                                        "pod5/dna_r10.4.1_e8.2_400bps_5khz", 5000),
+                        std::make_tuple("dna_r10.4.1_e8.2_400bps_sup@v4.2.0",
+                                        "pod5/dna_r10.4.1_e8.2_400bps_5khz", 5000),
+                        std::make_tuple("dna_r10.4.1_e8.2_400bps_fast@v4.3.0",
+                                        "pod5/dna_r10.4.1_e8.2_400bps_5khz", 5000),
+                        std::make_tuple("rna002_70bps_hac@v3", "pod5/rna002_70bps", 3000),
+                        std::make_tuple("rna004_130bps_fast@v3.0.1", "pod5/rna004_130bps", 4000),
+
+                }));
+
+        CAPTURE(model_name);
+        CHECK_NOTHROW(dorado::check_sampling_rates_compatible(
+                model_name, get_data_dir("pod5") + data_path, config_sample_rate, true));
     }
 }
