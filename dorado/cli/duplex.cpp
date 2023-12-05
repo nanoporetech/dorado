@@ -70,20 +70,16 @@ ModelFinder get_model_finder(const std::string& model_arg,
         // Get the model name
         const auto model_path = std::filesystem::canonical(std::filesystem::path(model_arg));
         const auto model_name = model_path.filename().string();
-        try {
-            // Try to find the model
-            const auto model_info = ModelFinder::get_simplex_model_info(model_name);
 
-            // Pass the model's ModelVariant (e.g. HAC) in here so everything matches
-            const auto inferred_selection = ModelSelection{
-                    models::to_string(model_info.simplex.variant), model_info.simplex, {}};
+        // Try to find the model
+        const auto model_info = ModelFinder::get_simplex_model_info(model_name);
 
-            // Return the ModelFinder which hasn't needed to inspect any data
-            return ModelFinder{model_info.chemistry, inferred_selection, false};
-        } catch (const std::exception& e) {
-            spdlog::error(e.what());
-            std::exit(EXIT_FAILURE);
-        }
+        // Pass the model's ModelVariant (e.g. HAC) in here so everything matches
+        const auto inferred_selection = ModelSelection{
+                models::to_string(model_info.simplex.variant), model_info.simplex, {}};
+
+        // Return the ModelFinder which hasn't needed to inspect any data
+        return ModelFinder{model_info.chemistry, inferred_selection, false};
     }
 
     // Model complex given, inspect data to find chemistry.
