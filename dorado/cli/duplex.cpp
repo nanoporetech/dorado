@@ -274,15 +274,12 @@ int duplex(int argc, char* argv[]) {
     cli::add_minimap2_arguments(parser, alignment::dflt_options);
     cli::add_internal_arguments(parser);
 
+    std::set<fs::path> temp_model_paths;
     try {
         cli::parse(parser, argc, argv);
 
         auto device(parser.visible.get<std::string>("-x"));
         auto model(parser.visible.get<std::string>("model"));
-
-        if (model.find("fast") != std::string::npos) {
-            spdlog::warn("Fast models are currently not recommended for duplex basecalling.");
-        }
 
         auto reads(parser.visible.get<std::string>("reads"));
         std::string pairs_file = parser.visible.get<std::string>("--pairs");
