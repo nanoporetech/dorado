@@ -100,11 +100,9 @@ DuplexModels load_models(const std::string& model_arg,
     auto ways = {inferred_selection.has_mods_variant(), !mod_bases.empty(),
                  !mod_bases_models.empty()};
     if (std::count(ways.begin(), ways.end(), true) > 1) {
-        spdlog::error(
-                "only one of --modified-bases, --modified-bases-models, or modified models set "
-                "via models argument can be used at once",
-                model_arg);
-        std::exit(EXIT_FAILURE);
+        throw std::runtime_error(
+                "Only one of --modified-bases, --modified-bases-models, or modified models set "
+                "via models argument can be used at once");
     };
 
     if (inferred_selection.model.variant == ModelVariant::FAST) {
