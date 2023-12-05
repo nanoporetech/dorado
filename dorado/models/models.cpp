@@ -81,7 +81,7 @@ void suggest_models(const std::vector<ModelInfo>& models,
                     const ModelVariantPair& model,
                     const ModsVariantPair& mods) {
     if (Chemistry::NONE == chemistry) {
-        throw std::runtime_error("cannot get model without chemistry");
+        throw std::runtime_error("Cannot get model without chemistry");
     }
 
     if (mods.has_variant()) {
@@ -154,7 +154,7 @@ ModelInfo find_model(const std::vector<ModelInfo>& models,
                      const ModsVariantPair& mods,
                      bool suggestions) {
     if (Chemistry::NONE == chemistry) {
-        throw std::runtime_error("cannot get model without chemistry");
+        throw std::runtime_error("Cannot get model without chemistry");
     }
     const auto matches = find_models(models, chemistry, model, mods);
 
