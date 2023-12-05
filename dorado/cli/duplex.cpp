@@ -441,6 +441,8 @@ int duplex(int argc, char* argv[]) {
                     load_models(model, mod_bases, mod_bases_models, reads, recursive_file_loading,
                                 skip_model_compatibility_check);
 
+            temp_model_paths = models.temp_paths;
+
             // create modbase runners first so basecall runners can pick batch sizes based on available memory
             auto mod_base_runners = create_modbase_runners(
                     models.mods_model_paths, device, default_parameters.mod_base_runners_per_caller,
@@ -547,7 +549,7 @@ int duplex(int argc, char* argv[]) {
             loader.load_reads(reads, parser.visible.get<bool>("--recursive"),
                               ReadOrder::BY_CHANNEL);
 
-            utils::clean_temporary_models(models.temp_paths);
+            utils::clean_temporary_models(temp_model_paths);
         }
 
         // Wait for the pipeline to complete.  When it does, we collect
@@ -567,6 +569,7 @@ int duplex(int argc, char* argv[]) {
                                               : std::optional<std::regex>(dump_stats_filter));
         }
     } catch (const std::exception& e) {
+        utils::clean_temporary_models(temp_model_paths);
         spdlog::error(e.what());
         return 1;
     }
