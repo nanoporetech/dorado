@@ -458,9 +458,8 @@ int basecaller(int argc, char* argv[]) {
     auto ways = {model_selection.has_mods_variant(), !mod_bases.empty(), !mod_bases_models.empty()};
     if (std::count(ways.begin(), ways.end(), true) > 1) {
         spdlog::error(
-                "only one of --modified-bases, --modified-bases-models, or modified models set "
-                "via models argument can be used at once",
-                model_arg);
+                "Only one of --modified-bases, --modified-bases-models, or modified models set "
+                "via models argument can be used at once");
         std::exit(EXIT_FAILURE);
     };
 
@@ -578,6 +577,7 @@ int basecaller(int argc, char* argv[]) {
             temp_download_paths = model_finder.downloaded_models();
         } catch (std::exception& e) {
             spdlog::error(e.what());
+            utils::clean_temporary_models(model_finder.downloaded_models());
             std::exit(EXIT_FAILURE);
         }
     }
@@ -605,6 +605,7 @@ int basecaller(int argc, char* argv[]) {
               parser.visible.get<bool>("--estimate-poly-a"), model_selection);
     } catch (const std::exception& e) {
         spdlog::error("{}", e.what());
+        utils::clean_temporary_models(temp_download_paths);
         return 1;
     }
 
