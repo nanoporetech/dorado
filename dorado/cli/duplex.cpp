@@ -130,21 +130,26 @@ DuplexModels load_models(const std::string& model_arg,
         if (!mod_bases.empty()) {
             std::transform(
                     mod_bases.begin(), mod_bases.end(), std::back_inserter(mods_model_paths),
-                    [&model_arg](std::string m) {
+                    [&model_arg](const std::string& m) {
                         return std::filesystem::path(models::get_modification_model(model_arg, m));
                     });
         } else if (!mod_bases_models.empty()) {
             const auto split = utils::split(mod_bases_models, ',');
             std::transform(split.begin(), split.end(), std::back_inserter(mods_model_paths),
-                           [&](std::string m) { return std::filesystem::path(m); });
+                           [&](const std::string& m) { return std::filesystem::path(m); });
         }
 
     } else {
-        model_path = model_finder.fetch_simplex_model();
-        stereo_model_path = model_finder.fetch_stereo_model();
-        mods_model_paths = inferred_selection.has_mods_variant()
-                                   ? model_finder.fetch_mods_models()
-                                   : std::vector<std::filesystem::path>{};
+        try {
+            model_path = model_finder.fetch_simplex_model();
+            stereo_model_path = model_finder.fetch_stereo_model();
+            mods_model_paths = inferred_selection.has_mods_variant()
+                                       ? model_finder.fetch_mods_models()
+                                       : std::vector<std::filesystem::path>{};
+        } catch (const std::exception&) {
+            utils::clean_temporary_models(model_finder.downloaded_models());
+            throw;
+        }
     }
 
     const auto model_name = model_finder.get_simplex_model_name();
