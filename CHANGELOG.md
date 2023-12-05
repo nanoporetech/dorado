@@ -2,6 +2,29 @@
 
 All notable changes to Dorado will be documented in this file.
 
+# [0.5.0] (5 Dec 2023)
+
+This release of Dorado introduces new, more accurate, and faster v4.3 basecalling models. It also enables hemi-methylation basecalling of duplex reads. Dorado now supports DNA primer and adapter trimming, custom barcode arrangements and sequences, and can automatically select the correct model for your data. Furthermore, this release introduces speed and memory enhancements for basecalling on Apple silicon and various stability improvements.
+
+* 14159695955dd0d08322f26b545069fbfecb5003 - Add v4.3 basecalling models
+* b7d4b380f17d4a15ed43d8d383cc770d121fca17 - Support for modified bases with duplex basecalling (hemi-methylation)
+* 30e639cf66c1c24d0f61f1e7b91c6ce5db2cf7bf - Primer and adapter trimming
+* fb85a70609eedfe895587275d06429515a1ce61e - Enable automatic model selection
+* 16e5b6ad577f5485eb3a78c755313fc8314b2b1c - Support for custom barcode arrangements and sequences
+* 46bbfddda06a7088f7031ef79eecf03b0f04660c - Add barcode column to summary file
+* e9f060c1afff8d72fd51da4201d3062d8c8a2064 - Improve the precision of read splitting
+* 4102ffc3454c609479665a337e1ad7c2f33b9d22 - Increase speed of v4.3 model execution
+* 0a0711012ad906f94aa6e26c3a6b540e5ccbcc0e - Prevent progress bar from `--resume-from` logging excessive dots
+* 20b5637dbbf944efcc3878c5271a8bd84d2b6eab - Ensure that aligner outputs SAM when not piped to a file
+* 942a35a69832883904a1116b9b21d5c1641d0e2b - Add `MN` tag to ouput BAM to help downstream tools interpret modified base tags
+* f0ac935035423d3b913940bf1b9b7fd50d832993 - Added modbase model name to BAM files in RG header section.
+* a7fa37132b0f442ce87a154e7f2db21dfaa66933 - Improve performance of HAC and SUP on Apple silicon
+* 152d5fdc782d14b1e9853d9242051d1f7064b63c - Improvements to auto batch sizing on Apple silicon
+* b0767a6f31cd7f084491b2b3313d33d048bcc5a0 - Fix bug causing segfault with `summary` command on Windows
+* 1c2c6a9e9bcf980702afec9b9f6a17cd27c3ae07 - Make AVX `reverse_complement` implementation preserve nucleotide case
+* 4a4dd1cffe9db32e4c58e79ca6dc5dc79125f0c9 - Use updated Koi functions for small LSTM layers, final convolutional layer in LSTM models, and final linear layer
+
+
 # [0.4.3] (14 Nov 2023)
 
 This release of Dorado introduces a new RNA m6A modified base model and initial support for poly(A)/poly(T) tail length estimation. It also introduces duplex performance enhancements and bug fixes to improve the stability of Dorado.
