@@ -43,8 +43,8 @@ ModelSelection ModelComplexParser::parse(const std::string& arg) {
                 spdlog::trace("Model option: '{}' unknown - assuming path", variant_str);
                 selection.model = ModelVariantPair{model_variant};
             } else {
-                spdlog::trace("'{}' found variant: '{}' and version: '{}'", variant_str),
-                        to_string(model_variant), to_string(version);
+                spdlog::trace("'{}' found variant: '{}' and version: '{}'", variant_str,
+                              to_string(model_variant), to_string(version));
                 selection.model = ModelVariantPair{model_variant, version};
             }
         } else {
