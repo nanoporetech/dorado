@@ -19,10 +19,10 @@ If you encounter any problems building or running Dorado, please [report an issu
 
 ## Installation
 
- - [dorado-0.4.3-linux-x64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.4.3-linux-x64.tar.gz)
- - [dorado-0.4.3-linux-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.4.3-linux-arm64.tar.gz)
- - [dorado-0.4.3-osx-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.4.3-osx-arm64.zip)
- - [dorado-0.4.3-win64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.4.3-win64.zip)
+ - [dorado-0.5.0-linux-x64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.5.0-linux-x64.tar.gz)
+ - [dorado-0.5.0-linux-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.5.0-linux-arm64.tar.gz)
+ - [dorado-0.5.0-osx-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.5.0-osx-arm64.zip)
+ - [dorado-0.5.0-win64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.5.0-win64.zip)
 
 ## Platforms
 
@@ -77,12 +77,39 @@ To basecall a single file, simply replace the directory `pod5s/` with a path to 
 If basecalling is interrupted, it is possible to resume basecalling from a BAM file. To do so, use the `--resume-from` flag to specify the path to the incomplete BAM file. For example:
 
 ```
-$ dorado basecaller hac pod5s --resume-from incomplete.bam > calls.bam
+$ dorado basecaller hac pod5s/ --resume-from incomplete.bam > calls.bam
 ```
 
 `calls.bam` will contain all of the reads from `incomplete.bam` plus the new basecalls *(`incomplete.bam` can be discarded after basecalling is complete)*.
 
 **Note: it is important to choose a different filename for the BAM file you are writing to when using `--resume-from`**. If you use the same filename, the interrupted BAM file will lose the existing basecalls and basecalling will restart from the beginning.
+
+### Adapter and primer trimming
+
+#### In-line with basecalling
+
+By default, `dorado basecaller` will attempt to detect any adapter or primer sequences at the beginning and ending of reads, and remove them from the output sequence.
+
+This functionality can be altered by using either the `--trim` or `--no-trim` options with `dorado basecaller`. The `--no-trim` option will prevent the trimming of detected barcode sequences as well as the detection and trimming of adapter and primer sequences.
+
+The `--trim` option takes as its argument one of the following values:
+
+* `all` This is the the same as the default behavior. Any detected adapters or primers will be trimmed, and if barcoding is enabled then any detected barcodes will be trimmed.
+* `primers` This will result in any detected adapters or primers being trimmed, but if barcoding is enabled the barcode sequences will not be trimmed.
+* `adapters` This will result in any detected adapters being trimmed, but primers will not be trimmed, and if barcoding is enabled then barcodes will not be trimmed either.
+* `none` This is the same as using the --no-trim option. Nothing will be trimmed.
+
+#### Trimming existing datasets
+
+Existing basecalled datasets can be scanned for adapter and/or primer sequences at either end, and trim any such found sequences. To do this, run:
+
+```
+$ dorado trim --output-dir <output-folder-for-trimmed-bams> <reads>
+```
+
+`<reads>` can either be an HTS format file (e.g. FASTQ, BAM, etc.) or a stream of an HTS format (e.g. the output of Dorado basecalling).
+
+The `--no-trim-primers` option can be used to prevent the trimming of primer sequences. In this case only adapter sequences will be trimmed.
 
 ### Modified basecalling
 
@@ -95,6 +122,8 @@ $ dorado basecaller hac,5mCG_5hmCG pod5s/ > calls.bam
 ```
 
 Refer to the [DNA models](#dna-models) table's _Compatible Modifications_ column to see available modifications that can be called with the `--modified-bases` option.
+
+Modified basecalling is also supported with [Duplex basecalling](#duplex), where it produces hemi-methylation calls.
 
 ### Duplex
 
@@ -113,9 +142,12 @@ The `dx` tag in the BAM record for each read can be used to distinguish between 
 
 Dorado will report the duplex rate as the number of nucleotides in the duplex basecalls multiplied by two and divided by the total number of nucleotides in the simplex basecalls. This value is a close approximation for the proportion of nucleotides which participated in a duplex basecall.
 
-Dorado duplex previously required a separate tool to perform duplex pair detection and read splitting, but this is now integrated into Dorado.
+Duplex basecalling can be performed with modified base detection, producing hemi-methylation calls for duplex reads:
 
-Note that modified basecalling is not yet supported in duplex mode.
+```
+$ dorado duplex hac,5mCG_5hmCG pod5s/
+```
+More information on how hemi-methylation calls are represented can be found in [page 7 of the SAM specification document (version aa7440d)](https://samtools.github.io/hts-specs/SAMtags.pdf) and [Modkit documentation](https://nanoporetech.github.io/modkit/intro_pileup_hemi.html).
 
 ### Alignment
 
@@ -152,7 +184,7 @@ Dorado supports barcode classification for existing basecalls as well as produci
 
 #### In-line with basecalling
 
-In this mode, reads are classified into their barcode groups during basecalling as part of the same command. To enable this, run
+In this mode, reads are classified into their barcode groups during basecalling as part of the same command. To enable this, run:
 ```
 $ dorado basecaller <model> <reads> --kit-name <barcode-kit-name>
 ```
@@ -184,11 +216,12 @@ Existing basecalled datasets can be classified as well as demultiplexed into per
 $ dorado demux --kit-name <kit-name> --output-dir <output-folder-for-demuxed-bams> <reads>
 ```
 
-`<reads>` can either be an HTS format file (e.g. fastq, BAM, etc.) or a stream of an HTS format (e.g. the output of dorado basecalling).
+`<reads>` can either be an HTS format file (e.g. FASTQ, BAM, etc.) or a stream of an HTS format (e.g. the output of dorado basecalling).
 
 This results in multiple BAM files being generated in the output folder, one per barcode (formatted as `KITNAME_BARCODEXX.bam`) and one for all unclassified reads. As with the in-line mode, `--no-trim` and `--barcode-both-ends` are also available as additional options.
 
 Here is an example output folder
+
 ```
 $ dorado demux --kit-name SQK-RPB004 --output-dir /tmp/demux reads.fastq
 
@@ -201,15 +234,18 @@ unclassified.bam
 ```
 
 #### Using a sample sheet
+
 Dorado is able to use a sample sheet to restrict the barcode classifications to only those present, and to apply aliases to the detected classifications. This is enabled by passing the path to a sample sheet to the `--sample-sheet` argument when using the `basecaller` or `demux` commands. See [here](documentation/SampleSheets.md) for more information.
 
-### Custom barcodes
+#### Custom barcodes
 
 In addition to supporting the standard barcode kits from Oxford Nanopore, Dorado also supports specifying custom barcode kit arrangements and sequences. This is done by passing a barcode arrangement file via the `--barcode-arrangement` argument (either to `dorado demux` or `dorado basecaller`). Custom barcode sequences can optionally be specified via the `--barcode-sequences` option. See [here](documentation/CustomBarcodes.md) for more details.
 
 ### Poly(A) tail estimation
 
 Dorado has initial support for estimating poly(A) tail lengths for cDNA and RNA. Note that Oxford Nanopore cDNA reads are sequenced in two different orientations and Dorado poly(A) tail length estimation handles both (A and T homopolymers). This feature can be enabled by passing `--estimate-poly-a` to the `basecaller` command. It is disabled by default. The estimated tail length is stored in the `pt:i` tag of the output record. Reads for which the tail length could not be estimated will not have the `pt:i` tag.
+
+Note that if this option is used, then adapter and primer trimming will be automatically disabled.
 
 ## Available basecalling models
 
@@ -244,9 +280,9 @@ Below is a table of the available basecalling models and the modified basecallin
 
 | Basecalling Models | Compatible<br />Modifications | Modifications<br />Model<br />Version | Data<br />Sampling<br />Frequency |
 | :-------- | :------- | :--- | :--- |
-| **dna_r10.4.1_e8.2_400bps_fast@v4.3.0** | 5mCG_5hmCG | v2 | 5 kHz |
-| **dna_r10.4.1_e8.2_400bps_hac@v4.3.0** | 5mCG_5hmCG | v2 | 5 kHz |
-| **dna_r10.4.1_e8.2_400bps_sup@v4.3.0** | 5mCG_5hmCG<br />5mC_5hmC<br />5mC<br />6mA<br />| v3.1<br />v1<br />v2<br />v3| 5 kHz |
+| **dna_r10.4.1_e8.2_400bps_fast@v4.3.0** | | | 5 kHz |
+| **dna_r10.4.1_e8.2_400bps_hac@v4.3.0** | 5mCG_5hmCG<br />5mC_5hmC<br />6mA<br /> | v1<br />v1<br />v1 | 5 kHz |
+| **dna_r10.4.1_e8.2_400bps_sup@v4.3.0** | 5mCG_5hmCG<br />5mC_5hmC<br />6mA<br /> | v1<br />v1<br />v1 | 5 kHz |
 | dna_r10.4.1_e8.2_400bps_fast@v4.2.0 | 5mCG_5hmCG | v2 | 5 kHz |
 | dna_r10.4.1_e8.2_400bps_hac@v4.2.0 | 5mCG_5hmCG | v2 | 5 kHz |
 | dna_r10.4.1_e8.2_400bps_sup@v4.2.0 | 5mCG_5hmCG<br />5mC_5hmC<br />5mC<br />6mA<br />| v3.1<br />v1<br />v2<br />v3| 5 kHz |
