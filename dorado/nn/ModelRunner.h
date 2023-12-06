@@ -5,8 +5,6 @@
 #include "decode/Decoder.h"
 #include "utils/stats.h"
 
-#include <spdlog/spdlog.h>
-#include <toml.hpp>
 #include <torch/nn.h>
 
 #include <atomic>
