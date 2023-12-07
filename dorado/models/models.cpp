@@ -81,7 +81,7 @@ void suggest_models(const std::vector<ModelInfo>& models,
                     const ModelVariantPair& model,
                     const ModsVariantPair& mods) {
     if (Chemistry::NONE == chemistry) {
-        throw std::runtime_error("cannot get model without chemistry");
+        throw std::runtime_error("Cannot get model without chemistry");
     }
 
     if (mods.has_variant()) {
@@ -154,18 +154,16 @@ ModelInfo find_model(const std::vector<ModelInfo>& models,
                      const ModsVariantPair& mods,
                      bool suggestions) {
     if (Chemistry::NONE == chemistry) {
-        throw std::runtime_error("cannot get model without chemistry");
+        throw std::runtime_error("Cannot get model without chemistry");
     }
     const auto matches = find_models(models, chemistry, model, mods);
 
     if (matches.empty()) {
+        spdlog::error("Failed to get {} model", description);
         if (suggestions) {
-            spdlog::error("Failed to get {} model. No matches for {}", description,
-                          format_msg(chemistry, model, mods));
             suggest_models(models, description, chemistry, model, mods);
         }
-        throw std::runtime_error("Failed to get " + description + " model. No matches for " +
-                                 format_msg(chemistry, model, mods));
+        throw std::runtime_error("No matches for " + format_msg(chemistry, model, mods));
     }
 
     // Get the only match or the latest model
