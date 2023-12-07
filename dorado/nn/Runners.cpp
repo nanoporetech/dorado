@@ -15,6 +15,7 @@
 #endif  // DORADO_GPU_BUILD
 
 #include <cxxpool.h>
+#include <spdlog/spdlog.h>
 
 #include <thread>
 
@@ -39,6 +40,10 @@ std::pair<std::vector<dorado::Runner>, size_t> create_basecall_runners(
     size_t num_devices = 1;
 
     if (device == "cpu") {
+#ifdef DORADO_TX2
+        spdlog::warn("CPU basecalling is not supported on this platform. Results may be incorrect");
+#endif  // #ifdef DORADO_TX2
+
         if (batch_size == 0) {
             batch_size = 128;
         }
