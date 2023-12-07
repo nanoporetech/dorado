@@ -679,6 +679,7 @@ mlhub:sweeper:
 mlhub:dorado-integration-tests:
   extends:
     - .mlhub
+    - .on_nightly_or_manual
   script:
     - |
       curl --header "Content-Type: application/json" \
@@ -695,11 +696,6 @@ mlhub:dorado-integration-tests:
           }
       }' \
       ${MLHUB_TRIGGER_URL}
-  rules:
-      - if: $CI_PIPELINE_SOURCE == "schedule"
-      - if: $CI_PIPELINE_SOURCE == "push"
-        when: manual
-        allow_failure: true
 
 # Deploy
 
