@@ -13,6 +13,11 @@ struct sam_hdr_t;
 
 namespace dorado {
 
+struct AdapterInfo {
+    bool trim_adapters{true};
+    bool trim_primers{true};
+};
+
 struct BarcodingInfo {
     using FilterSet = std::optional<std::unordered_set<std::string>>;
     std::string kit_name{};
