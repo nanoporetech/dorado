@@ -234,8 +234,6 @@ void DataLoader::load_reads(const std::string& path,
     }
 
     auto iterate_directory = [&](const auto& iterator) {
-        bool issued_fast5_warn = false;
-        bool pod5_seen = false;
         switch (traversal_order) {
         case ReadOrder::BY_CHANNEL:
             // If traversal in channel order is required, the following algorithm
@@ -297,6 +295,8 @@ void DataLoader::load_reads(const std::string& path,
             break;
         case ReadOrder::UNRESTRICTED:
             for (const auto& entry : iterator) {
+                static bool issued_fast5_warn = false;
+                static bool pod5_seen = false;
                 if (m_loaded_read_count == m_max_reads) {
                     break;
                 }
@@ -314,7 +314,8 @@ void DataLoader::load_reads(const std::string& path,
                     }
                     if (pod5_seen) {
                         spdlog::warn(
-                                "Data folder contains both POD5 and FAST5 files. Skipping FAST5 "
+                                "Data folder contains both POD5 and FAST5 files. Please basecall "
+                                "FAST5 separately. Skipping FAST5 "
                                 "file from {}.",
                                 entry.path().string());
                     } else {
