@@ -357,7 +357,7 @@ if(NOT WIN32)
     add_dependencies(dorado_lib htslib_project)
 endif()
 
-if(NOT DORADO_LIB_ONLY)
+if(NOT DORADO_DISABLE_DORADO)
     if(NOT WIN32)
         # Set up RPATHs so we can find dependencies
         set(CMAKE_SKIP_RPATH FALSE)
@@ -533,18 +533,18 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     
     enable_warnings_as_errors(dorado_io_lib)
 
-    if (NOT DORADO_LIB_ONLY)
+    if (NOT DORADO_DISABLE_TESTS)
         add_subdirectory(tests)
     endif()
 endif()
 
-if(NOT DORADO_LIB_ONLY)
+if(NOT DORADO_DISABLE_PACKAGING)
     include(cmake/DoradoPackaging.cmake)
 endif()
 
 # For capturing test coverage.
 if (GENERATE_TEST_COVERAGE)
-    if (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" AND NOT DORADO_LIB_ONLY)
+    if (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" AND NOT DORADO_DISABLE_TESTS)
         include(cmake/CodeCoverage.cmake)
         foreach(COVERAGE_TARGET dorado_tests dorado_lib dorado_io_lib dorado_models_lib dorado_utils)
             append_coverage_compiler_flags_to_target(${COVERAGE_TARGET})
