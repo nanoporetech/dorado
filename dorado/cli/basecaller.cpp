@@ -165,7 +165,7 @@ void setup(std::vector<std::string> args,
                 {current_sink_node}, std::thread::hardware_concurrency(),
                 is_rna_model(model_config), 1000);
     }
-    if (!barcode_kits.empty()) {
+    if (!barcode_kits.empty() || custom_kit) {
         current_sink_node = pipeline_desc.add_node<BarcodeClassifierNode>(
                 {current_sink_node}, thread_allocations.barcoder_threads, barcode_kits,
                 barcode_both_ends, barcode_no_trim, std::move(allowed_barcodes),

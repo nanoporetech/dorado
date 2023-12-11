@@ -29,9 +29,12 @@ ThreadAllocations default_thread_allocations(int num_devices,
     // subset of them are enabled.
     if (enable_aligner || enable_barcoder || adapter_trimming) {
         int number_enabled = int(enable_aligner) + int(enable_barcoder) + int(adapter_trimming);
-        allocs.aligner_threads = remaining_threads * int(enable_aligner) / number_enabled;
-        allocs.barcoder_threads = remaining_threads * int(enable_barcoder) / number_enabled;
-        allocs.adapter_threads = remaining_threads * int(adapter_trimming) / number_enabled;
+        allocs.aligner_threads =
+                std::max(1, remaining_threads * int(enable_aligner) / number_enabled);
+        allocs.barcoder_threads =
+                std::max(1, remaining_threads * int(enable_barcoder) / number_enabled);
+        allocs.adapter_threads =
+                std::max(1, remaining_threads * int(adapter_trimming) / number_enabled);
     }
     return allocs;
 };
