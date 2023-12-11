@@ -234,6 +234,8 @@ void DataLoader::load_reads(const std::string& path,
     }
 
     auto iterate_directory = [&](const auto& iterator) {
+        bool issued_fast5_warn = false;
+        bool pod5_seen = false;
         switch (traversal_order) {
         case ReadOrder::BY_CHANNEL:
             // If traversal in channel order is required, the following algorithm
@@ -302,9 +304,25 @@ void DataLoader::load_reads(const std::string& path,
                 std::transform(ext.begin(), ext.end(), ext.begin(),
                                [](unsigned char c) { return std::tolower(c); });
                 if (ext == ".fast5") {
-                    load_fast5_reads_from_file(entry.path().string());
+                    if (!issued_fast5_warn) {
+                        spdlog::warn(
+                                "FAST5 support is unoptimized and will result in poor performance. "
+                                "Please convert your dataset to POD5: "
+                                "https://pod5-file-format.readthedocs.io/en/latest/docs/"
+                                "tools.html#pod5-convert-fast5");
+                        issued_fast5_warn = true;
+                    }
+                    if (pod5_seen) {
+                        spdlog::warn(
+                                "Data folder contains both POD5 and FAST5 files. Skipping FAST5 "
+                                "file from {}.",
+                                entry.path().string());
+                    } else {
+                        load_fast5_reads_from_file(entry.path().string());
+                    }
                 } else if (ext == ".pod5") {
                     load_pod5_reads_from_file(entry.path().string());
+                    pod5_seen = true;
                 }
             }
             break;
