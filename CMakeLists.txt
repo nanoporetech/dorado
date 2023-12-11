@@ -522,14 +522,8 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
             ${POD5_LIBRARIES}
             ${HDF5_C_LIBRARIES}
             ${CMAKE_DL_LIBS}
-    )
-
-    if(WIN32)
-        target_link_libraries(dorado_io_lib
-            PRIVATE
             ${ZLIB_LIBRARIES}
-        )
-    endif()
+    )
 
     set_target_properties(dorado_io_lib
         PROPERTIES
