@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-namespace dorado {
+namespace dorado::basecall {
 
 enum class Activation { SWISH, SWISH_CLAMP, TANH };
 std::string to_string(const Activation& activation);
@@ -114,4 +114,4 @@ int32_t get_model_mean_qscore_start_pos(const CRFModelConfig& model_config);
 
 bool is_rna_model(const CRFModelConfig& model_config);
 
-}  // namespace dorado
+}  // namespace dorado::basecall

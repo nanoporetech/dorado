@@ -7,7 +7,7 @@
 #include <algorithm>
 #include <thread>
 
-namespace dorado {
+namespace dorado::basecall {
 std::vector<at::Tensor> load_crf_model_weights(const std::filesystem::path &dir,
                                                bool decomposition,
                                                bool linear_layer_bias) {
@@ -73,4 +73,4 @@ size_t auto_calculate_num_runners(const CRFModelConfig &model_config,
     return std::clamp(num_runners, size_t(1), std::size_t(std::thread::hardware_concurrency()));
 }
 
-}  // namespace dorado
+}  // namespace dorado::basecall

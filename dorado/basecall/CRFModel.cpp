@@ -44,12 +44,12 @@ using Slice = torch::indexing::Slice;
 
 #if USE_KOI
 
-KoiActivation get_koi_activation(dorado::Activation act) {
-    if (act == dorado::Activation::SWISH) {
+static KoiActivation get_koi_activation(dorado::basecall::Activation act) {
+    if (act == dorado::basecall::Activation::SWISH) {
         return KOI_SWISH;
-    } else if (act == dorado::Activation::SWISH_CLAMP) {
+    } else if (act == dorado::basecall::Activation::SWISH_CLAMP) {
         return KOI_SWISH_CLAMP;
-    } else if (act == dorado::Activation::TANH) {
+    } else if (act == dorado::basecall::Activation::TANH) {
         return KOI_TANH;
     } else {
         throw std::logic_error("Unrecognised activation function id.");
@@ -101,14 +101,15 @@ static bool koi_can_use_quantised_lstm() {
     return (prop->major > 6) || (prop->major == 6 && prop->minor != 2);
 }
 
-static TensorLayout get_koi_lstm_input_layout(int layer_size, dorado::Activation activation) {
+static TensorLayout get_koi_lstm_input_layout(int layer_size,
+                                              dorado::basecall::Activation activation) {
     TensorLayout layout = TensorLayout::CUBLAS_TN2C;
     if (koi_can_use_quantised_lstm() && (layer_size == 96 || layer_size == 128)) {
         layout = TensorLayout::NTC;
     } else if (koi_can_use_cutlass() && layer_size <= 1024 && layer_size > 128 &&
                (layer_size % 128) == 0) {
-        layout = (activation == dorado::Activation::TANH) ? TensorLayout::CUTLASS_TNC_I8
-                                                          : TensorLayout::CUTLASS_TNC_F16;
+        layout = (activation == dorado::basecall::Activation::TANH) ? TensorLayout::CUTLASS_TNC_I8
+                                                                    : TensorLayout::CUTLASS_TNC_F16;
     }
 
     // Apply override (Cutlass override can only be applied if conditions are met)
@@ -280,7 +281,8 @@ ModuleHolder<AnyModule> populate_model(Model &&model,
                                        const at::TensorOptions &options,
                                        bool decomposition,
                                        bool linear_layer_bias) {
-    auto state_dict = dorado::load_crf_model_weights(path, decomposition, linear_layer_bias);
+    auto state_dict =
+            dorado::basecall::load_crf_model_weights(path, decomposition, linear_layer_bias);
     model->load_state_dict(state_dict);
     model->to(options.dtype_opt().value().toScalarType());
     model->to(options.device_opt().value());
@@ -292,7 +294,7 @@ ModuleHolder<AnyModule> populate_model(Model &&model,
 }
 }  // namespace
 
-namespace dorado {
+namespace dorado::basecall {
 
 namespace nn {
 
@@ -913,4 +915,4 @@ ModuleHolder<AnyModule> load_crf_model(const CRFModelConfig &model_config,
                           model_config.out_features.has_value(), model_config.bias);
 }
 
-}  // namespace dorado
+}  // namespace dorado::basecall

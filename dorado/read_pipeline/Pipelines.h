@@ -12,9 +12,12 @@
 namespace dorado {
 
 class ModBaseRunner;
-class ModelRunnerBase;
 
+namespace basecall {
+class ModelRunnerBase;
 using Runner = std::shared_ptr<ModelRunnerBase>;
+}  // namespace basecall
+
 using PairingParameters = std::variant<DuplexPairingParameters, std::map<std::string, std::string>>;
 
 namespace pipelines {
@@ -23,7 +26,7 @@ namespace pipelines {
 /// If source_node_handle is valid, set this to be the source of the simplex pipeline
 /// If sink_node_handle is valid, set this to be the sink of the simplex pipeline
 void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
-                             std::vector<dorado::Runner>&& runners,
+                             std::vector<dorado::basecall::Runner>&& runners,
                              std::vector<std::unique_ptr<dorado::ModBaseRunner>>&& modbase_runners,
                              size_t overlap,
                              uint32_t mean_qscore_start_pos,
@@ -39,8 +42,8 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
 /// If sink_node_handle is valid, set this to be the sink of the simplex pipeline
 void create_stereo_duplex_pipeline(
         PipelineDescriptor& pipeline_desc,
-        std::vector<dorado::Runner>&& runners,
-        std::vector<dorado::Runner>&& stereo_runners,
+        std::vector<dorado::basecall::Runner>&& runners,
+        std::vector<dorado::basecall::Runner>&& stereo_runners,
         std::vector<std::unique_ptr<dorado::ModBaseRunner>>&& modbase_runners,
         size_t overlap,
         uint32_t mean_qscore_start_pos,

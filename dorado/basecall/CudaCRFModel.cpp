@@ -19,7 +19,7 @@
 
 using namespace std::chrono_literals;
 
-namespace dorado {
+namespace dorado::basecall {
 
 class CudaCaller {
 public:
@@ -95,7 +95,7 @@ public:
         return 64;
     }
 
-    int determine_batch_size(const dorado::CRFModelConfig &model_config,
+    int determine_batch_size(const CRFModelConfig &model_config,
                              int chunk_size_in,
                              float memory_limit_fraction,
                              bool run_benchmark) {
@@ -445,4 +445,4 @@ stats::NamedStats CudaModelRunner::sample_stats() const {
     return stats;
 }
 
-}  // namespace dorado
+}  // namespace dorado::basecall

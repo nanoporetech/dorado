@@ -12,6 +12,8 @@
 #include <string>
 #include <vector>
 
+namespace {
+
 enum SublayerType { CLAMP, CONVOLUTION, LINEAR, LINEAR_CRF_ENCODER, LSTM, PERMUTE, UNRECOGNISED };
 static const std::unordered_map<std::string, SublayerType> sublayer_map = {
         {"clamp", SublayerType::CLAMP},   {"convolution", SublayerType::CONVOLUTION},
@@ -29,7 +31,8 @@ SublayerType sublayer_type(const toml::value &segment) {
     return mapping_iter->second;
 }
 
-namespace dorado {
+}  // namespace
+namespace dorado::basecall {
 
 // Parse the config to determine if there are any clamp layers
 bool has_clamp(const std::vector<toml::value> &sublayers) {
@@ -157,7 +160,7 @@ SampleType get_model_type(const std::string &model_name) {
 
 std::string SignalNormalisationParams::to_string() const {
     std::string str = "SignalNormalisationParams {";
-    str += " strategy:" + dorado::to_string(strategy);
+    str += " strategy:" + dorado::basecall::to_string(strategy);
     if (strategy == ScalingStrategy::QUANTILE) {
         str += quantile.to_string();
     } else if (strategy == ScalingStrategy::PA && standarisation.standardise) {
@@ -173,7 +176,7 @@ std::string ConvParams::to_string() const {
     str += " size:" + std::to_string(size);
     str += " winlen:" + std::to_string(winlen);
     str += " stride:" + std::to_string(stride);
-    str += " activation:" + dorado::to_string(activation);
+    str += " activation:" + dorado::basecall::to_string(activation);
     str += "}";
     return str;
 };
@@ -362,4 +365,4 @@ ScalingStrategy scaling_strategy_from_string(const std::string &strategy) {
     throw std::runtime_error("Unknown scaling strategy: `" + strategy + "`");
 }
 
-}  // namespace dorado
+}  // namespace dorado::basecall

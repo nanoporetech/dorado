@@ -10,7 +10,7 @@
 #include <atomic>
 #include <string>
 
-namespace dorado {
+namespace dorado::basecall {
 
 class ModelRunnerBase {
 public:
@@ -109,4 +109,4 @@ stats::NamedStats ModelRunner<T>::sample_stats() const {
     return stats;
 }
 
-}  // namespace dorado
+}  // namespace dorado::basecall

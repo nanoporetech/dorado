@@ -8,14 +8,16 @@
 
 namespace dorado {
 
+namespace basecall {
 struct CRFModelConfig;
 class ModelRunnerBase;
+using Runner = std::shared_ptr<ModelRunnerBase>;
+}  // namespace basecall
+
 class ModBaseRunner;
 
-using Runner = std::shared_ptr<ModelRunnerBase>;
-
-std::pair<std::vector<dorado::Runner>, size_t> create_basecall_runners(
-        const dorado::CRFModelConfig& model_config,
+std::pair<std::vector<dorado::basecall::Runner>, size_t> create_basecall_runners(
+        const dorado::basecall::CRFModelConfig& model_config,
         const std::string& device,
         size_t num_gpu_runners,
         size_t num_cpu_runners,

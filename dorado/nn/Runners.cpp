@@ -22,8 +22,8 @@
 
 namespace dorado {
 
-std::pair<std::vector<dorado::Runner>, size_t> create_basecall_runners(
-        const dorado::CRFModelConfig& model_config,
+std::pair<std::vector<dorado::basecall::Runner>, size_t> create_basecall_runners(
+        const dorado::basecall::CRFModelConfig& model_config,
         const std::string& device,
         size_t num_gpu_runners,
         size_t num_cpu_runners,
@@ -35,7 +35,7 @@ std::pair<std::vector<dorado::Runner>, size_t> create_basecall_runners(
     (void)guard_gpus;
 #endif
 
-    std::vector<dorado::Runner> runners;
+    std::vector<dorado::basecall::Runner> runners;
 
     // Default is 1 device.  CUDA path may alter this.
     size_t num_devices = 1;
@@ -49,22 +49,23 @@ std::pair<std::vector<dorado::Runner>, size_t> create_basecall_runners(
             batch_size = 128;
         }
         if (num_cpu_runners == 0) {
-            num_cpu_runners = auto_calculate_num_runners(model_config, batch_size, memory_fraction);
+            num_cpu_runners =
+                    basecall::auto_calculate_num_runners(model_config, batch_size, memory_fraction);
         }
         spdlog::debug("- CPU calling: set batch size to {}, num_cpu_runners to {}", batch_size,
                       num_cpu_runners);
 
         for (size_t i = 0; i < num_cpu_runners; i++) {
-            runners.push_back(std::make_shared<dorado::ModelRunner<dorado::CPUDecoder>>(
+            runners.push_back(std::make_shared<dorado::basecall::ModelRunner<dorado::CPUDecoder>>(
                     model_config, device, int(chunk_size), int(batch_size)));
         }
     }
 #if DORADO_GPU_BUILD
 #ifdef __APPLE__
     else if (device == "metal") {
-        auto caller = dorado::create_metal_caller(model_config, chunk_size, batch_size);
+        auto caller = basecall::create_metal_caller(model_config, chunk_size, batch_size);
         for (size_t i = 0; i < num_gpu_runners; i++) {
-            runners.push_back(std::make_shared<dorado::MetalModelRunner>(caller));
+            runners.push_back(std::make_shared<basecall::MetalModelRunner>(caller));
         }
         if (batch_size == 0) {
             spdlog::info(" - set batch size to {}", runners.back()->batch_size());
@@ -85,13 +86,13 @@ std::pair<std::vector<dorado::Runner>, size_t> create_basecall_runners(
         }
 
         cxxpool::thread_pool pool{num_devices};
-        std::vector<std::shared_ptr<CudaCaller>> callers;
-        std::vector<std::future<std::shared_ptr<dorado::CudaCaller>>> futures;
+        std::vector<std::shared_ptr<basecall::CudaCaller>> callers;
+        std::vector<std::future<std::shared_ptr<dorado::basecall::CudaCaller>>> futures;
 
         for (auto device_string : devices) {
-            futures.push_back(pool.push(dorado::create_cuda_caller, model_config, int(chunk_size),
-                                        int(batch_size), device_string, memory_fraction,
-                                        guard_gpus));
+            futures.push_back(pool.push(dorado::basecall::create_cuda_caller, model_config,
+                                        int(chunk_size), int(batch_size), device_string,
+                                        memory_fraction, guard_gpus));
         }
 
         for (auto& caller : futures) {
@@ -100,7 +101,7 @@ std::pair<std::vector<dorado::Runner>, size_t> create_basecall_runners(
 
         for (size_t j = 0; j < num_devices; j++) {
             for (size_t i = 0; i < num_gpu_runners; i++) {
-                runners.push_back(std::make_shared<dorado::CudaModelRunner>(callers[j]));
+                runners.push_back(std::make_shared<dorado::basecall::CudaModelRunner>(callers[j]));
             }
             if (batch_size == 0) {
                 spdlog::info(" - set batch size for {} to {}", devices[j],

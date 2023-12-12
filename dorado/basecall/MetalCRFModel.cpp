@@ -65,7 +65,7 @@ bool finishCommandBuffer(const char *label, MTL::CommandBuffer *cb, int try_coun
 
 }  // namespace
 
-namespace dorado {
+namespace dorado::basecall {
 
 namespace nn {
 
@@ -1098,4 +1098,4 @@ stats::NamedStats MetalModelRunner::sample_stats() const {
     return stats;
 }
 
-}  // namespace dorado
+}  // namespace dorado::basecall

@@ -10,7 +10,7 @@
 #include <memory>
 #include <vector>
 
-namespace dorado {
+namespace dorado::basecall {
 
 struct CRFModelConfig;
 class CudaCaller;
@@ -46,4 +46,4 @@ private:
     std::atomic<int64_t> m_num_batches_called = 0;
 };
 
-}  // namespace dorado
+}  // namespace dorado::basecall

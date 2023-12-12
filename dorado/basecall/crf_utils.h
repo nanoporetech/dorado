@@ -5,7 +5,7 @@
 #include <filesystem>
 #include <vector>
 
-namespace dorado {
+namespace dorado::basecall {
 
 struct CRFModelConfig;
 
@@ -17,4 +17,4 @@ size_t auto_calculate_num_runners(const CRFModelConfig& model_config,
                                   size_t batch_size,
                                   float memory_fraction);
 
-}  // namespace dorado
+}  // namespace dorado::basecall
