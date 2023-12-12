@@ -14,6 +14,7 @@ namespace dorado::basecall {
 
 class ModelRunnerBase {
 public:
+    virtual ~ModelRunnerBase() = 0;
     virtual void accept_chunk(int chunk_idx, const at::Tensor &chunk) = 0;
     virtual std::vector<DecodedChunk> call_chunks(int num_chunks) = 0;
     virtual const CRFModelConfig &config() const = 0;
@@ -25,6 +26,8 @@ public:
     virtual std::string get_name() const = 0;
     virtual stats::NamedStats sample_stats() const = 0;
 };
+
+inline ModelRunnerBase::~ModelRunnerBase() = default;
 
 using Runner = std::unique_ptr<ModelRunnerBase>;
 
