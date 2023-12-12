@@ -2,6 +2,7 @@
 
 #include "basecall/CRFModel.h"
 #include "basecall/ModelRunner.h"
+#include "basecall/crf_utils.h"
 #include "basecall/decode/CPUDecoder.h"
 #include "modbase/ModBaseRunner.h"
 

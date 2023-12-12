@@ -4,6 +4,7 @@
 #include "MetalCRFModel.h"
 
 #include "CRFModelConfig.h"
+#include "crf_utils.h"
 #include "decode/beam_search.h"
 #include "utils/math_utils.h"
 #include "utils/metal_utils.h"

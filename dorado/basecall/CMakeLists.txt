@@ -1,4 +1,6 @@
 set(LIB_SOURCE_FILES
+    crf_utils.h
+    crf_utils.cpp
     CRFModel.h
     CRFModel.cpp
     CRFModelConfig.h
