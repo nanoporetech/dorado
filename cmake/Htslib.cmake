@@ -18,6 +18,11 @@ if(NOT TARGET htslib) # lazy include guard
         find_program(MAKE_COMMAND make REQUIRED)
         find_program(AUTOCONF_COMMAND autoconf REQUIRED)
         find_program(AUTOHEADER_COMMAND autoheader REQUIRED)
+        execute_process(COMMAND bash -c "${AUTOCONF_COMMAND} -V | sed 's/.* //; q'"
+            OUTPUT_VARIABLE AUTOCONF_VERS)
+        if (AUTOCONF_VERS VERSION_GREATER_EQUAL 2.70 AND NOT CMAKE_GENERATOR STREQUAL "Xcode")
+            set(AUTOCONF_COMMAND autoreconf --install)
+        endif()
 
         # The Htslib build apparently requires BUILD_IN_SOURCE=1, which is a problem when
         # switching between build targets because htscodecs object files aren't regenerated.
