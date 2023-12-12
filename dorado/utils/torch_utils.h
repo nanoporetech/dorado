@@ -13,7 +13,7 @@ inline void make_torch_deterministic() {
     torch::globalContext().setBenchmarkCuDNN(false);
 #endif
 
-#if TORCH_VERSION_MAJOR > 1
+#if TORCH_VERSION_MAJOR > 1 || TORCH_VERSION_MINOR >= 11
     torch::globalContext().setDeterministicAlgorithms(true, false);
 #else
     torch::globalContext().setDeterministicAlgorithms(true);
