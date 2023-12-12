@@ -1,9 +1,9 @@
 #include "ModBaseCallerNode.h"
 
 #include "modbase/ModBaseContext.h"
-#include "modbase/modbase_encoder.h"
-#include "nn/ModBaseModelConfig.h"
-#include "nn/ModBaseRunner.h"
+#include "modbase/ModBaseModelConfig.h"
+#include "modbase/ModBaseRunner.h"
+#include "modbase/ModbaseEncoder.h"
 #include "utils/math_utils.h"
 #include "utils/sequence_utils.h"
 #include "utils/stats.h"

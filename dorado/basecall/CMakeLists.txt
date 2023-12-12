@@ -1,5 +1,3 @@
-
-
 set(LIB_SOURCE_FILES
     CRFModel.h
     CRFModel.cpp

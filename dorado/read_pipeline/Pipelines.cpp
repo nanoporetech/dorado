@@ -8,7 +8,7 @@
 #include "StereoDuplexEncoderNode.h"
 #include "basecall/CRFModelConfig.h"
 #include "basecall/ModelRunner.h"
-#include "nn/ModBaseRunner.h"
+#include "modbase/ModBaseRunner.h"
 #include "splitter/DuplexReadSplitter.h"
 #include "splitter/RNAReadSplitter.h"
 

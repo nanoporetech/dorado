@@ -1,6 +1,6 @@
 #include "modbase/MotifMatcher.h"
 
-#include "nn/ModBaseModelConfig.h"
+#include "modbase/ModBaseModelConfig.h"
 
 #include <catch2/catch.hpp>
 

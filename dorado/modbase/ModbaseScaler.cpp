@@ -1,4 +1,4 @@
-#include "modbase_scaler.h"
+#include "ModbaseScaler.h"
 
 #include "utils/math_utils.h"
 

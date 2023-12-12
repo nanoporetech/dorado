@@ -1,4 +1,5 @@
-#include "modbase/modbase_encoder.h"
+#include "modbase/ModbaseEncoder.h"
+
 #include "utils/sequence_utils.h"
 
 #include <catch2/catch.hpp>

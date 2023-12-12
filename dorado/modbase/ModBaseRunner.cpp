@@ -2,8 +2,8 @@
 
 #include "ModBaseModel.h"
 #include "ModBaseModelConfig.h"
-#include "modbase/MotifMatcher.h"
-#include "modbase/modbase_scaler.h"
+#include "ModbaseScaler.h"
+#include "MotifMatcher.h"
 #include "utils/sequence_utils.h"
 #include "utils/stats.h"
 #include "utils/tensor_utils.h"

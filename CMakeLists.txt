@@ -162,6 +162,7 @@ enable_testing()
 add_subdirectory(dorado/utils)
 add_subdirectory(dorado/models)
 add_subdirectory(dorado/basecall)
+add_subdirectory(dorado/modbase)
 
 if("${CUDA_VERSION}" STREQUAL "")
   set(CUDA_VERSION ${CUDAToolkit_VERSION})
@@ -180,12 +181,6 @@ set(LIB_SOURCE_FILES
     dorado/alignment/Minimap2Index.h
     dorado/alignment/Minimap2IndexSupportTypes.h
     dorado/alignment/Minimap2Options.h
-    dorado/nn/ModBaseModel.cpp
-    dorado/nn/ModBaseModel.h
-    dorado/nn/ModBaseModelConfig.cpp
-    dorado/nn/ModBaseModelConfig.h    
-    dorado/nn/ModBaseRunner.cpp
-    dorado/nn/ModBaseRunner.h
     dorado/nn/Runners.cpp
     dorado/nn/Runners.h
     dorado/read_pipeline/Pipelines.cpp
@@ -259,14 +254,6 @@ set(LIB_SOURCE_FILES
     dorado/demux/Trimmer.h
     dorado/demux/parse_custom_kit.cpp
     dorado/demux/parse_custom_kit.h
-    dorado/modbase/modbase_encoder.cpp
-    dorado/modbase/modbase_encoder.h
-    dorado/modbase/modbase_scaler.cpp
-    dorado/modbase/modbase_scaler.h
-    dorado/modbase/ModBaseContext.cpp
-    dorado/modbase/ModBaseContext.h
-    dorado/modbase/MotifMatcher.cpp
-    dorado/modbase/MotifMatcher.h
  )
 
 add_library(dorado_lib ${LIB_SOURCE_FILES})
@@ -324,6 +311,7 @@ target_link_libraries(dorado_lib
         edlib
         dorado_utils
         dorado_basecall
+        dorado_modbase
     PRIVATE
         minimap2
 )
