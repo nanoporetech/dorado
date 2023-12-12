@@ -216,7 +216,7 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
         auto caller = dorado::basecall::create_metal_caller(model_config, default_params.chunksize,
                                                             batch_size);
         for (int i = 0; i < default_params.num_runners; i++) {
-            runners.push_back(std::make_shared<dorado::basecall::MetalModelRunner>(caller));
+            runners.push_back(std::make_unique<dorado::basecall::MetalModelRunner>(caller));
         }
 #else   // __APPLE__
         auto devices = dorado::utils::parse_cuda_device_string("cuda:all");
@@ -227,7 +227,7 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
             auto caller = dorado::basecall::create_cuda_caller(
                     model_config, default_params.chunksize, int(batch_size), device, 1.f, true);
             for (int i = 0; i < default_params.num_runners; i++) {
-                runners.push_back(std::make_shared<dorado::basecall::CudaModelRunner>(caller));
+                runners.push_back(std::make_unique<dorado::basecall::CudaModelRunner>(caller));
             }
         }
 #endif  // __APPLE__
@@ -239,7 +239,7 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
         set_num_reads(5);
         set_expected_messages(5);
         batch_size = 8;
-        runners.push_back(std::make_shared<dorado::basecall::ModelRunner<dorado::CPUDecoder>>(
+        runners.push_back(std::make_unique<dorado::basecall::ModelRunner<dorado::CPUDecoder>>(
                 model_config, "cpu", default_params.chunksize, int(batch_size)));
     }
 

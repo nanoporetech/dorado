@@ -1,7 +1,6 @@
 #pragma once
 
 #include "ReadPipeline.h"
-#include "basecall/ModelRunner.h"
 #include "utils/AsyncQueue.h"
 #include "utils/stats.h"
 
@@ -13,6 +12,11 @@
 #include <vector>
 
 namespace dorado {
+
+namespace basecall {
+class ModelRunnerBase;
+using Runner = std::unique_ptr<ModelRunnerBase>;
+}  // namespace basecall
 
 class BasecallerNode : public MessageSink {
     struct BasecallingRead;

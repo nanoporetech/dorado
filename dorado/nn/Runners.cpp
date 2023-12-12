@@ -1,10 +1,7 @@
 #include "Runners.h"
 
-#include "basecall/CRFModel.h"
-#include "basecall/ModelRunner.h"
 #include "basecall/crf_utils.h"
 #include "basecall/decode/CPUDecoder.h"
-#include "modbase/ModBaseRunner.h"
 
 #if DORADO_GPU_BUILD
 #ifdef __APPLE__
@@ -56,7 +53,7 @@ std::pair<std::vector<dorado::basecall::Runner>, size_t> create_basecall_runners
                       num_cpu_runners);
 
         for (size_t i = 0; i < num_cpu_runners; i++) {
-            runners.push_back(std::make_shared<dorado::basecall::ModelRunner<dorado::CPUDecoder>>(
+            runners.push_back(std::make_unique<dorado::basecall::ModelRunner<dorado::CPUDecoder>>(
                     model_config, device, int(chunk_size), int(batch_size)));
         }
     }
@@ -65,7 +62,7 @@ std::pair<std::vector<dorado::basecall::Runner>, size_t> create_basecall_runners
     else if (device == "metal") {
         auto caller = basecall::create_metal_caller(model_config, chunk_size, batch_size);
         for (size_t i = 0; i < num_gpu_runners; i++) {
-            runners.push_back(std::make_shared<basecall::MetalModelRunner>(caller));
+            runners.push_back(std::make_unique<basecall::MetalModelRunner>(caller));
         }
         if (batch_size == 0) {
             spdlog::info(" - set batch size to {}", runners.back()->batch_size());
@@ -101,7 +98,7 @@ std::pair<std::vector<dorado::basecall::Runner>, size_t> create_basecall_runners
 
         for (size_t j = 0; j < num_devices; j++) {
             for (size_t i = 0; i < num_gpu_runners; i++) {
-                runners.push_back(std::make_shared<dorado::basecall::CudaModelRunner>(callers[j]));
+                runners.push_back(std::make_unique<dorado::basecall::CudaModelRunner>(callers[j]));
             }
             if (batch_size == 0) {
                 spdlog::info(" - set batch size for {} to {}", devices[j],
@@ -123,7 +120,7 @@ std::pair<std::vector<dorado::basecall::Runner>, size_t> create_basecall_runners
     auto model_stride = runners.front()->model_stride();
 #endif
     auto adjusted_chunk_size = runners.front()->chunk_size();
-    assert(std::all_of(runners.begin(), runners.end(), [&](auto runner) {
+    assert(std::all_of(runners.begin(), runners.end(), [&](const auto& runner) {
         return runner->model_stride() == model_stride &&
                runner->chunk_size() == adjusted_chunk_size;
     }));
@@ -134,7 +131,7 @@ std::pair<std::vector<dorado::basecall::Runner>, size_t> create_basecall_runners
         chunk_size = adjusted_chunk_size;
     }
 
-    return {runners, num_devices};
+    return {std::move(runners), num_devices};
 }
 
 std::vector<dorado::modbase::Runner> create_modbase_runners(

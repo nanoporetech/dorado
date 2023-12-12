@@ -1,5 +1,8 @@
 #pragma once
 
+#include "basecall/ModelRunner.h"
+#include "modbase/ModBaseRunner.h"
+
 #include <filesystem>
 #include <memory>
 #include <string>
@@ -10,14 +13,7 @@ namespace dorado {
 
 namespace basecall {
 struct CRFModelConfig;
-class ModelRunnerBase;
-using Runner = std::shared_ptr<ModelRunnerBase>;
 }  // namespace basecall
-
-namespace modbase {
-class ModBaseRunner;
-using Runner = std::unique_ptr<ModBaseRunner>;
-}  // namespace modbase
 
 std::pair<std::vector<dorado::basecall::Runner>, size_t> create_basecall_runners(
         const dorado::basecall::CRFModelConfig& model_config,

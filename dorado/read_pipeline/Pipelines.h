@@ -13,7 +13,7 @@ namespace dorado {
 
 namespace basecall {
 class ModelRunnerBase;
-using Runner = std::shared_ptr<ModelRunnerBase>;
+using Runner = std::unique_ptr<ModelRunnerBase>;
 }  // namespace basecall
 
 namespace modbase {

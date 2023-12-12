@@ -26,7 +26,7 @@ public:
     virtual stats::NamedStats sample_stats() const = 0;
 };
 
-using Runner = std::shared_ptr<ModelRunnerBase>;
+using Runner = std::unique_ptr<ModelRunnerBase>;
 
 template <typename T>
 class ModelRunner final : public ModelRunnerBase {

@@ -1,10 +1,12 @@
 #include "BasecallerNode.h"
 
+#include "basecall/ModelRunner.h"
 #include "basecall/decode/CPUDecoder.h"
 #include "stitch.h"
 #include "utils/stats.h"
 
 #include <nvtx3/nvtx3.hpp>
+#include <torch/nn.h>
 
 #include <algorithm>
 #include <cstdlib>
@@ -116,7 +118,7 @@ void BasecallerNode::input_worker_thread() {
 
 void BasecallerNode::basecall_current_batch(int worker_id) {
     NVTX3_FUNC_RANGE();
-    auto model_runner = m_model_runners[worker_id];
+    auto &model_runner = m_model_runners[worker_id];
     dorado::stats::Timer timer;
     auto decode_results = model_runner->call_chunks(int(m_batched_chunks[worker_id].size()));
     m_call_chunks_ms += timer.GetElapsedMS();
