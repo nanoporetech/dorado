@@ -177,9 +177,9 @@ variables:
         # See https://forum.gitlab.com/t/specifying-a-pipeline-step-as-manual-causes-its-status-to-always-be-blocked/58333/3
         allow_failure: true
 
-# Always run a job in a push pipeline or a nightly.
+# Always run this job in a nightly or if its dependency exists.
 # This is required for dependents of on_nightly_or_manual jobs since that job won't otherwise exist.
-.on_nightly_or_push:
+.on_nightly_or_if_dependency_exists:
   rules:
       - if: $CI_PIPELINE_SOURCE == "schedule"
       - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH
@@ -500,7 +500,7 @@ test_archive:linux:x86:20.04_nvidia:
   extends:
     - .linux_runner
     - .test_archive
-    - .on_nightly_or_push
+    - .on_nightly_or_if_dependency_exists
   needs:
     - build_archive:linux:x86:centos7
 
@@ -510,7 +510,7 @@ test_archive:linux:x86:18.04:
   extends:
     - .linux_runner
     - .test_archive
-    - .on_nightly_or_push
+    - .on_nightly_or_if_dependency_exists
   needs:
     - build_archive:linux:x86:centos7
 
@@ -520,7 +520,7 @@ test_archive:linux:x86:20.04:
   extends:
     - .linux_runner
     - .test_archive
-    - .on_nightly_or_push
+    - .on_nightly_or_if_dependency_exists
   needs:
     - build_archive:linux:x86:centos7
 
@@ -530,7 +530,7 @@ test_archive:linux:arm64:18.04:
   extends:
     - .linux_tegra_runner
     - .test_archive
-    - .on_nightly_or_push
+    - .on_nightly_or_if_dependency_exists
   needs:
     - build_archive:linux:arm64:bionic
 
@@ -540,7 +540,7 @@ test_archive:linux:arm64:20.04:
     - .linux_dependencies
     - .linux_orin_runner
     - .test_archive
-    - .on_nightly_or_push
+    - .on_nightly_or_if_dependency_exists
   needs:
     - build_archive:linux:arm64:focal
 
