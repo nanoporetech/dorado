@@ -11,17 +11,13 @@ if(NOT TARGET htslib) # lazy include guard
             "INTERFACE_INCLUDE_DIRECTORIES" ${HTSLIB_DIR})
         target_link_directories(htslib INTERFACE ${HTSLIB_DIR})
     else()
-        message(STATUS "Building htslib")
-        set(HTSLIB_DIR ${DORADO_3RD_PARTY_SOURCE}/htslib CACHE STRING
-                    "Path to htslib repo")
-        set(MAKE_COMMAND make)
-        set(AUTOCONF_COMMAND autoconf)
-        execute_process(COMMAND bash -c "autoconf -V | sed 's/.* //; q'"
-                OUTPUT_VARIABLE AUTOCONF_VERS)
-        if(AUTOCONF_VERS VERSION_GREATER_EQUAL 2.70)
-            set(AUTOCONF_COMMAND autoreconf --install)
-        endif()
+        message(STATUS "Setting up htslib build")
+        set(HTSLIB_DIR ${DORADO_3RD_PARTY_SOURCE}/htslib CACHE STRING "Path to htslib repo")
         set(htslib_PREFIX ${CMAKE_BINARY_DIR}/3rdparty/htslib)
+
+        find_program(MAKE_COMMAND make REQUIRED)
+        find_program(AUTOCONF_COMMAND autoconf REQUIRED)
+        find_program(AUTOHEADER_COMMAND autoheader REQUIRED)
 
         # The Htslib build apparently requires BUILD_IN_SOURCE=1, which is a problem when
         # switching between build targets because htscodecs object files aren't regenerated.
@@ -42,7 +38,7 @@ if(NOT TARGET htslib) # lazy include guard
                 PREFIX ${HTSLIB_BUILD}
                 SOURCE_DIR ${HTSLIB_BUILD}/htslib
                 BUILD_IN_SOURCE 1
-                CONFIGURE_COMMAND autoheader
+                CONFIGURE_COMMAND ${AUTOHEADER_COMMAND}
                 COMMAND ${AUTOCONF_COMMAND}
                 COMMAND ./configure --disable-bz2 --disable-lzma --disable-libcurl --disable-s3 --disable-gcs ${CONFIGURE_FLAGS}
                 BUILD_COMMAND ${MAKE_COMMAND} install prefix=${htslib_PREFIX}
