@@ -228,7 +228,7 @@ build:linux:x86:focal_coverage:
   stage: build
   image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.1
   variables:
-    BUILD_OPTIONS: "-DGITLAB_CI_TOKEN=${CI_JOB_TOKEN} -DGENERATE_TEST_COVERAGE=1"
+    BUILD_OPTIONS: "-DGENERATE_TEST_COVERAGE=1"
     BUILD_TARGET: "dorado_test_coverage"
   extends:
     - .linux_dependencies
