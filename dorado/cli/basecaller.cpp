@@ -129,8 +129,8 @@ void setup(std::vector<std::string> args,
     auto read_groups = DataLoader::load_read_groups(data_path, model_name, modbase_model_names,
                                                     recursive_file_loading);
 
-    bool adapter_trimming_enabled = (!adapter_no_trim || !primer_no_trim);
-    bool barcode_enabled = !barcode_kits.empty() || custom_kits;
+    const bool adapter_trimming_enabled = (!adapter_no_trim || !primer_no_trim);
+    const bool barcode_enabled = !barcode_kits.empty() || custom_kit;
     const auto thread_allocations = utils::default_thread_allocations(
             int(num_devices), !remora_runners.empty() ? int(num_remora_threads) : 0, enable_aligner,
             barcode_enabled, adapter_trimming_enabled);
