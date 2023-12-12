@@ -49,4 +49,6 @@ private:
     std::atomic<int64_t> m_num_batches_called = 0;
 };
 
+using Runner = std::unique_ptr<ModBaseRunner>;
+
 }  // namespace dorado::modbase

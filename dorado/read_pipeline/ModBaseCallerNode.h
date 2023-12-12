@@ -18,13 +18,15 @@ namespace dorado {
 
 namespace modbase {
 class ModBaseRunner;
-}
+using Runner = std::unique_ptr<ModBaseRunner>;
+}  // namespace modbase
+
 class ModBaseCallerNode : public MessageSink {
     struct RemoraChunk;
     struct WorkingRead;
 
 public:
-    ModBaseCallerNode(std::vector<std::unique_ptr<modbase::ModBaseRunner>> model_runners,
+    ModBaseCallerNode(std::vector<modbase::Runner> model_runners,
                       size_t remora_threads,
                       size_t block_stride,
                       size_t max_reads);
@@ -57,7 +59,7 @@ private:
     // Worker thread, processes chunk results back into the reads
     void output_worker_thread();
 
-    std::vector<std::unique_ptr<modbase::ModBaseRunner>> m_runners;
+    std::vector<modbase::Runner> m_runners;
     size_t m_num_input_workers = 0;
     size_t m_block_stride;
     size_t m_batch_size;

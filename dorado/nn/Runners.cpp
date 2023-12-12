@@ -137,7 +137,7 @@ std::pair<std::vector<dorado::basecall::Runner>, size_t> create_basecall_runners
     return {runners, num_devices};
 }
 
-std::vector<std::unique_ptr<dorado::modbase::ModBaseRunner>> create_modbase_runners(
+std::vector<dorado::modbase::Runner> create_modbase_runners(
         const std::vector<std::filesystem::path>& remora_models,
         const std::string& device,
         size_t remora_runners_per_caller,
@@ -147,7 +147,7 @@ std::vector<std::unique_ptr<dorado::modbase::ModBaseRunner>> create_modbase_runn
     }
 
     // generate model callers before nodes or it affects the speed calculations
-    std::vector<std::unique_ptr<dorado::modbase::ModBaseRunner>> remora_runners;
+    std::vector<dorado::modbase::Runner> remora_runners;
     std::vector<std::string> modbase_devices;
 
     int remora_callers = 1;

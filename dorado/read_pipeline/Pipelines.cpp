@@ -16,18 +16,17 @@
 
 namespace dorado::pipelines {
 
-void create_simplex_pipeline(
-        PipelineDescriptor& pipeline_desc,
-        std::vector<dorado::basecall::Runner>&& runners,
-        std::vector<std::unique_ptr<dorado::modbase::ModBaseRunner>>&& modbase_runners,
-        size_t overlap,
-        uint32_t mean_qscore_start_pos,
-        int scaler_node_threads,
-        bool enable_read_splitter,
-        int splitter_node_threads,
-        int modbase_node_threads,
-        NodeHandle sink_node_handle,
-        NodeHandle source_node_handle) {
+void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
+                             std::vector<dorado::basecall::Runner>&& runners,
+                             std::vector<dorado::modbase::Runner>&& modbase_runners,
+                             size_t overlap,
+                             uint32_t mean_qscore_start_pos,
+                             int scaler_node_threads,
+                             bool enable_read_splitter,
+                             int splitter_node_threads,
+                             int modbase_node_threads,
+                             NodeHandle sink_node_handle,
+                             NodeHandle source_node_handle) {
     const auto& model_config = runners.front()->config();
     auto model_stride = runners.front()->model_stride();
     auto adjusted_overlap = (overlap / model_stride) * model_stride;
@@ -106,19 +105,18 @@ void create_simplex_pipeline(
     }
 }
 
-void create_stereo_duplex_pipeline(
-        PipelineDescriptor& pipeline_desc,
-        std::vector<dorado::basecall::Runner>&& runners,
-        std::vector<dorado::basecall::Runner>&& stereo_runners,
-        std::vector<std::unique_ptr<dorado::modbase::ModBaseRunner>>&& modbase_runners,
-        size_t overlap,
-        uint32_t mean_qscore_start_pos,
-        int scaler_node_threads,
-        int splitter_node_threads,
-        int modbase_node_threads,
-        PairingParameters pairing_parameters,
-        NodeHandle sink_node_handle,
-        NodeHandle source_node_handle) {
+void create_stereo_duplex_pipeline(PipelineDescriptor& pipeline_desc,
+                                   std::vector<dorado::basecall::Runner>&& runners,
+                                   std::vector<dorado::basecall::Runner>&& stereo_runners,
+                                   std::vector<dorado::modbase::Runner>&& modbase_runners,
+                                   size_t overlap,
+                                   uint32_t mean_qscore_start_pos,
+                                   int scaler_node_threads,
+                                   int splitter_node_threads,
+                                   int modbase_node_threads,
+                                   PairingParameters pairing_parameters,
+                                   NodeHandle sink_node_handle,
+                                   NodeHandle source_node_handle) {
     const auto& model_config = runners.front()->config();
     const auto& stereo_model_config = stereo_runners.front()->config();
     std::string model_name =

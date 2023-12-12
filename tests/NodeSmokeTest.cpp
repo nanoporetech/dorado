@@ -276,7 +276,7 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
             dorado::basecall::load_crf_model_config(model_dir.m_path / model_name).stride;
 
     // Create runners
-    std::vector<std::unique_ptr<dorado::modbase::ModBaseRunner>> remora_runners;
+    std::vector<dorado::modbase::Runner> remora_runners;
     std::vector<std::string> modbase_devices;
     int batch_size = default_params.remora_batchsize;
     if (gpu) {
