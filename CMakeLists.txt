@@ -181,10 +181,10 @@ set(LIB_SOURCE_FILES
     dorado/alignment/Minimap2Index.h
     dorado/alignment/Minimap2IndexSupportTypes.h
     dorado/alignment/Minimap2Options.h
-    dorado/nn/Runners.cpp
-    dorado/nn/Runners.h
-    dorado/read_pipeline/Pipelines.cpp
-    dorado/read_pipeline/Pipelines.h
+    dorado/api/Runners.cpp
+    dorado/api/Runners.h
+    dorado/api/Pipelines.cpp
+    dorado/api/Pipelines.h
     dorado/read_pipeline/FakeDataLoader.cpp
     dorado/read_pipeline/FakeDataLoader.h
     dorado/read_pipeline/ReadPipeline.cpp
