@@ -233,10 +233,9 @@ build:linux:x86:focal_coverage:
   extends:
     - .linux_dependencies
     - .linux_runner
+    - .on_nightly_or_manual
   script:
     - *run_dorado_cmake_build
-  rules:
-      - if: $CI_PIPELINE_SOURCE == "schedule"
   artifacts:
     paths:
       - build/dorado_test_coverage/*
