@@ -104,7 +104,7 @@ The `--trim` option takes as its argument one of the following values:
 Existing basecalled datasets can be scanned for adapter and/or primer sequences at either end, and trim any such found sequences. To do this, run:
 
 ```
-$ dorado trim --output-dir <output-folder-for-trimmed-bams> <reads>
+$ dorado trim --output-dir <output-folder-for-trimmed-bams> <reads> > trimmed.bam
 ```
 
 `<reads>` can either be an HTS format file (e.g. FASTQ, BAM, etc.) or a stream of an HTS format (e.g. the output of Dorado basecalling).
@@ -145,7 +145,7 @@ Dorado will report the duplex rate as the number of nucleotides in the duplex ba
 Duplex basecalling can be performed with modified base detection, producing hemi-methylation calls for duplex reads:
 
 ```
-$ dorado duplex hac,5mCG_5hmCG pod5s/
+$ dorado duplex hac,5mCG_5hmCG pod5s/ > duplex.bam
 ```
 More information on how hemi-methylation calls are represented can be found in [page 7 of the SAM specification document (version aa7440d)](https://samtools.github.io/hts-specs/SAMtags.pdf) and [Modkit documentation](https://nanoporetech.github.io/modkit/intro_pileup_hemi.html).
 
@@ -156,14 +156,14 @@ Dorado supports aligning existing basecalls or producing aligned output directly
 To align existing basecalls, run:
 
 ```
-$ dorado aligner <index> <reads> 
+$ dorado aligner <index> <reads>  > aligned.bam
 ```
 where `index` is a reference to align to in (FASTQ/FASTA/.mmi) format and `reads` is a file in any HTS format.
 
 To basecall with alignment with duplex or simplex, run with the `--reference` option:
 
 ```
-$ dorado basecaller <model> <reads> --reference <index>
+$ dorado basecaller <model> <reads> --reference <index> > calls.bam
 ```
 
 Alignment uses [minimap2](https://github.com/lh3/minimap2) and by default uses the `map-ont` preset. This can be overridden with the `-k` and `-w` options to set kmer and window size respectively.
@@ -173,7 +173,7 @@ Alignment uses [minimap2](https://github.com/lh3/minimap2) and by default uses t
 The `dorado summary` command outputs a tab-separated file with read level sequencing information from the BAM file generated during basecalling. To create a summary, run:
 
 ```
-$ dorado summary <bam>
+$ dorado summary <bam> > summary.tsv
 ```
 
 Note that summary generation is only available for reads basecalled from POD5 files. Reads basecalled from .fast5 files are not compatible with the summary command.
@@ -186,7 +186,7 @@ Dorado supports barcode classification for existing basecalls as well as produci
 
 In this mode, reads are classified into their barcode groups during basecalling as part of the same command. To enable this, run:
 ```
-$ dorado basecaller <model> <reads> --kit-name <barcode-kit-name>
+$ dorado basecaller <model> <reads> --kit-name <barcode-kit-name> > calls.bam
 ```
 
 This will result in a single output stream with classified reads. The classification will be reflected in the read group name as well as in the `BC` tag of the output record.
