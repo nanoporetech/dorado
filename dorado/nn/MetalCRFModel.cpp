@@ -495,8 +495,10 @@ struct MetalBlockImpl : Module {
             lstm_label.back()++;
             command_buffer = m_command_queue->commandBuffer();
 
-            const int kResBufSize = dtype_bytes * kernel_simd_groups * 2 * kTileSize * kTileSize;
-            const int kOutBufSize = dtype_bytes * kernel_simd_groups * kTileSize * kTileSize;
+            const int kResBufSize =
+                    static_cast<int>(dtype_bytes * kernel_simd_groups * 2 * kTileSize * kTileSize);
+            const int kOutBufSize =
+                    static_cast<int>(dtype_bytes * kernel_simd_groups * kTileSize * kTileSize);
             const std::vector<int> tg_buffer_lens{kResBufSize, kOutBufSize};
             for (const auto &args_lstm : m_args_lstm) {
                 const std::vector<MTL::Buffer *> buffers{args_lstm.get(), mat_working_mem.get(),
@@ -650,11 +652,11 @@ public:
                      static_cast<size_t>(m_states) * sizeof(int16_t) +  // Posts
                      static_cast<size_t>(m_states) * sizeof(float));    // Back guides.
             spdlog::debug("decode_buffer_size_per_elem {}", decode_buffer_size_per_elem);
-            const int max_batch_size = std::clamp(
+            const int max_batch_size = static_cast<int>(std::clamp(
                     utils::pad_to(physical_memory / (2 * decode_buffer_size_per_elem),
                                   static_cast<size_t>(MTL_CORE_BATCH_SIZE)),
                     static_cast<size_t>(MTL_CORE_BATCH_SIZE),
-                    static_cast<size_t>(MTL_CORE_BATCH_SIZE * get_mtl_device_core_count()));
+                    static_cast<size_t>(MTL_CORE_BATCH_SIZE * get_mtl_device_core_count())));
             spdlog::debug("max_batch_size {}", max_batch_size);
 
             // Subject to the above memory constraint, impose a minimum batch size
@@ -671,8 +673,8 @@ public:
                                               static_cast<float>(kNumSmallerSizes);
             for (int i = 0; i < kNumSmallerSizes; ++i) {
                 const int test_batch_size =
-                        utils::pad_to(min_batch_size + static_cast<size_t>(i * test_size_increment),
-                                      static_cast<size_t>(MTL_CORE_BATCH_SIZE));
+                        utils::pad_to(min_batch_size + static_cast<int>(i * test_size_increment),
+                                      static_cast<int>(MTL_CORE_BATCH_SIZE));
                 test_batch_sizes.insert(test_batch_size);
             }
 
@@ -684,7 +686,7 @@ public:
 
             // Iterate through batch size candidates to find the most efficient one.
             int best_batch_size = -1;
-            int best_us_per_batch_element = std::numeric_limits<int>::max();
+            long long best_us_per_batch_element = std::numeric_limits<long long>::max();
             for (int batch_size : test_batch_sizes) {
                 spdlog::debug("Trying batch size {}", batch_size);
                 set_chunk_batch_size(model_config, state_dict, benchmark_chunk_size, batch_size);
