@@ -14,7 +14,9 @@ class ModelRunnerBase;
 using Runner = std::shared_ptr<ModelRunnerBase>;
 }  // namespace basecall
 
+namespace modbase {
 class ModBaseRunner;
+}
 
 std::pair<std::vector<dorado::basecall::Runner>, size_t> create_basecall_runners(
         const dorado::basecall::CRFModelConfig& model_config,
@@ -26,7 +28,7 @@ std::pair<std::vector<dorado::basecall::Runner>, size_t> create_basecall_runners
         float memory_fraction,
         bool guard_gpus);
 
-std::vector<std::unique_ptr<dorado::ModBaseRunner>> create_modbase_runners(
+std::vector<std::unique_ptr<dorado::modbase::ModBaseRunner>> create_modbase_runners(
         const std::vector<std::filesystem::path>& remora_models,
         const std::string& device,
         size_t remora_runners_per_caller,

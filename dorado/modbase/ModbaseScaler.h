@@ -7,7 +7,7 @@
 #include <utility>
 #include <vector>
 
-namespace dorado {
+namespace dorado::modbase {
 
 /// Calculates new scaling values for improved modified base detection
 class ModBaseScaler {
@@ -64,4 +64,4 @@ public:
     ModBaseScaler(const std::vector<float>& kmer_levels, size_t kmer_len, size_t centre_index);
 };
 
-}  // namespace dorado
+}  // namespace dorado::modbase

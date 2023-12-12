@@ -22,7 +22,7 @@
 
 using namespace std::chrono_literals;
 
-namespace dorado {
+namespace dorado::modbase {
 
 class ModBaseCaller {
 public:
@@ -354,4 +354,4 @@ stats::NamedStats ModBaseRunner::sample_stats() const {
     return stats;
 }
 
-}  // namespace dorado
+}  // namespace dorado::modbase

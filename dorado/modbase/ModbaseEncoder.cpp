@@ -9,7 +9,7 @@
 #include <cstring>
 #include <stdexcept>
 
-namespace dorado {
+namespace dorado::modbase {
 
 ModBaseEncoder::ModBaseEncoder(size_t block_stride,
                                size_t context_samples,
@@ -275,4 +275,4 @@ std::vector<int8_t> ModBaseEncoder::encode_kmer(const std::vector<int>& seq,
                                m_kmer_len);
 }
 
-}  // namespace dorado
+}  // namespace dorado::modbase

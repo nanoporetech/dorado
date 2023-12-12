@@ -4,7 +4,7 @@
 #include <string_view>
 #include <vector>
 
-namespace dorado {
+namespace dorado::modbase {
 
 struct ModBaseModelConfig;
 class MotifMatcher {
@@ -19,4 +19,4 @@ private:
     const size_t m_motif_offset;
 };
 
-}  // namespace dorado
+}  // namespace dorado::modbase

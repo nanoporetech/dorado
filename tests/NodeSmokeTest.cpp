@@ -276,7 +276,7 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
             dorado::basecall::load_crf_model_config(model_dir.m_path / model_name).stride;
 
     // Create runners
-    std::vector<std::unique_ptr<dorado::ModBaseRunner>> remora_runners;
+    std::vector<std::unique_ptr<dorado::modbase::ModBaseRunner>> remora_runners;
     std::vector<std::string> modbase_devices;
     int batch_size = default_params.remora_batchsize;
     if (gpu) {
@@ -300,10 +300,10 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
         batch_size = 8;  // reduce batch size so we're not doing work on empty entries
     }
     for (const auto& device_string : modbase_devices) {
-        auto caller = dorado::create_modbase_caller({remora_model, remora_model_6mA}, batch_size,
-                                                    device_string);
+        auto caller = dorado::modbase::create_modbase_caller({remora_model, remora_model_6mA},
+                                                             batch_size, device_string);
         for (int i = 0; i < default_params.mod_base_runners_per_caller; i++) {
-            remora_runners.push_back(std::make_unique<dorado::ModBaseRunner>(caller));
+            remora_runners.push_back(std::make_unique<dorado::modbase::ModBaseRunner>(caller));
         }
     }
 

@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-namespace dorado {
+namespace dorado::modbase {
 
 struct ModBaseModelConfig {
     std::vector<std::string> mod_long_names;  ///< The long names of the modified bases.
@@ -32,4 +32,4 @@ ModBaseModelConfig load_modbase_model_config(const std::filesystem::path & model
 ModBaseInfo get_modbase_info(
         const std::vector<std::reference_wrapper<const ModBaseModelConfig>> & base_mod_params);
 
-}  // namespace dorado
+}  // namespace dorado::modbase

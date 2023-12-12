@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-namespace dorado {
+namespace dorado::modbase {
 
 class ModBaseEncoder {
 private:
@@ -61,4 +61,4 @@ public:
     Context get_context(size_t seq_pos) const;
 };
 
-}  // namespace dorado
+}  // namespace dorado::modbase

@@ -28,7 +28,7 @@ ModuleHolder<AnyModule> populate_model(Model&& model,
 }
 }  // namespace
 
-namespace dorado {
+namespace dorado::modbase {
 
 namespace nn {
 
@@ -257,4 +257,4 @@ ModuleHolder<AnyModule> load_modbase_model(const std::filesystem::path& model_pa
     throw std::runtime_error("Unknown model type in config file.");
 }
 
-}  // namespace dorado
+}  // namespace dorado::modbase

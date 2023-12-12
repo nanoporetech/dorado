@@ -6,7 +6,7 @@
 
 #include <toml.hpp>
 
-namespace dorado {
+namespace dorado::modbase {
 
 ModBaseModelConfig load_modbase_model_config(const std::filesystem::path& model_path) {
     ModBaseModelConfig config;
@@ -130,4 +130,4 @@ ModBaseInfo get_modbase_info(
     return result;
 }
 
-}  // namespace dorado
+}  // namespace dorado::modbase

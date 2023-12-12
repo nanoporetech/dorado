@@ -11,12 +11,14 @@
 
 namespace dorado {
 
-class ModBaseRunner;
-
 namespace basecall {
 class ModelRunnerBase;
 using Runner = std::shared_ptr<ModelRunnerBase>;
 }  // namespace basecall
+
+namespace modbase {
+class ModBaseRunner;
+}
 
 using PairingParameters = std::variant<DuplexPairingParameters, std::map<std::string, std::string>>;
 
@@ -25,17 +27,18 @@ namespace pipelines {
 /// Create a simplex basecall pipeline description
 /// If source_node_handle is valid, set this to be the source of the simplex pipeline
 /// If sink_node_handle is valid, set this to be the sink of the simplex pipeline
-void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
-                             std::vector<dorado::basecall::Runner>&& runners,
-                             std::vector<std::unique_ptr<dorado::ModBaseRunner>>&& modbase_runners,
-                             size_t overlap,
-                             uint32_t mean_qscore_start_pos,
-                             int scaler_node_threads,
-                             bool enable_read_splitter,
-                             int splitter_node_threads,
-                             int modbase_threads,
-                             NodeHandle sink_node_handle,
-                             NodeHandle source_node_handle);
+void create_simplex_pipeline(
+        PipelineDescriptor& pipeline_desc,
+        std::vector<dorado::basecall::Runner>&& runners,
+        std::vector<std::unique_ptr<dorado::modbase::ModBaseRunner>>&& modbase_runners,
+        size_t overlap,
+        uint32_t mean_qscore_start_pos,
+        int scaler_node_threads,
+        bool enable_read_splitter,
+        int splitter_node_threads,
+        int modbase_threads,
+        NodeHandle sink_node_handle,
+        NodeHandle source_node_handle);
 
 /// Create a duplex basecall pipeline description
 /// If source_node_handle is valid, set this to be the source of the simplex pipeline
@@ -44,7 +47,7 @@ void create_stereo_duplex_pipeline(
         PipelineDescriptor& pipeline_desc,
         std::vector<dorado::basecall::Runner>&& runners,
         std::vector<dorado::basecall::Runner>&& stereo_runners,
-        std::vector<std::unique_ptr<dorado::ModBaseRunner>>&& modbase_runners,
+        std::vector<std::unique_ptr<dorado::modbase::ModBaseRunner>>&& modbase_runners,
         size_t overlap,
         uint32_t mean_qscore_start_pos,
         int scaler_node_threads,

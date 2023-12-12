@@ -8,7 +8,7 @@
 #include <algorithm>
 #include <iterator>
 
-namespace dorado {
+namespace dorado::modbase {
 
 ModBaseScaler::ModBaseScaler(const std::vector<float>& kmer_levels,
                              size_t kmer_len,
@@ -98,4 +98,4 @@ std::pair<float, float> ModBaseScaler::calc_offset_scale(
     return {new_offset, new_scale};
 }
 
-}  // namespace dorado
+}  // namespace dorado::modbase
