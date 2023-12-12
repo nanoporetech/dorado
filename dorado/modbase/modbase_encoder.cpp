@@ -129,12 +129,12 @@ int ModBaseEncoder::compute_sample_pos(int base_pos) const {
 namespace {
 
 // Fallback path for non-AVX / kmer lengths not specifically optimised.
-inline std::vector<int8_t> encode_kmer_generic(const std::vector<int>& seq,
-                                               const std::vector<int>& seq_mappings,
-                                               int bases_before,
-                                               int bases_after,
-                                               int context_samples,
-                                               int kmer_len) {
+std::vector<int8_t> encode_kmer_generic(const std::vector<int>& seq,
+                                        const std::vector<int>& seq_mappings,
+                                        int bases_before,
+                                        int bases_after,
+                                        int context_samples,
+                                        int kmer_len) {
     const size_t seq_len = seq.size() - bases_before - bases_after;
     std::vector<int8_t> output(kmer_len * utils::BaseInfo::NUM_BASES * context_samples);
 
