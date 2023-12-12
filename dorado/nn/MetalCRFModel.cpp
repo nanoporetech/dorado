@@ -39,7 +39,7 @@ constexpr int kTileSize = 8;
 constexpr int kSIMDGroupWidth = 32;
 
 // Returns true on success.
-bool finishCommandBuffer(const char *label, MTL::CommandBuffer *cb, int try_count) {
+bool finishCommandBuffer(std::string_view label, MTL::CommandBuffer *cb, int try_count) {
     cb->commit();
     cb->waitUntilCompleted();
 
@@ -489,9 +489,12 @@ struct MetalBlockImpl : Module {
         if (!finishCommandBuffer("convolutions", command_buffer, try_count)) {
             return nullptr;
         }
-        command_buffer = m_command_queue->commandBuffer();
 
+        std::string lstm_label = "lstm_rnn0";
         for (auto &rnn : {rnn1, rnn2, rnn3, rnn4, rnn5}) {
+            lstm_label.back()++;
+            command_buffer = m_command_queue->commandBuffer();
+
             const int kResBufSize = dtype_bytes * kernel_simd_groups * 2 * kTileSize * kTileSize;
             const int kOutBufSize = dtype_bytes * kernel_simd_groups * kTileSize * kTileSize;
             const std::vector<int> tg_buffer_lens{kResBufSize, kOutBufSize};
@@ -503,10 +506,12 @@ struct MetalBlockImpl : Module {
                                       tg_buffer_lens, kernel_thread_groups,
                                       kernel_simd_groups * kSIMDGroupWidth);
             }
+
+            if (!finishCommandBuffer(lstm_label, command_buffer, try_count)) {
+                return nullptr;
+            }
         }
-        if (!finishCommandBuffer("lstm", command_buffer, try_count)) {
-            return nullptr;
-        }
+
         command_buffer = m_command_queue->commandBuffer();
 
         // The output buffers of conv/LSTM layers are not used by the decoding, so
@@ -977,7 +982,8 @@ public:
                     m_decoder_options.beam_cut, m_decoder_options.blank_score,
                     m_decoder_options.q_shift, m_decoder_options.q_scale, score_scale);
 
-            (*task->out_chunks)[chunk_idx] = DecodedChunk{sequence, qstring, moves};
+            (*task->out_chunks)[chunk_idx] =
+                    DecodedChunk{std::move(sequence), std::move(qstring), std::move(moves)};
 
             // Wake the waiting thread which called `call_chunks()` if we're done decoding
             std::unique_lock<std::mutex> task_lock(task->mut);
