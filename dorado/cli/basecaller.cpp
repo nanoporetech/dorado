@@ -129,10 +129,11 @@ void setup(std::vector<std::string> args,
     auto read_groups = DataLoader::load_read_groups(data_path, model_name, modbase_model_names,
                                                     recursive_file_loading);
 
-    bool adapter_trimming_enabled = (!adapter_no_trim || !primer_no_trim);
+    const bool adapter_trimming_enabled = (!adapter_no_trim || !primer_no_trim);
+    const bool barcode_enabled = !barcode_kits.empty() || custom_kit;
     const auto thread_allocations = utils::default_thread_allocations(
             int(num_devices), !remora_runners.empty() ? int(num_remora_threads) : 0, enable_aligner,
-            !barcode_kits.empty(), adapter_trimming_enabled);
+            barcode_enabled, adapter_trimming_enabled);
 
     std::unique_ptr<const utils::SampleSheet> sample_sheet;
     BarcodingInfo::FilterSet allowed_barcodes;
@@ -165,7 +166,7 @@ void setup(std::vector<std::string> args,
                 {current_sink_node}, std::thread::hardware_concurrency(),
                 is_rna_model(model_config), 1000);
     }
-    if (!barcode_kits.empty()) {
+    if (barcode_enabled) {
         current_sink_node = pipeline_desc.add_node<BarcodeClassifierNode>(
                 {current_sink_node}, thread_allocations.barcoder_threads, barcode_kits,
                 barcode_both_ends, barcode_no_trim, std::move(allowed_barcodes),
