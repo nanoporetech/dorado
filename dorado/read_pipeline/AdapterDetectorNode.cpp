@@ -104,15 +104,24 @@ void AdapterDetectorNode::process_read(SimplexRead& read) {
 
     std::pair<int, int> adapter_trim_interval = {0, seqlen};
     std::pair<int, int> primer_trim_interval = {0, seqlen};
-    if (m_trim_adapters) {
+
+    // Check read for instruction on what to trim.
+    bool trim_adapters = m_trim_adapters;
+    bool trim_primers = m_trim_primers;
+    if (read.read_common.adapter_info) {
+        // The read contains instruction on what to trim, so ignore class defaults.
+        trim_adapters = read.read_common.adapter_info->trim_adapters;
+        trim_primers = read.read_common.adapter_info->trim_primers;
+    }
+    if (trim_adapters) {
         auto adapter_res = m_detector.find_adapters(read.read_common.seq);
         adapter_trim_interval = Trimmer::determine_trim_interval(adapter_res, seqlen);
     }
-    if (m_trim_primers) {
+    if (trim_primers) {
         auto primer_res = m_detector.find_primers(read.read_common.seq);
         primer_trim_interval = Trimmer::determine_trim_interval(primer_res, seqlen);
     }
-    if (m_trim_adapters || m_trim_primers) {
+    if (trim_adapters || trim_primers) {
         std::pair<int, int> trim_interval = adapter_trim_interval;
         trim_interval.first = std::max(trim_interval.first, primer_trim_interval.first);
         trim_interval.second = std::min(trim_interval.second, primer_trim_interval.second);

@@ -54,6 +54,7 @@ public:
 
     uint64_t start_time_ms;
 
+    std::shared_ptr<const AdapterInfo> adapter_info;
     std::shared_ptr<const BarcodingInfo> barcoding_info;
     std::shared_ptr<const BarcodeScoreResult> barcoding_result;
     std::size_t pre_trim_seq_length{};
