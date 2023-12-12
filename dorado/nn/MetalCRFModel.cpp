@@ -982,7 +982,8 @@ public:
                     m_decoder_options.beam_cut, m_decoder_options.blank_score,
                     m_decoder_options.q_shift, m_decoder_options.q_scale, score_scale);
 
-            (*task->out_chunks)[chunk_idx] = DecodedChunk{sequence, qstring, moves};
+            (*task->out_chunks)[chunk_idx] =
+                    DecodedChunk{std::move(sequence), std::move(qstring), std::move(moves)};
 
             // Wake the waiting thread which called `call_chunks()` if we're done decoding
             std::unique_lock<std::mutex> task_lock(task->mut);
