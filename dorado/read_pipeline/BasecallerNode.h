@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../nn/ModelRunner.h"
 #include "ReadPipeline.h"
+#include "basecall/ModelRunner.h"
 #include "utils/AsyncQueue.h"
 #include "utils/stats.h"
 

@@ -1,6 +1,6 @@
 #pragma once
 #include "ReadPipeline.h"
-#include "nn/CRFModelConfig.h"
+#include "basecall/CRFModelConfig.h"
 #include "utils/stats.h"
 
 #include <ATen/core/TensorBody.h>

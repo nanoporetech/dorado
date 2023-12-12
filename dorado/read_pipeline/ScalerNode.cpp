@@ -1,6 +1,6 @@
 #include "ScalerNode.h"
 
-#include "nn/CRFModelConfig.h"
+#include "basecall/CRFModelConfig.h"
 #include "utils/tensor_utils.h"
 #include "utils/trim.h"
 

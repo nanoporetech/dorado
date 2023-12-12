@@ -1,4 +1,4 @@
-#include "nn/CRFModelConfig.h"
+#include "basecall/CRFModelConfig.h"
 
 #include "TestUtils.h"
 

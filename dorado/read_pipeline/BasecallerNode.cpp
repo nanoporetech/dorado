@@ -1,6 +1,6 @@
 #include "BasecallerNode.h"
 
-#include "decode/CPUDecoder.h"
+#include "basecall/decode/CPUDecoder.h"
 #include "stitch.h"
 #include "utils/stats.h"
 

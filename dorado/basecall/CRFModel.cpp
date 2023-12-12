@@ -12,7 +12,7 @@
 #if DORADO_GPU_BUILD && !defined(__APPLE__)
 #define USE_KOI 1
 
-#include "../utils/cuda_utils.h"
+#include "utils/cuda_utils.h"
 
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAGuard.h>

@@ -6,9 +6,9 @@
 #include "ReadSplitNode.h"
 #include "ScalerNode.h"
 #include "StereoDuplexEncoderNode.h"
-#include "nn/CRFModelConfig.h"
+#include "basecall/CRFModelConfig.h"
+#include "basecall/ModelRunner.h"
 #include "nn/ModBaseRunner.h"
-#include "nn/ModelRunner.h"
 #include "splitter/DuplexReadSplitter.h"
 #include "splitter/RNAReadSplitter.h"
 

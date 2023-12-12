@@ -1,15 +1,15 @@
 #include "Runners.h"
 
 #include "ModBaseRunner.h"
-#include "ModelRunner.h"
-#include "decode/CPUDecoder.h"
-#include "nn/CRFModel.h"
+#include "basecall/CRFModel.h"
+#include "basecall/ModelRunner.h"
+#include "basecall/decode/CPUDecoder.h"
 
 #if DORADO_GPU_BUILD
 #ifdef __APPLE__
-#include "nn/MetalCRFModel.h"
+#include "basecall/MetalCRFModel.h"
 #else
-#include "nn/CudaCRFModel.h"
+#include "basecall/CudaCRFModel.h"
 #include "utils/cuda_utils.h"
 #endif
 #endif  // DORADO_GPU_BUILD

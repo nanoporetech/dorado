@@ -1,12 +1,12 @@
 #include "MessageSinkUtils.h"
 #include "TestUtils.h"
-#include "decode/CPUDecoder.h"
+#include "basecall/CRFModel.h"
+#include "basecall/CRFModelConfig.h"
+#include "basecall/ModelRunner.h"
+#include "basecall/decode/CPUDecoder.h"
 #include "models/models.h"
-#include "nn/CRFModel.h"
-#include "nn/CRFModelConfig.h"
 #include "nn/ModBaseModel.h"
 #include "nn/ModBaseRunner.h"
-#include "nn/ModelRunner.h"
 #include "read_pipeline/AdapterDetectorNode.h"
 #include "read_pipeline/BarcodeClassifierNode.h"
 #include "read_pipeline/BasecallerNode.h"
@@ -21,9 +21,9 @@
 
 #if DORADO_GPU_BUILD
 #ifdef __APPLE__
-#include "nn/MetalCRFModel.h"
+#include "basecall/MetalCRFModel.h"
 #else
-#include "nn/CudaCRFModel.h"
+#include "basecall/CudaCRFModel.h"
 #include "utils/cuda_utils.h"
 #endif
 #endif  // DORADO_GPU_BUILD

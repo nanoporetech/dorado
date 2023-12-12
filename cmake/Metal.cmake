@@ -5,7 +5,7 @@ find_library(APPLE_FWK_METAL Metal REQUIRED)
 find_library(IOKIT IOKit REQUIRED)
 
 set(AIR_FILES)
-set(METAL_SOURCES dorado/nn/metal/nn.metal)
+set(METAL_SOURCES dorado/basecall/metal/nn.metal)
 
 if (CMAKE_SYSTEM_NAME STREQUAL "iOS")
     set(XCRUN_SDK iphoneos)

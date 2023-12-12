@@ -1,8 +1,8 @@
 #include "GPUDecoder.h"
 
-#include "../utils/cuda_utils.h"
-#include "../utils/gpu_profiling.h"
 #include "Decoder.h"
+#include "utils/cuda_utils.h"
+#include "utils/gpu_profiling.h"
 
 #include <c10/cuda/CUDAGuard.h>
 #include <nvtx3/nvtx3.hpp>
