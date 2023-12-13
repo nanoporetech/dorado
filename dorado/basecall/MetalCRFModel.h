@@ -23,7 +23,7 @@ class MetalModelRunner final : public ModelRunnerBase {
 public:
     explicit MetalModelRunner(std::shared_ptr<MetalCaller> caller);
     void accept_chunk(int chunk_idx, const at::Tensor& chunk) final;
-    std::vector<DecodedChunk> call_chunks(int num_chunks) final;
+    std::vector<decode::DecodedChunk> call_chunks(int num_chunks) final;
     const CRFModelConfig& config() const final;
     size_t model_stride() const final;
     size_t chunk_size() const final;

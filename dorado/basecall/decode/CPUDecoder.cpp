@@ -86,7 +86,7 @@ at::Tensor backward_scores(const at::Tensor& scores, const float fixed_stay_scor
 
 }  // namespace
 
-namespace dorado {
+namespace dorado::decode {
 
 std::vector<DecodedChunk> CPUDecoder::beam_search(const at::Tensor& scores,
                                                   const int num_chunks,
@@ -144,4 +144,4 @@ std::vector<DecodedChunk> CPUDecoder::beam_search(const at::Tensor& scores,
     return chunk_results;
 }
 
-}  // namespace dorado
+}  // namespace dorado::decode

@@ -53,7 +53,7 @@ std::pair<std::vector<basecall::Runner>, size_t> create_basecall_runners(
                       num_cpu_runners);
 
         for (size_t i = 0; i < num_cpu_runners; i++) {
-            runners.push_back(std::make_unique<basecall::ModelRunner<dorado::CPUDecoder>>(
+            runners.push_back(std::make_unique<basecall::ModelRunner<decode::CPUDecoder>>(
                     model_config, device, int(chunk_size), int(batch_size)));
         }
     }

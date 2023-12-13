@@ -611,7 +611,7 @@ public:
 
         m_device = get_mtl_device();
 
-        m_decoder_options = DecoderOptions();
+        m_decoder_options = decode::DecoderOptions();
         m_decoder_options.q_shift = model_config.qbias;
         m_decoder_options.q_scale = model_config.qscale;
 
@@ -815,14 +815,14 @@ public:
     }
 
     struct NNTask {
-        NNTask(at::Tensor *input_, int num_chunks_, std::vector<DecodedChunk> *out_chunks_)
+        NNTask(at::Tensor *input_, int num_chunks_, std::vector<decode::DecodedChunk> *out_chunks_)
                 : input(input_), out_chunks(out_chunks_), num_chunks(num_chunks_) {}
 
         at::Tensor *input;
         std::mutex mut;
         std::condition_variable cv;
         bool ready{false};
-        std::vector<DecodedChunk> *out_chunks;
+        std::vector<decode::DecodedChunk> *out_chunks;
         int num_chunks;
         int decode_chunks_started{0};
         int decode_chunks_finished{0};
@@ -830,7 +830,9 @@ public:
         uint64_t decode_complete_event_id = static_cast<uint64_t>(0);
     };
 
-    void call_chunks(at::Tensor &input, int num_chunks, std::vector<DecodedChunk> &out_chunks) {
+    void call_chunks(at::Tensor &input,
+                     int num_chunks,
+                     std::vector<decode::DecodedChunk> &out_chunks) {
         if (num_chunks == 0) {
             return;
         }
@@ -971,14 +973,14 @@ public:
             const int out_buf_idx = chunk_idx / m_out_batch_size;
             const int buf_chunk_idx = chunk_idx % m_out_batch_size;
 
-            auto [sequence, qstring, moves] = beam_search_decode(
+            auto [sequence, qstring, moves] = decode::beam_search_decode(
                     m_scores_int8.at(out_buf_idx).index({Slice(), buf_chunk_idx}),
                     m_bwd.at(out_buf_idx)[buf_chunk_idx],
                     m_posts_int16.at(out_buf_idx)[buf_chunk_idx], m_decoder_options.beam_width,
                     m_decoder_options.beam_cut, m_decoder_options.blank_score,
                     m_decoder_options.q_shift, m_decoder_options.q_scale, score_scale);
 
-            (*task->out_chunks)[chunk_idx] = DecodedChunk{sequence, qstring, moves};
+            (*task->out_chunks)[chunk_idx] = decode::DecodedChunk{sequence, qstring, moves};
 
             // Wake the waiting thread which called `call_chunks()` if we're done decoding
             std::unique_lock<std::mutex> task_lock(task->mut);
@@ -1030,7 +1032,7 @@ public:
     std::mutex m_decode_lock;
     std::condition_variable m_decode_cv;
     std::vector<std::unique_ptr<std::thread>> m_decode_threads;
-    DecoderOptions m_decoder_options;
+    decode::DecoderOptions m_decoder_options;
     nn::MetalModel m_model{nullptr};
     NS::SharedPtr<MTL::Device> m_device;
     NS::SharedPtr<MTL::ComputePipelineState> m_bwd_scan_cps, m_fwd_scan_add_softmax_cps;
@@ -1077,9 +1079,9 @@ void MetalModelRunner::accept_chunk(int chunk_idx, const at::Tensor &chunk) {
     }
 }
 
-std::vector<DecodedChunk> MetalModelRunner::call_chunks(int num_chunks) {
+std::vector<decode::DecodedChunk> MetalModelRunner::call_chunks(int num_chunks) {
     ++m_num_batches_called;
-    std::vector<DecodedChunk> out_chunks(num_chunks);
+    std::vector<decode::DecodedChunk> out_chunks(num_chunks);
     m_caller->call_chunks(m_input, num_chunks, out_chunks);
     return out_chunks;
 }

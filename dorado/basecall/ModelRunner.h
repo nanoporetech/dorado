@@ -16,7 +16,7 @@ class ModelRunnerBase {
 public:
     virtual ~ModelRunnerBase() = 0;
     virtual void accept_chunk(int chunk_idx, const at::Tensor &chunk) = 0;
-    virtual std::vector<DecodedChunk> call_chunks(int num_chunks) = 0;
+    virtual std::vector<decode::DecodedChunk> call_chunks(int num_chunks) = 0;
     virtual const CRFModelConfig &config() const = 0;
     virtual size_t model_stride() const = 0;
     virtual size_t chunk_size() const = 0;
@@ -39,7 +39,7 @@ public:
                 int chunk_size,
                 int batch_size);
     void accept_chunk(int chunk_idx, const at::Tensor &chunk) final;
-    std::vector<DecodedChunk> call_chunks(int num_chunks) final;
+    std::vector<decode::DecodedChunk> call_chunks(int num_chunks) final;
     const CRFModelConfig &config() const final { return m_config; };
     size_t model_stride() const final { return m_config.stride; }
     size_t chunk_size() const final { return m_input.size(2); }
@@ -54,7 +54,7 @@ private:
     at::Tensor m_input;
     at::TensorOptions m_options;
     std::unique_ptr<T> m_decoder;
-    DecoderOptions m_decoder_options;
+    decode::DecoderOptions m_decoder_options;
     torch::nn::ModuleHolder<torch::nn::AnyModule> m_module{nullptr};
 
     // Performance monitoring stats.
@@ -69,7 +69,7 @@ ModelRunner<T>::ModelRunner(const CRFModelConfig &model_config,
                             int chunk_size,
                             int batch_size)
         : m_config(model_config) {
-    m_decoder_options = DecoderOptions();
+    m_decoder_options = decode::DecoderOptions();
     m_decoder_options.q_shift = model_config.qbias;
     m_decoder_options.q_scale = model_config.qscale;
     m_decoder = std::make_unique<T>();
@@ -85,7 +85,7 @@ ModelRunner<T>::ModelRunner(const CRFModelConfig &model_config,
 }
 
 template <typename T>
-std::vector<DecodedChunk> ModelRunner<T>::call_chunks(int num_chunks) {
+std::vector<decode::DecodedChunk> ModelRunner<T>::call_chunks(int num_chunks) {
     at::InferenceMode guard;
     dorado::stats::Timer timer;
     auto scores = m_module->forward(m_input.to(m_options.device_opt().value()));

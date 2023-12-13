@@ -4,7 +4,7 @@
 
 #include <ATen/core/TensorBody.h>
 
-namespace dorado {
+namespace dorado::decode {
 
 class CPUDecoder final : Decoder {
 public:
@@ -14,4 +14,4 @@ public:
     constexpr static at::ScalarType dtype = at::ScalarType::Float;
 };
 
-}  // namespace dorado
+}  // namespace dorado::decode

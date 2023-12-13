@@ -11,7 +11,7 @@ extern "C" {
 #include "koi.h"
 }
 
-namespace dorado {
+namespace dorado::decode {
 
 at::Tensor GPUDecoder::gpu_part(at::Tensor scores, DecoderOptions options) {
     c10::cuda::CUDAGuard device_guard(scores.device());
@@ -113,4 +113,4 @@ std::vector<DecodedChunk> GPUDecoder::beam_search(const at::Tensor &scores,
     return cpu_part(gpu_part(scores, options));
 }
 
-}  // namespace dorado
+}  // namespace dorado::decode

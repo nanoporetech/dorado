@@ -32,16 +32,16 @@ public:
             : m_config(model_config),
               m_device(device),
               m_exclusive_gpu_access(exclusive_gpu_access) {
-        m_decoder_options = DecoderOptions();
+        m_decoder_options = decode::DecoderOptions();
         m_decoder_options.q_shift = model_config.qbias;
         m_decoder_options.q_scale = model_config.qscale;
-        m_decoder = std::make_unique<GPUDecoder>(model_config.clamp ? 5.f : 0.f);
+        m_decoder = std::make_unique<decode::GPUDecoder>(model_config.clamp ? 5.f : 0.f);
         m_num_input_features = model_config.num_features;
         // adjust chunk size to be a multiple of the stride
         m_out_chunk_size = chunk_size / model_config.stride;
         m_in_chunk_size = m_out_chunk_size * model_config.stride;
 
-        m_options = at::TensorOptions().dtype(GPUDecoder::dtype).device(device);
+        m_options = at::TensorOptions().dtype(decode::GPUDecoder::dtype).device(device);
         assert(m_options.device().is_cuda());
 
         at::InferenceMode guard;
@@ -155,7 +155,7 @@ public:
         // Determine size of working memory for decoder divided by (batch_size * chunk_size)
         // Decoder needs roughly (beam_width * 4) + num_states + 10 extra bytes
         // where num_states = 4^(state_len+1)
-        // See `dorado::GPUDecoder::gpu_part()`, block beginning with `if (!initialized) {`
+        // See `dorado::decode::GPUDecoder::gpu_part()`, block beginning with `if (!initialized) {`
         // for more details.
         int64_t decode_bytes_per_chunk_timestep =
                 10 + m_decoder_options.beam_width * 4 + (1ull << (model_config.state_len * 2 + 2));
@@ -230,15 +230,15 @@ public:
         bool done{false};
     };
 
-    std::vector<DecodedChunk> call_chunks(at::Tensor &input,
-                                          at::Tensor &output,
-                                          int num_chunks,
-                                          c10::cuda::CUDAStream stream) {
+    std::vector<decode::DecodedChunk> call_chunks(at::Tensor &input,
+                                                  at::Tensor &output,
+                                                  int num_chunks,
+                                                  c10::cuda::CUDAStream stream) {
         NVTX3_FUNC_RANGE();
         c10::cuda::CUDAStreamGuard stream_guard(stream);
 
         if (num_chunks == 0) {
-            return std::vector<DecodedChunk>();
+            return std::vector<decode::DecodedChunk>();
         }
 
         auto task = std::make_shared<NNTask>(input.to(m_options.device()));
@@ -370,8 +370,8 @@ public:
     const CRFModelConfig m_config;
     std::string m_device;
     at::TensorOptions m_options;
-    std::unique_ptr<GPUDecoder> m_decoder;
-    DecoderOptions m_decoder_options;
+    std::unique_ptr<decode::GPUDecoder> m_decoder;
+    decode::DecoderOptions m_decoder_options;
     torch::nn::ModuleHolder<torch::nn::AnyModule> m_module{nullptr};
     std::atomic<bool> m_terminate{false};
     std::deque<std::shared_ptr<NNTask>> m_input_queue;
@@ -413,7 +413,7 @@ void CudaModelRunner::accept_chunk(int chunk_idx, const at::Tensor &chunk) {
     m_input.index_put_({chunk_idx, torch::indexing::Ellipsis}, chunk);
 }
 
-std::vector<DecodedChunk> CudaModelRunner::call_chunks(int num_chunks) {
+std::vector<decode::DecodedChunk> CudaModelRunner::call_chunks(int num_chunks) {
     ++m_num_batches_called;
     stats::Timer timer;
     auto decoded_chunks = m_caller->call_chunks(m_input, m_output, num_chunks, m_stream);

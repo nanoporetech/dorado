@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-namespace dorado {
+namespace dorado::decode {
 
 struct DecodedChunk {
     std::string sequence;
@@ -30,4 +30,4 @@ public:
                                                   const DecoderOptions& options) = 0;
 };
 
-}  // namespace dorado
+}  // namespace dorado::decode

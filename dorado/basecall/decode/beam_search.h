@@ -8,6 +8,7 @@
 #include <tuple>
 #include <vector>
 
+namespace dorado::decode {
 std::tuple<std::string, std::string, std::vector<uint8_t>> beam_search_decode(
         const at::Tensor& scores_t,
         const at::Tensor& back_guides_t,
@@ -18,3 +19,4 @@ std::tuple<std::string, std::string, std::vector<uint8_t>> beam_search_decode(
         float q_shift,
         float q_scale,
         float byte_score_scale);
+}  // namespace dorado::decode
