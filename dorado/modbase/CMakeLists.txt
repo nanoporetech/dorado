@@ -1,4 +1,4 @@
-set(LIB_SOURCE_FILES
+add_library(dorado_modbase STATIC
     ModBaseContext.cpp
     ModBaseContext.h
     ModbaseEncoder.cpp
@@ -15,13 +15,6 @@ set(LIB_SOURCE_FILES
     MotifMatcher.h
 )
 
-add_library(dorado_modbase STATIC ${LIB_SOURCE_FILES})
-
-target_compile_definitions(dorado_modbase
-    PUBLIC
-        DORADO_GPU_BUILD=$<BOOL:${DORADO_GPU_BUILD}>
-)
-
 target_include_directories(dorado_modbase
     SYSTEM
     PUBLIC
@@ -29,7 +22,6 @@ target_include_directories(dorado_modbase
         ${DORADO_3RD_PARTY_SOURCE}/NVTX/c/include
         ${DORADO_3RD_PARTY_SOURCE}/toml11
 )
-
 
 target_link_libraries(dorado_modbase
     PUBLIC

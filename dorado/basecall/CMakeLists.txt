@@ -1,4 +1,4 @@
-set(LIB_SOURCE_FILES
+add_library(dorado_basecall STATIC
     crf_utils.h
     crf_utils.cpp
     CRFModel.h
@@ -14,12 +14,14 @@ set(LIB_SOURCE_FILES
 
 if (DORADO_GPU_BUILD)
     if(APPLE)
-        list(APPEND LIB_SOURCE_FILES
+        target_sources(dorado_basecall
+            PRIVATE
             MetalCRFModel.h
             MetalCRFModel.cpp
         )
     else()
-        list(APPEND LIB_SOURCE_FILES
+        target_sources(dorado_basecall
+            PRIVATE
             CudaCRFModel.h
             CudaCRFModel.cpp
             decode/GPUDecoder.cpp
@@ -27,13 +29,6 @@ if (DORADO_GPU_BUILD)
         )
     endif()
 endif()
-
-add_library(dorado_basecall STATIC ${LIB_SOURCE_FILES})
-
-target_compile_definitions(dorado_basecall
-    PUBLIC
-        DORADO_GPU_BUILD=$<BOOL:${DORADO_GPU_BUILD}>
-)
 
 target_include_directories(dorado_basecall
     SYSTEM
@@ -48,8 +43,8 @@ target_link_libraries(dorado_basecall
     PUBLIC
         ${TORCH_LIBRARIES}
         dorado_utils
-        dorado_models_lib
     PRIVATE
+        dorado_models_lib
         ${KOI_LIBRARIES}
         spdlog::spdlog
 )
