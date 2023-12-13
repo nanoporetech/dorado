@@ -19,8 +19,8 @@
 
 namespace dorado {
 
-std::pair<std::vector<dorado::basecall::Runner>, size_t> create_basecall_runners(
-        const dorado::basecall::CRFModelConfig& model_config,
+std::pair<std::vector<basecall::Runner>, size_t> create_basecall_runners(
+        const basecall::CRFModelConfig& model_config,
         const std::string& device,
         size_t num_gpu_runners,
         size_t num_cpu_runners,
@@ -32,7 +32,7 @@ std::pair<std::vector<dorado::basecall::Runner>, size_t> create_basecall_runners
     (void)guard_gpus;
 #endif
 
-    std::vector<dorado::basecall::Runner> runners;
+    std::vector<basecall::Runner> runners;
 
     // Default is 1 device.  CUDA path may alter this.
     size_t num_devices = 1;
@@ -53,7 +53,7 @@ std::pair<std::vector<dorado::basecall::Runner>, size_t> create_basecall_runners
                       num_cpu_runners);
 
         for (size_t i = 0; i < num_cpu_runners; i++) {
-            runners.push_back(std::make_unique<dorado::basecall::ModelRunner<dorado::CPUDecoder>>(
+            runners.push_back(std::make_unique<basecall::ModelRunner<dorado::CPUDecoder>>(
                     model_config, device, int(chunk_size), int(batch_size)));
         }
     }
@@ -84,12 +84,12 @@ std::pair<std::vector<dorado::basecall::Runner>, size_t> create_basecall_runners
 
         cxxpool::thread_pool pool{num_devices};
         std::vector<std::shared_ptr<basecall::CudaCaller>> callers;
-        std::vector<std::future<std::shared_ptr<dorado::basecall::CudaCaller>>> futures;
+        std::vector<std::future<std::shared_ptr<basecall::CudaCaller>>> futures;
 
         for (auto device_string : devices) {
-            futures.push_back(pool.push(dorado::basecall::create_cuda_caller, model_config,
-                                        int(chunk_size), int(batch_size), device_string,
-                                        memory_fraction, guard_gpus));
+            futures.push_back(pool.push(basecall::create_cuda_caller, model_config, int(chunk_size),
+                                        int(batch_size), device_string, memory_fraction,
+                                        guard_gpus));
         }
 
         for (auto& caller : futures) {
@@ -98,7 +98,7 @@ std::pair<std::vector<dorado::basecall::Runner>, size_t> create_basecall_runners
 
         for (size_t j = 0; j < num_devices; j++) {
             for (size_t i = 0; i < num_gpu_runners; i++) {
-                runners.push_back(std::make_unique<dorado::basecall::CudaModelRunner>(callers[j]));
+                runners.push_back(std::make_unique<basecall::CudaModelRunner>(callers[j]));
             }
             if (batch_size == 0) {
                 spdlog::info(" - set batch size for {} to {}", devices[j],
@@ -134,7 +134,7 @@ std::pair<std::vector<dorado::basecall::Runner>, size_t> create_basecall_runners
     return {std::move(runners), num_devices};
 }
 
-std::vector<dorado::modbase::Runner> create_modbase_runners(
+std::vector<modbase::Runner> create_modbase_runners(
         const std::vector<std::filesystem::path>& remora_models,
         const std::string& device,
         size_t remora_runners_per_caller,
@@ -144,7 +144,7 @@ std::vector<dorado::modbase::Runner> create_modbase_runners(
     }
 
     // generate model callers before nodes or it affects the speed calculations
-    std::vector<dorado::modbase::Runner> remora_runners;
+    std::vector<modbase::Runner> remora_runners;
     std::vector<std::string> modbase_devices;
 
     int remora_callers = 1;
@@ -167,10 +167,10 @@ std::vector<dorado::modbase::Runner> create_modbase_runners(
 #endif  // DORADO_GPU_BUILD
     for (const auto& device_string : modbase_devices) {
         for (int i = 0; i < remora_callers; ++i) {
-            auto caller = dorado::modbase::create_modbase_caller(
-                    remora_models, int(remora_batch_size), device_string);
+            auto caller = modbase::create_modbase_caller(remora_models, int(remora_batch_size),
+                                                         device_string);
             for (size_t j = 0; j < remora_runners_per_caller; j++) {
-                remora_runners.push_back(std::make_unique<dorado::modbase::ModBaseRunner>(caller));
+                remora_runners.push_back(std::make_unique<modbase::ModBaseRunner>(caller));
             }
         }
     };

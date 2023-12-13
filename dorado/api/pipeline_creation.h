@@ -29,8 +29,8 @@ namespace pipelines {
 /// If source_node_handle is valid, set this to be the source of the simplex pipeline
 /// If sink_node_handle is valid, set this to be the sink of the simplex pipeline
 void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
-                             std::vector<dorado::basecall::Runner>&& runners,
-                             std::vector<dorado::modbase::Runner>&& modbase_runners,
+                             std::vector<basecall::Runner>&& runners,
+                             std::vector<modbase::Runner>&& modbase_runners,
                              size_t overlap,
                              uint32_t mean_qscore_start_pos,
                              int scaler_node_threads,
@@ -44,9 +44,9 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
 /// If source_node_handle is valid, set this to be the source of the simplex pipeline
 /// If sink_node_handle is valid, set this to be the sink of the simplex pipeline
 void create_stereo_duplex_pipeline(PipelineDescriptor& pipeline_desc,
-                                   std::vector<dorado::basecall::Runner>&& runners,
-                                   std::vector<dorado::basecall::Runner>&& stereo_runners,
-                                   std::vector<dorado::modbase::Runner>&& modbase_runners,
+                                   std::vector<basecall::Runner>&& runners,
+                                   std::vector<basecall::Runner>&& stereo_runners,
+                                   std::vector<modbase::Runner>&& modbase_runners,
                                    size_t overlap,
                                    uint32_t mean_qscore_start_pos,
                                    int scaler_node_threads,

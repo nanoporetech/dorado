@@ -15,8 +15,8 @@ namespace basecall {
 struct CRFModelConfig;
 }  // namespace basecall
 
-std::pair<std::vector<dorado::basecall::Runner>, size_t> create_basecall_runners(
-        const dorado::basecall::CRFModelConfig& model_config,
+std::pair<std::vector<basecall::Runner>, size_t> create_basecall_runners(
+        const basecall::CRFModelConfig& model_config,
         const std::string& device,
         size_t num_gpu_runners,
         size_t num_cpu_runners,
@@ -25,7 +25,7 @@ std::pair<std::vector<dorado::basecall::Runner>, size_t> create_basecall_runners
         float memory_fraction,
         bool guard_gpus);
 
-std::vector<dorado::modbase::Runner> create_modbase_runners(
+std::vector<modbase::Runner> create_modbase_runners(
         const std::vector<std::filesystem::path>& remora_models,
         const std::string& device,
         size_t remora_runners_per_caller,

@@ -20,9 +20,9 @@ using namespace std::chrono_literals;
 using Slice = at::indexing::Slice;
 
 namespace dorado {
-using SampleType = dorado::basecall::SampleType;
-using ScalingStrategy = dorado::basecall::ScalingStrategy;
-using SignalNormalisationParams = dorado::basecall::SignalNormalisationParams;
+using SampleType = basecall::SampleType;
+using ScalingStrategy = basecall::ScalingStrategy;
+using SignalNormalisationParams = basecall::SignalNormalisationParams;
 
 std::pair<float, float> ScalerNode::normalisation(const at::Tensor& x) {
     // Calculate shift and scale factors for normalisation.
