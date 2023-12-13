@@ -1,6 +1,6 @@
 #include "Version.h"
-#include "api/Pipelines.h"
-#include "api/Runners.h"
+#include "api/pipeline_creation.h"
+#include "api/runner_creation.h"
 #include "basecall/CRFModelConfig.h"
 #include "cli/cli_utils.h"
 #include "data_loader/DataLoader.h"
