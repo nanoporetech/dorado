@@ -119,7 +119,7 @@ variables:
 .build_dorado_lib_only: &build_dorado_lib_only
   stage: build
   script:
-    - cmake ${BUILD_OPTIONS} -S . -B ${BUILD_DIR} -DDORADO_LIB_ONLY=1
+    - cmake ${BUILD_OPTIONS} -S . -B ${BUILD_DIR} -DDORADO_DISABLE_DORADO=1 -DDORADO_DISABLE_TESTS=1 -DDORADO_DISABLE_PACKAGING=1
     - cmake --build ${BUILD_DIR} -j 8
   interruptible: true
 
