@@ -102,6 +102,50 @@ std::string get_string_attribute(const HighFive::Group& group, const std::string
     }
     return attribute_string;
 }
+
+std::vector<std::filesystem::directory_entry> filter_fast5_for_mixed_datasets(
+        const std::vector<std::filesystem::directory_entry>& files) {
+    std::vector<std::filesystem::directory_entry> pod5_entries;
+    std::vector<std::filesystem::directory_entry> fast5_entries;
+
+    bool issued_fast5_warn = false;
+
+    for (const auto& entry : files) {
+        auto entry_path = std::filesystem::path(entry);
+        std::string ext = entry_path.extension().string();
+        std::transform(ext.begin(), ext.end(), ext.begin(),
+                       [](unsigned char c) { return std::tolower(c); });
+        if (ext == ".fast5") {
+            if (!issued_fast5_warn) {
+                spdlog::warn(
+                        "FAST5 support is unoptimized and will result in poor performance. "
+                        "Please convert your dataset to POD5: "
+                        "https://pod5-file-format.readthedocs.io/en/latest/docs/"
+                        "tools.html#pod5-convert-fast5");
+                issued_fast5_warn = true;
+            }
+
+            fast5_entries.push_back(entry);
+        } else if (ext == ".pod5") {
+            pod5_entries.push_back(entry);
+        }
+    }
+
+    if (pod5_entries.empty()) {
+        return fast5_entries;
+    } else if (!pod5_entries.empty() && !fast5_entries.empty()) {
+        for (const auto& f5 : fast5_entries) {
+            spdlog::warn(
+                    "Data folder contains both POD5 and FAST5 files. Please basecall "
+                    "FAST5 separately. Skipping FAST5 "
+                    "file from {}.",
+                    f5.path().string());
+        }
+    }
+
+    return pod5_entries;
+}
+
 }  // namespace
 
 namespace dorado {
@@ -314,7 +358,9 @@ void DataLoader::load_reads(const std::string& path,
         }
     };
 
-    iterate_directory(fetch_directory_entries(path, recursive_file_loading));
+    auto filtered_entries =
+            filter_fast5_for_mixed_datasets(fetch_directory_entries(path, recursive_file_loading));
+    iterate_directory(filtered_entries);
 }
 
 int DataLoader::get_num_reads(std::string data_path,
