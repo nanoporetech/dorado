@@ -78,7 +78,7 @@ public:
                 auto input_seqs = torch::empty(
                         {batch_size, sig_len, utils::BaseInfo::NUM_BASES * kmer_len}, opts);
                 module_holder->forward(input_sigs, input_seqs);
-                torch::cuda::synchronize(opts.device_index());
+                torch::cuda::synchronize(opts.device().index());
             }
 #endif
         }
@@ -150,7 +150,7 @@ public:
         auto task = std::make_shared<ModBaseTask>(input_sigs.to(m_options.device()),
                                                   input_seqs.to(m_options.device()), num_chunks);
 #if DORADO_GPU_BUILD && !defined(__APPLE__)
-        task->stream = c10::cuda::getCurrentCUDAStream(m_options.device_index());
+        task->stream = c10::cuda::getCurrentCUDAStream(m_options.device().index());
 #endif
         {
             std::lock_guard<std::mutex> lock(caller_data->input_lock);
@@ -280,7 +280,7 @@ ModBaseRunner::ModBaseRunner(std::shared_ptr<ModBaseCaller> caller) : m_caller(s
 #if DORADO_GPU_BUILD && !defined(__APPLE__)
         if (m_caller->m_options.device().is_cuda()) {
             m_streams.push_back(
-                    c10::cuda::getStreamFromPool(false, m_caller->m_options.device_index()));
+                    c10::cuda::getStreamFromPool(false, m_caller->m_options.device().index()));
         } else {
             m_streams.emplace_back();
         }
