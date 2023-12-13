@@ -42,14 +42,17 @@ using namespace torch::nn;
 namespace F = torch::nn::functional;
 using Slice = torch::indexing::Slice;
 
-#if USE_KOI
+namespace dorado::basecall {
 
-static KoiActivation get_koi_activation(dorado::basecall::Activation act) {
-    if (act == dorado::basecall::Activation::SWISH) {
+namespace {
+
+#if USE_KOI
+KoiActivation get_koi_activation(Activation act) {
+    if (act == Activation::SWISH) {
         return KOI_SWISH;
-    } else if (act == dorado::basecall::Activation::SWISH_CLAMP) {
+    } else if (act == Activation::SWISH_CLAMP) {
         return KOI_SWISH_CLAMP;
-    } else if (act == dorado::basecall::Activation::TANH) {
+    } else if (act == Activation::TANH) {
         return KOI_TANH;
     } else {
         throw std::logic_error("Unrecognised activation function id.");
@@ -91,25 +94,24 @@ static KoiActivation get_koi_activation(dorado::basecall::Activation act) {
 enum class TensorLayout { NTC, TNC, CUTLASS_TNC_F16, CUTLASS_TNC_I8, CUBLAS_TN2C };
 
 // TODO: These should really be part of Koi
-static bool koi_can_use_cutlass() {
+bool koi_can_use_cutlass() {
     cudaDeviceProp *prop = at::cuda::getCurrentDeviceProperties();
     return ((prop->major == 8 || prop->major == 9) && prop->minor == 0);
 }
-static bool koi_can_use_quantised_lstm() {
+bool koi_can_use_quantised_lstm() {
     cudaDeviceProp *prop = at::cuda::getCurrentDeviceProperties();
     // DP4A is supported on Pascal and later, except for TX2 (sm_62).
     return (prop->major > 6) || (prop->major == 6 && prop->minor != 2);
 }
 
-static TensorLayout get_koi_lstm_input_layout(int layer_size,
-                                              dorado::basecall::Activation activation) {
+TensorLayout get_koi_lstm_input_layout(int layer_size, Activation activation) {
     TensorLayout layout = TensorLayout::CUBLAS_TN2C;
     if (koi_can_use_quantised_lstm() && (layer_size == 96 || layer_size == 128)) {
         layout = TensorLayout::NTC;
     } else if (koi_can_use_cutlass() && layer_size <= 1024 && layer_size > 128 &&
                (layer_size % 128) == 0) {
-        layout = (activation == dorado::basecall::Activation::TANH) ? TensorLayout::CUTLASS_TNC_I8
-                                                                    : TensorLayout::CUTLASS_TNC_F16;
+        layout = (activation == Activation::TANH) ? TensorLayout::CUTLASS_TNC_I8
+                                                  : TensorLayout::CUTLASS_TNC_F16;
     }
 
     // Apply override (Cutlass override can only be applied if conditions are met)
@@ -274,15 +276,13 @@ public:
 
 #endif  // if USE_KOI
 
-namespace {
 template <class Model>
 ModuleHolder<AnyModule> populate_model(Model &&model,
                                        const std::filesystem::path &path,
                                        const at::TensorOptions &options,
                                        bool decomposition,
                                        bool linear_layer_bias) {
-    auto state_dict =
-            dorado::basecall::load_crf_model_weights(path, decomposition, linear_layer_bias);
+    auto state_dict = load_crf_model_weights(path, decomposition, linear_layer_bias);
     model->load_state_dict(state_dict);
     model->to(options.dtype_opt().value().toScalarType());
     model->to(options.device_opt().value());
@@ -292,9 +292,8 @@ ModuleHolder<AnyModule> populate_model(Model &&model,
     auto holder = ModuleHolder<AnyModule>(module);
     return holder;
 }
-}  // namespace
 
-namespace dorado::basecall {
+}  // namespace
 
 namespace nn {
 
