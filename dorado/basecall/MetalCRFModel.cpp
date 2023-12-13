@@ -4,6 +4,7 @@
 #include "MetalCRFModel.h"
 
 #include "CRFModelConfig.h"
+#include "crf_utils.h"
 #include "decode/beam_search.h"
 #include "utils/math_utils.h"
 #include "utils/metal_utils.h"
@@ -828,7 +829,7 @@ public:
         std::mutex mut;
         std::condition_variable cv;
         bool ready{false};
-        std::vector<DecodedChunk> *out_chunks;
+        std::vector<decode::DecodedChunk> *out_chunks;
         int num_chunks;
         int decode_chunks_started{0};
         int decode_chunks_finished{0};
