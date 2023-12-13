@@ -815,12 +815,15 @@ std::string barcode_kits_list_str() {
 
 std::string normalize_barcode_name(const std::string& barcode_name) {
     std::string digits = "";
-    for (const auto& c : barcode_name) {
-        if (std::isdigit(static_cast<unsigned char>(c))) {
-            digits += c;
+    for (auto rit = barcode_name.rbegin(); rit != barcode_name.rend(); ++rit) {
+        if (std::isdigit(static_cast<unsigned char>(*rit))) {
+            digits += *rit;
+        } else {
+            break;
         }
     }
 
+    std::reverse(digits.begin(), digits.end());
     return "barcode" + digits;
 }
 
