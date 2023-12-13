@@ -3,7 +3,9 @@
 #include "utils/stats.h"
 
 #include <ATen/core/TensorBody.h>
-
+#if DORADO_GPU_BUILD && !defined(__APPLE__)
+#include <c10/cuda/CUDAStream.h>
+#endif
 #include <atomic>
 #include <filesystem>
 #include <string>
@@ -44,6 +46,7 @@ private:
     std::shared_ptr<ModBaseCaller> m_caller;
     std::vector<at::Tensor> m_input_sigs;
     std::vector<at::Tensor> m_input_seqs;
+    std::vector<c10::optional<c10::Stream>> m_streams;
 
     // Performance monitoring stats.
     std::atomic<int64_t> m_num_batches_called = 0;
