@@ -35,6 +35,10 @@
 #include <functional>
 #include <random>
 
+#ifndef _WIN32
+#include <unistd.h>
+#endif
+
 namespace fs = std::filesystem;
 
 namespace {
