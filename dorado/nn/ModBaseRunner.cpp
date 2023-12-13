@@ -188,7 +188,7 @@ public:
             input_lock.unlock();
 
 #if DORADO_GPU_BUILD && !defined(__APPLE__)
-            // If caller_data->stream is set, sets the current stream to caller_data->stream, and the current device to
+            // If task->stream is set, sets the current stream to task->stream, and the current device to
             // the device associated with the stream. Resets both to their prior state on destruction
             c10::cuda::OptionalCUDAStreamGuard stream_guard(task->stream);
 #endif
