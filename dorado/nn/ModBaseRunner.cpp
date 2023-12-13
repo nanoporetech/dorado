@@ -36,6 +36,9 @@ public:
         at::Tensor out;
         bool done{false};
         int num_chunks;
+#if DORADO_GPU_BUILD && !defined(__APPLE__)
+        c10::optional<c10::Stream> stream;
+#endif
     };
 
     struct ModBaseData {
@@ -46,9 +49,6 @@ public:
         std::deque<std::shared_ptr<ModBaseTask>> input_queue;
         std::mutex input_lock;
         std::condition_variable input_cv;
-#if DORADO_GPU_BUILD && !defined(__APPLE__)
-        c10::optional<c10::Stream> stream;
-#endif
         const int batch_size;
 
         std::vector<size_t> get_motif_hits(const std::string& seq) const {
@@ -70,8 +70,6 @@ public:
 
 #if DORADO_GPU_BUILD && !defined(__APPLE__)
             if (opts.device().is_cuda()) {
-                stream = c10::cuda::getStreamFromPool(false, opts.device().index());
-
                 auto sig_len = static_cast<int64_t>(params.context_before + params.context_after);
                 auto kmer_len = params.bases_after + params.bases_before + 1;
 
@@ -149,12 +147,13 @@ public:
                            int num_chunks) {
         NVTX3_FUNC_RANGE();
         auto& caller_data = m_caller_data[model_id];
-
-#if DORADO_GPU_BUILD && !defined(__APPLE__)
-        c10::cuda::OptionalCUDAStreamGuard stream_guard(caller_data->stream);
-#endif
         auto task = std::make_shared<ModBaseTask>(input_sigs.to(m_options.device()),
                                                   input_seqs.to(m_options.device()), num_chunks);
+#if DORADO_GPU_BUILD && !defined(__APPLE__)
+        if (m_options.device().is_cuda()) {
+            task->stream = c10::cuda::getCurrentCUDAStream(m_options.device().index());
+        }
+#endif
         {
             std::lock_guard<std::mutex> lock(caller_data->input_lock);
             caller_data->input_queue.push_front(task);
@@ -171,17 +170,10 @@ public:
 
     void modbase_task_thread_fn(size_t model_id) {
         auto& caller_data = m_caller_data[model_id];
-#if DORADO_GPU_BUILD && !defined(__APPLE__)
-        const bool has_stream = caller_data->stream.has_value();
-#endif
         while (true) {
             nvtx3::scoped_range loop{"modbase_task_thread_fn"};
             at::InferenceMode guard;
-#if DORADO_GPU_BUILD && !defined(__APPLE__)
-            // If caller_data->stream is set, sets the current stream to caller_data->stream, and the current device to
-            // the device associated with the stream. Resets both to their prior state on destruction
-            c10::cuda::OptionalCUDAStreamGuard stream_guard(caller_data->stream);
-#endif
+
             std::unique_lock<std::mutex> input_lock(caller_data->input_lock);
             while (caller_data->input_queue.empty() && !m_terminate.load()) {
                 caller_data->input_cv.wait_for(input_lock, 100ms);
@@ -195,12 +187,18 @@ public:
             caller_data->input_queue.pop_back();
             input_lock.unlock();
 
+#if DORADO_GPU_BUILD && !defined(__APPLE__)
+            // If task->stream is set, sets the current stream to task->stream, and the current device to
+            // the device associated with the stream. Resets both to their prior state on destruction
+            c10::cuda::OptionalCUDAStreamGuard stream_guard(task->stream);
+#endif
+
             std::unique_lock<std::mutex> task_lock(task->mut);
             stats::Timer timer;
             task->out = caller_data->module_holder->forward(task->input_sigs, task->input_seqs);
 #if DORADO_GPU_BUILD && !defined(__APPLE__)
-            if (has_stream) {
-                caller_data->stream->synchronize();
+            if (task->stream.has_value()) {
+                task->stream->synchronize();
             }
             // Only meaningful if we're syncing the stream.
             m_model_ms += timer.GetElapsedMS();
@@ -281,6 +279,14 @@ ModBaseRunner::ModBaseRunner(std::shared_ptr<ModBaseCaller> caller) : m_caller(s
         m_input_seqs.push_back(torch::empty(
                 {caller_data->batch_size, sig_len, utils::BaseInfo::NUM_BASES * kmer_len},
                 seq_input_options));
+#if DORADO_GPU_BUILD && !defined(__APPLE__)
+        if (m_caller->m_options.device().is_cuda()) {
+            m_streams.push_back(
+                    c10::cuda::getStreamFromPool(false, m_caller->m_options.device().index()));
+        } else {
+            m_streams.emplace_back();
+        }
+#endif
     }
 }
 
@@ -311,6 +317,9 @@ void ModBaseRunner::accept_chunk(int model_id,
 }
 
 at::Tensor ModBaseRunner::call_chunks(int model_id, int num_chunks) {
+#if DORADO_GPU_BUILD && !defined(__APPLE__)
+    c10::cuda::OptionalCUDAStreamGuard guard(m_streams[model_id]);
+#endif
     return m_caller->call_chunks(model_id, m_input_sigs[model_id], m_input_seqs[model_id],
                                  num_chunks);
 }

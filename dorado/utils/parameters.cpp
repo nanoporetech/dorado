@@ -15,7 +15,7 @@ ThreadAllocations default_thread_allocations(int num_devices,
     allocs.writer_threads = num_devices * 2;
     allocs.read_converter_threads = num_devices * 2;
     allocs.read_filter_threads = num_devices * 2;
-    allocs.remora_threads = num_remora_threads;
+    allocs.remora_threads = num_devices * num_remora_threads;
     allocs.scaler_node_threads = num_devices * 4;
     allocs.splitter_node_threads = num_devices;
     allocs.loader_threads = num_devices;
