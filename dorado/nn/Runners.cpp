@@ -61,7 +61,7 @@ std::pair<std::vector<dorado::Runner>, size_t> create_basecall_runners(
 #if DORADO_GPU_BUILD
 #ifdef __APPLE__
     else if (device == "metal") {
-        auto caller = dorado::create_metal_caller(model_config, chunk_size, batch_size);
+        auto caller = dorado::create_metal_caller(model_config, int(chunk_size), int(batch_size));
         for (size_t i = 0; i < num_gpu_runners; i++) {
             runners.push_back(std::make_shared<dorado::MetalModelRunner>(caller));
         }
