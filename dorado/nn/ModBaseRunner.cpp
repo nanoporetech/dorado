@@ -150,7 +150,9 @@ public:
         auto task = std::make_shared<ModBaseTask>(input_sigs.to(m_options.device()),
                                                   input_seqs.to(m_options.device()), num_chunks);
 #if DORADO_GPU_BUILD && !defined(__APPLE__)
-        task->stream = c10::cuda::getCurrentCUDAStream(m_options.device().index());
+        if (m_options.device().is_cuda()) {
+            task->stream = c10::cuda::getCurrentCUDAStream(m_options.device().index());
+        }
 #endif
         {
             std::lock_guard<std::mutex> lock(caller_data->input_lock);
