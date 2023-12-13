@@ -292,7 +292,6 @@ public:
 
             std::unique_lock<std::mutex> task_lock(task->mut);
 
-#ifndef DORADO_TX2
             auto device_stats =
                     c10::cuda::CUDACachingAllocator::getDeviceStats(m_options.device().index());
 
@@ -311,10 +310,14 @@ public:
                     print_stat(device_stats.allocated_bytes),
                     print_stat(device_stats.reserved_bytes), print_stat(device_stats.active_bytes),
                     print_stat(device_stats.inactive_split_bytes),
-                    print_stat(device_stats.requested_bytes), device_stats.num_alloc_retries,
-                    device_stats.num_alloc_retries, device_stats.num_ooms,
-                    device_stats.max_split_size);
-#endif  // #ifndef DORADO_TX2
+#if TORCH_VERSION_MAJOR >= 2
+                    print_stat(device_stats.requested_bytes),
+#else
+                    "unknown",
+#endif  // TORCH_VERSION_MAJOR > 1
+                    device_stats.num_alloc_retries, device_stats.num_alloc_retries,
+                    device_stats.num_ooms, device_stats.max_split_size);
+
             auto run_basecalling = [&]() {
                 stats::Timer timer;
                 auto scores = m_module->forward(task->input);

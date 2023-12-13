@@ -129,12 +129,12 @@ int ModBaseEncoder::compute_sample_pos(int base_pos) const {
 namespace {
 
 // Fallback path for non-AVX / kmer lengths not specifically optimised.
-inline std::vector<int8_t> encode_kmer_generic(const std::vector<int>& seq,
-                                               const std::vector<int>& seq_mappings,
-                                               int bases_before,
-                                               int bases_after,
-                                               int context_samples,
-                                               int kmer_len) {
+std::vector<int8_t> encode_kmer_generic(const std::vector<int>& seq,
+                                        const std::vector<int>& seq_mappings,
+                                        int bases_before,
+                                        int bases_after,
+                                        int context_samples,
+                                        int kmer_len) {
     const size_t seq_len = seq.size() - bases_before - bases_after;
     std::vector<int8_t> output(kmer_len * utils::BaseInfo::NUM_BASES * context_samples);
 
@@ -146,7 +146,7 @@ inline std::vector<int8_t> encode_kmer_generic(const std::vector<int>& seq,
         for (int i = base_st; i < base_en; ++i) {
             for (size_t kmer_pos = 0; kmer_pos < size_t(kmer_len); ++kmer_pos) {
                 auto base = seq[seq_pos + kmer_pos];
-                uint32_t base_oh = (base == -1) ? 0ul : (1ul << (base << 3));
+                uint32_t base_oh = (base == -1) ? uint32_t{} : (uint32_t{1} << (base << 3));
                 // memcpy will be translated to a single 32 bit write.
                 std::memcpy(output_ptr, &base_oh, sizeof(base_oh));
                 output_ptr += 4;

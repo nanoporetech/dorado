@@ -326,7 +326,7 @@ float beam_search(const T* const scores,
             // 8 fold unrolled version has the small upside that both loads
             // can be done with a single ldp instruction.
             const int kUnroll = 8;
-            for (int i = new_elem_count / kUnroll; i; --i) {
+            for (int i = int(new_elem_count) / kUnroll; i; --i) {
                 // True comparison sets lane bits to 0xffffffff, or -1 in two's complement,
                 // which we subtract to increment our counts.
                 float32x4_t scores_x4_a = vld1q_f32(score_ptr);
