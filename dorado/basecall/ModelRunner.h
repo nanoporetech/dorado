@@ -29,7 +29,7 @@ public:
 
 inline ModelRunnerBase::~ModelRunnerBase() = default;
 
-using Runner = std::unique_ptr<ModelRunnerBase>;
+using RunnerPtr = std::unique_ptr<ModelRunnerBase>;
 
 template <typename T>
 class ModelRunner final : public ModelRunnerBase {

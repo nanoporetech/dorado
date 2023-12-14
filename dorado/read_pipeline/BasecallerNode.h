@@ -15,7 +15,7 @@ namespace dorado {
 
 namespace basecall {
 class ModelRunnerBase;
-using Runner = std::unique_ptr<ModelRunnerBase>;
+using RunnerPtr = std::unique_ptr<ModelRunnerBase>;
 }  // namespace basecall
 
 class BasecallerNode : public MessageSink {
@@ -24,7 +24,7 @@ class BasecallerNode : public MessageSink {
 
 public:
     // Chunk size and overlap are in raw samples
-    BasecallerNode(std::vector<basecall::Runner> model_runners,
+    BasecallerNode(std::vector<basecall::RunnerPtr> model_runners,
                    size_t overlap,
                    int batch_timeout_ms,
                    std::string model_name,
@@ -50,7 +50,7 @@ private:
     void working_reads_manager();
 
     // Vector of model runners (each with their own GPU access etc)
-    std::vector<basecall::Runner> m_model_runners;
+    std::vector<basecall::RunnerPtr> m_model_runners;
     // Chunk length
     size_t m_chunk_size;
     // Minimum overlap between two adjacent chunks in a read. Overlap is used to reduce edge effects and improve accuracy.

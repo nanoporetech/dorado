@@ -19,7 +19,7 @@
 
 namespace dorado {
 
-std::pair<std::vector<basecall::Runner>, size_t> create_basecall_runners(
+std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
         const basecall::CRFModelConfig& model_config,
         const std::string& device,
         size_t num_gpu_runners,
@@ -32,7 +32,7 @@ std::pair<std::vector<basecall::Runner>, size_t> create_basecall_runners(
     (void)guard_gpus;
 #endif
 
-    std::vector<basecall::Runner> runners;
+    std::vector<basecall::RunnerPtr> runners;
 
     // Default is 1 device.  CUDA path may alter this.
     size_t num_devices = 1;
@@ -134,7 +134,7 @@ std::pair<std::vector<basecall::Runner>, size_t> create_basecall_runners(
     return {std::move(runners), num_devices};
 }
 
-std::vector<modbase::Runner> create_modbase_runners(
+std::vector<modbase::RunnerPtr> create_modbase_runners(
         const std::vector<std::filesystem::path>& remora_models,
         const std::string& device,
         size_t remora_runners_per_caller,
@@ -144,7 +144,7 @@ std::vector<modbase::Runner> create_modbase_runners(
     }
 
     // generate model callers before nodes or it affects the speed calculations
-    std::vector<modbase::Runner> remora_runners;
+    std::vector<modbase::RunnerPtr> remora_runners;
     std::vector<std::string> modbase_devices;
 
     int remora_callers = 1;

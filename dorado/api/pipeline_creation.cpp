@@ -17,8 +17,8 @@
 namespace dorado::pipelines {
 
 void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
-                             std::vector<basecall::Runner>&& runners,
-                             std::vector<modbase::Runner>&& modbase_runners,
+                             std::vector<basecall::RunnerPtr>&& runners,
+                             std::vector<modbase::RunnerPtr>&& modbase_runners,
                              size_t overlap,
                              uint32_t mean_qscore_start_pos,
                              int scaler_node_threads,
@@ -106,9 +106,9 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
 }
 
 void create_stereo_duplex_pipeline(PipelineDescriptor& pipeline_desc,
-                                   std::vector<basecall::Runner>&& runners,
-                                   std::vector<basecall::Runner>&& stereo_runners,
-                                   std::vector<modbase::Runner>&& modbase_runners,
+                                   std::vector<basecall::RunnerPtr>&& runners,
+                                   std::vector<basecall::RunnerPtr>&& stereo_runners,
+                                   std::vector<modbase::RunnerPtr>&& modbase_runners,
                                    size_t overlap,
                                    uint32_t mean_qscore_start_pos,
                                    int scaler_node_threads,

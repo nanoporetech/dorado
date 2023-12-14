@@ -50,7 +50,7 @@ struct ModBaseCallerNode::WorkingRead {
             num_modbase_chunks_called;  // Number of modbase chunks which have been scored
 };
 
-ModBaseCallerNode::ModBaseCallerNode(std::vector<modbase::Runner> model_runners,
+ModBaseCallerNode::ModBaseCallerNode(std::vector<modbase::RunnerPtr> model_runners,
                                      size_t remora_threads,
                                      size_t block_stride,
                                      size_t max_reads)

@@ -13,12 +13,12 @@ namespace dorado {
 
 namespace basecall {
 class ModelRunnerBase;
-using Runner = std::unique_ptr<ModelRunnerBase>;
+using RunnerPtr = std::unique_ptr<ModelRunnerBase>;
 }  // namespace basecall
 
 namespace modbase {
 class ModBaseRunner;
-using Runner = std::unique_ptr<ModBaseRunner>;
+using RunnerPtr = std::unique_ptr<ModBaseRunner>;
 }  // namespace modbase
 
 using PairingParameters = std::variant<DuplexPairingParameters, std::map<std::string, std::string>>;
@@ -29,8 +29,8 @@ namespace pipelines {
 /// If source_node_handle is valid, set this to be the source of the simplex pipeline
 /// If sink_node_handle is valid, set this to be the sink of the simplex pipeline
 void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
-                             std::vector<basecall::Runner>&& runners,
-                             std::vector<modbase::Runner>&& modbase_runners,
+                             std::vector<basecall::RunnerPtr>&& runners,
+                             std::vector<modbase::RunnerPtr>&& modbase_runners,
                              size_t overlap,
                              uint32_t mean_qscore_start_pos,
                              int scaler_node_threads,
@@ -44,9 +44,9 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
 /// If source_node_handle is valid, set this to be the source of the simplex pipeline
 /// If sink_node_handle is valid, set this to be the sink of the simplex pipeline
 void create_stereo_duplex_pipeline(PipelineDescriptor& pipeline_desc,
-                                   std::vector<basecall::Runner>&& runners,
-                                   std::vector<basecall::Runner>&& stereo_runners,
-                                   std::vector<modbase::Runner>&& modbase_runners,
+                                   std::vector<basecall::RunnerPtr>&& runners,
+                                   std::vector<basecall::RunnerPtr>&& stereo_runners,
+                                   std::vector<modbase::RunnerPtr>&& modbase_runners,
                                    size_t overlap,
                                    uint32_t mean_qscore_start_pos,
                                    int scaler_node_threads,

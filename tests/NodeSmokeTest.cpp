@@ -213,7 +213,7 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
     std::size_t batch_size = 128;
 
     // Create runners
-    std::vector<dorado::basecall::Runner> runners;
+    std::vector<dorado::basecall::RunnerPtr> runners;
     if (gpu) {
 #if DORADO_GPU_BUILD
 #ifdef __APPLE__
@@ -281,7 +281,7 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
             dorado::basecall::load_crf_model_config(model_dir.m_path / model_name).stride;
 
     // Create runners
-    std::vector<dorado::modbase::Runner> remora_runners;
+    std::vector<dorado::modbase::RunnerPtr> remora_runners;
     std::vector<std::string> modbase_devices;
     int batch_size = default_params.remora_batchsize;
     if (gpu) {

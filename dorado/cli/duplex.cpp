@@ -487,7 +487,7 @@ int duplex(int argc, char* argv[]) {
                     create_basecall_runners(models.model_config, device, num_runners, 0, batch_size,
                                             chunk_size, 0.9f, true);
 
-            std::vector<basecall::Runner> stereo_runners;
+            std::vector<basecall::RunnerPtr> stereo_runners;
             // The fraction argument for GPU memory allocates the fraction of the
             // _remaining_ memory to the caller. So, we allocate all of the available
             // memory after simplex caller has been instantiated to the duplex caller.
