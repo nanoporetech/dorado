@@ -6,7 +6,6 @@
 #include "utils/stats.h"
 
 #include <nvtx3/nvtx3.hpp>
-#include <torch/nn.h>
 
 #include <algorithm>
 #include <cstdlib>
