@@ -3,7 +3,10 @@
 #include "utils/bam_utils.h"
 #include "utils/trim.h"
 
+#include <ATen/ATen.h>
 #include <htslib/sam.h>
+
+using Slice = at::indexing::Slice;
 
 namespace {
 
@@ -167,7 +170,12 @@ void Trimmer::trim_sequence(SimplexRead& read, std::pair<int, int> trim_interval
     size_t num_positions_trimmed;
     std::tie(num_positions_trimmed, read.read_common.moves) =
             utils::trim_move_table(read.read_common.moves, trim_interval);
-    read.read_common.num_trimmed_samples += read.read_common.model_stride * num_positions_trimmed;
+    if (num_positions_trimmed > 0) {
+        auto num_samples_trimmed = read.read_common.model_stride * num_positions_trimmed;
+        read.read_common.num_trimmed_samples += num_samples_trimmed;
+        read.read_common.raw_data =
+                read.read_common.raw_data.index({Slice(num_samples_trimmed, at::indexing::None)});
+    }
 
     if (read.read_common.mod_base_info) {
         int num_modbase_channels = int(read.read_common.mod_base_info->alphabet.size());
