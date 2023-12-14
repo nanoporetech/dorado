@@ -104,7 +104,7 @@ The `--trim` option takes as its argument one of the following values:
 Existing basecalled datasets can be scanned for adapter and/or primer sequences at either end, and trim any such found sequences. To do this, run:
 
 ```
-$ dorado trim --output-dir <output-folder-for-trimmed-bams> <reads> > trimmed.bam
+$ dorado trim <reads> > trimmed.bam
 ```
 
 `<reads>` can either be an HTS format file (e.g. FASTQ, BAM, etc.) or a stream of an HTS format (e.g. the output of Dorado basecalling).
