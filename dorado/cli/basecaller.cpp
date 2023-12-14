@@ -1,18 +1,17 @@
 #include "Version.h"
+#include "api/pipeline_creation.h"
+#include "api/runner_creation.h"
+#include "basecall/CRFModelConfig.h"
 #include "cli/cli_utils.h"
 #include "data_loader/DataLoader.h"
 #include "data_loader/ModelFinder.h"
 #include "models/kits.h"
 #include "models/models.h"
-#include "nn/CRFModelConfig.h"
-#include "nn/ModBaseRunner.h"
-#include "nn/Runners.h"
 #include "read_pipeline/AdapterDetectorNode.h"
 #include "read_pipeline/AlignerNode.h"
 #include "read_pipeline/BarcodeClassifierNode.h"
 #include "read_pipeline/HtsReader.h"
 #include "read_pipeline/HtsWriter.h"
-#include "read_pipeline/Pipelines.h"
 #include "read_pipeline/PolyACalculator.h"
 #include "read_pipeline/ProgressTracker.h"
 #include "read_pipeline/ReadFilterNode.h"
@@ -86,7 +85,7 @@ void setup(std::vector<std::string> args,
            argparse::ArgumentParser& resume_parser,
            bool estimate_poly_a,
            const ModelSelection& model_selection) {
-    const auto model_config = load_crf_model_config(model_path);
+    const auto model_config = basecall::load_crf_model_config(model_path);
     const std::string model_name = models::extract_model_name_from_path(model_path);
     const std::string modbase_model_names = models::extract_model_names_from_paths(remora_models);
 

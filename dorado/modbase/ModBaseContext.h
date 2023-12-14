@@ -24,12 +24,9 @@
  *  be "CXT:XG:_:_". 
  */
 
-namespace dorado {
+namespace dorado::modbase {
 struct ModBaseModelConfig;
 class MotifMatcher;
-}  // namespace dorado
-
-namespace dorado::utils {
 
 class ModBaseContext {
 public:
@@ -97,4 +94,4 @@ private:
     std::array<std::unique_ptr<MotifMatcher>, 4> m_motif_matchers;
 };
 
-}  // namespace dorado::utils
+}  // namespace dorado::modbase

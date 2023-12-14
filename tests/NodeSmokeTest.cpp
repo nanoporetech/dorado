@@ -1,12 +1,12 @@
 #include "MessageSinkUtils.h"
 #include "TestUtils.h"
-#include "decode/CPUDecoder.h"
+#include "basecall/CRFModel.h"
+#include "basecall/CRFModelConfig.h"
+#include "basecall/ModelRunner.h"
+#include "basecall/decode/CPUDecoder.h"
+#include "modbase/ModBaseModel.h"
+#include "modbase/ModBaseRunner.h"
 #include "models/models.h"
-#include "nn/CRFModel.h"
-#include "nn/CRFModelConfig.h"
-#include "nn/ModBaseModel.h"
-#include "nn/ModBaseRunner.h"
-#include "nn/ModelRunner.h"
 #include "read_pipeline/AdapterDetectorNode.h"
 #include "read_pipeline/BarcodeClassifierNode.h"
 #include "read_pipeline/BasecallerNode.h"
@@ -21,9 +21,9 @@
 
 #if DORADO_GPU_BUILD
 #ifdef __APPLE__
-#include "nn/MetalCRFModel.h"
+#include "basecall/MetalCRFModel.h"
 #else
-#include "nn/CudaCRFModel.h"
+#include "basecall/CudaCRFModel.h"
 #include "utils/cuda_utils.h"
 #endif
 #endif  // DORADO_GPU_BUILD
@@ -34,6 +34,10 @@
 #include <filesystem>
 #include <functional>
 #include <random>
+
+#ifndef _WIN32
+#include <unistd.h>
+#endif
 
 namespace fs = std::filesystem;
 
@@ -165,8 +169,9 @@ TempDir download_model(const std::string& model) {
 
 DEFINE_TEST(NodeSmokeTestRead, "ScalerNode") {
     auto pipeline_restart = GENERATE(false, true);
-    auto model_type = GENERATE(dorado::SampleType::DNA, dorado::SampleType::RNA002,
-                               dorado::SampleType::RNA004);
+    auto model_type =
+            GENERATE(dorado::basecall::SampleType::DNA, dorado::basecall::SampleType::RNA002,
+                     dorado::basecall::SampleType::RNA004);
     CAPTURE(pipeline_restart);
     CAPTURE(model_type);
 
@@ -177,8 +182,8 @@ DEFINE_TEST(NodeSmokeTestRead, "ScalerNode") {
         read->read_common.raw_data = read->read_common.raw_data.to(torch::kI16);
     });
 
-    dorado::SignalNormalisationParams config;
-    config.strategy = dorado::ScalingStrategy::QUANTILE;
+    dorado::basecall::SignalNormalisationParams config;
+    config.strategy = dorado::basecall::ScalingStrategy::QUANTILE;
     config.quantile.quantile_a = 0.2f;
     config.quantile.quantile_b = 0.9f;
     config.quantile.shift_multiplier = 0.51f;
@@ -202,20 +207,20 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
     const auto& default_params = dorado::utils::default_parameters;
     const auto model_dir = download_model(model_name);
     const auto model_path = (model_dir.m_path / model_name).string();
-    auto model_config = dorado::load_crf_model_config(model_path);
+    auto model_config = dorado::basecall::load_crf_model_config(model_path);
 
     // Use a fixed batch size otherwise we slow down CI autobatchsizing.
     std::size_t batch_size = 128;
 
     // Create runners
-    std::vector<dorado::Runner> runners;
+    std::vector<dorado::basecall::RunnerPtr> runners;
     if (gpu) {
 #if DORADO_GPU_BUILD
 #ifdef __APPLE__
-        auto caller =
-                dorado::create_metal_caller(model_config, default_params.chunksize, batch_size);
+        auto caller = dorado::basecall::create_metal_caller(model_config, default_params.chunksize,
+                                                            batch_size);
         for (int i = 0; i < default_params.num_runners; i++) {
-            runners.push_back(std::make_shared<dorado::MetalModelRunner>(caller));
+            runners.push_back(std::make_unique<dorado::basecall::MetalModelRunner>(caller));
         }
 #else   // __APPLE__
         auto devices = dorado::utils::parse_cuda_device_string("cuda:all");
@@ -223,10 +228,10 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
             SKIP("No CUDA devices found");
         }
         for (const auto& device : devices) {
-            auto caller = dorado::create_cuda_caller(model_config, default_params.chunksize,
-                                                     int(batch_size), device, 1.f, true);
+            auto caller = dorado::basecall::create_cuda_caller(
+                    model_config, default_params.chunksize, int(batch_size), device, 1.f, true);
             for (int i = 0; i < default_params.num_runners; i++) {
-                runners.push_back(std::make_shared<dorado::CudaModelRunner>(caller));
+                runners.push_back(std::make_unique<dorado::basecall::CudaModelRunner>(caller));
             }
         }
 #endif  // __APPLE__
@@ -238,7 +243,8 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
         set_num_reads(5);
         set_expected_messages(5);
         batch_size = 8;
-        runners.push_back(std::make_shared<dorado::ModelRunner<dorado::CPUDecoder>>(
+        runners.push_back(std::make_unique<
+                          dorado::basecall::ModelRunner<dorado::basecall::decode::CPUDecoder>>(
                 model_config, "cpu", default_params.chunksize, int(batch_size)));
     }
 
@@ -272,10 +278,10 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
     const char model_name[] = "dna_r10.4.1_e8.2_400bps_fast@v4.2.0";
     const auto model_dir = download_model(model_name);
     const std::size_t model_stride =
-            dorado::load_crf_model_config(model_dir.m_path / model_name).stride;
+            dorado::basecall::load_crf_model_config(model_dir.m_path / model_name).stride;
 
     // Create runners
-    std::vector<std::unique_ptr<dorado::ModBaseRunner>> remora_runners;
+    std::vector<dorado::modbase::RunnerPtr> remora_runners;
     std::vector<std::string> modbase_devices;
     int batch_size = default_params.remora_batchsize;
     if (gpu) {
@@ -299,10 +305,10 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
         batch_size = 8;  // reduce batch size so we're not doing work on empty entries
     }
     for (const auto& device_string : modbase_devices) {
-        auto caller = dorado::create_modbase_caller({remora_model, remora_model_6mA}, batch_size,
-                                                    device_string);
+        auto caller = dorado::modbase::create_modbase_caller({remora_model, remora_model_6mA},
+                                                             batch_size, device_string);
         for (int i = 0; i < default_params.mod_base_runners_per_caller; i++) {
-            remora_runners.push_back(std::make_unique<dorado::ModBaseRunner>(caller));
+            remora_runners.push_back(std::make_unique<dorado::modbase::ModBaseRunner>(caller));
         }
     }
 

@@ -161,6 +161,8 @@ enable_testing()
 
 add_subdirectory(dorado/utils)
 add_subdirectory(dorado/models)
+add_subdirectory(dorado/basecall)
+add_subdirectory(dorado/modbase)
 
 if("${CUDA_VERSION}" STREQUAL "")
   set(CUDA_VERSION ${CUDAToolkit_VERSION})
@@ -179,21 +181,10 @@ set(LIB_SOURCE_FILES
     dorado/alignment/Minimap2Index.h
     dorado/alignment/Minimap2IndexSupportTypes.h
     dorado/alignment/Minimap2Options.h
-    dorado/nn/CRFModel.h
-    dorado/nn/CRFModel.cpp
-    dorado/nn/CRFModelConfig.h
-    dorado/nn/CRFModelConfig.cpp
-    dorado/nn/ModelRunner.h
-    dorado/nn/ModBaseModel.cpp
-    dorado/nn/ModBaseModel.h
-    dorado/nn/ModBaseModelConfig.cpp
-    dorado/nn/ModBaseModelConfig.h    
-    dorado/nn/ModBaseRunner.cpp
-    dorado/nn/ModBaseRunner.h
-    dorado/nn/Runners.cpp
-    dorado/nn/Runners.h
-    dorado/read_pipeline/Pipelines.cpp
-    dorado/read_pipeline/Pipelines.h
+    dorado/api/runner_creation.cpp
+    dorado/api/runner_creation.h
+    dorado/api/pipeline_creation.cpp
+    dorado/api/pipeline_creation.h
     dorado/read_pipeline/FakeDataLoader.cpp
     dorado/read_pipeline/FakeDataLoader.h
     dorado/read_pipeline/ReadPipeline.cpp
@@ -263,35 +254,7 @@ set(LIB_SOURCE_FILES
     dorado/demux/Trimmer.h
     dorado/demux/parse_custom_kit.cpp
     dorado/demux/parse_custom_kit.h
-    dorado/decode/beam_search.cpp
-    dorado/decode/beam_search.h
-    dorado/decode/CPUDecoder.cpp
-    dorado/decode/CPUDecoder.h
-    dorado/modbase/modbase_encoder.cpp
-    dorado/modbase/modbase_encoder.h
-    dorado/modbase/modbase_scaler.cpp
-    dorado/modbase/modbase_scaler.h
-    dorado/modbase/ModBaseContext.cpp
-    dorado/modbase/ModBaseContext.h
-    dorado/modbase/MotifMatcher.cpp
-    dorado/modbase/MotifMatcher.h
  )
-
-if (DORADO_GPU_BUILD)
-    if(APPLE)
-        list(APPEND LIB_SOURCE_FILES
-            dorado/nn/MetalCRFModel.h
-            dorado/nn/MetalCRFModel.cpp
-        )
-    else()
-        list(APPEND LIB_SOURCE_FILES
-            dorado/decode/GPUDecoder.cpp
-            dorado/decode/GPUDecoder.h
-            dorado/nn/CudaCRFModel.h
-            dorado/nn/CudaCRFModel.cpp
-        )
-    endif()
-endif()
 
 add_library(dorado_lib ${LIB_SOURCE_FILES})
 
@@ -312,7 +275,6 @@ target_include_directories(dorado_lib
     PUBLIC
         ${CMAKE_CURRENT_BINARY_DIR}/dorado
         ${CMAKE_CURRENT_SOURCE_DIR}/dorado
-        ${KOI_INCLUDE}
         ${POD5_INCLUDE}
 )
 # 3rdparty libs should be considered SYSTEM headers
@@ -348,8 +310,9 @@ target_link_libraries(dorado_lib
         vbz_hdf_plugin
         edlib
         dorado_utils
+        dorado_basecall
+        dorado_modbase
     PRIVATE
-        ${KOI_LIBRARIES}    
         minimap2
 )
 

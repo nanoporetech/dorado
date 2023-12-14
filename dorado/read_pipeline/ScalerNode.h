@@ -1,6 +1,6 @@
 #pragma once
 #include "ReadPipeline.h"
-#include "nn/CRFModelConfig.h"
+#include "basecall/CRFModelConfig.h"
 #include "utils/stats.h"
 
 #include <ATen/core/TensorBody.h>
@@ -15,8 +15,8 @@ namespace dorado {
 
 class ScalerNode : public MessageSink {
 public:
-    ScalerNode(const SignalNormalisationParams& config,
-               SampleType model_type,
+    ScalerNode(const basecall::SignalNormalisationParams& config,
+               basecall::SampleType model_type,
                int num_worker_threads,
                size_t max_reads);
     ~ScalerNode() { terminate_impl(); }
@@ -32,8 +32,8 @@ private:
     std::vector<std::unique_ptr<std::thread>> m_worker_threads;
     std::atomic<int> m_num_worker_threads;
 
-    SignalNormalisationParams m_scaling_params;
-    const SampleType m_model_type;
+    basecall::SignalNormalisationParams m_scaling_params;
+    const basecall::SampleType m_model_type;
 
     std::pair<float, float> med_mad(const at::Tensor& x);
     std::pair<float, float> normalisation(const at::Tensor& x);

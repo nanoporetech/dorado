@@ -1,6 +1,6 @@
 #include "ScalerNode.h"
 
-#include "nn/CRFModelConfig.h"
+#include "basecall/CRFModelConfig.h"
 #include "utils/tensor_utils.h"
 #include "utils/trim.h"
 
@@ -20,6 +20,9 @@ using namespace std::chrono_literals;
 using Slice = at::indexing::Slice;
 
 namespace dorado {
+using SampleType = basecall::SampleType;
+using ScalingStrategy = basecall::ScalingStrategy;
+using SignalNormalisationParams = basecall::SignalNormalisationParams;
 
 std::pair<float, float> ScalerNode::normalisation(const at::Tensor& x) {
     // Calculate shift and scale factors for normalisation.

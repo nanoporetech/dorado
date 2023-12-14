@@ -1,9 +1,9 @@
 #include "ModBaseCallerNode.h"
 
 #include "modbase/ModBaseContext.h"
-#include "modbase/modbase_encoder.h"
-#include "nn/ModBaseModelConfig.h"
-#include "nn/ModBaseRunner.h"
+#include "modbase/ModBaseModelConfig.h"
+#include "modbase/ModBaseRunner.h"
+#include "modbase/ModbaseEncoder.h"
 #include "utils/math_utils.h"
 #include "utils/sequence_utils.h"
 #include "utils/stats.h"
@@ -50,7 +50,7 @@ struct ModBaseCallerNode::WorkingRead {
             num_modbase_chunks_called;  // Number of modbase chunks which have been scored
 };
 
-ModBaseCallerNode::ModBaseCallerNode(std::vector<std::unique_ptr<ModBaseRunner>> model_runners,
+ModBaseCallerNode::ModBaseCallerNode(std::vector<modbase::RunnerPtr> model_runners,
                                      size_t remora_threads,
                                      size_t block_stride,
                                      size_t max_reads)
@@ -125,9 +125,9 @@ void ModBaseCallerNode::restart() {
 }
 
 void ModBaseCallerNode::init_modbase_info() {
-    std::vector<std::reference_wrapper<const ModBaseModelConfig>> base_mod_params;
+    std::vector<std::reference_wrapper<const modbase::ModBaseModelConfig>> base_mod_params;
     auto& runner = m_runners[0];
-    utils::ModBaseContext context_handler;
+    modbase::ModBaseContext context_handler;
     for (size_t caller_id = 0; caller_id < runner->num_callers(); ++caller_id) {
         const auto& params = runner->caller_params(caller_id);
         if (!params.motif.empty()) {
@@ -137,7 +137,7 @@ void ModBaseCallerNode::init_modbase_info() {
         m_num_states += params.base_mod_count;
     }
 
-    auto result = get_modbase_info(base_mod_params);
+    auto result = modbase::get_modbase_info(base_mod_params);
     m_mod_base_info = std::make_shared<ModBaseInfo>(
             std::move(result.alphabet), std::move(result.long_names), context_handler.encode());
 
@@ -229,8 +229,8 @@ void ModBaseCallerNode::duplex_mod_call(Message&& message) {
                 auto context_samples = (params.context_before + params.context_after);
 
                 // One-hot encodes the kmer at each signal step for input into the network
-                ModBaseEncoder encoder(m_block_stride, context_samples, params.bases_before,
-                                       params.bases_after);
+                modbase::ModBaseEncoder encoder(m_block_stride, context_samples,
+                                                params.bases_before, params.bases_after);
                 encoder.init(sequence_ints, seq_to_sig_map);
 
                 auto context_hits = runner->get_motif_hits(caller_id, new_seq);
@@ -355,8 +355,8 @@ void ModBaseCallerNode::simplex_mod_call(Message&& message) {
         auto context_samples = (params.context_before + params.context_after);
 
         // One-hot encodes the kmer at each signal step for input into the network
-        ModBaseEncoder encoder(m_block_stride, context_samples, params.bases_before,
-                               params.bases_after);
+        modbase::ModBaseEncoder encoder(m_block_stride, context_samples, params.bases_before,
+                                        params.bases_after);
         encoder.init(sequence_ints, seq_to_sig_map);
 
         auto context_hits = runner->get_motif_hits(caller_id, read->read_common.seq);

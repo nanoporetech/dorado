@@ -1,6 +1,7 @@
 #include "BasecallerNode.h"
 
-#include "decode/CPUDecoder.h"
+#include "basecall/ModelRunner.h"
+#include "basecall/decode/CPUDecoder.h"
 #include "stitch.h"
 #include "utils/stats.h"
 
@@ -116,7 +117,7 @@ void BasecallerNode::input_worker_thread() {
 
 void BasecallerNode::basecall_current_batch(int worker_id) {
     NVTX3_FUNC_RANGE();
-    auto model_runner = m_model_runners[worker_id];
+    auto &model_runner = m_model_runners[worker_id];
     dorado::stats::Timer timer;
     auto decode_results = model_runner->call_chunks(int(m_batched_chunks[worker_id].size()));
     m_call_chunks_ms += timer.GetElapsedMS();
@@ -288,7 +289,7 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
 namespace {
 
 // Calculates the input queue size.
-size_t CalcMaxChunksIn(const std::vector<Runner> &model_runners) {
+size_t CalcMaxChunksIn(const std::vector<basecall::RunnerPtr> &model_runners) {
     // Allow 2 batches per model runner on the chunks_in queue
     size_t max_chunks_in = 0;
     // Allows optimal batch size to be used for every GPU
@@ -300,7 +301,7 @@ size_t CalcMaxChunksIn(const std::vector<Runner> &model_runners) {
 
 }  // namespace
 
-BasecallerNode::BasecallerNode(std::vector<Runner> model_runners,
+BasecallerNode::BasecallerNode(std::vector<basecall::RunnerPtr> model_runners,
                                size_t overlap,
                                int batch_timeout_ms,
                                std::string model_name,

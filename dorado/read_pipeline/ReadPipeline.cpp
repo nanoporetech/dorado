@@ -158,7 +158,7 @@ void ReadCommon::generate_modbase_tags(bam1_t *aln, uint8_t threshold) const {
     // Create a mask indicating which bases are modified.
     std::unordered_map<char, bool> base_has_context = {
             {'A', false}, {'C', false}, {'G', false}, {'T', false}};
-    utils::ModBaseContext context_handler;
+    modbase::ModBaseContext context_handler;
     if (!mod_base_info->context.empty()) {
         if (!context_handler.decode(mod_base_info->context)) {
             throw std::runtime_error("Invalid base modification context string.");

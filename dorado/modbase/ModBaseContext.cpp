@@ -5,14 +5,16 @@
 
 #include <sstream>
 
-namespace dorado::utils {
+namespace dorado::modbase {
 
 ModBaseContext::ModBaseContext() {}
 ModBaseContext::~ModBaseContext() {}
 
-const std::string& ModBaseContext::motif(char base) const { return m_motifs[base_to_int(base)]; }
+const std::string& ModBaseContext::motif(char base) const {
+    return m_motifs[utils::base_to_int(base)];
+}
 
-size_t ModBaseContext::motif_offset(char base) const { return m_offsets[base_to_int(base)]; }
+size_t ModBaseContext::motif_offset(char base) const { return m_offsets[utils::base_to_int(base)]; }
 
 void ModBaseContext::set_context(std::string motif, size_t offset) {
     if (motif.size() < 2) {
@@ -20,7 +22,7 @@ void ModBaseContext::set_context(std::string motif, size_t offset) {
         return;
     }
     char base = motif.at(offset);
-    auto index = base_to_int(base);
+    auto index = utils::base_to_int(base);
     m_motif_matchers[index] = std::make_unique<MotifMatcher>(motif, offset);
     m_motifs[index] = std::move(motif);
     m_offsets[index] = offset;
@@ -99,7 +101,7 @@ void ModBaseContext::update_mask(std::vector<bool>& mask,
             // A cardinal base.
             current_cardinal = modbase_alphabet[channel_idx][0];
         } else {
-            if (!m_motifs[base_to_int(current_cardinal)].empty()) {
+            if (!m_motifs[utils::base_to_int(current_cardinal)].empty()) {
                 // This cardinal base has a context associated with modifications, so the mask should
                 // not be updated, regardless of the threshold.
                 continue;
@@ -115,4 +117,4 @@ void ModBaseContext::update_mask(std::vector<bool>& mask,
     }
 }
 
-}  // namespace dorado::utils
+}  // namespace dorado::modbase
