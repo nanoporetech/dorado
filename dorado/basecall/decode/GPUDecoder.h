@@ -4,7 +4,7 @@
 
 #include <ATen/core/TensorBody.h>
 
-namespace dorado::decode {
+namespace dorado::basecall::decode {
 
 class GPUDecoder final : Decoder {
 public:
@@ -24,4 +24,4 @@ public:
     float m_score_clamp_val;
 };
 
-}  // namespace dorado::decode
+}  // namespace dorado::basecall::decode

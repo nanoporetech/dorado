@@ -117,7 +117,7 @@ uint32_t crc32c(uint32_t crc, uint32_t new_bits) {
 
 }  // anonymous namespace
 
-namespace dorado::decode {
+namespace dorado::basecall::decode {
 
 template <typename T, typename U>
 float beam_search(const T* const scores,
@@ -589,4 +589,4 @@ std::tuple<std::string, std::string, std::vector<uint8_t>> beam_search_decode(
     return {std::move(sequence), std::move(qstring), std::move(moves)};
 }
 
-}  // namespace dorado::decode
+}  // namespace dorado::basecall::decode

@@ -243,9 +243,9 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
         set_num_reads(5);
         set_expected_messages(5);
         batch_size = 8;
-        runners.push_back(
-                std::make_unique<dorado::basecall::ModelRunner<dorado::decode::CPUDecoder>>(
-                        model_config, "cpu", default_params.chunksize, int(batch_size)));
+        runners.push_back(std::make_unique<
+                          dorado::basecall::ModelRunner<dorado::basecall::decode::CPUDecoder>>(
+                model_config, "cpu", default_params.chunksize, int(batch_size)));
     }
 
     run_smoke_test<dorado::BasecallerNode>(std::move(runners),
