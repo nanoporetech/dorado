@@ -1,7 +1,7 @@
 #include "BasecallerNode.h"
 
-#include "basecall/ModelRunner.h"
-#include "basecall/decode/CPUDecoder.h"
+#include "basecall/CRFModelConfig.h"
+#include "basecall/ModelRunnerBase.h"
 #include "stitch.h"
 #include "utils/stats.h"
 

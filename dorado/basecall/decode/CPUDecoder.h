@@ -6,7 +6,7 @@
 
 namespace dorado::basecall::decode {
 
-class CPUDecoder final : Decoder {
+class CPUDecoder final : public Decoder {
 public:
     std::vector<DecodedChunk> beam_search(const at::Tensor& scores,
                                           int num_chunks,

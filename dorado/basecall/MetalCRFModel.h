@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ModelRunner.h"
+#include "ModelRunnerBase.h"
 
 #include <ATen/core/TensorBody.h>
 

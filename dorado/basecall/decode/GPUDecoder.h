@@ -6,7 +6,7 @@
 
 namespace dorado::basecall::decode {
 
-class GPUDecoder final : Decoder {
+class GPUDecoder final : public Decoder {
 public:
     explicit GPUDecoder(float score_clamp_val) : m_score_clamp_val(score_clamp_val) {}
 
