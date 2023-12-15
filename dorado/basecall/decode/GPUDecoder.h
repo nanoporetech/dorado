@@ -16,7 +16,7 @@ public:
     DecodeData beam_search_part_1(DecodeData data) const;
     std::vector<DecodedChunk> beam_search_part_2(DecodeData data) const;
 
-    c10::ScalarType dtype() const { return at::ScalarType::Half; };
+    at::ScalarType dtype() const { return at::ScalarType::Half; };
 
 private:
     float m_score_clamp_val;

@@ -11,7 +11,7 @@ public:
     DecodeData beam_search_part_1(DecodeData data) const;
     std::vector<DecodedChunk> beam_search_part_2(DecodeData data) const;
 
-    c10::ScalarType dtype() const { return at::ScalarType::Float; };
+    at::ScalarType dtype() const { return at::ScalarType::Float; };
 };
 
 }  // namespace dorado::basecall::decode
