@@ -26,7 +26,7 @@ ModelRunner::ModelRunner(const CRFModelConfig &model_config,
 std::vector<decode::DecodedChunk> ModelRunner::call_chunks(int num_chunks) {
     at::InferenceMode guard;
     dorado::stats::Timer timer;
-    auto scores = m_module->forward(m_input.to(m_options.device_opt().value()));
+    auto scores = m_module->forward(m_input.to(m_options.device()));
     const auto forward_ms = timer.GetElapsedMS();
     auto decoded_chunks = m_decoder->beam_search_part_2(
             m_decoder->beam_search_part_1({scores, num_chunks, m_decoder_options}));
