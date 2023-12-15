@@ -154,7 +154,7 @@ public:
         // Determine size of working memory for decoder divided by (batch_size * chunk_size)
         // Decoder needs roughly (beam_width * 4) + num_states + 10 extra bytes
         // where num_states = 4^(state_len+1)
-        // See `dorado::basecall::decode::GPUDecoder::beam_search_part_1()` for more details.
+        // See `dorado::basecall::decode::CUDADecoder::beam_search_part_1()` for more details.
         int64_t decode_bytes_per_chunk_timestep =
                 10 + m_decoder_options.beam_width * 4 + (1ull << (model_config.state_len * 2 + 2));
 

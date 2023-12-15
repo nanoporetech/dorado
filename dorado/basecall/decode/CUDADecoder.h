@@ -6,9 +6,9 @@
 
 namespace dorado::basecall::decode {
 
-class GPUDecoder final : public Decoder {
+class CUDADecoder final : public Decoder {
 public:
-    explicit GPUDecoder(float score_clamp_val) : m_score_clamp_val(score_clamp_val) {}
+    explicit CUDADecoder(float score_clamp_val) : m_score_clamp_val(score_clamp_val) {}
 
     // We split beam_search into two parts, the first one running on the GPU and the second
     // one on the CPU. While the second part is running we can submit more commands to the GPU

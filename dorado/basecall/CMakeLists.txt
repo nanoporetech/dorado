@@ -28,8 +28,8 @@ if (DORADO_GPU_BUILD)
             PRIVATE
             CudaCRFModel.cpp
             CudaCRFModel.h
-            decode/GPUDecoder.cpp
-            decode/GPUDecoder.h
+            decode/CUDADecoder.cpp
+            decode/CUDADecoder.h
         )
     endif()
 endif()

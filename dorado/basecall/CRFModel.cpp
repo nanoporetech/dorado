@@ -871,7 +871,7 @@ struct CRFModelImpl : Module {
         }
 
         // Clamping the scores to [-5, 5], if active (i.e. the role of `clamp1`), is performed by
-        // `GPUDecoder` on reading the scores. This eliminates the cost of a large matrix
+        // `CUDADecoder` on reading the scores. This eliminates the cost of a large matrix
         // read-modify-write operation.
 
         // Output is [N, T, C], F16, contiguous

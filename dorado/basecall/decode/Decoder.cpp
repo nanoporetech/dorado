@@ -1,7 +1,7 @@
 #include "Decoder.h"
 
 #if DORADO_GPU_BUILD && !defined(__APPLE__)
-#include "GPUDecoder.h"
+#include "CUDADecoder.h"
 #endif
 
 #include "CPUDecoder.h"
@@ -14,7 +14,7 @@ namespace dorado::basecall::decode {
 std::unique_ptr<Decoder> create_decoder(c10::Device device, const CRFModelConfig& config) {
 #if DORADO_GPU_BUILD && !defined(__APPLE__)
     if (device.is_cuda()) {
-        return std::make_unique<decode::GPUDecoder>(config.clamp ? 5.f : 0.f);
+        return std::make_unique<decode::CUDADecoder>(config.clamp ? 5.f : 0.f);
     }
 #else
     (void)config;  // unused in other build types

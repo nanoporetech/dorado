@@ -1,4 +1,4 @@
-#include "GPUDecoder.h"
+#include "CUDADecoder.h"
 
 #include "utils/cuda_utils.h"
 #include "utils/gpu_profiling.h"
@@ -12,7 +12,7 @@ extern "C" {
 
 namespace dorado::basecall::decode {
 
-DecodeData GPUDecoder::beam_search_part_1(DecodeData data) const {
+DecodeData CUDADecoder::beam_search_part_1(DecodeData data) const {
     auto scores = data.data;
     auto &options = data.options;
 
@@ -85,7 +85,7 @@ DecodeData GPUDecoder::beam_search_part_1(DecodeData data) const {
     return data;
 }
 
-std::vector<DecodedChunk> GPUDecoder::beam_search_part_2(DecodeData data) const {
+std::vector<DecodedChunk> CUDADecoder::beam_search_part_2(DecodeData data) const {
     auto moves_sequence_qstring_cpu = data.data;
     nvtx3::scoped_range loop{"cpu_decode"};
     assert(moves_sequence_qstring_cpu.device() == at::kCPU);
