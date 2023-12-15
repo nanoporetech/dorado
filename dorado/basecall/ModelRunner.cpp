@@ -1,7 +1,7 @@
 #include "ModelRunner.h"
 
 #include "CRFModel.h"
-#include "decode/CPUDecoder.h"
+#include "decode/Decoder.h"
 
 namespace dorado::basecall {
 
@@ -9,20 +9,18 @@ ModelRunner::ModelRunner(const CRFModelConfig &model_config,
                          const std::string &device,
                          int chunk_size,
                          int batch_size)
-        : m_config(model_config) {
-    m_decoder_options = decode::DecoderOptions();
+        : m_config(model_config),
+          m_decoder(decode::create_decoder(device, model_config)),
+          m_options(at::TensorOptions().dtype(m_decoder->dtype()).device(device)),
+          m_module(load_crf_model(model_config, m_options)) {
     m_decoder_options.q_shift = model_config.qbias;
     m_decoder_options.q_scale = model_config.qscale;
-    m_decoder = std::make_unique<decode::CPUDecoder>();
-
-    m_options = at::TensorOptions().dtype(decode::CPUDecoder::dtype).device(device);
-    m_module = load_crf_model(model_config, m_options);
 
     // adjust chunk size to be a multiple of the stride
     chunk_size -= chunk_size % model_config.stride;
 
     m_input = at::zeros({batch_size, model_config.num_features, chunk_size},
-                        at::TensorOptions().dtype(decode::CPUDecoder::dtype).device(at::kCPU));
+                        at::TensorOptions().dtype(m_decoder->dtype()).device(at::kCPU));
 }
 
 std::vector<decode::DecodedChunk> ModelRunner::call_chunks(int num_chunks) {

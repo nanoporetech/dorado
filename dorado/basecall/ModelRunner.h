@@ -31,11 +31,11 @@ public:
 
 private:
     const CRFModelConfig m_config;
-    at::Tensor m_input;
-    at::TensorOptions m_options;
     std::unique_ptr<decode::Decoder> m_decoder;
+    at::TensorOptions m_options;
     decode::DecoderOptions m_decoder_options;
     torch::nn::ModuleHolder<torch::nn::AnyModule> m_module{nullptr};
+    at::Tensor m_input;
 
     // Performance monitoring stats.
     std::atomic<int64_t> m_num_batches_called = 0;

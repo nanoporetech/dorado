@@ -8,10 +8,10 @@ namespace dorado::basecall::decode {
 
 class CPUDecoder final : public Decoder {
 public:
-    DecodeData beam_search_part_1(DecodeData data);
-    std::vector<DecodedChunk> beam_search_part_2(DecodeData data);
+    DecodeData beam_search_part_1(DecodeData data) const;
+    std::vector<DecodedChunk> beam_search_part_2(DecodeData data) const;
 
-    constexpr static at::ScalarType dtype = at::ScalarType::Float;
+    c10::ScalarType dtype() const { return at::ScalarType::Float; };
 };
 
 }  // namespace dorado::basecall::decode

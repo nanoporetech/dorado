@@ -12,6 +12,8 @@ add_library(dorado_basecall STATIC
     decode/beam_search.h
     decode/CPUDecoder.cpp
     decode/CPUDecoder.h
+    decode/Decoder.cpp
+    decode/Decoder.h
 )
 
 if (DORADO_GPU_BUILD)
