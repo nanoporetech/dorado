@@ -2,6 +2,7 @@
 
 #include <ATen/core/TensorBody.h>
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -23,11 +24,17 @@ struct DecoderOptions {
     bool move_pad = false;
 };
 
+struct DecodeData {
+    at::Tensor data;
+    int num_chunks;
+    DecoderOptions options;
+};
+
 class Decoder {
 public:
-    virtual std::vector<DecodedChunk> beam_search(const at::Tensor& scores,
-                                                  int num_chunks,
-                                                  const DecoderOptions& options) = 0;
+    virtual ~Decoder() = default;
+    virtual DecodeData beam_search_part_1(DecodeData data) = 0;
+    virtual std::vector<DecodedChunk> beam_search_part_2(DecodeData data) = 0;
 };
 
 }  // namespace dorado::basecall::decode

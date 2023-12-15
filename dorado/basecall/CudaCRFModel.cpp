@@ -222,9 +222,10 @@ public:
     }
 
     struct NNTask {
-        NNTask(at::Tensor input_) : input(input_) {}
+        NNTask(at::Tensor input_, int num_chunks_) : input(input_), num_chunks(num_chunks_) {}
         at::Tensor input;
-        at::Tensor out;
+        int num_chunks;
+        decode::DecodeData out;
         std::mutex mut;
         std::condition_variable cv;
         bool done{false};
@@ -241,7 +242,7 @@ public:
             return std::vector<decode::DecodedChunk>();
         }
 
-        auto task = std::make_shared<NNTask>(input.to(m_options.device()));
+        auto task = std::make_shared<NNTask>(input.to(m_options.device()), num_chunks);
         {
             std::lock_guard<std::mutex> lock(m_input_lock);
             m_input_queue.push_front(task);
@@ -253,8 +254,8 @@ public:
             task->cv.wait(lock);
         }
 
-        output.copy_(task->out);
-        return m_decoder->cpu_part(output);
+        output.copy_(task->out.data);
+        return m_decoder->beam_search_part_2({output, num_chunks, m_decoder_options});
     }
 
     void cuda_thread_fn() {
@@ -322,7 +323,8 @@ public:
                 stats::Timer timer;
                 auto scores = m_module->forward(task->input);
                 const auto forward_ms = timer.GetElapsedMS();
-                task->out = m_decoder->gpu_part(scores, m_decoder_options);
+                task->out = m_decoder->beam_search_part_1(
+                        {scores, task->num_chunks, m_decoder_options});
                 stream.synchronize();
                 const auto forward_plus_decode_ms = timer.GetElapsedMS();
                 m_model_ms += forward_ms;
@@ -373,7 +375,7 @@ public:
     const CRFModelConfig m_config;
     std::string m_device;
     at::TensorOptions m_options;
-    std::unique_ptr<decode::GPUDecoder> m_decoder;
+    std::unique_ptr<decode::Decoder> m_decoder;
     decode::DecoderOptions m_decoder_options;
     torch::nn::ModuleHolder<torch::nn::AnyModule> m_module{nullptr};
     std::atomic<bool> m_terminate{false};

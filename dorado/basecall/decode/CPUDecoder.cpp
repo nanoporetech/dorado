@@ -88,10 +88,12 @@ at::Tensor backward_scores(const at::Tensor& scores, const float fixed_stay_scor
 
 namespace dorado::basecall::decode {
 
-std::vector<DecodedChunk> CPUDecoder::beam_search(const at::Tensor& scores,
-                                                  const int num_chunks,
-                                                  const DecoderOptions& options) {
-    const auto scores_cpu = scores.to(at::kCPU);
+DecodeData CPUDecoder::beam_search_part_1(DecodeData data) { return data; }
+
+std::vector<DecodedChunk> CPUDecoder::beam_search_part_2(DecodeData data) {
+    const auto scores_cpu = data.data.to(at::kCPU);
+    const auto num_chunks = data.num_chunks;
+    const auto& options = data.options;
     int num_threads = std::min(num_chunks, 4);
     int chunks_per_thread = num_chunks / num_threads;
     int num_threads_with_one_more_chunk = num_chunks % num_threads;

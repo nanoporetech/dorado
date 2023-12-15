@@ -8,9 +8,9 @@ namespace dorado::basecall::decode {
 
 class CPUDecoder final : public Decoder {
 public:
-    std::vector<DecodedChunk> beam_search(const at::Tensor& scores,
-                                          int num_chunks,
-                                          const DecoderOptions& options) final;
+    DecodeData beam_search_part_1(DecodeData data);
+    std::vector<DecodedChunk> beam_search_part_2(DecodeData data);
+
     constexpr static at::ScalarType dtype = at::ScalarType::Float;
 };
 

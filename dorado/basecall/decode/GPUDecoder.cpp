@@ -1,6 +1,5 @@
 #include "GPUDecoder.h"
 
-#include "Decoder.h"
 #include "utils/cuda_utils.h"
 #include "utils/gpu_profiling.h"
 
@@ -13,7 +12,10 @@ extern "C" {
 
 namespace dorado::basecall::decode {
 
-at::Tensor GPUDecoder::gpu_part(at::Tensor scores, DecoderOptions options) {
+DecodeData GPUDecoder::beam_search_part_1(DecodeData data) {
+    auto scores = data.data;
+    auto &options = data.options;
+
     c10::cuda::CUDAGuard device_guard(scores.device());
     utils::ScopedProfileRange loop{"gpu_decode", 1};
     long int N = (long int)(scores.sizes()[0]);
@@ -78,10 +80,13 @@ at::Tensor GPUDecoder::gpu_part(at::Tensor scores, DecoderOptions options) {
                 sequence.data_ptr(), qstring.data_ptr(), options.q_scale, options.q_shift,
                 int(options.beam_width), options.beam_cut, options.blank_score, options.move_pad));
     }
-    return moves_sequence_qstring.reshape({3, N, -1});
+
+    data.data = moves_sequence_qstring.reshape({3, N, -1});
+    return data;
 }
 
-std::vector<DecodedChunk> GPUDecoder::cpu_part(at::Tensor moves_sequence_qstring_cpu) {
+std::vector<DecodedChunk> GPUDecoder::beam_search_part_2(DecodeData data) {
+    auto moves_sequence_qstring_cpu = data.data;
     nvtx3::scoped_range loop{"cpu_decode"};
     assert(moves_sequence_qstring_cpu.device() == at::kCPU);
     auto moves_cpu = moves_sequence_qstring_cpu[0];
@@ -105,12 +110,6 @@ std::vector<DecodedChunk> GPUDecoder::cpu_part(at::Tensor moves_sequence_qstring
     }
 
     return called_chunks;
-}
-
-std::vector<DecodedChunk> GPUDecoder::beam_search(const at::Tensor &scores,
-                                                  int,
-                                                  const DecoderOptions &options) {
-    return cpu_part(gpu_part(scores, options));
 }
 
 }  // namespace dorado::basecall::decode

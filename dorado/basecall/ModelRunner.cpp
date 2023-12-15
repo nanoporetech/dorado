@@ -30,7 +30,8 @@ std::vector<decode::DecodedChunk> ModelRunner::call_chunks(int num_chunks) {
     dorado::stats::Timer timer;
     auto scores = m_module->forward(m_input.to(m_options.device_opt().value()));
     const auto forward_ms = timer.GetElapsedMS();
-    auto decoded_chunks = m_decoder->beam_search(scores, num_chunks, m_decoder_options);
+    auto decoded_chunks = m_decoder->beam_search_part_2(
+            m_decoder->beam_search_part_1({scores, num_chunks, m_decoder_options}));
     const auto forward_plus_decode_ms = timer.GetElapsedMS();
     ++m_num_batches_called;
     m_model_ms += forward_ms;
