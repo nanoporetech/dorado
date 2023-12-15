@@ -35,8 +35,4 @@ enable_warnings_as_errors(dorado_modbase)
 
 if (DORADO_ENABLE_PCH)
     target_precompile_headers(dorado_modbase REUSE_FROM dorado_utils)
-    # these are defined publicly by minimap2, which we're not using.
-    # we need to define them here so that the environment matches the one
-    # used when building the PCH
-    target_compile_definitions(dorado_modbase PRIVATE PTW32_CLEANUP_C PTW32_STATIC_LIB)
 endif()
