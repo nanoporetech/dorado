@@ -1,3 +1,25 @@
+if (DORADO_ENABLE_PCH)
+    add_library(dorado_pch
+        precompiled.cpp
+        precompiled.h
+    )
+    target_precompile_headers(dorado_pch
+        PUBLIC
+            precompiled.h
+    )
+    target_link_libraries(dorado_pch
+        PUBLIC
+            ${TORCH_LIBRARIES}
+    )
+    # 3rdparty libs should be considered SYSTEM headers
+    target_include_directories(dorado_pch
+        SYSTEM
+        PUBLIC
+            ${TORCH_INCLUDE_DIRS}
+    )
+endif()
+
+
 add_library(dorado_utils
     alignment_utils.cpp
     alignment_utils.h
@@ -70,13 +92,6 @@ target_compile_definitions(dorado_utils
         DORADO_GPU_BUILD=$<BOOL:${DORADO_GPU_BUILD}>
 )
 
-if (DORADO_ENABLE_PCH)
-    target_precompile_headers(dorado_utils
-        PRIVATE
-        "precompiled.h"
-    )
-endif()
-
 target_include_directories(dorado_utils
     INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/..
@@ -102,6 +117,11 @@ target_link_libraries(dorado_utils
         OpenSSL::SSL
         htslib
 )
+
+if (DORADO_ENABLE_PCH)
+    target_link_libraries(dorado_utils PUBLIC dorado_pch)
+    target_precompile_headers(dorado_utils REUSE_FROM dorado_pch)
+endif()
 
 if(APPLE AND DORADO_GPU_BUILD)
     add_dependencies(dorado_utils metal-lib)
