@@ -12,6 +12,7 @@
 #include <vector>
 
 struct bam1_t;
+typedef struct mm_tbuf_s mm_tbuf_t;
 
 namespace dorado {
 
@@ -39,6 +40,7 @@ private:
     void terminate_impl();
     void worker_thread();
     std::shared_ptr<const alignment::Minimap2Index> get_index(const ReadCommon& read_common);
+    void align_read_common(ReadCommon& read_common, mm_tbuf_t* tbuf);
 
     size_t m_threads;
     std::vector<std::thread> m_workers;

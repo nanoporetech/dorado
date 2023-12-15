@@ -66,6 +66,17 @@ std::shared_ptr<const alignment::Minimap2Index> AlignerNode::get_index(
     }
     auto index =
             m_index_file_access->get_index(align_info.reference_file, align_info.minimap_options);
+    if (!index) {
+        if (read_common.client_info->is_disconnected()) {
+            // Unlikely but ... may have disconnected since last checked and caused a
+            // an unload of the index file.
+            return {};
+        }
+        throw std::runtime_error(
+                "Cannot align read. Expected alignment reference file is not loaded: " +
+                align_info.reference_file);
+    }
+
     return index;
 }
 
@@ -98,14 +109,24 @@ alignment::HeaderSequenceRecords AlignerNode::get_sequence_records_for_header() 
     return alignment::Minimap2Aligner(m_index_for_bam_messages).get_sequence_records_for_header();
 }
 
+void AlignerNode::align_read_common(ReadCommon& read_common, mm_tbuf_t* tbuf) {
+    if (read_common.client_info->is_disconnected()) {
+        return;
+    }
+
+    auto index = get_index(read_common);
+    if (!index) {
+        return;
+    }
+
+    alignment::Minimap2Aligner(index).align(read_common, tbuf);
+}
+
 void AlignerNode::worker_thread() {
     Message message;
     mm_tbuf_t* tbuf = mm_tbuf_init();
     auto align_read = [this, tbuf](auto&& read) {
-        auto index = get_index(read->read_common);
-        if (index) {
-            alignment::Minimap2Aligner(index).align(read->read_common, tbuf);
-        }
+        align_read_common(read->read_common, tbuf);
         send_message_to_sink(std::move(read));
     };
     while (get_input_message(message)) {
