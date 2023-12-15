@@ -79,10 +79,12 @@ std::pair<int, int> Trimmer::determine_trim_interval(const AdapterScoreResult& r
         trim_interval.first = 0;
     } else {
         trim_interval.first = res.front.position.second + 1;
+        spdlog::trace("Detected front interval adapter/primer - {}", res.front.name);
     }
     if (res.rear.name == "unclassified" || res.rear.score < score_thres) {
         trim_interval.second = seqlen;
     } else {
+        spdlog::trace("Detected rear interval adapter/primer - {}", res.rear.name);
         trim_interval.second = res.rear.position.first;
     }
 
