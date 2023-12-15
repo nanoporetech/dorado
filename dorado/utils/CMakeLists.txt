@@ -1,25 +1,3 @@
-if (DORADO_ENABLE_PCH)
-    add_library(dorado_pch
-        precompiled.cpp
-        precompiled.h
-    )
-    target_precompile_headers(dorado_pch
-        PUBLIC
-            precompiled.h
-    )
-    target_link_libraries(dorado_pch
-        PUBLIC
-            ${TORCH_LIBRARIES}
-    )
-    # 3rdparty libs should be considered SYSTEM headers
-    target_include_directories(dorado_pch
-        SYSTEM
-        PUBLIC
-            ${TORCH_INCLUDE_DIRS}
-    )
-endif()
-
-
 add_library(dorado_utils
     alignment_utils.cpp
     alignment_utils.h
@@ -119,6 +97,7 @@ target_link_libraries(dorado_utils
 )
 
 if (DORADO_ENABLE_PCH)
+    add_subdirectory(pch)
     target_link_libraries(dorado_utils PUBLIC dorado_pch)
     target_precompile_headers(dorado_utils REUSE_FROM dorado_pch)
 endif()
