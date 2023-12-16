@@ -836,6 +836,7 @@ class ModelDownloader {
 
         httplib::Client http(urls::URL_ROOT);
         http.set_follow_location(true);
+        http.set_connection_timeout(20);
 
         const char* proxy_url = getenv("dorado_proxy");
         const char* ps = getenv("dorado_proxy_port");
