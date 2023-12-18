@@ -1,8 +1,6 @@
 add_library(dorado_basecall STATIC
     crf_utils.cpp
     crf_utils.h
-    CRFModel.cpp
-    CRFModel.h
     CRFModelConfig.cpp
     CRFModelConfig.h
     ModelRunner.cpp
@@ -14,6 +12,8 @@ add_library(dorado_basecall STATIC
     decode/CPUDecoder.h
     decode/Decoder.cpp
     decode/Decoder.h
+    nn/CRFModel.cpp
+    nn/CRFModel.h
 )
 
 if (DORADO_GPU_BUILD)
@@ -33,6 +33,11 @@ if (DORADO_GPU_BUILD)
         )
     endif()
 endif()
+
+target_compile_definitions(dorado_basecall
+    PUBLIC
+        USE_KOI=$<AND:$<BOOL:${DORADO_GPU_BUILD}>,$<NOT:$<BOOL:${APPLE}>>>
+)
 
 target_include_directories(dorado_basecall
     SYSTEM

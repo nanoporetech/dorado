@@ -1,11 +1,14 @@
 #include "crf_utils.h"
 
 #include "CRFModelConfig.h"
+#include "nn/CRFModel.h"
 #include "utils/memory_utils.h"
 #include "utils/tensor_utils.h"
 
 #include <algorithm>
 #include <thread>
+
+using namespace torch::nn;
 
 namespace dorado::basecall {
 std::vector<at::Tensor> load_crf_model_weights(const std::filesystem::path &dir,
@@ -45,6 +48,21 @@ std::vector<at::Tensor> load_crf_model_weights(const std::filesystem::path &dir,
     }
 
     return utils::load_tensors(dir, tensors);
+}
+
+ModuleHolder<AnyModule> load_crf_model(const CRFModelConfig &model_config,
+                                       const at::TensorOptions &options) {
+    auto model = nn::CRFModel(model_config);
+    auto state_dict = load_crf_model_weights(
+            model_config.model_path, model_config.out_features.has_value(), model_config.bias);
+    model->load_state_dict(state_dict);
+    model->to(options.dtype().toScalarType());
+    model->to(options.device());
+    model->eval();
+
+    auto module = AnyModule(model);
+    auto holder = ModuleHolder<AnyModule>(module);
+    return holder;
 }
 
 size_t auto_calculate_num_runners(const CRFModelConfig &model_config,

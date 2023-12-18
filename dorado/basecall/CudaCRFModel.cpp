@@ -1,6 +1,7 @@
 #include "CudaCRFModel.h"
 
 #include "CRFModelConfig.h"
+#include "crf_utils.h"
 #include "decode/Decoder.h"
 #include "utils/cuda_utils.h"
 #include "utils/math_utils.h"

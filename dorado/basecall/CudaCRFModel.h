@@ -1,7 +1,7 @@
 #pragma once
 
-#include "CRFModel.h"
 #include "ModelRunnerBase.h"
+#include "nn/CRFModel.h"
 
 #include <ATen/core/TensorBody.h>
 #include <c10/cuda/CUDAStream.h>

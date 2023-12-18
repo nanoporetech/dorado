@@ -1,6 +1,5 @@
 #include "MessageSinkUtils.h"
 #include "TestUtils.h"
-#include "basecall/CRFModel.h"
 #include "basecall/CRFModelConfig.h"
 #include "basecall/ModelRunner.h"
 #include "modbase/ModBaseModel.h"

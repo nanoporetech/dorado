@@ -1,7 +1,8 @@
 #include "ModelRunner.h"
 
-#include "CRFModel.h"
+#include "crf_utils.h"
 #include "decode/Decoder.h"
+#include "nn/CRFModel.h"
 
 namespace dorado::basecall {
 
