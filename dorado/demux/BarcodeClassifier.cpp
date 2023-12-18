@@ -39,7 +39,7 @@ EdlibAlignConfig init_edlib_config_for_flanks() {
 // the detected region.
 EdlibAlignConfig init_edlib_config_for_mask() {
     EdlibAlignConfig mask_config = edlibDefaultAlignConfig();
-    mask_config.mode = EDLIB_MODE_NW;
+    mask_config.mode = EDLIB_MODE_HW;
     mask_config.task =
             (spdlog::get_level() == spdlog::level::trace) ? EDLIB_TASK_PATH : EDLIB_TASK_LOC;
     return mask_config;
@@ -84,6 +84,54 @@ std::tuple<EdlibAlignResult, float, int> extract_flank_fit(std::string_view stra
     spdlog::trace("\n{}", utils::alignment_to_str(strand.data(), read.data(), result));
     int bc_loc = extract_mask_location(result, strand);
     return {result, score, bc_loc};
+}
+
+// Helper function to locally align the flanks with barcode mask
+// against a subsequence of the read (either front or rear window)
+// and return the alignment, score & barcode position.
+std::tuple<EdlibAlignResult, float, int, int> extract_flank_fit_rbk(
+        std::string_view strand,
+        std::string_view read,
+        int barcode_len,
+        const EdlibAlignConfig& placement_config,
+        const char* debug_prefix) {
+    (void)strand;
+    const std::string front_flank =
+            "GCTTGGGTGTTTAACCNNNNNNNNNNNNNNNNNNNNNNNNGTTTTCGCATTTATCGTGAAACGCTTTCGCGTTTTTCGTGCGCCGC"
+            "TTCA";
+    const std::string rear_flank =
+            "CNNNNNNNNNNNNNNNNNNNNNNNNGTTTTCGCATTTATCGTGAAACGCTTTCGCGTTTTTCGTGCGCCGCTTCA";
+
+    EdlibAlignResult result_front = edlibAlign(front_flank.data(), int(front_flank.length()),
+                                               read.data(), int(read.length()), placement_config);
+    float front_score = 1.f - static_cast<float>(result_front.editDistance) /
+                                      (front_flank.length() - barcode_len);
+    int bc_loc_front = extract_mask_location(result_front, front_flank);
+    spdlog::trace("{} {} front_score {} pos {}", debug_prefix, result_front.editDistance,
+                  front_score, bc_loc_front);
+    spdlog::trace("\n{}", utils::alignment_to_str(front_flank.data(), read.data(), result_front));
+
+    EdlibAlignResult result_rear = edlibAlign(rear_flank.data(), int(rear_flank.length()),
+                                              read.data(), int(read.length()), placement_config);
+    float rear_score = 1.f - static_cast<float>(result_rear.editDistance) /
+                                     (rear_flank.length() - barcode_len);
+    int bc_loc_rear = extract_mask_location(result_rear, rear_flank);
+    spdlog::trace("{} {} rear_score {} pos {}", debug_prefix, result_rear.editDistance, rear_score,
+                  bc_loc_rear);
+    spdlog::trace("\n{}", utils::alignment_to_str(rear_flank.data(), read.data(), result_rear));
+
+    (void)bc_loc_front;
+    auto mask_len = bc_loc_rear + barcode_len - (front_score > 0.6f ? bc_loc_front : 0);
+    if (mask_len == 0) {
+        spdlog::error("{} {} front_score {} pos {}", debug_prefix, result_front.editDistance,
+                      front_score, bc_loc_front);
+        spdlog::error("\n{}",
+                      utils::alignment_to_str(front_flank.data(), read.data(), result_front));
+        spdlog::error("{} {} rear_score {} pos {}", debug_prefix, result_rear.editDistance,
+                      rear_score, bc_loc_rear);
+        spdlog::error("\n{}", utils::alignment_to_str(rear_flank.data(), read.data(), result_rear));
+    }
+    return {result_rear, (rear_score + front_score) / 2, bc_loc_front, mask_len};
 }
 
 // Helper function to globally align a barcode to a region
@@ -528,9 +576,9 @@ std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score(
     std::string_view top_context = candidate.top_context;
     int barcode_len = int(candidate.barcodes1[0].length());
 
-    auto [top_result, top_flank_score, top_bc_loc] =
-            extract_flank_fit(top_context, read_top, barcode_len, placement_config, "top score");
-    std::string_view top_mask = read_top.substr(top_bc_loc, barcode_len);
+    auto [top_result, top_flank_score, top_bc_loc, mask_len] = extract_flank_fit_rbk(
+            top_context, read_top, barcode_len, placement_config, "top score");
+    std::string_view top_mask = read_top.substr(top_bc_loc, mask_len);
     spdlog::trace("BC location {}", top_bc_loc);
 
     std::vector<BarcodeScoreResult> results;
