@@ -30,9 +30,9 @@ inline float conv_activation(float x) {
     // tanh or SiLU / swish activation.
     const float y = kConvTanhActivation ? tanh_fast(x) : x * sigmoid(x);
     if (kConvOutputClamp) {
-        // Note: the lower bound is inoperative, since SiLU(x) has a min. of ~-0.28.
-        // Needs to updated anyway, once clamp range is nailed down.
-        return clamp(y, -0.5f, 3.5f);
+        // We only clamp in the case of SiLU/swish, which has a minimum of ~0.28.
+        // Only an upper bound need be imposed.
+        return min(y, 3.5f);
     }
     return y;
 }
