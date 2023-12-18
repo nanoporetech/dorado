@@ -181,6 +181,8 @@ set(LIB_SOURCE_FILES
     dorado/alignment/Minimap2Index.h
     dorado/alignment/Minimap2IndexSupportTypes.h
     dorado/alignment/Minimap2Options.h
+    dorado/api/caller_creation.cpp
+    dorado/api/caller_creation.h
     dorado/api/runner_creation.cpp
     dorado/api/runner_creation.h
     dorado/api/pipeline_creation.cpp

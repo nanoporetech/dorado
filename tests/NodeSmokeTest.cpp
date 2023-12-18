@@ -1,5 +1,6 @@
 #include "MessageSinkUtils.h"
 #include "TestUtils.h"
+#include "api/caller_creation.h"
 #include "basecall/CRFModelConfig.h"
 #include "basecall/ModelRunner.h"
 #include "modbase/ModBaseModel.h"
@@ -21,7 +22,7 @@
 #ifdef __APPLE__
 #include "basecall/MetalCRFModel.h"
 #else
-#include "basecall/CudaCRFModel.h"
+#include "basecall/CudaModelRunner.h"
 #include "utils/cuda_utils.h"
 #endif
 #endif  // DORADO_GPU_BUILD
@@ -226,7 +227,7 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
             SKIP("No CUDA devices found");
         }
         for (const auto& device : devices) {
-            auto caller = dorado::basecall::create_cuda_caller(
+            auto caller = dorado::callers::create_cuda_caller(
                     model_config, default_params.chunksize, int(batch_size), device, 1.f, true);
             for (int i = 0; i < default_params.num_runners; i++) {
                 runners.push_back(std::make_unique<dorado::basecall::CudaModelRunner>(caller));

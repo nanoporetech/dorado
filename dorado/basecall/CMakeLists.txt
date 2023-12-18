@@ -26,8 +26,10 @@ if (DORADO_GPU_BUILD)
     else()
         target_sources(dorado_basecall
             PRIVATE
-            CudaCRFModel.cpp
-            CudaCRFModel.h
+            CudaModelRunner.cpp
+            CudaModelRunner.h
+            CudaCaller.cpp
+            CudaCaller.h
             decode/CUDADecoder.cpp
             decode/CUDADecoder.h
         )

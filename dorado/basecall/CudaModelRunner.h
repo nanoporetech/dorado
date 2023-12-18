@@ -1,7 +1,6 @@
 #pragma once
 
 #include "ModelRunnerBase.h"
-#include "nn/CRFModel.h"
 
 #include <ATen/core/TensorBody.h>
 #include <c10/cuda/CUDAStream.h>
@@ -15,13 +14,6 @@ namespace dorado::basecall {
 
 struct CRFModelConfig;
 class CudaCaller;
-
-std::shared_ptr<CudaCaller> create_cuda_caller(const CRFModelConfig& model_config,
-                                               int chunk_size,
-                                               int batch_size,
-                                               const std::string& device,
-                                               float memory_limit_fraction,
-                                               bool exclusive_gpu_access);
 
 class CudaModelRunner final : public ModelRunnerBase {
 public:
