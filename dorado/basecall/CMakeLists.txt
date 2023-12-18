@@ -22,6 +22,8 @@ if (DORADO_GPU_BUILD)
             PRIVATE
             MetalCRFModel.cpp
             MetalCRFModel.h
+            nn/MetalCRFModel.cpp
+            nn/MetalCRFModel.h
         )
     else()
         target_sources(dorado_basecall

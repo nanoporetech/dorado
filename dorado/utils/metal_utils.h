@@ -53,6 +53,9 @@ void launch_kernel_no_wait(MTL::ComputePipelineState *cps,
                            long threadgroups,
                            long threads_per_threadgroup);
 
+// Returns true on success.
+bool finishCommandBuffer(std::string_view label, MTL::CommandBuffer *cb, int try_count);
+
 NS::SharedPtr<MTL::Device> get_mtl_device();
 int get_mtl_device_core_count();
 int get_apple_cpu_perf_core_count();

@@ -15,6 +15,10 @@
 #include <optional>
 #include <string>
 
+namespace MTL {
+auto format_as(CommandBufferStatus status) { return fmt::underlying(status); }
+}  // namespace MTL
+
 using namespace MTL;
 
 namespace fs = std::filesystem;
@@ -204,6 +208,29 @@ void launch_kernel_no_wait(ComputePipelineState *const pipeline,
                                           MTL::Size(threads_per_threadgroup, 1, 1));
     compute_encoder->memoryBarrier(BarrierScopeBuffers);
     compute_encoder->endEncoding();
+}
+
+bool finishCommandBuffer(std::string_view label, MTL::CommandBuffer *cb, int try_count) {
+    cb->commit();
+    cb->waitUntilCompleted();
+
+    auto status = cb->status();
+    bool success = (status == MTL::CommandBufferStatusCompleted);
+    if (success) {
+        spdlog::debug("Metal command buffer {}: {} GPU ms {} CPU ms succeeded (try {})", label,
+                      1000.f * float(cb->GPUEndTime() - cb->GPUStartTime()),
+                      1000.f * float(cb->kernelEndTime() - cb->kernelStartTime()), try_count);
+    } else {
+        spdlog::warn("Metal command buffer {} failed: status {} (try {})", label, status,
+                     try_count);
+        if (status == MTL::CommandBufferStatusError) {
+            const auto *const error_ptr = cb->error();
+            if (error_ptr)
+                spdlog::warn("Command buffer error code: {} ({})", error_ptr->code(),
+                             error_ptr->localizedDescription()->utf8String());
+        }
+    }
+    return success;
 }
 
 static NS::SharedPtr<MTL::Device> mtl_device;
