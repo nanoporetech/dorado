@@ -253,8 +253,8 @@ void MetalCaller::set_chunk_batch_size(const CRFModelConfig &model_config,
     m_out_batch_size = m_batch_size / m_out_split;
     assert(m_out_batch_size % MTL_CORE_BATCH_SIZE == 0);
 
-    m_model = nn::MetalModel(model_config, m_in_chunk_size, m_batch_size, m_out_split,
-                             m_device.get());
+    m_model = nn::MetalCRFModel(model_config, m_in_chunk_size, m_batch_size, m_out_split,
+                                m_device.get());
     m_model->load_state_dict(state_dict);
     m_model->eval();
 

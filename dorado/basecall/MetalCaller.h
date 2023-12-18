@@ -56,7 +56,7 @@ private:
     std::condition_variable m_decode_cv;
     std::vector<std::unique_ptr<std::thread>> m_decode_threads;
     decode::DecoderOptions m_decoder_options;
-    nn::MetalModel m_model{nullptr};
+    nn::MetalCRFModel m_model{nullptr};
     NS::SharedPtr<MTL::Device> m_device;
     NS::SharedPtr<MTL::ComputePipelineState> m_bwd_scan_cps, m_fwd_scan_add_softmax_cps;
     // Used to signal completion of an NNTask's decoding.

@@ -83,12 +83,12 @@ struct MetalBlockImpl : torch::nn::Module {
 
 TORCH_MODULE(MetalBlock);
 
-struct MetalModelImpl : torch::nn::Module {
-    MetalModelImpl(const CRFModelConfig &config,
-                   int chunk_size,
-                   int batch_size,
-                   int out_split,
-                   MTL::Device *const device);
+struct MetalCRFModelImpl : torch::nn::Module {
+    MetalCRFModelImpl(const CRFModelConfig &config,
+                      int chunk_size,
+                      int batch_size,
+                      int out_split,
+                      MTL::Device *const device);
 
     void load_state_dict(const std::vector<at::Tensor> &weights);
 
@@ -100,6 +100,6 @@ struct MetalModelImpl : torch::nn::Module {
     MetalBlock mtl_block{nullptr};
 };
 
-TORCH_MODULE(MetalModel);
+TORCH_MODULE(MetalCRFModel);
 
 }  // namespace dorado::basecall::nn
