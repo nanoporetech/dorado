@@ -94,6 +94,11 @@ void AdapterDetectorNode::process_read(BamPtr& read) {
         std::pair<int, int> trim_interval = adapter_trim_interval;
         trim_interval.first = std::max(trim_interval.first, primer_trim_interval.first);
         trim_interval.second = std::min(trim_interval.second, primer_trim_interval.second);
+        if (trim_interval.first >= trim_interval.second) {
+            spdlog::warn("Unexpected adapter/primer trim interval {}-{} for {}",
+                         trim_interval.first, trim_interval.second, seq);
+            return;
+        }
         read = Trimmer::trim_sequence(std::move(read), trim_interval);
     }
 }
@@ -125,6 +130,11 @@ void AdapterDetectorNode::process_read(SimplexRead& read) {
         std::pair<int, int> trim_interval = adapter_trim_interval;
         trim_interval.first = std::max(trim_interval.first, primer_trim_interval.first);
         trim_interval.second = std::min(trim_interval.second, primer_trim_interval.second);
+        if (trim_interval.first >= trim_interval.second) {
+            spdlog::warn("Unexpected adapter/primer trim interval {}-{} for {}",
+                         trim_interval.first, trim_interval.second, read.read_common.seq);
+            return;
+        }
         Trimmer::trim_sequence(read, trim_interval);
     }
     m_num_records++;
