@@ -35,7 +35,7 @@ elseif(WIN32)
         execute_process(COMMAND cmake --build ${HDF5_ZLIB_BUILD_DIR} --config Release --target install)
 
         # HDF5 itself
-        download_and_extract(https://nanoporetech.box.com/shared/static/h5u267duw3sa4l814yirmxamx3hgouwp.zip ${HDF_VER})
+        download_and_extract(https://cdn.oxfordnanoportal.com/software/analysis/${HDF_VER}-win.zip ${HDF_VER})
     endif()
 
     list(APPEND CMAKE_PREFIX_PATH ${HDF5_ZLIB_INSTALL_DIR})
