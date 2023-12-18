@@ -15,6 +15,10 @@ using namespace dorado::utils;
 using namespace std::chrono_literals;
 using torch::indexing::Slice;
 
+namespace {
+constexpr int MTL_CORE_BATCH_SIZE = 48;
+}
+
 namespace dorado::basecall {
 
 struct MetalCaller::NNTask {
@@ -55,89 +59,15 @@ MetalCaller::MetalCaller(const CRFModelConfig &model_config, int chunk_size, int
     // v4 scores come from a clamped [-5, 5] range that is rescaled by the kernel to
     // fit into bytes.
     // In both cases beam search applies the same 5/127 factor to scores.
-    score_scale = static_cast<float>(5.0 / 127.0);
+    m_score_scale = static_cast<float>(5.0 / 127.0);
 
     auto state_dict = load_crf_model_weights(
             model_config.model_path, model_config.out_features.has_value(), model_config.bias);
 
-    if (batch_size == 0) {
-        const size_t physical_memory = get_apple_physical_memory_bytes();
-        spdlog::debug("Physical memory available {} GB", physical_memory / (size_t{1} << 30));
-
-        // Constrain the maximum batch size to use about half physical memory for decode buffers,
-        // with neural network GPU buffers and CPU buffers assumed to occupy a subset of the
-        // remaining memory.  This generally constrains the batch size to use fewer than
-        // the maximum GPU cores when running sup models on systems with a large GPU core
-        // to system memory ratio.
-        const auto out_chunk_size = static_cast<size_t>(chunk_size / model_config.stride);
-        const auto decode_buffer_size_per_elem =
-                static_cast<size_t>(out_chunk_size) *
-                (static_cast<size_t>(model_config.outsize) +        // Scores
-                 static_cast<size_t>(m_states) * sizeof(int16_t) +  // Posts
-                 static_cast<size_t>(m_states) * sizeof(float));    // Back guides.
-        spdlog::debug("decode_buffer_size_per_elem {}", decode_buffer_size_per_elem);
-        const int max_batch_size = static_cast<int>(
-                std::clamp(utils::pad_to(physical_memory / (2 * decode_buffer_size_per_elem),
-                                         static_cast<size_t>(MTL_CORE_BATCH_SIZE)),
-                           static_cast<size_t>(MTL_CORE_BATCH_SIZE),
-                           static_cast<size_t>(MTL_CORE_BATCH_SIZE * get_mtl_device_core_count())));
-        spdlog::debug("max_batch_size {}", max_batch_size);
-
-        // Subject to the above memory constraint, impose a minimum batch size
-        // that will use 1/4 of GPU cores for LSTM execution.
-        const int min_batch_size =
-                std::min(MTL_CORE_BATCH_SIZE * get_mtl_device_core_count() / 4, max_batch_size);
-        spdlog::debug("min_batch_size {}", min_batch_size);
-
-        std::set<int> test_batch_sizes{max_batch_size};
-
-        // Add some batch sizes evenly distributed in between.
-        const int kNumSmallerSizes = 16;
-        const float test_size_increment = static_cast<float>(max_batch_size - min_batch_size) /
-                                          static_cast<float>(kNumSmallerSizes);
-        for (int i = 0; i < kNumSmallerSizes; ++i) {
-            const int test_batch_size =
-                    utils::pad_to(min_batch_size + static_cast<int>(i * test_size_increment),
-                                  static_cast<int>(MTL_CORE_BATCH_SIZE));
-            test_batch_sizes.insert(test_batch_size);
-        }
-
-        // To speed up test runs, use a smaller chunk size.  This means we will not see
-        // the true effect of memory thrashing, so we are relying on the memory limit
-        // above to avoid that scenario.
-        const int benchmark_chunk_size =
-                std::min(chunk_size - chunk_size % model_config.stride, model_config.stride * 300);
-
-        // Iterate through batch size candidates to find the most efficient one.
-        int best_batch_size = -1;
-        long long best_us_per_batch_element = std::numeric_limits<long long>::max();
-        for (int batch_size : test_batch_sizes) {
-            spdlog::debug("Trying batch size {}", batch_size);
-            set_chunk_batch_size(model_config, state_dict, benchmark_chunk_size, batch_size);
-            auto dummy_input = torch::empty(
-                    {batch_size, benchmark_chunk_size, m_num_input_features}, torch::kF16);
-            const auto start_time = std::chrono::system_clock::now();
-            auto *cb = m_model->forward_async(dummy_input, nullptr, 0, 0, m_scores_int8);
-            run_scan_kernels(cb, 0);
-            const auto end_time = std::chrono::system_clock::now();
-            const auto elapsed_us =
-                    std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time)
-                            .count();
-            const auto us_per_batch_element = elapsed_us / batch_size;
-            spdlog::debug("Batch {} us Batch element {} us", elapsed_us, us_per_batch_element);
-            if (us_per_batch_element < best_us_per_batch_element) {
-                best_us_per_batch_element = us_per_batch_element;
-                best_batch_size = batch_size;
-            }
-        }
-        assert(best_batch_size >= MTL_CORE_BATCH_SIZE);
-        assert(best_batch_size % MTL_CORE_BATCH_SIZE == 0);
-        set_chunk_batch_size(model_config, state_dict, chunk_size, best_batch_size);
-    } else {
-        // Use the user-supplied batch size padded to the nearest reasonable value.
-        set_chunk_batch_size(model_config, state_dict, chunk_size,
-                             utils::pad_to(batch_size, MTL_CORE_BATCH_SIZE));
-    }
+    auto selected_batch_size = (batch_size == 0)
+                                       ? benchmark_batch_sizes(model_config, state_dict, chunk_size)
+                                       : utils::pad_to(batch_size, MTL_CORE_BATCH_SIZE);
+    set_chunk_batch_size(model_config, state_dict, chunk_size, selected_batch_size);
 
     start_threads();
 }
@@ -279,6 +209,83 @@ void MetalCaller::set_chunk_batch_size(const CRFModelConfig &model_config,
     }
 }
 
+int MetalCaller::benchmark_batch_sizes(const CRFModelConfig &model_config,
+                                       const std::vector<at::Tensor> &state_dict,
+                                       int chunk_size) {
+    const size_t physical_memory = get_apple_physical_memory_bytes();
+    spdlog::debug("Physical memory available {} GB", physical_memory / (size_t{1} << 30));
+
+    // Constrain the maximum batch size to use about half physical memory for decode buffers,
+    // with neural network GPU buffers and CPU buffers assumed to occupy a subset of the
+    // remaining memory.  This generally constrains the batch size to use fewer than
+    // the maximum GPU cores when running sup models on systems with a large GPU core
+    // to system memory ratio.
+    const auto out_chunk_size = static_cast<size_t>(chunk_size / model_config.stride);
+    const auto decode_buffer_size_per_elem =
+            static_cast<size_t>(out_chunk_size) *
+            (static_cast<size_t>(model_config.outsize) +        // Scores
+             static_cast<size_t>(m_states) * sizeof(int16_t) +  // Posts
+             static_cast<size_t>(m_states) * sizeof(float));    // Back guides.
+    spdlog::trace("decode_buffer_size_per_elem {}", decode_buffer_size_per_elem);
+    const int max_batch_size = static_cast<int>(
+            std::clamp(utils::pad_to(physical_memory / (2 * decode_buffer_size_per_elem),
+                                     static_cast<size_t>(MTL_CORE_BATCH_SIZE)),
+                       static_cast<size_t>(MTL_CORE_BATCH_SIZE),
+                       static_cast<size_t>(MTL_CORE_BATCH_SIZE * get_mtl_device_core_count())));
+    spdlog::trace("max_batch_size {}", max_batch_size);
+
+    // Subject to the above memory constraint, impose a minimum batch size
+    // that will use 1/4 of GPU cores for LSTM execution.
+    const int min_batch_size =
+            std::min(MTL_CORE_BATCH_SIZE * get_mtl_device_core_count() / 4, max_batch_size);
+    spdlog::trace("min_batch_size {}", min_batch_size);
+
+    std::set<int> test_batch_sizes{max_batch_size};
+
+    // Add some batch sizes evenly distributed in between.
+    const int kNumSmallerSizes = 16;
+    const float test_size_increment = static_cast<float>(max_batch_size - min_batch_size) /
+                                      static_cast<float>(kNumSmallerSizes);
+    for (int i = 0; i < kNumSmallerSizes; ++i) {
+        const int test_batch_size =
+                utils::pad_to(min_batch_size + static_cast<int>(i * test_size_increment),
+                              static_cast<int>(MTL_CORE_BATCH_SIZE));
+        test_batch_sizes.insert(test_batch_size);
+    }
+
+    // To speed up test runs, use a smaller chunk size.  This means we will not see
+    // the true effect of memory thrashing, so we are relying on the memory limit
+    // above to avoid that scenario.
+    const int benchmark_chunk_size =
+            std::min(chunk_size - chunk_size % model_config.stride, model_config.stride * 300);
+
+    // Iterate through batch size candidates to find the most efficient one.
+    int best_batch_size = -1;
+    long long best_us_per_batch_element = std::numeric_limits<long long>::max();
+    for (int batch_size : test_batch_sizes) {
+        spdlog::debug("Trying batch size {}", batch_size);
+        set_chunk_batch_size(model_config, state_dict, benchmark_chunk_size, batch_size);
+        auto dummy_input =
+                torch::empty({batch_size, benchmark_chunk_size, m_num_input_features}, torch::kF16);
+        const auto start_time = std::chrono::system_clock::now();
+        auto *cb = m_model->forward_async(dummy_input, nullptr, 0, 0, m_scores_int8);
+        run_scan_kernels(cb, 0);
+        const auto end_time = std::chrono::system_clock::now();
+        const auto elapsed_us =
+                std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time)
+                        .count();
+        const auto us_per_batch_element = elapsed_us / batch_size;
+        spdlog::debug("Batch {} us Batch element {} us", elapsed_us, us_per_batch_element);
+        if (us_per_batch_element < best_us_per_batch_element) {
+            best_us_per_batch_element = us_per_batch_element;
+            best_batch_size = batch_size;
+        }
+    }
+    assert(best_batch_size >= MTL_CORE_BATCH_SIZE);
+    assert(best_batch_size % MTL_CORE_BATCH_SIZE == 0);
+    return best_batch_size;
+}
+
 bool MetalCaller::run_scan_kernels(MTL::CommandBuffer *const cb, int try_count) {
     // This stage is operating on the split outputs of the linear layer, so
     // the effective batch size is m_out_batch_size.
@@ -416,7 +423,7 @@ void MetalCaller::decode_thread_fn() {
                 m_bwd.at(out_buf_idx)[buf_chunk_idx], m_posts_int16.at(out_buf_idx)[buf_chunk_idx],
                 m_decoder_options.beam_width, m_decoder_options.beam_cut,
                 m_decoder_options.blank_score, m_decoder_options.q_shift, m_decoder_options.q_scale,
-                score_scale);
+                m_score_scale);
 
         (*task->out_chunks)[chunk_idx] =
                 decode::DecodedChunk{std::move(sequence), std::move(qstring), std::move(moves)};

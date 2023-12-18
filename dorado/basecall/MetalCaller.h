@@ -32,12 +32,14 @@ public:
 
 private:
     struct NNTask;
-    static constexpr int MTL_CORE_BATCH_SIZE = 48;
 
     void set_chunk_batch_size(const CRFModelConfig &model_config,
                               const std::vector<at::Tensor> &state_dict,
                               int chunk_size,
                               int batch_size);
+    int benchmark_batch_sizes(const CRFModelConfig &model_config,
+                              const std::vector<at::Tensor> &state_dict,
+                              int chunk_size);
     bool run_scan_kernels(MTL::CommandBuffer *const cb, int try_count);
 
     void start_threads();
@@ -68,7 +70,7 @@ private:
     int m_out_split;
     int m_out_batch_size;
     // v3 and v4 models have different score scaling requirements.
-    float score_scale{0.0f};
+    float m_score_scale{0.0f};
     // Chunk input channel count.
     int m_num_input_features = -1;
 };
