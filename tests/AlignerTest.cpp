@@ -184,6 +184,35 @@ TEST_CASE("AlignerTest: Check dorado tags are retained", TEST_GROUP) {
     }
 }
 
+TEST_CASE("AlignerTest: Check modbase tags are removed for secondary alignments", TEST_GROUP) {
+    using Catch::Matchers::Contains;
+
+    fs::path aligner_test_dir = fs::path(get_aligner_data_dir());
+    auto ref = aligner_test_dir / "supplementary_basecall_target.fa";
+    auto query = aligner_test_dir / "basecall.sam";
+
+    auto options = dorado::alignment::dflt_options;
+    options.kmer_size = options.window_size = 15;
+    options.index_batch_size = 1'000'000'000ull;
+    options.soft_clipping = GENERATE(true, false);
+    dorado::HtsReader reader(query.string(), std::nullopt);
+    auto bam_records = RunAlignmentPipeline(reader, ref.string(), options, 10);
+    REQUIRE(bam_records.size() == 2);
+
+    bam1_t* rec = bam_records[1].get();
+
+    // Check aux tags.
+    if (options.soft_clipping) {
+        CHECK(bam_aux_get(rec, "MM") != NULL);
+        CHECK(bam_aux_get(rec, "ML") != NULL);
+        CHECK(bam_aux_get(rec, "MN") != NULL);
+    } else {
+        CHECK(bam_aux_get(rec, "MM") == NULL);
+        CHECK(bam_aux_get(rec, "ML") == NULL);
+        CHECK(bam_aux_get(rec, "MN") == NULL);
+    }
+}
+
 TEST_CASE("AlignerTest: Verify impact of updated aligner args", TEST_GROUP) {
     fs::path aligner_test_dir = fs::path(get_aligner_data_dir());
     auto ref = aligner_test_dir / "target.fq";
