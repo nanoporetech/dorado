@@ -1,10 +1,11 @@
 #include "BasecallerNode.h"
 
-#include "basecall/ModelRunner.h"
-#include "basecall/decode/CPUDecoder.h"
+#include "basecall/CRFModelConfig.h"
+#include "basecall/ModelRunnerBase.h"
 #include "stitch.h"
 #include "utils/stats.h"
 
+#include <ATen/ATen.h>
 #include <nvtx3/nvtx3.hpp>
 
 #include <algorithm>
@@ -15,7 +16,7 @@
 #endif
 
 using namespace std::chrono_literals;
-using namespace torch::indexing;
+using namespace at::indexing;
 
 namespace dorado {
 
@@ -242,15 +243,13 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
             if (slice_size != m_chunk_size) {
                 if (input_slice.ndimension() == 1) {
                     auto [n, overhang] = std::div((int)m_chunk_size, (int)slice_size);
-                    input_slice = torch::concat(
-                            {input_slice.repeat({n}),
-                             input_slice.index({Ellipsis, torch::indexing::Slice(0, overhang)})});
+                    input_slice = at::concat({input_slice.repeat({n}),
+                                              input_slice.index({Ellipsis, Slice(0, overhang)})});
                 } else if (input_slice.ndimension() == 2) {
                     auto [n, overhang] = std::div((int)m_chunk_size, (int)slice_size);
-                    input_slice = torch::concat(
-                            {input_slice.repeat({1, n}),
-                             input_slice.index({Ellipsis, torch::indexing::Slice(0, overhang)})},
-                            1);
+                    input_slice = at::concat({input_slice.repeat({1, n}),
+                                              input_slice.index({Ellipsis, Slice(0, overhang)})},
+                                             1);
                 }
             }
 

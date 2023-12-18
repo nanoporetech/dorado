@@ -1,11 +1,12 @@
 #pragma once
 
 #include "CRFModel.h"
-#include "ModelRunner.h"
+#include "ModelRunnerBase.h"
 
 #include <ATen/core/TensorBody.h>
 #include <c10/cuda/CUDAStream.h>
 
+#include <atomic>
 #include <filesystem>
 #include <memory>
 #include <vector>

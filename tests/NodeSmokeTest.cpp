@@ -3,7 +3,6 @@
 #include "basecall/CRFModel.h"
 #include "basecall/CRFModelConfig.h"
 #include "basecall/ModelRunner.h"
-#include "basecall/decode/CPUDecoder.h"
 #include "modbase/ModBaseModel.h"
 #include "modbase/ModBaseRunner.h"
 #include "models/models.h"
@@ -243,8 +242,7 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
         set_num_reads(5);
         set_expected_messages(5);
         batch_size = 8;
-        runners.push_back(std::make_unique<
-                          dorado::basecall::ModelRunner<dorado::basecall::decode::CPUDecoder>>(
+        runners.push_back(std::make_unique<dorado::basecall::ModelRunner>(
                 model_config, "cpu", default_params.chunksize, int(batch_size)));
     }
 

@@ -1,7 +1,6 @@
 #include "runner_creation.h"
 
 #include "basecall/crf_utils.h"
-#include "basecall/decode/CPUDecoder.h"
 
 #if DORADO_GPU_BUILD
 #ifdef __APPLE__
@@ -53,7 +52,7 @@ std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
                       num_cpu_runners);
 
         for (size_t i = 0; i < num_cpu_runners; i++) {
-            runners.push_back(std::make_unique<basecall::ModelRunner<basecall::decode::CPUDecoder>>(
+            runners.push_back(std::make_unique<basecall::ModelRunner>(
                     model_config, device, int(chunk_size), int(batch_size)));
         }
     }

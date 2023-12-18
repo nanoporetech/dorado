@@ -6,12 +6,12 @@
 
 namespace dorado::basecall::decode {
 
-class CPUDecoder final : Decoder {
+class CPUDecoder final : public Decoder {
 public:
-    std::vector<DecodedChunk> beam_search(const at::Tensor& scores,
-                                          int num_chunks,
-                                          const DecoderOptions& options) final;
-    constexpr static at::ScalarType dtype = at::ScalarType::Float;
+    DecodeData beam_search_part_1(DecodeData data) const;
+    std::vector<DecodedChunk> beam_search_part_2(DecodeData data) const;
+
+    at::ScalarType dtype() const { return at::ScalarType::Float; };
 };
 
 }  // namespace dorado::basecall::decode
