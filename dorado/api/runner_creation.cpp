@@ -5,7 +5,7 @@
 
 #if DORADO_GPU_BUILD
 #ifdef __APPLE__
-#include "basecall/MetalCRFModel.h"
+#include "basecall/MetalModelRunner.h"
 #else
 #include "basecall/CudaModelRunner.h"
 #include "utils/cuda_utils.h"
@@ -60,7 +60,7 @@ std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
 #if DORADO_GPU_BUILD
 #ifdef __APPLE__
     else if (device == "metal") {
-        auto caller = basecall::create_metal_caller(model_config, int(chunk_size), int(batch_size));
+        auto caller = callers::create_metal_caller(model_config, int(chunk_size), int(batch_size));
         for (size_t i = 0; i < num_gpu_runners; i++) {
             runners.push_back(std::make_unique<basecall::MetalModelRunner>(caller));
         }

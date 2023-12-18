@@ -20,7 +20,7 @@
 
 #if DORADO_GPU_BUILD
 #ifdef __APPLE__
-#include "basecall/MetalCRFModel.h"
+#include "basecall/MetalModelRunner.h"
 #else
 #include "basecall/CudaModelRunner.h"
 #include "utils/cuda_utils.h"
@@ -216,8 +216,8 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
     if (gpu) {
 #if DORADO_GPU_BUILD
 #ifdef __APPLE__
-        auto caller = dorado::basecall::create_metal_caller(model_config, default_params.chunksize,
-                                                            batch_size);
+        auto caller = dorado::callers::create_metal_caller(model_config, default_params.chunksize,
+                                                           batch_size);
         for (int i = 0; i < default_params.num_runners; i++) {
             runners.push_back(std::make_unique<dorado::basecall::MetalModelRunner>(caller));
         }

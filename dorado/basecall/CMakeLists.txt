@@ -20,8 +20,10 @@ if (DORADO_GPU_BUILD)
     if(APPLE)
         target_sources(dorado_basecall
             PRIVATE
-            MetalCRFModel.cpp
-            MetalCRFModel.h
+            MetalCaller.cpp
+            MetalCaller.h            
+            MetalModelRunner.cpp
+            MetalModelRunner.h
             nn/MetalCRFModel.cpp
             nn/MetalCRFModel.h
         )

@@ -15,10 +15,6 @@ namespace dorado::basecall {
 struct CRFModelConfig;
 class MetalCaller;
 
-std::shared_ptr<MetalCaller> create_metal_caller(const CRFModelConfig& model_config,
-                                                 int chunk_size,
-                                                 int batch_size);
-
 class MetalModelRunner final : public ModelRunnerBase {
 public:
     explicit MetalModelRunner(std::shared_ptr<MetalCaller> caller);
