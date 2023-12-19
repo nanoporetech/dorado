@@ -224,13 +224,13 @@ std::vector<BamPtr> Minimap2Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
 
         // Remove MM/ML/MN tags if secondary alignment and soft clipping is not enabled.
         if ((flag & BAM_FSECONDARY) && !(mm_map_opts.flag & MM_F_SOFTCLIP)) {
-            if (auto tag = bam_aux_get(record, "MM"); tag != NULL) {
+            if (auto tag = bam_aux_get(record, "MM"); tag != nullptr) {
                 bam_aux_del(record, tag);
             }
-            if (auto tag = bam_aux_get(record, "ML"); tag != NULL) {
+            if (auto tag = bam_aux_get(record, "ML"); tag != nullptr) {
                 bam_aux_del(record, tag);
             }
-            if (auto tag = bam_aux_get(record, "MN"); tag != NULL) {
+            if (auto tag = bam_aux_get(record, "MN"); tag != nullptr) {
                 bam_aux_del(record, tag);
             }
         }

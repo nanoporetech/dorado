@@ -203,13 +203,13 @@ TEST_CASE("AlignerTest: Check modbase tags are removed for secondary alignments"
 
     // Check aux tags.
     if (options.soft_clipping) {
-        CHECK(bam_aux_get(rec, "MM") != NULL);
-        CHECK(bam_aux_get(rec, "ML") != NULL);
-        CHECK(bam_aux_get(rec, "MN") != NULL);
+        CHECK(bam_aux_get(rec, "MM") != nullptr);
+        CHECK(bam_aux_get(rec, "ML") != nullptr);
+        CHECK(bam_aux_get(rec, "MN") != nullptr);
     } else {
-        CHECK(bam_aux_get(rec, "MM") == NULL);
-        CHECK(bam_aux_get(rec, "ML") == NULL);
-        CHECK(bam_aux_get(rec, "MN") == NULL);
+        CHECK(bam_aux_get(rec, "MM") == nullptr);
+        CHECK(bam_aux_get(rec, "ML") == nullptr);
+        CHECK(bam_aux_get(rec, "MN") == nullptr);
     }
 }
 
