@@ -132,6 +132,14 @@ void MetalCaller::restart() {
     }
 }
 
+at::Tensor MetalCaller::create_input_tensor() const {
+    // Metal convolution kernels operate with channel ordering (N, T, C).  If m_input
+    // is to be submitted directly then it must also have this arrangement.
+    // Note that this is not the same as other caller implementations, which
+    // have T innermost.
+    return torch::empty({m_batch_size, m_in_chunk_size, m_num_input_features}, torch::kF16);
+}
+
 void MetalCaller::set_chunk_batch_size(const CRFModelConfig &model_config,
                                        const std::vector<at::Tensor> &state_dict,
                                        int chunk_size,

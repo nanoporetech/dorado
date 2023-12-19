@@ -31,9 +31,9 @@ public:
 
 private:
     std::shared_ptr<CudaCaller> m_caller;
-    c10::cuda::CUDAStream m_stream;
     at::Tensor m_input;
     at::Tensor m_output;
+    c10::cuda::CUDAStream m_stream;
 
     // Performance monitoring stats.
     std::atomic<int64_t> m_num_batches_called = 0;

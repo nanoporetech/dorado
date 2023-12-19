@@ -20,8 +20,6 @@
 namespace dorado::basecall {
 
 class CudaCaller {
-    friend class CudaModelRunner;
-
 public:
     CudaCaller(const CRFModelConfig &model_config,
                int chunk_size,
@@ -38,6 +36,10 @@ public:
 
     void terminate();
     void restart();
+
+    at::Tensor create_input_tensor() const;
+    at::Tensor create_output_tensor() const;
+    const CRFModelConfig &config() const { return m_config; }
 
     std::string get_name() const { return std::string("CudaCaller_") + m_device; }
 

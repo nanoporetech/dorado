@@ -134,6 +134,17 @@ void CudaCaller::restart() {
     }
 }
 
+at::Tensor CudaCaller::create_input_tensor() const {
+    auto opts = at::TensorOptions().device(torch::kCPU).pinned_memory(true);
+    return torch::empty({m_batch_size, m_num_input_features, m_in_chunk_size},
+                        opts.dtype(m_options.dtype()));
+}
+
+at::Tensor CudaCaller::create_output_tensor() const {
+    auto opts = at::TensorOptions().device(torch::kCPU).pinned_memory(true);
+    return torch::empty({3, m_batch_size, m_out_chunk_size}, opts.dtype(torch::kInt8));
+}
+
 stats::NamedStats CudaCaller::sample_stats() const {
     stats::NamedStats stats;
     stats["batches_called"] = double(m_num_batches_called);

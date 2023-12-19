@@ -17,8 +17,6 @@
 namespace dorado::basecall {
 
 class MetalCaller {
-    friend class MetalModelRunner;
-
 public:
     MetalCaller(const CRFModelConfig &model_config, int chunk_size, int batch_size);
     ~MetalCaller();
@@ -29,6 +27,9 @@ public:
 
     void terminate();
     void restart();
+
+    const CRFModelConfig &config() const { return m_config; }
+    at::Tensor create_input_tensor() const;
 
 private:
     struct NNTask;
