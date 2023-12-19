@@ -23,7 +23,7 @@ using RunnerPtr = std::unique_ptr<ModBaseRunner>;
 
 using PairingParameters = std::variant<DuplexPairingParameters, std::map<std::string, std::string>>;
 
-namespace pipelines {
+namespace api {
 
 /// Create a simplex basecall pipeline description
 /// If source_node_handle is valid, set this to be the source of the simplex pipeline
@@ -56,6 +56,6 @@ void create_stereo_duplex_pipeline(PipelineDescriptor& pipeline_desc,
                                    NodeHandle sink_node_handle,
                                    NodeHandle source_node_handle);
 
-}  // namespace pipelines
+}  // namespace api
 
 }  // namespace dorado

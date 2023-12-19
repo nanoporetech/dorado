@@ -15,6 +15,8 @@ namespace basecall {
 struct CRFModelConfig;
 }  // namespace basecall
 
+namespace api {
+
 std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
         const basecall::CRFModelConfig& model_config,
         const std::string& device,
@@ -31,4 +33,5 @@ std::vector<modbase::RunnerPtr> create_modbase_runners(
         size_t remora_runners_per_caller,
         size_t remora_batch_size);
 
+}  // namespace api
 }  // namespace dorado

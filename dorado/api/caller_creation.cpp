@@ -10,7 +10,7 @@
 
 #include "modbase/ModBaseCaller.h"
 
-namespace dorado::callers {
+namespace dorado::api {
 
 #if DORADO_GPU_BUILD
 #ifndef __APPLE__
@@ -40,4 +40,4 @@ std::shared_ptr<modbase::ModBaseCaller> create_modbase_caller(
     return std::make_shared<modbase::ModBaseCaller>(model_paths, batch_size, device);
 }
 
-}  // namespace dorado::callers
+}  // namespace dorado::api

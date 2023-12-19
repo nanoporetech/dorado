@@ -215,8 +215,8 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
     if (gpu) {
 #if DORADO_GPU_BUILD
 #ifdef __APPLE__
-        auto caller = dorado::callers::create_metal_caller(model_config, default_params.chunksize,
-                                                           batch_size);
+        auto caller = dorado::api::create_metal_caller(model_config, default_params.chunksize,
+                                                       batch_size);
         for (int i = 0; i < default_params.num_runners; i++) {
             runners.push_back(std::make_unique<dorado::basecall::MetalModelRunner>(caller));
         }
@@ -226,8 +226,8 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
             SKIP("No CUDA devices found");
         }
         for (const auto& device : devices) {
-            auto caller = dorado::callers::create_cuda_caller(
-                    model_config, default_params.chunksize, int(batch_size), device, 1.f, true);
+            auto caller = dorado::api::create_cuda_caller(model_config, default_params.chunksize,
+                                                          int(batch_size), device, 1.f, true);
             for (int i = 0; i < default_params.num_runners; i++) {
                 runners.push_back(std::make_unique<dorado::basecall::CudaModelRunner>(caller));
             }
@@ -302,8 +302,8 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
         batch_size = 8;  // reduce batch size so we're not doing work on empty entries
     }
     for (const auto& device_string : modbase_devices) {
-        auto caller = dorado::callers::create_modbase_caller({remora_model, remora_model_6mA},
-                                                             batch_size, device_string);
+        auto caller = dorado::api::create_modbase_caller({remora_model, remora_model_6mA},
+                                                         batch_size, device_string);
         for (int i = 0; i < default_params.mod_base_runners_per_caller; i++) {
             remora_runners.push_back(std::make_unique<dorado::modbase::ModBaseRunner>(caller));
         }

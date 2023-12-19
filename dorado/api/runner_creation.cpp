@@ -18,7 +18,7 @@
 
 #include <thread>
 
-namespace dorado {
+namespace dorado::api {
 
 std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
         const basecall::CRFModelConfig& model_config,
@@ -61,7 +61,7 @@ std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
 #if DORADO_GPU_BUILD
 #ifdef __APPLE__
     else if (device == "metal") {
-        auto caller = callers::create_metal_caller(model_config, int(chunk_size), int(batch_size));
+        auto caller = create_metal_caller(model_config, int(chunk_size), int(batch_size));
         for (size_t i = 0; i < num_gpu_runners; i++) {
             runners.push_back(std::make_unique<basecall::MetalModelRunner>(caller));
         }
@@ -88,7 +88,7 @@ std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
         std::vector<std::future<std::shared_ptr<basecall::CudaCaller>>> futures;
 
         for (auto device_string : devices) {
-            futures.push_back(pool.push(callers::create_cuda_caller, model_config, int(chunk_size),
+            futures.push_back(pool.push(create_cuda_caller, model_config, int(chunk_size),
                                         int(batch_size), device_string, memory_fraction,
                                         guard_gpus));
         }
@@ -168,8 +168,8 @@ std::vector<modbase::RunnerPtr> create_modbase_runners(
 #endif  // DORADO_GPU_BUILD
     for (const auto& device_string : modbase_devices) {
         for (int i = 0; i < remora_callers; ++i) {
-            auto caller = callers::create_modbase_caller(remora_models, int(remora_batch_size),
-                                                         device_string);
+            auto caller =
+                    create_modbase_caller(remora_models, int(remora_batch_size), device_string);
             for (size_t j = 0; j < remora_runners_per_caller; j++) {
                 remora_runners.push_back(std::make_unique<modbase::ModBaseRunner>(caller));
             }
@@ -179,4 +179,4 @@ std::vector<modbase::RunnerPtr> create_modbase_runners(
     return remora_runners;
 }
 
-}  // namespace dorado
+}  // namespace dorado::api

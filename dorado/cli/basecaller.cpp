@@ -118,12 +118,12 @@ void setup(std::vector<std::string> args,
     const bool enable_aligner = !ref.empty();
 
     // create modbase runners first so basecall runners can pick batch sizes based on available memory
-    auto remora_runners = create_modbase_runners(remora_models, device,
-                                                 default_parameters.mod_base_runners_per_caller,
-                                                 remora_batch_size);
+    auto remora_runners = api::create_modbase_runners(
+            remora_models, device, default_parameters.mod_base_runners_per_caller,
+            remora_batch_size);
 
-    auto [runners, num_devices] = create_basecall_runners(model_config, device, num_runners, 0,
-                                                          batch_size, chunk_size, 1.f, false);
+    auto [runners, num_devices] = api::create_basecall_runners(model_config, device, num_runners, 0,
+                                                               batch_size, chunk_size, 1.f, false);
 
     auto read_groups = DataLoader::load_read_groups(data_path, model_name, modbase_model_names,
                                                     recursive_file_loading);
@@ -187,7 +187,7 @@ void setup(std::vector<std::string> args,
             throw std::runtime_error("Mean q-score start position cannot be < 0");
         }
     }
-    pipelines::create_simplex_pipeline(
+    api::create_simplex_pipeline(
             pipeline_desc, std::move(runners), std::move(remora_runners), overlap,
             mean_qscore_start_pos, thread_allocations.scaler_node_threads,
             true /* Enable read splitting */, thread_allocations.splitter_node_threads,
