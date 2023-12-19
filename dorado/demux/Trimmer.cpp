@@ -12,6 +12,20 @@ namespace {
 
 const std::string UNCLASSIFIED_BARCODE = "unclassified";
 
+// This part of trimming is split out into its own unoptimised function since not doing so
+// causes binaries built by GCC8 with ASAN enabled to crash during static init.
+// Note that the cause of the crash doesn't appear to be specific to this bit of code, since
+// removing other parts from subread() also "fixes" the issue, but this is the smallest
+// snippet that works around the issue without potentially incurring performance issues.
+// This fix is copied from others parts of the code that exhibited similar errors
+// with ASAN.
+#if defined(__GNUC__) && defined(__SANITIZE_ADDRESS__)
+__attribute__((optimize("O0")))
+#endif
+void trim_torch_tensor(at::Tensor& raw_data, int num_samples_trimmed) {
+    raw_data = raw_data.index({Slice(num_samples_trimmed, at::indexing::None)});
+}
+
 }  // namespace
 
 namespace dorado {
@@ -173,8 +187,7 @@ void Trimmer::trim_sequence(SimplexRead& read, std::pair<int, int> trim_interval
     if (num_positions_trimmed > 0) {
         auto num_samples_trimmed = read.read_common.model_stride * num_positions_trimmed;
         read.read_common.num_trimmed_samples += num_samples_trimmed;
-        read.read_common.raw_data =
-                read.read_common.raw_data.index({Slice(num_samples_trimmed, at::indexing::None)});
+        trim_torch_tensor(read.read_common.raw_data, num_samples_trimmed);
     }
 
     if (read.read_common.mod_base_info) {
