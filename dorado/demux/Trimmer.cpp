@@ -129,12 +129,12 @@ BamPtr Trimmer::trim_sequence(BamPtr input, std::pair<int, int> trim_interval) {
     auto trimmed_qual = utils::trim_quality(qual, trim_interval);
     auto [positions_trimmed, trimmed_moves] = utils::trim_move_table(move_vals, trim_interval);
     ts += positions_trimmed * stride;
-    // After trimming, the number of samples corresponding to the signal is the size of
-    // the new move table * stride. Since ns consider the number of trimmed samples as
-    // well, ts needs to be added to that final count.
+    // After sequence trimming, the number of samples corresponding to the sequence is the size of
+    // the new move table * stride. However, the ns tag includes the number of samples trimmed from the
+    // front of the read as well.
     // |---------------------- ns ------------------|
     // |----ts----|--------moves signal-------------|
-    ns = trimmed_moves.size() * stride + ts;
+    ns = int(trimmed_moves.size() * stride) + ts;
     auto [trimmed_modbase_str, trimmed_modbase_probs] =
             utils::trim_modbase_info(seq, modbase_str, modbase_probs, trim_interval);
     auto n_cigar = input_record->core.n_cigar;
@@ -193,20 +193,21 @@ void Trimmer::trim_sequence(SimplexRead& read, std::pair<int, int> trim_interval
     auto [leading_mv_positions_trimmed, trimmed_moves] =
             utils::trim_move_table(read.read_common.moves, trim_interval);
 
-    // Number of samples trimmed is the number of move positions times the stride.
+    // Number of samples trimmed is the number of move positions trimmed from the front
+    // of the read times the stride.
     auto num_leading_samples_trimmed = read.read_common.model_stride * leading_mv_positions_trimmed;
     // This gets added to the number of samples previously trimmed, such as from signal scaling, etc.
     read.read_common.num_trimmed_samples += num_leading_samples_trimmed;
-    // The move table can be trimmed from both ends, so determine the new total sample
-    // count by looking at new move count.
+    // The move table can be trimmed from both ends, so determine the new signal length corresponding
+    // to the trimmed sequence by looking at new move table size.
     auto num_samples_from_mv_table = trimmed_moves.size() * read.read_common.model_stride;
-    // The trimmed signal should only correspond to the moves from the trimmed move table, so
+    // The final signal should only correspond to the moves from the trimmed move table, so
     // the corresponding signal needs to be extracted from the original signal.
     trim_torch_tensor(
             read.read_common.raw_data,
             {num_leading_samples_trimmed, num_leading_samples_trimmed + num_samples_from_mv_table});
 
-    read.read_common.moves = trimmed_moves;
+    read.read_common.moves = std::move(trimmed_moves);
 
     if (read.read_common.mod_base_info) {
         int num_modbase_channels = int(read.read_common.mod_base_info->alphabet.size());
