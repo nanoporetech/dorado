@@ -26,10 +26,13 @@ struct ModBaseModelConfig {
     bool reverse_signal{false};           ///< Reverse model data before processing (rna model)
 };
 
-ModBaseModelConfig load_modbase_model_config(const std::filesystem::path & model_path);
+ModBaseModelConfig load_modbase_model_config(const std::filesystem::path& model_path);
 
 // Determine the modbase alphabet from parameters and calculate offset positions for the results
 ModBaseInfo get_modbase_info(
-        const std::vector<std::reference_wrapper<const ModBaseModelConfig>> & base_mod_params);
+        const std::vector<std::reference_wrapper<const ModBaseModelConfig>>& base_mod_params);
+
+void check_modbase_multi_model_compatibility(
+        const std::vector<std::filesystem::path>& modbase_models);
 
 }  // namespace dorado::modbase

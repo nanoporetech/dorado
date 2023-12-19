@@ -15,6 +15,7 @@ dorado_bin=$(cd "$(dirname $1)"; pwd -P)/$(basename $1)
 model_name=${2:-dna_r10.4.1_e8.2_400bps_hac@v4.1.0}
 batch=${3:-384}
 model_name_5k=${4:-dna_r10.4.1_e8.2_400bps_hac@v4.2.0}
+model_name_5k_v43=${4:-dna_r10.4.1_e8.2_400bps_hac@v4.3.0}
 data_dir=$test_dir/data
 output_dir_name=$(echo $RANDOM | head -c 10)
 output_dir=${test_dir}/${output_dir_name}
@@ -27,6 +28,8 @@ $dorado_bin download --model ${model_name} --directory ${output_dir}
 model=${output_dir}/${model_name}
 $dorado_bin download --model ${model_name_5k} --directory ${output_dir}
 model_5k=${output_dir}/${model_name_5k}
+$dorado_bin download --model ${model_name_5k_v43} --directory ${output_dir}
+model_5k_v43=${output_dir}/${model_name_5k_v43}
 
 echo dorado basecaller test stage
 $dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --emit-fastq > $output_dir/ref.fq
@@ -54,6 +57,10 @@ if $dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --emit-fastq --ref
 fi
 if $dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --emit-fastq --modified-bases 5mCG_5hmCG > $output_dir/error_condition.fq; then
     echo  "Error: dorado basecaller should fail with combination of emit-fastq and modbase!"
+    exit 1
+fi
+if $dorado_bin basecaller $model_5k_v43 $data_dir/duplex/pod5 --modified-bases 5mC_5hmC 5mCG_5hmCG > $output_dir/error_condition.fq; then 
+    echo  "Error: dorado basecaller should fail with multiple modbase configs having overlapping mods!"
     exit 1
 fi
 set -e
