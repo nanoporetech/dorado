@@ -3,7 +3,6 @@
 #include "api/caller_creation.h"
 #include "basecall/CRFModelConfig.h"
 #include "basecall/ModelRunner.h"
-#include "modbase/ModBaseModel.h"
 #include "modbase/ModBaseRunner.h"
 #include "models/models.h"
 #include "read_pipeline/AdapterDetectorNode.h"
@@ -303,7 +302,7 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
         batch_size = 8;  // reduce batch size so we're not doing work on empty entries
     }
     for (const auto& device_string : modbase_devices) {
-        auto caller = dorado::modbase::create_modbase_caller({remora_model, remora_model_6mA},
+        auto caller = dorado::callers::create_modbase_caller({remora_model, remora_model_6mA},
                                                              batch_size, device_string);
         for (int i = 0; i < default_params.mod_base_runners_per_caller; i++) {
             remora_runners.push_back(std::make_unique<dorado::modbase::ModBaseRunner>(caller));

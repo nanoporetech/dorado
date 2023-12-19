@@ -1,10 +1,10 @@
 add_library(dorado_modbase STATIC
+    ModBaseCaller.cpp
+    ModBaseCaller.h
     ModBaseContext.cpp
     ModBaseContext.h
     ModbaseEncoder.cpp
     ModbaseEncoder.h
-    ModBaseModel.cpp
-    ModBaseModel.h
     ModBaseModelConfig.cpp
     ModBaseModelConfig.h    
     ModBaseRunner.cpp
@@ -13,6 +13,8 @@ add_library(dorado_modbase STATIC
     ModbaseScaler.h
     MotifMatcher.cpp
     MotifMatcher.h
+    nn/ModBaseModel.cpp
+    nn/ModBaseModel.h
 )
 
 target_include_directories(dorado_modbase

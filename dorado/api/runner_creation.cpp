@@ -168,7 +168,7 @@ std::vector<modbase::RunnerPtr> create_modbase_runners(
 #endif  // DORADO_GPU_BUILD
     for (const auto& device_string : modbase_devices) {
         for (int i = 0; i < remora_callers; ++i) {
-            auto caller = modbase::create_modbase_caller(remora_models, int(remora_batch_size),
+            auto caller = callers::create_modbase_caller(remora_models, int(remora_batch_size),
                                                          device_string);
             for (size_t j = 0; j < remora_runners_per_caller; j++) {
                 remora_runners.push_back(std::make_unique<modbase::ModBaseRunner>(caller));

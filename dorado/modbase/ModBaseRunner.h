@@ -16,11 +16,6 @@ namespace dorado::modbase {
 struct ModBaseModelConfig;
 class ModBaseCaller;
 
-std::shared_ptr<ModBaseCaller> create_modbase_caller(
-        const std::vector<std::filesystem::path>& model_paths,
-        int batch_size,
-        const std::string& device);
-
 class ModBaseRunner {
 public:
     explicit ModBaseRunner(std::shared_ptr<ModBaseCaller> caller);
