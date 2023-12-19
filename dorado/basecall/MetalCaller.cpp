@@ -8,7 +8,9 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+#include <cassert>
 #include <chrono>
+#include <cstdint>
 #include <set>
 
 using namespace dorado::utils;
