@@ -1,9 +1,7 @@
 #include "MessageSinkUtils.h"
 #include "TestUtils.h"
-#include "api/caller_creation.h"
+#include "api/runner_creation.h"
 #include "basecall/CRFModelConfig.h"
-#include "basecall/ModelRunner.h"
-#include "modbase/ModBaseRunner.h"
 #include "models/models.h"
 #include "read_pipeline/AdapterDetectorNode.h"
 #include "read_pipeline/BarcodeClassifierNode.h"
@@ -17,16 +15,13 @@
 #include "utils/SampleSheet.h"
 #include "utils/parameters.h"
 
-#if DORADO_GPU_BUILD
-#ifdef __APPLE__
-#include "basecall/MetalModelRunner.h"
-#else
-#include "basecall/CudaModelRunner.h"
+#if DORADO_GPU_BUILD && !defined(__APPLE__)
 #include "utils/cuda_utils.h"
-#endif
-#endif  // DORADO_GPU_BUILD
+#endif  // DORADO_GPU_BUILD && !defined(__APPLE__)
 
+#include <ATen/Functions.h>
 #include <catch2/catch.hpp>
+#include <torch/types.h>
 
 #include <algorithm>
 #include <filesystem>
@@ -55,7 +50,7 @@ protected:
 
     auto make_test_read(std::string read_id) {
         auto read = std::make_unique<dorado::SimplexRead>();
-        read->read_common.raw_data = torch::rand(size_t(random_between(100, 200)));
+        read->read_common.raw_data = at::rand(size_t(random_between(100, 200)));
         read->read_common.sample_rate = 5000;
         read->read_common.shift = random_between(100, 200);
         read->read_common.scale = random_between(5, 10);
@@ -210,27 +205,16 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
     // Use a fixed batch size otherwise we slow down CI autobatchsizing.
     std::size_t batch_size = 128;
 
-    // Create runners
-    std::vector<dorado::basecall::RunnerPtr> runners;
+    std::string device;
     if (gpu) {
 #if DORADO_GPU_BUILD
 #ifdef __APPLE__
-        auto caller = dorado::api::create_metal_caller(model_config, default_params.chunksize,
-                                                       batch_size);
-        for (int i = 0; i < default_params.num_runners; i++) {
-            runners.push_back(std::make_unique<dorado::basecall::MetalModelRunner>(caller));
-        }
+        device = "metal";
 #else   // __APPLE__
-        auto devices = dorado::utils::parse_cuda_device_string("cuda:all");
+        device = "cuda:all";
+        auto devices = dorado::utils::parse_cuda_device_string(device);
         if (devices.empty()) {
             SKIP("No CUDA devices found");
-        }
-        for (const auto& device : devices) {
-            auto caller = dorado::api::create_cuda_caller(model_config, default_params.chunksize,
-                                                          int(batch_size), device, 1.f, true);
-            for (int i = 0; i < default_params.num_runners; i++) {
-                runners.push_back(std::make_unique<dorado::basecall::CudaModelRunner>(caller));
-            }
         }
 #endif  // __APPLE__
 #else   // DORADO_GPU_BUILD
@@ -241,10 +225,14 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
         set_num_reads(5);
         set_expected_messages(5);
         batch_size = 8;
-        runners.push_back(std::make_unique<dorado::basecall::ModelRunner>(
-                model_config, "cpu", default_params.chunksize, int(batch_size)));
+        device = "cpu";
     }
 
+    // Create runners
+    auto [runners, num_devices] = dorado::api::create_basecall_runners(
+            model_config, device, default_params.num_runners, 1, batch_size,
+            default_params.chunksize, 1.f, true);
+    CHECK(num_devices != 0);
     run_smoke_test<dorado::BasecallerNode>(std::move(runners),
                                            dorado::utils::default_parameters.overlap,
                                            kBatchTimeoutMS, model_name, 1000, "BasecallerNode", 0);
@@ -278,15 +266,15 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
             dorado::basecall::load_crf_model_config(model_dir.m_path / model_name).stride;
 
     // Create runners
-    std::vector<dorado::modbase::RunnerPtr> remora_runners;
-    std::vector<std::string> modbase_devices;
+    std::string device;
     int batch_size = default_params.remora_batchsize;
     if (gpu) {
 #if DORADO_GPU_BUILD
 #ifdef __APPLE__
-        modbase_devices.push_back("metal");
+        device = "metal";
 #else   //__APPLE__
-        modbase_devices = dorado::utils::parse_cuda_device_string("cuda:all");
+        device = "cuda:all";
+        auto modbase_devices = dorado::utils::parse_cuda_device_string("cuda:all");
         if (modbase_devices.empty()) {
             SKIP("No CUDA devices found");
         }
@@ -298,15 +286,8 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
         // CPU processing is very slow, so reduce the number of test reads we throw at it.
         set_num_reads(5);
         set_expected_messages(5);
-        modbase_devices.push_back("cpu");
+        device = "cpu";
         batch_size = 8;  // reduce batch size so we're not doing work on empty entries
-    }
-    for (const auto& device_string : modbase_devices) {
-        auto caller = dorado::api::create_modbase_caller({remora_model, remora_model_6mA},
-                                                         batch_size, device_string);
-        for (int i = 0; i < default_params.mod_base_runners_per_caller; i++) {
-            remora_runners.push_back(std::make_unique<dorado::modbase::ModBaseRunner>(caller));
-        }
     }
 
     // ModBase node expects half input and needs a move table
@@ -323,6 +304,10 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
         std::shuffle(std::next(read->read_common.moves.begin()), read->read_common.moves.end(),
                      m_rng);
     });
+
+    auto remora_runners = dorado::api::create_modbase_runners(
+            {remora_model, remora_model_6mA}, device, default_params.mod_base_runners_per_caller,
+            batch_size);
 
     run_smoke_test<dorado::ModBaseCallerNode>(std::move(remora_runners), 2, model_stride, 1000);
 }
