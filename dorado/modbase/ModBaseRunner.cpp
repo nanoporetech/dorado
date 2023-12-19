@@ -12,36 +12,34 @@
 
 #include <torch/torch.h>
 
+namespace {
+#if DORADO_GPU_BUILD && !defined(__APPLE__)
+std::vector<c10::optional<c10::Stream>> get_streams_from_tensors(
+        const std::vector<at::Tensor>& tensors) {
+    std::vector<c10::optional<c10::Stream>> streams;
+    for (const auto& tensor : tensors) {
+        if (tensor.device().is_cuda()) {
+            streams.push_back(c10::cuda::getStreamFromPool(false, tensor.device().index()));
+        } else {
+            streams.emplace_back();
+        }
+    }
+    return streams;
+}
+#endif
+}  // namespace
+
 namespace dorado::modbase {
 
-ModBaseRunner::ModBaseRunner(std::shared_ptr<ModBaseCaller> caller) : m_caller(std::move(caller)) {
-    auto opts = at::TensorOptions()
-                        .device(torch::kCPU)
-                        .pinned_memory(m_caller->m_options.device().is_cuda())
-                        .dtype(m_caller->m_options.dtype());
-
-    auto seq_input_options = at::TensorOptions()
-                                     .device(torch::kCPU)
-                                     .pinned_memory(m_caller->m_options.device().is_cuda())
-                                     .dtype(torch::kInt8);
-
-    for (auto& caller_data : m_caller->m_caller_data) {
-        auto sig_len = static_cast<int64_t>(caller_data->params.context_before +
-                                            caller_data->params.context_after);
-        auto kmer_len = caller_data->params.bases_after + caller_data->params.bases_before + 1;
-        m_input_sigs.push_back(torch::empty({caller_data->batch_size, 1, sig_len}, opts));
-        m_input_seqs.push_back(torch::empty(
-                {caller_data->batch_size, sig_len, utils::BaseInfo::NUM_BASES * kmer_len},
-                seq_input_options));
+ModBaseRunner::ModBaseRunner(std::shared_ptr<ModBaseCaller> caller)
+        : m_caller(std::move(caller)),
+          m_input_sigs(m_caller->create_input_sig_tensors()),
+          m_input_seqs(m_caller->create_input_seq_tensors())
 #if DORADO_GPU_BUILD && !defined(__APPLE__)
-        if (m_caller->m_options.device().is_cuda()) {
-            m_streams.push_back(
-                    c10::cuda::getStreamFromPool(false, m_caller->m_options.device().index()));
-        } else {
-            m_streams.emplace_back();
-        }
+          ,
+          m_streams(get_streams_from_tensors(m_input_sigs))
 #endif
-    }
+{
 }
 
 void ModBaseRunner::accept_chunk(int model_id,
@@ -82,7 +80,7 @@ at::Tensor ModBaseRunner::scale_signal(size_t caller_id,
                                        at::Tensor signal,
                                        const std::vector<int>& seq_ints,
                                        const std::vector<uint64_t>& seq_to_sig_map) const {
-    auto& scaler = m_caller->m_caller_data[caller_id]->scaler;
+    auto& scaler = m_caller->caller_data(caller_id)->scaler;
     if (scaler) {
         return scaler->scale_signal(signal, seq_ints, seq_to_sig_map);
     }
@@ -90,14 +88,14 @@ at::Tensor ModBaseRunner::scale_signal(size_t caller_id,
 }
 
 std::vector<size_t> ModBaseRunner::get_motif_hits(size_t caller_id, const std::string& seq) const {
-    return m_caller->m_caller_data[caller_id]->get_motif_hits(seq);
+    return m_caller->caller_data(caller_id)->get_motif_hits(seq);
 }
 
 const ModBaseModelConfig& ModBaseRunner::caller_params(size_t caller_id) const {
-    return m_caller->m_caller_data[caller_id]->params;
+    return m_caller->caller_data(caller_id)->params;
 }
 
-size_t ModBaseRunner::num_callers() const { return m_caller->m_caller_data.size(); }
+size_t ModBaseRunner::num_callers() const { return m_caller->num_model_callers(); }
 void ModBaseRunner::terminate() { m_caller->terminate(); }
 void ModBaseRunner::restart() { m_caller->restart(); }
 

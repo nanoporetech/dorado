@@ -37,8 +37,8 @@ struct ModBaseCaller::ModBaseTask {
 ModBaseCaller::ModBaseData::ModBaseData(const std::filesystem::path& model_path,
                                         at::TensorOptions opts,
                                         int batch_size_)
-        : module_holder(load_modbase_model(model_path, opts)),
-          params(load_modbase_model_config(model_path)),
+        : params(load_modbase_model_config(model_path)),
+          module_holder(load_modbase_model(model_path, opts)),
           matcher(params),
           batch_size(batch_size_) {
     if (params.refine_do_rough_rescale) {
@@ -112,6 +112,38 @@ ModBaseCaller::~ModBaseCaller() {
     for (auto& task_thread : m_task_threads) {
         task_thread->join();
     }
+}
+
+std::vector<at::Tensor> ModBaseCaller::create_input_sig_tensors() const {
+    auto opts = at::TensorOptions()
+                        .device(torch::kCPU)
+                        .pinned_memory(m_options.device().is_cuda())
+                        .dtype(m_options.dtype());
+
+    std::vector<at::Tensor> input_sigs;
+    for (auto& caller_data : m_caller_data) {
+        auto sig_len = static_cast<int64_t>(caller_data->params.context_before +
+                                            caller_data->params.context_after);
+        input_sigs.push_back(torch::empty({caller_data->batch_size, 1, sig_len}, opts));
+    }
+    return input_sigs;
+}
+
+std::vector<at::Tensor> ModBaseCaller::create_input_seq_tensors() const {
+    auto opts = at::TensorOptions()
+                        .device(torch::kCPU)
+                        .pinned_memory(m_options.device().is_cuda())
+                        .dtype(torch::kInt8);
+
+    std::vector<at::Tensor> input_seqs;
+    for (auto& caller_data : m_caller_data) {
+        auto sig_len = static_cast<int64_t>(caller_data->params.context_before +
+                                            caller_data->params.context_after);
+        auto kmer_len = caller_data->params.bases_after + caller_data->params.bases_before + 1;
+        input_seqs.push_back(torch::empty(
+                {caller_data->batch_size, sig_len, utils::BaseInfo::NUM_BASES * kmer_len}, opts));
+    }
+    return input_seqs;
 }
 
 at::Tensor ModBaseCaller::call_chunks(size_t model_id,
@@ -207,9 +239,9 @@ void ModBaseCaller::modbase_task_thread_fn(size_t model_id) {
         if (task->stream.has_value()) {
             task->stream->synchronize();
         }
+#endif
         // Only meaningful if we're syncing the stream.
         m_model_ms += timer.GetElapsedMS();
-#endif
         ++m_num_batches_called;
         task->done = true;
         task_lock.unlock();

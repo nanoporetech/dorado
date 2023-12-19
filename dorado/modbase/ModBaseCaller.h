@@ -21,13 +21,37 @@ namespace dorado::modbase {
 class ModBaseScaler;
 
 class ModBaseCaller {
-    friend class ModBaseRunner;
+    struct ModBaseTask;
 
 public:
+    class ModBaseData {
+        friend class ModBaseCaller;
+
+    public:
+        ModBaseData(const std::filesystem::path& model_path,
+                    at::TensorOptions opts,
+                    int batch_size_);
+        std::vector<size_t> get_motif_hits(const std::string& seq) const;
+
+        const ModBaseModelConfig params;
+        std::unique_ptr<ModBaseScaler> scaler;
+
+    private:
+        torch::nn::ModuleHolder<torch::nn::AnyModule> module_holder;
+        const MotifMatcher matcher;
+        std::deque<std::shared_ptr<ModBaseTask>> input_queue;
+        std::mutex input_lock;
+        std::condition_variable input_cv;
+        const int batch_size;
+    };
+
     ModBaseCaller(const std::vector<std::filesystem::path>& model_paths,
                   int batch_size,
                   const std::string& device);
     ~ModBaseCaller();
+
+    std::vector<at::Tensor> create_input_sig_tensors() const;
+    std::vector<at::Tensor> create_input_seq_tensors() const;
 
     at::Tensor call_chunks(size_t model_id,
                            at::Tensor& input_sigs,
@@ -43,25 +67,12 @@ public:
 
     stats::NamedStats sample_stats() const;
 
+    const std::unique_ptr<ModBaseData>& caller_data(size_t caller_id) {
+        return m_caller_data[caller_id];
+    }
+    size_t num_model_callers() const { return m_caller_data.size(); }
+
 private:
-    struct ModBaseTask;
-
-    struct ModBaseData {
-        ModBaseData(const std::filesystem::path& model_path,
-                    at::TensorOptions opts,
-                    int batch_size_);
-        std::vector<size_t> get_motif_hits(const std::string& seq) const;
-
-        torch::nn::ModuleHolder<torch::nn::AnyModule> module_holder;
-        std::unique_ptr<ModBaseScaler> scaler;
-        const ModBaseModelConfig params;
-        const MotifMatcher matcher;
-        std::deque<std::shared_ptr<ModBaseTask>> input_queue;
-        std::mutex input_lock;
-        std::condition_variable input_cv;
-        const int batch_size;
-    };
-
     void start_threads();
     void modbase_task_thread_fn(size_t model_id);
 
