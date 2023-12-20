@@ -197,19 +197,33 @@ TEST_CASE("AlignerTest: Check modbase tags are removed for secondary alignments"
     options.soft_clipping = GENERATE(true, false);
     dorado::HtsReader reader(query.string(), std::nullopt);
     auto bam_records = RunAlignmentPipeline(reader, ref.string(), options, 10);
-    REQUIRE(bam_records.size() == 2);
+    REQUIRE(bam_records.size() == 3);
 
-    bam1_t* rec = bam_records[1].get();
+    bam1_t* primary_rec = bam_records[0].get();
+    bam1_t* secondary_rec = bam_records[1].get();
+    bam1_t* supplementary_rec = bam_records[2].get();
 
     // Check aux tags.
     if (options.soft_clipping) {
-        CHECK(bam_aux_get(rec, "MM") != nullptr);
-        CHECK(bam_aux_get(rec, "ML") != nullptr);
-        CHECK(bam_aux_get(rec, "MN") != nullptr);
+        CHECK(bam_aux_get(primary_rec, "MM") != nullptr);
+        CHECK(bam_aux_get(primary_rec, "ML") != nullptr);
+        CHECK(bam_aux_get(primary_rec, "MN") != nullptr);
+        CHECK(bam_aux_get(secondary_rec, "MM") != nullptr);
+        CHECK(bam_aux_get(secondary_rec, "ML") != nullptr);
+        CHECK(bam_aux_get(secondary_rec, "MN") != nullptr);
+        CHECK(bam_aux_get(supplementary_rec, "MM") != nullptr);
+        CHECK(bam_aux_get(supplementary_rec, "ML") != nullptr);
+        CHECK(bam_aux_get(supplementary_rec, "MN") != nullptr);
     } else {
-        CHECK(bam_aux_get(rec, "MM") == nullptr);
-        CHECK(bam_aux_get(rec, "ML") == nullptr);
-        CHECK(bam_aux_get(rec, "MN") == nullptr);
+        CHECK(bam_aux_get(primary_rec, "MM") != nullptr);
+        CHECK(bam_aux_get(primary_rec, "ML") != nullptr);
+        CHECK(bam_aux_get(primary_rec, "MN") != nullptr);
+        CHECK(bam_aux_get(secondary_rec, "MM") == nullptr);
+        CHECK(bam_aux_get(secondary_rec, "ML") == nullptr);
+        CHECK(bam_aux_get(secondary_rec, "MN") == nullptr);
+        CHECK(bam_aux_get(supplementary_rec, "MM") == nullptr);
+        CHECK(bam_aux_get(supplementary_rec, "ML") == nullptr);
+        CHECK(bam_aux_get(supplementary_rec, "MN") == nullptr);
     }
 }
 
