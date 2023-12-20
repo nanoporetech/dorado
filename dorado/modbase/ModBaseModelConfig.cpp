@@ -2,7 +2,6 @@
 
 #include "utils/bam_utils.h"
 #include "utils/sequence_utils.h"
-#include "utils/string_utils.h"
 #include "utils/tensor_utils.h"
 
 #include <toml.hpp>
@@ -136,19 +135,14 @@ void check_modbase_multi_model_compatibility(
     std::string err_msg = "";
     for (size_t i = 0; i < modbase_models.size(); i++) {
         auto ref_model = load_modbase_model_config(modbase_models[i]);
-        const auto& ref_model_mods = ref_model.mod_long_names;
+        const auto& ref_motif = ref_model.motif[ref_model.motif_offset];
         for (size_t j = i + 1; j < modbase_models.size(); j++) {
             auto query_model = load_modbase_model_config(modbase_models[j]);
-            const auto& query_model_mods = query_model.mod_long_names;
+            const auto& query_motif = query_model.motif[query_model.motif_offset];
 
-            std::vector<std::string> overlap_mods;
-            std::set_intersection(ref_model_mods.begin(), ref_model_mods.end(),
-                                  query_model_mods.begin(), query_model_mods.end(),
-                                  std::back_inserter(overlap_mods));
-
-            if (!overlap_mods.empty()) {
+            if (ref_motif == query_motif) {
                 err_msg += modbase_models[i].string() + " and " + modbase_models[j].string() +
-                           " have overlapping mods: " + utils::join(overlap_mods, ",") + ";";
+                           " have overlapping canonical motif: " + ref_motif;
             }
         }
     }
