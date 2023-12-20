@@ -730,6 +730,20 @@ const std::vector<ModelInfo> models = {
                 ModsVariantPair{ModsVariant::M_6mA, VV::v1_0_0},
         },
         ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_hac@v4.3.0_6mA@v2",
+                "7b8e2887ba113832063555a0bc4df0e27ae2d905dbf7b65d05d7f91cf07df670",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelVariantPair{ModelVariant::HAC, VV::v4_3_0},
+                ModsVariantPair{ModsVariant::M_6mA, VV::v2_0_0},
+        },
+        ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_sup@v4.3.0_6mA@v2",
+                "643891d0cafcb07e6f985b17ed2fe3e033feff4db9c4c3053faa5e3281b4b5b4",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelVariantPair{ModelVariant::SUP, VV::v4_3_0},
+                ModsVariantPair{ModsVariant::M_6mA, VV::v2_0_0},
+        },
+        ModelInfo{
                 "dna_r10.4.1_e8.2_400bps_hac@v4.3.0_5mCG_5hmCG@v1",
                 "49b1f6e1ae353bf0991c0001a47bdb9d2c01e097b60229ec6f576ff1d02bf604",
                 CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
