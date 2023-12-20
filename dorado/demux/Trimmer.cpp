@@ -23,6 +23,10 @@ const std::string UNCLASSIFIED_BARCODE = "unclassified";
 __attribute__((optimize("O0")))
 #endif
 void trim_torch_tensor(at::Tensor& raw_data, std::pair<uint64_t,uint64_t> sample_trim_interval) {
+    // Note - Duplex signal/read trimming is not supported yet.
+    if (raw_data.sizes().size() > 1) {
+        throw std::runtime_error("Read trimming is not supported for duplex reads");
+    }
     raw_data = raw_data.index({Slice(sample_trim_interval.first, sample_trim_interval.second)});
 }
 
