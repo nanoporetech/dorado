@@ -7,6 +7,7 @@
 #include "utils/bam_utils.h"
 #include "utils/sequence_utils.h"
 
+#include <ATen/Functions.h>
 #include <catch2/catch.hpp>
 #include <htslib/sam.h>
 
@@ -142,6 +143,7 @@ TEST_CASE(
         moves.push_back(0);
     }
     read->read_common.moves = moves;
+    read->read_common.raw_data = at::zeros(moves.size() * stride);
 
     // Generate mod prob table so only the first A after the front flank has a mod.
     const std::vector<std::string> mod_alphabet = {"A", "a", "C", "G", "T"};
