@@ -770,14 +770,6 @@ const std::vector<ModelInfo> models = {
 
 }  // namespace modified
 
-const std::unordered_map<std::string, uint16_t> mean_qscore_start_pos_by_model = {
-
-        // To add model specific start positions for older models,
-        // create an entry keyed by model name with the value as
-        // the desired start position.
-        // e.g. {"dna_r10.4.1_e8.2_5khz_400bps_fast@v4.2.0", 10}
-};
-
 std::string calculate_checksum(std::string_view data) {
     // Hash the data.
     std::array<unsigned char, SHA256_DIGEST_LENGTH> hash{};
@@ -1090,17 +1082,7 @@ SamplingRate get_sample_rate_by_model_name(const std::string& model_name) {
         return iter->second.sampling_rate;
     } else {
         // This can only happen if a model_info.chemistry not in chemistries which should be impossible.
-        throw std::logic_error("Couldn't find chemsitry: " + to_string(model_info.chemistry));
-    }
-}
-
-uint32_t get_mean_qscore_start_pos_by_model_name(const std::string& model_name) {
-    auto iter = mean_qscore_start_pos_by_model.find(model_name);
-    if (iter != mean_qscore_start_pos_by_model.end()) {
-        return iter->second;
-    } else {
-        // Assume start position of 60 as default.
-        return 60;
+        throw std::logic_error("Couldn't find chemistry: " + to_string(model_info.chemistry));
     }
 }
 

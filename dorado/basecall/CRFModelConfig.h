@@ -108,8 +108,6 @@ struct CRFModelConfig {
 
 CRFModelConfig load_crf_model_config(const std::filesystem::path& path);
 
-int32_t get_model_mean_qscore_start_pos(const CRFModelConfig& model_config);
-
 bool is_rna_model(const CRFModelConfig& model_config);
 
 }  // namespace dorado::basecall
