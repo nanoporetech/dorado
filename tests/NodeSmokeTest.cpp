@@ -171,7 +171,7 @@ DEFINE_TEST(NodeSmokeTestRead, "ScalerNode") {
     auto model_type =
             GENERATE(dorado::basecall::SampleType::DNA, dorado::basecall::SampleType::RNA002,
                      dorado::basecall::SampleType::RNA004);
-    auto trim_adatper = GENERATE(true, false);
+    auto trim_adapter = GENERATE(true, false);
     CAPTURE(pipeline_restart);
     CAPTURE(model_type);
 
@@ -188,7 +188,7 @@ DEFINE_TEST(NodeSmokeTestRead, "ScalerNode") {
     config.quantile.quantile_b = 0.9f;
     config.quantile.shift_multiplier = 0.51f;
     config.quantile.scale_multiplier = 0.53f;
-    run_smoke_test<dorado::ScalerNode>(config, model_type, trim_adatper, 2, 1000);
+    run_smoke_test<dorado::ScalerNode>(config, model_type, trim_adapter, 2, 1000);
 }
 
 DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
