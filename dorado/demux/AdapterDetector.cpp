@@ -18,7 +18,8 @@
 
 namespace {
 
-const int TRIM_LENGTH = 150;
+const int ADAPTER_TRIM_LENGTH = 75;
+const int PRIMER_TRIM_LENGTH = 150;
 
 // Create edlib configuration for detecting adapters and primers.
 EdlibAlignConfig init_edlib_config_for_adapters() {
@@ -116,6 +117,7 @@ AdapterScoreResult AdapterDetector::detect(const std::string& seq,
                                            const std::vector<Query>& queries,
                                            AdapterDetector::QueryType query_type) const {
     const std::string_view seq_view(seq);
+    const auto TRIM_LENGTH = (query_type == ADAPTER ? ADAPTER_TRIM_LENGTH : PRIMER_TRIM_LENGTH);
     const std::string_view read_front = seq_view.substr(0, TRIM_LENGTH);
     int rear_start = std::max(0, int(seq.length()) - TRIM_LENGTH);
     const std::string_view read_rear = seq_view.substr(rear_start, TRIM_LENGTH);
@@ -128,7 +130,7 @@ AdapterScoreResult AdapterDetector::detect(const std::string& seq,
         const auto& name = queries[i].name;
         const auto& query_seq = queries[i].sequence;
         const auto& query_seq_rev = queries[i].sequence_rev;
-        spdlog::debug("Checking adapter/primer {}", name);
+        spdlog::trace("Checking adapter/primer {}", name);
 
         auto front_result = edlibAlign(query_seq.data(), int(query_seq.length()), read_front.data(),
                                        int(read_front.length()), placement_config);

@@ -133,7 +133,7 @@ int trim(int argc, char* argv[]) {
     auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, "-", output_mode, trim_writer_threads);
 
     pipeline_desc.add_node<AdapterDetectorNode>({hts_writer}, trim_threads, true,
-                                                parser.get<bool>("--no-trim-primers"));
+                                                !parser.get<bool>("--no-trim-primers"));
 
     // Create the Pipeline from our description.
     std::vector<dorado::stats::StatsReporter> stats_reporters;

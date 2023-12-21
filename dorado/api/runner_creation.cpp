@@ -3,6 +3,7 @@
 #include "basecall/ModelRunner.h"
 #include "basecall/crf_utils.h"
 #include "caller_creation.h"
+#include "modbase/ModBaseModelConfig.h"
 
 #if DORADO_GPU_BUILD
 #ifdef __APPLE__
@@ -143,6 +144,8 @@ std::vector<modbase::RunnerPtr> create_modbase_runners(
     if (remora_models.empty()) {
         return {};
     }
+
+    modbase::check_modbase_multi_model_compatibility(remora_models);
 
     // generate model callers before nodes or it affects the speed calculations
     std::vector<modbase::RunnerPtr> remora_runners;

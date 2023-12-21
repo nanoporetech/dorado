@@ -3,11 +3,32 @@
 #include "utils/bam_utils.h"
 #include "utils/trim.h"
 
+#include <ATen/ATen.h>
 #include <htslib/sam.h>
+
+using Slice = at::indexing::Slice;
 
 namespace {
 
 const std::string UNCLASSIFIED_BARCODE = "unclassified";
+
+// This part of trimming is split out into its own unoptimised function since not doing so
+// causes binaries built by GCC8 with ASAN enabled to crash during static init.
+// Note that the cause of the crash doesn't appear to be specific to this bit of code, since
+// removing other parts from subread() also "fixes" the issue, but this is the smallest
+// snippet that works around the issue without potentially incurring performance issues.
+// This fix is copied from others parts of the code that exhibited similar errors
+// with ASAN.
+#if defined(__GNUC__) && defined(__SANITIZE_ADDRESS__)
+__attribute__((optimize("O0")))
+#endif
+void trim_torch_tensor(at::Tensor& raw_data, std::pair<uint64_t,uint64_t> sample_trim_interval) {
+    // Note - Duplex signal/read trimming is not supported yet.
+    if (raw_data.sizes().size() > 1) {
+        throw std::runtime_error("Read trimming is not supported for duplex reads");
+    }
+    raw_data = raw_data.index({Slice(sample_trim_interval.first, sample_trim_interval.second)});
+}
 
 }  // namespace
 
@@ -79,10 +100,12 @@ std::pair<int, int> Trimmer::determine_trim_interval(const AdapterScoreResult& r
         trim_interval.first = 0;
     } else {
         trim_interval.first = res.front.position.second + 1;
+        spdlog::trace("Detected front interval adapter/primer - {}", res.front.name);
     }
     if (res.rear.name == "unclassified" || res.rear.score < score_thres) {
         trim_interval.second = seqlen;
     } else {
+        spdlog::trace("Detected rear interval adapter/primer - {}", res.rear.name);
         trim_interval.second = res.rear.position.first;
     }
 
@@ -104,6 +127,7 @@ BamPtr Trimmer::trim_sequence(BamPtr input, std::pair<int, int> trim_interval) {
     std::vector<uint8_t> qual = utils::extract_quality(input_record);
     auto [stride, move_vals] = utils::extract_move_table(input_record);
     int ts = bam_aux_get(input_record, "ts") ? int(bam_aux2i(bam_aux_get(input_record, "ts"))) : 0;
+    int ns = bam_aux_get(input_record, "ns") ? int(bam_aux2i(bam_aux_get(input_record, "ns"))) : 0;
     auto [modbase_str, modbase_probs] = utils::extract_modbase_info(input_record);
 
     // Actually trim components.
@@ -111,6 +135,12 @@ BamPtr Trimmer::trim_sequence(BamPtr input, std::pair<int, int> trim_interval) {
     auto trimmed_qual = utils::trim_quality(qual, trim_interval);
     auto [positions_trimmed, trimmed_moves] = utils::trim_move_table(move_vals, trim_interval);
     ts += positions_trimmed * stride;
+    // After sequence trimming, the number of samples corresponding to the sequence is the size of
+    // the new move table * stride. However, the ns tag includes the number of samples trimmed from the
+    // front of the read as well.
+    // |---------------------- ns ------------------|
+    // |----ts----|--------moves signal-------------|
+    ns = int(trimmed_moves.size() * stride) + ts;
     auto [trimmed_modbase_str, trimmed_modbase_probs] =
             utils::trim_modbase_info(seq, modbase_str, modbase_probs, trim_interval);
     auto n_cigar = input_record->core.n_cigar;
@@ -153,6 +183,7 @@ BamPtr Trimmer::trim_sequence(BamPtr input, std::pair<int, int> trim_interval) {
     }
 
     bam_aux_update_int(out_record, "ts", ts);
+    bam_aux_update_int(out_record, "ns", ns);
 
     return BamPtr(out_record);
 }
@@ -164,10 +195,25 @@ void Trimmer::trim_sequence(SimplexRead& read, std::pair<int, int> trim_interval
 
     read.read_common.seq = utils::trim_sequence(read.read_common.seq, trim_interval);
     read.read_common.qstring = utils::trim_sequence(read.read_common.qstring, trim_interval);
-    size_t num_positions_trimmed;
-    std::tie(num_positions_trimmed, read.read_common.moves) =
+
+    auto [leading_mv_positions_trimmed, trimmed_moves] =
             utils::trim_move_table(read.read_common.moves, trim_interval);
-    read.read_common.num_trimmed_samples += read.read_common.model_stride * num_positions_trimmed;
+
+    // Number of samples trimmed is the number of move positions trimmed from the front
+    // of the read times the stride.
+    auto num_leading_samples_trimmed = read.read_common.model_stride * leading_mv_positions_trimmed;
+    // This gets added to the number of samples previously trimmed, such as from signal scaling, etc.
+    read.read_common.num_trimmed_samples += num_leading_samples_trimmed;
+    // The move table can be trimmed from both ends, so determine the new signal length corresponding
+    // to the trimmed sequence by looking at new move table size.
+    auto num_samples_from_mv_table = trimmed_moves.size() * read.read_common.model_stride;
+    // The final signal should only correspond to the moves from the trimmed move table, so
+    // the corresponding signal needs to be extracted from the original signal.
+    trim_torch_tensor(
+            read.read_common.raw_data,
+            {num_leading_samples_trimmed, num_leading_samples_trimmed + num_samples_from_mv_table});
+
+    read.read_common.moves = std::move(trimmed_moves);
 
     if (read.read_common.mod_base_info) {
         int num_modbase_channels = int(read.read_common.mod_base_info->alphabet.size());
