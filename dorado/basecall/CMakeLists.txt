@@ -47,7 +47,6 @@ target_link_libraries(dorado_basecall
         ${TORCH_LIBRARIES}
         dorado_utils
     PRIVATE
-        dorado_models_lib
         ${KOI_LIBRARIES}
         spdlog::spdlog
 )

@@ -1,10 +1,7 @@
 #include "CRFModelConfig.h"
 
-#include "models/models.h"
-
 #include <spdlog/spdlog.h>
 #include <toml.hpp>
-#include <toml/value.hpp>
 
 #include <cstddef>
 #include <set>
@@ -29,6 +26,27 @@ SublayerType sublayer_type(const toml::value &segment) {
         return SublayerType::UNRECOGNISED;
     }
     return mapping_iter->second;
+}
+
+// the mean Q-score of short reads are artificially lowered because of
+// some lower quality bases at the beginning of the read. to correct for
+// that, mean Q-score calculation should ignore the first few bases. The
+// number of bases to ignore is dependent on the model.
+uint32_t get_mean_qscore_start_pos_by_model_name(const std::string &model_name) {
+    static const std::unordered_map<std::string, uint16_t> mean_qscore_start_pos_by_model = {
+            // To add model specific start positions for older models,
+            // create an entry keyed by model name with the value as
+            // the desired start position.
+            // e.g. {"dna_r10.4.1_e8.2_5khz_400bps_fast@v4.2.0", 10}
+    };
+
+    auto iter = mean_qscore_start_pos_by_model.find(model_name);
+    if (iter != mean_qscore_start_pos_by_model.end()) {
+        return iter->second;
+    } else {
+        // Assume start position of 60 as default.
+        return 60;
+    }
 }
 
 }  // namespace
@@ -217,6 +235,13 @@ CRFModelConfig load_crf_model_config(const std::filesystem::path &path) {
         config.qscale = toml::find<float>(qscore, "scale");
         if (qscore.contains("mean_qscore_start_pos")) {
             config.mean_qscore_start_pos = toml::find<int32_t>(qscore, "mean_qscore_start_pos");
+        } else {
+            // If information is not present in the config, find start position by model name.
+            std::string model_name = config.model_path.filename().string();
+            config.mean_qscore_start_pos = get_mean_qscore_start_pos_by_model_name(model_name);
+        }
+        if (config.mean_qscore_start_pos < 0) {
+            throw std::runtime_error("Mean q-score start position cannot be < 0");
         }
     } else {
         spdlog::debug("> no qscore calibration found");
@@ -305,19 +330,6 @@ CRFModelConfig load_crf_model_config(const std::filesystem::path &path) {
     config.sample_type = get_model_type(model_name);
 
     return config;
-}
-
-int32_t get_model_mean_qscore_start_pos(const CRFModelConfig &model_config) {
-    int32_t mean_qscore_start_pos = model_config.mean_qscore_start_pos;
-    if (mean_qscore_start_pos < 0) {
-        // If unsuccessful, find start position by model name.
-        std::string model_name = model_config.model_path.filename().string();
-        mean_qscore_start_pos = models::get_mean_qscore_start_pos_by_model_name(model_name);
-    }
-    if (mean_qscore_start_pos < 0) {
-        throw std::runtime_error("Mean q-score start position cannot be < 0");
-    }
-    return mean_qscore_start_pos;
 }
 
 bool is_rna_model(const CRFModelConfig &model_config) {
