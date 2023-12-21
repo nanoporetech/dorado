@@ -7,7 +7,7 @@ All notable changes to Dorado will be documented in this file.
 This release of Dorado fixes bugs with adapter trimming and custom barcodes, introduces a more accurate 6mA model, and adds several quality of life improvements.
 
 * TBD - Allow RNA adapter trimming to be skipped.
-* a510d531af46dc07c445d59914e809b4a18de0ad - Prevent simultaneous usage of multiple modbase models affecting the same modbase motif.
+* a510d531af46dc07c445d59914e809b4a18de0ad - Prevent simultaneous usage of multiple modbase models affecting the same canonical base.
 * 371a252ac5d62512597d288bb3396cc93a2b18fc - Fix incorrect sample count in the ns tag with sequence trimming.
 * 9f532ffe298c72f39984fc68e36e9fa24d811382 - Remove modbase tags for non-primary alignments except when soft clipping is enabled.
 * 52431e685dae82fd94ecf12c52f5d3cd8f78fd1a - Update 6mA model.
