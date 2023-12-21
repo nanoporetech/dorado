@@ -120,7 +120,7 @@ void ScalerNode::worker_thread() {
         bool is_rna = (m_model_type == SampleType::RNA002 || m_model_type == SampleType::RNA004);
         // Trim adapter for RNA first before scaling.
         int trim_start = 0;
-        if (is_rna) {
+        if (is_rna && m_trim_adapter) {
             trim_start = determine_rna_adapter_pos(*read, m_model_type);
             read->read_common.raw_data =
                     read->read_common.raw_data.index({Slice(trim_start, at::indexing::None)});
@@ -202,12 +202,14 @@ void ScalerNode::worker_thread() {
 
 ScalerNode::ScalerNode(const SignalNormalisationParams& config,
                        SampleType model_type,
+                       bool trim_adapter,
                        int num_worker_threads,
                        size_t max_reads)
         : MessageSink(max_reads),
           m_num_worker_threads(num_worker_threads),
           m_scaling_params(config),
-          m_model_type(model_type) {
+          m_model_type(model_type),
+          m_trim_adapter(trim_adapter) {
     start_threads();
 }
 
