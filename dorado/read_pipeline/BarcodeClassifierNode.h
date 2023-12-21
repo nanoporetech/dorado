@@ -5,6 +5,7 @@
 #include "utils/types.h"
 
 #include <atomic>
+#include <map>
 #include <memory>
 #include <optional>
 #include <string>
@@ -46,6 +47,8 @@ private:
     void barcode(SimplexRead& read);
 
     void terminate_impl();
+
+    std::map<std::string, std::atomic<size_t>> bc_count;
 };
 
 }  // namespace dorado

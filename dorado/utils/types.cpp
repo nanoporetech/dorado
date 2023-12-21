@@ -22,11 +22,6 @@ std::shared_ptr<const BarcodingInfo> create_barcoding_info(
     std::string kit_name = "";
     if (!kit_names.empty()) {
         kit_name = kit_names[0];
-    } else if (custom_kit.has_value()) {
-        kit_name = *custom_kit;
-    } else {
-        throw std::runtime_error(
-                "Neither kit name nor custom kit path was specified for BarcodeingInfo creation.");
     }
     spdlog::debug("Creating barcoding info for kit: {}", kit_name);
     auto result =

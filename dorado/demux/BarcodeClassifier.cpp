@@ -119,7 +119,9 @@ std::unordered_map<std::string, dorado::barcode_kits::KitInfo> process_custom_ki
     std::unordered_map<std::string, dorado::barcode_kits::KitInfo> kit_map;
     if (custom_kit) {
         auto [kit_name, kit_info] = demux::parse_custom_arrangement(*custom_kit);
-        kit_map[kit_name] = kit_info;
+        if (!kit_name.empty()) {
+            kit_map[kit_name] = kit_info;
+        }
     }
     return kit_map;
 }
@@ -208,17 +210,15 @@ std::vector<BarcodeClassifier::BarcodeCandidateKit> BarcodeClassifier::generate_
         const std::vector<std::string>& kit_names) {
     std::vector<BarcodeCandidateKit> candidates_list;
 
-    const auto& kit_info_map = barcode_kits::get_kit_infos();
-
     std::vector<std::string> final_kit_names;
     if (!m_custom_kit.empty()) {
         for (auto& [kit_name, _] : m_custom_kit) {
             final_kit_names.push_back(kit_name);
         }
     } else if (kit_names.empty()) {
-        for (auto& [kit_name, _] : kit_info_map) {
-            final_kit_names.push_back(kit_name);
-        }
+        throw std::runtime_error(
+                "Either custom kit must include kit arrangement or a kit name needs to be passed "
+                "in.");
     } else {
         final_kit_names = kit_names;
     }
@@ -613,11 +613,11 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
         auto best_bottom_score = std::max_element(
                 scores.begin(), scores.end(),
                 [](const auto& l, const auto& r) { return l.bottom_score < r.bottom_score; });
-        spdlog::trace("Check double ends: top bc {}, bottom bc {}", best_top_score->barcode_name,
-                      best_bottom_score->barcode_name);
         if ((best_top_score->score > m_scoring_params.min_soft_barcode_threshold) &&
             (best_bottom_score->score > m_scoring_params.min_soft_barcode_threshold) &&
             (best_top_score->barcode_name != best_bottom_score->barcode_name)) {
+            spdlog::trace("Two ends confidently predict different BCs: top bc {}, bottom bc {}",
+                          best_top_score->barcode_name, best_bottom_score->barcode_name);
             return UNCLASSIFIED;
         }
     }

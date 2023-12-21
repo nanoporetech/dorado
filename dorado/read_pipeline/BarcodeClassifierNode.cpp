@@ -86,7 +86,33 @@ void BarcodeClassifierNode::restart() {
     start_threads();
 }
 
-BarcodeClassifierNode::~BarcodeClassifierNode() { terminate_impl(); }
+BarcodeClassifierNode::~BarcodeClassifierNode() {
+    terminate_impl();
+    static bool done = false;
+    if (!done) {
+        done = !done;
+        spdlog::info("Barcode distribution :");
+        size_t unclassified = 0;
+        size_t fp = 0;
+        size_t total = 0;
+        for (const auto& [k, v] : bc_count) {
+            std::unordered_set<std::string> tps = {"TWIST-ALL_barcode33", "TWIST-ALL_barcode34",
+                                                   "TWIST-ALL_barcode35", "TWIST-ALL_barcode36",
+                                                   "TWIST-ALL_barcode37", "TWIST-ALL_barcode38",
+                                                   "TWIST-ALL_barcode39", "TWIST-ALL_barcode40",
+                                                   "TWIST-ALL_barcode41", "TWIST-ALL_barcode42"};
+            spdlog::info("{} : {}", k, v);
+            total += v;
+            if (k == "unclassified") {
+                unclassified += v;
+            } else if (tps.find(k) == tps.end()) {
+                fp += v;
+            }
+        }
+        spdlog::info("Unclassified rate {}", float(unclassified) / total);
+        spdlog::info("False Positive rate {}", float(fp) / total);
+    }
+}
 
 void BarcodeClassifierNode::worker_thread() {
     Message message;
@@ -134,6 +160,7 @@ void BarcodeClassifierNode::barcode(BamPtr& read) {
     auto bc_res = barcoder->barcode(seq, m_default_barcoding_info->barcode_both_ends,
                                     m_default_barcoding_info->allowed_barcodes);
     auto bc = generate_barcode_string(bc_res);
+    bc_count[bc]++;
     bam_aux_append(irecord, "BC", 'Z', int(bc.length() + 1), (uint8_t*)bc.c_str());
     m_num_records++;
 
