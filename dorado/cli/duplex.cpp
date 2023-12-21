@@ -512,13 +512,6 @@ int duplex(int argc, char* argv[]) {
             }
 
             auto mean_qscore_start_pos = models.model_config.mean_qscore_start_pos;
-            if (mean_qscore_start_pos < 0) {
-                mean_qscore_start_pos =
-                        models::get_mean_qscore_start_pos_by_model_name(models.stereo_model_name);
-                if (mean_qscore_start_pos < 0) {
-                    throw std::runtime_error("Mean q-score start position cannot be < 0");
-                }
-            }
 
             api::create_stereo_duplex_pipeline(
                     pipeline_desc, std::move(runners), std::move(stereo_runners),

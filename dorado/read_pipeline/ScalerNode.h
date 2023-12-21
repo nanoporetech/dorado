@@ -17,6 +17,7 @@ class ScalerNode : public MessageSink {
 public:
     ScalerNode(const basecall::SignalNormalisationParams& config,
                basecall::SampleType model_type,
+               bool trim_adapter,
                int num_worker_threads,
                size_t max_reads);
     ~ScalerNode() { terminate_impl(); }
@@ -34,6 +35,7 @@ private:
 
     basecall::SignalNormalisationParams m_scaling_params;
     const basecall::SampleType m_model_type;
+    const bool m_trim_adapter;
 
     std::pair<float, float> med_mad(const at::Tensor& x);
     std::pair<float, float> normalisation(const at::Tensor& x);

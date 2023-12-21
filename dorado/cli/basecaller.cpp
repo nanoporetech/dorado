@@ -181,15 +181,10 @@ void setup(std::vector<std::string> args,
             std::unordered_set<std::string>{}, thread_allocations.read_filter_threads);
 
     auto mean_qscore_start_pos = model_config.mean_qscore_start_pos;
-    if (mean_qscore_start_pos < 0) {
-        mean_qscore_start_pos = models::get_mean_qscore_start_pos_by_model_name(model_name);
-        if (mean_qscore_start_pos < 0) {
-            throw std::runtime_error("Mean q-score start position cannot be < 0");
-        }
-    }
+
     api::create_simplex_pipeline(
             pipeline_desc, std::move(runners), std::move(remora_runners), overlap,
-            mean_qscore_start_pos, thread_allocations.scaler_node_threads,
+            mean_qscore_start_pos, !adapter_no_trim, thread_allocations.scaler_node_threads,
             true /* Enable read splitting */, thread_allocations.splitter_node_threads,
             thread_allocations.remora_threads, current_sink_node,
             PipelineDescriptor::InvalidNodeHandle);
