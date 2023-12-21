@@ -567,6 +567,7 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
         bool barcode_both_ends,
         const BarcodingInfo::FilterSet& allowed_barcodes) const {
     if (read_seq.length() < TRIM_LENGTH) {
+        spdlog::trace("Read length shorter than minimum required ({}) : {}", TRIM_LENGTH, read_seq);
         return UNCLASSIFIED;
     }
     const std::string_view fwd = read_seq;
@@ -660,7 +661,8 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
         // For more stringent classification, ensure that both ends of a read
         // have a high score for the same barcode. If not then consider it
         // unclassified.
-        if (out.top_score < 0.6 || out.bottom_score < 0.6) {
+        if (std::min(out.top_score, out.bottom_score) <
+            m_scoring_params.min_hard_barcode_threshold) {
             return UNCLASSIFIED;
         }
     }
