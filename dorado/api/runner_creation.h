@@ -13,7 +13,18 @@ namespace dorado {
 
 namespace basecall {
 struct CRFModelConfig;
+
+#if DORADO_CUDA_BUILD
+class CudaCaller;
+#elif DORADO_METAL_BUILD
+class MetalCaller;
+#endif
+
 }  // namespace basecall
+
+namespace modbase {
+class ModBaseCaller;
+}
 
 namespace api {
 
@@ -32,6 +43,14 @@ std::vector<modbase::RunnerPtr> create_modbase_runners(
         const std::string& device,
         size_t remora_runners_per_caller,
         size_t remora_batch_size);
+
+#if DORADO_CUDA_BUILD
+basecall::RunnerPtr create_basecall_runner(std::shared_ptr<basecall::CudaCaller> caller);
+#elif DORADO_METAL_BUILD
+basecall::RunnerPtr create_basecall_runner(std::shared_ptr<basecall::MetalCaller> caller);
+#endif
+
+modbase::RunnerPtr create_modbase_runner(std::shared_ptr<modbase::ModBaseCaller> caller);
 
 }  // namespace api
 }  // namespace dorado

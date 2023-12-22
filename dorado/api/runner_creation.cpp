@@ -176,4 +176,20 @@ std::vector<modbase::RunnerPtr> create_modbase_runners(
     return remora_runners;
 }
 
+#if DORADO_GPU_BUILD
+#ifndef __APPLE__
+basecall::RunnerPtr create_basecall_runner(std::shared_ptr<basecall::CudaCaller> caller) {
+    return std::make_unique<basecall::CudaModelRunner>(std::move(caller));
+}
+#else
+basecall::RunnerPtr create_basecall_runner(std::shared_ptr<basecall::MetalCaller> caller) {
+    return std::make_unique<basecall::MetalModelRunner>(std::move(caller));
+}
+#endif
+#endif
+
+modbase::RunnerPtr create_modbase_runner(std::shared_ptr<modbase::ModBaseCaller> caller) {
+    return std::make_unique<::dorado::modbase::ModBaseRunner>(std::move(caller));
+}
+
 }  // namespace dorado::api
