@@ -472,13 +472,11 @@ int duplex(int argc, char* argv[]) {
             const size_t num_runners = default_parameters.num_runners;
 
             int stereo_batch_size = 0;
-#if DORADO_GPU_BUILD
-#ifdef __APPLE__
+#if DORADO_METAL_BUILD
             if (device == "metal") {
                 // For now, the minimal batch size is used for the duplex model.
                 stereo_batch_size = 48;
             }
-#endif
 #endif
             // Note: The memory assignment between simplex and duplex callers have been
             // performed based on empirical results considering a SUP model for simplex

@@ -40,11 +40,6 @@ if (DORADO_GPU_BUILD)
     endif()
 endif()
 
-target_compile_definitions(dorado_basecall
-    PUBLIC
-        USE_KOI=$<AND:$<BOOL:${DORADO_GPU_BUILD}>,$<NOT:$<BOOL:${APPLE}>>>
-)
-
 target_include_directories(dorado_basecall
     SYSTEM
     PRIVATE

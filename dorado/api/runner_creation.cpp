@@ -5,14 +5,12 @@
 #include "caller_creation.h"
 #include "modbase/ModBaseModelConfig.h"
 
-#if DORADO_GPU_BUILD
-#ifdef __APPLE__
+#if DORADO_METAL_BUILD
 #include "basecall/MetalModelRunner.h"
-#else
+#elif DORADO_CUDA_BUILD
 #include "basecall/CudaModelRunner.h"
 #include "utils/cuda_utils.h"
 #endif
-#endif  // DORADO_GPU_BUILD
 
 #include <cxxpool.h>
 #include <spdlog/spdlog.h>
@@ -59,8 +57,7 @@ std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
                     model_config, device, int(chunk_size), int(batch_size)));
         }
     }
-#if DORADO_GPU_BUILD
-#ifdef __APPLE__
+#if DORADO_METAL_BUILD
     else if (device == "metal") {
         auto caller = create_metal_caller(model_config, int(chunk_size), int(batch_size));
         for (size_t i = 0; i < num_gpu_runners; i++) {
@@ -76,7 +73,7 @@ std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
     } else {
         throw std::runtime_error(std::string("Unsupported device: ") + device);
     }
-#else   // ifdef __APPLE__
+#elif DORADO_CUDA_BUILD
     else {
         auto devices = dorado::utils::parse_cuda_device_string(device);
         num_devices = devices.size();
@@ -113,10 +110,9 @@ std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
             }
         }
     }
-#endif  // __APPLE__
-#else   // DORADO_GPU_BUILD
+#else
     (void)num_gpu_runners;
-#endif  // DORADO_GPU_BUILD
+#endif
 
 #ifndef NDEBUG
     auto model_stride = runners.front()->model_stride();
@@ -158,17 +154,15 @@ std::vector<modbase::RunnerPtr> create_modbase_runners(
         remora_runners_per_caller = 1;
         remora_callers = std::thread::hardware_concurrency();
     }
-#if DORADO_GPU_BUILD
-#ifdef __APPLE__
+#if DORADO_METAL_BUILD
     else if (device == "metal") {
         modbase_devices.push_back(device);
     }
-#else   // ifdef __APPLE__
+#elif DORADO_CUDA_BUILD
     else {
         modbase_devices = dorado::utils::parse_cuda_device_string(device);
     }
-#endif  // __APPLE__
-#endif  // DORADO_GPU_BUILD
+#endif
     for (const auto& device_string : modbase_devices) {
         for (int i = 0; i < remora_callers; ++i) {
             auto caller =

@@ -268,11 +268,6 @@ set_target_properties(dorado_lib
     ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
 )
 
-target_compile_definitions(dorado_lib
-    PUBLIC
-        DORADO_GPU_BUILD=$<BOOL:${DORADO_GPU_BUILD}>
-)
-
 target_include_directories(dorado_lib
     PUBLIC
         ${CMAKE_CURRENT_BINARY_DIR}/dorado

@@ -5,7 +5,7 @@
 #include "utils/module_utils.h"
 #include "utils/tensor_utils.h"
 
-#if USE_KOI
+#if DORADO_CUDA_BUILD
 #include "utils/cuda_utils.h"
 
 #include <ATen/cuda/CUDAContext.h>
@@ -24,7 +24,7 @@ using Slice = torch::indexing::Slice;
 
 namespace dorado::basecall::nn {
 
-#if USE_KOI
+#if DORADO_CUDA_BUILD
 namespace {
 
 KoiActivation get_koi_activation(Activation act) {
@@ -254,7 +254,7 @@ public:
     int C{0};     // current layer size (channels)
 };
 
-#endif  // if USE_KOI
+#endif  // if DORADO_CUDA_BUILD
 
 ConvStackImpl::ConvStackImpl(const std::vector<ConvParams> &layer_params) {
     for (size_t i = 0; i < layer_params.size(); ++i) {
@@ -266,7 +266,7 @@ ConvStackImpl::ConvStackImpl(const std::vector<ConvParams> &layer_params) {
     }
 }
 
-#if USE_KOI
+#if DORADO_CUDA_BUILD
 void ConvStackImpl::reserve_working_memory(WorkingMemory &wm) {
     auto &last = layers.back();
     last.output_layout = get_koi_lstm_input_layout(last.params.size, last.params.activation);
@@ -286,7 +286,7 @@ void ConvStackImpl::run_koi(WorkingMemory &wm) {
         layer.run_koi(wm);
     }
 }
-#endif  // if USE_KOI
+#endif  // if DORADO_CUDA_BUILD
 
 at::Tensor ConvStackImpl::forward(at::Tensor x) {
     // Input x is [N, C_in, T_in], contiguity optional
@@ -309,7 +309,7 @@ at::Tensor ConvStackImpl::forward(at::Tensor x) {
 
 ConvStackImpl::ConvLayer::ConvLayer(const ConvParams &params) : params(params) {}
 
-#if USE_KOI
+#if DORADO_CUDA_BUILD
 void ConvStackImpl::ConvLayer::reserve_working_memory(WorkingMemory &wm) {
     assert(wm.layout == TensorLayout::NTC);
     const int T_in = wm.T;
@@ -419,7 +419,7 @@ void ConvStackImpl::ConvLayer::run_koi(WorkingMemory &wm) {
         }
     }
 }
-#endif  // if USE_KOI
+#endif  // if DORADO_CUDA_BUILD
 
 LinearCRFImpl::LinearCRFImpl(int insize, int outsize, bool bias_, bool tanh_and_scale)
         : bias(bias_) {
@@ -441,7 +441,7 @@ at::Tensor LinearCRFImpl::forward(at::Tensor x) {
     return scores;
 }
 
-#if USE_KOI
+#if DORADO_CUDA_BUILD
 void LinearCRFImpl::reserve_working_memory(WorkingMemory &wm) {
     bool use_torch = utils::get_dev_opt<bool>("torch_linear", false) || !koi_can_use_cutlass();
     if (use_torch && wm.layout != TensorLayout::NTC) {
@@ -532,7 +532,7 @@ at::Tensor LSTMStackImpl::forward(at::Tensor x) {
     return (rnns.size() & 1) ? x.flip(1) : x;
 }
 
-#if USE_KOI
+#if DORADO_CUDA_BUILD
 void LSTMStackImpl::reserve_working_memory(WorkingMemory &wm) {
     if (wm.layout == TensorLayout::NTC) {
         wm.temp({wm.N * wm.T, 4 * layer_size}, torch::kF16);
@@ -709,7 +709,7 @@ void LSTMStackImpl::forward_quantized(WorkingMemory &wm) {
                 device_bias[i].data_ptr(), device_scale[i].data_ptr(), inout.data_ptr()));
     }
 }
-#endif  // if USE_KOI
+#endif  // if DORADO_CUDA_BUILD
 
 ClampImpl::ClampImpl(float _min, float _max, bool _active)
         : active(_active), min(_min), max(_max){};
@@ -752,7 +752,7 @@ void CRFModelImpl::load_state_dict(const std::vector<at::Tensor> &weights) {
     utils::load_state_dict(*this, weights, {});
 }
 
-#if USE_KOI
+#if DORADO_CUDA_BUILD
 at::Tensor CRFModelImpl::run_koi(at::Tensor in) {
     // Input is [N, C, T] -- TODO: change to [N, T, C] on the input buffer side?
     c10::cuda::CUDAGuard device_guard(in.device());
@@ -796,7 +796,7 @@ at::Tensor CRFModelImpl::forward(at::Tensor x) {
         // Output is [T, N, C], which CPU decoding requires.
         return encoder->forward(x).transpose(0, 1);
     }
-#if USE_KOI
+#if DORADO_CUDA_BUILD
     if (x.is_cuda() && x.dtype() == torch::kF16) {
         // Output is [N, T, C]
         return run_koi(x);

@@ -6,14 +6,14 @@
 #include "utils/sequence_utils.h"
 #include "utils/tensor_utils.h"
 
-#if DORADO_GPU_BUILD && !defined(__APPLE__)
+#if DORADO_CUDA_BUILD
 #include <c10/cuda/CUDAGuard.h>
 #endif
 
 #include <torch/torch.h>
 
 namespace {
-#if DORADO_GPU_BUILD && !defined(__APPLE__)
+#if DORADO_CUDA_BUILD
 std::vector<c10::optional<c10::Stream>> get_streams_from_tensors(
         const std::vector<at::Tensor>& tensors) {
     std::vector<c10::optional<c10::Stream>> streams;
@@ -35,7 +35,7 @@ ModBaseRunner::ModBaseRunner(std::shared_ptr<ModBaseCaller> caller)
         : m_caller(std::move(caller)),
           m_input_sigs(m_caller->create_input_sig_tensors()),
           m_input_seqs(m_caller->create_input_seq_tensors())
-#if DORADO_GPU_BUILD && !defined(__APPLE__)
+#if DORADO_CUDA_BUILD
           ,
           m_streams(get_streams_from_tensors(m_input_sigs))
 #endif
@@ -69,7 +69,7 @@ void ModBaseRunner::accept_chunk(int model_id,
 }
 
 at::Tensor ModBaseRunner::call_chunks(int model_id, int num_chunks) {
-#if DORADO_GPU_BUILD && !defined(__APPLE__)
+#if DORADO_CUDA_BUILD
     c10::cuda::OptionalCUDAStreamGuard guard(m_streams[model_id]);
 #endif
     return m_caller->call_chunks(model_id, m_input_sigs[model_id], m_input_seqs[model_id],

@@ -68,6 +68,8 @@ endif()
 target_compile_definitions(dorado_utils
     PUBLIC
         DORADO_GPU_BUILD=$<BOOL:${DORADO_GPU_BUILD}>
+        DORADO_CUDA_BUILD=$<AND:$<BOOL:${DORADO_GPU_BUILD}>,$<NOT:$<BOOL:${APPLE}>>>
+        DORADO_METAL_BUILD=$<AND:$<BOOL:${DORADO_GPU_BUILD}>,$<BOOL:${APPLE}>>        
 )
 
 target_include_directories(dorado_utils
