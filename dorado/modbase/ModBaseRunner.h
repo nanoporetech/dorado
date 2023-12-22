@@ -16,11 +16,6 @@ namespace dorado::modbase {
 struct ModBaseModelConfig;
 class ModBaseCaller;
 
-std::shared_ptr<ModBaseCaller> create_modbase_caller(
-        const std::vector<std::filesystem::path>& model_paths,
-        int batch_size,
-        const std::string& device);
-
 class ModBaseRunner {
 public:
     explicit ModBaseRunner(std::shared_ptr<ModBaseCaller> caller);
@@ -46,8 +41,9 @@ private:
     std::shared_ptr<ModBaseCaller> m_caller;
     std::vector<at::Tensor> m_input_sigs;
     std::vector<at::Tensor> m_input_seqs;
+#if DORADO_GPU_BUILD && !defined(__APPLE__)
     std::vector<c10::optional<c10::Stream>> m_streams;
-
+#endif
     // Performance monitoring stats.
     std::atomic<int64_t> m_num_batches_called = 0;
 };

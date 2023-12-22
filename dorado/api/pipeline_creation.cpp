@@ -14,7 +14,7 @@
 
 #include <spdlog/spdlog.h>
 
-namespace dorado::pipelines {
+namespace dorado::api {
 
 void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
                              std::vector<basecall::RunnerPtr>&& runners,
@@ -189,4 +189,4 @@ void create_stereo_duplex_pipeline(PipelineDescriptor& pipeline_desc,
     }
 }
 
-}  // namespace dorado::pipelines
+}  // namespace dorado::api

@@ -1,8 +1,6 @@
 add_library(dorado_basecall STATIC
     crf_utils.cpp
     crf_utils.h
-    CRFModel.cpp
-    CRFModel.h
     CRFModelConfig.cpp
     CRFModelConfig.h
     ModelRunner.cpp
@@ -14,25 +12,38 @@ add_library(dorado_basecall STATIC
     decode/CPUDecoder.h
     decode/Decoder.cpp
     decode/Decoder.h
+    nn/CRFModel.cpp
+    nn/CRFModel.h
 )
 
 if (DORADO_GPU_BUILD)
     if(APPLE)
         target_sources(dorado_basecall
             PRIVATE
-            MetalCRFModel.cpp
-            MetalCRFModel.h
+            MetalCaller.cpp
+            MetalCaller.h            
+            MetalModelRunner.cpp
+            MetalModelRunner.h
+            nn/MetalCRFModel.cpp
+            nn/MetalCRFModel.h
         )
     else()
         target_sources(dorado_basecall
             PRIVATE
-            CudaCRFModel.cpp
-            CudaCRFModel.h
+            CudaModelRunner.cpp
+            CudaModelRunner.h
+            CudaCaller.cpp
+            CudaCaller.h
             decode/CUDADecoder.cpp
             decode/CUDADecoder.h
         )
     endif()
 endif()
+
+target_compile_definitions(dorado_basecall
+    PUBLIC
+        USE_KOI=$<AND:$<BOOL:${DORADO_GPU_BUILD}>,$<NOT:$<BOOL:${APPLE}>>>
+)
 
 target_include_directories(dorado_basecall
     SYSTEM

@@ -448,7 +448,7 @@ int duplex(int argc, char* argv[]) {
             temp_model_paths = models.temp_paths;
 
             // create modbase runners first so basecall runners can pick batch sizes based on available memory
-            auto mod_base_runners = create_modbase_runners(
+            auto mod_base_runners = api::create_modbase_runners(
                     models.mods_model_paths, device, default_parameters.mod_base_runners_per_caller,
                     default_parameters.remora_batchsize);
 
@@ -484,8 +484,8 @@ int duplex(int argc, char* argv[]) {
             // performed based on empirical results considering a SUP model for simplex
             // calling.
             auto [runners, num_devices] =
-                    create_basecall_runners(models.model_config, device, num_runners, 0, batch_size,
-                                            chunk_size, 0.9f, true);
+                    api::create_basecall_runners(models.model_config, device, num_runners, 0,
+                                                 batch_size, chunk_size, 0.9f, true);
 
             std::vector<basecall::RunnerPtr> stereo_runners;
             // The fraction argument for GPU memory allocates the fraction of the
@@ -498,8 +498,8 @@ int duplex(int argc, char* argv[]) {
             // chances for the stereo model to use the cached allocations from the simplex
             // model.
             std::tie(stereo_runners, std::ignore) =
-                    create_basecall_runners(models.stereo_model_config, device, num_runners, 0,
-                                            stereo_batch_size, chunk_size, 0.5f, true);
+                    api::create_basecall_runners(models.stereo_model_config, device, num_runners, 0,
+                                                 stereo_batch_size, chunk_size, 0.5f, true);
 
             spdlog::info("> Starting Stereo Duplex pipeline");
 
@@ -513,7 +513,7 @@ int duplex(int argc, char* argv[]) {
 
             auto mean_qscore_start_pos = models.model_config.mean_qscore_start_pos;
 
-            pipelines::create_stereo_duplex_pipeline(
+            api::create_stereo_duplex_pipeline(
                     pipeline_desc, std::move(runners), std::move(stereo_runners),
                     std::move(mod_base_runners), overlap, mean_qscore_start_pos,
                     int(num_devices * 2), int(num_devices),

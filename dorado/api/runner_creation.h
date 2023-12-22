@@ -1,6 +1,6 @@
 #pragma once
 
-#include "basecall/ModelRunner.h"
+#include "basecall/ModelRunnerBase.h"
 #include "modbase/ModBaseRunner.h"
 
 #include <filesystem>
@@ -14,6 +14,8 @@ namespace dorado {
 namespace basecall {
 struct CRFModelConfig;
 }  // namespace basecall
+
+namespace api {
 
 std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
         const basecall::CRFModelConfig& model_config,
@@ -31,4 +33,5 @@ std::vector<modbase::RunnerPtr> create_modbase_runners(
         size_t remora_runners_per_caller,
         size_t remora_batch_size);
 
+}  // namespace api
 }  // namespace dorado
