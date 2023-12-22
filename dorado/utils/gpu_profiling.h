@@ -4,7 +4,7 @@
 // or use `dorado [basecaller|duplex] ... --devopts cuda_profile_level=<X> ...`
 #define CUDA_PROFILE_LEVEL_DEFAULT 0
 
-#if DORADO_GPU_BUILD && !defined(__APPLE__)
+#if DORADO_CUDA_BUILD
 #include "cuda_utils.h"
 #include "dev_utils.h"
 
@@ -60,8 +60,7 @@ private:
 
 }  // namespace dorado::utils
 
-#else  // DORADO_GPU_BUILD && !defined(__APPLE__)
-
+#else
 namespace dorado::utils {
 // Do nothing on Apple platforms
 struct ScopedProfileRange {
@@ -69,4 +68,4 @@ struct ScopedProfileRange {
 };
 }  // namespace dorado::utils
 
-#endif  // DORADO_GPU_BUILD && !defined(__APPLE__)
+#endif

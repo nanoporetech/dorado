@@ -5,7 +5,7 @@
 #include "nn/ModBaseModel.h"
 #include "utils/sequence_utils.h"
 
-#if DORADO_GPU_BUILD && !defined(__APPLE__)
+#if DORADO_CUDA_BUILD
 #include <c10/cuda/CUDAGuard.h>
 #include <c10/cuda/CUDAStream.h>
 #include <torch/cuda.h>
@@ -29,7 +29,7 @@ struct ModBaseCaller::ModBaseTask {
     at::Tensor out;
     bool done{false};
     int num_chunks;
-#if DORADO_GPU_BUILD && !defined(__APPLE__)
+#if DORADO_CUDA_BUILD
     c10::optional<c10::Stream> stream;
 #endif
 };
@@ -46,7 +46,7 @@ ModBaseCaller::ModBaseData::ModBaseData(const std::filesystem::path& model_path,
                                                  params.refine_kmer_center_idx);
     }
 
-#if DORADO_GPU_BUILD && !defined(__APPLE__)
+#if DORADO_CUDA_BUILD
     if (opts.device().is_cuda()) {
         auto sig_len = static_cast<int64_t>(params.context_before + params.context_after);
         auto kmer_len = params.bases_after + params.bases_before + 1;
@@ -154,7 +154,7 @@ at::Tensor ModBaseCaller::call_chunks(size_t model_id,
     auto& caller_data = m_caller_data[model_id];
     auto task = std::make_shared<ModBaseTask>(input_sigs.to(m_options.device()),
                                               input_seqs.to(m_options.device()), num_chunks);
-#if DORADO_GPU_BUILD && !defined(__APPLE__)
+#if DORADO_CUDA_BUILD
     if (m_options.device().is_cuda()) {
         task->stream = c10::cuda::getCurrentCUDAStream(m_options.device().index());
     }
@@ -194,7 +194,7 @@ void ModBaseCaller::restart() {
 stats::NamedStats ModBaseCaller::sample_stats() const {
     stats::NamedStats stats;
     stats["batches_called"] = double(m_num_batches_called);
-#if DORADO_GPU_BUILD && !defined(__APPLE__)
+#if DORADO_CUDA_BUILD
     stats["model_ms"] = double(m_model_ms);
 #endif
     return stats;
@@ -226,7 +226,7 @@ void ModBaseCaller::modbase_task_thread_fn(size_t model_id) {
         caller_data->input_queue.pop_back();
         input_lock.unlock();
 
-#if DORADO_GPU_BUILD && !defined(__APPLE__)
+#if DORADO_CUDA_BUILD
         // If task->stream is set, sets the current stream to task->stream, and the current device to
         // the device associated with the stream. Resets both to their prior state on destruction
         c10::cuda::OptionalCUDAStreamGuard stream_guard(task->stream);
@@ -235,7 +235,7 @@ void ModBaseCaller::modbase_task_thread_fn(size_t model_id) {
         std::unique_lock<std::mutex> task_lock(task->mut);
         stats::Timer timer;
         task->out = caller_data->module_holder->forward(task->input_sigs, task->input_seqs);
-#if DORADO_GPU_BUILD && !defined(__APPLE__)
+#if DORADO_CUDA_BUILD
         if (task->stream.has_value()) {
             task->stream->synchronize();
         }

@@ -5,12 +5,12 @@
 namespace dorado::utils {
 
 struct DefaultParameters {
-#if !DORADO_GPU_BUILD
-    std::string device{"cpu"};
-#elif defined(__APPLE__)
+#if DORADO_CUDA_BUILD
+    std::string device{"cuda:all"};
+#elif DORADO_METAL_BUILD
     std::string device{"metal"};
 #else
-    std::string device{"cuda:all"};
+    std::string device{"cpu"};
 #endif
     int batchsize{0};
     int chunksize{10000};

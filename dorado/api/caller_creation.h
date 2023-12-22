@@ -8,12 +8,10 @@
 namespace dorado::basecall {
 struct CRFModelConfig;
 
-#if DORADO_GPU_BUILD
-#ifndef __APPLE__
+#if DORADO_CUDA_BUILD
 class CudaCaller;
-#else
+#elif DORADO_METAL_BUILD
 class MetalCaller;
-#endif
 #endif
 
 }  // namespace dorado::basecall
@@ -24,8 +22,7 @@ class ModBaseCaller;
 
 namespace dorado::api {
 
-#if DORADO_GPU_BUILD
-#ifndef __APPLE__
+#if DORADO_CUDA_BUILD
 std::shared_ptr<basecall::CudaCaller> create_cuda_caller(
         const basecall::CRFModelConfig & model_config,
         int chunk_size,
@@ -33,10 +30,9 @@ std::shared_ptr<basecall::CudaCaller> create_cuda_caller(
         const std::string & device,
         float memory_limit_fraction,
         bool exclusive_gpu_access);
-#else
+#elif DORADO_METAL_BUILD
 std::shared_ptr<basecall::MetalCaller>
 create_metal_caller(const basecall::CRFModelConfig& model_config, int chunk_size, int batch_size);
-#endif
 #endif
 
 std::shared_ptr<modbase::ModBaseCaller> create_modbase_caller(

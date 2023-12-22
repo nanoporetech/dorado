@@ -15,9 +15,9 @@
 #include "utils/SampleSheet.h"
 #include "utils/parameters.h"
 
-#if DORADO_GPU_BUILD && !defined(__APPLE__)
+#if DORADO_CUDA_BUILD
 #include "utils/cuda_utils.h"
-#endif  // DORADO_GPU_BUILD && !defined(__APPLE__)
+#endif
 
 #include <ATen/Functions.h>
 #include <catch2/catch.hpp>
@@ -208,19 +208,17 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
 
     std::string device;
     if (gpu) {
-#if DORADO_GPU_BUILD
-#ifdef __APPLE__
+#if DORADO_METAL_BUILD
         device = "metal";
-#else   // __APPLE__
+#elif DORADO_CUDA_BUILD
         device = "cuda:all";
         auto devices = dorado::utils::parse_cuda_device_string(device);
         if (devices.empty()) {
             SKIP("No CUDA devices found");
         }
-#endif  // __APPLE__
-#else   // DORADO_GPU_BUILD
+#else
         SKIP("Can't test GPU without DORADO_GPU_BUILD");
-#endif  // DORADO_GPU_BUILD
+#endif
     } else {
         // CPU processing is very slow, so reduce the number of test reads we throw at it.
         set_num_reads(5);
@@ -270,19 +268,17 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
     std::string device;
     int batch_size = default_params.remora_batchsize;
     if (gpu) {
-#if DORADO_GPU_BUILD
-#ifdef __APPLE__
+#if DORADO_METAL_BUILD
         device = "metal";
-#else   //__APPLE__
+#elif DORADO_CUDA_BUILD
         device = "cuda:all";
         auto modbase_devices = dorado::utils::parse_cuda_device_string("cuda:all");
         if (modbase_devices.empty()) {
             SKIP("No CUDA devices found");
         }
-#endif  // __APPLE__
-#else   // DORADO_GPU_BUILD
+#else
         SKIP("Can't test GPU without DORADO_GPU_BUILD");
-#endif  // DORADO_GPU_BUILD
+#endif
     } else {
         // CPU processing is very slow, so reduce the number of test reads we throw at it.
         set_num_reads(5);
