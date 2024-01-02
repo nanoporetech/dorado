@@ -573,6 +573,9 @@ test:model_download:linux:x86:focal:
 .mlhub_sre:
   extends:
     - .mlhub
+  needs:
+    - job: build:linux:x86:focal
+      artifacts: false
   script:
     - echo ${MODELS}
     - |
@@ -586,8 +589,8 @@ test:model_download:linux:x86:focal:
               "duplex_models":'${DUPLEX_MODELS}',
               "sre_output":"'${SRE_OUTPUT_ROOT}'/'${CI_COMMIT_SHA}'/",
               "sre_config":"${projectDir}/configs/'${SRE_CONFIG}'",
-              "dorado_branch":"'${CI_COMMIT_SHA}'",
-              "dorado_exe":""
+              "basecaller_mode":"dorado_artifact",
+              "basecaller":"'${CI_COMMIT_SHA}'"
               }
       }' \
       ${MLHUB_TRIGGER_URL}
