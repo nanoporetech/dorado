@@ -37,7 +37,7 @@ TEST_CASE(TEST_TAG " FlowcellCode enumeration", TEST_TAG) {
         CHECK(fcs.size() == 19);
     }
 
-    SECTION("FlowcellCode self consitent") {
+    SECTION("FlowcellCode self consistent") {
         for (const auto& fc : fcs) {
             CHECK(fc.first == flowcell_code(to_string(fc.first)));
         }
