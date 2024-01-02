@@ -41,7 +41,6 @@ std::pair<std::string, barcode_kits::KitInfo> parse_custom_arrangement(
     const toml::value config_toml = toml::parse(arrangement_file);
 
     if (!config_toml.contains("arrangement")) {
-        return {"", barcode_kits::KitInfo{}};
         throw std::runtime_error(
                 "Custom barcode arrangement file must have [arrangement] section.");
     }

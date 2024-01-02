@@ -55,7 +55,8 @@ void HtsReader::read(Pipeline& pipeline, int max_reads) {
             }
         }
         pipeline.push_message(BamPtr(bam_dup1(record.get())));
-        if (max_reads > 0 && ++num_reads >= max_reads) {
+        ++num_reads;
+        if (max_reads > 0 && num_reads >= max_reads) {
             break;
         }
         if (num_reads % 50000 == 0) {

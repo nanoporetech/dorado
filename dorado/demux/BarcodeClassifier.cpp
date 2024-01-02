@@ -118,9 +118,13 @@ std::unordered_map<std::string, dorado::barcode_kits::KitInfo> process_custom_ki
         const std::optional<std::string>& custom_kit) {
     std::unordered_map<std::string, dorado::barcode_kits::KitInfo> kit_map;
     if (custom_kit) {
-        auto [kit_name, kit_info] = demux::parse_custom_arrangement(*custom_kit);
-        if (!kit_name.empty()) {
+        try {
+            auto [kit_name, kit_info] = demux::parse_custom_arrangement(*custom_kit);
             kit_map[kit_name] = kit_info;
+        } catch (const std::runtime_error& e) {
+            // This implies no arrangement information was found. This is okay
+            // since the custom kit may only have scoring information.
+            (void)e;
         }
     }
     return kit_map;

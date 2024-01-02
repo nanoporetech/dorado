@@ -360,29 +360,6 @@ const std::unordered_map<std::string, KitInfo> kit_info_map = {
                   "AE11R_85", "AF11R_86", "AG11R_87", "AH11R_88", "AA12R_89", "AB12R_90",
                   "AC12R_91", "AD12R_92", "AE12R_93", "AF12R_94", "AG12R_95", "AH12R_96"},
          }},
-        {"TWIST-FRONT",
-         {"PGx",
-          false,
-          false,
-          "CATACGAGAT",
-          "GTGACTGGAG",
-          "",
-          "",
-          {"AA01F_01", "AB01F_02", "AC01F_03", "AD01F_04", "AE01F_05", "AF01F_06", "AG01F_07",
-           "AH01F_08", "AA02F_09", "AB02F_10", "AC02F_11", "AD02F_12", "AE02F_13", "AF02F_14",
-           "AG02F_15", "AH02F_16", "AA03F_17", "AB03F_18", "AC03F_19", "AD03F_20", "AE03F_21",
-           "AF03F_22", "AG03F_23", "AH03F_24", "AA04F_25", "AB04F_26", "AC04F_27", "AD04F_28",
-           "AE04F_29", "AF04F_30", "AG04F_31", "AH04F_32", "AA05F_33", "AB05F_34", "AC05F_35",
-           "AD05F_36", "AE05F_37", "AF05F_38", "AG05F_39", "AH05F_40", "AA06F_41", "AB06F_42",
-           "AC06F_43", "AD06F_44", "AE06F_45", "AF06F_46", "AG06F_47", "AH06F_48", "AA07F_49",
-           "AB07F_50", "AC07F_51", "AD07F_52", "AE07F_53", "AF07F_54", "AG07F_55", "AH07F_56",
-           "AA08F_57", "AB08F_58", "AC08F_59", "AD08F_60", "AE08F_61", "AF08F_62", "AG08F_63",
-           "AH08F_64", "AA09F_65", "AB09F_66", "AC09F_67", "AD09F_68", "AE09F_69", "AF09F_70",
-           "AG09F_71", "AH09F_72", "AA10F_73", "AB10F_74", "AC10F_75", "AD10F_76", "AE10F_77",
-           "AF10F_78", "AG10F_79", "AH10F_80", "AA11F_81", "AB11F_82", "AC11F_83", "AD11F_84",
-           "AE11F_85", "AF11F_86", "AG11F_87", "AH11F_88", "AA12F_89", "AB12F_90", "AC12F_91",
-           "AD12F_92", "AE12F_93", "AF12F_94", "AG12F_95", "AH12F_96"},
-          {}}},
 };
 
 const std::unordered_map<std::string, std::string> barcodes = {
@@ -838,6 +815,7 @@ std::string barcode_kits_list_str() {
 
 std::string normalize_barcode_name(const std::string& barcode_name) {
     std::string digits = "";
+    // Normalize using only the digits at the end of the barcode name.
     for (auto rit = barcode_name.rbegin(); rit != barcode_name.rend(); ++rit) {
         if (std::isdigit(static_cast<unsigned char>(*rit))) {
             digits += *rit;
