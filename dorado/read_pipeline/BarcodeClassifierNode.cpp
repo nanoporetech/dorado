@@ -96,11 +96,11 @@ BarcodeClassifierNode::~BarcodeClassifierNode() {
         spdlog::debug("Barcode distribution :");
         size_t unclassified = 0;
         size_t total = 0;
-        for (const auto& [k, v] : m_barcode_count) {
-            spdlog::debug("{} : {}", k, v);
-            total += v;
-            if (k == "unclassified") {
-                unclassified += v;
+        for (const auto& [bc_name, bc_count] : m_barcode_count) {
+            spdlog::debug("{} : {}", bc_name, bc_count);
+            total += bc_count;
+            if (bc_name == "unclassified") {
+                unclassified += bc_count;
             }
         }
         spdlog::debug("Classified rate {}%", (1.f - float(unclassified) / total) * 100.f);

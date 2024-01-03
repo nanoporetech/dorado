@@ -9,7 +9,7 @@ TEST_CASE("Parse custom single ended barcode arrangement", "[barcode_demux]") {
     fs::path data_dir = fs::path(get_data_dir("barcode_demux/custom_barcodes"));
     const auto test_file = data_dir / "test_kit_single_ended.toml";
 
-    auto [kit_name, kit_info] = dorado::demux::parse_custom_arrangement(test_file.string());
+    auto [kit_name, kit_info] = *dorado::demux::parse_custom_arrangement(test_file.string());
 
     CHECK(kit_name == "test_kit_single_ended");
     CHECK(kit_info.barcodes.size() == 4);
@@ -29,7 +29,7 @@ TEST_CASE("Parse double ended barcode arrangement", "[barcode_demux]") {
     fs::path data_dir = fs::path(get_data_dir("barcode_demux/custom_barcodes"));
     const auto test_file = data_dir / "test_kit_double_ended.toml";
 
-    auto [kit_name, kit_info] = dorado::demux::parse_custom_arrangement(test_file.string());
+    auto [kit_name, kit_info] = *dorado::demux::parse_custom_arrangement(test_file.string());
 
     CHECK(kit_name == "test_kit_double_ended");
     CHECK(kit_info.barcodes.size() == 24);
@@ -49,7 +49,7 @@ TEST_CASE("Parse double ended barcode arrangement with different flanks", "[barc
     fs::path data_dir = fs::path(get_data_dir("barcode_demux/custom_barcodes"));
     const auto test_file = data_dir / "test_kit_ends_different_flanks.toml";
 
-    auto [kit_name, kit_info] = dorado::demux::parse_custom_arrangement(test_file.string());
+    auto [kit_name, kit_info] = *dorado::demux::parse_custom_arrangement(test_file.string());
 
     CHECK(kit_name == "test_kit_ends_different_flanks");
     CHECK(kit_info.barcodes.size() == 96);
@@ -69,7 +69,7 @@ TEST_CASE("Parse double ended barcode arrangement with different barcodes", "[ba
     fs::path data_dir = fs::path(get_data_dir("barcode_demux/custom_barcodes"));
     const auto test_file = data_dir / "test_kit_ends_different_barcodes.toml";
 
-    auto [kit_name, kit_info] = dorado::demux::parse_custom_arrangement(test_file.string());
+    auto [kit_name, kit_info] = *dorado::demux::parse_custom_arrangement(test_file.string());
 
     CHECK(kit_name == "test_kit_ends_different_barcodes");
     CHECK(kit_info.barcodes.size() == 12);
