@@ -1,8 +1,7 @@
 #pragma once
 
-#include <torch/torch.h>
-
 #include <cuda_runtime.h>
+#include <torch/torch.h>
 
 #include <mutex>
 #include <string>

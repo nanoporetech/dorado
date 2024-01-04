@@ -126,7 +126,8 @@ std::vector<std::string> parse_cuda_device_string(std::string device_string) {
         return devices;  // empty vector;
     } else if (device_string == "cuda:all" || device_string == "cuda:auto") {
         if (num_devices == 0) {
-            throw std::runtime_error("device string set to " + device_string + " but no CUDA devices available.");
+            throw std::runtime_error("device string set to " + device_string +
+                                     " but no CUDA devices available.");
         }
         for (size_t i = 0; i < num_devices; i++) {
             devices.push_back("cuda:" + std::to_string(i));
@@ -137,8 +138,10 @@ std::vector<std::string> parse_cuda_device_string(std::string device_string) {
                 std::string device_id = x.str();
                 int device_idx = std::stoi(device_id);
                 if (device_idx >= num_devices || device_idx < 0) {
-                    throw std::runtime_error("Invalid CUDA device index \"" + device_id + "\" from device string " + device_string + 
-                        ", there are " + std::to_string(num_devices) + " visible CUDA devices.");
+                    throw std::runtime_error("Invalid CUDA device index \"" + device_id +
+                                             "\" from device string " + device_string +
+                                             ", there are " + std::to_string(num_devices) +
+                                             " visible CUDA devices.");
                 }
                 devices.push_back("cuda:" + device_id);
             }
@@ -159,23 +162,24 @@ std::vector<CUDADeviceInfo> get_cuda_device_info(std::string device_string) {
     std::set<int> device_ids;
     if (device_string.substr(0, 5) != "cuda:") {
         // Nothing to add to device_ids
-    }
-    else if (device_string == "cuda:all" || device_string == "cuda:auto") {
+    } else if (device_string == "cuda:all" || device_string == "cuda:auto") {
         if (num_devices == 0) {
-            throw std::runtime_error("device string set to " + device_string + " but no CUDA devices available.");
+            throw std::runtime_error("device string set to " + device_string +
+                                     " but no CUDA devices available.");
         }
         for (int i = 0; i < int(num_devices); i++) {
             device_ids.insert(i);
         }
-    }
-    else {
+    } else {
         while (std::regex_search(device_string, m, e)) {
             for (auto x : m) {
                 std::string device_id = x.str();
                 int device_idx = std::stoi(device_id);
                 if (device_idx >= num_devices || device_idx < 0) {
-                    throw std::runtime_error("Invalid CUDA device index \"" + device_id + "\" from device string " + device_string +
-                        ", there are " + std::to_string(num_devices) + " visible CUDA devices.");
+                    throw std::runtime_error("Invalid CUDA device index \"" + device_id +
+                                             "\" from device string " + device_string +
+                                             ", there are " + std::to_string(num_devices) +
+                                             " visible CUDA devices.");
                 }
                 device_ids.insert(device_idx);
             }
@@ -187,11 +191,13 @@ std::vector<CUDADeviceInfo> get_cuda_device_info(std::string device_string) {
     for (int device_id = 0; device_id < int(num_devices); device_id++) {
         CUDADeviceInfo device_info;
         device_info.device_id = device_id;
-        
+
         cudaSetDevice(device_id);
         cudaMemGetInfo(&device_info.free_mem, &device_info.total_mem);
-        cudaDeviceGetAttribute(&device_info.compute_cap_major, cudaDevAttrComputeCapabilityMajor, device_id);
-        cudaDeviceGetAttribute(&device_info.compute_cap_minor, cudaDevAttrComputeCapabilityMinor, device_id);
+        cudaDeviceGetAttribute(&device_info.compute_cap_major, cudaDevAttrComputeCapabilityMajor,
+                               device_id);
+        cudaDeviceGetAttribute(&device_info.compute_cap_minor, cudaDevAttrComputeCapabilityMinor,
+                               device_id);
         cudaGetDeviceProperties(&device_info.device_properties, device_id);
 
         device_info.in_use = device_ids.find(device_id) != device_ids.end();
@@ -201,7 +207,6 @@ std::vector<CUDADeviceInfo> get_cuda_device_info(std::string device_string) {
 
     return results;
 }
-
 
 std::unique_lock<std::mutex> acquire_gpu_lock(int gpu_index, bool use_lock) {
     static std::vector<std::mutex> gpu_mutexes(torch::cuda::device_count());
