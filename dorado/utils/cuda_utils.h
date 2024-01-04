@@ -2,6 +2,8 @@
 
 #include <torch/torch.h>
 
+#include <cuda_runtime.h>
+
 #include <mutex>
 #include <string>
 #include <vector>
@@ -16,8 +18,21 @@ namespace dorado::utils {
 std::unique_lock<std::mutex> acquire_gpu_lock(int gpu_index, bool use_lock);
 
 // Given a string representing cuda devices (e.g "cuda:0,1,3") returns a vector of strings, one for
-// each device (e.g ["cuda:0", "cuda:2", ..., "cuda:7"]
+// each device (e.g ["cuda:0", "cuda:2", ..., "cuda:7"]. This function will validate that the device IDs
+// exist and will raise an exception if there is any issue with the string.
 std::vector<std::string> parse_cuda_device_string(std::string device_string);
+
+struct CUDADeviceInfo {
+    size_t free_mem, total_mem;
+    int device_id;
+    int compute_cap_major, compute_cap_minor;
+    cudaDeviceProp device_properties;
+    bool in_use;
+};
+
+// Given a string representing cuda devices (e.g "cuda:0,1,3") returns a vector of CUDADeviceInfo for all
+// visible devices on the host machine, with information on whether they are in use or not.
+std::vector<CUDADeviceInfo> get_cuda_device_info(std::string device_string);
 
 // Reports the amount of available memory (in bytes) for a given device.
 size_t available_memory(torch::Device device);
