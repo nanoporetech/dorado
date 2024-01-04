@@ -137,7 +137,7 @@ std::vector<std::string> parse_cuda_device_string(std::string device_string) {
             for (auto x : m) {
                 std::string device_id = x.str();
                 int device_idx = std::stoi(device_id);
-                if (device_idx >= num_devices || device_idx < 0) {
+                if (device_idx >= int(num_devices) || device_idx < 0) {
                     throw std::runtime_error("Invalid CUDA device index \"" + device_id +
                                              "\" from device string " + device_string +
                                              ", there are " + std::to_string(num_devices) +
@@ -175,7 +175,7 @@ std::vector<CUDADeviceInfo> get_cuda_device_info(std::string device_string) {
             for (auto x : m) {
                 std::string device_id = x.str();
                 int device_idx = std::stoi(device_id);
-                if (device_idx >= num_devices || device_idx < 0) {
+                if (device_idx >= int(num_devices) || device_idx < 0) {
                     throw std::runtime_error("Invalid CUDA device index \"" + device_id +
                                              "\" from device string " + device_string +
                                              ", there are " + std::to_string(num_devices) +
