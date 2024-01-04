@@ -2,6 +2,7 @@
 
 #include "models/models.h"
 #include "read_pipeline/ReadPipeline.h"
+#include "utils/PostCondition.h"
 #include "utils/compat_utils.h"
 #include "utils/time_utils.h"
 #include "utils/types.h"
@@ -602,6 +603,15 @@ uint16_t DataLoader::get_sample_rate(std::string data_path, bool recursive_file_
                     spdlog::error("Failed to open file {}: {}", file_path.c_str(),
                                   pod5_get_error_string());
                 } else {
+                    auto free_pod5 = [&]() {
+                        if (pod5_close_and_free_reader(file) != POD5_OK) {
+                            spdlog::error("Failed to close and free POD5 reader for file {}",
+                                          file_path.c_str());
+                        }
+                    };
+
+                    auto post = utils::PostCondition(free_pod5);
+
                     // First get the run info count
                     run_info_index_t run_info_count;
                     if (pod5_get_file_run_info_count(file, &run_info_count) != POD5_OK) {
@@ -626,11 +636,6 @@ uint16_t DataLoader::get_sample_rate(std::string data_path, bool recursive_file_
                                     file_path.c_str());
                         }
                     }
-                }
-
-                if (pod5_close_and_free_reader(file) != POD5_OK) {
-                    spdlog::error("Failed to close and free POD5 reader for file {}",
-                                  file_path.c_str());
                 }
             } else if (ext == ".fast5") {
                 H5Easy::File file(entry.path().string(), H5Easy::File::ReadOnly);
@@ -695,16 +700,21 @@ std::vector<models::ChemistryKey> DataLoader::get_sequencing_chemistry(
                 spdlog::error("Failed to open file {}: {}", file_path.c_str(),
                               pod5_get_error_string());
             } else {
+                auto free_pod5 = [&]() {
+                    if (pod5_close_and_free_reader(file) != POD5_OK) {
+                        spdlog::error("Failed to close and free POD5 reader for file {}",
+                                      file_path.c_str());
+                    }
+                };
+
+                auto post = utils::PostCondition(free_pod5);
+
                 // First get the run info count
                 run_info_index_t run_info_count;
                 if (pod5_get_file_run_info_count(file, &run_info_count) != POD5_OK) {
                     spdlog::error("Failed to fetch POD5 run info count for file {} : {}",
                                   file_path.c_str(), pod5_get_error_string());
 
-                    if (pod5_close_and_free_reader(file) != POD5_OK) {
-                        spdlog::error("Failed to close and free POD5 reader for file {}",
-                                      file_path.c_str());
-                    }
                     continue;
                 }
 
@@ -735,10 +745,6 @@ std::vector<models::ChemistryKey> DataLoader::get_sequencing_chemistry(
                                 "{}",
                                 file_path.c_str(), ri_idx);
                     }
-                }
-                if (pod5_close_and_free_reader(file) != POD5_OK) {
-                    spdlog::error("Failed to close and free POD5 reader for file {}",
-                                  file_path.c_str());
                 }
             };
         }
@@ -771,6 +777,14 @@ void DataLoader::load_pod5_reads_from_file_by_read_ids(const std::string& path,
         spdlog::error("Failed to open file {}: {}", path, pod5_get_error_string());
         return;
     }
+
+    auto free_pod5 = [&]() {
+        if (pod5_close_and_free_reader(file) != POD5_OK) {
+            spdlog::error("Failed to close and free POD5 reader for file {}", path.c_str());
+        }
+    };
+
+    auto post = utils::PostCondition(free_pod5);
 
     std::vector<uint8_t> read_id_array(POD5_READ_ID_SIZE * read_ids.size());
     for (size_t i = 0; i < read_ids.size(); i++) {
@@ -835,9 +849,6 @@ void DataLoader::load_pod5_reads_from_file_by_read_ids(const std::string& path,
         }
 
         row_offset += traversal_batch_counts[batch_index];
-    }
-    if (pod5_close_and_free_reader(file) != POD5_OK) {
-        spdlog::error("Failed to close and free POD5 reader");
     }
 }
 
