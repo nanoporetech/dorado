@@ -125,10 +125,6 @@ std::vector<std::string> parse_cuda_device_string(std::string device_string) {
     if (device_string.substr(0, 5) != "cuda:") {
         return devices;  // empty vector;
     } else if (device_string == "cuda:all" || device_string == "cuda:auto") {
-        if (num_devices == 0) {
-            throw std::runtime_error("device string set to " + device_string +
-                                     " but no CUDA devices available.");
-        }
         for (size_t i = 0; i < num_devices; i++) {
             devices.push_back("cuda:" + std::to_string(i));
         }
