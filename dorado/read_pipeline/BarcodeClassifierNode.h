@@ -5,7 +5,9 @@
 #include "utils/types.h"
 
 #include <atomic>
+#include <map>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -46,6 +48,11 @@ private:
     void barcode(SimplexRead& read);
 
     void terminate_impl();
+
+    // Track how many reads were classified as each barcode for debugging
+    // purposes.
+    std::map<std::string, std::atomic<size_t>> m_barcode_count;
+    std::mutex m_barcode_count_mutex;
 };
 
 }  // namespace dorado

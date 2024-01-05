@@ -1,6 +1,7 @@
 #pragma once
 
 #include "utils/stats.h"
+#include "utils/string_utils.h"
 #include "utils/tty_utils.h"
 
 #ifdef WIN32
@@ -69,6 +70,21 @@ public:
             rate_str << std::scientific << m_num_barcodes_demuxed / (duration / 1000.0);
             spdlog::info("> {} reads demuxed @ classifications/s: {}", m_num_barcodes_demuxed,
                          rate_str.str());
+            // Report how many reads were classified into each
+            // barcode.
+            if (spdlog::get_level() <= spdlog::level::debug) {
+                spdlog::debug("Barcode distribution :");
+                size_t unclassified = 0;
+                size_t total = 0;
+                for (const auto& [bc_name, bc_count] : m_barcode_count) {
+                    spdlog::debug("{} : {}", bc_name, bc_count);
+                    total += bc_count;
+                    if (bc_name == "unclassified") {
+                        unclassified += bc_count;
+                    }
+                }
+                spdlog::debug("Classified rate {}%", (1.f - float(unclassified) / total) * 100.f);
+            }
         }
     }
 
@@ -133,6 +149,17 @@ public:
             std::cerr << "\r> Output records written: " << m_num_simplex_reads_written;
             std::cerr << "\r";
         }
+
+        // Collect per barcode stats.
+        if (m_num_barcodes_demuxed > 0 && (spdlog::get_level() <= spdlog::level::debug)) {
+            for (const auto& [stat, val] : stats) {
+                const std::string prefix = "BarcodeClassifierNode.bc.";
+                if (utils::starts_with(stat, prefix)) {
+                    auto bc_name = stat.substr(prefix.length());
+                    m_barcode_count[bc_name] = static_cast<int>(val);
+                }
+            }
+        }
     }
 
 private:
@@ -149,6 +176,8 @@ private:
     int m_num_barcodes_demuxed{0};
 
     int m_num_reads_expected;
+
+    std::map<std::string, size_t> m_barcode_count;
 
     std::chrono::time_point<std::chrono::system_clock> m_initialization_time;
     std::chrono::time_point<std::chrono::system_clock> m_end_time;

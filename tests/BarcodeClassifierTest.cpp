@@ -417,3 +417,15 @@ TEST_CASE("BarcodeClassifier: test custom kit with double ended barcode", TEST_G
         }
     }
 }
+
+TEST_CASE(
+        "BarcodeClassifier: Fail if no kit name is passed and custom kit doesn't contain "
+        "arrangement",
+        TEST_GROUP) {
+    const fs::path data_dir = fs::path(get_data_dir("barcode_demux/custom_barcodes"));
+    const auto kit_file = data_dir / "scoring_params.toml";
+
+    CHECK_THROWS_WITH(
+            demux::BarcodeClassifier({}, kit_file.string(), std::nullopt),
+            "Either custom kit must include kit arrangement or a kit name needs to be passed in.");
+}
