@@ -86,26 +86,7 @@ void BarcodeClassifierNode::restart() {
     start_threads();
 }
 
-BarcodeClassifierNode::~BarcodeClassifierNode() {
-    terminate_impl();
-    // Report how many reads were classified into each
-    // barcode.
-    static bool done = false;
-    if (!done && (spdlog::get_level() <= spdlog::level::debug)) {
-        done = !done;
-        spdlog::debug("Barcode distribution :");
-        size_t unclassified = 0;
-        size_t total = 0;
-        for (const auto& [bc_name, bc_count] : m_barcode_count) {
-            spdlog::debug("{} : {}", bc_name, bc_count);
-            total += bc_count;
-            if (bc_name == "unclassified") {
-                unclassified += bc_count;
-            }
-        }
-        spdlog::debug("Classified rate {}%", (1.f - float(unclassified) / total) * 100.f);
-    }
-}
+BarcodeClassifierNode::~BarcodeClassifierNode() { terminate_impl(); }
 
 void BarcodeClassifierNode::worker_thread() {
     Message message;
@@ -194,6 +175,12 @@ void BarcodeClassifierNode::barcode(SimplexRead& read) {
 stats::NamedStats BarcodeClassifierNode::sample_stats() const {
     auto stats = stats::from_obj(m_work_queue);
     stats["num_barcodes_demuxed"] = m_num_records.load();
+    {
+        for (const auto& [bc_name, bc_count] : m_barcode_count) {
+            std::string key = "bc." + bc_name;
+            stats[key] = static_cast<float>(bc_count);
+        }
+    }
     return stats;
 }
 
