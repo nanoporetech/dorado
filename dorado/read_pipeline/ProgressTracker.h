@@ -1,6 +1,7 @@
 #pragma once
 
 #include "utils/stats.h"
+#include "utils/string_utils.h"
 #include "utils/tty_utils.h"
 
 #ifdef WIN32
@@ -153,7 +154,7 @@ public:
         if (m_num_barcodes_demuxed > 0 && (spdlog::get_level() <= spdlog::level::debug)) {
             for (const auto& [stat, val] : stats) {
                 const std::string prefix = "BarcodeClassifierNode.bc.";
-                if (stat.find(prefix) != std::string::npos) {
+                if (utils::starts_with(stat, prefix)) {
                     auto bc_name = stat.substr(prefix.length());
                     m_barcode_count[bc_name] = static_cast<int>(val);
                 }
