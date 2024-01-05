@@ -136,6 +136,7 @@ void AdapterDetectorNode::process_read(SimplexRead& read) {
             return;
         }
         Trimmer::trim_sequence(read, trim_interval);
+        read.read_common.adapter_trim_interval = trim_interval;
     }
     m_num_records++;
 }
