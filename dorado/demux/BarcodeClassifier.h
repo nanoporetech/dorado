@@ -54,6 +54,9 @@ private:
 
     const dorado::barcode_kits::KitInfo& get_kit_info(const std::string& kit_name) const;
     const std::string& get_barcode_sequence(const std::string& barcode_name) const;
+
+    int m_left_buffer;
+    int m_right_buffer;
 };
 
 }  // namespace demux
