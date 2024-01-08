@@ -132,8 +132,10 @@ SignalNormalisationParams parse_signal_normalisation_params(const toml::value &c
     if (config_toml.contains("standardisation")) {
         const auto &norm = toml::find(config_toml, "standardisation");
         params.standarisation.standardise = toml::find<int>(norm, "standardise") > 0;
-        params.standarisation.mean = toml::find<float>(norm, "mean");
-        params.standarisation.stdev = toml::find<float>(norm, "stdev");
+        if (params.standarisation.standardise) {
+            params.standarisation.mean = toml::find<float>(norm, "mean");
+            params.standarisation.stdev = toml::find<float>(norm, "stdev");
+        }
 
         if (params.standarisation.standardise && params.strategy != ScalingStrategy::PA) {
             throw std::runtime_error(
