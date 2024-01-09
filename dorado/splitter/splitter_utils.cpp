@@ -80,6 +80,9 @@ SimplexReadPtr subread(const SimplexRead& read,
                        subread->read_common.get_raw_data_samples());
     }
 
+    subread->read_common.barcoding_info = read.read_common.barcoding_info;
+    subread->read_common.adapter_info = read.read_common.adapter_info;
+
     // Initialize the subreads previous and next reads with the parent's ids.
     // These are updated at the end when all subreads are available.
     subread->prev_read = read.prev_read;
