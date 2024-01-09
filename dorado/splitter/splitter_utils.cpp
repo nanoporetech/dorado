@@ -37,8 +37,6 @@ SimplexReadPtr subread(const SimplexRead& read,
 
     auto subread = utils::shallow_copy_read(read);
 
-    subread->read_common.read_tag = read.read_common.read_tag;
-    subread->read_common.client_info = read.read_common.client_info;
     subread->read_common.raw_data = subread->read_common.raw_data.index(
             {at::indexing::Slice(signal_range.first, signal_range.second)});
     subread->read_common.attributes.read_number = -1;
@@ -79,9 +77,6 @@ SimplexReadPtr subread(const SimplexRead& read,
                subread->read_common.moves.size() * stride ==
                        subread->read_common.get_raw_data_samples());
     }
-
-    subread->read_common.barcoding_info = read.read_common.barcoding_info;
-    subread->read_common.adapter_info = read.read_common.adapter_info;
 
     // Initialize the subreads previous and next reads with the parent's ids.
     // These are updated at the end when all subreads are available.
