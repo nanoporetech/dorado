@@ -1,14 +1,23 @@
 #include "utils/trim.h"
 
+#include "TestUtils.h"
+#include "demux/Trimmer.h"
+#include "read_pipeline/HtsReader.h"
+
 #include <ATen/ATen.h>
 #include <catch2/catch.hpp>
+#include <htslib/sam.h>
 
+#include <filesystem>
 #include <random>
 
+using Catch::Matchers::Equals;
 using Slice = at::indexing::Slice;
 using namespace dorado;
 
 #define TEST_GROUP "[utils][trim]"
+
+namespace fs = std::filesystem;
 
 TEST_CASE("Test trim signal", TEST_GROUP) {
     constexpr int signal_len = 2000;
@@ -160,4 +169,25 @@ TEST_CASE("Test trim mod base info", TEST_GROUP) {
         CHECK(str == "");
         CHECK(probs.size() == 0);
     }
+}
+
+// This test case is useful because trimming of reverse strand requires
+// the modbase tags to be treated differently since they are written
+// relative to the original sequence that was basecalled.
+TEST_CASE("Test trim of reverse strand record in BAM", TEST_GROUP) {
+    const auto data_dir = fs::path(get_data_dir("trimmer"));
+    const auto bam_file = data_dir / "reverse_strand_record.bam";
+    HtsReader reader(bam_file.string(), std::nullopt);
+    reader.read();
+    auto &record = reader.record;
+
+    Trimmer trimmer;
+    const std::pair<int, int> trim_interval = {72, 647};
+    auto trimmed_record = trimmer.trim_sequence(std::move(record), trim_interval);
+    auto seqlen = trimmed_record->core.l_qseq;
+
+    CHECK(seqlen == (trim_interval.second - trim_interval.first));
+    CHECK(bam_aux2i(bam_aux_get(trimmed_record.get(), "MN")) == seqlen);
+    CHECK_THAT(bam_aux2Z(bam_aux_get(trimmed_record.get(), "MM")),
+               Equals("C+h?,28,24;C+m?,28,24;"));
 }
