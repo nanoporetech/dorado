@@ -16,9 +16,6 @@
 #include <utility>
 #include <vector>
 
-// TEMPORARY
-#include <spdlog/spdlog.h>
-
 namespace dorado {
 
 // Base class for an object which consumes messages as part of the processing pipeline.
@@ -60,7 +57,7 @@ protected:
     void terminate_input_queue() { m_work_queue.terminate(); }
 
     // Allows inputs again.
-    void restart_input_queue() { m_work_queue.restart(); }
+    void start_input_queue() { m_work_queue.restart(); }
 
     // Sends message to the designated sink.
     template <typename Msg>
@@ -104,10 +101,10 @@ protected:
         if (!m_input_threads.empty()) {
             throw std::runtime_error("Input threads already started");
         }
+
         // The queue must be in started state before we attempt to pop an item,
         // otherwise the pop will fail and the thread will terminate.
-        // TODO -- rename restart_input_queue to start_input_queue.  It's idempotent.
-        restart_input_queue();
+        start_input_queue();
         for (int i = 0; i < m_num_input_threads; ++i) {
             // TODO -- get rid of unique_ptr?
             std::unique_ptr<std::thread> input_thread =

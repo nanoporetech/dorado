@@ -542,7 +542,7 @@ void PairingNode::terminate_impl() {
 }
 
 void PairingNode::restart() {
-    restart_input_queue();
+    start_input_queue();
     start_threads();
 }
 

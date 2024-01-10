@@ -367,7 +367,6 @@ void BasecallerNode::restart() {
     for (auto &runner : m_model_runners) {
         runner->restart();
     }
-    restart_input_queue();
     m_chunks_in.restart();
     m_processed_chunks.restart();
     start_threads();

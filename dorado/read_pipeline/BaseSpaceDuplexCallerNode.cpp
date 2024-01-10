@@ -206,7 +206,7 @@ void BaseSpaceDuplexCallerNode::terminate_impl() {
 }
 
 void BaseSpaceDuplexCallerNode::restart() {
-    restart_input_queue();
+    start_input_queue();
     start_threads();
 }
 
